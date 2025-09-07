@@ -1,0 +1,106 @@
+// src/ui/SonarrActionGroup.tsx
+import React from 'react';
+import Button from '@/ui/Button';
+import { GearIcon, ExternalLinkIcon } from '@radix-ui/react-icons';
+import { useExtensionOptions } from '@/hooks/use-api-queries';
+
+type Status = 'LOADING' | 'IN_SONARR' | 'NOT_IN_SONARR' | 'ERROR' | 'ADDING';
+
+interface SonarrActionGroupProps {
+  status: Status;
+  seriesTitleSlug?: string | undefined;
+  animeTitle: string;
+  resolvedSearchTerm: string;
+  tvdbId: number | null | undefined;
+  onQuickAdd: () => void;
+  onOpenModal: () => void;
+  portalContainer?: HTMLElement | undefined;
+}
+
+const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
+  status,
+  seriesTitleSlug,
+  resolvedSearchTerm,
+  tvdbId,
+  onQuickAdd,
+  onOpenModal,
+  portalContainer
+}) => {
+  const { data: options } = useExtensionOptions();
+
+  const getButtonText = () => {
+    switch (status) {
+      case 'LOADING': return 'Checking Sonarr...';
+      case 'IN_SONARR': return 'In Sonarr';
+      case 'ADDING': return 'Adding...';
+      case 'ERROR': return 'Error';
+      default: return 'Add to Sonarr';
+    }
+  };
+
+  const isIdle = status === 'NOT_IN_SONARR';
+  const isInSonarr = status === 'IN_SONARR';
+  const isLoading = status === 'LOADING' || status === 'ADDING';
+  
+  return (
+    <div className="grid grid-cols-[1fr_auto] gap-4 items-start w-full">
+        <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group">
+            {/* Main Action Button */}
+            <Button
+                size="md"
+                onClick={onQuickAdd}
+                isLoading={isLoading}
+                disabled={!isIdle || tvdbId === null}
+                className="flex-1 rounded-none h-[35px] text-[14px] text-text-primary"
+                loadingText={getButtonText()}
+            >
+                {tvdbId === null ? "Cannot add" : getButtonText()}
+            </Button>
+            {/* Settings Button */}
+            <Button
+                size="icon"
+                onClick={onOpenModal}
+                disabled={!isIdle || tvdbId === null}
+                className="relative rounded-none h-[35px] w-[35px] bg-[rgb(var(--color-blue-600))]"
+                aria-label="Advanced options"
+            >
+                <div className="absolute inset-0 bg-white opacity-10"></div>
+                <GearIcon className="relative h-5 w-5" />
+            </Button>
+        </div>
+
+        {/* External Link Button */}
+        {options?.sonarrUrl && (
+          <Button
+            asChild
+            size="icon"
+            variant="primary"
+            tooltip="Open in Sonarr"
+            portalContainer={portalContainer}
+            className="h-[35px] w-[35px] rounded-[3px]"
+            onClick={() => {
+              if (isInSonarr && seriesTitleSlug) {
+                console.log(`[SonarrActionGroup] Redirecting to Sonarr series page for slug: ${seriesTitleSlug}`);
+              } else {
+                console.log(`[SonarrActionGroup] Redirecting to Sonarr Add New page with term: ${resolvedSearchTerm}`);
+              }
+            }}
+          >
+            <a
+              href={
+                isInSonarr && seriesTitleSlug
+                  ? `${options.sonarrUrl.replace(/\/$/, '')}/series/${seriesTitleSlug}`
+                  : `${options.sonarrUrl.replace(/\/$/, '')}/add/new?term=${encodeURIComponent(resolvedSearchTerm)}`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLinkIcon />
+            </a>
+          </Button>
+        )}
+    </div>
+  );
+};
+
+export default SonarrActionGroup;
