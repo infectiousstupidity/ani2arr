@@ -10,37 +10,23 @@ import './style.css';
 
 import type { ContentScriptContext, ShadowRootContentScriptUi } from 'wxt/client';
 
-/**
- * Requirements
- * - Renders directly under AniList “Add to List” with identical width/spacing.
- * - Never overlaps the `.rankings` area (sidebar). Works when rankings are missing.
- * - Reliable on SPA navigation AND hard refresh / opening a URL in a new tab.
- * - Survives AniList re-renders that replace the hero header.
- */
-
-/* ============================================================================
- * Constants
- * ========================================================================== */
-
 const queryClient = new QueryClient();
+
+const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
 
 const ANIME_PAGE = new MatchPattern('*://anilist.co/anime/*');
 
-// Left column (hero) selectors
+// AniList DOM
 const ACTIONS_SELECTOR = '.header .cover-wrap .actions, .cover-wrap .actions';
-const LIST_ROW_SELECTOR = '.actions .list'; // full row: "Add to List" + caret
-
-// Sidebar selector (for rankings/data)
+const LIST_ROW_SELECTOR = '.actions .list';
 const SIDEBAR_SELECTOR = '.content.container .sidebar';
 
-// Our DOM ids
+// Our ids
 const UI_NAME = 'kitsunarr-anime-page-ui';
-const ANCHOR_ID = 'kitsunarr-actions-anchor'; // WXT anchor
-const SPACER_ID = 'kitsunarr-actions-spacer'; // top of sidebar spacer
+const ANCHOR_ID = 'kitsunarr-actions-anchor';
+const SPACER_ID = 'kitsunarr-actions-spacer';
 
-/* ============================================================================
- * DOM Utilities
- * ========================================================================== */
+/* --------------------------------- Utils --------------------------------- */
 
 function waitForElement(selector: string, root: ParentNode = document): Promise<Element> {
   return new Promise((resolve) => {
@@ -59,7 +45,10 @@ function waitForElement(selector: string, root: ParentNode = document): Promise<
 
 const q = <T extends Element>(sel: string) => document.querySelector<T>(sel);
 
-/** Create/ensure a persistent anchor directly under the hero actions block. */
+/**
+ * Insert our anchor before the native "Add to List" row and make it span both grid columns.
+ * No explicit width - let AniList’s grid size it exactly like their rows.
+ */
 function ensureActionsAnchor(): HTMLElement | null {
   const actions = q<HTMLElement>(ACTIONS_SELECTOR);
   if (!actions) return null;
@@ -68,26 +57,28 @@ function ensureActionsAnchor(): HTMLElement | null {
   if (!anchor) {
     anchor = document.createElement('div');
     anchor.id = ANCHOR_ID;
+
+    // Make it behave as an Actions-row: full width across both grid tracks
     anchor.style.display = 'block';
-    anchor.style.marginTop = '12px'; // match AniList vertical rhythm
-    anchor.style.marginBottom = '0';
-    actions.appendChild(anchor);
+    anchor.style.gridColumn = '1 / -1';
+    anchor.style.justifySelf = 'stretch';
+    anchor.style.margin = '0';
+    anchor.style.width = 'auto';
+    anchor.style.maxWidth = 'none';
+
+    const listRow = actions.querySelector(LIST_ROW_SELECTOR);
+    if (listRow) actions.insertBefore(anchor, listRow);
+    else actions.prepend(anchor);
   }
   return anchor;
 }
 
-/**
- * Anchor keeper.
- * AniList re-renders the hero; this recreates our anchor whenever it disappears.
- * Run BEFORE creating/mounting the WXT UI so autoMount() has a target.
- */
 function startAnchorKeeper(): () => void {
   const heroRoot =
     q<HTMLElement>('.header .cover-wrap') ??
     q<HTMLElement>('.cover-wrap') ??
     document.body;
 
-  // Insert immediately if possible.
   ensureActionsAnchor();
 
   const mo = new MutationObserver(() => {
@@ -98,7 +89,6 @@ function startAnchorKeeper(): () => void {
   return () => mo.disconnect();
 }
 
-/** Ensure a single spacer at the very top of the sidebar (above `.rankings` when present). */
 function ensureSidebarSpacer(): HTMLElement | null {
   const sidebar = q<HTMLElement>(SIDEBAR_SELECTOR);
   if (!sidebar) return null;
@@ -117,25 +107,18 @@ function ensureSidebarSpacer(): HTMLElement | null {
   return spacer;
 }
 
-/** Match anchor width to the full native list row width. */
-function syncAnchorWidth(anchor: HTMLElement): void {
-  const row = q<HTMLElement>(LIST_ROW_SELECTOR);
-  const w = row?.getBoundingClientRect().width;
-  const px = w && Number.isFinite(w) ? `${Math.round(w)}px` : '240px';
-  anchor.style.width = px;
-  anchor.style.maxWidth = px;
-}
-
-/** Make sidebar start visually below our injected controls. */
-function syncSpacerHeight(host: HTMLElement, spacer: HTMLElement | null): void {
+/** Sidebar offset = total height of the entire actions block (ours + native). */
+function syncSidebarOffset(spacer: HTMLElement | null): void {
   if (!spacer) return;
-  const h = Math.ceil(host.getBoundingClientRect().height || 0);
-  spacer.style.height = `${h + 8}px`; // small breathing room
+  const actions = q<HTMLElement>(ACTIONS_SELECTOR);
+  const h = Math.ceil(actions?.getBoundingClientRect().height || 0);
+  spacer.style.height = `${h + 8}px`;
 }
 
-/** After mount: keep width/spacer synced to layout changes. */
+/**
+ * Keep sidebar spacer and favourite size synced. Do not touch AniList layout.
+ */
 function attachSizeSync(host: HTMLElement): () => void {
-  // Host fills the anchor; anchor carries spacing/width.
   Object.assign(host.style, {
     display: 'block',
     position: 'static',
@@ -145,47 +128,44 @@ function attachSizeSync(host: HTMLElement): () => void {
     margin: '0',
   });
 
-  const anchor = q<HTMLElement>(`#${ANCHOR_ID}`);
   const spacer = ensureSidebarSpacer();
 
-  if (anchor) syncAnchorWidth(anchor);
-  syncSpacerHeight(host, spacer);
+  const sync = () => {
+    // publish favourite size for our icon button
+    const fav = q<HTMLElement>('.actions .favourite');
+    const favBox = fav?.getBoundingClientRect();
+    const favSide = favBox ? Math.round(Math.max(favBox.width, favBox.height)) : 35;
+    host.style.setProperty('--kitsunarr-fav-size', `${favSide}px`);
 
-  // Observe the native list row for width changes (fonts/responsive/reflows).
-  const listRow = q<HTMLElement>(LIST_ROW_SELECTOR);
-  const roRow = listRow
-    ? new ResizeObserver(() => {
-        const a = q<HTMLElement>(`#${ANCHOR_ID}`);
-        if (a) syncAnchorWidth(a);
-        syncSpacerHeight(host, q<HTMLElement>(`#${SPACER_ID}`));
-      })
-    : null;
-  if (listRow && roRow) roRow.observe(listRow);
+    syncSidebarOffset(spacer);
+  };
 
-  // Observe our host for height changes (button state changes).
-  const roHost = new ResizeObserver(() => {
-    syncSpacerHeight(host, q<HTMLElement>(`#${SPACER_ID}`));
-  });
+  sync();
+
+  const fav = q<HTMLElement>('.actions .favourite');
+  const actions = q<HTMLElement>(ACTIONS_SELECTOR);
+
+  const roFav = fav ? new ResizeObserver(sync) : null;
+  if (fav && roFav) roFav.observe(fav);
+
+  const roHost = new ResizeObserver(sync);
   roHost.observe(host);
 
-  const onResize = () => {
-    const a = q<HTMLElement>(`#${ANCHOR_ID}`);
-    if (a) syncAnchorWidth(a);
-    syncSpacerHeight(host, q<HTMLElement>(`#${SPACER_ID}`));
-  };
-  window.addEventListener('resize', onResize);
+  const roActions = actions ? new ResizeObserver(sync) : null;
+  if (actions && roActions) roActions.observe(actions);
+
+  window.addEventListener('resize', sync);
 
   return () => {
-    roRow?.disconnect();
+    roFav?.disconnect();
     roHost.disconnect();
-    window.removeEventListener('resize', onResize);
+    roActions?.disconnect();
+    window.removeEventListener('resize', sync);
     q<HTMLElement>(`#${SPACER_ID}`)?.remove();
   };
 }
 
-/* ============================================================================
- * React UI
- * ========================================================================== */
+/* -------------------------------- React UI -------------------------------- */
 
 interface ContentRootProps {
   anilistId: number;
@@ -227,7 +207,7 @@ const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) => {
   const resolvedSearchTerm = statusQuery.data?.successfulSynonym ?? title;
 
   return (
-    <div ref={hostRef}>
+    <div ref={hostRef} style={{ width: '100%' }}>
       <SonarrActionGroup
         status={getStatus()}
         seriesTitleSlug={statusQuery.data?.series?.titleSlug ?? addSeriesMutation.data?.titleSlug}
@@ -239,42 +219,48 @@ const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) => {
         portalContainer={hostRef.current ?? undefined}
       />
       <React.Suspense fallback={null}>
-        {isModalOpen && hostRef.current &&
-          React.createElement(React.lazy(() => import('@/ui/AddSeriesModal')), {
-            anilistId,
-            title,
-            isOpen: isModalOpen,
-            onClose: () => setIsModalOpen(false),
-            portalContainer: hostRef.current,
-          })}
+        {isModalOpen && hostRef.current && (
+          <AddSeriesModal
+            anilistId={anilistId}
+            title={title}
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            portalContainer={hostRef.current}
+          />
+        )}
       </React.Suspense>
     </div>
   );
 };
 
-/* ============================================================================
- * Content-script bootstrap (SPA + hard refresh safe)
- * ========================================================================== */
+/* -------------------------- Content-script boot --------------------------- */
 
 let ui: ShadowRootContentScriptUi<Root> | null = null;
 let stopAnchorKeeper: (() => void) | null = null;
 let stopSizeSync: (() => void) | null = null;
 
 async function mountAnimePageUI(ctx: ContentScriptContext): Promise<void> {
+  // Parse ID from URL - stable on reload
   const idMatch = location.pathname.match(/\/anime\/(\d+)/);
   const anilistId = idMatch?.[1] ? parseInt(idMatch[1], 10) : null;
-  const title = document.querySelector('h1')?.textContent?.trim() ?? null;
-  if (!anilistId || !title) return;
+  if (!anilistId) return;
 
-  // Wait for base containers on first paint.
-  await Promise.all([waitForElement(ACTIONS_SELECTOR), waitForElement(SIDEBAR_SELECTOR)]);
+  // Wait for AniList to hydrate the hero + sidebar + title before reading them
+  await Promise.all([
+    waitForElement(ACTIONS_SELECTOR),
+    waitForElement(SIDEBAR_SELECTOR),
+    waitForElement('h1'),
+  ]);
 
-  // Start the anchor keeper BEFORE creating the UI so autoMount() has a target.
+  // Now read title (was missing on hard refresh before hydration)
+  const title = document.querySelector('h1')?.textContent?.trim() ?? '';
+
+  // Keep/refresh the anchor across hydration swaps
   stopAnchorKeeper?.();
   stopAnchorKeeper = startAnchorKeeper();
   ensureActionsAnchor();
 
-  // Clean previous instance (SPA back/forward).
+  // Clean previous instance (SPA back/forward)
   if (ui) {
     ui.remove();
     stopSizeSync?.();
@@ -305,27 +291,22 @@ async function mountAnimePageUI(ctx: ContentScriptContext): Promise<void> {
     },
   });
 
-  // Critical order for hard refresh/new tab reliability:
-  // 1) Begin automatic mount/remove watcher.
   ui.autoMount();
-  // 2) Eagerly mount now (works when anchor is already present).
   ui.mount();
 }
 
 export default defineContentScript({
-  matches: ['*://anilist.co/*'], // broad to handle SPA transitions
+  matches: ['*://anilist.co/*'],
   cssInjectionMode: 'ui',
-  runAt: 'document_end',         // set up before site hydration replaces DOM
+  runAt: 'document_end',
   async main(ctx: ContentScriptContext) {
     const route = async (url: string) => {
       if (!ANIME_PAGE.includes(url)) return;
       await mountAnimePageUI(ctx);
     };
 
-    // Initial load (works on direct URL and hard refresh).
     await route(location.href);
 
-    // SPA navigation.
     ctx.addEventListener(window, 'wxt:locationchange', async (e: Event & { newUrl: URL }) => {
       await route(e.newUrl.href);
     });

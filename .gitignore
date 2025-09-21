@@ -13,6 +13,9 @@ stats.html
 stats-*.json
 .wxt
 web-ext.config.ts
+.roo
+.roomodes
+.repomix
 
 # Editor directories and files
 .vscode/*
@@ -24,3 +27,4 @@ web-ext.config.ts
 *.njsproj
 *.sln
 *.sw?
+
