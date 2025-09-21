@@ -9,7 +9,7 @@
  * As an `index.ts` file, it allows consumers to import directly from the '@/services' path.
  */
 import { defineProxyService } from '@webext-core/proxy-service';
-import type { ICache } from './cache.service';
+import { CacheService } from './cache.service';
 import { SonarrApiService } from '@/api/sonarr.api';
 import { AnilistApiService } from '@/api/anilist.api';
 import { MappingService } from './mapping.service';
@@ -35,7 +35,7 @@ interface KitsunarrApi {
  * 2. `getKitsunarrApi`: A function that can be called from any part of the extension
  *    to get a proxied, type-safe instance of the API.
  */
-export const [registerKitsunarrApi, getKitsunarrApi] = defineProxyService<KitsunarrApi, [ICache]>(
+export const [registerKitsunarrApi, getKitsunarrApi] = defineProxyService<KitsunarrApi, []>(
   'KitsunarrApi',
 
   /**
@@ -45,12 +45,13 @@ export const [registerKitsunarrApi, getKitsunarrApi] = defineProxyService<Kitsun
    * @param cache The application's main cache service instance, conforming to the ICache interface.
    * @returns The fully constructed KitsunarrApi object.
    */
-  (cache: ICache) => {
+  () => {
     // 1. Instantiate all API clients and services.
+    const cacheService = new CacheService();
     const sonarrApiService = new SonarrApiService();
-    const anilistApiService = new AnilistApiService(cache);
-    const mappingService = new MappingService(sonarrApiService, anilistApiService, cache);
-    const libraryService = new LibraryService(sonarrApiService, mappingService, cache);
+    const anilistApiService = new AnilistApiService(cacheService);
+    const mappingService = new MappingService(sonarrApiService, anilistApiService, cacheService);
+    const libraryService = new LibraryService(sonarrApiService, mappingService, cacheService);
 
     // Bind all public methods of all services to preserve 'this' context.
 

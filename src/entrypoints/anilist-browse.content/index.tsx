@@ -25,6 +25,8 @@ const isBrowseSurface = (url: string): boolean => {
 const CARD_SELECTOR = '.media-card';
 const INJECTION_CONTAINER_CLASS = 'kitsunarr-overlay-container';
 
+const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
+
 type ModalState = { anilistId: number; title: string };
 
 /* ====================== Card overlay ====================== */
@@ -184,7 +186,7 @@ const BrowseContentApp: React.FC = () => {
 
       <React.Suspense fallback={null}>
         {modalState &&
-          React.createElement(React.lazy(() => import('@/ui/AddSeriesModal')), {
+          React.createElement(AddSeriesModal, {
             isOpen: true,
             anilistId: modalState.anilistId,
             title: modalState.title,

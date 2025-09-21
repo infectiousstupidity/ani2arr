@@ -21,6 +21,20 @@ export interface SonarrSeries {
   year?: number;
   /** Present on v3 Series model */
   genres?: string[];
+  seasonCount?: number;
+  episodeCount?: number;
+  episodeFileCount?: number;
+  sizeOnDisk?: number;
+  path?: string;
+  qualityProfileId?: number;
+  languageProfileId?: number;
+  seasons?: any[];
+  seriesType?: 'standard' | 'anime' | 'daily';
+  tags?: any[];
+  added?: string;
+  overview?: string;
+  previousAiring?: string | null;
+  network?: string;
 }
 
 /** Remote lookup item from /series/lookup */

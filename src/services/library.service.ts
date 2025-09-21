@@ -2,7 +2,7 @@
  * Sonarr library SWR cache + debounced status checks.
  */
 
-import type { ICache } from './cache.service';
+import type { CacheService } from './cache.service';
 import type { SonarrApiService } from '@/api/sonarr.api';
 import type { MappingService } from './mapping.service';
 import type { CheckSeriesStatusResponse, SonarrSeries, LeanSonarrSeries } from '../types';
@@ -27,13 +27,13 @@ export class LibraryService {
   private timer?: number;
 
   constructor(
-    private readonly sonarrApi: SonarrApiService,
+    private readonly sonarrClient: SonarrApiService,
     private readonly mappingService: MappingService,
-    private readonly cache: ICache,
+    private readonly cacheService: CacheService,
   ) {}
 
   public async getLeanSeriesList(): Promise<LeanSonarrSeries[]> {
-    const meta = await this.cache.getWithMeta<LeanSonarrSeries[]>(SONARR_KEY);
+    const meta = await this.cacheService.getWithMeta<LeanSonarrSeries[]>(SONARR_KEY);
     if (meta?.v) {
       if (Date.now() >= meta.staleAt && !this.isRefreshing) {
         this.isRefreshing = true;
@@ -51,13 +51,13 @@ export class LibraryService {
         const options = await extensionOptions.getValue();
         if (!options?.sonarrUrl || !options?.sonarrApiKey) return [];
         const credentials = { url: options.sonarrUrl, apiKey: options.sonarrApiKey };
-        const full = await this.sonarrApi.getAllSeries(credentials);
+        const full = await this.sonarrClient.getAllSeries(credentials);
         const lean = full.map((s: SonarrSeries) => ({ tvdbId: s.tvdbId, id: s.id, titleSlug: s.titleSlug }));
-        await this.cache.set(SONARR_KEY, lean, SONARR_STALE, SONARR_HARD);
+        await this.cacheService.set(SONARR_KEY, lean, SONARR_STALE, SONARR_HARD);
         return lean;
       } catch (e) {
         logError(normalizeError(e), 'LibraryService:refreshCache');
-        return (await this.cache.get<LeanSonarrSeries[]>(SONARR_KEY)) ?? [];
+        return (await this.cacheService.get<LeanSonarrSeries[]>(SONARR_KEY)) ?? [];
       } finally {
         this.inflightRefresh = null;
       }
@@ -68,12 +68,12 @@ export class LibraryService {
 
   public async addSeriesToCache(newSeries: SonarrSeries): Promise<void> {
     try {
-      const meta = await this.cache.getWithMeta<LeanSonarrSeries[]>(SONARR_KEY);
+      const meta = await this.cacheService.getWithMeta<LeanSonarrSeries[]>(SONARR_KEY);
       const current = meta?.v ?? [];
       if (!current.some(s => s.id === newSeries.id)) {
         const lean: LeanSonarrSeries = { tvdbId: newSeries.tvdbId, id: newSeries.id, titleSlug: newSeries.titleSlug };
         const updated = [...current, lean];
-        await this.cache.set(SONARR_KEY, updated, SONARR_STALE, SONARR_HARD);
+        await this.cacheService.set(SONARR_KEY, updated, SONARR_STALE, SONARR_HARD);
       }
     } catch (e) {
       logError(normalizeError(e), 'LibraryService:addSeriesToCache');
@@ -113,7 +113,7 @@ export class LibraryService {
             continue;
           }
 
-          const fresh = await this.sonarrApi.getSeriesByTvdbId(tvdbId, creds);
+          const fresh = await this.sonarrClient.getSeriesByTvdbId(tvdbId, creds);
           if (fresh) {
             req.resolve({ exists: true, tvdbId, series: hit, successfulSynonym });
           } else {
@@ -134,7 +134,7 @@ export class LibraryService {
   private async removeFromCache(tvdbId: number, list: LeanSonarrSeries[]): Promise<LeanSonarrSeries[]> {
     try {
       const updated = list.filter(s => s.tvdbId !== tvdbId);
-      await this.cache.set(SONARR_KEY, updated, SONARR_STALE, SONARR_HARD);
+      await this.cacheService.set(SONARR_KEY, updated, SONARR_STALE, SONARR_HARD);
       return updated;
     } catch (e) {
       logError(normalizeError(e), 'LibraryService:removeFromCache');

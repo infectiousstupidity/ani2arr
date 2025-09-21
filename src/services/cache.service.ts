@@ -10,16 +10,7 @@ export interface CacheValue<T> {
   etag?: string;            // optional HTTP ETag for If-None-Match
 }
 
-export interface ICache {
-  has(key: string): Promise<boolean>;
-  get<T>(key: string): Promise<T | null>;
-  getWithMeta<T>(key: string): Promise<CacheValue<T> | null>;
-  set<T>(key: string, value: T, staleTtlMs: number, hardTtlMs?: number, etag?: string): Promise<void>;
-  delete(key: string): Promise<void>;
-  clear(): Promise<void>;
-}
-
-export class CacheService implements ICache {
+export class CacheService {
   private readonly ram = new Map<string, CacheValue<unknown>>();
   constructor(private readonly namespace = 'kitsunarr_cache') {}
 

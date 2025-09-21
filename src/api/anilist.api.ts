@@ -1,7 +1,7 @@
 /**
  * AniList GraphQL client with cached TVDB externalLink and enriched metadata.
  */
-import type { ICache } from '@/services/cache.service';
+import type { CacheService } from '@/services/cache.service';
 import { logError, normalizeError } from '@/utils/error-handling';
 
 export type AniTitles = { romaji?: string; english?: string; native?: string };
@@ -22,7 +22,7 @@ export class AnilistApiService {
   private readonly STALE = 30 * 24 * 60 * 60 * 1000;         // 30d soft
   private readonly HARD  = 180 * 24 * 60 * 60 * 1000;        // 180d hard
 
-  constructor(private readonly cache: ICache) {}
+  constructor(private readonly cache: CacheService) {}
 
   public async findTvdbId(
     anilistId: number
