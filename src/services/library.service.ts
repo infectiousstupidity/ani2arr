@@ -1,7 +1,3 @@
-/**
- * Sonarr library SWR cache + debounced status checks.
- */
-
 import type { CacheService } from './cache.service';
 import type { SonarrApiService } from '@/api/sonarr.api';
 import type { MappingService } from './mapping.service';
@@ -10,21 +6,13 @@ import { logError, normalizeError } from '@/utils/error-handling';
 import { extensionOptions } from '@/utils/storage';
 
 const SONARR_KEY = 'sonarr_series_list_v2';
-const SONARR_STALE = 60 * 60 * 1000;    // 1h soft
-const SONARR_HARD  = 24 * 60 * 60 * 1000; // 24h hard
-const STATUS_DEBOUNCE_MS = 120;
-
-type PendingStatusRequest = {
-  options: { force_verify?: boolean };
-  resolve: (v: CheckSeriesStatusResponse) => void;
-  reject: (r?: unknown) => void;
-};
+const SONARR_STALE = 60 * 60 * 1000;
+const SONARR_HARD = 24 * 60 * 60 * 1000;
 
 export class LibraryService {
   private isRefreshing = false;
   private inflightRefresh: Promise<LeanSonarrSeries[]> | null = null;
-  private pending = new Map<number, PendingStatusRequest>();
-  private timer?: number;
+  private tvdbSet: Set<number> = new Set();
 
   constructor(
     private readonly sonarrClient: SonarrApiService,
@@ -34,108 +22,153 @@ export class LibraryService {
 
   public async getLeanSeriesList(): Promise<LeanSonarrSeries[]> {
     const meta = await this.cacheService.getWithMeta<LeanSonarrSeries[]>(SONARR_KEY);
+
     if (meta?.v) {
       if (Date.now() >= meta.staleAt && !this.isRefreshing) {
         this.isRefreshing = true;
-        this.refreshCache().finally(() => { this.isRefreshing = false; });
+        this.refreshCache().finally(() => {
+          this.isRefreshing = false;
+        });
+      }
+      if (this.tvdbSet.size === 0 && Array.isArray(meta.v)) {
+        this.tvdbSet = new Set(meta.v.map(s => s.tvdbId));
       }
       return meta.v;
     }
+
     return this.refreshCache();
   }
 
   public async refreshCache(): Promise<LeanSonarrSeries[]> {
     if (this.inflightRefresh) return this.inflightRefresh;
+
     const p = (async () => {
       try {
         const options = await extensionOptions.getValue();
-        if (!options?.sonarrUrl || !options?.sonarrApiKey) return [];
+        if (!options?.sonarrUrl || !options?.sonarrApiKey) {
+          this.tvdbSet.clear();
+          await this.cacheService.set(SONARR_KEY, [], SONARR_STALE, SONARR_HARD);
+          return [];
+        }
         const credentials = { url: options.sonarrUrl, apiKey: options.sonarrApiKey };
-        const full = await this.sonarrClient.getAllSeries(credentials);
-        const lean = full.map((s: SonarrSeries) => ({ tvdbId: s.tvdbId, id: s.id, titleSlug: s.titleSlug }));
-        await this.cacheService.set(SONARR_KEY, lean, SONARR_STALE, SONARR_HARD);
-        return lean;
+        const fullSeriesList = await this.sonarrClient.getAllSeries(credentials);
+        const leanSeriesList = fullSeriesList.map((s: SonarrSeries) => ({
+          tvdbId: s.tvdbId,
+          id: s.id,
+          titleSlug: s.titleSlug,
+        }));
+
+        this.tvdbSet = new Set(leanSeriesList.map(s => s.tvdbId));
+        await this.cacheService.set(SONARR_KEY, leanSeriesList, SONARR_STALE, SONARR_HARD);
+        return leanSeriesList;
       } catch (e) {
         logError(normalizeError(e), 'LibraryService:refreshCache');
-        return (await this.cacheService.get<LeanSonarrSeries[]>(SONARR_KEY)) ?? [];
+        const cached = (await this.cacheService.get<LeanSonarrSeries[]>(SONARR_KEY)) ?? [];
+        this.tvdbSet = new Set(cached.map(s => s.tvdbId));
+        return cached;
       } finally {
         this.inflightRefresh = null;
       }
     })();
+
     this.inflightRefresh = p;
     return p;
   }
 
   public async addSeriesToCache(newSeries: SonarrSeries): Promise<void> {
     try {
-      const meta = await this.cacheService.getWithMeta<LeanSonarrSeries[]>(SONARR_KEY);
-      const current = meta?.v ?? [];
-      if (!current.some(s => s.id === newSeries.id)) {
-        const lean: LeanSonarrSeries = { tvdbId: newSeries.tvdbId, id: newSeries.id, titleSlug: newSeries.titleSlug };
-        const updated = [...current, lean];
-        await this.cacheService.set(SONARR_KEY, updated, SONARR_STALE, SONARR_HARD);
+      const currentList = await this.getLeanSeriesList();
+      if (!currentList.some(s => s.id === newSeries.id)) {
+        const lean: LeanSonarrSeries = {
+          tvdbId: newSeries.tvdbId,
+          id: newSeries.id,
+          titleSlug: newSeries.titleSlug,
+        };
+        const updatedList = [...currentList, lean];
+        this.tvdbSet.add(newSeries.tvdbId);
+        await this.cacheService.set(SONARR_KEY, updatedList, SONARR_STALE, SONARR_HARD);
       }
     } catch (e) {
       logError(normalizeError(e), 'LibraryService:addSeriesToCache');
     }
   }
 
-  public getSeriesStatus(anilistId: number, options: { force_verify?: boolean } = {}): Promise<CheckSeriesStatusResponse> {
-    return new Promise((resolve, reject) => {
-      this.pending.set(anilistId, { options, resolve, reject });
-      if (this.timer) globalThis.clearTimeout(this.timer);
-      this.timer = globalThis.setTimeout(this.processQueue, STATUS_DEBOUNCE_MS) as unknown as number;
-    });
-  }
-
-  private processQueue = async (): Promise<void> => {
-    if (this.pending.size === 0) return;
-    const items = new Map(this.pending);
-    this.pending.clear();
-
+  public async getSeriesStatus(
+    anilistId: number,
+    options: { force_verify?: boolean; network?: 'never' } = {},
+  ): Promise<CheckSeriesStatusResponse> {
     try {
-      let lean = await this.getLeanSeriesList();
-      const options = await extensionOptions.getValue();
-      const creds = options?.sonarrUrl && options?.sonarrApiKey ? { url: options.sonarrUrl, apiKey: options.sonarrApiKey } : null;
+      const leanSeriesList = await this.getLeanSeriesList();
+      
+      const mappingOptions: { network?: 'never' } = {};
+      if (options.network === 'never') {
+        mappingOptions.network = 'never';
+      }
+      
+      const { tvdbId, successfulSynonym } = await this.mappingService.resolveTvdbId(anilistId, mappingOptions);
 
-      for (const [anilistId, req] of items) {
-        try {
-          const { tvdbId, successfulSynonym } = await this.mappingService.resolveTvdbId(anilistId);
-          const hit = lean.find(s => s.tvdbId === tvdbId);
+      if (tvdbId === null) {
+        return { exists: false, tvdbId: null, ...(successfulSynonym && { successfulSynonym }) };
+      }
 
-          if (!hit) {
-            req.resolve({ exists: false, tvdbId, successfulSynonym });
-            continue;
-          }
+      const seriesFromCache = leanSeriesList.find(s => s.tvdbId === tvdbId);
+      const existsInCache = !!seriesFromCache;
 
-          if (!req.options.force_verify || !creds) {
-            req.resolve({ exists: true, tvdbId, series: hit, successfulSynonym });
-            continue;
-          }
+      if (!options.force_verify) {
+        return {
+          exists: existsInCache,
+          tvdbId,
+          ...(seriesFromCache && { series: seriesFromCache }),
+          ...(successfulSynonym && { successfulSynonym }),
+        };
+      }
 
-          const fresh = await this.sonarrClient.getSeriesByTvdbId(tvdbId, creds);
-          if (fresh) {
-            req.resolve({ exists: true, tvdbId, series: hit, successfulSynonym });
-          } else {
-            lean = await this.removeFromCache(tvdbId, lean);
-            req.resolve({ exists: false, tvdbId, successfulSynonym });
-          }
-        } catch (e) {
-          logError(normalizeError(e), `LibraryService:getSeriesStatus:${anilistId}`);
-          req.resolve({ exists: false, tvdbId: null });
-        }
+      const sonarrOpts = await extensionOptions.getValue();
+      if (!sonarrOpts?.sonarrUrl || !sonarrOpts?.sonarrApiKey) {
+        return {
+          exists: existsInCache,
+          tvdbId,
+          ...(seriesFromCache && { series: seriesFromCache }),
+          ...(successfulSynonym && { successfulSynonym }),
+        };
+      }
+      
+      const credentials = { url: sonarrOpts.sonarrUrl, apiKey: sonarrOpts.sonarrApiKey };
+      const seriesFromApi = await this.sonarrClient.getSeriesByTvdbId(tvdbId, credentials);
+
+      if (seriesFromApi) {
+        if (!existsInCache) await this.addSeriesToCache(seriesFromApi);
+        const finalSeries = leanSeriesList.find(s => s.tvdbId === tvdbId) ?? {
+          tvdbId: seriesFromApi.tvdbId,
+          id: seriesFromApi.id,
+          titleSlug: seriesFromApi.titleSlug,
+        };
+        return {
+          exists: true,
+          tvdbId,
+          series: finalSeries,
+          ...(successfulSynonym && { successfulSynonym }),
+        };
+      } else {
+        if (existsInCache) await this.removeFromCache(tvdbId, leanSeriesList);
+        return {
+          exists: false,
+          tvdbId,
+          ...(successfulSynonym && { successfulSynonym }),
+        };
       }
     } catch (e) {
-      logError(normalizeError(e), 'LibraryService:processQueue:FATAL');
-      items.forEach(r => r.reject(e));
+      logError(normalizeError(e), `LibraryService:getSeriesStatus:${anilistId}`);
+      return { exists: false, tvdbId: null };
     }
-  };
+  }
 
   private async removeFromCache(tvdbId: number, list: LeanSonarrSeries[]): Promise<LeanSonarrSeries[]> {
     try {
-      const updated = list.filter(s => s.tvdbId !== tvdbId);
-      await this.cacheService.set(SONARR_KEY, updated, SONARR_STALE, SONARR_HARD);
-      return updated;
+      const updatedList = list.filter(s => s.tvdbId !== tvdbId);
+      this.tvdbSet.delete(tvdbId);
+      await this.cacheService.set(SONARR_KEY, updatedList, SONARR_STALE, SONARR_HARD);
+      return updatedList;
     } catch (e) {
       logError(normalizeError(e), 'LibraryService:removeFromCache');
       return list;

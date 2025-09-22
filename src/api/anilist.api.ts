@@ -1,84 +1,158 @@
-/**
- * AniList GraphQL client with cached TVDB externalLink and enriched metadata.
- */
-import type { CacheService } from '@/services/cache.service';
+// src/api/anilist.api.ts
+
 import { logError, normalizeError } from '@/utils/error-handling';
+import type { ExtensionError } from '@/types';
 
 export type AniTitles = { romaji?: string; english?: string; native?: string };
+export type AniFormat = 'TV' | 'TV_SHORT' | 'MOVIE' | 'SPECIAL' | 'OVA' | 'ONA' | 'MUSIC' | 'MANGA' | 'NOVEL' | 'ONE_SHOT';
 
-type AniListResponse = {
-  data?: {
-    Media?: {
-      title?: AniTitles;
-      startDate?: { year?: number | null } | null;
-      synonyms?: string[] | null;
-      externalLinks?: Array<{ id?: string | number | null; url?: string | null; site?: string | null }> | null;
-    };
+export type AniMedia = {
+  id: number;
+  format: AniFormat | null;
+  title: AniTitles;
+  startDate?: { year?: number | null; };
+  synonyms: string[];
+  externalLinks: { id?: string | number | null; url?: string | null; site?: string | null; }[];
+  relations?: {
+    edges: {
+      relationType: string;
+      node: AniMedia;
+    }[];
   };
+};
+
+type FindMediaResponse = {
+  data?: { Media?: AniMedia; };
+  errors?: { message: string; status: number; }[];
+};
+
+type QueuedRequest = {
+  anilistId: number;
+  resolve: (value: AniMedia) => void;
+  reject: (reason: Error | ExtensionError) => void;
 };
 
 export class AnilistApiService {
   private readonly API_URL = 'https://graphql.anilist.co';
-  private readonly STALE = 30 * 24 * 60 * 60 * 1000;         // 30d soft
-  private readonly HARD  = 180 * 24 * 60 * 60 * 1000;        // 180d hard
+  
+  private requestQueue: QueuedRequest[] = [];
+  private isProcessingQueue = false;
+  private readonly BATCH_SIZE = 5;
+  private readonly BATCH_DELAY_MS = 1000;
+  private inflight = new Map<number, Promise<AniMedia>>();
 
-  constructor(private readonly cache: CacheService) {}
-
-  public async findTvdbId(
-    anilistId: number
-  ): Promise<{ tvdbId: number | null; synonyms: string[]; titles: AniTitles; startYear?: number }> {
-    const cacheKey = `tvdb_id:${anilistId}`;
-    const cached = await this.cache.get<number>(cacheKey);
-    if (cached !== null) {
-      return { tvdbId: cached, synonyms: [] as string[], titles: {} };
-    }
-
-    const query = `
-      query ($id: Int) {
-        Media(id: $id, type: ANIME) {
-          title { romaji english native }
-          startDate { year }
-          synonyms
-          externalLinks { id url site }
+  private readonly findMediaWithRelationsQuery = `
+    query FindRoot($id: Int) {
+      Media(id: $id) {
+        id
+        format
+        title { romaji english native }
+        startDate { year }
+        synonyms
+        externalLinks { id url site }
+        relations {
+          edges {
+            relationType
+            node {
+              id
+              relations {
+                edges {
+                  relationType
+                  node {
+                    id
+                    relations {
+                      edges {
+                        relationType
+                        node {
+                          id
+                          relations {
+                            edges {
+                              relationType
+                              node { id }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
-    `;
+    }
+  `;
 
+  
+  constructor() {}
+
+  public fetchMediaWithRelations(anilistId: number): Promise<AniMedia> {
+    if (this.inflight.has(anilistId)) {
+      return this.inflight.get(anilistId)!;
+    }
+    
+    const promise = new Promise<AniMedia>((resolve, reject) => {
+      this.requestQueue.push({ anilistId, resolve, reject });
+      if (!this.isProcessingQueue) {
+        this.processQueue();
+      }
+    });
+
+    this.inflight.set(anilistId, promise);
+    return promise;
+  }
+
+  private async processQueue(): Promise<void> {
+    if (this.isProcessingQueue) return;
+    this.isProcessingQueue = true;
+
+    while (this.requestQueue.length > 0) {
+      const batch = this.requestQueue.splice(0, this.BATCH_SIZE);
+      
+      await Promise.allSettled(batch.map(async (req) => {
+        try {
+          const result = await this.fetchFromApi(req.anilistId);
+          req.resolve(result);
+        } catch (e) {
+          req.reject(normalizeError(e));
+        }
+      }));
+
+      if (this.requestQueue.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, this.BATCH_DELAY_MS));
+      }
+    }
+
+    this.isProcessingQueue = false;
+  }
+
+  private async fetchFromApi(anilistId: number): Promise<AniMedia> {
     try {
       const response = await fetch(this.API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ query, variables: { id: anilistId } }),
+        body: JSON.stringify({ query: this.findMediaWithRelationsQuery, variables: { id: anilistId } }),
       });
-      if (!response.ok) throw new Error(`AniList API ${response.status}`);
 
-      const result = (await response.json()) as AniListResponse;
+      if (!response.ok) throw new Error(`AniList API Error: ${response.status}`);
+      const result = (await response.json()) as FindMediaResponse;
+      
       const media = result?.data?.Media;
-
-      const titles: AniTitles = media?.title ?? {};
-      const startYearRaw = media?.startDate?.year ?? undefined;
-      const startYear = typeof startYearRaw === 'number' ? startYearRaw : undefined;
-      const synonyms: string[] = Array.isArray(media?.synonyms) ? media!.synonyms as string[] : [];
-
-      const links = Array.isArray(media?.externalLinks) ? media!.externalLinks! : [];
-      const tvdbLink = links.find(l => l?.site === 'TheTVDB');
-
-      let tvdbId: number | null = null;
-      if (tvdbLink && tvdbLink.id !== null && tvdbLink.id !== undefined) {
-        const raw = tvdbLink.id;
-        const num = typeof raw === 'string' ? Number(raw) : typeof raw === 'number' ? raw : NaN;
-        if (Number.isFinite(num)) tvdbId = num;
+      if (!media) {
+        if (result.errors) {
+          throw new Error(`GraphQL Error: ${result.errors.map(e => e.message).join(', ')}`);
+        }
+        throw new Error('No media data returned from AniList API.');
       }
+      
+      return media as AniMedia;
 
-      if (tvdbId !== null) {
-        await this.cache.set(cacheKey, tvdbId, this.STALE, this.HARD);
-        return { tvdbId, synonyms, titles, ...(startYear !== undefined ? { startYear } : {}) };
-      }
-
-      return { tvdbId: null, synonyms, titles, ...(startYear !== undefined ? { startYear } : {}) };
     } catch (e) {
-      logError(normalizeError(e), 'AnilistApiService:findTvdbId');
-      return { tvdbId: null, synonyms: [] as string[], titles: {} };
+      logError(normalizeError(e), `AnilistApiService:fetchFromApi:${anilistId}`);
+      throw e;
+    } finally {
+      this.inflight.delete(anilistId);
     }
   }
 }

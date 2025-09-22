@@ -1,4 +1,3 @@
-// src/hooks/use-api-queries.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getKitsunarrApi } from '@/services';
 import { extensionOptions } from '@/utils/storage';
@@ -12,15 +11,22 @@ export const queryKeys = {
   sonarrMetadata: (creds: SonarrCredentialsPayload | null) => [...queryKeys.all, 'sonarrMetadata', creds] as const,
 };
 
-// ... (useSeriesStatus, useExtensionOptions, useSonarrMetadata, useAddSeries, useTestConnection remain unchanged) ...
+export type SeriesStatusOptions = {
+  enabled?: boolean;
+  force_verify?: boolean;
+  network?: 'never';
+};
 
-export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: { enabled?: boolean; force_verify?: boolean }) => {
+export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: SeriesStatusOptions) => {
   return useQuery({
     queryKey: queryKeys.seriesStatus(payload.anilistId),
     queryFn: async () => {
-      const serviceOptions: { force_verify?: boolean } = {};
+      const serviceOptions: { force_verify?: boolean; network?: 'never' } = {};
       if (options?.force_verify) {
         serviceOptions.force_verify = true;
+      }
+      if (options?.network) {
+        serviceOptions.network = options.network;
       }
       return getKitsunarrApi().library.getSeriesStatus(payload.anilistId, serviceOptions);
     },
@@ -65,14 +71,13 @@ export const useAddSeries = () => {
       const baseOptions = await extensionOptions.getValue();
       if (!baseOptions) throw new Error('Extension options are not loaded.');
 
-      // 1. Resolve TVDB ID.
+      // This call correctly triggers the full, network-enabled lookup when the user
+      // explicitly clicks the "Add" button.
       const { tvdbId } = await api.mapping.resolveTvdbId(payload.anilistId);
       if (!tvdbId) throw new Error('Could not resolve TVDB ID for this series.');
 
-      // 2. Construct payload for Sonarr
       const sonarrPayload: AddRequestPayload = { ...payload, tvdbId };
 
-      // 3. Call the Sonarr API directly with the payload.
       return await api.sonarr.addSeries(sonarrPayload, baseOptions);
     },
     onSuccess: async (addedSeries, variables) => {
@@ -95,30 +100,19 @@ export const useTestConnection = () => {
   });
 };
 
-
-// --- CHANGED: Full rewrite of useSaveOptions ---
 export const useSaveOptions = () => {
   const queryClient = useQueryClient();
 
   return useMutation<void, Error, ExtensionOptions, { previousOptions: ExtensionOptions | undefined }>({
     mutationFn: (options: ExtensionOptions) => extensionOptions.setValue(options),
 
-    // Step 1: Called before the mutation function.
     onMutate: async (newOptions) => {
-      // Cancel any outgoing refetches so they don't overwrite our optimistic update.
       await queryClient.cancelQueries({ queryKey: queryKeys.options() });
-
-      // Snapshot the previous value.
       const previousOptions = queryClient.getQueryData<ExtensionOptions>(queryKeys.options());
-
-      // Optimistically update to the new value.
       queryClient.setQueryData(queryKeys.options(), newOptions);
-
-      // Return a context object with the snapshotted value.
       return { previousOptions };
     },
 
-    // Step 2: If the mutation fails, use the context we returned to roll back.
     onError: (err, newOptions, context) => {
       if (context?.previousOptions) {
         queryClient.setQueryData(queryKeys.options(), context.previousOptions);
@@ -126,8 +120,6 @@ export const useSaveOptions = () => {
       throw normalizeError(err);
     },
 
-    // Step 3: Always re-fetch after the mutation is settled (on success or error).
-    // This ensures our client state is eventually consistent with the backend.
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.options() });
     },

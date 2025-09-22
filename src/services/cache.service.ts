@@ -1,13 +1,17 @@
+// src/services/cache.service.ts
+
 /**
  * SWR cache with soft/hard TTLs and optional ETag metadata.
- * Persists plain JSON (no Map). MV2/Firefox-safe.
+ * Persists plain JSON (no Map). MV2/MV3/Firefox-safe.
  */
+
+import browser from 'webextension-polyfill';
 
 export interface CacheValue<T> {
   v: T;
-  staleAt: number;          // after this, serve-but-revalidate
-  expiresAt: number;        // after this, drop value
-  etag?: string;            // optional HTTP ETag for If-None-Match
+  staleAt: number;   // after this, serve-but-revalidate
+  expiresAt: number; // after this, drop value
+  etag?: string;     // optional HTTP ETag for If-None-Match
 }
 
 export class CacheService {

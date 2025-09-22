@@ -38,8 +38,7 @@ interface CardOverlayProps {
 }
 
 const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpenModal }) => {
-  const { data, isLoading } = useSeriesStatus({ anilistId });
-
+  const { data, isLoading } = useSeriesStatus({ anilistId }, { network: 'never' });
   if (isLoading) return null;
 
   if (data?.exists) {
@@ -210,9 +209,9 @@ export default defineContentScript({
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
-          staleTime: 60_000,
+          staleTime: Infinity,
           refetchOnWindowFocus: false,
-          retry: 1,
+          retry: false,
         },
       },
     });
@@ -249,8 +248,7 @@ export default defineContentScript({
 
     const remove = async () => {
       if (!ui) return;
-      // WXT: the method is `remove()`, not `unmount()`
-      await ui.remove();
+      ui.remove();
       ui = null;
       root = null;
     };
