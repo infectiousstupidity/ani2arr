@@ -17,9 +17,7 @@ export interface SonarrSeries {
   tvdbId: number;
   titleSlug: string;
   monitored?: boolean;
-  /** Present on v3 Series model */
   year?: number;
-  /** Present on v3 Series model */
   genres?: string[];
   seasonCount?: number;
   episodeCount?: number;
@@ -28,9 +26,9 @@ export interface SonarrSeries {
   path?: string;
   qualityProfileId?: number;
   languageProfileId?: number;
-  seasons?: any[];
+  seasons?: unknown[];
   seriesType?: 'standard' | 'anime' | 'daily';
-  tags?: any[];
+  tags?: unknown[];
   added?: string;
   overview?: string;
   previousAiring?: string | null;
@@ -42,10 +40,8 @@ export interface SonarrLookupSeries {
   title: string;
   tvdbId: number;
   titleSlug?: string;
-  /** Lookup also includes year/genres */
   year?: number;
   genres?: string[];
-  /** Some servers return id when series already exists */
   id?: number;
 }
 
@@ -59,7 +55,7 @@ export interface SonarrRootFolder { id: number; path: string; }
 
 export interface SonarrQualityProfile { id: number; name: string; }
 
-export interface SonarrTag { id: string; label: string; }
+export interface SonarrTag { id: number; label: string; }
 
 //================================================================
 // Extension-Specific Types
@@ -72,7 +68,7 @@ export interface SonarrFormState {
   monitorOption: SonarrMonitorOption;
   seasonFolder: boolean;
   searchForMissingEpisodes: boolean;
-  tags: string[];
+  tags: number[]; 
 }
 
 export interface ExtensionOptions {
@@ -96,10 +92,33 @@ export interface CheckSeriesStatusPayload { anilistId: number; }
 export interface CheckSeriesStatusResponse {
   exists: boolean;
   tvdbId: number | null;
-  successfulSynonym?: string | undefined;
+  successfulSynonym?: string;
   series?: LeanSonarrSeries;
 }
 
 export interface SonarrCredentialsPayload { url: string; apiKey: string; }
 
 export type TestConnectionPayload = SonarrCredentialsPayload;
+
+
+//================================================================
+// Error Handling Types
+//================================================================
+
+export enum ErrorCode {
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  VALIDATION_ERROR = 'VALIDATION_ERROR',
+  PERMISSION_ERROR = 'PERMISSION_ERROR',
+  API_ERROR = 'API_ERROR',
+  STORAGE_ERROR = 'STORAGE_ERROR',
+  CONFIGURATION_ERROR = 'CONFIGURATION_ERROR',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+}
+
+export interface ExtensionError {
+  code: ErrorCode;
+  message: string;
+  userMessage: string;
+  details?: Record<string, unknown>;
+  readonly timestamp: number;
+}

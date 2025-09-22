@@ -85,7 +85,6 @@ export function useSettingsManager() {
     }
   }, [savedOptions]);
 
-  // This effect now contains the TypeScript fix.
   useEffect(() => {
     if (sonarrMetadata.data) {
       const { qualityProfiles, rootFolders } = sonarrMetadata.data;

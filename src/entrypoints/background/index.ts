@@ -1,15 +1,13 @@
-// src/entrypoints/background/index.ts
-
 /**
- * @file Main background entrypoint (Firefox MV2).
+ * @file Main background entrypoint (WXT - Firefox/Chrome MV2/MV3-safe).
  * - Registers unified services
- * - Periodic static mapping refresh (alarms if available, otherwise setInterval fallback)
- * - Minimal RPC (open options, mapping refresh, score batch)
+ * - Initializes static mappings on startup and install.
+ * - Sets up a periodic alarm to refresh static mappings.
+ * - Handles basic browser messages.
  */
 
 import { defineBackground } from 'wxt/utils/define-background';
 import browser from 'webextension-polyfill';
-import { CacheService } from '@/services/cache.service';
 import { registerKitsunarrApi, getKitsunarrApi } from '@/services';
 import { computeTitleMatchScore } from '@/utils/matching';
 
@@ -26,9 +24,11 @@ type ScoreBatchMessage = {
 
 function isScoreBatchMessage(x: unknown): x is ScoreBatchMessage {
   const m = x as Partial<ScoreBatchMessage>;
-  return m?.type === 'kitsunarr:match:score-batch'
-    && typeof m.payload?.queryRaw === 'string'
-    && Array.isArray(m.payload?.candidates);
+  return (
+    m?.type === 'kitsunarr:match:score-batch' &&
+    typeof m.payload?.queryRaw === 'string' &&
+    Array.isArray(m.payload?.candidates)
+  );
 }
 function isOpenOptionsMessage(x: unknown): x is OpenOptionsMessage {
   return (x as OpenOptionsMessage)?.type === 'OPEN_OPTIONS_PAGE';
@@ -37,72 +37,73 @@ function isMappingRefreshMessage(x: unknown): x is MappingRefreshMessage {
   return (x as MappingRefreshMessage)?.type === 'kitsunarr:mapping:refresh';
 }
 
-const STATIC_ALARM = 'kitsunarr:refresh-static-mapping';
-const STATIC_REFRESH_PERIOD_MIN = 360; // 6h
+const MAPPING_REFRESH_ALARM = 'kitsunarr:refresh-static-mappings';
+const MAPPING_REFRESH_PERIOD_MIN = 360; // 6 hours
 
 export default defineBackground(() => {
   console.log('[Kitsunarr] Background initializing…');
 
-  const cache = new CacheService();
-  registerKitsunarrApi(cache);
+  registerKitsunarrApi();
   console.log('[Kitsunarr] API services registered.');
 
   const api = getKitsunarrApi();
-
-  // ---- alarms availability (permission may be missing) ----
   const alarmsApi = (browser as unknown as { alarms?: typeof browser.alarms }).alarms;
 
   const ensurePeriodicRefresh = async (): Promise<void> => {
     if (alarmsApi) {
-      const existing = await alarmsApi.get(STATIC_ALARM);
+      const existing = await alarmsApi.get(MAPPING_REFRESH_ALARM);
       if (!existing) {
-        alarmsApi.create(STATIC_ALARM, { periodInMinutes: STATIC_REFRESH_PERIOD_MIN });
-        console.log(`[Kitsunarr] Alarm created: ${STATIC_ALARM} every ${STATIC_REFRESH_PERIOD_MIN}m.`);
+        alarmsApi.create(MAPPING_REFRESH_ALARM, { periodInMinutes: MAPPING_REFRESH_PERIOD_MIN });
+        console.log(`[Kitsunarr] Alarm created: ${MAPPING_REFRESH_ALARM} every ${MAPPING_REFRESH_PERIOD_MIN}m.`);
       }
       return;
     }
-    // Fallback for no "alarms" permission: use setInterval in MV2 persistent background
+
     const key = '__kitsunarr_fallback_interval__';
-    if (!(globalThis as any)[key]) {
-      (globalThis as any)[key] = globalThis.setInterval(() => {
-        console.log('[Kitsunarr] Fallback timer → refresh static mapping');
-        void api.mapping.refreshStaticMapping();
-      }, STATIC_REFRESH_PERIOD_MIN * 60 * 1000);
+    if (!(globalThis as Record<string, unknown>)[key]) {
+      (globalThis as Record<string, unknown>)[key] = globalThis.setInterval(() => {
+        console.log('[Kitsunarr] Fallback timer → refreshing static mappings');
+        void api.mapping.initStaticPairs();
+      }, MAPPING_REFRESH_PERIOD_MIN * 60 * 1000);
       console.log('[Kitsunarr] Using setInterval fallback for periodic refresh.');
     }
   };
 
-  // First install/open and ensure periodic task
   browser.runtime.onInstalled.addListener(async (details) => {
     if (details.reason === 'install') {
       console.log('[Kitsunarr] First-time install.');
       browser.runtime.openOptionsPage().catch(() => {});
-      console.log('[Kitsunarr] Pre-fetch static mapping…');
-      await api.mapping.refreshStaticMapping();
     }
+    // Initialize mappings on first install
+    await api.mapping.initStaticPairs();
     await ensurePeriodicRefresh();
   });
 
-  browser.runtime.onStartup.addListener(() => { void ensurePeriodicRefresh(); });
+  browser.runtime.onStartup.addListener(async () => {
+    // Initialize mappings on browser startup
+    await api.mapping.initStaticPairs();
+    await ensurePeriodicRefresh();
+  });
 
   if (alarmsApi) {
     alarmsApi.onAlarm.addListener((alarm) => {
-      if (alarm.name === STATIC_ALARM) {
-        console.log('[Kitsunarr] Alarm → refresh static mapping');
-        void api.mapping.refreshStaticMapping();
+      if (alarm.name === MAPPING_REFRESH_ALARM) {
+        console.log('[Kitsunarr] Alarm → refreshing static mappings');
+        void api.mapping.initStaticPairs();
       }
     });
   }
 
   browser.runtime.onMessage.addListener(
-    (message: unknown, _sender: browser.Runtime.MessageSender): Promise<unknown> | void => {
+    (message: unknown): Promise<unknown> | void => {
       if (isOpenOptionsMessage(message)) {
         browser.runtime.openOptionsPage().catch(() => {});
         return;
       }
 
       if (isMappingRefreshMessage(message)) {
-        void api.mapping.refreshStaticMapping();
+        console.log('[Kitsunarr] Message → refreshing static mappings');
+        void api.mapping.initStaticPairs();
         return Promise.resolve({ ok: true as const });
       }
 
@@ -119,8 +120,6 @@ export default defineBackground(() => {
         );
         return Promise.resolve({ scores });
       }
-
-      return;
     },
   );
 

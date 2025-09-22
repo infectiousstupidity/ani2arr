@@ -1,6 +1,5 @@
-/**
- * @file Stateless client for Sonarr v3 API.
- */
+// src/api/sonarr.api.ts
+
 import { hasSonarrPermission } from '@/utils/validation';
 import { retryWithBackoff, RetriableError } from '@/utils/retry';
 import type {

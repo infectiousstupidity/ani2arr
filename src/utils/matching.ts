@@ -1,9 +1,3 @@
-/* eslint-disable no-useless-escape */
-/**
- * Title matching utilities: normalization, tokenization, scoring.
- * No Workers; pure functions for background-RPC or local fallback.
- */
-
 const STOPWORDS = new Set([
   'the','a','an','of','and','or','to','for','in','on','with','at','from','my','your','our',
   'season','tv','series','episode','episodes','part','movie','film','limited','special','ultimate',
@@ -18,17 +12,17 @@ export function normTitle(s: string): string {
     .normalize('NFKC')
     .toLowerCase()
     .replace(/[\u3000]/g, ' ')
-    .replace(/[\u2010-\u2015–—~]/g, '-')       // dash/tildes -> hyphen
+    .replace(/[\u2010-\u2015–—~]/g, '-')
     .replace(/[“”"']/g, '')
     .replace(/[·・•]/g, ' ')
-    .replace(/[():\[\]{}]/g, ' ')
-    .replace(/[^0-9a-z\u3040-\u30ff\u4e00-\u9faf\s\-]/gi, ' ')
+    .replace(/[():[\]{}]/g, ' ')
+    .replace(/[^0-9a-z\u3040-\u30ff\u4e00-\u9faf\s-]/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 export function stripParenContent(s: string): string {
-  return s.replace(/\s*[\(\[\{].*?[\)\]\}]\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  return s.replace(/\s*[([{].*?[)\]}]\s*/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export function tokenize(s: string): string[] {
@@ -43,7 +37,6 @@ export function tokenize(s: string): string[] {
   return out;
 }
 
-/** Sørensen–Dice on character bigrams. */
 export function diceBigram(a: string, b: string): number {
   if (a === b) return 1;
   if (a.length < 2 || b.length < 2) return a === b ? 1 : 0;
@@ -75,15 +68,14 @@ function hasRareTokenIntersection(query: string[], cand: string[]): boolean {
   return false;
 }
 
-function containsJapaneseChars(s: string): boolean {
-  return /[\u3040-\u30ff\u4e00-\u9faf]/.test(s);
-}
-
-function isLikelyAnime(genres?: readonly string[], title?: string): boolean {
-  const g = (genres ?? []).map(x => x.toLowerCase());
-  if (g.includes('anime') || g.includes('animation') || g.includes('anime series')) return true;
-  if (title && containsJapaneseChars(title)) return true;
-  return false;
+function isGenreMismatch(genres?: readonly string[]): boolean {
+  if (!genres || genres.length === 0) return false;
+  const lowerGenres = genres.map(g => g.toLowerCase());
+  const hasAnimeGenre = lowerGenres.includes('anime') || lowerGenres.includes('animation');
+  if (hasAnimeGenre) return false;
+  
+  const hasLiveActionGenre = lowerGenres.includes('drama') || lowerGenres.includes('comedy') || lowerGenres.includes('documentary') || lowerGenres.includes('western');
+  return hasLiveActionGenre;
 }
 
 export function computeTitleMatchScore(params: {
@@ -109,8 +101,14 @@ export function computeTitleMatchScore(params: {
     if (d === 0) score += 0.10;
     else if (d === 1) score += 0.06;
   }
+  
+  if (isGenreMismatch(params.candidateGenres)) {
+    score -= 0.5;
+  }
 
-  if (isLikelyAnime(params.candidateGenres, params.candidateRaw)) score += 0.05;
+  if (qTok.length <= 1 && cn.length > qn.length * 2) {
+    score *= 0.85;
+  }
 
   return Math.max(0, Math.min(1, score));
 }
