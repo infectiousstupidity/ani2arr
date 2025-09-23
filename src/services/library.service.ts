@@ -99,14 +99,16 @@ export class LibraryService {
   ): Promise<CheckSeriesStatusResponse> {
     try {
       const leanSeriesList = await this.getLeanSeriesList();
-      
+
       const mappingOptions: { network?: 'never' } = {};
       if (options.network === 'never') {
         mappingOptions.network = 'never';
       }
-      
-      const { tvdbId, successfulSynonym } = await this.mappingService.resolveTvdbId(anilistId, mappingOptions);
 
+      const { tvdbId, successfulSynonym } =
+        await this.mappingService.resolveTvdbId(anilistId, mappingOptions);
+
+      // MappingService never returns null tvdbId; keeping check defensively
       if (tvdbId === null) {
         return { exists: false, tvdbId: null, ...(successfulSynonym && { successfulSynonym }) };
       }
@@ -132,17 +134,18 @@ export class LibraryService {
           ...(successfulSynonym && { successfulSynonym }),
         };
       }
-      
+
       const credentials = { url: sonarrOpts.sonarrUrl, apiKey: sonarrOpts.sonarrApiKey };
       const seriesFromApi = await this.sonarrClient.getSeriesByTvdbId(tvdbId, credentials);
 
       if (seriesFromApi) {
         if (!existsInCache) await this.addSeriesToCache(seriesFromApi);
-        const finalSeries = leanSeriesList.find(s => s.tvdbId === tvdbId) ?? {
-          tvdbId: seriesFromApi.tvdbId,
-          id: seriesFromApi.id,
-          titleSlug: seriesFromApi.titleSlug,
-        };
+        const finalSeries =
+          leanSeriesList.find(s => s.tvdbId === tvdbId) ?? {
+            tvdbId: seriesFromApi.tvdbId,
+            id: seriesFromApi.id,
+            titleSlug: seriesFromApi.titleSlug,
+          };
         return {
           exists: true,
           tvdbId,

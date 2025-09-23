@@ -3,6 +3,7 @@ import React from 'react';
 import Button from '@/ui/Button';
 import { GearIcon, ExternalLinkIcon } from '@radix-ui/react-icons';
 import { useExtensionOptions } from '@/hooks/use-api-queries';
+import { logger } from '@/utils/logger';
 
 type Status = 'LOADING' | 'IN_SONARR' | 'NOT_IN_SONARR' | 'ERROR' | 'ADDING';
 
@@ -17,6 +18,7 @@ interface SonarrActionGroupProps {
   portalContainer?: HTMLElement | undefined;
 }
 
+const log = logger.create('SonarrActionGroup');
 const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
   status,
   seriesTitleSlug,
@@ -80,9 +82,9 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
             className="h-[35px] w-[35px] rounded-[3px]"
             onClick={() => {
               if (isInSonarr && seriesTitleSlug) {
-                console.log(`[SonarrActionGroup] Redirecting to Sonarr series page for slug: ${seriesTitleSlug}`);
+                log.debug(`Redirecting to Sonarr series page for slug: ${seriesTitleSlug}`);
               } else {
-                console.log(`[SonarrActionGroup] Redirecting to Sonarr Add New page with term: ${resolvedSearchTerm}`);
+                 log.debug(`Redirecting to Sonarr Add New page with term: ${resolvedSearchTerm}`);
               }
             }}
           >

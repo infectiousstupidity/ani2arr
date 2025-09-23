@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useExtensionOptions, useSaveOptions, useTestConnection, useSonarrMetadata, queryKeys } from './use-api-queries';
 import type { ExtensionOptions, SonarrFormState } from '@/types';
 import { requestSonarrPermission } from '@/utils/validation';
+import { logger } from '@/utils/logger';
 
 // Helper to get a complete, default-filled initial state.
 const getInitialOptions = (): ExtensionOptions => ({
@@ -19,6 +20,8 @@ const getInitialOptions = (): ExtensionOptions => ({
     tags: [],
   },
 });
+
+const log = logger.create('SettingsManager');
 
 export function useSettingsManager() {
   const queryClient = useQueryClient();
@@ -136,7 +139,7 @@ export function useSettingsManager() {
     if (permission.granted) {
       testConnection({ url: formState.sonarrUrl, apiKey: formState.sonarrApiKey });
     } else {
-      console.error("Permission denied by user.");
+      log.warn('Permission denied by user.');
     }
   }, [formState.sonarrUrl, formState.sonarrApiKey, testConnection]);
 

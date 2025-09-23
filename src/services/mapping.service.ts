@@ -7,6 +7,7 @@ import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-
 import { retryWithBackoff } from '@/utils/retry';
 import { normTitle, stripParenContent, computeTitleMatchScore } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
+import { incrementPhase0Counter } from '@/utils/metrics/phase0';
 
 const PRIMARY_URL = 'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json';
 const FALLBACK_URL = 'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json';
@@ -65,26 +66,33 @@ export class MappingService {
 
     const promise = this.getOrQueueResolution(anilistId, options);
     this.inflight.set(anilistId, promise);
-    
+
     promise.then(result => {
       const cacheKey = `resolved_mapping:${anilistId}`;
       this.cache.set(cacheKey, result, RESOLVED_STALE, RESOLVED_HARD);
     }).catch(() => {/* Do not cache failures */}).finally(() => {
       this.inflight.delete(anilistId);
     });
-    
+
     return promise;
   }
 
   private async getOrQueueResolution(anilistId: number, options: { network?: 'never' } = {}): Promise<ResolvedMapping> {
     const cacheKey = `resolved_mapping:${anilistId}`;
     const cached = await this.cache.get<ResolvedMapping>(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      incrementPhase0Counter('cache-hit');
+      return cached;
+    }
 
     await Promise.all([this.ensureMapLoaded('primary'), this.ensureMapLoaded('fallback')]);
 
-    const tvdbId = this.checkStaticMaps(anilistId);
-    if (tvdbId) return { tvdbId };
+    const staticHit = this.checkStaticMaps(anilistId);
+    if (staticHit) {
+      if (staticHit.source === 'primary') incrementPhase0Counter('static-primary');
+      else if (staticHit.source === 'fallback') incrementPhase0Counter('static-fallback');
+      return { tvdbId: staticHit.tvdbId };
+    }
 
     if (options.network === 'never') {
       throw this.notFound(anilistId, 'Local-only check failed, network access is disabled for this request.');
@@ -118,33 +126,33 @@ export class MappingService {
         await new Promise(resolve => setTimeout(resolve, MAPPING_BATCH_DELAY_MS));
       }
     }
-    
+
     this.isProcessingMappingQueue = false;
   }
 
   private async performNetworkResolution(anilistId: number): Promise<ResolvedMapping> {
     const media = await this.anilistApi.fetchMediaWithRelations(anilistId);
-    
+
     if (media.format === 'MOVIE') {
       throw this.notFound(anilistId, `Unsupported format: ${media.format}. Only TV series can be added to Sonarr.`);
     }
-    
-    const tvdbLink = media.externalLinks?.find(l => l?.site === 'TheTVDB');
-    if (tvdbLink?.id) {
-        const num = Number(tvdbLink.id);
-        if (Number.isFinite(num)) return { tvdbId: num };
-    }
+
+    // Removed: any use of media.externalLinks / TheTVDB direct link
 
     const prequelRootId = this.findPrequelRoot(media);
     if (prequelRootId !== anilistId) {
-        const tvdbId = this.checkStaticMaps(prequelRootId);
-        if (tvdbId) {
-            return { tvdbId };
-        }
+      const staticHit = this.checkStaticMaps(prequelRootId);
+      if (staticHit) {
+        if (staticHit.source === 'primary') incrementPhase0Counter('static-primary');
+        else if (staticHit.source === 'fallback') incrementPhase0Counter('static-fallback');
+        return { tvdbId: staticHit.tvdbId };
+      }
     }
-    
+
     const startYear = media.startDate?.year ?? undefined;
-    return this.lookupViaSonarr(anilistId, media.title, media.synonyms, startYear);
+    const sonarrResult = await this.lookupViaSonarr(anilistId, media.title, media.synonyms, startYear);
+    incrementPhase0Counter('sonarr-lookup');
+    return sonarrResult;
   }
 
   private findPrequelRoot(media: AniMedia): number {
@@ -152,28 +160,34 @@ export class MappingService {
     let rootId = media.id;
 
     while (currentNode?.relations) {
-        const prequelEdge = currentNode.relations.edges.find(e => e.relationType === 'PREQUEL');
-        if (prequelEdge) {
-            rootId = prequelEdge.node.id;
-            currentNode = prequelEdge.node;
-        } else {
-            break;
-        }
+      const prequelEdge = currentNode.relations.edges.find(e => e.relationType === 'PREQUEL');
+      if (prequelEdge) {
+        rootId = prequelEdge.node.id;
+        currentNode = prequelEdge.node;
+      } else {
+        break;
+      }
     }
     return rootId;
   }
 
-  private checkStaticMaps(anilistId: number): number | null {
-    const fromPrimary = this.primaryPairsMap.get(anilistId);
-    if (fromPrimary) return fromPrimary;
-    return this.fallbackPairsMap.get(anilistId) ?? null;
+  private checkStaticMaps(anilistId: number): { tvdbId: number; source: 'primary' | 'fallback' } | null {
+    if (this.primaryPairsMap.has(anilistId)) {
+      // primary wins if present
+      // note: we don't increment here to avoid double counting when called from multiple paths
+      return { tvdbId: this.primaryPairsMap.get(anilistId)!, source: 'primary' };
+    }
+    if (this.fallbackPairsMap.has(anilistId)) {
+      return { tvdbId: this.fallbackPairsMap.get(anilistId)!, source: 'fallback' };
+    }
+    return null;
   }
-  
+
   private async refreshStaticMapping(type: 'primary' | 'fallback'): Promise<void> {
-    const config = type === 'primary' 
+    const config = type === 'primary'
       ? { url: PRIMARY_URL, jsonKey: PRIMARY_JSON_KEY, metaKey: PRIMARY_META_KEY, map: this.primaryPairsMap, name: 'Primary' }
       : { url: FALLBACK_URL, jsonKey: FALLBACK_JSON_KEY, metaKey: FALLBACK_META_KEY, map: this.fallbackPairsMap, name: 'Fallback' };
-    
+
     try {
       await retryWithBackoff(async () => {
         const meta = (await browser.storage.local.get(config.metaKey))[config.metaKey] as { etag?: string; updatedAt?: number } | undefined;
@@ -200,15 +214,23 @@ export class MappingService {
       logError(normalizeError(e), `MappingService:refreshStaticMapping:${type}`);
     }
   }
-  
+
   private buildMapFromJSON(json: unknown, map: Map<number, number>, type: 'primary' | 'fallback'): void {
     map.clear();
     const source = type === 'primary' ? (json as { anilist?: unknown }).anilist : json;
     if (!source || typeof source !== 'object') return;
-    
+
+    interface MappingEntry {
+      anilist_id?: unknown;
+      anilist?: unknown;
+      tvdb_id?: unknown;
+      tvdb?: unknown;
+    }
+
     for (const entry of Object.values(source as Record<string, unknown>[])) {
-      const anilistId = this.coerceId(entry.anilist_id ?? entry.anilist);
-      const tvdbId = this.coerceId(entry.tvdb_id ?? entry.tvdb);
+      const mappingEntry = entry as MappingEntry;
+      const anilistId = this.coerceId(mappingEntry.anilist_id ?? mappingEntry.anilist);
+      const tvdbId = this.coerceId(mappingEntry.tvdb_id ?? mappingEntry.tvdb);
       if (anilistId != null && tvdbId != null) {
         map.set(anilistId, tvdbId);
       }
@@ -216,10 +238,10 @@ export class MappingService {
   }
 
   private async ensureMapLoaded(type: 'primary' | 'fallback'): Promise<void> {
-    const config = type === 'primary' 
+    const config = type === 'primary'
       ? { jsonKey: PRIMARY_JSON_KEY, map: this.primaryPairsMap }
       : { jsonKey: FALLBACK_JSON_KEY, map: this.fallbackPairsMap };
-      
+
     if (config.map.size > 0) return;
     const raw = await browser.storage.local.get(config.jsonKey);
     const json = raw[config.jsonKey];
@@ -269,7 +291,7 @@ export class MappingService {
       } catch (e) {
         logError(normalizeError(e), `MappingService:lookupViaSonarr:term:'${term}'`);
       }
-      
+
       if (bestMatch && bestMatch.score >= EARLY_STOP_THRESHOLD) {
         break;
       }
@@ -299,7 +321,7 @@ export class MappingService {
 
     pushIf(titles?.english);
     pushIf(titles?.romaji);
-    
+
     if (Array.isArray(synonyms)) {
       for (let i = 0; i < synonyms.length && i < 4; i++) pushIf(synonyms[i]);
     }

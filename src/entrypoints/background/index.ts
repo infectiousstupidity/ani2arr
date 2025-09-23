@@ -10,6 +10,7 @@ import { defineBackground } from 'wxt/utils/define-background';
 import browser from 'webextension-polyfill';
 import { registerKitsunarrApi, getKitsunarrApi } from '@/services';
 import { computeTitleMatchScore } from '@/utils/matching';
+import { logger } from '@/utils/logger';
 
 type OpenOptionsMessage = { type: 'OPEN_OPTIONS_PAGE' };
 type MappingRefreshMessage = { type: 'kitsunarr:mapping:refresh' };
@@ -40,11 +41,13 @@ function isMappingRefreshMessage(x: unknown): x is MappingRefreshMessage {
 const MAPPING_REFRESH_ALARM = 'kitsunarr:refresh-static-mappings';
 const MAPPING_REFRESH_PERIOD_MIN = 360; // 6 hours
 
+const log = logger.create('Background');
+
 export default defineBackground(() => {
-  console.log('[Kitsunarr] Background initializing…');
+  log.info('Background initializing…');
 
   registerKitsunarrApi();
-  console.log('[Kitsunarr] API services registered.');
+  log.info('API services registered.');
 
   const api = getKitsunarrApi();
   const alarmsApi = (browser as unknown as { alarms?: typeof browser.alarms }).alarms;
@@ -54,7 +57,7 @@ export default defineBackground(() => {
       const existing = await alarmsApi.get(MAPPING_REFRESH_ALARM);
       if (!existing) {
         alarmsApi.create(MAPPING_REFRESH_ALARM, { periodInMinutes: MAPPING_REFRESH_PERIOD_MIN });
-        console.log(`[Kitsunarr] Alarm created: ${MAPPING_REFRESH_ALARM} every ${MAPPING_REFRESH_PERIOD_MIN}m.`);
+        log.debug(`Alarm created: ${MAPPING_REFRESH_ALARM} every ${MAPPING_REFRESH_PERIOD_MIN}m.`);
       }
       return;
     }
@@ -62,16 +65,16 @@ export default defineBackground(() => {
     const key = '__kitsunarr_fallback_interval__';
     if (!(globalThis as Record<string, unknown>)[key]) {
       (globalThis as Record<string, unknown>)[key] = globalThis.setInterval(() => {
-        console.log('[Kitsunarr] Fallback timer → refreshing static mappings');
+        log.debug('Fallback timer → refreshing static mappings');
         void api.mapping.initStaticPairs();
       }, MAPPING_REFRESH_PERIOD_MIN * 60 * 1000);
-      console.log('[Kitsunarr] Using setInterval fallback for periodic refresh.');
+      log.debug('Using setInterval fallback for periodic refresh.');
     }
   };
 
   browser.runtime.onInstalled.addListener(async (details) => {
     if (details.reason === 'install') {
-      console.log('[Kitsunarr] First-time install.');
+      log.info('First-time install.');
       browser.runtime.openOptionsPage().catch(() => {});
     }
     // Initialize mappings on first install
@@ -88,7 +91,7 @@ export default defineBackground(() => {
   if (alarmsApi) {
     alarmsApi.onAlarm.addListener((alarm) => {
       if (alarm.name === MAPPING_REFRESH_ALARM) {
-        console.log('[Kitsunarr] Alarm → refreshing static mappings');
+        log.debug('Alarm → refreshing static mappings');
         void api.mapping.initStaticPairs();
       }
     });
@@ -102,7 +105,7 @@ export default defineBackground(() => {
       }
 
       if (isMappingRefreshMessage(message)) {
-        console.log('[Kitsunarr] Message → refreshing static mappings');
+        log.debug('Message → refreshing static mappings');
         void api.mapping.initStaticPairs();
         return Promise.resolve({ ok: true as const });
       }
@@ -123,5 +126,5 @@ export default defineBackground(() => {
     },
   );
 
-  console.log('[Kitsunarr] Background setup complete.');
+  log.info('Background setup complete.');
 });

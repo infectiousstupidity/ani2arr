@@ -13,6 +13,9 @@ import type {
   SonarrLookupSeries,
 } from '@/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
+import { logger } from '@/utils/logger';
+
+const log = logger.create('SonarrApiService');
 
 export class SonarrApiService {
   private request = async <T>(
@@ -109,7 +112,7 @@ export class SonarrApiService {
       },
     };
 
-    console.log('[SonarrApiService] Sending addSeries payload to Sonarr:', apiPayload);
+    log.debug('Sending addSeries payload to Sonarr:', apiPayload);
     return this.request<SonarrSeries>('series', sonarrCreds, {
       method: 'POST',
       body: JSON.stringify(apiPayload),
