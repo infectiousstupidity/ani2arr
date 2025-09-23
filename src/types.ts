@@ -93,6 +93,7 @@ export interface CheckSeriesStatusResponse {
   exists: boolean;
   tvdbId: number | null;
   successfulSynonym?: string;
+  anilistTvdbLinkMissing?: boolean;
   series?: LeanSonarrSeries;
 }
 

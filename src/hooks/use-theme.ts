@@ -7,11 +7,6 @@ const themeConfig = new Map<string, { selector: string; darkClass: string }>([
   // Future sites can be added here
 ]);
 
-/**
- * A React hook that applies the correct theme to a Shadow DOM host element.
- * It observes the host page for theme changes and syncs them.
- * @param refToChildOfHost A React ref pointing to an element *inside* the Shadow DOM.
- */
 export function useTheme(refToChildOfHost: React.RefObject<HTMLElement | null>): void {
   useLayoutEffect(() => {
     // 1. Get the element inside the shadow DOM from the ref.

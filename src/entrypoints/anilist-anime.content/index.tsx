@@ -6,9 +6,12 @@ import { useTheme } from '@/hooks/use-theme';
 import { useSeriesStatus, useAddSeries, useExtensionOptions, queryKeys } from '@/hooks/use-api-queries';
 import { getKitsunarrApi } from '@/services';
 import SonarrActionGroup from '@/ui/SonarrActionGroup';
+import { logger } from '@/utils/logger';
 import './style.css';
 
 import type { ContentScriptContext, ShadowRootContentScriptUi } from 'wxt/client';
+
+const log = logger.create('AniList Content');
 
 const queryClient = new QueryClient();
 
@@ -165,7 +168,7 @@ const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) => {
         localQueryClient.invalidateQueries({ queryKey: queryKeys.seriesStatus(anilistId) });
       })
       .catch(error => {
-        console.error("[Kitsunarr] Background re-validation failed:", error);
+        log.error('Background re-validation failed:', error);
       });
   
   }, [anilistId, localQueryClient]);
@@ -290,7 +293,9 @@ export default defineContentScript({
     await route(location.href);
 
     ctx.addEventListener(window, 'wxt:locationchange', (e: Event & { newUrl: URL }) => {
-      route(e.newUrl.href).catch(console.error);
+      route(e.newUrl.href).catch((error) => {
+        log.error('Failed to handle location change:', error);
+      });
     });
   },
 });

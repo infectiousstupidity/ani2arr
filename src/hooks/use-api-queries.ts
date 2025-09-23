@@ -71,8 +71,6 @@ export const useAddSeries = () => {
       const baseOptions = await extensionOptions.getValue();
       if (!baseOptions) throw new Error('Extension options are not loaded.');
 
-      // This call correctly triggers the full, network-enabled lookup when the user
-      // explicitly clicks the "Add" button.
       const { tvdbId } = await api.mapping.resolveTvdbId(payload.anilistId);
       if (!tvdbId) throw new Error('Could not resolve TVDB ID for this series.');
 
