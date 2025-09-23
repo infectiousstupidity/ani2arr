@@ -87,7 +87,10 @@ export interface AddRequestPayload extends Partial<SonarrFormState> {
   tvdbId?: number;
 }
 
-export interface CheckSeriesStatusPayload { anilistId: number; }
+export interface CheckSeriesStatusPayload {
+  anilistId: number;
+  title?: string;
+}
 
 export interface CheckSeriesStatusResponse {
   exists: boolean;

@@ -22,10 +22,20 @@ const SCORE_THRESHOLD = 0.76;
 const EARLY_STOP_THRESHOLD = 0.82;
 const MAX_TERMS = 5;
 
+type ResolveHints = {
+  primaryTitle?: string;
+};
+
+type ResolveTvdbIdOptions = {
+  network?: 'never';
+  hints?: ResolveHints;
+};
+
 type QueuedMappingRequest = {
   anilistId: number;
   resolve: (value: ResolvedMapping) => void;
   reject: (reason: Error | ExtensionError) => void;
+  hints?: ResolveHints;
 };
 const MAPPING_BATCH_SIZE = 3;
 const MAPPING_BATCH_DELAY_MS = 1500;
@@ -59,7 +69,7 @@ export class MappingService {
     }
   }
 
-  public resolveTvdbId(anilistId: number, options: { network?: 'never' } = {}): Promise<ResolvedMapping> {
+  public resolveTvdbId(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping> {
     if (this.inflight.has(anilistId)) {
       return this.inflight.get(anilistId)!;
     }
@@ -77,7 +87,7 @@ export class MappingService {
     return promise;
   }
 
-  private async getOrQueueResolution(anilistId: number, options: { network?: 'never' } = {}): Promise<ResolvedMapping> {
+  private async getOrQueueResolution(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping> {
     const cacheKey = `resolved_mapping:${anilistId}`;
     const cached = await this.cache.get<ResolvedMapping>(cacheKey);
     if (cached) {
@@ -98,8 +108,23 @@ export class MappingService {
       throw this.notFound(anilistId, 'Local-only check failed, network access is disabled for this request.');
     }
 
+    const hintTitle = options.hints?.primaryTitle?.trim();
+    let normalizedHints: ResolveHints | undefined;
+    if (hintTitle) {
+      const hinted = await this.attemptHintedSonarrLookup(anilistId, hintTitle);
+      if (hinted) {
+        return hinted;
+      }
+      normalizedHints = { primaryTitle: hintTitle };
+    }
+
+
     return new Promise((resolve, reject) => {
-      this.mappingQueue.push({ anilistId, resolve, reject });
+      const request: QueuedMappingRequest = { anilistId, resolve, reject };
+      if (normalizedHints) {
+        request.hints = normalizedHints;
+      }
+      this.mappingQueue.push(request);
       if (!this.isProcessingMappingQueue) {
         this.processMappingQueue();
       }
@@ -115,7 +140,7 @@ export class MappingService {
 
       await Promise.allSettled(batch.map(async (req) => {
         try {
-          const result = await this.performNetworkResolution(req.anilistId);
+          const result = await this.performNetworkResolution(req.anilistId, req.hints);
           req.resolve(result);
         } catch (e) {
           req.reject(normalizeError(e));
@@ -130,14 +155,34 @@ export class MappingService {
     this.isProcessingMappingQueue = false;
   }
 
-  private async performNetworkResolution(anilistId: number): Promise<ResolvedMapping> {
+  private async attemptHintedSonarrLookup(anilistId: number, primaryTitle: string): Promise<ResolvedMapping | null> {
+    const normalizedTitle = primaryTitle.trim();
+    if (!normalizedTitle) return null;
+
+    try {
+      const result = await this.lookupViaSonarr(
+        anilistId,
+        { english: normalizedTitle, romaji: normalizedTitle },
+        [normalizedTitle],
+        undefined,
+      );
+      incrementPhase0Counter('sonarr-lookup');
+      return result;
+    } catch (e) {
+      const normalized = normalizeError(e);
+      if (normalized.code !== ErrorCode.VALIDATION_ERROR && normalized.code !== ErrorCode.CONFIGURATION_ERROR) {
+        logError(normalized, `MappingService:hintLookup:${anilistId}`);
+      }
+      return null;
+    }
+  }
+
+  private async performNetworkResolution(anilistId: number, hints?: ResolveHints): Promise<ResolvedMapping> {
     const media = await this.anilistApi.fetchMediaWithRelations(anilistId);
 
     if (media.format === 'MOVIE') {
       throw this.notFound(anilistId, `Unsupported format: ${media.format}. Only TV series can be added to Sonarr.`);
     }
-
-    // Removed: any use of media.externalLinks / TheTVDB direct link
 
     const prequelRootId = this.findPrequelRoot(media);
     if (prequelRootId !== anilistId) {
@@ -149,8 +194,19 @@ export class MappingService {
       }
     }
 
+    const enrichedTitle: AniTitles = { ...media.title };
+    const synonyms = Array.isArray(media.synonyms) ? [...media.synonyms] : [];
+
+    const hintTitle = hints?.primaryTitle?.trim();
+    if (hintTitle) {
+      synonyms.unshift(hintTitle);
+      if (!enrichedTitle.english) {
+        enrichedTitle.english = hintTitle;
+      }
+    }
+
     const startYear = media.startDate?.year ?? undefined;
-    const sonarrResult = await this.lookupViaSonarr(anilistId, media.title, media.synonyms, startYear);
+    const sonarrResult = await this.lookupViaSonarr(anilistId, enrichedTitle, synonyms, startYear);
     incrementPhase0Counter('sonarr-lookup');
     return sonarrResult;
   }

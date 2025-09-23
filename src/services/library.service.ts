@@ -1,7 +1,7 @@
 import type { CacheService } from './cache.service';
 import type { SonarrApiService } from '@/api/sonarr.api';
 import type { MappingService } from './mapping.service';
-import type { CheckSeriesStatusResponse, SonarrSeries, LeanSonarrSeries } from '../types';
+import type { CheckSeriesStatusPayload, CheckSeriesStatusResponse, SonarrSeries, LeanSonarrSeries } from '../types';
 import { logError, normalizeError } from '@/utils/error-handling';
 import { extensionOptions } from '@/utils/storage';
 
@@ -94,19 +94,23 @@ export class LibraryService {
   }
 
   public async getSeriesStatus(
-    anilistId: number,
+    payload: CheckSeriesStatusPayload,
     options: { force_verify?: boolean; network?: 'never' } = {},
   ): Promise<CheckSeriesStatusResponse> {
     try {
       const leanSeriesList = await this.getLeanSeriesList();
 
-      const mappingOptions: { network?: 'never' } = {};
+      const mappingOptions: { network?: 'never'; hints?: { primaryTitle?: string } } = {};
       if (options.network === 'never') {
         mappingOptions.network = 'never';
       }
+      const normalizedTitle = payload.title?.trim();
+      if (normalizedTitle) {
+        mappingOptions.hints = { primaryTitle: normalizedTitle };
+      }
 
       const { tvdbId, successfulSynonym } =
-        await this.mappingService.resolveTvdbId(anilistId, mappingOptions);
+        await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
 
       // MappingService never returns null tvdbId; keeping check defensively
       if (tvdbId === null) {
@@ -161,7 +165,7 @@ export class LibraryService {
         };
       }
     } catch (e) {
-      logError(normalizeError(e), `LibraryService:getSeriesStatus:${anilistId}`);
+      logError(normalizeError(e), `LibraryService:getSeriesStatus:${payload.anilistId}`);
       return { exists: false, tvdbId: null };
     }
   }

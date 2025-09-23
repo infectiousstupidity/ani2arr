@@ -38,7 +38,7 @@ interface CardOverlayProps {
 }
 
 const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpenModal }) => {
-  const { data, isLoading } = useSeriesStatus({ anilistId }, { network: 'never' });
+  const { data, isLoading } = useSeriesStatus({ anilistId, title }, { network: 'never' });
   if (isLoading) return null;
 
   if (data?.exists) {

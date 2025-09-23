@@ -1,14 +1,35 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getKitsunarrApi } from '@/services';
 import { extensionOptions } from '@/utils/storage';
-import type { AddRequestPayload, CheckSeriesStatusPayload, ExtensionOptions, SonarrCredentialsPayload, SonarrSeries, TestConnectionPayload } from '@/types';
+import type {
+  AddRequestPayload,
+  CheckSeriesStatusPayload,
+  ExtensionOptions,
+  SonarrCredentialsPayload,
+  SonarrSeries,
+  TestConnectionPayload,
+} from '@/types';
 import { normalizeError } from '@/utils/error-handling';
 
+
+const rootQueryKey = ['kitsunarr'] as const;
+
+const normalizeTitleKey = (title?: string) => {
+  const trimmed = title?.trim();
+  return trimmed ? trimmed.toLowerCase() : null;
+};
+
+const seriesStatusBaseKey = (anilistId: number) => [...rootQueryKey, 'seriesStatus', anilistId] as const;
+
 export const queryKeys = {
-  all: ['kitsunarr'] as const,
-  options: () => [...queryKeys.all, 'options'] as const,
-  seriesStatus: (anilistId: number) => [...queryKeys.all, 'seriesStatus', anilistId] as const,
-  sonarrMetadata: (creds: SonarrCredentialsPayload | null) => [...queryKeys.all, 'sonarrMetadata', creds] as const,
+  all: rootQueryKey,
+  options: () => [...rootQueryKey, 'options'] as const,
+  seriesStatusBase: seriesStatusBaseKey,
+  seriesStatus: (payload: CheckSeriesStatusPayload) => [
+    ...seriesStatusBaseKey(payload.anilistId),
+    normalizeTitleKey(payload.title),
+  ] as const,
+  sonarrMetadata: (creds: SonarrCredentialsPayload | null) => [...rootQueryKey, 'sonarrMetadata', creds] as const,
 };
 
 export type SeriesStatusOptions = {
@@ -19,7 +40,7 @@ export type SeriesStatusOptions = {
 
 export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: SeriesStatusOptions) => {
   return useQuery({
-    queryKey: queryKeys.seriesStatus(payload.anilistId),
+    queryKey: queryKeys.seriesStatus(payload),
     queryFn: async () => {
       const serviceOptions: { force_verify?: boolean; network?: 'never' } = {};
       if (options?.force_verify) {
@@ -28,7 +49,7 @@ export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: Ser
       if (options?.network) {
         serviceOptions.network = options.network;
       }
-      return getKitsunarrApi().library.getSeriesStatus(payload.anilistId, serviceOptions);
+      return getKitsunarrApi().library.getSeriesStatus(payload, serviceOptions);
     },
     enabled: !!payload.anilistId && (options?.enabled ?? true),
     staleTime: 5 * 60 * 1000,
@@ -71,7 +92,9 @@ export const useAddSeries = () => {
       const baseOptions = await extensionOptions.getValue();
       if (!baseOptions) throw new Error('Extension options are not loaded.');
 
-      const { tvdbId } = await api.mapping.resolveTvdbId(payload.anilistId);
+      const { tvdbId } = await api.mapping.resolveTvdbId(payload.anilistId, {
+        hints: { primaryTitle: payload.title },
+      });
       if (!tvdbId) throw new Error('Could not resolve TVDB ID for this series.');
 
       const sonarrPayload: AddRequestPayload = { ...payload, tvdbId };
@@ -81,7 +104,7 @@ export const useAddSeries = () => {
     onSuccess: async (addedSeries, variables) => {
       const api = getKitsunarrApi();
       await api.library.addSeriesToCache(addedSeries);
-      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatus(variables.anilistId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
     },
     onError: (error: unknown) => {
       throw normalizeError(error);
