@@ -157,15 +157,15 @@ const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) => {
   const { data: options } = useExtensionOptions();
   const isConfigured = !!options?.sonarrUrl && !!options.sonarrApiKey;
 
-  const statusQuery = useSeriesStatus({ anilistId }, { enabled: !!anilistId });
+  const statusQuery = useSeriesStatus({ anilistId, title }, { enabled: !!anilistId });
   const addSeriesMutation = useAddSeries();
 
   useEffect(() => {
     if (!anilistId) return;
 
-    getKitsunarrApi().library.getSeriesStatus(anilistId, { force_verify: true })
+    getKitsunarrApi().library.getSeriesStatus({ anilistId, title }, { force_verify: true })
       .then(() => {
-        localQueryClient.invalidateQueries({ queryKey: queryKeys.seriesStatus(anilistId) });
+        localQueryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(anilistId) });
       })
       .catch(error => {
         log.error('Background re-validation failed:', error);

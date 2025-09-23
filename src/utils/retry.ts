@@ -5,6 +5,10 @@
  * This is used to make network requests more resilient to temporary failures.
  */
 
+import { logger } from '@/utils/logger';
+
+const log = logger.create('Retry');
+
 /**
  * Configuration options for the retry behavior.
  */
@@ -66,7 +70,9 @@ export async function retryWithBackoff<T>(fn: () => Promise<T>, options: RetryOp
       const delay = Math.min(baseDelay * Math.pow(backoffMultiplier, attempt), maxDelay);
       const jitteredDelay = delay + (Math.random() * (delay * 0.2)); // Jitter of up to 20%
 
-      console.log(`[Kitsunarr] Request failed. Retrying in ${Math.round(jitteredDelay)}ms (attempt ${attempt + 1}/${maxRetries}).`);
+      log.debug(
+        `Request failed. Retrying in ${Math.round(jitteredDelay)}ms (attempt ${attempt + 1}/${maxRetries}).`,
+      );
       await new Promise(resolve => setTimeout(resolve, jitteredDelay));
     }
   }
