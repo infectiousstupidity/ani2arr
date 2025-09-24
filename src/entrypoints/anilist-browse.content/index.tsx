@@ -372,23 +372,42 @@ const BrowseContentApp: React.FC = () => {
 
     const mo = new MutationObserver(mutations => {
       let shouldRescan = false;
+      const cardsToUpsert = new Set<Element>();
+
+      const enqueueCardForNode = (node: Node | null | undefined) => {
+        if (!node) return;
+        const element = node instanceof Element ? node : node.parentElement;
+        const card = element?.closest?.(CARD_SELECTOR);
+        if (card) {
+          cardsToUpsert.add(card);
+        }
+      };
 
       for (const m of mutations) {
         m.addedNodes.forEach(node => {
-          if (!(node instanceof Element)) return;
-          if (node.matches?.(CARD_SELECTOR)) {
-            upsertCard(node);
-          } else if (!shouldRescan && node.querySelector?.(CARD_SELECTOR)) {
+          if (node instanceof Element && node.matches?.(CARD_SELECTOR)) {
+            cardsToUpsert.add(node);
+            return;
+          }
+
+          enqueueCardForNode(node);
+
+          if (
+            !shouldRescan &&
+            (node instanceof Element || node instanceof DocumentFragment) &&
+            node.querySelector?.(CARD_SELECTOR)
+          ) {
             shouldRescan = true;
           }
         });
 
+        if (m.type === 'childList' && m.addedNodes.length > 0) {
+          enqueueCardForNode(m.target);
+        }
+
         if (m.type === 'attributes' && m.target instanceof Element) {
-          if (m.target.matches(COVER_SELECTOR)) {
-            const card = m.target.closest(CARD_SELECTOR);
-            if (card) {
-              upsertCard(card);
-            }
+          if (m.target.matches(COVER_SELECTOR) || m.target.matches(CARD_SELECTOR)) {
+            enqueueCardForNode(m.target);
           }
         }
 
@@ -397,6 +416,8 @@ const BrowseContentApp: React.FC = () => {
           removeStalePortals();
         }
       }
+
+      cardsToUpsert.forEach(card => upsertCard(card));
 
       if (shouldRescan) scanAll();
     });
