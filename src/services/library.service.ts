@@ -95,14 +95,17 @@ export class LibraryService {
 
   public async getSeriesStatus(
     payload: CheckSeriesStatusPayload,
-    options: { force_verify?: boolean; network?: 'never' } = {},
+    options: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {},
   ): Promise<CheckSeriesStatusResponse> {
     try {
       const leanSeriesList = await this.getLeanSeriesList();
 
-      const mappingOptions: { network?: 'never'; hints?: { primaryTitle?: string } } = {};
+      const mappingOptions: { network?: 'never'; hints?: { primaryTitle?: string }; ignoreFailureCache?: boolean } = {};
       if (options.network === 'never') {
         mappingOptions.network = 'never';
+      }
+      if (options.ignoreFailureCache) {
+        mappingOptions.ignoreFailureCache = true;
       }
       const normalizedTitle = payload.title?.trim();
       if (normalizedTitle) {

@@ -96,7 +96,11 @@ interface CardOverlayProps {
 
 const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpenModal }) => {
   const { data: options } = useExtensionOptions();
-  const statusQuery = useSeriesStatus({ anilistId, title }, { enabled: Number.isFinite(anilistId) });
+  const bypassFailureCacheRef = useRef(false);
+  const statusQuery = useSeriesStatus(
+    { anilistId, title },
+    { enabled: Number.isFinite(anilistId), ignoreFailureCache: () => bypassFailureCacheRef.current },
+  );
   const addSeriesMutation = useAddSeries();
 
   const isConfigured = !!options?.sonarrUrl && !!options.sonarrApiKey;
@@ -198,7 +202,12 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
           return;
         }
         if (statusHasError) {
-          void refetch({ throwOnError: false }).catch(() => {});
+          bypassFailureCacheRef.current = true;
+          void refetch({ throwOnError: false })
+            .catch(() => {})
+            .finally(() => {
+              bypassFailureCacheRef.current = false;
+            });
           return;
         }
       }
@@ -208,6 +217,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
     [
       addHasError,
       anilistId,
+      bypassFailureCacheRef,
       isConfigured,
       mutate,
       overlayState,

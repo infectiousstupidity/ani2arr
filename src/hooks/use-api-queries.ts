@@ -38,18 +38,26 @@ export type SeriesStatusOptions = {
   enabled?: boolean;
   force_verify?: boolean;
   network?: 'never';
+  ignoreFailureCache?: boolean | (() => boolean);
 };
 
 export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: SeriesStatusOptions) => {
   return useQuery<CheckSeriesStatusResponse, ExtensionError>({
     queryKey: queryKeys.seriesStatus(payload),
     queryFn: async () => {
-      const serviceOptions: { force_verify?: boolean; network?: 'never' } = {};
+      const serviceOptions: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {};
       if (options?.force_verify) {
         serviceOptions.force_verify = true;
       }
       if (options?.network) {
         serviceOptions.network = options.network;
+      }
+      const optionBypass =
+        typeof options?.ignoreFailureCache === 'function'
+          ? options.ignoreFailureCache()
+          : options?.ignoreFailureCache === true;
+      if (optionBypass) {
+        serviceOptions.ignoreFailureCache = true;
       }
       return getKitsunarrApi().library.getSeriesStatus(payload, serviceOptions);
     },
@@ -97,6 +105,7 @@ export const useAddSeries = () => {
 
         const { tvdbId } = await api.mapping.resolveTvdbId(payload.anilistId, {
           hints: { primaryTitle: payload.title },
+          ignoreFailureCache: true,
         });
         if (!tvdbId) throw new Error('Could not resolve TVDB ID for this series.');
 
