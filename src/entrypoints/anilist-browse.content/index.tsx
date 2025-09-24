@@ -266,9 +266,11 @@ const BrowseContentApp: React.FC = () => {
   const handleCloseModal = useCallback(() => setModalState(null), []);
 
   useEffect(() => {
-    const rootContainer =
+    const observerRoot = document.body ?? document.documentElement;
+    if (!observerRoot) return;
+
+    const getScanRoot = () =>
       document.querySelector<HTMLElement>('.page-content') ?? document.body;
-    if (!rootContainer) return;
 
     const parseCard = (card: Element): (CardOverlayProps & { host: HTMLAnchorElement }) | null => {
       const cover = card.querySelector<HTMLAnchorElement>(COVER_SELECTOR);
@@ -359,7 +361,13 @@ const BrowseContentApp: React.FC = () => {
     };
 
     const scanAll = () => {
-      const cards = rootContainer.querySelectorAll(CARD_SELECTOR);
+      const scanRoot = getScanRoot();
+      if (!scanRoot) {
+        removeStalePortals();
+        return;
+      }
+
+      const cards = scanRoot.querySelectorAll(CARD_SELECTOR);
       if (cards.length === 0) {
         removeStalePortals();
         return;
@@ -422,7 +430,7 @@ const BrowseContentApp: React.FC = () => {
       if (shouldRescan) scanAll();
     });
 
-    mo.observe(rootContainer, {
+    mo.observe(observerRoot, {
       childList: true,
       subtree: true,
       attributes: true,

@@ -171,7 +171,7 @@ const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) => {
         log.error('Background re-validation failed:', error);
       });
   
-  }, [anilistId, localQueryClient]);
+  }, [anilistId, title, localQueryClient]);
 
   const handleQuickAdd = () => {
     if (!isConfigured) {
@@ -280,22 +280,45 @@ async function mountAnimePageUI(ctx: ContentScriptContext): Promise<void> {
 }
 
 export default defineContentScript({
-  matches: ['*://anilist.co/anime/*'],
+  matches: ['*://anilist.co/*'],
   cssInjectionMode: 'ui',
   runAt: 'document_end',
   async main(ctx: ContentScriptContext) {
+    const removeAnimeUI = () => {
+      try {
+        ui?.remove();
+    } catch (error) {
+      log.error('Error removing UI:', error);
+      }
+      ui = null;
+      stopAnchorKeeper?.();
+      stopAnchorKeeper = null;
+      stopSizeSync?.();
+      stopSizeSync = null;
+    };
+
     const route = async (url: string) => {
       if (ANIME_PAGE.includes(url)) {
         await mountAnimePageUI(ctx);
+      } else {
+        removeAnimeUI();
       }
     };
 
+    // Initial route
     await route(location.href);
 
-    ctx.addEventListener(window, 'wxt:locationchange', (e: Event & { newUrl: URL }) => {
-      route(e.newUrl.href).catch((error) => {
+    type LocationChangeEvent = CustomEvent<{ newUrl: URL }>;
+    ctx.addEventListener(window, 'wxt:locationchange', (ev: Event) => {
+      const event = ev as LocationChangeEvent;
+      const href = event.detail?.newUrl?.href ?? location.href;
+      route(href).catch(error => {
         log.error('Failed to handle location change:', error);
       });
+    });
+
+    ctx.onInvalidated(() => {
+      removeAnimeUI();
     });
   },
 });
