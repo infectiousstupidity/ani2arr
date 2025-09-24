@@ -65,7 +65,7 @@ export default defineBackground(() => {
     const key = '__kitsunarr_fallback_interval__';
     if (!(globalThis as Record<string, unknown>)[key]) {
       (globalThis as Record<string, unknown>)[key] = globalThis.setInterval(() => {
-        log.debug('Fallback timer → refreshing static mappings');
+        log.debug('Fallback timer -> refreshing static mappings');
         void api.mapping.initStaticPairs();
       }, MAPPING_REFRESH_PERIOD_MIN * 60 * 1000);
       log.debug('Using setInterval fallback for periodic refresh.');
@@ -91,7 +91,7 @@ export default defineBackground(() => {
   if (alarmsApi) {
     alarmsApi.onAlarm.addListener((alarm) => {
       if (alarm.name === MAPPING_REFRESH_ALARM) {
-        log.debug('Alarm → refreshing static mappings');
+        log.debug('Alarm -> refreshing static mappings');
         void api.mapping.initStaticPairs();
       }
     });
@@ -105,7 +105,7 @@ export default defineBackground(() => {
       }
 
       if (isMappingRefreshMessage(message)) {
-        log.debug('Message → refreshing static mappings');
+        log.debug('Message -> refreshing static mappings');
         void api.mapping.initStaticPairs();
         return Promise.resolve({ ok: true as const });
       }

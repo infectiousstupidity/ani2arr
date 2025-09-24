@@ -2,9 +2,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { useTheme } from '@/hooks/use-theme';
 import { useSeriesStatus, useAddSeries, useExtensionOptions, queryKeys } from '@/hooks/use-api-queries';
 import { getKitsunarrApi } from '@/services';
+import { idbQueryCachePersister } from '@/utils/cache-persister';
 import SonarrActionGroup from '@/ui/SonarrActionGroup';
 import { logger } from '@/utils/logger';
 import './style.css';
@@ -14,6 +16,18 @@ import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shad
 const log = logger.create('AniList Content');
 
 const queryClient = new QueryClient();
+
+if (typeof window !== 'undefined') {
+  const [, restorePromise] = persistQueryClient({
+    queryClient,
+    persister: idbQueryCachePersister,
+    maxAge: 1000 * 60 * 60 * 24,
+  });
+
+  restorePromise.catch(error => {
+    log.warn('Failed to hydrate query cache', error);
+  });
+}
 
 const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
 

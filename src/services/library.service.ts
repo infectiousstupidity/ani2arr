@@ -165,8 +165,9 @@ export class LibraryService {
         };
       }
     } catch (e) {
-      logError(normalizeError(e), `LibraryService:getSeriesStatus:${payload.anilistId}`);
-      return { exists: false, tvdbId: null };
+      const normalized = normalizeError(e);
+      logError(normalized, `LibraryService:getSeriesStatus:${payload.anilistId}`);
+      throw normalized;
     }
   }
 

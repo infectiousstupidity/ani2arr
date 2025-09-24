@@ -31,7 +31,7 @@ export function incrementPhase0Counter(key: Phase0CounterKey): void {
   counters[key] += 1;
 
   if (logger.isLevelEnabled('debug')) {
-    metricsLogger.debug(`counter '${key}' → ${counters[key]}`);
+    metricsLogger.debug(`counter '${key}' -> ${counters[key]}`);
   }
 }
 

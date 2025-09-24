@@ -1,5 +1,5 @@
 // src/ui/SonarrForm.tsx
-import React, { useState, useLayoutEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useRef, useMemo } from 'react';
 import type { SonarrFormState, SonarrQualityProfile, SonarrRootFolder, SonarrTag } from '@/types';
 import {
   FormField,
@@ -31,6 +31,36 @@ interface SonarrFormProps {
 const SonarrForm: React.FC<SonarrFormProps> = ({ options, data, onChange, disabled, className }) => {
   const formRef = useRef<HTMLDivElement>(null);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
+
+  const tagMaps = useMemo(() => {
+    const idToLabel = new Map<number, string>();
+    const labelToId = new Map<string, number>();
+
+    for (const tag of data.tags) {
+      if (tag.label) {
+        idToLabel.set(tag.id, tag.label);
+        labelToId.set(tag.label, tag.id);
+      }
+    }
+
+    return { idToLabel, labelToId };
+  }, [data.tags]);
+
+  const { idToLabel, labelToId } = tagMaps;
+
+  const selectedTagLabels = useMemo(() => {
+    return options.tags
+      .map(tagId => idToLabel.get(tagId))
+      .filter((label): label is string => typeof label === 'string' && label.length > 0);
+  }, [options.tags, idToLabel]);
+
+  const handleTagsChange = (labels: string[]) => {
+    const tagIds = labels
+      .map(label => labelToId.get(label))
+      .filter((id): id is number => typeof id === 'number');
+
+    onChange('tags', tagIds);
+  };
 
   // useLayoutEffect runs synchronously after a render but before the screen is updated.
   // This is the ideal place to find a DOM node to prevent any flicker.
@@ -154,8 +184,8 @@ const SonarrForm: React.FC<SonarrFormProps> = ({ options, data, onChange, disabl
           <FormLabel>Tags</FormLabel>
           <FormControl>
             <MultiTagInput
-              value={options.tags}
-              onChange={(newTags) => onChange('tags', newTags)}
+              value={selectedTagLabels}
+              onChange={handleTagsChange}
               placeholder="Add tags..."
               disabled={!!disabled}
               existingTags={data.tags.map(t => t.label)}

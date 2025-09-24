@@ -8,9 +8,6 @@ import { CheckCircledIcon, CrossCircledIcon, ReloadIcon } from '@radix-ui/react-
 
 const SettingsForm: React.FC = () => {
   const manager = useSettingsManager();
-  const portalRef = React.useRef<HTMLDivElement>(null);
-  // portalTarget is now unused; logic moved inline for popup container handling.
-
   if (manager.isLoading) {
     return <div className="text-center p-8 text-text-secondary">Loading settings...</div>;
   }
@@ -111,17 +108,11 @@ const SettingsForm: React.FC = () => {
                 Loading Sonarr data...
               </div>
             ) : manager.sonarrMetadata.data ? (
-              <div ref={portalRef} className="space-y-6">
+              <div className="space-y-6">
                 <SonarrForm
                   options={manager.formState.defaults}
                   data={manager.sonarrMetadata.data}
                   onChange={manager.handleDefaultsChange}
-                  portalContainer={
-                    // Only pass portalContainer in popup context
-                    window.location.pathname.includes('popup')
-                      ? portalRef.current ?? undefined
-                      : undefined
-                  }
                   disabled={manager.saveState.isPending}
                 />
               </div>
