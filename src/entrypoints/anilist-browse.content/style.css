@@ -1,78 +1,213 @@
-/* src/entrypoints/anilist-browse.content/style.css */
+@import "tailwindcss";
 
-/*
-  The .media-card selector is now only used to establish a positioning context.
-  A data attribute [data-kitsunarr-processed] is added by the script to prevent re-processing cards.
-*/
-.media-card {
+/* Theme variables so shared UI components (e.g., Button) render consistently */
+:host {
+  --bg-primary:    #FAFAFA;
+  --bg-secondary:  #f2f5f7;
+  --bg-tertiary:   #EDF1F5;
+  --text-primary:  #212529;
+  --text-secondary:#607080;
+  --border-primary:#DEE2E6;
+  --accent-primary:#3DB4F2;
+  --accent-hover:  #299dd1;
+  --success:       #00BA7C;
+  --error:         #F91880;
+  --iconbutton-text: #FAFAFA;
+
+  color: var(--text-primary);
+}
+
+:host(.dark) {
+  --bg-primary:    #0b1622;
+  --bg-secondary:  #151f2e;
+  --bg-tertiary:   #253341;
+  --text-primary:  #F7F9F9;
+  --text-secondary:#9FADBD;
+  --border-primary:#38444D;
+  --accent-primary:#3DB4F2;
+  --accent-hover:  #299dd1;
+  --success:       #00BA7C;
+  --error:         #F91880;
+  --iconbutton-text: #F7F9F9;
+}
+
+@theme {
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-border-primary: var(--border-primary);
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-hover: var(--accent-hover);
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --color-iconbutton-text: var(--iconbutton-text);
+}
+
+a.cover {
   position: relative;
 }
 
-/* 
-  This is the container for the React Portal. It ensures our UI doesn't interfere
-  with the card's flex/grid layout and can be absolutely positioned reliably.
-*/
-.kitsunarr-overlay-container {
+.kitsunarr-card-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none; /* Allows clicks to pass through to the card link */
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 30;
+  font-family: inherit;
 }
 
-/* --- Tier 1: "In Sonarr" Triangle Indicator --- */
-.kitsunarr-in-sonarr-indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 0;
-  border-style: solid;
-  border-width: 28px 28px 0 0; /* Slightly smaller for a cleaner look */
-  border-color: #00BA7C transparent transparent transparent; /* Sonarr Green */
-  z-index: 5;
-  pointer-events: all; /* Capture hover events for the title attribute */
+.kitsunarr-card-overlay__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 150ms ease, transform 150ms ease;
+  pointer-events: none;
 }
 
-/* --- Tier 2: Hover-to-reveal "Add" Button --- */
-.kitsunarr-add-btn {
-  /* Re-enable pointer events for the button itself */
-  pointer-events: auto; 
-  
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
+a.cover:hover .kitsunarr-card-overlay__actions,
+.kitsunarr-card-overlay:focus-within .kitsunarr-card-overlay__actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.kitsunarr-card-overlay__action-wrapper {
+  pointer-events: auto;
+}
+
+.kitsunarr-card-overlay__gear {
+  width: 34px;
+  height: 34px;
   border-radius: 9999px;
-  background-color: hsla(208, 55%, 9%, 0.85); /* Dark background with slight transparency */
-  color: #F7F9F9; /* Light icon */
-  
-  /* Flex centering for the icon */
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(18, 22, 26, 0.92);
+  color: #f7f9f9;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease;
   cursor: pointer;
-  z-index: 10;
-  
-  /* Hidden by default */
-  opacity: 0;
-  transform: translateY(4px) scale(0.95);
-  transition: opacity 150ms ease-in-out, transform 150ms ease-in-out;
+  padding: 0;
 }
 
-/* Reveal on parent hover */
-.media-card:hover .kitsunarr-add-btn {
-  opacity: 1;
-  transform: translateY(0) scale(1);
+.kitsunarr-card-overlay__gear:hover {
+  transform: translateY(-1px);
+  background: rgba(34, 40, 46, 0.94);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+.kitsunarr-card-overlay__gear:focus-visible {
+  outline: 2px solid #3db4f2;
+  outline-offset: 2px;
 }
 
-.kitsunarr-add-btn:hover {
-    transform: scale(1.1) !important;
-    background-color: #3DB4F2; /* Accent color on hover */
-    border-color: transparent;
+.kitsunarr-card-overlay__gear:disabled,
+.kitsunarr-card-overlay__gear[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.kitsunarr-corner-action {
+  pointer-events: auto;
+  width: 48px;
+  height: 48px;
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  color: #f7f9f9;
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+  background: rgba(19, 22, 26, 0.9);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.32);
+  cursor: pointer;
+  transition: transform 120ms ease, filter 120ms ease, background-color 120ms ease;
+}
+  .kitsunarr-corner-action:focus-visible {
+  outline: 2px solid #f7f9f9;
+  outline-offset: 2px;
+}
+
+.kitsunarr-corner-action[disabled],
+.kitsunarr-corner-action[aria-disabled='true'] {
+  cursor: default;
+}
+
+.kitsunarr-corner-action[data-state='addable']:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.kitsunarr-corner-action[data-state='error']:hover {
+  filter: brightness(1.05);
+}
+
+.kitsunarr-corner-action[data-state='in-sonarr'] {
+  background: #00ba7c;
+}
+
+.kitsunarr-corner-action[data-state='addable'] {
+  background: rgba(26, 30, 35, 0.92);
+}
+
+.kitsunarr-corner-action[data-state='resolving'],
+.kitsunarr-corner-action[data-state='adding'] {
+  background: #3db4f2;
+}
+
+.kitsunarr-corner-action[data-state='error'] {
+  background: #d25565;
+}
+
+.kitsunarr-corner-action[data-state='disabled'] {
+  background: rgba(26, 30, 35, 0.55);
+  color: rgba(247, 249, 249, 0.65);
+}
+
+.kitsunarr-corner-action__icon {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 0 0 8px 8px;
+  width: 100%;
+  height: 100%;
+}
+
+.kitsunarr-corner-action__symbol {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.kitsunarr-corner-action__symbol--check {
+  font-size: 16px;
+}
+
+.kitsunarr-corner-action__spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  border: 2px solid rgba(247, 249, 249, 0.4);
+  border-top-color: #f7f9f9;
+  animation: kitsunarr-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kitsunarr-corner-action__spinner {
+    animation: none;
+  }
+}
+
+@keyframes kitsunarr-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

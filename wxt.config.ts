@@ -4,6 +4,9 @@ import tailwindcss from '@tailwindcss/vite';
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
+  webExt: {
+    openDevtools: true,
+  },
   dev: {
     server: {
       port: 3334,
