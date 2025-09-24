@@ -29,6 +29,7 @@ const COVER_SELECTOR = 'a.cover';
 const INJECTION_CONTAINER_CLASS = 'kitsunarr-overlay-container';
 const PROCESSED_ATTRIBUTE = 'data-kitsunarr-processed';
 const STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-browse';
+const SHADOW_STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-browse-shadow';
 
 const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
 
@@ -486,42 +487,60 @@ export default defineContentScript({
       },
     });
 
-    let ui: ShadowRootContentScriptUi<Root> | null = null;    
+    let ui: ShadowRootContentScriptUi<Root> | null = null;
     let root: Root | null = null;
-    let styleElement: HTMLStyleElement | null = null;
+    let globalStyleElement: HTMLStyleElement | null = null;
+    let shadowStyleElement: HTMLStyleElement | null = null;
 
-    const ensureStyles = () => {
-      if (!styleElement) {
-        styleElement = document.createElement('style');
-        styleElement.setAttribute(STYLE_DATA_ATTRIBUTE, 'true');
-        styleElement.textContent = browseStyles;
+    const ensureGlobalStyles = () => {
+      if (!globalStyleElement) {
+        globalStyleElement = document.createElement('style');
+        globalStyleElement.setAttribute(STYLE_DATA_ATTRIBUTE, 'true');
+        globalStyleElement.textContent = browseStyles;
       }
-      if (styleElement && !document.head.contains(styleElement)) {
-        document.head.appendChild(styleElement);
+      if (globalStyleElement && !document.head.contains(globalStyleElement)) {
+        document.head.appendChild(globalStyleElement);
       }
     };
 
+    const ensureShadowStyles = (shadowRoot: ShadowRoot) => {
+      if (!shadowStyleElement) {
+        shadowStyleElement = document.createElement('style');
+        shadowStyleElement.setAttribute(SHADOW_STYLE_DATA_ATTRIBUTE, 'true');
+        shadowStyleElement.textContent = browseStyles;
+      }
+      if (shadowStyleElement && shadowStyleElement.getRootNode() !== shadowRoot) {
+        shadowRoot.appendChild(shadowStyleElement);
+      }
+    };
     const cleanupDomArtifacts = () => {
       document.querySelectorAll<HTMLElement>(`.${INJECTION_CONTAINER_CLASS}`).forEach(container => {
         container.closest<HTMLAnchorElement>(COVER_SELECTOR)?.removeAttribute(PROCESSED_ATTRIBUTE);
         container.remove();
       });
 
-      if (styleElement?.parentNode) {
-        styleElement.parentNode.removeChild(styleElement);
+      if (shadowStyleElement?.parentNode) {
+        shadowStyleElement.parentNode.removeChild(shadowStyleElement);
       }
+      shadowStyleElement = null;
+
+      if (globalStyleElement?.parentNode) {
+        globalStyleElement.parentNode.removeChild(globalStyleElement);
+      }
+      globalStyleElement = null;
     };
 
     const mount = async () => {
       if (ui) return;
 
-      ensureStyles();
+      ensureGlobalStyles();
 
       ui = await createShadowRootUi(ctx, {
         name: 'kitsunarr-browse-root',
         position: 'inline',
         anchor: 'body',
-        onMount: (container: HTMLElement) => {
+        onMount: (container: HTMLElement, shadow: ShadowRoot) => {
+          ensureShadowStyles(shadow);
           root = createRoot(container);
           root.render(
             <React.StrictMode>
@@ -572,8 +591,8 @@ export default defineContentScript({
     );
 
     ctx.onInvalidated(() => {
-      styleElement?.remove();
       void remove();
     });
   },
 });
+
