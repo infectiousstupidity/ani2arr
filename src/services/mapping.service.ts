@@ -13,6 +13,11 @@ const PRIMARY_URL = 'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-M
 const FALLBACK_URL = 'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json';
 const RESOLVED_STALE = 30 * 24 * 60 * 60 * 1000;
 const RESOLVED_HARD = 180 * 24 * 60 * 60 * 1000;
+const FAILURE_CACHE_KEY_PREFIX = 'resolved_mapping_failure:';
+const FAILURE_STALE = 30 * 60 * 1000;
+const FAILURE_HARD = 2 * FAILURE_STALE;
+const NETWORK_FAILURE_STALE = 5 * 60 * 1000;
+const NETWORK_FAILURE_HARD = 3 * NETWORK_FAILURE_STALE;
 const PRIMARY_JSON_KEY = 'static_primary_json_v3';
 const PRIMARY_META_KEY = 'static_primary_meta_v3';
 const FALLBACK_JSON_KEY = 'static_fallback_json_v3';
@@ -29,6 +34,7 @@ type ResolveHints = {
 type ResolveTvdbIdOptions = {
   network?: 'never';
   hints?: ResolveHints;
+  ignoreFailureCache?: boolean;
 };
 
 type QueuedMappingRequest = {
@@ -36,6 +42,10 @@ type QueuedMappingRequest = {
   resolve: (value: ResolvedMapping) => void;
   reject: (reason: Error | ExtensionError) => void;
   hints?: ResolveHints;
+};
+type InflightResolution = {
+  promise: Promise<ResolvedMapping>;
+  bypassFailureCache: boolean;
 };
 const MAPPING_BATCH_SIZE = 3;
 const MAPPING_BATCH_DELAY_MS = 1500;
@@ -46,7 +56,7 @@ export interface ResolvedMapping {
 }
 
 export class MappingService {
-  private inflight = new Map<number, Promise<ResolvedMapping>>();
+  private inflight = new Map<number, InflightResolution>();
   private primaryPairsMap = new Map<number, number>();
   private fallbackPairsMap = new Map<number, number>();
 
@@ -59,6 +69,31 @@ export class MappingService {
     private readonly cache: CacheService,
   ) {}
 
+  private successCacheKey(anilistId: number): string {
+    return `resolved_mapping:${anilistId}`;
+  }
+
+  private failureCacheKey(anilistId: number): string {
+    return `${FAILURE_CACHE_KEY_PREFIX}${anilistId}`;
+  }
+
+  private shouldCacheFailure(error: ExtensionError): boolean {
+    return (
+      error.code === ErrorCode.VALIDATION_ERROR ||
+      error.code === ErrorCode.CONFIGURATION_ERROR ||
+      error.code === ErrorCode.NETWORK_ERROR ||
+      error.code === ErrorCode.API_ERROR ||
+      error.code === ErrorCode.PERMISSION_ERROR
+    );
+  }
+
+  private failureTtlsFor(error: ExtensionError): { stale: number; hard: number } {
+    if (error.code === ErrorCode.NETWORK_ERROR || error.code === ErrorCode.API_ERROR) {
+      return { stale: NETWORK_FAILURE_STALE, hard: NETWORK_FAILURE_HARD };
+    }
+    return { stale: FAILURE_STALE, hard: FAILURE_HARD };
+  }
+
   public async initStaticPairs(): Promise<void> {
     try {
       await Promise.all([this.ensureMapLoaded('primary'), this.ensureMapLoaded('fallback')]);
@@ -70,31 +105,80 @@ export class MappingService {
   }
 
   public resolveTvdbId(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping> {
-    if (this.inflight.has(anilistId)) {
-      return this.inflight.get(anilistId)!;
+    const bypassFailureCache = options.ignoreFailureCache === true;
+    const existing = this.inflight.get(anilistId);
+
+    if (existing) {
+      if (bypassFailureCache && !existing.bypassFailureCache) {
+        // Need a fresh attempt that bypasses the failure cache.
+      } else {
+        return existing.promise;
+      }
     }
 
-    const promise = this.getOrQueueResolution(anilistId, options);
-    this.inflight.set(anilistId, promise);
+    const promise = this.resolveTvdbIdInternal(anilistId, options);
+    this.inflight.set(anilistId, { promise, bypassFailureCache });
 
-    promise.then(result => {
-      const cacheKey = `resolved_mapping:${anilistId}`;
-      this.cache.set(cacheKey, result, RESOLVED_STALE, RESOLVED_HARD);
-    }).catch(() => {/* Do not cache failures */}).finally(() => {
-      this.inflight.delete(anilistId);
+    promise.finally(() => {
+      const current = this.inflight.get(anilistId);
+      if (current?.promise === promise) {
+        this.inflight.delete(anilistId);
+      }
     });
 
     return promise;
   }
 
-  private async getOrQueueResolution(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping> {
-    const cacheKey = `resolved_mapping:${anilistId}`;
-    const cached = await this.cache.get<ResolvedMapping>(cacheKey);
-    if (cached) {
+  private async resolveTvdbIdInternal(anilistId: number, options: ResolveTvdbIdOptions): Promise<ResolvedMapping> {
+    const successKey = this.successCacheKey(anilistId);
+    const failureKey = this.failureCacheKey(anilistId);
+
+    const cachedSuccess = await this.cache.get<ResolvedMapping>(successKey);
+    if (cachedSuccess) {
       incrementPhase0Counter('cache-hit');
-      return cached;
+      try {
+        await this.cache.delete(failureKey);
+      } catch {
+        /* noop */
+      }
+      return cachedSuccess;
     }
 
+    if (!options.ignoreFailureCache) {
+      const cachedFailure = await this.cache.get<ExtensionError>(failureKey);
+      if (cachedFailure) {
+        throw cachedFailure;
+      }
+    }
+
+    try {
+      const result = await this.getOrQueueResolution(anilistId, options);
+      try {
+        await this.cache.set(successKey, result, RESOLVED_STALE, RESOLVED_HARD);
+      } catch {
+        /* noop */
+      }
+      try {
+        await this.cache.delete(failureKey);
+      } catch {
+        /* noop */
+      }
+      return result;
+    } catch (error) {
+      const normalized = normalizeError(error);
+      if (this.shouldCacheFailure(normalized)) {
+        const { stale, hard } = this.failureTtlsFor(normalized);
+        try {
+          await this.cache.set(failureKey, normalized, stale, hard);
+        } catch {
+          /* noop */
+        }
+      }
+      throw normalized;
+    }
+  }
+
+  private async getOrQueueResolution(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping> {
     await Promise.all([this.ensureMapLoaded('primary'), this.ensureMapLoaded('fallback')]);
 
     const staticHit = this.checkStaticMaps(anilistId);
