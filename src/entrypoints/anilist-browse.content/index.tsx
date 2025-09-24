@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAddSeries, useExtensionOptions, useSeriesStatus } from '@/hooks/use-api-queries';
 import { useTheme } from '@/hooks/use-theme';
+import type { AniFormat } from '@/api/anilist.api';
 import browseStyles from './style.css?inline';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
@@ -30,6 +31,46 @@ const INJECTION_CONTAINER_CLASS = 'kitsunarr-overlay-container';
 const PROCESSED_ATTRIBUTE = 'data-kitsunarr-processed';
 const STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-browse';
 const SHADOW_STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-browse-shadow';
+
+type MediaCardElement = Element & {
+  __vue__?: {
+    $props?: { media?: { format?: AniFormat | null } };
+    media?: { format?: AniFormat | null };
+  };
+};
+
+const FORMAT_TEXT_MAP = new Map<string, AniFormat>([
+  ['tv show', 'TV'],
+  ['tv', 'TV'],
+  ['tv short', 'TV_SHORT'],
+  ['ona', 'ONA'],
+  ['ova', 'OVA'],
+  ['movie', 'MOVIE'],
+  ['special', 'SPECIAL'],
+  ['music', 'MUSIC'],
+]);
+
+const normalizeFormatText = (value: string): string =>
+  value.toLowerCase().trim().replace(/\s+series$/, '');
+
+const detectCardFormat = (card: Element): AniFormat | null => {
+  const infoSpan = card.querySelector<HTMLSpanElement>('.hover-data .info span');
+  const infoText = infoSpan?.textContent;
+  if (infoText) {
+    const normalized = normalizeFormatText(infoText);
+    const mapped = FORMAT_TEXT_MAP.get(normalized);
+    if (mapped) return mapped;
+  }
+
+  const cardWithVue = card as MediaCardElement;
+  const mediaFormat =
+    cardWithVue.__vue__?.$props?.media?.format ?? cardWithVue.__vue__?.media?.format ?? null;
+
+  return typeof mediaFormat === 'string' ? (mediaFormat as AniFormat) : null;
+};
+
+const shouldSkipFormat = (format: AniFormat | null | undefined): boolean =>
+  format === 'MOVIE' || format === 'MUSIC';
 
 const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
 
@@ -276,6 +317,9 @@ const BrowseContentApp: React.FC = () => {
     const parseCard = (card: Element): (CardOverlayProps & { host: HTMLAnchorElement }) | null => {
       const cover = card.querySelector<HTMLAnchorElement>(COVER_SELECTOR);
       if (!cover) return null;
+
+      const format = detectCardFormat(card);
+      if (shouldSkipFormat(format)) return null;
 
       const title =
         (card.querySelector<HTMLDivElement>('.title a')?.textContent ?? '').trim() ||
