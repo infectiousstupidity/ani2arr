@@ -1,5 +1,5 @@
 // src/hooks/use-settings-manager.ts
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useExtensionOptions, useSaveOptions, useTestConnection, useSonarrMetadata, queryKeys } from './use-api-queries';
 import type { ExtensionOptions, SonarrFormState } from '@/types';
@@ -20,6 +20,21 @@ const getInitialOptions = (): ExtensionOptions => ({
     tags: [],
   },
 });
+
+const mergeOptionsWithDefaults = (options: ExtensionOptions): ExtensionOptions => {
+  const base = getInitialOptions();
+  return {
+    ...base,
+    ...options,
+    defaults: {
+      ...base.defaults,
+      ...options.defaults,
+    },
+  };
+};
+
+const defaultsEqual = (a: ExtensionOptions['defaults'], b: ExtensionOptions['defaults']): boolean =>
+  JSON.stringify(a) === JSON.stringify(b);
 
 const log = logger.create('SettingsManager');
 
@@ -48,6 +63,8 @@ export function useSettingsManager() {
     return isSonarrUrlDirty || isSonarrApiKeyDirty || isDefaultsDirty;
   }, [formState, savedOptions]);
 
+  const lastSyncedOptionsRef = useRef<ExtensionOptions | null>(null);
+
   // Memoize credentials object to avoid unnecessary re-renders and query executions
   const sonarrCredentials = useMemo(
     () => ({ url: formState.sonarrUrl, apiKey: formState.sonarrApiKey }),
@@ -59,34 +76,35 @@ export function useSettingsManager() {
   );
 
   useEffect(() => {
-    if (savedOptions) {
-      const completeOptions = {
-        ...getInitialOptions(),
-        ...savedOptions,
-        defaults: {
-          ...getInitialOptions().defaults,
-          ...(savedOptions.defaults ?? {}),
-        }
-      };
-      // Only update formState if it actually differs from current state
+    if (!savedOptions) return;
+
+    const completeOptions = mergeOptionsWithDefaults(savedOptions);
+
+    setFormState(prev => {
       if (
-        formState.sonarrUrl !== completeOptions.sonarrUrl ||
-        formState.sonarrApiKey !== completeOptions.sonarrApiKey ||
-        JSON.stringify(formState.defaults) !== JSON.stringify(completeOptions.defaults)
+        prev.sonarrUrl === completeOptions.sonarrUrl &&
+        prev.sonarrApiKey === completeOptions.sonarrApiKey &&
+        defaultsEqual(prev.defaults, completeOptions.defaults)
       ) {
-        setFormState(completeOptions);
+        return prev;
       }
-      // Only test connection if credentials changed
-      if (
-        completeOptions.sonarrUrl &&
-        completeOptions.sonarrApiKey &&
-        (formState.sonarrUrl !== completeOptions.sonarrUrl ||
-          formState.sonarrApiKey !== completeOptions.sonarrApiKey)
-      ) {
-        testConnection({ url: completeOptions.sonarrUrl, apiKey: completeOptions.sonarrApiKey });
-      }
+      return completeOptions;
+    });
+
+    const previous = lastSyncedOptionsRef.current;
+    const credentialsChanged =
+      Boolean(completeOptions.sonarrUrl) &&
+      Boolean(completeOptions.sonarrApiKey) &&
+      (!previous ||
+        previous.sonarrUrl !== completeOptions.sonarrUrl ||
+        previous.sonarrApiKey !== completeOptions.sonarrApiKey);
+
+    if (credentialsChanged) {
+      testConnection({ url: completeOptions.sonarrUrl, apiKey: completeOptions.sonarrApiKey });
     }
-  }, [savedOptions]);
+
+    lastSyncedOptionsRef.current = completeOptions;
+  }, [savedOptions, testConnection]);
 
   useEffect(() => {
     if (sonarrMetadata.data) {
