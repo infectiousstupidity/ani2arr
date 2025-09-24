@@ -3,8 +3,12 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from '
 import { createRoot, Root } from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { useAddSeries, useExtensionOptions, useSeriesStatus } from '@/hooks/use-api-queries';
 import { useTheme } from '@/hooks/use-theme';
+import { idbQueryCachePersister } from '@/utils/cache-persister';
+import { logger } from '@/utils/logger';
+import type { ExtensionError } from '@/types';
 import type { AniFormat } from '@/api/anilist.api';
 import browseStyles from './style.css?inline';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
@@ -31,6 +35,8 @@ const INJECTION_CONTAINER_CLASS = 'kitsunarr-overlay-container';
 const PROCESSED_ATTRIBUTE = 'data-kitsunarr-processed';
 const STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-browse';
 const SHADOW_STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-browse-shadow';
+
+const log = logger.create('AniList Browse Content');
 
 type MediaCardElement = Element & {
   __vue__?: {
@@ -128,12 +134,18 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
     return 'addable';
   }, [alreadyInSonarr, hasError, isAdding, isConfigured, isResolving]);
 
-  const errorMessage = (() => {
-    if (addError instanceof Error) return addError.message;
-    if (statusError instanceof Error) return statusError.message;
-    if (typeof statusError === 'string') return statusError;
+  const resolveErrorMessage = (error: unknown): string | null => {
+    if (!error) return null;
+    if (typeof error === 'string') return error;
+    if (typeof error === 'object' && error !== null && 'userMessage' in (error as ExtensionError)) {
+      const { userMessage } = error as ExtensionError;
+      if (typeof userMessage === 'string' && userMessage.trim().length > 0) return userMessage;
+    }
+    if (error instanceof Error) return error.message;
     return null;
-  })();
+  };
+
+  const errorMessage = resolveErrorMessage(addError) ?? resolveErrorMessage(statusError);
 
   const quickAddDisabled = overlayState === 'in-sonarr' || overlayState === 'resolving' || overlayState === 'adding';
 
@@ -529,6 +541,22 @@ export default defineContentScript({
           retry: false,
         },
       },
+    });
+
+    const [unsubscribePersistence, restorePromise] = persistQueryClient({
+      queryClient,
+      persister: idbQueryCachePersister,
+      maxAge: 1000 * 60 * 60 * 24,
+    });
+
+    try {
+      await restorePromise;
+    } catch (error) {
+      log.warn('Failed to hydrate query cache', error);
+    }
+
+    ctx.onInvalidated(() => {
+      unsubscribePersistence();
     });
 
     let ui: ShadowRootContentScriptUi<Root> | null = null;

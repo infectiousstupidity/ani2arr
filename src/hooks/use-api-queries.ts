@@ -4,6 +4,8 @@ import { extensionOptions } from '@/utils/storage';
 import type {
   AddRequestPayload,
   CheckSeriesStatusPayload,
+  CheckSeriesStatusResponse,
+  ExtensionError,
   ExtensionOptions,
   SonarrCredentialsPayload,
   SonarrSeries,
@@ -39,7 +41,7 @@ export type SeriesStatusOptions = {
 };
 
 export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: SeriesStatusOptions) => {
-  return useQuery({
+  return useQuery<CheckSeriesStatusResponse, ExtensionError>({
     queryKey: queryKeys.seriesStatus(payload),
     queryFn: async () => {
       const serviceOptions: { force_verify?: boolean; network?: 'never' } = {};
@@ -86,37 +88,41 @@ export const useSonarrMetadata = (creds: SonarrCredentialsPayload | null, option
 
 export const useAddSeries = () => {
   const queryClient = useQueryClient();
-  return useMutation<SonarrSeries, Error, AddRequestPayload>({
+  return useMutation<SonarrSeries, ExtensionError, AddRequestPayload>({
     mutationFn: async (payload: AddRequestPayload) => {
-      const api = getKitsunarrApi();
-      const baseOptions = await extensionOptions.getValue();
-      if (!baseOptions) throw new Error('Extension options are not loaded.');
+      try {
+        const api = getKitsunarrApi();
+        const baseOptions = await extensionOptions.getValue();
+        if (!baseOptions) throw new Error('Extension options are not loaded.');
 
-      const { tvdbId } = await api.mapping.resolveTvdbId(payload.anilistId, {
-        hints: { primaryTitle: payload.title },
-      });
-      if (!tvdbId) throw new Error('Could not resolve TVDB ID for this series.');
+        const { tvdbId } = await api.mapping.resolveTvdbId(payload.anilistId, {
+          hints: { primaryTitle: payload.title },
+        });
+        if (!tvdbId) throw new Error('Could not resolve TVDB ID for this series.');
 
-      const sonarrPayload: AddRequestPayload = { ...payload, tvdbId };
+        const sonarrPayload: AddRequestPayload = { ...payload, tvdbId };
 
-      return await api.sonarr.addSeries(sonarrPayload, baseOptions);
+        return await api.sonarr.addSeries(sonarrPayload, baseOptions);
+      } catch (error) {
+        throw normalizeError(error);
+      }
     },
     onSuccess: async (addedSeries, variables) => {
       const api = getKitsunarrApi();
       await api.library.addSeriesToCache(addedSeries);
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
     },
-    onError: (error: unknown) => {
-      throw normalizeError(error);
-    },
   });
 };
 
 export const useTestConnection = () => {
-  return useMutation<{ version: string }, Error, TestConnectionPayload>({
-    mutationFn: (payload: TestConnectionPayload) => getKitsunarrApi().sonarr.testConnection(payload),
-    onError: (error: unknown) => {
-      throw normalizeError(error);
+  return useMutation<{ version: string }, ExtensionError, TestConnectionPayload>({
+    mutationFn: async (payload: TestConnectionPayload) => {
+      try {
+        return await getKitsunarrApi().sonarr.testConnection(payload);
+      } catch (error) {
+        throw normalizeError(error);
+      }
     },
   });
 };
@@ -124,8 +130,14 @@ export const useTestConnection = () => {
 export const useSaveOptions = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, ExtensionOptions, { previousOptions: ExtensionOptions | undefined }>({
-    mutationFn: (options: ExtensionOptions) => extensionOptions.setValue(options),
+  return useMutation<void, ExtensionError, ExtensionOptions, { previousOptions: ExtensionOptions | undefined }>({
+    mutationFn: async (options: ExtensionOptions) => {
+      try {
+        await extensionOptions.setValue(options);
+      } catch (error) {
+        throw normalizeError(error);
+      }
+    },
 
     onMutate: async (newOptions) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.options() });
@@ -134,11 +146,10 @@ export const useSaveOptions = () => {
       return { previousOptions };
     },
 
-    onError: (err, newOptions, context) => {
+    onError: (_err, _newOptions, context) => {
       if (context?.previousOptions) {
         queryClient.setQueryData(queryKeys.options(), context.previousOptions);
       }
-      throw normalizeError(err);
     },
 
     onSettled: () => {
