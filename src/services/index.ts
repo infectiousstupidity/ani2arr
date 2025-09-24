@@ -13,14 +13,19 @@ interface KitsunarrApi {
 }
 
 function bindAll<T extends object>(instance: T): T {
-  const proto = Object.getPrototypeOf(instance);
+  const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
+  if (!proto) return instance;
+
+  const target = instance as Record<string, unknown>;
+
   for (const key of Object.getOwnPropertyNames(proto)) {
     if (key === 'constructor') continue;
-    const val = (instance as any)[key];
-    if (typeof val === 'function') {
-      (instance as any)[key] = val.bind(instance);
+    const value = proto[key];
+    if (typeof value === 'function') {
+      target[key] = value.bind(instance);
     }
   }
+
   return instance;
 }
 
