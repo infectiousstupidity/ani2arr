@@ -25,13 +25,13 @@ const TooltipWrapper: React.FC<TooltipWrapperProps> = ({
       <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
       <Tooltip.Portal container={container}>
         <Tooltip.Content
-          className="p-2 bg-bg-tertiary border border-border-primary rounded-md shadow-lg text-sm z-[99999] text-text-primary max-w-xs break-words"
+          className="text-[13px] font-medium text-[rgba(255,255,255,0.92)] bg-[rgba(10,15,23,0.95)] border border-[rgba(255,255,255,0.08)] rounded-[6px] px-[10px] py-[6px] shadow-[0_12px_24px_rgba(8,12,20,0.35)] backdrop-blur-sm tracking-[0.01em] max-w-[240px] leading-[1.2] z-[99999]"
           side={side}
           align={align}
           sideOffset={sideOffset}
         >
           {content}
-          <Tooltip.Arrow className="fill-bg-tertiary" />
+          <Tooltip.Arrow className="fill-[rgba(10,15,23,0.95)]" />
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>
