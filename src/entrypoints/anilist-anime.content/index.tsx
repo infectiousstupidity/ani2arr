@@ -8,8 +8,8 @@ import { getKitsunarrApi } from '@/services';
 import SonarrActionGroup from '@/ui/SonarrActionGroup';
 import { logger } from '@/utils/logger';
 import './style.css';
-
-import type { ContentScriptContext, ShadowRootContentScriptUi } from 'wxt/client';
+import type { ContentScriptContext } from 'wxt/utils/content-script-context';
+import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 
 const log = logger.create('AniList Content');
 
