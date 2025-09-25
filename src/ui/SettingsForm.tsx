@@ -68,50 +68,51 @@ const SettingsForm: React.FC = () => {
           </FormItem>
         </FormField>
 
-        <FormField>
-          <FormItem>
-            <div className="text-sm flex items-center gap-1 h-9">
-              {manager.testConnectionState.isSuccess && (
-                <>
-                  <CheckCircledIcon className="text-success" />
-                  <span>Connected</span>
-                </>
-              )}
-              {manager.testConnectionState.isError && (
-                <>
-                  <CrossCircledIcon className="text-error" />
-                  <span>Failed</span>
-                </>
-              )}
-            </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className="text-sm flex items-center gap-1 h-9"
+            aria-live="polite"
+            role="status"
+          >
+            {manager.testConnectionState.isSuccess && (
+              <>
+                <CheckCircledIcon className="text-success" />
+                <span>Connected</span>
+              </>
+            )}
+            {manager.testConnectionState.isError && (
+              <>
+                <CrossCircledIcon className="text-error" />
+                <span>Failed</span>
+              </>
+            )}
+          </div>
 
-            <FormControl>
-              {manager.testConnectionState.isSuccess ? (
-                <div className="flex justify-end">
-                  <Button
-                    onClick={manager.resetConnection}
-                    variant="secondary"
-                    size="sm"
-                    type="button"
-                    className="w-full"
-                  >
-                    Edit
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  type="submit"
-                  isLoading={manager.testConnectionState.isPending}
-                  variant="secondary"
-                  loadingText="Connecting..."
-                  className="w-full"
-                >
-                  {getConnectButtonText()}
-                </Button>
-              )}
-            </FormControl>
-          </FormItem>
-        </FormField>
+          <div className="flex w-full justify-end sm:w-auto">
+            {manager.testConnectionState.isSuccess ? (
+              <Button
+                onClick={manager.resetConnection}
+                variant="secondary"
+                size="sm"
+                type="button"
+                className="w-full sm:w-auto"
+              >
+                Edit
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                isLoading={manager.testConnectionState.isPending}
+                variant="secondary"
+                loadingText="Connecting..."
+                className="w-full sm:w-auto"
+                aria-busy={manager.testConnectionState.isPending}
+              >
+                {getConnectButtonText()}
+              </Button>
+            )}
+          </div>
+        </div>
       </form>
 
       {manager.isConnected && (
@@ -125,6 +126,7 @@ const SettingsForm: React.FC = () => {
               size="icon"
               tooltip="Refresh data from Sonarr"
               portalContainer={portalContainer}
+              aria-busy={manager.sonarrMetadata.isRefetching}
             >
               <ReloadIcon />
             </Button>
@@ -151,8 +153,9 @@ const SettingsForm: React.FC = () => {
       <div className="flex justify-center">
         <Button
           onClick={manager.handleSave}
-          disabled={!manager.isDirty || manager.saveState.isPending || manager.testConnectionState.isPending}
+          disabled={!manager.isDirty || manager.testConnectionState.isPending}
           isLoading={manager.saveState.isPending}
+          aria-busy={manager.saveState.isPending}
         >
           Save settings
         </Button>

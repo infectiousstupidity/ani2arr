@@ -111,7 +111,7 @@ const SelectTrigger = React.memo(
       <SelectPrimitive.Trigger
         id={id}
         ref={ref}
-        className={`flex h-9 w-full items-center justify-between rounded-md border border-border-primary bg-bg-tertiary px-3 py-2 text-sm ring-offset-background placeholder:text-text-primary focus:outline-none focus:ring-2 focus:ring-accent-primary disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+        className={`flex h-9 w-full items-center justify-between rounded-md border border-border-primary bg-bg-tertiary px-3 py-2 text-sm ring-offset-background placeholder:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
         {...props}
       >
         {children}

@@ -25,6 +25,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
 }) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const [selectPortal, setSelectPortal] = useState<HTMLElement | null>(null);
+  const initialFocusRef = useRef<HTMLButtonElement | null>(null);
   const manager = useAddSeriesManager(anilistId, title, isOpen);
 
   useTheme(hostRef);
@@ -35,6 +36,16 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
     return () => clearTimeout(timer);
   }, [manager.addSeriesState.isSuccess, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!manager.formState || !manager.sonarrMetadata.data) return;
+    if (!initialFocusRef.current) return;
+    const id = window.requestAnimationFrame(() => {
+      initialFocusRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [isOpen, manager.formState, manager.sonarrMetadata.data]);
+
   const handleSelectPortalRef = useCallback((node: HTMLDivElement | null) => {
     setSelectPortal(node);
   }, []);
@@ -44,7 +55,13 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
   return (
     <div ref={hostRef}>
       <Modal open={isOpen} onOpenChange={onClose}>
-        <ModalContent container={portalContainer ?? undefined} className="mx-auto max-w-none">
+        <ModalContent
+          container={portalContainer ?? undefined}
+          className="mx-auto max-w-none"
+          onOpenAutoFocus={event => {
+            event.preventDefault();
+          }}
+        >
           <ModalTitle id="modal-title" className="">
             {title}
           </ModalTitle>
@@ -77,6 +94,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
                 onChange={manager.handleFormChange}
                 disabled={manager.addSeriesState.isPending || manager.addSeriesState.isSuccess}
                 portalContainer={selectPortal}
+                initialFocusRef={initialFocusRef}
               />
               <ModalFooter className="mt-4">
                 {manager.isDirty && (
@@ -85,6 +103,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
                     onClick={manager.handleSaveDefaults}
                     isLoading={manager.saveDefaultsState.isPending}
                     disabled={manager.addSeriesState.isPending}
+                    aria-busy={manager.saveDefaultsState.isPending}
                   >
                     Save as Default
                   </Button>
@@ -94,6 +113,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
                   isLoading={manager.addSeriesState.isPending}
                   disabled={manager.addSeriesState.isSuccess}
                   className="w-32"
+                  aria-busy={manager.addSeriesState.isPending}
                 >
                   {manager.addSeriesState.isSuccess ? 'Added!' : 'Add Series'}
                 </Button>
