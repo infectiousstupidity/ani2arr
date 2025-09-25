@@ -11,7 +11,7 @@ const queryClient = new QueryClient();
 const OptionsHeader: React.FC = () => (
   <header className="mb-4 py-4 flex flex-col items-center justify-center">
     <div className="flex items-center gap-4">
-      <img src="/icon/128.png" alt="Logo" className="h-12 w-12 rounded-lg" />
+      <img src="/icons/128.png" alt="Logo" className="h-12 w-12 rounded-lg" />
       <h1 className="text-4xl font-bold">Kitsunarr</h1>
     </div>
     <p className="text-lg text-text-secondary text-center mt-2">
