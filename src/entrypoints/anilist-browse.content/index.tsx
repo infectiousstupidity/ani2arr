@@ -89,14 +89,17 @@ type ModalState = { anilistId: number; title: string };
 
 type OverlayState = 'disabled' | 'in-sonarr' | 'addable' | 'resolving' | 'adding' | 'error';
 
-interface CardOverlayProps {
+interface CardOverlayDescriptor {
   anilistId: number;
   title: string;
   onOpenModal: (anilistId: number, title: string) => void;
 }
 
-const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpenModal }) => {
-  const { data: options } = useExtensionOptions();
+interface CardOverlayProps extends CardOverlayDescriptor {
+  isConfigured: boolean;
+}
+
+const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpenModal, isConfigured }) => {
   const bypassFailureCacheRef = useRef(false);
   const statusQuery = useSeriesStatus(
     { anilistId, title },
@@ -104,7 +107,6 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
   );
   const addSeriesMutation = useAddSeries();
 
-  const isConfigured = !!options?.sonarrUrl && !!options.sonarrApiKey;
 
   const {
     data: statusData,
@@ -124,7 +126,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
     reset,
   } = addSeriesMutation;
 
-    useEffect(() => {
+  useEffect(() => {
     reset();
   }, [anilistId, title, reset]);
 
@@ -316,7 +318,10 @@ const BrowseContentApp: React.FC = () => {
   const hostRef = useRef<HTMLDivElement>(null);
   useTheme(hostRef);
 
-  const [cardPortals, setCardPortals] = useState<Map<Element, CardOverlayProps>>(new Map());
+  const { data: extensionOptions } = useExtensionOptions();
+  const isConfigured = Boolean(extensionOptions?.sonarrUrl && extensionOptions?.sonarrApiKey);
+
+  const [cardPortals, setCardPortals] = useState<Map<Element, CardOverlayDescriptor>>(new Map());
   const [modalState, setModalState] = useState<ModalState | null>(null);
 
   const handleOpenModal = useCallback((anilistId: number, title: string) => {
@@ -326,13 +331,33 @@ const BrowseContentApp: React.FC = () => {
   const handleCloseModal = useCallback(() => setModalState(null), []);
 
   useEffect(() => {
-    const observerRoot = document.body ?? document.documentElement;
-    if (!observerRoot) return;
+    const fallbackObserverRoot =
+      document.querySelector<HTMLElement>('.page-content') ?? document.body ?? document.documentElement;
+    if (!fallbackObserverRoot) return;
 
-    const getScanRoot = () =>
-      document.querySelector<HTMLElement>('.page-content') ?? document.body;
+    const CARD_CONTAINER_SELECTORS = ['.media-grid', '.media-list', '.media-card-grid', '.media-card-wrap'];
 
-    const parseCard = (card: Element): (CardOverlayProps & { host: HTMLAnchorElement }) | null => {
+    const findCardContainer = (): HTMLElement | null => {
+      for (const selector of CARD_CONTAINER_SELECTORS) {
+        const node = document.querySelector<HTMLElement>(selector);
+        if (node) return node;
+      }
+      const firstCard = document.querySelector<HTMLElement>(CARD_SELECTOR);
+      if (firstCard) {
+        for (const selector of CARD_CONTAINER_SELECTORS) {
+          const closest = firstCard.closest<HTMLElement>(selector);
+          if (closest) return closest;
+        }
+        if (firstCard.parentElement instanceof HTMLElement) {
+          return firstCard.parentElement;
+        }
+      }
+      return document.querySelector<HTMLElement>('.page-content');
+    };
+
+    const getScanRoot = (): HTMLElement | null => findCardContainer();
+
+    const parseCard = (card: Element): (CardOverlayDescriptor & { host: HTMLAnchorElement }) | null => {
       const cover = card.querySelector<HTMLAnchorElement>(COVER_SELECTOR);
       if (!cover) return null;
 
@@ -441,80 +466,141 @@ const BrowseContentApp: React.FC = () => {
 
     scanAll();
 
-    const mo = new MutationObserver(mutations => {
-      let shouldRescan = false;
-      const cardsToUpsert = new Set<Element>();
+    const observerOptions: MutationObserverInit = {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['href'],
+    };
 
-      const enqueueCardForNode = (node: Node | null | undefined) => {
-        if (!node) return;
-        const element = node instanceof Element ? node : node.parentElement;
-        const card = element?.closest?.(CARD_SELECTOR);
-        if (card) {
-          cardsToUpsert.add(card);
-        }
-      };
+    const pendingCards = new Set<Element>();
+    let needsFullRescan = false;
+    let rafId: number | null = null;
+    let observedTarget: Node | null = null;
+    let resizeTarget: Element | null = null;
 
-      for (const m of mutations) {
-        m.addedNodes.forEach(node => {
+    let mo: MutationObserver | null = null;
+    let ro: ResizeObserver | null = null;
+
+    const enqueueCardForNode = (node: Node | null | undefined) => {
+      if (!node) return;
+      const element = node instanceof Element ? node : node.parentElement;
+      const card = element?.closest?.(CARD_SELECTOR);
+      if (card) {
+        pendingCards.add(card);
+      }
+    };
+
+    const ensureObserverTarget = () => {
+      const next = findCardContainer() ?? fallbackObserverRoot;
+      if (!next) return null;
+      if (observedTarget === next) return next;
+      if (mo) {
+        mo.disconnect();
+        mo.observe(next, observerOptions);
+      }
+      observedTarget = next;
+      return next;
+    };
+
+    const syncResizeObserver = () => {
+      const next = findCardContainer();
+      if (resizeTarget === next) return;
+      if (resizeTarget && ro) {
+        ro.unobserve(resizeTarget);
+      }
+      if (next && ro) {
+        ro.observe(next);
+      }
+      resizeTarget = next ?? null;
+    };
+
+    const flushMutations = () => {
+      ensureObserverTarget();
+      if (needsFullRescan) {
+        scanAll();
+      } else if (pendingCards.size > 0) {
+        pendingCards.forEach(card => upsertCard(card));
+        removeStalePortals();
+      }
+      pendingCards.clear();
+      needsFullRescan = false;
+      syncResizeObserver();
+    };
+
+    const scheduleFlush = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        flushMutations();
+      });
+    };
+
+    mo = new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        mutation.addedNodes.forEach(node => {
           if (node instanceof Element && node.matches?.(CARD_SELECTOR)) {
-            cardsToUpsert.add(node);
+            pendingCards.add(node);
             return;
           }
 
           enqueueCardForNode(node);
 
           if (
-            !shouldRescan &&
+            !needsFullRescan &&
             (node instanceof Element || node instanceof DocumentFragment) &&
             node.querySelector?.(CARD_SELECTOR)
           ) {
-            shouldRescan = true;
+            needsFullRescan = true;
           }
         });
 
-        if (m.type === 'childList' && m.addedNodes.length > 0) {
-          enqueueCardForNode(m.target);
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          enqueueCardForNode(mutation.target);
         }
 
-        if (m.type === 'attributes' && m.target instanceof Element) {
-          if (m.target.matches(COVER_SELECTOR) || m.target.matches(CARD_SELECTOR)) {
-            enqueueCardForNode(m.target);
+        if (mutation.type === 'attributes' && mutation.target instanceof Element) {
+          if (mutation.target.matches(COVER_SELECTOR) || mutation.target.matches(CARD_SELECTOR)) {
+            enqueueCardForNode(mutation.target);
           }
         }
 
-
-        if (m.removedNodes.length > 0) {
-          removeStalePortals();
+        if (mutation.removedNodes.length > 0) {
+          needsFullRescan = true;
         }
       }
 
-      cardsToUpsert.forEach(card => upsertCard(card));
-
-      if (shouldRescan) scanAll();
+      scheduleFlush();
     });
 
-    mo.observe(observerRoot, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['href'],
+    ro = new ResizeObserver(() => {
+      needsFullRescan = true;
+      scheduleFlush();
     });
 
-    const ro = new ResizeObserver(() => removeStalePortals());
-    if (document.body) {
-      ro.observe(document.body);
-    }
+    ensureObserverTarget();
+    syncResizeObserver();
 
     return () => {
-      mo.disconnect();
-      ro.disconnect();
+      if (mo) {
+        mo.disconnect();
+      }
+      if (ro) {
+        if (resizeTarget) {
+          ro.unobserve(resizeTarget);
+        }
+        ro.disconnect();
+      }
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
     };
   }, [handleOpenModal]);
 
   return (
     <div ref={hostRef}>
       {Array.from(cardPortals.entries()).map(([container, props]) =>
-        createPortal(<CardOverlay {...props} />, container)
+        createPortal(<CardOverlay {...props} isConfigured={isConfigured} />, container)
       )}
 
       <React.Suspense fallback={null}>
@@ -592,7 +678,12 @@ export default defineContentScript({
       }
     };
     const cleanupDomArtifacts = () => {
-      document.querySelectorAll<HTMLElement>(`.${INJECTION_CONTAINER_CLASS}`).forEach(container => {
+      const containers = document.querySelectorAll<HTMLElement>(`.${INJECTION_CONTAINER_CLASS}`);
+      if (containers.length === 0 && !shadowStyleElement && !globalStyleElement) {
+        return;
+      }
+
+      containers.forEach(container => {
         container.closest<HTMLAnchorElement>(COVER_SELECTOR)?.removeAttribute(PROCESSED_ATTRIBUTE);
         container.remove();
       });
@@ -641,11 +732,21 @@ export default defineContentScript({
     };
 
     const remove = async () => {
-      cleanupDomArtifacts();
-      if (!ui) return;
+      if (!ui) {
+        if (
+          document.querySelector(`.${INJECTION_CONTAINER_CLASS}`) ||
+          shadowStyleElement ||
+          globalStyleElement
+        ) {
+          cleanupDomArtifacts();
+        }
+        return;
+      }
+
       ui.remove();
       ui = null;
       root = null;
+      cleanupDomArtifacts();
     };
 
     const handleLocationChange = (url: string) => {
