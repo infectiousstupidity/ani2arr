@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { useTheme } from '@/hooks/use-theme';
 import { useSeriesStatus, useAddSeries, useExtensionOptions, queryKeys } from '@/hooks/use-api-queries';
@@ -277,7 +278,9 @@ async function mountAnimePageUI(ctx: ContentScriptContext): Promise<void> {
       const root = ReactDOM.createRoot(uiContainer);
       root.render(
         <QueryClientProvider client={queryClient}>
-          <ContentRoot anilistId={anilistId} title={title} />
+          <TooltipProvider>
+            <ContentRoot anilistId={anilistId} title={title} />
+          </TooltipProvider>
         </QueryClientProvider>,
       );
       return root;

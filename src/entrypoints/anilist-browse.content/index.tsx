@@ -3,6 +3,7 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from '
 import { createRoot, Root } from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { useAddSeries, useExtensionOptions, useSeriesStatus } from '@/hooks/use-api-queries';
 import { useTheme } from '@/hooks/use-theme';
@@ -622,7 +623,9 @@ export default defineContentScript({
           root.render(
             <React.StrictMode>
               <QueryClientProvider client={queryClient}>
-                <BrowseContentApp />
+                <TooltipProvider>
+                  <BrowseContentApp />
+                </TooltipProvider>
               </QueryClientProvider>
             </React.StrictMode>,
           );
