@@ -27,7 +27,9 @@ interface SonarrFormProps {
   disabled?: boolean;
   className?: string;
   portalContainer?: HTMLElement | null;
+  initialFocusRef?: React.RefObject<HTMLButtonElement | null>;
 }
+
 
 const SonarrForm: React.FC<SonarrFormProps> = ({
   options,
@@ -36,6 +38,7 @@ const SonarrForm: React.FC<SonarrFormProps> = ({
   disabled,
   className,
   portalContainer,
+  initialFocusRef,
 }) => {
   const tagMaps = useMemo(() => {
     const idToLabel = new Map<number, string>();
@@ -81,7 +84,7 @@ const SonarrForm: React.FC<SonarrFormProps> = ({
               value={String(options.qualityProfileId)}
               onValueChange={v => onChange('qualityProfileId', Number(v))}
             >
-              <SelectTrigger className="text-text-primary">
+              <SelectTrigger ref={initialFocusRef} className="text-text-primary">
                 <SelectValue placeholder="Select a profile..." />
               </SelectTrigger>
               <SelectContent container={selectPortal}>
