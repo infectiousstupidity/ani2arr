@@ -1,0 +1,265 @@
+@import "tailwindcss";
+
+/* ---------- Theme vars ---------- */
+:host {
+  --bg-primary: #FAFAFA;
+  --bg-secondary: #f2f5f7;
+  --bg-tertiary: #EDF1F5;
+  --text-primary: #212529;
+  --text-secondary: #607080;
+  --border-primary: #DEE2E6;
+  --accent-primary: #3DB4F2;
+  --accent-hover: #299dd1;
+  --success: #00BA7C;
+  --error: #F91880;
+  --iconbutton-text: #FAFAFA;
+
+  color: var(--text-primary);
+}
+
+:host(.dark) {
+  --bg-primary: #0b1622;
+  --bg-secondary: #151f2e;
+  --bg-tertiary: #253341;
+  --text-primary: #F7F9F9;
+  --text-secondary: #9FADBD;
+  --border-primary: #38444D;
+  --accent-primary: #3DB4F2;
+  --accent-hover: #299dd1;
+  --success: #00BA7C;
+  --error: #F91880;
+  --iconbutton-text: #F7F9F9;
+}
+
+@theme {
+  --spacing: 0.4rem;
+  --text-xs: 1.2rem;
+  --text-sm: 1.4rem;
+  --text-base: 1.6rem;
+  --text-lg: 1.8rem;
+  --text-xl: 2.0rem;
+  --text-2xl: 2.4rem;
+  --text-3xl: 3.0rem;
+  --text-button: 2.2rem;
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-border-primary: var(--border-primary);
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-hover: var(--accent-hover);
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --color-iconbutton-text: var(--iconbutton-text);
+}
+
+/* ---------- Positioning ---------- */
+a.cover {
+  position: relative;
+  overflow: visible !important;
+}
+
+.media-card {
+  overflow: visible !important;
+}
+
+.kitsunarr-card-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate(-18px, -18px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 80;
+  font-family: inherit;
+}
+
+/* ---------- Quick add button ---------- */
+.kitsunarr-card-overlay__quick {
+  pointer-events: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #3db4f2;
+  color: #072033;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 22px rgba(7, 14, 22, 0.45);
+  transform: scale(1);
+  transition: transform .2s ease-in-out,
+              box-shadow .2s ease-in-out;
+  cursor: pointer;
+}
+
+.kitsunarr-card-overlay__quick:hover:not([disabled]):not([data-state='in-sonarr']) {
+  transform: scale(1.08);
+  box-shadow: 0 14px 26px rgba(7, 14, 22, 0.5);
+}
+
+.kitsunarr-card-overlay__quick:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.kitsunarr-card-overlay__quick svg,
+.kitsunarr-card-overlay__symbol {
+  width: 15px;
+  height: 15px;
+}
+
+/* Quick add states */
+.kitsunarr-card-overlay__quick[data-state='resolving'],
+.kitsunarr-card-overlay__quick[data-state='adding'] {
+  background: #62c6ff;
+  color: #072033;
+}
+
+.kitsunarr-card-overlay__quick[data-state='in-sonarr'] {
+  background: #00ba7c;
+  color: #06281a;
+}
+
+.kitsunarr-card-overlay__quick[data-state='error'] {
+  background: #f45d75;
+  color: #33060d;
+}
+
+.kitsunarr-card-overlay__quick[data-state='disabled'] {
+  background: #556273;
+  color: #e4ecf5;
+  cursor: default;
+}
+
+.kitsunarr-card-overlay__quick[disabled] {
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.kitsunarr-card-overlay__spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(4, 18, 31, 0.2);
+  border-top-color: rgba(4, 18, 31, 0.7);
+  border-right-color: rgba(4, 18, 31, 0.7);
+  animation: kitsunarr-spin 0.7s linear infinite;
+}
+
+/* ---------- Gear reveal + button ---------- */
+.kitsunarr-card-overlay__gear-shell {
+  display: flex;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(.2);
+  transition: transform .2s ease-in-out,
+              opacity .2s ease-in-out;
+}
+
+a.cover:hover .kitsunarr-card-overlay__gear-shell,
+.kitsunarr-card-overlay:focus-within .kitsunarr-card-overlay__gear-shell {
+  pointer-events: auto;
+  opacity: 1;
+  transform: scale(1);
+}
+
+.kitsunarr-card-overlay__gear {
+  pointer-events: auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(12, 24, 32, 0.95);
+  color: #f7f9f9;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 22px rgba(7, 14, 22, 0.45);
+  padding: 0;
+  border: 1px solid rgba(5, 13, 24, 0.45);
+  transform: scale(1);
+  transition: transform .2s ease-in-out,
+              box-shadow .2s ease-in-out,
+              background-color .2s ease-in-out;
+  cursor: pointer;
+}
+
+.kitsunarr-card-overlay__gear:hover:not(:disabled):not([aria-disabled='true']) {
+  transform: scale(1.08);
+  box-shadow: 0 14px 26px rgba(7, 14, 22, 0.5);
+  background: rgba(12, 24, 32, 1);
+}
+
+.kitsunarr-card-overlay__gear svg {
+  width: 14px;
+  height: 14px;
+}
+
+.kitsunarr-card-overlay__gear:disabled,
+.kitsunarr-card-overlay__gear[aria-disabled='true'] {
+  cursor: default;
+}
+
+.kitsunarr-card-overlay__gear:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* ---------- A11y, motion, misc ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .kitsunarr-card-overlay__spinner {
+    animation: none;
+  }
+
+  .kitsunarr-card-overlay__quick,
+  .kitsunarr-card-overlay__gear,
+  .kitsunarr-card-overlay__gear-shell {
+    transition: none;
+    transform: none;
+  }
+}
+
+@keyframes kitsunarr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+*:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+[data-radix-popper-content-wrapper] {
+  z-index: 99999 !important;
+}
+
+/* Screen reader only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus trap */
+.focus-trap {
+  isolation: isolate;
+}
+

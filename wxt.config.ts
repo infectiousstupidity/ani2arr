@@ -22,6 +22,8 @@ export default defineConfig({
     const requiredHosts = [
       'https://anilist.co/*',
       'https://graphql.anilist.co/*',
+      'https://anichart.net/*',
+      'https://www.anichart.net/*',
       'https://raw.githubusercontent.com/*', // For the static mapping file
     ];
 

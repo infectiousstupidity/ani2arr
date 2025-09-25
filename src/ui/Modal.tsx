@@ -18,33 +18,45 @@ const Modal: FC<PropsWithChildren<ModalProps>> = ({ children, ...props }) => (
 
 const ModalTrigger = Dialog.Trigger;
 
+const BASE_MODAL_Z_INDEX = 2147483600;
+const MODAL_OVERLAY_Z_INDEX = BASE_MODAL_Z_INDEX;
+const MODAL_CONTENT_Z_INDEX = BASE_MODAL_Z_INDEX + 1;
+
 const ModalContent = forwardRef<
   React.ComponentRef<typeof Dialog.Content>,
   // Add the 'container' prop to the type definition
   React.ComponentPropsWithoutRef<typeof Dialog.Content> & { container?: HTMLElement | null | undefined }
->(({ className, children, container, ...props }, ref) => (
-  // Pass the container prop to the Dialog.Portal
-  <Dialog.Portal container={container ?? undefined}>
-    <Dialog.Overlay
-      className={clsx(
-        'fixed inset-0 z-50 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0'
-      )}
-    />
-    <Dialog.Content
-      ref={ref}
-      className={clsx(
-        'fixed left-1/2 top-1/2 z-50 grid w-[480px] -translate-x-1/2 -translate-y-1/2 gap-4 border bg-bg-primary p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg',
-        className
-      )}
-      aria-modal="true"
-      aria-labelledby="modal-title"
-      aria-describedby="modal-description"
-      {...props}
-    >
-      {children}
-    </Dialog.Content>
-  </Dialog.Portal>
-));
+>(({ className, children, container, style, ...props }, ref) => {
+  const contentStyle: React.CSSProperties = style
+    ? { ...style, zIndex: MODAL_CONTENT_Z_INDEX }
+    : { zIndex: MODAL_CONTENT_Z_INDEX };
+
+  return (
+    // Pass the container prop to the Dialog.Portal
+    <Dialog.Portal container={container ?? undefined}>
+      <Dialog.Overlay
+        className={clsx(
+          'fixed inset-0 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0'
+        )}
+        style={{ zIndex: MODAL_OVERLAY_Z_INDEX }}
+      />
+      <Dialog.Content
+        ref={ref}
+        className={clsx(
+          'fixed left-1/2 top-1/2 grid w-[480px] -translate-x-1/2 -translate-y-1/2 gap-4 border bg-bg-primary p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg',
+          className
+        )}
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        aria-describedby="modal-description"
+        style={contentStyle}
+        {...props}
+      >
+        {children}
+      </Dialog.Content>
+    </Dialog.Portal>
+  );
+});
 ModalContent.displayName = 'ModalContent';
 
 const ModalFooter: FC<HTMLAttributes<HTMLDivElement>> = memo(
