@@ -63,11 +63,12 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
                 size="icon"
                 onClick={onOpenModal}
                 disabled={!isIdle || tvdbId === null}
-                className="relative rounded-none h-[35px] w-[35px] bg-[rgb(var(--color-blue-600))]"
+                tooltip="Advanced Sonarr options"
+                portalContainer={portalContainer}
+                className="rounded-none h-[35px] w-[35px] bg-[#3db4f2] text-[#072033] transition-colors hover:bg-[#299dd1] focus-visible:z-10 focus-visible:ring-offset-0 disabled:bg-[#3db4f2]/50 disabled:text-[#072033]/60"
                 aria-label="Advanced options"
             >
-                <div className="absolute inset-0 bg-white opacity-10"></div>
-                <GearIcon className="relative h-5 w-5" />
+                <GearIcon className="h-4 w-4" />
             </Button>
         </div>
 

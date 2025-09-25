@@ -17,6 +17,8 @@ export default defineConfig({
   vite: () =>
     ({
       plugins: [tailwindcss()],
+      css: { devSourcemap: true },
+      build: { sourcemap: process.env.GENERATE_SOURCEMAP || false },
     } as WxtViteConfig),
   manifest: ({ manifestVersion }) => {
     const requiredHosts = [
