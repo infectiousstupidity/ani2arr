@@ -5,7 +5,6 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { idbQueryCachePersister } from '@/utils/cache-persister';
 import { logger } from '@/utils/logger';
-import type { AniFormat } from '@/api/anilist.api';
 import browseStyles from './style.css?inline';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
@@ -17,14 +16,13 @@ import {
   type ParsedCard,
 } from '@/ui/browse-overlay';
 
-const log = logger.create('AniList Browse Content');
+const log = logger.create('AniChart Browse Content');
 
-const isBrowseSurface = (url: string): boolean => {
+const isAniChartSurface = (url: string): boolean => {
   try {
     const u = new URL(url);
-    if (u.hostname !== 'anilist.co') return false;
-    const p = u.pathname;
-    return p === '/' || p === '/home' || p.startsWith('/search/anime');
+    if (u.hostname !== 'anichart.net' && u.hostname !== 'www.anichart.net') return false;
+    return true;
   } catch {
     return false;
   }
@@ -32,96 +30,44 @@ const isBrowseSurface = (url: string): boolean => {
 
 const CARD_SELECTOR = '.media-card';
 const COVER_SELECTOR = 'a.cover';
-const STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-browse';
-const SHADOW_STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-browse-shadow';
+const STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-anichart';
+const SHADOW_STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-anichart-shadow';
 
-const CARD_CONTAINER_SELECTORS = [
-  '.media-grid',
-  '.media-list',
-  '.media-card-grid',
-  '.media-card-wrap',
-  '.page-content',
-];
+const getSectionHeading = (card: Element): string =>
+  card
+    .closest('section')
+    ?.querySelector('h2')
+    ?.textContent
+    ?.trim()
+    .toLowerCase() ?? '';
 
-type MediaCardElement = Element & {
-  __vue__?: {
-    $props?: { media?: { format?: AniFormat | null } };
-    media?: { format?: AniFormat | null };
-  };
+const shouldSkipCard = (card: Element): boolean => {
+  const heading = getSectionHeading(card);
+  return heading.includes('movie') || heading.includes('music');
 };
 
-const FORMAT_TEXT_MAP = new Map<string, AniFormat>([
-  ['tv show', 'TV'],
-  ['tv', 'TV'],
-  ['tv short', 'TV_SHORT'],
-  ['ona', 'ONA'],
-  ['ova', 'OVA'],
-  ['movie', 'MOVIE'],
-  ['special', 'SPECIAL'],
-  ['music', 'MUSIC'],
-]);
+const extractTitle = (card: Element, cover: HTMLAnchorElement): string =>
+  (card.querySelector<HTMLElement>('.overlay .title')?.textContent ?? '').trim() ||
+  (cover.getAttribute('title') ?? '').trim() ||
+  cover.querySelector('img')?.getAttribute('alt')?.trim() ||
+  (card.querySelector<HTMLElement>('.data .header .title')?.textContent ?? '').trim() ||
+  '';
 
-const normalizeFormatText = (value: string): string =>
-  value.toLowerCase().trim().replace(/\s+series$/, '');
-
-const detectCardFormat = (card: Element): AniFormat | null => {
-  const infoSpan = card.querySelector<HTMLSpanElement>('.hover-data .info span');
-  const infoText = infoSpan?.textContent;
-  if (infoText) {
-    const normalized = normalizeFormatText(infoText);
-    const mapped = FORMAT_TEXT_MAP.get(normalized);
-    if (mapped) return mapped;
-  }
-
-  const cardWithVue = card as MediaCardElement;
-  const mediaFormat =
-    cardWithVue.__vue__?.$props?.media?.format ?? cardWithVue.__vue__?.media?.format ?? null;
-
-  return typeof mediaFormat === 'string' ? (mediaFormat as AniFormat) : null;
-};
-
-const shouldSkipFormat = (format: AniFormat | null | undefined): boolean =>
-  format === 'MOVIE' || format === 'MUSIC';
-
-const findCardContainer = (): HTMLElement | null => {
-  for (const selector of CARD_CONTAINER_SELECTORS) {
-    const node = document.querySelector<HTMLElement>(selector);
-    if (node) return node;
-  }
-
-  const firstCard = document.querySelector<HTMLElement>(CARD_SELECTOR);
-  if (firstCard) {
-    for (const selector of CARD_CONTAINER_SELECTORS) {
-      const closest = firstCard.closest<HTMLElement>(selector);
-      if (closest) return closest;
-    }
-    if (firstCard.parentElement instanceof HTMLElement) {
-      return firstCard.parentElement;
-    }
-  }
-
-  return document.querySelector<HTMLElement>('.page-content');
-};
-
-const parseAniListCard = (card: Element): ParsedCard | null => {
+const parseAniChartCard = (card: Element): ParsedCard | null => {
   const cover = card.querySelector<HTMLAnchorElement>(COVER_SELECTOR);
   if (!cover) return null;
 
-  const format = detectCardFormat(card);
-  if (shouldSkipFormat(format)) return null;
-
-  const title =
-    (card.querySelector<HTMLDivElement>('.title a')?.textContent ?? '').trim() ||
-    (card.querySelector<HTMLDivElement>('.title')?.textContent ?? '').trim() ||
-    cover.getAttribute('title')?.trim() ||
-    cover.querySelector('img')?.getAttribute('alt')?.trim() ||
-    '';
+  if (shouldSkipCard(card)) {
+    return null;
+  }
 
   const href = cover.getAttribute('href') ?? '';
-  const idMatch = href.match(/\/anime\/(\d+)/);
+  const idMatch = href.match(/anilist\.co\/anime\/(\d+)/i);
   const anilistId = idMatch ? Number(idMatch[1]) : NaN;
+  if (!Number.isFinite(anilistId)) return null;
 
-  if (!title || !Number.isFinite(anilistId)) return null;
+  const title = extractTitle(card, cover);
+  if (!title) return null;
 
   return { anilistId, title, host: cover };
 };
@@ -151,12 +97,12 @@ const browseAdapter: BrowseAdapter = {
   cardSelector: CARD_SELECTOR,
   containerClassName: DEFAULT_CONTAINER_CLASS,
   processedAttribute: DEFAULT_PROCESSED_ATTRIBUTE,
-  parseCard: parseAniListCard,
+  parseCard: parseAniChartCard,
   ensureContainer: ensureOverlayContainer,
   getContainerForCard: locateExistingContainer,
   onCardInvalid: clearProcessedAttribute,
   getObserverRoot: () => document.body ?? document.documentElement,
-  getScanRoot: () => findCardContainer(),
+  getScanRoot: () => document.body ?? null,
   mutationObserverInit: {
     childList: true,
     subtree: true,
@@ -169,8 +115,7 @@ const browseAdapter: BrowseAdapter = {
 const BrowseContentApp = createBrowseContentApp(browseAdapter);
 
 export default defineContentScript({
-  matches: ['*://anilist.co/*'],
-  excludeMatches: ['*://anilist.co/anime/*'],
+  matches: ['*://anichart.net/*', '*://www.anichart.net/*'],
 
   async main(ctx: ContentScriptContext) {
     const queryClient = new QueryClient({
@@ -254,7 +199,7 @@ export default defineContentScript({
       ensureGlobalStyles();
 
       ui = await createShadowRootUi(ctx, {
-        name: 'kitsunarr-browse-root',
+        name: 'kitsunarr-anichart-root',
         position: 'inline',
         anchor: 'body',
         onMount: (container: HTMLElement, shadow: ShadowRoot) => {
@@ -304,7 +249,7 @@ export default defineContentScript({
     };
 
     const handleLocationChange = (url: string) => {
-      if (isBrowseSurface(url)) void mount();
+      if (isAniChartSurface(url)) void mount();
       else void remove();
     };
 
@@ -328,5 +273,4 @@ export default defineContentScript({
     });
   },
 });
-
 
