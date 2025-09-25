@@ -60,19 +60,6 @@ const FormControl = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 );
 FormControl.displayName = 'FormControl';
 
-const FormMessage = React.memo(
-  React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement> & { type?: 'description' | 'error' }>(
-    ({ className = '', type = 'description', ...props }, ref) => (
-      <p
-        ref={ref}
-        className={`text-xs ${type === 'error' ? 'text-error' : 'text-text-secondary'} ${className}`}
-        {...props}
-      />
-    ),
-  ),
-);
-FormMessage.displayName = 'FormMessage';
-
 const Input = React.memo(
   React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
     ({ className = '', type, ...props }, ref) => {
@@ -140,12 +127,10 @@ SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 const SelectContent = React.memo(
   React.forwardRef<
     React.ElementRef<typeof SelectPrimitive.Content>,
-    // THIS IS THE FIX: The `container` prop is added back to the type definition.
-    React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & { container?: HTMLElement | null | undefined }
+    React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & { container?: HTMLElement | null }
   >(({ className = '', children, position = 'popper', container, ...props }, ref) => {
     return (
-      // The `container` prop is now correctly passed to the Portal.
-      <SelectPrimitive.Portal container={container as HTMLElement | undefined}>
+      <SelectPrimitive.Portal container={container ?? undefined}>
         <SelectPrimitive.Content
           ref={ref}
           className={`relative z-50 min-w-[8rem] w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-border-primary bg-bg-secondary text-text-primary shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ${className}`}
@@ -187,7 +172,6 @@ export {
   FormItem,
   FormLabel,
   FormControl,
-  FormMessage,
   Input,
   Switch,
   Select,

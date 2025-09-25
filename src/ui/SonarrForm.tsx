@@ -1,5 +1,5 @@
 // src/ui/SonarrForm.tsx
-import React, { useState, useLayoutEffect, useRef, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import type { SonarrFormState, SonarrQualityProfile, SonarrRootFolder, SonarrTag } from '@/types';
 import {
   FormField,
@@ -26,12 +26,17 @@ interface SonarrFormProps {
   onChange: <K extends keyof SonarrFormState>(field: K, value: SonarrFormState[K]) => void;
   disabled?: boolean;
   className?: string;
+  portalContainer?: HTMLElement | null;
 }
 
-const SonarrForm: React.FC<SonarrFormProps> = ({ options, data, onChange, disabled, className }) => {
-  const formRef = useRef<HTMLDivElement>(null);
-  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
-
+const SonarrForm: React.FC<SonarrFormProps> = ({
+  options,
+  data,
+  onChange,
+  disabled,
+  className,
+  portalContainer,
+}) => {
   const tagMaps = useMemo(() => {
     const idToLabel = new Map<number, string>();
     const labelToId = new Map<string, number>();
@@ -62,22 +67,10 @@ const SonarrForm: React.FC<SonarrFormProps> = ({ options, data, onChange, disabl
     onChange('tags', tagIds);
   };
 
-  // useLayoutEffect runs synchronously after a render but before the screen is updated.
-  // This is the ideal place to find a DOM node to prevent any flicker.
-  useLayoutEffect(() => {
-    if (formRef.current) {
-      // Get the root node of the form, which will be the Shadow Root.
-      const rootNode = formRef.current.getRootNode();
-      // Find our dedicated portal container within that root.
-      const host = (rootNode as Document | ShadowRoot).querySelector('#kitsunarr-select-portal-container');
-      if (host instanceof HTMLElement) {
-        setPortalHost(host);
-      }
-    }
-  }, []); // Run only once after the component mounts.
+  const selectPortal = portalContainer ?? null;
 
   return (
-    <div ref={formRef} className={`space-y-4 ${className ?? ''}`}>
+    <div className={`space-y-4 ${className ?? ''}`}>
       {/* Quality Profile */}
       <FormField>
         <FormItem>
@@ -91,7 +84,7 @@ const SonarrForm: React.FC<SonarrFormProps> = ({ options, data, onChange, disabl
               <SelectTrigger className="text-text-primary">
                 <SelectValue placeholder="Select a profile..." />
               </SelectTrigger>
-              <SelectContent container={portalHost}>
+              <SelectContent container={selectPortal}>
                 {data.qualityProfiles.map(p => (
                   <SelectItem key={p.id} value={String(p.id)}>
                     {p.name}
@@ -116,7 +109,7 @@ const SonarrForm: React.FC<SonarrFormProps> = ({ options, data, onChange, disabl
               <SelectTrigger className="text-text-primary">
                 <SelectValue placeholder="Select a folder..." />
               </SelectTrigger>
-              <SelectContent container={portalHost}>
+              <SelectContent container={selectPortal}>
                 {data.rootFolders.map(f => (
                   <SelectItem key={f.id} value={f.path}>
                     {f.path}
@@ -141,7 +134,7 @@ const SonarrForm: React.FC<SonarrFormProps> = ({ options, data, onChange, disabl
               <SelectTrigger className="w-[250px] text-text-primary">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent container={portalHost}>
+              <SelectContent container={selectPortal}>
                 {MONITOR_OPTIONS_WITH_DESCRIPTIONS.map(o => (
                   <SelectItem key={o.value} value={o.value}>
                     {o.label}
@@ -166,7 +159,7 @@ const SonarrForm: React.FC<SonarrFormProps> = ({ options, data, onChange, disabl
               <SelectTrigger className="text-text-primary">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent container={portalHost}>
+              <SelectContent container={selectPortal}>
                 {SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS.map(o => (
                   <SelectItem key={o.value} value={o.value}>
                     {o.label}

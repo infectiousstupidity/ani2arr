@@ -1,5 +1,5 @@
 // src/ui/AddSeriesModal.tsx
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAddSeriesManager } from '@/hooks/use-add-series-manager';
 import { useTheme } from '@/hooks/use-theme';
 import { Modal, ModalContent, ModalTitle, ModalFooter } from '@/ui/Modal';
@@ -7,7 +7,6 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Cross1Icon, ExternalLinkIcon } from '@radix-ui/react-icons';
 import Button from '@/ui/Button';
 import SonarrForm from '@/ui/SonarrForm';
-import { TooltipProvider } from '@radix-ui/react-tooltip';
 
 interface AddSeriesModalProps {
   anilistId: number;
@@ -17,16 +16,17 @@ interface AddSeriesModalProps {
   portalContainer?: HTMLElement | null;
 }
 
-const AddSeriesModal: React.FC<AddSeriesModalProps> = ({ 
-  anilistId, 
-  title, 
-  isOpen, 
-  onClose, 
-  portalContainer 
+const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
+  anilistId,
+  title,
+  isOpen,
+  onClose,
+  portalContainer,
 }) => {
   const hostRef = useRef<HTMLDivElement>(null);
+  const [selectPortal, setSelectPortal] = useState<HTMLElement | null>(null);
   const manager = useAddSeriesManager(anilistId, title, isOpen);
-  
+
   useTheme(hostRef);
 
   useEffect(() => {
@@ -35,15 +35,19 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
     return () => clearTimeout(timer);
   }, [manager.addSeriesState.isSuccess, onClose]);
 
+  const handleSelectPortalRef = useCallback((node: HTMLDivElement | null) => {
+    setSelectPortal(node);
+  }, []);
+
+  const tooltipPortal = selectPortal ?? undefined;
+
   return (
-    <TooltipProvider>
     <div ref={hostRef}>
       <Modal open={isOpen} onOpenChange={onClose}>
-        <ModalContent 
-          container={portalContainer || undefined} 
-          className="mx-auto max-w-none"
-        >
-          <ModalTitle id="modal-title" className="">{title}</ModalTitle>
+        <ModalContent container={portalContainer ?? undefined} className="mx-auto max-w-none">
+          <ModalTitle id="modal-title" className="">
+            {title}
+          </ModalTitle>
           <Dialog.Close
             className="absolute right-4 top-4 rounded-sm opacity-70 text-text-primary transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 disabled:pointer-events-none"
             aria-label="Close"
@@ -56,6 +60,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
               variant="ghost"
               size="icon"
               tooltip="Open in new tab"
+              portalContainer={tooltipPortal}
               onClick={() => browser.runtime.sendMessage({ type: 'OPEN_OPTIONS_PAGE', timestamp: Date.now() })}
               className="text-text-secondary"
             >
@@ -71,6 +76,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
                 data={manager.sonarrMetadata.data}
                 onChange={manager.handleFormChange}
                 disabled={manager.addSeriesState.isPending || manager.addSeriesState.isSuccess}
+                portalContainer={selectPortal}
               />
               <ModalFooter className="mt-4">
                 {manager.isDirty && (
@@ -95,12 +101,10 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
             </>
           )}
 
-          {/* This stable element will host the select dropdowns inside the modal's shadow DOM */}
-          <div id="kitsunarr-select-portal-container" />
+          <div id="kitsunarr-select-portal-container" ref={handleSelectPortalRef} />
         </ModalContent>
       </Modal>
     </div>
-    </TooltipProvider>
   );
 };
 
