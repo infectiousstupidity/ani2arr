@@ -172,13 +172,13 @@ const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) => {
   const { data: options } = useExtensionOptions();
   const isConfigured = !!options?.sonarrUrl && !!options.sonarrApiKey;
 
-  const statusQuery = useSeriesStatus({ anilistId, title }, { enabled: !!anilistId });
+  const statusQuery = useSeriesStatus({ anilistId, title }, { enabled: !!anilistId, ignoreFailureCache: true });
   const addSeriesMutation = useAddSeries();
 
   useEffect(() => {
     if (!anilistId) return;
 
-    getKitsunarrApi().library.getSeriesStatus({ anilistId, title }, { force_verify: true })
+  getKitsunarrApi().library.getSeriesStatus({ anilistId, title }, { force_verify: true, ignoreFailureCache: true })
       .then(() => {
         localQueryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(anilistId) });
       })
