@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { getKitsunarrApi } from '@/services';
 import { extensionOptions } from '@/utils/storage';
 import type {
@@ -26,6 +27,8 @@ const seriesStatusBaseKey = (anilistId: number) => [...rootQueryKey, 'seriesStat
 export const queryKeys = {
   all: rootQueryKey,
   options: () => [...rootQueryKey, 'options'] as const,
+  // root partial key for invalidating all series status queries
+  seriesStatusRoot: () => [...rootQueryKey, 'seriesStatus'] as const,
   seriesStatusBase: seriesStatusBaseKey,
   seriesStatus: (payload: CheckSeriesStatusPayload) => [
     ...seriesStatusBaseKey(payload.anilistId),
@@ -68,10 +71,21 @@ export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: Ser
 };
 
 export const useExtensionOptions = () => {
-  return useQuery({
+  const queryClient = useQueryClient();
+  const query = useQuery({
     queryKey: queryKeys.options(),
     queryFn: () => extensionOptions.getValue(),
+    staleTime: Infinity,
   });
+
+  useEffect(() => {
+    const unsubscribe = extensionOptions.watch(newValue => {
+      queryClient.setQueryData(queryKeys.options(), newValue);
+    });
+    return () => unsubscribe();
+  }, [queryClient]);
+
+  return query;
 };
 
 export const useSonarrMetadata = (creds: SonarrCredentialsPayload | null, options?: { enabled?: boolean }) => {

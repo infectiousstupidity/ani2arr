@@ -15,6 +15,8 @@ import {
   type BrowseAdapter,
   type ParsedCard,
 } from '@/ui/browse-overlay';
+import { queryKeys } from '@/hooks/use-api-queries';
+import browser from 'webextension-polyfill';
 
 const log = logger.create('AniChart Browse Content');
 
@@ -140,8 +142,19 @@ export default defineContentScript({
       log.warn('Failed to hydrate query cache', error);
     }
 
+    const messageListener = (message: unknown) => {
+      const msg = message as { type?: string };
+      if (msg?.type === 'KITSUNARR_CONFIG_UPDATED') {
+        log.info('Configuration updated, invalidating all series status queries.');
+        queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot() });
+      }
+    };
+
+    browser.runtime.onMessage.addListener(messageListener);
+
     ctx.onInvalidated(() => {
       unsubscribePersistence();
+      browser.runtime.onMessage.removeListener(messageListener);
     });
 
     let ui: ShadowRootContentScriptUi<Root> | null = null;
@@ -273,4 +286,3 @@ export default defineContentScript({
     });
   },
 });
-
