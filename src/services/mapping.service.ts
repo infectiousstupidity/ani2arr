@@ -9,7 +9,9 @@ import { retryWithBackoff } from '@/utils/retry';
 import { normTitle, stripParenContent, computeTitleMatchScore } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
 import { incrementPhase0Counter } from '@/utils/metrics/phase0';
+import { logger } from '@/utils/logger';
 
+const log = logger.create('MappingService');
 const PRIMARY_URL = 'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json';
 const FALLBACK_URL = 'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json';
 const RESOLVED_STALE = 30 * 24 * 60 * 60 * 1000;
@@ -141,6 +143,7 @@ export class MappingService {
 
     const cachedSuccess = await this.cache.get<ResolvedMapping>(successKey);
     if (cachedSuccess) {
+      log.debug(`[Cache HIT] Found resolved mapping for anilistId:${anilistId}.`);
       incrementPhase0Counter('cache-hit');
       try {
         await this.cache.delete(failureKey);
@@ -189,6 +192,7 @@ export class MappingService {
 
     const staticHit = this.checkStaticMaps(anilistId);
     if (staticHit) {
+      log.debug(`[Static HIT] Found static mapping for anilistId:${anilistId} in '${staticHit.source}' source.`);
       if (staticHit.source === 'primary') incrementPhase0Counter('static-primary');
       else if (staticHit.source === 'fallback') incrementPhase0Counter('static-fallback');
       return { tvdbId: staticHit.tvdbId };
@@ -215,6 +219,7 @@ export class MappingService {
     }
 
     return new Promise((resolve, reject) => {
+      log.debug(`[Queueing] No local mapping for anilistId:${anilistId}. Queuing for network resolution.`);
       const request: QueuedMappingRequest = { anilistId, resolve, reject };
       if (normalizedHints) {
         request.hints = normalizedHints;
