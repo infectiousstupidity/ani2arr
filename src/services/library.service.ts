@@ -1,7 +1,13 @@
 import type { CacheService } from './cache.service';
 import type { SonarrApiService } from '@/api/sonarr.api';
 import type { MappingService } from './mapping.service';
-import type { CheckSeriesStatusPayload, CheckSeriesStatusResponse, SonarrSeries, LeanSonarrSeries } from '../types';
+import type {
+  CheckSeriesStatusPayload,
+  CheckSeriesStatusResponse,
+  SonarrSeries,
+  LeanSonarrSeries,
+  ExtensionOptions,
+} from '../types';
 import { logError, normalizeError } from '@/utils/error-handling';
 import { extensionOptions } from '@/utils/storage';
 
@@ -39,12 +45,12 @@ export class LibraryService {
     return this.refreshCache();
   }
 
-  public async refreshCache(): Promise<LeanSonarrSeries[]> {
+  public async refreshCache(optionsOverride?: ExtensionOptions): Promise<LeanSonarrSeries[]> {
     if (this.inflightRefresh) return this.inflightRefresh;
 
     const p = (async () => {
       try {
-        const options = await extensionOptions.getValue();
+        const options = optionsOverride ?? await extensionOptions.getValue();
         if (!options?.sonarrUrl || !options?.sonarrApiKey) {
           this.tvdbSet.clear();
           await this.cacheService.set(SONARR_KEY, [], SONARR_STALE, SONARR_HARD);
@@ -114,8 +120,7 @@ export class LibraryService {
 
       const { tvdbId, successfulSynonym } =
         await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
-
-      // MappingService never returns null tvdbId; keeping check defensively
+        
       if (tvdbId === null) {
         return { exists: false, tvdbId: null, ...(successfulSynonym && { successfulSynonym }) };
       }
