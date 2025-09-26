@@ -130,6 +130,11 @@ export class MappingService {
     return promise;
   }
 
+  private async hasSonarrConfig(): Promise<boolean> {
+    const opts = await extensionOptions.getValue();
+    return !!opts?.sonarrUrl && !!opts?.sonarrApiKey;
+  }
+
   private async resolveTvdbIdInternal(anilistId: number, options: ResolveTvdbIdOptions): Promise<ResolvedMapping> {
     const successKey = this.successCacheKey(anilistId);
     const failureKey = this.failureCacheKey(anilistId);
@@ -189,20 +194,25 @@ export class MappingService {
       return { tvdbId: staticHit.tvdbId };
     }
 
-    if (options.network === 'never') {
-      throw this.notFound(anilistId, 'Local-only check failed, network access is disabled for this request.');
+    const sonarrConfigured = await this.hasSonarrConfig();
+
+    if (options.network === 'never' || !sonarrConfigured) {
+      // Skip hinted lookups and network queue entirely
+      const reason = options.network === 'never'
+        ? 'Local-only check failed, network access is disabled for this request.'
+        : 'Local-only check failed, Sonarr is not configured.';
+      throw this.notFound(anilistId, reason);
     }
 
     const hintTitle = options.hints?.primaryTitle?.trim();
     let normalizedHints: ResolveHints | undefined;
-    if (hintTitle) {
+    if (hintTitle && sonarrConfigured) {
       const hinted = await this.attemptHintedSonarrLookup(anilistId, hintTitle);
       if (hinted) {
         return hinted;
       }
       normalizedHints = { primaryTitle: hintTitle };
     }
-
 
     return new Promise((resolve, reject) => {
       const request: QueuedMappingRequest = { anilistId, resolve, reject };
@@ -244,6 +254,9 @@ export class MappingService {
     const normalizedTitle = primaryTitle.trim();
     if (!normalizedTitle) return null;
 
+    // Guard: do nothing if Sonarr is not configured
+    if (!(await this.hasSonarrConfig())) return null;
+
     try {
       const result = await this.lookupViaSonarr(
         anilistId,
@@ -256,13 +269,18 @@ export class MappingService {
     } catch (e) {
       const normalized = normalizeError(e);
       if (normalized.code !== ErrorCode.VALIDATION_ERROR && normalized.code !== ErrorCode.CONFIGURATION_ERROR) {
-        logError(normalized, `MappingService:hintLookup:${anilistId}`);
+        logError(normalizeError(e), `MappingService:hintLookup:${anilistId}`);
       }
       return null;
     }
   }
 
   private async performNetworkResolution(anilistId: number, hints?: ResolveHints): Promise<ResolvedMapping> {
+    // Guard: no network resolution if Sonarr is not configured
+    if (!(await this.hasSonarrConfig())) {
+      throw this.notFound(anilistId, 'Sonarr is not configured for network resolution.');
+    }
+
     const media = await this.anilistApi.fetchMediaWithRelations(anilistId);
 
     if (media.format === 'MOVIE') {
@@ -314,8 +332,6 @@ export class MappingService {
 
   private checkStaticMaps(anilistId: number): { tvdbId: number; source: 'primary' | 'fallback' } | null {
     if (this.primaryPairsMap.has(anilistId)) {
-      // primary wins if present
-      // note: we don't increment here to avoid double counting when called from multiple paths
       return { tvdbId: this.primaryPairsMap.get(anilistId)!, source: 'primary' };
     }
     if (this.fallbackPairsMap.has(anilistId)) {
