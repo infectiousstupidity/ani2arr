@@ -172,7 +172,6 @@ const BrowseContentApp = createBrowseContentApp(browseAdapter);
 
 export default defineContentScript({
   matches: ['*://anilist.co/*'],
-  excludeMatches: ['*://anilist.co/anime/*'],
 
   async main(ctx: ContentScriptContext) {
     const queryClient = new QueryClient({
