@@ -471,33 +471,30 @@ export class MappingService {
   }
 
   private buildSearchTerms(titles: AniTitles, synonyms: string[] | undefined, year?: number): string[] {
-    const raw: string[] = [];
-    const pushIf = (s?: string) => {
-      if (s && s.trim()) raw.push(s);
-    };
-
-    pushIf(titles?.english);
-    pushIf(titles?.romaji);
-
-    if (Array.isArray(synonyms)) {
-      for (let i = 0; i < synonyms.length && i < 4; i++) pushIf(synonyms[i]);
-    }
-
     const seen = new Set<string>();
     const out: string[] = [];
 
-    for (const base of raw) {
-      const cleaned = stripParenContent(base).trim();
-      const key = normTitle(cleaned);
-      if (key.length < 3 || seen.has(key)) continue;
-      seen.add(key);
-
-      if (typeof year === 'number') {
-        out.push(`${cleaned} ${year}`);
+    const addTerm = (term: string) => {
+      const key = normTitle(term);
+      if (key.length > 2 && !seen.has(key)) {
+        seen.add(key);
+        out.push(term);
       }
-      out.push(cleaned);
+    };
 
-      if (out.length >= MAX_TERMS) break;
+    const baseTitles: string[] = [];
+    if (titles.english) baseTitles.push(titles.english);
+    if (titles.romaji) baseTitles.push(titles.romaji);
+    if (synonyms) baseTitles.push(...synonyms);
+
+    for (const title of baseTitles) {
+      const original = stripParenContent(title).trim();
+      if (!original) continue;
+
+      addTerm(original);
+      if (year) {
+        addTerm(`${original} ${year}`);
+      }
     }
 
     return out.slice(0, MAX_TERMS);
