@@ -1,3 +1,4 @@
+// src/services/library.service.ts
 import type { CacheService } from './cache.service';
 import type { SonarrApiService } from '@/api/sonarr.api';
 import type { MappingService } from './mapping.service';
@@ -99,85 +100,98 @@ export class LibraryService {
     }
   }
 
-  public async getSeriesStatus(
-    payload: CheckSeriesStatusPayload,
-    options: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {},
-  ): Promise<CheckSeriesStatusResponse> {
-    try {
-      const leanSeriesList = await this.getLeanSeriesList();
+public async getSeriesStatus(
+  payload: CheckSeriesStatusPayload,
+  options: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {},
+): Promise<CheckSeriesStatusResponse> {
+  try {
+    const leanSeriesList = await this.getLeanSeriesList();
 
-      const mappingOptions: { network?: 'never'; hints?: { primaryTitle?: string }; ignoreFailureCache?: boolean } = {};
-      if (options.network === 'never') {
-        mappingOptions.network = 'never';
-      }
-      if (options.ignoreFailureCache) {
-        mappingOptions.ignoreFailureCache = true;
-      }
-      const normalizedTitle = payload.title?.trim();
-      if (normalizedTitle) {
-        mappingOptions.hints = { primaryTitle: normalizedTitle };
-      }
+    // Read Sonarr options once, decide capabilities up front
+    const sonarrOpts = await extensionOptions.getValue();
+    const hasSonarr = !!sonarrOpts?.sonarrUrl && !!sonarrOpts?.sonarrApiKey;
 
-      const { tvdbId, successfulSynonym } =
-        await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
-        
-      if (tvdbId === null) {
-        return { exists: false, tvdbId: null, ...(successfulSynonym && { successfulSynonym }) };
-      }
+    const mappingOptions: { network?: 'never'; hints?: { primaryTitle?: string }; ignoreFailureCache?: boolean } = {};
 
-      const seriesFromCache = leanSeriesList.find(s => s.tvdbId === tvdbId);
-      const existsInCache = !!seriesFromCache;
-
-      if (!options.force_verify) {
-        return {
-          exists: existsInCache,
-          tvdbId,
-          ...(seriesFromCache && { series: seriesFromCache }),
-          ...(successfulSynonym && { successfulSynonym }),
-        };
-      }
-
-      const sonarrOpts = await extensionOptions.getValue();
-      if (!sonarrOpts?.sonarrUrl || !sonarrOpts?.sonarrApiKey) {
-        return {
-          exists: existsInCache,
-          tvdbId,
-          ...(seriesFromCache && { series: seriesFromCache }),
-          ...(successfulSynonym && { successfulSynonym }),
-        };
-      }
-
-      const credentials = { url: sonarrOpts.sonarrUrl, apiKey: sonarrOpts.sonarrApiKey };
-      const seriesFromApi = await this.sonarrClient.getSeriesByTvdbId(tvdbId, credentials);
-
-      if (seriesFromApi) {
-        if (!existsInCache) await this.addSeriesToCache(seriesFromApi);
-        const finalSeries =
-          leanSeriesList.find(s => s.tvdbId === tvdbId) ?? {
-            tvdbId: seriesFromApi.tvdbId,
-            id: seriesFromApi.id,
-            titleSlug: seriesFromApi.titleSlug,
-          };
-        return {
-          exists: true,
-          tvdbId,
-          series: finalSeries,
-          ...(successfulSynonym && { successfulSynonym }),
-        };
-      } else {
-        if (existsInCache) await this.removeFromCache(tvdbId, leanSeriesList);
-        return {
-          exists: false,
-          tvdbId,
-          ...(successfulSynonym && { successfulSynonym }),
-        };
-      }
-    } catch (e) {
-      const normalized = normalizeError(e);
-      logError(normalized, `LibraryService:getSeriesStatus:${payload.anilistId}`);
-      throw normalized;
+    // If Sonarr isn't configured, never attempt network/Sonarr lookup - stay local/static only
+    if (!hasSonarr || options.network === 'never') {
+      mappingOptions.network = 'never';
     }
+    if (options.ignoreFailureCache) {
+      mappingOptions.ignoreFailureCache = true;
+    }
+    const normalizedTitle = payload.title?.trim();
+    if (normalizedTitle) {
+      mappingOptions.hints = { primaryTitle: normalizedTitle };
+    }
+
+    // Resolve mapping with graceful fallback on expected failures
+    let tvdbId: number | null = null;
+    let successfulSynonym: string | undefined;
+    try {
+      const res = await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
+      tvdbId = res.tvdbId ?? null;
+      successfulSynonym = res.successfulSynonym;
+    } catch (e) {
+      const err = normalizeError(e);
+      if (err.code === 'CONFIGURATION_ERROR' || err.code === 'VALIDATION_ERROR') {
+        tvdbId = null;
+      } else {
+        logError(err, `LibraryService:getSeriesStatus:${payload.anilistId}`);
+        throw err;
+      }
+    }
+
+    if (tvdbId === null) {
+      return { exists: false, tvdbId: null, ...(successfulSynonym && { successfulSynonym }) };
+    }
+
+    const seriesFromCache = leanSeriesList.find(s => s.tvdbId === tvdbId);
+    const existsInCache = !!seriesFromCache;
+
+    // If we don't have Sonarr configured, or force_verify is false, return cached view
+    if (!hasSonarr || !options.force_verify) {
+      return {
+        exists: existsInCache,
+        tvdbId,
+        ...(seriesFromCache && { series: seriesFromCache }),
+        ...(successfulSynonym && { successfulSynonym }),
+      };
+    }
+
+    // Verify live against Sonarr
+    const credentials = { url: sonarrOpts!.sonarrUrl!, apiKey: sonarrOpts!.sonarrApiKey! };
+    const seriesFromApi = await this.sonarrClient.getSeriesByTvdbId(tvdbId, credentials);
+
+    if (seriesFromApi) {
+      if (!existsInCache) await this.addSeriesToCache(seriesFromApi);
+      const finalSeries =
+        leanSeriesList.find(s => s.tvdbId === tvdbId) ?? {
+          tvdbId: seriesFromApi.tvdbId,
+          id: seriesFromApi.id,
+          titleSlug: seriesFromApi.titleSlug,
+        };
+      return {
+        exists: true,
+        tvdbId,
+        series: finalSeries,
+        ...(successfulSynonym && { successfulSynonym }),
+      };
+    } else {
+      if (existsInCache) await this.removeFromCache(tvdbId, leanSeriesList);
+      return {
+        exists: false,
+        tvdbId,
+        ...(successfulSynonym && { successfulSynonym }),
+      };
+    }
+  } catch (e) {
+    const normalized = normalizeError(e);
+    logError(normalized, `LibraryService:getSeriesStatus:${payload.anilistId}`);
+    throw normalized;
   }
+}
+
 
   private async removeFromCache(tvdbId: number, list: LeanSonarrSeries[]): Promise<LeanSonarrSeries[]> {
     try {

@@ -1,3 +1,4 @@
+// src/services/mapping.service.ts
 import browser from 'webextension-polyfill';
 import type { CacheService } from './cache.service';
 import type { AnilistApiService, AniTitles, AniMedia } from '@/api/anilist.api';
