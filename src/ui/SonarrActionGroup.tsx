@@ -68,7 +68,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
                 className="rounded-none h-[35px] w-[35px] bg-[#3db4f2] text-[#072033] transition-colors hover:bg-[#299dd1] focus-visible:z-10 focus-visible:ring-offset-0 disabled:bg-[#3db4f2]/50 disabled:text-[#072033]/60"
                 aria-label="Advanced options"
             >
-                <GearIcon className="h-4 w-4" />
+                <GearIcon className="h-4 w-4 text-text-primary" />
             </Button>
         </div>
 
@@ -85,7 +85,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
               if (isInSonarr && seriesTitleSlug) {
                 log.debug(`Redirecting to Sonarr series page for slug: ${seriesTitleSlug}`);
               } else {
-                 log.debug(`Redirecting to Sonarr Add New page with term: ${resolvedSearchTerm}`);
+                log.debug(`Redirecting to Sonarr Add New page with term: ${resolvedSearchTerm}`);
               }
             }}
           >
