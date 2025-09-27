@@ -47,3 +47,9 @@ export const AddInput = z.object({
   profileId: z.number().int().positive(),
   path: z.string().min(1),
 });
+
+// ---------- Sonarr Credentials ----------
+export const SonarrCredentialsInput = z.object({
+  url: z.string().trim().url(),
+  apiKey: z.string().trim().regex(/^[a-f0-9]{32}$/i),
+});

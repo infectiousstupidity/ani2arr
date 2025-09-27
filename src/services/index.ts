@@ -5,7 +5,20 @@ import { AnilistApiService } from '@/api/anilist.api';
 import { MappingService } from './mapping.service';
 import { LibraryService } from './library.service';
 import { extensionOptions } from '@/utils/storage';
-import { ResolveInput, MappingOutput, StatusInput, StatusOutput, AddInput } from '@/rpc/schemas';
+import {
+  ResolveInput,
+  MappingOutput,
+  StatusInput,
+  StatusOutput,
+  AddInput,
+  SonarrCredentialsInput,
+} from '@/rpc/schemas';
+import type {
+  SonarrCredentialsPayload,
+  SonarrQualityProfile,
+  SonarrRootFolder,
+  SonarrTag,
+} from '@/types';
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
@@ -25,6 +38,10 @@ type KitsunarrApi = {
   addToSonarr(input: unknown): Promise<{ ok: true }>;
   removeFromSonarr(input: { tvdbId: number }): Promise<{ ok: true }>;
   notifySettingsChanged(): Promise<{ ok: true }>;
+  getQualityProfiles(input: SonarrCredentialsPayload): Promise<SonarrQualityProfile[]>;
+  getRootFolders(input: SonarrCredentialsPayload): Promise<SonarrRootFolder[]>;
+  getTags(input: SonarrCredentialsPayload): Promise<SonarrTag[]>;
+  testConnection(input: SonarrCredentialsPayload): Promise<{ version: string }>;
 };
 
 export const [registerKitsunarrApi, getKitsunarrApi] =
@@ -103,6 +120,26 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
       async notifySettingsChanged() {
         await broadcast('settings-changed');
         return { ok: true };
+      },
+
+      async getQualityProfiles(input: SonarrCredentialsPayload) {
+        const creds = SonarrCredentialsInput.parse(input);
+        return sonarr.getQualityProfiles(creds);
+      },
+
+      async getRootFolders(input: SonarrCredentialsPayload) {
+        const creds = SonarrCredentialsInput.parse(input);
+        return sonarr.getRootFolders(creds);
+      },
+
+      async getTags(input: SonarrCredentialsPayload) {
+        const creds = SonarrCredentialsInput.parse(input);
+        return sonarr.getTags(creds);
+      },
+
+      async testConnection(input: SonarrCredentialsPayload) {
+        const creds = SonarrCredentialsInput.parse(input);
+        return sonarr.testConnection(creds);
       },
     };
   });
