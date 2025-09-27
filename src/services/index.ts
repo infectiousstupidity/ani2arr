@@ -51,8 +51,11 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
       async resolveMapping(input) {
         // Enforce your rule: no lookups unless Sonarr is configured
         await ensureConfigured();
-        const { anilistId } = ResolveInput.parse(input);
-        const res = await mapping.resolveTvdbId(anilistId);
+        const { anilistId, primaryTitleHint } = ResolveInput.parse(input);
+        const resolveOptions = primaryTitleHint
+          ? { hints: { primaryTitle: primaryTitleHint } }
+          : undefined;
+        const res = await mapping.resolveTvdbId(anilistId, resolveOptions);
         return MappingOutput.parse(res);
       },
 
