@@ -178,14 +178,20 @@ const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) => {
   useEffect(() => {
     if (!anilistId) return;
 
-  getKitsunarrApi().library.getSeriesStatus({ anilistId, title }, { force_verify: true, ignoreFailureCache: true })
+    getKitsunarrApi()
+      .getSeriesStatus({
+        anilistId,
+        title,
+        force_verify: true,
+        ignoreFailureCache: true,
+      })
       .then(() => {
         localQueryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(anilistId) });
       })
       .catch(error => {
         log.error('Background re-validation failed:', error);
       });
-  
+
   }, [anilistId, title, localQueryClient]);
 
   const handleQuickAdd = () => {

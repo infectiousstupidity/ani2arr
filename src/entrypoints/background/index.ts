@@ -57,7 +57,7 @@ export default defineBackground(() => {
     const key = '__kitsunarr_fallback_interval__';
     if (!(globalThis as Record<string, unknown>)[key]) {
       (globalThis as Record<string, unknown>)[key] = globalThis.setInterval(() => {
-        void api.mapping.initStaticPairs();
+        void api.initStaticMappings();
       }, MAPPING_REFRESH_PERIOD_MIN * 60 * 1000);
     }
   };
@@ -66,19 +66,19 @@ export default defineBackground(() => {
     if (details.reason === 'install') {
       browser.runtime.openOptionsPage().catch(() => {});
     }
-    await api.mapping.initStaticPairs();
+    await api.initStaticMappings();
     await ensurePeriodicRefresh();
   });
 
   browser.runtime.onStartup.addListener(async () => {
-    await api.mapping.initStaticPairs();
+    await api.initStaticMappings();
     await ensurePeriodicRefresh();
   });
 
   if (alarmsApi) {
     alarmsApi.onAlarm.addListener((alarm) => {
       if (alarm.name === MAPPING_REFRESH_ALARM) {
-        void api.mapping.initStaticPairs();
+        void api.initStaticMappings();
       }
     });
   }
@@ -91,7 +91,7 @@ export default defineBackground(() => {
       }
 
       if (isMappingRefreshMessage(message)) {
-        void api.mapping.initStaticPairs();
+        void api.initStaticMappings();
         return Promise.resolve({ ok: true as const });
       }
 
@@ -124,7 +124,7 @@ export default defineBackground(() => {
     if (credentialsChanged) {
       log.info('Sonarr credentials changed. Triggering library cache refresh.');
       try {
-        await api.library.refreshCache(newValue);
+        await api.refreshLibraryCache(newValue);
         log.info('Library cache refreshed. Notifying content scripts.');
         const tabs = await browser.tabs.query({
           url: ["*://anilist.co/*", "*://anichart.net/*"],

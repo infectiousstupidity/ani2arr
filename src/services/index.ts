@@ -6,6 +6,7 @@ import { MappingService } from './mapping.service';
 import { LibraryService } from './library.service';
 import { extensionOptions } from '@/utils/storage';
 import { ResolveInput, MappingOutput, StatusInput, StatusOutput, AddInput } from '@/rpc/schemas';
+import type { ExtensionOptions, LeanSonarrSeries } from '@/types';
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
@@ -25,6 +26,8 @@ type KitsunarrApi = {
   addToSonarr(input: unknown): Promise<{ ok: true }>;
   removeFromSonarr(input: { tvdbId: number }): Promise<{ ok: true }>;
   notifySettingsChanged(): Promise<{ ok: true }>;
+  initStaticMappings(): Promise<{ ok: true }>;
+  refreshLibraryCache(options?: ExtensionOptions): Promise<LeanSonarrSeries[]>;
 };
 
 export const [registerKitsunarrApi, getKitsunarrApi] =
@@ -103,6 +106,16 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
       async notifySettingsChanged() {
         await broadcast('settings-changed');
         return { ok: true };
+      },
+
+      async initStaticMappings() {
+        await mapping.initStaticPairs();
+        return { ok: true };
+      },
+
+      async refreshLibraryCache(options) {
+        const result = await library.refreshCache(options);
+        return result;
       },
     };
   });
