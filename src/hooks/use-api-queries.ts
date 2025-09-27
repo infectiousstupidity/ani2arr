@@ -1,3 +1,4 @@
+// src/hooks/use-api-queries.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { getKitsunarrApi } from '@/services';
@@ -14,7 +15,6 @@ import type {
 } from '@/types';
 import { normalizeError } from '@/utils/error-handling';
 
-
 const rootQueryKey = ['kitsunarr'] as const;
 
 const normalizeTitleKey = (title?: string) => {
@@ -27,7 +27,6 @@ const seriesStatusBaseKey = (anilistId: number) => [...rootQueryKey, 'seriesStat
 export const queryKeys = {
   all: rootQueryKey,
   options: () => [...rootQueryKey, 'options'] as const,
-  // root partial key for invalidating all series status queries
   seriesStatusRoot: () => [...rootQueryKey, 'seriesStatus'] as const,
   seriesStatusBase: seriesStatusBaseKey,
   seriesStatus: (payload: CheckSeriesStatusPayload) => [
@@ -48,21 +47,20 @@ export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: Ser
   return useQuery<CheckSeriesStatusResponse, ExtensionError>({
     queryKey: queryKeys.seriesStatus(payload),
     queryFn: async () => {
-      const serviceOptions: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {};
-      if (options?.force_verify) {
-        serviceOptions.force_verify = true;
-      }
-      if (options?.network) {
-        serviceOptions.network = options.network;
-      }
-      const optionBypass =
-        typeof options?.ignoreFailureCache === 'function'
-          ? options.ignoreFailureCache()
-          : options?.ignoreFailureCache === true;
-      if (optionBypass) {
-        serviceOptions.ignoreFailureCache = true;
-      }
-      return getKitsunarrApi().library.getSeriesStatus(payload, serviceOptions);
+      const api = getKitsunarrApi();
+      const serviceInput = {
+        anilistId: payload.anilistId,
+        title: payload.title,
+        force_verify: options?.force_verify ? true : undefined,
+        network: options?.network ?? undefined,
+        ignoreFailureCache:
+          typeof options?.ignoreFailureCache === 'function'
+            ? options.ignoreFailureCache()
+            : options?.ignoreFailureCache === true
+              ? true
+              : undefined,
+      };
+      return api.getSeriesStatus(serviceInput);
     },
     enabled: !!payload.anilistId && (options?.enabled ?? true),
     staleTime: 5 * 60 * 1000,
@@ -81,6 +79,8 @@ export const useExtensionOptions = () => {
   useEffect(() => {
     const unsubscribe = extensionOptions.watch(newValue => {
       queryClient.setQueryData(queryKeys.options(), newValue);
+      // optional: notify background to invalidate caches
+      getKitsunarrApi().notifySettingsChanged().catch(() => {});
     });
     return () => unsubscribe();
   }, [queryClient]);
@@ -94,10 +94,11 @@ export const useSonarrMetadata = (creds: SonarrCredentialsPayload | null, option
     queryFn: async () => {
       if (!creds?.url || !creds.apiKey) throw new Error('Sonarr credentials are not provided.');
       const api = getKitsunarrApi();
+      // These are expected to be pass-through RPC methods in services/index.ts.
       const [qualityProfiles, rootFolders, tags] = await Promise.all([
-        api.sonarr.getQualityProfiles(creds),
-        api.sonarr.getRootFolders(creds),
-        api.sonarr.getTags(creds),
+        api.getQualityProfiles(creds),
+        api.getRootFolders(creds),
+        api.getTags(creds),
       ]);
       return { qualityProfiles, rootFolders, tags };
     },
@@ -117,22 +118,28 @@ export const useAddSeries = () => {
         const baseOptions = await extensionOptions.getValue();
         if (!baseOptions) throw new Error('Extension options are not loaded.');
 
-        const { tvdbId } = await api.mapping.resolveTvdbId(payload.anilistId, {
-          hints: { primaryTitle: payload.title },
-          ignoreFailureCache: true,
+        // Resolve mapping via RPC
+        const mapping = await api.resolveMapping({
+          anilistId: payload.anilistId,
+          primaryTitleHint: payload.title,
         });
-        if (!tvdbId) throw new Error('Could not resolve TVDB ID for this series.');
 
-        const sonarrPayload: AddRequestPayload = { ...payload, tvdbId };
+        // Use RPC mutation that applies defaults server-side
+        const sonarrSeries = await api.addToSonarr({
+          tvdbId: mapping.tvdbId,
+          profileId: Number(payload.qualityProfileId),
+          path: payload.rootFolderPath,
+        });
 
-        return await api.sonarr.addSeries(sonarrPayload, baseOptions);
+        return sonarrSeries as unknown as SonarrSeries; // RPC can also return { ok: true }; adjust if needed
       } catch (error) {
         throw normalizeError(error);
       }
     },
-    onSuccess: async (addedSeries, variables) => {
+    onSuccess: async (_addedSeries, variables) => {
+      // Background already refreshes its cache and broadcasts; still invalidate local queries
       const api = getKitsunarrApi();
-      await api.library.addSeriesToCache(addedSeries);
+      await api.notifySettingsChanged().catch(() => {});
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
     },
   });
@@ -142,7 +149,8 @@ export const useTestConnection = () => {
   return useMutation<{ version: string }, ExtensionError, TestConnectionPayload>({
     mutationFn: async (payload: TestConnectionPayload) => {
       try {
-        return await getKitsunarrApi().sonarr.testConnection(payload);
+        // Pass-through RPC expected in services/index.ts
+        return await getKitsunarrApi().testConnection(payload);
       } catch (error) {
         throw normalizeError(error);
       }
@@ -157,6 +165,7 @@ export const useSaveOptions = () => {
     mutationFn: async (options: ExtensionOptions) => {
       try {
         await extensionOptions.setValue(options);
+        await getKitsunarrApi().notifySettingsChanged();
       } catch (error) {
         throw normalizeError(error);
       }

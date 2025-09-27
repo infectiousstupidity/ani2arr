@@ -68,7 +68,7 @@ export interface SonarrFormState {
   monitorOption: SonarrMonitorOption;
   seasonFolder: boolean;
   searchForMissingEpisodes: boolean;
-  tags: number[]; 
+  tags: number[];
 }
 
 export interface ExtensionOptions {
@@ -78,7 +78,13 @@ export interface ExtensionOptions {
 }
 
 //================================================================
-// Service Layer: Payloads & Responses
+/**
+ * Service Layer: Payloads & Responses
+ *
+ * Notes after refactor:
+ * - Mapping resolution is triggered by AniList ID and may include a primary title hint.
+ * - Library status RPC now accepts options in the same object (force_verify, network, ignoreFailureCache).
+ */
 //================================================================
 
 export interface AddRequestPayload extends Partial<SonarrFormState> {
@@ -92,6 +98,16 @@ export interface CheckSeriesStatusPayload {
   title?: string;
 }
 
+export type NetworkPolicy = 'never';
+
+export interface GetSeriesStatusRequest {
+  anilistId: number;
+  title?: string;
+  force_verify?: boolean;
+  network?: NetworkPolicy;
+  ignoreFailureCache?: boolean;
+}
+
 export interface CheckSeriesStatusResponse {
   exists: boolean;
   tvdbId: number | null;
@@ -100,10 +116,20 @@ export interface CheckSeriesStatusResponse {
   series?: LeanSonarrSeries;
 }
 
+export interface ResolveMappingRequest {
+  anilistId: number;
+  /** Optional title hint to bias matching without extra AniList calls */
+  primaryTitleHint?: string;
+}
+
+export interface ResolveMappingResponse {
+  tvdbId: number; // throws on not-found; response is only for success
+  successfulSynonym?: string;
+}
+
 export interface SonarrCredentialsPayload { url: string; apiKey: string; }
 
 export type TestConnectionPayload = SonarrCredentialsPayload;
-
 
 //================================================================
 // Error Handling Types

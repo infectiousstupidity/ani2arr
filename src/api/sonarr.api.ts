@@ -69,12 +69,12 @@ export class SonarrApiService {
     }
   };
 
-  /** /series */
+  /** GET /series */
   public getAllSeries = async (credentials: SonarrCredentialsPayload): Promise<SonarrSeries[]> => {
     return this.request<SonarrSeries[]>('series', credentials);
   };
 
-  /** /series?tvdbId=XYZ */
+  /** GET /series?tvdbId=XYZ */
   public getSeriesByTvdbId = async (
     tvdbId: number,
     credentials: SonarrCredentialsPayload,
@@ -83,7 +83,7 @@ export class SonarrApiService {
     return seriesArray[0] ?? null;
   };
 
-  /** /series/lookup?term=... */
+  /** GET /series/lookup?term=... */
   public lookupSeriesByTerm = async (
     term: string,
     credentials: SonarrCredentialsPayload,
@@ -92,23 +92,64 @@ export class SonarrApiService {
     return this.request<SonarrLookupSeries[]>(`series/lookup?term=${encodedTerm}`, credentials);
   };
 
-  /** POST /series */
-  public addSeries = async (payload: AddRequestPayload, baseOptions: ExtensionOptions): Promise<SonarrSeries> => {
-    const sonarrCreds = { url: baseOptions.sonarrUrl, apiKey: baseOptions.sonarrApiKey };
-
-    const finalPayload: AddRequestPayload = {
-      ...baseOptions.defaults,
-      ...payload,
+  /**
+   * POST /series
+   *
+   * Refactor note:
+   * - Supports both the legacy signature (payload, baseOptions) and a basic signature
+   *   ({ tvdbId, profileId, path }, { sonarrUrl, sonarrApiKey }) used by the new RPC.
+   * - When defaults are not provided, sensible fallbacks are applied.
+   */
+  public addSeries = async (
+    payload:
+      | AddRequestPayload
+      | { tvdbId: number; profileId: number; path: string },
+    base:
+      | ExtensionOptions
+      | { sonarrUrl: string; sonarrApiKey: string },
+  ): Promise<SonarrSeries> => {
+    const sonarrCreds: SonarrCredentialsPayload = {
+      url: 'sonarrUrl' in base ? base.sonarrUrl : (base as ExtensionOptions).sonarrUrl,
+      apiKey: 'sonarrApiKey' in base ? base.sonarrApiKey : (base as ExtensionOptions).sonarrApiKey,
     };
+
+    const defaults = 'defaults' in base
+      ? base.defaults
+      : {
+          seriesType: 'anime' as const,
+          monitorOption: 'future' as const,
+          seasonFolder: true,
+          searchForMissingEpisodes: false,
+          qualityProfileId: (payload as any).profileId ?? 1,
+          rootFolderPath: (payload as any).path ?? '',
+          tags: [] as number[],
+        };
+
+    const finalPayload: AddRequestPayload =
+      'title' in payload
+        ? { ...defaults, ...payload }
+        : {
+            title: '',               // Sonarr ignores title for add if tvdbId provided
+            anilistId: -1,           // not used by Sonarr
+            tvdbId: (payload as any).tvdbId,
+            qualityProfileId: (payload as any).profileId,
+            rootFolderPath: (payload as any).path,
+            seriesType: defaults.seriesType,
+            monitorOption: defaults.monitorOption,
+            seasonFolder: defaults.seasonFolder,
+            searchForMissingEpisodes: defaults.searchForMissingEpisodes,
+            tags: defaults.tags,
+          };
+
     const apiPayload = {
       ...finalPayload,
-      monitored: (finalPayload.monitorOption ?? baseOptions.defaults.monitorOption) !== 'none',
+      monitored: (finalPayload.monitorOption ?? defaults.monitorOption) !== 'none',
       monitoringOptions: {
-        monitor: finalPayload.monitorOption ?? baseOptions.defaults.monitorOption,
+        monitor: finalPayload.monitorOption ?? defaults.monitorOption,
       },
       addOptions: {
         searchForMissingEpisodes:
-          finalPayload.searchForMissingEpisodes ?? baseOptions.defaults.searchForMissingEpisodes,
+          finalPayload.searchForMissingEpisodes ?? defaults.searchForMissingEpisodes,
       },
     };
 
@@ -119,18 +160,22 @@ export class SonarrApiService {
     });
   };
 
+  /** GET /rootfolder */
   public getRootFolders = async (credentials: SonarrCredentialsPayload): Promise<SonarrRootFolder[]> => {
     return this.request<SonarrRootFolder[]>('rootfolder', credentials);
   };
 
+  /** GET /qualityprofile */
   public getQualityProfiles = async (credentials: SonarrCredentialsPayload): Promise<SonarrQualityProfile[]> => {
     return this.request<SonarrQualityProfile[]>('qualityprofile', credentials);
   };
 
+  /** GET /tag */
   public getTags = async (credentials: SonarrCredentialsPayload): Promise<SonarrTag[]> => {
     return this.request<SonarrTag[]>('tag', credentials);
   };
 
+  /** GET /system/status */
   public testConnection = async (credentials: SonarrCredentialsPayload): Promise<{ version: string }> => {
     return this.request<{ version: string }>('system/status', credentials);
   };

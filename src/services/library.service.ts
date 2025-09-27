@@ -1,5 +1,4 @@
 // src/services/library.service.ts
-import type { CacheService } from './cache.service';
 import type { SonarrApiService } from '@/api/sonarr.api';
 import type { MappingService } from './mapping.service';
 import type {
@@ -11,36 +10,47 @@ import type {
 } from '../types';
 import { logError, normalizeError } from '@/utils/error-handling';
 import { extensionOptions } from '@/utils/storage';
+import { createCache } from '@/cache';
+import { idbAdapter } from '@/cache/adapters/idb';
 
 const SONARR_KEY = 'sonarr_series_list_v2';
-const SONARR_STALE = 60 * 60 * 1000;
-const SONARR_HARD = 24 * 60 * 60 * 1000;
+const SONARR_STALE = 60 * 60 * 1000;      // 1h soft TTL
+const SONARR_HARD = 24 * 60 * 60 * 1000;  // 24h hard TTL
+const SONARR_ERR  = 5 * 60 * 1000;        // 5m error TTL
 
 export class LibraryService {
   private isRefreshing = false;
   private inflightRefresh: Promise<LeanSonarrSeries[]> | null = null;
   private tvdbSet: Set<number> = new Set();
 
+  // Persisted cache for the lean series list
+  private store = createCache(idbAdapter('library'), {
+    namespace: 'lib:list',
+    softTtlMs: SONARR_STALE,
+    hardTtlMs: SONARR_HARD,
+    errorTtlMs: SONARR_ERR,
+  });
+
   constructor(
     private readonly sonarrClient: SonarrApiService,
     private readonly mappingService: MappingService,
-    private readonly cacheService: CacheService,
   ) {}
 
   public async getLeanSeriesList(): Promise<LeanSonarrSeries[]> {
-    const meta = await this.cacheService.getWithMeta<LeanSonarrSeries[]>(SONARR_KEY);
+    const now = Date.now();
+    const meta = await this.store.get<LeanSonarrSeries[]>(SONARR_KEY);
 
-    if (meta?.v) {
-      if (Date.now() >= meta.staleAt && !this.isRefreshing) {
+    if (meta && !this.store.isExpired(meta, now)) {
+      if (this.tvdbSet.size === 0 && Array.isArray(meta.value)) {
+        this.tvdbSet = new Set(meta.value.map(s => s.tvdbId));
+      }
+      if (this.store.isStale(meta, now) && !this.isRefreshing) {
         this.isRefreshing = true;
         this.refreshCache().finally(() => {
           this.isRefreshing = false;
         });
       }
-      if (this.tvdbSet.size === 0 && Array.isArray(meta.v)) {
-        this.tvdbSet = new Set(meta.v.map(s => s.tvdbId));
-      }
-      return meta.v;
+      return meta.value;
     }
 
     return this.refreshCache();
@@ -54,7 +64,7 @@ export class LibraryService {
         const options = optionsOverride ?? await extensionOptions.getValue();
         if (!options?.sonarrUrl || !options?.sonarrApiKey) {
           this.tvdbSet.clear();
-          await this.cacheService.set(SONARR_KEY, [], SONARR_STALE, SONARR_HARD);
+          await this.store.set(SONARR_KEY, [], Date.now());
           return [];
         }
         const credentials = { url: options.sonarrUrl, apiKey: options.sonarrApiKey };
@@ -63,14 +73,14 @@ export class LibraryService {
           tvdbId: s.tvdbId,
           id: s.id,
           titleSlug: s.titleSlug,
-        }));
+        })) satisfies LeanSonarrSeries[];
 
         this.tvdbSet = new Set(leanSeriesList.map(s => s.tvdbId));
-        await this.cacheService.set(SONARR_KEY, leanSeriesList, SONARR_STALE, SONARR_HARD);
+        await this.store.set(SONARR_KEY, leanSeriesList, Date.now());
         return leanSeriesList;
       } catch (e) {
         logError(normalizeError(e), 'LibraryService:refreshCache');
-        const cached = (await this.cacheService.get<LeanSonarrSeries[]>(SONARR_KEY)) ?? [];
+        const cached = (await this.store.get<LeanSonarrSeries[]>(SONARR_KEY))?.value ?? [];
         this.tvdbSet = new Set(cached.map(s => s.tvdbId));
         return cached;
       } finally {
@@ -93,111 +103,108 @@ export class LibraryService {
         };
         const updatedList = [...currentList, lean];
         this.tvdbSet.add(newSeries.tvdbId);
-        await this.cacheService.set(SONARR_KEY, updatedList, SONARR_STALE, SONARR_HARD);
+        await this.store.set(SONARR_KEY, updatedList, Date.now());
       }
     } catch (e) {
       logError(normalizeError(e), 'LibraryService:addSeriesToCache');
     }
   }
 
-public async getSeriesStatus(
-  payload: CheckSeriesStatusPayload,
-  options: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {},
-): Promise<CheckSeriesStatusResponse> {
-  try {
-    const leanSeriesList = await this.getLeanSeriesList();
-
-    // Read Sonarr options once, decide capabilities up front
-    const sonarrOpts = await extensionOptions.getValue();
-    const hasSonarr = !!sonarrOpts?.sonarrUrl && !!sonarrOpts?.sonarrApiKey;
-
-    const mappingOptions: { network?: 'never'; hints?: { primaryTitle?: string }; ignoreFailureCache?: boolean } = {};
-
-    // If Sonarr isn't configured, never attempt network/Sonarr lookup - stay local/static only
-    if (!hasSonarr || options.network === 'never') {
-      mappingOptions.network = 'never';
-    }
-    if (options.ignoreFailureCache) {
-      mappingOptions.ignoreFailureCache = true;
-    }
-    const normalizedTitle = payload.title?.trim();
-    if (normalizedTitle) {
-      mappingOptions.hints = { primaryTitle: normalizedTitle };
-    }
-
-    // Resolve mapping with graceful fallback on expected failures
-    let tvdbId: number | null = null;
-    let successfulSynonym: string | undefined;
+  public async getSeriesStatus(
+    payload: CheckSeriesStatusPayload,
+    options: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {},
+  ): Promise<CheckSeriesStatusResponse> {
     try {
-      const res = await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
-      tvdbId = res.tvdbId ?? null;
-      successfulSynonym = res.successfulSynonym;
-    } catch (e) {
-      const err = normalizeError(e);
-      if (err.code === 'CONFIGURATION_ERROR' || err.code === 'VALIDATION_ERROR') {
-        tvdbId = null;
-      } else {
-        logError(err, `LibraryService:getSeriesStatus:${payload.anilistId}`);
-        throw err;
+      const leanSeriesList = await this.getLeanSeriesList();
+
+      // Read Sonarr options once
+      const sonarrOpts = await extensionOptions.getValue();
+      const hasSonarr = !!sonarrOpts?.sonarrUrl && !!sonarrOpts?.sonarrApiKey;
+
+      const mappingOptions: { network?: 'never'; hints?: { primaryTitle?: string }; ignoreFailureCache?: boolean } = {};
+      if (!hasSonarr || options.network === 'never') {
+        mappingOptions.network = 'never';
       }
-    }
+      if (options.ignoreFailureCache) {
+        mappingOptions.ignoreFailureCache = true;
+      }
+      const normalizedTitle = payload.title?.trim();
+      if (normalizedTitle) {
+        mappingOptions.hints = { primaryTitle: normalizedTitle };
+      }
 
-    if (tvdbId === null) {
-      return { exists: false, tvdbId: null, ...(successfulSynonym && { successfulSynonym }) };
-    }
+      // Resolve mapping
+      let tvdbId: number | null = null;
+      let successfulSynonym: string | undefined;
+      try {
+        const res = await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
+        tvdbId = res.tvdbId ?? null;
+        successfulSynonym = res.successfulSynonym;
+      } catch (e) {
+        const err = normalizeError(e);
+        if (err.code === 'CONFIGURATION_ERROR' || err.code === 'VALIDATION_ERROR') {
+          tvdbId = null;
+        } else {
+          logError(err, `LibraryService:getSeriesStatus:${payload.anilistId}`);
+          throw err;
+        }
+      }
 
-    const seriesFromCache = leanSeriesList.find(s => s.tvdbId === tvdbId);
-    const existsInCache = !!seriesFromCache;
+      if (tvdbId === null) {
+        return { exists: false, tvdbId: null, ...(successfulSynonym && { successfulSynonym }) };
+      }
 
-    // If we don't have Sonarr configured, or force_verify is false, return cached view
-    if (!hasSonarr || !options.force_verify) {
-      return {
-        exists: existsInCache,
-        tvdbId,
-        ...(seriesFromCache && { series: seriesFromCache }),
-        ...(successfulSynonym && { successfulSynonym }),
-      };
-    }
+      const seriesFromCache = leanSeriesList.find(s => s.tvdbId === tvdbId);
+      const existsInCache = !!seriesFromCache;
 
-    // Verify live against Sonarr
-    const credentials = { url: sonarrOpts!.sonarrUrl!, apiKey: sonarrOpts!.sonarrApiKey! };
-    const seriesFromApi = await this.sonarrClient.getSeriesByTvdbId(tvdbId, credentials);
-
-    if (seriesFromApi) {
-      if (!existsInCache) await this.addSeriesToCache(seriesFromApi);
-      const finalSeries =
-        leanSeriesList.find(s => s.tvdbId === tvdbId) ?? {
-          tvdbId: seriesFromApi.tvdbId,
-          id: seriesFromApi.id,
-          titleSlug: seriesFromApi.titleSlug,
+      // If Sonarr isn't configured, or we don't need forced verification, return cache view
+      if (!hasSonarr || !options.force_verify) {
+        return {
+          exists: existsInCache,
+          tvdbId,
+          ...(seriesFromCache && { series: seriesFromCache }),
+          ...(successfulSynonym && { successfulSynonym }),
         };
-      return {
-        exists: true,
-        tvdbId,
-        series: finalSeries,
-        ...(successfulSynonym && { successfulSynonym }),
-      };
-    } else {
-      if (existsInCache) await this.removeFromCache(tvdbId, leanSeriesList);
-      return {
-        exists: false,
-        tvdbId,
-        ...(successfulSynonym && { successfulSynonym }),
-      };
-    }
-  } catch (e) {
-    const normalized = normalizeError(e);
-    logError(normalized, `LibraryService:getSeriesStatus:${payload.anilistId}`);
-    throw normalized;
-  }
-}
+      }
 
+      // Live verify
+      const credentials = { url: sonarrOpts!.sonarrUrl!, apiKey: sonarrOpts!.sonarrApiKey! };
+      const seriesFromApi = await this.sonarrClient.getSeriesByTvdbId(tvdbId, credentials);
+
+      if (seriesFromApi) {
+        if (!existsInCache) await this.addSeriesToCache(seriesFromApi);
+        const finalSeries =
+          leanSeriesList.find(s => s.tvdbId === tvdbId) ?? {
+            tvdbId: seriesFromApi.tvdbId,
+            id: seriesFromApi.id,
+            titleSlug: seriesFromApi.titleSlug,
+          };
+        return {
+          exists: true,
+          tvdbId,
+          series: finalSeries,
+          ...(successfulSynonym && { successfulSynonym }),
+        };
+      } else {
+        if (existsInCache) await this.removeFromCache(tvdbId, leanSeriesList);
+        return {
+          exists: false,
+          tvdbId,
+          ...(successfulSynonym && { successfulSynonym }),
+        };
+      }
+    } catch (e) {
+      const normalized = normalizeError(e);
+      logError(normalized, `LibraryService:getSeriesStatus:${payload.anilistId}`);
+      throw normalized;
+    }
+  }
 
   private async removeFromCache(tvdbId: number, list: LeanSonarrSeries[]): Promise<LeanSonarrSeries[]> {
     try {
       const updatedList = list.filter(s => s.tvdbId !== tvdbId);
       this.tvdbSet.delete(tvdbId);
-      await this.cacheService.set(SONARR_KEY, updatedList, SONARR_STALE, SONARR_HARD);
+      await this.store.set(SONARR_KEY, updatedList, Date.now());
       return updatedList;
     } catch (e) {
       logError(normalizeError(e), 'LibraryService:removeFromCache');
