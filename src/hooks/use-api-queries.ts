@@ -131,7 +131,7 @@ export const useAddSeries = () => {
           path: payload.rootFolderPath,
         });
 
-        return sonarrSeries as unknown as SonarrSeries; // RPC can also return { ok: true }; adjust if needed
+        return sonarrSeries;
       } catch (error) {
         throw normalizeError(error);
       }

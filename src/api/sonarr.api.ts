@@ -160,6 +160,28 @@ export class SonarrApiService {
     });
   };
 
+  /** DELETE /series?tvdbId=XYZ */
+  public deleteSeries = async (
+    tvdbId: number,
+    base: ExtensionOptions | { sonarrUrl: string; sonarrApiKey: string },
+    options: { deleteFiles?: boolean; addImportListExclusion?: boolean } = {},
+  ): Promise<void> => {
+    const sonarrCreds: SonarrCredentialsPayload = {
+      url: 'sonarrUrl' in base ? base.sonarrUrl : (base as ExtensionOptions).sonarrUrl,
+      apiKey: 'sonarrApiKey' in base ? base.sonarrApiKey : (base as ExtensionOptions).sonarrApiKey,
+    };
+
+    const params = new URLSearchParams({
+      tvdbId: String(tvdbId),
+      deleteFiles: String(options.deleteFiles ?? false),
+      addImportListExclusion: String(options.addImportListExclusion ?? false),
+    });
+
+    await this.request<unknown>(`series?${params.toString()}`, sonarrCreds, {
+      method: 'DELETE',
+    });
+  };
+
   /** GET /rootfolder */
   public getRootFolders = async (credentials: SonarrCredentialsPayload): Promise<SonarrRootFolder[]> => {
     return this.request<SonarrRootFolder[]>('rootfolder', credentials);

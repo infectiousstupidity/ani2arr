@@ -6,6 +6,7 @@ import { MappingService } from './mapping.service';
 import { LibraryService } from './library.service';
 import { extensionOptions } from '@/utils/storage';
 import { ResolveInput, MappingOutput, StatusInput, StatusOutput, AddInput } from '@/rpc/schemas';
+import type { SonarrSeries } from '@/types';
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
@@ -22,7 +23,7 @@ function bindAll<T extends object>(instance: T): T {
 type KitsunarrApi = {
   resolveMapping(input: unknown): Promise<unknown>;
   getSeriesStatus(input: unknown): Promise<unknown>;
-  addToSonarr(input: unknown): Promise<{ ok: true }>;
+  addToSonarr(input: unknown): Promise<SonarrSeries>;
   removeFromSonarr(input: { tvdbId: number }): Promise<{ ok: true }>;
   notifySettingsChanged(): Promise<{ ok: true }>;
 };
@@ -75,25 +76,21 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
       async addToSonarr(input) {
         const { tvdbId, profileId, path } = AddInput.parse(input);
         const opts = await ensureConfigured();
-        await sonarr.addSeries({
-          tvdbId,
-          profileId,
-          path,
-          baseUrl: opts.sonarrUrl,
-          apiKey: opts.sonarrApiKey,
-        });
+        const series = await sonarr.addSeries(
+          { tvdbId, profileId, path },
+          { sonarrUrl: opts.sonarrUrl, sonarrApiKey: opts.sonarrApiKey },
+        );
         // Invalidate and notify UIs
         await library.refreshCache(opts);
         await broadcast('series-updated', { tvdbId });
-        return { ok: true };
+        return series;
       },
 
       async removeFromSonarr({ tvdbId }) {
         const opts = await ensureConfigured();
-        await sonarr.deleteSeries({
-          tvdbId,
-          baseUrl: opts.sonarrUrl,
-          apiKey: opts.sonarrApiKey,
+        await sonarr.deleteSeries(tvdbId, {
+          sonarrUrl: opts.sonarrUrl,
+          sonarrApiKey: opts.sonarrApiKey,
         });
         await library.refreshCache(opts);
         await broadcast('series-updated', { tvdbId });
