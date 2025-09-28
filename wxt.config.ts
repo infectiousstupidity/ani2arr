@@ -18,7 +18,15 @@ export default defineConfig({
     ({
       plugins: [tailwindcss()],
       css: { devSourcemap: true },
-      build: { sourcemap: process.env.GENERATE_SOURCEMAP || false },
+      build: {
+        sourcemap: (() => {
+          const sm = process.env.GENERATE_SOURCEMAP;
+          if (sm === 'true') return true;
+          if (sm === 'hidden') return 'hidden';
+          if (sm === 'inline') return 'inline';
+          return false;
+        })(),
+      },
     } as WxtViteConfig),
   manifest: ({ manifestVersion }) => {
     const requiredHosts = [
@@ -26,19 +34,18 @@ export default defineConfig({
       'https://graphql.anilist.co/*',
       'https://anichart.net/*',
       'https://www.anichart.net/*',
-      'https://raw.githubusercontent.com/*', // For the static mapping file
+      'https://raw.githubusercontent.com/*',
     ];
 
-    // Add "alarms" here so both MV2 and MV3 get it.
     const basePermissions = ['storage', 'alarms'];
 
     const mv3Permissions = {
-      permissions: basePermissions,          // "alarms" lives here on MV3
+      permissions: basePermissions,
       host_permissions: requiredHosts,
+      optional_host_permissions: ['<all_urls>'],
     };
 
     const mv2Permissions = {
-      // On MV2, host patterns must be in "permissions"
       permissions: [...basePermissions, ...requiredHosts],
       optional_permissions: ['<all_urls>'],
     };
@@ -47,10 +54,6 @@ export default defineConfig({
       name: 'Kitsunarr',
       description: 'Adds a one-click "Add to Sonarr" button to anime pages',
       ...(manifestVersion === 3 ? mv3Permissions : mv2Permissions),
-      // action: {
-      //   default_title: 'Kitsunarr Settings',
-      //   default_popup: 'popup/index.html'
-      // },
       options_ui: {
         page: 'options/index.html',
         open_in_tab: true,
