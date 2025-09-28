@@ -178,14 +178,17 @@ const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) => {
   useEffect(() => {
     if (!anilistId) return;
 
-  getKitsunarrApi().library.getSeriesStatus({ anilistId, title }, { force_verify: true, ignoreFailureCache: true })
+    getKitsunarrApi()
+      .library.getSeriesStatus(
+        { anilistId, title },
+        { force_verify: true, ignoreFailureCache: true },
+      )
       .then(() => {
         localQueryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(anilistId) });
       })
       .catch(error => {
         log.error('Background re-validation failed:', error);
       });
-  
   }, [anilistId, title, localQueryClient]);
 
   const handleQuickAdd = () => {
@@ -243,7 +246,10 @@ let ui: ShadowRootContentScriptUi<Root> | null = null;
 let stopAnchorKeeper: (() => void) | null = null;
 let stopSizeSync: (() => void) | null = null;
 
-async function mountAnimePageUI(ctx: ContentScriptContext): Promise<void> {
+async function mountAnimePageUI(
+  ctx: ContentScriptContext,
+  onMounted: () => void,
+): Promise<void> {
   const idMatch = location.pathname.match(/\/anime\/(\d+)/);
   const anilistId = idMatch?.[1] ? parseInt(idMatch[1], 10) : null;
   if (!anilistId) return;
@@ -294,6 +300,7 @@ async function mountAnimePageUI(ctx: ContentScriptContext): Promise<void> {
 
   ui.autoMount();
   ui.mount();
+  onMounted();
 }
 
 export default defineContentScript({
@@ -301,11 +308,31 @@ export default defineContentScript({
   cssInjectionMode: 'ui',
   runAt: 'document_end',
   async main(ctx: ContentScriptContext) {
+    let removeConfigListener: (() => void) | null = null;
+
+    const ensureConfigListener = () => {
+      if (removeConfigListener) return;
+
+      const messageListener = (message: unknown) => {
+        const msg = message as { type?: string };
+        if (msg?.type === 'KITSUNARR_CONFIG_UPDATED') {
+          log.info('Configuration updated, invalidating anime page status queries.');
+          queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot() });
+        }
+      };
+
+      browser.runtime.onMessage.addListener(messageListener);
+      removeConfigListener = () => {
+        browser.runtime.onMessage.removeListener(messageListener);
+        removeConfigListener = null;
+      };
+    };
+
     const removeAnimeUI = () => {
       try {
         ui?.remove();
-    } catch (error) {
-      log.error('Error removing UI:', error);
+      } catch (error) {
+        log.error('Error removing UI:', error);
       }
       ui = null;
       stopAnchorKeeper?.();
@@ -316,7 +343,7 @@ export default defineContentScript({
 
     const route = async (url: string) => {
       if (ANIME_PAGE.includes(url)) {
-        await mountAnimePageUI(ctx);
+        await mountAnimePageUI(ctx, ensureConfigListener);
       } else {
         removeAnimeUI();
       }
@@ -336,6 +363,7 @@ export default defineContentScript({
 
     ctx.onInvalidated(() => {
       removeAnimeUI();
+      removeConfigListener?.();
     });
   },
 });
