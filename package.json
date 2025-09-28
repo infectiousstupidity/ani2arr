@@ -1,8 +1,8 @@
 {
   "name": "kitsunarr",
-  "description": "manifest.json description",
+  "description": " Adds a one-click \"Add to Sonarr\" button to AniList/AniChart pages. The easiest way to get anime from AniList/AniChart to Sonarr.",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
