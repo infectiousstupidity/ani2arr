@@ -2,10 +2,11 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from '
 import browser from 'webextension-polyfill';
 import { createPortal } from 'react-dom';
 import { useAddSeries, useExtensionOptions, useSeriesStatus } from '@/hooks/use-api-queries';
+import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
 import { useTheme } from '@/hooks/use-theme';
 import TooltipWrapper from '@/ui/TooltipWrapper';
 import { CheckIcon, ExclamationTriangleIcon, GearIcon, PlusIcon } from '@radix-ui/react-icons';
-import type { ExtensionError } from '@/types';
+import type { ExtensionError, SonarrFormState } from '@/types';
 
 const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
 
@@ -18,6 +19,7 @@ export interface CardOverlayProps {
   title: string;
   onOpenModal: (anilistId: number, title: string) => void;
   isConfigured: boolean;
+  defaultForm: SonarrFormState | null;
 }
 
 export interface ParsedCard {
@@ -45,11 +47,12 @@ export interface BrowseAdapter {
 export const DEFAULT_CONTAINER_CLASS = 'kitsunarr-overlay-container';
 export const DEFAULT_PROCESSED_ATTRIBUTE = 'data-kitsunarr-processed';
 
-const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpenModal, isConfigured }) => {
+const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpenModal, isConfigured, defaultForm }) => {
+  const sonarrReady = isConfigured;
   const bypassFailureCacheRef = useRef(false);
   const statusQuery = useSeriesStatus(
     { anilistId, title },
-    { enabled: Number.isFinite(anilistId), ignoreFailureCache: () => bypassFailureCacheRef.current },
+    { enabled: sonarrReady && Number.isFinite(anilistId), ignoreFailureCache: () => bypassFailureCacheRef.current },
   );
   const addSeriesMutation = useAddSeries();
 
@@ -76,17 +79,18 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
   }, [anilistId, title, reset]);
 
   const isResolving = statusIsLoading || fetchStatus === 'fetching';
-  const hasError = addHasError || statusHasError;
+  const mappingUnavailable = statusData?.anilistTvdbLinkMissing === true;
+  const hasError = addHasError || statusHasError || mappingUnavailable;
   const alreadyInSonarr = !!statusData?.exists || addSuccess;
 
   const overlayState: OverlayState = useMemo(() => {
-    if (!isConfigured) return 'disabled';
+    if (!sonarrReady) return 'disabled';
     if (alreadyInSonarr) return 'in-sonarr';
     if (hasError) return 'error';
     if (isAdding) return 'adding';
     if (isResolving) return 'resolving';
     return 'addable';
-  }, [alreadyInSonarr, hasError, isAdding, isConfigured, isResolving]);
+  }, [alreadyInSonarr, hasError, isAdding, isResolving, sonarrReady]);
 
   const resolveErrorMessage = (error: unknown): string | null => {
     if (!error) return null;
@@ -99,22 +103,30 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
     return null;
   };
 
-  const errorMessage = resolveErrorMessage(addError) ?? resolveErrorMessage(statusError);
+  const errorMessage =
+    mappingUnavailable
+      ? 'No Sonarr match found. Click to retry mapping.'
+      : resolveErrorMessage(addError) ?? resolveErrorMessage(statusError);
 
-  const quickAddDisabled = overlayState === 'in-sonarr' || overlayState === 'resolving' || overlayState === 'adding';
+  const quickAddDisabled =
+    overlayState === 'in-sonarr' ||
+    overlayState === 'resolving' ||
+    overlayState === 'adding' ||
+    overlayState === 'disabled' ||
+    (overlayState === 'addable' && !defaultForm);
 
   const quickAddTitle = (() => {
     switch (overlayState) {
       case 'in-sonarr':
         return 'Already in Sonarr';
       case 'addable':
-        return 'Quick add to Sonarr';
+        return defaultForm ? 'Quick add to Sonarr' : 'Defaults unavailable';
       case 'resolving':
         return 'Resolving series mapping.';
       case 'adding':
         return 'Adding to Sonarr.';
       case 'error':
-        return errorMessage ? `Retry Sonarr add (${errorMessage})` : 'Retry Sonarr add';
+        return errorMessage ?? 'Retry Sonarr add';
       case 'disabled':
         return 'Configure Sonarr before adding';
       default:
@@ -122,7 +134,12 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
     }
   })();
 
-  const quickAddAriaLabel = overlayState === 'error' ? 'Retry adding to Sonarr' : quickAddTitle;
+  const quickAddAriaLabel =
+    overlayState === 'error' && mappingUnavailable
+      ? 'Retry mapping lookup'
+      : overlayState === 'error'
+        ? 'Retry adding to Sonarr'
+        : quickAddTitle;
 
   const swallowEvent = useCallback((event: React.MouseEvent<HTMLElement>) => {
     event.preventDefault();
@@ -133,25 +150,48 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
     (event: React.MouseEvent<HTMLButtonElement>) => {
       swallowEvent(event);
 
-      if (!isConfigured) {
+      if (!sonarrReady) {
         alert('Please configure your Sonarr settings first.');
         browser.runtime.openOptionsPage().catch(() => {});
         return;
+
       }
+
+
 
       if (overlayState === 'in-sonarr' || overlayState === 'resolving' || overlayState === 'adding') {
+
         return;
+
       }
 
+
+
       if (overlayState === 'error') {
-        if (addHasError) {
-          reset();
-          mutate({ anilistId, title });
+        if (mappingUnavailable) {
+          bypassFailureCacheRef.current = true;
+          refetch({ throwOnError: false })
+            .catch(() => {})
+            .finally(() => {
+              bypassFailureCacheRef.current = false;
+            });
           return;
         }
+
+        if (addHasError && defaultForm) {
+          reset();
+          mutate({
+            anilistId,
+            title,
+            primaryTitleHint: title,
+            form: { ...defaultForm },
+          });
+          return;
+        }
+
         if (statusHasError) {
           bypassFailureCacheRef.current = true;
-          void refetch({ throwOnError: false })
+          refetch({ throwOnError: false })
             .catch(() => {})
             .finally(() => {
               bypassFailureCacheRef.current = false;
@@ -160,16 +200,27 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
         }
       }
 
-      mutate({ anilistId, title });
+      if (!defaultForm) {
+        return;
+      }
+
+      mutate({
+        anilistId,
+        title,
+        primaryTitleHint: title,
+        form: { ...defaultForm },
+      });
     },
     [
       addHasError,
       anilistId,
-      isConfigured,
+      defaultForm,
+      mappingUnavailable,
       mutate,
       overlayState,
       refetch,
       reset,
+      sonarrReady,
       statusHasError,
       swallowEvent,
       title,
@@ -319,6 +370,7 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
   const BrowseContentApp: React.FC = () => {
     const hostRef = useRef<HTMLDivElement>(null);
     useTheme(hostRef);
+    useKitsunarrBroadcasts();
 
     const { data: extensionOptions } = useExtensionOptions();
     const isConfigured = Boolean(extensionOptions?.sonarrUrl && extensionOptions?.sonarrApiKey);
@@ -516,6 +568,7 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
               title={parsed.title}
               onOpenModal={handleOpenModal}
               isConfigured={isConfigured}
+              defaultForm={extensionOptions?.defaults ?? null}
             />,
             container,
           ),
@@ -539,6 +592,18 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
 };
 
 export { CardOverlay };
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

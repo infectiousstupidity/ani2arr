@@ -1,9 +1,9 @@
+// src/entrypoints/background/index.ts
 import { defineBackground } from 'wxt/utils/define-background';
 import browser from 'webextension-polyfill';
 import { registerKitsunarrApi, getKitsunarrApi } from '@/services';
 import { computeTitleMatchScore } from '@/utils/matching';
 import { logger } from '@/utils/logger';
-import { extensionOptions } from '@/utils/storage';
 
 type OpenOptionsMessage = { type: 'OPEN_OPTIONS_PAGE' };
 type MappingRefreshMessage = { type: 'kitsunarr:mapping:refresh' };
@@ -57,7 +57,7 @@ export default defineBackground(() => {
     const key = '__kitsunarr_fallback_interval__';
     if (!(globalThis as Record<string, unknown>)[key]) {
       (globalThis as Record<string, unknown>)[key] = globalThis.setInterval(() => {
-        void api.mapping.initStaticPairs();
+        void api.initMappings();
       }, MAPPING_REFRESH_PERIOD_MIN * 60 * 1000);
     }
   };
@@ -66,19 +66,19 @@ export default defineBackground(() => {
     if (details.reason === 'install') {
       browser.runtime.openOptionsPage().catch(() => {});
     }
-    await api.mapping.initStaticPairs();
+    await api.initMappings();
     await ensurePeriodicRefresh();
   });
 
   browser.runtime.onStartup.addListener(async () => {
-    await api.mapping.initStaticPairs();
+    await api.initMappings();
     await ensurePeriodicRefresh();
   });
 
   if (alarmsApi) {
     alarmsApi.onAlarm.addListener((alarm) => {
       if (alarm.name === MAPPING_REFRESH_ALARM) {
-        void api.mapping.initStaticPairs();
+        void api.initMappings();
       }
     });
   }
@@ -91,7 +91,7 @@ export default defineBackground(() => {
       }
 
       if (isMappingRefreshMessage(message)) {
-        void api.mapping.initStaticPairs();
+        void api.initMappings();
         return Promise.resolve({ ok: true as const });
       }
 
@@ -111,36 +111,8 @@ export default defineBackground(() => {
     },
   );
 
-  extensionOptions.watch(async (newValue, oldValue) => {
-    const newCredsValid = !!(newValue?.sonarrUrl && newValue?.sonarrApiKey);
-    const oldCredsValid = !!(oldValue?.sonarrUrl && oldValue?.sonarrApiKey);
-
-    const credentialsChanged =
-      newCredsValid &&
-      (!oldCredsValid ||
-        newValue.sonarrUrl !== oldValue.sonarrUrl ||
-        newValue.sonarrApiKey !== oldValue.sonarrApiKey);
-
-    if (credentialsChanged) {
-      log.info('Sonarr credentials changed. Triggering library cache refresh.');
-      try {
-        await api.library.refreshCache(newValue);
-        log.info('Library cache refreshed. Notifying content scripts.');
-        const tabs = await browser.tabs.query({
-          url: ["*://anilist.co/*", "*://anichart.net/*"],
-        });
-        for (const tab of tabs) {
-          if (tab.id) {
-            browser.tabs.sendMessage(tab.id, { type: 'KITSUNARR_CONFIG_UPDATED' }).catch(e => {
-              log.warn(`Could not message tab ${tab.id}:`, e.message);
-            });
-          }
-        }
-      } catch (e) {
-        log.error('Failed to refresh library cache after settings change:', e);
-      }
-    }
-  });
+  
 
   log.info('Background setup complete.');
 });
+

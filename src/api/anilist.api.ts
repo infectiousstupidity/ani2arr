@@ -1,6 +1,7 @@
 // src/api/anilist.api.ts
 
-import { logError, normalizeError } from '@/utils/error-handling';
+import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
+import { logger } from '@/utils/logger';
 import type { ExtensionError } from '@/types';
 
 export type AniTitles = { romaji?: string; english?: string; native?: string };
@@ -10,9 +11,8 @@ export type AniMedia = {
   id: number;
   format: AniFormat | null;
   title: AniTitles;
-  startDate?: { year?: number | null; };
+  startDate?: { year?: number | null };
   synonyms: string[];
-  externalLinks: { id?: string | number | null; url?: string | null; site?: string | null; }[];
   relations?: {
     edges: {
       relationType: string;
@@ -22,23 +22,41 @@ export type AniMedia = {
 };
 
 type FindMediaResponse = {
-  data?: { Media?: AniMedia; };
-  errors?: { message: string; status: number; }[];
+  data?: { Media?: AniMedia };
+  errors?: { message: string; status: number }[];
 };
 
 type QueuedRequest = {
   anilistId: number;
   resolve: (value: AniMedia) => void;
   reject: (reason: Error | ExtensionError) => void;
+  promise: Promise<AniMedia>;
 };
 
+class RateLimitError extends Error {
+  constructor(readonly retryAfterMs: number) {
+    super('AniList rate limit exceeded');
+    this.name = 'RateLimitError';
+  }
+}
+
+class RetriableHttpError extends Error {
+  constructor(readonly status: number) {
+    super(`AniList HTTP ${status}`);
+    this.name = 'RetriableHttpError';
+  }
+}
+
 export class AnilistApiService {
+  private readonly log = logger.create('AniListApiService');
   private readonly API_URL = 'https://graphql.anilist.co';
-  
+  private readonly BATCH_SIZE = 2;
+  private readonly BATCH_DELAY_MS = 1200;
+  private readonly MAX_RETRIES = 3;
+
   private requestQueue: QueuedRequest[] = [];
   private isProcessingQueue = false;
-  private readonly BATCH_SIZE = 5;
-  private readonly BATCH_DELAY_MS = 1000;
+  private queueBackoffUntil = 0;
   private inflight = new Map<number, Promise<AniMedia>>();
 
   private readonly findMediaWithRelationsQuery = `
@@ -49,7 +67,6 @@ export class AnilistApiService {
         title { romaji english native }
         startDate { year }
         synonyms
-        externalLinks { id url site }
         relations {
           edges {
             relationType
@@ -63,15 +80,7 @@ export class AnilistApiService {
                     relations {
                       edges {
                         relationType
-                        node {
-                          id
-                          relations {
-                            edges {
-                              relationType
-                              node { id }
-                            }
-                          }
-                        }
+                        node { id }
                       }
                     }
                   }
@@ -84,22 +93,28 @@ export class AnilistApiService {
     }
   `;
 
-  
-  constructor() {}
-
   public fetchMediaWithRelations(anilistId: number): Promise<AniMedia> {
+    if (this.log) {
+      this.log.debug(`enqueue anilist fetch ${anilistId}`);
+    }
     if (this.inflight.has(anilistId)) {
       return this.inflight.get(anilistId)!;
     }
-    
+
+    let resolveFn: (value: AniMedia) => void;
+    let rejectFn: (reason: Error | ExtensionError) => void;
+
     const promise = new Promise<AniMedia>((resolve, reject) => {
-      this.requestQueue.push({ anilistId, resolve, reject });
-      if (!this.isProcessingQueue) {
-        this.processQueue();
-      }
+      resolveFn = resolve;
+      rejectFn = reject;
     });
 
+    this.requestQueue.push({ anilistId, resolve: resolveFn!, reject: rejectFn!, promise });
     this.inflight.set(anilistId, promise);
+    this.processQueue().catch(error => {
+      logError(normalizeError(error), 'AnilistApiService:processQueue');
+    });
+
     return promise;
   }
 
@@ -107,52 +122,150 @@ export class AnilistApiService {
     if (this.isProcessingQueue) return;
     this.isProcessingQueue = true;
 
-    while (this.requestQueue.length > 0) {
-      const batch = this.requestQueue.splice(0, this.BATCH_SIZE);
-      
-      await Promise.allSettled(batch.map(async (req) => {
-        try {
-          const result = await this.fetchFromApi(req.anilistId);
-          req.resolve(result);
-        } catch (e) {
-          req.reject(normalizeError(e));
+    let processedInWindow = 0;
+
+    try {
+      while (this.requestQueue.length > 0) {
+      this.log.debug(`processing AniList queue size=${this.requestQueue.length}`);
+        const now = Date.now();
+        if (now < this.queueBackoffUntil) {
+          await this.delay(this.queueBackoffUntil - now);
+          processedInWindow = 0;
         }
-      }));
 
-      if (this.requestQueue.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, this.BATCH_DELAY_MS));
+        const request = this.requestQueue.shift()!;
+        this.log.debug(`issuing AniList request id=${request.anilistId}`);
+        const outcome = await this.handleRequest(request);
+
+        if (outcome === 'rate-limited') {
+          processedInWindow = 0;
+          continue;
+        }
+
+        processedInWindow += 1;
+        if (processedInWindow >= this.BATCH_SIZE && this.requestQueue.length > 0) {
+          processedInWindow = 0;
+          await this.delay(this.BATCH_DELAY_MS);
+        }
       }
+    } finally {
+      this.isProcessingQueue = false;
     }
-
-    this.isProcessingQueue = false;
   }
 
-  private async fetchFromApi(anilistId: number): Promise<AniMedia> {
+  private async handleRequest(request: QueuedRequest): Promise<'completed' | 'rate-limited'> {
     try {
-      const response = await fetch(this.API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ query: this.findMediaWithRelationsQuery, variables: { id: anilistId } }),
-      });
-
-      if (!response.ok) throw new Error(`AniList API Error: ${response.status}`);
-      const result = (await response.json()) as FindMediaResponse;
-      
-      const media = result?.data?.Media;
-      if (!media) {
-        if (result.errors) {
-          throw new Error(`GraphQL Error: ${result.errors.map(e => e.message).join(', ')}`);
-        }
-        throw new Error('No media data returned from AniList API.');
+      const media = await this.fetchFromApi(request.anilistId);
+      request.resolve(media);
+      this.clearInflight(request.anilistId, request.promise);
+      return 'completed';
+    } catch (error) {
+      if (error instanceof RateLimitError) {
+        this.queueBackoffUntil = Math.max(this.queueBackoffUntil, Date.now() + error.retryAfterMs);
+        this.requestQueue.unshift(request);
+        return 'rate-limited';
       }
-      
-      return media as AniMedia;
 
-    } catch (e) {
-      logError(normalizeError(e), `AnilistApiService:fetchFromApi:${anilistId}`);
-      throw e;
-    } finally {
+      const normalized = normalizeError(error);
+      request.reject(normalized);
+      this.clearInflight(request.anilistId, request.promise);
+      return 'completed';
+    }
+  }
+
+  private clearInflight(anilistId: number, promise: Promise<AniMedia>): void {
+    const current = this.inflight.get(anilistId);
+    if (current === promise) {
       this.inflight.delete(anilistId);
     }
   }
+
+  private async fetchFromApi(anilistId: number): Promise<AniMedia> {
+    let attempt = 0;
+    let delayMs = 1000;
+
+    while (true) {
+      try {
+        const response = await fetch(this.API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ query: this.findMediaWithRelationsQuery, variables: { id: anilistId } }),
+        });
+
+        if (response.status === 429) {
+          const retryAfterMs = this.parseRetryAfter(response.headers.get('Retry-After'));
+          throw new RateLimitError(retryAfterMs);
+        }
+
+        if (!response.ok) {
+          if (response.status >= 500 && response.status < 600) {
+            throw new RetriableHttpError(response.status);
+          }
+
+          const message = `AniList API Error: ${response.status}`;
+          throw createError(
+            ErrorCode.API_ERROR,
+            message,
+            'AniList request failed.',
+            { status: response.status },
+          );
+        }
+
+        const result = (await response.json()) as FindMediaResponse;
+        const media = result?.data?.Media;
+
+        if (!media) {
+          if (result?.errors?.length) {
+            const message = result.errors.map(e => e.message).join(', ');
+            throw createError(ErrorCode.API_ERROR, `AniList GraphQL Error: ${message}`, 'AniList request failed.');
+          }
+          throw createError(ErrorCode.API_ERROR, `AniList response missing media for ${anilistId}`, 'AniList returned an unexpected response.');
+        }
+
+        return media;
+      } catch (error) {
+        if (error instanceof RateLimitError) {
+          throw error;
+        }
+
+        if (error instanceof RetriableHttpError) {
+          attempt += 1;
+          if (attempt >= this.MAX_RETRIES) {
+            throw createError(
+              ErrorCode.API_ERROR,
+              `AniList API Error: ${error.status}`,
+              'AniList service is temporarily unavailable.',
+              { status: error.status },
+            );
+          }
+          await this.delay(delayMs + Math.random() * 150);
+          delayMs = Math.min(delayMs * 2, 5000);
+          continue;
+        }
+
+        throw error;
+      }
+    }
+  }
+
+  private parseRetryAfter(header: string | null): number {
+    if (!header) return 2000 + Math.random() * 500;
+
+    const seconds = Number(header);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return seconds * 1000;
+    }
+
+    const dateMs = Date.parse(header);
+    if (!Number.isNaN(dateMs)) {
+      return Math.max(1000, dateMs - Date.now());
+    }
+
+    return 2000 + Math.random() * 500;
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 }
+

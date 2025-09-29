@@ -1,13 +1,13 @@
 // src/entrypoints/anilist-anime.content/index.tsx
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { useTheme } from '@/hooks/use-theme';
-import { useSeriesStatus, useAddSeries, useExtensionOptions, queryKeys } from '@/hooks/use-api-queries';
-import { getKitsunarrApi } from '@/services';
-import { idbQueryCachePersister } from '@/utils/cache-persister';
+import { useSeriesStatus, useAddSeries, useExtensionOptions } from '@/hooks/use-api-queries';
+import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
+import { idbQueryCachePersister } from '@/cache/cache-persister';
 import SonarrActionGroup from '@/ui/SonarrActionGroup';
 import { logger } from '@/utils/logger';
 import './style.css';
@@ -165,52 +165,46 @@ interface ContentRootProps {
 const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) => {
   const hostRef = useRef<HTMLDivElement>(null);
   useTheme(hostRef);
+  useKitsunarrBroadcasts();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const localQueryClient = useQueryClient();
-
   const { data: options } = useExtensionOptions();
-  const isConfigured = !!options?.sonarrUrl && !!options.sonarrApiKey;
+  const isConfigured = !!options?.sonarrUrl && !!options?.sonarrApiKey;
+  const defaults = options?.defaults ?? null;
 
-  const statusQuery = useSeriesStatus({ anilistId, title }, { enabled: !!anilistId, ignoreFailureCache: true });
+  const statusQuery = useSeriesStatus(
+    { anilistId, title },
+    { enabled: Boolean(anilistId && isConfigured), ignoreFailureCache: true },
+  );
   const addSeriesMutation = useAddSeries();
 
-  useEffect(() => {
-    if (!anilistId) return;
-
-    getKitsunarrApi()
-      .library.getSeriesStatus(
-        { anilistId, title },
-        { force_verify: true, ignoreFailureCache: true },
-      )
-      .then(() => {
-        localQueryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(anilistId) });
-      })
-      .catch(error => {
-        log.error('Background re-validation failed:', error);
-      });
-  }, [anilistId, title, localQueryClient]);
-
   const handleQuickAdd = () => {
-    if (!isConfigured) {
+    if (!isConfigured || !defaults) {
       alert('Please configure your Sonarr settings first.');
-      browser.runtime.openOptionsPage();
+      browser.runtime.openOptionsPage().catch(() => {});
       return;
     }
-    addSeriesMutation.mutate({ anilistId, title });
+    addSeriesMutation.mutate({
+      anilistId,
+      title,
+      primaryTitleHint: title,
+      form: { ...defaults },
+    });
   };
 
+  const mappingUnavailable = statusQuery.data?.anilistTvdbLinkMissing === true;
+  const tvdbId = mappingUnavailable ? null : statusQuery.data?.tvdbId;
+
   const getStatus = (): 'LOADING' | 'IN_SONARR' | 'NOT_IN_SONARR' | 'ERROR' | 'ADDING' => {
+    if (!isConfigured) return 'ERROR';
     if (statusQuery.isLoading && statusQuery.fetchStatus !== 'idle') return 'LOADING';
-    if (statusQuery.isError) return 'ERROR';
-    if (statusQuery.data?.exists) return 'IN_SONARR';
+    if (statusQuery.isError || mappingUnavailable) return 'ERROR';
+    if (statusQuery.data?.exists || addSeriesMutation.isSuccess) return 'IN_SONARR';
     if (addSeriesMutation.isPending) return 'ADDING';
-    if (addSeriesMutation.isSuccess) return 'IN_SONARR';
     if (addSeriesMutation.isError) return 'ERROR';
     return 'NOT_IN_SONARR';
   };
 
-  const tvdbId = statusQuery.data?.tvdbId;
   const resolvedSearchTerm = statusQuery.data?.successfulSynonym ?? title;
 
   return (
@@ -308,26 +302,6 @@ export default defineContentScript({
   cssInjectionMode: 'ui',
   runAt: 'document_end',
   async main(ctx: ContentScriptContext) {
-    let removeConfigListener: (() => void) | null = null;
-
-    const ensureConfigListener = () => {
-      if (removeConfigListener) return;
-
-      const messageListener = (message: unknown) => {
-        const msg = message as { type?: string };
-        if (msg?.type === 'KITSUNARR_CONFIG_UPDATED') {
-          log.info('Configuration updated, invalidating anime page status queries.');
-          queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot() });
-        }
-      };
-
-      browser.runtime.onMessage.addListener(messageListener);
-      removeConfigListener = () => {
-        browser.runtime.onMessage.removeListener(messageListener);
-        removeConfigListener = null;
-      };
-    };
-
     const removeAnimeUI = () => {
       try {
         ui?.remove();
@@ -343,13 +317,12 @@ export default defineContentScript({
 
     const route = async (url: string) => {
       if (ANIME_PAGE.includes(url)) {
-        await mountAnimePageUI(ctx, ensureConfigListener);
+        await mountAnimePageUI(ctx, () => {});
       } else {
         removeAnimeUI();
       }
     };
 
-    // Initial route
     await route(location.href);
 
     type LocationChangeEvent = CustomEvent<{ newUrl: URL }>;
@@ -363,7 +336,18 @@ export default defineContentScript({
 
     ctx.onInvalidated(() => {
       removeAnimeUI();
-      removeConfigListener?.();
     });
-  },
+  }
+
 });
+
+
+
+
+
+
+
+
+
+
+

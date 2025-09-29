@@ -6,7 +6,7 @@ import type { SonarrFormState } from '@/types';
 export function useAddSeriesManager(anilistId: number, title: string, isOpen: boolean) {
   const { data: options, isLoading: isLoadingOptions } = useExtensionOptions();
 
-  const [formState, setFormState] = useState<SonarrFormState>(options?.defaults || {
+  const defaultFormState: SonarrFormState = {
     qualityProfileId: '',
     rootFolderPath: '',
     seriesType: 'anime',
@@ -14,13 +14,16 @@ export function useAddSeriesManager(anilistId: number, title: string, isOpen: bo
     seasonFolder: true,
     searchForMissingEpisodes: true,
     tags: [],
-  });
+  };
 
-  // API Hooks
-  const sonarrMetadata = useSonarrMetadata(
-    options ? { url: options.sonarrUrl, apiKey: options.sonarrApiKey } : null,
-    { enabled: !!options }
-  );
+  const [formState, setFormState] = useState<SonarrFormState>(options?.defaults ?? defaultFormState);
+
+  const sonarrReady = Boolean(options?.sonarrUrl && options?.sonarrApiKey);
+
+  const sonarrMetadata = useSonarrMetadata({
+    enabled: sonarrReady,
+    credentials: sonarrReady ? { url: options!.sonarrUrl, apiKey: options!.sonarrApiKey } : null,
+  });
   const addSeriesMutation = useAddSeries();
   const { mutate: saveOptions, ...saveOptionsMutation } = useSaveOptions();
 
@@ -37,18 +40,19 @@ export function useAddSeriesManager(anilistId: number, title: string, isOpen: bo
 
   const isLoading = isLoadingOptions || sonarrMetadata.isLoading;
 
-  // Handlers
   const handleFormChange = useCallback(<K extends keyof SonarrFormState>(field: K, value: SonarrFormState[K]) => {
     setFormState(prev => ({ ...prev, [field]: value }));
   }, []);
 
   const handleAddSeries = useCallback(() => {
+    if (!sonarrReady) return;
     addSeriesMutation.mutate({
-      ...formState,
       anilistId,
       title,
+      primaryTitleHint: title,
+      form: formState,
     });
-  }, [formState, anilistId, title, addSeriesMutation]);
+  }, [addSeriesMutation, anilistId, formState, sonarrReady, title]);
 
   const handleSaveDefaults = useCallback(() => {
     if (!formState || !options || !isDirty) return;
@@ -63,6 +67,7 @@ export function useAddSeriesManager(anilistId: number, title: string, isOpen: bo
     sonarrMetadata,
     isLoading,
     isDirty,
+    sonarrReady,
     addSeriesState: addSeriesMutation,
     saveDefaultsState: saveOptionsMutation,
     handleFormChange,

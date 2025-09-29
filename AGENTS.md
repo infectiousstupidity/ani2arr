@@ -25,7 +25,7 @@
 - `index.ts` exposes `registerKitsunarrApi` / `getKitsunarrApi` using `@webext-core/proxy-service`; every consumer must assume RPC semantics (async, serialized).
 - `library.service.ts` maintains a lean Sonarr series cache with soft/hard TTLs and derives status for AniList IDs.
 - `mapping.service.ts` resolves AniList IDs to TVDB IDs via static mapping tables (GitHub JSON mirrors), AniList fallbacks, and Sonarr lookups.
-- `cache.service.ts` wraps `browser.storage.local` for TTL-aware caching; use it for cross-context persistence.
+- `src/cache/ttl-cache.ts` exposes TTL-aware caches backed by IndexedDB; use them for cross-context persistence.
 
 ### Hooks & State (`src/hooks`)
 - `use-api-queries.ts` centralizes TanStack Query keys, option fetches, Sonarr metadata retrieval, and mutations for add/test/save flows.
@@ -80,3 +80,4 @@
 - `registerKitsunarrApi()` must execute exactly once (background). Content scripts should only ever call `getKitsunarrApi()`.
 - Respect rate limits on AniList and Sonarr: batch lookups via `MappingService` queue rather than issuing parallel fetches.
 - Keep AGENTS.md in sync when adding core flows or changing service contracts so future agents stay aligned.
+

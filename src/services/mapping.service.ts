@@ -1,34 +1,41 @@
 // src/services/mapping.service.ts
-import browser from 'webextension-polyfill';
-import type { CacheService } from './cache.service';
-import type { AnilistApiService, AniTitles, AniMedia } from '@/api/anilist.api';
+import type { TtlCache } from '@/cache';
+import type { AnilistApiService, AniMedia, AniTitles } from '@/api/anilist.api';
 import type { SonarrApiService } from '@/api/sonarr.api';
+import type { SonarrLookupSeries } from '@/types';
 import type { ExtensionError } from '@/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
-import { retryWithBackoff } from '@/utils/retry';
-import { normTitle, stripParenContent, computeTitleMatchScore } from '@/utils/matching';
+import { computeTitleMatchScore, normTitle, stripParenContent } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
-import { incrementPhase0Counter } from '@/utils/metrics/phase0';
-import { logger } from '@/utils/logger';
 
-const log = logger.create('MappingService');
+
 const PRIMARY_URL = 'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json';
 const FALLBACK_URL = 'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json';
-const RESOLVED_STALE = 30 * 24 * 60 * 60 * 1000;
-const RESOLVED_HARD = 180 * 24 * 60 * 60 * 1000;
-const FAILURE_CACHE_KEY_PREFIX = 'resolved_mapping_failure:';
-const FAILURE_STALE = 30 * 60 * 1000;
-const FAILURE_HARD = 2 * FAILURE_STALE;
-const NETWORK_FAILURE_STALE = 5 * 60 * 1000;
-const NETWORK_FAILURE_HARD = 3 * NETWORK_FAILURE_STALE;
-const PRIMARY_JSON_KEY = 'static_primary_json_v3';
-const PRIMARY_META_KEY = 'static_primary_meta_v3';
-const FALLBACK_JSON_KEY = 'static_fallback_json_v3';
-const FALLBACK_META_KEY = 'static_fallback_meta_v3';
-const STATIC_SOFT_TTL = 24 * 60 * 60 * 1000;
+
+const RESOLVED_SOFT_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
+const RESOLVED_HARD_TTL = 180 * 24 * 60 * 60 * 1000; // 180 days
+
+const FAILURE_SOFT_TTL = 30 * 60 * 1000; // 30 minutes
+const FAILURE_HARD_TTL = FAILURE_SOFT_TTL * 2;
+const NETWORK_FAILURE_SOFT_TTL = 5 * 60 * 1000; // 5 minutes
+const NETWORK_FAILURE_HARD_TTL = NETWORK_FAILURE_SOFT_TTL * 3;
+
+const STATIC_SOFT_TTL = 24 * 60 * 60 * 1000; // 1 day
+const STATIC_HARD_TTL = STATIC_SOFT_TTL * 7;
+
+const MAPPING_BATCH_SIZE = 3;
+const MAPPING_BATCH_DELAY_MS = 1500;
+
 const SCORE_THRESHOLD = 0.76;
 const EARLY_STOP_THRESHOLD = 0.82;
 const MAX_TERMS = 5;
+
+const ALLOWED_FORMATS = new Set(['TV', 'TV_SHORT', 'ONA', 'OVA', 'SPECIAL']);
+
+export interface ResolvedMapping {
+  tvdbId: number;
+  successfulSynonym?: string;
+}
 
 type ResolveHints = {
   primaryTitle?: string;
@@ -43,41 +50,358 @@ type ResolveTvdbIdOptions = {
 type QueuedMappingRequest = {
   anilistId: number;
   resolve: (value: ResolvedMapping) => void;
-  reject: (reason: Error | ExtensionError) => void;
+  reject: (reason: ExtensionError) => void;
   hints?: ResolveHints;
-};
-type InflightResolution = {
-  promise: Promise<ResolvedMapping>;
   bypassFailureCache: boolean;
 };
-const MAPPING_BATCH_SIZE = 3;
-const MAPPING_BATCH_DELAY_MS = 1500;
 
-export interface ResolvedMapping {
-  tvdbId: number;
-  successfulSynonym?: string;
+export interface StaticMappingPayload {
+  pairs: Record<number, number>;
+}
+
+interface InflightResolution {
+  promise: Promise<ResolvedMapping>;
+  bypassFailureCache: boolean;
 }
 
 export class MappingService {
-  private inflight = new Map<number, InflightResolution>();
-  private primaryPairsMap = new Map<number, number>();
-  private fallbackPairsMap = new Map<number, number>();
+  private readonly primaryPairsMap = new Map<number, number>();
+  private readonly fallbackPairsMap = new Map<number, number>();
 
-  private mappingQueue: QueuedMappingRequest[] = [];
+  private readonly inflight = new Map<number, InflightResolution>();
+  private readonly mappingQueue: QueuedMappingRequest[] = [];
   private isProcessingMappingQueue = false;
 
   constructor(
     private readonly sonarrApi: SonarrApiService,
     private readonly anilistApi: AnilistApiService,
-    private readonly cache: CacheService,
+    private readonly caches: {
+      success: TtlCache<ResolvedMapping>;
+      failure: TtlCache<ExtensionError>;
+      staticPrimary: TtlCache<StaticMappingPayload>;
+      staticFallback: TtlCache<StaticMappingPayload>;
+    },
   ) {}
 
+  public async initStaticPairs(): Promise<void> {
+    await Promise.all([this.ensureMapLoaded('primary'), this.ensureMapLoaded('fallback')]);
+
+    // Kick background refresh without blocking callers.
+    this.refreshStaticMapping('primary').catch(error => {
+      logError(normalizeError(error), 'MappingService:initStaticPairs:primaryRefresh');
+    });
+    this.refreshStaticMapping('fallback').catch(error => {
+      logError(normalizeError(error), 'MappingService:initStaticPairs:fallbackRefresh');
+    });
+  }
+
+  public resolveTvdbId(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping> {
+    const bypassFailureCache = options.ignoreFailureCache === true;
+    const existing = this.inflight.get(anilistId);
+
+    if (existing) {
+      if (bypassFailureCache && !existing.bypassFailureCache) {
+        // If a bypass is requested while a cached resolution is in flight, allow the existing promise to complete first.
+      }
+      return existing.promise;
+    }
+
+    const promise = this.resolveTvdbIdInternal(anilistId, options, bypassFailureCache);
+    this.inflight.set(anilistId, { promise, bypassFailureCache });
+
+    promise.finally(() => {
+      const current = this.inflight.get(anilistId);
+      if (current?.promise === promise) {
+        this.inflight.delete(anilistId);
+      }
+    });
+
+    return promise;
+  }
+
+  private async resolveTvdbIdInternal(
+    anilistId: number,
+    options: ResolveTvdbIdOptions,
+    bypassFailureCache: boolean,
+  ): Promise<ResolvedMapping> {
+    const cacheKey = this.successCacheKey(anilistId);
+
+    const cachedSuccess = await this.caches.success.read(cacheKey);
+    if (cachedSuccess) {
+      return cachedSuccess.value;
+    }
+
+    if (!bypassFailureCache) {
+      const cachedFailure = await this.caches.failure.read(this.failureCacheKey(anilistId));
+      if (cachedFailure) {
+        throw cachedFailure.value;
+      }
+    }
+
+    const staticHit = this.lookupStatic(anilistId);
+    if (staticHit) {
+      await this.caches.success.write(cacheKey, staticHit.mapping, {
+        staleMs: RESOLVED_SOFT_TTL,
+        hardMs: RESOLVED_HARD_TTL,
+      });
+      return staticHit.mapping;
+    }
+
+    if (options.network === 'never') {
+      throw createError(
+        ErrorCode.VALIDATION_ERROR,
+        `AniList ID ${anilistId} requires a network lookup but network access is disabled.`,
+        'Unable to resolve this title without contacting Sonarr.',
+      );
+    }
+
+    const hintTerm = options.hints?.primaryTitle?.trim();
+    if (hintTerm) {
+      try {
+        const hinted = await this.tryHintLookup(anilistId, hintTerm);
+        if (hinted) {
+          await this.caches.success.write(cacheKey, hinted, {
+            staleMs: RESOLVED_SOFT_TTL,
+            hardMs: RESOLVED_HARD_TTL,
+          });
+          return hinted;
+        }
+      } catch (error) {
+        logError(normalizeError(error), `MappingService:hintLookup:${anilistId}`);
+      }
+    }
+
+    return this.enqueueNetworkResolution(anilistId, options.hints, bypassFailureCache);
+  }
+
+  private enqueueNetworkResolution(
+    anilistId: number,
+    hints: ResolveHints | undefined,
+    bypassFailureCache: boolean,
+  ): Promise<ResolvedMapping> {
+    return new Promise<ResolvedMapping>((resolve, reject) => {
+      const request: QueuedMappingRequest = {
+        anilistId,
+        resolve,
+        reject,
+        bypassFailureCache,
+      };
+      if (hints) {
+        request.hints = hints;
+      }
+      this.mappingQueue.push(request);
+      this.processQueue().catch(error => {
+        logError(normalizeError(error), 'MappingService:processQueue');
+      });
+    });
+  }
+
+  private async processQueue(): Promise<void> {
+    if (this.isProcessingMappingQueue) return;
+    this.isProcessingMappingQueue = true;
+
+    try {
+      while (this.mappingQueue.length > 0) {
+        const batch = this.mappingQueue.splice(0, MAPPING_BATCH_SIZE);
+        await Promise.all(batch.map(req => this.handleNetworkRequest(req)));
+        if (this.mappingQueue.length > 0) {
+          await this.delay(MAPPING_BATCH_DELAY_MS);
+        }
+      }
+    } finally {
+      this.isProcessingMappingQueue = false;
+    }
+  }
+
+  private async handleNetworkRequest(request: QueuedMappingRequest): Promise<void> {
+    const cacheKey = this.successCacheKey(request.anilistId);
+
+    try {
+      const mapping = await this.resolveViaNetwork(request.anilistId, request.hints);
+      await this.caches.success.write(cacheKey, mapping, {
+        staleMs: RESOLVED_SOFT_TTL,
+        hardMs: RESOLVED_HARD_TTL,
+      });
+      request.resolve(mapping);
+    } catch (error) {
+      const normalized = normalizeError(error);
+      if (!request.bypassFailureCache && this.shouldCacheFailure(normalized)) {
+        const ttl = this.failureTtlsFor(normalized);
+        await this.caches.failure.write(this.failureCacheKey(request.anilistId), normalized, {
+          staleMs: ttl.stale,
+          hardMs: ttl.hard,
+        });
+      }
+      request.reject(normalized);
+    }
+  }
+
+  private async resolveViaNetwork(anilistId: number, hints?: ResolveHints): Promise<ResolvedMapping> {
+    const credentials = await this.getConfiguredCredentials();
+
+    const media = await this.anilistApi.fetchMediaWithRelations(anilistId);
+
+    if (media.format && !ALLOWED_FORMATS.has(media.format)) {
+      throw createError(
+        ErrorCode.VALIDATION_ERROR,
+        `Unsupported AniList format (${media.format}) for AniList ID ${anilistId}.`,
+        'This title is not a supported Sonarr series format.',
+      );
+    }
+
+    const prequelStatic = this.lookupPrequelStatic(media);
+    if (prequelStatic) {
+      return prequelStatic.mapping;
+    }
+
+    const searchTerms = this.buildSearchTerms(media.title, media.synonyms, media.startDate?.year ?? undefined);
+    if (hints?.primaryTitle) {
+      const trimmed = hints.primaryTitle.trim();
+      if (trimmed.length > 0) {
+        searchTerms.unshift(trimmed);
+      }
+    }
+
+    let bestMatch: { tvdbId: number; term: string; score: number } | null = null;
+
+    for (const term of searchTerms.slice(0, MAX_TERMS)) {
+      const results = await this.safeLookup(term, credentials);
+
+      for (const candidate of results) {
+        const mediaYear = media.startDate?.year;
+        const scoreParams = {
+          queryRaw: term,
+          candidateRaw: candidate.title,
+          ...(typeof candidate.year === 'number' ? { candidateYear: candidate.year } : {}),
+          ...(typeof mediaYear === 'number' ? { targetYear: mediaYear } : {}),
+          ...(Array.isArray(candidate.genres) ? { candidateGenres: candidate.genres } : {}),
+        } satisfies Parameters<typeof computeTitleMatchScore>[0];
+        const score = computeTitleMatchScore(scoreParams);
+
+        if (score >= EARLY_STOP_THRESHOLD) {
+          bestMatch = { tvdbId: candidate.tvdbId, term, score };
+          break;
+        }
+
+        if (score >= SCORE_THRESHOLD) {
+          if (!bestMatch || score > bestMatch.score) {
+            bestMatch = { tvdbId: candidate.tvdbId, term, score };
+          }
+        }
+      }
+
+      if (bestMatch && bestMatch.score >= EARLY_STOP_THRESHOLD) {
+        break;
+      }
+    }
+
+    if (bestMatch) {
+      return { tvdbId: bestMatch.tvdbId, successfulSynonym: bestMatch.term };
+    }
+
+    throw createError(
+      ErrorCode.VALIDATION_ERROR,
+      `Sonarr lookup yielded no match for AniList ID ${anilistId}.`,
+      'Could not find a matching series on TheTVDB.',
+    );
+  }
+
+  private async tryHintLookup(anilistId: number, term: string): Promise<ResolvedMapping | null> {
+    if (!term.trim()) return null;
+
+    let credentials: { url: string; apiKey: string };
+    try {
+      credentials = await this.getConfiguredCredentials();
+    } catch {
+      return null;
+    }
+
+    const results = await this.safeLookup(term, credentials);
+
+    for (const candidate of results) {
+      const scoreParams = {
+        queryRaw: term,
+        candidateRaw: candidate.title,
+        ...(typeof candidate.year === 'number' ? { candidateYear: candidate.year } : {}),
+      } satisfies Parameters<typeof computeTitleMatchScore>[0];
+
+      const score = computeTitleMatchScore(scoreParams);
+
+      if (score >= SCORE_THRESHOLD) {
+        return { tvdbId: candidate.tvdbId, successfulSynonym: term };
+      }
+    }
+
+    return null;
+  }
+
+  private async safeLookup(term: string, credentials: { url: string; apiKey: string }): Promise<SonarrLookupSeries[]> {
+    try {
+      return await this.sonarrApi.lookupSeriesByTerm(term, credentials);
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  }
+
+  private async getConfiguredCredentials(): Promise<{ url: string; apiKey: string }> {
+    const opts = await extensionOptions.getValue();
+    if (!opts?.sonarrUrl || !opts?.sonarrApiKey) {
+      throw createError(
+        ErrorCode.CONFIGURATION_ERROR,
+        'Sonarr URL or API key not configured.',
+        'Configure your Sonarr connection in Kitsunarr options.',
+      );
+    }
+    return { url: opts.sonarrUrl, apiKey: opts.sonarrApiKey };
+  }
+
+  private lookupStatic(anilistId: number): { mapping: ResolvedMapping; metricKey: 'static-primary' | 'static-fallback' } | null {
+    const primary = this.primaryPairsMap.get(anilistId);
+    if (typeof primary === 'number') {
+      return { mapping: { tvdbId: primary }, metricKey: 'static-primary' };
+    }
+
+    const fallback = this.fallbackPairsMap.get(anilistId);
+    if (typeof fallback === 'number') {
+      return { mapping: { tvdbId: fallback }, metricKey: 'static-fallback' };
+    }
+
+    return null;
+  }
+
+  private lookupPrequelStatic(media: AniMedia): { mapping: ResolvedMapping; metricKey: 'static-primary' | 'static-fallback' } | null {
+    const visited = new Set<number>();
+    let current: AniMedia | undefined = media;
+
+    while (current) {
+      const staticHit = this.lookupStatic(current.id);
+      if (staticHit) {
+        if (current.id !== media.id) {
+          return staticHit;
+        }
+        break;
+      }
+
+      const edges: { relationType: string; node: AniMedia }[] = current.relations?.edges ?? [];
+      const prequelEdge = edges.find(
+        (edge): edge is { relationType: string; node: AniMedia } => edge.relationType === 'PREQUEL',
+      );
+      const prequelNode = prequelEdge?.node;
+      if (!prequelNode || visited.has(prequelNode.id)) break;
+
+      visited.add(prequelNode.id);
+      current = prequelNode;
+    }
+
+    return null;
+  }
+
   private successCacheKey(anilistId: number): string {
-    return `resolved_mapping:${anilistId}`;
+    return `resolved:${anilistId}`;
   }
 
   private failureCacheKey(anilistId: number): string {
-    return `${FAILURE_CACHE_KEY_PREFIX}${anilistId}`;
+    return `resolved-failure:${anilistId}`;
   }
 
   private shouldCacheFailure(error: ExtensionError): boolean {
@@ -92,399 +416,109 @@ export class MappingService {
 
   private failureTtlsFor(error: ExtensionError): { stale: number; hard: number } {
     if (error.code === ErrorCode.NETWORK_ERROR || error.code === ErrorCode.API_ERROR) {
-      return { stale: NETWORK_FAILURE_STALE, hard: NETWORK_FAILURE_HARD };
+      return { stale: NETWORK_FAILURE_SOFT_TTL, hard: NETWORK_FAILURE_HARD_TTL };
     }
-    return { stale: FAILURE_STALE, hard: FAILURE_HARD };
-  }
-
-  public async initStaticPairs(): Promise<void> {
-    try {
-      await Promise.all([this.ensureMapLoaded('primary'), this.ensureMapLoaded('fallback')]);
-    } catch (e) {
-      logError(normalizeError(e), `MappingService:initStaticPairs`);
-    } finally {
-      await Promise.all([this.refreshStaticMapping('primary'), this.refreshStaticMapping('fallback')]);
-    }
-  }
-
-  public resolveTvdbId(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping> {
-    const bypassFailureCache = options.ignoreFailureCache === true;
-    const existing = this.inflight.get(anilistId);
-
-    if (existing) {
-      if (bypassFailureCache && !existing.bypassFailureCache) {
-        // Need a fresh attempt that bypasses the failure cache.
-      } else {
-        return existing.promise;
-      }
-    }
-
-    const promise = this.resolveTvdbIdInternal(anilistId, options);
-    this.inflight.set(anilistId, { promise, bypassFailureCache });
-
-    promise.finally(() => {
-      const current = this.inflight.get(anilistId);
-      if (current?.promise === promise) {
-        this.inflight.delete(anilistId);
-      }
-    });
-
-    return promise;
-  }
-
-  private async hasSonarrConfig(): Promise<boolean> {
-    const opts = await extensionOptions.getValue();
-    return !!opts?.sonarrUrl && !!opts?.sonarrApiKey;
-  }
-
-  private async resolveTvdbIdInternal(anilistId: number, options: ResolveTvdbIdOptions): Promise<ResolvedMapping> {
-    const successKey = this.successCacheKey(anilistId);
-    const failureKey = this.failureCacheKey(anilistId);
-
-    const cachedSuccess = await this.cache.get<ResolvedMapping>(successKey);
-    if (cachedSuccess) {
-      log.debug(`[Cache HIT] Found resolved mapping for anilistId:${anilistId}.`);
-      incrementPhase0Counter('cache-hit');
-      try {
-        await this.cache.delete(failureKey);
-      } catch {
-        /* noop */
-      }
-      return cachedSuccess;
-    }
-
-    if (!options.ignoreFailureCache) {
-      const cachedFailure = await this.cache.get<ExtensionError>(failureKey);
-      if (cachedFailure) {
-        throw cachedFailure;
-      }
-    }
-
-    try {
-      const result = await this.getOrQueueResolution(anilistId, options);
-      try {
-        await this.cache.set(successKey, result, RESOLVED_STALE, RESOLVED_HARD);
-      } catch {
-        /* noop */
-      }
-      try {
-        await this.cache.delete(failureKey);
-      } catch {
-        /* noop */
-      }
-      return result;
-    } catch (error) {
-      const normalized = normalizeError(error);
-      if (this.shouldCacheFailure(normalized)) {
-        const { stale, hard } = this.failureTtlsFor(normalized);
-        try {
-          await this.cache.set(failureKey, normalized, stale, hard);
-        } catch {
-          /* noop */
-        }
-      }
-      throw normalized;
-    }
-  }
-
-  private async getOrQueueResolution(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping> {
-    await Promise.all([this.ensureMapLoaded('primary'), this.ensureMapLoaded('fallback')]);
-
-    const staticHit = this.checkStaticMaps(anilistId);
-    if (staticHit) {
-      log.debug(`[Static HIT] Found static mapping for anilistId:${anilistId} in '${staticHit.source}' source.`);
-      if (staticHit.source === 'primary') incrementPhase0Counter('static-primary');
-      else if (staticHit.source === 'fallback') incrementPhase0Counter('static-fallback');
-      return { tvdbId: staticHit.tvdbId };
-    }
-
-    const sonarrConfigured = await this.hasSonarrConfig();
-
-    if (options.network === 'never' || !sonarrConfigured) {
-      // Skip hinted lookups and network queue entirely
-      const reason = options.network === 'never'
-        ? 'Local-only check failed, network access is disabled for this request.'
-        : 'Local-only check failed, Sonarr is not configured.';
-      throw this.notFound(anilistId, reason);
-    }
-
-    const hintTitle = options.hints?.primaryTitle?.trim();
-    let normalizedHints: ResolveHints | undefined;
-    if (hintTitle && sonarrConfigured) {
-      const hinted = await this.attemptHintedSonarrLookup(anilistId, hintTitle);
-      if (hinted) {
-        return hinted;
-      }
-      normalizedHints = { primaryTitle: hintTitle };
-    }
-
-    return new Promise((resolve, reject) => {
-      log.debug(`[Queueing] No local mapping for anilistId:${anilistId}. Queuing for network resolution.`);
-      const request: QueuedMappingRequest = { anilistId, resolve, reject };
-      if (normalizedHints) {
-        request.hints = normalizedHints;
-      }
-      this.mappingQueue.push(request);
-      if (!this.isProcessingMappingQueue) {
-        this.processMappingQueue();
-      }
-    });
-  }
-
-  private async processMappingQueue(): Promise<void> {
-    if (this.isProcessingMappingQueue) return;
-    this.isProcessingMappingQueue = true;
-
-    while (this.mappingQueue.length > 0) {
-      const batch = this.mappingQueue.splice(0, MAPPING_BATCH_SIZE);
-
-      await Promise.allSettled(batch.map(async (req) => {
-        try {
-          const result = await this.performNetworkResolution(req.anilistId, req.hints);
-          req.resolve(result);
-        } catch (e) {
-          req.reject(normalizeError(e));
-        }
-      }));
-
-      if (this.mappingQueue.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, MAPPING_BATCH_DELAY_MS));
-      }
-    }
-
-    this.isProcessingMappingQueue = false;
-  }
-
-  private async attemptHintedSonarrLookup(anilistId: number, primaryTitle: string): Promise<ResolvedMapping | null> {
-    const normalizedTitle = primaryTitle.trim();
-    if (!normalizedTitle) return null;
-
-    // Guard: do nothing if Sonarr is not configured
-    if (!(await this.hasSonarrConfig())) return null;
-
-    try {
-      const result = await this.lookupViaSonarr(
-        anilistId,
-        { english: normalizedTitle, romaji: normalizedTitle },
-        [normalizedTitle],
-        undefined,
-      );
-      incrementPhase0Counter('sonarr-lookup');
-      return result;
-    } catch (e) {
-      const normalized = normalizeError(e);
-      if (normalized.code !== ErrorCode.VALIDATION_ERROR && normalized.code !== ErrorCode.CONFIGURATION_ERROR) {
-        logError(normalizeError(e), `MappingService:hintLookup:${anilistId}`);
-      }
-      return null;
-    }
-  }
-
-  private async performNetworkResolution(anilistId: number, hints?: ResolveHints): Promise<ResolvedMapping> {
-    // Guard: no network resolution if Sonarr is not configured
-    if (!(await this.hasSonarrConfig())) {
-      throw this.notFound(anilistId, 'Sonarr is not configured for network resolution.');
-    }
-
-    const media = await this.anilistApi.fetchMediaWithRelations(anilistId);
-
-    if (media.format === 'MOVIE') {
-      throw this.notFound(anilistId, `Unsupported format: ${media.format}. Only TV series can be added to Sonarr.`);
-    }
-
-    const prequelRootId = this.findPrequelRoot(media);
-    if (prequelRootId !== anilistId) {
-      const staticHit = this.checkStaticMaps(prequelRootId);
-      if (staticHit) {
-        if (staticHit.source === 'primary') incrementPhase0Counter('static-primary');
-        else if (staticHit.source === 'fallback') incrementPhase0Counter('static-fallback');
-        return { tvdbId: staticHit.tvdbId };
-      }
-    }
-
-    const enrichedTitle: AniTitles = { ...media.title };
-    const synonyms = Array.isArray(media.synonyms) ? [...media.synonyms] : [];
-
-    const hintTitle = hints?.primaryTitle?.trim();
-    if (hintTitle) {
-      synonyms.unshift(hintTitle);
-      if (!enrichedTitle.english) {
-        enrichedTitle.english = hintTitle;
-      }
-    }
-
-    const startYear = media.startDate?.year ?? undefined;
-    const sonarrResult = await this.lookupViaSonarr(anilistId, enrichedTitle, synonyms, startYear);
-    incrementPhase0Counter('sonarr-lookup');
-    return sonarrResult;
-  }
-
-  private findPrequelRoot(media: AniMedia): number {
-    let currentNode = media;
-    let rootId = media.id;
-
-    while (currentNode?.relations) {
-      const prequelEdge = currentNode.relations.edges.find(e => e.relationType === 'PREQUEL');
-      if (prequelEdge) {
-        rootId = prequelEdge.node.id;
-        currentNode = prequelEdge.node;
-      } else {
-        break;
-      }
-    }
-    return rootId;
-  }
-
-  private checkStaticMaps(anilistId: number): { tvdbId: number; source: 'primary' | 'fallback' } | null {
-    if (this.primaryPairsMap.has(anilistId)) {
-      return { tvdbId: this.primaryPairsMap.get(anilistId)!, source: 'primary' };
-    }
-    if (this.fallbackPairsMap.has(anilistId)) {
-      return { tvdbId: this.fallbackPairsMap.get(anilistId)!, source: 'fallback' };
-    }
-    return null;
-  }
-
-  private async refreshStaticMapping(type: 'primary' | 'fallback'): Promise<void> {
-    const config = type === 'primary'
-      ? { url: PRIMARY_URL, jsonKey: PRIMARY_JSON_KEY, metaKey: PRIMARY_META_KEY, map: this.primaryPairsMap, name: 'Primary' }
-      : { url: FALLBACK_URL, jsonKey: FALLBACK_JSON_KEY, metaKey: FALLBACK_META_KEY, map: this.fallbackPairsMap, name: 'Fallback' };
-
-    try {
-      await retryWithBackoff(async () => {
-        const meta = (await browser.storage.local.get(config.metaKey))[config.metaKey] as { etag?: string; updatedAt?: number } | undefined;
-        const now = Date.now();
-        if (meta?.updatedAt && now - meta.updatedAt < STATIC_SOFT_TTL) return;
-
-        const headers: HeadersInit = { 'If-None-Match': meta?.etag ?? '' };
-        const resp = await fetch(config.url, { headers, cache: 'no-store' });
-
-        if (resp.status === 304) {
-          await browser.storage.local.set({ [config.metaKey]: { ...meta, updatedAt: now } });
-          return;
-        }
-        if (!resp.ok) throw new Error(`${config.name} mapping fetch failed: ${resp.status}`);
-
-        const json = await resp.json();
-        const etag = resp.headers.get('ETag') ?? undefined;
-        await browser.storage.local.set({ [config.jsonKey]: json });
-        await browser.storage.local.set({ [config.metaKey]: { etag, updatedAt: now } });
-
-        this.buildMapFromJSON(json, config.map, type);
-      });
-    } catch (e) {
-      logError(normalizeError(e), `MappingService:refreshStaticMapping:${type}`);
-    }
-  }
-
-  private buildMapFromJSON(json: unknown, map: Map<number, number>, type: 'primary' | 'fallback'): void {
-    map.clear();
-    const source = type === 'primary' ? (json as { anilist?: unknown }).anilist : json;
-    if (!source || typeof source !== 'object') return;
-
-    interface MappingEntry {
-      anilist_id?: unknown;
-      anilist?: unknown;
-      tvdb_id?: unknown;
-      tvdb?: unknown;
-    }
-
-    for (const entry of Object.values(source as Record<string, unknown>[])) {
-      const mappingEntry = entry as MappingEntry;
-      const anilistId = this.coerceId(mappingEntry.anilist_id ?? mappingEntry.anilist);
-      const tvdbId = this.coerceId(mappingEntry.tvdb_id ?? mappingEntry.tvdb);
-      if (anilistId != null && tvdbId != null) {
-        map.set(anilistId, tvdbId);
-      }
-    }
+    return { stale: FAILURE_SOFT_TTL, hard: FAILURE_HARD_TTL };
   }
 
   private async ensureMapLoaded(type: 'primary' | 'fallback'): Promise<void> {
-    const config = type === 'primary'
-      ? { jsonKey: PRIMARY_JSON_KEY, map: this.primaryPairsMap }
-      : { jsonKey: FALLBACK_JSON_KEY, map: this.fallbackPairsMap };
+    const map = type === 'primary' ? this.primaryPairsMap : this.fallbackPairsMap;
+    if (map.size > 0) return;
 
-    if (config.map.size > 0) return;
-    const raw = await browser.storage.local.get(config.jsonKey);
-    const json = raw[config.jsonKey];
-    if (json) {
-      this.buildMapFromJSON(json, config.map, type);
+    const cache = type === 'primary' ? this.caches.staticPrimary : this.caches.staticFallback;
+    const cached = await cache.read('static');
+    if (cached) {
+      this.hydrateMap(map, cached.value.pairs);
     }
   }
 
-  private async lookupViaSonarr(
-    anilistId: number,
-    titles: AniTitles,
-    synonyms: string[] | undefined,
-    startYear: number | undefined,
-  ): Promise<ResolvedMapping> {
-    const options = await extensionOptions.getValue();
-    if (!options?.sonarrUrl || !options?.sonarrApiKey) {
-      throw createError(ErrorCode.CONFIGURATION_ERROR, 'Sonarr not configured for lookup', 'Sonarr is not configured.');
-    }
-    const credentials = { url: options.sonarrUrl, apiKey: options.sonarrApiKey };
+  private async refreshStaticMapping(type: 'primary' | 'fallback'): Promise<void> {
+    const cache = type === 'primary' ? this.caches.staticPrimary : this.caches.staticFallback;
+    const map = type === 'primary' ? this.primaryPairsMap : this.fallbackPairsMap;
+    const url = type === 'primary' ? PRIMARY_URL : FALLBACK_URL;
 
-    const terms = this.buildSearchTerms(titles, synonyms, startYear);
-    let bestMatch: { tvdbId: number; score: number; term: string } | undefined;
+    try {
+      const cached = await cache.read('static');
+      const headers: Record<string, string> = {};
+      const etag = cached?.meta?.etag as string | undefined;
+      if (etag) {
+        headers['If-None-Match'] = etag;
+      }
 
-    for (const term of terms) {
-      try {
-        const results = await this.sonarrApi.lookupSeriesByTerm(term, credentials);
-
-        for (const r of results) {
-          const params = {
-            queryRaw: term,
-            candidateRaw: r.title,
-            ...(r.year !== undefined && { candidateYear: r.year }),
-            ...(startYear !== undefined && { targetYear: startYear }),
-            ...(r.genres !== undefined && { candidateGenres: r.genres }),
-          };
-          const score = computeTitleMatchScore(params);
-
-          if (score >= EARLY_STOP_THRESHOLD) {
-            bestMatch = { tvdbId: r.tvdbId, score, term };
-            break;
-          }
-
-          if (score >= SCORE_THRESHOLD && (!bestMatch || score > bestMatch.score)) {
-            bestMatch = { tvdbId: r.tvdbId, score, term };
-          }
+      const response = await fetch(url, { headers });
+      if (response.status === 304 && cached) {
+        if (map.size === 0) {
+          this.hydrateMap(map, cached.value.pairs);
         }
-      } catch (e) {
-        logError(normalizeError(e), `MappingService:lookupViaSonarr:term:'${term}'`);
+        return;
       }
 
-      if (bestMatch && bestMatch.score >= EARLY_STOP_THRESHOLD) {
-        break;
+      if (!response.ok) {
+        throw createError(ErrorCode.NETWORK_ERROR, `Failed to fetch static mapping (${response.status})`, 'Unable to refresh static mappings.');
+      }
+
+      const json = (await response.json()) as unknown;
+      const pairs = this.buildPairsFromSource(json);
+      this.hydrateMap(map, pairs);
+
+      const nextEtag = response.headers.get('ETag');
+      await cache.write('static', { pairs }, {
+        staleMs: STATIC_SOFT_TTL,
+        hardMs: STATIC_HARD_TTL,
+        ...(nextEtag ? { meta: { etag: nextEtag } } : {}),
+      });
+    } catch (error) {
+      logError(normalizeError(error), `MappingService:refreshStatic:${type}`);
+    }
+  }
+
+  private hydrateMap(map: Map<number, number>, pairs: Record<number, number>): void {
+    map.clear();
+    for (const [key, value] of Object.entries(pairs)) {
+      const k = Number(key);
+      if (!Number.isFinite(k) || !Number.isFinite(value)) continue;
+      map.set(k, value);
+    }
+  }
+
+  private buildPairsFromSource(source: unknown): Record<number, number> {
+    const pairs: Record<number, number> = {};
+    if (!source || typeof source !== 'object') return pairs;
+
+    const entries = Array.isArray(source) ? source : Object.values(source as Record<string, unknown>);
+
+    for (const rawEntry of entries) {
+      if (!rawEntry || typeof rawEntry !== 'object') continue;
+      const entry = rawEntry as Record<string, unknown>;
+      const anilistId = this.coerceId(entry.anilist_id ?? entry.anilist ?? entry.aniId);
+      const tvdbId = this.coerceId(entry.tvdb_id ?? entry.tvdb ?? entry.tvdbid);
+      if (anilistId != null && tvdbId != null) {
+        pairs[anilistId] = tvdbId;
       }
     }
 
-    if (bestMatch) {
-      return { tvdbId: bestMatch.tvdbId, successfulSynonym: bestMatch.term };
-    }
-
-    throw this.notFound(anilistId, 'Sonarr lookup yielded no matching results.');
+    return pairs;
   }
 
   private coerceId(value: unknown): number | null {
     if (typeof value === 'number' && Number.isFinite(value)) return value | 0;
     if (typeof value === 'string') {
-      const n = Number.parseInt(value.trim(), 10);
-      return Number.isFinite(n) ? (n | 0) : null;
+      const parsed = Number.parseInt(value, 10);
+      if (Number.isFinite(parsed)) return parsed | 0;
     }
     return null;
   }
 
-  private buildSearchTerms(titles: AniTitles, synonyms: string[] | undefined, year?: number): string[] {
+  private buildSearchTerms(titles: AniTitles, synonyms: string[] | undefined, startYear?: number | null): string[] {
     const seen = new Set<string>();
-    const out: string[] = [];
+    const terms: string[] = [];
 
     const addTerm = (term: string) => {
-      const key = normTitle(term);
-      if (key.length > 2 && !seen.has(key)) {
-        seen.add(key);
-        out.push(term);
-      }
+      const normalized = normTitle(term);
+      if (!normalized) return;
+      if (seen.has(normalized)) return;
+      seen.add(normalized);
+      terms.push(term);
     };
 
     const baseTitles: string[] = [];
@@ -493,23 +527,22 @@ export class MappingService {
     if (synonyms) baseTitles.push(...synonyms);
 
     for (const title of baseTitles) {
-      const original = stripParenContent(title).trim();
-      if (!original) continue;
-
-      addTerm(original);
-      if (year) {
-        addTerm(`${original} ${year}`);
+      const stripped = stripParenContent(title).trim();
+      if (!stripped) continue;
+      addTerm(stripped);
+      if (startYear) {
+        addTerm(`${stripped} ${startYear}`);
       }
     }
 
-    return out.slice(0, MAX_TERMS);
+    return terms;
   }
 
-  private notFound(anilistId: number, details?: string): ExtensionError {
-    return createError(
-      ErrorCode.VALIDATION_ERROR,
-      `Failed to resolve TVDB ID for AniList ID: ${anilistId}. ${details || ''}`.trim(),
-      'Could not find a matching series on TheTVDB.',
-    );
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
+
+
+
+
