@@ -1,3 +1,4 @@
+// src/hooks/use-settings-manager.ts
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -60,12 +61,10 @@ export function useSettingsManager() {
 
   const lastSyncedOptionsRef = useRef<ExtensionOptions | null>(null);
 
-  const sonarrCredentials = useMemo(
-    () => ({ url: formState.sonarrUrl, apiKey: formState.sonarrApiKey }),
-    [formState.sonarrUrl, formState.sonarrApiKey],
-  );
-
-  const sonarrMetadata = useSonarrMetadata(sonarrCredentials, { enabled: isConnected });
+  const sonarrMetadata = useSonarrMetadata({
+    enabled: isConnected,
+    credentials: isConnected ? { url: formState.sonarrUrl, apiKey: formState.sonarrApiKey } : null,
+  });
 
   useEffect(() => {
     if (!savedOptions) return;
@@ -173,11 +172,12 @@ export function useSettingsManager() {
 
   const handleRefresh = useCallback(() => {
     if (isConnected) {
+      const scope = `${formState.sonarrUrl}|${formState.sonarrApiKey}`;
       queryClient.invalidateQueries({
-        queryKey: queryKeys.sonarrMetadata({ url: formState.sonarrUrl, apiKey: formState.sonarrApiKey }),
+        queryKey: queryKeys.sonarrMetadata(scope),
       });
     }
-  }, [isConnected, queryClient, formState.sonarrUrl, formState.sonarrApiKey]);
+  }, [formState.sonarrApiKey, formState.sonarrUrl, isConnected, queryClient]);
 
   const resetConnection = useCallback(() => {
     testConnectionMutation.reset();

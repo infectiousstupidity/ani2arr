@@ -1,9 +1,9 @@
+// src/hooks/use-api-queries.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { getKitsunarrApi } from '@/services';
 import { extensionOptions } from '@/utils/storage';
 import type {
-  AddRequestPayload,
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
   ExtensionError,
@@ -12,14 +12,14 @@ import type {
   SonarrSeries,
   TestConnectionPayload,
 } from '@/types';
+import type { AddInput, StatusInput } from '@/rpc/schemas';
 import { normalizeError } from '@/utils/error-handling';
-
 
 const rootQueryKey = ['kitsunarr'] as const;
 
 const normalizeTitleKey = (title?: string) => {
   const trimmed = title?.trim();
-  return trimmed ? trimmed.toLowerCase() : null;
+  return trimmed ? trimmed.toLowerCase() : '::';
 };
 
 const seriesStatusBaseKey = (anilistId: number) => [...rootQueryKey, 'seriesStatus', anilistId] as const;
@@ -27,14 +27,13 @@ const seriesStatusBaseKey = (anilistId: number) => [...rootQueryKey, 'seriesStat
 export const queryKeys = {
   all: rootQueryKey,
   options: () => [...rootQueryKey, 'options'] as const,
-  // root partial key for invalidating all series status queries
   seriesStatusRoot: () => [...rootQueryKey, 'seriesStatus'] as const,
   seriesStatusBase: seriesStatusBaseKey,
   seriesStatus: (payload: CheckSeriesStatusPayload) => [
     ...seriesStatusBaseKey(payload.anilistId),
     normalizeTitleKey(payload.title),
   ] as const,
-  sonarrMetadata: (creds: SonarrCredentialsPayload | null) => [...rootQueryKey, 'sonarrMetadata', creds] as const,
+  sonarrMetadata: (scope?: string) => [...rootQueryKey, 'sonarrMetadata', scope ?? 'configured'] as const,
 };
 
 export type SeriesStatusOptions = {
@@ -48,21 +47,24 @@ export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: Ser
   return useQuery<CheckSeriesStatusResponse, ExtensionError>({
     queryKey: queryKeys.seriesStatus(payload),
     queryFn: async () => {
-      const serviceOptions: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {};
+      const request: StatusInput = { anilistId: payload.anilistId };
+      if (payload.title !== undefined) {
+        request.title = payload.title;
+      }
       if (options?.force_verify) {
-        serviceOptions.force_verify = true;
+        request.force_verify = true;
       }
       if (options?.network) {
-        serviceOptions.network = options.network;
+        request.network = options.network;
       }
-      const optionBypass =
+      const bypassFailureCache =
         typeof options?.ignoreFailureCache === 'function'
           ? options.ignoreFailureCache()
           : options?.ignoreFailureCache === true;
-      if (optionBypass) {
-        serviceOptions.ignoreFailureCache = true;
+      if (bypassFailureCache) {
+        request.ignoreFailureCache = true;
       }
-      return getKitsunarrApi().library.getSeriesStatus(payload, serviceOptions);
+      return getKitsunarrApi().getSeriesStatus(request);
     },
     enabled: !!payload.anilistId && (options?.enabled ?? true),
     staleTime: 5 * 60 * 1000,
@@ -88,20 +90,20 @@ export const useExtensionOptions = () => {
   return query;
 };
 
-export const useSonarrMetadata = (creds: SonarrCredentialsPayload | null, options?: { enabled?: boolean }) => {
+export const useSonarrMetadata = (options?: { enabled?: boolean; credentials?: SonarrCredentialsPayload | null }) => {
+  const credentialScope = options?.credentials?.url && options.credentials.apiKey
+    ? `${options.credentials.url}|${options.credentials.apiKey}`
+    : 'configured';
+
+  const request = options?.credentials ? { credentials: options.credentials } : undefined;
+
   return useQuery({
-    queryKey: queryKeys.sonarrMetadata(creds),
+    queryKey: queryKeys.sonarrMetadata(credentialScope),
     queryFn: async () => {
-      if (!creds?.url || !creds.apiKey) throw new Error('Sonarr credentials are not provided.');
       const api = getKitsunarrApi();
-      const [qualityProfiles, rootFolders, tags] = await Promise.all([
-        api.sonarr.getQualityProfiles(creds),
-        api.sonarr.getRootFolders(creds),
-        api.sonarr.getTags(creds),
-      ]);
-      return { qualityProfiles, rootFolders, tags };
+      return api.getSonarrMetadata(request);
     },
-    enabled: !!creds?.url && !!creds.apiKey && (options?.enabled ?? true),
+    enabled: options?.enabled ?? true,
     staleTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 1,
@@ -110,29 +112,15 @@ export const useSonarrMetadata = (creds: SonarrCredentialsPayload | null, option
 
 export const useAddSeries = () => {
   const queryClient = useQueryClient();
-  return useMutation<SonarrSeries, ExtensionError, AddRequestPayload>({
-    mutationFn: async (payload: AddRequestPayload) => {
+  return useMutation<SonarrSeries, ExtensionError, AddInput>({
+    mutationFn: async (input: AddInput) => {
       try {
-        const api = getKitsunarrApi();
-        const baseOptions = await extensionOptions.getValue();
-        if (!baseOptions) throw new Error('Extension options are not loaded.');
-
-        const { tvdbId } = await api.mapping.resolveTvdbId(payload.anilistId, {
-          hints: { primaryTitle: payload.title },
-          ignoreFailureCache: true,
-        });
-        if (!tvdbId) throw new Error('Could not resolve TVDB ID for this series.');
-
-        const sonarrPayload: AddRequestPayload = { ...payload, tvdbId };
-
-        return await api.sonarr.addSeries(sonarrPayload, baseOptions);
+        return await getKitsunarrApi().addToSonarr(input);
       } catch (error) {
         throw normalizeError(error);
       }
     },
-    onSuccess: async (addedSeries, variables) => {
-      const api = getKitsunarrApi();
-      await api.library.addSeriesToCache(addedSeries);
+    onSuccess: (_createdSeries, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
     },
   });
@@ -142,7 +130,7 @@ export const useTestConnection = () => {
   return useMutation<{ version: string }, ExtensionError, TestConnectionPayload>({
     mutationFn: async (payload: TestConnectionPayload) => {
       try {
-        return await getKitsunarrApi().sonarr.testConnection(payload);
+        return await getKitsunarrApi().testConnection(payload);
       } catch (error) {
         throw normalizeError(error);
       }
@@ -157,6 +145,7 @@ export const useSaveOptions = () => {
     mutationFn: async (options: ExtensionOptions) => {
       try {
         await extensionOptions.setValue(options);
+        await getKitsunarrApi().notifySettingsChanged();
       } catch (error) {
         throw normalizeError(error);
       }

@@ -27,6 +27,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
   const [selectPortal, setSelectPortal] = useState<HTMLElement | null>(null);
   const initialFocusRef = useRef<HTMLButtonElement | null>(null);
   const manager = useAddSeriesManager(anilistId, title, isOpen);
+  const sonarrReady = manager.sonarrReady;
 
   useTheme(hostRef);
 
@@ -84,7 +85,9 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
               <ExternalLinkIcon />
             </Button>
           </div>
-          {manager.isLoading || !manager.formState || !manager.sonarrMetadata.data ? (
+          {!sonarrReady ? (
+            <div className="p-8 text-center text-text-secondary">Configure Sonarr to enable adding series.</div>
+          ) : manager.isLoading || !manager.formState || !manager.sonarrMetadata.data ? (
             <div className="p-8 text-center text-text-secondary">Loading Sonarr settings...</div>
           ) : (
             <>
@@ -111,7 +114,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
                 <Button
                   onClick={manager.handleAddSeries}
                   isLoading={manager.addSeriesState.isPending}
-                  disabled={manager.addSeriesState.isSuccess}
+                  disabled={!sonarrReady || manager.addSeriesState.isSuccess}
                   className="w-32"
                   aria-busy={manager.addSeriesState.isPending}
                 >
@@ -129,3 +132,4 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
 };
 
 export default AddSeriesModal;
+

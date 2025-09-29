@@ -1,6 +1,4 @@
-/**
- * @file Central data dictionary for Kitsunarr.
- */
+// src/types.ts
 
 //================================================================
 // Sonarr API Enums and Types
@@ -116,6 +114,7 @@ export enum ErrorCode {
   API_ERROR = 'API_ERROR',
   STORAGE_ERROR = 'STORAGE_ERROR',
   CONFIGURATION_ERROR = 'CONFIGURATION_ERROR',
+  SONARR_NOT_CONFIGURED = 'SONARR_NOT_CONFIGURED',
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }
 
