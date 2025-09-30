@@ -162,7 +162,7 @@ interface ContentRootProps {
   title: string;
 }
 
-const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) => {
+export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) => {
   const hostRef = useRef<HTMLDivElement>(null);
   useTheme(hostRef);
   useKitsunarrBroadcasts();
