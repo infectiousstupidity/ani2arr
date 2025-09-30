@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import type { RenderHookResult } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { PropsWithChildren } from 'react';
 
@@ -188,6 +189,13 @@ const createOptions = (overrides: Partial<ExtensionOptions> = {}): ExtensionOpti
 const validUrl = 'https://sonarr.test';
 const validApiKey = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
+type UseSettingsManagerHook = ReturnType<typeof useSettingsManager>;
+type RenderResult = RenderHookResult<UseSettingsManagerHook, void>;
+
+const waitForOptionsLoaded = async (result: RenderResult['result']) => {
+  await waitFor(() => expect(result.current.isLoading).toBe(false));
+};
+
 const renderUseSettingsManager = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -245,7 +253,7 @@ describe('useSettingsManager', () => {
 
     const { result, queryClient } = renderUseSettingsManager();
 
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitForOptionsLoaded(result);
     await waitFor(() => expect(kitsunarrApiMock.testConnection).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(result.current.sonarrMetadata.isLoading).toBe(true));
     await waitFor(() => expect(result.current.sonarrMetadata.isSuccess).toBe(true));
@@ -254,6 +262,7 @@ describe('useSettingsManager', () => {
     expect(result.current.formState.defaults.rootFolderPath).toBe(rootFolder.path);
 
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const initialDataUpdatedAt = result.current.sonarrMetadata.dataUpdatedAt;
 
     await act(async () => {
       result.current.handleRefresh();
@@ -263,12 +272,15 @@ describe('useSettingsManager', () => {
       queryKey: queryKeys.sonarrMetadata(`${validUrl}|${validApiKey}`),
     });
 
+    await waitFor(() =>
+      expect(result.current.sonarrMetadata.dataUpdatedAt).toBeGreaterThan(initialDataUpdatedAt),
+    );
     await waitFor(() => expect(kitsunarrApiMock.getSonarrMetadata).toHaveBeenCalledTimes(2));
   });
 
   it('does not refresh metadata when connection has not been established', async () => {
     const { result, queryClient } = renderUseSettingsManager();
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitForOptionsLoaded(result);
 
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
@@ -281,7 +293,7 @@ describe('useSettingsManager', () => {
 
   it('validates inputs and requests permission before testing connection', async () => {
     const { result } = renderUseSettingsManager();
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitForOptionsLoaded(result);
 
     await act(async () => {
       result.current.handleFieldChange('sonarrUrl', validUrl);
@@ -302,7 +314,7 @@ describe('useSettingsManager', () => {
     validateUrlMock.mockReturnValueOnce({ isValid: false });
 
     const { result } = renderUseSettingsManager();
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitForOptionsLoaded(result);
 
     await act(async () => {
       result.current.handleFieldChange('sonarrUrl', 'notaurl');
@@ -321,7 +333,7 @@ describe('useSettingsManager', () => {
     requestSonarrPermissionMock.mockResolvedValueOnce({ granted: false });
 
     const { result } = renderUseSettingsManager();
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitForOptionsLoaded(result);
 
     await act(async () => {
       result.current.handleFieldChange('sonarrUrl', validUrl);
@@ -337,7 +349,7 @@ describe('useSettingsManager', () => {
 
   it('resets the connection state', async () => {
     const { result } = renderUseSettingsManager();
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitForOptionsLoaded(result);
 
     await act(async () => {
       result.current.handleFieldChange('sonarrUrl', validUrl);
@@ -360,7 +372,7 @@ describe('useSettingsManager', () => {
 
   it('does not attempt to save when the form is pristine', async () => {
     const { result } = renderUseSettingsManager();
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitForOptionsLoaded(result);
 
     await act(async () => {
       await result.current.handleSave();
@@ -374,7 +386,7 @@ describe('useSettingsManager', () => {
     validateUrlMock.mockReturnValueOnce({ isValid: false });
 
     const { result } = renderUseSettingsManager();
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitForOptionsLoaded(result);
 
     await act(async () => {
       result.current.handleFieldChange('sonarrUrl', 'bad-url');
@@ -394,7 +406,7 @@ describe('useSettingsManager', () => {
     requestSonarrPermissionMock.mockResolvedValueOnce({ granted: false });
 
     const { result } = renderUseSettingsManager();
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitForOptionsLoaded(result);
 
     await act(async () => {
       result.current.handleFieldChange('sonarrUrl', validUrl);
@@ -430,7 +442,7 @@ describe('useSettingsManager', () => {
 
   it('saves settings after successful validation, permission, and connection test', async () => {
     const { result, queryClient } = renderUseSettingsManager();
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitForOptionsLoaded(result);
 
     await act(async () => {
       result.current.handleFieldChange('sonarrUrl', validUrl);
@@ -471,7 +483,7 @@ describe('useSettingsManager', () => {
 
     const { result } = renderUseSettingsManager();
 
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitForOptionsLoaded(result);
 
     expect(result.current.formState.defaults.seriesType).toBe('anime');
     expect(result.current.isDirty).toBe(false);
