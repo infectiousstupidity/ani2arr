@@ -81,6 +81,7 @@
 - `registerKitsunarrApi()` must execute exactly once (background). Content scripts should only ever call `getKitsunarrApi()`.
 - Respect rate limits on AniList and Sonarr: batch lookups via `MappingService` queue rather than issuing parallel fetches.
 - Keep AGENTS.md in sync when adding core flows or changing service contracts so future agents stay aligned.
+- Long-running tooling (tests, docker compose, migrations, etc.) must always be invoked with sensible timeouts or in non-interactive batch mode. Never leave a shell command waiting indefinitely—prefer explicit timeouts, scripted runs, or log polling after the command exits.
 
 ## 11. Testing Conventions
 - Vitest is configured via `vitest.setup.jsdom.ts` `vitest.setup.node.ts, apply the `
@@ -88,4 +89,5 @@
 - Prefer MSW over manual `fetch` mocks so retry/backoff utilities exercise real timing. Reset handlers with `testServer.resetHandlers()` (already done in the global `afterEach`).
 - When mocking modules, use `vi.mock` inside test files and let `vitest.setup.ts` handle cleanup (`vi.resetModules`, `vi.clearAllMocks`). Avoid mutating `fakeBrowser` directly—call `fakeBrowser.reset()` or storage/runtime reset helpers between assertions if additional isolation is required.
 - Store new fixtures under `src/testing/fixtures` to keep API payload shapes centralized.
+
 
