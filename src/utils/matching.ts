@@ -2,7 +2,7 @@
 const STOPWORDS = new Set([
   'the','a','an','of','and','or','to','for','in','on','with','at','from','my','your','our',
   'season','tv','series','episode','episodes','part','movie','film','limited','special','ultimate',
-  'lv','lvl','level','unlimited','gift','gifts','edition','deluxe','complete'
+  'unlimited','gift','gifts','edition','deluxe','complete'
 ]);
 
 const RARE_TOKEN_MIN_LEN = 4;
@@ -30,8 +30,9 @@ export function tokenize(s: string): string[] {
   const out: string[] = [];
   for (const p of s.split(/\s|-/)) {
     if (!p) continue;
-    if (STOPWORDS.has(p)) continue;
-    const t = p.replace(/^lv(l)?$/,'level');
+    // Normalize 'lv' and 'lvl' to 'level' before stopword check
+    const t = p.replace(/^lv(l)?$/, 'level');
+    if (STOPWORDS.has(t)) continue;
     if (t.length === 1) continue;
     out.push(t);
   }
@@ -99,8 +100,18 @@ export function computeTitleMatchScore(params: {
 
   if (params.targetYear !== undefined && params.candidateYear !== undefined) {
     const d = Math.abs(params.targetYear - params.candidateYear);
-    if (d === 0) score += 0.10;
-    else if (d === 1) score += 0.06;
+    if (d === 0) {
+      score += 0.10;
+    } else if (d === 1) {
+      // Ensure bonus for year difference of 1 never pushes score to 1
+      const maxScore = 0.999;
+      const bonus = 0.06;
+      if (score + bonus >= 1) {
+        score = Math.min(maxScore, score + bonus);
+      } else {
+        score += bonus;
+      }
+    }
   }
   
   if (isGenreMismatch(params.candidateGenres)) {
