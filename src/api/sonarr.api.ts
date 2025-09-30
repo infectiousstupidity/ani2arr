@@ -56,8 +56,20 @@ export class SonarrApiService {
           throw new RetriableError(`Sonarr API Error: ${response.status} ${response.statusText}`, response.status);
         }
 
-        if (response.status === 204 || response.headers.get('Content-Length') === '0') {
+        if (response.status === 204) {
           return {} as T;
+        }
+
+        const contentLength = response.headers.get('Content-Length');
+        if (contentLength === '0') {
+          return {} as T;
+        }
+
+        if (contentLength === null) {
+          const rawBody = await response.clone().text();
+          if (!rawBody.trim()) {
+            return {} as T;
+          }
         }
 
         return (await response.json()) as T;
