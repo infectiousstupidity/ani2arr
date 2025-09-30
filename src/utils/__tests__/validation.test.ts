@@ -115,9 +115,9 @@ describe('Sonarr permission helpers', () => {
     const grantedOrigins = new Set<string>();
 
     const requestSpy = vi.spyOn(fakeBrowser.permissions, 'request').mockImplementation(
-      async (permissions) => {
-        const origins = permissions?.origins ?? [];
-        origins.forEach((origin) => grantedOrigins.add(origin));
+      async (permissions: unknown) => {
+        const origins = (permissions as { origins?: string[] } | undefined)?.origins ?? [];
+        origins.forEach((origin: string) => grantedOrigins.add(origin));
         return true;
       },
     );
@@ -151,9 +151,9 @@ describe('Sonarr permission helpers', () => {
   it('confirms when host permissions are present for a Sonarr URL', async () => {
     const grantedOrigins = new Set(['https://sonarr.example.com/*']);
 
-    vi.spyOn(fakeBrowser.permissions, 'contains').mockImplementation(async (permissions) => {
-      const origins = permissions?.origins ?? [];
-      return origins.every((origin) => grantedOrigins.has(origin));
+    vi.spyOn(fakeBrowser.permissions, 'contains').mockImplementation(async (permissions: unknown) => {
+      const origins = (permissions as { origins?: string[] } | undefined)?.origins ?? [];
+      return origins.every((origin: string) => grantedOrigins.has(origin));
     });
 
     expect(await hasSonarrPermission('https://sonarr.example.com/path')).toBe(true);
