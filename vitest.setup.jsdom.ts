@@ -11,20 +11,26 @@ type G = typeof globalThis & {
 const g = globalThis as G;
 
 (() => {
-  const ok = new NodeTextEncoder().encode('') instanceof Uint8Array;
-  if (!ok) {
-    Object.defineProperty(globalThis, 'TextEncoder', {
-      configurable: true,
-      writable: true,
-      value: NodeTextEncoder,
-    });
-    const NodeTD = NodeTextDecoder as unknown as typeof globalThis.TextDecoder;
-    Object.defineProperty(globalThis, 'TextDecoder', {
-      configurable: true,
-      writable: true,
-      value: NodeTD,
-    });
+  class CompatTextEncoder extends NodeTextEncoder {
+    encode(input?: Parameters<NodeTextEncoder['encode']>[0]): Uint8Array {
+      const result = super.encode(input);
+      return result instanceof Uint8Array ? result : new Uint8Array(result);
+    }
   }
+
+  const CompatTextDecoder = NodeTextDecoder as unknown as typeof globalThis.TextDecoder;
+
+  Object.defineProperty(globalThis, 'TextEncoder', {
+    configurable: true,
+    writable: true,
+    value: CompatTextEncoder as unknown as typeof globalThis.TextEncoder,
+  });
+
+  Object.defineProperty(globalThis, 'TextDecoder', {
+    configurable: true,
+    writable: true,
+    value: CompatTextDecoder,
+  });
 })();
 
 beforeAll(() => {
