@@ -10,11 +10,18 @@ import type { StaticMappingPayload } from '@/services/mapping.service';
 import { MappingService, type ResolvedMapping } from '@/services/mapping.service';
 import { createError, ErrorCode } from '@/utils/error-handling';
 import * as matching from '@/utils/matching';
-import { defaultSonarrCredentials, testServer, createStaticMappingHandler } from '@/testing';
+import {
+  defaultSonarrCredentials,
+  testServer,
+  createStaticMappingHandler,
+  createSonarrLookupHandler,
+  withLatency,
+} from '@/testing';
 import type { ExtensionOptions } from '@/types';
 import { http, HttpResponse } from 'msw';
 import { primaryMappingUrl } from '@/testing/fixtures/mappings';
 import { extensionOptions } from '@/utils/storage';
+import type { SonarrLookupSeries } from '@/types';
 
 type CacheStub<T> = TtlCache<T> & {
   read: ReturnType<typeof vi.fn>;
@@ -29,6 +36,16 @@ function createCacheStub<T>(): CacheStub<T> {
   const remove = vi.fn(async (_key: string) => {});
   const clear = vi.fn(async () => {});
   return { read, write, remove, clear } as unknown as CacheStub<T>;
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 const baseOptions: ExtensionOptions = {
@@ -75,6 +92,179 @@ describe('MappingService', () => {
     new MappingService(sonarrApi, anilistApi, caches, {
       delay: overrides?.delay ?? (async () => {}),
     });
+
+  it('processQueue batches requests and waits between batches respecting the batch delay', async () => {
+    const delayCalls: number[] = [];
+    const delayResolvers: Array<ReturnType<typeof createDeferred<void>>> = [];
+    const service = createService({
+      delay: async ms => {
+        delayCalls.push(ms);
+        const deferred = createDeferred<void>();
+        delayResolvers.push(deferred);
+        return deferred.promise;
+      },
+    });
+
+    const lookupsById = new Map<number, ReturnType<typeof createDeferred<SonarrLookupSeries[]>>>();
+    const lookupOrder: number[] = [];
+    let active = 0;
+    let maxActive = 0;
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async term => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      const deferred = createDeferred<SonarrLookupSeries[]>();
+      const idMatch = term.match(/Series (\d+)/);
+      if (!idMatch) {
+        throw new Error(`Unexpected lookup term: ${term}`);
+      }
+      const parsedId = Number(idMatch[1]);
+      lookupOrder.push(parsedId);
+      lookupsById.set(parsedId, deferred);
+      const results = await deferred.promise;
+      active -= 1;
+      return results;
+    });
+
+    (anilistApi.fetchMediaWithRelations as ReturnType<typeof vi.fn>).mockImplementation(async (id: number) => ({
+      id,
+      format: 'TV',
+      title: { english: `Series ${id}`, romaji: `Series ${id}` },
+      synonyms: [],
+      startDate: { year: 2020 },
+      relations: { edges: [] },
+    }) as AniMedia);
+
+    const scoreSpy = vi.spyOn(matching, 'computeTitleMatchScore').mockImplementation(() => 0.9);
+
+    const waitUntil = async (predicate: () => boolean, timeoutMs = 500) => {
+      const timeoutAt = Date.now() + timeoutMs;
+      while (!predicate()) {
+        if (Date.now() > timeoutAt) {
+          throw new Error(`Timed out waiting for condition; lookupOrder=${JSON.stringify(lookupOrder)}`);
+        }
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    };
+
+    const requests = [1, 2, 3, 4, 5].map(id => service.resolveTvdbId(id));
+    await waitUntil(() => lookupOrder.length >= 1);
+
+    expect(maxActive).toBeGreaterThanOrEqual(1);
+
+    const resolveLookupForId = (id: number, index: number) => {
+      const deferred = lookupsById.get(id);
+      if (!deferred) throw new Error(`Missing lookup entry for id ${id}`);
+      lookupsById.delete(id);
+      deferred.resolve([
+        {
+          tvdbId: 5000 + index,
+          title: `Series ${id}`,
+          year: 2020,
+          genres: ['Anime'],
+        },
+      ]);
+    };
+
+    resolveLookupForId(1, 0);
+    await waitUntil(() => delayCalls.length === 1);
+    expect(delayCalls).toEqual([1500]);
+    expect(delayResolvers).toHaveLength(1);
+    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+
+    delayResolvers[0].resolve();
+    await waitUntil(() => lookupOrder.length >= 4);
+    await waitUntil(() => lookupsById.has(2));
+    await waitUntil(() => lookupsById.has(3));
+    await waitUntil(() => lookupsById.has(4));
+
+    resolveLookupForId(2, 1);
+    resolveLookupForId(3, 2);
+    resolveLookupForId(4, 3);
+
+    await waitUntil(() => delayCalls.length === 2);
+    expect(delayCalls).toEqual([1500, 1500]);
+    expect(delayResolvers).toHaveLength(2);
+    delayResolvers[1].resolve();
+
+    await waitUntil(() => lookupOrder.length >= 5);
+    await waitUntil(() => lookupsById.has(5));
+
+    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(5);
+    resolveLookupForId(5, 4);
+
+    const results = await Promise.all(requests);
+    expect(results).toHaveLength(5);
+    expect(new Set(results.map(result => result.tvdbId)).size).toBe(5);
+
+    scoreSpy.mockRestore();
+  });
+
+  it('honors MSW withLatency delays before resolving Sonarr lookups', async () => {
+    vi.useFakeTimers();
+    const latencyMs = 320;
+
+    const sonarrCalls: string[] = [];
+    testServer.use(
+      createSonarrLookupHandler({
+        results: [
+          {
+            tvdbId: 9100,
+            title: 'Latency Check',
+            year: 2020,
+            genres: ['Anime'],
+          },
+        ],
+        ...withLatency(latencyMs),
+      }),
+    );
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async (term, credentials) => {
+      sonarrCalls.push(term);
+      const encoded = encodeURIComponent(term);
+      const response = await fetch(
+        `${credentials.url.replace(/\/$/, '')}/api/v3/series/lookup?term=${encoded}`,
+      );
+      if (!response.ok) {
+        throw createError(ErrorCode.NETWORK_ERROR, `Lookup failed (${response.status})`, 'Lookup failed');
+      }
+      return (await response.json()) as SonarrLookupSeries[];
+    });
+
+    (anilistApi.fetchMediaWithRelations as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 910,
+      format: 'TV',
+      title: { english: 'Latency Check', romaji: 'Latency Check' },
+      synonyms: [],
+      startDate: { year: 2020 },
+      relations: { edges: [] },
+    } as AniMedia);
+
+    const scoreSpy = vi.spyOn(matching, 'computeTitleMatchScore').mockImplementation(() => 0.9);
+
+    try {
+      const service = createService();
+      const promise = service.resolveTvdbId(910);
+
+      let settled = false;
+      promise.then(() => {
+        settled = true;
+      });
+
+      await Promise.resolve();
+      expect(settled).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(latencyMs);
+      const result = await promise;
+
+      expect(result).toEqual({ tvdbId: 9100, successfulSynonym: 'Latency Check' });
+      expect(sonarrCalls).toEqual(['Latency Check']);
+    } finally {
+      scoreSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
 
   it('returns cached mapping without hitting APIs when success cache hits', async () => {
     const cached: CacheHit<ResolvedMapping> = {
@@ -150,6 +340,38 @@ describe('MappingService', () => {
       hardMs: 180 * 24 * 60 * 60 * 1000,
     });
     expect(anilistApi.fetchMediaWithRelations).not.toHaveBeenCalled();
+    expect(sonarrApi.lookupSeriesByTerm).not.toHaveBeenCalled();
+  });
+
+  it('hydrates fallback static mappings when the primary table lacks a match', async () => {
+    caches.staticPrimary.read.mockResolvedValue({
+      value: { pairs: {} },
+      stale: false,
+      staleAt: Date.now() + 1,
+      expiresAt: Date.now() + 2,
+    });
+    caches.staticFallback.read.mockResolvedValue({
+      value: { pairs: { 888: 444 } },
+      stale: false,
+      staleAt: Date.now() + 1,
+      expiresAt: Date.now() + 2,
+    });
+
+    testServer.use(
+      createStaticMappingHandler('primary', { body: { pairs: {} } }),
+      createStaticMappingHandler('fallback', { body: { pairs: { 888: 444 } } }),
+    );
+
+    const service = createService();
+    await service.initStaticPairs();
+
+    const result = await service.resolveTvdbId(888);
+
+    expect(result).toEqual({ tvdbId: 444 });
+    expect(caches.success.write).toHaveBeenCalledWith('resolved:888', { tvdbId: 444 }, {
+      staleMs: 30 * 24 * 60 * 60 * 1000,
+      hardMs: 180 * 24 * 60 * 60 * 1000,
+    });
     expect(sonarrApi.lookupSeriesByTerm).not.toHaveBeenCalled();
   });
 
@@ -231,7 +453,7 @@ describe('MappingService', () => {
   });
 
 
-  it('skips failure caching for validation errors but caches network errors with shorter TTLs', async () => {
+  it('skips failure caching for validation errors but caches network and configuration errors with TTLs', async () => {
     const validationError = createError(ErrorCode.VALIDATION_ERROR, 'invalid', 'Invalid');
     (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockRejectedValue(validationError);
     (anilistApi.fetchMediaWithRelations as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -259,6 +481,111 @@ describe('MappingService', () => {
       staleMs: 5 * 60 * 1000,
       hardMs: 15 * 60 * 1000,
     });
+
+    const configError = createError(ErrorCode.CONFIGURATION_ERROR, 'config', 'Config');
+    lookupMock.mockReset();
+    lookupMock.mockRejectedValue(configError);
+
+    await expect(service.resolveTvdbId(44)).rejects.toEqual(configError);
+    expect(caches.failure.write).toHaveBeenCalledTimes(2);
+    expect(caches.failure.write).toHaveBeenLastCalledWith('resolved-failure:44', configError, {
+      staleMs: 30 * 60 * 1000,
+      hardMs: 60 * 60 * 1000,
+    });
+  });
+
+  it('bypasses cached failures when ignoreFailureCache is true and performs a fresh Sonarr lookup', async () => {
+    const cachedError = createError(ErrorCode.NETWORK_ERROR, 'cached', 'Cached');
+    caches.failure.read.mockResolvedValue({
+      value: cachedError,
+      stale: false,
+      staleAt: Date.now() + 1,
+      expiresAt: Date.now() + 2,
+    });
+
+    const service = createService();
+
+    await expect(service.resolveTvdbId(501)).rejects.toEqual(cachedError);
+    expect(caches.failure.read).toHaveBeenCalledTimes(1);
+
+    caches.failure.read.mockReset();
+    caches.failure.read.mockImplementation(async () => {
+      throw new Error('failure cache should have been bypassed');
+    });
+
+    const sonarrCalls: string[] = [];
+    testServer.use(
+      createSonarrLookupHandler({
+        results: [
+          {
+            tvdbId: 9501,
+            title: 'Fresh Hit',
+            year: 2021,
+            genres: ['Anime'],
+          },
+        ],
+        ...withLatency(25),
+      }),
+    );
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async (term, credentials) => {
+      sonarrCalls.push(term);
+      const encoded = encodeURIComponent(term);
+      const response = await fetch(
+        `${credentials.url.replace(/\/$/, '')}/api/v3/series/lookup?term=${encoded}`,
+      );
+      if (!response.ok) {
+        throw createError(ErrorCode.NETWORK_ERROR, `Lookup failed (${response.status})`, 'Lookup failed');
+      }
+      return (await response.json()) as SonarrLookupSeries[];
+    });
+
+    (anilistApi.fetchMediaWithRelations as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 501,
+      format: 'TV',
+      title: { english: 'Fresh Hit', romaji: 'Fresh Hit' },
+      synonyms: [],
+      startDate: { year: 2021 },
+      relations: { edges: [] },
+    } as AniMedia);
+
+    const scoreSpy = vi.spyOn(matching, 'computeTitleMatchScore').mockImplementation(() => 0.9);
+
+    const result = await service.resolveTvdbId(501, { ignoreFailureCache: true });
+
+    expect(result).toEqual({ tvdbId: 9501, successfulSynonym: 'Fresh Hit' });
+    expect(sonarrCalls).toEqual(['Fresh Hit']);
+    expect(caches.failure.write).not.toHaveBeenCalled();
+
+    scoreSpy.mockRestore();
+  });
+
+  it('short-circuits network resolution when a hint lookup succeeds', async () => {
+    const scoreSpy = vi.spyOn(matching, 'computeTitleMatchScore').mockImplementation(() => 0.9);
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async term => {
+      expect(term).toBe('Hint Title');
+      return [
+        {
+          tvdbId: 6400,
+          title: term,
+          year: 2020,
+          genres: ['Anime'],
+        },
+      ];
+    });
+
+    const service = createService();
+
+    const result = await service.resolveTvdbId(640, { hints: { primaryTitle: 'Hint Title' } });
+
+    expect(result).toEqual({ tvdbId: 6400, successfulSynonym: 'Hint Title' });
+    expect(caches.success.write).toHaveBeenCalledWith('resolved:640', { tvdbId: 6400, successfulSynonym: 'Hint Title' }, {
+      staleMs: 30 * 24 * 60 * 60 * 1000,
+      hardMs: 180 * 24 * 60 * 60 * 1000,
+    });
+    expect(anilistApi.fetchMediaWithRelations).not.toHaveBeenCalled();
+
+    scoreSpy.mockRestore();
   });
 
   it('throws when network access disabled and no static mapping exists', async () => {
@@ -298,5 +625,103 @@ describe('MappingService', () => {
     expect(ifNoneMatchHeaders).toContain(etag);
     expect(result).toEqual({ tvdbId: 333 });
     expect(caches.staticPrimary.write).not.toHaveBeenCalled();
+  });
+
+  it('traverses prequel relations to reuse static mappings', async () => {
+    const deepPrequel: AniMedia = {
+      id: 110,
+      format: 'TV',
+      title: { english: 'Deep Prequel', romaji: 'Deep Prequel' },
+      synonyms: [],
+      startDate: { year: 2005 },
+      relations: { edges: [] },
+    } as AniMedia;
+
+    const midPrequel: AniMedia = {
+      id: 120,
+      format: 'TV',
+      title: { english: 'Mid Prequel', romaji: 'Mid Prequel' },
+      synonyms: [],
+      startDate: { year: 2010 },
+      relations: { edges: [{ relationType: 'PREQUEL', node: deepPrequel }] },
+    } as AniMedia;
+
+    const root: AniMedia = {
+      id: 130,
+      format: 'TV',
+      title: { english: 'Root Series', romaji: 'Root Series' },
+      synonyms: [],
+      startDate: { year: 2015 },
+      relations: { edges: [{ relationType: 'PREQUEL', node: midPrequel }] },
+    } as AniMedia;
+
+    caches.staticPrimary.read.mockResolvedValue({
+      value: { pairs: { 110: 4110 } },
+      stale: false,
+      staleAt: Date.now() + 1,
+      expiresAt: Date.now() + 2,
+    });
+    caches.staticFallback.read.mockResolvedValue({
+      value: { pairs: {} },
+      stale: false,
+      staleAt: Date.now() + 1,
+      expiresAt: Date.now() + 2,
+    });
+
+    (anilistApi.fetchMediaWithRelations as ReturnType<typeof vi.fn>).mockResolvedValue(root);
+
+    const service = createService();
+    await service.initStaticPairs();
+
+    const result = await service.resolveTvdbId(130);
+
+    expect(result).toEqual({ tvdbId: 4110 });
+    expect(sonarrApi.lookupSeriesByTerm).not.toHaveBeenCalled();
+  });
+
+  it('returns the synonym responsible for the winning Sonarr score', async () => {
+    const scoreSpy = vi
+      .spyOn(matching, 'computeTitleMatchScore')
+      .mockImplementation(params => (params.queryRaw.includes('Secondary') ? 0.88 : 0.7));
+
+    testServer.use(
+      createSonarrLookupHandler({
+        results: [
+          {
+            tvdbId: 9777,
+            title: 'Secondary Title',
+            year: 2020,
+            genres: ['Anime'],
+          },
+        ],
+      }),
+    );
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async (term, credentials) => {
+      const encoded = encodeURIComponent(term);
+      const response = await fetch(
+        `${credentials.url.replace(/\/$/, '')}/api/v3/series/lookup?term=${encoded}`,
+      );
+      if (!response.ok) {
+        throw createError(ErrorCode.NETWORK_ERROR, `Lookup failed (${response.status})`, 'Lookup failed');
+      }
+      return (await response.json()) as SonarrLookupSeries[];
+    });
+
+    (anilistApi.fetchMediaWithRelations as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 977,
+      format: 'TV',
+      title: { english: 'Primary Title', romaji: 'Primary Title' },
+      synonyms: ['Secondary Title'],
+      startDate: { year: 2020 },
+      relations: { edges: [] },
+    } as AniMedia);
+
+    const service = createService();
+    const result = await service.resolveTvdbId(977);
+
+    expect(result).toEqual({ tvdbId: 9777, successfulSynonym: 'Secondary Title' });
+
+    scoreSpy.mockRestore();
   });
 });
