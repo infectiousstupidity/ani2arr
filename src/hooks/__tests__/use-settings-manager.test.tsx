@@ -29,7 +29,7 @@ vi.mock('@/utils/validation', () => {
   };
 });
 
-vi.mock('@/utils/storage', () => {
+const storageMocks = vi.hoisted(() => {
   type ExtensionOptions = import('@/types').ExtensionOptions;
   type Listener = (value: ExtensionOptions | undefined) => void;
 
@@ -66,7 +66,7 @@ vi.mock('@/utils/storage', () => {
     getValue,
     setValue,
     watch,
-  };
+  } satisfies Record<string, unknown>;
 
   const setMockExtensionOptionsValue = (value: ExtensionOptions | undefined) => {
     currentValue = value;
@@ -90,7 +90,12 @@ vi.mock('@/utils/storage', () => {
   };
 });
 
-vi.mock('@/services', () => {
+vi.mock('@/utils/storage', () => storageMocks);
+
+const { setMockExtensionOptionsValue, pushMockExtensionOptionsUpdate, resetMockExtensionOptions } =
+  storageMocks;
+
+const serviceMocks = vi.hoisted(() => {
   type SonarrCredentialsPayload = import('@/types').SonarrCredentialsPayload;
 
   const defaultSonarrUrl = 'https://sonarr.test';
@@ -118,7 +123,7 @@ vi.mock('@/services', () => {
     testConnection,
     notifySettingsChanged,
     getSonarrMetadata,
-  };
+  } satisfies Record<string, unknown>;
 
   const resetKitsunarrApiMock = () => {
     testConnection.mockReset();
@@ -137,8 +142,12 @@ vi.mock('@/services', () => {
   };
 });
 
-import { useSettingsManager } from './use-settings-manager';
-import { queryKeys } from './use-api-queries';
+vi.mock('@/services', () => serviceMocks);
+
+const { kitsunarrApiMock, resetKitsunarrApiMock } = serviceMocks;
+
+import { useSettingsManager } from '../use-settings-manager';
+import { queryKeys } from '../use-api-queries';
 import { createSonarrQualityProfileFixture, createSonarrRootFolderFixture } from '@/testing/fixtures/sonarr';
 import {
   createSonarrQualityProfileHandler,
@@ -147,13 +156,7 @@ import {
 } from '@/testing/msw-server';
 import { testServer } from '@/testing';
 import type { ExtensionOptions, SonarrFormState, SonarrQualityProfile, SonarrRootFolder } from '@/types';
-import { kitsunarrApiMock, resetKitsunarrApiMock } from '@/services';
-import {
-  extensionOptions,
-  setMockExtensionOptionsValue,
-  pushMockExtensionOptionsUpdate,
-  resetMockExtensionOptions,
-} from '@/utils/storage';
+import { extensionOptions } from '@/utils/storage';
 import { requestSonarrPermission, validateApiKey, validateUrl } from '@/utils/validation';
 
 const validateUrlMock = vi.mocked(validateUrl);
@@ -171,12 +174,16 @@ const createDefaults = (overrides: Partial<SonarrFormState> = {}): SonarrFormSta
   ...overrides,
 });
 
-const createOptions = (overrides: Partial<ExtensionOptions> = {}): ExtensionOptions => ({
-  sonarrUrl: '',
-  sonarrApiKey: '',
-  defaults: createDefaults(overrides.defaults),
-  ...overrides,
-});
+const createOptions = (overrides: Partial<ExtensionOptions> = {}): ExtensionOptions => {
+  const mergedDefaults = createDefaults(overrides.defaults);
+
+  return {
+    sonarrUrl: '',
+    sonarrApiKey: '',
+    ...overrides,
+    defaults: mergedDefaults,
+  };
+};
 
 const validUrl = 'https://sonarr.test';
 const validApiKey = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -437,13 +444,11 @@ describe('useSettingsManager', () => {
     });
 
     await waitFor(() => expect(kitsunarrApiMock.testConnection).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(extensionOptions.setValue).toHaveBeenCalledWith({
-        sonarrUrl: validUrl,
-        sonarrApiKey: validApiKey,
-        defaults: createDefaults(),
-      }),
-    );
+    await waitFor(() => expect(extensionOptions.setValue).toHaveBeenCalledWith({
+      sonarrUrl: validUrl,
+      sonarrApiKey: validApiKey,
+      defaults: createDefaults(),
+    }));
     await waitFor(() => expect(kitsunarrApiMock.notifySettingsChanged).toHaveBeenCalled());
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.options() }),
