@@ -12,6 +12,7 @@
 - `npm run build` produces a production bundle in `dist`; `npm run zip` creates distributable archives.
 - `npm run lint` uses ESLint 9 with TypeScript config; keep it passing.
 - Type-check with `npm run compile`; run targeted tests with `npx vitest` when suites are added.
+- `npm run test:contract` exercises the built background RPC contract against mocked Sonarr/AniList responses; it should stay green when services or schemas change.
 
 ## 3. Architecture Overview
 ### Entry points (`src/entrypoints`)
