@@ -12,6 +12,7 @@
 - `npm run build` produces a production bundle in `dist`; `npm run zip` creates distributable archives.
 - `npm run lint` uses ESLint 9 with TypeScript config; keep it passing.
 - Type-check with `npm run compile`; run targeted tests with `npx vitest` when suites are added.
+- `npm run test:contract` exercises the built background RPC contract against mocked Sonarr/AniList responses; it should stay green when services or schemas change.
 
 ## 3. Architecture Overview
 ### Entry points (`src/entrypoints`)
@@ -82,7 +83,7 @@
 - Keep AGENTS.md in sync when adding core flows or changing service contracts so future agents stay aligned.
 
 ## 11. Testing Conventions
-- Vitest is configured via `vitest.setup.ts` to install `whatwg-fetch`, apply the `fakeBrowser` shim, and bootstrap MSW. Avoid redefining globals—rely on the shared setup instead.
+- Vitest is configured via `vitest.setup.jsdom.ts` `vitest.setup.node.ts, apply the `
 - Import fixtures and MSW helpers from `@/testing`. `defaultTestHandlers` cover AniList, Sonarr, and mapping mirrors with typed data; tweak responses using helpers like `withLatency`, `withStatus`, `withEtag`, and `withRetryAfterSeconds`.
 - Prefer MSW over manual `fetch` mocks so retry/backoff utilities exercise real timing. Reset handlers with `testServer.resetHandlers()` (already done in the global `afterEach`).
 - When mocking modules, use `vi.mock` inside test files and let `vitest.setup.ts` handle cleanup (`vi.resetModules`, `vi.clearAllMocks`). Avoid mutating `fakeBrowser` directly—call `fakeBrowser.reset()` or storage/runtime reset helpers between assertions if additional isolation is required.
