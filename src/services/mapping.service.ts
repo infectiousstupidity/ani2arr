@@ -55,6 +55,10 @@ type QueuedMappingRequest = {
   bypassFailureCache: boolean;
 };
 
+type MappingServiceOptions = {
+  delay?: (ms: number) => Promise<void>;
+};
+
 export interface StaticMappingPayload {
   pairs: Record<number, number>;
 }
@@ -71,6 +75,7 @@ export class MappingService {
   private readonly inflight = new Map<number, InflightResolution>();
   private readonly mappingQueue: QueuedMappingRequest[] = [];
   private isProcessingMappingQueue = false;
+  private readonly delayFn: (ms: number) => Promise<void>;
 
   constructor(
     private readonly sonarrApi: SonarrApiService,
@@ -81,7 +86,10 @@ export class MappingService {
       staticPrimary: TtlCache<StaticMappingPayload>;
       staticFallback: TtlCache<StaticMappingPayload>;
     },
-  ) {}
+    options: MappingServiceOptions = {},
+  ) {
+    this.delayFn = options.delay ?? ((ms: number) => new Promise(resolve => setTimeout(resolve, ms)));
+  }
 
   public async initStaticPairs(): Promise<void> {
     await Promise.all([this.ensureMapLoaded('primary'), this.ensureMapLoaded('fallback')]);
@@ -539,7 +547,7 @@ export class MappingService {
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return this.delayFn(ms);
   }
 }
 
