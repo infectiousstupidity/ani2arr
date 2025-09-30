@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi, type SpyInstance } from 'vitest';
+// src/services/__tests__/library.service.test.ts
+import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
+import type { MockInstance } from 'vitest';
 import { LibraryService } from '@/services/library.service';
 import type { LeanSonarrSeries, SonarrSeries, ExtensionOptions, CheckSeriesStatusResponse } from '@/types';
 import type { CacheHit, TtlCache } from '@/cache';
@@ -90,8 +92,8 @@ describe('LibraryService', () => {
   let sonarrClient: SonarrClientMock;
   let mappingService: MappingMock;
   let service: LibraryService;
-  let optionsSpy: SpyInstance;
-  let logErrorSpy: SpyInstance;
+  let optionsSpy: MockInstance;
+  let logErrorSpy: MockInstance;
 
   beforeEach(() => {
     cache = createCacheMock();
@@ -122,7 +124,9 @@ describe('LibraryService', () => {
     it('clears the cache and resets the TVDB index when Sonarr is unconfigured', async () => {
       const fallback = [createLeanSeries({ tvdbId: 5, id: 5 })];
       cache.read.mockResolvedValueOnce(createCacheHit(fallback));
-      optionsSpy.mockResolvedValueOnce({ ...BASE_OPTIONS, sonarrUrl: '', sonarrApiKey: '' });
+      const unconfigured = { ...BASE_OPTIONS, sonarrUrl: '', sonarrApiKey: '' } as const;
+      optionsSpy.mockResolvedValueOnce(unconfigured);
+      optionsSpy.mockResolvedValueOnce(unconfigured);
 
       setPrivate(service, 'tvdbSet', new Set([123]));
 
@@ -253,7 +257,9 @@ describe('LibraryService', () => {
     const mappingResult = { tvdbId: 321, successfulSynonym: 'Alt Title' } as const;
 
     it('returns a missing-link response when mapping throws configuration or validation errors', async () => {
-      optionsSpy.mockResolvedValueOnce({ ...BASE_OPTIONS, sonarrUrl: '', sonarrApiKey: '' });
+      const unconfigured = { ...BASE_OPTIONS, sonarrUrl: '', sonarrApiKey: '' } as const;
+      optionsSpy.mockResolvedValueOnce(unconfigured);
+      optionsSpy.mockResolvedValueOnce(unconfigured);
       const configurationError = createError(
         ErrorCode.CONFIGURATION_ERROR,
         'config missing',
