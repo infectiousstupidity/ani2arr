@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { PropsWithChildren } from 'react';
@@ -66,7 +66,7 @@ vi.mock('@/utils/storage', () => {
     getValue,
     setValue,
     watch,
-  } satisfies Record<string, unknown>;
+  };
 
   const setMockExtensionOptionsValue = (value: ExtensionOptions | undefined) => {
     currentValue = value;
@@ -437,11 +437,13 @@ describe('useSettingsManager', () => {
     });
 
     await waitFor(() => expect(kitsunarrApiMock.testConnection).toHaveBeenCalled());
-    await waitFor(() => expect(extensionOptions.setValue).toHaveBeenCalledWith({
-      sonarrUrl: validUrl,
-      sonarrApiKey: validApiKey,
-      defaults: createDefaults(),
-    }));
+    await waitFor(() =>
+      expect(extensionOptions.setValue).toHaveBeenCalledWith({
+        sonarrUrl: validUrl,
+        sonarrApiKey: validApiKey,
+        defaults: createDefaults(),
+      }),
+    );
     await waitFor(() => expect(kitsunarrApiMock.notifySettingsChanged).toHaveBeenCalled());
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.options() }),
