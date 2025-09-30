@@ -137,6 +137,34 @@ describe('LibraryService', () => {
       expect(getPrivate<Set<number>>(service, 'tvdbSet').size).toBe(0);
     });
 
+    it('uses provided options overrides without reading extension storage', async () => {
+      cache.read.mockResolvedValueOnce(null);
+      const override: ExtensionOptions = {
+        ...BASE_OPTIONS,
+        sonarrUrl: 'https://override.local',
+        sonarrApiKey: 'override-key',
+      };
+      const fullList = [
+        createSonarrSeries({ id: 22, tvdbId: 999, titleSlug: 'override-slug' }),
+      ];
+      sonarrClient.getAllSeries.mockResolvedValueOnce(fullList);
+      optionsSpy.mockClear();
+
+      const result = await service.refreshCache(override);
+
+      expect(optionsSpy).not.toHaveBeenCalled();
+      expect(sonarrClient.getAllSeries).toHaveBeenCalledWith({
+        url: override.sonarrUrl,
+        apiKey: override.sonarrApiKey,
+      });
+      expect(cache.write).toHaveBeenCalledWith(
+        'sonarr:lean-series',
+        [{ tvdbId: 999, id: 22, titleSlug: 'override-slug' }],
+        STANDARD_TTL,
+      );
+      expect(result).toEqual([{ tvdbId: 999, id: 22, titleSlug: 'override-slug' }]);
+    });
+
     it('persists lean entries with standard TTLs when Sonarr returns data', async () => {
       cache.read.mockResolvedValueOnce(null);
       const fullList = [
@@ -185,6 +213,81 @@ describe('LibraryService', () => {
       );
       expect(logErrorSpy).toHaveBeenCalledWith(failure, 'LibraryService:refreshCache');
       expect(getPrivate<Set<number>>(service, 'tvdbSet')).toEqual(new Set([9]));
+    });
+  });
+
+  describe('getLeanSeriesList', () => {
+    it('returns stale cache entries while kicking off a single background refresh', async () => {
+      const cached = [createLeanSeries({ tvdbId: 7, id: 7, titleSlug: 'stale' })];
+      const cacheHit = createCacheHit(cached, { stale: true });
+      cache.read.mockResolvedValueOnce(cacheHit);
+      cache.read.mockResolvedValueOnce(cacheHit);
+      cache.read.mockResolvedValueOnce(cacheHit);
+
+      const deferred: {
+        promise: Promise<SonarrSeries[]>;
+        resolve: (value: SonarrSeries[]) => void;
+        reject: (reason?: unknown) => void;
+      } = (() => {
+        let resolve: (value: SonarrSeries[]) => void = () => {};
+        let reject: (reason?: unknown) => void = () => {};
+        const promise = new Promise<SonarrSeries[]>((res, rej) => {
+          resolve = res;
+          reject = rej;
+        });
+        return { promise, resolve, reject };
+      })();
+
+      sonarrClient.getAllSeries.mockReturnValueOnce(deferred.promise);
+
+      const firstResult = await service.getLeanSeriesList();
+      expect(firstResult).toEqual(cached);
+
+      const firstInflight = getPrivate<Promise<LeanSonarrSeries[]> | null>(service, 'inflightRefresh');
+      expect(firstInflight).toBeInstanceOf(Promise);
+
+      const secondResult = await service.getLeanSeriesList();
+      expect(secondResult).toEqual(cached);
+      const secondInflight = getPrivate<Promise<LeanSonarrSeries[]> | null>(service, 'inflightRefresh');
+      expect(secondInflight).toBe(firstInflight);
+      expect(sonarrClient.getAllSeries).toHaveBeenCalledTimes(1);
+
+      deferred.resolve([
+        createSonarrSeries({ id: 20, tvdbId: 800, titleSlug: 'fresh' }),
+      ]);
+      await firstInflight!;
+
+      expect(cache.write).toHaveBeenCalledWith(
+        'sonarr:lean-series',
+        [{ tvdbId: 800, id: 20, titleSlug: 'fresh' }],
+        STANDARD_TTL,
+      );
+    });
+
+    it('resets the tvdb index when a stale refresh finds Sonarr unconfigured', async () => {
+      const cached = [createLeanSeries({ tvdbId: 9, id: 9, titleSlug: 'stale' })];
+      const cacheHit = createCacheHit(cached, { stale: true });
+      cache.read.mockResolvedValueOnce(cacheHit);
+      cache.read.mockResolvedValueOnce(cacheHit);
+
+      const unconfigured = { ...BASE_OPTIONS, sonarrUrl: '', sonarrApiKey: '' } as const;
+      optionsSpy.mockResolvedValue(unconfigured);
+
+      setPrivate(service, 'tvdbSet', new Set([111]));
+
+      const list = await service.getLeanSeriesList();
+      expect(list).toEqual(cached);
+
+      const inflight = getPrivate<Promise<LeanSonarrSeries[]> | null>(service, 'inflightRefresh');
+      if (inflight) {
+        await inflight;
+      } else {
+        await Promise.resolve();
+      }
+
+      expect(sonarrClient.getAllSeries).not.toHaveBeenCalled();
+      expect(cache.write).toHaveBeenCalledWith('sonarr:lean-series', [], STANDARD_TTL);
+      expect(getPrivate<Set<number>>(service, 'tvdbSet').size).toBe(0);
     });
   });
 
@@ -283,6 +386,20 @@ describe('LibraryService', () => {
       );
     });
 
+    it('returns a missing-link response when mapping throws validation errors', async () => {
+      cache.read.mockResolvedValueOnce(createCacheHit([]));
+      const validationError = createError(
+        ErrorCode.VALIDATION_ERROR,
+        'validation failed',
+        'Validation error',
+      );
+      mappingService.resolveTvdbId.mockRejectedValueOnce(validationError);
+
+      const response = await service.getSeriesStatus({ anilistId: 12, title: 'Title' });
+
+      expect(response).toEqual({ exists: false, tvdbId: null, anilistTvdbLinkMissing: true });
+    });
+
     it('returns cached series without hitting Sonarr when mapping resolves to an existing entry', async () => {
       const cached = createLeanSeries({ tvdbId: mappingResult.tvdbId, id: 999, titleSlug: 'cached' });
       cache.read.mockResolvedValueOnce(createCacheHit([cached]));
@@ -346,6 +463,27 @@ describe('LibraryService', () => {
 
       expect(cache.write).toHaveBeenCalledWith('sonarr:lean-series', [], STANDARD_TTL);
       expect(response).toEqual({ exists: false, tvdbId: 888 });
+    });
+
+    it('forwards ignoreFailureCache when force verifying Sonarr data', async () => {
+      cache.read.mockResolvedValueOnce(createCacheHit([]));
+      mappingService.resolveTvdbId.mockResolvedValueOnce({ tvdbId: 444 });
+      sonarrClient.getSeriesByTvdbId.mockResolvedValueOnce(null);
+
+      const response = await service.getSeriesStatus(
+        { anilistId: 44, title: 'Ignore Failures' },
+        { force_verify: true, ignoreFailureCache: true },
+      );
+
+      expect(mappingService.resolveTvdbId).toHaveBeenCalledWith(
+        44,
+        expect.objectContaining({ ignoreFailureCache: true }),
+      );
+      expect(sonarrClient.getSeriesByTvdbId).toHaveBeenCalledWith(444, {
+        url: BASE_OPTIONS.sonarrUrl,
+        apiKey: BASE_OPTIONS.sonarrApiKey,
+      });
+      expect(response).toEqual({ exists: false, tvdbId: 444 });
     });
   });
 });
