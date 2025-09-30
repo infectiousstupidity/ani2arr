@@ -184,7 +184,11 @@ describe('MappingService', () => {
       relations: { edges: [] },
     }) as AniMedia);
 
-    const service = createService();
+    const service = createService({
+      delay: async ms => {
+        lookupCalls.push(`__delay__${ms}`);
+      },
+    });
 
     const p1 = service.resolveTvdbId(1);
     const p1b = service.resolveTvdbId(1);
@@ -201,7 +205,29 @@ describe('MappingService', () => {
     expect(r3).toEqual({ tvdbId: 8003, successfulSynonym: 'Series 3 best' });
     expect(r4).toEqual({ tvdbId: 8004, successfulSynonym: 'Series 4 best' });
 
-    expect(lookupCalls.filter(term => term.includes('Series 4'))).not.toHaveLength(0);
+    const delayIndex = lookupCalls.findIndex(term => term.startsWith('__delay__'));
+    expect(delayIndex).toBeGreaterThanOrEqual(0);
+
+    const lookupsBySeries = lookupCalls
+      .map((term, index) => ({ term, index }))
+      .filter(entry => entry.term.startsWith('Series'));
+
+    const countsById = new Map<number, number>();
+    for (const { term } of lookupsBySeries) {
+      const id = Number(term.match(/Series (\d+)/)?.[1] ?? 0);
+      countsById.set(id, (countsById.get(id) ?? 0) + 1);
+    }
+
+    expect(countsById.get(1) ?? 0).toBeGreaterThanOrEqual(5);
+    expect(countsById.get(2) ?? 0).toBeGreaterThanOrEqual(5);
+    expect(countsById.get(3) ?? 0).toBeGreaterThanOrEqual(5);
+    expect(countsById.get(4) ?? 0).toBeGreaterThanOrEqual(5);
+
+    const series4Indices = lookupsBySeries
+      .filter(entry => entry.term.includes('Series 4'))
+      .map(entry => entry.index);
+    expect(series4Indices.length).toBeGreaterThan(0);
+    expect(Math.min(...series4Indices)).toBeGreaterThan(delayIndex);
   });
 
 
