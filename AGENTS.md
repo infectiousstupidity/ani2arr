@@ -81,3 +81,10 @@
 - Respect rate limits on AniList and Sonarr: batch lookups via `MappingService` queue rather than issuing parallel fetches.
 - Keep AGENTS.md in sync when adding core flows or changing service contracts so future agents stay aligned.
 
+## 11. Testing Conventions
+- Vitest is configured via `vitest.setup.ts` to install `whatwg-fetch`, apply the `fakeBrowser` shim, and bootstrap MSW. Avoid redefining globals—rely on the shared setup instead.
+- Import fixtures and MSW helpers from `@/testing`. `defaultTestHandlers` cover AniList, Sonarr, and mapping mirrors with typed data; tweak responses using helpers like `withLatency`, `withStatus`, `withEtag`, and `withRetryAfterSeconds`.
+- Prefer MSW over manual `fetch` mocks so retry/backoff utilities exercise real timing. Reset handlers with `testServer.resetHandlers()` (already done in the global `afterEach`).
+- When mocking modules, use `vi.mock` inside test files and let `vitest.setup.ts` handle cleanup (`vi.resetModules`, `vi.clearAllMocks`). Avoid mutating `fakeBrowser` directly—call `fakeBrowser.reset()` or storage/runtime reset helpers between assertions if additional isolation is required.
+- Store new fixtures under `src/testing/fixtures` to keep API payload shapes centralized.
+
