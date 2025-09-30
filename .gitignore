@@ -16,6 +16,8 @@ web-ext.config.ts
 .roo
 .roomodes
 .repomix
+playwright-report
+test-results
 
 # Editor directories and files
 .vscode/*
