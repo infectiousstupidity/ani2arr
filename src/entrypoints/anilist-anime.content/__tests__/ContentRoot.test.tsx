@@ -1,4 +1,3 @@
-import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
@@ -89,12 +88,9 @@ vi.mock('webextension-polyfill', () => ({
       },
     },
   },
-  __runtimeListeners: browserMocks.runtimeListeners,
-  __storageListeners: browserMocks.storageListeners,
-  __storageState: browserMocks.storageState,
 }));
 
-import browser, { __runtimeListeners, __storageListeners, __storageState } from 'webextension-polyfill';
+import browser from 'webextension-polyfill';
 
 const storageMocks = vi.hoisted(() => {
   const defaultOptions = {
@@ -111,7 +107,7 @@ const storageMocks = vi.hoisted(() => {
     },
   } satisfies import('@/types').ExtensionOptions;
 
-  let current = structuredClone(defaultOptions);
+  let current: import('@/types').ExtensionOptions = structuredClone(defaultOptions);
   const watchers = new Set<(value: import('@/types').ExtensionOptions) => void>();
 
   const setOptions = (next: import('@/types').ExtensionOptions) => {
@@ -158,7 +154,12 @@ vi.mock('@/utils/validation', async () => {
   };
 });
 
-const { extensionOptions, __resetMockOptions, __getMockDefaultOptions } = await import('@/utils/storage');
+const storageModule = await import('@/utils/storage');
+const extensionOptions = storageModule.extensionOptions;
+const { __resetMockOptions, __getMockDefaultOptions } = storageModule as typeof storageModule & {
+  __resetMockOptions: () => void;
+  __getMockDefaultOptions: () => import('@/types').ExtensionOptions;
+};
 
 import { ContentRoot } from '../index';
 import {
@@ -431,7 +432,11 @@ vi.mock('@/services', () => ({
   __getTestApiSpies: () => apiState.current.spies,
 }));
 
-import { __resetTestApi, __getTestApiSpies } from '@/services';
+const servicesModule = await import('@/services');
+const { __resetTestApi, __getTestApiSpies } = servicesModule as typeof servicesModule & {
+  __resetTestApi: () => void;
+  __getTestApiSpies: () => ReturnType<typeof createTestApi>['spies'];
+};
 
 const configuredOptions: ExtensionOptions = {
   sonarrUrl: defaultSonarrCredentials.url,
@@ -476,10 +481,10 @@ beforeEach(async () => {
   browserMocks.openOptionsPageMock.mockClear();
   browserMocks.storageLocalGetMock.mockClear();
   browserMocks.storageLocalSetMock.mockClear();
-  __runtimeListeners.clear();
-  __storageListeners.clear();
-  __storageState.libraryEpoch = 0;
-  __storageState.settingsEpoch = 0;
+  browserMocks.runtimeListeners.clear();
+  browserMocks.storageListeners.clear();
+  browserMocks.storageState.libraryEpoch = 0;
+  browserMocks.storageState.settingsEpoch = 0;
   resolvedMappingCache.clear();
   localSeriesCache.clear();
   staticMappingCache.clear();
@@ -545,13 +550,13 @@ describe('ContentRoot', () => {
     await user.click(gearButton);
 
     const dialog = await screen.findByRole('dialog');
-    expect(dialog).toBeInTheDocument();
+    expect(dialog).toBeInstanceOf(HTMLElement);
 
     const closeButton = await screen.findByRole('button', { name: 'Close' });
     await user.click(closeButton);
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).toBeNull();
     });
   });
 
@@ -562,7 +567,7 @@ describe('ContentRoot', () => {
     testServer.use(
       createStaticMappingHandler('primary', { body: createStaticMappingPayload({}) }),
       createStaticMappingHandler('fallback', { body: createStaticMappingPayload({}) }),
-      createAniListHandlers({ media: createAniMediaFixture({ id: 9999, synonyms: [] }) }),
+      ...createAniListHandlers({ media: createAniMediaFixture({ id: 9999, synonyms: [] }) }),
       createSonarrLookupHandler({ results: [] }),
       createSonarrSeriesHandler({ series: [] }),
     );
@@ -570,7 +575,7 @@ describe('ContentRoot', () => {
     renderContentRoot({ anilistId: 9999, title: 'Unmapped Series' });
 
     const button = await screen.findByRole('button', { name: 'Cannot add' });
-    expect(button).toBeDisabled();
+    expect((button as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('refetches status queries when a Kitsunarr broadcast is received', async () => {
@@ -599,7 +604,7 @@ describe('ContentRoot', () => {
     testServer.use(
       createStaticMappingHandler('primary', { body: createStaticMappingPayload({}) }),
       createStaticMappingHandler('fallback', { body: createStaticMappingPayload({}) }),
-      createAniListHandlers({
+      ...createAniListHandlers({
         media: createAniMediaFixture({ id: 24680, synonyms: ['Custom Synonym'] }),
       }),
       createSonarrLookupHandler({
@@ -611,8 +616,7 @@ describe('ContentRoot', () => {
     renderContentRoot({ anilistId: 24680, title: 'Search Title' });
 
     const link = await screen.findByRole('link');
-    expect(link).toHaveAttribute(
-      'href',
+    expect(link.getAttribute('href')).toBe(
       `${configuredOptions.sonarrUrl.replace(/\/$/, '')}/add/new?term=${encodeURIComponent('Custom Synonym')}`,
     );
   });
