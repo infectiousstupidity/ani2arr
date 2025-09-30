@@ -119,6 +119,28 @@ describe('useTheme', () => {
     expect(host.classList.contains('dark')).toBe(false);
   });
 
+  it('uses AniChart data-theme attributes when class hints are missing', () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('https://anichart.net'),
+    });
+
+    document.body.dataset.theme = 'dark-mode';
+
+    const { host, container } = createHost();
+
+    render(<TestComponent />, { container });
+
+    expect(host.classList.contains('dark')).toBe(true);
+
+    expect(mutationObservers).toHaveLength(1);
+    const observer = mutationObservers[0];
+
+    document.body.dataset.theme = 'light-mode';
+    observer.trigger();
+    expect(host.classList.contains('dark')).toBe(false);
+  });
+
   it('hooks up matchMedia listeners for AniChart host and cleans up', () => {
     Object.defineProperty(window, 'location', {
       configurable: true,
@@ -165,6 +187,10 @@ describe('useTheme', () => {
     mediaQueryListeners.change?.({ matches: true } as MediaQueryListEvent);
     expect(host.classList.contains('dark')).toBe(true);
 
+    mediaQueryList.matches = false;
+    mediaQueryListeners.change?.({ matches: false } as MediaQueryListEvent);
+    expect(host.classList.contains('dark')).toBe(false);
+
     expect(mutationObservers).toHaveLength(1);
     const observer = mutationObservers[0];
     expect(observer.observe).toHaveBeenCalledWith(document.body, {
@@ -173,7 +199,8 @@ describe('useTheme', () => {
     });
 
     unmount();
-    expect(observer.disconnect).toHaveBeenCalled();
+    expect(observer.disconnect).toHaveBeenCalledTimes(1);
     expect(mediaQueryList.removeEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+    expect(mediaQueryList.removeEventListener).toHaveBeenCalledTimes(1);
   });
 });
