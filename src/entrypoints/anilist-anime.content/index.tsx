@@ -341,6 +341,15 @@ export default defineContentScript({
 
 });
 
+export {
+  waitForElement,
+  ensureActionsAnchor,
+  startAnchorKeeper,
+  ensureSidebarSpacer,
+  syncSidebarOffset,
+  attachSizeSync,
+};
+
 
 
 
