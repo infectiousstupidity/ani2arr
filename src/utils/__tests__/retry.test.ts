@@ -69,10 +69,12 @@ describe('retryWithBackoff', () => {
     const fn = vi.fn().mockRejectedValue(error);
 
     const promise = retryWithBackoff(fn, { maxRetries: 2, baseDelay: 60 });
+    const result = promise.catch((caughtError) => caughtError);
 
     await vi.runAllTimersAsync();
 
     await expect(promise).rejects.toBe(error);
+    await expect(result).resolves.toBe(error);
     expect(fn).toHaveBeenCalledTimes(2);
   });
 });
