@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 
 import { useTheme } from '../use-theme';
 
@@ -107,8 +107,8 @@ describe('useTheme', () => {
     expect((target.getRootNode() as ShadowRoot).host).toBe(host);
     expect(host.classList.contains('dark')).toBe(true);
 
-    expect(mutationObservers).toHaveLength(1);
-    const observer = mutationObservers[0];
+  expect(mutationObservers).toHaveLength(1);
+  const observer = mutationObservers[0]!;
     expect(observer.observe).toHaveBeenCalledWith(document.body, {
       attributes: true,
       attributeFilter: ['class'],
@@ -133,8 +133,8 @@ describe('useTheme', () => {
 
     expect(host.classList.contains('dark')).toBe(true);
 
-    expect(mutationObservers).toHaveLength(1);
-    const observer = mutationObservers[0];
+  expect(mutationObservers).toHaveLength(1);
+  const observer = mutationObservers[0]!;
 
     document.body.dataset.theme = 'light-mode';
     observer.trigger();
@@ -148,8 +148,15 @@ describe('useTheme', () => {
     });
 
     const mediaQueryListeners: { change?: (event: MediaQueryListEvent) => void } = {};
+    let mediaQueryMatches = false;
     const mediaQueryList: MediaQueryList = {
-      matches: false,
+      get matches() {
+        return mediaQueryMatches;
+      },
+      // allow tests to set matches by assigning to this property
+      set matches(v: boolean) {
+        mediaQueryMatches = v;
+      },
       media: prefersDarkQuery,
       onchange: null,
       addEventListener: vi.fn((event: string, handler: EventListenerOrEventListenerObject) => {
@@ -183,16 +190,16 @@ describe('useTheme', () => {
     expect(window.matchMedia).toHaveBeenCalledWith(prefersDarkQuery);
     expect(mediaQueryList.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
 
-    mediaQueryList.matches = true;
+  mediaQueryMatches = true;
     mediaQueryListeners.change?.({ matches: true } as MediaQueryListEvent);
     expect(host.classList.contains('dark')).toBe(true);
 
-    mediaQueryList.matches = false;
+  mediaQueryMatches = false;
     mediaQueryListeners.change?.({ matches: false } as MediaQueryListEvent);
     expect(host.classList.contains('dark')).toBe(false);
 
     expect(mutationObservers).toHaveLength(1);
-    const observer = mutationObservers[0];
+  const observer = mutationObservers[0]!;
     expect(observer.observe).toHaveBeenCalledWith(document.body, {
       attributes: true,
       attributeFilter: ['class'],

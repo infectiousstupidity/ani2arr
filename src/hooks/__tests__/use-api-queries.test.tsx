@@ -17,8 +17,8 @@ vi.mock('@/services', () => ({
 }));
 
 const extensionOptionsMock = vi.hoisted(() => ({
-  getValue: vi.fn<[], Promise<ExtensionOptions>>(),
-  setValue: vi.fn<[ExtensionOptions], Promise<void>>(),
+  getValue: vi.fn<() => Promise<ExtensionOptions>>(),
+  setValue: vi.fn<(value: ExtensionOptions) => Promise<void>>(),
   watch: vi.fn<(callback: (value: ExtensionOptions) => void) => () => void>(),
 }));
 
@@ -37,9 +37,13 @@ const createQueryClient = () =>
     },
   });
 
-const createWrapper = (client: QueryClient) => ({ children }: { children: ReactNode }) => (
-  <QueryClientProvider client={client}>{children}</QueryClientProvider>
-);
+const createWrapper = (client: QueryClient) => {
+  const QueryClientProviderWrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  QueryClientProviderWrapper.displayName = 'QueryClientProviderWrapper';
+  return QueryClientProviderWrapper;
+};
 
 const createOptions = (overrides?: Partial<ExtensionOptions>): ExtensionOptions => ({
   sonarrUrl: 'http://localhost:8989',
@@ -57,11 +61,11 @@ const createOptions = (overrides?: Partial<ExtensionOptions>): ExtensionOptions 
 });
 
 const createMockApi = () => ({
-  getSeriesStatus: vi.fn<[], Promise<unknown>>(),
-  addToSonarr: vi.fn<[], Promise<unknown>>(),
-  notifySettingsChanged: vi.fn<[], Promise<unknown>>(),
-  testConnection: vi.fn<[], Promise<unknown>>(),
-  getSonarrMetadata: vi.fn<[], Promise<unknown>>(),
+  getSeriesStatus: vi.fn<() => Promise<unknown>>(),
+  addToSonarr: vi.fn<() => Promise<unknown>>(),
+  notifySettingsChanged: vi.fn<() => Promise<unknown>>(),
+  testConnection: vi.fn<() => Promise<unknown>>(),
+  getSonarrMetadata: vi.fn<() => Promise<unknown>>(),
 });
 
 type MockApi = ReturnType<typeof createMockApi>;
@@ -226,7 +230,7 @@ describe('mutations', () => {
 
     const initialOptions = createOptions();
     const nextOptions = createOptions({ sonarrUrl: 'http://updated' });
-    const unsubscribe = vi.fn();
+  const unsubscribe = vi.fn<() => void>();
 
     queryClient.setQueryData(queryKeys.options(), initialOptions);
 
@@ -291,7 +295,7 @@ describe('useExtensionOptions', () => {
 
     const initial = createOptions();
     const updated = createOptions({ sonarrApiKey: 'updated-key' });
-    const unsubscribe = vi.fn();
+  const unsubscribe = vi.fn<() => void>();
 
     let watchCallback: ((value: ExtensionOptions) => void) | undefined;
     extensionOptionsMock.getValue.mockResolvedValue(initial);

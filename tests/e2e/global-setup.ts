@@ -1,3 +1,4 @@
+// tests/e2e/global-setup.ts
 import type { FullConfig } from '@playwright/test';
 import { startTestServer } from './server';
 

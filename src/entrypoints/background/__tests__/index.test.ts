@@ -1,4 +1,3 @@
-import type { runtime } from 'webextension-polyfill';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 
@@ -38,6 +37,7 @@ async function bootstrapBackground() {
 }
 
 const FALLBACK_INTERVAL_KEY = '__kitsunarr_fallback_interval__';
+const NO_SENDER = undefined as unknown as Parameters<typeof fakeBrowser.runtime.onMessage.trigger>[1];
 
 describe('background entrypoint', () => {
   beforeEach(() => {
@@ -64,7 +64,9 @@ describe('background entrypoint', () => {
 
     const { openOptionsSpy } = await bootstrapBackground();
 
-    await fakeBrowser.runtime.onInstalled.trigger({ reason: 'install' } as runtime.OnInstalledDetailsType);
+    await fakeBrowser.runtime.onInstalled.trigger({
+      reason: 'install',
+    } as Parameters<typeof fakeBrowser.runtime.onInstalled.trigger>[0]);
 
     expect(registerKitsunarrApi).toHaveBeenCalledTimes(1);
     expect(getKitsunarrApi).toHaveBeenCalledTimes(1);
@@ -102,27 +104,31 @@ describe('background entrypoint', () => {
       .mockReturnValueOnce(0.42)
       .mockReturnValueOnce(0.84);
 
-    await fakeBrowser.runtime.onMessage.trigger({ type: 'OPEN_OPTIONS_PAGE' });
+    await fakeBrowser.runtime.onMessage.trigger({ type: 'OPEN_OPTIONS_PAGE' }, NO_SENDER);
     expect(openOptionsSpy).toHaveBeenCalledTimes(1);
 
     initMappings.mockClear();
-    const [refreshResult] = await fakeBrowser.runtime.onMessage.trigger({
-      type: 'kitsunarr:mapping:refresh',
-    });
+    const [refreshResult] = await fakeBrowser.runtime.onMessage.trigger(
+      { type: 'kitsunarr:mapping:refresh' },
+      NO_SENDER,
+    );
     expect(initMappings).toHaveBeenCalledTimes(1);
     expect(refreshResult).toEqual({ ok: true });
 
-    const [scoreResult] = await fakeBrowser.runtime.onMessage.trigger({
-      type: 'kitsunarr:match:score-batch',
-      payload: {
-        queryRaw: 'Cowboy Bebop',
-        startYear: 1998,
-        candidates: [
-          { title: 'Cowboy Bebop', year: 1998, genres: ['Action', 'Sci-Fi'] },
-          { title: 'Trigun', year: 1998 },
-        ],
+    const [scoreResult] = await fakeBrowser.runtime.onMessage.trigger(
+      {
+        type: 'kitsunarr:match:score-batch',
+        payload: {
+          queryRaw: 'Cowboy Bebop',
+          startYear: 1998,
+          candidates: [
+            { title: 'Cowboy Bebop', year: 1998, genres: ['Action', 'Sci-Fi'] },
+            { title: 'Trigun', year: 1998 },
+          ],
+        },
       },
-    });
+      NO_SENDER,
+    );
 
     expect(computeTitleMatchScore).toHaveBeenNthCalledWith(1, {
       queryRaw: 'Cowboy Bebop',

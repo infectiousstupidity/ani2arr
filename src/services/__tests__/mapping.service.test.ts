@@ -143,7 +143,6 @@ describe('MappingService', () => {
         if (Date.now() > timeoutAt) {
           throw new Error(`Timed out waiting for condition; lookupOrder=${JSON.stringify(lookupOrder)}`);
         }
-        // eslint-disable-next-line no-await-in-loop
         await new Promise(resolve => setTimeout(resolve, 0));
       }
     };
@@ -173,7 +172,7 @@ describe('MappingService', () => {
     expect(delayResolvers).toHaveLength(1);
     expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
 
-    delayResolvers[0].resolve();
+  delayResolvers[0]!.resolve();
     await waitUntil(() => lookupOrder.length >= 4);
     await waitUntil(() => lookupsById.has(2));
     await waitUntil(() => lookupsById.has(3));
@@ -186,7 +185,7 @@ describe('MappingService', () => {
     await waitUntil(() => delayCalls.length === 2);
     expect(delayCalls).toEqual([1500, 1500]);
     expect(delayResolvers).toHaveLength(2);
-    delayResolvers[1].resolve();
+  delayResolvers[1]!.resolve();
 
     await waitUntil(() => lookupOrder.length >= 5);
     await waitUntil(() => lookupsById.has(5));
