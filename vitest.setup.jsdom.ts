@@ -1,4 +1,5 @@
 import { beforeAll, afterAll, afterEach } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { testServer, defaultTestHandlers, resetDefaultTestHandlers } from '@/testing';
