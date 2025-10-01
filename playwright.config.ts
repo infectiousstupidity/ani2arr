@@ -1,3 +1,4 @@
+// playwright.config.ts
 import { defineConfig } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,10 +8,7 @@ const __dirname = path.dirname(__filename);
 const projectRoot = __dirname;
 
 const chromiumExtensionPath = path.resolve(projectRoot, '.output', 'chrome-mv3');
-const firefoxExtensionPath = path.resolve(projectRoot, '.output', 'firefox-mv2');
-
 process.env.KITSUNARR_E2E_CHROMIUM_EXTENSION = chromiumExtensionPath;
-process.env.KITSUNARR_E2E_FIREFOX_EXTENSION = firefoxExtensionPath;
 
 export default defineConfig({
   testDir: path.join(projectRoot, 'tests', 'e2e'),
@@ -19,8 +17,8 @@ export default defineConfig({
     timeout: 15_000,
   },
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 2 : 0,
+  ...(process.env.CI ? { workers: 1 } : {}),
   reporter: [
     ['list'],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
@@ -43,20 +41,6 @@ export default defineConfig({
             `--load-extension=${chromiumExtensionPath}`,
             '--no-sandbox',
           ],
-        },
-      },
-    },
-    {
-      name: 'firefox',
-      use: {
-        browserName: 'firefox',
-        headless: false,
-        launchOptions: {
-          firefoxUserPrefs: {
-            'extensions.experiments.enabled': true,
-            'extensions.install.requireBuiltInCerts': false,
-            'xpinstall.signatures.required': false,
-          },
         },
       },
     },

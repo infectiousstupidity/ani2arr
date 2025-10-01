@@ -95,8 +95,8 @@ describe('createTtlCache', () => {
 
     const { del } = await import('idb-keyval');
     const delMock = del as unknown as Mock;
-    expect(delMock.mock.calls).toHaveLength(1);
-    expect(delMock.mock.calls[0][0]).toBe('expire:hero');
+  expect(delMock.mock.calls).toHaveLength(1);
+  expect(delMock.mock.calls[0]![0]).toBe('expire:hero');
 
     const secondRead = await cache.read('hero');
     expect(secondRead).toBeNull();

@@ -12,6 +12,8 @@ const BASE_CREDENTIALS: SonarrCredentialsPayload = {
   apiKey: 'abc123',
 };
 
+type RetryOptions = Parameters<typeof retry.retryWithBackoff>[1];
+
 describe('SonarrApiService', () => {
   let service: SonarrApiService;
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -23,8 +25,15 @@ describe('SonarrApiService', () => {
     fetchMock = vi.fn();
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-    hasPermissionSpy = vi.spyOn(validation, 'hasSonarrPermission').mockResolvedValue(true);
-    retrySpy = vi.spyOn(retry, 'retryWithBackoff').mockImplementation(async fn => fn());
+    hasPermissionSpy = vi.spyOn(validation, 'hasSonarrPermission') as unknown as ReturnType<typeof vi.spyOn>;
+    hasPermissionSpy.mockResolvedValue(true);
+
+    retrySpy = vi.spyOn(retry, 'retryWithBackoff') as unknown as ReturnType<typeof vi.spyOn>;
+    retrySpy.mockImplementation(async (...args: unknown[]) => {
+      const fn = args[0] as () => Promise<unknown>;
+      const _opts = args[1] as RetryOptions | undefined;
+      return fn();
+    });
   });
 
   afterEach(() => {
@@ -84,7 +93,8 @@ describe('SonarrApiService', () => {
     await service.addSeries(payload, baseOptions);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, requestInit] = fetchMock.mock.calls[0];
+  const call = fetchMock.mock.calls[0]! as [string, RequestInit | undefined];
+  const [url, requestInit] = call;
     expect(url).toBe('https://sonarr.local/api/v3/series');
 
     const body = JSON.parse(String(requestInit?.body));
@@ -160,7 +170,8 @@ describe('SonarrApiService', () => {
       .mockResolvedValueOnce(secondResponse);
 
     let capturedError: unknown;
-    retrySpy.mockImplementation(async fn => {
+    retrySpy.mockImplementation(async (...args: unknown[]) => {
+      const fn = args[0] as () => Promise<unknown>;
       try {
         return await fn();
       } catch (error) {
@@ -188,7 +199,8 @@ describe('SonarrApiService', () => {
     const logSpy = vi.spyOn(errorHandling, 'logError').mockImplementation(() => {});
 
     let capturedError: unknown;
-    retrySpy.mockImplementation(async fn => {
+    retrySpy.mockImplementation(async (...args: unknown[]) => {
+      const fn = args[0] as () => Promise<unknown>;
       try {
         return await fn();
       } catch (error) {

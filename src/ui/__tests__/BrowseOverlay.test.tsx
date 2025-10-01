@@ -5,14 +5,21 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { BrowseAdapter, ParsedCard } from '../BrowseOverlay';
 import { createBrowseContentApp } from '../BrowseOverlay';
 
-const extensionOptionsResult: { data: any } = {
+const extensionOptionsResult: {
+  data: { sonarrUrl: string; sonarrApiKey: string; defaults: Partial<import('@/types').SonarrFormState> | null };
+} = {
   data: {
     sonarrUrl: 'http://sonarr.local',
     sonarrApiKey: 'abc123',
     defaults: {
       qualityProfileId: 1,
       rootFolderPath: '/media',
-      languageProfileId: 1,
+      // languageProfileId removed; not part of SonarrFormState in types
+      seriesType: 'standard',
+      monitorOption: 'all',
+      seasonFolder: false,
+      searchForMissingEpisodes: false,
+      tags: [],
     },
   },
 };
@@ -34,7 +41,8 @@ const TooltipWrapperMock = vi.fn(
   ({ children }: { children: React.ReactNode; container?: HTMLElement | null }) => <>{children}</>,
 );
 
-const addSeriesModalSpy = vi.fn((props: any) => (
+type AddSeriesModalProps = { anilistId?: number; title?: string; portalContainer?: HTMLElement | null };
+const addSeriesModalSpy = vi.fn((props: AddSeriesModalProps) => (
   <div
     data-testid="add-series-modal"
     data-anilist-id={props.anilistId}
@@ -62,12 +70,12 @@ vi.mock('@/hooks/use-theme', () => ({
 
 vi.mock('@/ui/TooltipWrapper', () => ({
   __esModule: true,
-  default: (props: any) => TooltipWrapperMock(props),
+  default: (props: { children: React.ReactNode; container?: HTMLElement | null }) => TooltipWrapperMock(props),
 }));
 
 vi.mock('@/ui/AddSeriesModal', () => ({
   __esModule: true,
-  default: (props: any) => addSeriesModalSpy(props),
+  default: (props: AddSeriesModalProps) => addSeriesModalSpy(props),
 }));
 
 vi.mock('webextension-polyfill', () => ({
@@ -218,7 +226,11 @@ beforeEach(() => {
     defaults: {
       qualityProfileId: 1,
       rootFolderPath: '/media',
-      languageProfileId: 1,
+      seriesType: 'standard',
+      monitorOption: 'all',
+      seasonFolder: false,
+      searchForMissingEpisodes: false,
+      tags: [],
     },
   };
   mutationObservers = [];
@@ -352,10 +364,12 @@ describe('createBrowseContentApp', () => {
     });
 
     const existingContainer = validHost.querySelector('.kitsunarr-container');
-    existingContainer?.remove();
+  existingContainer?.remove();
 
-    expect(resizeObservers).toHaveLength(1);
-    resizeObservers[0].trigger();
+  expect(resizeObservers).toHaveLength(1);
+  const ro = resizeObservers[0];
+  expect(ro).toBeDefined();
+  ro!.trigger();
 
     await waitFor(() => {
       expect(validHost.hasAttribute('data-kitsunarr-test')).toBe(false);
@@ -404,7 +418,7 @@ describe('createBrowseContentApp', () => {
 
     expect(quickButton?.getAttribute('aria-label')).toBe('Retry mapping lookup');
 
-    quickButton && fireEvent.click(quickButton);
+  if (quickButton) fireEvent.click(quickButton);
 
     await waitFor(() => {
       expect(refetch).toHaveBeenCalledWith({ throwOnError: false });
@@ -434,7 +448,7 @@ describe('createBrowseContentApp', () => {
     );
     expect(quickButton?.disabled).toBe(false);
 
-    quickButton && fireEvent.click(quickButton);
+  if (quickButton) fireEvent.click(quickButton);
 
     expect(mutate).toHaveBeenCalledWith({
       anilistId: 20,
@@ -445,7 +459,7 @@ describe('createBrowseContentApp', () => {
 
     const gearButton = overlayHost.querySelector<HTMLButtonElement>('button.kitsunarr-card-overlay__gear');
     expect(gearButton).toBeTruthy();
-    gearButton && fireEvent.click(gearButton);
+  if (gearButton) fireEvent.click(gearButton);
 
     const modal = await screen.findByTestId('add-series-modal');
     expect(modal.getAttribute('data-anilist-id')).toBe('20');

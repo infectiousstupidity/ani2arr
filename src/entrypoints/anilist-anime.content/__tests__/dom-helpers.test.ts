@@ -25,7 +25,7 @@ const ANCHOR_ID = 'kitsunarr-actions-anchor';
 const SPACER_ID = 'kitsunarr-actions-spacer';
 
 const originalResizeObserver = globalThis.ResizeObserver;
-const resizeObserverInstances: any[] = [];
+const resizeObserverInstances: Array<MockResizeObserver> = [];
 
 class MockResizeObserver {
   public observed = new Set<Element>();
@@ -39,15 +39,16 @@ class MockResizeObserver {
   }
 
   trigger(target?: Element) {
-    const entryTarget = target ?? this.observed.values().next().value ?? null;
+    const entryTarget: Element | undefined = target ?? this.observed.values().next().value;
     if (entryTarget) {
-      const entry = {
+      const entry: Partial<ResizeObserverEntry> = {
         target: entryTarget,
         contentRect: entryTarget.getBoundingClientRect(),
-      } as ResizeObserverEntry;
-      this.callback([entry], this as unknown as ResizeObserver);
+      };
+      // Call the callback with a value matching ResizeObserverEntry[]; cast is safe for tests
+      this.callback([entry as ResizeObserverEntry], (this as unknown) as ResizeObserver);
     } else {
-      this.callback([], this as unknown as ResizeObserver);
+      this.callback([], (this as unknown) as ResizeObserver);
     }
   }
 }
@@ -95,7 +96,12 @@ const setupPageStructure = () => {
 const flushMicrotasks = () => new Promise<void>(resolve => queueMicrotask(() => resolve()));
 
 beforeAll(async () => {
-  (globalThis as any).ResizeObserver = MockResizeObserver;
+  // Assign the mock ResizeObserver to the global safely
+  Object.defineProperty(globalThis, 'ResizeObserver', {
+    configurable: true,
+    writable: true,
+    value: MockResizeObserver,
+  });
   const module = await import('../index');
   ({
     waitForElement,
@@ -109,9 +115,15 @@ beforeAll(async () => {
 
 afterAll(() => {
   if (originalResizeObserver) {
-    (globalThis as any).ResizeObserver = originalResizeObserver;
+    Object.defineProperty(globalThis, 'ResizeObserver', {
+      configurable: true,
+      writable: true,
+      value: originalResizeObserver,
+    });
   } else {
-    delete (globalThis as any).ResizeObserver;
+    // Remove the mocked property if there wasn't an original
+    // Use Reflect.deleteProperty for a safe delete in TS
+    Reflect.deleteProperty(globalThis, 'ResizeObserver');
   }
 });
 

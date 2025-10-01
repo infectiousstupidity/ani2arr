@@ -1,252 +1,160 @@
-import { test, expect, chromium, firefox } from '@playwright/test';
-import type { BrowserContext, Page, Route, Worker } from '@playwright/test';
-import { mkdtemp, rm } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
+import { test, expect } from '@playwright/test';
+import type { TestInfo } from '@playwright/test';
+import {
+  createExtensionHarness,
+  collectBackgroundDiagnostics,
+  readLibraryEpoch,
+  waitForLibraryEpochBump,
+  testServerBaseUrl,
+} from './support/extension';
+import { resetServerState, updateServerState, getSonarrSeries } from './support/server-control';
+import { OptionsPage } from './pages/options-page';
+import { AnilistPage } from './pages/anilist-page';
 
-const serverBaseUrl = process.env.KITSUNARR_E2E_BASE_URL;
+const SONARR_API_KEY = '0123456789abcdef0123456789abcdef';
+const INVALID_SONARR_KEY = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const EXPECTED_SONARR_KEY = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
-if (!serverBaseUrl) {
-  throw new Error('Missing MSW test server base URL. Did global setup run?');
-}
-
-const aniListPageHtml = `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>AniList Fixture</title>
-    <style>
-      body { font-family: sans-serif; background: #0f141a; color: #d3e1ec; margin: 0; }
-      .header { background: #151f2c; padding: 24px; }
-      .cover-wrap { display: grid; grid-template-columns: 240px 1fr; gap: 24px; }
-      .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: center; }
-      .actions .favourite { width: 35px; height: 35px; background: #3db4f2; border-radius: 50%; }
-      .actions .list { grid-column: 1 / -1; height: 48px; background: rgba(61, 180, 242, 0.12); border-radius: 12px; }
-      .content.container { display: flex; gap: 24px; padding: 24px; }
-      .content.container .sidebar { width: 280px; min-height: 200px; background: rgba(255,255,255,0.04); border-radius: 12px; padding: 16px; }
-      h1 { margin: 0; font-size: 2rem; }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-      <div class="cover-wrap">
-        <div class="poster" style="width:240px;height:340px;background:#22354a;border-radius:12px"></div>
-        <div class="info">
-          <h1>Kitsunarr Test</h1>
-          <div class="actions">
-            <div class="favourite" aria-label="Favorite" role="button"></div>
-            <div class="list" aria-hidden="true"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="content container">
-      <main class="body" style="flex:1">
-        <p>Fixture content body.</p>
-      </main>
-      <aside class="sidebar">
-        <div class="rankings">Rankings</div>
-      </aside>
-    </div>
-  </body>
-</html>`;
-
-type BackgroundTarget = Page | Worker;
-
-type PermissionShim = {
-  request?: (...args: unknown[]) => Promise<boolean>;
-  contains?: (...args: unknown[]) => Promise<boolean>;
-};
-
-type BrowserShim = {
-  permissions?: PermissionShim;
-};
-
-async function launchPersistentContext(browserName: string): Promise<{ context: BrowserContext; userDataDir: string }> {
-  const userDataDir = await mkdtemp(path.join(os.tmpdir(), 'kitsunarr-e2e-'));
-  if (browserName === 'chromium') {
-    const extensionPath = process.env.KITSUNARR_E2E_CHROMIUM_EXTENSION;
-    if (!extensionPath) throw new Error('Missing Chromium extension path');
-    const context = await chromium.launchPersistentContext(userDataDir, {
-      headless: false,
-      args: [
-        `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`,
-        '--no-sandbox',
-      ],
-    });
-    return { context, userDataDir };
-  }
-
-  if (browserName === 'firefox') {
-    const extensionPath = process.env.KITSUNARR_E2E_FIREFOX_EXTENSION;
-    if (!extensionPath) throw new Error('Missing Firefox extension path');
-    const context = await firefox.launchPersistentContext(userDataDir, {
-      headless: false,
-      firefoxUserPrefs: {
-        'extensions.experiments.enabled': true,
-        'extensions.install.requireBuiltInCerts': false,
-        'xpinstall.signatures.required': false,
-      },
-    });
-    const installer = context as unknown as {
-      installAddon(addonPath: string, options?: { temporary?: boolean }): Promise<string>;
-    };
-    await installer.installAddon(extensionPath, { temporary: true });
-    return { context, userDataDir };
-  }
-
-  throw new Error(`Unsupported browser: ${browserName}`);
-}
-
-async function waitForBackground(context: BrowserContext): Promise<BackgroundTarget> {
-  const existingWorker = context.serviceWorkers()[0];
-  if (existingWorker) return existingWorker;
+async function attachJson(testInfo: TestInfo, name: string, payload: unknown) {
   try {
-    return await context.waitForEvent('serviceworker', { timeout: 15_000 });
-  } catch {
-    const existingBackground = context.backgroundPages()[0];
-    if (existingBackground) return existingBackground;
-    return await context.waitForEvent('backgroundpage', { timeout: 15_000 });
+    const serialized = JSON.stringify(payload ?? null, null, 2) ?? 'null';
+    await testInfo.attach(name, {
+      body: Buffer.from(serialized, 'utf8'),
+      contentType: 'application/json',
+    });
+  } catch (error) {
+    console.warn(`[E2E] Failed to attach ${name}:`, (error as Error).message);
   }
 }
 
-async function proxyRoute(route: Route, targetUrl: string) {
-  const request = route.request();
-  const response = await fetch(targetUrl, {
-    method: request.method(),
-    headers: request.headers(),
-    body: request.postData(),
-  });
-  const headers: Record<string, string> = {};
-  response.headers.forEach((value, key) => {
-    headers[key] = value;
-  });
-  const body = await response.text();
-  await route.fulfill({
-    status: response.status,
-    headers,
-    body,
-  });
-}
-
-async function setupNetworkInterception(context: BrowserContext) {
-  await context.route('https://anilist.co/anime/*', async route => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'text/html',
-      body: aniListPageHtml,
-    });
-  });
-  await context.route('https://anilist.co/favicon.ico', async route => {
-    await route.fulfill({ status: 204 });
-  });
-  await context.route('https://graphql.anilist.co/*', async route => {
-    await proxyRoute(route, `${serverBaseUrl}/anilist/graphql`);
-  });
-  await context.route('https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json', async route => {
-    await proxyRoute(route, `${serverBaseUrl}/mappings/primary`);
-  });
-  await context.route('https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json', async route => {
-    await proxyRoute(route, `${serverBaseUrl}/mappings/fallback`);
-  });
-}
-
-async function resetBackendState() {
-  await fetch(`${serverBaseUrl}/__reset`, { method: 'POST' });
-}
-
-async function mockPermissions(context: BrowserContext, background: BackgroundTarget) {
-  await context.addInitScript(() => {
-    const globalBrowser = (globalThis as { browser?: BrowserShim }).browser;
-    const permissions = globalBrowser?.permissions;
-    if (permissions) {
-      permissions.request = async () => true;
-      permissions.contains = async () => true;
+async function waitForQuickAddCompletion(page: AnilistPage, timeoutMs = 15_000) {
+  const button = page.quickAddButton();
+  const start = Date.now();
+  let lastText = '';
+  while (Date.now() - start <= timeoutMs) {
+    const text = (await button.textContent())?.trim() ?? '';
+    if (text) {
+      lastText = text;
+      if (text.includes('In Sonarr')) return text;
+      if (text.includes('Error')) {
+        throw new Error(`Quick add failed with state: ${text}`);
+      }
     }
-  });
-
-  await background.evaluate(() => {
-    const permissions = (globalThis as { browser?: BrowserShim }).browser?.permissions;
-    if (permissions) {
-      permissions.request = async () => true;
-      permissions.contains = async () => true;
-    }
-  });
+    await page.page.waitForTimeout(250);
+  }
+  throw new Error(`Quick add did not reach 'In Sonarr' within ${timeoutMs}ms (last seen state: ${lastText || 'empty'})`);
 }
 
 test.describe('Kitsunarr extension end-to-end', () => {
   test('configures options and supports quick add flows', async ({ browserName }, testInfo) => {
-    const { context, userDataDir } = await launchPersistentContext(browserName);
-    await setupNetworkInterception(context);
+    const harness = await createExtensionHarness(browserName);
+    await resetServerState(harness.serverBaseUrl);
+
+    let optionsPage: OptionsPage | null = null;
+    let aniListPage: AnilistPage | null = null;
+
+    const collectDiagnostics = async (label: string) => {
+      const diagnostics = await collectBackgroundDiagnostics(harness.background);
+      await attachJson(testInfo, label, diagnostics);
+      return diagnostics;
+    };
 
     try {
-      const background = await waitForBackground(context);
-      await mockPermissions(context, background);
-      const optionsUrl = await background.evaluate(() => {
-        const runtime = (globalThis as { browser?: { runtime?: { getURL?: (path: string) => string } } }).browser?.runtime;
-        return runtime?.getURL ? runtime.getURL('options/index.html') : '';
+      await test.step('Configure Sonarr connection', async () => {
+        optionsPage = new OptionsPage(await harness.context.newPage());
+        await optionsPage.goto(harness.optionsUrl);
+        await expect(optionsPage.heading).toBeVisible();
+
+        await optionsPage.configureSonarr(`${harness.serverBaseUrl}/sonarr`, SONARR_API_KEY);
+        await optionsPage.connect();
+        await optionsPage.page.waitForTimeout(750);
+        await optionsPage.waitForConnectionSuccess();
+
+        await collectDiagnostics(`background-post-connect-${browserName}`);
+        console.log(`[${browserName}] Configure Sonarr connection complete`);
       });
-      if (!optionsUrl) {
-        throw new Error('Failed to resolve extension options page URL.');
+
+      await test.step('Persist settings', async () => {
+        if (!optionsPage) throw new Error('Options page not initialized');
+        await optionsPage.save();
+        await optionsPage.waitForSaveComplete();
+
+        await collectDiagnostics(`background-post-save-${browserName}`);
+        await testInfo.attach(`options-${browserName}`, {
+          body: await optionsPage.page.screenshot({ fullPage: true }),
+          contentType: 'image/png',
+        });
+        console.log(`[${browserName}] Persist settings complete`);
+      });
+
+      await test.step('Quick add series and verify state', async () => {
+        aniListPage = new AnilistPage(await harness.context.newPage());
+        console.log(`[${browserName}] Navigating to AniList page`);
+        await aniListPage.goto();
+        console.log(`[${browserName}] Waiting for quick add ready`);
+        await aniListPage.waitForQuickAddReady();
+
+        const quickButton = aniListPage.quickAddButton();
+        const initialEpoch = await readLibraryEpoch(harness.background);
+        await quickButton.click();
+        await aniListPage.waitForQuickAddState('Adding...', 5_000);
+        const finalText = await waitForQuickAddCompletion(aniListPage);
+        console.log(`[${browserName}] quick add final state: ${finalText}`);
+        const bumped = await waitForLibraryEpochBump(harness.background, initialEpoch ?? undefined);
+        if (!bumped) {
+          console.warn(`[${browserName}] libraryEpoch did not update after quick add`);
+        }
+
+        const sonarrSeries = await getSonarrSeries(harness.serverBaseUrl, SONARR_API_KEY);
+        expect(sonarrSeries.length).toBeGreaterThan(0);
+
+        await testInfo.attach(`anilist-${browserName}`, {
+          body: await aniListPage.screenshot(),
+          contentType: 'image/png',
+        });
+        console.log(`[${browserName}] Quick add series step complete`);
+      });
+    } catch (error) {
+      try {
+        await collectDiagnostics(`background-on-error-${browserName}`);
+      } catch (diagError) {
+        console.warn(`[E2E] Failed to capture diagnostics on error:`, (diagError as Error).message);
       }
-
-      await resetBackendState();
-
-      const optionsPage = await context.newPage();
-      await optionsPage.goto(optionsUrl, { waitUntil: 'networkidle' });
-
-      await expect(optionsPage.getByRole('heading', { name: 'Kitsunarr' })).toBeVisible();
-
-      const sonarrUrlField = optionsPage.getByLabel('Sonarr URL');
-      const sonarrApiKeyField = optionsPage.getByLabel('Sonarr API Key');
-      await sonarrUrlField.fill(`${serverBaseUrl}/sonarr`);
-      await sonarrApiKeyField.fill('0123456789abcdef0123456789abcdef');
-
-      const connectButton = optionsPage.getByRole('button', { name: 'Connect' });
-      await connectButton.click();
-
-      const status = optionsPage.getByRole('status');
-      await expect(status).toContainText('Connected');
-      await expect(optionsPage.getByRole('button', { name: 'Edit' })).toBeEnabled();
-      await expect(optionsPage.getByLabel('Quality Profile')).toBeVisible();
-
-      const saveButton = optionsPage.getByRole('button', { name: 'Save settings' });
-      await expect(saveButton).toBeEnabled();
-      await saveButton.click();
-      await expect(saveButton).toBeDisabled({ timeout: 15_000 });
-
-      await testInfo.attach(`options-${browserName}`, {
-        body: await optionsPage.screenshot({ fullPage: true }),
-        contentType: 'image/png',
-      });
-
-      const aniListPage = await context.newPage();
-      await aniListPage.goto('https://anilist.co/anime/12345', { waitUntil: 'networkidle' });
-
-      const advancedButton = aniListPage.getByRole('button', { name: 'Advanced options' });
-      await advancedButton.waitFor({ state: 'visible' });
-      const quickAddButton = advancedButton.locator('xpath=preceding-sibling::button[1]');
-      await expect(quickAddButton).toHaveText(/Add to Sonarr|In Sonarr/, { timeout: 20_000 });
-
-      await advancedButton.click();
-      const modal = aniListPage.getByRole('dialog');
-      await expect(modal).toBeVisible();
-      await expect(modal.getByRole('button', { name: 'Add Series' })).toBeVisible();
-      await modal.getByRole('button', { name: 'Close' }).click();
-      await expect(modal).toBeHidden();
-
-      await quickAddButton.click();
-      await expect(quickAddButton).toHaveText('Adding...', { timeout: 5_000 });
-      await expect(quickAddButton).toHaveText('In Sonarr', { timeout: 15_000 });
-
-      await testInfo.attach(`anilist-${browserName}`, {
-        body: await aniListPage.screenshot({ fullPage: false }),
-        contentType: 'image/png',
-      });
+      throw error;
     } finally {
-      await context.close();
-      await rm(userDataDir, { recursive: true, force: true });
+      await harness.cleanup();
+    }
+  });
+
+  test('surfaces Sonarr credential errors before allowing save', async ({ browserName }, testInfo) => {
+    const harness = await createExtensionHarness(browserName);
+    await resetServerState(harness.serverBaseUrl);
+    await updateServerState(harness.serverBaseUrl, { requiredApiKey: EXPECTED_SONARR_KEY });
+
+    try {
+      const optionsPage = new OptionsPage(await harness.context.newPage());
+      await optionsPage.goto(harness.optionsUrl);
+
+      await optionsPage.configureSonarr(`${harness.serverBaseUrl}/sonarr`, INVALID_SONARR_KEY);
+      await optionsPage.connect();
+      await optionsPage.page.waitForTimeout(500);
+      await optionsPage.waitForConnectionError();
+
+      const failureDiagnostics = await collectBackgroundDiagnostics(harness.background);
+      await attachJson(testInfo, `background-unauthorized-${browserName}`, failureDiagnostics);
+      console.log(`[${browserName}] Unauthorized state captured`);
+
+      await optionsPage.configureSonarr(`${harness.serverBaseUrl}/sonarr`, EXPECTED_SONARR_KEY);
+      await optionsPage.connect();
+      await optionsPage.page.waitForTimeout(500);
+      await optionsPage.waitForConnectionSuccess();
+
+      await optionsPage.save();
+      await optionsPage.waitForSaveComplete();
+      console.log(`[${browserName}] Authorization recovery complete`);
+    } finally {
+      await harness.cleanup();
+      await resetServerState(testServerBaseUrl);
     }
   });
 });

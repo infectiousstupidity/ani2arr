@@ -104,6 +104,31 @@ export const createAniListHandlers = (
   ];
 };
 
+// Export a resolver factory for tests that need to call the underlying resolver
+// directly (for example, when sequencing different responses in a single
+// handler). This returns the async function used as the handler resolver so
+// tests can invoke it with the same args a RequestHandler receives.
+export const createAniListResolver = (
+  options: (JsonResponseOptions<{ data: { Media: AniMedia } }> & { media?: AniMedia }) = {},
+): HttpHandler['resolver'] => {
+  const { media = createAniMediaFixture(), body, status, delayMs, headers } = options;
+  const payload = body ?? createAniGraphqlSuccessPayload(media);
+  const responseOptions: JsonResponseOptions<typeof payload> = {};
+  if (typeof status !== 'undefined') {
+    responseOptions.status = status;
+  }
+  if (typeof delayMs !== 'undefined') {
+    responseOptions.delayMs = delayMs;
+  }
+  if (headers) {
+    responseOptions.headers = headers;
+  }
+
+  return async () => {
+    return createJsonResponse(payload, responseOptions);
+  };
+};
+
 export const createAniListErrorHandler = (
   message = 'AniList failure',
   status = 500,

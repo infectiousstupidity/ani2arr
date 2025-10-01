@@ -4,6 +4,7 @@ import { http } from 'msw';
 import { AnilistApiService } from '../anilist.api';
 import {
   createAniListHandlers,
+  createAniListResolver,
   createAniListErrorHandler,
   testServer,
   withLatency,
@@ -26,8 +27,7 @@ describe('AnilistApiService', () => {
   });
 
   it('deduplicates inflight requests and resolves identical promises only once', async () => {
-    const [successHandler] = createAniListHandlers(withLatency(50));
-    testServer.use(successHandler);
+  testServer.use(...createAniListHandlers(withLatency(50)));
 
     const service = new AnilistApiService();
     const fetchSpy = vi.spyOn(global, 'fetch');
@@ -43,8 +43,7 @@ describe('AnilistApiService', () => {
   });
 
   it('batches requests respecting the batch size and delay', async () => {
-    const [successHandler] = createAniListHandlers();
-    testServer.use(successHandler);
+  testServer.use(...createAniListHandlers());
 
     const service = new AnilistApiService();
     const realFetch = global.fetch;
@@ -67,27 +66,27 @@ describe('AnilistApiService', () => {
   });
 
   it('pauses the queue when hitting rate limits with varying Retry-After headers', async () => {
-    const [rateLimitSecondsHandler] = createAniListHandlers({
+    const rateLimitSecondsResolver = createAniListResolver({
       ...withStatus(429),
       ...withRetryAfterSeconds(2),
     });
-    const [rateLimitDateHandler] = createAniListHandlers({
+    const rateLimitDateResolver = createAniListResolver({
       ...withStatus(429),
       ...withHeaders({ 'Retry-After': new Date(Date.now() + 4_000).toUTCString() }),
     });
-    const [successHandler] = createAniListHandlers();
+    const successResolver = createAniListResolver();
 
     let callIndex = 0;
     testServer.use(
       http.post(API_URL, async (...args) => {
         callIndex += 1;
         if (callIndex === 1) {
-          return rateLimitSecondsHandler.resolver(...args);
+          return rateLimitSecondsResolver(...args);
         }
         if (callIndex === 2) {
-          return rateLimitDateHandler.resolver(...args);
+          return rateLimitDateResolver(...args);
         }
-        return successHandler.resolver(...args);
+        return successResolver(...args);
       }),
     );
 
@@ -133,8 +132,8 @@ describe('AnilistApiService', () => {
   });
 
   it('retries 5xx responses up to MAX_RETRIES and surfaces normalized metadata', async () => {
-    const [errorHandler] = createAniListHandlers({ ...withStatus(503) });
-    testServer.use(errorHandler);
+  const errorResolver = createAniListResolver({ ...withStatus(503) });
+  testServer.use(http.post(API_URL, errorResolver));
 
     const service = new AnilistApiService();
     vi.spyOn(Math, 'random').mockReturnValue(0);

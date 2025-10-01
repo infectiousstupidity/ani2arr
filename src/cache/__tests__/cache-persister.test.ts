@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PersistedClient } from '@tanstack/query-persist-client-core';
 import type { ExtensionOptions } from '@/types';
 
 type MockFn = ReturnType<typeof vi.fn>;
@@ -33,6 +34,13 @@ describe('idbQueryCachePersister', () => {
   let persister: typeof import('../cache-persister').idbQueryCachePersister;
   let idb: Awaited<typeof import('idb-keyval')>;
 
+  const createPersistedClient = (overrides?: Partial<PersistedClient>): PersistedClient => ({
+    timestamp: Date.now(),
+    buster: 'test-buster',
+    clientState: { mutations: [], queries: [] },
+    ...overrides,
+  });
+
   beforeEach(async () => {
     vi.resetModules();
     idb = await import('idb-keyval');
@@ -42,16 +50,16 @@ describe('idbQueryCachePersister', () => {
   });
 
   it('persists client state using idb-keyval', async () => {
-    const clientState = { timestamp: 123, queries: [] };
+    const persistedClient = createPersistedClient({ timestamp: 123 });
 
-    await persister.persistClient(clientState);
+    await persister.persistClient(persistedClient);
 
     const setMock = idb.set as unknown as MockFn;
-    expect(setMock).toHaveBeenCalledWith(PERSIST_KEY, clientState);
+    expect(setMock).toHaveBeenCalledWith(PERSIST_KEY, persistedClient);
   });
 
   it('restores client state using idb-keyval', async () => {
-    const storedState = { timestamp: 456, queries: ['a'] };
+    const storedState = createPersistedClient({ timestamp: 456 });
     (idb as unknown as { __setStoredValue(value: unknown): void }).__setStoredValue(storedState);
 
     const result = await persister.restoreClient();
@@ -75,8 +83,9 @@ describe('idbQueryCachePersister', () => {
     const setMock = idb.set as unknown as MockFn;
     setMock.mockRejectedValueOnce(new Error('set failed'));
 
-    await expect(persister.persistClient({})).rejects.toThrow('set failed');
-    expect(setMock).toHaveBeenCalledWith(PERSIST_KEY, {});
+    const client = createPersistedClient();
+    await expect(persister.persistClient(client)).rejects.toThrow('set failed');
+    expect(setMock).toHaveBeenCalledWith(PERSIST_KEY, client);
   });
 
   it('propagates errors when restore fails', async () => {
@@ -110,17 +119,23 @@ describe('idbQueryCachePersister', () => {
       },
     };
     const fallbackSnapshot = JSON.parse(JSON.stringify(fallback)) as ExtensionOptions;
-    const state = {
-      dehydrated: { extensionOptions: fallback },
+    type ExtendedPersistedClient = PersistedClient & {
+      dehydrated: { extensionOptions: ExtensionOptions };
     };
+
+    const state = {
+      ...createPersistedClient(),
+      dehydrated: { extensionOptions: fallback },
+    } as ExtendedPersistedClient;
 
     await persister.persistClient(state);
 
     const setMock = idb.set as unknown as MockFn;
     expect(setMock).toHaveBeenCalledWith(PERSIST_KEY, state);
-    const [, savedState] = setMock.mock.calls[0];
-    expect(savedState).toBe(state);
-    expect(savedState.dehydrated.extensionOptions).toBe(fallback);
+    const [, savedState] = setMock.mock.calls[0]!;
+    const typedSavedState = savedState as ExtendedPersistedClient;
+    expect(typedSavedState).toBe(state);
+    expect(typedSavedState.dehydrated.extensionOptions).toBe(fallback);
     expect(fallback).toEqual(fallbackSnapshot);
   });
 
@@ -139,12 +154,17 @@ describe('idbQueryCachePersister', () => {
       },
     };
     const fallbackSnapshot = JSON.parse(JSON.stringify(fallback)) as ExtensionOptions;
-    const storedState = {
-      dehydrated: { extensionOptions: fallback },
+    type ExtendedPersistedClient = PersistedClient & {
+      dehydrated: { extensionOptions: ExtensionOptions };
     };
+
+    const storedState = {
+      ...createPersistedClient(),
+      dehydrated: { extensionOptions: fallback },
+    } as ExtendedPersistedClient;
     (idb as unknown as { __setStoredValue(value: unknown): void }).__setStoredValue(storedState);
 
-    const result = await persister.restoreClient();
+    const result = (await persister.restoreClient()) as ExtendedPersistedClient | undefined;
 
     expect(result?.dehydrated.extensionOptions).toBe(fallback);
     expect(fallback).toEqual(fallbackSnapshot);

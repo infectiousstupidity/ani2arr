@@ -166,7 +166,11 @@ function createBrowserMock() {
       const now = Date.now();
       const scheduledTime =
         info.when ?? (info.delayInMinutes != null ? now + info.delayInMinutes * 60 * 1000 : now);
-      alarms.set(name, { scheduledTime, periodInMinutes: info.periodInMinutes });
+      if (info.periodInMinutes === undefined) {
+        alarms.set(name, { scheduledTime });
+      } else {
+        alarms.set(name, { scheduledTime, periodInMinutes: info.periodInMinutes });
+      }
     },
     clear(name: string) {
       return Promise.resolve(alarms.delete(name));
