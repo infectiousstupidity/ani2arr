@@ -91,6 +91,7 @@ describe('LibraryService', () => {
   let cache: CacheMock;
   let sonarrClient: SonarrClientMock;
   let mappingService: MappingMock;
+  let mutationSpy: ReturnType<typeof vi.fn>;
   let service: LibraryService;
   let optionsSpy: MockInstance;
   let logErrorSpy: MockInstance;
@@ -104,10 +105,12 @@ describe('LibraryService', () => {
     mappingService = {
       resolveTvdbId: vi.fn(),
     } as unknown as MappingMock;
+    mutationSpy = vi.fn();
     service = new LibraryService(
       sonarrClient as unknown as SonarrApiService,
       mappingService as unknown as MappingService,
       cache,
+      mutationSpy,
     );
 
     optionsSpy = vi.spyOn(extensionOptions, 'getValue');
@@ -418,6 +421,7 @@ describe('LibraryService', () => {
         expect.objectContaining({ hints: { primaryTitle: 'Cached Title' } }),
       );
       expect(sonarrClient.getSeriesByTvdbId).not.toHaveBeenCalled();
+      expect(mutationSpy).not.toHaveBeenCalled();
     });
 
     it('verifies against Sonarr when forced and adds lean entries when found', async () => {
@@ -447,6 +451,8 @@ describe('LibraryService', () => {
         series: { tvdbId: 555, id: 777, titleSlug: 'from-sonarr' },
         successfulSynonym: undefined,
       });
+      expect(mutationSpy).toHaveBeenCalledTimes(1);
+      expect(mutationSpy).toHaveBeenCalledWith({ tvdbId: 555, action: 'added' });
     });
 
     it('removes entries from the cache when forced verification finds no Sonarr match', async () => {
@@ -463,6 +469,8 @@ describe('LibraryService', () => {
 
       expect(cache.write).toHaveBeenCalledWith('sonarr:lean-series', [], STANDARD_TTL);
       expect(response).toEqual({ exists: false, tvdbId: 888 });
+      expect(mutationSpy).toHaveBeenCalledTimes(1);
+      expect(mutationSpy).toHaveBeenCalledWith({ tvdbId: 888, action: 'removed' });
     });
 
     it('forwards ignoreFailureCache when force verifying Sonarr data', async () => {
@@ -484,6 +492,7 @@ describe('LibraryService', () => {
         apiKey: BASE_OPTIONS.sonarrApiKey,
       });
       expect(response).toEqual({ exists: false, tvdbId: 444 });
+      expect(mutationSpy).not.toHaveBeenCalled();
     });
   });
 });

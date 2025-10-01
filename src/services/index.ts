@@ -88,10 +88,6 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
       staticFallback: createTtlCache<StaticMappingPayload>('mapping:static:fallback'),
     }));
 
-    const libraryService = bindAll(
-      new LibraryService(sonarrApiService, mappingService, createTtlCache<LeanSonarrSeries[]>('library:lean')),
-    );
-
     let libraryEpoch = 0;
     let settingsEpoch = 0;
 
@@ -135,6 +131,15 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
       await browser.storage.local.set({ libraryEpoch: nextEpoch });
       await broadcast('series-updated', { epoch: nextEpoch, ...payload });
     };
+
+    const libraryService = bindAll(
+      new LibraryService(
+        sonarrApiService,
+        mappingService,
+        createTtlCache<LeanSonarrSeries[]>('library:lean'),
+        mutation => bumpLibraryEpoch({ tvdbId: mutation.tvdbId, action: mutation.action }),
+      ),
+    );
 
     const bumpSettingsEpoch = async (): Promise<void> => {
       settingsEpoch += 1;
