@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import type { BrowseAdapter, ParsedCard } from '../BrowseOverlay';
 import { createBrowseContentApp } from '../BrowseOverlay';
@@ -150,7 +150,11 @@ class MutationObserverMock implements MutationObserver {
 }
 
 class ResizeObserverMock implements ResizeObserver {
-  public readonly observe = vi.fn();
+  public readonly observe = vi.fn((target: Element, _options?: ResizeObserverOptions) => {
+    if ((target as HTMLElement).dataset.throwResize === 'true') {
+      throw new Error('observe failed');
+    }
+  });
   public readonly unobserve = vi.fn();
   public readonly disconnect = vi.fn();
   constructor(private readonly callback: ResizeObserverCallback) {
@@ -323,11 +327,13 @@ describe('createBrowseContentApp', () => {
     seriesStatusMap.set(3, createSeriesStatusStub());
     pageContent.appendChild(directCard);
 
-    const triggerObservers = (records: Partial<MutationRecord>[]) => {
-      mutationObservers.forEach(observer => observer.trigger(records));
+    const triggerObservers = async (records: Partial<MutationRecord>[]) => {
+      await act(async () => {
+        mutationObservers.forEach(observer => observer.trigger(records));
+      });
     };
 
-    triggerObservers([
+    await triggerObservers([
       {
         type: 'childList',
         target: pageContent,
@@ -349,7 +355,7 @@ describe('createBrowseContentApp', () => {
 
     const parseCallsBeforeRescan = parseCard.mock.calls.length;
 
-    triggerObservers([
+    await triggerObservers([
       {
         type: 'childList',
         target: pageContent,
@@ -376,7 +382,7 @@ describe('createBrowseContentApp', () => {
     });
 
     pageContent.removeChild(validCard);
-    triggerObservers([
+    await triggerObservers([
       {
         type: 'childList',
         target: pageContent,
@@ -388,6 +394,31 @@ describe('createBrowseContentApp', () => {
     await waitFor(() => {
       expect(adapter.onCardInvalid).toHaveBeenCalledWith(validCard);
     });
+  });
+
+  it('skips scanning when scan root is unavailable and ignores invalid resize targets', () => {
+    const observerRoot = document.createElement('div');
+    document.body.appendChild(observerRoot);
+
+    const brokenIterable = {
+      [Symbol.iterator]() {
+        throw new Error('broken iterable');
+      },
+    };
+
+    const { adapter, parseCard } = setupAdapter({
+      getObserverRoot: () => observerRoot,
+      getScanRoot: () => null,
+      resizeObserverTargets: () => brokenIterable as unknown as Iterable<Element>,
+    });
+
+    const BrowseContentApp = createBrowseContentApp(adapter);
+    render(<BrowseContentApp />);
+
+    expect(parseCard).not.toHaveBeenCalled();
+    expect(resizeObservers).toHaveLength(0);
+    expect(mutationObservers).toHaveLength(1);
+    expect(mutationObservers[0]?.observe).toHaveBeenCalled();
   });
 
   it('retries mapping when status reports missing link and quick add is pressed', async () => {
@@ -418,7 +449,8 @@ describe('createBrowseContentApp', () => {
 
     expect(quickButton?.getAttribute('aria-label')).toBe('Retry mapping lookup');
 
-  if (quickButton) fireEvent.click(quickButton);
+    expect(quickButton).not.toBeNull();
+    fireEvent.click(quickButton!);
 
     await waitFor(() => {
       expect(refetch).toHaveBeenCalledWith({ throwOnError: false });
@@ -448,7 +480,8 @@ describe('createBrowseContentApp', () => {
     );
     expect(quickButton?.disabled).toBe(false);
 
-  if (quickButton) fireEvent.click(quickButton);
+    expect(quickButton).not.toBeNull();
+    fireEvent.click(quickButton!);
 
     expect(mutate).toHaveBeenCalledWith({
       anilistId: 20,
@@ -459,7 +492,7 @@ describe('createBrowseContentApp', () => {
 
     const gearButton = overlayHost.querySelector<HTMLButtonElement>('button.kitsunarr-card-overlay__gear');
     expect(gearButton).toBeTruthy();
-  if (gearButton) fireEvent.click(gearButton);
+    fireEvent.click(gearButton!);
 
     const modal = await screen.findByTestId('add-series-modal');
     expect(modal.getAttribute('data-anilist-id')).toBe('20');
@@ -522,5 +555,131 @@ describe('createBrowseContentApp', () => {
     );
 
     expect(overlayRoot?.dataset.state).toBe('disabled');
+  });
+
+  it('handles attribute mutations, rescans when cards disappear, and ignores resize observer errors', async () => {
+    document.body.dataset.throwResize = 'true';
+
+    const pageContent = document.createElement('div');
+    pageContent.className = 'page-content';
+    document.body.appendChild(pageContent);
+
+    const { card, overlayHost } = createCard(50, 'Watched Card');
+    pageContent.appendChild(card);
+
+    const { adapter, ensureContainer } = setupAdapter({
+      getObserverRoot: () => pageContent,
+      getScanRoot: () => pageContent,
+    });
+
+    seriesStatusMap.set(50, createSeriesStatusStub());
+
+    const BrowseContentApp = createBrowseContentApp(adapter);
+    render(<BrowseContentApp />);
+
+    await waitFor(() => {
+      expect(ensureContainer).toHaveBeenCalledWith(overlayHost, card);
+    });
+
+    const ensureCallsBeforeAttribute = ensureContainer.mock.calls.length;
+
+    await act(async () => {
+      mutationObservers.forEach(observer =>
+        observer.trigger([
+          {
+            type: 'attributes',
+            target: card,
+            addedNodes: [] as unknown as NodeListOf<ChildNode>,
+            removedNodes: [] as unknown as NodeListOf<ChildNode>,
+          } as MutationRecord,
+        ]),
+      );
+    });
+
+    await waitFor(() => {
+      expect(ensureContainer.mock.calls.length).toBeGreaterThan(ensureCallsBeforeAttribute);
+    });
+
+    const containerNode = overlayHost.querySelector('.kitsunarr-container');
+    expect(containerNode).not.toBeNull();
+
+    pageContent.removeChild(card);
+
+    const fragment = document.createDocumentFragment();
+    const ghostCard = createCard(99, 'Ghost Card').card;
+    fragment.appendChild(ghostCard);
+
+    await act(async () => {
+      mutationObservers.forEach(observer =>
+        observer.trigger([
+          {
+            type: 'childList',
+            target: pageContent,
+            addedNodes: [] as unknown as NodeListOf<ChildNode>,
+            removedNodes: [card],
+          } as MutationRecord,
+          {
+            type: 'childList',
+            target: pageContent,
+            addedNodes: [fragment as unknown as Node],
+            removedNodes: [] as unknown as NodeListOf<ChildNode>,
+          } as MutationRecord,
+        ]),
+      );
+    });
+
+    await waitFor(() => {
+      expect(adapter.onCardInvalid).toHaveBeenCalledWith(card);
+      expect(containerNode?.isConnected).toBe(false);
+    });
+
+    delete document.body.dataset.throwResize;
+  });
+
+  it('removes fallback containers when card parsing fails', async () => {
+    const pageContent = document.createElement('div');
+    pageContent.className = 'page-content';
+    document.body.appendChild(pageContent);
+
+    const { card: invalidCard, overlayHost } = createCard(60, 'Invalid');
+    invalidCard.dataset.invalid = 'true';
+    const fallbackContainer = document.createElement('div');
+    fallbackContainer.className = 'kitsunarr-container';
+    overlayHost.appendChild(fallbackContainer);
+    pageContent.appendChild(invalidCard);
+
+    const { adapter } = setupAdapter();
+
+    const BrowseContentApp = createBrowseContentApp(adapter);
+    render(<BrowseContentApp />);
+
+    await waitFor(() => {
+      expect(adapter.onCardInvalid).toHaveBeenCalledWith(invalidCard);
+    });
+
+    expect(fallbackContainer.isConnected).toBe(false);
+  });
+
+  it('creates default containers when adapter does not supply one', async () => {
+    const pageContent = document.createElement('div');
+    pageContent.className = 'page-content';
+    document.body.appendChild(pageContent);
+
+    const { card, overlayHost } = createCard(70, 'Fallback Card');
+    pageContent.appendChild(card);
+
+    const { adapter } = setupAdapter();
+    // Remove ensureContainer to use default implementation
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete (adapter as Partial<BrowseAdapter>).ensureContainer;
+
+    seriesStatusMap.set(70, createSeriesStatusStub());
+
+    const BrowseContentApp = createBrowseContentApp(adapter);
+    render(<BrowseContentApp />);
+
+    await waitFor(() => {
+      expect(overlayHost.querySelector('.kitsunarr-container')).toBeTruthy();
+    });
   });
 });

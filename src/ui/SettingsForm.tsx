@@ -126,6 +126,7 @@ const SettingsForm: React.FC = () => {
               size="icon"
               tooltip="Refresh data from Sonarr"
               portalContainer={portalContainer}
+              aria-label="Refresh data from Sonarr"
               aria-busy={manager.sonarrMetadata.isRefetching}
             >
               <ReloadIcon />
