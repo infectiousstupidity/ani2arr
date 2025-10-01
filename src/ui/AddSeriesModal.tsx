@@ -79,6 +79,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
               size="icon"
               tooltip="Open in new tab"
               portalContainer={tooltipPortal}
+              aria-label="Open options page"
               onClick={() => browser.runtime.sendMessage({ type: 'OPEN_OPTIONS_PAGE', timestamp: Date.now() })}
               className="text-text-secondary"
             >

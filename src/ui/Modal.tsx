@@ -35,6 +35,7 @@ const ModalContent = forwardRef<
     // Pass the container prop to the Dialog.Portal
     <Dialog.Portal container={container ?? undefined}>
       <Dialog.Overlay
+        data-testid="modal-overlay"
         className={clsx(
           'fixed inset-0 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0'
         )}

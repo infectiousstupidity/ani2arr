@@ -107,9 +107,13 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
       </div>
       
       {isOpen && suggestions.length > 0 && (
-        <ul className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border-primary bg-bg-secondary p-1 shadow-lg">
+        <ul
+          role="listbox"
+          className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border-primary bg-bg-secondary p-1 shadow-lg"
+        >
           {suggestions.map(suggestion => (
             <li
+              role="option"
               key={suggestion}
               className="cursor-pointer rounded-sm px-3 py-1.5 text-sm text-text-primary hover:bg-bg-tertiary"
               onMouseDown={(e) => {
