@@ -174,7 +174,11 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) =>
 
   const statusQuery = useSeriesStatus(
     { anilistId, title },
-    { enabled: Boolean(anilistId && isConfigured), ignoreFailureCache: true },
+    {
+      enabled: Boolean(anilistId && isConfigured),
+      force_verify: true,
+      ignoreFailureCache: true,
+    },
   );
   const addSeriesMutation = useAddSeries();
 
@@ -197,7 +201,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) =>
 
   const getStatus = (): 'LOADING' | 'IN_SONARR' | 'NOT_IN_SONARR' | 'ERROR' | 'ADDING' => {
     if (!isConfigured) return 'ERROR';
-    if (statusQuery.isLoading && statusQuery.fetchStatus !== 'idle') return 'LOADING';
+    if (statusQuery.fetchStatus === 'fetching') return 'LOADING';
     if (statusQuery.isError || mappingUnavailable) return 'ERROR';
     if (statusQuery.data?.exists || addSeriesMutation.isSuccess) return 'IN_SONARR';
     if (addSeriesMutation.isPending) return 'ADDING';

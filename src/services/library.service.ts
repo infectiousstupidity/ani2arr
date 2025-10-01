@@ -16,6 +16,10 @@ const CACHE_KEY = 'sonarr:lean-series';
 const SOFT_TTL = 60 * 60 * 1000; // 1h
 const HARD_TTL = 24 * 60 * 60 * 1000; // 24h
 const ERROR_TTL = 5 * 60 * 1000; // 5m
+type LibraryMutationPayload = {
+  tvdbId: number;
+  action: 'added' | 'removed';
+};
 
 export class LibraryService {
   private inflightRefresh: Promise<LeanSonarrSeries[]> | null = null;
@@ -25,7 +29,17 @@ export class LibraryService {
     private readonly sonarrClient: SonarrApiService,
     private readonly mappingService: MappingService,
     private readonly cache: TtlCache<LeanSonarrSeries[]>,
+    private readonly emitLibraryMutation?: (payload: LibraryMutationPayload) => Promise<void> | void,
   ) {}
+
+  private async notifyLibraryMutation(payload: LibraryMutationPayload): Promise<void> {
+    if (!this.emitLibraryMutation) return;
+    try {
+      await this.emitLibraryMutation(payload);
+    } catch (error) {
+      logError(normalizeError(error), 'LibraryService:notifyLibraryMutation');
+    }
+  }
 
   public async getLeanSeriesList(): Promise<LeanSonarrSeries[]> {
     const cached = await this.cache.read(CACHE_KEY);
@@ -175,8 +189,10 @@ export class LibraryService {
     const liveSeries = await this.sonarrClient.getSeriesByTvdbId(tvdbId, credentials);
 
     if (liveSeries) {
+      let cacheMutated = false;
       if (!existsInCache) {
         await this.addSeriesToCache(liveSeries);
+        cacheMutated = true;
       }
 
       const finalSeries = existsInCache
@@ -186,6 +202,10 @@ export class LibraryService {
             id: liveSeries.id,
             titleSlug: liveSeries.titleSlug,
           };
+
+      if (cacheMutated) {
+        await this.notifyLibraryMutation({ tvdbId, action: 'added' });
+      }
 
       return {
         exists: true,
@@ -197,6 +217,7 @@ export class LibraryService {
 
     if (existsInCache) {
       await this.removeSeriesFromCache(tvdbId);
+      await this.notifyLibraryMutation({ tvdbId, action: 'removed' });
     }
 
     return {

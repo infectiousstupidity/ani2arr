@@ -44,6 +44,7 @@ export type SeriesStatusOptions = {
 };
 
 export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: SeriesStatusOptions) => {
+  const forceVerify = options?.force_verify === true;
   return useQuery<CheckSeriesStatusResponse, ExtensionError>({
     queryKey: queryKeys.seriesStatus(payload),
     queryFn: async () => {
@@ -67,7 +68,7 @@ export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: Ser
       return getKitsunarrApi().getSeriesStatus(request);
     },
     enabled: !!payload.anilistId && (options?.enabled ?? true),
-    staleTime: 5 * 60 * 1000,
+    staleTime: forceVerify ? 0 : 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 };
