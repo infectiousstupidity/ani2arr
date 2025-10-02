@@ -154,7 +154,7 @@ import {
   createSonarrRootFolderHandler,
   withLatency,
 } from '@/testing/msw-server';
-import { testServer } from '@/testing';
+import { testServer, createExtensionOptionsFixture, createSonarrDefaultsFixture } from '@/testing';
 import type { ExtensionOptions, SonarrFormState, SonarrQualityProfile, SonarrRootFolder } from '@/types';
 import { extensionOptions } from '@/utils/storage';
 import { requestSonarrPermission, validateApiKey, validateUrl } from '@/utils/validation';
@@ -163,27 +163,11 @@ const validateUrlMock = vi.mocked(validateUrl);
 const validateApiKeyMock = vi.mocked(validateApiKey);
 const requestSonarrPermissionMock = vi.mocked(requestSonarrPermission);
 
-const createDefaults = (overrides: Partial<SonarrFormState> = {}): SonarrFormState => ({
-  qualityProfileId: '',
-  rootFolderPath: '',
-  seriesType: 'anime',
-  monitorOption: 'all',
-  seasonFolder: true,
-  searchForMissingEpisodes: true,
-  tags: [],
-  ...overrides,
-});
-
-const createOptions = (overrides: Partial<ExtensionOptions> = {}): ExtensionOptions => {
-  const mergedDefaults = createDefaults(overrides.defaults);
-
-  return {
-    sonarrUrl: '',
-    sonarrApiKey: '',
+const createOptions = (overrides: Partial<ExtensionOptions> = {}): ExtensionOptions =>
+  createExtensionOptionsFixture({
     ...overrides,
-    defaults: mergedDefaults,
-  };
-};
+    defaults: createSonarrDefaultsFixture(overrides.defaults),
+  });
 
 const validUrl = 'https://sonarr.test';
 const validApiKey = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -239,7 +223,7 @@ describe('useSettingsManager', () => {
       createOptions({
         sonarrUrl: validUrl,
         sonarrApiKey: validApiKey,
-        defaults: createDefaults({ qualityProfileId: '', rootFolderPath: '' }),
+        defaults: createSonarrDefaultsFixture({ qualityProfileId: '', rootFolderPath: '' }),
       }),
     );
 
@@ -444,11 +428,13 @@ describe('useSettingsManager', () => {
     });
 
     await waitFor(() => expect(kitsunarrApiMock.testConnection).toHaveBeenCalled());
-    await waitFor(() => expect(extensionOptions.setValue).toHaveBeenCalledWith({
-      sonarrUrl: validUrl,
-      sonarrApiKey: validApiKey,
-      defaults: createDefaults(),
-    }));
+    await waitFor(() =>
+      expect(extensionOptions.setValue).toHaveBeenCalledWith({
+        sonarrUrl: validUrl,
+        sonarrApiKey: validApiKey,
+        defaults: createSonarrDefaultsFixture(),
+      }),
+    );
     await waitFor(() => expect(kitsunarrApiMock.notifySettingsChanged).toHaveBeenCalled());
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.options() }),

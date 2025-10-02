@@ -8,6 +8,7 @@ import {
   useSaveOptions,
 } from '../use-api-queries';
 import type { ExtensionOptions, SonarrFormState } from '@/types';
+import { createExtensionOptionsFixture, createSonarrDefaultsFixture } from '@/testing';
 
 vi.mock('../use-api-queries', () => ({
   useExtensionOptions: vi.fn(),
@@ -21,30 +22,27 @@ const mockedUseSonarrMetadata = vi.mocked(useSonarrMetadata);
 const mockedUseAddSeries = vi.mocked(useAddSeries);
 const mockedUseSaveOptions = vi.mocked(useSaveOptions);
 
-const createDefaults = (overrides: Partial<SonarrFormState> = {}): SonarrFormState => ({
-  qualityProfileId: 12,
-  rootFolderPath: '/anime',
-  seriesType: 'anime',
-  monitorOption: 'all',
-  seasonFolder: true,
-  searchForMissingEpisodes: true,
-  tags: [7, 9],
-  ...overrides,
-});
-
 type OptionsOverrides = Partial<Omit<ExtensionOptions, 'defaults'>> & {
   defaults?: Partial<SonarrFormState>;
 };
 
 const createOptions = (overrides: OptionsOverrides = {}): ExtensionOptions => {
   const { defaults: defaultsOverride, ...rest } = overrides;
-
-  return {
+  return createExtensionOptionsFixture({
     sonarrUrl: 'http://localhost:8989',
     sonarrApiKey: 'abc123',
-    defaults: createDefaults(defaultsOverride),
     ...rest,
-  };
+    defaults: createSonarrDefaultsFixture({
+      qualityProfileId: 12,
+      rootFolderPath: '/anime',
+      seriesType: 'anime',
+      monitorOption: 'all',
+      seasonFolder: true,
+      searchForMissingEpisodes: true,
+      tags: [7, 9],
+      ...defaultsOverride,
+    }),
+  });
 };
 
 let currentOptions: ExtensionOptions | undefined;

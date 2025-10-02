@@ -1,6 +1,6 @@
 // src/services/index.ts
 import { defineProxyService } from '@webext-core/proxy-service';
-import browser from 'webextension-polyfill';
+import { browser } from 'wxt/browser';
 import { createTtlCache } from '@/cache';
 import { SonarrApiService } from '@/api/sonarr.api';
 import { AnilistApiService } from '@/api/anilist.api';

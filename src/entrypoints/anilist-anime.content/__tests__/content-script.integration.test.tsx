@@ -3,9 +3,11 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { act } from '@testing-library/react';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
+import { flushAsync, setLocationHref } from '@/testing';
 
-vi.mock('webextension-polyfill', () => ({
+vi.mock('wxt/browser', () => ({
   default: fakeBrowser,
+  browser: fakeBrowser,
 }));
 
 const persistCallbackMock = vi.fn();
@@ -176,30 +178,6 @@ const setupDom = (title: string) => {
       <h1>${title}</h1>
     </main>
   `;
-};
-
-const flushAsync = () => new Promise<void>(resolve => setTimeout(resolve, 0));
-
-const setLocationHref = (href: string) => {
-  const url = new URL(href);
-  const mockLocation: Partial<Location> = {
-    href: url.href,
-    pathname: url.pathname,
-    assign: vi.fn(),
-    replace: vi.fn(),
-    reload: vi.fn(),
-    toString: () => url.href,
-  };
-  Object.defineProperty(window, 'location', {
-    configurable: true,
-    enumerable: true,
-    value: mockLocation,
-  });
-  Object.defineProperty(globalThis, 'location', {
-    configurable: true,
-    enumerable: true,
-    value: window.location,
-  });
 };
 
 beforeEach(() => {

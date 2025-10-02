@@ -4,7 +4,7 @@
  * @file Provides utility functions for validating user input and managing host permissions.
  * These are pure functions, ensuring they are testable and have no side effects.
  */
-import browser from 'webextension-polyfill';
+import { browser } from 'wxt/browser';
 
 /**
  * Validates and normalizes a URL, ensuring it's a valid HTTP/HTTPS endpoint.

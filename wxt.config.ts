@@ -13,7 +13,7 @@ export default defineConfig({
     },
   },
   srcDir: 'src',
-  modules: ['@wxt-dev/module-react', '@wxt-dev/auto-icons'],
+  modules: ['@wxt-dev/module-react', '@wxt-dev/auto-icons', '@wxt-dev/webextension-polyfill'],
   vite: () =>
     ({
       plugins: [tailwindcss()],

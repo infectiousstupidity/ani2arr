@@ -42,8 +42,8 @@ const { runtimeOnMessage, storageOnChanged, storageLocalGet } = vi.hoisted(() =>
   };
 });
 
-vi.mock('webextension-polyfill', () => ({
-  default: {
+vi.mock('wxt/browser', () => {
+  const mockBrowser = {
     runtime: {
       onMessage: runtimeOnMessage,
     },
@@ -53,8 +53,13 @@ vi.mock('webextension-polyfill', () => ({
         get: storageLocalGet,
       },
     },
-  },
-}));
+  } as const;
+
+  return {
+    default: mockBrowser,
+    browser: mockBrowser,
+  };
+});
 
 import { useKitsunarrBroadcasts } from '../use-broadcasts';
 

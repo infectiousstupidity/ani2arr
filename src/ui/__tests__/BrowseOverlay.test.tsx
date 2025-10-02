@@ -77,17 +77,16 @@ vi.mock('@/ui/AddSeriesModal', () => ({
   default: (props: AddSeriesModalProps) => addSeriesModalSpy(props),
 }));
 
-vi.mock('webextension-polyfill', () => ({
-  __esModule: true,
-  default: {
-    runtime: {
-      openOptionsPage: vi.fn(() => Promise.resolve()),
-    },
-  },
-  runtime: {
+vi.mock('wxt/browser', () => {
+  const runtime = {
     openOptionsPage: vi.fn(() => Promise.resolve()),
-  },
-}));
+  };
+  const mockBrowser = { runtime };
+  return {
+    __esModule: true,
+    default: mockBrowser,
+  };
+});
 
 type SeriesStatusStub = {
   data: Partial<{ exists: boolean; anilistTvdbLinkMissing: boolean }> | null;

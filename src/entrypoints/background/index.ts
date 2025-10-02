@@ -1,6 +1,5 @@
 // src/entrypoints/background/index.ts
-import { defineBackground } from 'wxt/utils/define-background';
-import browser from 'webextension-polyfill';
+import { browser } from 'wxt/browser';
 import { registerKitsunarrApi, getKitsunarrApi } from '@/services';
 import { computeTitleMatchScore } from '@/utils/matching';
 import { logger } from '@/utils/logger';

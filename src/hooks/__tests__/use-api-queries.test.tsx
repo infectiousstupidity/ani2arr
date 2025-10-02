@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ExtensionOptions, ExtensionError } from '@/types';
+import { createExtensionOptionsFixture, createSonarrDefaultsFixture } from '@/testing';
 
 const normalizeErrorMock = vi.hoisted(() => vi.fn<(error: unknown) => ExtensionError>());
 
@@ -45,20 +46,24 @@ const createWrapper = (client: QueryClient) => {
   return QueryClientProviderWrapper;
 };
 
-const createOptions = (overrides?: Partial<ExtensionOptions>): ExtensionOptions => ({
-  sonarrUrl: 'http://localhost:8989',
-  sonarrApiKey: 'secret',
-  defaults: {
-    qualityProfileId: 1,
-    rootFolderPath: '/anime',
-    seriesType: 'anime',
-    monitorOption: 'all',
-    seasonFolder: true,
-    searchForMissingEpisodes: true,
-    tags: [],
-  },
-  ...overrides,
-});
+const createOptions = (overrides?: Partial<ExtensionOptions>): ExtensionOptions => {
+  const { defaults: defaultsOverride, ...rest } = overrides ?? {};
+  return createExtensionOptionsFixture({
+    sonarrUrl: 'http://localhost:8989',
+    sonarrApiKey: 'secret',
+    ...rest,
+    defaults: createSonarrDefaultsFixture({
+      qualityProfileId: 1,
+      rootFolderPath: '/anime',
+      seriesType: 'anime',
+      monitorOption: 'all',
+      seasonFolder: true,
+      searchForMissingEpisodes: true,
+      tags: [],
+      ...defaultsOverride,
+    }),
+  });
+};
 
 const createMockApi = () => ({
   getSeriesStatus: vi.fn<() => Promise<unknown>>(),
