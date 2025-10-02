@@ -3,17 +3,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { TextEncoder as NodeTextEncoder } from 'node:util';
-
-if (!(new NodeTextEncoder().encode('') instanceof Uint8Array)) {
-  throw new Error('Node TextEncoder is not compatible with Uint8Array.');
-}
-
-Object.defineProperty(globalThis, 'TextEncoder', {
-  configurable: true,
-  writable: true,
-  value: NodeTextEncoder,
-});
 
 const browserMocks = vi.hoisted(() => {
   type RuntimeListener = (message: unknown) => unknown | Promise<unknown>;
@@ -37,7 +26,7 @@ const browserMocks = vi.hoisted(() => {
     ...defaults,
     ...storageState,
   }));
-
+  
   const storageLocalSetMock = vi.fn(async (next: Record<string, unknown>) => {
     const changes: Record<string, { oldValue?: unknown; newValue?: unknown }> = {};
     for (const [key, value] of Object.entries(next)) {
@@ -476,7 +465,13 @@ const renderContentRoot = (
   return { ...result, queryClient, user };
 };
 
+
+let alertMock: ReturnType<typeof vi.fn>;
+
 beforeEach(async () => {
+  alertMock = vi.fn();
+  vi.stubGlobal('alert', alertMock);
+  
   browserMocks.sendMessageMock.mockClear();
   browserMocks.openOptionsPageMock.mockClear();
   browserMocks.storageLocalGetMock.mockClear();
@@ -494,7 +489,9 @@ beforeEach(async () => {
   sessionStorage.clear();
 });
 
+
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
 
@@ -506,7 +503,6 @@ const findActionButton = async () =>
 
 describe('ContentRoot', () => {
   it('alerts and opens options when quick add is attempted without configuration', async () => {
-    const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const { user } = renderContentRoot();
 
     const quickAddButton = await findActionButton();
@@ -514,8 +510,6 @@ describe('ContentRoot', () => {
 
     expect(alertMock).toHaveBeenCalledWith('Please configure your Sonarr settings first.');
     expect(browser.runtime.openOptionsPage).toHaveBeenCalledTimes(1);
-
-    alertMock.mockRestore();
   });
 
   it('transitions to "In Sonarr" after a successful quick add', async () => {

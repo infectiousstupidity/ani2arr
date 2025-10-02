@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
@@ -108,9 +107,13 @@ describe('SonarrForm', () => {
     expect(handleChange).toHaveBeenCalledWith('tags', [10, 11]);
 
     const switches = screen.getAllByRole('switch');
+    expect(switches.length).toBeGreaterThanOrEqual(2);
+
+    if (!switches[0]) throw new Error('First switch not found');
     await user.click(switches[0]);
     expect(handleChange).toHaveBeenCalledWith('seasonFolder', true);
 
+    if (!switches[1]) throw new Error('Second switch not found');
     await user.click(switches[1]);
     expect(handleChange).toHaveBeenCalledWith('searchForMissingEpisodes', true);
   });

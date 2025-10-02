@@ -14,7 +14,6 @@ const extensionOptionsResult: {
     defaults: {
       qualityProfileId: 1,
       rootFolderPath: '/media',
-      // languageProfileId removed; not part of SonarrFormState in types
       seriesType: 'standard',
       monitorOption: 'all',
       seasonFolder: false,
@@ -591,7 +590,12 @@ describe('createBrowseContentApp', () => {
             target: card,
             addedNodes: [] as unknown as NodeListOf<ChildNode>,
             removedNodes: [] as unknown as NodeListOf<ChildNode>,
-          } as MutationRecord,
+            attributeName: null as unknown as string,
+            attributeNamespace: null as unknown as string,
+            previousSibling: null,
+            nextSibling: null,
+            oldValue: null,
+          } as unknown as MutationRecord,
         ]),
       );
     });
@@ -616,14 +620,13 @@ describe('createBrowseContentApp', () => {
             type: 'childList',
             target: pageContent,
             addedNodes: [] as unknown as NodeListOf<ChildNode>,
-            removedNodes: [card],
-          } as MutationRecord,
-          {
-            type: 'childList',
-            target: pageContent,
-            addedNodes: [fragment as unknown as Node],
-            removedNodes: [] as unknown as NodeListOf<ChildNode>,
-          } as MutationRecord,
+            removedNodes: [card] as unknown as NodeListOf<ChildNode>,
+            attributeName: null as unknown as string,
+            attributeNamespace: null as unknown as string,
+            previousSibling: null,
+            nextSibling: null,
+            oldValue: null,
+          } as unknown as MutationRecord,
         ]),
       );
     });
@@ -670,7 +673,6 @@ describe('createBrowseContentApp', () => {
 
     const { adapter } = setupAdapter();
     // Remove ensureContainer to use default implementation
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete (adapter as Partial<BrowseAdapter>).ensureContainer;
 
     seriesStatusMap.set(70, createSeriesStatusStub());

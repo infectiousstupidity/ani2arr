@@ -117,7 +117,7 @@ vi.mock('wxt/utils/content-script-ui/shadow-root', () => ({
         options.onRemove?.(mountedRoot ?? undefined);
         host.remove();
       },
-    } satisfies import('wxt/utils/content-script-ui/shadow-root').ShadowRootContentScriptUi<Root>;
+  } as unknown as import('wxt/utils/content-script-ui/shadow-root').ShadowRootContentScriptUi<Root>;
   }),
 }));
 
@@ -312,7 +312,9 @@ beforeEach(() => {
 
   setLocationHref('https://anilist.co/');
 
-  g.defineContentScript = ((definition: unknown) => definition) as GlobalWithWxt['defineContentScript'];
+  (window as unknown as Record<string, unknown>).defineContentScript = ((definition: unknown) => definition) as unknown as (
+    (definition: unknown) => unknown
+  );
   g.MatchPattern = TestMatchPattern;
   g.ResizeObserver = TestResizeObserver as unknown as typeof ResizeObserver;
 });
@@ -375,7 +377,7 @@ describe('AniList browse content script integration', () => {
 
     expect(cover1.querySelectorAll('.kitsunarr-overlay-container')).toHaveLength(1);
     expect(cover2.querySelectorAll('.kitsunarr-overlay-container')).toHaveLength(1);
-    expect(cover2.querySelector('.kitsunarr-overlay-container')?.dataset.origin).toBe('existing');
+  expect((cover2.querySelector('.kitsunarr-overlay-container') as HTMLElement)?.dataset.origin).toBe('existing');
     expect(cover3.querySelectorAll('.kitsunarr-overlay-container')).toHaveLength(1);
     expect(cover4.querySelectorAll('.kitsunarr-overlay-container')).toHaveLength(1);
 

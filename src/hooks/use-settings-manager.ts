@@ -48,8 +48,10 @@ export function useSettingsManager() {
   const [formState, setFormState] = useState<ExtensionOptions>(getInitialOptions());
 
   const { data: savedOptions, isLoading: isLoadingOptions } = useExtensionOptions();
-  const { mutateAsync: testConnection, ...testConnectionMutation } = useTestConnection();
-  const { mutate: saveOptions, ...saveMutation } = useSaveOptions();
+  const testConnectionMutation = useTestConnection();
+  const { mutateAsync: testConnection } = testConnectionMutation;
+  const saveMutation = useSaveOptions();
+  const { mutate: saveOptions } = saveMutation;
 
   const isConnected = testConnectionMutation.isSuccess;
 

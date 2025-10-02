@@ -60,7 +60,9 @@ describe('MultiTagInput', () => {
     );
 
     const removeButtons = screen.getAllByRole('button', { name: /Remove/ });
-    fireEvent.click(removeButtons[0]);
+    // assert element exists and use non-null assertion to satisfy TypeScript
+    expect(removeButtons[0]).toBeTruthy();
+    fireEvent.click(removeButtons[0]!);
     expect(handleChange).toHaveBeenCalledWith(['second']);
 
     rerender(<MultiTagInput value={['first']} onChange={handleChange} />);
@@ -93,7 +95,8 @@ describe('MultiTagInput', () => {
     expect(handleChange).not.toHaveBeenCalled();
 
     const reactKey = Object.keys(removeButton).find(key => key.startsWith('__reactProps$'));
-    const reactProps = reactKey ? (removeButton as Record<string, unknown>)[reactKey] : null;
+    // cast via unknown first to satisfy strict TS checks before indexing
+    const reactProps = reactKey ? (removeButton as unknown as Record<string, unknown>)[reactKey] : null;
     expect(reactProps && typeof (reactProps as { onClick?: unknown }).onClick).toBe('function');
     (reactProps as { onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void } | null)?.onClick?.(
       {
