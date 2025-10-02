@@ -6,8 +6,9 @@ const initMappings = vi.fn(async () => {});
 const getKitsunarrApi = vi.fn(() => ({ initMappings }));
 const computeTitleMatchScore = vi.fn();
 
-vi.mock('webextension-polyfill', () => ({
+vi.mock('wxt/browser', () => ({
   default: fakeBrowser,
+  browser: fakeBrowser,
 }));
 
 vi.mock('@/services', () => ({
@@ -42,8 +43,8 @@ const NO_SENDER = undefined as unknown as Parameters<typeof fakeBrowser.runtime.
 describe('background entrypoint', () => {
   beforeEach(() => {
     fakeBrowser.reset();
-    fakeBrowser.runtime.resetState();
-    fakeBrowser.alarms.resetState();
+    fakeBrowser.runtime?.resetState?.();
+    fakeBrowser.alarms?.resetState?.();
     initMappings.mockClear();
     registerKitsunarrApi.mockClear();
     getKitsunarrApi.mockClear();

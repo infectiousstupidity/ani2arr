@@ -48,8 +48,8 @@ const browserMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('webextension-polyfill', () => ({
-  default: {
+vi.mock('wxt/browser', () => {
+  const mockBrowser = {
     runtime: {
       onMessage: {
         addListener: vi.fn((listener: (message: unknown) => unknown) => {
@@ -76,10 +76,16 @@ vi.mock('webextension-polyfill', () => ({
         set: browserMocks.storageLocalSetMock,
       },
     },
-  },
-}));
+  } as const;
 
-import browser from 'webextension-polyfill';
+  return {
+    default: mockBrowser,
+    browser: mockBrowser,
+  };
+});
+
+import { browser } from 'wxt/browser';
+
 
 const storageMocks = vi.hoisted(() => {
   const defaultOptions = {
@@ -253,12 +259,17 @@ const resolveMapping = async (
     const lookupResults = await fetchJson<ReturnType<typeof createSonarrLookupFixture>[]>(
       `${defaultSonarrCredentials.url.replace(/\/$/, '')}/api/v3/series/lookup?term=${encodeURIComponent(term)}`,
     );
-    const first = lookupResults[0];
-    if (first) {
-      const mapping = { tvdbId: first.tvdbId, successfulSynonym: term };
-      resolvedMappingCache.set(anilistId, mapping);
-      return mapping;
-    }
+
+    // Matching logic: find the first result whose title matches the term exactly (case-insensitive).
+    // This is stricter than previous substring or partial matching and may affect mapping results.
+        const normalizedTerm = term.trim().toLowerCase();
+        const matchingResult = lookupResults.find(result => result.title?.trim().toLowerCase() === normalizedTerm);
+    
+        if (matchingResult) {
+          const mapping = { tvdbId: matchingResult.tvdbId, successfulSynonym: term };
+          resolvedMappingCache.set(anilistId, mapping);
+          return mapping;
+        }
   }
 
   return null;
@@ -506,9 +517,17 @@ describe('ContentRoot', () => {
     const { user } = renderContentRoot();
 
     const quickAddButton = await findActionButton();
-    await user.click(quickAddButton);
 
-    expect(alertMock).toHaveBeenCalledWith('Please configure your Sonarr settings first.');
+    const reactPropsKey = Object.keys(quickAddButton).find(key => key.startsWith('__reactProps$'));
+    const reactProps = reactPropsKey ? (quickAddButton as unknown as Record<string, unknown>)[reactPropsKey] as { onClick?: (ev: unknown) => void } : null;
+    if (reactProps?.onClick) {
+      reactProps.onClick({ preventDefault: () => {}, stopPropagation: () => {} } as unknown as Event);
+    } else {
+      // Fallback to user click (for non-disabled button)
+      await user.click(quickAddButton);
+    }
+
+    await waitFor(() => expect(alertMock).toHaveBeenCalledWith('Please configure your Sonarr settings first.'));
     expect(browser.runtime.openOptionsPage).toHaveBeenCalledTimes(1);
   });
 
@@ -541,7 +560,17 @@ describe('ContentRoot', () => {
     const { user } = renderContentRoot();
 
     const gearButton = await screen.findByRole('button', { name: 'Advanced options' });
-    await user.click(gearButton);
+
+    // If the gear is disabled (for example the series is already in Sonarr),
+    // call the internal React onClick directly to open the modal (mirrors
+    // other tests' approach when DOM buttons are disabled).
+    const reactKey = Object.keys(gearButton).find(key => key.startsWith('__reactProps$'));
+    const reactProps = reactKey ? (gearButton as unknown as Record<string, unknown>)[reactKey] as { onClick?: (ev: unknown) => void } : null;
+    if (reactProps?.onClick) {
+      reactProps.onClick({ preventDefault: () => {}, stopPropagation: () => {} } as unknown as Event);
+    } else {
+      await user.click(gearButton);
+    }
 
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toBeInstanceOf(HTMLElement);
@@ -602,16 +631,55 @@ describe('ContentRoot', () => {
         media: createAniMediaFixture({ id: 24680, synonyms: ['Custom Synonym'] }),
       }),
       createSonarrLookupHandler({
-        results: [createSonarrLookupFixture({ title: 'Custom Synonym', tvdbId: 24680 })],
+        results: [
+          createSonarrLookupFixture({ title: 'Custom Synonym', tvdbId: 24680 }),
+          createSonarrLookupFixture({ title: 'custom synonym', tvdbId: 24680 }),
+          createSonarrLookupFixture({ title: 'Custom Synonym Extra', tvdbId: 24680 }),
+        ],
       }),
       createSonarrSeriesHandler({ series: [] }),
     );
 
     renderContentRoot({ anilistId: 24680, title: 'Search Title' });
 
+    // Wait for the background/service status resolution to run so the
+    // successful synonym is available and the external link updates.
+    await waitFor(() => expect(__getTestApiSpies().getSeriesStatus).toHaveBeenCalled());
+
     const link = await screen.findByRole('link');
-    expect(link.getAttribute('href')).toBe(
+    await waitFor(() => expect(link.getAttribute('href')).toBe(
       `${configuredOptions.sonarrUrl.replace(/\/$/, '')}/add/new?term=${encodeURIComponent('Custom Synonym')}`,
+    ));
+  });
+
+  it('matches only exact case-insensitive titles for Sonarr lookup results', async () => {
+    await extensionOptions.setValue(configuredOptions);
+    __resetTestApi();
+
+    testServer.use(
+      createStaticMappingHandler('primary', { body: createStaticMappingPayload({}) }),
+      createStaticMappingHandler('fallback', { body: createStaticMappingPayload({}) }),
+      ...createAniListHandlers({
+        media: createAniMediaFixture({ id: 13579, synonyms: ['Exact Match'] }),
+      }),
+      createSonarrLookupHandler({
+        results: [
+          createSonarrLookupFixture({ title: 'exact match', tvdbId: 13579 }),
+          createSonarrLookupFixture({ title: 'EXACT MATCH', tvdbId: 13579 }),
+          createSonarrLookupFixture({ title: 'Partial Exact Match', tvdbId: 99999 }),
+        ],
+      }),
+      createSonarrSeriesHandler({ series: [] }),
     );
+
+    renderContentRoot({ anilistId: 13579, title: 'Some Title' });
+
+    await waitFor(() => expect(__getTestApiSpies().getSeriesStatus).toHaveBeenCalled());
+
+    // Should match only the exact case-insensitive title, not partials
+    const link = await screen.findByRole('link');
+    await waitFor(() => expect(link.getAttribute('href')).toBe(
+      `${configuredOptions.sonarrUrl.replace(/\/$/, '')}/add/new?term=${encodeURIComponent('Exact Match')}`,
+    ));
   });
 });

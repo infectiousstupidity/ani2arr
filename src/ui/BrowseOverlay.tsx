@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import browser from 'webextension-polyfill';
+import { browser } from 'wxt/browser';
 import { createPortal } from 'react-dom';
 import { useAddSeries, useExtensionOptions, useSeriesStatus } from '@/hooks/use-api-queries';
 import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';

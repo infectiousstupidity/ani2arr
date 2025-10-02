@@ -1,7 +1,8 @@
 // src/hooks/use-broadcasts.ts
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import browser from 'webextension-polyfill';
+import { browser } from 'wxt/browser';
+
 
 const SERIES_ROOT_KEY = ['kitsunarr', 'seriesStatus'] as const;
 const LIBRARY_SESSION_KEY = 'kitsunarr_library_epoch';

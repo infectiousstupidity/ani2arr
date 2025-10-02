@@ -33,6 +33,11 @@ export default defineConfig([
 
   // Project-wide rules
   {
+    settings: {
+      react: {
+        version: "detect",
+      },
+    },
     rules: {
       "react/prop-types": "off",
       "react/display-name": ["error", { ignoreTranspilerName: false }],
