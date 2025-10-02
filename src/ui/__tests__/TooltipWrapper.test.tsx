@@ -1,8 +1,7 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
+// src/ui/__tests__/TooltipWrapper.test.tsx
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, describe, expect, it } from 'vitest';
-
 import * as Tooltip from '@radix-ui/react-tooltip';
 
 import TooltipWrapper, { HelpTooltip } from '../TooltipWrapper';
@@ -13,7 +12,6 @@ beforeAll(() => {
     unobserve() {}
     disconnect() {}
   }
-  // @ts-expect-error - assign mock
   global.ResizeObserver = ResizeObserverMock;
 });
 
@@ -24,7 +22,7 @@ describe('TooltipWrapper', () => {
     document.body.appendChild(portalHost);
 
     render(
-      <Tooltip.Provider>
+      <Tooltip.Provider delayDuration={0} skipDelayDuration={0}>
         <TooltipWrapper content="Tooltip text" container={portalHost}>
           <button type="button">Trigger</button>
         </TooltipWrapper>
@@ -33,22 +31,27 @@ describe('TooltipWrapper', () => {
 
     await user.hover(screen.getByRole('button', { name: 'Trigger' }));
 
-    await screen.findAllByText('Tooltip text');
-    expect(portalHost.textContent).toContain('Tooltip text');
+    // Assert by role within the provided portal container.
+    await waitFor(() => {
+      const tip = within(portalHost).getByRole('tooltip');
+      expect(tip).toBeInTheDocument();
+      expect(tip).toHaveTextContent('Tooltip text');
+    });
   });
 
   it('provides default help trigger', async () => {
     const user = userEvent.setup();
 
     render(
-      <Tooltip.Provider>
+      <Tooltip.Provider delayDuration={0} skipDelayDuration={0}>
         <HelpTooltip content="Help" />
       </Tooltip.Provider>,
     );
 
-    const trigger = screen.getByRole('button');
-    await user.hover(trigger);
-    const helpMessages = await screen.findAllByText('Help');
-    expect(helpMessages.length).toBeGreaterThan(0);
+    await user.hover(screen.getByRole('button'));
+
+    // Assert via role to avoid duplicate text nodes
+    const tip = await screen.findByRole('tooltip');
+    expect(tip).toHaveTextContent('Help');
   });
 });

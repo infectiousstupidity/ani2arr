@@ -5,6 +5,42 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { SonarrFormState } from '@/types';
 
+type SonarrMetadataData = {
+  qualityProfiles: { id: number; name: string }[];
+  rootFolders: { id: number; path: string }[];
+  tags: { id: number; label: string }[];
+} | null;
+
+type Manager = {
+  isLoading: boolean;
+  isConnected: boolean;
+  isDirty: boolean;
+  formState: {
+    sonarrUrl: string;
+    sonarrApiKey: string;
+    defaults: SonarrFormState;
+  };
+  handleFieldChange: (field: string, value: unknown) => void;
+  handleTestConnection: () => void;
+  handleRefresh: () => void;
+  handleDefaultsChange: (key: string, value: unknown) => void;
+  handleSave: () => void;
+  resetConnection: () => void;
+  testConnectionState: {
+    isError: boolean;
+    isPending: boolean;
+    isSuccess: boolean;
+  };
+  sonarrMetadata: {
+    isFetching: boolean;
+    isRefetching: boolean;
+    data: SonarrMetadataData;
+  };
+  saveState: {
+    isPending: boolean;
+  };
+};
+
 const handleTestConnection = vi.fn();
 const handleFieldChange = vi.fn();
 const handleRefresh = vi.fn();
@@ -22,7 +58,7 @@ const defaultFormState: SonarrFormState = {
   tags: [],
 };
 
-const baseManager = () => ({
+const baseManager = (): Manager => ({
   isLoading: false,
   isConnected: false,
   isDirty: false,
@@ -62,7 +98,7 @@ const baseManager = () => ({
   },
 });
 
-const createManager = (overrides: Partial<ReturnType<typeof baseManager>> = {}) => ({
+const createManager = (overrides: Partial<Manager> = {}): Manager => ({
   ...baseManager(),
   ...overrides,
 });

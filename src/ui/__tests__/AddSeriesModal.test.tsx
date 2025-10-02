@@ -39,7 +39,7 @@ vi.mock('../TooltipWrapper', () => ({
 
 import AddSeriesModal from '../AddSeriesModal';
 
-let sendMessageSpy: ReturnType<typeof vi.spyOn>;
+let sendMessageSpy: unknown;
 
 const baseManager = () => ({
   formState: {
@@ -115,7 +115,13 @@ describe('AddSeriesModal', () => {
   });
 
   it('renders loading state when metadata is unavailable', () => {
-    useAddSeriesManagerMock.mockImplementation(() => createManager({ sonarrMetadata: { data: null }, formState: null, isLoading: true }));
+    // these overrides intentionally set parts of the manager to null to test
+    // loading behavior; cast to `any`/Partial to satisfy strict types in TS
+    useAddSeriesManagerMock.mockImplementation(() =>
+      createManager(
+        ({ sonarrMetadata: { data: null }, formState: null, isLoading: true } as unknown) as Partial<ReturnType<typeof baseManager>>,
+      ),
+    );
 
     render(
       <AddSeriesModal
@@ -150,8 +156,9 @@ describe('AddSeriesModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add Series' }));
     expect(manager.handleAddSeries).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByLabelText('Open options page'));
-    expect(sendMessageSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'OPEN_OPTIONS_PAGE' }));
+  fireEvent.click(screen.getByLabelText('Open options page'));
+  // spy type is intentionally loose for the fakeBrowser runtime; cast at assertion
+  expect(sendMessageSpy as ReturnType<typeof vi.spyOn>).toHaveBeenCalledWith(expect.objectContaining({ type: 'OPEN_OPTIONS_PAGE' }));
 
     expect(useThemeMock).toHaveBeenCalled();
     const focusButton = screen.getByRole('button', { name: 'Form focus' });

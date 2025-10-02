@@ -98,7 +98,7 @@ vi.mock('@/utils/logger', () => ({
 }));
 
 type GlobalWithWxt = typeof globalThis & {
-  defineContentScript?: <T>(definition: T) => T;
+  defineContentScript?: <T>(definition: T) => T | undefined;
   MatchPattern?: new (pattern: string) => { includes(url: string): boolean };
   ResizeObserver?: typeof ResizeObserver;
 };
@@ -214,7 +214,9 @@ beforeEach(() => {
 
   setLocationHref('https://anilist.co/anime/123');
 
-  g.defineContentScript = ((definition: unknown) => definition) as GlobalWithWxt['defineContentScript'];
+  (window as unknown as Record<string, unknown>).defineContentScript = ((definition: unknown) => definition) as unknown as (
+    (definition: unknown) => unknown
+  );
   g.MatchPattern = TestMatchPattern;
   g.ResizeObserver = TestResizeObserver as unknown as typeof ResizeObserver;
 });
@@ -225,16 +227,16 @@ afterEach(() => {
 });
 
 afterAll(() => {
-  if (originalDefineContentScript) g.defineContentScript = originalDefineContentScript;
-  else delete g.defineContentScript;
   if (originalDefineContentScript)
-    (window as Record<string, unknown>).defineContentScript = originalDefineContentScript as unknown as (definition: unknown) => unknown;
-  else delete (window as Record<string, unknown>).defineContentScript;
+    (window as unknown as Record<string, unknown>).defineContentScript = originalDefineContentScript as unknown as (
+      (definition: unknown) => unknown
+    );
+  else delete (window as unknown as Record<string, unknown>).defineContentScript;
 
   if (originalMatchPattern) g.MatchPattern = originalMatchPattern;
   else delete g.MatchPattern;
-  if (originalMatchPattern) (window as Record<string, unknown>).MatchPattern = originalMatchPattern;
-  else delete (window as Record<string, unknown>).MatchPattern;
+  if (originalMatchPattern) (window as unknown as Record<string, unknown>).MatchPattern = originalMatchPattern;
+  else delete (window as unknown as Record<string, unknown>).MatchPattern;
 
   if (originalResizeObserver) g.ResizeObserver = originalResizeObserver;
   else delete g.ResizeObserver;

@@ -4,6 +4,7 @@ import { cleanup } from '@testing-library/react';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { testServer, defaultTestHandlers, resetDefaultTestHandlers } from '@/testing';
 import { TextEncoder as NodeTextEncoder, TextDecoder as NodeTextDecoder } from 'node:util';
+import 'fake-indexeddb/auto';
 
 type G = typeof globalThis & {
   browser?: typeof fakeBrowser;
@@ -53,3 +54,11 @@ afterEach(() => {
 afterAll(() => {
   testServer.close();
 });
+
+if (typeof global.ResizeObserver === 'undefined') {
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}

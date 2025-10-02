@@ -119,12 +119,12 @@ vi.mock('wxt/utils/content-script-ui/shadow-root', () => ({
         options.onRemove?.(mountedRoot ?? undefined);
         host.remove();
       },
-    } satisfies import('wxt/utils/content-script-ui/shadow-root').ShadowRootContentScriptUi<Root>;
+  } as unknown as import('wxt/utils/content-script-ui/shadow-root').ShadowRootContentScriptUi<Root>;
   }),
 }));
 
 type GlobalWithWxt = typeof globalThis & {
-  defineContentScript?: <T>(definition: T) => T;
+  defineContentScript?: <T>(definition: T) => T | undefined;
   MatchPattern?: new (pattern: string) => { includes(url: string): boolean };
   ResizeObserver?: typeof ResizeObserver;
 };
@@ -307,7 +307,9 @@ beforeEach(() => {
 
   setLocationHref('https://anichart.net/spring');
 
-  g.defineContentScript = ((definition: unknown) => definition) as GlobalWithWxt['defineContentScript'];
+  (window as unknown as Record<string, unknown>).defineContentScript = ((definition: unknown) => definition) as unknown as (
+    (definition: unknown) => unknown
+  );
   g.MatchPattern = TestMatchPattern;
   g.ResizeObserver = TestResizeObserver as unknown as typeof ResizeObserver;
 });
@@ -358,7 +360,7 @@ describe('AniChart browse content script integration', () => {
 
     expect(dom.tvCard1.cover.querySelectorAll('.kitsunarr-overlay-container')).toHaveLength(1);
     expect(dom.tvCard2.cover.querySelectorAll('.kitsunarr-overlay-container')).toHaveLength(1);
-    expect(dom.tvCard2.cover.querySelector('.kitsunarr-overlay-container')?.dataset.origin).toBe('existing');
+  expect((dom.tvCard2.cover.querySelector('.kitsunarr-overlay-container') as HTMLElement)?.dataset.origin).toBe('existing');
 
     expect(dom.tvCard1.cover.getAttribute('data-kitsunarr-processed')).toBe('111');
     expect(dom.tvCard2.cover.getAttribute('data-kitsunarr-processed')).toBe('222');

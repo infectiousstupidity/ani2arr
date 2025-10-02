@@ -44,8 +44,8 @@ const createAddSeriesStub = (overrides: Partial<AddSeriesStub> = {}): AddSeriesS
   ...overrides,
 });
 
-const useSeriesStatusMock = vi.fn<[], SeriesStatusStub>();
-const useAddSeriesMock = vi.fn<[], AddSeriesStub>();
+const useSeriesStatusMock = vi.fn();
+const useAddSeriesMock = vi.fn();
 const useThemeMock = vi.fn();
 const tooltipCalls: Array<{ content?: React.ReactNode; children: React.ReactNode }> = [];
 
@@ -106,6 +106,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+type ReactInternalProps = { onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void } & Record<string, unknown>;
+
+function getReactInternalProps(
+  element: HTMLElement,
+): ReactInternalProps | null {
+  const reactPropsKey = Object.keys(element).find(key => key.startsWith('__reactProps$'));
+  return reactPropsKey
+    ? (element as unknown as Record<string, unknown>)[reactPropsKey] as unknown as ReactInternalProps
+    : null;
+}
+
 describe('CardOverlay', () => {
   it('disables quick add when Sonarr is not configured', async () => {
     render(
@@ -118,10 +129,9 @@ describe('CardOverlay', () => {
 
     const quickButton = screen.getByRole('button', { name: 'Configure Sonarr before adding' });
     expect(quickButton).toBeDisabled();
-    const reactPropsKey = Object.keys(quickButton).find(key => key.startsWith('__reactProps$'));
-    const reactProps = reactPropsKey ? (quickButton as Record<string, unknown>)[reactPropsKey] : null;
+    const reactProps = getReactInternalProps(quickButton);
     expect(typeof reactProps?.onClick).toBe('function');
-    (reactProps?.onClick as ((event: React.MouseEvent<HTMLButtonElement>) => void) | undefined)?.({
+    reactProps?.onClick?.({
       preventDefault: () => {},
       stopPropagation: () => {},
     } as React.MouseEvent<HTMLButtonElement>);
@@ -141,9 +151,8 @@ describe('CardOverlay', () => {
     const quickButton = screen.getByRole('button', { name: 'Resolving series mapping.' });
     expect(quickButton).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Resolving series mapping.' }).querySelector('.kitsunarr-card-overlay__spinner')).not.toBeNull();
-    const reactKey = Object.keys(quickButton).find(key => key.startsWith('__reactProps$'));
-    const reactProps = reactKey ? (quickButton as Record<string, unknown>)[reactKey] : null;
-    (reactProps as { onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void } | null)?.onClick?.(
+    const reactProps = getReactInternalProps(quickButton);
+    reactProps?.onClick?.(
       {
         preventDefault: () => {},
         stopPropagation: () => {},
@@ -161,8 +170,9 @@ describe('CardOverlay', () => {
     const quickButton = screen.getByRole('button', { name: 'Adding to Sonarr.' });
     expect(quickButton).toBeDisabled();
     const reactKey = Object.keys(quickButton).find(key => key.startsWith('__reactProps$'));
-    const reactProps = reactKey ? (quickButton as Record<string, unknown>)[reactKey] : null;
-    (reactProps as { onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void } | null)?.onClick?.(
+    type ReactInternalProps = { onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void } & Record<string, unknown>;
+    const reactProps = reactKey ? (quickButton as unknown as Record<string, unknown>)[reactKey] as unknown as ReactInternalProps : null;
+    reactProps?.onClick?.(
       {
         preventDefault: () => {},
         stopPropagation: () => {},
@@ -311,8 +321,9 @@ describe('CardOverlay', () => {
     expect(quickButton).toBeDisabled();
     expect(document.querySelector('[data-state="in-sonarr"]')).toBeInTheDocument();
     const reactKey = Object.keys(quickButton).find(key => key.startsWith('__reactProps$'));
-    const reactProps = reactKey ? (quickButton as Record<string, unknown>)[reactKey] : null;
-    (reactProps as { onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void } | null)?.onClick?.(
+    type ReactInternalProps = { onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void } & Record<string, unknown>;
+    const reactProps = reactKey ? (quickButton as unknown as Record<string, unknown>)[reactKey] as unknown as ReactInternalProps : null;
+    reactProps?.onClick?.(
       {
         preventDefault: () => {},
         stopPropagation: () => {},

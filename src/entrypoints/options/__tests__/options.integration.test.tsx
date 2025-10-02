@@ -1,4 +1,3 @@
-import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen } from '@testing-library/react';
 const settingsFormMock = vi.fn(() => <div data-testid="settings-form">Settings Form</div>);
