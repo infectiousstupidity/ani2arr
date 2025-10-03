@@ -1,4 +1,5 @@
-import type { AniMedia, AniTitles } from '@/api/anilist.api';
+import type { AniMedia } from '@/api/anilist.api';
+import type { AniTitles } from '@/types';
 
 const defaultTitles: AniTitles = {
   romaji: 'Kitsunarr Test',

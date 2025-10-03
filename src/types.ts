@@ -1,6 +1,36 @@
 // src/types.ts
 
 //================================================================
+// AniList types
+//================================================================
+
+export type AniFormat =
+  | 'TV'
+  | 'TV_SHORT'
+  | 'MOVIE'
+  | 'SPECIAL'
+  | 'OVA'
+  | 'ONA'
+  | 'MUSIC'
+  | 'MANGA'
+  | 'NOVEL'
+  | 'ONE_SHOT';
+
+export interface AniTitles {
+  romaji?: string;
+  english?: string;
+  native?: string;
+}
+
+export interface MediaMetadataHint {
+  titles?: AniTitles | null;
+  synonyms?: string[] | null;
+  startYear?: number | null;
+  format?: AniFormat | null;
+  relationPrequelIds?: number[] | null;
+}
+
+//================================================================
 // Sonarr API Enums and Types
 //================================================================
 
@@ -83,11 +113,13 @@ export interface AddRequestPayload extends Partial<SonarrFormState> {
   title: string;
   anilistId: number;
   tvdbId?: number;
+  metadata?: MediaMetadataHint | null;
 }
 
 export interface CheckSeriesStatusPayload {
   anilistId: number;
   title?: string;
+  metadata?: MediaMetadataHint | null;
 }
 
 export interface CheckSeriesStatusResponse {

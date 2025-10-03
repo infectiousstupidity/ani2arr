@@ -151,9 +151,16 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
     const api: KitsunarrApi = {
       async resolveMapping(input) {
         await ensureConfigured();
-        const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {};
+  const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {};
+  const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
         if (input.primaryTitleHint) {
-          resolveOptions.hints = { primaryTitle: input.primaryTitleHint };
+          hints.primaryTitle = input.primaryTitleHint;
+        }
+        if (input.metadata) {
+          hints.domMedia = input.metadata;
+        }
+        if (Object.keys(hints).length > 0) {
+          resolveOptions.hints = hints;
         }
         const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
         return {
@@ -167,6 +174,9 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
         const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
         if (input.title !== undefined) {
           payload.title = input.title;
+        }
+        if (input.metadata !== undefined) {
+          payload.metadata = input.metadata;
         }
         const requestOptions: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {};
         if (input.force_verify) {
@@ -187,8 +197,15 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
         const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {
           ignoreFailureCache: true,
         };
+        const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
         if (input.primaryTitleHint) {
-          resolveOptions.hints = { primaryTitle: input.primaryTitleHint };
+          hints.primaryTitle = input.primaryTitleHint;
+        }
+        if (input.metadata) {
+          hints.domMedia = input.metadata;
+        }
+        if (Object.keys(hints).length > 0) {
+          resolveOptions.hints = hints;
         }
         const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
 
@@ -197,6 +214,7 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
           anilistId: input.anilistId,
           title: input.title,
           tvdbId: mapping.tvdbId,
+          ...(input.metadata ? { metadata: input.metadata } : {}),
         };
 
         const created = await sonarrApiService.addSeries(payload, options);

@@ -1,6 +1,7 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { createBrowserMock } from '@/testing';
 
 import type { BrowseAdapter, ParsedCard } from '../BrowseOverlay';
 import { createBrowseContentApp } from '../BrowseOverlay';
@@ -28,7 +29,7 @@ let currentAddSeriesResult = createAddSeriesStub();
 
 const useExtensionOptionsMock = vi.fn(() => extensionOptionsResult);
 const useSeriesStatusMock = vi.fn(
-  (payload: { anilistId: number; title?: string }) =>
+  (payload: { anilistId: number; title?: string; metadata?: unknown | null }) =>
     seriesStatusMap.get(payload.anilistId) ?? createSeriesStatusStub(),
 );
 const useAddSeriesMock = vi.fn(() => currentAddSeriesResult);
@@ -40,7 +41,12 @@ const TooltipWrapperMock = vi.fn(
   ({ children }: { children: React.ReactNode; container?: HTMLElement | null }) => <>{children}</>,
 );
 
-type AddSeriesModalProps = { anilistId?: number; title?: string; portalContainer?: HTMLElement | null };
+type AddSeriesModalProps = {
+  anilistId?: number;
+  title?: string;
+  metadata?: unknown | null;
+  portalContainer?: HTMLElement | null;
+};
 const addSeriesModalSpy = vi.fn((props: AddSeriesModalProps) => (
   <div
     data-testid="add-series-modal"
@@ -53,7 +59,7 @@ const addSeriesModalSpy = vi.fn((props: AddSeriesModalProps) => (
 vi.mock('@/hooks/use-api-queries', () => ({
   __esModule: true,
   useExtensionOptions: () => useExtensionOptionsMock(),
-  useSeriesStatus: (payload: { anilistId: number; title?: string }) => useSeriesStatusMock(payload),
+  useSeriesStatus: (payload: { anilistId: number; title?: string; metadata?: unknown | null }) => useSeriesStatusMock(payload),
   useAddSeries: () => useAddSeriesMock(),
 }));
 
@@ -82,10 +88,7 @@ vi.mock('wxt/browser', () => {
     openOptionsPage: vi.fn(() => Promise.resolve()),
   };
   const mockBrowser = { runtime };
-  return {
-    __esModule: true,
-    default: mockBrowser,
-  };
+  return createBrowserMock(mockBrowser);
 });
 
 type SeriesStatusStub = {
@@ -193,6 +196,7 @@ const setupAdapter = (overrides: Partial<BrowseAdapter> = {}) => {
     return {
       anilistId: Number(element.dataset.anilistId ?? 0),
       title: element.dataset.title ?? '',
+      metadata: null,
       host,
     };
   });
@@ -485,6 +489,7 @@ describe('createBrowseContentApp', () => {
       anilistId: 20,
       title: 'Addable Card',
       primaryTitleHint: 'Addable Card',
+      metadata: null,
       form: extensionOptionsResult.data.defaults,
     });
 
@@ -501,6 +506,7 @@ describe('createBrowseContentApp', () => {
       expect.objectContaining({
         anilistId: 20,
         title: 'Addable Card',
+        metadata: null,
       }),
     );
   });

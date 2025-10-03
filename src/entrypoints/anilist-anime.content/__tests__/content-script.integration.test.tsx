@@ -2,13 +2,9 @@ import React from 'react';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from '@testing-library/react';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
-import { fakeBrowser } from 'wxt/testing/fake-browser';
-import { flushAsync, setLocationHref } from '@/testing';
+import { createBrowserMock, flushAsync, setLocationHref } from '@/testing';
 
-vi.mock('wxt/browser', () => ({
-  default: fakeBrowser,
-  browser: fakeBrowser,
-}));
+vi.mock('wxt/browser', () => createBrowserMock());
 
 const persistCallbackMock = vi.fn();
 
@@ -300,7 +296,7 @@ describe('AniList anime content script integration', () => {
       status: 'NOT_IN_SONARR',
     });
     expect(useSeriesStatusMock).toHaveBeenLastCalledWith(
-      { anilistId: 456, title: 'Second Title' },
+      expect.objectContaining({ anilistId: 456, title: 'Second Title' }),
       expect.objectContaining({ enabled: true }),
     );
   });

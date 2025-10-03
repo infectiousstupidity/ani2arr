@@ -6,7 +6,9 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { idbQueryCachePersister } from '@/cache/cache-persister';
 import { logger } from '@/utils/logger';
-import type { AniFormat } from '@/api/anilist.api';
+import { extractMediaMetadataFromDom, metadataFromMediaObject, mergeMetadataHints } from '@/utils/anilist-dom';
+import type { MediaMetadataHint } from '@/types';
+import type { AniFormat } from '@/types';
 import browseStyles from './style.css?inline';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
@@ -43,6 +45,17 @@ const CARD_CONTAINER_SELECTORS = [
   '.media-card-wrap',
   '.page-content',
 ];
+
+const metadataCache = new Map<number, MediaMetadataHint | null>();
+
+const getCachedDomMetadata = (anilistId: number): MediaMetadataHint | null => {
+  if (metadataCache.has(anilistId)) {
+    return metadataCache.get(anilistId) ?? null;
+  }
+  const metadata = extractMediaMetadataFromDom(anilistId);
+  metadataCache.set(anilistId, metadata ?? null);
+  return metadata ?? null;
+};
 
 type MediaCardElement = Element & {
   __vue__?: {
@@ -124,7 +137,22 @@ const parseAniListCard = (card: Element): ParsedCard | null => {
 
   if (!title || !Number.isFinite(anilistId)) return null;
 
-  return { anilistId, title, host: cover };
+  const cardWithVue = card as MediaCardElement;
+  const vueMedia = cardWithVue.__vue__?.$props?.media ?? cardWithVue.__vue__?.media;
+  const vueMetadata = metadataFromMediaObject(vueMedia);
+  const domMetadata = getCachedDomMetadata(anilistId);
+  const fallbackMetadata: MediaMetadataHint | null = title || format
+    ? {
+        titles: title ? { romaji: title } : null,
+        synonyms: title ? [title] : null,
+        startYear: null,
+        format: format ?? null,
+        relationPrequelIds: null,
+      }
+    : null;
+  const metadata = mergeMetadataHints(mergeMetadataHints(vueMetadata, domMetadata), fallbackMetadata);
+
+  return { anilistId, title, host: cover, metadata: metadata ?? null };
 };
 
 const ensureOverlayContainer = (cover: HTMLAnchorElement): HTMLElement => {

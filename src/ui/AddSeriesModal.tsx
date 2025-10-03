@@ -1,5 +1,6 @@
 // src/ui/AddSeriesModal.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { browser } from 'wxt/browser';
 import { useAddSeriesManager } from '@/hooks/use-add-series-manager';
 import { useTheme } from '@/hooks/use-theme';
 import { Modal, ModalContent, ModalTitle, ModalFooter } from '@/ui/Modal';
@@ -7,6 +8,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Cross1Icon, ExternalLinkIcon } from '@radix-ui/react-icons';
 import Button from '@/ui/Button';
 import SonarrForm from '@/ui/SonarrForm';
+import type { MediaMetadataHint } from '@/types';
 
 interface AddSeriesModalProps {
   anilistId: number;
@@ -14,6 +16,7 @@ interface AddSeriesModalProps {
   isOpen: boolean;
   onClose: () => void;
   portalContainer?: HTMLElement | null;
+  metadata?: MediaMetadataHint | null;
 }
 
 const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
@@ -22,11 +25,12 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
   isOpen,
   onClose,
   portalContainer,
+  metadata = null,
 }) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const [selectPortal, setSelectPortal] = useState<HTMLElement | null>(null);
   const initialFocusRef = useRef<HTMLButtonElement | null>(null);
-  const manager = useAddSeriesManager(anilistId, title, isOpen);
+  const manager = useAddSeriesManager(anilistId, title, metadata, isOpen);
   const sonarrReady = manager.sonarrReady;
 
   useTheme(hostRef);

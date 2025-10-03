@@ -1,9 +1,14 @@
 // src/hooks/use-add-series-manager.ts
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useExtensionOptions, useSonarrMetadata, useAddSeries, useSaveOptions } from './use-api-queries';
-import type { SonarrFormState } from '@/types';
+import type { MediaMetadataHint, SonarrFormState } from '@/types';
 
-export function useAddSeriesManager(anilistId: number, title: string, isOpen: boolean) {
+export function useAddSeriesManager(
+  anilistId: number,
+  title: string,
+  metadata: MediaMetadataHint | null,
+  isOpen: boolean,
+) {
   const { data: options, isLoading: isLoadingOptions } = useExtensionOptions();
 
   const defaultFormState: SonarrFormState = {
@@ -50,9 +55,10 @@ export function useAddSeriesManager(anilistId: number, title: string, isOpen: bo
       anilistId,
       title,
       primaryTitleHint: title,
+      metadata,
       form: formState,
     });
-  }, [addSeriesMutation, anilistId, formState, sonarrReady, title]);
+  }, [addSeriesMutation, anilistId, formState, metadata, sonarrReady, title]);
 
   const handleSaveDefaults = useCallback(() => {
     if (!formState || !options || !isDirty) return;

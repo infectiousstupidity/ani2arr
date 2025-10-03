@@ -1,10 +1,38 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createBrowserMock, getReactHandler } from '@/testing';
 
 import type { CardOverlayProps } from '../BrowseOverlay';
 import { CardOverlay } from '../BrowseOverlay';
-import { fakeBrowser } from 'wxt/testing/fake-browser';
+
+type FakeBrowser = {
+  runtime: {
+    openOptionsPage: () => Promise<void>;
+    sendMessage: () => Promise<void>;
+    onMessage: {
+      addListener: (listener: (...args: unknown[]) => unknown) => void;
+      removeListener: (listener: (...args: unknown[]) => unknown) => void;
+      hasListener: (listener: (...args: unknown[]) => unknown) => boolean;
+    };
+  };
+};
+
+vi.mock('wxt/browser', () => {
+  const browser: FakeBrowser = {
+    runtime: {
+      openOptionsPage: () => Promise.resolve(),
+      sendMessage: () => Promise.resolve(),
+      onMessage: {
+        addListener: () => {},
+        removeListener: () => {},
+        hasListener: () => false,
+      },
+    },
+  };
+
+  return createBrowserMock(browser);
+});
 
 type SeriesStatusStub = {
   data: Partial<{ exists: boolean; anilistTvdbLinkMissing: boolean }> | null;
@@ -73,6 +101,7 @@ const baseProps: CardOverlayProps = {
   title: 'Test',
   onOpenModal: vi.fn(),
   isConfigured: true,
+  metadata: null,
   defaultForm: {
     qualityProfileId: 1,
     rootFolderPath: '/media',
@@ -87,8 +116,18 @@ const baseProps: CardOverlayProps = {
 let statusStub: SeriesStatusStub;
 let addSeriesStub: AddSeriesStub;
 let openOptionsMock: ReturnType<typeof vi.fn>;
+let fakeBrowser: FakeBrowser;
 
-beforeEach(() => {
+beforeEach(async () => {
+  const browserModule = await import('wxt/browser');
+  fakeBrowser = browserModule.browser as unknown as FakeBrowser;
+
+  // Reset browser runtime handlers between tests.
+  fakeBrowser.runtime.openOptionsPage = vi.fn(() => Promise.resolve());
+  fakeBrowser.runtime.sendMessage = vi.fn(() => Promise.resolve());
+  fakeBrowser.runtime.onMessage.addListener = vi.fn();
+  fakeBrowser.runtime.onMessage.removeListener = vi.fn();
+  fakeBrowser.runtime.onMessage.hasListener = vi.fn(() => false);
   statusStub = createStatusStub();
   addSeriesStub = createAddSeriesStub();
   useSeriesStatusMock.mockImplementation(() => statusStub);
@@ -169,15 +208,11 @@ describe('CardOverlay', () => {
 
     const quickButton = screen.getByRole('button', { name: 'Adding to Sonarr.' });
     expect(quickButton).toBeDisabled();
-    const reactKey = Object.keys(quickButton).find(key => key.startsWith('__reactProps$'));
-    type ReactInternalProps = { onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void } & Record<string, unknown>;
-    const reactProps = reactKey ? (quickButton as unknown as Record<string, unknown>)[reactKey] as unknown as ReactInternalProps : null;
-    reactProps?.onClick?.(
-      {
-        preventDefault: () => {},
-        stopPropagation: () => {},
-      } as React.MouseEvent<HTMLButtonElement>,
-    );
+    const onClick = getReactHandler(quickButton, 'onClick') as React.MouseEventHandler<HTMLButtonElement> | null;
+    onClick?.({
+      preventDefault: () => {},
+      stopPropagation: () => {},
+    } as React.MouseEvent<HTMLButtonElement>);
     expect(addSeriesStub.mutate).not.toHaveBeenCalled();
   });
 
@@ -215,6 +250,7 @@ describe('CardOverlay', () => {
       anilistId: baseProps.anilistId,
       title: baseProps.title,
       primaryTitleHint: baseProps.title,
+      metadata: null,
       form: baseProps.defaultForm,
     });
   });
@@ -290,6 +326,7 @@ describe('CardOverlay', () => {
       anilistId: baseProps.anilistId,
       title: baseProps.title,
       primaryTitleHint: baseProps.title,
+      metadata: null,
       form: baseProps.defaultForm,
     });
   });
@@ -303,12 +340,13 @@ describe('CardOverlay', () => {
       anilistId: baseProps.anilistId,
       title: baseProps.title,
       primaryTitleHint: baseProps.title,
+      metadata: null,
       form: baseProps.defaultForm,
     });
 
     const gearButton = screen.getByRole('button', { name: 'Open advanced Sonarr options' });
     fireEvent.click(gearButton);
-    expect(baseProps.onOpenModal).toHaveBeenCalledWith(baseProps.anilistId, baseProps.title);
+  expect(baseProps.onOpenModal).toHaveBeenCalledWith(baseProps.anilistId, baseProps.title, null);
   });
 
   it('displays the in-sonarr state', () => {
@@ -320,15 +358,11 @@ describe('CardOverlay', () => {
     const quickButton = screen.getByRole('button', { name: 'Already in Sonarr' });
     expect(quickButton).toBeDisabled();
     expect(document.querySelector('[data-state="in-sonarr"]')).toBeInTheDocument();
-    const reactKey = Object.keys(quickButton).find(key => key.startsWith('__reactProps$'));
-    type ReactInternalProps = { onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void } & Record<string, unknown>;
-    const reactProps = reactKey ? (quickButton as unknown as Record<string, unknown>)[reactKey] as unknown as ReactInternalProps : null;
-    reactProps?.onClick?.(
-      {
-        preventDefault: () => {},
-        stopPropagation: () => {},
-      } as React.MouseEvent<HTMLButtonElement>,
-    );
+    const onClick = getReactHandler(quickButton, 'onClick') as React.MouseEventHandler<HTMLButtonElement> | null;
+    onClick?.({
+      preventDefault: () => {},
+      stopPropagation: () => {},
+    } as React.MouseEvent<HTMLButtonElement>);
     expect(addSeriesStub.mutate).not.toHaveBeenCalled();
   });
 });

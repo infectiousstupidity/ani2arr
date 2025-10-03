@@ -145,8 +145,15 @@ export class LibraryService {
       mappingOptions.ignoreFailureCache = true;
     }
     const normalizedTitle = payload.title?.trim();
+    const hints: NonNullable<Parameters<MappingService['resolveTvdbId']>[1]>['hints'] = {};
     if (normalizedTitle) {
-      mappingOptions.hints = { primaryTitle: normalizedTitle };
+      hints.primaryTitle = normalizedTitle;
+    }
+    if (payload.metadata) {
+      hints.domMedia = payload.metadata;
+    }
+    if (Object.keys(hints).length > 0) {
+      mappingOptions.hints = hints;
     }
 
     let tvdbId: number | null = null;

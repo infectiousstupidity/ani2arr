@@ -2,6 +2,9 @@ import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
+import { createBrowserMock } from '@/testing';
+
+vi.mock('wxt/browser', () => createBrowserMock(fakeBrowser));
 
 const useAddSeriesManagerMock = vi.fn();
 const useThemeMock = vi.fn();
@@ -18,8 +21,8 @@ const sonarrFormMock = vi.fn((props: Record<string, unknown>) => {
 
 vi.mock('@/hooks/use-add-series-manager', () => ({
   __esModule: true,
-  useAddSeriesManager: (anilistId: number, title: string, isOpen: boolean) =>
-    useAddSeriesManagerMock({ anilistId, title, isOpen }),
+  useAddSeriesManager: (anilistId: number, title: string, metadata: unknown | null, isOpen: boolean) =>
+    useAddSeriesManagerMock({ anilistId, title, metadata, isOpen }),
 }));
 
 vi.mock('@/hooks/use-theme', () => ({
@@ -108,6 +111,7 @@ describe('AddSeriesModal', () => {
         title="Test"
         isOpen
         onClose={vi.fn()}
+        metadata={null}
       />,
     );
 
@@ -129,6 +133,7 @@ describe('AddSeriesModal', () => {
         title="Test"
         isOpen
         onClose={vi.fn()}
+        metadata={null}
       />,
     );
 
@@ -145,6 +150,7 @@ describe('AddSeriesModal', () => {
         title="Test"
         isOpen
         onClose={onClose}
+        metadata={null}
       />,
     );
 
@@ -183,6 +189,7 @@ describe('AddSeriesModal', () => {
         title="Test"
         isOpen
         onClose={onClose}
+        metadata={null}
       />,
     );
 
