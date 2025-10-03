@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { getReactHandler } from '@/testing';
 
 import MultiTagInput from '../MultiTagInput';
 
@@ -94,16 +95,12 @@ describe('MultiTagInput', () => {
     fireEvent.click(removeButton);
     expect(handleChange).not.toHaveBeenCalled();
 
-    const reactKey = Object.keys(removeButton).find(key => key.startsWith('__reactProps$'));
-    // cast via unknown first to satisfy strict TS checks before indexing
-    const reactProps = reactKey ? (removeButton as unknown as Record<string, unknown>)[reactKey] : null;
-    expect(reactProps && typeof (reactProps as { onClick?: unknown }).onClick).toBe('function');
-    (reactProps as { onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void } | null)?.onClick?.(
-      {
-        preventDefault: () => {},
-        stopPropagation: () => {},
-      } as React.MouseEvent<HTMLButtonElement>,
-    );
+    const onClick = getReactHandler(removeButton, 'onClick') as React.MouseEventHandler<HTMLButtonElement> | null;
+    expect(onClick).toBeInstanceOf(Function);
+    onClick?.({
+      preventDefault: () => {},
+      stopPropagation: () => {},
+    } as React.MouseEvent<HTMLButtonElement>);
     expect(handleChange).not.toHaveBeenCalled();
   });
 });

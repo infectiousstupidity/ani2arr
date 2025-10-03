@@ -6,26 +6,28 @@ import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
 import { useTheme } from '@/hooks/use-theme';
 import TooltipWrapper from '@/ui/TooltipWrapper';
 import { CheckIcon, ExclamationTriangleIcon, GearIcon, PlusIcon } from '@radix-ui/react-icons';
-import type { ExtensionError, SonarrFormState } from '@/types';
+import type { ExtensionError, MediaMetadataHint, SonarrFormState } from '@/types';
 
 const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
 
-export type ModalState = { anilistId: number; title: string };
+export type ModalState = { anilistId: number; title: string; metadata: MediaMetadataHint | null };
 
 type OverlayState = 'disabled' | 'in-sonarr' | 'addable' | 'resolving' | 'adding' | 'error';
 
 export interface CardOverlayProps {
   anilistId: number;
   title: string;
-  onOpenModal: (anilistId: number, title: string) => void;
+  onOpenModal: (anilistId: number, title: string, metadata: MediaMetadataHint | null) => void;
   isConfigured: boolean;
   defaultForm: SonarrFormState | null;
+  metadata: MediaMetadataHint | null;
 }
 
 export interface ParsedCard {
   anilistId: number;
   title: string;
   host: HTMLElement;
+  metadata: MediaMetadataHint | null;
 }
 
 export interface BrowseAdapter {
@@ -47,11 +49,48 @@ export interface BrowseAdapter {
 export const DEFAULT_CONTAINER_CLASS = 'kitsunarr-overlay-container';
 export const DEFAULT_PROCESSED_ATTRIBUTE = 'data-kitsunarr-processed';
 
-const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpenModal, isConfigured, defaultForm }) => {
+const normalizeSynonyms = (synonyms?: string[] | null): string[] => {
+  if (!Array.isArray(synonyms)) return [];
+  return Array.from(new Set(
+    synonyms
+      .filter((value): value is string => typeof value === 'string')
+      .map(value => value.trim())
+      .filter(value => value.length > 0),
+  )).sort();
+};
+
+const normalizeRelationIds = (ids?: number[] | null): number[] => {
+  if (!Array.isArray(ids)) return [];
+  return Array.from(new Set(
+    ids
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value)),
+  )).sort((a, b) => a - b);
+};
+
+const metadataEqual = (a?: MediaMetadataHint | null, b?: MediaMetadataHint | null): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return !a && !b;
+
+  const titlesEqual = (key: keyof NonNullable<MediaMetadataHint['titles']>) => {
+    const aTitle = a.titles?.[key] ?? null;
+    const bTitle = b.titles?.[key] ?? null;
+    return aTitle === bTitle;
+  };
+
+  const titlesMatch = titlesEqual('english') && titlesEqual('romaji') && titlesEqual('native');
+  const synonymsMatch = JSON.stringify(normalizeSynonyms(a.synonyms)) === JSON.stringify(normalizeSynonyms(b.synonyms));
+  const startYearMatch = (a.startYear ?? null) === (b.startYear ?? null);
+  const formatMatch = (a.format ?? null) === (b.format ?? null);
+  const prequelMatch = JSON.stringify(normalizeRelationIds(a.relationPrequelIds)) === JSON.stringify(normalizeRelationIds(b.relationPrequelIds));
+
+  return titlesMatch && synonymsMatch && startYearMatch && formatMatch && prequelMatch;
+};
+
+const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpenModal, isConfigured, defaultForm, metadata }) => {
   const sonarrReady = isConfigured;
   const bypassFailureCacheRef = useRef(false);
   const statusQuery = useSeriesStatus(
-    { anilistId, title },
+    { anilistId, title, metadata },
     { enabled: sonarrReady && Number.isFinite(anilistId), ignoreFailureCache: () => bypassFailureCacheRef.current },
   );
   const addSeriesMutation = useAddSeries();
@@ -154,18 +193,11 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
         alert('Please configure your Sonarr settings first.');
         browser.runtime.openOptionsPage().catch(() => {});
         return;
-
       }
-
-
 
       if (overlayState === 'in-sonarr' || overlayState === 'resolving' || overlayState === 'adding') {
-
         return;
-
       }
-
-
 
       if (overlayState === 'error') {
         if (mappingUnavailable) {
@@ -184,6 +216,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
             anilistId,
             title,
             primaryTitleHint: title,
+            metadata,
             form: { ...defaultForm },
           });
           return;
@@ -208,6 +241,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
         anilistId,
         title,
         primaryTitleHint: title,
+        metadata,
         form: { ...defaultForm },
       });
     },
@@ -216,6 +250,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
       anilistId,
       defaultForm,
       mappingUnavailable,
+      metadata,
       mutate,
       overlayState,
       refetch,
@@ -231,9 +266,9 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
     (event: React.MouseEvent<HTMLButtonElement>) => {
       swallowEvent(event);
       if (overlayState === 'resolving' || overlayState === 'adding') return;
-      onOpenModal(anilistId, title);
+      onOpenModal(anilistId, title, metadata);
     },
-    [anilistId, onOpenModal, overlayState, swallowEvent, title],
+    [anilistId, metadata, onOpenModal, overlayState, swallowEvent, title],
   );
 
   const quickAddIcon = (() => {
@@ -378,8 +413,8 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
     const [cardPortals, setCardPortals] = useState<Map<Element, ParsedCard>>(new Map());
     const [modalState, setModalState] = useState<ModalState | null>(null);
 
-    const handleOpenModal = useCallback((anilistId: number, title: string) => {
-      setModalState({ anilistId, title });
+    const handleOpenModal = useCallback((anilistId: number, title: string, metadata: MediaMetadataHint | null) => {
+      setModalState({ anilistId, title, metadata });
     }, []);
 
     const handleCloseModal = useCallback(() => setModalState(null), []);
@@ -441,7 +476,8 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
             existing &&
             existing.anilistId === parsed.anilistId &&
             existing.title === parsed.title &&
-            existing.host === parsed.host
+            existing.host === parsed.host &&
+            metadataEqual(existing.metadata, parsed.metadata)
           ) {
             return prev;
           }
@@ -569,6 +605,7 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
               onOpenModal={handleOpenModal}
               isConfigured={isConfigured}
               defaultForm={extensionOptions?.defaults ?? null}
+              metadata={parsed.metadata}
             />,
             container,
           ),
@@ -582,6 +619,7 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
               isOpen: true,
               onClose: handleCloseModal,
               portalContainer: (hostRef.current as HTMLElement | null) ?? null,
+              metadata: modalState.metadata,
             })}
         </React.Suspense>
       </div>

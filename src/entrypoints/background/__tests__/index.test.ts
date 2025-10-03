@@ -1,15 +1,13 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
+import { createBrowserMock } from '@/testing';
 
 const registerKitsunarrApi = vi.fn();
 const initMappings = vi.fn(async () => {});
 const getKitsunarrApi = vi.fn(() => ({ initMappings }));
 const computeTitleMatchScore = vi.fn();
 
-vi.mock('wxt/browser', () => ({
-  default: fakeBrowser,
-  browser: fakeBrowser,
-}));
+vi.mock('wxt/browser', () => createBrowserMock(fakeBrowser));
 
 vi.mock('@/services', () => ({
   registerKitsunarrApi,

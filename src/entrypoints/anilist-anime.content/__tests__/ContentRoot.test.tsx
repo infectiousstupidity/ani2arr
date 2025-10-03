@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { createBrowserMock, getReactHandler } from '@/testing';
+import type { MediaMetadataHint } from '@/types';
 
 const browserMocks = vi.hoisted(() => {
   type RuntimeListener = (message: unknown) => unknown | Promise<unknown>;
@@ -78,10 +80,7 @@ vi.mock('wxt/browser', () => {
     },
   } as const;
 
-  return {
-    default: mockBrowser,
-    browser: mockBrowser,
-  };
+  return createBrowserMock(mockBrowser);
 });
 
 import { browser } from 'wxt/browser';
@@ -462,14 +461,22 @@ const createQueryClient = () =>
   });
 
 const renderContentRoot = (
-  props: { anilistId: number; title: string } = { anilistId: 12345, title: 'Kitsunarr Test' },
+  props: { anilistId: number; title: string; metadata?: MediaMetadataHint | null } = {
+    anilistId: 12345,
+    title: 'Kitsunarr Test',
+    metadata: null,
+  },
 ) => {
   const queryClient = createQueryClient();
   const user = userEvent.setup();
   const result = render(
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <ContentRoot {...props} />
+        <ContentRoot
+          anilistId={props.anilistId}
+          title={props.title}
+          metadata={props.metadata ?? null}
+        />
       </TooltipProvider>
     </QueryClientProvider>,
   );
@@ -518,10 +525,9 @@ describe('ContentRoot', () => {
 
     const quickAddButton = await findActionButton();
 
-    const reactPropsKey = Object.keys(quickAddButton).find(key => key.startsWith('__reactProps$'));
-    const reactProps = reactPropsKey ? (quickAddButton as unknown as Record<string, unknown>)[reactPropsKey] as { onClick?: (ev: unknown) => void } : null;
-    if (reactProps?.onClick) {
-      reactProps.onClick({ preventDefault: () => {}, stopPropagation: () => {} } as unknown as Event);
+    const onClick = getReactHandler(quickAddButton, 'onClick') as ((ev: Event) => void) | null;
+    if (onClick) {
+      onClick({ preventDefault: () => {}, stopPropagation: () => {} } as unknown as Event);
     } else {
       // Fallback to user click (for non-disabled button)
       await user.click(quickAddButton);
@@ -564,10 +570,9 @@ describe('ContentRoot', () => {
     // If the gear is disabled (for example the series is already in Sonarr),
     // call the internal React onClick directly to open the modal (mirrors
     // other tests' approach when DOM buttons are disabled).
-    const reactKey = Object.keys(gearButton).find(key => key.startsWith('__reactProps$'));
-    const reactProps = reactKey ? (gearButton as unknown as Record<string, unknown>)[reactKey] as { onClick?: (ev: unknown) => void } : null;
-    if (reactProps?.onClick) {
-      reactProps.onClick({ preventDefault: () => {}, stopPropagation: () => {} } as unknown as Event);
+    const onClick = getReactHandler(gearButton, 'onClick') as ((ev: Event) => void) | null;
+    if (onClick) {
+      onClick({ preventDefault: () => {}, stopPropagation: () => {} } as unknown as Event);
     } else {
       await user.click(gearButton);
     }
@@ -683,3 +688,4 @@ describe('ContentRoot', () => {
     ));
   });
 });
+

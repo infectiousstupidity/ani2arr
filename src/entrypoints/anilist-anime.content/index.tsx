@@ -10,6 +10,8 @@ import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
 import { idbQueryCachePersister } from '@/cache/cache-persister';
 import SonarrActionGroup from '@/ui/SonarrActionGroup';
 import { logger } from '@/utils/logger';
+import { extractMediaMetadataFromDom, mergeMetadataHints } from '@/utils/anilist-dom';
+import type { MediaMetadataHint } from '@/types';
 import './style.css';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
@@ -160,9 +162,10 @@ function attachSizeSync(host: HTMLElement): () => void {
 interface ContentRootProps {
   anilistId: number;
   title: string;
+  metadata: MediaMetadataHint | null;
 }
 
-export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) => {
+export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, metadata }) => {
   const hostRef = useRef<HTMLDivElement>(null);
   useTheme(hostRef);
   useKitsunarrBroadcasts();
@@ -173,7 +176,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) =>
   const defaults = options?.defaults ?? null;
 
   const statusQuery = useSeriesStatus(
-    { anilistId, title },
+    { anilistId, title, metadata },
     {
       enabled: Boolean(anilistId && isConfigured),
       force_verify: true,
@@ -192,6 +195,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) =>
       anilistId,
       title,
       primaryTitleHint: title,
+      metadata,
       form: { ...defaults },
     });
   };
@@ -230,6 +234,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title }) =>
             title={title}
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
+            metadata={metadata}
             portalContainer={hostRef.current}
           />
         )}
@@ -261,6 +266,18 @@ async function mountAnimePageUI(
   const title = document.querySelector('h1')?.textContent?.trim() ?? '';
   if (!title) return; // Don't mount if we can't get a title
 
+  const domMetadata = extractMediaMetadataFromDom(anilistId);
+  const fallbackMetadata: MediaMetadataHint | null = title
+    ? {
+        titles: { romaji: title },
+        synonyms: [title],
+        startYear: null,
+        format: null,
+        relationPrequelIds: null,
+      }
+    : null;
+  const metadata = mergeMetadataHints(domMetadata, fallbackMetadata);
+
   stopAnchorKeeper?.();
   stopAnchorKeeper = startAnchorKeeper();
   ensureActionsAnchor();
@@ -283,7 +300,7 @@ async function mountAnimePageUI(
       root.render(
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
-            <ContentRoot anilistId={anilistId} title={title} />
+            <ContentRoot anilistId={anilistId} title={title} metadata={metadata ?? null} />
           </TooltipProvider>
         </QueryClientProvider>,
       );

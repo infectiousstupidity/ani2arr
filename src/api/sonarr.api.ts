@@ -112,8 +112,10 @@ export class SonarrApiService {
       ...baseOptions.defaults,
       ...payload,
     };
+    const { metadata: _unusedMetadata, ...payloadForSonarr } = finalPayload;
+    void _unusedMetadata;
     const apiPayload = {
-      ...finalPayload,
+      ...payloadForSonarr,
       monitored: (finalPayload.monitorOption ?? baseOptions.defaults.monitorOption) !== 'none',
       monitoringOptions: {
         monitor: finalPayload.monitorOption ?? baseOptions.defaults.monitorOption,

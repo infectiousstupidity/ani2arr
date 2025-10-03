@@ -8,6 +8,7 @@ import type {
   CheckSeriesStatusResponse,
   ExtensionError,
   ExtensionOptions,
+  MediaMetadataHint,
   SonarrCredentialsPayload,
   SonarrSeries,
   TestConnectionPayload,
@@ -22,6 +23,21 @@ const normalizeTitleKey = (title?: string) => {
   return trimmed ? trimmed.toLowerCase() : '::';
 };
 
+const normalizeMetadataKey = (metadata?: MediaMetadataHint | null) => {
+  if (!metadata) return '::';
+  const titles = metadata.titles ?? {};
+  const english = typeof titles?.english === 'string' ? titles.english.trim() : '';
+  const romaji = typeof titles?.romaji === 'string' ? titles.romaji.trim() : '';
+  const native = typeof titles?.native === 'string' ? titles.native.trim() : '';
+  const synonyms = Array.isArray(metadata.synonyms) ? metadata.synonyms.slice(0, 5).join('|') : '';
+  const startYear = metadata.startYear ?? '';
+  const format = metadata.format ?? '';
+  const prequels = Array.isArray(metadata.relationPrequelIds)
+    ? metadata.relationPrequelIds.join(',')
+    : '';
+  return [english, romaji, native, synonyms, startYear, format, prequels].join('~');
+};
+
 const seriesStatusBaseKey = (anilistId: number) => [...rootQueryKey, 'seriesStatus', anilistId] as const;
 
 export const queryKeys = {
@@ -32,6 +48,7 @@ export const queryKeys = {
   seriesStatus: (payload: CheckSeriesStatusPayload) => [
     ...seriesStatusBaseKey(payload.anilistId),
     normalizeTitleKey(payload.title),
+    normalizeMetadataKey(payload.metadata),
   ] as const,
   sonarrMetadata: (scope?: string) => [...rootQueryKey, 'sonarrMetadata', scope ?? 'configured'] as const,
 };
@@ -51,6 +68,9 @@ export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: Ser
       const request: StatusInput = { anilistId: payload.anilistId };
       if (payload.title !== undefined) {
         request.title = payload.title;
+      }
+      if (payload.metadata !== undefined) {
+        request.metadata = payload.metadata;
       }
       if (options?.force_verify) {
         request.force_verify = true;

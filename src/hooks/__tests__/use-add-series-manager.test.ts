@@ -91,7 +91,7 @@ describe('useAddSeriesManager', () => {
     });
     currentOptions = initialOptions;
 
-    const { result, rerender } = renderHook(({ isOpen }) => useAddSeriesManager(42, 'Test Series', isOpen), {
+    const { result, rerender } = renderHook(({ isOpen }) => useAddSeriesManager(42, 'Test Series', null, isOpen), {
       initialProps: { isOpen: false },
     });
 
@@ -118,7 +118,7 @@ describe('useAddSeriesManager', () => {
   it('only attempts to add a series when Sonarr is configured', () => {
     currentOptions = createOptions({ sonarrUrl: '', sonarrApiKey: '' });
 
-    const { result, rerender } = renderHook(({ isOpen }) => useAddSeriesManager(99, 'Ready Check', isOpen), {
+    const { result, rerender } = renderHook(({ isOpen }) => useAddSeriesManager(99, 'Ready Check', null, isOpen), {
       initialProps: { isOpen: false },
     });
 
@@ -147,6 +147,7 @@ describe('useAddSeriesManager', () => {
       anilistId: 99,
       title: 'Ready Check',
       primaryTitleHint: 'Ready Check',
+      metadata: null,
       form: result.current.formState,
     });
   });
@@ -154,7 +155,7 @@ describe('useAddSeriesManager', () => {
   it('saves defaults only when dirty and merges updated form values', () => {
     currentOptions = createOptions();
 
-    const { result } = renderHook(({ isOpen }) => useAddSeriesManager(77, 'Save Defaults', isOpen), {
+    const { result } = renderHook(({ isOpen }) => useAddSeriesManager(77, 'Save Defaults', null, isOpen), {
       initialProps: { isOpen: false },
     });
 
@@ -186,7 +187,7 @@ describe('useAddSeriesManager', () => {
   it('combines option and metadata loading states', () => {
     currentOptions = createOptions();
 
-    const { result, rerender } = renderHook(({ isOpen }) => useAddSeriesManager(13, 'Loading Check', isOpen), {
+    const { result, rerender } = renderHook(({ isOpen }) => useAddSeriesManager(13, 'Loading Check', null, isOpen), {
       initialProps: { isOpen: false },
     });
 

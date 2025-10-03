@@ -6,6 +6,8 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { idbQueryCachePersister } from '@/cache/cache-persister';
 import { logger } from '@/utils/logger';
+import { extractMediaMetadataFromDom, mergeMetadataHints } from '@/utils/anilist-dom';
+import type { AniFormat, MediaMetadataHint } from '@/types';
 import browseStyles from './style.css?inline';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
@@ -35,16 +37,38 @@ const STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-anichart';
 const SHADOW_STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-anichart-shadow';
 
 const getSectionHeading = (card: Element): string =>
-  card
-    .closest('section')
-    ?.querySelector('h2')
-    ?.textContent
-    ?.trim()
-    .toLowerCase() ?? '';
+  card.closest('section')?.querySelector('h2')?.textContent?.trim() ?? '';
 
 const shouldSkipCard = (card: Element): boolean => {
-  const heading = getSectionHeading(card);
+  const heading = getSectionHeading(card).toLowerCase();
   return heading.includes('movie') || heading.includes('music');
+};
+
+const parseYearFromHeading = (heading: string): number | null => {
+  const match = heading.match(/(19|20|21)\d{2}/);
+  return match ? Number.parseInt(match[0], 10) : null;
+};
+
+const inferFormatFromHeading = (heading: string): AniFormat | null => {
+  const normalized = heading.toLowerCase();
+  if (normalized.includes('short')) return 'TV_SHORT';
+  if (normalized.includes('ova')) return 'OVA';
+  if (normalized.includes('ona')) return 'ONA';
+  if (normalized.includes('special')) return 'SPECIAL';
+  if (normalized.includes('movie')) return 'MOVIE';
+  if (normalized.includes('tv')) return 'TV';
+  return null;
+};
+
+const metadataCache = new Map<number, MediaMetadataHint | null>();
+
+const getCachedDomMetadata = (anilistId: number): MediaMetadataHint | null => {
+  if (metadataCache.has(anilistId)) {
+    return metadataCache.get(anilistId) ?? null;
+  }
+  const metadata = extractMediaMetadataFromDom(anilistId);
+  metadataCache.set(anilistId, metadata ?? null);
+  return metadata ?? null;
 };
 
 const extractTitle = (card: Element, cover: HTMLAnchorElement): string =>
@@ -70,7 +94,18 @@ const parseAniChartCard = (card: Element): ParsedCard | null => {
   const title = extractTitle(card, cover);
   if (!title) return null;
 
-  return { anilistId, title, host: cover };
+  const heading = getSectionHeading(card);
+  const domMetadata = getCachedDomMetadata(anilistId);
+  const fallbackMetadata: MediaMetadataHint = {
+    titles: { romaji: title },
+    synonyms: [title],
+    startYear: parseYearFromHeading(heading),
+    format: inferFormatFromHeading(heading),
+    relationPrequelIds: null,
+  };
+  const metadata = mergeMetadataHints(domMetadata, fallbackMetadata);
+
+  return { anilistId, title, host: cover, metadata: metadata ?? null };
 };
 
 const ensureOverlayContainer = (cover: HTMLAnchorElement): HTMLElement => {

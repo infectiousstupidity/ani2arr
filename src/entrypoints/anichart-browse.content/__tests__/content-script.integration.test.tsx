@@ -3,13 +3,9 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { act } from '@testing-library/react';
 import type { Root } from 'react-dom/client';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
-import { fakeBrowser } from 'wxt/testing/fake-browser';
-import { flushAsync, setLocationHref } from '@/testing';
+import { createBrowserMock, flushAsync, setLocationHref } from '@/testing';
 
-vi.mock('wxt/browser', () => ({
-  default: fakeBrowser,
-  browser: fakeBrowser,
-}));
+vi.mock('wxt/browser', () => createBrowserMock());
 
 const unsubscribePersistenceMock = vi.fn();
 const persistQueryClientMock = vi.fn(() => [unsubscribePersistenceMock, Promise.resolve()]);

@@ -1,9 +1,9 @@
 // src/services/mapping.service.ts
 import type { TtlCache } from '@/cache';
-import type { AnilistApiService, AniMedia, AniTitles } from '@/api/anilist.api';
+import type { AnilistApiService, AniMedia } from '@/api/anilist.api';
 import type { SonarrApiService } from '@/api/sonarr.api';
 import type { SonarrLookupSeries } from '@/types';
-import type { ExtensionError } from '@/types';
+import type { AniTitles, ExtensionError, MediaMetadataHint } from '@/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
 import { computeTitleMatchScore, normTitle, stripParenContent } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
@@ -39,6 +39,7 @@ export interface ResolvedMapping {
 
 type ResolveHints = {
   primaryTitle?: string;
+  domMedia?: MediaMetadataHint | null;
 };
 
 type ResolveTvdbIdOptions = {
@@ -247,8 +248,33 @@ export class MappingService {
   private async resolveViaNetwork(anilistId: number, hints?: ResolveHints): Promise<ResolvedMapping> {
     const credentials = await this.getConfiguredCredentials();
 
-    const media = await this.anilistApi.fetchMediaWithRelations(anilistId);
+    const metadataMedia = this.buildMediaFromMetadataHint(anilistId, hints?.domMedia);
+    if (metadataMedia) {
+      const resolved = await this.tryResolveWithPreparedMedia(anilistId, metadataMedia, credentials, hints);
+      if (resolved) {
+        return resolved;
+      }
+    }
 
+    const apiMedia = await this.anilistApi.fetchMediaWithRelations(anilistId);
+    const apiResolved = await this.tryResolveWithPreparedMedia(anilistId, apiMedia, credentials, hints);
+    if (apiResolved) {
+      return apiResolved;
+    }
+
+    throw createError(
+      ErrorCode.VALIDATION_ERROR,
+      `Sonarr lookup yielded no match for AniList ID ${anilistId}.`,
+      'Could not find a matching series on TheTVDB.',
+    );
+  }
+
+  private async tryResolveWithPreparedMedia(
+    anilistId: number,
+    media: AniMedia,
+    credentials: { url: string; apiKey: string },
+    hints?: ResolveHints,
+  ): Promise<ResolvedMapping | null> {
     if (media.format && !ALLOWED_FORMATS.has(media.format)) {
       throw createError(
         ErrorCode.VALIDATION_ERROR,
@@ -307,11 +333,73 @@ export class MappingService {
       return { tvdbId: bestMatch.tvdbId, successfulSynonym: bestMatch.term };
     }
 
-    throw createError(
-      ErrorCode.VALIDATION_ERROR,
-      `Sonarr lookup yielded no match for AniList ID ${anilistId}.`,
-      'Could not find a matching series on TheTVDB.',
-    );
+    return null;
+  }
+
+  private buildMediaFromMetadataHint(anilistId: number, metadata?: MediaMetadataHint | null): AniMedia | null {
+    if (!metadata) return null;
+
+    const titlesSource = metadata.titles ?? null;
+    const titles: AniTitles = {};
+    if (titlesSource?.english) titles.english = titlesSource.english;
+    if (titlesSource?.romaji) titles.romaji = titlesSource.romaji;
+    if (titlesSource?.native) titles.native = titlesSource.native;
+
+    const synonyms = Array.isArray(metadata.synonyms)
+      ? Array.from(
+          new Set(
+            metadata.synonyms
+              .filter((value): value is string => typeof value === 'string')
+              .map(value => value.trim())
+              .filter(value => value.length > 0),
+          ),
+        )
+      : [];
+
+    const startYear = typeof metadata.startYear === 'number' && Number.isFinite(metadata.startYear)
+      ? metadata.startYear
+      : null;
+
+    const format = metadata.format ?? null;
+
+    const relationIds = Array.isArray(metadata.relationPrequelIds)
+      ? metadata.relationPrequelIds.filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+      : [];
+
+    if (
+      Object.keys(titles).length === 0 &&
+      synonyms.length === 0 &&
+      startYear == null &&
+      !format &&
+      relationIds.length === 0
+    ) {
+      return null;
+    }
+
+    const relations = relationIds.length > 0
+      ? {
+          edges: relationIds.map(id => ({
+            relationType: 'PREQUEL',
+            node: {
+              id,
+              format: null,
+              title: {},
+              synonyms: [],
+            } as AniMedia,
+          })),
+        }
+      : undefined;
+
+    const startDate = startYear != null ? { year: startYear } : undefined;
+
+    return {
+      id: anilistId,
+      format,
+      title: Object.keys(titles).length > 0 ? titles : {},
+      ...(startDate ? { startDate } : {}),
+      synonyms,
+      ...(relations ? { relations } : {}),
+    };
   }
 
   private async tryHintLookup(anilistId: number, term: string): Promise<ResolvedMapping | null> {

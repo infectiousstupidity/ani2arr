@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { PropsWithChildren } from 'react';
+import { createBrowserMock } from '@/testing';
 
 type Listener<Args extends unknown[]> = (...args: Args) => unknown | Promise<unknown>;
 
@@ -55,10 +56,7 @@ vi.mock('wxt/browser', () => {
     },
   } as const;
 
-  return {
-    default: mockBrowser,
-    browser: mockBrowser,
-  };
+  return createBrowserMock(mockBrowser);
 });
 
 import { useKitsunarrBroadcasts } from '../use-broadcasts';
