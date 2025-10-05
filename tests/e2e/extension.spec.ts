@@ -61,13 +61,13 @@ test.describe('Kitsunarr extension end-to-end', () => {
 
     try {
       await test.step('Configure Sonarr connection', async () => {
-        optionsPage = new OptionsPage(await harness.context.newPage());
-        await optionsPage.goto(harness.optionsUrl);
+        optionsPage = new OptionsPage(await harness.openOptionsPage());
         await expect(optionsPage.heading).toBeVisible();
 
         await optionsPage.configureSonarr(`${harness.serverBaseUrl}/sonarr`, SONARR_API_KEY);
+        const statusResponse = harness.waitForTestConnection();
         await optionsPage.connect();
-        await optionsPage.page.waitForTimeout(750);
+        await statusResponse;
         await optionsPage.waitForConnectionSuccess();
 
         await collectDiagnostics(`background-post-connect-${browserName}`);
@@ -132,12 +132,12 @@ test.describe('Kitsunarr extension end-to-end', () => {
     await updateServerState(harness.serverBaseUrl, { requiredApiKey: EXPECTED_SONARR_KEY });
 
     try {
-      const optionsPage = new OptionsPage(await harness.context.newPage());
-      await optionsPage.goto(harness.optionsUrl);
+      const optionsPage = new OptionsPage(await harness.openOptionsPage());
 
       await optionsPage.configureSonarr(`${harness.serverBaseUrl}/sonarr`, INVALID_SONARR_KEY);
+      const initialStatusResponse = harness.waitForTestConnection();
       await optionsPage.connect();
-      await optionsPage.page.waitForTimeout(500);
+      await initialStatusResponse.catch(() => undefined);
       await optionsPage.waitForConnectionError();
 
       const failureDiagnostics = await collectBackgroundDiagnostics(harness.background);
@@ -145,8 +145,9 @@ test.describe('Kitsunarr extension end-to-end', () => {
       console.log(`[${browserName}] Unauthorized state captured`);
 
       await optionsPage.configureSonarr(`${harness.serverBaseUrl}/sonarr`, EXPECTED_SONARR_KEY);
+      const recoveryStatusResponse = harness.waitForTestConnection();
       await optionsPage.connect();
-      await optionsPage.page.waitForTimeout(500);
+      await recoveryStatusResponse;
       await optionsPage.waitForConnectionSuccess();
 
       await optionsPage.save();
