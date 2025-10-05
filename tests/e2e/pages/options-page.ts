@@ -45,6 +45,7 @@ export class OptionsPage {
   }
 
   async connect(): Promise<void> {
+    await expect(this.connectButton).toBeEnabled();
     await this.connectButton.click();
   }
 

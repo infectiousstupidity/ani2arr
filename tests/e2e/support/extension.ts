@@ -1,5 +1,12 @@
-import { chromium, firefox, type BrowserContext, type Page, type Route, type Worker } from '@playwright/test';
-import { mkdtemp, readFile, writeFile, rm, mkdir, cp } from 'node:fs/promises';
+import {
+  chromium,
+  firefox,
+  type BrowserContext,
+  type Page,
+  type Route,
+  type Worker,
+} from '@playwright/test';
+import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -7,17 +14,56 @@ const serverBaseUrlEnv = process.env.KITSUNARR_E2E_BASE_URL;
 if (!serverBaseUrlEnv) {
   throw new Error('Missing KITSUNARR_E2E_BASE_URL environment variable. Did global setup run?');
 }
-const serverBaseUrl: string = serverBaseUrlEnv;
+
+const DEFAULT_TIMEOUT_MS = 15_000;
+const serverBaseUrl = serverBaseUrlEnv;
+
+export const testServerBaseUrl = serverBaseUrl;
 
 export type BackgroundTarget = Page | Worker;
+type SupportedBrowser = 'chromium' | 'firefox';
 
-type PermissionShim = {
-  request?: (...args: unknown[]) => Promise<boolean>;
-  contains?: (...args: unknown[]) => Promise<boolean>;
+type DevToolsConnection = {
+  send(method: string, params?: Record<string, unknown>): Promise<unknown>;
 };
 
-type BrowserShim = {
+type PermissionShim = {
+  request?: (permissions: unknown) => Promise<boolean>;
+  contains?: (permissions: unknown) => Promise<boolean>;
+};
+
+type StorageAreaShim = {
+  get?: (keys?: unknown) => Promise<unknown>;
+};
+
+type StorageShim = {
+  local?: StorageAreaShim;
+  sync?: StorageAreaShim;
+};
+
+type WebExtRuntime = {
+  openOptionsPage?: () => Promise<void>;
+  getURL?: (path: string) => string;
+};
+
+type WebExtGlobals = {
+  browser?: { runtime?: WebExtRuntime; permissions?: PermissionShim; storage?: StorageShim };
+  chrome?: { runtime?: WebExtRuntime; permissions?: PermissionShim; storage?: StorageShim };
+  runtime?: WebExtRuntime;
   permissions?: PermissionShim;
+  storage?: StorageShim;
+  __kitsunarr_e2e_errors?: Array<{ time: number; type: string; payload: string }>;
+};
+
+type ManifestLike = {
+  manifest_version?: number;
+  permissions?: Array<string | Record<string, unknown>>;
+  host_permissions?: string[];
+};
+
+type LaunchResult = {
+  context: BrowserContext;
+  userDataDir: string;
 };
 
 const aniListPageHtml = `<!DOCTYPE html>
@@ -61,17 +107,60 @@ const aniListPageHtml = `<!DOCTYPE html>
   </body>
 </html>`;
 
-type LaunchResult = {
-  context: BrowserContext;
-  userDataDir: string;
-};
+async function patchManifestHostPermissions(extensionPath: string): Promise<void> {
+  try {
+    const manifestPath = path.join(extensionPath, 'manifest.json');
+    const raw = await readFile(manifestPath, 'utf8');
+    const manifest = JSON.parse(raw) as ManifestLike;
+    const origin = new URL(serverBaseUrl).origin;
+    const hostPattern = `${origin}/*`;
+    let updated = false;
 
-async function launchPersistentContext(browserName: string): Promise<LaunchResult> {
+    const manifestVersion = typeof manifest.manifest_version === 'number' ? manifest.manifest_version : 3;
+    if (manifestVersion >= 3) {
+      const hostPermissions = Array.isArray(manifest.host_permissions)
+        ? [...manifest.host_permissions]
+        : [];
+      if (!hostPermissions.includes(hostPattern)) {
+        hostPermissions.push(hostPattern);
+        manifest.host_permissions = hostPermissions;
+        updated = true;
+      }
+    }
+
+    if (manifestVersion < 3) {
+      const permissions = Array.isArray(manifest.permissions) ? [...manifest.permissions] : [];
+      const hasHostPermission = permissions.some(entry => entry === hostPattern);
+      if (!hasHostPermission) {
+        permissions.push(hostPattern);
+        manifest.permissions = permissions;
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+    }
+  } catch (error) {
+    console.warn('Could not patch extension manifest for host permissions:', (error as Error).message);
+  }
+}
+
+function getFirefoxDevtoolsConnection(context: BrowserContext): DevToolsConnection | undefined {
+  const contextWithConnection = context as unknown as {
+    _browser?: { _connection?: DevToolsConnection };
+  };
+  return contextWithConnection._browser?._connection;
+}
+
+async function launchPersistentContext(browserName: SupportedBrowser): Promise<LaunchResult> {
   const userDataDir = await mkdtemp(path.join(os.tmpdir(), 'kitsunarr-e2e-'));
 
   if (browserName === 'chromium') {
     const extensionPath = process.env.KITSUNARR_E2E_CHROMIUM_EXTENSION;
-    if (!extensionPath) throw new Error('Missing Chromium extension path');
+    if (!extensionPath) {
+      throw new Error('Missing Chromium extension path');
+    }
     await patchManifestHostPermissions(extensionPath);
     const context = await chromium.launchPersistentContext(userDataDir, {
       headless: false,
@@ -86,9 +175,10 @@ async function launchPersistentContext(browserName: string): Promise<LaunchResul
 
   if (browserName === 'firefox') {
     const extensionPath = process.env.KITSUNARR_E2E_FIREFOX_EXTENSION;
-    if (!extensionPath) throw new Error('Missing Firefox extension path');
+    if (!extensionPath) {
+      throw new Error('Missing Firefox extension path');
+    }
     await patchManifestHostPermissions(extensionPath);
-    await prepareFirefoxProfile(userDataDir, extensionPath);
     const context = await firefox.launchPersistentContext(userDataDir, {
       headless: false,
       firefoxUserPrefs: {
@@ -99,61 +189,46 @@ async function launchPersistentContext(browserName: string): Promise<LaunchResul
         'extensions.enabledScopes': 15,
       },
     });
-    const connection = (context as unknown as { _browser?: { _connection?: { send?: (method: string, params?: unknown) => Promise<unknown> } } })._browser?._connection;
-    if (connection && typeof connection.send === 'function') {
-      await connection.send('AddonManager.installTemporaryAddon', { addonPath: extensionPath });
+    const connection = getFirefoxDevtoolsConnection(context);
+    if (!connection) {
+      throw new Error('Unable to obtain Firefox DevTools connection for temporary addon install');
     }
+    await connection.send('AddonManager.installTemporaryAddon', { addonPath: extensionPath });
     return { context, userDataDir };
   }
 
   throw new Error(`Unsupported browser: ${browserName}`);
 }
 
-async function prepareFirefoxProfile(userDataDir: string, extensionPath: string): Promise<void> {
-  const manifestPath = path.join(extensionPath, 'manifest.json');
-  const raw = await readFile(manifestPath, 'utf8');
-  const manifest = JSON.parse(raw) as { browser_specific_settings?: { gecko?: { id?: string } } };
-  const geckoId = manifest.browser_specific_settings?.gecko?.id ?? 'kitsunarr@test';
-  const extensionsDir = path.join(userDataDir, 'extensions');
-  await mkdir(extensionsDir, { recursive: true });
-  const targetDir = path.join(extensionsDir, geckoId);
-  await rm(targetDir, { recursive: true, force: true });
-  await cp(extensionPath, targetDir, { recursive: true });
-}
-
-async function patchManifestHostPermissions(extensionPath: string) {
-  try {
-    const manifestPath = path.join(extensionPath.replace(/\\$/, ''), 'manifest.json');
-    const raw = await readFile(manifestPath, 'utf8');
-    const manifest = JSON.parse(raw) as Record<string, unknown>;
-    const origin = new URL(serverBaseUrl).origin;
-    const hostPattern = `${origin}/*`;
-    const existing = Array.isArray(manifest.host_permissions)
-      ? (manifest.host_permissions as string[])
-      : [];
-    if (!existing.includes(hostPattern)) {
-      existing.push(hostPattern);
-      manifest.host_permissions = existing;
-      await writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
-    }
-  } catch (error) {
-    console.warn('Could not patch extension manifest for host permissions:', (error as Error).message);
-  }
-}
-
 async function waitForBackground(context: BrowserContext): Promise<BackgroundTarget> {
   const existingWorker = context.serviceWorkers()[0];
-  if (existingWorker) return existingWorker;
-  try {
-    return await context.waitForEvent('serviceworker', { timeout: 15_000 });
-  } catch {
-    const existingBackground = context.backgroundPages()[0];
-    if (existingBackground) return existingBackground;
-    return await context.waitForEvent('backgroundpage', { timeout: 15_000 });
+  if (existingWorker) {
+    return existingWorker;
   }
+
+  const existingBackground = context.backgroundPages()[0];
+  if (existingBackground) {
+    return existingBackground;
+  }
+
+  const worker = await context
+    .waitForEvent('serviceworker', { timeout: DEFAULT_TIMEOUT_MS })
+    .catch(() => undefined);
+  if (worker) {
+    return worker;
+  }
+
+  const background = await context
+    .waitForEvent('backgroundpage', { timeout: DEFAULT_TIMEOUT_MS })
+    .catch(() => undefined);
+  if (background) {
+    return background;
+  }
+
+  throw new Error('Timed out waiting for background target to be ready');
 }
 
-async function proxyRoute(route: Route, targetUrl: string) {
+async function proxyRoute(route: Route, targetUrl: string): Promise<void> {
   const request = route.request();
   const response = await fetch(targetUrl, {
     method: request.method(),
@@ -172,7 +247,7 @@ async function proxyRoute(route: Route, targetUrl: string) {
   });
 }
 
-async function setupNetworkInterception(context: BrowserContext) {
+async function setupNetworkInterception(context: BrowserContext): Promise<void> {
   await context.route('https://anilist.co/anime/*', async route => {
     await route.fulfill({
       status: 200,
@@ -180,24 +255,72 @@ async function setupNetworkInterception(context: BrowserContext) {
       body: aniListPageHtml,
     });
   });
+
   await context.route('https://anilist.co/favicon.ico', async route => {
     await route.fulfill({ status: 204 });
   });
+
   await context.route('https://graphql.anilist.co/*', async route => {
     await proxyRoute(route, `${serverBaseUrl}/anilist/graphql`);
   });
-  await context.route('https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json', async route => {
-    await proxyRoute(route, `${serverBaseUrl}/mappings/primary`);
+
+  await context.route(
+    'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json',
+    async route => {
+      await proxyRoute(route, `${serverBaseUrl}/mappings/primary`);
+    },
+  );
+
+  await context.route(
+    'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json',
+    async route => {
+      await proxyRoute(route, `${serverBaseUrl}/mappings/fallback`);
+    },
+  );
+}
+
+function attachPageLogging(page: Page, browserName: string): void {
+  page.on('console', message => {
+    console.log(`[${browserName}] page console (${page.url()}): ${message.type()} ${message.text()}`);
   });
-  await context.route('https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json', async route => {
-    await proxyRoute(route, `${serverBaseUrl}/mappings/fallback`);
+  page.on('pageerror', error => {
+    console.error(`[${browserName}] page error (${page.url()}):`, error);
   });
 }
 
-async function mockPermissions(context: BrowserContext, background: BackgroundTarget) {
+function attachContextLogging(context: BrowserContext, browserName: string): void {
+  context.pages().forEach(page => attachPageLogging(page, browserName));
+  context.on('page', page => {
+    attachPageLogging(page, browserName);
+  });
+  context.on('console', message => {
+    console.log(`[${browserName}] context console: ${message.type()} ${message.text()}`);
+  });
+  context.on('requestfailed', request => {
+    const failure = request.failure();
+    console.warn(
+      `[${browserName}] request failed: ${request.url()} ${failure?.errorText ?? ''}`.trim(),
+    );
+  });
+  context.on('request', request => {
+    const url = request.url();
+    if (url.startsWith(serverBaseUrl)) {
+      console.log(`[${browserName}] request ${request.method()} ${url}`);
+    }
+  });
+  context.on('response', response => {
+    const url = response.url();
+    if (url.startsWith(serverBaseUrl)) {
+      console.log(`[${browserName}] response ${response.status()} ${url}`);
+    }
+  });
+}
+
+async function mockPermissions(context: BrowserContext, background: BackgroundTarget): Promise<void> {
   await context.addInitScript(() => {
-    const globalBrowser = (globalThis as { browser?: BrowserShim }).browser;
-    const permissions = globalBrowser?.permissions;
+    const globalObj = globalThis as unknown as WebExtGlobals;
+    const permissions =
+      globalObj.browser?.permissions ?? globalObj.chrome?.permissions ?? globalObj.permissions;
     if (permissions) {
       permissions.request = async () => true;
       permissions.contains = async () => true;
@@ -205,7 +328,9 @@ async function mockPermissions(context: BrowserContext, background: BackgroundTa
   });
 
   await background.evaluate(() => {
-    const permissions = (globalThis as { browser?: BrowserShim }).browser?.permissions;
+    const globalObj = globalThis as unknown as WebExtGlobals;
+    const permissions =
+      globalObj.browser?.permissions ?? globalObj.chrome?.permissions ?? globalObj.permissions;
     if (permissions) {
       permissions.request = async () => true;
       permissions.contains = async () => true;
@@ -213,123 +338,104 @@ async function mockPermissions(context: BrowserContext, background: BackgroundTa
   });
 }
 
-function attachContextLogging(context: BrowserContext, browserName: string) {
-  context.on('page', page => {
-    page.on('console', message => {
-      console.log(`[${browserName}] page console (${page.url()}): ${message.type()} ${message.text()}`);
-    });
-    page.on('pageerror', error => {
-      console.error(`[${browserName}] page error (${page.url()}):`, error);
-    });
-  });
-  context.on('console', message => {
-    console.log(`[${browserName}] context console: ${message.type()} ${message.text()}`);
-  });
-  context.on('requestfailed', request => {
-    const failure = request.failure();
-    console.warn(`[${browserName}] request failed: ${request.url()} ${failure?.errorText ?? ''}`.trim());
-  });
-  context.on('request', request => {
-    const url = request.url();
-    if (serverBaseUrl && url.startsWith(serverBaseUrl)) {
-      console.log(`[${browserName}] request ${request.method()} ${url}`);
-    }
-  });
-  context.on('response', response => {
-    const url = response.url();
-    if (serverBaseUrl && url.startsWith(serverBaseUrl)) {
-      console.log(`[${browserName}] response ${response.status()} ${url}`);
-    }
-  });
-}
-
-async function installBackgroundDiagnostics(background: BackgroundTarget) {
+async function installBackgroundDiagnostics(background: BackgroundTarget): Promise<void> {
   try {
     await background.evaluate(() => {
-      try {
-        const g = globalThis as unknown as Record<string, unknown> & { __kitsunarr_e2e_errors?: unknown[] };
-        g.__kitsunarr_e2e_errors = g.__kitsunarr_e2e_errors || [];
-        const push = (type: string, payload: unknown) => {
-          try {
-            g.__kitsunarr_e2e_errors!.push({ time: Date.now(), type, payload: String(payload) });
-          } catch (pushErr) {
-            try { console.warn('[E2E diagnostics push failed]', String(pushErr)); } catch (e) { console.warn(String(e)); }
-          }
-        };
-
-        try {
-          (globalThis as unknown as GlobalEventHandlers).addEventListener?.('error', (ev: unknown) => {
-            try {
-              const evRec = ev as Record<string, unknown>;
-              const msg = (evRec && evRec['message']) ?? ev;
-              console.error('[E2E background error]', String(msg));
-              push('error', msg);
-            } catch (handlerErr) {
-              console.warn('[E2E background error handler failed]', String(handlerErr));
-            }
-          });
-          (globalThis as unknown as GlobalEventHandlers).addEventListener?.('unhandledrejection', (ev: unknown) => {
-            try {
-              const evRec = ev as Record<string, unknown>;
-              const reason = (evRec && evRec['reason']) ?? ev;
-              console.error('[E2E background unhandledrejection]', String(reason));
-              push('unhandledrejection', reason);
-            } catch (handlerErr) {
-              console.warn('[E2E unhandledrejection handler failed]', String(handlerErr));
-            }
-          });
-        } catch (e) {
-          try { console.warn('[E2E diagnostics handlers install failed]', String(e)); } catch (ee) { console.warn(String(ee)); }
-        }
-      } catch (e) {
-        try { console.error('[E2E diagnostics install failed]', String(e)); } catch (ee) { console.warn(String(ee)); }
+      const globalObj = globalThis as unknown as WebExtGlobals;
+      if (!Array.isArray(globalObj.__kitsunarr_e2e_errors)) {
+        globalObj.__kitsunarr_e2e_errors = [];
       }
+
+      const push = (type: string, payload: unknown) => {
+        try {
+          globalObj.__kitsunarr_e2e_errors!.push({
+            time: Date.now(),
+            type,
+            payload: String(payload),
+          });
+        } catch (error) {
+          console.warn('[E2E diagnostics push failed]', String(error));
+        }
+      };
+
+      const handleError = (event: unknown, type: string) => {
+        try {
+          const record = event as { message?: unknown; reason?: unknown } | undefined;
+          const message =
+            (record && (type === 'error' ? record.message : record?.reason)) ?? event ?? 'Unknown';
+          console.error(`[E2E background ${type}]`, String(message));
+          push(type, message);
+        } catch (error) {
+          console.warn(`[E2E background ${type} handler failed]`, String(error));
+        }
+      };
+
+      (globalThis as unknown as EventTarget).addEventListener?.('error', event => {
+        handleError(event, 'error');
+      });
+
+      (globalThis as unknown as EventTarget).addEventListener?.('unhandledrejection', event => {
+        handleError(event, 'unhandledrejection');
+      });
     });
-  } catch (err) {
-    console.warn('Could not install background diagnostics collector:', (err as Error).message);
+  } catch (error) {
+    console.warn('Could not install background diagnostics collector:', (error as Error).message);
   }
 }
 
-async function resolveOptionsUrl(background: BackgroundTarget): Promise<string> {
-  let optionsUrl = await background.evaluate(() => {
-    const g = globalThis as unknown as {
-      browser?: { runtime?: { getURL?: (path: string) => string } };
-      chrome?: { runtime?: { getURL?: (path: string) => string } };
-      runtime?: { getURL?: (path: string) => string };
-    };
-    const runtime = g.browser?.runtime || g.chrome?.runtime || g.runtime;
-    if (runtime?.getURL) return runtime.getURL('options.html');
-    return '';
-  });
-
-  if (!optionsUrl) {
-    try {
-      const bgUrl = (background as BackgroundTarget).url();
-      const origin = new URL(bgUrl).origin;
-      optionsUrl = `${origin}/options.html`;
-    } catch {
-      optionsUrl = '';
-    }
-  }
-
-  return optionsUrl;
-}
-
-export function isPageBackground(target: BackgroundTarget): target is Page {
+function isPageBackground(target: BackgroundTarget): target is Page {
   return typeof (target as Page).bringToFront === 'function';
+}
+
+async function invokeRuntimeOpenOptionsPage(background: BackgroundTarget): Promise<void> {
+  await background.evaluate(async () => {
+    const globalObj = globalThis as unknown as WebExtGlobals;
+    const runtime =
+      globalObj.browser?.runtime ?? globalObj.chrome?.runtime ?? globalObj.runtime;
+    if (!runtime?.openOptionsPage) {
+      throw new Error('runtime.openOptionsPage is unavailable in the background context');
+    }
+    await runtime.openOptionsPage();
+  });
+}
+
+async function openExtensionOptions(
+  context: BrowserContext,
+  background: BackgroundTarget,
+): Promise<Page> {
+  const existing = context.pages().find(page => /options\.html/i.test(page.url()));
+  if (existing) {
+    await existing.bringToFront();
+    await existing.waitForLoadState('domcontentloaded', { timeout: DEFAULT_TIMEOUT_MS });
+    return existing;
+  }
+
+  const pagePromise = context.waitForEvent('page', { timeout: DEFAULT_TIMEOUT_MS });
+  await invokeRuntimeOpenOptionsPage(background);
+  const page = await pagePromise;
+  await page.waitForURL(/options\.html/i, { timeout: DEFAULT_TIMEOUT_MS });
+  await page.waitForLoadState('domcontentloaded', { timeout: DEFAULT_TIMEOUT_MS });
+  return page;
 }
 
 export interface ExtensionHarness {
   context: BrowserContext;
   background: BackgroundTarget;
-  optionsUrl: string;
+  browserName: SupportedBrowser;
   serverBaseUrl: string;
-  browserName: string;
+  openOptionsPage(): Promise<Page>;
+  waitForTestConnection(): Promise<void>;
   cleanup(): Promise<void>;
 }
 
 export async function createExtensionHarness(browserName: string): Promise<ExtensionHarness> {
+  if (browserName !== 'chromium' && browserName !== 'firefox') {
+    throw new Error(`Unsupported browser for Kitsunarr harness: ${browserName}`);
+  }
+
   const { context, userDataDir } = await launchPersistentContext(browserName);
+  context.setDefaultTimeout(DEFAULT_TIMEOUT_MS);
+  context.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS);
   attachContextLogging(context, browserName);
   await setupNetworkInterception(context);
   const background = await waitForBackground(context);
@@ -343,19 +449,28 @@ export async function createExtensionHarness(browserName: string): Promise<Exten
   }
   await mockPermissions(context, background);
   await installBackgroundDiagnostics(background);
-  const optionsUrl = await resolveOptionsUrl(background);
-  if (!optionsUrl) {
-    await context.close();
-    await rm(userDataDir, { recursive: true, force: true });
-    throw new Error('Failed to resolve extension options page URL.');
-  }
 
   return {
     context,
     background,
-    optionsUrl,
-    serverBaseUrl,
     browserName,
+    serverBaseUrl,
+    async openOptionsPage() {
+      return openExtensionOptions(context, background);
+    },
+    async waitForTestConnection() {
+      const targetUrl = `${serverBaseUrl}/sonarr/api/v3/system/status`;
+      const response = await context.waitForEvent('response', {
+        timeout: DEFAULT_TIMEOUT_MS,
+        predicate: candidate =>
+          candidate.url() === targetUrl && candidate.request().method() === 'GET',
+      });
+      if (!response.ok()) {
+        throw new Error(
+          `Sonarr status request failed: ${response.status()} ${response.statusText()}`,
+        );
+      }
+    },
     async cleanup() {
       await context.close();
       await rm(userDataDir, { recursive: true, force: true });
@@ -363,60 +478,38 @@ export async function createExtensionHarness(browserName: string): Promise<Exten
   };
 }
 
-export async function collectBackgroundDiagnostics(background: BackgroundTarget): Promise<Record<string, unknown>> {
+export async function collectBackgroundDiagnostics(
+  background: BackgroundTarget,
+): Promise<Record<string, unknown>> {
   const diagnostics: Record<string, unknown> = {};
   try {
     const result = await background.evaluate(async () => {
-      const out: Record<string, unknown> = {};
-      try {
-        const globalRecord = globalThis as unknown as Record<string, unknown>;
-        out.errors = globalRecord['__kitsunarr_e2e_errors'] ?? [];
-      } catch (err) {
-        out.errorsError = String(err);
+      const output: Record<string, unknown> = {};
+      const globalObj = globalThis as unknown as WebExtGlobals;
+      output.errors = globalObj.__kitsunarr_e2e_errors ?? [];
+
+      const storage =
+        globalObj.browser?.storage ?? globalObj.chrome?.storage ?? globalObj.storage;
+      if (storage?.local?.get) {
+        try {
+          output.storageLocal = await storage.local.get();
+        } catch (error) {
+          output.storageLocalError = String(error);
+        }
+      }
+      if (storage?.sync?.get) {
+        try {
+          output.storageSync = await storage.sync.get();
+        } catch (error) {
+          output.storageSyncError = String(error);
+        }
       }
 
-      try {
-        const globalRecord = globalThis as unknown as Record<string, unknown>;
-        const root =
-          (globalRecord['browser'] as Record<string, unknown> | undefined) ??
-          (globalRecord['chrome'] as Record<string, unknown> | undefined) ??
-          globalRecord;
-        const storage = root?.['storage'] as Record<string, unknown> | undefined;
-        if (storage && typeof storage['local'] === 'object') {
-          try {
-            const localObj = storage['local'] as { get?: (this: unknown, keys: unknown) => Promise<unknown> } | undefined;
-            const getLocal = localObj?.get;
-            if (typeof getLocal === 'function') {
-              out.storageLocal = await getLocal.call(localObj, null);
-            } else {
-              out.storageLocalError = 'storage.local.get not available';
-            }
-          } catch (err) {
-            out.storageLocalError = String(err);
-          }
-        }
-        if (storage && typeof storage['sync'] === 'object') {
-          try {
-            const syncObj = storage['sync'] as { get?: (this: unknown, keys: unknown) => Promise<unknown> } | undefined;
-            const getSync = syncObj?.get;
-            if (typeof getSync === 'function') {
-              out.storageSync = await getSync.call(syncObj, null);
-            } else {
-              out.storageSyncError = 'storage.sync.get not available';
-            }
-          } catch (err) {
-            out.storageSyncError = String(err);
-          }
-        }
-      } catch (err) {
-        out.storageReadError = String(err);
-      }
-
-      return out;
+      return output;
     });
     Object.assign(diagnostics, result);
-  } catch (err) {
-    diagnostics.evaluateError = String(err);
+  } catch (error) {
+    diagnostics.evaluateError = String(error);
   }
 
   try {
@@ -424,24 +517,24 @@ export async function collectBackgroundDiagnostics(background: BackgroundTarget)
       const tryRead = (dbName: string, storeName: string, key: string) =>
         new Promise<{ ok: boolean; value?: unknown; error?: string }>(resolve => {
           try {
-            const req = indexedDB.open(dbName);
-            req.onsuccess = () => {
+            const request = indexedDB.open(dbName);
+            request.onsuccess = () => {
               try {
-                const db = req.result;
+                const db = request.result;
                 if (!db.objectStoreNames.contains(storeName)) {
                   resolve({ ok: false, error: `store ${storeName} not found` });
                   return;
                 }
                 const tx = db.transaction(storeName, 'readonly');
                 const store = tx.objectStore(storeName);
-                const getReq = store.get(key);
-                getReq.onsuccess = () => resolve({ ok: true, value: getReq.result });
-                getReq.onerror = () => resolve({ ok: false, error: String(getReq.error) });
+                const getRequest = store.get(key);
+                getRequest.onsuccess = () => resolve({ ok: true, value: getRequest.result });
+                getRequest.onerror = () => resolve({ ok: false, error: String(getRequest.error) });
               } catch (error) {
                 resolve({ ok: false, error: String(error) });
               }
             };
-            req.onerror = () => resolve({ ok: false, error: String(req.error) });
+            request.onerror = () => resolve({ ok: false, error: String(request.error) });
           } catch (error) {
             resolve({ ok: false, error: String(error) });
           }
@@ -451,17 +544,19 @@ export async function collectBackgroundDiagnostics(background: BackgroundTarget)
         { db: 'keyval-store', store: 'keyval' },
         { db: 'keyval', store: 'keyval' },
       ];
+
       for (const candidate of candidates) {
         const result = await tryRead(candidate.db, candidate.store, 'kitsunarr-query-client-cache');
         if (result.ok) {
           return { ok: true, db: candidate.db, store: candidate.store, value: result.value } as const;
         }
       }
+
       return { ok: false, error: 'not found in known stores' } as const;
     });
     diagnostics.idbQueryClientCache = queryCache;
-  } catch (err) {
-    diagnostics.idbQueryClientCacheError = String(err);
+  } catch (error) {
+    diagnostics.idbQueryClientCacheError = String(error);
   }
 
   return diagnostics;
@@ -471,28 +566,26 @@ export async function readLibraryEpoch(background: BackgroundTarget): Promise<nu
   try {
     const result = await background.evaluate(async () => {
       try {
-        const globalRecord = globalThis as unknown as Record<string, unknown>;
-        const root =
-          (globalRecord['browser'] as Record<string, unknown> | undefined) ??
-          (globalRecord['chrome'] as Record<string, unknown> | undefined) ??
-          globalRecord;
-        const storage = root?.['storage'] as Record<string, unknown> | undefined;
-        if (storage && typeof storage['local'] === 'object') {
-          const localObj = storage['local'] as { get?: (this: unknown, keys: unknown) => Promise<Record<string, unknown>> } | undefined;
-          const getFn = localObj?.get;
-          if (typeof getFn === 'function') {
-            const values = await getFn.call(localObj, ['libraryEpoch']);
-            const epoch = (values as Record<string, unknown> | undefined)?.['libraryEpoch'];
-            return typeof epoch === 'number' ? epoch : undefined;
-          }
+        const globalObj = globalThis as unknown as WebExtGlobals;
+        const storage =
+          globalObj.browser?.storage ?? globalObj.chrome?.storage ?? globalObj.storage;
+        const localGet = storage?.local?.get;
+        if (typeof localGet === 'function') {
+          const values = (await localGet.call(storage.local, ['libraryEpoch'])) as
+            | Record<string, unknown>
+            | undefined;
+          const epoch = values?.libraryEpoch;
+          return typeof epoch === 'number' ? epoch : undefined;
         }
-      } catch {
+        return undefined;
+      } catch (error) {
+        console.warn('Failed to read libraryEpoch from storage.local:', String(error));
         return undefined;
       }
-      return undefined;
     });
     return typeof result === 'number' ? result : undefined;
-  } catch {
+  } catch (error) {
+    console.warn('Background evaluation failed while reading libraryEpoch:', String(error));
     return undefined;
   }
 }
@@ -500,7 +593,7 @@ export async function readLibraryEpoch(background: BackgroundTarget): Promise<nu
 export async function waitForLibraryEpochBump(
   background: BackgroundTarget,
   initialEpoch?: number,
-  timeoutMs = 15_000,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<number | undefined> {
   const start = Date.now();
   while (Date.now() - start <= timeoutMs) {
@@ -508,9 +601,9 @@ export async function waitForLibraryEpochBump(
     if (typeof current === 'number' && (initialEpoch === undefined || current > initialEpoch)) {
       return current;
     }
-    await new Promise(resolve => setTimeout(resolve, 250));
+    await new Promise(resolve => {
+      setTimeout(resolve, 250);
+    });
   }
   return undefined;
 }
-
-export const testServerBaseUrl = serverBaseUrl;
