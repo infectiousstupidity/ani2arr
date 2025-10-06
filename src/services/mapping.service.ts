@@ -8,6 +8,7 @@ import type { AniTitles, ExtensionError, MediaMetadataHint } from '@/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
 import { computeTitleMatchScore, normTitle, stripParenContent } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
+import { incrementCounter, timeAsync } from '@/utils/metrics';
 
 
 const PRIMARY_URL = 'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json';
@@ -33,6 +34,8 @@ const LOOKUP_SOFT_TTL = 10 * 60 * 1000; // 10 minutes
 const LOOKUP_HARD_TTL = 30 * 60 * 1000; // 30 minutes
 const LOOKUP_NEGATIVE_SOFT_TTL = 5 * 60 * 1000; // 5 minutes
 const LOOKUP_NEGATIVE_HARD_TTL = 15 * 60 * 1000; // 15 minutes
+
+const LOOKUP_LATENCY_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
 
 const SCORE_THRESHOLD = 0.76;
 const EARLY_STOP_THRESHOLD = 0.82;
@@ -451,16 +454,19 @@ export class MappingService {
 
     const positiveHit = await this.lookupCache.read(normalized);
     if (positiveHit && !positiveHit.stale) {
+      incrementCounter('mapping.lookup.cache_hit');
       return positiveHit.value;
     }
 
     const negativeHit = await this.negativeLookupCache.read(normalized);
     if (negativeHit && !negativeHit.stale) {
+      incrementCounter('mapping.lookup.negative_cache_hit');
       return [];
     }
 
     const inflight = this.lookupInflight.get(normalized);
     if (inflight) {
+      incrementCounter('mapping.lookup.inflight_reuse');
       return inflight;
     }
 
@@ -498,11 +504,14 @@ export class MappingService {
     term: string,
     credentials: { url: string; apiKey: string },
   ): Promise<SonarrLookupSeries[]> {
-    try {
-      return await this.sonarrApi.lookupSeriesByTerm(term, credentials);
-    } catch (error) {
-      throw normalizeError(error);
-    }
+    incrementCounter('mapping.lookup.network_miss');
+    return timeAsync('mapping.lookup.latency', LOOKUP_LATENCY_BUCKETS, async () => {
+      try {
+        return await this.sonarrApi.lookupSeriesByTerm(term, credentials);
+      } catch (error) {
+        throw normalizeError(error);
+      }
+    });
   }
 
   private async getConfiguredCredentials(): Promise<{ url: string; apiKey: string }> {

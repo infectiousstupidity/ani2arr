@@ -22,6 +22,7 @@ import { http, HttpResponse } from 'msw';
 import { primaryMappingUrl } from '@/testing/fixtures/mappings';
 import { extensionOptions } from '@/utils/storage';
 import type { SonarrLookupSeries } from '@/types';
+import { getMetricsSnapshot, resetMetrics } from '@/utils/metrics';
 
 type CacheStub<T> = TtlCache<T> & {
   read: ReturnType<typeof vi.fn>;
@@ -107,6 +108,19 @@ function attachLookupCaches(service: MappingService) {
   return { positive, negative };
 }
 
+function getSafeLookup(
+  service: MappingService,
+): (term: string, credentials: { url: string; apiKey: string }) => Promise<SonarrLookupSeries[]> {
+  const method = Reflect.get(service as unknown as Record<string, unknown>, 'safeLookup');
+  if (typeof method !== 'function') {
+    throw new Error('safeLookup not accessible');
+  }
+  return method.bind(service) as (
+    term: string,
+    credentials: { url: string; apiKey: string },
+  ) => Promise<SonarrLookupSeries[]>;
+}
+
 const baseOptions: ExtensionOptions = {
   sonarrUrl: defaultSonarrCredentials.url,
   sonarrApiKey: defaultSonarrCredentials.apiKey,
@@ -132,6 +146,7 @@ describe('MappingService', () => {
   };
 
   beforeEach(() => {
+    resetMetrics();
     sonarrApi = {
       lookupSeriesByTerm: vi.fn(),
     } as unknown as SonarrApiService;
@@ -370,10 +385,7 @@ describe('MappingService', () => {
   it('uses Sonarr lookup cache for normalized terms', async () => {
     const service = createService();
     attachLookupCaches(service);
-    const safeLookup = (service as any).safeLookup.bind(service) as (
-      term: string,
-      credentials: { url: string; apiKey: string },
-    ) => Promise<SonarrLookupSeries[]>;
+    const safeLookup = getSafeLookup(service);
 
     const credentials = {
       url: baseOptions.sonarrUrl!,
@@ -403,10 +415,7 @@ describe('MappingService', () => {
   it('uses negative Sonarr lookup cache when no results returned', async () => {
     const service = createService();
     attachLookupCaches(service);
-    const safeLookup = (service as any).safeLookup.bind(service) as (
-      term: string,
-      credentials: { url: string; apiKey: string },
-    ) => Promise<SonarrLookupSeries[]>;
+    const safeLookup = getSafeLookup(service);
 
     const credentials = {
       url: baseOptions.sonarrUrl!,
@@ -427,10 +436,7 @@ describe('MappingService', () => {
   it('shares inflight Sonarr lookups for the same normalized term', async () => {
     const service = createService();
     attachLookupCaches(service);
-    const safeLookup = (service as any).safeLookup.bind(service) as (
-      term: string,
-      credentials: { url: string; apiKey: string },
-    ) => Promise<SonarrLookupSeries[]>;
+    const safeLookup = getSafeLookup(service);
 
     const credentials = {
       url: baseOptions.sonarrUrl!,
@@ -466,16 +472,144 @@ describe('MappingService', () => {
     await expect(secondPromise).resolves.toEqual(payload);
   });
 
+  describe('metrics instrumentation', () => {
+    it('increments cache hit counter when a positive lookup cache entry is reused', async () => {
+      const service = createService();
+      const { positive } = attachLookupCaches(service);
+      const safeLookup = getSafeLookup(service);
+
+      const credentials = {
+        url: baseOptions.sonarrUrl!,
+        apiKey: baseOptions.sonarrApiKey!,
+      };
+
+      const normalized = matching.normTitle('Bleach');
+      const payload = [
+        {
+          tvdbId: 101,
+          title: 'Bleach',
+          year: 2004,
+          genres: ['Anime'],
+        },
+      ];
+      if (normalized) {
+        positive.store.set(normalized, {
+          value: payload,
+          staleAt: Date.now() + 10_000,
+          expiresAt: Date.now() + 20_000,
+        });
+      }
+
+      const results = await safeLookup('Bleach', credentials);
+
+      expect(results).toEqual(payload);
+      expect(sonarrApi.lookupSeriesByTerm).not.toHaveBeenCalled();
+      const snapshot = getMetricsSnapshot();
+      expect(snapshot.counters['mapping.lookup.cache_hit']).toBe(1);
+      expect(snapshot.counters['mapping.lookup.network_miss']).toBeUndefined();
+    });
+
+    it('increments negative cache counter when cached misses are reused', async () => {
+      const service = createService();
+      const { negative } = attachLookupCaches(service);
+      const safeLookup = getSafeLookup(service);
+
+      const credentials = {
+        url: baseOptions.sonarrUrl!,
+        apiKey: baseOptions.sonarrApiKey!,
+      };
+
+      const normalized = matching.normTitle('Samurai Champloo');
+      if (normalized) {
+        negative.store.set(normalized, {
+          value: true,
+          staleAt: Date.now() + 10_000,
+          expiresAt: Date.now() + 20_000,
+        });
+      }
+
+      const results = await safeLookup('Samurai Champloo', credentials);
+
+      expect(results).toEqual([]);
+      expect(sonarrApi.lookupSeriesByTerm).not.toHaveBeenCalled();
+      const snapshot = getMetricsSnapshot();
+      expect(snapshot.counters['mapping.lookup.negative_cache_hit']).toBe(1);
+      expect(snapshot.counters['mapping.lookup.network_miss']).toBeUndefined();
+    });
+
+    it('counts inflight reuse while sharing the same pending lookup', async () => {
+      const service = createService();
+      attachLookupCaches(service);
+      const safeLookup = getSafeLookup(service);
+
+      const credentials = {
+        url: baseOptions.sonarrUrl!,
+        apiKey: baseOptions.sonarrApiKey!,
+      };
+
+      const deferred = createDeferred<SonarrLookupSeries[]>();
+      (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockReturnValueOnce(deferred.promise);
+
+      const firstPromise = safeLookup('Fullmetal Alchemist', credentials);
+      await Promise.resolve();
+      const secondPromise = safeLookup('fullmetal alchemist', credentials);
+      await Promise.resolve();
+
+      const payload = [
+        {
+          tvdbId: 200,
+          title: 'Fullmetal Alchemist',
+          year: 2003,
+          genres: ['Anime'],
+        },
+      ];
+      deferred.resolve(payload);
+
+      await expect(firstPromise).resolves.toEqual(payload);
+      await expect(secondPromise).resolves.toEqual(payload);
+
+      const snapshot = getMetricsSnapshot();
+      expect(snapshot.counters['mapping.lookup.inflight_reuse']).toBe(1);
+      expect(snapshot.counters['mapping.lookup.network_miss']).toBe(1);
+    });
+
+    it('records network misses and lookup latency when performing Sonarr lookups', async () => {
+      const service = createService();
+      attachLookupCaches(service);
+      const safeLookup = getSafeLookup(service);
+
+      const credentials = {
+        url: baseOptions.sonarrUrl!,
+        apiKey: baseOptions.sonarrApiKey!,
+      };
+
+      const payload = [
+        {
+          tvdbId: 555,
+          title: 'Trigun Stampede',
+          year: 2023,
+          genres: ['Anime'],
+        },
+      ];
+      (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValueOnce(payload);
+
+      const results = await safeLookup('Trigun Stampede', credentials);
+
+      expect(results).toEqual(payload);
+      const snapshot = getMetricsSnapshot();
+      expect(snapshot.counters['mapping.lookup.network_miss']).toBe(1);
+      const histogram = snapshot.histograms['mapping.lookup.latency'];
+      expect(histogram?.count).toBe(1);
+    });
+  });
+
   it('refreshes Sonarr lookup cache after TTL expiry', async () => {
     vi.useFakeTimers();
 
     try {
       const service = createService();
       attachLookupCaches(service);
-      const safeLookup = (service as any).safeLookup.bind(service) as (
-        term: string,
-        credentials: { url: string; apiKey: string },
-      ) => Promise<SonarrLookupSeries[]>;
+      const safeLookup = getSafeLookup(service);
 
       const credentials = {
         url: baseOptions.sonarrUrl!,

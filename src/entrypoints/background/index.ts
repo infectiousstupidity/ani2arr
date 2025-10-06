@@ -3,6 +3,7 @@ import { browser } from 'wxt/browser';
 import { registerKitsunarrApi, getKitsunarrApi } from '@/services';
 import { computeTitleMatchScore } from '@/utils/matching';
 import { logger } from '@/utils/logger';
+import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/utils/metrics';
 
 type OpenOptionsMessage = { type: 'OPEN_OPTIONS_PAGE' };
 type MappingRefreshMessage = { type: 'kitsunarr:mapping:refresh' };
@@ -40,6 +41,15 @@ export default defineBackground(() => {
 
   registerKitsunarrApi();
   log.info('API services registered.');
+
+  if (import.meta.env.DEV) {
+    const globalWithMetrics = globalThis as typeof globalThis & {
+      __kitsunarrMetrics?: MetricsConsoleApi;
+    };
+    if (!globalWithMetrics.__kitsunarrMetrics) {
+      globalWithMetrics.__kitsunarrMetrics = createMetricsConsoleApi();
+    }
+  }
 
   const api = getKitsunarrApi();
   const alarmsApi = (browser as unknown as { alarms?: typeof browser.alarms }).alarms;
