@@ -12,6 +12,7 @@ import type {
 import { ErrorCode, logError, normalizeError } from '@/utils/error-handling';
 import { normTitle, stripParenContent } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
+import { incrementCounter } from '@/utils/metrics';
 
 const CACHE_KEY = 'sonarr:lean-series';
 const SOFT_TTL = 60 * 60 * 1000; // 1h
@@ -336,11 +337,23 @@ export class LibraryService {
     }
 
     const normalizedCandidates = this.normalizeTitleCandidates(candidates);
+    let sawAmbiguous = false;
+
     for (const key of normalizedCandidates) {
       const match = this.normalizedTitleIndex.get(key);
       if (typeof match === 'number' && this.tvdbSet.has(match)) {
+        incrementCounter('library.index.hit');
         return match;
       }
+      if (match === null) {
+        sawAmbiguous = true;
+      }
+    }
+
+    if (sawAmbiguous) {
+      incrementCounter('library.index.ambiguous');
+    } else {
+      incrementCounter('library.index.miss');
     }
 
     return null;

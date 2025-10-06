@@ -10,6 +10,7 @@ import * as errorHandling from '@/utils/error-handling';
 import type { MappingService } from '@/services/mapping.service';
 import type { SonarrApiService } from '@/api/sonarr.api';
 import { normTitle } from '@/utils/matching';
+import { getMetricsSnapshot, resetMetrics } from '@/utils/metrics';
 
 type CacheMock = TtlCache<LeanSonarrSeries[]> & {
   read: ReturnType<typeof vi.fn>;
@@ -100,6 +101,7 @@ describe('LibraryService', () => {
   let logErrorSpy: MockInstance;
 
   beforeEach(() => {
+    resetMetrics();
     cache = createCacheMock();
     sonarrClient = {
       getAllSeries: vi.fn(),
@@ -439,6 +441,70 @@ describe('LibraryService', () => {
       index = getPrivate(service, 'normalizedTitleIndex');
       expect(index.get(normTitle('New Show'))).toBe(909);
       expect(index.get(normTitle('New Show Alt'))).toBe(909);
+    });
+  });
+
+  describe('metrics instrumentation', () => {
+    it('counts index hits when a normalized candidate resolves to a single TVDB id', () => {
+      const normalizedTitle = normTitle('Hit Title');
+      const index = new Map<string, number | null>();
+      if (normalizedTitle) {
+        index.set(normalizedTitle, 1234);
+      }
+      setPrivate(service, 'normalizedTitleIndex', index);
+      setPrivate(service, 'tvdbSet', new Set([1234]));
+
+      const find = getPrivate<(payload: { anilistId: number; title?: string }) => number | null>(
+        service,
+        'findTvdbIdInIndex',
+      );
+
+      const result = find.call(service, { anilistId: 1, title: 'Hit Title' });
+
+      expect(result).toBe(1234);
+      const snapshot = getMetricsSnapshot();
+      expect(snapshot.counters['library.index.hit']).toBe(1);
+      expect(snapshot.counters['library.index.miss']).toBeUndefined();
+      expect(snapshot.counters['library.index.ambiguous']).toBeUndefined();
+    });
+
+    it('counts misses when no normalized candidate resolves to a TVDB id', () => {
+      setPrivate(service, 'normalizedTitleIndex', new Map());
+      setPrivate(service, 'tvdbSet', new Set());
+
+      const find = getPrivate<(payload: { anilistId: number; title?: string }) => number | null>(
+        service,
+        'findTvdbIdInIndex',
+      );
+
+      const result = find.call(service, { anilistId: 2, title: 'Unknown Title' });
+
+      expect(result).toBeNull();
+      const snapshot = getMetricsSnapshot();
+      expect(snapshot.counters['library.index.miss']).toBe(1);
+      expect(snapshot.counters['library.index.hit']).toBeUndefined();
+    });
+
+    it('counts ambiguous matches when normalized candidates map to conflicting TVDB ids', () => {
+      const normalizedTitle = normTitle('Conflicting Title');
+      const index = new Map<string, number | null>();
+      if (normalizedTitle) {
+        index.set(normalizedTitle, null);
+      }
+      setPrivate(service, 'normalizedTitleIndex', index);
+      setPrivate(service, 'tvdbSet', new Set([111, 222]));
+
+      const find = getPrivate<(payload: { anilistId: number; title?: string }) => number | null>(
+        service,
+        'findTvdbIdInIndex',
+      );
+
+      const result = find.call(service, { anilistId: 3, title: 'Conflicting Title' });
+
+      expect(result).toBeNull();
+      const snapshot = getMetricsSnapshot();
+      expect(snapshot.counters['library.index.ambiguous']).toBe(1);
+      expect(snapshot.counters['library.index.hit']).toBeUndefined();
     });
   });
 
