@@ -21,7 +21,8 @@ export class SonarrApiService {
   private request = async <T>(
     endpoint: string,
     credentials: SonarrCredentialsPayload,
-    fetchOptions: RequestInit = {},
+    fetchOptions?: RequestInit,
+    signal?: AbortSignal,
   ): Promise<T> => {
     if (!credentials.url || !credentials.apiKey) {
       throw createError(
@@ -45,10 +46,11 @@ export class SonarrApiService {
       return await retryWithBackoff(async () => {
         const response = await fetch(url, {
           ...fetchOptions,
+          signal: fetchOptions?.signal ?? signal,
           headers: {
             'Content-Type': 'application/json',
             'X-Api-Key': credentials.apiKey,
-            ...fetchOptions.headers,
+            ...(fetchOptions?.headers ?? {}),
           },
         });
 
@@ -90,8 +92,9 @@ export class SonarrApiService {
   public getSeriesByTvdbId = async (
     tvdbId: number,
     credentials: SonarrCredentialsPayload,
+    signal?: AbortSignal,
   ): Promise<SonarrSeries | null> => {
-    const seriesArray = await this.request<SonarrSeries[]>(`series?tvdbId=${tvdbId}`, credentials);
+    const seriesArray = await this.request<SonarrSeries[]>(`series?tvdbId=${tvdbId}`, credentials, undefined, signal);
     return seriesArray[0] ?? null;
   };
 
@@ -99,9 +102,10 @@ export class SonarrApiService {
   public lookupSeriesByTerm = async (
     term: string,
     credentials: SonarrCredentialsPayload,
+    signal?: AbortSignal,
   ): Promise<SonarrLookupSeries[]> => {
     const encodedTerm = encodeURIComponent(term);
-    return this.request<SonarrLookupSeries[]>(`series/lookup?term=${encodedTerm}`, credentials);
+    return this.request<SonarrLookupSeries[]>(`series/lookup?term=${encodedTerm}`, credentials, undefined, signal);
   };
 
   /** POST /series */

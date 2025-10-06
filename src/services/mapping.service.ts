@@ -48,6 +48,36 @@ export interface ResolvedMapping {
   successfulSynonym?: string;
 }
 
+const createAbortError = (signal?: AbortSignal): Error => {
+  if (signal?.reason instanceof Error) {
+    return signal.reason;
+  }
+  if (signal?.reason) {
+    const description = typeof signal.reason === 'string'
+      ? signal.reason
+      : 'The operation was aborted.';
+    return new DOMException(description, 'AbortError');
+  }
+  return new DOMException('The operation was aborted.', 'AbortError');
+};
+
+const throwIfAborted = (signal?: AbortSignal): void => {
+  if (signal?.aborted) {
+    throw createAbortError(signal);
+  }
+};
+
+const isAbortError = (error: unknown): error is DOMException | Error => {
+  if (!error) return false;
+  if (error instanceof DOMException) {
+    return error.name === 'AbortError';
+  }
+  if (error instanceof Error) {
+    return (error as { name?: string }).name === 'AbortError';
+  }
+  return false;
+};
+
 type ResolveHints = {
   primaryTitle?: string;
   domMedia?: MediaMetadataHint | null;
@@ -57,14 +87,16 @@ type ResolveTvdbIdOptions = {
   network?: 'never';
   hints?: ResolveHints;
   ignoreFailureCache?: boolean;
+  signal?: AbortSignal;
 };
 
 type QueuedMappingRequest = {
   anilistId: number;
   resolve: (value: ResolvedMapping) => void;
-  reject: (reason: ExtensionError) => void;
+  reject: (reason: ExtensionError | Error) => void;
   hints?: ResolveHints;
   bypassFailureCache: boolean;
+  signal?: AbortSignal;
 };
 
 type MappingServiceOptions = {
@@ -119,6 +151,8 @@ export class MappingService {
   }
 
   public resolveTvdbId(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping> {
+    const signal = options.signal;
+    throwIfAborted(signal);
     const bypassFailureCache = options.ignoreFailureCache === true;
     const existing = this.inflight.get(anilistId);
 
@@ -126,7 +160,37 @@ export class MappingService {
       if (bypassFailureCache && !existing.bypassFailureCache) {
         // If a bypass is requested while a cached resolution is in flight, allow the existing promise to complete first.
       }
-      return existing.promise;
+      if (!signal) {
+        return existing.promise;
+      }
+
+      return new Promise<ResolvedMapping>((resolve, reject) => {
+        const onAbort = () => {
+          signal.removeEventListener('abort', onAbort);
+          reject(createAbortError(signal));
+        };
+
+        if (signal.aborted) {
+          reject(createAbortError(signal));
+          return;
+        }
+
+        signal.addEventListener('abort', onAbort, { once: true });
+
+        existing.promise
+          .then(value => {
+            signal.removeEventListener('abort', onAbort);
+            if (signal.aborted) {
+              reject(createAbortError(signal));
+              return;
+            }
+            resolve(value);
+          })
+          .catch(error => {
+            signal.removeEventListener('abort', onAbort);
+            reject(error);
+          });
+      });
     }
 
     const promise = this.resolveTvdbIdInternal(anilistId, options, bypassFailureCache);
@@ -148,14 +212,18 @@ export class MappingService {
     bypassFailureCache: boolean,
   ): Promise<ResolvedMapping> {
     const cacheKey = this.successCacheKey(anilistId);
+    const signal = options.signal;
+    throwIfAborted(signal);
 
     const cachedSuccess = await this.caches.success.read(cacheKey);
+    throwIfAborted(signal);
     if (cachedSuccess) {
       return cachedSuccess.value;
     }
 
     if (!bypassFailureCache) {
       const cachedFailure = await this.caches.failure.read(this.failureCacheKey(anilistId));
+      throwIfAborted(signal);
       if (cachedFailure) {
         throw cachedFailure.value;
       }
@@ -167,6 +235,7 @@ export class MappingService {
         staleMs: RESOLVED_SOFT_TTL,
         hardMs: RESOLVED_HARD_TTL,
       });
+      throwIfAborted(signal);
       return staticHit.mapping;
     }
 
@@ -181,39 +250,85 @@ export class MappingService {
     const hintTerm = options.hints?.primaryTitle?.trim();
     if (hintTerm) {
       try {
-        const hinted = await this.tryHintLookup(anilistId, hintTerm);
+        const hinted = await this.tryHintLookup(anilistId, hintTerm, signal);
         if (hinted) {
           await this.caches.success.write(cacheKey, hinted, {
             staleMs: RESOLVED_SOFT_TTL,
             hardMs: RESOLVED_HARD_TTL,
           });
+          throwIfAborted(signal);
           return hinted;
         }
       } catch (error) {
+        if (isAbortError(error)) {
+          throw error;
+        }
         logError(normalizeError(error), `MappingService:hintLookup:${anilistId}`);
       }
     }
 
-    return this.enqueueNetworkResolution(anilistId, options.hints, bypassFailureCache);
+    return this.enqueueNetworkResolution(anilistId, options.hints, bypassFailureCache, signal);
   }
 
   private enqueueNetworkResolution(
     anilistId: number,
     hints: ResolveHints | undefined,
     bypassFailureCache: boolean,
+    signal?: AbortSignal,
   ): Promise<ResolvedMapping> {
+    if (signal?.aborted) {
+      return Promise.reject(createAbortError(signal));
+    }
+
     return new Promise<ResolvedMapping>((resolve, reject) => {
+      let settled = false;
+      const cleanup = () => {
+        if (signal) {
+          signal.removeEventListener('abort', onAbort);
+        }
+      };
+
+      const onAbort = () => {
+        if (settled) return;
+        const abortError = createAbortError(signal);
+        const index = this.mappingQueue.indexOf(request);
+        if (index >= 0) {
+          this.mappingQueue.splice(index, 1);
+        }
+        settled = true;
+        cleanup();
+        reject(abortError);
+      };
+
       const request: QueuedMappingRequest = {
         anilistId,
-        resolve,
-        reject,
+        resolve: value => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(value);
+        },
+        reject: reason => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(reason);
+        },
         bypassFailureCache,
+        ...(signal ? { signal } : {}),
       };
+
       if (hints) {
         request.hints = hints;
       }
+
+      if (signal) {
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
+
       this.mappingQueue.push(request);
       this.processQueue().catch(error => {
+        cleanup();
         logError(normalizeError(error), 'MappingService:processQueue');
       });
     });
@@ -238,15 +353,24 @@ export class MappingService {
 
   private async handleNetworkRequest(request: QueuedMappingRequest): Promise<void> {
     const cacheKey = this.successCacheKey(request.anilistId);
+    const signal = request.signal;
+    if (signal?.aborted) {
+      request.reject(createAbortError(signal));
+      return;
+    }
 
     try {
-      const mapping = await this.resolveViaNetwork(request.anilistId, request.hints);
+      const mapping = await this.resolveViaNetwork(request.anilistId, request.hints, signal);
       await this.caches.success.write(cacheKey, mapping, {
         staleMs: RESOLVED_SOFT_TTL,
         hardMs: RESOLVED_HARD_TTL,
       });
       request.resolve(mapping);
     } catch (error) {
+      if (isAbortError(error)) {
+        request.reject(error);
+        return;
+      }
       const normalized = normalizeError(error);
       if (!request.bypassFailureCache && this.shouldCacheFailure(normalized)) {
         const ttl = this.failureTtlsFor(normalized);
@@ -259,19 +383,26 @@ export class MappingService {
     }
   }
 
-  private async resolveViaNetwork(anilistId: number, hints?: ResolveHints): Promise<ResolvedMapping> {
+  private async resolveViaNetwork(
+    anilistId: number,
+    hints?: ResolveHints,
+    signal?: AbortSignal,
+  ): Promise<ResolvedMapping> {
+    throwIfAborted(signal);
     const credentials = await this.getConfiguredCredentials();
 
     const metadataMedia = this.buildMediaFromMetadataHint(anilistId, hints?.domMedia);
     if (metadataMedia) {
-      const resolved = await this.tryResolveWithPreparedMedia(anilistId, metadataMedia, credentials, hints);
+      throwIfAborted(signal);
+      const resolved = await this.tryResolveWithPreparedMedia(anilistId, metadataMedia, credentials, hints, signal);
       if (resolved) {
         return resolved;
       }
     }
 
     const apiMedia = await this.anilistApi.fetchMediaWithRelations(anilistId);
-    const apiResolved = await this.tryResolveWithPreparedMedia(anilistId, apiMedia, credentials, hints);
+    throwIfAborted(signal);
+    const apiResolved = await this.tryResolveWithPreparedMedia(anilistId, apiMedia, credentials, hints, signal);
     if (apiResolved) {
       return apiResolved;
     }
@@ -288,7 +419,9 @@ export class MappingService {
     media: AniMedia,
     credentials: { url: string; apiKey: string },
     hints?: ResolveHints,
+    signal?: AbortSignal,
   ): Promise<ResolvedMapping | null> {
+    throwIfAborted(signal);
     if (media.format && !ALLOWED_FORMATS.has(media.format)) {
       throw createError(
         ErrorCode.VALIDATION_ERROR,
@@ -313,9 +446,11 @@ export class MappingService {
     let bestMatch: { tvdbId: number; term: string; score: number } | null = null;
 
     for (const term of searchTerms.slice(0, MAX_TERMS)) {
-      const results = await this.safeLookup(term, credentials);
+      throwIfAborted(signal);
+      const results = await this.safeLookup(term, credentials, signal);
 
       for (const candidate of results) {
+        throwIfAborted(signal);
         const mediaYear = media.startDate?.year;
         const scoreParams = {
           queryRaw: term,
@@ -416,9 +551,14 @@ export class MappingService {
     };
   }
 
-  private async tryHintLookup(anilistId: number, term: string): Promise<ResolvedMapping | null> {
+  private async tryHintLookup(
+    anilistId: number,
+    term: string,
+    signal?: AbortSignal,
+  ): Promise<ResolvedMapping | null> {
     if (!term.trim()) return null;
 
+    throwIfAborted(signal);
     let credentials: { url: string; apiKey: string };
     try {
       credentials = await this.getConfiguredCredentials();
@@ -426,9 +566,11 @@ export class MappingService {
       return null;
     }
 
-    const results = await this.safeLookup(term, credentials);
+    throwIfAborted(signal);
+    const results = await this.safeLookup(term, credentials, signal);
 
     for (const candidate of results) {
+      throwIfAborted(signal);
       const scoreParams = {
         queryRaw: term,
         candidateRaw: candidate.title,
@@ -445,20 +587,27 @@ export class MappingService {
     return null;
   }
 
-  private async safeLookup(term: string, credentials: { url: string; apiKey: string }): Promise<SonarrLookupSeries[]> {
+  private async safeLookup(
+    term: string,
+    credentials: { url: string; apiKey: string },
+    signal?: AbortSignal,
+  ): Promise<SonarrLookupSeries[]> {
     const normalized = normTitle(term);
 
     if (!normalized) {
-      return this.performLookup(term, credentials);
+      return this.performLookup(term, credentials, signal);
     }
 
+    throwIfAborted(signal);
     const positiveHit = await this.lookupCache.read(normalized);
+    throwIfAborted(signal);
     if (positiveHit && !positiveHit.stale) {
       incrementCounter('mapping.lookup.cache_hit');
       return positiveHit.value;
     }
 
     const negativeHit = await this.negativeLookupCache.read(normalized);
+    throwIfAborted(signal);
     if (negativeHit && !negativeHit.stale) {
       incrementCounter('mapping.lookup.negative_cache_hit');
       return [];
@@ -467,12 +616,61 @@ export class MappingService {
     const inflight = this.lookupInflight.get(normalized);
     if (inflight) {
       incrementCounter('mapping.lookup.inflight_reuse');
-      return inflight;
+      if (!signal) {
+        return inflight;
+      }
+
+      return new Promise<SonarrLookupSeries[]>((resolve, reject) => {
+        const onAbort = () => {
+          signal.removeEventListener('abort', onAbort);
+          reject(createAbortError(signal));
+        };
+
+        if (signal.aborted) {
+          reject(createAbortError(signal));
+          return;
+        }
+
+        signal.addEventListener('abort', onAbort, { once: true });
+
+        inflight
+          .then(value => {
+            signal.removeEventListener('abort', onAbort);
+            if (signal.aborted) {
+              reject(createAbortError(signal));
+              return;
+            }
+            resolve(value);
+          })
+          .catch(error => {
+            signal.removeEventListener('abort', onAbort);
+            reject(error);
+          });
+      });
     }
 
+    const controller = signal ? new AbortController() : undefined;
+
     const promise = (async () => {
+      let abortCleanup: (() => void) | undefined;
+      if (signal && controller) {
+        const onAbort = () => {
+          controller.abort(signal.reason);
+        };
+        if (signal.aborted) {
+          controller.abort(signal.reason);
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true });
+          abortCleanup = () => signal.removeEventListener('abort', onAbort);
+        }
+      }
+
       try {
-        const results = await this.performLookup(term, credentials);
+        const results = await this.performLookup(
+          term,
+          credentials,
+          controller?.signal ?? signal,
+        );
 
         if (results.length > 0) {
           await this.lookupCache.write(normalized, results, {
@@ -489,12 +687,16 @@ export class MappingService {
         }
 
         return results;
+      } catch (error) {
+        if (isAbortError(error)) {
+          throw error;
+        }
+        throw normalizeError(error);
       } finally {
+        abortCleanup?.();
         this.lookupInflight.delete(normalized);
       }
-    })().catch(error => {
-      throw normalizeError(error);
-    });
+    })();
 
     this.lookupInflight.set(normalized, promise);
     return promise;
@@ -503,12 +705,17 @@ export class MappingService {
   private async performLookup(
     term: string,
     credentials: { url: string; apiKey: string },
+    signal?: AbortSignal,
   ): Promise<SonarrLookupSeries[]> {
     incrementCounter('mapping.lookup.network_miss');
     return timeAsync('mapping.lookup.latency', LOOKUP_LATENCY_BUCKETS, async () => {
       try {
-        return await this.sonarrApi.lookupSeriesByTerm(term, credentials);
+        throwIfAborted(signal);
+        return await this.sonarrApi.lookupSeriesByTerm(term, credentials, signal);
       } catch (error) {
+        if (isAbortError(error)) {
+          throw error;
+        }
         throw normalizeError(error);
       }
     });

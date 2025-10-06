@@ -66,7 +66,11 @@ const createOptions = (overrides?: Partial<ExtensionOptions>): ExtensionOptions 
 };
 
 const createMockApi = () => ({
-  getSeriesStatus: vi.fn<() => Promise<unknown>>(),
+  getSeriesStatus: vi.fn<(
+    payload?: unknown,
+    options?: { requestId?: string },
+  ) => Promise<unknown>>(),
+  cancelSeriesStatus: vi.fn<(input: { requestId: string }) => Promise<void>>(),
   addToSonarr: vi.fn<() => Promise<unknown>>(),
   notifySettingsChanged: vi.fn<() => Promise<unknown>>(),
   testConnection: vi.fn<() => Promise<unknown>>(),
@@ -88,6 +92,7 @@ let mockApi: MockApi;
 beforeEach(() => {
   mockApi = createMockApi();
   getKitsunarrApiMock.mockReturnValue(mockApi);
+  mockApi.cancelSeriesStatus.mockResolvedValue();
   extensionOptionsMock.getValue.mockReset();
   extensionOptionsMock.setValue.mockReset();
   extensionOptionsMock.watch.mockReset();
@@ -134,13 +139,54 @@ describe('useSeriesStatus', () => {
     await waitFor(() => expect(mockApi.getSeriesStatus).toHaveBeenCalledTimes(1));
 
     expect(ignoreFailureCache).toHaveBeenCalledTimes(1);
-    expect(mockApi.getSeriesStatus).toHaveBeenCalledWith(
-      expect.objectContaining({
-        anilistId: payload.anilistId,
-        title: payload.title,
-        ignoreFailureCache: true,
-      }),
-    );
+    const [requestArg, optionsArg] = mockApi.getSeriesStatus.mock.calls[0]!;
+    expect(requestArg).toMatchObject({
+      anilistId: payload.anilistId,
+      title: payload.title,
+      ignoreFailureCache: true,
+    });
+    expect(typeof optionsArg?.requestId).toBe('string');
+
+    queryClient.clear();
+  });
+
+  it('propagates query cancellation to the Kitsunarr API client', async () => {
+    const queryClient = createQueryClient();
+    const wrapper = createWrapper(queryClient);
+
+    const payload = { anilistId: 99 };
+    let capturedRequestId: string | undefined;
+    let rejectPending: ((error: unknown) => void) | undefined;
+
+    mockApi.getSeriesStatus.mockImplementation((_request, options) => {
+      capturedRequestId = options?.requestId;
+      return new Promise((_resolve, reject) => {
+        rejectPending = reject;
+      });
+    });
+
+    mockApi.cancelSeriesStatus.mockImplementation(({ requestId }) => {
+      if (rejectPending) {
+        rejectPending(new DOMException('The operation was aborted.', 'AbortError'));
+        rejectPending = undefined;
+      }
+      expect(requestId).toBe(capturedRequestId);
+      return Promise.resolve();
+    });
+
+    renderHook(() => useSeriesStatus(payload), { wrapper });
+
+    await waitFor(() => expect(mockApi.getSeriesStatus).toHaveBeenCalledTimes(1));
+    const pending = mockApi.getSeriesStatus.mock.results[0]?.value as Promise<unknown>;
+
+    await act(async () => {
+      queryClient.cancelQueries({ queryKey: queryKeys.seriesStatus(payload) });
+    });
+
+    await waitFor(() => expect(mockApi.cancelSeriesStatus).toHaveBeenCalledTimes(1));
+    expect(typeof capturedRequestId).toBe('string');
+    expect(mockApi.cancelSeriesStatus).toHaveBeenCalledWith({ requestId: capturedRequestId! });
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
 
     queryClient.clear();
   });

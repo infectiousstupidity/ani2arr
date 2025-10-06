@@ -409,6 +409,7 @@ const createTestApi = () => {
 
   const api = {
     getSeriesStatus,
+    cancelSeriesStatus: vi.fn(async () => {}),
     addToSonarr,
     getSonarrMetadata,
     notifySettingsChanged,

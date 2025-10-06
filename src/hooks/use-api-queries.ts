@@ -18,6 +18,13 @@ import { normalizeError } from '@/utils/error-handling';
 
 const rootQueryKey = ['kitsunarr'] as const;
 
+const createRequestId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2);
+};
+
 const normalizeTitleKey = (title?: string) => {
   const trimmed = title?.trim();
   return trimmed ? trimmed.toLowerCase() : '::';
@@ -64,7 +71,7 @@ export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: Ser
   const forceVerify = options?.force_verify === true;
   return useQuery<CheckSeriesStatusResponse, ExtensionError>({
     queryKey: queryKeys.seriesStatus(payload),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const request: StatusInput = { anilistId: payload.anilistId };
       if (payload.title !== undefined) {
         request.title = payload.title;
@@ -85,7 +92,38 @@ export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: Ser
       if (bypassFailureCache) {
         request.ignoreFailureCache = true;
       }
-      return getKitsunarrApi().getSeriesStatus(request);
+      const api = getKitsunarrApi();
+
+      if (signal?.aborted) {
+        throw signal.reason instanceof Error
+          ? signal.reason
+          : new DOMException('The operation was aborted.', 'AbortError');
+      }
+
+      const requestId = createRequestId();
+      let abortNotified = false;
+      const notifyAbort = () => {
+        if (abortNotified) return;
+        abortNotified = true;
+        void api.cancelSeriesStatus({ requestId }).catch(() => {
+          // Best-effort cancellation; ignore failures since the caller is already aborting.
+        });
+      };
+
+      if (signal) {
+        signal.addEventListener('abort', notifyAbort, { once: true });
+      }
+
+      try {
+        return await api.getSeriesStatus(request, { requestId });
+      } finally {
+        if (signal) {
+          signal.removeEventListener('abort', notifyAbort);
+          if (signal.aborted) {
+            notifyAbort();
+          }
+        }
+      }
     },
     enabled: !!payload.anilistId && (options?.enabled ?? true),
     staleTime: forceVerify ? 0 : 5 * 60 * 1000,

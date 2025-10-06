@@ -33,7 +33,8 @@ import type {
 
 interface KitsunarrApi {
   resolveMapping(input: ResolveInput): Promise<MappingOutput>;
-  getSeriesStatus(input: StatusInput): Promise<StatusOutput>;
+  getSeriesStatus(input: StatusInput, options?: { requestId?: string }): Promise<StatusOutput>;
+  cancelSeriesStatus(input: { requestId: string }): Promise<void>;
   addToSonarr(input: AddInput): Promise<SonarrSeries>;
   notifySettingsChanged(): Promise<{ ok: true }>;
   getQualityProfiles(): Promise<SonarrQualityProfile[]>;
@@ -90,6 +91,7 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
 
     let libraryEpoch = 0;
     let settingsEpoch = 0;
+    const statusAbortControllers = new Map<string, AbortController>();
 
     void initializeEpoch('libraryEpoch').then(epoch => {
       libraryEpoch = epoch;
@@ -169,8 +171,36 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
         } satisfies MappingOutput;
       },
 
-      async getSeriesStatus(input) {
-        await ensureConfigured();
+      async getSeriesStatus(input, options) {
+        const requestId = options?.requestId;
+        let controller: AbortController | undefined;
+        if (requestId) {
+          controller = new AbortController();
+          statusAbortControllers.set(requestId, controller);
+        }
+
+        const throwIfAborted = () => {
+          if (!controller?.signal.aborted) {
+            return;
+          }
+          const reason = controller.signal.reason;
+          if (reason instanceof Error) {
+            throw reason;
+          }
+          if (reason !== undefined) {
+            if (reason instanceof DOMException) {
+              throw reason;
+            }
+            const description = typeof reason === 'string' ? reason : 'The operation was aborted.';
+            throw new DOMException(description, 'AbortError');
+          }
+          throw new DOMException('The operation was aborted.', 'AbortError');
+        };
+
+        try {
+          await ensureConfigured();
+          throwIfAborted();
+
         const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
         if (input.title !== undefined) {
           payload.title = input.title;
@@ -188,7 +218,32 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
         if (input.ignoreFailureCache) {
           requestOptions.ignoreFailureCache = true;
         }
-        return libraryService.getSeriesStatus(payload, requestOptions);
+          throwIfAborted();
+          const result = await libraryService.getSeriesStatus(
+            payload,
+            requestOptions,
+            controller ? { signal: controller.signal } : undefined,
+          );
+          return result;
+        } finally {
+          if (requestId) {
+            const current = statusAbortControllers.get(requestId);
+            if (current === controller) {
+              statusAbortControllers.delete(requestId);
+            }
+          }
+        }
+      },
+
+      async cancelSeriesStatus({ requestId }) {
+        const controller = statusAbortControllers.get(requestId);
+        if (!controller) {
+          return;
+        }
+        statusAbortControllers.delete(requestId);
+        if (!controller.signal.aborted) {
+          controller.abort(new DOMException('The operation was aborted.', 'AbortError'));
+        }
       },
 
       async addToSonarr(input) {

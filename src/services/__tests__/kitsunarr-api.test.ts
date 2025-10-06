@@ -169,11 +169,62 @@ describe('KitsunarrApi service', () => {
     expect(library.getSeriesStatus).toHaveBeenCalledWith(
       { anilistId: 7, title: 'My Anime' },
       { force_verify: true, network: 'never', ignoreFailureCache: true },
+      undefined,
     );
 
     const storedEpochs = await fakeBrowser.storage.local.get({ libraryEpoch: undefined, settingsEpoch: undefined });
     expect(storedEpochs).toEqual({ libraryEpoch: undefined, settingsEpoch: undefined });
     expect(sendMessageSpy).not.toHaveBeenCalled();
+  });
+
+  it('aborts inflight getSeriesStatus requests when cancelled explicitly', async () => {
+    const { service, library } = await createService();
+    await extensionOptions.setValue(cloneOptions(baseOptions));
+
+    let capturedSignal: AbortSignal | undefined;
+    let abortTriggered = false;
+    const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+    try {
+      (library.getSeriesStatus as ReturnType<typeof vi.fn>).mockImplementation((_payload, _options, context) => {
+        capturedSignal = context?.signal;
+        return new Promise((_resolve, reject) => {
+          context?.signal?.addEventListener(
+            'abort',
+            () => {
+              const reason = context?.signal?.reason;
+              abortTriggered = true;
+              reject(
+                reason instanceof Error
+                  ? reason
+                  : new DOMException('The operation was aborted.', 'AbortError'),
+              );
+            },
+            { once: true },
+          );
+        });
+      });
+
+      const pending = service.getSeriesStatus({ anilistId: 11 }, { requestId: 'req-1' });
+
+      await vi.waitFor(() => {
+        expect(library.getSeriesStatus).toHaveBeenCalled();
+      });
+
+      expect(typeof capturedSignal).toBe('object');
+      expect(capturedSignal).toBeInstanceOf(AbortSignal);
+      expect(capturedSignal?.aborted).toBe(false);
+
+      await service.cancelSeriesStatus({ requestId: 'req-1' });
+      expect(abortSpy).toHaveBeenCalled();
+
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+      expect(abortTriggered).toBe(true);
+
+      // cancelling again should be a no-op
+      await expect(service.cancelSeriesStatus({ requestId: 'req-1' })).resolves.toBeUndefined();
+    } finally {
+      abortSpy.mockRestore();
+    }
   });
 
   it('merges payloads when adding to Sonarr and broadcasts epoch with tvdbId', async () => {
