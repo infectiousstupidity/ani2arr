@@ -169,6 +169,7 @@ describe('KitsunarrApi service', () => {
     expect(library.getSeriesStatus).toHaveBeenCalledWith(
       { anilistId: 7, title: 'My Anime' },
       { force_verify: true, network: 'never', ignoreFailureCache: true },
+      undefined,
     );
 
     const storedEpochs = await fakeBrowser.storage.local.get({ libraryEpoch: undefined, settingsEpoch: undefined });

@@ -274,6 +274,59 @@ describe('MappingService', () => {
     scoreSpy.mockRestore();
   });
 
+  it('drops network resolutions when the provided signal aborts before lookup begins', async () => {
+    const service = createService();
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('lookup should not be called for cancelled work');
+    });
+
+    const controller = new AbortController();
+
+    const promise = service.resolveTvdbId(42, { signal: controller.signal });
+
+    await Promise.resolve();
+    controller.abort();
+
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(sonarrApi.lookupSeriesByTerm).not.toHaveBeenCalled();
+    expect(anilistApi.fetchMediaWithRelations).not.toHaveBeenCalled();
+    expect(caches.success.write).not.toHaveBeenCalled();
+    expect(caches.failure.write).not.toHaveBeenCalled();
+  });
+
+  it('does not populate lookup caches when a lookup aborts mid-flight', async () => {
+    const service = createService();
+    const lookupCaches = attachLookupCaches(service);
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(
+      (_term: string, _credentials, signal?: AbortSignal) => {
+        const deferred = createDeferred<SonarrLookupSeries[]>();
+        signal?.addEventListener(
+          'abort',
+          () => {
+            const reason = signal.reason;
+            deferred.reject(reason instanceof Error ? reason : new DOMException('The operation was aborted.', 'AbortError'));
+          },
+          { once: true },
+        );
+        return deferred.promise;
+      },
+    );
+
+    const controller = new AbortController();
+    const promise = service.resolveTvdbId(43, { signal: controller.signal });
+
+    await Promise.resolve();
+    controller.abort();
+
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(lookupCaches.positive.write).not.toHaveBeenCalled();
+    expect(lookupCaches.negative.write).not.toHaveBeenCalled();
+  });
+
   it('honors MSW withLatency delays before resolving Sonarr lookups', async () => {
     vi.useFakeTimers();
     const latencyMs = 320;

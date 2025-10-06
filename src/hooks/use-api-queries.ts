@@ -64,7 +64,7 @@ export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: Ser
   const forceVerify = options?.force_verify === true;
   return useQuery<CheckSeriesStatusResponse, ExtensionError>({
     queryKey: queryKeys.seriesStatus(payload),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const request: StatusInput = { anilistId: payload.anilistId };
       if (payload.title !== undefined) {
         request.title = payload.title;
@@ -85,7 +85,7 @@ export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: Ser
       if (bypassFailureCache) {
         request.ignoreFailureCache = true;
       }
-      return getKitsunarrApi().getSeriesStatus(request);
+      return getKitsunarrApi().getSeriesStatus(request, { signal });
     },
     enabled: !!payload.anilistId && (options?.enabled ?? true),
     staleTime: forceVerify ? 0 : 5 * 60 * 1000,

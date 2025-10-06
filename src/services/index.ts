@@ -33,7 +33,7 @@ import type {
 
 interface KitsunarrApi {
   resolveMapping(input: ResolveInput): Promise<MappingOutput>;
-  getSeriesStatus(input: StatusInput): Promise<StatusOutput>;
+  getSeriesStatus(input: StatusInput, options?: { signal?: AbortSignal }): Promise<StatusOutput>;
   addToSonarr(input: AddInput): Promise<SonarrSeries>;
   notifySettingsChanged(): Promise<{ ok: true }>;
   getQualityProfiles(): Promise<SonarrQualityProfile[]>;
@@ -169,7 +169,7 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
         } satisfies MappingOutput;
       },
 
-      async getSeriesStatus(input) {
+      async getSeriesStatus(input, context) {
         await ensureConfigured();
         const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
         if (input.title !== undefined) {
@@ -188,7 +188,7 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
         if (input.ignoreFailureCache) {
           requestOptions.ignoreFailureCache = true;
         }
-        return libraryService.getSeriesStatus(payload, requestOptions);
+        return libraryService.getSeriesStatus(payload, requestOptions, context);
       },
 
       async addToSonarr(input) {

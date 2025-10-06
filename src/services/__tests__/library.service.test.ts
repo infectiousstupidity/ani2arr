@@ -614,10 +614,14 @@ describe('LibraryService', () => {
         { force_verify: true },
       );
 
-      expect(sonarrClient.getSeriesByTvdbId).toHaveBeenCalledWith(555, {
-        url: BASE_OPTIONS.sonarrUrl,
-        apiKey: BASE_OPTIONS.sonarrApiKey,
-      });
+      expect(sonarrClient.getSeriesByTvdbId).toHaveBeenCalledWith(
+        555,
+        {
+          url: BASE_OPTIONS.sonarrUrl,
+          apiKey: BASE_OPTIONS.sonarrApiKey,
+        },
+        undefined,
+      );
       expect(cache.write).toHaveBeenCalledWith(
         'sonarr:lean-series',
         [
@@ -679,10 +683,14 @@ describe('LibraryService', () => {
         44,
         expect.objectContaining({ ignoreFailureCache: true }),
       );
-      expect(sonarrClient.getSeriesByTvdbId).toHaveBeenCalledWith(444, {
-        url: BASE_OPTIONS.sonarrUrl,
-        apiKey: BASE_OPTIONS.sonarrApiKey,
-      });
+      expect(sonarrClient.getSeriesByTvdbId).toHaveBeenCalledWith(
+        444,
+        {
+          url: BASE_OPTIONS.sonarrUrl,
+          apiKey: BASE_OPTIONS.sonarrApiKey,
+        },
+        undefined,
+      );
       expect(response).toEqual({ exists: false, tvdbId: 444 });
       expect(mutationSpy).not.toHaveBeenCalled();
     });

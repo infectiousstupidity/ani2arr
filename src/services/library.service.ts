@@ -127,7 +127,11 @@ export class LibraryService {
   public async getSeriesStatus(
     payload: CheckSeriesStatusPayload,
     options: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {},
+    context: { signal?: AbortSignal } = {},
   ): Promise<CheckSeriesStatusResponse> {
+    const signal = context.signal;
+    signal?.throwIfAborted();
+
     const leanList = await this.getLeanSeriesList();
     const sonarrOpts = await extensionOptions.getValue();
     const isConfigured = !!(sonarrOpts?.sonarrUrl && sonarrOpts?.sonarrApiKey);
@@ -143,6 +147,9 @@ export class LibraryService {
       if (options.ignoreFailureCache) {
         mappingOptions.ignoreFailureCache = true;
       }
+      if (signal) {
+        mappingOptions.signal = signal;
+      }
 
       const hints: NonNullable<Parameters<MappingService['resolveTvdbId']>[1]>['hints'] = {};
       if (normalizedTitle) {
@@ -156,6 +163,7 @@ export class LibraryService {
       }
 
       try {
+        signal?.throwIfAborted();
         const mapping = await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
         tvdbId = mapping.tvdbId ?? null;
         successfulSynonym = mapping.successfulSynonym;
@@ -191,7 +199,8 @@ export class LibraryService {
     }
 
     const credentials = { url: sonarrOpts!.sonarrUrl!, apiKey: sonarrOpts!.sonarrApiKey! };
-    const liveSeries = await this.sonarrClient.getSeriesByTvdbId(tvdbId, credentials);
+    signal?.throwIfAborted();
+    const liveSeries = await this.sonarrClient.getSeriesByTvdbId(tvdbId, credentials, signal);
 
       if (liveSeries) {
         let cacheMutated = false;
