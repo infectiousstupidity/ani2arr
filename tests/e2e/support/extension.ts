@@ -569,9 +569,10 @@ export async function readLibraryEpoch(background: BackgroundTarget): Promise<nu
         const globalObj = globalThis as unknown as WebExtGlobals;
         const storage =
           globalObj.browser?.storage ?? globalObj.chrome?.storage ?? globalObj.storage;
-        const localGet = storage?.local?.get;
-        if (typeof localGet === 'function') {
-          const values = (await localGet.call(storage.local, ['libraryEpoch'])) as
+        const local = storage?.local;
+        const localGet = local?.get;
+        if (typeof localGet === 'function' && local) {
+          const values = (await localGet.call(local, ['libraryEpoch'])) as
             | Record<string, unknown>
             | undefined;
           const epoch = values?.libraryEpoch;

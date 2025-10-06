@@ -44,6 +44,7 @@ export interface SonarrSeries {
   title: string;
   tvdbId: number;
   titleSlug: string;
+  alternateTitles?: SonarrAlternateTitle[];
   monitored?: boolean;
   year?: number;
   genres?: string[];
@@ -63,6 +64,13 @@ export interface SonarrSeries {
   network?: string;
 }
 
+export interface SonarrAlternateTitle {
+  title?: string | null;
+  sceneSeasonNumber?: number | null;
+  seasonNumber?: number | null;
+  sourceType?: string | null;
+}
+
 /** Remote lookup item from /series/lookup */
 export interface SonarrLookupSeries {
   title: string;
@@ -77,6 +85,8 @@ export interface LeanSonarrSeries {
   tvdbId: number;
   id: number;
   titleSlug: string;
+  title: string;
+  alternateTitles?: string[];
 }
 
 export interface SonarrRootFolder { id: number; path: string; }
