@@ -174,12 +174,13 @@ import type {
   CheckSeriesStatusResponse,
   ExtensionError,
   ExtensionOptions,
+  LeanSonarrSeries,
   SonarrSeries,
 } from '@/types';
 
 const staticMappingCache = new Map<'primary' | 'fallback', Map<number, number>>();
 const resolvedMappingCache = new Map<number, { tvdbId: number; successfulSynonym?: string }>();
-const localSeriesCache = new Map<number, { tvdbId: number; id: number; titleSlug: string }>();
+const localSeriesCache = new Map<number, LeanSonarrSeries>();
 
 const fetchJson = async <T,>(input: RequestInfo, init?: RequestInit): Promise<T> => {
   const response = await fetch(input, init);
@@ -275,10 +276,18 @@ const resolveMapping = async (
 };
 
 const ensureSeriesCached = (series: SonarrSeries): void => {
+  const alternateTitles = Array.isArray(series.alternateTitles)
+    ? series.alternateTitles
+        .map(item => item?.title?.trim())
+        .filter((title): title is string => !!title)
+    : [];
+
   localSeriesCache.set(series.tvdbId, {
     tvdbId: series.tvdbId,
     id: series.id,
     titleSlug: series.titleSlug,
+    title: series.title,
+    ...(alternateTitles.length > 0 ? { alternateTitles } : {}),
   });
 };
 

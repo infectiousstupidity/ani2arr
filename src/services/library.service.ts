@@ -10,6 +10,7 @@ import type {
   SonarrSeries,
 } from '@/types';
 import { ErrorCode, logError, normalizeError } from '@/utils/error-handling';
+import { normTitle, stripParenContent } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
 
 const CACHE_KEY = 'sonarr:lean-series';
@@ -24,6 +25,7 @@ type LibraryMutationPayload = {
 export class LibraryService {
   private inflightRefresh: Promise<LeanSonarrSeries[]> | null = null;
   private tvdbSet: Set<number> = new Set();
+  private normalizedTitleIndex: Map<string, number | null> = new Map();
 
   constructor(
     private readonly sonarrClient: SonarrApiService,
@@ -44,7 +46,7 @@ export class LibraryService {
   public async getLeanSeriesList(): Promise<LeanSonarrSeries[]> {
     const cached = await this.cache.read(CACHE_KEY);
     if (cached) {
-      this.ensureTvdbIndex(cached.value);
+      this.ensureIndexes(cached.value);
       if (cached.stale && !this.inflightRefresh) {
         this.refreshCache().catch(error => {
           logError(normalizeError(error), 'LibraryService:backgroundRefresh');
@@ -66,22 +68,18 @@ export class LibraryService {
       try {
         const options = optionsOverride ?? (await extensionOptions.getValue());
         if (!options?.sonarrUrl || !options?.sonarrApiKey) {
-          this.resetTvdbIndex();
+          this.resetIndexes();
           await this.cache.write(CACHE_KEY, [], { staleMs: SOFT_TTL, hardMs: HARD_TTL });
           return [];
         }
 
         const credentials = { url: options.sonarrUrl, apiKey: options.sonarrApiKey };
         const fullSeriesList = await this.sonarrClient.getAllSeries(credentials);
-        const leanList: LeanSonarrSeries[] = fullSeriesList
-          .filter(series => typeof series.tvdbId === 'number' && Number.isFinite(series.tvdbId))
-          .map(series => ({
-            tvdbId: series.tvdbId,
-            id: series.id,
-            titleSlug: series.titleSlug,
-          }));
+    const leanList: LeanSonarrSeries[] = fullSeriesList
+      .filter(series => typeof series.tvdbId === 'number' && Number.isFinite(series.tvdbId))
+      .map(series => this.toLeanSeries(series));
 
-        this.ensureTvdbIndex(leanList, true);
+        this.ensureIndexes(leanList, true);
         await this.cache.write(CACHE_KEY, leanList, { staleMs: SOFT_TTL, hardMs: HARD_TTL });
         return leanList;
       } catch (error) {
@@ -94,7 +92,7 @@ export class LibraryService {
           meta: { lastErrorCode: normalized.code },
         });
 
-        this.ensureTvdbIndex(fallbackList);
+        this.ensureIndexes(fallbackList, true);
         return fallbackList;
       } finally {
         this.inflightRefresh = null;
@@ -109,14 +107,10 @@ export class LibraryService {
     const current = await this.getLeanSeriesList();
     if (current.some(series => series.id === newSeries.id)) return;
 
-    const lean: LeanSonarrSeries = {
-      tvdbId: newSeries.tvdbId,
-      id: newSeries.id,
-      titleSlug: newSeries.titleSlug,
-    };
+    const lean = this.toLeanSeries(newSeries);
 
     const updated = [...current, lean];
-    this.ensureTvdbIndex(updated, true);
+    this.ensureIndexes(updated, true);
     await this.cache.write(CACHE_KEY, updated, { staleMs: SOFT_TTL, hardMs: HARD_TTL });
   }
 
@@ -125,7 +119,7 @@ export class LibraryService {
     const filtered = current.filter(series => series.tvdbId !== tvdbId);
     if (filtered.length === current.length) return;
 
-    this.ensureTvdbIndex(filtered, true);
+    this.ensureIndexes(filtered, true);
     await this.cache.write(CACHE_KEY, filtered, { staleMs: SOFT_TTL, hardMs: HARD_TTL });
   }
 
@@ -137,43 +131,46 @@ export class LibraryService {
     const sonarrOpts = await extensionOptions.getValue();
     const isConfigured = !!(sonarrOpts?.sonarrUrl && sonarrOpts?.sonarrApiKey);
 
-    const mappingOptions: Parameters<MappingService['resolveTvdbId']>[1] = {};
-    if (!isConfigured || options.network === 'never') {
-      mappingOptions.network = 'never';
-    }
-    if (options.ignoreFailureCache) {
-      mappingOptions.ignoreFailureCache = true;
-    }
     const normalizedTitle = payload.title?.trim();
-    const hints: NonNullable<Parameters<MappingService['resolveTvdbId']>[1]>['hints'] = {};
-    if (normalizedTitle) {
-      hints.primaryTitle = normalizedTitle;
-    }
-    if (payload.metadata) {
-      hints.domMedia = payload.metadata;
-    }
-    if (Object.keys(hints).length > 0) {
-      mappingOptions.hints = hints;
-    }
-
-    let tvdbId: number | null = null;
+    let tvdbId = this.findTvdbIdInIndex(payload);
     let successfulSynonym: string | undefined;
-    try {
-      const mapping = await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
-      tvdbId = mapping.tvdbId ?? null;
-      successfulSynonym = mapping.successfulSynonym;
-    } catch (error) {
-      const normalized = normalizeError(error);
-      if (normalized.code === ErrorCode.CONFIGURATION_ERROR || normalized.code === ErrorCode.VALIDATION_ERROR) {
-        return {
-          exists: false,
-          tvdbId: null,
-          anilistTvdbLinkMissing: true,
-        };
+    if (tvdbId === null) {
+      const mappingOptions: Parameters<MappingService['resolveTvdbId']>[1] = {};
+      if (!isConfigured || options.network === 'never') {
+        mappingOptions.network = 'never';
+      }
+      if (options.ignoreFailureCache) {
+        mappingOptions.ignoreFailureCache = true;
       }
 
-      logError(normalized, `LibraryService:getSeriesStatus:${payload.anilistId}`);
-      throw normalized;
+      const hints: NonNullable<Parameters<MappingService['resolveTvdbId']>[1]>['hints'] = {};
+      if (normalizedTitle) {
+        hints.primaryTitle = normalizedTitle;
+      }
+      if (payload.metadata) {
+        hints.domMedia = payload.metadata;
+      }
+      if (Object.keys(hints).length > 0) {
+        mappingOptions.hints = hints;
+      }
+
+      try {
+        const mapping = await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
+        tvdbId = mapping.tvdbId ?? null;
+        successfulSynonym = mapping.successfulSynonym;
+      } catch (error) {
+        const normalized = normalizeError(error);
+        if (normalized.code === ErrorCode.CONFIGURATION_ERROR || normalized.code === ErrorCode.VALIDATION_ERROR) {
+          return {
+            exists: false,
+            tvdbId: null,
+            anilistTvdbLinkMissing: true,
+          };
+        }
+
+        logError(normalized, `LibraryService:getSeriesStatus:${payload.anilistId}`);
+        throw normalized;
+      }
     }
 
     if (tvdbId === null) {
@@ -195,24 +192,18 @@ export class LibraryService {
     const credentials = { url: sonarrOpts!.sonarrUrl!, apiKey: sonarrOpts!.sonarrApiKey! };
     const liveSeries = await this.sonarrClient.getSeriesByTvdbId(tvdbId, credentials);
 
-    if (liveSeries) {
-      let cacheMutated = false;
-      if (!existsInCache) {
-        await this.addSeriesToCache(liveSeries);
-        cacheMutated = true;
-      }
+      if (liveSeries) {
+        let cacheMutated = false;
+        if (!existsInCache) {
+          await this.addSeriesToCache(liveSeries);
+          cacheMutated = true;
+        }
 
-      const finalSeries = existsInCache
-        ? cachedSeries!
-        : {
-            tvdbId: liveSeries.tvdbId,
-            id: liveSeries.id,
-            titleSlug: liveSeries.titleSlug,
-          };
+        const finalSeries = existsInCache ? cachedSeries! : this.toLeanSeries(liveSeries);
 
-      if (cacheMutated) {
-        await this.notifyLibraryMutation({ tvdbId, action: 'added' });
-      }
+        if (cacheMutated) {
+          await this.notifyLibraryMutation({ tvdbId, action: 'added' });
+        }
 
       return {
         exists: true,
@@ -234,18 +225,129 @@ export class LibraryService {
     };
   }
 
-  private ensureTvdbIndex(list: LeanSonarrSeries[], reset = false): void {
+  private toLeanSeries(series: SonarrSeries): LeanSonarrSeries {
+    const alternateTitles = Array.isArray(series.alternateTitles)
+      ? series.alternateTitles
+          .map(item => item?.title?.trim())
+          .filter((title): title is string => !!title)
+      : [];
+
+    return {
+      tvdbId: series.tvdbId,
+      id: series.id,
+      titleSlug: series.titleSlug,
+      title: series.title,
+      ...(alternateTitles.length > 0 ? { alternateTitles } : {}),
+    };
+  }
+
+  private ensureIndexes(list: LeanSonarrSeries[], reset = false): void {
     if (reset) {
-      this.tvdbSet = new Set(list.map(series => series.tvdbId));
+      this.resetIndexes();
+      for (const series of list) {
+        this.indexSeries(series);
+      }
       return;
     }
 
-    if (this.tvdbSet.size === 0 && list.length > 0) {
-      this.tvdbSet = new Set(list.map(series => series.tvdbId));
+    if (this.tvdbSet.size === 0 && this.normalizedTitleIndex.size === 0 && list.length > 0) {
+      this.ensureIndexes(list, true);
     }
   }
 
-  private resetTvdbIndex(): void {
+  private indexSeries(series: LeanSonarrSeries): void {
+    this.tvdbSet.add(series.tvdbId);
+    const normalizedKeys = this.buildNormalizedKeysForSeries(series);
+    for (const key of normalizedKeys) {
+      const existing = this.normalizedTitleIndex.get(key);
+      if (existing === undefined) {
+        this.normalizedTitleIndex.set(key, series.tvdbId);
+      } else if (existing !== series.tvdbId) {
+        this.normalizedTitleIndex.set(key, null);
+      }
+    }
+  }
+
+  private buildNormalizedKeysForSeries(series: LeanSonarrSeries): string[] {
+    const rawValues = new Set<string>();
+    rawValues.add(series.title);
+    rawValues.add(series.titleSlug);
+    const slugSpaced = series.titleSlug.replace(/[-_.]+/g, ' ');
+    if (slugSpaced !== series.titleSlug) {
+      rawValues.add(slugSpaced);
+    }
+
+    if (Array.isArray(series.alternateTitles)) {
+      for (const title of series.alternateTitles) {
+        if (title) {
+          rawValues.add(title);
+        }
+      }
+    }
+
+    return this.normalizeTitleCandidates(rawValues);
+  }
+
+  private normalizeTitleCandidates(values: Iterable<string | null | undefined>): string[] {
+    const normalized = new Set<string>();
+    for (const value of values) {
+      if (!value) continue;
+      const trimmed = value.trim();
+      if (!trimmed) continue;
+
+      const primary = normTitle(trimmed);
+      if (primary) {
+        normalized.add(primary);
+      }
+
+      const stripped = stripParenContent(trimmed);
+      if (stripped && stripped !== trimmed) {
+        const strippedNorm = normTitle(stripped);
+        if (strippedNorm) {
+          normalized.add(strippedNorm);
+        }
+      }
+    }
+
+    return Array.from(normalized);
+  }
+
+  private findTvdbIdInIndex(payload: CheckSeriesStatusPayload): number | null {
+    const candidates = new Set<string>();
+    if (payload.title) {
+      candidates.add(payload.title);
+    }
+
+    const metadata = payload.metadata;
+    const mediaTitles = metadata?.titles;
+    if (mediaTitles) {
+      const { romaji, english, native } = mediaTitles;
+      if (romaji) candidates.add(romaji);
+      if (english) candidates.add(english);
+      if (native) candidates.add(native);
+    }
+
+    if (Array.isArray(metadata?.synonyms)) {
+      for (const synonym of metadata.synonyms) {
+        if (synonym) {
+          candidates.add(synonym);
+        }
+      }
+    }
+
+    const normalizedCandidates = this.normalizeTitleCandidates(candidates);
+    for (const key of normalizedCandidates) {
+      const match = this.normalizedTitleIndex.get(key);
+      if (typeof match === 'number' && this.tvdbSet.has(match)) {
+        return match;
+      }
+    }
+
+    return null;
+  }
+
+  private resetIndexes(): void {
     this.tvdbSet.clear();
+    this.normalizedTitleIndex.clear();
   }
 }
