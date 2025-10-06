@@ -48,6 +48,65 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+type LookupCacheEntry<T> = { value: T; staleAt: number; expiresAt: number; meta?: Record<string, unknown> };
+
+function createInMemoryLookupCache<T>() {
+  const store = new Map<string, LookupCacheEntry<T>>();
+
+  const read = vi.fn(async (key: string) => {
+    const entry = store.get(key);
+    if (!entry) return null;
+    const now = Date.now();
+    if (now >= entry.expiresAt) {
+      store.delete(key);
+      return null;
+    }
+    return {
+      value: entry.value,
+      stale: now >= entry.staleAt,
+      staleAt: entry.staleAt,
+      expiresAt: entry.expiresAt,
+      ...(entry.meta ? { meta: entry.meta } : {}),
+    } satisfies CacheHit<T>;
+  });
+
+  const write = vi.fn(async (key: string, value: T, options: CacheWriteOptions) => {
+    const now = Date.now();
+    store.set(key, {
+      value,
+      staleAt: now + options.staleMs,
+      expiresAt: now + (options.hardMs ?? options.staleMs * 4),
+      ...(options.meta ? { meta: options.meta } : {}),
+    });
+  });
+
+  const remove = vi.fn(async (key: string) => {
+    store.delete(key);
+  });
+
+  const clear = vi.fn(async () => {
+    store.clear();
+  });
+
+  return { read, write, remove, clear, store } as CacheStub<T> & { store: Map<string, LookupCacheEntry<T>> };
+}
+
+function attachLookupCaches(service: MappingService) {
+  const positive = createInMemoryLookupCache<SonarrLookupSeries[]>();
+  const negative = createInMemoryLookupCache<boolean>();
+  Object.defineProperty(service, 'lookupCache', {
+    value: positive,
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(service, 'negativeLookupCache', {
+    value: negative,
+    configurable: true,
+    writable: true,
+  });
+  return { positive, negative };
+}
+
 const baseOptions: ExtensionOptions = {
   sonarrUrl: defaultSonarrCredentials.url,
   sonarrApiKey: defaultSonarrCredentials.apiKey,
@@ -244,6 +303,7 @@ describe('MappingService', () => {
 
     try {
       const service = createService();
+      attachLookupCaches(service);
       const promise = service.resolveTvdbId(910);
 
       let settled = false;
@@ -305,6 +365,148 @@ describe('MappingService', () => {
 
     await expect(bypassService.resolveTvdbId(2020, { ignoreFailureCache: true })).rejects.not.toBeNull();
     expect(caches.failure.read).not.toHaveBeenCalled();
+  });
+
+  it('uses Sonarr lookup cache for normalized terms', async () => {
+    const service = createService();
+    attachLookupCaches(service);
+    const safeLookup = (service as any).safeLookup.bind(service) as (
+      term: string,
+      credentials: { url: string; apiKey: string },
+    ) => Promise<SonarrLookupSeries[]>;
+
+    const credentials = {
+      url: baseOptions.sonarrUrl!,
+      apiKey: baseOptions.sonarrApiKey!,
+    };
+
+    const resultPayload = [
+      {
+        tvdbId: 100,
+        title: 'Naruto',
+        year: 2002,
+        genres: ['Anime'],
+      },
+    ];
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue(resultPayload);
+
+    const first = await safeLookup('  Naruto  ', credentials);
+    expect(first).toEqual(resultPayload);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+
+    const second = await safeLookup('naruto', credentials);
+    expect(second).toEqual(resultPayload);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses negative Sonarr lookup cache when no results returned', async () => {
+    const service = createService();
+    attachLookupCaches(service);
+    const safeLookup = (service as any).safeLookup.bind(service) as (
+      term: string,
+      credentials: { url: string; apiKey: string },
+    ) => Promise<SonarrLookupSeries[]>;
+
+    const credentials = {
+      url: baseOptions.sonarrUrl!,
+      apiKey: baseOptions.sonarrApiKey!,
+    };
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const first = await safeLookup('Bleach', credentials);
+    expect(first).toEqual([]);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+
+    const second = await safeLookup('BLEACH', credentials);
+    expect(second).toEqual([]);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+  });
+
+  it('shares inflight Sonarr lookups for the same normalized term', async () => {
+    const service = createService();
+    attachLookupCaches(service);
+    const safeLookup = (service as any).safeLookup.bind(service) as (
+      term: string,
+      credentials: { url: string; apiKey: string },
+    ) => Promise<SonarrLookupSeries[]>;
+
+    const credentials = {
+      url: baseOptions.sonarrUrl!,
+      apiKey: baseOptions.sonarrApiKey!,
+    };
+
+    const deferred = createDeferred<SonarrLookupSeries[]>();
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockReturnValue(deferred.promise);
+
+    const firstPromise = safeLookup('Fullmetal Alchemist', credentials);
+    const inflightMap = (service as unknown as { lookupInflight: Map<string, Promise<SonarrLookupSeries[]>> }).lookupInflight;
+    expect(inflightMap).toBeInstanceOf(Map);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(inflightMap.size).toBe(1);
+    const secondPromise = safeLookup('fullmetal alchemist', credentials);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+
+    const payload = [
+      {
+        tvdbId: 200,
+        title: 'Fullmetal Alchemist',
+        year: 2003,
+        genres: ['Anime'],
+      },
+    ];
+    deferred.resolve(payload);
+
+    await expect(firstPromise).resolves.toEqual(payload);
+    await expect(secondPromise).resolves.toEqual(payload);
+  });
+
+  it('refreshes Sonarr lookup cache after TTL expiry', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const service = createService();
+      attachLookupCaches(service);
+      const safeLookup = (service as any).safeLookup.bind(service) as (
+        term: string,
+        credentials: { url: string; apiKey: string },
+      ) => Promise<SonarrLookupSeries[]>;
+
+      const credentials = {
+        url: baseOptions.sonarrUrl!,
+        apiKey: baseOptions.sonarrApiKey!,
+      };
+
+      const payload = [
+        {
+          tvdbId: 300,
+          title: 'One Piece',
+          year: 1999,
+          genres: ['Anime'],
+        },
+      ];
+
+      (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue(payload);
+
+      const first = await safeLookup('One Piece', credentials);
+      expect(first).toEqual(payload);
+      expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+
+      const softTtlMs = 10 * 60 * 1000;
+      await vi.advanceTimersByTimeAsync(softTtlMs + 1);
+
+      const second = await safeLookup('one piece', credentials);
+      await Promise.resolve();
+      expect(second).toEqual(payload);
+      expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('hydrates static pairs and writes resolved TTL metadata when static mapping exists', async () => {

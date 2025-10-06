@@ -1,5 +1,6 @@
 // src/services/mapping.service.ts
 import type { TtlCache } from '@/cache';
+import { createTtlCache } from '@/cache';
 import type { AnilistApiService, AniMedia } from '@/api/anilist.api';
 import type { SonarrApiService } from '@/api/sonarr.api';
 import type { SonarrLookupSeries } from '@/types';
@@ -25,6 +26,13 @@ const STATIC_HARD_TTL = STATIC_SOFT_TTL * 7;
 
 const MAPPING_BATCH_SIZE = 3;
 const MAPPING_BATCH_DELAY_MS = 1500;
+
+const LOOKUP_CACHE_NAMESPACE = 'mapping:lookup';
+const LOOKUP_NEGATIVE_CACHE_NAMESPACE = 'mapping:lookup-negative';
+const LOOKUP_SOFT_TTL = 10 * 60 * 1000; // 10 minutes
+const LOOKUP_HARD_TTL = 30 * 60 * 1000; // 30 minutes
+const LOOKUP_NEGATIVE_SOFT_TTL = 5 * 60 * 1000; // 5 minutes
+const LOOKUP_NEGATIVE_HARD_TTL = 15 * 60 * 1000; // 15 minutes
 
 const SCORE_THRESHOLD = 0.76;
 const EARLY_STOP_THRESHOLD = 0.82;
@@ -74,6 +82,9 @@ export class MappingService {
   private readonly fallbackPairsMap = new Map<number, number>();
 
   private readonly inflight = new Map<number, InflightResolution>();
+  private readonly lookupInflight = new Map<string, Promise<SonarrLookupSeries[]>>();
+  private readonly lookupCache = createTtlCache<SonarrLookupSeries[]>(LOOKUP_CACHE_NAMESPACE);
+  private readonly negativeLookupCache = createTtlCache<boolean>(LOOKUP_NEGATIVE_CACHE_NAMESPACE);
   private readonly mappingQueue: QueuedMappingRequest[] = [];
   private isProcessingMappingQueue = false;
   private readonly delayFn: (ms: number) => Promise<void>;
@@ -432,6 +443,61 @@ export class MappingService {
   }
 
   private async safeLookup(term: string, credentials: { url: string; apiKey: string }): Promise<SonarrLookupSeries[]> {
+    const normalized = normTitle(term);
+
+    if (!normalized) {
+      return this.performLookup(term, credentials);
+    }
+
+    const positiveHit = await this.lookupCache.read(normalized);
+    if (positiveHit && !positiveHit.stale) {
+      return positiveHit.value;
+    }
+
+    const negativeHit = await this.negativeLookupCache.read(normalized);
+    if (negativeHit && !negativeHit.stale) {
+      return [];
+    }
+
+    const inflight = this.lookupInflight.get(normalized);
+    if (inflight) {
+      return inflight;
+    }
+
+    const promise = (async () => {
+      try {
+        const results = await this.performLookup(term, credentials);
+
+        if (results.length > 0) {
+          await this.lookupCache.write(normalized, results, {
+            staleMs: LOOKUP_SOFT_TTL,
+            hardMs: LOOKUP_HARD_TTL,
+          });
+          await this.negativeLookupCache.remove(normalized);
+        } else {
+          await this.negativeLookupCache.write(normalized, true, {
+            staleMs: LOOKUP_NEGATIVE_SOFT_TTL,
+            hardMs: LOOKUP_NEGATIVE_HARD_TTL,
+          });
+          await this.lookupCache.remove(normalized);
+        }
+
+        return results;
+      } finally {
+        this.lookupInflight.delete(normalized);
+      }
+    })().catch(error => {
+      throw normalizeError(error);
+    });
+
+    this.lookupInflight.set(normalized, promise);
+    return promise;
+  }
+
+  private async performLookup(
+    term: string,
+    credentials: { url: string; apiKey: string },
+  ): Promise<SonarrLookupSeries[]> {
     try {
       return await this.sonarrApi.lookupSeriesByTerm(term, credentials);
     } catch (error) {
