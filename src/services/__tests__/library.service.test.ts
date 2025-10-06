@@ -9,6 +9,7 @@ import { ErrorCode, createError } from '@/utils/error-handling';
 import * as errorHandling from '@/utils/error-handling';
 import type { MappingService } from '@/services/mapping.service';
 import type { SonarrApiService } from '@/api/sonarr.api';
+import { normTitle } from '@/utils/matching';
 
 type CacheMock = TtlCache<LeanSonarrSeries[]> & {
   read: ReturnType<typeof vi.fn>;
@@ -58,6 +59,7 @@ const createLeanSeries = (overrides: Partial<LeanSonarrSeries> = {}): LeanSonarr
   tvdbId: 100,
   id: 1,
   titleSlug: 'lean-slug',
+  title: 'Lean Title',
   ...overrides,
 });
 
@@ -66,6 +68,7 @@ const createSonarrSeries = (overrides: Partial<SonarrSeries> = {}): SonarrSeries
   title: 'Series Title',
   tvdbId: 100,
   titleSlug: 'series-title',
+  alternateTitles: [],
   ...overrides,
 });
 
@@ -132,12 +135,14 @@ describe('LibraryService', () => {
       optionsSpy.mockResolvedValueOnce(unconfigured);
 
       setPrivate(service, 'tvdbSet', new Set([123]));
+      setPrivate(service, 'normalizedTitleIndex', new Map([['foo', 123]]));
 
       const result = await service.refreshCache();
 
       expect(result).toEqual([]);
       expect(cache.write).toHaveBeenCalledWith('sonarr:lean-series', [], STANDARD_TTL);
       expect(getPrivate<Set<number>>(service, 'tvdbSet').size).toBe(0);
+      expect(getPrivate<Map<string, number | null>>(service, 'normalizedTitleIndex').size).toBe(0);
     });
 
     it('uses provided options overrides without reading extension storage', async () => {
@@ -162,19 +167,21 @@ describe('LibraryService', () => {
       });
       expect(cache.write).toHaveBeenCalledWith(
         'sonarr:lean-series',
-        [{ tvdbId: 999, id: 22, titleSlug: 'override-slug' }],
+        [{ tvdbId: 999, id: 22, titleSlug: 'override-slug', title: 'Series Title' }],
         STANDARD_TTL,
       );
-      expect(result).toEqual([{ tvdbId: 999, id: 22, titleSlug: 'override-slug' }]);
+      expect(result).toEqual([
+        { tvdbId: 999, id: 22, titleSlug: 'override-slug', title: 'Series Title' },
+      ]);
     });
 
     it('persists lean entries with standard TTLs when Sonarr returns data', async () => {
       cache.read.mockResolvedValueOnce(null);
       const fullList = [
-        createSonarrSeries({ id: 10, tvdbId: 200, titleSlug: 'valid-one' }),
+        createSonarrSeries({ id: 10, tvdbId: 200, titleSlug: 'valid-one', title: 'Valid One' }),
         createSonarrSeries({ id: 11, tvdbId: Number.NaN, titleSlug: 'invalid-nan' }),
         createSonarrSeries({ id: 12, tvdbId: 'oops' as unknown as number, titleSlug: 'invalid-string' }),
-        createSonarrSeries({ id: 13, tvdbId: 300, titleSlug: 'valid-two' }),
+        createSonarrSeries({ id: 13, tvdbId: 300, titleSlug: 'valid-two', title: 'Valid Two' }),
       ];
       sonarrClient.getAllSeries.mockResolvedValueOnce(fullList);
 
@@ -184,14 +191,14 @@ describe('LibraryService', () => {
       expect(cache.write).toHaveBeenCalledWith(
         'sonarr:lean-series',
         [
-          { tvdbId: 200, id: 10, titleSlug: 'valid-one' },
-          { tvdbId: 300, id: 13, titleSlug: 'valid-two' },
+          { tvdbId: 200, id: 10, titleSlug: 'valid-one', title: 'Valid One' },
+          { tvdbId: 300, id: 13, titleSlug: 'valid-two', title: 'Valid Two' },
         ],
         STANDARD_TTL,
       );
       expect(result).toEqual([
-        { tvdbId: 200, id: 10, titleSlug: 'valid-one' },
-        { tvdbId: 300, id: 13, titleSlug: 'valid-two' },
+        { tvdbId: 200, id: 10, titleSlug: 'valid-one', title: 'Valid One' },
+        { tvdbId: 300, id: 13, titleSlug: 'valid-two', title: 'Valid Two' },
       ]);
       expect(getPrivate<Set<number>>(service, 'tvdbSet')).toEqual(new Set([200, 300]));
     });
@@ -256,13 +263,13 @@ describe('LibraryService', () => {
       expect(sonarrClient.getAllSeries).toHaveBeenCalledTimes(1);
 
       deferred.resolve([
-        createSonarrSeries({ id: 20, tvdbId: 800, titleSlug: 'fresh' }),
+        createSonarrSeries({ id: 20, tvdbId: 800, titleSlug: 'fresh', title: 'Fresh Title' }),
       ]);
       await firstInflight!;
 
       expect(cache.write).toHaveBeenCalledWith(
         'sonarr:lean-series',
-        [{ tvdbId: 800, id: 20, titleSlug: 'fresh' }],
+        [{ tvdbId: 800, id: 20, titleSlug: 'fresh', title: 'Fresh Title' }],
         STANDARD_TTL,
       );
     });
@@ -277,6 +284,7 @@ describe('LibraryService', () => {
       optionsSpy.mockResolvedValue(unconfigured);
 
       setPrivate(service, 'tvdbSet', new Set([111]));
+      setPrivate(service, 'normalizedTitleIndex', new Map([['foo', 111]]));
 
       const list = await service.getLeanSeriesList();
       expect(list).toEqual(cached);
@@ -291,6 +299,7 @@ describe('LibraryService', () => {
       expect(sonarrClient.getAllSeries).not.toHaveBeenCalled();
       expect(cache.write).toHaveBeenCalledWith('sonarr:lean-series', [], STANDARD_TTL);
       expect(getPrivate<Set<number>>(service, 'tvdbSet').size).toBe(0);
+      expect(getPrivate<Map<string, number | null>>(service, 'normalizedTitleIndex').size).toBe(0);
     });
   });
 
@@ -325,15 +334,112 @@ describe('LibraryService', () => {
     expect(cache.write).not.toHaveBeenCalled();
 
     deferred.resolve([
-      createSonarrSeries({ id: 20, tvdbId: 800, titleSlug: 'fresh' }),
+      createSonarrSeries({ id: 20, tvdbId: 800, titleSlug: 'fresh', title: 'Fresh Title' }),
     ]);
     await inflightRefresh!;
 
     expect(cache.write).toHaveBeenCalledWith(
       'sonarr:lean-series',
-      [{ tvdbId: 800, id: 20, titleSlug: 'fresh' }],
+      [{ tvdbId: 800, id: 20, titleSlug: 'fresh', title: 'Fresh Title' }],
       STANDARD_TTL,
     );
+  });
+
+  describe('normalized index', () => {
+    it('hydrates canonical, alternate, and slug variants during refresh', async () => {
+      cache.read.mockResolvedValueOnce(null);
+      const list = [
+        createSonarrSeries({
+          id: 10,
+          tvdbId: 1000,
+          title: 'My Show (2023)',
+          titleSlug: 'my-show',
+          alternateTitles: [{ title: 'My Show Season 1' }, { title: 'The My Show' }, { title: null }],
+        }),
+        createSonarrSeries({
+          id: 20,
+          tvdbId: 2000,
+          title: 'Other Show',
+          titleSlug: 'other-show',
+          alternateTitles: [{ title: 'Other-Show' }],
+        }),
+      ];
+      sonarrClient.getAllSeries.mockResolvedValueOnce(list);
+
+      await service.refreshCache();
+
+      const index = getPrivate<Map<string, number | null>>(service, 'normalizedTitleIndex');
+      const tvdbSet = getPrivate<Set<number>>(service, 'tvdbSet');
+
+      expect(tvdbSet).toEqual(new Set([1000, 2000]));
+      expect(index.get(normTitle('My Show (2023)'))).toBe(1000);
+      expect(index.get(normTitle('My Show'))).toBe(1000);
+      expect(index.get(normTitle('my-show'))).toBe(1000);
+      expect(index.get(normTitle('my show'))).toBe(1000);
+      expect(index.get(normTitle('My Show Season 1'))).toBe(1000);
+      expect(index.get(normTitle('The My Show'))).toBe(1000);
+      expect(index.get(normTitle('Other Show'))).toBe(2000);
+      expect(index.get(normTitle('Other-Show'))).toBe(2000);
+    });
+
+    it('resolves lookups locally by title and slug before hitting mapping', async () => {
+      const lean = createLeanSeries({
+        tvdbId: 321,
+        id: 42,
+        title: 'Local Hit',
+        titleSlug: 'local-hit',
+      });
+      const hit = createCacheHit([lean]);
+      cache.read.mockResolvedValue(hit);
+
+      const byTitle = await service.getSeriesStatus({ anilistId: 1, title: 'Local Hit' });
+
+      expect(mappingService.resolveTvdbId).not.toHaveBeenCalled();
+      expect(byTitle).toEqual({ exists: true, tvdbId: 321, series: lean });
+
+      const bySlug = await service.getSeriesStatus({ anilistId: 2, title: 'local-hit' });
+
+      expect(mappingService.resolveTvdbId).not.toHaveBeenCalled();
+      expect(bySlug).toEqual({ exists: true, tvdbId: 321, series: lean });
+    });
+
+    it('rebuilds the normalized index after cache mutations', async () => {
+      const initial = createLeanSeries({
+        tvdbId: 101,
+        id: 5,
+        title: 'Initial Title',
+        titleSlug: 'initial-title',
+      });
+      const initialHit = createCacheHit([initial]);
+      cache.read.mockResolvedValue(initialHit);
+
+      await service.getLeanSeriesList();
+
+      let index = getPrivate<Map<string, number | null>>(service, 'normalizedTitleIndex');
+      expect(index.get(normTitle('Initial Title'))).toBe(101);
+
+      await service.removeSeriesFromCache(101);
+
+      index = getPrivate(service, 'normalizedTitleIndex');
+      expect(index.size).toBe(0);
+      expect(getPrivate<Set<number>>(service, 'tvdbSet').size).toBe(0);
+
+      const emptyHit = createCacheHit([]);
+      cache.read.mockResolvedValue(emptyHit);
+      const newSeries = createSonarrSeries({
+        id: 9,
+        tvdbId: 909,
+        title: 'New Show',
+        titleSlug: 'new-show',
+        alternateTitles: [{ title: 'New Show Alt' }],
+      });
+
+      await service.addSeriesToCache(newSeries);
+
+      index = getPrivate(service, 'normalizedTitleIndex');
+      expect(index.get(normTitle('New Show'))).toBe(909);
+      expect(index.get(normTitle('New Show Alt'))).toBe(909);
+    });
   });
 
   describe('cache mutations', () => {
@@ -428,7 +534,13 @@ describe('LibraryService', () => {
       cache.read.mockResolvedValueOnce(createCacheHit([]));
       cache.read.mockResolvedValueOnce(createCacheHit([]));
       mappingService.resolveTvdbId.mockResolvedValueOnce({ tvdbId: 555 });
-      const foundSeries = createSonarrSeries({ id: 777, tvdbId: 555, titleSlug: 'from-sonarr' });
+      const foundSeries = createSonarrSeries({
+        id: 777,
+        tvdbId: 555,
+        titleSlug: 'from-sonarr',
+        title: 'From Sonarr',
+        alternateTitles: [{ title: 'Alt Sonarr' }],
+      });
       sonarrClient.getSeriesByTvdbId.mockResolvedValueOnce(foundSeries);
 
       const response = await service.getSeriesStatus(
@@ -442,13 +554,27 @@ describe('LibraryService', () => {
       });
       expect(cache.write).toHaveBeenCalledWith(
         'sonarr:lean-series',
-        [{ tvdbId: 555, id: 777, titleSlug: 'from-sonarr' }],
+        [
+          {
+            tvdbId: 555,
+            id: 777,
+            titleSlug: 'from-sonarr',
+            title: 'From Sonarr',
+            alternateTitles: ['Alt Sonarr'],
+          },
+        ],
         STANDARD_TTL,
       );
       expect(response).toEqual({
         exists: true,
         tvdbId: 555,
-        series: { tvdbId: 555, id: 777, titleSlug: 'from-sonarr' },
+        series: {
+          tvdbId: 555,
+          id: 777,
+          titleSlug: 'from-sonarr',
+          title: 'From Sonarr',
+          alternateTitles: ['Alt Sonarr'],
+        },
         successfulSynonym: undefined,
       });
       expect(mutationSpy).toHaveBeenCalledTimes(1);
