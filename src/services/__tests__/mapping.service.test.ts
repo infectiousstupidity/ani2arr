@@ -412,7 +412,7 @@ describe('MappingService', () => {
     expect(first).toEqual(resultPayload);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
 
-    const second = await safeLookup('Naruto Shippuden (2020)', credentials);
+    const second = await safeLookup('“Naruto” Shippuden!!!', credentials);
     expect(second).toEqual(resultPayload);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
   });
@@ -436,6 +436,37 @@ describe('MappingService', () => {
     const second = await safeLookup('“Bleach” 2004', credentials);
     expect(second).toEqual([]);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reuse lookup cache entries across different explicit years', async () => {
+    const service = createService();
+    const { positive } = attachLookupCaches(service);
+    const safeLookup = getSafeLookup(service);
+
+    const credentials = {
+      url: baseOptions.sonarrUrl!,
+      apiKey: baseOptions.sonarrApiKey!,
+    };
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([
+        { tvdbId: 100, title: 'Bleach', year: 2004, genres: ['Anime'] },
+      ])
+      .mockResolvedValueOnce([
+        { tvdbId: 200, title: 'Bleach (2024)', year: 2024, genres: ['Anime'] },
+      ]);
+
+    const first = await safeLookup('Bleach 2004', credentials);
+    expect(first).toEqual([{ tvdbId: 100, title: 'Bleach', year: 2004, genres: ['Anime'] }]);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+
+    const second = await safeLookup('Bleach 2024', credentials);
+    expect(second).toEqual([
+      { tvdbId: 200, title: 'Bleach (2024)', year: 2024, genres: ['Anime'] },
+    ]);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(2);
+
+    expect(Array.from(positive.store.keys()).sort()).toEqual(['bleach 2004', 'bleach 2024']);
   });
 
   it('shares inflight Sonarr lookups for the same normalized term', async () => {
