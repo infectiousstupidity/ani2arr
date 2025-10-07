@@ -226,6 +226,7 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
 
       async notifySettingsChanged() {
         await bumpSettingsEpoch();
+        await mappingService.resetLookupState();
         const options = await extensionOptions.getValue();
         const configured = !!(options?.sonarrUrl && options?.sonarrApiKey);
         if (configured) {

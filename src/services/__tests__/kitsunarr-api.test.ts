@@ -28,6 +28,7 @@ type SonarrApiMock = {
 type MappingServiceMock = {
   resolveTvdbId: MappingService['resolveTvdbId'];
   initStaticPairs: MappingService['initStaticPairs'];
+  resetLookupState: MappingService['resetLookupState'];
 };
 
 type LibraryServiceMock = {
@@ -59,6 +60,7 @@ function createMappingServiceMock(overrides: Partial<Record<keyof MappingService
   const base: Record<keyof MappingServiceMock, unknown> = {
     resolveTvdbId: vi.fn(),
     initStaticPairs: vi.fn(),
+    resetLookupState: vi.fn(),
   };
   return Object.assign(base, overrides) as MappingServiceMock;
 }
@@ -244,7 +246,7 @@ describe('KitsunarrApi service', () => {
   });
 
   it('refreshes cache and broadcasts on notifySettingsChanged when configured', async () => {
-    const { service, library } = await createService();
+    const { service, library, mapping } = await createService();
     await extensionOptions.setValue(cloneOptions(baseOptions));
     (library.refreshCache as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
 
@@ -257,6 +259,7 @@ describe('KitsunarrApi service', () => {
     const response = await service.notifySettingsChanged();
     expect(response).toEqual({ ok: true });
 
+    expect(mapping.resetLookupState).toHaveBeenCalledTimes(1);
     expect(library.refreshCache).toHaveBeenCalledWith(
       expect.objectContaining({
         sonarrUrl: baseOptions.sonarrUrl,

@@ -133,6 +133,16 @@ export class MappingService {
     };
   }
 
+  public async resetLookupState(): Promise<void> {
+    await Promise.all([
+      this.lookupCache.clear(),
+      this.negativeLookupCache.clear(),
+      this.caches.failure.clear(),
+    ]);
+    this.lookupInflight.clear();
+    this.inflight.clear();
+  }
+
   public async initStaticPairs(): Promise<void> {
     await Promise.all([this.ensureMapLoaded('primary'), this.ensureMapLoaded('fallback')]);
 

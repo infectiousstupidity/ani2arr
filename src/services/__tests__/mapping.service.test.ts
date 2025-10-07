@@ -176,6 +176,37 @@ describe('MappingService', () => {
       ...(overrides?.lookupLimiter ? { lookupLimiter: overrides.lookupLimiter } : {}),
     });
 
+  it('resets lookup caches and inflight state when requested', async () => {
+    const service = createService();
+    const { positive, negative } = attachLookupCaches(service);
+
+    const now = Date.now();
+    positive.store.set('foo', { value: [], staleAt: now + 1, expiresAt: now + 2 });
+    negative.store.set('bar', { value: true, staleAt: now + 1, expiresAt: now + 2 });
+
+    const inflight = Reflect.get(service as unknown as Record<string, unknown>, 'inflight') as Map<
+      number,
+      unknown
+    >;
+    inflight.set(1, { promise: Promise.resolve({ tvdbId: 1 }), bypassFailureCache: false });
+
+    const lookupInflight = Reflect.get(
+      service as unknown as Record<string, unknown>,
+      'lookupInflight',
+    ) as Map<string, Promise<SonarrLookupSeries[]>>;
+    lookupInflight.set('foo', Promise.resolve([]));
+
+    await service.resetLookupState();
+
+    expect(caches.failure.clear).toHaveBeenCalledTimes(1);
+    expect(positive.clear).toHaveBeenCalledTimes(1);
+    expect(negative.clear).toHaveBeenCalledTimes(1);
+    expect(positive.store.size).toBe(0);
+    expect(negative.store.size).toBe(0);
+    expect(inflight.size).toBe(0);
+    expect(lookupInflight.size).toBe(0);
+  });
+
   it('limits concurrent Sonarr lookups through the shared limiter', async () => {
     const service = createService({
       lookupLimiter: { maxConcurrent: 2, spacingMs: 0 },
