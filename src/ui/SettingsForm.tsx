@@ -161,6 +161,11 @@ const SettingsForm: React.FC = () => {
           Save settings
         </Button>
       </div>
+      {manager.saveError ? (
+        <div className="text-center text-sm text-error" role="alert" aria-live="polite">
+          {manager.saveError}
+        </div>
+      ) : null}
     </div>
   );
 };
