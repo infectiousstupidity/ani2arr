@@ -5,6 +5,8 @@ const STOPWORDS = new Set([
   'unlimited','gift','gifts','edition','deluxe','complete'
 ]);
 
+const YEAR_TOKEN_RE = /^(?:19|20)\d{2}$/;
+
 const RARE_TOKEN_MIN_LEN = 4;
 
 export function normTitle(s: string): string {
@@ -37,6 +39,30 @@ export function tokenize(s: string): string[] {
     out.push(t);
   }
   return out;
+}
+
+export function canonicalizeLookupTerm(term: string, options: { keepYear?: boolean } = {}): string {
+  if (!term) return '';
+
+  const normalized = normTitle(term);
+  if (!normalized) return '';
+
+  const tokens: string[] = [];
+  for (const rawToken of normalized.replace(/-/g, ' ').split(/\s+/)) {
+    if (!rawToken) continue;
+    const normalizedToken = rawToken.replace(/^lv(l)?$/, 'level');
+    if (STOPWORDS.has(normalizedToken)) continue;
+    if (normalizedToken.length === 1 && !/\d/.test(normalizedToken)) continue;
+    tokens.push(normalizedToken);
+  }
+
+  if (!options.keepYear) {
+    while (tokens.length > 0 && YEAR_TOKEN_RE.test(tokens[tokens.length - 1]!)) {
+      tokens.pop();
+    }
+  }
+
+  return tokens.join(' ');
 }
 
 export function diceBigram(a: string, b: string): number {
