@@ -9,7 +9,7 @@ import { ErrorCode, createError } from '@/utils/error-handling';
 import * as errorHandling from '@/utils/error-handling';
 import type { MappingService } from '@/services/mapping.service';
 import type { SonarrApiService } from '@/api/sonarr.api';
-import { normTitle } from '@/utils/matching';
+import { canonicalizeLookupTerm } from '@/utils/matching';
 import { getMetricsSnapshot, resetMetrics } from '@/utils/metrics';
 
 type CacheMock = TtlCache<LeanSonarrSeries[]> & {
@@ -374,14 +374,15 @@ describe('LibraryService', () => {
       const tvdbSet = getPrivate<Set<number>>(service, 'tvdbSet');
 
       expect(tvdbSet).toEqual(new Set([1000, 2000]));
-      expect(index.get(normTitle('My Show (2023)'))).toBe(1000);
-      expect(index.get(normTitle('My Show'))).toBe(1000);
-      expect(index.get(normTitle('my-show'))).toBe(1000);
-      expect(index.get(normTitle('my show'))).toBe(1000);
-      expect(index.get(normTitle('My Show Season 1'))).toBe(1000);
-      expect(index.get(normTitle('The My Show'))).toBe(1000);
-      expect(index.get(normTitle('Other Show'))).toBe(2000);
-      expect(index.get(normTitle('Other-Show'))).toBe(2000);
+      expect(index.get(canonicalizeLookupTerm('My Show (2023)'))).toBe(1000);
+      expect(index.get(canonicalizeLookupTerm('My Show'))).toBe(1000);
+      expect(index.get(canonicalizeLookupTerm('my-show'))).toBe(1000);
+      expect(index.get(canonicalizeLookupTerm('my show'))).toBe(1000);
+      expect(index.get(canonicalizeLookupTerm('My Show Season 1'))).toBe(1000);
+      expect(index.get(canonicalizeLookupTerm('The My Show'))).toBe(1000);
+      expect(index.get(canonicalizeLookupTerm('“My Show” / 2023'))).toBe(1000);
+      expect(index.get(canonicalizeLookupTerm('Other Show'))).toBe(2000);
+      expect(index.get(canonicalizeLookupTerm('Other-Show'))).toBe(2000);
     });
 
     it('resolves lookups locally by title and slug before hitting mapping', async () => {
@@ -418,7 +419,7 @@ describe('LibraryService', () => {
       await service.getLeanSeriesList();
 
       let index = getPrivate<Map<string, number | null>>(service, 'normalizedTitleIndex');
-      expect(index.get(normTitle('Initial Title'))).toBe(101);
+      expect(index.get(canonicalizeLookupTerm('Initial Title'))).toBe(101);
 
       await service.removeSeriesFromCache(101);
 
@@ -439,14 +440,14 @@ describe('LibraryService', () => {
       await service.addSeriesToCache(newSeries);
 
       index = getPrivate(service, 'normalizedTitleIndex');
-      expect(index.get(normTitle('New Show'))).toBe(909);
-      expect(index.get(normTitle('New Show Alt'))).toBe(909);
+      expect(index.get(canonicalizeLookupTerm('New Show'))).toBe(909);
+      expect(index.get(canonicalizeLookupTerm('New Show Alt'))).toBe(909);
     });
   });
 
   describe('metrics instrumentation', () => {
     it('counts index hits when a normalized candidate resolves to a single TVDB id', () => {
-      const normalizedTitle = normTitle('Hit Title');
+      const normalizedTitle = canonicalizeLookupTerm('Hit Title');
       const index = new Map<string, number | null>();
       if (normalizedTitle) {
         index.set(normalizedTitle, 1234);
@@ -486,7 +487,7 @@ describe('LibraryService', () => {
     });
 
     it('counts ambiguous matches when normalized candidates map to conflicting TVDB ids', () => {
-      const normalizedTitle = normTitle('Conflicting Title');
+      const normalizedTitle = canonicalizeLookupTerm('Conflicting Title');
       const index = new Map<string, number | null>();
       if (normalizedTitle) {
         index.set(normalizedTitle, null);
