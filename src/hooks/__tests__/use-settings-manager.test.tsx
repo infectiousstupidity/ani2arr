@@ -505,9 +505,12 @@ describe('useSettingsManager', () => {
     expect(result.current.saveError).toBeNull();
   });
 
-  it('aborts saving and reports an error when host permission removal fails', async () => {
+  it('aborts saving, rolls back settings, and reports an error when host permission removal fails', async () => {
     const previousUrl = 'https://legacy-sonarr.test';
-    vi.spyOn(fakeBrowser.permissions, 'remove').mockResolvedValue(false);
+    const removeSpy = vi
+      .spyOn(fakeBrowser.permissions, 'remove')
+      .mockResolvedValueOnce(false)
+      .mockResolvedValue(true);
 
     setMockExtensionOptionsValue(
       createOptions({ sonarrUrl: previousUrl, sonarrApiKey: validApiKey }),
@@ -525,9 +528,26 @@ describe('useSettingsManager', () => {
       await result.current.handleSave();
     });
 
-    expect(requestSonarrPermissionMock).not.toHaveBeenCalled();
-    expect(extensionOptions.setValue).not.toHaveBeenCalled();
+    await waitFor(() => expect(requestSonarrPermissionMock).toHaveBeenCalledWith(alternateUrl));
+    await waitFor(() => expect(extensionOptions.setValue).toHaveBeenCalledTimes(2));
+    expect(extensionOptions.setValue).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        sonarrUrl: alternateUrl,
+        sonarrApiKey: validApiKey,
+      }),
+    );
+    expect(extensionOptions.setValue).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        sonarrUrl: previousUrl,
+        sonarrApiKey: validApiKey,
+      }),
+    );
+    expect(removeSpy).toHaveBeenNthCalledWith(1, { origins: ['https://legacy-sonarr.test/*'] });
+    expect(removeSpy).toHaveBeenNthCalledWith(2, { origins: ['https://new-sonarr.test/*'] });
     expect(result.current.saveError).toBe(removalErrorMessage);
+    expect(result.current.formState.sonarrUrl).toBe(previousUrl);
   });
 
   it('skips host permission removal when the Sonarr URL is unchanged', async () => {
