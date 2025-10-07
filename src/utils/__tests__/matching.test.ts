@@ -15,6 +15,10 @@ describe('canonicalizeLookupTerm', () => {
     );
   });
 
+  it('normalizes heavily punctuated shonen titles for lookup', () => {
+    expect(canonicalizeLookupTerm('“Naruto” Shippuden!!!')).toBe('naruto shippuden');
+  });
+
   it('removes trailing years by default but can retain them when requested', () => {
     expect(canonicalizeLookupTerm('Fullmetal Alchemist: Brotherhood (2009)')).toBe(
       'fullmetal alchemist brotherhood',
@@ -22,6 +26,10 @@ describe('canonicalizeLookupTerm', () => {
     expect(
       canonicalizeLookupTerm('Fullmetal Alchemist: Brotherhood (2009)', { keepYear: true }),
     ).toBe('fullmetal alchemist brotherhood 2009');
+  });
+
+  it('retains explicit years embedded in titles when requested', () => {
+    expect(canonicalizeLookupTerm('Bleach (2004)', { keepYear: true })).toBe('bleach 2004');
   });
 });
 
