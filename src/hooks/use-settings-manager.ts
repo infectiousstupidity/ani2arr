@@ -46,12 +46,13 @@ const log = logger.create('SettingsManager');
 export function useSettingsManager() {
   const queryClient = useQueryClient();
   const [formState, setFormState] = useState<ExtensionOptions>(getInitialOptions());
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const { data: savedOptions, isLoading: isLoadingOptions } = useExtensionOptions();
   const testConnectionMutation = useTestConnection();
   const { mutateAsync: testConnection } = testConnectionMutation;
   const saveMutation = useSaveOptions();
-  const { mutate: saveOptions } = saveMutation;
+  const { mutateAsync: saveOptions } = saveMutation;
 
   const isConnected = testConnectionMutation.isSuccess;
 
@@ -122,6 +123,7 @@ export function useSettingsManager() {
 
   const handleFieldChange = useCallback(<K extends keyof ExtensionOptions>(key: K, value: ExtensionOptions[K]) => {
     setFormState(prev => ({ ...prev, [key]: value }));
+    setSaveError(null);
     if (key === 'sonarrUrl' || key === 'sonarrApiKey') {
       testConnectionMutation.reset();
     }
@@ -129,6 +131,7 @@ export function useSettingsManager() {
 
   const handleDefaultsChange = useCallback(<K extends keyof SonarrFormState>(key: K, value: SonarrFormState[K]) => {
     setFormState(prev => ({ ...prev, defaults: { ...prev.defaults, [key]: value } }));
+    setSaveError(null);
   }, []);
 
   const handleTestConnection = useCallback(async () => {
@@ -148,24 +151,48 @@ export function useSettingsManager() {
   const handleSave = useCallback(async () => {
     if (!isDirty || saveMutation.isPending) return;
 
+    setSaveError(null);
+
     const { sonarrUrl, sonarrApiKey } = formState;
     if (!validateUrl(sonarrUrl).isValid || !validateApiKey(sonarrApiKey).isValid) {
       log.error('Cannot save, invalid Sonarr URL or API key.');
       return;
     }
-    
+
     try {
+      const previousUrl = lastSyncedOptionsRef.current?.sonarrUrl;
+      if (previousUrl && previousUrl !== sonarrUrl) {
+        try {
+          const normalizedOrigin = `${new URL(previousUrl).origin}/*`;
+          const removed = await browser.permissions.remove({ origins: [normalizedOrigin] });
+          if (!removed) {
+            log.error('Failed to remove host permission for previous Sonarr URL.');
+            setSaveError('Failed to update host permissions. Please try again.');
+            return;
+          }
+        } catch (error) {
+          log.error('Error removing host permission for previous Sonarr URL.', error);
+          setSaveError('Failed to update host permissions. Please try again.');
+          return;
+        }
+      }
+
       const permission = await requestSonarrPermission(sonarrUrl);
       if (!permission.granted) {
         log.warn('Permission denied, aborting save.');
         return;
       }
-      
+
       // Test connection before saving to ensure credentials are valid
       await testConnection({ url: sonarrUrl, apiKey: sonarrApiKey });
 
       // Only save if the test connection succeeds
-      saveOptions(formState);
+      await saveOptions(formState);
+      lastSyncedOptionsRef.current = {
+        ...formState,
+        defaults: { ...formState.defaults },
+      };
+      setSaveError(null);
 
     } catch (error) {
       log.error('Connection test failed. Settings not saved.', error);
@@ -199,5 +226,6 @@ export function useSettingsManager() {
     handleSave,
     handleRefresh,
     resetConnection,
+    saveError,
   };
 }
