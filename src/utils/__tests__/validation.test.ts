@@ -32,25 +32,48 @@ describe('validateUrl', () => {
       expected: { isValid: false, error: 'Invalid hostname.' },
     },
     {
-      name: 'accepts IPv4 addresses',
-      input: 'http://127.0.0.1:8989',
-      expected: { isValid: true, normalizedUrl: 'http://127.0.0.1:8989' },
+      name: 'rejects out-of-range IPv4 octets',
+      input: 'http://256.0.0.1',
+      expected: { isValid: false, error: 'Invalid URL format.' },
     },
   ])('$name', ({ input, expected }) => {
     expect(validateUrl(input)).toEqual(expected);
+  });
+
+  it.each([
+    {
+      name: 'accepts IPv4 addresses with ports',
+      input: 'http://127.0.0.1:8989',
+      normalizedUrl: 'http://127.0.0.1:8989',
+    },
+    {
+      name: 'accepts localhost without a TLD',
+      input: 'http://localhost',
+      normalizedUrl: 'http://localhost',
+    },
+    {
+      name: 'accepts localhost with a port',
+      input: 'http://localhost:8989',
+      normalizedUrl: 'http://localhost:8989',
+    },
+    {
+      name: 'accepts bare intranet hostnames',
+      input: 'http://nas-box',
+      normalizedUrl: 'http://nas-box',
+    },
+    {
+      name: 'accepts IPv6 literals with ports',
+      input: 'http://[::1]:8989',
+      normalizedUrl: 'http://[::1]:8989',
+    },
+  ])('$name', ({ input, normalizedUrl }) => {
+    expect(validateUrl(input)).toEqual({ isValid: true, normalizedUrl });
   });
 
   it('normalizes trailing slashes on valid URLs', () => {
     expect(validateUrl('https://example.com/')).toEqual({
       isValid: true,
       normalizedUrl: 'https://example.com',
-    });
-  });
-
-  it('rejects malformed hostnames without dots or IPv4 structure', () => {
-    expect(validateUrl('https://localhost')).toEqual({
-      isValid: false,
-      error: 'Invalid hostname.',
     });
   });
 });
@@ -129,6 +152,17 @@ describe('Sonarr permission helpers', () => {
     expect(grantedOrigins.has('https://example.com:8989/*')).toBe(true);
   });
 
+  it('requests runtime permissions for IPv6 Sonarr hosts', async () => {
+    const requestSpy = vi
+      .spyOn(fakeBrowser.permissions, 'request')
+      .mockResolvedValue(true);
+
+    const result = await requestSonarrPermission('http://[::1]:8989/api');
+
+    expect(result).toEqual({ granted: true });
+    expect(requestSpy).toHaveBeenCalledWith({ origins: ['http://[::1]:8989/*'] });
+  });
+
   it('propagates validation errors from invalid URLs when requesting permissions', async () => {
     expect(await requestSonarrPermission('')).toEqual({ granted: false, error: 'URL is required.' });
   });
@@ -157,6 +191,12 @@ describe('Sonarr permission helpers', () => {
     });
 
     expect(await hasSonarrPermission('https://sonarr.example.com/path')).toBe(true);
+  });
+
+  it('confirms permissions for IPv6 Sonarr hosts', async () => {
+    vi.spyOn(fakeBrowser.permissions, 'contains').mockResolvedValue(true);
+
+    expect(await hasSonarrPermission('http://[::1]:8989/sonarr')).toBe(true);
   });
 
   it('returns false when host permissions are missing', async () => {
