@@ -2,7 +2,13 @@
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
 import type { MockInstance } from 'vitest';
 import { LibraryService } from '@/services/library.service';
-import type { LeanSonarrSeries, SonarrSeries, ExtensionOptions, CheckSeriesStatusResponse } from '@/types';
+import type {
+  LeanSonarrSeries,
+  SonarrSeries,
+  ExtensionOptions,
+  CheckSeriesStatusResponse,
+  CheckSeriesStatusPayload,
+} from '@/types';
 import type { CacheHit, TtlCache } from '@/cache';
 import { extensionOptions } from '@/utils/storage';
 import { ErrorCode, createError } from '@/utils/error-handling';
@@ -138,6 +144,7 @@ describe('LibraryService', () => {
 
       setPrivate(service, 'tvdbSet', new Set([123]));
       setPrivate(service, 'normalizedTitleIndex', new Map([['foo', 123]]));
+      setPrivate(service, 'leanSeriesByTvdbId', new Map([[123, createLeanSeries({ tvdbId: 123 })]]));
 
       const result = await service.refreshCache();
 
@@ -145,6 +152,7 @@ describe('LibraryService', () => {
       expect(cache.write).toHaveBeenCalledWith('sonarr:lean-series', [], STANDARD_TTL);
       expect(getPrivate<Set<number>>(service, 'tvdbSet').size).toBe(0);
       expect(getPrivate<Map<string, number | null>>(service, 'normalizedTitleIndex').size).toBe(0);
+      expect(getPrivate<Map<number, LeanSonarrSeries>>(service, 'leanSeriesByTvdbId').size).toBe(0);
     });
 
     it('uses provided options overrides without reading extension storage', async () => {
@@ -445,40 +453,64 @@ describe('LibraryService', () => {
     });
   });
 
-  describe('metrics instrumentation', () => {
-    it('counts index hits when a normalized candidate resolves to a single TVDB id', () => {
-      const normalizedTitle = canonicalizeLookupTerm('Hit Title');
+  describe('local index heuristics', () => {
+    const getFinder = () =>
+      getPrivate<(payload: CheckSeriesStatusPayload) => number | null>(service, 'findTvdbIdInIndex');
+
+    it('accepts high-confidence fuzzy matches and records a hit', () => {
+      const tvdbId = 4321;
+      const normalizedTitle = canonicalizeLookupTerm('Boku no Hero Academia 5th Season');
       const index = new Map<string, number | null>();
       if (normalizedTitle) {
-        index.set(normalizedTitle, 1234);
+        index.set(normalizedTitle, tvdbId);
       }
+      const leanSeries = createLeanSeries({
+        tvdbId,
+        title: 'My Hero Academia Season 5',
+        titleSlug: 'boku-no-hero-academia-5th-season',
+      });
+
       setPrivate(service, 'normalizedTitleIndex', index);
-      setPrivate(service, 'tvdbSet', new Set([1234]));
+      setPrivate(service, 'tvdbSet', new Set([tvdbId]));
+      setPrivate(service, 'leanSeriesByTvdbId', new Map([[tvdbId, leanSeries]]));
 
-      const find = getPrivate<(payload: { anilistId: number; title?: string }) => number | null>(
-        service,
-        'findTvdbIdInIndex',
-      );
+      const find = getFinder();
+      const result = find.call(service, {
+        anilistId: 10,
+        title: 'Boku no Hero Academia 5th Season',
+        metadata: { startYear: 2021 },
+      });
 
-      const result = find.call(service, { anilistId: 1, title: 'Hit Title' });
-
-      expect(result).toBe(1234);
+      expect(result).toBe(tvdbId);
       const snapshot = getMetricsSnapshot();
       expect(snapshot.counters['library.index.hit']).toBe(1);
       expect(snapshot.counters['library.index.miss']).toBeUndefined();
       expect(snapshot.counters['library.index.ambiguous']).toBeUndefined();
     });
 
-    it('counts misses when no normalized candidate resolves to a TVDB id', () => {
-      setPrivate(service, 'normalizedTitleIndex', new Map());
-      setPrivate(service, 'tvdbSet', new Set());
+    it('rejects low scoring matches and records a miss', () => {
+      const tvdbId = 9876;
+      const normalizedTitle = canonicalizeLookupTerm('Naruto');
+      const index = new Map<string, number | null>();
+      if (normalizedTitle) {
+        index.set(normalizedTitle, tvdbId);
+      }
+      const leanSeries = createLeanSeries({
+        tvdbId,
+        title: 'Boruto: Naruto Next Generations',
+        titleSlug: 'boruto-naruto-next-generations',
+      });
 
-      const find = getPrivate<(payload: { anilistId: number; title?: string }) => number | null>(
-        service,
-        'findTvdbIdInIndex',
-      );
+      setPrivate(service, 'normalizedTitleIndex', index);
+      setPrivate(service, 'tvdbSet', new Set([tvdbId]));
+      setPrivate(service, 'leanSeriesByTvdbId', new Map([[tvdbId, leanSeries]]));
 
-      const result = find.call(service, { anilistId: 2, title: 'Unknown Title' });
+      const find = getFinder();
+      const result = find.call(service, {
+        anilistId: 11,
+        title: 'Naruto',
+        metadata: { startYear: 2002 },
+      });
 
       expect(result).toBeNull();
       const snapshot = getMetricsSnapshot();
@@ -494,12 +526,9 @@ describe('LibraryService', () => {
       }
       setPrivate(service, 'normalizedTitleIndex', index);
       setPrivate(service, 'tvdbSet', new Set([111, 222]));
+      setPrivate(service, 'leanSeriesByTvdbId', new Map());
 
-      const find = getPrivate<(payload: { anilistId: number; title?: string }) => number | null>(
-        service,
-        'findTvdbIdInIndex',
-      );
-
+      const find = getFinder();
       const result = find.call(service, { anilistId: 3, title: 'Conflicting Title' });
 
       expect(result).toBeNull();

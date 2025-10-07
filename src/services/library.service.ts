@@ -10,7 +10,7 @@ import type {
   SonarrSeries,
 } from '@/types';
 import { ErrorCode, logError, normalizeError } from '@/utils/error-handling';
-import { canonicalizeLookupTerm, stripParenContent } from '@/utils/matching';
+import { canonicalizeLookupTerm, computeTitleMatchScore, stripParenContent } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
 import { incrementCounter } from '@/utils/metrics';
 
@@ -18,6 +18,7 @@ const CACHE_KEY = 'sonarr:lean-series';
 const SOFT_TTL = 60 * 60 * 1000; // 1h
 const HARD_TTL = 24 * 60 * 60 * 1000; // 24h
 const ERROR_TTL = 5 * 60 * 1000; // 5m
+const LOCAL_INDEX_ACCEPTANCE_THRESHOLD = 0.8;
 type LibraryMutationPayload = {
   tvdbId: number;
   action: 'added' | 'removed';
@@ -27,6 +28,7 @@ export class LibraryService {
   private inflightRefresh: Promise<LeanSonarrSeries[]> | null = null;
   private tvdbSet: Set<number> = new Set();
   private normalizedTitleIndex: Map<string, number | null> = new Map();
+  private leanSeriesByTvdbId: Map<number, LeanSonarrSeries> = new Map();
 
   constructor(
     private readonly sonarrClient: SonarrApiService,
@@ -251,13 +253,19 @@ export class LibraryService {
       return;
     }
 
-    if (this.tvdbSet.size === 0 && this.normalizedTitleIndex.size === 0 && list.length > 0) {
+    if (
+      this.tvdbSet.size === 0 &&
+      this.normalizedTitleIndex.size === 0 &&
+      this.leanSeriesByTvdbId.size === 0 &&
+      list.length > 0
+    ) {
       this.ensureIndexes(list, true);
     }
   }
 
   private indexSeries(series: LeanSonarrSeries): void {
     this.tvdbSet.add(series.tvdbId);
+    this.leanSeriesByTvdbId.set(series.tvdbId, series);
     const normalizedKeys = this.buildNormalizedKeysForSeries(series);
     for (const key of normalizedKeys) {
       const existing = this.normalizedTitleIndex.get(key);
@@ -314,40 +322,76 @@ export class LibraryService {
   }
 
   private findTvdbIdInIndex(payload: CheckSeriesStatusPayload): number | null {
-    const candidates = new Set<string>();
+    const candidateInputs = new Set<string>();
     if (payload.title) {
-      candidates.add(payload.title);
+      candidateInputs.add(payload.title);
     }
 
     const metadata = payload.metadata;
     const mediaTitles = metadata?.titles;
     if (mediaTitles) {
       const { romaji, english, native } = mediaTitles;
-      if (romaji) candidates.add(romaji);
-      if (english) candidates.add(english);
-      if (native) candidates.add(native);
+      if (romaji) candidateInputs.add(romaji);
+      if (english) candidateInputs.add(english);
+      if (native) candidateInputs.add(native);
     }
 
     if (Array.isArray(metadata?.synonyms)) {
       for (const synonym of metadata.synonyms) {
         if (synonym) {
-          candidates.add(synonym);
+          candidateInputs.add(synonym);
         }
       }
     }
 
-    const normalizedCandidates = this.normalizeTitleCandidates(candidates);
+    const targetYear = metadata?.startYear ?? undefined;
     let sawAmbiguous = false;
+    let bestMatch: { tvdbId: number; score: number } | null = null;
 
-    for (const key of normalizedCandidates) {
-      const match = this.normalizedTitleIndex.get(key);
-      if (typeof match === 'number' && this.tvdbSet.has(match)) {
-        incrementCounter('library.index.hit');
-        return match;
+    for (const rawTitle of candidateInputs) {
+      if (!rawTitle) continue;
+      const normalizedVariants = this.normalizeTitleCandidates([rawTitle]);
+      if (normalizedVariants.length === 0) continue;
+
+      for (const key of normalizedVariants) {
+        const match = this.normalizedTitleIndex.get(key);
+        if (typeof match === 'number' && this.tvdbSet.has(match)) {
+          const series = this.leanSeriesByTvdbId.get(match);
+          if (!series) continue;
+
+          const libraryTitles = new Set<string>();
+          libraryTitles.add(series.title);
+          libraryTitles.add(series.titleSlug);
+          if (Array.isArray(series.alternateTitles)) {
+            for (const alt of series.alternateTitles) {
+              if (alt) {
+                libraryTitles.add(alt);
+              }
+            }
+          }
+
+          for (const candidateRaw of libraryTitles) {
+            if (!candidateRaw) continue;
+            const score = computeTitleMatchScore({
+              queryRaw: rawTitle,
+              candidateRaw,
+              targetYear,
+            });
+            if (score >= LOCAL_INDEX_ACCEPTANCE_THRESHOLD) {
+              if (!bestMatch || score > bestMatch.score) {
+                bestMatch = { tvdbId: match, score };
+              }
+            }
+          }
+        } else if (match === null) {
+          sawAmbiguous = true;
+        }
       }
-      if (match === null) {
-        sawAmbiguous = true;
-      }
+    }
+
+    if (bestMatch) {
+      incrementCounter('library.index.hit');
+      return bestMatch.tvdbId;
     }
 
     if (sawAmbiguous) {
@@ -362,5 +406,6 @@ export class LibraryService {
   private resetIndexes(): void {
     this.tvdbSet.clear();
     this.normalizedTitleIndex.clear();
+    this.leanSeriesByTvdbId.clear();
   }
 }
