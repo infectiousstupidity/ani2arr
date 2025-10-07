@@ -819,10 +819,10 @@ describe('MappingService', () => {
 
     const [r1, r2, r3, r4] = await Promise.all([p1, p2, p3, p4]);
 
-    expect(r1).toEqual({ tvdbId: 8001, successfulSynonym: 'Series 1 best' });
-    expect(r2).toEqual({ tvdbId: 8002, successfulSynonym: 'Series 2 best' });
-    expect(r3).toEqual({ tvdbId: 8003, successfulSynonym: 'Series 3 best' });
-    expect(r4).toEqual({ tvdbId: 8004, successfulSynonym: 'Series 4 best' });
+    expect(r1).toEqual({ tvdbId: 8001, successfulSynonym: 'Series 1 alt' });
+    expect(r2).toEqual({ tvdbId: 8002, successfulSynonym: 'Series 2 alt' });
+    expect(r3).toEqual({ tvdbId: 8003, successfulSynonym: 'Series 3 alt' });
+    expect(r4).toEqual({ tvdbId: 8004, successfulSynonym: 'Series 4 alt' });
 
     const delayIndex = lookupCalls.findIndex(term => term.startsWith('__delay__'));
     expect(delayIndex).toBeGreaterThanOrEqual(0);
@@ -837,10 +837,10 @@ describe('MappingService', () => {
       countsById.set(id, (countsById.get(id) ?? 0) + 1);
     }
 
-    expect(countsById.get(1) ?? 0).toBeGreaterThanOrEqual(4);
-    expect(countsById.get(2) ?? 0).toBeGreaterThanOrEqual(4);
-    expect(countsById.get(3) ?? 0).toBeGreaterThanOrEqual(4);
-    expect(countsById.get(4) ?? 0).toBeGreaterThanOrEqual(4);
+    expect(countsById.get(1)).toBe(3);
+    expect(countsById.get(2)).toBe(3);
+    expect(countsById.get(3)).toBe(3);
+    expect(countsById.get(4)).toBe(3);
 
     const series4Indices = lookupsBySeries
       .filter(entry => Number(entry.term.match(/\d+/)?.[0] ?? 0) === 4)
@@ -985,7 +985,7 @@ describe('MappingService', () => {
     scoreSpy.mockRestore();
   });
 
-  it('avoids issuing a year retry when the initial lookup meets the score threshold', async () => {
+  it('short-circuits additional lookups once the initial term meets the score threshold', async () => {
     const scoreSpy = vi.spyOn(matching, 'computeTitleMatchScore').mockImplementation(params => {
       if (params.queryRaw === 'Series Base') {
         return 0.9;
@@ -993,20 +993,26 @@ describe('MappingService', () => {
       return 0.1;
     });
 
-    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue([
-      {
-        tvdbId: 7777,
-        title: 'Series Base',
-        year: 2020,
-        genres: ['Anime'],
-      },
-    ]);
+    const lookupMock = sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>;
+    lookupMock.mockImplementation(async term => {
+      if (term !== 'base') {
+        throw new Error(`unexpected lookup term: ${term}`);
+      }
+      return [
+        {
+          tvdbId: 7777,
+          title: 'Series Base',
+          year: 2020,
+          genres: ['Anime'],
+        },
+      ];
+    });
 
     (anilistApi.fetchMediaWithRelations as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: 77,
       format: 'TV',
       title: { english: 'Series Base' },
-      synonyms: [],
+      synonyms: ['Series Extra', 'Series Bonus'],
       startDate: { year: 2020 },
       relations: { edges: [] },
     } as AniMedia);
@@ -1015,11 +1021,8 @@ describe('MappingService', () => {
     const result = await service.resolveTvdbId(77);
 
     expect(result).toEqual({ tvdbId: 7777, successfulSynonym: 'Series Base' });
-    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
-    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(
-      'base',
-      expect.any(Object),
-    );
+    expect(lookupMock).toHaveBeenCalledTimes(1);
+    expect(lookupMock).toHaveBeenCalledWith('base', expect.any(Object));
 
     scoreSpy.mockRestore();
   });
