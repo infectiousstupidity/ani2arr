@@ -485,7 +485,13 @@ export class MappingService {
     credentials: { url: string; apiKey: string },
     options: { keepYear?: boolean } = {},
   ): Promise<SonarrLookupSeries[]> {
-    const canonical = canonicalizeLookupTerm(term, { keepYear: options.keepYear });
+    const canonicalWithYear = canonicalizeLookupTerm(term, { keepYear: true });
+    const canonicalWithoutYear = canonicalizeLookupTerm(term);
+
+    const shouldKeepYear =
+      options.keepYear === true || (!!canonicalWithYear && canonicalWithYear !== canonicalWithoutYear);
+
+    const canonical = shouldKeepYear ? canonicalWithYear : canonicalWithoutYear;
 
     if (!canonical) {
       return this.performLookup(term, credentials);
