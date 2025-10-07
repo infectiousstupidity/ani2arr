@@ -159,29 +159,40 @@ export function useSettingsManager() {
       return;
     }
 
-    try {
-      const previousUrl = lastSyncedOptionsRef.current?.sonarrUrl;
-      if (previousUrl && previousUrl !== sonarrUrl) {
-        try {
-          const normalizedOrigin = `${new URL(previousUrl).origin}/*`;
-          const removed = await browser.permissions.remove({ origins: [normalizedOrigin] });
-          if (!removed) {
-            log.error('Failed to remove host permission for previous Sonarr URL.');
-            setSaveError('Failed to update host permissions. Please try again.');
-            return;
-          }
-        } catch (error) {
-          log.error('Error removing host permission for previous Sonarr URL.', error);
-          setSaveError('Failed to update host permissions. Please try again.');
-          return;
-        }
-      }
+    const previousOptions = lastSyncedOptionsRef.current;
+    const previousUrl = previousOptions?.sonarrUrl ?? null;
+    const urlChanged = previousUrl ? previousUrl !== sonarrUrl : Boolean(sonarrUrl);
+    const newOrigin = urlChanged ? `${new URL(sonarrUrl).origin}/*` : null;
+    const previousOrigin = previousUrl ? `${new URL(previousUrl).origin}/*` : null;
 
+    const revertToPreviousOptions = async () => {
+      if (!previousOptions) return;
+
+      try {
+        await saveOptions(previousOptions);
+        lastSyncedOptionsRef.current = {
+          ...previousOptions,
+          defaults: { ...previousOptions.defaults },
+        };
+        setFormState({
+          ...previousOptions,
+          defaults: { ...previousOptions.defaults },
+        });
+      } catch (revertError) {
+        log.error('Failed to restore previous settings after permission removal failure.', revertError);
+      }
+    };
+
+    let grantedNewHostPermission = false;
+
+    try {
       const permission = await requestSonarrPermission(sonarrUrl);
       if (!permission.granted) {
         log.warn('Permission denied, aborting save.');
         return;
       }
+
+      grantedNewHostPermission = urlChanged;
 
       // Test connection before saving to ensure credentials are valid
       await testConnection({ url: sonarrUrl, apiKey: sonarrApiKey });
@@ -192,12 +203,51 @@ export function useSettingsManager() {
         ...formState,
         defaults: { ...formState.defaults },
       };
-      setSaveError(null);
 
+      if (urlChanged && previousOrigin) {
+        try {
+          const removed = await browser.permissions.remove({ origins: [previousOrigin] });
+          if (!removed) {
+            throw new Error('Permission removal rejected without throwing.');
+          }
+        } catch (error) {
+          log.error('Error removing host permission for previous Sonarr URL.', error);
+          setSaveError('Failed to update host permissions. Please try again.');
+
+          await revertToPreviousOptions();
+
+          if (grantedNewHostPermission && newOrigin) {
+            try {
+              await browser.permissions.remove({ origins: [newOrigin] });
+            } catch (rollbackError) {
+              log.error('Failed to roll back new host permission after removal failure.', rollbackError);
+            }
+          }
+
+          return;
+        }
+      }
+
+      setSaveError(null);
     } catch (error) {
       log.error('Connection test failed. Settings not saved.', error);
+
+      if (grantedNewHostPermission && newOrigin) {
+        try {
+          await browser.permissions.remove({ origins: [newOrigin] });
+        } catch (rollbackError) {
+          log.error('Failed to roll back new host permission after save error.', rollbackError);
+        }
+      }
     }
-  }, [formState, isDirty, saveOptions, testConnection, saveMutation.isPending]);
+  }, [
+    formState,
+    isDirty,
+    saveMutation.isPending,
+    saveOptions,
+    testConnection,
+    setFormState,
+  ]);
 
   const handleRefresh = useCallback(() => {
     if (isConnected) {
