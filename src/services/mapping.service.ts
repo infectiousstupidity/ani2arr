@@ -347,12 +347,16 @@ export class MappingService {
         }
       }
 
+      if (bestMatch) {
+        break outer;
+      }
+
       const canonicalWithoutYear = canonicalizeLookupTerm(term);
       const canonicalWithYear = canonicalizeLookupTerm(term, { keepYear: true });
       const hasExplicitYear =
         !!canonicalWithoutYear && !!canonicalWithYear && canonicalWithoutYear !== canonicalWithYear;
 
-      if (!baseProducedHit && typeof mediaYear === 'number' && !hasExplicitYear) {
+      if (!bestMatch && !baseProducedHit && typeof mediaYear === 'number' && !hasExplicitYear) {
         const termWithYear = `${term} ${mediaYear}`.trim();
         const yearResults = await this.safeLookup(termWithYear, credentials, { keepYear: true });
 
@@ -375,6 +379,10 @@ export class MappingService {
             }
           }
         }
+      }
+
+      if (bestMatch) {
+        break outer;
       }
     }
 
