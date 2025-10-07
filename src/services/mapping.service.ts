@@ -36,6 +36,8 @@ const LOOKUP_NEGATIVE_SOFT_TTL = 5 * 60 * 1000; // 5 minutes
 const LOOKUP_NEGATIVE_HARD_TTL = 15 * 60 * 1000; // 15 minutes
 
 const LOOKUP_LATENCY_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
+const LOOKUP_LIMITER_MAX_CONCURRENCY = 2;
+const LOOKUP_LIMITER_SPACING_MS = 250;
 
 const SCORE_THRESHOLD = 0.76;
 const EARLY_STOP_THRESHOLD = 0.82;
@@ -69,6 +71,10 @@ type QueuedMappingRequest = {
 
 type MappingServiceOptions = {
   delay?: (ms: number) => Promise<void>;
+  lookupLimiter?: {
+    maxConcurrent: number;
+    spacingMs: number;
+  };
 };
 
 export interface StaticMappingPayload {
@@ -79,6 +85,12 @@ interface InflightResolution {
   promise: Promise<ResolvedMapping>;
   bypassFailureCache: boolean;
 }
+
+type LookupLimiterTask<T> = {
+  run: () => Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason: unknown) => void;
+};
 
 export class MappingService {
   private readonly primaryPairsMap = new Map<number, number>();
@@ -91,6 +103,14 @@ export class MappingService {
   private readonly mappingQueue: QueuedMappingRequest[] = [];
   private isProcessingMappingQueue = false;
   private readonly delayFn: (ms: number) => Promise<void>;
+  private readonly lookupLimiterQueue: LookupLimiterTask<unknown>[] = [];
+  private lookupLimiterActiveCount = 0;
+  private lookupLimiterProcessing = false;
+  private lookupLimiterLastStartAt = 0;
+  private readonly lookupLimiterConfig: {
+    maxConcurrent: number;
+    spacingMs: number;
+  };
 
   constructor(
     private readonly sonarrApi: SonarrApiService,
@@ -104,6 +124,13 @@ export class MappingService {
     options: MappingServiceOptions = {},
   ) {
     this.delayFn = options.delay ?? ((ms: number) => new Promise(resolve => setTimeout(resolve, ms)));
+    const limiterOptions = options.lookupLimiter;
+    const rawMax = limiterOptions?.maxConcurrent ?? LOOKUP_LIMITER_MAX_CONCURRENCY;
+    const rawSpacing = limiterOptions?.spacingMs ?? LOOKUP_LIMITER_SPACING_MS;
+    this.lookupLimiterConfig = {
+      maxConcurrent: Number.isFinite(rawMax) ? Math.max(1, Math.floor(rawMax)) : LOOKUP_LIMITER_MAX_CONCURRENCY,
+      spacingMs: Number.isFinite(rawSpacing) ? Math.max(0, Math.floor(rawSpacing)) : LOOKUP_LIMITER_SPACING_MS,
+    };
   }
 
   public async initStaticPairs(): Promise<void> {
@@ -494,7 +521,7 @@ export class MappingService {
     const canonical = shouldKeepYear ? canonicalWithYear : canonicalWithoutYear;
 
     if (!canonical) {
-      return this.performLookup(term, term, credentials);
+      return this.scheduleLookup(() => this.performLookup(term, term, credentials));
     }
 
     const positiveHit = await this.lookupCache.read(canonical);
@@ -517,7 +544,9 @@ export class MappingService {
 
     const promise = (async () => {
       try {
-        const results = await this.performLookup(term, canonical, credentials);
+        const results = await this.scheduleLookup(() =>
+          this.performLookup(term, canonical, credentials),
+        );
 
         if (results.length > 0) {
           await this.lookupCache.write(canonical, results, {
@@ -543,6 +572,69 @@ export class MappingService {
 
     this.lookupInflight.set(canonical, promise);
     return promise;
+  }
+
+  private scheduleLookup<T>(factory: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const task: LookupLimiterTask<T> = {
+        run: factory,
+        resolve,
+        reject,
+      };
+      this.lookupLimiterQueue.push(task as unknown as LookupLimiterTask<unknown>);
+      this.processLookupLimiter().catch(error => {
+        logError(normalizeError(error), 'MappingService:lookupLimiter:process');
+      });
+    });
+  }
+
+  private async processLookupLimiter(): Promise<void> {
+    if (this.lookupLimiterProcessing) return;
+    this.lookupLimiterProcessing = true;
+
+    try {
+      while (
+        this.lookupLimiterActiveCount < this.lookupLimiterConfig.maxConcurrent &&
+        this.lookupLimiterQueue.length > 0
+      ) {
+        const task = this.lookupLimiterQueue.shift();
+        if (!task) {
+          continue;
+        }
+        this.lookupLimiterActiveCount += 1;
+        this.runLookupLimiterTask(task);
+      }
+    } finally {
+      this.lookupLimiterProcessing = false;
+    }
+  }
+
+  private runLookupLimiterTask(task: LookupLimiterTask<unknown>): void {
+    (async () => {
+      try {
+        const spacingMs = this.lookupLimiterConfig.spacingMs;
+        if (spacingMs > 0 && this.lookupLimiterLastStartAt !== 0) {
+          const now = Date.now();
+          const delayUntil = this.lookupLimiterLastStartAt + spacingMs;
+          if (now < delayUntil) {
+            await this.delay(delayUntil - now);
+          }
+        }
+
+        this.lookupLimiterLastStartAt = Date.now();
+        const result = await task.run();
+        task.resolve(result);
+      } catch (error) {
+        task.reject(error);
+      } finally {
+        this.lookupLimiterActiveCount = Math.max(0, this.lookupLimiterActiveCount - 1);
+        this.processLookupLimiter().catch(processError => {
+          logError(normalizeError(processError), 'MappingService:lookupLimiter:process');
+        });
+      }
+    })().catch(error => {
+      logError(normalizeError(error), 'MappingService:lookupLimiter:task');
+    });
   }
 
   private async performLookup(
