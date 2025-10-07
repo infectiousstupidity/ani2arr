@@ -158,6 +158,7 @@ import { testServer, createExtensionOptionsFixture, createSonarrDefaultsFixture 
 import type { ExtensionOptions, SonarrFormState, SonarrQualityProfile, SonarrRootFolder } from '@/types';
 import { extensionOptions } from '@/utils/storage';
 import { requestSonarrPermission, validateApiKey, validateUrl } from '@/utils/validation';
+import { fakeBrowser } from 'wxt/testing/fake-browser';
 
 const validateUrlMock = vi.mocked(validateUrl);
 const validateApiKeyMock = vi.mocked(validateApiKey);
@@ -171,6 +172,8 @@ const createOptions = (overrides: Partial<ExtensionOptions> = {}): ExtensionOpti
 
 const validUrl = 'https://sonarr.test';
 const validApiKey = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const alternateUrl = 'https://new-sonarr.test';
+const removalErrorMessage = 'Failed to update host permissions. Please try again.';
 
 const renderUseSettingsManager = () => {
   const queryClient = new QueryClient({
@@ -473,5 +476,102 @@ describe('useSettingsManager', () => {
     });
 
     await waitFor(() => expect(result.current.isDirty).toBe(false));
+  });
+
+  it('removes previous host permissions when the Sonarr URL changes', async () => {
+    const previousUrl = 'https://legacy-sonarr.test:8989/subpath';
+    const removeSpy = vi
+      .spyOn(fakeBrowser.permissions, 'remove')
+      .mockResolvedValue(true);
+
+    setMockExtensionOptionsValue(
+      createOptions({ sonarrUrl: previousUrl, sonarrApiKey: validApiKey }),
+    );
+
+    const { result } = renderUseSettingsManager();
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      result.current.handleFieldChange('sonarrUrl', alternateUrl);
+    });
+
+    await act(async () => {
+      await result.current.handleSave();
+    });
+
+    expect(removeSpy).toHaveBeenCalledWith({ origins: ['https://legacy-sonarr.test:8989/*'] });
+    expect(requestSonarrPermissionMock).toHaveBeenCalledWith(alternateUrl);
+    expect(result.current.saveError).toBeNull();
+  });
+
+  it('aborts saving, rolls back settings, and reports an error when host permission removal fails', async () => {
+    const previousUrl = 'https://legacy-sonarr.test';
+    const removeSpy = vi
+      .spyOn(fakeBrowser.permissions, 'remove')
+      .mockResolvedValueOnce(false)
+      .mockResolvedValue(true);
+
+    setMockExtensionOptionsValue(
+      createOptions({ sonarrUrl: previousUrl, sonarrApiKey: validApiKey }),
+    );
+
+    const { result } = renderUseSettingsManager();
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      result.current.handleFieldChange('sonarrUrl', alternateUrl);
+    });
+
+    await act(async () => {
+      await result.current.handleSave();
+    });
+
+    await waitFor(() => expect(requestSonarrPermissionMock).toHaveBeenCalledWith(alternateUrl));
+    await waitFor(() => expect(extensionOptions.setValue).toHaveBeenCalledTimes(2));
+    expect(extensionOptions.setValue).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        sonarrUrl: alternateUrl,
+        sonarrApiKey: validApiKey,
+      }),
+    );
+    expect(extensionOptions.setValue).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        sonarrUrl: previousUrl,
+        sonarrApiKey: validApiKey,
+      }),
+    );
+    expect(removeSpy).toHaveBeenNthCalledWith(1, { origins: ['https://legacy-sonarr.test/*'] });
+    expect(removeSpy).toHaveBeenNthCalledWith(2, { origins: ['https://new-sonarr.test/*'] });
+    expect(result.current.saveError).toBe(removalErrorMessage);
+    expect(result.current.formState.sonarrUrl).toBe(previousUrl);
+  });
+
+  it('skips host permission removal when the Sonarr URL is unchanged', async () => {
+    const removeSpy = vi.spyOn(fakeBrowser.permissions, 'remove');
+    const updatedApiKey = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+    setMockExtensionOptionsValue(
+      createOptions({ sonarrUrl: validUrl, sonarrApiKey: validApiKey }),
+    );
+
+    const { result } = renderUseSettingsManager();
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      result.current.handleFieldChange('sonarrApiKey', updatedApiKey);
+    });
+
+    await act(async () => {
+      await result.current.handleSave();
+    });
+
+    expect(removeSpy).not.toHaveBeenCalled();
+    expect(requestSonarrPermissionMock).toHaveBeenCalledWith(validUrl);
+    expect(result.current.saveError).toBeNull();
   });
 });
