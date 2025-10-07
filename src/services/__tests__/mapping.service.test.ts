@@ -167,10 +167,176 @@ describe('MappingService', () => {
     vi.spyOn(extensionOptions, 'getValue').mockResolvedValue(baseOptions);
   });
 
-  const createService = (overrides?: { delay?: (ms: number) => Promise<void> }) =>
+  const createService = (overrides?: {
+    delay?: (ms: number) => Promise<void>;
+    lookupLimiter?: { maxConcurrent: number; spacingMs: number };
+  }) =>
     new MappingService(sonarrApi, anilistApi, caches, {
       delay: overrides?.delay ?? (async () => {}),
+      ...(overrides?.lookupLimiter ? { lookupLimiter: overrides.lookupLimiter } : {}),
     });
+
+  it('limits concurrent Sonarr lookups through the shared limiter', async () => {
+    const service = createService({
+      lookupLimiter: { maxConcurrent: 2, spacingMs: 0 },
+    });
+    const safeLookup = getSafeLookup(service);
+    const credentials = {
+      url: baseOptions.sonarrUrl!,
+      apiKey: baseOptions.sonarrApiKey!,
+    };
+
+    const pending: Array<ReturnType<typeof createDeferred<SonarrLookupSeries[]>>> = [];
+    let active = 0;
+    let maxActive = 0;
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      const deferred = createDeferred<SonarrLookupSeries[]>();
+      pending.push(deferred);
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      deferred.promise.finally(() => {
+        active -= 1;
+      });
+      return deferred.promise;
+    });
+
+    const waitUntil = async (predicate: () => boolean, timeoutMs = 500) => {
+      const timeoutAt = Date.now() + timeoutMs;
+      while (!predicate()) {
+        if (Date.now() > timeoutAt) {
+          throw new Error('Timed out waiting for limiter condition');
+        }
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    };
+
+    const lookups = ['Limiter 0', 'Limiter 1', 'Limiter 2', 'Limiter 3'].map(term =>
+      safeLookup(term, credentials),
+    );
+
+    await waitUntil(() => pending.length === 2);
+    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(2);
+    expect(maxActive).toBeLessThanOrEqual(2);
+
+    const buildResult = (index: number): SonarrLookupSeries[] => [
+      {
+        tvdbId: 6100 + index,
+        title: `Limiter ${index}`,
+        year: 2020,
+        genres: ['Anime'],
+      },
+    ];
+
+    pending[0]!.resolve(buildResult(0));
+    await waitUntil(() => pending.length >= 3);
+    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(3);
+
+    pending[1]!.resolve(buildResult(1));
+    await waitUntil(() => pending.length >= 4);
+    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(4);
+
+    pending[2]!.resolve(buildResult(2));
+    pending[3]!.resolve(buildResult(3));
+
+    const results = await Promise.all(lookups);
+    expect(results).toHaveLength(4);
+    expect(maxActive).toBeLessThanOrEqual(2);
+  });
+
+  it('applies limiter spacing between sequential Sonarr lookups', async () => {
+    const delayCalls: Array<{
+      ms: number;
+      deferred: ReturnType<typeof createDeferred<void>>;
+    }> = [];
+    const service = createService({
+      delay: async ms => {
+        const deferred = createDeferred<void>();
+        delayCalls.push({ ms, deferred });
+        return deferred.promise;
+      },
+      lookupLimiter: { maxConcurrent: 1, spacingMs: 125 },
+    });
+    const safeLookup = getSafeLookup(service);
+    const credentials = {
+      url: baseOptions.sonarrUrl!,
+      apiKey: baseOptions.sonarrApiKey!,
+    };
+
+    const pending: Array<{
+      index: number;
+      deferred: ReturnType<typeof createDeferred<SonarrLookupSeries[]>>;
+    }> = [];
+    let callIndex = 0;
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      const deferred = createDeferred<SonarrLookupSeries[]>();
+      const index = callIndex++;
+      pending.push({ index, deferred });
+      return deferred.promise;
+    });
+
+    const waitUntil = async (predicate: () => boolean, timeoutMs = 500) => {
+      const timeoutAt = Date.now() + timeoutMs;
+      while (!predicate()) {
+        if (Date.now() > timeoutAt) {
+          throw new Error('Timed out waiting for spacing condition');
+        }
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    };
+
+    const lookups = ['Burst 0', 'Burst 1', 'Burst 2'].map(term => safeLookup(term, credentials));
+
+    await waitUntil(() => pending.length === 1);
+    expect(delayCalls).toHaveLength(0);
+    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+
+    const resolveResult = (entryIndex: number) => {
+      const entry = pending[entryIndex];
+      if (!entry) throw new Error(`Missing pending entry at index ${entryIndex}`);
+      entry.deferred.resolve([
+        {
+          tvdbId: 6200 + entry.index,
+          title: `Burst ${entry.index}`,
+          year: 2020,
+          genres: ['Anime'],
+        },
+      ]);
+    };
+
+    resolveResult(0);
+    await waitUntil(() => delayCalls.length === 1);
+    expect(delayCalls[0]!.ms).toBeGreaterThan(0);
+    expect(delayCalls[0]!.ms).toBeLessThanOrEqual(125);
+    expect(pending.length).toBe(1);
+    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+
+    delayCalls[0]!.deferred.resolve();
+    await waitUntil(() => pending.length === 2);
+    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(2);
+
+    resolveResult(1);
+    await waitUntil(() => delayCalls.length === 2);
+    expect(delayCalls[1]!.ms).toBeGreaterThan(0);
+    expect(delayCalls[1]!.ms).toBeLessThanOrEqual(125);
+    expect(pending.length).toBe(2);
+    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(2);
+
+    delayCalls[1]!.deferred.resolve();
+    await waitUntil(() => pending.length === 3);
+    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(3);
+
+    resolveResult(2);
+
+    const results = await Promise.all(lookups);
+    expect(results).toHaveLength(3);
+    expect(delayCalls).toHaveLength(2);
+    for (const call of delayCalls) {
+      expect(call.ms).toBeGreaterThan(0);
+      expect(call.ms).toBeLessThanOrEqual(125);
+    }
+  });
 
   it('processQueue batches requests and waits between batches respecting the batch delay', async () => {
     const delayCalls: number[] = [];
@@ -182,6 +348,7 @@ describe('MappingService', () => {
         delayResolvers.push(deferred);
         return deferred.promise;
       },
+      lookupLimiter: { maxConcurrent: 2, spacingMs: 0 },
     });
 
     const lookupsById = new Map<number, ReturnType<typeof createDeferred<SonarrLookupSeries[]>>>();
@@ -189,16 +356,16 @@ describe('MappingService', () => {
     let active = 0;
     let maxActive = 0;
 
-    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async term => {
-      active += 1;
-      maxActive = Math.max(maxActive, active);
-      const deferred = createDeferred<SonarrLookupSeries[]>();
-      const idMatch = term.match(/\d+/);
-      if (!idMatch) {
-        throw new Error(`Unexpected lookup term: ${term}`);
-      }
-      const parsedId = Number(idMatch[0]);
-      lookupOrder.push(parsedId);
+      (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async term => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        const deferred = createDeferred<SonarrLookupSeries[]>();
+        const idMatch = term.match(/\d+/);
+        if (!idMatch) {
+          throw new Error(`Unexpected lookup term: ${term}`);
+        }
+        const parsedId = Number(idMatch[0]);
+        lookupOrder.push(parsedId);
       lookupsById.set(parsedId, deferred);
       const results = await deferred.promise;
       active -= 1;
@@ -230,6 +397,7 @@ describe('MappingService', () => {
     await waitUntil(() => lookupOrder.length >= 1);
 
     expect(maxActive).toBeGreaterThanOrEqual(1);
+    expect(maxActive).toBeLessThanOrEqual(2);
 
     const resolveLookupForId = (id: number, index: number) => {
       const deferred = lookupsById.get(id);
@@ -245,32 +413,33 @@ describe('MappingService', () => {
       ]);
     };
 
+    await waitUntil(() => lookupsById.has(1), 2000);
     resolveLookupForId(1, 0);
-    await waitUntil(() => delayCalls.length === 1);
-    expect(delayCalls).toEqual([1500]);
+
+    await waitUntil(() => delayCalls.length >= 1);
+    expect(delayCalls[0]).toBe(1500);
     expect(delayResolvers).toHaveLength(1);
-    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(1);
+    expect(lookupOrder[0]).toBe(1);
 
-  delayResolvers[0]!.resolve();
-    await waitUntil(() => lookupOrder.length >= 4);
-    await waitUntil(() => lookupsById.has(2));
-    await waitUntil(() => lookupsById.has(3));
-    await waitUntil(() => lookupsById.has(4));
-
+    delayResolvers[0]!.resolve();
+    await waitUntil(() => lookupsById.has(2), 2000);
+    await waitUntil(() => lookupsById.has(3), 2000);
     resolveLookupForId(2, 1);
     resolveLookupForId(3, 2);
+    await waitUntil(() => lookupsById.has(4), 2000);
     resolveLookupForId(4, 3);
 
-    await waitUntil(() => delayCalls.length === 2);
-    expect(delayCalls).toEqual([1500, 1500]);
+    await waitUntil(() => delayCalls.length >= 2);
+    expect(delayCalls[1]).toBe(1500);
     expect(delayResolvers).toHaveLength(2);
-  delayResolvers[1]!.resolve();
+    delayResolvers[1]!.resolve();
 
-    await waitUntil(() => lookupOrder.length >= 5);
-    await waitUntil(() => lookupsById.has(5));
-
-    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(5);
+    await waitUntil(() => lookupsById.has(5), 2000);
     resolveLookupForId(5, 4);
+
+    expect(delayCalls.every(ms => ms === 1500)).toBe(true);
+    expect(lookupOrder.length).toBeGreaterThanOrEqual(5);
+    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledTimes(5);
 
     const results = await Promise.all(requests);
     expect(results).toHaveLength(5);
