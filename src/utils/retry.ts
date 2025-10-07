@@ -29,11 +29,13 @@ interface RetryOptions {
  */
 export class RetriableError extends Error {
   public status: number | undefined;
+  public retryAfterMs: number | undefined;
 
-  constructor(message: string, status?: number) {
+  constructor(message: string, status?: number, retryAfterMs?: number) {
     super(message);
     this.name = 'RetriableError';
     this.status = status;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -67,13 +69,20 @@ export async function retryWithBackoff<T>(fn: () => Promise<T>, options: RetryOp
       }
 
       // Calculate delay with jitter to prevent thundering herd problem.
-      const delay = Math.min(baseDelay * Math.pow(backoffMultiplier, attempt), maxDelay);
-      const jitteredDelay = delay + (Math.random() * (delay * 0.2)); // Jitter of up to 20%
+      const retryAfterMs = (error as RetriableError).retryAfterMs;
+      let delay: number;
+
+      if (typeof retryAfterMs === 'number' && Number.isFinite(retryAfterMs) && retryAfterMs >= 0) {
+        delay = retryAfterMs;
+      } else {
+        const base = Math.min(baseDelay * Math.pow(backoffMultiplier, attempt), maxDelay);
+        delay = base + (Math.random() * (base * 0.2)); // Jitter of up to 20%
+      }
 
       log.debug(
-        `Request failed. Retrying in ${Math.round(jitteredDelay)}ms (attempt ${attempt + 1}/${maxRetries}).`,
+        `Request failed. Retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${maxRetries}).`,
       );
-      await new Promise(resolve => setTimeout(resolve, jitteredDelay));
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 

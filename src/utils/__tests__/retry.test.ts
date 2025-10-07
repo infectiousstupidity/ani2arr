@@ -64,6 +64,21 @@ describe('retryWithBackoff', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
+  it('respects retryAfterMs when provided by the error', async () => {
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(new RetriableError('too many requests', 429, 5000))
+      .mockResolvedValue('ok');
+
+    const promise = retryWithBackoff(fn, { maxRetries: 2, baseDelay: 75 });
+
+    await vi.runAllTimersAsync();
+
+    await expect(promise).resolves.toBe('ok');
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000);
+  });
+
   it('fails after exhausting the configured retry attempts', async () => {
     const error = new RetriableError('bad gateway', 502);
     const fn = vi.fn().mockRejectedValue(error);
