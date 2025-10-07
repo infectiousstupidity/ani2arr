@@ -10,7 +10,7 @@ import type {
   SonarrSeries,
 } from '@/types';
 import { ErrorCode, logError, normalizeError } from '@/utils/error-handling';
-import { normTitle, stripParenContent } from '@/utils/matching';
+import { canonicalizeLookupTerm, stripParenContent } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
 import { incrementCounter } from '@/utils/metrics';
 
@@ -296,16 +296,16 @@ export class LibraryService {
       const trimmed = value.trim();
       if (!trimmed) continue;
 
-      const primary = normTitle(trimmed);
+      const primary = canonicalizeLookupTerm(trimmed);
       if (primary) {
         normalized.add(primary);
       }
 
       const stripped = stripParenContent(trimmed);
       if (stripped && stripped !== trimmed) {
-        const strippedNorm = normTitle(stripped);
-        if (strippedNorm) {
-          normalized.add(strippedNorm);
+        const strippedCanonical = canonicalizeLookupTerm(stripped);
+        if (strippedCanonical) {
+          normalized.add(strippedCanonical);
         }
       }
     }
