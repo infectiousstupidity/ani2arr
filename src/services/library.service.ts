@@ -375,7 +375,7 @@ export class LibraryService {
             const score = computeTitleMatchScore({
               queryRaw: rawTitle,
               candidateRaw,
-              targetYear,
+              ...(targetYear !== undefined ? { targetYear } : {}),
             });
             if (score >= LOCAL_INDEX_ACCEPTANCE_THRESHOLD) {
               if (!bestMatch || score > bestMatch.score) {

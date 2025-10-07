@@ -3,7 +3,7 @@
 ## 1. Project Snapshot
 - Kitsunarr adds Sonarr integration to AniList pages via a WXT browser extension targeting Chromium and Firefox.
 - Core stack: TypeScript (strict), React 19, TanStack Query 5, Radix UI primitives, Tailwind CSS 4, WebExtension APIs via `wxt`.
-- Services rely on `@webext-core/proxy-service` for background/foreground RPC, `@wxt-dev/storage` for options sync, `idb-keyval` for query caching.
+- Services rely on `@webext-core/proxy-service` for background/foreground RPC, `@wxt-dev/storage` for local-only storage, `idb-keyval` for query caching.
 - Domain: map AniList anime -> TVDB -> Sonarr library, allowing quick add with customizable defaults.
 
 ## 2. Tooling & Commands
@@ -37,8 +37,9 @@
 - [`use-add-series-manager.ts`](src/hooks/use-add-series-manager.ts), [`use-network-status.ts`](src/hooks/use-network-status.ts), and [`use-theme.ts`](src/hooks/use-theme.ts) provide focused UI helpers (add form state, online/offline detection with 30s polling, AniList theme sync).
 
 ## 4. Domain Model & Data Flow
-- Types live in [`src/types.ts`](src/types.ts); key shapes include `ExtensionOptions` (stored in sync storage), `SonarrFormState`, `AddRequestPayload`, and `CheckSeriesStatusResponse`. RPC schemas in [`src/rpc/schemas.ts`](src/rpc/schemas.ts) define the public API surface.
-- Settings flow: options UI → [`use-settings-manager`](src/hooks/use-settings-manager.ts) → [`extensionOptions`](src/utils/storage.ts) storage item → background services receive updated credentials via `notifySettingsChanged()` → `settingsEpoch` bump → broadcast triggers cache clear in all contexts.
+- Types live in [`src/types.ts`](src/types.ts); key shapes include `ExtensionOptions` (stored in local storage), `SonarrFormState`, `AddRequestPayload`, and `CheckSeriesStatusResponse`. RPC schemas in [`src/rpc/schemas.ts`](src/rpc/schemas.ts) define the public API surface.
+- Settings flow: options UI → [`use-settings-manager`](src/hooks/use-settings-manager.ts) → [`extensionOptions`](src/utils/storage.ts) storage item (local-only) → background services receive updated credentials via `notifySettingsChanged()` → `settingsEpoch` bump → broadcast triggers cache clear in all contexts.
+- **Security note**: All settings (including Sonarr credentials) are stored in `browser.storage.local` (device-only) to prevent API keys from being synced to browser cloud accounts. User defaults are hydrated from Sonarr metadata on connection, so cross-device sync is unnecessary.
 - Content flow: AniList content script → [`library.getSeriesStatus()`](src/services/library.service.ts) (with optional `force_verify`, `network: 'never'` flags) → mapping resolution via [`mapping.resolveTvdbId()`](src/services/mapping.service.ts) → Sonarr lookup if needed → [`sonarr.addSeries()`](src/api/sonarr.api.ts) on user action → `libraryEpoch` bump → broadcast triggers status query invalidation.
 - Permissions: Sonarr host access is requested on-demand via [`requestSonarrPermission()`](src/utils/validation.ts) when testConnection or API calls require it; every outbound fetch verifies with [`hasSonarrPermission()`](src/utils/validation.ts) before proceeding.
 

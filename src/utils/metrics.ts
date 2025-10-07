@@ -82,7 +82,7 @@ export function recordDuration(
   if (bucketIndex === -1) {
     bucketIndex = histogram.buckets.length;
   }
-  histogram.counts[bucketIndex] += 1;
+  histogram.counts[bucketIndex] = (histogram.counts[bucketIndex] ?? 0) + 1;
 }
 
 export function getCounterValue(name: CounterName): number {

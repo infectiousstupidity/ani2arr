@@ -29,12 +29,12 @@ const getDefaultOptions = (): ExtensionOptions => ({
 /**
  * The primary storage item for all user-configured settings.
  *
- * - It is stored in `sync` storage, allowing settings to be shared
- *   across different browsers where the user is logged in.
+ * - It is stored in `local` storage (device-only, not synced to browser account)
+ *   to keep Sonarr credentials local and avoid exposing them to cloud sync.
  * - It uses a `fallback` to provide default values if none are set.
  * - It is versioned to allow for future migrations if the options structure changes.
  */
-export const extensionOptions = storage.defineItem<ExtensionOptions>('sync:options', {
+export const extensionOptions = storage.defineItem<ExtensionOptions>('local:options', {
   fallback: getDefaultOptions(),
   version: 1,
 });
