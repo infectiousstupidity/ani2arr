@@ -42,12 +42,12 @@ export default defineConfig({
     const mv3Permissions = {
       permissions: basePermissions,
       host_permissions: requiredHosts,
-      optional_host_permissions: ['<all_urls>'],
+      optional_host_permissions: ['http://*/*', 'https://*/*'],
     };
 
     const mv2Permissions = {
       permissions: [...basePermissions, ...requiredHosts],
-      optional_permissions: ['<all_urls>'],
+      optional_permissions: ['http://*/*', 'https://*/*'],
     };
 
     return {
