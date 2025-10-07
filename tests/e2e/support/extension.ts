@@ -497,13 +497,7 @@ export async function collectBackgroundDiagnostics(
           output.storageLocalError = String(error);
         }
       }
-      if (storage?.sync?.get) {
-        try {
-          output.storageSync = await storage.sync.get();
-        } catch (error) {
-          output.storageSyncError = String(error);
-        }
-      }
+      // Note: Kitsunarr no longer uses sync storage (credentials are local-only)
 
       return output;
     });

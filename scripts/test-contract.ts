@@ -851,7 +851,7 @@ async function main(): Promise<void> {
   }
 
   // Test unconfigured state
-  await browser.storage.sync.clear();
+  await browser.storage.local.clear();
   try {
     await api.getSeriesStatus({ anilistId: 1234 });
     assert.fail('getSeriesStatus should fail when not configured');
@@ -936,7 +936,7 @@ async function main(): Promise<void> {
 
   // Storage events should fire
   assert.ok(storageChanges.length > 0, 'Storage changes should trigger onChanged listeners');
-  assert.ok(storageChanges.some(c => c.areaName === 'sync'), 'Extension options should emit sync storage changes');
+  assert.ok(storageChanges.some(c => c.areaName === 'local'), 'Extension options should emit local storage changes');
   browser.storage.onChanged.removeListener(storageListener);
   record('storage-events');
 
@@ -985,16 +985,16 @@ async function main(): Promise<void> {
 
   console.log('\n=== Test Suite 10: Epoch Management ===');
 
-  const beforeEpochs = await browser.storage.local.get(['libraryEpoch', 'settingsEpoch']) as { libraryEpoch: number; settingsEpoch: number };
-  const beforeLibrary = beforeEpochs.libraryEpoch;
-  const beforeSettings = beforeEpochs.settingsEpoch;
+  const beforeEpochs = await browser.storage.local.get(['libraryEpoch', 'settingsEpoch']) as { libraryEpoch?: number; settingsEpoch?: number };
+  const beforeLibrary = beforeEpochs.libraryEpoch ?? 0;
+  const beforeSettings = beforeEpochs.settingsEpoch ?? 0;
 
   broadcasts.length = 0;
   await api.notifySettingsChanged();
   
-  const afterEpochs = await browser.storage.local.get(['libraryEpoch', 'settingsEpoch']) as { libraryEpoch: number; settingsEpoch: number };
-  assert.ok(afterEpochs.settingsEpoch > beforeSettings, 'settingsEpoch should increment');
-  assert.ok(afterEpochs.libraryEpoch > beforeLibrary, 'libraryEpoch should increment on settings change');
+  const afterEpochs = await browser.storage.local.get(['libraryEpoch', 'settingsEpoch']) as { libraryEpoch?: number; settingsEpoch?: number };
+  assert.ok(typeof afterEpochs.settingsEpoch === 'number' && afterEpochs.settingsEpoch > beforeSettings, 'settingsEpoch should increment');
+  assert.ok(typeof afterEpochs.libraryEpoch === 'number' && afterEpochs.libraryEpoch > beforeLibrary, 'libraryEpoch should increment on settings change');
   
   const settingsBroadcast = broadcasts.find(b => b.topic === 'settings-changed');
   assert.ok(settingsBroadcast, 'Should broadcast settings-changed');
