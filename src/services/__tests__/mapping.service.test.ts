@@ -193,11 +193,11 @@ describe('MappingService', () => {
       active += 1;
       maxActive = Math.max(maxActive, active);
       const deferred = createDeferred<SonarrLookupSeries[]>();
-      const idMatch = term.match(/Series (\d+)/);
+      const idMatch = term.match(/\d+/);
       if (!idMatch) {
         throw new Error(`Unexpected lookup term: ${term}`);
       }
-      const parsedId = Number(idMatch[1]);
+      const parsedId = Number(idMatch[0]);
       lookupOrder.push(parsedId);
       lookupsById.set(parsedId, deferred);
       const results = await deferred.promise;
@@ -338,7 +338,7 @@ describe('MappingService', () => {
       const result = await promise;
 
       expect(result).toEqual({ tvdbId: 9100, successfulSynonym: 'Latency Check' });
-      expect(sonarrCalls).toEqual(['Latency Check']);
+      expect(sonarrCalls).toEqual(['latency check']);
     } finally {
       scoreSpy.mockRestore();
       vi.useRealTimers();
@@ -411,6 +411,11 @@ describe('MappingService', () => {
     const first = await safeLookup('  Naruto/ Shippuden!!!  ', credentials);
     expect(first).toEqual(resultPayload);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenNthCalledWith(
+      1,
+      'naruto shippuden',
+      credentials,
+    );
 
     const second = await safeLookup('“Naruto” Shippuden!!!', credentials);
     expect(second).toEqual(resultPayload);
@@ -432,6 +437,7 @@ describe('MappingService', () => {
     const first = await safeLookup('Bleach (2004)', credentials);
     expect(first).toEqual([]);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenNthCalledWith(1, 'bleach 2004', credentials);
 
     const second = await safeLookup('“Bleach” 2004', credentials);
     expect(second).toEqual([]);
@@ -459,12 +465,14 @@ describe('MappingService', () => {
     const first = await safeLookup('Bleach 2004', credentials);
     expect(first).toEqual([{ tvdbId: 100, title: 'Bleach', year: 2004, genres: ['Anime'] }]);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenNthCalledWith(1, 'bleach 2004', credentials);
 
     const second = await safeLookup('Bleach 2024', credentials);
     expect(second).toEqual([
       { tvdbId: 200, title: 'Bleach (2024)', year: 2024, genres: ['Anime'] },
     ]);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(2);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenNthCalledWith(2, 'bleach 2024', credentials);
 
     expect(Array.from(positive.store.keys()).sort()).toEqual(['bleach 2004', 'bleach 2024']);
   });
@@ -775,7 +783,7 @@ describe('MappingService', () => {
     const lookupCalls: string[] = [];
     (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async term => {
       lookupCalls.push(term);
-      const id = Number(term.match(/Series (\d+)/)?.[1] ?? 0);
+      const id = Number(term.match(/\d+/)?.[0] ?? 0);
       return [
         {
           tvdbId: 8000 + id,
@@ -821,11 +829,11 @@ describe('MappingService', () => {
 
     const lookupsBySeries = lookupCalls
       .map((term, index) => ({ term, index }))
-      .filter(entry => entry.term.startsWith('Series'));
+      .filter(entry => !entry.term.startsWith('__delay__'));
 
     const countsById = new Map<number, number>();
     for (const { term } of lookupsBySeries) {
-      const id = Number(term.match(/Series (\d+)/)?.[1] ?? 0);
+      const id = Number(term.match(/\d+/)?.[0] ?? 0);
       countsById.set(id, (countsById.get(id) ?? 0) + 1);
     }
 
@@ -835,7 +843,7 @@ describe('MappingService', () => {
     expect(countsById.get(4) ?? 0).toBeGreaterThanOrEqual(4);
 
     const series4Indices = lookupsBySeries
-      .filter(entry => entry.term.includes('Series 4'))
+      .filter(entry => Number(entry.term.match(/\d+/)?.[0] ?? 0) === 4)
       .map(entry => entry.index);
     expect(series4Indices.length).toBeGreaterThan(0);
     expect(Math.min(...series4Indices)).toBeGreaterThan(delayIndex);
@@ -943,7 +951,7 @@ describe('MappingService', () => {
     const result = await service.resolveTvdbId(501, { ignoreFailureCache: true });
 
     expect(result).toEqual({ tvdbId: 9501, successfulSynonym: 'Fresh Hit' });
-    expect(sonarrCalls).toEqual(['Fresh Hit']);
+    expect(sonarrCalls).toEqual(['fresh hit']);
     expect(caches.failure.write).not.toHaveBeenCalled();
 
     scoreSpy.mockRestore();
@@ -952,7 +960,7 @@ describe('MappingService', () => {
   it('short-circuits network resolution when a hint lookup succeeds', async () => {
     const scoreSpy = vi.spyOn(matching, 'computeTitleMatchScore').mockImplementation(() => 0.9);
     (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async term => {
-      expect(term).toBe('Hint Title');
+      expect(term).toBe('hint title');
       return [
         {
           tvdbId: 6400,
@@ -1009,7 +1017,7 @@ describe('MappingService', () => {
     expect(result).toEqual({ tvdbId: 7777, successfulSynonym: 'Series Base' });
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
     expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(
-      'Series Base',
+      'base',
       expect.any(Object),
     );
 

@@ -494,7 +494,7 @@ export class MappingService {
     const canonical = shouldKeepYear ? canonicalWithYear : canonicalWithoutYear;
 
     if (!canonical) {
-      return this.performLookup(term, credentials);
+      return this.performLookup(term, term, credentials);
     }
 
     const positiveHit = await this.lookupCache.read(canonical);
@@ -517,7 +517,7 @@ export class MappingService {
 
     const promise = (async () => {
       try {
-        const results = await this.performLookup(term, credentials);
+        const results = await this.performLookup(term, canonical, credentials);
 
         if (results.length > 0) {
           await this.lookupCache.write(canonical, results, {
@@ -546,13 +546,16 @@ export class MappingService {
   }
 
   private async performLookup(
-    term: string,
+    rawTerm: string,
+    lookupTerm: string,
     credentials: { url: string; apiKey: string },
   ): Promise<SonarrLookupSeries[]> {
+    // Preserve the raw term for metrics/logging contexts even though the lookup uses the canonical form.
+    void rawTerm;
     incrementCounter('mapping.lookup.network_miss');
     return timeAsync('mapping.lookup.latency', LOOKUP_LATENCY_BUCKETS, async () => {
       try {
-        return await this.sonarrApi.lookupSeriesByTerm(term, credentials);
+        return await this.sonarrApi.lookupSeriesByTerm(lookupTerm, credentials);
       } catch (error) {
         throw normalizeError(error);
       }
