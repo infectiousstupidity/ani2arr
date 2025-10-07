@@ -2,7 +2,7 @@
 const STOPWORDS = new Set([
   'the','a','an','of','and','or','to','for','in','on','with','at','from','my','your','our',
   'season','tv','series','episode','episodes','part','movie','film','limited','special','ultimate',
-  'unlimited','gift','gifts','edition','deluxe','complete'
+  'unlimited','gift','gifts','edition','deluxe','complete','volume','vol','vs','versus'
 ]);
 
 const YEAR_TOKEN_RE = /^(?:19|20)\d{2}$/;
@@ -32,8 +32,9 @@ export function tokenize(s: string): string[] {
   const out: string[] = [];
   for (const p of s.split(/\s|-/)) {
     if (!p) continue;
-    // Normalize 'lv' and 'lvl' to 'level' before stopword check
-    const t = p.replace(/^lv(l)?$/, 'level');
+    // Normalize 'lv' and 'lvl' to 'level', and plural 'specials' to 'special' before stopword check
+    let t = p.replace(/^lv(l)?$/, 'level');
+    if (t === 'specials') t = 'special';
     if (STOPWORDS.has(t)) continue;
     if (t.length === 1) continue;
     out.push(t);

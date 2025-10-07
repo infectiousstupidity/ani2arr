@@ -1049,6 +1049,54 @@ describe('MappingService', () => {
     expect(Math.min(...series4Indices)).toBeGreaterThan(delayIndex);
   });
 
+  it('skips lookup terms that canonicalize to ordinal tokens only', async () => {
+    const lookupCalls: string[] = [];
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async term => {
+      lookupCalls.push(term);
+      if (term === 'oshi no ko') {
+        return [
+          {
+            tvdbId: 182587,
+            title: 'Oshi no Ko',
+            year: 2023,
+            genres: ['Anime'],
+          },
+        ];
+      }
+      return [];
+    });
+
+    const scoreSpy = vi.spyOn(matching, 'computeTitleMatchScore').mockImplementation(params => {
+      if (params.queryRaw === 'Oshi no Ko') {
+        return 0.9;
+      }
+      return 0.2;
+    });
+
+    (anilistApi.fetchMediaWithRelations as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 182587,
+      format: 'TV',
+      title: {
+        english: '[Oshi no Ko] 3rd Season',
+        romaji: 'Oshi no Ko 3rd Season',
+      },
+      synonyms: ['Oshi no Ko'],
+      startDate: { year: 2023 },
+      relations: { edges: [] },
+    } as AniMedia);
+
+    const service = createService();
+    const result = await service.resolveTvdbId(182587);
+
+    expect(result).toEqual({ tvdbId: 182587, successfulSynonym: 'Oshi no Ko' });
+    expect(lookupCalls).toContain('oshi no ko');
+    expect(lookupCalls).toContain('oshi no ko 3rd');
+    expect(lookupCalls).not.toContain('3rd');
+    expect(lookupCalls).not.toContain('3rd season');
+
+    scoreSpy.mockRestore();
+  });
+
 
   it('skips failure caching for validation errors but caches network and configuration errors with TTLs', async () => {
     const validationError = createError(ErrorCode.VALIDATION_ERROR, 'invalid', 'Invalid');
