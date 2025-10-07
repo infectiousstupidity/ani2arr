@@ -26,11 +26,40 @@ export function validateUrl(url: string): { isValid: boolean; error?: string; no
     if (!['http:', 'https:'].includes(urlObj.protocol)) {
       return { isValid: false, error: 'URL must use http or https.' };
     }
-    // A simple check for a TLD or an IP address-like structure.
-    if (!urlObj.hostname || (urlObj.hostname.indexOf('.') === -1 && !/^\d{1,3}(\.\d{1,3}){3}$/.test(urlObj.hostname))) {
-        return { isValid: false, error: 'Invalid hostname.' };
+
+    const hostname = urlObj.hostname;
+    if (!hostname) {
+      return { isValid: false, error: 'Invalid hostname.' };
     }
-    // Return the URL without a trailing slash for consistency.
+
+    const isIpv6Literal = hostname.startsWith('[') && hostname.endsWith(']');
+    const normalizedHostname = isIpv6Literal ? hostname.slice(1, -1) : hostname;
+
+    const hostnameLabelRegex = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+    const hostnameSegments = normalizedHostname.split('.');
+    const looksLikeIpv4 = hostnameSegments.length === 4 && hostnameSegments.every(part => /^\d+$/.test(part));
+    const isIpv4Address = looksLikeIpv4
+      ? hostnameSegments.every(part => {
+          if (!/^\d{1,3}$/.test(part)) return false;
+          const value = Number.parseInt(part, 10);
+          return value >= 0 && value <= 255;
+        })
+      : false;
+
+    const hasValidHostnameLabels =
+      !isIpv6Literal &&
+      hostnameSegments.every(segment => segment.length > 0 && hostnameLabelRegex.test(segment));
+
+    const isIpv6Address = isIpv6Literal && /^[0-9a-f:.]+$/i.test(normalizedHostname);
+    const isValidHostname =
+      isIpv4Address ||
+      isIpv6Address ||
+      (hasValidHostnameLabels && (!looksLikeIpv4 || isIpv4Address));
+
+    if (!isValidHostname) {
+      return { isValid: false, error: 'Invalid hostname.' };
+    }
+
     const normalizedUrl = urlObj.toString().replace(/\/$/, '');
     return { isValid: true, normalizedUrl };
   } catch {
