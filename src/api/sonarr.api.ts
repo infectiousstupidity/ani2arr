@@ -53,7 +53,30 @@ export class SonarrApiService {
         });
 
         if (!response.ok) {
-          throw new RetriableError(`Sonarr API Error: ${response.status} ${response.statusText}`, response.status);
+          let retryAfterMs: number | undefined;
+
+          if (response.status === 429) {
+            const retryAfterHeader = response.headers.get('Retry-After');
+
+            if (retryAfterHeader) {
+              const seconds = Number(retryAfterHeader);
+
+              if (Number.isFinite(seconds)) {
+                retryAfterMs = Math.max(0, seconds * 1000);
+              } else {
+                const parsedDate = Date.parse(retryAfterHeader);
+                if (!Number.isNaN(parsedDate)) {
+                  retryAfterMs = Math.max(0, parsedDate - Date.now());
+                }
+              }
+            }
+          }
+
+          throw new RetriableError(
+            `Sonarr API Error: ${response.status} ${response.statusText}`,
+            response.status,
+            retryAfterMs,
+          );
         }
 
         if (response.status === 204) {
