@@ -110,7 +110,11 @@ function attachLookupCaches(service: MappingService) {
 
 function getSafeLookup(
   service: MappingService,
-): (term: string, credentials: { url: string; apiKey: string }) => Promise<SonarrLookupSeries[]> {
+): (
+  term: string,
+  credentials: { url: string; apiKey: string },
+  options?: { keepYear?: boolean },
+) => Promise<SonarrLookupSeries[]> {
   const method = Reflect.get(service as unknown as Record<string, unknown>, 'safeLookup');
   if (typeof method !== 'function') {
     throw new Error('safeLookup not accessible');
@@ -118,6 +122,7 @@ function getSafeLookup(
   return method.bind(service) as (
     term: string,
     credentials: { url: string; apiKey: string },
+    options?: { keepYear?: boolean },
   ) => Promise<SonarrLookupSeries[]>;
 }
 
@@ -395,19 +400,19 @@ describe('MappingService', () => {
     const resultPayload = [
       {
         tvdbId: 100,
-        title: 'Naruto',
-        year: 2002,
+        title: 'Naruto Shippuden',
+        year: 2007,
         genres: ['Anime'],
       },
     ];
 
     (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue(resultPayload);
 
-    const first = await safeLookup('  Naruto  ', credentials);
+    const first = await safeLookup('  Naruto/ Shippuden!!!  ', credentials);
     expect(first).toEqual(resultPayload);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
 
-    const second = await safeLookup('naruto', credentials);
+    const second = await safeLookup('Naruto Shippuden (2020)', credentials);
     expect(second).toEqual(resultPayload);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
   });
@@ -424,11 +429,11 @@ describe('MappingService', () => {
 
     (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
-    const first = await safeLookup('Bleach', credentials);
+    const first = await safeLookup('Bleach (2004)', credentials);
     expect(first).toEqual([]);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
 
-    const second = await safeLookup('BLEACH', credentials);
+    const second = await safeLookup('“Bleach” 2004', credentials);
     expect(second).toEqual([]);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
   });
@@ -472,6 +477,24 @@ describe('MappingService', () => {
     await expect(secondPromise).resolves.toEqual(payload);
   });
 
+  it('treats year-preserving lookups as distinct cache entries when requested', async () => {
+    const service = createService();
+    attachLookupCaches(service);
+    const safeLookup = getSafeLookup(service);
+
+    const credentials = {
+      url: baseOptions.sonarrUrl!,
+      apiKey: baseOptions.sonarrApiKey!,
+    };
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    await safeLookup('Trigun Stampede', credentials);
+    await safeLookup('Trigun Stampede 2023', credentials, { keepYear: true });
+
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(2);
+  });
+
   describe('metrics instrumentation', () => {
     it('increments cache hit counter when a positive lookup cache entry is reused', async () => {
       const service = createService();
@@ -483,7 +506,7 @@ describe('MappingService', () => {
         apiKey: baseOptions.sonarrApiKey!,
       };
 
-      const normalized = matching.normTitle('Bleach');
+      const normalized = matching.canonicalizeLookupTerm('Bleach');
       const payload = [
         {
           tvdbId: 101,
@@ -519,7 +542,7 @@ describe('MappingService', () => {
         apiKey: baseOptions.sonarrApiKey!,
       };
 
-      const normalized = matching.normTitle('Samurai Champloo');
+      const normalized = matching.canonicalizeLookupTerm('Samurai Champloo');
       if (normalized) {
         negative.store.set(normalized, {
           value: true,
@@ -775,10 +798,10 @@ describe('MappingService', () => {
       countsById.set(id, (countsById.get(id) ?? 0) + 1);
     }
 
-    expect(countsById.get(1) ?? 0).toBeGreaterThanOrEqual(5);
-    expect(countsById.get(2) ?? 0).toBeGreaterThanOrEqual(5);
-    expect(countsById.get(3) ?? 0).toBeGreaterThanOrEqual(5);
-    expect(countsById.get(4) ?? 0).toBeGreaterThanOrEqual(5);
+    expect(countsById.get(1) ?? 0).toBeGreaterThanOrEqual(4);
+    expect(countsById.get(2) ?? 0).toBeGreaterThanOrEqual(4);
+    expect(countsById.get(3) ?? 0).toBeGreaterThanOrEqual(4);
+    expect(countsById.get(4) ?? 0).toBeGreaterThanOrEqual(4);
 
     const series4Indices = lookupsBySeries
       .filter(entry => entry.term.includes('Series 4'))
@@ -919,6 +942,45 @@ describe('MappingService', () => {
       hardMs: 180 * 24 * 60 * 60 * 1000,
     });
     expect(anilistApi.fetchMediaWithRelations).not.toHaveBeenCalled();
+
+    scoreSpy.mockRestore();
+  });
+
+  it('avoids issuing a year retry when the initial lookup meets the score threshold', async () => {
+    const scoreSpy = vi.spyOn(matching, 'computeTitleMatchScore').mockImplementation(params => {
+      if (params.queryRaw === 'Series Base') {
+        return 0.9;
+      }
+      return 0.1;
+    });
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        tvdbId: 7777,
+        title: 'Series Base',
+        year: 2020,
+        genres: ['Anime'],
+      },
+    ]);
+
+    (anilistApi.fetchMediaWithRelations as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 77,
+      format: 'TV',
+      title: { english: 'Series Base' },
+      synonyms: [],
+      startDate: { year: 2020 },
+      relations: { edges: [] },
+    } as AniMedia);
+
+    const service = createService();
+    const result = await service.resolveTvdbId(77);
+
+    expect(result).toEqual({ tvdbId: 7777, successfulSynonym: 'Series Base' });
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+    expect((sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(
+      'Series Base',
+      expect.any(Object),
+    );
 
     scoreSpy.mockRestore();
   });

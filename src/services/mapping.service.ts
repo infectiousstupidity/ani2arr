@@ -6,7 +6,7 @@ import type { SonarrApiService } from '@/api/sonarr.api';
 import type { SonarrLookupSeries } from '@/types';
 import type { AniTitles, ExtensionError, MediaMetadataHint } from '@/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
-import { computeTitleMatchScore, normTitle, stripParenContent } from '@/utils/matching';
+import { canonicalizeLookupTerm, computeTitleMatchScore, stripParenContent } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
 import { incrementCounter, timeAsync } from '@/utils/metrics';
 
@@ -302,21 +302,31 @@ export class MappingService {
       return prequelStatic.mapping;
     }
 
-    const searchTerms = this.buildSearchTerms(media.title, media.synonyms, media.startDate?.year ?? undefined);
+    const mediaYear = media.startDate?.year;
+    const searchTerms = this.buildSearchTerms(media.title, media.synonyms);
     if (hints?.primaryTitle) {
       const trimmed = hints.primaryTitle.trim();
       if (trimmed.length > 0) {
-        searchTerms.unshift(trimmed);
+        const canonicalHint = canonicalizeLookupTerm(trimmed);
+        if (canonicalHint) {
+          const existingIndex = searchTerms.findIndex(
+            value => canonicalizeLookupTerm(value) === canonicalHint,
+          );
+          if (existingIndex >= 0) {
+            searchTerms.splice(existingIndex, 1);
+          }
+          searchTerms.unshift(trimmed);
+        }
       }
     }
 
     let bestMatch: { tvdbId: number; term: string; score: number } | null = null;
 
-    for (const term of searchTerms.slice(0, MAX_TERMS)) {
-      const results = await this.safeLookup(term, credentials);
+    outer: for (const term of searchTerms.slice(0, MAX_TERMS)) {
+      const baseResults = await this.safeLookup(term, credentials);
+      let baseProducedHit = false;
 
-      for (const candidate of results) {
-        const mediaYear = media.startDate?.year;
+      for (const candidate of baseResults) {
         const scoreParams = {
           queryRaw: term,
           candidateRaw: candidate.title,
@@ -326,20 +336,45 @@ export class MappingService {
         } satisfies Parameters<typeof computeTitleMatchScore>[0];
         const score = computeTitleMatchScore(scoreParams);
 
-        if (score >= EARLY_STOP_THRESHOLD) {
-          bestMatch = { tvdbId: candidate.tvdbId, term, score };
-          break;
-        }
-
         if (score >= SCORE_THRESHOLD) {
+          baseProducedHit = true;
           if (!bestMatch || score > bestMatch.score) {
             bestMatch = { tvdbId: candidate.tvdbId, term, score };
+          }
+          if (score >= EARLY_STOP_THRESHOLD) {
+            break outer;
           }
         }
       }
 
-      if (bestMatch && bestMatch.score >= EARLY_STOP_THRESHOLD) {
-        break;
+      const canonicalWithoutYear = canonicalizeLookupTerm(term);
+      const canonicalWithYear = canonicalizeLookupTerm(term, { keepYear: true });
+      const hasExplicitYear =
+        !!canonicalWithoutYear && !!canonicalWithYear && canonicalWithoutYear !== canonicalWithYear;
+
+      if (!baseProducedHit && typeof mediaYear === 'number' && !hasExplicitYear) {
+        const termWithYear = `${term} ${mediaYear}`.trim();
+        const yearResults = await this.safeLookup(termWithYear, credentials, { keepYear: true });
+
+        for (const candidate of yearResults) {
+          const scoreParams = {
+            queryRaw: termWithYear,
+            candidateRaw: candidate.title,
+            ...(typeof candidate.year === 'number' ? { candidateYear: candidate.year } : {}),
+            targetYear: mediaYear,
+            ...(Array.isArray(candidate.genres) ? { candidateGenres: candidate.genres } : {}),
+          } satisfies Parameters<typeof computeTitleMatchScore>[0];
+          const score = computeTitleMatchScore(scoreParams);
+
+          if (score >= SCORE_THRESHOLD) {
+            if (!bestMatch || score > bestMatch.score) {
+              bestMatch = { tvdbId: candidate.tvdbId, term: termWithYear, score };
+            }
+            if (score >= EARLY_STOP_THRESHOLD) {
+              break outer;
+            }
+          }
+        }
       }
     }
 
@@ -445,26 +480,30 @@ export class MappingService {
     return null;
   }
 
-  private async safeLookup(term: string, credentials: { url: string; apiKey: string }): Promise<SonarrLookupSeries[]> {
-    const normalized = normTitle(term);
+  private async safeLookup(
+    term: string,
+    credentials: { url: string; apiKey: string },
+    options: { keepYear?: boolean } = {},
+  ): Promise<SonarrLookupSeries[]> {
+    const canonical = canonicalizeLookupTerm(term, { keepYear: options.keepYear });
 
-    if (!normalized) {
+    if (!canonical) {
       return this.performLookup(term, credentials);
     }
 
-    const positiveHit = await this.lookupCache.read(normalized);
+    const positiveHit = await this.lookupCache.read(canonical);
     if (positiveHit && !positiveHit.stale) {
       incrementCounter('mapping.lookup.cache_hit');
       return positiveHit.value;
     }
 
-    const negativeHit = await this.negativeLookupCache.read(normalized);
+    const negativeHit = await this.negativeLookupCache.read(canonical);
     if (negativeHit && !negativeHit.stale) {
       incrementCounter('mapping.lookup.negative_cache_hit');
       return [];
     }
 
-    const inflight = this.lookupInflight.get(normalized);
+    const inflight = this.lookupInflight.get(canonical);
     if (inflight) {
       incrementCounter('mapping.lookup.inflight_reuse');
       return inflight;
@@ -475,28 +514,28 @@ export class MappingService {
         const results = await this.performLookup(term, credentials);
 
         if (results.length > 0) {
-          await this.lookupCache.write(normalized, results, {
+          await this.lookupCache.write(canonical, results, {
             staleMs: LOOKUP_SOFT_TTL,
             hardMs: LOOKUP_HARD_TTL,
           });
-          await this.negativeLookupCache.remove(normalized);
+          await this.negativeLookupCache.remove(canonical);
         } else {
-          await this.negativeLookupCache.write(normalized, true, {
+          await this.negativeLookupCache.write(canonical, true, {
             staleMs: LOOKUP_NEGATIVE_SOFT_TTL,
             hardMs: LOOKUP_NEGATIVE_HARD_TTL,
           });
-          await this.lookupCache.remove(normalized);
+          await this.lookupCache.remove(canonical);
         }
 
         return results;
       } finally {
-        this.lookupInflight.delete(normalized);
+        this.lookupInflight.delete(canonical);
       }
     })().catch(error => {
       throw normalizeError(error);
     });
 
-    this.lookupInflight.set(normalized, promise);
+    this.lookupInflight.set(canonical, promise);
     return promise;
   }
 
@@ -680,29 +719,35 @@ export class MappingService {
     return null;
   }
 
-  private buildSearchTerms(titles: AniTitles, synonyms: string[] | undefined, startYear?: number | null): string[] {
+  private buildSearchTerms(titles: AniTitles, synonyms: string[] | undefined): string[] {
     const seen = new Set<string>();
     const terms: string[] = [];
 
     const addTerm = (term: string) => {
-      const normalized = normTitle(term);
-      if (!normalized) return;
-      if (seen.has(normalized)) return;
-      seen.add(normalized);
-      terms.push(term);
+      const trimmed = term.trim();
+      if (!trimmed) return;
+      const canonical = canonicalizeLookupTerm(trimmed);
+      if (!canonical) return;
+      if (seen.has(canonical)) return;
+      seen.add(canonical);
+      terms.push(trimmed);
     };
 
-    const baseTitles: string[] = [];
-    if (titles.english) baseTitles.push(titles.english);
-    if (titles.romaji) baseTitles.push(titles.romaji);
-    if (synonyms) baseTitles.push(...synonyms);
+    const considerTitle = (value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      addTerm(trimmed);
+      const stripped = stripParenContent(trimmed);
+      if (stripped && stripped !== trimmed) {
+        addTerm(stripped);
+      }
+    };
 
-    for (const title of baseTitles) {
-      const stripped = stripParenContent(title).trim();
-      if (!stripped) continue;
-      addTerm(stripped);
-      if (startYear) {
-        addTerm(`${stripped} ${startYear}`);
+    if (titles.english) considerTitle(titles.english);
+    if (titles.romaji) considerTitle(titles.romaji);
+    if (synonyms) {
+      for (const synonym of synonyms) {
+        considerTitle(synonym);
       }
     }
 

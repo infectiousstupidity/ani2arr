@@ -1,6 +1,29 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeTitleMatchScore, normTitle, tokenize } from '@/utils/matching';
+import { canonicalizeLookupTerm, computeTitleMatchScore, normTitle, tokenize } from '@/utils/matching';
+
+describe('canonicalizeLookupTerm', () => {
+  it('normalizes punctuation, stopwords, and whitespace', () => {
+    expect(canonicalizeLookupTerm('The Legend of Zelda: Breath of the Wild')).toBe(
+      'legend zelda breath wild',
+    );
+  });
+
+  it('collapses slashes and quotes and strips boilerplate tokens', () => {
+    expect(canonicalizeLookupTerm('“Kaguya-sama: Love Is War” / Season 2')).toBe(
+      'kaguya sama love is war 2',
+    );
+  });
+
+  it('removes trailing years by default but can retain them when requested', () => {
+    expect(canonicalizeLookupTerm('Fullmetal Alchemist: Brotherhood (2009)')).toBe(
+      'fullmetal alchemist brotherhood',
+    );
+    expect(
+      canonicalizeLookupTerm('Fullmetal Alchemist: Brotherhood (2009)', { keepYear: true }),
+    ).toBe('fullmetal alchemist brotherhood 2009');
+  });
+});
 
 describe('normTitle', () => {
   it('normalizes whitespace, punctuation, and casing', () => {
