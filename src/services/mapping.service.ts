@@ -43,6 +43,8 @@ const SCORE_THRESHOLD = 0.76;
 const EARLY_STOP_THRESHOLD = 0.82;
 const MAX_TERMS = 5;
 
+const ORDINAL_SUFFIX_RE = /^\d+(?:st|nd|rd|th)$/;
+
 const ALLOWED_FORMATS = new Set(['TV', 'TV_SHORT', 'ONA', 'OVA', 'SPECIAL']);
 
 export interface ResolvedMapping {
@@ -847,6 +849,14 @@ export class MappingService {
       if (!trimmed) return;
       const canonical = canonicalizeLookupTerm(trimmed);
       if (!canonical) return;
+      const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
+      if (canonicalTokens.length === 0) return;
+      // Skip search terms that consist entirely of ordinal numbers (e.g., '3rd', '2nd'), 
+      // to avoid matching generic or ambiguous titles. This may filter out legitimate anime titles 
+      // that are primarily numeric/ordinal, but helps reduce false positives in most cases.
+      if (canonicalTokens.every(token => ORDINAL_SUFFIX_RE.test(token))) {
+        return;
+      }
       if (seen.has(canonical)) return;
       seen.add(canonical);
       terms.push(trimmed);
