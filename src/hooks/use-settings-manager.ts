@@ -9,7 +9,12 @@ import {
   queryKeys,
 } from './use-api-queries';
 import type { ExtensionOptions, SonarrFormState } from '@/types';
-import { requestSonarrPermission, validateUrl, validateApiKey } from '@/utils/validation';
+import {
+  buildSonarrPermissionPattern,
+  requestSonarrPermission,
+  validateUrl,
+  validateApiKey,
+} from '@/utils/validation';
 import { logger } from '@/utils/logger';
 
 const getInitialOptions = (): ExtensionOptions => ({
@@ -162,8 +167,21 @@ export function useSettingsManager() {
     const previousOptions = lastSyncedOptionsRef.current;
     const previousUrl = previousOptions?.sonarrUrl ?? null;
     const urlChanged = previousUrl ? previousUrl !== sonarrUrl : Boolean(sonarrUrl);
-    const newOrigin = urlChanged ? `${new URL(sonarrUrl).origin}/*` : null;
-    const previousOrigin = previousUrl ? `${new URL(previousUrl).origin}/*` : null;
+    const newPermissionPattern = buildSonarrPermissionPattern(sonarrUrl);
+    if (!newPermissionPattern) {
+      log.error('Failed to determine host permission for Sonarr URL.');
+      setSaveError('Failed to update host permissions. Please try again.');
+      return;
+    }
+
+    const previousPermissionPattern =
+      previousUrl && previousUrl.length > 0 ? buildSonarrPermissionPattern(previousUrl) : null;
+
+    if (previousUrl && !previousPermissionPattern) {
+      log.error('Failed to determine host permission for previous Sonarr URL.');
+      setSaveError('Failed to update host permissions. Please try again.');
+      return;
+    }
 
     const revertToPreviousOptions = async () => {
       if (!previousOptions) return;
@@ -204,9 +222,9 @@ export function useSettingsManager() {
         defaults: { ...formState.defaults },
       };
 
-      if (urlChanged && previousOrigin) {
+      if (urlChanged && previousPermissionPattern) {
         try {
-          const removed = await browser.permissions.remove({ origins: [previousOrigin] });
+          const removed = await browser.permissions.remove({ origins: [previousPermissionPattern] });
           if (!removed) {
             throw new Error('Permission removal rejected without throwing.');
           }
@@ -216,9 +234,9 @@ export function useSettingsManager() {
 
           await revertToPreviousOptions();
 
-          if (grantedNewHostPermission && newOrigin) {
+          if (grantedNewHostPermission && newPermissionPattern) {
             try {
-              await browser.permissions.remove({ origins: [newOrigin] });
+              await browser.permissions.remove({ origins: [newPermissionPattern] });
             } catch (rollbackError) {
               log.error('Failed to roll back new host permission after removal failure.', rollbackError);
             }
@@ -232,9 +250,9 @@ export function useSettingsManager() {
     } catch (error) {
       log.error('Connection test failed. Settings not saved.', error);
 
-      if (grantedNewHostPermission && newOrigin) {
+      if (grantedNewHostPermission && newPermissionPattern) {
         try {
-          await browser.permissions.remove({ origins: [newOrigin] });
+          await browser.permissions.remove({ origins: [newPermissionPattern] });
         } catch (rollbackError) {
           log.error('Failed to roll back new host permission after save error.', rollbackError);
         }
