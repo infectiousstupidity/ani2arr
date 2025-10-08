@@ -98,6 +98,22 @@ export function sanitizeInput(input: string): string {
 }
 
 /**
+ * Builds a WebExtension host permission pattern for a Sonarr URL.
+ * @param url The Sonarr URL to convert into a permission pattern.
+ * @returns The permission pattern or null when the URL cannot be parsed.
+ */
+export function buildSonarrPermissionPattern(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    const normalizedPath = urlObj.pathname.replace(/\/+$/, '');
+    const finalPath = normalizedPath.length > 0 && normalizedPath !== '/' ? normalizedPath : '';
+    return `${urlObj.origin}${finalPath}/*`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Requests host permission for a given URL at runtime.
  * This is necessary for the extension to make fetch requests to the user's Sonarr instance.
  * @param url The URL for which to request permission.
@@ -111,8 +127,11 @@ export async function requestSonarrPermission(url: string): Promise<{ granted: b
       : { granted: false };
   }
   try {
-    const origin = new URL(validation.normalizedUrl!).origin + '/*';
-    const granted = await browser.permissions.request({ origins: [origin] });
+    const permissionPattern = buildSonarrPermissionPattern(validation.normalizedUrl!);
+    if (!permissionPattern) {
+      return { granted: false, error: 'Failed to construct a valid origin for permission request.' };
+    }
+    const granted = await browser.permissions.request({ origins: [permissionPattern] });
     return { granted };
   } catch {
     return { granted: false, error: 'Failed to construct a valid origin for permission request.' };
@@ -128,8 +147,9 @@ export async function hasSonarrPermission(url: string): Promise<boolean> {
   try {
     const validation = validateUrl(url);
     if (!validation.isValid) return false;
-    const origin = new URL(validation.normalizedUrl!).origin + '/*';
-    return await browser.permissions.contains({ origins: [origin] });
+    const permissionPattern = buildSonarrPermissionPattern(validation.normalizedUrl!);
+    if (!permissionPattern) return false;
+    return await browser.permissions.contains({ origins: [permissionPattern] });
   } catch {
     return false;
   }

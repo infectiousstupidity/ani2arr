@@ -21,8 +21,10 @@ vi.mock('@/utils/logger', () => {
   };
 });
 
-vi.mock('@/utils/validation', () => {
+vi.mock('@/utils/validation', async () => {
+  const actual = await vi.importActual<typeof import('@/utils/validation')>('@/utils/validation');
   return {
+    ...actual,
     validateUrl: vi.fn(),
     validateApiKey: vi.fn(),
     requestSonarrPermission: vi.fn(),
@@ -157,12 +159,13 @@ import {
 import { testServer, createExtensionOptionsFixture, createSonarrDefaultsFixture } from '@/testing';
 import type { ExtensionOptions, SonarrFormState, SonarrQualityProfile, SonarrRootFolder } from '@/types';
 import { extensionOptions } from '@/utils/storage';
-import { requestSonarrPermission, validateApiKey, validateUrl } from '@/utils/validation';
+import * as validationUtils from '@/utils/validation';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 
-const validateUrlMock = vi.mocked(validateUrl);
-const validateApiKeyMock = vi.mocked(validateApiKey);
-const requestSonarrPermissionMock = vi.mocked(requestSonarrPermission);
+const validateUrlMock = vi.mocked(validationUtils.validateUrl);
+const validateApiKeyMock = vi.mocked(validationUtils.validateApiKey);
+const requestSonarrPermissionMock = vi.mocked(validationUtils.requestSonarrPermission);
+const buildSonarrPermissionPatternSpy = vi.spyOn(validationUtils, 'buildSonarrPermissionPattern');
 
 const createOptions = (overrides: Partial<ExtensionOptions> = {}): ExtensionOptions =>
   createExtensionOptionsFixture({
@@ -171,8 +174,9 @@ const createOptions = (overrides: Partial<ExtensionOptions> = {}): ExtensionOpti
   });
 
 const validUrl = 'https://sonarr.test';
+const validUrlWithBasePath = 'https://sonarr.test/base';
 const validApiKey = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-const alternateUrl = 'https://new-sonarr.test';
+const alternateUrl = 'https://new-sonarr.test/app';
 const removalErrorMessage = 'Failed to update host permissions. Please try again.';
 
 const renderUseSettingsManager = () => {
@@ -197,6 +201,7 @@ beforeEach(() => {
   validateUrlMock.mockImplementation(url => ({ isValid: true, normalizedUrl: url }));
   validateApiKeyMock.mockReturnValue({ isValid: true });
   requestSonarrPermissionMock.mockResolvedValue({ granted: true });
+  buildSonarrPermissionPatternSpy.mockClear();
   resetMockExtensionOptions();
   resetKitsunarrApiMock();
 });
@@ -271,7 +276,7 @@ describe('useSettingsManager', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
-      result.current.handleFieldChange('sonarrUrl', validUrl);
+      result.current.handleFieldChange('sonarrUrl', validUrlWithBasePath);
       result.current.handleFieldChange('sonarrApiKey', validApiKey);
     });
 
@@ -279,10 +284,13 @@ describe('useSettingsManager', () => {
       await result.current.handleTestConnection();
     });
 
-    expect(validateUrlMock).toHaveBeenCalledWith(validUrl);
+    expect(validateUrlMock).toHaveBeenCalledWith(validUrlWithBasePath);
     expect(validateApiKeyMock).toHaveBeenCalledWith(validApiKey);
-    expect(requestSonarrPermissionMock).toHaveBeenCalledWith(validUrl);
-    expect(kitsunarrApiMock.testConnection).toHaveBeenCalledWith({ url: validUrl, apiKey: validApiKey });
+    expect(requestSonarrPermissionMock).toHaveBeenCalledWith(validUrlWithBasePath);
+    expect(kitsunarrApiMock.testConnection).toHaveBeenCalledWith({
+      url: validUrlWithBasePath,
+      apiKey: validApiKey,
+    });
   });
 
   it('skips connection test when validation fails', async () => {
@@ -384,7 +392,7 @@ describe('useSettingsManager', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
-      result.current.handleFieldChange('sonarrUrl', validUrl);
+      result.current.handleFieldChange('sonarrUrl', validUrlWithBasePath);
       result.current.handleFieldChange('sonarrApiKey', validApiKey);
     });
 
@@ -403,7 +411,7 @@ describe('useSettingsManager', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
-      result.current.handleFieldChange('sonarrUrl', validUrl);
+      result.current.handleFieldChange('sonarrUrl', validUrlWithBasePath);
       result.current.handleFieldChange('sonarrApiKey', validApiKey);
     });
 
@@ -420,7 +428,7 @@ describe('useSettingsManager', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
-      result.current.handleFieldChange('sonarrUrl', validUrl);
+      result.current.handleFieldChange('sonarrUrl', validUrlWithBasePath);
       result.current.handleFieldChange('sonarrApiKey', validApiKey);
     });
 
@@ -433,7 +441,7 @@ describe('useSettingsManager', () => {
     await waitFor(() => expect(kitsunarrApiMock.testConnection).toHaveBeenCalled());
     await waitFor(() =>
       expect(extensionOptions.setValue).toHaveBeenCalledWith({
-        sonarrUrl: validUrl,
+        sonarrUrl: validUrlWithBasePath,
         sonarrApiKey: validApiKey,
         defaults: createSonarrDefaultsFixture(),
       }),
@@ -500,8 +508,11 @@ describe('useSettingsManager', () => {
       await result.current.handleSave();
     });
 
-    expect(removeSpy).toHaveBeenCalledWith({ origins: ['https://legacy-sonarr.test:8989/*'] });
+    expect(removeSpy).toHaveBeenCalledWith({ origins: ['https://legacy-sonarr.test:8989/subpath/*'] });
+    expect(removeSpy).toHaveBeenCalledTimes(1);
     expect(requestSonarrPermissionMock).toHaveBeenCalledWith(alternateUrl);
+    expect(buildSonarrPermissionPatternSpy).toHaveBeenCalledWith(previousUrl);
+    expect(buildSonarrPermissionPatternSpy).toHaveBeenCalledWith(alternateUrl);
     expect(result.current.saveError).toBeNull();
   });
 
@@ -545,7 +556,7 @@ describe('useSettingsManager', () => {
       }),
     );
     expect(removeSpy).toHaveBeenNthCalledWith(1, { origins: ['https://legacy-sonarr.test/*'] });
-    expect(removeSpy).toHaveBeenNthCalledWith(2, { origins: ['https://new-sonarr.test/*'] });
+    expect(removeSpy).toHaveBeenNthCalledWith(2, { origins: ['https://new-sonarr.test/app/*'] });
     expect(result.current.saveError).toBe(removalErrorMessage);
     expect(result.current.formState.sonarrUrl).toBe(previousUrl);
   });
