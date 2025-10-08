@@ -183,16 +183,6 @@ export function useSettingsManager() {
       return;
     }
 
-    const legacyPermissionPattern = previousUrl
-      ? (() => {
-          try {
-            return `${new URL(previousUrl).origin}/*`;
-          } catch {
-            return null;
-          }
-        })()
-      : null;
-
     const revertToPreviousOptions = async () => {
       if (!previousOptions) return;
 
@@ -236,21 +226,7 @@ export function useSettingsManager() {
         try {
           const removed = await browser.permissions.remove({ origins: [previousPermissionPattern] });
           if (!removed) {
-            if (
-              legacyPermissionPattern &&
-              legacyPermissionPattern !== previousPermissionPattern
-            ) {
-              const legacyRemoved = await browser.permissions.remove({
-                origins: [legacyPermissionPattern],
-              });
-              if (legacyRemoved) {
-                log.info('Removed legacy Sonarr host permission wildcard.');
-              } else {
-                log.debug('Legacy Sonarr host permission wildcard was already absent.');
-              }
-            } else {
-              log.debug('Previous Sonarr host permission was already absent.');
-            }
+            throw new Error('Permission removal rejected without throwing.');
           }
         } catch (error) {
           log.error('Error removing host permission for previous Sonarr URL.', error);
