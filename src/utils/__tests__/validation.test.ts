@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 
 import {
+  buildSonarrPermissionPattern,
   hasSonarrPermission,
   requestSonarrPermission,
   sanitizeInput,
@@ -134,7 +135,7 @@ describe('Sonarr permission helpers', () => {
     fakeBrowser.reset();
   });
 
-  it('requests runtime permissions for normalized origins', async () => {
+  it('requests runtime permissions for Sonarr URLs with base paths', async () => {
     const grantedOrigins = new Set<string>();
 
     const requestSpy = vi.spyOn(fakeBrowser.permissions, 'request').mockImplementation(
@@ -145,11 +146,20 @@ describe('Sonarr permission helpers', () => {
       },
     );
 
-    const result = await requestSonarrPermission('https://example.com:8989/api');
+    const result = await requestSonarrPermission('https://example.com:8989/sonarr');
+
+    expect(result).toEqual({ granted: true });
+    expect(requestSpy).toHaveBeenCalledWith({ origins: ['https://example.com:8989/sonarr/*'] });
+    expect(grantedOrigins.has('https://example.com:8989/sonarr/*')).toBe(true);
+  });
+
+  it('collapses root paths to wildcard permissions when requesting access', async () => {
+    const requestSpy = vi.spyOn(fakeBrowser.permissions, 'request').mockResolvedValue(true);
+
+    const result = await requestSonarrPermission('https://example.com:8989');
 
     expect(result).toEqual({ granted: true });
     expect(requestSpy).toHaveBeenCalledWith({ origins: ['https://example.com:8989/*'] });
-    expect(grantedOrigins.has('https://example.com:8989/*')).toBe(true);
   });
 
   it('requests runtime permissions for IPv6 Sonarr hosts', async () => {
@@ -160,7 +170,7 @@ describe('Sonarr permission helpers', () => {
     const result = await requestSonarrPermission('http://[::1]:8989/api');
 
     expect(result).toEqual({ granted: true });
-    expect(requestSpy).toHaveBeenCalledWith({ origins: ['http://[::1]:8989/*'] });
+    expect(requestSpy).toHaveBeenCalledWith({ origins: ['http://[::1]:8989/api/*'] });
   });
 
   it('propagates validation errors from invalid URLs when requesting permissions', async () => {
@@ -183,7 +193,7 @@ describe('Sonarr permission helpers', () => {
   });
 
   it('confirms when host permissions are present for a Sonarr URL', async () => {
-    const grantedOrigins = new Set(['https://sonarr.example.com/*']);
+    const grantedOrigins = new Set(['https://sonarr.example.com/path/*']);
 
     vi.spyOn(fakeBrowser.permissions, 'contains').mockImplementation(async (permissions: unknown) => {
       const origins = (permissions as { origins?: string[] } | undefined)?.origins ?? [];
@@ -194,9 +204,10 @@ describe('Sonarr permission helpers', () => {
   });
 
   it('confirms permissions for IPv6 Sonarr hosts', async () => {
-    vi.spyOn(fakeBrowser.permissions, 'contains').mockResolvedValue(true);
+    const containsSpy = vi.spyOn(fakeBrowser.permissions, 'contains').mockResolvedValue(true);
 
     expect(await hasSonarrPermission('http://[::1]:8989/sonarr')).toBe(true);
+    expect(containsSpy).toHaveBeenCalledWith({ origins: ['http://[::1]:8989/sonarr/*'] });
   });
 
   it('returns false when host permissions are missing', async () => {
@@ -207,5 +218,21 @@ describe('Sonarr permission helpers', () => {
 
   it('rejects invalid Sonarr URLs when checking permissions', async () => {
     expect(await hasSonarrPermission('notaurl')).toBe(false);
+  });
+});
+
+describe('buildSonarrPermissionPattern', () => {
+  it('includes base paths when building permission patterns', () => {
+    expect(buildSonarrPermissionPattern('https://example.com/base/api')).toBe(
+      'https://example.com/base/api/*',
+    );
+  });
+
+  it('collapses the root path to a wildcard', () => {
+    expect(buildSonarrPermissionPattern('https://example.com/')).toBe('https://example.com/*');
+  });
+
+  it('returns null for invalid URLs', () => {
+    expect(buildSonarrPermissionPattern('not a url')).toBeNull();
   });
 });
