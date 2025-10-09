@@ -4,6 +4,11 @@ import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-
 import { logger } from '@/utils/logger';
 import type { AniFormat, AniTitles, ExtensionError } from '@/types';
 
+const SAFETY_BUFFER_MS = 1_500;
+const RATE_LIMIT_MARGIN = 2;
+const DEFAULT_MIN_SPACING_MS = 1_200;
+const DEFAULT_BACKOFF_MS = 2_000;
+
 export type AniMedia = {
   id: number;
   format: AniFormat | null;
@@ -34,12 +39,12 @@ export interface AniRateLimitSnapshot {
   limit?: number;
   remaining?: number;
   resetAt?: number;
-  retryAt?: number;
+  backoffUntil?: number;
   lastUpdated: number;
 }
 
 class RateLimitError extends Error {
-  constructor(readonly retryAfterMs: number) {
+  constructor(readonly retryAt: number) {
     super('AniList rate limit exceeded');
     this.name = 'RateLimitError';
   }
@@ -55,15 +60,14 @@ class RetriableHttpError extends Error {
 export class AnilistApiService {
   private readonly log = logger.create('AniListApiService');
   private readonly API_URL = 'https://graphql.anilist.co';
-  private readonly BATCH_SIZE = 2;
-  private readonly BATCH_DELAY_MS = 1200;
   private readonly MAX_RETRIES = 3;
-
   private requestQueue: QueuedRequest[] = [];
   private isProcessingQueue = false;
-  private queueBackoffUntil = 0;
   private inflight = new Map<number, Promise<AniMedia>>();
   private queueState: { rateLimit: AniRateLimitSnapshot | null } = { rateLimit: null };
+  private lastDispatchAt = Number.NEGATIVE_INFINITY;
+  private backoffUntil = 0;
+  private minSpacingMs = DEFAULT_MIN_SPACING_MS;
 
   private readonly findMediaWithRelationsQuery = `
     query FindRoot($id: Int) {
@@ -125,61 +129,41 @@ export class AnilistApiService {
   }
 
   public getQueueState(): Readonly<{ rateLimit: AniRateLimitSnapshot | null }> {
-    return this.queueState;
+    const rateLimit = this.queueState.rateLimit;
+    return Object.freeze({ rateLimit: rateLimit ? { ...rateLimit } : null });
   }
 
   private async processQueue(): Promise<void> {
     if (this.isProcessingQueue) return;
     this.isProcessingQueue = true;
 
-    let processedInWindow = 0;
-
     try {
       while (this.requestQueue.length > 0) {
-      this.log.debug(`processing AniList queue size=${this.requestQueue.length}`);
-        const now = Date.now();
-        if (now < this.queueBackoffUntil) {
-          await this.delay(this.queueBackoffUntil - now);
-          processedInWindow = 0;
-        }
+        const request = this.requestQueue[0]!;
+        let shouldRemove = false;
 
-        const request = this.requestQueue.shift()!;
-        this.log.debug(`issuing AniList request id=${request.anilistId}`);
-        const outcome = await this.handleRequest(request);
+        try {
+          const media = await this.dispatchWithGate(request.anilistId);
+          request.resolve(media);
+          shouldRemove = true;
+        } catch (error) {
+          if (error instanceof RateLimitError) {
+            this.backoffUntil = Math.max(this.backoffUntil, error.retryAt);
+            continue;
+          }
 
-        if (outcome === 'rate-limited') {
-          processedInWindow = 0;
-          continue;
-        }
-
-        processedInWindow += 1;
-        if (processedInWindow >= this.BATCH_SIZE && this.requestQueue.length > 0) {
-          processedInWindow = 0;
-          await this.delay(this.BATCH_DELAY_MS);
+          const normalized = normalizeError(error);
+          request.reject(normalized);
+          shouldRemove = true;
+        } finally {
+          if (shouldRemove && this.requestQueue[0] === request) {
+            this.clearInflight(request.anilistId, request.promise);
+            this.requestQueue.shift();
+          }
         }
       }
     } finally {
       this.isProcessingQueue = false;
-    }
-  }
-
-  private async handleRequest(request: QueuedRequest): Promise<'completed' | 'rate-limited'> {
-    try {
-      const media = await this.fetchFromApi(request.anilistId);
-      request.resolve(media);
-      this.clearInflight(request.anilistId, request.promise);
-      return 'completed';
-    } catch (error) {
-      if (error instanceof RateLimitError) {
-        this.queueBackoffUntil = Math.max(this.queueBackoffUntil, Date.now() + error.retryAfterMs);
-        this.requestQueue.unshift(request);
-        return 'rate-limited';
-      }
-
-      const normalized = normalizeError(error);
-      request.reject(normalized);
-      this.clearInflight(request.anilistId, request.promise);
-      return 'completed';
     }
   }
 
@@ -190,28 +174,31 @@ export class AnilistApiService {
     }
   }
 
-  private async fetchFromApi(anilistId: number): Promise<AniMedia> {
+  private async dispatchWithGate(anilistId: number): Promise<AniMedia> {
     let attempt = 0;
     let delayMs = 1000;
 
     while (true) {
       try {
+        await this.awaitDispatchSlot();
         const response = await fetch(this.API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({ query: this.findMediaWithRelationsQuery, variables: { id: anilistId } }),
         });
 
+        const retryTs = this.parseRetryAfterTs(response.headers.get('Retry-After'));
         const headerSnapshot = this.parseRateLimitHeaders(response.headers);
-
         if (response.status === 429) {
-          const retryAfterMs = this.parseRetryAfter(response.headers.get('Retry-After'));
-          this.applyRateLimitSnapshot({
-            ...(headerSnapshot ?? {}),
-            retryAt: Date.now() + retryAfterMs,
-            lastUpdated: Date.now(),
-          });
-          throw new RateLimitError(retryAfterMs);
+          const fallbackTarget = Date.now() + DEFAULT_BACKOFF_MS + SAFETY_BUFFER_MS;
+          const baseTarget = retryTs ?? headerSnapshot?.resetAt ?? null;
+          const backoffTarget = baseTarget ? baseTarget + SAFETY_BUFFER_MS : fallbackTarget;
+          this.applyRateLimitSnapshot(
+            headerSnapshot
+              ? { ...headerSnapshot, backoffUntil: backoffTarget, lastUpdated: Date.now() }
+              : { backoffUntil: backoffTarget, lastUpdated: Date.now() },
+          );
+          throw new RateLimitError(backoffTarget);
         }
 
         if (!response.ok) {
@@ -228,9 +215,9 @@ export class AnilistApiService {
           );
         }
 
-        if (headerSnapshot) {
-          this.applyRateLimitSnapshot({ ...headerSnapshot, lastUpdated: Date.now() });
-        }
+        this.applyRateLimitSnapshot(
+          headerSnapshot ? { ...headerSnapshot, lastUpdated: Date.now() } : null,
+        );
 
         const result = (await response.json()) as FindMediaResponse;
         const media = result?.data?.Media;
@@ -259,7 +246,7 @@ export class AnilistApiService {
               { status: error.status },
             );
           }
-          await this.delay(delayMs + Math.random() * 150);
+          await this.delay(delayMs);
           delayMs = Math.min(delayMs * 2, 5000);
           continue;
         }
@@ -269,20 +256,44 @@ export class AnilistApiService {
     }
   }
 
-  private parseRetryAfter(header: string | null): number {
-    if (!header) return 2000 + Math.random() * 500;
-
-    const seconds = Number(header);
-    if (Number.isFinite(seconds) && seconds > 0) {
-      return seconds * 1000;
+  private async awaitDispatchSlot(): Promise<void> {
+    while (true) {
+      const now = Date.now();
+      const earliest = Math.max(this.backoffUntil, this.lastDispatchAt + this.minSpacingMs);
+      if (now >= earliest) {
+        this.lastDispatchAt = Math.max(now, earliest);
+        return;
+      }
+      await this.delay(earliest - now);
     }
+  }
 
-    const dateMs = Date.parse(header);
-    if (!Number.isNaN(dateMs)) {
-      return Math.max(1000, dateMs - Date.now());
+  private parseRetryAfterTs(header: string | null): number | null {
+    if (!header) return null;
+    const numeric = Number(header);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return Date.now() + numeric * 1000;
     }
+    const parsed = Date.parse(header);
+    return Number.isNaN(parsed) ? null : Math.max(Date.now(), parsed);
+  }
 
-    return 2000 + Math.random() * 500;
+  private parseResetTs(header: string | null): number | null {
+    if (!header) return null;
+    const numeric = Number(header);
+    if (Number.isFinite(numeric)) {
+      return numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+    }
+    const parsed = Date.parse(header);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  private computeMinSpacing(limit?: number): number {
+    if (!Number.isFinite(limit as number) || (limit as number) <= 0) {
+      return this.minSpacingMs ?? DEFAULT_MIN_SPACING_MS;
+    }
+    const effective = Math.max(1, Math.round(limit as number) - RATE_LIMIT_MARGIN);
+    return Math.ceil(60_000 / effective);
   }
 
   private delay(ms: number): Promise<void> {
@@ -311,42 +322,50 @@ export class AnilistApiService {
     }
 
     if (resetHeader) {
-      const resetNumeric = Number(resetHeader);
-      if (Number.isFinite(resetNumeric)) {
-        snapshot.resetAt = resetNumeric < 1_000_000_000_000 ? resetNumeric * 1000 : resetNumeric;
-      } else {
-        const parsed = Date.parse(resetHeader);
-        if (!Number.isNaN(parsed)) {
-          snapshot.resetAt = parsed;
-        }
+      const resetTs = this.parseResetTs(resetHeader);
+      if (resetTs !== null) {
+        snapshot.resetAt = resetTs;
       }
     }
 
     return Object.keys(snapshot).length > 0 ? snapshot : null;
   }
 
-  private applyRateLimitSnapshot(snapshot: AniRateLimitSnapshot): void {
+  private applyRateLimitSnapshot(snapshot: AniRateLimitSnapshot | null): void {
     const now = Date.now();
-    const merged: AniRateLimitSnapshot = {
-      ...snapshot,
-      lastUpdated: snapshot.lastUpdated ?? now,
+    const previous = this.queueState.rateLimit ?? undefined;
+    const merged: AniRateLimitSnapshot | undefined = snapshot
+      ? { ...snapshot, lastUpdated: snapshot.lastUpdated ?? now }
+      : previous
+      ? { ...previous, lastUpdated: now }
+      : undefined;
+
+    if (!merged) {
+      return;
+    }
+
+    if (Number.isFinite(merged.limit as number)) {
+      this.minSpacingMs = this.computeMinSpacing(merged.limit);
+    }
+
+    if (Number.isFinite(merged.backoffUntil as number)) {
+      this.backoffUntil = Math.max(this.backoffUntil, merged.backoffUntil!);
+    }
+
+    if ((merged.remaining ?? Infinity) <= 0 && Number.isFinite(merged.resetAt as number)) {
+      this.backoffUntil = Math.max(this.backoffUntil, merged.resetAt! + SAFETY_BUFFER_MS);
+    }
+
+    this.queueState.rateLimit = {
+      ...merged,
+      backoffUntil: this.backoffUntil || undefined,
     };
-
-    this.queueState.rateLimit = merged;
-
-    if (typeof merged.retryAt === 'number' && Number.isFinite(merged.retryAt)) {
-      this.queueBackoffUntil = Math.max(this.queueBackoffUntil, merged.retryAt);
-    }
-
-    if (typeof merged.remaining === 'number' && merged.remaining <= 0 && typeof merged.resetAt === 'number') {
-      this.queueBackoffUntil = Math.max(this.queueBackoffUntil, merged.resetAt);
-    }
 
     if (this.log) {
       this.log.debug(
         `AniList rate-limit update limit=${merged.limit ?? 'n/a'} remaining=${merged.remaining ?? 'n/a'} resetAt=${
           merged.resetAt ?? 'n/a'
-        } backoffUntil=${this.queueBackoffUntil}`,
+        } backoffUntil=${this.backoffUntil || 'n/a'} minSpacing=${this.minSpacingMs}`,
       );
     }
   }
