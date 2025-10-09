@@ -145,6 +145,7 @@ export class MappingService {
     ]);
     this.lookupInflight.clear();
     this.inflight.clear();
+    this.sessionSeenCanonical.clear();
   }
 
   public async initStaticPairs(): Promise<void> {
