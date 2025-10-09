@@ -6,7 +6,7 @@ import type { SonarrApiService } from '@/api/sonarr.api';
 import type { SonarrLookupSeries } from '@/types';
 import type { AniTitles, ExtensionError, MediaMetadataHint } from '@/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
-import { canonicalizeLookupTerm, computeTitleMatchScore, stripParenContent } from '@/utils/matching';
+import { computeTitleMatchScore, stripParenContent } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
 import { incrementCounter, timeAsync } from '@/utils/metrics';
 
@@ -42,6 +42,7 @@ const LOOKUP_LIMITER_SPACING_MS = 250;
 const SCORE_THRESHOLD = 0.76;
 const EARLY_STOP_THRESHOLD = 0.82;
 const MAX_TERMS = 5;
+const YEAR_PROBE_SCORE_THRESHOLD = 0.8;
 
 const ORDINAL_SUFFIX_RE = /^\d+(?:st|nd|rd|th)$/;
 
@@ -102,6 +103,7 @@ export class MappingService {
   private readonly lookupInflight = new Map<string, Promise<SonarrLookupSeries[]>>();
   private readonly lookupCache = createTtlCache<SonarrLookupSeries[]>(LOOKUP_CACHE_NAMESPACE);
   private readonly negativeLookupCache = createTtlCache<boolean>(LOOKUP_NEGATIVE_CACHE_NAMESPACE);
+  private readonly sessionSeenCanonical = new Set<string>();
   private readonly mappingQueue: QueuedMappingRequest[] = [];
   private isProcessingMappingQueue = false;
   private readonly delayFn: (ms: number) => Promise<void>;
@@ -143,6 +145,7 @@ export class MappingService {
     ]);
     this.lookupInflight.clear();
     this.inflight.clear();
+    this.sessionSeenCanonical.clear();
   }
 
   public async initStaticPairs(): Promise<void> {
@@ -346,82 +349,54 @@ export class MappingService {
     if (hints?.primaryTitle) {
       const trimmed = hints.primaryTitle.trim();
       if (trimmed.length > 0) {
-        const canonicalHint = canonicalizeLookupTerm(trimmed);
+        const canonicalHint = canonicalKeyForTerm(trimmed);
         if (canonicalHint) {
-          const existingIndex = searchTerms.findIndex(
-            value => canonicalizeLookupTerm(value) === canonicalHint,
-          );
+          const existingIndex = searchTerms.findIndex(value => value.canonical === canonicalHint);
           if (existingIndex >= 0) {
             searchTerms.splice(existingIndex, 1);
           }
-          searchTerms.unshift(trimmed);
+          searchTerms.unshift({ canonical: canonicalHint, display: trimmed });
         }
       }
     }
 
     let bestMatch: { tvdbId: number; term: string; score: number } | null = null;
 
-    outer: for (const term of searchTerms.slice(0, MAX_TERMS)) {
-      const baseResults = await this.safeLookup(term, credentials);
-      let baseProducedHit = false;
+    for (const term of searchTerms.slice(0, MAX_TERMS)) {
+      if (!term.canonical) {
+        continue;
+      }
 
-      for (const candidate of baseResults) {
-        const scoreParams = {
-          queryRaw: term,
-          candidateRaw: candidate.title,
-          ...(typeof candidate.year === 'number' ? { candidateYear: candidate.year } : {}),
-          ...(typeof mediaYear === 'number' ? { targetYear: mediaYear } : {}),
-          ...(Array.isArray(candidate.genres) ? { candidateGenres: candidate.genres } : {}),
-        } satisfies Parameters<typeof computeTitleMatchScore>[0];
-        const score = computeTitleMatchScore(scoreParams);
+      const seenInSession = this.sessionSeenCanonical.has(term.canonical);
+      const baseResults = seenInSession
+        ? await this.readCachedLookup(term.canonical)
+        : await this.safeLookup(term.canonical, term.display, credentials);
 
-        if (score >= SCORE_THRESHOLD) {
-          baseProducedHit = true;
-          if (!bestMatch || score > bestMatch.score) {
-            bestMatch = { tvdbId: candidate.tvdbId, term, score };
-          }
-          if (score >= EARLY_STOP_THRESHOLD) {
-            break outer;
-          }
+      let { bestCandidate, topScore } = this.evaluateLookupResults(baseResults, term.display, mediaYear);
+
+      if (bestCandidate && (!bestMatch || bestCandidate.score > bestMatch.score)) {
+        bestMatch = bestCandidate;
+      }
+
+      if (!seenInSession && typeof mediaYear === 'number' && topScore < YEAR_PROBE_SCORE_THRESHOLD) {
+        incrementCounter('mapping.lookup.year_probe');
+        const termWithYear = `${term.display} ${mediaYear}`.trim();
+        const yearResults = await this.safeLookup(term.canonical, termWithYear, credentials, {
+          forceNetwork: true,
+        });
+        const yearEval = this.evaluateLookupResults(yearResults, termWithYear, mediaYear);
+        topScore = Math.max(topScore, yearEval.topScore);
+        if (yearEval.bestCandidate && (!bestMatch || yearEval.bestCandidate.score > bestMatch.score)) {
+          bestMatch = yearEval.bestCandidate;
         }
       }
 
-      if (bestMatch) {
-        break outer;
+      if (!seenInSession) {
+        this.sessionSeenCanonical.add(term.canonical);
       }
 
-      const canonicalWithoutYear = canonicalizeLookupTerm(term);
-      const canonicalWithYear = canonicalizeLookupTerm(term, { keepYear: true });
-      const hasExplicitYear =
-        !!canonicalWithoutYear && !!canonicalWithYear && canonicalWithoutYear !== canonicalWithYear;
-
-      if (!bestMatch && !baseProducedHit && typeof mediaYear === 'number' && !hasExplicitYear) {
-        const termWithYear = `${term} ${mediaYear}`.trim();
-        const yearResults = await this.safeLookup(termWithYear, credentials, { keepYear: true });
-
-        for (const candidate of yearResults) {
-          const scoreParams = {
-            queryRaw: termWithYear,
-            candidateRaw: candidate.title,
-            ...(typeof candidate.year === 'number' ? { candidateYear: candidate.year } : {}),
-            targetYear: mediaYear,
-            ...(Array.isArray(candidate.genres) ? { candidateGenres: candidate.genres } : {}),
-          } satisfies Parameters<typeof computeTitleMatchScore>[0];
-          const score = computeTitleMatchScore(scoreParams);
-
-          if (score >= SCORE_THRESHOLD) {
-            if (!bestMatch || score > bestMatch.score) {
-              bestMatch = { tvdbId: candidate.tvdbId, term: termWithYear, score };
-            }
-            if (score >= EARLY_STOP_THRESHOLD) {
-              break outer;
-            }
-          }
-        }
-      }
-
-      if (bestMatch) {
-        break outer;
+      if (bestMatch && bestMatch.score >= EARLY_STOP_THRESHOLD) {
+        break;
       }
     }
 
@@ -508,7 +483,12 @@ export class MappingService {
       return null;
     }
 
-    const results = await this.safeLookup(term, credentials);
+    const canonical = canonicalKeyForTerm(term);
+    if (!canonical) {
+      return null;
+    }
+
+    const results = await this.safeLookup(canonical, term, credentials);
 
     for (const candidate of results) {
       const scoreParams = {
@@ -527,32 +507,8 @@ export class MappingService {
     return null;
   }
 
-  private async safeLookup(
-    term: string,
-    credentials: { url: string; apiKey: string },
-    options: { keepYear?: boolean } = {},
-  ): Promise<SonarrLookupSeries[]> {
-    const canonicalWithYear = canonicalizeLookupTerm(term, { keepYear: true });
-    const canonicalWithoutYear = canonicalizeLookupTerm(term);
-
-    const shouldKeepYear =
-      options.keepYear === true || (!!canonicalWithYear && canonicalWithYear !== canonicalWithoutYear);
-
-    const canonical = shouldKeepYear ? canonicalWithYear : canonicalWithoutYear;
-
+  private async readCachedLookup(canonical: string): Promise<SonarrLookupSeries[]> {
     if (!canonical) {
-      return this.scheduleLookup(() => this.performLookup(term, term, credentials));
-    }
-
-    const positiveHit = await this.lookupCache.read(canonical);
-    if (positiveHit && !positiveHit.stale) {
-      incrementCounter('mapping.lookup.cache_hit');
-      return positiveHit.value;
-    }
-
-    const negativeHit = await this.negativeLookupCache.read(canonical);
-    if (negativeHit && !negativeHit.stale) {
-      incrementCounter('mapping.lookup.negative_cache_hit');
       return [];
     }
 
@@ -562,10 +518,67 @@ export class MappingService {
       return inflight;
     }
 
+    const positiveHit = await this.lookupCache.read(canonical);
+    if (positiveHit) {
+      incrementCounter('mapping.lookup.cache_hit');
+      return positiveHit.value;
+    }
+
+    const negativeHit = await this.negativeLookupCache.read(canonical);
+    if (negativeHit) {
+      incrementCounter('mapping.lookup.negative_cache_hit');
+      return [];
+    }
+
+    return [];
+  }
+
+  /**
+   * Performs a Sonarr lookup while normalizing caching by canonical key.
+   * The `forceNetwork` option should only be used for year retry probes that must bypass cache reads.
+   */
+  private async safeLookup(
+    canonicalKey: string,
+    rawDisplay: string,
+    credentials: { url: string; apiKey: string },
+    options?: { forceNetwork?: boolean },
+  ): Promise<SonarrLookupSeries[]> {
+    const canonical = canonicalKey || canonicalKeyForTerm(rawDisplay);
+    const forceNetwork = options?.forceNetwork === true;
+
+    if (!canonical) {
+      return this.scheduleLookup(() => this.performLookup(rawDisplay, rawDisplay, credentials));
+    }
+
+    if (!forceNetwork) {
+      const positiveHit = await this.lookupCache.read(canonical);
+      if (positiveHit && !positiveHit.stale) {
+        incrementCounter('mapping.lookup.cache_hit');
+        return positiveHit.value;
+      }
+
+      const negativeHit = await this.negativeLookupCache.read(canonical);
+      if (negativeHit && !negativeHit.stale) {
+        incrementCounter('mapping.lookup.negative_cache_hit');
+        return [];
+      }
+
+      const inflight = this.lookupInflight.get(canonical);
+      if (inflight) {
+        incrementCounter('mapping.lookup.inflight_reuse');
+        return inflight;
+      }
+    } else {
+      const inflight = this.lookupInflight.get(canonical);
+      if (inflight) {
+        return inflight;
+      }
+    }
+
     const promise = (async () => {
       try {
         const results = await this.scheduleLookup(() =>
-          this.performLookup(term, canonical, credentials),
+          this.performLookup(rawDisplay, rawDisplay, credentials),
         );
 
         if (results.length > 0) {
@@ -592,6 +605,39 @@ export class MappingService {
 
     this.lookupInflight.set(canonical, promise);
     return promise;
+  }
+
+  private evaluateLookupResults(
+    results: SonarrLookupSeries[],
+    term: string,
+    targetYear?: number,
+  ): {
+    bestCandidate: { tvdbId: number; term: string; score: number } | null;
+    topScore: number;
+  } {
+    let bestCandidate: { tvdbId: number; term: string; score: number } | null = null;
+    let topScore = 0;
+
+    for (const candidate of results) {
+      const scoreParams = {
+        queryRaw: term,
+        candidateRaw: candidate.title,
+        ...(typeof candidate.year === 'number' ? { candidateYear: candidate.year } : {}),
+        ...(typeof targetYear === 'number' ? { targetYear } : {}),
+        ...(Array.isArray(candidate.genres) ? { candidateGenres: candidate.genres } : {}),
+      } satisfies Parameters<typeof computeTitleMatchScore>[0];
+
+      const score = computeTitleMatchScore(scoreParams);
+      if (score > topScore) {
+        topScore = score;
+      }
+
+      if (score >= SCORE_THRESHOLD && (!bestCandidate || score > bestCandidate.score)) {
+        bestCandidate = { tvdbId: candidate.tvdbId, term, score };
+      }
+    }
+
+    return { bestCandidate, topScore };
   }
 
   private scheduleLookup<T>(factory: () => Promise<T>): Promise<T> {
@@ -662,7 +708,7 @@ export class MappingService {
     lookupTerm: string,
     credentials: { url: string; apiKey: string },
   ): Promise<SonarrLookupSeries[]> {
-    // Preserve the raw term for metrics/logging contexts even though the lookup uses the canonical form.
+    // Preserve the raw term for metrics/logging contexts even when the lookup term may differ.
     void rawTerm;
     incrementCounter('mapping.lookup.network_miss');
     return timeAsync('mapping.lookup.latency', LOOKUP_LATENCY_BUCKETS, async () => {
@@ -840,26 +886,37 @@ export class MappingService {
     return null;
   }
 
-  private buildSearchTerms(titles: AniTitles, synonyms: string[] | undefined): string[] {
+  private buildSearchTerms(
+    titles: AniTitles,
+    synonyms: string[] | undefined,
+  ): Array<{ canonical: string; display: string }> {
     const seen = new Set<string>();
-    const terms: string[] = [];
+    const referenceTitle = titles.english ?? titles.romaji ?? titles.native ?? '';
+    const terms: Array<{ canonical: string; display: string; score: number }> = [];
 
     const addTerm = (term: string) => {
       const trimmed = term.trim();
       if (!trimmed) return;
-      const canonical = canonicalizeLookupTerm(trimmed);
+      const canonical = canonicalKeyForTerm(trimmed);
       if (!canonical) return;
+      if (seen.has(canonical)) return;
+
       const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
       if (canonicalTokens.length === 0) return;
-      // Skip search terms that consist entirely of ordinal numbers (e.g., '3rd', '2nd'), 
-      // to avoid matching generic or ambiguous titles. This may filter out legitimate anime titles 
+      // Skip search terms that consist entirely of ordinal numbers (e.g., '3rd', '2nd'),
+      // to avoid matching generic or ambiguous titles. This may filter out legitimate anime titles
       // that are primarily numeric/ordinal, but helps reduce false positives in most cases.
       if (canonicalTokens.every(token => ORDINAL_SUFFIX_RE.test(token))) {
         return;
       }
-      if (seen.has(canonical)) return;
+
       seen.add(canonical);
-      terms.push(trimmed);
+
+      const score = referenceTitle
+        ? computeTitleMatchScore({ queryRaw: referenceTitle, candidateRaw: trimmed })
+        : 0;
+
+      terms.push({ canonical, display: trimmed, score });
     };
 
     const considerTitle = (value: string) => {
@@ -880,12 +937,44 @@ export class MappingService {
       }
     }
 
-    return terms;
+    return terms
+      .sort((a, b) => b.score - a.score)
+      .map(({ canonical, display }) => ({ canonical, display }));
   }
 
   private delay(ms: number): Promise<void> {
     return this.delayFn(ms);
   }
+}
+
+const COMBINING_MARKS_RE = /[\u0300-\u036f]/g;
+const NON_ALPHANUMERIC_RE = /[^a-z0-9]+/g;
+const YEAR_SUFFIX_TOKEN_RE = /^(?:19|20)\d{2}$/;
+
+function canonicalizeTitle(term: string): string {
+  if (!term) return '';
+
+  return term
+    .normalize('NFKD')
+    .replace(COMBINING_MARKS_RE, '')
+    .replace(/ß/g, 'ss')
+    .toLowerCase()
+    .replace(NON_ALPHANUMERIC_RE, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function canonicalKeyForTerm(term: string): string {
+  const canonical = canonicalizeTitle(term);
+  if (!canonical) return '';
+
+  const tokens = canonical.split(' ').filter(Boolean);
+
+  while (tokens.length > 0 && YEAR_SUFFIX_TOKEN_RE.test(tokens[tokens.length - 1]!)) {
+    tokens.pop();
+  }
+
+  return tokens.join(' ');
 }
 
 

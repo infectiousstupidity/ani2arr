@@ -108,21 +108,38 @@ function attachLookupCaches(service: MappingService) {
   return { positive, negative };
 }
 
+type TestSafeLookupOptions = {
+  canonicalKey?: string;
+  forceNetwork?: boolean;
+};
+
 function getSafeLookup(
   service: MappingService,
 ): (
   term: string,
   credentials: { url: string; apiKey: string },
-  options?: { keepYear?: boolean },
+  options?: TestSafeLookupOptions,
 ) => Promise<SonarrLookupSeries[]> {
   const method = Reflect.get(service as unknown as Record<string, unknown>, 'safeLookup');
   if (typeof method !== 'function') {
     throw new Error('safeLookup not accessible');
   }
-  return method.bind(service) as (
+  return ((term, credentials, options) =>
+    (method as (
+      canonicalKey: string,
+      rawDisplay: string,
+      creds: { url: string; apiKey: string },
+      opts?: { forceNetwork?: boolean },
+    ) => Promise<SonarrLookupSeries[]>).call(
+      service,
+      options?.canonicalKey ?? '',
+      term,
+      credentials,
+      options?.forceNetwork ? { forceNetwork: true } : undefined,
+    )) as (
     term: string,
     credentials: { url: string; apiKey: string },
-    options?: { keepYear?: boolean },
+    options?: TestSafeLookupOptions,
   ) => Promise<SonarrLookupSeries[]>;
 }
 
@@ -538,7 +555,7 @@ describe('MappingService', () => {
       const result = await promise;
 
       expect(result).toEqual({ tvdbId: 9100, successfulSynonym: 'Latency Check' });
-      expect(sonarrCalls).toEqual(['latency check']);
+      expect(sonarrCalls).toEqual(['Latency Check']);
     } finally {
       scoreSpy.mockRestore();
       vi.useRealTimers();
@@ -587,9 +604,9 @@ describe('MappingService', () => {
     expect(caches.failure.read).not.toHaveBeenCalled();
   });
 
-  it('uses Sonarr lookup cache for normalized terms', async () => {
+  it('deduplicates punctuation and year variants into a single Sonarr lookup', async () => {
     const service = createService();
-    attachLookupCaches(service);
+    const { positive } = attachLookupCaches(service);
     const safeLookup = getSafeLookup(service);
 
     const credentials = {
@@ -608,18 +625,20 @@ describe('MappingService', () => {
 
     (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue(resultPayload);
 
-    const first = await safeLookup('  Naruto/ Shippuden!!!  ', credentials);
+    const first = await safeLookup('Naruto Shippuden 2007', credentials);
     expect(first).toEqual(resultPayload);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenNthCalledWith(
       1,
-      'naruto shippuden',
+      'Naruto Shippuden 2007',
       credentials,
     );
 
-    const second = await safeLookup('“Naruto” Shippuden!!!', credentials);
+    const second = await safeLookup('Naruto: Shippuden!!!', credentials);
     expect(second).toEqual(resultPayload);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+
+    expect(Array.from(positive.store.keys())).toEqual(['naruto shippuden']);
   });
 
   it('uses negative Sonarr lookup cache when no results returned', async () => {
@@ -634,17 +653,17 @@ describe('MappingService', () => {
 
     (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
-    const first = await safeLookup('Bleach (2004)', credentials);
+    const first = await safeLookup('Bleach 2004', credentials);
     expect(first).toEqual([]);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
-    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenNthCalledWith(1, 'bleach 2004', credentials);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenNthCalledWith(1, 'Bleach 2004', credentials);
 
     const second = await safeLookup('“Bleach” 2004', credentials);
     expect(second).toEqual([]);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
   });
 
-  it('does not reuse lookup cache entries across different explicit years', async () => {
+  it('reuses lookup cache entries across explicit years via canonical key', async () => {
     const service = createService();
     const { positive } = attachLookupCaches(service);
     const safeLookup = getSafeLookup(service);
@@ -665,16 +684,13 @@ describe('MappingService', () => {
     const first = await safeLookup('Bleach 2004', credentials);
     expect(first).toEqual([{ tvdbId: 100, title: 'Bleach', year: 2004, genres: ['Anime'] }]);
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
-    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenNthCalledWith(1, 'bleach 2004', credentials);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenNthCalledWith(1, 'Bleach 2004', credentials);
 
     const second = await safeLookup('Bleach 2024', credentials);
-    expect(second).toEqual([
-      { tvdbId: 200, title: 'Bleach (2024)', year: 2024, genres: ['Anime'] },
-    ]);
-    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(2);
-    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenNthCalledWith(2, 'bleach 2024', credentials);
+    expect(second).toEqual(first);
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
 
-    expect(Array.from(positive.store.keys()).sort()).toEqual(['bleach 2004', 'bleach 2024']);
+    expect(Array.from(positive.store.keys())).toEqual(['bleach']);
   });
 
   it('shares inflight Sonarr lookups for the same normalized term', async () => {
@@ -716,7 +732,7 @@ describe('MappingService', () => {
     await expect(secondPromise).resolves.toEqual(payload);
   });
 
-  it('treats year-preserving lookups as distinct cache entries when requested', async () => {
+  it('allows forcing a second lookup for the same canonical key', async () => {
     const service = createService();
     attachLookupCaches(service);
     const safeLookup = getSafeLookup(service);
@@ -726,12 +742,261 @@ describe('MappingService', () => {
       apiKey: baseOptions.sonarrApiKey!,
     };
 
-    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([
+        { tvdbId: 100, title: 'Trigun Stampede', year: 2023, genres: ['Anime'] },
+      ])
+      .mockResolvedValueOnce([
+        { tvdbId: 101, title: 'Trigun Stampede (Alt)', year: 2023, genres: ['Anime'] },
+      ]);
 
     await safeLookup('Trigun Stampede', credentials);
-    await safeLookup('Trigun Stampede 2023', credentials, { keepYear: true });
+    const forced = await safeLookup('Trigun Stampede 2023', credentials, { forceNetwork: true });
 
     expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(2);
+    expect(forced).toEqual([
+      { tvdbId: 101, title: 'Trigun Stampede (Alt)', year: 2023, genres: ['Anime'] },
+    ]);
+  });
+
+  it('performs a year retry when the initial score is weak', async () => {
+    const service = createService();
+    attachLookupCaches(service);
+
+    const tryResolve = Reflect.get(
+      service as unknown as Record<string, unknown>,
+      'tryResolveWithPreparedMedia',
+    ) as (
+      anilistId: number,
+      media: AniMedia,
+      credentials: { url: string; apiKey: string },
+      hints?: unknown,
+    ) => Promise<ResolvedMapping | null>;
+
+    const credentials = {
+      url: baseOptions.sonarrUrl!,
+      apiKey: baseOptions.sonarrApiKey!,
+    };
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async term => {
+      if (term.includes('2020')) {
+        return [
+          { tvdbId: 2020, title: 'Shared Example', year: 2020, genres: ['Anime'] },
+        ];
+      }
+      return [
+        { tvdbId: 101, title: 'Shared Example (OVA)', year: 2019, genres: ['Anime'] },
+      ];
+    });
+
+    const scoreSpy = vi
+      .spyOn(matching, 'computeTitleMatchScore')
+      .mockImplementation(params => {
+        if (params.queryRaw === 'Shared Example' && params.candidateRaw === 'Shared Example') {
+          return 1;
+        }
+        if (params.queryRaw.includes('2020')) {
+          return 0.92;
+        }
+        return 0.78;
+      });
+
+    const media: AniMedia = {
+      id: 5000,
+      format: 'TV',
+      title: { english: 'Shared Example' },
+      synonyms: [],
+      startDate: { year: 2020 },
+    } as AniMedia;
+
+    try {
+      const result = await tryResolve.call(service, media.id, media, credentials);
+
+      expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(2);
+      expect(sonarrApi.lookupSeriesByTerm).toHaveBeenNthCalledWith(1, 'Shared Example', credentials);
+      expect(sonarrApi.lookupSeriesByTerm).toHaveBeenNthCalledWith(
+        2,
+        'Shared Example 2020',
+        credentials,
+      );
+      expect(result).toEqual({ tvdbId: 2020, successfulSynonym: 'Shared Example 2020' });
+
+      const snapshot = getMetricsSnapshot();
+      expect(snapshot.counters['mapping.lookup.year_probe']).toBe(1);
+    } finally {
+      scoreSpy.mockRestore();
+    }
+  });
+
+  it('does not perform a year retry when the top score meets the threshold', async () => {
+    const service = createService();
+    attachLookupCaches(service);
+
+    const tryResolve = Reflect.get(
+      service as unknown as Record<string, unknown>,
+      'tryResolveWithPreparedMedia',
+    ) as (
+      anilistId: number,
+      media: AniMedia,
+      credentials: { url: string; apiKey: string },
+      hints?: unknown,
+    ) => Promise<ResolvedMapping | null>;
+
+    const credentials = {
+      url: baseOptions.sonarrUrl!,
+      apiKey: baseOptions.sonarrApiKey!,
+    };
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { tvdbId: 303, title: 'Strong Match Example', year: 2021, genres: ['Anime'] },
+    ]);
+
+    const scoreSpy = vi
+      .spyOn(matching, 'computeTitleMatchScore')
+      .mockImplementation(params => {
+        if (
+          params.queryRaw === 'Strong Match Example' &&
+          params.candidateRaw === 'Strong Match Example'
+        ) {
+          return 0.84;
+        }
+        return 0.5;
+      });
+
+    const media: AniMedia = {
+      id: 5001,
+      format: 'TV',
+      title: { english: 'Strong Match Example' },
+      synonyms: [],
+      startDate: { year: 2021 },
+    } as AniMedia;
+
+    try {
+      const result = await tryResolve.call(service, media.id, media, credentials);
+
+      expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+      expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledWith('Strong Match Example', credentials);
+      expect(result).toEqual({ tvdbId: 303, successfulSynonym: 'Strong Match Example' });
+
+      const snapshot = getMetricsSnapshot();
+      expect(snapshot.counters['mapping.lookup.year_probe']).toBeUndefined();
+    } finally {
+      scoreSpy.mockRestore();
+    }
+  });
+
+  it('bypasses cached lookup entries when performing a year retry probe', async () => {
+    const service = createService();
+    const { positive } = attachLookupCaches(service);
+
+    const tryResolve = Reflect.get(
+      service as unknown as Record<string, unknown>,
+      'tryResolveWithPreparedMedia',
+    ) as (
+      anilistId: number,
+      media: AniMedia,
+      credentials: { url: string; apiKey: string },
+      hints?: unknown,
+    ) => Promise<ResolvedMapping | null>;
+
+    const credentials = {
+      url: baseOptions.sonarrUrl!,
+      apiKey: baseOptions.sonarrApiKey!,
+    };
+
+    const canonical = matching.canonicalizeLookupTerm('Vinland Saga');
+    const cachedPayload: SonarrLookupSeries[] = [
+      { tvdbId: 401, title: 'Vinland Saga', year: 2019, genres: ['Anime'] },
+    ];
+    if (canonical) {
+      positive.store.set(canonical, {
+        value: cachedPayload,
+        staleAt: Date.now() + 10_000,
+        expiresAt: Date.now() + 20_000,
+      });
+    }
+
+    const scoreSpy = vi
+      .spyOn(matching, 'computeTitleMatchScore')
+      .mockImplementation(params => (params.queryRaw.includes('2023') ? 0.9 : 0.6));
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async term => {
+      if (!term.includes('2023')) {
+        throw new Error(`unexpected base network call: ${term}`);
+      }
+      return [
+        { tvdbId: 402, title: 'Vinland Saga Season 2', year: 2023, genres: ['Anime'] },
+      ];
+    });
+
+    const media: AniMedia = {
+      id: 5002,
+      format: 'TV',
+      title: { english: 'Vinland Saga' },
+      synonyms: [],
+      startDate: { year: 2023 },
+    } as AniMedia;
+
+    try {
+      const result = await tryResolve.call(service, media.id, media, credentials);
+
+      expect(result).toEqual({ tvdbId: 402, successfulSynonym: 'Vinland Saga 2023' });
+      expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+      expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledWith('Vinland Saga 2023', credentials);
+
+      const snapshot = getMetricsSnapshot();
+      expect(snapshot.counters['mapping.lookup.year_probe']).toBe(1);
+    } finally {
+      scoreSpy.mockRestore();
+    }
+  });
+
+  it('reuses cached results for the same canonical term across different media within a session', async () => {
+    const service = createService();
+    attachLookupCaches(service);
+
+    const tryResolve = Reflect.get(
+      service as unknown as Record<string, unknown>,
+      'tryResolveWithPreparedMedia',
+    ) as (
+      anilistId: number,
+      media: AniMedia,
+      credentials: { url: string; apiKey: string },
+      hints?: unknown,
+    ) => Promise<ResolvedMapping | null>;
+
+    const credentials = {
+      url: baseOptions.sonarrUrl!,
+      apiKey: baseOptions.sonarrApiKey!,
+    };
+
+    (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { tvdbId: 777, title: 'Shared Canonical Title', year: 2018, genres: ['Anime'] },
+    ]);
+
+    const mediaA: AniMedia = {
+      id: 6001,
+      format: 'TV',
+      title: { english: 'Shared Canonical Title' },
+      synonyms: ['Shared Canonical Title!'],
+      startDate: { year: 2018 },
+    } as AniMedia;
+
+    const mediaB: AniMedia = {
+      id: 6002,
+      format: 'TV',
+      title: { english: 'Shared Canonical Title' },
+      synonyms: ['Shared Canonical Title?'],
+      startDate: { year: 2018 },
+    } as AniMedia;
+
+    const first = await tryResolve.call(service, mediaA.id, mediaA, credentials);
+    expect(first).toEqual({ tvdbId: 777, successfulSynonym: 'Shared Canonical Title' });
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
+
+    const second = await tryResolve.call(service, mediaB.id, mediaB, credentials);
+    expect(second).toEqual({ tvdbId: 777, successfulSynonym: 'Shared Canonical Title' });
+    expect(sonarrApi.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
   });
 
   describe('metrics instrumentation', () => {
@@ -1019,10 +1284,10 @@ describe('MappingService', () => {
 
     const [r1, r2, r3, r4] = await Promise.all([p1, p2, p3, p4]);
 
-    expect(r1).toEqual({ tvdbId: 8001, successfulSynonym: 'Series 1 alt' });
-    expect(r2).toEqual({ tvdbId: 8002, successfulSynonym: 'Series 2 alt' });
-    expect(r3).toEqual({ tvdbId: 8003, successfulSynonym: 'Series 3 alt' });
-    expect(r4).toEqual({ tvdbId: 8004, successfulSynonym: 'Series 4 alt' });
+    expect(r1).toEqual({ tvdbId: 8001, successfulSynonym: 'Series 1 best' });
+    expect(r2).toEqual({ tvdbId: 8002, successfulSynonym: 'Series 2 best' });
+    expect(r3).toEqual({ tvdbId: 8003, successfulSynonym: 'Series 3 best' });
+    expect(r4).toEqual({ tvdbId: 8004, successfulSynonym: 'Series 4 best' });
 
     const delayIndex = lookupCalls.findIndex(term => term.startsWith('__delay__'));
     expect(delayIndex).toBeGreaterThanOrEqual(0);
@@ -1037,10 +1302,10 @@ describe('MappingService', () => {
       countsById.set(id, (countsById.get(id) ?? 0) + 1);
     }
 
-    expect(countsById.get(1)).toBe(3);
-    expect(countsById.get(2)).toBe(3);
-    expect(countsById.get(3)).toBe(3);
-    expect(countsById.get(4)).toBe(3);
+    expect(countsById.get(1)).toBe(5);
+    expect(countsById.get(2)).toBe(5);
+    expect(countsById.get(3)).toBe(5);
+    expect(countsById.get(4)).toBe(5);
 
     const series4Indices = lookupsBySeries
       .filter(entry => Number(entry.term.match(/\d+/)?.[0] ?? 0) === 4)
@@ -1053,7 +1318,7 @@ describe('MappingService', () => {
     const lookupCalls: string[] = [];
     (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async term => {
       lookupCalls.push(term);
-      if (term === 'oshi no ko') {
+      if (term === 'Oshi no Ko') {
         return [
           {
             tvdbId: 182587,
@@ -1089,8 +1354,8 @@ describe('MappingService', () => {
     const result = await service.resolveTvdbId(182587);
 
     expect(result).toEqual({ tvdbId: 182587, successfulSynonym: 'Oshi no Ko' });
-    expect(lookupCalls).toContain('oshi no ko');
-    expect(lookupCalls).toContain('oshi no ko 3rd');
+    expect(lookupCalls).toContain('Oshi no Ko');
+    expect(lookupCalls).toContain('[Oshi no Ko] 3rd Season');
     expect(lookupCalls).not.toContain('3rd');
     expect(lookupCalls).not.toContain('3rd season');
 
@@ -1199,7 +1464,7 @@ describe('MappingService', () => {
     const result = await service.resolveTvdbId(501, { ignoreFailureCache: true });
 
     expect(result).toEqual({ tvdbId: 9501, successfulSynonym: 'Fresh Hit' });
-    expect(sonarrCalls).toEqual(['fresh hit']);
+    expect(sonarrCalls).toEqual(['Fresh Hit']);
     expect(caches.failure.write).not.toHaveBeenCalled();
 
     scoreSpy.mockRestore();
@@ -1208,7 +1473,7 @@ describe('MappingService', () => {
   it('short-circuits network resolution when a hint lookup succeeds', async () => {
     const scoreSpy = vi.spyOn(matching, 'computeTitleMatchScore').mockImplementation(() => 0.9);
     (sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>).mockImplementation(async term => {
-      expect(term).toBe('hint title');
+      expect(term).toBe('Hint Title');
       return [
         {
           tvdbId: 6400,
@@ -1243,7 +1508,7 @@ describe('MappingService', () => {
 
     const lookupMock = sonarrApi.lookupSeriesByTerm as ReturnType<typeof vi.fn>;
     lookupMock.mockImplementation(async term => {
-      if (term !== 'base') {
+      if (term !== 'Series Base') {
         throw new Error(`unexpected lookup term: ${term}`);
       }
       return [
@@ -1270,7 +1535,7 @@ describe('MappingService', () => {
 
     expect(result).toEqual({ tvdbId: 7777, successfulSynonym: 'Series Base' });
     expect(lookupMock).toHaveBeenCalledTimes(1);
-    expect(lookupMock).toHaveBeenCalledWith('base', expect.any(Object));
+    expect(lookupMock).toHaveBeenCalledWith('Series Base', expect.any(Object));
 
     scoreSpy.mockRestore();
   });
