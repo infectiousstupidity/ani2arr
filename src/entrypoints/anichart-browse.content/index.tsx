@@ -18,6 +18,7 @@ import {
   type BrowseAdapter,
   type ParsedCard,
 } from '@/ui/BrowseOverlay';
+import { awaitBackgroundReady } from '@/utils/background-ready';
 
 const log = logger.create('AniChart Browse Content');
 
@@ -154,6 +155,8 @@ export default defineContentScript({
   matches: ['*://anichart.net/*', '*://www.anichart.net/*'],
 
   async main(ctx: ContentScriptContext) {
+    // Ensure background is awake before rendering and kicking off any RPCs.
+    await awaitBackgroundReady();
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {

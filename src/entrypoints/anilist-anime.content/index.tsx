@@ -1,5 +1,5 @@
 // src/entrypoints/anilist-anime.content/index.tsx
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
@@ -15,6 +15,7 @@ import type { MediaMetadataHint } from '@/types';
 import './style.css';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
+import { awaitBackgroundReady } from '@/utils/background-ready';
 
 const log = logger.create('AniList Content');
 
@@ -171,14 +172,33 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   useKitsunarrBroadcasts();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [backgroundReady, setBackgroundReady] = useState(false);
   const { data: options } = useExtensionOptions();
   const isConfigured = !!options?.sonarrUrl && !!options?.sonarrApiKey;
   const defaults = options?.defaults ?? null;
 
+  // Kick off background readiness probe without blocking initial render
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        await awaitBackgroundReady();
+        if (mounted) setBackgroundReady(true);
+      } catch {
+        // If ping fails repeatedly, we still allow the UI to remain interactive; the query will surface errors.
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const statusQuery = useSeriesStatus(
     { anilistId, title, metadata },
     {
-      enabled: Boolean(anilistId && isConfigured),
+      // Only fire the status query once background is ready to avoid proxy races,
+      // but render the UI immediately while we wait.
+      enabled: Boolean(anilistId && isConfigured && backgroundReady),
       force_verify: true,
       ignoreFailureCache: true,
     },
@@ -205,6 +225,8 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
 
   const getStatus = (): 'LOADING' | 'IN_SONARR' | 'NOT_IN_SONARR' | 'ERROR' | 'ADDING' => {
     if (!isConfigured) return 'ERROR';
+    // While background is booting, show a loading state even before the query fires
+    if (!backgroundReady) return 'LOADING';
     if (statusQuery.fetchStatus === 'fetching') return 'LOADING';
     if (statusQuery.isError || mappingUnavailable) return 'ERROR';
     if (statusQuery.data?.exists || addSeriesMutation.isSuccess) return 'IN_SONARR';
@@ -253,6 +275,7 @@ async function mountAnimePageUI(
   ctx: ContentScriptContext,
   onMounted: () => void,
 ): Promise<void> {
+  // Do not block UI render on background readiness; ContentRoot will gate the query.
   const idMatch = location.pathname.match(/\/anime\/(\d+)/);
   const anilistId = idMatch?.[1] ? parseInt(idMatch[1], 10) : null;
   if (!anilistId) return;
