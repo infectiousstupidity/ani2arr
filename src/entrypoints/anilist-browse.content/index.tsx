@@ -19,6 +19,7 @@ import {
   type BrowseAdapter,
   type ParsedCard,
 } from '@/ui/BrowseOverlay';
+import { awaitBackgroundReady } from '@/utils/background-ready';
 
 const log = logger.create('AniList Browse Content');
 
@@ -201,6 +202,8 @@ export default defineContentScript({
   matches: ['*://anilist.co/*'],
 
   async main(ctx: ContentScriptContext) {
+    // Ensure background is awake before rendering and kicking off any RPCs.
+    await awaitBackgroundReady();
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
