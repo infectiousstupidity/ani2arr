@@ -1,18 +1,18 @@
 // src/services/mapping.service.ts
 import type { TtlCache } from '@/cache';
-import { createTtlCache } from '@/cache';
 import type { AnilistApiService, AniMedia } from '@/api/anilist.api';
-import type { SonarrApiService } from '@/api/sonarr.api';
-import type { SonarrLookupSeries } from '@/types';
-import type { AniTitles, ExtensionError, MediaMetadataHint } from '@/types';
+import type { ExtensionError, MediaMetadataHint, AniTitles, SonarrLookupSeries } from '@/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
-import { computeTitleMatchScore, stripParenContent } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
-import { incrementCounter, timeAsync } from '@/utils/metrics';
-
-
-const PRIMARY_URL = 'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json';
-const FALLBACK_URL = 'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json';
+import { incrementCounter } from '@/utils/metrics';
+import { logger } from '@/utils/logger';
+import { canonicalTitleKey, computeTitleMatchScore, sanitizeLookupDisplay } from '@/utils/matching';
+import { StaticMappingProvider, type StaticMappingPayload } from './mapping/static-mapping.provider';
+import {
+  SonarrLookupClient,
+  type SonarrLookupCredentials,
+} from './mapping/sonarr-lookup.client';
+import { generateSearchTerms, isSeasonalCanonicalTokens } from './mapping/search-term-generator';
 
 const RESOLVED_SOFT_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
 const RESOLVED_HARD_TTL = 180 * 24 * 60 * 60 * 1000; // 180 days
@@ -22,29 +22,9 @@ const FAILURE_HARD_TTL = FAILURE_SOFT_TTL * 2;
 const NETWORK_FAILURE_SOFT_TTL = 5 * 60 * 1000; // 5 minutes
 const NETWORK_FAILURE_HARD_TTL = NETWORK_FAILURE_SOFT_TTL * 3;
 
-const STATIC_SOFT_TTL = 24 * 60 * 60 * 1000; // 1 day
-const STATIC_HARD_TTL = STATIC_SOFT_TTL * 7;
-
-const MAPPING_BATCH_SIZE = 3;
-const MAPPING_BATCH_DELAY_MS = 1500;
-
-const LOOKUP_CACHE_NAMESPACE = 'mapping:lookup';
-const LOOKUP_NEGATIVE_CACHE_NAMESPACE = 'mapping:lookup-negative';
-const LOOKUP_SOFT_TTL = 10 * 60 * 1000; // 10 minutes
-const LOOKUP_HARD_TTL = 30 * 60 * 1000; // 30 minutes
-const LOOKUP_NEGATIVE_SOFT_TTL = 5 * 60 * 1000; // 5 minutes
-const LOOKUP_NEGATIVE_HARD_TTL = 15 * 60 * 1000; // 15 minutes
-
-const LOOKUP_LATENCY_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
-const LOOKUP_LIMITER_MAX_CONCURRENCY = 2;
-const LOOKUP_LIMITER_SPACING_MS = 250;
-
 const SCORE_THRESHOLD = 0.76;
 const EARLY_STOP_THRESHOLD = 0.82;
 const MAX_TERMS = 5;
-const YEAR_PROBE_SCORE_THRESHOLD = 0.8;
-
-const ORDINAL_SUFFIX_RE = /^\d+(?:st|nd|rd|th)$/;
 
 const ALLOWED_FORMATS = new Set(['TV', 'TV_SHORT', 'ONA', 'OVA', 'SPECIAL']);
 
@@ -64,119 +44,44 @@ type ResolveTvdbIdOptions = {
   ignoreFailureCache?: boolean;
 };
 
-type QueuedMappingRequest = {
-  anilistId: number;
-  resolve: (value: ResolvedMapping) => void;
-  reject: (reason: ExtensionError) => void;
-  hints?: ResolveHints;
-  bypassFailureCache: boolean;
-};
-
-type MappingServiceOptions = {
-  delay?: (ms: number) => Promise<void>;
-  lookupLimiter?: {
-    maxConcurrent: number;
-    spacingMs: number;
-  };
-};
-
-export interface StaticMappingPayload {
-  pairs: Record<number, number>;
-}
-
-interface InflightResolution {
-  promise: Promise<ResolvedMapping>;
-  bypassFailureCache: boolean;
-}
-
-type LookupLimiterTask<T> = {
-  run: () => Promise<T>;
-  resolve: (value: T) => void;
-  reject: (reason: unknown) => void;
-};
-
 export class MappingService {
-  private readonly primaryPairsMap = new Map<number, number>();
-  private readonly fallbackPairsMap = new Map<number, number>();
-
-  private readonly inflight = new Map<number, InflightResolution>();
-  private readonly lookupInflight = new Map<string, Promise<SonarrLookupSeries[]>>();
-  private readonly lookupCache = createTtlCache<SonarrLookupSeries[]>(LOOKUP_CACHE_NAMESPACE);
-  private readonly negativeLookupCache = createTtlCache<boolean>(LOOKUP_NEGATIVE_CACHE_NAMESPACE);
+  private readonly log = logger.create('MappingService');
+  private readonly inflight = new Map<number, Promise<ResolvedMapping>>();
   private readonly sessionSeenCanonical = new Set<string>();
-  private readonly mappingQueue: QueuedMappingRequest[] = [];
-  private isProcessingMappingQueue = false;
-  private readonly delayFn: (ms: number) => Promise<void>;
-  private readonly lookupLimiterQueue: LookupLimiterTask<unknown>[] = [];
-  private lookupLimiterActiveCount = 0;
-  private lookupLimiterProcessing = false;
-  private lookupLimiterLastStartAt = 0;
-  private readonly lookupLimiterConfig: {
-    maxConcurrent: number;
-    spacingMs: number;
-  };
 
   constructor(
-    private readonly sonarrApi: SonarrApiService,
     private readonly anilistApi: AnilistApiService,
+    private readonly staticProvider: StaticMappingProvider,
+    private readonly lookupClient: SonarrLookupClient,
     private readonly caches: {
       success: TtlCache<ResolvedMapping>;
       failure: TtlCache<ExtensionError>;
-      staticPrimary: TtlCache<StaticMappingPayload>;
-      staticFallback: TtlCache<StaticMappingPayload>;
     },
-    options: MappingServiceOptions = {},
-  ) {
-    this.delayFn = options.delay ?? ((ms: number) => new Promise(resolve => setTimeout(resolve, ms)));
-    const limiterOptions = options.lookupLimiter;
-    const rawMax = limiterOptions?.maxConcurrent ?? LOOKUP_LIMITER_MAX_CONCURRENCY;
-    const rawSpacing = limiterOptions?.spacingMs ?? LOOKUP_LIMITER_SPACING_MS;
-    this.lookupLimiterConfig = {
-      maxConcurrent: Number.isFinite(rawMax) ? Math.max(1, Math.floor(rawMax)) : LOOKUP_LIMITER_MAX_CONCURRENCY,
-      spacingMs: Number.isFinite(rawSpacing) ? Math.max(0, Math.floor(rawSpacing)) : LOOKUP_LIMITER_SPACING_MS,
-    };
-  }
+  ) {}
 
   public async resetLookupState(): Promise<void> {
-    await Promise.all([
-      this.lookupCache.clear(),
-      this.negativeLookupCache.clear(),
-      this.caches.failure.clear(),
-    ]);
-    this.lookupInflight.clear();
+    await Promise.all([this.lookupClient.reset(), this.caches.failure.clear()]);
     this.inflight.clear();
     this.sessionSeenCanonical.clear();
   }
 
-  public async initStaticPairs(): Promise<void> {
-    await Promise.all([this.ensureMapLoaded('primary'), this.ensureMapLoaded('fallback')]);
-
-    // Kick background refresh without blocking callers.
-    this.refreshStaticMapping('primary').catch(error => {
-      logError(normalizeError(error), 'MappingService:initStaticPairs:primaryRefresh');
-    });
-    this.refreshStaticMapping('fallback').catch(error => {
-      logError(normalizeError(error), 'MappingService:initStaticPairs:fallbackRefresh');
-    });
+  public initStaticPairs(): Promise<void> {
+    return this.staticProvider.init();
   }
 
   public resolveTvdbId(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping> {
     const bypassFailureCache = options.ignoreFailureCache === true;
     const existing = this.inflight.get(anilistId);
-
     if (existing) {
-      if (bypassFailureCache && !existing.bypassFailureCache) {
-        // If a bypass is requested while a cached resolution is in flight, allow the existing promise to complete first.
-      }
-      return existing.promise;
+      return existing;
     }
 
     const promise = this.resolveTvdbIdInternal(anilistId, options, bypassFailureCache);
-    this.inflight.set(anilistId, { promise, bypassFailureCache });
+    this.inflight.set(anilistId, promise);
 
     promise.finally(() => {
       const current = this.inflight.get(anilistId);
-      if (current?.promise === promise) {
+      if (current === promise) {
         this.inflight.delete(anilistId);
       }
     });
@@ -190,7 +95,6 @@ export class MappingService {
     bypassFailureCache: boolean,
   ): Promise<ResolvedMapping> {
     const cacheKey = this.successCacheKey(anilistId);
-
     const cachedSuccess = await this.caches.success.read(cacheKey);
     if (cachedSuccess) {
       return cachedSuccess.value;
@@ -203,13 +107,14 @@ export class MappingService {
       }
     }
 
-    const staticHit = this.lookupStatic(anilistId);
+    const staticHit = this.staticProvider.get(anilistId);
     if (staticHit) {
-      await this.caches.success.write(cacheKey, staticHit.mapping, {
+      incrementCounter('mapping.lookup.static_hit');
+      await this.caches.success.write(cacheKey, { tvdbId: staticHit.tvdbId }, {
         staleMs: RESOLVED_SOFT_TTL,
         hardMs: RESOLVED_HARD_TTL,
       });
-      return staticHit.mapping;
+      return { tvdbId: staticHit.tvdbId };
     }
 
     if (options.network === 'never') {
@@ -223,7 +128,7 @@ export class MappingService {
     const hintTerm = options.hints?.primaryTitle?.trim();
     if (hintTerm) {
       try {
-        const hinted = await this.tryHintLookup(anilistId, hintTerm);
+        const hinted = await this.tryHintLookup(hintTerm);
         if (hinted) {
           await this.caches.success.write(cacheKey, hinted, {
             staleMs: RESOLVED_SOFT_TTL,
@@ -236,69 +141,26 @@ export class MappingService {
       }
     }
 
-    return this.enqueueNetworkResolution(anilistId, options.hints, bypassFailureCache);
-  }
-
-  private enqueueNetworkResolution(
-    anilistId: number,
-    hints: ResolveHints | undefined,
-    bypassFailureCache: boolean,
-  ): Promise<ResolvedMapping> {
-    return new Promise<ResolvedMapping>((resolve, reject) => {
-      const request: QueuedMappingRequest = {
-        anilistId,
-        resolve,
-        reject,
-        bypassFailureCache,
-      };
-      if (hints) {
-        request.hints = hints;
-      }
-      this.mappingQueue.push(request);
-      this.processQueue().catch(error => {
-        logError(normalizeError(error), 'MappingService:processQueue');
-      });
-    });
-  }
-
-  private async processQueue(): Promise<void> {
-    if (this.isProcessingMappingQueue) return;
-    this.isProcessingMappingQueue = true;
-
+    let resolved: ResolvedMapping;
     try {
-      while (this.mappingQueue.length > 0) {
-        const batch = this.mappingQueue.splice(0, MAPPING_BATCH_SIZE);
-        await Promise.all(batch.map(req => this.handleNetworkRequest(req)));
-        if (this.mappingQueue.length > 0) {
-          await this.delay(MAPPING_BATCH_DELAY_MS);
-        }
-      }
-    } finally {
-      this.isProcessingMappingQueue = false;
-    }
-  }
-
-  private async handleNetworkRequest(request: QueuedMappingRequest): Promise<void> {
-    const cacheKey = this.successCacheKey(request.anilistId);
-
-    try {
-      const mapping = await this.resolveViaNetwork(request.anilistId, request.hints);
-      await this.caches.success.write(cacheKey, mapping, {
-        staleMs: RESOLVED_SOFT_TTL,
-        hardMs: RESOLVED_HARD_TTL,
-      });
-      request.resolve(mapping);
+      resolved = await this.resolveViaNetwork(anilistId, options.hints);
     } catch (error) {
       const normalized = normalizeError(error);
-      if (!request.bypassFailureCache && this.shouldCacheFailure(normalized)) {
+      if (!bypassFailureCache && this.shouldCacheFailure(normalized)) {
         const ttl = this.failureTtlsFor(normalized);
-        await this.caches.failure.write(this.failureCacheKey(request.anilistId), normalized, {
+        await this.caches.failure.write(this.failureCacheKey(anilistId), normalized, {
           staleMs: ttl.stale,
           hardMs: ttl.hard,
         });
       }
-      request.reject(normalized);
+      throw normalized;
     }
+
+    await this.caches.success.write(cacheKey, resolved, {
+      staleMs: RESOLVED_SOFT_TTL,
+      hardMs: RESOLVED_HARD_TTL,
+    });
+    return resolved;
   }
 
   private async resolveViaNetwork(anilistId: number, hints?: ResolveHints): Promise<ResolvedMapping> {
@@ -306,14 +168,14 @@ export class MappingService {
 
     const metadataMedia = this.buildMediaFromMetadataHint(anilistId, hints?.domMedia);
     if (metadataMedia) {
-      const resolved = await this.tryResolveWithPreparedMedia(anilistId, metadataMedia, credentials, hints);
+      const resolved = await this.tryResolveWithMedia(metadataMedia, credentials, hints);
       if (resolved) {
         return resolved;
       }
     }
 
     const apiMedia = await this.anilistApi.fetchMediaWithRelations(anilistId);
-    const apiResolved = await this.tryResolveWithPreparedMedia(anilistId, apiMedia, credentials, hints);
+    const apiResolved = await this.tryResolveWithMedia(apiMedia, credentials, hints);
     if (apiResolved) {
       return apiResolved;
     }
@@ -325,37 +187,43 @@ export class MappingService {
     );
   }
 
-  private async tryResolveWithPreparedMedia(
-    anilistId: number,
+  private async tryResolveWithMedia(
     media: AniMedia,
-    credentials: { url: string; apiKey: string },
+    credentials: SonarrLookupCredentials,
     hints?: ResolveHints,
   ): Promise<ResolvedMapping | null> {
     if (media.format && !ALLOWED_FORMATS.has(media.format)) {
       throw createError(
         ErrorCode.VALIDATION_ERROR,
-        `Unsupported AniList format (${media.format}) for AniList ID ${anilistId}.`,
+        `Unsupported AniList format (${media.format}) for AniList ID ${media.id}.`,
         'This title is not a supported Sonarr series format.',
       );
     }
 
-    const prequelStatic = this.lookupPrequelStatic(media);
+    const prequelStatic = await this.lookupPrequelStatic(media);
     if (prequelStatic) {
-      return prequelStatic.mapping;
+      return prequelStatic;
     }
 
-    const mediaYear = media.startDate?.year;
-    const searchTerms = this.buildSearchTerms(media.title, media.synonyms);
+    const mediaYear = media.startDate?.year ?? undefined;
+    const searchTerms = generateSearchTerms(media.title ?? ({} as AniTitles), media.synonyms);
+
     if (hints?.primaryTitle) {
       const trimmed = hints.primaryTitle.trim();
       if (trimmed.length > 0) {
-        const canonicalHint = canonicalKeyForTerm(trimmed);
-        if (canonicalHint) {
-          const existingIndex = searchTerms.findIndex(value => value.canonical === canonicalHint);
-          if (existingIndex >= 0) {
-            searchTerms.splice(existingIndex, 1);
+        const sanitizedHint = sanitizeLookupDisplay(trimmed);
+        if (sanitizedHint) {
+          const canonicalHint = canonicalTitleKey(sanitizedHint);
+          if (canonicalHint) {
+            const canonicalTokens = canonicalHint.split(/\s+/).filter(Boolean);
+            if (canonicalTokens.length > 0 && !isSeasonalCanonicalTokens(canonicalTokens)) {
+              const existingIndex = searchTerms.findIndex(value => value.canonical === canonicalHint);
+              if (existingIndex >= 0) {
+                searchTerms.splice(existingIndex, 1);
+              }
+              searchTerms.unshift({ canonical: canonicalHint, display: sanitizedHint });
+            }
           }
-          searchTerms.unshift({ canonical: canonicalHint, display: trimmed });
         }
       }
     }
@@ -363,32 +231,17 @@ export class MappingService {
     let bestMatch: { tvdbId: number; term: string; score: number } | null = null;
 
     for (const term of searchTerms.slice(0, MAX_TERMS)) {
-      if (!term.canonical) {
-        continue;
-      }
+      if (!term.canonical) continue;
 
       const seenInSession = this.sessionSeenCanonical.has(term.canonical);
       const baseResults = seenInSession
-        ? await this.readCachedLookup(term.canonical)
-        : await this.safeLookup(term.canonical, term.display, credentials);
+        ? await this.lookupClient.readFromCache(term.canonical)
+        : await this.lookupClient.lookup(term.canonical, term.display, credentials);
 
-      let { bestCandidate, topScore } = this.evaluateLookupResults(baseResults, term.display, mediaYear);
+      const { bestCandidate } = this.evaluateLookupResults(baseResults, term.display, mediaYear);
 
       if (bestCandidate && (!bestMatch || bestCandidate.score > bestMatch.score)) {
         bestMatch = bestCandidate;
-      }
-
-      if (!seenInSession && typeof mediaYear === 'number' && topScore < YEAR_PROBE_SCORE_THRESHOLD) {
-        incrementCounter('mapping.lookup.year_probe');
-        const termWithYear = `${term.display} ${mediaYear}`.trim();
-        const yearResults = await this.safeLookup(term.canonical, termWithYear, credentials, {
-          forceNetwork: true,
-        });
-        const yearEval = this.evaluateLookupResults(yearResults, termWithYear, mediaYear);
-        topScore = Math.max(topScore, yearEval.topScore);
-        if (yearEval.bestCandidate && (!bestMatch || yearEval.bestCandidate.score > bestMatch.score)) {
-          bestMatch = yearEval.bestCandidate;
-        }
       }
 
       if (!seenInSession) {
@@ -407,204 +260,51 @@ export class MappingService {
     return null;
   }
 
-  private buildMediaFromMetadataHint(anilistId: number, metadata?: MediaMetadataHint | null): AniMedia | null {
-    if (!metadata) return null;
-
-    const titlesSource = metadata.titles ?? null;
-    const titles: AniTitles = {};
-    if (titlesSource?.english) titles.english = titlesSource.english;
-    if (titlesSource?.romaji) titles.romaji = titlesSource.romaji;
-    if (titlesSource?.native) titles.native = titlesSource.native;
-
-    const synonyms = Array.isArray(metadata.synonyms)
-      ? Array.from(
-          new Set(
-            metadata.synonyms
-              .filter((value): value is string => typeof value === 'string')
-              .map(value => value.trim())
-              .filter(value => value.length > 0),
-          ),
-        )
-      : [];
-
-    const startYear = typeof metadata.startYear === 'number' && Number.isFinite(metadata.startYear)
-      ? metadata.startYear
-      : null;
-
-    const format = metadata.format ?? null;
-
-    const relationIds = Array.isArray(metadata.relationPrequelIds)
-      ? metadata.relationPrequelIds.filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
-      : [];
-
-    if (
-      Object.keys(titles).length === 0 &&
-      synonyms.length === 0 &&
-      startYear == null &&
-      !format &&
-      relationIds.length === 0
-    ) {
-      return null;
+  private async lookupPrequelStatic(media: AniMedia): Promise<ResolvedMapping | null> {
+    const directHit = this.staticProvider.get(media.id);
+    if (directHit) {
+      return { tvdbId: directHit.tvdbId };
     }
 
-    const relations = relationIds.length > 0
-      ? {
-          edges: relationIds.map(id => ({
-            relationType: 'PREQUEL',
-            node: {
-              id,
-              format: null,
-              title: {},
-              synonyms: [],
-            } as AniMedia,
-          })),
-        }
-      : undefined;
+    const visited = new Set<number>([media.id]);
 
-    const startDate = startYear != null ? { year: startYear } : undefined;
+    for await (const prequel of this.anilistApi.iteratePrequelChain(media)) {
+      if (visited.has(prequel.id)) {
+        continue;
+      }
+      const hit = this.staticProvider.get(prequel.id);
+      if (hit) {
+        return { tvdbId: hit.tvdbId };
+      }
+      visited.add(prequel.id);
+    }
 
-    return {
-      id: anilistId,
-      format,
-      title: Object.keys(titles).length > 0 ? titles : {},
-      ...(startDate ? { startDate } : {}),
-      synonyms,
-      ...(relations ? { relations } : {}),
-    };
+    return null;
   }
 
-  private async tryHintLookup(anilistId: number, term: string): Promise<ResolvedMapping | null> {
-    if (!term.trim()) return null;
+  private async tryHintLookup(term: string): Promise<ResolvedMapping | null> {
+    const trimmed = term.trim();
+    const sanitized = sanitizeLookupDisplay(trimmed);
+    if (!sanitized) return null;
 
-    let credentials: { url: string; apiKey: string };
+    let credentials: SonarrLookupCredentials;
     try {
       credentials = await this.getConfiguredCredentials();
     } catch {
       return null;
     }
 
-    const canonical = canonicalKeyForTerm(term);
-    if (!canonical) {
+    const canonical = canonicalTitleKey(sanitized) ?? '';
+    const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
+    if (canonicalTokens.length === 0 || isSeasonalCanonicalTokens(canonicalTokens)) {
       return null;
     }
-
-    const results = await this.safeLookup(canonical, term, credentials);
-
-    for (const candidate of results) {
-      const scoreParams = {
-        queryRaw: term,
-        candidateRaw: candidate.title,
-        ...(typeof candidate.year === 'number' ? { candidateYear: candidate.year } : {}),
-      } satisfies Parameters<typeof computeTitleMatchScore>[0];
-
-      const score = computeTitleMatchScore(scoreParams);
-
-      if (score >= SCORE_THRESHOLD) {
-        return { tvdbId: candidate.tvdbId, successfulSynonym: term };
-      }
+    const results = await this.lookupClient.lookup(canonical, sanitized, credentials);
+    const { bestCandidate } = this.evaluateLookupResults(results, sanitized);
+    if (bestCandidate) {
+      return { tvdbId: bestCandidate.tvdbId, successfulSynonym: sanitized };
     }
-
     return null;
-  }
-
-  private async readCachedLookup(canonical: string): Promise<SonarrLookupSeries[]> {
-    if (!canonical) {
-      return [];
-    }
-
-    const inflight = this.lookupInflight.get(canonical);
-    if (inflight) {
-      incrementCounter('mapping.lookup.inflight_reuse');
-      return inflight;
-    }
-
-    const positiveHit = await this.lookupCache.read(canonical);
-    if (positiveHit) {
-      incrementCounter('mapping.lookup.cache_hit');
-      return positiveHit.value;
-    }
-
-    const negativeHit = await this.negativeLookupCache.read(canonical);
-    if (negativeHit) {
-      incrementCounter('mapping.lookup.negative_cache_hit');
-      return [];
-    }
-
-    return [];
-  }
-
-  /**
-   * Performs a Sonarr lookup while normalizing caching by canonical key.
-   * The `forceNetwork` option should only be used for year retry probes that must bypass cache reads.
-   */
-  private async safeLookup(
-    canonicalKey: string,
-    rawDisplay: string,
-    credentials: { url: string; apiKey: string },
-    options?: { forceNetwork?: boolean },
-  ): Promise<SonarrLookupSeries[]> {
-    const canonical = canonicalKey || canonicalKeyForTerm(rawDisplay);
-    const forceNetwork = options?.forceNetwork === true;
-
-    if (!canonical) {
-      return this.scheduleLookup(() => this.performLookup(rawDisplay, rawDisplay, credentials));
-    }
-
-    if (!forceNetwork) {
-      const positiveHit = await this.lookupCache.read(canonical);
-      if (positiveHit && !positiveHit.stale) {
-        incrementCounter('mapping.lookup.cache_hit');
-        return positiveHit.value;
-      }
-
-      const negativeHit = await this.negativeLookupCache.read(canonical);
-      if (negativeHit && !negativeHit.stale) {
-        incrementCounter('mapping.lookup.negative_cache_hit');
-        return [];
-      }
-
-      const inflight = this.lookupInflight.get(canonical);
-      if (inflight) {
-        incrementCounter('mapping.lookup.inflight_reuse');
-        return inflight;
-      }
-    } else {
-      const inflight = this.lookupInflight.get(canonical);
-      if (inflight) {
-        return inflight;
-      }
-    }
-
-    const promise = (async () => {
-      try {
-        const results = await this.scheduleLookup(() =>
-          this.performLookup(rawDisplay, rawDisplay, credentials),
-        );
-
-        if (results.length > 0) {
-          await this.lookupCache.write(canonical, results, {
-            staleMs: LOOKUP_SOFT_TTL,
-            hardMs: LOOKUP_HARD_TTL,
-          });
-          await this.negativeLookupCache.remove(canonical);
-        } else {
-          await this.negativeLookupCache.write(canonical, true, {
-            staleMs: LOOKUP_NEGATIVE_SOFT_TTL,
-            hardMs: LOOKUP_NEGATIVE_HARD_TTL,
-          });
-          await this.lookupCache.remove(canonical);
-        }
-
-        return results;
-      } finally {
-        this.lookupInflight.delete(canonical);
-      }
-    })().catch(error => {
-      throw normalizeError(error);
-    });
-
-    this.lookupInflight.set(canonical, promise);
-    return promise;
   }
 
   private evaluateLookupResults(
@@ -631,7 +331,6 @@ export class MappingService {
       if (score > topScore) {
         topScore = score;
       }
-
       if (score >= SCORE_THRESHOLD && (!bestCandidate || score > bestCandidate.score)) {
         bestCandidate = { tvdbId: candidate.tvdbId, term, score };
       }
@@ -640,137 +339,74 @@ export class MappingService {
     return { bestCandidate, topScore };
   }
 
-  private scheduleLookup<T>(factory: () => Promise<T>): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const task: LookupLimiterTask<T> = {
-        run: factory,
-        resolve,
-        reject,
-      };
-      this.lookupLimiterQueue.push(task as unknown as LookupLimiterTask<unknown>);
-      this.processLookupLimiter().catch(error => {
-        logError(normalizeError(error), 'MappingService:lookupLimiter:process');
-      });
-    });
-  }
+  private buildMediaFromMetadataHint(anilistId: number, metadata?: MediaMetadataHint | null): AniMedia | null {
+    if (!metadata) return null;
 
-  private async processLookupLimiter(): Promise<void> {
-    if (this.lookupLimiterProcessing) return;
-    this.lookupLimiterProcessing = true;
+    const titlesSource = metadata.titles ?? null;
+    const titles: AniTitles = {};
+    if (titlesSource?.english) titles.english = titlesSource.english;
+    if (titlesSource?.romaji) titles.romaji = titlesSource.romaji;
+    if (titlesSource?.native) titles.native = titlesSource.native;
 
-    try {
-      while (
-        this.lookupLimiterActiveCount < this.lookupLimiterConfig.maxConcurrent &&
-        this.lookupLimiterQueue.length > 0
-      ) {
-        const task = this.lookupLimiterQueue.shift();
-        if (!task) {
-          continue;
-        }
-        this.lookupLimiterActiveCount += 1;
-        this.runLookupLimiterTask(task);
-      }
-    } finally {
-      this.lookupLimiterProcessing = false;
+    const synonyms = Array.isArray(metadata.synonyms)
+      ? Array.from(
+          new Set(
+            metadata.synonyms
+              .filter((value): value is string => typeof value === 'string')
+              .map(value => value.trim())
+              .filter(value => value.length > 0),
+          ),
+        )
+      : [];
+
+    const startYear =
+      typeof metadata.startYear === 'number' && Number.isFinite(metadata.startYear)
+        ? metadata.startYear
+        : null;
+
+    const format = metadata.format ?? null;
+
+    const relationIds = Array.isArray(metadata.relationPrequelIds)
+      ? metadata.relationPrequelIds.filter(
+          (value): value is number => typeof value === 'number' && Number.isFinite(value),
+        )
+      : [];
+
+    if (
+      Object.keys(titles).length === 0 &&
+      synonyms.length === 0 &&
+      startYear == null &&
+      !format &&
+      relationIds.length === 0
+    ) {
+      return null;
     }
-  }
 
-  private runLookupLimiterTask(task: LookupLimiterTask<unknown>): void {
-    (async () => {
-      try {
-        const spacingMs = this.lookupLimiterConfig.spacingMs;
-        if (spacingMs > 0 && this.lookupLimiterLastStartAt !== 0) {
-          const now = Date.now();
-          const delayUntil = this.lookupLimiterLastStartAt + spacingMs;
-          if (now < delayUntil) {
-            await this.delay(delayUntil - now);
+    const relations =
+      relationIds.length > 0
+        ? {
+            edges: relationIds.map(id => ({
+              relationType: 'PREQUEL',
+              node: {
+                id,
+                format: null,
+                title: {},
+                synonyms: [],
+              } as AniMedia,
+            })),
           }
-        }
+        : undefined;
 
-        this.lookupLimiterLastStartAt = Date.now();
-        const result = await task.run();
-        task.resolve(result);
-      } catch (error) {
-        task.reject(error);
-      } finally {
-        this.lookupLimiterActiveCount = Math.max(0, this.lookupLimiterActiveCount - 1);
-        this.processLookupLimiter().catch(processError => {
-          logError(normalizeError(processError), 'MappingService:lookupLimiter:process');
-        });
-      }
-    })().catch(error => {
-      logError(normalizeError(error), 'MappingService:lookupLimiter:task');
-    });
-  }
+    const startDate = startYear != null ? { year: startYear } : undefined;
 
-  private async performLookup(
-    rawTerm: string,
-    lookupTerm: string,
-    credentials: { url: string; apiKey: string },
-  ): Promise<SonarrLookupSeries[]> {
-    // Preserve the raw term for metrics/logging contexts even when the lookup term may differ.
-    void rawTerm;
-    incrementCounter('mapping.lookup.network_miss');
-    return timeAsync('mapping.lookup.latency', LOOKUP_LATENCY_BUCKETS, async () => {
-      try {
-        return await this.sonarrApi.lookupSeriesByTerm(lookupTerm, credentials);
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    });
-  }
-
-  private async getConfiguredCredentials(): Promise<{ url: string; apiKey: string }> {
-    const opts = await extensionOptions.getValue();
-    if (!opts?.sonarrUrl || !opts?.sonarrApiKey) {
-      throw createError(
-        ErrorCode.CONFIGURATION_ERROR,
-        'Sonarr URL or API key not configured.',
-        'Configure your Sonarr connection in Kitsunarr options.',
-      );
-    }
-    return { url: opts.sonarrUrl, apiKey: opts.sonarrApiKey };
-  }
-
-  private lookupStatic(anilistId: number): { mapping: ResolvedMapping; metricKey: 'static-primary' | 'static-fallback' } | null {
-    const primary = this.primaryPairsMap.get(anilistId);
-    if (typeof primary === 'number') {
-      return { mapping: { tvdbId: primary }, metricKey: 'static-primary' };
-    }
-
-    const fallback = this.fallbackPairsMap.get(anilistId);
-    if (typeof fallback === 'number') {
-      return { mapping: { tvdbId: fallback }, metricKey: 'static-fallback' };
-    }
-
-    return null;
-  }
-
-  private lookupPrequelStatic(media: AniMedia): { mapping: ResolvedMapping; metricKey: 'static-primary' | 'static-fallback' } | null {
-    const visited = new Set<number>();
-    let current: AniMedia | undefined = media;
-
-    while (current) {
-      const staticHit = this.lookupStatic(current.id);
-      if (staticHit) {
-        if (current.id !== media.id) {
-          return staticHit;
-        }
-        break;
-      }
-
-      const edges: { relationType: string; node: AniMedia }[] = current.relations?.edges ?? [];
-      const prequelEdge = edges.find(
-        (edge): edge is { relationType: string; node: AniMedia } => edge.relationType === 'PREQUEL',
-      );
-      const prequelNode = prequelEdge?.node;
-      if (!prequelNode || visited.has(prequelNode.id)) break;
-
-      visited.add(prequelNode.id);
-      current = prequelNode;
-    }
-
-    return null;
+    return {
+      id: anilistId,
+      format,
+      title: Object.keys(titles).length > 0 ? titles : {},
+      ...(startDate ? { startDate } : {}),
+      synonyms,
+      ...(relations ? { relations } : {}),
+    };
   }
 
   private successCacheKey(anilistId: number): string {
@@ -798,185 +434,17 @@ export class MappingService {
     return { stale: FAILURE_SOFT_TTL, hard: FAILURE_HARD_TTL };
   }
 
-  private async ensureMapLoaded(type: 'primary' | 'fallback'): Promise<void> {
-    const map = type === 'primary' ? this.primaryPairsMap : this.fallbackPairsMap;
-    if (map.size > 0) return;
-
-    const cache = type === 'primary' ? this.caches.staticPrimary : this.caches.staticFallback;
-    const cached = await cache.read('static');
-    if (cached) {
-      this.hydrateMap(map, cached.value.pairs);
+  private async getConfiguredCredentials(): Promise<SonarrLookupCredentials> {
+    const opts = await extensionOptions.getValue();
+    if (!opts?.sonarrUrl || !opts?.sonarrApiKey) {
+      throw createError(
+        ErrorCode.SONARR_NOT_CONFIGURED,
+        'Sonarr credentials are not configured.',
+        'Configure your Sonarr connection in Kitsunarr options.',
+      );
     }
-  }
-
-  private async refreshStaticMapping(type: 'primary' | 'fallback'): Promise<void> {
-    const cache = type === 'primary' ? this.caches.staticPrimary : this.caches.staticFallback;
-    const map = type === 'primary' ? this.primaryPairsMap : this.fallbackPairsMap;
-    const url = type === 'primary' ? PRIMARY_URL : FALLBACK_URL;
-
-    try {
-      const cached = await cache.read('static');
-      const headers: Record<string, string> = {};
-      const etag = cached?.meta?.etag as string | undefined;
-      if (etag) {
-        headers['If-None-Match'] = etag;
-      }
-
-      const response = await fetch(url, { headers });
-      if (response.status === 304 && cached) {
-        if (map.size === 0) {
-          this.hydrateMap(map, cached.value.pairs);
-        }
-        return;
-      }
-
-      if (!response.ok) {
-        throw createError(ErrorCode.NETWORK_ERROR, `Failed to fetch static mapping (${response.status})`, 'Unable to refresh static mappings.');
-      }
-
-      const json = (await response.json()) as unknown;
-      const pairs = this.buildPairsFromSource(json);
-      this.hydrateMap(map, pairs);
-
-      const nextEtag = response.headers.get('ETag');
-      await cache.write('static', { pairs }, {
-        staleMs: STATIC_SOFT_TTL,
-        hardMs: STATIC_HARD_TTL,
-        ...(nextEtag ? { meta: { etag: nextEtag } } : {}),
-      });
-    } catch (error) {
-      logError(normalizeError(error), `MappingService:refreshStatic:${type}`);
-    }
-  }
-
-  private hydrateMap(map: Map<number, number>, pairs: Record<number, number>): void {
-    map.clear();
-    for (const [key, value] of Object.entries(pairs)) {
-      const k = Number(key);
-      if (!Number.isFinite(k) || !Number.isFinite(value)) continue;
-      map.set(k, value);
-    }
-  }
-
-  private buildPairsFromSource(source: unknown): Record<number, number> {
-    const pairs: Record<number, number> = {};
-    if (!source || typeof source !== 'object') return pairs;
-
-    const entries = Array.isArray(source) ? source : Object.values(source as Record<string, unknown>);
-
-    for (const rawEntry of entries) {
-      if (!rawEntry || typeof rawEntry !== 'object') continue;
-      const entry = rawEntry as Record<string, unknown>;
-      const anilistId = this.coerceId(entry.anilist_id ?? entry.anilist ?? entry.aniId);
-      const tvdbId = this.coerceId(entry.tvdb_id ?? entry.tvdb ?? entry.tvdbid);
-      if (anilistId != null && tvdbId != null) {
-        pairs[anilistId] = tvdbId;
-      }
-    }
-
-    return pairs;
-  }
-
-  private coerceId(value: unknown): number | null {
-    if (typeof value === 'number' && Number.isFinite(value)) return value | 0;
-    if (typeof value === 'string') {
-      const parsed = Number.parseInt(value, 10);
-      if (Number.isFinite(parsed)) return parsed | 0;
-    }
-    return null;
-  }
-
-  private buildSearchTerms(
-    titles: AniTitles,
-    synonyms: string[] | undefined,
-  ): Array<{ canonical: string; display: string }> {
-    const seen = new Set<string>();
-    const referenceTitle = titles.english ?? titles.romaji ?? titles.native ?? '';
-    const terms: Array<{ canonical: string; display: string; score: number }> = [];
-
-    const addTerm = (term: string) => {
-      const trimmed = term.trim();
-      if (!trimmed) return;
-      const canonical = canonicalKeyForTerm(trimmed);
-      if (!canonical) return;
-      if (seen.has(canonical)) return;
-
-      const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
-      if (canonicalTokens.length === 0) return;
-      // Skip search terms that consist entirely of ordinal numbers (e.g., '3rd', '2nd'),
-      // to avoid matching generic or ambiguous titles. This may filter out legitimate anime titles
-      // that are primarily numeric/ordinal, but helps reduce false positives in most cases.
-      if (canonicalTokens.every(token => ORDINAL_SUFFIX_RE.test(token))) {
-        return;
-      }
-
-      seen.add(canonical);
-
-      const score = referenceTitle
-        ? computeTitleMatchScore({ queryRaw: referenceTitle, candidateRaw: trimmed })
-        : 0;
-
-      terms.push({ canonical, display: trimmed, score });
-    };
-
-    const considerTitle = (value: string) => {
-      const trimmed = value.trim();
-      if (!trimmed) return;
-      addTerm(trimmed);
-      const stripped = stripParenContent(trimmed);
-      if (stripped && stripped !== trimmed) {
-        addTerm(stripped);
-      }
-    };
-
-    if (titles.english) considerTitle(titles.english);
-    if (titles.romaji) considerTitle(titles.romaji);
-    if (synonyms) {
-      for (const synonym of synonyms) {
-        considerTitle(synonym);
-      }
-    }
-
-    return terms
-      .sort((a, b) => b.score - a.score)
-      .map(({ canonical, display }) => ({ canonical, display }));
-  }
-
-  private delay(ms: number): Promise<void> {
-    return this.delayFn(ms);
+    return { url: opts.sonarrUrl, apiKey: opts.sonarrApiKey };
   }
 }
 
-const COMBINING_MARKS_RE = /[\u0300-\u036f]/g;
-const NON_ALPHANUMERIC_RE = /[^a-z0-9]+/g;
-const YEAR_SUFFIX_TOKEN_RE = /^(?:19|20)\d{2}$/;
-
-function canonicalizeTitle(term: string): string {
-  if (!term) return '';
-
-  return term
-    .normalize('NFKD')
-    .replace(COMBINING_MARKS_RE, '')
-    .replace(/ß/g, 'ss')
-    .toLowerCase()
-    .replace(NON_ALPHANUMERIC_RE, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
-}
-
-function canonicalKeyForTerm(term: string): string {
-  const canonical = canonicalizeTitle(term);
-  if (!canonical) return '';
-
-  const tokens = canonical.split(' ').filter(Boolean);
-
-  while (tokens.length > 0 && YEAR_SUFFIX_TOKEN_RE.test(tokens[tokens.length - 1]!)) {
-    tokens.pop();
-  }
-
-  return tokens.join(' ');
-}
-
-
-
-
+export type { StaticMappingPayload };
