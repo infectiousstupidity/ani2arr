@@ -84,7 +84,7 @@ describe('createTtlCache', () => {
     expect(delMock.mock.calls.length).toBe(0);
   });
 
-  it('deletes expired entries from storage and memory', async () => {
+  it('deletes expired entries from storage', async () => {
     const cache = createTtlCache<string>('expire');
     await cache.write('hero', 'midoriya', { staleMs: 1_000 });
 
@@ -95,8 +95,8 @@ describe('createTtlCache', () => {
 
     const { del } = await import('idb-keyval');
     const delMock = del as unknown as Mock;
-  expect(delMock.mock.calls).toHaveLength(1);
-  expect(delMock.mock.calls[0]![0]).toBe('expire:hero');
+    expect(delMock.mock.calls).toHaveLength(1);
+    expect(delMock.mock.calls[0]![0]).toBe('expire:hero');
 
     const secondRead = await cache.read('hero');
     expect(secondRead).toBeNull();

@@ -11,7 +11,7 @@
 - `npm run dev` (or `npm run dev:firefox`) launches the WXT dev server with fast reload.
 - `npm run build` produces a production bundle in `dist`; `npm run zip` creates distributable archives.
 - `npm run lint` uses ESLint 9 with TypeScript config; keep it passing.
-- Type-check with `npm run compile`; run targeted tests with `npx vitest` when suites are added.
+- Type-check with `npm run compile`; run tests with `npm test` or `npx vitest`.
 - `npm run test:contract` exercises the KitsunarrApi RPC contract in a Node.js environment with mocked browser APIs (storage, runtime, alarms) and fetch handlers for Sonarr/AniList/mapping endpoints. It validates method signatures, response schemas, error handling, message broadcasting (settings-changed, series-updated), storage events, epoch management, and concurrent request deduplication. Run this after API changes to ensure background service contract stability.
 - `npm run test:e2e` runs Playwright end-to-end tests against a real browser with the extension loaded and a mock Sonarr server. These tests validate the full user journey from options configuration through series addition on AniList pages.
 
@@ -27,14 +27,14 @@
 ### Shared services (`src/services`)
 - `index.ts` exposes [`registerKitsunarrApi()`](src/services/index.ts) / [`getKitsunarrApi()`](src/services/index.ts) using `@webext-core/proxy-service`; every consumer must assume RPC semantics (async, serialized, cross-context). The API handles epoch bumping (libraryEpoch, settingsEpoch) and broadcasts runtime messages (`_kitsunarr: true`) for cache invalidation.
 - [`library.service.ts`](src/services/library.service.ts) maintains a lean Sonarr series cache (TVDB-indexed) with soft TTL (1h) / hard TTL (24h) and derives status for AniList IDs via mapping resolution. Errors are cached separately (5min TTL) to avoid repeated failures.
-- [`mapping.service.ts`](src/services/mapping.service.ts) resolves AniList IDs to TVDB IDs via static mapping tables (GitHub JSON mirrors with 7-day cache), AniList synonym/relation traversal with title matching, and Sonarr lookup fallback. Failed resolutions are cached by category (config, permission, network) with separate TTLs.
-- [`src/cache/ttl-cache.ts`](src/cache/ttl-cache.ts) exposes stale-while-revalidate TTL caches backed by IndexedDB; use them for cross-context persistence with automatic expiry.
+- [`mapping.service.ts`](src/services/mapping.service.ts) orchestrates `StaticMappingProvider` (static payloads), `SonarrLookupClient` (Sonarr lookups + positive/negative TTL caches), and the search-term generator to resolve AniList IDs; successes/failures are cached with scoped TTL constants per collaborator.
+- [`src/cache/ttl-cache.ts`](src/cache/ttl-cache.ts) exposes stale-while-revalidate TTL caches persisted in IndexedDB only (no process-level shadow cache); expect asynchronous reads and rely on each service's in-memory indexes when hot-path speed is required.
 
 ### Hooks & State (`src/hooks`)
 - [`use-api-queries.ts`](src/hooks/use-api-queries.ts) centralizes TanStack Query keys under `queryKeys` object, provides hooks for options/metadata/status fetches, and exposes mutations for add/test/save flows with optimistic updates and error handling.
 - [`use-broadcasts.ts`](src/hooks/use-broadcasts.ts) listens for `browser.runtime.onMessage` events with `_kitsunarr: true` flag, invalidating TanStack Query caches on `series-updated` and `settings-changed` topics while syncing epoch values to sessionStorage.
 - [`use-settings-manager.ts`](src/hooks/use-settings-manager.ts) orchestrates the options form with dirty tracking, connection testing, metadata hydration (quality profiles, root folders, tags), and coordinated save/reset flows.
-- [`use-add-series-manager.ts`](src/hooks/use-add-series-manager.ts), [`use-network-status.ts`](src/hooks/use-network-status.ts), and [`use-theme.ts`](src/hooks/use-theme.ts) provide focused UI helpers (add form state, online/offline detection with 30s polling, AniList theme sync).
+- [`use-add-series-manager.ts`](src/hooks/use-add-series-manager.ts) and [`use-theme.ts`](src/hooks/use-theme.ts) provide focused UI helpers (add form state, AniList theme sync).
 
 ## 4. Domain Model & Data Flow
 - Types live in [`src/types.ts`](src/types.ts); key shapes include `ExtensionOptions` (stored in local storage), `SonarrFormState`, `AddRequestPayload`, and `CheckSeriesStatusResponse`. RPC schemas in [`src/rpc/schemas.ts`](src/rpc/schemas.ts) define the public API surface.
@@ -48,11 +48,11 @@
 - [`src/api/anilist.api.ts`](src/api/anilist.api.ts): fetches AniList GraphQL metadata with request deduplication (inflight map), batched queue processing (2 requests per 1.2s batch), and multi-level relation traversal (up to 3 hops) for synonym/parent resolution.
 - [`src/ui/Form.tsx`](src/ui/Form.tsx): shared form primitives using Radix Context pattern with Tailwind styling, providing FormField/FormItem/FormLabel/FormControl/FormMessage components with automatic ID wiring via `useFormField()`.
 - [`src/ui/SonarrActionGroup.tsx`](src/ui/SonarrActionGroup.tsx): renders the injected button group with status-dependent UI (loading, in Sonarr, not found, error), handling quick-add clicks, modal launches, and external Sonarr/search links.
-- [`src/ui/SonarrForm.tsx`](src/ui/SonarrForm.tsx) / [`src/ui/SelectContent.tsx`](src/ui/SelectContent.tsx): override Radix Select portal/container behavior to render inside shadow DOM (`portalContainer` prop) instead of document.body.
+- [`src/ui/Form.tsx`](src/ui/Form.tsx): exports Radix Select primitives, including `SelectContent` that accepts a `container` prop to render inside the shadow DOM. Callers like [`src/ui/SonarrForm.tsx`](src/ui/SonarrForm.tsx) pass a `portalContainer` through so dropdowns mount within the shadow root instead of `document.body`.
 - [`src/ui/BrowseOverlay.tsx`](src/ui/BrowseOverlay.tsx): adapter-based browse integration system using MutationObserver to scan for media cards, parse metadata from DOM attributes, inject action buttons via React portals into shadow DOM, and respond to wxt:locationchange events.
 - [`src/utils/error-handling.tsx`](src/utils/error-handling.tsx): defines [`ExtensionError`](src/utils/error-handling.tsx) class with `ErrorCode` enum (config, permission, network, sonarr, anilist, mapping, unknown), factory helpers (`createConfigError`, `createPermissionError`, etc.), [`normalizeError()`](src/utils/error-handling.tsx) for unknown error conversion, and React ErrorBoundary component.
 - [`src/utils/retry.ts`](src/utils/retry.ts): exponential backoff with jitter (`withRetry()` wrapper) supporting max retries, custom backoff multipliers, and typed error handling; avoid writing bespoke retry loops.
-- [`src/utils/cache-persister.ts`](src/utils/cache-persister.ts): TanStack Query persister using `idb-keyval` with key `kitsunarr-query-client-cache` for persistent cache across page reloads.
+- [`src/cache/cache-persister.ts`](src/cache/cache-persister.ts): TanStack Query persister using `idb-keyval` with key `kitsunarr-query-client-cache` for persistent cache across page reloads.
 - [`wxt.config.ts`](wxt.config.ts): single source of truth for manifest data (name, description, permissions split by MV2/MV3), entry points, @tailwindcss/vite plugin, source maps configuration, and required/optional host permissions.
 
 ## 6. Patterns & Conventions
@@ -65,13 +65,13 @@
 - Logging goes through [`logger.create(scope)`](src/utils/logger.ts) to honor build-time log level gating and consistent prefixes.
 
 ## 7. Caching & Resilience
-- [`CacheService`](src/cache/ttl-cache.ts) entries store both `staleAt` (soft TTL) and `expiresAt` (hard TTL); stale data is returned while background refresh runs (`getOrFetch()` behavior). Respect those semantics when adding new cache keys to avoid blocking UI on slow networks.
-- Mapping resolution caches successes (180-day TTL) and categorized failures: config/permission errors (30min), network errors (5min). Use the categorized TTL helpers to avoid hammering third parties during outages.
-- TanStack Query persistence (via [`idbQueryCachePersister`](src/utils/cache-persister.ts)) keeps AniList page state snappy across navigations; invalidate via `queryClient.invalidateQueries({ queryKey })` with matching keys after mutations or epoch bumps.
+- `createTtlCache` entries store both `staleAt` (soft TTL) and `expiresAt` (hard TTL); stale data is returned while background refresh runs. With the in-memory shim removed, every read hits IndexedDB—make sure callers that need instantaneous responses maintain their own lightweight mirrors (e.g., `StaticMappingProvider` maps, library indexes).
+- Mapping resolution caches successes (30d soft / 180d hard TTL) and categorized failures: config/permission errors (30min), network errors (5min). Use the categorized TTL helpers to avoid hammering third parties during outages.
+- TanStack Query persistence (via [`idbQueryCachePersister`](src/cache/cache-persister.ts)) keeps AniList page state snappy across navigations; invalidate via `queryClient.invalidateQueries({ queryKey })` with matching keys after mutations or epoch bumps.
 - Error caches prevent retry storms: [`library.service.ts`](src/services/library.service.ts) caches API failures for 5min, [`mapping.service.ts`](src/services/mapping.service.ts) caches by error category, [`anilist.api.ts`](src/api/anilist.api.ts) uses inflight deduplication to prevent duplicate GraphQL queries.
 
 ## 8. UI System Notes
-- Shadow DOM constraints: content scripts mount UIs via `createShadowRootUi({ cssInjectionMode: 'ui' })`. When building new portals (Radix Select, Dialog, Tooltip), pass `portalContainer` prop down (see [`SelectContent`](src/ui/SelectContent.tsx)) to render inside shadow root instead of document.body.
+- Shadow DOM constraints: content scripts mount UIs via `createShadowRootUi({ cssInjectionMode: 'ui' })`. When building new portals (Radix Select, Dialog, Tooltip), pass `portalContainer` and have consumers render Radix selects via the exported `SelectContent` from [`Form.tsx`](src/ui/Form.tsx) with its `container` prop so content renders inside the shadow root instead of `document.body`.
 - Forms rely on `FormField` context (from [`Form.tsx`](src/ui/Form.tsx)) to link labels/inputs via `useFormField()` hook; avoid breaking the context contract or accessibility will degrade.
 - Tooltips, dialogs, selects, and accordion components come from Radix UI; style through Tailwind utility classes applied to the composed primitives (Trigger, Content, Portal, etc.).
 - Browse overlays use MutationObserver with `childList: true, subtree: true, attributes: true` to detect card additions/updates. Throttle scans and use `data-kitsunarr-processed` attribute to prevent duplicate processing.
@@ -81,14 +81,14 @@
 - Use `npm run compile` to ensure the TypeScript project (including partner tsconfigs under `.wxt/`) stays error-free across all entry points.
 - For runtime verification, run `npm run dev`, load `.output/chrome-mv3` via browser extensions page, and exercise AniList anime pages, browse views, and options page.
 - Unit tests (`npx vitest`) use Vitest with MSW for API mocking, `fake-indexeddb` for storage, and `fakeBrowser` from `wxt/testing` for WebExtension APIs. See [`vitest.setup.jsdom.ts`](vitest.setup.jsdom.ts) and [`vitest.setup.node.ts`](vitest.setup.node.ts) for global setup.
-- Contract test (`npm run test:contract`) validates the KitsunarrApi RPC surface in isolation with comprehensive error handling, broadcasting, and schema validation. See [`CONTRACT_TEST_SUMMARY.md`](CONTRACT_TEST_SUMMARY.md) for detailed coverage breakdown.
+- Contract test (`npm run test:contract`) validates the KitsunarrApi RPC surface in isolation with comprehensive error handling, broadcasting, and schema validation. For coverage details and scenarios, refer to inline docs in `scripts/test-contract.ts` and the assertions within that suite.
 - E2E tests (`npm run test:e2e`) use Playwright with real Chromium/Firefox browsers, loaded extension, and mock HTTP server to validate full user workflows from options setup through series addition.
 
 ## 10. Operational Tips & Pitfalls
 - New hosts require manifest updates in [`wxt.config.ts`](wxt.config.ts) under `host_permissions` (MV3) or `permissions` (MV2) and may also need runtime permission prompts via [`requestSonarrPermission()`](src/utils/validation.ts).
 - Background alarms (`browser.alarms`) do not fire reliably in MV2 on Chromium when the background page is suspended; [`background/index.ts`](src/entrypoints/background/index.ts) falls back to `setInterval` via a global guard (`__kitsunarr_fallback_interval__`).
 - [`registerKitsunarrApi()`](src/services/index.ts) must execute exactly once (in background context). Content scripts and options pages should only ever call [`getKitsunarrApi()`](src/services/index.ts) to access the proxy client.
-- Respect rate limits: AniList GraphQL batches 2 requests per 1.2s, Sonarr responses may include `Retry-After` header (429 status). [`MappingService`](src/services/mapping.service.ts) queues lookups and processes them with delays to avoid bans.
+- Respect rate limits: AniList GraphQL batching is enforced via `AnilistApiService`'s `PQueue` (2 requests per 1.2s window). Sonarr lookups rely on `SonarrLookupClient` for inflight dedupe plus positive/negative TTL caches—there is no internal queue anymore, so throttle at the caller before introducing new bursty flows.
 - Keep AGENTS.md in sync when adding core flows, changing service contracts, or modifying RPC schemas so future agents (human or AI) stay aligned with actual behavior.
 - Long-running tooling (tests, docker compose, migrations, etc.) must always be invoked with sensible timeouts or in non-interactive batch mode. Never leave a shell command waiting indefinitely—prefer explicit timeouts, scripted runs, or log polling after the command exits.
 

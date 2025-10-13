@@ -3,12 +3,10 @@ import { defineProxyService } from '@webext-core/proxy-service';
 import { browser } from 'wxt/browser';
 import { createTtlCache } from '@/cache';
 import { SonarrApiService } from '@/api/sonarr.api';
-import { AnilistApiService } from '@/api/anilist.api';
-import {
-  MappingService,
-  type ResolvedMapping,
-  type StaticMappingPayload,
-} from './mapping.service';
+import { AnilistApiService, type AniMedia } from '@/api/anilist.api';
+import { MappingService, type ResolvedMapping, type StaticMappingPayload } from './mapping.service';
+import { StaticMappingProvider } from './mapping/static-mapping.provider';
+import { SonarrLookupClient } from './mapping/sonarr-lookup.client';
 import { LibraryService } from './library.service';
 import type {
   LeanSonarrSeries,
@@ -16,6 +14,7 @@ import type {
   SonarrRootFolder,
   SonarrQualityProfile,
   SonarrTag,
+  SonarrLookupSeries,
   ExtensionOptions,
   ExtensionError,
   SonarrCredentialsPayload,
@@ -79,14 +78,28 @@ const initializeEpoch = async (key: 'libraryEpoch' | 'settingsEpoch'): Promise<n
 export const [registerKitsunarrApi, getKitsunarrApi] =
   defineProxyService<KitsunarrApi, []>('KitsunarrApi', () => {
     const sonarrApiService = bindAll(new SonarrApiService());
-    const anilistApiService = bindAll(new AnilistApiService());
+    const anilistApiService = bindAll(
+      new AnilistApiService({
+        media: createTtlCache<AniMedia>('anilist:media'),
+      }),
+    );
 
-    const mappingService = bindAll(new MappingService(sonarrApiService, anilistApiService, {
-      success: createTtlCache<ResolvedMapping>('mapping:success'),
-      failure: createTtlCache<ExtensionError>('mapping:failure'),
-      staticPrimary: createTtlCache<StaticMappingPayload>('mapping:static:primary'),
-      staticFallback: createTtlCache<StaticMappingPayload>('mapping:static:fallback'),
-    }));
+    const staticProvider = new StaticMappingProvider({
+      primary: createTtlCache<StaticMappingPayload>('mapping:static:primary'),
+      fallback: createTtlCache<StaticMappingPayload>('mapping:static:fallback'),
+    });
+
+    const lookupClient = new SonarrLookupClient(sonarrApiService, {
+      positive: createTtlCache<SonarrLookupSeries[]>('mapping:lookup'),
+      negative: createTtlCache<boolean>('mapping:lookup-negative'),
+    });
+
+    const mappingService = bindAll(
+      new MappingService(anilistApiService, staticProvider, lookupClient, {
+        success: createTtlCache<ResolvedMapping>('mapping:success'),
+        failure: createTtlCache<ExtensionError>('mapping:failure'),
+      }),
+    );
 
     let libraryEpoch = 0;
     let settingsEpoch = 0;

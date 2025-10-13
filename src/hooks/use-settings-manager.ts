@@ -51,6 +51,7 @@ const log = logger.create('SettingsManager');
 export function useSettingsManager() {
   const queryClient = useQueryClient();
   const [formState, setFormState] = useState<ExtensionOptions>(getInitialOptions());
+  const formRef = useRef<ExtensionOptions>(getInitialOptions());
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const { data: savedOptions, isLoading: isLoadingOptions } = useExtensionOptions();
@@ -86,6 +87,7 @@ export function useSettingsManager() {
       ) {
         return prev;
       }
+      formRef.current = completeOptions;
       return completeOptions;
     });
 
@@ -127,7 +129,11 @@ export function useSettingsManager() {
   }, [sonarrMetadata.data, formState.defaults]);
 
   const handleFieldChange = useCallback(<K extends keyof ExtensionOptions>(key: K, value: ExtensionOptions[K]) => {
-    setFormState(prev => ({ ...prev, [key]: value }));
+    setFormState(prev => {
+      const next = { ...prev, [key]: value };
+      formRef.current = next;
+      return next;
+    });
     setSaveError(null);
     if (key === 'sonarrUrl' || key === 'sonarrApiKey') {
       testConnectionMutation.reset();
@@ -135,12 +141,16 @@ export function useSettingsManager() {
   }, [testConnectionMutation]);
 
   const handleDefaultsChange = useCallback(<K extends keyof SonarrFormState>(key: K, value: SonarrFormState[K]) => {
-    setFormState(prev => ({ ...prev, defaults: { ...prev.defaults, [key]: value } }));
+    setFormState(prev => {
+      const next = { ...prev, defaults: { ...prev.defaults, [key]: value } };
+      formRef.current = next;
+      return next;
+    });
     setSaveError(null);
   }, []);
 
   const handleTestConnection = useCallback(async () => {
-    const { sonarrUrl, sonarrApiKey } = formState;
+    const { sonarrUrl, sonarrApiKey } = formRef.current;
     if (!validateUrl(sonarrUrl).isValid || !validateApiKey(sonarrApiKey).isValid) {
       log.warn('Validation failed, skipping connection test.');
       return;
@@ -151,7 +161,7 @@ export function useSettingsManager() {
     } else {
       log.warn('Permission denied by user.');
     }
-  }, [formState, testConnection]);
+  }, [testConnection]);
 
   const handleSave = useCallback(async () => {
     if (!isDirty || saveMutation.isPending) return;

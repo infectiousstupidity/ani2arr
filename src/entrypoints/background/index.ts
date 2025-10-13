@@ -4,6 +4,7 @@ import { registerKitsunarrApi, getKitsunarrApi } from '@/services';
 import { computeTitleMatchScore } from '@/utils/matching';
 import { logger } from '@/utils/logger';
 import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/utils/metrics';
+import { logError, normalizeError } from '@/utils/error-handling';
 
 type OpenOptionsMessage = { type: 'OPEN_OPTIONS_PAGE' };
 type MappingRefreshMessage = { type: 'kitsunarr:mapping:refresh' };
@@ -66,28 +67,40 @@ export default defineBackground(() => {
     const key = '__kitsunarr_fallback_interval__';
     if (!(globalThis as Record<string, unknown>)[key]) {
       (globalThis as Record<string, unknown>)[key] = globalThis.setInterval(() => {
-        void api.initMappings();
+        void api.initMappings().catch(err => {
+          logError(normalizeError(err), 'Background:initMappings:interval');
+        });
       }, MAPPING_REFRESH_PERIOD_MIN * 60 * 1000);
     }
   };
 
   browser.runtime.onInstalled.addListener(async (details) => {
-    if (details.reason === 'install') {
-      browser.runtime.openOptionsPage().catch(() => {});
+    try {
+      if (details.reason === 'install') {
+        browser.runtime.openOptionsPage().catch(() => {});
+      }
+      await api.initMappings();
+      await ensurePeriodicRefresh();
+    } catch (error) {
+      logError(normalizeError(error), 'Background:onInstalled');
     }
-    await api.initMappings();
-    await ensurePeriodicRefresh();
   });
 
   browser.runtime.onStartup.addListener(async () => {
-    await api.initMappings();
-    await ensurePeriodicRefresh();
+    try {
+      await api.initMappings();
+      await ensurePeriodicRefresh();
+    } catch (error) {
+      logError(normalizeError(error), 'Background:onStartup');
+    }
   });
 
   if (alarmsApi) {
     alarmsApi.onAlarm.addListener((alarm) => {
       if (alarm.name === MAPPING_REFRESH_ALARM) {
-        void api.initMappings();
+        void api.initMappings().catch(err => {
+          logError(normalizeError(err), 'Background:initMappings:alarm');
+        });
       }
     });
   }

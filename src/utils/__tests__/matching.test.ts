@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { canonicalizeLookupTerm, computeTitleMatchScore, normTitle, tokenize } from '@/utils/matching';
+import {
+  canonicalTitleKey,
+  canonicalizeLookupTerm,
+  computeTitleMatchScore,
+  isOrdinalToken,
+  normTitle,
+  normalizeTitleTokens,
+  tokenize,
+} from '@/utils/matching';
 
 describe('canonicalizeLookupTerm', () => {
   it('normalizes punctuation, stopwords, and whitespace', () => {
@@ -10,13 +18,13 @@ describe('canonicalizeLookupTerm', () => {
   });
 
   it('collapses slashes and quotes and strips boilerplate tokens', () => {
-    expect(canonicalizeLookupTerm('“Kaguya-sama: Love Is War” / Season 2')).toBe(
+    expect(canonicalizeLookupTerm('"Kaguya-sama: Love Is War" / Season 2')).toBe(
       'kaguya sama love is war 2',
     );
   });
 
   it('normalizes heavily punctuated shonen titles for lookup', () => {
-    expect(canonicalizeLookupTerm('“Naruto” Shippuden!!!')).toBe('naruto shippuden');
+    expect(canonicalizeLookupTerm('"Naruto" Shippuden!!!')).toBe('naruto shippuden');
   });
 
   it('removes trailing years by default but can retain them when requested', () => {
@@ -33,15 +41,82 @@ describe('canonicalizeLookupTerm', () => {
   });
 });
 
+describe('normalizeTitleTokens', () => {
+  it('returns normalized text alongside filtered tokens', () => {
+    const result = normalizeTitleTokens('The “Promised” Neverland / Season 2', {
+      filterStopwords: true,
+      allowSingleLetters: false,
+    });
+
+    expect(result.normalized).toBe('the promised neverland season 2');
+    expect(result.tokens).toEqual(['promised', 'neverland', '2']);
+  });
+
+  it('drops trailing years only when keepYear is false', () => {
+    expect(
+      normalizeTitleTokens('Bleach (2004)', {
+        filterStopwords: true,
+        allowSingleLetters: false,
+      }).tokens,
+    ).toEqual(['bleach']);
+
+    expect(
+      normalizeTitleTokens('Bleach (2004)', {
+        filterStopwords: true,
+        allowSingleLetters: false,
+        keepYear: true,
+      }).tokens,
+    ).toEqual(['bleach', '2004']);
+  });
+
+  it('supports disabling token mutation helpers', () => {
+    expect(
+      normalizeTitleTokens('lvl 99 Slime', {
+        filterStopwords: true,
+        allowSingleLetters: false,
+      }).tokens,
+    ).toContain('level');
+
+    expect(
+      normalizeTitleTokens('lvl 99 Slime', {
+        filterStopwords: true,
+        allowSingleLetters: false,
+        mutateTokens: false,
+      }).tokens,
+    ).toContain('lvl');
+  });
+});
+
+describe('canonicalTitleKey', () => {
+  it('produces ASCII-safe canonical keys and trims trailing years', () => {
+    expect(canonicalTitleKey('“Fullmetal Alchemist” (2003)')).toBe('fullmetal alchemist');
+    expect(canonicalTitleKey('Pokémon: Mewtwo Strikes Back—Evolution 2019')).toBe(
+      'pokemon mewtwo strikes back evolution',
+    );
+  });
+
+  it('retains single-letter tokens and respects keepYear when requested', () => {
+    expect(canonicalTitleKey('K-ON!')).toBe('k on');
+    expect(canonicalTitleKey('Steins;Gate 2011', { keepYear: true })).toBe('steins gate 2011');
+  });
+});
+
 describe('normTitle', () => {
   it('normalizes whitespace, punctuation, and casing', () => {
-    expect(normTitle(' “Attack—on・Titan” (Final Season) ')).toBe('attack-on titan final season');
+    expect(normTitle(' "Attack-on�Titan" (Final Season) ')).toBe('attack-on titan final season');
   });
 });
 
 describe('tokenize', () => {
   it('drops stopwords, single characters, and normalizes level tokens', () => {
     expect(tokenize('the legend of lvl a heroes')).toEqual(['legend', 'level', 'heroes']);
+  });
+});
+
+describe('isOrdinalToken', () => {
+  it('identifies ordinal suffix tokens', () => {
+    expect(isOrdinalToken('1st')).toBe(true);
+    expect(isOrdinalToken('third')).toBe(false);
   });
 });
 
@@ -96,6 +171,19 @@ describe('computeTitleMatchScore', () => {
 
     expect(penalized).toBeLessThan(base);
     expect(penalized).toBeGreaterThan(0);
+    expect(penalized).toBeCloseTo(base * 0.85, 5);
+  });
+
+  it('keeps perfect scores when animation genres are present', () => {
+    const score = computeTitleMatchScore({
+      queryRaw: 'Fullmetal Alchemist Brotherhood',
+      candidateRaw: 'Fullmetal Alchemist Brotherhood',
+      candidateYear: 2009,
+      targetYear: 2009,
+      candidateGenres: ['Animation', 'Action', 'Adventure'],
+    });
+
+    expect(score).toBe(1);
   });
 
   it('attenuates scores when the query is a single token but the candidate is verbose', () => {

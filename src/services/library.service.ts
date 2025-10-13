@@ -78,9 +78,9 @@ export class LibraryService {
 
         const credentials = { url: options.sonarrUrl, apiKey: options.sonarrApiKey };
         const fullSeriesList = await this.sonarrClient.getAllSeries(credentials);
-    const leanList: LeanSonarrSeries[] = fullSeriesList
-      .filter(series => typeof series.tvdbId === 'number' && Number.isFinite(series.tvdbId))
-      .map(series => this.toLeanSeries(series));
+        const leanList: LeanSonarrSeries[] = fullSeriesList
+          .filter(series => typeof series.tvdbId === 'number' && Number.isFinite(series.tvdbId))
+          .map(series => this.toLeanSeries(series));
 
         this.ensureIndexes(leanList, true);
         await this.cache.write(CACHE_KEY, leanList, { staleMs: SOFT_TTL, hardMs: HARD_TTL });
@@ -195,18 +195,18 @@ export class LibraryService {
     const credentials = { url: sonarrOpts!.sonarrUrl!, apiKey: sonarrOpts!.sonarrApiKey! };
     const liveSeries = await this.sonarrClient.getSeriesByTvdbId(tvdbId, credentials);
 
-      if (liveSeries) {
-        let cacheMutated = false;
-        if (!existsInCache) {
-          await this.addSeriesToCache(liveSeries);
-          cacheMutated = true;
-        }
+    if (liveSeries) {
+      let cacheMutated = false;
+      if (!existsInCache) {
+        await this.addSeriesToCache(liveSeries);
+        cacheMutated = true;
+      }
 
-        const finalSeries = existsInCache ? cachedSeries! : this.toLeanSeries(liveSeries);
+      const finalSeries = existsInCache ? cachedSeries! : this.toLeanSeries(liveSeries);
 
-        if (cacheMutated) {
-          await this.notifyLibraryMutation({ tvdbId, action: 'added' });
-        }
+      if (cacheMutated) {
+        await this.notifyLibraryMutation({ tvdbId, action: 'added' });
+      }
 
       return {
         exists: true,
