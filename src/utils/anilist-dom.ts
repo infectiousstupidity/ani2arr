@@ -84,16 +84,6 @@ const coerceRelationPrequelIds = (value: unknown): number[] | null => {
   return ids.length > 0 ? Array.from(new Set(ids)) : null;
 };
 
-const hasMediaShape = (value: unknown): boolean => {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Record<string, unknown>;
-  if (candidate.title && typeof candidate.title === 'object') return true;
-  if (Array.isArray(candidate.synonyms)) return true;
-  if (candidate.format && typeof candidate.format === 'string') return true;
-  if (candidate.startDate && typeof candidate.startDate === 'object') return true;
-  return false;
-};
-
 const metadataFromAny = (value: unknown): MediaMetadataHint | null => {
   if (!value || typeof value !== 'object') return null;
   const source = value as Record<string, unknown>;
@@ -116,52 +106,6 @@ const metadataFromAny = (value: unknown): MediaMetadataHint | null => {
   } satisfies MediaMetadataHint;
 };
 
-const breadthFirstFind = (root: unknown, predicate: (value: unknown) => boolean): unknown | null => {
-  if (!root || typeof root !== 'object') return null;
-  const seen = new WeakSet<object>();
-  const queue: unknown[] = [root];
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current || typeof current !== 'object') continue;
-    if (seen.has(current as object)) continue;
-    seen.add(current as object);
-
-    if (predicate(current)) {
-      return current;
-    }
-
-    if (Array.isArray(current)) {
-      for (const item of current) {
-        if (item && typeof item === 'object') queue.push(item);
-      }
-      continue;
-    }
-
-    for (const value of Object.values(current)) {
-      if (value && typeof value === 'object') {
-        queue.push(value);
-      }
-    }
-  }
-
-  return null;
-};
-
-const findMediaCandidate = (root: unknown, anilistId: number): unknown | null => {
-  return breadthFirstFind(root, value => {
-    if (!value || typeof value !== 'object') return false;
-    const record = value as Record<string, unknown>;
-    const idCandidate = record.id ?? record.mediaId ?? record.mediaID;
-    const id = typeof idCandidate === 'number'
-      ? idCandidate
-      : typeof idCandidate === 'string'
-        ? Number.parseInt(idCandidate, 10)
-        : NaN;
-    if (!Number.isFinite(id) || id !== anilistId) return false;
-    return hasMediaShape(record);
-  });
-};
 
 const mergeSynonyms = (a: string[] | null | undefined, b: string[] | null | undefined): string[] | null => {
   const merged = [...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]
@@ -182,31 +126,63 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
   if (typeof window === 'undefined' || !Number.isFinite(anilistId)) {
     return null;
   }
-
-  const globalAny = window as unknown as Record<string, unknown>;
-  const sources: unknown[] = [];
-
-  const nuxt = globalAny.__NUXT__;
-  if (nuxt && typeof nuxt === 'object') {
-    const nuxtRecord = nuxt as Record<string, unknown>;
-    if (Array.isArray(nuxtRecord.data)) {
-      sources.push(...nuxtRecord.data);
+  try {
+    const { location, document } = window;
+    const hrefIdMatch = location.pathname.match(/\/anime\/(\d+)/);
+    const onAnimeDetailPage = hrefIdMatch && Number.parseInt(hrefIdMatch[1]!, 10) === anilistId;
+    const FORMAT_TEXT_MAP = new Map<string, AniFormat>([
+      ['tv show', 'TV'],
+      ['tv', 'TV'],
+      ['tv short', 'TV_SHORT'],
+      ['ona', 'ONA'],
+      ['ova', 'OVA'],
+      ['movie', 'MOVIE'],
+      ['special', 'SPECIAL'],
+      ['music', 'MUSIC'],
+    ]);
+    const normalizeFormatText = (value: string): string => value.toLowerCase().trim().replace(/\s+series$/, '');
+    if (onAnimeDetailPage) {
+      const title = document.querySelector('h1')?.textContent?.trim() ?? '';
+      if (title) {
+        const hint: MediaMetadataHint = {
+          titles: { romaji: title },
+          synonyms: [title],
+          startYear: null,
+          format: null,
+          relationPrequelIds: null,
+        };
+        return hint;
+      }
     }
-    if (nuxtRecord.state) {
-      sources.push(nuxtRecord.state);
+    const cover = document.querySelector<HTMLAnchorElement>(`.media-card a.cover[href*="/anime/${anilistId}"]`);
+    if (cover) {
+      const card = cover.closest('.media-card') as Element | null;
+      const title = (
+        card?.querySelector<HTMLDivElement>('.title a')?.textContent ?? ''
+      ).trim() || (
+        card?.querySelector<HTMLDivElement>('.title')?.textContent ?? ''
+      ).trim() || (cover.getAttribute('title') ?? '').trim() || cover.querySelector('img')?.getAttribute('alt')?.trim() || '';
+      let format: AniFormat | null = null;
+      const infoSpan = card?.querySelector<HTMLSpanElement>('.hover-data .info span');
+      const infoText = infoSpan?.textContent;
+      if (infoText) {
+        const mapped = FORMAT_TEXT_MAP.get(normalizeFormatText(infoText));
+        if (mapped) format = mapped;
+      }
+
+      if (title || format) {
+        const hint: MediaMetadataHint = {
+          titles: title ? { romaji: title } : null,
+          synonyms: title ? [title] : null,
+          startYear: null,
+          format: format ?? null,
+          relationPrequelIds: null,
+        };
+        return hint;
+      }
     }
-  }
-
-  const apollo = globalAny.__APOLLO_STATE__;
-  if (apollo && typeof apollo === 'object') {
-    sources.push(apollo);
-  }
-
-  for (const source of sources) {
-    const candidate = findMediaCandidate(source, anilistId);
-    if (!candidate) continue;
-    const metadata = metadataFromAny(candidate);
-    if (metadata) return metadata;
+  } catch {
+    /* noop */
   }
 
   return null;

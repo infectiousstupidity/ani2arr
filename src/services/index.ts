@@ -5,7 +5,7 @@ import { createTtlCache } from '@/cache';
 import { CacheNamespaces } from '@/cache/namespaces';
 import { SonarrApiService } from '@/api/sonarr.api';
 import { AnilistApiService, type AniMedia } from '@/api/anilist.api';
-import { MappingService, type ResolvedMapping, type StaticMappingPayload } from './mapping.service';
+import { MappingService, type ResolvedMapping, type StaticMappingPayload } from './mapping';
 import { StaticMappingProvider } from './mapping/static-mapping.provider';
 import { SonarrLookupClient } from './mapping/sonarr-lookup.client';
 import { LibraryService } from './library.service';

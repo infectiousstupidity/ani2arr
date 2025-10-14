@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CacheHit, CacheWriteOptions, TtlCache } from '@/cache';
 import type { AnilistApiService, AniMedia } from '@/api/anilist.api';
 import type { StaticMappingProvider } from '@/services/mapping/static-mapping.provider';
-import { MappingService, type ResolvedMapping } from '@/services/mapping.service';
+import { MappingService, type ResolvedMapping } from '@/services/mapping';
 import type { SonarrLookupClient } from '@/services/mapping/sonarr-lookup.client';
 import type { ExtensionOptions, SonarrLookupSeries } from '@/types';
 import { createError, ErrorCode } from '@/utils/error-handling';

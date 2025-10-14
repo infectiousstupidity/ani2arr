@@ -24,7 +24,7 @@ import type {
   SonarrSeries,
   SonarrTag,
 } from '@/types';
-import type { StaticMappingPayload } from '@/services/mapping.service';
+import type { StaticMappingPayload } from '@/services/mapping';
 
 export const testServer = setupServer();
 

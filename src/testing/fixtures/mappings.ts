@@ -1,4 +1,4 @@
-import type { StaticMappingPayload } from '@/services/mapping.service';
+import type { StaticMappingPayload } from '@/services/mapping';
 
 export const primaryMappingUrl =
   'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json';

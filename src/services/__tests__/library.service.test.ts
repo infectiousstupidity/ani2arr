@@ -13,7 +13,7 @@ import type { CacheHit, TtlCache } from '@/cache';
 import { extensionOptions } from '@/utils/storage';
 import { ErrorCode, createError } from '@/utils/error-handling';
 import * as errorHandling from '@/utils/error-handling';
-import type { MappingService } from '@/services/mapping.service';
+import type { MappingService } from '@/services/mapping';
 import type { SonarrApiService } from '@/api/sonarr.api';
 import { canonicalizeLookupTerm } from '@/utils/matching';
 import { getMetricsSnapshot, resetMetrics } from '@/utils/metrics';

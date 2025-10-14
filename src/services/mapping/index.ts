@@ -1,18 +1,17 @@
-// src/services/mapping.service.ts
+// src/services/mapping/index.ts
 import type { TtlCache } from '@/cache';
 import type { AnilistApiService, AniMedia } from '@/api/anilist.api';
-import type { ExtensionError, MediaMetadataHint, AniTitles, SonarrLookupSeries } from '@/types';
+import type { ExtensionError, MediaMetadataHint, AniTitles } from '@/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
 import { extensionOptions } from '@/utils/storage';
 import { incrementCounter } from '@/utils/metrics';
 import { logger } from '@/utils/logger';
-import { canonicalTitleKey, computeTitleMatchScore, sanitizeLookupDisplay } from '@/utils/matching';
-import { StaticMappingProvider, type StaticMappingPayload } from './mapping/static-mapping.provider';
-import {
-  SonarrLookupClient,
-  type SonarrLookupCredentials,
-} from './mapping/sonarr-lookup.client';
-import { generateSearchTerms, isSeasonalCanonicalTokens } from './mapping/search-term-generator';
+import { canonicalTitleKey, sanitizeLookupDisplay } from '@/utils/matching';
+import { StaticMappingProvider, type StaticMappingPayload } from './static-mapping.provider';
+import { SonarrLookupClient, type SonarrLookupCredentials } from './sonarr-lookup.client';
+import { isSeasonalCanonicalTokens } from './search-term-generator';
+import { resolveViaPipeline } from './pipeline';
+import { scoreCandidates } from './scoring';
 
 const RESOLVED_SOFT_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
 const RESOLVED_HARD_TTL = 180 * 24 * 60 * 60 * 1000; // 180 days
@@ -21,10 +20,6 @@ const FAILURE_SOFT_TTL = 30 * 60 * 1000; // 30 minutes
 const FAILURE_HARD_TTL = FAILURE_SOFT_TTL * 2;
 const NETWORK_FAILURE_SOFT_TTL = 5 * 60 * 1000; // 5 minutes
 const NETWORK_FAILURE_HARD_TTL = NETWORK_FAILURE_SOFT_TTL * 3;
-
-const SCORE_THRESHOLD = 0.76;
-const EARLY_STOP_THRESHOLD = 0.82;
-const MAX_TERMS = 5;
 
 const ALLOWED_FORMATS = new Set(['TV', 'TV_SHORT', 'ONA', 'OVA', 'SPECIAL']);
 
@@ -114,7 +109,6 @@ export class MappingService {
         staleMs: RESOLVED_SOFT_TTL,
         hardMs: RESOLVED_HARD_TTL,
       });
-      // Mapping is stable; evict AniList media cache to save space.
       this.evictAniListMedia(anilistId);
       return { tvdbId: staticHit.tvdbId };
     }
@@ -136,7 +130,6 @@ export class MappingService {
             staleMs: RESOLVED_SOFT_TTL,
             hardMs: RESOLVED_HARD_TTL,
           });
-          // Mapping is stable; evict AniList media cache to save space.
           this.evictAniListMedia(anilistId);
           return hinted;
         }
@@ -164,7 +157,6 @@ export class MappingService {
       staleMs: RESOLVED_SOFT_TTL,
       hardMs: RESOLVED_HARD_TTL,
     });
-    // Mapping is stable; evict AniList media cache to save space.
     this.evictAniListMedia(anilistId);
     return resolved;
   }
@@ -222,58 +214,26 @@ export class MappingService {
       return prequelStatic;
     }
 
-    const mediaYear = media.startDate?.year ?? undefined;
-    const searchTerms = generateSearchTerms(media.title ?? ({} as AniTitles), media.synonyms);
+    const outcome = await resolveViaPipeline(media, {
+      anilistApi: this.anilistApi,
+      lookupClient: this.lookupClient,
+      staticProvider: this.staticProvider,
+      credentials,
+      sessionSeenCanonical: this.sessionSeenCanonical,
+      limits: {
+        maxTerms: 5,
+        scoreThreshold: 0.76,
+        earlyStopThreshold: 0.82,
+      },
+      log: this.log,
+    }, hints?.primaryTitle);
 
-    if (hints?.primaryTitle) {
-      const trimmed = hints.primaryTitle.trim();
-      if (trimmed.length > 0) {
-        const sanitizedHint = sanitizeLookupDisplay(trimmed);
-        if (sanitizedHint) {
-          const canonicalHint = canonicalTitleKey(sanitizedHint);
-          if (canonicalHint) {
-            const canonicalTokens = canonicalHint.split(/\s+/).filter(Boolean);
-            if (canonicalTokens.length > 0 && !isSeasonalCanonicalTokens(canonicalTokens)) {
-              const existingIndex = searchTerms.findIndex(value => value.canonical === canonicalHint);
-              if (existingIndex >= 0) {
-                searchTerms.splice(existingIndex, 1);
-              }
-              searchTerms.unshift({ canonical: canonicalHint, display: sanitizedHint });
-            }
-          }
-        }
-      }
+    if (outcome.status === 'resolved') {
+      return {
+        tvdbId: outcome.tvdbId,
+        ...(outcome.successfulSynonym ? { successfulSynonym: outcome.successfulSynonym } : {}),
+      };
     }
-
-    let bestMatch: { tvdbId: number; term: string; score: number } | null = null;
-
-    for (const term of searchTerms.slice(0, MAX_TERMS)) {
-      if (!term.canonical) continue;
-
-      const seenInSession = this.sessionSeenCanonical.has(term.canonical);
-      const baseResults = seenInSession
-        ? await this.lookupClient.readFromCache(term.canonical)
-        : await this.lookupClient.lookup(term.canonical, term.display, credentials);
-
-      const { bestCandidate } = this.evaluateLookupResults(baseResults, term.display, mediaYear);
-
-      if (bestCandidate && (!bestMatch || bestCandidate.score > bestMatch.score)) {
-        bestMatch = bestCandidate;
-      }
-
-      if (!seenInSession) {
-        this.sessionSeenCanonical.add(term.canonical);
-      }
-
-      if (bestMatch && bestMatch.score >= EARLY_STOP_THRESHOLD) {
-        break;
-      }
-    }
-
-    if (bestMatch) {
-      return { tvdbId: bestMatch.tvdbId, successfulSynonym: bestMatch.term };
-    }
-
     return null;
   }
 
@@ -317,43 +277,12 @@ export class MappingService {
       return null;
     }
     const results = await this.lookupClient.lookup(canonical, sanitized, credentials);
-    const { bestCandidate } = this.evaluateLookupResults(results, sanitized);
-    if (bestCandidate) {
-      return { tvdbId: bestCandidate.tvdbId, successfulSynonym: sanitized };
+    const scored = scoreCandidates({ canonical, display: sanitized }, results);
+    const top = scored[0];
+    if (top && top.score >= 0.76) {
+      return { tvdbId: top.result.tvdbId, successfulSynonym: sanitized };
     }
     return null;
-  }
-
-  private evaluateLookupResults(
-    results: SonarrLookupSeries[],
-    term: string,
-    targetYear?: number,
-  ): {
-    bestCandidate: { tvdbId: number; term: string; score: number } | null;
-    topScore: number;
-  } {
-    let bestCandidate: { tvdbId: number; term: string; score: number } | null = null;
-    let topScore = 0;
-
-    for (const candidate of results) {
-      const scoreParams = {
-        queryRaw: term,
-        candidateRaw: candidate.title,
-        ...(typeof candidate.year === 'number' ? { candidateYear: candidate.year } : {}),
-        ...(typeof targetYear === 'number' ? { targetYear } : {}),
-        ...(Array.isArray(candidate.genres) ? { candidateGenres: candidate.genres } : {}),
-      } satisfies Parameters<typeof computeTitleMatchScore>[0];
-
-      const score = computeTitleMatchScore(scoreParams);
-      if (score > topScore) {
-        topScore = score;
-      }
-      if (score >= SCORE_THRESHOLD && (!bestCandidate || score > bestCandidate.score)) {
-        bestCandidate = { tvdbId: candidate.tvdbId, term, score };
-      }
-    }
-
-    return { bestCandidate, topScore };
   }
 
   private buildMediaFromMetadataHint(anilistId: number, metadata?: MediaMetadataHint | null): AniMedia | null {

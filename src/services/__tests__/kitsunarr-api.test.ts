@@ -10,7 +10,7 @@ import type {
   CheckSeriesStatusResponse,
 } from '@/types';
 import type { SonarrApiService } from '@/api/sonarr.api';
-import type { MappingService } from '@/services/mapping.service';
+import type { MappingService } from '@/services/mapping';
 import type { LibraryService } from '@/services/library.service';
 import { extensionOptions } from '@/utils/storage';
 import { ErrorCode } from '@/utils/error-handling';
@@ -83,7 +83,7 @@ vi.mock('@/api/sonarr.api', () => ({
   }),
 }));
 
-vi.mock('@/services/mapping.service', () => ({
+vi.mock('@/services/mapping', () => ({
   MappingService: vi.fn(() => {
     if (!hoisted.mappingInstance) {
       throw new Error('mappingInstance not set before import');
