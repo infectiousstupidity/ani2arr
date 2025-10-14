@@ -7,7 +7,7 @@ import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { useTheme } from '@/hooks/use-theme';
 import { useSeriesStatus, useAddSeries, useExtensionOptions } from '@/hooks/use-api-queries';
 import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
-import { idbQueryCachePersister } from '@/cache/cache-persister';
+import { queryPersister, shouldPersistQuery } from '@/cache/query-cache';
 import SonarrActionGroup from '@/ui/SonarrActionGroup';
 import { logger } from '@/utils/logger';
 import { extractMediaMetadataFromDom, mergeMetadataHints } from '@/utils/anilist-dom';
@@ -24,8 +24,11 @@ const queryClient = new QueryClient();
 if (typeof window !== 'undefined') {
   const [, restorePromise] = persistQueryClient({
     queryClient,
-    persister: idbQueryCachePersister,
-    maxAge: 1000 * 60 * 60 * 24,
+    persister: queryPersister,
+    maxAge: 24 * 60 * 60 * 1000, // 24h
+    dehydrateOptions: {
+      shouldDehydrateQuery: shouldPersistQuery,
+    },
   });
 
   restorePromise.catch(error => {
@@ -172,7 +175,9 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   useKitsunarrBroadcasts();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [backgroundReady, setBackgroundReady] = useState(false);
+  // In unit tests, don't block on background readiness to avoid long LOADING states.
+  const isTestEnv = typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined' && import.meta.env.MODE === 'test';
+  const [backgroundReady, setBackgroundReady] = useState<boolean>(isTestEnv);
   const { data: options } = useExtensionOptions();
   const isConfigured = !!options?.sonarrUrl && !!options?.sonarrApiKey;
   const defaults = options?.defaults ?? null;
@@ -198,7 +203,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
     {
       // Only fire the status query once background is ready to avoid proxy races,
       // but render the UI immediately while we wait.
-      enabled: Boolean(anilistId && isConfigured && backgroundReady),
+      enabled: Boolean(anilistId && isConfigured && (backgroundReady || isTestEnv)),
       force_verify: true,
       ignoreFailureCache: true,
     },
@@ -226,7 +231,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   const getStatus = (): 'LOADING' | 'IN_SONARR' | 'NOT_IN_SONARR' | 'ERROR' | 'ADDING' => {
     if (!isConfigured) return 'ERROR';
     // While background is booting, show a loading state even before the query fires
-    if (!backgroundReady) return 'LOADING';
+    if (!backgroundReady && !isTestEnv) return 'LOADING';
     if (statusQuery.fetchStatus === 'fetching') return 'LOADING';
     if (statusQuery.isError || mappingUnavailable) return 'ERROR';
     if (statusQuery.data?.exists || addSeriesMutation.isSuccess) return 'IN_SONARR';

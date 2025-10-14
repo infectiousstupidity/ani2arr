@@ -52,7 +52,7 @@
 - [`src/ui/BrowseOverlay.tsx`](src/ui/BrowseOverlay.tsx): adapter-based browse integration system using MutationObserver to scan for media cards, parse metadata from DOM attributes, inject action buttons via React portals into shadow DOM, and respond to wxt:locationchange events.
 - [`src/utils/error-handling.tsx`](src/utils/error-handling.tsx): defines [`ExtensionError`](src/utils/error-handling.tsx) class with `ErrorCode` enum (config, permission, network, sonarr, anilist, mapping, unknown), factory helpers (`createConfigError`, `createPermissionError`, etc.), [`normalizeError()`](src/utils/error-handling.tsx) for unknown error conversion, and React ErrorBoundary component.
 - [`src/utils/retry.ts`](src/utils/retry.ts): exponential backoff with jitter (`withRetry()` wrapper) supporting max retries, custom backoff multipliers, and typed error handling; avoid writing bespoke retry loops.
-- [`src/cache/cache-persister.ts`](src/cache/cache-persister.ts): TanStack Query persister using `idb-keyval` with key `kitsunarr-query-client-cache` for persistent cache across page reloads.
+- [`src/cache/query-cache.ts`](src/cache/query-cache.ts): TanStack Query persister using `idb-keyval` with key `kitsunarr:tanstack-query` for persistent cache across page reloads. Filters out credential-bearing queries (options) to prevent API key leakage into page-origin IndexedDB.
 - [`wxt.config.ts`](wxt.config.ts): single source of truth for manifest data (name, description, permissions split by MV2/MV3), entry points, @tailwindcss/vite plugin, source maps configuration, and required/optional host permissions.
 
 ## 6. Patterns & Conventions
@@ -66,8 +66,9 @@
 
 ## 7. Caching & Resilience
 - `createTtlCache` entries store both `staleAt` (soft TTL) and `expiresAt` (hard TTL); stale data is returned while background refresh runs. With the in-memory shim removed, every read hits IndexedDB—make sure callers that need instantaneous responses maintain their own lightweight mirrors (e.g., `StaticMappingProvider` maps, library indexes).
+- Persistent cache namespaces are centralized in `src/cache/namespaces.ts` via `CacheNamespaces`. Always pass one of these constants to `createTtlCache(...)` instead of a string literal to avoid drift and make audits easy.
 - Mapping resolution caches successes (30d soft / 180d hard TTL) and categorized failures: config/permission errors (30min), network errors (5min). Use the categorized TTL helpers to avoid hammering third parties during outages.
-- TanStack Query persistence (via [`idbQueryCachePersister`](src/cache/cache-persister.ts)) keeps AniList page state snappy across navigations; invalidate via `queryClient.invalidateQueries({ queryKey })` with matching keys after mutations or epoch bumps.
+- TanStack Query persistence (via [`queryPersister`](src/cache/query-cache.ts)) keeps AniList page state snappy across navigations; invalidate via `queryClient.invalidateQueries({ queryKey })` with matching keys after mutations or epoch bumps.
 - Error caches prevent retry storms: [`library.service.ts`](src/services/library.service.ts) caches API failures for 5min, [`mapping.service.ts`](src/services/mapping.service.ts) caches by error category, [`anilist.api.ts`](src/api/anilist.api.ts) uses inflight deduplication to prevent duplicate GraphQL queries.
 
 ## 8. UI System Notes

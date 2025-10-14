@@ -4,7 +4,7 @@ import { createRoot, Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { persistQueryClient } from '@tanstack/query-persist-client-core';
-import { idbQueryCachePersister } from '@/cache/cache-persister';
+import { queryPersister, shouldPersistQuery } from '@/cache/query-cache';
 import { logger } from '@/utils/logger';
 import { extractMediaMetadataFromDom, metadataFromMediaObject, mergeMetadataHints } from '@/utils/anilist-dom';
 import type { MediaMetadataHint } from '@/types';
@@ -216,8 +216,9 @@ export default defineContentScript({
 
     const [unsubscribePersistence, restorePromise] = persistQueryClient({
       queryClient,
-      persister: idbQueryCachePersister,
-      maxAge: 1000 * 60 * 60 * 24,
+      persister: queryPersister,
+      maxAge: 24 * 60 * 60 * 1000, // 24h
+      dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
     });
 
     try {

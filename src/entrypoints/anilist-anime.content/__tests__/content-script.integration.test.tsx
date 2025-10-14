@@ -7,17 +7,19 @@ import { createBrowserMock, flushAsync, setLocationHref } from '@/testing';
 vi.mock('wxt/browser', () => createBrowserMock());
 
 const persistCallbackMock = vi.fn();
+const persistQueryClientMock = vi.fn(() => [persistCallbackMock, Promise.resolve()]);
 
 vi.mock('@tanstack/query-persist-client-core', () => ({
-  persistQueryClient: vi.fn(() => [persistCallbackMock, Promise.resolve()]),
+  persistQueryClient: persistQueryClientMock,
 }));
 
-vi.mock('@/cache/cache-persister', () => ({
-  idbQueryCachePersister: {
+vi.mock('@/cache/query-cache', () => ({
+  queryPersister: {
     persistClient: vi.fn(),
     restoreClient: vi.fn(),
     removeClient: vi.fn(),
   },
+  shouldPersistQuery: vi.fn(() => true),
 }));
 
 const useThemeMock = vi.fn();
@@ -63,11 +65,15 @@ vi.mock('@/hooks/use-broadcasts', () => ({
   useKitsunarrBroadcasts: () => useKitsunarrBroadcastsMock(),
 }));
 
-vi.mock('@/hooks/use-api-queries', () => ({
-  useSeriesStatus: (...args: Parameters<typeof useSeriesStatusMock>) => useSeriesStatusMock(...args),
-  useAddSeries: () => useAddSeriesMock(),
-  useExtensionOptions: () => useExtensionOptionsMock(),
-}));
+vi.mock('@/hooks/use-api-queries', async () => {
+  const actual = await vi.importActual<typeof import('@/hooks/use-api-queries')>('@/hooks/use-api-queries');
+  return {
+    ...actual,
+    useSeriesStatus: (...args: Parameters<typeof useSeriesStatusMock>) => useSeriesStatusMock(...args),
+    useAddSeries: () => useAddSeriesMock(),
+    useExtensionOptions: () => useExtensionOptionsMock(),
+  };
+});
 
 const actionGroupProps: Array<Record<string, unknown>> = [];
 
@@ -233,6 +239,7 @@ describe('AniList anime content script integration', () => {
     const { ctx, notifyInvalidated } = createTestContext();
 
     const module = await import('../index');
+    const { persistQueryClient } = await import('@tanstack/query-persist-client-core');
     expect(module.default.main).toBeInstanceOf(Function);
 
     await act(async () => {
@@ -252,6 +259,13 @@ describe('AniList anime content script integration', () => {
     });
 
     expect(document.getElementById('kitsunarr-actions-spacer')).toBeNull();
+    expect(persistQueryClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dehydrateOptions: expect.objectContaining({
+          shouldDehydrateQuery: expect.any(Function),
+        }),
+      }),
+    );
   });
 
   it('responds to location changes by removing and remounting the UI', async () => {

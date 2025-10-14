@@ -11,20 +11,20 @@ const unsubscribePersistenceMock = vi.fn();
 const persistQueryClientMock = vi.fn(() => [unsubscribePersistenceMock, Promise.resolve()]);
 
 vi.mock('@tanstack/query-persist-client-core', () => ({
-  persistQueryClient: (...args: Parameters<typeof persistQueryClientMock>) =>
-    persistQueryClientMock(...args),
+  persistQueryClient: persistQueryClientMock,
 }));
 
 vi.mock('../style.css?inline', () => ({
   default: '.kitsunarr-overlay-container{display:block}',
 }));
 
-vi.mock('@/cache/cache-persister', () => ({
-  idbQueryCachePersister: {
+vi.mock('@/cache/query-cache', () => ({
+  queryPersister: {
     persistClient: vi.fn(),
     restoreClient: vi.fn(),
     removeClient: vi.fn(),
   },
+  shouldPersistQuery: vi.fn(() => true),
 }));
 
 const warnMock = vi.fn();
@@ -325,6 +325,7 @@ describe('AniList browse content script integration', () => {
     const { ctx, notifyInvalidated } = createTestContext();
 
     const module = await import('../index');
+    const { persistQueryClient } = await import('@tanstack/query-persist-client-core');
     expect(module.default.main).toBeInstanceOf(Function);
 
     await act(async () => {
@@ -383,6 +384,14 @@ describe('AniList browse content script integration', () => {
       notifyInvalidated();
       await flushAsync();
     });
+
+    expect(persistQueryClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dehydrateOptions: expect.objectContaining({
+          shouldDehydrateQuery: expect.any(Function),
+        }),
+      }),
+    );
 
     expect(document.querySelector('.kitsunarr-overlay-container')).toBeNull();
     expect(document.head.querySelector('[data-kitsunarr-browse]')).toBeNull();

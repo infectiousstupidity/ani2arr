@@ -114,6 +114,8 @@ export class MappingService {
         staleMs: RESOLVED_SOFT_TTL,
         hardMs: RESOLVED_HARD_TTL,
       });
+      // Mapping is stable; evict AniList media cache to save space.
+      this.evictAniListMedia(anilistId);
       return { tvdbId: staticHit.tvdbId };
     }
 
@@ -134,6 +136,8 @@ export class MappingService {
             staleMs: RESOLVED_SOFT_TTL,
             hardMs: RESOLVED_HARD_TTL,
           });
+          // Mapping is stable; evict AniList media cache to save space.
+          this.evictAniListMedia(anilistId);
           return hinted;
         }
       } catch (error) {
@@ -160,7 +164,20 @@ export class MappingService {
       staleMs: RESOLVED_SOFT_TTL,
       hardMs: RESOLVED_HARD_TTL,
     });
+    // Mapping is stable; evict AniList media cache to save space.
+    this.evictAniListMedia(anilistId);
     return resolved;
+  }
+
+  private evictAniListMedia(anilistId: number): void {
+    try {
+      const anyApi = this.anilistApi as unknown as { removeMediaFromCache?: (id: number) => Promise<void> };
+      if (anyApi && typeof anyApi.removeMediaFromCache === 'function') {
+        void anyApi.removeMediaFromCache(anilistId).catch(() => {});
+      }
+    } catch {
+      // best-effort eviction; ignore failures
+    }
   }
 
   private async resolveViaNetwork(anilistId: number, hints?: ResolveHints): Promise<ResolvedMapping> {
