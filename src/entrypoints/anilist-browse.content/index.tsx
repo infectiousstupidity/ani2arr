@@ -6,9 +6,8 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { queryPersister, shouldPersistQuery } from '@/cache/query-cache';
 import { logger } from '@/utils/logger';
-import { extractMediaMetadataFromDom, metadataFromMediaObject, mergeMetadataHints } from '@/utils/anilist-dom';
+import { extractMediaMetadataFromDom, mergeMetadataHints } from '@/utils/anilist-dom';
 import type { MediaMetadataHint } from '@/types';
-import type { AniFormat } from '@/types';
 import browseStyles from './style.css?inline';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
@@ -58,44 +57,7 @@ const getCachedDomMetadata = (anilistId: number): MediaMetadataHint | null => {
   return metadata ?? null;
 };
 
-type MediaCardElement = Element & {
-  __vue__?: {
-    $props?: { media?: { format?: AniFormat | null } };
-    media?: { format?: AniFormat | null };
-  };
-};
-
-const FORMAT_TEXT_MAP = new Map<string, AniFormat>([
-  ['tv show', 'TV'],
-  ['tv', 'TV'],
-  ['tv short', 'TV_SHORT'],
-  ['ona', 'ONA'],
-  ['ova', 'OVA'],
-  ['movie', 'MOVIE'],
-  ['special', 'SPECIAL'],
-  ['music', 'MUSIC'],
-]);
-
-const normalizeFormatText = (value: string): string =>
-  value.toLowerCase().trim().replace(/\s+series$/, '');
-
-const detectCardFormat = (card: Element): AniFormat | null => {
-  const infoSpan = card.querySelector<HTMLSpanElement>('.hover-data .info span');
-  const infoText = infoSpan?.textContent;
-  if (infoText) {
-    const normalized = normalizeFormatText(infoText);
-    const mapped = FORMAT_TEXT_MAP.get(normalized);
-    if (mapped) return mapped;
-  }
-
-  const cardWithVue = card as MediaCardElement;
-  const mediaFormat =
-    cardWithVue.__vue__?.$props?.media?.format ?? cardWithVue.__vue__?.media?.format ?? null;
-
-  return typeof mediaFormat === 'string' ? (mediaFormat as AniFormat) : null;
-};
-
-const shouldSkipFormat = (format: AniFormat | null | undefined): boolean =>
+const shouldSkipFormat = (format: MediaMetadataHint['format']): boolean =>
   format === 'MOVIE' || format === 'MUSIC';
 
 const findCardContainer = (): HTMLElement | null => {
@@ -122,9 +84,6 @@ const parseAniListCard = (card: Element): ParsedCard | null => {
   const cover = card.querySelector<HTMLAnchorElement>(COVER_SELECTOR);
   if (!cover) return null;
 
-  const format = detectCardFormat(card);
-  if (shouldSkipFormat(format)) return null;
-
   const title =
     (card.querySelector<HTMLDivElement>('.title a')?.textContent ?? '').trim() ||
     (card.querySelector<HTMLDivElement>('.title')?.textContent ?? '').trim() ||
@@ -138,20 +97,19 @@ const parseAniListCard = (card: Element): ParsedCard | null => {
 
   if (!title || !Number.isFinite(anilistId)) return null;
 
-  const cardWithVue = card as MediaCardElement;
-  const vueMedia = cardWithVue.__vue__?.$props?.media ?? cardWithVue.__vue__?.media;
-  const vueMetadata = metadataFromMediaObject(vueMedia);
   const domMetadata = getCachedDomMetadata(anilistId);
-  const fallbackMetadata: MediaMetadataHint | null = title || format
+  if (shouldSkipFormat(domMetadata?.format ?? null)) return null;
+
+  const fallbackMetadata: MediaMetadataHint | null = title
     ? {
         titles: title ? { romaji: title } : null,
         synonyms: title ? [title] : null,
         startYear: null,
-        format: format ?? null,
+        format: domMetadata?.format ?? null,
         relationPrequelIds: null,
       }
     : null;
-  const metadata = mergeMetadataHints(mergeMetadataHints(vueMetadata, domMetadata), fallbackMetadata);
+  const metadata = mergeMetadataHints(domMetadata, fallbackMetadata);
 
   return { anilistId, title, host: cover, metadata: metadata ?? null };
 };

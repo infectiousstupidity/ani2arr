@@ -1,7 +1,7 @@
 // src/services/library.service.ts
 import type { TtlCache } from '@/cache';
 import type { SonarrApiService } from '@/api/sonarr.api';
-import type { MappingService } from './mapping.service';
+import type { MappingService } from './mapping';
 import type {
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
