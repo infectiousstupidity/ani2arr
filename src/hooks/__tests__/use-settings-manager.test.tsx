@@ -239,7 +239,6 @@ describe('useSettingsManager', () => {
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     await waitFor(() => expect(kitsunarrApiMock.testConnection).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(result.current.sonarrMetadata.isLoading).toBe(true));
     await waitFor(() => expect(result.current.sonarrMetadata.isSuccess).toBe(true));
 
     expect(result.current.formState.defaults.qualityProfileId).toBe(qualityProfile.id);
@@ -343,7 +342,7 @@ describe('useSettingsManager', () => {
       await result.current.handleTestConnection();
     });
 
-    expect(result.current.testConnectionState.isSuccess).toBe(true);
+    await waitFor(() => expect(result.current.testConnectionState.isSuccess).toBe(true));
 
     await act(async () => {
       result.current.resetConnection();

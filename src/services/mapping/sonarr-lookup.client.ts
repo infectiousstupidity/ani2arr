@@ -45,9 +45,9 @@ export class SonarrLookupClient {
     await Promise.all([this.caches.positive.clear(), this.caches.negative.clear()]);
   }
 
-  public async readFromCache(canonical: string): Promise<SonarrLookupSeries[]> {
+  public readFromCache(canonical: string): Promise<SonarrLookupSeries[]> {
     if (!canonical) {
-      return [];
+      return Promise.resolve([]);
     }
 
     const inflight = this.inflight.get(canonical);
@@ -57,21 +57,27 @@ export class SonarrLookupClient {
       return inflight;
     }
 
-    const positive = await this.caches.positive.read(canonical);
-    if (positive) {
-      incrementCounter('mapping.lookup.cache_hit');
-      this.log.debug(`readFromCache(${canonical}): positive cache hit (stale=${String(positive.stale)})`);
-      return positive.value;
-    }
+    return (async () => {
+      const positive = await this.caches.positive.read(canonical);
+      if (positive) {
+        incrementCounter('mapping.lookup.cache_hit');
+        this.log.debug(
+          `readFromCache(${canonical}): positive cache hit (stale=${String(positive.stale)})`,
+        );
+        return positive.value;
+      }
 
-    const negative = await this.caches.negative.read(canonical);
-    if (negative) {
-      incrementCounter('mapping.lookup.negative_cache_hit');
-      this.log.debug(`readFromCache(${canonical}): negative cache hit (stale=${String(negative.stale)})`);
+      const negative = await this.caches.negative.read(canonical);
+      if (negative) {
+        incrementCounter('mapping.lookup.negative_cache_hit');
+        this.log.debug(
+          `readFromCache(${canonical}): negative cache hit (stale=${String(negative.stale)})`,
+        );
+        return [];
+      }
+
       return [];
-    }
-
-    return [];
+    })();
   }
 
   public async lookup(
@@ -92,38 +98,44 @@ export class SonarrLookupClient {
     if (!canonical) {
       return this.performLookup(rawTerm, credentials);
     }
-
-    if (!forceNetwork) {
-      const positiveHit = await this.caches.positive.read(canonical);
-      if (positiveHit && !positiveHit.stale) {
-        incrementCounter('mapping.lookup.cache_hit');
-        this.log.debug(`lookup(${canonical}): returning fresh positive cache`);
-        return positiveHit.value;
-      }
-
-      const negativeHit = await this.caches.negative.read(canonical);
-      if (negativeHit && !negativeHit.stale) {
-        incrementCounter('mapping.lookup.negative_cache_hit');
-        this.log.debug(`lookup(${canonical}): returning fresh negative cache`);
-        return [];
-      }
-
-      const inflight = this.inflight.get(canonical);
-      if (inflight) {
-        incrementCounter('mapping.lookup.inflight_reuse');
-        this.log.debug(`lookup(${canonical}): reusing inflight lookup`);
-        return inflight;
-      }
-    } else {
-      const inflight = this.inflight.get(canonical);
-      if (inflight) {
-        this.log.debug(`lookup(${canonical}): forceNetwork requested but inflight exists; reusing`);
-        return inflight;
-      }
+    // Reuse any existing inflight request immediately
+    const existing = this.inflight.get(canonical);
+    if (existing) {
+      this.log.debug(`lookup(${canonical}): existing inflight found; reusing`);
+      incrementCounter('mapping.lookup.inflight_reuse');
+      return existing;
     }
 
-    const promise = this.performLookup(safeTerm, credentials)
-      .then(async results => {
+    // Create a deferred promise and set it as inflight BEFORE any awaits
+    let resolveFn!: (v: SonarrLookupSeries[]) => void;
+    let rejectFn!: (e: unknown) => void;
+    const deferred = new Promise<SonarrLookupSeries[]>((resolve, reject) => {
+      resolveFn = resolve;
+      rejectFn = reject;
+    });
+    this.inflight.set(canonical, deferred);
+
+    (async () => {
+      try {
+        if (!forceNetwork) {
+          const positiveHit = await this.caches.positive.read(canonical);
+          if (positiveHit && !positiveHit.stale) {
+            incrementCounter('mapping.lookup.cache_hit');
+            this.log.debug(`lookup(${canonical}): returning fresh positive cache (deferred)`);
+            resolveFn(positiveHit.value);
+            return;
+          }
+
+          const negativeHit = await this.caches.negative.read(canonical);
+          if (negativeHit && !negativeHit.stale) {
+            incrementCounter('mapping.lookup.negative_cache_hit');
+            this.log.debug(`lookup(${canonical}): returning fresh negative cache (deferred)`);
+            resolveFn([]);
+            return;
+          }
+        }
+
+        const results = await this.performLookup(safeTerm, credentials);
         if (results.length > 0) {
           await this.caches.positive.write(canonical, results, {
             staleMs: LOOKUP_SOFT_TTL,
@@ -137,17 +149,15 @@ export class SonarrLookupClient {
           });
           await this.caches.positive.remove(canonical);
         }
-        return results;
-      })
-      .catch(error => {
-        throw normalizeError(error);
-      })
-      .finally(() => {
+        resolveFn(results);
+      } catch (error) {
+        rejectFn(normalizeError(error));
+      } finally {
         this.inflight.delete(canonical);
-      });
+      }
+    })();
 
-    this.inflight.set(canonical, promise);
-    return promise;
+    return deferred;
   }
 
   private async performLookup(

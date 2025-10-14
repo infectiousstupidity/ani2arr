@@ -316,5 +316,8 @@ export function sanitizeLookupDisplay(term: string): string {
   const noParens = stripParenContent(cleaned);
   const reduced = stripSeasonalSuffixes(noParens);
   const trailingStripped = stripTrailingOrdinalOrNumber(reduced);
-  return trailingStripped.replace(/\s+/g, ' ').trim();
+  const normalized = trailingStripped.replace(/\s+/g, ' ').trim();
+  // If the string is only punctuation/separators (e.g., '/', '-', '&') treat as empty
+  if (!/[\p{L}\p{N}]/u.test(normalized)) return '';
+  return normalized;
 }

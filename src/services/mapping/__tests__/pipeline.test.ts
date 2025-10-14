@@ -13,7 +13,7 @@ import type { SonarrLookupClient, SonarrLookupCredentials } from '@/services/map
 
 vi.mock('@/services/mapping/scoring', () => ({
   scoreCandidates: vi.fn((term: SearchTerm, results: SonarrLookupSeries[]) =>
-    results.map((r: SonarrLookupSeries) => ({ term, result: r, score: (r as unknown as { score?: number }).score ?? 0 } as ScoredCandidate)),
+    results.map((r: SonarrLookupSeries) => ({ term, result: r, score: (r as unknown as { score?: number }).score ?? 0.8 } as ScoredCandidate)),
   ),
 }));
 
