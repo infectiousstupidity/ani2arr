@@ -428,4 +428,15 @@ export class AnilistApiService {
       setTimeout(resolve, ms);
     });
   }
+
+  // Evict a cached AniList media entry once it is no longer needed.
+  public async removeMediaFromCache(anilistId: number): Promise<void> {
+    const cache = this.caches?.media;
+    if (!cache) return;
+    try {
+      await cache.remove(String(anilistId));
+    } catch {
+      // best-effort eviction; ignore failures
+    }
+  }
 }

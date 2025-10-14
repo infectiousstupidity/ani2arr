@@ -12,7 +12,11 @@ export async function awaitBackgroundReady(
 ): Promise<void> {
   for (let i = 1; i <= attempts; i++) {
     try {
-      const res = (await browser.runtime.sendMessage({ type: 'kitsunarr:ping' })) as { ok?: boolean } | undefined;
+      const res = (await browser.runtime.sendMessage({
+        _kitsunarr: true,
+        type: 'kitsunarr:ping',
+        timestamp: Date.now(),
+      })) as { ok?: boolean } | undefined;
       if (res?.ok) return;
     } catch {
       // ignore and retry

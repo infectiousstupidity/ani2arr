@@ -99,6 +99,7 @@ export const useExtensionOptions = () => {
     queryKey: queryKeys.options(),
     queryFn: () => extensionOptions.getValue(),
     staleTime: Infinity,
+    meta: { persist: false },
   });
 
   useEffect(() => {

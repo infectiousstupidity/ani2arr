@@ -109,7 +109,9 @@ export default defineBackground(() => {
     (message: unknown): Promise<unknown> | void => {
       // Lightweight readiness probe so content scripts can wait until the
       // background has registered services before issuing RPC calls.
-      if ((message as { type?: string })?.type === 'kitsunarr:ping') {
+      if (
+        (message as { type?: string; timestamp?: number; _kitsunarr?: boolean })?.type === 'kitsunarr:ping'
+      ) {
         return Promise.resolve({ ok: true as const });
       }
 

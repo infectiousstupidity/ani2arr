@@ -4,12 +4,13 @@ const persistClientMock = vi.fn();
 const restoreClientMock = vi.fn().mockResolvedValue(undefined);
 const removeClientMock = vi.fn().mockResolvedValue(undefined);
 
-vi.mock('@/cache/cache-persister', () => ({
-  idbQueryCachePersister: {
+vi.mock('@/cache/query-cache', () => ({
+  queryPersister: {
     persistClient: persistClientMock,
     restoreClient: restoreClientMock,
     removeClient: removeClientMock,
   },
+  shouldPersistQuery: vi.fn(() => true),
 }));
 
 type HelpersModule = typeof import('../index');

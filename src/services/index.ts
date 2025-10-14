@@ -2,6 +2,7 @@
 import { defineProxyService } from '@webext-core/proxy-service';
 import { browser } from 'wxt/browser';
 import { createTtlCache } from '@/cache';
+import { CacheNamespaces } from '@/cache/namespaces';
 import { SonarrApiService } from '@/api/sonarr.api';
 import { AnilistApiService, type AniMedia } from '@/api/anilist.api';
 import { MappingService, type ResolvedMapping, type StaticMappingPayload } from './mapping.service';
@@ -80,24 +81,24 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
     const sonarrApiService = bindAll(new SonarrApiService());
     const anilistApiService = bindAll(
       new AnilistApiService({
-        media: createTtlCache<AniMedia>('anilist:media'),
+        media: createTtlCache<AniMedia>(CacheNamespaces.anilistMedia),
       }),
     );
 
     const staticProvider = new StaticMappingProvider({
-      primary: createTtlCache<StaticMappingPayload>('mapping:static:primary'),
-      fallback: createTtlCache<StaticMappingPayload>('mapping:static:fallback'),
+      primary: createTtlCache<StaticMappingPayload>(CacheNamespaces.mappingStaticPrimary),
+      fallback: createTtlCache<StaticMappingPayload>(CacheNamespaces.mappingStaticFallback),
     });
 
     const lookupClient = new SonarrLookupClient(sonarrApiService, {
-      positive: createTtlCache<SonarrLookupSeries[]>('mapping:lookup'),
-      negative: createTtlCache<boolean>('mapping:lookup-negative'),
+      positive: createTtlCache<SonarrLookupSeries[]>(CacheNamespaces.mappingLookupPositive),
+      negative: createTtlCache<boolean>(CacheNamespaces.mappingLookupNegative),
     });
 
     const mappingService = bindAll(
       new MappingService(anilistApiService, staticProvider, lookupClient, {
-        success: createTtlCache<ResolvedMapping>('mapping:success'),
-        failure: createTtlCache<ExtensionError>('mapping:failure'),
+        success: createTtlCache<ResolvedMapping>(CacheNamespaces.mappingResolvedSuccess),
+        failure: createTtlCache<ExtensionError>(CacheNamespaces.mappingResolvedFailure),
       }),
     );
 
@@ -149,7 +150,7 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
       new LibraryService(
         sonarrApiService,
         mappingService,
-        createTtlCache<LeanSonarrSeries[]>('library:lean'),
+        createTtlCache<LeanSonarrSeries[]>(CacheNamespaces.libraryLean),
         mutation => bumpLibraryEpoch({ tvdbId: mutation.tvdbId, action: mutation.action }),
       ),
     );
