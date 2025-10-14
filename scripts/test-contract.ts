@@ -940,6 +940,7 @@ async function main(): Promise<void> {
   browser.storage.onChanged.removeListener(storageListener);
   record('storage-events');
 
+
   console.log('\n=== Test Suite 7: Network Resilience (Simulated) ===');
 
   // Note: Full network failure testing would require disabling retry mechanisms
@@ -951,6 +952,27 @@ async function main(): Promise<void> {
     assert.ok(error, 'Invalid URL should throw error');
     record('network-invalid-url');
   }
+
+  // New test suite for malformed URLs
+  console.log('\n=== Test Suite 7a: Malformed URL Rejection ===');
+  const malformedUrlTests = [
+    { url: 'javascript:void(0)', name: 'javascript protocol' },
+    { url: 'ftp://sonarr.local', name: 'unsupported protocol' },
+    { url: 'http://user:pass@sonarr.local', name: 'credentials in URL' },
+    { url: 'http://sonarr.local:65537', name: 'invalid port' },
+    { url: 'data:text/plain,hello', name: 'data protocol' },
+    { url: 'http://invalid_host', name: 'malformed hostname' },
+  ];
+
+  for (const { url, name } of malformedUrlTests) {
+    try {
+      await api.testConnection({ url, apiKey: 'any-key' });
+      assert.fail(`testConnection should have rejected malformed URL (${name})`);
+    } catch (error) {
+      assert.ok(error, `testConnection correctly rejected malformed URL (${name})`);
+    }
+  }
+  record('malformed-url-rejection');
 
   console.log('\n=== Test Suite 8: Mapping Resolution Chain ===');
 

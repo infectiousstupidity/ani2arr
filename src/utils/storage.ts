@@ -2,8 +2,10 @@
 
 /**
  * @file Defines and exports user-configurable extension settings.
- * This file uses `@wxt-dev/storage` for its powerful features like
- * versioning, defaults, and cross-device synchronization ('sync' storage).
+ * This file uses `@wxt-dev/storage` for features like
+ * versioning and defaults. The extension intentionally stores
+ * credentials in `browser.storage.local` (device-only) so API keys
+ * are not uploaded to any browser cloud sync service.
  */
 import { storage } from '@wxt-dev/storage';
 import type { ExtensionOptions } from '../types';

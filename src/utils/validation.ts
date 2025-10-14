@@ -21,10 +21,32 @@ export function validateUrl(url: string): { isValid: boolean; error?: string; no
     return { isValid: false, error: 'URL cannot be empty.' };
   }
 
+  // Quickly detect explicit port and validate range before URL parsing (handles >65535 which can throw)
+  const portMatch = /^https?:\/\/(?:\[[^\]]+\]|[^\/:]+)(?::(?<port>\d+))?(?:[\/:]|$)/i.exec(trimmedUrl);
+  if (portMatch?.groups?.port) {
+    const portNum = Number.parseInt(portMatch.groups.port, 10);
+    if (!Number.isFinite(portNum) || portNum < 1 || portNum > 65535) {
+      return { isValid: false, error: 'Invalid port.' };
+    }
+  }
+
   try {
     const urlObj = new URL(trimmedUrl);
     if (!['http:', 'https:'].includes(urlObj.protocol)) {
       return { isValid: false, error: 'URL must use http or https.' };
+    }
+
+    // Disallow embedded credentials (userinfo) in URLs
+    if ((urlObj.username && urlObj.username.length > 0) || (urlObj.password && urlObj.password.length > 0)) {
+      return { isValid: false, error: 'Credentials in URL are not supported.' };
+    }
+
+    // Validate explicit port range when present
+    if (urlObj.port) {
+      const portNum = Number.parseInt(urlObj.port, 10);
+      if (!Number.isFinite(portNum) || portNum < 1 || portNum > 65535) {
+        return { isValid: false, error: 'Invalid port.' };
+      }
     }
 
     const hostname = urlObj.hostname;

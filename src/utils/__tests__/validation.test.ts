@@ -28,6 +28,16 @@ describe('validateUrl', () => {
       expected: { isValid: false, error: 'URL must use http or https.' },
     },
     {
+      name: 'rejects javascript protocol',
+      input: 'javascript:alert(1)',
+      expected: { isValid: false, error: 'URL must use http or https.' },
+    },
+    {
+      name: 'rejects data protocol',
+      input: 'data:text/plain,hello',
+      expected: { isValid: false, error: 'URL must use http or https.' },
+    },
+    {
       name: 'rejects malformed hosts',
       input: 'http://invalid_host',
       expected: { isValid: false, error: 'Invalid hostname.' },
@@ -36,6 +46,16 @@ describe('validateUrl', () => {
       name: 'rejects out-of-range IPv4 octets',
       input: 'http://256.0.0.1',
       expected: { isValid: false, error: 'Invalid URL format.' },
+    },
+    {
+      name: 'rejects credentials in URL',
+      input: 'https://user:pass@example.com',
+      expected: { isValid: false, error: 'Credentials in URL are not supported.' },
+    },
+    {
+      name: 'rejects invalid port',
+      input: 'http://sonarr.local:65537',
+      expected: { isValid: false, error: 'Invalid port.' },
     },
   ])('$name', ({ input, expected }) => {
     expect(validateUrl(input)).toEqual(expected);

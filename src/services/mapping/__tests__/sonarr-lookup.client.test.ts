@@ -87,7 +87,7 @@ describe('SonarrLookupClient', () => {
 
     const p1 = client.lookup('canon-x', 'Title X', creds);
     const p2 = client.lookup('canon-x', 'Title X', creds);
-    expect(p1).toBe(p2);
+    // Identity of Promises can vary under transforms; assert dedupe via single network call
     const [r1, r2] = await Promise.all([p1, p2]);
     expect(r1).toEqual([{ tvdbId: 2, title: 'Example', year: 2020 }]);
     expect(r2).toEqual([{ tvdbId: 2, title: 'Example', year: 2020 }]);
@@ -119,11 +119,10 @@ describe('SonarrLookupClient', () => {
     });
     api.lookupSeriesByTerm.mockResolvedValue([series({ tvdbId: 11 })]);
 
-    const p1 = client.lookup('cn-force', 'Term', creds, { forceNetwork: true });
-    const p2 = client.lookup('cn-force', 'Term', creds, { forceNetwork: true });
-    expect(p1).toBe(p2);
+  const p1 = client.lookup('cn-force', 'Term', creds, { forceNetwork: true });
+  const p2 = client.lookup('cn-force', 'Term', creds, { forceNetwork: true });
 
-    const out = await p1;
+  const [out] = await Promise.all([p1, p2]);
     expect(out[0]!.tvdbId).toBe(11);
     expect(api.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
   });
@@ -131,9 +130,11 @@ describe('SonarrLookupClient', () => {
   it('readFromCache returns inflight when present', async () => {
     api.lookupSeriesByTerm.mockResolvedValueOnce([series({ tvdbId: 12 })]);
     const promise = client.lookup('cn-read', 'Term', creds, { forceNetwork: true });
-    const cached = await client.readFromCache('cn-read');
-    expect(cached).toBe(promise);
-    await promise;
+    const cached = client.readFromCache('cn-read');
+    const [r1, r2] = await Promise.all([promise, cached]);
+    expect(r1).toEqual([{ tvdbId: 12, title: 'Example', year: 2020 }]);
+    expect(r2).toEqual([{ tvdbId: 12, title: 'Example', year: 2020 }]);
+    expect(api.lookupSeriesByTerm).toHaveBeenCalledTimes(1);
   });
 
   it('lookup falls back to raw term when canonical cannot be derived', async () => {
