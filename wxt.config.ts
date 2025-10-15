@@ -34,7 +34,8 @@ export default defineConfig({
       'https://graphql.anilist.co/*',
       'https://anichart.net/*',
       'https://www.anichart.net/*',
-      'https://raw.githubusercontent.com/*',
+      'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json',
+      'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json',
     ];
 
     const basePermissions = ['storage', 'alarms'];

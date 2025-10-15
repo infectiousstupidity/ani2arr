@@ -1,6 +1,7 @@
 // src/ui/SonarrActionGroup.tsx
 import React from 'react';
 import Button from '@/ui/Button';
+import TooltipWrapper from '@/ui/TooltipWrapper';
 import { GearIcon, ExternalLinkIcon } from '@radix-ui/react-icons';
 import { useExtensionOptions } from '@/hooks/use-api-queries';
 import { logger } from '@/utils/logger';
@@ -43,34 +44,88 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
   const isIdle = status === 'NOT_IN_SONARR';
   const isInSonarr = status === 'IN_SONARR';
   const isLoading = status === 'LOADING' || status === 'ADDING';
+
+  // Group-level tooltip: when mapping wasn't found, show the same message for the whole button cluster
+  const groupTooltip = tvdbId === null ? 'No automatic TVDB ID match was found for this title. Try searching for it manually.' : undefined;
+
+  const mainButtonTooltip = (() => {
+    // When group tooltip is active, avoid a second tooltip on the button itself
+    if (groupTooltip) return undefined;
+    switch (status) {
+      case 'IN_SONARR':
+        return 'Already added to Sonarr';
+      case 'LOADING':
+        return 'Checking Sonarr status…';
+      case 'ADDING':
+        return 'Submitting add request to Sonarr…';
+      case 'ERROR':
+        return 'An error occurred resolving this title.';
+      default:
+        return undefined;
+    }
+  })();
+  const settingsDisabled = !isIdle || tvdbId === null;
+  const settingsTooltip = !groupTooltip && !settingsDisabled ? 'Advanced Sonarr options' : undefined;
   
   return (
-    <div className="grid grid-cols-[1fr_auto] gap-4 items-start w-full">
-        <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group">
+  <div className="grid grid-cols-[1fr_auto] gap-4 items-start w-full">
+    {groupTooltip ? (
+      <TooltipWrapper content={groupTooltip} container={portalContainer ?? null}>
+      <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group">
+        {/* Main Action Button */}
+        <Button
+          size="md"
+          onClick={onQuickAdd}
+          isLoading={isLoading}
+          disabled={!isIdle || tvdbId === null}
+          portalContainer={portalContainer}
+          className="flex-1 rounded-none h-[35px] text-[14px] text-text-primary"
+          loadingText={getButtonText()}
+        >
+          {tvdbId === null ? "Cannot add" : getButtonText()}
+        </Button>
+        {/* Settings Button */}
+        <Button
+          size="icon"
+          onClick={onOpenModal}
+          disabled={settingsDisabled}
+          portalContainer={portalContainer}
+          className="rounded-none h-[35px] w-[35px] bg-[#3db4f2] text-[#072033] transition-colors hover:bg-[#299dd1] focus-visible:z-10 focus-visible:ring-offset-0 disabled:bg-[#3db4f2]/50 disabled:text-[#072033]/60"
+          aria-label="Advanced options"
+        >
+          <GearIcon className="h-4 w-4 text-text-primary" />
+        </Button>
+      </div>
+      </TooltipWrapper>
+    ) : (
+      <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group">
             {/* Main Action Button */}
-            <Button
-                size="md"
-                onClick={onQuickAdd}
-                isLoading={isLoading}
-                disabled={!isIdle || tvdbId === null}
-                className="flex-1 rounded-none h-[35px] text-[14px] text-text-primary"
-                loadingText={getButtonText()}
-            >
+      <Button
+        size="md"
+        onClick={onQuickAdd}
+        isLoading={isLoading}
+        disabled={!isIdle || tvdbId === null}
+        {...(mainButtonTooltip ? { tooltip: mainButtonTooltip } : {})}
+        portalContainer={portalContainer}
+        className="flex-1 rounded-none h-[35px] text-[14px] text-text-primary"
+        loadingText={getButtonText()}
+      >
                 {tvdbId === null ? "Cannot add" : getButtonText()}
             </Button>
             {/* Settings Button */}
             <Button
                 size="icon"
                 onClick={onOpenModal}
-                disabled={!isIdle || tvdbId === null}
-                tooltip="Advanced Sonarr options"
+        disabled={settingsDisabled}
+        {...(settingsTooltip ? { tooltip: settingsTooltip } : {})}
                 portalContainer={portalContainer}
                 className="rounded-none h-[35px] w-[35px] bg-[#3db4f2] text-[#072033] transition-colors hover:bg-[#299dd1] focus-visible:z-10 focus-visible:ring-offset-0 disabled:bg-[#3db4f2]/50 disabled:text-[#072033]/60"
                 aria-label="Advanced options"
             >
                 <GearIcon className="h-4 w-4 text-text-primary" />
             </Button>
-        </div>
+      </div>
+    )}
 
         {/* External Link Button */}
         {options?.sonarrUrl && (

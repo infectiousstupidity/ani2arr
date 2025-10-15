@@ -41,7 +41,7 @@ type ResolveTvdbIdOptions = {
 
 export class MappingService {
   private readonly log = logger.create('MappingService');
-  private readonly inflight = new Map<number, Promise<ResolvedMapping>>();
+  private readonly inflight = new Map<number, Promise<ResolvedMapping | null>>();
   private readonly sessionSeenCanonical = new Set<string>();
 
   constructor(
@@ -64,7 +64,11 @@ export class MappingService {
     return this.staticProvider.init();
   }
 
-  public resolveTvdbId(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping> {
+  /**
+   * Resolve AniList ID to TVDB ID. Returns null if no mapping is found (expected case).
+   * Still throws for genuine errors (network, permission, config, api errors).
+   */
+  public resolveTvdbId(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping | null> {
     const bypassFailureCache = options.ignoreFailureCache === true;
     const existing = this.inflight.get(anilistId);
     if (existing) {
@@ -88,7 +92,7 @@ export class MappingService {
     anilistId: number,
     options: ResolveTvdbIdOptions,
     bypassFailureCache: boolean,
-  ): Promise<ResolvedMapping> {
+  ): Promise<ResolvedMapping | null> {
     const cacheKey = this.successCacheKey(anilistId);
     const cachedSuccess = await this.caches.success.read(cacheKey);
     if (cachedSuccess) {
@@ -138,11 +142,23 @@ export class MappingService {
       }
     }
 
-    let resolved: ResolvedMapping;
+    let resolved: ResolvedMapping | null;
     try {
       resolved = await this.resolveViaNetwork(anilistId, options.hints);
     } catch (error) {
       const normalized = normalizeError(error);
+      // VALIDATION_ERROR means no match found (expected) — return null instead of throwing
+      if (normalized.code === ErrorCode.VALIDATION_ERROR) {
+        if (!bypassFailureCache) {
+          const ttl = this.failureTtlsFor(normalized);
+          await this.caches.failure.write(this.failureCacheKey(anilistId), normalized, {
+            staleMs: ttl.stale,
+            hardMs: ttl.hard,
+          });
+        }
+        return null;
+      }
+      // Real errors (network, config, permission) still throw
       if (!bypassFailureCache && this.shouldCacheFailure(normalized)) {
         const ttl = this.failureTtlsFor(normalized);
         await this.caches.failure.write(this.failureCacheKey(anilistId), normalized, {
@@ -151,6 +167,10 @@ export class MappingService {
         });
       }
       throw normalized;
+    }
+
+    if (resolved === null) {
+      return null;
     }
 
     await this.caches.success.write(cacheKey, resolved, {
@@ -172,7 +192,7 @@ export class MappingService {
     }
   }
 
-  private async resolveViaNetwork(anilistId: number, hints?: ResolveHints): Promise<ResolvedMapping> {
+  private async resolveViaNetwork(anilistId: number, hints?: ResolveHints): Promise<ResolvedMapping | null> {
     const credentials = await this.getConfiguredCredentials();
 
     const metadataMedia = this.buildMediaFromMetadataHint(anilistId, hints?.domMedia);
@@ -189,11 +209,9 @@ export class MappingService {
       return apiResolved;
     }
 
-    throw createError(
-      ErrorCode.VALIDATION_ERROR,
-      `Sonarr lookup yielded no match for AniList ID ${anilistId}.`,
-      'Could not find a matching series on TheTVDB.',
-    );
+    // No match found — return null (expected case, not an error)
+    this.log.debug(`resolveViaNetwork: no match found for AniList ID ${anilistId}`);
+    return null;
   }
 
   private async tryResolveWithMedia(
@@ -202,11 +220,9 @@ export class MappingService {
     hints?: ResolveHints,
   ): Promise<ResolvedMapping | null> {
     if (media.format && !ALLOWED_FORMATS.has(media.format)) {
-      throw createError(
-        ErrorCode.VALIDATION_ERROR,
-        `Unsupported AniList format (${media.format}) for AniList ID ${media.id}.`,
-        'This title is not a supported Sonarr series format.',
-      );
+      // Unsupported format — return null (not an error, just not mappable)
+      this.log.debug(`tryResolveWithMedia: unsupported format '${media.format}' for AniList ID ${media.id}`);
+      return null;
     }
 
     const prequelStatic = await this.lookupPrequelStatic(media);

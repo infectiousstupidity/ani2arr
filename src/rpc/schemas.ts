@@ -8,7 +8,7 @@ export interface ResolveInput {
 }
 
 export interface MappingOutput {
-  tvdbId: number;
+  tvdbId: number | null;
   successfulSynonym?: string;
 }
 
