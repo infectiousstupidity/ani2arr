@@ -178,8 +178,8 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
         }
         const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
         return {
-          tvdbId: mapping.tvdbId,
-          ...(mapping.successfulSynonym ? { successfulSynonym: mapping.successfulSynonym } : {}),
+          tvdbId: mapping ? mapping.tvdbId : null,
+          ...(mapping?.successfulSynonym ? { successfulSynonym: mapping.successfulSynonym } : {}),
         } satisfies MappingOutput;
       },
 
@@ -222,6 +222,14 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
           resolveOptions.hints = hints;
         }
         const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
+
+        if (!mapping) {
+          throw createError(
+            ErrorCode.VALIDATION_ERROR,
+            `Could not resolve AniList ID ${input.anilistId} to a TVDB ID.`,
+            'Unable to add this series to Sonarr because no matching TVDB entry was found.',
+          );
+        }
 
         const payload = {
           ...input.form,

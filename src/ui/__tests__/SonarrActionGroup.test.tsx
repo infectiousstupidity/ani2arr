@@ -77,7 +77,8 @@ describe('SonarrActionGroup', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'In Sonarr' })).toBeDisabled();
+  const inSonarrBtn = screen.getByRole('button', { name: 'In Sonarr' });
+  expect(inSonarrBtn).toBeDisabled();
     const externalLink = screen.getByRole('link');
     fireEvent.click(externalLink);
     expect(externalLink.getAttribute('href')).toBe('http://sonarr.local/series/series-slug');
@@ -99,7 +100,8 @@ describe('SonarrActionGroup', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Cannot add' })).toBeDisabled();
+  const cannotAddBtn = screen.getByRole('button', { name: 'Cannot add' });
+  expect(cannotAddBtn).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Advanced options' })).toBeDisabled();
   });
 

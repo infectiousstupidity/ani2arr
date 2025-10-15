@@ -591,14 +591,10 @@ describe('LibraryService', () => {
       );
     });
 
-    it('returns a missing-link response when mapping throws validation errors', async () => {
+    it('returns a missing-link response when mapping returns null (no match)', async () => {
       cache.read.mockResolvedValueOnce(createCacheHit([]));
-      const validationError = createError(
-        ErrorCode.VALIDATION_ERROR,
-        'validation failed',
-        'Validation error',
-      );
-      mappingService.resolveTvdbId.mockRejectedValueOnce(validationError);
+      // resolveTvdbId now returns null when no mapping is found (instead of throwing VALIDATION_ERROR)
+      mappingService.resolveTvdbId.mockResolvedValueOnce(null);
 
       const response = await service.getSeriesStatus({ anilistId: 12, title: 'Title' });
 

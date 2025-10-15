@@ -105,6 +105,7 @@ a.cover {
 .kitsunarr-card-overlay__symbol {
   width: 14px;
   height: 14px;
+  color: #ffffff; /* make inline SVG icons white */
 }
 
 /* Quick add states */
@@ -122,6 +123,7 @@ a.cover {
 .kitsunarr-card-overlay__quick[data-state='in-sonarr'] {
   background: #00ba7c;
   color: #06281a;
+  cursor: default;
 }
 
 .kitsunarr-card-overlay__quick[data-state='error'] {
@@ -192,14 +194,40 @@ a.cover:hover .kitsunarr-card-overlay__gear-shell,
 .kitsunarr-card-overlay__gear:hover:not(:disabled):not([aria-disabled='true']) {
   transform: scale(1.06);
   box-shadow: 0 0 6px 2px rgba(45, 45, 45, 0.45);
-  background: rgba(var(--color-overlay, 12, 24, 32), 1);
+  /* slightly darker on hover */
+  background: #0f5f80;
   cursor: pointer;
 }
 
 .kitsunarr-card-overlay__gear svg {
   width: 14px;
   height: 14px;
+  color: #ffffff; /* white gear icon */
 }
+
+/* External Sonarr link button - same size as gear and darker variant */
+.kitsunarr-card-overlay__external {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #167ea6;
+  color: #ffffff;
+  box-shadow: 0 0 5px 2px rgba(45, 45, 45, 0.35);
+  text-decoration: none;
+  transition: transform .2s ease-in-out, box-shadow .2s ease-in-out, background-color .2s ease-in-out, opacity .2s ease-in-out;
+}
+
+.kitsunarr-card-overlay__external:hover:not([disabled]) {
+  transform: scale(1.06);
+  box-shadow: 0 0 6px 2px rgba(45, 45, 45, 0.45);
+  background: #0f5f80;
+}
+
+.kitsunarr-card-overlay__external svg { width: 14px; height: 14px; color: #ffffff; }
 
 .kitsunarr-card-overlay__gear:disabled,
 .kitsunarr-card-overlay__gear[aria-disabled='true'] {

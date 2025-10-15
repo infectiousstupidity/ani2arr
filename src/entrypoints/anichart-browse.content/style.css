@@ -121,6 +121,7 @@ a.cover {
 .kitsunarr-card-overlay__quick[data-state='in-sonarr'] {
   background: #00ba7c;
   color: #06281a;
+  cursor: default;
 }
 
 .kitsunarr-card-overlay__quick[data-state='error'] {
@@ -134,7 +135,7 @@ a.cover {
   cursor: default;
 }
 
-.kitsunarr-card-overlay__quick[disabled] {
+.kitsunarr-card-overlay__quick[disabled]:not([data-state='in-sonarr']) {
   opacity: 1;
   cursor: not-allowed;
 }
@@ -171,8 +172,9 @@ a.cover:hover .kitsunarr-card-overlay__gear-shell,
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: rgba(12, 24, 32, 0.95);
-  color: #f7f9f9;
+  /* improved, deeper blue variant for contrast; icons use white for accessibility */
+  background: #167ea6; /* deeper blue that pairs with #3db4f2 */
+  color: #ffffff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -189,13 +191,39 @@ a.cover:hover .kitsunarr-card-overlay__gear-shell,
 .kitsunarr-card-overlay__gear:hover:not(:disabled):not([aria-disabled='true']) {
   transform: scale(1.08);
   box-shadow: 0 14px 26px rgba(7, 14, 22, 0.5);
-  background: rgba(12, 24, 32, 1);
+  background: #0f5f80;
 }
 
 .kitsunarr-card-overlay__gear svg {
   width: 14px;
   height: 14px;
+  color: #ffffff; /* white gear icon */
 }
+
+/* External Sonarr link button - same size as gear and darker variant */
+.kitsunarr-card-overlay__external {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #167ea6;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(7, 14, 22, 0.45);
+  text-decoration: none;
+  border: 1px solid rgba(5, 13, 24, 0.45);
+  transition: transform .2s ease-in-out, box-shadow .2s ease-in-out, background-color .2s ease-in-out;
+}
+
+.kitsunarr-card-overlay__external:hover:not([disabled]) {
+  transform: scale(1.08);
+  box-shadow: 0 14px 26px rgba(7, 14, 22, 0.5);
+  background: #0f5f80;
+}
+
+.kitsunarr-card-overlay__external svg { width: 14px; height: 14px; color: #ffffff; }
 
 .kitsunarr-card-overlay__gear:disabled,
 .kitsunarr-card-overlay__gear[aria-disabled='true'] {

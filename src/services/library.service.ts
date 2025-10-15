@@ -159,11 +159,15 @@ export class LibraryService {
 
       try {
         const mapping = await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
-        tvdbId = mapping.tvdbId ?? null;
-        successfulSynonym = mapping.successfulSynonym;
+        if (mapping) {
+          tvdbId = mapping.tvdbId;
+          successfulSynonym = mapping.successfulSynonym;
+        }
+        // mapping is null = not found (expected)
       } catch (error) {
         const normalized = normalizeError(error);
-        if (normalized.code === ErrorCode.CONFIGURATION_ERROR || normalized.code === ErrorCode.VALIDATION_ERROR) {
+        // Only CONFIGURATION_ERROR is treated as graceful (not configured yet)
+        if (normalized.code === ErrorCode.CONFIGURATION_ERROR) {
           return {
             exists: false,
             tvdbId: null,

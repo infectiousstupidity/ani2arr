@@ -5,7 +5,7 @@ import { useAddSeries, useExtensionOptions, useSeriesStatus } from '@/hooks/use-
 import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
 import { useTheme } from '@/hooks/use-theme';
 import TooltipWrapper from '@/ui/TooltipWrapper';
-import { CheckIcon, ExclamationTriangleIcon, GearIcon, PlusIcon } from '@radix-ui/react-icons';
+import { CheckIcon, ExclamationTriangleIcon, GearIcon, PlusIcon, ExternalLinkIcon } from '@radix-ui/react-icons';
 import type { ExtensionError, MediaMetadataHint, SonarrFormState } from '@/types';
 
 const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
@@ -288,7 +288,10 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
   const quickAddTooltip = quickAddTitle;
   const tooltipContainer = useMemo(() => (typeof document !== 'undefined' ? document.body : null), []);
 
+  const { data: extensionOptions } = useExtensionOptions();
+
   const showAdvancedButton = overlayState === 'addable';
+  const showExternalButton = overlayState === 'in-sonarr' && Boolean(extensionOptions?.sonarrUrl);
   const advancedDisabled = false;
 
   return (
@@ -314,27 +317,59 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({ anilistId, title, onOpen
         </button>
       </TooltipWrapper>
 
-      {showAdvancedButton && (
+      {(showAdvancedButton || showExternalButton) && (
         <div className="kitsunarr-card-overlay__gear-shell" data-state={overlayState}>
-          <TooltipWrapper
-            content="Advanced Sonarr options"
-            side="top"
-            align="start"
-            sideOffset={6}
-            container={tooltipContainer}
-          >
-            <button
-              type="button"
-              className="kitsunarr-card-overlay__gear"
-              aria-label="Open advanced Sonarr options"
-              onClick={handleOpenAdvanced}
-              onMouseDown={swallowEvent}
-              disabled={advancedDisabled}
-              aria-disabled={advancedDisabled || undefined}
+          {showAdvancedButton && (
+            <TooltipWrapper
+              content="Advanced Sonarr options"
+              side="top"
+              align="start"
+              sideOffset={6}
+              container={tooltipContainer}
             >
-              <GearIcon aria-hidden="true" />
-            </button>
-          </TooltipWrapper>
+              <button
+                type="button"
+                className="kitsunarr-card-overlay__gear"
+                aria-label="Open advanced Sonarr options"
+                onClick={handleOpenAdvanced}
+                onMouseDown={swallowEvent}
+                disabled={advancedDisabled}
+                aria-disabled={advancedDisabled || undefined}
+              >
+                <GearIcon aria-hidden="true" />
+              </button>
+            </TooltipWrapper>
+          )}
+
+          {showExternalButton && (
+            <TooltipWrapper
+              content="Open in Sonarr"
+              side="top"
+              align="start"
+              sideOffset={6}
+              container={tooltipContainer}
+            >
+              <div>
+                {/* mirror External Link Button behavior from SonarrActionGroup */}
+                <a
+                  className="kitsunarr-card-overlay__external"
+                  href={
+                    extensionOptions!.sonarrUrl!.replace(/\/$/, '') + (
+                      statusData?.series?.titleSlug
+                        ? `/series/${statusData.series.titleSlug}`
+                        : `/add/new?term=${encodeURIComponent(title)}`
+                    )
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onMouseDown={swallowEvent}
+                  aria-label="Open in Sonarr"
+                >
+                  <ExternalLinkIcon aria-hidden="true" />
+                </a>
+              </div>
+            </TooltipWrapper>
+          )}
         </div>
       )}
     </div>

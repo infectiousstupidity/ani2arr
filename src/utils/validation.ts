@@ -22,7 +22,7 @@ export function validateUrl(url: string): { isValid: boolean; error?: string; no
   }
 
   // Quickly detect explicit port and validate range before URL parsing (handles >65535 which can throw)
-  const portMatch = /^https?:\/\/(?:\[[^\]]+\]|[^\/:]+)(?::(?<port>\d+))?(?:[\/:]|$)/i.exec(trimmedUrl);
+  const portMatch = /^https?:\/\/(?:\[[^\]]+\]|[^/:]+)(?::(?<port>\d+))?(?:[/:]|$)/i.exec(trimmedUrl);
   if (portMatch?.groups?.port) {
     const portNum = Number.parseInt(portMatch.groups.port, 10);
     if (!Number.isFinite(portNum) || portNum < 1 || portNum > 65535) {

@@ -207,7 +207,8 @@ describe('MappingService', () => {
     const service = createService();
     const result = await service.resolveTvdbId(14, { ignoreFailureCache: true });
 
-    expect(result.tvdbId).toBe(100);
+  expect(result).not.toBeNull();
+  expect(result!.tvdbId).toBe(100);
     expect(lookupClientMock.lookup).toHaveBeenCalled();
   });
 
