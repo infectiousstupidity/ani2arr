@@ -2,6 +2,9 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
+import { logger } from '@/utils/logger';
+
+const log = logger.create('Broadcasts');
 
 
 const SERIES_ROOT_KEY = ['kitsunarr', 'seriesStatus'] as const;
@@ -87,7 +90,7 @@ export function useKitsunarrBroadcasts(): void {
           queryClient.clear();
         }
       } catch (error) {
-        console.warn('Failed to reconcile Kitsunarr library epoch.', error);
+        log.warn('Failed to reconcile Kitsunarr library epoch.', error instanceof Error ? error.message : String(error));
       }
     })();
   }, [queryClient]);

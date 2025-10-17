@@ -51,7 +51,66 @@ function emit(level: LogLevel, scope: string | undefined, args: unknown[]): void
     return;
   }
 
-  const [first, ...rest] = args;
+  // Redact sensitive fields from arguments to avoid leaking credentials
+  const SENSITIVE_KEYS = new Set([
+    'apiKey',
+    'sonarrApiKey',
+    'api_key',
+    'sonarrUrl',
+    'sonarr_url',
+    // keep benign URLs visible; redact only when credentials are present
+    'password',
+    'token',
+    'authorization',
+    'auth',
+    'x-api-key',
+    'X-Api-Key',
+  ]);
+
+  function redactValue(value: unknown, depth = 0): unknown {
+    if (depth > 5) return '[REDACTED]';
+    if (value === null || value === undefined) return value;
+    const t = typeof value;
+    if (t === 'string') {
+      // Redact URLs containing API keys in query params or paths
+      const str = value as string;
+      if (str.includes('apikey=') || str.includes('api_key=') || str.includes('token=')) {
+        return '[REDACTED_URL]';
+      }
+      return value;
+    }
+    if (t === 'number' || t === 'boolean') return value;
+    if (Array.isArray(value)) return value.map((v) => redactValue(v, depth + 1));
+    if (t === 'object') {
+      try {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+          const lowerKey = k.toLowerCase();
+          // Check both exact match and case-insensitive match for HTTP headers
+          if (SENSITIVE_KEYS.has(k) || SENSITIVE_KEYS.has(lowerKey)) {
+            out[k] = '[REDACTED]';
+          } else {
+            out[k] = redactValue(v, depth + 1);
+          }
+        }
+        return out;
+      } catch {
+        return '[REDACTED]';
+      }
+    }
+    return '[REDACTED]';
+  }
+
+  function redactArg(arg: unknown): unknown {
+    if (typeof arg === 'object' && arg !== null) {
+      return redactValue(arg);
+    }
+    return arg;
+  }
+
+  const safeArgs = args.map(redactArg);
+
+  const [first, ...rest] = safeArgs;
   if (typeof first === 'string') {
     consoleMethod.call(console, `${prefix} ${first}`, ...rest);
   } else {

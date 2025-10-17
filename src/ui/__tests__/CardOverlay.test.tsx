@@ -5,6 +5,7 @@ import { createBrowserMock, getReactHandler } from '@/testing';
 
 import type { CardOverlayProps } from '../BrowseOverlay';
 import { CardOverlay } from '../BrowseOverlay';
+import { createStatusStub, createAddSeriesStub, SeriesStatusStub, AddSeriesStub } from '@/testing/mocks/useApiQueriesMock';
 
 type FakeBrowser = {
   runtime: {
@@ -34,54 +35,23 @@ vi.mock('wxt/browser', () => {
   return createBrowserMock(browser);
 });
 
-type SeriesStatusStub = {
-  data: Partial<{ exists: boolean; anilistTvdbLinkMissing: boolean }> | null;
-  isError: boolean;
-  error: unknown;
-  isLoading: boolean;
-  fetchStatus: 'idle' | 'fetching';
-  refetch: ReturnType<typeof vi.fn>;
-};
-
-type AddSeriesStub = {
-  mutate: ReturnType<typeof vi.fn>;
-  isPending: boolean;
-  isSuccess: boolean;
-  isError: boolean;
-  error: unknown;
-  reset: ReturnType<typeof vi.fn>;
-};
-
-const createStatusStub = (overrides: Partial<SeriesStatusStub> = {}): SeriesStatusStub => ({
-  data: null,
-  isError: false,
-  error: null,
-  isLoading: false,
-  fetchStatus: 'idle',
-  refetch: vi.fn(() => Promise.resolve()),
-  ...overrides,
-});
-
-const createAddSeriesStub = (overrides: Partial<AddSeriesStub> = {}): AddSeriesStub => ({
-  mutate: vi.fn(),
-  isPending: false,
-  isSuccess: false,
-  isError: false,
-  error: null,
-  reset: vi.fn(),
-  ...overrides,
-});
-
-const useSeriesStatusMock = vi.fn();
-const useAddSeriesMock = vi.fn();
-const useThemeMock = vi.fn();
-const tooltipCalls: Array<{ content?: React.ReactNode; children: React.ReactNode }> = [];
-
+// Hoisted spies + vi.mock factory for use-api-queries
+const hoisted = vi.hoisted(() => ({
+  useSeriesStatusMock: vi.fn(),
+  useAddSeriesMock: vi.fn(),
+  useExtensionOptionsMock: vi.fn(() => ({ data: null })),
+}));
 vi.mock('@/hooks/use-api-queries', () => ({
   __esModule: true,
-  useSeriesStatus: () => useSeriesStatusMock(),
-  useAddSeries: () => useAddSeriesMock(),
+  useSeriesStatus: (..._args: unknown[]) => hoisted.useSeriesStatusMock(..._args),
+  useAddSeries: () => hoisted.useAddSeriesMock(),
+  useExtensionOptions: () => hoisted.useExtensionOptionsMock(),
+  useSonarrMetadata: () => ({ data: null }),
+  useTestConnection: () => ({ mutate: vi.fn() }),
+  useSaveOptions: () => ({ mutate: vi.fn() }),
 }));
+const useThemeMock = vi.fn();
+const tooltipCalls: Array<{ content?: React.ReactNode; children: React.ReactNode }> = [];
 
 vi.mock('@/hooks/use-theme', () => ({
   __esModule: true,
@@ -130,8 +100,8 @@ beforeEach(async () => {
   fakeBrowser.runtime.onMessage.hasListener = vi.fn(() => false);
   statusStub = createStatusStub();
   addSeriesStub = createAddSeriesStub();
-  useSeriesStatusMock.mockImplementation(() => statusStub);
-  useAddSeriesMock.mockImplementation(() => addSeriesStub);
+  hoisted.useSeriesStatusMock.mockImplementation(() => statusStub);
+  hoisted.useAddSeriesMock.mockImplementation(() => addSeriesStub);
   useThemeMock.mockClear();
   tooltipCalls.length = 0;
   openOptionsMock = vi.fn(() => Promise.resolve());
@@ -183,7 +153,7 @@ describe('CardOverlay', () => {
 
   it('shows resolving state while status is loading', () => {
     statusStub = createStatusStub({ isLoading: true });
-    useSeriesStatusMock.mockImplementation(() => statusStub);
+  hoisted.useSeriesStatusMock.mockImplementation(() => statusStub);
 
     render(<CardOverlay {...baseProps} />);
 
@@ -202,7 +172,7 @@ describe('CardOverlay', () => {
 
   it('shows adding state while mutation is pending', () => {
     addSeriesStub = createAddSeriesStub({ isPending: true });
-    useAddSeriesMock.mockImplementation(() => addSeriesStub);
+  hoisted.useAddSeriesMock.mockImplementation(() => addSeriesStub);
 
     render(<CardOverlay {...baseProps} />);
 
@@ -219,7 +189,7 @@ describe('CardOverlay', () => {
   it('retries mapping when the link is missing', async () => {
     const refetch = vi.fn(() => Promise.reject(new Error('retry failed')));
     statusStub = createStatusStub({ data: { anilistTvdbLinkMissing: true }, refetch });
-    useSeriesStatusMock.mockImplementation(() => statusStub);
+  hoisted.useSeriesStatusMock.mockImplementation(() => statusStub);
 
     render(<CardOverlay {...baseProps} />);
 
@@ -238,7 +208,7 @@ describe('CardOverlay', () => {
       mutate: vi.fn(),
       reset: vi.fn(),
     });
-    useAddSeriesMock.mockImplementation(() => addSeriesStub);
+  hoisted.useAddSeriesMock.mockImplementation(() => addSeriesStub);
 
     render(<CardOverlay {...baseProps} />);
 
@@ -258,7 +228,7 @@ describe('CardOverlay', () => {
   it('refetches when status query errors', async () => {
     const refetch = vi.fn(() => Promise.reject(new Error('status failed')));
     statusStub = createStatusStub({ isError: true, error: { userMessage: 'Status error' }, refetch });
-    useSeriesStatusMock.mockImplementation(() => statusStub);
+  hoisted.useSeriesStatusMock.mockImplementation(() => statusStub);
 
     render(<CardOverlay {...baseProps} />);
 
@@ -290,7 +260,7 @@ describe('CardOverlay', () => {
       mutate: vi.fn(),
       reset: vi.fn(),
     });
-    useAddSeriesMock.mockImplementation(() => addSeriesStub);
+  hoisted.useAddSeriesMock.mockImplementation(() => addSeriesStub);
 
     render(
       <CardOverlay
@@ -313,7 +283,7 @@ describe('CardOverlay', () => {
       mutate: vi.fn(),
       reset: vi.fn(),
     });
-    useAddSeriesMock.mockImplementation(() => addSeriesStub);
+  hoisted.useAddSeriesMock.mockImplementation(() => addSeriesStub);
 
     render(<CardOverlay {...baseProps} />);
 
@@ -351,7 +321,7 @@ describe('CardOverlay', () => {
 
   it('displays the in-sonarr state', () => {
     statusStub = createStatusStub({ data: { exists: true } });
-    useSeriesStatusMock.mockImplementation(() => statusStub);
+  hoisted.useSeriesStatusMock.mockImplementation(() => statusStub);
 
     render(<CardOverlay {...baseProps} />);
 

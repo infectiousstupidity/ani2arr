@@ -65,15 +65,30 @@ vi.mock('@/hooks/use-broadcasts', () => ({
   useKitsunarrBroadcasts: () => useKitsunarrBroadcastsMock(),
 }));
 
-vi.mock('@/hooks/use-api-queries', async () => {
-  const actual = await vi.importActual<typeof import('@/hooks/use-api-queries')>('@/hooks/use-api-queries');
-  return {
-    ...actual,
-    useSeriesStatus: (...args: Parameters<typeof useSeriesStatusMock>) => useSeriesStatusMock(...args),
-    useAddSeries: () => useAddSeriesMock(),
+import { makeUseApiQueriesMock } from '@/testing/mocks/useApiQueriesMock';
+vi.mock('@/hooks/use-api-queries', () =>
+  makeUseApiQueriesMock({
+    useSeriesStatus: (...args: unknown[]) => {
+      const res = useSeriesStatusMock(...(args as Parameters<typeof useSeriesStatusMock>));
+      // Ensure full stub shape
+      return {
+        error: null,
+        isLoading: false,
+        refetch: vi.fn(),
+        ...res,
+      } as typeof res & { error: unknown; isLoading: boolean; refetch: ReturnType<typeof vi.fn> };
+    },
+    useAddSeries: () => {
+      const res = useAddSeriesMock();
+      return {
+        error: null,
+        reset: vi.fn(),
+        ...res,
+      } as typeof res & { error: unknown; reset: ReturnType<typeof vi.fn> };
+    },
     useExtensionOptions: () => useExtensionOptionsMock(),
-  };
-});
+  }),
+);
 
 const actionGroupProps: Array<Record<string, unknown>> = [];
 

@@ -2,13 +2,7 @@
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
 import type { MockInstance } from 'vitest';
 import { LibraryService } from '@/services/library.service';
-import type {
-  LeanSonarrSeries,
-  SonarrSeries,
-  ExtensionOptions,
-  CheckSeriesStatusResponse,
-  CheckSeriesStatusPayload,
-} from '@/types';
+import type { LeanSonarrSeries, SonarrSeries, ExtensionOptions, CheckSeriesStatusResponse, CheckSeriesStatusPayload } from '@/types';
 import type { CacheHit, TtlCache } from '@/cache';
 import { extensionOptions } from '@/utils/storage';
 import { ErrorCode, createError } from '@/utils/error-handling';
@@ -17,6 +11,7 @@ import type { MappingService } from '@/services/mapping';
 import type { SonarrApiService } from '@/api/sonarr.api';
 import { canonicalizeLookupTerm } from '@/utils/matching';
 import { getMetricsSnapshot, resetMetrics } from '@/utils/metrics';
+import { createLeanSonarrSeriesFixture, createSonarrSeriesFixture } from '@/testing/fixtures/sonarr';
 
 type CacheMock = TtlCache<LeanSonarrSeries[]> & {
   read: ReturnType<typeof vi.fn>;
@@ -62,22 +57,11 @@ const createCacheMock = (): CacheMock => {
   return cache;
 };
 
-const createLeanSeries = (overrides: Partial<LeanSonarrSeries> = {}): LeanSonarrSeries => ({
-  tvdbId: 100,
-  id: 1,
-  titleSlug: 'lean-slug',
-  title: 'Lean Title',
-  ...overrides,
-});
+const createLeanSeries = (overrides: Partial<LeanSonarrSeries> = {}) =>
+  createLeanSonarrSeriesFixture({ ...overrides });
 
-const createSonarrSeries = (overrides: Partial<SonarrSeries> = {}): SonarrSeries => ({
-  id: 1,
-  title: 'Series Title',
-  tvdbId: 100,
-  titleSlug: 'series-title',
-  alternateTitles: [],
-  ...overrides,
-});
+const createSonarrSeries = (overrides: Partial<SonarrSeries> = {}) =>
+  createSonarrSeriesFixture({ ...overrides });
 
 const createCacheHit = (
   value: LeanSonarrSeries[],
@@ -177,11 +161,11 @@ describe('LibraryService', () => {
       });
       expect(cache.write).toHaveBeenCalledWith(
         'sonarr:lean-series',
-        [{ tvdbId: 999, id: 22, titleSlug: 'override-slug', title: 'Series Title' }],
+        [{ tvdbId: 999, id: 22, titleSlug: 'override-slug', title: 'Kitsunarr Test Series' }],
         STANDARD_TTL,
       );
       expect(result).toEqual([
-        { tvdbId: 999, id: 22, titleSlug: 'override-slug', title: 'Series Title' },
+        { tvdbId: 999, id: 22, titleSlug: 'override-slug', title: 'Kitsunarr Test Series' },
       ]);
     });
 
@@ -195,9 +179,13 @@ describe('LibraryService', () => {
       ];
       sonarrClient.getAllSeries.mockResolvedValueOnce(fullList);
 
-      const result = await service.refreshCache();
+  const leanSeriesList = await service.refreshCache();
 
-      expect(sonarrClient.getAllSeries).toHaveBeenCalledTimes(1);
+  expect(leanSeriesList).toEqual([
+    { tvdbId: 200, id: 10, titleSlug: 'valid-one', title: 'Valid One' },
+    { tvdbId: 300, id: 13, titleSlug: 'valid-two', title: 'Valid Two' },
+  ]);
+  expect(sonarrClient.getAllSeries).toHaveBeenCalledTimes(1);
       expect(cache.write).toHaveBeenCalledWith(
         'sonarr:lean-series',
         [
@@ -206,10 +194,6 @@ describe('LibraryService', () => {
         ],
         STANDARD_TTL,
       );
-      expect(result).toEqual([
-        { tvdbId: 200, id: 10, titleSlug: 'valid-one', title: 'Valid One' },
-        { tvdbId: 300, id: 13, titleSlug: 'valid-two', title: 'Valid Two' },
-      ]);
       expect(getPrivate<Set<number>>(service, 'tvdbSet')).toEqual(new Set([200, 300]));
     });
 

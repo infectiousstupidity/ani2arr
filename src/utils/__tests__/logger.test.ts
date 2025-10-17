@@ -58,6 +58,32 @@ describe('logger', () => {
     expect(consoleSpies.warn).toHaveBeenCalledWith('[Kitsunarr | Matching]', { reason: 'timeout' }, 'retrying');
   });
 
+  it('redacts sensitive fields from objects before logging', () => {
+    logger.configure({ enabled: true, levels: { debug: true, info: true, warn: true, error: true } });
+    const scoped = logger.create('Secrets');
+
+    const payload = {
+      sonarrApiKey: 'SECRET123',
+      other: 'value',
+      nested: { apiKey: 'SHOULD_BE_REDACTED', ok: true },
+      list: [{ token: 'TOKEN' }, 'x'],
+    };
+
+    scoped.info('sensitive', payload);
+
+    // First argument should be the prefixed message string, second the redacted object
+    expect(consoleSpies.info).toHaveBeenCalled();
+    const call = (consoleSpies.info as ReturnType<typeof vi.spyOn>).mock.calls[0]!;
+    expect(call).toBeDefined();
+    expect(call[0]).toBe('[Kitsunarr | Secrets] sensitive');
+    expect(call[1]).toEqual({
+      sonarrApiKey: '[REDACTED]',
+      other: 'value',
+      nested: { apiKey: '[REDACTED]', ok: true },
+      list: [{ token: '[REDACTED]' }, 'x'],
+    });
+  });
+
   it('always emits errors even when other levels are disabled', () => {
     logger.configure({ enabled: false, levels: { error: true } });
 
