@@ -3,14 +3,24 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 
-const { useExtensionOptionsMock, debugMock } = vi.hoisted(() => ({
-  useExtensionOptionsMock: vi.fn(() => ({ data: { sonarrUrl: 'http://sonarr.local' } })),
-  debugMock: vi.fn(),
-}));
+// no shared helpers needed here; using minimal hoisted spies
 
+const { debugMock } = vi.hoisted(() => ({ debugMock: vi.fn() }));
+
+// Hoisted spies + vi.mock factory for use-api-queries
+const hoistedApi = vi.hoisted(() => ({
+  useSeriesStatusMock: vi.fn(),
+  useAddSeriesMock: vi.fn(),
+  useExtensionOptionsMock: vi.fn(() => ({ data: null })),
+}));
 vi.mock('@/hooks/use-api-queries', () => ({
   __esModule: true,
-  useExtensionOptions: () => useExtensionOptionsMock(),
+  useSeriesStatus: (..._args: unknown[]) => hoistedApi.useSeriesStatusMock(..._args),
+  useAddSeries: () => hoistedApi.useAddSeriesMock(),
+  useExtensionOptions: () => ({ data: { sonarrUrl: 'http://sonarr.local' } }),
+  useSonarrMetadata: () => ({ data: null }),
+  useTestConnection: () => ({ mutate: vi.fn() }),
+  useSaveOptions: () => ({ mutate: vi.fn() }),
 }));
 
 vi.mock('@/utils/logger', () => ({
@@ -25,7 +35,6 @@ const renderWithTooltipProvider = (ui: React.ReactElement) =>
 
 afterEach(() => {
   vi.clearAllMocks();
-  useExtensionOptionsMock.mockReset();
   debugMock.mockReset();
 });
 

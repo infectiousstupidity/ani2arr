@@ -2,37 +2,85 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createBrowserMock } from '@/testing';
+import { createStatusStub, createAddSeriesStub } from '@/testing/mocks/useApiQueriesMock';
+import type { CheckSeriesStatusPayload } from '@/types';
 
 import type { BrowseAdapter, ParsedCard } from '../BrowseOverlay';
 import { createBrowseContentApp } from '../BrowseOverlay';
+// Hoisted spies + state for use-api-queries
+const hoisted = vi.hoisted(() => {
+  const spies = {
+    // Type spies loosely (unknown) to avoid narrowing issues when overriding implementations
+    useSeriesStatusMock: vi.fn<(...args: unknown[]) => unknown>(),
+    useAddSeriesMock: vi.fn<() => unknown>(),
+    useExtensionOptionsMock: vi.fn<() => { data: unknown }>(() => ({ data: null as unknown })),
+  };
 
-const extensionOptionsResult: {
-  data: { sonarrUrl: string; sonarrApiKey: string; defaults: Partial<import('@/types').SonarrFormState> | null };
-} = {
-  data: {
-    sonarrUrl: 'http://sonarr.local',
-    sonarrApiKey: 'abc123',
-    defaults: {
-      qualityProfileId: 1,
-      rootFolderPath: '/media',
-      seriesType: 'standard',
-      monitorOption: 'all',
-      seasonFolder: false,
-      searchForMissingEpisodes: false,
-      tags: [],
+  const extensionOptionsResult: {
+    data: { sonarrUrl: string; sonarrApiKey: string; defaults: Partial<import('@/types').SonarrFormState> | null };
+  } = {
+    data: {
+      sonarrUrl: 'http://sonarr.local',
+      sonarrApiKey: 'abc123',
+      defaults: {
+        qualityProfileId: 1,
+        rootFolderPath: '/media',
+        seriesType: 'standard',
+        monitorOption: 'all',
+        seasonFolder: false,
+        searchForMissingEpisodes: false,
+        tags: [],
+      },
     },
-  },
-};
+  };
 
-const seriesStatusMap = new Map<number, ReturnType<typeof createSeriesStatusStub>>();
-let currentAddSeriesResult = createAddSeriesStub();
+  const seriesStatusMap = new Map<number, {
+    data: unknown | null;
+    isError: boolean;
+    error: unknown;
+    isLoading: boolean;
+    fetchStatus: 'idle' | 'fetching';
+    refetch: ReturnType<typeof vi.fn>;
+  }>();
+  const currentAddSeriesResultRef: { value: ReturnType<typeof createAddSeriesStub> } = {
+    value: {
+      mutate: vi.fn(),
+      isPending: false,
+      isSuccess: false,
+      isError: false,
+      error: null,
+      reset: vi.fn(),
+    },
+  };
 
-const useExtensionOptionsMock = vi.fn(() => extensionOptionsResult);
-const useSeriesStatusMock = vi.fn(
-  (payload: { anilistId: number; title?: string; metadata?: unknown | null }) =>
-    seriesStatusMap.get(payload.anilistId) ?? createSeriesStatusStub(),
-);
-const useAddSeriesMock = vi.fn(() => currentAddSeriesResult);
+  // Default spy implementations, can be overridden in tests
+  spies.useExtensionOptionsMock.mockImplementation(() => extensionOptionsResult as unknown as { data: unknown });
+  spies.useSeriesStatusMock.mockImplementation((...args: unknown[]) => {
+    const payload = args[0] as CheckSeriesStatusPayload;
+    return seriesStatusMap.get(payload.anilistId) ?? {
+      data: null,
+      isError: false,
+      error: null,
+      isLoading: false,
+      fetchStatus: 'idle',
+      refetch: vi.fn(() => Promise.resolve()),
+    };
+  });
+  spies.useAddSeriesMock.mockImplementation(() => currentAddSeriesResultRef.value);
+
+  return { ...spies, extensionOptionsResult, seriesStatusMap, currentAddSeriesResultRef } as const;
+});
+
+// Use hoist-safe vi.mock with overrides that delegate to the local spies above
+vi.mock('@/hooks/use-api-queries', () => ({
+  __esModule: true,
+  useExtensionOptions: () => hoisted.useExtensionOptionsMock(),
+  useSeriesStatus: (...args: unknown[]) => hoisted.useSeriesStatusMock(args[0] as CheckSeriesStatusPayload),
+  useAddSeries: () => hoisted.useAddSeriesMock(),
+  useSonarrMetadata: () => ({ data: null }),
+  useTestConnection: () => ({ mutate: vi.fn() }),
+  useSaveOptions: () => ({ mutate: vi.fn() }),
+}));
 
 const useKitsunarrBroadcastsMock = vi.fn();
 const useThemeMock = vi.fn();
@@ -56,12 +104,7 @@ const addSeriesModalSpy = vi.fn((props: AddSeriesModalProps) => (
   />
 ));
 
-vi.mock('@/hooks/use-api-queries', () => ({
-  __esModule: true,
-  useExtensionOptions: () => useExtensionOptionsMock(),
-  useSeriesStatus: (payload: { anilistId: number; title?: string; metadata?: unknown | null }) => useSeriesStatusMock(payload),
-  useAddSeries: () => useAddSeriesMock(),
-}));
+// (duplicate vi.mock for '@/hooks/use-api-queries' removed; consolidated above)
 
 vi.mock('@/hooks/use-broadcasts', () => ({
   __esModule: true,
@@ -91,47 +134,7 @@ vi.mock('wxt/browser', () => {
   return createBrowserMock(mockBrowser);
 });
 
-type SeriesStatusStub = {
-  data: Partial<{ exists: boolean; anilistTvdbLinkMissing: boolean }> | null;
-  isError: boolean;
-  error: unknown;
-  isLoading: boolean;
-  fetchStatus: 'idle' | 'fetching';
-  refetch: ReturnType<typeof vi.fn>;
-};
-
-type AddSeriesStub = {
-  mutate: ReturnType<typeof vi.fn>;
-  isPending: boolean;
-  isSuccess: boolean;
-  isError: boolean;
-  error: unknown;
-  reset: ReturnType<typeof vi.fn>;
-};
-
-function createSeriesStatusStub(overrides: Partial<SeriesStatusStub> = {}): SeriesStatusStub {
-  return {
-    data: null,
-    isError: false,
-    error: null,
-    isLoading: false,
-    fetchStatus: 'idle',
-    refetch: vi.fn(() => Promise.resolve()),
-    ...overrides,
-  };
-}
-
-function createAddSeriesStub(overrides: Partial<AddSeriesStub> = {}): AddSeriesStub {
-  return {
-    mutate: vi.fn(),
-    isPending: false,
-    isSuccess: false,
-    isError: false,
-    error: null,
-    reset: vi.fn(),
-    ...overrides,
-  };
-}
+// Use centralized stub creators via import; local types not required
 
 let mutationObservers: MutationObserverMock[] = [];
 let resizeObservers: ResizeObserverMock[] = [];
@@ -226,7 +229,7 @@ const setupAdapter = (overrides: Partial<BrowseAdapter> = {}) => {
 };
 
 beforeEach(() => {
-  extensionOptionsResult.data = {
+  hoisted.extensionOptionsResult.data = {
     sonarrUrl: 'http://sonarr.local',
     sonarrApiKey: 'abc123',
     defaults: {
@@ -241,13 +244,14 @@ beforeEach(() => {
   };
   mutationObservers = [];
   resizeObservers = [];
-  seriesStatusMap.clear();
-  currentAddSeriesResult = createAddSeriesStub();
-  useExtensionOptionsMock.mockImplementation(() => extensionOptionsResult);
-  useSeriesStatusMock.mockImplementation(
-    (payload: { anilistId: number; title?: string }) => seriesStatusMap.get(payload.anilistId) ?? createSeriesStatusStub(),
-  );
-  useAddSeriesMock.mockImplementation(() => currentAddSeriesResult);
+  hoisted.seriesStatusMap.clear();
+  hoisted.currentAddSeriesResultRef.value = createAddSeriesStub();
+  hoisted.useExtensionOptionsMock.mockImplementation(() => hoisted.extensionOptionsResult);
+  hoisted.useSeriesStatusMock.mockImplementation((...args: unknown[]) => {
+    const payload = args[0] as { anilistId: number; title?: string };
+    return hoisted.seriesStatusMap.get(payload.anilistId) ?? createStatusStub();
+  });
+  hoisted.useAddSeriesMock.mockImplementation(() => hoisted.currentAddSeriesResultRef.value);
   useThemeMock.mockClear();
   useKitsunarrBroadcastsMock.mockClear();
   TooltipWrapperMock.mockClear();
@@ -280,8 +284,8 @@ afterEach(() => {
     value: originalResizeObserver,
   });
   window.alert = originalAlert;
-  seriesStatusMap.clear();
-  currentAddSeriesResult = createAddSeriesStub();
+  hoisted.seriesStatusMap.clear();
+  hoisted.currentAddSeriesResultRef.value = createAddSeriesStub();
 });
 
 describe('createBrowseContentApp', () => {
@@ -296,7 +300,7 @@ describe('createBrowseContentApp', () => {
 
     const { adapter, parseCard, ensureContainer } = setupAdapter();
 
-    seriesStatusMap.set(1, createSeriesStatusStub());
+  hoisted.seriesStatusMap.set(1, createStatusStub());
 
     const BrowseContentApp = createBrowseContentApp(adapter);
     const { container } = render(<BrowseContentApp />);
@@ -326,7 +330,7 @@ describe('createBrowseContentApp', () => {
     expect(mutationObservers.length).toBeGreaterThan(0);
 
     const { card: directCard, overlayHost: directHost } = createCard(3, 'Direct Card');
-    seriesStatusMap.set(3, createSeriesStatusStub());
+  hoisted.seriesStatusMap.set(3, createStatusStub());
     pageContent.appendChild(directCard);
 
     const triggerObservers = async (records: Partial<MutationRecord>[]) => {
@@ -351,7 +355,7 @@ describe('createBrowseContentApp', () => {
 
     const wrapper = document.createElement('div');
     const { card: rescanCard, overlayHost: rescanHost } = createCard(4, 'Rescan Card');
-    seriesStatusMap.set(4, createSeriesStatusStub());
+  hoisted.seriesStatusMap.set(4, createStatusStub());
     wrapper.appendChild(rescanCard);
     pageContent.appendChild(wrapper);
 
@@ -434,9 +438,9 @@ describe('createBrowseContentApp', () => {
     const { adapter } = setupAdapter();
 
     const refetch = vi.fn(() => Promise.resolve());
-    seriesStatusMap.set(
+    hoisted.seriesStatusMap.set(
       10,
-      createSeriesStatusStub({
+      createStatusStub({
         data: { anilistTvdbLinkMissing: true },
         refetch,
       }),
@@ -469,10 +473,10 @@ describe('createBrowseContentApp', () => {
 
     const { adapter } = setupAdapter();
 
-    seriesStatusMap.set(20, createSeriesStatusStub());
+  hoisted.seriesStatusMap.set(20, createStatusStub());
 
-    const mutate = vi.fn();
-    currentAddSeriesResult = createAddSeriesStub({ mutate });
+  const mutate = vi.fn();
+  hoisted.currentAddSeriesResultRef.value = createAddSeriesStub({ mutate });
 
     const BrowseContentApp = createBrowseContentApp(adapter);
     render(<BrowseContentApp />);
@@ -490,7 +494,7 @@ describe('createBrowseContentApp', () => {
       title: 'Addable Card',
       primaryTitleHint: 'Addable Card',
       metadata: null,
-      form: extensionOptionsResult.data.defaults,
+  form: hoisted.extensionOptionsResult.data.defaults,
     });
 
     const gearButton = overlayHost.querySelector<HTMLButtonElement>('button.kitsunarr-card-overlay__gear');
@@ -521,8 +525,8 @@ describe('createBrowseContentApp', () => {
 
     const { adapter } = setupAdapter();
 
-    seriesStatusMap.set(30, createSeriesStatusStub());
-    currentAddSeriesResult = createAddSeriesStub({ isSuccess: true });
+  hoisted.seriesStatusMap.set(30, createStatusStub());
+  hoisted.currentAddSeriesResultRef.value = createAddSeriesStub({ isSuccess: true });
 
     const BrowseContentApp = createBrowseContentApp(adapter);
     render(<BrowseContentApp />);
@@ -544,8 +548,8 @@ describe('createBrowseContentApp', () => {
 
     const { adapter } = setupAdapter();
 
-    seriesStatusMap.set(40, createSeriesStatusStub());
-    extensionOptionsResult.data = {
+  hoisted.seriesStatusMap.set(40, createStatusStub());
+    hoisted.extensionOptionsResult.data = {
       sonarrUrl: '',
       sonarrApiKey: '',
       defaults: null,
@@ -576,7 +580,7 @@ describe('createBrowseContentApp', () => {
       getScanRoot: () => pageContent,
     });
 
-    seriesStatusMap.set(50, createSeriesStatusStub());
+    hoisted.seriesStatusMap.set(50, createStatusStub());
 
     const BrowseContentApp = createBrowseContentApp(adapter);
     render(<BrowseContentApp />);
@@ -680,7 +684,7 @@ describe('createBrowseContentApp', () => {
     // Remove ensureContainer to use default implementation
     delete (adapter as Partial<BrowseAdapter>).ensureContainer;
 
-    seriesStatusMap.set(70, createSeriesStatusStub());
+  hoisted.seriesStatusMap.set(70, createStatusStub());
 
     const BrowseContentApp = createBrowseContentApp(adapter);
     render(<BrowseContentApp />);

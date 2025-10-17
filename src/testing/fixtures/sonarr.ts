@@ -7,6 +7,7 @@ import type {
   SonarrSeries,
   SonarrTag,
 } from '@/types';
+import type { LeanSonarrSeries } from '@/types';
 
 export const defaultSonarrUrl = 'https://sonarr.test';
 export const defaultSonarrCredentials: SonarrCredentialsPayload = {
@@ -35,6 +36,16 @@ export const createSonarrSeriesFixture = (overrides: Partial<SonarrSeries> = {})
   overview: 'A fixture anime series for testing.',
   previousAiring: null,
   network: 'Test Network',
+  ...overrides,
+});
+
+export const createLeanSonarrSeriesFixture = (
+  overrides: Partial<LeanSonarrSeries> = {},
+): LeanSonarrSeries => ({
+  tvdbId: 987654,
+  id: 7,
+  titleSlug: 'kitsunarr-test-series',
+  title: 'Kitsunarr Test Series',
   ...overrides,
 });
 

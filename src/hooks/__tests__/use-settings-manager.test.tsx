@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { PropsWithChildren } from 'react';
+import { makeUtilsStorageMock, makeServicesMock } from '@/testing';
 
 vi.mock('@/utils/logger', () => {
   const createLogger = () => ({
@@ -31,122 +32,9 @@ vi.mock('@/utils/validation', async () => {
   };
 });
 
-const storageMocks = vi.hoisted(() => {
-  type ExtensionOptions = import('@/types').ExtensionOptions;
-  type Listener = (value: ExtensionOptions | undefined) => void;
+vi.mock('@/utils/storage', () => makeUtilsStorageMock());
 
-  const listeners = new Set<Listener>();
-  const createDefaultOptions = (): ExtensionOptions => ({
-    sonarrUrl: '',
-    sonarrApiKey: '',
-    defaults: {
-      qualityProfileId: '',
-      rootFolderPath: '',
-      seriesType: 'anime',
-      monitorOption: 'all',
-      seasonFolder: true,
-      searchForMissingEpisodes: true,
-      tags: [],
-    },
-  });
-
-  let currentValue: ExtensionOptions | undefined = createDefaultOptions();
-
-  const getValue = vi.fn(async () => currentValue ?? createDefaultOptions());
-  const setValue = vi.fn(async (value: ExtensionOptions) => {
-    currentValue = value;
-    listeners.forEach(listener => listener(value));
-  });
-  const watch = vi.fn((callback: Listener) => {
-    listeners.add(callback);
-    return () => {
-      listeners.delete(callback);
-    };
-  });
-
-  const extensionOptions = {
-    getValue,
-    setValue,
-    watch,
-  } satisfies Record<string, unknown>;
-
-  const setMockExtensionOptionsValue = (value: ExtensionOptions | undefined) => {
-    currentValue = value;
-  };
-
-  const pushMockExtensionOptionsUpdate = (value: ExtensionOptions) => {
-    currentValue = value;
-    listeners.forEach(listener => listener(value));
-  };
-
-  const resetMockExtensionOptions = () => {
-    currentValue = undefined;
-    listeners.clear();
-  };
-
-  return {
-    extensionOptions,
-    setMockExtensionOptionsValue,
-    pushMockExtensionOptionsUpdate,
-    resetMockExtensionOptions,
-  };
-});
-
-vi.mock('@/utils/storage', () => storageMocks);
-
-const { setMockExtensionOptionsValue, pushMockExtensionOptionsUpdate, resetMockExtensionOptions } =
-  storageMocks;
-
-const serviceMocks = vi.hoisted(() => {
-  type SonarrCredentialsPayload = import('@/types').SonarrCredentialsPayload;
-
-  const defaultSonarrUrl = 'https://sonarr.test';
-
-  const fetchSonarrMetadata = async (credentials?: SonarrCredentialsPayload) => {
-    const baseUrl = (credentials?.url ?? defaultSonarrUrl).replace(/\/$/, '');
-    const [qualityProfiles, rootFolders, tags] = await Promise.all([
-      fetch(`${baseUrl}/api/v3/qualityprofile`).then(response => response.json()),
-      fetch(`${baseUrl}/api/v3/rootfolder`).then(response => response.json()),
-      fetch(`${baseUrl}/api/v3/tag`).then(response => response.json()),
-    ]);
-
-    return {
-      qualityProfiles,
-      rootFolders,
-      tags,
-    };
-  };
-
-  const testConnection = vi.fn(async () => ({ version: '4.0.0.0' }));
-  const notifySettingsChanged = vi.fn(async () => ({ ok: true }));
-  const getSonarrMetadata = vi.fn(fetchSonarrMetadata);
-
-  const kitsunarrApiMock = {
-    testConnection,
-    notifySettingsChanged,
-    getSonarrMetadata,
-  } satisfies Record<string, unknown>;
-
-  const resetKitsunarrApiMock = () => {
-    testConnection.mockReset();
-    testConnection.mockResolvedValue({ version: '4.0.0.0' });
-    notifySettingsChanged.mockReset();
-    notifySettingsChanged.mockResolvedValue({ ok: true });
-    getSonarrMetadata.mockReset();
-    getSonarrMetadata.mockImplementation(fetchSonarrMetadata);
-  };
-
-  return {
-    registerKitsunarrApi: vi.fn(),
-    getKitsunarrApi: vi.fn(() => kitsunarrApiMock),
-    kitsunarrApiMock,
-    resetKitsunarrApiMock,
-  };
-});
-
-vi.mock('@/services', () => serviceMocks);
-
-const { kitsunarrApiMock, resetKitsunarrApiMock } = serviceMocks;
+vi.mock('@/services', () => makeServicesMock());
 
 import { useSettingsManager } from '../use-settings-manager';
 import { queryKeys } from '../use-api-queries';
@@ -159,6 +47,23 @@ import {
 import { testServer, createExtensionOptionsFixture, createSonarrDefaultsFixture } from '@/testing';
 import type { ExtensionOptions, SonarrFormState, SonarrQualityProfile, SonarrRootFolder } from '@/types';
 import { extensionOptions } from '@/utils/storage';
+import * as storageModule from '@/utils/storage';
+import * as servicesModule from '@/services';
+// Access mock-only helpers from the mocked modules via an untyped cast
+const { setMockExtensionOptionsValue, pushMockExtensionOptionsUpdate, resetMockExtensionOptions } =
+  storageModule as unknown as {
+    setMockExtensionOptionsValue: (v: unknown) => void;
+    pushMockExtensionOptionsUpdate: (v: unknown) => void;
+    resetMockExtensionOptions: () => void;
+  };
+const { kitsunarrApiMock, resetKitsunarrApiMock } = servicesModule as unknown as {
+  kitsunarrApiMock: {
+    testConnection: ReturnType<typeof vi.fn>;
+    notifySettingsChanged: ReturnType<typeof vi.fn>;
+    getSonarrMetadata: ReturnType<typeof vi.fn>;
+  };
+  resetKitsunarrApiMock: () => void;
+};
 import * as validationUtils from '@/utils/validation';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 
