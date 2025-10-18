@@ -1,11 +1,4 @@
-import {
-  chromium,
-  firefox,
-  type BrowserContext,
-  type Page,
-  type Route,
-  type Worker,
-} from '@playwright/test';
+import { chromium, type BrowserContext, type Page, type Route, type Worker } from '@playwright/test';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,11 +14,7 @@ const serverBaseUrl = serverBaseUrlEnv;
 export const testServerBaseUrl = serverBaseUrl;
 
 export type BackgroundTarget = Page | Worker;
-type SupportedBrowser = 'chromium' | 'firefox';
-
-type DevToolsConnection = {
-  send(method: string, params?: Record<string, unknown>): Promise<unknown>;
-};
+type SupportedBrowser = 'chromium';
 
 type PermissionShim = {
   request?: (permissions: unknown) => Promise<boolean>;
@@ -146,58 +135,25 @@ async function patchManifestHostPermissions(extensionPath: string): Promise<void
   }
 }
 
-function getFirefoxDevtoolsConnection(context: BrowserContext): DevToolsConnection | undefined {
-  const contextWithConnection = context as unknown as {
-    _browser?: { _connection?: DevToolsConnection };
-  };
-  return contextWithConnection._browser?._connection;
-}
+const SUPPORTED_BROWSER: SupportedBrowser = 'chromium';
 
-async function launchPersistentContext(browserName: SupportedBrowser): Promise<LaunchResult> {
+async function launchPersistentContext(): Promise<LaunchResult> {
   const userDataDir = await mkdtemp(path.join(os.tmpdir(), 'kitsunarr-e2e-'));
 
-  if (browserName === 'chromium') {
-    const extensionPath = process.env.KITSUNARR_E2E_CHROMIUM_EXTENSION;
-    if (!extensionPath) {
-      throw new Error('Missing Chromium extension path');
-    }
-    await patchManifestHostPermissions(extensionPath);
-    const context = await chromium.launchPersistentContext(userDataDir, {
-      headless: false,
-      args: [
-        `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`,
-        '--no-sandbox',
-      ],
-    });
-    return { context, userDataDir };
+  const extensionPath = process.env.KITSUNARR_E2E_CHROMIUM_EXTENSION;
+  if (!extensionPath) {
+    throw new Error('Missing Chromium extension path');
   }
-
-  if (browserName === 'firefox') {
-    const extensionPath = process.env.KITSUNARR_E2E_FIREFOX_EXTENSION;
-    if (!extensionPath) {
-      throw new Error('Missing Firefox extension path');
-    }
-    await patchManifestHostPermissions(extensionPath);
-    const context = await firefox.launchPersistentContext(userDataDir, {
-      headless: false,
-      firefoxUserPrefs: {
-        'extensions.experiments.enabled': true,
-        'extensions.install.requireBuiltInCerts': false,
-        'xpinstall.signatures.required': false,
-        'extensions.autoDisableScopes': 0,
-        'extensions.enabledScopes': 15,
-      },
-    });
-    const connection = getFirefoxDevtoolsConnection(context);
-    if (!connection) {
-      throw new Error('Unable to obtain Firefox DevTools connection for temporary addon install');
-    }
-    await connection.send('AddonManager.installTemporaryAddon', { addonPath: extensionPath });
-    return { context, userDataDir };
-  }
-
-  throw new Error(`Unsupported browser: ${browserName}`);
+  await patchManifestHostPermissions(extensionPath);
+  const context = await chromium.launchPersistentContext(userDataDir, {
+    headless: false,
+    args: [
+      `--disable-extensions-except=${extensionPath}`,
+      `--load-extension=${extensionPath}`,
+      '--no-sandbox',
+    ],
+  });
+  return { context, userDataDir };
 }
 
 async function waitForBackground(context: BrowserContext): Promise<BackgroundTarget> {
@@ -428,23 +384,19 @@ export interface ExtensionHarness {
   cleanup(): Promise<void>;
 }
 
-export async function createExtensionHarness(browserName: string): Promise<ExtensionHarness> {
-  if (browserName !== 'chromium' && browserName !== 'firefox') {
-    throw new Error(`Unsupported browser for Kitsunarr harness: ${browserName}`);
-  }
-
-  const { context, userDataDir } = await launchPersistentContext(browserName);
+export async function createExtensionHarness(): Promise<ExtensionHarness> {
+  const { context, userDataDir } = await launchPersistentContext();
   context.setDefaultTimeout(DEFAULT_TIMEOUT_MS);
   context.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS);
-  attachContextLogging(context, browserName);
+  attachContextLogging(context, SUPPORTED_BROWSER);
   await setupNetworkInterception(context);
   const background = await waitForBackground(context);
   if (isPageBackground(background)) {
     background.on('console', message => {
-      console.log(`[${browserName}] background console: ${message.type()} ${message.text()}`);
+      console.log(`[${SUPPORTED_BROWSER}] background console: ${message.type()} ${message.text()}`);
     });
     background.on('pageerror', error => {
-      console.error(`[${browserName}] background error:`, error);
+      console.error(`[${SUPPORTED_BROWSER}] background error:`, error);
     });
   }
   await mockPermissions(context, background);
@@ -453,7 +405,7 @@ export async function createExtensionHarness(browserName: string): Promise<Exten
   return {
     context,
     background,
-    browserName,
+    browserName: SUPPORTED_BROWSER,
     serverBaseUrl,
     async openOptionsPage() {
       return openExtensionOptions(context, background);

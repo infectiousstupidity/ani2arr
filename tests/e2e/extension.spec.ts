@@ -47,7 +47,7 @@ async function waitForQuickAddCompletion(page: AnilistPage, timeoutMs = 15_000) 
 
 test.describe('Kitsunarr extension end-to-end', () => {
   test('configures options and supports quick add flows', async ({ browserName }, testInfo) => {
-    const harness = await createExtensionHarness(browserName);
+    const harness = await createExtensionHarness();
     await resetServerState(harness.serverBaseUrl);
 
     let optionsPage: OptionsPage | null = null;
@@ -127,7 +127,7 @@ test.describe('Kitsunarr extension end-to-end', () => {
   });
 
   test('surfaces Sonarr credential errors before allowing save', async ({ browserName }, testInfo) => {
-    const harness = await createExtensionHarness(browserName);
+    const harness = await createExtensionHarness();
     await resetServerState(harness.serverBaseUrl);
     await updateServerState(harness.serverBaseUrl, { requiredApiKey: EXPECTED_SONARR_KEY });
 
