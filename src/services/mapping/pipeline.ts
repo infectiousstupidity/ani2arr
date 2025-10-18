@@ -1,10 +1,9 @@
 // src/services/mapping/pipeline.ts
-import { generateSearchTerms } from './search-term-generator';
+import { generateSearchTerms, isSeasonalCanonicalTokens } from './search-term-generator';
 import { scoreCandidates } from './scoring';
 import { maybeEarlyStop, pickBest } from './early-stop';
-import type { EvaluationOutcome, MappingContext, AniMedia } from './types';
+import type { EvaluationOutcome, MappingContext, AniMedia } from '@/types';
 import { canonicalTitleKey, sanitizeLookupDisplay } from '@/utils/matching';
-import { isSeasonalCanonicalTokens } from './search-term-generator';
 
 export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, primaryTitleHint?: string): Promise<EvaluationOutcome> {
   const mediaYear = media.startDate?.year ?? undefined;
@@ -57,8 +56,8 @@ export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, p
       };
     }
 
-  // Optional soft time budget guard (kept minimal per constraints)
-  if (Date.now() - start > 2000) break;
+    // Optional soft time budget guard (kept minimal per constraints)
+    if (Date.now() - start > 2000) break;
   }
 
   overall.sort((a, b) => b.score - a.score);

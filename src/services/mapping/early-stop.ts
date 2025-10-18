@@ -1,5 +1,5 @@
 // src/services/mapping/early-stop.ts
-import type { ScoredCandidate } from './types';
+import type { ScoredCandidate } from '@/types';
 
 export interface EarlyStopLimits {
   earlyStopThreshold: number; // e.g., 0.82

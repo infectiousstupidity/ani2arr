@@ -1,6 +1,11 @@
-import type { MediaMetadataHint, SonarrFormState } from '@/types';
+import type { MediaMetadataHint } from './anilist';
+import type { SonarrFormState } from './extension';
 
-export type ModalState = { anilistId: number; title: string; metadata: MediaMetadataHint | null };
+export type ModalState = {
+  anilistId: number;
+  title: string;
+  metadata: MediaMetadataHint | null;
+};
 
 export interface CardOverlayProps {
   anilistId: number;

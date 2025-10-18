@@ -4,12 +4,14 @@ process.on('unhandledRejection', noop);
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CacheHit, CacheWriteOptions, TtlCache } from '@/cache';
-import type { AnilistApiService, AniMedia } from '@/api/anilist.api';
+import type { AnilistApiService } from '@/api/anilist.api';
 import type { StaticMappingProvider } from '@/services/mapping/static-mapping.provider';
 import { MappingService, type ResolvedMapping } from '@/services/mapping';
 import type { SonarrLookupClient } from '@/services/mapping/sonarr-lookup.client';
-import type { ExtensionOptions, SonarrLookupSeries } from '@/types';
+import * as pipelineModule from '@/services/mapping/pipeline';
+import type { ExtensionOptions, SonarrLookupSeries, AniMedia } from '@/types';
 import { createError, ErrorCode } from '@/utils/error-handling';
+import * as errorHandlingModule from '@/utils/error-handling';
 import { extensionOptions } from '@/utils/storage';
 import { resetMetrics } from '@/utils/metrics';
 
@@ -60,7 +62,9 @@ describe('MappingService', () => {
     readFromCache: ReturnType<typeof vi.fn>;
   };
   let lookupClient: SonarrLookupClient;
-  let anilistApi: Pick<AnilistApiService, 'fetchMediaWithRelations' | 'iteratePrequelChain'>;
+  let anilistApi: Pick<AnilistApiService, 'fetchMediaWithRelations' | 'iteratePrequelChain'> & {
+    removeMediaFromCache?: (id: number) => Promise<void>;
+  };
 
   beforeEach(() => {
     resetMetrics();
@@ -92,6 +96,7 @@ describe('MappingService', () => {
       iteratePrequelChain: vi.fn(async function* () {
         yield* [] as AniMedia[];
       }),
+      removeMediaFromCache: vi.fn(async () => {}),
     };
 
     vi.spyOn(extensionOptions, 'getValue').mockResolvedValue(baseOptions);
@@ -237,5 +242,150 @@ describe('MappingService', () => {
 
     expect(lookupClientMock.reset).toHaveBeenCalled();
     expect(failureCache.clear).toHaveBeenCalled();
+  });
+
+  it('evicts AniList cached media after static resolution and swallows eviction errors', async () => {
+    const removeSpy = anilistApi.removeMediaFromCache as ReturnType<typeof vi.fn>;
+    (staticProvider.get as ReturnType<typeof vi.fn>).mockImplementation((id: number) => ({ tvdbId: id + 100, source: 'static' }));
+    removeSpy.mockResolvedValueOnce(undefined);
+    removeSpy.mockRejectedValueOnce(new Error('evict failed'));
+
+    const service = createService();
+
+    await expect(service.resolveTvdbId(20)).resolves.toEqual({ tvdbId: 120 });
+    await expect(service.resolveTvdbId(21)).resolves.toEqual({ tvdbId: 121 });
+
+    expect(removeSpy).toHaveBeenNthCalledWith(1, 20);
+    expect(removeSpy).toHaveBeenNthCalledWith(2, 21);
+  });
+
+  it('uses DOM metadata hints before fetching AniList data', async () => {
+    const pipelineSpy = vi
+      .spyOn(pipelineModule, 'resolveViaPipeline')
+      .mockResolvedValue({
+        status: 'resolved',
+        tvdbId: 654,
+        confidence: 0.92,
+        successfulSynonym: 'Hint Title',
+      } as never);
+
+    const service = createService();
+    const result = await service.resolveTvdbId(50, {
+      hints: {
+        domMedia: {
+          titles: { english: 'Hint Title', romaji: 'Hint Title' },
+          synonyms: ['Hint Title', 'Hint Title', ''],
+          startYear: 2024,
+          format: 'TV',
+          relationPrequelIds: [200, 200],
+        },
+      },
+    });
+
+    expect(result).toEqual({ tvdbId: 654, successfulSynonym: 'Hint Title' });
+    expect(anilistApi.fetchMediaWithRelations).not.toHaveBeenCalled();
+    expect(pipelineSpy).toHaveBeenCalledTimes(1);
+
+    const mediaArg = pipelineSpy.mock.calls[0]?.[0] as AniMedia;
+    expect(mediaArg.startDate?.year).toBe(2024);
+    expect(mediaArg.synonyms).toEqual(['Hint Title']);
+    expect(mediaArg.relations?.edges?.[0]?.node.id).toBe(200);
+
+    pipelineSpy.mockRestore();
+  });
+
+  it('falls back to AniList API when metadata hints are empty', async () => {
+    const pipelineSpy = vi
+      .spyOn(pipelineModule, 'resolveViaPipeline')
+      .mockResolvedValue({
+        status: 'resolved',
+        tvdbId: 777,
+        confidence: 0.8,
+      } as never);
+
+    const service = createService();
+    const result = await service.resolveTvdbId(60, {
+      hints: {
+        domMedia: {
+          titles: null,
+          synonyms: null,
+          startYear: null,
+          format: null,
+          relationPrequelIds: null,
+        },
+      },
+    });
+
+    expect(result).toEqual({ tvdbId: 777 });
+    expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledWith(60);
+    pipelineSpy.mockRestore();
+  });
+
+  it('returns null and caches validation failures when pipeline throws', async () => {
+    const validationError = createError(ErrorCode.VALIDATION_ERROR, 'no match', 'No mapping');
+    lookupClientMock.lookup.mockRejectedValueOnce(validationError);
+
+    const service = createService();
+    await expect(service.resolveTvdbId(42)).resolves.toBeNull();
+
+    expect(failureCache.write).toHaveBeenCalledWith(
+      expect.stringContaining('resolved-failure:42'),
+      validationError,
+      expect.objectContaining({ staleMs: expect.any(Number), hardMs: expect.any(Number) }),
+    );
+  });
+
+  it('does not cache configuration errors when Sonarr credentials are missing', async () => {
+    // Simulate unconfigured credentials by returning empty values
+    vi.spyOn(extensionOptions, 'getValue').mockResolvedValueOnce({
+      ...baseOptions,
+      sonarrUrl: '',
+      sonarrApiKey: '',
+    });
+
+    const service = createService();
+    await expect(service.resolveTvdbId(88)).rejects.toMatchObject({ code: ErrorCode.SONARR_NOT_CONFIGURED });
+    expect(failureCache.write).not.toHaveBeenCalled();
+  });
+
+  it('logs hint lookup errors and continues resolving', async () => {
+    const service = createService();
+    const hintSpy = vi.spyOn(
+      service as unknown as { tryHintLookup: (term: string) => Promise<ResolvedMapping | null> },
+      'tryHintLookup',
+    );
+    hintSpy.mockRejectedValueOnce(new Error('hint failed'));
+
+    lookupClientMock.lookup.mockResolvedValueOnce([defaultSeries({ title: 'Hint Title' })]);
+
+    const logSpy = vi.spyOn(errorHandlingModule, 'logError').mockImplementation(() => {});
+
+    const result = await service.resolveTvdbId(70, { hints: { primaryTitle: 'Hint Title' } });
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ code: ErrorCode.UNKNOWN_ERROR }),
+      'MappingService:hintLookup:70',
+    );
+    expect(result).toEqual({ tvdbId: 100, successfulSynonym: 'Hint Title' });
+
+    logSpy.mockRestore();
+    hintSpy.mockRestore();
+  });
+
+  it('skips unsupported media formats without invoking the pipeline', async () => {
+    const pipelineSpy = vi.spyOn(pipelineModule, 'resolveViaPipeline');
+    (anilistApi.fetchMediaWithRelations as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: 90,
+      format: 'MANGA',
+      title: { romaji: 'Non Mappable' },
+      synonyms: [],
+    } as AniMedia);
+
+    const service = createService();
+    const result = await service.resolveTvdbId(90);
+
+    expect(result).toBeNull();
+    expect(pipelineSpy).not.toHaveBeenCalled();
+    pipelineSpy.mockRestore();
   });
 });

@@ -1,5 +1,6 @@
 import type {
   AddRequestPayload,
+  LeanSonarrSeries,
   SonarrCredentialsPayload,
   SonarrLookupSeries,
   SonarrQualityProfile,
@@ -7,7 +8,6 @@ import type {
   SonarrSeries,
   SonarrTag,
 } from '@/types';
-import type { LeanSonarrSeries } from '@/types';
 
 export const defaultSonarrUrl = 'https://sonarr.test';
 export const defaultSonarrCredentials: SonarrCredentialsPayload = {

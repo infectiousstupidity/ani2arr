@@ -3,7 +3,7 @@ import type { TtlCache } from '@/cache';
 
 import { createError, ErrorCode } from '@/utils/error-handling';
 import { logger } from '@/utils/logger';
-import type { AniFormat, AniTitles } from '@/types';
+import type { AniMedia } from '@/types';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -45,20 +45,6 @@ const FIND_MEDIA_QUERY = `
     }
   }
 `;
-
-export type AniMedia = {
-  id: number;
-  format: AniFormat | null;
-  title: AniTitles;
-  startDate?: { year?: number | null };
-  synonyms: string[];
-  relations?: {
-    edges: {
-      relationType: string;
-      node: AniMedia;
-    }[];
-  };
-};
 
 type FindMediaResponse = {
   data?: { Media?: AniMedia };

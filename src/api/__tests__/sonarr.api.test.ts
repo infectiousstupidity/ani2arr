@@ -143,6 +143,15 @@ describe('SonarrApiService', () => {
     expect(result).toEqual({});
   });
 
+  it('treats explicit zero content-length responses as empty payloads', async () => {
+    const request = (service as unknown as { request: SonarrApiService['request'] }).request.bind(service);
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 200, headers: { 'Content-Length': '0' } }));
+
+    const result = await request('series', BASE_CREDENTIALS);
+
+    expect(result).toEqual({});
+  });
+
   it('normalizes and logs errors when Sonarr responds with a failure', async () => {
     fetchMock.mockResolvedValueOnce(new Response('nope', { status: 500, statusText: 'Server Error' }));
 
@@ -216,5 +225,106 @@ describe('SonarrApiService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(normalizeSpy).toHaveBeenCalledTimes(1);
     expect(logSpy).toHaveBeenCalledWith(normalizedError, 'SonarrApiService:request:series');
+  });
+
+  it('includes retry-after seconds header values on rate limiting errors', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response('slow down', {
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: { 'Retry-After': '7' },
+      }),
+    );
+
+    let captured: retry.RetriableError | null = null;
+    const normalizedError = { code: ErrorCode.API_ERROR, message: '429', userMessage: '429', timestamp: Date.now() };
+    const normalizeSpy = vi.spyOn(errorHandling, 'normalizeError').mockImplementation(error => {
+      captured = error as retry.RetriableError;
+      return normalizedError;
+    });
+    const logSpy = vi.spyOn(errorHandling, 'logError').mockImplementation(() => {});
+
+    await expect(service.getAllSeries(BASE_CREDENTIALS)).rejects.toBe(normalizedError);
+
+    expect(captured).toBeInstanceOf(retry.RetriableError);
+    const err = (captured as unknown) as retry.RetriableError; // satisfy TS narrow for property access
+    expect(err.status).toBe(429);
+    expect(err.retryAfterMs).toBe(7_000);
+
+    normalizeSpy.mockRestore();
+    logSpy.mockRestore();
+  });
+
+  it('derives retry-after ms from HTTP date headers when rate limited', async () => {
+    const retryDate = new Date(Date.now() + 10_000).toUTCString();
+    fetchMock.mockResolvedValueOnce(
+      new Response('slow down', {
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: { 'Retry-After': retryDate },
+      }),
+    );
+
+    let captured: retry.RetriableError | null = null;
+    const normalizedError = { code: ErrorCode.API_ERROR, message: '429', userMessage: '429', timestamp: Date.now() };
+    const normalizeSpy = vi.spyOn(errorHandling, 'normalizeError').mockImplementation(error => {
+      captured = error as retry.RetriableError;
+      return normalizedError;
+    });
+    const logSpy = vi.spyOn(errorHandling, 'logError').mockImplementation(() => {});
+
+    await expect(service.getAllSeries(BASE_CREDENTIALS)).rejects.toBe(normalizedError);
+
+    expect(captured).toBeInstanceOf(retry.RetriableError);
+    const err2 = (captured as unknown) as retry.RetriableError; // satisfy TS narrow for property access
+    expect(err2.status).toBe(429);
+    expect(err2.retryAfterMs).toBeGreaterThanOrEqual(0);
+    expect(err2.retryAfterMs).toBeLessThanOrEqual(10_000);
+
+    normalizeSpy.mockRestore();
+    logSpy.mockRestore();
+  });
+
+  it('treats content-length null with empty body as an empty payload', async () => {
+    const request = (service as unknown as { request: SonarrApiService['request'] }).request.bind(service);
+    const cloneText = vi.fn().mockResolvedValue('   ');
+    const response = {
+      ok: true,
+      status: 200,
+      headers: { get: () => null } as unknown as Headers,
+      clone: () => ({ text: cloneText }),
+      json: vi.fn(),
+    };
+
+    fetchMock.mockResolvedValueOnce(response as unknown as Response);
+
+    const result = await request('series', BASE_CREDENTIALS);
+    expect(result).toEqual({});
+    expect(cloneText).toHaveBeenCalledTimes(1);
+    expect(response.json).not.toHaveBeenCalled();
+  });
+
+  it('returns null when series lookup by tvdb id has no matches', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('[]', { status: 200 }));
+    const result = await service.getSeriesByTvdbId(404, BASE_CREDENTIALS);
+    expect(result).toBeNull();
+  });
+
+  it('returns Sonarr metadata lists and system status', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: 10 }]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: 20 }]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ id: 30 }]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ version: '4.0.0' }), { status: 200 }));
+
+    const roots = await service.getRootFolders(BASE_CREDENTIALS);
+    const profiles = await service.getQualityProfiles(BASE_CREDENTIALS);
+    const tags = await service.getTags(BASE_CREDENTIALS);
+    const status = await service.testConnection(BASE_CREDENTIALS);
+
+    expect(roots).toEqual([{ id: 10 }]);
+    expect(profiles).toEqual([{ id: 20 }]);
+    expect(tags).toEqual([{ id: 30 }]);
+    expect(status).toEqual({ version: '4.0.0' });
   });
 });

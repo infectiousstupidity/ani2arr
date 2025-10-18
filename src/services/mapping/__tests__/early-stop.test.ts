@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { maybeEarlyStop, pickBest } from '@/services/mapping/early-stop';
-import type { ScoredCandidate } from '@/services/mapping/types';
+import type { SonarrLookupSeries, ScoredCandidate } from '@/types';
 import type { SearchTerm } from '@/services/mapping/search-term-generator';
-import type { SonarrLookupSeries } from '@/types';
 
 const cand = (score: number): ScoredCandidate => {
   const term: SearchTerm = { canonical: 'c', display: 'd' };
