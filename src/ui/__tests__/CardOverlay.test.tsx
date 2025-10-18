@@ -3,8 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBrowserMock, getReactHandler } from '@/testing';
 
-import type { CardOverlayProps } from '../BrowseOverlay';
-import { CardOverlay } from '../BrowseOverlay';
+import type { CardOverlayProps } from '@/ui/browse-overlay-types';
+import { CardOverlay } from '@/ui/card-overlay';
 import { createStatusStub, createAddSeriesStub, SeriesStatusStub, AddSeriesStub } from '@/testing/mocks/useApiQueriesMock';
 
 type FakeBrowser = {
@@ -81,6 +81,7 @@ const baseProps: CardOverlayProps = {
     searchForMissingEpisodes: true,
     tags: [],
   },
+  sonarrUrl: null,
 };
 
 let statusStub: SeriesStatusStub;

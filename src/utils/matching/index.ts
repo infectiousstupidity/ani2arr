@@ -6,6 +6,7 @@ export {
   stripParenContent,
   normalizeTitleTokens,
   canonicalizeLookupTerm,
+  tokenize,
   diceBigram,
   tokenOverlap,
   isOrdinalToken,

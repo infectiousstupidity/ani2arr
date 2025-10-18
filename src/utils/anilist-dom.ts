@@ -1,4 +1,5 @@
 import type { AniFormat, AniTitles, MediaMetadataHint } from '@/types';
+import { normalizeRelationIds, normalizeSynonyms } from '@/utils/media-metadata';
 
 const FORMAT_VALUES: ReadonlySet<AniFormat> = new Set([
   'TV',
@@ -31,11 +32,12 @@ const coerceTitles = (value: unknown): AniTitles | null => {
 
 const coerceSynonyms = (value: unknown): string[] | null => {
   if (!Array.isArray(value)) return null;
-  const synonyms = value
-    .filter((item): item is string => typeof item === 'string')
-    .map(item => item.trim())
-    .filter(item => item.length > 0);
-  return synonyms.length > 0 ? Array.from(new Set(synonyms)) : null;
+  const normalized = normalizeSynonyms(
+    value
+      .filter((item): item is string => typeof item === 'string')
+      .map(item => item.trim()),
+  );
+  return normalized.length > 0 ? normalized : null;
 };
 
 const coerceFormat = (value: unknown): AniFormat | null => {
@@ -81,7 +83,8 @@ const coerceRelationPrequelIds = (value: unknown): number[] | null => {
       ids.push(parsed);
     }
   }
-  return ids.length > 0 ? Array.from(new Set(ids)) : null;
+  const normalized = normalizeRelationIds(ids);
+  return normalized.length > 0 ? normalized : null;
 };
 
 const metadataFromAny = (value: unknown): MediaMetadataHint | null => {
@@ -105,21 +108,6 @@ const metadataFromAny = (value: unknown): MediaMetadataHint | null => {
     relationPrequelIds: prequelIds ?? null,
   } satisfies MediaMetadataHint;
 };
-
-
-const mergeSynonyms = (a: string[] | null | undefined, b: string[] | null | undefined): string[] | null => {
-  const merged = [...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]
-    .map(item => item.trim())
-    .filter(item => item.length > 0);
-  return merged.length > 0 ? Array.from(new Set(merged)) : null;
-};
-
-const mergeRelationIds = (a: number[] | null | undefined, b: number[] | null | undefined): number[] | null => {
-  const merged = [...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-  return merged.length > 0 ? Array.from(new Set(merged)) : null;
-};
-
 export const metadataFromMediaObject = (value: unknown): MediaMetadataHint | null => metadataFromAny(value);
 
 export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHint | null => {
@@ -186,33 +174,4 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
   }
 
   return null;
-};
-
-export const mergeMetadataHints = (
-  primary?: MediaMetadataHint | null,
-  secondary?: MediaMetadataHint | null,
-): MediaMetadataHint | null => {
-  const hints = [primary ?? null, secondary ?? null].filter((hint): hint is MediaMetadataHint => !!hint);
-  if (hints.length === 0) return null;
-
-  return hints.reduce<MediaMetadataHint>((acc, hint) => {
-    if (!acc.titles && hint.titles) {
-      acc.titles = hint.titles;
-    }
-    if (!acc.startYear && hint.startYear) {
-      acc.startYear = hint.startYear;
-    }
-    if (!acc.format && hint.format) {
-      acc.format = hint.format;
-    }
-    acc.synonyms = mergeSynonyms(acc.synonyms, hint.synonyms);
-    acc.relationPrequelIds = mergeRelationIds(acc.relationPrequelIds, hint.relationPrequelIds);
-    return acc;
-  }, {
-    titles: null,
-    synonyms: null,
-    startYear: null,
-    format: null,
-    relationPrequelIds: null,
-  });
 };
