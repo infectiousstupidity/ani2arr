@@ -9,6 +9,7 @@ import {
   normalizeTitleTokens,
   tokenize,
 } from '@/utils/matching';
+import { BONUS_YEAR_CAP } from '@/utils/matching/constants';
 
 describe('canonicalizeLookupTerm', () => {
   it('normalizes punctuation, stopwords, and whitespace', () => {
@@ -138,7 +139,7 @@ describe('computeTitleMatchScore', () => {
         candidateYear: 2020,
         targetYear: 2020,
       }),
-    ).toBe(1);
+    ).toBe(BONUS_YEAR_CAP);
   });
 
   it('applies smaller bonuses when the year differs by one', () => {
@@ -183,7 +184,7 @@ describe('computeTitleMatchScore', () => {
       candidateGenres: ['Animation', 'Action', 'Adventure'],
     });
 
-    expect(score).toBe(1);
+    expect(score).toBe(BONUS_YEAR_CAP);
   });
 
   it('attenuates scores when the query is a single token but the candidate is verbose', () => {

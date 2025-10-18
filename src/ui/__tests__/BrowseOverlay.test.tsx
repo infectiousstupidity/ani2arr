@@ -5,8 +5,8 @@ import { createBrowserMock } from '@/testing';
 import { createStatusStub, createAddSeriesStub } from '@/testing/mocks/useApiQueriesMock';
 import type { CheckSeriesStatusPayload } from '@/types';
 
-import type { BrowseAdapter, ParsedCard } from '../BrowseOverlay';
-import { createBrowseContentApp } from '../BrowseOverlay';
+import type { BrowseAdapter, ParsedCard } from '@/ui/browse-overlay-types';
+import { createBrowseContentApp } from '@/ui/BrowseOverlay';
 // Hoisted spies + state for use-api-queries
 const hoisted = vi.hoisted(() => {
   const spies = {
