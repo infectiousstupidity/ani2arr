@@ -8,9 +8,8 @@ const __dirname = path.dirname(__filename);
 const projectRoot = __dirname;
 
 const chromiumExtensionPath = path.resolve(projectRoot, '.output', 'chrome-mv3');
-const firefoxExtensionPath = path.resolve(projectRoot, '.output', 'firefox-mv2');
 process.env.KITSUNARR_E2E_CHROMIUM_EXTENSION = chromiumExtensionPath;
-process.env.KITSUNARR_E2E_FIREFOX_EXTENSION = firefoxExtensionPath;
+// Firefox automation is disabled while the E2E harness only supports Chromium.
 
 export default defineConfig({
   testDir: path.join(projectRoot, 'tests', 'e2e'),
@@ -43,16 +42,6 @@ export default defineConfig({
             `--load-extension=${chromiumExtensionPath}`,
             '--no-sandbox',
           ],
-        },
-      },
-    },
-    {
-      name: 'firefox',
-      use: {
-        browserName: 'firefox',
-        headless: false,
-        launchOptions: {
-          args: ['-wait-for-browser'],
         },
       },
     },
