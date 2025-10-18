@@ -50,9 +50,55 @@ export class AnilistPage {
   }
 
   async clickAddSeries(dialog: Locator): Promise<void> {
-    const addButton = dialog.getByRole('button', { name: 'Add Series' });
+    const addButton = this.modalAddSeriesButton(dialog);
     await expect(addButton).toBeVisible();
     await addButton.click();
+  }
+
+  async waitForAddSeriesStatus(dialog: Locator, expected: RegExp | string, timeout = 15_000): Promise<void> {
+    const addButton = this.modalAddSeriesButton(dialog);
+    await expect(addButton).toHaveText(expected, { timeout });
+  }
+
+  async readModalStatusText(dialog: Locator): Promise<string> {
+    const addButton = this.modalAddSeriesButton(dialog);
+    const text = (await addButton.textContent()) ?? '';
+    return text.trim();
+  }
+
+  async selectQualityProfile(dialog: Locator, profileName: string): Promise<void> {
+    const trigger = dialog.getByLabel('Quality Profile');
+    await this.selectFromDropdown(trigger, profileName);
+  }
+
+  async selectRootFolder(dialog: Locator, folderPath: string): Promise<void> {
+    const trigger = dialog.getByLabel('Root Folder');
+    await this.selectFromDropdown(trigger, folderPath);
+  }
+
+  async selectMonitorOption(dialog: Locator, optionLabel: string): Promise<void> {
+    const trigger = dialog.getByLabel('Monitor');
+    await this.selectFromDropdown(trigger, optionLabel);
+  }
+
+  async selectSeriesType(dialog: Locator, optionLabel: string): Promise<void> {
+    const trigger = dialog.getByLabel('Series Type');
+    await this.selectFromDropdown(trigger, optionLabel);
+  }
+
+  async setSeasonFolder(dialog: Locator, enabled: boolean): Promise<void> {
+    await this.setSwitchState(dialog, 'Use Season Folders', enabled);
+  }
+
+  async setSearchForMissingEpisodes(dialog: Locator, enabled: boolean): Promise<void> {
+    await this.setSwitchState(dialog, 'Search on Add', enabled);
+  }
+
+  async saveDefaults(dialog: Locator): Promise<void> {
+    const button = dialog.getByRole('button', { name: 'Save as Default' });
+    await expect(button).toBeVisible();
+    await button.click();
+    await expect(button).toBeHidden({ timeout: 10_000 });
   }
 
   async waitForModalHidden(dialog: Locator): Promise<void> {
@@ -65,5 +111,26 @@ export class AnilistPage {
 
   async screenshot(): Promise<Buffer> {
     return this.page.screenshot({ fullPage: false });
+  }
+
+  private modalAddSeriesButton(dialog: Locator): Locator {
+    return dialog.getByRole('button', { name: /Add Series|Added!/ });
+  }
+
+  private async selectFromDropdown(trigger: Locator, optionLabel: string): Promise<void> {
+    await trigger.click();
+    const option = this.page.getByRole('option', { name: optionLabel });
+    await expect(option).toBeVisible();
+    await option.click();
+  }
+
+  private async setSwitchState(dialog: Locator, label: string, enabled: boolean): Promise<void> {
+    const control = dialog.getByRole('switch', { name: label });
+    const expectedState = enabled ? 'checked' : 'unchecked';
+    const currentState = await control.getAttribute('data-state');
+    if (currentState !== expectedState) {
+      await control.click();
+    }
+    await expect(control).toHaveAttribute('data-state', expectedState);
   }
 }
