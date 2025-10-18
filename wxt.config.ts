@@ -31,6 +31,7 @@ export default defineConfig({
   manifest: ({ manifestVersion }) => {
     const requiredHosts = [
       'https://anilist.co/*',
+      'https://www.anilist.co/*',
       'https://graphql.anilist.co/*',
       'https://anichart.net/*',
       'https://www.anichart.net/*',
@@ -53,7 +54,7 @@ export default defineConfig({
 
     return {
       name: 'Kitsunarr',
-      description: 'Adds a one-click "Add to Sonarr" button to anime pages',
+      description: 'Adds a one-click "Add to Sonarr" button to AniList and AniChart pages',
       ...(manifestVersion === 3 ? mv3Permissions : mv2Permissions),
       options_ui: {
         page: 'options/index.html',
@@ -61,7 +62,7 @@ export default defineConfig({
       },
       browser_specific_settings: {
         gecko: {
-          id: 'kitsunarr@local',
+          id: 'infectiousstupidity@proton.me',
           strict_min_version: '109.0',
         },
       },
