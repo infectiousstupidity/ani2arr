@@ -109,6 +109,10 @@ export class AnilistPage {
     await expect(this.quickAddButton()).toHaveText(expected, { timeout });
   }
 
+  async waitForQuickAddError(timeout = 15_000): Promise<void> {
+    await this.waitForQuickAddState(/Error/i, timeout);
+  }
+
   async screenshot(): Promise<Buffer> {
     return this.page.screenshot({ fullPage: false });
   }
