@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ParsedCard } from '@/ui/browse-overlay-types';
+import type { ParsedCard } from '@/types';
 import { metadataEqual } from '@/utils/media-metadata';
 
 const toElementArray = (value: Iterable<Element> | Element | null | undefined): Element[] => {

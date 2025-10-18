@@ -4,8 +4,8 @@ import { useExtensionOptions } from '@/hooks/use-api-queries';
 import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
 import { useTheme } from '@/hooks/use-theme';
 import { useBrowsePortals } from '@/hooks/use-browse-portals';
-import type { BrowseAdapter, ModalState, ParsedCard } from '@/ui/browse-overlay-types';
-import { CardOverlay } from '@/ui/card-overlay';
+import type { BrowseAdapter, ModalState, ParsedCard } from '@/types';
+import { CardOverlay } from '@/ui/CardOverlay';
 
 const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
 
@@ -130,5 +130,5 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
   return BrowseContentApp;
 };
 
-export { CardOverlay } from '@/ui/card-overlay';
-export type { BrowseAdapter, ModalState, ParsedCard, CardOverlayProps } from '@/ui/browse-overlay-types';
+export { CardOverlay } from '@/ui/CardOverlay';
+export type { BrowseAdapter, ModalState, ParsedCard, CardOverlayProps } from '@/types';

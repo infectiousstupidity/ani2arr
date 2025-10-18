@@ -1,7 +1,7 @@
 // src/services/mapping/index.ts
 import type { TtlCache } from '@/cache';
-import type { AnilistApiService, AniMedia } from '@/api/anilist.api';
-import type { ExtensionError, MediaMetadataHint, AniTitles } from '@/types';
+import type { AnilistApiService } from '@/api/anilist.api';
+import type { ExtensionError, MediaMetadataHint, AniTitles, AniMedia } from '@/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
 import { extensionOptions } from '@/utils/storage';
 import { incrementCounter } from '@/utils/metrics';

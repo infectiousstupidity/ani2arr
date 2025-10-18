@@ -4,7 +4,7 @@ import { browser } from 'wxt/browser';
 import { createTtlCache } from '@/cache';
 import { CacheNamespaces } from '@/cache/namespaces';
 import { SonarrApiService } from '@/api/sonarr.api';
-import { AnilistApiService, type AniMedia } from '@/api/anilist.api';
+import { AnilistApiService } from '@/api/anilist.api';
 import { MappingService, type ResolvedMapping, type StaticMappingPayload } from './mapping';
 import { StaticMappingProvider } from './mapping/static-mapping.provider';
 import { SonarrLookupClient } from './mapping/sonarr-lookup.client';
@@ -17,6 +17,7 @@ import type {
   SonarrTag,
   SonarrLookupSeries,
   ExtensionOptions,
+  AniMedia,
   ExtensionError,
   SonarrCredentialsPayload,
   CheckSeriesStatusPayload,

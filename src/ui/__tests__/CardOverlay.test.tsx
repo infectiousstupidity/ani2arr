@@ -3,8 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBrowserMock, getReactHandler } from '@/testing';
 
-import type { CardOverlayProps } from '@/ui/browse-overlay-types';
-import { CardOverlay } from '@/ui/card-overlay';
+import type { CardOverlayProps } from '@/types';
+import { CardOverlay } from '@/ui/CardOverlay';
 import { createStatusStub, createAddSeriesStub, SeriesStatusStub, AddSeriesStub } from '@/testing/mocks/useApiQueriesMock';
 
 type FakeBrowser = {
@@ -335,5 +335,130 @@ describe('CardOverlay', () => {
       stopPropagation: () => {},
     } as React.MouseEvent<HTMLButtonElement>);
     expect(addSeriesStub.mutate).not.toHaveBeenCalled();
+  });
+
+  it('renders external Sonarr link with series slug and opens in new tab', () => {
+    statusStub = createStatusStub({
+      data: {
+        exists: true,
+        series: { titleSlug: 'my-series' },
+      },
+    });
+  hoisted.useSeriesStatusMock.mockImplementation(() => statusStub);
+
+    render(<CardOverlay {...baseProps} sonarrUrl="https://sonarr.example/" />);
+
+    const externalLink = screen.getByRole('link', { name: 'Open in Sonarr' });
+    expect(externalLink).toHaveAttribute('href', 'https://sonarr.example/series/my-series');
+
+    const clickHandler = getReactHandler(externalLink, 'onClick') as React.MouseEventHandler<HTMLAnchorElement> | null;
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(window);
+
+    clickHandler?.({
+      preventDefault,
+      stopPropagation,
+    } as unknown as React.MouseEvent<HTMLAnchorElement>);
+
+    expect(stopPropagation).toHaveBeenCalled();
+    expect(openSpy).toHaveBeenCalledWith('https://sonarr.example/series/my-series', '_blank', 'noopener');
+    expect(preventDefault).toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it('falls back to Sonarr add-new search when slug is missing', () => {
+    statusStub = createStatusStub({
+      data: {
+        exists: true,
+        series: { titleSlug: null },
+      },
+    });
+  hoisted.useSeriesStatusMock.mockImplementation(() => statusStub);
+
+    render(
+      <CardOverlay
+        {...baseProps}
+        title="Example Title"
+        sonarrUrl="https://sonarr.example/"
+      />,
+    );
+
+    const externalLink = screen.getByRole('link', { name: 'Open in Sonarr' });
+    expect(externalLink).toHaveAttribute('href', 'https://sonarr.example/add/new?term=Example%20Title');
+  });
+
+  it('swallows quick-button mouse down events to avoid bubbling', () => {
+    render(<CardOverlay {...baseProps} />);
+
+    const quickButton = screen.getByRole('button', { name: 'Quick add to Sonarr' });
+    const mouseDownHandler = getReactHandler(quickButton, 'onMouseDown') as React.MouseEventHandler<HTMLButtonElement> | null;
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+
+    mouseDownHandler?.({
+      preventDefault,
+      stopPropagation,
+    } as unknown as React.MouseEvent<HTMLButtonElement>);
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops propagation for pointer interactions on the Sonarr link', () => {
+    statusStub = createStatusStub({
+      data: {
+        exists: true,
+        series: { titleSlug: 'slug' },
+      },
+    });
+    hoisted.useSeriesStatusMock.mockImplementation(() => statusStub);
+
+    render(<CardOverlay {...baseProps} sonarrUrl="https://sonarr.example/" />);
+
+    const link = screen.getByRole('link', { name: 'Open in Sonarr' });
+    const mouseDown = getReactHandler(link, 'onMouseDown') as React.MouseEventHandler<HTMLAnchorElement> | null;
+    const pointerDown = getReactHandler(link, 'onPointerDown') as React.PointerEventHandler<HTMLAnchorElement> | null;
+    const auxClick = getReactHandler(link, 'onAuxClick') as React.MouseEventHandler<HTMLAnchorElement> | null;
+
+    const stopPropagation = vi.fn();
+
+    mouseDown?.({ stopPropagation } as unknown as React.MouseEvent<HTMLAnchorElement>);
+    pointerDown?.({ stopPropagation } as unknown as React.PointerEvent<HTMLAnchorElement>);
+    auxClick?.({ stopPropagation } as unknown as React.MouseEvent<HTMLAnchorElement>);
+
+    expect(stopPropagation).toHaveBeenCalledTimes(3);
+  });
+
+  it('falls back gracefully when window.open throws on the Sonarr link', () => {
+    statusStub = createStatusStub({
+      data: {
+        exists: true,
+        series: { titleSlug: 'slug' },
+      },
+    });
+    hoisted.useSeriesStatusMock.mockImplementation(() => statusStub);
+
+    render(<CardOverlay {...baseProps} sonarrUrl="https://sonarr.example/" />);
+
+    const link = screen.getByRole('link', { name: 'Open in Sonarr' });
+    const clickHandler = getReactHandler(link, 'onClick') as React.MouseEventHandler<HTMLAnchorElement> | null;
+
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+
+    expect(() =>
+      clickHandler?.({
+        preventDefault,
+        stopPropagation,
+      } as unknown as React.MouseEvent<HTMLAnchorElement>),
+    ).not.toThrow();
+
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    openSpy.mockRestore();
   });
 });

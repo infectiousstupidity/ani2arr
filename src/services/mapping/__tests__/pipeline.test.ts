@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { resolveViaPipeline } from '@/services/mapping/pipeline';
-import type { MappingContext, AniMedia } from '@/services/mapping/types';
+import type { MappingContext, AniMedia } from '@/types';
 import type { SonarrLookupSeries } from '@/types';
 import { canonicalTitleKey } from '@/utils/matching';
 import type { SearchTerm } from '@/services/mapping/search-term-generator';
-import type { ScoredCandidate } from '@/services/mapping/types';
+import type { ScoredCandidate } from '@/types';
 import type { AnilistApiService } from '@/api/anilist.api';
 import type { StaticMappingProvider } from '@/services/mapping/static-mapping.provider';
 import type { ScopedLogger } from '@/utils/logger';

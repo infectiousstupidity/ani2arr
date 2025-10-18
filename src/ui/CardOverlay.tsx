@@ -1,7 +1,7 @@
 import React, { memo, useCallback, useMemo } from 'react';
 import { CheckIcon, ExclamationTriangleIcon, ExternalLinkIcon, GearIcon, PlusIcon } from '@radix-ui/react-icons';
 import TooltipWrapper from '@/ui/TooltipWrapper';
-import type { CardOverlayProps } from '@/ui/browse-overlay-types';
+import type { CardOverlayProps } from '@/types';
 import { useCardOverlayState } from '@/hooks/use-card-overlay-state';
 
 const CardOverlay: React.FC<CardOverlayProps> = memo(({
@@ -129,9 +129,25 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
                 <a
                   className="kitsunarr-card-overlay__external"
                   href={externalHref}
+                  // keep the semantics for non-JS fallback and accessibility
                   target="_blank"
                   rel="noopener noreferrer"
-                  onMouseDown={swallowEvent}
+                  onClick={(e) => {
+                    // stop parent handlers from receiving the click
+                    e.stopPropagation();
+                    // attempt to open the URL in a new tab programmatically
+                    try {
+                      // window.open respects user preferences (new tab/window)
+                      window.open(externalHref || undefined, '_blank', 'noopener');
+                    } catch {
+                      // if window.open fails for any reason, allow the anchor to work
+                    }
+                    // prevent default to avoid duplicate navigation in same tab
+                    e.preventDefault();
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onAuxClick={(e) => e.stopPropagation()}
                   aria-label="Open in Sonarr"
                 >
                   <ExternalLinkIcon aria-hidden="true" />

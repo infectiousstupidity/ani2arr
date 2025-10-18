@@ -1,10 +1,10 @@
-// src/services/mapping/types.ts
-import type { AniMedia, AnilistApiService } from '@/api/anilist.api';
-import type { SonarrLookupSeries } from '@/types';
-import type { SonarrLookupClient, SonarrLookupCredentials } from './sonarr-lookup.client';
-import type { StaticMappingProvider } from './static-mapping.provider';
+import type { AnilistApiService } from '@/api/anilist.api';
+import type { SonarrLookupClient, SonarrLookupCredentials } from '@/services/mapping/sonarr-lookup.client';
+import type { StaticMappingProvider } from '@/services/mapping/static-mapping.provider';
+import type { SearchTerm } from '@/services/mapping/search-term-generator';
+import type { SonarrLookupSeries } from './sonarr';
 import type { ScopedLogger } from '@/utils/logger';
-import type { SearchTerm } from './search-term-generator';
+import type { AniMedia } from './anilist';
 
 export interface Candidate {
   term: SearchTerm;
@@ -12,7 +12,10 @@ export interface Candidate {
 }
 
 export interface ScoredCandidate extends Candidate {
-  score: number; // 0..1
+  /**
+   * Confidence score in range [0, 1].
+   */
+  score: number;
   breakdown?: Record<string, number>;
 }
 

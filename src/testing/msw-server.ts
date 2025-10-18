@@ -16,8 +16,8 @@ import {
   fallbackMappingUrl,
   primaryMappingUrl,
 } from './fixtures';
-import type { AniMedia } from '@/api/anilist.api';
 import type {
+  AniMedia,
   SonarrLookupSeries,
   SonarrQualityProfile,
   SonarrRootFolder,

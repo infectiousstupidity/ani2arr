@@ -65,7 +65,7 @@
  * 1. Update KitsunarrApiMinimal type with new method signature
  * 2. Add test case exercising the new method
  * 3. Update fetch mock handlers if new endpoints are called
- * 4. Validate response schema matches src/types.ts
+ * 4. Validate response schema matches src/types/index.ts
  * 
  * When changing existing API contracts:
  * 1. This test should FAIL until updated to match new contract
