@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { OptionsPage } from '../pages/options-page';
 import { AnilistPage } from '../pages/anilist-page';
 import { resetServerState, getSonarrSeries, updateServerState } from '../support/server-control';
+import { createSonarrSeriesFixture } from '@/testing/fixtures/sonarr';
 import {
   attachJson,
   withChromiumHarness,
@@ -91,6 +92,72 @@ test.describe('Chromium quick add flow', () => {
         } catch (diagError) {
           console.warn(
             `[E2E] Failed to capture diagnostics on error:`,
+            (diagError as Error).message,
+          );
+        }
+        throw error;
+      } finally {
+        await resetServerState(harness.serverBaseUrl);
+      }
+    });
+  });
+
+  test('quick add reflects existing Sonarr series immediately', async ({ browserName }, testInfo) => {
+    await withChromiumHarness(async harness => {
+      await resetServerState(harness.serverBaseUrl);
+
+      const captureDiagnostics = async (label: string) => {
+        const diagnostics = await collectBackgroundDiagnostics(harness.background);
+        await attachJson(testInfo, `${label}-${browserName}`, diagnostics);
+        return diagnostics;
+      };
+
+      const seededSeries = createSonarrSeriesFixture({ id: 2048, titleSlug: 'kitsunarr-test-series' });
+
+      try {
+        const optionsPage = new OptionsPage(await harness.openOptionsPage());
+        await expect(optionsPage.heading).toBeVisible();
+
+        await optionsPage.configureSonarr(`${harness.serverBaseUrl}/sonarr`, SONARR_API_KEY);
+        const statusResponse = harness.waitForTestConnection();
+        await optionsPage.connect();
+        await statusResponse;
+        await optionsPage.waitForConnectionSuccess();
+
+        await captureDiagnostics('background-post-connect-seeded');
+
+        await optionsPage.save();
+        await optionsPage.waitForSaveComplete();
+
+        await captureDiagnostics('background-post-save-seeded');
+
+        await updateServerState(harness.serverBaseUrl, { seedSeries: [seededSeries] });
+
+        const aniListPage = new AnilistPage(await harness.context.newPage());
+        await aniListPage.goto();
+        await aniListPage.waitForQuickAddReady();
+        await aniListPage.waitForQuickAddState('In Sonarr');
+
+        await expect(aniListPage.quickAddButton()).toHaveText('In Sonarr');
+        await expect(aniListPage.quickAddButton()).toBeDisabled();
+
+        const dialog = await aniListPage.openAdvancedModal({ allowDisabled: true });
+        const modalAddButton = dialog.getByRole('button', { name: 'Add Series' });
+        await expect(modalAddButton).toBeDisabled();
+
+        const externalHref = await aniListPage.readExternalLinkHref();
+        expect(externalHref).toBe(`${harness.serverBaseUrl}/sonarr/series/${seededSeries.titleSlug}`);
+
+        await testInfo.attach(`anilist-seeded-${browserName}`, {
+          body: await aniListPage.screenshot(),
+          contentType: 'image/png',
+        });
+      } catch (error) {
+        try {
+          await captureDiagnostics('background-on-error-seeded');
+        } catch (diagError) {
+          console.warn(
+            `[E2E] Failed to capture diagnostics on seeded error:`,
             (diagError as Error).message,
           );
         }

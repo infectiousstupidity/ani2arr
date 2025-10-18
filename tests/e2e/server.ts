@@ -153,10 +153,18 @@ export async function startTestServer(): Promise<TestServer> {
       version: string;
       requiredApiKey: string;
       failNextAdd: PendingAddFailure | null;
+      seedSeries: SonarrSeries[];
     }>;
     if (typeof patch.version === 'string') state.version = patch.version;
     if (typeof patch.requiredApiKey === 'string') state.requiredApiKey = patch.requiredApiKey;
     if ('failNextAdd' in patch) state.failNextAdd = patch.failNextAdd ?? undefined;
+    if (Array.isArray(patch.seedSeries)) {
+      state.sonarrSeries.splice(0, state.sonarrSeries.length, ...patch.seedSeries.map(series => ({ ...series })));
+      const maxId = state.sonarrSeries.reduce((highest, series) => (series.id > highest ? series.id : highest), 0);
+      if (maxId >= state.nextSeriesId) {
+        state.nextSeriesId = maxId + 1;
+      }
+    }
     res.status(204).end();
   });
 

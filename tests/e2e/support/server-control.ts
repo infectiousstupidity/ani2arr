@@ -3,6 +3,7 @@ export interface ServerStatePatch {
   version?: string;
   requiredApiKey?: string;
   failNextAdd?: { status: number; body?: unknown } | null;
+  seedSeries?: SonarrSeries[] | null;
 }
 
 export async function resetServerState(baseUrl: string): Promise<void> {

@@ -15,6 +15,20 @@ export class AnilistPage {
     return this.advancedButton.locator('xpath=preceding-sibling::button[1]');
   }
 
+  externalSonarrLink(): Locator {
+    return this.page.locator('a[target="_blank"][href*="/sonarr/"]').first();
+  }
+
+  async readExternalLinkHref(): Promise<string> {
+    const anchor = this.externalSonarrLink();
+    await expect(anchor).toHaveAttribute('href', /.+/);
+    const href = await anchor.getAttribute('href');
+    if (!href) {
+      throw new Error('Expected external Sonarr link to have an href attribute');
+    }
+    return href;
+  }
+
   async waitForQuickAddReady(): Promise<void> {
     const timeout = 20_000;
     const pollInterval = 300;
@@ -40,10 +54,23 @@ export class AnilistPage {
     throw new Error(`quick add button did not become ready within ${timeout}ms (final text: "${finalText}")`);
   }
 
-  async openAdvancedModal(): Promise<Locator> {
+  async openAdvancedModal(options: { allowDisabled?: boolean } = {}): Promise<Locator> {
     const button = this.advancedButton;
     await button.waitFor({ state: 'visible' });
-    await button.click();
+    const isEnabled = await button.isEnabled();
+    if (!isEnabled) {
+      if (!options.allowDisabled) {
+        throw new Error('Advanced options button is disabled');
+      }
+      const handle = await button.elementHandle();
+      if (!handle) {
+        throw new Error('Failed to obtain handle for advanced options button');
+      }
+      await this.page.evaluate(element => {
+        element.removeAttribute('disabled');
+      }, handle);
+    }
+    await button.click({ force: options.allowDisabled });
     const dialog = this.page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     return dialog;
