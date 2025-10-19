@@ -14,7 +14,7 @@ const EXPECTED_SONARR_KEY = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
 test.describe('Chromium options page', () => {
   test('configures Sonarr connection and persists settings', async ({ browserName }, testInfo) => {
-    await withChromiumHarness(async harness => {
+    await withChromiumHarness(testInfo, async harness => {
       await resetServerState(harness.serverBaseUrl);
 
       let optionsPage: OptionsPage | null = null;
@@ -67,7 +67,7 @@ test.describe('Chromium options page', () => {
   });
 
   test('surfaces Sonarr credential errors before allowing save', async ({ browserName }, testInfo) => {
-    await withChromiumHarness(async harness => {
+    await withChromiumHarness(testInfo, async harness => {
       await resetServerState(harness.serverBaseUrl);
       await updateServerState(harness.serverBaseUrl, { requiredApiKey: EXPECTED_SONARR_KEY });
 

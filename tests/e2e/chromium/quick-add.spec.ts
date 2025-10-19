@@ -35,7 +35,7 @@ async function waitForQuickAddCompletion(page: AnilistPage, timeoutMs = 15_000):
 
 test.describe('Chromium quick add flow', () => {
   test('quick add completes after configuring Sonarr', async ({ browserName }, testInfo) => {
-    await withChromiumHarness(async harness => {
+    await withChromiumHarness(testInfo, async harness => {
       await resetServerState(harness.serverBaseUrl);
 
       const captureDiagnostics = async (label: string) => {
@@ -103,7 +103,7 @@ test.describe('Chromium quick add flow', () => {
   });
 
   test('quick add reflects existing Sonarr series immediately', async ({ browserName }, testInfo) => {
-    await withChromiumHarness(async harness => {
+    await withChromiumHarness(testInfo, async harness => {
       await resetServerState(harness.serverBaseUrl);
 
       const captureDiagnostics = async (label: string) => {
@@ -169,7 +169,7 @@ test.describe('Chromium quick add flow', () => {
   });
 
   test('quick add surfaces failure and recovers without reload', async ({ browserName }, testInfo) => {
-    await withChromiumHarness(async harness => {
+    await withChromiumHarness(testInfo, async harness => {
       await resetServerState(harness.serverBaseUrl);
 
       const captureDiagnostics = async (label: string) => {

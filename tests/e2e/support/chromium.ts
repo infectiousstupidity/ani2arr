@@ -23,8 +23,13 @@ export async function attachJson(testInfo: TestInfo, name: string, payload: unkn
   }
 }
 
-export async function withChromiumHarness<T>(run: (harness: ExtensionHarness) => Promise<T>): Promise<T> {
-  const harness = await createExtensionHarness();
+export async function withChromiumHarness<T>(
+  testInfo: TestInfo,
+  run: (harness: ExtensionHarness) => Promise<T>,
+): Promise<T> {
+  const harness = await createExtensionHarness({
+    headless: testInfo.project.use.headless ?? true,
+  });
   try {
     return await run(harness);
   } finally {
