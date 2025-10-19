@@ -1,12 +1,13 @@
-# End-to-end tests
+# End-to-end testing
 
-The Playwright suite defaults to headless Chromium runs, including in CI. To observe
-browser interactions locally, explicitly request a headful session:
+Kitsunarr's Playwright suite loads the MV3 Chromium extension in a persistent profile. Chromium
+currently **does not support running MV3 extensions in headless mode**, so the tests must run
+headful. When running in environments without a display (for example CI), wrap the Playwright
+command in a virtual display such as `xvfb-run`:
 
 ```bash
-PW_HEADFUL=1 npm run test:e2e
+xvfb-run --auto-servernum -- npm run test:e2e
 ```
 
-Keeping the default headless mode avoids CI crashes on environments without a display
-server. Export `PW_HEADFUL=1` only when debugging locally or when a headed browser is
-required.
+The test harness will throw if headless mode is requested to avoid silent failures. Local runs can
+execute `npm run test:e2e` directly; Playwright defaults to launching Chromium with a visible window.

@@ -146,6 +146,10 @@ async function patchManifestHostPermissions(extensionPath: string): Promise<void
 const SUPPORTED_BROWSER: SupportedBrowser = 'chromium';
 
 export interface ExtensionHarnessOptions {
+  /**
+   * Chromium MV3 extensions cannot run in headless mode. Provide a virtual display (for example
+   * via xvfb-run) instead of requesting headless execution. Passing `true` here will throw.
+   */
   headless?: boolean;
 }
 
@@ -157,8 +161,13 @@ async function launchPersistentContext({ headless }: ExtensionHarnessOptions = {
     throw new Error('Missing Chromium extension path');
   }
   await patchManifestHostPermissions(extensionPath);
+  if (headless === true) {
+    throw new Error(
+      'Chromium MV3 extensions do not support headless mode. Run the tests with a virtual display instead.',
+    );
+  }
   const context = await chromium.launchPersistentContext(userDataDir, {
-    headless: headless ?? true,
+    headless: false,
     args: [
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,

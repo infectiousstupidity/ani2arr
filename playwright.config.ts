@@ -11,9 +11,9 @@ const chromiumExtensionPath = path.resolve(projectRoot, '.output', 'chrome-mv3')
 process.env.KITSUNARR_E2E_CHROMIUM_EXTENSION = chromiumExtensionPath;
 // Firefox automation is disabled while the E2E harness only supports Chromium.
 
-const headfulRequested =
-  process.env.PW_HEADFUL === '1' || process.env.PW_HEADFUL?.toLowerCase() === 'true';
-const headless = !headfulRequested;
+// Chromium MV3 extensions require a full browser environment. See tests/e2e/README.md for
+// instructions on providing a virtual display (for example via xvfb-run) when running in CI.
+const headless = false;
 
 export default defineConfig({
   testDir: path.join(projectRoot, 'tests', 'e2e'),
