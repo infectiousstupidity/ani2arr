@@ -55,7 +55,8 @@ type LaunchResult = {
   userDataDir: string;
 };
 
-const aniListPageHtml = `<!DOCTYPE html>
+const aniListPageHtml = String.raw`
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -74,11 +75,14 @@ const aniListPageHtml = `<!DOCTYPE html>
   </head>
   <body>
     <div class="header">
+      <!-- Mirrors AniList's hero container so Kitsunarr can anchor its shadow-root mount point. -->
       <div class="cover-wrap">
         <div class="poster" style="width:240px;height:340px;background:#22354a;border-radius:12px"></div>
         <div class="info">
+          <!-- Ensures the extension finds the media title it augments. -->
           <h1>Kitsunarr Test</h1>
           <div class="actions">
+            <!-- Provides the action tray Kitsunarr injects buttons into. -->
             <div class="favourite" aria-label="Favorite" role="button"></div>
             <div class="list" aria-hidden="true"></div>
           </div>
@@ -90,11 +94,15 @@ const aniListPageHtml = `<!DOCTYPE html>
         <p>Fixture content body.</p>
       </main>
       <aside class="sidebar">
+        <!-- Sidebar layout matches AniList so Kitsunarr can render status panels. -->
         <div class="rankings">Rankings</div>
       </aside>
     </div>
   </body>
-</html>`;
+</html>
+`;
+
+let hasValidatedAniListFixture = false;
 
 async function patchManifestHostPermissions(extensionPath: string): Promise<void> {
   try {
@@ -210,6 +218,33 @@ async function setupNetworkInterception(context: BrowserContext): Promise<void> 
       contentType: 'text/html',
       body: aniListPageHtml,
     });
+
+    if (hasValidatedAniListFixture) {
+      return;
+    }
+
+    const frame = route.request().frame();
+    if (!frame || frame.parentFrame()) {
+      return;
+    }
+
+    try {
+      await frame.waitForLoadState('domcontentloaded', { timeout: DEFAULT_TIMEOUT_MS });
+      await frame.evaluate(() => {
+        const root = document.documentElement;
+        if (!root) {
+          throw new Error('AniList fixture missing documentElement');
+        }
+        const requiredSelectors = ['.header', '.actions', '.sidebar', 'h1'];
+        const missing = requiredSelectors.filter(selector => !document.querySelector(selector));
+        if (missing.length > 0) {
+          throw new Error(`AniList fixture missing selectors: ${missing.join(', ')}`);
+        }
+      });
+      hasValidatedAniListFixture = true;
+    } catch (error) {
+      throw new Error(`AniList fixture validation failed: ${(error as Error).message}`);
+    }
   });
 
   await context.route('https://anilist.co/favicon.ico', async route => {
