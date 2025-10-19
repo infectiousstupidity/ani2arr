@@ -23,7 +23,7 @@ function extractStoredDefaults(diagnostics: Record<string, unknown>): Record<str
 
 test.describe('Chromium advanced modal flow', () => {
   test('advanced add saves defaults and adds series', async ({ browserName }, testInfo) => {
-    await withChromiumHarness(async harness => {
+    await withChromiumHarness(testInfo, async harness => {
       await resetServerState(harness.serverBaseUrl);
 
       const captureDiagnostics = async (label: string) => {

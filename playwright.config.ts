@@ -11,6 +11,10 @@ const chromiumExtensionPath = path.resolve(projectRoot, '.output', 'chrome-mv3')
 process.env.KITSUNARR_E2E_CHROMIUM_EXTENSION = chromiumExtensionPath;
 // Firefox automation is disabled while the E2E harness only supports Chromium.
 
+const headfulRequested =
+  process.env.PW_HEADFUL === '1' || process.env.PW_HEADFUL?.toLowerCase() === 'true';
+const headless = !headfulRequested;
+
 export default defineConfig({
   testDir: path.join(projectRoot, 'tests', 'e2e'),
   timeout: 120_000,
@@ -35,7 +39,7 @@ export default defineConfig({
       name: 'chromium',
       use: {
         browserName: 'chromium',
-        headless: false,
+        headless,
         launchOptions: {
           args: [
             `--disable-extensions-except=${chromiumExtensionPath}`,

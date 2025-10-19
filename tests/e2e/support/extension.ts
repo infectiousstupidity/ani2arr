@@ -145,7 +145,11 @@ async function patchManifestHostPermissions(extensionPath: string): Promise<void
 
 const SUPPORTED_BROWSER: SupportedBrowser = 'chromium';
 
-async function launchPersistentContext(): Promise<LaunchResult> {
+export interface ExtensionHarnessOptions {
+  headless?: boolean;
+}
+
+async function launchPersistentContext({ headless }: ExtensionHarnessOptions = {}): Promise<LaunchResult> {
   const userDataDir = await mkdtemp(path.join(os.tmpdir(), 'kitsunarr-e2e-'));
 
   const extensionPath = process.env.KITSUNARR_E2E_CHROMIUM_EXTENSION;
@@ -154,7 +158,7 @@ async function launchPersistentContext(): Promise<LaunchResult> {
   }
   await patchManifestHostPermissions(extensionPath);
   const context = await chromium.launchPersistentContext(userDataDir, {
-    headless: false,
+    headless: headless ?? true,
     args: [
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,
@@ -419,8 +423,10 @@ export interface ExtensionHarness {
   cleanup(): Promise<void>;
 }
 
-export async function createExtensionHarness(): Promise<ExtensionHarness> {
-  const { context, userDataDir } = await launchPersistentContext();
+export async function createExtensionHarness(
+  options: ExtensionHarnessOptions = {},
+): Promise<ExtensionHarness> {
+  const { context, userDataDir } = await launchPersistentContext(options);
   context.setDefaultTimeout(DEFAULT_TIMEOUT_MS);
   context.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS);
   attachContextLogging(context, SUPPORTED_BROWSER);
