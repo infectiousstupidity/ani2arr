@@ -15,22 +15,12 @@ const SONARR_API_KEY = '0123456789abcdef0123456789abcdef';
 
 async function waitForQuickAddCompletion(page: AnilistPage, timeoutMs = 15_000): Promise<string> {
   const button = page.quickAddButton();
-  const start = Date.now();
-  let lastText = '';
-  while (Date.now() - start <= timeoutMs) {
-    const text = (await button.textContent())?.trim() ?? '';
-    if (text) {
-      lastText = text;
-      if (text.includes('In Sonarr')) return text;
-      if (text.includes('Error')) {
-        throw new Error(`Quick add failed with state: ${text}`);
-      }
-    }
-    await page.page.waitForTimeout(250);
+  await expect(button).toHaveText(/In Sonarr|Error/i, { timeout: timeoutMs });
+  const finalText = (await button.textContent())?.trim() ?? '';
+  if (/Error/i.test(finalText)) {
+    throw new Error(`Quick add failed with state: ${finalText}`);
   }
-  throw new Error(
-    `Quick add did not reach 'In Sonarr' within ${timeoutMs}ms (last seen state: ${lastText || 'empty'})`,
-  );
+  return finalText;
 }
 
 test.describe('Chromium quick add flow', () => {
@@ -70,8 +60,8 @@ test.describe('Chromium quick add flow', () => {
         const quickButton = aniListPage.quickAddButton();
         const initialEpoch = await readLibraryEpoch(harness.background);
         await quickButton.click();
-        await aniListPage.waitForQuickAddState('Adding...', 5_000);
         const finalText = await waitForQuickAddCompletion(aniListPage);
+        expect(finalText).toContain('In Sonarr');
         console.log(`[${browserName}] quick add final state: ${finalText}`);
         const bumped = await waitForLibraryEpochBump(harness.background, initialEpoch ?? undefined);
         if (!bumped) {
@@ -136,7 +126,8 @@ test.describe('Chromium quick add flow', () => {
         const aniListPage = new AnilistPage(await harness.context.newPage());
         await aniListPage.goto();
         await aniListPage.waitForQuickAddReady();
-        await aniListPage.waitForQuickAddState('In Sonarr');
+        const finalText = await waitForQuickAddCompletion(aniListPage);
+        expect(finalText).toBe('In Sonarr');
 
         await expect(aniListPage.quickAddButton()).toHaveText('In Sonarr');
         await expect(aniListPage.quickAddButton()).toBeDisabled();
@@ -206,7 +197,6 @@ test.describe('Chromium quick add flow', () => {
         });
 
         await quickButton.click();
-        await aniListPage.waitForQuickAddState('Adding...', 5_000);
         await aniListPage.waitForQuickAddError();
 
         const afterFailureSeries = await getSonarrSeries(harness.serverBaseUrl, SONARR_API_KEY);
@@ -215,7 +205,6 @@ test.describe('Chromium quick add flow', () => {
         await aniListPage.waitForQuickAddState('Add to Sonarr', 10_000);
 
         await quickButton.click();
-        await aniListPage.waitForQuickAddState('Adding...', 5_000);
         const finalText = await waitForQuickAddCompletion(aniListPage);
         expect(finalText).toContain('In Sonarr');
 
