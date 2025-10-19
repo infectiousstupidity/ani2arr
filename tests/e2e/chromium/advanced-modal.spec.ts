@@ -46,6 +46,8 @@ test.describe('Chromium advanced modal flow', () => {
         await optionsPage.waitForSaveComplete();
 
         const postSaveDiagnostics = await captureDiagnostics('background-post-save');
+        // Read modal defaults from background storage diagnostics instead of mutating
+        // the rendered DOM so the test exercises the real persistence flow.
         const baselineDefaults = extractStoredDefaults(postSaveDiagnostics);
 
         const aniListPage = new AnilistPage(await harness.context.newPage());

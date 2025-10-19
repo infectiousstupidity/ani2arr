@@ -54,23 +54,14 @@ export class AnilistPage {
     throw new Error(`quick add button did not become ready within ${timeout}ms (final text: "${finalText}")`);
   }
 
-  async openAdvancedModal(options: { allowDisabled?: boolean } = {}): Promise<Locator> {
+  async openAdvancedModal(): Promise<Locator> {
     const button = this.advancedButton;
     await button.waitFor({ state: 'visible' });
     const isEnabled = await button.isEnabled();
     if (!isEnabled) {
-      if (!options.allowDisabled) {
-        throw new Error('Advanced options button is disabled');
-      }
-      const handle = await button.elementHandle();
-      if (!handle) {
-        throw new Error('Failed to obtain handle for advanced options button');
-      }
-      await this.page.evaluate(element => {
-        element.removeAttribute('disabled');
-      }, handle);
+      throw new Error('Advanced options button is disabled');
     }
-    await button.click({ force: options.allowDisabled });
+    await button.click();
     const dialog = this.page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     return dialog;
