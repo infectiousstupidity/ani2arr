@@ -141,9 +141,7 @@ test.describe('Chromium quick add flow', () => {
         await expect(aniListPage.quickAddButton()).toHaveText('In Sonarr');
         await expect(aniListPage.quickAddButton()).toBeDisabled();
 
-        const dialog = await aniListPage.openAdvancedModal({ allowDisabled: true });
-        const modalAddButton = dialog.getByRole('button', { name: 'Add Series' });
-        await expect(modalAddButton).toBeDisabled();
+        await expect(aniListPage.advancedButton).toBeDisabled();
 
         const externalHref = await aniListPage.readExternalLinkHref();
         expect(externalHref).toBe(`${harness.serverBaseUrl}/sonarr/series/${seededSeries.titleSlug}`);
