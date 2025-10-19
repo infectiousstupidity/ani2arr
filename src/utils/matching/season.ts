@@ -86,10 +86,18 @@ export function stripTrailingOrdinalOrNumber(s: string): string {
 
 export function sanitizeLookupDisplay(term: string): string {
   if (!term) return '';
-  const cleaned = cleanTitleDecorations(term);
-  const noParens = stripParenContent(cleaned);
-  const reduced = stripSeasonalSuffixes(noParens);
-  const trailingStripped = stripTrailingOrdinalOrNumber(reduced);
-  const normalized = trailingStripped.replace(/\s+/g, ' ').trim();
+  let s = cleanTitleDecorations(term);
+
+  // Preserve meaningful content inside ASCII square brackets by unwrapping instead of removing
+  // Example: "[Oshi no Ko] 3rd Season" -> "Oshi no Ko 3rd Season"
+  s = s.replace(/\[([^\]]+)\]/g, '$1');
+
+  // Now strip seasonal suffixes and trailing ordinals/numbers on the resulting string
+  const seasonalReduced = stripSeasonalSuffixes(s);
+  const trailingStripped = stripTrailingOrdinalOrNumber(seasonalReduced);
+
+  // Finally, remove any remaining parenthetical/braced segments like (TV), {2024}
+  const noParens = stripParenContent(trailingStripped);
+  const normalized = noParens.replace(/\s+/g, ' ').trim();
   return /[\p{L}\p{N}]/u.test(normalized) ? normalized : '';
 }

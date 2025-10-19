@@ -166,8 +166,25 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
     const api: KitsunarrApi = {
       async resolveMapping(input) {
         await ensureConfigured();
-  const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {};
-  const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
+
+        // Fast path: try local library index only (no network)
+        try {
+          const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
+          if (input.primaryTitleHint !== undefined) payload.title = input.primaryTitleHint;
+          if (input.metadata !== undefined) payload.metadata = input.metadata ?? null;
+          const status = await libraryService.getSeriesStatus(payload, { network: 'never', ignoreFailureCache: true });
+          if (status.exists && typeof status.tvdbId === 'number') {
+            return {
+              tvdbId: status.tvdbId,
+              ...(status.successfulSynonym ? { successfulSynonym: status.successfulSynonym } : {}),
+            } satisfies MappingOutput;
+          }
+        } catch (err) {
+          void err;
+        }
+
+        const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {};
+        const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
         if (input.primaryTitleHint) {
           hints.primaryTitle = input.primaryTitleHint;
         }

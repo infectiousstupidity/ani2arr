@@ -10,7 +10,7 @@ import type {
   SonarrSeries,
 } from '@/types';
 import { ErrorCode, logError, normalizeError } from '@/utils/error-handling';
-import { canonicalizeLookupTerm, computeTitleMatchScore, stripParenContent } from '@/utils/matching';
+import { canonicalizeLookupTerm, computeTitleMatchScore, stripParenContent, sanitizeLookupDisplay } from '@/utils/matching';
 import { extensionOptions } from '@/utils/storage';
 import { incrementCounter } from '@/utils/metrics';
 
@@ -274,8 +274,10 @@ export class LibraryService {
     for (const key of normalizedKeys) {
       const existing = this.normalizedTitleIndex.get(key);
       if (existing === undefined) {
+        // First time seeing this key
         this.normalizedTitleIndex.set(key, series.tvdbId);
       } else if (existing !== series.tvdbId) {
+        // Collision detected — mark ambiguous and track all candidates
         this.normalizedTitleIndex.set(key, null);
       }
     }
@@ -311,6 +313,14 @@ export class LibraryService {
       const primary = canonicalizeLookupTerm(trimmed);
       if (primary) {
         normalized.add(primary);
+      }
+
+      const sanitized = sanitizeLookupDisplay(trimmed);
+      if (sanitized && sanitized !== trimmed) {
+        const sanitizedCanonical = canonicalizeLookupTerm(sanitized);
+        if (sanitizedCanonical) {
+          normalized.add(sanitizedCanonical);
+        }
       }
 
       const stripped = stripParenContent(trimmed);
@@ -352,6 +362,43 @@ export class LibraryService {
     let sawAmbiguous = false;
     let bestMatch: { tvdbId: number; score: number } | null = null;
 
+    const scoreAgainstSeries = (rawTitle: string, series: LeanSonarrSeries): number => {
+      const sanitizedQuery = sanitizeLookupDisplay(rawTitle);
+      const libraryTitles = new Set<string>();
+      libraryTitles.add(series.title);
+      libraryTitles.add(series.titleSlug);
+      if (Array.isArray(series.alternateTitles)) {
+        for (const alt of series.alternateTitles) {
+          if (alt) {
+            libraryTitles.add(alt);
+          }
+        }
+      }
+
+      let top = 0;
+      for (const candidateRaw of libraryTitles) {
+        if (!candidateRaw) continue;
+        const baseArgs = (yr?: number) => (yr !== undefined ? { targetYear: yr } : {} as Record<string, unknown>);
+        // Score with original query
+        const scoreRaw = computeTitleMatchScore({
+          queryRaw: rawTitle,
+          candidateRaw,
+          ...baseArgs(targetYear),
+        });
+        if (scoreRaw > top) top = scoreRaw;
+        // Score with sanitized query (season/ordinal stripped) if different
+        if (sanitizedQuery && sanitizedQuery !== rawTitle) {
+          const scoreSanitized = computeTitleMatchScore({
+            queryRaw: sanitizedQuery,
+            candidateRaw,
+            ...baseArgs(targetYear),
+          });
+          if (scoreSanitized > top) top = scoreSanitized;
+        }
+      }
+      return top;
+    };
+
     for (const rawTitle of candidateInputs) {
       if (!rawTitle) continue;
       const normalizedVariants = this.normalizeTitleCandidates([rawTitle]);
@@ -362,29 +409,10 @@ export class LibraryService {
         if (typeof match === 'number' && this.tvdbSet.has(match)) {
           const series = this.leanSeriesByTvdbId.get(match);
           if (!series) continue;
-
-          const libraryTitles = new Set<string>();
-          libraryTitles.add(series.title);
-          libraryTitles.add(series.titleSlug);
-          if (Array.isArray(series.alternateTitles)) {
-            for (const alt of series.alternateTitles) {
-              if (alt) {
-                libraryTitles.add(alt);
-              }
-            }
-          }
-
-          for (const candidateRaw of libraryTitles) {
-            if (!candidateRaw) continue;
-            const score = computeTitleMatchScore({
-              queryRaw: rawTitle,
-              candidateRaw,
-              ...(targetYear !== undefined ? { targetYear } : {}),
-            });
-            if (score >= LOCAL_INDEX_ACCEPTANCE_THRESHOLD) {
-              if (!bestMatch || score > bestMatch.score) {
-                bestMatch = { tvdbId: match, score };
-              }
+          const score = scoreAgainstSeries(rawTitle, series);
+          if (score >= LOCAL_INDEX_ACCEPTANCE_THRESHOLD) {
+            if (!bestMatch || score > bestMatch.score) {
+              bestMatch = { tvdbId: match, score };
             }
           }
         } else if (match === null) {
