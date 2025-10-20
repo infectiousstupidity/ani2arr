@@ -54,6 +54,16 @@ describe('shouldPersistQuery', () => {
     expect(shouldPersistQuery(makeQuery(['kitsunarr', 'options', 'defaults']))).toBe(false);
   });
 
+  it('skips persistence for sonarrMetadata queries containing filesystem paths and config', () => {
+    expect(shouldPersistQuery(makeQuery(['kitsunarr', 'sonarrMetadata', 'configured']))).toBe(false);
+    expect(shouldPersistQuery(makeQuery(['kitsunarr', 'sonarrMetadata', 'http://localhost|key123']))).toBe(false);
+  });
+
+  it('allows persistence for seriesStatus queries (safe: only titles, IDs, slugs)', () => {
+    expect(shouldPersistQuery(makeQuery(['kitsunarr', 'seriesStatus', 123]))).toBe(true);
+    expect(shouldPersistQuery(makeQuery(['kitsunarr', 'seriesStatus', 456, 'attack on titan']))).toBe(true);
+  });
+
   it('allows persistence for unrelated kitsunarr queries', () => {
     expect(shouldPersistQuery(makeQuery(['kitsunarr', 'series', 123]))).toBe(true);
   });
