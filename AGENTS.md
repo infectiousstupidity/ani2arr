@@ -17,24 +17,28 @@
 
 ## 3. Architecture Overview
 ### Entry points (`src/entrypoints`)
-- `background/index.ts` registers proxy services via [`registerKitsunarrApi()`](src/services/index.ts), seeds mapping caches on install/start using [`initMappings()`](src/services/index.ts), handles periodic mapping refreshes via browser alarms (or setInterval fallback in MV2), and processes cross-context messages (OPEN_OPTIONS_PAGE, match:score-batch, mapping:refresh).
-- `options/index.tsx` renders the settings page ([`SettingsForm`](src/ui/SettingsForm.tsx)) under `options/index.html` with TanStack Query provider and Radix TooltipProvider.
-- `popup/index.tsx` shows a lightweight status/shortcut UI when the toolbar icon is opened (currently excluded from Chrome/Firefox via manifest).
+ `popup/index.tsx` contains a lightweight status/shortcut UI, but this entrypoint is currently deactivated/not referenced by the manifest.
 - `anilist-anime.content/index.tsx` injects the main action group ([`SonarrActionGroup`](src/ui/SonarrActionGroup.tsx)) on AniList anime detail pages, hydrating TanStack Query with an IndexedDB persister and mounting UI into shadow DOM via `createShadowRootUi`.
-- `anilist-browse.content/index.tsx` handles AniList list/grid views using [`BrowseOverlay`](src/ui/BrowseOverlay.tsx) adapter pattern, rendering action buttons on media cards with MutationObserver-based card scanning.
-- `anichart-browse.content/index.tsx` provides AniChart.net integration using the same BrowseOverlay system with site-specific selectors.
+ [`MappingService`](src/services/mapping/index.ts) orchestrates `StaticMappingProvider` (static payloads), `SonarrLookupClient` (Sonarr lookups + positive/negative TTL caches), and the search-term generator to resolve AniList IDs; successes/failures are cached with scoped TTL constants per collaborator.
+ `src/api/anilist.api.ts` fetches AniList GraphQL metadata with request deduplication (inflight map) and a rate‑limit‑aware queue (concurrency 1, ~30 req/min with adaptive global backoff on 429). It supports multi‑level prequel traversal (up to 5 hops by default) for synonym/parent resolution.
+ `src/ui/Form.tsx` exports Radix Select primitives, including `SelectContent` that accepts a `container` prop to render inside the shadow DOM. Callers like [`src/ui/SonarrForm.tsx`](src/ui/SonarrForm.tsx) pass a `portalContainer` through so dropdowns mount within the shadow root instead of `document.body`.
+ [`src/utils/error-handling.tsx`](src/utils/error-handling.tsx): exports `ErrorCode` enum and `ExtensionError` type, provides a `createError()` factory and [`normalizeError()`](src/utils/error-handling.tsx) for unknown error conversion, plus a React ErrorBoundary component.
+ [`src/utils/retry.ts`](src/utils/retry.ts): exponential backoff with jitter via `retryWithBackoff()` supporting max retries, custom backoff multipliers, and typed error handling; avoid writing bespoke retry loops.
+ Content flow: AniList content script → [`library.getSeriesStatus()`](src/services/library.service.ts) (with optional `force_verify`, `network: 'never'` flags) → mapping resolution via [`mapping.resolveTvdbId()`](src/services/mapping/index.ts) → Sonarr lookup if needed → [`sonarr.addSeries()`](src/api/sonarr.api.ts) on user action → `libraryEpoch` bump → broadcast triggers status query invalidation.
+ Background alarms (`browser.alarms`) do not fire reliably in MV2 on Chromium when the background page is suspended; [`background/index.ts`](src/entrypoints/background/index.ts) falls back to `setInterval` via a global guard (`__kitsunarr_fallback_interval__`). It also supports a simple readiness probe (`{ type: 'kitsunarr:ping' }`).
+ Respect rate limits: AniList GraphQL requests are queued via `AnilistApiService` with a conservative cap (~30 req/min) and adaptive global backoff on 429 responses. Sonarr lookups rely on `SonarrLookupClient` for inflight dedupe plus positive/negative TTL caches and an internal queue (concurrency 5).
+ Use `npm run dev`, load `.output/chrome-mv3` via browser extensions page, and exercise AniList anime pages, browse views, and options page.
+ E2E tests (`npm run test:e2e`) use Playwright with real Chromium/Firefox browsers, loaded extension, and a mock HTTP server to validate full user workflows from options setup through series addition.
+ Both test types are **complementary**: contract tests are fast (seconds) and catch API breaks; E2E tests are slow (minutes) but validate real-world behavior. Keep both green.
 
-### Shared services (`src/services`)
-- `index.ts` exposes [`registerKitsunarrApi()`](src/services/index.ts) / [`getKitsunarrApi()`](src/services/index.ts) using `@webext-core/proxy-service`; every consumer must assume RPC semantics (async, serialized, cross-context). The API handles epoch bumping (libraryEpoch, settingsEpoch) and broadcasts runtime messages (`_kitsunarr: true`) for cache invalidation.
-- [`library.service.ts`](src/services/library.service.ts) maintains a lean Sonarr series cache (TVDB-indexed) with soft TTL (1h) / hard TTL (24h) and derives status for AniList IDs via mapping resolution. Errors are cached separately (5min TTL) to avoid repeated failures.
-- [`mapping.service.ts`](src/services/mapping.service.ts) orchestrates `StaticMappingProvider` (static payloads), `SonarrLookupClient` (Sonarr lookups + positive/negative TTL caches), and the search-term generator to resolve AniList IDs; successes/failures are cached with scoped TTL constants per collaborator.
-- [`src/cache/ttl-cache.ts`](src/cache/ttl-cache.ts) exposes stale-while-revalidate TTL caches persisted in IndexedDB only (no process-level shadow cache); expect asynchronous reads and rely on each service's in-memory indexes when hot-path speed is required.
-
-### Hooks & State (`src/hooks`)
-- [`use-api-queries.ts`](src/hooks/use-api-queries.ts) centralizes TanStack Query keys under `queryKeys` object, provides hooks for options/metadata/status fetches, and exposes mutations for add/test/save flows with optimistic updates and error handling.
-- [`use-broadcasts.ts`](src/hooks/use-broadcasts.ts) listens for `browser.runtime.onMessage` events with `_kitsunarr: true` flag, invalidating TanStack Query caches on `series-updated` and `settings-changed` topics while syncing epoch values to sessionStorage.
-- [`use-settings-manager.ts`](src/hooks/use-settings-manager.ts) orchestrates the options form with dirty tracking, connection testing, metadata hydration (quality profiles, root folders, tags), and coordinated save/reset flows.
-- [`use-add-series-manager.ts`](src/hooks/use-add-series-manager.ts) and [`use-theme.ts`](src/hooks/use-theme.ts) provide focused UI helpers (add form state, AniList theme sync).
+ ## 13. Message Names and Topics
+ Background listens for the following messages:
+	- `OPEN_OPTIONS_PAGE` — opens the options page
+	- `kitsunarr:mapping:refresh` — triggers static mapping refresh
+	- `kitsunarr:match:score-batch` — computes title match scores for a batch of candidates
+ Broadcast topics used across contexts (wrapped with `_kitsunarr: true`):
+	- `series-updated`
+	- `settings-changed`
 
 ## 4. Domain Model & Data Flow
 - Shared contracts live under [`src/types/`](src/types); see `index.ts` for the curated surface. Modules like `anilist.ts`, `sonarr.ts`, and `extension.ts` cover AniList metadata, Sonarr resources, and RPC payloads. [`src/rpc/schemas.ts`](src/rpc/schemas.ts) defines the wire-level API surface.
