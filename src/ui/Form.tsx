@@ -80,7 +80,7 @@ Input.displayName = 'Input';
 
 const Switch = React.memo(
   React.forwardRef<
-    React.ElementRef<typeof SwitchPrimitive.Root>,
+    React.ComponentRef<typeof SwitchPrimitive.Root>,
     React.ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>
   >(({ className = '', ...props }, ref) => {
     const { id } = useFormField();
@@ -103,7 +103,7 @@ const SelectValue = SelectPrimitive.Value;
 
 const SelectTrigger = React.memo(
   React.forwardRef<
-    React.ElementRef<typeof SelectPrimitive.Trigger>,
+    React.ComponentRef<typeof SelectPrimitive.Trigger>,
     React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
   >(({ className = '', children, ...props }, ref) => {
     const { id } = useFormField();
@@ -126,7 +126,7 @@ SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
 const SelectContent = React.memo(
   React.forwardRef<
-    React.ElementRef<typeof SelectPrimitive.Content>,
+    React.ComponentRef<typeof SelectPrimitive.Content>,
     React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & { container?: HTMLElement | null }
   >(({ className = '', children, position = 'popper', container, ...props }, ref) => {
     return (
@@ -147,7 +147,7 @@ SelectContent.displayName = SelectPrimitive.Content.displayName;
 
 const SelectItem = React.memo(
   React.forwardRef<
-    React.ElementRef<typeof SelectPrimitive.Item>,
+    React.ComponentRef<typeof SelectPrimitive.Item>,
     React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
   >(({ className = '', children, ...props }, ref) => (
     <SelectPrimitive.Item
