@@ -3,7 +3,7 @@ import React from 'react';
 import Button from '@/ui/Button';
 import TooltipWrapper from '@/ui/TooltipWrapper';
 import { GearIcon, ExternalLinkIcon } from '@radix-ui/react-icons';
-import { useExtensionOptions } from '@/hooks/use-api-queries';
+import { usePublicOptions } from '@/hooks/use-api-queries';
 import { logger } from '@/utils/logger';
 
 type Status = 'LOADING' | 'IN_SONARR' | 'NOT_IN_SONARR' | 'ERROR' | 'ADDING';
@@ -29,7 +29,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
   onOpenModal,
   portalContainer
 }) => {
-  const { data: options } = useExtensionOptions();
+  const { data: options } = usePublicOptions();
 
   const getButtonText = () => {
     switch (status) {

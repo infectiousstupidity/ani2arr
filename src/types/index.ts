@@ -21,6 +21,8 @@ export type {
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
   ExtensionOptions,
+  PublicOptions,
+  SonarrSecrets,
   SonarrCredentialsPayload,
   SonarrFormState,
   TestConnectionPayload,

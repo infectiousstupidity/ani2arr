@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { persistQueryClient } from '@tanstack/query-persist-client-core';
 import { useTheme } from '@/hooks/use-theme';
-import { useSeriesStatus, useAddSeries, useExtensionOptions } from '@/hooks/use-api-queries';
+import { useSeriesStatus, useAddSeries, usePublicOptions } from '@/hooks/use-api-queries';
 import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
 import { queryPersister, shouldPersistQuery } from '@/cache/query-cache';
 import SonarrActionGroup from '@/ui/SonarrActionGroup';
@@ -179,8 +179,8 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   // In unit tests, don't block on background readiness to avoid long LOADING states.
   const isTestEnv = typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined' && import.meta.env.MODE === 'test';
   const [backgroundReady, setBackgroundReady] = useState<boolean>(isTestEnv);
-  const { data: options } = useExtensionOptions();
-  const isConfigured = !!options?.sonarrUrl && !!options?.sonarrApiKey;
+  const { data: options } = usePublicOptions();
+  const isConfigured = Boolean(options?.isConfigured);
   const defaults = options?.defaults ?? null;
 
   // Kick off background readiness probe without blocking initial render

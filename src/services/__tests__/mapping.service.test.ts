@@ -12,7 +12,7 @@ import * as pipelineModule from '@/services/mapping/pipeline';
 import type { ExtensionOptions, SonarrLookupSeries, AniMedia } from '@/types';
 import { createError, ErrorCode } from '@/utils/error-handling';
 import * as errorHandlingModule from '@/utils/error-handling';
-import { extensionOptions } from '@/utils/storage';
+import * as storageModule from '@/utils/storage';
 import { resetMetrics } from '@/utils/metrics';
 
 type CacheStub<T> = TtlCache<T> & {
@@ -99,7 +99,7 @@ describe('MappingService', () => {
       removeMediaFromCache: vi.fn(async () => {}),
     };
 
-    vi.spyOn(extensionOptions, 'getValue').mockResolvedValue(baseOptions);
+    vi.spyOn(storageModule, 'getExtensionOptionsSnapshot').mockResolvedValue(baseOptions);
   });
 
   const createService = () =>
@@ -337,7 +337,7 @@ describe('MappingService', () => {
 
   it('does not cache configuration errors when Sonarr credentials are missing', async () => {
     // Simulate unconfigured credentials by returning empty values
-    vi.spyOn(extensionOptions, 'getValue').mockResolvedValueOnce({
+    vi.spyOn(storageModule, 'getExtensionOptionsSnapshot').mockResolvedValueOnce({
       ...baseOptions,
       sonarrUrl: '',
       sonarrApiKey: '',

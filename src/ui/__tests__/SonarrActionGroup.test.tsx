@@ -11,13 +11,13 @@ const { debugMock } = vi.hoisted(() => ({ debugMock: vi.fn() }));
 const hoistedApi = vi.hoisted(() => ({
   useSeriesStatusMock: vi.fn(),
   useAddSeriesMock: vi.fn(),
-  useExtensionOptionsMock: vi.fn(() => ({ data: null })),
+  usePublicOptionsMock: vi.fn(() => ({ data: null })),
 }));
 vi.mock('@/hooks/use-api-queries', () => ({
   __esModule: true,
   useSeriesStatus: (..._args: unknown[]) => hoistedApi.useSeriesStatusMock(..._args),
   useAddSeries: () => hoistedApi.useAddSeriesMock(),
-  useExtensionOptions: () => ({ data: { sonarrUrl: 'http://sonarr.local' } }),
+  usePublicOptions: () => ({ data: { sonarrUrl: 'http://sonarr.local', isConfigured: true, defaults: null } }),
   useSonarrMetadata: () => ({ data: null }),
   useTestConnection: () => ({ mutate: vi.fn() }),
   useSaveOptions: () => ({ mutate: vi.fn() }),

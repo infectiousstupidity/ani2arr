@@ -11,7 +11,7 @@ import type {
 } from '@/types';
 import { ErrorCode, logError, normalizeError } from '@/utils/error-handling';
 import { canonicalizeLookupTerm, computeTitleMatchScore, stripParenContent, sanitizeLookupDisplay } from '@/utils/matching';
-import { extensionOptions } from '@/utils/storage';
+import { getExtensionOptionsSnapshot } from '@/utils/storage';
 import { incrementCounter } from '@/utils/metrics';
 
 const CACHE_KEY = 'sonarr:lean-series';
@@ -69,7 +69,7 @@ export class LibraryService {
       const fallbackList = cached?.value ?? [];
 
       try {
-        const options = optionsOverride ?? (await extensionOptions.getValue());
+        const options = optionsOverride ?? (await getExtensionOptionsSnapshot());
         if (!options?.sonarrUrl || !options?.sonarrApiKey) {
           this.resetIndexes();
           await this.cache.write(CACHE_KEY, [], { staleMs: SOFT_TTL, hardMs: HARD_TTL });
@@ -131,7 +131,7 @@ export class LibraryService {
     options: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {},
   ): Promise<CheckSeriesStatusResponse> {
     const leanList = await this.getLeanSeriesList();
-    const sonarrOpts = await extensionOptions.getValue();
+    const sonarrOpts = await getExtensionOptionsSnapshot();
     const isConfigured = !!(sonarrOpts?.sonarrUrl && sonarrOpts?.sonarrApiKey);
 
     const normalizedTitle = payload.title?.trim();

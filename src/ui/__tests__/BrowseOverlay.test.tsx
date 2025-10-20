@@ -13,15 +13,15 @@ const hoisted = vi.hoisted(() => {
     // Type spies loosely (unknown) to avoid narrowing issues when overriding implementations
     useSeriesStatusMock: vi.fn<(...args: unknown[]) => unknown>(),
     useAddSeriesMock: vi.fn<() => unknown>(),
-    useExtensionOptionsMock: vi.fn<() => { data: unknown }>(() => ({ data: null as unknown })),
+    usePublicOptionsMock: vi.fn<() => { data: unknown }>(() => ({ data: null as unknown })),
   };
 
-  const extensionOptionsResult: {
-    data: { sonarrUrl: string; sonarrApiKey: string; defaults: Partial<import('@/types').SonarrFormState> | null };
+  const publicOptionsResult: {
+    data: { sonarrUrl: string; defaults: Partial<import('@/types').SonarrFormState> | null; isConfigured: boolean };
   } = {
     data: {
       sonarrUrl: 'http://sonarr.local',
-      sonarrApiKey: 'abc123',
+      isConfigured: true,
       defaults: {
         qualityProfileId: 1,
         rootFolderPath: '/media',
@@ -54,7 +54,7 @@ const hoisted = vi.hoisted(() => {
   };
 
   // Default spy implementations, can be overridden in tests
-  spies.useExtensionOptionsMock.mockImplementation(() => extensionOptionsResult as unknown as { data: unknown });
+  spies.usePublicOptionsMock.mockImplementation(() => publicOptionsResult as unknown as { data: unknown });
   spies.useSeriesStatusMock.mockImplementation((...args: unknown[]) => {
     const payload = args[0] as CheckSeriesStatusPayload;
     return seriesStatusMap.get(payload.anilistId) ?? {
@@ -68,13 +68,13 @@ const hoisted = vi.hoisted(() => {
   });
   spies.useAddSeriesMock.mockImplementation(() => currentAddSeriesResultRef.value);
 
-  return { ...spies, extensionOptionsResult, seriesStatusMap, currentAddSeriesResultRef } as const;
+  return { ...spies, publicOptionsResult, seriesStatusMap, currentAddSeriesResultRef } as const;
 });
 
 // Use hoist-safe vi.mock with overrides that delegate to the local spies above
 vi.mock('@/hooks/use-api-queries', () => ({
   __esModule: true,
-  useExtensionOptions: () => hoisted.useExtensionOptionsMock(),
+  usePublicOptions: () => hoisted.usePublicOptionsMock(),
   useSeriesStatus: (...args: unknown[]) => hoisted.useSeriesStatusMock(args[0] as CheckSeriesStatusPayload),
   useAddSeries: () => hoisted.useAddSeriesMock(),
   useSonarrMetadata: () => ({ data: null }),
@@ -229,9 +229,9 @@ const setupAdapter = (overrides: Partial<BrowseAdapter> = {}) => {
 };
 
 beforeEach(() => {
-  hoisted.extensionOptionsResult.data = {
+  hoisted.publicOptionsResult.data = {
     sonarrUrl: 'http://sonarr.local',
-    sonarrApiKey: 'abc123',
+    isConfigured: true,
     defaults: {
       qualityProfileId: 1,
       rootFolderPath: '/media',
@@ -246,7 +246,7 @@ beforeEach(() => {
   resizeObservers = [];
   hoisted.seriesStatusMap.clear();
   hoisted.currentAddSeriesResultRef.value = createAddSeriesStub();
-  hoisted.useExtensionOptionsMock.mockImplementation(() => hoisted.extensionOptionsResult);
+  hoisted.usePublicOptionsMock.mockImplementation(() => hoisted.publicOptionsResult);
   hoisted.useSeriesStatusMock.mockImplementation((...args: unknown[]) => {
     const payload = args[0] as { anilistId: number; title?: string };
     return hoisted.seriesStatusMap.get(payload.anilistId) ?? createStatusStub();
@@ -494,7 +494,7 @@ describe('createBrowseContentApp', () => {
       title: 'Addable Card',
       primaryTitleHint: 'Addable Card',
       metadata: null,
-  form: hoisted.extensionOptionsResult.data.defaults,
+  form: hoisted.publicOptionsResult.data.defaults,
     });
 
     const gearButton = overlayHost.querySelector<HTMLButtonElement>('button.kitsunarr-card-overlay__gear');
@@ -549,9 +549,9 @@ describe('createBrowseContentApp', () => {
     const { adapter } = setupAdapter();
 
   hoisted.seriesStatusMap.set(40, createStatusStub());
-    hoisted.extensionOptionsResult.data = {
+    hoisted.publicOptionsResult.data = {
       sonarrUrl: '',
-      sonarrApiKey: '',
+      isConfigured: false,
       defaults: null,
     };
 

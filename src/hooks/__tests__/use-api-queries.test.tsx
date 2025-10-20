@@ -2,7 +2,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ExtensionOptions, ExtensionError } from '@/types';
+import type { ExtensionOptions, ExtensionError, PublicOptions } from '@/types';
 import { createExtensionOptionsFixture, createSonarrDefaultsFixture } from '@/testing';
 
 const normalizeErrorMock = vi.hoisted(() => vi.fn<(error: unknown) => ExtensionError>());
@@ -17,14 +17,28 @@ vi.mock('@/services', () => ({
   getKitsunarrApi: getKitsunarrApiMock,
 }));
 
-const extensionOptionsMock = vi.hoisted(() => ({
-  getValue: vi.fn<() => Promise<ExtensionOptions>>(),
-  setValue: vi.fn<(value: ExtensionOptions) => Promise<void>>(),
-  watch: vi.fn<(callback: (value: ExtensionOptions) => void) => () => void>(),
+const publicOptionsMock = vi.hoisted(() => ({
+  getValue: vi.fn<() => Promise<PublicOptions>>(),
+  setValue: vi.fn<(value: PublicOptions) => Promise<void>>(),
+  watch: vi.fn<(callback: (value: PublicOptions) => void) => () => void>(),
 }));
 
+const sonarrSecretsMock = vi.hoisted(() => ({
+  getValue: vi.fn<() => Promise<{ apiKey: string }>>(),
+  setValue: vi.fn<(value: { apiKey: string }) => Promise<void>>(),
+  watch: vi.fn<(callback: (value: { apiKey: string }) => void) => () => void>(),
+}));
+
+const getExtensionOptionsSnapshotMock = vi.hoisted(() => vi.fn<() => Promise<ExtensionOptions>>());
+const setExtensionOptionsSnapshotMock = vi.hoisted(() => vi.fn<(value: ExtensionOptions) => Promise<void>>());
+const getPublicOptionsSnapshotMock = vi.hoisted(() => vi.fn<() => Promise<PublicOptions>>());
+
 vi.mock('@/utils/storage', () => ({
-  extensionOptions: extensionOptionsMock,
+  publicOptions: publicOptionsMock,
+  sonarrSecrets: sonarrSecretsMock,
+  getExtensionOptionsSnapshot: getExtensionOptionsSnapshotMock,
+  setExtensionOptionsSnapshot: setExtensionOptionsSnapshotMock,
+  getPublicOptionsSnapshot: getPublicOptionsSnapshotMock,
 }));
 
 import { queryKeys, useSeriesStatus, useAddSeries, useTestConnection, useSaveOptions, useExtensionOptions } from '../use-api-queries';
@@ -65,6 +79,12 @@ const createOptions = (overrides?: Partial<ExtensionOptions>): ExtensionOptions 
   });
 };
 
+const toPublicOptions = (options: ExtensionOptions): PublicOptions => ({
+  sonarrUrl: options.sonarrUrl,
+  defaults: options.defaults,
+  isConfigured: Boolean(options.sonarrUrl && options.sonarrApiKey),
+});
+
 const createMockApi = () => ({
   getSeriesStatus: vi.fn<() => Promise<unknown>>(),
   addToSonarr: vi.fn<() => Promise<unknown>>(),
@@ -88,9 +108,15 @@ let mockApi: MockApi;
 beforeEach(() => {
   mockApi = createMockApi();
   getKitsunarrApiMock.mockReturnValue(mockApi);
-  extensionOptionsMock.getValue.mockReset();
-  extensionOptionsMock.setValue.mockReset();
-  extensionOptionsMock.watch.mockReset();
+  publicOptionsMock.getValue.mockReset();
+  publicOptionsMock.setValue.mockReset();
+  publicOptionsMock.watch.mockReset();
+  sonarrSecretsMock.getValue.mockReset();
+  sonarrSecretsMock.setValue.mockReset();
+  sonarrSecretsMock.watch.mockReset();
+  getExtensionOptionsSnapshotMock.mockReset();
+  setExtensionOptionsSnapshotMock.mockReset();
+  getPublicOptionsSnapshotMock.mockReset();
   normalizeErrorMock.mockReset();
 });
 
@@ -235,13 +261,12 @@ describe('mutations', () => {
 
     const initialOptions = createOptions();
     const nextOptions = createOptions({ sonarrUrl: 'http://updated' });
-  const unsubscribe = vi.fn<() => void>();
+    const initialPublic = toPublicOptions(initialOptions);
 
     queryClient.setQueryData(queryKeys.options(), initialOptions);
+    queryClient.setQueryData(queryKeys.publicOptions(), initialPublic);
 
-    extensionOptionsMock.setValue.mockResolvedValue();
-    extensionOptionsMock.watch.mockReturnValue(unsubscribe);
-    extensionOptionsMock.getValue.mockResolvedValue(initialOptions);
+    setExtensionOptionsSnapshotMock.mockResolvedValue();
     mockApi.notifySettingsChanged.mockResolvedValue({ ok: true });
 
     const { result } = renderHook(() => useSaveOptions(), { wrapper });
@@ -254,11 +279,13 @@ describe('mutations', () => {
       await mutation;
     });
 
-    expect(extensionOptionsMock.setValue).toHaveBeenCalledWith(nextOptions);
+    expect(setExtensionOptionsSnapshotMock).toHaveBeenCalledWith(nextOptions);
     expect(mockApi.notifySettingsChanged).toHaveBeenCalled();
 
     const state = queryClient.getQueryState(queryKeys.options());
     expect(state?.isInvalidated).toBe(true);
+    const publicState = queryClient.getQueryState(queryKeys.publicOptions());
+    expect(publicState?.isInvalidated).toBe(true);
 
     queryClient.clear();
   });
@@ -274,9 +301,7 @@ describe('mutations', () => {
 
     queryClient.setQueryData(queryKeys.options(), initialOptions);
 
-    extensionOptionsMock.setValue.mockRejectedValue(rawError);
-    extensionOptionsMock.watch.mockReturnValue(() => undefined);
-    extensionOptionsMock.getValue.mockResolvedValue(initialOptions);
+    setExtensionOptionsSnapshotMock.mockRejectedValue(rawError);
     normalizeErrorMock.mockReturnValueOnce(normalized);
 
     const { result } = renderHook(() => useSaveOptions(), { wrapper });
@@ -285,7 +310,7 @@ describe('mutations', () => {
       await expect(result.current.mutateAsync(nextOptions)).rejects.toBe(normalized);
     });
 
-    expect(extensionOptionsMock.setValue).toHaveBeenCalledWith(nextOptions);
+    expect(setExtensionOptionsSnapshotMock).toHaveBeenCalledWith(nextOptions);
     expect(queryClient.getQueryData(queryKeys.options())).toEqual(initialOptions);
     expect(normalizeErrorMock).toHaveBeenCalledWith(rawError);
 
@@ -300,28 +325,37 @@ describe('useExtensionOptions', () => {
 
     const initial = createOptions();
     const updated = createOptions({ sonarrApiKey: 'updated-key' });
-  const unsubscribe = vi.fn<() => void>();
+    const initialPublic = toPublicOptions(initial);
+    const updatedPublic = toPublicOptions(updated);
+    const unsubscribePublic = vi.fn<() => void>();
+    const unsubscribeSecrets = vi.fn<() => void>();
 
-    let watchCallback: ((value: ExtensionOptions) => void) | undefined;
-    extensionOptionsMock.getValue.mockResolvedValue(initial);
-    extensionOptionsMock.watch.mockImplementation(callback => {
-      watchCallback = callback;
-      return unsubscribe;
+    let publicCallback: ((value: PublicOptions) => void) | undefined;
+    publicOptionsMock.getValue.mockResolvedValue(initialPublic);
+    publicOptionsMock.watch.mockImplementation(callback => {
+      publicCallback = callback;
+      return unsubscribePublic;
     });
+    sonarrSecretsMock.watch.mockReturnValue(unsubscribeSecrets);
+    getExtensionOptionsSnapshotMock.mockResolvedValue(initial);
 
     const { result, unmount } = renderHook(() => useExtensionOptions(), { wrapper });
 
     await waitFor(() => expect(result.current.data).toEqual(initial));
-    expect(extensionOptionsMock.watch).toHaveBeenCalledTimes(1);
+    expect(publicOptionsMock.watch).toHaveBeenCalledTimes(1);
+    expect(sonarrSecretsMock.watch).toHaveBeenCalledTimes(1);
 
-    watchCallback?.(updated);
+    getExtensionOptionsSnapshotMock.mockResolvedValueOnce(updated);
+    publicCallback?.(updatedPublic);
 
     await waitFor(() => expect(result.current.data).toEqual(updated));
     expect(queryClient.getQueryData(queryKeys.options())).toEqual(updated);
 
     unmount();
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(unsubscribePublic).toHaveBeenCalledTimes(1);
+    expect(unsubscribeSecrets).toHaveBeenCalledTimes(1);
 
     queryClient.clear();
   });
 });
+

@@ -41,10 +41,10 @@ const useAddSeriesMock = vi.fn(() => ({
   isError: false,
   data: null,
 }));
-const useExtensionOptionsMock = vi.fn(() => ({
+const usePublicOptionsMock = vi.fn(() => ({
   data: {
     sonarrUrl: 'https://sonarr.test',
-    sonarrApiKey: 'test-key',
+    isConfigured: true,
     defaults: {
       qualityProfileId: 1,
       rootFolderPath: '/library/anime',
@@ -86,7 +86,7 @@ vi.mock('@/hooks/use-api-queries', () =>
         ...res,
       } as typeof res & { error: unknown; reset: ReturnType<typeof vi.fn> };
     },
-    useExtensionOptions: () => useExtensionOptionsMock(),
+    usePublicOptions: () => usePublicOptionsMock(),
   }),
 );
 
@@ -202,7 +202,7 @@ beforeEach(() => {
   actionGroupProps.length = 0;
   useSeriesStatusMock.mockClear();
   useAddSeriesMock.mockClear();
-  useExtensionOptionsMock.mockClear();
+  usePublicOptionsMock.mockClear();
   useThemeMock.mockClear();
   useKitsunarrBroadcastsMock.mockClear();
   persistCallbackMock.mockClear();

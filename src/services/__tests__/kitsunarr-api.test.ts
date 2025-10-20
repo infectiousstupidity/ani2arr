@@ -12,7 +12,7 @@ import type {
 import type { SonarrApiService } from '@/api/sonarr.api';
 import type { MappingService } from '@/services/mapping';
 import type { LibraryService } from '@/services/library.service';
-import { extensionOptions } from '@/utils/storage';
+import * as storageModule from '@/utils/storage';
 import { ErrorCode } from '@/utils/error-handling';
 
 type SonarrApiMock = {
@@ -153,7 +153,7 @@ describe('KitsunarrApi service', () => {
 
   it('delegates getSeriesStatus without touching epochs or broadcasting', async () => {
     const { service, library } = await createService();
-    await extensionOptions.setValue(cloneOptions(baseOptions));
+    await storageModule.setExtensionOptionsSnapshot(cloneOptions(baseOptions));
     const sendMessageSpy = vi.spyOn(fakeBrowser.runtime, 'sendMessage');
 
     const expected: CheckSeriesStatusResponse = { exists: true, tvdbId: 500 };
@@ -180,7 +180,7 @@ describe('KitsunarrApi service', () => {
 
   it('merges payloads when adding to Sonarr and broadcasts epoch with tvdbId', async () => {
     const { service, sonarr, mapping, library } = await createService();
-    await extensionOptions.setValue(cloneOptions(baseOptions));
+    await storageModule.setExtensionOptionsSnapshot(cloneOptions(baseOptions));
 
     (mapping.resolveTvdbId as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ tvdbId: 321 });
     const created: SonarrSeries = { id: 99, title: 'Added', tvdbId: 321, titleSlug: 'added' };
@@ -247,7 +247,7 @@ describe('KitsunarrApi service', () => {
 
   it('refreshes cache and broadcasts on notifySettingsChanged when configured', async () => {
     const { service, library, mapping } = await createService();
-    await extensionOptions.setValue(cloneOptions(baseOptions));
+    await storageModule.setExtensionOptionsSnapshot(cloneOptions(baseOptions));
     (library.refreshCache as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
 
     const runtimeMessages: unknown[] = [];
@@ -298,7 +298,7 @@ describe('KitsunarrApi service', () => {
     });
     const { service, sonarr } = await createService({ sonarr: sonarrMock });
 
-    await extensionOptions.setValue(
+    await storageModule.setExtensionOptionsSnapshot(
       cloneOptions({
         ...baseOptions,
         sonarrUrl: 'https://stored',
@@ -306,7 +306,7 @@ describe('KitsunarrApi service', () => {
       }),
     );
 
-    const getValueSpy = vi.spyOn(extensionOptions, 'getValue');
+    const getValueSpy = vi.spyOn(storageModule, 'getExtensionOptionsSnapshot');
 
     const metadata = await service.getSonarrMetadata({ credentials: directCredentials });
 

@@ -2,12 +2,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { getKitsunarrApi } from '@/services';
-import { extensionOptions } from '@/utils/storage';
+import {
+  getExtensionOptionsSnapshot,
+  getPublicOptionsSnapshot,
+  publicOptions,
+  setExtensionOptionsSnapshot,
+  sonarrSecrets,
+} from '@/utils/storage';
 import type {
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
   ExtensionError,
   ExtensionOptions,
+  PublicOptions,
+  SonarrFormState,
   MediaMetadataHint,
   SonarrCredentialsPayload,
   SonarrSeries,
@@ -43,6 +51,7 @@ const seriesStatusBaseKey = (anilistId: number) => [...rootQueryKey, 'seriesStat
 export const queryKeys = {
   all: rootQueryKey,
   options: () => [...rootQueryKey, 'options'] as const,
+  publicOptions: () => [...rootQueryKey, 'publicOptions'] as const,
   seriesStatusRoot: () => [...rootQueryKey, 'seriesStatus'] as const,
   seriesStatusBase: seriesStatusBaseKey,
   seriesStatus: (payload: CheckSeriesStatusPayload) => [
@@ -97,14 +106,46 @@ export const useExtensionOptions = () => {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: queryKeys.options(),
-    queryFn: () => extensionOptions.getValue(),
+    queryFn: () => getExtensionOptionsSnapshot(),
     staleTime: Infinity,
     meta: { persist: false },
   });
 
   useEffect(() => {
-    const unsubscribe = extensionOptions.watch(newValue => {
-      queryClient.setQueryData(queryKeys.options(), newValue);
+    const refreshOptions = async () => {
+      const snapshot = await getExtensionOptionsSnapshot();
+      queryClient.setQueryData(queryKeys.options(), snapshot);
+    };
+    const unsubscribes = [
+      publicOptions.watch(() => {
+        void refreshOptions();
+      }),
+      sonarrSecrets.watch(() => {
+        void refreshOptions();
+      }),
+    ];
+    return () => {
+      for (const unsubscribe of unsubscribes) {
+        unsubscribe();
+      }
+    };
+  }, [queryClient]);
+
+  return query;
+};
+
+export const usePublicOptions = () => {
+  const queryClient = useQueryClient();
+  const query = useQuery<PublicOptions>({
+    queryKey: queryKeys.publicOptions(),
+    queryFn: () => getPublicOptionsSnapshot(),
+    staleTime: Infinity,
+    meta: { persist: false },
+  });
+
+  useEffect(() => {
+    const unsubscribe = publicOptions.watch(newValue => {
+      queryClient.setQueryData(queryKeys.publicOptions(), newValue);
     });
     return () => unsubscribe();
   }, [queryClient]);
@@ -166,7 +207,7 @@ export const useSaveOptions = () => {
   return useMutation<void, ExtensionError, ExtensionOptions, { previousOptions: ExtensionOptions | undefined }>({
     mutationFn: async (options: ExtensionOptions) => {
       try {
-        await extensionOptions.setValue(options);
+        await setExtensionOptionsSnapshot(options);
         await getKitsunarrApi().notifySettingsChanged();
       } catch (error) {
         throw normalizeError(error);
@@ -174,20 +215,63 @@ export const useSaveOptions = () => {
     },
 
     onMutate: async (newOptions) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.options() });
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: queryKeys.options() }),
+        queryClient.cancelQueries({ queryKey: queryKeys.publicOptions() }),
+      ]);
       const previousOptions = queryClient.getQueryData<ExtensionOptions>(queryKeys.options());
       queryClient.setQueryData(queryKeys.options(), newOptions);
+      queryClient.setQueryData(queryKeys.publicOptions(), {
+        sonarrUrl: newOptions.sonarrUrl,
+        defaults: newOptions.defaults,
+        isConfigured: Boolean(newOptions.sonarrUrl && newOptions.sonarrApiKey),
+      } satisfies PublicOptions);
       return { previousOptions };
     },
 
     onError: (_err, _newOptions, context) => {
       if (context?.previousOptions) {
         queryClient.setQueryData(queryKeys.options(), context.previousOptions);
+        queryClient.setQueryData(queryKeys.publicOptions(), {
+          sonarrUrl: context.previousOptions.sonarrUrl,
+          defaults: context.previousOptions.defaults,
+          isConfigured: Boolean(
+            context.previousOptions.sonarrUrl && context.previousOptions.sonarrApiKey,
+          ),
+        } satisfies PublicOptions);
       }
     },
 
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.options() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.publicOptions() });
+    },
+  });
+};
+
+export const useUpdateDefaultSettings = () => {
+  const queryClient = useQueryClient();
+  return useMutation<void, ExtensionError, SonarrFormState>({
+    mutationFn: async (defaults: SonarrFormState) => {
+      try {
+        await getKitsunarrApi().updateDefaults(defaults);
+      } catch (error) {
+        throw normalizeError(error);
+      }
+    },
+    onSuccess: (_data, defaults) => {
+      queryClient.setQueryData(queryKeys.publicOptions(), (prev?: PublicOptions) =>
+        prev
+          ? {
+              ...prev,
+              defaults,
+            }
+          : prev,
+      );
+      queryClient.invalidateQueries({ queryKey: queryKeys.options() });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.publicOptions() });
     },
   });
 };

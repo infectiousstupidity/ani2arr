@@ -3,7 +3,7 @@ import type { TtlCache } from '@/cache';
 import type { AnilistApiService } from '@/api/anilist.api';
 import type { ExtensionError, MediaMetadataHint, AniTitles, AniMedia } from '@/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
-import { extensionOptions } from '@/utils/storage';
+import { getExtensionOptionsSnapshot } from '@/utils/storage';
 import { incrementCounter } from '@/utils/metrics';
 import { logger } from '@/utils/logger';
 import { canonicalTitleKey, sanitizeLookupDisplay } from '@/utils/matching';
@@ -397,7 +397,7 @@ export class MappingService {
   }
 
   private async getConfiguredCredentials(): Promise<SonarrLookupCredentials> {
-    const opts = await extensionOptions.getValue();
+    const opts = await getExtensionOptionsSnapshot();
     if (!opts?.sonarrUrl || !opts?.sonarrApiKey) {
       throw createError(
         ErrorCode.SONARR_NOT_CONFIGURED,

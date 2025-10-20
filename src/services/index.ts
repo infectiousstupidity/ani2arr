@@ -17,12 +17,13 @@ import type {
   SonarrTag,
   SonarrLookupSeries,
   ExtensionOptions,
+  SonarrFormState,
   AniMedia,
   ExtensionError,
   SonarrCredentialsPayload,
   CheckSeriesStatusPayload,
 } from '@/types';
-import { extensionOptions } from '@/utils/storage';
+import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/utils/storage';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
 import type {
   ResolveInput,
@@ -37,6 +38,7 @@ interface KitsunarrApi {
   getSeriesStatus(input: StatusInput): Promise<StatusOutput>;
   addToSonarr(input: AddInput): Promise<SonarrSeries>;
   notifySettingsChanged(): Promise<{ ok: true }>;
+  updateDefaults(defaults: SonarrFormState): Promise<{ ok: true }>;
   getQualityProfiles(): Promise<SonarrQualityProfile[]>;
   getRootFolders(): Promise<SonarrRootFolder[]>;
   getTags(): Promise<SonarrTag[]>;
@@ -114,7 +116,7 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
     });
 
     const ensureConfigured = async (): Promise<{ credentials: { url: string; apiKey: string }; options: ExtensionOptions }> => {
-      const options = await extensionOptions.getValue();
+      const options = await getExtensionOptionsSnapshot();
       if (!options?.sonarrUrl || !options?.sonarrApiKey) {
         throw createError(
           ErrorCode.SONARR_NOT_CONFIGURED,
@@ -161,6 +163,17 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
       const nextEpoch = settingsEpoch;
       await browser.storage.local.set({ settingsEpoch: nextEpoch });
       await broadcast('settings-changed', { epoch: nextEpoch });
+    };
+
+    const handleOptionsUpdated = async (optionsHint?: ExtensionOptions): Promise<void> => {
+      await bumpSettingsEpoch();
+      await mappingService.resetLookupState();
+      const options = optionsHint ?? (await getExtensionOptionsSnapshot());
+      const configured = !!(options?.sonarrUrl && options?.sonarrApiKey);
+      if (configured) {
+        await libraryService.refreshCache(options);
+        await bumpLibraryEpoch();
+      }
     };
 
     const api: KitsunarrApi = {
@@ -265,14 +278,19 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
       },
 
       async notifySettingsChanged() {
-        await bumpSettingsEpoch();
-        await mappingService.resetLookupState();
-        const options = await extensionOptions.getValue();
-        const configured = !!(options?.sonarrUrl && options?.sonarrApiKey);
-        if (configured) {
-          await libraryService.refreshCache(options!);
-          await bumpLibraryEpoch();
-        }
+        const options = await getExtensionOptionsSnapshot();
+        await handleOptionsUpdated(options);
+        return { ok: true as const };
+      },
+
+      async updateDefaults(defaults) {
+        const current = await getExtensionOptionsSnapshot();
+        const next: ExtensionOptions = {
+          ...current,
+          defaults,
+        };
+        await setExtensionOptionsSnapshot(next);
+        await handleOptionsUpdated(next);
         return { ok: true as const };
       },
 

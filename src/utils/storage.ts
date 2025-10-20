@@ -2,41 +2,104 @@
 
 /**
  * @file Defines and exports user-configurable extension settings.
- * This file uses `@wxt-dev/storage` for features like
- * versioning and defaults. The extension intentionally stores
- * credentials in `browser.storage.local` (device-only) so API keys
- * are not uploaded to any browser cloud sync service.
+ * Public-facing configuration is stored separately from sensitive
+ * Sonarr credentials so that content scripts never touch the API key.
  */
 import { storage } from '@wxt-dev/storage';
-import type { ExtensionOptions } from '../types';
+import type {
+  ExtensionOptions,
+  PublicOptions,
+  SonarrFormState,
+  SonarrSecrets,
+} from '@/types';
 
-/**
- * A factory function that returns the default state for the extension options.
- * This ensures a consistent default object is always available.
- */
-const getDefaultOptions = (): ExtensionOptions => ({
+const getDefaultFormState = (): SonarrFormState => ({
+  qualityProfileId: '',
+  rootFolderPath: '',
+  seriesType: 'anime',
+  monitorOption: 'all',
+  seasonFolder: true,
+  searchForMissingEpisodes: true,
+  tags: [],
+});
+
+const createDefaultPublicOptions = (): PublicOptions => ({
   sonarrUrl: '',
-  sonarrApiKey: '',
-  defaults: {
-    qualityProfileId: '',
-    rootFolderPath: '',
-    seriesType: 'anime',
-    monitorOption: 'all',
-    seasonFolder: true,
-    searchForMissingEpisodes: true,
-    tags: [],
-  }
+  defaults: getDefaultFormState(),
+  isConfigured: false,
+});
+
+const createDefaultSecrets = (): SonarrSecrets => ({
+  apiKey: '',
 });
 
 /**
- * The primary storage item for all user-configured settings.
- *
- * - It is stored in `local` storage (device-only, not synced to browser account)
- *   to keep Sonarr credentials local and avoid exposing them to cloud sync.
- * - It uses a `fallback` to provide default values if none are set.
- * - It is versioned to allow for future migrations if the options structure changes.
+ * Public configuration safe for content scripts. This intentionally excludes
+ * the Sonarr API key and only mirrors a derived `isConfigured` flag.
  */
-export const extensionOptions = storage.defineItem<ExtensionOptions>('local:options', {
-  fallback: getDefaultOptions(),
+export const publicOptions = storage.defineItem<PublicOptions>('local:publicOptions', {
+  fallback: createDefaultPublicOptions(),
   version: 1,
 });
+
+/**
+ * Sensitive credentials that may only be accessed from privileged contexts.
+ */
+export const sonarrSecrets = storage.defineItem<SonarrSecrets>('local:sonarrSecrets', {
+  fallback: createDefaultSecrets(),
+  version: 1,
+});
+
+interface HasDefaults {
+  defaults: SonarrFormState;
+}
+
+const mergeDefaults = <T extends HasDefaults>(options: T): T => ({
+  ...options,
+  defaults: {
+    ...getDefaultFormState(),
+    ...options.defaults,
+  },
+});
+
+/**
+ * Fetches the combined extension options (including secrets) for use in
+ * background and options contexts.
+ */
+export async function getExtensionOptionsSnapshot(): Promise<ExtensionOptions> {
+  const [pub, secrets] = await Promise.all([publicOptions.getValue(), sonarrSecrets.getValue()]);
+  return {
+    sonarrUrl: pub.sonarrUrl,
+    sonarrApiKey: secrets.apiKey,
+    defaults: mergeDefaults(pub).defaults,
+  };
+}
+
+/**
+ * Persists the full extension options, splitting the public slice from secrets.
+ * Exposes a single call site for writes to keep the boolean mirror in sync.
+ */
+export async function setExtensionOptionsSnapshot(options: ExtensionOptions): Promise<void> {
+  const sanitized = mergeDefaults(options);
+  await Promise.all([
+    publicOptions.setValue({
+      sonarrUrl: sanitized.sonarrUrl,
+      defaults: sanitized.defaults,
+      isConfigured: Boolean(sanitized.sonarrUrl && sanitized.sonarrApiKey),
+    }),
+    sonarrSecrets.setValue({ apiKey: sanitized.sonarrApiKey }),
+  ]);
+}
+
+/**
+ * Returns the current public configuration, merging in default values so
+ * callers never have to defensively clone structures.
+ */
+export async function getPublicOptionsSnapshot(): Promise<PublicOptions> {
+  const pub = await publicOptions.getValue();
+  return {
+    sonarrUrl: pub.sonarrUrl,
+    defaults: mergeDefaults(pub).defaults,
+    isConfigured: pub.isConfigured,
+  };
+}

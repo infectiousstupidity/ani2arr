@@ -47,6 +47,7 @@ export const defaultUseApiQueries = () => ({
     return createStatusStub();
   },
   useAddSeries: () => createAddSeriesStub(),
+  usePublicOptions: () => ({ data: null as unknown | null }),
   useExtensionOptions: () => ({ data: null as unknown | null }),
   useSonarrMetadata: (_options?: unknown) => {
     void _options;
@@ -54,6 +55,7 @@ export const defaultUseApiQueries = () => ({
   },
   useTestConnection: () => ({ mutate: vi.fn() }),
   useSaveOptions: () => ({ mutate: vi.fn() }),
+  useUpdateDefaultSettings: () => ({ mutate: vi.fn() }),
 });
 
 // Helper to set up a partial mock while preserving other exports from the original module
@@ -71,6 +73,7 @@ export const makeUseApiQueriesMock = (overrides?: Partial<ReturnType<typeof defa
 export type UseApiQueriesSpies = {
   useSeriesStatusMock: ReturnType<typeof vi.fn>;
   useAddSeriesMock: ReturnType<typeof vi.fn>;
+  usePublicOptionsMock: ReturnType<typeof vi.fn>;
   useExtensionOptionsMock: ReturnType<typeof vi.fn>;
 };
 
@@ -78,6 +81,7 @@ export type UseApiQueriesSpies = {
 export const createUseApiQueriesSpies = (): UseApiQueriesSpies => ({
   useSeriesStatusMock: vi.fn(),
   useAddSeriesMock: vi.fn(),
+  usePublicOptionsMock: vi.fn(() => ({ data: null as unknown | null })),
   useExtensionOptionsMock: vi.fn(() => ({ data: null as unknown | null })),
 });
 
@@ -89,6 +93,7 @@ export const makeUseApiQueriesViMockFromSpies = (
   makeUseApiQueriesMock({
     useSeriesStatus: (...args: unknown[]) => spies.useSeriesStatusMock(...args),
     useAddSeries: () => spies.useAddSeriesMock(),
+    usePublicOptions: () => spies.usePublicOptionsMock(),
     useExtensionOptions: () => spies.useExtensionOptionsMock(),
     ...(overrides ?? {}),
   });

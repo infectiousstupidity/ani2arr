@@ -20,6 +20,27 @@ export interface ExtensionOptions {
   defaults: SonarrFormState;
 }
 
+/**
+ * Public-facing configuration data that is safe to expose to content scripts.
+ * Secrets (like the Sonarr API key) are intentionally excluded.
+ */
+export interface PublicOptions {
+  sonarrUrl: string;
+  defaults: SonarrFormState;
+  /**
+   * Indicates whether the user has completed Sonarr setup (URL + API key).
+   * This is derived in the background and mirrored into public storage.
+   */
+  isConfigured: boolean;
+}
+
+/**
+ * Sensitive credentials that must remain in background or options contexts.
+ */
+export interface SonarrSecrets {
+  apiKey: string;
+}
+
 export interface AddRequestPayload extends Partial<SonarrFormState> {
   title: string;
   anilistId: number;
