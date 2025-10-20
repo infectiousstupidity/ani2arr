@@ -134,6 +134,34 @@ export const useBrowsePortals = ({
 
     scanAll();
 
+    // Throttle full scans and stale portal cleanup to avoid repeated expensive operations
+    // while still processing direct card additions/removals immediately.
+    // Uses simple coalescing debounces local to this effect.
+    const fullScanTimerRef = { current: null as number | null };
+    const stalePortalsTimerRef = { current: null as number | null };
+    const FULL_SCAN_WAIT = 150; // ms
+    const STALE_PORTALS_WAIT = 100; // ms
+    
+    const scheduleFullScan = () => {
+      if (fullScanTimerRef.current !== null) {
+        window.clearTimeout(fullScanTimerRef.current);
+      }
+      fullScanTimerRef.current = window.setTimeout(() => {
+        fullScanTimerRef.current = null;
+        scanAll();
+      }, FULL_SCAN_WAIT);
+    };
+
+    const scheduleStalePortalsCleanup = () => {
+      if (stalePortalsTimerRef.current !== null) {
+        window.clearTimeout(stalePortalsTimerRef.current);
+      }
+      stalePortalsTimerRef.current = window.setTimeout(() => {
+        stalePortalsTimerRef.current = null;
+        removeStalePortals();
+      }, STALE_PORTALS_WAIT);
+    };
+
     const mo = new MutationObserver(mutations => {
       let shouldRescan = false;
       const cardsToUpsert = new Set<Element>();
@@ -180,13 +208,13 @@ export const useBrowsePortals = ({
               });
             }
           });
-          removeStalePortals();
+          scheduleStalePortalsCleanup();
         }
       }
 
       cardsToUpsert.forEach(card => upsertCard(card));
 
-      if (shouldRescan) scanAll();
+      if (shouldRescan) scheduleFullScan();
     });
 
     mo.observe(observerRoot, mutationObserverInit);
@@ -194,7 +222,7 @@ export const useBrowsePortals = ({
     const resizeTargets = toElementArray(getResizeTargets());
     let ro: ResizeObserver | null = null;
     if (resizeTargets.length > 0) {
-      ro = new ResizeObserver(() => removeStalePortals());
+      ro = new ResizeObserver(() => scheduleStalePortalsCleanup());
       for (const target of resizeTargets) {
         try {
           ro.observe(target);
@@ -208,6 +236,14 @@ export const useBrowsePortals = ({
       mo.disconnect();
       if (ro) {
         ro.disconnect();
+      }
+      if (fullScanTimerRef.current !== null) {
+        window.clearTimeout(fullScanTimerRef.current);
+        fullScanTimerRef.current = null;
+      }
+      if (stalePortalsTimerRef.current !== null) {
+        window.clearTimeout(stalePortalsTimerRef.current);
+        stalePortalsTimerRef.current = null;
       }
     };
   }, [
