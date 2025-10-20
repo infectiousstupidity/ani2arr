@@ -3,9 +3,12 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { act } from '@testing-library/react';
 import type { Root } from 'react-dom/client';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
-import { createBrowserMock, flushAsync, setLocationHref } from '@/testing';
+import type { ExtensionOptions } from '@/types';
+import { createBrowserMock, flushAsync, setLocationHref, createExtensionOptionsFixture, makeUtilsStorageMock } from '@/testing';
 
 vi.mock('wxt/browser', () => createBrowserMock());
+
+vi.mock('@/utils/storage', () => makeUtilsStorageMock());
 
 const unsubscribePersistenceMock = vi.fn();
 const persistQueryClientMock = vi.fn(() => [unsubscribePersistenceMock, Promise.resolve()]);
@@ -27,6 +30,11 @@ vi.mock('@/cache/query-cache', () => ({
   shouldPersistQuery: vi.fn(() => true),
 }));
 
+import { getStorageMockHelpers } from '@/testing';
+
+const storageModule = await import('@/utils/storage');
+const { resetMockExtensionOptions, setExtensionOptionsSnapshot } = getStorageMockHelpers(storageModule);
+
 const warnMock = vi.fn();
 
 vi.mock('@/utils/logger', () => ({
@@ -44,6 +52,11 @@ const invalidCardLog: Element[] = [];
 const recordedScanRoots: Array<Element | null> = [];
 const recordedObserverRoots: Array<Node | null> = [];
 const recordedResizeTargets: Array<Element | Iterable<Element> | null> = [];
+
+const configuredOptions: ExtensionOptions = createExtensionOptionsFixture({
+  sonarrUrl: 'https://sonarr.test',
+  sonarrApiKey: 'test-key',
+});
 
 vi.mock('@/ui/BrowseOverlay', async () => {
   const actual = await vi.importActual<typeof import('@/ui/BrowseOverlay')>('@/ui/BrowseOverlay');
@@ -272,13 +285,15 @@ const setupBrowseDom = () => {
   };
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.resetModules();
   renderedCardLog.length = 0;
   invalidCardLog.length = 0;
   recordedScanRoots.length = 0;
   recordedObserverRoots.length = 0;
   recordedResizeTargets.length = 0;
+  resetMockExtensionOptions();
+  await setExtensionOptionsSnapshot(configuredOptions);
   unsubscribePersistenceMock.mockClear();
   persistQueryClientMock.mockClear();
   warnMock.mockClear();

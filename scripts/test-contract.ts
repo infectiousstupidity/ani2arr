@@ -181,6 +181,7 @@ function createBrowserMock() {
 
   const messageListeners = new Set<MessageListener>();
   const alarmListeners = new Set<AlarmListener>();
+  const commandListeners = new Set<(command: string) => void>();
 
   const alarms = new Map<string, { scheduledTime: number; periodInMinutes?: number }>();
   const grantedOrigins = new Set<string>();
@@ -304,6 +305,22 @@ function createBrowserMock() {
     runtime,
     alarms: alarmsApi,
     permissions,
+    commands: {
+      onCommand: {
+        addListener(listener: (command: string) => void) {
+          commandListeners.add(listener);
+        },
+        removeListener(listener: (command: string) => void) {
+          commandListeners.delete(listener);
+        },
+        hasListener(listener: (command: string) => void) {
+          return commandListeners.has(listener);
+        },
+      },
+      async getAll() {
+        return [] as Array<{ name: string; description?: string }>;
+      },
+    },
     tabs: {
       async sendMessage() {
         throw new Error('tabs.sendMessage is not implemented in contract test environment.');
@@ -711,7 +728,7 @@ type KitsunarrApiMinimal = {
 };
 
 async function main(): Promise<void> {
-  const [{ extensionOptions }, services] = await Promise.all([
+  const [{ setExtensionOptionsSnapshot }, services] = await Promise.all([
     import('../src/utils/storage.ts'),
     import('../src/services/index.ts'),
   ]);
@@ -744,7 +761,7 @@ async function main(): Promise<void> {
   console.log('\n=== Test Suite 1: Happy Path ===');
   
   // Configure extension
-  await extensionOptions.setValue({
+  await setExtensionOptionsSnapshot({
     sonarrUrl: 'https://sonarr.local',
     sonarrApiKey: '0123456789abcdef0123456789abcdef',
     defaults: {
@@ -862,7 +879,7 @@ async function main(): Promise<void> {
   }
 
   // Restore config for remaining tests
-  await extensionOptions.setValue({
+  await setExtensionOptionsSnapshot({
     sonarrUrl: 'https://sonarr.local',
     sonarrApiKey: '0123456789abcdef0123456789abcdef',
     defaults: {
@@ -920,7 +937,7 @@ async function main(): Promise<void> {
   };
   browser.storage.onChanged.addListener(storageListener);
 
-  await extensionOptions.setValue({
+  await setExtensionOptionsSnapshot({
     sonarrUrl: 'https://sonarr.local',
     sonarrApiKey: '0123456789abcdef0123456789abcdef',
     defaults: {

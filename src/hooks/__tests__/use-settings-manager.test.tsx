@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { PropsWithChildren } from 'react';
-import { makeUtilsStorageMock, makeServicesMock } from '@/testing';
+import {
+  makeUtilsStorageMock,
+  makeServicesMock,
+  getStorageMockHelpers,
+  getServicesMockHelpers,
+} from '@/testing';
 
 vi.mock('@/utils/logger', () => {
   const createLogger = () => ({
@@ -46,24 +51,17 @@ import {
 } from '@/testing/msw-server';
 import { testServer, createExtensionOptionsFixture, createSonarrDefaultsFixture } from '@/testing';
 import type { ExtensionOptions, SonarrFormState, SonarrQualityProfile, SonarrRootFolder } from '@/types';
-import { extensionOptions } from '@/utils/storage';
 import * as storageModule from '@/utils/storage';
 import * as servicesModule from '@/services';
-// Access mock-only helpers from the mocked modules via an untyped cast
-const { setMockExtensionOptionsValue, pushMockExtensionOptionsUpdate, resetMockExtensionOptions } =
-  storageModule as unknown as {
-    setMockExtensionOptionsValue: (v: unknown) => void;
-    pushMockExtensionOptionsUpdate: (v: unknown) => void;
-    resetMockExtensionOptions: () => void;
-  };
-const { kitsunarrApiMock, resetKitsunarrApiMock } = servicesModule as unknown as {
-  kitsunarrApiMock: {
-    testConnection: ReturnType<typeof vi.fn>;
-    notifySettingsChanged: ReturnType<typeof vi.fn>;
-    getSonarrMetadata: ReturnType<typeof vi.fn>;
-  };
-  resetKitsunarrApiMock: () => void;
-};
+
+const {
+  setMockExtensionOptionsValue,
+  pushMockExtensionOptionsUpdate,
+  resetMockExtensionOptions,
+  setExtensionOptionsSnapshot: setExtensionOptionsSnapshotMock,
+} = getStorageMockHelpers(storageModule);
+
+const { kitsunarrApiMock, resetKitsunarrApiMock } = getServicesMockHelpers(servicesModule);
 import * as validationUtils from '@/utils/validation';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 
@@ -266,7 +264,7 @@ describe('useSettingsManager', () => {
     });
 
     expect(requestSonarrPermissionMock).not.toHaveBeenCalled();
-    expect(extensionOptions.setValue).not.toHaveBeenCalled();
+    expect(setExtensionOptionsSnapshotMock).not.toHaveBeenCalled();
   });
 
   it('aborts save when validation fails', async () => {
@@ -286,7 +284,7 @@ describe('useSettingsManager', () => {
 
     expect(requestSonarrPermissionMock).not.toHaveBeenCalled();
     expect(kitsunarrApiMock.testConnection).not.toHaveBeenCalled();
-    expect(extensionOptions.setValue).not.toHaveBeenCalled();
+    expect(setExtensionOptionsSnapshotMock).not.toHaveBeenCalled();
   });
 
   it('aborts save when permission is denied', async () => {
@@ -305,7 +303,7 @@ describe('useSettingsManager', () => {
     });
 
     expect(kitsunarrApiMock.testConnection).not.toHaveBeenCalled();
-    expect(extensionOptions.setValue).not.toHaveBeenCalled();
+    expect(setExtensionOptionsSnapshotMock).not.toHaveBeenCalled();
   });
 
   it('does not persist settings when the connection test fails', async () => {
@@ -323,7 +321,7 @@ describe('useSettingsManager', () => {
       await result.current.handleSave();
     });
 
-    expect(extensionOptions.setValue).not.toHaveBeenCalled();
+    expect(setExtensionOptionsSnapshotMock).not.toHaveBeenCalled();
     expect(kitsunarrApiMock.notifySettingsChanged).not.toHaveBeenCalled();
   });
 
@@ -344,7 +342,7 @@ describe('useSettingsManager', () => {
 
     await waitFor(() => expect(kitsunarrApiMock.testConnection).toHaveBeenCalled());
     await waitFor(() =>
-      expect(extensionOptions.setValue).toHaveBeenCalledWith({
+      expect(setExtensionOptionsSnapshotMock).toHaveBeenCalledWith({
         sonarrUrl: validUrlWithBasePath,
         sonarrApiKey: validApiKey,
         defaults: createSonarrDefaultsFixture(),
@@ -446,15 +444,15 @@ describe('useSettingsManager', () => {
     });
 
     await waitFor(() => expect(requestSonarrPermissionMock).toHaveBeenCalledWith(alternateUrl));
-    await waitFor(() => expect(extensionOptions.setValue).toHaveBeenCalledTimes(2));
-    expect(extensionOptions.setValue).toHaveBeenNthCalledWith(
+    await waitFor(() => expect(setExtensionOptionsSnapshotMock).toHaveBeenCalledTimes(2));
+    expect(setExtensionOptionsSnapshotMock).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
         sonarrUrl: alternateUrl,
         sonarrApiKey: validApiKey,
       }),
     );
-    expect(extensionOptions.setValue).toHaveBeenNthCalledWith(
+    expect(setExtensionOptionsSnapshotMock).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         sonarrUrl: previousUrl,
@@ -493,15 +491,15 @@ describe('useSettingsManager', () => {
     });
 
     await waitFor(() => expect(requestSonarrPermissionMock).toHaveBeenCalledWith(alternateUrl));
-    await waitFor(() => expect(extensionOptions.setValue).toHaveBeenCalledTimes(2));
-    expect(extensionOptions.setValue).toHaveBeenNthCalledWith(
+    await waitFor(() => expect(setExtensionOptionsSnapshotMock).toHaveBeenCalledTimes(2));
+    expect(setExtensionOptionsSnapshotMock).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
         sonarrUrl: alternateUrl,
         sonarrApiKey: validApiKey,
       }),
     );
-    expect(extensionOptions.setValue).toHaveBeenNthCalledWith(
+    expect(setExtensionOptionsSnapshotMock).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         sonarrUrl: previousUrl,

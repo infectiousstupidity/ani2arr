@@ -2,36 +2,35 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAddSeriesManager } from '../use-add-series-manager';
 import {
-  useExtensionOptions,
+  usePublicOptions,
   useSonarrMetadata,
   useAddSeries,
-  useSaveOptions,
+  useUpdateDefaultSettings,
 } from '../use-api-queries';
-import type { ExtensionOptions, SonarrFormState } from '@/types';
-import { createExtensionOptionsFixture, createSonarrDefaultsFixture } from '@/testing';
+import type { PublicOptions, SonarrFormState } from '@/types';
+import { createSonarrDefaultsFixture } from '@/testing';
 
 vi.mock('../use-api-queries', () => ({
-  useExtensionOptions: vi.fn(),
+  usePublicOptions: vi.fn(),
   useSonarrMetadata: vi.fn(),
   useAddSeries: vi.fn(),
-  useSaveOptions: vi.fn(),
+  useUpdateDefaultSettings: vi.fn(),
 }));
 
-const mockedUseExtensionOptions = vi.mocked(useExtensionOptions);
+const mockedUsePublicOptions = vi.mocked(usePublicOptions);
 const mockedUseSonarrMetadata = vi.mocked(useSonarrMetadata);
 const mockedUseAddSeries = vi.mocked(useAddSeries);
-const mockedUseSaveOptions = vi.mocked(useSaveOptions);
+const mockedUseUpdateDefaults = vi.mocked(useUpdateDefaultSettings);
 
-type OptionsOverrides = Partial<Omit<ExtensionOptions, 'defaults'>> & {
+type OptionsOverrides = Partial<Omit<PublicOptions, 'defaults'>> & {
   defaults?: Partial<SonarrFormState>;
 };
 
-const createOptions = (overrides: OptionsOverrides = {}): ExtensionOptions => {
+const createOptions = (overrides: OptionsOverrides = {}): PublicOptions => {
   const { defaults: defaultsOverride, ...rest } = overrides;
-  return createExtensionOptionsFixture({
+  return {
     sonarrUrl: 'http://localhost:8989',
-    sonarrApiKey: 'abc123',
-    ...rest,
+    isConfigured: true,
     defaults: createSonarrDefaultsFixture({
       qualityProfileId: 12,
       rootFolderPath: '/anime',
@@ -42,14 +41,15 @@ const createOptions = (overrides: OptionsOverrides = {}): ExtensionOptions => {
       tags: [7, 9],
       ...defaultsOverride,
     }),
-  });
+    ...rest,
+  };
 };
 
-let currentOptions: ExtensionOptions | undefined;
+let currentOptions: PublicOptions | undefined;
 let optionsLoading = false;
 let metadataLoading = false;
 let addSeriesMutateSpy: ReturnType<typeof vi.fn>;
-let saveOptionsMutateSpy: ReturnType<typeof vi.fn>;
+let saveDefaultsMutateSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -58,12 +58,12 @@ beforeEach(() => {
   optionsLoading = false;
   metadataLoading = false;
   addSeriesMutateSpy = vi.fn();
-  saveOptionsMutateSpy = vi.fn();
+  saveDefaultsMutateSpy = vi.fn();
 
-  mockedUseExtensionOptions.mockImplementation(() => ({
+  mockedUsePublicOptions.mockImplementation(() => ({
     data: currentOptions,
     isLoading: optionsLoading,
-  }) as unknown as ReturnType<typeof useExtensionOptions>);
+  }) as unknown as ReturnType<typeof usePublicOptions>);
 
   mockedUseSonarrMetadata.mockImplementation(() => ({
     data: null,
@@ -75,10 +75,10 @@ beforeEach(() => {
     isPending: false,
   } as unknown as ReturnType<typeof useAddSeries>);
 
-  mockedUseSaveOptions.mockReturnValue({
-    mutate: saveOptionsMutateSpy,
+  mockedUseUpdateDefaults.mockReturnValue({
+    mutate: saveDefaultsMutateSpy,
     isPending: false,
-  } as unknown as ReturnType<typeof useSaveOptions>);
+  } as unknown as ReturnType<typeof useUpdateDefaultSettings>);
 });
 
 describe('useAddSeriesManager', () => {
@@ -116,7 +116,7 @@ describe('useAddSeriesManager', () => {
   });
 
   it('only attempts to add a series when Sonarr is configured', () => {
-    currentOptions = createOptions({ sonarrUrl: '', sonarrApiKey: '' });
+    currentOptions = createOptions({ isConfigured: false });
 
     const { result, rerender } = renderHook(({ isOpen }) => useAddSeriesManager(99, 'Ready Check', null, isOpen), {
       initialProps: { isOpen: false },
@@ -165,7 +165,7 @@ describe('useAddSeriesManager', () => {
       result.current.handleSaveDefaults();
     });
 
-    expect(saveOptionsMutateSpy).not.toHaveBeenCalled();
+    expect(saveDefaultsMutateSpy).not.toHaveBeenCalled();
 
     act(() => {
       result.current.handleFormChange('monitorOption', 'future');
@@ -177,11 +177,8 @@ describe('useAddSeriesManager', () => {
       result.current.handleSaveDefaults();
     });
 
-    expect(saveOptionsMutateSpy).toHaveBeenCalledTimes(1);
-    expect(saveOptionsMutateSpy).toHaveBeenCalledWith({
-      ...currentOptions!,
-      defaults: result.current.formState,
-    });
+    expect(saveDefaultsMutateSpy).toHaveBeenCalledTimes(1);
+    expect(saveDefaultsMutateSpy).toHaveBeenCalledWith(result.current.formState);
   });
 
   it('combines option and metadata loading states', () => {

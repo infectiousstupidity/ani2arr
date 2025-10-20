@@ -4,7 +4,7 @@ import type { MockInstance } from 'vitest';
 import { LibraryService } from '@/services/library.service';
 import type { LeanSonarrSeries, SonarrSeries, ExtensionOptions, CheckSeriesStatusResponse, CheckSeriesStatusPayload } from '@/types';
 import type { CacheHit, TtlCache } from '@/cache';
-import { extensionOptions } from '@/utils/storage';
+import * as storageModule from '@/utils/storage';
 import { ErrorCode, createError } from '@/utils/error-handling';
 import * as errorHandling from '@/utils/error-handling';
 import type { MappingService } from '@/services/mapping';
@@ -108,7 +108,7 @@ describe('LibraryService', () => {
       mutationSpy,
     );
 
-    optionsSpy = vi.spyOn(extensionOptions, 'getValue');
+  optionsSpy = vi.spyOn(storageModule, 'getExtensionOptionsSnapshot');
     optionsSpy.mockResolvedValue(BASE_OPTIONS);
 
     logErrorSpy = vi.spyOn(errorHandling, 'logError').mockImplementation(() => {});

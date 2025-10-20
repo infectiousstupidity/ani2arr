@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useExtensionOptions } from '@/hooks/use-api-queries';
+import { usePublicOptions } from '@/hooks/use-api-queries';
 import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
 import { useTheme } from '@/hooks/use-theme';
 import { useBrowsePortals } from '@/hooks/use-browse-portals';
@@ -67,10 +67,10 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
     useTheme(hostRef);
     useKitsunarrBroadcasts();
 
-    const { data: extensionOptions } = useExtensionOptions();
-    const isConfigured = Boolean(extensionOptions?.sonarrUrl && extensionOptions?.sonarrApiKey);
-    const sonarrUrl = extensionOptions?.sonarrUrl ?? null;
-    const defaultForm = extensionOptions?.defaults ?? null;
+    const { data: publicOptions } = usePublicOptions();
+    const isConfigured = Boolean(publicOptions?.isConfigured);
+    const sonarrUrl = publicOptions?.sonarrUrl ?? null;
+    const defaultForm = publicOptions?.defaults ?? null;
 
     const { cardPortals } = useBrowsePortals({
       cardSelector,

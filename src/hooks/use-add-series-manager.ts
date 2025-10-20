@@ -1,6 +1,11 @@
 // src/hooks/use-add-series-manager.ts
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useExtensionOptions, useSonarrMetadata, useAddSeries, useSaveOptions } from './use-api-queries';
+import {
+  usePublicOptions,
+  useSonarrMetadata,
+  useAddSeries,
+  useUpdateDefaultSettings,
+} from './use-api-queries';
 import type { MediaMetadataHint, SonarrFormState } from '@/types';
 
 export function useAddSeriesManager(
@@ -9,7 +14,7 @@ export function useAddSeriesManager(
   metadata: MediaMetadataHint | null,
   isOpen: boolean,
 ) {
-  const { data: options, isLoading: isLoadingOptions } = useExtensionOptions();
+  const { data: options, isLoading: isLoadingOptions } = usePublicOptions();
 
   const defaultFormState: SonarrFormState = {
     qualityProfileId: '',
@@ -23,14 +28,13 @@ export function useAddSeriesManager(
 
   const [formState, setFormState] = useState<SonarrFormState>(options?.defaults ?? defaultFormState);
 
-  const sonarrReady = Boolean(options?.sonarrUrl && options?.sonarrApiKey);
+  const sonarrReady = Boolean(options?.isConfigured);
 
   const sonarrMetadata = useSonarrMetadata({
     enabled: sonarrReady,
-    credentials: sonarrReady ? { url: options!.sonarrUrl, apiKey: options!.sonarrApiKey } : null,
   });
   const addSeriesMutation = useAddSeries();
-  const { mutate: saveOptions, ...saveOptionsMutation } = useSaveOptions();
+  const { mutate: saveDefaults, ...saveDefaultsMutation } = useUpdateDefaultSettings();
 
   useEffect(() => {
     if (isOpen && options?.defaults) {
@@ -62,11 +66,8 @@ export function useAddSeriesManager(
 
   const handleSaveDefaults = useCallback(() => {
     if (!formState || !options || !isDirty) return;
-    saveOptions({
-      ...options,
-      defaults: formState,
-    });
-  }, [formState, options, isDirty, saveOptions]);
+    saveDefaults({ ...formState });
+  }, [formState, options, isDirty, saveDefaults]);
 
   return {
     formState,
@@ -75,7 +76,7 @@ export function useAddSeriesManager(
     isDirty,
     sonarrReady,
     addSeriesState: addSeriesMutation,
-    saveDefaultsState: saveOptionsMutation,
+    saveDefaultsState: saveDefaultsMutation,
     handleFormChange,
     handleAddSeries,
     handleSaveDefaults,

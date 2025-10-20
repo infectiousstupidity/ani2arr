@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createBrowserMock, getReactHandler } from '@/testing';
+import { createBrowserMock, getReactHandler, makeUtilsStorageMock } from '@/testing';
 import type { MediaMetadataHint } from '@/types';
 
 const browserMocks = vi.hoisted(() => {
@@ -86,74 +86,15 @@ vi.mock('wxt/browser', () => {
 import { browser } from 'wxt/browser';
 
 
-const storageMocks = vi.hoisted(() => {
-  const defaultOptions = {
-    sonarrUrl: '',
-    sonarrApiKey: '',
-    defaults: {
-      qualityProfileId: '',
-      rootFolderPath: '',
-      seriesType: 'anime' as const,
-      monitorOption: 'all' as const,
-      seasonFolder: true,
-      searchForMissingEpisodes: true,
-      tags: [] as number[],
-    },
-  } satisfies import('@/types').ExtensionOptions;
+vi.mock( '@/utils/storage', () => makeUtilsStorageMock()); 
 
-  let current: import('@/types').ExtensionOptions = structuredClone(defaultOptions);
-  const watchers = new Set<(value: import('@/types').ExtensionOptions) => void>();
 
-  const setOptions = (next: import('@/types').ExtensionOptions) => {
-    current = structuredClone(next);
-    watchers.forEach(callback => callback(structuredClone(current)));
-  };
 
-  const reset = () => {
-    current = structuredClone(defaultOptions);
-    watchers.clear();
-  };
-
-  return {
-    defaultOptions,
-    get options() {
-      return structuredClone(current);
-    },
-    setOptions,
-    reset,
-    watchers,
-  };
-});
-
-vi.mock('@/utils/storage', () => ({
-  extensionOptions: {
-    getValue: vi.fn(async () => storageMocks.options),
-    setValue: vi.fn(async (value: import('@/types').ExtensionOptions) => {
-      storageMocks.setOptions(value);
-    }),
-    watch: vi.fn((callback: (value: import('@/types').ExtensionOptions) => void) => {
-      storageMocks.watchers.add(callback);
-      return () => storageMocks.watchers.delete(callback);
-    }),
-  },
-  __resetMockOptions: storageMocks.reset,
-  __getMockDefaultOptions: () => structuredClone(storageMocks.defaultOptions),
-}));
-
-vi.mock('@/utils/validation', async () => {
-  const actual = await vi.importActual<typeof import('@/utils/validation')>('@/utils/validation');
-  return {
-    ...actual,
-    hasSonarrPermission: vi.fn().mockResolvedValue(true),
-  };
-});
+import { getStorageMockHelpers } from '@/testing';
 
 const storageModule = await import('@/utils/storage');
-const extensionOptions = storageModule.extensionOptions;
-const { __resetMockOptions, __getMockDefaultOptions } = storageModule as typeof storageModule & {
-  __resetMockOptions: () => void;
-  __getMockDefaultOptions: () => import('@/types').ExtensionOptions;
-};
+const { resetMockExtensionOptions, setExtensionOptionsSnapshot, getExtensionOptionsSnapshot, __getMockDefaultOptions } =
+  getStorageMockHelpers(storageModule);
 
 import { ContentRoot } from '../index';
 import {
@@ -296,7 +237,7 @@ const createTestApi = () => {
   let settingsEpoch = 0;
 
   const ensureConfigured = async (): Promise<ExtensionOptions> => {
-    const options = await extensionOptions.getValue();
+    const options = await getExtensionOptionsSnapshot();
     if (!options?.sonarrUrl || !options?.sonarrApiKey) {
       throw createExtensionError(
         'SONARR_NOT_CONFIGURED',
@@ -510,8 +451,8 @@ beforeEach(async () => {
   resolvedMappingCache.clear();
   localSeriesCache.clear();
   staticMappingCache.clear();
-  __resetMockOptions();
-  await extensionOptions.setValue(__getMockDefaultOptions());
+  resetMockExtensionOptions();
+  await setExtensionOptionsSnapshot(__getMockDefaultOptions());
   __resetTestApi();
   sessionStorage.clear();
 });
@@ -547,7 +488,7 @@ describe('ContentRoot', () => {
   });
 
   it('transitions to "In Sonarr" after a successful quick add', async () => {
-    await extensionOptions.setValue(configuredOptions);
+    await setExtensionOptionsSnapshot(configuredOptions);
     __resetTestApi();
 
     testServer.use(
@@ -569,7 +510,7 @@ describe('ContentRoot', () => {
   });
 
   it('opens and closes the advanced options modal', async () => {
-    await extensionOptions.setValue(configuredOptions);
+    await setExtensionOptionsSnapshot(configuredOptions);
     __resetTestApi();
 
     const { user } = renderContentRoot();
@@ -598,7 +539,7 @@ describe('ContentRoot', () => {
   });
 
   it('disables quick add when mapping fails to resolve a TVDB identifier', async () => {
-    await extensionOptions.setValue(configuredOptions);
+    await setExtensionOptionsSnapshot(configuredOptions);
     __resetTestApi();
 
     testServer.use(
@@ -616,7 +557,7 @@ describe('ContentRoot', () => {
   });
 
   it('refetches status queries when a Kitsunarr broadcast is received', async () => {
-    await extensionOptions.setValue(configuredOptions);
+    await setExtensionOptionsSnapshot(configuredOptions);
     __resetTestApi();
 
     testServer.use(createSonarrSeriesHandler({ series: [] }));
@@ -635,7 +576,7 @@ describe('ContentRoot', () => {
   });
 
   it('prefers the successful synonym when building the Sonarr search link', async () => {
-    await extensionOptions.setValue(configuredOptions);
+    await setExtensionOptionsSnapshot(configuredOptions);
     __resetTestApi();
 
     testServer.use(
@@ -667,7 +608,7 @@ describe('ContentRoot', () => {
   });
 
   it('matches only exact case-insensitive titles for Sonarr lookup results', async () => {
-    await extensionOptions.setValue(configuredOptions);
+    await setExtensionOptionsSnapshot(configuredOptions);
     __resetTestApi();
 
     testServer.use(
@@ -697,4 +638,6 @@ describe('ContentRoot', () => {
     ));
   });
 });
+
+
 

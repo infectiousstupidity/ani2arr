@@ -39,13 +39,13 @@ vi.mock('wxt/browser', () => {
 const hoisted = vi.hoisted(() => ({
   useSeriesStatusMock: vi.fn(),
   useAddSeriesMock: vi.fn(),
-  useExtensionOptionsMock: vi.fn(() => ({ data: null })),
+  usePublicOptionsMock: vi.fn(() => ({ data: null })),
 }));
 vi.mock('@/hooks/use-api-queries', () => ({
   __esModule: true,
   useSeriesStatus: (..._args: unknown[]) => hoisted.useSeriesStatusMock(..._args),
   useAddSeries: () => hoisted.useAddSeriesMock(),
-  useExtensionOptions: () => hoisted.useExtensionOptionsMock(),
+  usePublicOptions: () => hoisted.usePublicOptionsMock(),
   useSonarrMetadata: () => ({ data: null }),
   useTestConnection: () => ({ mutate: vi.fn() }),
   useSaveOptions: () => ({ mutate: vi.fn() }),
