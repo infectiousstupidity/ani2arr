@@ -1,5 +1,6 @@
 // src/hooks/use-api-queries.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { getKitsunarrApi } from '@/services';
 import {
@@ -62,6 +63,40 @@ export const queryKeys = {
   sonarrMetadata: (scope?: string) => [...rootQueryKey, 'sonarrMetadata', scope ?? 'configured'] as const,
 };
 
+/**
+ * Internal hooks to centralize storage -> query cache synchronization.
+ * These keep responsibilities split (public vs combined options) while
+ * avoiding duplicated effect bodies across callers.
+ */
+const useSyncExtensionOptionsQuery = (queryClient: QueryClient): void => {
+  useEffect(() => {
+    const refreshOptions = async () => {
+      const snapshot = await getExtensionOptionsSnapshot();
+      queryClient.setQueryData(queryKeys.options(), snapshot);
+    };
+    const unsubscribes = [
+      publicOptions.watch(() => {
+        void refreshOptions();
+      }),
+      sonarrSecrets.watch(() => {
+        void refreshOptions();
+      }),
+    ];
+    return () => {
+      for (const unsubscribe of unsubscribes) unsubscribe();
+    };
+  }, [queryClient]);
+};
+
+const useSyncPublicOptionsQuery = (queryClient: QueryClient): void => {
+  useEffect(() => {
+    const unsubscribe = publicOptions.watch(newValue => {
+      queryClient.setQueryData(queryKeys.publicOptions(), newValue);
+    });
+    return () => unsubscribe();
+  }, [queryClient]);
+};
+
 export type SeriesStatusOptions = {
   enabled?: boolean;
   force_verify?: boolean;
@@ -111,25 +146,8 @@ export const useExtensionOptions = () => {
     meta: { persist: false },
   });
 
-  useEffect(() => {
-    const refreshOptions = async () => {
-      const snapshot = await getExtensionOptionsSnapshot();
-      queryClient.setQueryData(queryKeys.options(), snapshot);
-    };
-    const unsubscribes = [
-      publicOptions.watch(() => {
-        void refreshOptions();
-      }),
-      sonarrSecrets.watch(() => {
-        void refreshOptions();
-      }),
-    ];
-    return () => {
-      for (const unsubscribe of unsubscribes) {
-        unsubscribe();
-      }
-    };
-  }, [queryClient]);
+  // Keep combined options in sync when either public slice or secrets change.
+  useSyncExtensionOptionsQuery(queryClient);
 
   return query;
 };
@@ -143,12 +161,8 @@ export const usePublicOptions = () => {
     meta: { persist: false },
   });
 
-  useEffect(() => {
-    const unsubscribe = publicOptions.watch(newValue => {
-      queryClient.setQueryData(queryKeys.publicOptions(), newValue);
-    });
-    return () => unsubscribe();
-  }, [queryClient]);
+  // Keep public options in sync for content/UI contexts.
+  useSyncPublicOptionsQuery(queryClient);
 
   return query;
 };
