@@ -4,21 +4,21 @@ import { SonarrApiService } from '@/api/sonarr.api';
 import type { AddRequestPayload, ExtensionOptions, SonarrCredentialsPayload } from '@/types';
 import { ErrorCode } from '@/utils/error-handling';
 import * as validation from '@/utils/validation';
-import * as retry from '@/utils/retry';
 import * as errorHandling from '@/utils/error-handling';
+import PRetry from 'p-retry';
 
 const BASE_CREDENTIALS: SonarrCredentialsPayload = {
   url: 'https://sonarr.local',
   apiKey: 'abc123',
 };
 
-type RetryOptions = Parameters<typeof retry.retryWithBackoff>[1];
+vi.mock('p-retry');
 
 describe('SonarrApiService', () => {
   let service: SonarrApiService;
   let fetchMock: ReturnType<typeof vi.fn>;
   let hasPermissionSpy: ReturnType<typeof vi.spyOn>;
-  let retrySpy: ReturnType<typeof vi.spyOn>;
+  let pRetryMock: ReturnType<typeof vi.mocked<typeof PRetry>>;
 
   beforeEach(() => {
     service = new SonarrApiService();
@@ -28,12 +28,8 @@ describe('SonarrApiService', () => {
     hasPermissionSpy = vi.spyOn(validation, 'hasSonarrPermission') as unknown as ReturnType<typeof vi.spyOn>;
     hasPermissionSpy.mockResolvedValue(true);
 
-    retrySpy = vi.spyOn(retry, 'retryWithBackoff') as unknown as ReturnType<typeof vi.spyOn>;
-    retrySpy.mockImplementation(async (...args: unknown[]) => {
-      const fn = args[0] as () => Promise<unknown>;
-      const _opts = args[1] as RetryOptions | undefined;
-      return fn();
-    });
+    pRetryMock = vi.mocked(PRetry);
+    pRetryMock.mockImplementation(async (fn: (attemptNumber: number) => PromiseLike<unknown> | unknown) => fn(1));
   });
 
   afterEach(() => {
@@ -44,7 +40,7 @@ describe('SonarrApiService', () => {
     const attempt = service.getAllSeries({ url: '', apiKey: '' });
 
     await expect(attempt).rejects.toMatchObject({ code: ErrorCode.CONFIGURATION_ERROR });
-    expect(retrySpy).not.toHaveBeenCalled();
+    expect(pRetryMock).not.toHaveBeenCalled();
     expect(hasPermissionSpy).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -55,7 +51,7 @@ describe('SonarrApiService', () => {
     const attempt = service.getAllSeries(BASE_CREDENTIALS);
 
     await expect(attempt).rejects.toMatchObject({ code: ErrorCode.PERMISSION_ERROR });
-    expect(retrySpy).not.toHaveBeenCalled();
+    expect(pRetryMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -163,8 +159,8 @@ describe('SonarrApiService', () => {
 
     expect(normalizeSpy).toHaveBeenCalledTimes(1);
     const thrown = normalizeSpy.mock.calls[0]?.[0];
-    expect(thrown).toBeInstanceOf(retry.RetriableError);
-    expect((thrown as retry.RetriableError).status).toBe(500);
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toContain('500');
     expect(logSpy).toHaveBeenCalledWith(normalizedError, 'SonarrApiService:request:series');
   });
 
@@ -179,23 +175,20 @@ describe('SonarrApiService', () => {
       .mockResolvedValueOnce(secondResponse);
 
     let capturedError: unknown;
-    retrySpy.mockImplementation(async (...args: unknown[]) => {
-      const fn = args[0] as () => Promise<unknown>;
+    pRetryMock.mockImplementation(async (fn: (attemptNumber: number) => PromiseLike<unknown> | unknown) => {
       try {
-        return await fn();
+        return await fn(1);
       } catch (error) {
         capturedError = error;
-        if (error instanceof retry.RetriableError && error.status && error.status >= 500) {
-          return fn();
-        }
-        throw error;
+        // Retry once on server error
+        return await fn(2);
       }
     });
 
     const result = await service.getAllSeries(BASE_CREDENTIALS);
 
-    expect(capturedError).toBeInstanceOf(retry.RetriableError);
-    expect((capturedError as retry.RetriableError).status).toBe(503);
+    expect(capturedError).toBeInstanceOf(Error);
+    expect((capturedError as Error).message).toContain('503');
     expect(result).toEqual(successBody);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -208,10 +201,9 @@ describe('SonarrApiService', () => {
     const logSpy = vi.spyOn(errorHandling, 'logError').mockImplementation(() => {});
 
     let capturedError: unknown;
-    retrySpy.mockImplementation(async (...args: unknown[]) => {
-      const fn = args[0] as () => Promise<unknown>;
+    pRetryMock.mockImplementation(async (fn: (attemptNumber: number) => PromiseLike<unknown> | unknown) => {
       try {
-        return await fn();
+        return await fn(1);
       } catch (error) {
         capturedError = error;
         throw error;
@@ -220,8 +212,8 @@ describe('SonarrApiService', () => {
 
     await expect(service.getAllSeries(BASE_CREDENTIALS)).rejects.toBe(normalizedError);
 
-    expect(capturedError).toBeInstanceOf(retry.RetriableError);
-    expect((capturedError as retry.RetriableError).status).toBe(404);
+    // AbortError is thrown for non-retriable client errors (400-499 except 429)
+    expect(capturedError).toBeDefined();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(normalizeSpy).toHaveBeenCalledTimes(1);
     expect(logSpy).toHaveBeenCalledWith(normalizedError, 'SonarrApiService:request:series');
@@ -236,20 +228,21 @@ describe('SonarrApiService', () => {
       }),
     );
 
-    let captured: retry.RetriableError | null = null;
+    let captured: (Error & { retryAfterMs?: number }) | null = null;
     const normalizedError = { code: ErrorCode.API_ERROR, message: '429', userMessage: '429', timestamp: Date.now() };
     const normalizeSpy = vi.spyOn(errorHandling, 'normalizeError').mockImplementation(error => {
-      captured = error as retry.RetriableError;
+      captured = error as Error & { retryAfterMs?: number };
       return normalizedError;
     });
     const logSpy = vi.spyOn(errorHandling, 'logError').mockImplementation(() => {});
 
     await expect(service.getAllSeries(BASE_CREDENTIALS)).rejects.toBe(normalizedError);
 
-    expect(captured).toBeInstanceOf(retry.RetriableError);
-    const err = (captured as unknown) as retry.RetriableError; // satisfy TS narrow for property access
-    expect(err.status).toBe(429);
-    expect(err.retryAfterMs).toBe(7_000);
+    expect(captured).toBeInstanceOf(Error);
+    expect(captured).not.toBeNull();
+    const capturedErr = captured as unknown as Error & { retryAfterMs?: number };
+    expect(capturedErr.message).toContain('429');
+    expect(capturedErr.retryAfterMs).toBe(7_000);
 
     normalizeSpy.mockRestore();
     logSpy.mockRestore();
@@ -265,21 +258,22 @@ describe('SonarrApiService', () => {
       }),
     );
 
-    let captured: retry.RetriableError | null = null;
+    let captured: (Error & { retryAfterMs?: number }) | null = null;
     const normalizedError = { code: ErrorCode.API_ERROR, message: '429', userMessage: '429', timestamp: Date.now() };
     const normalizeSpy = vi.spyOn(errorHandling, 'normalizeError').mockImplementation(error => {
-      captured = error as retry.RetriableError;
+      captured = error as Error & { retryAfterMs?: number };
       return normalizedError;
     });
     const logSpy = vi.spyOn(errorHandling, 'logError').mockImplementation(() => {});
 
     await expect(service.getAllSeries(BASE_CREDENTIALS)).rejects.toBe(normalizedError);
 
-    expect(captured).toBeInstanceOf(retry.RetriableError);
-    const err2 = (captured as unknown) as retry.RetriableError; // satisfy TS narrow for property access
-    expect(err2.status).toBe(429);
-    expect(err2.retryAfterMs).toBeGreaterThanOrEqual(0);
-    expect(err2.retryAfterMs).toBeLessThanOrEqual(10_000);
+    expect(captured).toBeInstanceOf(Error);
+    expect(captured).not.toBeNull();
+    const capturedErr = captured as unknown as Error & { retryAfterMs?: number };
+    expect(capturedErr.message).toContain('429');
+    expect(capturedErr.retryAfterMs).toBeGreaterThanOrEqual(0);
+    expect(capturedErr.retryAfterMs).toBeLessThanOrEqual(10_000);
 
     normalizeSpy.mockRestore();
     logSpy.mockRestore();

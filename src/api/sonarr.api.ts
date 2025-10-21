@@ -1,7 +1,7 @@
 // src/api/sonarr.api.ts
 
+import PRetry, { AbortError } from 'p-retry';
 import { hasSonarrPermission } from '@/utils/validation';
-import { retryWithBackoff, RetriableError } from '@/utils/retry';
 import type {
   ExtensionOptions,
   SonarrCredentialsPayload,
@@ -42,25 +42,23 @@ export class SonarrApiService {
     const url = `${credentials.url.replace(/\/$/, '')}/api/v3/${endpoint}`;
 
     try {
-      return await retryWithBackoff(async () => {
-        const response = await fetch(url, {
-          ...fetchOptions,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Api-Key': credentials.apiKey,
-            ...fetchOptions.headers,
-          },
-        });
+      return await PRetry(
+        async () => {
+          const response = await fetch(url, {
+            ...fetchOptions,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Api-Key': credentials.apiKey,
+              ...fetchOptions.headers,
+            },
+          });
 
-        if (!response.ok) {
-          let retryAfterMs: number | undefined;
-
-          if (response.status === 429) {
+          if (!response.ok) {
             const retryAfterHeader = response.headers.get('Retry-After');
+            let retryAfterMs: number | undefined;
 
-            if (retryAfterHeader) {
+            if (response.status === 429 && retryAfterHeader) {
               const seconds = Number(retryAfterHeader);
-
               if (Number.isFinite(seconds)) {
                 retryAfterMs = Math.max(0, seconds * 1000);
               } else {
@@ -70,33 +68,49 @@ export class SonarrApiService {
                 }
               }
             }
+
+            if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+              throw new AbortError(`Client error: ${response.status}`);
+            }
+
+            const err = new Error(`Sonarr API Error: ${response.status} ${response.statusText}`) as Error & {
+              retryAfterMs?: number;
+            };
+            if (retryAfterMs !== undefined) {
+              err.retryAfterMs = retryAfterMs;
+            }
+            throw err;
           }
 
-          throw new RetriableError(
-            `Sonarr API Error: ${response.status} ${response.statusText}`,
-            response.status,
-            retryAfterMs,
-          );
-        }
-
-        if (response.status === 204) {
-          return {} as T;
-        }
-
-        const contentLength = response.headers.get('Content-Length');
-        if (contentLength === '0') {
-          return {} as T;
-        }
-
-        if (contentLength === null) {
-          const rawBody = await response.clone().text();
-          if (!rawBody.trim()) {
+          if (response.status === 204) {
             return {} as T;
           }
-        }
 
-        return (await response.json()) as T;
-      });
+          const contentLength = response.headers.get('Content-Length');
+          if (contentLength === '0') {
+            return {} as T;
+          }
+
+          if (contentLength === null) {
+            const rawBody = await response.clone().text();
+            if (!rawBody.trim()) {
+              return {} as T;
+            }
+          }
+
+          return (await response.json()) as T;
+        },
+        {
+          retries: 3,
+          onFailedAttempt: async error => {
+            const retryAfterMs = (error.error as unknown as Error & { retryAfterMs?: number })
+              .retryAfterMs;
+            if (retryAfterMs) {
+              await new Promise(resolve => setTimeout(resolve, retryAfterMs));
+            }
+          },
+        },
+      );
     } catch (error) {
       const normalized = normalizeError(error);
       logError(normalized, `SonarrApiService:request:${endpoint}`);
@@ -104,12 +118,10 @@ export class SonarrApiService {
     }
   };
 
-  /** /series */
   public getAllSeries = async (credentials: SonarrCredentialsPayload): Promise<SonarrSeries[]> => {
     return this.request<SonarrSeries[]>('series', credentials);
   };
 
-  /** /series?tvdbId=XYZ */
   public getSeriesByTvdbId = async (
     tvdbId: number,
     credentials: SonarrCredentialsPayload,
@@ -118,7 +130,6 @@ export class SonarrApiService {
     return seriesArray[0] ?? null;
   };
 
-  /** /series/lookup?term=... */
   public lookupSeriesByTerm = async (
     term: string,
     credentials: SonarrCredentialsPayload,
@@ -127,7 +138,6 @@ export class SonarrApiService {
     return this.request<SonarrLookupSeries[]>(`series/lookup?term=${encodedTerm}`, credentials);
   };
 
-  /** POST /series */
   public addSeries = async (payload: AddRequestPayload, baseOptions: ExtensionOptions): Promise<SonarrSeries> => {
     const sonarrCreds = { url: baseOptions.sonarrUrl, apiKey: baseOptions.sonarrApiKey };
 
