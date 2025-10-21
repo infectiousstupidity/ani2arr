@@ -3,7 +3,7 @@
 ## 1. Project Snapshot
 - Kitsunarr adds Sonarr integration to AniList pages via a WXT browser extension targeting Chromium and Firefox.
 - Core stack: TypeScript (strict), React 19, TanStack Query 5, Radix UI primitives, Tailwind CSS 4, WebExtension APIs via `wxt`.
-- Services rely on `@webext-core/proxy-service` for background/foreground RPC, `@wxt-dev/storage` for local-only storage, `idb-keyval` for query caching.
+- Services rely on `@webext-core/proxy-service` for background/foreground RPC, `@wxt-dev/storage` for local-only storage, `idb` for query caching.
 - Domain: map AniList anime -> TVDB -> Sonarr library, allowing quick add with customizable defaults.
 
 ## 2. Tooling & Commands
@@ -26,7 +26,7 @@
  [`src/utils/retry.ts`](src/utils/retry.ts): exponential backoff with jitter via `retryWithBackoff()` supporting max retries, custom backoff multipliers, and typed error handling; avoid writing bespoke retry loops.
  Content flow: AniList content script → [`library.getSeriesStatus()`](src/services/library.service.ts) (with optional `force_verify`, `network: 'never'` flags) → mapping resolution via [`mapping.resolveTvdbId()`](src/services/mapping/index.ts) → Sonarr lookup if needed → [`sonarr.addSeries()`](src/api/sonarr.api.ts) on user action → `libraryEpoch` bump → broadcast triggers status query invalidation.
  Background alarms (`browser.alarms`) do not fire reliably in MV2 on Chromium when the background page is suspended; [`background/index.ts`](src/entrypoints/background/index.ts) falls back to `setInterval` via a global guard (`__kitsunarr_fallback_interval__`). It also supports a simple readiness probe (`{ type: 'kitsunarr:ping' }`).
- Respect rate limits: AniList GraphQL requests are queued via `AnilistApiService` with a conservative cap (~30 req/min) and adaptive global backoff on 429 responses. Sonarr lookups rely on `SonarrLookupClient` for inflight dedupe plus positive/negative TTL caches and an internal queue (concurrency 5).
+ Respect rate limits: AniList GraphQL requests run through `AnilistApiService`'s queue (concurrency 5) with `p-retry` handling retries/backoff, honoring `Retry-After` headers on 429s. Sonarr lookups rely on `SonarrLookupClient` for inflight dedupe plus positive/negative TTL caches and an internal queue (concurrency 5).
  Use `npm run dev`, load `.output/chrome-mv3` via browser extensions page, and exercise AniList anime pages, browse views, and options page.
  E2E tests (`npm run test:e2e`) use Playwright with real Chromium/Firefox browsers, loaded extension, and a mock HTTP server to validate full user workflows from options setup through series addition.
  Both test types are **complementary**: contract tests are fast (seconds) and catch API breaks; E2E tests are slow (minutes) but validate real-world behavior. Keep both green.
@@ -57,7 +57,7 @@
 - [`src/ui/BrowseOverlay.tsx`](src/ui/BrowseOverlay.tsx): adapter-based browse integration system using MutationObserver to scan for media cards, parse metadata from DOM attributes, inject action buttons via React portals into shadow DOM, and respond to wxt:locationchange events.
 - [`src/utils/error-handling.tsx`](src/utils/error-handling.tsx): defines [`ExtensionError`](src/utils/error-handling.tsx) class with `ErrorCode` enum (config, permission, network, sonarr, anilist, mapping, unknown), factory helpers (`createConfigError`, `createPermissionError`, etc.), [`normalizeError()`](src/utils/error-handling.tsx) for unknown error conversion, and React ErrorBoundary component.
 - [`src/utils/retry.ts`](src/utils/retry.ts): exponential backoff with jitter (`withRetry()` wrapper) supporting max retries, custom backoff multipliers, and typed error handling; avoid writing bespoke retry loops.
-- [`src/cache/query-cache.ts`](src/cache/query-cache.ts): TanStack Query persister using `idb-keyval` with key `kitsunarr:tanstack-query` for persistent cache across page reloads. Filters out credential-bearing queries (options) to prevent API key leakage into page-origin IndexedDB.
+- [`src/cache/query-cache.ts`](src/cache/query-cache.ts): TanStack Query persister backed by `idb` with key `kitsunarr:tanstack-query` for persistent cache across page reloads. Filters out credential-bearing queries (options) to prevent API key leakage into page-origin IndexedDB.
 - [`wxt.config.ts`](wxt.config.ts): single source of truth for manifest data (name, description, permissions split by MV2/MV3), entry points, @tailwindcss/vite plugin, source maps configuration, and required/optional host permissions.
 
 ## 6. Patterns & Conventions
@@ -94,7 +94,7 @@
 - New hosts require manifest updates in [`wxt.config.ts`](wxt.config.ts) under `host_permissions` (MV3) or `permissions` (MV2) and may also need runtime permission prompts via [`requestSonarrPermission()`](src/utils/validation.ts).
 - Background alarms (`browser.alarms`) do not fire reliably in MV2 on Chromium when the background page is suspended; [`background/index.ts`](src/entrypoints/background/index.ts) falls back to `setInterval` via a global guard (`__kitsunarr_fallback_interval__`).
 - [`registerKitsunarrApi()`](src/services/index.ts) must execute exactly once (in background context). Content scripts and options pages should only ever call [`getKitsunarrApi()`](src/services/index.ts) to access the proxy client.
-- Respect rate limits: AniList GraphQL batching is enforced via `AnilistApiService`'s `PQueue` (2 requests per 1.2s window). Sonarr lookups rely on `SonarrLookupClient` for inflight dedupe plus positive/negative TTL caches—there is no internal queue anymore, so throttle at the caller before introducing new bursty flows.
+- Respect rate limits: AniList GraphQL retries are handled by `AnilistApiService` using `p-retry` with exponential backoff plus `Retry-After` handling; the queue concurrency is 5. Sonarr lookups rely on `SonarrLookupClient` for inflight dedupe plus positive/negative TTL caches—there is no internal queue anymore, so throttle at the caller before introducing new bursty flows.
 - Keep AGENTS.md in sync when adding core flows, changing service contracts, or modifying RPC schemas so future agents (human or AI) stay aligned with actual behavior.
 - Long-running tooling (tests, docker compose, migrations, etc.) must always be invoked with sensible timeouts or in non-interactive batch mode. Never leave a shell command waiting indefinitely—prefer explicit timeouts, scripted runs, or log polling after the command exits.
 

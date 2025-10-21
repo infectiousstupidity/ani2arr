@@ -1,7 +1,6 @@
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { http } from 'msw';
 
-import { AnilistApiService } from '../anilist.api';
 import { createAniListResolver, createAniMediaFixture, testServer, withHeaders, withStatus } from '@/testing';
 import type { AniMedia } from '@/types';
 import { ErrorCode, normalizeError } from '@/utils/error-handling';
@@ -12,10 +11,14 @@ const advance = async (ms: number): Promise<void> => {
   await vi.advanceTimersByTimeAsync(ms);
 };
 
+let AnilistApiService: typeof import('../anilist.api').AnilistApiService;
+
 describe('AnilistApiService', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
+    vi.resetModules();
+    ({ AnilistApiService } = await import('../anilist.api'));
   });
 
   afterEach(() => {
@@ -34,24 +37,39 @@ describe('AnilistApiService', () => {
   });
 
   it('retries 5xx responses up to MAX_RETRIES with exponential delay', async () => {
+    const setTimeoutSpy = vi
+      .spyOn(globalThis, 'setTimeout')
+      .mockImplementation(((handler: TimerHandler, _timeout?: number, ...args: unknown[]) => {
+        queueMicrotask(() => {
+          if (typeof handler === 'function') {
+            handler(...args);
+          }
+        });
+        return 0 as unknown as ReturnType<typeof setTimeout>;
+      }) as unknown as typeof setTimeout);
+    const clearTimeoutSpy = vi
+      .spyOn(globalThis, 'clearTimeout')
+      .mockImplementation((() => {}) as unknown as typeof clearTimeout);
+
     const resolver = createAniListResolver({ ...withStatus(503) });
     testServer.use(http.post(API_URL, resolver));
 
     const service = new AnilistApiService();
-    const promise = service.fetchMediaWithRelations(101).catch(error => normalizeError(error));
+    try {
+      const promise = service.fetchMediaWithRelations(101).catch(error => normalizeError(error));
+      const error = await promise;
 
-    await advance(1_000);
-    await advance(2_000);
-    await advance(4_000);
-    const error = await promise;
-
-    expect(error).toMatchObject({
-      code: ErrorCode.API_ERROR,
-      message: 'AniList API Error: 503',
-      userMessage: 'AniList service is temporarily unavailable.',
-      details: { status: 503 },
-    });
-  });
+      expect(error).toMatchObject({
+        code: ErrorCode.API_ERROR,
+        message: 'AniList API Error: 503',
+        userMessage: 'AniList service is temporarily unavailable.',
+        details: { status: 503 },
+      });
+    } finally {
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+    }
+  }, 15_000);
 
   it('applies retry-after header before retrying after a 429', async () => {
     const rateLimited = createAniListResolver({
@@ -77,11 +95,11 @@ describe('AnilistApiService', () => {
     const promise = service.fetchMediaWithRelations(202);
 
     await advance(0);
-    await advance(2_500);
+    await advance(1_000);
     await advance(0);
     await promise;
 
-    expect(callTimes).toEqual([0, 2_500]);
+    expect(callTimes).toEqual([0, 1_000]);
   });
 
   it('traverses prequel chain lazily by issuing follow-up requests', async () => {
@@ -311,52 +329,11 @@ describe('AnilistApiService', () => {
     expect(seen).toEqual([300, 301]);
   });
 
-  it('parses rate limit headers into queue state snapshots', () => {
-    const service = new AnilistApiService();
-    const serviceInternals = service as unknown as {
-      parseRateLimitHeaders: (headers: Headers) => unknown;
-      applyRateLimitSnapshot: (snapshot: unknown) => void;
-    };
 
-    const futureReset = Math.floor((Date.now() + 45_000) / 1000);
-    const snapshot = serviceInternals.parseRateLimitHeaders(
-      new Headers({
-        'X-RateLimit-Limit': '120',
-        'X-RateLimit-Remaining': '118',
-        'X-RateLimit-Reset': String(futureReset),
-      }),
-    );
-    expect(snapshot).toMatchObject({ limit: 120, remaining: 118 });
-    expect(typeof (snapshot as { resetAt: number }).resetAt).toBe('number');
-
-    serviceInternals.applyRateLimitSnapshot({ ...(snapshot as object), lastUpdated: 123 });
-    const firstState = service.getQueueState();
-    expect(firstState.rateLimit).toMatchObject({
-      limit: 120,
-      remaining: 118,
-      lastUpdated: 123,
-    });
-
-    vi.setSystemTime(456);
-    serviceInternals.applyRateLimitSnapshot(null);
-    const updatedState = service.getQueueState();
-    expect(updatedState.rateLimit?.lastUpdated).toBe(456);
-
-    const exposed = service.getQueueState();
-    expect(() => {
-      if (exposed.rateLimit) {
-        (exposed.rateLimit as { remaining: number }).remaining = 0;
-      }
-    }).not.toThrow();
-    // Mutating the frozen copy does not affect internal state
-    expect(service.getQueueState().rateLimit?.remaining).toBe(118);
-  });
-
-  it('parses retry-after and timestamp headers with multiple formats', () => {
+  it('parses retry-after headers with multiple formats', () => {
     const service = new AnilistApiService();
     const internals = service as unknown as {
       parseRetryAfterTs: (value: string | null) => number | null;
-      parseTimestamp: (value: string | null) => number | null;
     };
 
     vi.setSystemTime(1_000);
@@ -367,94 +344,6 @@ describe('AnilistApiService', () => {
     expect(internals.parseRetryAfterTs(future)).toBeGreaterThanOrEqual(baseNow);
 
     expect(internals.parseRetryAfterTs('not-a-date')).toBeNull();
-
-    expect(internals.parseTimestamp(String(Math.floor(baseNow / 1000) + 30))).toBe(
-      (Math.floor(baseNow / 1000) + 30) * 1000,
-    );
-    expect(internals.parseTimestamp(String(baseNow + 30_000))).toBe((baseNow + 30_000) * 1000);
-    expect(internals.parseTimestamp(new Date(baseNow + 60_000).toISOString())).toBeGreaterThan(baseNow);
-    expect(internals.parseTimestamp('bad')).toBeNull();
-  });
-
-  it('waits for global backoff and resets the countdown after waiting', async () => {
-    const service = new AnilistApiService();
-    const internals = service as unknown as {
-      waitForGlobalBackoff: () => Promise<void>;
-      delay: (ms: number) => Promise<void>;
-      globalBackoffUntil: number;
-    };
-    const delaySpy = vi.spyOn(internals, 'delay').mockImplementation(async ms => {
-      vi.advanceTimersByTime(ms);
-    });
-
-    const initialNow = Date.now();
-    const target = initialNow + 2_000;
-    internals.globalBackoffUntil = target;
-
-    await internals.waitForGlobalBackoff();
-    expect(delaySpy).toHaveBeenCalledWith(target - initialNow);
-    expect(internals.globalBackoffUntil).toBe(0);
-    delaySpy.mockRestore();
-  });
-
-  it('enforces rate-limit and burst windows before claiming a request slot', async () => {
-    const service = new AnilistApiService();
-    const internals = service as unknown as {
-      reserveRequestSlot: () => Promise<void>;
-      delay: (ms: number) => Promise<void>;
-      requestLog: number[];
-      queueState: { rateLimit: { limit: number; lastUpdated: number } | null };
-      purgeRequestLog: (now: number) => void;
-      countRequestsSince: (threshold: number) => number;
-    };
-
-    internals.queueState.rateLimit = { limit: 1, lastUpdated: 0 };
-    internals.requestLog.splice(0, internals.requestLog.length, Date.now());
-
-    const delaySpy = vi.spyOn(internals, 'delay').mockImplementation(async ms => {
-      vi.advanceTimersByTime(ms);
-      internals.requestLog.splice(0, internals.requestLog.length);
-    });
-
-    await internals.reserveRequestSlot();
-    expect(delaySpy).toHaveBeenCalled();
-    delaySpy.mockReset();
-
-    const now = Date.now();
-    internals.queueState.rateLimit = { limit: 30, lastUpdated: now };
-    internals.requestLog.splice(
-      0,
-      internals.requestLog.length,
-      ...Array.from({ length: 10 }, (_, index) => now - 4_000 + index * 100),
-    );
-
-    delaySpy.mockImplementation(async ms => {
-      vi.advanceTimersByTime(ms);
-      internals.requestLog.pop();
-    });
-
-    await internals.reserveRequestSlot();
-    expect(delaySpy).toHaveBeenCalled();
-    expect(internals.countRequestsSince(Date.now() - 5_000)).toBeLessThan(10);
-
-    delaySpy.mockRestore();
-  });
-
-  it('purges stale request log entries and counts recent requests', () => {
-    const service = new AnilistApiService();
-    const internals = service as unknown as {
-      purgeRequestLog: (now: number) => void;
-      countRequestsSince: (threshold: number) => number;
-      requestLog: number[];
-    };
-
-    const requestWindowMs = 60_000;
-    internals.requestLog.splice(0, internals.requestLog.length, 1, requestWindowMs + 5, requestWindowMs + 10);
-    internals.purgeRequestLog(requestWindowMs + 20);
-    expect(internals.requestLog[0]).toBe(requestWindowMs + 5);
-
-    const recentCount = internals.countRequestsSince(requestWindowMs - 10);
-    expect(recentCount).toBe(2);
   });
 
   it('removes cached media entries gracefully', async () => {

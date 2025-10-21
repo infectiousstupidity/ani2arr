@@ -1,75 +1,40 @@
+import 'fake-indexeddb/auto';
+import { openDB } from 'idb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-type Mock = ReturnType<typeof vi.fn>;
+const DB_NAME = 'kitsunarr-cache-db';
+const STORE_NAME = 'ttl-cache-store';
 
-vi.mock('idb-keyval', () => {
-  const storeBuckets = new Map<string, Map<unknown, unknown>>();
-  let storeHandles = new Map<object, string>();
-
-  const ensureStore = (store: object | undefined) => {
-    if (!store) throw new Error('store handle missing');
-    const key = storeHandles.get(store);
-    if (!key) throw new Error('unknown store handle');
-    let bucket = storeBuckets.get(key);
-    if (!bucket) {
-      bucket = new Map();
-      storeBuckets.set(key, bucket);
-    }
-    return bucket;
-  };
-
-  const createStore = vi.fn((dbName: string, storeName: string) => {
-    const key = `${dbName}:${storeName}`;
-    if (!storeBuckets.has(key)) {
-      storeBuckets.set(key, new Map());
-    }
-    const handle = { key };
-    storeHandles.set(handle, key);
-    return handle;
+const deleteDatabase = async (name: string): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(name);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error('delete blocked'));
   });
-
-  const get = vi.fn(async (key: string, store?: object) => ensureStore(store).get(key));
-
-  const set = vi.fn(async (key: string, value: unknown, store?: object) => {
-    ensureStore(store).set(key, value);
-  });
-
-  const del = vi.fn(async (key: string, store?: object) => {
-    ensureStore(store).delete(key);
-  });
-
-  const keys = vi.fn(async (store?: object) => Array.from(ensureStore(store).keys()));
-
-  const __reset = () => {
-    storeBuckets.clear();
-    storeHandles = new Map();
-  };
-
-  return { createStore, get, set, del, keys, __reset };
-});
 
 describe('createTtlCache', () => {
   let createTtlCache: typeof import('../ttl-cache').createTtlCache;
+  let now = 0;
+  let nowSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     vi.resetModules();
-    const idb = await import('idb-keyval');
-    (idb as unknown as { __reset: () => void }).__reset();
+    await deleteDatabase(DB_NAME).catch(() => {});
     ({ createTtlCache } = await import('../ttl-cache'));
-    vi.useFakeTimers();
-    vi.setSystemTime(0);
-    vi.clearAllMocks();
+    now = 0;
+    nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now);
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    nowSpy.mockRestore();
   });
 
   it('returns stale entries while flagging them for refresh', async () => {
     const cache = createTtlCache<string>('stale');
     await cache.write('anime', 'naruto', { staleMs: 1_000 });
 
-    vi.setSystemTime(1_500);
+    now = 1_500;
 
     const hit = await cache.read('anime');
 
@@ -78,25 +43,21 @@ describe('createTtlCache', () => {
     expect(hit?.stale).toBe(true);
     expect(hit?.staleAt).toBe(1_000);
     expect(hit?.expiresAt).toBe(4_000);
-
-    const { del } = await import('idb-keyval');
-    const delMock = del as unknown as Mock;
-    expect(delMock.mock.calls.length).toBe(0);
   });
 
   it('deletes expired entries from storage', async () => {
     const cache = createTtlCache<string>('expire');
     await cache.write('hero', 'midoriya', { staleMs: 1_000 });
 
-    vi.setSystemTime(5_000);
+    now = 5_000;
 
     const result = await cache.read('hero');
     expect(result).toBeNull();
 
-    const { del } = await import('idb-keyval');
-    const delMock = del as unknown as Mock;
-    expect(delMock.mock.calls).toHaveLength(1);
-    expect(delMock.mock.calls[0]![0]).toBe('expire:hero');
+    const db = await openDB(DB_NAME, 1);
+    const storedEntry = await db.get(STORE_NAME, 'expire:hero');
+    expect(storedEntry).toBeUndefined();
+    db.close();
 
     const secondRead = await cache.read('hero');
     expect(secondRead).toBeNull();

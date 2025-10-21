@@ -1,15 +1,47 @@
-import type { Persister } from '@tanstack/query-persist-client-core';
+// src/cache/query-cache.ts
+import type { PersistedClient, Persister } from '@tanstack/query-persist-client-core';
 import type { Query } from '@tanstack/query-core';
+import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
-import { del, get, set } from 'idb-keyval';
-
+const DB_NAME = 'kitsunarr-tanstack-query-db';
+const STORE_NAME = 'tanstack-query-store';
 const STORE_KEY = 'kitsunarr:tanstack-query';
+
+interface QueryCacheDbSchema extends DBSchema {
+  [STORE_NAME]: {
+    key: string;
+    value: PersistedClient;
+  };
+}
+
+let dbPromise: Promise<IDBPDatabase<QueryCacheDbSchema>> | null = null;
+const getDb = (): Promise<IDBPDatabase<QueryCacheDbSchema>> => {
+  if (!dbPromise) {
+    dbPromise = openDB<QueryCacheDbSchema>(DB_NAME, 1, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+      },
+    });
+  }
+  return dbPromise;
+};
 
 // Persister adapter for TanStack Query persistence API
 export const queryPersister: Persister = {
-  persistClient: async (client) => set(STORE_KEY, client),
-  restoreClient: async () => get(STORE_KEY),
-  removeClient: async () => del(STORE_KEY),
+  persistClient: async (client) => {
+    const db = await getDb();
+    await db.put(STORE_NAME, client, STORE_KEY);
+  },
+  restoreClient: async () => {
+    const db = await getDb();
+    return db.get(STORE_NAME, STORE_KEY);
+  },
+  removeClient: async () => {
+    const db = await getDb();
+    await db.delete(STORE_NAME, STORE_KEY);
+  },
 };
 
 // Filter: never persist queries containing Sonarr credentials or metadata
