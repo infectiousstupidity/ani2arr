@@ -15,6 +15,7 @@ const makeQuery = (queryKey: unknown, meta?: Record<string, unknown>): Query =>
   ({
     queryKey,
     meta,
+    state: { status: 'success' },
   } as unknown as Query);
 
 describe('queryPersister', () => {

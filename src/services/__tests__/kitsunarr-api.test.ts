@@ -188,7 +188,7 @@ describe('KitsunarrApi service', () => {
     (library.refreshCache as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
 
     const runtimeMessages: unknown[] = [];
-    vi.spyOn(fakeBrowser.runtime, 'sendMessage').mockImplementation(async message => {
+    vi.spyOn(fakeBrowser.runtime, 'sendMessage').mockImplementation(async (message: unknown) => {
       runtimeMessages.push(message);
       return undefined as never;
     });
@@ -251,7 +251,7 @@ describe('KitsunarrApi service', () => {
     (library.refreshCache as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined);
 
     const runtimeMessages: unknown[] = [];
-    vi.spyOn(fakeBrowser.runtime, 'sendMessage').mockImplementation(async message => {
+    vi.spyOn(fakeBrowser.runtime, 'sendMessage').mockImplementation(async (message: unknown) => {
       runtimeMessages.push(message);
       return undefined as never;
     });

@@ -1,5 +1,6 @@
 import type { Persister } from '@tanstack/query-persist-client-core';
 import type { Query } from '@tanstack/query-core';
+
 import { del, get, set } from 'idb-keyval';
 
 const STORE_KEY = 'kitsunarr:tanstack-query';
@@ -26,7 +27,9 @@ const METADATA_QUERY_PREFIX = ['kitsunarr', 'sonarrMetadata'] as const;
  * - 'seriesStatus' queries: contain only titles, IDs, slugs (no sensitive data)
  * - AniList metadata: already public GraphQL data
  */
-export const shouldPersistQuery = (query: Query): boolean => {
+export const shouldPersistQuery = (
+  query: Query<unknown, Error, unknown, readonly unknown[]>,
+): boolean => {
   if (query.meta?.persist === false) return false;
   const key = query.queryKey;
   if (!Array.isArray(key) || key.length < 2) return true;
