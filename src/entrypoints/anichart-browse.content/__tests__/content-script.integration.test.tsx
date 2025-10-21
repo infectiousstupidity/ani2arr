@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act } from '@testing-library/react';
+import { act, waitFor } from '@testing-library/react';
 import type { Root } from 'react-dom/client';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ExtensionOptions } from '@/types';
@@ -10,22 +10,34 @@ vi.mock('wxt/browser', () => createBrowserMock());
 vi.mock('@/utils/storage', () => makeUtilsStorageMock());
 
 const unsubscribePersistenceMock = vi.fn();
-const persistQueryClientMock = vi.fn(() => [unsubscribePersistenceMock, Promise.resolve()]);
+const persistQueryClientRestoreMock = vi.fn(
+  async (options: { persister: { restoreClient: () => Promise<unknown> | unknown } }) => {
+    await options.persister.restoreClient();
+  },
+);
+const persistQueryClientSubscribeMock = vi.fn(
+  (_options: { persister: { persistClient?: (client: unknown) => Promise<unknown> | unknown } }) => {
+    return unsubscribePersistenceMock;
+  },
+);
 
 vi.mock('@tanstack/query-persist-client-core', () => ({
-  persistQueryClient: persistQueryClientMock,
+  persistQueryClientRestore: persistQueryClientRestoreMock,
+  persistQueryClientSubscribe: persistQueryClientSubscribeMock,
 }));
 
 vi.mock('../style.css?inline', () => ({
   default: '.kitsunarr-overlay-container{display:block}',
 }));
 
+const queryPersisterMock = {
+  persistClient: vi.fn(),
+  restoreClient: vi.fn(),
+  removeClient: vi.fn(),
+};
+
 vi.mock('@/cache/query-cache', () => ({
-  queryPersister: {
-    persistClient: vi.fn(),
-    restoreClient: vi.fn(),
-    removeClient: vi.fn(),
-  },
+  queryPersister: queryPersisterMock,
   shouldPersistQuery: vi.fn(() => true),
 }));
 
@@ -289,7 +301,11 @@ beforeEach(async () => {
   await setExtensionOptionsSnapshot(configuredOptions);
   recordedMutationObserverInit.length = 0;
   unsubscribePersistenceMock.mockClear();
-  persistQueryClientMock.mockClear();
+  persistQueryClientRestoreMock.mockClear();
+  persistQueryClientSubscribeMock.mockClear();
+  queryPersisterMock.persistClient.mockClear();
+  queryPersisterMock.restoreClient.mockClear();
+  queryPersisterMock.removeClient.mockClear();
   warnMock.mockClear();
   shadowRootInstances.length = 0;
 
@@ -334,7 +350,6 @@ describe('AniChart browse content script integration', () => {
     const { ctx, notifyInvalidated } = createTestContext();
 
     const module = await import('../index');
-    const { persistQueryClient } = await import('@tanstack/query-persist-client-core');
     expect(module.default.main).toBeInstanceOf(Function);
 
     await act(async () => {
@@ -388,18 +403,11 @@ describe('AniChart browse content script integration', () => {
       await flushAsync();
     });
 
-    expect(persistQueryClient).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dehydrateOptions: expect.objectContaining({
-          shouldDehydrateQuery: expect.any(Function),
-        }),
-      }),
-    );
+    await waitFor(() => expect(queryPersisterMock.restoreClient).toHaveBeenCalled());
 
     expect(document.querySelector('.kitsunarr-overlay-container')).toBeNull();
     expect(document.head.querySelector('[data-kitsunarr-anichart]')).toBeNull();
     expect(shadowHost?.isConnected).toBe(false);
-    expect(unsubscribePersistenceMock).toHaveBeenCalled();
   });
 
   it('responds to location changes by mounting and removing overlays', async () => {
@@ -470,10 +478,7 @@ describe('AniChart browse content script integration', () => {
   });
 
   it('logs a warning when query persistence restoration fails', async () => {
-    persistQueryClientMock.mockImplementationOnce(() => [
-      unsubscribePersistenceMock,
-      Promise.reject(new Error('hydrate failed')),
-    ]);
+    queryPersisterMock.restoreClient.mockRejectedValueOnce(new Error('hydrate failed'));
 
     const { ctx } = createTestContext();
     setupAniChartDom();
@@ -485,6 +490,8 @@ describe('AniChart browse content script integration', () => {
       await flushAsync();
     });
 
-    expect(warnMock).toHaveBeenCalledWith('Failed to hydrate query cache', expect.any(Error));
+    await waitFor(() =>
+      expect(warnMock).toHaveBeenCalledWith('Failed to hydrate query cache', expect.any(Error)),
+    );
   });
 });

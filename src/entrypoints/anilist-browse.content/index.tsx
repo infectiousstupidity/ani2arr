@@ -1,10 +1,9 @@
 // src/entrypoints/anilist-browse.content/index.tsx
 import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import { persistQueryClient } from '@tanstack/query-persist-client-core';
-import { queryPersister, shouldPersistQuery } from '@/cache/query-cache';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { logger } from '@/utils/logger';
 import { extractMediaMetadataFromDom } from '@/utils/anilist-dom';
 import { mergeMetadataHints } from '@/utils/media-metadata';
@@ -20,6 +19,7 @@ import {
   type ParsedCard,
 } from '@/ui/BrowseOverlay';
 import { awaitBackgroundReady } from '@/utils/background-ready';
+import { createPersistOptions } from '@/utils/query-persist-options';
 
 const log = logger.create('AniList Browse Content');
 
@@ -173,22 +173,7 @@ export default defineContentScript({
       },
     });
 
-    const [unsubscribePersistence, restorePromise] = persistQueryClient({
-      queryClient,
-      persister: queryPersister,
-      maxAge: 24 * 60 * 60 * 1000, // 24h
-      dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
-    });
-
-    try {
-      await restorePromise;
-    } catch (error) {
-      log.warn('Failed to hydrate query cache', error);
-    }
-
-    ctx.onInvalidated(() => {
-      unsubscribePersistence();
-    });
+    const persistOptions = createPersistOptions(log);
 
     let ui: ShadowRootContentScriptUi<Root> | null = null;
     let root: Root | null = null;
@@ -253,11 +238,11 @@ export default defineContentScript({
           root = createRoot(container);
           root.render(
             <React.StrictMode>
-              <QueryClientProvider client={queryClient}>
+              <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
                 <TooltipProvider>
                   <BrowseContentApp />
                 </TooltipProvider>
-              </QueryClientProvider>
+              </PersistQueryClientProvider>
             </React.StrictMode>,
           );
           return root;

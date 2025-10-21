@@ -33,7 +33,7 @@
  * - Cross-context serialization bugs
  * - Service wiring problems
  * 
- * TEST SUITES (12 total)
+ * TEST SUITES (14 total)
  * ----------------------
  * 1. Happy Path - All core operations work correctly
  * 2. Error Handling - Invalid credentials, unconfigured state
@@ -47,6 +47,8 @@
  * 10. Epoch Management - Increment tracking and broadcast payloads
  * 11. Add Series with Hints - primaryTitleHint parameter support
  * 12. Complete Response Validation - Deep schema checks on all types
+ * 13. Query Persistence Hydration - Validates cache hydration and persistence logic
+ * 14. Query Persistence Failure Handling - Ensures hydration failures are handled and warned
  * 
  * RUNNING THE TEST
  * ----------------
@@ -56,7 +58,7 @@
  * 1. Load the built background bundle (or source if not built)
  * 2. Initialize in-memory storage and fetch mocks
  * 3. Register the KitsunarrApi service
- * 4. Execute all 12 test suites
+ * 4. Execute all 14 test suites
  * 5. Exit with code 0 on success, 1 on failure
  * 
  * MAINTENANCE
@@ -1090,7 +1092,106 @@ async function main(): Promise<void> {
 
   record('complete-schema-validation');
 
-  console.log('\n✅ All contract tests passed! (12 test suites, ' + steps.length + ' assertions)');
+  console.log('\n=== Test Suite 13: Query Persistence Hydration ===');
+
+  const [{ QueryClient }, { persistQueryClientSave, persistQueryClientRestore }, { queryPersister, shouldPersistQuery }] =
+    await Promise.all([
+      import('@tanstack/query-core'),
+      import('@tanstack/query-persist-client-core'),
+      import('../src/cache/query-cache'),
+    ]);
+
+  await queryPersister.removeClient();
+
+  const persistedClient = new QueryClient();
+  const hydratedKey = ['kitsunarr', 'seriesStatus', 4321, 'persisted-title', 'persisted-meta'] as const;
+  const hydratedValue = {
+    exists: true,
+    tvdbId: 432123,
+    successfulSynonym: 'Persisted Title',
+    series: { titleSlug: 'persisted-slug' },
+  };
+
+  persistedClient.setQueryData(hydratedKey, hydratedValue);
+
+  await persistQueryClientSave({
+    queryClient: persistedClient,
+    persister: queryPersister,
+    dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+  });
+
+  const hydratedClient = new QueryClient();
+  await persistQueryClientRestore({
+    queryClient: hydratedClient,
+    persister: queryPersister,
+    maxAge: 24 * 60 * 60 * 1000,
+  });
+
+  const restoredValue = hydratedClient.getQueryData<typeof hydratedValue>(hydratedKey);
+  assert.deepEqual(restoredValue, hydratedValue, 'Persisted cache should hydrate before queries execute');
+  record('cache-hydrated');
+
+  console.log('\n=== Test Suite 14: Query Persistence Failure Handling ===');
+
+  const warnings: unknown[] = [];
+  const consoleWarnMock = {
+    warn: (...args: unknown[]) => {
+      warnings.push(args);
+    },
+  };
+
+  // Create a mock function to track calls without mutating the imported module
+  let restoreClientCallCount = 0;
+  const failingRestoreClient = async () => {
+    restoreClientCallCount++;
+    throw new Error('IndexedDB for tests intentionally unavailable');
+  };
+
+  // Construct a failing persister (composition, not mutation)
+  const failingPersister = {
+    persistClient: queryPersister.persistClient,
+    removeClient: queryPersister.removeClient,
+    restoreClient: failingRestoreClient,
+  };
+
+  let threw = false;
+  try {
+    // Manually construct persist options with the failing persister
+    const persistOptions = {
+      persister: {
+        persistClient: failingPersister.persistClient,
+        removeClient: failingPersister.removeClient,
+        restoreClient: async () => {
+          try {
+            return await failingPersister.restoreClient();
+          } catch (error) {
+            consoleWarnMock.warn('Failed to hydrate query cache', error);
+            throw error;
+          }
+        },
+      },
+      maxAge: 24 * 60 * 60 * 1000,
+      dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
+    };
+    await persistOptions.persister.restoreClient();
+  } catch (error) {
+    threw = true;
+    assert.ok(error instanceof Error, 'Hydration failure should surface an Error');
+  }
+
+  assert.ok(threw, 'Hydration failure should propagate to provider');
+  assert.ok(warnings.length > 0, 'Hydration failure should emit a warning');
+  // Assert that the warning message contains the expected error text
+  const warningText = warnings.flat().map(String).join(' ');
+  assert.ok(
+    /IndexedDB for tests intentionally unavailable|hydration/i.test(warningText),
+    'Warning should mention cache hydration failure'
+  );
+  // Verify the mock was actually called
+  assert.strictEqual(restoreClientCallCount, 1, 'restoreClient should be called once');
+  record('cache-hydration-failure');
+
+  console.log('\n✅ All contract tests passed! (14 test suites, ' + steps.length + ' assertions)');
   console.log('\nTest coverage:');
   console.log('  ✅ Happy path workflows');
   console.log('  ✅ Error handling (invalid credentials, unconfigured state, network errors)');

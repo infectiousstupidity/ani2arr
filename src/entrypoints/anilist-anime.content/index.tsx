@@ -1,13 +1,13 @@
 // src/entrypoints/anilist-anime.content/index.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import { persistQueryClient } from '@tanstack/query-persist-client-core';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { useTheme } from '@/hooks/use-theme';
 import { useSeriesStatus, useAddSeries, usePublicOptions } from '@/hooks/use-api-queries';
 import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
-import { queryPersister, shouldPersistQuery } from '@/cache/query-cache';
+import { createPersistOptions } from '@/utils/query-persist-options';
 import SonarrActionGroup from '@/ui/SonarrActionGroup';
 import { logger } from '@/utils/logger';
 import { extractMediaMetadataFromDom } from '@/utils/anilist-dom';
@@ -21,21 +21,7 @@ import { awaitBackgroundReady } from '@/utils/background-ready';
 const log = logger.create('AniList Content');
 
 const queryClient = new QueryClient();
-
-if (typeof window !== 'undefined') {
-  const [, restorePromise] = persistQueryClient({
-    queryClient,
-    persister: queryPersister,
-    maxAge: 24 * 60 * 60 * 1000, // 24h
-    dehydrateOptions: {
-      shouldDehydrateQuery: shouldPersistQuery,
-    },
-  });
-
-  restorePromise.catch(error => {
-    log.warn('Failed to hydrate query cache', error);
-  });
-}
+const persistOptions = createPersistOptions(log);
 
 const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
 
@@ -327,11 +313,11 @@ async function mountAnimePageUI(
       stopSizeSync = attachSizeSync(shadowHost);
       const root = ReactDOM.createRoot(uiContainer);
       root.render(
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
           <TooltipProvider>
             <ContentRoot anilistId={anilistId} title={title} metadata={metadata ?? null} />
           </TooltipProvider>
-        </QueryClientProvider>,
+        </PersistQueryClientProvider>,
       );
       return root;
     },
