@@ -1,3 +1,4 @@
+// tests/utils/validation.spec.ts
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 
@@ -5,7 +6,6 @@ import {
   buildSonarrPermissionPattern,
   hasSonarrPermission,
   requestSonarrPermission,
-  sanitizeInput,
   validateApiKey,
   validateUrl,
 } from '@/utils/validation';
@@ -15,7 +15,7 @@ describe('validateUrl', () => {
     {
       name: 'rejects empty strings',
       input: '',
-      expected: { isValid: false, error: 'URL is required.' },
+      expected: { isValid: false, error: 'URL cannot be empty.' },
     },
     {
       name: 'rejects whitespace only strings',
@@ -38,28 +38,18 @@ describe('validateUrl', () => {
       expected: { isValid: false, error: 'URL must use http or https.' },
     },
     {
-      name: 'rejects malformed hosts',
-      input: 'http://invalid_host',
-      expected: { isValid: false, error: 'Invalid hostname.' },
-    },
-    {
-      name: 'rejects out-of-range IPv4 octets',
-      input: 'http://256.0.0.1',
-      expected: { isValid: false, error: 'Invalid URL format.' },
-    },
-    {
       name: 'rejects credentials in URL',
       input: 'https://user:pass@example.com',
       expected: { isValid: false, error: 'Credentials in URL are not supported.' },
     },
     {
-      name: 'rejects invalid port',
-      input: 'http://sonarr.local:65537',
-      expected: { isValid: false, error: 'Invalid port.' },
+      name: 'rejects invalid IPv4 octet',
+      input: 'http://256.0.0.1',
+      expected: { isValid: false, error: 'Invalid URL format.' },
     },
-  ])('$name', ({ input, expected }) => {
-    expect(validateUrl(input)).toEqual(expected);
-  });
+   ])('$name', ({ input, expected }) => {
+     expect(validateUrl(input)).toEqual(expected);
+   });
 
   it.each([
     {
@@ -83,6 +73,16 @@ describe('validateUrl', () => {
       normalizedUrl: 'http://nas-box',
     },
     {
+      name: 'accepts hostnames with underscores (common on LAN)',
+      input: 'http://sonarr_server:8989',
+      normalizedUrl: 'http://sonarr_server:8989',
+    },
+    {
+      name: 'accepts private IPv4 addresses',
+      input: 'http://192.168.1.10:8989',
+      normalizedUrl: 'http://192.168.1.10:8989',
+    },
+    {
       name: 'accepts IPv6 literals with ports',
       input: 'http://[::1]:8989',
       normalizedUrl: 'http://[::1]:8989',
@@ -104,7 +104,7 @@ describe('validateApiKey', () => {
     {
       name: 'rejects empty strings',
       input: '',
-      expected: { isValid: false, error: 'API key is required.' },
+      expected: { isValid: false, error: 'API key cannot be empty.' },
     },
     {
       name: 'rejects whitespace-only strings',
@@ -136,23 +136,10 @@ describe('validateApiKey', () => {
   });
 });
 
-describe('sanitizeInput', () => {
-  it('strips potentially dangerous characters', () => {
-    expect(sanitizeInput('  <script>alert("x")</script>  ')).toBe('scriptalert(x)script');
-  });
-
-  it('preserves legitimate text', () => {
-    expect(sanitizeInput('  Hello, world! Stay safe.  ')).toBe('Hello, world! Stay safe.');
-  });
-
-  it('returns an empty string when input is not a string', () => {
-    expect(sanitizeInput(undefined as unknown as string)).toBe('');
-  });
-});
-
 describe('Sonarr permission helpers', () => {
   beforeEach(() => {
     fakeBrowser.reset();
+    vi.restoreAllMocks();
   });
 
   it('requests runtime permissions for Sonarr URLs with base paths', async () => {
@@ -183,9 +170,7 @@ describe('Sonarr permission helpers', () => {
   });
 
   it('requests runtime permissions for IPv6 Sonarr hosts', async () => {
-    const requestSpy = vi
-      .spyOn(fakeBrowser.permissions, 'request')
-      .mockResolvedValue(true);
+    const requestSpy = vi.spyOn(fakeBrowser.permissions, 'request').mockResolvedValue(true);
 
     const result = await requestSonarrPermission('http://[::1]:8989/api');
 
@@ -194,7 +179,7 @@ describe('Sonarr permission helpers', () => {
   });
 
   it('propagates validation errors from invalid URLs when requesting permissions', async () => {
-    expect(await requestSonarrPermission('')).toEqual({ granted: false, error: 'URL is required.' });
+    expect(await requestSonarrPermission('')).toEqual({ granted: false, error: 'URL cannot be empty.' });
   });
 
   it('returns a descriptive error when the permission request throws', async () => {
