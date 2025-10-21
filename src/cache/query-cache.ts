@@ -29,7 +29,8 @@ const getDb = (): Promise<IDBPDatabase<QueryCacheDbSchema>> => {
 };
 
 // Persister adapter for TanStack Query persistence API
-export const queryPersister: Persister = {
+// Default persister implementation using IndexedDB
+const defaultPersister: Persister = {
   persistClient: async (client) => {
     const db = await getDb();
     await db.put(STORE_NAME, client, STORE_KEY);
@@ -43,6 +44,30 @@ export const queryPersister: Persister = {
     await db.delete(STORE_NAME, STORE_KEY);
   },
 };
+
+// Current active persister. Tests may replace this via the exported
+// `overrideQueryPersisterForTests` helper. Production code should never
+// need to change this.
+let currentPersister: Persister = defaultPersister;
+
+// Exported persister delegates to the current active persister. This keeps
+// the exported object reference stable while allowing controlled overrides
+// for tests without mutating imported module state.
+export const queryPersister: Persister = {
+  persistClient: (...args: Parameters<Persister['persistClient']>) => currentPersister.persistClient(...args),
+  restoreClient: (...args: Parameters<Persister['restoreClient']>) => currentPersister.restoreClient(...args),
+  removeClient: (...args: Parameters<Persister['removeClient']>) => currentPersister.removeClient(...args),
+};
+
+/**
+ * Test-only: override the active persister used by `queryPersister`.
+ * Passing `null` will restore the default IndexedDB persister.
+ *
+ * Note: exported for tests only. Avoid using this in production code.
+ */
+export function overrideQueryPersisterForTests(persister: Persister | null): void {
+  currentPersister = persister ?? defaultPersister;
+}
 
 // Filter: never persist queries containing Sonarr credentials or metadata
 const CREDENTIAL_QUERY_PREFIX = ['kitsunarr', 'options'] as const;

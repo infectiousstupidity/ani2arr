@@ -1,24 +1,36 @@
 import React from 'react';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act } from '@testing-library/react';
+import { act, waitFor } from '@testing-library/react';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { createBrowserMock, flushAsync, setLocationHref } from '@/testing';
 
 vi.mock('wxt/browser', () => createBrowserMock());
 
-const persistCallbackMock = vi.fn();
-const persistQueryClientMock = vi.fn(() => [persistCallbackMock, Promise.resolve()]);
+const unsubscribePersistenceMock = vi.fn();
+const persistQueryClientRestoreMock = vi.fn(
+  async (options: { persister: { restoreClient: () => Promise<unknown> | unknown } }) => {
+    await options.persister.restoreClient();
+  },
+);
+const persistQueryClientSubscribeMock = vi.fn(
+  (_options: { persister: { persistClient?: (client: unknown) => Promise<unknown> | unknown } }) => {
+    return unsubscribePersistenceMock;
+  },
+);
 
 vi.mock('@tanstack/query-persist-client-core', () => ({
-  persistQueryClient: persistQueryClientMock,
+  persistQueryClientRestore: persistQueryClientRestoreMock,
+  persistQueryClientSubscribe: persistQueryClientSubscribeMock,
 }));
 
+const queryPersisterMock = {
+  persistClient: vi.fn(),
+  restoreClient: vi.fn(),
+  removeClient: vi.fn(),
+};
+
 vi.mock('@/cache/query-cache', () => ({
-  queryPersister: {
-    persistClient: vi.fn(),
-    restoreClient: vi.fn(),
-    removeClient: vi.fn(),
-  },
+  queryPersister: queryPersisterMock,
   shouldPersistQuery: vi.fn(() => true),
 }));
 
@@ -205,7 +217,12 @@ beforeEach(() => {
   usePublicOptionsMock.mockClear();
   useThemeMock.mockClear();
   useKitsunarrBroadcastsMock.mockClear();
-  persistCallbackMock.mockClear();
+  unsubscribePersistenceMock.mockClear();
+  persistQueryClientRestoreMock.mockClear();
+  persistQueryClientSubscribeMock.mockClear();
+  queryPersisterMock.persistClient.mockClear();
+  queryPersisterMock.restoreClient.mockClear();
+  queryPersisterMock.removeClient.mockClear();
 
   setLocationHref('https://anilist.co/anime/123');
 
@@ -254,11 +271,11 @@ describe('AniList anime content script integration', () => {
     const { ctx, notifyInvalidated } = createTestContext();
 
     const module = await import('../index');
-    const { persistQueryClient } = await import('@tanstack/query-persist-client-core');
     expect(module.default.main).toBeInstanceOf(Function);
 
     await act(async () => {
       await module.default.main?.(ctx);
+      await flushAsync();
     });
 
     expect(actionGroupProps.length).toBeGreaterThan(0);
@@ -271,16 +288,13 @@ describe('AniList anime content script integration', () => {
 
     await act(async () => {
       notifyInvalidated();
-    });
+    await flushAsync();
+  });
 
-    expect(document.getElementById('kitsunarr-actions-spacer')).toBeNull();
-    expect(persistQueryClient).toHaveBeenCalledWith(
-      expect.objectContaining({
-        dehydrateOptions: expect.objectContaining({
-          shouldDehydrateQuery: expect.any(Function),
-        }),
-      }),
-    );
+  expect(document.getElementById('kitsunarr-actions-spacer')).toBeNull();
+  await waitFor(() =>
+    expect(queryPersisterMock.restoreClient).toHaveBeenCalled(),
+  );
   });
 
   it('responds to location changes by removing and remounting the UI', async () => {
