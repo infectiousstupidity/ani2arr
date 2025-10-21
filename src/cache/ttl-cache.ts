@@ -1,5 +1,5 @@
 // src/cache/ttl-cache.ts
-import { createStore, del, get, keys, set } from 'idb-keyval';
+import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
 export interface CacheEntry<T> {
   value: T;
@@ -29,20 +29,43 @@ export interface TtlCache<T> {
   clear(): Promise<void>;
 }
 
-const STORE_NAME = 'kitsunarr-cache';
-const STORE = createStore(STORE_NAME, 'entries');
+const DB_NAME = 'kitsunarr-cache-db';
+const STORE_NAME = 'ttl-cache-store';
+const DB_VERSION = 1;
+
+interface CacheDbSchema extends DBSchema {
+  [STORE_NAME]: {
+    key: string;
+    value: CacheEntry<unknown>;
+  };
+}
+
+let dbPromise: Promise<IDBPDatabase<CacheDbSchema>> | null = null;
+
+const getDb = (): Promise<IDBPDatabase<CacheDbSchema>> => {
+  if (!dbPromise) {
+    dbPromise = openDB<CacheDbSchema>(DB_NAME, DB_VERSION, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+      },
+    });
+  }
+  return dbPromise;
+};
 
 export function createTtlCache<T>(namespace: string): TtlCache<T> {
   const keyFor = (key: string) => `${namespace}:${key}`;
 
   const read = async (key: string): Promise<CacheHit<T> | null> => {
-    const id = keyFor(key);
     const now = Date.now();
-    const entry = (await get<CacheEntry<T>>(id, STORE)) ?? null;
+    const db = await getDb();
+    const entry = (await db.get(STORE_NAME, keyFor(key))) as CacheEntry<T> | undefined;
     if (!entry) return null;
 
     if (now >= entry.expiresAt) {
-      await del(id, STORE);
+      await db.delete(STORE_NAME, keyFor(key));
       return null;
     }
 
@@ -56,7 +79,6 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
   };
 
   const write = async (key: string, value: T, options: CacheWriteOptions): Promise<void> => {
-    const id = keyFor(key);
     const now = Date.now();
     const entry: CacheEntry<T> = {
       value,
@@ -64,19 +86,22 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
       expiresAt: now + (options.hardMs ?? options.staleMs * 4),
       ...(options.meta ? { meta: options.meta } : {}),
     };
-    await set(id, entry, STORE);
+    const db = await getDb();
+    await db.put(STORE_NAME, entry, keyFor(key));
   };
 
   const remove = async (key: string): Promise<void> => {
-    const id = keyFor(key);
-    await del(id, STORE);
+    const db = await getDb();
+    await db.delete(STORE_NAME, keyFor(key));
   };
 
   const clear = async (): Promise<void> => {
-    const allKeys = await keys(STORE);
-    const scoped = allKeys.filter((key): key is string => typeof key === 'string' && key.startsWith(`${namespace}:`));
-    if (scoped.length === 0) return;
-    await Promise.all(scoped.map(id => del(id, STORE)));
+    const db = await getDb();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const range = IDBKeyRange.bound(`${namespace}:`, `${namespace}:\uffff`);
+    await store.delete(range);
+    await tx.done;
   };
 
   return {

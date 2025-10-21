@@ -1,30 +1,17 @@
+// src/api/anilist.api.ts
 import PQueue from 'p-queue';
+import PRetry, { AbortError } from 'p-retry';
 import type { TtlCache } from '@/cache';
-
 import { createError, ErrorCode } from '@/utils/error-handling';
 import { logger } from '@/utils/logger';
 import type { AniMedia } from '@/types';
 
 const API_URL = 'https://graphql.anilist.co';
-
-const RATE_LIMIT_SAFETY_BUFFER_MS = 1_500;
-const DEFAULT_BACKOFF_MS = 2_000;
-const RETRY_BASE_DELAY_MS = 1_000;
-const RETRY_MAX_DELAY_MS = 5_000;
-const MAX_RETRIES = 3;
-
-const API_DEFAULT_MINUTE_LIMIT = 90;
-const DEGRADED_MINUTE_LIMIT = 30;
-const REQUEST_LOG_WINDOW_MS = 60_000;
-const BURST_WINDOW_MS = 5_000;
-const BURST_CAP = 10;
-const MIN_WAIT_DELAY_MS = 25;
-
-const QUEUE_CONCURRENCY = 1;
-const QUEUE_INTERVAL_CAP = DEGRADED_MINUTE_LIMIT;
-const QUEUE_INTERVAL_MS = 60_000;
-
+const QUEUE_CONCURRENCY = 5;
+const MEDIA_SOFT_TTL = 14 * 24 * 60 * 60 * 1000; // 14 days
+const MEDIA_HARD_TTL = 60 * 24 * 60 * 60 * 1000; // 60 days
 const DEFAULT_PREQUEL_DEPTH = 5;
+const DEFAULT_RATE_LIMIT_DELAY_MS = 5_000;
 
 const FIND_MEDIA_QUERY = `
   query FindMedia($id: Int) {
@@ -51,52 +38,28 @@ type FindMediaResponse = {
   errors?: { message: string; status: number }[];
 };
 
-export interface AniRateLimitSnapshot {
-  limit?: number;
-  remaining?: number;
-  resetAt?: number;
-  backoffUntil?: number;
-  lastUpdated: number;
-}
-
-class RetriableHttpError extends Error {
-  constructor(readonly status: number) {
-    super(`AniList HTTP ${status}`);
-    this.name = 'RetriableHttpError';
-  }
-}
-
-type RateLimitHeaders = Omit<AniRateLimitSnapshot, 'lastUpdated'> & { lastUpdated?: number };
+type ExtensionErrorLike = ReturnType<typeof createError>;
 
 export class AnilistApiService {
   private readonly log = logger.create('AniListApiService');
-  private readonly queue = new PQueue({
-    concurrency: QUEUE_CONCURRENCY,
-    intervalCap: QUEUE_INTERVAL_CAP,
-    interval: QUEUE_INTERVAL_MS,
-    carryoverConcurrencyCount: true,
-  });
-
-  private readonly queueState: { rateLimit: AniRateLimitSnapshot | null } = { rateLimit: null };
-  private readonly requestLog: number[] = [];
-  private globalBackoffUntil = 0;
+  private readonly queue = new PQueue({ concurrency: QUEUE_CONCURRENCY });
   private readonly inflight = new Map<number, Promise<AniMedia>>();
   private readonly caches: { media: TtlCache<AniMedia> } | undefined;
 
   constructor(caches?: { media: TtlCache<AniMedia> }) {
-    this.caches = caches ?? undefined;
+    this.caches = caches;
   }
 
   public fetchMediaWithRelations(anilistId: number): Promise<AniMedia> {
-    // Persistent cache lookup
     const cache = this.caches?.media;
     if (cache) {
       return (async () => {
         const hit = await cache.read(String(anilistId));
         if (hit) {
           if (hit.stale) {
-            // SWR: refresh in background via queue
-            void this.enqueueAndCache(anilistId).catch(() => {});
+            void this.enqueueAndCache(anilistId).catch(error => {
+              this.log.warn(`background refresh failed for AniList ID ${anilistId}`, error);
+            });
           }
           return hit.value;
         }
@@ -104,31 +67,7 @@ export class AnilistApiService {
       })();
     }
 
-    // No cache configured: just queue the fetch
-    this.log.debug(`queue anilist fetch ${anilistId}`);
-    return this.queue.add(() => this.executeFetch(anilistId)) as Promise<AniMedia>;
-  }
-
-  private enqueueAndCache(anilistId: number): Promise<AniMedia> {
-    const existing = this.inflight.get(anilistId);
-    if (existing) return existing;
-    const promise = (this.queue.add(() => this.executeFetch(anilistId)) as Promise<AniMedia>)
-      .then(async media => {
-        const cache = this.caches?.media;
-        if (cache) {
-          const now = Date.now();
-          // 14d soft, 60d hard — Ani metadata and prequel links are slow-moving.
-          const MEDIA_SOFT_TTL = 14 * 24 * 60 * 60 * 1000;
-          const MEDIA_HARD_TTL = 60 * 24 * 60 * 60 * 1000;
-          await cache.write(String(anilistId), media, { staleMs: MEDIA_SOFT_TTL, hardMs: MEDIA_HARD_TTL, meta: { cachedAt: now } });
-        }
-        return media;
-      })
-      .finally(() => {
-        this.inflight.delete(anilistId);
-      });
-    this.inflight.set(anilistId, promise);
-    return promise;
+    return this.enqueueAndCache(anilistId);
   }
 
   public async *iteratePrequelChain(
@@ -165,240 +104,148 @@ export class AnilistApiService {
     }
   }
 
-  public getQueueState(): Readonly<{ rateLimit: AniRateLimitSnapshot | null }> {
-    const snapshot = this.queueState.rateLimit;
-    return Object.freeze({ rateLimit: snapshot ? { ...snapshot } : null });
+  public async removeMediaFromCache(anilistId: number): Promise<void> {
+    const cache = this.caches?.media;
+    if (!cache) return;
+    try {
+      await cache.remove(String(anilistId));
+    } catch {
+      // best-effort eviction; ignore failures
+    }
+  }
+
+  private enqueueAndCache(anilistId: number): Promise<AniMedia> {
+    const existing = this.inflight.get(anilistId);
+    if (existing) return existing;
+
+    const queuePromise = this.queue.add(() => this.executeFetch(anilistId)) as Promise<AniMedia>;
+    const promise = queuePromise
+      .then(async media => {
+        const cache = this.caches?.media;
+        if (cache) {
+          await cache.write(String(anilistId), media, {
+            staleMs: MEDIA_SOFT_TTL,
+            hardMs: MEDIA_HARD_TTL,
+            meta: { cachedAt: Date.now() },
+          });
+        }
+        return media;
+      })
+      .finally(() => {
+        this.inflight.delete(anilistId);
+      });
+
+    this.inflight.set(anilistId, promise);
+    return promise;
   }
 
   private async executeFetch(anilistId: number): Promise<AniMedia> {
-    let attempt = 0;
-    let retryDelay = RETRY_BASE_DELAY_MS;
-
-    while (true) {
-      await this.waitForGlobalBackoff();
-      await this.reserveRequestSlot();
-
-      try {
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ query: FIND_MEDIA_QUERY, variables: { id: anilistId } }),
-        });
-
-        const retryAfter = this.parseRetryAfterTs(response.headers.get('Retry-After'));
-        const rateLimitHeaders = this.parseRateLimitHeaders(response.headers);
-
-        if (response.status === 429) {
-          const fallbackTarget = Date.now() + DEFAULT_BACKOFF_MS + RATE_LIMIT_SAFETY_BUFFER_MS;
-          const baseTarget = retryAfter ?? rateLimitHeaders?.resetAt ?? null;
-          const backoffTarget = baseTarget ? baseTarget + RATE_LIMIT_SAFETY_BUFFER_MS : fallbackTarget;
-          this.globalBackoffUntil = Math.max(this.globalBackoffUntil, backoffTarget);
-          this.applyRateLimitSnapshot({
-            ...(rateLimitHeaders ?? {}),
-            backoffUntil: backoffTarget,
-            lastUpdated: Date.now(),
+    try {
+      return await PRetry(
+        async () => {
+          const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ query: FIND_MEDIA_QUERY, variables: { id: anilistId } }),
           });
-          continue;
-        }
 
-        if (!response.ok) {
-          if (response.status >= 500 && response.status < 600) {
-            throw new RetriableHttpError(response.status);
+          if (!response.ok) {
+            if (response.status === 429) {
+              const retryAfter = this.parseRetryAfterTs(response.headers.get('Retry-After'));
+              const delay = retryAfter ? Math.max(0, retryAfter - Date.now()) : DEFAULT_RATE_LIMIT_DELAY_MS;
+              this.log.warn(`AniList rate limit hit. Retrying AniList ID ${anilistId} after ${delay}ms.`);
+              const error = new Error('Rate limit exceeded');
+              (error as { retryAfterMs?: number }).retryAfterMs = delay;
+              throw error;
+            }
+
+            if (response.status >= 400 && response.status < 500) {
+              const extensionError = createError(
+                ErrorCode.API_ERROR,
+                `AniList API Error: ${response.status}`,
+                'AniList request failed.',
+                { status: response.status },
+              );
+              const nonRetryable = Object.assign(new Error(extensionError.message), { extensionError });
+              throw new AbortError(nonRetryable);
+            }
+
+            const retriable = new Error(`AniList API Error: ${response.status}`);
+            (retriable as { status?: number }).status = response.status;
+            throw retriable;
           }
 
-          throw createError(
-            ErrorCode.API_ERROR,
-            `AniList API Error: ${response.status}`,
-            'AniList request failed.',
-            { status: response.status },
-          );
-        }
+          const payload = (await response.json()) as FindMediaResponse;
+          const media = payload?.data?.Media;
 
-        if (rateLimitHeaders) {
-          this.applyRateLimitSnapshot({ ...rateLimitHeaders, lastUpdated: Date.now() });
-        }
+          if (!media) {
+            if (payload?.errors?.length) {
+              const message = payload.errors.map(err => err.message).join(', ');
+              const extensionError = createError(
+                ErrorCode.API_ERROR,
+                `AniList GraphQL Error: ${message}`,
+                'AniList request failed.',
+              );
+              const nonRetryable = Object.assign(new Error(extensionError.message), { extensionError });
+              throw new AbortError(nonRetryable);
+            }
 
-        const payload = (await response.json()) as FindMediaResponse;
-        const media = payload?.data?.Media;
-
-        if (!media) {
-          if (payload?.errors?.length) {
-            const message = payload.errors.map(error => error.message).join(', ');
-            throw createError(ErrorCode.API_ERROR, `AniList GraphQL Error: ${message}`, 'AniList request failed.');
-          }
-          throw createError(
-            ErrorCode.API_ERROR,
-            `AniList response missing media for ${anilistId}`,
-            'AniList returned an unexpected response.',
-          );
-        }
-
-        return media;
-      } catch (error) {
-        if (error instanceof RetriableHttpError) {
-          attempt += 1;
-          if (attempt > MAX_RETRIES) {
-            throw createError(
+            const extensionError = createError(
               ErrorCode.API_ERROR,
-              `AniList API Error: ${error.status}`,
-              'AniList service is temporarily unavailable.',
-              { status: error.status },
+              `AniList response missing media for ${anilistId}`,
+              'AniList returned an unexpected response.',
             );
+            const nonRetryable = Object.assign(new Error(extensionError.message), { extensionError });
+            throw new AbortError(nonRetryable);
           }
 
-          await this.delay(retryDelay);
-          retryDelay = Math.min(retryDelay * 2, RETRY_MAX_DELAY_MS);
-          continue;
+          return media;
+        },
+        {
+          retries: 3,
+          minTimeout: 0,
+          maxTimeout: 0,
+          onFailedAttempt: async ({ error: attemptError, attemptNumber }) => {
+            const retryAfterMs = (attemptError as Error & { retryAfterMs?: number }).retryAfterMs;
+            const exponentialDelay = Math.min(1_000 * 2 ** (attemptNumber - 1), 5_000);
+            const waitMs =
+              retryAfterMs && retryAfterMs > 0 ? Math.max(retryAfterMs, exponentialDelay) : exponentialDelay;
+            if (waitMs > 0) {
+              await new Promise(resolve => setTimeout(resolve, waitMs));
+            }
+          },
+        },
+      );
+    } catch (error) {
+      if (error instanceof AbortError) {
+        const original = error.originalError as Error & { extensionError?: ExtensionErrorLike };
+        if (original?.extensionError) {
+          throw original.extensionError;
         }
-
-        throw error;
-      }
-    }
-  }
-
-  private async reserveRequestSlot(): Promise<void> {
-    while (true) {
-      const now = Date.now();
-      this.purgeRequestLog(now);
-
-      const minuteLimit = this.getEffectiveMinuteLimit();
-      if (minuteLimit > 0 && this.requestLog.length >= minuteLimit) {
-        const nextWindow = this.requestLog[0]! + REQUEST_LOG_WINDOW_MS + RATE_LIMIT_SAFETY_BUFFER_MS;
-        const waitMs = Math.max(nextWindow - now, MIN_WAIT_DELAY_MS);
-        await this.delay(waitMs);
-        continue;
+        throw createError(ErrorCode.API_ERROR, original?.message ?? error.message, 'AniList request failed.');
       }
 
-      const burstThreshold = now - BURST_WINDOW_MS;
-      const burstCount = this.countRequestsSince(burstThreshold);
-      if (burstCount >= BURST_CAP) {
-        const earliestWithinBurst = this.requestLog[this.requestLog.length - burstCount]!;
-        const waitUntil = earliestWithinBurst + BURST_WINDOW_MS + RATE_LIMIT_SAFETY_BUFFER_MS;
-        const waitMs = Math.max(waitUntil - now, MIN_WAIT_DELAY_MS);
-        await this.delay(waitMs);
-        continue;
+      if (error instanceof Error) {
+        const withExtension = error as Error & { extensionError?: ExtensionErrorLike };
+        if (withExtension.extensionError) {
+          throw withExtension.extensionError;
+        }
       }
 
-      this.requestLog.push(now);
-      break;
-    }
-  }
-
-  private purgeRequestLog(now: number): void {
-    while (this.requestLog.length > 0 && now - this.requestLog[0]! >= REQUEST_LOG_WINDOW_MS) {
-      this.requestLog.shift();
-    }
-  }
-
-  private countRequestsSince(threshold: number): number {
-    let count = 0;
-    for (let i = this.requestLog.length - 1; i >= 0; i -= 1) {
-      const ts = this.requestLog[i]!;
-      if (ts >= threshold) {
-        count += 1;
-      } else {
-        break;
+     if (error instanceof Error) {
+        const { status } = error as Error & { status?: unknown };
+        if (typeof status === 'number') {
+          throw createError(
+            ErrorCode.API_ERROR,
+            `AniList API Error: ${status}`,
+            'AniList service is temporarily unavailable.',
+            { status },
+          );
+        }
       }
+
+      throw error;
     }
-    return count;
-  }
-
-  private getEffectiveMinuteLimit(): number {
-    const headerLimit = this.queueState.rateLimit?.limit;
-    const resolvedHeaderLimit =
-      typeof headerLimit === 'number' && Number.isFinite(headerLimit) ? headerLimit : API_DEFAULT_MINUTE_LIMIT;
-    return Math.min(resolvedHeaderLimit, DEGRADED_MINUTE_LIMIT);
-  }
-
-  private async waitForGlobalBackoff(): Promise<void> {
-    const waitMs = this.globalBackoffUntil - Date.now();
-    if (waitMs > 0) {
-      await this.delay(waitMs);
-    }
-    if (Date.now() >= this.globalBackoffUntil) {
-      this.globalBackoffUntil = 0;
-    }
-  }
-
-  private applyRateLimitSnapshot(snapshot: RateLimitHeaders | null): void {
-    if (!snapshot) {
-      const existing = this.queueState.rateLimit;
-      if (existing) {
-        this.queueState.rateLimit = { ...existing, lastUpdated: Date.now() };
-      }
-      return;
-    }
-
-    const now = snapshot.lastUpdated ?? Date.now();
-    const resolved: AniRateLimitSnapshot = {
-      lastUpdated: now,
-    };
-
-    if (typeof snapshot.limit === 'number') resolved.limit = snapshot.limit;
-    if (typeof snapshot.remaining === 'number') resolved.remaining = snapshot.remaining;
-    if (typeof snapshot.resetAt === 'number') resolved.resetAt = snapshot.resetAt;
-    if (typeof snapshot.backoffUntil === 'number') {
-      resolved.backoffUntil = snapshot.backoffUntil;
-      this.globalBackoffUntil = Math.max(this.globalBackoffUntil, snapshot.backoffUntil);
-    }
-
-    this.queueState.rateLimit = resolved;
-
-    const { limit, remaining, resetAt, backoffUntil } = resolved;
-    this.log.debug(
-      `rate limit updated limit=${limit ?? 'n/a'} remaining=${remaining ?? 'n/a'} resetAt=${resetAt ?? 'n/a'} backoff=${backoffUntil ?? 'n/a'}`,
-    );
-  }
-
-  private parseRateLimitHeaders(headers: Headers): RateLimitHeaders | null {
-    const limitHeader = headers.get('X-RateLimit-Limit');
-    const remainingHeader = headers.get('X-RateLimit-Remaining');
-    const resetHeader = headers.get('X-RateLimit-Reset');
-
-    const snapshot: RateLimitHeaders = {};
-
-    if (limitHeader) {
-      const limit = Number(limitHeader);
-      if (Number.isFinite(limit)) {
-        snapshot.limit = limit;
-      }
-    }
-
-    if (remainingHeader) {
-      const remaining = Number(remainingHeader);
-      if (Number.isFinite(remaining)) {
-        snapshot.remaining = remaining;
-      }
-    }
-
-    if (resetHeader) {
-      const resetTs = this.parseTimestamp(resetHeader);
-      if (resetTs !== null) {
-        snapshot.resetAt = resetTs;
-      }
-    }
-
-    return Object.keys(snapshot).length > 0 ? snapshot : null;
-  }
-
-  private parseRetryAfterTs(header: string | null): number | null {
-    if (!header) return null;
-    const numeric = Number(header);
-    if (Number.isFinite(numeric) && numeric > 0) {
-      return Date.now() + numeric * 1000;
-    }
-    const parsed = Date.parse(header);
-    return Number.isNaN(parsed) ? null : Math.max(Date.now(), parsed);
-  }
-
-  private parseTimestamp(value: string | null): number | null {
-    if (!value) return null;
-    const numeric = Number(value);
-    if (Number.isFinite(numeric)) {
-      return numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
-    }
-    const parsed = Date.parse(value);
-    return Number.isNaN(parsed) ? null : parsed;
   }
 
   private extractPrequelId(media: AniMedia): number | null {
@@ -409,20 +256,13 @@ export class AnilistApiService {
     return typeof id === 'number' && Number.isFinite(id) ? id : null;
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => {
-      setTimeout(resolve, ms);
-    });
-  }
-
-  // Evict a cached AniList media entry once it is no longer needed.
-  public async removeMediaFromCache(anilistId: number): Promise<void> {
-    const cache = this.caches?.media;
-    if (!cache) return;
-    try {
-      await cache.remove(String(anilistId));
-    } catch {
-      // best-effort eviction; ignore failures
+  private parseRetryAfterTs(header: string | null): number | null {
+    if (!header) return null;
+    const numeric = Number(header);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return Date.now() + numeric * 1000;
     }
+    const parsed = Date.parse(header);
+    return Number.isNaN(parsed) ? null : Math.max(Date.now(), parsed);
   }
 }
