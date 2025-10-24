@@ -64,7 +64,7 @@ const baseManager = (): Manager => ({
   isDirty: false,
   formState: {
     sonarrUrl: 'http://localhost:8989',
-    sonarrApiKey: 'abc123',
+      sonarrApiKey: '0123456789abcdef0123456789abcdef',
     defaults: defaultFormState,
   },
   handleFieldChange,

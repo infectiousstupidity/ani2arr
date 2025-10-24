@@ -106,27 +106,41 @@ export default defineBackground(() => {
   }
 
   browser.runtime.onMessage.addListener(
-    (message: unknown): Promise<unknown> | void => {
+    (message: unknown, sender?: { id?: string }): Promise<unknown> | void => {
+      // Only accept messages originating from the extension itself and that
+      // explicitly carry the _kitsunarr marker to prevent other origins from
+      // invoking privileged background handlers.
+      const senderId = (sender as { id?: string } | undefined)?.id;
+      const msg = message as { type?: string; timestamp?: number; _kitsunarr?: boolean } | undefined;
+
+      if (senderId !== browser.runtime.id) {
+        // Ignore messages from other extensions/origins or no sender info.
+        return;
+      }
+
+      if (!msg?._kitsunarr) {
+        // Marker missing; ignore.
+        return;
+      }
+
       // Lightweight readiness probe so content scripts can wait until the
       // background has registered services before issuing RPC calls.
-      if (
-        (message as { type?: string; timestamp?: number; _kitsunarr?: boolean })?.type === 'kitsunarr:ping'
-      ) {
+      if (msg.type === 'kitsunarr:ping') {
         return Promise.resolve({ ok: true as const });
       }
 
-      if (isOpenOptionsMessage(message)) {
+      if (isOpenOptionsMessage(msg)) {
         browser.runtime.openOptionsPage().catch(() => {});
         return;
       }
 
-      if (isMappingRefreshMessage(message)) {
+      if (isMappingRefreshMessage(msg)) {
         void api.initMappings();
         return Promise.resolve({ ok: true as const });
       }
 
-      if (isScoreBatchMessage(message)) {
-        const { queryRaw, startYear, candidates } = message.payload;
+      if (isScoreBatchMessage(msg)) {
+        const { queryRaw, startYear, candidates } = msg.payload;
         const scores = candidates.map((c) =>
           computeTitleMatchScore({
             queryRaw,

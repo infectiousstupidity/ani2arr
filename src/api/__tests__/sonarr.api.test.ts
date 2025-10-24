@@ -9,7 +9,7 @@ import PRetry from 'p-retry';
 
 const BASE_CREDENTIALS: SonarrCredentialsPayload = {
   url: 'https://sonarr.local',
-  apiKey: 'abc123',
+  apiKey: '0123456789abcdef0123456789abcdef',
 };
 
 vi.mock('p-retry');

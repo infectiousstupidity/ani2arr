@@ -27,7 +27,7 @@ function createCacheStub<T>() {
   };
 }
 
-const creds: SonarrLookupCredentials = { url: 'https://sonarr.local', apiKey: 'abc123' };
+const creds: SonarrLookupCredentials = { url: 'https://sonarr.local', apiKey: '0123456789abcdef0123456789abcdef' };
 
 describe('SonarrLookupClient', () => {
   let api: { lookupSeriesByTerm: Mock<(term: string, creds: SonarrLookupCredentials) => Promise<SonarrLookupSeries[]>> };

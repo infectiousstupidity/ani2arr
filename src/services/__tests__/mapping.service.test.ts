@@ -32,7 +32,7 @@ function createCacheStub<T>(): CacheStub<T> {
 
 const baseOptions: ExtensionOptions = {
   sonarrUrl: 'http://localhost:8989',
-  sonarrApiKey: 'abc123',
+  sonarrApiKey: '0123456789abcdef0123456789abcdef',
   defaults: {
     qualityProfileId: 1,
     rootFolderPath: '/anime',
