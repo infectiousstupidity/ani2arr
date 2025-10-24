@@ -68,7 +68,7 @@ a.cover {
   position: absolute;
   top: 0;
   left: 0;
-  transform: translate(-18px, -18px);
+  transform: translate(-16px, -16px);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -80,8 +80,8 @@ a.cover {
 /* ---------- Quick add button ---------- */
 .kitsunarr-card-overlay__quick {
   pointer-events: auto;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: #3db4f2;
   color: #072033;
