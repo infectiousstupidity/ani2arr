@@ -12,7 +12,7 @@ import type {
 export const defaultSonarrUrl = 'https://sonarr.test';
 export const defaultSonarrCredentials: SonarrCredentialsPayload = {
   url: defaultSonarrUrl,
-  apiKey: 'sonarr-api-key',
+  apiKey: '0123456789abcdef0123456789abcdef',
 };
 
 export const createSonarrSeriesFixture = (overrides: Partial<SonarrSeries> = {}): SonarrSeries => ({

@@ -6,6 +6,7 @@
  * Sonarr credentials so that content scripts never touch the API key.
  */
 import { storage } from '@wxt-dev/storage';
+import { validateUrl, validateApiKey } from '@/utils/validation';
 import type {
   ExtensionOptions,
   PublicOptions,
@@ -81,13 +82,34 @@ export async function getExtensionOptionsSnapshot(): Promise<ExtensionOptions> {
  */
 export async function setExtensionOptionsSnapshot(options: ExtensionOptions): Promise<void> {
   const sanitized = mergeDefaults(options);
+
+  // Defensive validation: only validate/normalize non-empty values. Empty
+  // values are permitted to allow clearing configuration.
+  let normalizedUrl = sanitized.sonarrUrl ?? '';
+  if (normalizedUrl && normalizedUrl.trim() !== '') {
+    const v = validateUrl(normalizedUrl);
+    if (!v.isValid) {
+      throw new Error(`Invalid Sonarr URL: ${v.error ?? 'unknown'}`);
+    }
+    normalizedUrl = v.normalizedUrl ?? normalizedUrl;
+  }
+
+  let apiKey = sanitized.sonarrApiKey ?? '';
+  if (apiKey && apiKey.trim() !== '') {
+    const k = validateApiKey(apiKey);
+    if (!k.isValid) {
+      throw new Error(`Invalid Sonarr API key: ${k.error ?? 'invalid format'}`);
+    }
+    apiKey = apiKey.trim();
+  }
+
   await Promise.all([
     publicOptions.setValue({
-      sonarrUrl: sanitized.sonarrUrl,
+      sonarrUrl: normalizedUrl,
       defaults: sanitized.defaults,
-      isConfigured: Boolean(sanitized.sonarrUrl && sanitized.sonarrApiKey),
+      isConfigured: Boolean(normalizedUrl && apiKey),
     }),
-    sonarrSecrets.setValue({ apiKey: sanitized.sonarrApiKey }),
+    sonarrSecrets.setValue({ apiKey }),
   ]);
 }
 

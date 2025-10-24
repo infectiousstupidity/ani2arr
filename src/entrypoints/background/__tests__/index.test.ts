@@ -36,7 +36,7 @@ async function bootstrapBackground() {
 }
 
 const FALLBACK_INTERVAL_KEY = '__kitsunarr_fallback_interval__';
-const NO_SENDER = undefined as unknown as Parameters<typeof fakeBrowser.runtime.onMessage.trigger>[1];
+const SENDER = { id: fakeBrowser.runtime.id } as Parameters<typeof fakeBrowser.runtime.onMessage.trigger>[1];
 
 describe('background entrypoint', () => {
   beforeEach(() => {
@@ -103,19 +103,20 @@ describe('background entrypoint', () => {
       .mockReturnValueOnce(0.42)
       .mockReturnValueOnce(0.84);
 
-    await fakeBrowser.runtime.onMessage.trigger({ type: 'OPEN_OPTIONS_PAGE' }, NO_SENDER);
+    await fakeBrowser.runtime.onMessage.trigger({ _kitsunarr: true, type: 'OPEN_OPTIONS_PAGE' }, SENDER);
     expect(openOptionsSpy).toHaveBeenCalledTimes(1);
 
     initMappings.mockClear();
     const [refreshResult] = await fakeBrowser.runtime.onMessage.trigger(
-      { type: 'kitsunarr:mapping:refresh' },
-      NO_SENDER,
+      { _kitsunarr: true, type: 'kitsunarr:mapping:refresh' },
+      SENDER,
     );
     expect(initMappings).toHaveBeenCalledTimes(1);
     expect(refreshResult).toEqual({ ok: true });
 
     const [scoreResult] = await fakeBrowser.runtime.onMessage.trigger(
       {
+        _kitsunarr: true,
         type: 'kitsunarr:match:score-batch',
         payload: {
           queryRaw: 'Cowboy Bebop',
@@ -126,7 +127,7 @@ describe('background entrypoint', () => {
           ],
         },
       },
-      NO_SENDER,
+      SENDER,
     );
 
     expect(computeTitleMatchScore).toHaveBeenNthCalledWith(1, {
@@ -143,5 +144,18 @@ describe('background entrypoint', () => {
       targetYear: 1998,
     });
     expect(scoreResult).toEqual({ scores: [0.42, 0.84] });
+  });
+
+  it('ignores messages missing _kitsunarr marker or from other senders', async () => {
+    const { openOptionsSpy } = await bootstrapBackground();
+
+    // Missing marker should be ignored
+    await fakeBrowser.runtime.onMessage.trigger({ type: 'OPEN_OPTIONS_PAGE' }, SENDER);
+    expect(openOptionsSpy).toHaveBeenCalledTimes(0);
+
+    // Wrong sender id should be ignored even with marker
+    const wrongSender = { id: 'some-other-id' } as Parameters<typeof fakeBrowser.runtime.onMessage.trigger>[1];
+    await fakeBrowser.runtime.onMessage.trigger({ _kitsunarr: true, type: 'kitsunarr:mapping:refresh' }, wrongSender);
+    expect(initMappings).toHaveBeenCalledTimes(0);
   });
 });

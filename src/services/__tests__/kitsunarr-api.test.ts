@@ -103,7 +103,7 @@ vi.mock('@/services/library.service', () => ({
 
 const baseOptions: ExtensionOptions = {
   sonarrUrl: 'https://sonarr.test',
-  sonarrApiKey: 'api-123',
+  sonarrApiKey: '0123456789abcdef0123456789abcdef',
   defaults: {
     qualityProfileId: 1,
     rootFolderPath: '/anime',
@@ -290,7 +290,7 @@ describe('KitsunarrApi service', () => {
   });
 
   it('prefers provided credentials when fetching Sonarr metadata', async () => {
-    const directCredentials: SonarrCredentialsPayload = { url: 'https://override', apiKey: 'override-key' };
+    const directCredentials: SonarrCredentialsPayload = { url: 'https://override', apiKey: '00112233445566778899aabbccddeeff' };
     const sonarrMock = createSonarrApiMock({
       getQualityProfiles: vi.fn().mockResolvedValue([{ id: 1, name: 'HD' } satisfies SonarrQualityProfile]),
       getRootFolders: vi.fn().mockResolvedValue([{ id: 2, path: '/shows' } satisfies SonarrRootFolder]),
@@ -302,7 +302,7 @@ describe('KitsunarrApi service', () => {
       cloneOptions({
         ...baseOptions,
         sonarrUrl: 'https://stored',
-        sonarrApiKey: 'stored-key',
+        sonarrApiKey: 'fedcba9876543210fedcba9876543210',
       }),
     );
 

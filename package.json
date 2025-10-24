@@ -18,7 +18,7 @@
     "test:watch": "vitest --watch",
     "test:ci": "vitest run --coverage",
     "test:contract": "tsx scripts/test-contract.ts",
-    "test:e2e": "npm run build && npm run build:firefox && playwright test"
+    "test:e2e": "npm run build && playwright test"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",

@@ -64,7 +64,7 @@ const createOptions = (overrides?: Partial<ExtensionOptions>): ExtensionOptions 
   const { defaults: defaultsOverride, ...rest } = overrides ?? {};
   return createExtensionOptionsFixture({
     sonarrUrl: 'http://localhost:8989',
-    sonarrApiKey: 'secret',
+    sonarrApiKey: '0123456789abcdef0123456789abcdef',
     ...rest,
     defaults: createSonarrDefaultsFixture({
       qualityProfileId: 1,
@@ -295,7 +295,7 @@ describe('mutations', () => {
     const wrapper = createWrapper(queryClient);
 
     const initialOptions = createOptions();
-    const nextOptions = createOptions({ sonarrApiKey: 'changed' });
+    const nextOptions = createOptions({ sonarrApiKey: 'fedcba9876543210fedcba9876543210' });
     const rawError = new Error('storage failed');
     const normalized = createNormalizedError({ message: 'normalized storage failed' });
 
@@ -324,7 +324,7 @@ describe('useExtensionOptions', () => {
     const wrapper = createWrapper(queryClient);
 
     const initial = createOptions();
-    const updated = createOptions({ sonarrApiKey: 'updated-key' });
+    const updated = createOptions({ sonarrApiKey: '00112233445566778899aabbccddeeff' });
     const initialPublic = toPublicOptions(initial);
     const updatedPublic = toPublicOptions(updated);
     const unsubscribePublic = vi.fn<() => void>();

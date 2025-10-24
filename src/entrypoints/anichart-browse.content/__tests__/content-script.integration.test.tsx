@@ -66,7 +66,7 @@ const recordedResizeTargets: Array<Element | Iterable<Element> | null> = [];
 
 const configuredOptions: ExtensionOptions = createExtensionOptionsFixture({
   sonarrUrl: 'https://sonarr.test',
-  sonarrApiKey: 'test-key',
+  sonarrApiKey: '0123456789abcdef0123456789abcdef',
 });
 const recordedMutationObserverInit: MutationObserverInit[] = [];
 

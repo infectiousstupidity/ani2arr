@@ -162,9 +162,11 @@ describe('AddSeriesModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add Series' }));
     expect(manager.handleAddSeries).toHaveBeenCalledTimes(1);
 
-  fireEvent.click(screen.getByLabelText('Open options page'));
-  // spy type is intentionally loose for the fakeBrowser runtime; cast at assertion
-  expect(sendMessageSpy as ReturnType<typeof vi.spyOn>).toHaveBeenCalledWith(expect.objectContaining({ type: 'OPEN_OPTIONS_PAGE' }));
+    fireEvent.click(screen.getByLabelText('Open options page'));
+    // spy type is intentionally loose for the fakeBrowser runtime; cast at assertion
+    expect(sendMessageSpy as ReturnType<typeof vi.spyOn>).toHaveBeenCalledWith(
+      expect.objectContaining({ _kitsunarr: true, type: 'OPEN_OPTIONS_PAGE' }),
+    );
 
     expect(useThemeMock).toHaveBeenCalled();
     const focusButton = screen.getByRole('button', { name: 'Form focus' });

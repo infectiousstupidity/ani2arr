@@ -1,119 +1,35 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { PropsWithChildren } from 'react';
+import { describe, it, expect, vi } from 'vitest';
+import { act, waitFor } from '@testing-library/react';
 import {
-  makeUtilsStorageMock,
-  makeServicesMock,
-  getStorageMockHelpers,
-  getServicesMockHelpers,
-} from '@/testing';
-
-vi.mock('@/utils/logger', () => {
-  const createLogger = () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  });
-
-  const rootLogger = createLogger();
-
-  return {
-    logger: {
-      ...rootLogger,
-      create: vi.fn(() => createLogger()),
-    },
-  };
-});
-
-vi.mock('@/utils/validation', async () => {
-  const actual = await vi.importActual<typeof import('@/utils/validation')>('@/utils/validation');
-  return {
-    ...actual,
-    validateUrl: vi.fn(),
-    validateApiKey: vi.fn(),
-    requestSonarrPermission: vi.fn(),
-  };
-});
-
-vi.mock('@/utils/storage', () => makeUtilsStorageMock());
-
-vi.mock('@/services', () => makeServicesMock());
-
-import { useSettingsManager } from '../use-settings-manager';
-import { queryKeys } from '../use-api-queries';
-import { createSonarrQualityProfileFixture, createSonarrRootFolderFixture } from '@/testing/fixtures/sonarr';
+  renderUseSettingsManager,
+  createOptions,
+  validUrl,
+  validUrlWithBasePath,
+  validApiKey,
+  alternateUrl,
+  removalErrorMessage,
+  setExtensionOptionsSnapshotMock,
+  setMockExtensionOptionsValue,
+  pushMockExtensionOptionsUpdate,
+  kitsunarrApiMock,
+  validateUrlMock,
+  validateApiKeyMock,
+  requestSonarrPermissionMock,
+  buildSonarrPermissionPatternSpy,
+} from './use-settings-manager/test-harness';
+import { queryKeys } from '@/hooks/use-api-queries';
+import { fakeBrowser } from 'wxt/testing/fake-browser';
+import {
+  createSonarrQualityProfileFixture,
+  createSonarrRootFolderFixture,
+} from '@/testing/fixtures/sonarr';
 import {
   createSonarrQualityProfileHandler,
   createSonarrRootFolderHandler,
   withLatency,
 } from '@/testing/msw-server';
-import { testServer, createExtensionOptionsFixture, createSonarrDefaultsFixture } from '@/testing';
-import type { ExtensionOptions, SonarrFormState, SonarrQualityProfile, SonarrRootFolder } from '@/types';
-import * as storageModule from '@/utils/storage';
-import * as servicesModule from '@/services';
-
-const {
-  setMockExtensionOptionsValue,
-  pushMockExtensionOptionsUpdate,
-  resetMockExtensionOptions,
-  setExtensionOptionsSnapshot: setExtensionOptionsSnapshotMock,
-} = getStorageMockHelpers(storageModule);
-
-const { kitsunarrApiMock, resetKitsunarrApiMock } = getServicesMockHelpers(servicesModule);
-import * as validationUtils from '@/utils/validation';
-import { fakeBrowser } from 'wxt/testing/fake-browser';
-
-const validateUrlMock = vi.mocked(validationUtils.validateUrl);
-const validateApiKeyMock = vi.mocked(validationUtils.validateApiKey);
-const requestSonarrPermissionMock = vi.mocked(validationUtils.requestSonarrPermission);
-const buildSonarrPermissionPatternSpy = vi.spyOn(validationUtils, 'buildSonarrPermissionPattern');
-
-const createOptions = (overrides: Partial<ExtensionOptions> = {}): ExtensionOptions =>
-  createExtensionOptionsFixture({
-    ...overrides,
-    defaults: createSonarrDefaultsFixture(overrides.defaults),
-  });
-
-const validUrl = 'https://sonarr.test';
-const validUrlWithBasePath = 'https://sonarr.test/base';
-const validApiKey = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-const alternateUrl = 'https://new-sonarr.test/app';
-const removalErrorMessage = 'Failed to update host permissions. Please try again.';
-
-const renderUseSettingsManager = () => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
-  const wrapper = ({ children }: PropsWithChildren) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-
-  const hook = renderHook(() => useSettingsManager(), { wrapper });
-
-  return { result: hook.result, queryClient };
-};
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  validateUrlMock.mockImplementation(url => ({ isValid: true, normalizedUrl: url }));
-  validateApiKeyMock.mockReturnValue({ isValid: true });
-  requestSonarrPermissionMock.mockResolvedValue({ granted: true });
-  buildSonarrPermissionPatternSpy.mockClear();
-  resetMockExtensionOptions();
-  resetKitsunarrApiMock();
-});
-
-afterEach(() => {
-  resetMockExtensionOptions();
-  resetKitsunarrApiMock();
-});
-
+import { testServer, createSonarrDefaultsFixture } from '@/testing';
+import type { SonarrFormState, SonarrQualityProfile, SonarrRootFolder } from '@/types';
 describe('useSettingsManager', () => {
   it('auto-fills Sonarr defaults from metadata and refetches on refresh', async () => {
     const qualityProfile = createSonarrQualityProfileFixture({ id: 42, name: 'UltraHD' });

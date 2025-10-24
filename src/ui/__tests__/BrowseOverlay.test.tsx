@@ -1,292 +1,19 @@
-import React from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { createBrowserMock } from '@/testing';
+import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { createStatusStub, createAddSeriesStub } from '@/testing/mocks/useApiQueriesMock';
-import type { CheckSeriesStatusPayload } from '@/types';
-
-import type { BrowseAdapter, ParsedCard } from '@/types';
+import type { BrowseAdapter } from '@/types';
+import {
+  hoisted,
+  createCard,
+  setupAdapter,
+  getMutationObservers,
+  getResizeObservers,
+  TooltipWrapperMock,
+  useThemeMock,
+  addSeriesModalSpy,
+  renderWithProviders,
+} from './browse-overlay/test-harness';
 import { createBrowseContentApp } from '@/ui/BrowseOverlay';
-// Hoisted spies + state for use-api-queries
-const hoisted = vi.hoisted(() => {
-  const spies = {
-    // Type spies loosely (unknown) to avoid narrowing issues when overriding implementations
-    useSeriesStatusMock: vi.fn<(...args: unknown[]) => unknown>(),
-    useAddSeriesMock: vi.fn<() => unknown>(),
-    usePublicOptionsMock: vi.fn<() => { data: unknown }>(() => ({ data: null as unknown })),
-  };
-
-  const publicOptionsResult: {
-    data: { sonarrUrl: string; defaults: Partial<import('@/types').SonarrFormState> | null; isConfigured: boolean };
-  } = {
-    data: {
-      sonarrUrl: 'http://sonarr.local',
-      isConfigured: true,
-      defaults: {
-        qualityProfileId: 1,
-        rootFolderPath: '/media',
-        seriesType: 'standard',
-        monitorOption: 'all',
-        seasonFolder: false,
-        searchForMissingEpisodes: false,
-        tags: [],
-      },
-    },
-  };
-
-  const seriesStatusMap = new Map<number, {
-    data: unknown | null;
-    isError: boolean;
-    error: unknown;
-    isLoading: boolean;
-    fetchStatus: 'idle' | 'fetching';
-    refetch: ReturnType<typeof vi.fn>;
-  }>();
-  const currentAddSeriesResultRef: { value: ReturnType<typeof createAddSeriesStub> } = {
-    value: {
-      mutate: vi.fn(),
-      isPending: false,
-      isSuccess: false,
-      isError: false,
-      error: null,
-      reset: vi.fn(),
-    },
-  };
-
-  // Default spy implementations, can be overridden in tests
-  spies.usePublicOptionsMock.mockImplementation(() => publicOptionsResult as unknown as { data: unknown });
-  spies.useSeriesStatusMock.mockImplementation((...args: unknown[]) => {
-    const payload = args[0] as CheckSeriesStatusPayload;
-    return seriesStatusMap.get(payload.anilistId) ?? {
-      data: null,
-      isError: false,
-      error: null,
-      isLoading: false,
-      fetchStatus: 'idle',
-      refetch: vi.fn(() => Promise.resolve()),
-    };
-  });
-  spies.useAddSeriesMock.mockImplementation(() => currentAddSeriesResultRef.value);
-
-  return { ...spies, publicOptionsResult, seriesStatusMap, currentAddSeriesResultRef } as const;
-});
-
-// Use hoist-safe vi.mock with overrides that delegate to the local spies above
-vi.mock('@/hooks/use-api-queries', () => ({
-  __esModule: true,
-  usePublicOptions: () => hoisted.usePublicOptionsMock(),
-  useSeriesStatus: (...args: unknown[]) => hoisted.useSeriesStatusMock(args[0] as CheckSeriesStatusPayload),
-  useAddSeries: () => hoisted.useAddSeriesMock(),
-  useSonarrMetadata: () => ({ data: null }),
-  useTestConnection: () => ({ mutate: vi.fn() }),
-  useSaveOptions: () => ({ mutate: vi.fn() }),
-}));
-
-const useKitsunarrBroadcastsMock = vi.fn();
-const useThemeMock = vi.fn();
-
-const TooltipWrapperMock = vi.fn(
-  ({ children }: { children: React.ReactNode; container?: HTMLElement | null }) => <>{children}</>,
-);
-
-type AddSeriesModalProps = {
-  anilistId?: number;
-  title?: string;
-  metadata?: unknown | null;
-  portalContainer?: HTMLElement | null;
-};
-const addSeriesModalSpy = vi.fn((props: AddSeriesModalProps) => (
-  <div
-    data-testid="add-series-modal"
-    data-anilist-id={props.anilistId}
-    data-title={props.title}
-    data-portal-host={props.portalContainer ? 'present' : 'missing'}
-  />
-));
-
-// (duplicate vi.mock for '@/hooks/use-api-queries' removed; consolidated above)
-
-vi.mock('@/hooks/use-broadcasts', () => ({
-  __esModule: true,
-  useKitsunarrBroadcasts: () => useKitsunarrBroadcastsMock(),
-}));
-
-vi.mock('@/hooks/use-theme', () => ({
-  __esModule: true,
-  useTheme: (ref: React.RefObject<HTMLDivElement>) => useThemeMock(ref),
-}));
-
-vi.mock('@/ui/TooltipWrapper', () => ({
-  __esModule: true,
-  default: (props: { children: React.ReactNode; container?: HTMLElement | null }) => TooltipWrapperMock(props),
-}));
-
-vi.mock('@/ui/AddSeriesModal', () => ({
-  __esModule: true,
-  default: (props: AddSeriesModalProps) => addSeriesModalSpy(props),
-}));
-
-vi.mock('wxt/browser', () => {
-  const runtime = {
-    openOptionsPage: vi.fn(() => Promise.resolve()),
-  };
-  const mockBrowser = { runtime };
-  return createBrowserMock(mockBrowser);
-});
-
-// Use centralized stub creators via import; local types not required
-
-let mutationObservers: MutationObserverMock[] = [];
-let resizeObservers: ResizeObserverMock[] = [];
-
-class MutationObserverMock implements MutationObserver {
-  public readonly observe = vi.fn();
-  public readonly disconnect = vi.fn();
-  constructor(private readonly callback: MutationCallback) {
-    mutationObservers.push(this);
-  }
-  takeRecords(): MutationRecord[] {
-    return [];
-  }
-  trigger(records: Partial<MutationRecord>[]) {
-    this.callback(records as MutationRecord[], this);
-  }
-}
-
-class ResizeObserverMock implements ResizeObserver {
-  public readonly observe = vi.fn((target: Element, _options?: ResizeObserverOptions) => {
-    if ((target as HTMLElement).dataset.throwResize === 'true') {
-      throw new Error('observe failed');
-    }
-  });
-  public readonly unobserve = vi.fn();
-  public readonly disconnect = vi.fn();
-  constructor(private readonly callback: ResizeObserverCallback) {
-    resizeObservers.push(this);
-  }
-  trigger() {
-    this.callback([], this);
-  }
-}
-
-const originalMutationObserver = globalThis.MutationObserver;
-const originalResizeObserver = globalThis.ResizeObserver;
-
-const originalAlert = window.alert;
-
-const createCard = (id: number, title: string, options: { invalid?: boolean } = {}) => {
-  const card = document.createElement('div');
-  card.className = 'media-card';
-  card.dataset.anilistId = String(id);
-  card.dataset.title = title;
-  if (options.invalid) {
-    card.dataset.invalid = 'true';
-  }
-  const overlayHost = document.createElement('div');
-  overlayHost.className = 'overlay-host';
-  card.appendChild(overlayHost);
-  return { card, overlayHost };
-};
-
-const setupAdapter = (overrides: Partial<BrowseAdapter> = {}) => {
-  const parseCard = vi.fn((card: Element): ParsedCard | null => {
-    const element = card as HTMLElement;
-    if (element.dataset.invalid === 'true') {
-      return null;
-    }
-    const host = element.querySelector<HTMLElement>('.overlay-host');
-    if (!host) return null;
-    return {
-      anilistId: Number(element.dataset.anilistId ?? 0),
-      title: element.dataset.title ?? '',
-      metadata: null,
-      host,
-    };
-  });
-
-  const ensureContainer = vi.fn((host: HTMLElement) => {
-    let container = host.querySelector<HTMLElement>('.kitsunarr-container');
-    if (!container) {
-      container = host.ownerDocument.createElement('div');
-      container.className = 'kitsunarr-container';
-      host.appendChild(container);
-    }
-    return container;
-  });
-
-  const adapter: BrowseAdapter = {
-    cardSelector: '.media-card',
-    containerClassName: 'kitsunarr-container',
-    processedAttribute: 'data-kitsunarr-test',
-    parseCard,
-    ensureContainer,
-    onCardInvalid: vi.fn(),
-    resizeObserverTargets: () => [document.body],
-    ...overrides,
-  };
-
-  return { adapter, parseCard, ensureContainer };
-};
-
-beforeEach(() => {
-  hoisted.publicOptionsResult.data = {
-    sonarrUrl: 'http://sonarr.local',
-    isConfigured: true,
-    defaults: {
-      qualityProfileId: 1,
-      rootFolderPath: '/media',
-      seriesType: 'standard',
-      monitorOption: 'all',
-      seasonFolder: false,
-      searchForMissingEpisodes: false,
-      tags: [],
-    },
-  };
-  mutationObservers = [];
-  resizeObservers = [];
-  hoisted.seriesStatusMap.clear();
-  hoisted.currentAddSeriesResultRef.value = createAddSeriesStub();
-  hoisted.usePublicOptionsMock.mockImplementation(() => hoisted.publicOptionsResult);
-  hoisted.useSeriesStatusMock.mockImplementation((...args: unknown[]) => {
-    const payload = args[0] as { anilistId: number; title?: string };
-    return hoisted.seriesStatusMap.get(payload.anilistId) ?? createStatusStub();
-  });
-  hoisted.useAddSeriesMock.mockImplementation(() => hoisted.currentAddSeriesResultRef.value);
-  useThemeMock.mockClear();
-  useKitsunarrBroadcastsMock.mockClear();
-  TooltipWrapperMock.mockClear();
-  addSeriesModalSpy.mockClear();
-  vi.spyOn(window, 'alert').mockImplementation(() => {});
-  Object.defineProperty(globalThis, 'MutationObserver', {
-    configurable: true,
-    writable: true,
-    value: MutationObserverMock,
-  });
-  Object.defineProperty(globalThis, 'ResizeObserver', {
-    configurable: true,
-    writable: true,
-    value: ResizeObserverMock,
-  });
-  document.body.innerHTML = '';
-});
-
-afterEach(() => {
-  document.body.innerHTML = '';
-  vi.restoreAllMocks();
-  Object.defineProperty(globalThis, 'MutationObserver', {
-    configurable: true,
-    writable: true,
-    value: originalMutationObserver,
-  });
-  Object.defineProperty(globalThis, 'ResizeObserver', {
-    configurable: true,
-    writable: true,
-    value: originalResizeObserver,
-  });
-  window.alert = originalAlert;
-  hoisted.seriesStatusMap.clear();
-  hoisted.currentAddSeriesResultRef.value = createAddSeriesStub();
-});
 
 describe('createBrowseContentApp', () => {
   it('detects cards, marks hosts processed, and cleans up when nodes are removed', async () => {
@@ -303,7 +30,7 @@ describe('createBrowseContentApp', () => {
   hoisted.seriesStatusMap.set(1, createStatusStub());
 
     const BrowseContentApp = createBrowseContentApp(adapter);
-    const { container } = render(<BrowseContentApp />);
+    const { container } = renderWithProviders(<BrowseContentApp />);
 
     await waitFor(() => {
       const containerNode = validHost.querySelector('.kitsunarr-container');
@@ -327,7 +54,7 @@ describe('createBrowseContentApp', () => {
       expect(props.container).toBe(document.body);
     });
 
-    expect(mutationObservers.length).toBeGreaterThan(0);
+    expect(getMutationObservers().length).toBeGreaterThan(0);
 
     const { card: directCard, overlayHost: directHost } = createCard(3, 'Direct Card');
   hoisted.seriesStatusMap.set(3, createStatusStub());
@@ -335,7 +62,7 @@ describe('createBrowseContentApp', () => {
 
     const triggerObservers = async (records: Partial<MutationRecord>[]) => {
       await act(async () => {
-        mutationObservers.forEach(observer => observer.trigger(records));
+        getMutationObservers().forEach(observer => observer.trigger(records));
       });
     };
 
@@ -378,10 +105,11 @@ describe('createBrowseContentApp', () => {
     const existingContainer = validHost.querySelector('.kitsunarr-container');
   existingContainer?.remove();
 
-  expect(resizeObservers).toHaveLength(1);
-  const ro = resizeObservers[0];
+  const resizeList = getResizeObservers();
+  expect(resizeList).toHaveLength(1);
+  const ro = resizeList[0];
   expect(ro).toBeDefined();
-  ro!.trigger();
+  ro?.trigger();
 
     await waitFor(() => {
       expect(validHost.hasAttribute('data-kitsunarr-test')).toBe(false);
@@ -419,12 +147,13 @@ describe('createBrowseContentApp', () => {
     });
 
     const BrowseContentApp = createBrowseContentApp(adapter);
-    render(<BrowseContentApp />);
+    renderWithProviders(<BrowseContentApp />);
 
     expect(parseCard).not.toHaveBeenCalled();
-    expect(resizeObservers).toHaveLength(0);
-    expect(mutationObservers).toHaveLength(1);
-    expect(mutationObservers[0]?.observe).toHaveBeenCalled();
+    expect(getResizeObservers()).toHaveLength(0);
+    const mutationList = getMutationObservers();
+    expect(mutationList).toHaveLength(1);
+    expect(mutationList[0]?.observe).toHaveBeenCalled();
   });
 
   it('retries mapping when status reports missing link and quick add is pressed', async () => {
@@ -447,7 +176,7 @@ describe('createBrowseContentApp', () => {
     );
 
     const BrowseContentApp = createBrowseContentApp(adapter);
-    render(<BrowseContentApp />);
+    renderWithProviders(<BrowseContentApp />);
 
     const quickButton = await waitFor(() =>
       overlayHost.querySelector<HTMLButtonElement>('button.kitsunarr-card-overlay__quick'),
@@ -479,7 +208,7 @@ describe('createBrowseContentApp', () => {
   hoisted.currentAddSeriesResultRef.value = createAddSeriesStub({ mutate });
 
     const BrowseContentApp = createBrowseContentApp(adapter);
-    render(<BrowseContentApp />);
+    renderWithProviders(<BrowseContentApp />);
 
     const quickButton = await waitFor(() =>
       overlayHost.querySelector<HTMLButtonElement>('button.kitsunarr-card-overlay__quick'),
@@ -529,7 +258,7 @@ describe('createBrowseContentApp', () => {
   hoisted.currentAddSeriesResultRef.value = createAddSeriesStub({ isSuccess: true });
 
     const BrowseContentApp = createBrowseContentApp(adapter);
-    render(<BrowseContentApp />);
+    renderWithProviders(<BrowseContentApp />);
 
     const overlayRoot = await waitFor(() =>
       overlayHost.querySelector<HTMLElement>('.kitsunarr-card-overlay'),
@@ -556,7 +285,7 @@ describe('createBrowseContentApp', () => {
     };
 
     const BrowseContentApp = createBrowseContentApp(adapter);
-    render(<BrowseContentApp />);
+    renderWithProviders(<BrowseContentApp />);
 
     const overlayRoot = await waitFor(() =>
       overlayHost.querySelector<HTMLElement>('.kitsunarr-card-overlay'),
@@ -583,7 +312,7 @@ describe('createBrowseContentApp', () => {
     hoisted.seriesStatusMap.set(50, createStatusStub());
 
     const BrowseContentApp = createBrowseContentApp(adapter);
-    render(<BrowseContentApp />);
+    renderWithProviders(<BrowseContentApp />);
 
     await waitFor(() => {
       expect(ensureContainer).toHaveBeenCalledWith(overlayHost, card);
@@ -592,7 +321,7 @@ describe('createBrowseContentApp', () => {
     const ensureCallsBeforeAttribute = ensureContainer.mock.calls.length;
 
     await act(async () => {
-      mutationObservers.forEach(observer =>
+      getMutationObservers().forEach(observer =>
         observer.trigger([
           {
             type: 'attributes',
@@ -623,7 +352,7 @@ describe('createBrowseContentApp', () => {
     fragment.appendChild(ghostCard);
 
     await act(async () => {
-      mutationObservers.forEach(observer =>
+      getMutationObservers().forEach(observer =>
         observer.trigger([
           {
             type: 'childList',
@@ -663,7 +392,7 @@ describe('createBrowseContentApp', () => {
     const { adapter } = setupAdapter();
 
     const BrowseContentApp = createBrowseContentApp(adapter);
-    render(<BrowseContentApp />);
+    renderWithProviders(<BrowseContentApp />);
 
     await waitFor(() => {
       expect(adapter.onCardInvalid).toHaveBeenCalledWith(invalidCard);
@@ -687,7 +416,7 @@ describe('createBrowseContentApp', () => {
   hoisted.seriesStatusMap.set(70, createStatusStub());
 
     const BrowseContentApp = createBrowseContentApp(adapter);
-    render(<BrowseContentApp />);
+    renderWithProviders(<BrowseContentApp />);
 
     await waitFor(() => {
       expect(overlayHost.querySelector('.kitsunarr-container')).toBeTruthy();

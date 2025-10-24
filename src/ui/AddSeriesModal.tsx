@@ -84,7 +84,9 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
               tooltip="Open in new tab"
               portalContainer={tooltipPortal}
               aria-label="Open options page"
-              onClick={() => browser.runtime.sendMessage({ type: 'OPEN_OPTIONS_PAGE', timestamp: Date.now() })}
+              onClick={() =>
+                browser.runtime.sendMessage({ _kitsunarr: true, type: 'OPEN_OPTIONS_PAGE', timestamp: Date.now() })
+              }
               className="text-text-secondary"
             >
               <ExternalLinkIcon />

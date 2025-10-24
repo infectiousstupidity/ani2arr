@@ -7,7 +7,9 @@ import { logger } from '@/utils/logger';
 import type { AniMedia } from '@/types';
 
 const API_URL = 'https://graphql.anilist.co';
-const QUEUE_CONCURRENCY = 5;
+const QUEUE_CONCURRENCY = 1;
+const QUEUE_INTERVAL_MS = 60_000;
+const QUEUE_INTERVAL_CAP = 45;
 const MEDIA_SOFT_TTL = 14 * 24 * 60 * 60 * 1000; // 14 days
 const MEDIA_HARD_TTL = 60 * 24 * 60 * 60 * 1000; // 60 days
 const DEFAULT_PREQUEL_DEPTH = 5;
@@ -42,9 +44,14 @@ type ExtensionErrorLike = ReturnType<typeof createError>;
 
 export class AnilistApiService {
   private readonly log = logger.create('AniListApiService');
-  private readonly queue = new PQueue({ concurrency: QUEUE_CONCURRENCY });
+  private readonly queue = new PQueue({
+    concurrency: QUEUE_CONCURRENCY,
+    interval: QUEUE_INTERVAL_MS,
+    intervalCap: QUEUE_INTERVAL_CAP,
+  });
   private readonly inflight = new Map<number, Promise<AniMedia>>();
   private readonly caches: { media: TtlCache<AniMedia> } | undefined;
+  private pausedUntil: number = 0;
 
   constructor(caches?: { media: TtlCache<AniMedia> }) {
     this.caches = caches;
@@ -114,9 +121,14 @@ export class AnilistApiService {
     }
   }
 
-  private enqueueAndCache(anilistId: number): Promise<AniMedia> {
+  private async enqueueAndCache(anilistId: number): Promise<AniMedia> {
     const existing = this.inflight.get(anilistId);
     if (existing) return existing;
+
+    const now = Date.now();
+    if (this.pausedUntil > now) {
+      await new Promise(resolve => setTimeout(resolve, this.pausedUntil - now));
+    }
 
     const queuePromise = this.queue.add(() => this.executeFetch(anilistId)) as Promise<AniMedia>;
     const promise = queuePromise
@@ -153,7 +165,8 @@ export class AnilistApiService {
             if (response.status === 429) {
               const retryAfter = this.parseRetryAfterTs(response.headers.get('Retry-After'));
               const delay = retryAfter ? Math.max(0, retryAfter - Date.now()) : DEFAULT_RATE_LIMIT_DELAY_MS;
-              this.log.warn(`AniList rate limit hit. Retrying AniList ID ${anilistId} after ${delay}ms.`);
+              this.pausedUntil = Date.now() + delay;
+              this.log.warn(`AniList rate limit hit. Pausing ALL requests for ${delay}ms.`);
               const error = new Error('Rate limit exceeded');
               (error as { retryAfterMs?: number }).retryAfterMs = delay;
               throw error;

@@ -34,7 +34,7 @@ const ERROR_TTL = { staleMs: 5 * 60 * 1000, hardMs: 10 * 60 * 1000 } as const;
 
 const BASE_OPTIONS: ExtensionOptions = {
   sonarrUrl: 'https://sonarr.local',
-  sonarrApiKey: 'apikey-123',
+  sonarrApiKey: '0123456789abcdef0123456789abcdef',
   defaults: {
     qualityProfileId: 1,
     rootFolderPath: '/anime',
@@ -144,7 +144,7 @@ describe('LibraryService', () => {
       const override: ExtensionOptions = {
         ...BASE_OPTIONS,
         sonarrUrl: 'https://override.local',
-        sonarrApiKey: 'override-key',
+        sonarrApiKey: 'fedcba9876543210fedcba9876543210',
       };
       const fullList = [
         createSonarrSeries({ id: 22, tvdbId: 999, titleSlug: 'override-slug' }),
