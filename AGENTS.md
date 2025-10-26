@@ -11,9 +11,6 @@
 - `npm run dev` (or `npm run dev:firefox`) launches the WXT dev server with fast reload.
 - `npm run build` produces a production bundle in `dist`; `npm run zip` creates distributable archives.
 - `npm run lint` uses ESLint 9 with TypeScript config; keep it passing.
-- Type-check with `npm run compile`; run tests with `npm test` or `npx vitest`.
-- `npm run test:contract` exercises the KitsunarrApi RPC contract in a Node.js environment with mocked browser APIs (storage, runtime, alarms) and fetch handlers for Sonarr/AniList/mapping endpoints. It validates method signatures, response schemas, error handling, message broadcasting (settings-changed, series-updated), storage events, epoch management, and concurrent request deduplication. Run this after API changes to ensure background service contract stability.
-- `npm run test:e2e` runs Playwright end-to-end tests against a real browser with the extension loaded and a mock Sonarr server. These tests validate the full user journey from options configuration through series addition on AniList pages.
 
 ## 3. Architecture Overview
 ### Entry points (`src/entrypoints`)
@@ -28,8 +25,6 @@
  Background alarms (`browser.alarms`) do not fire reliably in MV2 on Chromium when the background page is suspended; [`background/index.ts`](src/entrypoints/background/index.ts) falls back to `setInterval` via a global guard (`__kitsunarr_fallback_interval__`). It also supports a simple readiness probe (`{ type: 'kitsunarr:ping' }`).
  Respect rate limits: AniList GraphQL requests run through `AnilistApiService`'s queue (concurrency 5) with `p-retry` handling retries/backoff, honoring `Retry-After` headers on 429s. Sonarr lookups rely on `SonarrLookupClient` for inflight dedupe plus positive/negative TTL caches and an internal queue (concurrency 5).
  Use `npm run dev`, load `.output/chrome-mv3` via browser extensions page, and exercise AniList anime pages, browse views, and options page.
- E2E tests (`npm run test:e2e`) use Playwright with real Chromium/Firefox browsers, loaded extension, and a mock HTTP server to validate full user workflows from options setup through series addition.
- Both test types are **complementary**: contract tests are fast (seconds) and catch API breaks; E2E tests are slow (minutes) but validate real-world behavior. Keep both green.
 
  ## 13. Message Names and Topics
  Background listens for the following messages:
@@ -82,31 +77,9 @@
 - Tooltips, dialogs, selects, and accordion components come from Radix UI; style through Tailwind utility classes applied to the composed primitives (Trigger, Content, Portal, etc.).
 - Browse overlays use MutationObserver with `childList: true, subtree: true, attributes: true` to detect card additions/updates. Throttle scans and use `data-kitsunarr-processed` attribute to prevent duplicate processing.
 
-## 9. Testing & Validation
-- Lint before committing (`npm run lint`); ESLint is strict about React hooks rules, exhaustive deps, unused vars, and import ordering.
-- Use `npm run compile` to ensure the TypeScript project (including partner tsconfigs under `.wxt/`) stays error-free across all entry points.
-- For runtime verification, run `npm run dev`, load `.output/chrome-mv3` via browser extensions page, and exercise AniList anime pages, browse views, and options page.
-- Unit tests (`npx vitest`) use Vitest with MSW for API mocking, `fake-indexeddb` for storage, and `fakeBrowser` from `wxt/testing` for WebExtension APIs. See [`vitest.setup.jsdom.ts`](vitest.setup.jsdom.ts) and [`vitest.setup.node.ts`](vitest.setup.node.ts) for global setup.
-- Contract test (`npm run test:contract`) validates the KitsunarrApi RPC surface in isolation with comprehensive error handling, broadcasting, and schema validation. For coverage details and scenarios, refer to inline docs in `scripts/test-contract.ts` and the assertions within that suite.
-- E2E tests (`npm run test:e2e`) use Playwright with real Chromium/Firefox browsers, loaded extension, and mock HTTP server to validate full user workflows from options setup through series addition.
-
 ## 10. Operational Tips & Pitfalls
 - New hosts require manifest updates in [`wxt.config.ts`](wxt.config.ts) under `host_permissions` (MV3) or `permissions` (MV2) and may also need runtime permission prompts via [`requestSonarrPermission()`](src/utils/validation.ts).
 - Background alarms (`browser.alarms`) do not fire reliably in MV2 on Chromium when the background page is suspended; [`background/index.ts`](src/entrypoints/background/index.ts) falls back to `setInterval` via a global guard (`__kitsunarr_fallback_interval__`).
 - [`registerKitsunarrApi()`](src/services/index.ts) must execute exactly once (in background context). Content scripts and options pages should only ever call [`getKitsunarrApi()`](src/services/index.ts) to access the proxy client.
 - Respect rate limits: AniList GraphQL retries are handled by `AnilistApiService` using `p-retry` with exponential backoff plus `Retry-After` handling; the queue concurrency is 5. Sonarr lookups rely on `SonarrLookupClient` for inflight dedupe plus positive/negative TTL caches—there is no internal queue anymore, so throttle at the caller before introducing new bursty flows.
 - Keep AGENTS.md in sync when adding core flows, changing service contracts, or modifying RPC schemas so future agents (human or AI) stay aligned with actual behavior.
-- Long-running tooling (tests, docker compose, migrations, etc.) must always be invoked with sensible timeouts or in non-interactive batch mode. Never leave a shell command waiting indefinitely—prefer explicit timeouts, scripted runs, or log polling after the command exits.
-
-## 11. Testing Conventions
-- Vitest is configured via [`vitest.setup.jsdom.ts`](vitest.setup.jsdom.ts) (for UI tests with React Testing Library) and [`vitest.setup.node.ts`](vitest.setup.node.ts) (for service/API tests). Global setup includes MSW server start, `fakeBrowser` initialization, and `fake-indexeddb` polyfill.
-- Import fixtures and MSW helpers from [`@/testing`](src/testing/index.ts). [`defaultTestHandlers`](src/testing/msw-server.ts) cover AniList, Sonarr, and mapping mirrors with typed data; tweak responses using helpers like `withLatency`, `withStatus`, `withEtag`, and `withRetryAfterSeconds`.
-- Prefer MSW over manual `fetch` mocks so retry/backoff utilities exercise real timing. Reset handlers with `testServer.resetHandlers()` (already done in global `afterEach`).
-- When mocking modules, use `vi.mock()` inside test files and let [`vitest.setup.*.ts`](vitest.setup.node.ts) handle cleanup (`vi.resetModules`, `vi.clearAllMocks`). Avoid mutating `fakeBrowser` directly—call `fakeBrowser.reset()` or storage/runtime reset helpers between assertions if additional isolation is required.
-- Store new fixtures under [`src/testing/fixtures`](src/testing/fixtures/index.ts) to keep API payload shapes centralized and reusable across unit/integration/contract tests.
-- E2E tests follow the Page Object Model pattern (see [`tests/e2e/pages`](tests/e2e/pages/options-page.ts)) and use a shared mock HTTP server (`tests/e2e/server.ts`) that provides both AniList and Sonarr endpoints with stateful series management.
-
-## 12. Contract vs E2E Testing
-- **Contract tests** ([`scripts/test-contract.ts`](scripts/test-contract.ts)) validate the KitsunarrApi RPC boundary in **Node.js** with mocked browser APIs (no real browser). They ensure method signatures, response schemas, error handling, broadcasting, and epoch management remain stable across refactors. Run these during development to catch breaking changes early.
-- **E2E tests** ([`tests/e2e/extension.spec.ts`](tests/e2e/extension.spec.ts)) validate the **full user journey** in **real Chromium/Firefox** with the extension loaded. They test DOM interactions, content script injection, shadow DOM rendering, options page workflows, and cross-context messaging. Run these before releases to catch integration issues.
-- Both test types are **complementary**: contract tests are fast (seconds) and catch API breaks; E2E tests are slow (minutes) but validate real-world behavior. Keep both green.

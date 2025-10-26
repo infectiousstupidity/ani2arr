@@ -12,7 +12,6 @@
 ## Quick links
 - `wxt.config.ts` - manifest & host permissions
 - `src/utils/validation.ts` - runtime permission checks
-- `scripts/test-contract.ts` - RPC contract verification
 
 ## Quick install (recommended)
 - Firefox (AMO-signed): install from Mozilla Add‑ons (AMO) when a signed release is available.
@@ -47,10 +46,6 @@ npm run build
 npm run zip
 # firefox XPI: npm run zip:firefox
 ```
-
-## Testing
-- Unit & integration: npm test
-- RPC contract verification (Node): npm run test:contract - see [`scripts/test-contract.ts`](scripts/test-contract.ts)
 
 ## Security & privacy
 - Sonarr credentials are stored in browser.storage.local (device only). See [`src/utils/validation.ts`](src/utils/validation.ts) for runtime permission checks.
