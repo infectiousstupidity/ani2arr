@@ -31,25 +31,27 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const Comp = asChild ? Slot : 'button';
 
+    const isDisabled = isLoading || !!props.disabled;
+
     const variantClasses = {
-      primary: 'bg-accent-primary text-white hover:bg-accent-hover disabled:bg-accent-primary/50',
-      secondary: 'bg-bg-secondary text-text-primary hover:bg-bg-tertiary disabled:bg-bg-secondary/50',
-      outline: 'border border-border-primary text-text-secondary hover:bg-bg-secondary disabled:opacity-50',
-      ghost: 'hover:bg-bg-secondary disabled:opacity-50',
-    };
+      primary: `bg-accent-primary text-white ${isDisabled ? 'shadow-[inset_0_0_0_9999px_rgba(0,0,0,0.5)]' : 'hover:bg-accent-hover'}`,
+      secondary: `${isDisabled ? 'bg-bg-tertiary' : 'bg-bg-secondary hover:bg-bg-tertiary'} text-text-primary`,
+      outline: `border border-border-primary text-text-secondary ${isDisabled ? '' : 'hover:bg-bg-secondary'}`,
+      ghost: `${isDisabled ? '' : 'hover:bg-bg-secondary'}`,
+    } as const;
 
     const sizeClasses = {
       sm: 'h-8 px-3 text-sm',
       md: 'h-9 px-4 text-sm',
       lg: 'h-11 px-6 text-lg',
       icon: 'h-9 w-9',
-    };
+    } as const;
 
     const button = (
       <Comp
         ref={ref}
-        disabled={isLoading || props.disabled}
-        className={`inline-flex items-center justify-center whitespace-nowrap rounded-md ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed ${variantClasses[variant]} ${sizeClasses[size]} ${className ?? ''}`}
+        disabled={isDisabled}
+        className={`inline-flex items-center justify-center whitespace-nowrap rounded-md ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isDisabled ? 'cursor-not-allowed' : ''} ${variantClasses[variant]} ${sizeClasses[size]} ${className ?? ''}`}
         {...props}
       >
         {isLoading ? (

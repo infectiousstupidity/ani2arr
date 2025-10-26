@@ -79,7 +79,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
           isLoading={isLoading}
           disabled={!isIdle || tvdbId === null}
           portalContainer={portalContainer}
-          className="flex-1 rounded-none h-[35px] text-[14px] text-text-primary"
+          className="flex-1 rounded-none h-[35px] text-[14px]"
           loadingText={getButtonText()}
         >
           {tvdbId === null ? "Cannot add" : getButtonText()}
@@ -87,13 +87,14 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
         {/* Settings Button */}
         <Button
           size="icon"
+          variant="primary"
           onClick={onOpenModal}
           disabled={settingsDisabled}
           portalContainer={portalContainer}
-          className="rounded-none h-[35px] w-[35px] bg-[#3db4f2] text-[#072033] transition-colors hover:bg-[#299dd1] focus-visible:z-10 focus-visible:ring-offset-0 disabled:bg-[#3db4f2]/50 disabled:text-[#072033]/60"
+          className="rounded-none h-[35px] w-[35px] focus-visible:z-10 focus-visible:ring-offset-0"
           aria-label="Advanced options"
         >
-          <GearIcon className="h-4 w-4 text-text-primary" />
+          <GearIcon className="h-4 w-4" />
         </Button>
       </div>
       </TooltipWrapper>
@@ -107,22 +108,23 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
         disabled={!isIdle || tvdbId === null}
         {...(mainButtonTooltip ? { tooltip: mainButtonTooltip } : {})}
         portalContainer={portalContainer}
-        className="flex-1 rounded-none h-[35px] text-[14px] text-text-primary"
+        className="flex-1 rounded-none h-[35px] text-[14px]"
         loadingText={getButtonText()}
       >
                 {tvdbId === null ? "Cannot add" : getButtonText()}
             </Button>
             {/* Settings Button */}
             <Button
-                size="icon"
-                onClick={onOpenModal}
-        disabled={settingsDisabled}
-        {...(settingsTooltip ? { tooltip: settingsTooltip } : {})}
-                portalContainer={portalContainer}
-                className="rounded-none h-[35px] w-[35px] bg-[#3db4f2] text-[#072033] transition-colors hover:bg-[#299dd1] focus-visible:z-10 focus-visible:ring-offset-0 disabled:bg-[#3db4f2]/50 disabled:text-[#072033]/60"
-                aria-label="Advanced options"
+              size="icon"
+              variant="primary"
+              onClick={onOpenModal}
+          disabled={settingsDisabled}
+          {...(settingsTooltip ? { tooltip: settingsTooltip } : {})}
+              portalContainer={portalContainer}
+              className="rounded-none h-[35px] w-[35px] focus-visible:z-10 focus-visible:ring-offset-0"
+              aria-label="Advanced options"
             >
-                <GearIcon className="h-4 w-4 text-text-primary" />
+                <GearIcon className="h-4 w-4" />
             </Button>
       </div>
     )}

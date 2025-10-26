@@ -148,6 +148,26 @@ function attachSizeSync(host: HTMLElement): () => void {
   };
 }
 
+// NEW: robustly read the "Format" value from the AniList sidebar
+function readFormatFromSidebar(doc: Document = document): string | null {
+  const rows = Array.from(doc.querySelectorAll<HTMLDivElement>('.sidebar .data .data-set'));
+  const formatRow = rows.find(r => r.querySelector('.type')?.textContent?.trim() === 'Format');
+  const raw = formatRow?.querySelector('.value')?.textContent ?? '';
+  const normalized = raw.replace(/\s+/g, ' ').trim().toLowerCase(); // e.g. "movie", "tv short"
+  if (!normalized) return null;
+
+  // Normalize common enum spellings
+  if (normalized.includes('movie')) return 'movie';
+  if (normalized.includes('music')) return 'music';
+  if (normalized === 'tv short') return 'tv_short';
+  return normalized;
+}
+
+function shouldSkipByFormat(doc: Document = document): boolean {
+  const fmt = readFormatFromSidebar(doc);
+  return fmt === 'movie' || fmt === 'music';
+}
+
 /* -------------------------------- React UI -------------------------------- */
 
 interface ContentRootProps {
@@ -278,6 +298,22 @@ async function mountAnimePageUI(
     waitForElement('h1'),
   ]);
 
+  // NEW: skip movie/music pages entirely
+  if (shouldSkipByFormat(document)) {
+    try {
+      ui?.remove();
+    } catch (error) {
+      log.error('Error removing UI on skip:', error);
+    }
+    ui = null;
+    stopAnchorKeeper?.();
+    stopAnchorKeeper = null;
+    stopSizeSync?.();
+    stopSizeSync = null;
+    log.debug('AniList page skipped due to format being movie/music');
+    return;
+  }
+
   const title = document.querySelector('h1')?.textContent?.trim() ?? '';
   if (!title) return; // Don't mount if we can't get a title
 
@@ -385,14 +421,3 @@ export {
   syncSidebarOffset,
   attachSizeSync,
 };
-
-
-
-
-
-
-
-
-
-
-
