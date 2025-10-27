@@ -30,3 +30,8 @@ test-results
 *.sln
 *.sw?
 
+# Playwright
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

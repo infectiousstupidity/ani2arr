@@ -6,6 +6,8 @@ import { defineConfig } from "eslint/config";
 import autoImports from "./.wxt/eslint-auto-imports.mjs";
 import reactYouMightNotNeedAnEffect from "eslint-plugin-react-you-might-not-need-an-effect";
 import reactHooks from "eslint-plugin-react-hooks";
+import playwright from 'eslint-plugin-playwright'
+import testingLibrary from 'eslint-plugin-testing-library'
 
 export default defineConfig([
   autoImports,
@@ -65,6 +67,27 @@ export default defineConfig([
           caughtErrorsIgnorePattern: "^_",
         },
       ],
+    },
+  },
+  // Playwright tests
+  {
+    ...playwright.configs['flat/recommended'],
+    files: ['tests/**'],
+    rules: {
+      ...playwright.configs['flat/recommended'].rules,
+    },
+  },
+  // Testing Library (React)
+  {
+    ...testingLibrary.configs['flat/react'],
+    files: [
+      "**/*.test.{ts,tsx,js,jsx}",
+      "**/__tests__/**/*.{ts,tsx,js,jsx}",
+      "src/**/tests/**/*.{ts,tsx,js,jsx}",
+      "tests/**",
+    ],
+    rules: {
+      ...testingLibrary.configs['flat/react'].rules,
     },
   },
 ]);
