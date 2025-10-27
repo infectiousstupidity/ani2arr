@@ -1,5 +1,4 @@
 // src/services/index.ts
-import { defineProxyService } from '@webext-core/proxy-service';
 import { browser } from 'wxt/browser';
 import { createTtlCache } from '@/cache';
 import { CacheNamespaces } from '@/cache/namespaces';
@@ -11,13 +10,8 @@ import { SonarrLookupClient } from './mapping/sonarr-lookup.client';
 import { LibraryService } from './library.service';
 import type {
   LeanSonarrSeries,
-  SonarrSeries,
-  SonarrRootFolder,
-  SonarrQualityProfile,
-  SonarrTag,
   SonarrLookupSeries,
   ExtensionOptions,
-  SonarrFormState,
   AniMedia,
   ExtensionError,
   SonarrCredentialsPayload,
@@ -25,31 +19,8 @@ import type {
 } from '@/types';
 import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/utils/storage';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
-import type {
-  ResolveInput,
-  MappingOutput,
-  StatusInput,
-  StatusOutput,
-  AddInput,
-} from '@/rpc/schemas';
-
-interface KitsunarrApi {
-  resolveMapping(input: ResolveInput): Promise<MappingOutput>;
-  getSeriesStatus(input: StatusInput): Promise<StatusOutput>;
-  addToSonarr(input: AddInput): Promise<SonarrSeries>;
-  notifySettingsChanged(): Promise<{ ok: true }>;
-  updateDefaults(defaults: SonarrFormState): Promise<{ ok: true }>;
-  getQualityProfiles(): Promise<SonarrQualityProfile[]>;
-  getRootFolders(): Promise<SonarrRootFolder[]>;
-  getTags(): Promise<SonarrTag[]>;
-  testConnection(payload: SonarrCredentialsPayload): Promise<{ version: string }>;
-  getSonarrMetadata(input?: { credentials?: SonarrCredentialsPayload }): Promise<{
-    qualityProfiles: SonarrQualityProfile[];
-    rootFolders: SonarrRootFolder[];
-    tags: SonarrTag[];
-  }>;
-  initMappings(): Promise<void>;
-}
+import type { MappingOutput } from '@/rpc/schemas';
+import { type KitsunarrApi } from '@/rpc';
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
@@ -79,9 +50,8 @@ const initializeEpoch = async (key: 'libraryEpoch' | 'settingsEpoch'): Promise<n
   return 0;
 };
 
-export const [registerKitsunarrApi, getKitsunarrApi] =
-  defineProxyService<KitsunarrApi, []>('KitsunarrApi', () => {
-    const sonarrApiService = bindAll(new SonarrApiService());
+export const createApiImplementation = (): KitsunarrApi => {
+  const sonarrApiService = bindAll(new SonarrApiService());
     const anilistApiService = bindAll(
       new AnilistApiService({
         media: createTtlCache<AniMedia>(CacheNamespaces.anilistMedia),
@@ -176,164 +146,164 @@ export const [registerKitsunarrApi, getKitsunarrApi] =
       }
     };
 
-    const api: KitsunarrApi = {
-      async resolveMapping(input) {
-        await ensureConfigured();
+  const api: KitsunarrApi = {
+    async resolveMapping(input) {
+      await ensureConfigured();
 
-        // Fast path: try local library index only (no network)
-        try {
-          const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
-          if (input.primaryTitleHint !== undefined) payload.title = input.primaryTitleHint;
-          if (input.metadata !== undefined) payload.metadata = input.metadata ?? null;
-          const status = await libraryService.getSeriesStatus(payload, { network: 'never', ignoreFailureCache: true });
-          if (status.exists && typeof status.tvdbId === 'number') {
-            return {
-              tvdbId: status.tvdbId,
-              ...(status.successfulSynonym ? { successfulSynonym: status.successfulSynonym } : {}),
-            } satisfies MappingOutput;
-          }
-        } catch (err) {
-          void err;
-        }
-
-        const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {};
-        const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
-        if (input.primaryTitleHint) {
-          hints.primaryTitle = input.primaryTitleHint;
-        }
-        if (input.metadata) {
-          hints.domMedia = input.metadata;
-        }
-        if (Object.keys(hints).length > 0) {
-          resolveOptions.hints = hints;
-        }
-        const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
-        return {
-          tvdbId: mapping ? mapping.tvdbId : null,
-          ...(mapping?.successfulSynonym ? { successfulSynonym: mapping.successfulSynonym } : {}),
-        } satisfies MappingOutput;
-      },
-
-      async getSeriesStatus(input) {
-        await ensureConfigured();
+      // Fast path: try local library index only (no network)
+      try {
         const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
-        if (input.title !== undefined) {
-          payload.title = input.title;
+        if (input.primaryTitleHint !== undefined) payload.title = input.primaryTitleHint;
+        if (input.metadata !== undefined) payload.metadata = input.metadata ?? null;
+        const status = await libraryService.getSeriesStatus(payload, { network: 'never', ignoreFailureCache: true });
+        if (status.exists && typeof status.tvdbId === 'number') {
+          return {
+            tvdbId: status.tvdbId,
+            ...(status.successfulSynonym ? { successfulSynonym: status.successfulSynonym } : {}),
+          } satisfies MappingOutput;
         }
-        if (input.metadata !== undefined) {
-          payload.metadata = input.metadata;
-        }
-        const requestOptions: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {};
-        if (input.force_verify) {
-          requestOptions.force_verify = true;
-        }
-        if (input.network) {
-          requestOptions.network = input.network;
-        }
-        if (input.ignoreFailureCache) {
-          requestOptions.ignoreFailureCache = true;
-        }
-        return libraryService.getSeriesStatus(payload, requestOptions);
-      },
+      } catch (err) {
+        void err;
+      }
 
-      async addToSonarr(input) {
-        const { options } = await ensureConfigured();
+      const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {};
+      const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
+      if (input.primaryTitleHint) {
+        hints.primaryTitle = input.primaryTitleHint;
+      }
+      if (input.metadata) {
+        hints.domMedia = input.metadata;
+      }
+      if (Object.keys(hints).length > 0) {
+        resolveOptions.hints = hints;
+      }
+      const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
+      return {
+        tvdbId: mapping ? mapping.tvdbId : null,
+        ...(mapping?.successfulSynonym ? { successfulSynonym: mapping.successfulSynonym } : {}),
+      } satisfies MappingOutput;
+    },
 
-        const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {
-          ignoreFailureCache: true,
-        };
-        const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
-        if (input.primaryTitleHint) {
-          hints.primaryTitle = input.primaryTitleHint;
-        }
-        if (input.metadata) {
-          hints.domMedia = input.metadata;
-        }
-        if (Object.keys(hints).length > 0) {
-          resolveOptions.hints = hints;
-        }
-        const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
+    async getSeriesStatus(input) {
+      await ensureConfigured();
+      const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
+      if (input.title !== undefined) {
+        payload.title = input.title;
+      }
+      if (input.metadata !== undefined) {
+        payload.metadata = input.metadata;
+      }
+      const requestOptions: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {};
+      if (input.force_verify) {
+        requestOptions.force_verify = true;
+      }
+      if (input.network) {
+        requestOptions.network = input.network;
+      }
+      if (input.ignoreFailureCache) {
+        requestOptions.ignoreFailureCache = true;
+      }
+      return libraryService.getSeriesStatus(payload, requestOptions);
+    },
 
-        if (!mapping) {
-          throw createError(
-            ErrorCode.VALIDATION_ERROR,
-            `Could not resolve AniList ID ${input.anilistId} to a TVDB ID.`,
-            'Unable to add this series to Sonarr because no matching TVDB entry was found.',
-          );
-        }
+    async addToSonarr(input) {
+      const { options } = await ensureConfigured();
 
-        const payload = {
-          ...input.form,
-          anilistId: input.anilistId,
-          title: input.title,
-          tvdbId: mapping.tvdbId,
-          ...(input.metadata ? { metadata: input.metadata } : {}),
-        };
+      const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {
+        ignoreFailureCache: true,
+      };
+      const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
+      if (input.primaryTitleHint) {
+        hints.primaryTitle = input.primaryTitleHint;
+      }
+      if (input.metadata) {
+        hints.domMedia = input.metadata;
+      }
+      if (Object.keys(hints).length > 0) {
+        resolveOptions.hints = hints;
+      }
+      const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
 
-        const created = await sonarrApiService.addSeries(payload, options);
-        await libraryService.addSeriesToCache(created);
-        await libraryService.refreshCache(options);
-        await bumpLibraryEpoch({ tvdbId: created.tvdbId });
-        return created;
-      },
+      if (!mapping) {
+        throw createError(
+          ErrorCode.VALIDATION_ERROR,
+          `Could not resolve AniList ID ${input.anilistId} to a TVDB ID.`,
+          'Unable to add this series to Sonarr because no matching TVDB entry was found.',
+        );
+      }
 
-      async notifySettingsChanged() {
-        const options = await getExtensionOptionsSnapshot();
-        await handleOptionsUpdated(options);
-        return { ok: true as const };
-      },
+      const payload = {
+        ...input.form,
+        anilistId: input.anilistId,
+        title: input.title,
+        tvdbId: mapping.tvdbId,
+        ...(input.metadata ? { metadata: input.metadata } : {}),
+      };
 
-      async updateDefaults(defaults) {
-        const current = await getExtensionOptionsSnapshot();
-        const next: ExtensionOptions = {
-          ...current,
-          defaults,
-        };
-        await setExtensionOptionsSnapshot(next);
-        await handleOptionsUpdated(next);
-        return { ok: true as const };
-      },
+      const created = await sonarrApiService.addSeries(payload, options);
+      await libraryService.addSeriesToCache(created);
+      await libraryService.refreshCache(options);
+      await bumpLibraryEpoch({ tvdbId: created.tvdbId });
+      return created;
+    },
 
-      async getQualityProfiles() {
-        const { credentials } = await ensureConfigured();
-        return sonarrApiService.getQualityProfiles(credentials);
-      },
+    async notifySettingsChanged() {
+      const options = await getExtensionOptionsSnapshot();
+      await handleOptionsUpdated(options);
+      return { ok: true as const };
+    },
 
-      async getRootFolders() {
-        const { credentials } = await ensureConfigured();
-        return sonarrApiService.getRootFolders(credentials);
-      },
+    async updateDefaults(defaults) {
+      const current = await getExtensionOptionsSnapshot();
+      const next: ExtensionOptions = {
+        ...current,
+        defaults,
+      };
+      await setExtensionOptionsSnapshot(next);
+      await handleOptionsUpdated(next);
+      return { ok: true as const };
+    },
 
-      async getTags() {
-        const { credentials } = await ensureConfigured();
-        return sonarrApiService.getTags(credentials);
-      },
+    async getQualityProfiles() {
+      const { credentials } = await ensureConfigured();
+      return sonarrApiService.getQualityProfiles(credentials);
+    },
 
-      testConnection(payload) {
-        return sonarrApiService.testConnection(payload);
-      },
+    async getRootFolders() {
+      const { credentials } = await ensureConfigured();
+      return sonarrApiService.getRootFolders(credentials);
+    },
 
-      async getSonarrMetadata(input) {
-        const maybeCredentials = input?.credentials;
-        let credentials: SonarrCredentialsPayload;
-        if (maybeCredentials?.url && maybeCredentials.apiKey) {
-          credentials = maybeCredentials;
-        } else {
-          const ensured = await ensureConfigured();
-          credentials = ensured.credentials;
-        }
-        const [qualityProfiles, rootFolders, tags] = await Promise.all([
-          sonarrApiService.getQualityProfiles(credentials),
-          sonarrApiService.getRootFolders(credentials),
-          sonarrApiService.getTags(credentials),
-        ]);
-        return { qualityProfiles, rootFolders, tags };
-      },
+    async getTags() {
+      const { credentials } = await ensureConfigured();
+      return sonarrApiService.getTags(credentials);
+    },
 
-      initMappings() {
-        return mappingService.initStaticPairs();
-      },
-    };
+    testConnection(payload) {
+      return sonarrApiService.testConnection(payload);
+    },
 
-    return api;
-  });
+    async getSonarrMetadata(input) {
+      const maybeCredentials = input?.credentials;
+      let credentials: SonarrCredentialsPayload;
+      if (maybeCredentials?.url && maybeCredentials.apiKey) {
+        credentials = maybeCredentials;
+      } else {
+        const ensured = await ensureConfigured();
+        credentials = ensured.credentials;
+      }
+      const [qualityProfiles, rootFolders, tags] = await Promise.all([
+        sonarrApiService.getQualityProfiles(credentials),
+        sonarrApiService.getRootFolders(credentials),
+        sonarrApiService.getTags(credentials),
+      ]);
+      return { qualityProfiles, rootFolders, tags };
+    },
+
+    initMappings() {
+      return mappingService.initStaticPairs();
+    },
+  };
+
+  return api;
+};

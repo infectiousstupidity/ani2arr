@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   webExt: {
     openDevtools: true,
+    chromiumArgs: ['--auto-open-devtools-for-tabs'],
   },
   dev: {
     server: {

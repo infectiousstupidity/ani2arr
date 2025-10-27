@@ -1,6 +1,7 @@
 // src/entrypoints/background/index.ts
 import { browser } from 'wxt/browser';
-import { registerKitsunarrApi, getKitsunarrApi } from '@/services';
+import { registerKitsunarrApi, getKitsunarrApi } from '@/rpc';
+import { createApiImplementation } from '@/services';
 import { computeTitleMatchScore } from '@/utils/matching';
 import { logger } from '@/utils/logger';
 import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/utils/metrics';
@@ -40,7 +41,7 @@ const log = logger.create('Background');
 export default defineBackground(() => {
   log.info('Background initializing…');
 
-  registerKitsunarrApi();
+  registerKitsunarrApi(createApiImplementation());
   log.info('API services registered.');
 
   if (import.meta.env.DEV) {
