@@ -50,7 +50,17 @@ export class StaticMappingProvider {
   public async init(): Promise<void> {
     await Promise.all([this.ensureLoaded('primary'), this.ensureLoaded('fallback')]);
 
-    // Fire and forget refreshes so callers can continue without awaiting.
+    // If nothing is in memory yet (first run, cold cache), perform a blocking
+    // refresh so early lookups can benefit from static pairs and avoid
+    // unnecessary upstream requests.
+    if (this.primaryPairs.size === 0 && this.fallbackPairs.size === 0) {
+      await this.refreshAll().catch(error => {
+        logError(normalizeError(error), 'StaticMappingProvider:init:refreshAll');
+      });
+      return;
+    }
+
+    // Otherwise refresh in the background.
     void this.refresh('primary').catch(error => {
       logError(normalizeError(error), 'StaticMappingProvider:init:primary');
     });

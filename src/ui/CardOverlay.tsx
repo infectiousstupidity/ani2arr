@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckIcon, ExclamationTriangleIcon, ExternalLinkIcon, GearIcon, PlusIcon } from '@radix-ui/react-icons';
 import TooltipWrapper from '@/ui/TooltipWrapper';
 import type { CardOverlayProps } from '@/types';
@@ -12,7 +12,32 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   defaultForm,
   metadata,
   sonarrUrl,
+  observeTarget,
 }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  useEffect(() => {
+    const target = (observeTarget as Element | undefined) ?? null;
+    if (!target || typeof IntersectionObserver === 'undefined') {
+      return undefined;
+    }
+    if (!observerRef.current) {
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.target === target) {
+              setIsVisible(entry.isIntersecting && entry.intersectionRatio >= 0.25);
+            }
+          }
+        },
+        { root: null, threshold: 0.25 },
+      );
+    }
+    const observer = observerRef.current;
+    try { observer.observe(target); } catch { /* ignore */ }
+    return () => { try { observer.unobserve(target); } catch { /* ignore */ } };
+  }, [observeTarget]);
   const {
     overlayState,
     quickAddTitle,
@@ -26,6 +51,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     metadata,
     defaultForm,
     isConfigured,
+    enabled: isVisible,
   });
 
   const swallowEvent = useCallback((event: React.MouseEvent<HTMLElement>) => {

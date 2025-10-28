@@ -12,6 +12,7 @@ export interface UseCardOverlayStateParams {
   metadata: MediaMetadataHint | null;
   defaultForm: SonarrFormState | null;
   isConfigured: boolean;
+  enabled?: boolean;
 }
 
 export interface UseCardOverlayStateResult {
@@ -41,12 +42,16 @@ export const useCardOverlayState = ({
   metadata,
   defaultForm,
   isConfigured,
+  enabled,
 }: UseCardOverlayStateParams): UseCardOverlayStateResult => {
   const bypassFailureCacheRef = useRef(false);
 
   const statusQuery = useSeriesStatus(
     { anilistId, title, metadata },
-    { enabled: isConfigured && Number.isFinite(anilistId), ignoreFailureCache: () => bypassFailureCacheRef.current },
+    {
+      enabled: (enabled ?? (isConfigured && Number.isFinite(anilistId))) && isConfigured && Number.isFinite(anilistId),
+      ignoreFailureCache: () => bypassFailureCacheRef.current,
+    },
   );
 
   const addSeriesMutation = useAddSeries();

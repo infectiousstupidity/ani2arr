@@ -4,6 +4,7 @@ import { usePublicOptions } from '@/hooks/use-api-queries';
 import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
 import { useTheme } from '@/hooks/use-theme';
 import { useBrowsePortals } from '@/hooks/use-browse-portals';
+import { useAnilistBatchPrefetch } from '@/hooks/use-anilist-batch-prefetch';
 import type { BrowseAdapter, ModalState, ParsedCard } from '@/types';
 import { CardOverlay } from '@/ui/CardOverlay';
 
@@ -87,6 +88,9 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
       onCardInvalid: adapter.onCardInvalid,
     });
 
+    // Prefetch AniList metadata on browse/search pages using viewport-prioritized batching.
+    useAnilistBatchPrefetch({ cardPortals });
+
     const [modalState, setModalState] = useState<ModalState | null>(null);
 
     const handleOpenModal = useCallback((anilistId: number, title: string, metadata: ModalState['metadata']) => {
@@ -107,6 +111,7 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
               defaultForm={defaultForm}
               metadata={parsed.metadata}
               sonarrUrl={sonarrUrl}
+              observeTarget={container}
             />,
             container,
           ),
