@@ -15,6 +15,7 @@ export interface CardOverlayProps {
   defaultForm: SonarrFormState | null;
   metadata: MediaMetadataHint | null;
   sonarrUrl: string | null;
+  observeTarget?: Element | null;
 }
 
 export interface ParsedCard {

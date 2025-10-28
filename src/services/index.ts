@@ -283,6 +283,7 @@ export const createApiImplementation = (): KitsunarrApi => {
       return sonarrApiService.testConnection(payload);
     },
 
+    // Fetch Sonarr metadata (quality profiles, root folders, tags)
     async getSonarrMetadata(input) {
       const maybeCredentials = input?.credentials;
       let credentials: SonarrCredentialsPayload;
@@ -298,6 +299,21 @@ export const createApiImplementation = (): KitsunarrApi => {
         sonarrApiService.getTags(credentials),
       ]);
       return { qualityProfiles, rootFolders, tags };
+    },
+
+    // Fetch AniList media data for a batch of AniList IDs
+    async prefetchAniListMedia(ids) {
+      const map = await anilistApiService.fetchMediaBatch(ids);
+      return Array.from(map.entries());
+    },
+
+    async getStaticMapped(ids) {
+      const hits: number[] = [];
+      for (const id of ids) {
+        const hit = staticProvider.get(id);
+        if (hit) hits.push(id);
+      }
+      return hits;
     },
 
     initMappings() {
