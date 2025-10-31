@@ -1,7 +1,7 @@
 // src/services/mapping/index.ts
 import type { TtlCache } from '@/cache';
 import type { AnilistApiService } from '@/api/anilist.api';
-import type { ExtensionError, MediaMetadataHint, AniTitles, AniMedia } from '@/types';
+import type { ExtensionError, MediaMetadataHint, AniTitles, AniMedia, RequestPriority } from '@/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
 import { getExtensionOptionsSnapshot } from '@/utils/storage';
 import { incrementCounter } from '@/utils/metrics';
@@ -37,6 +37,9 @@ type ResolveTvdbIdOptions = {
   network?: 'never';
   hints?: ResolveHints;
   ignoreFailureCache?: boolean;
+  priority?: RequestPriority;
+  /** Force Sonarr lookups to bypass fresh caches (used by anime detail force-verify). */
+  forceLookupNetwork?: boolean;
 };
 
 export class MappingService {
@@ -64,14 +67,44 @@ export class MappingService {
     return this.staticProvider.init();
   }
 
+  // Expose a thin wrapper to bump AniList media priority from other services
+  public prioritizeAniListMedia(anilistId: number, options?: { schedule?: boolean }): void {
+    try {
+      const anyApi = this.anilistApi as unknown as { prioritize?: (ids: number | number[], options?: { schedule?: boolean }) => void };
+      if (anyApi && typeof anyApi.prioritize === 'function') {
+        anyApi.prioritize(anilistId, { schedule: options?.schedule === true });
+      }
+    } catch {
+      // best-effort; ignore failures
+    }
+  }
+
   /**
    * Resolve AniList ID to TVDB ID. Returns null if no mapping is found (expected case).
    * Still throws for genuine errors (network, permission, config, api errors).
    */
   public resolveTvdbId(anilistId: number, options: ResolveTvdbIdOptions = {}): Promise<ResolvedMapping | null> {
+    if (import.meta.env.DEV) {
+      this.log.debug?.(
+        `mapping:start anilistId=${anilistId} priority=${options.priority ?? 'normal'} network=${options.network ?? 'allow'} ignoreFailureCache=${String(options.ignoreFailureCache === true)}`,
+      );
+    }
     const bypassFailureCache = options.ignoreFailureCache === true;
     const existing = this.inflight.get(anilistId);
     if (existing) {
+      // If a mapping is already in-flight but caller requests high priority,
+      // bump AniList fetch priority to ensure the underlying media request is preempted.
+      if (options.priority === 'high') {
+        try {
+          const anyApi = this.anilistApi as unknown as { prioritize?: (ids: number | number[], options?: { schedule?: boolean }) => void };
+          if (anyApi && typeof anyApi.prioritize === 'function') {
+            // Only bump tokens; do not force-schedule a fetch here to respect AniList cache.
+            anyApi.prioritize(anilistId, { schedule: false });
+          }
+        } catch {
+          // best-effort bump; ignore failures
+        }
+      }
       return existing;
     }
 
@@ -96,12 +129,18 @@ export class MappingService {
     const cacheKey = this.successCacheKey(anilistId);
     const cachedSuccess = await this.caches.success.read(cacheKey);
     if (cachedSuccess) {
+      if (import.meta.env.DEV) {
+        this.log.debug?.(`mapping:success-cache-hit anilistId=${anilistId} tvdbId=${cachedSuccess.value.tvdbId}`);
+      }
       return cachedSuccess.value;
     }
 
     if (!bypassFailureCache) {
       const cachedFailure = await this.caches.failure.read(this.failureCacheKey(anilistId));
       if (cachedFailure) {
+        if (import.meta.env.DEV) {
+          this.log.debug?.(`mapping:failure-cache-hit anilistId=${anilistId} code=${cachedFailure.value.code}`);
+        }
         throw cachedFailure.value;
       }
     }
@@ -113,7 +152,9 @@ export class MappingService {
         staleMs: RESOLVED_SOFT_TTL,
         hardMs: RESOLVED_HARD_TTL,
       });
-      this.evictAniListMedia(anilistId);
+      if (import.meta.env.DEV) {
+        this.log.debug?.(`mapping:static-hit anilistId=${anilistId} tvdbId=${staticHit.tvdbId}`);
+      }
       return { tvdbId: staticHit.tvdbId };
     }
 
@@ -128,13 +169,12 @@ export class MappingService {
     const hintTerm = options.hints?.primaryTitle?.trim();
     if (hintTerm) {
       try {
-        const hinted = await this.tryHintLookup(hintTerm);
+        const hinted = await this.tryHintLookup(hintTerm, options.forceLookupNetwork === true);
         if (hinted) {
           await this.caches.success.write(cacheKey, hinted, {
             staleMs: RESOLVED_SOFT_TTL,
             hardMs: RESOLVED_HARD_TTL,
           });
-          this.evictAniListMedia(anilistId);
           return hinted;
         }
       } catch (error) {
@@ -144,7 +184,15 @@ export class MappingService {
 
     let resolved: ResolvedMapping | null;
     try {
-      resolved = await this.resolveViaNetwork(anilistId, options.hints);
+      if (import.meta.env.DEV) {
+        this.log.debug?.(`mapping:network-start anilistId=${anilistId} priority=${options.priority ?? 'normal'}`);
+      }
+      resolved = await this.resolveViaNetwork(
+        anilistId,
+        options.hints,
+        options.priority,
+        options.forceLookupNetwork === true,
+      );
     } catch (error) {
       const normalized = normalizeError(error);
       // VALIDATION_ERROR means no match found (expected) — return null instead of throwing
@@ -177,7 +225,11 @@ export class MappingService {
       staleMs: RESOLVED_SOFT_TTL,
       hardMs: RESOLVED_HARD_TTL,
     });
-    this.evictAniListMedia(anilistId);
+    if (import.meta.env.DEV) {
+      this.log.debug?.(
+        `mapping:network-success anilistId=${anilistId} tvdbId=${resolved.tvdbId}${resolved.successfulSynonym ? ` synonym="${resolved.successfulSynonym}"` : ''}`,
+      );
+    }
     return resolved;
   }
 
@@ -192,19 +244,39 @@ export class MappingService {
     }
   }
 
-  private async resolveViaNetwork(anilistId: number, hints?: ResolveHints): Promise<ResolvedMapping | null> {
+  private async resolveViaNetwork(
+    anilistId: number,
+    hints: ResolveHints | undefined,
+    prio: RequestPriority | undefined,
+    forceLookupNetwork: boolean,
+  ): Promise<ResolvedMapping | null> {
     const credentials = await this.getConfiguredCredentials();
 
     const metadataMedia = this.buildMediaFromMetadataHint(anilistId, hints?.domMedia);
     if (metadataMedia) {
-      const resolved = await this.tryResolveWithMedia(metadataMedia, credentials, hints);
+      const resolved = await this.tryResolveWithMedia(
+        metadataMedia,
+        credentials,
+        hints,
+        prio,
+        forceLookupNetwork,
+      );
       if (resolved) {
         return resolved;
       }
     }
 
-    const apiMedia = await this.anilistApi.fetchMediaWithRelations(anilistId);
-    const apiResolved = await this.tryResolveWithMedia(apiMedia, credentials, hints);
+    const apiMedia = await this.anilistApi.fetchMediaWithRelations(
+      anilistId,
+      prio === undefined ? undefined : { priority: prio },
+    );
+    const apiResolved = await this.tryResolveWithMedia(
+      apiMedia,
+      credentials,
+      hints,
+      prio,
+      forceLookupNetwork,
+    );
     if (apiResolved) {
       return apiResolved;
     }
@@ -217,7 +289,9 @@ export class MappingService {
   private async tryResolveWithMedia(
     media: AniMedia,
     credentials: SonarrLookupCredentials,
-    hints?: ResolveHints,
+    hints: ResolveHints | undefined,
+    priority: RequestPriority | undefined,
+    forceLookupNetwork: boolean,
   ): Promise<ResolvedMapping | null> {
     if (media.format && !ALLOWED_FORMATS.has(media.format)) {
       // Unsupported format — return null (not an error, just not mappable)
@@ -230,19 +304,25 @@ export class MappingService {
       return prequelStatic;
     }
 
-    const outcome = await resolveViaPipeline(media, {
-      anilistApi: this.anilistApi,
-      lookupClient: this.lookupClient,
-      staticProvider: this.staticProvider,
-      credentials,
-      sessionSeenCanonical: this.sessionSeenCanonical,
-      limits: {
-        maxTerms: 5,
-        scoreThreshold: 0.76,
-        earlyStopThreshold: 0.82,
+    const outcome = await resolveViaPipeline(
+      media,
+      {
+        anilistApi: this.anilistApi,
+        lookupClient: this.lookupClient,
+        staticProvider: this.staticProvider,
+        credentials,
+        ...(typeof priority !== 'undefined' ? { priority } : {}),
+        ...(forceLookupNetwork ? { forceLookupNetwork: true } : {}),
+        sessionSeenCanonical: this.sessionSeenCanonical,
+        limits: {
+          maxTerms: 5,
+          scoreThreshold: 0.76,
+          earlyStopThreshold: 0.82,
+        },
+        log: this.log,
       },
-      log: this.log,
-    }, hints?.primaryTitle);
+      hints?.primaryTitle,
+    );
 
     if (outcome.status === 'resolved') {
       return {
@@ -275,7 +355,7 @@ export class MappingService {
     return null;
   }
 
-  private async tryHintLookup(term: string): Promise<ResolvedMapping | null> {
+  private async tryHintLookup(term: string, forceLookupNetwork?: boolean): Promise<ResolvedMapping | null> {
     const trimmed = term.trim();
     const sanitized = sanitizeLookupDisplay(trimmed);
     if (!sanitized) return null;
@@ -292,7 +372,9 @@ export class MappingService {
     if (canonicalTokens.length === 0 || isSeasonalCanonicalTokens(canonicalTokens)) {
       return null;
     }
-    const results = await this.lookupClient.lookup(canonical, sanitized, credentials);
+    const results = await this.lookupClient.lookup(canonical, sanitized, credentials, {
+      ...(forceLookupNetwork ? { forceNetwork: true } : {}),
+    });
     const scored = scoreCandidates({ canonical, display: sanitized }, results);
     const top = scored[0];
     if (top && top.score >= 0.76) {

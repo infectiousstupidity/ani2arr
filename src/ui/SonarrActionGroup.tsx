@@ -74,6 +74,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
       <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group">
         {/* Main Action Button */}
         <Button
+          data-testid="kitsunarr-main-action-button"
           size="md"
           onClick={onQuickAdd}
           isLoading={isLoading}
@@ -86,6 +87,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
         </Button>
         {/* Settings Button */}
         <Button
+          data-testid="kitsunarr-settings-button"
           size="icon"
           variant="primary"
           onClick={onOpenModal}
@@ -102,6 +104,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
       <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group">
             {/* Main Action Button */}
       <Button
+        data-testid="kitsunarr-main-action-button"
         size="md"
         onClick={onQuickAdd}
         isLoading={isLoading}
@@ -115,6 +118,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
             </Button>
             {/* Settings Button */}
             <Button
+              data-testid="kitsunarr-settings-button"
               size="icon"
               variant="primary"
               onClick={onOpenModal}

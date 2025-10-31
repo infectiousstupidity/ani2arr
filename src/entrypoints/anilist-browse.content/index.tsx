@@ -169,6 +169,8 @@ export default defineContentScript({
           staleTime: Infinity,
           refetchOnWindowFocus: false,
           retry: false,
+          // Keep results in memory longer so scrolling back quickly doesn't GC them
+          gcTime: 30 * 60 * 1000,
         },
       },
     });

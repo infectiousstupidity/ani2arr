@@ -2,10 +2,15 @@
 import { generateSearchTerms, isSeasonalCanonicalTokens } from './search-term-generator';
 import { scoreCandidates } from './scoring';
 import { maybeEarlyStop, pickBest } from './early-stop';
-import type { EvaluationOutcome, MappingContext, AniMedia } from '@/types';
+import type { EvaluationOutcome, EvaluationOutcomeResolved, MappingContext, AniMedia } from '@/types';
 import { canonicalTitleKey, sanitizeLookupDisplay } from '@/utils/matching';
 
 export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, primaryTitleHint?: string): Promise<EvaluationOutcome> {
+  if (import.meta.env.DEV) {
+    ctx.log.debug?.(
+      `pipeline:start anilistId=${media.id} priority=${ctx.priority ?? 'normal'}${primaryTitleHint ? ` hint="${primaryTitleHint}"` : ''}`,
+    );
+  }
   const mediaYear = media.startDate?.year ?? undefined;
   const terms = generateSearchTerms(media.title ?? ({} as Record<string, never>), media.synonyms);
 
@@ -32,28 +37,54 @@ export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, p
     if (!term.canonical) continue;
 
     const seenInSession = ctx.sessionSeenCanonical.has(term.canonical);
-    const results = seenInSession
-      ? await ctx.lookupClient.readFromCache(term.canonical)
-      : await ctx.lookupClient.lookup(term.canonical, term.display, ctx.credentials);
+    let results;
+    if (ctx.forceLookupNetwork) {
+      // Always hit network on anime detail force-verify
+      const opts = {
+        ...(typeof ctx.priority !== 'undefined' ? { priority: ctx.priority } : {}),
+        forceNetwork: true as const,
+      };
+      results = await ctx.lookupClient.lookup(term.canonical, term.display, ctx.credentials, opts);
+    } else if (seenInSession) {
+      const probe = await ctx.lookupClient.readFromCache(term.canonical);
+      if (probe.hit === 'none') {
+        const opts = {
+          ...(typeof ctx.priority !== 'undefined' ? { priority: ctx.priority } : {}),
+        };
+        results = await ctx.lookupClient.lookup(term.canonical, term.display, ctx.credentials, opts);
+      } else {
+        results = probe.results;
+      }
+    } else {
+      const opts = {
+        ...(typeof ctx.priority !== 'undefined' ? { priority: ctx.priority } : {}),
+      };
+      results = await ctx.lookupClient.lookup(term.canonical, term.display, ctx.credentials, opts);
+    }
 
     const scored = scoreCandidates(term, results, mediaYear);
     overall = overall.concat(scored);
 
-    if (!seenInSession) {
-      ctx.sessionSeenCanonical.add(term.canonical);
-    }
+    // Mark canonical as seen once we’ve either looked up or confirmed a cache hit
+    ctx.sessionSeenCanonical.add(term.canonical);
 
     const early = maybeEarlyStop(scored, {
       earlyStopThreshold: ctx.limits.earlyStopThreshold,
       scoreThreshold: ctx.limits.scoreThreshold,
     });
     if (early.stop && early.pick) {
-      return {
+      const out: EvaluationOutcomeResolved = {
         status: 'resolved',
         tvdbId: early.pick.result.tvdbId,
         confidence: early.pick.score,
         successfulSynonym: early.pick.term.display,
       };
+      if (import.meta.env.DEV) {
+        ctx.log.debug?.(
+          `pipeline:resolved anilistId=${media.id} tvdbId=${out.tvdbId} confidence=${early.pick.score} synonym="${early.pick.term.display}"`,
+        );
+      }
+      return out;
     }
 
     // Optional soft time budget guard (kept minimal per constraints)
@@ -63,13 +94,22 @@ export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, p
   overall.sort((a, b) => b.score - a.score);
   const pick = pickBest(overall, ctx.limits.scoreThreshold);
   if (pick) {
-    return {
+    const out: EvaluationOutcomeResolved = {
       status: 'resolved',
       tvdbId: pick.result.tvdbId,
       confidence: pick.score,
       successfulSynonym: pick.term.display,
     };
+    if (import.meta.env.DEV) {
+      ctx.log.debug?.(
+        `pipeline:resolved anilistId=${media.id} tvdbId=${out.tvdbId} confidence=${pick.score} synonym="${pick.term.display}"`,
+      );
+    }
+    return out;
   }
 
+  if (import.meta.env.DEV) {
+    ctx.log.debug?.(`pipeline:unresolved anilistId=${media.id} reason=low-confidence`);
+  }
   return { status: 'unresolved', reason: 'low-confidence' };
 }

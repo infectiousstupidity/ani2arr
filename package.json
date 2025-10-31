@@ -14,8 +14,9 @@
     "compile": "tsc --noEmit",
     "postinstall": "wxt prepare",
     "lint": "eslint src",
-    "test:ui": "playwright test",
-    "e2e:install": "playwright install --with-deps"
+    "test:ui": "npm run build && playwright test",
+    "e2e:install": "playwright install --with-deps",
+    "e2e:prepare": "npm run build && npm run e2e:install"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",

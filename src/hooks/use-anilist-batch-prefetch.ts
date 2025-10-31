@@ -11,8 +11,11 @@ const log = logger.create('AniList Prefetch');
 
 // Hook to prefetch AniList media data in batches based on card visibility
 export const useAnilistBatchPrefetch = ({ cardPortals }: UseAnilistBatchPrefetchParams): void => {
-  // Only enable on search/browse surfaces where grids are large.
-  const enabled = typeof window !== 'undefined' && window.location.pathname.startsWith('/search/anime');
+  // Enable on AniList browse/search surfaces where grids are large.
+  const enabled = typeof window !== 'undefined' && (() => {
+    const p = window.location.pathname || '';
+    return p === '/' || p.startsWith('/home') || p.startsWith('/search/anime');
+  })();
   const api = useMemo(() => getKitsunarrApi(), []);
 
   const idByContainerRef = useRef<WeakMap<Element, number>>(new WeakMap());
@@ -22,9 +25,23 @@ export const useAnilistBatchPrefetch = ({ cardPortals }: UseAnilistBatchPrefetch
   const offscreenQueueRef = useRef<number[]>([]);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const busyRef = useRef(false);
+  const infoBurstCountRef = useRef(0);
+  const initLoggedRef = useRef(false);
 
   useEffect(() => {
     if (!enabled) return;
+
+    // Emit a one-time init at info level to verify hook activation in Firefox
+    if (!initLoggedRef.current) {
+      initLoggedRef.current = true;
+      try {
+        log.info?.(
+          `prefetch:init enabled path=${window.location.pathname} cards=${cardPortals.size}`,
+        );
+      } catch {
+        // ignore
+      }
+    }
 
     // Ensure an observer exists
     if (!observerRef.current) {
@@ -123,6 +140,19 @@ export const useAnilistBatchPrefetch = ({ cardPortals }: UseAnilistBatchPrefetch
 
       // Chunk to 50 per request and process a single chunk per tick
       const chunk = toFetch.slice(0, 50);
+      if (import.meta.env.DEV) {
+        const visibleArr = Array.from(visible.values()).slice(0, 60);
+        log.debug?.(
+          `prefetch:tick choose chunk size=${chunk.length} visible_size=${visibleArr.length} offscreen_backlog=${offscreen.length} chunk_ids=[${chunk.join(',')}]`,
+        );
+        // Surface the first few ticks at info-level to make discovery easier
+        if (infoBurstCountRef.current < 3) {
+          infoBurstCountRef.current += 1;
+          log.info?.(
+            `prefetch:tick size=${chunk.length} visible_size=${visibleArr.length} offscreen_backlog=${offscreen.length}`,
+          );
+        }
+      }
       busyRef.current = true;
 
       try {
