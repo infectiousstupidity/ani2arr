@@ -2,9 +2,10 @@
 import React from 'react';
 import Button from '@/ui/Button';
 import TooltipWrapper from '@/ui/TooltipWrapper';
-import { GearIcon, ExternalLinkIcon } from '@radix-ui/react-icons';
+import { ExternalLinkIcon, ChevronDownIcon } from '@radix-ui/react-icons';
 import { usePublicOptions } from '@/hooks/use-api-queries';
 import { logger } from '@/utils/logger';
+import Dropdown, { DropdownItem } from '@/ui/Dropdown';
 
 type Status = 'LOADING' | 'IN_SONARR' | 'NOT_IN_SONARR' | 'ERROR' | 'ADDING';
 
@@ -15,7 +16,8 @@ interface SonarrActionGroupProps {
   resolvedSearchTerm: string;
   tvdbId: number | null | undefined;
   onQuickAdd: () => void;
-  onOpenModal: () => void;
+  onOpenModal: () => void; // Advanced Sonarr options
+  onOpenMappingFix: () => void; // Fix mapping modal
   portalContainer?: HTMLElement | undefined;
 }
 
@@ -27,6 +29,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
   tvdbId,
   onQuickAdd,
   onOpenModal,
+  onOpenMappingFix,
   portalContainer
 }) => {
   const { data: options } = usePublicOptions();
@@ -64,8 +67,8 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
         return undefined;
     }
   })();
-  const settingsDisabled = !isIdle || tvdbId === null;
-  const settingsTooltip = !groupTooltip && !settingsDisabled ? 'Advanced Sonarr options' : undefined;
+  // Chevron should always be available to open actions (even when already in Sonarr or error states)
+  const dropdownDisabled = false;
   
   return (
   <div className="grid grid-cols-[1fr_auto] gap-4 items-start w-full">
@@ -85,19 +88,29 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
         >
           {tvdbId === null ? "Cannot add" : getButtonText()}
         </Button>
-        {/* Settings Button */}
-        <Button
-          data-testid="kitsunarr-settings-button"
-          size="icon"
-          variant="primary"
-          onClick={onOpenModal}
-          disabled={settingsDisabled}
-          portalContainer={portalContainer}
-          className="rounded-none h-[35px] w-[35px] focus-visible:z-10 focus-visible:ring-offset-0"
-          aria-label="Advanced options"
+        {/* Actions Dropdown */}
+        <Dropdown
+          container={portalContainer ?? null}
+          trigger={
+            <Button
+              data-testid="kitsunarr-actions-dropdown"
+              size="icon"
+              variant="primary"
+              disabled={dropdownDisabled}
+              portalContainer={portalContainer}
+              className="rounded-none h-[35px] w-[35px] focus-visible:z-10 focus-visible:ring-offset-0"
+              aria-label="Actions"
+            >
+              <ChevronDownIcon className="h-4 w-4" />
+            </Button>
+          }
         >
-          <GearIcon className="h-4 w-4" />
-        </Button>
+          <DropdownItem onSelect={onOpenModal} disabled={tvdbId === null}>Advanced Sonarr options</DropdownItem>
+          <DropdownItem onSelect={() => {
+            log.debug('Action: Fix mapping clicked');
+            onOpenMappingFix();
+          }}>Fix mapping…</DropdownItem>
+        </Dropdown>
       </div>
       </TooltipWrapper>
     ) : (
@@ -116,20 +129,29 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
       >
                 {tvdbId === null ? "Cannot add" : getButtonText()}
             </Button>
-            {/* Settings Button */}
-            <Button
-              data-testid="kitsunarr-settings-button"
-              size="icon"
-              variant="primary"
-              onClick={onOpenModal}
-          disabled={settingsDisabled}
-          {...(settingsTooltip ? { tooltip: settingsTooltip } : {})}
-              portalContainer={portalContainer}
-              className="rounded-none h-[35px] w-[35px] focus-visible:z-10 focus-visible:ring-offset-0"
-              aria-label="Advanced options"
+            {/* Actions Dropdown */}
+            <Dropdown
+              container={portalContainer ?? null}
+              trigger={
+                <Button
+                  data-testid="kitsunarr-actions-dropdown"
+                  size="icon"
+                  variant="primary"
+                  disabled={dropdownDisabled}
+                  portalContainer={portalContainer}
+                  className="rounded-none h-[35px] w-[35px] focus-visible:z-10 focus-visible:ring-offset-0"
+                  aria-label="Actions"
+                >
+                  <ChevronDownIcon className="h-4 w-4" />
+                </Button>
+              }
             >
-                <GearIcon className="h-4 w-4" />
-            </Button>
+              <DropdownItem onSelect={onOpenModal} disabled={tvdbId === null}>Advanced Sonarr options</DropdownItem>
+              <DropdownItem onSelect={() => {
+                log.debug('Action: Fix mapping clicked');
+                onOpenMappingFix();
+              }}>Fix mapping…</DropdownItem>
+            </Dropdown>
       </div>
     )}
 

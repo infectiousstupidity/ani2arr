@@ -60,6 +60,8 @@ export interface CheckSeriesStatusResponse {
   successfulSynonym?: string;
   anilistTvdbLinkMissing?: boolean;
   series?: LeanSonarrSeries;
+  /** True when a manual AniList -> TVDB override is active for this ID. */
+  overrideActive?: boolean;
 }
 
 export interface SonarrCredentialsPayload {
