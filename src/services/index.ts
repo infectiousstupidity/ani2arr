@@ -5,6 +5,7 @@ import { CacheNamespaces } from '@/cache/namespaces';
 import { SonarrApiService } from '@/api/sonarr.api';
 import { AnilistApiService } from '@/api/anilist.api';
 import { MappingService, type ResolvedMapping, type StaticMappingPayload } from './mapping';
+import { MappingOverridesService } from './mapping/overrides.service';
 import { StaticMappingProvider } from './mapping/static-mapping.provider';
 import { SonarrLookupClient } from './mapping/sonarr-lookup.client';
 import { LibraryService } from './library.service';
@@ -69,11 +70,14 @@ export const createApiImplementation = (): KitsunarrApi => {
       negative: createTtlCache<boolean>(CacheNamespaces.mappingLookupNegative),
     });
 
+    const overridesService = new MappingOverridesService();
+    void overridesService.init();
+
     const mappingService = bindAll(
       new MappingService(anilistApiService, staticProvider, lookupClient, {
         success: createTtlCache<ResolvedMapping>(CacheNamespaces.mappingResolvedSuccess),
         failure: createTtlCache<ExtensionError>(CacheNamespaces.mappingResolvedFailure),
-      }),
+      }, overridesService),
     );
 
     let libraryEpoch = 0;
@@ -209,7 +213,9 @@ export const createApiImplementation = (): KitsunarrApi => {
       if (input.priority) {
         requestOptions.priority = input.priority;
       }
-      return libraryService.getSeriesStatus(payload, requestOptions);
+      const status = await libraryService.getSeriesStatus(payload, requestOptions);
+      // Surface whether a manual override is active for this AniList ID
+      return { ...status, overrideActive: mappingService.isOverrideActive(input.anilistId) };
     },
 
     async addToSonarr(input) {
@@ -324,6 +330,55 @@ export const createApiImplementation = (): KitsunarrApi => {
 
     initMappings() {
       return mappingService.initStaticPairs();
+    },
+
+    // Lookup Sonarr series by term and include library membership info
+    async searchSonarr(input) {
+      const { credentials } = await ensureConfigured();
+      const [results, library] = await Promise.all([
+        sonarrApiService.lookupSeriesByTerm(input.term, credentials),
+        libraryService.getLeanSeriesList(),
+      ]);
+      const libraryTvdbIds = library.map(s => s.tvdbId);
+      return { results, libraryTvdbIds };
+    },
+
+    // Validate a TVDB ID in library and catalog
+    async validateTvdbId(input) {
+      const { credentials } = await ensureConfigured();
+      const found = await sonarrApiService.getSeriesByTvdbId(input.tvdbId, credentials);
+      let inCatalog = false;
+      try {
+        const hits = await sonarrApiService.lookupSeriesByTerm(`tvdb:${input.tvdbId}`, credentials);
+        inCatalog = hits.some(h => h?.tvdbId === input.tvdbId);
+      } catch {
+        // ignore
+      }
+      return { inLibrary: !!found, inCatalog };
+    },
+
+    // Manual mapping overrides
+    async setMappingOverride(input) {
+      await overridesService.set(input.anilistId, input.tvdbId);
+      await mappingService.evictResolved(input.anilistId);
+      // Best-effort: refresh library cache if configured
+      const options = await getExtensionOptionsSnapshot();
+      if (options?.sonarrUrl && options?.sonarrApiKey) {
+        await libraryService.refreshCache(options);
+      }
+      await bumpLibraryEpoch({ anilistId: input.anilistId, tvdbId: input.tvdbId, action: 'override:set' });
+      return { ok: true as const };
+    },
+
+    async clearMappingOverride(input) {
+      await overridesService.clear(input.anilistId);
+      await mappingService.evictResolved(input.anilistId);
+      const options = await getExtensionOptionsSnapshot();
+      if (options?.sonarrUrl && options?.sonarrApiKey) {
+        await libraryService.refreshCache(options);
+      }
+      await bumpLibraryEpoch({ anilistId: input.anilistId, action: 'override:clear' });
+      return { ok: true as const };
     },
   };
 

@@ -24,6 +24,7 @@ const queryClient = new QueryClient();
 const persistOptions = createPersistOptions(log);
 
 const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
+const MappingFixModal = React.lazy(() => import('@/ui/MappingFixModal'));
 
 const ANIME_PAGE = new MatchPattern('*://anilist.co/anime/*');
 
@@ -182,6 +183,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   useKitsunarrBroadcasts();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [fixModalOpen, setFixModalOpen] = useState(false);
   // In unit tests, don't block on background readiness to avoid long LOADING states.
   const isTestEnv = typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined' && import.meta.env.MODE === 'test';
   const [backgroundReady, setBackgroundReady] = useState<boolean>(isTestEnv);
@@ -249,6 +251,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   };
 
   const resolvedSearchTerm = statusQuery.data?.successfulSynonym ?? title;
+  const overrideActive = statusQuery.data?.overrideActive === true;
 
   return (
     <div ref={hostRef} style={{ width: '100%' }}>
@@ -260,6 +263,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
         tvdbId={tvdbId}
         onQuickAdd={handleQuickAdd}
         onOpenModal={() => setIsModalOpen(true)}
+        onOpenMappingFix={() => setFixModalOpen(true)}
         portalContainer={hostRef.current ?? undefined}
       />
       <React.Suspense fallback={null}>
@@ -270,6 +274,16 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
             metadata={metadata}
+            portalContainer={hostRef.current}
+          />
+        )}
+        {fixModalOpen && (
+          <MappingFixModal
+            anilistId={anilistId}
+            title={title}
+            isOpen={fixModalOpen}
+            onClose={() => setFixModalOpen(false)}
+            overrideActive={overrideActive}
             portalContainer={hostRef.current}
           />
         )}

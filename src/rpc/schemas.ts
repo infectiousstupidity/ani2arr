@@ -32,3 +32,31 @@ export interface AddInput {
   form: SonarrFormState;
 }
 
+export interface SetMappingOverrideInput {
+  anilistId: number;
+  tvdbId: number;
+}
+
+export interface ClearMappingOverrideInput {
+  anilistId: number;
+}
+
+export interface SonarrLookupInput {
+  term: string;
+  priority?: RequestPriority;
+  force_network?: boolean;
+}
+
+export interface SonarrLookupOutput {
+  results: import('@/types').SonarrLookupSeries[];
+  libraryTvdbIds: number[];
+}
+
+export interface ValidateTvdbInput {
+  tvdbId: number;
+}
+
+export interface ValidateTvdbOutput {
+  inLibrary: boolean;
+  inCatalog: boolean;
+}

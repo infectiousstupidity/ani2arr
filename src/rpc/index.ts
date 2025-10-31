@@ -9,7 +9,7 @@ import type {
   SonarrCredentialsPayload,
 } from '@/types';
 import type { AniMedia } from '@/types';
-import type { ResolveInput, MappingOutput, StatusInput, StatusOutput, AddInput } from './schemas';
+import type { ResolveInput, MappingOutput, StatusInput, StatusOutput, AddInput, SetMappingOverrideInput, ClearMappingOverrideInput, SonarrLookupInput, SonarrLookupOutput, ValidateTvdbInput, ValidateTvdbOutput } from './schemas';
 
 export interface KitsunarrApi {
   resolveMapping(input: ResolveInput): Promise<MappingOutput>;
@@ -29,6 +29,10 @@ export interface KitsunarrApi {
     tags: SonarrTag[];
   }>;
   initMappings(): Promise<void>;
+  setMappingOverride(input: SetMappingOverrideInput): Promise<{ ok: true }>;
+  clearMappingOverride(input: ClearMappingOverrideInput): Promise<{ ok: true }>;
+  searchSonarr(input: SonarrLookupInput): Promise<SonarrLookupOutput>;
+  validateTvdbId(input: ValidateTvdbInput): Promise<ValidateTvdbOutput>;
 }
 
 export const [registerKitsunarrApi, getKitsunarrApi] =

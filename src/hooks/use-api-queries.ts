@@ -22,7 +22,7 @@ import type {
   SonarrSeries,
   TestConnectionPayload,
 } from '@/types';
-import type { AddInput, StatusInput } from '@/rpc/schemas';
+import type { AddInput, StatusInput, SetMappingOverrideInput, ClearMappingOverrideInput } from '@/rpc/schemas';
 import { normalizeError } from '@/utils/error-handling';
 
 const rootQueryKey = ['kitsunarr'] as const;
@@ -203,6 +203,38 @@ export const useAddSeries = () => {
       }
     },
     onSuccess: (_createdSeries, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
+    },
+  });
+};
+
+export const useSetMappingOverride = () => {
+  const queryClient = useQueryClient();
+  return useMutation<{ ok: true }, ExtensionError, SetMappingOverrideInput>({
+    mutationFn: async (input: SetMappingOverrideInput) => {
+      try {
+        return await getKitsunarrApi().setMappingOverride(input);
+      } catch (error) {
+        throw normalizeError(error);
+      }
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
+    },
+  });
+};
+
+export const useClearMappingOverride = () => {
+  const queryClient = useQueryClient();
+  return useMutation<{ ok: true }, ExtensionError, ClearMappingOverrideInput>({
+    mutationFn: async (input: ClearMappingOverrideInput) => {
+      try {
+        return await getKitsunarrApi().clearMappingOverride(input);
+      } catch (error) {
+        throw normalizeError(error);
+      }
+    },
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
     },
   });

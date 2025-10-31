@@ -12,6 +12,7 @@ import { SonarrLookupClient, type SonarrLookupCredentials } from './sonarr-looku
 import { isSeasonalCanonicalTokens } from './search-term-generator';
 import { resolveViaPipeline } from './pipeline';
 import { scoreCandidates } from './scoring';
+import { MappingOverridesService } from './overrides.service';
 
 const RESOLVED_SOFT_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
 const RESOLVED_HARD_TTL = 180 * 24 * 60 * 60 * 1000; // 180 days
@@ -55,6 +56,7 @@ export class MappingService {
       success: TtlCache<ResolvedMapping>;
       failure: TtlCache<ExtensionError>;
     },
+    private readonly overrides?: MappingOverridesService,
   ) {}
 
   public async resetLookupState(): Promise<void> {
@@ -126,6 +128,14 @@ export class MappingService {
     options: ResolveTvdbIdOptions,
     bypassFailureCache: boolean,
   ): Promise<ResolvedMapping | null> {
+    // Phase 0: Check user overrides first; authoritative mapping if present
+    const overrideTvdb = this.overrides?.get(anilistId) ?? null;
+    if (typeof overrideTvdb === 'number') {
+      if (import.meta.env.DEV) {
+        this.log.debug?.(`mapping:override-hit anilistId=${anilistId} tvdbId=${overrideTvdb}`);
+      }
+      return { tvdbId: overrideTvdb };
+    }
     const cacheKey = this.successCacheKey(anilistId);
     const cachedSuccess = await this.caches.success.read(cacheKey);
     if (cachedSuccess) {
@@ -459,6 +469,21 @@ export class MappingService {
 
   private failureCacheKey(anilistId: number): string {
     return `resolved-failure:${anilistId}`;
+  }
+
+  // Evict resolved caches for a specific AniList ID (used when overrides change)
+  public async evictResolved(anilistId: number): Promise<void> {
+    await Promise.all([
+      this.caches.success.remove(this.successCacheKey(anilistId)),
+      this.caches.failure.remove(this.failureCacheKey(anilistId)),
+    ]);
+    this.inflight.delete(anilistId);
+    this.evictAniListMedia(anilistId);
+  }
+
+  // Utility for LibraryService to surface whether an override is active
+  public isOverrideActive(anilistId: number): boolean {
+    return this.overrides?.has(anilistId) ?? false;
   }
 
   private shouldCacheFailure(error: ExtensionError): boolean {
