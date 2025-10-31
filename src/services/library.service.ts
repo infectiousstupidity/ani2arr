@@ -8,6 +8,7 @@ import type {
   ExtensionOptions,
   LeanSonarrSeries,
   SonarrSeries,
+  RequestPriority,
 } from '@/types';
 import { ErrorCode, logError, normalizeError } from '@/utils/error-handling';
 import { canonicalizeLookupTerm, computeTitleMatchScore, stripParenContent, sanitizeLookupDisplay } from '@/utils/matching';
@@ -128,8 +129,13 @@ export class LibraryService {
 
   public async getSeriesStatus(
     payload: CheckSeriesStatusPayload,
-    options: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {},
+    options: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean; priority?: RequestPriority } = {},
   ): Promise<CheckSeriesStatusResponse> {
+    if (import.meta.env.DEV) {
+      const pr = options.priority ?? 'normal';
+      const net = options.network ?? 'allow';
+      console.debug(`[Kitsunarr | LibraryService] status:start anilistId=${payload.anilistId} priority=${pr} network=${net} force_verify=${String(options.force_verify === true)}`);
+    }
     const leanList = await this.getLeanSeriesList();
     const sonarrOpts = await getExtensionOptionsSnapshot();
     const isConfigured = !!(sonarrOpts?.sonarrUrl && sonarrOpts?.sonarrApiKey);
@@ -138,12 +144,33 @@ export class LibraryService {
     let tvdbId = this.findTvdbIdInIndex(payload);
     let successfulSynonym: string | undefined;
     if (tvdbId === null) {
+      // If caller requests a high-priority check, bump AniList media priority immediately.
+      if (options.priority === 'high') {
+        try {
+          const anyMapping = this.mappingService as unknown as { prioritizeAniListMedia?: (id: number, opts?: { schedule?: boolean }) => void };
+          if (anyMapping && typeof anyMapping.prioritizeAniListMedia === 'function') {
+            // Only bump priority tokens; do not schedule a network fetch here.
+            // Let downstream cache-aware calls decide whether a request is needed.
+            anyMapping.prioritizeAniListMedia(payload.anilistId, { schedule: false });
+          }
+        } catch {
+          // best-effort bump; ignore failures
+        }
+      }
       const mappingOptions: Parameters<MappingService['resolveTvdbId']>[1] = {};
       if (!isConfigured || options.network === 'never') {
         mappingOptions.network = 'never';
       }
       if (options.ignoreFailureCache) {
         mappingOptions.ignoreFailureCache = true;
+      }
+      if (options.priority) {
+        mappingOptions.priority = options.priority;
+      }
+      // On anime detail pages we pass force_verify=true. In that case, force Sonarr
+      // lookups to bypass fresh caches so we always evaluate with current data.
+      if (options.force_verify) {
+        mappingOptions.forceLookupNetwork = true;
       }
 
       const hints: NonNullable<Parameters<MappingService['resolveTvdbId']>[1]>['hints'] = {};
@@ -158,6 +185,11 @@ export class LibraryService {
       }
 
       try {
+        if (import.meta.env.DEV) {
+          console.debug(
+            `[Kitsunarr | LibraryService] status:lookup-start anilistId=${payload.anilistId} priority=${options.priority ?? 'normal'} network=${options.network ?? 'allow'} ignoreFailureCache=${String(options.ignoreFailureCache === true)}`,
+          );
+        }
         const mapping = await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
         if (mapping) {
           tvdbId = mapping.tvdbId;
@@ -181,6 +213,9 @@ export class LibraryService {
     }
 
     if (tvdbId === null) {
+      if (import.meta.env.DEV) {
+        console.debug(`[Kitsunarr | LibraryService] status:result anilistId=${payload.anilistId} outcome=unresolved`);
+      }
       return { exists: false, tvdbId: null, anilistTvdbLinkMissing: true };
     }
 
@@ -188,12 +223,18 @@ export class LibraryService {
     const existsInCache = cachedSeries !== null;
 
     if (!isConfigured || !options.force_verify) {
-      return {
+      const out = {
         exists: existsInCache,
         tvdbId,
         ...(cachedSeries ? { series: cachedSeries } : {}),
         ...(successfulSynonym ? { successfulSynonym } : {}),
-      };
+      } as CheckSeriesStatusResponse;
+      if (import.meta.env.DEV) {
+        console.debug(
+          `[Kitsunarr | LibraryService] status:result anilistId=${payload.anilistId} outcome=cached exists=${String(existsInCache)} tvdbId=${tvdbId}`,
+        );
+      }
+      return out;
     }
 
     const credentials = { url: sonarrOpts!.sonarrUrl!, apiKey: sonarrOpts!.sonarrApiKey! };
@@ -212,12 +253,18 @@ export class LibraryService {
         await this.notifyLibraryMutation({ tvdbId, action: 'added' });
       }
 
-      return {
+      const out2 = {
         exists: true,
         tvdbId,
         series: finalSeries,
         ...(successfulSynonym ? { successfulSynonym } : {}),
-      };
+      } as CheckSeriesStatusResponse;
+      if (import.meta.env.DEV) {
+        console.debug(
+          `[Kitsunarr | LibraryService] status:result anilistId=${payload.anilistId} outcome=live exists=true tvdbId=${tvdbId}`,
+        );
+      }
+      return out2;
     }
 
     if (existsInCache) {
@@ -225,11 +272,17 @@ export class LibraryService {
       await this.notifyLibraryMutation({ tvdbId, action: 'removed' });
     }
 
-    return {
+    const out3 = {
       exists: false,
       tvdbId,
       ...(successfulSynonym ? { successfulSynonym } : {}),
-    };
+    } as CheckSeriesStatusResponse;
+    if (import.meta.env.DEV) {
+      console.debug(
+        `[Kitsunarr | LibraryService] status:result anilistId=${payload.anilistId} outcome=removed exists=false tvdbId=${tvdbId}`,
+      );
+    }
+    return out3;
   }
 
   private toLeanSeries(series: SonarrSeries): LeanSonarrSeries {

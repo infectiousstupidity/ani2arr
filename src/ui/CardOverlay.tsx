@@ -15,7 +15,9 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   observeTarget,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [gateOpen, setGateOpen] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const gateTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const target = (observeTarget as Element | undefined) ?? null;
@@ -38,6 +40,32 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     try { observer.observe(target); } catch { /* ignore */ }
     return () => { try { observer.unobserve(target); } catch { /* ignore */ } };
   }, [observeTarget]);
+
+  // Micro-gate: wait briefly after becoming visible to allow batch prefetch
+  useEffect(() => {
+    if (!isVisible) {
+      setGateOpen(false);
+      if (gateTimerRef.current !== null) {
+        window.clearTimeout(gateTimerRef.current);
+        gateTimerRef.current = null;
+      }
+      return;
+    }
+    if (gateTimerRef.current !== null) {
+      window.clearTimeout(gateTimerRef.current);
+      gateTimerRef.current = null;
+    }
+    gateTimerRef.current = window.setTimeout(() => {
+      setGateOpen(true);
+      gateTimerRef.current = null;
+    }, 125);
+    return () => {
+      if (gateTimerRef.current !== null) {
+        window.clearTimeout(gateTimerRef.current);
+        gateTimerRef.current = null;
+      }
+    };
+  }, [isVisible]);
   const {
     overlayState,
     quickAddTitle,
@@ -51,7 +79,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     metadata,
     defaultForm,
     isConfigured,
-    enabled: isVisible,
+    enabled: isVisible && gateOpen,
   });
 
   const swallowEvent = useCallback((event: React.MouseEvent<HTMLElement>) => {

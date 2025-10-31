@@ -16,6 +16,7 @@ import type {
   ExtensionError,
   SonarrCredentialsPayload,
   CheckSeriesStatusPayload,
+  RequestPriority,
 } from '@/types';
 import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/utils/storage';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
@@ -136,6 +137,8 @@ export const createApiImplementation = (): KitsunarrApi => {
     };
 
     const handleOptionsUpdated = async (optionsHint?: ExtensionOptions): Promise<void> => {
+      // Clear API-layer read caches (e.g., ETag map) when settings change
+      sonarrApiService.clearEtagCache();
       await bumpSettingsEpoch();
       await mappingService.resetLookupState();
       const options = optionsHint ?? (await getExtensionOptionsSnapshot());
@@ -193,7 +196,7 @@ export const createApiImplementation = (): KitsunarrApi => {
       if (input.metadata !== undefined) {
         payload.metadata = input.metadata;
       }
-      const requestOptions: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean } = {};
+      const requestOptions: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean; priority?: RequestPriority } = {};
       if (input.force_verify) {
         requestOptions.force_verify = true;
       }
@@ -202,6 +205,9 @@ export const createApiImplementation = (): KitsunarrApi => {
       }
       if (input.ignoreFailureCache) {
         requestOptions.ignoreFailureCache = true;
+      }
+      if (input.priority) {
+        requestOptions.priority = input.priority;
       }
       return libraryService.getSeriesStatus(payload, requestOptions);
     },

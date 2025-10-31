@@ -2,7 +2,8 @@
 import type { TtlCache } from '@/cache';
 import PQueue from 'p-queue';
 import type { SonarrApiService } from '@/api/sonarr.api';
-import type { SonarrLookupSeries } from '@/types';
+import type { SonarrLookupSeries, RequestPriority } from '@/types';
+import { priorityValue } from '@/utils/priority';
 import { canonicalTitleKey, sanitizeLookupDisplay } from '@/utils/matching';
 import { incrementCounter, timeAsync } from '@/utils/metrics';
 import { logger } from '@/utils/logger';
@@ -23,6 +24,7 @@ export interface SonarrLookupCredentials {
 
 export interface SonarrLookupOptions {
   forceNetwork?: boolean;
+  priority?: RequestPriority;
 }
 
 type LookupCaches = {
@@ -45,39 +47,40 @@ export class SonarrLookupClient {
     await Promise.all([this.caches.positive.clear(), this.caches.negative.clear()]);
   }
 
-  public readFromCache(canonical: string): Promise<SonarrLookupSeries[]> {
+  public async readFromCache(
+    canonical: string,
+  ): Promise<{ results: SonarrLookupSeries[]; hit: 'positive' | 'negative' | 'inflight' | 'none' }> {
     if (!canonical) {
-      return Promise.resolve([]);
+      return { results: [], hit: 'none' };
     }
 
     const inflight = this.inflight.get(canonical);
     if (inflight) {
       incrementCounter('mapping.lookup.inflight_reuse');
       this.log.debug(`readFromCache(${canonical}): reusing inflight promise`);
-      return inflight;
+      const results = await inflight;
+      return { results, hit: 'inflight' };
     }
 
-    return (async () => {
-      const positive = await this.caches.positive.read(canonical);
-      if (positive) {
-        incrementCounter('mapping.lookup.cache_hit');
-        this.log.debug(
-          `readFromCache(${canonical}): positive cache hit (stale=${String(positive.stale)})`,
-        );
-        return positive.value;
-      }
+    const positive = await this.caches.positive.read(canonical);
+    if (positive) {
+      incrementCounter('mapping.lookup.cache_hit');
+      this.log.debug(
+        `readFromCache(${canonical}): positive cache hit (stale=${String(positive.stale)})`,
+      );
+      return { results: positive.value, hit: 'positive' };
+    }
 
-      const negative = await this.caches.negative.read(canonical);
-      if (negative) {
-        incrementCounter('mapping.lookup.negative_cache_hit');
-        this.log.debug(
-          `readFromCache(${canonical}): negative cache hit (stale=${String(negative.stale)})`,
-        );
-        return [];
-      }
+    const negative = await this.caches.negative.read(canonical);
+    if (negative) {
+      incrementCounter('mapping.lookup.negative_cache_hit');
+      this.log.debug(
+        `readFromCache(${canonical}): negative cache hit (stale=${String(negative.stale)})`,
+      );
+      return { results: [], hit: 'negative' };
+    }
 
-      return [];
-    })();
+    return { results: [], hit: 'none' };
   }
 
   public async lookup(
@@ -135,7 +138,7 @@ export class SonarrLookupClient {
           }
         }
 
-        const results = await this.performLookup(safeTerm, credentials);
+        const results = await this.performLookup(safeTerm, credentials, options.priority);
         if (results.length > 0) {
           await this.caches.positive.write(canonical, results, {
             staleMs: LOOKUP_SOFT_TTL,
@@ -163,12 +166,17 @@ export class SonarrLookupClient {
   private async performLookup(
     term: string,
     credentials: SonarrLookupCredentials,
+    priority?: RequestPriority,
   ): Promise<SonarrLookupSeries[]> {
     incrementCounter('mapping.lookup.network_miss');
     return timeAsync('mapping.lookup.latency', LOOKUP_LATENCY_BUCKETS, async () => {
       try {
-        const results = await (this.queue.add(() =>
-          this.sonarrApi.lookupSeriesByTerm(term, credentials),
+        if (import.meta.env.DEV) {
+          this.log.debug?.(`lookup:queue term='${term}' priority=${priority ?? 'normal'} prioValue=${priorityValue(priority)}`);
+        }
+        const results = await (this.queue.add(
+          () => this.sonarrApi.lookupSeriesByTerm(term, credentials),
+          { priority: priorityValue(priority) },
         ) as Promise<SonarrLookupSeries[]>);
         this.log.debug(`performLookup: term='${term}' resultCount=${results.length}`);
         return results;

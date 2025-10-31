@@ -78,7 +78,9 @@ export const useCardOverlayState = ({
     reset();
   }, [anilistId, title, reset]);
 
-  const isResolving = statusIsLoading || fetchStatus === 'fetching';
+  // Reduce flicker: if we already have previous data, keep showing it while a refetch runs
+  const hasPrevData = statusData !== undefined && statusData !== null;
+  const isResolving = statusIsLoading || (fetchStatus === 'fetching' && !hasPrevData);
   const mappingUnavailable = statusData?.anilistTvdbLinkMissing === true;
   const hasError = addHasError || statusHasError || mappingUnavailable;
   const alreadyInSonarr = !!statusData?.exists || addSuccess;

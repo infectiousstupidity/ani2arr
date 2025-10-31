@@ -5,6 +5,7 @@ import type { SearchTerm } from '@/services/mapping/search-term-generator';
 import type { SonarrLookupSeries } from './sonarr';
 import type { ScopedLogger } from '@/utils/logger';
 import type { AniMedia } from './anilist';
+import type { RequestPriority } from './common';
 
 export interface Candidate {
   term: SearchTerm;
@@ -38,6 +39,10 @@ export interface MappingContext {
   lookupClient: SonarrLookupClient;
   staticProvider: StaticMappingProvider;
   credentials: SonarrLookupCredentials;
+  /** Priority hint for Sonarr lookups spawned by this context. */
+  priority?: RequestPriority;
+  /** If true, bypass fresh lookup caches and hit the network. */
+  forceLookupNetwork?: boolean;
   sessionSeenCanonical: Set<string>;
   limits: {
     maxTerms: number;

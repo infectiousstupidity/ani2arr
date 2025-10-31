@@ -1,5 +1,5 @@
 // src/rpc/schemas.ts
-import type { CheckSeriesStatusResponse, MediaMetadataHint, SonarrFormState } from '@/types';
+import type { CheckSeriesStatusResponse, MediaMetadataHint, SonarrFormState, RequestPriority } from '@/types';
 
 export interface ResolveInput {
   anilistId: number;
@@ -19,6 +19,7 @@ export interface StatusInput {
   network?: 'never';
   ignoreFailureCache?: boolean;
   metadata?: MediaMetadataHint | null;
+  priority?: RequestPriority;
 }
 
 export type StatusOutput = CheckSeriesStatusResponse;

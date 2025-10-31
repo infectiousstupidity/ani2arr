@@ -39,6 +39,8 @@ export {
   type ScoredCandidate,
 } from './mapping';
 
+export type { RequestPriority } from './common';
+
 export {
   type BrowseAdapter,
   type CardOverlayProps,

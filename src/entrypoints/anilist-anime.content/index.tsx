@@ -213,6 +213,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
       enabled: Boolean(anilistId && isConfigured && (backgroundReady || isTestEnv)),
       force_verify: true,
       ignoreFailureCache: true,
+      priority: 'high',
     },
   );
   const addSeriesMutation = useAddSeries();
@@ -364,8 +365,8 @@ async function mountAnimePageUI(
     },
   });
 
+  // Use autoMount so the UI re-mounts if the anchor is replaced
   ui.autoMount();
-  ui.mount();
   onMounted();
 }
 

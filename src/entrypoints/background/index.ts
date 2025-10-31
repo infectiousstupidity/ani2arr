@@ -77,7 +77,9 @@ export default defineBackground(() => {
 
   browser.runtime.onInstalled.addListener(async (details) => {
     try {
-      if (details.reason === 'install') {
+      // Do not automatically open the options page during test runs as the
+      // test harness controls navigation and may race with extension startup.
+      if (details.reason === 'install' && import.meta.env.MODE !== 'test') {
         browser.runtime.openOptionsPage().catch(() => {});
       }
       await api.initMappings();

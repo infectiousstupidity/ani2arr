@@ -102,6 +102,7 @@ export type SeriesStatusOptions = {
   force_verify?: boolean;
   network?: 'never';
   ignoreFailureCache?: boolean | (() => boolean);
+  priority?: 'high' | 'normal' | (() => 'high' | 'normal' | undefined);
 };
 
 export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: SeriesStatusOptions) => {
@@ -128,6 +129,10 @@ export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: Ser
           : options?.ignoreFailureCache === true;
       if (bypassFailureCache) {
         request.ignoreFailureCache = true;
+      }
+      const prio = typeof options?.priority === 'function' ? options.priority() : options?.priority;
+      if (prio) {
+        request.priority = prio;
       }
       return getKitsunarrApi().getSeriesStatus(request);
     },

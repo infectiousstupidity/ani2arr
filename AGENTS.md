@@ -1,85 +1,294 @@
-# Kitsunarr Agents Guide
+# Kitsunarr
 
-## 1. Project Snapshot
-- Kitsunarr adds Sonarr integration to AniList pages via a WXT browser extension targeting Chromium and Firefox.
-- Core stack: TypeScript (strict), React 19, TanStack Query 5, Radix UI primitives, Tailwind CSS 4, WebExtension APIs via `wxt`.
-- Services rely on `@webext-core/proxy-service` for background/foreground RPC, `@wxt-dev/storage` for local-only storage, `idb` for query caching.
-- Domain: map AniList anime -> TVDB -> Sonarr library, allowing quick add with customizable defaults.
+This file is for AI agents working in this repository.
+It defines the extension’s structure, conventions, and operational rules so agents can modify the code safely and efficiently.
 
-## 2. Tooling & Commands
-- `npm install` seeds deps and runs `wxt prepare` via `postinstall`.
-- `npm run dev` (or `npm run dev:firefox`) launches the WXT dev server with fast reload.
-- `npm run build` produces a production bundle in `dist`; `npm run zip` creates distributable archives.
-- `npm run lint` uses ESLint 9 with TypeScript config; keep it passing.
+## Keep this guide up to date
 
-## 3. Architecture Overview
-### Entry points (`src/entrypoints`)
- `popup/index.tsx` contains a lightweight status/shortcut UI, but this entrypoint is currently deactivated/not referenced by the manifest.
-- `anilist-anime.content/index.tsx` injects the main action group ([`SonarrActionGroup`](src/ui/SonarrActionGroup.tsx)) on AniList anime detail pages, hydrating TanStack Query with an IndexedDB persister and mounting UI into shadow DOM via `createShadowRootUi`.
- [`MappingService`](src/services/mapping/index.ts) orchestrates `StaticMappingProvider` (static payloads), `SonarrLookupClient` (Sonarr lookups + positive/negative TTL caches), and the search-term generator to resolve AniList IDs; successes/failures are cached with scoped TTL constants per collaborator.
- `src/api/anilist.api.ts` fetches AniList GraphQL metadata with request deduplication (inflight map) and a rate‑limit‑aware queue (concurrency 1, ~30 req/min with adaptive global backoff on 429). It supports multi‑level prequel traversal (up to 5 hops by default) for synonym/parent resolution.
- `src/ui/Form.tsx` exports Radix Select primitives, including `SelectContent` that accepts a `container` prop to render inside the shadow DOM. Callers like [`src/ui/SonarrForm.tsx`](src/ui/SonarrForm.tsx) pass a `portalContainer` through so dropdowns mount within the shadow root instead of `document.body`.
- [`src/utils/error-handling.tsx`](src/utils/error-handling.tsx): exports `ErrorCode` enum and `ExtensionError` type, provides a `createError()` factory and [`normalizeError()`](src/utils/error-handling.tsx) for unknown error conversion, plus a React ErrorBoundary component.
- [`src/utils/retry.ts`](src/utils/retry.ts): exponential backoff with jitter via `retryWithBackoff()` supporting max retries, custom backoff multipliers, and typed error handling; avoid writing bespoke retry loops.
- Content flow: AniList content script → [`library.getSeriesStatus()`](src/services/library.service.ts) (with optional `force_verify`, `network: 'never'` flags) → mapping resolution via [`mapping.resolveTvdbId()`](src/services/mapping/index.ts) → Sonarr lookup if needed → [`sonarr.addSeries()`](src/api/sonarr.api.ts) on user action → `libraryEpoch` bump → broadcast triggers status query invalidation.
- Background alarms (`browser.alarms`) do not fire reliably in MV2 on Chromium when the background page is suspended; [`background/index.ts`](src/entrypoints/background/index.ts) falls back to `setInterval` via a global guard (`__kitsunarr_fallback_interval__`). It also supports a simple readiness probe (`{ type: 'kitsunarr:ping' }`).
- Respect rate limits: AniList GraphQL requests run through `AnilistApiService`'s queue (concurrency 5) with `p-retry` handling retries/backoff, honoring `Retry-After` headers on 429s. Sonarr lookups rely on `SonarrLookupClient` for inflight dedupe plus positive/negative TTL caches and an internal queue (concurrency 5).
- Use `npm run dev`, load `.output/chrome-mv3` via browser extensions page, and exercise AniList anime pages, browse views, and options page.
+Treat `AGENTS.md` as the source of truth for structure and conventions.
 
- ## 13. Message Names and Topics
- Background listens for the following messages:
-	- `OPEN_OPTIONS_PAGE` — opens the options page
-	- `kitsunarr:mapping:refresh` — triggers static mapping refresh
-	- `kitsunarr:match:score-batch` — computes title match scores for a batch of candidates
- Broadcast topics used across contexts (wrapped with `_kitsunarr: true`):
-	- `series-updated`
-	- `settings-changed`
+* When the user requests process/structure changes (e.g., “move all types to `/example/types` instead of `/src/types`”), update this document in the same change.
+* Reflect new paths, responsibilities, and checklists; update all path references accordingly.
+* Document contract changes alongside code changes so future contributors and agents remain aligned.
 
-## 4. Domain Model & Data Flow
-- Shared contracts live under [`src/types/`](src/types); see `index.ts` for the curated surface. Modules like `anilist.ts`, `sonarr.ts`, and `extension.ts` cover AniList metadata, Sonarr resources, and RPC payloads. [`src/rpc/schemas.ts`](src/rpc/schemas.ts) defines the wire-level API surface.
-- Settings flow: options UI → [`use-settings-manager`](src/hooks/use-settings-manager.ts) → [`setExtensionOptionsSnapshot()`](src/utils/storage.ts) (splits public settings vs. `sonarrSecrets`) → background services receive updated credentials via `notifySettingsChanged()` → `settingsEpoch` bump → broadcast triggers cache clear in all contexts.
-	- Watchers rationale: `useExtensionOptions()` subscribes to both `publicOptions` and `sonarrSecrets` to maintain the combined snapshot in options/background contexts. `usePublicOptions()` subscribes only to `publicOptions` for content/UIs that cannot access secrets. These hooks are not mounted together in the same page under normal operation (options vs content), so there’s no redundant double invalidation. Cross-context updates are additionally handled by `useKitsunarrBroadcasts` via `settings-changed`/`series-updated` broadcasts.
-- **Security note**: All settings (including Sonarr credentials) are stored in `browser.storage.local` (device-only) to prevent API keys from being synced to browser cloud accounts. User defaults are hydrated from Sonarr metadata on connection, so cross-device sync is unnecessary.
-- Content flow: AniList content script → [`library.getSeriesStatus()`](src/services/library.service.ts) (with optional `force_verify`, `network: 'never'` flags) → mapping resolution via [`mapping.resolveTvdbId()`](src/services/mapping.service.ts) → Sonarr lookup if needed → [`sonarr.addSeries()`](src/api/sonarr.api.ts) on user action → `libraryEpoch` bump → broadcast triggers status query invalidation.
-- Permissions: Sonarr host access is requested on-demand via [`requestSonarrPermission()`](src/utils/validation.ts) when testConnection or API calls require it; every outbound fetch verifies with [`hasSonarrPermission()`](src/utils/validation.ts) before proceeding.
+---
 
-## 5. Key Modules At A Glance
-- [`src/api/sonarr.api.ts`](src/api/sonarr.api.ts): wraps Sonarr v3 endpoints (series, lookup, rootfolder, qualityprofile, tag, system/status) with exponential backoff retry (max 3 attempts), permission checks, rate limit handling (429 with Retry-After), and [`ExtensionError`](src/utils/error-handling.tsx) normalization.
-- [`src/api/anilist.api.ts`](src/api/anilist.api.ts): fetches AniList GraphQL metadata with request deduplication (inflight map), batched queue processing (2 requests per 1.2s batch), and multi-level relation traversal (up to 3 hops) for synonym/parent resolution.
-- [`src/ui/Form.tsx`](src/ui/Form.tsx): shared form primitives using Radix Context pattern with Tailwind styling, providing FormField/FormItem/FormLabel/FormControl/FormMessage components with automatic ID wiring via `useFormField()`.
-- [`src/ui/SonarrActionGroup.tsx`](src/ui/SonarrActionGroup.tsx): renders the injected button group with status-dependent UI (loading, in Sonarr, not found, error), handling quick-add clicks, modal launches, and external Sonarr/search links.
-- [`src/ui/Form.tsx`](src/ui/Form.tsx): exports Radix Select primitives, including `SelectContent` that accepts a `container` prop to render inside the shadow DOM. Callers like [`src/ui/SonarrForm.tsx`](src/ui/SonarrForm.tsx) pass a `portalContainer` through so dropdowns mount within the shadow root instead of `document.body`.
-- [`src/ui/BrowseOverlay.tsx`](src/ui/BrowseOverlay.tsx): adapter-based browse integration system using MutationObserver to scan for media cards, parse metadata from DOM attributes, inject action buttons via React portals into shadow DOM, and respond to wxt:locationchange events.
-- [`src/utils/error-handling.tsx`](src/utils/error-handling.tsx): defines [`ExtensionError`](src/utils/error-handling.tsx) class with `ErrorCode` enum (config, permission, network, sonarr, anilist, mapping, unknown), factory helpers (`createConfigError`, `createPermissionError`, etc.), [`normalizeError()`](src/utils/error-handling.tsx) for unknown error conversion, and React ErrorBoundary component.
-- [`src/utils/retry.ts`](src/utils/retry.ts): exponential backoff with jitter (`withRetry()` wrapper) supporting max retries, custom backoff multipliers, and typed error handling; avoid writing bespoke retry loops.
-- [`src/cache/query-cache.ts`](src/cache/query-cache.ts): TanStack Query persister backed by `idb` with key `kitsunarr:tanstack-query` for persistent cache across page reloads. Filters out credential-bearing queries (options) to prevent API key leakage into page-origin IndexedDB.
-- [`wxt.config.ts`](wxt.config.ts): single source of truth for manifest data (name, description, permissions split by MV2/MV3), entry points, @tailwindcss/vite plugin, source maps configuration, and required/optional host permissions.
+## 1. Repository snapshot
 
-## 6. Patterns & Conventions
-- Use the `@/*` path alias (configured in [`tsconfig.json`](tsconfig.json)) instead of relative traversals.
-- Stick to functional React components with `React.memo` / `React.forwardRef` when creating reusable primitives; avoid class components.
-- TanStack Query keys live in `queryKeys` object in [`use-api-queries.ts`](src/hooks/use-api-queries.ts); reuse them to avoid accidental cache fragmentation and ensure broadcasts invalidate correctly.
-- Always wrap cross-context service calls in `try/catch` and pass errors through [`normalizeError()`](src/utils/error-handling.tsx) so UI can present `userMessage` via toast/alert.
-- Prefer pure helpers in `utils/` and keep side effects (storage, fetches, cache writes) inside services or hooks.
-- Tailwind utility classes drive styling; co-locate component-specific `.css` only when shadow DOM isolation or global overrides (injected via `cssInjectionMode: 'ui'`) are required.
-- Logging goes through [`logger.create(scope)`](src/utils/logger.ts) to honor build-time log level gating and consistent prefixes.
+* Browser extension integrating **Sonarr** into **AniList** and **AniChart** (Chromium + Firefox via **WXT**).
+* Stack: **TypeScript (strict)**, **React 19**, **TanStack Query 5**, **Radix UI**, **Tailwind CSS 4**.
+* RPC via `@webext-core/proxy-service`; local-only storage via `@wxt-dev/storage`; persistent caching via IndexedDB.
+* Domain: map AniList anime → TVDB → Sonarr library; allow quick-add with customizable defaults.
 
-## 7. Caching & Resilience
-- `createTtlCache` entries store both `staleAt` (soft TTL) and `expiresAt` (hard TTL); stale data is returned while background refresh runs. With the in-memory shim removed, every read hits IndexedDB—make sure callers that need instantaneous responses maintain their own lightweight mirrors (e.g., `StaticMappingProvider` maps, library indexes).
-- Persistent cache namespaces are centralized in `src/cache/namespaces.ts` via `CacheNamespaces`. Always pass one of these constants to `createTtlCache(...)` instead of a string literal to avoid drift and make audits easy.
-- Mapping resolution caches successes (30d soft / 180d hard TTL) and categorized failures: config/permission errors (30min), network errors (5min). Use the categorized TTL helpers to avoid hammering third parties during outages.
-- **TanStack Query persistence** (via [`queryPersister`](src/cache/query-cache.ts)) keeps AniList page state snappy across navigations. **Security boundary**: only `seriesStatus` queries (containing non-sensitive titles, IDs, slugs) and public AniList metadata are persisted to the page's IndexedDB. Credentials (`options` queries) and Sonarr metadata (`sonarrMetadata` queries with filesystem paths, quality profiles, tags) are **explicitly excluded** via [`shouldPersistQuery`](src/cache/query-cache.ts) to prevent leakage to page scripts.
-- Error caches prevent retry storms: [`library.service.ts`](src/services/library.service.ts) caches API failures for 5min, [`mapping.service.ts`](src/services/mapping.service.ts) caches by error category, [`anilist.api.ts`](src/api/anilist.api.ts) uses inflight deduplication to prevent duplicate GraphQL queries.
+---
 
-## 8. UI System Notes
-- Shadow DOM constraints: content scripts mount UIs via `createShadowRootUi({ cssInjectionMode: 'ui' })`. When building new portals (Radix Select, Dialog, Tooltip), pass `portalContainer` and have consumers render Radix selects via the exported `SelectContent` from [`Form.tsx`](src/ui/Form.tsx) with its `container` prop so content renders inside the shadow root instead of `document.body`.
-- Forms rely on `FormField` context (from [`Form.tsx`](src/ui/Form.tsx)) to link labels/inputs via `useFormField()` hook; avoid breaking the context contract or accessibility will degrade.
-- Tooltips, dialogs, selects, and accordion components come from Radix UI; style through Tailwind utility classes applied to the composed primitives (Trigger, Content, Portal, etc.).
-- Browse overlays use MutationObserver with `childList: true, subtree: true, attributes: true` to detect card additions/updates. Throttle scans and use `data-kitsunarr-processed` attribute to prevent duplicate processing.
+## 2. Commands
 
-## 10. Operational Tips & Pitfalls
-- New hosts require manifest updates in [`wxt.config.ts`](wxt.config.ts) under `host_permissions` (MV3) or `permissions` (MV2) and may also need runtime permission prompts via [`requestSonarrPermission()`](src/utils/validation.ts).
-- Background alarms (`browser.alarms`) do not fire reliably in MV2 on Chromium when the background page is suspended; [`background/index.ts`](src/entrypoints/background/index.ts) falls back to `setInterval` via a global guard (`__kitsunarr_fallback_interval__`).
-- [`registerKitsunarrApi()`](src/services/index.ts) must execute exactly once (in background context). Content scripts and options pages should only ever call [`getKitsunarrApi()`](src/services/index.ts) to access the proxy client.
-- Respect rate limits: AniList GraphQL retries are handled by `AnilistApiService` using `p-retry` with exponential backoff plus `Retry-After` handling; the queue concurrency is 5. Sonarr lookups rely on `SonarrLookupClient` for inflight dedupe plus positive/negative TTL caches—there is no internal queue anymore, so throttle at the caller before introducing new bursty flows.
-- Keep AGENTS.md in sync when adding core flows, changing service contracts, or modifying RPC schemas so future agents (human or AI) stay aligned with actual behavior.
+Run all commands from the project root.
+
+* `npm install` — installs dependencies and runs `wxt prepare`.
+* `npm run dev` / `npm run dev:firefox` — starts the WXT dev server with hot reload.
+* `npm run build` — creates a production bundle in `dist/`.
+* `npm run zip` — builds distributable extension archives.
+* `npm run lint` — ESLint 9 with TypeScript config. Must pass clean.
+
+Always run **lint and build** after code edits.
+Do **not** ask for confirmation before running these commands.
+
+---
+
+## 3. Entry points (`src/entrypoints/`)
+
+| Path                       | Purpose                                                                                                                                                        |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `background/`              | Registers RPC services, schedules static mapping refresh, handles readiness pings and message routing. Must contain exactly one `registerKitsunarrApi()` call. |
+| `anilist-anime.content/`   | Injects the `SonarrActionGroup` into AniList anime detail pages via `createShadowRootUi({ cssInjectionMode: 'ui' })`. Skips movies and music.                  |
+| `anilist-browse.content/`  | Adds overlay buttons on AniList browse/search pages using `BrowseOverlay` + portals. Includes AniList media prefetch.                                          |
+| `anichart-browse.content/` | Adds overlays for AniChart browse pages.                                                                                                                       |
+| `options/`                 | Options page for configuring Sonarr URL, API key, and default settings. Handles runtime permission requests.                                                   |
+| `popup/`                   | Exists but not referenced by the manifest.                                                                                                                     |
+
+---
+
+## 4. Core services and modules
+
+### Mapping (`src/services/mapping/`)
+
+* `StaticMappingProvider`: provides cached static payloads.
+* `SonarrLookupClient`: inflight dedupe, positive/negative TTL caches, internal concurrency (5).
+* Search-term scoring pipeline with bounded depth and early-stop.
+* TTLs: success = 30d soft / 180d hard; failure = 30m (config/perm/api) or 5m (network).
+
+### AniList API (`src/api/anilist.api.ts`)
+
+* Single-lane queue (concurrency 1).
+* Inflight deduplication and 429 `Retry-After` handling.
+* Batch size 50.
+* Multi-hop prequel traversal.
+
+### Sonarr API (`src/api/sonarr.api.ts`)
+
+* Permission-checked fetch wrapper with retries/backoff on 429.
+* All requests authenticate via `X-Api-Key` header. Do not place API keys in URLs.
+* Accept CORS preflights; extensions have host permissions to allow these requests.
+* JSON requests use `Content-Type: application/json`.
+* ETag caching for read endpoints: `series`, `qualityprofile`, `rootfolder`, `tag` using `If-None-Match`/`ETag` with an in-memory cache in the background; cleared on `settings-changed`.
+
+### Library (`src/services/library.service.ts`)
+
+* Lean local Set/Map index of Sonarr series.
+* TTL: 1h soft / 24h hard.
+* Broadcasts `series-updated` on add/remove.
+
+---
+
+## 5. Query and persistence
+
+* Query keys: `src/hooks/use-api-queries.ts`. Always reuse existing keys.
+* IndexedDB persister: `src/cache/query-cache.ts` with strict `shouldPersistQuery` filtering.
+* TanStack persistence wrapper: `src/utils/query-persist-options.ts`.
+* Guards `DataCloneError` and excludes credential-bearing queries.
+
+---
+
+## 6. UI and component patterns
+
+* **Forms:** `src/ui/Form.tsx` (Radix). Use `SelectContent` with `container` prop to render dropdowns inside the shadow DOM.
+* **Overlays:** `src/ui/BrowseOverlay.tsx` and `src/ui/CardOverlay.tsx` use `IntersectionObserver` with visibility gating; portals must mount inside the shadow DOM.
+* **Settings hooks:**
+
+  * `useExtensionOptions()` = full snapshot (public + secrets)
+  * `usePublicOptions()` = public-only (safe for content scripts).
+* Cache invalidation via `useKitsunarrBroadcasts` on `settings-changed` and `series-updated`.
+
+---
+
+## 7. Messages and broadcasts
+
+All messages and broadcasts must include `_kitsunarr: true`.
+
+### Background messages
+
+* `OPEN_OPTIONS_PAGE` — open the options page.
+* `kitsunarr:mapping:refresh` — trigger static mapping refresh.
+* `kitsunarr:match:score-batch` — compute title match scores.
+* `{ type: 'kitsunarr:ping' }` — readiness probe.
+
+### Broadcast topics
+
+* `series-updated` — invalidates series queries and bumps epoch.
+* `settings-changed` — clears query cache and bumps epoch.
+
+---
+
+## 8. Security and permissions
+
+* Credentials are stored only in `browser.storage.local` (never synced).
+* Each Sonarr fetch checks `hasSonarrPermission()`; runtime requests use `requestSonarrPermission()`.
+* Logger (`src/utils/logger.ts`) redacts sensitive fields. Verbose logs disabled outside dev.
+* Do not include credentials in URLs. Headers are preferred and safer for logs/proxies.
+
+Never:
+
+* Write credentials to IndexedDB or persisted TanStack caches.
+* Add new host permissions without updating `wxt.config.ts` and following the checklist.
+
+---
+
+## 9. Caching and resilience
+
+* `createTtlCache` stores both `staleAt` and `expiresAt`. Stale reads return cached data while refreshing in background.
+* Mapping caches: categorized by result (success, config error, network).
+* AniList media cache TTL: 14d soft / 60d hard.
+* Library cache TTL: 1h soft / 24h hard.
+* Persistent cache namespaces live in `src/cache/namespaces.ts`. Use only these constants.
+
+---
+
+## 10. Coding conventions
+
+* Use `@/*` path aliases. No relative traversals.
+* Keep helpers pure in `utils/`; limit side effects to services or hooks.
+* Always wrap cross-context RPC calls in `try/catch` and pass errors through `normalizeError()`.
+* Use `withRetry()` for all retry logic (in `src/utils/retry.ts`). Do not hand-roll loops.
+* Follow strict TypeScript. Do not disable type checking or introduce `any`.
+* Keep PRs minimal and consistent with existing naming patterns.
+
+* Favor KISS, DRY, and YAGNI — solve the current problem simply, avoid duplication, and do not build speculative features.
+* Prefer well-maintained, reputable libraries over custom implementations; do not reinvent the wheel when a solid package exists.
+* Avoid needless complexity or verbosity; write clear, concise, production-grade code only.
+* Do not add superfluous comments; let code be self-explanatory and include focused docs only when they add real value.
+* Fix problems at the root; never ship hacky workarounds if a proper fix is feasible.
+* Keep edits precise and minimal; limit scope and avoid churn unrelated to the change.
+* Think holistically about the project; optimize for overall goals and user outcomes, not just local changes.
+
+### File size limits (max LOC per file)
+
+Keep files focused and small. Split concerns early to avoid “god files.”
+
+* Utilities/services (TypeScript): prefer ≤ 400 LOC (excluding imports/exports).
+* React components: prefer ≤ 250 LOC (JSX + logic). Extract subcomponents/hooks.
+* Mapping/algorithms: may go up to ~500 LOC only if tightly cohesive; otherwise split.
+* If a file exceeds these limits, add a follow-up task to split it and note the rationale in the PR description.
+
+### Function and code structure best practices
+
+* Keep functions small (≈ 40–60 LOC) and single-responsibility; avoid deep nesting; use early returns.
+* Prefer pure helpers in `src/utils/`; keep side effects confined to services or hooks.
+* Reuse existing helpers instead of rolling your own:
+  * `withRetry()` in `src/utils/retry.ts`
+  * `normalizeError()` in `src/utils/error-handling.tsx`
+  * Logger in `src/utils/logger.ts` (redacts sensitive fields)
+* Type safety: no `any`; use precise unions, discriminated unions, and `readonly` where practical.
+* Keep cross-context payloads lean and serializable; avoid giant parameter objects.
+* Consistency: reuse query keys and caches; don’t duplicate logic; never log credentials.
+
+### Type conventions (project-specific)
+
+Centralize shared types in `src/types/` and re-export curated surfaces via `src/types/index.ts`.
+
+* Organization
+  * AniList domain: `src/types/anilist.ts`
+  * Sonarr domain: `src/types/sonarr.ts`
+  * Extension/options and payloads: `src/types/extension.ts`
+  * Mapping: `src/types/mapping.ts`
+  * Overlay/UI adapters: `src/types/browse-overlay.ts`
+* Patterns
+  * Use discriminated unions for statuses/results; prefer string literal unions over enums.
+  * Mark arrays/records `readonly` when possible for immutability.
+  * Separate “public” vs “sensitive” shapes (e.g., public options safe for content scripts vs. full options with secrets).
+* Cross-context contracts
+  * RPC payloads should reference `src/types/*` and validate via `src/rpc/schemas.ts`.
+  * Do not redefine ad-hoc types inside feature files; add or reuse in `src/types/` and re-export from `src/types/index.ts`.
+
+---
+
+## 11. Operational notes
+
+* MV2 background pages may suspend `browser.alarms`; fallback to `setInterval` guarded by `__kitsunarr_fallback_interval__`.
+* `registerKitsunarrApi()` runs **once** in the background; all other contexts call `getKitsunarrApi()`.
+* Avoid persisting credential-bearing queries; filters in `query-cache.ts` enforce this.
+* Browse overlays must throttle DOM scans and mark processed cards with `data-kitsunarr-processed`.
+
+---
+
+## 12. Change recipes
+
+### Add new host permission
+
+1. Edit `wxt.config.ts` under `host_permissions` (MV3).
+2. If runtime permission is required, call `requestSonarrPermission()` from the options UI.
+3. Validate the new domain in `utils/validation.ts`.
+
+### Add a Sonarr form field
+
+1. Extend form schema in `src/rpc/schemas.ts`.
+2. Update the UI in `src/ui/SonarrForm.tsx`.
+3. Ensure selects/dialogs use the `portalContainer` prop for shadow DOM rendering.
+
+### Extend mapping logic
+
+1. Modify files in `src/services/mapping/*`.
+2. Maintain correct TTLs and inflight deduplication behavior.
+3. Categorize and cache failures by type.
+
+### Add a query that must not persist
+
+1. Define its key in `use-api-queries.ts`.
+2. Update `shouldPersistQuery` to explicitly exclude it.
+
+### Add a new overlay action
+
+1. Implement in `src/ui/BrowseOverlay.tsx` or `src/ui/CardOverlay.tsx`.
+2. Guard duplicates with `data-kitsunarr-processed`.
+3. Mount portals into the shadow root.
+
+---
+
+## 13. Tests and validation
+
+Run targeted tests first, then full suite if shared modules changed.
+
+```bash
+npm run lint
+npm run compile
+```
+
+Smoke validation checklist:
+
+* Background responds to readiness ping.
+* Options page saves and restores Sonarr settings correctly.
+* Content injection occurs once per AniList page.
+* Radix portals render inside the shadow DOM.
+* AniList and Sonarr requests stay within documented concurrency and respect 429 `Retry-After`.
+* No credential data appears in IndexedDB or persisted queries.
+
+---
+
+## 14. File pointers
+
+| Area          | Path                                                                          |
+| ------------- | ----------------------------------------------------------------------------- |
+| RPC           | `src/rpc/index.ts`, `src/rpc/schemas.ts`                                      |
+| Mapping       | `src/services/mapping/*`                                                      |
+| AniList API   | `src/api/anilist.api.ts`                                                      |
+| Sonarr API    | `src/api/sonarr.api.ts`                                                       |
+| Library       | `src/services/library.service.ts`                                             |
+| Persistence   | `src/cache/query-cache.ts`, `src/utils/query-persist-options.ts`              |
+| Broadcasts    | `src/hooks/use-broadcasts.ts`                                                 |
+| UI            | `src/ui/SonarrActionGroup.tsx`, `src/ui/Form.tsx`, `src/ui/BrowseOverlay.tsx` |
+| Config        | `wxt.config.ts`                                                               |
+| Retry helpers | `src/utils/retry.ts`                                                          |
+
+---
+
+## 15. Final checklist before commit
+
+* ✅ `npm run lint` passes with no warnings.
+* ✅ `npm run build` completes successfully.
+* ✅ Background service responds to ping.
+* ✅ Options page permission flow works.
+* ✅ AniList overlay injects once and renders correctly.
+* ✅ No new persisted queries contain secrets.
+* ✅ 429 handling and TTL logic unchanged or extended safely.
+* ✅ No additional host permissions added without manifest update.

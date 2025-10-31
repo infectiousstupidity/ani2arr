@@ -1,4 +1,4 @@
-// src/entrypoints/anilist-browse.content/index.tsx
+// src/entrypoints/anichart-browse.content/index.tsx
 import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { QueryClient } from '@tanstack/react-query';
@@ -164,6 +164,7 @@ export default defineContentScript({
           staleTime: Infinity,
           refetchOnWindowFocus: false,
           retry: false,
+          gcTime: 30 * 60 * 1000,
         },
       },
     });
