@@ -187,8 +187,8 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   // In unit tests, don't block on background readiness to avoid long LOADING states.
   const isTestEnv = typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined' && import.meta.env.MODE === 'test';
   const [backgroundReady, setBackgroundReady] = useState<boolean>(isTestEnv);
-  const { data: options } = usePublicOptions();
-  const isConfigured = Boolean(options?.isConfigured);
+  const { data: options, isPending: optionsPending, isError: optionsError } = usePublicOptions();
+  const isConfigured = options?.isConfigured === true;
   const defaults = options?.defaults ?? null;
 
   // Kick off background readiness probe without blocking initial render
@@ -239,6 +239,9 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   const tvdbId = mappingUnavailable ? null : statusQuery.data?.tvdbId;
 
   const getStatus = (): 'LOADING' | 'IN_SONARR' | 'NOT_IN_SONARR' | 'ERROR' | 'ADDING' => {
+    // Treat unknown configuration as loading to avoid showing a persistent error
+    if (optionsPending) return 'LOADING';
+    if (optionsError) return 'ERROR';
     if (!isConfigured) return 'ERROR';
     // While background is booting, show a loading state even before the query fires
     if (!backgroundReady && !isTestEnv) return 'LOADING';

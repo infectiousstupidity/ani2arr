@@ -4,7 +4,7 @@ import { useSettingsManager } from '@/hooks/use-settings-manager';
 import { Input, FormField, FormItem, FormLabel, FormControl } from './Form';
 import Button from './Button';
 import SonarrForm from './SonarrForm';
-import { CheckCircledIcon, CrossCircledIcon, ReloadIcon } from '@radix-ui/react-icons';
+import { CircleCheck, CircleX, RotateCcw } from 'lucide-react';
 
 const SettingsForm: React.FC = () => {
   const manager = useSettingsManager();
@@ -76,13 +76,13 @@ const SettingsForm: React.FC = () => {
           >
             {manager.testConnectionState.isSuccess && (
               <>
-                <CheckCircledIcon className="text-success" />
+                <CircleCheck className="text-success" />
                 <span>Connected</span>
               </>
             )}
             {manager.testConnectionState.isError && (
               <>
-                <CrossCircledIcon className="text-error" />
+                <CircleX className="text-error" />
                 <span>Failed</span>
               </>
             )}
@@ -129,7 +129,7 @@ const SettingsForm: React.FC = () => {
               aria-label="Refresh data from Sonarr"
               aria-busy={manager.sonarrMetadata.isRefetching}
             >
-              <ReloadIcon />
+              <RotateCcw />
             </Button>
           </div>
 

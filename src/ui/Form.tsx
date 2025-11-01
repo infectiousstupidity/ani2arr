@@ -3,7 +3,7 @@ import React, { createContext, useContext, useId } from 'react';
 import * as LabelPrimitive from '@radix-ui/react-label';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
-import { CheckIcon, ChevronDownIcon } from '@radix-ui/react-icons';
+import { Check, ChevronDown } from 'lucide-react';
 
 type FormItemContextValue = {
   id: string;
@@ -116,7 +116,7 @@ const SelectTrigger = React.memo(
       >
         {children}
         <SelectPrimitive.Icon asChild>
-          <ChevronDownIcon className="h-4 w-4 opacity-50" />
+          <ChevronDown className="h-4 w-4 opacity-50" />
         </SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
     );
@@ -157,7 +157,7 @@ const SelectItem = React.memo(
     >
       <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
         <SelectPrimitive.ItemIndicator>
-          <CheckIcon className="h-4 w-4" />
+          <Check className="h-4 w-4" />
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>

@@ -1,6 +1,6 @@
 // src/ui/MultiTagInput.tsx
 import React, { useState, useMemo, useRef } from 'react';
-import { Cross2Icon } from '@radix-ui/react-icons';
+import { X } from 'lucide-react';
 
 interface MultiTagInputProps {
   value: string[];
@@ -89,7 +89,7 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
               disabled={disabled}
               aria-label={`Remove ${tag}`}
             >
-              <Cross2Icon className="h-3 w-3" />
+              <X className="h-3 w-3" />
             </button>
           </span>
         ))}

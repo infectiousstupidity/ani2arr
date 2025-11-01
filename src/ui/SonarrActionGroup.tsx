@@ -2,7 +2,7 @@
 import React from 'react';
 import Button from '@/ui/Button';
 import TooltipWrapper from '@/ui/TooltipWrapper';
-import { ExternalLinkIcon, ChevronDownIcon } from '@radix-ui/react-icons';
+import { SquareArrowOutUpRight, ChevronDown } from 'lucide-react';
 import { usePublicOptions } from '@/hooks/use-api-queries';
 import { logger } from '@/utils/logger';
 import Dropdown, { DropdownItem } from '@/ui/Dropdown';
@@ -101,7 +101,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
               className="rounded-none h-[35px] w-[35px] focus-visible:z-10 focus-visible:ring-offset-0"
               aria-label="Actions"
             >
-              <ChevronDownIcon className="h-4 w-4" />
+              <ChevronDown className="h-4 w-4" />
             </Button>
           }
         >
@@ -142,7 +142,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
                   className="rounded-none h-[35px] w-[35px] focus-visible:z-10 focus-visible:ring-offset-0"
                   aria-label="Actions"
                 >
-                  <ChevronDownIcon className="h-4 w-4" />
+                  <ChevronDown className="h-4 w-4" />
                 </Button>
               }
             >
@@ -181,7 +181,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
               target="_blank"
               rel="noopener noreferrer"
             >
-              <ExternalLinkIcon />
+              <SquareArrowOutUpRight className="h-4 w-4" />
             </a>
           </Button>
         )}

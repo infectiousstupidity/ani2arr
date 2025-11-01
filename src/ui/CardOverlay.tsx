@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CheckIcon, ExclamationTriangleIcon, ExternalLinkIcon, GearIcon, PlusIcon } from '@radix-ui/react-icons';
+import { Check, TriangleAlert, SlidersHorizontal, Plus, Wrench, SquareArrowOutUpRight } from 'lucide-react';
 import TooltipWrapper from '@/ui/TooltipWrapper';
 import type { CardOverlayProps } from '@/types';
 import { useCardOverlayState } from '@/hooks/use-card-overlay-state';
@@ -8,16 +8,40 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   anilistId,
   title,
   onOpenModal,
+  onOpenMappingFix,
   isConfigured,
   defaultForm,
   metadata,
   sonarrUrl,
   observeTarget,
+  anchorCorner = 'bottom-left',
+  stackDirection = 'up',
+  anchorOffsetX = -8,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [gateOpen, setGateOpen] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const gateTimerRef = useRef<number | null>(null);
+  const [stackOpen, setStackOpen] = useState(false);
+  const closeTimerRef = useRef<number | null>(null);
+
+  const openStack = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setStackOpen(true);
+  }, []);
+
+  const scheduleCloseStack = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = window.setTimeout(() => {
+      setStackOpen(false);
+      closeTimerRef.current = null;
+    }, 160);
+  }, []);
 
   useEffect(() => {
     const target = (observeTarget as Element | undefined) ?? null;
@@ -73,6 +97,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     quickAddDisabled,
     handleQuickAdd,
     statusData,
+    mappingUnavailable,
   } = useCardOverlayState({
     anilistId,
     title,
@@ -102,18 +127,18 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
       case 'adding':
         return <span className="kitsunarr-card-overlay__spinner" aria-hidden="true" />;
       case 'in-sonarr':
-        return <CheckIcon className="kitsunarr-card-overlay__symbol" aria-hidden="true" />;
+        return <Check className="kitsunarr-card-overlay__symbol" aria-hidden="true" />;
       case 'error':
-        return <ExclamationTriangleIcon className="kitsunarr-card-overlay__symbol" aria-hidden="true" />;
+        return <TriangleAlert className="kitsunarr-card-overlay__symbol" aria-hidden="true" />;
       default:
-        return <PlusIcon className="kitsunarr-card-overlay__symbol" aria-hidden="true" />;
+        return <Plus className="kitsunarr-card-overlay__symbol" aria-hidden="true" />;
     }
   })();
 
   const tooltipContainer = useMemo(() => (typeof document !== 'undefined' ? document.body : null), []);
-  const showAdvancedButton = overlayState === 'addable';
-  const showExternalButton = overlayState === 'in-sonarr' && Boolean(sonarrUrl);
-  const advancedDisabled = false;
+  const showAdvancedButton = overlayState === 'addable' || overlayState === 'in-sonarr' || overlayState === 'error' || overlayState === 'resolving' || overlayState === 'adding';
+  const showExternalButton = (overlayState === 'in-sonarr' || overlayState === 'adding') && Boolean(sonarrUrl);
+  const advancedDisabled = overlayState === 'resolving' || overlayState === 'adding' || (overlayState === 'error' && mappingUnavailable);
   const externalHref = useMemo(() => {
     if (!sonarrUrl) return null;
     const normalized = sonarrUrl.replace(/\/$/, '');
@@ -123,92 +148,126 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     return `${normalized}/add/new?term=${encodeURIComponent(title)}`;
   }, [sonarrUrl, statusData?.series?.titleSlug, title]);
 
-  return (
-    <div className="kitsunarr-card-overlay" data-state={overlayState}>
-      <TooltipWrapper
-        content={quickAddTitle}
-        side="top"
-        align="start"
-        sideOffset={6}
-        container={tooltipContainer}
-      >
+  const overrideActive = statusData?.overrideActive === true;
+
+  const openMappingFix = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onOpenMappingFix?.(anilistId, title, overrideActive);
+  }, [anilistId, onOpenMappingFix, overrideActive, title]);
+
+  
+
+  // Prebuild stack action nodes
+  const actionOpenExternal = (
+    showExternalButton && externalHref ? (
+      <TooltipWrapper content="Open in Sonarr" side="right" align="center" sideOffset={6} container={tooltipContainer}>
         <button
           type="button"
-          className="kitsunarr-card-overlay__quick"
-          data-state={overlayState}
-          aria-label={quickAddAriaLabel}
-          onClick={handleQuickAdd}
-          onMouseDown={swallowEvent}
-          disabled={quickAddDisabled}
-          aria-disabled={quickAddDisabled || undefined}
+          className="kitsunarr-card-overlay__action"
+          aria-label="Open in Sonarr"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try { window.open(externalHref || undefined, '_blank', 'noopener'); } catch { /* ignore */ }
+          }}
+          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
         >
-          {quickAddIcon}
+          <SquareArrowOutUpRight aria-hidden="true" className="h-4 w-4" />
         </button>
       </TooltipWrapper>
+    ) : null
+  );
 
-      {(showAdvancedButton || showExternalButton) && (
-        <div className="kitsunarr-card-overlay__gear-shell" data-state={overlayState}>
-          {showAdvancedButton && (
-            <TooltipWrapper
-              content="Advanced Sonarr options"
-              side="top"
-              align="start"
-              sideOffset={6}
-              container={tooltipContainer}
-            >
-              <button
-                type="button"
-                className="kitsunarr-card-overlay__gear"
-                aria-label="Open advanced Sonarr options"
-                onClick={handleOpenAdvanced}
-                onMouseDown={swallowEvent}
-                disabled={advancedDisabled}
-                aria-disabled={advancedDisabled || undefined}
-              >
-                <GearIcon aria-hidden="true" />
-              </button>
-            </TooltipWrapper>
-          )}
+  const actionFixMapping = (
+    onOpenMappingFix ? (
+      <TooltipWrapper content="Fix mapping…" side="right" align="center" sideOffset={6} container={tooltipContainer}>
+        <button type="button" className="kitsunarr-card-overlay__action" aria-label="Fix mapping" onClick={openMappingFix} onMouseDown={swallowEvent}>
+          <Wrench aria-hidden="true" className="h-4 w-4" />
+        </button>
+      </TooltipWrapper>
+    ) : null
+  );
 
-          {showExternalButton && externalHref && (
-            <TooltipWrapper
-              content="Open in Sonarr"
-              side="top"
-              align="start"
-              sideOffset={6}
-              container={tooltipContainer}
-            >
-              <div>
-                {/* mirror External Link Button behavior from SonarrActionGroup */}
-                <a
-                  className="kitsunarr-card-overlay__external"
-                  href={externalHref}
-                  // keep the semantics for non-JS fallback and accessibility
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => {
-                    // stop parent handlers from receiving the click
-                    e.stopPropagation();
-                    // attempt to open the URL in a new tab programmatically
-                    try {
-                      // window.open respects user preferences (new tab/window)
-                      window.open(externalHref || undefined, '_blank', 'noopener');
-                    } catch {
-                      // if window.open fails for any reason, allow the anchor to work
-                    }
-                    // prevent default to avoid duplicate navigation in same tab
-                    e.preventDefault();
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onAuxClick={(e) => e.stopPropagation()}
-                  aria-label="Open in Sonarr"
-                >
-                  <ExternalLinkIcon aria-hidden="true" />
-                </a>
-              </div>
-            </TooltipWrapper>
-          )}
+  const actionAdvanced = (
+    showAdvancedButton ? (
+      <TooltipWrapper content="Advanced Sonarr options" side="right" align="center" sideOffset={6} container={tooltipContainer}>
+        <button
+          type="button"
+          className="kitsunarr-card-overlay__action"
+          aria-label="Open advanced Sonarr options"
+          onClick={handleOpenAdvanced}
+          onMouseDown={swallowEvent}
+          disabled={advancedDisabled}
+          aria-disabled={advancedDisabled || undefined}
+        >
+          <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
+        </button>
+      </TooltipWrapper>
+    ) : null
+  );
+
+  const renderStackItems = () => {
+    const items: React.ReactNode[] = [];
+    const showExternal = (overlayState === 'in-sonarr' || overlayState === 'adding') && !!actionOpenExternal;
+    if (stackDirection === 'down') {
+      if (actionAdvanced) items.push(actionAdvanced);
+      if (actionFixMapping) items.push(actionFixMapping);
+      if (showExternal) items.push(actionOpenExternal);
+    } else {
+      // Stack grows upward: the last DOM item sits closest to the anchor.
+      // Desired visual bottom→top = Advanced → Fix mapping → Open in Sonarr.
+      // Therefore DOM (top→bottom) must be = Open → Fix mapping → Advanced.
+      if (showExternal) items.push(actionOpenExternal);
+      if (actionFixMapping) items.push(actionFixMapping);
+      if (actionAdvanced) items.push(actionAdvanced);
+    }
+    return items;
+  };
+
+  return (
+    <div
+      className="kitsunarr-card-overlay"
+      data-state={overlayState}
+      data-corner={anchorCorner}
+      style={{ ['--badge-offset-x']: `${anchorOffsetX}px` } as React.CSSProperties}
+      onMouseEnter={openStack}
+      onMouseLeave={scheduleCloseStack}
+    >
+      <div className="kitsunarr-card-overlay__anchor-wrap" onMouseEnter={openStack} onMouseLeave={scheduleCloseStack}>
+        <TooltipWrapper
+          content={quickAddTitle}
+          side="right"
+          align="center"
+          sideOffset={6}
+          container={tooltipContainer}
+        >
+          <button
+            type="button"
+            className="kitsunarr-card-overlay__quick"
+            data-state={overlayState}
+            aria-label={quickAddAriaLabel}
+            onClick={handleQuickAdd}
+            onMouseDown={swallowEvent}
+            disabled={quickAddDisabled}
+            aria-disabled={quickAddDisabled || undefined}
+          >
+            {quickAddIcon}
+          </button>
+        </TooltipWrapper>
+      </div>
+
+      {/* Vertical action stack */}
+      {(showAdvancedButton || showExternalButton || onOpenMappingFix) && (
+        <div
+          className="kitsunarr-card-overlay__stack"
+          data-open={stackOpen || undefined}
+          data-direction={stackDirection}
+          onMouseEnter={openStack}
+          onMouseLeave={scheduleCloseStack}
+        >
+          {renderStackItems()}
+
         </div>
       )}
     </div>
@@ -218,3 +277,5 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
 CardOverlay.displayName = 'CardOverlay';
 
 export { CardOverlay };
+
+// (removed) Wrench fallback not needed after switching to lucide-react

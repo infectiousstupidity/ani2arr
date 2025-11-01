@@ -66,15 +66,17 @@ a.cover {
 
 .kitsunarr-card-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  transform: translate(-16px, -16px);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   pointer-events: none;
   z-index: 80;
   font-family: inherit;
+}
+.kitsunarr-card-overlay[data-corner='bottom-left'] {
+  left: var(--badge-offset-x, -8px);
+  bottom: 16px;
+}
+.kitsunarr-card-overlay[data-corner='top-left'] {
+  left: var(--badge-offset-x, -6px);
+  top: -6px;
 }
 
 /* ---------- Quick add button ---------- */
@@ -93,6 +95,12 @@ a.cover {
   transition: transform .2s ease-in-out,
               box-shadow .2s ease-in-out;
   cursor: pointer;
+}
+
+/* Anchor wrapper to capture hover even when button is disabled */
+.kitsunarr-card-overlay__anchor-wrap {
+  display: inline-block;
+  pointer-events: auto;
 }
 
 .kitsunarr-card-overlay__quick:hover:not([disabled]):not([data-state='in-sonarr']) {
@@ -150,30 +158,29 @@ a.cover {
   animation: kitsunarr-spin 0.7s linear infinite;
 }
 
-/* ---------- Gear reveal + button ---------- */
-.kitsunarr-card-overlay__gear-shell {
-  display: flex;
+/* Vertical action stack */
+.kitsunarr-card-overlay__stack {
+  position: absolute;
+  left: 0;
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
   opacity: 0;
-  transform: scale(.2);
-  transition: transform .2s ease-in-out,
-              opacity .2s ease-in-out;
+  transition: opacity .2s ease-in-out;
 }
-
-a.cover:hover .kitsunarr-card-overlay__gear-shell,
-.kitsunarr-card-overlay:focus-within .kitsunarr-card-overlay__gear-shell {
+.kitsunarr-card-overlay__stack[data-direction='up'] { bottom: 36px; }
+.kitsunarr-card-overlay__stack[data-direction='down'] { top: 36px; }
+.kitsunarr-card-overlay__stack[data-open='true'] {
   pointer-events: auto;
   opacity: 1;
-  transform: scale(1);
 }
 
-.kitsunarr-card-overlay__gear {
+.kitsunarr-card-overlay__action {
   pointer-events: auto;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  /* improved, deeper blue variant for contrast; icons use white for accessibility */
-  background: #167ea6; /* deeper blue that pairs with #3db4f2 */
+  background: #167ea6;
   color: #ffffff;
   display: inline-flex;
   align-items: center;
@@ -181,59 +188,32 @@ a.cover:hover .kitsunarr-card-overlay__gear-shell,
   box-shadow: 0 10px 22px rgba(7, 14, 22, 0.45);
   padding: 0;
   border: 1px solid rgba(5, 13, 24, 0.45);
-  transform: scale(1);
-  transition: transform .2s ease-in-out,
-              box-shadow .2s ease-in-out,
-              background-color .2s ease-in-out;
+  transform-origin: center bottom;
+  transform: scale(0.86);
+  opacity: 0;
+  margin-bottom: 0;
+  transition:
+    transform .2s ease-in-out,
+    opacity .2s ease-in-out,
+    box-shadow .2s ease-in-out,
+    background-color .2s ease-in-out,
+    margin-bottom .2s ease-in-out;
   cursor: pointer;
 }
-
-.kitsunarr-card-overlay__gear:hover:not(:disabled):not([aria-disabled='true']) {
+.kitsunarr-card-overlay__stack[data-open='true'] .kitsunarr-card-overlay__action {
+  transform: scale(1);
+  opacity: 1;
+  margin-bottom: 8px;
+}
+.kitsunarr-card-overlay__stack[data-open='true'] .kitsunarr-card-overlay__action:last-child { margin-bottom: 0; }
+.kitsunarr-card-overlay__action:hover:not(:disabled):not([aria-disabled='true']) {
   transform: scale(1.08);
   box-shadow: 0 14px 26px rgba(7, 14, 22, 0.5);
   background: #0f5f80;
 }
-
-.kitsunarr-card-overlay__gear svg {
-  width: 14px;
-  height: 14px;
-  color: #ffffff; /* white gear icon */
-}
-
-/* External Sonarr link button - same size as gear and darker variant */
-.kitsunarr-card-overlay__external {
-  pointer-events: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: #167ea6;
-  color: #ffffff;
-  box-shadow: 0 10px 22px rgba(7, 14, 22, 0.45);
-  text-decoration: none;
-  border: 1px solid rgba(5, 13, 24, 0.45);
-  transition: transform .2s ease-in-out, box-shadow .2s ease-in-out, background-color .2s ease-in-out;
-}
-
-.kitsunarr-card-overlay__external:hover:not([disabled]) {
-  transform: scale(1.08);
-  box-shadow: 0 14px 26px rgba(7, 14, 22, 0.5);
-  background: #0f5f80;
-}
-
-.kitsunarr-card-overlay__external svg { width: 14px; height: 14px; color: #ffffff; }
-
-.kitsunarr-card-overlay__gear:disabled,
-.kitsunarr-card-overlay__gear[aria-disabled='true'] {
-  cursor: default;
-}
-
-.kitsunarr-card-overlay__gear:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-}
+.kitsunarr-card-overlay__action svg { width: 14px; height: 14px; color: #ffffff; }
+.kitsunarr-card-overlay__action:disabled,
+.kitsunarr-card-overlay__action[aria-disabled='true'] { cursor: default; }
 
 /* ---------- A11y, motion, misc ---------- */
 @media (prefers-reduced-motion: reduce) {
@@ -242,8 +222,8 @@ a.cover:hover .kitsunarr-card-overlay__gear-shell,
   }
 
   .kitsunarr-card-overlay__quick,
-  .kitsunarr-card-overlay__gear,
-  .kitsunarr-card-overlay__gear-shell {
+  .kitsunarr-card-overlay__action,
+  .kitsunarr-card-overlay__stack {
     transition: none;
     transform: none;
   }

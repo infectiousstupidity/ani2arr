@@ -5,7 +5,7 @@ import { useAddSeriesManager } from '@/hooks/use-add-series-manager';
 import { useTheme } from '@/hooks/use-theme';
 import { Modal, ModalContent, ModalTitle, ModalFooter } from '@/ui/Modal';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Cross1Icon, ExternalLinkIcon } from '@radix-ui/react-icons';
+import { X, SquareArrowOutUpRight } from 'lucide-react';
 import Button from '@/ui/Button';
 import SonarrForm from '@/ui/SonarrForm';
 import type { MediaMetadataHint } from '@/types';
@@ -74,7 +74,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
             className="absolute right-4 top-4 rounded-sm opacity-70 text-text-primary transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 disabled:pointer-events-none"
             aria-label="Close"
           >
-            <Cross1Icon className="h-4 w-4" />
+            <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </Dialog.Close>
           <div className="flex items-center ml-auto">
@@ -89,7 +89,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
               }
               className="text-text-secondary"
             >
-              <ExternalLinkIcon />
+              <SquareArrowOutUpRight className="h-4 w-4" />
             </Button>
           </div>
           {!sonarrReady ? (
