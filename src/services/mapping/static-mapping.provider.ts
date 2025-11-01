@@ -219,9 +219,11 @@ export class StaticMappingProvider {
       if (anilistId != null && tvdbId != null) {
         pairs[anilistId] = tvdbId;
       } else {
-        this.log.debug(
-          `buildPairsFromSource: skipped entry ${rawKey} (anilist=${String(anilistId)}, tvdb=${String(tvdbId)})`,
-        );
+        // Commented out to reduce log noise while keeping the message available
+        // for future debugging.
+        // this.log.debug(
+        //   `buildPairsFromSource: skipped entry ${rawKey} (anilist=${String(anilistId)}, tvdb=${String(tvdbId)})`,
+        // );
       }
     }
 

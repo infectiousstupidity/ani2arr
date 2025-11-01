@@ -11,10 +11,19 @@ const log = logger.create('AniList Prefetch');
 
 // Hook to prefetch AniList media data in batches based on card visibility
 export const useAnilistBatchPrefetch = ({ cardPortals }: UseAnilistBatchPrefetchParams): void => {
-  // Enable on AniList browse/search surfaces where grids are large.
+  // Enable on AniList browse/search and AniChart season/browse surfaces.
   const enabled = typeof window !== 'undefined' && (() => {
+    const host = (window.location.hostname || '').toLowerCase();
     const p = window.location.pathname || '';
-    return p === '/' || p.startsWith('/home') || p.startsWith('/search/anime');
+    // AniList browse/search
+    if (host.includes('anilist.co')) {
+      return p === '/' || p.startsWith('/home') || p.startsWith('/search');
+    }
+    // AniChart season/browse pages (loaded only on anichart entrypoint)
+    if (host.includes('anichart.net')) {
+      return true;
+    }
+    return false;
   })();
   const api = useMemo(() => getKitsunarrApi(), []);
 
