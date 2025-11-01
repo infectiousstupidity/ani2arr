@@ -57,7 +57,19 @@ Do **not** ask for confirmation before running these commands.
 * `StaticMappingProvider`: provides cached static payloads.
 * `SonarrLookupClient`: inflight dedupe, positive/negative TTL caches, internal concurrency (5).
 * Search-term scoring pipeline with bounded depth and early-stop.
-* TTLs: success = 30d soft / 180d hard; failure = 30m (config/perm/api) or 5m (network).
+* TTLs:
+  * Resolved mapping success = 30d soft / 180d hard.
+  * No-match (validation) failure = 24h soft / 48h hard.
+  * Config/permission/API failure = 30m soft / 60m hard.
+  * Network failure = 5m soft / 15m hard.
+* Sonarr lookup cache TTLs:
+  * Positive = 10m soft / 30m hard (unchanged).
+  * Negative (no results) = 24h soft / 48h hard. Manual retries from the overlay bypass caches.
+* Mapping overrides: background-resident in-memory map with sync/local storage hydration.
+  * Storage keys: `sync:mappingOverrides` (authoritative), `local:mappingOverridesCache` (mirror for hot reads).
+  * Shape: `{ [anilistId: string]: { tvdbId: number; updatedAt: number } }`.
+  * `MappingService` checks overrides first; overrides are authoritative.
+  * Per-ID cache eviction helper used when overrides change.
 
 ### AniList API (`src/api/anilist.api.ts`)
 
@@ -88,6 +100,7 @@ Do **not** ask for confirmation before running these commands.
 * IndexedDB persister: `src/cache/query-cache.ts` with strict `shouldPersistQuery` filtering.
 * TanStack persistence wrapper: `src/utils/query-persist-options.ts`.
 * Guards `DataCloneError` and excludes credential-bearing queries.
+* Mapping overrides are persisted via `@wxt-dev/storage` sync storage (no secrets) with a local mirror for fast reads.
 
 ---
 
@@ -118,6 +131,7 @@ All messages and broadcasts must include `_kitsunarr: true`.
 
 * `series-updated` — invalidates series queries and bumps epoch.
 * `settings-changed` — clears query cache and bumps epoch.
+* Overrides set/clear also broadcast via `series-updated` with `{ action: 'override:set' | 'override:clear' }` for UI invalidation.
 
 ---
 
@@ -200,6 +214,7 @@ Centralize shared types in `src/types/` and re-export curated surfaces via `src/
 * Cross-context contracts
   * RPC payloads should reference `src/types/*` and validate via `src/rpc/schemas.ts`.
   * Do not redefine ad-hoc types inside feature files; add or reuse in `src/types/` and re-export from `src/types/index.ts`.
+  * `CheckSeriesStatusResponse` includes optional `overrideActive?: boolean` to signal active manual mapping.
 
 ---
 
@@ -275,6 +290,7 @@ Smoke validation checklist:
 | Sonarr API    | `src/api/sonarr.api.ts`                                                       |
 | Library       | `src/services/library.service.ts`                                             |
 | Persistence   | `src/cache/query-cache.ts`, `src/utils/query-persist-options.ts`              |
+| Overrides     | `src/utils/overrides-storage.ts`, `src/services/mapping/overrides.service.ts` |
 | Broadcasts    | `src/hooks/use-broadcasts.ts`                                                 |
 | UI            | `src/ui/SonarrActionGroup.tsx`, `src/ui/Form.tsx`, `src/ui/BrowseOverlay.tsx` |
 | Config        | `wxt.config.ts`                                                               |

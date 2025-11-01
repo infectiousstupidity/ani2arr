@@ -12,8 +12,10 @@ import { normalizeError } from '@/utils/error-handling';
 const LOOKUP_SOFT_TTL = 10 * 60 * 1000; // 10 minutes
 const LOOKUP_HARD_TTL = 30 * 60 * 1000; // 30 minutes
 
-const LOOKUP_NEGATIVE_SOFT_TTL = 5 * 60 * 1000; // 5 minutes
-const LOOKUP_NEGATIVE_HARD_TTL = 15 * 60 * 1000; // 15 minutes
+// Negative results (no matches) should not be retried frequently during browsing
+// Manual retries bypasses via forceNetwork.
+const LOOKUP_NEGATIVE_SOFT_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const LOOKUP_NEGATIVE_HARD_TTL = 48 * 60 * 60 * 1000; // 48 hours
 
 const LOOKUP_LATENCY_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
 

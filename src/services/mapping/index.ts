@@ -17,7 +17,12 @@ import { MappingOverridesService } from './overrides.service';
 const RESOLVED_SOFT_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
 const RESOLVED_HARD_TTL = 180 * 24 * 60 * 60 * 1000; // 180 days
 
-const FAILURE_SOFT_TTL = 30 * 60 * 1000; // 30 minutes
+// Validation (no-match) failures should not re-trigger pipeline repeatedly during browsing.
+// Use a longer TTL, but keep other failure types shorter.
+const NO_MATCH_SOFT_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const NO_MATCH_HARD_TTL = 48 * 60 * 60 * 1000; // 48 hours
+
+const FAILURE_SOFT_TTL = 30 * 60 * 1000; // 30 minutes (config/perm/api)
 const FAILURE_HARD_TTL = FAILURE_SOFT_TTL * 2;
 const NETWORK_FAILURE_SOFT_TTL = 5 * 60 * 1000; // 5 minutes
 const NETWORK_FAILURE_HARD_TTL = NETWORK_FAILURE_SOFT_TTL * 3;
@@ -39,7 +44,7 @@ type ResolveTvdbIdOptions = {
   hints?: ResolveHints;
   ignoreFailureCache?: boolean;
   priority?: RequestPriority;
-  /** Force Sonarr lookups to bypass fresh caches (used by anime detail force-verify). */
+  // Force Sonarr lookups to bypass fresh caches (used by anime detail force-verify).
   forceLookupNetwork?: boolean;
 };
 
@@ -497,9 +502,15 @@ export class MappingService {
   }
 
   private failureTtlsFor(error: ExtensionError): { stale: number; hard: number } {
+    if (error.code === ErrorCode.VALIDATION_ERROR) {
+      // No match found (expected) — back off for a day unless user explicitly retries
+      return { stale: NO_MATCH_SOFT_TTL, hard: NO_MATCH_HARD_TTL };
+    }
     if (error.code === ErrorCode.NETWORK_ERROR || error.code === ErrorCode.API_ERROR) {
+      // Transient; keep short
       return { stale: NETWORK_FAILURE_SOFT_TTL, hard: NETWORK_FAILURE_HARD_TTL };
     }
+    // Config/permission/api (non-transient): medium backoff
     return { stale: FAILURE_SOFT_TTL, hard: FAILURE_HARD_TTL };
   }
 

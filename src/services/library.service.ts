@@ -163,6 +163,8 @@ export class LibraryService {
       }
       if (options.ignoreFailureCache) {
         mappingOptions.ignoreFailureCache = true;
+        // When user explicitly retries from the overlay, bypass Sonarr lookup caches as well.
+        mappingOptions.forceLookupNetwork = true;
       }
       if (options.priority) {
         mappingOptions.priority = options.priority;
