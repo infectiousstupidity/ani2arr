@@ -57,18 +57,23 @@
 /* ---------- Positioning ---------- */
 a.cover {
   position: relative;
+  overflow: visible !important; /* allow anchor to extend left for rank-badge alignment */
 }
 
 .kitsunarr-card-overlay {
   position: absolute;
-  left: 14px;
-  bottom: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: inline-block;
   pointer-events: none;
   z-index: 30;
   font-family: inherit;
+}
+.kitsunarr-card-overlay[data-corner='bottom-left'] {
+  left: var(--badge-offset-x, -6px);
+  bottom: -6px;
+}
+.kitsunarr-card-overlay[data-corner='top-left'] {
+  left: var(--badge-offset-x, -8px);
+  top: 14px;
 }
 
 /* ---------- Quick add button ---------- */
@@ -88,6 +93,12 @@ a.cover {
               box-shadow .2s ease-in-out,
               opacity .2s ease-in-out;
   cursor: pointer;
+}
+
+/* Anchor wrapper to capture hover even when button is disabled */
+.kitsunarr-card-overlay__anchor-wrap {
+  display: inline-block;
+  pointer-events: auto;
 }
 
 .kitsunarr-card-overlay__quick:hover:not([disabled]):not([data-state='in-sonarr']) {
@@ -154,23 +165,24 @@ a.cover {
 }
 
 /* ---------- Gear reveal + button ---------- */
-.kitsunarr-card-overlay__gear-shell {
-  display: flex;
+/* Vertical action stack */
+.kitsunarr-card-overlay__stack {
+  position: absolute;
+  left: 0;
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
   opacity: 0;
-  transform: scale(.2);
-  transition: transform .2s ease-in-out,
-              opacity .2s ease-in-out;
+  transition: opacity .2s ease-in-out;
 }
-
-a.cover:hover .kitsunarr-card-overlay__gear-shell,
-.kitsunarr-card-overlay:focus-within .kitsunarr-card-overlay__gear-shell {
+.kitsunarr-card-overlay__stack[data-direction='up'] { bottom: 36px; }
+.kitsunarr-card-overlay__stack[data-direction='down'] { top: 36px; }
+.kitsunarr-card-overlay__stack[data-open='true'] {
   pointer-events: auto;
   opacity: 1;
-  transform: scale(1);
 }
 
-.kitsunarr-card-overlay__gear {
+.kitsunarr-card-overlay__action {
   pointer-events: auto;
   width: 28px;
   height: 28px;
@@ -183,56 +195,33 @@ a.cover:hover .kitsunarr-card-overlay__gear-shell,
   box-shadow: 0 0 5px 2px rgba(45, 45, 45, 0.35);
   padding: 0;
   border: 1px solid rgba(5, 13, 24, 0.4);
+  transform-origin: center bottom;
+  transform: scale(0.86);
+  opacity: 0;
+  margin-bottom: 0;
+  transition:
+    transform .2s ease-in-out,
+    opacity .2s ease-in-out,
+    box-shadow .2s ease-in-out,
+    background-color .2s ease-in-out,
+    margin-bottom .2s ease-in-out;
+  cursor: pointer;
+}
+.kitsunarr-card-overlay__stack[data-open='true'] .kitsunarr-card-overlay__action {
   transform: scale(1);
-  transition: transform .2s ease-in-out,
-              box-shadow .2s ease-in-out,
-              background-color .2s ease-in-out,
-              opacity .2s ease-in-out;
-  cursor: pointer;
+  opacity: 1;
+  margin-bottom: 8px;
 }
-
-.kitsunarr-card-overlay__gear:hover:not(:disabled):not([aria-disabled='true']) {
-  transform: scale(1.06);
-  box-shadow: 0 0 6px 2px rgba(45, 45, 45, 0.45);
-  /* slightly darker on hover */
-  background: #0f5f80;
-  cursor: pointer;
-}
-
-.kitsunarr-card-overlay__gear svg {
-  width: 14px;
-  height: 14px;
-  color: #ffffff; /* white gear icon */
-}
-
-/* External Sonarr link button - same size as gear and darker variant */
-.kitsunarr-card-overlay__external {
-  pointer-events: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #167ea6;
-  color: #ffffff;
-  box-shadow: 0 0 5px 2px rgba(45, 45, 45, 0.35);
-  text-decoration: none;
-  transition: transform .2s ease-in-out, box-shadow .2s ease-in-out, background-color .2s ease-in-out, opacity .2s ease-in-out;
-}
-
-.kitsunarr-card-overlay__external:hover:not([disabled]) {
+.kitsunarr-card-overlay__stack[data-open='true'] .kitsunarr-card-overlay__action:last-child { margin-bottom: 0; }
+.kitsunarr-card-overlay__action:hover:not(:disabled):not([aria-disabled='true']) {
   transform: scale(1.06);
   box-shadow: 0 0 6px 2px rgba(45, 45, 45, 0.45);
   background: #0f5f80;
+  cursor: pointer;
 }
-
-.kitsunarr-card-overlay__external svg { width: 14px; height: 14px; color: #ffffff; }
-
-.kitsunarr-card-overlay__gear:disabled,
-.kitsunarr-card-overlay__gear[aria-disabled='true'] {
-  cursor: default;
-}
+.kitsunarr-card-overlay__action svg { width: 14px; height: 14px; color: #ffffff; }
+.kitsunarr-card-overlay__action:disabled,
+.kitsunarr-card-overlay__action[aria-disabled='true'] { cursor: default; }
 
 
 .kitsunarr-card-overlay__gear:focus-visible {
@@ -247,8 +236,8 @@ a.cover:hover .kitsunarr-card-overlay__gear-shell,
   }
 
   .kitsunarr-card-overlay__quick,
-  .kitsunarr-card-overlay__gear,
-  .kitsunarr-card-overlay__gear-shell {
+  .kitsunarr-card-overlay__action,
+  .kitsunarr-card-overlay__stack {
     transition: none;
     transform: none;
   }

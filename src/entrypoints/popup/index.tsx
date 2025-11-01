@@ -10,7 +10,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SettingsForm from '@/ui/SettingsForm';
 import './style.css';
-import { ExternalLinkIcon } from '@radix-ui/react-icons';
+import { SquareArrowOutUpRight } from 'lucide-react';
 import Button from '@/ui/Button';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 
@@ -37,7 +37,7 @@ const PopupPanel: React.FC = () => {
             tooltip="Open in new tab"
             onClick={() => browser.runtime.openOptionsPage()}
           >
-            <ExternalLinkIcon />
+            <SquareArrowOutUpRight className="h-4 w-4" />
           </Button>
         </header>
         <SettingsForm />

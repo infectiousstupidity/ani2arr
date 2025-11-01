@@ -9,6 +9,7 @@ import type { BrowseAdapter, ModalState, ParsedCard } from '@/types';
 import { CardOverlay } from '@/ui/CardOverlay';
 
 const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
+const MappingFixModal = React.lazy(() => import('@/ui/MappingFixModal'));
 
 export const DEFAULT_CONTAINER_CLASS = 'kitsunarr-overlay-container';
 export const DEFAULT_PROCESSED_ATTRIBUTE = 'data-kitsunarr-processed';
@@ -92,12 +93,27 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
     useAnilistBatchPrefetch({ cardPortals });
 
     const [modalState, setModalState] = useState<ModalState | null>(null);
+    const [mappingFixState, setMappingFixState] = useState<{
+      anilistId: number;
+      title: string;
+      overrideActive?: boolean;
+    } | null>(null);
 
     const handleOpenModal = useCallback((anilistId: number, title: string, metadata: ModalState['metadata']) => {
       setModalState({ anilistId, title, metadata });
     }, []);
 
     const handleCloseModal = useCallback(() => setModalState(null), []);
+
+    const handleOpenMappingFix = useCallback((anilistId: number, title: string, overrideActive?: boolean) => {
+      setMappingFixState(
+        overrideActive === undefined
+          ? { anilistId, title }
+          : { anilistId, title, overrideActive }
+      );
+    }, []);
+
+    const handleCloseMappingFix = useCallback(() => setMappingFixState(null), []);
 
     return (
       <div ref={hostRef}>
@@ -107,11 +123,15 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
               anilistId={parsed.anilistId}
               title={parsed.title}
               onOpenModal={handleOpenModal}
+              onOpenMappingFix={handleOpenMappingFix}
               isConfigured={isConfigured}
               defaultForm={defaultForm}
               metadata={parsed.metadata}
               sonarrUrl={sonarrUrl}
               observeTarget={container}
+              anchorCorner={adapter?.anchorCorner ?? 'bottom-left'}
+              stackDirection={adapter?.stackDirection ?? 'up'}
+              anchorOffsetX={adapter?.anchorOffsetX ?? -8}
             />,
             container,
           ),
@@ -126,6 +146,17 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
               onClose: handleCloseModal,
               portalContainer: (hostRef.current as HTMLElement | null) ?? null,
               metadata: modalState.metadata,
+            })}
+          {mappingFixState &&
+            React.createElement(MappingFixModal, {
+              anilistId: mappingFixState.anilistId,
+              title: mappingFixState.title,
+              isOpen: true,
+              onClose: handleCloseMappingFix,
+              ...(mappingFixState.overrideActive === undefined
+                ? {}
+                : { overrideActive: mappingFixState.overrideActive }),
+              portalContainer: (hostRef.current as HTMLElement | null) ?? null,
             })}
         </React.Suspense>
       </div>

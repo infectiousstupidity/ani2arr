@@ -11,11 +11,18 @@ export interface CardOverlayProps {
   anilistId: number;
   title: string;
   onOpenModal: (anilistId: number, title: string, metadata: MediaMetadataHint | null) => void;
+  onOpenMappingFix?: (anilistId: number, title: string, overrideActive?: boolean) => void;
   isConfigured: boolean;
   defaultForm: SonarrFormState | null;
   metadata: MediaMetadataHint | null;
   sonarrUrl: string | null;
   observeTarget?: Element | null;
+  /** Corner for anchor placement */
+  anchorCorner?: 'bottom-left' | 'top-left';
+  /** Direction the action stack animates */
+  stackDirection?: 'up' | 'down';
+  /** Horizontal offset to align with native rank badge (px). Defaults to -8. */
+  anchorOffsetX?: number;
 }
 
 export interface ParsedCard {
@@ -39,4 +46,8 @@ export interface BrowseAdapter {
   getScanRoot?(): Element | null;
   mutationObserverInit?: MutationObserverInit;
   resizeObserverTargets?: () => Iterable<Element> | Element | null;
+  // Overlay layout hints per surface
+  anchorCorner?: 'bottom-left' | 'top-left';
+  stackDirection?: 'up' | 'down';
+  anchorOffsetX?: number; // px; default -8
 }

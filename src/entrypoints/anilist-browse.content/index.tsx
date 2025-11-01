@@ -153,6 +153,9 @@ const browseAdapter: BrowseAdapter = {
     attributeFilter: ['href'],
   },
   resizeObserverTargets: () => (document.body ? [document.body] : []),
+  anchorCorner: 'bottom-left',
+  stackDirection: 'up',
+  anchorOffsetX: -8,
 };
 
 const BrowseContentApp = createBrowseContentApp(browseAdapter);
