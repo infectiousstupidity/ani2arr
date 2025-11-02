@@ -130,7 +130,7 @@ export function createMetricsConsoleApi(): MetricsConsoleApi {
     reset: resetMetrics,
     print(): void {
       const snapshot = getMetricsSnapshot();
-      console.log('Kitsunarr metrics snapshot', snapshot);
+      console.log('ani2arr metrics snapshot', snapshot);
     },
   };
 }

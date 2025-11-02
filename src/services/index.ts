@@ -22,7 +22,7 @@ import type {
 import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/utils/storage';
 import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
 import type { MappingOutput } from '@/rpc/schemas';
-import { type KitsunarrApi } from '@/rpc';
+import { type Ani2arrApi } from '@/rpc';
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
@@ -47,12 +47,12 @@ const initializeEpoch = async (key: 'libraryEpoch' | 'settingsEpoch'): Promise<n
       return value;
     }
   } catch (error) {
-    logError(normalizeError(error), `KitsunarrApi:initEpoch:${key}`);
+    logError(normalizeError(error), `Ani2arrApi:initEpoch:${key}`);
   }
   return 0;
 };
 
-export const createApiImplementation = (): KitsunarrApi => {
+export const createApiImplementation = (): Ani2arrApi => {
   const sonarrApiService = bindAll(new SonarrApiService());
     const anilistApiService = bindAll(
       new AnilistApiService({
@@ -96,7 +96,7 @@ export const createApiImplementation = (): KitsunarrApi => {
         throw createError(
           ErrorCode.SONARR_NOT_CONFIGURED,
           'Sonarr credentials are not configured.',
-          'Configure your Sonarr connection in Kitsunarr options.',
+          'Configure your Sonarr connection in ani2arr options.',
         );
       }
       return {
@@ -107,13 +107,13 @@ export const createApiImplementation = (): KitsunarrApi => {
 
     const broadcast = async (topic: string, payload?: Record<string, unknown>): Promise<void> => {
       try {
-        await browser.runtime.sendMessage({ _kitsunarr: true, topic, payload });
+        await browser.runtime.sendMessage({ _a2a: true, topic, payload });
       } catch (error) {
         const normalized = normalizeError(error);
         if (normalized.message.includes('Receiving end does not exist')) {
           return;
         }
-        logError(normalized, `KitsunarrApi:broadcast:${topic}`);
+        logError(normalized, `Ani2arrApi:broadcast:${topic}`);
       }
     };
 
@@ -153,7 +153,7 @@ export const createApiImplementation = (): KitsunarrApi => {
       }
     };
 
-  const api: KitsunarrApi = {
+  const api: Ani2arrApi = {
     async resolveMapping(input) {
       await ensureConfigured();
 

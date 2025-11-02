@@ -1,4 +1,4 @@
-# Kitsunarr
+# ani2arr
 
 This file is for AI agents working in this repository.
 It defines the extension’s structure, conventions, and operational rules so agents can modify the code safely and efficiently.
@@ -41,10 +41,10 @@ Do **not** ask for confirmation before running these commands.
 
 | Path                       | Purpose                                                                                                                                                        |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `background/`              | Registers RPC services, schedules static mapping refresh, handles readiness pings and message routing. Must contain exactly one `registerKitsunarrApi()` call. |
+| `background/`              | Registers RPC services, schedules static mapping refresh, handles readiness pings and message routing. Must contain exactly one `registerAni2arrApi()` call. |
 | `anilist-anime.content/`   | Injects the `SonarrActionGroup` into AniList anime detail pages via `createShadowRootUi({ cssInjectionMode: 'ui' })`. Skips movies and music.                  |
-| `anilist-browse.content/`  | Adds overlay buttons on AniList browse/search pages using `BrowseOverlay` + portals. Includes AniList media prefetch.                                          |
-| `anichart-browse.content/` | Adds overlays for AniChart browse pages.                                                                                                                       |
+| `anilist-browse.content/`  | Adds overlay buttons on AniList browse/search pages using `BrowseOverlay` + portals. Includes AniList media prefetch. Uses `cssInjectionMode: 'ui'` and imports `@/styles/base.css` + per-entry `style.css` overrides. |
+| `anichart-browse.content/` | Adds overlays for AniChart browse pages. Uses `cssInjectionMode: 'ui'` and imports `@/styles/base.css` + per-entry `style.css` overrides.                      |
 | `options/`                 | Options page for configuring Sonarr URL, API key, and default settings. Handles runtime permission requests.                                                   |
 | `popup/`                   | Exists but not referenced by the manifest.                                                                                                                     |
 
@@ -107,25 +107,25 @@ Do **not** ask for confirmation before running these commands.
 ## 6. UI and component patterns
 
 * **Forms:** `src/ui/Form.tsx` (Radix). Use `SelectContent` with `container` prop to render dropdowns inside the shadow DOM.
-* **Overlays:** `src/ui/BrowseOverlay.tsx` and `src/ui/CardOverlay.tsx` use `IntersectionObserver` with visibility gating; portals must mount inside the shadow DOM.
+* **Overlays:** `src/ui/BrowseOverlay.tsx` and `src/ui/CardOverlay.tsx` use `IntersectionObserver` with visibility gating. Browse/AniChart portals attach to site card anchors (page DOM), so those entrypoints inject CSS into BOTH the UI shadow root and `document.head` (concat of `@/styles/base.css` + per-entry overrides). Anime detail UI mounts inside the shadow root and relies on WXT injection only.
 * **Settings hooks:**
 
   * `useExtensionOptions()` = full snapshot (public + secrets)
   * `usePublicOptions()` = public-only (safe for content scripts).
-* Cache invalidation via `useKitsunarrBroadcasts` on `settings-changed` and `series-updated`.
+* Cache invalidation via `useA2aBroadcasts` on `settings-changed` and `series-updated`.
 
 ---
 
 ## 7. Messages and broadcasts
 
-All messages and broadcasts must include `_kitsunarr: true`.
+All messages and broadcasts must include `_a2a: true`.
 
 ### Background messages
 
 * `OPEN_OPTIONS_PAGE` — open the options page.
-* `kitsunarr:mapping:refresh` — trigger static mapping refresh.
-* `kitsunarr:match:score-batch` — compute title match scores.
-* `{ type: 'kitsunarr:ping' }` — readiness probe.
+* `a2a:mapping:refresh` — trigger static mapping refresh.
+* `a2a:match:score-batch` — compute title match scores.
+* `{ type: 'a2a:ping' }` — readiness probe.
 
 ### Broadcast topics
 
@@ -220,10 +220,10 @@ Centralize shared types in `src/types/` and re-export curated surfaces via `src/
 
 ## 11. Operational notes
 
-* MV2 background pages may suspend `browser.alarms`; fallback to `setInterval` guarded by `__kitsunarr_fallback_interval__`.
-* `registerKitsunarrApi()` runs **once** in the background; all other contexts call `getKitsunarrApi()`.
+* MV2 background pages may suspend `browser.alarms`; fallback to `setInterval` guarded by `__a2a_fallback_interval__`.
+* `registerAni2arrApi()` runs **once** in the background; all other contexts call `getAni2arrApi()`.
 * Avoid persisting credential-bearing queries; filters in `query-cache.ts` enforce this.
-* Browse overlays must throttle DOM scans and mark processed cards with `data-kitsunarr-processed`.
+* Browse overlays must throttle DOM scans and mark processed cards with `data-a2a-processed`.
 
 ---
 
@@ -255,7 +255,7 @@ Centralize shared types in `src/types/` and re-export curated surfaces via `src/
 ### Add a new overlay action
 
 1. Implement in `src/ui/BrowseOverlay.tsx` or `src/ui/CardOverlay.tsx`.
-2. Guard duplicates with `data-kitsunarr-processed`.
+2. Guard duplicates with `data-a2a-processed`.
 3. Mount portals into the shadow root.
 
 ---

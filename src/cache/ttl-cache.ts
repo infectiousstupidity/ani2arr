@@ -29,7 +29,7 @@ export interface TtlCache<T> {
   clear(): Promise<void>;
 }
 
-const DB_NAME = 'kitsunarr-cache-db';
+const DB_NAME = 'a2a-cache-db';
 const STORE_NAME = 'ttl-cache-store';
 const DB_VERSION = 1;
 

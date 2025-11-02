@@ -134,7 +134,7 @@ export class LibraryService {
     if (import.meta.env.DEV) {
       const pr = options.priority ?? 'normal';
       const net = options.network ?? 'allow';
-      console.debug(`[Kitsunarr | LibraryService] status:start anilistId=${payload.anilistId} priority=${pr} network=${net} force_verify=${String(options.force_verify === true)}`);
+      console.debug(`[ani2arr | LibraryService] status:start anilistId=${payload.anilistId} priority=${pr} network=${net} force_verify=${String(options.force_verify === true)}`);
     }
     const leanList = await this.getLeanSeriesList();
     const sonarrOpts = await getExtensionOptionsSnapshot();
@@ -189,7 +189,7 @@ export class LibraryService {
       try {
         if (import.meta.env.DEV) {
           console.debug(
-            `[Kitsunarr | LibraryService] status:lookup-start anilistId=${payload.anilistId} priority=${options.priority ?? 'normal'} network=${options.network ?? 'allow'} ignoreFailureCache=${String(options.ignoreFailureCache === true)}`,
+            `[ani2arr | LibraryService] status:lookup-start anilistId=${payload.anilistId} priority=${options.priority ?? 'normal'} network=${options.network ?? 'allow'} ignoreFailureCache=${String(options.ignoreFailureCache === true)}`,
           );
         }
         const mapping = await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
@@ -216,7 +216,7 @@ export class LibraryService {
 
     if (tvdbId === null) {
       if (import.meta.env.DEV) {
-        console.debug(`[Kitsunarr | LibraryService] status:result anilistId=${payload.anilistId} outcome=unresolved`);
+        console.debug(`[ani2arr | LibraryService] status:result anilistId=${payload.anilistId} outcome=unresolved`);
       }
       return { exists: false, tvdbId: null, anilistTvdbLinkMissing: true };
     }
@@ -233,7 +233,7 @@ export class LibraryService {
       } as CheckSeriesStatusResponse;
       if (import.meta.env.DEV) {
         console.debug(
-          `[Kitsunarr | LibraryService] status:result anilistId=${payload.anilistId} outcome=cached exists=${String(existsInCache)} tvdbId=${tvdbId}`,
+          `[ani2arr | LibraryService] status:result anilistId=${payload.anilistId} outcome=cached exists=${String(existsInCache)} tvdbId=${tvdbId}`,
         );
       }
       return out;
@@ -263,7 +263,7 @@ export class LibraryService {
       } as CheckSeriesStatusResponse;
       if (import.meta.env.DEV) {
         console.debug(
-          `[Kitsunarr | LibraryService] status:result anilistId=${payload.anilistId} outcome=live exists=true tvdbId=${tvdbId}`,
+          `[ani2arr | LibraryService] status:result anilistId=${payload.anilistId} outcome=live exists=true tvdbId=${tvdbId}`,
         );
       }
       return out2;
@@ -281,7 +281,7 @@ export class LibraryService {
     } as CheckSeriesStatusResponse;
     if (import.meta.env.DEV) {
       console.debug(
-        `[Kitsunarr | LibraryService] status:result anilistId=${payload.anilistId} outcome=removed exists=false tvdbId=${tvdbId}`,
+        `[ani2arr | LibraryService] status:result anilistId=${payload.anilistId} outcome=removed exists=false tvdbId=${tvdbId}`,
       );
     }
     return out3;

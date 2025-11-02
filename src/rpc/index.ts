@@ -11,7 +11,7 @@ import type {
 import type { AniMedia } from '@/types';
 import type { ResolveInput, MappingOutput, StatusInput, StatusOutput, AddInput, SetMappingOverrideInput, ClearMappingOverrideInput, SonarrLookupInput, SonarrLookupOutput, ValidateTvdbInput, ValidateTvdbOutput } from './schemas';
 
-export interface KitsunarrApi {
+export interface Ani2arrApi {
   resolveMapping(input: ResolveInput): Promise<MappingOutput>;
   getSeriesStatus(input: StatusInput): Promise<StatusOutput>;
   addToSonarr(input: AddInput): Promise<SonarrSeries>;
@@ -35,5 +35,5 @@ export interface KitsunarrApi {
   validateTvdbId(input: ValidateTvdbInput): Promise<ValidateTvdbOutput>;
 }
 
-export const [registerKitsunarrApi, getKitsunarrApi] =
-  defineProxyService<KitsunarrApi, [KitsunarrApi]>('KitsunarrApi', (impl) => impl);
+export const [registerAni2arrApi, getAni2arrApi] =
+  defineProxyService<Ani2arrApi, [Ani2arrApi]>('Ani2arrApi', (impl) => impl);

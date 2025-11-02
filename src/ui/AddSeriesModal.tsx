@@ -85,7 +85,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
               portalContainer={tooltipPortal}
               aria-label="Open options page"
               onClick={() =>
-                browser.runtime.sendMessage({ _kitsunarr: true, type: 'OPEN_OPTIONS_PAGE', timestamp: Date.now() })
+                browser.runtime.sendMessage({ _a2a: true, type: 'OPEN_OPTIONS_PAGE', timestamp: Date.now() })
               }
               className="text-text-secondary"
             >
@@ -131,7 +131,7 @@ const AddSeriesModal: React.FC<AddSeriesModalProps> = ({
             </>
           )}
 
-          <div id="kitsunarr-select-portal-container" ref={handleSelectPortalRef} />
+          <div id="a2a-select-portal-container" ref={handleSelectPortalRef} />
         </ModalContent>
       </Modal>
     </div>

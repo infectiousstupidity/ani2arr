@@ -520,7 +520,7 @@ export class MappingService {
       throw createError(
         ErrorCode.SONARR_NOT_CONFIGURED,
         'Sonarr credentials are not configured.',
-        'Configure your Sonarr connection in Kitsunarr options.',
+        'Configure your Sonarr connection in ani2arr options.',
       );
     }
     return { url: opts.sonarrUrl, apiKey: opts.sonarrApiKey };

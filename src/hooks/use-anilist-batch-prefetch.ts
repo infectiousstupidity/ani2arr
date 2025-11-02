@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { ParsedCard } from '@/types';
-import { getKitsunarrApi } from '@/rpc';
+import { getAni2arrApi } from '@/rpc';
 import { logger } from '@/utils/logger';
 
 interface UseAnilistBatchPrefetchParams {
@@ -25,7 +25,7 @@ export const useAnilistBatchPrefetch = ({ cardPortals }: UseAnilistBatchPrefetch
     }
     return false;
   })();
-  const api = useMemo(() => getKitsunarrApi(), []);
+  const api = useMemo(() => getAni2arrApi(), []);
 
   const idByContainerRef = useRef<WeakMap<Element, number>>(new WeakMap());
   const visibleIdsRef = useRef<Set<number>>(new Set());

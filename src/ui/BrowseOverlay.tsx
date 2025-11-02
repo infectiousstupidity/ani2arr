@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePublicOptions } from '@/hooks/use-api-queries';
-import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
+import { useA2aBroadcasts } from '@/hooks/use-broadcasts';
 import { useTheme } from '@/hooks/use-theme';
 import { useBrowsePortals } from '@/hooks/use-browse-portals';
 import { useAnilistBatchPrefetch } from '@/hooks/use-anilist-batch-prefetch';
@@ -11,8 +11,8 @@ import { CardOverlay } from '@/ui/CardOverlay';
 const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
 const MappingFixModal = React.lazy(() => import('@/ui/MappingFixModal'));
 
-export const DEFAULT_CONTAINER_CLASS = 'kitsunarr-overlay-container';
-export const DEFAULT_PROCESSED_ATTRIBUTE = 'data-kitsunarr-processed';
+export const DEFAULT_CONTAINER_CLASS = 'a2a-overlay-container';
+export const DEFAULT_PROCESSED_ATTRIBUTE = 'data-a2a-processed';
 
 export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
   const {
@@ -67,7 +67,7 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC => {
   const BrowseContentApp: React.FC = () => {
     const hostRef = useRef<HTMLDivElement>(null);
     useTheme(hostRef);
-    useKitsunarrBroadcasts();
+    useA2aBroadcasts();
 
     const { data: publicOptions } = usePublicOptions();
     const isConfigured = Boolean(publicOptions?.isConfigured);
