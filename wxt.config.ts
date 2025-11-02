@@ -54,7 +54,7 @@ export default defineConfig({
     };
 
     return {
-      name: 'Kitsunarr',
+      name: 'ani2arr',
       description: 'Adds a one-click "Add to Sonarr" button to AniList and AniChart pages',
       ...(manifestVersion === 3 ? mv3Permissions : mv2Permissions),
       options_ui: {

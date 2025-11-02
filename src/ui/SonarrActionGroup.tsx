@@ -77,7 +77,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
       <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group">
         {/* Main Action Button */}
         <Button
-          data-testid="kitsunarr-main-action-button"
+          data-testid="a2a-main-action-button"
           size="md"
           onClick={onQuickAdd}
           isLoading={isLoading}
@@ -93,7 +93,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
           container={portalContainer ?? null}
           trigger={
             <Button
-              data-testid="kitsunarr-actions-dropdown"
+              data-testid="a2a-actions-dropdown"
               size="icon"
               variant="primary"
               disabled={dropdownDisabled}
@@ -117,7 +117,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
       <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group">
             {/* Main Action Button */}
       <Button
-        data-testid="kitsunarr-main-action-button"
+        data-testid="a2a-main-action-button"
         size="md"
         onClick={onQuickAdd}
         isLoading={isLoading}
@@ -134,7 +134,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
               container={portalContainer ?? null}
               trigger={
                 <Button
-                  data-testid="kitsunarr-actions-dropdown"
+                  data-testid="a2a-actions-dropdown"
                   size="icon"
                   variant="primary"
                   disabled={dropdownDisabled}

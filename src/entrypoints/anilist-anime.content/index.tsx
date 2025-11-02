@@ -6,13 +6,14 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { useTheme } from '@/hooks/use-theme';
 import { useSeriesStatus, useAddSeries, usePublicOptions } from '@/hooks/use-api-queries';
-import { useKitsunarrBroadcasts } from '@/hooks/use-broadcasts';
+import { useA2aBroadcasts } from '@/hooks/use-broadcasts';
 import { createPersistOptions } from '@/utils/query-persist-options';
 import SonarrActionGroup from '@/ui/SonarrActionGroup';
 import { logger } from '@/utils/logger';
 import { extractMediaMetadataFromDom } from '@/utils/anilist-dom';
 import { mergeMetadataHints } from '@/utils/media-metadata';
 import type { MediaMetadataHint } from '@/types';
+import '@/styles/base.css';
 import './style.css';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
@@ -32,9 +33,9 @@ const ACTIONS_SELECTOR = '.header .cover-wrap .actions, .cover-wrap .actions';
 const LIST_ROW_SELECTOR = '.actions .list';
 const SIDEBAR_SELECTOR = '.content.container .sidebar';
 
-const UI_NAME = 'kitsunarr-anime-page-ui';
-const ANCHOR_ID = 'kitsunarr-actions-anchor';
-const SPACER_ID = 'kitsunarr-actions-spacer';
+const UI_NAME = 'a2a-anime-page-ui';
+const ANCHOR_ID = 'a2a-actions-anchor';
+const SPACER_ID = 'a2a-actions-spacer';
 
 /* --------------------------------- Utils --------------------------------- */
 
@@ -124,7 +125,7 @@ function attachSizeSync(host: HTMLElement): () => void {
     const fav = q<HTMLElement>('.actions .favourite');
     const favBox = fav?.getBoundingClientRect();
     const favSide = favBox ? Math.round(Math.max(favBox.width, favBox.height)) : 35;
-    host.style.setProperty('--kitsunarr-fav-size', `${favSide}px`);
+    host.style.setProperty('--a2a-fav-size', `${favSide}px`);
     syncSidebarOffset(spacer);
   };
 
@@ -180,7 +181,7 @@ interface ContentRootProps {
 export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, metadata }) => {
   const hostRef = useRef<HTMLDivElement>(null);
   useTheme(hostRef);
-  useKitsunarrBroadcasts();
+  useA2aBroadcasts();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [fixModalOpen, setFixModalOpen] = useState(false);

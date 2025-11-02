@@ -8,6 +8,7 @@ import { logger } from '@/utils/logger';
 import { extractMediaMetadataFromDom } from '@/utils/anilist-dom';
 import { mergeMetadataHints } from '@/utils/media-metadata';
 import type { AniFormat, MediaMetadataHint } from '@/types';
+import baseStyles from '@/styles/base.css?inline';
 import browseStyles from './style.css?inline';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
@@ -35,8 +36,8 @@ const isAniChartSurface = (url: string): boolean => {
 
 const CARD_SELECTOR = '.media-card';
 const COVER_SELECTOR = 'a.cover';
-const STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-anichart';
-const SHADOW_STYLE_DATA_ATTRIBUTE = 'data-kitsunarr-anichart-shadow';
+// We render portals into containers attached to AniChart cover anchors (page DOM).
+// Therefore we must inject styles into BOTH the shadow root and the page document.
 
 const getSectionHeading = (card: Element): string =>
   card.closest('section')?.querySelector('h2')?.textContent?.trim() ?? '';
@@ -157,6 +158,7 @@ const BrowseContentApp = createBrowseContentApp(browseAdapter);
 
 export default defineContentScript({
   matches: ['*://anichart.net/*', '*://www.anichart.net/*'],
+  cssInjectionMode: 'ui',
 
   async main(ctx: ContentScriptContext) {
     // Ensure background is awake before rendering and kicking off any RPCs.
@@ -176,14 +178,26 @@ export default defineContentScript({
 
     let ui: ShadowRootContentScriptUi<Root> | null = null;
     let root: Root | null = null;
+    const cleanupDomArtifacts = () => {
+      const containers = document.querySelectorAll<HTMLElement>(`.${DEFAULT_CONTAINER_CLASS}`);
+      if (containers.length === 0) {
+        return;
+      }
+
+      containers.forEach(container => {
+        container.closest<HTMLAnchorElement>(COVER_SELECTOR)?.removeAttribute(DEFAULT_PROCESSED_ATTRIBUTE);
+        container.remove();
+      });
+    };
+
     let globalStyleElement: HTMLStyleElement | null = null;
     let shadowStyleElement: HTMLStyleElement | null = null;
 
     const ensureGlobalStyles = () => {
       if (!globalStyleElement) {
         globalStyleElement = document.createElement('style');
-        globalStyleElement.setAttribute(STYLE_DATA_ATTRIBUTE, 'true');
-        globalStyleElement.textContent = browseStyles;
+        globalStyleElement.setAttribute('data-a2a-anichart', 'true');
+        globalStyleElement.textContent = `${baseStyles}\n${browseStyles}`;
       }
       if (globalStyleElement && !document.head.contains(globalStyleElement)) {
         document.head.appendChild(globalStyleElement);
@@ -193,34 +207,12 @@ export default defineContentScript({
     const ensureShadowStyles = (shadowRoot: ShadowRoot) => {
       if (!shadowStyleElement) {
         shadowStyleElement = document.createElement('style');
-        shadowStyleElement.setAttribute(SHADOW_STYLE_DATA_ATTRIBUTE, 'true');
-        shadowStyleElement.textContent = browseStyles;
+        shadowStyleElement.setAttribute('data-a2a-anichart-shadow', 'true');
+        shadowStyleElement.textContent = `${baseStyles}\n${browseStyles}`;
       }
       if (shadowStyleElement && shadowStyleElement.getRootNode() !== shadowRoot) {
         shadowRoot.appendChild(shadowStyleElement);
       }
-    };
-
-    const cleanupDomArtifacts = () => {
-      const containers = document.querySelectorAll<HTMLElement>(`.${DEFAULT_CONTAINER_CLASS}`);
-      if (containers.length === 0 && !shadowStyleElement && !globalStyleElement) {
-        return;
-      }
-
-      containers.forEach(container => {
-        container.closest<HTMLAnchorElement>(COVER_SELECTOR)?.removeAttribute(DEFAULT_PROCESSED_ATTRIBUTE);
-        container.remove();
-      });
-
-      if (shadowStyleElement?.parentNode) {
-        shadowStyleElement.parentNode.removeChild(shadowStyleElement);
-      }
-      shadowStyleElement = null;
-
-      if (globalStyleElement?.parentNode) {
-        globalStyleElement.parentNode.removeChild(globalStyleElement);
-      }
-      globalStyleElement = null;
     };
 
     const mount = async () => {
@@ -229,7 +221,7 @@ export default defineContentScript({
       ensureGlobalStyles();
 
       ui = await createShadowRootUi(ctx, {
-        name: 'kitsunarr-anichart-root',
+        name: 'a2a-anichart-root',
         position: 'inline',
         anchor: 'body',
         onMount: (container: HTMLElement, shadow: ShadowRoot) => {
@@ -262,11 +254,7 @@ export default defineContentScript({
 
     const remove = async () => {
       if (!ui) {
-        if (
-          document.querySelector(`.${DEFAULT_CONTAINER_CLASS}`) ||
-          shadowStyleElement ||
-          globalStyleElement
-        ) {
+        if (document.querySelector(`.${DEFAULT_CONTAINER_CLASS}`) || shadowStyleElement || globalStyleElement) {
           cleanupDomArtifacts();
         }
         return;
@@ -276,6 +264,10 @@ export default defineContentScript({
       ui = null;
       root = null;
       cleanupDomArtifacts();
+      if (shadowStyleElement?.parentNode) shadowStyleElement.parentNode.removeChild(shadowStyleElement);
+      shadowStyleElement = null;
+      if (globalStyleElement?.parentNode) globalStyleElement.parentNode.removeChild(globalStyleElement);
+      globalStyleElement = null;
     };
 
     const handleLocationChange = (url: string) => {

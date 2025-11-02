@@ -1,6 +1,6 @@
 // src/entrypoints/background/index.ts
 import { browser } from 'wxt/browser';
-import { registerKitsunarrApi, getKitsunarrApi } from '@/rpc';
+import { registerAni2arrApi, getAni2arrApi } from '@/rpc';
 import { createApiImplementation } from '@/services';
 import { computeTitleMatchScore } from '@/utils/matching';
 import { logger } from '@/utils/logger';
@@ -8,9 +8,9 @@ import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/utils/metrics
 import { logError, normalizeError } from '@/utils/error-handling';
 
 type OpenOptionsMessage = { type: 'OPEN_OPTIONS_PAGE' };
-type MappingRefreshMessage = { type: 'kitsunarr:mapping:refresh' };
+type MappingRefreshMessage = { type: 'a2a:mapping:refresh' };
 type ScoreBatchMessage = {
-  type: 'kitsunarr:match:score-batch';
+  type: 'a2a:match:score-batch';
   payload: {
     queryRaw: string;
     startYear?: number;
@@ -21,7 +21,7 @@ type ScoreBatchMessage = {
 function isScoreBatchMessage(x: unknown): x is ScoreBatchMessage {
   const m = x as Partial<ScoreBatchMessage>;
   return (
-    m?.type === 'kitsunarr:match:score-batch' &&
+    m?.type === 'a2a:match:score-batch' &&
     typeof m.payload?.queryRaw === 'string' &&
     Array.isArray(m.payload?.candidates)
   );
@@ -30,10 +30,10 @@ function isOpenOptionsMessage(x: unknown): x is OpenOptionsMessage {
   return (x as OpenOptionsMessage)?.type === 'OPEN_OPTIONS_PAGE';
 }
 function isMappingRefreshMessage(x: unknown): x is MappingRefreshMessage {
-  return (x as MappingRefreshMessage)?.type === 'kitsunarr:mapping:refresh';
+  return (x as MappingRefreshMessage)?.type === 'a2a:mapping:refresh';
 }
 
-const MAPPING_REFRESH_ALARM = 'kitsunarr:refresh-static-mappings';
+const MAPPING_REFRESH_ALARM = 'a2a:refresh-static-mappings';
 const MAPPING_REFRESH_PERIOD_MIN = 360;
 
 const log = logger.create('Background');
@@ -41,19 +41,19 @@ const log = logger.create('Background');
 export default defineBackground(() => {
   log.info('Background initializing…');
 
-  registerKitsunarrApi(createApiImplementation());
+  registerAni2arrApi(createApiImplementation());
   log.info('API services registered.');
 
   if (import.meta.env.DEV) {
     const globalWithMetrics = globalThis as typeof globalThis & {
-      __kitsunarrMetrics?: MetricsConsoleApi;
+      __a2aMetrics?: MetricsConsoleApi;
     };
-    if (!globalWithMetrics.__kitsunarrMetrics) {
-      globalWithMetrics.__kitsunarrMetrics = createMetricsConsoleApi();
+    if (!globalWithMetrics.__a2aMetrics) {
+      globalWithMetrics.__a2aMetrics = createMetricsConsoleApi();
     }
   }
 
-  const api = getKitsunarrApi();
+  const api = getAni2arrApi();
   const alarmsApi = (browser as unknown as { alarms?: typeof browser.alarms }).alarms;
 
   const ensurePeriodicRefresh = async (): Promise<void> => {
@@ -65,7 +65,7 @@ export default defineBackground(() => {
       return;
     }
 
-    const key = '__kitsunarr_fallback_interval__';
+    const key = '__a2a_fallback_interval__';
     if (!(globalThis as Record<string, unknown>)[key]) {
       (globalThis as Record<string, unknown>)[key] = globalThis.setInterval(() => {
         void api.initMappings().catch(err => {
@@ -111,24 +111,24 @@ export default defineBackground(() => {
   browser.runtime.onMessage.addListener(
     (message: unknown, sender?: { id?: string }): Promise<unknown> | void => {
       // Only accept messages originating from the extension itself and that
-      // explicitly carry the _kitsunarr marker to prevent other origins from
+      // explicitly carry the _a2a marker to prevent other origins from
       // invoking privileged background handlers.
       const senderId = (sender as { id?: string } | undefined)?.id;
-      const msg = message as { type?: string; timestamp?: number; _kitsunarr?: boolean } | undefined;
+      const msg = message as { type?: string; timestamp?: number; _a2a?: boolean } | undefined;
 
       if (senderId !== browser.runtime.id) {
         // Ignore messages from other extensions/origins or no sender info.
         return;
       }
 
-      if (!msg?._kitsunarr) {
+      if (!msg?._a2a) {
         // Marker missing; ignore.
         return;
       }
 
       // Lightweight readiness probe so content scripts can wait until the
       // background has registered services before issuing RPC calls.
-      if (msg.type === 'kitsunarr:ping') {
+      if (msg.type === 'a2a:ping') {
         return Promise.resolve({ ok: true as const });
       }
 

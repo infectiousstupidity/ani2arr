@@ -27,7 +27,7 @@ const PopupPanel: React.FC = () => {
           {/* 2. Center Group: Expands to fill space and centers its content. */}
           <div className="flex flex-1 justify-center items-center gap-2">
             <img src="/icon/48.png" alt="Logo" className="h-8 w-8 rounded-md" />
-            <h1 className="text-2xl font-bold">Kitsunarr</h1>
+            <h1 className="text-2xl font-bold">ani2arr</h1>
           </div>
 
           {/* 3. Right Button: Unchanged. */}

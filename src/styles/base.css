@@ -1,0 +1,171 @@
+/* src/styles/base.css */
+@import "tailwindcss";
+
+/* 1) Theme variables scoped to the shadow host */
+:host {
+  /* Light */
+  --bg-primary:    #FAFAFA;
+  --bg-secondary:  #f2f5f7;
+  --bg-tertiary:   #EDF1F5;
+  --text-primary:  #212529;
+  --text-secondary:#607080;
+  --border-primary:#DEE2E6;
+  --accent-primary:#3DB4F2;
+  --accent-hover:  #299dd1;
+  --success:       #00BA7C;
+  --error:         #F91880;
+  --iconbutton-text: #FAFAFA;
+
+  color: var(--text-primary);
+}
+
+:host(.dark) {
+  /* Dark */
+  --bg-primary:    #0b1622;
+  --bg-secondary:  #151f2e;
+  --bg-tertiary:   #253341;
+  --text-primary:  #F7F9F9;
+  --text-secondary:#9FADBD;
+  --border-primary:#38444D;
+  --accent-primary:#3DB4F2;
+  --accent-hover:  #299dd1;
+  --iconbutton-text: #F7F9F9;
+}
+
+/* 2) Tailwind v4 tokens mapped from host variables */
+@theme {
+  /* spacing & type scale */
+  --spacing: 0.4rem;
+  --text-xs: 1.2rem;
+  --text-sm: 1.4rem;
+  --text-base: 1.6rem;
+  --text-lg: 1.8rem;
+  --text-xl: 2.0rem;
+  --text-2xl: 2.4rem;
+  --text-3xl: 3.0rem;
+  --text-button: 2.2rem;
+
+  /* colors */
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-border-primary: var(--border-primary);
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-hover: var(--accent-hover);
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --color-iconbutton-text: var(--iconbutton-text);
+}
+
+/* 3) Accessibility helpers */
+[data-radix-popper-content-wrapper] { z-index: 99999 !important; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.focus-trap { isolation: isolate; }
+
+/* 4) Shared focus-visible styles (scoped to common interactives) */
+:host button:focus-visible,
+:host [role="button"]:focus-visible,
+:host a:focus-visible,
+:host input:focus-visible,
+:host select:focus-visible,
+:host textarea:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* 5) Spinner */
+@keyframes a2a-spin { to { transform: rotate(360deg); } }
+
+/* 6) Shared overlay components */
+.a2a-card-overlay {
+  position: absolute;
+  display: inline-block;
+  pointer-events: none;
+  z-index: 80;
+  font-family: inherit;
+}
+.a2a-card-overlay__anchor-wrap { display: inline-block; pointer-events: auto; }
+
+.a2a-card-overlay__quick {
+  pointer-events: auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #53A7FF;
+  color: #ffffff;
+  display: inline-grid;
+  place-items: center;
+  box-shadow: none;
+  transform: scale(1);
+  transition: all .2s ease-in-out;
+  cursor: pointer;
+}
+.a2a-card-overlay__quick:hover:not([disabled]):not([data-state='in-sonarr']) { transform: none; box-shadow: none; }
+.a2a-card-overlay__quick:focus,
+.a2a-card-overlay__quick:focus-visible { outline: none; }
+.a2a-card-overlay__quick svg,
+.a2a-card-overlay__symbol { width: 16px; height: 16px; color: #ffffff; stroke-width: 1.5; }
+
+/* Quick add states */
+.a2a-card-overlay__quick[data-state='addable'],
+.a2a-card-overlay__quick[data-state='resolving'],
+.a2a-card-overlay__quick[data-state='adding'] { background: #53A7FF; color: #ffffff; }
+.a2a-card-overlay__quick[data-state='in-sonarr'] { background: #5CCD7A; color: #ffffff; cursor: default; }
+.a2a-card-overlay__quick[data-state='error'] { background: #FF6B6B; color: #ffffff; }
+.a2a-card-overlay__quick[data-state='disabled'] { background: #1a2230; color: #E4ECF5; box-shadow: none; }
+.a2a-rotate { animation: a2a-spin 1s linear infinite; }
+
+/* Action stack */
+.a2a-card-overlay__stack {
+  position: absolute;
+  left: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transition: opacity .2s ease-in-out;
+}
+.a2a-card-overlay__stack[data-direction='up'] { bottom: 36px; }
+.a2a-card-overlay__stack[data-direction='down'] { top: 36px; }
+.a2a-card-overlay__stack[data-open='true'] { pointer-events: auto; opacity: 1; }
+
+.a2a-card-overlay__action {
+  pointer-events: auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(21, 34, 50, 1);
+  color: #ffffff;
+  display: inline-grid;
+  place-items: center;
+  box-shadow: none;
+  padding: 0;
+  border: none;
+  transform-origin: center bottom;
+  transform: scale(0.2) translateY(8px);
+  opacity: 0;
+  margin-bottom: 8px;
+  transition: transform .2s ease, opacity .2s ease, background-color .18s ease, box-shadow .18s ease;
+  cursor: pointer;
+}
+.a2a-card-overlay__action svg { width: 14px; height: 14px; stroke-width: 1.5; }
+.a2a-card-overlay__stack[data-open='true'] .a2a-card-overlay__action { transform: scale(1) translateY(0); opacity: 1; }
+.a2a-card-overlay__stack[data-open='true'] .a2a-card-overlay__action:last-child { margin-bottom: 0; }
+.a2a-card-overlay__action:disabled,
+.a2a-card-overlay__action[aria-disabled='true'] { cursor: default; }
+.a2a-card-overlay__action:hover:not(:disabled):not([aria-disabled='true']) { background: rgba(31,38,39,0.9); opacity: 1; }
+.a2a-card-overlay__action:active:not(:disabled):not([aria-disabled='true']) { background: rgba(31,38,39,0.9); opacity: 1; }

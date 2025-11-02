@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import Button from '@/ui/Button';
 import { usePublicOptions, useSetMappingOverride, useClearMappingOverride } from '@/hooks/use-api-queries';
 import { Modal, ModalContent, ModalDescription, ModalFooter, ModalTitle } from '@/ui/Modal';
-import { getKitsunarrApi } from '@/rpc';
+import { getAni2arrApi } from '@/rpc';
 import type { SonarrLookupSeries } from '@/types';
 
 interface MappingFixModalProps {
@@ -54,7 +54,7 @@ const MappingFixModal: React.FC<MappingFixModalProps> = ({
     setSearching(true);
     const id = window.setTimeout(async () => {
       try {
-        const api = getKitsunarrApi();
+        const api = getAni2arrApi();
         const out = await api.searchSonarr({ term, priority: 'high' });
         if (cancelled) return;
         setResults(out.results ?? []);
@@ -80,7 +80,7 @@ const MappingFixModal: React.FC<MappingFixModalProps> = ({
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
-        const api = getKitsunarrApi();
+        const api = getAni2arrApi();
         const v = await api.validateTvdbId({ tvdbId: id });
         if (!cancelled) setValidation(v);
       } catch {

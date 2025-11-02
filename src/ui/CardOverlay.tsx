@@ -125,13 +125,13 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     switch (overlayState) {
       case 'resolving':
       case 'adding':
-        return <RotateCcw className="kitsunarr-card-overlay__symbol kitsunarr-rotate" aria-hidden="true" />;
+        return <RotateCcw className="a2a-card-overlay__symbol a2a-rotate" aria-hidden="true" />;
       case 'in-sonarr':
-        return <Check className="kitsunarr-card-overlay__symbol" aria-hidden="true" />;
+        return <Check className="a2a-card-overlay__symbol" aria-hidden="true" />;
       case 'error':
-        return <TriangleAlert className="kitsunarr-card-overlay__symbol" aria-hidden="true" />;
+        return <TriangleAlert className="a2a-card-overlay__symbol" aria-hidden="true" />;
       default:
-        return <Plus className="kitsunarr-card-overlay__symbol" aria-hidden="true" />;
+        return <Plus className="a2a-card-overlay__symbol" aria-hidden="true" />;
     }
   })();
 
@@ -164,7 +164,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
       <TooltipWrapper content="Open in Sonarr" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
         <button
           type="button"
-          className="kitsunarr-card-overlay__action kitsunarr-card-overlay__action--external"
+          className="a2a-card-overlay__action a2a-card-overlay__action--external"
           aria-label="Open in Sonarr"
           onClick={(e) => {
             e.preventDefault();
@@ -182,7 +182,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   const actionFixMapping = (
     onOpenMappingFix ? (
       <TooltipWrapper content="Fix mapping…" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
-        <button type="button" className="kitsunarr-card-overlay__action kitsunarr-card-overlay__action--fix" aria-label="Fix mapping" onClick={openMappingFix} onMouseDown={swallowEvent}>
+        <button type="button" className="a2a-card-overlay__action a2a-card-overlay__action--fix" aria-label="Fix mapping" onClick={openMappingFix} onMouseDown={swallowEvent}>
           <Wrench aria-hidden="true" className="h-4 w-4" />
         </button>
       </TooltipWrapper>
@@ -194,7 +194,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
       <TooltipWrapper content="Advanced Sonarr options" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
         <button
           type="button"
-          className="kitsunarr-card-overlay__action kitsunarr-card-overlay__action--advanced"
+          className="a2a-card-overlay__action a2a-card-overlay__action--advanced"
           aria-label="Open advanced Sonarr options"
           onClick={handleOpenAdvanced}
           onMouseDown={swallowEvent}
@@ -227,14 +227,14 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
 
   return (
     <div
-      className="kitsunarr-card-overlay"
+      className="a2a-card-overlay"
       data-state={overlayState}
       data-corner={anchorCorner}
       style={{ ['--badge-offset-x']: `${anchorOffsetX}px` } as React.CSSProperties}
       onMouseEnter={openStack}
       onMouseLeave={scheduleCloseStack}
     >
-      <div className="kitsunarr-card-overlay__anchor-wrap" onMouseEnter={openStack} onMouseLeave={scheduleCloseStack}>
+      <div className="a2a-card-overlay__anchor-wrap" onMouseEnter={openStack} onMouseLeave={scheduleCloseStack}>
         <TooltipWrapper
           content={quickAddTitle}
           side="right"
@@ -245,7 +245,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
         >
           <button
             type="button"
-            className="kitsunarr-card-overlay__quick"
+            className="a2a-card-overlay__quick"
             data-state={overlayState}
             aria-label={quickAddAriaLabel}
             onClick={handleQuickAdd}
@@ -261,7 +261,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
       {/* Vertical action stack */}
       {(showAdvancedButton || showExternalButton || onOpenMappingFix) && (
         <div
-          className="kitsunarr-card-overlay__stack"
+          className="a2a-card-overlay__stack"
           data-open={stackOpen || undefined}
           data-direction={stackDirection}
           onMouseEnter={openStack}

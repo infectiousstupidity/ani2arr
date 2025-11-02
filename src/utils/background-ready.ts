@@ -13,8 +13,8 @@ export async function awaitBackgroundReady(
   for (let i = 1; i <= attempts; i++) {
     try {
       const res = (await browser.runtime.sendMessage({
-        _kitsunarr: true,
-        type: 'kitsunarr:ping',
+        _a2a: true,
+        type: 'a2a:ping',
         timestamp: Date.now(),
       })) as { ok?: boolean } | undefined;
       if (res?.ok) return;

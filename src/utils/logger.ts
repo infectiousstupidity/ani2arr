@@ -21,7 +21,7 @@ export interface ScopedLogger {
   error: (...args: unknown[]) => void;
 }
 
-const DEFAULT_SCOPE = 'Kitsunarr';
+const DEFAULT_SCOPE = 'ani2arr';
 
 const isDevBuild = Boolean(import.meta.env?.DEV);
 

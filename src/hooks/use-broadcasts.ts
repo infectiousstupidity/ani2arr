@@ -7,21 +7,21 @@ import { logger } from '@/utils/logger';
 const log = logger.create('Broadcasts');
 
 
-const SERIES_ROOT_KEY = ['kitsunarr', 'seriesStatus'] as const;
-const LIBRARY_SESSION_KEY = 'kitsunarr_library_epoch';
-const SETTINGS_SESSION_KEY = 'kitsunarr_settings_epoch';
+const SERIES_ROOT_KEY = ['a2a', 'seriesStatus'] as const;
+const LIBRARY_SESSION_KEY = 'a2a_library_epoch';
+const SETTINGS_SESSION_KEY = 'a2a_settings_epoch';
 
-export function useKitsunarrBroadcasts(): void {
+export function useA2aBroadcasts(): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     const handler = (message: unknown) => {
       const envelope = message as {
-        _kitsunarr?: boolean;
+        _a2a?: boolean;
         topic?: string;
         payload?: Record<string, unknown>;
       };
-      if (!envelope?._kitsunarr) return;
+      if (!envelope?._a2a) return;
 
       if (envelope.topic === 'series-updated') {
         queryClient.invalidateQueries({ queryKey: SERIES_ROOT_KEY });
@@ -90,7 +90,7 @@ export function useKitsunarrBroadcasts(): void {
           queryClient.clear();
         }
       } catch (error) {
-        log.warn('Failed to reconcile Kitsunarr library epoch.', error instanceof Error ? error.message : String(error));
+        log.warn('Failed to reconcile ani2arr library epoch.', error instanceof Error ? error.message : String(error));
       }
     })();
   }, [queryClient]);

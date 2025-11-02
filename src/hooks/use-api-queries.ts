@@ -2,7 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { getKitsunarrApi } from '@/rpc';
+import { getAni2arrApi } from '@/rpc';
 import {
   getExtensionOptionsSnapshot,
   getPublicOptionsSnapshot,
@@ -25,7 +25,7 @@ import type {
 import type { AddInput, StatusInput, SetMappingOverrideInput, ClearMappingOverrideInput } from '@/rpc/schemas';
 import { normalizeError } from '@/utils/error-handling';
 
-const rootQueryKey = ['kitsunarr'] as const;
+const rootQueryKey = ['a2a'] as const;
 
 const normalizeTitleKey = (title?: string) => {
   const trimmed = title?.trim();
@@ -134,7 +134,7 @@ export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: Ser
       if (prio) {
         request.priority = prio;
       }
-      return getKitsunarrApi().getSeriesStatus(request);
+      return getAni2arrApi().getSeriesStatus(request);
     },
     enabled: !!payload.anilistId && (options?.enabled ?? true),
     staleTime: forceVerify ? 0 : 5 * 60 * 1000,
@@ -182,7 +182,7 @@ export const useSonarrMetadata = (options?: { enabled?: boolean; credentials?: S
   return useQuery({
     queryKey: queryKeys.sonarrMetadata(credentialScope),
     queryFn: async () => {
-      const api = getKitsunarrApi();
+      const api = getAni2arrApi();
       return api.getSonarrMetadata(request);
     },
     enabled: options?.enabled ?? true,
@@ -197,7 +197,7 @@ export const useAddSeries = () => {
   return useMutation<SonarrSeries, ExtensionError, AddInput>({
     mutationFn: async (input: AddInput) => {
       try {
-        return await getKitsunarrApi().addToSonarr(input);
+        return await getAni2arrApi().addToSonarr(input);
       } catch (error) {
         throw normalizeError(error);
       }
@@ -213,7 +213,7 @@ export const useSetMappingOverride = () => {
   return useMutation<{ ok: true }, ExtensionError, SetMappingOverrideInput>({
     mutationFn: async (input: SetMappingOverrideInput) => {
       try {
-        return await getKitsunarrApi().setMappingOverride(input);
+        return await getAni2arrApi().setMappingOverride(input);
       } catch (error) {
         throw normalizeError(error);
       }
@@ -229,7 +229,7 @@ export const useClearMappingOverride = () => {
   return useMutation<{ ok: true }, ExtensionError, ClearMappingOverrideInput>({
     mutationFn: async (input: ClearMappingOverrideInput) => {
       try {
-        return await getKitsunarrApi().clearMappingOverride(input);
+        return await getAni2arrApi().clearMappingOverride(input);
       } catch (error) {
         throw normalizeError(error);
       }
@@ -244,7 +244,7 @@ export const useTestConnection = () => {
   return useMutation<{ version: string }, ExtensionError, TestConnectionPayload>({
     mutationFn: async (payload: TestConnectionPayload) => {
       try {
-        return await getKitsunarrApi().testConnection(payload);
+        return await getAni2arrApi().testConnection(payload);
       } catch (error) {
         throw normalizeError(error);
       }
@@ -259,7 +259,7 @@ export const useSaveOptions = () => {
     mutationFn: async (options: ExtensionOptions) => {
       try {
         await setExtensionOptionsSnapshot(options);
-        await getKitsunarrApi().notifySettingsChanged();
+        await getAni2arrApi().notifySettingsChanged();
       } catch (error) {
         throw normalizeError(error);
       }
@@ -305,7 +305,7 @@ export const useUpdateDefaultSettings = () => {
   return useMutation<void, ExtensionError, SonarrFormState>({
     mutationFn: async (defaults: SonarrFormState) => {
       try {
-        await getKitsunarrApi().updateDefaults(defaults);
+        await getAni2arrApi().updateDefaults(defaults);
       } catch (error) {
         throw normalizeError(error);
       }

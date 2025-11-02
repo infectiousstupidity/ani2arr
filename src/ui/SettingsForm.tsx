@@ -147,7 +147,7 @@ const SettingsForm: React.FC = () => {
             </div>
           ) : null}
 
-          <div id="kitsunarr-select-portal-container" ref={handleSelectPortalRef} />
+          <div id="a2a-select-portal-container" ref={handleSelectPortalRef} />
         </div>
       )}
 

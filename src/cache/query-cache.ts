@@ -3,9 +3,9 @@ import type { PersistedClient, Persister } from '@tanstack/query-persist-client-
 import type { Query } from '@tanstack/query-core';
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
-const DB_NAME = 'kitsunarr-tanstack-query-db';
+const DB_NAME = 'a2a-tanstack-query-db';
 const STORE_NAME = 'tanstack-query-store';
-const STORE_KEY = 'kitsunarr:tanstack-query';
+const STORE_KEY = 'a2a:tanstack-query';
 
 interface QueryCacheDbSchema extends DBSchema {
   [STORE_NAME]: {
@@ -70,8 +70,8 @@ export function overrideQueryPersisterForTests(persister: Persister | null): voi
 }
 
 // Filter: never persist queries containing Sonarr credentials or metadata
-const CREDENTIAL_QUERY_PREFIX = ['kitsunarr', 'options'] as const;
-const METADATA_QUERY_PREFIX = ['kitsunarr', 'sonarrMetadata'] as const;
+const CREDENTIAL_QUERY_PREFIX = ['a2a', 'options'] as const;
+const METADATA_QUERY_PREFIX = ['a2a', 'sonarrMetadata'] as const;
 
 /**
  * Determines which queries should be persisted to IndexedDB in the page context.
