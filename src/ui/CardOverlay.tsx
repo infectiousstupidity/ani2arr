@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, TriangleAlert, SlidersHorizontal, Plus, Wrench, SquareArrowOutUpRight } from 'lucide-react';
+import { Check, TriangleAlert, SlidersHorizontal, Plus, Wrench, SquareArrowOutUpRight, RotateCcw } from 'lucide-react';
 import TooltipWrapper from '@/ui/TooltipWrapper';
 import type { CardOverlayProps } from '@/types';
 import { useCardOverlayState } from '@/hooks/use-card-overlay-state';
@@ -125,7 +125,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     switch (overlayState) {
       case 'resolving':
       case 'adding':
-        return <span className="kitsunarr-card-overlay__spinner" aria-hidden="true" />;
+        return <RotateCcw className="kitsunarr-card-overlay__symbol kitsunarr-rotate" aria-hidden="true" />;
       case 'in-sonarr':
         return <Check className="kitsunarr-card-overlay__symbol" aria-hidden="true" />;
       case 'error':
@@ -161,10 +161,10 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   // Prebuild stack action nodes
   const actionOpenExternal = (
     showExternalButton && externalHref ? (
-      <TooltipWrapper content="Open in Sonarr" side="right" align="center" sideOffset={6} container={tooltipContainer}>
+      <TooltipWrapper content="Open in Sonarr" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
         <button
           type="button"
-          className="kitsunarr-card-overlay__action"
+          className="kitsunarr-card-overlay__action kitsunarr-card-overlay__action--external"
           aria-label="Open in Sonarr"
           onClick={(e) => {
             e.preventDefault();
@@ -181,8 +181,8 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
 
   const actionFixMapping = (
     onOpenMappingFix ? (
-      <TooltipWrapper content="Fix mapping…" side="right" align="center" sideOffset={6} container={tooltipContainer}>
-        <button type="button" className="kitsunarr-card-overlay__action" aria-label="Fix mapping" onClick={openMappingFix} onMouseDown={swallowEvent}>
+      <TooltipWrapper content="Fix mapping…" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
+        <button type="button" className="kitsunarr-card-overlay__action kitsunarr-card-overlay__action--fix" aria-label="Fix mapping" onClick={openMappingFix} onMouseDown={swallowEvent}>
           <Wrench aria-hidden="true" className="h-4 w-4" />
         </button>
       </TooltipWrapper>
@@ -191,10 +191,10 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
 
   const actionAdvanced = (
     showAdvancedButton ? (
-      <TooltipWrapper content="Advanced Sonarr options" side="right" align="center" sideOffset={6} container={tooltipContainer}>
+      <TooltipWrapper content="Advanced Sonarr options" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
         <button
           type="button"
-          className="kitsunarr-card-overlay__action"
+          className="kitsunarr-card-overlay__action kitsunarr-card-overlay__action--advanced"
           aria-label="Open advanced Sonarr options"
           onClick={handleOpenAdvanced}
           onMouseDown={swallowEvent}
@@ -241,6 +241,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
           align="center"
           sideOffset={6}
           container={tooltipContainer}
+          showArrow={false}
         >
           <button
             type="button"
