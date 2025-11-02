@@ -1,5 +1,7 @@
 // src/ui/MappingFixModal.tsx
 import React, { useEffect, useMemo, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { X } from 'lucide-react';
 import Button from '@/ui/Button';
 import { usePublicOptions, useSetMappingOverride, useClearMappingOverride } from '@/hooks/use-api-queries';
 import { Modal, ModalContent, ModalDescription, ModalFooter, ModalTitle } from '@/ui/Modal';
@@ -95,6 +97,13 @@ const MappingFixModal: React.FC<MappingFixModalProps> = ({
     <Modal open={isOpen} onOpenChange={onClose}>
       <ModalContent className="w-[560px] max-w-[95vw]" container={portalContainer ?? undefined}>
         <ModalTitle>Fix mapping for {title}</ModalTitle>
+        <Dialog.Close
+          className="absolute right-4 top-4 rounded-sm opacity-70 text-text-primary transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 disabled:pointer-events-none"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </Dialog.Close>
         <ModalDescription>
           Enter a TVDB ID to override automatic matching. Overrides sync across devices and take effect immediately.
         </ModalDescription>
