@@ -69,7 +69,7 @@ const Input = React.memo(
           id={id}
           type={type}
           ref={ref}
-          className={`flex h-9 w-full rounded-md border border-border-primary bg-bg-tertiary px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+          className={`flex h-9 w-full rounded-md border border-border-primary bg-bg-tertiary px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-text-secondary disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
           {...props}
         />
       );
@@ -87,7 +87,7 @@ const Switch = React.memo(
     return (
       <SwitchPrimitive.Root
         id={id}
-        className={`peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-accent-primary data-[state=unchecked]:bg-bg-tertiary ${className}`}
+        className={`peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-accent-primary data-[state=unchecked]:bg-bg-tertiary ${className}`}
         {...props}
         ref={ref}
       >
@@ -111,7 +111,7 @@ const SelectTrigger = React.memo(
       <SelectPrimitive.Trigger
         id={id}
         ref={ref}
-        className={`flex h-9 w-full items-center justify-between rounded-md border border-border-primary bg-bg-tertiary px-3 py-2 text-sm ring-offset-background placeholder:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+        className={`flex h-9 w-full items-center justify-between rounded-md border border-border-primary bg-bg-tertiary px-3 py-2 text-sm ring-offset-background placeholder:text-text-primary disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
         {...props}
       >
         {children}
@@ -133,7 +133,7 @@ const SelectContent = React.memo(
       <SelectPrimitive.Portal container={container ?? undefined}>
         <SelectPrimitive.Content
           ref={ref}
-          className={`relative z-50 min-w-[8rem] w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-border-primary bg-bg-secondary text-text-primary shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ${className}`}
+          className={`relative z-50 min-w-32 w-(--radix-select-trigger-width) overflow-hidden rounded-md border border-border-primary bg-bg-secondary text-text-primary shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ${className}`}
           position={position}
           {...props}
         >
@@ -152,7 +152,7 @@ const SelectItem = React.memo(
   >(({ className = '', children, ...props }, ref) => (
     <SelectPrimitive.Item
       ref={ref}
-      className={`relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-bg-tertiary data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ${className}`}
+      className={`relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm data-disabled:pointer-events-none data-disabled:opacity-50 ${className}`}
       {...props}
     >
       <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">

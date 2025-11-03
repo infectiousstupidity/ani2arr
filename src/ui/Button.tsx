@@ -34,7 +34,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const isDisabled = isLoading || !!props.disabled;
 
     const variantClasses = {
-      primary: `bg-accent-primary text-white ${isDisabled ? 'shadow-[inset_0_0_0_9999px_rgba(0,0,0,0.5)]' : 'hover:bg-accent-hover'}`,
+      // Primary has no hover darkening to match AniList buttons.
+      primary: `bg-accent-primary text-white`,
       secondary: `${isDisabled ? 'bg-bg-tertiary' : 'bg-bg-secondary hover:bg-bg-tertiary'} text-text-primary`,
       outline: `border border-border-primary text-text-secondary ${isDisabled ? '' : 'hover:bg-bg-secondary'}`,
       ghost: `${isDisabled ? '' : 'hover:bg-bg-secondary'}`,
@@ -51,7 +52,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         ref={ref}
         disabled={isDisabled}
-        className={`inline-flex items-center justify-center whitespace-nowrap rounded-md ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${isDisabled ? 'cursor-not-allowed' : ''} ${variantClasses[variant]} ${sizeClasses[size]} ${className ?? ''}`}
+        className={`inline-flex items-center justify-center whitespace-nowrap rounded-md ring-offset-background transition-colors ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} ${variantClasses[variant]} ${sizeClasses[size]} ${className ?? ''}`}
         {...props}
       >
         {isLoading ? (

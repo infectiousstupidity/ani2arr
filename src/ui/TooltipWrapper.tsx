@@ -26,7 +26,7 @@ const TooltipWrapper: React.FC<TooltipWrapperProps> = ({
     <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
     <Tooltip.Portal container={container}>
       <Tooltip.Content
-        className="pointer-events-none text-[13px] font-medium text-[rgba(255,255,255,0.92)] bg-[rgba(10,15,23,0.95)] border border-[rgba(255,255,255,0.08)] rounded-md px-[10px] py-[6px] shadow-[0_12px_24px_rgba(8,12,20,0.35)] backdrop-blur-sm tracking-[0.01em] max-w-[240px] leading-[1.2] z-99999"
+        className="pointer-events-none text-[13px] font-medium text-[rgba(255,255,255,0.92)] bg-[rgba(10,15,23,0.95)] border border-[rgba(255,255,255,0.08)] rounded-md px-2.5 py-1.5 shadow-[0_12px_24px_rgba(8,12,20,0.35)] backdrop-blur-sm tracking-[0.01em] max-w-60 leading-[1.2] z-99999"
         side={side}
         align={align}
         sideOffset={sideOffset}

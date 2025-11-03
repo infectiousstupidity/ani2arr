@@ -21,12 +21,6 @@
   cursor: not-allowed;
 }
 
-/* Scoped focus styles for switch (no global * selectors) */
-.a2a-switch-root:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-}
-
 .a2a-switch-thumb {
   display: block;
   width: 20px;

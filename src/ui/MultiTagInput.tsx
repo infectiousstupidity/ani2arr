@@ -59,7 +59,7 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
 
   const suggestions = useMemo(() => {
     const lowerInputValue = inputValue.toLowerCase();
-    
+
     // Filter out tags that are already selected
     const availableTags = existingTags.filter(
       tag => !tags.some(t => t.toLowerCase() === tag.toLowerCase())
@@ -69,14 +69,14 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
     if (inputValue) {
       return availableTags.filter(tag => tag.toLowerCase().includes(lowerInputValue));
     }
-    
+
     return availableTags;
   }, [inputValue, existingTags, tags]);
 
   return (
     <div className="relative" onBlur={handleBlur}>
       <div 
-        className="flex w-full flex-wrap items-center gap-2 rounded-md border border-border-primary bg-bg-tertiary p-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-accent-primary"
+        className="flex w-full flex-wrap items-center gap-2 rounded-md border border-border-primary bg-bg-tertiary p-2 text-sm ring-offset-background"
         onClick={() => inputRef.current?.focus()} // Focus the input when clicking the container
       >
         {tags.map((tag, index) => (
@@ -84,7 +84,7 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
             {tag}
             <button
               type="button"
-              className="rounded-full outline-none focus:ring-2 focus:ring-accent-primary"
+              className="rounded-full"
               onClick={() => removeTag(index)}
               disabled={disabled}
               aria-label={`Remove ${tag}`}
@@ -101,11 +101,11 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder={tags.length === 0 ? placeholder : ''}
-          className="min-w-[80px] flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary focus:outline-none"
+          className="min-w-20 flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary"
           disabled={disabled}
         />
       </div>
-      
+
       {isOpen && suggestions.length > 0 && (
         <ul
           role="listbox"
