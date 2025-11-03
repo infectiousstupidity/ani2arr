@@ -16,7 +16,7 @@ interface SonarrActionGroupProps {
   resolvedSearchTerm: string;
   tvdbId: number | null | undefined;
   onQuickAdd: () => void;
-  onOpenModal: () => void; // Advanced Sonarr options
+  onOpenModal: () => void; // Sonarr options
   onOpenMappingFix: () => void; // Fix mapping modal
   portalContainer?: HTMLElement | undefined;
 }
@@ -33,6 +33,8 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
   portalContainer
 }) => {
   const { data: options } = usePublicOptions();
+  const hasExternal = Boolean(options?.sonarrUrl);
+  const sonarrBaseUrl = hasExternal ? (options!.sonarrUrl as string).replace(/\/$/, '') : '';
 
   const getButtonText = () => {
     switch (status) {
@@ -44,7 +46,6 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
     }
   };
 
-  const isIdle = status === 'NOT_IN_SONARR';
   const isInSonarr = status === 'IN_SONARR';
   const isLoading = status === 'LOADING' || status === 'ADDING';
 
@@ -56,7 +57,8 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
     if (groupTooltip) return undefined;
     switch (status) {
       case 'IN_SONARR':
-        return 'Already added to Sonarr';
+        // Button is clickable in this state and opens the options modal
+        return 'Open Sonarr options';
       case 'LOADING':
         return 'Checking Sonarr status…';
       case 'ADDING':
@@ -71,19 +73,19 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
   const dropdownDisabled = false;
   
   return (
-  <div className="grid grid-cols-[1fr_auto] gap-4 items-start w-full">
+  <div className={`grid ${hasExternal ? 'grid-cols-[1fr_auto] gap-[15px]' : 'grid-cols-1 gap-0'} items-start w-full`}>
     {groupTooltip ? (
       <TooltipWrapper content={groupTooltip} container={portalContainer ?? null}>
-      <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group">
+      <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group" style={{ width: '100%' }}>
         {/* Main Action Button */}
         <Button
           data-testid="a2a-main-action-button"
           size="md"
-          onClick={onQuickAdd}
+          onClick={isInSonarr ? onOpenModal : onQuickAdd}
           isLoading={isLoading}
-          disabled={!isIdle || tvdbId === null}
+          disabled={isLoading || (tvdbId === null && !isInSonarr)}
           portalContainer={portalContainer}
-          className="flex-1 rounded-none h-[35px] text-[14px]"
+          className="flex-1 w-[calc(100%-34px)] rounded-none h-[35px] text-[14px] text-center px-0 pl-2.5"
           loadingText={getButtonText()}
         >
           {tvdbId === null ? "Cannot add" : getButtonText()}
@@ -98,14 +100,14 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
               variant="primary"
               disabled={dropdownDisabled}
               portalContainer={portalContainer}
-              className="rounded-none h-[35px] w-[35px] focus-visible:z-10 focus-visible:ring-offset-0"
+              className="relative rounded-none h-[35px] w-[34px]"
               aria-label="Actions"
             >
               <ChevronDown className="h-4 w-4" />
             </Button>
           }
         >
-          <DropdownItem onSelect={onOpenModal} disabled={tvdbId === null}>Advanced Sonarr options</DropdownItem>
+          <DropdownItem onSelect={onOpenModal} disabled={tvdbId === null}>Sonarr options</DropdownItem>
           <DropdownItem onSelect={() => {
             log.debug('Action: Fix mapping clicked');
             onOpenMappingFix();
@@ -114,17 +116,17 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
       </div>
       </TooltipWrapper>
     ) : (
-      <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group">
+      <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group" style={{ width: '100%' }}>
             {/* Main Action Button */}
       <Button
         data-testid="a2a-main-action-button"
         size="md"
-        onClick={onQuickAdd}
+        onClick={isInSonarr ? onOpenModal : onQuickAdd}
         isLoading={isLoading}
-        disabled={!isIdle || tvdbId === null}
+        disabled={isLoading || (tvdbId === null && !isInSonarr)}
         {...(mainButtonTooltip ? { tooltip: mainButtonTooltip } : {})}
         portalContainer={portalContainer}
-        className="flex-1 rounded-none h-[35px] text-[14px]"
+        className="flex-1 w-[calc(100%-34px)] rounded-none h-[35px] text-[14px] text-center px-0 pl-2.5"
         loadingText={getButtonText()}
       >
                 {tvdbId === null ? "Cannot add" : getButtonText()}
@@ -139,14 +141,14 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
                   variant="primary"
                   disabled={dropdownDisabled}
                   portalContainer={portalContainer}
-                  className="rounded-none h-[35px] w-[35px] focus-visible:z-10 focus-visible:ring-offset-0"
+                className="relative rounded-none h-[35px] w-[34px] after:content-[''] after:absolute after:inset-0 after:bg-[rgba(255,255,255,0.14)] after:pointer-events-none"
                   aria-label="Actions"
                 >
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               }
             >
-              <DropdownItem onSelect={onOpenModal} disabled={tvdbId === null}>Advanced Sonarr options</DropdownItem>
+              <DropdownItem onSelect={onOpenModal} disabled={tvdbId === null}>Sonarr options</DropdownItem>
               <DropdownItem onSelect={() => {
                 log.debug('Action: Fix mapping clicked');
                 onOpenMappingFix();
@@ -156,7 +158,7 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
     )}
 
         {/* External Link Button */}
-        {options?.sonarrUrl && (
+        {hasExternal && (
           <Button
             asChild
             size="icon"
@@ -175,8 +177,8 @@ const SonarrActionGroup: React.FC<SonarrActionGroupProps> = ({
             <a
               href={
                 isInSonarr && seriesTitleSlug
-                  ? `${options.sonarrUrl.replace(/\/$/, '')}/series/${seriesTitleSlug}`
-                  : `${options.sonarrUrl.replace(/\/$/, '')}/add/new?term=${encodeURIComponent(resolvedSearchTerm)}`
+                  ? `${sonarrBaseUrl}/series/${seriesTitleSlug}`
+                  : `${sonarrBaseUrl}/add/new?term=${encodeURIComponent(resolvedSearchTerm)}`
               }
               target="_blank"
               rel="noopener noreferrer"

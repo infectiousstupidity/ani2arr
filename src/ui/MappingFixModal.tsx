@@ -98,7 +98,7 @@ const MappingFixModal: React.FC<MappingFixModalProps> = ({
       <ModalContent className="w-[560px] max-w-[95vw]" container={portalContainer ?? undefined}>
         <ModalTitle>Fix mapping for {title}</ModalTitle>
         <Dialog.Close
-          className="absolute right-4 top-4 rounded-sm opacity-70 text-text-primary transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 disabled:pointer-events-none"
+          className="absolute right-4 top-4 rounded-sm opacity-70 text-text-primary transition-opacity hover:opacity-100 disabled:pointer-events-none"
           aria-label="Close"
         >
           <X className="h-4 w-4" />
@@ -115,7 +115,7 @@ const MappingFixModal: React.FC<MappingFixModalProps> = ({
             <input
               id="search-input"
               type="text"
-              className="w-full h-9 px-3 rounded-md border border-border-primary bg-bg-secondary text-text-primary outline-none focus:outline-none"
+              className="w-full h-9 px-3 rounded-md border border-border-primary bg-bg-secondary text-text-primary"
               placeholder="Type a title or tvdb:12345"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
@@ -135,7 +135,7 @@ const MappingFixModal: React.FC<MappingFixModalProps> = ({
                   <li key={`${r.tvdbId}-${r.titleSlug}`}> 
                     <button
                       type="button"
-                      className={`w-full h-9 flex items-center justify-between px-3 text-left cursor-pointer outline-none focus:outline-none hover:bg-[rgba(255,255,255,0.06)] ${selectedId === r.tvdbId ? 'bg-[rgba(255,255,255,0.08)]' : ''}`}
+                      className={`w-full h-9 flex items-center justify-between px-3 text-left cursor-pointer hover:bg-[rgba(255,255,255,0.06)] ${selectedId === r.tvdbId ? 'bg-[rgba(255,255,255,0.08)]' : ''}`}
                       onMouseDown={e => {
                         // Avoid focus steal causing click suppression inside some portals
                         e.preventDefault();
@@ -160,7 +160,7 @@ const MappingFixModal: React.FC<MappingFixModalProps> = ({
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
-              className="w-full h-9 px-3 rounded-md border border-border-primary bg-bg-secondary text-text-primary outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2"
+              className="w-full h-9 px-3 rounded-md border border-border-primary bg-bg-secondary text-text-primary"
               placeholder="e.g. 305074"
               value={tvdbIdInput}
               onChange={e => setTvdbIdInput(e.target.value)}

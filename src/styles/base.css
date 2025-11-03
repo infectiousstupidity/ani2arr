@@ -4,7 +4,7 @@
 /* 1) Theme variables scoped to the shadow host */
 :host {
   /* Light */
-  --bg-primary:    #FAFAFA;
+  --bg-primary:    #FFFFFF;
   --bg-secondary:  #f2f5f7;
   --bg-tertiary:   #EDF1F5;
   --text-primary:  #212529;
@@ -76,16 +76,17 @@
 
 .focus-trap { isolation: isolate; }
 
-/* 4) Shared focus-visible styles (scoped to common interactives) */
-:host button:focus-visible,
-:host [role="button"]:focus-visible,
-:host a:focus-visible,
-:host input:focus-visible,
-:host select:focus-visible,
-:host textarea:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
+/* 4) Focus reset — remove outlines/rings within our UI shadow roots */
+/* This is scoped to our extension's shadow host via :host to avoid touching the page. */
+:host *:focus,
+:host *:focus-visible,
+:host *:focus-within {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important; /* neutralize Tailwind ring utilities */
 }
+
+
 
 /* 5) Spinner */
 @keyframes a2a-spin { to { transform: rotate(360deg); } }
@@ -115,8 +116,7 @@
   cursor: pointer;
 }
 .a2a-card-overlay__quick:hover:not([disabled]):not([data-state='in-sonarr']) { transform: none; box-shadow: none; }
-.a2a-card-overlay__quick:focus,
-.a2a-card-overlay__quick:focus-visible { outline: none; }
+/* outline removed globally for interactive overlay quick buttons */
 .a2a-card-overlay__quick svg,
 .a2a-card-overlay__symbol { width: 16px; height: 16px; color: #ffffff; stroke-width: 1.5; }
 
@@ -169,3 +169,28 @@
 .a2a-card-overlay__action[aria-disabled='true'] { cursor: default; }
 .a2a-card-overlay__action:hover:not(:disabled):not([aria-disabled='true']) { background: rgba(31,38,39,0.9); opacity: 1; }
 .a2a-card-overlay__action:active:not(:disabled):not([aria-disabled='true']) { background: rgba(31,38,39,0.9); opacity: 1; }
+
+/* Aggressive overrides for overlays injected into host pages (browse/content scripts).
+   Some host sites apply their own focus styles which can override component classes.
+   To honor the user's request to remove outlines/rings everywhere, neutralize focus
+   indicators for our overlay container and card overlays using !important so the
+   host CSS cannot re-enable outlines in those contexts. */
+.a2a-overlay-container input,
+.a2a-overlay-container button,
+.a2a-overlay-container select,
+.a2a-overlay-container textarea,
+.a2a-card-overlay input,
+.a2a-card-overlay button,
+.a2a-card-overlay select,
+.a2a-card-overlay textarea {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.a2a-overlay-container *:focus,
+.a2a-overlay-container *:focus-visible,
+.a2a-card-overlay *:focus,
+.a2a-card-overlay *:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}

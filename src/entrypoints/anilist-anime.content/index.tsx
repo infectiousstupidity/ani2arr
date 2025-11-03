@@ -115,13 +115,19 @@ function attachSizeSync(host: HTMLElement): () => void {
     display: 'block',
     position: 'static',
     zIndex: 'auto',
-    width: '100%',
+    width: 'auto',
     maxWidth: '100%',
     margin: '0',
   });
 
   const spacer = ensureSidebarSpacer();
   const sync = () => {
+    // Match AniList's native Add-to-List button width exactly to avoid sub-pixel drift.
+    const nativeList = q<HTMLElement>('.actions .list');
+    const listBox = nativeList?.getBoundingClientRect();
+    const listWidth = listBox ? Math.round(listBox.width) : 165; // AniList default width ~165px
+    host.style.width = `${listWidth}px`;
+
     const fav = q<HTMLElement>('.actions .favourite');
     const favBox = fav?.getBoundingClientRect();
     const favSide = favBox ? Math.round(Math.max(favBox.width, favBox.height)) : 35;
@@ -185,35 +191,29 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [fixModalOpen, setFixModalOpen] = useState(false);
-  // In unit tests, don't block on background readiness to avoid long LOADING states.
-  const isTestEnv = typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined' && import.meta.env.MODE === 'test';
-  const [backgroundReady, setBackgroundReady] = useState<boolean>(isTestEnv);
+  // Note: Do not gate queries on background readiness. Allow the
+  // RPC to wake the background naturally to avoid LOADING stalls.
+  // Detecting test mode is no longer necessary here.
   const { data: options, isPending: optionsPending, isError: optionsError } = usePublicOptions();
   const isConfigured = options?.isConfigured === true;
   const defaults = options?.defaults ?? null;
 
-  // Kick off background readiness probe without blocking initial render
+  // Fire a readiness probe, but never block UI on its result.
   useEffect(() => {
-    let mounted = true;
     (async () => {
       try {
         await awaitBackgroundReady();
-        if (mounted) setBackgroundReady(true);
       } catch {
         // If ping fails repeatedly, we still allow the UI to remain interactive; the query will surface errors.
       }
     })();
-    return () => {
-      mounted = false;
-    };
   }, []);
 
   const statusQuery = useSeriesStatus(
     { anilistId, title, metadata },
     {
-      // Only fire the status query once background is ready to avoid proxy races,
-      // but render the UI immediately while we wait.
-      enabled: Boolean(anilistId && isConfigured && (backgroundReady || isTestEnv)),
+      // Allow query immediately when configured; background will wake on demand.
+      enabled: Boolean(anilistId && isConfigured),
       force_verify: true,
       ignoreFailureCache: true,
       priority: 'high',
@@ -244,8 +244,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
     if (optionsPending) return 'LOADING';
     if (optionsError) return 'ERROR';
     if (!isConfigured) return 'ERROR';
-    // While background is booting, show a loading state even before the query fires
-    if (!backgroundReady && !isTestEnv) return 'LOADING';
+    // Rely on query state; do not block on background readiness.
     if (statusQuery.fetchStatus === 'fetching') return 'LOADING';
     if (statusQuery.isError || mappingUnavailable) return 'ERROR';
     if (statusQuery.data?.exists || addSeriesMutation.isSuccess) return 'IN_SONARR';

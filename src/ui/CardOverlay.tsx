@@ -191,11 +191,11 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
 
   const actionAdvanced = (
     showAdvancedButton ? (
-      <TooltipWrapper content="Advanced Sonarr options" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
+      <TooltipWrapper content="Sonarr options" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
         <button
           type="button"
           className="a2a-card-overlay__action a2a-card-overlay__action--advanced"
-          aria-label="Open advanced Sonarr options"
+          aria-label="Open Sonarr options"
           onClick={handleOpenAdvanced}
           onMouseDown={swallowEvent}
           disabled={advancedDisabled}

@@ -14,13 +14,13 @@ export const Dropdown: React.FC<DropdownProps> = ({ trigger, children, container
       <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
       <DropdownMenu.Portal container={container ?? undefined}>
         <DropdownMenu.Content
-          className="min-w-[180px] rounded-[6px] bg-[rgba(10,15,23,0.95)] text-[rgba(255,255,255,0.92)] border border-[rgba(255,255,255,0.12)] p-1 shadow-[0_12px_24px_rgba(8,12,20,0.35)] outline-none focus-visible:outline-none z-[99999]"
+          className="rounded-md bg-[#ffffff] text-(--text-secondary) border-0 shadow-[0_1px_10px_rgba(49,54,68,0.15)] py-1.5 z-99999"
           side="bottom"
           align="end"
           sideOffset={6}
         >
           {children}
-          <DropdownMenu.Arrow className="fill-[rgba(10,15,23,0.95)] stroke-[rgba(255,255,255,0.12)]" />
+          <DropdownMenu.Arrow className="fill-[#ffffff] stroke-transparent" />
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
@@ -33,10 +33,10 @@ export const DropdownItem: React.FC<{
   children: React.ReactNode;
 }> = ({ onSelect, disabled, children }) => (
   <DropdownMenu.Item
-    className={`text-sm leading-none rounded-[4px] flex items-center h-8 px-3 select-none outline-none focus-visible:outline-none ${
+    className={`text-[14px] leading-[30px] rounded-sm flex items-center px-[17px] select-none ${
       disabled
-        ? 'opacity-50 cursor-not-allowed text-[rgba(255,255,255,0.5)]'
-        : 'text-[rgba(255,255,255,0.92)] hover:bg-[rgba(255,255,255,0.06)]'
+        ? 'opacity-50 cursor-not-allowed text-text-secondary'
+        : 'text-text-secondary cursor-pointer hover:bg-accent-primary hover:text-white'
     }`}
     onSelect={() => {
       if (!disabled) onSelect?.();
