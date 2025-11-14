@@ -1,6 +1,6 @@
 // src/services/mapping/overrides.service.ts
 import { browser } from 'wxt/browser';
-import { mappingOverridesLocal, mappingOverridesSync, type MappingOverrideEntry } from '@/utils/overrides-storage';
+import { mappingOverridesLocal, mappingOverridesSync, type MappingOverrideEntry } from '@/shared/utils/overrides-storage';
 
 export class MappingOverridesService {
   private readonly map = new Map<number, MappingOverrideEntry>();

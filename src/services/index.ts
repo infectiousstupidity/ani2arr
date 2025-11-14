@@ -1,4 +1,3 @@
-// src/services/index.ts
 import { browser } from 'wxt/browser';
 import { createTtlCache } from '@/cache';
 import { CacheNamespaces } from '@/cache/namespaces';
@@ -8,7 +7,8 @@ import { MappingService, type ResolvedMapping, type StaticMappingPayload } from 
 import { MappingOverridesService } from './mapping/overrides.service';
 import { StaticMappingProvider } from './mapping/static-mapping.provider';
 import { SonarrLookupClient } from './mapping/sonarr-lookup.client';
-import { LibraryService } from './library.service';
+import { SonarrLibrary } from '@/services/library/sonarr';
+
 import type {
   LeanSonarrSeries,
   SonarrLookupSeries,
@@ -18,24 +18,26 @@ import type {
   SonarrCredentialsPayload,
   CheckSeriesStatusPayload,
   RequestPriority,
-} from '@/types';
-import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/utils/storage';
-import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
+} from '@/shared/types';
+import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/shared/utils/storage';
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
 import type { MappingOutput } from '@/rpc/schemas';
 import { type Ani2arrApi } from '@/rpc';
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
   if (!proto) return instance;
-
   for (const key of Object.getOwnPropertyNames(proto)) {
     if (key === 'constructor') continue;
-    const value = proto[key];
-    if (typeof value === 'function') {
-      (instance as Record<string, unknown>)[key] = (value as (...args: unknown[]) => unknown).bind(instance);
+    const descriptor = Object.getOwnPropertyDescriptor(proto, key);
+    if (descriptor && typeof descriptor.value === 'function') {
+      const fn = descriptor.value as (...args: unknown[]) => unknown;
+      Object.defineProperty(instance, key, {
+        ...descriptor,
+        value: fn.bind(instance),
+      });
     }
   }
-
   return instance;
 }
 
@@ -43,9 +45,7 @@ const initializeEpoch = async (key: 'libraryEpoch' | 'settingsEpoch'): Promise<n
   try {
     const stored = await browser.storage.local.get(key);
     const value = stored[key];
-    if (typeof value === 'number') {
-      return value;
-    }
+    if (typeof value === 'number') return value;
   } catch (error) {
     logError(normalizeError(error), `Ani2arrApi:initEpoch:${key}`);
   }
@@ -54,136 +54,135 @@ const initializeEpoch = async (key: 'libraryEpoch' | 'settingsEpoch'): Promise<n
 
 export const createApiImplementation = (): Ani2arrApi => {
   const sonarrApiService = bindAll(new SonarrApiService());
-    const anilistApiService = bindAll(
-      new AnilistApiService({
-        media: createTtlCache<AniMedia>(CacheNamespaces.anilistMedia),
-      }),
-    );
+  const anilistApiService = bindAll(
+    new AnilistApiService({
+      media: createTtlCache<AniMedia>(CacheNamespaces.anilistMedia),
+    }),
+  );
 
-    const staticProvider = new StaticMappingProvider({
-      primary: createTtlCache<StaticMappingPayload>(CacheNamespaces.mappingStaticPrimary),
-      fallback: createTtlCache<StaticMappingPayload>(CacheNamespaces.mappingStaticFallback),
-    });
+  const staticProvider = new StaticMappingProvider({
+    primary: createTtlCache<StaticMappingPayload>(CacheNamespaces.mappingStaticPrimary),
+    fallback: createTtlCache<StaticMappingPayload>(CacheNamespaces.mappingStaticFallback),
+  });
 
-    const lookupClient = new SonarrLookupClient(sonarrApiService, {
-      positive: createTtlCache<SonarrLookupSeries[]>(CacheNamespaces.mappingLookupPositive),
-      negative: createTtlCache<boolean>(CacheNamespaces.mappingLookupNegative),
-    });
+  const lookupClient = new SonarrLookupClient(sonarrApiService, {
+    positive: createTtlCache<SonarrLookupSeries[]>(CacheNamespaces.mappingLookupPositive),
+    negative: createTtlCache<boolean>(CacheNamespaces.mappingLookupNegative),
+  });
 
-    const overridesService = new MappingOverridesService();
-    void overridesService.init();
+  const overridesService = new MappingOverridesService();
+  void overridesService.init();
 
-    const mappingService = bindAll(
-      new MappingService(anilistApiService, staticProvider, lookupClient, {
+  const mappingService = bindAll(
+    new MappingService(
+      anilistApiService,
+      staticProvider,
+      lookupClient,
+      {
         success: createTtlCache<ResolvedMapping>(CacheNamespaces.mappingResolvedSuccess),
         failure: createTtlCache<ExtensionError>(CacheNamespaces.mappingResolvedFailure),
-      }, overridesService),
-    );
+      },
+      overridesService,
+    ),
+  );
 
-    let libraryEpoch = 0;
-    let settingsEpoch = 0;
+  let libraryEpoch = 0;
+  let settingsEpoch = 0;
 
-    void initializeEpoch('libraryEpoch').then(epoch => {
-      libraryEpoch = epoch;
-    });
-    void initializeEpoch('settingsEpoch').then(epoch => {
-      settingsEpoch = epoch;
-    });
+  void initializeEpoch('libraryEpoch').then(epoch => {
+    libraryEpoch = epoch;
+  });
+  void initializeEpoch('settingsEpoch').then(epoch => {
+    settingsEpoch = epoch;
+  });
 
-    const ensureConfigured = async (): Promise<{ credentials: { url: string; apiKey: string }; options: ExtensionOptions }> => {
-      const options = await getExtensionOptionsSnapshot();
-      if (!options?.sonarrUrl || !options?.sonarrApiKey) {
-        throw createError(
-          ErrorCode.SONARR_NOT_CONFIGURED,
-          'Sonarr credentials are not configured.',
-          'Configure your Sonarr connection in ani2arr options.',
-        );
-      }
-      return {
-        credentials: { url: options.sonarrUrl, apiKey: options.sonarrApiKey },
-        options,
-      };
+  const ensureConfigured = async (): Promise<{ credentials: { url: string; apiKey: string }; options: ExtensionOptions }> => {
+    const options = await getExtensionOptionsSnapshot();
+    if (!options?.sonarrUrl || !options?.sonarrApiKey) {
+      throw createError(
+        ErrorCode.SONARR_NOT_CONFIGURED,
+        'Sonarr credentials are not configured.',
+        'Configure your Sonarr connection in ani2arr options.',
+      );
+    }
+    return {
+      credentials: { url: options.sonarrUrl, apiKey: options.sonarrApiKey },
+      options,
     };
+  };
 
-    const broadcast = async (topic: string, payload?: Record<string, unknown>): Promise<void> => {
-      try {
-        await browser.runtime.sendMessage({ _a2a: true, topic, payload });
-      } catch (error) {
-        const normalized = normalizeError(error);
-        if (normalized.message.includes('Receiving end does not exist')) {
-          return;
-        }
-        logError(normalized, `Ani2arrApi:broadcast:${topic}`);
-      }
-    };
+  const broadcast = async (topic: string, payload?: Record<string, unknown>): Promise<void> => {
+    try {
+      await browser.runtime.sendMessage({ _a2a: true, topic, payload });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      if (normalized.message.includes('Receiving end does not exist')) return;
+      logError(normalizeError(error), `Ani2arrApi:broadcast:${topic}`);
+    }
+  };
 
-    const bumpLibraryEpoch = async (payload?: Record<string, unknown>): Promise<void> => {
-      libraryEpoch += 1;
-      const nextEpoch = libraryEpoch;
-      await browser.storage.local.set({ libraryEpoch: nextEpoch });
-      await broadcast('series-updated', { epoch: nextEpoch, ...payload });
-    };
+  const bumpLibraryEpoch = async (payload?: Record<string, unknown>): Promise<void> => {
+    libraryEpoch += 1;
+    const nextEpoch = libraryEpoch;
+    await browser.storage.local.set({ libraryEpoch: nextEpoch });
+    await broadcast('series-updated', { epoch: nextEpoch, ...payload });
+  };
 
-    const libraryService = bindAll(
-      new LibraryService(
-        sonarrApiService,
-        mappingService,
-        createTtlCache<LeanSonarrSeries[]>(CacheNamespaces.libraryLean),
-        mutation => bumpLibraryEpoch({ tvdbId: mutation.tvdbId, action: mutation.action }),
-      ),
-    );
+  // REPLACED: LibraryService -> SonarrLibrary
+  const sonarrLibrary = bindAll(
+    new SonarrLibrary(
+      sonarrApiService,
+      mappingService,
+      { leanSeries: createTtlCache<LeanSonarrSeries[]>(CacheNamespaces.libraryLean) },
+      mutation => bumpLibraryEpoch({ tvdbId: mutation.tvdbId, action: mutation.action }),
+    ),
+  );
 
-    const bumpSettingsEpoch = async (): Promise<void> => {
-      settingsEpoch += 1;
-      const nextEpoch = settingsEpoch;
-      await browser.storage.local.set({ settingsEpoch: nextEpoch });
-      await broadcast('settings-changed', { epoch: nextEpoch });
-    };
+  const bumpSettingsEpoch = async (): Promise<void> => {
+    settingsEpoch += 1;
+    const nextEpoch = settingsEpoch;
+    await browser.storage.local.set({ settingsEpoch: nextEpoch });
+    await broadcast('settings-changed', { epoch: nextEpoch });
+  };
 
-    const handleOptionsUpdated = async (optionsHint?: ExtensionOptions): Promise<void> => {
-      // Clear API-layer read caches (e.g., ETag map) when settings change
-      sonarrApiService.clearEtagCache();
-      await bumpSettingsEpoch();
-      await mappingService.resetLookupState();
-      const options = optionsHint ?? (await getExtensionOptionsSnapshot());
-      const configured = !!(options?.sonarrUrl && options?.sonarrApiKey);
-      if (configured) {
-        await libraryService.refreshCache(options);
-        await bumpLibraryEpoch();
-      }
-    };
+  const handleOptionsUpdated = async (optionsHint?: ExtensionOptions): Promise<void> => {
+    sonarrApiService.clearEtagCache();
+    await bumpSettingsEpoch();
+    await mappingService.resetLookupState();
+    const options = optionsHint ?? (await getExtensionOptionsSnapshot());
+    const configured = !!(options?.sonarrUrl && options?.sonarrApiKey);
+    if (configured) {
+      await sonarrLibrary.refreshCache(options);
+      await bumpLibraryEpoch();
+    }
+  };
 
   const api: Ani2arrApi = {
     async resolveMapping(input) {
       await ensureConfigured();
 
-      // Fast path: try local library index only (no network)
+      // Fast path: local library index only
       try {
         const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
         if (input.primaryTitleHint !== undefined) payload.title = input.primaryTitleHint;
         if (input.metadata !== undefined) payload.metadata = input.metadata ?? null;
-        const status = await libraryService.getSeriesStatus(payload, { network: 'never', ignoreFailureCache: true });
+        const status = await sonarrLibrary.getSeriesStatus(payload, { network: 'never', ignoreFailureCache: true });
         if (status.exists && typeof status.tvdbId === 'number') {
           return {
             tvdbId: status.tvdbId,
             ...(status.successfulSynonym ? { successfulSynonym: status.successfulSynonym } : {}),
           } satisfies MappingOutput;
         }
-      } catch (err) {
-        void err;
+      } catch {
+        // ignore fast-path errors
       }
 
       const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {};
       const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
-      if (input.primaryTitleHint) {
-        hints.primaryTitle = input.primaryTitleHint;
-      }
-      if (input.metadata) {
-        hints.domMedia = input.metadata;
-      }
-      if (Object.keys(hints).length > 0) {
-        resolveOptions.hints = hints;
-      }
+      if (input.primaryTitleHint) hints.primaryTitle = input.primaryTitleHint;
+      if (input.metadata) hints.domMedia = input.metadata;
+      if (Object.keys(hints).length > 0) resolveOptions.hints = hints;
+
       const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
       return {
         tvdbId: mapping ? mapping.tvdbId : null,
@@ -194,48 +193,29 @@ export const createApiImplementation = (): Ani2arrApi => {
     async getSeriesStatus(input) {
       await ensureConfigured();
       const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
-      if (input.title !== undefined) {
-        payload.title = input.title;
-      }
-      if (input.metadata !== undefined) {
-        payload.metadata = input.metadata;
-      }
+      if (input.title !== undefined) payload.title = input.title;
+      if (input.metadata !== undefined) payload.metadata = input.metadata;
+
       const requestOptions: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean; priority?: RequestPriority } = {};
-      if (input.force_verify) {
-        requestOptions.force_verify = true;
-      }
-      if (input.network) {
-        requestOptions.network = input.network;
-      }
-      if (input.ignoreFailureCache) {
-        requestOptions.ignoreFailureCache = true;
-      }
-      if (input.priority) {
-        requestOptions.priority = input.priority;
-      }
-      const status = await libraryService.getSeriesStatus(payload, requestOptions);
-      // Surface whether a manual override is active for this AniList ID
+      if (input.force_verify) requestOptions.force_verify = true;
+      if (input.network) requestOptions.network = input.network;
+      if (input.ignoreFailureCache) requestOptions.ignoreFailureCache = true;
+      if (input.priority) requestOptions.priority = input.priority;
+
+      const status = await sonarrLibrary.getSeriesStatus(payload, requestOptions);
       return { ...status, overrideActive: mappingService.isOverrideActive(input.anilistId) };
     },
 
     async addToSonarr(input) {
       const { options } = await ensureConfigured();
 
-      const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {
-        ignoreFailureCache: true,
-      };
+      const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = { ignoreFailureCache: true };
       const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
-      if (input.primaryTitleHint) {
-        hints.primaryTitle = input.primaryTitleHint;
-      }
-      if (input.metadata) {
-        hints.domMedia = input.metadata;
-      }
-      if (Object.keys(hints).length > 0) {
-        resolveOptions.hints = hints;
-      }
-      const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
+      if (input.primaryTitleHint) hints.primaryTitle = input.primaryTitleHint;
+      if (input.metadata) hints.domMedia = input.metadata;
+      if (Object.keys(hints).length > 0) resolveOptions.hints = hints;
 
+      const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
       if (!mapping) {
         throw createError(
           ErrorCode.VALIDATION_ERROR,
@@ -253,8 +233,8 @@ export const createApiImplementation = (): Ani2arrApi => {
       };
 
       const created = await sonarrApiService.addSeries(payload, options);
-      await libraryService.addSeriesToCache(created);
-      await libraryService.refreshCache(options);
+      await sonarrLibrary.addSeriesToCache(created);
+      await sonarrLibrary.refreshCache(options);
       await bumpLibraryEpoch({ tvdbId: created.tvdbId });
       return created;
     },
@@ -267,10 +247,7 @@ export const createApiImplementation = (): Ani2arrApi => {
 
     async updateDefaults(defaults) {
       const current = await getExtensionOptionsSnapshot();
-      const next: ExtensionOptions = {
-        ...current,
-        defaults,
-      };
+      const next: ExtensionOptions = { ...current, defaults };
       await setExtensionOptionsSnapshot(next);
       await handleOptionsUpdated(next);
       return { ok: true as const };
@@ -295,7 +272,6 @@ export const createApiImplementation = (): Ani2arrApi => {
       return sonarrApiService.testConnection(payload);
     },
 
-    // Fetch Sonarr metadata (quality profiles, root folders, tags)
     async getSonarrMetadata(input) {
       const maybeCredentials = input?.credentials;
       let credentials: SonarrCredentialsPayload;
@@ -313,7 +289,6 @@ export const createApiImplementation = (): Ani2arrApi => {
       return { qualityProfiles, rootFolders, tags };
     },
 
-    // Fetch AniList media data for a batch of AniList IDs
     async prefetchAniListMedia(ids) {
       const map = await anilistApiService.fetchMediaBatch(ids);
       return Array.from(map.entries());
@@ -332,18 +307,16 @@ export const createApiImplementation = (): Ani2arrApi => {
       return mappingService.initStaticPairs();
     },
 
-    // Lookup Sonarr series by term and include library membership info
     async searchSonarr(input) {
       const { credentials } = await ensureConfigured();
       const [results, library] = await Promise.all([
         sonarrApiService.lookupSeriesByTerm(input.term, credentials),
-        libraryService.getLeanSeriesList(),
+        sonarrLibrary.getLeanSeriesList(),
       ]);
       const libraryTvdbIds = library.map(s => s.tvdbId);
       return { results, libraryTvdbIds };
     },
 
-    // Validate a TVDB ID in library and catalog
     async validateTvdbId(input) {
       const { credentials } = await ensureConfigured();
       const found = await sonarrApiService.getSeriesByTvdbId(input.tvdbId, credentials);
@@ -357,14 +330,12 @@ export const createApiImplementation = (): Ani2arrApi => {
       return { inLibrary: !!found, inCatalog };
     },
 
-    // Manual mapping overrides
     async setMappingOverride(input) {
       await overridesService.set(input.anilistId, input.tvdbId);
       await mappingService.evictResolved(input.anilistId);
-      // Best-effort: refresh library cache if configured
       const options = await getExtensionOptionsSnapshot();
       if (options?.sonarrUrl && options?.sonarrApiKey) {
-        await libraryService.refreshCache(options);
+        await sonarrLibrary.refreshCache(options);
       }
       await bumpLibraryEpoch({ anilistId: input.anilistId, tvdbId: input.tvdbId, action: 'override:set' });
       return { ok: true as const };
@@ -375,7 +346,7 @@ export const createApiImplementation = (): Ani2arrApi => {
       await mappingService.evictResolved(input.anilistId);
       const options = await getExtensionOptionsSnapshot();
       if (options?.sonarrUrl && options?.sonarrApiKey) {
-        await libraryService.refreshCache(options);
+        await sonarrLibrary.refreshCache(options);
       }
       await bumpLibraryEpoch({ anilistId: input.anilistId, action: 'override:clear' });
       return { ok: true as const };

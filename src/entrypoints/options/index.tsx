@@ -3,7 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import SettingsForm from '@/ui/SettingsForm';
+import SettingsForm from '@/shared/components/settings-form';
 import './style.css';
 
 const queryClient = new QueryClient();

@@ -2,8 +2,8 @@
 import { generateSearchTerms, isSeasonalCanonicalTokens } from './search-term-generator';
 import { scoreCandidates } from './scoring';
 import { maybeEarlyStop, pickBest } from './early-stop';
-import type { EvaluationOutcome, EvaluationOutcomeResolved, MappingContext, AniMedia } from '@/types';
-import { canonicalTitleKey, sanitizeLookupDisplay } from '@/utils/matching';
+import type { EvaluationOutcome, EvaluationOutcomeResolved, MappingContext, AniMedia } from '@/shared/types';
+import { canonicalTitleKey, sanitizeLookupDisplay } from '@/shared/utils/matching';
 
 export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, primaryTitleHint?: string): Promise<EvaluationOutcome> {
   if (import.meta.env.DEV) {

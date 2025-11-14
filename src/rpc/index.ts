@@ -1,14 +1,14 @@
 // src/rpc/index.ts
 import { defineProxyService } from '@webext-core/proxy-service';
-import type {
+import type { 
+  AniMedia,
   SonarrSeries,
   SonarrRootFolder,
   SonarrQualityProfile,
   SonarrTag,
   SonarrFormState,
   SonarrCredentialsPayload,
-} from '@/types';
-import type { AniMedia } from '@/types';
+} from '@/shared/types';
 import type { ResolveInput, MappingOutput, StatusInput, StatusOutput, AddInput, SetMappingOverrideInput, ClearMappingOverrideInput, SonarrLookupInput, SonarrLookupOutput, ValidateTvdbInput, ValidateTvdbOutput } from './schemas';
 
 export interface Ani2arrApi {

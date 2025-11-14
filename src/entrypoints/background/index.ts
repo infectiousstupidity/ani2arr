@@ -2,10 +2,10 @@
 import { browser } from 'wxt/browser';
 import { registerAni2arrApi, getAni2arrApi } from '@/rpc';
 import { createApiImplementation } from '@/services';
-import { computeTitleMatchScore } from '@/utils/matching';
-import { logger } from '@/utils/logger';
-import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/utils/metrics';
-import { logError, normalizeError } from '@/utils/error-handling';
+import { computeTitleMatchScore } from '@/shared/utils/matching';
+import { logger } from '@/shared/utils/logger';
+import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/shared/utils/metrics';
+import { logError, normalizeError } from '@/shared/utils/error-handling';
 
 type OpenOptionsMessage = { type: 'OPEN_OPTIONS_PAGE' };
 type MappingRefreshMessage = { type: 'a2a:mapping:refresh' };

@@ -1,11 +1,11 @@
 // src/api/anilist.api.ts
 import PQueue from 'p-queue';
-import { withRetry, AbortError } from '@/utils/retry';
+import { withRetry, AbortError } from '@/shared/utils/retry';
 import type { TtlCache } from '@/cache';
-import { createError, ErrorCode } from '@/utils/error-handling';
-import { logger } from '@/utils/logger';
-import type { AniMedia, RequestPriority } from '@/types';
-import { priorityValue } from '@/utils/priority';
+import { createError, ErrorCode } from '@/shared/utils/error-handling';
+import { logger } from '@/shared/utils/logger';
+import type { AniMedia, RequestPriority } from '@/shared/types';
+import { priorityValue } from '@/shared/utils/priority';
 
 const API_URL = 'https://graphql.anilist.co';
 const QUEUE_CONCURRENCY = 1;

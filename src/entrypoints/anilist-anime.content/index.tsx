@@ -1,31 +1,31 @@
-// src/entrypoints/anilist-anime.content/index.tsx
+// Version date: 2025-11-12
 import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { useTheme } from '@/hooks/use-theme';
-import { useSeriesStatus, useAddSeries, usePublicOptions } from '@/hooks/use-api-queries';
-import { useA2aBroadcasts } from '@/hooks/use-broadcasts';
-import { createPersistOptions } from '@/utils/query-persist-options';
-import SonarrActionGroup from '@/ui/SonarrActionGroup';
-import { logger } from '@/utils/logger';
-import { extractMediaMetadataFromDom } from '@/utils/anilist-dom';
-import { mergeMetadataHints } from '@/utils/media-metadata';
-import type { MediaMetadataHint } from '@/types';
-import '@/styles/base.css';
+import { useTheme } from '@/shared/hooks/use-theme';
+import { useSeriesStatus, useAddSeries, usePublicOptions } from '@/shared/hooks/use-api-queries';
+import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
+import { createPersistOptions } from '@/shared/utils/query-persist-options';
+import MediaActions, { Status } from '@/shared/components/media-actions';
+import { logger } from '@/shared/utils/logger';
+import { extractMediaMetadataFromDom } from '@/shared/utils/anilist-dom';
+import { mergeMetadataHints } from '@/shared/utils/media-metadata';
+import type { MediaMetadataHint } from '@/shared/types';
+import '@/shared/styles/base.css';
 import './style.css';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
-import { awaitBackgroundReady } from '@/utils/background-ready';
+import { awaitBackgroundReady } from '@/shared/utils/background-ready';
 
 const log = logger.create('AniList Content');
 
 const queryClient = new QueryClient();
 const persistOptions = createPersistOptions(log);
 
-const AddSeriesModal = React.lazy(() => import('@/ui/AddSeriesModal'));
-const MappingFixModal = React.lazy(() => import('@/ui/MappingFixModal'));
+const AddSeriesModal = React.lazy(() => import('@/shared/components/add-series-modal'));
+const MappingFixModal = React.lazy(() => import('@/shared/components/mapping-modal'));
 
 const ANIME_PAGE = new MatchPattern('*://anilist.co/anime/*');
 
@@ -125,7 +125,7 @@ function attachSizeSync(host: HTMLElement): () => void {
     // Match AniList's native Add-to-List button width exactly to avoid sub-pixel drift.
     const nativeList = q<HTMLElement>('.actions .list');
     const listBox = nativeList?.getBoundingClientRect();
-    const listWidth = listBox ? Math.round(listBox.width) : 165; // AniList default width ~165px
+    const listWidth = listBox ? Math.round(listBox.width) : 165;
     host.style.width = `${listWidth}px`;
 
     const fav = q<HTMLElement>('.actions .favourite');
@@ -156,15 +156,12 @@ function attachSizeSync(host: HTMLElement): () => void {
   };
 }
 
-// NEW: robustly read the "Format" value from the AniList sidebar
 function readFormatFromSidebar(doc: Document = document): string | null {
   const rows = Array.from(doc.querySelectorAll<HTMLDivElement>('.sidebar .data .data-set'));
   const formatRow = rows.find(r => r.querySelector('.type')?.textContent?.trim() === 'Format');
   const raw = formatRow?.querySelector('.value')?.textContent ?? '';
-  const normalized = raw.replace(/\s+/g, ' ').trim().toLowerCase(); // e.g. "movie", "tv short"
+  const normalized = raw.replace(/\s+/g, ' ').trim().toLowerCase();
   if (!normalized) return null;
-
-  // Normalize common enum spellings
   if (normalized.includes('movie')) return 'movie';
   if (normalized.includes('music')) return 'music';
   if (normalized === 'tv short') return 'tv_short';
@@ -191,20 +188,16 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [fixModalOpen, setFixModalOpen] = useState(false);
-  // Note: Do not gate queries on background readiness. Allow the
-  // RPC to wake the background naturally to avoid LOADING stalls.
-  // Detecting test mode is no longer necessary here.
   const { data: options, isPending: optionsPending, isError: optionsError } = usePublicOptions();
   const isConfigured = options?.isConfigured === true;
   const defaults = options?.defaults ?? null;
 
-  // Fire a readiness probe, but never block UI on its result.
   useEffect(() => {
     (async () => {
       try {
         await awaitBackgroundReady();
       } catch {
-        // If ping fails repeatedly, we still allow the UI to remain interactive; the query will surface errors.
+        // non-blocking probe
       }
     })();
   }, []);
@@ -212,7 +205,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   const statusQuery = useSeriesStatus(
     { anilistId, title, metadata },
     {
-      // Allow query immediately when configured; background will wake on demand.
       enabled: Boolean(anilistId && isConfigured),
       force_verify: true,
       ignoreFailureCache: true,
@@ -239,31 +231,34 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   const mappingUnavailable = statusQuery.data?.anilistTvdbLinkMissing === true;
   const tvdbId = mappingUnavailable ? null : statusQuery.data?.tvdbId;
 
-  const getStatus = (): 'LOADING' | 'IN_SONARR' | 'NOT_IN_SONARR' | 'ERROR' | 'ADDING' => {
-    // Treat unknown configuration as loading to avoid showing a persistent error
+  const getStatus = (): Status => {
     if (optionsPending) return 'LOADING';
     if (optionsError) return 'ERROR';
     if (!isConfigured) return 'ERROR';
-    // Rely on query state; do not block on background readiness.
     if (statusQuery.fetchStatus === 'fetching') return 'LOADING';
     if (statusQuery.isError || mappingUnavailable) return 'ERROR';
-    if (statusQuery.data?.exists || addSeriesMutation.isSuccess) return 'IN_SONARR';
+    if (statusQuery.data?.exists || addSeriesMutation.isSuccess) return 'IN';
     if (addSeriesMutation.isPending) return 'ADDING';
     if (addSeriesMutation.isError) return 'ERROR';
-    return 'NOT_IN_SONARR';
+    return 'NOT_IN';
   };
+
+  const status: Status = getStatus();
+
+  const librarySlug =
+    statusQuery.data?.series?.titleSlug ?? addSeriesMutation.data?.titleSlug ?? null;
 
   const resolvedSearchTerm = statusQuery.data?.successfulSynonym ?? title;
   const overrideActive = statusQuery.data?.overrideActive === true;
 
   return (
     <div ref={hostRef} style={{ width: '100%' }}>
-      <SonarrActionGroup
-        status={getStatus()}
-        seriesTitleSlug={statusQuery.data?.series?.titleSlug ?? addSeriesMutation.data?.titleSlug}
-        animeTitle={title}
+      <MediaActions
+        service="sonarr"
+        status={status}
+        {...(librarySlug ? { librarySlug } : {})}
         resolvedSearchTerm={resolvedSearchTerm}
-        tvdbId={tvdbId}
+        externalId={tvdbId}
         onQuickAdd={handleQuickAdd}
         onOpenModal={() => setIsModalOpen(true)}
         onOpenMappingFix={() => setFixModalOpen(true)}
@@ -305,7 +300,6 @@ async function mountAnimePageUI(
   ctx: ContentScriptContext,
   onMounted: () => void,
 ): Promise<void> {
-  // Do not block UI render on background readiness; ContentRoot will gate the query.
   const idMatch = location.pathname.match(/\/anime\/(\d+)/);
   const anilistId = idMatch?.[1] ? parseInt(idMatch[1], 10) : null;
   if (!anilistId) return;
@@ -316,7 +310,6 @@ async function mountAnimePageUI(
     waitForElement('h1'),
   ]);
 
-  // NEW: skip movie/music pages entirely
   if (shouldSkipByFormat(document)) {
     try {
       ui?.remove();
@@ -333,7 +326,7 @@ async function mountAnimePageUI(
   }
 
   const title = document.querySelector('h1')?.textContent?.trim() ?? '';
-  if (!title) return; // Don't mount if we can't get a title
+  if (!title) return;
 
   const domMetadata = extractMediaMetadataFromDom(anilistId);
   const fallbackMetadata: MediaMetadataHint | null = title
@@ -382,7 +375,6 @@ async function mountAnimePageUI(
     },
   });
 
-  // Use autoMount so the UI re-mounts if the anchor is replaced
   ui.autoMount();
   onMounted();
 }

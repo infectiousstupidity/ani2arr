@@ -1,12 +1,12 @@
 // src/services/mapping/index.ts
 import type { TtlCache } from '@/cache';
 import type { AnilistApiService } from '@/api/anilist.api';
-import type { ExtensionError, MediaMetadataHint, AniTitles, AniMedia, RequestPriority } from '@/types';
-import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
-import { getExtensionOptionsSnapshot } from '@/utils/storage';
-import { incrementCounter } from '@/utils/metrics';
-import { logger } from '@/utils/logger';
-import { canonicalTitleKey, sanitizeLookupDisplay } from '@/utils/matching';
+import type { ExtensionError, MediaMetadataHint, AniTitles, AniMedia, RequestPriority } from '@/shared/types';
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
+import { getExtensionOptionsSnapshot } from '@/shared/utils/storage';
+import { incrementCounter } from '@/shared/utils/metrics';
+import { logger } from '@/shared/utils/logger';
+import { canonicalTitleKey, sanitizeLookupDisplay } from '@/shared/utils/matching';
 import { StaticMappingProvider, type StaticMappingPayload } from './static-mapping.provider';
 import { SonarrLookupClient, type SonarrLookupCredentials } from './sonarr-lookup.client';
 import { isSeasonalCanonicalTokens } from './search-term-generator';
