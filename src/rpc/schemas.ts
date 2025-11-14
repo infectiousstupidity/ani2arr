@@ -1,5 +1,5 @@
 // src/rpc/schemas.ts
-import type { CheckSeriesStatusResponse, MediaMetadataHint, SonarrFormState, RequestPriority } from '@/types';
+import type { CheckSeriesStatusResponse, MediaMetadataHint, SonarrFormState, RequestPriority } from '@/shared/types';
 
 export interface ResolveInput {
   anilistId: number;
@@ -48,7 +48,7 @@ export interface SonarrLookupInput {
 }
 
 export interface SonarrLookupOutput {
-  results: import('@/types').SonarrLookupSeries[];
+  results: import('@/shared/types').SonarrLookupSeries[];
   libraryTvdbIds: number[];
 }
 

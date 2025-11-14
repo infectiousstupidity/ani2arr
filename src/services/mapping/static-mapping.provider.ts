@@ -1,8 +1,8 @@
 // src/services/mapping/static-mapping.provider.ts
 import type { TtlCache } from '@/cache';
-import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
-import { logger } from '@/utils/logger';
-import type { ScopedLogger } from '@/utils/logger';
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
+import { logger } from '@/shared/utils/logger';
+import type { ScopedLogger } from '@/shared/utils/logger';
 
 const PRIMARY_URL = 'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json';
 const FALLBACK_URL = 'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json';

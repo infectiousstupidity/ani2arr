@@ -1,5 +1,5 @@
 // src/services/mapping/early-stop.ts
-import type { ScoredCandidate } from '@/types';
+import type { ScoredCandidate } from '@/shared/types';
 
 export interface EarlyStopLimits {
   earlyStopThreshold: number; // e.g., 0.82
@@ -14,7 +14,6 @@ export function maybeEarlyStop(
   const top = batch[0];
   const second = batch[1];
   if (top && top.score >= limits.earlyStopThreshold) {
-    // basic margin check could be added if needed; keep simple per KISS
     return { stop: true, pick: top };
   }
   if (top && top.score >= limits.scoreThreshold && (!second || top.score > second.score)) {

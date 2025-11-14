@@ -1,6 +1,6 @@
 // src/services/mapping/search-term-generator.ts
-import type { AniTitles } from '@/types';
-import { canonicalTitleKey, isOrdinalToken, stripParenContent, sanitizeLookupDisplay } from '@/utils/matching';
+import type { AniTitles } from '@/shared/types';
+import { canonicalTitleKey, isOrdinalToken, stripParenContent, sanitizeLookupDisplay } from '@/shared/utils/matching';
 
 export interface SearchTerm {
   canonical: string;

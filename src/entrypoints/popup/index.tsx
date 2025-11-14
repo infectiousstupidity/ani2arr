@@ -8,10 +8,10 @@ I gave up.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import SettingsForm from '@/ui/SettingsForm';
+import SettingsForm from '@/shared/components/settings-form';
 import './style.css';
 import { SquareArrowOutUpRight } from 'lucide-react';
-import Button from '@/ui/Button';
+import Button from '@/shared/components/button';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 
 const queryClient = new QueryClient();

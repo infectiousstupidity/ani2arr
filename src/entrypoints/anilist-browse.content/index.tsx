@@ -4,11 +4,11 @@ import { createRoot, Root } from 'react-dom/client';
 import { QueryClient } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { logger } from '@/utils/logger';
-import { extractMediaMetadataFromDom } from '@/utils/anilist-dom';
-import { mergeMetadataHints } from '@/utils/media-metadata';
-import type { MediaMetadataHint } from '@/types';
-import baseStyles from '@/styles/base.css?inline';
+import { logger } from '@/shared/utils/logger';
+import { extractMediaMetadataFromDom } from '@/shared/utils/anilist-dom';
+import { mergeMetadataHints } from '@/shared/utils/media-metadata';
+import type { MediaMetadataHint } from '@/shared/types';
+import baseStyles from '@/shared/styles/base.css?inline';
 import browseStyles from './style.css?inline';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
@@ -18,9 +18,9 @@ import {
   DEFAULT_PROCESSED_ATTRIBUTE,
   type BrowseAdapter,
   type ParsedCard,
-} from '@/ui/BrowseOverlay';
-import { awaitBackgroundReady } from '@/utils/background-ready';
-import { createPersistOptions } from '@/utils/query-persist-options';
+} from '@/features/media-overlay';
+import { awaitBackgroundReady } from '@/shared/utils/background-ready';
+import { createPersistOptions } from '@/shared/utils/query-persist-options';
 
 const log = logger.create('AniList Browse Content');
 

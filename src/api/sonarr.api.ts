@@ -1,7 +1,7 @@
 // src/api/sonarr.api.ts
 
-import { withRetry, AbortError } from '@/utils/retry';
-import { hasSonarrPermission } from '@/utils/validation';
+import { withRetry, AbortError } from '@/shared/utils/retry';
+import { hasSonarrPermission } from '@/shared/utils/validation';
 import type {
   ExtensionOptions,
   SonarrCredentialsPayload,
@@ -11,9 +11,9 @@ import type {
   AddRequestPayload,
   SonarrTag,
   SonarrLookupSeries,
-} from '@/types';
-import { createError, ErrorCode, logError, normalizeError } from '@/utils/error-handling';
-import { logger } from '@/utils/logger';
+} from '@/shared/types';
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
+import { logger } from '@/shared/utils/logger';
 
 const log = logger.create('SonarrApiService');
 
