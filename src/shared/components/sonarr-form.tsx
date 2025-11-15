@@ -1,6 +1,12 @@
 // src/shared/components/sonarr-form.tsx
 import React, { useMemo } from 'react';
-import type { SonarrFormState, SonarrQualityProfile, SonarrRootFolder, SonarrTag } from '@/shared/types';
+import type { UseFormReturn } from 'react-hook-form';
+import type {
+  SonarrFormState,
+  SonarrQualityProfile,
+  SonarrRootFolder,
+  SonarrTag,
+} from '@/shared/types';
 import {
   FormField,
   FormLabel,
@@ -14,37 +20,77 @@ import {
   FormItem,
 } from './form';
 import MultiTagInput from './multi-tag-input';
-import { MONITOR_OPTIONS_WITH_DESCRIPTIONS, SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS } from '@/shared/utils/constants';
+import {
+  MONITOR_OPTIONS_WITH_DESCRIPTIONS,
+  SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
+} from '@/shared/utils/constants';
 
-interface SonarrFormProps {
-  options: SonarrFormState;
-  data: {
-    qualityProfiles: SonarrQualityProfile[];
-    rootFolders: SonarrRootFolder[];
-    tags: SonarrTag[];
-  };
-  onChange: <K extends keyof SonarrFormState>(field: K, value: SonarrFormState[K]) => void;
+export interface SonarrFormMetadata {
+  qualityProfiles: SonarrQualityProfile[];
+  rootFolders: SonarrRootFolder[];
+  tags: SonarrTag[];
+}
+
+export interface SonarrFormProps {
+  // Preferred RHF-based API (settings page, media modal Series tab)
+  form?: UseFormReturn<SonarrFormState>;
+  metadata?: SonarrFormMetadata;
+
+  // Legacy controlled-props API (AddSeriesModal) – kept during migration
+  options?: SonarrFormState;
+  data?: SonarrFormMetadata;
+  onChange?: <K extends keyof SonarrFormState>(field: K, value: SonarrFormState[K]) => void;
+
   disabled?: boolean;
   className?: string;
   portalContainer?: HTMLElement | null;
   initialFocusRef?: React.RefObject<HTMLButtonElement | null>;
+
+  // Optional computed path context (used by media modal)
+  computedPath?: string | null;
+  pathHintTitle?: string;
+  pathHintTvdbId?: number | null;
 }
 
+function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
+  const {
+    form,
+    metadata,
+    options,
+    data,
+    onChange,
+    disabled,
+    className,
+    portalContainer,
+    initialFocusRef,
+  } = props;
 
-const SonarrForm: React.FC<SonarrFormProps> = ({
-  options,
-  data,
-  onChange,
-  disabled,
-  className,
-  portalContainer,
-  initialFocusRef,
-}) => {
+  const effectiveMetadata: SonarrFormMetadata | undefined = metadata ?? data;
+  const effectiveValues: SonarrFormState | undefined = form?.watch() ?? options;
+
+  const setFieldValue = <K extends keyof SonarrFormState>(
+    field: K,
+    value: SonarrFormState[K],
+  ): void => {
+    if (form) {
+      form.setValue(field, value, { shouldDirty: true, shouldValidate: true });
+    } else if (onChange) {
+      onChange(field, value);
+    }
+  };
+
   const tagMaps = useMemo(() => {
+    if (!effectiveMetadata) {
+      return {
+        idToLabel: new Map<number, string>(),
+        labelToId: new Map<string, number>(),
+      };
+    }
+
     const idToLabel = new Map<number, string>();
     const labelToId = new Map<string, number>();
 
-    for (const tag of data.tags) {
+    for (const tag of effectiveMetadata.tags) {
       if (tag.label) {
         idToLabel.set(tag.id, tag.label);
         labelToId.set(tag.label, tag.id);
@@ -52,22 +98,30 @@ const SonarrForm: React.FC<SonarrFormProps> = ({
     }
 
     return { idToLabel, labelToId };
-  }, [data.tags]);
+  }, [effectiveMetadata]);
 
   const { idToLabel, labelToId } = tagMaps;
 
   const selectedTagLabels = useMemo(() => {
-    return options.tags
+    if (!effectiveValues) {
+      return [];
+    }
+    return effectiveValues.tags
       .map(tagId => idToLabel.get(tagId))
       .filter((label): label is string => typeof label === 'string' && label.length > 0);
-  }, [options.tags, idToLabel]);
+  }, [effectiveValues, idToLabel]);
+
+  if (!effectiveMetadata || !effectiveValues) {
+    // Callers should guard on metadata/form presence; fail safe if they do not.
+    return null;
+  }
 
   const handleTagsChange = (labels: string[]) => {
     const tagIds = labels
       .map(label => labelToId.get(label))
       .filter((id): id is number => typeof id === 'number');
 
-    onChange('tags', tagIds);
+    setFieldValue('tags', tagIds);
   };
 
   const selectPortal = portalContainer ?? null;
@@ -81,14 +135,14 @@ const SonarrForm: React.FC<SonarrFormProps> = ({
           <FormControl>
             <Select
               disabled={!!disabled}
-              value={String(options.qualityProfileId)}
-              onValueChange={v => onChange('qualityProfileId', Number(v))}
+              value={String(effectiveValues.qualityProfileId)}
+              onValueChange={v => setFieldValue('qualityProfileId', Number(v))}
             >
               <SelectTrigger ref={initialFocusRef} className="text-text-primary">
                 <SelectValue placeholder="Select a profile..." />
               </SelectTrigger>
               <SelectContent container={selectPortal}>
-                {data.qualityProfiles.map(p => (
+                {effectiveMetadata.qualityProfiles.map(p => (
                   <SelectItem key={p.id} value={String(p.id)}>
                     {p.name}
                   </SelectItem>
@@ -106,14 +160,14 @@ const SonarrForm: React.FC<SonarrFormProps> = ({
           <FormControl>
             <Select
               disabled={!!disabled}
-              value={options.rootFolderPath}
-              onValueChange={v => onChange('rootFolderPath', v)}
+              value={effectiveValues.rootFolderPath}
+              onValueChange={v => setFieldValue('rootFolderPath', v)}
             >
               <SelectTrigger className="text-text-primary">
                 <SelectValue placeholder="Select a folder..." />
               </SelectTrigger>
               <SelectContent container={selectPortal}>
-                {data.rootFolders.map(f => (
+                {effectiveMetadata.rootFolders.map(f => (
                   <SelectItem key={f.id} value={f.path}>
                     {f.path}
                   </SelectItem>
@@ -131,8 +185,10 @@ const SonarrForm: React.FC<SonarrFormProps> = ({
           <FormControl>
             <Select
               disabled={!!disabled}
-              value={options.monitorOption}
-              onValueChange={v => onChange('monitorOption', v as SonarrFormState['monitorOption'])}
+              value={effectiveValues.monitorOption}
+              onValueChange={v =>
+                setFieldValue('monitorOption', v as SonarrFormState['monitorOption'])
+              }
             >
               <SelectTrigger className="w-[250px] text-text-primary">
                 <SelectValue />
@@ -156,8 +212,10 @@ const SonarrForm: React.FC<SonarrFormProps> = ({
           <FormControl>
             <Select
               disabled={!!disabled}
-              value={options.seriesType}
-              onValueChange={v => onChange('seriesType', v as SonarrFormState['seriesType'])}
+              value={effectiveValues.seriesType}
+              onValueChange={v =>
+                setFieldValue('seriesType', v as SonarrFormState['seriesType'])
+              }
             >
               <SelectTrigger className="text-text-primary">
                 <SelectValue />
@@ -184,7 +242,7 @@ const SonarrForm: React.FC<SonarrFormProps> = ({
               onChange={handleTagsChange}
               placeholder="Add tags..."
               disabled={!!disabled}
-              existingTags={data.tags.map(t => t.label)}
+              existingTags={effectiveMetadata.tags.map(t => t.label)}
             />
           </FormControl>
         </FormItem>
@@ -197,8 +255,8 @@ const SonarrForm: React.FC<SonarrFormProps> = ({
           <FormControl className="flex justify-end">
             <Switch
               disabled={!!disabled}
-              checked={options.seasonFolder}
-              onCheckedChange={v => onChange('seasonFolder', v)}
+              checked={effectiveValues.seasonFolder}
+              onCheckedChange={v => setFieldValue('seasonFolder', v)}
             />
           </FormControl>
         </FormItem>
@@ -211,14 +269,14 @@ const SonarrForm: React.FC<SonarrFormProps> = ({
           <FormControl className="flex justify-end">
             <Switch
               disabled={!!disabled}
-              checked={options.searchForMissingEpisodes}
-              onCheckedChange={v => onChange('searchForMissingEpisodes', v)}
+              checked={effectiveValues.searchForMissingEpisodes}
+              onCheckedChange={v => setFieldValue('searchForMissingEpisodes', v)}
             />
           </FormControl>
         </FormItem>
       </FormField>
     </div>
   );
-};
+}
 
 export default React.memo(SonarrForm);
