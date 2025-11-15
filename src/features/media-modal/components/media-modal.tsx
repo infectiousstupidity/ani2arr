@@ -1,23 +1,12 @@
 // src/features/media-modal/components/media-modal.tsx
-import { useCallback, useState } from "react";
-import type { ReactNode } from "react";
+import { useCallback, useState } from 'react';
+import type { ReactNode } from 'react';
+import { Modal, ModalContent } from '@/shared/components/modal';
+import { Header, type MediaModalTabId } from './media-modal-header';
+import { Footer } from './media-modal-footer';
 
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-import { Modal, ModalContent, ModalTitle } from "@/shared/components/modal";
-=======
->>>>>>> theirs
-=======
-import { Modal, ModalContent } from "@/shared/components/modal";
->>>>>>> theirs
-=======
->>>>>>> theirs
-import { Header, type MediaModalTabId } from "./media-modal-header";
-import { Footer } from "./media-modal-footer";
-
-import MappingTab, { type MappingTabProps } from "../tabs/mapping-tab";
-import SonarrTab, { type SonarrTabProps } from "../tabs/sonarr-tab";
+import MappingTab, { type MappingTabProps } from '../tabs/mapping-tab';
+import SonarrTab, { type SonarrTabProps } from '../tabs/sonarr-tab';
 
 export type FooterState = {
   leftContent?: ReactNode;
@@ -48,6 +37,8 @@ export type MediaModalProps = {
 
   initialTab?: MediaModalTabId;
 
+  portalContainer?: HTMLElement | null;
+
   mappingTabProps: MappingTabProps;
   sonarrTabProps: SonarrTabProps;
 };
@@ -63,6 +54,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     tvdbId,
     inLibrary,
     initialTab = "series",
+    portalContainer,
     mappingTabProps,
     sonarrTabProps,
   } = props;
@@ -107,8 +99,6 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   }
 
   return (
-<<<<<<< ours
-<<<<<<< ours
     <Modal open={isOpen} onOpenChange={handleClose}>
       <ModalContent
         container={portalContainer ?? undefined}
@@ -128,42 +118,23 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           onTabChange={handleTabChange}
           onClose={handleClose}
         />
-=======
-=======
->>>>>>> theirs
-    <div className="mx-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-border-primary bg-bg-secondary shadow-2xl shadow-black/40">
-      <Header
-        title={title}
-        bannerImage={bannerImage}
-        coverImage={coverImage}
-        anilistIds={anilistIds}
-        tvdbId={tvdbId ?? null}
-        inLibrary={inLibrary}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        onClose={handleClose}
-      />
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
+        <div className="px-6 py-5">{tabContent}</div>
 
-      <div className="px-6 py-5">{tabContent}</div>
-
-      {footerState && (
-        <Footer
-          leftContent={footerState.leftContent}
-          primaryLabel={footerState.primaryLabel}
-          primaryDisabled={footerState.primaryDisabled ?? false}
-          primaryLoading={footerState.primaryLoading ?? false}
-          onPrimaryClick={footerState.onPrimaryClick}
-          secondaryLabel="Cancel"
-          onSecondaryClick={handleClose}
-          showTertiary={footerState.showTertiary}
-          tertiaryLabel={footerState.tertiaryLabel}
-          onTertiaryClick={footerState.onTertiaryClick}
-        />
-      )}
-    </div>
+        {footerState && (
+          <Footer
+            leftContent={footerState.leftContent}
+            primaryLabel={footerState.primaryLabel}
+            primaryDisabled={footerState.primaryDisabled ?? false}
+            primaryLoading={footerState.primaryLoading ?? false}
+            onPrimaryClick={footerState.onPrimaryClick}
+            secondaryLabel="Cancel"
+            onSecondaryClick={handleClose}
+            showTertiary={footerState.showTertiary}
+            tertiaryLabel={footerState.tertiaryLabel}
+            onTertiaryClick={footerState.onTertiaryClick}
+          />
+        )}
+      </ModalContent>
+    </Modal>
   );
 }
