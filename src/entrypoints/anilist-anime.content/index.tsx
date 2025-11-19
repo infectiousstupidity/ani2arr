@@ -1,11 +1,16 @@
 // Version date: 2025-11-12
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { useTheme } from '@/shared/hooks/use-theme';
-import { useSeriesStatus, useAddSeries, usePublicOptions } from '@/shared/hooks/use-api-queries';
+import {
+  useSeriesStatus,
+  useAddSeries,
+  usePublicOptions,
+} from '@/shared/hooks/use-api-queries';
+import { useMediaModalProps } from '@/shared/hooks/use-media-modal-props';
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
 import { createPersistOptions } from '@/shared/utils/query-persist-options';
 import MediaActions, { Status } from '@/shared/components/media-actions';
@@ -13,6 +18,8 @@ import { logger } from '@/shared/utils/logger';
 import { extractMediaMetadataFromDom } from '@/shared/utils/anilist-dom';
 import { mergeMetadataHints } from '@/shared/utils/media-metadata';
 import type { MediaMetadataHint } from '@/shared/types';
+import { MediaModal } from '@/features/media-modal';
+import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
 import '@/shared/styles/base.css';
 import './style.css';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
@@ -23,9 +30,6 @@ const log = logger.create('AniList Content');
 
 const queryClient = new QueryClient();
 const persistOptions = createPersistOptions(log);
-
-const AddSeriesModal = React.lazy(() => import('@/shared/components/add-series-modal'));
-const MappingFixModal = React.lazy(() => import('@/shared/components/mapping-modal'));
 
 const ANIME_PAGE = new MatchPattern('*://anilist.co/anime/*');
 
@@ -182,12 +186,16 @@ interface ContentRootProps {
 }
 
 export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, metadata }) => {
-  const hostRef = useRef<HTMLDivElement>(null);
-  useTheme(hostRef);
+  const [hostElement, setHostElement] = useState<HTMLDivElement | null>(null);
+  const hostRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      setHostElement(node);
+    }
+  }, []);
+  useTheme({ current: hostElement });
   useA2aBroadcasts();
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [fixModalOpen, setFixModalOpen] = useState(false);
+  const mediaModal = useMediaModalState();
   const { data: options, isPending: optionsPending, isError: optionsError } = usePublicOptions();
   const isConfigured = options?.isConfigured === true;
   const defaults = options?.defaults ?? null;
@@ -229,13 +237,13 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   };
 
   const mappingUnavailable = statusQuery.data?.anilistTvdbLinkMissing === true;
-  const tvdbId = mappingUnavailable ? null : statusQuery.data?.tvdbId;
 
   const getStatus = (): Status => {
     if (optionsPending) return 'LOADING';
     if (optionsError) return 'ERROR';
     if (!isConfigured) return 'ERROR';
-    if (statusQuery.fetchStatus === 'fetching') return 'LOADING';
+    // Only show loading if fetching AND we don't have data yet (avoid flash when refetching)
+    if (statusQuery.fetchStatus === 'fetching' && !statusQuery.data) return 'LOADING';
     if (statusQuery.isError || mappingUnavailable) return 'ERROR';
     if (statusQuery.data?.exists || addSeriesMutation.isSuccess) return 'IN';
     if (addSeriesMutation.isPending) return 'ADDING';
@@ -249,7 +257,16 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
     statusQuery.data?.series?.titleSlug ?? addSeriesMutation.data?.titleSlug ?? null;
 
   const resolvedSearchTerm = statusQuery.data?.successfulSynonym ?? title;
-  const overrideActive = statusQuery.data?.overrideActive === true;
+
+  const modalProps = useMediaModalProps({
+    anilistId: mediaModal.state?.anilistId,
+    title: mediaModal.state?.title,
+    metadata: mediaModal.state?.metadata,
+    portalContainer: hostElement,
+    isOpen: mediaModal.state?.isOpen ?? false,
+  });
+
+  const tvdbId = mappingUnavailable ? null : statusQuery.data?.tvdbId ?? null;
 
   return (
     <div ref={hostRef} style={{ width: '100%' }}>
@@ -260,32 +277,41 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
         resolvedSearchTerm={resolvedSearchTerm}
         externalId={tvdbId}
         onQuickAdd={handleQuickAdd}
-        onOpenModal={() => setIsModalOpen(true)}
-        onOpenMappingFix={() => setFixModalOpen(true)}
-        portalContainer={hostRef.current ?? undefined}
+        onOpenModal={() => {
+          mediaModal.open({
+            anilistId,
+            title,
+            initialTab: 'series',
+            metadata,
+          });
+        }}
+        onOpenMappingFix={() => {
+          mediaModal.open({
+            anilistId,
+            title,
+            initialTab: 'mapping',
+            metadata,
+          });
+        }}
+        portalContainer={hostElement ?? undefined}
       />
-      <React.Suspense fallback={null}>
-        {isModalOpen && hostRef.current && (
-          <AddSeriesModal
-            anilistId={anilistId}
-            title={title}
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            metadata={metadata}
-            portalContainer={hostRef.current}
-          />
-        )}
-        {fixModalOpen && (
-          <MappingFixModal
-            anilistId={anilistId}
-            title={title}
-            isOpen={fixModalOpen}
-            onClose={() => setFixModalOpen(false)}
-            overrideActive={overrideActive}
-            portalContainer={hostRef.current}
-          />
-        )}
-      </React.Suspense>
+      {hostElement && mediaModal.state && modalProps && (
+        <MediaModal
+          key={`modal-${mediaModal.state.anilistId}`}
+          isOpen={mediaModal.state.isOpen}
+          onClose={mediaModal.reset}
+          title={mediaModal.state.title}
+          bannerImage={null}
+          coverImage={null}
+          anilistIds={[mediaModal.state.anilistId]}
+          tvdbId={modalProps.tvdbId}
+          inLibrary={modalProps.inLibrary}
+          initialTab={mediaModal.state.initialTab ?? 'series'}
+          portalContainer={hostElement}
+          mappingTabProps={modalProps.mappingTabProps}
+          sonarrTabProps={modalProps.sonarrTabProps}
+        />
+      )}
     </div>
   );
 };

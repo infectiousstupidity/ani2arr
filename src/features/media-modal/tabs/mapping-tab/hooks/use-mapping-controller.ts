@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { useMappingSearch } from '@/shared/mapping';
-import type { MappingSearchResult, MappingTargetId } from '@/shared/types';
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useMappingSearch } from "@/shared/mapping";
+import type { MappingSearchResult } from "@/shared/types";
+import { useMappingOverrides } from "./use-mapping-overrides";
 
 export interface UseMappingControllerInput {
-  service: 'sonarr' | 'radarr';
+  service: "sonarr" | "radarr";
+  anilistId: number;
   currentMapping: MappingSearchResult | null;
-  onSubmitOverride(target: MappingTargetId): Promise<void>;
-  onRevertToAutomatic(): Promise<void>;
 }
 
 export interface MappingTabState {
@@ -22,7 +22,10 @@ type Action =
   | { type: 'CLEAR_SELECTION' }
   | { type: 'RESET_FROM_CURRENT'; current: MappingSearchResult | null };
 
-function targetsEqual(a?: MappingTargetId | null, b?: MappingTargetId | null): boolean {
+function targetsEqual(
+  a?: MappingSearchResult["target"] | null,
+  b?: MappingSearchResult["target"] | null,
+): boolean {
   if (!a || !b) return false;
   return a.id === b.id && a.idType === b.idType;
 }
@@ -81,7 +84,7 @@ export interface UseMappingControllerResult {
 
 export function useMappingController(input: UseMappingControllerInput): UseMappingControllerResult {
   const currentTarget = input.currentMapping?.target ?? null;
-  const currentRef = useRef<MappingTargetId | null>(currentTarget);
+  const currentRef = useRef<MappingSearchResult["target"] | null>(currentTarget);
   currentRef.current = currentTarget;
 
   const [state, dispatch] = useReducer(reducer, {
@@ -90,6 +93,8 @@ export function useMappingController(input: UseMappingControllerInput): UseMappi
     selected: null,
     isDirty: false,
   } satisfies MappingTabState);
+
+  const overrides = useMappingOverrides(input.anilistId);
 
   const debouncedQuery = useDebounced(state.query, 300);
   const searchQuery = useMappingSearch({
@@ -115,22 +120,22 @@ export function useMappingController(input: UseMappingControllerInput): UseMappi
     if (!state.selected) return;
     setSubmitting(true);
     try {
-      await input.onSubmitOverride(state.selected.target);
+      await overrides.setOverride(state.selected.target);
       dispatch({ type: 'RESET_FROM_CURRENT', current: input.currentMapping });
     } finally {
       setSubmitting(false);
     }
-  }, [input, state.selected]);
+  }, [input.currentMapping, overrides, state.selected]);
 
   const handleRevertToAutomatic = useCallback(async () => {
     setSubmitting(true);
     try {
-      await input.onRevertToAutomatic();
+      await overrides.clearOverride();
       dispatch({ type: 'RESET_FROM_CURRENT', current: null });
     } finally {
       setSubmitting(false);
     }
-  }, [input]);
+  }, [overrides]);
 
   return {
     state,

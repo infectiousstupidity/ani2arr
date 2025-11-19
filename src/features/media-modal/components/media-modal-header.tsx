@@ -5,8 +5,8 @@ export type MediaModalTabId = "series" | "mapping"; // extend later if needed
 
 export type HeaderProps = {
   title: string;
-  bannerImage: string;
-  coverImage: string;
+  bannerImage: string | null;
+  coverImage: string | null;
   anilistIds: number[];
   tvdbId?: number | null;
   inLibrary: boolean;
@@ -41,11 +41,15 @@ export function Header(props: HeaderProps): React.JSX.Element {
     <header className="relative">
       {/* Banner */}
       <div className="relative h-28 w-full overflow-hidden">
-        <img
-          src={bannerImage}
-          alt={title}
-          className="h-full w-full object-cover"
-        />
+        {bannerImage ? (
+          <img
+            src={bannerImage}
+            alt={title}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="h-full w-full bg-bg-tertiary" />
+        )}
         <div className="pointer-events-none absolute inset-0 bg-[rgba(31,40,53,0.65)] shadow-[0_0_40px_rgba(0,0,0,0.8)]" />
       </div>
 
@@ -64,11 +68,15 @@ export function Header(props: HeaderProps): React.JSX.Element {
       {/* Cover + title + IDs */}
       <div className="absolute inset-x-0 top-0 flex items-center gap-4 px-6 py-4">
         <div className="hidden h-[140px] w-[100px] shrink-0 overflow-hidden rounded-xl border border-border-primary bg-bg-tertiary shadow-lg sm:block">
-          <img
-            src={coverImage}
-            alt={title}
-            className="h-full w-full object-cover"
-          />
+          {coverImage ? (
+            <img
+              src={coverImage}
+              alt={title}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="h-full w-full bg-bg-tertiary" />
+          )}
         </div>
 
         <div className="min-w-0 flex-1 pb-1">

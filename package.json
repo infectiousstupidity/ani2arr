@@ -68,6 +68,7 @@
     "@webext-core/proxy-service": "^1.2.1",
     "@wxt-dev/storage": "^1.1.1",
     "@wxt-dev/webextension-polyfill": "^1.0.0",
+    "clsx": "^2.1.1",
     "idb": "^8.0.3",
     "lucide-react": "^0.468.0",
     "p-queue": "^9.0.0",

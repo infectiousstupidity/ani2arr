@@ -30,7 +30,15 @@ function SettingsForm(): React.JSX.Element {
     const subscription = sonarrDefaultsForm.watch(values => {
       (Object.keys(values) as (keyof SonarrFormState)[]).forEach(key => {
         const value = values[key];
-        manager.handleDefaultsChange(key, value);
+        if (value === undefined) {
+          return;
+        }
+        if (Array.isArray(value)) {
+          const cleaned = value.filter((item): item is number => typeof item === 'number');
+          manager.handleDefaultsChange(key, cleaned);
+        } else {
+          manager.handleDefaultsChange(key, value);
+        }
       });
     });
 

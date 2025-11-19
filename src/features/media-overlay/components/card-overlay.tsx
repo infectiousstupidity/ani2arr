@@ -208,19 +208,19 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   );
 
   const renderStackItems = () => {
-    const items: React.ReactNode[] = [];
+    const items: React.ReactElement[] = [];
     const showExternal = (overlayState === 'in-sonarr' || overlayState === 'adding') && !!actionOpenExternal;
     if (stackDirection === 'down') {
-      if (actionAdvanced) items.push(actionAdvanced);
-      if (actionFixMapping) items.push(actionFixMapping);
-      if (showExternal) items.push(actionOpenExternal);
+      if (actionAdvanced) items.push(<span key="advanced">{actionAdvanced}</span>);
+      if (actionFixMapping) items.push(<span key="fix">{actionFixMapping}</span>);
+      if (showExternal) items.push(<span key="external">{actionOpenExternal}</span>);
     } else {
       // Stack grows upward: the last DOM item sits closest to the anchor.
       // Desired visual bottom→top = Advanced → Fix mapping → Open in Sonarr.
       // Therefore DOM (top→bottom) must be = Open → Fix mapping → Advanced.
-      if (showExternal) items.push(actionOpenExternal);
-      if (actionFixMapping) items.push(actionFixMapping);
-      if (actionAdvanced) items.push(actionAdvanced);
+      if (showExternal) items.push(<span key="external">{actionOpenExternal}</span>);
+      if (actionFixMapping) items.push(<span key="fix">{actionFixMapping}</span>);
+      if (actionAdvanced) items.push(<span key="advanced">{actionAdvanced}</span>);
     }
     return items;
   };
