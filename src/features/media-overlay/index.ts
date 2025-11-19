@@ -6,5 +6,5 @@ export {
 
 export { CardOverlay } from './components/card-overlay';
 
-export type { BrowseAdapter, ParsedCard } from './components/media-overlay';
+export type { BrowseAdapter, ParsedCard, BrowseContentAppProps } from './components/media-overlay';
 export type { CardOverlayProps } from '@/shared/types';

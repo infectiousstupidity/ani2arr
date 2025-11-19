@@ -1,12 +1,6 @@
 import type { MediaMetadataHint } from './anilist';
 import type { SonarrFormState } from './extension';
 
-export type ModalState = {
-  anilistId: number;
-  title: string;
-  metadata: MediaMetadataHint | null;
-};
-
 export interface CardOverlayProps {
   anilistId: number;
   title: string;
@@ -20,7 +14,7 @@ export interface CardOverlayProps {
   /** Corner for anchor placement */
   anchorCorner?: 'bottom-left' | 'top-left';
   /** Direction the action stack animates */
-  stackDirection?: 'up' | 'down';
+  stackDirection?: "up" | "down";
   /** Horizontal offset to align with native rank badge (px). Defaults to -8. */
   anchorOffsetX?: number;
 }

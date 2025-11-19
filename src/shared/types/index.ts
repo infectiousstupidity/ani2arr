@@ -47,6 +47,5 @@ export type { MappingTargetId, MappingSearchResult } from './mapping-ui';
 export {
   type BrowseAdapter,
   type CardOverlayProps,
-  type ModalState,
   type ParsedCard,
 } from './browse-overlay';

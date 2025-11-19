@@ -21,6 +21,9 @@ import {
 } from '@/features/media-overlay';
 import { awaitBackgroundReady } from '@/shared/utils/background-ready';
 import { createPersistOptions } from '@/shared/utils/query-persist-options';
+import { useMediaModalProps } from '@/shared/hooks/use-media-modal-props';
+import { MediaModal } from '@/features/media-modal';
+import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
 
 const log = logger.create('AniList Browse Content');
 
@@ -161,6 +164,49 @@ const browseAdapter: BrowseAdapter = {
 
 const BrowseContentApp = createBrowseContentApp(browseAdapter);
 
+interface BrowseRootProps {
+  portalContainer: HTMLElement | null;
+}
+
+const BrowseRoot: React.FC<BrowseRootProps> = ({ portalContainer }) => {
+  const mediaModal = useMediaModalState();
+
+  const modalProps = useMediaModalProps({
+    anilistId: mediaModal.state?.anilistId,
+    title: mediaModal.state?.title,
+    metadata: mediaModal.state?.metadata,
+    portalContainer,
+    isOpen: mediaModal.state?.isOpen ?? false,
+  });
+
+  return (
+    <>
+      <BrowseContentApp
+        onOpenMediaModal={({ anilistId, title, initialTab, metadata }) => {
+          mediaModal.open({ anilistId, title, initialTab: initialTab ?? 'series', metadata });
+        }}
+      />
+      {portalContainer && mediaModal.state && modalProps && (
+        <MediaModal
+          key={`modal-${mediaModal.state.anilistId}`}
+          isOpen={mediaModal.state.isOpen}
+          onClose={mediaModal.reset}
+          title={mediaModal.state.title}
+          bannerImage={null}
+          coverImage={null}
+          anilistIds={[mediaModal.state.anilistId]}
+          tvdbId={modalProps.tvdbId}
+          inLibrary={modalProps.inLibrary}
+          initialTab={mediaModal.state.initialTab ?? 'series'}
+          portalContainer={portalContainer}
+          mappingTabProps={modalProps.mappingTabProps}
+          sonarrTabProps={modalProps.sonarrTabProps}
+        />
+      )}
+    </>
+  );
+};
+
 export default defineContentScript({
   matches: ['*://anilist.co/*'],
   cssInjectionMode: 'ui',
@@ -232,12 +278,14 @@ export default defineContentScript({
         anchor: 'body',
         onMount: (container: HTMLElement, shadow: ShadowRoot) => {
           ensureShadowStyles(shadow);
+          // Use the shadow root container for all portals (keeps everything inside the shadow DOM)
+          const portalContainer = container;
           root = createRoot(container);
           root.render(
             <React.StrictMode>
               <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
                 <TooltipProvider>
-                  <BrowseContentApp />
+                  <BrowseRoot portalContainer={portalContainer} />
                 </TooltipProvider>
               </PersistQueryClientProvider>
             </React.StrictMode>,
