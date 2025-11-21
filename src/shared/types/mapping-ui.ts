@@ -28,11 +28,14 @@ export interface MappingSearchResult {
 
   statusLabel?: string; // "Continuing", "Ended", "Announced"
   networkOrStudio?: string;
+  overview?: string;
+  imdbId?: string;
+  alternateTitles?: string[];
 
   // For listing or preview
-  episodeOrMovieCount?: number;
+  episodeOrMovieCount?: number; // Total episodes in series
+  fileCount?: number;           // Downloaded episodes
 
   // Multi AniList mapping info
   linkedAniListIds?: number[];
 }
-

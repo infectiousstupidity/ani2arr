@@ -1,3 +1,4 @@
+// src/features/media-modal/tabs/mapping-tab/mapping-tab-layout.tsx
 import type { MappingSearchResult } from '@/shared/types';
 import { ProviderSearchSection } from './provider-search-section';
 import { CurrentMappingSection } from './current-mapping-section';
@@ -30,7 +31,7 @@ export function MappingTabLayout(props: MappingTabLayoutProps) {
         baseUrl={baseUrl}
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <ProviderSearchSection
           controller={controller}
           currentMapping={currentMapping}

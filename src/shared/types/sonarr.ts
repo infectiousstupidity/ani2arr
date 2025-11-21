@@ -70,7 +70,7 @@ export interface SonarrLookupSeries {
     seasonCount?: number;
     episodeCount?: number;
     episodeFileCount?: number;
-  };
+    totalEpisodeCount?: number;};
 }
 
 export interface LeanSonarrSeries {
@@ -79,6 +79,14 @@ export interface LeanSonarrSeries {
   titleSlug: string;
   title: string;
   alternateTitles?: string[];
+  statistics?: {
+    seasonCount?: number;
+    episodeCount?: number;
+    episodeFileCount?: number;
+    totalEpisodeCount?: number;
+    sizeOnDisk?: number;
+    percentOfEpisodes?: number;
+  };
 }
 
 export interface SonarrRootFolder {

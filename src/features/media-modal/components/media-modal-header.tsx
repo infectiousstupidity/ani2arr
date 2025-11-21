@@ -1,5 +1,6 @@
 import { type MouseEventHandler } from "react";
 import { X, Database, List, Link2 } from "lucide-react";
+import type { AniFormat, MediaStatus } from "@/shared/types";
 
 export type MediaModalTabId = "series" | "mapping"; // extend later if needed
 
@@ -10,6 +11,9 @@ export type HeaderProps = {
   anilistIds: number[];
   tvdbId?: number | null;
   inLibrary: boolean;
+  format?: AniFormat | null;
+  year?: number | null;
+  status?: MediaStatus | null;
 
   activeTab: MediaModalTabId;
   onTabChange: (tab: MediaModalTabId) => void;
@@ -22,6 +26,16 @@ function formatAniListIds(anilistIds: number[]): string {
   return `${anilistIds[0]} (+${anilistIds.length - 1})`;
 }
 
+function formatMediaFormat(format?: AniFormat | null): string | null {
+  return format ? format.replace(/_/g, " ") : null;
+}
+
+function formatMediaStatus(status?: MediaStatus | null): string | null {
+  if (!status) return null;
+  const normalized = status.toLowerCase().replace(/_/g, " ");
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
 export function Header(props: HeaderProps): React.JSX.Element {
   const {
     title,
@@ -30,31 +44,34 @@ export function Header(props: HeaderProps): React.JSX.Element {
     anilistIds,
     tvdbId,
     inLibrary,
+    format,
+    year,
+    status,
     activeTab,
     onTabChange,
     onClose,
   } = props;
 
   const aniDisplay = formatAniListIds(anilistIds);
+  const formatLabel = formatMediaFormat(format);
+  const yearLabel = year ?? null;
+  const statusLabel = formatMediaStatus(status);
+  const isReleasing = status === "RELEASING";
 
   return (
     <header className="relative">
       {/* Banner */}
-      <div className="relative h-28 w-full overflow-hidden">
-        {bannerImage ? (
-          <img
-            src={bannerImage}
-            alt={title}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="h-full w-full bg-bg-tertiary" />
-        )}
-        <div className="pointer-events-none absolute inset-0 bg-[rgba(31,40,53,0.65)] shadow-[0_0_40px_rgba(0,0,0,0.8)]" />
+      <div
+        className="relative h-[180px] w-full overflow-hidden bg-bg-tertiary bg-cover bg-center bg-no-repeat shadow-[inset_0_0_250px_#2f3133]"
+        style={{
+          backgroundImage: bannerImage ? `url(${bannerImage})` : undefined,
+        }}
+      >
+        <div className="absolute inset-0 z-0 bg-[rgba(31,40,53,0.65)]" />
       </div>
 
       {/* Close */}
-      <div className="absolute inset-x-0 top-0 flex items-start justify-between px-6 pt-4">
+      <div className="absolute inset-x-0 top-0 z-10 flex items-start justify-between px-6 pt-4">
         <button
           type="button"
           aria-label="Close"
@@ -66,7 +83,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
       </div>
 
       {/* Cover + title + IDs */}
-      <div className="absolute inset-x-0 top-0 flex items-center gap-4 px-6 py-4">
+      <div className="absolute inset-x-0 top-0 z-10 flex items-center gap-4 px-6 py-4">
         <div className="hidden h-[140px] w-[100px] shrink-0 overflow-hidden rounded-xl border border-border-primary bg-bg-tertiary shadow-lg sm:block">
           {coverImage ? (
             <img
@@ -84,7 +101,29 @@ export function Header(props: HeaderProps): React.JSX.Element {
             {title}
           </h1>
 
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+          {(formatLabel || yearLabel || statusLabel) && (
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-text-secondary">
+              {formatLabel ? (
+                <span className="font-semibold text-text-primary">{formatLabel}</span>
+              ) : null}
+              {yearLabel ? (
+                <>
+                  <span className="text-text-secondary/60">|</span>
+                  <span>{yearLabel}</span>
+                </>
+              ) : null}
+              {statusLabel ? (
+                <>
+                  <span className="text-text-secondary/60">|</span>
+                  <span className={isReleasing ? "text-success" : "text-text-secondary"}>
+                    {statusLabel}
+                  </span>
+                </>
+              ) : null}
+            </div>
+          )}
+
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
             {inLibrary && (
               <span className="inline-flex items-center gap-1 rounded-full bg-success/20 px-2.5 py-0.5 text-[11px] font-medium text-success">
                 <Database className="h-3.5 w-3.5" />
@@ -106,7 +145,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-border-primary bg-bg-secondary px-6 pt-20 pb-4">
+      <div className="border-b border-border-primary bg-bg-secondary px-6 py-4">
         <div className="flex items-center gap-2">
           <TabButton
             id="series"

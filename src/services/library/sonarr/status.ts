@@ -114,24 +114,16 @@ export class SonarrStatus {
         cacheMutated = true;
       }
 
-      const finalSeries = existsInCache ? cachedSeries! : {
-        tvdbId: liveSeries.tvdbId,
-        id: liveSeries.id,
-        titleSlug: liveSeries.titleSlug,
-        title: liveSeries.title,
-        ...(Array.isArray(liveSeries.alternateTitles) && liveSeries.alternateTitles.length > 0
-          ? { alternateTitles: liveSeries.alternateTitles.map(t => t?.title?.trim()).filter((t): t is string => !!t) }
-          : {}),
-      };
-
       if (cacheMutated) {
         await notifyLibraryMutation(this.emitMutation, { tvdbId, action: 'added' });
       }
 
+      // When force_verify is true and we have live data, return the full series object
+      // so the UI can display rich metadata (images, network, etc.)
       const out2: CheckSeriesStatusResponse = {
         exists: true,
         tvdbId,
-        series: finalSeries,
+        series: liveSeries,
         ...(successfulSynonym ? { successfulSynonym } : {}),
       };
       if (import.meta.env.DEV) {

@@ -1,3 +1,4 @@
+// src/features/media-modal/tabs/mapping-tab/hooks/use-mapping-controller.ts
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useMappingSearch } from "@/shared/mapping";
 import type { MappingSearchResult } from "@/shared/types";
@@ -39,11 +40,10 @@ function reducer(state: MappingTabState, action: Action): MappingTabState {
         ...state,
         selected: action.result,
         lastQuery: state.query,
-        query: '',
         isDirty: action.isDirty,
       };
     case 'CLEAR_SELECTION':
-      return { ...state, selected: null, query: state.lastQuery };
+      return { ...state, selected: null };
     case 'RESET_FROM_CURRENT':
       return {
         query: '',
@@ -100,7 +100,7 @@ export function useMappingController(input: UseMappingControllerInput): UseMappi
   const searchQuery = useMappingSearch({
     service: input.service,
     query: debouncedQuery,
-    enabled: debouncedQuery.trim().length >= 2 && !state.selected,
+    enabled: debouncedQuery.trim().length >= 2,
   });
 
   const [isSubmitting, setSubmitting] = useState(false);

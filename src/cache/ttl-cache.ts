@@ -41,6 +41,7 @@ interface CacheDbSchema extends DBSchema {
 }
 
 let dbPromise: Promise<IDBPDatabase<CacheDbSchema>> | null = null;
+const memoryFallback = new Map<string, CacheEntry<unknown>>();
 
 const getDb = (): Promise<IDBPDatabase<CacheDbSchema>> => {
   if (!dbPromise) {
@@ -60,6 +61,23 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
 
   const read = async (key: string): Promise<CacheHit<T> | null> => {
     const now = Date.now();
+
+    const memKey = keyFor(key);
+    const memEntry = memoryFallback.get(memKey) as CacheEntry<T> | undefined;
+    if (memEntry) {
+      if (now >= memEntry.expiresAt) {
+        memoryFallback.delete(memKey);
+      } else {
+        return {
+          value: memEntry.value,
+          stale: now >= memEntry.staleAt,
+          staleAt: memEntry.staleAt,
+          expiresAt: memEntry.expiresAt,
+          ...(memEntry.meta ? { meta: memEntry.meta } : {}),
+        };
+      }
+    }
+
     const db = await getDb();
     const entry = (await db.get(STORE_NAME, keyFor(key))) as CacheEntry<T> | undefined;
     if (!entry) return null;
@@ -86,16 +104,26 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
       expiresAt: now + (options.hardMs ?? options.staleMs * 4),
       ...(options.meta ? { meta: options.meta } : {}),
     };
+    const memKey = keyFor(key);
     const db = await getDb();
-    await db.put(STORE_NAME, entry, keyFor(key));
+    await db.put(STORE_NAME, entry, memKey);
+    // Keep a shadow copy so reads still work if IDB evicts or is inaccessible.
+    memoryFallback.set(memKey, entry as CacheEntry<unknown>);
   };
 
   const remove = async (key: string): Promise<void> => {
+    memoryFallback.delete(keyFor(key));
     const db = await getDb();
     await db.delete(STORE_NAME, keyFor(key));
   };
 
   const clear = async (): Promise<void> => {
+    // Clear namespace slice of the in-memory fallback
+    for (const memKey of Array.from(memoryFallback.keys())) {
+      if (memKey.startsWith(`${namespace}:`)) {
+        memoryFallback.delete(memKey);
+      }
+    }
     const db = await getDb();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);

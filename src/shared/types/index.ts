@@ -3,6 +3,7 @@ export type {
   AniMedia,
   AniTitles,
   MediaMetadataHint,
+  MediaStatus
 } from './anilist';
 
 export type {

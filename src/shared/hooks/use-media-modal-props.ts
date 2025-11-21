@@ -3,17 +3,22 @@ import type {
   CheckSeriesStatusResponse,
   MappingSearchResult,
   MediaMetadataHint,
+  MediaStatus,
   MediaService,
   SonarrFormState,
+  SonarrLookupSeries,
+  AniFormat,
 } from '@/shared/types';
 import type { MappingTabProps, SonarrTabProps } from '@/features/media-modal';
 import {
   useAddSeries,
+  useAniListMedia,
   usePublicOptions,
   useSeriesStatus,
   useSonarrMetadata,
   useUpdateDefaultSettings,
 } from './use-api-queries';
+import { toMappingSearchResultFromSonarr } from '@/shared/mapping/sonarr.adapter';
 
 export interface UseMediaModalPropsInput {
   anilistId: number | undefined;
@@ -24,10 +29,15 @@ export interface UseMediaModalPropsInput {
 }
 
 export interface UseMediaModalPropsResult {
-  mappingTabProps: MappingTabProps;
-  sonarrTabProps: SonarrTabProps;
+  mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'>;
+  sonarrTabProps: Omit<SonarrTabProps, 'controller'>;
   tvdbId: number | null;
   inLibrary: boolean;
+  bannerImage: string | null;
+  coverImage: string | null;
+  format: AniFormat | null;
+  year: number | null;
+  status: MediaStatus | null;
 }
 
 const defaultFormState: SonarrFormState = {
@@ -43,11 +53,22 @@ const defaultFormState: SonarrFormState = {
 function deriveCurrentMappingFromStatus(
   status: CheckSeriesStatusResponse | null | undefined,
   service: MediaService = 'sonarr',
+  baseUrl?: string,
 ): MappingSearchResult | null {
   if (!status || status.tvdbId == null) {
     return null;
   }
 
+  // If we have a full series object (from force_verify), map it using the adapter
+  // to get rich metadata like posters, overview, etc.
+  if (status.series && 'images' in status.series) {
+    return toMappingSearchResultFromSonarr(status.series as SonarrLookupSeries, {
+      baseUrl: baseUrl ?? '',
+      libraryTvdbIds: [status.tvdbId], // Mark as in library
+    });
+  }
+
+  // Fallback for lean series (cached status)
   const tvdbId = status.tvdbId;
   const inLibrary = Boolean(status.exists);
   const librarySlug = status.series?.titleSlug;
@@ -91,12 +112,32 @@ export function useMediaModalProps(
     },
   );
 
+  const aniListMediaQuery = useAniListMedia(anilistId, {
+    enabled: Boolean(anilistId && isOpen),
+    // Rely on cached/prefetched media; background refresh is handled by the service when stale.
+    forceRefresh: false,
+  });
+
+  const apiMedia = aniListMediaQuery.data;
+  const coverImage =
+    apiMedia?.coverImage?.extraLarge ??
+    apiMedia?.coverImage?.large ??
+    apiMedia?.coverImage?.medium ??
+    metadata?.coverImage ??
+    null;
+  const bannerImage = apiMedia?.bannerImage ?? null;
+
   const addSeriesMutation = useAddSeries();
   const sonarrReady = isConfigured;
 
   const mappingUnavailable = statusQuery.data?.anilistTvdbLinkMissing === true;
   const tvdbId = mappingUnavailable ? null : statusQuery.data?.tvdbId ?? null;
   const inLibrary = Boolean(statusQuery.data?.exists || addSeriesMutation.isSuccess);
+
+  const format: AniFormat | null = apiMedia?.format ?? metadata?.format ?? null;
+  const year: number | null =
+    apiMedia?.seasonYear ?? apiMedia?.startDate?.year ?? metadata?.startYear ?? null;
+  const status: MediaStatus | null = apiMedia?.status ?? null;
 
   const sonarrMetadataQuery = useSonarrMetadata({
     enabled: sonarrReady && isOpen,
@@ -106,22 +147,23 @@ export function useMediaModalProps(
 
   const defaultForm: SonarrFormState = options?.defaults ?? defaultFormState;
 
-  // Return null if modal is closed or required data is missing
-  if (!isOpen || !anilistId || !title) {
+  // Return null if required data is missing (but allow modal to render even when closed)
+  if (!anilistId || !title) {
     return null;
   }
 
-  const mappingTabProps: MappingTabProps = {
+  const mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'> = {
     aniListEntry: {
       id: anilistId,
       title: title,
+      ...(coverImage ? { posterUrl: coverImage } : {}),
     },
-    currentMapping: deriveCurrentMappingFromStatus(statusQuery.data, 'sonarr'),
+    currentMapping: deriveCurrentMappingFromStatus(statusQuery.data, 'sonarr', options?.sonarrUrl),
     otherAniListIds: [],
     service: 'sonarr',
   };
 
-  const sonarrTabProps: SonarrTabProps = {
+  const sonarrTabProps: Omit<SonarrTabProps, 'controller'> = {
     mode: 'add',
     anilistId,
     title,
@@ -152,5 +194,10 @@ export function useMediaModalProps(
     sonarrTabProps,
     tvdbId,
     inLibrary,
+    bannerImage,
+    coverImage,
+    format,
+    year,
+    status,
   };
 }

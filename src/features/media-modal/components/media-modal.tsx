@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Modal, ModalContent, ModalTitle, ModalDescription } from "./modal";
 import { Header, type MediaModalTabId } from "./media-modal-header";
 import { Footer } from "./media-modal-footer";
+import type { AniFormat, MediaStatus } from "@/shared/types";
 
 import MappingTab, { type MappingTabProps } from "../tabs/mapping-tab";
 import SonarrTab, { type SonarrTabProps } from "../tabs/sonarr-tab";
@@ -20,6 +21,9 @@ export type MediaModalProps = {
   anilistIds: number[];
   tvdbId: number | null;
   inLibrary: boolean;
+  format: AniFormat | null;
+  year: number | null;
+  status: MediaStatus | null;
 
   initialTab?: MediaModalTabId;
 
@@ -35,13 +39,16 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     onClose,
     title,
     bannerImage,
-    coverImage,
-    anilistIds,
-    tvdbId,
-    inLibrary,
-    initialTab = "series",
-    portalContainer,
-    mappingTabProps,
+  coverImage,
+  anilistIds,
+  tvdbId,
+  inLibrary,
+  format,
+  year,
+  status,
+  initialTab = "series",
+  portalContainer,
+  mappingTabProps,
     sonarrTabProps,
   } = props;
 
@@ -146,7 +153,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     <Modal open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <ModalContent
         container={portalContainer ?? null}
-        className="mx-auto w-full max-w-3xl min-h-[920px] overflow-hidden rounded-2xl border border-border-primary bg-bg-secondary shadow-2xl shadow-black/40 p-0"
+        className="h-[920px] max-h-[90vh] w-full max-w-[1000px] flex flex-col overflow-hidden rounded-2xl border border-border-primary bg-bg-secondary shadow-2xl shadow-black/40 p-0"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
         }}
@@ -163,19 +170,23 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           anilistIds={anilistIds}
           tvdbId={tvdbId ?? null}
           inLibrary={inLibrary}
+          format={format}
+          year={year}
+          status={status}
           activeTab={activeTab}
           onTabChange={handleTabChange}
           onClose={handleClose}
         />
-        <div className="px-6 py-5">
-          <div style={{ display: activeTab === "mapping" ? "block" : "none" }}>
+        {/* Content Area - flex-1 to take space, overflow-hidden to clip children, justify-start to align top */}
+        <div className="flex-1 overflow-y-auto px-8 py-6 flex flex-col justify-start">
+          <div style={{ display: activeTab === "mapping" ? "block" : "none" }} className="h-full">
             <MappingTab
               {...mappingTabProps}
               controller={mappingController}
               baseUrl={baseUrl}
             />
           </div>
-          <div style={{ display: activeTab === "series" ? "block" : "none" }}>
+          <div style={{ display: activeTab === "series" ? "block" : "none" }} className="h-full">
             <SonarrTab
               {...sonarrTabProps}
               controller={sonarrController}

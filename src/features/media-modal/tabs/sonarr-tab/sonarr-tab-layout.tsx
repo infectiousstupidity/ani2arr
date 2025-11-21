@@ -1,3 +1,4 @@
+// src/features/media-modal/tabs/sonarr-tab/sonarr-tab-layout.tsx
 import SonarrForm from "@/shared/components/sonarr-form";
 import type { SonarrTabMode, SonarrTabProps } from ".";
 import type { UseSonarrTabControllerResult } from "./hooks/use-sonarr-tab-controller";
@@ -14,8 +15,7 @@ export interface SonarrTabLayoutProps {
 }
 
 export function SonarrTabLayout(props: SonarrTabLayoutProps): React.JSX.Element {
-  const { mode, title, tvdbId, controller, metadata, sonarrReady, disabled, portalContainer } =
-    props;
+  const { mode, title, tvdbId, controller, metadata, sonarrReady, disabled, portalContainer } = props;
 
   if (!sonarrReady || !metadata) {
     return (
@@ -29,15 +29,17 @@ export function SonarrTabLayout(props: SonarrTabLayoutProps): React.JSX.Element 
   }
 
   return (
-    <SonarrForm
-      form={controller.form}
-      metadata={metadata}
-      disabled={disabled || !sonarrReady}
-      portalContainer={portalContainer ?? null}
-      computedPath={controller.computedPath}
-      pathHintTitle={title}
-      pathHintTvdbId={tvdbId}
-      className="space-y-4"
-    />
+    <div className="space-y-4">
+      <SonarrForm
+        form={controller.form}
+        metadata={metadata}
+        disabled={disabled || !sonarrReady}
+        portalContainer={portalContainer ?? null}
+        computedPath={controller.computedPath}
+        pathHintTitle={title}
+        pathHintTvdbId={tvdbId}
+        className="space-y-4"
+      />
+    </div>
   );
 }

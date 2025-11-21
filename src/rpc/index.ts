@@ -1,6 +1,6 @@
 // src/rpc/index.ts
 import { defineProxyService } from '@webext-core/proxy-service';
-import type { 
+import type {
   AniMedia,
   SonarrSeries,
   SonarrRootFolder,
@@ -16,6 +16,7 @@ export interface Ani2arrApi {
   getSeriesStatus(input: StatusInput): Promise<StatusOutput>;
   addToSonarr(input: AddInput): Promise<SonarrSeries>;
   prefetchAniListMedia(ids: number[]): Promise<Array<[number, AniMedia]>>;
+  fetchAniListMedia(anilistId: number): Promise<AniMedia | null>;
   getStaticMapped(ids: number[]): Promise<number[]>;
   notifySettingsChanged(): Promise<{ ok: true }>;
   updateDefaults(defaults: SonarrFormState): Promise<{ ok: true }>;

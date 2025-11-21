@@ -90,16 +90,21 @@ export const shouldPersistQuery = (
   if (query.meta?.persist === false) return false;
   const key = query.queryKey;
   if (!Array.isArray(key) || key.length < 2) return true;
-  
+
   // Block credentials (Sonarr URL + API key)
   if (key[0] === CREDENTIAL_QUERY_PREFIX[0] && key[1] === CREDENTIAL_QUERY_PREFIX[1]) {
     return false;
   }
-  
+
   // Block Sonarr metadata (filesystem paths, quality profiles, tags)
   if (key[0] === METADATA_QUERY_PREFIX[0] && key[1] === METADATA_QUERY_PREFIX[1]) {
     return false;
   }
-  
+
+  // Block series status queries to avoid persisting rich Sonarr payloads
+  if (key[0] === 'a2a' && key[1] === 'seriesStatus') {
+    return false;
+  }
+
   return true;
 };

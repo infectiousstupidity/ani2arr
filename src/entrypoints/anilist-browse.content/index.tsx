@@ -192,11 +192,14 @@ const BrowseRoot: React.FC<BrowseRootProps> = ({ portalContainer }) => {
           isOpen={mediaModal.state.isOpen}
           onClose={mediaModal.reset}
           title={mediaModal.state.title}
-          bannerImage={null}
-          coverImage={null}
+          bannerImage={modalProps.bannerImage}
+          coverImage={modalProps.coverImage}
           anilistIds={[mediaModal.state.anilistId]}
           tvdbId={modalProps.tvdbId}
           inLibrary={modalProps.inLibrary}
+          format={modalProps.format}
+          year={modalProps.year}
+          status={modalProps.status}
           initialTab={mediaModal.state.initialTab ?? 'series'}
           portalContainer={portalContainer}
           mappingTabProps={modalProps.mappingTabProps}
