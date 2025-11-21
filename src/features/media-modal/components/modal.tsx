@@ -6,7 +6,7 @@ import React, {
   type PropsWithChildren,
 } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import clsx from "clsx";
+import { cn } from "@/shared/utils/cn";
 
 
 type ModalProps = React.ComponentPropsWithoutRef<typeof Dialog.Root>;
@@ -46,15 +46,15 @@ export const ModalContent = forwardRef<
     <Dialog.Portal container={container ?? undefined}>
       <Dialog.Overlay
         data-testid="modal-overlay"
-        className={clsx(
+        className={cn(
           "fixed inset-0 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         )}
         style={{ zIndex: MODAL_OVERLAY_Z_INDEX }}
       />
       <Dialog.Content
         ref={ref}
-        className={clsx(
-          "fixed left-1/2 top-1/2 grid w-[480px] -translate-x-1/2 -translate-y-1/2 gap-4 border bg-bg-primary p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        className={cn(
+          "fixed left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 gap-4 border bg-bg-primary p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
           className,
         )}
         style={contentStyle}
@@ -74,7 +74,7 @@ export const ModalFooter = memo(function ModalFooter(
   const { className, ...rest } = props;
   return (
     <div
-      className={clsx(
+      className={cn(
         "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
         className,
       )}
@@ -96,7 +96,7 @@ export const ModalTitle = forwardRef<
   return (
     <Dialog.Title
       ref={ref}
-      className={clsx("text-lg font-semibold text-text-primary tracking-tight", className)}
+      className={cn("text-lg font-semibold text-text-primary tracking-tight", className)}
       {...rest}
     />
   );
@@ -116,7 +116,7 @@ export const ModalDescription = forwardRef<
   return (
     <Dialog.Description
       ref={ref}
-      className={clsx("text-sm text-text-secondary", className)}
+      className={cn("text-sm text-text-secondary", className)}
       {...rest}
     />
   );

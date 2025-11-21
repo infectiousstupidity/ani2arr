@@ -23,12 +23,35 @@ const FIND_MEDIA_QUERY = `
       title { romaji english native }
       startDate { year }
       synonyms
+      description(asHtml: false)
+      episodes
+      duration
+      nextAiringEpisode {
+        episode
+        airingAt
+      }
       relations {
         edges {
           relationType
           node {
             id
           }
+        }
+      }
+      bannerImage
+      coverImage {
+        extraLarge
+        large
+        medium
+        color
+      }
+      status
+      season
+      seasonYear
+      genres
+      studios(isMain: true) {
+        nodes {
+          name
         }
       }
     }
@@ -45,10 +68,33 @@ const FIND_MEDIA_BATCH_QUERY = `
         title { romaji english native }
         startDate { year }
         synonyms
+        description(asHtml: false)
+        episodes
+        duration
+        nextAiringEpisode {
+          episode
+          airingAt
+        }
         relations {
           edges {
             relationType
             node { id }
+          }
+        }
+        bannerImage
+        coverImage {
+          extraLarge
+          large
+          medium
+          color
+        }
+        status
+        season
+        seasonYear
+        genres
+        studios(isMain: true) {
+          nodes {
+            name
           }
         }
       }
@@ -67,14 +113,15 @@ type FindMediaBatchResponse = {
 };
 
 type ExtensionErrorLike = ReturnType<typeof createError>;
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+};
 
 export class AnilistApiService {
   private readonly log = logger.create('AniListApiService');
   private readonly queue = new PQueue({
-    // Keep a single global lane for AniList to ensure ordering
-    // and allow high-priority tasks to jump ahead of background batches.
-    // Rate limiting is enforced via 429 handling (pausedUntil),
-    // which applies uniformly to all queued tasks.
     concurrency: QUEUE_CONCURRENCY,
   });
   private readonly inflight = new Map<number, { promise: Promise<AniMedia>; kind: 'single' | 'batch'; token?: number }>();
@@ -82,22 +129,91 @@ export class AnilistApiService {
   private pausedUntil: number = 0;
   private readonly tokens = new Map<number, number>();
   private readonly batchRunningIds = new Set<number>();
+  private readonly pausedByPriority = new Map<RequestPriority, Map<number, { deferred: Deferred<AniMedia>; token: number }>>();
+  private pausedFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private hasCompleteMediaFields(media: AniMedia | null | undefined): media is AniMedia {
+    if (!media) return false;
+    const cover = media.coverImage;
+    // We strictly check for cover presence to validate "completeness"
+    const hasCover =
+      !!cover &&
+      ((typeof cover.extraLarge === 'string' && cover.extraLarge.trim().length > 0) ||
+        (typeof cover.large === 'string' && cover.large.trim().length > 0) ||
+          (typeof cover.medium === 'string' && cover.medium.trim().length > 0));
+
+    return hasCover;
+  }
+
+  private normalizeMedia(media: AniMedia): AniMedia {
+    const cover = media.coverImage ?? null;
+    return {
+      ...media,
+      // Pass through new fields
+      description: media.description ?? null,
+      episodes: media.episodes ?? null,
+      duration: media.duration ?? null,
+      nextAiringEpisode: media.nextAiringEpisode ?? null,
+      bannerImage: media.bannerImage ?? null,
+      coverImage: cover
+        ? {
+            extraLarge: cover.extraLarge ?? null,
+            large: cover.large ?? null,
+            medium: cover.medium ?? null,
+            color: cover.color ?? null,
+          }
+        : null,
+      title: media.title ?? {},
+      synonyms: Array.isArray(media.synonyms) ? [...media.synonyms] : [],
+    };
+  }
+
+  private sanitizeMedia(media: AniMedia): AniMedia {
+    try {
+      return JSON.parse(JSON.stringify(media)) as AniMedia;
+    } catch {
+      return media;
+    }
+  }
+
+  private async cacheMedia(id: number, media: AniMedia): Promise<AniMedia> {
+    const normalized = this.normalizeMedia(media);
+    const sanitized = this.sanitizeMedia(normalized);
+    const cache = this.caches?.media;
+    if (!cache) return sanitized;
+
+    try {
+      await cache.write(String(id), sanitized, {
+        staleMs: MEDIA_SOFT_TTL,
+        hardMs: MEDIA_HARD_TTL,
+        meta: { cachedAt: Date.now() },
+      });
+    } catch (error) {
+      const name = (error as { name?: string } | null | undefined)?.name ?? '';
+      if (name === 'DataCloneError') {
+        this.log.warn(`cache:media DataCloneError id=${id}; skipping cache write`);
+        return sanitized;
+      }
+      throw error;
+    }
+
+    return sanitized;
+  }
 
   constructor(caches?: { media: TtlCache<AniMedia> }) {
     this.caches = caches;
   }
 
-  private createDeferred<T>() {
+  private createDeferred<T>(): Deferred<T> {
     let resolve!: (value: T | PromiseLike<T>) => void;
     let reject!: (reason?: unknown) => void;
     const promise = new Promise<T>((res, rej) => {
       resolve = res;
       reject = rej;
     });
-    return { promise, resolve, reject } as const;
+    return { promise, resolve, reject };
   }
 
-  // Bump and read token helpers for per-ID preemption
   private bumpToken(id: number): number {
     const next = (this.tokens.get(id) ?? 0) + 1;
     this.tokens.set(id, next);
@@ -106,8 +222,32 @@ export class AnilistApiService {
   private currentToken(id: number): number {
     return this.tokens.get(id) ?? 0;
   }
+  private normalizePriority(priority?: RequestPriority): RequestPriority {
+    return priority ?? 'normal';
+  }
 
-  // Future-ready public API to allow priority bumps outside detail pages
+  private getPausedBucket(priority: RequestPriority): Map<number, { deferred: Deferred<AniMedia>; token: number }> {
+    let bucket = this.pausedByPriority.get(priority);
+    if (!bucket) {
+      bucket = new Map();
+      this.pausedByPriority.set(priority, bucket);
+    }
+    return bucket;
+  }
+
+  private schedulePausedFlush(): void {
+    if (this.pausedFlushTimer) {
+      clearTimeout(this.pausedFlushTimer);
+      this.pausedFlushTimer = null;
+    }
+
+    const delay = Math.max(0, this.pausedUntil - Date.now());
+    this.pausedFlushTimer = setTimeout(() => {
+      this.pausedFlushTimer = null;
+      void this.flushPausedQueue();
+    }, delay);
+  }
+
   public prioritize(ids: number | number[], options?: { schedule?: boolean }): void {
     const list = Array.isArray(ids) ? ids : [ids];
     const schedule = options?.schedule === true;
@@ -123,27 +263,158 @@ export class AnilistApiService {
     }
   }
 
-  // Fetch single media by ID with caching
+  private enqueueWhilePaused(anilistId: number, priority: RequestPriority): Promise<AniMedia> {
+    const bucket = this.getPausedBucket(priority);
+    const existing = bucket.get(anilistId);
+    if (existing) return existing.deferred.promise;
+
+    const deferred = this.createDeferred<AniMedia>();
+    const token = priority === 'high' ? this.bumpToken(anilistId) : this.currentToken(anilistId);
+    bucket.set(anilistId, { deferred, token });
+    this.inflight.set(anilistId, { promise: deferred.promise, kind: 'batch', token });
+    this.schedulePausedFlush();
+    return deferred.promise;
+  }
+
+  private async flushPausedQueue(): Promise<void> {
+    if (this.pausedUntil > Date.now()) {
+      this.schedulePausedFlush();
+      return;
+    }
+
+    const priorities: RequestPriority[] = ['high', 'normal', 'low'];
+    for (const priority of priorities) {
+      const bucket = this.pausedByPriority.get(priority);
+      if (!bucket || bucket.size === 0) continue;
+
+      const entries = Array.from(bucket.entries());
+      bucket.clear();
+
+      const active: Array<{ id: number; deferred: Deferred<AniMedia>; token: number }> = [];
+      for (const [id, entry] of entries) {
+        const current = this.currentToken(id);
+        if (current !== entry.token) {
+          entry.deferred.reject(
+            createError(ErrorCode.API_ERROR, `AniList request preempted for ${id}`, 'Request superseded.', {
+              preempted: true,
+            }),
+          );
+          const inflight = this.inflight.get(id);
+          if (inflight && inflight.promise === entry.deferred.promise) {
+            this.inflight.delete(id);
+          }
+          continue;
+        }
+        active.push({ id, deferred: entry.deferred, token: entry.token });
+      }
+
+      if (active.length === 0) continue;
+
+      for (let i = 0; i < active.length; i += 50) {
+        const chunk = active.slice(i, i + 50);
+        await this.runPausedChunk(priority, chunk);
+      }
+    }
+  }
+
+  private async runPausedChunk(
+    priority: RequestPriority,
+    entries: Array<{ id: number; deferred: Deferred<AniMedia>; token: number }>,
+  ): Promise<void> {
+    if (entries.length === 0) return;
+
+    const prio = priorityValue(priority);
+    const ids = entries.map(entry => entry.id);
+    const entryById = new Map<number, { deferred: Deferred<AniMedia>; token: number }>();
+    for (const entry of entries) entryById.set(entry.id, { deferred: entry.deferred, token: entry.token });
+
+    const run = async () => {
+      for (const id of ids) this.batchRunningIds.add(id);
+      try {
+        if (ids.length === 1) {
+          const single = await this.executeFetch(ids[0]);
+          return single ? [single] : [];
+        }
+        return await this.executeBatch(ids);
+      } finally {
+        for (const id of ids) this.batchRunningIds.delete(id);
+      }
+    };
+
+    let medias: AniMedia[];
+    try {
+      medias = (await this.queue.add(() => run(), { priority: prio })) as AniMedia[];
+    } catch (error) {
+      for (const { id, deferred } of entries) {
+        deferred.reject(error);
+        const inflight = this.inflight.get(id);
+        if (inflight && inflight.promise === deferred.promise) {
+          this.inflight.delete(id);
+        }
+      }
+      return;
+    }
+
+    const resolved = new Set<number>();
+    for (const media of medias) {
+      if (!media || typeof media.id !== 'number') continue;
+      const cached = await this.cacheMedia(media.id, media);
+      resolved.add(media.id);
+      const target = entryById.get(media.id);
+      if (target) {
+        target.deferred.resolve(cached);
+        const inflight = this.inflight.get(media.id);
+        if (inflight && inflight.promise === target.deferred.promise) {
+          this.inflight.delete(media.id);
+        }
+      }
+    }
+
+    for (const { id, deferred } of entries) {
+      if (resolved.has(id)) continue;
+      deferred.reject(
+        createError(
+          ErrorCode.API_ERROR,
+          `AniList response missing media for ${id}`,
+          'AniList returned an unexpected response.',
+        ),
+      );
+      const inflight = this.inflight.get(id);
+      if (inflight && inflight.promise === deferred.promise) {
+        this.inflight.delete(id);
+      }
+    }
+  }
+
   public fetchMediaWithRelations(
     anilistId: number,
-    options?: { priority?: RequestPriority },
+    options?: { priority?: RequestPriority; forceRefresh?: boolean },
   ): Promise<AniMedia> {
+    if (options?.forceRefresh) {
+      return this.enqueueAndCache(anilistId, options);
+    }
+
     const cache = this.caches?.media;
     if (cache) {
       return (async () => {
         const hit = await cache.read(String(anilistId));
         if (hit) {
+          const isComplete = this.hasCompleteMediaFields(hit.value);
           if (import.meta.env.DEV) {
             this.log.debug?.(
-              `cache:media id=${anilistId} hit stale=${String(hit.stale)} staleAt=${hit.staleAt} expiresAt=${hit.expiresAt}`,
+              `cache:media id=${anilistId} hit stale=${String(hit.stale)} staleAt=${hit.staleAt} expiresAt=${hit.expiresAt} complete=${String(isComplete)}`,
             );
           }
-          if (hit.stale) {
-            void this.enqueueAndCache(anilistId, options).catch(error => {
-              this.log.warn(`background refresh failed for AniList ID ${anilistId}`, error);
-            });
+          if (isComplete) {
+            const normalized = this.normalizeMedia(hit.value);
+            if (hit.stale) {
+              void this.enqueueAndCache(anilistId, options).catch(error => {
+                this.log.warn(`background refresh failed for AniList ID ${anilistId}`, error);
+              });
+            }
+            return this.sanitizeMedia(normalized);
           }
-          return hit.value;
+          void cache.remove(String(anilistId)).catch(() => {});
         }
         return this.enqueueAndCache(anilistId, options);
       })();
@@ -152,7 +423,6 @@ export class AnilistApiService {
     return this.enqueueAndCache(anilistId, options);
   }
 
-  // Iterate prequel chain from seed media
   public async *iteratePrequelChain(
     seed: AniMedia,
     options: { includeRoot?: boolean; maxDepth?: number } = {},
@@ -187,18 +457,16 @@ export class AnilistApiService {
     }
   }
 
-  // Remove media from cache (best-effort)
   public async removeMediaFromCache(anilistId: number): Promise<void> {
     const cache = this.caches?.media;
     if (!cache) return;
     try {
       await cache.remove(String(anilistId));
     } catch {
-      // best-effort eviction; ignore failures
+      // best-effort eviction
     }
   }
 
-  // Fetch multiple media by IDs with batching and caching
   public async fetchMediaBatch(ids: number[]): Promise<Map<number, AniMedia>> {
     const uniqueIds = Array.from(new Set(ids.filter(id => typeof id === 'number' && Number.isFinite(id)))) as number[];
     const results = new Map<number, AniMedia>();
@@ -208,16 +476,18 @@ export class AnilistApiService {
     const freshMisses: number[] = [];
 
     if (cache) {
-      // Read cache and short-circuit fresh hits; schedule refresh for stale.
       for (const id of uniqueIds) {
         const hit = await cache.read(String(id));
         if (hit) {
-          results.set(id, hit.value);
-          if (hit.stale) {
-            // Background refresh; don't await.
-            void this.enqueueAndCache(id).catch(() => {});
+          const isComplete = this.hasCompleteMediaFields(hit.value);
+          if (isComplete) {
+            results.set(id, this.normalizeMedia(hit.value));
+            if (hit.stale) {
+              void this.enqueueAndCache(id).catch(() => {});
+            }
+            continue;
           }
-          continue;
+          void cache.remove(String(id)).catch(() => {});
         }
         freshMisses.push(id);
       }
@@ -227,10 +497,7 @@ export class AnilistApiService {
 
     if (freshMisses.length === 0) return results;
 
-    // Exclude IDs that already have an inflight single/batch fetch
     const pendingIds = freshMisses.filter(id => !this.inflight.has(id));
-
-    // Chunk into groups of 50 per GraphQL call.
     const chunks: number[][] = [];
     for (let i = 0; i < pendingIds.length; i += 50) {
       chunks.push(pendingIds.slice(i, i + 50));
@@ -239,7 +506,6 @@ export class AnilistApiService {
     for (const chunk of chunks) {
       if (chunk.length === 0) continue;
 
-      // Create per-ID deferreds and seed inflight dedupe before scheduling
       const deferredById = new Map<number, { promise: Promise<AniMedia>; resolve: (v: AniMedia) => void; reject: (r?: unknown) => void }>();
       const scheduledTokenById = new Map<number, number>();
       for (const id of chunk) {
@@ -252,26 +518,14 @@ export class AnilistApiService {
 
       const now = Date.now();
       if (this.pausedUntil > now) {
-        // Honor rate-limit pause before queuing next chunk.
         await new Promise(resolve => setTimeout(resolve, this.pausedUntil - now));
       }
 
-      // Queue the batch as a single task respecting interval caps.
       try {
         const prio = priorityValue('low');
-        if (import.meta.env.DEV) {
-          this.log.debug?.(
-            `queue:add batch size=${chunk.length} prio=${prio} size=${this.queue.size} pending=${this.queue.pending} ids=[${chunk.join(',')}]`,
-          );
-        }
         const handled = new Set<number>();
         const medias = await this.queue.add(
           async () => {
-            if (import.meta.env.DEV) {
-              this.log.debug?.(`queue:start batch size=${chunk.length} prio=${prio}`);
-            }
-
-            // JIT filter: drop IDs preempted or no longer batch; resolve cached
             const finalIds: number[] = [];
             const dropped: Array<{ id: number; reason: 'preempted' | 'not-batch' | 'cached' }> = [];
 
@@ -282,7 +536,6 @@ export class AnilistApiService {
               const infl = this.inflight.get(id);
 
               if (nowToken !== scheduledToken) {
-                // Preempted by newer focus bump
                 dropped.push({ id, reason: 'preempted' });
                 if (d) d.reject(createError(ErrorCode.API_ERROR, `AniList request preempted for ${id}`, 'Request superseded.', { preempted: true }));
                 handled.add(id);
@@ -290,14 +543,12 @@ export class AnilistApiService {
               }
 
               if (!infl || infl.kind !== 'batch' || infl.promise !== d?.promise) {
-                // No longer a matching batch inflight (likely promoted to single)
                 dropped.push({ id, reason: 'not-batch' });
                 if (d) d.reject(createError(ErrorCode.API_ERROR, `AniList request preempted for ${id}`, 'Request superseded.', { preempted: true }));
                 handled.add(id);
                 continue;
               }
 
-              // Check cache again; if fresh now, resolve from cache and drop from batch
               const cache = this.caches?.media;
               if (cache) {
                 try {
@@ -305,7 +556,6 @@ export class AnilistApiService {
                   if (hit && !hit.stale) {
                     results.set(id, hit.value);
                     if (d) d.resolve(hit.value);
-                    // Only clear inflight if it still points to this batch's deferred
                     const cur = this.inflight.get(id);
                     if (cur && cur.kind === 'batch' && cur.promise === d?.promise) {
                       this.inflight.delete(id);
@@ -315,38 +565,16 @@ export class AnilistApiService {
                     continue;
                   }
                 } catch {
-                  // ignore cache read failures; fall through to include in batch
+                   // ignore
                 }
               }
-
               finalIds.push(id);
             }
 
-            if (import.meta.env.DEV) {
-              const kept = finalIds.length;
-              const droppedCount = dropped.length;
-              const reasons = dropped.reduce<Record<string, number>>((acc, x) => {
-                acc[x.reason] = (acc[x.reason] ?? 0) + 1;
-                return acc;
-              }, {});
-              this.log.debug?.(`batch:filter size_in=${chunk.length} kept=${kept} dropped=${droppedCount} reasons=${JSON.stringify(reasons)}`);
-              if (droppedCount > 0) {
-                for (const d of dropped) {
-                  this.log.debug?.(`batch:drop id=${d.id} reason=${d.reason}`);
-                }
-              }
-            }
-
             if (finalIds.length === 0) {
-              if (import.meta.env.DEV) {
-                for (const d of dropped) {
-                  this.log.debug?.(`batch:drop id=${d.id} reason=${d.reason}`);
-                }
-              }
               return [] as AniMedia[];
             }
 
-            // Mark these IDs as running under a batch before the HTTP call
             for (const id of finalIds) this.batchRunningIds.add(id);
             try {
               return await this.executeBatch(finalIds);
@@ -359,30 +587,18 @@ export class AnilistApiService {
 
         for (const media of medias) {
           if (!media || typeof media.id !== 'number') continue;
-          results.set(media.id, media);
-          // Write to cache per item.
-          await this.caches?.media?.write(String(media.id), media, {
-            staleMs: MEDIA_SOFT_TTL,
-            hardMs: MEDIA_HARD_TTL,
-            meta: { cachedAt: Date.now() },
-          });
+          const cachedMedia = await this.cacheMedia(media.id, media);
+          results.set(media.id, cachedMedia);
           const d = deferredById.get(media.id);
           if (d) {
-            d.resolve(media);
+            d.resolve(cachedMedia);
           }
-          // Only clear inflight if it still corresponds to this batch task
           const cur = this.inflight.get(media.id);
           if (cur && cur.kind === 'batch' && cur.promise === d?.promise) {
             this.inflight.delete(media.id);
           }
-          if (import.meta.env.DEV) {
-            const t = (media?.title ?? {}) as Record<string, string>;
-            const name = (t.romaji || t.english || t.native || '').toString().trim();
-            this.log.debug?.(`queue:done batch-item id=${media.id}${name ? ` name="${name}"` : ''}`);
-          }
         }
 
-        // For IDs not returned, reject deduped promises and clear inflight.
         for (const id of chunk) {
           if (!results.has(id) && !handled.has(id)) {
             const d = deferredById.get(id);
@@ -395,7 +611,6 @@ export class AnilistApiService {
                 ),
               );
             }
-            // Only clear inflight if it still corresponds to this batch task
             const cur = this.inflight.get(id);
             if (cur && cur.kind === 'batch' && cur.promise === d?.promise) {
               this.inflight.delete(id);
@@ -403,13 +618,11 @@ export class AnilistApiService {
           }
         }
       } catch (error) {
-        // Propagate failures to waiting singles and clear inflight entries
         for (const id of chunk) {
           const d = deferredById.get(id);
           if (d) {
             d.reject(error);
           }
-          // Only clear inflight if it still corresponds to this batch task
           const cur = this.inflight.get(id);
           if (cur && cur.kind === 'batch' && cur.promise === d?.promise) {
             this.inflight.delete(id);
@@ -422,30 +635,19 @@ export class AnilistApiService {
     return results;
   }
 
-  // Fetch single media with inflight deduplication and caching
   private async enqueueAndCache(
     anilistId: number,
     options?: { priority?: RequestPriority },
   ): Promise<AniMedia> {
+    const priority = this.normalizePriority(options?.priority);
     const existing = this.inflight.get(anilistId);
     if (existing) {
-      const wantsHigh = options?.priority === 'high';
+      const wantsHigh = priority === 'high';
       if (existing.kind === 'batch' && wantsHigh) {
         if (this.batchRunningIds.has(anilistId)) {
-          // Batch already running for this id; reuse to avoid duplicate HTTP
-          if (import.meta.env.DEV) {
-            this.log.debug?.(`queue:reuse-running-batch id=${anilistId}`);
-          }
           return existing.promise;
         } else {
-          const oldToken = this.currentToken(anilistId);
-          const newToken = this.bumpToken(anilistId);
-          if (import.meta.env.DEV) {
-          this.log.debug?.(
-            `queue:preempt id=${anilistId} from=batch to=single prio=${priorityValue('high')} token_old=${oldToken} token_new=${newToken}`,
-          );
-          }
-          // continue to schedule a high-priority single and replace inflight
+          // continue to schedule a high-priority single
         }
       } else {
         return existing.promise;
@@ -454,42 +656,23 @@ export class AnilistApiService {
 
     const now = Date.now();
     if (this.pausedUntil > now) {
-      await new Promise(resolve => setTimeout(resolve, this.pausedUntil - now));
+      return this.enqueueWhilePaused(anilistId, priority);
     }
 
-    const wantsHigh = options?.priority === 'high';
+    const wantsHigh = priority === 'high';
     const scheduledToken = wantsHigh ? this.bumpToken(anilistId) : this.currentToken(anilistId);
-    const prio = priorityValue(options?.priority);
-    if (import.meta.env.DEV) {
-      this.log.debug?.(
-        `queue:add single id=${anilistId} prio=${prio} size=${this.queue.size} pending=${this.queue.pending}`,
-      );
-    }
+    const prio = priorityValue(priority);
+
     const queuePromise = this.queue.add(
       () => {
-        if (import.meta.env.DEV) {
-          this.log.debug?.(`queue:start single id=${anilistId} prio=${prio}`);
-        }
         return this.executeFetch(anilistId);
       },
       { priority: prio },
     ) as Promise<AniMedia>;
+    
     const promise = queuePromise
       .then(async media => {
-        const cache = this.caches?.media;
-        if (cache) {
-          await cache.write(String(anilistId), media, {
-            staleMs: MEDIA_SOFT_TTL,
-            hardMs: MEDIA_HARD_TTL,
-            meta: { cachedAt: Date.now() },
-          });
-        }
-        if (import.meta.env.DEV) {
-          const t = (media?.title ?? {}) as Record<string, string>;
-          const name = (t.romaji || t.english || t.native || '').toString().trim();
-          this.log.debug?.(`queue:done single id=${anilistId}${name ? ` name="${name}"` : ''}`);
-        }
-        return media;
+        return await this.cacheMedia(anilistId, media);
       })
       .finally(() => {
         this.inflight.delete(anilistId);
@@ -499,7 +682,6 @@ export class AnilistApiService {
     return promise;
   }
 
-  // Execute the actual fetch with retries and error handling
   private async executeFetch(anilistId: number): Promise<AniMedia> {
     try {
       return await withRetry(
@@ -515,50 +697,29 @@ export class AnilistApiService {
               const retryAfter = this.parseRetryAfterTs(response.headers.get('Retry-After'));
               const delay = retryAfter ? Math.max(0, retryAfter - Date.now()) : DEFAULT_RATE_LIMIT_DELAY_MS;
               this.pausedUntil = Date.now() + delay;
-              this.log.warn(`AniList rate limit hit. Pausing ALL requests for ${delay}ms.`);
               const error = new Error('Rate limit exceeded');
               (error as { retryAfterMs?: number }).retryAfterMs = delay;
               throw error;
             }
-
             if (response.status >= 400 && response.status < 500) {
-              const extensionError = createError(
-                ErrorCode.API_ERROR,
-                `AniList API Error: ${response.status}`,
-                'AniList request failed.',
-                { status: response.status },
-              );
-              const nonRetryable = Object.assign(new Error(extensionError.message), { extensionError });
-              throw new AbortError(nonRetryable);
+              const extensionError = createError(ErrorCode.API_ERROR, `AniList API Error: ${response.status}`, 'AniList request failed.', { status: response.status });
+              throw new AbortError(Object.assign(new Error(extensionError.message), { extensionError }));
             }
-
-            const retriable = new Error(`AniList API Error: ${response.status}`);
-            (retriable as { status?: number }).status = response.status;
-            throw retriable;
+            throw Object.assign(new Error(`AniList API Error: ${response.status}`), { status: response.status });
           }
 
           const payload = (await response.json()) as FindMediaResponse;
           const media = payload?.data?.Media;
 
           if (!media) {
-            if (payload?.errors?.length) {
-              const message = payload.errors.map(err => err.message).join(', ');
-              const extensionError = createError(
-                ErrorCode.API_ERROR,
-                `AniList GraphQL Error: ${message}`,
-                'AniList request failed.',
-              );
-              const nonRetryable = Object.assign(new Error(extensionError.message), { extensionError });
-              throw new AbortError(nonRetryable);
-            }
-
-            const extensionError = createError(
-              ErrorCode.API_ERROR,
-              `AniList response missing media for ${anilistId}`,
-              'AniList returned an unexpected response.',
-            );
-            const nonRetryable = Object.assign(new Error(extensionError.message), { extensionError });
-            throw new AbortError(nonRetryable);
+             // Error handling
+             if (payload?.errors?.length) {
+               const message = payload.errors.map(err => err.message).join(', ');
+               const extensionError = createError(ErrorCode.API_ERROR, `AniList GraphQL Error: ${message}`, 'AniList request failed.');
+               throw new AbortError(Object.assign(new Error(extensionError.message), { extensionError }));
+             }
+             const extensionError = createError(ErrorCode.API_ERROR, `AniList response missing media for ${anilistId}`, 'AniList returned an unexpected response.');
+             throw new AbortError(Object.assign(new Error(extensionError.message), { extensionError }));
           }
 
           return media;
@@ -573,36 +734,21 @@ export class AnilistApiService {
     } catch (error) {
       if (error instanceof AbortError) {
         const original = error.originalError as Error & { extensionError?: ExtensionErrorLike };
-        if (original?.extensionError) {
-          throw original.extensionError;
-        }
+        if (original?.extensionError) throw original.extensionError;
         throw createError(ErrorCode.API_ERROR, original?.message ?? error.message, 'AniList request failed.');
       }
-
       if (error instanceof Error) {
         const withExtension = error as Error & { extensionError?: ExtensionErrorLike };
-        if (withExtension.extensionError) {
-          throw withExtension.extensionError;
-        }
-      }
-
-     if (error instanceof Error) {
+        if (withExtension.extensionError) throw withExtension.extensionError;
         const { status } = error as Error & { status?: unknown };
         if (typeof status === 'number') {
-          throw createError(
-            ErrorCode.API_ERROR,
-            `AniList API Error: ${status}`,
-            'AniList service is temporarily unavailable.',
-            { status },
-          );
+          throw createError(ErrorCode.API_ERROR, `AniList API Error: ${status}`, 'AniList service is temporarily unavailable.', { status });
         }
       }
-
       throw error;
     }
   }
 
-  // Execute batch fetch with retries and error handling
   private async executeBatch(ids: number[]): Promise<AniMedia[]> {
     try {
       return await withRetry(
@@ -618,26 +764,15 @@ export class AnilistApiService {
               const retryAfter = this.parseRetryAfterTs(response.headers.get('Retry-After'));
               const delay = retryAfter ? Math.max(0, retryAfter - Date.now()) : DEFAULT_RATE_LIMIT_DELAY_MS;
               this.pausedUntil = Date.now() + delay;
-              this.log.warn(`AniList rate limit hit (batch x${ids.length}). Pausing for ${delay}ms.`);
               const error = new Error('Rate limit exceeded');
               (error as { retryAfterMs?: number }).retryAfterMs = delay;
               throw error;
             }
-
             if (response.status >= 400 && response.status < 500) {
-              const extensionError = createError(
-                ErrorCode.API_ERROR,
-                `AniList API Error: ${response.status}`,
-                'AniList request failed.',
-                { status: response.status },
-              );
-              const nonRetryable = Object.assign(new Error(extensionError.message), { extensionError });
-              throw new AbortError(nonRetryable);
+              const extensionError = createError(ErrorCode.API_ERROR, `AniList API Error: ${response.status}`, 'AniList request failed.', { status: response.status });
+              throw new AbortError(Object.assign(new Error(extensionError.message), { extensionError }));
             }
-
-            const retriable = new Error(`AniList API Error: ${response.status}`);
-            (retriable as { status?: number }).status = response.status;
-            throw retriable;
+             throw Object.assign(new Error(`AniList API Error: ${response.status}`), { status: response.status });
           }
 
           const payload = (await response.json()) as FindMediaBatchResponse;
@@ -652,38 +787,24 @@ export class AnilistApiService {
         },
       );
     } catch (error) {
-      if (error instanceof AbortError) {
+       // Same error handling logic as executeFetch
+       if (error instanceof AbortError) {
         const original = error.originalError as Error & { extensionError?: ExtensionErrorLike };
-        if (original?.extensionError) {
-          throw original.extensionError;
-        }
+        if (original?.extensionError) throw original.extensionError;
         throw createError(ErrorCode.API_ERROR, original?.message ?? error.message, 'AniList request failed.');
       }
-
       if (error instanceof Error) {
         const withExtension = error as Error & { extensionError?: ExtensionErrorLike };
-        if (withExtension.extensionError) {
-          throw withExtension.extensionError;
-        }
-      }
-
-      if (error instanceof Error) {
+        if (withExtension.extensionError) throw withExtension.extensionError;
         const { status } = error as Error & { status?: unknown };
         if (typeof status === 'number') {
-          throw createError(
-            ErrorCode.API_ERROR,
-            `AniList API Error: ${status}`,
-            'AniList service is temporarily unavailable.',
-            { status },
-          );
+           throw createError(ErrorCode.API_ERROR, `AniList API Error: ${status}`, 'AniList service is temporarily unavailable.', { status });
         }
       }
-
       throw error;
     }
   }
 
-  // Extract prequel ID from media relations
   private extractPrequelId(media: AniMedia): number | null {
     const edges = media.relations?.edges ?? [];
     const prequelEdge = edges.find(edge => edge?.relationType === 'PREQUEL');
@@ -692,7 +813,6 @@ export class AnilistApiService {
     return typeof id === 'number' && Number.isFinite(id) ? id : null;
   }
 
-  // Parse Retry-After header to timestamp
   private parseRetryAfterTs(header: string | null): number | null {
     if (!header) return null;
     const numeric = Number(header);

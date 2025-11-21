@@ -108,6 +108,7 @@ export class SonarrLibraryStore {
       titleSlug: series.titleSlug,
       title: series.title,
       ...(alternateTitles.length > 0 ? { alternateTitles } : {}),
+      ...(series.statistics ? { statistics: series.statistics } : {}),
     };
   }
 }

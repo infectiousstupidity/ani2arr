@@ -1,9 +1,8 @@
 // Version date: 2025-11-12
 import React, { useEffect, useState, useCallback } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { useTheme } from '@/shared/hooks/use-theme';
 import {
   useSeriesStatus,
@@ -12,7 +11,6 @@ import {
 } from '@/shared/hooks/use-api-queries';
 import { useMediaModalProps } from '@/shared/hooks/use-media-modal-props';
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
-import { createPersistOptions } from '@/shared/utils/query-persist-options';
 import MediaActions, { Status } from '@/shared/components/media-actions';
 import { logger } from '@/shared/utils/logger';
 import { extractMediaMetadataFromDom } from '@/shared/utils/anilist-dom';
@@ -28,8 +26,16 @@ import { awaitBackgroundReady } from '@/shared/utils/background-ready';
 
 const log = logger.create('AniList Content');
 
-const queryClient = new QueryClient();
-const persistOptions = createPersistOptions(log);
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 30 * 60 * 1000, // 30 minutes
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const ANIME_PAGE = new MatchPattern('*://anilist.co/anime/*');
 
@@ -301,11 +307,14 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
           isOpen={mediaModal.state.isOpen}
           onClose={mediaModal.reset}
           title={mediaModal.state.title}
-          bannerImage={null}
-          coverImage={null}
+          bannerImage={modalProps.bannerImage}
+          coverImage={modalProps.coverImage}
           anilistIds={[mediaModal.state.anilistId]}
           tvdbId={modalProps.tvdbId}
           inLibrary={modalProps.inLibrary}
+          format={modalProps.format}
+          year={modalProps.year}
+          status={modalProps.status}
           initialTab={mediaModal.state.initialTab ?? 'series'}
           portalContainer={hostElement}
           mappingTabProps={modalProps.mappingTabProps}
@@ -386,11 +395,11 @@ async function mountAnimePageUI(
       stopSizeSync = attachSizeSync(shadowHost);
       const root = ReactDOM.createRoot(uiContainer);
       root.render(
-        <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+        <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <ContentRoot anilistId={anilistId} title={title} metadata={metadata ?? null} />
           </TooltipProvider>
-        </PersistQueryClientProvider>,
+        </QueryClientProvider>,
       );
       return root;
     },

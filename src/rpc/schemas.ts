@@ -50,6 +50,14 @@ export interface SonarrLookupInput {
 export interface SonarrLookupOutput {
   results: import('@/shared/types').SonarrLookupSeries[];
   libraryTvdbIds: number[];
+  statsMap?: Record<number, {
+    seasonCount?: number;
+    episodeCount?: number;
+    episodeFileCount?: number;
+    totalEpisodeCount?: number;
+    sizeOnDisk?: number;
+    percentOfEpisodes?: number;
+  }>;
 }
 
 export interface ValidateTvdbInput {

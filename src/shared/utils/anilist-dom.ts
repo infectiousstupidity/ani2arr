@@ -130,8 +130,17 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
       ['music', 'MUSIC'],
     ]);
     const normalizeFormatText = (value: string): string => value.toLowerCase().trim().replace(/\s+series$/, '');
+    
+    // Extract cover image helper
+    const getCoverImage = (imgEl: HTMLImageElement | null | undefined): string | null => {
+      if (!imgEl) return null;
+      return imgEl.src || imgEl.dataset.src || null;
+    };
+
     if (onAnimeDetailPage) {
       const title = document.querySelector('h1')?.textContent?.trim() ?? '';
+      const coverImg = document.querySelector<HTMLImageElement>('.cover-wrap .cover');
+      
       if (title) {
         const hint: MediaMetadataHint = {
           titles: { romaji: title },
@@ -139,10 +148,12 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
           startYear: null,
           format: null,
           relationPrequelIds: null,
+          coverImage: getCoverImage(coverImg),
         };
         return hint;
       }
     }
+    
     const cover = document.querySelector<HTMLAnchorElement>(`.media-card a.cover[href*="/anime/${anilistId}"]`);
     if (cover) {
       const card = cover.closest('.media-card') as Element | null;
@@ -151,6 +162,7 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
       ).trim() || (
         card?.querySelector<HTMLDivElement>('.title')?.textContent ?? ''
       ).trim() || (cover.getAttribute('title') ?? '').trim() || cover.querySelector('img')?.getAttribute('alt')?.trim() || '';
+      
       let format: AniFormat | null = null;
       const infoSpan = card?.querySelector<HTMLSpanElement>('.hover-data .info span');
       const infoText = infoSpan?.textContent;
@@ -159,6 +171,8 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
         if (mapped) format = mapped;
       }
 
+      const cardImg = cover.querySelector('img');
+
       if (title || format) {
         const hint: MediaMetadataHint = {
           titles: title ? { romaji: title } : null,
@@ -166,6 +180,7 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
           startYear: null,
           format: format ?? null,
           relationPrequelIds: null,
+          coverImage: getCoverImage(cardImg),
         };
         return hint;
       }

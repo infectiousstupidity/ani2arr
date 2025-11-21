@@ -82,6 +82,9 @@ export const mergeMetadataHints = (
     if (!acc.format && hint.format) {
       acc.format = hint.format;
     }
+    if (!acc.coverImage && hint.coverImage) {
+      acc.coverImage = hint.coverImage;
+    }
 
     acc.synonyms = mergeSynonyms(acc.synonyms, hint.synonyms);
     acc.relationPrequelIds = mergeRelationIds(acc.relationPrequelIds, hint.relationPrequelIds);
@@ -93,5 +96,6 @@ export const mergeMetadataHints = (
     startYear: null,
     format: null,
     relationPrequelIds: null,
+    coverImage: null,
   });
 };

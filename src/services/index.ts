@@ -291,7 +291,16 @@ export const createApiImplementation = (): Ani2arrApi => {
 
     async prefetchAniListMedia(ids) {
       const map = await anilistApiService.fetchMediaBatch(ids);
-      return Array.from(map.entries());
+      return Array.from(map.entries()) as Array<[number, AniMedia]>;
+    },
+
+    async fetchAniListMedia(anilistId) {
+      if (typeof anilistId !== 'number' || !Number.isFinite(anilistId) || anilistId <= 0) {
+        return null;
+      }
+      // Prefer cached media; background refresh will occur if stale.
+      const media = await anilistApiService.fetchMediaWithRelations(anilistId, { priority: 'high' });
+      return media ?? null;
     },
 
     async getStaticMapped(ids) {
@@ -314,7 +323,13 @@ export const createApiImplementation = (): Ani2arrApi => {
         sonarrLibrary.getLeanSeriesList(),
       ]);
       const libraryTvdbIds = library.map(s => s.tvdbId);
-      return { results, libraryTvdbIds };
+      const statsMap: Record<number, NonNullable<LeanSonarrSeries['statistics']>> = {};
+      for (const s of library) {
+        if (s.statistics) {
+          statsMap[s.tvdbId] = s.statistics;
+        }
+      }
+      return { results, libraryTvdbIds, ...(Object.keys(statsMap).length > 0 ? { statsMap } : {}) };
     },
 
     async validateTvdbId(input) {
