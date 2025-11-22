@@ -1,3 +1,4 @@
+// src/features/media-modal/components/media-modal-footer.tsx
 import type { ReactNode } from "react";
 
 export type FooterProps = {

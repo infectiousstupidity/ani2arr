@@ -1,3 +1,4 @@
+// src/features/media-modal/hooks/use-media-modal-state.ts
 import { useCallback, useState } from "react";
 
 import type { MediaMetadataHint } from "@/shared/types";

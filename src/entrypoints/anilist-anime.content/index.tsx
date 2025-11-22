@@ -318,7 +318,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
           initialTab={mediaModal.state.initialTab ?? 'series'}
           portalContainer={hostElement}
           mappingTabProps={modalProps.mappingTabProps}
-          sonarrTabProps={modalProps.sonarrTabProps}
+          sonarrPanelProps={modalProps.sonarrPanelProps}
         />
       )}
     </div>

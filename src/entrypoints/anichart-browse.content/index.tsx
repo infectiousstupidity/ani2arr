@@ -197,7 +197,7 @@ const BrowseRoot: React.FC<BrowseRootProps> = ({ portalContainer }) => {
           initialTab={mediaModal.state.initialTab ?? 'series'}
           portalContainer={portalContainer}
           mappingTabProps={modalProps.mappingTabProps}
-          sonarrTabProps={modalProps.sonarrTabProps}
+          sonarrPanelProps={modalProps.sonarrPanelProps}
         />
       )}
     </>

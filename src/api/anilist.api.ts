@@ -332,7 +332,8 @@ export class AnilistApiService {
       for (const id of ids) this.batchRunningIds.add(id);
       try {
         if (ids.length === 1) {
-          const single = await this.executeFetch(ids[0]);
+          const [firstId] = ids;
+          const single = firstId !== undefined ? await this.executeFetch(firstId) : null;
           return single ? [single] : [];
         }
         return await this.executeBatch(ids);

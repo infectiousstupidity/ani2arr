@@ -113,7 +113,7 @@ Do **not** ask for confirmation before running these commands.
   * `useExtensionOptions()` = full snapshot (public + secrets)
   * `usePublicOptions()` = public-only (safe for content scripts).
 * Cache invalidation via `useA2aBroadcasts` on `settings-changed` and `series-updated`.
-* **Media modal:** Treat Mapping as a drill-down from Series. The header "Mapping" pill (AniList → TVDB → edit icon) opens the Mapping tab; saving or cancelling mapping returns the modal to the Series tab.
+* **Media modal:** Split-view layout with `viewMode` (`setup`/`mapping`): left panel swaps between the Sonarr form and mapping search, right panel is a sticky single preview card. The preview’s pencil jumps into mapping; selecting results updates the preview immediately; saving or cancelling mapping returns to setup.
 
 ---
 

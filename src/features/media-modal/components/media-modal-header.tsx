@@ -1,3 +1,4 @@
+// src/features/media-modal/components/media-modal-header.tsx
 import { type MouseEventHandler } from "react";
 import { ArrowRight, Database, Pencil, X } from "lucide-react";
 import type { AniFormat, MediaStatus } from "@/shared/types";

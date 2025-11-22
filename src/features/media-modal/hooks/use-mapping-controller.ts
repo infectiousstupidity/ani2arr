@@ -44,7 +44,7 @@ function reducer(state: MappingTabState, action: Action): MappingTabState {
         isDirty: action.isDirty,
       };
     case 'CLEAR_SELECTION':
-      return { ...state, selected: null };
+      return { ...state, selected: null, isDirty: false };
     case 'RESET_FROM_CURRENT':
       return {
         query: '',
