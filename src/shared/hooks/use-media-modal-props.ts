@@ -9,7 +9,7 @@ import type {
   SonarrLookupSeries,
   AniFormat,
 } from '@/shared/types';
-import type { MappingTabProps, SonarrTabProps } from '@/features/media-modal';
+import type { MappingTabProps, SonarrPanelProps } from '@/features/media-modal';
 import {
   useAddSeries,
   useAniListMedia,
@@ -30,7 +30,7 @@ export interface UseMediaModalPropsInput {
 
 export interface UseMediaModalPropsResult {
   mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'>;
-  sonarrTabProps: Omit<SonarrTabProps, 'controller'>;
+  sonarrPanelProps: Omit<SonarrPanelProps, 'controller'>;
   tvdbId: number | null;
   inLibrary: boolean;
   bannerImage: string | null;
@@ -164,7 +164,7 @@ export function useMediaModalProps(
     service: 'sonarr',
   };
 
-  const sonarrTabProps: Omit<SonarrTabProps, 'controller'> = {
+  const sonarrPanelProps: Omit<SonarrPanelProps, 'controller'> = {
     mode: 'add',
     anilistId,
     title,
@@ -192,7 +192,7 @@ export function useMediaModalProps(
 
   return {
     mappingTabProps,
-    sonarrTabProps,
+    sonarrPanelProps,
     tvdbId,
     inLibrary,
     bannerImage,

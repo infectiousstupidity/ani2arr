@@ -1,3 +1,4 @@
+// src/features/media-modal/components/multi-mapping-info.tsx
 import * as Tooltip from '@radix-ui/react-tooltip';
 
 interface MultiMappingInfoProps {

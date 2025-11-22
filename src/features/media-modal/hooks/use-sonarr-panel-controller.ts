@@ -1,14 +1,15 @@
+// src/features/media-modal/hooks/use-sonarr-panel-controller.ts
 import { useCallback, useMemo, useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 
 import type { SonarrFormState } from "@/shared/types";
-import type { SonarrTabMode, SonarrTabProps } from "..";
+import type { SonarrPanelBaseProps, SonarrPanelMode } from "../types";
 
-export interface UseSonarrTabControllerInput {
-  mode: SonarrTabMode;
+export interface UseSonarrPanelControllerInput {
+  mode: SonarrPanelMode;
   initialForm: SonarrFormState;
   defaultForm: SonarrFormState;
-  metadata: SonarrTabProps["metadata"];
+  metadata: SonarrPanelBaseProps["metadata"];
   title: string;
   tvdbId: number | null;
   disabled: boolean | undefined;
@@ -16,7 +17,7 @@ export interface UseSonarrTabControllerInput {
   onSaveDefaults(form: SonarrFormState): Promise<void>;
 }
 
-export interface UseSonarrTabControllerResult {
+export interface UseSonarrPanelControllerResult {
   form: UseFormReturn<SonarrFormState>;
   current: SonarrFormState;
 
@@ -60,9 +61,9 @@ function computePath(
   return `${normalizedRoot}/${normalizedTitle} [tvdb-${tvdbId}]`;
 }
 
-export function useSonarrTabController(
-  input: UseSonarrTabControllerInput,
-): UseSonarrTabControllerResult {
+export function useSonarrPanelController(
+  input: UseSonarrPanelControllerInput,
+): UseSonarrPanelControllerResult {
   const {
     mode,
     initialForm,

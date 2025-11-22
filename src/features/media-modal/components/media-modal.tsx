@@ -6,11 +6,16 @@ import { Footer } from "./media-modal-footer";
 import Button from "@/shared/components/button";
 import type { AniFormat, MediaStatus } from "@/shared/types";
 
-import MappingTab, { type MappingTabProps } from "../tabs/mapping-tab";
-import SonarrTab, { type SonarrTabProps } from "../tabs/sonarr-tab";
-import { useMappingController } from "../tabs/mapping-tab/hooks/use-mapping-controller";
-import { useSonarrTabController } from "../tabs/sonarr-tab/hooks/use-sonarr-tab-controller";
+import { ProviderSearchSection } from "./provider-search-section";
+import type { MappingTabProps } from "../types";
+import { MappingPreviewPanel } from "./mapping-preview-panel";
+import { SonarrPanel } from "./sonarr-panel";
+import type { SonarrPanelProps } from "../types";
+import { useMappingController } from "../hooks/use-mapping-controller";
+import { useSonarrPanelController } from "../hooks/use-sonarr-panel-controller";
 import { usePublicOptions } from "@/shared/hooks/use-api-queries";
+
+type MediaModalViewMode = "setup" | "mapping";
 
 export type MediaModalProps = {
   isOpen: boolean;
@@ -31,7 +36,7 @@ export type MediaModalProps = {
   portalContainer?: HTMLElement | ShadowRoot | null;
 
   mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'>;
-  sonarrTabProps: Omit<SonarrTabProps, 'controller'>;
+  sonarrPanelProps: Omit<SonarrPanelProps, 'controller'>;
 };
 
 export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
@@ -50,12 +55,13 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     initialTab = "series",
     portalContainer,
     mappingTabProps,
-    sonarrTabProps,
+    sonarrPanelProps,
   } = props;
 
   const [floatingPortalEl, setFloatingPortalEl] = useState<HTMLDivElement | null>(null);
 
-  const [activeTab, setActiveTab] = useState<MediaModalTabId>(initialTab ?? "series");
+  const initialViewMode: MediaModalViewMode = initialTab === "mapping" ? "mapping" : "setup";
+  const [viewMode, setViewMode] = useState<MediaModalViewMode>(initialViewMode);
 
   // Lift state up: manage controller logic in parent
   const mappingController = useMappingController({
@@ -65,16 +71,16 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     overrideActive: mappingTabProps.overrideActive,
   });
 
-  const sonarrController = useSonarrTabController({
-    mode: sonarrTabProps.mode,
-    initialForm: sonarrTabProps.initialForm,
-    defaultForm: sonarrTabProps.defaultForm,
-    metadata: sonarrTabProps.metadata,
-    title: sonarrTabProps.title,
-    tvdbId: sonarrTabProps.tvdbId,
-    disabled: sonarrTabProps.disabled,
-    onSubmit: sonarrTabProps.onSubmit,
-    onSaveDefaults: sonarrTabProps.onSaveDefaults,
+  const sonarrController = useSonarrPanelController({
+    mode: sonarrPanelProps.mode,
+    initialForm: sonarrPanelProps.initialForm,
+    defaultForm: sonarrPanelProps.defaultForm,
+    metadata: sonarrPanelProps.metadata,
+    title: sonarrPanelProps.title,
+    tvdbId: sonarrPanelProps.tvdbId,
+    disabled: sonarrPanelProps.disabled,
+    onSubmit: sonarrPanelProps.onSubmit,
+    onSaveDefaults: sonarrPanelProps.onSaveDefaults,
   });
 
   const publicOptions = usePublicOptions();
@@ -89,25 +95,38 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   }, []);
 
   const handleEnterMapping = useCallback(() => {
-    setActiveTab("mapping");
+    setViewMode("mapping");
   }, []);
 
   const handleMappingCancel = useCallback(() => {
     mappingController.resetToCurrent();
-    setActiveTab("series");
+    setViewMode("setup");
   }, [mappingController]);
 
   const handleMappingSubmit = useCallback(async () => {
     try {
       await mappingController.handleSubmit();
+      setViewMode("setup");
     } catch {
       // Leave the user in mapping mode if saving fails.
     }
   }, [mappingController]);
 
-  // Compute footer state directly in parent based on active tab
+  const effectiveCurrentMapping = mappingController.currentMapping ?? mappingTabProps.currentMapping ?? null;
+  const selectedMapping = mappingController.state.selected;
+
+  const previewMapping = useMemo(
+    () =>
+      viewMode === "mapping" && selectedMapping ? selectedMapping : effectiveCurrentMapping,
+    [effectiveCurrentMapping, selectedMapping, viewMode],
+  );
+
+  const isPreviewingSelection = viewMode === "mapping" && Boolean(selectedMapping);
+  const showResetPreview = viewMode === "mapping" && mappingController.canSubmit && Boolean(selectedMapping);
+
+  // Compute footer state directly in parent based on view mode
   const footerState = useMemo(() => {
-    if (activeTab === "mapping") {
+    if (viewMode === "mapping") {
       return {
         leftContent: mappingController.canRevert ? (
           <Button
@@ -136,7 +155,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     } else {
       return {
         leftContent:
-          sonarrTabProps.mode === "add" ? (
+          sonarrPanelProps.mode === "add" ? (
             <>
               <span className="mr-1 text-[11px] font-medium uppercase tracking-wide">
                 On add, also:
@@ -163,7 +182,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
               </button>
             </>
         ) : null,
-        primaryLabel: sonarrTabProps.mode === "edit" ? "Save series" : "Add series",
+        primaryLabel: sonarrPanelProps.mode === "edit" ? "Save series" : "Add series",
         primaryDisabled: !sonarrController.canSubmit,
         primaryLoading: sonarrController.isSubmitting,
         onPrimaryClick: () => {
@@ -179,13 +198,13 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
       };
     }
   }, [
-    activeTab,
+    viewMode,
     handleClose,
     handleMappingCancel,
     handleMappingSubmit,
     mappingController,
     sonarrController,
-    sonarrTabProps.mode,
+    sonarrPanelProps.mode,
   ]);
 
   const selectPortalContainer = floatingPortalEl ?? portalContainer ?? null;
@@ -219,26 +238,47 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           format={format}
           year={year}
           status={status}
-          activeTab={activeTab}
+          activeTab={viewMode === "mapping" ? "mapping" : "series"}
           onEnterMapping={handleEnterMapping}
           onExitMapping={handleMappingCancel}
           onClose={handleClose}
         />
-        {/* Content Area - flex-1 to take space, overflow-hidden to clip children, justify-start to align top */}
-        <div className="flex-1 overflow-y-auto px-8 py-6 flex flex-col justify-start">
-          <div style={{ display: activeTab === "mapping" ? "block" : "none" }} className="h-full">
-            <MappingTab
-              {...mappingTabProps}
-              controller={mappingController}
-              baseUrl={baseUrl}
-            />
-          </div>
-          <div style={{ display: activeTab === "series" ? "block" : "none" }} className="h-full">
-            <SonarrTab
-              {...sonarrTabProps}
-              controller={sonarrController}
-              portalContainer={selectPortalContainer}
-            />
+        {/* Content Area - split view, left panel scrolls, right panel stays sticky */}
+        <div className="flex-1 overflow-hidden px-8 pb-6">
+          <div className="mx-auto flex h-full max-w-[1000px] flex-col gap-6">
+            <div className="grid h-full grid-cols-[3fr_2fr] gap-6">
+              <div className="flex h-full flex-col overflow-hidden">
+                <div className="flex-1 overflow-y-auto pr-1">
+                  {viewMode === "mapping" ? (
+                    <ProviderSearchSection
+                      controller={mappingController}
+                      currentMapping={effectiveCurrentMapping}
+                      baseUrl={baseUrl}
+                    />
+                  ) : (
+                    <SonarrPanel
+                      {...sonarrPanelProps}
+                      controller={sonarrController}
+                      portalContainer={selectPortalContainer}
+                    />
+                  )}
+                </div>
+              </div>
+              <div className="relative h-full">
+                <div className="sticky top-0">
+                  <MappingPreviewPanel
+                    aniListEntry={mappingTabProps.aniListEntry}
+                    otherAniListIds={mappingTabProps.otherAniListIds}
+                    baseUrl={baseUrl}
+                    mapping={previewMapping}
+                    isPreviewingSelection={isPreviewingSelection}
+                    showResetPreview={showResetPreview}
+                    onResetPreview={mappingController.clearSelection}
+                    onEditMapping={handleEnterMapping}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

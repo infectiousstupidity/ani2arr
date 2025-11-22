@@ -1,21 +1,18 @@
-// src/features/media-modal/tabs/sonarr-tab/sonarr-tab-layout.tsx
+// src/features/media-modal/components/sonarr-panel.tsx
 import SonarrForm from "@/shared/components/sonarr-form";
-import type { SonarrTabMode, SonarrTabProps } from ".";
-import type { UseSonarrTabControllerResult } from "./hooks/use-sonarr-tab-controller";
+import type { SonarrPanelProps } from "../types";
 
-export interface SonarrTabLayoutProps {
-  mode: SonarrTabMode;
-  title: string;
-  tvdbId: number | null;
-  controller: UseSonarrTabControllerResult;
-  metadata: SonarrTabProps["metadata"];
-  sonarrReady: boolean;
-  disabled?: boolean;
-  portalContainer?: HTMLElement | ShadowRoot | null;
-}
-
-export function SonarrTabLayout(props: SonarrTabLayoutProps): React.JSX.Element {
-  const { mode, title, tvdbId, controller, metadata, sonarrReady, disabled, portalContainer } = props;
+export function SonarrPanel(props: SonarrPanelProps): React.JSX.Element {
+  const {
+    mode,
+    title,
+    tvdbId,
+    controller,
+    metadata,
+    sonarrReady,
+    disabled,
+    portalContainer,
+  } = props;
 
   if (!sonarrReady || !metadata) {
     return (
@@ -35,7 +32,7 @@ export function SonarrTabLayout(props: SonarrTabLayoutProps): React.JSX.Element 
       <SonarrForm
         form={controller.form}
         metadata={ensuredMetadata}
-        disabled={disabled || !sonarrReady}
+        disabled={Boolean(disabled) || !sonarrReady}
         portalContainer={portalContainer ?? null}
         computedPath={controller.computedPath}
         pathHintTitle={title}
