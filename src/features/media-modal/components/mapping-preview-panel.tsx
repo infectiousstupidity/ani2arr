@@ -23,8 +23,6 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
     baseUrl,
     mapping,
     isPreviewingSelection,
-    showResetPreview,
-    onResetPreview,
     onEditMapping,
   } = props;
 
@@ -54,16 +52,6 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
           <Pencil className="h-4 w-4" />
         </button>
       </div>
-
-      {showResetPreview ? (
-        <button
-          type="button"
-          onClick={onResetPreview}
-          className="text-xs font-semibold text-accent-primary hover:text-accent-hover"
-        >
-          Reset to original
-        </button>
-      ) : null}
 
       <MappingPreviewCard
         mapping={mapping}

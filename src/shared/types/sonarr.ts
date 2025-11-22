@@ -25,11 +25,19 @@ export interface SonarrSeries {
   episodeFileCount?: number;
   sizeOnDisk?: number;
   path?: string;
+  rootFolderPath?: string;
+  folder?: string;
   qualityProfileId?: number;
   languageProfileId?: number;
   seasons?: unknown[];
+  seasonFolder?: boolean;
+  monitorNewItems?: 'all' | 'none';
+  addOptions?: {
+    searchForMissingEpisodes?: boolean;
+    monitor?: SonarrMonitorOption;
+  };
   seriesType?: 'standard' | 'anime' | 'daily';
-  tags?: unknown[];
+  tags?: number[];
   added?: string;
   overview?: string;
   previousAiring?: string | null;

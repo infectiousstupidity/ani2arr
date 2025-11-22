@@ -33,6 +33,7 @@ export interface SonarrPanelBaseProps {
   anilistId: number;
   title: string;
   tvdbId: number | null;
+  folderSlug?: string | null;
 
   initialForm: SonarrFormState;
   defaultForm: SonarrFormState;

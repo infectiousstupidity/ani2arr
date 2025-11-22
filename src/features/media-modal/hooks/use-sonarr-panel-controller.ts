@@ -1,5 +1,5 @@
 // src/features/media-modal/hooks/use-sonarr-panel-controller.ts
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 
 import type { SonarrFormState } from "@/shared/types";
@@ -12,6 +12,7 @@ export interface UseSonarrPanelControllerInput {
   metadata: SonarrPanelBaseProps["metadata"];
   title: string;
   tvdbId: number | null;
+  folderSlug?: string | null;
   disabled: boolean | undefined;
   onSubmit(form: SonarrFormState): Promise<void>;
   onSaveDefaults(form: SonarrFormState): Promise<void>;
@@ -42,10 +43,20 @@ function normalizePathSegment(segment: string): string {
   return trimmed.replace(/\s+/g, " ");
 }
 
+function buildSlug(title: string, tvdbId: number | null): string | null {
+  if (!title) return null;
+  const normalizedTitle = normalizePathSegment(title);
+  if (!normalizedTitle) return null;
+  if (tvdbId == null) return normalizedTitle;
+  return `${normalizedTitle} [tvdb-${tvdbId}]`;
+}
+
 function computePath(
   rootFolderPath: string,
   title: string,
   tvdbId: number | null,
+  mode: SonarrPanelMode,
+  folderSlug?: string | null,
 ): string | null {
   if (!rootFolderPath || !title || tvdbId == null) {
     return null;
@@ -56,9 +67,10 @@ function computePath(
       ? rootFolderPath.slice(0, -1)
       : rootFolderPath;
 
-  const normalizedTitle = normalizePathSegment(title);
+  const slug = mode === "edit" && folderSlug ? folderSlug : buildSlug(title, tvdbId);
+  if (!slug) return null;
 
-  return `${normalizedRoot}/${normalizedTitle} [tvdb-${tvdbId}]`;
+  return `${normalizedRoot}/${slug}`;
 }
 
 export function useSonarrPanelController(
@@ -71,6 +83,7 @@ export function useSonarrPanelController(
     metadata,
     title,
     tvdbId,
+    folderSlug,
     disabled,
     onSubmit,
     onSaveDefaults,
@@ -83,6 +96,10 @@ export function useSonarrPanelController(
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDefaults, setIsSavingDefaults] = useState(false);
+
+  useEffect(() => {
+    form.reset(initialForm);
+  }, [form, initialForm, mode]);
 
   const current = form.watch();
 
@@ -122,8 +139,8 @@ export function useSonarrPanelController(
   }, [current, defaultForm]);
 
   const computedPath = useMemo(
-    () => computePath(current.rootFolderPath, title, tvdbId),
-    [current.rootFolderPath, title, tvdbId],
+    () => computePath(current.rootFolderPath, title, tvdbId, mode, folderSlug),
+    [current.rootFolderPath, folderSlug, mode, title, tvdbId],
   );
 
   const handleFieldChange = useCallback(
