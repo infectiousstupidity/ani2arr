@@ -12,6 +12,7 @@ import type {
   PublicOptions,
   SonarrFormState,
   SonarrSecrets,
+  TitleLanguage,
 } from '@/shared/types';
 
 const getDefaultFormState = (): SonarrFormState => ({
@@ -24,9 +25,12 @@ const getDefaultFormState = (): SonarrFormState => ({
   tags: [],
 });
 
+const DEFAULT_TITLE_LANGUAGE: TitleLanguage = 'english';
+
 const createDefaultPublicOptions = (): PublicOptions => ({
   sonarrUrl: '',
   defaults: getDefaultFormState(),
+  titleLanguage: DEFAULT_TITLE_LANGUAGE,
   isConfigured: false,
 });
 
@@ -73,6 +77,7 @@ export async function getExtensionOptionsSnapshot(): Promise<ExtensionOptions> {
     sonarrUrl: pub.sonarrUrl,
     sonarrApiKey: secrets.apiKey,
     defaults: mergeDefaults(pub).defaults,
+    titleLanguage: pub.titleLanguage ?? DEFAULT_TITLE_LANGUAGE,
   };
 }
 
@@ -103,10 +108,16 @@ export async function setExtensionOptionsSnapshot(options: ExtensionOptions): Pr
     apiKey = apiKey.trim();
   }
 
+  const titleLanguage: TitleLanguage =
+    sanitized.titleLanguage === 'romaji' || sanitized.titleLanguage === 'native'
+      ? sanitized.titleLanguage
+      : DEFAULT_TITLE_LANGUAGE;
+
   await Promise.all([
     publicOptions.setValue({
       sonarrUrl: normalizedUrl,
       defaults: sanitized.defaults,
+      titleLanguage,
       isConfigured: Boolean(normalizedUrl && apiKey),
     }),
     sonarrSecrets.setValue({ apiKey }),
@@ -122,6 +133,7 @@ export async function getPublicOptionsSnapshot(): Promise<PublicOptions> {
   return {
     sonarrUrl: pub.sonarrUrl,
     defaults: mergeDefaults(pub).defaults,
+    titleLanguage: pub.titleLanguage ?? DEFAULT_TITLE_LANGUAGE,
     isConfigured: pub.isConfigured,
   };
 }

@@ -23,6 +23,7 @@ export type {
   CheckSeriesStatusResponse,
   ExtensionOptions,
   PublicOptions,
+  TitleLanguage,
   SonarrSecrets,
   SonarrCredentialsPayload,
   SonarrFormState,

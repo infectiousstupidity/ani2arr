@@ -29,6 +29,7 @@ const getInitialOptions = (): ExtensionOptions => ({
     searchForMissingEpisodes: true,
     tags: [],
   },
+  titleLanguage: 'english',
 });
 
 const mergeOptionsWithDefaults = (options: ExtensionOptions): ExtensionOptions => {
@@ -40,6 +41,7 @@ const mergeOptionsWithDefaults = (options: ExtensionOptions): ExtensionOptions =
       ...base.defaults,
       ...options.defaults,
     },
+    titleLanguage: options.titleLanguage ?? base.titleLanguage,
   };
 };
 
@@ -83,7 +85,8 @@ export function useSettingsManager() {
       if (
         prev.sonarrUrl === completeOptions.sonarrUrl &&
         prev.sonarrApiKey === completeOptions.sonarrApiKey &&
-        defaultsEqual(prev.defaults, completeOptions.defaults)
+        defaultsEqual(prev.defaults, completeOptions.defaults) &&
+        prev.titleLanguage === completeOptions.titleLanguage
       ) {
         return prev;
       }

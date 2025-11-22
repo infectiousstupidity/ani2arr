@@ -6,7 +6,13 @@ import Button from './button';
 import SonarrForm from './sonarr-form';
 import { CircleCheck, CircleX, RotateCcw } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import type { SonarrFormState } from '@/shared/types';
+import type { SonarrFormState, TitleLanguage } from '@/shared/types';
+
+const titleLanguageOptions: Array<{ value: TitleLanguage; label: string }> = [
+  { value: 'english', label: 'English (default)' },
+  { value: 'romaji', label: 'Romaji' },
+  { value: 'native', label: 'Native' },
+];
 
 function SettingsForm(): React.JSX.Element {
   const manager = useSettingsManager();
@@ -93,6 +99,24 @@ function SettingsForm(): React.JSX.Element {
                 placeholder="Sonarr API key"
                 disabled={manager.isConnected}
               />
+            </FormControl>
+          </FormItem>
+        </FormField>
+        <FormField>
+          <FormItem>
+            <FormLabel>Preferred title language</FormLabel>
+            <FormControl>
+              <select
+                value={manager.formState.titleLanguage}
+                onChange={e => manager.handleFieldChange('titleLanguage', e.target.value as TitleLanguage)}
+                className="w-full rounded-md border border-border-primary bg-bg-tertiary px-3 py-2 text-sm text-text-primary focus:border-accent-primary focus:outline-none"
+              >
+                {titleLanguageOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </FormControl>
           </FormItem>
         </FormField>

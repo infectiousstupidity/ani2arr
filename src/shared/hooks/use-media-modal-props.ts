@@ -8,6 +8,8 @@ import type {
   SonarrFormState,
   SonarrLookupSeries,
   AniFormat,
+  AniTitles,
+  ExtensionOptions,
 } from '@/shared/types';
 import type { MappingTabProps, SonarrPanelProps } from '@/features/media-modal';
 import {
@@ -19,6 +21,7 @@ import {
   useUpdateDefaultSettings,
 } from './use-api-queries';
 import { toMappingSearchResultFromSonarr } from '@/shared/mapping/sonarr.adapter';
+import { resolveTitlePreference } from '@/shared/utils/title-preference';
 
 export interface UseMediaModalPropsInput {
   anilistId: number | undefined;
@@ -29,6 +32,9 @@ export interface UseMediaModalPropsInput {
 }
 
 export interface UseMediaModalPropsResult {
+  title: string;
+  alternateTitles: Array<{ label: string; value: string }>;
+  titleLanguage: NonNullable<ExtensionOptions['titleLanguage']>;
   mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'>;
   sonarrPanelProps: Omit<SonarrPanelProps, 'controller'>;
   tvdbId: number | null;
@@ -138,6 +144,31 @@ export function useMediaModalProps(
   const year: number | null =
     apiMedia?.seasonYear ?? apiMedia?.startDate?.year ?? metadata?.startYear ?? null;
   const status: MediaStatus | null = apiMedia?.status ?? null;
+  const preferredTitleLanguage: NonNullable<ExtensionOptions['titleLanguage']> =
+    options?.titleLanguage ?? 'english';
+
+  const pickTitle = (...values: Array<string | null | undefined>): string | undefined => {
+    for (const value of values) {
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value;
+      }
+    }
+    return undefined;
+  };
+
+  const resolvedTitles: AniTitles = {};
+  const _english = pickTitle(apiMedia?.title?.english, metadata?.titles?.english);
+  if (typeof _english === 'string') resolvedTitles.english = _english;
+  const _romaji = pickTitle(apiMedia?.title?.romaji, metadata?.titles?.romaji, title);
+  if (typeof _romaji === 'string') resolvedTitles.romaji = _romaji;
+  const _native = pickTitle(apiMedia?.title?.native, metadata?.titles?.native);
+  if (typeof _native === 'string') resolvedTitles.native = _native;
+
+  const resolvedTitle = resolveTitlePreference({
+    titles: resolvedTitles,
+    preferred: preferredTitleLanguage,
+    fallback: title ?? null,
+  });
 
   const sonarrMetadataQuery = useSonarrMetadata({
     enabled: sonarrReady && isOpen,
@@ -155,7 +186,7 @@ export function useMediaModalProps(
   const mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'> = {
     aniListEntry: {
       id: anilistId,
-      title: title,
+      title: resolvedTitle.primary,
       ...(coverImage ? { posterUrl: coverImage } : {}),
     },
     currentMapping: deriveCurrentMappingFromStatus(statusQuery.data, 'sonarr', options?.sonarrUrl),
@@ -167,7 +198,7 @@ export function useMediaModalProps(
   const sonarrPanelProps: Omit<SonarrPanelProps, 'controller'> = {
     mode: 'add',
     anilistId,
-    title,
+    title: resolvedTitle.primary,
     tvdbId,
     initialForm: defaultForm,
     defaultForm,
@@ -179,8 +210,8 @@ export function useMediaModalProps(
       if (!sonarrReady) return;
       await addSeriesMutation.mutateAsync({
         anilistId,
-        title,
-        primaryTitleHint: title,
+        title: resolvedTitle.primary,
+        primaryTitleHint: resolvedTitle.primary,
         metadata: metadata ?? null,
         form,
       });
@@ -200,5 +231,8 @@ export function useMediaModalProps(
     format,
     year,
     status,
+    title: resolvedTitle.primary,
+    alternateTitles: resolvedTitle.alternates,
+    titleLanguage: preferredTitleLanguage,
   };
 }

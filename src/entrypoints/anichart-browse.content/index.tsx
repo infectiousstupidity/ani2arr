@@ -185,7 +185,9 @@ const BrowseRoot: React.FC<BrowseRootProps> = ({ portalContainer }) => {
         <MediaModal
           isOpen={mediaModal.state.isOpen}
           onClose={mediaModal.reset}
-          title={mediaModal.state.title}
+          title={modalProps.title}
+          alternateTitles={modalProps.alternateTitles}
+          titleLanguage={modalProps.titleLanguage}
           bannerImage={modalProps.bannerImage}
           coverImage={modalProps.coverImage}
           anilistIds={[mediaModal.state.anilistId]}

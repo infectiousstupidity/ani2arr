@@ -1,12 +1,15 @@
 // src/features/media-modal/components/media-modal-header.tsx
 import { type MouseEventHandler } from "react";
 import { ArrowRight, Database, Pencil, X } from "lucide-react";
-import type { AniFormat, MediaStatus } from "@/shared/types";
+import TooltipWrapper from "@/shared/components/tooltip";
+import type { AniFormat, MediaStatus, TitleLanguage } from "@/shared/types";
 
 export type MediaModalTabId = "series" | "mapping";
 
 export type HeaderProps = {
   title: string;
+  alternateTitles: Array<{ label: string; value: string }>;
+  titleLanguage: TitleLanguage;
   bannerImage: string | null;
   coverImage: string | null;
   anilistIds: number[];
@@ -20,6 +23,7 @@ export type HeaderProps = {
   onEnterMapping: () => void;
   onExitMapping: () => void;
   onClose: MouseEventHandler<HTMLButtonElement>;
+  tooltipContainer?: HTMLElement | null;
 };
 
 function formatAniListIds(anilistIds: number[]): string {
@@ -47,6 +51,8 @@ function statusTone(status?: MediaStatus | null): "success" | "warning" | "info"
 export function Header(props: HeaderProps): React.JSX.Element {
   const {
     title,
+    alternateTitles,
+    titleLanguage,
     bannerImage,
     coverImage,
     anilistIds,
@@ -59,6 +65,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
     onEnterMapping,
     onExitMapping,
     onClose,
+    tooltipContainer,
   } = props;
 
   const aniDisplay = formatAniListIds(anilistIds);
@@ -66,6 +73,18 @@ export function Header(props: HeaderProps): React.JSX.Element {
   const yearLabel = year ?? null;
   const statusLabel = formatMediaStatus(status);
   const currentTone = statusTone(status);
+  const hasAlternateTitles = alternateTitles.length > 0;
+  const tooltipPortal = tooltipContainer ?? null;
+
+  const titleNode = (
+    <h1
+      className={`truncate text-xl font-semibold tracking-tight text-text-primary drop-shadow-lg ${
+        hasAlternateTitles ? "cursor-help" : ""
+      }`}
+    >
+      {title}
+    </h1>
+  );
 
   return (
     <header className="relative">
@@ -107,9 +126,32 @@ export function Header(props: HeaderProps): React.JSX.Element {
 
             <div className="min-w-0 flex-1 space-y-3">
               <div className="flex flex-wrap items-start gap-3">
-                <h1 className="truncate text-xl font-semibold tracking-tight text-text-primary drop-shadow-lg">
-                  {title}
-                </h1>
+                {hasAlternateTitles ? (
+                  <TooltipWrapper
+                    content={(
+                      <div className="space-y-1">
+                        {alternateTitles.map(alt => (
+                          <div key={`${titleLanguage}-${alt.label}`} className="space-y-0.5">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                              {alt.label}
+                            </div>
+                            <div className="text-sm text-white leading-tight">
+                              {alt.value}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    side="top"
+                    align="start"
+                    sideOffset={10}
+                    container={tooltipPortal}
+                  >
+                    {titleNode}
+                  </TooltipWrapper>
+                ) : (
+                  titleNode
+                )}
                 {formatLabel ? (
                   <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/80 shadow-sm">
                     {formatLabel}
