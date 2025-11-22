@@ -1,5 +1,5 @@
 // src/features/media-modal/components/provider-search-section.tsx
-import { ExternalLink, X } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import type { MappingSearchResult } from "@/shared/types";
 import { buildExternalMediaLink } from "@/shared/utils/build-external-media-link";
 import type { UseMappingControllerResult } from "../hooks/use-mapping-controller";
@@ -8,10 +8,11 @@ interface ProviderSearchSectionProps {
   controller: UseMappingControllerResult;
   currentMapping: MappingSearchResult | null;
   baseUrl: string;
+  hideHeader?: boolean;
 }
 
 export function ProviderSearchSection(props: ProviderSearchSectionProps) {
-  const { controller, currentMapping, baseUrl } = props;
+  const { controller, currentMapping, baseUrl, hideHeader = false } = props;
   const { state, setQuery, selectResult, clearSelection, searchQuery } = controller;
   const results = searchQuery.data ?? [];
   const selected = state.selected;
@@ -19,25 +20,27 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
 
   return (
     <div className="flex h-full flex-col gap-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-            Mapping search
-          </p>
-          <p className="text-xs text-text-secondary">
-            Find the right TVDB entry; your selection updates the preview on the right.
-          </p>
+      {!hideHeader ? (
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
+              Mapping search
+            </p>
+            <p className="text-xs text-text-secondary">
+              Find the right TVDB entry; your selection updates the preview on the right.
+            </p>
+          </div>
+          {selected ? (
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="text-xs font-semibold text-accent-primary hover:text-accent-hover"
+            >
+              Clear
+            </button>
+          ) : null}
         </div>
-        {selected ? (
-          <button
-            type="button"
-            onClick={clearSelection}
-            className="text-xs font-semibold text-accent-primary hover:text-accent-hover"
-          >
-            Clear
-          </button>
-        ) : null}
-      </div>
+      ) : null}
 
       <div className="space-y-2">
         <input
@@ -46,21 +49,6 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
           placeholder="Search Sonarr / TVDB"
           className="w-full rounded-lg border border-border-primary bg-bg-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-accent-primary focus:outline-none"
         />
-        {selected ? (
-          <div className="flex items-center gap-2 rounded-lg border border-accent-primary/30 bg-accent-primary/5 px-3 py-2 text-xs text-text-secondary">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-accent-primary">Previewing</span>
-            <span className="font-mono text-text-primary/80">TVDB {String(selected.target.id)}</span>
-            <span className="truncate text-text-primary">{selected.title}</span>
-            <button
-              type="button"
-              onClick={clearSelection}
-              className="ml-auto inline-flex items-center justify-center rounded-full border border-accent-primary/30 p-1 text-accent-primary hover:bg-accent-primary/10"
-              aria-label="Reset selection"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ) : null}
       </div>
 
       <div className="flex-1 overflow-hidden rounded-xl border border-border-primary bg-bg-tertiary/80 shadow-inner">

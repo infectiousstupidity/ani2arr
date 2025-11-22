@@ -17,11 +17,12 @@ import type {
   ExtensionError,
   SonarrCredentialsPayload,
   CheckSeriesStatusPayload,
+  SonarrSeries,
   RequestPriority,
 } from '@/shared/types';
 import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/shared/utils/storage';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
-import type { MappingOutput } from '@/rpc/schemas';
+import type { MappingOutput, UpdateSonarrInput } from '@/rpc/schemas';
 import { type Ani2arrApi } from '@/rpc';
 
 function bindAll<T extends object>(instance: T): T {
@@ -50,6 +51,54 @@ const initializeEpoch = async (key: 'libraryEpoch' | 'settingsEpoch'): Promise<n
     logError(normalizeError(error), `Ani2arrApi:initEpoch:${key}`);
   }
   return 0;
+};
+
+const trimTrailingSeparators = (input: string): string => input.replace(/[\\/]+$/, '').trim();
+
+const normalizePathForCompare = (input?: string | null): string | null => {
+  if (!input) return null;
+  return trimTrailingSeparators(input).replace(/\\/g, '/').toLowerCase();
+};
+
+const extractFolderSlug = (path?: string | null, rootFolderPath?: string | null): string | null => {
+  if (!path) return null;
+  const normalizedPath = trimTrailingSeparators(path).replace(/\\/g, '/');
+  const normalizedRoot = rootFolderPath ? trimTrailingSeparators(rootFolderPath).replace(/\\/g, '/') : null;
+
+  if (normalizedRoot && normalizedPath.toLowerCase().startsWith(normalizedRoot.toLowerCase())) {
+    const remainder = normalizedPath.slice(normalizedRoot.length).replace(/^\/+/, '');
+    if (remainder.length > 0) return remainder;
+  }
+
+  const segments = normalizedPath.split('/');
+  const last = segments[segments.length - 1];
+  return last?.length ? last : null;
+};
+
+const sanitizeFolderSegment = (segment: string): string => {
+  const replaced = segment.replace(/[\\/]+/g, ' ').trim();
+  return replaced.replace(/\s+/g, ' ');
+};
+
+const buildFolderSlug = (series: SonarrSeries, fallbackTitle: string): string => {
+  const fromPath = extractFolderSlug(series.path, series.rootFolderPath);
+  if (fromPath) return fromPath;
+  if (series.folder && series.folder.trim()) return series.folder.trim();
+  if (series.titleSlug && series.titleSlug.trim()) return series.titleSlug.trim();
+
+  const baseTitle = sanitizeFolderSegment(series.title || fallbackTitle || 'Series');
+  const tvdbPart =
+    typeof series.tvdbId === 'number' && Number.isFinite(series.tvdbId)
+      ? ` [tvdb-${series.tvdbId}]`
+      : '';
+  return `${baseTitle}${tvdbPart}`;
+};
+
+const joinRootAndSlug = (rootFolderPath: string, slug: string): string => {
+  const normalizedRoot = trimTrailingSeparators(rootFolderPath);
+  if (!normalizedRoot) return slug;
+  const separator = normalizedRoot.includes('\\') ? '\\' : '/';
+  return `${normalizedRoot}${separator}${slug}`;
 };
 
 export const createApiImplementation = (): Ani2arrApi => {
@@ -237,6 +286,85 @@ export const createApiImplementation = (): Ani2arrApi => {
       await sonarrLibrary.refreshCache(options);
       await bumpLibraryEpoch({ tvdbId: created.tvdbId });
       return created;
+    },
+
+    async updateSonarrSeries(input: UpdateSonarrInput) {
+      const { credentials, options } = await ensureConfigured();
+
+      if (!input.tvdbId || !Number.isFinite(input.tvdbId)) {
+        throw createError(
+          ErrorCode.VALIDATION_ERROR,
+          'Missing or invalid TVDB ID for update.',
+          'Unable to update this series because its TVDB ID is unknown.',
+        );
+      }
+
+      const existing = await sonarrApiService.getSeriesByTvdbId(input.tvdbId, credentials);
+      if (!existing) {
+        throw createError(
+          ErrorCode.VALIDATION_ERROR,
+          `Series with TVDB ID ${input.tvdbId} not found in Sonarr.`,
+          'Cannot edit because this series is not present in your Sonarr library.',
+        );
+      }
+
+      let baseSeries: SonarrSeries = existing;
+      try {
+        baseSeries = await sonarrApiService.getSeriesById(existing.id, credentials);
+      } catch (error) {
+        const normalized = normalizeError(error);
+        logError(normalized, `Ani2arrApi:updateSeries:fetch:${input.tvdbId}`);
+      }
+
+      const resolvedQualityId =
+        typeof input.form.qualityProfileId === 'number' && Number.isFinite(input.form.qualityProfileId)
+          ? input.form.qualityProfileId
+          : typeof baseSeries.qualityProfileId === 'number' && Number.isFinite(baseSeries.qualityProfileId)
+            ? baseSeries.qualityProfileId
+            : typeof options.defaults.qualityProfileId === 'number' && Number.isFinite(options.defaults.qualityProfileId)
+              ? options.defaults.qualityProfileId
+              : undefined;
+
+      const resolvedTags = Array.isArray(input.form.tags)
+        ? input.form.tags.map(tag => Number(tag)).filter(tag => Number.isFinite(tag))
+        : Array.isArray(baseSeries.tags)
+          ? baseSeries.tags.filter((tag): tag is number => typeof tag === 'number')
+          : [];
+
+      const resolvedRoot = input.form.rootFolderPath || baseSeries.rootFolderPath || '';
+      const slug = buildFolderSlug(baseSeries, input.title);
+      const nextPath = joinRootAndSlug(resolvedRoot, slug);
+
+      const currentPathNormalized = normalizePathForCompare(baseSeries.path);
+      const nextPathNormalized = normalizePathForCompare(nextPath);
+      const moveFiles =
+        currentPathNormalized !== null &&
+        nextPathNormalized !== null &&
+        currentPathNormalized !== nextPathNormalized;
+
+      const monitored = (input.form.monitorOption ?? options.defaults.monitorOption) !== 'none';
+
+      const resolvedSeriesType = input.form.seriesType ?? baseSeries.seriesType ?? options.defaults.seriesType;
+
+      const mergedSeries: SonarrSeries = {
+        ...baseSeries,
+        ...(resolvedQualityId !== undefined ? { qualityProfileId: resolvedQualityId } : {}),
+        rootFolderPath: resolvedRoot,
+        path: nextPath,
+        seasonFolder: input.form.seasonFolder,
+        seriesType: resolvedSeriesType,
+        monitored,
+        tags: resolvedTags,
+      };
+
+      const updated = await sonarrApiService.updateSeries(baseSeries.id, mergedSeries, credentials, {
+        moveFiles,
+      });
+
+      await sonarrLibrary.refreshCache(options);
+      await bumpLibraryEpoch({ tvdbId: updated.tvdbId, action: 'updated' });
+
+      return updated;
     },
 
     async notifySettingsChanged() {

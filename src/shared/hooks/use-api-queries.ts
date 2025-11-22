@@ -23,7 +23,7 @@ import type {
   SonarrSeries,
   TestConnectionPayload,
 } from '@/shared/types';
-import type { AddInput, StatusInput, SetMappingOverrideInput, ClearMappingOverrideInput } from '@/rpc/schemas';
+import type { AddInput, UpdateSonarrInput, StatusInput, SetMappingOverrideInput, ClearMappingOverrideInput } from '@/rpc/schemas';
 import { normalizeError } from '@/shared/utils/error-handling';
 
 const rootQueryKey = ['a2a'] as const;
@@ -289,6 +289,22 @@ export const useAddSeries = () => {
       }
     },
     onSuccess: (_createdSeries, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
+    },
+  });
+};
+
+export const useUpdateSeries = () => {
+  const queryClient = useQueryClient();
+  return useMutation<SonarrSeries, ExtensionError, UpdateSonarrInput>({
+    mutationFn: async (input: UpdateSonarrInput) => {
+      try {
+        return await getAni2arrApi().updateSonarrSeries(input);
+      } catch (error) {
+        throw normalizeError(error);
+      }
+    },
+    onSuccess: (_updatedSeries, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
     },
   });

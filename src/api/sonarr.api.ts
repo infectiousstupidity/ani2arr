@@ -168,6 +168,13 @@ export class SonarrApiService {
     return seriesArray[0] ?? null;
   };
 
+  public getSeriesById = async (
+    seriesId: number,
+    credentials: SonarrCredentialsPayload,
+  ): Promise<SonarrSeries> => {
+    return this.request<SonarrSeries>(`series/${seriesId}`, credentials);
+  };
+
   public lookupSeriesByTerm = async (
     term: string,
     credentials: SonarrCredentialsPayload,
@@ -199,6 +206,25 @@ export class SonarrApiService {
     return this.request<SonarrSeries>('series', sonarrCreds, {
       method: 'POST',
       body: JSON.stringify(apiPayload),
+    });
+  };
+
+  public updateSeries = async (
+    seriesId: number,
+    payload: SonarrSeries,
+    credentials: SonarrCredentialsPayload,
+    options?: { moveFiles?: boolean },
+  ): Promise<SonarrSeries> => {
+    const qs = new URLSearchParams();
+    if (options?.moveFiles) {
+      qs.set('moveFiles', 'true');
+    }
+    const endpoint = qs.size > 0 ? `series/${seriesId}?${qs.toString()}` : `series/${seriesId}`;
+
+    log.debug('Sending updateSeries payload to Sonarr:', { seriesId, moveFiles: options?.moveFiles, payload });
+    return this.request<SonarrSeries>(endpoint, credentials, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
     });
   };
 

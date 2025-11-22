@@ -1,4 +1,5 @@
 // src/shared/hooks/use-media-modal-props.ts
+import { useMemo } from 'react';
 import type {
   CheckSeriesStatusResponse,
   MappingSearchResult,
@@ -7,6 +8,7 @@ import type {
   MediaService,
   SonarrFormState,
   SonarrLookupSeries,
+  SonarrSeries,
   AniFormat,
   AniTitles,
   ExtensionOptions,
@@ -19,6 +21,7 @@ import {
   useSeriesStatus,
   useSonarrMetadata,
   useUpdateDefaultSettings,
+  useUpdateSeries,
 } from './use-api-queries';
 import { toMappingSearchResultFromSonarr } from '@/shared/mapping/sonarr.adapter';
 import { resolveTitlePreference } from '@/shared/utils/title-preference';
@@ -55,6 +58,61 @@ const defaultFormState: SonarrFormState = {
   searchForMissingEpisodes: true,
   tags: [],
 };
+
+const trimTrailingSeparators = (input: string): string => input.replace(/[\\/]+$/, '').trim();
+
+const extractSlugFromPath = (path?: string | null, rootFolderPath?: string | null): string | null => {
+  if (!path) return null;
+  const normalizedPath = trimTrailingSeparators(path).replace(/\\/g, '/');
+  const normalizedRoot = rootFolderPath ? trimTrailingSeparators(rootFolderPath).replace(/\\/g, '/') : null;
+
+  if (normalizedRoot && normalizedPath.toLowerCase().startsWith(normalizedRoot.toLowerCase())) {
+    const remainder = normalizedPath.slice(normalizedRoot.length).replace(/^\/+/, '');
+    if (remainder.length > 0) return remainder;
+  }
+
+  const segments = normalizedPath.split('/');
+  const last = segments[segments.length - 1];
+  return last?.length ? last : null;
+};
+
+const sanitizePathSegment = (segment: string): string => segment.replace(/[\\/]+/g, ' ').trim().replace(/\s+/g, ' ');
+
+const deriveFolderSlug = (series: SonarrSeries | null | undefined): string | null => {
+  if (!series) return null;
+
+  const slugFromPath = extractSlugFromPath(series.path, series.rootFolderPath);
+  if (slugFromPath) return slugFromPath;
+  if (series.folder && series.folder.trim()) return series.folder.trim();
+  if (series.titleSlug && series.titleSlug.trim()) return series.titleSlug.trim();
+
+  const title = sanitizePathSegment(series.title ?? '');
+  if (!title) return null;
+  const suffix =
+    typeof series.tvdbId === 'number' && Number.isFinite(series.tvdbId)
+      ? ` [tvdb-${series.tvdbId}]`
+      : '';
+  return `${title}${suffix}`;
+};
+
+const deriveRootFromSeries = (series: SonarrSeries | null | undefined, slug?: string | null): string | null => {
+  if (!series) return null;
+  if (series.rootFolderPath && series.rootFolderPath.trim()) return series.rootFolderPath;
+  if (!series.path || !series.path.trim()) return null;
+
+  const normalizedPath = trimTrailingSeparators(series.path);
+  if (slug && normalizedPath.toLowerCase().endsWith(slug.toLowerCase())) {
+    const candidate = normalizedPath.slice(0, normalizedPath.length - slug.length);
+    return trimTrailingSeparators(candidate);
+  }
+
+  const lastSlash = Math.max(normalizedPath.lastIndexOf('/'), normalizedPath.lastIndexOf('\\'));
+  if (lastSlash === -1) return null;
+  return normalizedPath.slice(0, lastSlash);
+};
+
+const isFullSonarrSeries = (series: unknown): series is SonarrSeries =>
+  Boolean(series && typeof series === 'object' && ('path' in (series as Record<string, unknown>) || 'rootFolderPath' in (series as Record<string, unknown>)));
 
 function deriveCurrentMappingFromStatus(
   status: CheckSeriesStatusResponse | null | undefined,
@@ -134,11 +192,12 @@ export function useMediaModalProps(
   const bannerImage = apiMedia?.bannerImage ?? null;
 
   const addSeriesMutation = useAddSeries();
+  const updateSeriesMutation = useUpdateSeries();
   const sonarrReady = isConfigured;
 
   const mappingUnavailable = statusQuery.data?.anilistTvdbLinkMissing === true;
   const tvdbId = mappingUnavailable ? null : statusQuery.data?.tvdbId ?? null;
-  const inLibrary = Boolean(statusQuery.data?.exists || addSeriesMutation.isSuccess);
+  const inLibrary = Boolean(statusQuery.data?.exists || addSeriesMutation.isSuccess || updateSeriesMutation.isSuccess);
 
   const format: AniFormat | null = apiMedia?.format ?? metadata?.format ?? null;
   const year: number | null =
@@ -177,6 +236,38 @@ export function useMediaModalProps(
   const updateDefaultsMutation = useUpdateDefaultSettings();
 
   const defaultForm: SonarrFormState = options?.defaults ?? defaultFormState;
+  const panelMode: 'add' | 'edit' = sonarrReady && statusQuery.data?.exists ? 'edit' : 'add';
+
+  const seriesFromStatus = statusQuery.data?.series;
+  const fullSeries = isFullSonarrSeries(seriesFromStatus) ? seriesFromStatus : null;
+  const folderSlug = deriveFolderSlug(fullSeries);
+  const resolvedRootFolder = deriveRootFromSeries(fullSeries, folderSlug) ?? defaultForm.rootFolderPath;
+
+  const initialForm: SonarrFormState = useMemo(() => {
+    if (panelMode === 'edit' && fullSeries) {
+      return {
+        ...defaultForm,
+        qualityProfileId:
+          typeof fullSeries.qualityProfileId === 'number' && Number.isFinite(fullSeries.qualityProfileId)
+            ? fullSeries.qualityProfileId
+            : defaultForm.qualityProfileId,
+        rootFolderPath: resolvedRootFolder,
+        seriesType: fullSeries.seriesType ?? defaultForm.seriesType,
+        monitorOption:
+          fullSeries.monitored === false
+            ? 'none'
+            : (fullSeries.addOptions?.monitor as SonarrFormState['monitorOption']) ?? defaultForm.monitorOption,
+        seasonFolder:
+          typeof fullSeries.seasonFolder === 'boolean' ? fullSeries.seasonFolder : defaultForm.seasonFolder,
+        searchForMissingEpisodes: defaultForm.searchForMissingEpisodes,
+        tags: Array.isArray(fullSeries.tags)
+          ? fullSeries.tags.filter((tag): tag is number => typeof tag === 'number')
+          : defaultForm.tags,
+      };
+    }
+
+    return defaultForm;
+  }, [defaultForm, fullSeries, panelMode, resolvedRootFolder]);
 
   // Return null if required data is missing (but allow modal to render even when closed)
   if (!anilistId || !title) {
@@ -196,25 +287,36 @@ export function useMediaModalProps(
   };
 
   const sonarrPanelProps: Omit<SonarrPanelProps, 'controller'> = {
-    mode: 'add',
+    mode: panelMode,
     anilistId,
     title: resolvedTitle.primary,
     tvdbId,
-    initialForm: defaultForm,
+    initialForm,
     defaultForm,
     metadata: sonarrMetadataQuery.data ?? null,
     sonarrReady,
     disabled: !sonarrReady || sonarrMetadataQuery.isPending || sonarrMetadataQuery.isError,
     portalContainer,
+    folderSlug: folderSlug ?? null,
     onSubmit: async (form: SonarrFormState) => {
       if (!sonarrReady) return;
-      await addSeriesMutation.mutateAsync({
-        anilistId,
-        title: resolvedTitle.primary,
-        primaryTitleHint: resolvedTitle.primary,
-        metadata: metadata ?? null,
-        form,
-      });
+      if (panelMode === 'edit') {
+        if (!tvdbId) return;
+        await updateSeriesMutation.mutateAsync({
+          anilistId,
+          tvdbId,
+          title: resolvedTitle.primary,
+          form,
+        });
+      } else {
+        await addSeriesMutation.mutateAsync({
+          anilistId,
+          title: resolvedTitle.primary,
+          primaryTitleHint: resolvedTitle.primary,
+          metadata: metadata ?? null,
+          form,
+        });
+      }
     },
     onSaveDefaults: async (form: SonarrFormState) => {
       await updateDefaultsMutation.mutateAsync(form);

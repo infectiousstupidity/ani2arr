@@ -9,12 +9,13 @@ import type {
   SonarrFormState,
   SonarrCredentialsPayload,
 } from '@/shared/types';
-import type { ResolveInput, MappingOutput, StatusInput, StatusOutput, AddInput, SetMappingOverrideInput, ClearMappingOverrideInput, SonarrLookupInput, SonarrLookupOutput, ValidateTvdbInput, ValidateTvdbOutput } from './schemas';
+import type { ResolveInput, MappingOutput, StatusInput, StatusOutput, AddInput, UpdateSonarrInput, SetMappingOverrideInput, ClearMappingOverrideInput, SonarrLookupInput, SonarrLookupOutput, ValidateTvdbInput, ValidateTvdbOutput } from './schemas';
 
 export interface Ani2arrApi {
   resolveMapping(input: ResolveInput): Promise<MappingOutput>;
   getSeriesStatus(input: StatusInput): Promise<StatusOutput>;
   addToSonarr(input: AddInput): Promise<SonarrSeries>;
+  updateSonarrSeries(input: UpdateSonarrInput): Promise<SonarrSeries>;
   prefetchAniListMedia(ids: number[]): Promise<Array<[number, AniMedia]>>;
   fetchAniListMedia(anilistId: number): Promise<AniMedia | null>;
   getStaticMapped(ids: number[]): Promise<number[]>;

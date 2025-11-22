@@ -32,6 +32,13 @@ export interface AddInput {
   form: SonarrFormState;
 }
 
+export interface UpdateSonarrInput {
+  anilistId: number;
+  tvdbId: number;
+  title: string;
+  form: SonarrFormState;
+}
+
 export interface SetMappingOverrideInput {
   anilistId: number;
   tvdbId: number;

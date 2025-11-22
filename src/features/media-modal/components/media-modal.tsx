@@ -82,6 +82,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     metadata: sonarrPanelProps.metadata,
     title: sonarrPanelProps.title,
     tvdbId: sonarrPanelProps.tvdbId,
+    folderSlug: sonarrPanelProps.folderSlug ?? null,
     disabled: sonarrPanelProps.disabled,
     onSubmit: sonarrPanelProps.onSubmit,
     onSaveDefaults: sonarrPanelProps.onSaveDefaults,
@@ -197,7 +198,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
               </button>
             </>
         ) : null,
-        primaryLabel: sonarrPanelProps.mode === "edit" ? "Save series" : "Add series",
+        primaryLabel: sonarrPanelProps.mode === "edit" ? "Save changes" : "Add series",
         primaryDisabled: !sonarrController.canSubmit,
         primaryLoading: sonarrController.isSubmitting,
         onPrimaryClick: () => {
@@ -267,12 +268,34 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           <div className="mx-auto flex h-full max-w-[1000px] flex-col gap-6">
             <div className="grid h-full grid-cols-[3fr_2fr] gap-6">
               <div className="flex h-full flex-col overflow-hidden">
+                <div className="px-0 pb-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
+                        {viewMode === "mapping"
+                          ? "Mapping search"
+                          : sonarrPanelProps.mode === "edit"
+                          ? "Manage series"
+                          : "New series setup"}
+                      </p>
+                      <p className="text-xs text-text-secondary">
+                        {viewMode === "mapping"
+                          ? "Find the right TVDB entry; your selection updates the preview on the right."
+                          : sonarrPanelProps.mode === "edit"
+                          ? "Update configuration or move files to a new location."
+                          : "Choose the root folder and monitoring options for this series."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex-1 overflow-y-auto pr-1">
                   {viewMode === "mapping" ? (
                     <ProviderSearchSection
                       controller={mappingController}
                       currentMapping={effectiveCurrentMapping}
                       baseUrl={baseUrl}
+                      hideHeader
                     />
                   ) : (
                     <SonarrPanel
