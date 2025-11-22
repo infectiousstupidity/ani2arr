@@ -28,7 +28,7 @@ export interface SonarrTabProps {
   sonarrReady: boolean;
   disabled?: boolean;
 
-  portalContainer?: HTMLElement | null;
+  portalContainer?: HTMLElement | ShadowRoot | null;
 
   onSubmit(form: SonarrFormState): Promise<void>;
   onSaveDefaults(form: SonarrFormState): Promise<void>;

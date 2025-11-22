@@ -11,7 +11,7 @@ export interface SonarrTabLayoutProps {
   metadata: SonarrTabProps["metadata"];
   sonarrReady: boolean;
   disabled?: boolean;
-  portalContainer?: HTMLElement | null;
+  portalContainer?: HTMLElement | ShadowRoot | null;
 }
 
 export function SonarrTabLayout(props: SonarrTabLayoutProps): React.JSX.Element {
@@ -28,11 +28,13 @@ export function SonarrTabLayout(props: SonarrTabLayoutProps): React.JSX.Element 
     );
   }
 
+  const ensuredMetadata = metadata;
+
   return (
     <div className="space-y-4">
       <SonarrForm
         form={controller.form}
-        metadata={metadata}
+        metadata={ensuredMetadata}
         disabled={disabled || !sonarrReady}
         portalContainer={portalContainer ?? null}
         computedPath={controller.computedPath}

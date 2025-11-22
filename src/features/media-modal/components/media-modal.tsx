@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Modal, ModalContent, ModalTitle, ModalDescription } from "./modal";
 import { Header, type MediaModalTabId } from "./media-modal-header";
 import { Footer } from "./media-modal-footer";
+import Button from "@/shared/components/button";
 import type { AniFormat, MediaStatus } from "@/shared/types";
 
 import MappingTab, { type MappingTabProps } from "../tabs/mapping-tab";
@@ -27,7 +28,7 @@ export type MediaModalProps = {
 
   initialTab?: MediaModalTabId;
 
-  portalContainer?: HTMLElement | null;
+  portalContainer?: HTMLElement | ShadowRoot | null;
 
   mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'>;
   sonarrTabProps: Omit<SonarrTabProps, 'controller'>;
@@ -39,18 +40,20 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     onClose,
     title,
     bannerImage,
-  coverImage,
-  anilistIds,
-  tvdbId,
-  inLibrary,
-  format,
-  year,
-  status,
-  initialTab = "series",
-  portalContainer,
-  mappingTabProps,
+    coverImage,
+    anilistIds,
+    tvdbId,
+    inLibrary,
+    format,
+    year,
+    status,
+    initialTab = "series",
+    portalContainer,
+    mappingTabProps,
     sonarrTabProps,
   } = props;
+
+  const [floatingPortalEl, setFloatingPortalEl] = useState<HTMLDivElement | null>(null);
 
   const [activeTab, setActiveTab] = useState<MediaModalTabId>(initialTab ?? "series");
 
@@ -59,6 +62,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     anilistId: mappingTabProps.aniListEntry.id,
     service: mappingTabProps.service,
     currentMapping: mappingTabProps.currentMapping,
+    overrideActive: mappingTabProps.overrideActive,
   });
 
   const sonarrController = useSonarrTabController({
@@ -80,25 +84,54 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     onClose();
   }, [onClose]);
 
-  const handleTabChange = useCallback((tab: MediaModalTabId) => {
-    setActiveTab(tab);
+  const handleFloatingPortalRef = useCallback((node: HTMLDivElement | null) => {
+    setFloatingPortalEl(node);
   }, []);
+
+  const handleEnterMapping = useCallback(() => {
+    setActiveTab("mapping");
+  }, []);
+
+  const handleMappingCancel = useCallback(() => {
+    mappingController.resetToCurrent();
+    setActiveTab("series");
+  }, [mappingController]);
+
+  const handleMappingSubmit = useCallback(async () => {
+    try {
+      await mappingController.handleSubmit();
+    } catch {
+      // Leave the user in mapping mode if saving fails.
+    }
+  }, [mappingController]);
 
   // Compute footer state directly in parent based on active tab
   const footerState = useMemo(() => {
     if (activeTab === "mapping") {
       return {
-        primaryLabel: mappingTabProps.currentMapping ? 'Override mapping' : 'Save mapping',
+        leftContent: mappingController.canRevert ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs font-medium"
+            disabled={mappingController.isSubmitting}
+            onClick={() => { void mappingController.handleRevertToAutomatic(); }}
+          >
+            Reset to automatic
+          </Button>
+        ) : null,
+        primaryLabel: 'Update mapping',
         primaryDisabled: !mappingController.canSubmit,
         primaryLoading: mappingController.isSubmitting,
         onPrimaryClick: () => {
-          void mappingController.handleSubmit();
+          void handleMappingSubmit();
         },
-        showTertiary: mappingController.canRevert,
-        tertiaryLabel: 'Revert to automatic',
-        onTertiaryClick: mappingController.canRevert ? () => {
-          void mappingController.handleRevertToAutomatic();
-        } : undefined,
+        secondaryLabel: 'Cancel',
+        onSecondaryClick: handleMappingCancel,
+        showTertiary: false,
+        tertiaryLabel: '',
+        onTertiaryClick: undefined,
       };
     } else {
       return {
@@ -129,13 +162,15 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                 Search for missing episodes
               </button>
             </>
-          ) : null,
+        ) : null,
         primaryLabel: sonarrTabProps.mode === "edit" ? "Save series" : "Add series",
         primaryDisabled: !sonarrController.canSubmit,
         primaryLoading: sonarrController.isSubmitting,
         onPrimaryClick: () => {
           void sonarrController.handlePrimarySubmit();
         },
+        secondaryLabel: "Cancel",
+        onSecondaryClick: handleClose,
         showTertiary: sonarrController.showSaveDefaults,
         tertiaryLabel: "Save as default",
         onTertiaryClick: sonarrController.showSaveDefaults ? () => {
@@ -143,7 +178,17 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
         } : undefined,
       };
     }
-  }, [activeTab, mappingTabProps.currentMapping, mappingController, sonarrTabProps.mode, sonarrController]);
+  }, [
+    activeTab,
+    handleClose,
+    handleMappingCancel,
+    handleMappingSubmit,
+    mappingController,
+    sonarrController,
+    sonarrTabProps.mode,
+  ]);
+
+  const selectPortalContainer = floatingPortalEl ?? portalContainer ?? null;
 
   if (!isOpen) {
     return null;
@@ -153,7 +198,8 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     <Modal open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <ModalContent
         container={portalContainer ?? null}
-        className="h-[920px] max-h-[90vh] w-full max-w-[1000px] flex flex-col overflow-hidden rounded-2xl border border-border-primary bg-bg-secondary shadow-2xl shadow-black/40 p-0"
+        floatingPortalRef={handleFloatingPortalRef}
+        className="h-[800px] max-h-[90vh] w-full max-w-[1000px] flex flex-col overflow-hidden rounded-2xl border border-border-primary bg-bg-secondary shadow-2xl shadow-black/40 p-0"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
         }}
@@ -174,7 +220,8 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           year={year}
           status={status}
           activeTab={activeTab}
-          onTabChange={handleTabChange}
+          onEnterMapping={handleEnterMapping}
+          onExitMapping={handleMappingCancel}
           onClose={handleClose}
         />
         {/* Content Area - flex-1 to take space, overflow-hidden to clip children, justify-start to align top */}
@@ -190,14 +237,13 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
             <SonarrTab
               {...sonarrTabProps}
               controller={sonarrController}
+              portalContainer={selectPortalContainer}
             />
           </div>
         </div>
 
         <Footer
           {...footerState}
-          secondaryLabel="Cancel"
-          onSecondaryClick={handleClose}
         />
       </ModalContent>
     </Modal>

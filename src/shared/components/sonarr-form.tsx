@@ -32,24 +32,13 @@ export interface SonarrFormMetadata {
 }
 
 export interface SonarrFormProps {
-  // Preferred RHF-based API (settings page, media modal Series tab)
-  form?: UseFormReturn<SonarrFormState>;
-  metadata?: SonarrFormMetadata;
-
-  // Legacy controlled-props API (AddSeriesModal) – kept during migration
-  options?: SonarrFormState;
-  data?: SonarrFormMetadata;
-  onChange?: (
-    field: keyof SonarrFormState,
-    value: SonarrFormState[keyof SonarrFormState],
-  ) => void;
-
+  form: UseFormReturn<SonarrFormState>;
+  metadata: SonarrFormMetadata;
   disabled?: boolean;
   className?: string;
-  portalContainer?: HTMLElement | null;
+  portalContainer?: HTMLElement | ShadowRoot | null;
   initialFocusRef?: React.RefObject<HTMLButtonElement | null>;
 
-  // Optional computed path context (used by media modal)
   computedPath?: string | null;
   pathHintTitle?: string;
   pathHintTvdbId?: number | null;
@@ -59,9 +48,6 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
   const {
     form,
     metadata,
-    options,
-    data,
-    onChange,
     disabled,
     className,
     portalContainer,
@@ -71,18 +57,14 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
     pathHintTvdbId,
   } = props;
 
-  const effectiveMetadata: SonarrFormMetadata | undefined = metadata ?? data;
-  const effectiveValues: SonarrFormState | undefined = form?.watch() ?? options;
+  const effectiveMetadata: SonarrFormMetadata = metadata;
+  const effectiveValues: SonarrFormState = form.watch();
 
   const setFieldValue = (
     field: keyof SonarrFormState,
     value: SonarrFormState[keyof SonarrFormState],
   ): void => {
-    if (form) {
-      form.setValue(field, value, { shouldDirty: true, shouldValidate: true });
-    } else if (onChange) {
-      onChange(field, value);
-    }
+    form.setValue(field, value, { shouldDirty: true, shouldValidate: true });
   };
 
   const tagMaps = useMemo(() => {
@@ -108,19 +90,15 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
 
   const { idToLabel, labelToId } = tagMaps;
 
-  const selectedTagLabels = useMemo(() => {
-    if (!effectiveValues) {
-      return [];
-    }
-    return effectiveValues.tags
-      .map(tagId => idToLabel.get(tagId))
-      .filter((label): label is string => typeof label === 'string' && label.length > 0);
-  }, [effectiveValues, idToLabel]);
+  const selectedTagLabels = useMemo(
+    () =>
+      effectiveValues.tags
+        .map(tagId => idToLabel.get(tagId))
+        .filter((label): label is string => typeof label === 'string' && label.length > 0),
+    [effectiveValues, idToLabel],
+  );
 
-  if (!effectiveMetadata || !effectiveValues) {
-    // Callers should guard on metadata/form presence; fail safe if they do not.
-    return null;
-  }
+  const selectPortal = portalContainer ?? null;
 
   const handleTagsChange = (labels: string[]) => {
     const tagIds = labels
@@ -129,8 +107,6 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
 
     setFieldValue('tags', tagIds);
   };
-
-  const selectPortal = portalContainer ?? null;
 
   return (
     <div className={className ?? "space-y-4"}>
@@ -326,4 +302,4 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
   );
 }
 
-export default React.memo(SonarrForm);
+export default SonarrForm;

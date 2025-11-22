@@ -127,13 +127,16 @@ SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 const SelectContent = React.memo(
   React.forwardRef<
     React.ComponentRef<typeof SelectPrimitive.Content>,
-    React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & { container?: HTMLElement | null }
+    React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & { container?: HTMLElement | ShadowRoot | null }
   >(({ className = '', children, position = 'popper', container, ...props }, ref) => {
+    const portalTarget =
+      container instanceof ShadowRoot || container instanceof HTMLElement ? container : undefined;
+
     return (
-      <SelectPrimitive.Portal container={container ?? undefined}>
+      <SelectPrimitive.Portal container={portalTarget as HTMLElement | undefined}>
         <SelectPrimitive.Content
           ref={ref}
-          className={`relative z-50 min-w-32 w-(--radix-select-trigger-width) overflow-hidden rounded-md border border-border-primary bg-bg-secondary text-text-primary shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ${className}`}
+          className={`relative z-[2147483602] min-w-32 w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-border-primary bg-bg-secondary text-text-primary shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ${className}`}
           position={position}
           {...props}
         >

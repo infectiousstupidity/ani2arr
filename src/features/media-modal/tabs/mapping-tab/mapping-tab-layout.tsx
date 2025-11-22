@@ -22,11 +22,12 @@ interface MappingTabLayoutProps {
 
 export function MappingTabLayout(props: MappingTabLayoutProps) {
   const { aniListEntry, currentMapping, otherAniListIds, controller, baseUrl } = props;
+  const mappingToShow = controller.currentMapping ?? currentMapping;
   return (
     <div className="flex flex-col gap-4">
       <CurrentMappingSection
         aniListEntry={aniListEntry}
-        currentMapping={currentMapping}
+        currentMapping={mappingToShow}
         otherAniListIds={otherAniListIds}
         baseUrl={baseUrl}
       />
@@ -34,7 +35,7 @@ export function MappingTabLayout(props: MappingTabLayoutProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <ProviderSearchSection
           controller={controller}
-          currentMapping={currentMapping}
+          currentMapping={mappingToShow}
           baseUrl={baseUrl}
         />
         <SelectedResultPreview
