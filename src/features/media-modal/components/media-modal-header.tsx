@@ -87,7 +87,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
       </div>
 
       <div className="absolute inset-x-0 top-0 z-10 flex flex-col">
-        <div className="flex items-start justify-between px-6 pt-4">
+        <div className="flex items-start justify-between px-8 pt-4">
           <button
             type="button"
             aria-label="Close"
@@ -98,7 +98,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
           </button>
         </div>
 
-        <div className="mt-auto px-6 pb-6">
+        <div className="mt-auto px-8 pb-6">
           <div className="flex items-start gap-4">
             <div className="hidden h-[150px] w-[110px] shrink-0 overflow-hidden rounded-xl border border-border-primary/60 bg-bg-tertiary/80 shadow-lg sm:block">
               {coverImage ? (

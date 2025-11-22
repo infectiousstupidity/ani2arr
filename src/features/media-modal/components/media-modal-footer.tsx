@@ -1,5 +1,6 @@
 // src/features/media-modal/components/media-modal-footer.tsx
 import type { ReactNode } from "react";
+import Button from "@/shared/components/button";
 
 export type FooterProps = {
   // Left side (tab-specific)
@@ -35,47 +36,48 @@ export function Footer(props: FooterProps): React.JSX.Element {
     onTertiaryClick,
   } = props;
 
-  const effectivePrimaryDisabled = primaryDisabled || primaryLoading;
-
   return (
-    <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border-primary bg-bg-secondary px-6 py-4">
+    <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border-primary bg-bg-secondary px-8 py-4">
       <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
         {leftContent}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         {secondaryLabel && onSecondaryClick ? (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={onSecondaryClick}
-            className="inline-flex items-center rounded-lg border border-border-primary bg-bg-tertiary px-3 py-2 text-sm text-text-secondary hover:bg-bg-primary"
           >
             {secondaryLabel}
-          </button>
+          </Button>
         ) : null}
 
         {showTertiary && tertiaryLabel && onTertiaryClick ? (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={onTertiaryClick}
-            className="inline-flex items-center rounded-lg border border-border-primary bg-bg-secondary px-3 py-2 text-xs font-medium text-text-secondary hover:border-accent-primary hover:text-text-primary"
+            className="text-xs font-medium"
           >
             {tertiaryLabel}
-          </button>
+          </Button>
         ) : null}
 
-        <button
+        <Button
           type="button"
+          variant="primary"
+          size="sm"
           onClick={onPrimaryClick}
-          disabled={effectivePrimaryDisabled}
-          className={`inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium ${
-            effectivePrimaryDisabled
-              ? "cursor-not-allowed bg-bg-tertiary text-text-secondary/40"
-              : "bg-accent-primary text-white hover:bg-accent-hover"
-          }`}
+          disabled={primaryDisabled}
+          isLoading={primaryLoading}
+          loadingText={primaryLabel}
+          className="font-medium"
         >
-          {primaryLoading ? "Working..." : primaryLabel}
-        </button>
+          {primaryLabel}
+        </Button>
       </div>
     </footer>
   );
