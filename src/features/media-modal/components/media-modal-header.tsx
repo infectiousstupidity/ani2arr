@@ -1,6 +1,6 @@
 // src/features/media-modal/components/media-modal-header.tsx
 import { type MouseEventHandler } from "react";
-import { ArrowRight, Database, Pencil, X } from "lucide-react";
+import { Database, X } from "lucide-react";
 import TooltipWrapper from "@/shared/components/tooltip";
 import type { AniFormat, MediaStatus, TitleLanguage } from "@/shared/types";
 
@@ -26,12 +26,6 @@ export type HeaderProps = {
   tooltipContainer?: HTMLElement | null;
 };
 
-function formatAniListIds(anilistIds: number[]): string {
-  if (anilistIds.length === 0) return "Unknown";
-  if (anilistIds.length === 1) return String(anilistIds[0]);
-  return `${anilistIds[0]} (+${anilistIds.length - 1})`;
-}
-
 function formatMediaFormat(format?: AniFormat | null): string | null {
   return format ? format.replace(/_/g, " ") : null;
 }
@@ -55,20 +49,14 @@ export function Header(props: HeaderProps): React.JSX.Element {
     titleLanguage,
     bannerImage,
     coverImage,
-    anilistIds,
-    tvdbId,
     inLibrary,
     format,
     year,
     status,
-    activeTab,
-    onEnterMapping,
-    onExitMapping,
     onClose,
     tooltipContainer,
   } = props;
 
-  const aniDisplay = formatAniListIds(anilistIds);
   const formatLabel = formatMediaFormat(format);
   const yearLabel = year ?? null;
   const statusLabel = formatMediaStatus(status);
@@ -177,13 +165,6 @@ export function Header(props: HeaderProps): React.JSX.Element {
                   />
                 ) : null}
                 <span className="flex-1" />
-                <MappingPill
-                  aniListLabel={aniDisplay}
-                  tvdbId={tvdbId ?? null}
-                  isActive={activeTab === "mapping"}
-                  onEdit={onEnterMapping}
-                  onExit={onExitMapping}
-                />
               </div>
             </div>
           </div>
@@ -216,54 +197,4 @@ function MetadataBadge(props: MetadataBadgeProps) {
   );
 }
 
-type MappingPillProps = {
-  aniListLabel: string;
-  tvdbId: number | null;
-  isActive: boolean;
-  onEdit: () => void;
-  onExit: () => void;
-};
 
-function MappingPill(props: MappingPillProps) {
-  const { aniListLabel, tvdbId, isActive, onEdit, onExit } = props;
-  const isUnmapped = tvdbId == null;
-  const ActionIcon = isActive ? X : Pencil;
-  const actionLabel = isActive ? "Back to series" : "Edit mapping";
-
-  return (
-    <div className="flex items-center overflow-hidden rounded-full border border-white/10 bg-black/50 text-[11px] font-medium text-gray-200 shadow-sm backdrop-blur">
-      <div className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5">
-        <span className="flex h-5 w-5 items-center justify-center rounded-full border border-white/20 bg-[#2c80ff]/40 text-[10px] font-semibold text-white shadow-inner">
-          A
-        </span>
-        <span className="tabular-nums text-gray-100">{aniListLabel}</span>
-      </div>
-
-      <div className="flex items-center justify-center px-2 text-gray-500">
-        <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.2} />
-      </div>
-
-      <button
-        type="button"
-        onClick={isActive ? onExit : onEdit}
-        className={`group flex items-center gap-2 pl-2 pr-3 py-1.5 transition-colors border-l border-white/5 ${
-          isActive ? "bg-white/15 text-white" : "hover:bg-white/15 hover:text-white"
-        }`}
-        title={actionLabel}
-        aria-label={actionLabel}
-      >
-        <div className="flex items-center gap-1.5">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full border border-emerald-200/50 bg-emerald-400/15 text-[10px] font-semibold uppercase text-emerald-50 shadow-inner">
-            TV
-          </span>
-          <span className={`tabular-nums ${isUnmapped ? "text-amber-200" : "text-white"}`}>
-            {isUnmapped ? "Unmapped" : tvdbId}
-          </span>
-        </div>
-        <span className="flex h-5 w-5 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/70 transition group-hover:border-white/40 group-hover:text-white">
-          <ActionIcon className="h-3.5 w-3.5" />
-        </span>
-      </button>
-    </div>
-  );
-}

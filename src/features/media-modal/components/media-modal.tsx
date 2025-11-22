@@ -116,6 +116,17 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     }
   }, [mappingController]);
 
+  // Handle ESC key: exit mapping mode first, then allow modal close
+  const handleEscapeKeyDown = useCallback((event: KeyboardEvent) => {
+    if (viewMode === "mapping") {
+      // Prevent modal from closing and exit edit mode instead
+      event.preventDefault();
+      event.stopPropagation();
+      handleMappingCancel();
+    }
+    // Otherwise, let Radix Dialog handle the close
+  }, [viewMode, handleMappingCancel]);
+
   const effectiveCurrentMapping = mappingController.currentMapping ?? mappingTabProps.currentMapping ?? null;
   const selectedMapping = mappingController.state.selected;
 
@@ -226,6 +237,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
         onOpenAutoFocus={(event) => {
           event.preventDefault();
         }}
+        onEscapeKeyDown={handleEscapeKeyDown}
       >
         {/* Accessible dialog title/description for screen readers. Visual title handled by Header. */}
         <ModalTitle className="sr-only">{title}</ModalTitle>
