@@ -1,5 +1,5 @@
 // src/features/media-modal/tabs/mapping-tab/hooks/use-mapping-controller.ts
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { useMappingSearch } from "@/shared/mapping";
 import type { MappingSearchResult } from "@/shared/types";
 import { useMappingOverrides } from "./use-mapping-overrides";
@@ -8,6 +8,7 @@ export interface UseMappingControllerInput {
   service: "sonarr" | "radarr";
   anilistId: number;
   currentMapping: MappingSearchResult | null;
+  overrideActive: boolean;
 }
 
 export interface MappingTabState {
@@ -21,7 +22,7 @@ type Action =
   | { type: 'SET_QUERY'; query: string }
   | { type: 'SELECT_RESULT'; result: MappingSearchResult; isDirty: boolean }
   | { type: 'CLEAR_SELECTION' }
-  | { type: 'RESET_FROM_CURRENT'; current: MappingSearchResult | null };
+  | { type: 'RESET_FROM_CURRENT' };
 
 function targetsEqual(
   a?: MappingSearchResult["target"] | null,
@@ -58,22 +59,22 @@ function reducer(state: MappingTabState, action: Action): MappingTabState {
 
 function useDebounced<T>(value: T, delay = 250): T {
   const [debounced, setDebounced] = useState(value);
-  const timer = useRef<number | null>(null);
   useEffect(() => {
-    if (timer.current != null) window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setDebounced(value), delay);
-    return () => {
-      if (timer.current != null) window.clearTimeout(timer.current);
-    };
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
   }, [value, delay]);
   return debounced;
 }
 
+type OptimisticState = 'set' | 'clear' | null;
+
 export interface UseMappingControllerResult {
   state: MappingTabState;
+  currentMapping: MappingSearchResult | null;
   setQuery(q: string): void;
   selectResult(r: MappingSearchResult): void;
   clearSelection(): void;
+  resetToCurrent(): void;
   searchQuery: ReturnType<typeof useMappingSearch>;
   handleSubmit(): Promise<void>;
   handleRevertToAutomatic(): Promise<void>;
@@ -83,10 +84,6 @@ export interface UseMappingControllerResult {
 }
 
 export function useMappingController(input: UseMappingControllerInput): UseMappingControllerResult {
-  const currentTarget = input.currentMapping?.target ?? null;
-  const currentRef = useRef<MappingSearchResult["target"] | null>(currentTarget);
-  currentRef.current = currentTarget;
-
   const [state, dispatch] = useReducer(reducer, {
     query: '',
     lastQuery: '',
@@ -104,34 +101,83 @@ export function useMappingController(input: UseMappingControllerInput): UseMappi
   });
 
   const [isSubmitting, setSubmitting] = useState(false);
+  const [optimisticMapping, setOptimisticMapping] = useState<MappingSearchResult | null>(null);
+  const [optimisticOverrideState, setOptimisticOverrideState] = useState<OptimisticState>(null);
+
+  // Drop optimistic flags once the server reflects the change.
+  useEffect(() => {
+    if (
+      optimisticOverrideState === 'set' &&
+      input.overrideActive &&
+      optimisticMapping &&
+      input.currentMapping &&
+      targetsEqual(optimisticMapping.target, input.currentMapping.target)
+    ) {
+      setOptimisticOverrideState(null);
+    }
+    if (optimisticOverrideState === 'clear' && !input.overrideActive && !input.currentMapping) {
+      setOptimisticOverrideState(null);
+    }
+  }, [input.currentMapping, input.overrideActive, optimisticMapping, optimisticOverrideState]);
+
+  const effectiveCurrentMapping = useMemo<MappingSearchResult | null>(() => {
+    if (optimisticOverrideState === 'set') {
+      if (
+        optimisticMapping &&
+        input.currentMapping &&
+        targetsEqual(optimisticMapping.target, input.currentMapping.target)
+      ) {
+        return input.currentMapping;
+      }
+      return optimisticMapping;
+    }
+    if (optimisticOverrideState === 'clear') {
+      return null;
+    }
+    if (input.currentMapping) return input.currentMapping;
+    return optimisticMapping ?? null;
+  }, [input.currentMapping, optimisticMapping, optimisticOverrideState]);
+
+  const effectiveTarget = effectiveCurrentMapping?.target ?? null;
+
+  const hasActiveOverride = optimisticOverrideState === 'set' || input.overrideActive === true;
 
   const setQuery = useCallback((q: string) => dispatch({ type: 'SET_QUERY', query: q }), []);
   const selectResult = useCallback(
     (r: MappingSearchResult) =>
-      dispatch({ type: 'SELECT_RESULT', result: r, isDirty: !targetsEqual(r?.target ?? null, currentRef.current) }),
-    [],
+      dispatch({ type: 'SELECT_RESULT', result: r, isDirty: !targetsEqual(r?.target ?? null, effectiveTarget) }),
+    [effectiveTarget],
   );
   const clearSelection = useCallback(() => dispatch({ type: 'CLEAR_SELECTION' }), []);
+  const resetToCurrent = useCallback(() => {
+    dispatch({ type: 'RESET_FROM_CURRENT' });
+  }, []);
 
-  const canSubmit = Boolean(state.selected && !targetsEqual(state.selected?.target ?? null, currentRef.current));
-  const canRevert = Boolean(currentRef.current);
+  const canSubmit = Boolean(
+    state.selected &&
+    !targetsEqual(state.selected?.target ?? null, effectiveTarget),
+  );
 
   const handleSubmit = useCallback(async () => {
     if (!state.selected) return;
     setSubmitting(true);
     try {
       await overrides.setOverride(state.selected.target);
-      dispatch({ type: 'RESET_FROM_CURRENT', current: input.currentMapping });
+      setOptimisticOverrideState('set');
+      setOptimisticMapping(state.selected);
+      dispatch({ type: 'RESET_FROM_CURRENT' });
     } finally {
       setSubmitting(false);
     }
-  }, [input.currentMapping, overrides, state.selected]);
+  }, [overrides, state.selected]);
 
   const handleRevertToAutomatic = useCallback(async () => {
     setSubmitting(true);
     try {
       await overrides.clearOverride();
-      dispatch({ type: 'RESET_FROM_CURRENT', current: null });
+      setOptimisticOverrideState('clear');
+      setOptimisticMapping(null);
+      dispatch({ type: 'RESET_FROM_CURRENT' });
     } finally {
       setSubmitting(false);
     }
@@ -139,15 +185,17 @@ export function useMappingController(input: UseMappingControllerInput): UseMappi
 
   return {
     state,
+    currentMapping: effectiveCurrentMapping,
     setQuery,
     selectResult,
     clearSelection,
+    resetToCurrent,
     searchQuery,
     handleSubmit,
     handleRevertToAutomatic,
     canSubmit,
     isSubmitting,
-    canRevert,
+    canRevert: hasActiveOverride,
   };
 }
 

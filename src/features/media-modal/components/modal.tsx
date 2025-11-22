@@ -26,7 +26,8 @@ const MODAL_CONTENT_Z_INDEX = BASE_MODAL_Z_INDEX + 1;
 
 type ModalContentProps =
   React.ComponentPropsWithoutRef<typeof Dialog.Content> & {
-    container?: HTMLElement | null;
+    container?: HTMLElement | ShadowRoot | null;
+    floatingPortalRef?: React.RefCallback<HTMLDivElement> | React.RefObject<HTMLDivElement | null>;
   };
 
 export const ModalContent = forwardRef<
@@ -36,20 +37,29 @@ export const ModalContent = forwardRef<
   props,
   ref,
 ): React.JSX.Element {
-  const { className, children, container, style, ...rest } = props;
+  const { className, children, container, floatingPortalRef, style, ...rest } = props;
 
   const contentStyle: React.CSSProperties | undefined = style
     ? { ...style, zIndex: MODAL_CONTENT_Z_INDEX }
     : { zIndex: MODAL_CONTENT_Z_INDEX };
 
+  const portalContainer =
+    container instanceof ShadowRoot || container instanceof HTMLElement
+      ? (container as HTMLElement | ShadowRoot)
+      : undefined;
+
   return (
-    <Dialog.Portal container={container ?? undefined}>
+    <Dialog.Portal container={portalContainer as HTMLElement | undefined}>
       <Dialog.Overlay
         data-testid="modal-overlay"
         className={cn(
           "fixed inset-0 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         )}
         style={{ zIndex: MODAL_OVERLAY_Z_INDEX }}
+      />
+      <div
+        ref={floatingPortalRef as React.Ref<HTMLDivElement> | undefined}
+        style={{ position: "fixed", inset: 0, zIndex: MODAL_CONTENT_Z_INDEX + 2, pointerEvents: "none" }}
       />
       <Dialog.Content
         ref={ref}

@@ -9,6 +9,7 @@ import type { UseMappingControllerResult } from "./hooks/use-mapping-controller"
 export interface MappingTabProps {
   aniListEntry: AniListEntrySummary;
   currentMapping: MappingSearchResult | null;
+  overrideActive: boolean;
   otherAniListIds: number[];
   service: "sonarr" | "radarr";
   controller: UseMappingControllerResult;

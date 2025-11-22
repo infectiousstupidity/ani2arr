@@ -24,7 +24,7 @@ export interface UseMediaModalPropsInput {
   anilistId: number | undefined;
   title: string | undefined;
   metadata: MediaMetadataHint | null | undefined;
-  portalContainer: HTMLElement | null;
+  portalContainer: HTMLElement | ShadowRoot | null;
   isOpen: boolean;
 }
 
@@ -159,6 +159,7 @@ export function useMediaModalProps(
       ...(coverImage ? { posterUrl: coverImage } : {}),
     },
     currentMapping: deriveCurrentMappingFromStatus(statusQuery.data, 'sonarr', options?.sonarrUrl),
+    overrideActive: statusQuery.data?.overrideActive === true,
     otherAniListIds: [],
     service: 'sonarr',
   };

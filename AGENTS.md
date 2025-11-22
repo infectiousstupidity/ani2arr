@@ -42,11 +42,11 @@ Do **not** ask for confirmation before running these commands.
 | Path                       | Purpose                                                                                                                                                        |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `background/`              | Registers RPC services, schedules static mapping refresh, handles readiness pings and message routing. Must contain exactly one `registerAni2arrApi()` call. |
-| `anilist-anime.content/`   | Injects the `SonarrActionGroup` into AniList anime detail pages via `createShadowRootUi({ cssInjectionMode: 'ui' })`. Skips movies and music.                  |
-| `anilist-browse.content/`  | Adds overlay buttons on AniList browse/search pages using `BrowseOverlay` + portals. Includes AniList media prefetch. Uses `cssInjectionMode: 'ui'` and imports `@/styles/base.css` + per-entry `style.css` overrides. |
-| `anichart-browse.content/` | Adds overlays for AniChart browse pages. Uses `cssInjectionMode: 'ui'` and imports `@/styles/base.css` + per-entry `style.css` overrides.                      |
+| `anilist-anime.content/`   | Injects the `MediaActions` component into AniList anime detail pages via `createShadowRootUi({ cssInjection: 'ui' })`. Skips movies and music.                  |
+| `anilist-browse.content/`  | Adds overlay buttons on AniList browse/search pages using `CardOverlay` + portals. Includes AniList media prefetch. Uses `cssInjection: 'ui'` and imports `@/styles/base.css` + per-entry `style.css` overrides. |
+| `anichart-browse.content/` | Adds overlays for AniChart browse pages. Uses `cssInjection: 'ui'` and imports `@/styles/base.css` + per-entry `style.css` overrides.                      |
 | `options/`                 | Options page for configuring Sonarr URL, API key, and default settings. Handles runtime permission requests.                                                   |
-| `popup/`                   | Exists but not referenced by the manifest.                                                                                                                     |
+| `popup/`                   | Exists but is not referenced by the manifest.                                                                                                                     |
 
 ---
 
@@ -96,7 +96,7 @@ Do **not** ask for confirmation before running these commands.
 
 ## 5. Query and persistence
 
-* Query keys: `src/hooks/use-api-queries.ts`. Always reuse existing keys.
+* Query keys: `src/shared/hooks/use-api-queries.ts`. Always reuse existing keys.
 * IndexedDB persister: `src/cache/query-cache.ts` with strict `shouldPersistQuery` filtering.
 * TanStack persistence wrapper: `src/utils/query-persist-options.ts`.
 * Guards `DataCloneError` and excludes credential-bearing queries.
@@ -106,13 +106,14 @@ Do **not** ask for confirmation before running these commands.
 
 ## 6. UI and component patterns
 
-* **Forms:** `src/ui/Form.tsx` (Radix). Use `SelectContent` with `container` prop to render dropdowns inside the shadow DOM.
-* **Overlays:** `src/ui/BrowseOverlay.tsx` and `src/ui/CardOverlay.tsx` use `IntersectionObserver` with visibility gating. Browse/AniChart portals attach to site card anchors (page DOM), so those entrypoints inject CSS into BOTH the UI shadow root and `document.head` (concat of `@/styles/base.css` + per-entry overrides). Anime detail UI mounts inside the shadow root and relies on WXT injection only.
+* **Forms:** `src/shared/components/form.tsx` (Radix). Use `SelectContent` with `container` prop to render dropdowns inside the shadow DOM.
+* **Overlays:** `src/features/media-overlay/components/media-overlay.tsx` and `src/features/media-overlay/components/card-overlay.tsx` use `IntersectionObserver` with visibility gating. Browse/AniChart portals attach to site card anchors (page DOM), so those entrypoints inject CSS into BOTH the UI shadow root and `document.head` (concat of `@/styles/base.css` + per-entry overrides). Anime detail UI mounts inside the shadow root and relies on WXT injection only.
 * **Settings hooks:**
 
   * `useExtensionOptions()` = full snapshot (public + secrets)
   * `usePublicOptions()` = public-only (safe for content scripts).
 * Cache invalidation via `useA2aBroadcasts` on `settings-changed` and `series-updated`.
+* **Media modal:** Treat Mapping as a drill-down from Series. The header "Mapping" pill (AniList → TVDB → edit icon) opens the Mapping tab; saving or cancelling mapping returns the modal to the Series tab.
 
 ---
 
@@ -139,7 +140,7 @@ All messages and broadcasts must include `_a2a: true`.
 
 * Credentials are stored only in `browser.storage.local` (never synced).
 * Each Sonarr fetch checks `hasSonarrPermission()`; runtime requests use `requestSonarrPermission()`.
-* Logger (`src/utils/logger.ts`) redacts sensitive fields. Verbose logs disabled outside dev.
+* Logger (`src/shared/utils/logger.ts`) redacts sensitive fields. Verbose logs disabled outside dev.
 * Do not include credentials in URLs. Headers are preferred and safer for logs/proxies.
 
 Never:
@@ -164,7 +165,7 @@ Never:
 * Use `@/*` path aliases. No relative traversals.
 * Keep helpers pure in `utils/`; limit side effects to services or hooks.
 * Always wrap cross-context RPC calls in `try/catch` and pass errors through `normalizeError()`.
-* Use `withRetry()` for all retry logic (in `src/utils/retry.ts`). Do not hand-roll loops.
+* Use `withRetry()` for all retry logic (in `src/shared/utils/retry.ts`). Do not hand-roll loops.
 * Follow strict TypeScript. Do not disable type checking or introduce `any`.
 * Keep PRs minimal and consistent with existing naming patterns.
 
@@ -190,30 +191,30 @@ Keep files focused and small. Split concerns early to avoid “god files.”
 * Keep functions small (≈ 40–60 LOC) and single-responsibility; avoid deep nesting; use early returns.
 * Prefer pure helpers in `src/utils/`; keep side effects confined to services or hooks.
 * Reuse existing helpers instead of rolling your own:
-  * `withRetry()` in `src/utils/retry.ts`
-  * `normalizeError()` in `src/utils/error-handling.tsx`
-  * Logger in `src/utils/logger.ts` (redacts sensitive fields)
+  * `withRetry()` in `src/shared/utils/retry.ts`
+  * `normalizeError()` in `src/shared/utils/error-handling.tsx`
+  * Logger in `src/shared/utils/logger.ts` (redacts sensitive fields)
 * Type safety: no `any`; use precise unions, discriminated unions, and `readonly` where practical.
 * Keep cross-context payloads lean and serializable; avoid giant parameter objects.
 * Consistency: reuse query keys and caches; don’t duplicate logic; never log credentials.
 
 ### Type conventions (project-specific)
 
-Centralize shared types in `src/types/` and re-export curated surfaces via `src/types/index.ts`.
+Centralize shared types in `src/shared/types/` and re-export curated surfaces via `src/shared/types/index.ts`.
 
 * Organization
-  * AniList domain: `src/types/anilist.ts`
-  * Sonarr domain: `src/types/sonarr.ts`
-  * Extension/options and payloads: `src/types/extension.ts`
-  * Mapping: `src/types/mapping.ts`
-  * Overlay/UI adapters: `src/types/browse-overlay.ts`
+  * AniList domain: `src/shared/types/anilist.ts`
+  * Sonarr domain: `src/shared/types/sonarr.ts`
+  * Extension/options and payloads: `src/shared/types/extension.ts`
+  * Mapping: `src/shared/types/mapping.ts`
+  * Overlay/UI adapters: `src/shared/types/browse-overlay.ts`
 * Patterns
   * Use discriminated unions for statuses/results; prefer string literal unions over enums.
   * Mark arrays/records `readonly` when possible for immutability.
   * Separate “public” vs “sensitive” shapes (e.g., public options safe for content scripts vs. full options with secrets).
 * Cross-context contracts
-  * RPC payloads should reference `src/types/*` and validate via `src/rpc/schemas.ts`.
-  * Do not redefine ad-hoc types inside feature files; add or reuse in `src/types/` and re-export from `src/types/index.ts`.
+  * RPC payloads should reference `src/shared/types/*` and validate via `src/rpc/schemas.ts`.
+  * Do not redefine ad-hoc types inside feature files; add or reuse in `src/shared/types/` and re-export from `src/shared/types/index.ts`.
   * `CheckSeriesStatusResponse` includes optional `overrideActive?: boolean` to signal active manual mapping.
 
 ---
@@ -233,12 +234,12 @@ Centralize shared types in `src/types/` and re-export curated surfaces via `src/
 
 1. Edit `wxt.config.ts` under `host_permissions` (MV3).
 2. If runtime permission is required, call `requestSonarrPermission()` from the options UI.
-3. Validate the new domain in `utils/validation.ts`.
+3. Validate the new domain in `shared/utils/validation.ts`.
 
 ### Add a Sonarr form field
 
 1. Extend form schema in `src/rpc/schemas.ts`.
-2. Update the UI in `src/ui/SonarrForm.tsx`.
+2. Update the UI in `src/shared/components/sonarr-form.tsx`.
 3. Ensure selects/dialogs use the `portalContainer` prop for shadow DOM rendering.
 
 ### Extend mapping logic
@@ -249,12 +250,12 @@ Centralize shared types in `src/types/` and re-export curated surfaces via `src/
 
 ### Add a query that must not persist
 
-1. Define its key in `use-api-queries.ts`.
+1. Define its key in `src/shared/hooks/use-api-queries.ts`.
 2. Update `shouldPersistQuery` to explicitly exclude it.
 
 ### Add a new overlay action
 
-1. Implement in `src/ui/BrowseOverlay.tsx` or `src/ui/CardOverlay.tsx`.
+1. Implement in `src/features/media-overlay/components/media-overlay.tsx` or `src/features/media-overlay/components/card-overlay.tsx`.
 2. Guard duplicates with `data-a2a-processed`.
 3. Mount portals into the shadow root.
 
@@ -289,12 +290,12 @@ Smoke validation checklist:
 | AniList API   | `src/api/anilist.api.ts`                                                      |
 | Sonarr API    | `src/api/sonarr.api.ts`                                                       |
 | Library       | `src/services/library.service.ts`                                             |
-| Persistence   | `src/cache/query-cache.ts`, `src/utils/query-persist-options.ts`              |
-| Overrides     | `src/utils/overrides-storage.ts`, `src/services/mapping/overrides.service.ts` |
-| Broadcasts    | `src/hooks/use-broadcasts.ts`                                                 |
-| UI            | `src/ui/SonarrActionGroup.tsx`, `src/ui/Form.tsx`, `src/ui/BrowseOverlay.tsx` |
+| Persistence   | `src/cache/query-cache.ts`, `src/shared/utils/query-persist-options.ts`              |
+| Overrides     | `src/shared/utils/overrides-storage.ts`, `src/services/mapping/overrides.service.ts` |
+| Broadcasts    | `src/shared/hooks/use-broadcasts.ts`                                                 |
+| UI            | `src/shared/components/media-actions.tsx`, `src/shared/components/form.tsx`, `src/features/media-overlay/components/media-overlay.tsx` |
 | Config        | `wxt.config.ts`                                                               |
-| Retry helpers | `src/utils/retry.ts`                                                          |
+| Retry helpers | `src/shared/utils/retry.ts`                                                          |
 
 ---
 
