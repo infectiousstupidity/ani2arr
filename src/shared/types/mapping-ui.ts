@@ -2,8 +2,8 @@ import type { MediaService } from './common';
 
 // What we store/compare as the mapping target id
 export interface MappingTargetId {
-  id: number | string; // TVDB/TMDB/IMDb ids
-  idType: 'tvdb' | 'tmdb' | 'imdb';
+  id: number | string; // TVDB/TMDB ids
+  idType: 'tvdb' | 'tmdb';
 }
 
 // Normalized view model for search results and current mapping preview
@@ -29,7 +29,6 @@ export interface MappingSearchResult {
   statusLabel?: string; // "Continuing", "Ended", "Announced"
   networkOrStudio?: string;
   overview?: string;
-  imdbId?: string;
   alternateTitles?: string[];
 
   // For listing or preview

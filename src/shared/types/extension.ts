@@ -16,10 +16,13 @@ export interface SonarrFormState {
   tags: number[];
 }
 
+export type TitleLanguage = 'english' | 'romaji' | 'native';
+
 export interface ExtensionOptions {
   sonarrUrl: string;
   sonarrApiKey: string;
   defaults: SonarrFormState;
+  titleLanguage: TitleLanguage;
 }
 
 /**
@@ -29,6 +32,7 @@ export interface ExtensionOptions {
 export interface PublicOptions {
   sonarrUrl: string;
   defaults: SonarrFormState;
+  titleLanguage: TitleLanguage;
   /**
    * Indicates whether the user has completed Sonarr setup (URL + API key).
    * This is derived in the background and mirrored into public storage.

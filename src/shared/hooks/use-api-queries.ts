@@ -95,7 +95,10 @@ const useSyncExtensionOptionsQuery = (queryClient: QueryClient): void => {
 const useSyncPublicOptionsQuery = (queryClient: QueryClient): void => {
   useEffect(() => {
     const unsubscribe = publicOptions.watch(newValue => {
-      queryClient.setQueryData(queryKeys.publicOptions(), newValue);
+      queryClient.setQueryData(queryKeys.publicOptions(), {
+        ...newValue,
+        titleLanguage: newValue?.titleLanguage ?? 'english',
+      } satisfies PublicOptions);
     });
     return () => unsubscribe();
   }, [queryClient]);
@@ -358,6 +361,7 @@ export const useSaveOptions = () => {
       queryClient.setQueryData(queryKeys.publicOptions(), {
         sonarrUrl: newOptions.sonarrUrl,
         defaults: newOptions.defaults,
+        titleLanguage: newOptions.titleLanguage,
         isConfigured: Boolean(newOptions.sonarrUrl && newOptions.sonarrApiKey),
       } satisfies PublicOptions);
       return { previousOptions };
@@ -369,6 +373,7 @@ export const useSaveOptions = () => {
         queryClient.setQueryData(queryKeys.publicOptions(), {
           sonarrUrl: context.previousOptions.sonarrUrl,
           defaults: context.previousOptions.defaults,
+          titleLanguage: context.previousOptions.titleLanguage,
           isConfigured: Boolean(
             context.previousOptions.sonarrUrl && context.previousOptions.sonarrApiKey,
           ),

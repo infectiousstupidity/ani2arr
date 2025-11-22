@@ -64,7 +64,6 @@ export function toMappingSearchResultFromSonarr(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const s = series as any;
   const overview = typeof s.overview === 'string' ? s.overview : undefined;
-  const imdbId = typeof s.imdbId === 'string' ? s.imdbId : undefined;
   const alternateTitles = Array.isArray(s.alternateTitles)
     ? s.alternateTitles
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,7 +85,6 @@ export function toMappingSearchResultFromSonarr(
     ...(episodeOrMovieCount !== undefined ? { episodeOrMovieCount } : {}),
     ...(fileCount !== undefined ? { fileCount } : {}),
     ...(overview ? { overview } : {}),
-    ...(imdbId ? { imdbId } : {}),
     ...(alternateTitles && alternateTitles.length > 0 ? { alternateTitles } : {}),
   };
 }

@@ -4,7 +4,7 @@ import { Modal, ModalContent, ModalTitle, ModalDescription } from "./modal";
 import { Header, type MediaModalTabId } from "./media-modal-header";
 import { Footer } from "./media-modal-footer";
 import Button from "@/shared/components/button";
-import type { AniFormat, MediaStatus } from "@/shared/types";
+import type { AniFormat, MediaStatus, TitleLanguage } from "@/shared/types";
 
 import { ProviderSearchSection } from "./provider-search-section";
 import type { MappingTabProps } from "../types";
@@ -22,6 +22,8 @@ export type MediaModalProps = {
   onClose: () => void;
 
   title: string;
+  alternateTitles: Array<{ label: string; value: string }>;
+  titleLanguage: TitleLanguage;
   bannerImage: string | null;
   coverImage: string | null;
   anilistIds: number[];
@@ -44,6 +46,8 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     isOpen,
     onClose,
     title,
+    alternateTitles,
+    titleLanguage,
     bannerImage,
     coverImage,
     anilistIds,
@@ -230,6 +234,8 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
         </ModalDescription>
         <Header
           title={title}
+          alternateTitles={alternateTitles}
+          titleLanguage={titleLanguage}
           bannerImage={bannerImage}
           coverImage={coverImage}
           anilistIds={anilistIds}
@@ -242,6 +248,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           onEnterMapping={handleEnterMapping}
           onExitMapping={handleMappingCancel}
           onClose={handleClose}
+          tooltipContainer={floatingPortalEl ?? (portalContainer instanceof HTMLElement ? portalContainer : null)}
         />
         {/* Content Area - split view, left panel scrolls, right panel stays sticky */}
         <div className="flex-1 overflow-hidden px-8 pb-6">

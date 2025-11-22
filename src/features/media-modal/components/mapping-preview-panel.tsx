@@ -98,6 +98,11 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
     ...(mapping.librarySlug ? { librarySlug: mapping.librarySlug } : {}),
     searchTerm: mapping.title,
   });
+  const detailParts = [
+    mapping.year ? String(mapping.year) : null,
+    mapping.networkOrStudio ?? null,
+    mapping.episodeOrMovieCount ? `${mapping.episodeOrMovieCount} eps` : null,
+  ].filter((value): value is string => Boolean(value));
 
   return (
     <div className="overflow-hidden rounded-xl border border-border-primary bg-bg-tertiary shadow-lg shadow-black/30">
@@ -145,9 +150,7 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
           </div>
 
           <div className="text-xs text-text-secondary">
-            {mapping.year ? `${mapping.year}` : ""}
-            {mapping.networkOrStudio ? ` • ${mapping.networkOrStudio}` : ""}
-            {mapping.episodeOrMovieCount ? ` • ${mapping.episodeOrMovieCount} eps` : ""}
+            {detailParts.join(" | ")}
           </div>
 
           <div className="text-xs text-text-secondary/80 leading-relaxed line-clamp-4">
@@ -157,23 +160,11 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
       </div>
 
       <div className="flex items-center justify-between border-t border-border-primary bg-bg-primary/30 px-4 py-3 text-xs text-text-secondary">
-        <div className="flex items-center gap-2">
-          {mapping.imdbId ? (
-            <a
-              href={`https://www.imdb.com/title/${mapping.imdbId}/`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded px-2 py-1 text-[#f5c518] hover:underline"
-            >
-              IMDb {mapping.imdbId}
-            </a>
-          ) : null}
-          {mapping.statusLabel ? (
-            <span className="rounded bg-bg-primary/60 px-2 py-1 text-[10px] font-medium text-text-secondary">
-              {mapping.statusLabel}
-            </span>
-          ) : null}
-        </div>
+        {mapping.statusLabel ? (
+          <span className="rounded bg-bg-primary/60 px-2 py-1 text-[10px] font-medium text-text-secondary">
+            {mapping.statusLabel}
+          </span>
+        ) : <span />}
         {link ? (
           <a
             href={link}
@@ -194,5 +185,4 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
     </div>
   );
 }
-
 

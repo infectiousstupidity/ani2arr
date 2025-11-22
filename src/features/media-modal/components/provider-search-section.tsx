@@ -84,6 +84,11 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
               selected &&
               result.target.id === selected.target.id &&
               result.target.idType === selected.target.idType;
+            const metaParts = [
+              `TVDB ${String(result.target.id)}`,
+              result.year ? String(result.year) : null,
+              result.typeLabel ?? null,
+            ].filter((value): value is string => Boolean(value));
             const link = buildExternalMediaLink({
               service: "sonarr",
               baseUrl,
@@ -124,9 +129,7 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
                       {result.title}
                     </div>
                     <div className="text-xs text-text-secondary">
-                      TVDB {String(result.target.id)}
-                      {result.year ? ` • ${result.year}` : ""}
-                      {result.typeLabel ? ` • ${result.typeLabel}` : ""}
+                      {metaParts.join(" | ")}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium">
                       {result.inLibrary ? (
@@ -158,3 +161,4 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
     </div>
   );
 }
+
