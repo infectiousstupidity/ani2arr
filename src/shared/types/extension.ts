@@ -14,6 +14,7 @@ export interface SonarrFormState {
   seasonFolder: boolean;
   searchForMissingEpisodes: boolean;
   tags: number[];
+  freeformTags: string[];
 }
 
 export type TitleLanguage = 'english' | 'romaji' | 'native';
@@ -47,6 +48,10 @@ export interface SonarrSecrets {
   apiKey: string;
 }
 
+/**
+ * Payload used when adding a series.
+ * Inherits all Sonarr form fields (including tags/freeformTags) as optional.
+ */
 export interface AddRequestPayload extends Partial<SonarrFormState> {
   title: string;
   anilistId: number;

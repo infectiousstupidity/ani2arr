@@ -24,6 +24,7 @@ import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/shar
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
 import type { MappingOutput, UpdateSonarrInput } from '@/rpc/schemas';
 import { type Ani2arrApi } from '@/rpc';
+import { resolveSonarrTagIds } from '@/shared/utils/sonarr-tags';
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
@@ -325,11 +326,16 @@ export const createApiImplementation = (): Ani2arrApi => {
               ? options.defaults.qualityProfileId
               : undefined;
 
-      const resolvedTags = Array.isArray(input.form.tags)
+      const tagsFromForm = Array.isArray(input.form.tags)
         ? input.form.tags.map(tag => Number(tag)).filter(tag => Number.isFinite(tag))
         : Array.isArray(baseSeries.tags)
           ? baseSeries.tags.filter((tag): tag is number => typeof tag === 'number')
           : [];
+
+      const freeformTags = Array.isArray(input.form.freeformTags) ? input.form.freeformTags : [];
+
+      const existingTags = await sonarrApiService.getTags(credentials);
+      const resolvedTags = await resolveSonarrTagIds(credentials, tagsFromForm, freeformTags, existingTags);
 
       const resolvedRoot = input.form.rootFolderPath || baseSeries.rootFolderPath || '';
       const slug = buildFolderSlug(baseSeries, input.title);

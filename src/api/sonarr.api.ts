@@ -53,15 +53,16 @@ export class SonarrApiService {
     try {
       return await withRetry(
         async () => {
-          // Always authenticate with header; avoid leaking API key in URLs
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 15000);
 
-          // Determine if this request is cacheable (GET + no query + in whitelist)
           const method = (fetchOptions.method ?? 'GET').toString().toUpperCase();
           const normalizedEndpoint = endpoint.split('?')[0] ?? endpoint;
           const cacheKey = normalizedEndpoint;
-          const isCacheable = method === 'GET' && this.cacheableEndpoints.has(normalizedEndpoint) && endpoint === normalizedEndpoint;
+          const isCacheable =
+            method === 'GET' &&
+            this.cacheableEndpoints.has(normalizedEndpoint) &&
+            endpoint === normalizedEndpoint;
 
           const init: RequestInit = {
             ...fetchOptions,
@@ -101,7 +102,6 @@ export class SonarrApiService {
               }
             }
 
-            // Try to parse Sonarr error body for better diagnostics
             let detail: unknown;
             try {
               detail = await response.clone().json();
@@ -115,17 +115,14 @@ export class SonarrApiService {
             if (detail !== undefined) err.detail = detail;
 
             if (response.status >= 400 && response.status < 500 && response.status !== 429) {
-              // Abort further retries for client errors (except 429 which is rate-limit)
               throw new AbortError(err.message);
             }
             throw err;
           }
 
-          // If the server indicates content not modified, return cached body
           if (response.status === 304 && isCacheable) {
             const cached = this.etagCache.get(cacheKey)?.json as T | undefined;
             if (cached !== undefined) return cached;
-            // fall through to parse if cache missing (shouldn't happen)
           }
 
           if (response.status === 204) return {} as T;
@@ -133,7 +130,6 @@ export class SonarrApiService {
           const isJson = response.headers.get('content-type')?.includes('application/json');
           const data = (isJson ? ((await response.json()) as T) : ({} as T));
 
-          // Store fresh ETag and body for cacheable reads
           if (isCacheable && isJson) {
             const nextEtag = response.headers.get('ETag');
             if (nextEtag) {
@@ -183,21 +179,103 @@ export class SonarrApiService {
     return this.request<SonarrLookupSeries[]>(`series/lookup?${qs}`, credentials);
   };
 
-  public addSeries = async (payload: AddRequestPayload, baseOptions: ExtensionOptions): Promise<SonarrSeries> => {
-    const sonarrCreds = { url: baseOptions.sonarrUrl, apiKey: baseOptions.sonarrApiKey };
+  public addSeries = async (
+    payload: AddRequestPayload,
+    baseOptions: ExtensionOptions,
+  ): Promise<SonarrSeries> => {
+    const sonarrCreds: SonarrCredentialsPayload = {
+      url: baseOptions.sonarrUrl,
+      apiKey: baseOptions.sonarrApiKey,
+    };
 
     const finalPayload: AddRequestPayload = {
       ...baseOptions.defaults,
       ...payload,
     };
-    const { metadata: _unusedMetadata, ...payloadForSonarr } = finalPayload;
+
+    // Resolve tags:
+    // - Start from existing tags ids in the form (finalPayload.tags)
+    // - Merge in ids for freeform labels (finalPayload.freeformTags),
+    //   creating Sonarr tags when necessary.
+    const existingTagIdsFromForm: number[] = Array.isArray(finalPayload.tags)
+      ? finalPayload.tags.filter(id => typeof id === 'number' && !Number.isNaN(id))
+      : [];
+
+    const freeformLabelsRaw: string[] = Array.isArray(finalPayload.freeformTags)
+      ? finalPayload.freeformTags
+      : [];
+
+    const freeformLabels: string[] = [];
+    const seenLabels = new Set<string>();
+
+    for (const label of freeformLabelsRaw) {
+      if (!label) continue;
+      const trimmed = label.trim();
+      if (!trimmed) continue;
+      if (seenLabels.has(trimmed)) continue;
+      seenLabels.add(trimmed);
+      freeformLabels.push(trimmed);
+    }
+
+    // Fetch current tags once to avoid unnecessary createTag calls
+    const existingTags: SonarrTag[] = await this.getTags(sonarrCreds);
+    const labelToId = new Map<string, number>();
+
+    for (const tag of existingTags) {
+      if (tag.label && tag.label.trim().length > 0) {
+        const trimmed = tag.label.trim();
+        labelToId.set(trimmed, tag.id);
+      }
+    }
+
+    const finalTagIds: number[] = [];
+    const seenIds = new Set<number>();
+
+    // Start with existing ids from the form
+    for (const id of existingTagIdsFromForm) {
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        finalTagIds.push(id);
+      }
+    }
+
+    // Then handle freeform labels
+    for (const label of freeformLabels) {
+      const existingId = labelToId.get(label);
+      if (typeof existingId === 'number') {
+        if (!seenIds.has(existingId)) {
+          seenIds.add(existingId);
+          finalTagIds.push(existingId);
+        }
+        continue;
+      }
+
+      // Not found in existing tags, create it
+      const created = await this.createTag(sonarrCreds, label);
+      if (typeof created.id === 'number' && !seenIds.has(created.id)) {
+        seenIds.add(created.id);
+        finalTagIds.push(created.id);
+      }
+    }
+
+    // Strip fields that Sonarr does not understand (`metadata`, `freeformTags`) before sending
+    const {
+      metadata: _unusedMetadata,
+      freeformTags: _unusedFreeformTags,
+      ...payloadForSonarr
+    } = finalPayload;
     void _unusedMetadata;
+    void _unusedFreeformTags;
+
     const apiPayload = {
       ...payloadForSonarr,
-      monitored: (finalPayload.monitorOption ?? baseOptions.defaults.monitorOption) !== 'none',
+      tags: finalTagIds,
+      monitored:
+        (finalPayload.monitorOption ?? baseOptions.defaults.monitorOption) !== 'none',
       addOptions: {
         searchForMissingEpisodes:
-          finalPayload.searchForMissingEpisodes ?? baseOptions.defaults.searchForMissingEpisodes,
+          finalPayload.searchForMissingEpisodes ??
+          baseOptions.defaults.searchForMissingEpisodes,
         monitor: finalPayload.monitorOption ?? baseOptions.defaults.monitorOption,
       },
     };
@@ -221,18 +299,26 @@ export class SonarrApiService {
     }
     const endpoint = qs.size > 0 ? `series/${seriesId}?${qs.toString()}` : `series/${seriesId}`;
 
-    log.debug('Sending updateSeries payload to Sonarr:', { seriesId, moveFiles: options?.moveFiles, payload });
+    log.debug('Sending updateSeries payload to Sonarr:', {
+      seriesId,
+      moveFiles: options?.moveFiles,
+      payload,
+    });
     return this.request<SonarrSeries>(endpoint, credentials, {
       method: 'PUT',
       body: JSON.stringify(payload),
     });
   };
 
-  public getRootFolders = async (credentials: SonarrCredentialsPayload): Promise<SonarrRootFolder[]> => {
+  public getRootFolders = async (
+    credentials: SonarrCredentialsPayload,
+  ): Promise<SonarrRootFolder[]> => {
     return this.request<SonarrRootFolder[]>('rootfolder', credentials);
   };
 
-  public getQualityProfiles = async (credentials: SonarrCredentialsPayload): Promise<SonarrQualityProfile[]> => {
+  public getQualityProfiles = async (
+    credentials: SonarrCredentialsPayload,
+  ): Promise<SonarrQualityProfile[]> => {
     return this.request<SonarrQualityProfile[]>('qualityprofile', credentials);
   };
 
@@ -240,7 +326,37 @@ export class SonarrApiService {
     return this.request<SonarrTag[]>('tag', credentials);
   };
 
-  public testConnection = async (credentials: SonarrCredentialsPayload): Promise<{ version: string }> => {
+  /**
+   * Creates a new tag in Sonarr with the given label.
+   * Returns the created SonarrTag (including its numeric id).
+   */
+  public createTag = async (
+    credentials: SonarrCredentialsPayload,
+    label: string,
+  ): Promise<SonarrTag> => {
+    const trimmed = label.trim();
+    if (!trimmed) {
+      throw createError(
+        ErrorCode.VALIDATION_ERROR,
+        'Tag label is empty.',
+        'Tag label cannot be empty.',
+      );
+    }
+
+    const created = await this.request<SonarrTag>('tag', credentials, {
+      method: 'POST',
+      body: JSON.stringify({ label: trimmed }),
+    });
+
+    // Tag list has changed; drop cached /tag response so the next getTags sees it.
+    this.etagCache.delete('tag');
+
+    return created;
+  };
+
+  public testConnection = async (
+    credentials: SonarrCredentialsPayload,
+  ): Promise<{ version: string }> => {
     return this.request<{ version: string }>('system/status', credentials);
   };
 }

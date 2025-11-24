@@ -57,6 +57,7 @@ const defaultFormState: SonarrFormState = {
   seasonFolder: true,
   searchForMissingEpisodes: true,
   tags: [],
+  freeformTags: [],
 };
 
 const trimTrailingSeparators = (input: string): string => input.replace(/[\\/]+$/, '').trim();
@@ -295,7 +296,8 @@ export function useMediaModalProps(
     defaultForm,
     metadata: sonarrMetadataQuery.data ?? null,
     sonarrReady,
-    disabled: !sonarrReady || sonarrMetadataQuery.isPending || sonarrMetadataQuery.isError,
+    disabled:
+      !sonarrReady || sonarrMetadataQuery.isPending || sonarrMetadataQuery.isError,
     portalContainer,
     folderSlug: folderSlug ?? null,
     onSubmit: async (form: SonarrFormState) => {
