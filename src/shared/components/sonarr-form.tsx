@@ -1,12 +1,12 @@
 // src/shared/components/sonarr-form.tsx
-import React, { useMemo } from 'react';
-import type { UseFormReturn } from 'react-hook-form';
+import React, { useMemo, useCallback } from "react";
+import type { UseFormReturn } from "react-hook-form";
 import type {
   SonarrFormState,
   SonarrQualityProfile,
   SonarrRootFolder,
   SonarrTag,
-} from '@/shared/types';
+} from "@/shared/types";
 import {
   FormField,
   FormLabel,
@@ -18,12 +18,12 @@ import {
   SelectItem,
   Switch,
   FormItem,
-} from './form';
-import MultiTagInput from './multi-tag-input';
+} from "./form";
+import MultiTagInput from "./multi-tag-input";
 import {
   MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
-} from '@/shared/utils/constants';
+} from "@/shared/utils/constants";
 
 export interface SonarrFormMetadata {
   qualityProfiles: SonarrQualityProfile[];
@@ -42,6 +42,50 @@ export interface SonarrFormProps {
   computedPath?: string | null;
   pathHintTitle?: string;
   pathHintTvdbId?: number | null;
+  includeSearchToggle?: boolean;
+  displayRootWithSlug?: boolean;
+  folderSlug?: string | null;
+}
+
+function normalizePathSegment(segment: string): string {
+  const replaced = segment.replace(/[\\/]+/g, " ");
+  const trimmed = replaced.trim();
+  return trimmed.replace(/\s+/g, " ");
+}
+
+function buildFolderSlug(
+  folderSlug?: string | null,
+  title?: string,
+  tvdbId?: number | null,
+): string | null {
+  if (folderSlug && folderSlug.trim().length > 0) {
+    return folderSlug.trim();
+  }
+
+  if (!title) return null;
+
+  const normalizedTitle = normalizePathSegment(title);
+  if (!normalizedTitle) return null;
+  if (tvdbId == null) return normalizedTitle;
+
+  return `${normalizedTitle} [tvdb-${tvdbId}]`;
+}
+
+function ellipsize(text?: string | null, max = 60): string {
+  if (!text) return "";
+  if (text.length <= max) return text;
+  return text.slice(0, Math.max(0, max - 3)) + "...";
+}
+
+function formatRootPath(rootPath: string, slug: string | null): string {
+  if (!slug) return rootPath;
+
+  const normalizedRoot =
+    rootPath.endsWith("/") || rootPath.endsWith("\\")
+      ? rootPath.slice(0, -1)
+      : rootPath;
+
+  return `${normalizedRoot}/${slug}`;
 }
 
 function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
@@ -55,7 +99,19 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
     computedPath,
     pathHintTitle,
     pathHintTvdbId,
+    includeSearchToggle = true,
+    displayRootWithSlug = false,
+    folderSlug,
   } = props;
+
+  const fieldRowClassName = "grid gap-4";
+  const fieldRowTemplateStyle: React.CSSProperties = {
+    gridTemplateColumns: "120px minmax(0, 1fr)",
+  };
+  const fieldRowStartStyle: React.CSSProperties = {
+    ...fieldRowTemplateStyle,
+    alignItems: "flex-start",
+  };
 
   const effectiveMetadata: SonarrFormMetadata = metadata;
   const effectiveValues: SonarrFormState = form.watch();
@@ -68,13 +124,6 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
   };
 
   const tagMaps = useMemo(() => {
-    if (!effectiveMetadata) {
-      return {
-        idToLabel: new Map<number, string>(),
-        labelToId: new Map<string, number>(),
-      };
-    }
-
     const idToLabel = new Map<number, string>();
     const labelToId = new Map<string, number>();
 
@@ -94,209 +143,317 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
     () =>
       effectiveValues.tags
         .map(tagId => idToLabel.get(tagId))
-        .filter((label): label is string => typeof label === 'string' && label.length > 0),
+        .filter((label): label is string => typeof label === "string" && label.length > 0),
     [effectiveValues, idToLabel],
   );
 
   const selectPortal = portalContainer ?? null;
 
+  const computedSlug = useMemo(
+    () => buildFolderSlug(folderSlug, pathHintTitle, pathHintTvdbId),
+    [folderSlug, pathHintTitle, pathHintTvdbId],
+  );
+
+  const getRootDisplayPath = useCallback(
+    (rootPath: string) => {
+      if (!rootPath) return rootPath;
+      return displayRootWithSlug ? formatRootPath(rootPath, computedSlug) : rootPath;
+    },
+    [computedSlug, displayRootWithSlug],
+  );
+
+  const selectedRootDisplay = effectiveValues.rootFolderPath
+    ? getRootDisplayPath(effectiveValues.rootFolderPath)
+    : undefined;
+
+  const formatFreeSpace = useCallback((bytes?: number | null): string | null => {
+    if (bytes == null || Number.isNaN(bytes)) return null;
+    const tebibyte = 1024 ** 4;
+    const gibibyte = 1024 ** 3;
+    if (bytes >= tebibyte) {
+      return `${(bytes / tebibyte).toFixed(1)} TiB free`;
+    }
+    if (bytes >= gibibyte) {
+      return `${(bytes / gibibyte).toFixed(1)} GiB free`;
+    }
+    return `${bytes.toLocaleString()} B free`;
+  }, []);
+
   const handleTagsChange = (labels: string[]) => {
     const tagIds = labels
       .map(label => labelToId.get(label))
-      .filter((id): id is number => typeof id === 'number');
+      .filter((id): id is number => typeof id === "number");
 
-    setFieldValue('tags', tagIds);
+    setFieldValue("tags", tagIds);
   };
 
+  const showComputedPath = Boolean(computedPath);
+  const showPathHint = Boolean(computedSlug);
+
+  const containerClassName =
+    (className ? `${className} ` : "") +
+    "w-full rounded-xl bg-bg-secondary p-5";
+
+  const selectItemClassName =
+    "cursor-pointer outline-none focus:bg-bg-tertiary focus:text-text-primary data-[state=checked]:bg-bg-secondary data-[state=checked]:text-text-primary";
+
   return (
-    <div className={className ?? "space-y-4"}>
-      {computedPath != null && pathHintTitle ? (
-        <div className="mb-4 space-y-3 rounded-xl border border-border-primary bg-bg-tertiary px-4 py-4">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-text-primary">Root Folder</h3>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <FormField>
-                <FormItem>
-                  <FormLabel>Root Folder</FormLabel>
-                  <FormControl>
-                    <Select
-                      disabled={!!disabled}
-                      value={effectiveValues.rootFolderPath}
-                      onValueChange={v => setFieldValue('rootFolderPath', v)}
-                    >
-                      <SelectTrigger className="text-text-primary">
-                        <SelectValue placeholder="Select a folder..." />
-                      </SelectTrigger>
-                      <SelectContent container={selectPortal}>
-                        {effectiveMetadata.rootFolders.map(f => (
-                          <SelectItem key={f.id} value={f.path}>
-                            {f.path}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                </FormItem>
-              </FormField>
+    <div className={containerClassName}>
+      <div className="space-y-4">
+        {/* Root folder */}
+        <div className="space-y-1">
+          <FormField>
+            <FormItem
+              className={`${fieldRowClassName} items-start`}
+              style={fieldRowStartStyle}
+            >
+              <FormLabel className="text-xs font-medium text-text-secondary">
+                Root Folder
+              </FormLabel>
+              <FormControl className="w-full min-w-0">
+                <Select
+                  disabled={!!disabled}
+                  value={effectiveValues.rootFolderPath}
+                  onValueChange={v => setFieldValue("rootFolderPath", v)}
+                >
+                  <SelectTrigger
+                    ref={initialFocusRef}
+                    className="min-w-0 cursor-pointer text-left text-text-primary"
+                  >
+                    <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                      <SelectValue placeholder="Select a folder...">
+                        {selectedRootDisplay ? (
+                          <span
+                            className="block min-w-0 truncate text-left"
+                            title={selectedRootDisplay}
+                          >
+                            {ellipsize(selectedRootDisplay, 60)}
+                          </span>
+                        ) : null}
+                      </SelectValue>
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent
+                    container={selectPortal}
+                    className="min-w-(--radix-select-trigger-width) max-w-[90vw]"
+                  >
+                    {effectiveMetadata.rootFolders.map(f => {
+                      const fullPath = getRootDisplayPath(f.path) ?? "";
+                      const freeSpaceLabel = formatFreeSpace(f.freeSpace);
+                      return (
+                        <SelectItem
+                          key={f.id}
+                          value={f.path}
+                          className={selectItemClassName}
+                        >
+                          <div className="flex w-full items-center justify-between gap-4">
+                            <span
+                              className="whitespace-nowrap text-left"
+                              title={fullPath || undefined}
+                            >
+                              {fullPath}
+                            </span>
+                            {freeSpaceLabel ? (
+                              <span className="shrink-0 whitespace-nowrap text-xs text-text-tertiary">
+                                {freeSpaceLabel}
+                              </span>
+                            ) : null}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </FormControl>
+            </FormItem>
+          </FormField>
+
+          {(showComputedPath && computedPath) || showPathHint ? (
+            <div className={fieldRowClassName} style={fieldRowTemplateStyle}>
+              {/* Spacer div to align text with the second column (inputs) */}
+              <div />
+              <div className="space-y-1">
+                {showPathHint ? (
+                  <p className="text-xs text-text-secondary">
+                    &apos;{computedSlug}&apos; subfolder will be created automatically.
+                  </p>
+                ) : null}
+              </div>
             </div>
-            <div className="space-y-2">
-              <FormField>
-                <FormItem>
-                  <FormLabel>Path</FormLabel>
-                  <FormControl>
-                    <input
-                      type="text"
-                      readOnly
-                      value={computedPath ?? ''}
-                      placeholder="Path will be generated automatically"
-                      className="w-full rounded-md border border-border-primary bg-bg-secondary px-3 py-2 text-sm text-text-primary"
-                    />
-                  </FormControl>
-                </FormItem>
-              </FormField>
-              {pathHintTitle && pathHintTvdbId ? (
-                <p className="text-xs text-text-secondary">
-                  &apos;
-                  {pathHintTitle}
-                  {' '}
-                  [tvdb-
-                  {pathHintTvdbId}
-                  ]
-                  &apos; subfolder will be created automatically.
-                </p>
-              ) : null}
-            </div>
-          </div>
+          ) : null}
         </div>
-      ) : null}
 
-      <div className="space-y-4 rounded-xl border border-border-primary bg-bg-tertiary px-4 py-4">
-        <h3 className="text-sm font-semibold text-text-primary">Series setup</h3>
+        {/* Monitor */}
+        <div className="space-y-1">
+          <FormField>
+            <FormItem
+              className={`${fieldRowClassName} items-center`}
+              style={fieldRowTemplateStyle}
+            >
+              <FormLabel className="text-xs font-medium text-text-secondary">Monitor</FormLabel>
+              <FormControl className="w-full">
+                <Select
+                  disabled={!!disabled}
+                  value={effectiveValues.monitorOption}
+                  onValueChange={v =>
+                    setFieldValue("monitorOption", v as SonarrFormState["monitorOption"])
+                  }
+                >
+                  <SelectTrigger className="cursor-pointer text-text-primary">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent container={selectPortal}>
+                    {MONITOR_OPTIONS_WITH_DESCRIPTIONS.map(o => (
+                      <SelectItem
+                        key={o.value}
+                        value={o.value}
+                        className={selectItemClassName}
+                      >
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormControl>
+            </FormItem>
+          </FormField>
+        </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-4">
+        {/* Quality profile */}
+        <div className="space-y-1">
+          <FormField>
+            <FormItem
+              className={`${fieldRowClassName} items-center`}
+              style={fieldRowTemplateStyle}
+            >
+              <FormLabel className="text-xs font-medium text-text-secondary">
+                Quality Profile
+              </FormLabel>
+              <FormControl className="w-full">
+                <Select
+                  disabled={!!disabled}
+                  value={String(effectiveValues.qualityProfileId)}
+                  onValueChange={v => setFieldValue("qualityProfileId", Number(v))}
+                >
+                  <SelectTrigger className="cursor-pointer text-text-primary">
+                    <SelectValue placeholder="Select a profile..." />
+                  </SelectTrigger>
+                  <SelectContent container={selectPortal}>
+                    {effectiveMetadata.qualityProfiles.map(p => (
+                      <SelectItem
+                        key={p.id}
+                        value={String(p.id)}
+                        className={selectItemClassName}
+                      >
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormControl>
+            </FormItem>
+          </FormField>
+        </div>
+
+        {/* Series type */}
+        <div className="space-y-1">
+          <FormField>
+            <FormItem
+              className={`${fieldRowClassName} items-center`}
+              style={fieldRowTemplateStyle}
+            >
+              <FormLabel className="text-xs font-medium text-text-secondary">
+                Series Type
+              </FormLabel>
+              <FormControl className="w-full">
+                <Select
+                  disabled={!!disabled}
+                  value={effectiveValues.seriesType}
+                  onValueChange={v =>
+                    setFieldValue("seriesType", v as SonarrFormState["seriesType"])
+                  }
+                >
+                  <SelectTrigger className="cursor-pointer text-text-primary">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent container={selectPortal}>
+                    {SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS.map(o => (
+                      <SelectItem
+                        key={o.value}
+                        value={o.value}
+                        className={selectItemClassName}
+                      >
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormControl>
+            </FormItem>
+          </FormField>
+        </div>
+
+        {/* Tags */}
+        <div className="space-y-1">
+          <FormField>
+            <FormItem
+              className={`${fieldRowClassName} items-start`}
+              style={fieldRowStartStyle}
+            >
+              <FormLabel className="text-xs font-medium text-text-secondary">Tags</FormLabel>
+              <FormControl className="w-full">
+                <MultiTagInput
+                  value={selectedTagLabels}
+                  onChange={handleTagsChange}
+                  placeholder="Add tags..."
+                  disabled={!!disabled}
+                  existingTags={effectiveMetadata.tags.map(t => t.label)}
+                />
+              </FormControl>
+            </FormItem>
+          </FormField>
+        </div>
+        
+        {/* Toggles */}
+        <div className="space-y-1.5 pt-1">
+          <FormField>
+            <FormItem
+              className={`${fieldRowClassName} items-center`}
+              style={fieldRowTemplateStyle}
+            >
+              <FormLabel className="text-xs font-medium text-text-secondary">
+                Season Folders
+              </FormLabel>
+              <FormControl className="flex justify-start">
+                <Switch
+                  disabled={!!disabled}
+                  checked={effectiveValues.seasonFolder}
+                  onCheckedChange={v => setFieldValue("seasonFolder", v)}
+                />
+              </FormControl>
+            </FormItem>
+          </FormField>
+
+          {includeSearchToggle ? (
             <FormField>
-              <FormItem>
-                <FormLabel>Quality Profile</FormLabel>
-                <FormControl>
-                  <Select
-                    disabled={!!disabled}
-                    value={String(effectiveValues.qualityProfileId)}
-                    onValueChange={v => setFieldValue('qualityProfileId', Number(v))}
-                  >
-                    <SelectTrigger ref={initialFocusRef} className="text-text-primary">
-                      <SelectValue placeholder="Select a profile..." />
-                    </SelectTrigger>
-                    <SelectContent container={selectPortal}>
-                      {effectiveMetadata.qualityProfiles.map(p => (
-                        <SelectItem key={p.id} value={String(p.id)}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-              </FormItem>
-            </FormField>
-
-            <FormField>
-              <FormItem>
-                <FormLabel>Monitor</FormLabel>
-                <FormControl>
-                  <Select
-                    disabled={!!disabled}
-                    value={effectiveValues.monitorOption}
-                    onValueChange={v =>
-                      setFieldValue('monitorOption', v as SonarrFormState['monitorOption'])
-                    }
-                  >
-                    <SelectTrigger className="w-[250px] text-text-primary">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent container={selectPortal}>
-                      {MONITOR_OPTIONS_WITH_DESCRIPTIONS.map(o => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-              </FormItem>
-            </FormField>
-          </div>
-
-          <div className="space-y-4">
-            <FormField>
-              <FormItem>
-                <FormLabel>Series Type</FormLabel>
-                <FormControl>
-                  <Select
-                    disabled={!!disabled}
-                    value={effectiveValues.seriesType}
-                    onValueChange={v =>
-                      setFieldValue('seriesType', v as SonarrFormState['seriesType'])
-                    }
-                  >
-                    <SelectTrigger className="text-text-primary">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent container={selectPortal}>
-                      {SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS.map(o => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-              </FormItem>
-            </FormField>
-
-            <FormField>
-              <FormItem>
-                <FormLabel>Use Season Folders</FormLabel>
-                <FormControl className="flex justify-end">
+              <FormItem
+                className={`${fieldRowClassName} items-center`}
+                style={fieldRowTemplateStyle}
+              >
+                <FormLabel className="text-xs font-medium text-text-secondary">
+                  Search on Add
+                </FormLabel>
+                <FormControl className="flex justify-start">
                   <Switch
                     disabled={!!disabled}
-                    checked={effectiveValues.seasonFolder}
-                    onCheckedChange={v => setFieldValue('seasonFolder', v)}
+                    checked={effectiveValues.searchForMissingEpisodes}
+                    onCheckedChange={v => setFieldValue("searchForMissingEpisodes", v)}
                   />
                 </FormControl>
               </FormItem>
             </FormField>
-          </div>
+          ) : null}
         </div>
-
-        <FormField>
-          <FormItem>
-            <FormLabel>Tags</FormLabel>
-            <FormControl>
-              <MultiTagInput
-                value={selectedTagLabels}
-                onChange={handleTagsChange}
-                placeholder="Add tags..."
-                disabled={!!disabled}
-                existingTags={effectiveMetadata.tags.map(t => t.label)}
-              />
-            </FormControl>
-          </FormItem>
-        </FormField>
-
-        <FormField>
-          <FormItem>
-            <FormLabel>Search on Add</FormLabel>
-            <FormControl className="flex justify-end">
-              <Switch
-                disabled={!!disabled}
-                checked={effectiveValues.searchForMissingEpisodes}
-                onCheckedChange={v => setFieldValue('searchForMissingEpisodes', v)}
-              />
-            </FormControl>
-          </FormItem>
-        </FormField>
       </div>
     </div>
   );

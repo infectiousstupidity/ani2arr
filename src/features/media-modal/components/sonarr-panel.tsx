@@ -12,6 +12,7 @@ export function SonarrPanel(props: SonarrPanelProps): React.JSX.Element {
     sonarrReady,
     disabled,
     portalContainer,
+    folderSlug,
   } = props;
 
   if (!sonarrReady || !metadata) {
@@ -28,17 +29,18 @@ export function SonarrPanel(props: SonarrPanelProps): React.JSX.Element {
   const ensuredMetadata = metadata;
 
   return (
-    <div className="space-y-4">
-      <SonarrForm
-        form={controller.form}
-        metadata={ensuredMetadata}
-        disabled={Boolean(disabled) || !sonarrReady}
-        portalContainer={portalContainer ?? null}
-        computedPath={controller.computedPath}
-        pathHintTitle={title}
-        pathHintTvdbId={tvdbId}
-        className="space-y-4"
-      />
-    </div>
+    <SonarrForm
+      form={controller.form}
+      metadata={ensuredMetadata}
+      disabled={Boolean(disabled) || !sonarrReady}
+      portalContainer={portalContainer ?? null}
+      computedPath={controller.computedPath}
+      pathHintTitle={title}
+      pathHintTvdbId={tvdbId}
+      includeSearchToggle
+      displayRootWithSlug
+      folderSlug={folderSlug ?? null}
+      className="space-y-4"
+    />
   );
 }

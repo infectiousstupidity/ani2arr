@@ -69,7 +69,7 @@ const Input = React.memo(
           id={id}
           type={type}
           ref={ref}
-          className={`flex h-9 w-full rounded-md border border-border-primary bg-bg-tertiary px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-text-secondary disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+          className={`flex h-9 w-full rounded-md bg-bg-tertiary px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-text-secondary disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
           {...props}
         />
       );
@@ -111,7 +111,7 @@ const SelectTrigger = React.memo(
       <SelectPrimitive.Trigger
         id={id}
         ref={ref}
-        className={`flex h-9 w-full items-center justify-between rounded-md border border-border-primary bg-bg-tertiary px-3 py-2 text-sm ring-offset-background placeholder:text-text-primary disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+        className={`flex h-9 w-full min-w-0 items-center justify-between overflow-hidden rounded-md bg-bg-primary px-3 py-2 text-sm ring-offset-background placeholder:text-text-primary whitespace-nowrap text-ellipsis disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
         {...props}
       >
         {children}
@@ -136,11 +136,19 @@ const SelectContent = React.memo(
       <SelectPrimitive.Portal container={portalTarget as HTMLElement | undefined}>
         <SelectPrimitive.Content
           ref={ref}
-          className={`relative z-[2147483602] min-w-32 w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-border-primary bg-bg-secondary text-text-primary shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ${className}`}
+          className={`relative z-2147483602 min-w-(--radix-select-trigger-width) max-w-[90vw] overflow-hidden 
+            rounded-md border border-bg-primary bg-bg-secondary text-text-primary shadow-xl 
+            data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 
+            data-[state=open]:fade-in-0 ${className}`}
+          style={{
+            minWidth: 'var(--radix-select-trigger-width)',
+            width: 'max-content',
+            maxWidth: '90vw',
+          }}
           position={position}
           {...props}
         >
-          <SelectPrimitive.Viewport className="p-1">{children}</SelectPrimitive.Viewport>
+          <SelectPrimitive.Viewport className="w-full p-1">{children}</SelectPrimitive.Viewport>
         </SelectPrimitive.Content>
       </SelectPrimitive.Portal>
     );
@@ -163,7 +171,9 @@ const SelectItem = React.memo(
           <Check className="h-4 w-4" />
         </SelectPrimitive.ItemIndicator>
       </span>
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      <SelectPrimitive.ItemText asChild>
+        <div className="flex-1 min-w-0">{children}</div>
+      </SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
   )),
 );

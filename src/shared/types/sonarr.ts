@@ -98,6 +98,7 @@ export interface LeanSonarrSeries {
 }
 
 export interface SonarrRootFolder {
+  freeSpace: number;
   id: number;
   path: string;
 }

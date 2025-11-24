@@ -46,7 +46,7 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
         <button
           type="button"
           onClick={onEditMapping}
-          className="inline-flex items-center justify-center rounded-full border border-border-primary bg-bg-tertiary p-2 text-text-secondary shadow-md transition hover:border-accent-primary hover:text-accent-primary"
+          className="inline-flex items-center justify-center rounded-full bg-bg-secondary p-2 text-text-secondary shadow-md transition hover:border-accent-primary hover:text-accent-primary"
           aria-label="Edit mapping"
         >
           <Pencil className="h-4 w-4" />
@@ -93,9 +93,9 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
   ].filter((value): value is string => Boolean(value));
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border-primary bg-bg-tertiary shadow-lg shadow-black/30">
+    <div className="overflow-hidden rounded-xl bg-bg-secondary shadow-lg shadow-black/30">
       <div className="flex gap-4 p-4">
-        <div className="h-40 w-28 overflow-hidden rounded-lg border border-border-primary/70 bg-bg-primary shadow-inner">
+        <div className="h-40 w-28 overflow-hidden rounded-lg bg-bg-primary shadow-inner">
           {mapping.posterUrl ? (
             <img
               src={mapping.posterUrl}
@@ -147,7 +147,7 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-border-primary bg-bg-primary/30 px-4 py-3 text-xs text-text-secondary">
+      <div className="flex items-center justify-between bg-bg-primary/30 px-4 py-3 text-xs text-text-secondary">
         {mapping.statusLabel ? (
           <span className="rounded bg-bg-primary/60 px-2 py-1 text-[10px] font-medium text-text-secondary">
             {mapping.statusLabel}

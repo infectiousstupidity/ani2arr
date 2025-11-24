@@ -47,11 +47,11 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
           value={state.query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search Sonarr / TVDB"
-          className="w-full rounded-lg border border-border-primary bg-bg-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-accent-primary focus:outline-none"
+          className="w-full rounded-lg bg-bg-secondary px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-accent-primary focus:outline-none"
         />
       </div>
 
-      <div className="flex-1 overflow-hidden rounded-xl border border-border-primary bg-bg-tertiary/80 shadow-inner">
+      <div className="flex-1 overflow-hidden rounded-xl bg-bg-secondary/80 shadow-inner">
         <div className="h-full divide-y divide-border-primary overflow-y-auto">
           {searchQuery.isFetching && !results.length ? (
             <div className="flex h-32 items-center justify-center text-xs text-text-secondary">

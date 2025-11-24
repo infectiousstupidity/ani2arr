@@ -170,34 +170,6 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
       };
     } else {
       return {
-        leftContent:
-          sonarrPanelProps.mode === "add" ? (
-            <>
-              <span className="mr-1 text-[11px] font-medium uppercase tracking-wide">
-                On add, also:
-              </span>
-              <button
-                type="button"
-                onClick={() => sonarrController.handleFieldChange("searchForMissingEpisodes", !sonarrController.current.searchForMissingEpisodes)}
-                className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-medium ${
-                  sonarrController.current.searchForMissingEpisodes
-                    ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
-                    : "border-border-primary bg-bg-tertiary text-text-secondary hover:border-accent-primary hover:text-text-primary"
-                }`}
-              >
-                <span
-                  className={`mr-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border text-[10px] ${
-                    sonarrController.current.searchForMissingEpisodes
-                      ? "border-accent-primary bg-accent-primary text-white"
-                      : "border-border-primary bg-bg-secondary text-text-secondary"
-                  }`}
-                >
-                  {sonarrController.current.searchForMissingEpisodes ? "\u2713" : ""}
-                </span>
-                Search for missing episodes
-              </button>
-            </>
-        ) : null,
         primaryLabel: sonarrPanelProps.mode === "edit" ? "Save changes" : "Add series",
         primaryDisabled: !sonarrController.canSubmit,
         primaryLoading: sonarrController.isSubmitting,
@@ -234,7 +206,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
       <ModalContent
         container={portalContainer ?? null}
         floatingPortalRef={handleFloatingPortalRef}
-        className="h-[800px] max-h-[90vh] w-full max-w-[1000px] flex flex-col overflow-hidden rounded-2xl border border-border-primary bg-bg-secondary shadow-2xl shadow-black/40 p-0"
+        className="w-full max-w-[1000px] flex flex-col rounded-2xl bg-bg-primary shadow-2xl shadow-black/40 p-0"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
         }}
@@ -263,11 +235,11 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           onClose={handleClose}
           tooltipContainer={floatingPortalEl ?? (portalContainer instanceof HTMLElement ? portalContainer : null)}
         />
-        {/* Content Area - split view, left panel scrolls, right panel stays sticky */}
-        <div className="flex-1 overflow-hidden px-8 pb-6">
-          <div className="mx-auto flex h-full max-w-[1000px] flex-col gap-6">
-            <div className="grid h-full grid-cols-[3fr_2fr] gap-6">
-              <div className="flex h-full flex-col overflow-hidden">
+        {/* Content Area - split view with sticky preview and inline content */}
+        <div className="flex-1 px-8 pb-6">
+          <div className="mx-auto flex max-w-[1000px] flex-col gap-6">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="flex flex-col">
                 <div className="px-0 pb-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
@@ -289,7 +261,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto pr-1">
+                <div className="flex-1">
                   {viewMode === "mapping" ? (
                     <ProviderSearchSection
                       controller={mappingController}
@@ -306,7 +278,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                   )}
                 </div>
               </div>
-              <div className="relative h-full">
+              <div className="relative">
                 <div className="sticky top-0">
                   <MappingPreviewPanel
                     aniListEntry={mappingTabProps.aniListEntry}
