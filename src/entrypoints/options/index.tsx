@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
+import ToastProvider from '@/shared/components/toast-provider';
 import SettingsForm from '@/shared/components/settings-form';
 import './style.css';
 import { ConfirmProvider } from '@/shared/hooks/use-confirm';
@@ -38,9 +39,11 @@ if (rootElement) {
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <ConfirmProvider>
-            <OptionsPage />
-          </ConfirmProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+              <OptionsPage />
+            </ConfirmProvider>
+          </ToastProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </React.StrictMode>,

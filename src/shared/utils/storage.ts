@@ -23,6 +23,7 @@ const getDefaultFormState = (): SonarrFormState => ({
   seasonFolder: true,
   searchForMissingEpisodes: true,
   tags: [],
+  freeformTags: [],
 });
 
 const DEFAULT_TITLE_LANGUAGE: TitleLanguage = 'english';

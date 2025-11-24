@@ -13,6 +13,7 @@ import './style.css';
 import { SquareArrowOutUpRight } from 'lucide-react';
 import Button from '@/shared/components/button';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
+import ToastProvider from '@/shared/components/toast-provider';
 
 const queryClient = new QueryClient();
 
@@ -51,8 +52,12 @@ if (root) {
   ReactDOM.createRoot(root).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
-        <PopupPanel />
-      </QueryClientProvider>
+          <TooltipProvider>
+            <ToastProvider>
+              <PopupPanel />
+            </ToastProvider>
+          </TooltipProvider>
+        </QueryClientProvider>
     </React.StrictMode>,
   );
 }

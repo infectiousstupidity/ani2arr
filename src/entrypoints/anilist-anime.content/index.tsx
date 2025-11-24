@@ -3,6 +3,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
+import ToastProvider, { useToast } from '@/shared/components/toast-provider';
 import { useTheme } from '@/shared/hooks/use-theme';
 import {
   useSeriesStatus,
@@ -23,6 +24,7 @@ import './style.css';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 import { awaitBackgroundReady } from '@/shared/utils/background-ready';
+import { ConfirmProvider } from '@/shared/hooks/use-confirm';
 
 const log = logger.create('AniList Content');
 
@@ -227,9 +229,15 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   );
   const addSeriesMutation = useAddSeries();
 
+  const toast = useToast();
+
   const handleQuickAdd = () => {
     if (!isConfigured || !defaults) {
-      alert('Please configure your Sonarr settings first.');
+      toast.showToast({
+        title: 'Sonarr not configured',
+        description: 'Please configure your Sonarr settings first.',
+        variant: 'info',
+      });
       browser.runtime.openOptionsPage().catch(() => {});
       return;
     }
@@ -276,53 +284,55 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
 
   return (
     <div ref={hostRef} style={{ width: '100%' }}>
-      <MediaActions
-        service="sonarr"
-        status={status}
-        {...(librarySlug ? { librarySlug } : {})}
-        resolvedSearchTerm={resolvedSearchTerm}
-        externalId={tvdbId}
-        onQuickAdd={handleQuickAdd}
-        onOpenModal={() => {
-          mediaModal.open({
-            anilistId,
-            title,
-            initialTab: 'series',
-            metadata,
-          });
-        }}
-        onOpenMappingFix={() => {
-          mediaModal.open({
-            anilistId,
-            title,
-            initialTab: 'mapping',
-            metadata,
-          });
-        }}
-        portalContainer={hostElement ?? undefined}
-      />
-      {hostElement && mediaModal.state && modalProps && (
-        <MediaModal
-          key={`modal-${mediaModal.state.anilistId}`}
-          isOpen={mediaModal.state.isOpen}
-          onClose={mediaModal.reset}
-          title={modalProps.title}
-          alternateTitles={modalProps.alternateTitles}
-          titleLanguage={modalProps.titleLanguage}
-          bannerImage={modalProps.bannerImage}
-          coverImage={modalProps.coverImage}
-          anilistIds={[mediaModal.state.anilistId]}
-          tvdbId={modalProps.tvdbId}
-          inLibrary={modalProps.inLibrary}
-          format={modalProps.format}
-          year={modalProps.year}
-          status={modalProps.status}
-          initialTab={mediaModal.state.initialTab ?? 'series'}
-          portalContainer={hostElement}
-          mappingTabProps={modalProps.mappingTabProps}
-          sonarrPanelProps={modalProps.sonarrPanelProps}
+      <ConfirmProvider portalContainer={hostElement ?? null}>
+        <MediaActions
+          service="sonarr"
+          status={status}
+          {...(librarySlug ? { librarySlug } : {})}
+          resolvedSearchTerm={resolvedSearchTerm}
+          externalId={tvdbId}
+          onQuickAdd={handleQuickAdd}
+          onOpenModal={() => {
+            mediaModal.open({
+              anilistId,
+              title,
+              initialTab: 'series',
+              metadata,
+            });
+          }}
+          onOpenMappingFix={() => {
+            mediaModal.open({
+              anilistId,
+              title,
+              initialTab: 'mapping',
+              metadata,
+            });
+          }}
+          portalContainer={hostElement ?? undefined}
         />
-      )}
+        {hostElement && mediaModal.state && modalProps && (
+          <MediaModal
+            key={`modal-${mediaModal.state.anilistId}`}
+            isOpen={mediaModal.state.isOpen}
+            onClose={mediaModal.reset}
+            title={modalProps.title}
+            alternateTitles={modalProps.alternateTitles}
+            titleLanguage={modalProps.titleLanguage}
+            bannerImage={modalProps.bannerImage}
+            coverImage={modalProps.coverImage}
+            anilistIds={[mediaModal.state.anilistId]}
+            tvdbId={modalProps.tvdbId}
+            inLibrary={modalProps.inLibrary}
+            format={modalProps.format}
+            year={modalProps.year}
+            status={modalProps.status}
+            initialTab={mediaModal.state.initialTab ?? 'series'}
+            portalContainer={hostElement}
+            mappingTabProps={modalProps.mappingTabProps}
+            sonarrPanelProps={modalProps.sonarrPanelProps}
+          />
+        )}
+      </ConfirmProvider>
     </div>
   );
 };
@@ -399,7 +409,9 @@ async function mountAnimePageUI(
       root.render(
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
-            <ContentRoot anilistId={anilistId} title={title} metadata={metadata ?? null} />
+            <ToastProvider>
+              <ContentRoot anilistId={anilistId} title={title} metadata={metadata ?? null} />
+            </ToastProvider>
           </TooltipProvider>
         </QueryClientProvider>,
       );
