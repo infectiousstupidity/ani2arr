@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import SettingsForm from '@/shared/components/settings-form';
 import './style.css';
+import { ConfirmProvider } from '@/shared/hooks/use-confirm';
 
 const queryClient = new QueryClient();
 
@@ -37,7 +38,9 @@ if (rootElement) {
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <OptionsPage />
+          <ConfirmProvider>
+            <OptionsPage />
+          </ConfirmProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </React.StrictMode>,

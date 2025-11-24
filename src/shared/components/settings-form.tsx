@@ -8,6 +8,7 @@ import SonarrForm from './sonarr-form';
 import { CircleCheck, CircleX, RotateCcw } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import type { SonarrFormState, TitleLanguage } from '@/shared/types';
+import { useConfirm } from '@/shared/hooks/use-confirm';
 
 const titleLanguageOptions: Array<{ value: TitleLanguage; label: string }> = [
   { value: 'english', label: 'English (default)' },
@@ -68,6 +69,8 @@ function SettingsForm(): React.JSX.Element {
   };
 
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  const confirm = useConfirm();
 
 
   if (manager.isLoading) {
@@ -158,7 +161,12 @@ function SettingsForm(): React.JSX.Element {
                 </Button>
                 <Button
                   onClick={async () => {
-                    const shouldDisconnect = window.confirm('Disconnect Sonarr? This will remove saved credentials and permissions.');
+                    const shouldDisconnect = await confirm({
+                      title: 'Disconnect Sonarr?',
+                      description: 'This will remove saved credentials and permissions.',
+                      confirmText: 'Disconnect',
+                      cancelText: 'Cancel',
+                    });
                     if (!shouldDisconnect) return;
                     setIsDisconnecting(true);
                     try {
