@@ -34,6 +34,7 @@
     "@types/react-dom": "^19.1.6",
     "@wxt-dev/auto-icons": "^1.0.2",
     "@wxt-dev/module-react": "^1.1.3",
+    "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9.36.0",
     "eslint-plugin-playwright": "^2.2.2",
     "eslint-plugin-react": "^7.37.5",
@@ -53,6 +54,7 @@
     "wxt": "^0.20.11"
   },
   "dependencies": {
+    "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.1",
     "@radix-ui/react-dropdown-menu": "^2.1.6",
     "@radix-ui/react-label": "^2.1.7",
