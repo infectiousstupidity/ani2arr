@@ -174,11 +174,20 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
         primaryDisabled: !sonarrController.canSubmit,
         primaryLoading: sonarrController.isSubmitting,
         onPrimaryClick: () => {
-          void sonarrController.handlePrimarySubmit();
+          void (async () => {
+            try {
+              await sonarrController.handlePrimarySubmit();
+              if (sonarrPanelProps.mode === "edit") {
+                handleClose();
+              }
+            } catch {
+              // Keep modal open on error.
+            }
+          })();
         },
         secondaryLabel: "Cancel",
         onSecondaryClick: handleClose,
-        showTertiary: sonarrController.showSaveDefaults,
+        showTertiary: sonarrController.showSaveDefaults && Boolean(sonarrController.form.formState.isDirty),
         tertiaryLabel: "Save as default",
         onTertiaryClick: sonarrController.showSaveDefaults ? () => {
           void sonarrController.handleSaveDefaults();

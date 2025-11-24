@@ -10,23 +10,54 @@ interface MultiTagInputProps {
   existingTags?: string[];
 }
 
-const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, placeholder, disabled, existingTags = [] }) => {
+const MultiTagInput: React.FC<MultiTagInputProps> = ({
+  value: tags,
+  onChange,
+  placeholder,
+  disabled,
+  existingTags = [],
+}) => {
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const addTag = (tagToAdd: string) => {
-    const newTag = tagToAdd.trim();
-    if (newTag && !tags.includes(newTag)) {
-      onChange([...tags, newTag]);
+  const normalizedTags = useMemo(
+    () => tags.map(tag => tag.toLowerCase()),
+    [tags],
+  );
+
+  const existingTagMap = useMemo(
+    () =>
+      new Map(
+        existingTags
+          .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+          .map(tag => [tag.toLowerCase(), tag]),
+      ),
+    [existingTags],
+  );
+
+  const addTag = (tagToAdd: string): boolean => {
+    const trimmed = tagToAdd.trim();
+    if (!trimmed) {
+      return false;
     }
+
+    const normalized = trimmed.toLowerCase();
+    const canonical = existingTagMap.get(normalized) ?? trimmed;
+
+    if (normalizedTags.includes(canonical.toLowerCase())) {
+      return false;
+    }
+
+    onChange([...tags, canonical]);
     setInputValue('');
+    return true;
   };
 
   const removeTag = (indexToRemove: number) => {
     if (disabled) return;
     onChange(tags.filter((_, index) => index !== indexToRemove));
-    inputRef.current?.focus(); // Keep focus in the component
+    inputRef.current?.focus();
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -37,7 +68,7 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ' ' || e.key === ',') {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === ',' || e.key === 'Spacebar') {
       e.preventDefault();
       addTag(inputValue);
     } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
@@ -58,29 +89,30 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
   };
 
   const suggestions = useMemo(() => {
-    const lowerInputValue = inputValue.toLowerCase();
+    const lowerInput = inputValue.toLowerCase();
 
-    // Filter out tags that are already selected
-    const availableTags = existingTags.filter(
-      tag => !tags.some(t => t.toLowerCase() === tag.toLowerCase())
-    );
+    const availableTags = existingTags
+      .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+      .filter(tag => !normalizedTags.includes(tag.toLowerCase()));
 
-    // If there's input, filter based on it. Otherwise, show all available tags.
     if (inputValue) {
-      return availableTags.filter(tag => tag.toLowerCase().includes(lowerInputValue));
+      return availableTags.filter(tag => tag.toLowerCase().includes(lowerInput));
     }
 
     return availableTags;
-  }, [inputValue, existingTags, tags]);
+  }, [inputValue, existingTags, normalizedTags]);
 
   return (
     <div className="relative" onBlur={handleBlur}>
       <div
         className="flex w-full min-h-[42px] flex-nowrap items-center gap-2 overflow-x-auto rounded-md bg-bg-primary p-2 text-sm ring-offset-background"
-        onClick={() => inputRef.current?.focus()} // Focus the input when clicking the container
+        onClick={() => inputRef.current?.focus()}
       >
         {tags.map((tag, index) => (
-          <span key={index} className="flex items-center gap-1 rounded-sm bg-accent-primary/20 px-2 py-1 text-xs font-medium text-accent-primary">
+          <span
+            key={`${tag}-${index}`}
+            className="flex items-center gap-1 rounded-full bg-accent-primary/20 px-2 py-1 text-xs font-medium text-accent-primary"
+          >
             {tag}
             <button
               type="button"
@@ -90,7 +122,7 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
               aria-label={`Remove ${tag}`}
             >
               <X className="h-3 w-3" />
-            </button>
+          </button>
           </span>
         ))}
         <input
@@ -116,7 +148,7 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
               role="option"
               key={suggestion}
               className="cursor-pointer rounded-sm px-3 py-1.5 text-sm text-text-primary hover:bg-bg-tertiary"
-              onMouseDown={(e) => {
+              onMouseDown={e => {
                 e.preventDefault();
                 addTag(suggestion);
               }}

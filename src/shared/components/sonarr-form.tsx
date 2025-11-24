@@ -123,29 +123,73 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
     form.setValue(field, value, { shouldDirty: true, shouldValidate: true });
   };
 
+  // Map Sonarr tag ids <-> labels from metadata
   const tagMaps = useMemo(() => {
     const idToLabel = new Map<number, string>();
     const labelToId = new Map<string, number>();
 
-    for (const tag of effectiveMetadata.tags) {
-      if (tag.label) {
-        idToLabel.set(tag.id, tag.label);
-        labelToId.set(tag.label, tag.id);
+    for (const tag of metadata.tags) {
+      if (tag.label && tag.label.trim().length > 0) {
+        const trimmed = tag.label.trim();
+        idToLabel.set(tag.id, trimmed);
+        labelToId.set(trimmed, tag.id);
       }
     }
 
     return { idToLabel, labelToId };
-  }, [effectiveMetadata]);
+  }, [metadata.tags]);
 
   const { idToLabel, labelToId } = tagMaps;
 
-  const selectedTagLabels = useMemo(
+  // Labels for tags that already exist in Sonarr (from numeric ids)
+  const selectedExistingTagLabels = useMemo(
     () =>
-      effectiveValues.tags
+      (effectiveValues.tags ?? [])
         .map(tagId => idToLabel.get(tagId))
-        .filter((label): label is string => typeof label === "string" && label.length > 0),
-    [effectiveValues, idToLabel],
+        .filter(
+          (label): label is string =>
+            typeof label === "string" && label.length > 0,
+        ),
+    [effectiveValues.tags, idToLabel],
   );
+
+  // Labels the user entered that do not yet exist as Sonarr tags
+  const freeformTagLabels = useMemo(
+    () =>
+      (effectiveValues.freeformTags ?? []).filter(
+        (label): label is string =>
+          typeof label === "string" && label.trim().length > 0,
+      ),
+    [effectiveValues.freeformTags],
+  );
+
+  // Combined list passed to MultiTagInput (deduplicated)
+  const allSelectedTagLabels = useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+
+    for (const label of [...selectedExistingTagLabels, ...freeformTagLabels]) {
+      if (!seen.has(label)) {
+        seen.add(label);
+        result.push(label);
+      }
+    }
+
+    return result;
+  }, [selectedExistingTagLabels, freeformTagLabels]);
+
+  // All existing tag labels (for suggestions)
+  const existingTagLabels = useMemo(
+    () =>
+      metadata.tags
+        .map(t => t.label)
+        .filter(
+          (label): label is string =>
+            typeof label === "string" && label.trim().length > 0,
+        ),
+    [metadata.tags],
+  );
+
 
   const selectPortal = portalContainer ?? null;
 
@@ -179,12 +223,32 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
     return `${bytes.toLocaleString()} B free`;
   }, []);
 
+  // Split labels into existing tag ids and freeform labels
   const handleTagsChange = (labels: string[]) => {
-    const tagIds = labels
-      .map(label => labelToId.get(label))
-      .filter((id): id is number => typeof id === "number");
+    const uniqueLabels: string[] = [];
+    const seen = new Set<string>();
+
+    for (const label of labels) {
+      if (!label) continue;
+      if (seen.has(label)) continue;
+      seen.add(label);
+      uniqueLabels.push(label);
+    }
+
+    const tagIds: number[] = [];
+    const freeform: string[] = [];
+
+    for (const label of uniqueLabels) {
+      const id = labelToId.get(label);
+      if (typeof id === "number") {
+        tagIds.push(id);
+      } else {
+        freeform.push(label);
+      }
+    }
 
     setFieldValue("tags", tagIds);
+    setFieldValue("freeformTags", freeform);
   };
 
   const showComputedPath = Boolean(computedPath);
@@ -403,11 +467,11 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
               <FormLabel className="text-xs font-medium text-text-secondary">Tags</FormLabel>
               <FormControl className="w-full">
                 <MultiTagInput
-                  value={selectedTagLabels}
+                  value={allSelectedTagLabels}
                   onChange={handleTagsChange}
                   placeholder="Add tags..."
                   disabled={!!disabled}
-                  existingTags={effectiveMetadata.tags.map(t => t.label)}
+                  existingTags={existingTagLabels}
                 />
               </FormControl>
             </FormItem>
