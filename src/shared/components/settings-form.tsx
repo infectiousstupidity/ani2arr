@@ -66,6 +66,8 @@ function SettingsForm(): React.JSX.Element {
     manager.handleTestConnection();
   };
 
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+
 
   if (manager.isLoading) {
     return <div className="text-center p-8 text-text-secondary">Loading settings...</div>;
@@ -143,15 +145,36 @@ function SettingsForm(): React.JSX.Element {
 
           <div className="flex w-full justify-end sm:w-auto">
             {manager.testConnectionState.isSuccess ? (
-              <Button
-                onClick={manager.resetConnection}
-                variant="secondary"
-                size="sm"
-                type="button"
-                className="w-full sm:w-auto"
-              >
-                Edit
-              </Button>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button
+                  onClick={manager.resetConnection}
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  className="w-full sm:w-auto"
+                >
+                  Edit
+                </Button>
+                <Button
+                  onClick={async () => {
+                    const ok = window.confirm('Disconnect Sonarr? This will remove saved credentials and permissions.');
+                    if (!ok) return;
+                    setIsDisconnecting(true);
+                    try {
+                      await manager.handleDisconnect();
+                    } finally {
+                      setIsDisconnecting(false);
+                    }
+                  }}
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  className="w-full sm:w-auto text-error border-error"
+                  isLoading={isDisconnecting}
+                >
+                  Disconnect
+                </Button>
+              </div>
             ) : (
               <Button
                 type="submit"

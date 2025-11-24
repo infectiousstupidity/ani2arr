@@ -297,6 +297,49 @@ export function useSettingsManager() {
     testConnectionMutation.reset();
   }, [testConnectionMutation]);
 
+  const handleDisconnect = useCallback(async () => {
+    setSaveError(null);
+    const current = formRef.current;
+    const currentUrl = current?.sonarrUrl ?? '';
+
+    if (!currentUrl) {
+      // Nothing to do
+      return;
+    }
+
+    const permissionPatternResult = buildSonarrPermissionPattern(currentUrl);
+
+    if (!permissionPatternResult.ok) {
+      log.error('Failed to determine host permission for Sonarr URL.', permissionPatternResult.error);
+      setSaveError('Failed to disconnect Sonarr. Please try again.');
+      return;
+    }
+
+    const permissionPattern = permissionPatternResult.value;
+
+    try {
+      const removed = await browser.permissions.remove({ origins: [permissionPattern] });
+      if (!removed) {
+        log.warn('Permission removal returned false, continuing to clear credentials.');
+      }
+    } catch (error) {
+      log.error('Error removing host permission for Sonarr URL during disconnect.', error);
+      setSaveError('Failed to remove host permission. Please try again.');
+      return;
+    }
+
+    try {
+      const cleared = { ...formRef.current, sonarrUrl: '', sonarrApiKey: '' } as ExtensionOptions;
+      await saveOptions(cleared);
+      lastSyncedOptionsRef.current = { ...cleared, defaults: { ...cleared.defaults } };
+      setFormState({ ...cleared, defaults: { ...cleared.defaults } });
+      testConnectionMutation.reset();
+    } catch (error) {
+      log.error('Failed to clear Sonarr credentials during disconnect.', error);
+      setSaveError('Failed to disconnect Sonarr. Please try again.');
+    }
+  }, [saveOptions, testConnectionMutation]);
+
   return {
     formState,
     sonarrMetadata,
@@ -311,6 +354,7 @@ export function useSettingsManager() {
     handleSave,
     handleRefresh,
     resetConnection,
+    handleDisconnect,
     saveError,
   };
 }
