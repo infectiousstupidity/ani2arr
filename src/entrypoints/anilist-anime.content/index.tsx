@@ -1,4 +1,4 @@
-// Version date: 2025-11-12
+// src/entrypoints/anilist-anime.content/index.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

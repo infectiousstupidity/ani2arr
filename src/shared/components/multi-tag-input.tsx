@@ -75,8 +75,8 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
 
   return (
     <div className="relative" onBlur={handleBlur}>
-      <div 
-        className="flex w-full flex-wrap items-center gap-2 rounded-md border border-border-primary bg-bg-tertiary p-2 text-sm ring-offset-background"
+      <div
+        className="flex w-full min-h-[42px] flex-nowrap items-center gap-2 overflow-x-auto rounded-md bg-bg-primary p-2 text-sm ring-offset-background"
         onClick={() => inputRef.current?.focus()} // Focus the input when clicking the container
       >
         {tags.map((tag, index) => (
@@ -101,7 +101,7 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder={tags.length === 0 ? placeholder : ''}
-          className="min-w-20 flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-secondary"
+          className="flex-1 min-w-0 bg-transparent text-sm text-text-primary placeholder:text-text-secondary"
           disabled={disabled}
         />
       </div>
@@ -109,7 +109,7 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({ value: tags, onChange, pl
       {isOpen && suggestions.length > 0 && (
         <ul
           role="listbox"
-          className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border-primary bg-bg-secondary p-1 shadow-lg"
+          className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md bg-bg-secondary p-1 shadow-lg"
         >
           {suggestions.map(suggestion => (
             <li
