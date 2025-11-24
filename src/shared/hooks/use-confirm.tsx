@@ -14,34 +14,53 @@ type ContextType = {
 
 const ConfirmContext = React.createContext<ContextType | null>(null);
 
-export const ConfirmProvider: React.FC<React.PropsWithChildren<unknown>> = ({ children }) => {
+type ConfirmProviderProps = React.PropsWithChildren<{
+  portalContainer?: HTMLElement | ShadowRoot | null;
+}>;
+
+export const ConfirmProvider: React.FC<ConfirmProviderProps> = ({ children, portalContainer }) => {
   const [open, setOpen] = useState(false);
   const [opts, setOpts] = useState<ConfirmOptions | undefined>(undefined);
   const [resolver, setResolver] = useState<((value: boolean) => void) | null>(null);
 
   const confirm = useCallback((options?: ConfirmOptions) => {
-    return new Promise<boolean>(resolve => {
+    return new Promise<boolean>(resolvePromise => {
       setOpts(options);
-      setResolver(() => resolve);
+      setResolver(() => resolvePromise);
       setOpen(true);
     });
   }, []);
 
-  const handleClose = useCallback(() => {
-    setOpen(false);
-    setOpts(undefined);
-    setResolver(null);
-  }, []);
+  const handleResolve = useCallback(
+    (value: boolean) => {
+      if (resolver) {
+        resolver(value);
+      }
+      setOpen(false);
+      setOpts(undefined);
+      setResolver(null);
+    },
+    [resolver],
+  );
 
   const handleConfirm = useCallback(() => {
-    if (resolver) resolver(true);
-    handleClose();
-  }, [resolver, handleClose]);
+    handleResolve(true);
+  }, [handleResolve]);
 
   const handleCancel = useCallback(() => {
-    if (resolver) resolver(false);
-    handleClose();
-  }, [resolver, handleClose]);
+    handleResolve(false);
+  }, [handleResolve]);
+
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen && open) {
+        handleResolve(false);
+        return;
+      }
+      setOpen(nextOpen);
+    },
+    [handleResolve, open],
+  );
 
   return (
     <ConfirmContext.Provider value={{ confirm }}>
@@ -54,7 +73,8 @@ export const ConfirmProvider: React.FC<React.PropsWithChildren<unknown>> = ({ ch
         cancelText={opts?.cancelText ?? 'Cancel'}
         onConfirm={handleConfirm}
         onCancel={handleCancel}
-        onOpenChange={setOpen}
+        onOpenChange={handleOpenChange}
+        container={portalContainer ?? null}
       />
     </ConfirmContext.Provider>
   );

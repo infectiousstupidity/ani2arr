@@ -3,6 +3,7 @@ import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { QueryClient } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
+import ToastProvider from '@/shared/components/toast-provider';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { logger } from '@/shared/utils/logger';
 import { extractMediaMetadataFromDom } from '@/shared/utils/anilist-dom';
@@ -24,6 +25,7 @@ import { createPersistOptions } from '@/shared/utils/query-persist-options';
 import { useMediaModalProps } from '@/shared/hooks/use-media-modal-props';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
+import { ConfirmProvider } from '@/shared/hooks/use-confirm';
 
 const log = logger.create('AniChart Browse Content');
 
@@ -281,7 +283,11 @@ export default defineContentScript({
             <React.StrictMode>
               <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
                 <TooltipProvider>
-                  <BrowseRoot portalContainer={shadow.host as HTMLElement} />
+                  <ToastProvider>
+                    <ConfirmProvider portalContainer={shadow.host as HTMLElement}>
+                      <BrowseRoot portalContainer={shadow.host as HTMLElement} />
+                    </ConfirmProvider>
+                  </ToastProvider>
                 </TooltipProvider>
               </PersistQueryClientProvider>
             </React.StrictMode>,

@@ -1,5 +1,6 @@
 // src/features/media-modal/components/provider-search-section.tsx
 import { ExternalLink } from "lucide-react";
+import * as ScrollArea from "@radix-ui/react-scroll-area";
 import type { MappingSearchResult } from "@/shared/types";
 import { buildExternalMediaLink } from "@/shared/utils/build-external-media-link";
 import type { UseMappingControllerResult } from "../hooks/use-mapping-controller";
@@ -51,8 +52,10 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
         />
       </div>
 
-      <div className="flex-1 overflow-hidden rounded-xl bg-bg-secondary/80 shadow-inner">
-        <div className="h-full divide-y divide-border-primary overflow-y-auto">
+      <div className="flex-1 rounded-xl bg-bg-secondary/80 shadow-inner overflow-hidden">
+        <ScrollArea.Root className="h-full">
+          <ScrollArea.Viewport className="h-full">
+            <div className="h-full divide-y divide-border-primary">
           {searchQuery.isFetching && !results.length ? (
             <div className="flex h-32 items-center justify-center text-xs text-text-secondary">
               Searching...
@@ -144,7 +147,13 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
               </div>
             );
           })}
-        </div>
+            </div>
+          </ScrollArea.Viewport>
+          <ScrollArea.Scrollbar orientation="vertical" className="flex touch-none select-none p-0.5">
+            <ScrollArea.Thumb className="flex-1 rounded bg-border-primary/40" />
+          </ScrollArea.Scrollbar>
+          <ScrollArea.Corner />
+        </ScrollArea.Root>
       </div>
     </div>
   );

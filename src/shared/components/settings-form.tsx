@@ -2,13 +2,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { logger } from '@/shared/utils/logger';
 import { useSettingsManager } from '@/shared/hooks/use-settings-manager';
-import { Input, FormField, FormItem, FormLabel, FormControl } from './form';
+import { Input, FormField, FormItem, FormLabel, FormControl, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './form';
 import Button from './button';
 import SonarrForm from './sonarr-form';
 import { CircleCheck, CircleX, RotateCcw } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import type { SonarrFormState, TitleLanguage } from '@/shared/types';
 import { useConfirm } from '@/shared/hooks/use-confirm';
+import { useToast } from '@/shared/components/toast-provider';
 
 const titleLanguageOptions: Array<{ value: TitleLanguage; label: string }> = [
   { value: 'english', label: 'English (default)' },
@@ -71,6 +72,7 @@ function SettingsForm(): React.JSX.Element {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   const confirm = useConfirm();
+  const toast = useToast();
 
 
   if (manager.isLoading) {
@@ -111,19 +113,23 @@ function SettingsForm(): React.JSX.Element {
         <FormField>
           <FormItem>
             <FormLabel>Preferred title language</FormLabel>
-            <FormControl>
-              <select
-                value={manager.formState.titleLanguage}
-                onChange={e => manager.handleFieldChange('titleLanguage', e.target.value as TitleLanguage)}
-                className="w-full rounded-md border border-border-primary bg-bg-tertiary px-3 py-2 text-sm text-text-primary focus:border-accent-primary focus:outline-none"
-              >
-                {titleLanguageOptions.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </FormControl>
+              <FormControl>
+                <Select
+                  value={manager.formState.titleLanguage}
+                  onValueChange={v => manager.handleFieldChange('titleLanguage', v as TitleLanguage)}
+                >
+                  <SelectTrigger className="w-full rounded-md border border-border-primary bg-bg-tertiary px-3 py-2 text-sm text-text-primary text-left">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent container={selectPortal ?? null}>
+                    {titleLanguageOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormControl>
           </FormItem>
         </FormField>
 
@@ -174,7 +180,11 @@ function SettingsForm(): React.JSX.Element {
                     } catch (err) {
                       logger.error('Unexpected error during disconnect', err);
                       if (!manager.saveError) {
-                        alert('Failed to disconnect Sonarr. Please try again.');
+                        toast.showToast({
+                          title: 'Disconnect failed',
+                          description: 'Failed to disconnect Sonarr. Please try again.',
+                          variant: 'error',
+                        });
                       }
                     } finally {
                       setIsDisconnecting(false);

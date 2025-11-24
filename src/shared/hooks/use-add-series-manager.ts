@@ -24,6 +24,7 @@ export function useAddSeriesManager(
     seasonFolder: true,
     searchForMissingEpisodes: true,
     tags: [],
+    freeformTags: [],
   };
 
   const [formState, setFormState] = useState<SonarrFormState>(options?.defaults ?? defaultFormState);

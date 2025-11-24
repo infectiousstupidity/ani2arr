@@ -14,6 +14,7 @@ import type { SonarrPanelProps } from "../types";
 import { useMappingController } from "../hooks/use-mapping-controller";
 import { useSonarrPanelController } from "../hooks/use-sonarr-panel-controller";
 import { usePublicOptions } from "@/shared/hooks/use-api-queries";
+import { useConfirm } from "@/shared/hooks/use-confirm";
 
 type MediaModalViewMode = "setup" | "mapping";
 
@@ -90,6 +91,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
 
   const publicOptions = usePublicOptions();
   const baseUrl = publicOptions.data?.sonarrUrl ?? '';
+  const confirm = useConfirm();
 
   const handleClose = useCallback(() => {
     onClose();
@@ -128,6 +130,20 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     // Otherwise, let Radix Dialog handle the close
   }, [viewMode, handleMappingCancel]);
 
+  const handleConfirmReset = useCallback(async () => {
+    if (mappingController.isSubmitting) {
+      return;
+    }
+    const shouldReset = await confirm({
+      title: 'Reset mapping override?',
+      description: 'This will remove the manual TVDB mapping and return to the automatic match for this title.',
+      confirmText: 'Reset mapping',
+      cancelText: 'Keep override',
+    });
+    if (!shouldReset) return;
+    await mappingController.handleRevertToAutomatic();
+  }, [confirm, mappingController]);
+
   const effectiveCurrentMapping = mappingController.currentMapping ?? mappingTabProps.currentMapping ?? null;
   const selectedMapping = mappingController.state.selected;
 
@@ -151,7 +167,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
             size="sm"
             className="text-xs font-medium"
             disabled={mappingController.isSubmitting}
-            onClick={() => { void mappingController.handleRevertToAutomatic(); }}
+            onClick={() => { void handleConfirmReset(); }}
           >
             Reset to automatic
           </Button>
@@ -168,37 +184,38 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
         tertiaryLabel: '',
         onTertiaryClick: undefined,
       };
-    } else {
-      return {
-        primaryLabel: sonarrPanelProps.mode === "edit" ? "Save changes" : "Add series",
-        primaryDisabled: !sonarrController.canSubmit,
-        primaryLoading: sonarrController.isSubmitting,
-        onPrimaryClick: () => {
-          void (async () => {
-            try {
-              await sonarrController.handlePrimarySubmit();
-              if (sonarrPanelProps.mode === "edit") {
-                handleClose();
-              }
-            } catch {
-              // Keep modal open on error.
-            }
-          })();
-        },
-        secondaryLabel: "Cancel",
-        onSecondaryClick: handleClose,
-        showTertiary: sonarrController.showSaveDefaults && Boolean(sonarrController.form.formState.isDirty),
-        tertiaryLabel: "Save as default",
-        onTertiaryClick: sonarrController.showSaveDefaults ? () => {
-          void sonarrController.handleSaveDefaults();
-        } : undefined,
-      };
     }
+
+    return {
+      primaryLabel: sonarrPanelProps.mode === "edit" ? "Save changes" : "Add series",
+      primaryDisabled: !sonarrController.canSubmit,
+      primaryLoading: sonarrController.isSubmitting,
+      onPrimaryClick: () => {
+        void (async () => {
+          try {
+            await sonarrController.handlePrimarySubmit();
+            if (sonarrPanelProps.mode === "edit") {
+              handleClose();
+            }
+          } catch {
+            // Keep modal open on error.
+          }
+        })();
+      },
+      secondaryLabel: "Cancel",
+      onSecondaryClick: handleClose,
+      showTertiary: sonarrController.showSaveDefaults && Boolean(sonarrController.form.formState.isDirty),
+      tertiaryLabel: "Save as default",
+      onTertiaryClick: sonarrController.showSaveDefaults ? () => {
+        void sonarrController.handleSaveDefaults();
+      } : undefined,
+    };
   }, [
     viewMode,
     handleClose,
     handleMappingCancel,
     handleMappingSubmit,
+    handleConfirmReset,
     mappingController,
     sonarrController,
     sonarrPanelProps.mode,
