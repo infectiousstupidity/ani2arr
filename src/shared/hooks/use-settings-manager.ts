@@ -28,6 +28,7 @@ const getInitialOptions = (): ExtensionOptions => ({
     seasonFolder: true,
     searchForMissingEpisodes: true,
     tags: [],
+    freeformTags: [],
   },
   titleLanguage: 'english',
 });
@@ -266,6 +267,7 @@ export function useSettingsManager() {
       setSaveError(null);
     } catch (error) {
       log.error('Connection test failed. Settings not saved.', error);
+      setSaveError('Connection test failed. Please check your Sonarr URL and API key.');
 
       if (grantedNewHostPermission && newPermissionPattern) {
         try {
@@ -317,17 +319,7 @@ export function useSettingsManager() {
 
     const permissionPattern = permissionPatternResult.value;
 
-    try {
-      const removed = await browser.permissions.remove({ origins: [permissionPattern] });
-      if (!removed) {
-        log.warn('Permission removal returned false, continuing to clear credentials.');
-      }
-    } catch (error) {
-      log.error('Error removing host permission for Sonarr URL during disconnect.', error);
-      setSaveError('Failed to remove host permission. Please try again.');
-      return;
-    }
-
+    // First clear saved credentials (so there's no risk of leaving credentials stored without permissions)
     try {
       const cleared = { ...formRef.current, sonarrUrl: '', sonarrApiKey: '' } as ExtensionOptions;
       await saveOptions(cleared);
@@ -336,9 +328,28 @@ export function useSettingsManager() {
       testConnectionMutation.reset();
     } catch (error) {
       log.error('Failed to clear Sonarr credentials during disconnect.', error);
-      setSaveError('Failed to disconnect Sonarr. Please try again.');
+      setSaveError('Failed to clear saved Sonarr credentials. Please try again.');
+      return;
     }
-  }, [saveOptions, testConnectionMutation]);
+
+    // Then attempt to remove host permission
+    try {
+      const removed = await browser.permissions.remove({ origins: [permissionPattern] });
+      if (!removed) {
+        log.warn('Permission removal returned false during disconnect.');
+        setSaveError('Disconnected, but failed to remove host permission. Remove it manually or retry disconnect.');
+        return;
+      }
+    } catch (error) {
+      log.error('Error removing host permission for Sonarr URL during disconnect.', error);
+      setSaveError('Disconnected, but failed to remove host permission. Remove it manually or retry disconnect.');
+      return;
+    }
+
+    // Success: clear any save error and invalidate queries
+    setSaveError(null);
+    queryClient.invalidateQueries({ queryKey: queryKeys.sonarrMetadata() });
+  }, [saveOptions, testConnectionMutation, queryClient]);
 
   return {
     formState,
