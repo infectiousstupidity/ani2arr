@@ -1,5 +1,6 @@
 // src/shared/components/settings-form.tsx
 import React, { useCallback, useEffect, useState } from 'react';
+import { logger } from '@/shared/utils/logger';
 import { useSettingsManager } from '@/shared/hooks/use-settings-manager';
 import { Input, FormField, FormItem, FormLabel, FormControl } from './form';
 import Button from './button';
@@ -157,11 +158,16 @@ function SettingsForm(): React.JSX.Element {
                 </Button>
                 <Button
                   onClick={async () => {
-                    const ok = window.confirm('Disconnect Sonarr? This will remove saved credentials and permissions.');
-                    if (!ok) return;
+                    const shouldDisconnect = window.confirm('Disconnect Sonarr? This will remove saved credentials and permissions.');
+                    if (!shouldDisconnect) return;
                     setIsDisconnecting(true);
                     try {
                       await manager.handleDisconnect();
+                    } catch (err) {
+                      logger.error('Unexpected error during disconnect', err);
+                      if (!manager.saveError) {
+                        alert('Failed to disconnect Sonarr. Please try again.');
+                      }
                     } finally {
                       setIsDisconnecting(false);
                     }
@@ -171,6 +177,8 @@ function SettingsForm(): React.JSX.Element {
                   type="button"
                   className="w-full sm:w-auto text-error border-error"
                   isLoading={isDisconnecting}
+                  disabled={manager.saveState.isPending || manager.testConnectionState.isPending}
+                  aria-busy={isDisconnecting || manager.saveState.isPending}
                 >
                   Disconnect
                 </Button>
