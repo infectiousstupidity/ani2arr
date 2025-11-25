@@ -156,7 +156,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
                   <Pill tone={currentTone} className="uppercase">{statusLabel}</Pill>
                 ) : null}
                 {inLibrary ? (
-                  <Pill tone="success" icon={Database} className="uppercase">In library</Pill>
+                  <Pill tone="success" icon={Database} className="uppercase">In Sonarr</Pill>
                 ) : null}
                 <span className="flex-1" />
               </div>

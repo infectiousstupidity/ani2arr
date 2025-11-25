@@ -1,5 +1,6 @@
 // src/features/media-modal/components/multi-mapping-info.tsx
-import * as Tooltip from '@radix-ui/react-tooltip';
+import Pill from "@/shared/components/pill";
+import Tooltip from "@/shared/components/tooltip";
 
 interface MultiMappingInfoProps {
   currentAniListId: number;
@@ -9,19 +10,33 @@ interface MultiMappingInfoProps {
 export function MultiMappingInfo(props: MultiMappingInfoProps) {
   const { currentAniListId, linkedAniListIds } = props;
   const others = (linkedAniListIds || []).filter(id => id !== currentAniListId);
-  if (!others.length) return null;
+  const otherCount = others.length;
+  const pill = (
+    <Pill
+      tone="accent"
+      small
+      className="cursor-default font-mono text-text-primary/90 normal-case"
+    >
+      AniList {currentAniListId}
+    </Pill>
+  );
+
+  if (!otherCount) return pill;
+
   return (
-    <Tooltip.Provider>
-      <Tooltip.Root delayDuration={200}>
-        <Tooltip.Trigger asChild>
-          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700 cursor-default">
-            +{others.length}
-          </span>
-        </Tooltip.Trigger>
-        <Tooltip.Content side="top" className="rounded bg-black text-white text-xs px-2 py-1">
-          Also linked to {others.length} other AniList entr{others.length === 1 ? 'y' : 'ies'}
-        </Tooltip.Content>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+    <Tooltip
+      content={
+        <div className="space-y-1">
+          <div className="font-semibold">
+            Also linked to {otherCount} other AniList entr{otherCount === 1 ? "y" : "ies"}:
+          </div>
+          <div className="font-mono text-[11px] text-white/90">{others.join(", ")}</div>
+        </div>
+      }
+      side="top"
+      sideOffset={6}
+    >
+      {pill}
+    </Tooltip>
   );
 }

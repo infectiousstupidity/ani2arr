@@ -22,22 +22,24 @@ const TONE_CLASSES: Record<Tone, string> = {
   default: "bg-bg-primary/10 text-text-primary",
 };
 
-export default function Pill(props: PillProps) {
+const Pill = React.forwardRef<HTMLSpanElement, PillProps>(function Pill(props, ref) {
   const { children, tone = "muted", small = false, icon: Icon = null, className } = props;
 
   const base = cn(
-    "inline-flex items-center whitespace-nowrap rounded-full",
+    "inline-flex items-center justify-center whitespace-nowrap rounded-full align-middle",
     small
-      ? "px-2 py-[3px] text-[10px] font-medium leading-[1]"
-      : "px-3 py-[4px] text-[11px] font-semibold leading-[1]"
+      ? "px-2 py-[3px] text-[10px] font-medium leading-none uppercase"
+      : "px-3 py-[4px] text-[11px] font-semibold leading-none uppercase"
   );
 
   return (
-    <span className={cn(base, TONE_CLASSES[tone], className)}>
+    <span ref={ref} className={cn(base, TONE_CLASSES[tone], className)}>
       {Icon ? (
         <Icon className={small ? "mr-1 h-3 w-3 shrink-0" : "mr-1 h-3.5 w-3.5 shrink-0"} />
       ) : null}
       {children}
     </span>
   );
-}
+});
+
+export default Pill;

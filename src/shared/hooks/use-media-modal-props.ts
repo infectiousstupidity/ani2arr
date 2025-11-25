@@ -129,7 +129,7 @@ function deriveCurrentMappingFromStatus(
   if (status.series && 'images' in status.series) {
     return toMappingSearchResultFromSonarr(status.series as SonarrLookupSeries, {
       baseUrl: baseUrl ?? '',
-      libraryTvdbIds: [status.tvdbId], // Mark as in library
+      libraryTvdbIds: [status.tvdbId], // Mark as in Sonarr
     });
   }
 
