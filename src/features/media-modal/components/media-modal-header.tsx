@@ -99,7 +99,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
           </button>
         </div>
 
-        <div className="mt-auto px-8 pb-14">
+        <div className="mt-auto px-8 pb-14 pt-8">
           <div className="flex items-start gap-4">
             <div className="hidden h-[150px] w-[110px] shrink-0 overflow-hidden rounded-xl border border-border-primary/60 bg-bg-tertiary/80 shadow-lg sm:block relative z-20 translate-y-8">
               {coverImage ? (

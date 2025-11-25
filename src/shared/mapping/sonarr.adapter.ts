@@ -13,6 +13,7 @@ export interface SonarrAdapterOptions {
     sizeOnDisk?: number;
     percentOfEpisodes?: number;
   }>>;
+  linkedAniListIdsByTvdbId?: Readonly<Record<number, readonly number[]>>;
 }
 
 const joinUrl = (root: string, path?: string | null): string | undefined => {
@@ -70,6 +71,11 @@ export function toMappingSearchResultFromSonarr(
         .map((t: any) => t?.title)
         .filter((t: unknown): t is string => typeof t === 'string' && t.length > 0)
     : undefined;
+  const linkedAniListIds = Array.isArray(opts.linkedAniListIdsByTvdbId?.[tvdbId])
+    ? opts.linkedAniListIdsByTvdbId![tvdbId]!.filter(
+        (id): id is number => typeof id === 'number' && Number.isFinite(id),
+      )
+    : undefined;
 
   return {
     service: 'sonarr',
@@ -86,5 +92,6 @@ export function toMappingSearchResultFromSonarr(
     ...(fileCount !== undefined ? { fileCount } : {}),
     ...(overview ? { overview } : {}),
     ...(alternateTitles && alternateTitles.length > 0 ? { alternateTitles } : {}),
+    ...(linkedAniListIds && linkedAniListIds.length > 0 ? { linkedAniListIds: Array.from(new Set(linkedAniListIds)) } : {}),
   };
 }

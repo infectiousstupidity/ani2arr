@@ -4,7 +4,8 @@ import { Modal, ModalContent, ModalTitle, ModalDescription } from "./modal";
 import { Header, type MediaModalTabId } from "./media-modal-header";
 import { Footer } from "./media-modal-footer";
 import Button from "@/shared/components/button";
-import type { AniFormat, MediaStatus, TitleLanguage } from "@/shared/types";
+import type { AniFormat, MediaStatus, TitleLanguage, ExtensionError } from "@/shared/types";
+import { ErrorCode } from "@/shared/types";
 
 import { ProviderSearchSection } from "./provider-search-section";
 import type { MappingTabProps } from "../types";
@@ -111,13 +112,60 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   }, [mappingController]);
 
   const handleMappingSubmit = useCallback(async () => {
-    try {
-      await mappingController.handleSubmit();
+    const selected = mappingController.state.selected;
+    const currentAniListId = mappingTabProps.aniListEntry.id;
+    const tvdbId = selected?.target.id;
+    const tvdbLabel = tvdbId ? `TVDB ${tvdbId}` : "This TVDB entry";
+
+    const confirmShare = async (conflictingIds: number[]): Promise<boolean> => {
+      if (!conflictingIds.length) return true;
+      return confirm({
+        title: "Share this TVDB mapping?",
+        description: `${tvdbLabel} is already linked to AniList entr${conflictingIds.length === 1 ? "y" : "ies"} ${conflictingIds.join(", ")}. Continue to share this mapping?`,
+        confirmText: "Share mapping",
+        cancelText: "Cancel",
+      });
+    };
+
+    const attemptSubmit = async (force?: boolean) => {
+      await mappingController.handleSubmit(force ? { force: true } : undefined);
       setViewMode("setup");
-    } catch {
-      // Leave the user in mapping mode if saving fails.
+    };
+
+    const visibleConflicts = (selected?.linkedAniListIds ?? []).filter(id => id !== currentAniListId);
+    if (visibleConflicts.length > 0 && selected) {
+      const proceed = await confirmShare(visibleConflicts);
+      if (!proceed) return;
+      try {
+        await attemptSubmit(true);
+        return;
+      } catch {
+        // Leave mapping mode if submission fails.
+        return;
+      }
     }
-  }, [mappingController]);
+
+    try {
+      await attemptSubmit(false);
+    } catch (error) {
+      const normalized = error as ExtensionError;
+      const conflictIds = Array.isArray(normalized?.details?.conflictingAniListIds)
+        ? (normalized.details?.conflictingAniListIds as number[])
+        : [];
+      if (normalized?.code === ErrorCode.VALIDATION_ERROR && conflictIds.length > 0) {
+        const filtered = conflictIds.filter(id => id !== currentAniListId);
+        const proceed = await confirmShare(filtered.length > 0 ? filtered : conflictIds);
+        if (!proceed) return;
+        try {
+          await attemptSubmit(true);
+          return;
+        } catch {
+          return;
+        }
+      }
+      // Leave mapping mode unchanged on other errors.
+    }
+  }, [confirm, mappingController, mappingTabProps.aniListEntry.id]);
 
   // Handle ESC key: exit mapping mode first, then allow modal close
   const handleEscapeKeyDown = useCallback((event: KeyboardEvent) => {

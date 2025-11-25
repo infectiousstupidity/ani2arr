@@ -15,9 +15,9 @@ export function MultiMappingInfo(props: MultiMappingInfoProps) {
     <Pill
       tone="accent"
       small
-      className="cursor-default font-mono text-text-primary/90 normal-case"
+      className="cursor-default font-mono text-text-primary/90 uppercase"
     >
-      AniList {currentAniListId}
+      ANILIST {currentAniListId}
     </Pill>
   );
 

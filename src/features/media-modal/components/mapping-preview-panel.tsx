@@ -91,6 +91,7 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
           <MappingPreviewCard
             mapping={currentMapping}
             baseUrl={baseUrl}
+            currentAniListId={aniListEntry.id}
           />
         ) : null}
 
@@ -98,6 +99,7 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
           <MappingPreviewCard
             mapping={previewMapping}
             baseUrl={baseUrl}
+            currentAniListId={aniListEntry.id}
             highlight="preview"
           />
         ) : null}
@@ -122,10 +124,11 @@ interface MappingPreviewCardProps {
   mapping: MappingSearchResult;
   baseUrl: string;
   highlight?: "preview";
+  currentAniListId: number;
 }
 
 function MappingPreviewCard(props: MappingPreviewCardProps) {
-  const { mapping, baseUrl, highlight } = props;
+  const { mapping, baseUrl, highlight, currentAniListId } = props;
 
   const link = buildExternalMediaLink({
     service: "sonarr",
@@ -161,6 +164,9 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
       <Pill key="library" small tone="success">{`In Sonarr${mapping.fileCount ? ` - ${mapping.fileCount} eps` : ""}`}</Pill>
     );
   }
+  const otherLinkedIds = Array.isArray(mapping.linkedAniListIds)
+    ? mapping.linkedAniListIds.filter(id => id !== currentAniListId)
+    : [];
 
   return (
     <div className={`overflow-hidden rounded-xl bg-bg-secondary shadow-lg shadow-black/30 ${highlight === "preview" ? "ring-1 ring-inset ring-accent-primary/40" : ""}`}>
@@ -210,9 +216,9 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
         </div>
       </div>
 
-      {mapping.linkedAniListIds && mapping.linkedAniListIds.length > 0 ? (
+      {otherLinkedIds.length > 0 ? (
         <div className="px-4 pb-3 text-[10px] text-amber-200">
-          Warning: Linked to {mapping.linkedAniListIds.length} other AniList entr{mapping.linkedAniListIds.length === 1 ? "y" : "ies"}
+          Warning: Linked to {otherLinkedIds.length} other AniList entr{otherLinkedIds.length === 1 ? "y" : "ies"}
         </div>
       ) : null}
     </div>

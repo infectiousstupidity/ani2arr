@@ -127,10 +127,16 @@ function deriveCurrentMappingFromStatus(
   // If we have a full series object (from force_verify), map it using the adapter
   // to get rich metadata like posters, overview, etc.
   if (status.series && 'images' in status.series) {
-    return toMappingSearchResultFromSonarr(status.series as SonarrLookupSeries, {
+    const mapped = toMappingSearchResultFromSonarr(status.series as SonarrLookupSeries, {
       baseUrl: baseUrl ?? '',
       libraryTvdbIds: [status.tvdbId], // Mark as in Sonarr
     });
+    return {
+      ...mapped,
+      ...(status.linkedAniListIds && status.linkedAniListIds.length > 0
+        ? { linkedAniListIds: status.linkedAniListIds }
+        : {}),
+    };
   }
 
   // Fallback for lean series (cached status)
@@ -147,7 +153,12 @@ function deriveCurrentMappingFromStatus(
     ...(librarySlug ? { librarySlug } : {}),
   };
 
-  return mapping;
+  return {
+    ...mapping,
+    ...(status.linkedAniListIds && status.linkedAniListIds.length > 0
+      ? { linkedAniListIds: status.linkedAniListIds }
+      : {}),
+  };
 }
 
 /**
@@ -199,6 +210,7 @@ export function useMediaModalProps(
   const mappingUnavailable = statusQuery.data?.anilistTvdbLinkMissing === true;
   const tvdbId = mappingUnavailable ? null : statusQuery.data?.tvdbId ?? null;
   const inLibrary = Boolean(statusQuery.data?.exists || addSeriesMutation.isSuccess || updateSeriesMutation.isSuccess);
+  const linkedAniListIds = statusQuery.data?.linkedAniListIds ?? [];
 
   const format: AniFormat | null = apiMedia?.format ?? metadata?.format ?? null;
   const year: number | null =
@@ -283,7 +295,7 @@ export function useMediaModalProps(
     },
     currentMapping: deriveCurrentMappingFromStatus(statusQuery.data, 'sonarr', options?.sonarrUrl),
     overrideActive: statusQuery.data?.overrideActive === true,
-    otherAniListIds: [],
+    otherAniListIds: linkedAniListIds.filter(id => id !== anilistId),
     service: 'sonarr',
   };
 

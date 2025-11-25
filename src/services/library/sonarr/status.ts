@@ -38,6 +38,7 @@ export class SonarrStatus {
     const normalizedTitle = payload.title?.trim();
     let tvdbId = this.indexer.findTvdbIdInIndex(payload);
     let successfulSynonym: string | undefined;
+    let linkedAniListIds: number[] | undefined;
 
     if (tvdbId === null) {
       if (options.priority === 'high') {
@@ -88,6 +89,13 @@ export class SonarrStatus {
       return { exists: false, tvdbId: null, anilistTvdbLinkMissing: true };
     }
 
+    if (typeof this.mapping.getLinkedAniListIdsForTvdb === 'function') {
+      const linked = this.mapping.getLinkedAniListIdsForTvdb(tvdbId);
+      if (linked.length > 0) {
+        linkedAniListIds = linked;
+      }
+    }
+
     const cachedSeries = leanList.find(s => s.tvdbId === tvdbId) ?? null;
     const existsInCache = cachedSeries !== null;
 
@@ -97,6 +105,7 @@ export class SonarrStatus {
         tvdbId,
         ...(cachedSeries ? { series: cachedSeries } : {}),
         ...(successfulSynonym ? { successfulSynonym } : {}),
+        ...(linkedAniListIds ? { linkedAniListIds } : {}),
       };
       if (import.meta.env.DEV) {
         console.debug(`[ani2arr | SonarrStatus] status:result anilistId=${payload.anilistId} outcome=cached exists=${String(existsInCache)} tvdbId=${tvdbId}`);
@@ -125,6 +134,7 @@ export class SonarrStatus {
         tvdbId,
         series: liveSeries,
         ...(successfulSynonym ? { successfulSynonym } : {}),
+        ...(linkedAniListIds ? { linkedAniListIds } : {}),
       };
       if (import.meta.env.DEV) {
         console.debug(`[ani2arr | SonarrStatus] status:result anilistId=${payload.anilistId} outcome=live exists=true tvdbId=${tvdbId}`);
@@ -141,6 +151,7 @@ export class SonarrStatus {
       exists: false,
       tvdbId,
       ...(successfulSynonym ? { successfulSynonym } : {}),
+      ...(linkedAniListIds ? { linkedAniListIds } : {}),
     };
     if (import.meta.env.DEV) {
       console.debug(`[ani2arr | SonarrStatus] status:result anilistId=${payload.anilistId} outcome=removed exists=false tvdbId=${tvdbId}`);

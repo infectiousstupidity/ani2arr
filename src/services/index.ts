@@ -121,7 +121,7 @@ export const createApiImplementation = (): Ani2arrApi => {
   });
 
   const overridesService = new MappingOverridesService();
-  void overridesService.init();
+  const overridesReady = overridesService.init();
 
   const mappingService = bindAll(
     new MappingService(
@@ -210,6 +210,7 @@ export const createApiImplementation = (): Ani2arrApi => {
   const api: Ani2arrApi = {
     async resolveMapping(input) {
       await ensureConfigured();
+      await overridesReady;
 
       // Fast path: local library index only
       try {
@@ -242,6 +243,7 @@ export const createApiImplementation = (): Ani2arrApi => {
 
     async getSeriesStatus(input) {
       await ensureConfigured();
+      await overridesReady;
       const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
       if (input.title !== undefined) payload.title = input.title;
       if (input.metadata !== undefined) payload.metadata = input.metadata;
@@ -258,6 +260,7 @@ export const createApiImplementation = (): Ani2arrApi => {
 
     async addToSonarr(input) {
       const { options } = await ensureConfigured();
+      await overridesReady;
 
       const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = { ignoreFailureCache: true };
       const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
@@ -452,6 +455,7 @@ export const createApiImplementation = (): Ani2arrApi => {
 
     async searchSonarr(input) {
       const { credentials } = await ensureConfigured();
+      await overridesReady;
       const [results, library] = await Promise.all([
         sonarrApiService.lookupSeriesByTerm(input.term, credentials),
         sonarrLibrary.getLeanSeriesList(),
@@ -463,7 +467,27 @@ export const createApiImplementation = (): Ani2arrApi => {
           statsMap[s.tvdbId] = s.statistics;
         }
       }
-      return { results, libraryTvdbIds, ...(Object.keys(statsMap).length > 0 ? { statsMap } : {}) };
+      const linkedAniListIdsByTvdbId: Record<number, number[]> = {};
+      if (typeof mappingService.getLinkedAniListIdsForTvdb === 'function') {
+        const uniqueTvdbIds = new Set<number>();
+        for (const series of results) {
+          if (typeof series?.tvdbId === 'number' && Number.isFinite(series.tvdbId)) {
+            uniqueTvdbIds.add(series.tvdbId);
+          }
+        }
+        for (const tvdbId of uniqueTvdbIds) {
+          const linked = mappingService.getLinkedAniListIdsForTvdb(tvdbId);
+          if (linked.length > 0) {
+            linkedAniListIdsByTvdbId[tvdbId] = linked;
+          }
+        }
+      }
+      return {
+        results,
+        libraryTvdbIds,
+        ...(Object.keys(statsMap).length > 0 ? { statsMap } : {}),
+        ...(Object.keys(linkedAniListIdsByTvdbId).length > 0 ? { linkedAniListIdsByTvdbId } : {}),
+      };
     },
 
     async validateTvdbId(input) {
@@ -480,6 +504,20 @@ export const createApiImplementation = (): Ani2arrApi => {
     },
 
     async setMappingOverride(input) {
+      await overridesReady;
+      const linkedIds =
+        typeof mappingService.getLinkedAniListIdsForTvdb === 'function'
+          ? mappingService.getLinkedAniListIdsForTvdb(input.tvdbId)
+          : [];
+      const conflictingAniListIds = linkedIds.filter(id => id !== input.anilistId);
+      if (conflictingAniListIds.length > 0 && input.force !== true) {
+        throw createError(
+          ErrorCode.VALIDATION_ERROR,
+          `TVDB ID ${input.tvdbId} is already linked to other AniList entries.`,
+          'This TVDB ID is already linked to other AniList entries. Confirm if you want to share it.',
+          { conflictingAniListIds },
+        );
+      }
       await overridesService.set(input.anilistId, input.tvdbId);
       await mappingService.evictResolved(input.anilistId);
       const options = await getExtensionOptionsSnapshot();
@@ -491,6 +529,7 @@ export const createApiImplementation = (): Ani2arrApi => {
     },
 
     async clearMappingOverride(input) {
+      await overridesReady;
       await overridesService.clear(input.anilistId);
       await mappingService.evictResolved(input.anilistId);
       const options = await getExtensionOptionsSnapshot();

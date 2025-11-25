@@ -8,11 +8,15 @@ export function useMappingOverrides(anilistId: number) {
   const clearOverrideMutation = useClearMappingOverride();
 
   const setOverride = useCallback(
-    async (target: MappingTargetId) => {
+    async (target: MappingTargetId, options?: { force?: boolean }) => {
       if (target.idType !== "tvdb" || typeof target.id !== "number") {
         return;
       }
-      await setOverrideMutation.mutateAsync({ anilistId, tvdbId: target.id });
+      await setOverrideMutation.mutateAsync({
+        anilistId,
+        tvdbId: target.id,
+        ...(options?.force ? { force: true } : {}),
+      });
     },
     [anilistId, setOverrideMutation],
   );
