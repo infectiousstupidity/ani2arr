@@ -141,20 +141,19 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
       cancelText: 'Keep override',
     });
     if (!shouldReset) return;
-    await mappingController.handleRevertToAutomatic();
+    try {
+      await mappingController.handleRevertToAutomatic();
+      setViewMode("setup");
+    } catch {
+      // Leave the user in mapping mode if reverting fails.
+    }
   }, [confirm, mappingController]);
 
   const effectiveCurrentMapping = mappingController.currentMapping ?? mappingTabProps.currentMapping ?? null;
   const selectedMapping = mappingController.state.selected;
 
-  const previewMapping = useMemo(
-    () =>
-      viewMode === "mapping" && selectedMapping ? selectedMapping : effectiveCurrentMapping,
-    [effectiveCurrentMapping, selectedMapping, viewMode],
-  );
-
-  const isPreviewingSelection = viewMode === "mapping" && Boolean(selectedMapping);
   const showResetPreview = viewMode === "mapping" && mappingController.canSubmit && Boolean(selectedMapping);
+  const previewMapping = showResetPreview ? selectedMapping : null;
 
   // Compute footer state directly in parent based on view mode
   const footerState = useMemo(() => {
@@ -178,7 +177,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
         onPrimaryClick: () => {
           void handleMappingSubmit();
         },
-        secondaryLabel: 'Back to manage series',
+        secondaryLabel: 'Exit mapping',
         onSecondaryClick: handleMappingCancel,
         showTertiary: false,
         tertiaryLabel: '',
@@ -266,27 +265,6 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           <div className="mx-auto flex h-full max-w-[1000px] flex-col gap-6">
             <div className="grid h-full grid-cols-2 gap-6">
               <div className="flex h-full flex-col overflow-hidden">
-                <div className="px-0 pb-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-                        {viewMode === "mapping"
-                          ? "Mapping search"
-                          : sonarrPanelProps.mode === "edit"
-                          ? "Manage series"
-                          : "New series setup"}
-                      </p>
-                      <p className="text-xs text-text-secondary">
-                        {viewMode === "mapping"
-                          ? "Find the right TVDB entry; your selection updates the preview on the right."
-                          : sonarrPanelProps.mode === "edit"
-                          ? "Update configuration or move files to a new location."
-                          : "Choose the root folder and monitoring options for this series."}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="flex-1 min-h-0">
                   {viewMode === "mapping" ? (
                     <ProviderSearchSection
@@ -294,7 +272,6 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                       currentMapping={effectiveCurrentMapping}
                       baseUrl={baseUrl}
                       autoFocus={isOpen && viewMode === "mapping"}
-                      hideHeader
                       portalContainer={selectPortalContainer instanceof HTMLElement ? selectPortalContainer : null}
                     />
                   ) : (
@@ -312,11 +289,18 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                     aniListEntry={mappingTabProps.aniListEntry}
                     otherAniListIds={mappingTabProps.otherAniListIds}
                     baseUrl={baseUrl}
-                    mapping={previewMapping}
-                    isPreviewingSelection={isPreviewingSelection}
+                    currentMapping={effectiveCurrentMapping}
+                    previewMapping={previewMapping}
+                    isInMappingMode={viewMode === "mapping"}
                     showResetPreview={showResetPreview}
                     onResetPreview={mappingController.clearSelection}
-                    onEditMapping={handleEnterMapping}
+                    onEditMapping={() => {
+                      if (viewMode === "mapping") {
+                        handleMappingCancel();
+                      } else {
+                        handleEnterMapping();
+                      }
+                    }}
                   />
                 </div>
               </div>

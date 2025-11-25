@@ -1,8 +1,8 @@
 // src/features/media-modal/components/provider-search-section.tsx
 import { useCallback, useEffect, useRef, type WheelEvent as ReactWheelEvent } from "react";
 import { ExternalLink } from "lucide-react";
-import TooltipWrapper from '@/shared/components/tooltip';
-import Pill from '@/shared/components/pill';
+import Pill from "@/shared/components/pill";
+import TooltipWrapper from "@/shared/components/tooltip";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import type { MappingSearchResult } from "@/shared/types";
 import { buildExternalMediaLink } from "@/shared/utils/build-external-media-link";
@@ -12,14 +12,13 @@ interface ProviderSearchSectionProps {
   controller: UseMappingControllerResult;
   currentMapping: MappingSearchResult | null;
   baseUrl: string;
-  hideHeader?: boolean;
   autoFocus?: boolean;
   portalContainer?: HTMLElement | null;
 }
 
 export function ProviderSearchSection(props: ProviderSearchSectionProps) {
-  const { controller, currentMapping, baseUrl, hideHeader = false, autoFocus = false, portalContainer } = props;
-  const { state, setQuery, selectResult, clearSelection, searchQuery } = controller;
+  const { controller, currentMapping, baseUrl, autoFocus = false, portalContainer } = props;
+  const { state, setQuery, selectResult, searchQuery } = controller;
   const results = searchQuery.data ?? [];
   const selected = state.selected;
   const hasQuery = state.query.trim().length > 0;
@@ -42,8 +41,8 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
   }, [autoFocus]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
-      {!hideHeader ? (
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="pb-1">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
@@ -53,17 +52,8 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
               Find the right TVDB entry; your selection updates the preview on the right.
             </p>
           </div>
-          {selected ? (
-            <button
-              type="button"
-              onClick={clearSelection}
-              className="text-xs font-semibold text-accent-primary hover:text-accent-hover"
-            >
-              Clear
-            </button>
-          ) : null}
         </div>
-      ) : null}
+      </div>
 
       <div className="space-y-2">
         <input
@@ -111,11 +101,43 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
                       result.target.id === selected.target.id &&
                       result.target.idType === selected.target.idType;
 
-                    const metaParts = [
-                      `TVDB ${String(result.target.id)}`,
-                      result.year ? String(result.year) : null,
-                      result.typeLabel ?? null,
-                    ].filter((value): value is string => Boolean(value));
+                    const metadataPills: React.ReactNode[] = [
+                      <Pill key="tvdb" small tone="muted" className="font-mono text-text-primary">
+                        {`TVDB ${result.target.id}`}
+                      </Pill>,
+                    ];
+
+                    if (result.year) {
+                      metadataPills.push(
+                        <Pill key="year" small tone="muted">
+                          {result.year}
+                        </Pill>
+                      );
+                    }
+
+                    if (result.typeLabel) {
+                      metadataPills.push(
+                        <Pill key="type" small tone="muted" className="text-text-secondary">
+                          {result.typeLabel}
+                        </Pill>
+                      );
+                    }
+
+                    if (result.inLibrary) {
+                      metadataPills.push(
+                        <Pill key="library" small tone="success" className="uppercase tracking-wide">
+                          In Sonarr
+                        </Pill>
+                      );
+                    }
+
+                    if (isCurrent) {
+                      metadataPills.push(
+                        <Pill key="current" small tone="blue" className="uppercase tracking-wide">
+                          Current mapping
+                        </Pill>
+                      );
+                    }
 
                     const link = buildExternalMediaLink({
                       service: "sonarr",
@@ -136,7 +158,7 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
                       >
                         <button
                           type="button"
-                          className="flex flex-1 items-center gap-3 text-left"
+                          className="flex flex-1 items-start gap-3 text-left"
                           onClick={() => selectResult(result)}
                         >
                           {result.posterUrl ? (
@@ -148,41 +170,34 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
                           ) : (
                             <div className="h-14 w-10 shrink-0 rounded bg-bg-primary" />
                           )}
-                          <div className="min-w-0 space-y-1">
+                          <div className="min-w-0 flex-1 space-y-2">
                             <div
-                              className={`truncate text-sm font-semibold ${
+                              className={`text-sm font-semibold leading-tight ${
                                 isSelected ? "text-accent-primary" : "text-text-primary"
-                              }`}
+                              } line-clamp-2`}
                             >
                               {result.title}
                             </div>
-                            <div className="text-xs text-text-secondary">
-                              {metaParts.join(" | ")}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              {result.inLibrary ? (
-                                <Pill small tone="success" className="uppercase tracking-wide">In library</Pill>
-                              ) : null}
-                              {isCurrent ? (
-                                <Pill small tone="blue" className="uppercase tracking-wide">Current mapping</Pill>
-                              ) : null}
-                              {isSelected ? (
-                                <Pill small tone="accent" className="uppercase tracking-wide">SELECTED</Pill>
-                              ) : null}
-                            </div>
+                            {metadataPills.length ? (
+                              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                                {metadataPills}
+                              </div>
+                            ) : null}
                           </div>
                         </button>
-                        <TooltipWrapper content="Open in Sonarr" container={portalContainer ?? null}>
-                          <a
-                            href={link}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center rounded p-2 text-text-secondary hover:text-text-primary"
-                            aria-label="Open in Sonarr"
-                          >
-                            <ExternalLink size={16} />
-                          </a>
-                        </TooltipWrapper>
+                        {link ? (
+                          <TooltipWrapper content="Open in Sonarr" container={portalContainer ?? null}>
+                            <a
+                              href={link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center rounded p-2 text-text-secondary hover:text-text-primary"
+                              aria-label="Open in Sonarr"
+                            >
+                              <ExternalLink size={16} />
+                            </a>
+                          </TooltipWrapper>
+                        ) : null}
                       </div>
                     );
                   })}
