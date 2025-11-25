@@ -31,6 +31,7 @@ export interface MappingResolver {
     }
   ): Promise<{ tvdbId: number; successfulSynonym?: string } | null>;
   prioritizeAniListMedia?(anilistId: number, opts?: { schedule?: boolean }): void;
+  getLinkedAniListIdsForTvdb?(tvdbId: number): number[];
 }
 
 export interface TitleIndexer {

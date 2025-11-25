@@ -525,6 +525,20 @@ export class MappingService {
     }
     return { url: opts.sonarrUrl, apiKey: opts.sonarrApiKey };
   }
+
+  public getLinkedAniListIdsForTvdb(tvdbId: number): number[] {
+    const ids = new Set<number>();
+    if (this.overrides) {
+      for (const id of this.overrides.getLinkedAniListIds(tvdbId)) {
+        ids.add(id);
+      }
+    }
+    const staticIds = this.staticProvider.getAniListIdsForTvdb(tvdbId);
+    for (const id of staticIds) {
+      ids.add(id);
+    }
+    return Array.from(ids);
+  }
 }
 
 export type { StaticMappingPayload };

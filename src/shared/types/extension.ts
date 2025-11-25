@@ -73,6 +73,8 @@ export interface CheckSeriesStatusResponse {
   series?: LeanSonarrSeries | SonarrSeries;
   /** True when a manual AniList -> TVDB override is active for this ID. */
   overrideActive?: boolean;
+  /** Other AniList IDs currently linked to the same TVDB ID (overrides or static pairs). */
+  linkedAniListIds?: number[];
 }
 
 export interface SonarrCredentialsPayload {

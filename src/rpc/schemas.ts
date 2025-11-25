@@ -42,6 +42,7 @@ export interface UpdateSonarrInput {
 export interface SetMappingOverrideInput {
   anilistId: number;
   tvdbId: number;
+  force?: boolean;
 }
 
 export interface ClearMappingOverrideInput {
@@ -57,6 +58,7 @@ export interface SonarrLookupInput {
 export interface SonarrLookupOutput {
   results: import('@/shared/types').SonarrLookupSeries[];
   libraryTvdbIds: number[];
+  linkedAniListIdsByTvdbId?: Record<number, number[]>;
   statsMap?: Record<number, {
     seasonCount?: number;
     episodeCount?: number;

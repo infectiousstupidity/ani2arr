@@ -131,6 +131,14 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
                       );
                     }
 
+                    if (Array.isArray(result.linkedAniListIds) && result.linkedAniListIds.length > 0) {
+                      metadataPills.push(
+                        <Pill key="linked" small tone="warning" className="uppercase tracking-wide text-[10px]">
+                          {`Linked to ${result.linkedAniListIds.length} AniList entr${result.linkedAniListIds.length === 1 ? "y" : "ies"}`}
+                        </Pill>
+                      );
+                    }
+
                     if (isCurrent) {
                       metadataPills.push(
                         <Pill key="current" small tone="blue" className="uppercase tracking-wide">

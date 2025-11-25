@@ -23,12 +23,13 @@ export function useMappingSearch(input: UseMappingSearchInput) {
     queryFn: async () => {
       if (input.service !== 'sonarr') return [];
       const api = getAni2arrApi();
-      const { results, libraryTvdbIds, statsMap } = await api.searchSonarr({ term: q });
+      const { results, libraryTvdbIds, statsMap, linkedAniListIdsByTvdbId } = await api.searchSonarr({ term: q });
       const mapped: MappingSearchResult[] = results.map((r: SonarrLookupSeries) =>
         toMappingSearchResultFromSonarr(r, {
           baseUrl,
           libraryTvdbIds,
           ...(statsMap ? { statsMap } : {}),
+          ...(linkedAniListIdsByTvdbId ? { linkedAniListIdsByTvdbId } : {}),
         }),
       );
       return mapped;

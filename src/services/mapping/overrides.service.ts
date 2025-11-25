@@ -4,6 +4,7 @@ import { mappingOverridesLocal, mappingOverridesSync, type MappingOverrideEntry 
 
 export class MappingOverridesService {
   private readonly map = new Map<number, MappingOverrideEntry>();
+  private readonly reverse = new Map<number, Set<number>>();
   private initialized = false;
 
   public async init(): Promise<void> {
@@ -12,8 +13,7 @@ export class MappingOverridesService {
       mappingOverridesSync.getValue(),
       mappingOverridesLocal.getValue(),
     ]);
-    this.hydrateFromRecords(sync);
-    this.hydrateFromRecords(local);
+    this.rebuildFromRecords(sync, local);
     this.attachWatchers();
     this.initialized = true;
   }
@@ -21,6 +21,13 @@ export class MappingOverridesService {
   public get(anilistId: number): number | null {
     const entry = this.map.get(anilistId);
     return entry ? entry.tvdbId : null;
+  }
+
+  public getLinkedAniListIds(tvdbId: number): number[] {
+    if (typeof tvdbId !== 'number' || !Number.isFinite(tvdbId)) return [];
+    const bucket = this.reverse.get(tvdbId);
+    if (!bucket) return [];
+    return Array.from(bucket);
   }
 
   public has(anilistId: number): boolean {
@@ -31,7 +38,12 @@ export class MappingOverridesService {
     const updatedAt = Date.now();
     const key = String(anilistId);
     const entry: MappingOverrideEntry = { tvdbId, updatedAt };
+    const prev = this.map.get(anilistId);
+    if (prev) {
+      this.removeReverse(prev.tvdbId, anilistId);
+    }
     this.map.set(anilistId, entry);
+    this.addReverse(tvdbId, anilistId);
 
     const [sync, local] = await Promise.all([
       mappingOverridesSync.getValue(),
@@ -47,6 +59,10 @@ export class MappingOverridesService {
 
   public async clear(anilistId: number): Promise<void> {
     const key = String(anilistId);
+    const prev = this.map.get(anilistId);
+    if (prev) {
+      this.removeReverse(prev.tvdbId, anilistId);
+    }
     this.map.delete(anilistId);
     const [sync, local] = await Promise.all([
       mappingOverridesSync.getValue(),
@@ -60,17 +76,6 @@ export class MappingOverridesService {
     ]);
   }
 
-  private hydrateFromRecords(records: Record<string, MappingOverrideEntry>): void {
-    for (const [key, entry] of Object.entries(records ?? {})) {
-      const id = Number(key);
-      if (!Number.isFinite(id) || typeof entry?.tvdbId !== 'number') continue;
-      const prev = this.map.get(id);
-      if (!prev || (typeof entry.updatedAt === 'number' && entry.updatedAt > (prev.updatedAt ?? 0))) {
-        this.map.set(id, { tvdbId: entry.tvdbId, updatedAt: entry.updatedAt ?? Date.now() });
-      }
-    }
-  }
-
   private attachWatchers(): void {
     browser.storage.onChanged.addListener((changes, area) => {
       if (area !== 'sync' && area !== 'local') return;
@@ -80,8 +85,49 @@ export class MappingOverridesService {
       if (!change) return;
       const next = change.newValue as Record<string, MappingOverrideEntry> | undefined;
       if (!next || typeof next !== 'object') return;
-      this.hydrateFromRecords(next);
+      this.rebuildFromRecords(next);
     });
   }
-}
 
+  private rebuildFromRecords(...recordsList: Array<Record<string, MappingOverrideEntry>>): void {
+    this.map.clear();
+    this.reverse.clear();
+    const merged = new Map<number, MappingOverrideEntry>();
+    for (const records of recordsList) {
+      for (const [key, entry] of Object.entries(records ?? {})) {
+        const id = Number(key);
+        if (!Number.isFinite(id) || typeof entry?.tvdbId !== 'number') continue;
+        const normalized: MappingOverrideEntry = {
+          tvdbId: entry.tvdbId,
+          updatedAt: typeof entry.updatedAt === 'number' ? entry.updatedAt : Date.now(),
+        };
+        const prev = merged.get(id);
+        if (!prev || normalized.updatedAt > (prev.updatedAt ?? 0)) {
+          merged.set(id, normalized);
+        }
+      }
+    }
+    for (const [id, entry] of merged.entries()) {
+      this.map.set(id, entry);
+      this.addReverse(entry.tvdbId, id);
+    }
+  }
+
+  private addReverse(tvdbId: number, anilistId: number): void {
+    const bucket = this.reverse.get(tvdbId);
+    if (bucket) {
+      bucket.add(anilistId);
+      return;
+    }
+    this.reverse.set(tvdbId, new Set([anilistId]));
+  }
+
+  private removeReverse(tvdbId: number, anilistId: number): void {
+    const bucket = this.reverse.get(tvdbId);
+    if (!bucket) return;
+    bucket.delete(anilistId);
+    if (bucket.size === 0) {
+      this.reverse.delete(tvdbId);
+    }
+  }
+}

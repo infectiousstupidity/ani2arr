@@ -36,7 +36,9 @@ export class StaticMappingProvider {
   private readonly log: ScopedLogger;
   private readonly fetchImpl: typeof fetch;
   private readonly primaryPairs = new Map<number, number>();
+  private readonly primaryReverse = new Map<number, Set<number>>();
   private readonly fallbackPairs = new Map<number, number>();
+  private readonly fallbackReverse = new Map<number, Set<number>>();
 
   constructor(private readonly caches: StaticCaches, options: StaticMappingProviderOptions = {}) {
     this.log = logger.create(options.scope ?? 'StaticMappingProvider');
@@ -106,7 +108,7 @@ export class StaticMappingProvider {
       if (response.status === 304 && cached) {
         this.log.debug(`refresh(${source}): not modified`);
         if (map.size === 0) {
-          this.hydrateMap(map, cached.value.pairs);
+          this.hydrateMap(map, this.reverseFor(source), cached.value.pairs);
         }
         return;
       }
@@ -119,7 +121,7 @@ export class StaticMappingProvider {
 
       const payload = (await response.json()) as unknown;
       const pairs = this.buildPairsFromSource(payload);
-      this.hydrateMap(map, pairs);
+      this.hydrateMap(map, this.reverseFor(source), pairs);
 
       const nextEtag = response.headers.get('ETag');
       await cache.write(
@@ -141,7 +143,9 @@ export class StaticMappingProvider {
 
   public async reset(): Promise<void> {
     this.primaryPairs.clear();
+    this.primaryReverse.clear();
     this.fallbackPairs.clear();
+    this.fallbackReverse.clear();
     await Promise.all([
       this.caches.primary.remove(CACHE_KEY),
       this.caches.fallback.remove(CACHE_KEY),
@@ -154,7 +158,7 @@ export class StaticMappingProvider {
 
     const cached = await this.cacheFor(source).read(CACHE_KEY);
     if (cached) {
-      this.hydrateMap(map, cached.value.pairs);
+      this.hydrateMap(map, this.reverseFor(source), cached.value.pairs);
     }
   }
 
@@ -166,20 +170,39 @@ export class StaticMappingProvider {
     return source === 'primary' ? this.primaryPairs : this.fallbackPairs;
   }
 
+  private reverseFor(source: StaticMappingSource): Map<number, Set<number>> {
+    return source === 'primary' ? this.primaryReverse : this.fallbackReverse;
+  }
+
   private urlFor(source: StaticMappingSource): string {
     return source === 'primary' ? PRIMARY_URL : FALLBACK_URL;
   }
 
-  private hydrateMap(map: Map<number, number>, pairs: Record<number, number>): void {
+  private hydrateMap(
+    map: Map<number, number>,
+    reverse: Map<number, Set<number>>,
+    pairs: Record<number, number>,
+  ): void {
     map.clear();
+    reverse.clear();
     for (const [rawKey, rawValue] of Object.entries(pairs)) {
       const key = this.coerceId(rawKey);
       const value = this.coerceId(rawValue);
       if (key != null && value != null) {
         map.set(key, value);
+        this.addReverse(reverse, value, key);
       }
     }
     this.log.debug(`hydrateMap: populated map with ${map.size} entries`);
+  }
+
+  private addReverse(reverse: Map<number, Set<number>>, tvdbId: number, anilistId: number): void {
+    const bucket = reverse.get(tvdbId);
+    if (bucket) {
+      bucket.add(anilistId);
+      return;
+    }
+    reverse.set(tvdbId, new Set([anilistId]));
   }
 
   private buildPairsFromSource(source: unknown): Record<number, number> {
@@ -243,5 +266,18 @@ export class StaticMappingProvider {
     }
 
     return null;
+  }
+
+  public getAniListIdsForTvdb(tvdbId: number): number[] {
+    if (typeof tvdbId !== 'number' || !Number.isFinite(tvdbId)) return [];
+    const ids = new Set<number>();
+    const collect = (reverse: Map<number, Set<number>>): void => {
+      const bucket = reverse.get(tvdbId);
+      if (!bucket) return;
+      bucket.forEach(id => ids.add(id));
+    };
+    collect(this.primaryReverse);
+    collect(this.fallbackReverse);
+    return Array.from(ids);
   }
 }

@@ -76,7 +76,7 @@ export interface UseMappingControllerResult {
   clearSelection(): void;
   resetToCurrent(): void;
   searchQuery: ReturnType<typeof useMappingSearch>;
-  handleSubmit(): Promise<void>;
+  handleSubmit(options?: { force?: boolean }): Promise<void>;
   handleRevertToAutomatic(): Promise<void>;
   canSubmit: boolean;
   isSubmitting: boolean;
@@ -158,11 +158,11 @@ export function useMappingController(input: UseMappingControllerInput): UseMappi
     !targetsEqual(state.selected?.target ?? null, effectiveTarget),
   );
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (options?: { force?: boolean }) => {
     if (!state.selected) return;
     setSubmitting(true);
     try {
-      await overrides.setOverride(state.selected.target);
+      await overrides.setOverride(state.selected.target, { force: options?.force === true });
       setOptimisticOverrideState('set');
       setOptimisticMapping(state.selected);
       dispatch({ type: 'RESET_FROM_CURRENT' });
