@@ -26,14 +26,25 @@ const FormField: React.FC<{ children: React.ReactNode }> = React.memo(({ childre
 });
 FormField.displayName = 'FormField';
 
-const FormItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className = '', ...props }, ref) => (
-    <div
-      ref={ref}
-      className={`grid grid-cols-2 items-center gap-4 ${className}`}
-      {...props}
-    />
-  ),
+type FormItemProps = React.HTMLAttributes<HTMLDivElement> & { vertical?: boolean };
+
+const FormItem = React.forwardRef<HTMLDivElement, FormItemProps>(
+  ({ className = '', vertical = false, ...props }, ref) => {
+    const base = vertical
+      ? 'flex flex-col gap-3 items-start'
+      : 'grid grid-cols-2 items-center gap-4';
+
+    // Add consistent vertical spacing between form groups
+    const spacing = 'mb-4 last:mb-0';
+
+    return (
+      <div
+        ref={ref}
+        className={`${base} ${spacing} ${className}`}
+        {...props}
+      />
+    );
+  },
 );
 FormItem.displayName = 'FormItem';
 

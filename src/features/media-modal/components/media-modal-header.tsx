@@ -2,6 +2,7 @@
 import { type MouseEventHandler } from "react";
 import { Database, X } from "lucide-react";
 import TooltipWrapper from "@/shared/components/tooltip";
+import Pill from '@/shared/components/pill';
 import type { AniFormat, MediaStatus, TitleLanguage } from "@/shared/types";
 
 export type MediaModalTabId = "series" | "mapping";
@@ -75,7 +76,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
   );
 
   return (
-    <header className="relative">
+    <header className="relative mb-12">
       <div
         className="relative h-[200px] w-full overflow-hidden bg-bg-tertiary bg-cover bg-center bg-no-repeat shadow-[inset_0_0_250px_#121722]"
         style={{
@@ -98,9 +99,9 @@ export function Header(props: HeaderProps): React.JSX.Element {
           </button>
         </div>
 
-        <div className="mt-auto px-8 pb-6">
+        <div className="mt-auto px-8 pb-14">
           <div className="flex items-start gap-4">
-            <div className="hidden h-[150px] w-[110px] shrink-0 overflow-hidden rounded-xl border border-border-primary/60 bg-bg-tertiary/80 shadow-lg sm:block">
+            <div className="hidden h-[150px] w-[110px] shrink-0 overflow-hidden rounded-xl border border-border-primary/60 bg-bg-tertiary/80 shadow-lg sm:block relative z-20 translate-y-8">
               {coverImage ? (
                 <img
                   src={coverImage}
@@ -112,7 +113,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
               )}
             </div>
 
-            <div className="min-w-0 flex-1 space-y-3">
+            <div className="min-w-0 flex-1 space-y-3 mt-auto pb-5">
               <div className="flex flex-wrap items-start gap-3">
                 {hasAlternateTitles ? (
                   <TooltipWrapper
@@ -149,20 +150,13 @@ export function Header(props: HeaderProps): React.JSX.Element {
 
               <div className="flex flex-wrap items-center gap-2 text-[12px] font-medium text-text-secondary">
                 {yearLabel ? (
-                  <MetadataBadge tone="muted" label={String(yearLabel)} />
+                  <Pill tone="muted" className="uppercase">{String(yearLabel)}</Pill>
                 ) : null}
                 {statusLabel ? (
-                  <MetadataBadge
-                    tone={currentTone}
-                    label={statusLabel}
-                  />
+                  <Pill tone={currentTone} className="uppercase">{statusLabel}</Pill>
                 ) : null}
                 {inLibrary ? (
-                  <MetadataBadge
-                    tone="success"
-                    icon={Database}
-                    label="In library"
-                  />
+                  <Pill tone="success" icon={Database} className="uppercase">In library</Pill>
                 ) : null}
                 <span className="flex-1" />
               </div>
@@ -174,27 +168,6 @@ export function Header(props: HeaderProps): React.JSX.Element {
   );
 }
 
-type MetadataBadgeProps = {
-  label: string;
-  icon?: typeof Database;
-  tone?: "muted" | "success" | "warning" | "info";
-};
 
-function MetadataBadge(props: MetadataBadgeProps) {
-  const { label, icon: Icon, tone = "muted" } = props;
-  const toneClasses: Record<NonNullable<MetadataBadgeProps["tone"]>, string> = {
-    muted: "border-white/15 bg-white/10 text-white/80",
-    success: "border-success/25 bg-success/20 text-success",
-    warning: "border-amber-200/30 bg-amber-100/15 text-amber-100",
-    info: "border-white/15 bg-white/10 text-white/80",
-  };
-
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] ${toneClasses[tone]}`}>
-      {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
-      <span className="leading-none">{label}</span>
-    </span>
-  );
-}
 
 

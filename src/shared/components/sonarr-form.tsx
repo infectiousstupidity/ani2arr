@@ -104,15 +104,6 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
     folderSlug,
   } = props;
 
-  const fieldRowClassName = "grid gap-4";
-  const fieldRowTemplateStyle: React.CSSProperties = {
-    gridTemplateColumns: "120px minmax(0, 1fr)",
-  };
-  const fieldRowStartStyle: React.CSSProperties = {
-    ...fieldRowTemplateStyle,
-    alignItems: "flex-start",
-  };
-
   const effectiveMetadata: SonarrFormMetadata = metadata;
   const effectiveValues: SonarrFormState = form.watch();
 
@@ -267,10 +258,7 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
         {/* Root folder */}
         <div className="space-y-1">
           <FormField>
-            <FormItem
-              className={`${fieldRowClassName} items-start`}
-              style={fieldRowStartStyle}
-            >
+            <FormItem vertical>
               <FormLabel className="text-xs font-medium text-text-secondary">
                 Root Folder
               </FormLabel>
@@ -333,16 +321,12 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
           </FormField>
 
           {(showComputedPath && computedPath) || showPathHint ? (
-            <div className={fieldRowClassName} style={fieldRowTemplateStyle}>
-              {/* Spacer div to align text with the second column (inputs) */}
-              <div />
-              <div className="space-y-1">
-                {showPathHint ? (
-                  <p className="text-xs text-text-secondary">
-                    &apos;{computedSlug}&apos; subfolder will be created automatically.
-                  </p>
-                ) : null}
-              </div>
+            <div className="space-y-1">
+              {showPathHint ? (
+                <p className="text-xs text-text-secondary">
+                  &apos;{computedSlug}&apos; subfolder will be created automatically.
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -350,10 +334,7 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
         {/* Monitor */}
         <div className="space-y-1">
           <FormField>
-            <FormItem
-              className={`${fieldRowClassName} items-center`}
-              style={fieldRowTemplateStyle}
-            >
+            <FormItem vertical>
               <FormLabel className="text-xs font-medium text-text-secondary">Monitor</FormLabel>
               <FormControl className="w-full">
                 <Select
@@ -386,10 +367,7 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
         {/* Quality profile */}
         <div className="space-y-1">
           <FormField>
-            <FormItem
-              className={`${fieldRowClassName} items-center`}
-              style={fieldRowTemplateStyle}
-            >
+            <FormItem vertical>
               <FormLabel className="text-xs font-medium text-text-secondary">
                 Quality Profile
               </FormLabel>
@@ -422,10 +400,7 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
         {/* Series type */}
         <div className="space-y-1">
           <FormField>
-            <FormItem
-              className={`${fieldRowClassName} items-center`}
-              style={fieldRowTemplateStyle}
-            >
+            <FormItem vertical>
               <FormLabel className="text-xs font-medium text-text-secondary">
                 Series Type
               </FormLabel>
@@ -460,10 +435,7 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
         {/* Tags */}
         <div className="space-y-1">
           <FormField>
-            <FormItem
-              className={`${fieldRowClassName} items-start`}
-              style={fieldRowStartStyle}
-            >
+            <FormItem vertical>
               <FormLabel className="text-xs font-medium text-text-secondary">Tags</FormLabel>
               <FormControl className="w-full">
                 <MultiTagInput
@@ -481,10 +453,7 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
         {/* Toggles */}
         <div className="space-y-1.5 pt-1">
           <FormField>
-            <FormItem
-              className={`${fieldRowClassName} items-center`}
-              style={fieldRowTemplateStyle}
-            >
+            <FormItem vertical>
               <FormLabel className="text-xs font-medium text-text-secondary">
                 Season Folders
               </FormLabel>
@@ -500,10 +469,7 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
 
           {includeSearchToggle ? (
             <FormField>
-              <FormItem
-                className={`${fieldRowClassName} items-center`}
-                style={fieldRowTemplateStyle}
-              >
+              <FormItem vertical>
                 <FormLabel className="text-xs font-medium text-text-secondary">
                   Search on Add
                 </FormLabel>

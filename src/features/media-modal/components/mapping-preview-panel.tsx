@@ -1,5 +1,7 @@
 // src/features/media-modal/components/mapping-preview-panel.tsx
 import { ExternalLink, Pencil } from "lucide-react";
+import Button from '@/shared/components/button';
+import Pill from '@/shared/components/pill';
 import type { MappingSearchResult } from "@/shared/types";
 import { buildExternalMediaLink } from "@/shared/utils/build-external-media-link";
 import type { AniListEntrySummary } from "../types";
@@ -43,14 +45,24 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
             ) : null}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onEditMapping}
-          className="inline-flex items-center justify-center rounded-full bg-bg-secondary p-2 text-text-secondary shadow-md transition hover:border-accent-primary hover:text-accent-primary"
-          aria-label="Edit mapping"
-        >
-          <Pencil className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            onClick={(e) => {
+              // Prevent parent handlers from receiving this click.
+              e.stopPropagation();
+              onEditMapping();
+            }}
+            variant="ghost"
+            size="sm"
+            className="inline-flex items-center gap-2 text-sm font-medium text-text-primary"
+          >
+            Edit mapping
+            <span className="inline-flex items-center">
+              <Pencil className="h-4 w-4" />
+            </span>
+          </Button>
+        </div>
       </div>
 
       <MappingPreviewCard
@@ -109,27 +121,17 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
 
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-            <span className="rounded-full bg-bg-primary/70 px-2 py-1 font-mono text-[10px] text-text-primary">
-              TVDB {mapping.target.id}
-            </span>
+            <Pill small tone="default" className="font-mono text-text-primary">{`TVDB ${mapping.target.id}`}</Pill>
             {mapping.typeLabel ? (
-              <span className="rounded-full bg-bg-primary/60 px-2 py-1 text-[10px] text-text-secondary">
-                {mapping.typeLabel}
-              </span>
+              <Pill small tone="default" className="text-text-secondary">{mapping.typeLabel}</Pill>
             ) : null}
             {isPreviewingSelection ? (
-              <span className="rounded-full bg-accent-primary/20 px-2 py-1 text-[10px] text-accent-primary">
-                Selected
-              </span>
+              <Pill small tone="accent" className="uppercase tracking-wide">SELECTED</Pill>
             ) : null}
             {mapping.inLibrary ? (
-              <span className="rounded-full bg-success/15 px-2 py-1 text-[10px] font-medium text-success">
-                In library{mapping.fileCount ? ` (${mapping.fileCount} downloaded)` : ""}
-              </span>
+              <Pill small tone="success">{`In library${mapping.fileCount ? ` (${mapping.fileCount} downloaded)` : ""}`}</Pill>
             ) : (
-              <span className="rounded-full bg-blue-500/15 px-2 py-1 text-[10px] font-medium text-blue-400">
-                Not in library
-              </span>
+              <Pill small tone="blue">Not in library</Pill>
             )}
           </div>
 
@@ -149,19 +151,21 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
 
       <div className="flex items-center justify-between bg-bg-primary/30 px-4 py-3 text-xs text-text-secondary">
         {mapping.statusLabel ? (
-          <span className="rounded bg-bg-primary/60 px-2 py-1 text-[10px] font-medium text-text-secondary">
+          <span className="rounded bg-bg-primary/60 px-2 py-1 uppercase text-[10px] font-medium text-text-secondary">
             {mapping.statusLabel}
           </span>
         ) : <span />}
         {link ? (
-          <a
-            href={link}
-            target="_blank"
-            rel="noreferrer"
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
             className="inline-flex items-center gap-1 text-sm font-medium text-accent-primary hover:text-accent-hover"
           >
-            Open in Sonarr <ExternalLink size={14} />
-          </a>
+            <a href={link} target="_blank" rel="noreferrer">
+              Open in Sonarr <ExternalLink size={14} />
+            </a>
+          </Button>
         ) : null}
       </div>
 
