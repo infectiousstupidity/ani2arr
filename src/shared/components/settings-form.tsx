@@ -1,5 +1,5 @@
 // src/shared/components/settings-form.tsx
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { logger } from '@/shared/utils/logger';
 import { useSettingsManager } from '@/shared/hooks/use-settings-manager';
 import { Input, FormField, FormItem, FormLabel, FormControl, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './form';
@@ -20,6 +20,7 @@ const titleLanguageOptions: Array<{ value: TitleLanguage; label: string }> = [
 function SettingsForm(): React.JSX.Element {
   const manager = useSettingsManager();
   const [selectPortal, setSelectPortal] = useState<HTMLElement | null>(null);
+  const sonarrUrlInputRef = useRef<HTMLInputElement | null>(null);
   const sonarrDefaultsForm = useForm<SonarrFormState>({
     defaultValues: manager.formState.defaults,
     mode: 'onChange',
@@ -34,6 +35,14 @@ function SettingsForm(): React.JSX.Element {
   useEffect(() => {
     sonarrDefaultsForm.reset(manager.formState.defaults);
   }, [manager.formState.defaults, manager.isLoading, sonarrDefaultsForm]);
+
+  useEffect(() => {
+    if (manager.isLoading) return;
+    if (manager.isConnected) return;
+    const sonarrUrl = manager.formState.sonarrUrl ?? '';
+    if (sonarrUrl.trim().length > 0) return;
+    sonarrUrlInputRef.current?.focus();
+  }, [manager.formState.sonarrUrl, manager.isConnected, manager.isLoading]);
 
   useEffect(() => {
     const subscription = sonarrDefaultsForm.watch(values => {
@@ -88,6 +97,7 @@ function SettingsForm(): React.JSX.Element {
             <FormLabel>Sonarr URL</FormLabel>
             <FormControl>
               <Input
+                ref={sonarrUrlInputRef}
                 value={manager.formState.sonarrUrl}
                 onChange={e => manager.handleFieldChange('sonarrUrl', e.target.value)}
                 placeholder="http://localhost:8989"

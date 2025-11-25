@@ -35,10 +35,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantClasses = {
       // Primary has no hover darkening to match AniList buttons.
-      primary: `bg-accent-primary text-white`,
-      secondary: `${isDisabled ? 'bg-bg-tertiary' : 'bg-bg-secondary hover:bg-bg-tertiary'} text-text-primary`,
-      outline: `border border-border-primary text-text-secondary ${isDisabled ? '' : 'hover:bg-bg-secondary'}`,
-      ghost: `${isDisabled ? '' : 'hover:bg-bg-secondary'}`,
+      primary: `${isDisabled ? 'bg-bg-tertiary text-text-secondary' : 'bg-accent-primary text-white'}`,
+      secondary: `${isDisabled ? 'bg-bg-tertiary text-text-secondary' : 'bg-bg-secondary hover:bg-bg-tertiary'} text-text-primary`,
+      outline: `${isDisabled ? 'border border-border-primary text-text-secondary/60' : 'border border-border-primary text-text-secondary hover:bg-bg-secondary'}`,
+      ghost: `${isDisabled ? 'text-text-secondary/60' : 'hover:bg-bg-secondary'}`,
     } as const;
 
     const sizeClasses = {

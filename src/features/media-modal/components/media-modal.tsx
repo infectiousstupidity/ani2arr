@@ -178,7 +178,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
         onPrimaryClick: () => {
           void handleMappingSubmit();
         },
-        secondaryLabel: 'Cancel',
+        secondaryLabel: 'Back to manage series',
         onSecondaryClick: handleMappingCancel,
         showTertiary: false,
         tertiaryLabel: '',
@@ -232,7 +232,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
       <ModalContent
         container={portalContainer ?? null}
         floatingPortalRef={handleFloatingPortalRef}
-        className="w-full max-w-[1000px] flex flex-col rounded-2xl bg-bg-primary shadow-2xl shadow-black/40 p-0"
+        className="w-full max-w-[1000px] h-[80vh] flex flex-col overflow-hidden rounded-none bg-bg-primary shadow-2xl shadow-black/40 p-0 sm:h-[vh] sm:min-h-[720px] sm:rounded-2xl"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
         }}
@@ -262,10 +262,10 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           tooltipContainer={floatingPortalEl ?? (portalContainer instanceof HTMLElement ? portalContainer : null)}
         />
         {/* Content Area - split view with sticky preview and inline content */}
-        <div className="flex-1 px-8 pb-6">
-          <div className="mx-auto flex max-w-[1000px] flex-col gap-6">
-            <div className="grid grid-cols-2 gap-6">
-              <div className="flex flex-col">
+        <div className="flex-1 overflow-hidden px-8 pb-6">
+          <div className="mx-auto flex h-full max-w-[1000px] flex-col gap-6">
+            <div className="grid h-full grid-cols-2 gap-6">
+              <div className="flex h-full flex-col overflow-hidden">
                 <div className="px-0 pb-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
@@ -287,13 +287,15 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                   </div>
                 </div>
 
-                <div className="flex-1">
+                <div className="flex-1 min-h-0">
                   {viewMode === "mapping" ? (
                     <ProviderSearchSection
                       controller={mappingController}
                       currentMapping={effectiveCurrentMapping}
                       baseUrl={baseUrl}
+                      autoFocus={isOpen && viewMode === "mapping"}
                       hideHeader
+                      portalContainer={selectPortalContainer instanceof HTMLElement ? selectPortalContainer : null}
                     />
                   ) : (
                     <SonarrPanel

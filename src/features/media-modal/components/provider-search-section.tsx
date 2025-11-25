@@ -1,5 +1,8 @@
 // src/features/media-modal/components/provider-search-section.tsx
+import { useCallback, useEffect, useRef, type WheelEvent as ReactWheelEvent } from "react";
 import { ExternalLink } from "lucide-react";
+import TooltipWrapper from '@/shared/components/tooltip';
+import Pill from '@/shared/components/pill';
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import type { MappingSearchResult } from "@/shared/types";
 import { buildExternalMediaLink } from "@/shared/utils/build-external-media-link";
@@ -10,17 +13,36 @@ interface ProviderSearchSectionProps {
   currentMapping: MappingSearchResult | null;
   baseUrl: string;
   hideHeader?: boolean;
+  autoFocus?: boolean;
+  portalContainer?: HTMLElement | null;
 }
 
 export function ProviderSearchSection(props: ProviderSearchSectionProps) {
-  const { controller, currentMapping, baseUrl, hideHeader = false } = props;
+  const { controller, currentMapping, baseUrl, hideHeader = false, autoFocus = false, portalContainer } = props;
   const { state, setQuery, selectResult, clearSelection, searchQuery } = controller;
   const results = searchQuery.data ?? [];
   const selected = state.selected;
   const hasQuery = state.query.trim().length > 0;
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+
+  const handleWheelCapture = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const canScrollY = viewport.scrollHeight > viewport.clientHeight;
+    const canScrollX = viewport.scrollWidth > viewport.clientWidth;
+    if (!canScrollY && !canScrollX) return;
+    viewport.scrollBy({ top: event.deltaY, left: event.deltaX });
+    event.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    inputRef.current?.focus();
+  }, [autoFocus]);
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       {!hideHeader ? (
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
@@ -45,6 +67,7 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
 
       <div className="space-y-2">
         <input
+          ref={inputRef}
           value={state.query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search Sonarr / TVDB"
@@ -52,110 +75,134 @@ export function ProviderSearchSection(props: ProviderSearchSectionProps) {
         />
       </div>
 
-      <div className="flex-1 rounded-xl bg-bg-secondary/80 shadow-inner overflow-hidden">
-        <ScrollArea.Root className="h-full">
-          <ScrollArea.Viewport className="h-full">
-            <div className="h-full divide-y divide-border-primary">
-          {searchQuery.isFetching && !results.length ? (
-            <div className="flex h-32 items-center justify-center text-xs text-text-secondary">
-              Searching...
-            </div>
-          ) : null}
-          {!results.length && !searchQuery.isFetching ? (
-            <div className="flex h-32 items-center justify-center px-3 py-6 text-center text-xs text-text-secondary">
-              {hasQuery ? "No results found." : "Type to search Sonarr."}
-            </div>
-          ) : null}
-          {results.map((result) => {
-            const isCurrent =
-              currentMapping &&
-              result.target.id === currentMapping.target.id &&
-              result.target.idType === currentMapping.target.idType;
-            const isSelected =
-              selected &&
-              result.target.id === selected.target.id &&
-              result.target.idType === selected.target.idType;
-            const metaParts = [
-              `TVDB ${String(result.target.id)}`,
-              result.year ? String(result.year) : null,
-              result.typeLabel ?? null,
-            ].filter((value): value is string => Boolean(value));
-            const link = buildExternalMediaLink({
-              service: "sonarr",
-              baseUrl,
-              inLibrary: result.inLibrary,
-              ...(result.librarySlug ? { librarySlug: result.librarySlug } : {}),
-              searchTerm: result.title,
-            });
+      <div className="flex-1 min-h-0 rounded-xl bg-bg-secondary/80 shadow-inner overflow-hidden">
+        <ScrollArea.Root
+          className="h-full w-full"
+          onWheelCapture={handleWheelCapture}
+        >
+          <div className="flex h-full">
+            {/* Viewport takes remaining width */}
+            <ScrollArea.Viewport
+              ref={viewportRef}
+              className="h-full flex-1 overflow-y-auto"
+            >
+              {/* small top/bottom padding so selection highlight isn't cut by rounded corners */}
+              <div className="py-1">
+                <div className="divide-y divide-border-primary">
+                  {searchQuery.isFetching && !results.length ? (
+                    <div className="flex h-32 items-center justify-center text-xs text-text-secondary">
+                      Searching...
+                    </div>
+                  ) : null}
 
-            return (
-              <div
-                key={`${result.target.id}-${result.target.idType}`}
-                className={`group flex items-center gap-3 px-3 py-3 transition-colors ${
-                  isSelected
-                    ? "bg-accent-primary/15 ring-1 ring-inset ring-accent-primary/30"
-                    : "hover:bg-bg-primary/50"
-                }`}
-              >
-                <button
-                  type="button"
-                  className="flex flex-1 items-center gap-3 text-left"
-                  onClick={() => selectResult(result)}
-                >
-                  {result.posterUrl ? (
-                    <img
-                      src={result.posterUrl}
-                      alt="Poster"
-                      className="h-14 w-10 shrink-0 rounded object-cover shadow-sm"
-                    />
-                  ) : (
-                    <div className="h-14 w-10 shrink-0 rounded bg-bg-primary" />
-                  )}
-                  <div className="min-w-0 space-y-1">
-                    <div
-                      className={`truncate text-sm font-semibold ${
-                        isSelected ? "text-accent-primary" : "text-text-primary"
-                      }`}
-                    >
-                      {result.title}
+                  {!results.length && !searchQuery.isFetching ? (
+                    <div className="flex h-32 items-center justify-center px-3 py-6 text-center text-xs text-text-secondary">
+                      {hasQuery ? "No results found." : "Type to search Sonarr."}
                     </div>
-                    <div className="text-xs text-text-secondary">
-                      {metaParts.join(" | ")}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium">
-                      {result.inLibrary ? (
-                        <span className="rounded bg-success/10 px-1.5 py-0.5 text-success">In library</span>
-                      ) : null}
-                      {isCurrent ? (
-                        <span className="rounded bg-blue-500/15 px-1.5 py-0.5 text-blue-400">Current mapping</span>
-                      ) : null}
-                      {isSelected ? (
-                        <span className="rounded bg-accent-primary/20 px-1.5 py-0.5 text-accent-primary">Active</span>
-                      ) : null}
-                    </div>
-                  </div>
-                </button>
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center rounded p-2 text-text-secondary hover:text-text-primary"
-                  aria-label="Open in Sonarr"
-                >
-                  <ExternalLink size={16} />
-                </a>
+                  ) : null}
+
+                  {results.map((result) => {
+                    const isCurrent =
+                      currentMapping &&
+                      result.target.id === currentMapping.target.id &&
+                      result.target.idType === currentMapping.target.idType;
+                    const isSelected =
+                      selected &&
+                      result.target.id === selected.target.id &&
+                      result.target.idType === selected.target.idType;
+
+                    const metaParts = [
+                      `TVDB ${String(result.target.id)}`,
+                      result.year ? String(result.year) : null,
+                      result.typeLabel ?? null,
+                    ].filter((value): value is string => Boolean(value));
+
+                    const link = buildExternalMediaLink({
+                      service: "sonarr",
+                      baseUrl,
+                      inLibrary: result.inLibrary,
+                      ...(result.librarySlug ? { librarySlug: result.librarySlug } : {}),
+                      searchTerm: result.title,
+                    });
+
+                    return (
+                      <div
+                        key={`${result.target.id}-${result.target.idType}`}
+                        className={`group flex items-center gap-3 px-3 py-3 transition-colors ${
+                          isSelected
+                            ? "bg-accent-primary/15 ring-1 ring-inset ring-accent-primary/30"
+                            : "hover:bg-bg-primary/50"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          className="flex flex-1 items-center gap-3 text-left"
+                          onClick={() => selectResult(result)}
+                        >
+                          {result.posterUrl ? (
+                            <img
+                              src={result.posterUrl}
+                              alt="Poster"
+                              className="h-14 w-10 shrink-0 rounded object-cover shadow-sm"
+                            />
+                          ) : (
+                            <div className="h-14 w-10 shrink-0 rounded bg-bg-primary" />
+                          )}
+                          <div className="min-w-0 space-y-1">
+                            <div
+                              className={`truncate text-sm font-semibold ${
+                                isSelected ? "text-accent-primary" : "text-text-primary"
+                              }`}
+                            >
+                              {result.title}
+                            </div>
+                            <div className="text-xs text-text-secondary">
+                              {metaParts.join(" | ")}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {result.inLibrary ? (
+                                <Pill small tone="success" className="uppercase tracking-wide">In library</Pill>
+                              ) : null}
+                              {isCurrent ? (
+                                <Pill small tone="blue" className="uppercase tracking-wide">Current mapping</Pill>
+                              ) : null}
+                              {isSelected ? (
+                                <Pill small tone="accent" className="uppercase tracking-wide">SELECTED</Pill>
+                              ) : null}
+                            </div>
+                          </div>
+                        </button>
+                        <TooltipWrapper content="Open in Sonarr" container={portalContainer ?? null}>
+                          <a
+                            href={link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center rounded p-2 text-text-secondary hover:text-text-primary"
+                            aria-label="Open in Sonarr"
+                          >
+                            <ExternalLink size={16} />
+                          </a>
+                        </TooltipWrapper>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            );
-          })}
-            </div>
-          </ScrollArea.Viewport>
-          <ScrollArea.Scrollbar orientation="vertical" className="flex touch-none select-none p-0.5">
-            <ScrollArea.Thumb className="flex-1 rounded bg-border-primary/40" />
-          </ScrollArea.Scrollbar>
-          <ScrollArea.Corner />
+            </ScrollArea.Viewport>
+
+            {/* Scrollbar sits BESIDE the content, not over it */}
+            <ScrollArea.Scrollbar
+              orientation="vertical"
+              className="flex w-2.5 select-none touch-none p-0.5"
+            >
+              <ScrollArea.Thumb className="flex-1 rounded bg-border-primary/40" />
+            </ScrollArea.Scrollbar>
+
+            <ScrollArea.Corner />
+          </div>
         </ScrollArea.Root>
       </div>
+
     </div>
   );
 }
-
