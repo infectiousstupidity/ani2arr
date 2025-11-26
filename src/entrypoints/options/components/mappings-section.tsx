@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import Button from '@/shared/components/button';
-import { Input } from '@/shared/components/form';
+import { InputField } from '@/shared/components/form';
 import {
   useAniListMedia,
   useClearAllMappingOverrides,
@@ -57,16 +57,19 @@ const OverrideRow: React.FC<{
         <div className="text-xs text-text-secondary">AniList #{entry.anilistId}</div>
       </div>
       <div className="col-span-3 min-w-0">
-        <div className="text-xs text-text-secondary">TVDB ID</div>
         {isEditing ? (
-          <Input
+          <InputField
+            label="TVDB ID"
             value={tvdbInput}
             onChange={(e) => setTvdbInput(e.target.value)}
             className="mt-1 h-9"
             inputMode="numeric"
           />
         ) : (
-          <div className="font-medium">#{entry.tvdbId}</div>
+          <>
+            <div className="text-xs text-text-secondary">TVDB ID</div>
+            <div className="font-medium">#{entry.tvdbId}</div>
+          </>
         )}
       </div>
       <div className="col-span-3 min-w-0 text-xs text-text-secondary">
@@ -146,8 +149,8 @@ const CreateOverrideForm: React.FC<{
       className="grid gap-3 rounded-lg border border-border-primary bg-bg-secondary/60 p-4 md:grid-cols-12 md:items-end"
     >
       <div className="md:col-span-4">
-        <label className="text-xs text-text-secondary">AniList ID</label>
-        <Input
+        <InputField
+          label="AniList ID"
           value={anilistId}
           onChange={(e) => setAnilistId(e.target.value)}
           placeholder="e.g. 21708"
@@ -156,8 +159,8 @@ const CreateOverrideForm: React.FC<{
         />
       </div>
       <div className="md:col-span-4">
-        <label className="text-xs text-text-secondary">TVDB ID</label>
-        <Input
+        <InputField
+          label="TVDB ID"
           value={tvdbId}
           onChange={(e) => setTvdbId(e.target.value)}
           placeholder="e.g. 79824"

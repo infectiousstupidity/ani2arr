@@ -155,7 +155,6 @@ const SonarrDefaultsCard: React.FC<{
 }> = ({ manager, sonarrDefaultsForm, portalContainer, onPortalRef }) => (
   <div className="space-y-4 p-4 border border-border-primary rounded-lg">
     <div className="flex justify-between items-center border-b border-border-primary pb-2">
-      <h2 className="text-lg font-semibold">Default Options</h2>
       <Button
         onClick={manager.handleRefresh}
         isLoading={manager.sonarrMetadata.isRefetching}
