@@ -11,6 +11,7 @@ export interface TooltipWrapperProps {
   sideOffset?: number;
   container?: HTMLElement | null;
   showArrow?: boolean;
+  delayDuration?: number;
 }
 
 const TooltipWrapper: React.FC<TooltipWrapperProps> = ({
@@ -21,8 +22,9 @@ const TooltipWrapper: React.FC<TooltipWrapperProps> = ({
   sideOffset = 5,
   container,
   showArrow = true,
+  delayDuration = 100,
 }) => (
-  <Tooltip.Root delayDuration={100} disableHoverableContent>
+  <Tooltip.Root delayDuration={delayDuration} disableHoverableContent>
     <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
     <Tooltip.Portal container={container}>
       <Tooltip.Content

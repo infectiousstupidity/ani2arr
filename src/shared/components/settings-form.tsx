@@ -1,15 +1,17 @@
 // src/shared/components/settings-form.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useForm, type UseFormReturn } from 'react-hook-form';
+import { RotateCcw } from 'lucide-react';
+
 import { logger } from '@/shared/utils/logger';
 import { useSettingsManager } from '@/shared/hooks/use-settings-manager';
-import { Input, FormField, FormItem, FormLabel, FormControl, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './form';
-import Button from './button';
-import SonarrForm from './sonarr-form';
-import { RotateCcw } from 'lucide-react';
-import { useForm, type UseFormReturn } from 'react-hook-form';
-import type { SonarrFormState, TitleLanguage } from '@/shared/types';
 import { useConfirm } from '@/shared/hooks/use-confirm';
 import { useToast } from '@/shared/components/toast-provider';
+import type { SonarrFormState, TitleLanguage } from '@/shared/types';
+
+import { InputField, SelectField } from './form';
+import Button from './button';
+import SonarrForm from './sonarr-form';
 
 const titleLanguageOptions: Array<{ value: TitleLanguage; label: string }> = [
   { value: 'english', label: 'English (default)' },
@@ -52,56 +54,31 @@ const SonarrConnectionCard: React.FC<{
 
   return (
     <form onSubmit={handleConnectSubmit} className="space-y-4">
-      <FormField>
-        <FormItem vertical>
-          <FormLabel className="text-sm font-semibold text-text-primary">Sonarr URL</FormLabel>
-          <FormControl>
-            <Input
-              ref={sonarrUrlInputRef}
-              value={manager.formState.sonarrUrl}
-              onChange={e => manager.handleFieldChange('sonarrUrl', e.target.value)}
-              placeholder="http://localhost:8989"
-              disabled={manager.isConnected}
-            />
-          </FormControl>
-        </FormItem>
-      </FormField>
-      <FormField>
-        <FormItem vertical>
-          <FormLabel className="text-sm font-semibold text-text-primary">Sonarr API key</FormLabel>
-          <FormControl>
-            <Input
-              type="password"
-              value={manager.formState.sonarrApiKey}
-              onChange={e => manager.handleFieldChange('sonarrApiKey', e.target.value)}
-              placeholder="Sonarr API key"
-              disabled={manager.isConnected}
-            />
-          </FormControl>
-        </FormItem>
-      </FormField>
-      <FormField>
-        <FormItem vertical>
-          <FormLabel className="text-sm font-semibold text-text-primary">Preferred title language</FormLabel>
-            <FormControl>
-              <Select
-                value={manager.formState.titleLanguage}
-                onValueChange={v => manager.handleFieldChange('titleLanguage', v as TitleLanguage)}
-              >
-                <SelectTrigger className="w-full rounded-md border border-border-primary bg-bg-tertiary px-3 py-2 text-sm text-text-primary text-left">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent container={selectPortal}>
-                  {titleLanguageOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormControl>
-        </FormItem>
-      </FormField>
+      <InputField
+        label="Sonarr URL"
+        ref={sonarrUrlInputRef}
+        value={manager.formState.sonarrUrl}
+        onChange={(e) => manager.handleFieldChange('sonarrUrl', e.target.value)}
+        placeholder="http://localhost:8989"
+        disabled={manager.isConnected}
+      />
+
+      <InputField
+        label="Sonarr API key"
+        type="password"
+        value={manager.formState.sonarrApiKey}
+        onChange={(e) => manager.handleFieldChange('sonarrApiKey', e.target.value)}
+        placeholder="Sonarr API key"
+        disabled={manager.isConnected}
+      />
+
+      <SelectField
+        label="Preferred title language"
+        value={manager.formState.titleLanguage}
+        onValueChange={(v) => manager.handleFieldChange('titleLanguage', v as TitleLanguage)}
+        options={titleLanguageOptions}
+        container={selectPortal}
+      />
 
       <div className="flex flex-col gap-3 border-t border-border-primary pt-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="flex w-full justify-end gap-2 sm:w-auto">
@@ -287,7 +264,11 @@ function SettingsFormInner({
   return (
     <div className="space-y-6">
       {showConnection ? (
-        <SonarrConnectionCard manager={manager} selectPortal={portalContainer ?? null} sonarrUrlInputRef={sonarrUrlInputRef} />
+        <SonarrConnectionCard
+          manager={manager}
+          selectPortal={portalContainer ?? null}
+          sonarrUrlInputRef={sonarrUrlInputRef}
+        />
       ) : null}
 
       {showDefaults && manager.isConnected ? (

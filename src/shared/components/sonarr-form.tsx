@@ -1,5 +1,7 @@
 // src/shared/components/sonarr-form.tsx
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, useId } from "react";
+import * as SelectPrimitive from "@radix-ui/react-select";
+import { Check, ChevronDown } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import type {
   SonarrFormState,
@@ -9,21 +11,18 @@ import type {
 } from "@/shared/types";
 import {
   FormField,
-  FormLabel,
-  FormControl,
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-  Switch,
-  FormItem,
+  Label,
+  SelectField,
+  SwitchField,
 } from "./form";
 import MultiTagInput from "./multi-tag-input";
 import {
   MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
 } from "@/shared/utils/constants";
+import { cn } from "@/shared/utils/cn";
+
+const DEFAULT_CONTAINER = "w-full rounded-xl bg-bg-secondary p-5";
 
 export interface SonarrFormMetadata {
   qualityProfiles: SonarrQualityProfile[];
@@ -46,6 +45,8 @@ export interface SonarrFormProps {
   displayRootWithSlug?: boolean;
   folderSlug?: string | null;
 }
+
+// --- Helper Functions ---
 
 function normalizePathSegment(segment: string): string {
   const replaced = segment.replace(/[\\/]+/g, " ");
@@ -71,12 +72,6 @@ function buildFolderSlug(
   return `${normalizedTitle} [tvdb-${tvdbId}]`;
 }
 
-function ellipsize(text?: string | null, max = 60): string {
-  if (!text) return "";
-  if (text.length <= max) return text;
-  return text.slice(0, Math.max(0, max - 3)) + "...";
-}
-
 function formatRootPath(rootPath: string, slug: string | null): string {
   if (!slug) return rootPath;
 
@@ -86,6 +81,12 @@ function formatRootPath(rootPath: string, slug: string | null): string {
       : rootPath;
 
   return `${normalizedRoot}/${slug}`;
+}
+
+function ellipsize(value: string, maxLength = 60): string {
+  if (value.length <= maxLength) return value;
+  if (maxLength <= 3) return value.slice(0, maxLength);
+  return `${value.slice(0, maxLength - 3)}...`;
 }
 
 function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
@@ -113,6 +114,8 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
   ): void => {
     form.setValue(field, value, { shouldDirty: true, shouldValidate: true });
   };
+
+  // --- Tag Logic ---
 
   // Map Sonarr tag ids <-> labels from metadata
   const tagMaps = useMemo(() => {
@@ -181,40 +184,6 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
     [metadata.tags],
   );
 
-
-  const selectPortal = portalContainer ?? null;
-
-  const computedSlug = useMemo(
-    () => buildFolderSlug(folderSlug, pathHintTitle, pathHintTvdbId),
-    [folderSlug, pathHintTitle, pathHintTvdbId],
-  );
-
-  const getRootDisplayPath = useCallback(
-    (rootPath: string) => {
-      if (!rootPath) return rootPath;
-      return displayRootWithSlug ? formatRootPath(rootPath, computedSlug) : rootPath;
-    },
-    [computedSlug, displayRootWithSlug],
-  );
-
-  const selectedRootDisplay = effectiveValues.rootFolderPath
-    ? getRootDisplayPath(effectiveValues.rootFolderPath)
-    : undefined;
-
-  const formatFreeSpace = useCallback((bytes?: number | null): string | null => {
-    if (bytes == null || Number.isNaN(bytes)) return null;
-    const tebibyte = 1024 ** 4;
-    const gibibyte = 1024 ** 3;
-    if (bytes >= tebibyte) {
-      return `${(bytes / tebibyte).toFixed(1)} TiB free`;
-    }
-    if (bytes >= gibibyte) {
-      return `${(bytes / gibibyte).toFixed(1)} GiB free`;
-    }
-    return `${bytes.toLocaleString()} B free`;
-  }, []);
-
-  // Split labels into existing tag ids and freeform labels
   const handleTagsChange = (labels: string[]) => {
     const uniqueLabels: string[] = [];
     const seen = new Set<string>();
@@ -242,65 +211,119 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
     setFieldValue("freeformTags", freeform);
   };
 
-  const showComputedPath = Boolean(computedPath);
+  // --- Display Logic ---
+
+  const selectPortal = portalContainer ?? null;
+
+  const computedSlug = useMemo(
+    () => buildFolderSlug(folderSlug, pathHintTitle, pathHintTvdbId),
+    [folderSlug, pathHintTitle, pathHintTvdbId],
+  );
+
+  const getRootDisplayPath = useCallback(
+    (rootPath: string) => {
+      if (!rootPath) return rootPath;
+      return displayRootWithSlug ? formatRootPath(rootPath, computedSlug) : rootPath;
+    },
+    [computedSlug, displayRootWithSlug],
+  );
+
+  const formatFreeSpace = useCallback((bytes?: number | null): string | null => {
+    if (bytes == null || Number.isNaN(bytes)) return null;
+    const tebibyte = 1024 ** 4;
+    const gibibyte = 1024 ** 3;
+    if (bytes >= tebibyte) {
+      return `${(bytes / tebibyte).toFixed(1)} TiB free`;
+    }
+    if (bytes >= gibibyte) {
+      return `${(bytes / gibibyte).toFixed(1)} GiB free`;
+    }
+    return `${bytes.toLocaleString()} B free`;
+  }, []);
+
   const showPathHint = Boolean(computedSlug);
 
-  const containerClassName =
-    (className ? `${className} ` : "") +
-    "w-full rounded-xl bg-bg-secondary p-5";
+  const selectedRootDisplay = useMemo(() => {
+    if (!effectiveValues.rootFolderPath) return null;
+    return getRootDisplayPath(effectiveValues.rootFolderPath) ?? effectiveValues.rootFolderPath;
+  }, [effectiveValues.rootFolderPath, getRootDisplayPath]);
 
-  const selectItemClassName =
-    "cursor-pointer outline-none focus:bg-bg-tertiary focus:text-text-primary data-[state=checked]:bg-bg-secondary data-[state=checked]:text-text-primary";
+  const qualityProfileOptions = useMemo(() => {
+    return effectiveMetadata.qualityProfiles.map((p) => ({
+      value: String(p.id),
+      label: p.name,
+    }));
+  }, [effectiveMetadata.qualityProfiles]);
+
+  const containerClassName = cn(className, DEFAULT_CONTAINER);
+  const rootFolderFieldId = useId();
+
+  // --- Render ---
 
   return (
     <div className={containerClassName}>
       <div className="space-y-4">
-        {/* Root folder */}
+        
+        {/* Root Folder */}
         <div className="space-y-1">
-          <FormField>
-            <FormItem vertical>
-              <FormLabel className="text-xs font-medium text-text-secondary">
-                Root Folder
-              </FormLabel>
-              <FormControl className="w-full min-w-0">
-                <Select
-                  disabled={!!disabled}
-                  value={effectiveValues.rootFolderPath}
-                  onValueChange={v => setFieldValue("rootFolderPath", v)}
-                >
-                  <SelectTrigger
-                    ref={initialFocusRef}
-                    className="min-w-0 cursor-pointer text-left text-text-primary"
-                  >
-                    <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                      <SelectValue placeholder="Select a folder...">
-                        {selectedRootDisplay ? (
-                          <span
-                            className="block min-w-0 truncate text-left"
-                            title={selectedRootDisplay}
-                          >
-                            {ellipsize(selectedRootDisplay, 60)}
-                          </span>
-                        ) : null}
-                      </SelectValue>
+          <label
+            htmlFor={rootFolderFieldId}
+            className="text-xs font-medium text-text-secondary"
+          >
+            Root Folder
+          </label>
+          <SelectPrimitive.Root
+            disabled={!!disabled}
+            value={effectiveValues.rootFolderPath}
+            onValueChange={(v) => setFieldValue("rootFolderPath", v)}
+          >
+            <SelectPrimitive.Trigger
+              id={rootFolderFieldId}
+              ref={initialFocusRef as React.RefObject<HTMLButtonElement>}
+              className="flex h-9 w-full min-w-0 items-center justify-between rounded-md bg-bg-primary px-3 py-2 text-sm text-left text-text-primary placeholder:text-text-primary disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent-primary/20"
+            >
+              <span className="flex min-w-0 flex-1 items-center overflow-hidden text-ellipsis whitespace-nowrap">
+                <SelectPrimitive.Value placeholder="Select a folder...">
+                  {selectedRootDisplay ? (
+                    <span
+                      className="block min-w-0 truncate text-left"
+                      title={selectedRootDisplay}
+                    >
+                      {ellipsize(selectedRootDisplay, 60)}
                     </span>
-                  </SelectTrigger>
-                  <SelectContent
-                    container={selectPortal}
-                    className="min-w-(--radix-select-trigger-width) max-w-[90vw]"
-                  >
-                    {effectiveMetadata.rootFolders.map(f => {
-                      const fullPath = getRootDisplayPath(f.path) ?? "";
-                      const freeSpaceLabel = formatFreeSpace(f.freeSpace);
-                      return (
-                        <SelectItem
-                          key={f.id}
-                          value={f.path}
-                          className={selectItemClassName}
-                        >
+                  ) : null}
+                </SelectPrimitive.Value>
+              </span>
+              <SelectPrimitive.Icon asChild>
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              </SelectPrimitive.Icon>
+            </SelectPrimitive.Trigger>
+            <SelectPrimitive.Portal
+              container={selectPortal as HTMLElement | ShadowRoot | null | undefined}
+            >
+              <SelectPrimitive.Content
+                className="relative z-50 min-w-(--radix-select-trigger-width) max-w-[90vw] overflow-hidden rounded-md border border-bg-primary bg-bg-secondary text-text-primary shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+                position="popper"
+              >
+                <SelectPrimitive.Viewport className="w-full p-1">
+                  {effectiveMetadata.rootFolders.map((f) => {
+                    const fullPath = getRootDisplayPath(f.path) ?? "";
+                    const freeSpaceLabel = formatFreeSpace(f.freeSpace);
+                    return (
+                      <SelectPrimitive.Item
+                        key={f.id}
+                        value={f.path}
+                        className="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-bg-tertiary focus:text-text-primary data-[state=checked]:text-accent-primary"
+                      >
+                        <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                          <SelectPrimitive.ItemIndicator>
+                            <Check className="h-4 w-4" />
+                          </SelectPrimitive.ItemIndicator>
+                        </span>
+                        <SelectPrimitive.ItemText asChild>
                           <div className="flex w-full items-center justify-between gap-4">
                             <span
-                              className="whitespace-nowrap text-left"
+                              className="min-w-0 truncate text-left"
                               title={fullPath || undefined}
                             >
                               {fullPath}
@@ -311,199 +334,113 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
                               </span>
                             ) : null}
                           </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </FormControl>
-            </FormItem>
-          </FormField>
-
-          {(showComputedPath && computedPath) || showPathHint ? (
-            <div className="space-y-1">
-              {showPathHint ? (
-                <p className="text-xs text-text-secondary">
-                  &apos;{computedSlug}&apos; subfolder will be created automatically.
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+                        </SelectPrimitive.ItemText>
+                      </SelectPrimitive.Item>
+                    );
+                  })}
+                </SelectPrimitive.Viewport>
+              </SelectPrimitive.Content>
+            </SelectPrimitive.Portal>
+          </SelectPrimitive.Root>
         </div>
+
+        {(Boolean(computedPath) || showPathHint) && showPathHint ? (
+          <div className="space-y-1">
+            <p className="text-xs text-text-secondary">
+              &apos;{computedSlug}&apos; subfolder will be created automatically.
+            </p>
+          </div>
+        ) : null}
 
         {/* Monitor */}
-        <div className="space-y-1">
-          <FormField>
-            <FormItem vertical>
-              <FormLabel className="text-xs font-medium text-text-secondary">Monitor</FormLabel>
-              <FormControl className="w-full">
-                <Select
-                  disabled={!!disabled}
-                  value={effectiveValues.monitorOption}
-                  onValueChange={v =>
-                    setFieldValue("monitorOption", v as SonarrFormState["monitorOption"])
-                  }
-                >
-                  <SelectTrigger className="cursor-pointer text-text-primary">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent container={selectPortal}>
-                    {MONITOR_OPTIONS_WITH_DESCRIPTIONS.map(o => (
-                      <SelectItem
-                        key={o.value}
-                        value={o.value}
-                        className={selectItemClassName}
-                      >
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormControl>
-            </FormItem>
-          </FormField>
-        </div>
+        <SelectField
+          label="Monitor"
+          disabled={!!disabled}
+          value={effectiveValues.monitorOption}
+          onValueChange={(v) =>
+            setFieldValue("monitorOption", v as SonarrFormState["monitorOption"])
+          }
+          options={MONITOR_OPTIONS_WITH_DESCRIPTIONS}
+          container={selectPortal}
+        />
 
-        {/* Quality profile */}
-        <div className="space-y-1">
-          <FormField>
-            <FormItem vertical>
-              <FormLabel className="text-xs font-medium text-text-secondary">
-                Quality Profile
-              </FormLabel>
-              <FormControl className="w-full">
-                <Select
-                  disabled={!!disabled}
-                  value={String(effectiveValues.qualityProfileId)}
-                  onValueChange={v => setFieldValue("qualityProfileId", Number(v))}
-                >
-                  <SelectTrigger className="cursor-pointer text-text-primary">
-                    <SelectValue placeholder="Select a profile..." />
-                  </SelectTrigger>
-                  <SelectContent container={selectPortal}>
-                    {effectiveMetadata.qualityProfiles.map(p => (
-                      <SelectItem
-                        key={p.id}
-                        value={String(p.id)}
-                        className={selectItemClassName}
-                      >
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormControl>
-            </FormItem>
-          </FormField>
-        </div>
+        {/* Quality Profile */}
+        <SelectField
+          label="Quality Profile"
+          disabled={!!disabled}
+          value={String(effectiveValues.qualityProfileId)}
+          onValueChange={(v) => setFieldValue("qualityProfileId", Number(v))}
+          options={qualityProfileOptions}
+          placeholder="Select a profile..."
+          container={selectPortal}
+        />
 
-        {/* Series type */}
-        <div className="space-y-1">
-          <FormField>
-            <FormItem vertical>
-              <FormLabel className="text-xs font-medium text-text-secondary">
-                Series Type
-              </FormLabel>
-              <FormControl className="w-full">
-                <Select
-                  disabled={!!disabled}
-                  value={effectiveValues.seriesType}
-                  onValueChange={v =>
-                    setFieldValue("seriesType", v as SonarrFormState["seriesType"])
-                  }
-                >
-                  <SelectTrigger className="cursor-pointer text-text-primary">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent container={selectPortal}>
-                    {SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS.map(o => (
-                      <SelectItem
-                        key={o.value}
-                        value={o.value}
-                        className={selectItemClassName}
-                      >
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormControl>
-            </FormItem>
-          </FormField>
-        </div>
+        {/* Series Type */}
+        <SelectField
+          label="Series Type"
+          disabled={!!disabled}
+          value={effectiveValues.seriesType}
+          onValueChange={(v) =>
+            setFieldValue("seriesType", v as SonarrFormState["seriesType"])
+          }
+          options={SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
+          container={selectPortal}
+        />
 
         {/* Tags */}
-        <div className="space-y-1">
-          <FormField>
-            <FormItem vertical>
-              <FormLabel className="text-xs font-medium text-text-secondary">Tags</FormLabel>
-              <FormControl className="w-full">
-                <MultiTagInput
-                  value={allSelectedTagLabels}
-                  onChange={handleTagsChange}
-                  placeholder="Add tags..."
-                  disabled={!!disabled}
-                  existingTags={existingTagLabels}
-                />
-              </FormControl>
-            </FormItem>
-          </FormField>
-        </div>
+        <FormField>
+          <div className="space-y-3">
+            <Label>Tags</Label>
+            <MultiTagInput
+              value={allSelectedTagLabels}
+              onChange={handleTagsChange}
+              placeholder="Add tags..."
+              disabled={!!disabled}
+              existingTags={existingTagLabels}
+            />
+          </div>
+        </FormField>
         
-        {/* Toggles: labels in one row, switches in the row beneath */}
+        {/* Toggles Grid */}
         <div className="pt-1">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             
-            {/* Season folders */}
-            <FormField>
-              <FormItem className="flex flex-col items-center rounded-lg bg-bg-tertiary px-3 py-3 text-center">
-                <FormLabel className="text-xs font-medium text-text-secondary mb-2">
-                  Season Folders
-                </FormLabel>
-                <FormControl>
-                  <Switch
-                    disabled={!!disabled}
-                    checked={effectiveValues.seasonFolder}
-                    onCheckedChange={v => setFieldValue("seasonFolder", v)}
-                  />
-                </FormControl>
-              </FormItem>
-            </FormField>
+            <SwitchField
+              label="Season Folders"
+              disabled={!!disabled}
+              checked={effectiveValues.seasonFolder}
+              onCheckedChange={(v) => setFieldValue("seasonFolder", v)}
+              labelHelp={"Organize episodes into per-season subfolders created automatically."}
+              labelHelpDelay={600}
+              labelHelpContainer={selectPortal}
+            />
 
-            {/* Search on Add */}
             {includeSearchToggle ? (
-              <FormField>
-                <FormItem className="flex flex-col items-center rounded-lg bg-bg-tertiary px-3 py-3 text-center">
-                  <FormLabel className="text-xs font-medium text-text-secondary mb-2">
-                    Search on Add
-                  </FormLabel>
-                  <FormControl>
-                    <Switch
-                      disabled={!!disabled}
-                      checked={effectiveValues.searchForMissingEpisodes}
-                      onCheckedChange={v => setFieldValue("searchForMissingEpisodes", v)}
-                    />
-                  </FormControl>
-                </FormItem>
-              </FormField>
-            ) : null}
+              <>
+                <SwitchField
+                  label="Search on Add"
+                  disabled={!!disabled}
+                  checked={effectiveValues.searchForMissingEpisodes}
+                  onCheckedChange={(v) =>
+                    setFieldValue("searchForMissingEpisodes", v)
+                  }
+                  labelHelp={"Automatically trigger a search for any missing episodes once the series is added."}
+                  labelHelpDelay={600}
+                  labelHelpContainer={selectPortal}
+                />
 
-            {/* Cutoff unmet episodes */}
-            {includeSearchToggle ? (
-              <FormField>
-                <FormItem className="flex flex-col items-center rounded-lg bg-bg-tertiary px-3 py-3 text-center">
-                  <FormLabel className="text-xs font-medium text-text-secondary mb-2">
-                    Cutoff Unmet Episodes
-                  </FormLabel>
-                  <FormControl>
-                    <Switch
-                      disabled={!!disabled}
-                      checked={effectiveValues.searchForCutoffUnmet}
-                      onCheckedChange={v => setFieldValue("searchForCutoffUnmet", v)}
-                    />
-                  </FormControl>
-                </FormItem>
-              </FormField>
+                <SwitchField
+                  label="Cutoff Unmet"
+                  disabled={!!disabled}
+                  checked={effectiveValues.searchForCutoffUnmet}
+                  onCheckedChange={(v) =>
+                    setFieldValue("searchForCutoffUnmet", v)
+                  }
+                  labelHelp={"Trigger searches for episodes that are below the quality cutoff to find better releases."}
+                  labelHelpDelay={600}
+                  labelHelpContainer={selectPortal}
+                />
+              </>
             ) : null}
 
           </div>
