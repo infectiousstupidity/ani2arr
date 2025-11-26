@@ -112,7 +112,13 @@ const ConnectionsSection: React.FC<{ manager: SettingsManager }> = ({ manager })
 const DefaultsSection: React.FC<{ manager: SettingsManager }> = ({ manager }) => (
   <div className="space-y-6">
     <SectionHeader title="Default options" description="Configure default Sonarr add settings." />
-    <SettingsFormWithManager manager={manager} showSaveBar={false} showConnection={false} showDefaults />
+    <SettingsFormWithManager
+      manager={manager}
+      showSaveBar={false}
+      showConnection={false}
+      showDefaults
+      sonarrFormLayout="grid"
+    />
   </div>
 );
 
