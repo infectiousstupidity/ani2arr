@@ -56,7 +56,7 @@ export function SonarrPanel(props: SonarrPanelProps): React.JSX.Element {
             includeSearchToggle
             displayRootWithSlug
             folderSlug={folderSlug ?? null}
-            className="space-y-4"
+            layout="stacked"
           />
         )}
       </div>

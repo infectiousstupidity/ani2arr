@@ -11,7 +11,7 @@ import type { SonarrFormState, TitleLanguage } from '@/shared/types';
 
 import { InputField, SelectField } from './form';
 import Button from './button';
-import SonarrForm from './sonarr-form';
+import SonarrForm, { type SonarrFormLayout } from './sonarr-form';
 
 const titleLanguageOptions: Array<{ value: TitleLanguage; label: string }> = [
   { value: 'english', label: 'English (default)' },
@@ -24,6 +24,7 @@ export interface SettingsFormProps {
   showSaveBar?: boolean;
   showConnection?: boolean;
   showDefaults?: boolean;
+  sonarrFormLayout?: SonarrFormLayout;
 }
 
 export type SettingsManager = ReturnType<typeof useSettingsManager>;
@@ -152,7 +153,11 @@ const SonarrDefaultsCard: React.FC<{
   sonarrDefaultsForm: UseFormReturn<SonarrFormState>;
   portalContainer: HTMLElement | undefined;
   onPortalRef: (node: HTMLDivElement | null) => void;
-}> = ({ manager, sonarrDefaultsForm, portalContainer, onPortalRef }) => (
+  layout?: SonarrFormLayout;
+}> = ({ manager, sonarrDefaultsForm, portalContainer, onPortalRef, layout }) => {
+  const sonarrLayoutProps = layout !== undefined ? { layout } : {};
+
+  return (
   <div className="space-y-4 p-4 border border-border-primary rounded-lg">
     <div className="flex justify-between items-center border-b border-border-primary pb-2">
       <Button
@@ -178,13 +183,15 @@ const SonarrDefaultsCard: React.FC<{
           metadata={manager.sonarrMetadata.data}
           disabled={manager.saveState.isPending}
           portalContainer={portalContainer ?? null}
+          {...sonarrLayoutProps}
         />
       </div>
     ) : null}
 
     <div id="a2a-select-portal-container" ref={onPortalRef} />
   </div>
-);
+  );
+};
 
 export const SaveSettingsBar: React.FC<{ manager: SettingsManager }> = ({ manager }) => (
   <>
@@ -211,6 +218,7 @@ function SettingsFormInner({
   showSaveBar = true,
   showConnection = true,
   showDefaults = true,
+  sonarrFormLayout,
 }: SettingsFormProps): React.JSX.Element {
   const [selectPortal, setSelectPortal] = useState<HTMLElement | null>(null);
   const sonarrUrlInputRef = useRef<HTMLInputElement | null>(null);
@@ -276,6 +284,7 @@ function SettingsFormInner({
           sonarrDefaultsForm={sonarrDefaultsForm}
           portalContainer={portalContainer}
           onPortalRef={handleSelectPortalRef}
+          {...(sonarrFormLayout !== undefined ? { layout: sonarrFormLayout } : {})}
         />
       ) : null}
 
