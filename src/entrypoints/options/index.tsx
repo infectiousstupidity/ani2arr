@@ -119,6 +119,7 @@ const OptionsPage: React.FC = React.memo(() => {
 
   useEffect(() => {
     const section = sections.find(entry => entry.id === activeSection) ?? sections[0];
+    if (!section) return;
     const url = new URL(window.location.href);
     url.hash = section.path;
     window.history.replaceState(null, '', url);
