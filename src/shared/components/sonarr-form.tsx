@@ -113,6 +113,7 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
   const layoutClassName = isGridLayout
     ? "grid gap-4 md:grid-cols-2"
     : "flex flex-col gap-4";
+
   const effectiveMetadata: SonarrFormMetadata = metadata;
   const effectiveValues: SonarrFormState = form.watch();
 
@@ -125,7 +126,6 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
 
   // --- Tag Logic ---
 
-  // Map Sonarr tag ids <-> labels from metadata
   const tagMaps = useMemo(() => {
     const idToLabel = new Map<number, string>();
     const labelToId = new Map<string, number>();
@@ -143,7 +143,6 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
 
   const { idToLabel, labelToId } = tagMaps;
 
-  // Labels for tags that already exist in Sonarr (from numeric ids)
   const selectedExistingTagLabels = useMemo(
     () =>
       (effectiveValues.tags ?? [])
@@ -155,7 +154,6 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
     [effectiveValues.tags, idToLabel],
   );
 
-  // Labels the user entered that do not yet exist as Sonarr tags
   const freeformTagLabels = useMemo(
     () =>
       (effectiveValues.freeformTags ?? []).filter(
@@ -165,7 +163,6 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
     [effectiveValues.freeformTags],
   );
 
-  // Combined list passed to MultiTagInput (deduplicated)
   const allSelectedTagLabels = useMemo(() => {
     const seen = new Set<string>();
     const result: string[] = [];
@@ -180,7 +177,6 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
     return result;
   }, [selectedExistingTagLabels, freeformTagLabels]);
 
-  // All existing tag labels (for suggestions)
   const existingTagLabels = useMemo(
     () =>
       metadata.tags
@@ -394,25 +390,22 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
       />
 
       {/* Tags */}
-      <div>
-        <FormField>
-          <div className="space-y-3">
-            <Label>Tags</Label>
-            <MultiTagInput
-              value={allSelectedTagLabels}
-              onChange={handleTagsChange}
-              placeholder="Add tags..."
-              disabled={!!disabled}
-              existingTags={existingTagLabels}
-            />
-          </div>
-        </FormField>
-      </div>
-      
+      <FormField>
+        <div className="space-y-3">
+          <Label>Tags</Label>
+          <MultiTagInput
+            value={allSelectedTagLabels}
+            onChange={handleTagsChange}
+            placeholder="Add tags..."
+            disabled={!!disabled}
+            existingTags={existingTagLabels}
+          />
+        </div>
+      </FormField>
+
       {/* Toggles Grid */}
       <div className={cn("pt-1", fullWidthClass)}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          
           <SwitchField
             label="Season Folders"
             disabled={!!disabled}
@@ -450,7 +443,6 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
               />
             </>
           ) : null}
-
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 // src/shared/components/settings-form.tsx
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { RotateCcw } from 'lucide-react';
 
@@ -21,9 +21,6 @@ const titleLanguageOptions: Array<{ value: TitleLanguage; label: string }> = [
 
 export interface SettingsFormProps {
   manager: SettingsManager;
-  showSaveBar?: boolean;
-  showConnection?: boolean;
-  showDefaults?: boolean;
   sonarrFormLayout?: SonarrFormLayout;
 }
 
@@ -151,47 +148,127 @@ const SonarrConnectionCard: React.FC<{
 const SonarrDefaultsCard: React.FC<{
   manager: SettingsManager;
   sonarrDefaultsForm: UseFormReturn<SonarrFormState>;
-  portalContainer: HTMLElement | undefined;
-  onPortalRef: (node: HTMLDivElement | null) => void;
+  portalContainer: HTMLElement | null;
   layout?: SonarrFormLayout;
-}> = ({ manager, sonarrDefaultsForm, portalContainer, onPortalRef, layout }) => {
+}> = ({ manager, sonarrDefaultsForm, portalContainer, layout }) => {
   const sonarrLayoutProps = layout !== undefined ? { layout } : {};
 
   return (
-  <div className="space-y-4 p-4 border border-border-primary rounded-lg">
-    <div className="flex justify-between items-center border-b border-border-primary pb-2">
+    <div className="space-y-4">
+      {manager.sonarrMetadata.isFetching ? (
+        <div className="text-center p-8 text-text-secondary">Loading Sonarr data...</div>
+      ) : manager.sonarrMetadata.data ? (
+        <div className="space-y-6">
+          <SonarrForm
+            form={sonarrDefaultsForm}
+            metadata={manager.sonarrMetadata.data}
+            disabled={manager.saveState.isPending}
+            portalContainer={portalContainer ?? null}
+            {...sonarrLayoutProps}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+
+const ConnectionStatusBadge: React.FC<{ manager: SettingsManager }> = ({ manager }) => {
+  const status = useMemo(() => {
+    if (manager.isConnected) {
+      return {
+        label: 'Connected',
+        className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/40',
+      };
+    }
+    if (manager.testConnectionState.isPending) {
+      return {
+        label: 'Connecting',
+        className: 'bg-amber-500/10 text-amber-300 border-amber-500/40',
+      };
+    }
+    return {
+      label: 'Not connected',
+      className: 'bg-slate-700/50 text-text-secondary border-border-primary',
+    };
+  }, [manager.isConnected, manager.testConnectionState.isPending]);
+
+  return (
+    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold border ${status.className}`}>
+      {status.label}
+    </span>
+  );
+};
+
+const SonarrConnectionSection: React.FC<{
+  manager: SettingsManager;
+  selectPortal: HTMLElement | null;
+  sonarrUrlInputRef: React.RefObject<HTMLInputElement | null>;
+}> = ({ manager, selectPortal, sonarrUrlInputRef }) => (
+  <section className="rounded-2xl border border-border-primary bg-bg-secondary/80 p-5 shadow-sm">
+    <div className="flex items-start justify-between gap-3 border-b border-border-primary pb-3">
+      <div>
+        <h3 className="text-base font-semibold text-text-primary">Connection</h3>
+        <p className="mt-1 text-xs text-text-secondary">Sonarr URL, API key, and preferred title language.</p>
+      </div>
+      <ConnectionStatusBadge manager={manager} />
+    </div>
+    <div className="mt-4">
+      <SonarrConnectionCard
+        manager={manager}
+        selectPortal={selectPortal}
+        sonarrUrlInputRef={sonarrUrlInputRef}
+      />
+    </div>
+  </section>
+);
+
+const SonarrDefaultsSection: React.FC<{
+  manager: SettingsManager;
+  sonarrDefaultsForm: UseFormReturn<SonarrFormState>;
+  portalContainer: HTMLElement | null;
+  layout?: SonarrFormLayout;
+}> = ({ manager, sonarrDefaultsForm, portalContainer, layout }) => (
+  <section className="rounded-2xl border border-border-primary bg-bg-secondary/70 p-5 shadow-sm">
+    <div className="flex items-start justify-between gap-3 border-b border-border-primary pb-3">
+      <div>
+        <h3 className="text-base font-semibold text-text-primary">Default add options</h3>
+        <p className="mt-1 text-xs text-text-secondary">
+          Configure defaults reused by overlays and the media modal.
+        </p>
+      </div>
       <Button
         onClick={manager.handleRefresh}
         isLoading={manager.sonarrMetadata.isRefetching}
         variant="ghost"
         size="icon"
         tooltip="Refresh data from Sonarr"
-        portalContainer={portalContainer}
+        portalContainer={portalContainer ?? undefined}
         aria-label="Refresh data from Sonarr"
         aria-busy={manager.sonarrMetadata.isRefetching}
+        disabled={!manager.isConnected}
       >
         <RotateCcw />
       </Button>
     </div>
 
-    {manager.sonarrMetadata.isFetching ? (
-      <div className="text-center p-8 text-text-secondary">Loading Sonarr data...</div>
-    ) : manager.sonarrMetadata.data ? (
-      <div className="space-y-6">
-        <SonarrForm
-          form={sonarrDefaultsForm}
-          metadata={manager.sonarrMetadata.data}
-          disabled={manager.saveState.isPending}
-          portalContainer={portalContainer ?? null}
-          {...sonarrLayoutProps}
+    <div className="mt-4">
+      {manager.isConnected ? (
+        <SonarrDefaultsCard
+          manager={manager}
+          sonarrDefaultsForm={sonarrDefaultsForm}
+          portalContainer={portalContainer}
+          layout={layout}
         />
-      </div>
-    ) : null}
+      ) : (
+        <div className="rounded-lg border border-dashed border-border-primary/70 bg-bg-tertiary/40 p-4 text-sm text-text-secondary">
+          Connect to Sonarr to load available folders, profiles, and tags.
+        </div>
+      )}
+    </div>
+  </section>
+);
 
-    <div id="a2a-select-portal-container" ref={onPortalRef} />
-  </div>
-  );
-};
 
 export const SaveSettingsBar: React.FC<{ manager: SettingsManager }> = ({ manager }) => (
   <>
@@ -215,9 +292,6 @@ export const SaveSettingsBar: React.FC<{ manager: SettingsManager }> = ({ manage
 
 function SettingsFormInner({
   manager,
-  showSaveBar = true,
-  showConnection = true,
-  showDefaults = true,
   sonarrFormLayout,
 }: SettingsFormProps): React.JSX.Element {
   const [selectPortal, setSelectPortal] = useState<HTMLElement | null>(null);
@@ -230,8 +304,6 @@ function SettingsFormInner({
   const handleSelectPortalRef = useCallback((node: HTMLDivElement | null) => {
     setSelectPortal(node);
   }, []);
-
-  const portalContainer = selectPortal ?? undefined;
 
   useEffect(() => {
     sonarrDefaultsForm.reset(manager.formState.defaults);
@@ -269,27 +341,26 @@ function SettingsFormInner({
   }
 
   return (
-    <div className="space-y-6">
-      {showConnection ? (
-        <SonarrConnectionCard
+    <>
+      <div className="space-y-6">
+        <SonarrConnectionSection
           manager={manager}
-          selectPortal={portalContainer ?? null}
+          selectPortal={selectPortal}
           sonarrUrlInputRef={sonarrUrlInputRef}
         />
-      ) : null}
 
-      {showDefaults && manager.isConnected ? (
-        <SonarrDefaultsCard
+        <SonarrDefaultsSection
           manager={manager}
           sonarrDefaultsForm={sonarrDefaultsForm}
-          portalContainer={portalContainer}
-          onPortalRef={handleSelectPortalRef}
-          {...(sonarrFormLayout !== undefined ? { layout: sonarrFormLayout } : {})}
+          portalContainer={selectPortal}
+          layout={sonarrFormLayout}
         />
-      ) : null}
 
-      {showSaveBar ? <SaveSettingsBar manager={manager} /> : null}
-    </div>
+        <SaveSettingsBar manager={manager} />
+      </div>
+
+      <div id="a2a-select-portal-container" ref={handleSelectPortalRef} className="h-0 w-0 overflow-hidden" />
+    </>
   );
 }
 
