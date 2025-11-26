@@ -228,46 +228,50 @@ const SonarrDefaultsSection: React.FC<{
   sonarrDefaultsForm: UseFormReturn<SonarrFormState>;
   portalContainer: HTMLElement | null;
   layout?: SonarrFormLayout;
-}> = ({ manager, sonarrDefaultsForm, portalContainer, layout }) => (
-  <section className="rounded-2xl border border-border-primary bg-bg-secondary/70 p-5 shadow-sm">
-    <div className="flex items-start justify-between gap-3 border-b border-border-primary pb-3">
-      <div>
-        <h3 className="text-base font-semibold text-text-primary">Default add options</h3>
-        <p className="mt-1 text-xs text-text-secondary">
-          Configure defaults reused by overlays and the media modal.
-        </p>
-      </div>
-      <Button
-        onClick={manager.handleRefresh}
-        isLoading={manager.sonarrMetadata.isRefetching}
-        variant="ghost"
-        size="icon"
-        tooltip="Refresh data from Sonarr"
-        portalContainer={portalContainer ?? undefined}
-        aria-label="Refresh data from Sonarr"
-        aria-busy={manager.sonarrMetadata.isRefetching}
-        disabled={!manager.isConnected}
-      >
-        <RotateCcw />
-      </Button>
-    </div>
+}> = ({ manager, sonarrDefaultsForm, portalContainer, layout }) => {
+  const sonarrLayoutProps = layout !== undefined ? { layout } : {};
 
-    <div className="mt-4">
-      {manager.isConnected ? (
-        <SonarrDefaultsCard
-          manager={manager}
-          sonarrDefaultsForm={sonarrDefaultsForm}
-          portalContainer={portalContainer}
-          layout={layout}
-        />
-      ) : (
-        <div className="rounded-lg border border-dashed border-border-primary/70 bg-bg-tertiary/40 p-4 text-sm text-text-secondary">
-          Connect to Sonarr to load available folders, profiles, and tags.
+  return (
+    <section className="rounded-2xl border border-border-primary bg-bg-secondary/70 p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3 border-b border-border-primary pb-3">
+        <div>
+          <h3 className="text-base font-semibold text-text-primary">Default add options</h3>
+          <p className="mt-1 text-xs text-text-secondary">
+            Configure defaults reused by overlays and the media modal.
+          </p>
         </div>
-      )}
-    </div>
-  </section>
-);
+        <Button
+          onClick={manager.handleRefresh}
+          isLoading={manager.sonarrMetadata.isRefetching}
+          variant="ghost"
+          size="icon"
+          tooltip="Refresh data from Sonarr"
+          portalContainer={portalContainer ?? undefined}
+          aria-label="Refresh data from Sonarr"
+          aria-busy={manager.sonarrMetadata.isRefetching}
+          disabled={!manager.isConnected}
+        >
+          <RotateCcw />
+        </Button>
+      </div>
+
+      <div className="mt-4">
+        {manager.isConnected ? (
+          <SonarrDefaultsCard
+            manager={manager}
+            sonarrDefaultsForm={sonarrDefaultsForm}
+            portalContainer={portalContainer}
+            {...sonarrLayoutProps}
+          />
+        ) : (
+          <div className="rounded-lg border border-dashed border-border-primary/70 bg-bg-tertiary/40 p-4 text-sm text-text-secondary">
+            Connect to Sonarr to load available folders, profiles, and tags.
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
 
 
 export const SaveSettingsBar: React.FC<{ manager: SettingsManager }> = ({ manager }) => (
@@ -353,7 +357,7 @@ function SettingsFormInner({
           manager={manager}
           sonarrDefaultsForm={sonarrDefaultsForm}
           portalContainer={selectPortal}
-          layout={sonarrFormLayout}
+          {...(sonarrFormLayout !== undefined ? { layout: sonarrFormLayout } : {})}
         />
 
         <SaveSettingsBar manager={manager} />
