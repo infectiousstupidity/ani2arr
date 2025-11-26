@@ -76,6 +76,29 @@ export class MappingOverridesService {
     ]);
   }
 
+  public list(): Array<{ anilistId: number; tvdbId: number; updatedAt: number }> {
+    const entries: Array<{ anilistId: number; tvdbId: number; updatedAt: number }> = [];
+    for (const [anilistId, entry] of this.map.entries()) {
+      if (typeof entry?.tvdbId !== 'number') continue;
+      entries.push({
+        anilistId,
+        tvdbId: entry.tvdbId,
+        updatedAt: typeof entry.updatedAt === 'number' ? entry.updatedAt : Date.now(),
+      });
+    }
+    entries.sort((a, b) => b.updatedAt - a.updatedAt);
+    return entries;
+  }
+
+  public async clearAll(): Promise<void> {
+    this.map.clear();
+    this.reverse.clear();
+    await Promise.all([
+      mappingOverridesSync.setValue({}),
+      mappingOverridesLocal.setValue({}),
+    ]);
+  }
+
   private attachWatchers(): void {
     browser.storage.onChanged.addListener((changes, area) => {
       if (area !== 'sync' && area !== 'local') return;

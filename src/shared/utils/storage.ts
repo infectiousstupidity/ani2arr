@@ -13,6 +13,8 @@ import type {
   SonarrFormState,
   SonarrSecrets,
   TitleLanguage,
+  UiOptions,
+  BadgeVisibility,
 } from '@/shared/types';
 
 const getDefaultFormState = (): SonarrFormState => ({
@@ -22,16 +24,32 @@ const getDefaultFormState = (): SonarrFormState => ({
   monitorOption: 'all',
   seasonFolder: true,
   searchForMissingEpisodes: true,
+  searchForCutoffUnmet: false,
   tags: [],
   freeformTags: [],
 });
 
+const sanitizeBadgeVisibility = (value?: BadgeVisibility): BadgeVisibility => {
+  if (value === 'hover' || value === 'hidden') return value;
+  return 'always';
+};
+
+const getDefaultUiOptions = (): UiOptions => ({
+  browseOverlayEnabled: true,
+  badgeVisibility: 'always',
+  headerInjectionEnabled: true,
+  modalEnabled: true,
+});
+
 const DEFAULT_TITLE_LANGUAGE: TitleLanguage = 'english';
+const DEFAULT_DEBUG_LOGGING = false;
 
 const createDefaultPublicOptions = (): PublicOptions => ({
   sonarrUrl: '',
   defaults: getDefaultFormState(),
   titleLanguage: DEFAULT_TITLE_LANGUAGE,
+  ui: getDefaultUiOptions(),
+  debugLogging: DEFAULT_DEBUG_LOGGING,
   isConfigured: false,
 });
 
@@ -66,6 +84,15 @@ const mergeDefaults = <T extends HasDefaults>(options: T): T => ({
     ...getDefaultFormState(),
     ...options.defaults,
   },
+  ui: {
+    ...getDefaultUiOptions(),
+    ...(options as unknown as { ui?: UiOptions })?.ui,
+    badgeVisibility: sanitizeBadgeVisibility((options as unknown as { ui?: UiOptions })?.ui?.badgeVisibility),
+  },
+  debugLogging:
+    typeof (options as unknown as { debugLogging?: boolean })?.debugLogging === 'boolean'
+      ? (options as unknown as { debugLogging?: boolean })?.debugLogging
+      : DEFAULT_DEBUG_LOGGING,
 });
 
 /**
@@ -79,6 +106,8 @@ export async function getExtensionOptionsSnapshot(): Promise<ExtensionOptions> {
     sonarrApiKey: secrets.apiKey,
     defaults: mergeDefaults(pub).defaults,
     titleLanguage: pub.titleLanguage ?? DEFAULT_TITLE_LANGUAGE,
+    ui: mergeDefaults(pub).ui,
+    debugLogging: mergeDefaults(pub).debugLogging,
   };
 }
 
@@ -113,12 +142,16 @@ export async function setExtensionOptionsSnapshot(options: ExtensionOptions): Pr
     sanitized.titleLanguage === 'romaji' || sanitized.titleLanguage === 'native'
       ? sanitized.titleLanguage
       : DEFAULT_TITLE_LANGUAGE;
+  const uiOptions = mergeDefaults(sanitized).ui;
+  const debugLogging = mergeDefaults(sanitized).debugLogging;
 
   await Promise.all([
     publicOptions.setValue({
       sonarrUrl: normalizedUrl,
       defaults: sanitized.defaults,
       titleLanguage,
+      ui: uiOptions,
+      debugLogging,
       isConfigured: Boolean(normalizedUrl && apiKey),
     }),
     sonarrSecrets.setValue({ apiKey }),
@@ -131,10 +164,13 @@ export async function setExtensionOptionsSnapshot(options: ExtensionOptions): Pr
  */
 export async function getPublicOptionsSnapshot(): Promise<PublicOptions> {
   const pub = await publicOptions.getValue();
+  const merged = mergeDefaults(pub);
   return {
     sonarrUrl: pub.sonarrUrl,
-    defaults: mergeDefaults(pub).defaults,
+    defaults: merged.defaults,
     titleLanguage: pub.titleLanguage ?? DEFAULT_TITLE_LANGUAGE,
+    ui: merged.ui,
+    debugLogging: merged.debugLogging,
     isConfigured: pub.isConfigured,
   };
 }

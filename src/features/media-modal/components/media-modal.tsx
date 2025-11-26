@@ -7,7 +7,7 @@ import Button from "@/shared/components/button";
 import type { AniFormat, MediaStatus, TitleLanguage, ExtensionError } from "@/shared/types";
 import { ErrorCode } from "@/shared/types";
 
-import { ProviderSearchSection } from "./provider-search-section";
+import { SearchSection } from "./search-section";
 import type { MappingTabProps } from "../types";
 import { MappingPreviewPanel } from "./mapping-preview-panel";
 import { SonarrPanel } from "./sonarr-panel";
@@ -315,7 +315,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
               <div className="flex h-full flex-col overflow-hidden">
                 <div className="flex-1 min-h-0">
                   {viewMode === "mapping" ? (
-                    <ProviderSearchSection
+                    <SearchSection
                       controller={mappingController}
                       currentMapping={effectiveCurrentMapping}
                       baseUrl={baseUrl}

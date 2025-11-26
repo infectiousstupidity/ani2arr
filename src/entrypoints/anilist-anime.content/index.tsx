@@ -207,6 +207,8 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   const { data: options, isPending: optionsPending, isError: optionsError } = usePublicOptions();
   const isConfigured = options?.isConfigured === true;
   const defaults = options?.defaults ?? null;
+  const uiEnabled = options?.ui?.headerInjectionEnabled ?? true;
+  const modalEnabled = options?.ui?.modalEnabled ?? true;
 
   useEffect(() => {
     (async () => {
@@ -282,6 +284,10 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
 
   const tvdbId = mappingUnavailable ? null : statusQuery.data?.tvdbId ?? null;
 
+  if (!uiEnabled) {
+    return null;
+  }
+
   return (
     <div ref={hostRef} style={{ width: '100%' }}>
       <ConfirmProvider portalContainer={hostElement ?? null}>
@@ -293,6 +299,14 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
           externalId={tvdbId}
           onQuickAdd={handleQuickAdd}
           onOpenModal={() => {
+            if (!modalEnabled) {
+              toast.showToast({
+                title: 'Modal disabled',
+                description: 'Enable the ani2arr modal in Options to open mapping/setup here.',
+                variant: 'info',
+              });
+              return;
+            }
             mediaModal.open({
               anilistId,
               title,
@@ -301,6 +315,14 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
             });
           }}
           onOpenMappingFix={() => {
+            if (!modalEnabled) {
+              toast.showToast({
+                title: 'Modal disabled',
+                description: 'Enable the ani2arr modal in Options to adjust mappings here.',
+                variant: 'info',
+              });
+              return;
+            }
             mediaModal.open({
               anilistId,
               title,
@@ -310,7 +332,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
           }}
           portalContainer={hostElement ?? undefined}
         />
-        {hostElement && mediaModal.state && modalProps && (
+        {modalEnabled && hostElement && mediaModal.state && modalProps && (
           <MediaModal
             key={`modal-${mediaModal.state.anilistId}`}
             isOpen={mediaModal.state.isOpen}

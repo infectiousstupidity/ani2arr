@@ -28,6 +28,8 @@ export type {
   SonarrCredentialsPayload,
   SonarrFormState,
   TestConnectionPayload,
+  UiOptions,
+  BadgeVisibility,
 } from './extension';
 
 export { ErrorCode, type ExtensionError } from './errors';
@@ -39,6 +41,7 @@ export {
   type EvaluationOutcomeUnresolved,
   type MappingContext,
   type ScoredCandidate,
+  type MappingOverrideRecord,
 } from './mapping';
 
 export type { RequestPriority } from './common';

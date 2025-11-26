@@ -1,4 +1,4 @@
-// src/features/media-modal/components/provider-search-section.tsx
+// src/features/media-modal/components/search-section.tsx
 import { useCallback, useEffect, useRef, type WheelEvent as ReactWheelEvent } from "react";
 import { ExternalLink } from "lucide-react";
 import Pill from "@/shared/components/pill";
@@ -8,7 +8,7 @@ import type { MappingSearchResult } from "@/shared/types";
 import { buildExternalMediaLink } from "@/shared/utils/build-external-media-link";
 import type { UseMappingControllerResult } from "../hooks/use-mapping-controller";
 
-interface ProviderSearchSectionProps {
+interface SearchSectionProps {
   controller: UseMappingControllerResult;
   currentMapping: MappingSearchResult | null;
   baseUrl: string;
@@ -16,7 +16,7 @@ interface ProviderSearchSectionProps {
   portalContainer?: HTMLElement | null;
 }
 
-export function ProviderSearchSection(props: ProviderSearchSectionProps) {
+export function SearchSection(props: SearchSectionProps) {
   const { controller, currentMapping, baseUrl, autoFocus = false, portalContainer } = props;
   const { state, setQuery, selectResult, searchQuery } = controller;
   const results = searchQuery.data ?? [];

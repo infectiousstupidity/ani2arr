@@ -53,3 +53,9 @@ export interface MappingContext {
 }
 
 export type { AniMedia };
+
+export interface MappingOverrideRecord {
+  anilistId: number;
+  tvdbId: number;
+  updatedAt: number;
+}

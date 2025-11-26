@@ -142,6 +142,19 @@
 .a2a-card-overlay__stack[data-direction='up'] { bottom: 36px; }
 .a2a-card-overlay__stack[data-direction='down'] { top: 36px; }
 .a2a-card-overlay__stack[data-open='true'] { pointer-events: auto; opacity: 1; }
+.a2a-card-overlay[data-visibility='hidden'] { display: none; }
+.a2a-card-overlay[data-visibility='hover'] .a2a-card-overlay__quick,
+.a2a-card-overlay[data-visibility='hover'] .a2a-card-overlay__stack {
+  opacity: 0;
+  pointer-events: none;
+}
+.a2a-card-overlay[data-visibility='hover']:hover .a2a-card-overlay__quick,
+.a2a-card-overlay[data-visibility='hover']:hover .a2a-card-overlay__stack,
+.a2a-card-overlay[data-visibility='hover']:focus-within .a2a-card-overlay__quick,
+.a2a-card-overlay[data-visibility='hover']:focus-within .a2a-card-overlay__stack {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .a2a-card-overlay__action {
   pointer-events: auto;

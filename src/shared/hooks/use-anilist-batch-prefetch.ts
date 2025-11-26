@@ -5,14 +5,15 @@ import { logger } from '@/shared/utils/logger';
 
 interface UseAnilistBatchPrefetchParams {
   cardPortals: Map<Element, ParsedCard>;
+  enabled?: boolean;
 }
 
 const log = logger.create('AniList Prefetch');
 
 // Hook to prefetch AniList media data in batches based on card visibility
-export const useAnilistBatchPrefetch = ({ cardPortals }: UseAnilistBatchPrefetchParams): void => {
+export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnilistBatchPrefetchParams): void => {
   // Enable on AniList browse/search and AniChart season/browse surfaces.
-  const enabled = typeof window !== 'undefined' && (() => {
+  const surfaceEnabled = typeof window !== 'undefined' && (() => {
     const host = (window.location.hostname || '').toLowerCase();
     const p = window.location.pathname || '';
     // AniList browse/search
@@ -25,6 +26,7 @@ export const useAnilistBatchPrefetch = ({ cardPortals }: UseAnilistBatchPrefetch
     }
     return false;
   })();
+  const isEnabled = enabled && surfaceEnabled;
   const api = useMemo(() => getAni2arrApi(), []);
 
   const idByContainerRef = useRef<WeakMap<Element, number>>(new WeakMap());
@@ -38,7 +40,7 @@ export const useAnilistBatchPrefetch = ({ cardPortals }: UseAnilistBatchPrefetch
   const initLoggedRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!isEnabled) return;
 
     // Emit a one-time init at info level to verify hook activation in Firefox
     if (!initLoggedRef.current) {
@@ -105,7 +107,7 @@ export const useAnilistBatchPrefetch = ({ cardPortals }: UseAnilistBatchPrefetch
     const TICK_MS = 300;
 
     const tick = async () => {
-      if (!enabled) return;
+      if (!isEnabled) return;
       if (busyRef.current) return;
 
       const prefetched = prefetchedIdsRef.current;
@@ -206,7 +208,7 @@ export const useAnilistBatchPrefetch = ({ cardPortals }: UseAnilistBatchPrefetch
       visibleIdsRef.current = new Set();
       offscreenQueueRef.current = [];
     };
-  }, [enabled, api, cardPortals]);
+  }, [isEnabled, api, cardPortals]);
 };
 
 export default useAnilistBatchPrefetch;

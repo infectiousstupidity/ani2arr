@@ -8,7 +8,7 @@ import {
   useSonarrMetadata,
   queryKeys,
 } from './use-api-queries';
-import type { ExtensionOptions, SonarrFormState } from '@/shared/types';
+import type { ExtensionOptions, SonarrFormState, UiOptions } from '@/shared/types';
 import {
   buildSonarrPermissionPattern,
   requestSonarrPermission,
@@ -16,6 +16,19 @@ import {
   validateApiKey,
 } from '@/shared/utils/validation';
 import { logger } from '@/shared/utils/logger';
+
+const getDefaultUiOptions = (): UiOptions => ({
+  browseOverlayEnabled: true,
+  badgeVisibility: 'always',
+  headerInjectionEnabled: true,
+  modalEnabled: true,
+});
+
+const mergeUiOptions = (ui?: UiOptions): UiOptions => ({
+  ...getDefaultUiOptions(),
+  ...(ui ?? {}),
+  badgeVisibility: ui?.badgeVisibility === 'hover' || ui?.badgeVisibility === 'hidden' ? ui.badgeVisibility : 'always',
+});
 
 const getInitialOptions = (): ExtensionOptions => ({
   sonarrUrl: '',
@@ -27,10 +40,13 @@ const getInitialOptions = (): ExtensionOptions => ({
     monitorOption: 'all',
     seasonFolder: true,
     searchForMissingEpisodes: true,
+    searchForCutoffUnmet: false,
     tags: [],
     freeformTags: [],
   },
   titleLanguage: 'english',
+  ui: getDefaultUiOptions(),
+  debugLogging: false,
 });
 
 const mergeOptionsWithDefaults = (options: ExtensionOptions): ExtensionOptions => {
@@ -43,11 +59,15 @@ const mergeOptionsWithDefaults = (options: ExtensionOptions): ExtensionOptions =
       ...options.defaults,
     },
     titleLanguage: options.titleLanguage ?? base.titleLanguage,
+    ui: mergeUiOptions(options.ui),
+    debugLogging: typeof options.debugLogging === 'boolean' ? options.debugLogging : base.debugLogging,
   };
 };
 
 const defaultsEqual = (a: ExtensionOptions['defaults'], b: ExtensionOptions['defaults']): boolean =>
   JSON.stringify(a) === JSON.stringify(b);
+
+const uiEqual = (a: UiOptions, b: UiOptions): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 const log = logger.create('SettingsManager');
 
@@ -87,7 +107,9 @@ export function useSettingsManager() {
         prev.sonarrUrl === completeOptions.sonarrUrl &&
         prev.sonarrApiKey === completeOptions.sonarrApiKey &&
         defaultsEqual(prev.defaults, completeOptions.defaults) &&
-        prev.titleLanguage === completeOptions.titleLanguage
+        prev.titleLanguage === completeOptions.titleLanguage &&
+        uiEqual(prev.ui, completeOptions.ui) &&
+        prev.debugLogging === completeOptions.debugLogging
       ) {
         return prev;
       }
@@ -147,6 +169,15 @@ export function useSettingsManager() {
   const handleDefaultsChange = useCallback(<K extends keyof SonarrFormState>(key: K, value: SonarrFormState[K]) => {
     setFormState(prev => {
       const next = { ...prev, defaults: { ...prev.defaults, [key]: value } };
+      formRef.current = next;
+      return next;
+    });
+    setSaveError(null);
+  }, []);
+
+  const handleUiChange = useCallback(<K extends keyof UiOptions>(key: K, value: UiOptions[K]) => {
+    setFormState(prev => {
+      const next = { ...prev, ui: { ...prev.ui, [key]: value } };
       formRef.current = next;
       return next;
     });
@@ -351,6 +382,45 @@ export function useSettingsManager() {
     queryClient.invalidateQueries({ queryKey: queryKeys.sonarrMetadata() });
   }, [saveOptions, testConnectionMutation, queryClient]);
 
+  const handleResetAll = useCallback(async () => {
+    setSaveError(null);
+    const previousUrl = formRef.current?.sonarrUrl ?? '';
+    const initial = mergeOptionsWithDefaults(getInitialOptions());
+    try {
+      await saveOptions(initial);
+      lastSyncedOptionsRef.current = {
+        ...initial,
+        defaults: { ...initial.defaults },
+        ui: { ...initial.ui },
+      };
+      setFormState(initial);
+      testConnectionMutation.reset();
+    } catch (error) {
+      log.error('Failed to reset settings to defaults.', error);
+      setSaveError('Failed to reset settings. Please try again.');
+      return;
+    }
+
+    if (previousUrl) {
+      const permissionPatternResult = buildSonarrPermissionPattern(previousUrl);
+      if (permissionPatternResult.ok && permissionPatternResult.value) {
+        try {
+          await browser.permissions.remove({ origins: [permissionPatternResult.value] });
+        } catch (permError) {
+          log.warn('Failed to remove Sonarr host permission during reset.', permError);
+        }
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: queryKeys.options() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.publicOptions() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.sonarrMetadata() });
+  }, [queryClient, saveOptions, testConnectionMutation]);
+
+  useEffect(() => {
+    logger.configure({ enabled: formState.debugLogging || import.meta.env.DEV });
+  }, [formState.debugLogging]);
+
   return {
     formState,
     sonarrMetadata,
@@ -361,11 +431,14 @@ export function useSettingsManager() {
     saveState: saveMutation,
     handleFieldChange,
     handleDefaultsChange,
+    handleUiChange,
+    setDebugLogging: (value: boolean) => handleFieldChange('debugLogging', value as ExtensionOptions['debugLogging']),
     handleTestConnection,
     handleSave,
     handleRefresh,
     resetConnection,
     handleDisconnect,
+    handleResetAll,
     saveError,
   };
 }

@@ -9,7 +9,7 @@ import type {
   SonarrFormState,
   SonarrCredentialsPayload,
 } from '@/shared/types';
-import type { ResolveInput, MappingOutput, StatusInput, StatusOutput, AddInput, UpdateSonarrInput, SetMappingOverrideInput, ClearMappingOverrideInput, SonarrLookupInput, SonarrLookupOutput, ValidateTvdbInput, ValidateTvdbOutput } from './schemas';
+import type { ResolveInput, MappingOutput, StatusInput, StatusOutput, AddInput, UpdateSonarrInput, SetMappingOverrideInput, ClearMappingOverrideInput, SonarrLookupInput, SonarrLookupOutput, ValidateTvdbInput, ValidateTvdbOutput, MappingOverrideItem } from './schemas';
 
 export interface Ani2arrApi {
   resolveMapping(input: ResolveInput): Promise<MappingOutput>;
@@ -35,6 +35,8 @@ export interface Ani2arrApi {
   clearMappingOverride(input: ClearMappingOverrideInput): Promise<{ ok: true }>;
   searchSonarr(input: SonarrLookupInput): Promise<SonarrLookupOutput>;
   validateTvdbId(input: ValidateTvdbInput): Promise<ValidateTvdbOutput>;
+  getMappingOverrides(): Promise<MappingOverrideItem[]>;
+  clearAllMappingOverrides(): Promise<{ ok: true }>;
 }
 
 export const [registerAni2arrApi, getAni2arrApi] =

@@ -79,6 +79,8 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
     const isConfigured = Boolean(publicOptions?.isConfigured);
     const sonarrUrl = publicOptions?.sonarrUrl ?? null;
     const defaultForm = publicOptions?.defaults ?? null;
+    const overlaysEnabled = publicOptions?.ui?.browseOverlayEnabled ?? true;
+    const badgeVisibility = publicOptions?.ui?.badgeVisibility ?? 'always';
 
     const { cardPortals } = useBrowsePortals({
       cardSelector,
@@ -93,10 +95,15 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
       getResizeTargets,
       mutationObserverInit,
       onCardInvalid: adapter.onCardInvalid,
+      enabled: overlaysEnabled,
     });
 
     // Prefetch AniList metadata on browse/search pages using viewport-prioritized batching.
-    useAnilistBatchPrefetch({ cardPortals });
+    useAnilistBatchPrefetch({ cardPortals, enabled: overlaysEnabled });
+
+    if (!overlaysEnabled) {
+      return <div ref={hostRef} />;
+    }
 
     return (
       <div ref={hostRef}>
@@ -127,6 +134,7 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
               metadata={parsed.metadata}
               sonarrUrl={sonarrUrl}
               observeTarget={container}
+              badgeVisibility={badgeVisibility}
               anchorCorner={adapter?.anchorCorner ?? 'bottom-left'}
               stackDirection={adapter?.stackDirection ?? 'up'}
               anchorOffsetX={adapter?.anchorOffsetX ?? -8}

@@ -26,6 +26,8 @@ import { useMediaModalProps } from '@/shared/hooks/use-media-modal-props';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
 import { ConfirmProvider } from '@/shared/hooks/use-confirm';
+import { usePublicOptions } from '@/shared/hooks/use-api-queries';
+import { useToast } from '@/shared/components/toast-provider';
 
 const log = logger.create('AniList Browse Content');
 
@@ -172,6 +174,9 @@ interface BrowseRootProps {
 
 const BrowseRoot: React.FC<BrowseRootProps> = ({ portalContainer }) => {
   const mediaModal = useMediaModalState();
+  const { data: options } = usePublicOptions();
+  const modalEnabled = options?.ui?.modalEnabled ?? true;
+  const toast = useToast();
 
   const modalProps = useMediaModalProps({
     anilistId: mediaModal.state?.anilistId,
@@ -185,10 +190,18 @@ const BrowseRoot: React.FC<BrowseRootProps> = ({ portalContainer }) => {
     <>
       <BrowseContentApp
         onOpenMediaModal={({ anilistId, title, initialTab, metadata }) => {
+          if (!modalEnabled) {
+            toast.showToast({
+              title: 'Modal disabled',
+              description: 'Enable the ani2arr modal in Options to open mapping/setup here.',
+              variant: 'info',
+            });
+            return;
+          }
           mediaModal.open({ anilistId, title, initialTab: initialTab ?? 'series', metadata });
         }}
       />
-      {portalContainer && mediaModal.state && modalProps && (
+      {modalEnabled && portalContainer && mediaModal.state && modalProps && (
         <MediaModal
           key={`modal-${mediaModal.state.anilistId}`}
           isOpen={mediaModal.state.isOpen}
