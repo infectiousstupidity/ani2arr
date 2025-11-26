@@ -31,7 +31,7 @@ type FormItemProps = React.HTMLAttributes<HTMLDivElement> & { vertical?: boolean
 const FormItem = React.forwardRef<HTMLDivElement, FormItemProps>(
   ({ className = '', vertical = false, ...props }, ref) => {
     const base = vertical
-      ? 'flex flex-col gap-3 items-start'
+      ? 'flex flex-col gap-3 items-stretch'
       : 'grid grid-cols-2 items-center gap-4';
 
     // Add consistent vertical spacing between form groups
@@ -80,7 +80,7 @@ const Input = React.memo(
           id={id}
           type={type}
           ref={ref}
-          className={`flex h-9 w-full rounded-md bg-bg-tertiary px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-text-secondary disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+          className={`flex h-10 w-full rounded-md bg-bg-tertiary px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-text-secondary disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
           {...props}
         />
       );

@@ -25,6 +25,7 @@ export interface UseBrowsePortalsParams {
   getResizeTargets(): Iterable<Element> | Element | null;
   mutationObserverInit: MutationObserverInit;
   onCardInvalid?: ((card: Element) => void) | undefined;
+  enabled?: boolean;
 }
 
 export interface UseBrowsePortalsResult {
@@ -44,8 +45,15 @@ export const useBrowsePortals = ({
   getResizeTargets,
   mutationObserverInit,
   onCardInvalid,
+  enabled = true,
 }: UseBrowsePortalsParams): UseBrowsePortalsResult => {
   const [cardPortals, setCardPortals] = useState<Map<Element, ParsedCard>>(new Map());
+
+  useEffect(() => {
+    if (!enabled) {
+      setCardPortals(prev => (prev.size > 0 ? new Map() : prev));
+    }
+  }, [enabled]);
 
   const removePortalForContainer = useCallback((container: Element, removeDom = false) => {
     setCardPortals(prev => {
@@ -112,6 +120,11 @@ export const useBrowsePortals = ({
   }, [ensureContainer, getContainerForCard, markProcessed, onCardInvalid, parseCard, removePortalForContainer]);
 
   const scanAll = useCallback(() => {
+    if (!enabled) {
+      setCardPortals(prev => (prev.size > 0 ? new Map() : prev));
+      return;
+    }
+
     const root = getScanRoot();
     if (!root) {
       removeStalePortals();
@@ -126,9 +139,11 @@ export const useBrowsePortals = ({
 
     cards.forEach(card => upsertCard(card));
     removeStalePortals();
-  }, [cardSelector, getScanRoot, removeStalePortals, upsertCard]);
+  }, [cardSelector, getScanRoot, removeStalePortals, upsertCard, enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
+
     const observerRoot = getObserverRoot();
     if (!observerRoot) return;
 
@@ -257,6 +272,7 @@ export const useBrowsePortals = ({
     removeStalePortals,
     scanAll,
     upsertCard,
+    enabled,
   ]);
 
   return { cardPortals };

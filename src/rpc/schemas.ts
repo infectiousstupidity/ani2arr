@@ -49,6 +49,12 @@ export interface ClearMappingOverrideInput {
   anilistId: number;
 }
 
+export interface MappingOverrideItem {
+  anilistId: number;
+  tvdbId: number;
+  updatedAt: number;
+}
+
 export interface SonarrLookupInput {
   term: string;
   priority?: RequestPriority;

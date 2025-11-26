@@ -25,6 +25,7 @@ import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils
 import type { MappingOutput, UpdateSonarrInput } from '@/rpc/schemas';
 import { type Ani2arrApi } from '@/rpc';
 import { resolveSonarrTagIds } from '@/shared/utils/sonarr-tags';
+import { logger } from '@/shared/utils/logger';
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
@@ -139,6 +140,12 @@ export const createApiImplementation = (): Ani2arrApi => {
   let libraryEpoch = 0;
   let settingsEpoch = 0;
 
+  void getExtensionOptionsSnapshot()
+    .then(options => {
+      logger.configure({ enabled: (options?.debugLogging ?? false) || import.meta.env.DEV });
+    })
+    .catch(() => {});
+
   void initializeEpoch('libraryEpoch').then(epoch => {
     libraryEpoch = epoch;
   });
@@ -197,6 +204,7 @@ export const createApiImplementation = (): Ani2arrApi => {
 
   const handleOptionsUpdated = async (optionsHint?: ExtensionOptions): Promise<void> => {
     sonarrApiService.clearEtagCache();
+    logger.configure({ enabled: (optionsHint?.debugLogging ?? false) || import.meta.env.DEV });
     await bumpSettingsEpoch();
     await mappingService.resetLookupState();
     const options = optionsHint ?? (await getExtensionOptionsSnapshot());
@@ -537,6 +545,24 @@ export const createApiImplementation = (): Ani2arrApi => {
         await sonarrLibrary.refreshCache(options);
       }
       await bumpLibraryEpoch({ anilistId: input.anilistId, action: 'override:clear' });
+      return { ok: true as const };
+    },
+
+    async getMappingOverrides() {
+      await overridesReady;
+      return overridesService.list();
+    },
+
+    async clearAllMappingOverrides() {
+      await overridesReady;
+      const existing = overridesService.list();
+      await overridesService.clearAll();
+      await Promise.all(existing.map(entry => mappingService.evictResolved(entry.anilistId)));
+      const options = await getExtensionOptionsSnapshot();
+      if (options?.sonarrUrl && options?.sonarrApiKey) {
+        await sonarrLibrary.refreshCache(options);
+      }
+      await bumpLibraryEpoch({ action: 'override:clearAll' });
       return { ok: true as const };
     },
   };

@@ -6,6 +6,15 @@ import type {
   SonarrMonitorOption,
 } from './sonarr';
 
+export type BadgeVisibility = 'always' | 'hover' | 'hidden';
+
+export interface UiOptions {
+  browseOverlayEnabled: boolean;
+  badgeVisibility: BadgeVisibility;
+  headerInjectionEnabled: boolean;
+  modalEnabled: boolean;
+}
+
 export interface SonarrFormState {
   qualityProfileId: number | '';
   rootFolderPath: string;
@@ -13,6 +22,7 @@ export interface SonarrFormState {
   monitorOption: SonarrMonitorOption;
   seasonFolder: boolean;
   searchForMissingEpisodes: boolean;
+  searchForCutoffUnmet: boolean;
   tags: number[];
   freeformTags: string[];
 }
@@ -24,6 +34,8 @@ export interface ExtensionOptions {
   sonarrApiKey: string;
   defaults: SonarrFormState;
   titleLanguage: TitleLanguage;
+  ui: UiOptions;
+  debugLogging: boolean | undefined;
 }
 
 /**
@@ -34,6 +46,8 @@ export interface PublicOptions {
   sonarrUrl: string;
   defaults: SonarrFormState;
   titleLanguage: TitleLanguage;
+  ui: UiOptions;
+  debugLogging: boolean | undefined;
   /**
    * Indicates whether the user has completed Sonarr setup (URL + API key).
    * This is derived in the background and mirrored into public storage.

@@ -14,6 +14,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   metadata,
   sonarrUrl,
   observeTarget,
+  badgeVisibility = 'always',
   anchorCorner = 'bottom-left',
   stackDirection = 'up',
   anchorOffsetX = -8,
@@ -230,6 +231,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
       className="a2a-card-overlay"
       data-state={overlayState}
       data-corner={anchorCorner}
+      data-visibility={badgeVisibility}
       style={{ ['--badge-offset-x']: `${anchorOffsetX}px` } as React.CSSProperties}
       onMouseEnter={openStack}
       onMouseLeave={scheduleCloseStack}

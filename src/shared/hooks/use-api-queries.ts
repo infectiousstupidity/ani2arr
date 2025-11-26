@@ -22,9 +22,12 @@ import type {
   SonarrCredentialsPayload,
   SonarrSeries,
   TestConnectionPayload,
+  MappingOverrideRecord,
+  UiOptions,
 } from '@/shared/types';
 import type { AddInput, UpdateSonarrInput, StatusInput, SetMappingOverrideInput, ClearMappingOverrideInput } from '@/rpc/schemas';
 import { normalizeError } from '@/shared/utils/error-handling';
+import { logger } from '@/shared/utils/logger';
 
 const rootQueryKey = ['a2a'] as const;
 
@@ -50,6 +53,19 @@ const normalizeMetadataKey = (metadata?: MediaMetadataHint | null) => {
 
 const seriesStatusBaseKey = (anilistId: number) => [...rootQueryKey, 'seriesStatus', anilistId] as const;
 
+const defaultUiOptions: UiOptions = {
+  browseOverlayEnabled: true,
+  badgeVisibility: 'always',
+  headerInjectionEnabled: true,
+  modalEnabled: true,
+};
+
+const mergeUiOptions = (ui?: UiOptions): UiOptions => ({
+  ...defaultUiOptions,
+  ...(ui ?? {}),
+  badgeVisibility: ui?.badgeVisibility === 'hover' || ui?.badgeVisibility === 'hidden' ? ui.badgeVisibility : 'always',
+});
+
 export const queryKeys = {
   all: rootQueryKey,
   options: () => [...rootQueryKey, 'options'] as const,
@@ -65,6 +81,7 @@ export const queryKeys = {
   sonarrMetadata: (scope?: string) => [...rootQueryKey, 'sonarrMetadata', scope ?? 'configured'] as const,
   mappingSearch: (service: 'sonarr' | 'radarr', query: string) =>
     [...rootQueryKey, 'mappingSearch', service, query.trim().toLowerCase()] as const,
+  mappingOverrides: () => [...rootQueryKey, 'mappingOverrides'] as const,
 };
 
 /**
@@ -98,7 +115,10 @@ const useSyncPublicOptionsQuery = (queryClient: QueryClient): void => {
       queryClient.setQueryData(queryKeys.publicOptions(), {
         ...newValue,
         titleLanguage: newValue?.titleLanguage ?? 'english',
+        ui: mergeUiOptions(newValue?.ui),
+        debugLogging: newValue?.debugLogging ?? false,
       } satisfies PublicOptions);
+      logger.configure({ enabled: (newValue?.debugLogging ?? false) || import.meta.env.DEV });
     });
     return () => unsubscribe();
   }, [queryClient]);
@@ -322,6 +342,7 @@ export const useSetMappingOverride = () => {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
     },
   });
 };
@@ -338,9 +359,38 @@ export const useClearMappingOverride = () => {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
     },
   });
 };
+
+export const useClearAllMappingOverrides = () => {
+  const queryClient = useQueryClient();
+  return useMutation<{ ok: true }, ExtensionError>({
+    mutationFn: async () => {
+      try {
+        return await getAni2arrApi().clearAllMappingOverrides();
+      } catch (error) {
+        throw normalizeError(error);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot() });
+    },
+  });
+};
+
+export const useMappingOverrides = () =>
+  useQuery<MappingOverrideRecord[], ExtensionError>({
+    queryKey: queryKeys.mappingOverrides(),
+    queryFn: async () => {
+      const api = getAni2arrApi();
+      return api.getMappingOverrides();
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
 
 export const useTestConnection = () => {
   return useMutation<{ version: string }, ExtensionError, TestConnectionPayload>({
@@ -378,6 +428,8 @@ export const useSaveOptions = () => {
         sonarrUrl: newOptions.sonarrUrl,
         defaults: newOptions.defaults,
         titleLanguage: newOptions.titleLanguage,
+        ui: mergeUiOptions(newOptions.ui),
+        debugLogging: newOptions.debugLogging ?? false,
         isConfigured: Boolean(newOptions.sonarrUrl && newOptions.sonarrApiKey),
       } satisfies PublicOptions);
       return { previousOptions };
@@ -390,6 +442,8 @@ export const useSaveOptions = () => {
           sonarrUrl: context.previousOptions.sonarrUrl,
           defaults: context.previousOptions.defaults,
           titleLanguage: context.previousOptions.titleLanguage,
+          ui: mergeUiOptions(context.previousOptions.ui),
+          debugLogging: context.previousOptions.debugLogging ?? false,
           isConfigured: Boolean(
             context.previousOptions.sonarrUrl && context.previousOptions.sonarrApiKey,
           ),

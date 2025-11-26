@@ -23,6 +23,7 @@ export function useAddSeriesManager(
     monitorOption: 'all',
     seasonFolder: true,
     searchForMissingEpisodes: true,
+    searchForCutoffUnmet: false,
     tags: [],
     freeformTags: [],
   };

@@ -56,6 +56,7 @@ const defaultFormState: SonarrFormState = {
   monitorOption: 'all',
   seasonFolder: true,
   searchForMissingEpisodes: true,
+  searchForCutoffUnmet: false,
   tags: [],
   freeformTags: [],
 };
@@ -273,6 +274,7 @@ export function useMediaModalProps(
         seasonFolder:
           typeof fullSeries.seasonFolder === 'boolean' ? fullSeries.seasonFolder : defaultForm.seasonFolder,
         searchForMissingEpisodes: defaultForm.searchForMissingEpisodes,
+        searchForCutoffUnmet: defaultForm.searchForCutoffUnmet,
         tags: Array.isArray(fullSeries.tags)
           ? fullSeries.tags.filter((tag): tag is number => typeof tag === 'number')
           : defaultForm.tags,

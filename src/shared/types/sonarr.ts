@@ -112,3 +112,25 @@ export interface SonarrTag {
   id: number;
   label: string;
 }
+
+/**
+ * Represents a single item returned by the Sonarr `/wanted/cutoff` endpoint.
+ * The Sonarr API payloads may vary by version; keep this intentionally
+ * permissive while exposing the commonly-used fields.
+ */
+export interface SonarrCutoffItem {
+  id?: number;
+  seriesId?: number;
+  tvdbId?: number;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  title?: string;
+  overview?: string | null;
+  airDate?: string | null;
+  quality?: string | null;
+  sizeOnDisk?: number | null;
+  // Allow other unknown fields returned by Sonarr
+  [key: string]: unknown;
+}
+
+export type SonarrCutoffList = SonarrCutoffItem[];

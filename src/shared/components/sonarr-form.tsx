@@ -450,39 +450,63 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
           </FormField>
         </div>
         
-        {/* Toggles */}
-        <div className="space-y-1.5 pt-1">
-          <FormField>
-            <FormItem vertical>
-              <FormLabel className="text-xs font-medium text-text-secondary">
-                Season Folders
-              </FormLabel>
-              <FormControl className="flex justify-start">
-                <Switch
-                  disabled={!!disabled}
-                  checked={effectiveValues.seasonFolder}
-                  onCheckedChange={v => setFieldValue("seasonFolder", v)}
-                />
-              </FormControl>
-            </FormItem>
-          </FormField>
-
-          {includeSearchToggle ? (
+        {/* Toggles: labels in one row, switches in the row beneath */}
+        <div className="pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            
+            {/* Season folders */}
             <FormField>
-              <FormItem vertical>
-                <FormLabel className="text-xs font-medium text-text-secondary">
-                  Search on Add
+              <FormItem className="flex flex-col items-center rounded-lg bg-bg-tertiary px-3 py-3 text-center">
+                <FormLabel className="text-xs font-medium text-text-secondary mb-2">
+                  Season Folders
                 </FormLabel>
-                <FormControl className="flex justify-start">
+                <FormControl>
                   <Switch
                     disabled={!!disabled}
-                    checked={effectiveValues.searchForMissingEpisodes}
-                    onCheckedChange={v => setFieldValue("searchForMissingEpisodes", v)}
+                    checked={effectiveValues.seasonFolder}
+                    onCheckedChange={v => setFieldValue("seasonFolder", v)}
                   />
                 </FormControl>
               </FormItem>
             </FormField>
-          ) : null}
+
+            {/* Search on Add */}
+            {includeSearchToggle ? (
+              <FormField>
+                <FormItem className="flex flex-col items-center rounded-lg bg-bg-tertiary px-3 py-3 text-center">
+                  <FormLabel className="text-xs font-medium text-text-secondary mb-2">
+                    Search on Add
+                  </FormLabel>
+                  <FormControl>
+                    <Switch
+                      disabled={!!disabled}
+                      checked={effectiveValues.searchForMissingEpisodes}
+                      onCheckedChange={v => setFieldValue("searchForMissingEpisodes", v)}
+                    />
+                  </FormControl>
+                </FormItem>
+              </FormField>
+            ) : null}
+
+            {/* Cutoff unmet episodes */}
+            {includeSearchToggle ? (
+              <FormField>
+                <FormItem className="flex flex-col items-center rounded-lg bg-bg-tertiary px-3 py-3 text-center">
+                  <FormLabel className="text-xs font-medium text-text-secondary mb-2">
+                    Cutoff Unmet Episodes
+                  </FormLabel>
+                  <FormControl>
+                    <Switch
+                      disabled={!!disabled}
+                      checked={effectiveValues.searchForCutoffUnmet}
+                      onCheckedChange={v => setFieldValue("searchForCutoffUnmet", v)}
+                    />
+                  </FormControl>
+                </FormItem>
+              </FormField>
+            ) : null}
+
+          </div>
         </div>
       </div>
     </div>

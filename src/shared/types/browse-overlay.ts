@@ -11,6 +11,7 @@ export interface CardOverlayProps {
   metadata: MediaMetadataHint | null;
   sonarrUrl: string | null;
   observeTarget?: Element | null;
+  badgeVisibility?: 'always' | 'hover' | 'hidden';
   /** Corner for anchor placement */
   anchorCorner?: 'bottom-left' | 'top-left';
   /** Direction the action stack animates */
