@@ -130,7 +130,7 @@ function deriveCurrentMappingFromStatus(
   if (status.series && 'images' in status.series) {
     const mapped = toMappingSearchResultFromSonarr(status.series as SonarrLookupSeries, {
       baseUrl: baseUrl ?? '',
-      libraryTvdbIds: [status.tvdbId], // Mark as in Sonarr
+      libraryTvdbIds: status.exists ? [status.tvdbId] : [],
     });
     return {
       ...mapped,

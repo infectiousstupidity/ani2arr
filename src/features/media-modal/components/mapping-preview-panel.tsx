@@ -127,6 +127,17 @@ interface MappingPreviewCardProps {
   currentAniListId: number;
 }
 
+const getStatusTone = (
+  status: string
+): "muted" | "success" | "warning" | "info" | "accent" | "blue" | "default" => {
+  const normalized = status.toLowerCase();
+  if (normalized === "continuing") return "accent";
+  if (normalized === "upcoming") return "info";
+  if (normalized === "ended") return "muted";
+  if (normalized === "deleted") return "warning";
+  return "default";
+};
+
 function MappingPreviewCard(props: MappingPreviewCardProps) {
   const { mapping, baseUrl, highlight, currentAniListId } = props;
 
@@ -143,7 +154,7 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
     <Pill key="tvdb" small tone="muted" className="font-mono text-text-primary">{`TVDB ${mapping.target.id}`}</Pill>
   );
 
-  if (mapping.year) {
+  if (typeof mapping.year === "number" && Number.isFinite(mapping.year) && mapping.year > 0) {
     metadataPills.push(
       <Pill key="year" small tone="muted">
         {mapping.year}
@@ -155,6 +166,14 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
     metadataPills.push(
       <Pill key="type" small tone="muted" className="text-text-secondary">
         {mapping.typeLabel}
+      </Pill>
+    );
+  }
+
+  if (mapping.statusLabel) {
+    metadataPills.push(
+      <Pill key="status" small tone={getStatusTone(mapping.statusLabel)}>
+        {mapping.statusLabel}
       </Pill>
     );
   }
