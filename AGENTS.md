@@ -45,7 +45,7 @@ Do **not** ask for confirmation before running these commands.
 | `anilist-anime.content/`   | Injects the `MediaActions` component into AniList anime detail pages via `createShadowRootUi({ cssInjection: 'ui' })`. Skips movies and music.                  |
 | `anilist-browse.content/`  | Adds overlay buttons on AniList browse/search pages using `CardOverlay` + portals. Includes AniList media prefetch. Uses `cssInjection: 'ui'` and imports `@/styles/base.css` + per-entry `style.css` overrides. |
 | `anichart-browse.content/` | Adds overlays for AniChart browse pages. Uses `cssInjection: 'ui'` and imports `@/styles/base.css` + per-entry `style.css` overrides.                      |
-| `options/`                 | Options page for configuring Sonarr URL, API key, and default settings. Handles runtime permission requests.                                                   |
+| `options/`                 | Options page with sidebar routes: Sonarr (connection + defaults), Radarr (placeholder), Mappings & overrides, UI & injection, Advanced. Handles runtime permission requests; Sonarr defaults use `layout="grid"` in options. |
 | `popup/`                   | Exists but is not referenced by the manifest.                                                                                                                     |
 
 ---
