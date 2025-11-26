@@ -164,6 +164,14 @@ export class SonarrApiService {
     return seriesArray[0] ?? null;
   };
 
+  public lookupSeriesByTvdbId = async (
+    tvdbId: number,
+    credentials: SonarrCredentialsPayload,
+  ): Promise<SonarrLookupSeries | null> => {
+    const hits = await this.lookupSeriesByTerm(`tvdb:${tvdbId}`, credentials);
+    return hits.find(hit => hit?.tvdbId === tvdbId) ?? null;
+  };
+
   public getSeriesById = async (
     seriesId: number,
     credentials: SonarrCredentialsPayload,

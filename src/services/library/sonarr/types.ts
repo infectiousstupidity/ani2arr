@@ -2,6 +2,7 @@
 import type { TtlCache } from '@/cache';
 import type {
   LeanSonarrSeries,
+  SonarrLookupSeries,
   SonarrSeries,
   ExtensionOptions,
   CheckSeriesStatusPayload,
@@ -9,11 +10,20 @@ import type {
   RequestPriority,
 } from '@/shared/types';
 
-export type { LeanSonarrSeries, SonarrSeries, ExtensionOptions, CheckSeriesStatusPayload, CheckSeriesStatusResponse, RequestPriority };
+export type {
+  LeanSonarrSeries,
+  SonarrLookupSeries,
+  SonarrSeries,
+  ExtensionOptions,
+  CheckSeriesStatusPayload,
+  CheckSeriesStatusResponse,
+  RequestPriority,
+};
 
 export interface SonarrClient {
   getAllSeries(credentials: { url: string; apiKey: string }): Promise<SonarrSeries[]>;
   getSeriesByTvdbId(tvdbId: number, credentials: { url: string; apiKey: string }): Promise<SonarrSeries | null>;
+  lookupSeriesByTvdbId(tvdbId: number, credentials: { url: string; apiKey: string }): Promise<SonarrLookupSeries | null>;
 }
 
 export interface MappingResolver {

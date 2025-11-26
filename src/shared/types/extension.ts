@@ -2,6 +2,7 @@
 import type { MediaMetadataHint } from './anilist';
 import type {
   LeanSonarrSeries,
+  SonarrLookupSeries,
   SonarrSeries,
   SonarrMonitorOption,
 } from './sonarr';
@@ -84,7 +85,7 @@ export interface CheckSeriesStatusResponse {
   tvdbId: number | null;
   successfulSynonym?: string;
   anilistTvdbLinkMissing?: boolean;
-  series?: LeanSonarrSeries | SonarrSeries;
+  series?: LeanSonarrSeries | SonarrSeries | SonarrLookupSeries;
   /** True when a manual AniList -> TVDB override is active for this ID. */
   overrideActive?: boolean;
   /** Other AniList IDs currently linked to the same TVDB ID (overrides or static pairs). */

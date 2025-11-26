@@ -6,6 +6,7 @@ import type {
   TitleIndexer,
   SonarrClient,
   RequestPriority,
+  SonarrLookupSeries,
 } from './types';
 import { getExtensionOptionsSnapshot } from '@/shared/utils/storage';
 import { ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
@@ -115,6 +116,7 @@ export class SonarrStatus {
 
     const credentials = { url: sonarrOpts!.sonarrUrl!, apiKey: sonarrOpts!.sonarrApiKey! };
     const liveSeries = await this.sonarr.getSeriesByTvdbId(tvdbId, credentials);
+    let lookupSeries: SonarrLookupSeries | null = null;
 
     if (liveSeries) {
       let cacheMutated = false;
@@ -142,6 +144,12 @@ export class SonarrStatus {
       return out2;
     }
 
+    try {
+      lookupSeries = await this.sonarr.lookupSeriesByTvdbId(tvdbId, credentials);
+    } catch (error) {
+      logError(normalizeError(error), `SonarrStatus:getSeriesStatus:lookup:${tvdbId}`);
+    }
+
     if (existsInCache) {
       await this.store.removeSeriesFromCache(tvdbId);
       await notifyLibraryMutation(this.emitMutation, { tvdbId, action: 'removed' });
@@ -150,6 +158,7 @@ export class SonarrStatus {
     const out3: CheckSeriesStatusResponse = {
       exists: false,
       tvdbId,
+      ...(lookupSeries ? { series: lookupSeries } : {}),
       ...(successfulSynonym ? { successfulSynonym } : {}),
       ...(linkedAniListIds ? { linkedAniListIds } : {}),
     };
