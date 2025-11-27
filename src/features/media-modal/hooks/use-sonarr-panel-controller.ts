@@ -97,9 +97,13 @@ export function useSonarrPanelController(
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDefaults, setIsSavingDefaults] = useState(false);
 
+  // Only reset when mode or tvdbId changes, not on every initialForm change.
+  // Intentionally excludes initialForm to prevent form reset when defaults change
+  // in options page while modal is open in edit mode.
   useEffect(() => {
     form.reset(initialForm);
-  }, [form, initialForm, mode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, mode, tvdbId]);
 
   const current = form.watch();
 

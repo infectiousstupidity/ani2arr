@@ -6,52 +6,24 @@
  * Sonarr credentials so that content scripts never touch the API key.
  */
 import { storage } from '@wxt-dev/storage';
+import * as v from 'valibot';
+import { SettingsSchema, createDefaultSettings } from '@/shared/schemas/settings';
+import type { Settings } from '@/shared/schemas/settings';
+import type { ExtensionOptions, PublicOptions, SonarrSecrets } from '@/shared/types';
 import { validateUrl, validateApiKey } from '@/shared/utils/validation';
-import type {
-  ExtensionOptions,
-  PublicOptions,
-  SonarrFormState,
-  SonarrSecrets,
-  TitleLanguage,
-  UiOptions,
-  BadgeVisibility,
-} from '@/shared/types';
+import { logger } from '@/shared/utils/logger';
 
-const getDefaultFormState = (): SonarrFormState => ({
-  qualityProfileId: '',
-  rootFolderPath: '',
-  seriesType: 'anime',
-  monitorOption: 'all',
-  seasonFolder: true,
-  searchForMissingEpisodes: true,
-  searchForCutoffUnmet: false,
-  tags: [],
-  freeformTags: [],
-});
-
-const sanitizeBadgeVisibility = (value?: BadgeVisibility): BadgeVisibility => {
-  if (value === 'hover' || value === 'hidden') return value;
-  return 'always';
+const createDefaultPublicOptions = (): PublicOptions => {
+  const defaults = createDefaultSettings();
+  return {
+    sonarrUrl: defaults.sonarrUrl,
+    defaults: defaults.defaults,
+    titleLanguage: defaults.titleLanguage,
+    ui: defaults.ui,
+    debugLogging: defaults.debugLogging,
+    isConfigured: false,
+  };
 };
-
-const getDefaultUiOptions = (): UiOptions => ({
-  browseOverlayEnabled: true,
-  badgeVisibility: 'always',
-  headerInjectionEnabled: true,
-  modalEnabled: true,
-});
-
-const DEFAULT_TITLE_LANGUAGE: TitleLanguage = 'english';
-const DEFAULT_DEBUG_LOGGING = false;
-
-const createDefaultPublicOptions = (): PublicOptions => ({
-  sonarrUrl: '',
-  defaults: getDefaultFormState(),
-  titleLanguage: DEFAULT_TITLE_LANGUAGE,
-  ui: getDefaultUiOptions(),
-  debugLogging: DEFAULT_DEBUG_LOGGING,
-  isConfigured: false,
-});
 
 const createDefaultSecrets = (): SonarrSecrets => ({
   apiKey: '',
@@ -74,41 +46,37 @@ export const sonarrSecrets = storage.defineItem<SonarrSecrets>('local:sonarrSecr
   version: 1,
 });
 
-interface HasDefaults {
-  defaults: SonarrFormState;
-}
+export const parseSettings = (raw: unknown): Settings => {
+  const result = v.safeParse(SettingsSchema, raw);
+  if (result.success) return result.output;
+  logger.warn('Storage mismatch, applying defaults', result.issues);
+  return v.parse(SettingsSchema, raw ?? {});
+};
 
-const mergeDefaults = <T extends HasDefaults>(options: T): T => ({
-  ...options,
-  defaults: {
-    ...getDefaultFormState(),
-    ...options.defaults,
-  },
-  ui: {
-    ...getDefaultUiOptions(),
-    ...(options as unknown as { ui?: UiOptions })?.ui,
-    badgeVisibility: sanitizeBadgeVisibility((options as unknown as { ui?: UiOptions })?.ui?.badgeVisibility),
-  },
-  debugLogging:
-    typeof (options as unknown as { debugLogging?: boolean })?.debugLogging === 'boolean'
-      ? (options as unknown as { debugLogging?: boolean })?.debugLogging
-      : DEFAULT_DEBUG_LOGGING,
+export const toPublicOptions = (settings: Settings): PublicOptions => ({
+  sonarrUrl: settings.sonarrUrl,
+  defaults: settings.defaults,
+  titleLanguage: settings.titleLanguage,
+  ui: settings.ui,
+  debugLogging: settings.debugLogging,
+  isConfigured: Boolean(settings.sonarrUrl && settings.sonarrApiKey),
 });
+
+const getRawOptions = async () => {
+  const [pub, secrets] = await Promise.all([publicOptions.getValue(), sonarrSecrets.getValue()]);
+  return {
+    ...pub,
+    sonarrApiKey: secrets.apiKey,
+  };
+};
 
 /**
  * Fetches the combined extension options (including secrets) for use in
  * background and options contexts.
  */
-export async function getExtensionOptionsSnapshot(): Promise<ExtensionOptions> {
-  const [pub, secrets] = await Promise.all([publicOptions.getValue(), sonarrSecrets.getValue()]);
-  return {
-    sonarrUrl: pub.sonarrUrl,
-    sonarrApiKey: secrets.apiKey,
-    defaults: mergeDefaults(pub).defaults,
-    titleLanguage: pub.titleLanguage ?? DEFAULT_TITLE_LANGUAGE,
-    ui: mergeDefaults(pub).ui,
-    debugLogging: mergeDefaults(pub).debugLogging,
-  };
+export async function getExtensionOptionsSnapshot(): Promise<Settings> {
+  const raw = await getRawOptions();
+  return parseSettings(raw);
 }
 
 /**
@@ -116,44 +84,38 @@ export async function getExtensionOptionsSnapshot(): Promise<ExtensionOptions> {
  * Exposes a single call site for writes to keep the boolean mirror in sync.
  */
 export async function setExtensionOptionsSnapshot(options: ExtensionOptions): Promise<void> {
-  const sanitized = mergeDefaults(options);
+  const parsed = parseSettings(options);
 
-  // Defensive validation: only validate/normalize non-empty values. Empty
-  // values are permitted to allow clearing configuration.
-  let normalizedUrl = sanitized.sonarrUrl ?? '';
-  if (normalizedUrl && normalizedUrl.trim() !== '') {
-    const v = validateUrl(normalizedUrl);
-    if (!v.isValid) {
-      throw new Error(`Invalid Sonarr URL: ${v.error ?? 'unknown'}`);
+  let normalizedUrl = parsed.sonarrUrl ?? '';
+  if (normalizedUrl.trim() !== '') {
+    const vUrl = validateUrl(normalizedUrl);
+    if (!vUrl.isValid) {
+      throw new Error(`Invalid Sonarr URL: ${vUrl.error ?? 'unknown'}`);
     }
-    normalizedUrl = v.normalizedUrl ?? normalizedUrl;
+    normalizedUrl = vUrl.normalizedUrl ?? normalizedUrl.trim();
+  } else {
+    normalizedUrl = '';
   }
 
-  let apiKey = sanitized.sonarrApiKey ?? '';
-  if (apiKey && apiKey.trim() !== '') {
+  let apiKey = parsed.sonarrApiKey ?? '';
+  if (apiKey.trim() !== '') {
     const k = validateApiKey(apiKey);
     if (!k.isValid) {
       throw new Error(`Invalid Sonarr API key: ${k.error ?? 'invalid format'}`);
     }
     apiKey = apiKey.trim();
+  } else {
+    apiKey = '';
   }
 
-  const titleLanguage: TitleLanguage =
-    sanitized.titleLanguage === 'romaji' || sanitized.titleLanguage === 'native'
-      ? sanitized.titleLanguage
-      : DEFAULT_TITLE_LANGUAGE;
-  const uiOptions = mergeDefaults(sanitized).ui;
-  const debugLogging = mergeDefaults(sanitized).debugLogging;
+  const sanitized: Settings = {
+    ...parsed,
+    sonarrUrl: normalizedUrl,
+    sonarrApiKey: apiKey,
+  };
 
   await Promise.all([
-    publicOptions.setValue({
-      sonarrUrl: normalizedUrl,
-      defaults: sanitized.defaults,
-      titleLanguage,
-      ui: uiOptions,
-      debugLogging,
-      isConfigured: Boolean(normalizedUrl && apiKey),
-    }),
+    publicOptions.setValue(toPublicOptions(sanitized)),
     sonarrSecrets.setValue({ apiKey }),
   ]);
 }
@@ -163,14 +125,7 @@ export async function setExtensionOptionsSnapshot(options: ExtensionOptions): Pr
  * callers never have to defensively clone structures.
  */
 export async function getPublicOptionsSnapshot(): Promise<PublicOptions> {
-  const pub = await publicOptions.getValue();
-  const merged = mergeDefaults(pub);
-  return {
-    sonarrUrl: pub.sonarrUrl,
-    defaults: merged.defaults,
-    titleLanguage: pub.titleLanguage ?? DEFAULT_TITLE_LANGUAGE,
-    ui: merged.ui,
-    debugLogging: merged.debugLogging,
-    isConfigured: pub.isConfigured,
-  };
+  const raw = await getRawOptions();
+  const parsed = parseSettings(raw);
+  return toPublicOptions(parsed);
 }

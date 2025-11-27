@@ -9,7 +9,7 @@ export interface TooltipWrapperProps {
   side?: 'top' | 'bottom' | 'left' | 'right';
   align?: 'start' | 'center' | 'end';
   sideOffset?: number;
-  container?: HTMLElement | null;
+  container?: HTMLElement | ShadowRoot | null;
   showArrow?: boolean;
   delayDuration?: number;
 }
@@ -42,8 +42,9 @@ const TooltipWrapper: React.FC<TooltipWrapperProps> = ({
 
 export const HelpTooltip: React.FC<Omit<TooltipWrapperProps, 'children'>> = props => (
   <TooltipWrapper {...props}>
-    <button type="button" className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600 cursor-pointer">
-      <CircleHelp className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+    <button type="button" className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-bg-tertiary text-text-secondary"
+>
+      <CircleHelp className="w-4 h-4 text-text-secondary" />
     </button>
   </TooltipWrapper>
 );

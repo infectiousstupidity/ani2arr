@@ -2,17 +2,21 @@
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { FormProvider, useForm } from 'react-hook-form';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import ToastProvider from '@/shared/components/toast-provider';
 import { SaveSettingsBar } from '@/shared/components/settings-form';
 import './style.css';
 import { ConfirmProvider } from '@/shared/hooks/use-confirm';
 import MappingsSection from '@/entrypoints/options/components/mappings-section';
-import { useSettingsManager } from '@/shared/hooks/use-settings-manager';
 import UiSection from '@/entrypoints/options/components/ui-section';
 import AdvancedSection from '@/entrypoints/options/components/advanced-section';
 import SonarrPage from '@/entrypoints/options/pages/sonarr';
 import RadarrPage from '@/entrypoints/options/pages/radarr';
+import { useExtensionOptions } from '@/shared/hooks/use-api-queries';
+import { createDefaultSettings } from '@/shared/schemas/settings';
+import type { SettingsFormValues } from '@/shared/schemas/settings';
+import { useSettingsActions } from '@/shared/hooks/use-settings-actions';
 
 const queryClient = new QueryClient();
 
@@ -107,38 +111,33 @@ const NavItem: React.FC<{
   </button>
 );
 
-const OptionsPage: React.FC = React.memo(() => {
-  const [activeSection, setActiveSection] = useState<SectionId>(getInitialSection);
-  const settingsManager = useSettingsManager();
-
-  useEffect(() => {
-    const handleHashChange = () => setActiveSection(resolveSectionFromHash(window.location.hash));
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
-
-  useEffect(() => {
-    const section = sections.find(entry => entry.id === activeSection) ?? sections[0];
-    if (!section) return;
-    const url = new URL(window.location.href);
-    url.hash = section.path;
-    window.history.replaceState(null, '', url);
-    document.title = `ani2arr – ${section.label}`;
-  }, [activeSection]);
+type OptionsContentProps = {
+  activeSection: SectionId;
+  setActiveSection: (id: SectionId) => void;
+  optionsQuery: ReturnType<typeof useExtensionOptions>;
+};
+const OptionsContent: React.FC<OptionsContentProps> = ({ activeSection, setActiveSection, optionsQuery }) => {
+  const actions = useSettingsActions(optionsQuery.data ? { savedSettings: optionsQuery.data } : {});
 
   const renderSection = () => {
     switch (activeSection) {
       case 'sonarr':
-        return <SonarrPage manager={settingsManager} />;
+        return (
+          <SonarrPage
+            actions={actions}
+            {...(optionsQuery.data ? { savedSettings: optionsQuery.data } : {})}
+            isLoading={optionsQuery.isLoading}
+          />
+        );
       case 'radarr':
         return <RadarrPage />;
       case 'mappings':
         return <MappingsSection />;
       case 'ui':
-        return <UiSection manager={settingsManager} />;
+        return <UiSection />;
       case 'advanced':
       default:
-        return <AdvancedSection manager={settingsManager} />;
+        return <AdvancedSection actions={actions} />;
     }
   };
 
@@ -169,17 +168,55 @@ const OptionsPage: React.FC = React.memo(() => {
           </nav>
           <div className="rounded-lg border border-border-primary bg-bg-secondary/70 p-3 text-xs text-text-secondary">
             <p className="font-semibold text-text-primary">Tip</p>
-            <p className="mt-1">
-              Settings are global. Per-title behaviour stays in the media modal.
-            </p>
+            <p className="mt-1">Settings are global. Per-title behaviour stays in the media modal.</p>
           </div>
         </aside>
         <main className="flex-1 space-y-4 pb-12">
           {renderSection()}
-          {shouldShowSaveBar ? <SaveSettingsBar manager={settingsManager} /> : null}
+          {shouldShowSaveBar ? <SaveSettingsBar actions={actions} isLoading={optionsQuery.isLoading} /> : null}
         </main>
       </div>
     </div>
+  );
+};
+
+const OptionsPage: React.FC = React.memo(() => {
+  const [activeSection, setActiveSection] = useState<SectionId>(getInitialSection);
+  const optionsQuery = useExtensionOptions();
+  const methods = useForm<SettingsFormValues>({
+    defaultValues: (optionsQuery.data ?? createDefaultSettings()) as SettingsFormValues,
+    mode: 'onChange',
+  });
+
+  useEffect(() => {
+    const handleHashChange = () => setActiveSection(resolveSectionFromHash(window.location.hash));
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    const section = sections.find(entry => entry.id === activeSection) ?? sections[0];
+    if (!section) return;
+    const url = new URL(window.location.href);
+    url.hash = section.path;
+    window.history.replaceState(null, '', url);
+    document.title = `ani2arr - ${section.label}`;
+  }, [activeSection]);
+
+  useEffect(() => {
+    if (optionsQuery.data && !methods.formState.isDirty) {
+      methods.reset(optionsQuery.data as SettingsFormValues);
+    }
+  }, [methods, optionsQuery.data]);
+
+  return (
+    <FormProvider {...methods}>
+      <OptionsContent
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        optionsQuery={optionsQuery}
+      />
+    </FormProvider>
   );
 });
 OptionsPage.displayName = 'OptionsPage';

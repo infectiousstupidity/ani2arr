@@ -259,30 +259,33 @@ export function useMediaModalProps(
 
   const initialForm: SonarrFormState = useMemo(() => {
     if (panelMode === 'edit' && fullSeries) {
+      // In edit mode, derive form values ONLY from the series object.
+      // Do NOT merge with defaultForm to avoid reactivity to options changes.
       return {
-        ...defaultForm,
         qualityProfileId:
           typeof fullSeries.qualityProfileId === 'number' && Number.isFinite(fullSeries.qualityProfileId)
             ? fullSeries.qualityProfileId
-            : defaultForm.qualityProfileId,
+            : '',
         rootFolderPath: resolvedRootFolder,
-        seriesType: fullSeries.seriesType ?? defaultForm.seriesType,
+        seriesType: fullSeries.seriesType ?? 'anime',
         monitorOption:
           fullSeries.monitored === false
             ? 'none'
-            : (fullSeries.addOptions?.monitor as SonarrFormState['monitorOption']) ?? defaultForm.monitorOption,
+            : (fullSeries.addOptions?.monitor as SonarrFormState['monitorOption']) ?? 'all',
         seasonFolder:
-          typeof fullSeries.seasonFolder === 'boolean' ? fullSeries.seasonFolder : defaultForm.seasonFolder,
-        searchForMissingEpisodes: defaultForm.searchForMissingEpisodes,
-        searchForCutoffUnmet: defaultForm.searchForCutoffUnmet,
+          typeof fullSeries.seasonFolder === 'boolean' ? fullSeries.seasonFolder : true,
+        searchForMissingEpisodes: true,
+        searchForCutoffUnmet: false,
         tags: Array.isArray(fullSeries.tags)
           ? fullSeries.tags.filter((tag): tag is number => typeof tag === 'number')
-          : defaultForm.tags,
+          : [],
+        freeformTags: [],
       };
     }
 
+    // In add mode, use live defaults
     return defaultForm;
-  }, [defaultForm, fullSeries, panelMode, resolvedRootFolder]);
+  }, [panelMode, fullSeries, resolvedRootFolder, defaultForm]);
 
   // Return null if required data is missing (but allow modal to render even when closed)
   if (!anilistId || !title) {

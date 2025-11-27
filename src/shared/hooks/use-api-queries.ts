@@ -1,4 +1,4 @@
-// src/hooks/use-api-queries.ts
+// src/shared/hooks/use-api-queries.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -6,9 +6,11 @@ import { getAni2arrApi } from '@/rpc';
 import {
   getExtensionOptionsSnapshot,
   getPublicOptionsSnapshot,
+  parseSettings,
   publicOptions,
   setExtensionOptionsSnapshot,
   sonarrSecrets,
+  toPublicOptions,
 } from '@/shared/utils/storage';
 import type {
   AniMedia,
@@ -23,11 +25,11 @@ import type {
   SonarrSeries,
   TestConnectionPayload,
   MappingOverrideRecord,
-  UiOptions,
 } from '@/shared/types';
 import type { AddInput, UpdateSonarrInput, StatusInput, SetMappingOverrideInput, ClearMappingOverrideInput } from '@/rpc/schemas';
 import { normalizeError } from '@/shared/utils/error-handling';
 import { logger } from '@/shared/utils/logger';
+import type { Settings } from '@/shared/schemas/settings';
 
 const rootQueryKey = ['a2a'] as const;
 
@@ -52,19 +54,6 @@ const normalizeMetadataKey = (metadata?: MediaMetadataHint | null) => {
 };
 
 const seriesStatusBaseKey = (anilistId: number) => [...rootQueryKey, 'seriesStatus', anilistId] as const;
-
-const defaultUiOptions: UiOptions = {
-  browseOverlayEnabled: true,
-  badgeVisibility: 'always',
-  headerInjectionEnabled: true,
-  modalEnabled: true,
-};
-
-const mergeUiOptions = (ui?: UiOptions): UiOptions => ({
-  ...defaultUiOptions,
-  ...(ui ?? {}),
-  badgeVisibility: ui?.badgeVisibility === 'hover' || ui?.badgeVisibility === 'hidden' ? ui.badgeVisibility : 'always',
-});
 
 export const queryKeys = {
   all: rootQueryKey,
@@ -111,16 +100,30 @@ const useSyncExtensionOptionsQuery = (queryClient: QueryClient): void => {
 
 const useSyncPublicOptionsQuery = (queryClient: QueryClient): void => {
   useEffect(() => {
-    const unsubscribe = publicOptions.watch(newValue => {
-      queryClient.setQueryData(queryKeys.publicOptions(), {
-        ...newValue,
-        titleLanguage: newValue?.titleLanguage ?? 'english',
-        ui: mergeUiOptions(newValue?.ui),
-        debugLogging: newValue?.debugLogging ?? false,
-      } satisfies PublicOptions);
-      logger.configure({ enabled: (newValue?.debugLogging ?? false) || import.meta.env.DEV });
-    });
-    return () => unsubscribe();
+    let active = true;
+
+    const refreshPublicOptions = async () => {
+      const snapshot = await getPublicOptionsSnapshot();
+      if (!active) return;
+      queryClient.setQueryData(queryKeys.publicOptions(), snapshot);
+      logger.configure({ enabled: snapshot.debugLogging || import.meta.env.DEV });
+    };
+
+    const unsubscribes = [
+      publicOptions.watch(() => {
+        void refreshPublicOptions();
+      }),
+      sonarrSecrets.watch(() => {
+        void refreshPublicOptions();
+      }),
+    ];
+
+    void refreshPublicOptions();
+
+    return () => {
+      active = false;
+      for (const unsubscribe of unsubscribes) unsubscribe();
+    };
   }, [queryClient]);
 };
 
@@ -250,7 +253,7 @@ export const useAniListMedia = (
 
 export const useExtensionOptions = () => {
   const queryClient = useQueryClient();
-  const query = useQuery({
+  const query = useQuery<Settings>({
     queryKey: queryKeys.options(),
     queryFn: () => getExtensionOptionsSnapshot(),
     staleTime: Infinity,
@@ -407,7 +410,7 @@ export const useTestConnection = () => {
 export const useSaveOptions = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<void, ExtensionError, ExtensionOptions, { previousOptions: ExtensionOptions | undefined }>({
+  return useMutation<void, ExtensionError, ExtensionOptions, { previousOptions: Settings | undefined }>({
     mutationFn: async (options: ExtensionOptions) => {
       try {
         await setExtensionOptionsSnapshot(options);
@@ -422,32 +425,19 @@ export const useSaveOptions = () => {
         queryClient.cancelQueries({ queryKey: queryKeys.options() }),
         queryClient.cancelQueries({ queryKey: queryKeys.publicOptions() }),
       ]);
-      const previousOptions = queryClient.getQueryData<ExtensionOptions>(queryKeys.options());
-      queryClient.setQueryData(queryKeys.options(), newOptions);
-      queryClient.setQueryData(queryKeys.publicOptions(), {
-        sonarrUrl: newOptions.sonarrUrl,
-        defaults: newOptions.defaults,
-        titleLanguage: newOptions.titleLanguage,
-        ui: mergeUiOptions(newOptions.ui),
-        debugLogging: newOptions.debugLogging ?? false,
-        isConfigured: Boolean(newOptions.sonarrUrl && newOptions.sonarrApiKey),
-      } satisfies PublicOptions);
+      const previousOptions = queryClient.getQueryData<Settings>(queryKeys.options());
+      const nextSettings = parseSettings(newOptions);
+      const nextPublicOptions = toPublicOptions(nextSettings);
+      queryClient.setQueryData(queryKeys.options(), nextSettings);
+      queryClient.setQueryData(queryKeys.publicOptions(), nextPublicOptions);
       return { previousOptions };
     },
 
     onError: (_err, _newOptions, context) => {
       if (context?.previousOptions) {
-        queryClient.setQueryData(queryKeys.options(), context.previousOptions);
-        queryClient.setQueryData(queryKeys.publicOptions(), {
-          sonarrUrl: context.previousOptions.sonarrUrl,
-          defaults: context.previousOptions.defaults,
-          titleLanguage: context.previousOptions.titleLanguage,
-          ui: mergeUiOptions(context.previousOptions.ui),
-          debugLogging: context.previousOptions.debugLogging ?? false,
-          isConfigured: Boolean(
-            context.previousOptions.sonarrUrl && context.previousOptions.sonarrApiKey,
-          ),
-        } satisfies PublicOptions);
+        const fallback = parseSettings(context.previousOptions);
+        queryClient.setQueryData(queryKeys.options(), fallback);
+        queryClient.setQueryData(queryKeys.publicOptions(), toPublicOptions(fallback));
       }
     },
 

@@ -35,10 +35,7 @@ export const ToastProvider: React.FC<React.PropsWithChildren> = ({ children }) =
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const showToast = useCallback((opts: ShowToastOptions) => {
-    type CryptoWithRandomUUID = typeof crypto & { randomUUID?: () => string }
-    const uuid = typeof crypto !== 'undefined' && (crypto as CryptoWithRandomUUID).randomUUID
-      ? (crypto as CryptoWithRandomUUID).randomUUID!()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+    const uuid = crypto.randomUUID()
 
     const toast: Toast = {
       id: uuid,

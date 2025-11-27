@@ -6,13 +6,25 @@
  */
 
 import { browser } from "wxt/browser";
+import * as v from "valibot";
 
 type Ok<T> = { ok: true; value: T };
 type Err = { ok: false; error: string };
 
+const urlSchema = v.pipe(
+  v.string(),
+  v.nonEmpty("URL cannot be empty."),
+  v.url("Invalid URL format.")
+);
+
 function normalizeUrl(input: string): Ok<{ normalized: string; url: URL }> | Err {
   const raw = input.trim();
-  if (raw.length === 0) return { ok: false, error: "URL cannot be empty." };
+
+  const parsedResult = v.safeParse(urlSchema, raw);
+  if (!parsedResult.success) {
+    const first = parsedResult.issues?.[0];
+    return { ok: false, error: (first && String(first.message)) || "Invalid URL format." };
+  }
 
   let parsed: URL;
   try {
@@ -47,10 +59,16 @@ export function validateUrl(url: string): { isValid: boolean; error?: string; no
 }
 
 export function validateApiKey(apiKey: string): { isValid: boolean; error?: string } {
-  const v = apiKey.trim();
-  if (v.length === 0) return { isValid: false, error: "API key cannot be empty." };
-  if (!/^[a-fA-F0-9]{32}$/.test(v)) {
-    return { isValid: false, error: "API key must be a 32-character hexadecimal string." };
+  const keySchema = v.pipe(
+    v.string(),
+    v.nonEmpty("API key cannot be empty."),
+    v.regex(/^[a-fA-F0-9]{32}$/, "API key must be a 32-character hexadecimal string.")
+  );
+
+  const parsed = v.safeParse(keySchema, apiKey.trim());
+  if (!parsed.success) {
+    const first = parsed.issues?.[0];
+    return { isValid: false, error: (first && String(first.message)) || "Invalid API key." };
   }
   return { isValid: true };
 }
