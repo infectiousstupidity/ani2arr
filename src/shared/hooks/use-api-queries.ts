@@ -33,24 +33,33 @@ import type { Settings } from '@/shared/schemas/settings';
 
 const rootQueryKey = ['a2a'] as const;
 
+// Normalize strings to ensure "Show Name" and "show name " hit the same cache
 const normalizeTitleKey = (title?: string) => {
   const trimmed = title?.trim();
   return trimmed ? trimmed.toLowerCase() : '::';
 };
 
-const normalizeMetadataKey = (metadata?: MediaMetadataHint | null) => {
-  if (!metadata) return '::';
-  const titles = metadata.titles ?? {};
-  const english = typeof titles?.english === 'string' ? titles.english.trim() : '';
-  const romaji = typeof titles?.romaji === 'string' ? titles.romaji.trim() : '';
-  const native = typeof titles?.native === 'string' ? titles.native.trim() : '';
-  const synonyms = Array.isArray(metadata.synonyms) ? metadata.synonyms.slice(0, 5).join('|') : '';
-  const startYear = metadata.startYear ?? '';
-  const format = metadata.format ?? '';
-  const prequels = Array.isArray(metadata.relationPrequelIds)
-    ? metadata.relationPrequelIds.join(',')
-    : '';
-  return [english, romaji, native, synonyms, startYear, format, prequels].join('~');
+// Create a deterministic subset of metadata for cache stability.
+// This prevents cache misses caused by:
+// 1. Reference instability (new objects with same content)
+// 2. undefined vs null inconsistencies
+// 3. Unstable array ordering (prequel IDs)
+// 4. Irrelevant fields (coverImage, etc.)
+const getStableMetadata = (metadata?: MediaMetadataHint | null) => {
+  if (!metadata) return null;
+  return {
+    titles: {
+      english: metadata.titles?.english?.trim() || null,
+      romaji: metadata.titles?.romaji?.trim() || null,
+      native: metadata.titles?.native?.trim() || null,
+    },
+    startYear: metadata.startYear || null,
+    format: metadata.format || null,
+    // Limit synonyms to 5 to match backend matching logic and reduce cache fragmentation
+    synonyms: (metadata.synonyms || []).slice(0, 5),
+    // Sort numeric IDs to ensure array order doesn't affect cache identity
+    prequelIds: (metadata.relationPrequelIds || []).slice().sort((a, b) => a - b),
+  };
 };
 
 const seriesStatusBaseKey = (anilistId: number) => [...rootQueryKey, 'seriesStatus', anilistId] as const;
@@ -64,8 +73,12 @@ export const queryKeys = {
   seriesStatusBase: seriesStatusBaseKey,
   seriesStatus: (payload: CheckSeriesStatusPayload) => [
     ...seriesStatusBaseKey(payload.anilistId),
-    normalizeTitleKey(payload.title),
-    normalizeMetadataKey(payload.metadata),
+    { 
+      // TanStack Query hashes this object. By using normalized inputs, 
+      // we ensure cache hits across different contexts (e.g. Card vs Page).
+      title: normalizeTitleKey(payload.title), 
+      metadata: getStableMetadata(payload.metadata) 
+    }
   ] as const,
   sonarrMetadata: (scope?: string) => [...rootQueryKey, 'sonarrMetadata', scope ?? 'configured'] as const,
   mappingSearch: (service: 'sonarr' | 'radarr', query: string) =>

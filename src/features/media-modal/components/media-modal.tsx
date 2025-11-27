@@ -279,7 +279,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
       <ModalContent
         container={portalContainer ?? null}
         floatingPortalRef={handleFloatingPortalRef}
-        className="w-full max-w-[1000px] h-[80vh] flex flex-col overflow-hidden rounded-none bg-bg-primary shadow-2xl shadow-black/40 p-0 sm:h-[vh] sm:min-h-[720px] sm:rounded-2xl"
+        className="w-full max-w-[1000px] h-[74vh] flex flex-col overflow-hidden rounded-none bg-bg-primary shadow-2xl shadow-black/40 p-0 sm:h-[vh] sm:min-h-[720px] sm:rounded-2xl"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
         }}
@@ -309,7 +309,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           tooltipContainer={floatingPortalEl ?? (portalContainer instanceof HTMLElement ? portalContainer : null)}
         />
         {/* Content Area - split view with sticky preview and inline content */}
-        <div className="flex-1 overflow-hidden px-8 pb-6">
+        <div className="flex-1 overflow-hidden px-8">
           <div className="mx-auto flex h-full max-w-[1000px] flex-col gap-6">
             <div className="grid h-full grid-cols-2 gap-6">
               <div className="flex h-full flex-col overflow-hidden">
