@@ -53,12 +53,12 @@ const getStableMetadata = (metadata?: MediaMetadataHint | null) => {
       romaji: metadata.titles?.romaji?.trim() || null,
       native: metadata.titles?.native?.trim() || null,
     },
-    startYear: metadata.startYear || null,
-    format: metadata.format || null,
+    startYear: metadata.startYear ?? null,
+    format: metadata.format ?? null,
     // Limit synonyms to 5 to match backend matching logic and reduce cache fragmentation
     synonyms: (metadata.synonyms || []).slice(0, 5),
     // Sort numeric IDs to ensure array order doesn't affect cache identity
-    prequelIds: (metadata.relationPrequelIds || []).slice().sort((a, b) => a - b),
+    relationPrequelIds: (metadata.relationPrequelIds || []).slice().sort((a, b) => a - b),
   };
 };
 
