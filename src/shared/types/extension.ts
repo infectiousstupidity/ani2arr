@@ -36,7 +36,7 @@ export interface ExtensionOptions {
   defaults: SonarrFormState;
   titleLanguage: TitleLanguage;
   ui: UiOptions;
-  debugLogging: boolean | undefined;
+  debugLogging: boolean;
 }
 
 /**
@@ -48,7 +48,7 @@ export interface PublicOptions {
   defaults: SonarrFormState;
   titleLanguage: TitleLanguage;
   ui: UiOptions;
-  debugLogging: boolean | undefined;
+  debugLogging: boolean;
   /**
    * Indicates whether the user has completed Sonarr setup (URL + API key).
    * This is derived in the background and mirrored into public storage.

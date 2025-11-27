@@ -1,16 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import { browser } from 'wxt/browser';
+import { useFormContext, useWatch } from 'react-hook-form';
 import Button from '@/shared/components/button';
 import TooltipWrapper from '@/shared/components/tooltip';
-import type { SettingsManager } from '@/shared/components/settings-form';
 import { useConfirm } from '@/shared/hooks/use-confirm';
 import { useToast } from '@/shared/components/toast-provider';
+import type { SettingsFormValues } from '@/shared/schemas/settings';
+import type { SettingsActions } from '@/shared/hooks/use-settings-actions';
 
-const AdvancedSection: React.FC<{ manager: SettingsManager }> = ({ manager }) => {
+const AdvancedSection: React.FC<{ actions: SettingsActions }> = ({ actions }) => {
   const confirm = useConfirm();
   const toast = useToast();
   const [isResetting, setIsResetting] = useState(false);
   const version = useMemo(() => browser.runtime.getManifest()?.version ?? 'unknown', []);
+  const methods = useFormContext<SettingsFormValues>();
+  const debugLogging = Boolean(useWatch({ control: methods.control, name: 'debugLogging' as const }));
 
   const handleReset = async () => {
     const shouldReset = await confirm({
@@ -22,7 +26,7 @@ const AdvancedSection: React.FC<{ manager: SettingsManager }> = ({ manager }) =>
     if (!shouldReset) return;
     setIsResetting(true);
     try {
-      await manager.handleResetAll();
+      await actions.handleReset();
       toast.showToast({
         title: 'Settings reset',
         description: 'ani2arr settings returned to defaults.',
@@ -73,8 +77,8 @@ const AdvancedSection: React.FC<{ manager: SettingsManager }> = ({ manager }) =>
             <input
               type="checkbox"
               className="h-4 w-4"
-              checked={Boolean(manager.formState.debugLogging)}
-              onChange={(e) => manager.setDebugLogging(e.target.checked)}
+              checked={debugLogging}
+              onChange={(e) => methods.setValue('debugLogging', e.target.checked, { shouldDirty: true })}
             />
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-primary pt-3">
@@ -83,7 +87,7 @@ const AdvancedSection: React.FC<{ manager: SettingsManager }> = ({ manager }) =>
               className="text-error border-error"
               onClick={handleReset}
               isLoading={isResetting}
-              disabled={manager.saveState.isPending}
+              disabled={actions.saveState.isPending}
             >
               Reset all settings
             </Button>

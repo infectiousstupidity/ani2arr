@@ -1,7 +1,9 @@
 import React from 'react';
+import { useFormContext, useWatch } from 'react-hook-form';
 import TooltipWrapper from '@/shared/components/tooltip';
-import type { SettingsManager } from '@/shared/components/settings-form';
 import type { BadgeVisibility } from '@/shared/types';
+import type { SettingsFormValues } from '@/shared/schemas/settings';
+import { defaultUiOptions } from '@/shared/schemas/settings';
 
 const BadgeToggle: React.FC<{
   value: BadgeVisibility;
@@ -33,8 +35,17 @@ const BadgeToggle: React.FC<{
   );
 };
 
-const UiSection: React.FC<{ manager: SettingsManager }> = ({ manager }) => {
-  const ui = manager.formState.ui;
+const UiSection: React.FC = () => {
+  const methods = useFormContext<SettingsFormValues>();
+  const ui = (useWatch<SettingsFormValues>({ control: methods.control, name: 'ui' as const }) ??
+    defaultUiOptions()) as SettingsFormValues['ui'];
+  const setUiValue = <K extends keyof SettingsFormValues['ui']>(key: K, value: SettingsFormValues['ui'][K]) => {
+    methods.setValue(
+      'ui',
+      { ...ui, [key]: value } as SettingsFormValues['ui'],
+      { shouldDirty: true },
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -71,14 +82,14 @@ const UiSection: React.FC<{ manager: SettingsManager }> = ({ manager }) => {
               type="checkbox"
               className="h-4 w-4"
               checked={ui.browseOverlayEnabled}
-              onChange={(e) => manager.handleUiChange('browseOverlayEnabled', e.target.checked)}
+              onChange={(e) => setUiValue('browseOverlayEnabled', e.target.checked)}
             />
           </div>
           <fieldset className="space-y-2" disabled={!ui.browseOverlayEnabled}>
             <legend className="text-xs font-medium text-text-secondary">Badge visibility</legend>
             <BadgeToggle
               value={ui.badgeVisibility}
-              onChange={(value) => manager.handleUiChange('badgeVisibility', value)}
+              onChange={(value) => setUiValue('badgeVisibility', value)}
             />
           </fieldset>
         </div>
@@ -104,7 +115,7 @@ const UiSection: React.FC<{ manager: SettingsManager }> = ({ manager }) => {
                 type="checkbox"
                 className="h-4 w-4"
                 checked={ui.headerInjectionEnabled}
-                onChange={(e) => manager.handleUiChange('headerInjectionEnabled', e.target.checked)}
+                onChange={(e) => setUiValue('headerInjectionEnabled', e.target.checked)}
               />
             </div>
           </div>

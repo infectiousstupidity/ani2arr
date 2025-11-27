@@ -25,12 +25,14 @@ export const FormField: React.FC<{ children: React.ReactNode }> = ({ children })
 export const Label = React.forwardRef<
   React.ComponentRef<typeof LabelPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root>
->(({ className = '', ...props }, ref) => {
-  const { id } = useFormField();
+>(({ className = '', htmlFor, ...props }, ref) => {
+  const context = useContext(FormItemContext);
+  const derivedId = htmlFor ?? context?.id;
+
   return (
     <LabelPrimitive.Root
       ref={ref}
-      htmlFor={id}
+      htmlFor={derivedId}
       className={`block text-sm font-medium text-text-primary mb-2 ${className}`}
       {...props}
     />
@@ -38,19 +40,20 @@ export const Label = React.forwardRef<
 });
 Label.displayName = 'FormLabel';
 
-export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
-  ({ className = '', ...props }, ref) => {
-    const { id } = useFormField();
-    return (
-      <input
-        id={id}
-        ref={ref}
-        className={`flex h-10 w-full rounded-md bg-bg-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent-primary/20 ${className}`}
-        {...props}
-      />
-    );
-  }
-);
+export const Input = React.forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement>
+>(({ className = '', ...props }, ref) => {
+  const { id } = useFormField();
+  return (
+    <input
+      id={id}
+      ref={ref}
+      className={`flex h-10 w-full rounded-md bg-bg-tertiary px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent-primary/20 ${className}`}
+      {...props}
+    />
+  );
+});
 Input.displayName = 'Input';
 
 const Switch = React.forwardRef<
@@ -71,8 +74,11 @@ const Switch = React.forwardRef<
 });
 Switch.displayName = 'Switch';
 
-// --- Select Primitive Wrappers ---
-const SelectTrigger = React.forwardRef<
+// --- 3. Select Primitives ---
+
+export const Select = SelectPrimitive.Root;
+
+export const SelectTrigger = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
 >(({ className = '', children, ...props }, ref) => {
@@ -93,9 +99,11 @@ const SelectTrigger = React.forwardRef<
 });
 SelectTrigger.displayName = 'SelectTrigger';
 
-const SelectContent = React.forwardRef<
+export const SelectContent = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & { container?: HTMLElement | ShadowRoot | null | undefined }
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
+    container?: HTMLElement | ShadowRoot | null | undefined;
+  }
 >(({ className = '', children, container, position = 'popper', ...props }, ref) => (
   <SelectPrimitive.Portal container={container as HTMLElement | ShadowRoot | null}>
     <SelectPrimitive.Content
@@ -104,13 +112,15 @@ const SelectContent = React.forwardRef<
       className={`relative z-50 min-w-(--radix-select-trigger-width) overflow-hidden rounded-md border border-bg-primary bg-bg-secondary text-text-primary shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ${className}`}
       {...props}
     >
-      <SelectPrimitive.Viewport className="w-full p-1">{children}</SelectPrimitive.Viewport>
+      <SelectPrimitive.Viewport className="w-full p-1">
+        {children}
+      </SelectPrimitive.Viewport>
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
 ));
 SelectContent.displayName = 'SelectContent';
 
-const SelectItem = React.forwardRef<
+export const SelectItem = React.forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
 >(({ className = '', children, ...props }, ref) => (
@@ -124,12 +134,15 @@ const SelectItem = React.forwardRef<
         <Check className="h-4 w-4" />
       </SelectPrimitive.ItemIndicator>
     </span>
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    {/* Using asChild allows consumers to pass flex containers or complex layouts if needed */}
+    <SelectPrimitive.ItemText asChild>
+      <span className="flex-1 truncate">{children}</span>
+    </SelectPrimitive.ItemText>
   </SelectPrimitive.Item>
 ));
 SelectItem.displayName = 'SelectItem';
 
-// --- 3. HIGH LEVEL COMPOSITES ---
+// --- 4. HIGH LEVEL COMPOSITES ---
 
 interface FieldProps {
   label: string;
@@ -137,51 +150,114 @@ interface FieldProps {
   description?: React.ReactNode;
 }
 
-export const InputField = React.forwardRef<HTMLInputElement, FieldProps & React.ComponentProps<typeof Input>>(
-  ({ label, className, description, ...props }, ref) => (
+export const InputField = React.forwardRef<
+  HTMLInputElement,
+  FieldProps & React.ComponentProps<typeof Input>
+>(({ label, className, description, ...props }, ref) => {
+  const descriptionId = useId();
+
+  return (
     <FormField>
       <div className={`space-y-3 ${className}`}>
         <Label>{label}</Label>
-        <Input ref={ref} {...props} />
-        {description && <p className="text-xs text-text-secondary">{description}</p>}
+        <Input
+          ref={ref}
+          {...props}
+          aria-describedby={description ? descriptionId : undefined}
+        />
+        {description && (
+          <p id={descriptionId} className="text-xs text-text-secondary">
+            {description}
+          </p>
+        )}
       </div>
     </FormField>
-  )
-);
+  );
+});
 InputField.displayName = 'InputField';
 
 type SwitchFieldExtraProps = {
   labelHelp?: React.ReactNode;
   labelHelpDelay?: number;
   labelHelpContainer?: HTMLElement | ShadowRoot | null;
+  /**
+   * Custom onChange handler (value: boolean) to replace standard DOM onChange
+   */
+  onChange?: (checked: boolean) => void;
 };
 
 export const SwitchField = React.forwardRef<
   React.ComponentRef<typeof Switch>,
-  FieldProps & React.ComponentProps<typeof Switch> & SwitchFieldExtraProps
->(({ label, className, description, labelHelp, labelHelpDelay, labelHelpContainer, ...props }, ref) => (
-    <FormField>
-      <div className={`flex flex-col items-center justify-center rounded-lg bg-bg-tertiary p-3 text-center ${className}`}>
-        {labelHelp ? (
-          <TooltipWrapper content={labelHelp} container={labelHelpContainer as HTMLElement | null} delayDuration={labelHelpDelay ?? 500}>
-            <Label className="mb-2 text-xs text-text-secondary cursor-help">{label}</Label>
-          </TooltipWrapper>
-        ) : (
-          <Label className="mb-2 text-xs text-text-secondary">{label}</Label>
-        )}
-        <Switch ref={ref} {...props} />
-        {description && <div className="mt-1 text-xs text-text-secondary">{description}</div>}
-      </div>
-    </FormField>
-  )
+  FieldProps & Omit<React.ComponentProps<typeof Switch>, 'onChange'> & SwitchFieldExtraProps
+>(
+  (
+    {
+      label,
+      className,
+      description,
+      labelHelp,
+      labelHelpDelay,
+      labelHelpContainer,
+      onChange,
+      onCheckedChange,
+      ...props
+    },
+    ref
+  ) => {
+    const descriptionId = useId();
+    const effectiveOnCheckedChange = onCheckedChange ?? onChange;
+
+    const switchProps = {
+      ...props,
+      ...(effectiveOnCheckedChange ? { onCheckedChange: effectiveOnCheckedChange } : {}),
+    };
+
+    return (
+      <FormField>
+        <div
+          className={`flex flex-col items-center justify-center rounded-lg bg-bg-tertiary p-3 text-center ${className}`}
+        >
+          {labelHelp ? (
+            <TooltipWrapper
+              content={labelHelp}
+              container={labelHelpContainer as HTMLElement | null}
+              delayDuration={labelHelpDelay ?? 500}
+            >
+              <Label className="mb-2 text-xs text-text-secondary cursor-help">
+                {label}
+              </Label>
+            </TooltipWrapper>
+          ) : (
+            <Label className="mb-2 text-xs text-text-secondary">{label}</Label>
+          )}
+          <Switch
+            ref={ref}
+            {...switchProps}
+            aria-describedby={description ? descriptionId : undefined}
+          />
+          {description && (
+            <div id={descriptionId} className="mt-1 text-xs text-text-secondary">
+              {description}
+            </div>
+          )}
+        </div>
+      </FormField>
+    );
+  }
 );
 SwitchField.displayName = 'SwitchField';
 
-interface SelectFieldProps extends FieldProps, React.ComponentProps<typeof SelectPrimitive.Root> {
+interface SelectFieldProps
+  extends FieldProps,
+    Omit<React.ComponentProps<typeof SelectPrimitive.Root>, 'onChange'> {
   placeholder?: string;
   options: Array<{ value: string; label: string; description?: string }>;
   container?: HTMLElement | ShadowRoot | null;
   triggerClassName?: string;
+  /**
+   * Alias for onValueChange
+   */
+  onChange?: (value: string) => void;
 }
 
 export const SelectField: React.FC<SelectFieldProps> = ({
@@ -192,36 +268,43 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   className,
   triggerClassName,
   description,
+  onChange,
+  onValueChange,
   ...props
 }) => {
-  // Helper to find label for display if needed
-  const selectedLabel = options.find(o => o.value === props.value)?.label;
+  const descriptionId = useId();
+  const effectiveOnValueChange = onValueChange ?? onChange;
+
+  // Fix: Create rootProps to conditionally include onValueChange
+  const rootProps = {
+    ...props,
+    ...(effectiveOnValueChange ? { onValueChange: effectiveOnValueChange } : {}),
+  };
 
   return (
     <FormField>
       <div className={`space-y-3 ${className}`}>
         <Label>{label}</Label>
-        <SelectPrimitive.Root {...props}>
-          <SelectTrigger className={triggerClassName}>
-             {/* Handle complex display logic via children or default to Value */}
-            <SelectPrimitive.Value placeholder={placeholder}>
-              {selectedLabel}
-            </SelectPrimitive.Value>
+        <Select {...rootProps}>
+          <SelectTrigger
+            className={triggerClassName}
+            aria-describedby={description ? descriptionId : undefined}
+          >
+            <SelectPrimitive.Value placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent container={container}>
             {options.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
-                <div className="flex w-full items-center justify-between gap-4">
-                  <span>{opt.label}</span>
-                  {opt.description && (
-                    <span className="text-xs text-text-tertiary opacity-70">{opt.description}</span>
-                  )}
-                </div>
+                {opt.label}
               </SelectItem>
             ))}
           </SelectContent>
-        </SelectPrimitive.Root>
-        {description && <div className="text-xs text-text-secondary">{description}</div>}
+        </Select>
+        {description && (
+          <div id={descriptionId} className="text-xs text-text-secondary">
+            {description}
+          </div>
+        )}
       </div>
     </FormField>
   );

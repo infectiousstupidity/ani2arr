@@ -1,3 +1,6 @@
+import type { InferOutput } from 'valibot';
+import { SettingsSchema } from '@/shared/schemas/settings';
+
 export type {
   AniFormat,
   AniMedia,
@@ -54,3 +57,5 @@ export {
   type CardOverlayProps,
   type ParsedCard,
 } from './browse-overlay';
+
+export type Settings = InferOutput<typeof SettingsSchema>;
