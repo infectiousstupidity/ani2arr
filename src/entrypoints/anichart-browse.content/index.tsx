@@ -196,7 +196,7 @@ const BrowseRoot: React.FC<BrowseRootProps> = ({ portalContainer }) => {
           mediaModal.open({ anilistId, title, initialTab: initialTab ?? 'series', metadata });
         }}
       />
-      {modalEnabled && mediaModal.state && modalProps && (
+      {modalEnabled && portalContainer && mediaModal.state && modalProps && (
         <MediaModal
           isOpen={mediaModal.state.isOpen}
           onClose={mediaModal.reset}
@@ -291,14 +291,16 @@ export default defineContentScript({
         anchor: 'body',
         onMount: (container: HTMLElement, shadow: ShadowRoot) => {
           ensureShadowStyles(shadow);
+          // Keep portals inside the shadow DOM so dialog overlays render correctly
+          const portalContainer = container;
           root = createRoot(container);
           root.render(
             <React.StrictMode>
               <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
                 <TooltipProvider>
                   <ToastProvider>
-                    <ConfirmProvider portalContainer={shadow.host as HTMLElement}>
-                      <BrowseRoot portalContainer={shadow.host as HTMLElement} />
+                    <ConfirmProvider portalContainer={portalContainer}>
+                      <BrowseRoot portalContainer={portalContainer} />
                     </ConfirmProvider>
                   </ToastProvider>
                 </TooltipProvider>
