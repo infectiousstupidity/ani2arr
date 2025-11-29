@@ -102,8 +102,7 @@ export function useSonarrPanelController(
   // in options page while modal is open in edit mode.
   useEffect(() => {
     form.reset(initialForm);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, mode, tvdbId]);
+  }, [form, initialForm, mode, tvdbId]);
 
   const current = form.watch();
 
