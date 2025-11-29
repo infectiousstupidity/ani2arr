@@ -3,6 +3,7 @@ import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 import pluginReact from "eslint-plugin-react";
+import reactCompilerPlugin from 'eslint-plugin-react-compiler';
 import { defineConfig } from "eslint/config";
 import autoImports from "./.wxt/eslint-auto-imports.mjs";
 import reactYouMightNotNeedAnEffect from "eslint-plugin-react-you-might-not-need-an-effect";
@@ -32,6 +33,7 @@ export default defineConfig([
   pluginReact.configs.flat["jsx-runtime"],
   reactYouMightNotNeedAnEffect.configs.recommended,
   reactHooks.configs["recommended-latest"],
+  reactCompilerPlugin.configs.recommended,
 
   // Project-wide rules
   {
