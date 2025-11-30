@@ -1,15 +1,16 @@
 // src/features/media-modal/components/mapping-preview-panel.tsx
-import { ExternalLink, Pencil, X, Settings } from "lucide-react";
+import { ExternalLink, SquarePen, PenOff, X, Settings } from "lucide-react";
 import Button from "@/shared/components/button";
 import Pill from "@/shared/components/pill";
+import TooltipWrapper from "@/shared/components/tooltip";
+import { useMappingOverrides, useSeriesStatus } from "@/shared/hooks/use-api-queries";
 import type { MappingSearchResult } from "@/shared/types";
 import { buildExternalMediaLink } from "@/shared/utils/build-external-media-link";
 import type { AniListEntrySummary } from "../types";
-import { MultiMappingInfo } from "./multi-mapping-info";
 
 interface MappingPreviewPanelProps {
   aniListEntry: AniListEntrySummary;
-  otherAniListIds: number[];
+  
   baseUrl: string;
   currentMapping: MappingSearchResult | null;
   previewMapping: MappingSearchResult | null;
@@ -23,33 +24,52 @@ interface MappingPreviewPanelProps {
 export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.Element {
   const {
     aniListEntry,
-    otherAniListIds,
     baseUrl,
     currentMapping,
     previewMapping,
     showResetPreview,
     onResetPreview,
     onEditMapping,
+    isInMappingMode,
     portalContainer,
   } = props;
+
+  const EditIcon = isInMappingMode ? PenOff : SquarePen;
+  const editTooltip = isInMappingMode ? "Exit mapping mode" : "Edit current mapping ID";
+  const editAriaLabel = isInMappingMode ? "Exit mapping mode" : "Edit current mapping ID";
 
   const hasPreviewMapping = Boolean(previewMapping);
   const hasCurrentMapping = Boolean(currentMapping);
   const showEmptyState = !hasPreviewMapping && !hasCurrentMapping;
+  const { data: seriesStatus } = useSeriesStatus({ anilistId: aniListEntry.id });
+  const mappingOverrides = useMappingOverrides();
+
+  const overrideActiveFromStatus = seriesStatus?.overrideActive;
+  const overrideActiveFromOverrides =
+    overrideActiveFromStatus === undefined &&
+    Array.isArray(mappingOverrides.data) &&
+    mappingOverrides.data.some((record) => record.anilistId === aniListEntry.id);
+
+  const isOverridden = overrideActiveFromStatus ?? overrideActiveFromOverrides ?? false;
+  const overrideTooltip = isOverridden
+    ? "Manual override is active for this AniList entry."
+    : "Using the automatic AniList to TVDB mapping.";
 
   return (
     <div className="flex h-full flex-col">
       <div className="pb-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-              CURRENT MAPPING
+              CURRENT MAPPING FOR
             </p>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
-              <MultiMappingInfo
-                currentAniListId={aniListEntry.id}
-                linkedAniListIds={otherAniListIds}
-              />
+            <div className="flex items-center text-xs text-text-secondary">
+              <Pill small tone="muted" className="font-mono text-text-primary">{`AniList ${aniListEntry.id}`}</Pill>
+              <TooltipWrapper content={overrideTooltip} container={portalContainer ?? null}>
+                <Pill small tone={isOverridden ? "accent" : "info"} className="ml-2">
+                  {isOverridden ? "Manual" : "Auto"}
+                </Pill>
+              </TooltipWrapper>
             </div>
           </div>
 
@@ -63,12 +83,12 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
                 }}
                 variant="ghost"
                 size="icon"
-                tooltip="Edit current mapping ID"
+                tooltip={editTooltip}
                 portalContainer={portalContainer ?? undefined}
                 className="h-8 w-8 text-text-secondary hover:text-text-primary"
-                aria-label="Edit current mapping ID"
+                aria-label={editAriaLabel}
               >
-                <Pencil className="h-4 w-4" />
+                <EditIcon className="h-4 w-4" />
               </Button>
 
               <Button

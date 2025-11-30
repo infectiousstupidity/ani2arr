@@ -4,12 +4,11 @@ import { cn } from "@/shared/utils/cn";
 
 type Tone = "muted" | "success" | "warning" | "info" | "accent" | "blue" | "default";
 
-type PillProps = {
+type PillProps = React.HTMLAttributes<HTMLSpanElement> & {
   children: React.ReactNode;
   tone?: Tone;
   small?: boolean;
   icon?: React.ComponentType<{ className?: string }> | null;
-  className?: string;
 };
 
 const TONE_CLASSES: Record<Tone, string> = {
@@ -23,7 +22,7 @@ const TONE_CLASSES: Record<Tone, string> = {
 };
 
 const Pill = React.forwardRef<HTMLSpanElement, PillProps>(function Pill(props, ref) {
-  const { children, tone = "muted", small = false, icon: Icon = null, className } = props;
+  const { children, tone = "muted", small = false, icon: Icon = null, className, ...rest } = props;
 
   const base = cn(
     "inline-flex items-center justify-center whitespace-nowrap rounded-full align-middle",
@@ -33,7 +32,7 @@ const Pill = React.forwardRef<HTMLSpanElement, PillProps>(function Pill(props, r
   );
 
   return (
-    <span ref={ref} className={cn(base, TONE_CLASSES[tone], className)}>
+    <span ref={ref} className={cn(base, TONE_CLASSES[tone], className)} {...rest}>
       {Icon ? (
         <Icon className={small ? "mr-1 h-3 w-3 shrink-0" : "mr-1 h-3.5 w-3.5 shrink-0"} />
       ) : null}
