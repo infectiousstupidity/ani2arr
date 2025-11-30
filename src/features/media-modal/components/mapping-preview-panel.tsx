@@ -18,6 +18,7 @@ interface MappingPreviewPanelProps {
   showResetPreview: boolean;
   onResetPreview: () => void;
   onEditMapping: () => void;
+  portalContainer?: HTMLElement | null;
 }
 
 export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.Element {
@@ -31,7 +32,9 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
     showResetPreview,
     onResetPreview,
     onEditMapping,
+    portalContainer,
   } = props;
+
   const hasPreviewMapping = Boolean(previewMapping);
   const hasCurrentMapping = Boolean(currentMapping);
   const showEmptyState = !hasPreviewMapping && !hasCurrentMapping;
@@ -47,28 +50,17 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
               Current mapping
             </p>
             <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
-              <MultiMappingInfo currentAniListId={aniListEntry.id} linkedAniListIds={otherAniListIds} />
+              <MultiMappingInfo
+                currentAniListId={aniListEntry.id}
+                linkedAniListIds={otherAniListIds}
+              />
             </div>
           </div>
+
           <div className="flex items-center gap-2">
-            {showResetPreview ? (
-              <Button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onResetPreview();
-                }}
-                variant="ghost"
-                size="sm"
-                className="inline-flex items-center gap-2 text-sm font-medium text-text-secondary hover:text-text-primary"
-              >
-                Clear selection
-              </Button>
-            ) : null}
             <Button
               type="button"
               onClick={(e) => {
-                // Prevent parent handlers from receiving this click.
                 e.stopPropagation();
                 onEditMapping();
               }}
@@ -86,12 +78,13 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
         </div>
       </div>
 
-      <div className="flex-1 space-y-3">
+      <div className="flex-1 space-y-4">
         {hasCurrentMapping && currentMapping ? (
           <MappingPreviewCard
             mapping={currentMapping}
             baseUrl={baseUrl}
             currentAniListId={aniListEntry.id}
+            portalContainer={portalContainer ?? null}
           />
         ) : null}
 
@@ -101,6 +94,9 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
             baseUrl={baseUrl}
             currentAniListId={aniListEntry.id}
             highlight="preview"
+            showResetPreview={showResetPreview}
+            onResetPreview={onResetPreview}
+            portalContainer={portalContainer ?? null}
           />
         ) : null}
 
@@ -125,10 +121,13 @@ interface MappingPreviewCardProps {
   baseUrl: string;
   highlight?: "preview";
   currentAniListId: number;
+  showResetPreview?: boolean;
+  onResetPreview?: () => void;
+  portalContainer?: HTMLElement | null;
 }
 
 const getStatusTone = (
-  status: string
+  status: string,
 ): "muted" | "success" | "warning" | "info" | "accent" | "blue" | "default" => {
   const normalized = status.toLowerCase();
   if (normalized === "continuing") return "accent";
@@ -138,8 +137,8 @@ const getStatusTone = (
   return "default";
 };
 
-function MappingPreviewCard(props: MappingPreviewCardProps) {
-  const { mapping, baseUrl, highlight, currentAniListId } = props;
+function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
+  const { mapping, baseUrl, highlight, currentAniListId, showResetPreview, onResetPreview, portalContainer } = props;
 
   const link = buildExternalMediaLink({
     service: "sonarr",
@@ -148,17 +147,19 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
     ...(mapping.librarySlug ? { librarySlug: mapping.librarySlug } : {}),
     searchTerm: mapping.title,
   });
+
+  // Prepare pills logic
   const metadataPills: React.ReactNode[] = [];
 
   metadataPills.push(
-    <Pill key="tvdb" small tone="muted" className="font-mono text-text-primary">{`TVDB ${mapping.target.id}`}</Pill>
+    <Pill key="tvdb" small tone="muted" className="font-mono text-text-primary">{`TVDB ${mapping.target.id}`}</Pill>,
   );
 
   if (typeof mapping.year === "number" && Number.isFinite(mapping.year) && mapping.year > 0) {
     metadataPills.push(
       <Pill key="year" small tone="muted">
         {mapping.year}
-      </Pill>
+      </Pill>,
     );
   }
 
@@ -166,7 +167,7 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
     metadataPills.push(
       <Pill key="type" small tone="muted" className="text-text-secondary">
         {mapping.typeLabel}
-      </Pill>
+      </Pill>,
     );
   }
 
@@ -174,23 +175,31 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
     metadataPills.push(
       <Pill key="status" small tone={getStatusTone(mapping.statusLabel)}>
         {mapping.statusLabel}
-      </Pill>
+      </Pill>,
     );
   }
 
   if (mapping.inLibrary) {
     metadataPills.push(
-      <Pill key="library" small tone="success">{`In Sonarr${mapping.fileCount ? ` - ${mapping.fileCount} eps` : ""}`}</Pill>
+      <Pill key="library" small tone="success">{`In Sonarr${
+        mapping.fileCount ? ` - ${mapping.fileCount} eps` : ""
+      }`}</Pill>,
     );
   }
+
   const otherLinkedIds = Array.isArray(mapping.linkedAniListIds)
-    ? mapping.linkedAniListIds.filter(id => id !== currentAniListId)
+    ? mapping.linkedAniListIds.filter((id) => id !== currentAniListId)
     : [];
 
   return (
-    <div className={`overflow-hidden rounded-xl bg-bg-secondary shadow-lg shadow-black/30 ${highlight === "preview" ? "ring-1 ring-inset ring-accent-primary/40" : ""}`}>
-      <div className="flex gap-4 p-4">
-        <div className="h-40 w-28 overflow-hidden rounded-lg bg-bg-primary shadow-inner">
+    <div
+      className={`relative min-h-[230px] overflow-hidden rounded-xl bg-bg-secondary shadow-lg shadow-black/30 ${
+        highlight === "preview" ? "ring-1 ring-inset ring-accent-primary/40" : ""
+      }`}
+    >
+      <div className="flex gap-5 p-5">
+        {/* IMAGE: Kept exactly as requested */}
+        <div className="h-44 w-32 shrink-0 overflow-hidden rounded-lg bg-bg-primary shadow-inner">
           {mapping.posterUrl ? (
             <img
               src={mapping.posterUrl}
@@ -202,42 +211,74 @@ function MappingPreviewCard(props: MappingPreviewCardProps) {
           )}
         </div>
 
-        <div className="flex flex-1 items-start gap-3">
-          <div className="min-w-0 flex-1 space-y-3">
-            <div className="text-xl font-semibold leading-tight text-text-primary line-clamp-2">
+        {/* CONTENT COLUMN */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          
+          {/* ROW 1: Title & Actions */}
+          <div className="flex items-start justify-between gap-3">
+            <h3
+              className="text-xl font-semibold leading-tight text-text-primary line-clamp-2"
+              title={mapping.title}
+            >
               {mapping.title}
-            </div>
+            </h3>
 
-            {metadataPills.length ? (
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-                {metadataPills}
-              </div>
-            ) : null}
+            {/* Actions anchored top-right, separate from text flow */}
+            <div className="flex shrink-0 items-center gap-1">
+              {link ? (
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon"
+                  tooltip="Open in Sonarr"
+                  portalContainer={portalContainer ?? undefined}
+                  className="h-8 w-8 text-text-secondary hover:text-text-primary"
+                >
+                  <a href={link} target="_blank" rel="noreferrer" aria-label="Open in Sonarr">
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </Button>
+              ) : null}
 
-            <div className="text-xs leading-relaxed text-text-secondary/80 line-clamp-4">
-              {mapping.overview ?? "No overview available."}
+              {highlight === "preview" && showResetPreview ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  tooltip="Clear selection"
+                  portalContainer={portalContainer ?? undefined}
+                  className="h-8 w-8 text-text-secondary hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onResetPreview?.();
+                  }}
+                  aria-label="Clear selection"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              ) : null}
             </div>
           </div>
 
-          {link ? (
-            <Button
-              asChild
-              variant="ghost"
-              size="icon"
-              tooltip="Open in Sonarr"
-              className="shrink-0 self-start text-text-secondary hover:text-text-primary"
-            >
-              <a href={link} target="_blank" rel="noreferrer" aria-label="Open in Sonarr">
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            </Button>
+          {/* ROW 2: Metadata Pills - Full Width now */}
+          {metadataPills.length ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {metadataPills}
+            </div>
           ) : null}
+
+          {/* ROW 3: Description */}
+          <div className="mt-3 text-xs leading-relaxed text-text-secondary/80 line-clamp-4">
+            {mapping.overview ?? "No overview available."}
+          </div>
         </div>
       </div>
 
+      {/* FOOTER: Warning */}
       {otherLinkedIds.length > 0 ? (
-        <div className="px-4 pb-3 text-[10px] text-amber-200">
-          Warning: Linked to {otherLinkedIds.length} other AniList entr{otherLinkedIds.length === 1 ? "y" : "ies"}
+        <div className="px-5 pb-4 text-[10px] text-amber-200">
+          Warning: Linked to {otherLinkedIds.length} other AniList entr
+          {otherLinkedIds.length === 1 ? "y" : "ies"}
         </div>
       ) : null}
     </div>

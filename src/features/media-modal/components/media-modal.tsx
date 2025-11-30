@@ -279,7 +279,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
       <ModalContent
         container={portalContainer ?? null}
         floatingPortalRef={handleFloatingPortalRef}
-        className="w-full max-w-[1000px] h-[74vh] flex flex-col overflow-hidden rounded-none bg-bg-primary shadow-2xl shadow-black/40 p-0 sm:h-[vh] sm:min-h-[720px] sm:rounded-2xl"
+        className="w-full max-w-[1000px] h-[75.5vh] flex flex-col overflow-hidden rounded-none bg-bg-primary shadow-2xl shadow-black/40 p-0 sm:h-[vh] sm:min-h-[720px] sm:rounded-2xl"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
         }}
@@ -349,6 +349,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                         handleEnterMapping();
                       }
                     }}
+                    portalContainer={selectPortalContainer instanceof HTMLElement ? selectPortalContainer : null}
                   />
                 </div>
               </div>
