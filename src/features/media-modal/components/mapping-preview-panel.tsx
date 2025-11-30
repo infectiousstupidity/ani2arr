@@ -1,6 +1,5 @@
 // src/features/media-modal/components/mapping-preview-panel.tsx
-import { ExternalLink, Pencil, X } from "lucide-react";
-
+import { ExternalLink, Pencil, X, Settings } from "lucide-react";
 import Button from "@/shared/components/button";
 import Pill from "@/shared/components/pill";
 import type { MappingSearchResult } from "@/shared/types";
@@ -28,7 +27,6 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
     baseUrl,
     currentMapping,
     previewMapping,
-    isInMappingMode,
     showResetPreview,
     onResetPreview,
     onEditMapping,
@@ -38,8 +36,6 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
   const hasPreviewMapping = Boolean(previewMapping);
   const hasCurrentMapping = Boolean(currentMapping);
   const showEmptyState = !hasPreviewMapping && !hasCurrentMapping;
-  const editLabel = isInMappingMode ? "Exit mapping" : "Edit mapping";
-  const EditIcon = isInMappingMode ? X : Pencil;
 
   return (
     <div className="flex h-full flex-col">
@@ -47,7 +43,7 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-              Current mapping
+              CURRENT MAPPING
             </p>
             <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
               <MultiMappingInfo
@@ -58,22 +54,48 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEditMapping();
-              }}
-              variant="ghost"
-              size="sm"
-              className="inline-flex items-center gap-2 text-sm font-medium text-text-primary"
-              aria-label={editLabel}
-            >
-              {editLabel}
-              <span className="inline-flex items-center">
-                <EditIcon className="h-4 w-4" />
-              </span>
-            </Button>
+            <div className="inline-flex items-center gap-1">
+              <Button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditMapping();
+                }}
+                variant="ghost"
+                size="icon"
+                tooltip="Edit current mapping ID"
+                portalContainer={portalContainer ?? undefined}
+                className="h-8 w-8 text-text-secondary hover:text-text-primary"
+                aria-label="Edit current mapping ID"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+
+              <Button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  try {
+                    void browser.runtime.sendMessage({
+                      _a2a: true,
+                      type: "OPEN_OPTIONS_PAGE",
+                      sectionId: "mappings",
+                      timestamp: Date.now(),
+                    });
+                  } catch {
+                    // best-effort only
+                  }
+                }}
+                variant="ghost"
+                size="icon"
+                tooltip="Open Mapping & Overrides settings in the options page"
+                portalContainer={portalContainer ?? undefined}
+                className="h-8 w-8 text-text-secondary hover:text-text-primary"
+                aria-label="Open Mapping & Overrides settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>

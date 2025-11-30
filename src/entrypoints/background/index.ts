@@ -7,7 +7,12 @@ import { logger } from '@/shared/utils/logger';
 import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/shared/utils/metrics';
 import { logError, normalizeError } from '@/shared/utils/error-handling';
 
-type OpenOptionsMessage = { type: 'OPEN_OPTIONS_PAGE' };
+type OptionsSectionId = 'sonarr' | 'radarr' | 'mappings' | 'ui' | 'advanced';
+
+type OpenOptionsMessage = {
+  type: 'OPEN_OPTIONS_PAGE';
+  sectionId?: OptionsSectionId;
+};
 type MappingRefreshMessage = { type: 'a2a:mapping:refresh' };
 type ScoreBatchMessage = {
   type: 'a2a:match:score-batch';
@@ -130,12 +135,36 @@ export default defineBackground(() => {
       // background has registered services before issuing RPC calls.
       if (msg.type === 'a2a:ping') {
         return Promise.resolve({ ok: true as const });
-      }
+    }
 
-      if (isOpenOptionsMessage(msg)) {
-        browser.runtime.openOptionsPage().catch(() => {});
-        return;
-      }
+    if (isOpenOptionsMessage(msg)) {
+      const open = async (): Promise<void> => {
+        try {
+          const section =
+            msg.sectionId === 'sonarr' ||
+            msg.sectionId === 'radarr' ||
+            msg.sectionId === 'mappings' ||
+            msg.sectionId === 'ui' ||
+            msg.sectionId === 'advanced'
+              ? msg.sectionId
+              : null;
+
+          const baseUrl = browser.runtime.getURL('/options.html');
+          const url = section ? `${baseUrl}#/options/${section}` : baseUrl;
+
+          await browser.tabs.create({ url });
+        } catch {
+          try {
+            await browser.runtime.openOptionsPage();
+          } catch {
+            // best-effort only
+          }
+        }
+      };
+
+      void open();
+      return;
+    }
 
       if (isMappingRefreshMessage(msg)) {
         void api.initMappings();
@@ -162,4 +191,3 @@ export default defineBackground(() => {
 
   log.info('Background setup complete.');
 });
-
