@@ -3,6 +3,7 @@ import { ExternalLink, SquarePen, PenOff, X, Settings } from "lucide-react";
 import Button from "@/shared/components/button";
 import Pill from "@/shared/components/pill";
 import TooltipWrapper from "@/shared/components/tooltip";
+import { MultiMappingInfo } from "@/features/media-modal/components/multi-mapping-info";
 import { useMappingOverrides, useSeriesStatus } from "@/shared/hooks/use-api-queries";
 import type { MappingSearchResult } from "@/shared/types";
 import { buildExternalMediaLink } from "@/shared/utils/build-external-media-link";
@@ -193,8 +194,26 @@ function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
   // Prepare pills logic
   const metadataPills: React.ReactNode[] = [];
 
+  const tvdbPill = (
+    <Pill key="tvdb" small tone="muted" className="font-mono text-text-primary">{`TVDB ${mapping.target.id}`}</Pill>
+  );
+
+  const hasMultipleLinked = Array.isArray(mapping.linkedAniListIds) && mapping.linkedAniListIds.length > 1;
+
   metadataPills.push(
-    <Pill key="tvdb" small tone="muted" className="font-mono text-text-primary">{`TVDB ${mapping.target.id}`}</Pill>,
+    hasMultipleLinked ? (
+      <TooltipWrapper
+        key="tvdb"
+        content={<MultiMappingInfo currentAniListId={currentAniListId} linkedAniListIds={mapping.linkedAniListIds ?? []} />}
+        side="top"
+        sideOffset={6}
+        container={portalContainer ?? null}
+      >
+        {tvdbPill}
+      </TooltipWrapper>
+    ) : (
+      tvdbPill
+    ),
   );
 
   if (typeof mapping.year === "number" && Number.isFinite(mapping.year) && mapping.year > 0) {
