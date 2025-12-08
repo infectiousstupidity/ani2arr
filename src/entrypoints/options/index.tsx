@@ -72,7 +72,8 @@ const sections: SectionConfig[] = [
 
 const resolveSectionFromHash = (hash: string): SectionId => {
   const cleaned = (hash ?? '').replace(/^#/, '');
-  const normalized = cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+  const withoutQuery = cleaned.split('?')[0] ?? '';
+  const normalized = withoutQuery.startsWith('/') ? withoutQuery : `/${withoutQuery}`;
   const normalizedId = normalized.replace(/^\//, '');
 
   if (normalizedId === 'connections' || normalizedId === 'defaults') {
@@ -91,6 +92,17 @@ const resolveSectionFromHash = (hash: string): SectionId => {
 const getInitialSection = (): SectionId => {
   if (typeof window === 'undefined') return 'sonarr';
   return resolveSectionFromHash(window.location.hash);
+};
+
+const extractTargetAnilistIdFromHash = (hash: string): number | null => {
+  const cleaned = (hash ?? '').replace(/^#/, '');
+  const query = cleaned.split('?')[1];
+  if (!query) return null;
+  const params = new URLSearchParams(query);
+  const raw = params.get('anilistId');
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 const NavItem: React.FC<{
@@ -115,8 +127,16 @@ type OptionsContentProps = {
   activeSection: SectionId;
   setActiveSection: (id: SectionId) => void;
   optionsQuery: ReturnType<typeof useExtensionOptions>;
+  targetAnilistId: number | null;
+  clearTargetAnilistId: () => void;
 };
-const OptionsContent: React.FC<OptionsContentProps> = ({ activeSection, setActiveSection, optionsQuery }) => {
+const OptionsContent: React.FC<OptionsContentProps> = ({
+  activeSection,
+  setActiveSection,
+  optionsQuery,
+  targetAnilistId,
+  clearTargetAnilistId,
+}) => {
   const actions = useSettingsActions(optionsQuery.data ? { savedSettings: optionsQuery.data } : {});
 
   const renderSection = () => {
@@ -132,7 +152,12 @@ const OptionsContent: React.FC<OptionsContentProps> = ({ activeSection, setActiv
       case 'radarr':
         return <RadarrPage />;
       case 'mappings':
-        return <MappingsSection />;
+        return (
+          <MappingsSection
+            {...(targetAnilistId !== null ? { targetAnilistId } : {})}
+            onClearTargetAnilistId={clearTargetAnilistId}
+          />
+        );
       case 'ui':
         return <UiSection />;
       case 'advanced':
@@ -182,6 +207,10 @@ const OptionsContent: React.FC<OptionsContentProps> = ({ activeSection, setActiv
 
 const OptionsPage: React.FC = React.memo(() => {
   const [activeSection, setActiveSection] = useState<SectionId>(getInitialSection);
+  const [targetAnilistId, setTargetAnilistId] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return extractTargetAnilistIdFromHash(window.location.hash);
+  });
   const optionsQuery = useExtensionOptions();
   const methods = useForm<SettingsFormValues>({
     defaultValues: (optionsQuery.data ?? createDefaultSettings()) as SettingsFormValues,
@@ -189,7 +218,11 @@ const OptionsPage: React.FC = React.memo(() => {
   });
 
   useEffect(() => {
-    const handleHashChange = () => setActiveSection(resolveSectionFromHash(window.location.hash));
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      setActiveSection(resolveSectionFromHash(hash));
+      setTargetAnilistId(extractTargetAnilistIdFromHash(hash));
+    };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
@@ -198,10 +231,14 @@ const OptionsPage: React.FC = React.memo(() => {
     const section = sections.find(entry => entry.id === activeSection) ?? sections[0];
     if (!section) return;
     const url = new URL(window.location.href);
-    url.hash = section.path;
+    const query =
+      activeSection === 'mappings' && typeof targetAnilistId === 'number'
+        ? `${section.path}?anilistId=${targetAnilistId}`
+        : section.path;
+    url.hash = query;
     window.history.replaceState(null, '', url);
     document.title = `ani2arr - ${section.label}`;
-  }, [activeSection]);
+  }, [activeSection, targetAnilistId]);
 
   useEffect(() => {
     if (optionsQuery.data && !methods.formState.isDirty) {
@@ -215,6 +252,8 @@ const OptionsPage: React.FC = React.memo(() => {
         activeSection={activeSection}
         setActiveSection={setActiveSection}
         optionsQuery={optionsQuery}
+        targetAnilistId={targetAnilistId}
+        clearTargetAnilistId={() => setTargetAnilistId(null)}
       />
     </FormProvider>
   );

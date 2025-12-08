@@ -1,22 +1,21 @@
-// src/features/media-modal/components/search-section.tsx
-import { useCallback, useEffect, useRef, type WheelEvent as ReactWheelEvent } from "react";
-import { ExternalLink } from "lucide-react";
-import Pill from "@/shared/components/pill";
-import TooltipWrapper from "@/shared/components/tooltip";
-import * as ScrollArea from "@radix-ui/react-scroll-area";
-import type { MappingSearchResult } from "@/shared/types";
-import { buildExternalMediaLink } from "@/shared/utils/build-external-media-link";
-import type { UseMappingControllerResult } from "../hooks/use-mapping-controller";
+import { useCallback, useEffect, useRef, type WheelEvent as ReactWheelEvent } from 'react';
+import { ExternalLink } from 'lucide-react';
+import * as ScrollArea from '@radix-ui/react-scroll-area';
+import Pill from '@/shared/components/pill';
+import TooltipWrapper from '@/shared/components/tooltip';
+import type { MappingSearchResult } from '@/shared/types';
+import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link';
+import type { MappingSearchController } from './types';
 
-interface SearchSectionProps {
-  controller: UseMappingControllerResult;
+interface MappingSearchPanelProps {
+  controller: MappingSearchController;
   currentMapping: MappingSearchResult | null;
   baseUrl: string;
   autoFocus?: boolean;
   portalContainer?: HTMLElement | null;
 }
 
-export function SearchSection(props: SearchSectionProps) {
+export function MappingSearchPanel(props: MappingSearchPanelProps) {
   const { controller, currentMapping, baseUrl, autoFocus = false, portalContainer } = props;
   const { state, setQuery, selectResult, searchQuery } = controller;
   const results = searchQuery.data ?? [];
@@ -65,18 +64,16 @@ export function SearchSection(props: SearchSectionProps) {
         />
       </div>
 
-      <div className="flex-1 min-h-0 rounded-xl bg-bg-secondary/80 shadow-inner overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden rounded-xl bg-bg-secondary/80 shadow-inner">
         <ScrollArea.Root
           className="h-full w-full"
           onWheelCapture={handleWheelCapture}
         >
           <div className="flex h-full">
-            {/* Viewport takes remaining width */}
             <ScrollArea.Viewport
               ref={viewportRef}
               className="h-full flex-1 overflow-y-auto"
             >
-              {/* small top/bottom padding so selection highlight isn't cut by rounded corners */}
               <div className="py-1">
                 <div className="divide-y divide-border-primary">
                   {searchQuery.isFetching && !results.length ? (
@@ -87,7 +84,7 @@ export function SearchSection(props: SearchSectionProps) {
 
                   {!results.length && !searchQuery.isFetching ? (
                     <div className="flex h-32 items-center justify-center px-3 py-6 text-center text-xs text-text-secondary">
-                      {hasQuery ? "No results found." : "Type to search Sonarr."}
+                      {hasQuery ? 'No results found.' : 'Type to search Sonarr.'}
                     </div>
                   ) : null}
 
@@ -111,7 +108,7 @@ export function SearchSection(props: SearchSectionProps) {
                       metadataPills.push(
                         <Pill key="year" small tone="muted">
                           {result.year}
-                        </Pill>
+                        </Pill>,
                       );
                     }
 
@@ -119,7 +116,7 @@ export function SearchSection(props: SearchSectionProps) {
                       metadataPills.push(
                         <Pill key="type" small tone="muted" className="text-text-secondary">
                           {result.typeLabel}
-                        </Pill>
+                        </Pill>,
                       );
                     }
 
@@ -127,15 +124,15 @@ export function SearchSection(props: SearchSectionProps) {
                       metadataPills.push(
                         <Pill key="library" small tone="success" className="uppercase tracking-wide">
                           In Sonarr
-                        </Pill>
+                        </Pill>,
                       );
                     }
 
                     if (Array.isArray(result.linkedAniListIds) && result.linkedAniListIds.length > 0) {
                       metadataPills.push(
-                        <Pill key="linked" small tone="warning" className="uppercase tracking-wide text-[10px]">
-                          {`Linked to ${result.linkedAniListIds.length} AniList entr${result.linkedAniListIds.length === 1 ? "y" : "ies"}`}
-                        </Pill>
+                        <Pill key="linked" small tone="warning" className="text-[10px] font-semibold uppercase tracking-wide">
+                          {`Linked to ${result.linkedAniListIds.length} AniList entr${result.linkedAniListIds.length === 1 ? 'y' : 'ies'}`}
+                        </Pill>,
                       );
                     }
 
@@ -143,12 +140,12 @@ export function SearchSection(props: SearchSectionProps) {
                       metadataPills.push(
                         <Pill key="current" small tone="blue" className="uppercase tracking-wide">
                           Current mapping
-                        </Pill>
+                        </Pill>,
                       );
                     }
 
                     const link = buildExternalMediaLink({
-                      service: "sonarr",
+                      service: 'sonarr',
                       baseUrl,
                       inLibrary: result.inLibrary,
                       ...(result.librarySlug ? { librarySlug: result.librarySlug } : {}),
@@ -160,8 +157,8 @@ export function SearchSection(props: SearchSectionProps) {
                         key={`${result.target.id}-${result.target.idType}`}
                         className={`group flex items-center gap-3 px-3 py-3 transition-colors ${
                           isSelected
-                            ? "bg-accent-primary/15 ring-1 ring-inset ring-accent-primary/30"
-                            : "hover:bg-bg-primary/50"
+                            ? 'bg-accent-primary/15 ring-1 ring-inset ring-accent-primary/30'
+                            : 'hover:bg-bg-primary/50'
                         }`}
                       >
                         <button
@@ -181,7 +178,7 @@ export function SearchSection(props: SearchSectionProps) {
                           <div className="min-w-0 flex-1 space-y-2">
                             <div
                               className={`text-sm font-semibold leading-tight ${
-                                isSelected ? "text-accent-primary" : "text-text-primary"
+                                isSelected ? 'text-accent-primary' : 'text-text-primary'
                               } line-clamp-2`}
                             >
                               {result.title}
@@ -213,7 +210,6 @@ export function SearchSection(props: SearchSectionProps) {
               </div>
             </ScrollArea.Viewport>
 
-            {/* Scrollbar sits BESIDE the content, not over it */}
             <ScrollArea.Scrollbar
               orientation="vertical"
               className="flex w-2.5 select-none touch-none p-0.5"
@@ -225,7 +221,6 @@ export function SearchSection(props: SearchSectionProps) {
           </div>
         </ScrollArea.Root>
       </div>
-
     </div>
   );
 }

@@ -1,11 +1,12 @@
-// src/features/media-modal/tabs/mapping-tab/hooks/use-mapping-controller.ts
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { useMappingSearch } from "@/shared/mapping";
-import type { MappingSearchResult } from "@/shared/types";
-import { useMappingOverrides } from "./use-mapping-overrides";
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import { useDebounced } from '@/shared/hooks/use-debounced';
+import { useMappingSearch } from './use-mapping-search';
+import type { MappingSearchResult } from '@/shared/types';
+import { useMappingOverrides } from './use-mapping-overrides';
+import type { MappingSearchController } from './types';
 
 export interface UseMappingControllerInput {
-  service: "sonarr" | "radarr";
+  service: 'sonarr' | 'radarr';
   anilistId: number;
   currentMapping: MappingSearchResult | null;
   overrideActive: boolean;
@@ -25,8 +26,8 @@ type Action =
   | { type: 'RESET_FROM_CURRENT' };
 
 function targetsEqual(
-  a?: MappingSearchResult["target"] | null,
-  b?: MappingSearchResult["target"] | null,
+  a?: MappingSearchResult['target'] | null,
+  b?: MappingSearchResult['target'] | null,
 ): boolean {
   if (!a || !b) return false;
   return a.id === b.id && a.idType === b.idType;
@@ -57,25 +58,14 @@ function reducer(state: MappingTabState, action: Action): MappingTabState {
   }
 }
 
-function useDebounced<T>(value: T, delay = 250): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebounced(value), delay);
-    return () => window.clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
+// Debounced hook moved to shared `useDebounced`
 
 type OptimisticState = 'set' | 'clear' | null;
 
-export interface UseMappingControllerResult {
-  state: MappingTabState;
+export interface UseMappingControllerResult extends MappingSearchController {
   currentMapping: MappingSearchResult | null;
-  setQuery(q: string): void;
-  selectResult(r: MappingSearchResult): void;
   clearSelection(): void;
   resetToCurrent(): void;
-  searchQuery: ReturnType<typeof useMappingSearch>;
   handleSubmit(options?: { force?: boolean }): Promise<void>;
   handleRevertToAutomatic(): Promise<void>;
   canSubmit: boolean;
@@ -104,7 +94,6 @@ export function useMappingController(input: UseMappingControllerInput): UseMappi
   const [optimisticMapping, setOptimisticMapping] = useState<MappingSearchResult | null>(null);
   const [optimisticOverrideState, setOptimisticOverrideState] = useState<OptimisticState>(null);
 
-  // Drop optimistic flags once the server reflects the change.
   useEffect(() => {
     if (
       optimisticOverrideState === 'set' &&

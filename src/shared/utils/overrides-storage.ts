@@ -8,6 +8,12 @@ export interface MappingOverrideEntry {
 
 export type MappingOverrideMap = Record<string, MappingOverrideEntry>;
 
+export interface MappingIgnoreEntry {
+  updatedAt: number;
+}
+
+export type MappingIgnoreMap = Record<string, MappingIgnoreEntry>;
+
 // Sync store: authoritative source replicated across devices (no secrets)
 export const mappingOverridesSync = storage.defineItem<MappingOverrideMap>('sync:mappingOverrides', {
   fallback: {},
@@ -20,3 +26,13 @@ export const mappingOverridesLocal = storage.defineItem<MappingOverrideMap>('loc
   version: 1,
 });
 
+// Ignored mappings (negative overrides)
+export const mappingIgnoresSync = storage.defineItem<MappingIgnoreMap>('sync:ignoredMappings', {
+  fallback: {},
+  version: 1,
+});
+
+export const mappingIgnoresLocal = storage.defineItem<MappingIgnoreMap>('local:ignoredMappingsCache', {
+  fallback: {},
+  version: 1,
+});

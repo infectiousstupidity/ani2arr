@@ -8,6 +8,7 @@ import { MappingOverridesService } from './mapping/overrides.service';
 import { StaticMappingProvider } from './mapping/static-mapping.provider';
 import { SonarrLookupClient } from './mapping/sonarr-lookup.client';
 import { SonarrLibrary } from '@/services/library/sonarr';
+import { AniListMetadataStore } from './anilist-metadata.store';
 
 import type {
   LeanSonarrSeries,
@@ -19,6 +20,9 @@ import type {
   CheckSeriesStatusPayload,
   SonarrSeries,
   RequestPriority,
+  MappingSummary,
+  MappingStatus,
+  MappingSource,
 } from '@/shared/types';
 import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/shared/utils/storage';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
@@ -26,6 +30,8 @@ import type { MappingOutput, UpdateSonarrInput } from '@/rpc/schemas';
 import { type Ani2arrApi } from '@/rpc';
 import { resolveSonarrTagIds } from '@/shared/utils/sonarr-tags';
 import { logger } from '@/shared/utils/logger';
+
+const DEBOUNCED_LIBRARY_REFRESH_MS = 45 * 1000;
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
@@ -137,6 +143,8 @@ export const createApiImplementation = (): Ani2arrApi => {
     ),
   );
 
+  const anilistMetadataStore = new AniListMetadataStore(anilistApiService);
+
   let libraryEpoch = 0;
   let settingsEpoch = 0;
 
@@ -152,6 +160,26 @@ export const createApiImplementation = (): Ani2arrApi => {
   void initializeEpoch('settingsEpoch').then(epoch => {
     settingsEpoch = epoch;
   });
+
+  let pendingLibraryRefresh: ReturnType<typeof setTimeout> | null = null;
+  let refreshOptionsHint: ExtensionOptions | null = null;
+
+  const scheduleLibraryRefresh = (optionsHint?: ExtensionOptions): void => {
+    if (optionsHint) {
+      refreshOptionsHint = optionsHint;
+    }
+    if (pendingLibraryRefresh !== null) return;
+    pendingLibraryRefresh = globalThis.setTimeout(async () => {
+      pendingLibraryRefresh = null;
+      try {
+        const options = refreshOptionsHint ?? (await getExtensionOptionsSnapshot());
+        if (!options?.sonarrUrl || !options?.sonarrApiKey) return;
+        await sonarrLibrary.refreshCache(options);
+      } catch (error) {
+        logError(normalizeError(error), 'Ani2arrApi:debouncedLibraryRefresh');
+      }
+    }, DEBOUNCED_LIBRARY_REFRESH_MS);
+  };
 
   const ensureConfigured = async (): Promise<{ credentials: { url: string; apiKey: string }; options: ExtensionOptions }> => {
     const options = await getExtensionOptionsSnapshot();
@@ -295,7 +323,7 @@ export const createApiImplementation = (): Ani2arrApi => {
 
       const created = await sonarrApiService.addSeries(payload, options);
       await sonarrLibrary.addSeriesToCache(created);
-      await sonarrLibrary.refreshCache(options);
+      scheduleLibraryRefresh(options);
       await bumpLibraryEpoch({ tvdbId: created.tvdbId });
       return created;
     },
@@ -378,7 +406,8 @@ export const createApiImplementation = (): Ani2arrApi => {
         moveFiles,
       });
 
-      await sonarrLibrary.refreshCache(options);
+      await sonarrLibrary.addSeriesToCache(updated);
+      scheduleLibraryRefresh(options);
       await bumpLibraryEpoch({ tvdbId: updated.tvdbId, action: 'updated' });
 
       return updated;
@@ -446,6 +475,15 @@ export const createApiImplementation = (): Ani2arrApi => {
       // Prefer cached media; background refresh will occur if stale.
       const media = await anilistApiService.fetchMediaWithRelations(anilistId, { priority: 'high' });
       return media ?? null;
+    },
+
+    async searchAniList(input) {
+      try {
+        const request = typeof input.limit === 'number' ? { limit: input.limit } : {};
+        return await anilistApiService.searchMedia(input.search, request);
+      } catch (error) {
+        throw normalizeError(error);
+      }
     },
 
     async getStaticMapped(ids) {
@@ -530,7 +568,7 @@ export const createApiImplementation = (): Ani2arrApi => {
       await mappingService.evictResolved(input.anilistId);
       const options = await getExtensionOptionsSnapshot();
       if (options?.sonarrUrl && options?.sonarrApiKey) {
-        await sonarrLibrary.refreshCache(options);
+        scheduleLibraryRefresh(options);
       }
       await bumpLibraryEpoch({ anilistId: input.anilistId, tvdbId: input.tvdbId, action: 'override:set' });
       return { ok: true as const };
@@ -542,9 +580,25 @@ export const createApiImplementation = (): Ani2arrApi => {
       await mappingService.evictResolved(input.anilistId);
       const options = await getExtensionOptionsSnapshot();
       if (options?.sonarrUrl && options?.sonarrApiKey) {
-        await sonarrLibrary.refreshCache(options);
+        scheduleLibraryRefresh(options);
       }
       await bumpLibraryEpoch({ anilistId: input.anilistId, action: 'override:clear' });
+      return { ok: true as const };
+    },
+
+    async setMappingIgnore(input) {
+      await overridesReady;
+      await overridesService.setIgnore(input.anilistId);
+      await mappingService.evictResolved(input.anilistId);
+      await bumpLibraryEpoch({ anilistId: input.anilistId, action: 'override:ignore' });
+      return { ok: true as const };
+    },
+
+    async clearMappingIgnore(input) {
+      await overridesReady;
+      await overridesService.clearIgnore(input.anilistId);
+      await mappingService.evictResolved(input.anilistId);
+      await bumpLibraryEpoch({ anilistId: input.anilistId, action: 'override:clearIgnore' });
       return { ok: true as const };
     },
 
@@ -560,10 +614,202 @@ export const createApiImplementation = (): Ani2arrApi => {
       await Promise.all(existing.map(entry => mappingService.evictResolved(entry.anilistId)));
       const options = await getExtensionOptionsSnapshot();
       if (options?.sonarrUrl && options?.sonarrApiKey) {
-        await sonarrLibrary.refreshCache(options);
+        scheduleLibraryRefresh(options);
       }
       await bumpLibraryEpoch({ action: 'override:clearAll' });
       return { ok: true as const };
+    },
+
+    async getMappings(input) {
+      await overridesReady;
+      const normalizedQuery = input?.query?.trim().toLowerCase() || '';
+      const sources =
+        input?.sources && input.sources.length > 0
+          ? new Set<MappingSource>(input.sources)
+          : new Set<MappingSource>(['manual', 'ignored', 'auto']);
+      const providers =
+        input?.providers && input.providers.length > 0
+          ? new Set<MappingSummary['provider']>(input.providers)
+          : new Set<MappingSummary['provider']>(['sonarr']);
+      if (!providers.has('sonarr')) {
+        return { mappings: [], total: 0, nextCursor: null };
+      }
+
+      const defaultLimit = normalizedQuery ? 200 : 500;
+      const limit = Math.min(Math.max(input?.limit ?? defaultLimit, 1), 2000);
+      const cursor = input?.cursor;
+
+      let library: LeanSonarrSeries[] = [];
+      try {
+        library = await sonarrLibrary.getLeanSeriesList();
+      } catch {
+        library = [];
+      }
+
+      const libraryByTvdbId = new Map<number, LeanSonarrSeries>();
+      for (const series of library) {
+        libraryByTvdbId.set(series.tvdbId, series);
+      }
+
+      const priorityMap: Record<MappingSource, number> = {
+        ignored: 3,
+        manual: 2,
+        upstream: 1,
+        auto: 0,
+      };
+
+      type Candidate = {
+        externalId: { id: number; kind: 'tvdb' } | null;
+        source: MappingSource;
+        updatedAt: number;
+        hadResolveAttempt?: boolean;
+        priority: number;
+      };
+
+      const candidates = new Map<number, Candidate>();
+      const applyCandidate = (anilistId: number, candidate: Omit<Candidate, 'priority' | 'updatedAt'> & { updatedAt?: number }) => {
+        if (!Number.isFinite(anilistId)) return;
+        if (!sources.has(candidate.source)) return;
+        const priority = priorityMap[candidate.source];
+        const existing = candidates.get(anilistId);
+        if (existing && existing.priority > priority) return;
+        candidates.set(anilistId, { ...candidate, updatedAt: candidate.updatedAt ?? 0, priority });
+      };
+
+      const ignores = overridesService.listIgnores();
+      for (const ignore of ignores) {
+        applyCandidate(ignore.anilistId, {
+          externalId: null,
+          source: 'ignored',
+          updatedAt: ignore.updatedAt,
+          hadResolveAttempt: true,
+        });
+      }
+
+      const overrides = overridesService.list();
+      for (const entry of overrides) {
+        applyCandidate(entry.anilistId, {
+          externalId: { id: entry.tvdbId, kind: 'tvdb' },
+          source: 'manual',
+          updatedAt: entry.updatedAt,
+          hadResolveAttempt: true,
+        });
+      }
+
+      if (sources.has('upstream')) {
+        for (const pair of staticProvider.listAllPairs()) {
+          applyCandidate(pair.anilistId, {
+            externalId: { id: pair.tvdbId, kind: 'tvdb' },
+            source: 'upstream',
+          });
+        }
+      }
+
+      const recorded = mappingService.getRecordedResolvedMappings();
+      for (const entry of recorded) {
+        applyCandidate(entry.anilistId, {
+          externalId: { id: entry.tvdbId, kind: 'tvdb' },
+          source: entry.source === 'upstream' ? 'upstream' : 'auto',
+          updatedAt: entry.updatedAt,
+          hadResolveAttempt: entry.source === 'auto',
+        });
+      }
+
+      const matchesQuery = (summary: MappingSummary): boolean => {
+        if (!normalizedQuery) return true;
+        const haystackParts: string[] = [
+          String(summary.anilistId),
+          summary.externalId ? String(summary.externalId.id) : '',
+          summary.providerMeta?.title ?? '',
+        ];
+        const haystack = haystackParts.join(' ').toLowerCase();
+        return haystack.includes(normalizedQuery);
+      };
+
+      const results: MappingSummary[] = [];
+      for (const [anilistId, candidate] of candidates.entries()) {
+        const externalId = candidate.externalId ?? null;
+        const tvdbId = externalId?.id ?? null;
+        const series = tvdbId != null ? libraryByTvdbId.get(tvdbId) ?? null : null;
+        const linkedAniListIds = tvdbId != null ? mappingService.getLinkedAniListIdsForTvdb(tvdbId) : [];
+        const status: MappingStatus =
+          tvdbId === null ? 'unmapped' : series ? 'in-provider' : 'not-in-provider';
+
+        const inLibraryCount =
+          series?.statistics?.episodeCount ??
+          series?.statistics?.episodeFileCount;
+        const statusLabel =
+          series && typeof (series as { status?: unknown }).status === 'string'
+            ? (series as { status?: string }).status
+            : undefined;
+        const providerMeta = series
+          ? {
+              ...(series.title ? { title: series.title } : {}),
+              type: 'series' as const,
+              ...(statusLabel ? { statusLabel } : {}),
+            }
+          : undefined;
+        const hadResolveAttempt =
+          candidate.hadResolveAttempt ||
+          candidate.source === 'auto' ||
+          candidate.source === 'manual' ||
+          candidate.source === 'ignored';
+
+        const summary: MappingSummary = {
+          anilistId,
+          provider: 'sonarr',
+          externalId,
+          source: candidate.source,
+          status,
+          updatedAt: candidate.updatedAt,
+          ...(linkedAniListIds.length ? { linkedAniListIds } : {}),
+          ...(typeof inLibraryCount === 'number' ? { inLibraryCount } : {}),
+          ...(providerMeta ? { providerMeta } : {}),
+          ...(hadResolveAttempt ? { hadResolveAttempt: true } : {}),
+        };
+        if (matchesQuery(summary)) {
+          results.push(summary);
+        }
+      }
+
+      results.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0) || a.anilistId - b.anilistId);
+      const total = results.length;
+      const filteredByCursor =
+        cursor && typeof cursor.updatedAt === 'number'
+          ? results.filter(summary => {
+              const ts = summary.updatedAt ?? 0;
+              if (ts < cursor.updatedAt) return true;
+              if (ts > cursor.updatedAt) return false;
+              return summary.anilistId > cursor.anilistId;
+            })
+          : results;
+      const page = filteredByCursor.slice(0, limit);
+      const last = page[page.length - 1];
+      const nextCursor =
+        filteredByCursor.length > page.length && last
+          ? {
+              updatedAt: last.updatedAt ?? 0,
+              anilistId: last.anilistId,
+            }
+          : null;
+
+      return { mappings: page, total, nextCursor };
+    },
+
+    async getAniListMetadata(input) {
+      const ids = Array.isArray(input?.ids) ? input.ids : [];
+      const normalizedIds = ids.filter(id => typeof id === 'number' && Number.isFinite(id) && id > 0);
+      if (normalizedIds.length === 0) {
+        return { metadata: [], missingIds: [] };
+      }
+      const result = await anilistMetadataStore.getMetadata(normalizedIds, {
+        refreshStale: input?.refreshStale ?? true,
+        ...(input?.maxBatch !== undefined ? { maxBatch: input.maxBatch } : {}),
+      });
+      return {
+        metadata: result.metadata,
+        ...(result.missingIds?.length ? { missingIds: result.missingIds } : {}),
+      };
     },
   };
 

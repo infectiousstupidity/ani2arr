@@ -5,18 +5,12 @@ import type {
   SonarrRootFolder,
   SonarrTag,
 } from "@/shared/types";
-import type { UseMappingControllerResult } from "./hooks/use-mapping-controller";
+import type { UseMappingControllerResult } from "@/shared/mapping";
 import type { UseSonarrPanelControllerResult } from "./hooks/use-sonarr-panel-controller";
-
-export interface AniListEntrySummary {
-  id: number;
-  title: string;
-  seasonLabel?: string;
-  posterUrl?: string;
-}
+import type { MappingAniListSummary } from "@/shared/mapping";
 
 export interface MappingTabProps {
-  aniListEntry: AniListEntrySummary;
+  aniListEntry: MappingAniListSummary;
   currentMapping: import("@/shared/types").MappingSearchResult | null;
   overrideActive: boolean;
   otherAniListIds: number[];

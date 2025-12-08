@@ -1,6 +1,5 @@
-// src/features/media-modal/components/multi-mapping-info.tsx
-import Pill from "@/shared/components/pill";
-import Tooltip from "@/shared/components/tooltip";
+import Pill from '@/shared/components/pill';
+import Tooltip from '@/shared/components/tooltip';
 
 interface MultiMappingInfoProps {
   currentAniListId: number;
@@ -28,9 +27,9 @@ export function MultiMappingInfo(props: MultiMappingInfoProps) {
       content={
         <div className="space-y-1">
           <div className="font-semibold">
-            Also linked to {otherCount} other AniList entr{otherCount === 1 ? "y" : "ies"}:
+            Also linked to {otherCount} other AniList entr{otherCount === 1 ? 'y' : 'ies'}:
           </div>
-          <div className="font-mono text-[11px] text-white/90">{others.join(", ")}</div>
+          <div className="font-mono text-[11px] text-white/90">{others.join(', ')}</div>
         </div>
       }
       side="top"

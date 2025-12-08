@@ -73,10 +73,9 @@ export class SonarrLibraryStore {
 
   async addSeriesToCache(newSeries: SonarrSeries): Promise<void> {
     const current = await this.getLeanSeriesList();
-    if (current.some(s => s.id === newSeries.id)) return;
-
     const lean = this.toLeanSeries(newSeries);
-    const updated = [...current, lean];
+    const idx = current.findIndex(s => s.id === newSeries.id);
+    const updated = idx >= 0 ? [...current.slice(0, idx), lean, ...current.slice(idx + 1)] : [...current, lean];
     this.indexer.reindex(updated);
     await this.caches.leanSeries.write(CACHE_KEY, updated, { staleMs: SOFT_TTL_MS, hardMs: HARD_TTL_MS });
   }

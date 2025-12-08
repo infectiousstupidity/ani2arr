@@ -16,7 +16,8 @@
     "lint": "eslint src",
     "test:ui": "npm run build && playwright test",
     "e2e:install": "playwright install --with-deps",
-    "e2e:prepare": "npm run build && npm run e2e:install"
+    "e2e:prepare": "npm run build && npm run e2e:install",
+    "generate:anilist-metadata": "node ./scripts/generate-anilist-metadata.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
@@ -55,10 +56,12 @@
     "wxt": "^0.20.11"
   },
   "dependencies": {
+    "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-dialog": "^1.1.1",
     "@radix-ui/react-dropdown-menu": "^2.1.6",
     "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-scroll-area": "^1.2.10",
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-slot": "^1.1.0",
@@ -68,6 +71,7 @@
     "@tanstack/query-persist-client-core": "^5.91.4",
     "@tanstack/react-query": "5.90.x",
     "@tanstack/react-query-persist-client": "^5.90.7",
+    "@tanstack/react-virtual": "^3.13.12",
     "@webext-core/job-scheduler": "^1.0.0",
     "@webext-core/messaging": "^2.3.0",
     "@webext-core/proxy-service": "^1.2.1",

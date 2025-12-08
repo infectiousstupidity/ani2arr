@@ -9,7 +9,29 @@ import type {
   SonarrFormState,
   SonarrCredentialsPayload,
 } from '@/shared/types';
-import type { ResolveInput, MappingOutput, StatusInput, StatusOutput, AddInput, UpdateSonarrInput, SetMappingOverrideInput, ClearMappingOverrideInput, SonarrLookupInput, SonarrLookupOutput, ValidateTvdbInput, ValidateTvdbOutput, MappingOverrideItem } from './schemas';
+import type {
+  ResolveInput,
+  MappingOutput,
+  StatusInput,
+  StatusOutput,
+  AddInput,
+  UpdateSonarrInput,
+  SetMappingOverrideInput,
+  ClearMappingOverrideInput,
+  SonarrLookupInput,
+  SonarrLookupOutput,
+  ValidateTvdbInput,
+  ValidateTvdbOutput,
+  MappingOverrideItem,
+  SetMappingIgnoreInput,
+  ClearMappingIgnoreInput,
+  GetMappingsOutput,
+  GetMappingsInput,
+  GetAniListMetadataInput,
+  GetAniListMetadataOutput,
+  SearchAniListInput,
+  AniListSearchResultDto,
+} from './schemas';
 
 export interface Ani2arrApi {
   resolveMapping(input: ResolveInput): Promise<MappingOutput>;
@@ -33,10 +55,15 @@ export interface Ani2arrApi {
   initMappings(): Promise<void>;
   setMappingOverride(input: SetMappingOverrideInput): Promise<{ ok: true }>;
   clearMappingOverride(input: ClearMappingOverrideInput): Promise<{ ok: true }>;
+  setMappingIgnore(input: SetMappingIgnoreInput): Promise<{ ok: true }>;
+  clearMappingIgnore(input: ClearMappingIgnoreInput): Promise<{ ok: true }>;
   searchSonarr(input: SonarrLookupInput): Promise<SonarrLookupOutput>;
   validateTvdbId(input: ValidateTvdbInput): Promise<ValidateTvdbOutput>;
   getMappingOverrides(): Promise<MappingOverrideItem[]>;
   clearAllMappingOverrides(): Promise<{ ok: true }>;
+  getMappings(input?: GetMappingsInput): Promise<GetMappingsOutput>;
+  getAniListMetadata(input: GetAniListMetadataInput): Promise<GetAniListMetadataOutput>;
+  searchAniList(input: SearchAniListInput): Promise<AniListSearchResultDto[]>;
 }
 
 export const [registerAni2arrApi, getAni2arrApi] =

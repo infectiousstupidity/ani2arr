@@ -83,6 +83,7 @@ export interface CheckSeriesStatusPayload {
 export interface CheckSeriesStatusResponse {
   exists: boolean;
   tvdbId: number | null;
+  externalId?: { id: number; kind: 'tvdb' | 'tmdb' } | null;
   successfulSynonym?: string;
   anilistTvdbLinkMissing?: boolean;
   series?: LeanSonarrSeries | SonarrSeries | SonarrLookupSeries;

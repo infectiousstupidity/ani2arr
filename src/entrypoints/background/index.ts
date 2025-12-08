@@ -12,6 +12,7 @@ type OptionsSectionId = 'sonarr' | 'radarr' | 'mappings' | 'ui' | 'advanced';
 type OpenOptionsMessage = {
   type: 'OPEN_OPTIONS_PAGE';
   sectionId?: OptionsSectionId;
+  targetAnilistId?: number;
 };
 type MappingRefreshMessage = { type: 'a2a:mapping:refresh' };
 type ScoreBatchMessage = {
@@ -150,7 +151,15 @@ export default defineBackground(() => {
               : null;
 
           const baseUrl = browser.runtime.getURL('/options.html');
-          const url = section ? `${baseUrl}#/options/${section}` : baseUrl;
+          const targetHash =
+            typeof msg.targetAnilistId === 'number' && Number.isFinite(msg.targetAnilistId)
+              ? `?anilistId=${msg.targetAnilistId}`
+              : '';
+          const url = section
+            ? `${baseUrl}#/options/${section}${targetHash}`
+            : targetHash
+              ? `${baseUrl}#${targetHash}`
+              : baseUrl;
 
           await browser.tabs.create({ url });
         } catch {

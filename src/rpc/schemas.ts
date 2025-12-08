@@ -1,6 +1,6 @@
 // src/rpc/schemas.ts
 import * as v from 'valibot';
-import type { CheckSeriesStatusResponse, SonarrLookupSeries } from '@/shared/types';
+import type { CheckSeriesStatusResponse, MappingSummary, SonarrLookupSeries } from '@/shared/types';
 
 // ============================================================================
 // Shared / Reusable Validators
@@ -10,6 +10,9 @@ import type { CheckSeriesStatusResponse, SonarrLookupSeries } from '@/shared/typ
  * Standard positive integer ID (used for AniList, TVDB, IDs, etc.)
  */
 const IdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
+const MappingProviderSchema = v.picklist(['sonarr', 'radarr']);
+const MappingSourceSchema = v.picklist(['manual', 'upstream', 'auto', 'ignored']);
+const MappingStatusSchema = v.picklist(['unmapped', 'in-provider', 'not-in-provider']);
 
 /**
  * Standard non-empty string validation
@@ -29,6 +32,11 @@ const AniTitlesSchema = v.object({
   native: v.optional(v.string()),
 });
 
+const AniListMetadataImageSchema = v.object({
+  medium: v.optional(v.nullable(v.string())),
+  large: v.optional(v.nullable(v.string())),
+});
+
 const AniFormatSchema = v.picklist([
   'TV',
   'TV_SHORT',
@@ -42,13 +50,21 @@ const AniFormatSchema = v.picklist([
   'ONE_SHOT',
 ]);
 
+const AniStatusSchema = v.picklist([
+  'FINISHED',
+  'RELEASING',
+  'NOT_YET_RELEASED',
+  'CANCELLED',
+  'HIATUS',
+]);
+
 const MediaMetadataHintSchema = v.object({
-  titles: v.optional(AniTitlesSchema),
-  synonyms: v.optional(v.array(v.string())),
-  startYear: v.optional(v.number()),
-  format: v.optional(AniFormatSchema),
-  relationPrequelIds: v.optional(v.array(v.number())),
-  coverImage: v.optional(v.string()),
+  titles: v.optional(v.nullable(AniTitlesSchema)),
+  synonyms: v.optional(v.nullable(v.array(v.string()))),
+  startYear: v.optional(v.nullable(v.number())),
+  format: v.optional(v.nullable(AniFormatSchema)),
+  relationPrequelIds: v.optional(v.nullable(v.array(v.number()))),
+  coverImage: v.optional(v.nullable(v.string())),
 });
 
 const SonarrMonitorOptionSchema = v.picklist([
@@ -82,6 +98,30 @@ const SonarrCredentialsSchema = v.object({
   apiKey: createRequiredStringSchema('API key cannot be empty'),
 });
 
+const MappingExternalIdSchema = v.object({
+  id: IdSchema,
+  kind: v.picklist(['tvdb', 'tmdb']),
+});
+
+export const MappingSummarySchema = v.object({
+  anilistId: IdSchema,
+  provider: MappingProviderSchema,
+  externalId: v.nullable(MappingExternalIdSchema),
+  source: MappingSourceSchema,
+  status: MappingStatusSchema,
+  updatedAt: v.optional(v.number()),
+  linkedAniListIds: v.optional(v.array(IdSchema)),
+  inLibraryCount: v.optional(v.number()),
+  providerMeta: v.optional(
+    v.object({
+      title: v.optional(v.string()),
+      type: v.optional(v.picklist(['series', 'movie'])),
+      statusLabel: v.optional(v.string()),
+    }),
+  ),
+  hadResolveAttempt: v.optional(v.boolean()),
+});
+
 // ============================================================================
 // RPC Input Schemas
 // ============================================================================
@@ -89,7 +129,7 @@ const SonarrCredentialsSchema = v.object({
 export const ResolveInputSchema = v.object({
   anilistId: IdSchema,
   primaryTitleHint: v.optional(v.string()),
-  metadata: v.optional(MediaMetadataHintSchema),
+  metadata: v.optional(v.nullable(MediaMetadataHintSchema)),
 });
 
 export const StatusInputSchema = v.object({
@@ -98,7 +138,7 @@ export const StatusInputSchema = v.object({
   force_verify: v.optional(v.boolean()),
   network: v.optional(v.literal('never')),
   ignoreFailureCache: v.optional(v.boolean()),
-  metadata: v.optional(MediaMetadataHintSchema),
+  metadata: v.optional(v.nullable(MediaMetadataHintSchema)),
   priority: v.optional(RequestPrioritySchema),
 });
 
@@ -106,7 +146,7 @@ export const AddInputSchema = v.object({
   anilistId: IdSchema,
   title: createRequiredStringSchema('Title cannot be empty'),
   primaryTitleHint: v.optional(v.string()),
-  metadata: v.optional(MediaMetadataHintSchema),
+  metadata: v.optional(v.nullable(MediaMetadataHintSchema)),
   form: SonarrFormStateSchema,
 });
 
@@ -124,6 +164,14 @@ export const SetMappingOverrideInputSchema = v.object({
 });
 
 export const ClearMappingOverrideInputSchema = v.object({
+  anilistId: IdSchema,
+});
+
+export const SetMappingIgnoreInputSchema = v.object({
+  anilistId: IdSchema,
+});
+
+export const ClearMappingIgnoreInputSchema = v.object({
   anilistId: IdSchema,
 });
 
@@ -152,6 +200,49 @@ export const GetSonarrMetadataInputSchema = v.optional(
   }),
 );
 
+const MappingCursorSchema = v.object({
+  updatedAt: v.number(),
+  anilistId: IdSchema,
+});
+
+export const SearchAniListInputSchema = v.object({
+  search: createRequiredStringSchema('Search cannot be empty'),
+  limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(25))),
+});
+
+export const GetMappingsInputSchema = v.optional(
+  v.object({
+    sources: v.optional(v.array(MappingSourceSchema)),
+    providers: v.optional(v.array(MappingProviderSchema)),
+    limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+    cursor: v.optional(MappingCursorSchema),
+    query: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1))),
+  }),
+);
+
+export const AniListMetadataSchema = v.object({
+  id: IdSchema,
+  titles: AniTitlesSchema,
+  seasonYear: v.optional(v.nullable(v.number())),
+  format: v.optional(v.nullable(AniFormatSchema)),
+  coverImage: v.optional(v.nullable(AniListMetadataImageSchema)),
+  updatedAt: v.number(),
+});
+
+export const AniListSearchResultSchema = v.object({
+  id: IdSchema,
+  title: AniTitlesSchema,
+  coverImage: v.optional(v.nullable(AniListMetadataImageSchema)),
+  format: v.optional(v.nullable(AniFormatSchema)),
+  status: v.optional(v.nullable(AniStatusSchema)),
+});
+
+export const GetAniListMetadataInputSchema = v.object({
+  ids: v.array(IdSchema),
+  refreshStale: v.optional(v.boolean()),
+  maxBatch: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+});
+
 // ============================================================================
 // TypeScript types inferred from schemas
 // ============================================================================
@@ -164,6 +255,15 @@ export type SetMappingOverrideInput = v.InferOutput<typeof SetMappingOverrideInp
 export type ClearMappingOverrideInput = v.InferOutput<typeof ClearMappingOverrideInputSchema>;
 export type SonarrLookupInput = v.InferOutput<typeof SonarrLookupInputSchema>;
 export type ValidateTvdbInput = v.InferOutput<typeof ValidateTvdbInputSchema>;
+export type SetMappingIgnoreInput = v.InferOutput<typeof SetMappingIgnoreInputSchema>;
+export type ClearMappingIgnoreInput = v.InferOutput<typeof ClearMappingIgnoreInputSchema>;
+export type GetMappingsInput = v.InferOutput<typeof GetMappingsInputSchema>;
+export type MappingSummaryDto = v.InferOutput<typeof MappingSummarySchema>;
+export type MappingCursor = v.InferOutput<typeof MappingCursorSchema>;
+export type AniListMetadataDto = v.InferOutput<typeof AniListMetadataSchema>;
+export type SearchAniListInput = v.InferOutput<typeof SearchAniListInputSchema>;
+export type AniListSearchResultDto = v.InferOutput<typeof AniListSearchResultSchema>;
+export type GetAniListMetadataInput = v.InferOutput<typeof GetAniListMetadataInputSchema>;
 
 // ============================================================================
 // Output types
@@ -180,6 +280,12 @@ export interface MappingOverrideItem {
   anilistId: number;
   tvdbId: number;
   updatedAt: number;
+}
+
+export interface GetMappingsOutput {
+  mappings: MappingSummary[];
+  nextCursor?: MappingCursor | null;
+  total?: number;
 }
 
 export interface SonarrLookupOutput {
@@ -202,4 +308,9 @@ export interface SonarrLookupOutput {
 export interface ValidateTvdbOutput {
   inLibrary: boolean;
   inCatalog: boolean;
+}
+
+export interface GetAniListMetadataOutput {
+  metadata: AniListMetadataDto[];
+  missingIds?: number[];
 }

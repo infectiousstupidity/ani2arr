@@ -1,7 +1,6 @@
-// src/features/media-modal/tabs/mapping-tab/hooks/use-mapping-overrides.ts
-import { useCallback } from "react";
-import type { MappingTargetId } from "@/shared/types";
-import { useClearMappingOverride, useSetMappingOverride } from "@/shared/hooks/use-api-queries";
+import { useCallback } from 'react';
+import type { MappingTargetId } from '@/shared/types';
+import { useClearMappingOverride, useSetMappingOverride } from '@/shared/hooks/use-api-queries';
 
 export function useMappingOverrides(anilistId: number) {
   const setOverrideMutation = useSetMappingOverride();
@@ -9,7 +8,7 @@ export function useMappingOverrides(anilistId: number) {
 
   const setOverride = useCallback(
     async (target: MappingTargetId, options?: { force?: boolean }) => {
-      if (target.idType !== "tvdb" || typeof target.id !== "number") {
+      if (target.idType !== 'tvdb' || typeof target.id !== 'number') {
         return;
       }
       await setOverrideMutation.mutateAsync({

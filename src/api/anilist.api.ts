@@ -4,7 +4,7 @@ import { withRetry, AbortError } from '@/shared/utils/retry';
 import type { TtlCache } from '@/cache';
 import { createError, ErrorCode } from '@/shared/utils/error-handling';
 import { logger } from '@/shared/utils/logger';
-import type { AniMedia, RequestPriority } from '@/shared/types';
+import type { AniMedia, AniListSearchResult, RequestPriority } from '@/shared/types';
 import { priorityValue } from '@/shared/utils/priority';
 
 const API_URL = 'https://graphql.anilist.co';
@@ -822,5 +822,111 @@ export class AnilistApiService {
     }
     const parsed = Date.parse(header);
     return Number.isNaN(parsed) ? null : Math.max(Date.now(), parsed);
+  }
+
+  public async searchMedia(search: string, options?: { limit?: number }): Promise<AniListSearchResult[]> {
+    const term = search.trim();
+    if (!term) return [];
+    const limit = Math.min(Math.max(options?.limit ?? 8, 1), 25);
+
+    const run = async () => {
+      const now = Date.now();
+      if (this.pausedUntil > now) {
+        await new Promise(resolve => setTimeout(resolve, this.pausedUntil - now));
+      }
+      return this.executeSearch(term, limit);
+    };
+
+    return this.queue.add(() => run(), { priority: priorityValue('normal') }) as Promise<AniListSearchResult[]>;
+  }
+
+  private async executeSearch(search: string, limit: number): Promise<AniListSearchResult[]> {
+    const SEARCH_QUERY = `
+      query SearchAnime($search: String!, $perPage: Int!) {
+        Page(perPage: $perPage) {
+          media(search: $search, type: ANIME) {
+            id
+            title { english romaji native }
+            coverImage { large medium }
+            format
+            status
+          }
+        }
+      }
+    `;
+
+    try {
+      const results = await withRetry(
+        async () => {
+          const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ query: SEARCH_QUERY, variables: { search, perPage: limit } }),
+          });
+
+          if (!response.ok) {
+            if (response.status === 429) {
+              const retryAfter = this.parseRetryAfterTs(response.headers.get('Retry-After'));
+              const delay = retryAfter ? Math.max(0, retryAfter - Date.now()) : DEFAULT_RATE_LIMIT_DELAY_MS;
+              this.pausedUntil = Date.now() + delay;
+              const error = new Error('Rate limit exceeded');
+              (error as { retryAfterMs?: number }).retryAfterMs = delay;
+              throw error;
+            }
+            if (response.status >= 400 && response.status < 500) {
+              const extensionError = createError(
+                ErrorCode.API_ERROR,
+                `AniList API Error: ${response.status}`,
+                'AniList request failed.',
+                { status: response.status },
+              );
+              throw new AbortError(Object.assign(new Error(extensionError.message), { extensionError }));
+            }
+            throw Object.assign(new Error(`AniList API Error: ${response.status}`), { status: response.status });
+          }
+
+          const payload = (await response.json()) as {
+            data?: { Page?: { media?: AniListSearchResult[] } };
+          };
+          return payload?.data?.Page?.media ?? [];
+        },
+        {
+          retries: 3,
+          minTimeout: 0,
+          maxTimeout: 0,
+          extractRetryAfterMs: (e: unknown) => (e as { retryAfterMs?: number })?.retryAfterMs,
+        },
+      );
+
+      return results
+        .filter((item): item is AniListSearchResult => typeof item?.id === 'number' && Number.isFinite(item.id))
+        .map(item => ({
+          id: item.id,
+          title: item.title ?? {},
+          coverImage: item.coverImage ?? null,
+          format: item.format ?? null,
+          status: item.status ?? null,
+        }));
+    } catch (error) {
+      if (error instanceof AbortError) {
+        const original = error.originalError as Error & { extensionError?: ExtensionErrorLike };
+        if (original?.extensionError) throw original.extensionError;
+        throw createError(ErrorCode.API_ERROR, original?.message ?? error.message, 'AniList request failed.');
+      }
+      if (error instanceof Error) {
+        const withExtension = error as Error & { extensionError?: ExtensionErrorLike };
+        if (withExtension.extensionError) throw withExtension.extensionError;
+        const { status } = error as Error & { status?: unknown };
+        if (typeof status === 'number') {
+          throw createError(
+            ErrorCode.API_ERROR,
+            `AniList API Error: ${status}`,
+            'AniList service is temporarily unavailable.',
+            { status },
+          );
+        }
+      }
+      throw error;
+    }
   }
 }
