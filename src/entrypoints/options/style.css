@@ -24,4 +24,19 @@
   --color-accent-hover: var(--accent-hover);
   --color-success: var(--success);
   --color-error: var(--error);
+
+  /* Accordion animations */
+  --animate-accordion-down: accordion-down 200ms ease-out;
+  --animate-accordion-up: accordion-up 200ms ease-out;
+}
+
+/* Accordion keyframes */
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
 }

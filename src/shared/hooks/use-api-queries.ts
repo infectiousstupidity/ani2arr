@@ -1,5 +1,5 @@
 // src/shared/hooks/use-api-queries.ts
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { getAni2arrApi } from '@/rpc';
@@ -26,7 +26,18 @@ import type {
   TestConnectionPayload,
   MappingOverrideRecord,
 } from '@/shared/types';
-import type { AddInput, UpdateSonarrInput, StatusInput, SetMappingOverrideInput, ClearMappingOverrideInput } from '@/rpc/schemas';
+import type {
+  AddInput,
+  UpdateSonarrInput,
+  StatusInput,
+  SetMappingOverrideInput,
+  ClearMappingOverrideInput,
+  SetMappingIgnoreInput,
+  ClearMappingIgnoreInput,
+  GetMappingsInput,
+  GetMappingsOutput,
+  GetAniListMetadataOutput,
+} from '@/rpc/schemas';
 import { normalizeError } from '@/shared/utils/error-handling';
 import { logger } from '@/shared/utils/logger';
 import type { Settings } from '@/shared/schemas/settings';
@@ -64,6 +75,36 @@ const getStableMetadata = (metadata?: MediaMetadataHint | null) => {
 
 const seriesStatusBaseKey = (anilistId: number) => [...rootQueryKey, 'seriesStatus', anilistId] as const;
 
+const normalizeMappingsInput = (input?: GetMappingsInput) => {
+  if (!input) return 'default';
+  const normalized: Record<string, unknown> = {};
+  if (input.sources?.length) {
+    normalized.sources = Array.from(new Set(input.sources)).sort();
+  }
+  if (input.providers?.length) {
+    normalized.providers = Array.from(new Set(input.providers)).sort();
+  }
+  if (typeof input.limit === 'number') {
+    normalized.limit = input.limit;
+  }
+   if (input.query && input.query.trim()) {
+     normalized.query = input.query.trim().toLowerCase();
+   }
+  if (input.cursor) {
+    normalized.cursor = {
+      updatedAt: input.cursor.updatedAt,
+      anilistId: input.cursor.anilistId,
+    };
+  }
+  return normalized;
+};
+
+const normalizeMetadataIds = (ids: number[]) => {
+  const unique = Array.from(new Set(ids.filter(id => Number.isFinite(id) && id > 0))) as number[];
+  unique.sort((a, b) => a - b);
+  return unique;
+};
+
 export const queryKeys = {
   all: rootQueryKey,
   options: () => [...rootQueryKey, 'options'] as const,
@@ -84,6 +125,9 @@ export const queryKeys = {
   mappingSearch: (service: 'sonarr' | 'radarr', query: string) =>
     [...rootQueryKey, 'mappingSearch', service, query.trim().toLowerCase()] as const,
   mappingOverrides: () => [...rootQueryKey, 'mappingOverrides'] as const,
+  mappingsRoot: () => [...rootQueryKey, 'mappings'] as const,
+  mappings: (input?: GetMappingsInput) => [...rootQueryKey, 'mappings', normalizeMappingsInput(input)] as const,
+  aniListMetadata: (ids: number[]) => [...rootQueryKey, 'aniListMetadata', normalizeMetadataIds(ids)] as const,
 };
 
 /**
@@ -359,6 +403,7 @@ export const useSetMappingOverride = () => {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
     },
   });
 };
@@ -376,6 +421,7 @@ export const useClearMappingOverride = () => {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
     },
   });
 };
@@ -393,6 +439,7 @@ export const useClearAllMappingOverrides = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
     },
   });
 };
@@ -407,6 +454,81 @@ export const useMappingOverrides = () =>
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
+
+export const useSetMappingIgnore = () => {
+  const queryClient = useQueryClient();
+  return useMutation<{ ok: true }, ExtensionError, SetMappingIgnoreInput>({
+    mutationFn: async (input: SetMappingIgnoreInput) => {
+      try {
+        return await getAni2arrApi().setMappingIgnore(input);
+      } catch (error) {
+        throw normalizeError(error);
+      }
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+    },
+  });
+};
+
+export const useClearMappingIgnore = () => {
+  const queryClient = useQueryClient();
+  return useMutation<{ ok: true }, ExtensionError, ClearMappingIgnoreInput>({
+    mutationFn: async (input: ClearMappingIgnoreInput) => {
+      try {
+        return await getAni2arrApi().clearMappingIgnore(input);
+      } catch (error) {
+        throw normalizeError(error);
+      }
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+    },
+  });
+};
+
+export const useMappings = (input?: GetMappingsInput) =>
+  useInfiniteQuery<GetMappingsOutput, ExtensionError>({
+    queryKey: queryKeys.mappings(input),
+    queryFn: async ({ pageParam }) => {
+      const api = getAni2arrApi();
+      type MappingCursor = NonNullable<GetMappingsInput>['cursor'];
+      const cursor = (pageParam as MappingCursor | undefined) ?? input?.cursor;
+      return api.getMappings({
+        ...input,
+        ...(cursor ? { cursor } : {}),
+      });
+    },
+    initialPageParam: input?.cursor ?? undefined,
+    getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
+    staleTime: 45 * 60 * 1000,
+    gcTime: 2 * 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    meta: { persist: false },
+  });
+
+export const useAniListMetadataBatch = (ids: number[], options?: { enabled?: boolean; refreshStale?: boolean }) => {
+  const normalizedIds = normalizeMetadataIds(ids);
+  return useQuery<GetAniListMetadataOutput, ExtensionError>({
+    queryKey: queryKeys.aniListMetadata(normalizedIds),
+    queryFn: async () => {
+      const api = getAni2arrApi();
+      return api.getAniListMetadata({
+        ids: normalizedIds,
+        refreshStale: options?.refreshStale ?? true,
+      });
+    },
+    enabled: (options?.enabled ?? true) && normalizedIds.length > 0,
+    staleTime: 12 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    meta: { persist: false },
+  });
+};
 
 export const useTestConnection = () => {
   return useMutation<{ version: string }, ExtensionError, TestConnectionPayload>({

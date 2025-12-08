@@ -66,8 +66,9 @@ const getCachedDomMetadata = (anilistId: number): MediaMetadataHint | null => {
   return metadata ?? null;
 };
 
+// Allow movies so specials that live in Sonarr can still render overlays; keep skipping music.
 const shouldSkipFormat = (format: MediaMetadataHint['format']): boolean =>
-  format === 'MOVIE' || format === 'MUSIC';
+  format === 'MUSIC';
 
 const findCardContainer = (): HTMLElement | null => {
   for (const selector of CARD_CONTAINER_SELECTORS) {

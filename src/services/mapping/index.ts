@@ -52,6 +52,7 @@ export class MappingService {
   private readonly log = logger.create('MappingService');
   private readonly inflight = new Map<number, Promise<ResolvedMapping | null>>();
   private readonly sessionSeenCanonical = new Set<string>();
+  private readonly resolvedLog = new Map<number, { tvdbId: number; source: 'auto' | 'upstream'; updatedAt: number }>();
 
   constructor(
     private readonly anilistApi: AnilistApiService,
@@ -133,6 +134,12 @@ export class MappingService {
     options: ResolveTvdbIdOptions,
     bypassFailureCache: boolean,
   ): Promise<ResolvedMapping | null> {
+    if (this.overrides?.isIgnored(anilistId)) {
+      if (import.meta.env.DEV) {
+        this.log.debug?.(`mapping:ignored anilistId=${anilistId}`);
+      }
+      return null;
+    }
     // Phase 0: Check user overrides first; authoritative mapping if present
     const overrideTvdb = this.overrides?.get(anilistId) ?? null;
     if (typeof overrideTvdb === 'number') {
@@ -147,6 +154,7 @@ export class MappingService {
       if (import.meta.env.DEV) {
         this.log.debug?.(`mapping:success-cache-hit anilistId=${anilistId} tvdbId=${cachedSuccess.value.tvdbId}`);
       }
+      this.recordResolvedMapping(anilistId, cachedSuccess.value.tvdbId, 'auto');
       return cachedSuccess.value;
     }
 
@@ -170,6 +178,7 @@ export class MappingService {
       if (import.meta.env.DEV) {
         this.log.debug?.(`mapping:static-hit anilistId=${anilistId} tvdbId=${staticHit.tvdbId}`);
       }
+      this.recordResolvedMapping(anilistId, staticHit.tvdbId, 'upstream');
       return { tvdbId: staticHit.tvdbId };
     }
 
@@ -190,6 +199,7 @@ export class MappingService {
             staleMs: RESOLVED_SOFT_TTL,
             hardMs: RESOLVED_HARD_TTL,
           });
+          this.recordResolvedMapping(anilistId, hinted.tvdbId, 'auto');
           return hinted;
         }
       } catch (error) {
@@ -236,6 +246,7 @@ export class MappingService {
       return null;
     }
 
+    this.recordResolvedMapping(anilistId, resolved.tvdbId, 'auto');
     await this.caches.success.write(cacheKey, resolved, {
       staleMs: RESOLVED_SOFT_TTL,
       hardMs: RESOLVED_HARD_TTL,
@@ -316,6 +327,7 @@ export class MappingService {
 
     const prequelStatic = await this.lookupPrequelStatic(media);
     if (prequelStatic) {
+      this.recordResolvedMapping(media.id, prequelStatic.tvdbId, 'upstream');
       return prequelStatic;
     }
 
@@ -484,11 +496,28 @@ export class MappingService {
     ]);
     this.inflight.delete(anilistId);
     this.evictAniListMedia(anilistId);
+    this.resolvedLog.delete(anilistId);
   }
 
   // Utility for LibraryService to surface whether an override is active
   public isOverrideActive(anilistId: number): boolean {
     return this.overrides?.has(anilistId) ?? false;
+  }
+
+  public isIgnored(anilistId: number): boolean {
+    return this.overrides?.isIgnored(anilistId) ?? false;
+  }
+
+  public getRecordedResolvedMappings(): Array<{ anilistId: number; tvdbId: number; source: 'auto' | 'upstream'; updatedAt: number }> {
+    const entries: Array<{ anilistId: number; tvdbId: number; source: 'auto' | 'upstream'; updatedAt: number }> = [];
+    for (const [anilistId, entry] of this.resolvedLog.entries()) {
+      entries.push({ anilistId, tvdbId: entry.tvdbId, source: entry.source, updatedAt: entry.updatedAt });
+    }
+    return entries;
+  }
+
+  private recordResolvedMapping(anilistId: number, tvdbId: number, source: 'auto' | 'upstream'): void {
+    this.resolvedLog.set(anilistId, { tvdbId, source, updatedAt: Date.now() });
   }
 
   private shouldCacheFailure(error: ExtensionError): boolean {

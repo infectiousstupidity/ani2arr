@@ -7,12 +7,11 @@ import Button from "@/shared/components/button";
 import type { AniFormat, MediaStatus, TitleLanguage, ExtensionError } from "@/shared/types";
 import { ErrorCode } from "@/shared/types";
 
-import { SearchSection } from "./search-section";
+import { MappingPreviewPanel, MappingSearchPanel } from "@/shared/mapping";
 import type { MappingTabProps } from "../types";
-import { MappingPreviewPanel } from "./mapping-preview-panel";
 import { SonarrPanel } from "./sonarr-panel";
 import type { SonarrPanelProps } from "../types";
-import { useMappingController } from "../hooks/use-mapping-controller";
+import { useMappingController } from "@/shared/mapping";
 import { useSonarrPanelController } from "../hooks/use-sonarr-panel-controller";
 import { usePublicOptions } from "@/shared/hooks/use-api-queries";
 import { useConfirm } from "@/shared/hooks/use-confirm";
@@ -315,7 +314,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
               <div className="flex h-full flex-col overflow-hidden">
                 <div className="flex-1 min-h-0">
                   {viewMode === "mapping" ? (
-                    <SearchSection
+                    <MappingSearchPanel
                       controller={mappingController}
                       currentMapping={effectiveCurrentMapping}
                       baseUrl={baseUrl}
@@ -335,7 +334,6 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                 <div className="sticky top-0">
                   <MappingPreviewPanel
                     aniListEntry={mappingTabProps.aniListEntry}
-                    otherAniListIds={mappingTabProps.otherAniListIds}
                     baseUrl={baseUrl}
                     currentMapping={effectiveCurrentMapping}
                     previewMapping={previewMapping}

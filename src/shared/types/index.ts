@@ -6,7 +6,10 @@ export type {
   AniMedia,
   AniTitles,
   MediaMetadataHint,
-  MediaStatus
+  MediaStatus,
+  AniListMetadata,
+  AniListMetadataBundle,
+  AniListSearchResult,
 } from './anilist';
 
 export type {
@@ -45,6 +48,12 @@ export {
   type MappingContext,
   type ScoredCandidate,
   type MappingOverrideRecord,
+  type MappingSummary,
+  type MappingExternalId,
+  type MappingProvider,
+  type MappingSource,
+  type MappingStatus,
+  type MappingIgnoreRecord,
 } from './mapping';
 
 export type { RequestPriority } from './common';

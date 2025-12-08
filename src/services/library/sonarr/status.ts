@@ -78,7 +78,7 @@ export class SonarrStatus {
       } catch (error) {
         const normalized = normalizeError(error);
         if (normalized.code === ErrorCode.CONFIGURATION_ERROR) {
-          return { exists: false, tvdbId: null, anilistTvdbLinkMissing: true };
+          return { exists: false, tvdbId: null, externalId: null, anilistTvdbLinkMissing: true };
         }
         logError(normalized, `SonarrStatus:getSeriesStatus:${payload.anilistId}`);
         throw normalized;
@@ -87,7 +87,7 @@ export class SonarrStatus {
 
     if (tvdbId === null) {
       if (import.meta.env.DEV) console.debug(`[ani2arr | SonarrStatus] status:result anilistId=${payload.anilistId} outcome=unresolved`);
-      return { exists: false, tvdbId: null, anilistTvdbLinkMissing: true };
+      return { exists: false, tvdbId: null, externalId: null, anilistTvdbLinkMissing: true };
     }
 
     if (typeof this.mapping.getLinkedAniListIdsForTvdb === 'function') {
@@ -104,6 +104,7 @@ export class SonarrStatus {
       const out: CheckSeriesStatusResponse = {
         exists: existsInCache,
         tvdbId,
+        externalId: { id: tvdbId, kind: 'tvdb' },
         ...(cachedSeries ? { series: cachedSeries } : {}),
         ...(successfulSynonym ? { successfulSynonym } : {}),
         ...(linkedAniListIds ? { linkedAniListIds } : {}),
@@ -134,6 +135,7 @@ export class SonarrStatus {
       const out2: CheckSeriesStatusResponse = {
         exists: true,
         tvdbId,
+        externalId: { id: tvdbId, kind: 'tvdb' },
         series: liveSeries,
         ...(successfulSynonym ? { successfulSynonym } : {}),
         ...(linkedAniListIds ? { linkedAniListIds } : {}),
@@ -158,6 +160,7 @@ export class SonarrStatus {
     const out3: CheckSeriesStatusResponse = {
       exists: false,
       tvdbId,
+      externalId: { id: tvdbId, kind: 'tvdb' },
       ...(lookupSeries ? { series: lookupSeries } : {}),
       ...(successfulSynonym ? { successfulSynonym } : {}),
       ...(linkedAniListIds ? { linkedAniListIds } : {}),

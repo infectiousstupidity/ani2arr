@@ -280,4 +280,18 @@ export class StaticMappingProvider {
     collect(this.fallbackReverse);
     return Array.from(ids);
   }
+
+  public listAllPairs(): Array<{ anilistId: number; tvdbId: number; source: StaticMappingSource }> {
+    const entries: Array<{ anilistId: number; tvdbId: number; source: StaticMappingSource }> = [];
+    const seen = new Set<number>();
+    for (const [anilistId, tvdbId] of this.primaryPairs.entries()) {
+      entries.push({ anilistId, tvdbId, source: 'primary' });
+      seen.add(anilistId);
+    }
+    for (const [anilistId, tvdbId] of this.fallbackPairs.entries()) {
+      if (seen.has(anilistId)) continue;
+      entries.push({ anilistId, tvdbId, source: 'fallback' });
+    }
+    return entries;
+  }
 }
