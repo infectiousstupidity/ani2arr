@@ -30,6 +30,7 @@ Run all commands from the project root.
 * `npm run dev` / `npm run dev:firefox` — starts the WXT dev server with hot reload.
 * `npm run build` — creates a production bundle in `dist/`.
 * `npm run zip` — builds distributable extension archives.
+* `npm run generate:anilist-metadata` — regenerates the baked AniList metadata index used by the options mappings table.
 * `npm run lint` — ESLint 9 with TypeScript config. Must pass clean.
 
 Always run **lint and build** after code edits.
@@ -70,13 +71,21 @@ Do **not** ask for confirmation before running these commands.
   * Shape: `{ [anilistId: string]: { tvdbId: number; updatedAt: number } }`.
   * `MappingService` checks overrides first; overrides are authoritative.
   * Per-ID cache eviction helper used when overrides change.
+* Options `getMappings` RPC returns provider summaries only (no AniList lookups). Inputs: `sources`/`providers`/`limit`/`cursor`; defaults to manual + ignored + auto with limit 500, sorted by `updatedAt` desc then `anilistId` asc.
 
-### AniList API (`src/api/anilist.api.ts`)
+### AniList API (`src/api/anilist/`)
 
 * Single-lane queue (concurrency 1).
 * Inflight deduplication and 429 `Retry-After` handling.
 * Batch size 50.
 * Multi-hop prequel traversal.
+
+### AniList metadata (`src/services/anilist-metadata.store.ts`)
+
+* Baked index lives at `public/anilist-static-metadata.json` (generated via `npm run generate:anilist-metadata`).
+* Loads baked payload on background startup; refreshed entries stored in `browser.storage.local` under `local:anilistMetadata`.
+* Stale after ~45d; hard drop at 120d. Refresh batch cap = 10 IDs per call to avoid starving overlays.
+* `getAniListMetadata(ids)` returns baked/locally refreshed entries and only hits AniList for missing/stale IDs.
 
 ### Sonarr API (`src/api/sonarr.api.ts`)
 
@@ -101,6 +110,7 @@ Do **not** ask for confirmation before running these commands.
 * TanStack persistence wrapper: `src/utils/query-persist-options.ts`.
 * Guards `DataCloneError` and excludes credential-bearing queries.
 * Mapping overrides are persisted via `@wxt-dev/storage` sync storage (no secrets) with a local mirror for fast reads.
+* `useMappings` is an infinite query with `meta.persist=false` and ~45m `staleTime`; rely on explicit invalidations for refresh. Upstream dataset must be fetched via filters (defaults to manual/ignored/auto only). Use `useAniListMetadataBatch` to hydrate titles/covers without touching AniList in `getMappings`.
 
 ---
 
@@ -123,7 +133,7 @@ All messages and broadcasts must include `_a2a: true`.
 
 ### Background messages
 
-* `OPEN_OPTIONS_PAGE` — open the options page.
+* `OPEN_OPTIONS_PAGE` — open the options page; accepts optional `sectionId?: 'sonarr' | 'radarr' | 'mappings' | 'ui' | 'advanced'` to navigate directly to a section.
 * `a2a:mapping:refresh` — trigger static mapping refresh.
 * `a2a:match:score-batch` — compute title match scores.
 * `{ type: 'a2a:ping' }` — readiness probe.
@@ -206,6 +216,7 @@ Centralize shared types in `src/shared/types/` and re-export curated surfaces vi
   * AniList domain: `src/shared/types/anilist.ts`
   * Sonarr domain: `src/shared/types/sonarr.ts`
   * Extension/options and payloads: `src/shared/types/extension.ts`
+  * Settings schema + defaults: `src/shared/schemas/settings.ts` (source of truth for options shape)
   * Mapping: `src/shared/types/mapping.ts`
   * Overlay/UI adapters: `src/shared/types/browse-overlay.ts`
 * Patterns
@@ -259,6 +270,12 @@ Centralize shared types in `src/shared/types/` and re-export curated surfaces vi
 2. Guard duplicates with `data-a2a-processed`.
 3. Mount portals into the shadow root.
 
+### Regenerate AniList metadata index
+
+1. Run `npm run generate:anilist-metadata` from project root (reads static mapping sources, batches AniList in 50s).
+2. Commit the updated `public/anilist-static-metadata.json`.
+3. Ensure background metadata store still loads and `useAniListMetadataBatch` hydrates options rows without hitting AniList.
+
 ---
 
 ## 13. Tests and validation
@@ -287,13 +304,14 @@ Smoke validation checklist:
 | ------------- | ----------------------------------------------------------------------------- |
 | RPC           | `src/rpc/index.ts`, `src/rpc/schemas.ts`                                      |
 | Mapping       | `src/services/mapping/*`                                                      |
-| AniList API   | `src/api/anilist.api.ts`                                                      |
+| AniList API   | `src/api/anilist/`                                                            |
 | Sonarr API    | `src/api/sonarr.api.ts`                                                       |
 | Library       | `src/services/library.service.ts`                                             |
 | Persistence   | `src/cache/query-cache.ts`, `src/shared/utils/query-persist-options.ts`              |
 | Overrides     | `src/shared/utils/overrides-storage.ts`, `src/services/mapping/overrides.service.ts` |
 | Broadcasts    | `src/shared/hooks/use-broadcasts.ts`                                                 |
 | UI            | `src/shared/components/media-actions.tsx`, `src/shared/components/form.tsx`, `src/features/media-overlay/components/media-overlay.tsx` |
+| Options mappings | `src/entrypoints/options/components/mappings-explorer.tsx`, `src/shared/mapping/mapping-editor.tsx` |
 | Config        | `wxt.config.ts`                                                               |
 | Retry helpers | `src/shared/utils/retry.ts`                                                          |
 

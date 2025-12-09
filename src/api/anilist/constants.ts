@@ -1,0 +1,7 @@
+export const API_URL = 'https://graphql.anilist.co';
+export const QUEUE_CONCURRENCY = 1;
+export const MEDIA_SOFT_TTL = 14 * 24 * 60 * 60 * 1000; // 14 days
+export const MEDIA_HARD_TTL = 60 * 24 * 60 * 60 * 1000; // 60 days
+export const DEFAULT_PREQUEL_DEPTH = 5;
+export const DEFAULT_RATE_LIMIT_DELAY_MS = 5_000;
+export const MAX_BATCH_SIZE = 50;

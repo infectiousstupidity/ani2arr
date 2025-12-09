@@ -1,0 +1,1 @@
+export { AnilistApiService } from './service';
