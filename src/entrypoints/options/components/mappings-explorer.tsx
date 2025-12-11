@@ -42,8 +42,6 @@ const parseAniListIdInput = (input: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-// Debounce helper moved to shared hook: `useDebounced`
-
 const AddMissingEntryDialog: React.FC<AddMissingEntryDialogProps> = ({ open, onClose, onSelect }) => {
   const [input, setInput] = useState('');
   const debouncedInput = useDebounced(input, 300);

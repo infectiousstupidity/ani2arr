@@ -7,6 +7,7 @@ import { MappingPreviewPanel } from './mapping-preview-panel';
 import { MappingSearchPanel } from './mapping-search-panel';
 import { useMappingController } from './use-mapping-controller';
 import type { MappingExternalId, MappingProvider, MappingSearchResult, SonarrLookupSeries } from '@/shared/types';
+import { metadataFromMediaObject } from '@/shared/utils/anilist-dom';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
 import { useToast } from '@/shared/components/toast-provider';
 
@@ -51,7 +52,7 @@ const buildCurrentMapping = (
 export const MappingEditor: React.FC<MappingEditorProps> = ({
   anilistId,
   open,
-      onClose,
+  onClose,
   initialExternalId,
   provider,
 }) => {
@@ -60,7 +61,25 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
   const baseUrl = publicOptions.data?.sonarrUrl ?? '';
 
   const aniListMedia = useAniListMedia(anilistId, { enabled: open });
-  const seriesStatus = useSeriesStatus({ anilistId }, { enabled: open });
+  const aniTitle = useMemo(
+    () =>
+      aniListMedia.data?.title?.english ||
+      aniListMedia.data?.title?.romaji ||
+      aniListMedia.data?.title?.native ||
+      `AniList #${anilistId}`,
+    [aniListMedia.data, anilistId],
+  );
+  const metadataHint = useMemo(() => metadataFromMediaObject(aniListMedia.data), [aniListMedia.data]);
+
+  const seriesStatus = useSeriesStatus(
+    { anilistId, title: aniTitle, metadata: metadataHint },
+    {
+      enabled: open,
+      force_verify: true,
+      ignoreFailureCache: true,
+      priority: 'high',
+    },
+  );
 
   const statusSeries = seriesStatus.data?.series as SonarrLookupSeries | undefined;
   const statusExternalId: MappingExternalId | null =
@@ -77,9 +96,9 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
       linkedAniListIds,
       seriesStatus.data?.exists ?? false,
       baseUrl,
-      aniListMedia.data?.title?.english || aniListMedia.data?.title?.romaji || aniListMedia.data?.title?.native,
+      aniTitle,
     );
-  }, [aniListMedia.data, baseUrl, externalId, linkedAniListIds, seriesStatus.data?.exists, statusSeries]);
+  }, [aniTitle, baseUrl, externalId, linkedAniListIds, seriesStatus.data?.exists, statusSeries]);
 
   const mappingController = useMappingController({
     service: provider,
@@ -108,12 +127,6 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
       });
     }
   };
-
-  const aniTitle =
-    aniListMedia.data?.title?.english ||
-    aniListMedia.data?.title?.romaji ||
-    aniListMedia.data?.title?.native ||
-    `AniList #${anilistId}`;
 
   return (
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
