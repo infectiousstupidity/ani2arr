@@ -1,6 +1,5 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useMemo } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronDown, EyeOff, Pencil, Trash2, Undo2 } from 'lucide-react';
 import type {
   MappingExternalId,
@@ -11,7 +10,6 @@ import type {
 import type { AniListMetadataDto } from '@/rpc/schemas';
 import {
   useAniListMetadataBatch,
-  usePublicOptions,
   useSeriesStatus,
 } from '@/shared/hooks/use-api-queries';
 import Button from '@/shared/components/button';
@@ -19,11 +17,6 @@ import Pill from '@/shared/components/pill';
 import { cn } from '@/shared/utils/cn';
 import SonarrIcon from '@/assets/sonarr.svg';
 import RadarrIcon from '@/assets/radarr.svg';
-
-/** Height of collapsed accordion row header in pixels */
-const ROW_HEIGHT_COLLAPSED = 56;
-/** Estimated height of expanded content per entry */
-const ENTRY_HEIGHT_EXPANDED = 140;
 
 export type MappingTableEntry = {
   entry: MappingSummary;
@@ -39,23 +32,6 @@ export type MappingTableRowData = {
   entries: MappingTableEntry[];
   sources: MappingSource[];
   updatedAt?: number;
-};
-
-type MappingTableProps = {
-  rows: MappingTableRowData[];
-  isLoading: boolean;
-  isRefreshing?: boolean;
-  hasNextPage: boolean;
-  isFetchingNextPage: boolean;
-  onLoadMore: () => void;
-  onEdit: (entry: MappingSummary) => void;
-  onDeleteOverride: (entry: MappingSummary) => void;
-  onIgnore: (entry: MappingSummary) => void;
-  onClearIgnore: (entry: MappingSummary) => void;
-  isMutating: boolean;
-  totalCount?: number;
-  loadedCount?: number;
-  emptyCopy?: string;
 };
 
 const sourceStyles: Record<MappingSummary['source'], { label: string; className: string }> = {
@@ -109,7 +85,7 @@ const buildProviderLink = (
   return null;
 };
 
-const MappingEntryRow: React.FC<{
+type MappingEntryRowProps = {
   entry: MappingSummary;
   title: string;
   metadata?: AniListMetadataDto | null | undefined;
@@ -119,7 +95,9 @@ const MappingEntryRow: React.FC<{
   onIgnore: (entry: MappingSummary) => void;
   onClearIgnore: (entry: MappingSummary) => void;
   providerUrl?: string | null;
-}> = ({
+};
+
+const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   entry,
   title,
   metadata,
@@ -262,7 +240,7 @@ const MappingEntryRow: React.FC<{
                 onClick={() => onEdit(entry)}
                 disabled={isMutating}
                 tooltip={entry.provider === 'sonarr' ? 'Edit mapping' : 'Radarr editing coming soon'}
-                  aria-label="Edit mapping"
+                aria-label={entry.provider === 'sonarr' ? 'Edit mapping' : 'Radarr editing coming soon'}
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
@@ -295,7 +273,7 @@ const MappingEntryRow: React.FC<{
   );
 };
 
-const MappingAccordionItem: React.FC<{
+type MappingAccordionItemProps = {
   row: MappingTableRowData;
   isMutating: boolean;
   isExpanded: boolean;
@@ -304,7 +282,18 @@ const MappingAccordionItem: React.FC<{
   onIgnore: (entry: MappingSummary) => void;
   onClearIgnore: (entry: MappingSummary) => void;
   providerUrl?: string | null;
-}> = ({ row, isMutating, isExpanded, onEdit, onDeleteOverride, onIgnore, onClearIgnore, providerUrl }) => {
+};
+
+export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
+  row,
+  isMutating,
+  isExpanded,
+  onEdit,
+  onDeleteOverride,
+  onIgnore,
+  onClearIgnore,
+  providerUrl,
+}) => {
   const anilistIds = useMemo(
     () =>
       Array.from(
@@ -457,132 +446,3 @@ const MappingAccordionItem: React.FC<{
     </Accordion.Item>
   );
 };
-
-export const MappingTable: React.FC<MappingTableProps> = ({
-  rows,
-  isLoading,
-  isRefreshing,
-  hasNextPage,
-  isFetchingNextPage,
-  onLoadMore,
-  onEdit,
-  onDeleteOverride,
-  onIgnore,
-  onClearIgnore,
-  isMutating,
-  totalCount,
-  emptyCopy,
-}) => {
-  const [expandedItems, setExpandedItems] = useState<string[]>([]);
-  const expandedSet = useMemo(() => new Set(expandedItems), [expandedItems]);
-  const { data: publicOptions } = usePublicOptions();
-  const sonarrUrl = publicOptions?.sonarrUrl ?? null;
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  // Estimate row height based on expansion state
-  const estimateSize = useCallback(
-    (index: number) => {
-      const row = rows[index];
-      if (!row) return ROW_HEIGHT_COLLAPSED;
-      if (expandedSet.has(row.id)) {
-        // Header + padding + entries
-        return ROW_HEIGHT_COLLAPSED + 24 + row.entries.length * ENTRY_HEIGHT_EXPANDED;
-      }
-      return ROW_HEIGHT_COLLAPSED;
-    },
-    [rows, expandedSet],
-  );
-
-  const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scrollContainerRef.current,
-    estimateSize,
-    overscan: 5,
-  });
-
-  const handleValueChange = useCallback((newValue: string[]) => {
-    setExpandedItems(newValue);
-  }, []);
-
-  if (isLoading) {
-    return <div className="px-4 py-6 text-sm text-text-secondary">Loading mappings...</div>;
-  }
-
-  if (!rows.length) {
-    return (
-      <div className="px-4 py-6 text-sm text-text-secondary">
-        {emptyCopy ?? 'No mappings match this filter.'}
-      </div>
-    );
-  }
-
-  const virtualItems = virtualizer.getVirtualItems();
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 border-b border-border-primary/70 px-4 py-2 text-xs text-text-secondary md:px-6">
-        <span>Showing {rows.length} of {totalCount ?? rows.length}</span>
-        {isRefreshing ? <span className="text-text-tertiary">· Refreshing...</span> : null}
-      </div>
-
-      <div
-        ref={scrollContainerRef}
-        className="max-h-[70vh] min-h-60 overflow-auto"
-      >
-        <Accordion.Root
-          type="multiple"
-          value={expandedItems}
-          onValueChange={handleValueChange}
-          style={{ height: virtualizer.getTotalSize(), position: 'relative' }}
-        >
-          {virtualItems.map((virtualRow) => {
-            const row = rows[virtualRow.index];
-            if (!row) return null;
-            const isExpanded = expandedSet.has(row.id);
-            const providerUrl = row.provider === 'sonarr' ? sonarrUrl : null;
-            return (
-              <div
-                key={row.id}
-                data-index={virtualRow.index}
-                ref={virtualizer.measureElement}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  transform: `translateY(${virtualRow.start}px)`,
-                }}
-              >
-                <MappingAccordionItem
-                  row={row}
-                  isMutating={isMutating}
-                  isExpanded={isExpanded}
-                  onEdit={onEdit}
-                  onDeleteOverride={onDeleteOverride}
-                  onIgnore={onIgnore}
-                  onClearIgnore={onClearIgnore}
-                  providerUrl={providerUrl}
-                />
-              </div>
-            );
-          })}
-        </Accordion.Root>
-      </div>
-
-      {hasNextPage ? (
-        <div className="border-t border-border-primary/70 bg-bg-secondary/60 px-4 py-3 text-center">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onLoadMore}
-            isLoading={isFetchingNextPage}
-          >
-            {isFetchingNextPage ? 'Loading more...' : 'Load more results'}
-          </Button>
-        </div>
-      ) : null}
-    </div>
-  );
-};
-
-export default MappingTable;

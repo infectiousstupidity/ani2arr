@@ -8,7 +8,7 @@ import ToastProvider from '@/shared/components/toast-provider';
 import { SaveSettingsBar } from '@/shared/components/settings-form';
 import './style.css';
 import { ConfirmProvider } from '@/shared/hooks/use-confirm';
-import MappingsSection from '@/entrypoints/options/components/mappings-section';
+import MappingsSection from '@/entrypoints/options/pages/mappings-section';
 import UiSection from '@/entrypoints/options/components/ui-section';
 import AdvancedSection from '@/entrypoints/options/components/advanced-section';
 import SonarrPage from '@/entrypoints/options/pages/sonarr';
