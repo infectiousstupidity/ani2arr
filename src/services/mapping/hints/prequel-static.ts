@@ -1,7 +1,7 @@
 import type { AnilistApiService } from '@/api/anilist.api';
 import type { AniMedia } from '@/shared/types';
-import type { StaticMappingProvider } from './static-mapping.provider';
-import type { ResolvedMapping } from './types';
+import type { StaticMappingProvider } from '../static-mapping.provider';
+import type { ResolvedMapping } from '../types';
 
 export async function resolvePrequelStatic(
   media: AniMedia,

@@ -278,7 +278,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
       <ModalContent
         container={portalContainer ?? null}
         floatingPortalRef={handleFloatingPortalRef}
-        className="w-full max-w-[1000px] h-[75.5vh] flex flex-col overflow-hidden rounded-none bg-bg-primary shadow-2xl shadow-black/40 p-0 sm:h-[vh] sm:min-h-[720px] sm:rounded-2xl"
+        className="w-full max-w-250 h-[75.5vh] flex flex-col overflow-hidden rounded-none bg-bg-primary shadow-2xl shadow-black/40 p-0 sm:h-[vh] sm:min-h-180 sm:rounded-2xl"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
         }}
@@ -309,7 +309,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
         />
         {/* Content Area - split view with sticky preview and inline content */}
         <div className="flex-1 overflow-hidden px-8">
-          <div className="mx-auto flex h-full max-w-[1000px] flex-col gap-6">
+          <div className="mx-auto flex h-full max-w-250 flex-col gap-6">
             <div className="grid h-full grid-cols-2 gap-6">
               <div className="flex h-full flex-col overflow-hidden">
                 <div className="flex-1 min-h-0">

@@ -1,7 +1,7 @@
 import type { AnilistApiService } from '@/api/anilist.api';
 import type { SonarrLookupClient, SonarrLookupCredentials } from '@/services/mapping/sonarr-lookup.client';
 import type { StaticMappingProvider } from '@/services/mapping/static-mapping.provider';
-import type { SearchTerm } from '@/services/mapping/search-term-generator';
+import type { SearchTerm } from '@/services/mapping/pipeline/search-term-generator';
 import type { SonarrLookupSeries } from './sonarr';
 import type { ScopedLogger } from '@/shared/utils/logger';
 import type { AniMedia } from './anilist';

@@ -78,7 +78,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
   return (
     <header className="relative mb-12">
       <div
-        className="relative h-[200px] w-full overflow-hidden bg-bg-tertiary bg-cover bg-center bg-no-repeat shadow-[inset_0_0_250px_#121722]"
+        className="relative h-50 w-full overflow-hidden bg-bg-tertiary bg-cover bg-center bg-no-repeat shadow-[inset_0_0_250px_#121722]"
         style={{
           backgroundImage: bannerImage ? `url(${bannerImage})` : undefined,
         }}
@@ -101,7 +101,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
 
         <div className="mt-auto px-8 pb-14">
           <div className="flex items-start gap-4">
-            <div className="hidden h-[150px] w-[110px] shrink-0 overflow-hidden rounded-xl border border-border-primary/60 bg-bg-tertiary/80 shadow-lg sm:block relative z-20 translate-y-8">
+            <div className="hidden h-37.5 w-27.5 shrink-0 overflow-hidden rounded-xl border border-border-primary/60 bg-bg-tertiary/80 shadow-lg sm:block relative z-20 translate-y-8">
               {coverImage ? (
                 <img
                   src={coverImage}

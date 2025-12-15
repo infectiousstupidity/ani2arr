@@ -1,4 +1,3 @@
-// src/services/mapping/search-term-generator.ts
 import type { AniTitles } from '@/shared/types';
 import { canonicalTitleKey, isOrdinalToken, stripParenContent, sanitizeLookupDisplay } from '@/shared/utils/matching';
 
@@ -8,12 +7,14 @@ export interface SearchTerm {
 }
 
 const SEASON_INDICATORS = new Set(['season', 'part', 'cour']);
+
+// Intentionally permissive — detects Roman numeral-like tokens, not strict validation
 const ROMAN_NUMERAL_RE = /^[ivxlcdm]+$/i;
 const SEASON_CODE_RE = /^s\d+$/i;
 
 export function isSeasonalCanonicalTokens(tokens: string[]): boolean {
   if (tokens.length === 0) {
-    return true;
+    return false; // Empty input is not "seasonal"
   }
   return tokens.every(
     token => isOrdinalToken(token) || ROMAN_NUMERAL_RE.test(token) || SEASON_CODE_RE.test(token) || SEASON_INDICATORS.has(token),

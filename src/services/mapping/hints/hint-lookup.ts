@@ -1,10 +1,11 @@
-import type { SonarrLookupCredentials } from './sonarr-lookup.client';
-import type { SonarrLookupClient } from './sonarr-lookup.client';
+import type { SonarrLookupCredentials } from '../sonarr-lookup.client';
+import type { SonarrLookupClient } from '../sonarr-lookup.client';
 import { canonicalTitleKey, sanitizeLookupDisplay } from '@/shared/utils/matching';
-import { scoreCandidates } from './scoring';
-import { isSeasonalCanonicalTokens } from './search-term-generator';
-import type { ResolvedMapping } from './types';
+import { scoreCandidates } from '../pipeline/scoring';
+import { isSeasonalCanonicalTokens } from '../pipeline/search-term-generator';
+import type { ResolvedMapping } from '../types';
 import type { ScopedLogger } from '@/shared/utils/logger';
+import { SCORE_THRESHOLD } from '../constants';
 
 export async function tryHintLookup(
   term: string,
@@ -32,7 +33,7 @@ export async function tryHintLookup(
   });
   const scored = scoreCandidates({ canonical, display: sanitized }, results);
   const top = scored[0];
-  if (top && top.score >= 0.76) {
+  if (top && top.score >= SCORE_THRESHOLD) {
     log.debug?.(
       `mapping:hint-hit canonical="${canonical}" tvdbId=${top.result.tvdbId} score=${top.score} synonym="${sanitized}"`,
     );

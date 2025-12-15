@@ -1,4 +1,3 @@
-// src/services/mapping/scoring.ts
 import type { SonarrLookupSeries, ScoredCandidate } from '@/shared/types';
 import type { SearchTerm } from './search-term-generator';
 import { computeTitleMatchScore } from '@/shared/utils/matching';

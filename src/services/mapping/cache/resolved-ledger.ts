@@ -1,4 +1,4 @@
-import type { ResolvedMapping } from './types';
+import type { ResolvedMapping } from '../types';
 
 export type ResolvedMappingSource = 'auto' | 'upstream';
 
@@ -12,11 +12,10 @@ export class ResolvedLedger {
   private readonly entries = new Map<number, ResolvedLedgerEntry>();
 
   public record(anilistId: number, mapping: ResolvedMapping, source: ResolvedMappingSource): void {
-    const { tvdbId, successfulSynonym } = mapping;
     this.entries.set(anilistId, {
       anilistId,
-      tvdbId,
-      ...(successfulSynonym !== undefined ? { successfulSynonym } : {}),
+      tvdbId: mapping.tvdbId,
+      ...(mapping.successfulSynonym ? { successfulSynonym: mapping.successfulSynonym } : {}),
       source,
       updatedAt: Date.now(),
     });

@@ -4,9 +4,13 @@ import type { AniListMetadata, AniListMetadataBundle, AniMedia, AniTitles } from
 import { logError, normalizeError } from '@/shared/utils/error-handling';
 import { logger } from '@/shared/utils/logger';
 
+
+// Helper to convert days to milliseconds
+const days = (n: number): number => n * 24 * 60 * 60 * 1000;
+
 const STORAGE_KEY = 'local:anilistMetadata';
-const BAKED_STALE_MS = 45 * 24 * 60 * 60 * 1000; // 45 days
-const BAKED_HARD_MS = 120 * 24 * 60 * 60 * 1000; // 120 days
+const BAKED_STALE_MS = days(45); // 45 days
+const BAKED_HARD_MS = days(120); // 120 days
 const MAX_REFRESH_BATCH = 10;
 
 type PersistedRecord = Record<string, AniListMetadata>;

@@ -1,4 +1,3 @@
-// src/services/mapping/early-stop.ts
 import type { ScoredCandidate } from '@/shared/types';
 
 export interface EarlyStopLimits {

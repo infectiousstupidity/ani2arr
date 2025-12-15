@@ -83,7 +83,7 @@ Browse overlays share mount/bootstrap plumbing (QueryClient, style injection, mo
 * Batch size 50.
 * Multi-hop prequel traversal.
 
-### AniList metadata (`src/services/anilist-metadata.store.ts`)
+### AniList metadata (`src/services/anilist/metadata.store.ts`)
 
 * Baked index lives at `public/anilist-static-metadata.json` (generated via `npm run generate:anilist-metadata`).
 * Loads baked payload on background startup; refreshed entries stored in `browser.storage.local` under `local:anilistMetadata`.
