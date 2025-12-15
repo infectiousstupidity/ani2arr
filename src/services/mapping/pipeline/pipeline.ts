@@ -1,9 +1,10 @@
-// src/services/mapping/pipeline.ts
 import { generateSearchTerms, isSeasonalCanonicalTokens } from './search-term-generator';
 import { scoreCandidates } from './scoring';
 import { maybeEarlyStop, pickBest } from './early-stop';
 import type { EvaluationOutcome, EvaluationOutcomeResolved, MappingContext, AniMedia } from '@/shared/types';
 import { canonicalTitleKey, sanitizeLookupDisplay } from '@/shared/utils/matching';
+import { PIPELINE_SOFT_TIME_BUDGET_MS } from '../constants';
+
 
 export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, primaryTitleHint?: string): Promise<EvaluationOutcome> {
   if (import.meta.env.DEV) {
@@ -65,7 +66,7 @@ export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, p
     const scored = scoreCandidates(term, results, mediaYear);
     overall = overall.concat(scored);
 
-    // Mark canonical as seen once we’ve either looked up or confirmed a cache hit
+    // Mark canonical as seen once we've either looked up or confirmed a cache hit
     ctx.sessionSeenCanonical.add(term.canonical);
 
     const early = maybeEarlyStop(scored, {
@@ -88,7 +89,7 @@ export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, p
     }
 
     // Optional soft time budget guard (kept minimal per constraints)
-    if (Date.now() - start > 2000) break;
+    if (Date.now() - start > PIPELINE_SOFT_TIME_BUDGET_MS) break;
   }
 
   overall.sort((a, b) => b.score - a.score);

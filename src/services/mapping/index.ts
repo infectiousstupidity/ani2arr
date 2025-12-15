@@ -8,13 +8,13 @@ import { incrementCounter } from '@/shared/utils/metrics';
 import { logger } from '@/shared/utils/logger';
 import { StaticMappingProvider, type StaticMappingPayload } from './static-mapping.provider';
 import { SonarrLookupClient, type SonarrLookupCredentials } from './sonarr-lookup.client';
-import { resolveViaPipeline } from './pipeline';
+import { resolveViaPipeline } from './pipeline/pipeline';
 import { MappingOverridesService } from './overrides.service';
-import { buildMediaFromMetadataHint } from './media-hints';
-import { tryHintLookup } from './hint-lookup';
-import { ResolvedLedger } from './resolved-ledger';
-import { resolvePrequelStatic } from './prequel-static';
+import { buildMediaFromMetadataHint } from './hints/media-hints';
+import { tryHintLookup } from './hints/hint-lookup';
+import { resolvePrequelStatic } from './hints/prequel-static';
 import {
+  ResolvedLedger,
   ALLOWED_FORMATS,
   FAILURE_HARD_TTL,
   FAILURE_SOFT_TTL,
@@ -23,7 +23,10 @@ import {
   NO_MATCH_HARD_TTL,
   NO_MATCH_SOFT_TTL,
   RESOLVED_PERSIST_MS,
-} from './constants';
+  SCORE_THRESHOLD,
+  EARLY_STOP_THRESHOLD,
+  MAX_SEARCH_TERMS,
+} from './cache';
 import type { ResolveHints, ResolveTvdbIdOptions, ResolvedMapping } from './types';
 
 export class MappingService {
@@ -361,9 +364,9 @@ export class MappingService {
         ...(forceLookupNetwork ? { forceLookupNetwork: true } : {}),
         sessionSeenCanonical: this.sessionSeenCanonical,
         limits: {
-          maxTerms: 5,
-          scoreThreshold: 0.76,
-          earlyStopThreshold: 0.82,
+          maxTerms: MAX_SEARCH_TERMS,
+          scoreThreshold: SCORE_THRESHOLD,
+          earlyStopThreshold: EARLY_STOP_THRESHOLD,
         },
         log: this.log,
       },
