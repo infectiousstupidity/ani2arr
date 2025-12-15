@@ -77,7 +77,11 @@ export class SonarrStatus {
         }
       } catch (error) {
         const normalized = normalizeError(error);
-        if (normalized.code === ErrorCode.CONFIGURATION_ERROR) {
+        if (
+          normalized.code === ErrorCode.CONFIGURATION_ERROR ||
+          normalized.code === ErrorCode.SONARR_NOT_CONFIGURED ||
+          (normalized.code === ErrorCode.VALIDATION_ERROR && normalized.details?.reason === 'network-disabled')
+        ) {
           return { exists: false, tvdbId: null, externalId: null, anilistTvdbLinkMissing: true };
         }
         logError(normalized, `SonarrStatus:getSeriesStatus:${payload.anilistId}`);
