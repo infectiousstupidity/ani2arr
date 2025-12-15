@@ -26,12 +26,12 @@ Treat `AGENTS.md` as the source of truth for structure and conventions.
 
 Run all commands from the project root.
 
-* `npm install` — installs dependencies and runs `wxt prepare`.
-* `npm run dev` / `npm run dev:firefox` — starts the WXT dev server with hot reload.
-* `npm run build` — creates a production bundle in `dist/`.
-* `npm run zip` — builds distributable extension archives.
-* `npm run generate:anilist-metadata` — regenerates the baked AniList metadata index used by the options mappings table.
-* `npm run lint` — ESLint 9 with TypeScript config. Must pass clean.
+* `pnpm install` — installs dependencies and runs `wxt prepare`.
+* `pnpm run dev` / `pnpm run dev:firefox` — starts the WXT dev server with hot reload.
+* `pnpm run build` — creates a production bundle in `dist/`.
+* `pnpm run zip` — builds distributable extension archives.
+* `pnpm run generate:anilist-metadata` — regenerates the baked AniList metadata index used by the options mappings table.
+* `pnpm run lint` — ESLint 9 with TypeScript config. Must pass clean.
 
 Always run **lint and build** after code edits.
 Do **not** ask for confirmation before running these commands.
@@ -48,6 +48,8 @@ Do **not** ask for confirmation before running these commands.
 | `anichart-browse.content/` | Adds overlays for AniChart browse pages. Uses `cssInjection: 'ui'` and imports `@/styles/base.css` + per-entry `style.css` overrides.                      |
 | `options/`                 | Options page with sidebar routes: Sonarr (connection + defaults), Radarr (placeholder), Mappings & overrides, UI & injection, Advanced. Handles runtime permission requests; Sonarr defaults use `layout="grid"` in options. |
 | `popup/`                   | Exists but is not referenced by the manifest.                                                                                                                     |
+
+Browse overlays share mount/bootstrap plumbing (QueryClient, style injection, modal wiring) via `src/shared/entrypoints/browse-bootstrap.tsx` + `src/shared/entrypoints/browse-root.tsx`; use these helpers instead of duplicating setup in entrypoint files.
 
 ---
 
@@ -272,7 +274,7 @@ Centralize shared types in `src/shared/types/` and re-export curated surfaces vi
 
 ### Regenerate AniList metadata index
 
-1. Run `npm run generate:anilist-metadata` from project root (reads static mapping sources, batches AniList in 50s).
+1. Run `pnpm run generate:anilist-metadata` from project root (reads static mapping sources, batches AniList in 50s).
 2. Commit the updated `public/anilist-static-metadata.json`.
 3. Ensure background metadata store still loads and `useAniListMetadataBatch` hydrates options rows without hitting AniList.
 
@@ -283,8 +285,8 @@ Centralize shared types in `src/shared/types/` and re-export curated surfaces vi
 Run targeted tests first, then full suite if shared modules changed.
 
 ```bash
-npm run lint
-npm run compile
+pnpm run lint
+pnpm run compile
 ```
 
 Smoke validation checklist:
@@ -319,8 +321,8 @@ Smoke validation checklist:
 
 ## 15. Final checklist before commit
 
-* ✅ `npm run lint` passes with no warnings.
-* ✅ `npm run build` completes successfully.
+* ✅ `pnpm run lint` passes with no warnings.
+* ✅ `pnpm run build` completes successfully.
 * ✅ Background service responds to ping.
 * ✅ Options page permission flow works.
 * ✅ AniList overlay injects once and renders correctly.

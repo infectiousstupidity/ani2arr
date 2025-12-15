@@ -35,10 +35,25 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
   const staticallyMappedRef = useRef<Set<number>>(new Set());
   const offscreenQueueRef = useRef<number[]>([]);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const observedContainersRef = useRef<Set<Element>>(new Set());
   const busyRef = useRef(false);
   const infoBurstCountRef = useRef(0);
   const initLoggedRef = useRef(false);
+  const timerRef = useRef<number | null>(null);
 
+  // Stable tick function that doesn't depend on cardPortals
+  const tickRef = useRef<(() => Promise<void>) | null>(null);
+
+  // Derive container->ID map from cardPortals as a stable memoized value
+  const containerIdMap = useMemo(() => {
+    const map = new Map<Element, number>();
+    for (const [container, parsed] of cardPortals) {
+      map.set(container, parsed.anilistId);
+    }
+    return map;
+  }, [cardPortals]);
+
+  // Initialize observer and timer once when enabled
   useEffect(() => {
     if (!isEnabled) return;
 
@@ -46,15 +61,13 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
     if (!initLoggedRef.current) {
       initLoggedRef.current = true;
       try {
-        log.info?.(
-          `prefetch:init enabled path=${window.location.pathname} cards=${cardPortals.size}`,
-        );
+        log.info?.(`prefetch:init enabled path=${window.location.pathname}`);
       } catch {
         // ignore
       }
     }
 
-    // Ensure an observer exists
+    // Create observer if it doesn't exist
     if (!observerRef.current) {
       observerRef.current = new IntersectionObserver(
         entries => {
@@ -84,29 +97,8 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       );
     }
 
-    const observer = observerRef.current;
-
-    // Track current containers and observe them
-    const currentContainers = Array.from(cardPortals.keys());
-    const idByContainer = idByContainerRef.current;
-
-    // Observe new containers and map ids
-    for (const container of currentContainers) {
-      const parsed = cardPortals.get(container);
-      if (!parsed) continue;
-      idByContainer.set(container, parsed.anilistId);
-      try {
-        observer.observe(container);
-      } catch {
-        // ignore
-      }
-    }
-
-    // Debounced scheduler loop
-    let timer: number | null = null;
-    const TICK_MS = 300;
-
-    const tick = async () => {
+    // Define the tick function
+    tickRef.current = async () => {
       if (!isEnabled) return;
       if (busyRef.current) return;
 
@@ -184,31 +176,75 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       }
     };
 
-    const start = () => {
-      if (timer !== null) return;
-      timer = window.setInterval(tick, TICK_MS);
-    };
-    const stop = () => {
-      if (timer !== null) {
-        window.clearInterval(timer);
-        timer = null;
-      }
-    };
+    // Start the interval timer
+    const TICK_MS = 300;
+    if (timerRef.current === null) {
+      timerRef.current = window.setInterval(() => {
+        tickRef.current?.();
+      }, TICK_MS);
+    }
 
-    start();
+    // Capture refs for cleanup
+    const observedContainers = observedContainersRef.current;
 
+    // Cleanup only on disable or unmount
     return () => {
-      stop();
+      if (timerRef.current !== null) {
+        window.clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       try {
-        observer.disconnect();
+        observerRef.current?.disconnect();
       } catch {
         // ignore
       }
-      // Reset state without reading ref values in cleanup
+      observerRef.current = null;
+      observedContainers.clear();
+      observedContainersRef.current = new Set();
       visibleIdsRef.current = new Set();
       offscreenQueueRef.current = [];
+      tickRef.current = null;
     };
-  }, [isEnabled, api, cardPortals]);
+  }, [isEnabled, api]);
+
+  // Incremental observer updates: only observe added containers, unobserve removed ones
+  useEffect(() => {
+    if (!isEnabled) return;
+
+    const observer = observerRef.current;
+    if (!observer) return;
+
+    const idByContainer = idByContainerRef.current;
+    const observedContainers = observedContainersRef.current;
+    const currentContainers = new Set(containerIdMap.keys());
+
+    // Find removed containers and unobserve them
+    for (const container of observedContainers) {
+      if (!currentContainers.has(container)) {
+        try {
+          observer.unobserve(container);
+        } catch {
+          // ignore
+        }
+        observedContainers.delete(container);
+      }
+    }
+
+    // Find added containers and observe them
+    for (const container of currentContainers) {
+      if (!observedContainers.has(container)) {
+        const id = containerIdMap.get(container);
+        if (!id) continue;
+        idByContainer.set(container, id);
+        try {
+          observer.observe(container);
+        } catch {
+          // ignore
+        }
+        observedContainers.add(container);
+      }
+    }
+  }, [isEnabled, containerIdMap]);
 };
 
 export default useAnilistBatchPrefetch;
