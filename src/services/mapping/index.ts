@@ -1,58 +1,36 @@
 // src/services/mapping/index.ts
 import type { TtlCache } from '@/cache';
 import type { AnilistApiService } from '@/api/anilist.api';
-import type { ExtensionError, MediaMetadataHint, AniTitles, AniMedia, RequestPriority } from '@/shared/types';
+import type { ExtensionError, AniMedia, RequestPriority } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
 import { getExtensionOptionsSnapshot } from '@/shared/utils/storage';
 import { incrementCounter } from '@/shared/utils/metrics';
 import { logger } from '@/shared/utils/logger';
-import { canonicalTitleKey, sanitizeLookupDisplay } from '@/shared/utils/matching';
 import { StaticMappingProvider, type StaticMappingPayload } from './static-mapping.provider';
 import { SonarrLookupClient, type SonarrLookupCredentials } from './sonarr-lookup.client';
-import { isSeasonalCanonicalTokens } from './search-term-generator';
 import { resolveViaPipeline } from './pipeline';
-import { scoreCandidates } from './scoring';
 import { MappingOverridesService } from './overrides.service';
-
-// Authoritative mappings should persist until explicitly invalidated (override/ignore/static change).
-const RESOLVED_PERSIST_MS = 10 * 365 * 24 * 60 * 60 * 1000; // ~10 years (effectively permanent)
-
-// Validation (no-match) failures should not re-trigger pipeline repeatedly during browsing.
-// Use a longer TTL, but keep other failure types shorter.
-const NO_MATCH_SOFT_TTL = 24 * 60 * 60 * 1000; // 24 hours
-const NO_MATCH_HARD_TTL = 48 * 60 * 60 * 1000; // 48 hours
-
-const FAILURE_SOFT_TTL = 30 * 60 * 1000; // 30 minutes (config/perm/api)
-const FAILURE_HARD_TTL = FAILURE_SOFT_TTL * 2;
-const NETWORK_FAILURE_SOFT_TTL = 5 * 60 * 1000; // 5 minutes
-const NETWORK_FAILURE_HARD_TTL = NETWORK_FAILURE_SOFT_TTL * 3;
-
-const ALLOWED_FORMATS = new Set(['TV', 'TV_SHORT', 'ONA', 'OVA', 'SPECIAL']);
-
-export interface ResolvedMapping {
-  tvdbId: number;
-  successfulSynonym?: string;
-}
-
-type ResolveHints = {
-  primaryTitle?: string;
-  domMedia?: MediaMetadataHint | null;
-};
-
-type ResolveTvdbIdOptions = {
-  network?: 'never';
-  hints?: ResolveHints;
-  ignoreFailureCache?: boolean;
-  priority?: RequestPriority;
-  // Force Sonarr lookups to bypass fresh caches (used by anime detail force-verify).
-  forceLookupNetwork?: boolean;
-};
+import { buildMediaFromMetadataHint } from './media-hints';
+import { tryHintLookup } from './hint-lookup';
+import { ResolvedLedger } from './resolved-ledger';
+import { resolvePrequelStatic } from './prequel-static';
+import {
+  ALLOWED_FORMATS,
+  FAILURE_HARD_TTL,
+  FAILURE_SOFT_TTL,
+  NETWORK_FAILURE_HARD_TTL,
+  NETWORK_FAILURE_SOFT_TTL,
+  NO_MATCH_HARD_TTL,
+  NO_MATCH_SOFT_TTL,
+  RESOLVED_PERSIST_MS,
+} from './constants';
+import type { ResolveHints, ResolveTvdbIdOptions, ResolvedMapping } from './types';
 
 export class MappingService {
   private readonly log = logger.create('MappingService');
   private readonly inflight = new Map<number, Promise<ResolvedMapping | null>>();
   private readonly sessionSeenCanonical = new Set<string>();
-  private readonly resolvedLog = new Map<number, { tvdbId: number; source: 'auto' | 'upstream'; updatedAt: number }>();
+  private readonly ledger = new ResolvedLedger();
 
   constructor(
     private readonly anilistApi: AnilistApiService,
@@ -214,7 +192,14 @@ export class MappingService {
     const hintTerm = options.hints?.primaryTitle?.trim();
     if (hintTerm) {
       try {
-        const hinted = await this.tryHintLookup(hintTerm, options.forceLookupNetwork === true);
+        const credentials = await this.getConfiguredCredentials();
+        const hinted = await tryHintLookup(
+          hintTerm,
+          this.lookupClient,
+          credentials,
+          this.log,
+          options.forceLookupNetwork === true,
+        );
         if (hinted) {
           await this.caches.success.write(cacheKey, hinted, {
             staleMs: RESOLVED_PERSIST_MS,
@@ -312,7 +297,7 @@ export class MappingService {
   ): Promise<ResolvedMapping | null> {
     const credentials = await this.getConfiguredCredentials();
 
-    const metadataMedia = this.buildMediaFromMetadataHint(anilistId, hints?.domMedia);
+    const metadataMedia = buildMediaFromMetadataHint(anilistId, hints?.domMedia);
     if (metadataMedia) {
       const resolved = await this.tryResolveWithMedia(
         metadataMedia,
@@ -359,7 +344,7 @@ export class MappingService {
       return null;
     }
 
-    const prequelStatic = await this.lookupPrequelStatic(media);
+    const prequelStatic = await resolvePrequelStatic(media, this.staticProvider, this.anilistApi);
     if (prequelStatic) {
       this.recordResolvedMapping(media.id, prequelStatic.tvdbId, 'upstream');
       return prequelStatic;
@@ -394,126 +379,6 @@ export class MappingService {
     return null;
   }
 
-  private async lookupPrequelStatic(media: AniMedia): Promise<ResolvedMapping | null> {
-    const directHit = this.staticProvider.get(media.id);
-    if (directHit) {
-      return { tvdbId: directHit.tvdbId };
-    }
-
-    const visited = new Set<number>([media.id]);
-
-    for await (const prequel of this.anilistApi.iteratePrequelChain(media)) {
-      if (visited.has(prequel.id)) {
-        continue;
-      }
-      const hit = this.staticProvider.get(prequel.id);
-      if (hit) {
-        return { tvdbId: hit.tvdbId };
-      }
-      visited.add(prequel.id);
-    }
-
-    return null;
-  }
-
-  private async tryHintLookup(term: string, forceLookupNetwork?: boolean): Promise<ResolvedMapping | null> {
-    const trimmed = term.trim();
-    const sanitized = sanitizeLookupDisplay(trimmed);
-    if (!sanitized) return null;
-
-    let credentials: SonarrLookupCredentials;
-    try {
-      credentials = await this.getConfiguredCredentials();
-    } catch {
-      return null;
-    }
-
-    const canonical = canonicalTitleKey(sanitized) ?? '';
-    const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
-    if (canonicalTokens.length === 0 || isSeasonalCanonicalTokens(canonicalTokens)) {
-      return null;
-    }
-    const results = await this.lookupClient.lookup(canonical, sanitized, credentials, {
-      ...(forceLookupNetwork ? { forceNetwork: true } : {}),
-    });
-    const scored = scoreCandidates({ canonical, display: sanitized }, results);
-    const top = scored[0];
-    if (top && top.score >= 0.76) {
-      return { tvdbId: top.result.tvdbId, successfulSynonym: sanitized };
-    }
-    return null;
-  }
-
-  private buildMediaFromMetadataHint(anilistId: number, metadata?: MediaMetadataHint | null): AniMedia | null {
-    if (!metadata) return null;
-
-    const titlesSource = metadata.titles ?? null;
-    const titles: AniTitles = {};
-    if (titlesSource?.english) titles.english = titlesSource.english;
-    if (titlesSource?.romaji) titles.romaji = titlesSource.romaji;
-    if (titlesSource?.native) titles.native = titlesSource.native;
-
-    const synonyms = Array.isArray(metadata.synonyms)
-      ? Array.from(
-          new Set(
-            metadata.synonyms
-              .filter((value): value is string => typeof value === 'string')
-              .map(value => value.trim())
-              .filter(value => value.length > 0),
-          ),
-        )
-      : [];
-
-    const startYear =
-      typeof metadata.startYear === 'number' && Number.isFinite(metadata.startYear)
-        ? metadata.startYear
-        : null;
-
-    const format = metadata.format ?? null;
-
-    const relationIds = Array.isArray(metadata.relationPrequelIds)
-      ? metadata.relationPrequelIds.filter(
-          (value): value is number => typeof value === 'number' && Number.isFinite(value),
-        )
-      : [];
-
-    if (
-      Object.keys(titles).length === 0 &&
-      synonyms.length === 0 &&
-      startYear == null &&
-      !format &&
-      relationIds.length === 0
-    ) {
-      return null;
-    }
-
-    const relations =
-      relationIds.length > 0
-        ? {
-            edges: relationIds.map(id => ({
-              relationType: 'PREQUEL',
-              node: {
-                id,
-                format: null,
-                title: {},
-                synonyms: [],
-              } as AniMedia,
-            })),
-          }
-        : undefined;
-
-    const startDate = startYear != null ? { year: startYear } : undefined;
-
-    return {
-      id: anilistId,
-      format,
-      title: Object.keys(titles).length > 0 ? titles : {},
-      ...(startDate ? { startDate } : {}),
-      synonyms,
-      ...(relations ? { relations } : {}),
-    };
-  }
-
   private successCacheKey(anilistId: number): string {
     return `resolved:${anilistId}`;
   }
@@ -530,7 +395,7 @@ export class MappingService {
     ]);
     this.inflight.delete(anilistId);
     this.evictAniListMedia(anilistId);
-    this.resolvedLog.delete(anilistId);
+    this.ledger.delete(anilistId);
   }
 
   // Utility for LibraryService to surface whether an override is active
@@ -543,15 +408,16 @@ export class MappingService {
   }
 
   public getRecordedResolvedMappings(): Array<{ anilistId: number; tvdbId: number; source: 'auto' | 'upstream'; updatedAt: number }> {
-    const entries: Array<{ anilistId: number; tvdbId: number; source: 'auto' | 'upstream'; updatedAt: number }> = [];
-    for (const [anilistId, entry] of this.resolvedLog.entries()) {
-      entries.push({ anilistId, tvdbId: entry.tvdbId, source: entry.source, updatedAt: entry.updatedAt });
-    }
-    return entries;
+    return this.ledger.list().map(entry => ({
+      anilistId: entry.anilistId,
+      tvdbId: entry.tvdbId,
+      source: entry.source,
+      updatedAt: entry.updatedAt,
+    }));
   }
 
   private recordResolvedMapping(anilistId: number, tvdbId: number, source: 'auto' | 'upstream'): void {
-    this.resolvedLog.set(anilistId, { tvdbId, source, updatedAt: Date.now() });
+    this.ledger.record(anilistId, { tvdbId }, source);
   }
 
   private shouldCacheFailure(error: ExtensionError): boolean {
@@ -604,4 +470,4 @@ export class MappingService {
   }
 }
 
-export type { StaticMappingPayload };
+export type { StaticMappingPayload, ResolvedMapping };
