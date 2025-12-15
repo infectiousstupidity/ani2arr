@@ -61,7 +61,7 @@ Browse overlays share mount/bootstrap plumbing (QueryClient, style injection, mo
 * `SonarrLookupClient`: inflight dedupe, positive/negative TTL caches, internal concurrency (5).
 * Search-term scoring pipeline with bounded depth and early-stop.
 * TTLs:
-  * Resolved mapping success = 30d soft / 180d hard.
+  * Resolved mapping success = persistent (no expiry); evict only on override/ignore/static updates.
   * No-match (validation) failure = 24h soft / 48h hard.
   * Config/permission/API failure = 30m soft / 60m hard.
   * Network failure = 5m soft / 15m hard.
@@ -71,6 +71,7 @@ Browse overlays share mount/bootstrap plumbing (QueryClient, style injection, mo
 * Mapping overrides: background-resident in-memory map with sync/local storage hydration.
   * Storage keys: `sync:mappingOverrides` (authoritative), `local:mappingOverridesCache` (mirror for hot reads).
   * Shape: `{ [anilistId: string]: { tvdbId: number; updatedAt: number } }`.
+  * If an upstream static mapping matches an existing manual override, the override is cleared and the upstream mapping becomes authoritative.
   * `MappingService` checks overrides first; overrides are authoritative.
   * Per-ID cache eviction helper used when overrides change.
 * Options `getMappings` RPC returns provider summaries only (no AniList lookups). Inputs: `sources`/`providers`/`limit`/`cursor`; defaults to manual + ignored + auto with limit 500, sorted by `updatedAt` desc then `anilistId` asc.
