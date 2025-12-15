@@ -14,8 +14,8 @@ import { resolveViaPipeline } from './pipeline';
 import { scoreCandidates } from './scoring';
 import { MappingOverridesService } from './overrides.service';
 
-const RESOLVED_SOFT_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
-const RESOLVED_HARD_TTL = 180 * 24 * 60 * 60 * 1000; // 180 days
+// Authoritative mappings should persist until explicitly invalidated (override/ignore/static change).
+const RESOLVED_PERSIST_MS = 10 * 365 * 24 * 60 * 60 * 1000; // ~10 years (effectively permanent)
 
 // Validation (no-match) failures should not re-trigger pipeline repeatedly during browsing.
 // Use a longer TTL, but keep other failure types shorter.
@@ -143,6 +143,26 @@ export class MappingService {
     // Phase 0: Check user overrides first; authoritative mapping if present
     const overrideTvdb = this.overrides?.get(anilistId) ?? null;
     if (typeof overrideTvdb === 'number') {
+      const staticHit = this.staticProvider.get(anilistId);
+      if (staticHit && staticHit.tvdbId === overrideTvdb) {
+        // Upstream now matches the manual override; drop the override and treat as upstream.
+        try {
+          await this.overrides?.clear(anilistId);
+        } catch (error) {
+          logError(normalizeError(error), `MappingService:clearOverride:${anilistId}`);
+        }
+        this.recordResolvedMapping(anilistId, staticHit.tvdbId, 'upstream');
+        // Update the cache with the new authoritative mapping and TTL
+        const cacheKey = this.successCacheKey(anilistId);
+        await this.caches.success.write(cacheKey, { tvdbId: staticHit.tvdbId }, {
+          staleMs: RESOLVED_PERSIST_MS,
+          hardMs: RESOLVED_PERSIST_MS,
+        });
+        if (import.meta.env.DEV) {
+          this.log.debug?.(`mapping:override-cleared-to-upstream anilistId=${anilistId} tvdbId=${staticHit.tvdbId}`);
+        }
+        return { tvdbId: staticHit.tvdbId };
+      }
       if (import.meta.env.DEV) {
         this.log.debug?.(`mapping:override-hit anilistId=${anilistId} tvdbId=${overrideTvdb}`);
       }
@@ -172,8 +192,8 @@ export class MappingService {
     if (staticHit) {
       incrementCounter('mapping.lookup.static_hit');
       await this.caches.success.write(cacheKey, { tvdbId: staticHit.tvdbId }, {
-        staleMs: RESOLVED_SOFT_TTL,
-        hardMs: RESOLVED_HARD_TTL,
+        staleMs: RESOLVED_PERSIST_MS,
+        hardMs: RESOLVED_PERSIST_MS,
       });
       if (import.meta.env.DEV) {
         this.log.debug?.(`mapping:static-hit anilistId=${anilistId} tvdbId=${staticHit.tvdbId}`);
@@ -187,6 +207,7 @@ export class MappingService {
         ErrorCode.VALIDATION_ERROR,
         `AniList ID ${anilistId} requires a network lookup but network access is disabled.`,
         'Unable to resolve this title without contacting Sonarr.',
+        { reason: 'network-disabled' },
       );
     }
 
@@ -196,8 +217,8 @@ export class MappingService {
         const hinted = await this.tryHintLookup(hintTerm, options.forceLookupNetwork === true);
         if (hinted) {
           await this.caches.success.write(cacheKey, hinted, {
-            staleMs: RESOLVED_SOFT_TTL,
-            hardMs: RESOLVED_HARD_TTL,
+            staleMs: RESOLVED_PERSIST_MS,
+            hardMs: RESOLVED_PERSIST_MS,
           });
           this.recordResolvedMapping(anilistId, hinted.tvdbId, 'auto');
           return hinted;
@@ -243,13 +264,26 @@ export class MappingService {
     }
 
     if (resolved === null) {
+      if (!bypassFailureCache) {
+        const noMatchError = createError(
+          ErrorCode.VALIDATION_ERROR,
+          `No TVDB match found for AniList ID ${anilistId}.`,
+          'No matching TVDB entry was found.',
+          { reason: 'no-match' },
+        );
+        const ttl = this.failureTtlsFor(noMatchError);
+        await this.caches.failure.write(this.failureCacheKey(anilistId), noMatchError, {
+          staleMs: ttl.stale,
+          hardMs: ttl.hard,
+        });
+      }
       return null;
     }
 
     this.recordResolvedMapping(anilistId, resolved.tvdbId, 'auto');
     await this.caches.success.write(cacheKey, resolved, {
-      staleMs: RESOLVED_SOFT_TTL,
-      hardMs: RESOLVED_HARD_TTL,
+      staleMs: RESOLVED_PERSIST_MS,
+      hardMs: RESOLVED_PERSIST_MS,
     });
     if (import.meta.env.DEV) {
       this.log.debug?.(

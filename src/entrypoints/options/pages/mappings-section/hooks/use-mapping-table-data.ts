@@ -224,8 +224,8 @@ export const useMappingTableData = ({
       }
     });
 
-    return sortedRows.map((row) => {
-      const { sortIndex: _sortIndex, ...rest } = row;
+    return sortedRows.map(({ sortIndex, ...rest }) => {
+      void sortIndex;
       return rest;
     });
   }, [filteredEntryRows, metadataMap, sortOption]);
