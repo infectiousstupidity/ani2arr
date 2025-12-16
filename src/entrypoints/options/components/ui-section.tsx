@@ -1,3 +1,4 @@
+// src/entrypoints/options/components/ui-section.tsx
 import React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import TooltipWrapper from '@/shared/components/tooltip';
