@@ -1,3 +1,4 @@
+// src/entrypoints/options/components/advanced-section.tsx
 import React, { useMemo, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { useFormContext, useWatch } from 'react-hook-form';

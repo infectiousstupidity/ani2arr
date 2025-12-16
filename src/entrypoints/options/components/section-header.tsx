@@ -1,3 +1,4 @@
+// src/entrypoints/options/components/section-header.tsx
 import React from 'react';
 
 const SectionHeader: React.FC<{ title: string; description: string }> = ({ title, description }) => (

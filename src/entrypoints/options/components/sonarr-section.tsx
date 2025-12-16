@@ -1,3 +1,4 @@
+// src/entrypoints/options/components/sonarr-section.tsx
 import React from 'react';
 import SectionHeader from '@/entrypoints/options/components/section-header';
 import SettingsForm from '@/shared/components/settings-form';
