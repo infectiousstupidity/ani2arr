@@ -2,12 +2,12 @@ import React, { useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
-import { useDebounced } from '@/shared/hooks/use-debounced';
-import { InputField } from '@/shared/components/form';
-import Button from '@/shared/components/button';
-import Pill from '@/shared/components/pill';
+import { useDebounced } from '@/shared/hooks/common/use-debounced';
+import { InputField } from '@/shared/ui/form/form';
+import Button from '@/shared/ui/primitives/button';
+import Pill from '@/shared/ui/primitives/pill';
 import { getAni2arrApi } from '@/rpc';
-import { useAniListMedia } from '@/shared/hooks/use-api-queries';
+import { useAniListMedia } from '@/shared/api';
 import type { AniListSearchResult } from '@/shared/types';
 
 type AddMissingEntryDialogProps = {

@@ -1,15 +1,15 @@
 import React, { useMemo } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import Button from '@/shared/components/button';
-import { useAniListMedia, usePublicOptions, useSeriesStatus } from '@/shared/hooks/use-api-queries';
+import Button from '@/shared/ui/primitives/button';
+import { useAniListMedia, usePublicOptions, useSeriesStatus } from '@/shared/api';
 import { MappingPreviewPanel } from './mapping-preview-panel';
 import { MappingSearchPanel } from './mapping-search-panel';
 import { useMappingController } from './use-mapping-controller';
 import type { MappingExternalId, MappingProvider, MappingSearchResult, SonarrLookupSeries } from '@/shared/types';
-import { metadataFromMediaObject } from '@/shared/utils/anilist-dom';
+import { metadataFromMediaObject } from '@/shared/utils/dom/anilist-dom';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
-import { useToast } from '@/shared/components/toast-provider';
+import { useToast } from '@/shared/ui/feedback/toast-provider';
 
 interface MappingEditorProps {
   anilistId: number;

@@ -1,11 +1,11 @@
-// Version date: 2025-11-12
+// src/shared/ui/media/media-actions.tsx
 import React from 'react';
-import Button from '@/shared/components/button';
-import TooltipWrapper from '@/shared/components/tooltip';
+import Button from '@/shared/ui/primitives/button';
+import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { SquareArrowOutUpRight, ChevronDown } from 'lucide-react';
-import { usePublicOptions } from '@/shared/hooks/use-api-queries';
+import { usePublicOptions } from '@/shared/api';
 import { logger } from '@/shared/utils/logger';
-import Dropdown, { DropdownItem } from '@/shared/components/dropdown';
+import Dropdown, { DropdownItem } from '@/shared/ui/primitives/dropdown';
 import { buildExternalMediaLink, type ExternalLinkInput } from '@/shared/utils/build-external-media-link';
 import type { MediaService } from '@/shared/types';
 

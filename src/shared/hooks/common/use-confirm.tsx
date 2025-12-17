@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useState } from 'react';
-import ConfirmDialog from '@/shared/components/confirm-dialog';
+import ConfirmDialog from '@/shared/ui/primitives/confirm-dialog';
 
 type ConfirmOptions = {
   title?: React.ReactNode;

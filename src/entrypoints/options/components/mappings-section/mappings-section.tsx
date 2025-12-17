@@ -1,14 +1,10 @@
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
-import Button from '@/shared/components/button';
-import { MappingEditor } from '@/shared/mapping/mapping-editor';
-import {
-  useClearMappingIgnore,
-  useClearMappingOverride,
-  useSetMappingIgnore,
-} from '@/shared/hooks/use-api-queries';
-import { useConfirm } from '@/shared/hooks/use-confirm';
-import { useToast } from '@/shared/components/toast-provider';
+import Button from '@/shared/ui/primitives/button';
+import { MappingEditor } from '@/features/mapping/mapping-editor';
+import { useClearMappingIgnore, useClearMappingOverride, useSetMappingIgnore } from '@/shared/api';
+import { useConfirm } from '@/shared/hooks/common/use-confirm';
+import { useToast } from '@/shared/ui/feedback/toast-provider';
 import type { MappingProvider, MappingSummary } from '@/shared/types';
 import { cn } from '@/shared/utils/cn';
 import MappingToolbar, { type LibraryFilter, type MappingSort, type SourceFilterSet } from './components/mapping-toolbar';

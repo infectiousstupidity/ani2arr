@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, TriangleAlert, SlidersHorizontal, Plus, Wrench, SquareArrowOutUpRight, RotateCcw } from 'lucide-react';
-import TooltipWrapper from '@/shared/components/tooltip';
+import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import type { CardOverlayProps } from '@/shared/types';
 import { useCardOverlayState } from '../hooks/use-card-overlay-state';
 

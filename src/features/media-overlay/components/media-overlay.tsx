@@ -1,10 +1,10 @@
 import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { usePublicOptions } from '@/shared/hooks/use-api-queries';
+import { usePublicOptions } from '@/shared/api';
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
-import { useTheme } from '@/shared/hooks/use-theme';
+import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useBrowsePortals } from '../hooks/use-media-portals';
-import { useAnilistBatchPrefetch } from '@/shared/hooks/use-anilist-batch-prefetch';
+import { useAnilistBatchPrefetch } from '@/shared/hooks/entrypoints/use-anilist-batch-prefetch';
 import type { BrowseAdapter, ParsedCard, MediaMetadataHint } from '@/shared/types';
 import { CardOverlay } from './card-overlay';
 

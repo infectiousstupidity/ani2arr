@@ -1,6 +1,6 @@
 // src/features/media-modal/components/media-modal-footer.tsx
 import type { ReactNode } from "react";
-import Button from "@/shared/components/button";
+import Button from "@/shared/ui/primitives/button";
 
 export type FooterProps = {
   // Left side (tab-specific)

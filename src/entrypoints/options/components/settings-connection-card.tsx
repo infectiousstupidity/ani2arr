@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import type { SettingsActions } from '@/shared/hooks/use-settings-actions';
+import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import type { TitleLanguage } from '@/shared/types';
-import { InputField, SelectField } from './form';
-import Button from './button';
-import { useConfirm } from '@/shared/hooks/use-confirm';
-import { useToast } from '@/shared/components/toast-provider';
+import { InputField, SelectField } from '../../../shared/ui/form/form';
+import Button from '../../../shared/ui/primitives/button';
+import { useConfirm } from '@/shared/hooks/common/use-confirm';
+import { useToast } from '@/shared/ui/feedback/toast-provider';
 import { logger } from '@/shared/utils/logger';
 
 const titleLanguageOptions: Array<{ value: TitleLanguage; label: string }> = [

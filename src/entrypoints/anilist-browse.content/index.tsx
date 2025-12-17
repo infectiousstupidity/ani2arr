@@ -1,5 +1,5 @@
 // src/entrypoints/anilist-browse.content/index.tsx
-import { extractMediaMetadataFromDom } from '@/shared/utils/anilist-dom';
+import { extractMediaMetadataFromDom } from '@/shared/utils/dom/anilist-dom';
 import { mergeMetadataHints } from '@/shared/utils/media-metadata';
 import type { MediaMetadataHint } from '@/shared/types';
 import baseStyles from '@/shared/styles/base.css?inline';

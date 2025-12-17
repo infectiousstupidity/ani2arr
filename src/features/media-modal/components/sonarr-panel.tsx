@@ -1,5 +1,5 @@
 // src/features/media-modal/components/sonarr-panel.tsx
-import SonarrForm from "@/shared/components/sonarr-form";
+import SonarrForm from "@/shared/ui/sonarr-form";
 import type { SonarrPanelProps } from "../types";
 
 export function SonarrPanel(props: SonarrPanelProps): React.JSX.Element {

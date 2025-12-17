@@ -1,7 +1,7 @@
 // src/entrypoints/options/components/radarr-section.tsx
 import React from 'react';
 import SectionHeader from '@/entrypoints/options/components/section-header';
-import Button from '@/shared/components/button';
+import Button from '@/shared/ui/primitives/button';
 
 const RadarrPage: React.FC = () => (
   <div className="space-y-6">

@@ -5,9 +5,9 @@ import type {
   SonarrRootFolder,
   SonarrTag,
 } from "@/shared/types";
-import type { UseMappingControllerResult } from "@/shared/mapping";
+import type { UseMappingControllerResult } from "@/features/mapping";
 import type { UseSonarrPanelControllerResult } from "./hooks/use-sonarr-panel-controller";
-import type { MappingAniListSummary } from "@/shared/mapping";
+import type { MappingAniListSummary } from "@/features/mapping";
 
 export interface MappingTabProps {
   aniListEntry: MappingAniListSummary;

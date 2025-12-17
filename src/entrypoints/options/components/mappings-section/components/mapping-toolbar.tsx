@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { ArrowUpDown, Check, ChevronDown, Filter, LibraryBig, Search, X } from 'lucide-react';
 import type { MappingSource } from '@/shared/types';
-import Button from '@/shared/components/button';
+import Button from '@/shared/ui/primitives/button';
 import { cn } from '@/shared/utils/cn';
 
 export type SourceFilterSet = Set<MappingSource>;

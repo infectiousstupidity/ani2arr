@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, type WheelEvent as ReactWheelEvent } from 'react';
 import { ExternalLink } from 'lucide-react';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
-import Pill from '@/shared/components/pill';
-import TooltipWrapper from '@/shared/components/tooltip';
+import Pill from '@/shared/ui/primitives/pill';
+import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import type { MappingSearchResult } from '@/shared/types';
 import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link';
 import type { MappingSearchController } from './types';

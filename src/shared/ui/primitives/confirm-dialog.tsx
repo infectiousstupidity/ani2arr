@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from 'react';
-import Button from '@/shared/components/button';
+import Button from '@/shared/ui/primitives/button';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { cn } from '@/shared/utils/cn';
 

@@ -1,10 +1,10 @@
 import { ExternalLink, SquarePen, PenOff, X, Settings } from 'lucide-react';
-import Button from '@/shared/components/button';
-import Pill from '@/shared/components/pill';
-import TooltipWrapper from '@/shared/components/tooltip';
+import Button from '@/shared/ui/primitives/button';
+import Pill from '@/shared/ui/primitives/pill';
+import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { MultiMappingInfo } from './multi-mapping-info';
-import { useMappingOverrides, useSeriesStatus } from '@/shared/hooks/use-api-queries';
-import type { MappingSearchResult } from '@/shared/types';
+import { useMappingOverrides, useSeriesStatus } from '@/shared/api';
+import type { MappingOverrideRecord, MappingSearchResult } from '@/shared/types';
 import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link';
 import type { MappingAniListSummary } from './types';
 
@@ -47,7 +47,7 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
   const overrideActiveFromOverrides =
     overrideActiveFromStatus === undefined &&
     Array.isArray(mappingOverrides.data) &&
-    mappingOverrides.data.some((record) => record.anilistId === aniListEntry.id);
+    mappingOverrides.data.some((record: MappingOverrideRecord) => record.anilistId === aniListEntry.id);
 
   const isOverridden = overrideActiveFromStatus ?? overrideActiveFromOverrides ?? false;
   const overrideTooltip = isOverridden
