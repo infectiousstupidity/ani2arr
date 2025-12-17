@@ -3,7 +3,7 @@ import type { TtlCache } from '@/cache';
 import type { AnilistApiService } from '@/api/anilist.api';
 import type { ExtensionError, AniMedia, RequestPriority } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
-import { getExtensionOptionsSnapshot } from '@/shared/utils/storage';
+import { getExtensionOptionsSnapshot } from '@/shared/utils/storage/storage';
 import { incrementCounter } from '@/shared/utils/metrics';
 import { logger } from '@/shared/utils/logger';
 import { StaticMappingProvider, type StaticMappingPayload } from './static-mapping.provider';

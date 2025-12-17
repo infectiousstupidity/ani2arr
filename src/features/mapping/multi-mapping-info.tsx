@@ -1,5 +1,5 @@
-import Pill from '@/shared/components/pill';
-import Tooltip from '@/shared/components/tooltip';
+import Pill from '@/shared/ui/primitives/pill';
+import Tooltip from '@/shared/ui/primitives/tooltip';
 
 interface MultiMappingInfoProps {
   currentAniListId: number;

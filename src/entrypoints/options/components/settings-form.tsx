@@ -4,21 +4,21 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
 
-import { useSonarrMetadata, queryKeys } from '@/shared/hooks/use-api-queries';
+import { useSonarrMetadata, queryKeys } from '@/shared/api';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
-import type { SettingsActions } from '@/shared/hooks/use-settings-actions';
+import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import {
   requestSonarrPermission,
   validateApiKey,
   validateUrl,
   buildSonarrPermissionPattern,
 } from '@/shared/utils/validation';
-import Button from './button';
+import Button from '../../../shared/ui/primitives/button';
 import { logger } from '@/shared/utils/logger';
 
 import { SonarrConnectionCard, ConnectionStatusBadge } from './settings-connection-card';
 import { SonarrDefaultsSection } from './settings-sonarr-defaults';
-import type { SonarrFormLayout } from './sonarr-form';
+import type { SonarrFormLayout } from '../../../shared/ui/sonarr-form';
 
 // --- Helper Hook for Portal Container ---
 const usePortalContainer = () => {

@@ -4,19 +4,19 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FormProvider, useForm } from 'react-hook-form';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import ToastProvider from '@/shared/components/toast-provider';
-import { SaveSettingsBar } from '@/shared/components/settings-form';
+import ToastProvider from '@/shared/ui/feedback/toast-provider';
+import { SaveSettingsBar } from '@/entrypoints/options/components/settings-form';
 import './style.css';
-import { ConfirmProvider } from '@/shared/hooks/use-confirm';
+import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 import MappingsSection from '@/entrypoints/options/components/mappings-section';
 import UiSection from '@/entrypoints/options/components/ui-section';
 import AdvancedSection from '@/entrypoints/options/components/advanced-section';
 import SonarrPage from '@/entrypoints/options/components/sonarr-section';
 import RadarrPage from '@/entrypoints/options/components/radarr-section';
-import { useExtensionOptions } from '@/shared/hooks/use-api-queries';
+import { useExtensionOptions } from '@/shared/api';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
-import { useSettingsActions } from '@/shared/hooks/use-settings-actions';
+import { useSettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 
 const queryClient = new QueryClient();
 

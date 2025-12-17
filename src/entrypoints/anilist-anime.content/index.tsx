@@ -3,18 +3,14 @@ import React, { useEffect, useState, useCallback } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import ToastProvider, { useToast } from '@/shared/components/toast-provider';
-import { useTheme } from '@/shared/hooks/use-theme';
-import {
-  useSeriesStatus,
-  useAddSeries,
-  usePublicOptions,
-} from '@/shared/hooks/use-api-queries';
-import { useMediaModalProps } from '@/shared/hooks/use-media-modal-props';
+import ToastProvider, { useToast } from '@/shared/ui/feedback/toast-provider';
+import { useTheme } from '@/shared/hooks/common/use-theme';
+import { useSeriesStatus, useAddSeries, usePublicOptions } from '@/shared/api';
+import { useMediaModalProps } from '@/shared/hooks/entrypoints/use-media-modal-props';
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
-import MediaActions, { Status } from '@/shared/components/media-actions';
+import MediaActions, { Status } from '@/shared/ui/media/media-actions';
 import { logger } from '@/shared/utils/logger';
-import { extractMediaMetadataFromDom } from '@/shared/utils/anilist-dom';
+import { extractMediaMetadataFromDom } from '@/shared/utils/dom/anilist-dom';
 import { mergeMetadataHints } from '@/shared/utils/media-metadata';
 import type { MediaMetadataHint } from '@/shared/types';
 import { MediaModal } from '@/features/media-modal';
@@ -23,8 +19,8 @@ import '@/shared/styles/base.css';
 import './style.css';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
-import { awaitBackgroundReady } from '@/shared/utils/background-ready';
-import { ConfirmProvider } from '@/shared/hooks/use-confirm';
+import { awaitBackgroundReady } from '@/shared/utils/dom/background-ready';
+import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 
 const log = logger.create('AniList Content');
 

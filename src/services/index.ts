@@ -14,7 +14,7 @@ import { updateSonarrSeriesHandler } from '@/services/api/update-series';
 import { createApiHandlers } from '@/services/api/handlers';
 
 import type { LeanSonarrSeries, SonarrLookupSeries, ExtensionOptions, AniMedia, ExtensionError } from '@/shared/types';
-import { getExtensionOptionsSnapshot } from '@/shared/utils/storage';
+import { getExtensionOptionsSnapshot } from '@/shared/utils/storage/storage';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
 import { type Ani2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';

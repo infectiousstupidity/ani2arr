@@ -1,9 +1,9 @@
 // src/entrypoints/options/components/sonarr-section.tsx
 import React from 'react';
 import SectionHeader from '@/entrypoints/options/components/section-header';
-import SettingsForm from '@/shared/components/settings-form';
+import SettingsForm from '@/entrypoints/options/components/settings-form';
 import type { Settings } from '@/shared/schemas/settings';
-import type { SettingsActions } from '@/shared/hooks/use-settings-actions';
+import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 
 const SonarrPage: React.FC<{
   actions: SettingsActions;

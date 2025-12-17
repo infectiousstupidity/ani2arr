@@ -1,7 +1,7 @@
 // src/entrypoints/options/components/ui-section.tsx
 import React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
-import TooltipWrapper from '@/shared/components/tooltip';
+import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import type { BadgeVisibility } from '@/shared/types';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import { defaultUiOptions } from '@/shared/schemas/settings';

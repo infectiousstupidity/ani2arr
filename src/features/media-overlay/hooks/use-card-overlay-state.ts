@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { browser } from 'wxt/browser';
-import { useAddSeries, useSeriesStatus } from '@/shared/hooks/use-api-queries';
+import { useAddSeries, useSeriesStatus } from '@/shared/api';
 import type { ExtensionError, MediaMetadataHint, SonarrFormState } from '@/shared/types';
-import { useToast } from '@/shared/components/toast-provider';
+import { useToast } from '@/shared/ui/feedback/toast-provider';
 
 export type OverlayState = 'disabled' | 'in-sonarr' | 'addable' | 'resolving' | 'adding' | 'error';
 

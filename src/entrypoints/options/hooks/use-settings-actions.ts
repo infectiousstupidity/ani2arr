@@ -3,16 +3,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { useFormContext } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  queryKeys,
-  useSaveOptions,
-  useTestConnection,
-} from '@/shared/hooks/use-api-queries';
+import { queryKeys, useSaveOptions, useTestConnection } from '@/shared/api';
 import { buildSonarrPermissionPattern, requestSonarrPermission, validateApiKey, validateUrl } from '@/shared/utils/validation';
 import { logger } from '@/shared/utils/logger';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import { createDefaultSettings } from '@/shared/schemas/settings';
-import { parseSettings } from '@/shared/utils/storage';
+import { parseSettings } from '@/shared/utils/storage/storage';
 import type { ExtensionOptions } from '@/shared/types';
 
 interface UseSettingsActionsParams {

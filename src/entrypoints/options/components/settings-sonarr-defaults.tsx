@@ -4,18 +4,18 @@ import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown, RotateCcw } from 'lucide-react';
 
 import type { SettingsFormValues } from '@/shared/schemas/settings';
-import type { SettingsActions } from '@/shared/hooks/use-settings-actions';
-import type { useSonarrMetadata } from '@/shared/hooks/use-api-queries';
+import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
+import type { useSonarrMetadata } from '@/shared/api';
 import type { SonarrQualityProfile, SonarrRootFolder } from '@/shared/types';
 
-import { FormField, Label, SelectField, SwitchField } from './form';
-import MultiTagInput from './multi-tag-input';
-import Button from './button';
+import { FormField, Label, SelectField, SwitchField } from '@/shared/ui/form/form';
+import MultiTagInput from '@/shared/ui/form/multi-tag-input';
+import Button from '@/shared/ui/primitives/button';
 import {
   MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
 } from '@/shared/utils/constants';
-import type { SonarrFormLayout } from './sonarr-form';
+import type { SonarrFormLayout } from '@/shared/ui/sonarr-form';
 
 type SonarrDefaultsSectionProps = {
   actions: SettingsActions;

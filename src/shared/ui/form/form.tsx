@@ -4,7 +4,7 @@ import * as LabelPrimitive from '@radix-ui/react-label';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
 import { Check, ChevronDown } from 'lucide-react';
-import TooltipWrapper from './tooltip';
+import TooltipWrapper from '../primitives/tooltip';
 
 // --- 1. Accessibility Context ---
 const FormItemContext = createContext<{ id: string } | undefined>(undefined);

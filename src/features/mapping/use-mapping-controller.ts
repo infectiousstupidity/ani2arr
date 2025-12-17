@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
-import { useDebounced } from '@/shared/hooks/use-debounced';
+import { useDebounced } from '@/shared/hooks/common/use-debounced';
 import { useMappingSearch } from './use-mapping-search';
 import type { MappingSearchResult } from '@/shared/types';
 import { useMappingOverrides } from './use-mapping-overrides';

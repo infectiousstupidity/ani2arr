@@ -2,12 +2,12 @@
 import React, { useMemo, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { useFormContext, useWatch } from 'react-hook-form';
-import Button from '@/shared/components/button';
-import TooltipWrapper from '@/shared/components/tooltip';
-import { useConfirm } from '@/shared/hooks/use-confirm';
-import { useToast } from '@/shared/components/toast-provider';
+import Button from '@/shared/ui/primitives/button';
+import TooltipWrapper from '@/shared/ui/primitives/tooltip';
+import { useConfirm } from '@/shared/hooks/common/use-confirm';
+import { useToast } from '@/shared/ui/feedback/toast-provider';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
-import type { SettingsActions } from '@/shared/hooks/use-settings-actions';
+import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 
 const AdvancedSection: React.FC<{ actions: SettingsActions }> = ({ actions }) => {
   const confirm = useConfirm();

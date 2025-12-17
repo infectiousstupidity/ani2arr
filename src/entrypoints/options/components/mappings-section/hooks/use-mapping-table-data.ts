@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { useDebounced } from '@/shared/hooks/use-debounced';
-import { useAniListMetadataBatch, useMappings } from '@/shared/hooks/use-api-queries';
+import { useDebounced } from '@/shared/hooks/common/use-debounced';
+import { useAniListMetadataBatch, useMappings } from '@/shared/api';
 import type { MappingProvider, MappingSummary } from '@/shared/types';
-import type { GetAniListMetadataOutput, GetMappingsInput } from '@/rpc/schemas';
+import type { GetAniListMetadataOutput, GetMappingsInput, GetMappingsOutput } from '@/rpc/schemas';
 import type { MappingTableRowData } from '../components/mapping-table';
 import type { LibraryFilter, MappingSort, SourceFilterSet } from '../components/mapping-toolbar';
 
@@ -43,9 +43,9 @@ export const useMappingTableData = ({
   }, [debouncedQuery, providersToQuery, sourceFilters]);
 
   const mappings = useMappings(mappingQueryInput);
-  const mappingPages = useMemo(() => mappings.data?.pages ?? [], [mappings.data?.pages]);
+  const mappingPages = useMemo<GetMappingsOutput[]>(() => mappings.data?.pages ?? [], [mappings.data?.pages]);
   const totalAvailable = mappingPages[0]?.total;
-  const mappingEntries = useMemo(
+  const mappingEntries = useMemo<GetMappingsOutput['mappings'][number][]>(
     () => mappingPages.flatMap((page) => page.mappings),
     [mappingPages],
   );
@@ -63,8 +63,10 @@ export const useMappingTableData = ({
     return map;
   }, [metadata.data?.metadata]);
 
-  const entryRows = useMemo(() => {
-    return mappingEntries.map((entry) => {
+  type EntryRow = { entry: MappingSummary; title: string; haystack: string };
+
+  const entryRows = useMemo<EntryRow[]>(() => {
+    return mappingEntries.map((entry: MappingSummary) => {
       const meta = metadataMap.get(entry.anilistId);
       const title =
         meta?.titles?.english ||

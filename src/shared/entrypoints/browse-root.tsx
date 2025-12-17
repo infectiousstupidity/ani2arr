@@ -2,9 +2,9 @@ import React from 'react';
 import type { BrowseContentAppProps } from '@/features/media-overlay';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
-import { useMediaModalProps } from '@/shared/hooks/use-media-modal-props';
-import { usePublicOptions } from '@/shared/hooks/use-api-queries';
-import { useToast } from '@/shared/components/toast-provider';
+import { useMediaModalProps } from '@/shared/hooks/entrypoints/use-media-modal-props';
+import { usePublicOptions } from '@/shared/api';
+import { useToast } from '@/shared/ui/feedback/toast-provider';
 
 export interface BrowseRootProps {
   BrowseContentApp: React.FC<BrowseContentAppProps>;

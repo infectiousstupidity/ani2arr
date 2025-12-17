@@ -22,8 +22,8 @@ import {
   useSonarrMetadata,
   useUpdateDefaultSettings,
   useUpdateSeries,
-} from './use-api-queries';
-import { toMappingSearchResultFromSonarr } from '@/shared/mapping/sonarr.adapter';
+} from '@/shared/api';
+import { toMappingSearchResultFromSonarr } from '@/features/mapping/sonarr.adapter';
 import { resolveTitlePreference } from '@/shared/utils/title-preference';
 
 export interface UseMediaModalPropsInput {
@@ -300,7 +300,7 @@ export function useMediaModalProps(
     },
     currentMapping: deriveCurrentMappingFromStatus(statusQuery.data, 'sonarr', options?.sonarrUrl),
     overrideActive: statusQuery.data?.overrideActive === true,
-    otherAniListIds: linkedAniListIds.filter(id => id !== anilistId),
+    otherAniListIds: linkedAniListIds.filter((id: number) => id !== anilistId),
     service: 'sonarr',
   };
 

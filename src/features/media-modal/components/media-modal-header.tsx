@@ -1,8 +1,8 @@
 // src/features/media-modal/components/media-modal-header.tsx
 import { type MouseEventHandler } from "react";
 import { Database, X } from "lucide-react";
-import TooltipWrapper from "@/shared/components/tooltip";
-import Pill from '@/shared/components/pill';
+import TooltipWrapper from "@/shared/ui/primitives/tooltip";
+import Pill from '@/shared/ui/primitives/pill';
 import type { AniFormat, MediaStatus, TitleLanguage } from "@/shared/types";
 
 export type MediaModalTabId = "series" | "mapping";

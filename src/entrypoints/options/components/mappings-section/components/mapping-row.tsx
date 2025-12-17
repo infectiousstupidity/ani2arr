@@ -8,12 +8,9 @@ import type {
   MappingSummary,
 } from '@/shared/types';
 import type { AniListMetadataDto } from '@/rpc/schemas';
-import {
-  useAniListMetadataBatch,
-  useSeriesStatus,
-} from '@/shared/hooks/use-api-queries';
-import Button from '@/shared/components/button';
-import Pill from '@/shared/components/pill';
+import { useAniListMetadataBatch, useSeriesStatus } from '@/shared/api';
+import Button from '@/shared/ui/primitives/button';
+import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';
 import SonarrIcon from '@/assets/sonarr.svg';
 import RadarrIcon from '@/assets/radarr.svg';

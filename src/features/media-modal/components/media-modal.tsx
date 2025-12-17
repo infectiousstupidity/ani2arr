@@ -3,18 +3,18 @@ import { useCallback, useMemo, useState } from "react";
 import { Modal, ModalContent, ModalTitle, ModalDescription } from "./modal";
 import { Header, type MediaModalTabId } from "./media-modal-header";
 import { Footer } from "./media-modal-footer";
-import Button from "@/shared/components/button";
+import Button from "@/shared/ui/primitives/button";
 import type { AniFormat, MediaStatus, TitleLanguage, ExtensionError } from "@/shared/types";
 import { ErrorCode } from "@/shared/types";
 
-import { MappingPreviewPanel, MappingSearchPanel } from "@/shared/mapping";
+import { MappingPreviewPanel, MappingSearchPanel } from "@/features/mapping";
 import type { MappingTabProps } from "../types";
 import { SonarrPanel } from "./sonarr-panel";
 import type { SonarrPanelProps } from "../types";
-import { useMappingController } from "@/shared/mapping";
+import { useMappingController } from "@/features/mapping";
 import { useSonarrPanelController } from "../hooks/use-sonarr-panel-controller";
-import { usePublicOptions } from "@/shared/hooks/use-api-queries";
-import { useConfirm } from "@/shared/hooks/use-confirm";
+import { usePublicOptions } from '@/shared/api';
+import { useConfirm } from "@/shared/hooks/common/use-confirm";
 
 type MediaModalViewMode = "setup" | "mapping";
 
