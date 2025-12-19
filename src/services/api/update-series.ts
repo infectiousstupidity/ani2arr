@@ -3,7 +3,7 @@ import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { UpdateSonarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, SonarrCredentialsPayload, SonarrSeries } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
-import { resolveSonarrTagIds } from '@/shared/utils/sonarr-tags';
+import { resolveSonarrTagIds } from '@/services/sonarr/tag-resolver';
 import { buildFolderSlug, joinRootAndSlug, paths } from '@/services/helpers/path-utils';
 
 type UpdateSeriesDeps = {
@@ -62,7 +62,13 @@ export async function updateSonarrSeriesHandler(
   const freeformTags = Array.isArray(input.form.freeformTags) ? input.form.freeformTags : [];
 
   const existingTags = await sonarrApiService.getTags(credentials);
-  const resolvedTags = await resolveSonarrTagIds(credentials, tagsFromForm, freeformTags, existingTags);
+  const resolvedTags = await resolveSonarrTagIds(
+    sonarrApiService,
+    credentials,
+    tagsFromForm,
+    freeformTags,
+    existingTags,
+  );
 
   const resolvedRoot = input.form.rootFolderPath || baseSeries.rootFolderPath || '';
   const slug = buildFolderSlug(baseSeries, input.title);
