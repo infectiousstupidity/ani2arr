@@ -4,7 +4,7 @@ import { createError, ErrorCode } from '@/shared/utils/error-handling';
 
 /**
  * Resolves the complete tag ID list for a Sonarr payload, creating freeform tags when needed.
- * Networked behavior lives here instead of shared utils to keep side effects in service code.
+ * Networked behavior lives alongside API flows to keep side effects out of generic utils.
  */
 export async function resolveSonarrTagIds(
   api: SonarrApiService,
@@ -56,30 +56,17 @@ export async function resolveSonarrTagIds(
         idToLabel.set(created.id, trimmed);
         labelToId.set(trimmed, created.id);
       }
-    } catch (error) {
-      // Intentionally swallow tag-creation race errors: tag may already exist, so refresh tags once for the batch and retry lookup.
-      // This helps diagnose issues beyond the "tag already exists" race scenario.
-      console.error('Failed to create Sonarr tag, attempting to recover by refreshing tags.', {
-        label,
-        error,
-      });
-      // Most likely race: tag already exists. Refresh tags once for the batch
-      // and retry lookup for this specific label. If it still cannot be resolved,
-      // surface the original error instead of assuming a race.
+    } catch {
+      // Race: tag already exists, refresh tags once for the batch and retry lookup
       if (!refreshedTags) {
         refreshedTags = await api.getTags(credentials);
-        for (const tag of refreshedTags) {
-          if (tag.label && tag.label.trim().length > 0) {
-            const trimmed = tag.label.trim();
-            idToLabel.set(tag.id, trimmed);
-            labelToId.set(trimmed, tag.id);
-          }
-        }
       }
-
-      // After refresh, if the specific label still does not resolve, rethrow.
-      if (!labelToId.has(label)) {
-        throw error;
+      for (const tag of refreshedTags) {
+        if (tag.label && tag.label.trim().length > 0) {
+          const trimmed = tag.label.trim();
+          idToLabel.set(tag.id, trimmed);
+          labelToId.set(trimmed, tag.id);
+        }
       }
     }
   }
@@ -98,7 +85,7 @@ export async function resolveSonarrTagIds(
     }
   }
 
-  const allIds = [...existingIdsFromForm, ...idsFromFreeform];
+  const allIds = [...(existingIdsFromForm ?? []), ...idsFromFreeform];
   const deduped: number[] = [];
   const seenIds = new Set<number>();
 
