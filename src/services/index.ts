@@ -9,9 +9,9 @@ import { StaticMappingProvider } from './mapping/static-mapping.provider';
 import { SonarrLookupClient } from './mapping/sonarr-lookup.client';
 import { SonarrLibrary } from '@/services/library/sonarr';
 import { AniListMetadataStore } from './anilist';
-import { getMappingsHandler } from '@/services/api/get-mappings';
-import { updateSonarrSeriesHandler } from '@/services/api/update-series';
-import { createApiHandlers } from '@/services/api/handlers';
+import { getMappingsHandler } from '@/rpc/handlers/get-mappings';
+import { updateSonarrSeriesHandler } from '@/rpc/handlers/update-series';
+import { createApiHandlers } from '@/rpc/handlers/handlers';
 
 import type { LeanSonarrSeries, SonarrLookupSeries, ExtensionOptions, AniMedia, ExtensionError } from '@/shared/types';
 import { getExtensionOptionsSnapshot } from '@/shared/options/storage';
