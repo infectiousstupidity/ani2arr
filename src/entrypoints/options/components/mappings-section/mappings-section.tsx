@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 import Button from '@/shared/ui/primitives/button';
 import { MappingEditor } from '@/features/mapping/mapping-editor';
-import { useClearMappingIgnore, useClearMappingOverride, useSetMappingIgnore } from '@/shared/api';
+import { useClearMappingIgnore, useClearMappingOverride, useSetMappingIgnore } from '@/shared/queries';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import type { MappingProvider, MappingSummary } from '@/shared/types';

@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
-import { queryKeys } from '@/shared/api';
+import { queryKeys } from '@/shared/queries';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
 import type { MappingSearchResult, SonarrLookupSeries } from '@/shared/types';
-import { usePublicOptions } from '@/shared/api';
+import { usePublicOptions } from '@/shared/queries';
 
 interface UseMappingSearchInput {
   service: 'sonarr' | 'radarr';

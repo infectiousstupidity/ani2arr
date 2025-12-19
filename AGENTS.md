@@ -76,7 +76,7 @@ Browse overlays share mount/bootstrap plumbing (QueryClient, style injection, mo
   * Per-ID cache eviction helper used when overrides change.
 * Options `getMappings` RPC returns provider summaries only (no AniList lookups). Inputs: `sources`/`providers`/`limit`/`cursor`; defaults to manual + ignored + auto with limit 500, sorted by `updatedAt` desc then `anilistId` asc.
 
-### AniList API (`src/api/anilist/`)
+### AniList API (`src/clients/anilist/`)
 
 * Single-lane queue (concurrency 1).
 * Inflight deduplication and 429 `Retry-After` handling.
@@ -90,7 +90,7 @@ Browse overlays share mount/bootstrap plumbing (QueryClient, style injection, mo
 * Stale after ~45d; hard drop at 120d. Refresh batch cap = 10 IDs per call to avoid starving overlays.
 * `getAniListMetadata(ids)` returns baked/locally refreshed entries and only hits AniList for missing/stale IDs.
 
-### Sonarr API (`src/api/sonarr.api.ts`)
+### Sonarr API (`src/clients/sonarr.api.ts`)
 
 * Permission-checked fetch wrapper with retries/backoff on 429.
 * All requests authenticate via `X-Api-Key` header. Do not place API keys in URLs.
@@ -108,8 +108,8 @@ Browse overlays share mount/bootstrap plumbing (QueryClient, style injection, mo
 
 ## 5. Query and persistence
 
-* API hooks live in `src/shared/api/*` (options.ts, sonarr.ts, mapping.ts, metadata.ts). Import from `@/shared/api`.
-* Query keys: `src/shared/api/query-keys.ts`. Always reuse existing keys.
+* API hooks live in `src/shared/queries/*` (options.ts, sonarr.ts, mapping.ts, metadata.ts). Import from `@/shared/queries`.
+* Query keys: `src/shared/queries/query-keys.ts`. Always reuse existing keys.
 * IndexedDB persister: `src/cache/query-cache.ts` with strict `shouldPersistQuery` filtering.
 * TanStack persistence wrapper: `src/cache/persist-options.ts`.
 * Guards `DataCloneError` and excludes credential-bearing queries.
@@ -266,7 +266,7 @@ Centralize shared types in `src/shared/types/` and re-export curated surfaces vi
 
 ### Add a query that must not persist
 
-1. Define its key in `src/shared/api/query-keys.ts`.
+1. Define its key in `src/shared/queries/query-keys.ts`.
 2. Update `shouldPersistQuery` to explicitly exclude it.
 
 ### Add a new overlay action
@@ -309,14 +309,15 @@ Smoke validation checklist:
 | ------------- | ----------------------------------------------------------------------------- |
 | RPC           | `src/rpc/index.ts`, `src/rpc/schemas.ts`                                      |
 | Mapping       | `src/services/mapping/*`                                                      |
-| AniList API   | `src/api/anilist/`                                                            |
-| Sonarr API    | `src/api/sonarr.api.ts`                                                       |
+| AniList API   | `src/clients/anilist/`                                                            |
+| Sonarr API    | `src/clients/sonarr.api.ts`                                                       |
 | Library       | `src/services/library.service.ts`                                             |
 | Persistence   | `src/cache/query-cache.ts`, `src/cache/persist-options.ts`              |
-| Overrides     | `src/shared/utils/storage/overrides-storage.ts`, `src/services/mapping/overrides.service.ts` |
+| Overrides     | `src/services/mapping/overrides-storage.ts`, `src/services/mapping/overrides.service.ts` |
+| Options storage | `src/shared/options/storage.ts` |
 | Broadcasts    | `src/shared/hooks/use-broadcasts.ts`                                                 |
 | UI            | `src/shared/components/media-actions.tsx`, `src/shared/components/form.tsx`, `src/features/media-overlay/components/media-overlay.tsx` |
-| Shared API hooks | `src/shared/api/*` |
+| Shared API hooks | `src/shared/queries/*` |
 | Options mappings | `src/entrypoints/options/components/mappings-explorer.tsx`, `src/shared/mapping/mapping-editor.tsx` |
 | Config        | `wxt.config.ts`                                                               |
 | Retry helpers | `src/shared/utils/retry.ts`                                                          |

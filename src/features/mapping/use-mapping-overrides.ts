@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { MappingExternalId } from '@/shared/types';
-import { useClearMappingOverride, useSetMappingOverride } from '@/shared/api';
+import { useClearMappingOverride, useSetMappingOverride } from '@/shared/queries';
 
 export function useMappingOverrides(anilistId: number) {
   const setOverrideMutation = useSetMappingOverride();

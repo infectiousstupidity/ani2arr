@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import Button from '@/shared/ui/primitives/button';
-import { useAniListMedia, usePublicOptions, useSeriesStatus } from '@/shared/api';
+import { useAniListMedia, usePublicOptions, useSeriesStatus } from '@/shared/queries';
 import { MappingPreviewPanel } from './mapping-preview-panel';
 import { MappingSearchPanel } from './mapping-search-panel';
 import { useMappingController } from './use-mapping-controller';

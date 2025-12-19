@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { usePublicOptions } from '@/shared/api';
+import { usePublicOptions } from '@/shared/queries';
 import Button from '@/shared/ui/primitives/button';
 import {
   MappingAccordionItem,

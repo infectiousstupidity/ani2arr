@@ -1,7 +1,7 @@
 import type { Ani2arrApi } from '@/rpc';
 import type { MappingOutput, UpdateSonarrInput } from '@/rpc/schemas';
-import type { AnilistApiService } from '@/api/anilist.api';
-import type { SonarrApiService } from '@/api/sonarr.api';
+import type { AnilistApiService } from '@/clients/anilist.api';
+import type { SonarrApiService } from '@/clients/sonarr.api';
 import type { MappingService } from '@/services/mapping';
 import type { MappingOverridesService } from '@/services/mapping/overrides.service';
 import type { SonarrLibrary } from '@/services/library/sonarr';
@@ -16,7 +16,7 @@ import type {
   CheckSeriesStatusPayload,
 } from '@/shared/types';
 import { createError, ErrorCode, normalizeError } from '@/shared/errors/error-utils';
-import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/shared/utils/storage/storage';
+import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/shared/options/storage';
 import type { getMappingsHandler, GetMappingsInput } from './get-mappings';
 import type { updateSonarrSeriesHandler } from './update-series';
 

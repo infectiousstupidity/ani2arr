@@ -3,7 +3,7 @@ import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { MultiMappingInfo } from './multi-mapping-info';
-import { useMappingOverrides, useSeriesStatus } from '@/shared/api';
+import { useMappingOverrides, useSeriesStatus } from '@/shared/queries';
 import type { MappingOverrideRecord, MappingSearchResult } from '@/shared/types';
 import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link';
 import type { MappingAniListSummary } from './types';

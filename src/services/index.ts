@@ -1,8 +1,8 @@
 import { browser } from 'wxt/browser';
 import { createTtlCache } from '@/cache';
 import { CacheNamespaces } from '@/cache/namespaces';
-import { SonarrApiService } from '@/api/sonarr.api';
-import { AnilistApiService } from '@/api/anilist.api';
+import { SonarrApiService } from '@/clients/sonarr.api';
+import { AnilistApiService } from '@/clients/anilist.api';
 import { MappingService, type ResolvedMapping, type StaticMappingPayload } from './mapping';
 import { MappingOverridesService } from './mapping/overrides.service';
 import { StaticMappingProvider } from './mapping/static-mapping.provider';
@@ -14,7 +14,7 @@ import { updateSonarrSeriesHandler } from '@/services/api/update-series';
 import { createApiHandlers } from '@/services/api/handlers';
 
 import type { LeanSonarrSeries, SonarrLookupSeries, ExtensionOptions, AniMedia, ExtensionError } from '@/shared/types';
-import { getExtensionOptionsSnapshot } from '@/shared/utils/storage/storage';
+import { getExtensionOptionsSnapshot } from '@/shared/options/storage';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { type Ani2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';

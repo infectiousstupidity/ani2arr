@@ -1,4 +1,4 @@
-import type { SonarrApiService } from '@/api/sonarr.api';
+import type { SonarrApiService } from '@/clients/sonarr.api';
 import type { SonarrCredentialsPayload, SonarrTag } from '@/shared/types';
 import { createError, ErrorCode } from '@/shared/errors/error-utils';
 

@@ -22,7 +22,7 @@ import {
   useSonarrMetadata,
   useUpdateDefaultSettings,
   useUpdateSeries,
-} from '@/shared/api';
+} from '@/shared/queries';
 import { toMappingSearchResultFromSonarr } from '@/features/mapping/sonarr.adapter';
 import { resolveTitlePreference } from '@/shared/anilist/title-preference';
 

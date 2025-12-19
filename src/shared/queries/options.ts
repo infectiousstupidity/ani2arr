@@ -9,7 +9,7 @@ import {
   setExtensionOptionsSnapshot,
   sonarrSecrets,
   toPublicOptions,
-} from '@/shared/utils/storage/storage';
+} from '@/shared/options/storage';
 import type { ExtensionError, ExtensionOptions, PublicOptions } from '@/shared/types';
 import type { Settings } from '@/shared/schemas/settings';
 import { normalizeError } from '@/shared/errors/error-utils';

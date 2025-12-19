@@ -13,7 +13,7 @@ import { SonarrPanel } from "./sonarr-panel";
 import type { SonarrPanelProps } from "../types";
 import { useMappingController } from "@/features/mapping";
 import { useSonarrPanelController } from "../hooks/use-sonarr-panel-controller";
-import { usePublicOptions } from '@/shared/api';
+import { usePublicOptions } from '@/shared/queries';
 import { useConfirm } from "@/shared/hooks/common/use-confirm";
 
 type MediaModalViewMode = "setup" | "mapping";

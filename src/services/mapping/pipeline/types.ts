@@ -3,7 +3,7 @@ import type { SonarrLookupClient, SonarrLookupCredentials } from '../sonarr-look
 import type { StaticMappingProvider } from '../static-mapping.provider';
 import type { ScopedLogger } from '@/shared/utils/logger';
 import type { AniMedia, RequestPriority, SonarrLookupSeries } from '@/shared/types';
-import type { AnilistApiService } from '@/api/anilist.api';
+import type { AnilistApiService } from '@/clients/anilist.api';
 
 export interface Candidate {
   term: SearchTerm;

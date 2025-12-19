@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { browser } from 'wxt/browser';
-import { useAddSeries, useSeriesStatus } from '@/shared/api';
+import { useAddSeries, useSeriesStatus } from '@/shared/queries';
 import type { ExtensionError, MediaMetadataHint, SonarrFormState } from '@/shared/types';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 

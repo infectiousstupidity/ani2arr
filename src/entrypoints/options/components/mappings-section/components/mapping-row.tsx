@@ -8,7 +8,7 @@ import type {
   MappingSummary,
 } from '@/shared/types';
 import type { AniListMetadataDto } from '@/rpc/schemas';
-import { useAniListMetadataBatch, useSeriesStatus } from '@/shared/api';
+import { useAniListMetadataBatch, useSeriesStatus } from '@/shared/queries';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';

@@ -1,7 +1,7 @@
 // src/services/mapping/sonarr-lookup.client.ts
 import type { TtlCache } from '@/cache';
 import PQueue from 'p-queue';
-import type { SonarrApiService } from '@/api/sonarr.api';
+import type { SonarrApiService } from '@/clients/sonarr.api';
 import type { SonarrLookupSeries, RequestPriority } from '@/shared/types';
 import { priorityValue } from '@/shared/utils/priority';
 import { canonicalTitleKey, sanitizeLookupDisplay } from '@/services/mapping/pipeline/matching';
