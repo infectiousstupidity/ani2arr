@@ -307,7 +307,8 @@ Smoke validation checklist:
 
 | Area          | Path                                                                          |
 | ------------- | ----------------------------------------------------------------------------- |
-| RPC           | `src/rpc/index.ts`, `src/rpc/schemas.ts`                                      |
+| RPC contracts | `src/rpc/index.ts`, `src/rpc/schemas.ts`                                      |
+| RPC handlers  | `src/rpc/handlers/*`                                                          |
 | Mapping       | `src/services/mapping/*`                                                      |
 | AniList API   | `src/clients/anilist/`                                                            |
 | Sonarr API    | `src/clients/sonarr.api.ts`                                                       |
