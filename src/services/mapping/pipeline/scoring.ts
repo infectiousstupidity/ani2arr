@@ -1,7 +1,7 @@
 import type { SonarrLookupSeries } from '@/shared/types';
 import type { ScoredCandidate } from './types';
 import type { SearchTerm } from './search-term-generator';
-import { computeTitleMatchScore } from '@/shared/utils/matching';
+import { computeTitleMatchScore } from '@/services/mapping/pipeline/matching';
 
 export function scoreCandidates(
   term: SearchTerm,

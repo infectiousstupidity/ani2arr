@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
-import { normalizeError } from '@/shared/utils/error-handling';
+import { normalizeError } from '@/shared/errors/error-utils';
 import type { AniMedia, ExtensionError } from '@/shared/types';
 import type { GetAniListMetadataOutput } from '@/rpc/schemas';
 import { queryKeys, normalizeMetadataIds } from './query-keys';

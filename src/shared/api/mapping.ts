@@ -15,7 +15,7 @@ import type {
   SetMappingOverrideInput,
   StatusInput,
 } from '@/rpc/schemas';
-import { normalizeError } from '@/shared/utils/error-handling';
+import { normalizeError } from '@/shared/errors/error-utils';
 import { queryKeys } from './query-keys';
 
 export type SeriesStatusOptions = {

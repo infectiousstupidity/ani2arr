@@ -1,7 +1,7 @@
 // src
 import type { LibraryCaches, LeanSonarrSeries, SonarrClient, SonarrSeries, ExtensionOptions, TitleIndexer } from './types';
 import { getExtensionOptionsSnapshot } from '@/shared/utils/storage/storage';
-import { logError, normalizeError } from '@/shared/utils/error-handling';
+import { logError, normalizeError } from '@/shared/errors/error-utils';
 import { CACHE_KEY, SOFT_TTL_MS, HARD_TTL_MS, ERROR_TTL_MS } from './constants';
 
 export class SonarrLibraryStore {

@@ -1,6 +1,6 @@
 // src/services/mapping/static-mapping.provider.ts
 import type { TtlCache } from '@/cache';
-import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 import type { ScopedLogger } from '@/shared/utils/logger';
 

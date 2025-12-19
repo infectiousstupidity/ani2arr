@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
 import type { AnilistApiService } from '@/api/anilist.api';
 import type { AniListMetadata, AniListMetadataBundle, AniMedia, AniTitles } from '@/shared/types';
-import { logError, normalizeError } from '@/shared/utils/error-handling';
+import { logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 
 

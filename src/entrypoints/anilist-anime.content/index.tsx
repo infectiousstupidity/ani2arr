@@ -10,8 +10,8 @@ import { useMediaModalProps } from '@/shared/hooks/entrypoints/use-media-modal-p
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
 import MediaActions, { Status } from '@/shared/ui/media/media-actions';
 import { logger } from '@/shared/utils/logger';
-import { extractMediaMetadataFromDom } from '@/shared/utils/dom/anilist-dom';
-import { mergeMetadataHints } from '@/shared/utils/media-metadata';
+import { extractMediaMetadataFromDom } from '@/shared/anilist/dom/anilist-dom';
+import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
 import type { MediaMetadataHint } from '@/shared/types';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
@@ -19,7 +19,7 @@ import '@/shared/styles/base.css';
 import './style.css';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
-import { awaitBackgroundReady } from '@/shared/utils/dom/background-ready';
+import { awaitBackgroundReady } from '@/shared/dom/background-ready';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 
 const log = logger.create('AniList Content');

@@ -9,7 +9,7 @@ import type {
   SonarrLookupSeries,
 } from './types';
 import { getExtensionOptionsSnapshot } from '@/shared/utils/storage/storage';
-import { ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
+import { ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { notifyLibraryMutation, type LibraryMutationEmitter } from './notify';
 import type { SonarrLibraryStore } from './store';
 

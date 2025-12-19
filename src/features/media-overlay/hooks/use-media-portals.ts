@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ParsedCard } from '@/shared/types';
-import { metadataEqual } from '@/shared/utils/media-metadata';
+import { metadataEqual } from '@/shared/anilist/media-metadata';
 
 const toElementArray = (value: Iterable<Element> | Element | null | undefined): Element[] => {
   if (!value) return [];

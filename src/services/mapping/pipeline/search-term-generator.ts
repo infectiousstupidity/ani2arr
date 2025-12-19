@@ -1,5 +1,5 @@
 import type { AniTitles } from '@/shared/types';
-import { canonicalTitleKey, isOrdinalToken, stripParenContent, sanitizeLookupDisplay } from '@/shared/utils/matching';
+import { canonicalTitleKey, isOrdinalToken, stripParenContent, sanitizeLookupDisplay } from '@/services/mapping/pipeline/matching';
 
 export interface SearchTerm {
   canonical: string;

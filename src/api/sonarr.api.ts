@@ -1,7 +1,7 @@
 // src/api/sonarr.api.ts
 
 import { withRetry, AbortError } from '@/shared/utils/retry';
-import { hasSonarrPermission } from '@/shared/utils/validation';
+import { hasSonarrPermission } from '@/shared/sonarr/validation';
 import type {
   ExtensionOptions,
   SonarrCredentialsPayload,
@@ -12,7 +12,7 @@ import type {
   SonarrTag,
   SonarrLookupSeries,
 } from '@/shared/types';
-import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 import { resolveSonarrTagIds } from '@/services/api/sonarr-tag-resolver';
 

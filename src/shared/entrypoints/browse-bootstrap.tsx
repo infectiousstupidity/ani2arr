@@ -5,8 +5,8 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import ToastProvider from '@/shared/ui/feedback/toast-provider';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
-import { awaitBackgroundReady } from '@/shared/utils/dom/background-ready';
-import { createPersistOptions } from '@/shared/utils/query-persist-options';
+import { awaitBackgroundReady } from '@/shared/dom/background-ready';
+import { createPersistOptions } from '@/cache/persist-options';
 import { logger } from '@/shared/utils/logger';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { createShadowRootUi, type ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';

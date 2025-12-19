@@ -1,5 +1,5 @@
-// Public surface for matching utilities.
-// Consumers import from '@/utils/matching'.
+// Public surface for mapping matching utilities.
+// Consumers import from '@/services/mapping/pipeline/matching'.
 
 export {
   normTitle,

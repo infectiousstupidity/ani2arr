@@ -2,10 +2,10 @@
 import { browser } from 'wxt/browser';
 import { registerAni2arrApi, getAni2arrApi } from '@/rpc';
 import { createApiImplementation } from '@/services';
-import { computeTitleMatchScore } from '@/shared/utils/matching';
+import { computeTitleMatchScore } from '@/services/mapping/pipeline/matching';
 import { logger } from '@/shared/utils/logger';
 import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/shared/utils/metrics';
-import { logError, normalizeError } from '@/shared/utils/error-handling';
+import { logError, normalizeError } from '@/shared/errors/error-utils';
 
 type OptionsSectionId = 'sonarr' | 'radarr' | 'mappings' | 'ui' | 'advanced';
 

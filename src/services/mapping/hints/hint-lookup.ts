@@ -1,6 +1,6 @@
 import type { SonarrLookupCredentials } from '../sonarr-lookup.client';
 import type { SonarrLookupClient } from '../sonarr-lookup.client';
-import { canonicalTitleKey, sanitizeLookupDisplay } from '@/shared/utils/matching';
+import { canonicalTitleKey, sanitizeLookupDisplay } from '@/services/mapping/pipeline/matching';
 import { scoreCandidates } from '../pipeline/scoring';
 import { isSeasonalCanonicalTokens } from '../pipeline/search-term-generator';
 import type { ResolvedMapping } from '../types';

@@ -10,7 +10,7 @@ import * as v from 'valibot';
 import { SettingsSchema, createDefaultSettings } from '@/shared/schemas/settings';
 import type { Settings } from '@/shared/schemas/settings';
 import type { ExtensionOptions, PublicOptions, SonarrSecrets } from '@/shared/types';
-import { validateUrl, validateApiKey } from '@/shared/utils/validation';
+import { validateUrl, validateApiKey } from '@/shared/sonarr/validation';
 import { logger } from '@/shared/utils/logger';
 
 const createDefaultPublicOptions = (): PublicOptions => {

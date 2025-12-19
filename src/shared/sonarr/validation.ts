@@ -1,4 +1,4 @@
-// src/shared/utils/validation.ts
+// src/shared/sonarr/validation.ts
 
 /**
  * @file Provides utility functions for validating user input and managing host permissions.
