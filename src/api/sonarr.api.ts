@@ -14,7 +14,7 @@ import type {
 } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
 import { logger } from '@/shared/utils/logger';
-import { resolveSonarrTagIds } from '@/services/sonarr/tag-resolver';
+import { resolveSonarrTagIds } from '@/services/api/sonarr-tag-resolver';
 
 const log = logger.create('SonarrApiService');
 

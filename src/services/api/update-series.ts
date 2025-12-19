@@ -3,7 +3,7 @@ import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { UpdateSonarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, SonarrCredentialsPayload, SonarrSeries } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
-import { resolveSonarrTagIds } from '@/services/sonarr/tag-resolver';
+import { resolveSonarrTagIds } from '@/services/api/sonarr-tag-resolver';
 import { buildFolderSlug, joinRootAndSlug, paths } from '@/services/helpers/path-utils';
 
 type UpdateSeriesDeps = {
