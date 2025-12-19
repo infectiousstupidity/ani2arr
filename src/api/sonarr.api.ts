@@ -14,6 +14,7 @@ import type {
 } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/utils/error-handling';
 import { logger } from '@/shared/utils/logger';
+import { resolveSonarrTagIds } from '@/services/sonarr/tag-resolver';
 
 const log = logger.create('SonarrApiService');
 
@@ -229,70 +230,14 @@ export class SonarrApiService {
       ...payload,
     };
 
-    // Resolve tags:
-    // - Start from existing tags ids in the form (finalPayload.tags)
-    // - Merge in ids for freeform labels (finalPayload.freeformTags),
-    //   creating Sonarr tags when necessary.
-    const existingTagIdsFromForm: number[] = Array.isArray(finalPayload.tags)
-      ? finalPayload.tags.filter(id => typeof id === 'number' && !Number.isNaN(id))
-      : [];
-
-    const freeformLabelsRaw: string[] = Array.isArray(finalPayload.freeformTags)
-      ? finalPayload.freeformTags
-      : [];
-
-    const freeformLabels: string[] = [];
-    const seenLabels = new Set<string>();
-
-    for (const label of freeformLabelsRaw) {
-      if (!label) continue;
-      const trimmed = label.trim();
-      if (!trimmed) continue;
-      if (seenLabels.has(trimmed)) continue;
-      seenLabels.add(trimmed);
-      freeformLabels.push(trimmed);
-    }
-
-    // Fetch current tags once to avoid unnecessary createTag calls
-    const existingTags: SonarrTag[] = await this.getTags(sonarrCreds);
-    const labelToId = new Map<string, number>();
-
-    for (const tag of existingTags) {
-      if (tag.label && tag.label.trim().length > 0) {
-        const trimmed = tag.label.trim();
-        labelToId.set(trimmed, tag.id);
-      }
-    }
-
-    const finalTagIds: number[] = [];
-    const seenIds = new Set<number>();
-
-    // Start with existing ids from the form
-    for (const id of existingTagIdsFromForm) {
-      if (!seenIds.has(id)) {
-        seenIds.add(id);
-        finalTagIds.push(id);
-      }
-    }
-
-    // Then handle freeform labels
-    for (const label of freeformLabels) {
-      const existingId = labelToId.get(label);
-      if (typeof existingId === 'number') {
-        if (!seenIds.has(existingId)) {
-          seenIds.add(existingId);
-          finalTagIds.push(existingId);
-        }
-        continue;
-      }
-
-      // Not found in existing tags, create it
-      const created = await this.createTag(sonarrCreds, label);
-      if (typeof created.id === 'number' && !seenIds.has(created.id)) {
-        seenIds.add(created.id);
-        finalTagIds.push(created.id);
-      }
-    }
+    const finalTagIds = await resolveSonarrTagIds(
+      this,
+      sonarrCreds,
+      Array.isArray(finalPayload.tags)
+        ? finalPayload.tags.filter(id => typeof id === 'number' && !Number.isNaN(id))
+        : [],
+      Array.isArray(finalPayload.freeformTags) ? finalPayload.freeformTags : [],
+    );
 
     // Strip fields that Sonarr does not understand (`metadata`, `freeformTags`) before sending
     const {
