@@ -1,4 +1,4 @@
-// src/shared/utils/overrides-storage.ts
+// src/services/mapping/overrides-storage.ts
 import { storage } from '@wxt-dev/storage';
 
 export interface MappingOverrideEntry {

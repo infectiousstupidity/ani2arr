@@ -5,7 +5,7 @@ import { Check, ChevronDown, RotateCcw } from 'lucide-react';
 
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
-import type { useSonarrMetadata } from '@/shared/api';
+import type { useSonarrMetadata } from '@/shared/queries';
 import type { SonarrQualityProfile, SonarrRootFolder } from '@/shared/types';
 
 import { FormField, Label, SelectField, SwitchField } from '@/shared/ui/form/form';

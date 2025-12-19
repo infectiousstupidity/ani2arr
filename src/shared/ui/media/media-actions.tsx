@@ -3,7 +3,7 @@ import React from 'react';
 import Button from '@/shared/ui/primitives/button';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { SquareArrowOutUpRight, ChevronDown } from 'lucide-react';
-import { usePublicOptions } from '@/shared/api';
+import { usePublicOptions } from '@/shared/queries';
 import { logger } from '@/shared/utils/logger';
 import Dropdown, { DropdownItem } from '@/shared/ui/primitives/dropdown';
 import { buildExternalMediaLink, type ExternalLinkInput } from '@/shared/utils/build-external-media-link';

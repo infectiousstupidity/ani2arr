@@ -1,4 +1,4 @@
-import type { SonarrApiService } from '@/api/sonarr.api';
+import type { SonarrApiService } from '@/clients/sonarr.api';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { UpdateSonarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, SonarrCredentialsPayload, SonarrSeries } from '@/shared/types';

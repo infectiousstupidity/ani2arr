@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import ToastProvider, { useToast } from '@/shared/ui/feedback/toast-provider';
 import { useTheme } from '@/shared/hooks/common/use-theme';
-import { useSeriesStatus, useAddSeries, usePublicOptions } from '@/shared/api';
+import { useSeriesStatus, useAddSeries, usePublicOptions } from '@/shared/queries';
 import { useMediaModalProps } from '@/shared/hooks/entrypoints/use-media-modal-props';
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
 import MediaActions, { Status } from '@/shared/ui/media/media-actions';

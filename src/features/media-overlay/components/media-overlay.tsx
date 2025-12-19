@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { usePublicOptions } from '@/shared/api';
+import { usePublicOptions } from '@/shared/queries';
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useBrowsePortals } from '../hooks/use-media-portals';

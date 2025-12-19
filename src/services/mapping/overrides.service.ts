@@ -7,7 +7,7 @@ import {
   mappingOverridesSync,
   type MappingIgnoreEntry,
   type MappingOverrideEntry,
-} from '@/shared/utils/storage/overrides-storage';
+} from '@/services/mapping/overrides-storage';
 import type { MappingIgnoreRecord } from '@/shared/types';
 
 export class MappingOverridesService {

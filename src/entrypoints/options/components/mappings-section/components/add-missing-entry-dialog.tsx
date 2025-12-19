@@ -7,7 +7,7 @@ import { InputField } from '@/shared/ui/form/form';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { getAni2arrApi } from '@/rpc';
-import { useAniListMedia } from '@/shared/api';
+import { useAniListMedia } from '@/shared/queries';
 import type { AniListSearchResult } from '@/shared/types';
 
 type AddMissingEntryDialogProps = {

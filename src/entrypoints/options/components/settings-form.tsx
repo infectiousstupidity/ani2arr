@@ -4,7 +4,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
 
-import { useSonarrMetadata, queryKeys } from '@/shared/api';
+import { useSonarrMetadata, queryKeys } from '@/shared/queries';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import {

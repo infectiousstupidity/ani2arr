@@ -13,7 +13,7 @@ import UiSection from '@/entrypoints/options/components/ui-section';
 import AdvancedSection from '@/entrypoints/options/components/advanced-section';
 import SonarrPage from '@/entrypoints/options/components/sonarr-section';
 import RadarrPage from '@/entrypoints/options/components/radarr-section';
-import { useExtensionOptions } from '@/shared/api';
+import { useExtensionOptions } from '@/shared/queries';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import { useSettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';

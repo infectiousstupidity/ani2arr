@@ -1,4 +1,4 @@
-// src/api/sonarr.api.ts
+// src/clients/sonarr.api.ts
 
 import { withRetry, AbortError } from '@/shared/utils/retry';
 import { hasSonarrPermission } from '@/shared/sonarr/validation';
