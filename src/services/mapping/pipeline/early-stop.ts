@@ -1,4 +1,4 @@
-import type { ScoredCandidate } from '@/shared/types';
+import type { ScoredCandidate } from './types';
 
 export interface EarlyStopLimits {
   earlyStopThreshold: number; // e.g., 0.82

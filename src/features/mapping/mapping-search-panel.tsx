@@ -92,15 +92,15 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                     const isCurrent =
                       currentMapping &&
                       result.target.id === currentMapping.target.id &&
-                      result.target.idType === currentMapping.target.idType;
+                      result.target.kind === currentMapping.target.kind;
                     const isSelected =
                       selected &&
                       result.target.id === selected.target.id &&
-                      result.target.idType === selected.target.idType;
+                      result.target.kind === selected.target.kind;
 
                     const metadataPills: React.ReactNode[] = [
                       <Pill key="tvdb" small tone="muted" className="font-mono text-text-primary">
-                        {`TVDB ${result.target.id}`}
+                        {`${result.target.kind.toUpperCase()} ${result.target.id}`}
                       </Pill>,
                     ];
 
@@ -154,7 +154,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
 
                     return (
                       <div
-                        key={`${result.target.id}-${result.target.idType}`}
+                        key={`${result.target.id}-${result.target.kind}`}
                         className={`group flex items-center gap-3 px-3 py-3 transition-colors ${
                           isSelected
                             ? 'bg-accent-primary/15 ring-1 ring-inset ring-accent-primary/30'

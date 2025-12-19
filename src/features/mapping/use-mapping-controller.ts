@@ -30,7 +30,7 @@ function targetsEqual(
   b?: MappingSearchResult['target'] | null,
 ): boolean {
   if (!a || !b) return false;
-  return a.id === b.id && a.idType === b.idType;
+  return a.id === b.id && a.kind === b.kind;
 }
 
 function reducer(state: MappingTabState, action: Action): MappingTabState {

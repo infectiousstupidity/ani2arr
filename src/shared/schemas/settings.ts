@@ -7,8 +7,8 @@ import type {
   SonarrFormState,
   TitleLanguage,
   UiOptions,
-} from '@/shared/types/extension';
-import type { SonarrMonitorOption } from '@/shared/types/sonarr';
+} from '@/shared/types/options';
+import type { SonarrMonitorOption } from '@/shared/types/providers';
 
 // --- Constants ---
 
@@ -178,7 +178,7 @@ const ExtensionOptionsSchema = v.pipe(
 
 export const SettingsSchema = v.fallback(ExtensionOptionsSchema, createDefaultSettingsInternal());
 
-// Export intersection to enforce strict contract with types/extension
+// Export intersection to enforce strict contract with types/options
 export type Settings = v.InferOutput<typeof SettingsSchema> & ExtensionOptions;
 export type SettingsFormValues = Settings & FieldValues;
 

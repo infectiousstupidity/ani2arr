@@ -79,7 +79,7 @@ export function toMappingSearchResultFromSonarr(
 
   return {
     service: 'sonarr',
-    target: { id: tvdbId, idType: 'tvdb' },
+    target: { id: tvdbId, kind: 'tvdb' },
     title: series.title,
     ...(year !== undefined ? { year } : {}),
     ...(typeLabel ? { typeLabel } : {}),

@@ -108,7 +108,8 @@ Browse overlays share mount/bootstrap plumbing (QueryClient, style injection, mo
 
 ## 5. Query and persistence
 
-* Query keys: `src/shared/hooks/use-api-queries.ts`. Always reuse existing keys.
+* API hooks live in `src/shared/api/*` (options.ts, sonarr.ts, mapping.ts, metadata.ts). Import from `@/shared/api`.
+* Query keys: `src/shared/api/query-keys.ts`. Always reuse existing keys.
 * IndexedDB persister: `src/cache/query-cache.ts` with strict `shouldPersistQuery` filtering.
 * TanStack persistence wrapper: `src/utils/query-persist-options.ts`.
 * Guards `DataCloneError` and excludes credential-bearing queries.
@@ -209,7 +210,7 @@ Keep files focused and small. Split concerns early to avoid “god files.”
   * Logger in `src/shared/utils/logger.ts` (redacts sensitive fields)
 * Type safety: no `any`; use precise unions, discriminated unions, and `readonly` where practical.
 * Keep cross-context payloads lean and serializable; avoid giant parameter objects.
-* Consistency: reuse query keys and caches; don’t duplicate logic; never log credentials.
+* Consistency: reuse query keys and caches; don't duplicate logic; never log credentials.
 
 ### Type conventions (project-specific)
 
@@ -217,11 +218,12 @@ Centralize shared types in `src/shared/types/` and re-export curated surfaces vi
 
 * Organization
   * AniList domain: `src/shared/types/anilist.ts`
-  * Sonarr domain: `src/shared/types/sonarr.ts`
-  * Extension/options and payloads: `src/shared/types/extension.ts`
+  * Providers (Sonarr/Radarr): `src/shared/types/providers.ts`
+  * Options and payloads: `src/shared/types/options.ts`
   * Settings schema + defaults: `src/shared/schemas/settings.ts` (source of truth for options shape)
-  * Mapping: `src/shared/types/mapping.ts`
-  * Overlay/UI adapters: `src/shared/types/browse-overlay.ts`
+  * Mapping contracts: `src/shared/types/mapping.ts`
+  * UI view models (overlays, mapping search): `src/shared/types/ui.ts`
+  * Mapping pipeline-only types live locally at `src/services/mapping/pipeline/types.ts`
 * Patterns
   * Use discriminated unions for statuses/results; prefer string literal unions over enums.
   * Mark arrays/records `readonly` when possible for immutability.
@@ -264,7 +266,7 @@ Centralize shared types in `src/shared/types/` and re-export curated surfaces vi
 
 ### Add a query that must not persist
 
-1. Define its key in `src/shared/hooks/use-api-queries.ts`.
+1. Define its key in `src/shared/api/query-keys.ts`.
 2. Update `shouldPersistQuery` to explicitly exclude it.
 
 ### Add a new overlay action
@@ -314,6 +316,7 @@ Smoke validation checklist:
 | Overrides     | `src/shared/utils/overrides-storage.ts`, `src/services/mapping/overrides.service.ts` |
 | Broadcasts    | `src/shared/hooks/use-broadcasts.ts`                                                 |
 | UI            | `src/shared/components/media-actions.tsx`, `src/shared/components/form.tsx`, `src/features/media-overlay/components/media-overlay.tsx` |
+| Shared API hooks | `src/shared/api/*` |
 | Options mappings | `src/entrypoints/options/components/mappings-explorer.tsx`, `src/shared/mapping/mapping-editor.tsx` |
 | Config        | `wxt.config.ts`                                                               |
 | Retry helpers | `src/shared/utils/retry.ts`                                                          |

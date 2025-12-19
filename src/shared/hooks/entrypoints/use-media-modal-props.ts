@@ -148,7 +148,7 @@ function deriveCurrentMappingFromStatus(
 
   const mapping: MappingSearchResult = {
     service,
-    target: { id: tvdbId, idType: 'tvdb' },
+    target: { id: tvdbId, kind: 'tvdb' },
     title,
     inLibrary,
     ...(librarySlug ? { librarySlug } : {}),
