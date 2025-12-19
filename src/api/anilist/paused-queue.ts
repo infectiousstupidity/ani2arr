@@ -1,6 +1,6 @@
 import PQueue from 'p-queue';
 import type { TtlCache } from '@/cache';
-import { createError, ErrorCode } from '@/shared/utils/error-handling';
+import { createError, ErrorCode } from '@/shared/errors/error-utils';
 import { priorityValue } from '@/shared/utils/priority';
 import type { AniMedia, RequestPriority } from '@/shared/types';
 import { cacheMedia } from './media-normalizer';

@@ -12,7 +12,7 @@ import {
 } from '@/shared/utils/storage/storage';
 import type { ExtensionError, ExtensionOptions, PublicOptions } from '@/shared/types';
 import type { Settings } from '@/shared/schemas/settings';
-import { normalizeError } from '@/shared/utils/error-handling';
+import { normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 import { queryKeys } from './query-keys';
 

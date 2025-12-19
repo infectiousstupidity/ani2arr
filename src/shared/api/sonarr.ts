@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
-import { normalizeError } from '@/shared/utils/error-handling';
+import { normalizeError } from '@/shared/errors/error-utils';
 import type {
   ExtensionError,
   SonarrCredentialsPayload,

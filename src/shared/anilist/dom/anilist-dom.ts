@@ -1,6 +1,6 @@
-// src/shared/utils/anilist-dom.ts
+// src/shared/anilist/dom/anilist-dom.ts
 import type { AniFormat, AniTitles, MediaMetadataHint } from '@/shared/types';
-import { normalizeRelationIds, normalizeSynonyms } from '@/shared/utils/media-metadata';
+import { normalizeRelationIds, normalizeSynonyms } from '@/shared/anilist/media-metadata';
 
 const FORMAT_VALUES: ReadonlySet<AniFormat> = new Set([
   'TV',

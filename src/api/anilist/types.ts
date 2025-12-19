@@ -1,5 +1,5 @@
 import type { AniListSearchResult, AniMedia } from '@/shared/types';
-import type { createError } from '@/shared/utils/error-handling';
+import type { createError } from '@/shared/errors/error-utils';
 
 export type GraphQLError = { message: string; status?: number };
 

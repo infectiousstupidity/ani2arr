@@ -1,6 +1,6 @@
 // src/services/library/sonarr/title-indexer.ts
 import type { LeanSonarrSeries, TitleIndexer, CheckSeriesStatusPayload } from './types';
-import { canonicalizeLookupTerm, computeTitleMatchScore, stripParenContent, sanitizeLookupDisplay } from '@/shared/utils/matching';
+import { canonicalizeLookupTerm, computeTitleMatchScore, stripParenContent, sanitizeLookupDisplay } from '@/services/mapping/pipeline/matching';
 import { incrementCounter } from '@/shared/utils/metrics';
 import { LOCAL_INDEX_ACCEPTANCE_THRESHOLD } from './constants';
 

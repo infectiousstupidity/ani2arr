@@ -7,7 +7,7 @@ import { MappingPreviewPanel } from './mapping-preview-panel';
 import { MappingSearchPanel } from './mapping-search-panel';
 import { useMappingController } from './use-mapping-controller';
 import type { MappingExternalId, MappingProvider, MappingSearchResult, SonarrLookupSeries } from '@/shared/types';
-import { metadataFromMediaObject } from '@/shared/utils/dom/anilist-dom';
+import { metadataFromMediaObject } from '@/shared/anilist/dom/anilist-dom';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 

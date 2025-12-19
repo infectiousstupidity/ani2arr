@@ -1,4 +1,4 @@
-// src/shared/utils/media-metadata.ts
+// src/shared/anilist/media-metadata.ts
 import type { MediaMetadataHint } from '@/shared/types';
 
 export const normalizeSynonyms = (synonyms?: string[] | null): string[] => {

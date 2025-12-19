@@ -1,6 +1,6 @@
 // src/entrypoints/anichart-browse.content/index.tsx
-import { extractMediaMetadataFromDom } from '@/shared/utils/dom/anilist-dom';
-import { mergeMetadataHints } from '@/shared/utils/media-metadata';
+import { extractMediaMetadataFromDom } from '@/shared/anilist/dom/anilist-dom';
+import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
 import type { AniFormat, MediaMetadataHint } from '@/shared/types';
 import baseStyles from '@/shared/styles/base.css?inline';
 import browseStyles from './style.css?inline';

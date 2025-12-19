@@ -24,7 +24,7 @@ import {
   useUpdateSeries,
 } from '@/shared/api';
 import { toMappingSearchResultFromSonarr } from '@/features/mapping/sonarr.adapter';
-import { resolveTitlePreference } from '@/shared/utils/title-preference';
+import { resolveTitlePreference } from '@/shared/anilist/title-preference';
 
 export interface UseMediaModalPropsInput {
   anilistId: number | undefined;

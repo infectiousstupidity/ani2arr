@@ -12,7 +12,7 @@ import {
   validateApiKey,
   validateUrl,
   buildSonarrPermissionPattern,
-} from '@/shared/utils/validation';
+} from '@/shared/sonarr/validation';
 import Button from '../../../shared/ui/primitives/button';
 import { logger } from '@/shared/utils/logger';
 

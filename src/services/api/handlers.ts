@@ -15,7 +15,7 @@ import type {
   SonarrCredentialsPayload,
   CheckSeriesStatusPayload,
 } from '@/shared/types';
-import { createError, ErrorCode, normalizeError } from '@/shared/utils/error-handling';
+import { createError, ErrorCode, normalizeError } from '@/shared/errors/error-utils';
 import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/shared/utils/storage/storage';
 import type { getMappingsHandler, GetMappingsInput } from './get-mappings';
 import type { updateSonarrSeriesHandler } from './update-series';

@@ -1,4 +1,4 @@
-// src/shared/utils/constants.ts
+// src/shared/sonarr/constants.ts
 
 /**
  * @file Defines static, shared constants used throughout the extension.

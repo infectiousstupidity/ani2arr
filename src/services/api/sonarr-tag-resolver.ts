@@ -1,6 +1,6 @@
 import type { SonarrApiService } from '@/api/sonarr.api';
 import type { SonarrCredentialsPayload, SonarrTag } from '@/shared/types';
-import { createError, ErrorCode } from '@/shared/utils/error-handling';
+import { createError, ErrorCode } from '@/shared/errors/error-utils';
 
 /**
  * Resolves the complete tag ID list for a Sonarr payload, creating freeform tags when needed.

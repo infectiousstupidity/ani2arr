@@ -1,5 +1,5 @@
 // src/services/library/sonarr/notify.ts
-import { logError, normalizeError } from '@/shared/utils/error-handling';
+import { logError, normalizeError } from '@/shared/errors/error-utils';
 import type { LibraryMutationPayload } from './types';
 
 export type LibraryMutationEmitter = (payload: LibraryMutationPayload) => Promise<void> | void;

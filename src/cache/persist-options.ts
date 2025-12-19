@@ -1,4 +1,4 @@
-// src/shared/utils/query-persist-options.ts
+// src/cache/persist-options.ts
 import type { Query, DehydrateOptions } from '@tanstack/query-core';
 import type { PersistQueryClientProviderProps } from '@tanstack/react-query-persist-client';
 import { queryPersister, shouldPersistQuery } from '@/cache/query-cache';

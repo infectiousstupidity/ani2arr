@@ -3,7 +3,7 @@ import type { FieldPath, FieldPathValue, UseFormReturn } from 'react-hook-form';
 import type { SonarrFormState, SonarrQualityProfile, SonarrRootFolder, SonarrTag } from '@/shared/types';
 import { SelectField } from '@/shared/ui/form/form';
 import { cn } from '@/shared/utils/cn';
-import { MONITOR_OPTIONS_WITH_DESCRIPTIONS, SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS } from '@/shared/utils/constants';
+import { MONITOR_OPTIONS_WITH_DESCRIPTIONS, SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS } from '@/shared/sonarr/constants';
 import { DEFAULT_CONTAINER_CLASS_NAME, buildFolderSlug } from './helpers';
 import { RootFolderField } from './components/root-folder-field';
 import { TagsField } from './components/tags-field';

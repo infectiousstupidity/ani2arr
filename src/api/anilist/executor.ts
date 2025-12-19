@@ -1,5 +1,5 @@
 import { withRetry, AbortError } from '@/shared/utils/retry';
-import { createError, ErrorCode } from '@/shared/utils/error-handling';
+import { createError, ErrorCode } from '@/shared/errors/error-utils';
 import type { AniListSearchResult, AniMedia } from '@/shared/types';
 import {
   AniListAbortError,

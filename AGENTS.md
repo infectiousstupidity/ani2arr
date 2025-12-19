@@ -111,7 +111,7 @@ Browse overlays share mount/bootstrap plumbing (QueryClient, style injection, mo
 * API hooks live in `src/shared/api/*` (options.ts, sonarr.ts, mapping.ts, metadata.ts). Import from `@/shared/api`.
 * Query keys: `src/shared/api/query-keys.ts`. Always reuse existing keys.
 * IndexedDB persister: `src/cache/query-cache.ts` with strict `shouldPersistQuery` filtering.
-* TanStack persistence wrapper: `src/utils/query-persist-options.ts`.
+* TanStack persistence wrapper: `src/cache/persist-options.ts`.
 * Guards `DataCloneError` and excludes credential-bearing queries.
 * Mapping overrides are persisted via `@wxt-dev/storage` sync storage (no secrets) with a local mirror for fast reads.
 * `useMappings` is an infinite query with `meta.persist=false` and ~45m `staleTime`; rely on explicit invalidations for refresh. Upstream dataset must be fetched via filters (defaults to manual/ignored/auto only). Use `useAniListMetadataBatch` to hydrate titles/covers without touching AniList in `getMappings`.
@@ -177,7 +177,7 @@ Never:
 ## 10. Coding conventions
 
 * Use `@/*` path aliases. No relative traversals.
-* Keep helpers pure in `utils/`; limit side effects to services or hooks.
+* Keep helpers pure in `utils/`; place domain helpers in `shared/sonarr` or `shared/anilist`; limit side effects to services or hooks.
 * Always wrap cross-context RPC calls in `try/catch` and pass errors through `normalizeError()`.
 * Use `withRetry()` for all retry logic (in `src/shared/utils/retry.ts`). Do not hand-roll loops.
 * Follow strict TypeScript. Do not disable type checking or introduce `any`.
@@ -206,7 +206,7 @@ Keep files focused and small. Split concerns early to avoid “god files.”
 * Prefer pure helpers in `src/utils/`; keep side effects confined to services or hooks.
 * Reuse existing helpers instead of rolling your own:
   * `withRetry()` in `src/shared/utils/retry.ts`
-  * `normalizeError()` in `src/shared/utils/error-handling.tsx`
+  * `normalizeError()` in `src/shared/errors/error-utils.ts`
   * Logger in `src/shared/utils/logger.ts` (redacts sensitive fields)
 * Type safety: no `any`; use precise unions, discriminated unions, and `readonly` where practical.
 * Keep cross-context payloads lean and serializable; avoid giant parameter objects.
@@ -250,7 +250,7 @@ Centralize shared types in `src/shared/types/` and re-export curated surfaces vi
 
 1. Edit `wxt.config.ts` under `host_permissions` (MV3).
 2. If runtime permission is required, call `requestSonarrPermission()` from the options UI.
-3. Validate the new domain in `shared/utils/validation.ts`.
+3. Validate the new domain in `shared/sonarr/validation.ts`.
 
 ### Add a Sonarr form field
 
@@ -312,8 +312,8 @@ Smoke validation checklist:
 | AniList API   | `src/api/anilist/`                                                            |
 | Sonarr API    | `src/api/sonarr.api.ts`                                                       |
 | Library       | `src/services/library.service.ts`                                             |
-| Persistence   | `src/cache/query-cache.ts`, `src/shared/utils/query-persist-options.ts`              |
-| Overrides     | `src/shared/utils/overrides-storage.ts`, `src/services/mapping/overrides.service.ts` |
+| Persistence   | `src/cache/query-cache.ts`, `src/cache/persist-options.ts`              |
+| Overrides     | `src/shared/utils/storage/overrides-storage.ts`, `src/services/mapping/overrides.service.ts` |
 | Broadcasts    | `src/shared/hooks/use-broadcasts.ts`                                                 |
 | UI            | `src/shared/components/media-actions.tsx`, `src/shared/components/form.tsx`, `src/features/media-overlay/components/media-overlay.tsx` |
 | Shared API hooks | `src/shared/api/*` |

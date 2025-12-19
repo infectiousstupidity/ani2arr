@@ -4,10 +4,10 @@ import PQueue from 'p-queue';
 import type { SonarrApiService } from '@/api/sonarr.api';
 import type { SonarrLookupSeries, RequestPriority } from '@/shared/types';
 import { priorityValue } from '@/shared/utils/priority';
-import { canonicalTitleKey, sanitizeLookupDisplay } from '@/shared/utils/matching';
+import { canonicalTitleKey, sanitizeLookupDisplay } from '@/services/mapping/pipeline/matching';
 import { incrementCounter, timeAsync } from '@/shared/utils/metrics';
 import { logger } from '@/shared/utils/logger';
-import { normalizeError } from '@/shared/utils/error-handling';
+import { normalizeError } from '@/shared/errors/error-utils';
 
 const LOOKUP_SOFT_TTL = 10 * 60 * 1000; // 10 minutes
 const LOOKUP_HARD_TTL = 30 * 60 * 1000; // 30 minutes
