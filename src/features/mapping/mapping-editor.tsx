@@ -42,7 +42,7 @@ const buildCurrentMapping = (
   }
   return {
     service: 'sonarr',
-    target: { id: tvdbId, idType: 'tvdb' },
+    target: { id: tvdbId, kind: 'tvdb' },
     title: fallbackTitle ? `${fallbackTitle} (TVDB ${tvdbId})` : `TVDB ${tvdbId}`,
     inLibrary,
     ...(linkedAniListIds && linkedAniListIds.length > 0 ? { linkedAniListIds } : {}),

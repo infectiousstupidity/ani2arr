@@ -1,3 +1,5 @@
+export type MediaService = 'sonarr' | 'radarr';
+
 export type SonarrMonitorOption =
   | 'all'
   | 'future'
@@ -78,7 +80,8 @@ export interface SonarrLookupSeries {
     seasonCount?: number;
     episodeCount?: number;
     episodeFileCount?: number;
-    totalEpisodeCount?: number;};
+    totalEpisodeCount?: number;
+  };
 }
 
 export interface LeanSonarrSeries {
@@ -134,3 +137,4 @@ export interface SonarrCutoffItem {
 }
 
 export type SonarrCutoffList = SonarrCutoffItem[];
+

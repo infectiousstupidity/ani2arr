@@ -1,4 +1,5 @@
-import type { SonarrLookupSeries, ScoredCandidate } from '@/shared/types';
+import type { SonarrLookupSeries } from '@/shared/types';
+import type { ScoredCandidate } from './types';
 import type { SearchTerm } from './search-term-generator';
 import { computeTitleMatchScore } from '@/shared/utils/matching';
 

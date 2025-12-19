@@ -1,6 +1,3 @@
-import type { InferOutput } from 'valibot';
-import { SettingsSchema } from '@/shared/schemas/settings';
-
 export type {
   AniFormat,
   AniMedia,
@@ -13,6 +10,7 @@ export type {
 } from './anilist';
 
 export type {
+  MediaService,
   LeanSonarrSeries,
   SonarrAlternateTitle,
   SonarrLookupSeries,
@@ -21,7 +19,9 @@ export type {
   SonarrRootFolder,
   SonarrSeries,
   SonarrTag,
-} from './sonarr';
+  SonarrCutoffItem,
+  SonarrCutoffList,
+} from './providers';
 
 export type {
   AddRequestPayload,
@@ -36,35 +36,29 @@ export type {
   TestConnectionPayload,
   UiOptions,
   BadgeVisibility,
-} from './extension';
+} from './options';
 
 export { ErrorCode, type ExtensionError } from './errors';
 
 export {
-  type Candidate,
-  type EvaluationOutcome,
-  type EvaluationOutcomeResolved,
-  type EvaluationOutcomeUnresolved,
-  type MappingContext,
-  type ScoredCandidate,
   type MappingOverrideRecord,
   type MappingSummary,
-  type MappingExternalId,
   type MappingProvider,
   type MappingSource,
   type MappingStatus,
   type MappingIgnoreRecord,
+  type MappingExternalId,
+  type MappingExternalIdKind,
+  type RequestPriority,
 } from './mapping';
 
-export type { RequestPriority } from './common';
-export type { MediaService } from './common';
-
-export type { MappingTargetId, MappingSearchResult } from './mapping-ui';
-
 export {
+  type AnchorCorner,
+  type StackDirection,
+  type MappingSearchResult,
   type BrowseAdapter,
   type CardOverlayProps,
   type ParsedCard,
-} from './browse-overlay';
+} from './ui';
 
-export type Settings = InferOutput<typeof SettingsSchema>;
+export type { Settings } from '@/shared/schemas/settings';

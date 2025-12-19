@@ -9,7 +9,7 @@ import type {
   PublicOptions,
 } from '@/shared/types';
 import type { AddInput, UpdateSonarrInput } from '@/rpc/schemas';
-import type { TestConnectionPayload } from '@/shared/types/extension';
+import type { TestConnectionPayload } from '@/shared/types/options';
 import { queryKeys } from './query-keys';
 
 export const useSonarrMetadata = (options?: { enabled?: boolean; credentials?: SonarrCredentialsPayload | null }) => {

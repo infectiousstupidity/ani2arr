@@ -1,7 +1,7 @@
 import { generateSearchTerms, isSeasonalCanonicalTokens } from './search-term-generator';
 import { scoreCandidates } from './scoring';
 import { maybeEarlyStop, pickBest } from './early-stop';
-import type { EvaluationOutcome, EvaluationOutcomeResolved, MappingContext, AniMedia } from '@/shared/types';
+import type { EvaluationOutcome, EvaluationOutcomeResolved, MappingContext, AniMedia } from './types';
 import { canonicalTitleKey, sanitizeLookupDisplay } from '@/shared/utils/matching';
 import { PIPELINE_SOFT_TIME_BUDGET_MS } from '../constants';
 

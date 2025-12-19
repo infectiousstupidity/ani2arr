@@ -1,11 +1,11 @@
-// src/shared/types/extension.ts
 import type { MediaMetadataHint } from './anilist';
 import type {
   LeanSonarrSeries,
   SonarrLookupSeries,
   SonarrSeries,
   SonarrMonitorOption,
-} from './sonarr';
+} from './providers';
+import type { MappingExternalId } from './mapping';
 
 export type BadgeVisibility = 'always' | 'hover' | 'hidden';
 
@@ -83,7 +83,7 @@ export interface CheckSeriesStatusPayload {
 export interface CheckSeriesStatusResponse {
   exists: boolean;
   tvdbId: number | null;
-  externalId?: { id: number; kind: 'tvdb' | 'tmdb' } | null;
+  externalId?: MappingExternalId | null;
   successfulSynonym?: string;
   anilistTvdbLinkMissing?: boolean;
   series?: LeanSonarrSeries | SonarrSeries | SonarrLookupSeries;
@@ -99,3 +99,4 @@ export interface SonarrCredentialsPayload {
 }
 
 export type TestConnectionPayload = SonarrCredentialsPayload;
+
