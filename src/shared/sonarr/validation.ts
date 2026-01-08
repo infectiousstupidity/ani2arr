@@ -20,8 +20,7 @@ const nonEmptyUrlSchema = v.pipe(
 
 const apiKeySchema = v.pipe(
   v.string(),
-  v.nonEmpty("API key cannot be empty."),
-  v.regex(/^[a-fA-F0-9]{32}$/, "API key must be a 32-character hexadecimal string.")
+  v.nonEmpty("API key cannot be empty.")
 );
 
 // Helpers
