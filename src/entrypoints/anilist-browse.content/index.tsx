@@ -1,5 +1,6 @@
 // src/entrypoints/anilist-browse.content/index.tsx
 import { extractMediaMetadataFromDom } from '@/shared/anilist/dom/anilist-dom';
+import { shouldSkipSonarrFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
 import type { MediaMetadataHint } from '@/shared/types';
 import baseStyles from '@/shared/styles/base.css?inline';
@@ -49,10 +50,6 @@ const getCachedDomMetadata = (anilistId: number): MediaMetadataHint | null => {
   return metadata ?? null;
 };
 
-// Allow movies so specials that live in Sonarr can still render overlays; keep skipping music.
-const shouldSkipFormat = (format: MediaMetadataHint['format']): boolean =>
-  format === 'MUSIC';
-
 const findCardContainer = (): HTMLElement | null => {
   for (const selector of CARD_CONTAINER_SELECTORS) {
     const node = document.querySelector<HTMLElement>(selector);
@@ -91,7 +88,7 @@ const parseAniListCard = (card: Element): ParsedCard | null => {
   if (!title || !Number.isFinite(anilistId)) return null;
 
   const domMetadata = getCachedDomMetadata(anilistId);
-  if (shouldSkipFormat(domMetadata?.format ?? null)) return null;
+  if (shouldSkipSonarrFormat(domMetadata?.format ?? null)) return null;
 
   const fallbackMetadata: MediaMetadataHint | null = title
     ? {
