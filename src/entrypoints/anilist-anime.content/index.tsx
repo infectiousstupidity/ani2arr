@@ -11,8 +11,9 @@ import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
 import MediaActions, { Status } from '@/shared/ui/media/media-actions';
 import { logger } from '@/shared/utils/logger';
 import { extractMediaMetadataFromDom } from '@/shared/anilist/dom/anilist-dom';
+import { shouldSkipSonarrFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
-import type { MediaMetadataHint } from '@/shared/types';
+import type { AniFormat, MediaMetadataHint } from '@/shared/types';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
 import '@/shared/styles/base.css';
@@ -164,21 +165,24 @@ function attachSizeSync(host: HTMLElement): () => void {
   };
 }
 
-function readFormatFromSidebar(doc: Document = document): string | null {
+function readFormatFromSidebar(doc: Document = document): AniFormat | null {
   const rows = Array.from(doc.querySelectorAll<HTMLDivElement>('.sidebar .data .data-set'));
   const formatRow = rows.find(r => r.querySelector('.type')?.textContent?.trim() === 'Format');
   const raw = formatRow?.querySelector('.value')?.textContent ?? '';
   const normalized = raw.replace(/\s+/g, ' ').trim().toLowerCase();
   if (!normalized) return null;
-  if (normalized.includes('movie')) return 'movie';
-  if (normalized.includes('music')) return 'music';
-  if (normalized === 'tv short') return 'tv_short';
-  return normalized;
+  if (normalized.includes('movie')) return 'MOVIE';
+  if (normalized.includes('music')) return 'MUSIC';
+  if (normalized === 'tv short') return 'TV_SHORT';
+  if (normalized === 'tv') return 'TV';
+  if (normalized === 'special') return 'SPECIAL';
+  if (normalized === 'ova') return 'OVA';
+  if (normalized === 'ona') return 'ONA';
+  return null;
 }
 
 function shouldSkipByFormat(doc: Document = document): boolean {
-  const fmt = readFormatFromSidebar(doc);
-  return fmt === 'movie' || fmt === 'music';
+  return shouldSkipSonarrFormat(readFormatFromSidebar(doc));
 }
 
 /* -------------------------------- React UI -------------------------------- */
