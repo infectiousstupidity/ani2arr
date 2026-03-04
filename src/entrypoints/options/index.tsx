@@ -4,13 +4,14 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FormProvider, useForm } from 'react-hook-form';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
+import { ChevronRight, ShieldCheck } from 'lucide-react';
 import ToastProvider from '@/shared/ui/feedback/toast-provider';
 import { SaveSettingsBar } from '@/entrypoints/options/components/settings-form';
 import './style.css';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 import MappingsSection from '@/entrypoints/options/components/mappings-section';
 import UiSection from '@/entrypoints/options/components/ui-section';
-import AdvancedSection from '@/entrypoints/options/components/advanced-section';
+import AdvancedSection, { type AdvancedPanelId } from '@/entrypoints/options/components/advanced-section';
 import SonarrPage from '@/entrypoints/options/components/sonarr-section';
 import RadarrPage from '@/entrypoints/options/components/radarr-section';
 import { useExtensionOptions } from '@/shared/queries';
@@ -105,6 +106,18 @@ const extractTargetAnilistIdFromHash = (hash: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const extractAdvancedPanelFromHash = (hash: string): AdvancedPanelId => {
+  const cleaned = (hash ?? '').replace(/^#/, '');
+  const withoutQuery = cleaned.split('?')[0] ?? '';
+  const normalized = withoutQuery.startsWith('/') ? withoutQuery : `/${withoutQuery}`;
+  if (normalized !== '/options/advanced') return null;
+
+  const query = cleaned.split('?')[1];
+  if (!query) return null;
+  const params = new URLSearchParams(query);
+  return params.get('panel') === 'privacy' ? 'privacy' : null;
+};
+
 const NavItem: React.FC<{
   id: SectionId;
   active: boolean;
@@ -129,6 +142,8 @@ type OptionsContentProps = {
   optionsQuery: ReturnType<typeof useExtensionOptions>;
   targetAnilistId: number | null;
   clearTargetAnilistId: () => void;
+  advancedPanel: AdvancedPanelId;
+  openPrivacyPanel: () => void;
 };
 const OptionsContent: React.FC<OptionsContentProps> = ({
   activeSection,
@@ -136,6 +151,8 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
   optionsQuery,
   targetAnilistId,
   clearTargetAnilistId,
+  advancedPanel,
+  openPrivacyPanel,
 }) => {
   const actions = useSettingsActions(optionsQuery.data ? { savedSettings: optionsQuery.data } : {});
 
@@ -162,7 +179,7 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
         return <UiSection />;
       case 'advanced':
       default:
-        return <AdvancedSection actions={actions} />;
+        return <AdvancedSection actions={actions} focusPanel={advancedPanel} />;
     }
   };
 
@@ -195,6 +212,22 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
             <p className="font-semibold text-text-primary">Tip</p>
             <p className="mt-1">Settings are global. Per-title behaviour stays in the media modal.</p>
           </div>
+          <button
+            type="button"
+            onClick={openPrivacyPanel}
+            className="flex w-full items-start gap-3 rounded-lg border border-border-primary bg-bg-secondary/40 p-3 text-left transition-colors hover:bg-bg-secondary/70"
+          >
+            <span className="mt-0.5 inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-bg-tertiary text-accent-primary">
+              <ShieldCheck className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-semibold text-text-primary">Privacy & permissions</span>
+              <span className="mt-1 block text-xs text-text-secondary">
+                See how ani2arr stores settings, uses the Sonarr API key, and requests host access.
+              </span>
+            </span>
+            <ChevronRight className="mt-1 h-4 w-4 flex-none text-text-secondary" />
+          </button>
         </aside>
         <main className="flex-1 space-y-4 pb-12">
           {renderSection()}
@@ -211,6 +244,10 @@ const OptionsPage: React.FC = React.memo(() => {
     if (typeof window === 'undefined') return null;
     return extractTargetAnilistIdFromHash(window.location.hash);
   });
+  const [advancedPanel, setAdvancedPanel] = useState<AdvancedPanelId>(() => {
+    if (typeof window === 'undefined') return null;
+    return extractAdvancedPanelFromHash(window.location.hash);
+  });
   const optionsQuery = useExtensionOptions();
   const methods = useForm<SettingsFormValues>({
     defaultValues: (optionsQuery.data ?? createDefaultSettings()) as SettingsFormValues,
@@ -222,6 +259,7 @@ const OptionsPage: React.FC = React.memo(() => {
       const hash = window.location.hash;
       setActiveSection(resolveSectionFromHash(hash));
       setTargetAnilistId(extractTargetAnilistIdFromHash(hash));
+      setAdvancedPanel(extractAdvancedPanelFromHash(hash));
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -234,11 +272,25 @@ const OptionsPage: React.FC = React.memo(() => {
     const query =
       activeSection === 'mappings' && typeof targetAnilistId === 'number'
         ? `${section.path}?anilistId=${targetAnilistId}`
+        : activeSection === 'advanced' && advancedPanel === 'privacy'
+          ? `${section.path}?panel=privacy`
         : section.path;
     url.hash = query;
     window.history.replaceState(null, '', url);
     document.title = `ani2arr - ${section.label}`;
-  }, [activeSection, targetAnilistId]);
+  }, [activeSection, targetAnilistId, advancedPanel]);
+
+  const handleSelectSection = (id: SectionId) => {
+    setActiveSection(id);
+    if (id !== 'advanced') {
+      setAdvancedPanel(null);
+    }
+  };
+
+  const handleOpenPrivacyPanel = () => {
+    setActiveSection('advanced');
+    setAdvancedPanel('privacy');
+  };
 
   useEffect(() => {
     if (optionsQuery.data && !methods.formState.isDirty) {
@@ -250,10 +302,12 @@ const OptionsPage: React.FC = React.memo(() => {
     <FormProvider {...methods}>
       <OptionsContent
         activeSection={activeSection}
-        setActiveSection={setActiveSection}
+        setActiveSection={handleSelectSection}
         optionsQuery={optionsQuery}
         targetAnilistId={targetAnilistId}
         clearTargetAnilistId={() => setTargetAnilistId(null)}
+        advancedPanel={advancedPanel}
+        openPrivacyPanel={handleOpenPrivacyPanel}
       />
     </FormProvider>
   );

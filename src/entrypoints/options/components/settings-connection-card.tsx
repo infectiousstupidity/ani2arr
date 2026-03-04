@@ -129,15 +129,30 @@ export const SonarrConnectionCard: React.FC<SonarrConnectionCardProps> = ({
     <form onSubmit={handleConnectSubmit} className="space-y-4">
       <InputField
         label="Sonarr URL"
+        labelHelp={
+          <>
+            Firefox needs an optional host permission for the exact Sonarr origin you enter here.
+            ani2arr declares broad optional host patterns so it can request access to your
+            specific self-hosted server at runtime.
+          </>
+        }
         ref={sonarrUrlInputRef}
         value={sonarrUrl}
         onChange={(e) => setSonarrUrl(e.target.value)}
         placeholder="http://localhost:8989"
         disabled={(isConnected && !isEditingConnection) || Boolean(isLoading)}
+        description="Only the exact origin you enter is requested at runtime. Saved credentials stay in browser local storage."
       />
 
       <InputField
         label="Sonarr API key"
+        labelHelp={
+          <>
+            The API key lets ani2arr authenticate with your Sonarr server so it can test the
+            connection, read metadata, and add or update series. It is stored only in browser
+            local storage and sent only to the Sonarr origin you configure.
+          </>
+        }
         type="password"
         value={sonarrApiKey}
         onChange={(e) => setSonarrApiKey(e.target.value)}

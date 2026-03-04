@@ -4,13 +4,17 @@ import { fileURLToPath } from 'node:url';
 
 const PRIMARY_URL = 'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json';
 const FALLBACK_URL = 'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json';
-const OUTPUT_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public', 'anilist-static-metadata.json');
+const OUTPUT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
+const OUTPUT_FILE = path.resolve(OUTPUT_DIR, 'anilist-static-metadata.json');
 const ANILIST_API = 'https://graphql.anilist.co';
 
 const BATCH_SIZE = 50;
 const BATCH_DELAY_MS = 300;
 const GENERATOR_STALE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const CHECKPOINT_INTERVAL = 40;
+const MAX_CHUNK_BYTES = 4.5 * 1024 * 1024;
+const CHUNK_FILE_PREFIX = 'anilist-static-metadata.part-';
+const CHUNK_FILE_PATTERN = /^anilist-static-metadata\.part-\d+\.json$/;
 
 const FETCH_MEDIA_QUERY = `
   query FetchMediaBatch($ids: [Int!]) {
@@ -69,7 +73,26 @@ const loadExisting = (file) => {
   try {
     if (!fs.existsSync(file)) return { generatedAt: 0, entries: [] };
     const raw = fs.readFileSync(file, 'utf8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed.entries)) return parsed;
+    if (!Array.isArray(parsed.chunks)) return { generatedAt: 0, entries: [] };
+
+    const entries = [];
+    for (const chunk of parsed.chunks) {
+      if (!chunk || typeof chunk.file !== 'string') continue;
+      const chunkFile = path.resolve(OUTPUT_DIR, chunk.file);
+      if (!fs.existsSync(chunkFile)) continue;
+      const chunkRaw = fs.readFileSync(chunkFile, 'utf8');
+      const chunkParsed = JSON.parse(chunkRaw);
+      if (Array.isArray(chunkParsed.entries)) {
+        entries.push(...chunkParsed.entries);
+      }
+    }
+
+    return {
+      generatedAt: typeof parsed.generatedAt === 'number' ? parsed.generatedAt : 0,
+      entries,
+    };
   } catch (error) {
     console.warn(`Failed to load existing metadata: ${error.message}`);
     return { generatedAt: 0, entries: [] };
@@ -93,6 +116,37 @@ const toMetadataEntry = (media) => ({
   updatedAt: Date.now(),
 });
 
+const toChunkBundle = (entries, generatedAt) => ({
+  generatedAt,
+  entries,
+});
+
+const toChunkFilename = (index) => `${CHUNK_FILE_PREFIX}${index + 1}.json`;
+
+const splitIntoChunks = (entries, generatedAt) => {
+  const chunks = [];
+  let current = [];
+
+  for (const entry of entries) {
+    const next = [...current, entry];
+    const nextSize = Buffer.byteLength(JSON.stringify(toChunkBundle(next, generatedAt)));
+
+    if (current.length > 0 && nextSize > MAX_CHUNK_BYTES) {
+      chunks.push(current);
+      current = [entry];
+      continue;
+    }
+
+    current = next;
+  }
+
+  if (current.length > 0) {
+    chunks.push(current);
+  }
+
+  return chunks;
+};
+
 const persistBundle = (entries, generatedAt = Date.now()) => {
   const deduped = Array.from(
     new Map(entries.map((entry) => [entry.id, entry])).entries(),
@@ -100,12 +154,29 @@ const persistBundle = (entries, generatedAt = Date.now()) => {
     .map(([, entry]) => entry)
     .sort((a, b) => a.id - b.id);
 
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+
+  for (const file of fs.readdirSync(OUTPUT_DIR)) {
+    if (CHUNK_FILE_PATTERN.test(file)) {
+      fs.rmSync(path.resolve(OUTPUT_DIR, file), { force: true });
+    }
+  }
+
+  const chunkEntries = splitIntoChunks(deduped, generatedAt);
+  const chunks = chunkEntries.map((chunk, index) => {
+    const file = toChunkFilename(index);
+    fs.writeFileSync(
+      path.resolve(OUTPUT_DIR, file),
+      JSON.stringify(toChunkBundle(chunk, generatedAt)),
+    );
+    return { file, count: chunk.length };
+  });
+
   const payload = {
     generatedAt,
-    entries: deduped,
+    chunks,
   };
 
-  fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(payload, null, 2));
   return deduped;
 };

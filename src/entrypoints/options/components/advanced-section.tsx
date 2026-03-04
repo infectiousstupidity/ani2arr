@@ -1,5 +1,5 @@
 // src/entrypoints/options/components/advanced-section.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { useFormContext, useWatch } from 'react-hook-form';
 import Button from '@/shared/ui/primitives/button';
@@ -9,13 +9,28 @@ import { useToast } from '@/shared/ui/feedback/toast-provider';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 
-const AdvancedSection: React.FC<{ actions: SettingsActions }> = ({ actions }) => {
+export type AdvancedPanelId = 'privacy' | null;
+
+const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: AdvancedPanelId }> = ({
+  actions,
+  focusPanel = null,
+}) => {
   const confirm = useConfirm();
   const toast = useToast();
   const [isResetting, setIsResetting] = useState(false);
   const version = useMemo(() => browser.runtime.getManifest()?.version ?? 'unknown', []);
   const methods = useFormContext<SettingsFormValues>();
   const debugLogging = Boolean(useWatch({ control: methods.control, name: 'debugLogging' as const }));
+  const privacyCardRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (focusPanel !== 'privacy') return;
+    const node = privacyCardRef.current;
+    if (!node) return;
+
+    node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => node.focus(), 120);
+  }, [focusPanel]);
 
   const handleReset = async () => {
     const shouldReset = await confirm({
@@ -53,6 +68,35 @@ const AdvancedSection: React.FC<{ actions: SettingsActions }> = ({ actions }) =>
         </p>
       </div>
 
+      <div
+        ref={privacyCardRef}
+        id="privacy-permissions"
+        tabIndex={-1}
+        className="rounded-2xl border border-border-primary bg-bg-secondary/70 focus:outline-none focus:ring-2 focus:ring-accent-primary/30"
+      >
+        <div className="px-4 py-3 border-b border-border-primary">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">Privacy & permissions</h3>
+            <p className="mt-1 text-xs text-text-secondary">
+              How ani2arr stores settings, requests host access, and talks to external services.
+            </p>
+          </div>
+        </div>
+        <div className="space-y-3 px-4 py-4 text-sm text-text-secondary">
+          <p>
+            ani2arr does not use a developer-operated backend or analytics service. Your Sonarr
+            URL, API key, and extension settings are stored locally in the browser.
+          </p>
+          <ul className="space-y-2 text-xs leading-5">
+            <li>Only the exact Sonarr origin you enter is requested at runtime.</li>
+            <li>The API key is sent only to that configured Sonarr origin.</li>
+            <li>AniList metadata is fetched from AniList GraphQL and public mapping files from GitHub.</li>
+          </ul>
+          <p className="text-xs">
+            Full policy text is available in the repository privacy policy and AMO reviewer notes.
+          </p>
+        </div>
+      </div>
       <div className="rounded-2xl border border-border-primary bg-bg-secondary/70">
         <div className="px-4 py-3 border-b border-border-primary">
           <div className="flex items-center justify-between gap-2">

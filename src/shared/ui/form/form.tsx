@@ -4,7 +4,7 @@ import * as LabelPrimitive from '@radix-ui/react-label';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import * as SwitchPrimitive from '@radix-ui/react-switch';
 import { Check, ChevronDown } from 'lucide-react';
-import TooltipWrapper from '../primitives/tooltip';
+import { HelpTooltip } from '../primitives/tooltip';
 
 // --- 1. Accessibility Context ---
 const FormItemContext = createContext<{ id: string } | undefined>(undefined);
@@ -148,18 +148,32 @@ interface FieldProps {
   label: string;
   className?: string;
   description?: React.ReactNode;
+  labelHelp?: React.ReactNode;
+  labelHelpDelay?: number;
+  labelHelpContainer?: HTMLElement | ShadowRoot | null;
 }
 
 export const InputField = React.forwardRef<
   HTMLInputElement,
   FieldProps & React.ComponentProps<typeof Input>
->(({ label, className, description, ...props }, ref) => {
+>(({ label, className, description, labelHelp, labelHelpDelay, labelHelpContainer, ...props }, ref) => {
   const descriptionId = useId();
 
   return (
     <FormField>
       <div className={`space-y-3 ${className}`}>
-        <Label>{label}</Label>
+        {labelHelp ? (
+          <div className="flex items-center gap-2">
+            <Label className="mb-0">{label}</Label>
+            <HelpTooltip
+              content={labelHelp}
+              container={labelHelpContainer ?? null}
+              delayDuration={labelHelpDelay ?? 500}
+            />
+          </div>
+        ) : (
+          <Label>{label}</Label>
+        )}
         <Input
           ref={ref}
           {...props}
@@ -218,15 +232,14 @@ export const SwitchField = React.forwardRef<
           className={`flex flex-col items-center justify-center rounded-lg bg-bg-tertiary p-3 text-center ${className}`}
         >
           {labelHelp ? (
-            <TooltipWrapper
-              content={labelHelp}
-              container={labelHelpContainer as HTMLElement | null}
-              delayDuration={labelHelpDelay ?? 500}
-            >
-              <Label className="mb-2 text-xs text-text-secondary cursor-help">
-                {label}
-              </Label>
-            </TooltipWrapper>
+            <div className="mb-2 flex items-center gap-2">
+              <Label className="mb-0 text-xs text-text-secondary">{label}</Label>
+              <HelpTooltip
+                content={labelHelp}
+                container={labelHelpContainer ?? null}
+                delayDuration={labelHelpDelay ?? 500}
+              />
+            </div>
           ) : (
             <Label className="mb-2 text-xs text-text-secondary">{label}</Label>
           )}
@@ -268,6 +281,9 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   className,
   triggerClassName,
   description,
+  labelHelp,
+  labelHelpDelay,
+  labelHelpContainer,
   onChange,
   onValueChange,
   ...props
@@ -284,7 +300,18 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   return (
     <FormField>
       <div className={`space-y-3 ${className}`}>
-        <Label>{label}</Label>
+        {labelHelp ? (
+          <div className="flex items-center gap-2">
+            <Label className="mb-0">{label}</Label>
+            <HelpTooltip
+              content={labelHelp}
+              container={labelHelpContainer ?? null}
+              delayDuration={labelHelpDelay ?? 500}
+            />
+          </div>
+        ) : (
+          <Label>{label}</Label>
+        )}
         <Select {...rootProps}>
           <SelectTrigger
             className={triggerClassName}
