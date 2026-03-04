@@ -5,6 +5,7 @@ export type {
   MediaMetadataHint,
   MediaStatus,
   AniListMetadata,
+  AniListMetadataChunk,
   AniListMetadataBundle,
   AniListSearchResult,
 } from './anilist';

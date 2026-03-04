@@ -42,8 +42,11 @@ const TooltipWrapper: React.FC<TooltipWrapperProps> = ({
 
 export const HelpTooltip: React.FC<Omit<TooltipWrapperProps, 'children'>> = props => (
   <TooltipWrapper {...props}>
-    <button type="button" className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-bg-tertiary text-text-secondary"
->
+    <button
+      type="button"
+      aria-label="More information"
+      className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-bg-tertiary text-text-secondary"
+    >
       <CircleHelp className="w-4 h-4 text-text-secondary" />
     </button>
   </TooltipWrapper>

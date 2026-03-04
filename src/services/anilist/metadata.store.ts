@@ -1,6 +1,12 @@
 import { browser } from 'wxt/browser';
 import type { AnilistApiService } from '@/clients/anilist.api';
-import type { AniListMetadata, AniListMetadataBundle, AniMedia, AniTitles } from '@/shared/types';
+import type {
+  AniListMetadata,
+  AniListMetadataBundle,
+  AniListMetadataChunk,
+  AniMedia,
+  AniTitles,
+} from '@/shared/types';
 import { logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 
@@ -42,11 +48,10 @@ export class AniListMetadataStore {
 
   private async init(): Promise<void> {
     try {
-      const url = browser.runtime.getURL('/anilist-static-metadata.json');
-      const response = await fetch(url);
+      const response = await fetch(this.toBakedUrl('anilist-static-metadata.json'));
       if (response.ok) {
         const bundle = (await response.json()) as AniListMetadataBundle;
-        this.loadBakedBundle(bundle);
+        await this.loadBakedMetadata(bundle);
       } else {
         this.log.warn(
           `loadBakedBundle: failed to load static metadata (status ${response.status})`,
@@ -56,6 +61,69 @@ export class AniListMetadataStore {
       logError(normalizeError(error), 'AniListMetadataStore:init:fetchStatic');
     }
     await this.hydrateLocal();
+  }
+
+  private toBakedUrl(file: string): string {
+    return browser.runtime.getURL(`/${file}`);
+  }
+
+  private async loadBakedMetadata(bundle: AniListMetadataBundle | null | undefined): Promise<void> {
+    if (!bundle) {
+      this.log.warn('loadBakedMetadata: missing bundle');
+      return;
+    }
+
+    if (Array.isArray(bundle.entries)) {
+      this.loadBakedBundle(bundle);
+      return;
+    }
+
+    if (!Array.isArray(bundle.chunks) || bundle.chunks.length === 0) {
+      this.log.warn('loadBakedMetadata: missing chunk manifest');
+      return;
+    }
+
+    const generatedAt = typeof bundle.generatedAt === 'number' && Number.isFinite(bundle.generatedAt)
+      ? bundle.generatedAt
+      : Date.now();
+
+    const settled = await Promise.allSettled(
+      bundle.chunks.map(chunk => this.fetchBakedChunk(chunk, generatedAt)),
+    );
+
+    let loadedChunks = 0;
+    for (const result of settled) {
+      if (result.status === 'fulfilled' && result.value) {
+        this.loadBakedBundle(result.value);
+        loadedChunks += 1;
+      } else if (result.status === 'rejected') {
+        logError(normalizeError(result.reason), 'AniListMetadataStore:loadBakedChunk');
+      }
+    }
+
+    this.log.debug(
+      `loadBakedMetadata: loaded ${this.bakedMap.size} entries from ${loadedChunks}/${bundle.chunks.length} chunks`,
+    );
+  }
+
+  private async fetchBakedChunk(
+    chunk: AniListMetadataChunk,
+    generatedAt: number,
+  ): Promise<AniListMetadataBundle | null> {
+    if (!chunk || typeof chunk.file !== 'string' || chunk.file.length === 0) {
+      return null;
+    }
+
+    const response = await fetch(this.toBakedUrl(chunk.file));
+    if (!response.ok) {
+      throw new Error(`Failed to load baked chunk ${chunk.file} (${response.status})`);
+    }
+
+    const bundle = (await response.json()) as AniListMetadataBundle;
+    return {
+      generatedAt,
+      entries: Array.isArray(bundle.entries) ? bundle.entries : [],
+    };
   }
 
   private loadBakedBundle(bundle: AniListMetadataBundle | null | undefined): void {

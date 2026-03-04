@@ -93,9 +93,15 @@ export interface AniListMetadata {
   updatedAt: number;
 }
 
+export interface AniListMetadataChunk {
+  file: string;
+  count: number;
+}
+
 export interface AniListMetadataBundle {
   generatedAt: number;
-  entries: AniListMetadata[];
+  entries?: AniListMetadata[];
+  chunks?: AniListMetadataChunk[];
 }
 
 export interface AniListSearchResult {
