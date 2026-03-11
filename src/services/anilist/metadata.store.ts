@@ -64,7 +64,8 @@ export class AniListMetadataStore {
   }
 
   private toBakedUrl(file: string): string {
-    return browser.runtime.getURL(`/${file}`);
+    const getRuntimeUrl = browser.runtime.getURL as (path: string) => string;
+    return getRuntimeUrl(`/${file}`);
   }
 
   private async loadBakedMetadata(bundle: AniListMetadataBundle | null | undefined): Promise<void> {
