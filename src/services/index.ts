@@ -20,6 +20,7 @@ import { type Ani2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 45 * 1000;
+const CONTENT_SCRIPT_URL_PATTERNS = ['*://anilist.co/*', '*://www.anilist.co/*', '*://anichart.net/*', '*://www.anichart.net/*'];
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
@@ -105,12 +106,31 @@ export const createApiImplementation = (): Ani2arrApi => {
   let refreshOptionsHint: ExtensionOptions | null = null;
 
   const broadcast = async (topic: string, payload?: Record<string, unknown>): Promise<void> => {
+    const message = { _a2a: true, topic, payload };
+
     try {
-      await browser.runtime.sendMessage({ _a2a: true, topic, payload });
+      await browser.runtime.sendMessage(message);
     } catch (error) {
       const normalized = normalizeError(error);
       if (normalized.message.includes('Receiving end does not exist')) return;
       logError(normalized, `Ani2arrApi:broadcast:${topic}`);
+    }
+    try {
+      const tabs = await browser.tabs.query({ url: CONTENT_SCRIPT_URL_PATTERNS });
+      await Promise.all(
+        tabs.map(async tab => {
+          if (typeof tab.id !== 'number') return;
+          try {
+            await browser.tabs.sendMessage(tab.id, message);
+          } catch (error) {
+            const normalized = normalizeError(error);
+            if (normalized.message.includes('Receiving end does not exist')) return;
+            logError(normalized, `Ani2arrApi:broadcast:tab:${topic}`);
+          }
+        }),
+      );
+    } catch (error) {
+      logError(normalizeError(error), `Ani2arrApi:broadcast:tabsQuery:${topic}`);
     }
   };
 
