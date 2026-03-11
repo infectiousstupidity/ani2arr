@@ -13,7 +13,6 @@ export interface UiOptions {
   browseOverlayEnabled: boolean;
   badgeVisibility: BadgeVisibility;
   headerInjectionEnabled: boolean;
-  modalEnabled: boolean;
 }
 
 export interface SonarrFormState {
@@ -99,4 +98,3 @@ export interface SonarrCredentialsPayload {
 }
 
 export type TestConnectionPayload = SonarrCredentialsPayload;
-

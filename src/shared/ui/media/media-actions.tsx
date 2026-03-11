@@ -41,17 +41,6 @@ const MediaActions: React.FC<MediaActionsProps> = ({
   const serviceLabel = service === 'sonarr' ? 'Sonarr' : 'Radarr';
   const inService = status === 'IN';
   const isLoading = status === 'LOADING' || status === 'ADDING';
-
-  const sonarrUrl = (options as { sonarrUrl?: string } | undefined)?.sonarrUrl ?? '';
-  const radarrUrl = (options as { radarrUrl?: string } | undefined)?.radarrUrl ?? '';
-  const externalBaseUrl = service === 'sonarr' ? sonarrUrl : radarrUrl;
-  const hasExternal = externalBaseUrl.length > 0;
-
-  const groupTooltip =
-    externalId === null
-      ? 'No automatic ID match was found for this title. Try searching for it manually.'
-      : undefined;
-
   const getButtonText = () => {
     switch (status) {
       case 'LOADING': return `Checking ${serviceLabel}...`;
@@ -61,10 +50,33 @@ const MediaActions: React.FC<MediaActionsProps> = ({
       default: return `Add to ${serviceLabel}`;
     }
   };
+  const isServiceConfigured = service === 'sonarr' ? options?.isConfigured === true : true;
+  const requiresConfiguration = !isServiceConfigured;
+  const hasNoAutoMatch = externalId === null;
+  const mainButtonText = requiresConfiguration
+    ? `Configure ${serviceLabel}`
+    : hasNoAutoMatch
+      ? 'Cannot add'
+      : getButtonText();
+  const disableMainAction = isLoading || (hasNoAutoMatch && !inService && !requiresConfiguration);
+
+  const sonarrUrl = (options as { sonarrUrl?: string } | undefined)?.sonarrUrl ?? '';
+  const radarrUrl = (options as { radarrUrl?: string } | undefined)?.radarrUrl ?? '';
+  const externalBaseUrl = service === 'sonarr' ? sonarrUrl : radarrUrl;
+  const hasExternal = externalBaseUrl.length > 0;
+
+  const groupTooltip =
+    requiresConfiguration
+      ? undefined
+      : hasNoAutoMatch
+      ? 'No automatic ID match was found for this title. Try searching for it manually.'
+      : undefined;
 
   const mainButtonTooltip =
     groupTooltip
       ? undefined
+      : requiresConfiguration
+        ? `Open ${serviceLabel} settings to continue.`
       : status === 'IN'
         ? `Open ${serviceLabel} options`
         : status === 'LOADING'
@@ -100,12 +112,12 @@ const MediaActions: React.FC<MediaActionsProps> = ({
               size="md"
               onClick={inService ? onOpenModal : onQuickAdd}
               isLoading={isLoading}
-              disabled={isLoading || (externalId === null && !inService)}
+              disabled={disableMainAction}
               portalContainer={portalContainer}
               className="flex-1 w-[calc(100%-34px)] rounded-none h-[35px] text-[14px] text-center px-0 pl-2.5"
               loadingText={getButtonText()}
             >
-              {externalId === null ? 'Cannot add' : getButtonText()}
+              {mainButtonText}
             </Button>
 
             <Dropdown
@@ -139,13 +151,13 @@ const MediaActions: React.FC<MediaActionsProps> = ({
             size="md"
             onClick={inService ? onOpenModal : onQuickAdd}
             isLoading={isLoading}
-            disabled={isLoading || (externalId === null && !inService)}
+            disabled={disableMainAction}
             {...(mainButtonTooltip ? { tooltip: mainButtonTooltip } : {})}
             portalContainer={portalContainer}
             className="flex-1 w-[calc(100%-34px)] rounded-none h-[35px] text-[14px] text-center px-0 pl-2.5"
             loadingText={getButtonText()}
           >
-            {externalId === null ? 'Cannot add' : getButtonText()}
+            {mainButtonText}
           </Button>
 
           <Dropdown

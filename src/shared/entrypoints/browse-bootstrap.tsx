@@ -3,7 +3,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import ToastProvider from '@/shared/ui/feedback/toast-provider';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 import { awaitBackgroundReady } from '@/shared/dom/background-ready';
 import { createPersistOptions } from '@/cache/persist-options';
@@ -100,11 +99,9 @@ export const createBrowseContentMain = (options: BrowseBootstrapOptions) => {
             <React.StrictMode>
               <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
                 <TooltipProvider>
-                  <ToastProvider>
-                    <ConfirmProvider portalContainer={portalContainer}>
-                      {options.renderRoot(portalContainer)}
-                    </ConfirmProvider>
-                  </ToastProvider>
+                  <ConfirmProvider portalContainer={portalContainer}>
+                    {options.renderRoot(portalContainer)}
+                  </ConfirmProvider>
                 </TooltipProvider>
               </PersistQueryClientProvider>
             </React.StrictMode>,
