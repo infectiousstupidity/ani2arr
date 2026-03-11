@@ -207,7 +207,7 @@ export const SonarrConnectionCard: React.FC<SonarrConnectionCardProps> = ({
             <Button
               type="submit"
               isLoading={actions.testConnectionState.isPending}
-              variant="secondary"
+              variant="primary"
               loadingText="Connecting..."
               className="w-full sm:w-auto"
               aria-busy={actions.testConnectionState.isPending}
