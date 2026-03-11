@@ -3,7 +3,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import ToastProvider, { useToast } from '@/shared/ui/feedback/toast-provider';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useSeriesStatus, useAddSeries, usePublicOptions } from '@/shared/queries';
 import { useMediaModalProps } from '@/shared/hooks/entrypoints/use-media-modal-props';
@@ -64,6 +63,11 @@ function waitForElement(selector: string, root: ParentNode = document): Promise<
 }
 
 const q = <T extends Element>(sel: string) => document.querySelector<T>(sel);
+
+const removeLayoutArtifacts = (): void => {
+  q<HTMLElement>(`#${ANCHOR_ID}`)?.remove();
+  q<HTMLElement>(`#${SPACER_ID}`)?.remove();
+};
 
 function ensureActionsAnchor(): HTMLElement | null {
   const actions = q<HTMLElement>(ACTIONS_SELECTOR);
@@ -208,7 +212,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   const isConfigured = options?.isConfigured === true;
   const defaults = options?.defaults ?? null;
   const uiEnabled = options?.ui?.headerInjectionEnabled ?? true;
-  const modalEnabled = options?.ui?.modalEnabled ?? true;
 
   useEffect(() => {
     (async () => {
@@ -231,16 +234,16 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   );
   const addSeriesMutation = useAddSeries();
 
-  const toast = useToast();
-
   const handleQuickAdd = () => {
     if (!isConfigured || !defaults) {
-      toast.showToast({
-        title: 'Sonarr not configured',
-        description: 'Please configure your Sonarr settings first.',
-        variant: 'info',
-      });
-      browser.runtime.openOptionsPage().catch(() => {});
+      void browser.runtime
+        .sendMessage({
+          _a2a: true,
+          type: 'OPEN_OPTIONS_PAGE',
+          sectionId: 'sonarr',
+          timestamp: Date.now(),
+        })
+        .catch(() => {});
       return;
     }
     addSeriesMutation.mutate({
@@ -299,14 +302,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
           externalId={tvdbId}
           onQuickAdd={handleQuickAdd}
           onOpenModal={() => {
-            if (!modalEnabled) {
-              toast.showToast({
-                title: 'Modal disabled',
-                description: 'Enable the ani2arr modal in Options to open mapping/setup here.',
-                variant: 'info',
-              });
-              return;
-            }
             mediaModal.open({
               anilistId,
               title,
@@ -315,14 +310,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
             });
           }}
           onOpenMappingFix={() => {
-            if (!modalEnabled) {
-              toast.showToast({
-                title: 'Modal disabled',
-                description: 'Enable the ani2arr modal in Options to adjust mappings here.',
-                variant: 'info',
-              });
-              return;
-            }
             mediaModal.open({
               anilistId,
               title,
@@ -332,7 +319,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
           }}
           portalContainer={hostElement ?? undefined}
         />
-        {modalEnabled && hostElement && mediaModal.state && modalProps && (
+        {hostElement && mediaModal.state && modalProps && (
           <MediaModal
             key={`modal-${mediaModal.state.anilistId}`}
             isOpen={mediaModal.state.isOpen}
@@ -390,6 +377,7 @@ async function mountAnimePageUI(
     stopAnchorKeeper = null;
     stopSizeSync?.();
     stopSizeSync = null;
+    removeLayoutArtifacts();
     log.debug('AniList page skipped due to format being movie/music');
     return;
   }
@@ -431,9 +419,7 @@ async function mountAnimePageUI(
       root.render(
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
-            <ToastProvider>
-              <ContentRoot anilistId={anilistId} title={title} metadata={metadata ?? null} />
-            </ToastProvider>
+            <ContentRoot anilistId={anilistId} title={title} metadata={metadata ?? null} />
           </TooltipProvider>
         </QueryClientProvider>,
       );
@@ -455,6 +441,19 @@ export default defineContentScript({
   cssInjectionMode: 'ui',
   runAt: 'document_end',
   async main(ctx: ContentScriptContext) {
+    const isHeaderInjectionEnabled = async (): Promise<boolean> => {
+      try {
+        const stored = await browser.storage.local.get('publicOptions');
+        const raw = (stored as { publicOptions?: { ui?: { headerInjectionEnabled?: boolean } } }).publicOptions;
+        if (typeof raw?.ui?.headerInjectionEnabled === 'boolean') {
+          return raw.ui.headerInjectionEnabled;
+        }
+      } catch {
+        // Fall back to enabled to preserve existing behavior on transient storage failures.
+      }
+      return true;
+    };
+
     const removeAnimeUI = () => {
       try {
         ui?.remove();
@@ -466,10 +465,15 @@ export default defineContentScript({
       stopAnchorKeeper = null;
       stopSizeSync?.();
       stopSizeSync = null;
+      removeLayoutArtifacts();
     };
 
     const route = async (url: string) => {
       if (ANIME_PAGE.includes(url)) {
+        if (!(await isHeaderInjectionEnabled())) {
+          removeAnimeUI();
+          return;
+        }
         await mountAnimePageUI(ctx, () => {});
       } else {
         removeAnimeUI();
@@ -487,7 +491,21 @@ export default defineContentScript({
       });
     });
 
+    const onStorageChanged: Parameters<typeof browser.storage.onChanged.addListener>[0] = (
+      changes,
+      areaName,
+    ) => {
+      if (areaName !== 'local') return;
+      if (!changes.publicOptions) return;
+      if (!ANIME_PAGE.includes(location.href)) return;
+      route(location.href).catch(error => {
+        log.error('Failed to apply settings change on AniList anime page.', error);
+      });
+    };
+    browser.storage.onChanged.addListener(onStorageChanged);
+
     ctx.onInvalidated(() => {
+      browser.storage.onChanged.removeListener(onStorageChanged);
       removeAnimeUI();
     });
   }

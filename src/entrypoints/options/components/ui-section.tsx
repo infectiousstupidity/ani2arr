@@ -53,7 +53,7 @@ const UiSection: React.FC = () => {
       <div>
         <h2 className="text-lg font-semibold text-text-primary">UI &amp; injection</h2>
         <p className="text-sm text-text-secondary">
-          Control AniList overlays, badges, and modal behaviour.
+          Control AniList overlays, badges, and injection behaviour.
         </p>
       </div>
 

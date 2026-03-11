@@ -3,7 +3,6 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import { browser } from 'wxt/browser';
 import { useAddSeries, useSeriesStatus } from '@/shared/queries';
 import type { ExtensionError, MediaMetadataHint, SonarrFormState } from '@/shared/types';
-import { useToast } from '@/shared/ui/feedback/toast-provider';
 
 export type OverlayState = 'disabled' | 'in-sonarr' | 'addable' | 'resolving' | 'adding' | 'error';
 
@@ -56,8 +55,6 @@ export const useCardOverlayState = ({
   );
 
   const addSeriesMutation = useAddSeries();
-
-  const toast = useToast();
 
   const {
     data: statusData,
@@ -141,8 +138,14 @@ export const useCardOverlayState = ({
       event.stopPropagation();
 
       if (!isConfigured) {
-        toast.showToast({ title: 'Sonarr not configured', description: 'Please configure your Sonarr settings first.', variant: 'info' });
-        browser.runtime.openOptionsPage().catch(() => {});
+        void browser.runtime
+          .sendMessage({
+            _a2a: true,
+            type: 'OPEN_OPTIONS_PAGE',
+            sectionId: 'sonarr',
+            timestamp: Date.now(),
+          })
+          .catch(() => {});
         return;
       }
 
@@ -209,7 +212,6 @@ export const useCardOverlayState = ({
       isConfigured,
       statusHasError,
       title,
-      toast,
     ],
   );
 

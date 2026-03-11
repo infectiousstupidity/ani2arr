@@ -58,7 +58,7 @@ const sections: SectionConfig[] = [
   {
     id: 'ui',
     label: 'UI & injection',
-    description: 'Control AniList overlay and modal behaviour.',
+    description: 'Control AniList overlay and injection behaviour.',
     path: '/options/ui',
     usesManager: true,
   },
