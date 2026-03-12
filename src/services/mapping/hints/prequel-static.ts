@@ -10,7 +10,7 @@ export async function resolvePrequelStatic(
 ): Promise<ResolvedMapping | null> {
   const directHit = staticProvider.get(media.id);
   if (directHit) {
-    return { tvdbId: directHit.tvdbId };
+    return { externalId: { id: directHit.tvdbId, kind: 'tvdb' } };
   }
 
   const visited = new Set<number>([media.id]);
@@ -21,7 +21,7 @@ export async function resolvePrequelStatic(
     }
     const hit = staticProvider.get(prequel.id);
     if (hit) {
-      return { tvdbId: hit.tvdbId };
+      return { externalId: { id: hit.tvdbId, kind: 'tvdb' } };
     }
     visited.add(prequel.id);
   }

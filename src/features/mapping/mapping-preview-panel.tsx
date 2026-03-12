@@ -3,14 +3,16 @@ import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { MultiMappingInfo } from './multi-mapping-info';
-import { useMappingOverrides, useSeriesStatus } from '@/shared/queries';
-import type { MappingOverrideRecord, MappingSearchResult } from '@/shared/types';
+import { useMappingOverrides, useMovieStatus, useSeriesStatus } from '@/shared/queries';
+import type { MappingOverrideRecord, MappingProvider, MappingSearchResult } from '@/shared/types';
 import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link';
+import { getProviderLabel } from '@/services/providers/resolver';
 import type { MappingAniListSummary } from './types';
 
 interface MappingPreviewPanelProps {
   aniListEntry: MappingAniListSummary;
   baseUrl: string;
+  provider: MappingProvider;
   currentMapping: MappingSearchResult | null;
   previewMapping: MappingSearchResult | null;
   isInMappingMode: boolean;
@@ -24,6 +26,7 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
   const {
     aniListEntry,
     baseUrl,
+    provider,
     currentMapping,
     previewMapping,
     showResetPreview,
@@ -40,19 +43,28 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
   const hasPreviewMapping = Boolean(previewMapping);
   const hasCurrentMapping = Boolean(currentMapping);
   const showEmptyState = !hasPreviewMapping && !hasCurrentMapping;
-  const { data: seriesStatus } = useSeriesStatus({ anilistId: aniListEntry.id });
-  const mappingOverrides = useMappingOverrides();
+  const { data: seriesStatus } = useSeriesStatus(
+    { anilistId: aniListEntry.id },
+    { enabled: provider === 'sonarr' },
+  );
+  const { data: movieStatus } = useMovieStatus(
+    { anilistId: aniListEntry.id },
+    { enabled: provider === 'radarr' },
+  );
+  const mappingOverrides = useMappingOverrides(provider);
 
-  const overrideActiveFromStatus = seriesStatus?.overrideActive;
+  const overrideActiveFromStatus = provider === 'radarr' ? movieStatus?.overrideActive : seriesStatus?.overrideActive;
   const overrideActiveFromOverrides =
     overrideActiveFromStatus === undefined &&
     Array.isArray(mappingOverrides.data) &&
-    mappingOverrides.data.some((record: MappingOverrideRecord) => record.anilistId === aniListEntry.id);
+    mappingOverrides.data.some(
+      (record: MappingOverrideRecord) => record.anilistId === aniListEntry.id && record.provider === provider,
+    );
 
   const isOverridden = overrideActiveFromStatus ?? overrideActiveFromOverrides ?? false;
   const overrideTooltip = isOverridden
     ? 'Manual override is active for this AniList entry.'
-    : 'Using the automatic AniList to TVDB mapping.';
+    : 'Using the automatic AniList mapping.';
 
   return (
     <div className="flex h-full flex-col">
@@ -144,7 +156,7 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
 
         {showEmptyState ? (
           <div className="flex min-h-[260px] items-center justify-center rounded-xl border border-dashed border-border-primary bg-bg-tertiary/60 px-3 text-center text-sm text-text-secondary">
-            No mapping yet. Use the search to pick the correct TVDB series.
+            No mapping yet. Use the search to pick the correct provider entry.
           </div>
         ) : null}
       </div>
@@ -181,9 +193,11 @@ const getStatusTone = (
 
 function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
   const { mapping, baseUrl, highlight, currentAniListId, showResetPreview, onResetPreview, portalContainer } = props;
+  const providerLabel = getProviderLabel(mapping.service);
+  const externalLabel = `${mapping.target.kind.toUpperCase()} ${mapping.target.id}`;
 
   const link = buildExternalMediaLink({
-    service: 'sonarr',
+    service: mapping.service,
     baseUrl,
     inLibrary: mapping.inLibrary,
     ...(mapping.librarySlug ? { librarySlug: mapping.librarySlug } : {}),
@@ -193,7 +207,9 @@ function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
   const metadataPills: React.ReactNode[] = [];
 
   const tvdbPill = (
-    <Pill key="tvdb" small tone="muted" className="font-mono text-text-primary">{`TVDB ${mapping.target.id}`}</Pill>
+    <Pill key="external-id" small tone="muted" className="font-mono text-text-primary">
+      {externalLabel}
+    </Pill>
   );
 
   const hasMultipleLinked = Array.isArray(mapping.linkedAniListIds) && mapping.linkedAniListIds.length > 1;
@@ -240,7 +256,7 @@ function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
 
   if (mapping.inLibrary) {
     metadataPills.push(
-      <Pill key="library" small tone="success">{`In Sonarr${
+      <Pill key="library" small tone="success">{`In ${providerLabel}${
         mapping.fileCount ? ` - ${mapping.fileCount} eps` : ''
       }`}</Pill>,
     );
@@ -284,11 +300,11 @@ function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
                   asChild
                   variant="ghost"
                   size="icon"
-                  tooltip="Open in Sonarr"
+                  tooltip={`Open in ${providerLabel}`}
                   portalContainer={portalContainer ?? undefined}
                   className="h-8 w-8 text-text-secondary hover:text-text-primary"
                 >
-                  <a href={link} target="_blank" rel="noreferrer" aria-label="Open in Sonarr">
+                  <a href={link} target="_blank" rel="noreferrer" aria-label={`Open in ${providerLabel}`}>
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 </Button>

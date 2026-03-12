@@ -8,12 +8,14 @@ import type {
   MappingSummary,
 } from '@/shared/types';
 import type { AniListMetadataDto } from '@/rpc/schemas';
-import { useAniListMetadataBatch, useSeriesStatus } from '@/shared/queries';
+import { useAniListMetadataBatch, useMovieStatus, useSeriesStatus } from '@/shared/queries';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';
+import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link';
 import SonarrIcon from '@/assets/sonarr.svg';
 import RadarrIcon from '@/assets/radarr.svg';
+import { getLibrarySlug, type FolderSlugSource } from '@/services/helpers/path-utils';
 
 export type MappingTableEntry = {
   entry: MappingSummary;
@@ -69,19 +71,6 @@ const getExternalLink = (provider: MappingProvider, externalId: MappingExternalI
 
 const MetaSeparator: React.FC = () => <span className="text-text-tertiary">·</span>;
 
-const buildProviderLink = (
-  baseUrl: string | null | undefined,
-  provider: MappingProvider,
-  titleSlug?: string | null,
-) => {
-  if (!baseUrl) return null;
-  const normalized = baseUrl.replace(/\/$/, '');
-  if (provider === 'sonarr' && titleSlug) {
-    return `${normalized}/series/${titleSlug}`;
-  }
-  return null;
-};
-
 type MappingEntryRowProps = {
   entry: MappingSummary;
   title: string;
@@ -122,6 +111,21 @@ const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
     },
     { enabled: entry.provider === 'sonarr' && !!entry.externalId, network: 'never' },
   );
+  const radarrStatus = useMovieStatus(
+    {
+      anilistId: entry.anilistId,
+      title,
+      metadata: metadata
+        ? {
+            titles: metadata.titles,
+            startYear: metadata.seasonYear,
+            format: metadata.format,
+            coverImage: metadata.coverImage?.large ?? metadata.coverImage?.medium ?? undefined,
+          }
+        : null,
+    },
+    { enabled: entry.provider === 'radarr' && !!entry.externalId, network: 'never' },
+  );
 
   const anilistCover =
     metadata?.coverImage?.large ??
@@ -134,9 +138,15 @@ const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   const providerStatus = entry.providerMeta?.statusLabel ?? null;
   const metaParts = [formatLabel, anilistYear ? String(anilistYear) : null, providerStatus].filter(Boolean) as string[];
 
-  const series = sonarrStatus.data?.series;
-  const sonarrSlug = series && 'titleSlug' in series ? (series as { titleSlug?: string | null })?.titleSlug : undefined;
-  const providerLink = buildProviderLink(providerUrl, entry.provider, sonarrSlug);
+  const providerItem = entry.provider === 'radarr' ? radarrStatus.data?.movie : sonarrStatus.data?.series;
+  const providerSlug = getLibrarySlug(entry.provider, providerItem as FolderSlugSource | null);
+  const providerLink = buildExternalMediaLink({
+    service: entry.provider,
+    baseUrl: providerUrl ?? '',
+    inLibrary: Boolean(providerSlug),
+    ...(providerSlug ? { librarySlug: providerSlug } : {}),
+    searchTerm: title,
+  });
   const externalLink = getExternalLink(entry.provider, entry.externalId);
 
   const linkItems: Array<{ label: string; href: string; tooltip: string }> = [
@@ -236,8 +246,8 @@ const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
                 variant="ghost"
                 onClick={() => onEdit(entry)}
                 disabled={isMutating}
-                tooltip={entry.provider === 'sonarr' ? 'Edit mapping' : 'Radarr editing coming soon'}
-                aria-label={entry.provider === 'sonarr' ? 'Edit mapping' : 'Radarr editing coming soon'}
+                tooltip="Edit mapping"
+                aria-label="Edit mapping"
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>

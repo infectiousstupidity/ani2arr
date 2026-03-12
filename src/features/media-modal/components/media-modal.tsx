@@ -4,19 +4,52 @@ import { Modal, ModalContent, ModalTitle, ModalDescription } from "./modal";
 import { Header, type MediaModalTabId } from "./media-modal-header";
 import { Footer } from "./media-modal-footer";
 import Button from "@/shared/ui/primitives/button";
-import type { AniFormat, MediaStatus, TitleLanguage, ExtensionError } from "@/shared/types";
+import type {
+  AniFormat,
+  ExtensionError,
+  MediaService,
+  MediaStatus,
+  RadarrFormState,
+  SonarrFormState,
+  TitleLanguage,
+} from "@/shared/types";
 import { ErrorCode } from "@/shared/types";
 
 import { MappingPreviewPanel, MappingSearchPanel } from "@/features/mapping";
 import type { MappingTabProps } from "../types";
+import { RadarrPanel } from "./radarr-panel";
 import { SonarrPanel } from "./sonarr-panel";
-import type { SonarrPanelProps } from "../types";
+import type { RadarrPanelProps, SonarrPanelProps } from "../types";
 import { useMappingController } from "@/features/mapping";
+import { useRadarrPanelController } from "../hooks/use-radarr-panel-controller";
 import { useSonarrPanelController } from "../hooks/use-sonarr-panel-controller";
 import { usePublicOptions } from '@/shared/queries';
 import { useConfirm } from "@/shared/hooks/common/use-confirm";
+import { getProviderLabel } from "@/services/providers/resolver";
 
 type MediaModalViewMode = "setup" | "mapping";
+
+const EMPTY_SONARR_FORM: SonarrFormState = {
+  qualityProfileId: '',
+  rootFolderPath: '',
+  seriesType: 'anime',
+  monitorOption: 'all',
+  seasonFolder: true,
+  searchForMissingEpisodes: true,
+  searchForCutoffUnmet: false,
+  tags: [],
+  freeformTags: [],
+};
+
+const EMPTY_RADARR_FORM: RadarrFormState = {
+  qualityProfileId: '',
+  rootFolderPath: '',
+  monitored: true,
+  searchForMovie: true,
+  minimumAvailability: 'announced',
+  tags: [],
+  freeformTags: [],
+};
 
 export type MediaModalProps = {
   isOpen: boolean;
@@ -28,7 +61,7 @@ export type MediaModalProps = {
   bannerImage: string | null;
   coverImage: string | null;
   anilistIds: number[];
-  tvdbId: number | null;
+  service: MediaService;
   inLibrary: boolean;
   format: AniFormat | null;
   year: number | null;
@@ -39,7 +72,8 @@ export type MediaModalProps = {
   portalContainer?: HTMLElement | ShadowRoot | null;
 
   mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'>;
-  sonarrPanelProps: Omit<SonarrPanelProps, 'controller'>;
+  sonarrPanelProps: Omit<SonarrPanelProps, 'controller'> | null;
+  radarrPanelProps: Omit<RadarrPanelProps, 'controller'> | null;
 };
 
 export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
@@ -52,7 +86,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     bannerImage,
     coverImage,
     anilistIds,
-    tvdbId,
+    service,
     inLibrary,
     format,
     year,
@@ -61,6 +95,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     portalContainer,
     mappingTabProps,
     sonarrPanelProps,
+    radarrPanelProps,
   } = props;
 
   const [floatingPortalEl, setFloatingPortalEl] = useState<HTMLDivElement | null>(null);
@@ -77,21 +112,38 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   });
 
   const sonarrController = useSonarrPanelController({
-    mode: sonarrPanelProps.mode,
-    initialForm: sonarrPanelProps.initialForm,
-    defaultForm: sonarrPanelProps.defaultForm,
-    metadata: sonarrPanelProps.metadata,
-    title: sonarrPanelProps.title,
-    tvdbId: sonarrPanelProps.tvdbId,
-    folderSlug: sonarrPanelProps.folderSlug ?? null,
-    disabled: sonarrPanelProps.disabled,
-    onSubmit: sonarrPanelProps.onSubmit,
-    onSaveDefaults: sonarrPanelProps.onSaveDefaults,
+    mode: sonarrPanelProps?.mode ?? "add",
+    initialForm: sonarrPanelProps?.initialForm ?? EMPTY_SONARR_FORM,
+    defaultForm: sonarrPanelProps?.defaultForm ?? EMPTY_SONARR_FORM,
+    metadata: sonarrPanelProps?.metadata ?? null,
+    title: sonarrPanelProps?.title ?? title,
+    tvdbId: sonarrPanelProps?.tvdbId ?? null,
+    folderSlug: sonarrPanelProps?.folderSlug ?? null,
+    disabled: sonarrPanelProps?.disabled ?? true,
+    onSubmit: sonarrPanelProps?.onSubmit ?? (async () => {}),
+    onSaveDefaults: sonarrPanelProps?.onSaveDefaults ?? (async () => {}),
+  });
+
+  const radarrController = useRadarrPanelController({
+    mode: radarrPanelProps?.mode ?? "add",
+    initialForm: radarrPanelProps?.initialForm ?? EMPTY_RADARR_FORM,
+    defaultForm: radarrPanelProps?.defaultForm ?? EMPTY_RADARR_FORM,
+    metadata: radarrPanelProps?.metadata ?? null,
+    folderSlug: radarrPanelProps?.folderSlug ?? null,
+    disabled: radarrPanelProps?.disabled ?? true,
+    onSubmit: radarrPanelProps?.onSubmit ?? (async () => {}),
+    onSaveDefaults: radarrPanelProps?.onSaveDefaults ?? (async () => {}),
   });
 
   const publicOptions = usePublicOptions();
-  const baseUrl = publicOptions.data?.sonarrUrl ?? '';
+  const baseUrl =
+    service === 'radarr'
+      ? publicOptions.data?.providers.radarr.url ?? ''
+      : publicOptions.data?.providers.sonarr.url ?? '';
   const confirm = useConfirm();
+  const providerLabel = getProviderLabel(service);
+  const activePanelMode = service === 'radarr' ? radarrPanelProps?.mode : sonarrPanelProps?.mode;
+  const activeController = service === 'radarr' ? radarrController : sonarrController;
 
   const handleClose = useCallback(() => {
     onClose();
@@ -113,14 +165,13 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   const handleMappingSubmit = useCallback(async () => {
     const selected = mappingController.state.selected;
     const currentAniListId = mappingTabProps.aniListEntry.id;
-    const tvdbId = selected?.target.id;
-    const tvdbLabel = tvdbId ? `TVDB ${tvdbId}` : "This TVDB entry";
+    const externalLabel = selected?.target ? `${selected.target.kind.toUpperCase()} ${selected.target.id}` : 'This mapping';
 
     const confirmShare = async (conflictingIds: number[]): Promise<boolean> => {
       if (!conflictingIds.length) return true;
       return confirm({
-        title: "Share this TVDB mapping?",
-        description: `${tvdbLabel} is already linked to AniList entr${conflictingIds.length === 1 ? "y" : "ies"} ${conflictingIds.join(", ")}. Continue to share this mapping?`,
+        title: 'Share this mapping?',
+        description: `${externalLabel} is already linked to AniList entr${conflictingIds.length === 1 ? 'y' : 'ies'} ${conflictingIds.join(', ')}. Continue to share this mapping?`,
         confirmText: "Share mapping",
         cancelText: "Cancel",
       });
@@ -183,7 +234,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     }
     const shouldReset = await confirm({
       title: 'Reset mapping override?',
-      description: 'This will remove the manual TVDB mapping and return to the automatic match for this title.',
+      description: 'This will remove the manual override and return to the automatic match for this title.',
       confirmText: 'Reset mapping',
       cancelText: 'Keep override',
     });
@@ -233,14 +284,19 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     }
 
     return {
-      primaryLabel: sonarrPanelProps.mode === "edit" ? "Save changes" : "Add series",
-      primaryDisabled: !sonarrController.canSubmit,
-      primaryLoading: sonarrController.isSubmitting,
+      primaryLabel:
+        activePanelMode === "edit"
+          ? "Save changes"
+          : service === 'radarr'
+            ? "Add movie"
+            : "Add series",
+      primaryDisabled: !activeController.canSubmit,
+      primaryLoading: activeController.isSubmitting,
       onPrimaryClick: () => {
         void (async () => {
           try {
-            await sonarrController.handlePrimarySubmit();
-            if (sonarrPanelProps.mode === "edit") {
+            await activeController.handlePrimarySubmit();
+            if (activePanelMode === "edit") {
               handleClose();
             }
           } catch {
@@ -250,21 +306,22 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
       },
       secondaryLabel: "Cancel",
       onSecondaryClick: handleClose,
-      showTertiary: sonarrController.showSaveDefaults && Boolean(sonarrController.form.formState.isDirty),
+      showTertiary: activeController.showSaveDefaults && Boolean(activeController.form.formState.isDirty),
       tertiaryLabel: "Save as default",
-      onTertiaryClick: sonarrController.showSaveDefaults ? () => {
-        void sonarrController.handleSaveDefaults();
+      onTertiaryClick: activeController.showSaveDefaults ? () => {
+        void activeController.handleSaveDefaults();
       } : undefined,
     };
   }, [
+    activeController,
+    activePanelMode,
     viewMode,
     handleClose,
     handleMappingCancel,
     handleMappingSubmit,
     handleConfirmReset,
     mappingController,
-    sonarrController,
-    sonarrPanelProps.mode,
+    service,
   ]);
 
   const selectPortalContainer = floatingPortalEl ?? portalContainer ?? null;
@@ -287,7 +344,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
         {/* Accessible dialog title/description for screen readers. Visual title handled by Header. */}
         <ModalTitle className="sr-only">{title}</ModalTitle>
         <ModalDescription className="sr-only">
-          Configure Sonarr options or update ID mapping for this anime.
+          Configure {providerLabel} options or update ID mapping for this AniList entry.
         </ModalDescription>
         <Header
           title={title}
@@ -296,7 +353,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           bannerImage={bannerImage}
           coverImage={coverImage}
           anilistIds={anilistIds}
-          tvdbId={tvdbId ?? null}
+          service={service}
           inLibrary={inLibrary}
           format={format}
           year={year}
@@ -317,16 +374,28 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                     <MappingSearchPanel
                       controller={mappingController}
                       currentMapping={effectiveCurrentMapping}
+                      provider={mappingTabProps.service}
                       baseUrl={baseUrl}
                       autoFocus={isOpen && viewMode === "mapping"}
                       portalContainer={selectPortalContainer instanceof HTMLElement ? selectPortalContainer : null}
                     />
                   ) : (
-                    <SonarrPanel
-                      {...sonarrPanelProps}
-                      controller={sonarrController}
-                      portalContainer={selectPortalContainer}
-                    />
+                    <>
+                      {service === 'radarr' && radarrPanelProps ? (
+                        <RadarrPanel
+                          {...radarrPanelProps}
+                          controller={radarrController}
+                          portalContainer={selectPortalContainer}
+                        />
+                      ) : null}
+                      {service === 'sonarr' && sonarrPanelProps ? (
+                        <SonarrPanel
+                          {...sonarrPanelProps}
+                          controller={sonarrController}
+                          portalContainer={selectPortalContainer}
+                        />
+                      ) : null}
+                    </>
                   )}
                 </div>
               </div>
@@ -335,6 +404,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                   <MappingPreviewPanel
                     aniListEntry={mappingTabProps.aniListEntry}
                     baseUrl={baseUrl}
+                    provider={mappingTabProps.service}
                     currentMapping={effectiveCurrentMapping}
                     previewMapping={previewMapping}
                     isInMappingMode={viewMode === "mapping"}

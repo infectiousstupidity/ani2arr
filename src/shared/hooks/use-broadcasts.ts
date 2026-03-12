@@ -2,15 +2,18 @@
 import { useCallback, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
+import type { MappingProvider } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
 import { queryKeys } from '@/shared/queries';
 
 const log = logger.create('Broadcasts');
 
-const SERIES_ROOT_KEY = queryKeys.seriesStatusRoot();
 const PUBLIC_OPTIONS_KEY = queryKeys.publicOptions();
-const LIBRARY_SESSION_KEY = 'a2a_library_epoch';
 const SETTINGS_SESSION_KEY = 'a2a_settings_epoch';
+const LIBRARY_SESSION_KEYS: Record<MappingProvider, string> = {
+  sonarr: 'a2a_library_epoch_sonarr',
+  radarr: 'a2a_library_epoch_radarr',
+};
 
 export function useA2aBroadcasts(): void {
   const queryClient = useQueryClient();
@@ -19,21 +22,28 @@ export function useA2aBroadcasts(): void {
     queryClient.invalidateQueries({ queryKey: PUBLIC_OPTIONS_KEY });
   }, [queryClient]);
 
+  const refreshLibraryQueries = useCallback(
+    (provider: MappingProvider, epoch?: number) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot(provider) });
+      if (typeof epoch === 'number') {
+        sessionStorage.setItem(LIBRARY_SESSION_KEYS[provider], String(epoch));
+      }
+    },
+    [queryClient],
+  );
+
   useEffect(() => {
     const handler = (message: unknown) => {
       const envelope = message as {
         _a2a?: boolean;
         topic?: string;
-        payload?: Record<string, unknown>;
+        payload?: Record<string, unknown> & { provider?: MappingProvider; epoch?: number };
       };
       if (!envelope?._a2a) return;
 
       if (envelope.topic === 'series-updated') {
-        queryClient.invalidateQueries({ queryKey: SERIES_ROOT_KEY });
-        const epoch = envelope.payload?.epoch;
-        if (typeof epoch === 'number') {
-          sessionStorage.setItem(LIBRARY_SESSION_KEY, String(epoch));
-        }
+        const provider = envelope.payload?.provider === 'radarr' ? 'radarr' : 'sonarr';
+        refreshLibraryQueries(provider, envelope.payload?.epoch);
       }
 
       if (envelope.topic === 'settings-changed') {
@@ -47,7 +57,7 @@ export function useA2aBroadcasts(): void {
 
     browser.runtime.onMessage.addListener(handler);
     return () => browser.runtime.onMessage.removeListener(handler);
-  }, [queryClient, refreshSettingsQueries]);
+  }, [refreshLibraryQueries, refreshSettingsQueries]);
 
   useEffect(() => {
     const onStorageChanged: Parameters<typeof browser.storage.onChanged.addListener>[0] = (
@@ -56,11 +66,24 @@ export function useA2aBroadcasts(): void {
     ) => {
       if (areaName !== 'local') return;
 
+      if (changes.libraryEpochSonarr) {
+        const next = changes.libraryEpochSonarr.newValue;
+        if (typeof next === 'number') {
+          refreshLibraryQueries('sonarr', next);
+        }
+      }
+
+      if (changes.libraryEpochRadarr) {
+        const next = changes.libraryEpochRadarr.newValue;
+        if (typeof next === 'number') {
+          refreshLibraryQueries('radarr', next);
+        }
+      }
+
       if (changes.libraryEpoch) {
-        queryClient.invalidateQueries({ queryKey: SERIES_ROOT_KEY });
         const next = changes.libraryEpoch.newValue;
         if (typeof next === 'number') {
-          sessionStorage.setItem(LIBRARY_SESSION_KEY, String(next));
+          refreshLibraryQueries('sonarr', next);
         }
       }
 
@@ -72,27 +95,36 @@ export function useA2aBroadcasts(): void {
         }
       }
 
-      if (changes.publicOptions || changes.sonarrSecrets) {
+      if (changes.publicOptions || changes.sonarrSecrets || changes.radarrSecrets) {
         refreshSettingsQueries();
       }
     };
 
     browser.storage.onChanged.addListener(onStorageChanged);
     return () => browser.storage.onChanged.removeListener(onStorageChanged);
-  }, [queryClient, refreshSettingsQueries]);
+  }, [refreshLibraryQueries, refreshSettingsQueries]);
 
   useEffect(() => {
     (async () => {
       try {
-        const { libraryEpoch, settingsEpoch } = await browser.storage.local.get({
+        const { libraryEpoch, libraryEpochSonarr, libraryEpochRadarr, settingsEpoch } = await browser.storage.local.get({
           libraryEpoch: 0,
+          libraryEpochSonarr: 0,
+          libraryEpochRadarr: 0,
           settingsEpoch: 0,
         });
-        const previousLibrary = Number(sessionStorage.getItem(LIBRARY_SESSION_KEY) ?? '0');
-        if (typeof libraryEpoch === 'number' && libraryEpoch > previousLibrary) {
-          sessionStorage.setItem(LIBRARY_SESSION_KEY, String(libraryEpoch));
-          queryClient.invalidateQueries({ queryKey: SERIES_ROOT_KEY });
+
+        const sonarrEpoch = typeof libraryEpochSonarr === 'number' ? libraryEpochSonarr : libraryEpoch;
+        const previousSonarr = Number(sessionStorage.getItem(LIBRARY_SESSION_KEYS.sonarr) ?? '0');
+        if (typeof sonarrEpoch === 'number' && sonarrEpoch > previousSonarr) {
+          refreshLibraryQueries('sonarr', sonarrEpoch);
         }
+
+        const previousRadarr = Number(sessionStorage.getItem(LIBRARY_SESSION_KEYS.radarr) ?? '0');
+        if (typeof libraryEpochRadarr === 'number' && libraryEpochRadarr > previousRadarr) {
+          refreshLibraryQueries('radarr', libraryEpochRadarr);
+        }
+
         const previousSettings = Number(sessionStorage.getItem(SETTINGS_SESSION_KEY) ?? '0');
         if (typeof settingsEpoch === 'number' && settingsEpoch > previousSettings) {
           sessionStorage.setItem(SETTINGS_SESSION_KEY, String(settingsEpoch));
@@ -102,5 +134,5 @@ export function useA2aBroadcasts(): void {
         log.warn('Failed to reconcile ani2arr library epoch.', error instanceof Error ? error.message : String(error));
       }
     })();
-  }, [queryClient, refreshSettingsQueries]);
+  }, [refreshLibraryQueries, refreshSettingsQueries]);
 }

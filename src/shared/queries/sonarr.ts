@@ -44,7 +44,7 @@ export const useAddSeries = () => {
       }
     },
     onSuccess: (_createdSeries, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId, 'sonarr') });
     },
   });
 };
@@ -60,7 +60,7 @@ export const useUpdateSeries = () => {
       }
     },
     onSuccess: (_updatedSeries, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId, 'sonarr') });
     },
   });
 };
@@ -92,7 +92,13 @@ export const useUpdateDefaultSettings = () => {
         prev
           ? {
               ...prev,
-              defaults,
+              providers: {
+                ...prev.providers,
+                sonarr: {
+                  ...prev.providers.sonarr,
+                  defaults,
+                },
+              },
             }
           : prev,
       );

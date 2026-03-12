@@ -68,8 +68,8 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
 
   // --- Tag Logic Mapping ---
   
-  const tagsValue = watch('defaults.tags');
-  const freeformTagsValue = watch('defaults.freeformTags');
+  const tagsValue = watch('providers.sonarr.defaults.tags');
+  const freeformTagsValue = watch('providers.sonarr.defaults.freeformTags');
   
   // Memoize the map derivation. Safe access metadataQuery.data?.tags inside to prevent stale closure or dependency warnings.
   const tagMaps = useMemo(() => {
@@ -114,8 +114,8 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
           freeform.push(label);
         }
       }
-      setValue('defaults.tags', tagIds, { shouldDirty: true });
-      setValue('defaults.freeformTags', freeform, { shouldDirty: true });
+      setValue('providers.sonarr.defaults.tags', tagIds, { shouldDirty: true });
+      setValue('providers.sonarr.defaults.freeformTags', freeform, { shouldDirty: true });
     },
     [labelToId, setValue]
   );
@@ -158,7 +158,7 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
         <div className={fullWidthClass}>
           <Controller
             control={control}
-            name="defaults.rootFolderPath"
+            name="providers.sonarr.defaults.rootFolderPath"
             render={({ field }) => {
               const selectedDisplay = field.value
                 ? formatRootPath(field.value)
@@ -251,7 +251,7 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
         {/* Monitor */}
         <Controller
           control={control}
-          name="defaults.monitorOption"
+          name="providers.sonarr.defaults.monitorOption"
           render={({ field }) => (
             <SelectField
               {...field}
@@ -266,7 +266,7 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
         {/* Quality Profile */}
         <Controller
           control={control}
-          name="defaults.qualityProfileId"
+          name="providers.sonarr.defaults.qualityProfileId"
           render={({ field }) => (
             <SelectField
               label="Quality Profile"
@@ -283,7 +283,7 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
         {/* Series Type */}
         <Controller
           control={control}
-          name="defaults.seriesType"
+          name="providers.sonarr.defaults.seriesType"
           render={({ field }) => (
             <SelectField
               {...field}
@@ -314,7 +314,7 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Controller
               control={control}
-              name="defaults.seasonFolder"
+              name="providers.sonarr.defaults.seasonFolder"
               render={({ field }) => (
                 <SwitchField
                   label="Season Folders"
@@ -328,7 +328,7 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
             />
             <Controller
               control={control}
-              name="defaults.searchForMissingEpisodes"
+              name="providers.sonarr.defaults.searchForMissingEpisodes"
               render={({ field }) => (
                 <SwitchField
                   label="Search on Add"
@@ -342,7 +342,7 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
             />
             <Controller
               control={control}
-              name="defaults.searchForCutoffUnmet"
+              name="providers.sonarr.defaults.searchForCutoffUnmet"
               render={({ field }) => (
                 <SwitchField
                   label="Cutoff Unmet"

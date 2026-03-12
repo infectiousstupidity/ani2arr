@@ -1,6 +1,10 @@
 import type { MediaMetadataHint } from './anilist';
 import type {
+  LeanRadarrMovie,
   LeanSonarrSeries,
+  RadarrLookupMovie,
+  RadarrMovie,
+  RadarrMinimumAvailability,
   SonarrLookupSeries,
   SonarrSeries,
   SonarrMonitorOption,
@@ -27,38 +31,78 @@ export interface SonarrFormState {
   freeformTags: string[];
 }
 
+export interface RadarrFormState {
+  qualityProfileId: number | '';
+  rootFolderPath: string;
+  monitored: boolean;
+  searchForMovie: boolean;
+  minimumAvailability: RadarrMinimumAvailability;
+  tags: number[];
+  freeformTags: string[];
+}
+
 export type TitleLanguage = 'english' | 'romaji' | 'native';
 
-export interface ExtensionOptions {
-  sonarrUrl: string;
-  sonarrApiKey: string;
+export interface SonarrSettings {
+  url: string;
+  apiKey: string;
   defaults: SonarrFormState;
+}
+
+export interface RadarrSettings {
+  url: string;
+  apiKey: string;
+  defaults: RadarrFormState;
+}
+
+export interface ProviderSettings {
+  sonarr: SonarrSettings;
+  radarr: RadarrSettings;
+}
+
+export interface ExtensionOptions {
+  providers: ProviderSettings;
   titleLanguage: TitleLanguage;
   ui: UiOptions;
   debugLogging: boolean;
 }
 
+export interface SonarrPublicSettings {
+  url: string;
+  defaults: SonarrFormState;
+  isConfigured: boolean;
+}
+
+export interface RadarrPublicSettings {
+  url: string;
+  defaults: RadarrFormState;
+  isConfigured: boolean;
+}
+
+export interface ProviderPublicOptions {
+  sonarr: SonarrPublicSettings;
+  radarr: RadarrPublicSettings;
+}
+
 /**
  * Public-facing configuration data that is safe to expose to content scripts.
- * Secrets (like the Sonarr API key) are intentionally excluded.
+ * Secrets (like provider API keys) are intentionally excluded.
  */
 export interface PublicOptions {
-  sonarrUrl: string;
-  defaults: SonarrFormState;
+  providers: ProviderPublicOptions;
   titleLanguage: TitleLanguage;
   ui: UiOptions;
   debugLogging: boolean;
-  /**
-   * Indicates whether the user has completed Sonarr setup (URL + API key).
-   * This is derived in the background and mirrored into public storage.
-   */
-  isConfigured: boolean;
 }
 
 /**
  * Sensitive credentials that must remain in background or options contexts.
  */
 export interface SonarrSecrets {
+  apiKey: string;
+}
+
+export interface RadarrSecrets {
   apiKey: string;
 }
 
@@ -92,9 +136,32 @@ export interface CheckSeriesStatusResponse {
   linkedAniListIds?: number[];
 }
 
-export interface SonarrCredentialsPayload {
+export interface CheckMovieStatusPayload {
+  anilistId: number;
+  title?: string;
+  metadata?: MediaMetadataHint | null;
+}
+
+export interface CheckMovieStatusResponse {
+  exists: boolean;
+  tmdbId: number | null;
+  externalId?: MappingExternalId | null;
+  successfulSynonym?: string;
+  anilistTmdbLinkMissing?: boolean;
+  movie?: LeanRadarrMovie | RadarrMovie | RadarrLookupMovie;
+  /** True when a manual AniList -> TMDB override is active for this ID. */
+  overrideActive?: boolean;
+  /** Other AniList IDs currently linked to the same TMDB ID. */
+  linkedAniListIds?: number[];
+}
+
+export interface ArrCredentialsPayload {
   url: string;
   apiKey: string;
 }
 
-export type TestConnectionPayload = SonarrCredentialsPayload;
+export type SonarrCredentialsPayload = ArrCredentialsPayload;
+
+export type RadarrCredentialsPayload = ArrCredentialsPayload;
+
+export type TestConnectionPayload = ArrCredentialsPayload;

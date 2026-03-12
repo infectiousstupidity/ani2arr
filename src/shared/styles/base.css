@@ -115,7 +115,7 @@
   transition: all .2s ease-in-out;
   cursor: pointer;
 }
-.a2a-card-overlay__quick:hover:not([disabled]):not([data-state='in-sonarr']) { transform: none; box-shadow: none; }
+.a2a-card-overlay__quick:hover:not([disabled]):not([data-state='in-library']) { transform: none; box-shadow: none; }
 /* outline removed globally for interactive overlay quick buttons */
 .a2a-card-overlay__quick svg,
 .a2a-card-overlay__symbol { width: 16px; height: 16px; color: #ffffff; stroke-width: 1.5; }
@@ -124,7 +124,7 @@
 .a2a-card-overlay__quick[data-state='addable'],
 .a2a-card-overlay__quick[data-state='resolving'],
 .a2a-card-overlay__quick[data-state='adding'] { background: #53A7FF; color: #ffffff; }
-.a2a-card-overlay__quick[data-state='in-sonarr'] { background: #5CCD7A; color: #ffffff; cursor: default; }
+.a2a-card-overlay__quick[data-state='in-library'] { background: #5CCD7A; color: #ffffff; cursor: default; }
 .a2a-card-overlay__quick[data-state='error'] { background: #FF6B6B; color: #ffffff; }
 .a2a-card-overlay__quick[data-state='disabled'] { background: #1a2230; color: #E4ECF5; box-shadow: none; }
 .a2a-rotate { animation: a2a-spin 1s linear infinite; }

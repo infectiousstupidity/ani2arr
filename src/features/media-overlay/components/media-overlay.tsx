@@ -1,11 +1,13 @@
 import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { usePublicOptions } from '@/shared/queries';
+import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
+import { useAniListMetadataBatch, usePublicOptions } from '@/shared/queries';
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useBrowsePortals } from '../hooks/use-media-portals';
 import { useAnilistBatchPrefetch } from '@/shared/hooks/entrypoints/use-anilist-batch-prefetch';
 import type { BrowseAdapter, ParsedCard, MediaMetadataHint } from '@/shared/types';
+import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import { CardOverlay } from './card-overlay';
 
 export const DEFAULT_CONTAINER_CLASS = 'a2a-overlay-container';
@@ -76,9 +78,6 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
     useA2aBroadcasts();
 
     const { data: publicOptions } = usePublicOptions();
-    const isConfigured = Boolean(publicOptions?.isConfigured);
-    const sonarrUrl = publicOptions?.sonarrUrl ?? null;
-    const defaultForm = publicOptions?.defaults ?? null;
     const overlaysEnabled = publicOptions?.ui?.browseOverlayEnabled ?? true;
     const badgeVisibility = publicOptions?.ui?.badgeVisibility ?? 'always';
 
@@ -97,6 +96,11 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
       onCardInvalid: adapter.onCardInvalid,
       enabled: overlaysEnabled,
     });
+    const metadataIds = Array.from(new Set(Array.from(cardPortals.values(), parsed => parsed.anilistId)));
+    const metadataBatch = useAniListMetadataBatch(metadataIds, { enabled: overlaysEnabled });
+    const canonicalMetadataById = new Map(
+      (metadataBatch.data?.metadata ?? []).map(entry => [entry.id, metadataHintFromAniListMetadata(entry)]),
+    );
 
     // Prefetch AniList metadata on browse/search pages using viewport-prioritized batching.
     useAnilistBatchPrefetch({ cardPortals, enabled: overlaysEnabled });
@@ -107,18 +111,30 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
 
     return (
       <div ref={hostRef}>
-        {Array.from(cardPortals.entries()).map(([container, parsed]) =>
-          createPortal(
+        {Array.from(cardPortals.entries()).map(([container, parsed]) => {
+          const effectiveMetadata = mergeMetadataHints(
+            canonicalMetadataById.get(parsed.anilistId) ?? null,
+            parsed.metadata,
+          );
+          const service = resolveProviderForAniListFormat(effectiveMetadata?.format ?? null);
+          if (!service) {
+            return null;
+          }
+          const providerOptions =
+            service === 'radarr' ? publicOptions?.providers.radarr : publicOptions?.providers.sonarr;
+
+          return createPortal(
             <CardOverlay
               key={parsed.anilistId}
+              service={service}
               anilistId={parsed.anilistId}
               title={parsed.title}
-              onOpenModal={(anilistId, title, metadata) =>
+              onOpenModal={(anilistId, title) =>
                 onOpenMediaModal({
                   anilistId,
                   title,
                   initialTab: 'series',
-                  metadata,
+                  metadata: effectiveMetadata,
                 })
               }
               onOpenMappingFix={(anilistId, title) =>
@@ -126,13 +142,13 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
                   anilistId,
                   title,
                   initialTab: 'mapping',
-                  metadata: parsed.metadata,
+                  metadata: effectiveMetadata,
                 })
               }
-              isConfigured={isConfigured}
-              defaultForm={defaultForm}
-              metadata={parsed.metadata}
-              sonarrUrl={sonarrUrl}
+              isConfigured={Boolean(providerOptions?.isConfigured)}
+              defaultForm={providerOptions?.defaults ?? null}
+              metadata={effectiveMetadata}
+              providerUrl={providerOptions?.url ?? null}
               observeTarget={container}
               badgeVisibility={badgeVisibility}
               anchorCorner={adapter?.anchorCorner ?? 'bottom-left'}
@@ -140,8 +156,8 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
               anchorOffsetX={adapter?.anchorOffsetX ?? -8}
             />,
             container,
-          ),
-        )}
+          );
+        })}
       </div>
     );
   };

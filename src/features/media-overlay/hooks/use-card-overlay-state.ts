@@ -1,16 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { browser } from 'wxt/browser';
-import { useAddSeries, useSeriesStatus } from '@/shared/queries';
-import type { ExtensionError, MediaMetadataHint, SonarrFormState } from '@/shared/types';
+import { useAddMovie, useAddSeries, useMovieStatus, useSeriesStatus } from '@/shared/queries';
+import type {
+  ExtensionError,
+  MediaMetadataHint,
+  MediaService,
+  RadarrFormState,
+  SonarrFormState,
+} from '@/shared/types';
+import { getProviderLabel } from '@/services/providers/resolver';
 
-export type OverlayState = 'disabled' | 'in-sonarr' | 'addable' | 'resolving' | 'adding' | 'error';
+export type OverlayState = 'disabled' | 'in-library' | 'addable' | 'resolving' | 'adding' | 'error';
 
 export interface UseCardOverlayStateParams {
+  service: MediaService;
   anilistId: number;
   title: string;
   metadata: MediaMetadataHint | null;
-  defaultForm: SonarrFormState | null;
+  defaultForm: SonarrFormState | RadarrFormState | null;
   isConfigured: boolean;
   enabled?: boolean;
 }
@@ -21,7 +29,7 @@ export interface UseCardOverlayStateResult {
   quickAddAriaLabel: string;
   quickAddDisabled: boolean;
   handleQuickAdd: (event: ReactMouseEvent<HTMLButtonElement>) => void;
-  statusData: ReturnType<typeof useSeriesStatus>['data'];
+  statusData: ReturnType<typeof useSeriesStatus>['data'] | ReturnType<typeof useMovieStatus>['data'];
   mappingUnavailable: boolean;
 }
 
@@ -37,6 +45,7 @@ const resolveErrorMessage = (error: unknown): string | null => {
 };
 
 export const useCardOverlayState = ({
+  service,
   anilistId,
   title,
   metadata,
@@ -45,62 +54,76 @@ export const useCardOverlayState = ({
   enabled,
 }: UseCardOverlayStateParams): UseCardOverlayStateResult => {
   const bypassFailureCacheRef = useRef(false);
+  const providerLabel = getProviderLabel(service);
 
-  const statusQuery = useSeriesStatus(
+  const seriesStatusQuery = useSeriesStatus(
     { anilistId, title, metadata },
     {
-      enabled: (enabled ?? (isConfigured && Number.isFinite(anilistId))) && isConfigured && Number.isFinite(anilistId),
+      enabled:
+        service === 'sonarr' &&
+        (enabled ?? (isConfigured && Number.isFinite(anilistId))) &&
+        isConfigured &&
+        Number.isFinite(anilistId),
+      ignoreFailureCache: () => bypassFailureCacheRef.current,
+    },
+  );
+
+  const movieStatusQuery = useMovieStatus(
+    { anilistId, title, metadata },
+    {
+      enabled:
+        service === 'radarr' &&
+        (enabled ?? (isConfigured && Number.isFinite(anilistId))) &&
+        isConfigured &&
+        Number.isFinite(anilistId),
       ignoreFailureCache: () => bypassFailureCacheRef.current,
     },
   );
 
   const addSeriesMutation = useAddSeries();
+  const addMovieMutation = useAddMovie();
 
-  const {
-    data: statusData,
-    isError: statusHasError,
-    error: statusError,
-    isLoading: statusIsLoading,
-    fetchStatus,
-    refetch,
-  } = statusQuery;
-
-  const {
-    mutate,
-    isPending: isAdding,
-    isSuccess: addSuccess,
-    isError: addHasError,
-    error: addError,
-    reset,
-  } = addSeriesMutation;
+  const statusData = service === 'radarr' ? movieStatusQuery.data : seriesStatusQuery.data;
+  const statusHasError = service === 'radarr' ? movieStatusQuery.isError : seriesStatusQuery.isError;
+  const statusError = service === 'radarr' ? movieStatusQuery.error : seriesStatusQuery.error;
+  const statusIsLoading = service === 'radarr' ? movieStatusQuery.isLoading : seriesStatusQuery.isLoading;
+  const fetchStatus = service === 'radarr' ? movieStatusQuery.fetchStatus : seriesStatusQuery.fetchStatus;
+  const refetch = service === 'radarr' ? movieStatusQuery.refetch : seriesStatusQuery.refetch;
+  const isAdding = service === 'radarr' ? addMovieMutation.isPending : addSeriesMutation.isPending;
+  const addSuccess = service === 'radarr' ? addMovieMutation.isSuccess : addSeriesMutation.isSuccess;
+  const addHasError = service === 'radarr' ? addMovieMutation.isError : addSeriesMutation.isError;
+  const addError = service === 'radarr' ? addMovieMutation.error : addSeriesMutation.error;
+  const reset = service === 'radarr' ? addMovieMutation.reset : addSeriesMutation.reset;
 
   useEffect(() => {
     reset();
-  }, [anilistId, title, reset]);
+  }, [anilistId, reset, title]);
 
-  // Reduce flicker: if we already have previous data, keep showing it while a refetch runs
   const hasPrevData = statusData !== undefined && statusData !== null;
   const isResolving = statusIsLoading || (fetchStatus === 'fetching' && !hasPrevData);
-  const mappingUnavailable = statusData?.anilistTvdbLinkMissing === true;
+  const mappingUnavailable =
+    service === 'radarr'
+      ? movieStatusQuery.data?.anilistTmdbLinkMissing === true
+      : seriesStatusQuery.data?.anilistTvdbLinkMissing === true;
   const hasError = addHasError || statusHasError || mappingUnavailable;
-  const alreadyInSonarr = !!statusData?.exists || addSuccess;
+  const alreadyInLibrary = Boolean(statusData?.exists || addSuccess);
 
   const overlayState: OverlayState = useMemo(() => {
     if (!isConfigured) return 'disabled';
-    if (alreadyInSonarr) return 'in-sonarr';
+    if (alreadyInLibrary) return 'in-library';
     if (hasError) return 'error';
     if (isAdding) return 'adding';
     if (isResolving) return 'resolving';
     return 'addable';
-  }, [alreadyInSonarr, hasError, isAdding, isConfigured, isResolving]);
+  }, [alreadyInLibrary, hasError, isAdding, isConfigured, isResolving]);
 
   const errorMessage =
     mappingUnavailable
-      ? 'No Sonarr match found. Click to retry mapping.'
+      ? `No ${providerLabel} match found. Click to retry mapping.`
       : resolveErrorMessage(addError) ?? resolveErrorMessage(statusError);
 
   const quickAddDisabled =
-    overlayState === 'in-sonarr' ||
+    overlayState === 'in-library' ||
     overlayState === 'resolving' ||
     overlayState === 'adding' ||
     overlayState === 'disabled' ||
@@ -108,20 +131,20 @@ export const useCardOverlayState = ({
 
   const quickAddTitle = (() => {
     switch (overlayState) {
-      case 'in-sonarr':
-        return 'Already in Sonarr';
+      case 'in-library':
+        return `Already in ${providerLabel}`;
       case 'addable':
-        return defaultForm ? 'Quick add to Sonarr' : 'Defaults unavailable';
+        return defaultForm ? `Quick add to ${providerLabel}` : 'Defaults unavailable';
       case 'resolving':
-        return 'Resolving series mapping.';
+        return `Resolving ${providerLabel} mapping.`;
       case 'adding':
-        return 'Adding to Sonarr.';
+        return `Adding to ${providerLabel}.`;
       case 'error':
-        return errorMessage ?? 'Retry Sonarr add';
+        return errorMessage ?? `Retry ${providerLabel} add`;
       case 'disabled':
-        return 'Configure Sonarr before adding';
+        return `Configure ${providerLabel} before adding`;
       default:
-        return 'Sonarr';
+        return providerLabel;
     }
   })();
 
@@ -129,7 +152,7 @@ export const useCardOverlayState = ({
     overlayState === 'error' && mappingUnavailable
       ? 'Retry mapping lookup'
       : overlayState === 'error'
-        ? 'Retry adding to Sonarr'
+        ? `Retry adding to ${providerLabel}`
         : quickAddTitle;
 
   const handleQuickAdd = useCallback(
@@ -142,19 +165,19 @@ export const useCardOverlayState = ({
           .sendMessage({
             _a2a: true,
             type: 'OPEN_OPTIONS_PAGE',
-            sectionId: 'sonarr',
+            sectionId: service,
             timestamp: Date.now(),
           })
           .catch(() => {});
         return;
       }
 
-      if (overlayState === 'in-sonarr' || overlayState === 'resolving' || overlayState === 'adding') {
+      if (overlayState === 'in-library' || overlayState === 'resolving' || overlayState === 'adding') {
         return;
       }
 
       if (overlayState === 'error') {
-        if (mappingUnavailable) {
+        if (mappingUnavailable || statusHasError) {
           bypassFailureCacheRef.current = true;
           refetch({ throwOnError: false })
             .catch(() => {})
@@ -166,23 +189,23 @@ export const useCardOverlayState = ({
 
         if (addHasError && defaultForm) {
           reset();
-          mutate({
-            anilistId,
-            title,
-            primaryTitleHint: title,
-            metadata,
-            form: { ...defaultForm },
-          });
-          return;
-        }
-
-        if (statusHasError) {
-          bypassFailureCacheRef.current = true;
-          refetch({ throwOnError: false })
-            .catch(() => {})
-            .finally(() => {
-              bypassFailureCacheRef.current = false;
+          if (service === 'radarr') {
+            addMovieMutation.mutate({
+              anilistId,
+              title,
+              primaryTitleHint: title,
+              metadata,
+              form: { ...(defaultForm as RadarrFormState) },
             });
+          } else {
+            addSeriesMutation.mutate({
+              anilistId,
+              title,
+              primaryTitleHint: title,
+              metadata,
+              form: { ...(defaultForm as SonarrFormState) },
+            });
+          }
           return;
         }
       }
@@ -191,25 +214,37 @@ export const useCardOverlayState = ({
         return;
       }
 
-      mutate({
-        anilistId,
-        title,
-        primaryTitleHint: title,
-        metadata,
-        form: { ...defaultForm },
-      });
+      if (service === 'radarr') {
+        addMovieMutation.mutate({
+          anilistId,
+          title,
+          primaryTitleHint: title,
+          metadata,
+          form: { ...(defaultForm as RadarrFormState) },
+        });
+      } else {
+        addSeriesMutation.mutate({
+          anilistId,
+          title,
+          primaryTitleHint: title,
+          metadata,
+          form: { ...(defaultForm as SonarrFormState) },
+        });
+      }
     },
     [
       addHasError,
+      addMovieMutation,
+      addSeriesMutation,
       anilistId,
       defaultForm,
+      isConfigured,
       mappingUnavailable,
       metadata,
-      mutate,
       overlayState,
       refetch,
       reset,
-      isConfigured,
+      service,
       statusHasError,
       title,
     ],

@@ -4,11 +4,12 @@ import type { FieldValues } from 'react-hook-form';
 import type {
   BadgeVisibility,
   ExtensionOptions,
+  RadarrFormState,
   SonarrFormState,
   TitleLanguage,
   UiOptions,
 } from '@/shared/types/options';
-import type { SonarrMonitorOption } from '@/shared/types/providers';
+import type { RadarrMinimumAvailability, SonarrMonitorOption } from '@/shared/types/providers';
 
 // --- Constants ---
 
@@ -44,6 +45,13 @@ const MONITOR_OPTIONS: [SonarrMonitorOption, ...SonarrMonitorOption[]] = [
   'none',
 ];
 
+const MINIMUM_AVAILABILITY_OPTIONS: [RadarrMinimumAvailability, ...RadarrMinimumAvailability[]] = [
+  'announced',
+  'inCinemas',
+  'released',
+  'preDB',
+];
+
 // --- Factories ---
 
 const createDefaultFormState = (): SonarrFormState => ({
@@ -58,6 +66,16 @@ const createDefaultFormState = (): SonarrFormState => ({
   freeformTags: [],
 });
 
+const createDefaultRadarrFormState = (): RadarrFormState => ({
+  qualityProfileId: '',
+  rootFolderPath: '',
+  monitored: true,
+  searchForMovie: true,
+  minimumAvailability: 'released',
+  tags: [],
+  freeformTags: [],
+});
+
 const createDefaultUiOptions = (): UiOptions => ({
   browseOverlayEnabled: true,
   badgeVisibility: 'always',
@@ -65,9 +83,18 @@ const createDefaultUiOptions = (): UiOptions => ({
 });
 
 const createDefaultSettingsInternal = (): ExtensionOptions => ({
-  sonarrUrl: '',
-  sonarrApiKey: '',
-  defaults: createDefaultFormState(),
+  providers: {
+    sonarr: {
+      url: '',
+      apiKey: '',
+      defaults: createDefaultFormState(),
+    },
+    radarr: {
+      url: '',
+      apiKey: '',
+      defaults: createDefaultRadarrFormState(),
+    },
+  },
   titleLanguage: 'english',
   ui: createDefaultUiOptions(),
   debugLogging: false,
@@ -128,15 +155,7 @@ const CoerceStringArray = v.pipe(
 
 const SonarrDefaultsSchema = v.pipe(
   v.unknown(),
-  // Pre-process step: Handle legacy migration (tagIds -> tags) and ensure object
-  v.transform((input) => {
-    const obj = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
-    // Legacy support: map tagIds to tags if tags is missing
-    if (obj.tagIds !== undefined && obj.tags === undefined) {
-      return { ...obj, tags: obj.tagIds };
-    }
-    return obj;
-  }),
+  v.transform((input) => (input && typeof input === 'object' ? input : {})),
   v.object({
     qualityProfileId: v.fallback(CoerceQualityProfileId, ''),
     rootFolderPath: SafeString,
@@ -150,6 +169,20 @@ const SonarrDefaultsSchema = v.pipe(
   })
 );
 
+const RadarrDefaultsSchema = v.pipe(
+  v.unknown(),
+  v.transform((input) => (input && typeof input === 'object' ? input : {})),
+  v.object({
+    qualityProfileId: v.fallback(CoerceQualityProfileId, ''),
+    rootFolderPath: SafeString,
+    monitored: v.fallback(v.boolean(), true),
+    searchForMovie: v.fallback(v.boolean(), true),
+    minimumAvailability: v.fallback(v.picklist(MINIMUM_AVAILABILITY_OPTIONS), 'released'),
+    tags: v.fallback(CoerceNumberArray, []),
+    freeformTags: v.fallback(CoerceStringArray, []),
+  }),
+);
+
 const UiOptionsSchema = v.pipe(
   v.unknown(),
   v.transform((input) => (input && typeof input === 'object' ? input : {})),
@@ -160,14 +193,35 @@ const UiOptionsSchema = v.pipe(
   })
 );
 
+const SonarrSettingsSchema = v.object({
+  url: SafeString,
+  apiKey: SafeString,
+  defaults: v.fallback(SonarrDefaultsSchema, createDefaultFormState()),
+});
+
+const RadarrSettingsSchema = v.object({
+  url: SafeString,
+  apiKey: SafeString,
+  defaults: v.fallback(RadarrDefaultsSchema, createDefaultRadarrFormState()),
+});
+
 // Main Settings Schema
 const ExtensionOptionsSchema = v.pipe(
   v.unknown(),
   v.transform((input) => (input && typeof input === 'object' ? input : {})),
   v.object({
-    sonarrUrl: SafeString,
-    sonarrApiKey: SafeString,
-    defaults: v.fallback(SonarrDefaultsSchema, createDefaultFormState()),
+    providers: v.object({
+      sonarr: v.fallback(SonarrSettingsSchema, {
+        url: '',
+        apiKey: '',
+        defaults: createDefaultFormState(),
+      }),
+      radarr: v.fallback(RadarrSettingsSchema, {
+        url: '',
+        apiKey: '',
+        defaults: createDefaultRadarrFormState(),
+      }),
+    }),
     titleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
     ui: v.fallback(UiOptionsSchema, createDefaultUiOptions()),
     debugLogging: v.fallback(v.boolean(), false),
@@ -183,4 +237,5 @@ export type SettingsFormValues = Settings & FieldValues;
 export const createDefaultSettings = createDefaultSettingsInternal;
 export const defaultSettings = createDefaultSettingsInternal;
 export const defaultSonarrFormState = createDefaultFormState;
+export const defaultRadarrFormState = createDefaultRadarrFormState;
 export const defaultUiOptions = createDefaultUiOptions;

@@ -2,12 +2,19 @@ import React, { useMemo } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import Button from '@/shared/ui/primitives/button';
-import { useAniListMedia, usePublicOptions, useSeriesStatus } from '@/shared/queries';
+import { useAniListMedia, useMovieStatus, usePublicOptions, useSeriesStatus } from '@/shared/queries';
 import { MappingPreviewPanel } from './mapping-preview-panel';
 import { MappingSearchPanel } from './mapping-search-panel';
 import { useMappingController } from './use-mapping-controller';
-import type { MappingExternalId, MappingProvider, MappingSearchResult, SonarrLookupSeries } from '@/shared/types';
+import type {
+  MappingExternalId,
+  MappingProvider,
+  MappingSearchResult,
+  RadarrLookupMovie,
+  SonarrLookupSeries,
+} from '@/shared/types';
 import { metadataFromMediaObject } from '@/shared/anilist/dom/anilist-dom';
+import { toMappingSearchResultFromRadarr } from './radarr.adapter';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 
@@ -22,20 +29,44 @@ interface MappingEditorProps {
 const DIALOG_Z_INDEX = 2147483600;
 
 const buildCurrentMapping = (
+  provider: MappingProvider,
   externalId: MappingExternalId | null | undefined,
-  statusSeries: SonarrLookupSeries | undefined,
+  statusItem: SonarrLookupSeries | RadarrLookupMovie | undefined,
   linkedAniListIds: number[] | undefined,
   inLibrary: boolean,
   baseUrl: string,
   fallbackTitle?: string,
 ): MappingSearchResult | null => {
-  if (!externalId || externalId.kind !== 'tvdb') return null;
+  if (!externalId) return null;
+
+  if (provider === 'radarr') {
+    if (externalId.kind !== 'tmdb') return null;
+    const tmdbId = externalId.id;
+    if (statusItem) {
+      return toMappingSearchResultFromRadarr(statusItem as RadarrLookupMovie, {
+        baseUrl,
+        libraryTmdbIds: inLibrary ? [tmdbId] : [],
+        ...(linkedAniListIds?.length
+          ? { linkedAniListIdsByTmdbId: { [tmdbId]: linkedAniListIds } }
+          : {}),
+      });
+    }
+    return {
+      service: 'radarr',
+      target: { id: tmdbId, kind: 'tmdb' },
+      title: fallbackTitle ? `${fallbackTitle} (TMDB ${tmdbId})` : `TMDB ${tmdbId}`,
+      inLibrary,
+      ...(linkedAniListIds?.length ? { linkedAniListIds } : {}),
+    };
+  }
+
+  if (externalId.kind !== 'tvdb') return null;
   const tvdbId = externalId.id;
-  if (statusSeries) {
-    return toMappingSearchResultFromSonarr(statusSeries, {
+  if (statusItem) {
+    return toMappingSearchResultFromSonarr(statusItem as SonarrLookupSeries, {
       baseUrl,
       libraryTvdbIds: inLibrary ? [tvdbId] : [],
-      ...(linkedAniListIds && linkedAniListIds.length > 0
+      ...(linkedAniListIds?.length
         ? { linkedAniListIdsByTvdbId: { [tvdbId]: linkedAniListIds } }
         : {}),
     });
@@ -58,7 +89,10 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
 }) => {
   const toast = useToast();
   const publicOptions = usePublicOptions();
-  const baseUrl = publicOptions.data?.sonarrUrl ?? '';
+  const baseUrl =
+    provider === 'radarr'
+      ? publicOptions.data?.providers.radarr.url ?? ''
+      : publicOptions.data?.providers.sonarr.url ?? '';
 
   const aniListMedia = useAniListMedia(anilistId, { enabled: open });
   const aniTitle = useMemo(
@@ -74,7 +108,16 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
   const seriesStatus = useSeriesStatus(
     { anilistId, title: aniTitle, metadata: metadataHint },
     {
-      enabled: open,
+      enabled: open && provider === 'sonarr',
+      force_verify: true,
+      ignoreFailureCache: true,
+      priority: 'high',
+    },
+  );
+  const movieStatus = useMovieStatus(
+    { anilistId, title: aniTitle, metadata: metadataHint },
+    {
+      enabled: open && provider === 'radarr',
       force_verify: true,
       ignoreFailureCache: true,
       priority: 'high',
@@ -82,29 +125,49 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
   );
 
   const statusSeries = seriesStatus.data?.series as SonarrLookupSeries | undefined;
+  const statusMovie = movieStatus.data?.movie as RadarrLookupMovie | undefined;
   const statusExternalId: MappingExternalId | null =
-    seriesStatus.data?.externalId ??
-    (typeof seriesStatus.data?.tvdbId === 'number'
-      ? { id: seriesStatus.data.tvdbId, kind: 'tvdb' }
-      : null);
+    provider === 'radarr'
+      ? movieStatus.data?.externalId ??
+        (typeof movieStatus.data?.tmdbId === 'number'
+          ? { id: movieStatus.data.tmdbId, kind: 'tmdb' }
+          : null)
+      : seriesStatus.data?.externalId ??
+        (typeof seriesStatus.data?.tvdbId === 'number'
+          ? { id: seriesStatus.data.tvdbId, kind: 'tvdb' }
+          : null);
   const externalId = statusExternalId ?? initialExternalId ?? null;
-  const linkedAniListIds = seriesStatus.data?.linkedAniListIds;
+  const linkedAniListIds = provider === 'radarr' ? movieStatus.data?.linkedAniListIds : seriesStatus.data?.linkedAniListIds;
   const currentMapping = useMemo<MappingSearchResult | null>(() => {
     return buildCurrentMapping(
+      provider,
       externalId,
-      statusSeries,
+      provider === 'radarr' ? statusMovie : statusSeries,
       linkedAniListIds,
-      seriesStatus.data?.exists ?? false,
+      provider === 'radarr' ? movieStatus.data?.exists ?? false : seriesStatus.data?.exists ?? false,
       baseUrl,
       aniTitle,
     );
-  }, [aniTitle, baseUrl, externalId, linkedAniListIds, seriesStatus.data?.exists, statusSeries]);
+  }, [
+    aniTitle,
+    baseUrl,
+    externalId,
+    linkedAniListIds,
+    movieStatus.data?.exists,
+    provider,
+    seriesStatus.data?.exists,
+    statusMovie,
+    statusSeries,
+  ]);
 
   const mappingController = useMappingController({
     service: provider,
     anilistId,
     currentMapping,
-    overrideActive: seriesStatus.data?.overrideActive === true,
+    overrideActive:
+      provider === 'radarr'
+        ? movieStatus.data?.overrideActive === true
+        : seriesStatus.data?.overrideActive === true,
   });
 
   const previewMapping = mappingController.state.selected;
@@ -113,9 +176,12 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
   const handleSave = async () => {
     try {
       await mappingController.handleSubmit();
+      const target = mappingController.currentMapping?.target ?? previewMapping?.target ?? null;
       toast.showToast({
         title: 'Mapping saved',
-        description: `AniList #${anilistId} now maps to TVDB #${mappingController.currentMapping?.target.id ?? previewMapping?.target.id}.`,
+        description: target
+          ? `AniList #${anilistId} now maps to ${target.kind.toUpperCase()} #${target.id}.`
+          : `AniList #${anilistId} mapping was updated.`,
         variant: 'success',
       });
       onClose();
@@ -161,6 +227,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
               <MappingSearchPanel
                 controller={mappingController}
                 currentMapping={mappingController.currentMapping}
+                provider={provider}
                 baseUrl={baseUrl}
                 autoFocus
               />
@@ -173,6 +240,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
                   ...(aniListMedia.data?.coverImage?.large ? { posterUrl: aniListMedia.data.coverImage.large } : {}),
                 }}
                 baseUrl={baseUrl}
+                provider={provider}
                 currentMapping={mappingController.currentMapping}
                 previewMapping={previewMapping}
                 isInMappingMode

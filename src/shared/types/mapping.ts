@@ -32,11 +32,13 @@ export interface MappingSummary {
 
 export interface MappingOverrideRecord {
   anilistId: number;
-  tvdbId: number;
+  provider: MappingProvider;
+  externalId: MappingExternalId;
   updatedAt: number;
 }
 
 export interface MappingIgnoreRecord {
   anilistId: number;
+  provider: MappingProvider;
   updatedAt: number;
 }

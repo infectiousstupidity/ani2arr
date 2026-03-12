@@ -8,6 +8,11 @@ import { canonicalTitleKey, sanitizeLookupDisplay } from '@/services/mapping/pip
 import { incrementCounter, timeAsync } from '@/shared/utils/metrics';
 import { logger } from '@/shared/utils/logger';
 import { normalizeError } from '@/shared/errors/error-utils';
+import type {
+  LookupClientCredentials,
+  ProviderLookupClient,
+  ProviderLookupOptions,
+} from './provider-lookup.client';
 
 const LOOKUP_SOFT_TTL = 10 * 60 * 1000; // 10 minutes
 const LOOKUP_HARD_TTL = 30 * 60 * 1000; // 30 minutes
@@ -19,13 +24,9 @@ const LOOKUP_NEGATIVE_HARD_TTL = 48 * 60 * 60 * 1000; // 48 hours
 
 const LOOKUP_LATENCY_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
 
-export interface SonarrLookupCredentials {
-  url: string;
-  apiKey: string;
-}
+export type SonarrLookupCredentials = LookupClientCredentials;
 
-export interface SonarrLookupOptions {
-  forceNetwork?: boolean;
+export interface SonarrLookupOptions extends ProviderLookupOptions {
   priority?: RequestPriority;
 }
 
@@ -34,10 +35,14 @@ type LookupCaches = {
   negative: TtlCache<boolean>;
 };
 
-export class SonarrLookupClient {
+export class SonarrLookupClient
+  implements ProviderLookupClient<SonarrLookupCredentials, SonarrLookupSeries>
+{
   private readonly log = logger.create('SonarrLookupClient');
   private readonly inflight = new Map<string, Promise<SonarrLookupSeries[]>>();
   private readonly queue = new PQueue({ concurrency: 5 });
+  public readonly provider = 'sonarr' as const;
+  public readonly externalIdKind = 'tvdb' as const;
 
   constructor(
     private readonly sonarrApi: SonarrApiService,
@@ -163,6 +168,13 @@ export class SonarrLookupClient {
     })();
 
     return deferred;
+  }
+
+  public getExternalId(result: unknown): number | null {
+    const candidate = result as { tvdbId?: unknown } | null;
+    return typeof candidate?.tvdbId === 'number' && Number.isFinite(candidate.tvdbId)
+      ? candidate.tvdbId
+      : null;
   }
 
   private async performLookup(

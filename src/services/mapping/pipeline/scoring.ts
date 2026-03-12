@@ -1,14 +1,14 @@
-import type { SonarrLookupSeries } from '@/shared/types';
 import type { ScoredCandidate } from './types';
 import type { SearchTerm } from './search-term-generator';
 import { computeTitleMatchScore } from '@/services/mapping/pipeline/matching';
+import type { ProviderLookupResult } from '../provider-lookup.client';
 
-export function scoreCandidates(
+export function scoreCandidates<TResult extends ProviderLookupResult>(
   term: SearchTerm,
-  results: SonarrLookupSeries[],
+  results: TResult[],
   targetYear?: number,
-): ScoredCandidate[] {
-  const scored: ScoredCandidate[] = [];
+): ScoredCandidate<TResult>[] {
+  const scored: ScoredCandidate<TResult>[] = [];
   for (const candidate of results) {
     const scoreParams = {
       queryRaw: term.display,

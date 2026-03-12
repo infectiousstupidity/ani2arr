@@ -6,6 +6,7 @@ import {
   getPublicOptionsSnapshot,
   parseSettings,
   publicOptions,
+  radarrSecrets,
   setExtensionOptionsSnapshot,
   sonarrSecrets,
   toPublicOptions,
@@ -34,6 +35,9 @@ const useSyncExtensionOptionsQuery = (queryClient: ReturnType<typeof useQueryCli
       sonarrSecrets.watch(() => {
         void refreshOptions();
       }),
+      radarrSecrets.watch(() => {
+        void refreshOptions();
+      }),
     ];
     return () => {
       for (const unsubscribe of unsubscribes) unsubscribe();
@@ -57,6 +61,9 @@ const useSyncPublicOptionsQuery = (queryClient: ReturnType<typeof useQueryClient
         void refreshPublicOptions();
       }),
       sonarrSecrets.watch(() => {
+        void refreshPublicOptions();
+      }),
+      radarrSecrets.watch(() => {
         void refreshPublicOptions();
       }),
     ];

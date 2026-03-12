@@ -72,7 +72,7 @@ export default defineConfig({
     return {
       name: "ani2arr",
       description:
-        'Adds a one-click "Add to Sonarr" button to AniList and AniChart pages',
+        'Adds one-click Sonarr and Radarr actions to AniList and AniChart pages',
       ...(manifestVersion === 3 ? mv3Permissions : mv2Permissions),
       options_ui: {
         page: "options/index.html",

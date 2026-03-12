@@ -8,13 +8,14 @@ import { logger } from '@/shared/utils/logger';
 import Dropdown, { DropdownItem } from '@/shared/ui/primitives/dropdown';
 import { buildExternalMediaLink, type ExternalLinkInput } from '@/shared/utils/build-external-media-link';
 import type { MediaService } from '@/shared/types';
+import { getProviderBaseUrl, getProviderLabel, isProviderConfigured } from '@/services/providers/resolver';
 
 export type Status = 'LOADING' | 'IN' | 'NOT_IN' | 'ERROR' | 'ADDING';
 
 interface MediaActionsProps {
-  service: MediaService;      // 'sonarr' | 'radarr'
+  service: MediaService;
   status: Status;
-  librarySlug?: string;       // optional - do not pass when undefined
+  librarySlug?: string;
   resolvedSearchTerm: string;
   externalId: number | null | undefined;
   onQuickAdd: () => void;
@@ -34,23 +35,28 @@ const MediaActions: React.FC<MediaActionsProps> = ({
   onQuickAdd,
   onOpenModal,
   onOpenMappingFix,
-  portalContainer
+  portalContainer,
 }) => {
   const { data: options } = usePublicOptions();
 
-  const serviceLabel = service === 'sonarr' ? 'Sonarr' : 'Radarr';
+  const serviceLabel = getProviderLabel(service);
   const inService = status === 'IN';
   const isLoading = status === 'LOADING' || status === 'ADDING';
   const getButtonText = () => {
     switch (status) {
-      case 'LOADING': return `Checking ${serviceLabel}...`;
-      case 'IN': return `In ${serviceLabel}`;
-      case 'ADDING': return 'Adding...';
-      case 'ERROR': return 'Error';
-      default: return `Add to ${serviceLabel}`;
+      case 'LOADING':
+        return `Checking ${serviceLabel}...`;
+      case 'IN':
+        return `In ${serviceLabel}`;
+      case 'ADDING':
+        return 'Adding...';
+      case 'ERROR':
+        return 'Error';
+      default:
+        return `Add to ${serviceLabel}`;
     }
   };
-  const isServiceConfigured = service === 'sonarr' ? options?.isConfigured === true : true;
+  const isServiceConfigured = isProviderConfigured(service, options);
   const requiresConfiguration = !isServiceConfigured;
   const hasNoAutoMatch = externalId === null;
   const mainButtonText = requiresConfiguration
@@ -60,23 +66,19 @@ const MediaActions: React.FC<MediaActionsProps> = ({
       : getButtonText();
   const disableMainAction = isLoading || (hasNoAutoMatch && !inService && !requiresConfiguration);
 
-  const sonarrUrl = (options as { sonarrUrl?: string } | undefined)?.sonarrUrl ?? '';
-  const radarrUrl = (options as { radarrUrl?: string } | undefined)?.radarrUrl ?? '';
-  const externalBaseUrl = service === 'sonarr' ? sonarrUrl : radarrUrl;
+  const externalBaseUrl = getProviderBaseUrl(service, options);
   const hasExternal = externalBaseUrl.length > 0;
 
-  const groupTooltip =
-    requiresConfiguration
-      ? undefined
-      : hasNoAutoMatch
+  const groupTooltip = requiresConfiguration
+    ? undefined
+    : hasNoAutoMatch
       ? 'No automatic ID match was found for this title. Try searching for it manually.'
       : undefined;
 
-  const mainButtonTooltip =
-    groupTooltip
-      ? undefined
-      : requiresConfiguration
-        ? `Open ${serviceLabel} settings to continue.`
+  const mainButtonTooltip = groupTooltip
+    ? undefined
+    : requiresConfiguration
+      ? `Open ${serviceLabel} settings to continue.`
       : status === 'IN'
         ? `Open ${serviceLabel} options`
         : status === 'LOADING'
@@ -94,7 +96,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
     ...(librarySlug ? { librarySlug } : {}),
     ...(resolvedSearchTerm ? { searchTerm: resolvedSearchTerm } : {}),
   };
-  const externalHref = hasExternal ? buildExternalMediaLink(linkInput) : '';
+  const externalHref = hasExternal ? buildExternalMediaLink(linkInput) : null;
 
   const Group: React.FC<React.PropsWithChildren> = ({ children }) => (
     <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group" style={{ width: '100%' }}>
@@ -103,7 +105,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
   );
 
   return (
-    <div className={`grid ${hasExternal ? 'grid-cols-[1fr_auto] gap-[15px]' : 'grid-cols-1 gap-0'} items-start w-full`}>
+    <div className={`grid ${externalHref ? 'grid-cols-[1fr_auto] gap-[15px]' : 'grid-cols-1 gap-0'} items-start w-full`}>
       {groupTooltip ? (
         <TooltipWrapper content={groupTooltip} container={portalContainer ?? null}>
           <Group>
@@ -185,7 +187,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
         </Group>
       )}
 
-      {hasExternal && (
+      {externalHref && (
         <Button
           asChild
           size="icon"

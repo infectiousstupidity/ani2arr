@@ -50,7 +50,8 @@ export const MappingTable: React.FC<MappingTableProps> = ({
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const expandedSet = useMemo(() => new Set(expandedItems), [expandedItems]);
   const { data: publicOptions } = usePublicOptions();
-  const sonarrUrl = publicOptions?.sonarrUrl ?? null;
+  const sonarrUrl = publicOptions?.providers.sonarr.url ?? null;
+  const radarrUrl = publicOptions?.providers.radarr.url ?? null;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Estimate row height based on expansion state
@@ -107,7 +108,7 @@ export const MappingTable: React.FC<MappingTableProps> = ({
               const row = rows[virtualRow.index];
               if (!row) return null;
               const isExpanded = expandedSet.has(row.id);
-              const providerUrl = row.provider === 'sonarr' ? sonarrUrl : null;
+              const providerUrl = row.provider === 'sonarr' ? sonarrUrl : radarrUrl;
               return (
                 <div
                   key={row.id}

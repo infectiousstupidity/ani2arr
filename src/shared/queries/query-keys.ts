@@ -1,4 +1,4 @@
-import type { CheckSeriesStatusPayload, MediaMetadataHint } from '@/shared/types';
+import type { CheckSeriesStatusPayload, MappingProvider, MediaMetadataHint } from '@/shared/types';
 import type { GetMappingsInput } from '@/rpc/schemas';
 
 const rootQueryKey = ['a2a'] as const;
@@ -32,7 +32,13 @@ const getStableMetadata = (metadata?: MediaMetadataHint | null) => {
   };
 };
 
-const seriesStatusBaseKey = (anilistId: number) => [...rootQueryKey, 'seriesStatus', anilistId] as const;
+const seriesStatusRootKey = (provider: MappingProvider) => [...rootQueryKey, 'seriesStatus', provider] as const;
+
+const seriesStatusBaseKey = (provider: MappingProvider, anilistId: number) =>
+  [...seriesStatusRootKey(provider), anilistId] as const;
+
+const providerMetadataRootKey = (provider: MappingProvider) =>
+  [...rootQueryKey, `${provider}Metadata`] as const;
 
 const normalizeMappingsInput = (input?: GetMappingsInput) => {
   if (!input) return 'default';
@@ -53,6 +59,7 @@ const normalizeMappingsInput = (input?: GetMappingsInput) => {
     normalized.cursor = {
       updatedAt: input.cursor.updatedAt,
       anilistId: input.cursor.anilistId,
+      provider: input.cursor.provider,
     };
   }
   return normalized;
@@ -69,11 +76,12 @@ export const queryKeys = {
   options: () => [...rootQueryKey, 'options'] as const,
   publicOptions: () => [...rootQueryKey, 'publicOptions'] as const,
   aniListMedia: (anilistId: number) => [...rootQueryKey, 'aniListMedia', anilistId] as const,
-  seriesStatusRoot: () => [...rootQueryKey, 'seriesStatus'] as const,
-  seriesStatusBase: seriesStatusBaseKey,
-  seriesStatus: (payload: CheckSeriesStatusPayload) =>
+  seriesStatusRoot: (provider: MappingProvider = 'sonarr') => seriesStatusRootKey(provider),
+  seriesStatusBase: (anilistId: number, provider: MappingProvider = 'sonarr') =>
+    seriesStatusBaseKey(provider, anilistId),
+  seriesStatus: (payload: CheckSeriesStatusPayload, provider: MappingProvider = 'sonarr') =>
     [
-      ...seriesStatusBaseKey(payload.anilistId),
+      ...seriesStatusBaseKey(provider, payload.anilistId),
       {
         // TanStack Query hashes this object. By using normalized inputs,
         // we ensure cache hits across different contexts (e.g. Card vs Page).
@@ -81,10 +89,15 @@ export const queryKeys = {
         metadata: getStableMetadata(payload.metadata),
       },
     ] as const,
+  sonarrMetadataRoot: () => providerMetadataRootKey('sonarr'),
   sonarrMetadata: (scope?: string) => [...rootQueryKey, 'sonarrMetadata', scope ?? 'configured'] as const,
+  radarrMetadataRoot: () => providerMetadataRootKey('radarr'),
+  radarrMetadata: (scope?: string) => [...rootQueryKey, 'radarrMetadata', scope ?? 'configured'] as const,
   mappingSearch: (service: 'sonarr' | 'radarr', query: string) =>
     [...rootQueryKey, 'mappingSearch', service, query.trim().toLowerCase()] as const,
-  mappingOverrides: () => [...rootQueryKey, 'mappingOverrides'] as const,
+  mappingOverridesRoot: () => [...rootQueryKey, 'mappingOverrides'] as const,
+  mappingOverrides: (provider: MappingProvider | 'all' = 'all') =>
+    [...rootQueryKey, 'mappingOverrides', provider] as const,
   mappingsRoot: () => [...rootQueryKey, 'mappings'] as const,
   mappings: (input?: GetMappingsInput) => [...rootQueryKey, 'mappings', normalizeMappingsInput(input)] as const,
   aniListMetadata: (ids: number[]) => [...rootQueryKey, 'aniListMetadata', normalizeMetadataIds(ids)] as const,

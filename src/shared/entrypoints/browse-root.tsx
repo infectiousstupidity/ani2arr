@@ -39,7 +39,7 @@ export const BrowseRoot: React.FC<BrowseRootProps> = ({ BrowseContentApp, portal
           bannerImage={modalProps.bannerImage}
           coverImage={modalProps.coverImage}
           anilistIds={[mediaModal.state.anilistId]}
-          tvdbId={modalProps.tvdbId}
+          service={modalProps.service}
           inLibrary={modalProps.inLibrary}
           format={modalProps.format}
           year={modalProps.year}
@@ -48,6 +48,7 @@ export const BrowseRoot: React.FC<BrowseRootProps> = ({ BrowseContentApp, portal
           portalContainer={portalContainer}
           mappingTabProps={modalProps.mappingTabProps}
           sonarrPanelProps={modalProps.sonarrPanelProps}
+          radarrPanelProps={modalProps.radarrPanelProps}
         />
       )}
     </>

@@ -1,6 +1,7 @@
 // src/clients/sonarr.api.ts
 
-import { withRetry, AbortError } from '@/shared/utils/retry';
+import { BaseArrClient } from '@/clients/base-arr.client';
+import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { hasSonarrPermission } from '@/shared/sonarr/validation';
 import type {
   ExtensionOptions,
@@ -12,145 +13,16 @@ import type {
   SonarrTag,
   SonarrLookupSeries,
 } from '@/shared/types';
-import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
-import { logger } from '@/shared/utils/logger';
-import { resolveSonarrTagIds } from '@/rpc/handlers/sonarr-tag-resolver';
-
-const log = logger.create('SonarrApiService');
-
-export class SonarrApiService {
-  // Simple in-memory ETag cache for common read endpoints
-  private readonly etagCache: Map<string, { etag: string; json: unknown }> = new Map();
-  private readonly cacheableEndpoints = new Set<string>(['series', 'qualityprofile', 'rootfolder', 'tag']);
-
-  /** Clears all cached ETags and associated payloads. Call on settings changes. */
-  public clearEtagCache(): void {
-    this.etagCache.clear();
+import { createError, ErrorCode } from '@/shared/errors/error-utils';
+export class SonarrApiService extends BaseArrClient {
+  public constructor() {
+    super({
+      serviceName: 'Sonarr',
+      logScope: 'SonarrApiService',
+      cacheableEndpoints: ['series', 'qualityprofile', 'rootfolder', 'tag'],
+      hasPermission: hasSonarrPermission,
+    });
   }
-
-  private request = async <T>(
-    endpoint: string,
-    credentials: SonarrCredentialsPayload,
-    fetchOptions: RequestInit = {},
-  ): Promise<T> => {
-    if (!credentials.url || !credentials.apiKey) {
-      throw createError(
-        ErrorCode.CONFIGURATION_ERROR,
-        'Sonarr URL or API Key not provided.',
-        'Sonarr URL or API Key is missing.',
-      );
-    }
-
-    if (!(await hasSonarrPermission(credentials.url))) {
-      throw createError(
-        ErrorCode.PERMISSION_ERROR,
-        `Missing permission for Sonarr URL: ${credentials.url}`,
-        'Permission for the Sonarr URL is required. Please grant access in the extension options.',
-      );
-    }
-
-    const baseUrl = `${credentials.url.replace(/\/$/, '')}/api/v3/${endpoint}`;
-
-    try {
-      return await withRetry(
-        async () => {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 15000);
-
-          const method = (fetchOptions.method ?? 'GET').toString().toUpperCase();
-          const normalizedEndpoint = endpoint.split('?')[0] ?? endpoint;
-          const cacheKey = normalizedEndpoint;
-          const isCacheable =
-            method === 'GET' &&
-            this.cacheableEndpoints.has(normalizedEndpoint) &&
-            endpoint === normalizedEndpoint;
-
-          const init: RequestInit = {
-            ...fetchOptions,
-            headers: {
-              ...(fetchOptions.headers ?? {}),
-              ...(fetchOptions.body ? { 'Content-Type': 'application/json' } : {}),
-              'X-Api-Key': credentials.apiKey,
-              ...(isCacheable && this.etagCache.has(cacheKey)
-                ? { 'If-None-Match': this.etagCache.get(cacheKey)!.etag }
-                : {}),
-            },
-            referrerPolicy: 'no-referrer',
-            credentials: 'omit',
-            signal: controller.signal,
-          };
-
-          let response: Response;
-          try {
-            response = await fetch(baseUrl, init);
-          } finally {
-            clearTimeout(timeout);
-          }
-
-          if (!response.ok) {
-            const retryAfterHeader = response.headers.get('Retry-After');
-            let retryAfterMs: number | undefined;
-
-            if (response.status === 429 && retryAfterHeader) {
-              const seconds = Number(retryAfterHeader);
-              if (Number.isFinite(seconds)) {
-                retryAfterMs = Math.max(0, seconds * 1000);
-              } else {
-                const parsedDate = Date.parse(retryAfterHeader);
-                if (!Number.isNaN(parsedDate)) {
-                  retryAfterMs = Math.max(0, parsedDate - Date.now());
-                }
-              }
-            }
-
-            let detail: unknown;
-            try {
-              detail = await response.clone().json();
-            } catch {
-              // ignore
-            }
-
-            const baseMessage = `Sonarr API Error: ${response.status} ${response.statusText}`;
-            const err = new Error(baseMessage) as Error & { retryAfterMs?: number; detail?: unknown };
-            if (retryAfterMs !== undefined) err.retryAfterMs = retryAfterMs;
-            if (detail !== undefined) err.detail = detail;
-
-            if (response.status >= 400 && response.status < 500 && response.status !== 429) {
-              throw new AbortError(err.message);
-            }
-            throw err;
-          }
-
-          if (response.status === 304 && isCacheable) {
-            const cached = this.etagCache.get(cacheKey)?.json as T | undefined;
-            if (cached !== undefined) return cached;
-          }
-
-          if (response.status === 204) return {} as T;
-
-          const isJson = response.headers.get('content-type')?.includes('application/json');
-          const data = (isJson ? ((await response.json()) as T) : ({} as T));
-
-          if (isCacheable && isJson) {
-            const nextEtag = response.headers.get('ETag');
-            if (nextEtag) {
-              this.etagCache.set(cacheKey, { etag: nextEtag, json: data });
-            }
-          }
-
-          return data;
-        },
-        {
-          retries: 3,
-          extractRetryAfterMs: (e: unknown) => (e as { retryAfterMs?: number })?.retryAfterMs,
-        },
-      );
-    } catch (error) {
-      const normalized = normalizeError(error);
-      logError(normalized, `SonarrApiService:request:${endpoint}`);
-      throw normalized;
-    }
-  };
 
   public getAllSeries = async (credentials: SonarrCredentialsPayload): Promise<SonarrSeries[]> => {
     return this.request<SonarrSeries[]>('series', credentials);
@@ -220,24 +92,26 @@ export class SonarrApiService {
     payload: AddRequestPayload,
     baseOptions: ExtensionOptions,
   ): Promise<SonarrSeries> => {
+    const providerOptions = baseOptions.providers.sonarr;
     const sonarrCreds: SonarrCredentialsPayload = {
-      url: baseOptions.sonarrUrl,
-      apiKey: baseOptions.sonarrApiKey,
+      url: providerOptions.url,
+      apiKey: providerOptions.apiKey,
     };
 
     const finalPayload: AddRequestPayload = {
-      ...baseOptions.defaults,
+      ...providerOptions.defaults,
       ...payload,
     };
 
-    const finalTagIds = await resolveSonarrTagIds(
-      this,
-      sonarrCreds,
-      Array.isArray(finalPayload.tags)
+    const finalTagIds = await resolveArrTagIds({
+      api: this,
+      credentials: sonarrCreds,
+      existingIdsFromForm: Array.isArray(finalPayload.tags)
         ? finalPayload.tags.filter(id => typeof id === 'number' && !Number.isNaN(id))
         : [],
-      Array.isArray(finalPayload.freeformTags) ? finalPayload.freeformTags : [],
-    );
+      freeformLabelsFromForm: Array.isArray(finalPayload.freeformTags) ? finalPayload.freeformTags : [],
+      serviceLabel: 'Sonarr',
+    });
 
     // Strip fields that Sonarr does not understand (`metadata`, `freeformTags`) before sending
     const {
@@ -252,16 +126,16 @@ export class SonarrApiService {
       ...payloadForSonarr,
       tags: finalTagIds,
       monitored:
-        (finalPayload.monitorOption ?? baseOptions.defaults.monitorOption) !== 'none',
+        (finalPayload.monitorOption ?? providerOptions.defaults.monitorOption) !== 'none',
       addOptions: {
         searchForMissingEpisodes:
           finalPayload.searchForMissingEpisodes ??
-          baseOptions.defaults.searchForMissingEpisodes,
-        monitor: finalPayload.monitorOption ?? baseOptions.defaults.monitorOption,
+          providerOptions.defaults.searchForMissingEpisodes,
+        monitor: finalPayload.monitorOption ?? providerOptions.defaults.monitorOption,
       },
     };
 
-    log.debug('Sending addSeries payload to Sonarr:', apiPayload);
+    this.log.debug('Sending addSeries payload to Sonarr:', apiPayload);
     const created = await this.request<SonarrSeries>('series', sonarrCreds, {
       method: 'POST',
       body: JSON.stringify(apiPayload),
@@ -271,14 +145,14 @@ export class SonarrApiService {
     // fail the addSeries call if the follow-up search fails; log and continue.
     const shouldRunCutoffSearch =
       (finalPayload as Partial<AddRequestPayload> & { searchForCutoffUnmet?: boolean })
-        .searchForCutoffUnmet ?? baseOptions.defaults.searchForCutoffUnmet;
+        .searchForCutoffUnmet ?? providerOptions.defaults.searchForCutoffUnmet;
 
     if (shouldRunCutoffSearch) {
       try {
         // Prefer scoping to the newly created series when possible.
         await this.triggerMissingEpisodeSearch(sonarrCreds, created.id);
       } catch (err) {
-        log.warn('Failed to trigger cutoff-unmet (missing episode) search', err);
+        this.log.warn('Failed to trigger cutoff-unmet (missing episode) search', err);
       }
     }
 
@@ -297,7 +171,7 @@ export class SonarrApiService {
     }
     const endpoint = qs.size > 0 ? `series/${seriesId}?${qs.toString()}` : `series/${seriesId}`;
 
-    log.debug('Sending updateSeries payload to Sonarr:', {
+    this.log.debug('Sending updateSeries payload to Sonarr:', {
       seriesId,
       moveFiles: options?.moveFiles,
       payload,
@@ -347,7 +221,7 @@ export class SonarrApiService {
     });
 
     // Tag list has changed; drop cached /tag response so the next getTags sees it.
-    this.etagCache.delete('tag');
+    this.invalidateCachedEndpoint('tag');
 
     return created;
   };

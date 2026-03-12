@@ -6,11 +6,12 @@ import type {
   CheckSeriesStatusResponse,
   ExtensionOptions,
   SonarrSeries,
+  SonarrLibraryMutationEmitter,
+  SonarrLibraryStatusOptions,
 } from './types';
 import { SonarrTitleIndexer } from './title-indexer';
 import { SonarrLibraryStore } from './store';
 import { SonarrStatus } from './status';
-import type { RequestPriority } from '@/shared/types';
 
 export class SonarrLibrary {
   private readonly indexer = new SonarrTitleIndexer();
@@ -21,7 +22,7 @@ export class SonarrLibrary {
     sonarrClient: SonarrClient,
     mappingResolver: MappingResolver,
     caches: LibraryCaches,
-    emitLibraryMutation?: (payload: { tvdbId: number; action: 'added' | 'removed' }) => Promise<void> | void
+    emitLibraryMutation?: SonarrLibraryMutationEmitter,
   ) {
     this.store = new SonarrLibraryStore(sonarrClient, caches, this.indexer);
     this.status = new SonarrStatus(this.store, this.indexer, mappingResolver, sonarrClient, emitLibraryMutation);
@@ -45,7 +46,7 @@ export class SonarrLibrary {
 
   getSeriesStatus(
     payload: CheckSeriesStatusPayload,
-    options: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean; priority?: RequestPriority } = {}
+    options: SonarrLibraryStatusOptions = {},
   ): Promise<CheckSeriesStatusResponse> {
     return this.status.getSeriesStatus(payload, options);
   }

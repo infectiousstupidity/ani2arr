@@ -9,23 +9,21 @@ import { storage } from '@wxt-dev/storage';
 import * as v from 'valibot';
 import { SettingsSchema, createDefaultSettings } from '@/shared/schemas/settings';
 import type { Settings } from '@/shared/schemas/settings';
-import type { ExtensionOptions, PublicOptions, SonarrSecrets } from '@/shared/types';
+import type {
+  ExtensionOptions,
+  PublicOptions,
+  RadarrSecrets,
+  SonarrSecrets,
+} from '@/shared/types';
+import { validateApiKey as validateRadarrApiKey, validateUrl as validateRadarrUrl } from '@/shared/radarr/validation';
 import { validateUrl, validateApiKey } from '@/shared/sonarr/validation';
 import { logger } from '@/shared/utils/logger';
 
-const createDefaultPublicOptions = (): PublicOptions => {
-  const defaults = createDefaultSettings();
-  return {
-    sonarrUrl: defaults.sonarrUrl,
-    defaults: defaults.defaults,
-    titleLanguage: defaults.titleLanguage,
-    ui: defaults.ui,
-    debugLogging: defaults.debugLogging,
-    isConfigured: false,
-  };
-};
-
 const createDefaultSecrets = (): SonarrSecrets => ({
+  apiKey: '',
+});
+
+const createDefaultRadarrSecrets = (): RadarrSecrets => ({
   apiKey: '',
 });
 
@@ -46,6 +44,11 @@ export const sonarrSecrets = storage.defineItem<SonarrSecrets>('local:sonarrSecr
   version: 1,
 });
 
+export const radarrSecrets = storage.defineItem<RadarrSecrets>('local:radarrSecrets', {
+  fallback: createDefaultRadarrSecrets(),
+  version: 1,
+});
+
 export const parseSettings = (raw: unknown): Settings => {
   const result = v.safeParse(SettingsSchema, raw);
   if (result.success) return result.output;
@@ -53,20 +56,50 @@ export const parseSettings = (raw: unknown): Settings => {
   return v.parse(SettingsSchema, raw ?? {});
 };
 
-export const toPublicOptions = (settings: Settings): PublicOptions => ({
-  sonarrUrl: settings.sonarrUrl,
-  defaults: settings.defaults,
-  titleLanguage: settings.titleLanguage,
-  ui: settings.ui,
-  debugLogging: settings.debugLogging,
-  isConfigured: Boolean(settings.sonarrUrl && settings.sonarrApiKey),
-});
+export function toPublicOptions(settings: ExtensionOptions): PublicOptions {
+  return {
+    providers: {
+      sonarr: {
+        url: settings.providers.sonarr.url,
+        defaults: settings.providers.sonarr.defaults,
+        isConfigured: Boolean(settings.providers.sonarr.url && settings.providers.sonarr.apiKey),
+      },
+      radarr: {
+        url: settings.providers.radarr.url,
+        defaults: settings.providers.radarr.defaults,
+        isConfigured: Boolean(settings.providers.radarr.url && settings.providers.radarr.apiKey),
+      },
+    },
+    titleLanguage: settings.titleLanguage,
+    ui: settings.ui,
+    debugLogging: settings.debugLogging,
+  };
+}
+
+function createDefaultPublicOptions(): PublicOptions {
+  return toPublicOptions(createDefaultSettings());
+}
 
 const getRawOptions = async () => {
-  const [pub, secrets] = await Promise.all([publicOptions.getValue(), sonarrSecrets.getValue()]);
+  const [pub, sonarr, radarr] = await Promise.all([
+    publicOptions.getValue(),
+    sonarrSecrets.getValue(),
+    radarrSecrets.getValue(),
+  ]);
   return {
-    ...pub,
-    sonarrApiKey: secrets.apiKey,
+    providers: {
+      sonarr: {
+        ...(pub.providers?.sonarr ?? {}),
+        apiKey: sonarr.apiKey,
+      },
+      radarr: {
+        ...(pub.providers?.radarr ?? {}),
+        apiKey: radarr.apiKey,
+      },
+    },
+    titleLanguage: pub.titleLanguage,
+    ui: pub.ui,
+    debugLogging: pub.debugLogging,
   };
 };
 
@@ -86,37 +119,70 @@ export async function getExtensionOptionsSnapshot(): Promise<Settings> {
 export async function setExtensionOptionsSnapshot(options: ExtensionOptions): Promise<void> {
   const parsed = parseSettings(options);
 
-  let normalizedUrl = parsed.sonarrUrl ?? '';
-  if (normalizedUrl.trim() !== '') {
-    const vUrl = validateUrl(normalizedUrl);
+  let sonarrUrl = parsed.providers.sonarr.url ?? '';
+  if (sonarrUrl.trim() !== '') {
+    const vUrl = validateUrl(sonarrUrl);
     if (!vUrl.isValid) {
       throw new Error(`Invalid Sonarr URL: ${vUrl.error ?? 'unknown'}`);
     }
-    normalizedUrl = vUrl.normalizedUrl ?? normalizedUrl.trim();
+    sonarrUrl = vUrl.normalizedUrl ?? sonarrUrl.trim();
   } else {
-    normalizedUrl = '';
+    sonarrUrl = '';
   }
 
-  let apiKey = parsed.sonarrApiKey ?? '';
-  if (apiKey.trim() !== '') {
-    const k = validateApiKey(apiKey);
+  let sonarrApiKey = parsed.providers.sonarr.apiKey ?? '';
+  if (sonarrApiKey.trim() !== '') {
+    const k = validateApiKey(sonarrApiKey);
     if (!k.isValid) {
       throw new Error(`Invalid Sonarr API key: ${k.error ?? 'invalid format'}`);
     }
-    apiKey = apiKey.trim();
+    sonarrApiKey = sonarrApiKey.trim();
   } else {
-    apiKey = '';
+    sonarrApiKey = '';
+  }
+
+  let radarrUrl = parsed.providers.radarr.url ?? '';
+  if (radarrUrl.trim() !== '') {
+    const vUrl = validateRadarrUrl(radarrUrl);
+    if (!vUrl.isValid) {
+      throw new Error(`Invalid Radarr URL: ${vUrl.error ?? 'unknown'}`);
+    }
+    radarrUrl = vUrl.normalizedUrl ?? radarrUrl.trim();
+  } else {
+    radarrUrl = '';
+  }
+
+  let radarrApiKey = parsed.providers.radarr.apiKey ?? '';
+  if (radarrApiKey.trim() !== '') {
+    const k = validateRadarrApiKey(radarrApiKey);
+    if (!k.isValid) {
+      throw new Error(`Invalid Radarr API key: ${k.error ?? 'invalid format'}`);
+    }
+    radarrApiKey = radarrApiKey.trim();
+  } else {
+    radarrApiKey = '';
   }
 
   const sanitized: Settings = {
     ...parsed,
-    sonarrUrl: normalizedUrl,
-    sonarrApiKey: apiKey,
+    providers: {
+      sonarr: {
+        ...parsed.providers.sonarr,
+        url: sonarrUrl,
+        apiKey: sonarrApiKey,
+      },
+      radarr: {
+        ...parsed.providers.radarr,
+        url: radarrUrl,
+        apiKey: radarrApiKey,
+      },
+    },
   };
 
   await Promise.all([
     publicOptions.setValue(toPublicOptions(sanitized)),
-    sonarrSecrets.setValue({ apiKey }),
+    sonarrSecrets.setValue({ apiKey: sonarrApiKey }),
+    radarrSecrets.setValue({ apiKey: radarrApiKey }),
   ]);
 }
 
