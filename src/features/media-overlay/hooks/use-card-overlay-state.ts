@@ -119,7 +119,7 @@ export const useCardOverlayState = ({
 
   const errorMessage =
     mappingUnavailable
-      ? `No ${providerLabel} match found. Click to retry mapping.`
+      ? `No automatic ${providerLabel} match was found. Click to search manually.`
       : resolveErrorMessage(addError) ?? resolveErrorMessage(statusError);
 
   const quickAddDisabled =
@@ -150,7 +150,7 @@ export const useCardOverlayState = ({
 
   const quickAddAriaLabel =
     overlayState === 'error' && mappingUnavailable
-      ? 'Retry mapping lookup'
+      ? `Find ${providerLabel} match manually`
       : overlayState === 'error'
         ? `Retry adding to ${providerLabel}`
         : quickAddTitle;

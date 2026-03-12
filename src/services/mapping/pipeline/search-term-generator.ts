@@ -1,5 +1,10 @@
-import type { AniTitles } from '@/shared/types';
-import { canonicalTitleKey, isOrdinalToken, stripParenContent, sanitizeLookupDisplay } from '@/services/mapping/pipeline/matching';
+import type { AniTitles, MappingProvider } from '@/shared/types';
+import {
+  canonicalTitleKeyForProvider,
+  isOrdinalToken,
+  stripParenContent,
+  sanitizeLookupDisplayForProvider,
+} from '@/services/mapping/pipeline/matching';
 
 export interface SearchTerm {
   canonical: string;
@@ -21,16 +26,20 @@ export function isSeasonalCanonicalTokens(tokens: string[]): boolean {
   );
 }
 
-export function generateSearchTerms(titles: AniTitles, synonyms: string[] | undefined): SearchTerm[] {
+export function generateSearchTerms(
+  provider: MappingProvider,
+  titles: AniTitles,
+  synonyms: string[] | undefined,
+): SearchTerm[] {
   const seen = new Set<string>();
   const queue: Array<{ canonical: string; display: string; priority: number; order: number }> = [];
   let order = 0;
 
   const register = (raw: string, priority: number) => {
-    const display = sanitizeLookupDisplay(raw.trim());
+    const display = sanitizeLookupDisplayForProvider(provider, raw.trim());
     if (!display) return;
 
-    const canonical = canonicalTitleKey(display);
+    const canonical = canonicalTitleKeyForProvider(provider, display);
     if (!canonical || seen.has(canonical)) return;
 
     const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
@@ -44,9 +53,9 @@ export function generateSearchTerms(titles: AniTitles, synonyms: string[] | unde
 
   const consider = (value: string | undefined, priority: number) => {
     if (!value) return;
-    const primary = sanitizeLookupDisplay(value);
+    const primary = sanitizeLookupDisplayForProvider(provider, value);
     register(primary, priority);
-    const stripped = sanitizeLookupDisplay(stripParenContent(value));
+    const stripped = sanitizeLookupDisplayForProvider(provider, stripParenContent(value));
     if (stripped && stripped !== primary) {
       register(stripped, priority + 0.5);
     }

@@ -191,6 +191,7 @@ export interface RadarrLookupMovie {
   imdbId?: string | null;
   titleSlug?: string;
   sortTitle?: string;
+  originalTitle?: string;
   year?: number;
   runtime?: number;
   status?: string;

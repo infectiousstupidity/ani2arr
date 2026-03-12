@@ -360,6 +360,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
           {...(librarySlug ? { librarySlug } : {})}
           resolvedSearchTerm={resolvedSearchTerm}
           externalId={externalId}
+          noAutoMatch={mappingUnavailable}
           onQuickAdd={handleQuickAdd}
           onOpenModal={() => {
             mediaModal.open({
