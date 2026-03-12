@@ -1,28 +1,26 @@
 import { useCallback } from 'react';
-import type { MappingExternalId } from '@/shared/types';
+import type { MappingExternalId, MappingProvider } from '@/shared/types';
 import { useClearMappingOverride, useSetMappingOverride } from '@/shared/queries';
 
-export function useMappingOverrides(anilistId: number) {
+export function useMappingOverrides(anilistId: number, provider: MappingProvider) {
   const setOverrideMutation = useSetMappingOverride();
   const clearOverrideMutation = useClearMappingOverride();
 
   const setOverride = useCallback(
     async (target: MappingExternalId, options?: { force?: boolean }) => {
-      if (target.kind !== 'tvdb') {
-        return;
-      }
       await setOverrideMutation.mutateAsync({
         anilistId,
-        tvdbId: target.id,
+        provider,
+        externalId: target,
         ...(options?.force ? { force: true } : {}),
       });
     },
-    [anilistId, setOverrideMutation],
+    [anilistId, provider, setOverrideMutation],
   );
 
   const clearOverride = useCallback(async () => {
-    await clearOverrideMutation.mutateAsync({ anilistId });
-  }, [anilistId, clearOverrideMutation]);
+    await clearOverrideMutation.mutateAsync({ anilistId, provider });
+  }, [anilistId, clearOverrideMutation, provider]);
 
   return {
     setOverride,

@@ -47,11 +47,12 @@ const sections: SectionConfig[] = [
     description: 'Configure Radarr connection and defaults.',
     path: '/options/radarr',
     usesManager: true,
+    hasInternalSaveBar: true,
   },
   {
     id: 'mappings',
     label: 'Mappings & overrides',
-    description: 'Manage AniList to Sonarr mappings.',
+    description: 'Manage AniList mappings and overrides.',
     path: '/options/mappings',
     usesManager: true,
   },
@@ -167,7 +168,13 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
           />
         );
       case 'radarr':
-        return <RadarrPage />;
+        return (
+          <RadarrPage
+            actions={actions}
+            {...(optionsQuery.data ? { savedSettings: optionsQuery.data } : {})}
+            isLoading={optionsQuery.isLoading}
+          />
+        );
       case 'mappings':
         return (
           <MappingsSection
@@ -223,7 +230,7 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
             <span className="min-w-0 flex-1">
               <span className="block text-xs font-semibold text-text-primary">Privacy & permissions</span>
               <span className="mt-1 block text-xs text-text-secondary">
-                See how ani2arr stores settings, uses the Sonarr API key, and requests host access.
+                See how ani2arr stores settings, uses Arr API keys, and requests host access.
               </span>
             </span>
             <ChevronRight className="mt-1 h-4 w-4 flex-none text-text-secondary" />

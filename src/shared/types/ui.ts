@@ -1,5 +1,5 @@
 import type { MediaMetadataHint } from './anilist';
-import type { BadgeVisibility, SonarrFormState } from './options';
+import type { BadgeVisibility, RadarrFormState, SonarrFormState } from './options';
 import type { MediaService } from './providers';
 import type { MappingExternalId } from './mapping';
 
@@ -7,14 +7,15 @@ export type AnchorCorner = 'bottom-left' | 'top-left';
 export type StackDirection = 'up' | 'down';
 
 export interface CardOverlayProps {
+  service: MediaService;
   anilistId: number;
   title: string;
   onOpenModal: (anilistId: number, title: string, metadata: MediaMetadataHint | null) => void;
   onOpenMappingFix?: (anilistId: number, title: string, overrideActive?: boolean) => void;
   isConfigured: boolean;
-  defaultForm: SonarrFormState | null;
+  defaultForm: SonarrFormState | RadarrFormState | null;
   metadata: MediaMetadataHint | null;
-  sonarrUrl: string | null;
+  providerUrl: string | null;
   observeTarget?: Element | null;
   badgeVisibility?: BadgeVisibility;
   /** Corner for anchor placement */
@@ -76,4 +77,3 @@ export interface MappingSearchResult {
   // Multi AniList mapping info
   linkedAniListIds?: number[];
 }
-

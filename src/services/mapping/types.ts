@@ -1,7 +1,7 @@
-import type { MediaMetadataHint, RequestPriority } from '@/shared/types';
+import type { MappingExternalId, MediaMetadataHint, RequestPriority } from '@/shared/types';
 
 export interface ResolvedMapping {
-  tvdbId: number;
+  externalId: MappingExternalId;
   successfulSynonym?: string;
 }
 
@@ -10,11 +10,13 @@ export type ResolveHints = {
   domMedia?: MediaMetadataHint | null;
 };
 
-export type ResolveTvdbIdOptions = {
+export type ResolveExternalIdOptions = {
   network?: 'never';
   hints?: ResolveHints;
   ignoreFailureCache?: boolean;
   priority?: RequestPriority;
-  // Force Sonarr lookups to bypass fresh caches (used by anime detail force-verify).
+  // Force provider lookups to bypass fresh caches (used by anime detail force-verify).
   forceLookupNetwork?: boolean;
 };
+
+export type ResolveTvdbIdOptions = ResolveExternalIdOptions;

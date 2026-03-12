@@ -69,16 +69,15 @@ export function overrideQueryPersisterForTests(persister: Persister | null): voi
   currentPersister = persister ?? defaultPersister;
 }
 
-// Filter: never persist queries containing Sonarr credentials or metadata
+// Filter: never persist queries containing provider credentials or Arr metadata
 const CREDENTIAL_QUERY_PREFIX = ['a2a', 'options'] as const;
-const METADATA_QUERY_PREFIX = ['a2a', 'sonarrMetadata'] as const;
 
 /**
  * Determines which queries should be persisted to IndexedDB in the page context.
  * 
  * EXCLUDED (for security/privacy):
- * - 'options' queries: contain Sonarr URL + API key
- * - 'sonarrMetadata' queries: contain server filesystem paths, quality profile names, tag labels
+ * - 'options' queries: contain provider URLs + API keys
+ * - Arr metadata queries: contain server filesystem paths, quality profile names, tag labels
  * 
  * INCLUDED (safe to persist):
  * - 'seriesStatus' queries: contain only titles, IDs, slugs (no sensitive data)
@@ -96,8 +95,8 @@ export const shouldPersistQuery = (
     return false;
   }
 
-  // Block Sonarr metadata (filesystem paths, quality profiles, tags)
-  if (key[0] === METADATA_QUERY_PREFIX[0] && key[1] === METADATA_QUERY_PREFIX[1]) {
+  // Block Arr metadata (filesystem paths, quality profiles, tags)
+  if (key[0] === 'a2a' && (key[1] === 'sonarrMetadata' || key[1] === 'radarrMetadata')) {
     return false;
   }
 

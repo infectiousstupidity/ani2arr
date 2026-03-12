@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import Button from '@/shared/ui/primitives/button';
 import { MappingEditor } from '@/features/mapping/mapping-editor';
-import { useClearMappingIgnore, useClearMappingOverride, useSetMappingIgnore } from '@/shared/queries';
+import { useAniListMedia, useClearMappingIgnore, useClearMappingOverride, useSetMappingIgnore } from '@/shared/queries';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import type { MappingProvider, MappingSummary } from '@/shared/types';
 import { cn } from '@/shared/utils/cn';
+import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import MappingToolbar, { type LibraryFilter, type MappingSort, type SourceFilterSet } from './components/mapping-toolbar';
 import { MappingTable } from './components/mapping-table';
 import AddMissingEntryDialog from './components/add-missing-entry-dialog';
@@ -21,6 +22,9 @@ const MappingsSection: React.FC<{
   const clearOverride = useClearMappingOverride();
   const setIgnore = useSetMappingIgnore();
   const clearIgnore = useClearMappingIgnore();
+  const targetMedia = useAniListMedia(targetAnilistId ?? undefined, {
+    enabled: typeof targetAnilistId === 'number' && Number.isFinite(targetAnilistId),
+  });
   const [providerFilters, setProviderFilters] = useState<Set<MappingProvider>>(new Set(['sonarr', 'radarr']));
   const [sourceFilters, setSourceFilters] = useState<SourceFilterSet>(new Set(['manual', 'ignored']));
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,9 +34,7 @@ const MappingsSection: React.FC<{
     anilistId: number;
     provider: MappingProvider;
     externalId?: MappingSummary['externalId'] | null;
-  } | null>(
-    targetAnilistId ? { anilistId: targetAnilistId, provider: 'sonarr' } : null,
-  );
+  } | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const isMutating = setIgnore.isPending || clearIgnore.isPending || clearOverride.isPending;
   const { mappings, tableRows, totalAvailable, loadedCount, emptyCopy } = useMappingTableData({
@@ -46,7 +48,23 @@ const MappingsSection: React.FC<{
     setEditorState(null);
     onClearTargetAnilistId?.();
   };
-  const handleDeleteOverride = async (anilistId: number) => {
+
+  useEffect(() => {
+    if (typeof targetAnilistId !== 'number' || !Number.isFinite(targetAnilistId)) {
+      return;
+    }
+    const provider = resolveProviderForAniListFormat(targetMedia.data?.format ?? null);
+    if (!provider) {
+      return;
+    }
+    setEditorState(current =>
+      current && current.anilistId === targetAnilistId
+        ? { ...current, provider }
+        : { anilistId: targetAnilistId, provider },
+    );
+  }, [targetAnilistId, targetMedia.data?.format]);
+  const handleDeleteOverride = async (entry: MappingSummary) => {
+    const { anilistId, provider } = entry;
     const ok = await confirm({
       title: 'Remove override?',
       description: `Clear the manual mapping for AniList #${anilistId}?`,
@@ -55,7 +73,7 @@ const MappingsSection: React.FC<{
     });
     if (!ok) return;
     try {
-      await clearOverride.mutateAsync({ anilistId });
+      await clearOverride.mutateAsync({ anilistId, provider });
       toast.showToast({
         title: 'Override removed',
         description: `Cleared manual mapping for AniList #${anilistId}.`,
@@ -70,7 +88,8 @@ const MappingsSection: React.FC<{
     }
   };
 
-  const handleSetIgnore = async (anilistId: number) => {
+  const handleSetIgnore = async (entry: MappingSummary) => {
+    const { anilistId, provider } = entry;
     const ok = await confirm({
       title: 'Ignore this mapping?',
       description: 'This AniList entry will be treated as unmapped until you remove the ignore.',
@@ -79,7 +98,7 @@ const MappingsSection: React.FC<{
     });
     if (!ok) return;
     try {
-      await setIgnore.mutateAsync({ anilistId });
+      await setIgnore.mutateAsync({ anilistId, provider });
       toast.showToast({
         title: 'Ignored',
         description: `AniList #${anilistId} will be skipped.`,
@@ -94,9 +113,10 @@ const MappingsSection: React.FC<{
     }
   };
 
-  const handleClearIgnore = async (anilistId: number) => {
+  const handleClearIgnore = async (entry: MappingSummary) => {
+    const { anilistId, provider } = entry;
     try {
-      await clearIgnore.mutateAsync({ anilistId });
+      await clearIgnore.mutateAsync({ anilistId, provider });
       toast.showToast({
         title: 'Ignore removed',
         description: `AniList #${anilistId} will use upstream/auto mapping again.`,
@@ -112,14 +132,6 @@ const MappingsSection: React.FC<{
   };
 
   const handleEdit = (entry: MappingSummary) => {
-    if (entry.provider !== 'sonarr') {
-      toast.showToast({
-        title: 'Radarr editing not yet available',
-        description: 'Viewing Radarr mappings is supported; editing will arrive once Radarr is implemented.',
-        variant: 'info',
-      });
-      return;
-    }
     setEditorState({ anilistId: entry.anilistId, externalId: entry.externalId ?? null, provider: entry.provider });
   };
 
@@ -201,9 +213,9 @@ const MappingsSection: React.FC<{
           isFetchingNextPage={mappings.isFetchingNextPage}
           onLoadMore={() => mappings.fetchNextPage()}
           onEdit={handleEdit}
-          onDeleteOverride={(entry) => handleDeleteOverride(entry.anilistId)}
-          onIgnore={(entry) => handleSetIgnore(entry.anilistId)}
-          onClearIgnore={(entry) => handleClearIgnore(entry.anilistId)}
+          onDeleteOverride={handleDeleteOverride}
+          onIgnore={handleSetIgnore}
+          onClearIgnore={handleClearIgnore}
           isMutating={isMutating}
           totalCount={totalAvailable ?? tableRows.length}
           loadedCount={loadedCount}
@@ -224,17 +236,21 @@ const MappingsSection: React.FC<{
       <AddMissingEntryDialog
         open={addDialogOpen}
         onClose={() => setAddDialogOpen(false)}
-        onSelect={(id) => {
-          if (!providerFilters.has('sonarr')) {
+        onSelect={(id, format) => {
+          const provider = resolveProviderForAniListFormat(format);
+          if (!provider) {
             toast.showToast({
-              title: 'Radarr editing coming soon',
-              description: 'Add/edit for Radarr will arrive when Radarr support is shipped.',
+              title: 'Unsupported format',
+              description: 'This AniList entry does not map to Sonarr or Radarr.',
               variant: 'info',
             });
             setAddDialogOpen(false);
             return;
           }
-          setEditorState({ anilistId: id, provider: 'sonarr', externalId: null });
+          if (!providerFilters.has(provider)) {
+            setProviderFilters(new Set([provider]));
+          }
+          setEditorState({ anilistId: id, provider, externalId: null });
           setAddDialogOpen(false);
         }}
       />

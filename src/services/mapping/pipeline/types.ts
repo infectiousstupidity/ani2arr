@@ -1,16 +1,21 @@
 import type { SearchTerm } from './search-term-generator';
-import type { SonarrLookupClient, SonarrLookupCredentials } from '../sonarr-lookup.client';
 import type { StaticMappingProvider } from '../static-mapping.provider';
 import type { ScopedLogger } from '@/shared/utils/logger';
-import type { AniMedia, RequestPriority, SonarrLookupSeries } from '@/shared/types';
+import type { AniMedia, RequestPriority } from '@/shared/types';
 import type { AnilistApiService } from '@/clients/anilist.api';
+import type {
+  LookupClientCredentials,
+  ProviderLookupClient,
+  ProviderLookupResult,
+} from '../provider-lookup.client';
 
-export interface Candidate {
+export interface Candidate<TResult extends ProviderLookupResult = ProviderLookupResult> {
   term: SearchTerm;
-  result: SonarrLookupSeries;
+  result: TResult;
 }
 
-export interface ScoredCandidate extends Candidate {
+export interface ScoredCandidate<TResult extends ProviderLookupResult = ProviderLookupResult>
+  extends Candidate<TResult> {
   /**
    * Confidence score in range [0, 1].
    */
@@ -20,7 +25,7 @@ export interface ScoredCandidate extends Candidate {
 
 export interface EvaluationOutcomeResolved {
   status: 'resolved';
-  tvdbId: number;
+  externalId: number;
   confidence: number;
   successfulSynonym?: string;
 }
@@ -32,12 +37,15 @@ export interface EvaluationOutcomeUnresolved {
 
 export type EvaluationOutcome = EvaluationOutcomeResolved | EvaluationOutcomeUnresolved;
 
-export interface MappingContext {
+export interface MappingContext<
+  TResult extends ProviderLookupResult = ProviderLookupResult,
+  TCredentials = LookupClientCredentials,
+> {
   anilistApi: AnilistApiService;
-  lookupClient: SonarrLookupClient;
+  lookupClient: ProviderLookupClient<TCredentials, TResult>;
   staticProvider: StaticMappingProvider;
-  credentials: SonarrLookupCredentials;
-  /** Priority hint for Sonarr lookups spawned by this context. */
+  credentials: TCredentials;
+  /** Priority hint for provider lookups spawned by this context. */
   priority?: RequestPriority;
   /** If true, bypass fresh lookup caches and hit the network. */
   forceLookupNetwork?: boolean;

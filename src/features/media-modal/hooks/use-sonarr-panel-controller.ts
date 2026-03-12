@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 
 import type { SonarrFormState } from "@/shared/types";
+import { buildComputedMediaPath, sanitizeFolderSegment } from "@/services/helpers/path-utils";
 import type { SonarrPanelBaseProps, SonarrPanelMode } from "../types";
 
 export interface UseSonarrPanelControllerInput {
@@ -37,40 +38,12 @@ export interface UseSonarrPanelControllerResult {
   computedPath: string | null;
 }
 
-function normalizePathSegment(segment: string): string {
-  const replaced = segment.replace(/[\\/]+/g, " ");
-  const trimmed = replaced.trim();
-  return trimmed.replace(/\s+/g, " ");
-}
-
 function buildSlug(title: string, tvdbId: number | null): string | null {
   if (!title) return null;
-  const normalizedTitle = normalizePathSegment(title);
+  const normalizedTitle = sanitizeFolderSegment(title);
   if (!normalizedTitle) return null;
   if (tvdbId == null) return normalizedTitle;
   return `${normalizedTitle} [tvdb-${tvdbId}]`;
-}
-
-function computePath(
-  rootFolderPath: string,
-  title: string,
-  tvdbId: number | null,
-  mode: SonarrPanelMode,
-  folderSlug?: string | null,
-): string | null {
-  if (!rootFolderPath || !title || tvdbId == null) {
-    return null;
-  }
-
-  const normalizedRoot =
-    rootFolderPath.endsWith("/") || rootFolderPath.endsWith("\\")
-      ? rootFolderPath.slice(0, -1)
-      : rootFolderPath;
-
-  const slug = mode === "edit" && folderSlug ? folderSlug : buildSlug(title, tvdbId);
-  if (!slug) return null;
-
-  return `${normalizedRoot}/${slug}`;
 }
 
 export function useSonarrPanelController(
@@ -142,7 +115,10 @@ export function useSonarrPanelController(
   }, [current, defaultForm]);
 
   const computedPath = useMemo(
-    () => computePath(current.rootFolderPath, title, tvdbId, mode, folderSlug),
+    () => {
+      const slug = mode === "edit" && folderSlug ? folderSlug : buildSlug(title, tvdbId);
+      return buildComputedMediaPath(current.rootFolderPath, slug);
+    },
     [current.rootFolderPath, folderSlug, mode, title, tvdbId],
   );
 

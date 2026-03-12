@@ -140,13 +140,27 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
     if (onAnimeDetailPage) {
       const title = document.querySelector('h1')?.textContent?.trim() ?? '';
       const coverImg = document.querySelector<HTMLImageElement>('.cover-wrap .cover');
+      let format: AniFormat | null = null;
+      const rows = Array.from(document.querySelectorAll<HTMLDivElement>('.sidebar .data .data-set'));
+      const formatRow = rows.find(row => row.querySelector('.type')?.textContent?.trim() === 'Format');
+      const rawFormat = formatRow?.querySelector('.value')?.textContent ?? '';
+      const normalizedFormat = rawFormat.replace(/\s+/g, ' ').trim().toLowerCase();
+      if (normalizedFormat) {
+        if (normalizedFormat.includes('movie')) format = 'MOVIE';
+        else if (normalizedFormat.includes('music')) format = 'MUSIC';
+        else if (normalizedFormat === 'tv short') format = 'TV_SHORT';
+        else if (normalizedFormat === 'tv') format = 'TV';
+        else if (normalizedFormat === 'special') format = 'SPECIAL';
+        else if (normalizedFormat === 'ova') format = 'OVA';
+        else if (normalizedFormat === 'ona') format = 'ONA';
+      }
       
-      if (title) {
+      if (title || format) {
         const hint: MediaMetadataHint = {
-          titles: { romaji: title },
-          synonyms: [title],
+          titles: title ? { romaji: title } : null,
+          synonyms: title ? [title] : null,
           startYear: null,
-          format: null,
+          format,
           relationPrequelIds: null,
           coverImage: getCoverImage(coverImg),
         };

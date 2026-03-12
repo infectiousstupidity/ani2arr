@@ -1,14 +1,17 @@
 // src/services/mapping/overrides-storage.ts
 import { storage } from '@wxt-dev/storage';
+import type { MappingExternalId, MappingProvider } from '@/shared/types';
 
 export interface MappingOverrideEntry {
-  tvdbId: number;
+  provider: MappingProvider;
+  externalId: MappingExternalId;
   updatedAt: number;
 }
 
 export type MappingOverrideMap = Record<string, MappingOverrideEntry>;
 
 export interface MappingIgnoreEntry {
+  provider: MappingProvider;
   updatedAt: number;
 }
 

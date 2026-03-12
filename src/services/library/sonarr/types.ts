@@ -1,5 +1,4 @@
 // src/services/library/sonarr/types.ts
-import type { TtlCache } from '@/cache';
 import type {
   LeanSonarrSeries,
   SonarrLookupSeries,
@@ -9,6 +8,12 @@ import type {
   CheckSeriesStatusResponse,
   RequestPriority,
 } from '@/shared/types';
+import type {
+  LibraryCaches as BaseLibraryCaches,
+  LibraryMutationEmitter,
+  LibraryStatusOptions,
+  LibraryTitleIndexer,
+} from '@/services/library/base-library.interface';
 
 export type {
   LeanSonarrSeries,
@@ -44,18 +49,17 @@ export interface MappingResolver {
   getLinkedAniListIdsForTvdb?(tvdbId: number): number[];
 }
 
-export interface TitleIndexer {
-  reset(): void;
-  bulkIndex(list: LeanSonarrSeries[]): void;
-  reindex(list: LeanSonarrSeries[]): void;
+export interface TitleIndexer extends LibraryTitleIndexer<LeanSonarrSeries> {
   findTvdbIdInIndex(payload: CheckSeriesStatusPayload): number | null;
 }
 
-export interface LibraryCaches {
-  leanSeries: TtlCache<LeanSonarrSeries[]>;
-}
+export type LibraryCaches = BaseLibraryCaches<LeanSonarrSeries>;
+
+export type SonarrLibraryStatusOptions = LibraryStatusOptions;
 
 export type LibraryMutationPayload = {
   tvdbId: number;
   action: 'added' | 'removed';
 };
+
+export type SonarrLibraryMutationEmitter = LibraryMutationEmitter<LibraryMutationPayload>;

@@ -1,21 +1,25 @@
-/** Minimal shape for building folder slugs from series-like objects. */
-interface FolderSlugSource {
+import type { MediaService } from '@/shared/types';
+
+/** Minimal shape for building folder slugs from series/movie-like objects. */
+export interface FolderSlugSource {
   path?: string | null;
   rootFolderPath?: string | null;
   folder?: string | null;
+  folderName?: string | null;
   titleSlug?: string | null;
   title?: string | null;
   tvdbId?: number | null;
+  tmdbId?: number | null;
 }
 
-const trimTrailingSeparators = (input: string): string => input.replace(/[\\/]+$/, '').trim();
+export const trimTrailingSeparators = (input: string): string => input.replace(/[\\/]+$/, '').trim();
 
-const normalizePathForCompare = (input?: string | null): string | null => {
+export const normalizePathForCompare = (input?: string | null): string | null => {
   if (!input) return null;
   return trimTrailingSeparators(input).replace(/\\/g, '/').toLowerCase();
 };
 
-const extractFolderSlug = (path?: string | null, rootFolderPath?: string | null): string | null => {
+export const extractFolderSlug = (path?: string | null, rootFolderPath?: string | null): string | null => {
   if (!path) return null;
   const normalizedPath = trimTrailingSeparators(path).replace(/\\/g, '/');
   const normalizedRoot = rootFolderPath ? trimTrailingSeparators(rootFolderPath).replace(/\\/g, '/') : null;
@@ -30,23 +34,66 @@ const extractFolderSlug = (path?: string | null, rootFolderPath?: string | null)
   return last?.length ? last : null;
 };
 
-const sanitizeFolderSegment = (segment: string): string => {
+export const sanitizeFolderSegment = (segment: string): string => {
   const replaced = segment.replace(/[\\/]+/g, ' ').trim();
   return replaced.replace(/\s+/g, ' ');
 };
 
-export const buildFolderSlug = (series: FolderSlugSource, fallbackTitle: string): string => {
-  const fromPath = extractFolderSlug(series.path, series.rootFolderPath);
+export const buildFolderSlug = (media: FolderSlugSource, fallbackTitle: string): string => {
+  const fromPath = extractFolderSlug(media.path, media.rootFolderPath);
   if (fromPath) return fromPath;
-  if (series.folder && series.folder.trim()) return series.folder.trim();
-  if (series.titleSlug && series.titleSlug.trim()) return series.titleSlug.trim();
+  if (media.folder && media.folder.trim()) return media.folder.trim();
+  if (media.folderName && media.folderName.trim()) return media.folderName.trim();
+  if (media.titleSlug && media.titleSlug.trim()) return media.titleSlug.trim();
 
-  const baseTitle = sanitizeFolderSegment(series.title || fallbackTitle || 'Series');
-  const tvdbPart =
-    typeof series.tvdbId === 'number' && Number.isFinite(series.tvdbId)
-      ? ` [tvdb-${series.tvdbId}]`
-      : '';
-  return `${baseTitle}${tvdbPart}`;
+  const baseTitle = sanitizeFolderSegment(media.title || fallbackTitle || 'Media');
+  if (typeof media.tvdbId === 'number' && Number.isFinite(media.tvdbId)) {
+    return `${baseTitle} [tvdb-${media.tvdbId}]`;
+  }
+  if (typeof media.tmdbId === 'number' && Number.isFinite(media.tmdbId)) {
+    return `${baseTitle} [tmdb-${media.tmdbId}]`;
+  }
+  return baseTitle;
+};
+
+export const extractRootFolderPath = (
+  media?: FolderSlugSource | null,
+  slug?: string | null,
+): string | null => {
+  if (!media) return null;
+  if (media.rootFolderPath && media.rootFolderPath.trim()) {
+    return media.rootFolderPath;
+  }
+  if (!media.path || !media.path.trim()) {
+    return null;
+  }
+
+  const normalizedPath = trimTrailingSeparators(media.path);
+  if (slug && normalizedPath.toLowerCase().endsWith(slug.toLowerCase())) {
+    const candidate = normalizedPath.slice(0, normalizedPath.length - slug.length);
+    return trimTrailingSeparators(candidate);
+  }
+
+  const lastSlash = Math.max(normalizedPath.lastIndexOf('/'), normalizedPath.lastIndexOf('\\'));
+  if (lastSlash === -1) return null;
+  return normalizedPath.slice(0, lastSlash);
+};
+
+export const getLibrarySlug = (
+  provider: MediaService,
+  media?: FolderSlugSource | null,
+): string | null => {
+  if (!media) return null;
+  if (media.titleSlug && media.titleSlug.trim()) {
+    return media.titleSlug.trim();
+  }
+  if (provider === 'radarr' && media.folderName && media.folderName.trim()) {
+    return media.folderName.trim();
+  }
+  if (provider === 'sonarr' && media.folder && media.folder.trim()) {
+    return media.folder.trim();
+  }
+  return extractFolderSlug(media.path, media.rootFolderPath);
 };
 
 export const joinRootAndSlug = (rootFolderPath: string, slug: string): string => {
@@ -54,6 +101,14 @@ export const joinRootAndSlug = (rootFolderPath: string, slug: string): string =>
   if (!normalizedRoot) return slug;
   const separator = normalizedRoot.includes('\\') ? '\\' : '/';
   return `${normalizedRoot}${separator}${slug}`;
+};
+
+export const buildComputedMediaPath = (
+  rootFolderPath: string,
+  slug?: string | null,
+): string | null => {
+  if (!rootFolderPath || !slug) return null;
+  return joinRootAndSlug(rootFolderPath, slug);
 };
 
 export const paths = {

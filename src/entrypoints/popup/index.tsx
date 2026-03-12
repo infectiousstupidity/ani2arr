@@ -22,7 +22,8 @@ const QuickSettings: React.FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const settings = optionsQuery.data;
-  const isSonarrConfigured = Boolean(settings?.sonarrUrl && settings?.sonarrApiKey);
+  const isSonarrConfigured = Boolean(settings?.providers.sonarr.url && settings?.providers.sonarr.apiKey);
+  const isRadarrConfigured = Boolean(settings?.providers.radarr.url && settings?.providers.radarr.apiKey);
   const isLoading = optionsQuery.isLoading;
   const isSaving = saveOptions.isPending;
   const isBusy = isLoading || isSaving;
@@ -103,8 +104,15 @@ const QuickSettings: React.FC = () => {
           </button>
           <p className="text-[11px] uppercase tracking-wide text-text-secondary">Radarr</p>
           <div className="mt-1 flex items-center gap-2">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-500" aria-hidden />
-            <span className="text-sm text-text-secondary">Soon</span>
+            <span
+              className={`inline-block h-2.5 w-2.5 rounded-full ${
+                isLoading ? 'bg-slate-400' : isRadarrConfigured ? 'bg-emerald-400' : 'bg-rose-400'
+              }`}
+              aria-hidden
+            />
+            <span className="text-sm">
+              {isLoading ? 'Checking...' : isRadarrConfigured ? 'Connected' : 'Not connected'}
+            </span>
           </div>
         </div>
       </section>
@@ -228,3 +236,4 @@ if (rootElement) {
     </React.StrictMode>,
   );
 }
+

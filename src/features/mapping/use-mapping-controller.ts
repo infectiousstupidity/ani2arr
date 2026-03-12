@@ -81,7 +81,7 @@ export function useMappingController(input: UseMappingControllerInput): UseMappi
     isDirty: false,
   } satisfies MappingTabState);
 
-  const overrides = useMappingOverrides(input.anilistId);
+  const overrides = useMappingOverrides(input.anilistId, input.service);
 
   const debouncedQuery = useDebounced(state.query, 300);
   const searchQuery = useMappingSearch({

@@ -1,30 +1,47 @@
-// src/shared/hooks/use-media-modal-props.ts
 import { useMemo } from 'react';
 import type {
+  AniFormat,
+  AniTitles,
+  CheckMovieStatusResponse,
   CheckSeriesStatusResponse,
-  MappingSearchResult,
+  ExtensionOptions,
   MediaMetadataHint,
-  MediaStatus,
   MediaService,
+  MediaStatus,
+  RadarrFormState,
+  RadarrLookupMovie,
+  RadarrMovie,
   SonarrFormState,
   SonarrLookupSeries,
   SonarrSeries,
-  AniFormat,
-  AniTitles,
-  ExtensionOptions,
 } from '@/shared/types';
-import type { MappingTabProps, SonarrPanelProps } from '@/features/media-modal';
+import type { MappingTabProps, RadarrPanelProps, SonarrPanelProps } from '@/features/media-modal';
 import {
+  useAddMovie,
   useAddSeries,
   useAniListMedia,
+  useAniListMetadataBatch,
+  useMovieStatus,
   usePublicOptions,
+  useRadarrMetadata,
   useSeriesStatus,
   useSonarrMetadata,
   useUpdateDefaultSettings,
+  useUpdateMovie,
+  useUpdateRadarrDefaultSettings,
   useUpdateSeries,
 } from '@/shared/queries';
+import { toMappingSearchResultFromRadarr } from '@/features/mapping/radarr.adapter';
 import { toMappingSearchResultFromSonarr } from '@/features/mapping/sonarr.adapter';
 import { resolveTitlePreference } from '@/shared/anilist/title-preference';
+import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
+import {
+  buildFolderSlug,
+  extractRootFolderPath,
+  getLibrarySlug,
+  type FolderSlugSource,
+} from '@/services/helpers/path-utils';
+import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 
 export interface UseMediaModalPropsInput {
   anilistId: number | undefined;
@@ -38,9 +55,11 @@ export interface UseMediaModalPropsResult {
   title: string;
   alternateTitles: Array<{ label: string; value: string }>;
   titleLanguage: NonNullable<ExtensionOptions['titleLanguage']>;
+  service: MediaService;
   mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'>;
-  sonarrPanelProps: Omit<SonarrPanelProps, 'controller'>;
-  tvdbId: number | null;
+  sonarrPanelProps: Omit<SonarrPanelProps, 'controller'> | null;
+  radarrPanelProps: Omit<RadarrPanelProps, 'controller'> | null;
+  externalId: number | null;
   inLibrary: boolean;
   bannerImage: string | null;
   coverImage: string | null;
@@ -49,7 +68,7 @@ export interface UseMediaModalPropsResult {
   status: MediaStatus | null;
 }
 
-const defaultFormState: SonarrFormState = {
+const defaultSonarrFormState: SonarrFormState = {
   qualityProfileId: '',
   rootFolderPath: '',
   seriesType: 'anime',
@@ -61,72 +80,40 @@ const defaultFormState: SonarrFormState = {
   freeformTags: [],
 };
 
-const trimTrailingSeparators = (input: string): string => input.replace(/[\\/]+$/, '').trim();
-
-const extractSlugFromPath = (path?: string | null, rootFolderPath?: string | null): string | null => {
-  if (!path) return null;
-  const normalizedPath = trimTrailingSeparators(path).replace(/\\/g, '/');
-  const normalizedRoot = rootFolderPath ? trimTrailingSeparators(rootFolderPath).replace(/\\/g, '/') : null;
-
-  if (normalizedRoot && normalizedPath.toLowerCase().startsWith(normalizedRoot.toLowerCase())) {
-    const remainder = normalizedPath.slice(normalizedRoot.length).replace(/^\/+/, '');
-    if (remainder.length > 0) return remainder;
-  }
-
-  const segments = normalizedPath.split('/');
-  const last = segments[segments.length - 1];
-  return last?.length ? last : null;
-};
-
-const sanitizePathSegment = (segment: string): string => segment.replace(/[\\/]+/g, ' ').trim().replace(/\s+/g, ' ');
-
-const deriveFolderSlug = (series: SonarrSeries | null | undefined): string | null => {
-  if (!series) return null;
-
-  const slugFromPath = extractSlugFromPath(series.path, series.rootFolderPath);
-  if (slugFromPath) return slugFromPath;
-  if (series.folder && series.folder.trim()) return series.folder.trim();
-  if (series.titleSlug && series.titleSlug.trim()) return series.titleSlug.trim();
-
-  const title = sanitizePathSegment(series.title ?? '');
-  if (!title) return null;
-  const suffix =
-    typeof series.tvdbId === 'number' && Number.isFinite(series.tvdbId)
-      ? ` [tvdb-${series.tvdbId}]`
-      : '';
-  return `${title}${suffix}`;
-};
-
-const deriveRootFromSeries = (series: SonarrSeries | null | undefined, slug?: string | null): string | null => {
-  if (!series) return null;
-  if (series.rootFolderPath && series.rootFolderPath.trim()) return series.rootFolderPath;
-  if (!series.path || !series.path.trim()) return null;
-
-  const normalizedPath = trimTrailingSeparators(series.path);
-  if (slug && normalizedPath.toLowerCase().endsWith(slug.toLowerCase())) {
-    const candidate = normalizedPath.slice(0, normalizedPath.length - slug.length);
-    return trimTrailingSeparators(candidate);
-  }
-
-  const lastSlash = Math.max(normalizedPath.lastIndexOf('/'), normalizedPath.lastIndexOf('\\'));
-  if (lastSlash === -1) return null;
-  return normalizedPath.slice(0, lastSlash);
+const defaultRadarrFormState: RadarrFormState = {
+  qualityProfileId: '',
+  rootFolderPath: '',
+  monitored: true,
+  searchForMovie: true,
+  minimumAvailability: 'announced',
+  tags: [],
+  freeformTags: [],
 };
 
 const isFullSonarrSeries = (series: unknown): series is SonarrSeries =>
-  Boolean(series && typeof series === 'object' && ('path' in (series as Record<string, unknown>) || 'rootFolderPath' in (series as Record<string, unknown>)));
+  Boolean(
+    series &&
+      typeof series === 'object' &&
+      ('path' in (series as Record<string, unknown>) || 'rootFolderPath' in (series as Record<string, unknown>)),
+  );
 
-function deriveCurrentMappingFromStatus(
+const isFullRadarrMovie = (movie: unknown): movie is RadarrMovie =>
+  Boolean(
+    movie &&
+      typeof movie === 'object' &&
+      ('path' in (movie as Record<string, unknown>) ||
+        'rootFolderPath' in (movie as Record<string, unknown>) ||
+        'folderName' in (movie as Record<string, unknown>)),
+  );
+
+function deriveSonarrCurrentMappingFromStatus(
   status: CheckSeriesStatusResponse | null | undefined,
-  service: MediaService = 'sonarr',
   baseUrl?: string,
-): MappingSearchResult | null {
+) {
   if (!status || status.tvdbId == null) {
     return null;
   }
 
-  // If we have a full series object (from force_verify), map it using the adapter
-  // to get rich metadata like posters, overview, etc.
   if (status.series && 'images' in status.series) {
     const mapped = toMappingSearchResultFromSonarr(status.series as SonarrLookupSeries, {
       baseUrl: baseUrl ?? '',
@@ -134,88 +121,117 @@ function deriveCurrentMappingFromStatus(
     });
     return {
       ...mapped,
-      ...(status.linkedAniListIds && status.linkedAniListIds.length > 0
-        ? { linkedAniListIds: status.linkedAniListIds }
-        : {}),
+      ...(status.linkedAniListIds?.length ? { linkedAniListIds: status.linkedAniListIds } : {}),
     };
   }
 
-  // Fallback for lean series (cached status)
   const tvdbId = status.tvdbId;
-  const inLibrary = Boolean(status.exists);
   const librarySlug = status.series?.titleSlug;
   const title = status.series?.title ?? `TVDB ${tvdbId}`;
 
-  const mapping: MappingSearchResult = {
-    service,
-    target: { id: tvdbId, kind: 'tvdb' },
-    title,
-    inLibrary,
-    ...(librarySlug ? { librarySlug } : {}),
-  };
-
   return {
-    ...mapping,
-    ...(status.linkedAniListIds && status.linkedAniListIds.length > 0
-      ? { linkedAniListIds: status.linkedAniListIds }
-      : {}),
+    service: 'sonarr' as const,
+    target: { id: tvdbId, kind: 'tvdb' as const },
+    title,
+    inLibrary: Boolean(status.exists),
+    ...(librarySlug ? { librarySlug } : {}),
+    ...(status.linkedAniListIds?.length ? { linkedAniListIds: status.linkedAniListIds } : {}),
   };
 }
 
-/**
- * Shared hook to build MediaModal tab props from AniList entry data.
- * Encapsulates all query/mutation logic and prop derivation.
- * Used by all entrypoints (anime detail, browse, AniChart) to avoid duplication.
- */
+function deriveRadarrCurrentMappingFromStatus(
+  status: CheckMovieStatusResponse | null | undefined,
+  baseUrl?: string,
+) {
+  if (!status || status.tmdbId == null) {
+    return null;
+  }
+
+  if (status.movie && 'images' in status.movie) {
+    const mapped = toMappingSearchResultFromRadarr(status.movie as RadarrLookupMovie, {
+      baseUrl: baseUrl ?? '',
+      libraryTmdbIds: status.exists ? [status.tmdbId] : [],
+    });
+    return {
+      ...mapped,
+      ...(status.linkedAniListIds?.length ? { linkedAniListIds: status.linkedAniListIds } : {}),
+    };
+  }
+
+  const tmdbId = status.tmdbId;
+  const librarySlug = getLibrarySlug('radarr', status.movie as FolderSlugSource | undefined);
+  const title = status.movie?.title ?? `TMDB ${tmdbId}`;
+
+  return {
+    service: 'radarr' as const,
+    target: { id: tmdbId, kind: 'tmdb' as const },
+    title,
+    inLibrary: Boolean(status.exists),
+    ...(librarySlug ? { librarySlug } : {}),
+    ...(status.linkedAniListIds?.length ? { linkedAniListIds: status.linkedAniListIds } : {}),
+  };
+}
+
 export function useMediaModalProps(
   input: UseMediaModalPropsInput,
 ): UseMediaModalPropsResult | null {
   const { anilistId, title, metadata, portalContainer, isOpen } = input;
 
   const { data: options } = usePublicOptions();
-  const isConfigured = options?.isConfigured === true;
+  const metadataBatch = useAniListMetadataBatch(anilistId ? [anilistId] : [], {
+    enabled: Boolean(anilistId && isOpen),
+  });
+  const { data: apiMedia } = useAniListMedia(anilistId, {
+    enabled: Boolean(anilistId && isOpen),
+    forceRefresh: false,
+  });
 
-  const statusQuery = useSeriesStatus(
+  const canonicalMetadata = metadataHintFromAniListMetadata(metadataBatch.data?.metadata?.[0] ?? null);
+  const resolvedMetadata = mergeMetadataHints(canonicalMetadata, metadata ?? null);
+  const format: AniFormat | null = canonicalMetadata?.format ?? apiMedia?.format ?? resolvedMetadata?.format ?? null;
+  const service = resolveProviderForAniListFormat(format);
+
+  const isSonarrConfigured = options?.providers.sonarr.isConfigured === true;
+  const isRadarrConfigured = options?.providers.radarr.isConfigured === true;
+  const isConfigured = service === 'radarr' ? isRadarrConfigured : isSonarrConfigured;
+
+  const sonarrStatusQuery = useSeriesStatus(
     {
       anilistId: anilistId ?? 0,
       title: title ?? '',
-      metadata: metadata ?? null,
+      metadata: resolvedMetadata,
     },
     {
-      enabled: Boolean(anilistId && isConfigured && isOpen),
+      enabled: Boolean(anilistId && isOpen && service === 'sonarr' && isSonarrConfigured),
       force_verify: true,
       ignoreFailureCache: true,
       priority: 'high',
     },
   );
 
-  const aniListMediaQuery = useAniListMedia(anilistId, {
-    enabled: Boolean(anilistId && isOpen),
-    // Rely on cached/prefetched media; background refresh is handled by the service when stale.
-    forceRefresh: false,
-  });
+  const radarrStatusQuery = useMovieStatus(
+    {
+      anilistId: anilistId ?? 0,
+      title: title ?? '',
+      metadata: resolvedMetadata,
+    },
+    {
+      enabled: Boolean(anilistId && isOpen && service === 'radarr' && isRadarrConfigured),
+      force_verify: true,
+      ignoreFailureCache: true,
+      priority: 'high',
+    },
+  );
 
-  const apiMedia = aniListMediaQuery.data;
   const coverImage =
     apiMedia?.coverImage?.extraLarge ??
     apiMedia?.coverImage?.large ??
     apiMedia?.coverImage?.medium ??
-    metadata?.coverImage ??
+    resolvedMetadata?.coverImage ??
     null;
   const bannerImage = apiMedia?.bannerImage ?? null;
-
-  const addSeriesMutation = useAddSeries();
-  const updateSeriesMutation = useUpdateSeries();
-  const sonarrReady = isConfigured;
-
-  const mappingUnavailable = statusQuery.data?.anilistTvdbLinkMissing === true;
-  const tvdbId = mappingUnavailable ? null : statusQuery.data?.tvdbId ?? null;
-  const inLibrary = Boolean(statusQuery.data?.exists || addSeriesMutation.isSuccess || updateSeriesMutation.isSuccess);
-  const linkedAniListIds = statusQuery.data?.linkedAniListIds ?? [];
-
-  const format: AniFormat | null = apiMedia?.format ?? metadata?.format ?? null;
   const year: number | null =
-    apiMedia?.seasonYear ?? apiMedia?.startDate?.year ?? metadata?.startYear ?? null;
+    apiMedia?.seasonYear ?? apiMedia?.startDate?.year ?? resolvedMetadata?.startYear ?? null;
   const status: MediaStatus | null = apiMedia?.status ?? null;
   const preferredTitleLanguage: NonNullable<ExtensionOptions['titleLanguage']> =
     options?.titleLanguage ?? 'english';
@@ -230,12 +246,12 @@ export function useMediaModalProps(
   };
 
   const resolvedTitles: AniTitles = {};
-  const _english = pickTitle(apiMedia?.title?.english, metadata?.titles?.english);
-  if (typeof _english === 'string') resolvedTitles.english = _english;
-  const _romaji = pickTitle(apiMedia?.title?.romaji, metadata?.titles?.romaji, title);
-  if (typeof _romaji === 'string') resolvedTitles.romaji = _romaji;
-  const _native = pickTitle(apiMedia?.title?.native, metadata?.titles?.native);
-  if (typeof _native === 'string') resolvedTitles.native = _native;
+  const english = pickTitle(apiMedia?.title?.english, resolvedMetadata?.titles?.english);
+  if (english) resolvedTitles.english = english;
+  const romaji = pickTitle(apiMedia?.title?.romaji, resolvedMetadata?.titles?.romaji, title);
+  if (romaji) resolvedTitles.romaji = romaji;
+  const native = pickTitle(apiMedia?.title?.native, resolvedMetadata?.titles?.native);
+  if (native) resolvedTitles.native = native;
 
   const resolvedTitle = resolveTitlePreference({
     titles: resolvedTitles,
@@ -243,52 +259,110 @@ export function useMediaModalProps(
     fallback: title ?? null,
   });
 
+  const addSeriesMutation = useAddSeries();
+  const updateSeriesMutation = useUpdateSeries();
+  const addMovieMutation = useAddMovie();
+  const updateMovieMutation = useUpdateMovie();
   const sonarrMetadataQuery = useSonarrMetadata({
-    enabled: sonarrReady && isOpen,
+    enabled: service === 'sonarr' && isConfigured && isOpen,
   });
-
+  const radarrMetadataQuery = useRadarrMetadata({
+    enabled: service === 'radarr' && isConfigured && isOpen,
+  });
   const updateDefaultsMutation = useUpdateDefaultSettings();
+  const updateRadarrDefaultsMutation = useUpdateRadarrDefaultSettings();
 
-  const defaultForm: SonarrFormState = options?.defaults ?? defaultFormState;
-  const panelMode: 'add' | 'edit' = sonarrReady && statusQuery.data?.exists ? 'edit' : 'add';
+  const statusQuery = service === 'radarr' ? radarrStatusQuery : sonarrStatusQuery;
+  const mappingUnavailable =
+    service === 'radarr'
+      ? radarrStatusQuery.data?.anilistTmdbLinkMissing === true
+      : sonarrStatusQuery.data?.anilistTvdbLinkMissing === true;
+  const externalId = mappingUnavailable
+    ? null
+    : service === 'radarr'
+      ? radarrStatusQuery.data?.tmdbId ?? null
+      : sonarrStatusQuery.data?.tvdbId ?? null;
 
-  const seriesFromStatus = statusQuery.data?.series;
-  const fullSeries = isFullSonarrSeries(seriesFromStatus) ? seriesFromStatus : null;
-  const folderSlug = deriveFolderSlug(fullSeries);
-  const resolvedRootFolder = deriveRootFromSeries(fullSeries, folderSlug) ?? defaultForm.rootFolderPath;
+  const inLibrary = Boolean(
+    statusQuery.data?.exists ||
+      (service === 'radarr'
+        ? addMovieMutation.isSuccess || updateMovieMutation.isSuccess
+        : addSeriesMutation.isSuccess || updateSeriesMutation.isSuccess),
+  );
 
-  const initialForm: SonarrFormState = useMemo(() => {
-    if (panelMode === 'edit' && fullSeries) {
-      // In edit mode, derive form values ONLY from the series object.
-      // Do NOT merge with defaultForm to avoid reactivity to options changes.
+  const linkedAniListIds =
+    service === 'radarr'
+      ? radarrStatusQuery.data?.linkedAniListIds ?? []
+      : sonarrStatusQuery.data?.linkedAniListIds ?? [];
+
+  const sonarrDefaultForm: SonarrFormState = options?.providers.sonarr.defaults ?? defaultSonarrFormState;
+  const radarrDefaultForm: RadarrFormState = options?.providers.radarr.defaults ?? defaultRadarrFormState;
+
+  const sonarrSeriesFromStatus = sonarrStatusQuery.data?.series;
+  const fullSonarrSeries = isFullSonarrSeries(sonarrSeriesFromStatus) ? sonarrSeriesFromStatus : null;
+  const sonarrFolderSlug = fullSonarrSeries ? buildFolderSlug(fullSonarrSeries, resolvedTitle.primary) : null;
+  const resolvedSonarrRootFolder =
+    extractRootFolderPath(fullSonarrSeries, sonarrFolderSlug) ?? sonarrDefaultForm.rootFolderPath;
+  const sonarrPanelMode: 'add' | 'edit' =
+    isConfigured && service === 'sonarr' && sonarrStatusQuery.data?.exists ? 'edit' : 'add';
+
+  const sonarrInitialForm: SonarrFormState = useMemo(() => {
+    if (sonarrPanelMode === 'edit' && fullSonarrSeries) {
       return {
         qualityProfileId:
-          typeof fullSeries.qualityProfileId === 'number' && Number.isFinite(fullSeries.qualityProfileId)
-            ? fullSeries.qualityProfileId
+          typeof fullSonarrSeries.qualityProfileId === 'number' && Number.isFinite(fullSonarrSeries.qualityProfileId)
+            ? fullSonarrSeries.qualityProfileId
             : '',
-        rootFolderPath: resolvedRootFolder,
-        seriesType: fullSeries.seriesType ?? 'anime',
+        rootFolderPath: resolvedSonarrRootFolder,
+        seriesType: fullSonarrSeries.seriesType ?? 'anime',
         monitorOption:
-          fullSeries.monitored === false
+          fullSonarrSeries.monitored === false
             ? 'none'
-            : (fullSeries.addOptions?.monitor as SonarrFormState['monitorOption']) ?? 'all',
+            : (fullSonarrSeries.addOptions?.monitor as SonarrFormState['monitorOption']) ?? 'all',
         seasonFolder:
-          typeof fullSeries.seasonFolder === 'boolean' ? fullSeries.seasonFolder : true,
+          typeof fullSonarrSeries.seasonFolder === 'boolean' ? fullSonarrSeries.seasonFolder : true,
         searchForMissingEpisodes: true,
         searchForCutoffUnmet: false,
-        tags: Array.isArray(fullSeries.tags)
-          ? fullSeries.tags.filter((tag): tag is number => typeof tag === 'number')
+        tags: Array.isArray(fullSonarrSeries.tags)
+          ? fullSonarrSeries.tags.filter((tag): tag is number => typeof tag === 'number')
           : [],
         freeformTags: [],
       };
     }
 
-    // In add mode, use live defaults
-    return defaultForm;
-  }, [panelMode, fullSeries, resolvedRootFolder, defaultForm]);
+    return sonarrDefaultForm;
+  }, [fullSonarrSeries, resolvedSonarrRootFolder, sonarrDefaultForm, sonarrPanelMode]);
 
-  // Return null if required data is missing (but allow modal to render even when closed)
-  if (!anilistId || !title) {
+  const radarrMovieFromStatus = radarrStatusQuery.data?.movie;
+  const fullRadarrMovie = isFullRadarrMovie(radarrMovieFromStatus) ? radarrMovieFromStatus : null;
+  const radarrFolderSlug = fullRadarrMovie ? buildFolderSlug(fullRadarrMovie, resolvedTitle.primary) : null;
+  const resolvedRadarrRootFolder =
+    extractRootFolderPath(fullRadarrMovie, radarrFolderSlug) ?? radarrDefaultForm.rootFolderPath;
+  const radarrPanelMode: 'add' | 'edit' =
+    isConfigured && service === 'radarr' && radarrStatusQuery.data?.exists ? 'edit' : 'add';
+
+  const radarrInitialForm: RadarrFormState = useMemo(() => {
+    if (radarrPanelMode === 'edit' && fullRadarrMovie) {
+      return {
+        qualityProfileId:
+          typeof fullRadarrMovie.qualityProfileId === 'number' && Number.isFinite(fullRadarrMovie.qualityProfileId)
+            ? fullRadarrMovie.qualityProfileId
+            : '',
+        rootFolderPath: resolvedRadarrRootFolder,
+        monitored: fullRadarrMovie.monitored ?? true,
+        searchForMovie: fullRadarrMovie.addOptions?.searchForMovie ?? radarrDefaultForm.searchForMovie,
+        minimumAvailability: fullRadarrMovie.minimumAvailability ?? radarrDefaultForm.minimumAvailability,
+        tags: Array.isArray(fullRadarrMovie.tags)
+          ? fullRadarrMovie.tags.filter((tag): tag is number => typeof tag === 'number')
+          : [],
+        freeformTags: [],
+      };
+    }
+
+    return radarrDefaultForm;
+  }, [fullRadarrMovie, radarrDefaultForm, radarrPanelMode, resolvedRadarrRootFolder]);
+
+  if (!anilistId || !title || !service) {
     return null;
   }
 
@@ -298,62 +372,114 @@ export function useMediaModalProps(
       title: resolvedTitle.primary,
       ...(coverImage ? { posterUrl: coverImage } : {}),
     },
-    currentMapping: deriveCurrentMappingFromStatus(statusQuery.data, 'sonarr', options?.sonarrUrl),
-    overrideActive: statusQuery.data?.overrideActive === true,
+    currentMapping:
+      service === 'radarr'
+        ? deriveRadarrCurrentMappingFromStatus(radarrStatusQuery.data, options?.providers.radarr.url)
+        : deriveSonarrCurrentMappingFromStatus(sonarrStatusQuery.data, options?.providers.sonarr.url),
+    overrideActive:
+      service === 'radarr'
+        ? radarrStatusQuery.data?.overrideActive === true
+        : sonarrStatusQuery.data?.overrideActive === true,
     otherAniListIds: linkedAniListIds.filter((id: number) => id !== anilistId),
-    service: 'sonarr',
+    service,
   };
 
-  const sonarrPanelProps: Omit<SonarrPanelProps, 'controller'> = {
-    mode: panelMode,
-    anilistId,
-    title: resolvedTitle.primary,
-    tvdbId,
-    initialForm,
-    defaultForm,
-    metadata: sonarrMetadataQuery.data ?? null,
-    sonarrReady,
-    disabled:
-      !sonarrReady || sonarrMetadataQuery.isPending || sonarrMetadataQuery.isError,
-    portalContainer,
-    folderSlug: folderSlug ?? null,
-    onSubmit: async (form: SonarrFormState) => {
-      if (!sonarrReady) return;
-      if (panelMode === 'edit') {
-        if (!tvdbId) return;
-        await updateSeriesMutation.mutateAsync({
-          anilistId,
-          tvdbId,
-          title: resolvedTitle.primary,
-          form,
-        });
-      } else {
-        await addSeriesMutation.mutateAsync({
+  const sonarrPanelProps: Omit<SonarrPanelProps, 'controller'> | null =
+    service === 'sonarr'
+      ? {
+          mode: sonarrPanelMode,
           anilistId,
           title: resolvedTitle.primary,
-          primaryTitleHint: resolvedTitle.primary,
-          metadata: metadata ?? null,
-          form,
-        });
-      }
-    },
-    onSaveDefaults: async (form: SonarrFormState) => {
-      await updateDefaultsMutation.mutateAsync(form);
-    },
-  };
+          tvdbId: externalId,
+          initialForm: sonarrInitialForm,
+          defaultForm: sonarrDefaultForm,
+          metadata: sonarrMetadataQuery.data ?? null,
+          sonarrReady: isConfigured,
+          disabled: !isConfigured || sonarrMetadataQuery.isPending || sonarrMetadataQuery.isError,
+          portalContainer,
+          folderSlug: sonarrFolderSlug ?? null,
+          onSubmit: async (form: SonarrFormState) => {
+            if (!isConfigured) return;
+            if (sonarrPanelMode === 'edit') {
+              if (!externalId) return;
+              await updateSeriesMutation.mutateAsync({
+                anilistId,
+                tvdbId: externalId,
+                title: resolvedTitle.primary,
+                form,
+              });
+              return;
+            }
+
+            await addSeriesMutation.mutateAsync({
+              anilistId,
+              title: resolvedTitle.primary,
+              primaryTitleHint: resolvedTitle.primary,
+              metadata: resolvedMetadata,
+              form,
+            });
+          },
+          onSaveDefaults: async (form: SonarrFormState) => {
+            await updateDefaultsMutation.mutateAsync(form);
+          },
+        }
+      : null;
+
+  const radarrPanelProps: Omit<RadarrPanelProps, 'controller'> | null =
+    service === 'radarr'
+      ? {
+          mode: radarrPanelMode,
+          anilistId,
+          title: resolvedTitle.primary,
+          tmdbId: externalId,
+          initialForm: radarrInitialForm,
+          defaultForm: radarrDefaultForm,
+          metadata: radarrMetadataQuery.data ?? null,
+          radarrReady: isConfigured,
+          disabled: !isConfigured || radarrMetadataQuery.isPending || radarrMetadataQuery.isError,
+          portalContainer,
+          folderSlug: radarrFolderSlug ?? null,
+          onSubmit: async (form: RadarrFormState) => {
+            if (!isConfigured) return;
+            if (radarrPanelMode === 'edit') {
+              if (!externalId) return;
+              await updateMovieMutation.mutateAsync({
+                anilistId,
+                tmdbId: externalId,
+                title: resolvedTitle.primary,
+                form,
+              });
+              return;
+            }
+
+            await addMovieMutation.mutateAsync({
+              anilistId,
+              title: resolvedTitle.primary,
+              primaryTitleHint: resolvedTitle.primary,
+              metadata: resolvedMetadata,
+              form,
+            });
+          },
+          onSaveDefaults: async (form: RadarrFormState) => {
+            await updateRadarrDefaultsMutation.mutateAsync(form);
+          },
+        }
+      : null;
 
   return {
+    title: resolvedTitle.primary,
+    alternateTitles: resolvedTitle.alternates,
+    titleLanguage: preferredTitleLanguage,
+    service,
     mappingTabProps,
     sonarrPanelProps,
-    tvdbId,
+    radarrPanelProps,
+    externalId,
     inLibrary,
     bannerImage,
     coverImage,
     format,
     year,
     status,
-    title: resolvedTitle.primary,
-    alternateTitles: resolvedTitle.alternates,
-    titleLanguage: preferredTitleLanguage,
   };
 }

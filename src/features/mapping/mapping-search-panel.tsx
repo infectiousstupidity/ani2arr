@@ -3,26 +3,29 @@ import { ExternalLink } from 'lucide-react';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
 import Pill from '@/shared/ui/primitives/pill';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
-import type { MappingSearchResult } from '@/shared/types';
+import type { MappingProvider, MappingSearchResult } from '@/shared/types';
 import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link';
+import { getProviderLabel } from '@/services/providers/resolver';
 import type { MappingSearchController } from './types';
 
 interface MappingSearchPanelProps {
   controller: MappingSearchController;
   currentMapping: MappingSearchResult | null;
+  provider: MappingProvider;
   baseUrl: string;
   autoFocus?: boolean;
   portalContainer?: HTMLElement | null;
 }
 
 export function MappingSearchPanel(props: MappingSearchPanelProps) {
-  const { controller, currentMapping, baseUrl, autoFocus = false, portalContainer } = props;
+  const { controller, currentMapping, provider, baseUrl, autoFocus = false, portalContainer } = props;
   const { state, setQuery, selectResult, searchQuery } = controller;
   const results = searchQuery.data ?? [];
   const selected = state.selected;
   const hasQuery = state.query.trim().length > 0;
   const inputRef = useRef<HTMLInputElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const providerLabel = getProviderLabel(provider);
 
   const handleWheelCapture = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
     const viewport = viewportRef.current;
@@ -48,7 +51,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
               Mapping search
             </p>
             <p className="text-xs text-text-secondary">
-              Find the right TVDB entry; your selection updates the preview on the right.
+              {`Find the right ${provider === 'radarr' ? 'TMDB' : 'TVDB'} entry; your selection updates the preview on the right.`}
             </p>
           </div>
         </div>
@@ -59,7 +62,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
           ref={inputRef}
           value={state.query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search Sonarr / TVDB"
+          placeholder={`Search ${providerLabel} / ${provider === 'radarr' ? 'TMDB' : 'TVDB'}`}
           className="w-full rounded-lg bg-bg-secondary px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-accent-primary focus:outline-none"
         />
       </div>
@@ -84,7 +87,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
 
                   {!results.length && !searchQuery.isFetching ? (
                     <div className="flex h-32 items-center justify-center px-3 py-6 text-center text-xs text-text-secondary">
-                      {hasQuery ? 'No results found.' : 'Type to search Sonarr.'}
+                      {hasQuery ? 'No results found.' : `Type to search ${providerLabel}.`}
                     </div>
                   ) : null}
 
@@ -123,7 +126,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                     if (result.inLibrary) {
                       metadataPills.push(
                         <Pill key="library" small tone="success" className="uppercase tracking-wide">
-                          In Sonarr
+                          {`In ${providerLabel}`}
                         </Pill>,
                       );
                     }
@@ -145,7 +148,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                     }
 
                     const link = buildExternalMediaLink({
-                      service: 'sonarr',
+                      service: provider,
                       baseUrl,
                       inLibrary: result.inLibrary,
                       ...(result.librarySlug ? { librarySlug: result.librarySlug } : {}),
@@ -191,13 +194,13 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                           </div>
                         </button>
                         {link ? (
-                          <TooltipWrapper content="Open in Sonarr" container={portalContainer ?? null}>
+                          <TooltipWrapper content={`Open in ${providerLabel}`} container={portalContainer ?? null}>
                             <a
                               href={link}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center rounded p-2 text-text-secondary hover:text-text-primary"
-                              aria-label="Open in Sonarr"
+                              aria-label={`Open in ${providerLabel}`}
                             >
                               <ExternalLink size={16} />
                             </a>

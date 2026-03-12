@@ -4,6 +4,7 @@ import type {
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
   ExtensionError,
+  MappingProvider,
   MappingOverrideRecord,
 } from '@/shared/types';
 import type {
@@ -29,7 +30,7 @@ export type SeriesStatusOptions = {
 export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: SeriesStatusOptions) => {
   const forceVerify = options?.force_verify === true;
   return useQuery<CheckSeriesStatusResponse, ExtensionError>({
-    queryKey: queryKeys.seriesStatus(payload),
+    queryKey: queryKeys.seriesStatus(payload, 'sonarr'),
     queryFn: async () => {
       const request: StatusInput = { anilistId: payload.anilistId };
       if (payload.title !== undefined) {
@@ -75,8 +76,9 @@ export const useSetMappingOverride = () => {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId, variables.provider) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides(variables.provider) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides('all') });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
     },
   });
@@ -93,8 +95,9 @@ export const useClearMappingOverride = () => {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId, variables.provider) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides(variables.provider) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides('all') });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
     },
   });
@@ -111,19 +114,22 @@ export const useClearAllMappingOverrides = () => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverridesRoot() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot('sonarr') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot('radarr') });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
     },
   });
 };
 
-export const useMappingOverrides = () =>
+export const useMappingOverrides = (provider: MappingProvider | 'all' = 'all') =>
   useQuery<MappingOverrideRecord[], ExtensionError>({
-    queryKey: queryKeys.mappingOverrides(),
+    queryKey: queryKeys.mappingOverrides(provider),
     queryFn: async () => {
       const api = getAni2arrApi();
-      return api.getMappingOverrides();
+      const records = await api.getMappingOverrides();
+      if (provider === 'all') return records;
+      return records.filter(record => record.provider === provider);
     },
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -140,8 +146,9 @@ export const useSetMappingIgnore = () => {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId, variables.provider) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides(variables.provider) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides('all') });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
     },
   });
@@ -158,8 +165,9 @@ export const useClearMappingIgnore = () => {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId, variables.provider) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides(variables.provider) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides('all') });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
     },
   });

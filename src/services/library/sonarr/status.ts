@@ -3,15 +3,16 @@ import type {
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
   MappingResolver,
-  TitleIndexer,
   SonarrClient,
-  RequestPriority,
   SonarrLookupSeries,
+  SonarrLibraryStatusOptions,
+  TitleIndexer,
 } from './types';
 import { getExtensionOptionsSnapshot } from '@/shared/options/storage';
 import { ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
-import { notifyLibraryMutation, type LibraryMutationEmitter } from './notify';
+import { notifyLibraryMutation } from '@/services/library/notify';
 import type { SonarrLibraryStore } from './store';
+import type { SonarrLibraryMutationEmitter } from './types';
 
 export class SonarrStatus {
   constructor(
@@ -19,12 +20,12 @@ export class SonarrStatus {
     private readonly indexer: TitleIndexer,
     private readonly mapping: MappingResolver,
     private readonly sonarr: SonarrClient,
-    private readonly emitMutation?: LibraryMutationEmitter
+    private readonly emitMutation?: SonarrLibraryMutationEmitter
   ) {}
 
   async getSeriesStatus(
     payload: CheckSeriesStatusPayload,
-    options: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean; priority?: RequestPriority } = {}
+    options: SonarrLibraryStatusOptions = {}
   ): Promise<CheckSeriesStatusResponse> {
     if (import.meta.env.DEV) {
       const pr = options.priority ?? 'normal';
@@ -34,7 +35,7 @@ export class SonarrStatus {
 
     const leanList = await this.store.getLeanSeriesList();
     const sonarrOpts = await getExtensionOptionsSnapshot();
-    const isConfigured = !!(sonarrOpts?.sonarrUrl && sonarrOpts?.sonarrApiKey);
+    const isConfigured = !!(sonarrOpts?.providers.sonarr.url && sonarrOpts?.providers.sonarr.apiKey);
 
     const normalizedTitle = payload.title?.trim();
     let tvdbId = this.indexer.findTvdbIdInIndex(payload);
@@ -119,7 +120,10 @@ export class SonarrStatus {
       return out;
     }
 
-    const credentials = { url: sonarrOpts!.sonarrUrl!, apiKey: sonarrOpts!.sonarrApiKey! };
+    const credentials = {
+      url: sonarrOpts!.providers.sonarr.url,
+      apiKey: sonarrOpts!.providers.sonarr.apiKey,
+    };
     const liveSeries = await this.sonarr.getSeriesByTvdbId(tvdbId, credentials);
     let lookupSeries: SonarrLookupSeries | null = null;
 
@@ -131,7 +135,7 @@ export class SonarrStatus {
       }
 
       if (cacheMutated) {
-        await notifyLibraryMutation(this.emitMutation, { tvdbId, action: 'added' });
+        await notifyLibraryMutation('SonarrLibrary:notifyLibraryMutation', this.emitMutation, { tvdbId, action: 'added' });
       }
 
       // When force_verify is true and we have live data, return the full series object
@@ -158,7 +162,7 @@ export class SonarrStatus {
 
     if (existsInCache) {
       await this.store.removeSeriesFromCache(tvdbId);
-      await notifyLibraryMutation(this.emitMutation, { tvdbId, action: 'removed' });
+      await notifyLibraryMutation('SonarrLibrary:notifyLibraryMutation', this.emitMutation, { tvdbId, action: 'removed' });
     }
 
     const out3: CheckSeriesStatusResponse = {

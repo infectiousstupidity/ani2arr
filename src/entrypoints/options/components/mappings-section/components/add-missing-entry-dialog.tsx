@@ -8,12 +8,12 @@ import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { getAni2arrApi } from '@/rpc';
 import { useAniListMedia } from '@/shared/queries';
-import type { AniListSearchResult } from '@/shared/types';
+import type { AniFormat, AniListSearchResult } from '@/shared/types';
 
 type AddMissingEntryDialogProps = {
   open: boolean;
   onClose: () => void;
-  onSelect: (anilistId: number) => void;
+  onSelect: (anilistId: number, format: AniFormat | null | undefined) => void;
 };
 
 const parseAniListIdInput = (input: string): number | null => {
@@ -158,7 +158,7 @@ const AddMissingEntryDialog: React.FC<AddMissingEntryDialogProps> = ({ open, onC
                     size="sm"
                     onClick={() => {
                       setInput('');
-                      onSelect(result.id);
+                      onSelect(result.id, result.format);
                     }}
                   >
                     Select

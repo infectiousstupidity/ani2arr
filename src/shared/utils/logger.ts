@@ -49,6 +49,84 @@ function hasSensitiveKey(key: string): boolean {
   return SENSITIVE_KEYS.has(key.toLowerCase());
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.prototype.toString.call(value) === '[object Object]'
+  );
+}
+
+function maybeParseJsonString(value: string): unknown {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  ) {
+    try {
+      return JSON.parse(trimmed) as unknown;
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
+function redactValue(value: unknown, seen: WeakSet<object>): unknown {
+  if (value === null || value === undefined) return value;
+
+  if (typeof value === 'string') {
+    const parsed = maybeParseJsonString(value);
+    if (parsed !== value) {
+      return redactValue(parsed, seen);
+    }
+    return value;
+  }
+
+  if (typeof value !== 'object') return value;
+
+  if (typeof Headers !== 'undefined' && value instanceof Headers) {
+    return redactObject(Object.fromEntries(value.entries()), seen);
+  }
+
+  if (typeof URLSearchParams !== 'undefined' && value instanceof URLSearchParams) {
+    return redactObject(Object.fromEntries(value.entries()), seen);
+  }
+
+  if (seen.has(value)) {
+    return '[Circular]';
+  }
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return value.map(item => redactValue(item, seen));
+  }
+
+  if (isPlainObject(value)) {
+    return redactObject(value, seen);
+  }
+
+  return value;
+}
+
+function redactObject(
+  obj: Record<string, unknown>,
+  seen: WeakSet<object>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+
+  for (const [key, val] of Object.entries(obj)) {
+    if (hasSensitiveKey(key)) {
+      out[key] = '[REDACTED]';
+    } else {
+      out[key] = redactValue(val, seen);
+    }
+  }
+
+  return out;
+}
+
 function formatPrefix(scope?: string): string {
   return scope ? `[${DEFAULT_SCOPE} | ${scope}]` : `[${DEFAULT_SCOPE}]`;
 }
@@ -68,52 +146,7 @@ function emit(level: LogLevel, scope: string | undefined, args: unknown[]): void
     return;
   }
 
-  function isPlainObject(value: unknown): value is Record<string, unknown> {
-    return (
-      value !== null &&
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      Object.prototype.toString.call(value) === '[object Object]'
-    );
-  }
-
-  function redactValue(value: unknown): unknown {
-    if (value === null || value === undefined) return value;
-
-    const t = typeof value;
-
-    // Primitives pass through
-    if (t !== 'object') return value;
-
-    // Redact arrays containing objects
-    if (Array.isArray(value)) {
-      return value.map((item) => (isPlainObject(item) ? redactObject(item) : item));
-    }
-
-    // Redact plain objects
-    if (isPlainObject(value)) {
-      return redactObject(value);
-    }
-
-    // Pass through other types (Errors, etc.)
-    return value;
-  }
-
-  function redactObject(obj: Record<string, unknown>): Record<string, unknown> {
-    const out: Record<string, unknown> = {};
-
-    for (const [key, val] of Object.entries(obj)) {
-      if (hasSensitiveKey(key)) {
-        out[key] = '[REDACTED]';
-      } else {
-        out[key] = val;
-      }
-    }
-
-    return out;
-  }
-
-  const safeArgs = args.map(redactValue);
+  const safeArgs = args.map(arg => redactValue(arg, new WeakSet<object>()));
 
   const [first, ...rest] = safeArgs;
   if (typeof first === 'string') {

@@ -1,26 +1,42 @@
-import type { SonarrApiService } from '@/clients/sonarr.api';
-import type { SonarrCredentialsPayload, SonarrTag } from '@/shared/types';
 import { createError, ErrorCode } from '@/shared/errors/error-utils';
 
-/**
- * Resolves the complete tag ID list for a Sonarr payload, creating freeform tags when needed.
- * Networked behavior lives alongside API flows to keep side effects out of generic utils.
- */
-export async function resolveSonarrTagIds(
-  api: SonarrApiService,
-  credentials: SonarrCredentialsPayload,
-  existingIdsFromForm: number[],
-  freeformLabelsFromForm: string[],
-  existingTags?: SonarrTag[],
+type ArrTagLike = {
+  id: number;
+  label: string;
+};
+
+type ArrTagApi<TCredentials, TTag extends ArrTagLike> = {
+  getTags(credentials: TCredentials): Promise<TTag[]>;
+  createTag(credentials: TCredentials, label: string): Promise<TTag>;
+};
+
+interface ResolveArrTagIdsInput<TCredentials, TTag extends ArrTagLike> {
+  api: ArrTagApi<TCredentials, TTag>;
+  credentials: TCredentials;
+  existingIdsFromForm: number[];
+  freeformLabelsFromForm: string[];
+  existingTags?: TTag[];
+  serviceLabel: string;
+}
+
+export async function resolveArrTagIds<TCredentials, TTag extends ArrTagLike>(
+  input: ResolveArrTagIdsInput<TCredentials, TTag>,
 ): Promise<number[]> {
+  const {
+    api,
+    credentials,
+    existingIdsFromForm,
+    freeformLabelsFromForm,
+    existingTags,
+    serviceLabel,
+  } = input;
+
   const tags = existingTags ?? (await api.getTags(credentials));
-  const idToLabel = new Map<number, string>();
   const labelToId = new Map<string, number>();
 
   for (const tag of tags) {
     if (tag.label && tag.label.trim().length > 0) {
       const trimmed = tag.label.trim();
-      idToLabel.set(tag.id, trimmed);
       labelToId.set(trimmed, tag.id);
     }
   }
@@ -39,7 +55,7 @@ export async function resolveSonarrTagIds(
     }
   }
 
-  let refreshedTags: SonarrTag[] | null = null;
+  let refreshedTags: TTag[] | null = null;
 
   for (const label of labelsToCreate) {
     try {
@@ -47,25 +63,20 @@ export async function resolveSonarrTagIds(
       if (!created || typeof created.id !== 'number') {
         throw createError(
           ErrorCode.API_ERROR,
-          'Sonarr returned invalid tag payload.',
-          'Failed to create tag in Sonarr.',
+          `${serviceLabel} returned invalid tag payload.`,
+          `Failed to create tag in ${serviceLabel}.`,
         );
       }
       if (created.label && created.label.trim().length > 0) {
-        const trimmed = created.label.trim();
-        idToLabel.set(created.id, trimmed);
-        labelToId.set(trimmed, created.id);
+        labelToId.set(created.label.trim(), created.id);
       }
     } catch {
-      // Race: tag already exists, refresh tags once for the batch and retry lookup
       if (!refreshedTags) {
         refreshedTags = await api.getTags(credentials);
       }
       for (const tag of refreshedTags) {
         if (tag.label && tag.label.trim().length > 0) {
-          const trimmed = tag.label.trim();
-          idToLabel.set(tag.id, trimmed);
-          labelToId.set(trimmed, tag.id);
+          labelToId.set(tag.label.trim(), tag.id);
         }
       }
     }
@@ -76,13 +87,14 @@ export async function resolveSonarrTagIds(
     const id = labelToId.get(label);
     if (typeof id === 'number') {
       idsFromFreeform.push(id);
-    } else {
-      throw createError(
-        ErrorCode.API_ERROR,
-        `Failed to resolve tag ID for label: ${label}`,
-        'Unable to resolve tag ID for one or more tags.',
-      );
+      continue;
     }
+
+    throw createError(
+      ErrorCode.API_ERROR,
+      `Failed to resolve tag ID for label: ${label}`,
+      'Unable to resolve tag ID for one or more tags.',
+    );
   }
 
   const allIds = [...(existingIdsFromForm ?? []), ...idsFromFreeform];
