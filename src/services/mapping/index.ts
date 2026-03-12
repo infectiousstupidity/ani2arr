@@ -361,7 +361,9 @@ export class MappingService {
 
     const apiMedia = await this.anilistApi.fetchMediaWithRelations(
       anilistId,
-      priority === undefined ? undefined : { priority },
+      priority === undefined
+        ? { source: 'mapping-resolve' }
+        : { priority, source: 'mapping-resolve' },
     );
     const apiResolved = await this.tryResolveWithMedia(
       provider,

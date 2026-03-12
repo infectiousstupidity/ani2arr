@@ -247,7 +247,11 @@ export class AniListMetadataStore {
 
     const limited = clampBatch(pending);
     const batchPromise = this.anilistApi
-      .fetchMediaBatch(limited)
+      .fetchMediaBatch(limited, {
+        priority: 'low',
+        forceRefresh: true,
+        source: 'metadata-refresh',
+      })
       .then(mediaMap => {
         const refreshed: AniListMetadata[] = [];
         for (const [id, media] of mediaMap.entries()) {

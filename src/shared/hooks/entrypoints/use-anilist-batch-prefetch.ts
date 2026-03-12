@@ -32,11 +32,11 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
   const idByContainerRef = useRef<WeakMap<Element, number>>(new WeakMap());
   const visibleIdsRef = useRef<Set<number>>(new Set());
   const prefetchedIdsRef = useRef<Set<number>>(new Set());
+  const queuedIdsRef = useRef<Set<number>>(new Set());
   const staticallyMappedRef = useRef<Set<number>>(new Set());
   const offscreenQueueRef = useRef<number[]>([]);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const observedContainersRef = useRef<Set<Element>>(new Set());
-  const busyRef = useRef(false);
   const infoBurstCountRef = useRef(0);
   const initLoggedRef = useRef(false);
   const timerRef = useRef<number | null>(null);
@@ -100,9 +100,9 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
     // Define the tick function
     tickRef.current = async () => {
       if (!isEnabled) return;
-      if (busyRef.current) return;
 
       const prefetched = prefetchedIdsRef.current;
+      const queued = queuedIdsRef.current;
       const visible = visibleIdsRef.current;
       const offscreen = offscreenQueueRef.current;
       const staticallyMapped = staticallyMappedRef.current;
@@ -110,7 +110,7 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       // Prioritize visible ids (cap ~60)
       const visibleCandidates: number[] = [];
       for (const id of visible) {
-        if (!prefetched.has(id)) visibleCandidates.push(id);
+        if (!prefetched.has(id) && !queued.has(id)) visibleCandidates.push(id);
         if (visibleCandidates.length >= 60) break;
       }
 
@@ -120,7 +120,7 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       } else {
         // Background: offscreen FIFO
         for (const id of offscreen) {
-          if (!prefetched.has(id)) toFetch.push(id);
+          if (!prefetched.has(id) && !queued.has(id)) toFetch.push(id);
           if (toFetch.length >= 60) break;
         }
       }
@@ -156,23 +156,25 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
           );
         }
       }
-      busyRef.current = true;
+
+      for (const id of chunk) {
+        queued.add(id);
+      }
 
       try {
         const entries = await api.prefetchAniListMedia(chunk);
-        // Mark prefetched for all requested ids regardless of individual results
         for (const id of chunk) {
+          queued.delete(id);
           prefetched.add(id);
         }
-        // Optional: could use returned entries for local UI hydration if needed
         if (entries.length > 0) {
           log.debug?.(`Prefetched AniList media: +${entries.length} (requested ${chunk.length})`);
         }
       } catch (error) {
-        // Background handles retry/backoff; on failure, clear busy and try later
+        for (const id of chunk) {
+          queued.delete(id);
+        }
         log.warn('Prefetch batch failed', error);
-      } finally {
-        busyRef.current = false;
       }
     };
 
@@ -202,6 +204,7 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       observedContainers.clear();
       observedContainersRef.current = new Set();
       visibleIdsRef.current = new Set();
+      queuedIdsRef.current = new Set();
       offscreenQueueRef.current = [];
       tickRef.current = null;
     };
