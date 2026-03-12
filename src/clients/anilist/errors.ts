@@ -1,23 +1,33 @@
 import { AbortError } from '@/shared/utils/retry';
 import type { ReturnTypeOfCreateError } from './types';
+import type { AniListRequestMeta } from './rate-limit';
 
 export class AniListRateLimitError extends Error {
   public readonly retryAfterMs: number;
+  public readonly pausedUntil: number;
+  public readonly meta: AniListRequestMeta;
+  public readonly status = 429;
 
-  constructor(retryAfterMs: number) {
+  constructor(meta: AniListRequestMeta, pausedUntil: number) {
     super('AniList rate limit exceeded');
     this.name = 'AniListRateLimitError';
-    this.retryAfterMs = retryAfterMs;
+    this.meta = meta;
+    this.pausedUntil = pausedUntil;
+    this.retryAfterMs = Math.max(0, pausedUntil - meta.receivedAt);
   }
 }
 
 export class AniListHttpError extends Error {
   public readonly status: number;
+  public readonly meta?: AniListRequestMeta;
 
-  constructor(status: number, message?: string) {
+  constructor(status: number, message?: string, meta?: AniListRequestMeta) {
     super(message ?? `AniList API Error: ${status}`);
     this.name = 'AniListHttpError';
     this.status = status;
+    if (meta) {
+      this.meta = meta;
+    }
   }
 
   public get isClientError(): boolean {
@@ -36,7 +46,12 @@ export class AniListAbortError extends AbortError {
 
 export const isRateLimitError = (error: unknown): error is AniListRateLimitError =>
   error instanceof AniListRateLimitError ||
-  (typeof error === 'object' && error !== null && typeof (error as { retryAfterMs?: unknown }).retryAfterMs === 'number');
+  (
+    typeof error === 'object' &&
+    error !== null &&
+    typeof (error as { retryAfterMs?: unknown }).retryAfterMs === 'number' &&
+    typeof (error as { pausedUntil?: unknown }).pausedUntil === 'number'
+  );
 
 export const isHttpError = (error: unknown): error is AniListHttpError =>
   error instanceof AniListHttpError ||

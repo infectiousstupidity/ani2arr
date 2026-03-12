@@ -362,7 +362,10 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     },
 
     async prefetchAniListMedia(ids) {
-      const map = await anilistApiService.fetchMediaBatch(ids);
+      const map = await anilistApiService.fetchMediaBatch(ids, {
+        priority: 'low',
+        source: 'browse-prefetch',
+      });
       return Array.from(map.entries()) as Array<[number, AniMedia]>;
     },
 
@@ -370,7 +373,10 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       if (typeof anilistId !== 'number' || !Number.isFinite(anilistId) || anilistId <= 0) {
         return null;
       }
-      const media = await anilistApiService.fetchMediaWithRelations(anilistId, { priority: 'high' });
+      const media = await anilistApiService.fetchMediaWithRelations(anilistId, {
+        priority: 'high',
+        source: 'media-modal',
+      });
       return media ?? null;
     },
 
