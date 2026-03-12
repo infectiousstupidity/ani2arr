@@ -4,7 +4,10 @@ import PQueue from 'p-queue';
 import type { SonarrApiService } from '@/clients/sonarr.api';
 import type { SonarrLookupSeries, RequestPriority } from '@/shared/types';
 import { priorityValue } from '@/shared/utils/priority';
-import { canonicalTitleKey, sanitizeLookupDisplay } from '@/services/mapping/pipeline/matching';
+import {
+  canonicalTitleKeyForProvider,
+  sanitizeLookupDisplayForProvider,
+} from '@/services/mapping/pipeline/matching';
 import { incrementCounter, timeAsync } from '@/shared/utils/metrics';
 import { logger } from '@/shared/utils/logger';
 import { normalizeError } from '@/shared/errors/error-utils';
@@ -96,13 +99,16 @@ export class SonarrLookupClient
     credentials: SonarrLookupCredentials,
     options: SonarrLookupOptions = {},
   ): Promise<SonarrLookupSeries[]> {
-    const safeTerm = sanitizeLookupDisplay(rawTerm);
+    const safeTerm = sanitizeLookupDisplayForProvider(this.provider, rawTerm);
     if (!safeTerm) {
       this.log.debug(`lookup: sanitized term empty for raw='${rawTerm}', skipping.`);
       return [];
     }
 
-    const canonical = canonicalKey || canonicalTitleKey(safeTerm) || canonicalTitleKey(rawTerm);
+    const canonical =
+      canonicalKey ||
+      canonicalTitleKeyForProvider(this.provider, safeTerm) ||
+      canonicalTitleKeyForProvider(this.provider, rawTerm);
     const forceNetwork = options.forceNetwork === true;
 
     if (!canonical) {

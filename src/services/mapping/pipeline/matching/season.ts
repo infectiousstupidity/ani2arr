@@ -1,5 +1,4 @@
-// Seasonal and trailing ordinal/number stripping plus display sanitization.
-
+// Sonarr-specific seasonal and trailing ordinal/number stripping.
 import { stripParenContent } from './normalize';
 
 const TRAILING_DESCRIPTOR_TOKENS = new Set(['season', 'part', 'cour', 'volume', 'vol', 'book', 'chapter']);
@@ -92,7 +91,7 @@ export function sanitizeLookupDisplay(term: string): string {
   // Example: "[Oshi no Ko] 3rd Season" -> "Oshi no Ko 3rd Season"
   s = s.replace(/\[([^\]]+)\]/g, '$1');
 
-  // Now strip seasonal suffixes and trailing ordinals/numbers on the resulting string
+  // Sonarr benefits from sequel/season cleanup before lookup.
   const seasonalReduced = stripSeasonalSuffixes(s);
   const trailingStripped = stripTrailingOrdinalOrNumber(seasonalReduced);
 

@@ -136,7 +136,9 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
       case 'in-library':
         return <Check className="a2a-card-overlay__symbol" aria-hidden="true" />;
       case 'error':
-        return <TriangleAlert className="a2a-card-overlay__symbol" aria-hidden="true" />;
+        return mappingUnavailable
+          ? <Wrench className="a2a-card-overlay__symbol" aria-hidden="true" />
+          : <TriangleAlert className="a2a-card-overlay__symbol" aria-hidden="true" />;
       default:
         return <Plus className="a2a-card-overlay__symbol" aria-hidden="true" />;
     }
@@ -172,6 +174,14 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     onOpenMappingFix?.(anilistId, title, overrideActive);
   }, [anilistId, onOpenMappingFix, overrideActive, title]);
 
+  const handlePrimaryAction = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    if (mappingUnavailable && onOpenMappingFix) {
+      openMappingFix(event);
+      return;
+    }
+    handleQuickAdd(event);
+  }, [handleQuickAdd, mappingUnavailable, onOpenMappingFix, openMappingFix]);
+
   
 
   // Prebuild stack action nodes
@@ -197,8 +207,8 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
 
   const actionFixMapping = (
     onOpenMappingFix ? (
-      <TooltipWrapper content="Fix mapping…" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
-        <button type="button" className="a2a-card-overlay__action a2a-card-overlay__action--fix" aria-label="Fix mapping" onClick={openMappingFix} onMouseDown={swallowEvent}>
+      <TooltipWrapper content="Find match manually…" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
+        <button type="button" className="a2a-card-overlay__action a2a-card-overlay__action--fix" aria-label="Find match manually" onClick={openMappingFix} onMouseDown={swallowEvent}>
           <Wrench aria-hidden="true" className="h-4 w-4" />
         </button>
       </TooltipWrapper>
@@ -265,7 +275,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
             className="a2a-card-overlay__quick"
             data-state={overlayState}
             aria-label={quickAddAriaLabel}
-            onClick={handleQuickAdd}
+            onClick={handlePrimaryAction}
             onMouseDown={swallowEvent}
             disabled={quickAddDisabled}
             aria-disabled={quickAddDisabled || undefined}

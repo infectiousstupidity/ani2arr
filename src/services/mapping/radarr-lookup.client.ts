@@ -3,7 +3,10 @@ import PQueue from 'p-queue';
 import type { RadarrApiService } from '@/clients/radarr.api';
 import type { RadarrLookupMovie, RequestPriority } from '@/shared/types';
 import { normalizeError } from '@/shared/errors/error-utils';
-import { canonicalTitleKey, sanitizeLookupDisplay } from '@/services/mapping/pipeline/matching';
+import {
+  canonicalTitleKeyForProvider,
+  sanitizeLookupDisplayForProvider,
+} from '@/services/mapping/pipeline/matching';
 import { incrementCounter, timeAsync } from '@/shared/utils/metrics';
 import { priorityValue } from '@/shared/utils/priority';
 import { logger } from '@/shared/utils/logger';
@@ -91,13 +94,16 @@ export class RadarrLookupClient
     credentials: RadarrLookupCredentials,
     options: RadarrLookupOptions = {},
   ): Promise<RadarrLookupMovie[]> {
-    const safeTerm = sanitizeLookupDisplay(rawTerm);
+    const safeTerm = sanitizeLookupDisplayForProvider(this.provider, rawTerm);
     if (!safeTerm) {
       this.log.debug(`lookup: sanitized term empty for raw='${rawTerm}', skipping.`);
       return [];
     }
 
-    const canonical = canonicalKey || canonicalTitleKey(safeTerm) || canonicalTitleKey(rawTerm);
+    const canonical =
+      canonicalKey ||
+      canonicalTitleKeyForProvider(this.provider, safeTerm) ||
+      canonicalTitleKeyForProvider(this.provider, rawTerm);
     const forceNetwork = options.forceNetwork === true;
 
     if (!canonical) {

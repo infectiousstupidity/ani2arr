@@ -1,4 +1,7 @@
-import { canonicalTitleKey, sanitizeLookupDisplay } from '@/services/mapping/pipeline/matching';
+import {
+  canonicalTitleKeyForProvider,
+  sanitizeLookupDisplayForProvider,
+} from '@/services/mapping/pipeline/matching';
 import { scoreCandidates } from '../pipeline/scoring';
 import { isSeasonalCanonicalTokens } from '../pipeline/search-term-generator';
 import type { ResolvedMapping } from '../types';
@@ -17,14 +20,15 @@ export async function tryHintLookup<TResult extends ProviderLookupResult>(
   log: ScopedLogger,
   forceLookupNetwork?: boolean,
 ): Promise<ResolvedMapping | null> {
+  const provider = lookupClient.provider;
   const trimmed = term.trim();
-  const sanitized = sanitizeLookupDisplay(trimmed);
+  const sanitized = sanitizeLookupDisplayForProvider(provider, trimmed);
   if (!sanitized) {
     log.debug?.(`mapping:hint-skip empty after sanitize raw="${term}"`);
     return null;
   }
 
-  const canonical = canonicalTitleKey(sanitized) ?? '';
+  const canonical = canonicalTitleKeyForProvider(provider, sanitized) ?? '';
   const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
   if (canonicalTokens.length === 0 || isSeasonalCanonicalTokens(canonicalTokens)) {
     log.debug?.(`mapping:hint-skip seasonal/empty canonical="${canonical}" raw="${sanitized}"`);
@@ -34,7 +38,7 @@ export async function tryHintLookup<TResult extends ProviderLookupResult>(
   const results = await lookupClient.lookup(canonical, sanitized, credentials, {
     ...(forceLookupNetwork ? { forceNetwork: true } : {}),
   });
-  const scored = scoreCandidates({ canonical, display: sanitized }, results);
+  const scored = scoreCandidates(provider, { canonical, display: sanitized }, results);
   const top = scored[0];
   if (top && top.score >= SCORE_THRESHOLD) {
     const externalId = lookupClient.getExternalId(top.result);

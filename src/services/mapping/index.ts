@@ -217,6 +217,7 @@ export class MappingService {
         staleMs: RESOLVED_PERSIST_MS,
         hardMs: RESOLVED_PERSIST_MS,
       });
+      await providerCaches.failure.remove(this.failureCacheKey(provider, anilistId));
       this.recordResolvedMapping(provider, anilistId, resolved, 'upstream');
       return resolved;
     }
@@ -246,6 +247,7 @@ export class MappingService {
             staleMs: RESOLVED_PERSIST_MS,
             hardMs: RESOLVED_PERSIST_MS,
           });
+          await providerCaches.failure.remove(this.failureCacheKey(provider, anilistId));
           this.recordResolvedMapping(provider, anilistId, hinted, 'auto');
           return hinted;
         }
@@ -313,6 +315,7 @@ export class MappingService {
       staleMs: RESOLVED_PERSIST_MS,
       hardMs: RESOLVED_PERSIST_MS,
     });
+    await providerCaches.failure.remove(this.failureCacheKey(provider, anilistId));
     if (import.meta.env.DEV) {
       this.log.debug?.(
         `mapping:network-success provider=${provider} anilistId=${anilistId} ${resolved.externalId.kind}Id=${resolved.externalId.id}${resolved.successfulSynonym ? ` synonym="${resolved.successfulSynonym}"` : ''}`,

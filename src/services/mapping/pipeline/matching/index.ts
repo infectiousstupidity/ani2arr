@@ -19,6 +19,7 @@ export {
 } from './season';
 
 export {
+  computeTitleMatchScoreForProvider,
   computeTitleMatchScore,
   composeBaseScore,
   applyYearBonus,
@@ -37,3 +38,17 @@ export {
 } from './constants';
 
 export { canonicalTitleKey } from './key';
+
+export {
+  getMatchingProfile,
+  compactTitleKey,
+  sanitizeLookupDisplayForProvider,
+  sanitizeLookupDisplayWithProfile,
+  canonicalTitleKeyForProvider,
+  canonicalizeLookupTermForProvider,
+  buildTitleIndexKeysForProvider,
+  buildQueryTitleVariantsForProvider,
+  extractCandidateTitleVariants,
+} from './profile';
+
+export type { CandidateTitleVariant, CandidateTitleVariantSource, MatchingProfile } from './profile';

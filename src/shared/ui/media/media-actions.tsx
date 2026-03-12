@@ -1,7 +1,6 @@
 // src/shared/ui/media/media-actions.tsx
 import React from 'react';
 import Button from '@/shared/ui/primitives/button';
-import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { SquareArrowOutUpRight, ChevronDown } from 'lucide-react';
 import { usePublicOptions } from '@/shared/queries';
 import { logger } from '@/shared/utils/logger';
@@ -18,6 +17,7 @@ interface MediaActionsProps {
   librarySlug?: string;
   resolvedSearchTerm: string;
   externalId: number | null | undefined;
+  noAutoMatch?: boolean;
   onQuickAdd: () => void;
   onOpenModal: () => void;
   onOpenMappingFix: () => void;
@@ -32,6 +32,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
   librarySlug,
   resolvedSearchTerm,
   externalId,
+  noAutoMatch = false,
   onQuickAdd,
   onOpenModal,
   onOpenMappingFix,
@@ -58,27 +59,28 @@ const MediaActions: React.FC<MediaActionsProps> = ({
   };
   const isServiceConfigured = isProviderConfigured(service, options);
   const requiresConfiguration = !isServiceConfigured;
-  const hasNoAutoMatch = externalId === null;
+  const shouldOpenManualMatch = noAutoMatch && !inService && !requiresConfiguration;
   const mainButtonText = requiresConfiguration
     ? `Configure ${serviceLabel}`
-    : hasNoAutoMatch
-      ? 'Cannot add'
+    : shouldOpenManualMatch
+      ? 'Find match'
       : getButtonText();
-  const disableMainAction = isLoading || (hasNoAutoMatch && !inService && !requiresConfiguration);
+  const disableMainAction = isLoading;
+  const handleMainAction = requiresConfiguration
+    ? onQuickAdd
+    : shouldOpenManualMatch
+      ? onOpenMappingFix
+      : inService
+        ? onOpenModal
+        : onQuickAdd;
 
   const externalBaseUrl = getProviderBaseUrl(service, options);
   const hasExternal = externalBaseUrl.length > 0;
 
-  const groupTooltip = requiresConfiguration
-    ? undefined
-    : hasNoAutoMatch
-      ? 'No automatic ID match was found for this title. Try searching for it manually.'
-      : undefined;
-
-  const mainButtonTooltip = groupTooltip
-    ? undefined
-    : requiresConfiguration
-      ? `Open ${serviceLabel} settings to continue.`
+  const mainButtonTooltip = requiresConfiguration
+    ? `Open ${serviceLabel} settings to continue.`
+    : shouldOpenManualMatch
+      ? `No automatic ${serviceLabel} match was found. Search manually.`
       : status === 'IN'
         ? `Open ${serviceLabel} options`
         : status === 'LOADING'
@@ -106,86 +108,44 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 
   return (
     <div className={`grid ${externalHref ? 'grid-cols-[1fr_auto] gap-[15px]' : 'grid-cols-1 gap-0'} items-start w-full`}>
-      {groupTooltip ? (
-        <TooltipWrapper content={groupTooltip} container={portalContainer ?? null}>
-          <Group>
+      <Group>
+        <Button
+          data-testid="a2a-main-action-button"
+          size="md"
+          onClick={handleMainAction}
+          isLoading={isLoading}
+          disabled={disableMainAction}
+          {...(mainButtonTooltip ? { tooltip: mainButtonTooltip } : {})}
+          portalContainer={portalContainer}
+          className="flex-1 w-[calc(100%-34px)] rounded-none h-[35px] text-[14px] text-center px-0 pl-2.5"
+          loadingText={getButtonText()}
+        >
+          {mainButtonText}
+        </Button>
+
+        <Dropdown
+          container={portalContainer ?? null}
+          trigger={
             <Button
-              data-testid="a2a-main-action-button"
-              size="md"
-              onClick={inService ? onOpenModal : onQuickAdd}
-              isLoading={isLoading}
-              disabled={disableMainAction}
+              data-testid="a2a-actions-dropdown"
+              size="icon"
+              variant="primary"
               portalContainer={portalContainer}
-              className="flex-1 w-[calc(100%-34px)] rounded-none h-[35px] text-[14px] text-center px-0 pl-2.5"
-              loadingText={getButtonText()}
+              className="relative rounded-none h-[35px] w-[34px] after:content-[''] after:absolute after:inset-0 after:bg-[rgba(255,255,255,0.14)] after:pointer-events-none"
+              aria-label="Actions"
             >
-              {mainButtonText}
+              <ChevronDown className="h-4 w-4" />
             </Button>
-
-            <Dropdown
-              container={portalContainer ?? null}
-              trigger={
-                <Button
-                  data-testid="a2a-actions-dropdown"
-                  size="icon"
-                  variant="primary"
-                  portalContainer={portalContainer}
-                  className="relative rounded-none h-[35px] w-[34px]"
-                  aria-label="Actions"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              }
-            >
-              <DropdownItem onSelect={onOpenModal} disabled={externalId === null}>
-                {serviceLabel} options
-              </DropdownItem>
-              <DropdownItem onSelect={() => { log.debug('Action: Fix mapping clicked'); onOpenMappingFix(); }}>
-                Fix mapping…
-              </DropdownItem>
-            </Dropdown>
-          </Group>
-        </TooltipWrapper>
-      ) : (
-        <Group>
-          <Button
-            data-testid="a2a-main-action-button"
-            size="md"
-            onClick={inService ? onOpenModal : onQuickAdd}
-            isLoading={isLoading}
-            disabled={disableMainAction}
-            {...(mainButtonTooltip ? { tooltip: mainButtonTooltip } : {})}
-            portalContainer={portalContainer}
-            className="flex-1 w-[calc(100%-34px)] rounded-none h-[35px] text-[14px] text-center px-0 pl-2.5"
-            loadingText={getButtonText()}
-          >
-            {mainButtonText}
-          </Button>
-
-          <Dropdown
-            container={portalContainer ?? null}
-            trigger={
-              <Button
-                data-testid="a2a-actions-dropdown"
-                size="icon"
-                variant="primary"
-                portalContainer={portalContainer}
-                className="relative rounded-none h-[35px] w-[34px] after:content-[''] after:absolute after:inset-0 after:bg-[rgba(255,255,255,0.14)] after:pointer-events-none"
-                aria-label="Actions"
-              >
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            }
-          >
-            <DropdownItem onSelect={onOpenModal} disabled={externalId === null}>
-              {serviceLabel} options
-            </DropdownItem>
-            <DropdownItem onSelect={() => { log.debug('Action: Fix mapping clicked'); onOpenMappingFix(); }}>
-              Fix mapping…
-            </DropdownItem>
-          </Dropdown>
-        </Group>
-      )}
+          }
+        >
+          <DropdownItem onSelect={onOpenModal} disabled={externalId === null}>
+            {serviceLabel} options
+          </DropdownItem>
+          <DropdownItem onSelect={() => { log.debug('Action: Fix mapping clicked'); onOpenMappingFix(); }}>
+            Find match manually…
+          </DropdownItem>
+        </Dropdown>
+      </Group>
 
       {externalHref && (
         <Button
