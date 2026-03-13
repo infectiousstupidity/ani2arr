@@ -16,6 +16,7 @@ interface MappingPreviewPanelProps {
   currentMapping: MappingSearchResult | null;
   previewMapping: MappingSearchResult | null;
   isInMappingMode: boolean;
+  exitClosesModal?: boolean;
   showResetPreview: boolean;
   onResetPreview: () => void;
   onEditMapping: () => void;
@@ -33,15 +34,20 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
     onResetPreview,
     onEditMapping,
     isInMappingMode,
+    exitClosesModal = false,
     portalContainer,
   } = props;
 
+  const hasCurrentMapping = Boolean(currentMapping);
   const EditIcon = isInMappingMode ? PenOff : SquarePen;
-  const editTooltip = isInMappingMode ? 'Exit mapping mode' : 'Edit current mapping ID';
-  const editAriaLabel = isInMappingMode ? 'Exit mapping mode' : 'Edit current mapping ID';
+  const editTooltip = isInMappingMode
+    ? (exitClosesModal ? 'Exit modal' : 'Exit mapping mode')
+    : (hasCurrentMapping ? 'Edit current mapping ID' : 'Add mapping ID');
+  const editAriaLabel = isInMappingMode
+    ? (exitClosesModal ? 'Exit modal' : 'Exit mapping mode')
+    : (hasCurrentMapping ? 'Edit current mapping ID' : 'Add mapping ID');
 
   const hasPreviewMapping = Boolean(previewMapping);
-  const hasCurrentMapping = Boolean(currentMapping);
   const showEmptyState = !hasPreviewMapping && !hasCurrentMapping;
   const { data: seriesStatus } = useSeriesStatus(
     { anilistId: aniListEntry.id },

@@ -20,7 +20,7 @@ interface MediaActionsProps {
   noAutoMatch?: boolean;
   onQuickAdd: () => void;
   onOpenModal: () => void;
-  onOpenMappingFix: () => void;
+  onOpenMappingFix: (mappingRequired?: boolean) => void;
   portalContainer?: HTMLElement | undefined;
 }
 
@@ -60,6 +60,8 @@ const MediaActions: React.FC<MediaActionsProps> = ({
   const isServiceConfigured = isProviderConfigured(service, options);
   const requiresConfiguration = !isServiceConfigured;
   const shouldOpenManualMatch = noAutoMatch && !inService && !requiresConfiguration;
+  const hasMapping = externalId != null;
+  const manualMappingLabel = hasMapping ? 'Update mapping manually' : 'Find match manually';
   const mainButtonText = requiresConfiguration
     ? `Configure ${serviceLabel}`
     : shouldOpenManualMatch
@@ -69,7 +71,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
   const handleMainAction = requiresConfiguration
     ? onQuickAdd
     : shouldOpenManualMatch
-      ? onOpenMappingFix
+      ? () => onOpenMappingFix(true)
       : inService
         ? onOpenModal
         : onQuickAdd;
@@ -141,8 +143,8 @@ const MediaActions: React.FC<MediaActionsProps> = ({
           <DropdownItem onSelect={onOpenModal} disabled={externalId === null}>
             {serviceLabel} options
           </DropdownItem>
-          <DropdownItem onSelect={() => { log.debug('Action: Fix mapping clicked'); onOpenMappingFix(); }}>
-            Find match manually…
+          <DropdownItem onSelect={() => { log.debug('Action: Fix mapping clicked'); onOpenMappingFix(!hasMapping); }}>
+            {manualMappingLabel}
           </DropdownItem>
         </Dropdown>
       </Group>

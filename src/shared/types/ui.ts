@@ -11,7 +11,7 @@ export interface CardOverlayProps {
   anilistId: number;
   title: string;
   onOpenModal: (anilistId: number, title: string, metadata: MediaMetadataHint | null) => void;
-  onOpenMappingFix?: (anilistId: number, title: string, overrideActive?: boolean) => void;
+  onOpenMappingFix?: (anilistId: number, title: string, mappingRequired?: boolean) => void;
   isConfigured: boolean;
   defaultForm: SonarrFormState | RadarrFormState | null;
   metadata: MediaMetadataHint | null;
