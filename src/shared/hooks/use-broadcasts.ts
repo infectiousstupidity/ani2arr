@@ -10,6 +10,7 @@ const log = logger.create('Broadcasts');
 
 const PUBLIC_OPTIONS_KEY = queryKeys.publicOptions();
 const SETTINGS_SESSION_KEY = 'a2a_settings_epoch';
+const MAPPINGS_SESSION_KEY = 'a2a_mappings_epoch';
 const LIBRARY_SESSION_KEYS: Record<MappingProvider, string> = {
   sonarr: 'a2a_library_epoch_sonarr',
   radarr: 'a2a_library_epoch_radarr',
@@ -21,6 +22,16 @@ export function useA2aBroadcasts(): void {
   const refreshSettingsQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: PUBLIC_OPTIONS_KEY });
   }, [queryClient]);
+
+  const refreshMappingsQueries = useCallback(
+    (epoch?: number) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+      if (typeof epoch === 'number') {
+        sessionStorage.setItem(MAPPINGS_SESSION_KEY, String(epoch));
+      }
+    },
+    [queryClient],
+  );
 
   const refreshLibraryQueries = useCallback(
     (provider: MappingProvider, epoch?: number) => {
@@ -53,11 +64,15 @@ export function useA2aBroadcasts(): void {
           sessionStorage.setItem(SETTINGS_SESSION_KEY, String(epoch));
         }
       }
+
+      if (envelope.topic === 'mappings-updated') {
+        refreshMappingsQueries(envelope.payload?.epoch);
+      }
     };
 
     browser.runtime.onMessage.addListener(handler);
     return () => browser.runtime.onMessage.removeListener(handler);
-  }, [refreshLibraryQueries, refreshSettingsQueries]);
+  }, [refreshLibraryQueries, refreshMappingsQueries, refreshSettingsQueries]);
 
   useEffect(() => {
     const onStorageChanged: Parameters<typeof browser.storage.onChanged.addListener>[0] = (
@@ -95,6 +110,13 @@ export function useA2aBroadcasts(): void {
         }
       }
 
+      if (changes.mappingsEpoch) {
+        const next = changes.mappingsEpoch.newValue;
+        if (typeof next === 'number') {
+          refreshMappingsQueries(next);
+        }
+      }
+
       if (changes.publicOptions || changes.sonarrSecrets || changes.radarrSecrets) {
         refreshSettingsQueries();
       }
@@ -102,16 +124,17 @@ export function useA2aBroadcasts(): void {
 
     browser.storage.onChanged.addListener(onStorageChanged);
     return () => browser.storage.onChanged.removeListener(onStorageChanged);
-  }, [refreshLibraryQueries, refreshSettingsQueries]);
+  }, [refreshLibraryQueries, refreshMappingsQueries, refreshSettingsQueries]);
 
   useEffect(() => {
     (async () => {
       try {
-        const { libraryEpoch, libraryEpochSonarr, libraryEpochRadarr, settingsEpoch } = await browser.storage.local.get({
+        const { libraryEpoch, libraryEpochSonarr, libraryEpochRadarr, settingsEpoch, mappingsEpoch } = await browser.storage.local.get({
           libraryEpoch: 0,
           libraryEpochSonarr: 0,
           libraryEpochRadarr: 0,
           settingsEpoch: 0,
+          mappingsEpoch: 0,
         });
 
         const sonarrEpoch = typeof libraryEpochSonarr === 'number' ? libraryEpochSonarr : libraryEpoch;
@@ -130,9 +153,14 @@ export function useA2aBroadcasts(): void {
           sessionStorage.setItem(SETTINGS_SESSION_KEY, String(settingsEpoch));
           refreshSettingsQueries();
         }
+
+        const previousMappings = Number(sessionStorage.getItem(MAPPINGS_SESSION_KEY) ?? '0');
+        if (typeof mappingsEpoch === 'number' && mappingsEpoch > previousMappings) {
+          refreshMappingsQueries(mappingsEpoch);
+        }
       } catch (error) {
         log.warn('Failed to reconcile ani2arr library epoch.', error instanceof Error ? error.message : String(error));
       }
     })();
-  }, [refreshLibraryQueries, refreshSettingsQueries]);
+  }, [refreshLibraryQueries, refreshMappingsQueries, refreshSettingsQueries]);
 }

@@ -24,6 +24,7 @@ import {
   RESOLVED_PERSIST_MS,
   ResolvedLedger,
   SCORE_THRESHOLD,
+  UnresolvedLedger,
 } from './cache';
 import { tryHintLookup } from './hints/hint-lookup';
 import { buildMediaFromMetadataHint } from './hints/media-hints';
@@ -56,6 +57,7 @@ export class MappingService {
     radarr: new Set<string>(),
   };
   private readonly ledger = new ResolvedLedger();
+  private readonly unresolvedLedger = new UnresolvedLedger();
 
   constructor(
     private readonly anilistApi: AnilistApiService,
@@ -63,6 +65,7 @@ export class MappingService {
     private readonly lookupClients: ProviderLookupRegistry,
     private readonly caches: Record<MappingProvider, ProviderCaches>,
     private readonly overrides?: MappingOverridesService,
+    private readonly notifyMappingsChanged?: () => void,
   ) {}
 
   public async resetLookupState(): Promise<void> {
@@ -75,6 +78,9 @@ export class MappingService {
     this.inflight.clear();
     this.sessionSeenCanonical.sonarr.clear();
     this.sessionSeenCanonical.radarr.clear();
+    if (this.unresolvedLedger.clear()) {
+      this.notifyMappingsChanged?.();
+    }
   }
 
   public initStaticPairs(): Promise<void> {
@@ -149,6 +155,7 @@ export class MappingService {
     bypassFailureCache: boolean,
   ): Promise<ResolvedMapping | null> {
     if (this.overrides?.isIgnored(provider, anilistId)) {
+      this.clearUnresolvedMapping(provider, anilistId);
       if (import.meta.env.DEV) {
         this.log.debug?.(`mapping:ignored provider=${provider} anilistId=${anilistId}`);
       }
@@ -161,6 +168,7 @@ export class MappingService {
     const cacheKey = this.successCacheKey(provider, anilistId);
     const overrideExternalId = this.overrides?.get(provider, anilistId) ?? null;
     if (overrideExternalId) {
+      this.clearUnresolvedMapping(provider, anilistId);
       const staticHit = this.getUpstreamStaticExternalId(provider, anilistId);
       if (staticHit && staticHit.id === overrideExternalId.id && staticHit.kind === overrideExternalId.kind) {
         try {
@@ -193,6 +201,7 @@ export class MappingService {
           `mapping:success-cache-hit provider=${provider} anilistId=${anilistId} ${cachedSuccess.value.externalId.kind}Id=${cachedSuccess.value.externalId.id}`,
         );
       }
+      this.clearUnresolvedMapping(provider, anilistId);
       this.recordResolvedMapping(provider, anilistId, cachedSuccess.value, 'auto');
       return cachedSuccess.value;
     }
@@ -218,6 +227,7 @@ export class MappingService {
         hardMs: RESOLVED_PERSIST_MS,
       });
       await providerCaches.failure.remove(this.failureCacheKey(provider, anilistId));
+      this.clearUnresolvedMapping(provider, anilistId);
       this.recordResolvedMapping(provider, anilistId, resolved, 'upstream');
       return resolved;
     }
@@ -248,6 +258,7 @@ export class MappingService {
             hardMs: RESOLVED_PERSIST_MS,
           });
           await providerCaches.failure.remove(this.failureCacheKey(provider, anilistId));
+          this.clearUnresolvedMapping(provider, anilistId);
           this.recordResolvedMapping(provider, anilistId, hinted, 'auto');
           return hinted;
         }
@@ -307,9 +318,11 @@ export class MappingService {
           hardMs: ttl.hard,
         });
       }
+      this.recordUnresolvedMapping(provider, anilistId, options.hints);
       return null;
     }
 
+    this.clearUnresolvedMapping(provider, anilistId);
     this.recordResolvedMapping(provider, anilistId, resolved, 'auto');
     await providerCaches.success.write(cacheKey, resolved, {
       staleMs: RESOLVED_PERSIST_MS,
@@ -455,6 +468,7 @@ export class MappingService {
     this.inflight.delete(this.inflightKey(provider, anilistId));
     this.evictAniListMedia(anilistId);
     this.ledger.delete(provider, anilistId);
+    this.clearUnresolvedMapping(provider, anilistId);
   }
 
   public isOverrideActive(anilistId: number, provider: MappingProvider = 'sonarr'): boolean {
@@ -477,6 +491,21 @@ export class MappingService {
         externalId: entry.externalId,
         source: entry.source,
         updatedAt: entry.updatedAt,
+      }));
+  }
+
+  public getRecordedUnresolvedMappings(
+    provider?: MappingProvider,
+  ): Array<{ anilistId: number; provider: MappingProvider; source: 'unresolved'; updatedAt: number; title?: string }> {
+    return this.unresolvedLedger
+      .list()
+      .filter(entry => (provider ? entry.provider === provider : true))
+      .map(entry => ({
+        anilistId: entry.anilistId,
+        provider: entry.provider,
+        source: entry.source,
+        updatedAt: entry.updatedAt,
+        ...(entry.title ? { title: entry.title } : {}),
       }));
   }
 
@@ -506,6 +535,31 @@ export class MappingService {
     source: 'auto' | 'upstream',
   ): void {
     this.ledger.record(provider, anilistId, mapping, source);
+  }
+
+  private recordUnresolvedMapping(provider: MappingProvider, anilistId: number, hints?: ResolveHints): void {
+    const changed = this.unresolvedLedger.record(provider, anilistId, this.resolveUnresolvedTitle(hints));
+    if (changed) {
+      this.notifyMappingsChanged?.();
+    }
+  }
+
+  private clearUnresolvedMapping(provider: MappingProvider, anilistId: number): void {
+    if (this.unresolvedLedger.delete(provider, anilistId)) {
+      this.notifyMappingsChanged?.();
+    }
+  }
+
+  private resolveUnresolvedTitle(hints?: ResolveHints): string | undefined {
+    const directTitle = hints?.primaryTitle?.trim();
+    if (directTitle) {
+      return directTitle;
+    }
+    const titles = hints?.domMedia?.titles;
+    const metadataTitle = [titles?.english, titles?.romaji, titles?.native]
+      .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      ?.trim();
+    return metadataTitle || undefined;
   }
 
   private shouldCacheFailure(error: ExtensionError): boolean {

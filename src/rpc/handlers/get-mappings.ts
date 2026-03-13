@@ -34,7 +34,7 @@ export async function getMappingsHandler(
   const sources =
     input?.sources && input.sources.length > 0
       ? new Set<MappingSource>(input.sources)
-      : new Set<MappingSource>(['manual', 'ignored', 'auto']);
+      : new Set<MappingSource>(['manual', 'ignored', 'auto', 'unresolved']);
   const providers =
     input?.providers && input.providers.length > 0
       ? new Set<MappingSummary['provider']>(input.providers)
@@ -59,8 +59,9 @@ export async function getMappingsHandler(
   }
 
   const priorityMap: Record<MappingSource, number> = {
+    manual: 4,
     ignored: 3,
-    manual: 2,
+    unresolved: 2,
     upstream: 1,
     auto: 0,
   };
@@ -71,6 +72,7 @@ export async function getMappingsHandler(
     source: MappingSource;
     updatedAt: number;
     hadResolveAttempt?: boolean;
+    title?: string;
     priority: number;
   };
 
@@ -132,6 +134,18 @@ export async function getMappingsHandler(
     });
   }
 
+  const unresolved = mappingService.getRecordedUnresolvedMappings();
+  for (const entry of unresolved) {
+    applyCandidate(entry.anilistId, {
+      provider: entry.provider,
+      externalId: null,
+      source: entry.source,
+      updatedAt: entry.updatedAt,
+      hadResolveAttempt: true,
+      ...(entry.title ? { title: entry.title } : {}),
+    });
+  }
+
   const matchesQuery = (summary: MappingSummary): boolean => {
     if (!normalizedQuery) return true;
     const haystackParts: string[] = [
@@ -177,6 +191,11 @@ export async function getMappingsHandler(
             ...(movie.title ? { title: movie.title } : {}),
             type: 'movie' as const,
             ...(statusLabel ? { statusLabel } : {}),
+          }
+      : candidate.title
+        ? {
+            title: candidate.title,
+            type: candidate.provider === 'sonarr' ? ('series' as const) : ('movie' as const),
           }
       : undefined;
     const hadResolveAttempt =
