@@ -1,6 +1,7 @@
 // src/rpc/schemas.ts
 import * as v from 'valibot';
 import type {
+  AniListSchedulerDebugSnapshot,
   CheckMovieStatusResponse,
   CheckSeriesStatusResponse,
   MappingSummary,
@@ -403,3 +404,5 @@ export interface GetAniListMetadataOutput {
   metadata: AniListMetadataDto[];
   missingIds?: number[];
 }
+
+export type GetAniListSchedulerDebugOutput = AniListSchedulerDebugSnapshot;

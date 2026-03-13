@@ -13,6 +13,7 @@ import type {
   SonarrCredentialsPayload,
 } from '@/shared/types';
 import type {
+  GetAniListSchedulerDebugOutput,
   ResolveInput,
   MappingOutput,
   MovieStatusOutput,
@@ -82,6 +83,7 @@ export interface Ani2arrApi {
   clearAllMappingOverrides(): Promise<{ ok: true }>;
   getMappings(input?: GetMappingsInput): Promise<GetMappingsOutput>;
   getAniListMetadata(input: GetAniListMetadataInput): Promise<GetAniListMetadataOutput>;
+  getAniListSchedulerDebug(): Promise<GetAniListSchedulerDebugOutput>;
   searchAniList(input: SearchAniListInput): Promise<AniListSearchResultDto[]>;
 }
 

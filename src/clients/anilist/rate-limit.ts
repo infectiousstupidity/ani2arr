@@ -29,6 +29,13 @@ export interface AniListRequestMeta {
   receivedAt: number;
 }
 
+type LimiterEventType = 'success' | 'rate-limit' | 'resume';
+type LimiterListener = (
+  event: LimiterEventType,
+  snapshot: AniListRateLimitStateSnapshot,
+  meta: AniListRequestMeta,
+) => void;
+
 const parseHeaderNumber = (value: string | null): number | null => {
   if (!value) return null;
   const numeric = Number(value);
@@ -81,8 +88,14 @@ export class AniListRateLimiter {
   private lastKnownResetAt: number | null = null;
   private last429At: number | null = null;
   private lastLowDispatchAt: number | null = null;
+  private listener: LimiterListener | null = null;
+
+  public setListener(listener: LimiterListener | null): void {
+    this.listener = listener;
+  }
 
   public updateFromSuccess(meta: AniListRequestMeta): void {
+    const wasPaused = this.pausedUntil > meta.receivedAt;
     this.applyKnownRateLimit(meta.rateLimit);
 
     const { remaining, resetAt } = meta.rateLimit;
@@ -98,6 +111,11 @@ export class AniListRateLimiter {
       this.log.debug?.(
         `anilist:limiter update remaining=${String(this.lastKnownRemaining)} limit=${String(this.lastKnownLimit)} resetAt=${String(this.lastKnownResetAt)} pausedUntil=${this.pausedUntil || 0}`,
       );
+    }
+
+    this.listener?.('success', this.snapshot(), meta);
+    if (wasPaused && this.pausedUntil <= meta.receivedAt) {
+      this.listener?.('resume', this.snapshot(), meta);
     }
   }
 
@@ -119,6 +137,8 @@ export class AniListRateLimiter {
         `anilist:limiter rate-limit remaining=${String(this.lastKnownRemaining)} limit=${String(this.lastKnownLimit)} resetAt=${String(this.lastKnownResetAt)} pausedUntil=${this.pausedUntil}`,
       );
     }
+
+    this.listener?.('rate-limit', this.snapshot(), meta);
 
     return this.pausedUntil;
   }
