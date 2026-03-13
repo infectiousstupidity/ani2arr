@@ -80,6 +80,7 @@ const createDefaultUiOptions = (): UiOptions => ({
   browseOverlayEnabled: true,
   badgeVisibility: 'always',
   headerInjectionEnabled: true,
+  schedulerDebugOverlayEnabled: false,
 });
 
 const createDefaultSettingsInternal = (): ExtensionOptions => ({
@@ -190,6 +191,7 @@ const UiOptionsSchema = v.pipe(
     browseOverlayEnabled: v.fallback(v.boolean(), true),
     badgeVisibility: v.fallback(v.picklist(BADGE_VISIBILITY_OPTIONS), 'always'),
     headerInjectionEnabled: v.fallback(v.boolean(), true),
+    schedulerDebugOverlayEnabled: v.fallback(v.boolean(), false),
   })
 );
 
