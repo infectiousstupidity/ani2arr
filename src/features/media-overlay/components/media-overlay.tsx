@@ -18,6 +18,7 @@ export interface BrowseContentAppProps {
     anilistId: number;
     title: string;
     initialTab?: 'series' | 'mapping';
+    initialMappingRequired?: boolean;
     metadata: MediaMetadataHint | null;
   }): void;
 }
@@ -137,11 +138,12 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
                   metadata: effectiveMetadata,
                 })
               }
-              onOpenMappingFix={(anilistId, title) =>
+              onOpenMappingFix={(anilistId, title, mappingRequired) =>
                 onOpenMediaModal({
                   anilistId,
                   title,
                   initialTab: 'mapping',
+                  initialMappingRequired: mappingRequired ?? false,
                   metadata: effectiveMetadata,
                 })
               }

@@ -68,6 +68,7 @@ export type MediaModalProps = {
   status: MediaStatus | null;
 
   initialTab?: MediaModalTabId;
+  initialMappingRequired?: boolean;
 
   portalContainer?: HTMLElement | ShadowRoot | null;
 
@@ -92,6 +93,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     year,
     status,
     initialTab = "series",
+    initialMappingRequired = false,
     portalContainer,
     mappingTabProps,
     sonarrPanelProps,
@@ -157,10 +159,17 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     setViewMode("mapping");
   }, []);
 
-  const handleMappingCancel = useCallback(() => {
+  const effectiveCurrentMapping = mappingController.currentMapping ?? mappingTabProps.currentMapping ?? null;
+  const mappingRequiresResolution = initialMappingRequired && effectiveCurrentMapping == null;
+
+  const handleExitMapping = useCallback(() => {
     mappingController.resetToCurrent();
+    if (mappingRequiresResolution) {
+      handleClose();
+      return;
+    }
     setViewMode("setup");
-  }, [mappingController]);
+  }, [handleClose, mappingController, mappingRequiresResolution]);
 
   const handleMappingSubmit = useCallback(async () => {
     const selected = mappingController.state.selected;
@@ -220,13 +229,13 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   // Handle ESC key: exit mapping mode first, then allow modal close
   const handleEscapeKeyDown = useCallback((event: KeyboardEvent) => {
     if (viewMode === "mapping") {
-      // Prevent modal from closing and exit edit mode instead
+      // Prevent Radix from closing first so the mapping flow can decide whether to exit or close.
       event.preventDefault();
       event.stopPropagation();
-      handleMappingCancel();
+      handleExitMapping();
     }
     // Otherwise, let Radix Dialog handle the close
-  }, [viewMode, handleMappingCancel]);
+  }, [viewMode, handleExitMapping]);
 
   const handleConfirmReset = useCallback(async () => {
     if (mappingController.isSubmitting) {
@@ -247,7 +256,6 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     }
   }, [confirm, mappingController]);
 
-  const effectiveCurrentMapping = mappingController.currentMapping ?? mappingTabProps.currentMapping ?? null;
   const selectedMapping = mappingController.state.selected;
 
   const showResetPreview = viewMode === "mapping" && mappingController.canSubmit && Boolean(selectedMapping);
@@ -256,6 +264,9 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   // Compute footer state directly in parent based on view mode
   const footerState = useMemo(() => {
     if (viewMode === "mapping") {
+      const primaryLabel = mappingRequiresResolution ? 'Add mapping' : 'Update mapping';
+      const secondaryLabel = mappingRequiresResolution ? 'Exit modal' : 'Exit mapping';
+
       return {
         leftContent: mappingController.canRevert ? (
           <Button
@@ -269,14 +280,14 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
             Reset to automatic
           </Button>
         ) : null,
-        primaryLabel: 'Update mapping',
+        primaryLabel,
         primaryDisabled: !mappingController.canSubmit,
         primaryLoading: mappingController.isSubmitting,
         onPrimaryClick: () => {
           void handleMappingSubmit();
         },
-        secondaryLabel: 'Exit mapping',
-        onSecondaryClick: handleMappingCancel,
+        secondaryLabel,
+        onSecondaryClick: handleExitMapping,
         showTertiary: false,
         tertiaryLabel: '',
         onTertiaryClick: undefined,
@@ -315,9 +326,10 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   }, [
     activeController,
     activePanelMode,
+    mappingRequiresResolution,
     viewMode,
     handleClose,
-    handleMappingCancel,
+    handleExitMapping,
     handleMappingSubmit,
     handleConfirmReset,
     mappingController,
@@ -360,7 +372,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           status={status}
           activeTab={viewMode === "mapping" ? "mapping" : "series"}
           onEnterMapping={handleEnterMapping}
-          onExitMapping={handleMappingCancel}
+          onExitMapping={handleExitMapping}
           onClose={handleClose}
           tooltipContainer={floatingPortalEl ?? (portalContainer instanceof HTMLElement ? portalContainer : null)}
         />
@@ -408,11 +420,12 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                     currentMapping={effectiveCurrentMapping}
                     previewMapping={previewMapping}
                     isInMappingMode={viewMode === "mapping"}
+                    exitClosesModal={mappingRequiresResolution}
                     showResetPreview={showResetPreview}
                     onResetPreview={mappingController.clearSelection}
                     onEditMapping={() => {
                       if (viewMode === "mapping") {
-                        handleMappingCancel();
+                        handleExitMapping();
                       } else {
                         handleEnterMapping();
                       }

@@ -370,11 +370,12 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
               metadata: resolvedMetadata,
             });
           }}
-          onOpenMappingFix={() => {
+          onOpenMappingFix={(mappingRequired) => {
             mediaModal.open({
               anilistId,
               title,
               initialTab: 'mapping',
+              initialMappingRequired: mappingRequired ?? mappingUnavailable,
               metadata: resolvedMetadata,
             });
           }}
@@ -397,6 +398,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
             year={modalProps.year}
             status={modalProps.status}
             initialTab={mediaModal.state.initialTab ?? 'series'}
+            initialMappingRequired={mediaModal.state.initialMappingRequired ?? false}
             portalContainer={hostElement}
             mappingTabProps={modalProps.mappingTabProps}
             sonarrPanelProps={modalProps.sonarrPanelProps}

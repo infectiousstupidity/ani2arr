@@ -9,6 +9,7 @@ export type OpenMediaModalInput = {
   anilistId: number;
   title: string;
   initialTab?: MediaModalTabId;
+  initialMappingRequired?: boolean;
   metadata: MediaMetadataHint | null;
 };
 
@@ -17,6 +18,7 @@ export type MediaModalState = {
   anilistId: number;
   title: string;
   initialTab?: MediaModalTabId;
+  initialMappingRequired?: boolean;
   metadata: MediaMetadataHint | null;
 } | null;
 
@@ -36,6 +38,7 @@ export function useMediaModalState(): UseMediaModalStateResult {
       anilistId: input.anilistId,
       title: input.title,
       ...(input.initialTab !== undefined ? { initialTab: input.initialTab } : {}),
+      ...(input.initialMappingRequired !== undefined ? { initialMappingRequired: input.initialMappingRequired } : {}),
       metadata: input.metadata,
     });
   }, []);

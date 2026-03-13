@@ -166,13 +166,18 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     });
   }, [librarySlug, overlayState, providerUrl, service, title]);
 
-  const overrideActive = (service === 'radarr' ? movieStatus?.overrideActive : seriesStatus?.overrideActive) === true;
+  const hasMapping =
+    service === 'radarr'
+      ? !mappingUnavailable && movieStatus?.tmdbId != null
+      : !mappingUnavailable && seriesStatus?.tvdbId != null;
+  const manualMappingLabel = hasMapping ? 'Update mapping manually' : 'Find match manually';
+  const manualMappingAriaLabel = hasMapping ? 'Update mapping manually' : 'Find match manually';
 
   const openMappingFix = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    onOpenMappingFix?.(anilistId, title, overrideActive);
-  }, [anilistId, onOpenMappingFix, overrideActive, title]);
+    onOpenMappingFix?.(anilistId, title, !hasMapping);
+  }, [anilistId, hasMapping, onOpenMappingFix, title]);
 
   const handlePrimaryAction = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     if (mappingUnavailable && onOpenMappingFix) {
@@ -207,8 +212,8 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
 
   const actionFixMapping = (
     onOpenMappingFix ? (
-      <TooltipWrapper content="Find match manually…" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
-        <button type="button" className="a2a-card-overlay__action a2a-card-overlay__action--fix" aria-label="Find match manually" onClick={openMappingFix} onMouseDown={swallowEvent}>
+      <TooltipWrapper content={manualMappingLabel} side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
+        <button type="button" className="a2a-card-overlay__action a2a-card-overlay__action--fix" aria-label={manualMappingAriaLabel} onClick={openMappingFix} onMouseDown={swallowEvent}>
           <Wrench aria-hidden="true" className="h-4 w-4" />
         </button>
       </TooltipWrapper>
