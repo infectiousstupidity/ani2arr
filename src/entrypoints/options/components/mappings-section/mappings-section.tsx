@@ -26,7 +26,7 @@ const MappingsSection: React.FC<{
     enabled: typeof targetAnilistId === 'number' && Number.isFinite(targetAnilistId),
   });
   const [providerFilters, setProviderFilters] = useState<Set<MappingProvider>>(new Set(['sonarr', 'radarr']));
-  const [sourceFilters, setSourceFilters] = useState<SourceFilterSet>(new Set(['manual', 'ignored']));
+  const [sourceFilters, setSourceFilters] = useState<SourceFilterSet>(new Set(['manual', 'ignored', 'unresolved']));
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState<MappingSort>('updated-desc');
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>('all');

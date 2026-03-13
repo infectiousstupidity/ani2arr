@@ -18,6 +18,7 @@ import { useExtensionOptions } from '@/shared/queries';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import { useSettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
+import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
 
 const queryClient = new QueryClient();
 
@@ -219,6 +220,20 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
             <p className="font-semibold text-text-primary">Tip</p>
             <p className="mt-1">Settings are global. Per-title behaviour stays in the media modal.</p>
           </div>
+          {activeSection === 'mappings' ? (
+            <div className="rounded-lg border border-border-primary bg-bg-secondary/70 p-3 text-xs text-text-secondary">
+              <p className="font-semibold text-text-primary">Mappings notes</p>
+              <p className="mt-1">
+                <strong className="font-semibold text-text-primary">Ignore mapping</strong> marks an AniList entry as
+                intentionally unmapped, so ani2arr will skip automatic matching until you remove the ignore.
+              </p>
+              <p className="mt-2">
+                <strong className="font-semibold text-text-primary">Unresolved</strong> entries only appear after
+                ani2arr has tried to resolve them in an active title flow such as the anime page, modal, or mapping
+                tools. The general browse page is not used to build this list.
+              </p>
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={openPrivacyPanel}
@@ -246,6 +261,7 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
 };
 
 const OptionsPage: React.FC = React.memo(() => {
+  useA2aBroadcasts();
   const [activeSection, setActiveSection] = useState<SectionId>(getInitialSection);
   const [targetAnilistId, setTargetAnilistId] = useState<number | null>(() => {
     if (typeof window === 'undefined') return null;
