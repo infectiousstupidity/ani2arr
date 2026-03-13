@@ -11,6 +11,18 @@ export type {
 } from './anilist';
 
 export type {
+  AniListSchedulerEventType,
+  AniListSchedulerRequestDebug,
+  AniListSchedulerPendingEntryDebug,
+  AniListSchedulerBucketDebug,
+  AniListSchedulerBatchMediaCountsDebug,
+  AniListSchedulerBatchDebug,
+  AniListSchedulerEventDebug,
+  AniListSchedulerLimiterDebug,
+  AniListSchedulerDebugSnapshot,
+} from './anilist-debug';
+
+export type {
   LeanRadarrMovie,
   MediaService,
   LeanSonarrSeries,

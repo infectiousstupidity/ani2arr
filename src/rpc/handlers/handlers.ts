@@ -607,6 +607,10 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         ...(result.missingIds?.length ? { missingIds: result.missingIds } : {}),
       };
     },
+
+    async getAniListSchedulerDebug() {
+      return anilistApiService.getSchedulerDebugSnapshot();
+    },
   } satisfies Ani2arrApi;
 
   return handlers;

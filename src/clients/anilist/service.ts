@@ -1,6 +1,11 @@
 import PQueue from 'p-queue';
 import type { TtlCache } from '@/cache';
-import type { AniMedia, AniListSearchResult, RequestPriority } from '@/shared/types';
+import type {
+  AniListSchedulerDebugSnapshot,
+  AniMedia,
+  AniListSearchResult,
+  RequestPriority,
+} from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
 import { priorityValue } from '@/shared/utils/priority';
 import { DEFAULT_PREQUEL_DEPTH, QUEUE_CONCURRENCY } from './constants';
@@ -127,6 +132,10 @@ export class AnilistApiService {
       await this.waitForLimiterWindow('normal');
       return this.executor.search(term, limit);
     }, { priority: priorityValue('normal') });
+  }
+
+  public getSchedulerDebugSnapshot(): AniListSchedulerDebugSnapshot {
+    return this.mediaScheduler.getDebugSnapshot();
   }
 
   private async waitForLimiterWindow(priority: RequestPriority): Promise<void> {
