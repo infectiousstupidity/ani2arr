@@ -17,6 +17,7 @@ export interface UiOptions {
   browseOverlayEnabled: boolean;
   badgeVisibility: BadgeVisibility;
   headerInjectionEnabled: boolean;
+  schedulerDebugOverlayEnabled: boolean;
 }
 
 export interface SonarrFormState {

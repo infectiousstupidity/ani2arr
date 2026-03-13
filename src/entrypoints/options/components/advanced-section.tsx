@@ -21,6 +21,10 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
   const version = useMemo(() => browser.runtime.getManifest()?.version ?? 'unknown', []);
   const methods = useFormContext<SettingsFormValues>();
   const debugLogging = Boolean(useWatch({ control: methods.control, name: 'debugLogging' as const }));
+  const schedulerDebugOverlayEnabled = Boolean(
+    useWatch({ control: methods.control, name: 'ui.schedulerDebugOverlayEnabled' as const }),
+  );
+  const showSchedulerDebugToggle = import.meta.env.DEV;
   const privacyCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -126,6 +130,26 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
               onChange={(e) => methods.setValue('debugLogging', e.target.checked, { shouldDirty: true })}
             />
           </div>
+          {showSchedulerDebugToggle ? (
+            <div className="flex items-center justify-between gap-4 rounded-xl bg-bg-tertiary/60 px-3 py-2">
+              <div>
+                <p className="text-sm text-text-primary">Scheduler debug overlay</p>
+                <p className="text-xs text-text-secondary">
+                  Show the AniList query inspector on browse pages with aggregate totals, merge previews, and sent batch history.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={schedulerDebugOverlayEnabled}
+                onChange={(e) =>
+                  methods.setValue('ui.schedulerDebugOverlayEnabled', e.target.checked, {
+                    shouldDirty: true,
+                  })
+                }
+              />
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-primary pt-3">
             <Button
               variant="outline"
