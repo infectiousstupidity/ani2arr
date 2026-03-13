@@ -1,4 +1,5 @@
 export { ResolvedLedger } from './resolved-ledger';
+export { UnresolvedLedger } from './unresolved-ledger';
 export {
   RESOLVED_PERSIST_MS,
   NO_MATCH_SOFT_TTL,

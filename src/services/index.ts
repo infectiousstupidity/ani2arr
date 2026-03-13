@@ -55,7 +55,7 @@ function bindAll<T extends object>(instance: T): T {
 }
 
 const initializeEpoch = async (
-  key: 'libraryEpochSonarr' | 'libraryEpochRadarr' | 'settingsEpoch',
+  key: 'libraryEpochSonarr' | 'libraryEpochRadarr' | 'settingsEpoch' | 'mappingsEpoch',
 ): Promise<number> => {
   try {
     const stored = await browser.storage.local.get(key);
@@ -93,6 +93,14 @@ export const createApiImplementation = (): Ani2arrApi => {
 
   const overridesService = new MappingOverridesService();
   const overridesReady = overridesService.init();
+  let mappingsEpoch = 0;
+
+  const bumpMappingsEpoch = async (payload?: Record<string, unknown>): Promise<void> => {
+    mappingsEpoch += 1;
+    const nextEpoch = mappingsEpoch;
+    await browser.storage.local.set({ mappingsEpoch: nextEpoch });
+    await broadcast('mappings-updated', { epoch: nextEpoch, ...payload });
+  };
 
   const mappingService = bindAll(
     new MappingService(
@@ -113,6 +121,9 @@ export const createApiImplementation = (): Ani2arrApi => {
         },
       },
       overridesService,
+      () => {
+        void bumpMappingsEpoch();
+      },
     ),
   );
 
@@ -138,6 +149,9 @@ export const createApiImplementation = (): Ani2arrApi => {
   });
   void initializeEpoch('settingsEpoch').then(epoch => {
     settingsEpoch = epoch;
+  });
+  void initializeEpoch('mappingsEpoch').then(epoch => {
+    mappingsEpoch = epoch;
   });
 
   const pendingLibraryRefresh: Record<LibraryProvider, ReturnType<typeof setTimeout> | null> = {
@@ -275,6 +289,7 @@ export const createApiImplementation = (): Ani2arrApi => {
     logger.configure({ enabled: (optionsHint?.debugLogging ?? false) || import.meta.env.DEV });
     await bumpSettingsEpoch();
     await mappingService.resetLookupState();
+    await bumpMappingsEpoch({ action: 'reset-lookup-state' });
     const options = optionsHint ?? (await getExtensionOptionsSnapshot());
     await Promise.all([
       sonarrLibrary.refreshCache(options),
@@ -301,6 +316,7 @@ export const createApiImplementation = (): Ani2arrApi => {
     ensureRadarrConfigured,
     scheduleLibraryRefresh,
     bumpLibraryEpoch,
+    bumpMappingsEpoch,
     handleOptionsUpdated,
     getMappings: getMappingsHandler,
     updateMovie: updateRadarrMovieHandler,

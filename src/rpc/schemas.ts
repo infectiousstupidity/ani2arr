@@ -22,7 +22,7 @@ import type {
  */
 const IdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
 const MappingProviderSchema = v.picklist(['sonarr', 'radarr']);
-const MappingSourceSchema = v.picklist(['manual', 'upstream', 'auto', 'ignored']);
+const MappingSourceSchema = v.picklist(['manual', 'upstream', 'auto', 'ignored', 'unresolved']);
 const MappingStatusSchema = v.picklist(['unmapped', 'in-provider', 'not-in-provider']);
 
 /**

@@ -2,7 +2,7 @@ export type RequestPriority = 'high' | 'normal' | 'low';
 
 import type { MediaService } from './providers';
 
-export type MappingSource = 'manual' | 'upstream' | 'auto' | 'ignored';
+export type MappingSource = 'manual' | 'upstream' | 'auto' | 'ignored' | 'unresolved';
 export type MappingStatus = 'unmapped' | 'in-provider' | 'not-in-provider';
 export type MappingProvider = MediaService;
 

@@ -39,6 +39,7 @@ type CommonDeps = {
   ensureRadarrConfigured: () => Promise<{ credentials: RadarrCredentialsPayload; options: ExtensionOptions }>;
   scheduleLibraryRefresh: (provider: 'sonarr' | 'radarr', optionsHint?: ExtensionOptions) => void;
   bumpLibraryEpoch: (provider: 'sonarr' | 'radarr', payload?: Record<string, unknown>) => Promise<void>;
+  bumpMappingsEpoch: (payload?: Record<string, unknown>) => Promise<void>;
   handleOptionsUpdated: (optionsHint?: ExtensionOptions) => Promise<void>;
   getMappings: typeof getMappingsHandler;
   updateMovie: typeof updateRadarrMovieHandler;
@@ -61,6 +62,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     ensureRadarrConfigured,
     scheduleLibraryRefresh,
     bumpLibraryEpoch,
+    bumpMappingsEpoch,
     handleOptionsUpdated,
     getMappings,
     updateMovie,
@@ -527,6 +529,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         externalId: input.externalId,
         action: 'override:set',
       });
+      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'override:set' });
       return { ok: true as const };
     },
 
@@ -541,6 +544,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         }
       }
       await bumpLibraryEpoch(input.provider, { anilistId: input.anilistId, action: 'override:clear' });
+      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'override:clear' });
       return { ok: true as const };
     },
 
@@ -549,6 +553,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesService.setIgnore(input.provider, input.anilistId);
       await mappingService.evictResolved(input.anilistId, input.provider);
       await bumpLibraryEpoch(input.provider, { anilistId: input.anilistId, action: 'override:ignore' });
+      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'override:ignore' });
       return { ok: true as const };
     },
 
@@ -557,6 +562,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesService.clearIgnore(input.provider, input.anilistId);
       await mappingService.evictResolved(input.anilistId, input.provider);
       await bumpLibraryEpoch(input.provider, { anilistId: input.anilistId, action: 'override:clearIgnore' });
+      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'override:clearIgnore' });
       return { ok: true as const };
     },
 
@@ -578,6 +584,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       }
       await bumpLibraryEpoch('sonarr', { action: 'override:clearAll' });
       await bumpLibraryEpoch('radarr', { action: 'override:clearAll' });
+      await bumpMappingsEpoch({ action: 'override:clearAll' });
       return { ok: true as const };
     },
 
