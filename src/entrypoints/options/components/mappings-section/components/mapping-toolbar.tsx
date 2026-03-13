@@ -30,6 +30,7 @@ type MappingToolbarProps = {
 
 const sourceOptions: { value: MappingSource; label: string; color: string }[] = [
   { value: 'manual', label: 'Manual', color: 'bg-blue-500' },
+  { value: 'unresolved', label: 'Unresolved', color: 'bg-amber-500' },
   { value: 'auto', label: 'Auto', color: 'bg-purple-500' },
   { value: 'upstream', label: 'Upstream', color: 'bg-slate-400' },
   { value: 'ignored', label: 'Ignored', color: 'bg-red-500' },
@@ -42,7 +43,7 @@ const sortOptions: { value: MappingSort; label: string; description?: string }[]
   { value: 'title-desc', label: 'Title (Z-A)' },
   { value: 'linked-desc', label: 'Linked (most first)' },
   { value: 'linked-asc', label: 'Linked (fewest first)' },
-  { value: 'source', label: 'Source (manual first)', description: 'Manual -> ignored -> upstream -> auto' },
+  { value: 'source', label: 'Source (manual first)', description: 'Manual -> unresolved -> ignored -> upstream -> auto' },
 ];
 
 const libraryOptions: { value: LibraryFilter; label: string; description?: string }[] = [

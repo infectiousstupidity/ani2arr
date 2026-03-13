@@ -33,7 +33,7 @@ export const useMappingTableData = ({
     const trimmedQuery = debouncedQuery.trim();
     const hasQuery = trimmedQuery.length >= 2;
     const sourceList: NonNullable<GetMappingsInput>['sources'] =
-      sourceFilters.size > 0 ? Array.from(sourceFilters) : ['manual', 'ignored', 'auto', 'upstream'];
+      sourceFilters.size > 0 ? Array.from(sourceFilters) : ['manual', 'ignored', 'unresolved', 'auto', 'upstream'];
     return {
       providers: providersToQuery,
       sources: sourceList,
@@ -151,9 +151,10 @@ export const useMappingTableData = ({
 
     const sourcePriority: Record<MappingSummary['source'], number> = {
       manual: 0,
-      ignored: 1,
-      upstream: 2,
-      auto: 3,
+      unresolved: 1,
+      ignored: 2,
+      upstream: 3,
+      auto: 4,
     };
 
     const resolveTitle = (row: MappingTableRowData) => {

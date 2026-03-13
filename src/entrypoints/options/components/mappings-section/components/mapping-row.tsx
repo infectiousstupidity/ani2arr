@@ -35,6 +35,7 @@ export type MappingTableRowData = {
 
 const sourceStyles: Record<MappingSummary['source'], { label: string; className: string }> = {
   manual: { label: 'Manual', className: 'bg-blue-500/15 text-blue-300' },
+  unresolved: { label: 'Unresolved', className: 'bg-amber-500/15 text-amber-300' },
   auto: { label: 'Auto', className: 'bg-purple-500/15 text-purple-300' },
   upstream: { label: 'Upstream', className: 'bg-slate-500/15 text-slate-200' },
   ignored: { label: 'Ignored', className: 'bg-red-500/15 text-red-300' },
@@ -70,6 +71,19 @@ const getExternalLink = (provider: MappingProvider, externalId: MappingExternalI
 };
 
 const MetaSeparator: React.FC = () => <span className="text-text-tertiary">·</span>;
+
+const resolveAniListTitle = (
+  metadata: AniListMetadataDto | null | undefined,
+  fallback?: string | null,
+): string => {
+  return (
+    metadata?.titles?.english ||
+    metadata?.titles?.romaji ||
+    metadata?.titles?.native ||
+    fallback ||
+    'Unknown title'
+  );
+};
 
 type MappingEntryRowProps = {
   entry: MappingSummary;
@@ -341,9 +355,14 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
   }, [providedMetadata, fetchedMetadata.data?.metadata]);
 
   const firstEntry = row.entries[0];
+  const firstEntryMetadata = firstEntry ? metadataMap.get(firstEntry.entry.anilistId) ?? firstEntry.metadata ?? null : null;
+  const uniqueSources = Array.from(new Set(row.sources));
+  const prefersAniListTitle = !row.externalId && uniqueSources.includes('unresolved');
+  const preferredProviderTitle = prefersAniListTitle ? null : row.providerMeta?.title;
   const targetTitle =
+    preferredProviderTitle ??
+    (firstEntry ? resolveAniListTitle(firstEntryMetadata, firstEntry.title) : null) ??
     row.providerMeta?.title ??
-    firstEntry?.title ??
     (row.externalId ? `${row.externalId.kind.toUpperCase()} #${row.externalId.id}` : 'Unmapped');
   const externalIdLabel = row.externalId
     ? `${row.externalId.kind.toUpperCase()} #${row.externalId.id}`
@@ -353,10 +372,13 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
   const providerLabel = row.provider === 'sonarr' ? 'Sonarr' : 'Radarr';
   const inLibraryCount = row.entries.filter((e) => e.entry.status === 'in-provider').length;
   const hasMapping = Boolean(row.externalId);
-  const linkedLabel = inLibraryCount > 0
-    ? `${row.entries.length} linked · ${inLibraryCount} in library`
-    : `${row.entries.length} linked`;
-  const uniqueSources = Array.from(new Set(row.sources));
+  const linkedLabel = !hasMapping
+    ? uniqueSources.includes('unresolved')
+      ? 'Unresolved attempt'
+      : 'No target linked'
+    : inLibraryCount > 0
+      ? `${row.entries.length} linked · ${inLibraryCount} in library`
+      : `${row.entries.length} linked`;
   const hasMultipleSources = uniqueSources.length > 1;
 
   return (
@@ -431,11 +453,12 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
             <div className="space-y-3 pl-6">
               {row.entries.map(({ entry, title }) => {
                 const resolvedMetadata = metadataMap.get(entry.anilistId) ?? null;
+                const resolvedTitle = resolveAniListTitle(resolvedMetadata, title);
                 return (
                   <MappingEntryRow
                     key={entry.anilistId}
                     entry={entry}
-                    title={title}
+                    title={resolvedTitle}
                     metadata={resolvedMetadata}
                     isMutating={isMutating}
                     onEdit={onEdit}
