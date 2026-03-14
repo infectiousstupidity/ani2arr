@@ -18,7 +18,7 @@ import { logger } from '@/shared/utils/logger';
 
 import {
   ProviderConnectionCard,
-  ConnectionStatusBadge,
+  ProviderConnectionStatusBadge,
   SonarrTitleLanguageField,
 } from './settings-connection-card';
 import { SonarrDefaultsSection } from './settings-sonarr-defaults';
@@ -148,6 +148,14 @@ function SettingsFormInner({
     hasSavedCredentials ||
       (credentialScope && confirmedScope === credentialScope)
   );
+  const connectionStatus =
+    actions.sonarrTestConnectionState.isPending
+      ? 'connecting'
+      : credentialScope && confirmedScope === credentialScope
+        ? 'connected'
+        : hasSavedCredentials
+          ? 'configured'
+          : 'not-configured';
 
   // Reset confirmed scope if credentials change
   useEffect(() => {
@@ -334,10 +342,7 @@ function SettingsFormInner({
                 Sonarr URL, API key, and preferred title language.
               </p>
             </div>
-            <ConnectionStatusBadge
-              isConnected={isConnected}
-              isTesting={actions.sonarrTestConnectionState.isPending}
-            />
+            <ProviderConnectionStatusBadge status={connectionStatus} />
           </div>
           <div className="mt-4">
             <ProviderConnectionCard

@@ -7,7 +7,7 @@ import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import { buildRadarrPermissionPattern, requestRadarrPermission, validateApiKey, validateUrl } from '@/shared/radarr/validation';
 import { logger } from '@/shared/utils/logger';
-import { ConnectionStatusBadge, ProviderConnectionCard } from './settings-connection-card';
+import { ProviderConnectionCard, ProviderConnectionStatusBadge } from './settings-connection-card';
 import { RadarrDefaultsSection } from './settings-radarr-defaults';
 import { SaveSettingsBar } from './settings-form';
 import { useSelectPortal } from './use-select-portal';
@@ -81,6 +81,14 @@ function RadarrSettingsFormInner({
   );
 
   const isConnected = Boolean(hasSavedCredentials || (credentialScope && confirmedScope === credentialScope));
+  const connectionStatus =
+    actions.radarrTestConnectionState.isPending
+      ? 'connecting'
+      : credentialScope && confirmedScope === credentialScope
+        ? 'connected'
+        : hasSavedCredentials
+          ? 'configured'
+          : 'not-configured';
 
   useEffect(() => {
     if (!credentialScope) {
@@ -248,10 +256,7 @@ function RadarrSettingsFormInner({
               Radarr URL and API key for movie lookups, adds, and updates.
             </p>
           </div>
-          <ConnectionStatusBadge
-            isConnected={isConnected}
-            isTesting={actions.radarrTestConnectionState.isPending}
-          />
+          <ProviderConnectionStatusBadge status={connectionStatus} />
         </div>
         <div className="mt-4">
           <ProviderConnectionCard
