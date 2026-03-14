@@ -287,11 +287,12 @@ export class AniListMetadataStore {
 
   public async getMetadata(
     ids: number[],
-    options?: { refreshStale?: boolean; maxBatch?: number },
+    options?: { refreshStale?: boolean; maxBatch?: number; fetchMissing?: boolean },
   ): Promise<{ metadata: AniListMetadata[]; missingIds?: number[] }> {
     await this.ready;
     const refreshStale = options?.refreshStale ?? true;
     const maxBatch = options?.maxBatch;
+    const fetchMissing = options?.fetchMissing ?? true;
     const now = Date.now();
     const metadata = new Map<number, AniListMetadata>();
     const refreshIds: number[] = [];
@@ -304,7 +305,7 @@ export class AniListMetadataStore {
         if (refreshStale && this.isStale(entry, now) && !this.inflight.has(id)) {
           refreshIds.push(id);
         }
-      } else {
+      } else if (fetchMissing) {
         refreshIds.push(id);
       }
     }
@@ -323,5 +324,18 @@ export class AniListMetadataStore {
       metadata: Array.from(metadata.values()),
       ...(missingIds.length > 0 ? { missingIds } : {}),
     };
+  }
+
+  public async clearLocalCache(): Promise<void> {
+    await this.ready;
+    this.localMap.clear();
+    this.inflight.clear();
+
+    try {
+      await browser.storage.local.remove(STORAGE_KEY);
+    } catch (error) {
+      logError(normalizeError(error), 'AniListMetadataStore:clearLocalCache');
+      throw error;
+    }
   }
 }
