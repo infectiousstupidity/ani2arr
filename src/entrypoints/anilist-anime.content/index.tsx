@@ -218,7 +218,12 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
 
   const mediaModal = useMediaModalState();
   const { data: options, isPending: optionsPending, isError: optionsError } = usePublicOptions();
-  const metadataBatch = useAniListMetadataBatch([anilistId], { enabled: Number.isFinite(anilistId) });
+  const hasConfiguredProvider = Boolean(
+    options?.providers.sonarr.isConfigured || options?.providers.radarr.isConfigured,
+  );
+  const metadataBatch = useAniListMetadataBatch([anilistId], {
+    enabled: Number.isFinite(anilistId) && hasConfiguredProvider,
+  });
   const canonicalMetadata = metadataHintFromAniListMetadata(metadataBatch.data?.metadata?.[0] ?? null);
   const resolvedMetadata = mergeMetadataHints(canonicalMetadata, metadata);
   const uiEnabled = options?.ui?.headerInjectionEnabled ?? true;

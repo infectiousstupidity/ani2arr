@@ -291,6 +291,13 @@ export const createApiImplementation = (): Ani2arrApi => {
     await mappingService.resetLookupState();
     await bumpMappingsEpoch({ action: 'reset-lookup-state' });
     const options = optionsHint ?? (await getExtensionOptionsSnapshot());
+    const hasConfiguredProvider = Boolean(
+      (options?.providers.sonarr.url && options.providers.sonarr.apiKey) ||
+      (options?.providers.radarr.url && options.providers.radarr.apiKey),
+    );
+    if (hasConfiguredProvider) {
+      await mappingService.initStaticPairs();
+    }
     await Promise.all([
       sonarrLibrary.refreshCache(options),
       radarrLibrary.refreshCache(options),
