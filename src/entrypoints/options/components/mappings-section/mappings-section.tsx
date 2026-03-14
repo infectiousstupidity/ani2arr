@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Download, Plus } from 'lucide-react';
 import Button from '@/shared/ui/primitives/button';
 import { MappingEditor } from '@/features/mapping/mapping-editor';
-import { useAniListMedia, useClearMappingIgnore, useClearMappingOverride, useSetMappingIgnore } from '@/shared/queries';
+import {
+  useAniListMedia,
+  useClearMappingIgnore,
+  useClearMappingOverride,
+  useSetMappingIgnore,
+} from '@/shared/queries';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import type { MappingProvider, MappingSummary } from '@/shared/types';
@@ -11,6 +16,8 @@ import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import MappingToolbar, { type LibraryFilter, type MappingSort, type SourceFilterSet } from './components/mapping-toolbar';
 import { MappingTable } from './components/mapping-table';
 import AddMissingEntryDialog from './components/add-missing-entry-dialog';
+import ExportMappingsDialog from './components/export-mappings-dialog';
+import { buildMappingsExportPayload, type ExportMappingsFilters } from './export-mappings';
 import { useMappingTableData } from './hooks/use-mapping-table-data';
 
 const MappingsSection: React.FC<{
@@ -30,6 +37,8 @@ const MappingsSection: React.FC<{
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState<MappingSort>('updated-desc');
   const [libraryFilter, setLibraryFilter] = useState<LibraryFilter>('all');
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [editorState, setEditorState] = useState<{
     anilistId: number;
     provider: MappingProvider;
@@ -135,6 +144,37 @@ const MappingsSection: React.FC<{
     setEditorState({ anilistId: entry.anilistId, externalId: entry.externalId ?? null, provider: entry.provider });
   };
 
+  const handleExport = async (filters: ExportMappingsFilters) => {
+    setIsExporting(true);
+    try {
+      const payload = await buildMappingsExportPayload(filters);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const stamp = payload.exportedAt.replace(/[:.]/g, '-');
+      link.href = objectUrl;
+      link.download = `ani2arr-mappings-${stamp}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      toast.showToast({
+        title: 'Mappings exported',
+        description: `Downloaded ${payload.summary.rowCount} mapping groups with ${payload.summary.entryCount} entries.`,
+        variant: 'success',
+      });
+      setExportDialogOpen(false);
+    } catch (error) {
+      toast.showToast({
+        title: 'Export failed',
+        description: (error as Error)?.message ?? 'Unable to export filtered mappings.',
+        variant: 'error',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const toggleProvider = (provider: MappingProvider) => {
     setProviderFilters((prev) => {
       const next = new Set(prev);
@@ -158,10 +198,14 @@ const MappingsSection: React.FC<{
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" type="button">
-            Import
-          </Button>
-          <Button variant="outline" size="sm" type="button">
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={() => setExportDialogOpen(true)}
+            isLoading={isExporting}
+          >
+            <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
         </div>
@@ -254,6 +298,19 @@ const MappingsSection: React.FC<{
           setAddDialogOpen(false);
         }}
       />
+
+      {exportDialogOpen ? (
+        <ExportMappingsDialog
+          open={exportDialogOpen}
+          providerFilters={providerFilters}
+          sourceFilters={sourceFilters}
+          searchQuery={searchQuery}
+          libraryFilter={libraryFilter}
+          onClose={() => setExportDialogOpen(false)}
+          onExport={handleExport}
+          isExporting={isExporting}
+        />
+      ) : null}
     </div>
   );
 };

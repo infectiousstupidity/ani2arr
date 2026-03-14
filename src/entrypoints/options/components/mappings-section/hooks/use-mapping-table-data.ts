@@ -5,6 +5,7 @@ import type { MappingProvider, MappingSummary } from '@/shared/types';
 import type { GetAniListMetadataOutput, GetMappingsInput, GetMappingsOutput } from '@/rpc/schemas';
 import type { MappingTableRowData } from '../components/mapping-table';
 import type { LibraryFilter, MappingSort, SourceFilterSet } from '../components/mapping-toolbar';
+import { normalizeMappingSearchQuery } from '../search-query';
 
 type UseMappingTableDataParams = {
   providerFilters: Set<MappingProvider>;
@@ -12,6 +13,7 @@ type UseMappingTableDataParams = {
   searchQuery: string;
   libraryFilter: LibraryFilter;
   sortOption: MappingSort;
+  limitOverride?: number;
 };
 
 export const useMappingTableData = ({
@@ -20,6 +22,7 @@ export const useMappingTableData = ({
   searchQuery,
   libraryFilter,
   sortOption,
+  limitOverride,
 }: UseMappingTableDataParams) => {
   const debouncedQuery = useDebounced(searchQuery, 250);
 
@@ -30,17 +33,16 @@ export const useMappingTableData = ({
   }, [providerFilters]);
 
   const mappingQueryInput = useMemo<GetMappingsInput>(() => {
-    const trimmedQuery = debouncedQuery.trim();
-    const hasQuery = trimmedQuery.length >= 2;
+    const normalizedQuery = normalizeMappingSearchQuery(debouncedQuery);
     const sourceList: NonNullable<GetMappingsInput>['sources'] =
       sourceFilters.size > 0 ? Array.from(sourceFilters) : ['manual', 'ignored', 'unresolved', 'auto', 'upstream'];
     return {
       providers: providersToQuery,
       sources: sourceList,
-      limit: hasQuery ? 200 : 500,
-      ...(hasQuery ? { query: trimmedQuery } : {}),
+      limit: limitOverride ?? (normalizedQuery ? 200 : 500),
+      ...(normalizedQuery ? { query: normalizedQuery } : {}),
     };
-  }, [debouncedQuery, providersToQuery, sourceFilters]);
+  }, [debouncedQuery, limitOverride, providersToQuery, sourceFilters]);
 
   const mappings = useMappings(mappingQueryInput);
   const mappingPages = useMemo<GetMappingsOutput[]>(() => mappings.data?.pages ?? [], [mappings.data?.pages]);
@@ -250,6 +252,7 @@ export const useMappingTableData = ({
 
   return {
     mappings,
+    filteredEntryRows,
     tableRows,
     totalAvailable,
     loadedCount,
