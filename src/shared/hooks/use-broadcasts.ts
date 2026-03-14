@@ -2,18 +2,29 @@
 import { useCallback, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
+import { clearPersistedQueryCache } from '@/cache/query-cache';
 import type { MappingProvider } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
 import { queryKeys } from '@/shared/queries';
+import {
+  clearA2aSessionStorage,
+  CLIENT_STORAGE_RESET_TOPIC,
+  LIBRARY_SESSION_KEYS,
+  MAPPINGS_SESSION_KEY,
+  SETTINGS_SESSION_KEY,
+} from '@/shared/utils/client-storage';
 
 const log = logger.create('Broadcasts');
 
 const PUBLIC_OPTIONS_KEY = queryKeys.publicOptions();
-const SETTINGS_SESSION_KEY = 'a2a_settings_epoch';
-const MAPPINGS_SESSION_KEY = 'a2a_mappings_epoch';
-const LIBRARY_SESSION_KEYS: Record<MappingProvider, string> = {
-  sonarr: 'a2a_library_epoch_sonarr',
-  radarr: 'a2a_library_epoch_radarr',
+
+const syncSessionEpoch = (key: string, epoch: unknown): void => {
+  if (typeof epoch === 'number' && epoch > 0) {
+    sessionStorage.setItem(key, String(epoch));
+    return;
+  }
+
+  sessionStorage.removeItem(key);
 };
 
 export function useA2aBroadcasts(): void {
@@ -26,9 +37,7 @@ export function useA2aBroadcasts(): void {
   const refreshMappingsQueries = useCallback(
     (epoch?: number) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-      if (typeof epoch === 'number') {
-        sessionStorage.setItem(MAPPINGS_SESSION_KEY, String(epoch));
-      }
+      syncSessionEpoch(MAPPINGS_SESSION_KEY, epoch);
     },
     [queryClient],
   );
@@ -36,12 +45,22 @@ export function useA2aBroadcasts(): void {
   const refreshLibraryQueries = useCallback(
     (provider: MappingProvider, epoch?: number) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot(provider) });
-      if (typeof epoch === 'number') {
-        sessionStorage.setItem(LIBRARY_SESSION_KEYS[provider], String(epoch));
-      }
+      syncSessionEpoch(LIBRARY_SESSION_KEYS[provider], epoch);
     },
     [queryClient],
   );
+
+  const clearClientStorage = useCallback(async () => {
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    clearA2aSessionStorage();
+
+    try {
+      await clearPersistedQueryCache();
+    } catch (error) {
+      log.warn('Failed to clear persisted query cache.', error instanceof Error ? error.message : String(error));
+    }
+  }, [queryClient]);
 
   useEffect(() => {
     const handler = (message: unknown) => {
@@ -59,20 +78,21 @@ export function useA2aBroadcasts(): void {
 
       if (envelope.topic === 'settings-changed') {
         refreshSettingsQueries();
-        const epoch = envelope.payload?.epoch;
-        if (typeof epoch === 'number') {
-          sessionStorage.setItem(SETTINGS_SESSION_KEY, String(epoch));
-        }
+        syncSessionEpoch(SETTINGS_SESSION_KEY, envelope.payload?.epoch);
       }
 
       if (envelope.topic === 'mappings-updated') {
         refreshMappingsQueries(envelope.payload?.epoch);
       }
+
+      if (envelope.topic === CLIENT_STORAGE_RESET_TOPIC) {
+        void clearClientStorage();
+      }
     };
 
     browser.runtime.onMessage.addListener(handler);
     return () => browser.runtime.onMessage.removeListener(handler);
-  }, [refreshLibraryQueries, refreshMappingsQueries, refreshSettingsQueries]);
+  }, [clearClientStorage, refreshLibraryQueries, refreshMappingsQueries, refreshSettingsQueries]);
 
   useEffect(() => {
     const onStorageChanged: Parameters<typeof browser.storage.onChanged.addListener>[0] = (
@@ -104,10 +124,7 @@ export function useA2aBroadcasts(): void {
 
       if (changes.settingsEpoch) {
         refreshSettingsQueries();
-        const next = changes.settingsEpoch.newValue;
-        if (typeof next === 'number') {
-          sessionStorage.setItem(SETTINGS_SESSION_KEY, String(next));
-        }
+        syncSessionEpoch(SETTINGS_SESSION_KEY, changes.settingsEpoch.newValue);
       }
 
       if (changes.mappingsEpoch) {
@@ -141,22 +158,30 @@ export function useA2aBroadcasts(): void {
         const previousSonarr = Number(sessionStorage.getItem(LIBRARY_SESSION_KEYS.sonarr) ?? '0');
         if (typeof sonarrEpoch === 'number' && sonarrEpoch > previousSonarr) {
           refreshLibraryQueries('sonarr', sonarrEpoch);
+        } else if (!(typeof sonarrEpoch === 'number' && sonarrEpoch > 0)) {
+          sessionStorage.removeItem(LIBRARY_SESSION_KEYS.sonarr);
         }
 
         const previousRadarr = Number(sessionStorage.getItem(LIBRARY_SESSION_KEYS.radarr) ?? '0');
         if (typeof libraryEpochRadarr === 'number' && libraryEpochRadarr > previousRadarr) {
           refreshLibraryQueries('radarr', libraryEpochRadarr);
+        } else if (!(typeof libraryEpochRadarr === 'number' && libraryEpochRadarr > 0)) {
+          sessionStorage.removeItem(LIBRARY_SESSION_KEYS.radarr);
         }
 
         const previousSettings = Number(sessionStorage.getItem(SETTINGS_SESSION_KEY) ?? '0');
         if (typeof settingsEpoch === 'number' && settingsEpoch > previousSettings) {
-          sessionStorage.setItem(SETTINGS_SESSION_KEY, String(settingsEpoch));
+          syncSessionEpoch(SETTINGS_SESSION_KEY, settingsEpoch);
           refreshSettingsQueries();
+        } else if (!(typeof settingsEpoch === 'number' && settingsEpoch > 0)) {
+          sessionStorage.removeItem(SETTINGS_SESSION_KEY);
         }
 
         const previousMappings = Number(sessionStorage.getItem(MAPPINGS_SESSION_KEY) ?? '0');
         if (typeof mappingsEpoch === 'number' && mappingsEpoch > previousMappings) {
           refreshMappingsQueries(mappingsEpoch);
+        } else if (!(typeof mappingsEpoch === 'number' && mappingsEpoch > 0)) {
+          sessionStorage.removeItem(MAPPINGS_SESSION_KEY);
         }
       } catch (error) {
         log.warn('Failed to reconcile ani2arr library epoch.', error instanceof Error ? error.message : String(error));
