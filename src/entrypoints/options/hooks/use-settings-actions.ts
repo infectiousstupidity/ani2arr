@@ -22,6 +22,7 @@ import {
   validateUrl as validateRadarrUrl,
 } from '@/shared/radarr/validation';
 import { logger } from '@/shared/utils/logger';
+import { CLIENT_STORAGE_RESET_MESSAGE_TYPE } from '@/shared/utils/client-storage';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import { parseSettings } from '@/shared/options/storage';
@@ -60,6 +61,10 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
     queryClient.invalidateQueries({ queryKey: queryKeys.publicOptions() });
     queryClient.invalidateQueries({ queryKey: queryKeys.sonarrMetadataRoot() });
     queryClient.invalidateQueries({ queryKey: queryKeys.radarrMetadataRoot() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverridesRoot() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot('sonarr') });
+    queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot('radarr') });
   }, [queryClient]);
 
   const handleSave = useCallback(async (): Promise<boolean> => {
@@ -303,37 +308,18 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
   const handleReset = useCallback(async (): Promise<void> => {
     setSaveError(null);
     const defaults = createDefaultSettings();
-    const currentSettings = parseSettings(savedSettingsRef.current ?? methods.getValues());
 
     try {
-      await saveOptions.mutateAsync(defaults as ExtensionOptions);
+      await browser.runtime.sendMessage({
+        _a2a: true,
+        type: CLIENT_STORAGE_RESET_MESSAGE_TYPE,
+        timestamp: Date.now(),
+      });
       methods.reset(defaults as SettingsFormValues);
-
-      for (const provider of ['sonarr', 'radarr'] as ProviderKey[]) {
-        const currentUrl = currentSettings.providers[provider].url;
-        if (!currentUrl) {
-          continue;
-        }
-
-        const permissionPatternResult =
-          provider === 'sonarr'
-            ? buildSonarrPermissionPattern(String(currentUrl))
-            : buildRadarrPermissionPattern(String(currentUrl));
-
-        if (permissionPatternResult.ok) {
-          try {
-            await browser.permissions.remove({ origins: [permissionPatternResult.value] });
-          } catch (permError) {
-            logger.warn(`Failed to remove ${provider} host permission during reset.`, permError);
-          }
-        } else {
-          logger.warn(`Failed to determine ${provider} host permission for reset; skipping permission removal.`, permissionPatternResult.error);
-        }
-      }
     } finally {
       invalidateSettingsQueries();
     }
-  }, [saveOptions, methods, invalidateSettingsQueries]);
+  }, [methods, invalidateSettingsQueries]);
 
   return {
     handleSave,

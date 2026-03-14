@@ -18,11 +18,24 @@ import type {
   SonarrCredentialsPayload,
   CheckSeriesStatusPayload,
 } from '@/shared/types';
-import { createError, ErrorCode, normalizeError } from '@/shared/errors/error-utils';
+import { createDefaultSettings } from '@/shared/schemas/settings';
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/shared/options/storage';
+import { clearAllTtlCaches } from '@/cache/ttl-cache';
+import { clearPersistedQueryCache } from '@/cache/query-cache';
+import { buildRadarrPermissionPattern } from '@/shared/radarr/validation';
+import { buildSonarrPermissionPattern } from '@/shared/sonarr/validation';
 import type { getMappingsHandler, GetMappingsInput } from './get-mappings';
 import type { updateRadarrMovieHandler } from './update-movie';
 import type { updateSonarrSeriesHandler } from './update-series';
+
+const RESET_EPOCH_STORAGE_KEYS = [
+  'libraryEpoch',
+  'libraryEpochSonarr',
+  'libraryEpochRadarr',
+  'settingsEpoch',
+  'mappingsEpoch',
+] as const;
 
 type CommonDeps = {
   sonarrApiService: SonarrApiService;
@@ -80,6 +93,46 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
           : 'Radarr overrides must use TMDB IDs.',
       );
     }
+  };
+
+  const clearPersistentCachesInternal = async (): Promise<void> => {
+    sonarrApiService.clearEtagCache();
+    radarrApiService.clearEtagCache();
+
+    await Promise.all([
+      anilistMetadataStore.clearLocalCache(),
+      mappingService.resetLookupState(),
+      staticProvider.reset(),
+    ]);
+
+    await clearAllTtlCaches();
+    await clearPersistedQueryCache();
+    await browser.storage.local.remove([...RESET_EPOCH_STORAGE_KEYS]);
+  };
+
+  const removeProviderHostPermissions = async (options: ExtensionOptions): Promise<void> => {
+    const removals = [
+      { provider: 'sonarr' as const, url: options.providers.sonarr.url, buildPattern: buildSonarrPermissionPattern },
+      { provider: 'radarr' as const, url: options.providers.radarr.url, buildPattern: buildRadarrPermissionPattern },
+    ];
+
+    await Promise.all(removals.map(async ({ provider, url, buildPattern }) => {
+      if (!url) {
+        return;
+      }
+
+      const patternResult = buildPattern(String(url));
+      if (!patternResult.ok) {
+        logError(normalizeError(patternResult.error), `Ani2arrApi:resetExtensionState:${provider}:permissionPattern`);
+        return;
+      }
+
+      try {
+        await browser.permissions.remove({ origins: [patternResult.value] });
+      } catch (error) {
+        logError(normalizeError(error), `Ani2arrApi:resetExtensionState:${provider}:removePermission`);
+      }
+    }));
   };
 
   const handlers = {
@@ -392,6 +445,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     },
 
     async getStaticMapped(ids) {
+      await mappingService.initStaticPairs();
       const hits: number[] = [];
       for (const id of ids) {
         const hit = staticProvider.get(id);
@@ -573,23 +627,101 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
     async clearAllMappingOverrides() {
       await overridesReady;
+      const snapshot = overridesService.exportState();
       const existing = overridesService.list();
-      await overridesService.clearAll();
-      await Promise.all(
-        existing.map(entry => mappingService.evictResolved(entry.anilistId, entry.provider)),
-      );
-      const options = await getExtensionOptionsSnapshot();
-      if (options?.providers.sonarr.url && options?.providers.sonarr.apiKey) {
-        scheduleLibraryRefresh('sonarr', options);
+      const existingIgnores = overridesService.listIgnores();
+      try {
+        await overridesService.clearAll();
+        await Promise.all(
+          existing.map(entry => mappingService.evictResolved(entry.anilistId, entry.provider)),
+        );
+        await Promise.all(
+          existingIgnores.map(entry => mappingService.evictResolved(entry.anilistId, entry.provider)),
+        );
+        const options = await getExtensionOptionsSnapshot();
+        if (options?.providers.sonarr.url && options?.providers.sonarr.apiKey) {
+          scheduleLibraryRefresh('sonarr', options);
+        }
+        await bumpLibraryEpoch('sonarr', { action: 'override:clearAll' });
+        await bumpLibraryEpoch('radarr', { action: 'override:clearAll' });
+        await bumpMappingsEpoch({ action: 'override:clearAll' });
+        return { ok: true as const };
+      } catch (error) {
+        try {
+          await overridesService.importState(snapshot);
+        } catch (restoreError) {
+          throw createError(
+            ErrorCode.STORAGE_ERROR,
+            'Failed to clear stored mappings, and rollback failed.',
+            'Failed to clear stored mappings, and the previous mapping state could not be restored.',
+            { cause: restoreError },
+          );
+        }
+
+        throw error;
       }
-      await bumpLibraryEpoch('sonarr', { action: 'override:clearAll' });
-      await bumpLibraryEpoch('radarr', { action: 'override:clearAll' });
-      await bumpMappingsEpoch({ action: 'override:clearAll' });
+    },
+
+    async exportStoredMappings() {
+      await overridesReady;
+      const overrides = Object.fromEntries(
+        overridesService.list().map((entry) => [
+          `${entry.provider}:${entry.anilistId}`,
+          {
+            anilistId: entry.anilistId,
+            provider: entry.provider,
+            externalId: entry.externalId,
+            updatedAt: entry.updatedAt,
+          },
+        ]),
+      );
+      const ignores = Object.fromEntries(
+        overridesService.listIgnores().map((entry) => [
+          `${entry.provider}:${entry.anilistId}`,
+          {
+            anilistId: entry.anilistId,
+            provider: entry.provider,
+            updatedAt: entry.updatedAt,
+          },
+        ]),
+      );
+      return {
+        version: 1 as const,
+        exportedAt: new Date().toISOString(),
+        summary: {
+          overrideCount: Object.keys(overrides).length,
+          ignoreCount: Object.keys(ignores).length,
+        },
+        mappings: {
+          overrides,
+          ignores,
+        },
+      };
+    },
+
+    async clearPersistentCaches() {
+      await clearPersistentCachesInternal();
+
+      return { ok: true as const };
+    },
+
+    async resetExtensionState() {
+      await overridesReady;
+
+      const previousOptions = await getExtensionOptionsSnapshot();
+      const defaults = createDefaultSettings() as ExtensionOptions;
+
+      await overridesService.clearAll();
+      await clearPersistentCachesInternal();
+      await setExtensionOptionsSnapshot(defaults);
+      await removeProviderHostPermissions(previousOptions);
+
       return { ok: true as const };
     },
 
     async getMappings(input) {
       await overridesReady;
+      await mappingService.initStaticPairs();
       return getMappings(input as GetMappingsInput, {
         overridesService,
         staticProvider,
@@ -607,6 +739,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       }
       const result = await anilistMetadataStore.getMetadata(normalizedIds, {
         refreshStale: input?.refreshStale ?? true,
+        fetchMissing: input?.fetchMissing ?? true,
         ...(input?.maxBatch !== undefined ? { maxBatch: input.maxBatch } : {}),
       });
       return {

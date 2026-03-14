@@ -39,7 +39,7 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
   const handleReset = async () => {
     const shouldReset = await confirm({
       title: 'Reset all settings?',
-      description: 'This clears ani2arr configuration and permissions. Sonarr data is not affected.',
+      description: 'This clears ani2arr configuration, stored mapping overrides, cached page data, granted permissions, and session state. Sonarr and Radarr libraries are not affected.',
       confirmText: 'Reset',
       cancelText: 'Cancel',
     });
@@ -49,7 +49,7 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
       await actions.handleReset();
       toast.showToast({
         title: 'Settings reset',
-        description: 'ani2arr settings returned to defaults.',
+        description: 'Settings, stored mappings, cached page data, and permissions were cleared.',
         variant: 'success',
       });
     } catch (error) {

@@ -34,6 +34,7 @@ import type {
   ValidateTmdbInput,
   ValidateTmdbOutput,
   MappingOverrideItem,
+  ExportStoredMappingsOutput,
   SetMappingIgnoreInput,
   ClearMappingIgnoreInput,
   GetMappingsOutput,
@@ -81,6 +82,9 @@ export interface Ani2arrApi {
   validateTmdbId(input: ValidateTmdbInput): Promise<ValidateTmdbOutput>;
   getMappingOverrides(): Promise<MappingOverrideItem[]>;
   clearAllMappingOverrides(): Promise<{ ok: true }>;
+  exportStoredMappings(): Promise<ExportStoredMappingsOutput>;
+  clearPersistentCaches(): Promise<{ ok: true }>;
+  resetExtensionState(): Promise<{ ok: true }>;
   getMappings(input?: GetMappingsInput): Promise<GetMappingsOutput>;
   getAniListMetadata(input: GetAniListMetadataInput): Promise<GetAniListMetadataOutput>;
   getAniListSchedulerDebug(): Promise<GetAniListSchedulerDebugOutput>;
