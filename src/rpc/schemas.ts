@@ -301,6 +301,7 @@ export const AniListSearchResultSchema = v.object({
 export const GetAniListMetadataInputSchema = v.object({
   ids: v.array(IdSchema),
   refreshStale: v.optional(v.boolean()),
+  fetchMissing: v.optional(v.boolean()),
   maxBatch: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 });
 
@@ -350,6 +351,25 @@ export interface MappingOverrideItem {
     kind: 'tvdb' | 'tmdb';
   };
   updatedAt: number;
+}
+
+export interface MappingIgnoreItem {
+  anilistId: number;
+  provider: 'sonarr' | 'radarr';
+  updatedAt: number;
+}
+
+export interface ExportStoredMappingsOutput {
+  version: 1;
+  exportedAt: string;
+  summary: {
+    overrideCount: number;
+    ignoreCount: number;
+  };
+  mappings: {
+    overrides: Record<string, MappingOverrideItem>;
+    ignores: Record<string, MappingIgnoreItem>;
+  };
 }
 
 export interface GetMappingsOutput {
