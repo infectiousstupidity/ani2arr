@@ -10,6 +10,7 @@ import type {
 import type {
   ClearMappingIgnoreInput,
   ClearMappingOverrideInput,
+  ExportStoredMappingsOutput,
   GetMappingsInput,
   GetMappingsOutput,
   SetMappingIgnoreInput,
@@ -121,6 +122,17 @@ export const useClearAllMappingOverrides = () => {
     },
   });
 };
+
+export const useExportStoredMappings = () =>
+  useMutation<ExportStoredMappingsOutput, ExtensionError>({
+    mutationFn: async () => {
+      try {
+        return await getAni2arrApi().exportStoredMappings();
+      } catch (error) {
+        throw normalizeError(error);
+      }
+    },
+  });
 
 export const useMappingOverrides = (provider: MappingProvider | 'all' = 'all') =>
   useQuery<MappingOverrideRecord[], ExtensionError>({

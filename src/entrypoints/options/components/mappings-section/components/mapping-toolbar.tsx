@@ -22,10 +22,13 @@ type MappingToolbarProps = {
   sourceFilters: SourceFilterSet;
   sortOption: MappingSort;
   libraryFilter: LibraryFilter;
+  searchPlaceholder?: string;
   onSearchQueryChange: (value: string) => void;
   onSourceFiltersChange: (value: SourceFilterSet) => void;
   onSortChange: (value: MappingSort) => void;
   onLibraryFilterChange: (value: LibraryFilter) => void;
+  hideSort?: boolean;
+  popoverContainer?: HTMLElement | null;
 };
 
 const sourceOptions: { value: MappingSource; label: string; color: string }[] = [
@@ -57,10 +60,13 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
   sourceFilters,
   sortOption,
   libraryFilter,
+  searchPlaceholder = 'Search title, AniList ID, or target ID',
   onSearchQueryChange,
   onSourceFiltersChange,
   onSortChange,
   onLibraryFilterChange,
+  hideSort = false,
+  popoverContainer,
 }) => {
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
@@ -106,7 +112,7 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
           type="text"
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}
-          placeholder="Search title, AniList ID, or target ID"
+          placeholder={searchPlaceholder}
           className="w-full bg-transparent text-sm text-text-primary outline-none placeholder:text-text-tertiary"
         />
         {searchQuery && (
@@ -121,57 +127,59 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
       </div>
 
       <div className="flex items-center gap-2">
-        <Popover.Root open={sortOpen} onOpenChange={setSortOpen}>
-          <Popover.Trigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <ArrowUpDown className="h-3.5 w-3.5" />
-              {sortLabel}
-              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', sortOpen && 'rotate-180')} />
-            </Button>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content
-              className="z-50 w-64 rounded-lg border border-border-primary bg-bg-secondary p-1 shadow-xl"
-              side="bottom"
-              align="end"
-              sideOffset={4}
-            >
-              <div className="space-y-0.5">
-                {sortOptions.map((option) => {
-                  const isSelected = option.value === sortOption;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        onSortChange(option.value);
-                        setSortOpen(false);
-                      }}
-                      className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-bg-tertiary"
-                    >
-                      <div
-                        className={cn(
-                          'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-                          isSelected
-                            ? 'border-accent-primary bg-accent-primary'
-                            : 'border-border-primary bg-bg-primary',
-                        )}
+        {!hideSort ? (
+          <Popover.Root open={sortOpen} onOpenChange={setSortOpen}>
+            <Popover.Trigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <ArrowUpDown className="h-3.5 w-3.5" />
+                {sortLabel}
+                <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', sortOpen && 'rotate-180')} />
+              </Button>
+            </Popover.Trigger>
+            <Popover.Portal container={popoverContainer ?? undefined}>
+              <Popover.Content
+                className="z-50 w-64 rounded-lg border border-border-primary bg-bg-secondary p-1 shadow-xl"
+                side="bottom"
+                align="end"
+                sideOffset={4}
+              >
+                <div className="space-y-0.5">
+                  {sortOptions.map((option) => {
+                    const isSelected = option.value === sortOption;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          onSortChange(option.value);
+                          setSortOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-bg-tertiary"
                       >
-                        {isSelected && <Check className="h-3 w-3 text-white" />}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="truncate text-text-primary">{option.label}</div>
-                        {option.description ? (
-                          <div className="truncate text-xs text-text-secondary">{option.description}</div>
-                        ) : null}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </Popover.Content>
-          </Popover.Portal>
-        </Popover.Root>
+                        <div
+                          className={cn(
+                            'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+                            isSelected
+                              ? 'border-accent-primary bg-accent-primary'
+                              : 'border-border-primary bg-bg-primary',
+                          )}
+                        >
+                          {isSelected && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-text-primary">{option.label}</div>
+                          {option.description ? (
+                            <div className="truncate text-xs text-text-secondary">{option.description}</div>
+                          ) : null}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
+        ) : null}
 
         <Popover.Root open={libraryOpen} onOpenChange={setLibraryOpen}>
           <Popover.Trigger asChild>
@@ -181,7 +189,7 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
               <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', libraryOpen && 'rotate-180')} />
             </Button>
           </Popover.Trigger>
-          <Popover.Portal>
+          <Popover.Portal container={popoverContainer ?? undefined}>
             <Popover.Content
               className="z-50 w-64 rounded-lg border border-border-primary bg-bg-secondary p-1 shadow-xl"
               side="bottom"
@@ -233,7 +241,7 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
               <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', filterOpen && 'rotate-180')} />
             </Button>
           </Popover.Trigger>
-          <Popover.Portal>
+          <Popover.Portal container={popoverContainer ?? undefined}>
             <Popover.Content
               className="z-50 w-48 rounded-lg border border-border-primary bg-bg-secondary p-1 shadow-xl"
               side="bottom"
