@@ -24,6 +24,7 @@ const QuickSettings: React.FC = () => {
   const settings = optionsQuery.data;
   const isSonarrConfigured = Boolean(settings?.providers.sonarr.url && settings?.providers.sonarr.apiKey);
   const isRadarrConfigured = Boolean(settings?.providers.radarr.url && settings?.providers.radarr.apiKey);
+  const hasAnyProviderConfigured = isSonarrConfigured || isRadarrConfigured;
   const isLoading = optionsQuery.isLoading;
   const isSaving = saveOptions.isPending;
   const isBusy = isLoading || isSaving;
@@ -89,7 +90,7 @@ const QuickSettings: React.FC = () => {
               aria-hidden
             />
             <span className="text-sm">
-              {isLoading ? 'Checking...' : isSonarrConfigured ? 'Connected' : 'Not connected'}
+              {isLoading ? 'Checking...' : isSonarrConfigured ? 'Configured' : 'Not configured'}
             </span>
           </div>
         </div>
@@ -106,118 +107,108 @@ const QuickSettings: React.FC = () => {
           <div className="mt-1 flex items-center gap-2">
             <span
               className={`inline-block h-2.5 w-2.5 rounded-full ${
-                isLoading ? 'bg-slate-400' : isRadarrConfigured ? 'bg-emerald-400' : 'bg-rose-400'
+                isLoading ? 'bg-slate-400' : isRadarrConfigured ? 'bg-sky-400' : 'bg-rose-400'
               }`}
               aria-hidden
             />
             <span className="text-sm">
-              {isLoading ? 'Checking...' : isRadarrConfigured ? 'Connected' : 'Not connected'}
+              {isLoading ? 'Checking...' : isRadarrConfigured ? 'Configured' : 'Not configured'}
             </span>
           </div>
         </div>
       </section>
 
-      {isSonarrConfigured ? (
-        <section className="space-y-3 rounded-xl border border-border-primary bg-bg-secondary/70 p-3">
-          <div className="space-y-3 rounded-lg border border-border-primary/70 bg-bg-tertiary/40 p-3">
-            <div>
-              <p className="text-sm font-semibold">Card actions (browse pages)</p>
-              <p className="text-xs text-text-secondary">
-                Controls action buttons on AniList/AniChart browse and search cards.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg bg-bg-tertiary/60 px-3 py-2">
-              <div>
-                <p className="text-sm">Enable card actions</p>
-                <p className="text-xs text-text-secondary">Show action controls on browse/search cards.</p>
-              </div>
-              <input
-                type="checkbox"
-                className="h-4 w-4"
-                checked={settings?.ui.browseOverlayEnabled ?? false}
-                disabled={isBusy || !settings}
-                onChange={(event) => {
-                  const nextValue = event.currentTarget.checked;
-                  void updateSettings(current => ({
-                    ...current,
-                    ui: { ...current.ui, browseOverlayEnabled: nextValue },
-                  }));
-                }}
-              />
-            </div>
-
-            <div className="rounded-lg bg-bg-tertiary/60 px-3 py-2">
-              <p className="text-sm">Card action visibility</p>
-              <p className="text-xs text-text-secondary">Choose when card actions appear.</p>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {badgeOptions.map(option => {
-                  const selected = settings?.ui.badgeVisibility === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      disabled={isBusy || !settings}
-                      onClick={() => {
-                        void updateSettings(current => ({
-                          ...current,
-                          ui: { ...current.ui, badgeVisibility: option.value },
-                        }));
-                      }}
-                      className={`rounded-md border px-2 py-1.5 text-xs transition-colors ${
-                        selected
-                          ? 'border-accent-primary bg-accent-primary/20 text-text-primary'
-                          : 'border-border-primary text-text-secondary hover:bg-bg-secondary'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+      <section className="space-y-3 rounded-xl border border-border-primary bg-bg-secondary/70 p-3">
+        <div className="space-y-3 rounded-lg border border-border-primary/70 bg-bg-tertiary/40 p-3">
+          <div>
+            <p className="text-sm font-semibold">Card actions (browse pages)</p>
+            <p className="text-xs text-text-secondary">
+              Controls action buttons on AniList and AniChart browse and search cards.
+            </p>
           </div>
 
           <div className="flex items-center justify-between rounded-lg bg-bg-tertiary/60 px-3 py-2">
             <div>
-              <p className="text-sm">Anime page actions</p>
-              <p className="text-xs text-text-secondary">
-                Show actions above AniList&apos;s native <em>Add to List</em> button.
-              </p>
+              <p className="text-sm">Enable card actions</p>
+              <p className="text-xs text-text-secondary">Show action controls on browse/search cards.</p>
             </div>
             <input
               type="checkbox"
               className="h-4 w-4"
-              checked={settings?.ui.headerInjectionEnabled ?? false}
+              checked={settings?.ui.browseOverlayEnabled ?? false}
               disabled={isBusy || !settings}
               onChange={(event) => {
                 const nextValue = event.currentTarget.checked;
                 void updateSettings(current => ({
                   ...current,
-                  ui: { ...current.ui, headerInjectionEnabled: nextValue },
+                  ui: { ...current.ui, browseOverlayEnabled: nextValue },
                 }));
               }}
             />
           </div>
-        </section>
-      ) : (
-        <section className="space-y-3 rounded-xl border border-border-primary bg-bg-secondary/70 p-3">
+
+          <div className="rounded-lg bg-bg-tertiary/60 px-3 py-2">
+            <p className="text-sm">Card action visibility</p>
+            <p className="text-xs text-text-secondary">Choose when card actions appear.</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {badgeOptions.map(option => {
+                const selected = settings?.ui.badgeVisibility === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={isBusy || !settings}
+                    onClick={() => {
+                      void updateSettings(current => ({
+                        ...current,
+                        ui: { ...current.ui, badgeVisibility: option.value },
+                      }));
+                    }}
+                    className={`rounded-md border px-2 py-1.5 text-xs transition-colors ${
+                      selected
+                        ? 'border-accent-primary bg-accent-primary/20 text-text-primary'
+                        : 'border-border-primary text-text-secondary hover:bg-bg-secondary'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg bg-bg-tertiary/60 px-3 py-2">
           <div>
-            <p className="text-sm font-semibold">Sonarr is not configured</p>
+            <p className="text-sm">Anime page actions</p>
             <p className="text-xs text-text-secondary">
-              Configure Sonarr in the full settings page to enable card and anime page actions.
+              Show actions above AniList&apos;s native <em>Add to List</em> button.
             </p>
           </div>
+          <input
+            type="checkbox"
+            className="h-4 w-4"
+            checked={settings?.ui.headerInjectionEnabled ?? false}
+            disabled={isBusy || !settings}
+            onChange={(event) => {
+              const nextValue = event.currentTarget.checked;
+              void updateSettings(current => ({
+                ...current,
+                ui: { ...current.ui, headerInjectionEnabled: nextValue },
+              }));
+            }}
+          />
+        </div>
 
-          <button
-            type="button"
-            onClick={() => openOptionsSectionInTab('sonarr')}
-            className="inline-flex w-full items-center justify-center rounded-md bg-accent-primary px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Configure Sonarr
-          </button>
-        </section>
-      )}
+        {!hasAnyProviderConfigured ? (
+          <div className="rounded-lg border border-border-primary/70 bg-bg-tertiary/40 px-3 py-2">
+            <p className="text-sm font-semibold">No provider configured yet</p>
+            <p className="mt-1 text-xs text-text-secondary">
+              Configure Sonarr, Radarr, or both in the full settings page to enable add and update actions.
+            </p>
+          </div>
+        ) : null}
+      </section>
 
       <div className="mt-2 min-h-5 text-xs text-text-secondary" role="status" aria-live="polite">
         {isLoading ? 'Loading settings...' : isSaving ? 'Saving...' : saveError ? saveError : null}
@@ -236,4 +227,3 @@ if (rootElement) {
     </React.StrictMode>,
   );
 }
-
