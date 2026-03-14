@@ -42,6 +42,43 @@ export const ConnectionStatusBadge: React.FC<{ isConnected: boolean; isTesting: 
   );
 };
 
+export type ProviderConnectionStatus = 'connected' | 'configured' | 'connecting' | 'not-configured';
+
+export const ProviderConnectionStatusBadge: React.FC<{ status: ProviderConnectionStatus }> = ({
+  status,
+}) => {
+  const appearance = useMemo(() => {
+    switch (status) {
+      case 'connected':
+        return {
+          label: 'Connected',
+          className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/40',
+        };
+      case 'configured':
+        return {
+          label: 'Configured',
+          className: 'bg-sky-500/10 text-sky-300 border-sky-500/40',
+        };
+      case 'connecting':
+        return {
+          label: 'Connecting',
+          className: 'bg-amber-500/10 text-amber-300 border-amber-500/40',
+        };
+      default:
+        return {
+          label: 'Not configured',
+          className: 'bg-slate-700/50 text-text-secondary border-border-primary',
+        };
+    }
+  }, [status]);
+
+  return (
+    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold border ${appearance.className}`}>
+      {appearance.label}
+    </span>
+  );
+};
+
 type ConnectionMutationState = {
   isError: boolean;
   isPending: boolean;
