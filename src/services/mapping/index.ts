@@ -76,6 +76,7 @@ export class MappingService {
       this.caches.radarr.failure.clear(),
     ]);
     this.inflight.clear();
+    this.ledger.clear();
     this.sessionSeenCanonical.sonarr.clear();
     this.sessionSeenCanonical.radarr.clear();
     if (this.unresolvedLedger.clear()) {

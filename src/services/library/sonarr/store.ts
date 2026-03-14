@@ -37,7 +37,7 @@ export class SonarrLibraryStore {
         const options = optionsOverride ?? (await getExtensionOptionsSnapshot());
         if (!options?.providers.sonarr.url || !options?.providers.sonarr.apiKey) {
           this.indexer.reset();
-          await this.caches.lean.write(CACHE_KEY, [], { staleMs: SOFT_TTL_MS, hardMs: HARD_TTL_MS });
+          await this.caches.lean.remove(CACHE_KEY);
           return [];
         }
 

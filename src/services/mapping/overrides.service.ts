@@ -5,7 +5,9 @@ import {
   mappingIgnoresSync,
   mappingOverridesLocal,
   mappingOverridesSync,
+  type MappingIgnoreMap,
   type MappingIgnoreEntry,
+  type MappingOverrideMap,
   type MappingOverrideEntry,
 } from '@/services/mapping/overrides-storage';
 import type {
@@ -242,20 +244,61 @@ export class MappingOverridesService {
     return entries;
   }
 
+  public exportState(): { overrides: MappingOverrideMap; ignores: MappingIgnoreMap } {
+    const overrides: MappingOverrideMap = {};
+    for (const [key, entry] of this.map.entries()) {
+      overrides[key] = {
+        provider: entry.provider,
+        externalId: entry.externalId,
+        updatedAt: typeof entry.updatedAt === 'number' ? entry.updatedAt : Date.now(),
+      };
+    }
+
+    const ignores: MappingIgnoreMap = {};
+    for (const [key, entry] of this.ignored.entries()) {
+      ignores[key] = {
+        provider: entry.provider,
+        updatedAt: typeof entry.updatedAt === 'number' ? entry.updatedAt : Date.now(),
+      };
+    }
+
+    return { overrides, ignores };
+  }
+
+  public async importState(state: { overrides: MappingOverrideMap; ignores: MappingIgnoreMap }): Promise<void> {
+    const overrides = { ...(state.overrides ?? {}) };
+    const ignores = { ...(state.ignores ?? {}) };
+
+    await Promise.all([
+      mappingOverridesSync.setValue(overrides),
+      mappingOverridesLocal.setValue(overrides),
+      mappingIgnoresSync.setValue(ignores),
+      mappingIgnoresLocal.setValue(ignores),
+    ]);
+
+    this.rebuildOverridesFromRecords(overrides, overrides);
+    this.rebuildIgnoresFromRecords(ignores, ignores);
+  }
+
   public async clearAll(provider?: MappingProvider): Promise<void> {
     if (!provider) {
       this.map.clear();
       this.reverse.clear();
+      this.ignored.clear();
       await Promise.all([
         mappingOverridesSync.setValue({}),
         mappingOverridesLocal.setValue({}),
+        mappingIgnoresSync.setValue({}),
+        mappingIgnoresLocal.setValue({}),
       ]);
       return;
     }
 
-    const [syncOverrides, localOverrides] = await Promise.all([
+    const [syncOverrides, localOverrides, syncIgnores, localIgnores] = await Promise.all([
       mappingOverridesSync.getValue(),
       mappingOverridesLocal.getValue(),
+      mappingIgnoresSync.getValue(),
+      mappingIgnoresLocal.getValue(),
     ]);
 
     for (const key of Object.keys(syncOverrides)) {
@@ -264,13 +307,22 @@ export class MappingOverridesService {
     for (const key of Object.keys(localOverrides)) {
       if (key.startsWith(`${provider}:`)) delete localOverrides[key];
     }
+    for (const key of Object.keys(syncIgnores)) {
+      if (key.startsWith(`${provider}:`)) delete syncIgnores[key];
+    }
+    for (const key of Object.keys(localIgnores)) {
+      if (key.startsWith(`${provider}:`)) delete localIgnores[key];
+    }
 
     await Promise.all([
       mappingOverridesSync.setValue(syncOverrides),
       mappingOverridesLocal.setValue(localOverrides),
+      mappingIgnoresSync.setValue(syncIgnores),
+      mappingIgnoresLocal.setValue(localIgnores),
     ]);
 
     this.rebuildOverridesFromRecords(syncOverrides, localOverrides);
+    this.rebuildIgnoresFromRecords(syncIgnores, localIgnores);
   }
 
   private attachWatchers(): void {
