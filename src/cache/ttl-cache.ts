@@ -1,5 +1,8 @@
 // src/cache/ttl-cache.ts
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { deleteDB, openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { logger } from '@/shared/utils/logger';
+
+const log = logger.create('TtlCache');
 
 export interface CacheEntry<T> {
   value: T;
@@ -43,18 +46,61 @@ interface CacheDbSchema extends DBSchema {
 let dbPromise: Promise<IDBPDatabase<CacheDbSchema>> | null = null;
 const memoryFallback = new Map<string, CacheEntry<unknown>>();
 
+const openCacheDb = (): Promise<IDBPDatabase<CacheDbSchema>> =>
+  openDB<CacheDbSchema>(DB_NAME, DB_VERSION, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    },
+  });
+
+const recreateDb = async (): Promise<IDBPDatabase<CacheDbSchema>> => {
+  await deleteDB(DB_NAME);
+  return openCacheDb();
+};
+
 const getDb = (): Promise<IDBPDatabase<CacheDbSchema>> => {
   if (!dbPromise) {
-    dbPromise = openDB<CacheDbSchema>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME);
-        }
-      },
+    dbPromise = openCacheDb().then(async db => {
+      if (db.objectStoreNames.contains(STORE_NAME)) {
+        return db;
+      }
+
+      log.warn('Object store missing after open; recreating database.');
+      db.close();
+      return recreateDb();
+    }).catch(async error => {
+      if (error instanceof DOMException && error.name === 'VersionError') {
+        log.warn('VersionError opening database; recreating.');
+        return recreateDb();
+      }
+
+      throw error;
     });
   }
   return dbPromise;
 };
+
+export async function clearAllTtlCaches(): Promise<void> {
+  memoryFallback.clear();
+
+  if (dbPromise) {
+    try {
+      const db = await dbPromise;
+      db.close();
+    } finally {
+      dbPromise = null;
+    }
+  }
+
+  await deleteDB(DB_NAME, {
+    blocked() {
+      // Force-close any lingering connections so the delete can proceed.
+      // This can happen if a read/write was initiated concurrently.
+    },
+  });
+}
 
 export function createTtlCache<T>(namespace: string): TtlCache<T> {
   const keyFor = (key: string) => `${namespace}:${key}`;
