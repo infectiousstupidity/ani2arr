@@ -80,6 +80,10 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
 
     const { data: publicOptions } = usePublicOptions();
     const overlaysEnabled = publicOptions?.ui?.browseOverlayEnabled ?? true;
+    const hasConfiguredProvider = Boolean(
+      publicOptions?.providers.sonarr.isConfigured || publicOptions?.providers.radarr.isConfigured,
+    );
+    const metadataEnabled = overlaysEnabled && hasConfiguredProvider;
     const badgeVisibility = publicOptions?.ui?.badgeVisibility ?? 'always';
 
     const { cardPortals } = useBrowsePortals({
@@ -98,13 +102,13 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
       enabled: overlaysEnabled,
     });
     const metadataIds = Array.from(new Set(Array.from(cardPortals.values(), parsed => parsed.anilistId)));
-    const metadataBatch = useAniListMetadataBatch(metadataIds, { enabled: overlaysEnabled });
+    const metadataBatch = useAniListMetadataBatch(metadataIds, { enabled: metadataEnabled });
     const canonicalMetadataById = new Map(
       (metadataBatch.data?.metadata ?? []).map(entry => [entry.id, metadataHintFromAniListMetadata(entry)]),
     );
 
     // Prefetch AniList metadata on browse/search pages using viewport-prioritized batching.
-    useAnilistBatchPrefetch({ cardPortals, enabled: overlaysEnabled });
+    useAnilistBatchPrefetch({ cardPortals, enabled: metadataEnabled });
 
     if (!overlaysEnabled) {
       return <div ref={hostRef} />;
