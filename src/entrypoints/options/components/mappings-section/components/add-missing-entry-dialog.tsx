@@ -88,7 +88,7 @@ const AddMissingEntryDialog: React.FC<AddMissingEntryDialogProps> = ({ open, onC
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next) handleClose(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 w-[min(640px,95vw)] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-bg-primary p-6 shadow-2xl outline-none">
+        <Dialog.Content className="fixed left-1/2 top-1/2 max-h-[calc(100vh-2rem)] w-[min(640px,95vw)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl bg-bg-primary p-6 shadow-2xl outline-none">
           <div className="flex items-start justify-between gap-3">
             <div>
               <Dialog.Title className="text-lg font-semibold text-text-primary">Add missing entry</Dialog.Title>

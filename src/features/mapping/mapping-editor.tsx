@@ -202,7 +202,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
           style={{ zIndex: DIALOG_Z_INDEX }}
         />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 h-[90vh] w-[min(1100px,96vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-bg-primary shadow-2xl outline-none"
+          className="fixed left-1/2 top-1/2 h-[90vh] max-h-[calc(100vh-2rem)] w-[min(1100px,96vw)] max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-bg-primary shadow-2xl outline-none"
           style={{ zIndex: DIALOG_Z_INDEX + 1 }}
         >
           <div className="flex items-start justify-between border-b border-border-primary px-6 py-4">
