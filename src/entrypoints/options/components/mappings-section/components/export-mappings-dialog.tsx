@@ -5,7 +5,14 @@ import { ChevronDown, Download, FileText, Search, SlidersHorizontal, X } from 'l
 import Button from '@/shared/ui/primitives/button';
 import { Modal, ModalContent, ModalDescription, ModalFooter, ModalTitle } from '@/features/media-modal/components/modal';
 import { cn } from '@/shared/utils/cn';
-import MappingToolbar, { type LibraryFilter, type SourceFilterSet } from './mapping-toolbar';
+import MappingToolbar, {
+  getScopeSourceFilters,
+  type LibraryFilter,
+  type MappingScope,
+  type ProviderFilter,
+  type SourceFilter,
+  type SourceFilterSet,
+} from './mapping-toolbar';
 import { useMappingTableData } from '../hooks/use-mapping-table-data';
 import type { MappingProvider, MappingSource } from '@/shared/types';
 import type { ExportMappingsFilters } from '../export-mappings';
@@ -24,20 +31,24 @@ type ExportMappingsDialogProps = {
 };
 
 const providerOptions: MappingProvider[] = ['sonarr', 'radarr'];
-const exportableSourceOptions: MappingSource[] = ['manual', 'ignored', 'unresolved', 'auto', 'upstream'];
+const exportableSourceOptions: MappingSource[] = ['manual', 'rejected', 'blocked', 'ignored', 'unresolved', 'auto', 'upstream'];
 const sourceLabels: Record<MappingSource, string> = {
   manual: 'Manual',
+  rejected: 'Rejected',
+  blocked: 'Blocked',
   ignored: 'Ignored',
   unresolved: 'Unresolved',
   auto: 'Auto',
   upstream: 'Upstream',
 };
 const sourceBadgeClasses: Record<MappingSource, string> = {
-  manual: 'bg-blue-500/15 text-blue-300',
-  ignored: 'bg-red-500/15 text-red-300',
-  unresolved: 'bg-amber-500/15 text-amber-300',
-  auto: 'bg-purple-500/15 text-purple-300',
-  upstream: 'bg-slate-500/15 text-slate-200',
+  manual: 'border border-accent-primary/30 bg-accent-primary/16 text-accent-primary',
+  rejected: 'border border-warning/20 bg-warning/12 text-warning',
+  blocked: 'border border-error/28 bg-error/16 text-error',
+  ignored: 'border border-error/24 bg-error/12 text-error',
+  unresolved: 'border border-warning/24 bg-warning/14 text-warning',
+  auto: 'border border-success/24 bg-success/14 text-success',
+  upstream: 'border border-border-primary/70 bg-bg-primary/46 text-text-secondary',
 };
 const statusLabels: Record<'unmapped' | 'in-provider' | 'not-in-provider', string> = {
   unmapped: 'Unmapped',
@@ -47,6 +58,43 @@ const statusLabels: Record<'unmapped' | 'in-provider' | 'not-in-provider', strin
 const PREVIEW_ROW_HEIGHT = 76;
 const PREVIEW_ENTRY_HEIGHT = 58;
 
+const areSourceSetsEqual = (left: Set<MappingSource>, right: Set<MappingSource>): boolean => {
+  if (left.size !== right.size) {
+    return false;
+  }
+
+  for (const value of left) {
+    if (!right.has(value)) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const deriveScopeFromSourceFilters = (filters: SourceFilterSet): MappingScope => {
+  if (filters.size === 1 && filters.has('manual')) return 'manual-overrides';
+  if (areSourceSetsEqual(filters, getScopeSourceFilters('suppressed'))) return 'suppressed';
+  if (areSourceSetsEqual(filters, getScopeSourceFilters('needs-attention'))) return 'needs-attention';
+  return 'all';
+};
+
+const deriveSourceFilterFromSourceFilters = (filters: SourceFilterSet): SourceFilter => {
+  if (filters.size !== 1) {
+    return 'all';
+  }
+
+  return Array.from(filters)[0] ?? 'all';
+};
+
+const deriveProviderFilterFromProviderFilters = (filters: Set<MappingProvider>): ProviderFilter => {
+  if (filters.size !== 1) {
+    return 'all';
+  }
+
+  return Array.from(filters)[0] ?? 'all';
+};
+
 const formatExternalId = (row: MappingTableRowData): string => {
   if (!row.externalId) {
     return 'No external ID';
@@ -55,7 +103,7 @@ const formatExternalId = (row: MappingTableRowData): string => {
 };
 
 const resolveGroupTitle = (row: MappingTableRowData): string => {
-  if (row.providerMeta?.title) {
+  if (row.externalId && row.providerMeta?.title) {
     return row.providerMeta.title;
   }
   if (row.entries[0]?.title) {
@@ -81,7 +129,7 @@ const matchesPreviewSearch = (row: MappingTableRowData, query: string): boolean 
       String(entry.anilistId),
       entry.status,
       entry.source,
-      entry.providerMeta?.title ?? '',
+      entry.externalId ? (entry.providerMeta?.title ?? '') : '',
     ]),
   ]
     .filter(Boolean)
@@ -140,15 +188,15 @@ const ExportPreviewList: React.FC<ExportPreviewListProps> = ({
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border-primary px-4 py-6 text-sm text-text-secondary">
+      <div className="rounded-2xl border border-dashed border-border-primary/75 bg-bg-primary/24 px-4 py-6 text-sm text-text-secondary">
         No mappings match these filters.
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-border-primary bg-bg-secondary/40">
-      <div className="flex items-center gap-2 border-b border-border-primary px-4 py-3 text-sm font-medium text-text-primary">
+    <div className="overflow-hidden rounded-2xl border border-border-primary/75 bg-bg-primary/24 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
+      <div className="flex items-center gap-2 border-b border-border-primary/75 px-4 py-3 text-sm font-medium text-text-primary">
         <FileText className="h-4 w-4 text-text-secondary" />
         Export preview
       </div>
@@ -176,7 +224,7 @@ const ExportPreviewList: React.FC<ExportPreviewListProps> = ({
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
-                <Accordion.Item value={row.id} className="rounded-lg border border-border-primary/70 bg-bg-primary/50">
+                <Accordion.Item value={row.id} className="rounded-xl border border-border-primary/70 bg-bg-primary/42 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                   <Accordion.Header>
                     <Accordion.Trigger className="flex w-full items-start justify-between gap-3 px-3 py-3 text-left">
                       <div className="min-w-0 flex-1">
@@ -213,7 +261,7 @@ const ExportPreviewList: React.FC<ExportPreviewListProps> = ({
                       {row.entries.map(({ entry, title }) => (
                         <div
                           key={`${row.id}-${entry.provider}-${entry.anilistId}`}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-bg-secondary/60 px-3 py-2"
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border-primary/60 bg-bg-secondary/48 px-3 py-2"
                         >
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm text-text-primary" title={title}>
@@ -259,9 +307,16 @@ export default function ExportMappingsDialog({
   const [popoverContainer, setPopoverContainer] = useState<HTMLDivElement | null>(null);
   const [draftProviderFilters, setDraftProviderFilters] = useState<Set<MappingProvider>>(new Set(providerFilters));
   const [draftSourceFilters, setDraftSourceFilters] = useState<SourceFilterSet>(new Set(sourceFilters));
+  const [draftScope, setDraftScope] = useState<MappingScope>(() => deriveScopeFromSourceFilters(new Set(sourceFilters)));
+  const [draftSourceFilter, setDraftSourceFilter] = useState<SourceFilter>(() => deriveSourceFilterFromSourceFilters(new Set(sourceFilters)));
   const [draftSearchQuery, setDraftSearchQuery] = useState(searchQuery);
   const [draftLibraryFilter, setDraftLibraryFilter] = useState<LibraryFilter>(libraryFilter);
   const [previewSearchQuery, setPreviewSearchQuery] = useState('');
+
+  const draftProviderFilter = useMemo(
+    () => deriveProviderFilterFromProviderFilters(draftProviderFilters),
+    [draftProviderFilters],
+  );
 
   const { filteredEntryRows, tableRows, mappings, totalAvailable } = useMappingTableData({
     providerFilters: draftProviderFilters,
@@ -279,6 +334,7 @@ export default function ExportMappingsDialog({
         anilistId: entry.anilistId,
         provider: entry.provider,
         externalId: entry.externalId ?? null,
+        ...(entry.suppressedExternalId ? { suppressedExternalId: entry.suppressedExternalId } : {}),
         source: entry.source,
         status: entry.status,
         ...(entry.updatedAt !== undefined ? { updatedAt: entry.updatedAt } : {}),
@@ -345,6 +401,29 @@ export default function ExportMappingsDialog({
     });
   };
 
+  const handleProviderFilterChange = (value: ProviderFilter) => {
+    setDraftProviderFilters(value === 'all' ? new Set(providerOptions) : new Set([value]));
+  };
+
+  const handleSourceFilterChange = (value: SourceFilter) => {
+    setDraftSourceFilter(value);
+    setDraftSourceFilters(value === 'all' ? getScopeSourceFilters(draftScope) : new Set([value]));
+  };
+
+  const handleScopeChange = (value: MappingScope) => {
+    setDraftScope(value);
+    setDraftSourceFilter('all');
+    setDraftSourceFilters(getScopeSourceFilters(value));
+  };
+
+  const handleClearRefinements = () => {
+    setDraftProviderFilters(new Set(providerOptions));
+    setDraftScope('all');
+    setDraftSourceFilter('all');
+    setDraftSourceFilters(getScopeSourceFilters('all'));
+    setDraftLibraryFilter('all');
+  };
+
   const handleExport = async () => {
     await onExport({
       providers: Array.from(draftProviderFilters),
@@ -364,13 +443,13 @@ export default function ExportMappingsDialog({
   return (
     <Modal open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
       <ModalContent
-        className="flex h-[75.5vh] max-h-[calc(100vh-2rem)] w-full max-w-5xl flex-col overflow-hidden bg-bg-primary p-0 sm:rounded-2xl"
+        className="a2a-settings-panel flex h-[75.5vh] max-h-[calc(100vh-2rem)] w-full max-w-5xl flex-col overflow-hidden p-0"
         floatingPortalRef={setPopoverContainer}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
         }}
       >
-        <div className="border-b border-border-primary px-6 py-4">
+        <div className="a2a-settings-panel__header border-b px-6 py-4">
           <ModalTitle>Export mappings</ModalTitle>
           <ModalDescription className="mt-1">
             Pick the same kinds of filters used in the mappings list, then export the matching mapping entries.
@@ -378,17 +457,17 @@ export default function ExportMappingsDialog({
         </div>
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          <div className="flex items-center gap-2 rounded-lg bg-bg-primary/70 p-1">
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-border-primary/75 bg-bg-primary/35 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
             {providerOptions.map((provider) => (
               <button
                 key={provider}
                 type="button"
                 onClick={() => toggleProvider(provider)}
                 className={cn(
-                  'rounded-md px-4 py-2 text-sm font-semibold transition-colors',
+                  'rounded-xl px-4 py-2 text-sm font-semibold transition-colors',
                   draftProviderFilters.has(provider)
                     ? 'bg-accent-primary text-white shadow-sm'
-                    : 'text-text-secondary hover:text-text-primary',
+                    : 'text-text-secondary hover:bg-bg-secondary/70 hover:text-text-primary',
                 )}
               >
                 {provider === 'sonarr' ? 'Sonarr' : 'Radarr'}
@@ -396,8 +475,8 @@ export default function ExportMappingsDialog({
             ))}
           </div>
 
-          <div className="rounded-xl border border-border-primary bg-bg-secondary/30">
-            <div className="border-b border-border-primary px-4 py-3">
+          <div className="overflow-hidden rounded-2xl border border-border-primary/75 bg-bg-primary/24 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
+            <div className="border-b border-border-primary/75 px-4 py-3">
               <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
                 <SlidersHorizontal className="h-4 w-4 text-text-secondary" />
                 Export selection
@@ -409,34 +488,50 @@ export default function ExportMappingsDialog({
             <div className="space-y-4 px-4 py-4">
               <MappingToolbar
                 searchQuery={draftSearchQuery}
-                sourceFilters={draftSourceFilters}
+                providerFilter={draftProviderFilter}
+                sourceFilter={draftSourceFilter}
                 sortOption="updated-desc"
                 libraryFilter={draftLibraryFilter}
+                activeScope={draftScope}
+                resultsSummary={`${previewRowCount} of ${totalAvailable ?? previewRowCount} groups`}
+                resultsSummaryDetail="Export uses the current provider, source, search, and library filters."
+                hasActiveRefinements={
+                  draftProviderFilter !== 'all' ||
+                  draftScope !== 'all' ||
+                  draftSourceFilter !== 'all' ||
+                  draftLibraryFilter !== 'all'
+                }
                 searchPlaceholder="Filter what gets exported by title, AniList ID, or target ID"
                 onSearchQueryChange={setDraftSearchQuery}
-                onSourceFiltersChange={setDraftSourceFilters}
+                onProviderFilterChange={handleProviderFilterChange}
+                onSourceFilterChange={handleSourceFilterChange}
                 onSortChange={() => {}}
                 onLibraryFilterChange={setDraftLibraryFilter}
+                onScopeChange={handleScopeChange}
+                onClearRefinements={handleClearRefinements}
+                onAddMapping={() => {}}
+                onExportMappings={handleExport}
+                hideActions
                 hideSort
                 popoverContainer={popoverContainer}
               />
 
-              <div className="rounded-xl border border-sky-500/30 bg-sky-500/8 px-4 py-4">
+              <div className="rounded-2xl border border-accent-primary/25 bg-accent-primary/8 px-4 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-sky-300">Will Be Exported</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-accent-primary">Will Be Exported</p>
                     <p className="mt-1 text-sm text-text-secondary">
                       The current selection above will export these matching mapping groups.
                     </p>
                   </div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-bg-primary/50 px-3 py-1 text-xs text-sky-200">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-accent-primary/25 bg-bg-primary/45 px-3 py-1 text-xs text-accent-primary">
                     <Download className="h-3.5 w-3.5" />
                     JSON export selection
                   </div>
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-lg border border-border-primary/70 bg-bg-primary/50 px-3 py-3">
+                  <div className="rounded-2xl border border-border-primary/70 bg-bg-primary/42 px-3 py-3">
                     <p className="text-[11px] uppercase tracking-wide text-text-secondary">
                       {isPreviewPartial ? 'Previewed groups' : 'Selected groups'}
                     </p>
@@ -447,7 +542,7 @@ export default function ExportMappingsDialog({
                         : 'Grouped records that will be written to the export.'}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-border-primary/70 bg-bg-primary/50 px-3 py-3">
+                  <div className="rounded-2xl border border-border-primary/70 bg-bg-primary/42 px-3 py-3">
                     <p className="text-[11px] uppercase tracking-wide text-text-secondary">{entryCountLabel}</p>
                     <p className="mt-1 text-2xl font-semibold text-text-primary">{entryCountValue}</p>
                     <p className="mt-1 text-xs text-text-secondary">
@@ -456,7 +551,7 @@ export default function ExportMappingsDialog({
                         : 'Entries currently loaded after applying the library filter.'}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-border-primary/70 bg-bg-primary/50 px-3 py-3">
+                  <div className="rounded-2xl border border-border-primary/70 bg-bg-primary/42 px-3 py-3">
                     <p className="text-[11px] uppercase tracking-wide text-text-secondary">
                       {isPreviewPartial ? 'Preview cap' : 'Providers'}
                     </p>
@@ -490,13 +585,13 @@ export default function ExportMappingsDialog({
                 ) : null}
 
                 {searchNeedsMoreCharacters ? (
-                  <p className="mt-3 text-xs text-amber-300">
+                  <p className="mt-3 text-xs text-warning">
                     Export-selection search starts matching after 2 characters.
                   </p>
                 ) : null}
                 {mappings.isFetching ? <p className="mt-3 text-xs text-text-secondary">Refreshing export selection...</p> : null}
                 {isPreviewPartial ? (
-                  <p className="mt-3 text-xs text-amber-300">
+                  <p className="mt-3 text-xs text-warning">
                     Preview loads selected results incrementally for performance. Keep scrolling, or use preview search to pull in more results while the exported file still includes every match from the selection above.
                   </p>
                 ) : null}
@@ -504,7 +599,7 @@ export default function ExportMappingsDialog({
             </div>
           </div>
 
-          <div className="rounded-xl border border-border-primary bg-bg-secondary/40 px-4 py-3">
+          <div className="rounded-2xl border border-border-primary/75 bg-bg-primary/24 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-medium text-text-primary">Preview search</p>
@@ -513,7 +608,7 @@ export default function ExportMappingsDialog({
                 </p>
               </div>
               <div className="min-w-0 flex-1 sm:max-w-md">
-                <div className="flex min-w-0 items-center gap-2 rounded-md border border-border-primary bg-bg-primary px-3 py-2">
+                <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border-primary/80 bg-bg-primary/45 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                   <Search className="h-4 w-4 shrink-0 text-text-secondary" />
                   <input
                     type="text"

@@ -35,7 +35,7 @@ export const useMappingTableData = ({
   const mappingQueryInput = useMemo<GetMappingsInput>(() => {
     const normalizedQuery = normalizeMappingSearchQuery(debouncedQuery);
     const sourceList: NonNullable<GetMappingsInput>['sources'] =
-      sourceFilters.size > 0 ? Array.from(sourceFilters) : ['manual', 'ignored', 'unresolved', 'auto', 'upstream'];
+      sourceFilters.size > 0 ? Array.from(sourceFilters) : ['manual', 'rejected', 'blocked', 'ignored', 'unresolved', 'auto', 'upstream'];
     return {
       providers: providersToQuery,
       sources: sourceList,
@@ -80,7 +80,7 @@ export const useMappingTableData = ({
         String(entry.anilistId),
         entry.externalId ? String(entry.externalId.id) : '',
         title.toLowerCase(),
-        entry.providerMeta?.title?.toLowerCase() ?? '',
+        entry.externalId ? (entry.providerMeta?.title?.toLowerCase() ?? '') : '',
         meta?.titles?.english?.toLowerCase() ?? '',
         meta?.titles?.romaji?.toLowerCase() ?? '',
         meta?.titles?.native?.toLowerCase() ?? '',
@@ -154,9 +154,11 @@ export const useMappingTableData = ({
     const sourcePriority: Record<MappingSummary['source'], number> = {
       manual: 0,
       unresolved: 1,
-      ignored: 2,
-      upstream: 3,
-      auto: 4,
+      rejected: 2,
+      blocked: 3,
+      ignored: 4,
+      upstream: 5,
+      auto: 6,
     };
 
     const resolveTitle = (row: MappingTableRowData) => {
