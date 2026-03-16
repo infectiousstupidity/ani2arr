@@ -10,53 +10,24 @@ import {
 import { postAniList } from './request';
 import {
   FIND_MEDIA_BATCH_QUERY,
-  FIND_MEDIA_QUERY,
   SEARCH_MEDIA_QUERY,
 } from './queries';
+import type { AniListRateLimiter, AniListRequestMeta } from './rate-limit';
 import type {
   ExtensionErrorLike,
   FindMediaBatchResponse,
-  FindMediaResponse,
   SearchMediaResponse,
 } from './types';
 
 type ExecutorDeps = {
-  setPausedUntil: (timestamp: number) => void;
+  limiter: AniListRateLimiter;
 };
 
 export class AniListExecutor {
-  private readonly setPausedUntil: ExecutorDeps['setPausedUntil'];
+  private readonly limiter: ExecutorDeps['limiter'];
 
   constructor(deps: ExecutorDeps) {
-    this.setPausedUntil = deps.setPausedUntil;
-  }
-
-  public fetchMedia(anilistId: number): Promise<AniMedia> {
-    return this.executeGraphql<FindMediaResponse, AniMedia>(
-      () => postAniList({ query: FIND_MEDIA_QUERY, variables: { id: anilistId } }),
-      payload => {
-        const media = payload?.data?.Media;
-        if (media) return media;
-
-        if (payload?.errors?.length) {
-          const message = payload.errors.map(err => err.message).filter(Boolean).join(', ');
-          const extensionError = createError(
-            ErrorCode.API_ERROR,
-            `AniList GraphQL Error: ${message || 'Unknown error'}`,
-            'AniList request failed.',
-          );
-          throw new AniListAbortError(extensionError);
-        }
-
-        const extensionError = createError(
-          ErrorCode.API_ERROR,
-          `AniList response missing media for ${anilistId}`,
-          'AniList returned an unexpected response.',
-        );
-        throw new AniListAbortError(extensionError);
-      },
-      'AniList request failed.',
-    );
+    this.limiter = deps.limiter;
   }
 
   public fetchBatch(ids: number[]): Promise<AniMedia[]> {
@@ -109,20 +80,26 @@ export class AniListExecutor {
   }
 
   private async executeGraphql<TPayload, TResult>(
-    task: () => Promise<TPayload>,
-    parse: (payload: TPayload) => TResult,
+    task: () => Promise<{ payload: TPayload; meta: AniListRequestMeta }>,
+    parse: (payload: TPayload, meta: AniListRequestMeta) => TResult,
     fallbackMessage: string,
   ): Promise<TResult> {
     try {
-      const payload = await this.requestWithRetry(task);
-      return parse(payload);
+      const response = await this.requestWithRetry(task);
+      return parse(response.payload, response.meta);
     } catch (error) {
       return this.handleRequestError(error, fallbackMessage);
     }
   }
 
-  private requestWithRetry<T>(task: () => Promise<T>): Promise<T> {
-    return withRetry(task, {
+  private requestWithRetry<TPayload>(
+    task: () => Promise<{ payload: TPayload; meta: AniListRequestMeta }>,
+  ): Promise<{ payload: TPayload; meta: AniListRequestMeta }> {
+    return withRetry(async () => {
+      const response = await task();
+      this.limiter.updateFromSuccess(response.meta);
+      return response;
+    }, {
       retries: 3,
       minTimeout: 0,
       maxTimeout: 0,
@@ -135,7 +112,7 @@ export class AniListExecutor {
   private extractRetryAfterMs(error: unknown): number | undefined {
     const normalized = this.unwrapAbortError(error);
     if (isRateLimitError(normalized)) {
-      return normalized.retryAfterMs;
+      return Math.max(0, normalized.pausedUntil - Date.now());
     }
     return undefined;
   }
@@ -143,7 +120,7 @@ export class AniListExecutor {
   private applyRateLimitPause(error: unknown): void {
     const normalized = this.unwrapAbortError(error);
     if (isRateLimitError(normalized)) {
-      this.setPausedUntil(Date.now() + normalized.retryAfterMs);
+      this.limiter.updateFromRateLimit(normalized.meta, normalized.pausedUntil);
     }
   }
 
@@ -180,12 +157,12 @@ export class AniListExecutor {
     }
 
     if (isRateLimitError(normalized)) {
-      this.setPausedUntil(Date.now() + normalized.retryAfterMs);
+      this.limiter.updateFromRateLimit(normalized.meta, normalized.pausedUntil);
       throw createError(
         ErrorCode.API_ERROR,
         'AniList rate limit exceeded',
         'AniList request failed.',
-        { retryAfterMs: normalized.retryAfterMs },
+        { retryAfterMs: Math.max(0, normalized.pausedUntil - Date.now()) },
       );
     }
 

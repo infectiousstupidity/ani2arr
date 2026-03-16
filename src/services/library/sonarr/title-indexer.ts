@@ -1,6 +1,10 @@
 // src/services/library/sonarr/title-indexer.ts
 import type { LeanSonarrSeries, TitleIndexer, CheckSeriesStatusPayload } from './types';
-import { canonicalizeLookupTerm, computeTitleMatchScore, stripParenContent, sanitizeLookupDisplay } from '@/services/mapping/pipeline/matching';
+import {
+  buildTitleIndexKeysForProvider,
+  computeTitleMatchScoreForProvider,
+  extractCandidateTitleVariants,
+} from '@/services/mapping/pipeline/matching';
 import { incrementCounter } from '@/shared/utils/metrics';
 import { LOCAL_INDEX_ACCEPTANCE_THRESHOLD } from './constants';
 
@@ -46,24 +50,13 @@ export class SonarrTitleIndexer implements TitleIndexer {
     let bestMatch: { tvdbId: number; score: number } | null = null;
 
     const scoreAgainstSeries = (rawTitle: string, series: LeanSonarrSeries): number => {
-      const sanitizedQuery = sanitizeLookupDisplay(rawTitle);
-      const libraryTitles = new Set<string>();
-      libraryTitles.add(series.title);
-      libraryTitles.add(series.titleSlug);
-      if (Array.isArray(series.alternateTitles)) for (const alt of series.alternateTitles) if (alt) libraryTitles.add(alt);
-
-      let top = 0;
-      for (const candidateRaw of libraryTitles) {
-        if (!candidateRaw) continue;
-        const baseArgs = (yr?: number) => (yr !== undefined ? { targetYear: yr } : {});
-        const scoreRaw = computeTitleMatchScore({ queryRaw: rawTitle, candidateRaw, ...baseArgs(targetYear) });
-        if (scoreRaw > top) top = scoreRaw;
-        if (sanitizedQuery && sanitizedQuery !== rawTitle) {
-          const scoreSanitized = computeTitleMatchScore({ queryRaw: sanitizedQuery, candidateRaw, ...baseArgs(targetYear) });
-          if (scoreSanitized > top) top = scoreSanitized;
-        }
-      }
-      return top;
+      return computeTitleMatchScoreForProvider({
+        provider: 'sonarr',
+        queryRaw: rawTitle,
+        candidate: series,
+        ...(typeof targetYear === 'number' ? { targetYear } : {}),
+        candidateCount: 1,
+      });
     };
 
     for (const rawTitle of candidateInputs) {
@@ -111,14 +104,10 @@ export class SonarrTitleIndexer implements TitleIndexer {
   }
 
   private buildNormalizedKeysForSeries(series: LeanSonarrSeries): string[] {
-    const rawValues = new Set<string>();
-    rawValues.add(series.title);
-    rawValues.add(series.titleSlug);
-    const slugSpaced = series.titleSlug.replace(/[-_.]+/g, ' ');
-    if (slugSpaced !== series.titleSlug) rawValues.add(slugSpaced);
-    if (Array.isArray(series.alternateTitles)) for (const t of series.alternateTitles) if (t) rawValues.add(t);
-    return this.normalizeTitleCandidates(rawValues);
-    }
+    return this.normalizeTitleCandidates(
+      extractCandidateTitleVariants('sonarr', series).map(variant => variant.value),
+    );
+  }
 
   private normalizeTitleCandidates(values: Iterable<string | null | undefined>): string[] {
     const out = new Set<string>();
@@ -126,20 +115,8 @@ export class SonarrTitleIndexer implements TitleIndexer {
       if (!value) continue;
       const trimmed = value.trim();
       if (!trimmed) continue;
-
-      const primary = canonicalizeLookupTerm(trimmed);
-      if (primary) out.add(primary);
-
-      const sanitized = sanitizeLookupDisplay(trimmed);
-      if (sanitized && sanitized !== trimmed) {
-        const sanitizedCanonical = canonicalizeLookupTerm(sanitized);
-        if (sanitizedCanonical) out.add(sanitizedCanonical);
-      }
-
-      const stripped = stripParenContent(trimmed);
-      if (stripped && stripped !== trimmed) {
-        const strippedCanonical = canonicalizeLookupTerm(stripped);
-        if (strippedCanonical) out.add(strippedCanonical);
+      for (const key of buildTitleIndexKeysForProvider('sonarr', trimmed)) {
+        if (key) out.add(key);
       }
     }
     return Array.from(out);

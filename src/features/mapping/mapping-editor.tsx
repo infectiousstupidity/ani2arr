@@ -1,13 +1,22 @@
 import React, { useMemo } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { useAniListMedia, useMovieStatus, usePublicOptions, useSeriesStatus } from '@/shared/queries';
+import { Footer } from '@/features/media-modal/components/media-modal-footer';
+import { Header } from '@/features/media-modal/components/media-modal-header';
+import { Modal, ModalContent, ModalDescription, ModalTitle } from '@/features/media-modal/components/modal';
 import Button from '@/shared/ui/primitives/button';
-import { useAniListMedia, usePublicOptions, useSeriesStatus } from '@/shared/queries';
 import { MappingPreviewPanel } from './mapping-preview-panel';
 import { MappingSearchPanel } from './mapping-search-panel';
 import { useMappingController } from './use-mapping-controller';
-import type { MappingExternalId, MappingProvider, MappingSearchResult, SonarrLookupSeries } from '@/shared/types';
+import type {
+  MappingExternalId,
+  MappingProvider,
+  MappingSearchResult,
+  RadarrLookupMovie,
+  SonarrLookupSeries,
+  TitleLanguage,
+} from '@/shared/types';
 import { metadataFromMediaObject } from '@/shared/anilist/dom/anilist-dom';
+import { toMappingSearchResultFromRadarr } from './radarr.adapter';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 
@@ -19,23 +28,45 @@ interface MappingEditorProps {
   provider: MappingProvider;
 }
 
-const DIALOG_Z_INDEX = 2147483600;
-
 const buildCurrentMapping = (
+  provider: MappingProvider,
   externalId: MappingExternalId | null | undefined,
-  statusSeries: SonarrLookupSeries | undefined,
+  statusItem: SonarrLookupSeries | RadarrLookupMovie | undefined,
   linkedAniListIds: number[] | undefined,
   inLibrary: boolean,
   baseUrl: string,
   fallbackTitle?: string,
 ): MappingSearchResult | null => {
-  if (!externalId || externalId.kind !== 'tvdb') return null;
+  if (!externalId) return null;
+
+  if (provider === 'radarr') {
+    if (externalId.kind !== 'tmdb') return null;
+    const tmdbId = externalId.id;
+    if (statusItem) {
+      return toMappingSearchResultFromRadarr(statusItem as RadarrLookupMovie, {
+        baseUrl,
+        libraryTmdbIds: inLibrary ? [tmdbId] : [],
+        ...(linkedAniListIds?.length
+          ? { linkedAniListIdsByTmdbId: { [tmdbId]: linkedAniListIds } }
+          : {}),
+      });
+    }
+    return {
+      service: 'radarr',
+      target: { id: tmdbId, kind: 'tmdb' },
+      title: fallbackTitle ? `${fallbackTitle} (TMDB ${tmdbId})` : `TMDB ${tmdbId}`,
+      inLibrary,
+      ...(linkedAniListIds?.length ? { linkedAniListIds } : {}),
+    };
+  }
+
+  if (externalId.kind !== 'tvdb') return null;
   const tvdbId = externalId.id;
-  if (statusSeries) {
-    return toMappingSearchResultFromSonarr(statusSeries, {
+  if (statusItem) {
+    return toMappingSearchResultFromSonarr(statusItem as SonarrLookupSeries, {
       baseUrl,
       libraryTvdbIds: inLibrary ? [tvdbId] : [],
-      ...(linkedAniListIds && linkedAniListIds.length > 0
+      ...(linkedAniListIds?.length
         ? { linkedAniListIdsByTvdbId: { [tvdbId]: linkedAniListIds } }
         : {}),
     });
@@ -58,7 +89,10 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
 }) => {
   const toast = useToast();
   const publicOptions = usePublicOptions();
-  const baseUrl = publicOptions.data?.sonarrUrl ?? '';
+  const baseUrl =
+    provider === 'radarr'
+      ? publicOptions.data?.providers.radarr.url ?? ''
+      : publicOptions.data?.providers.sonarr.url ?? '';
 
   const aniListMedia = useAniListMedia(anilistId, { enabled: open });
   const aniTitle = useMemo(
@@ -69,12 +103,58 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
       `AniList #${anilistId}`,
     [aniListMedia.data, anilistId],
   );
+  const alternateTitles = useMemo(() => {
+    const titles = aniListMedia.data?.title;
+    if (!titles) return [];
+
+    const titleEntries = [
+      { label: 'English', value: titles.english },
+      { label: 'Romaji', value: titles.romaji },
+      { label: 'Native', value: titles.native },
+    ];
+    const normalizedPrimary = aniTitle.trim().toLowerCase();
+    const seen = new Set<string>();
+
+    return titleEntries.filter((entry): entry is { label: string; value: string } => {
+      if (typeof entry.value !== 'string') return false;
+      const value = entry.value.trim();
+      if (!value) return false;
+      const normalizedValue = value.toLowerCase();
+      if (normalizedValue === normalizedPrimary || seen.has(normalizedValue)) {
+        return false;
+      }
+      seen.add(normalizedValue);
+      return true;
+    });
+  }, [aniListMedia.data?.title, aniTitle]);
   const metadataHint = useMemo(() => metadataFromMediaObject(aniListMedia.data), [aniListMedia.data]);
+  const titleLanguage: TitleLanguage =
+    provider === 'radarr'
+      ? publicOptions.data?.providers.radarr.titleLanguage ?? 'english'
+      : publicOptions.data?.providers.sonarr.titleLanguage ?? 'english';
+  const coverImage =
+    aniListMedia.data?.coverImage?.extraLarge ??
+    aniListMedia.data?.coverImage?.large ??
+    aniListMedia.data?.coverImage?.medium ??
+    null;
+  const bannerImage = aniListMedia.data?.bannerImage ?? null;
+  const format = aniListMedia.data?.format ?? null;
+  const year = aniListMedia.data?.seasonYear ?? aniListMedia.data?.startDate?.year ?? null;
+  const status = aniListMedia.data?.status ?? null;
 
   const seriesStatus = useSeriesStatus(
     { anilistId, title: aniTitle, metadata: metadataHint },
     {
-      enabled: open,
+      enabled: open && provider === 'sonarr',
+      force_verify: true,
+      ignoreFailureCache: true,
+      priority: 'high',
+    },
+  );
+  const movieStatus = useMovieStatus(
+    { anilistId, title: aniTitle, metadata: metadataHint },
+    {
+      enabled: open && provider === 'radarr',
       force_verify: true,
       ignoreFailureCache: true,
       priority: 'high',
@@ -82,40 +162,66 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
   );
 
   const statusSeries = seriesStatus.data?.series as SonarrLookupSeries | undefined;
+  const statusMovie = movieStatus.data?.movie as RadarrLookupMovie | undefined;
   const statusExternalId: MappingExternalId | null =
-    seriesStatus.data?.externalId ??
-    (typeof seriesStatus.data?.tvdbId === 'number'
-      ? { id: seriesStatus.data.tvdbId, kind: 'tvdb' }
-      : null);
+    provider === 'radarr'
+      ? movieStatus.data?.externalId ??
+        (typeof movieStatus.data?.tmdbId === 'number'
+          ? { id: movieStatus.data.tmdbId, kind: 'tmdb' }
+          : null)
+      : seriesStatus.data?.externalId ??
+        (typeof seriesStatus.data?.tvdbId === 'number'
+          ? { id: seriesStatus.data.tvdbId, kind: 'tvdb' }
+          : null);
   const externalId = statusExternalId ?? initialExternalId ?? null;
-  const linkedAniListIds = seriesStatus.data?.linkedAniListIds;
+  const linkedAniListIds = provider === 'radarr' ? movieStatus.data?.linkedAniListIds : seriesStatus.data?.linkedAniListIds;
   const currentMapping = useMemo<MappingSearchResult | null>(() => {
     return buildCurrentMapping(
+      provider,
       externalId,
-      statusSeries,
+      provider === 'radarr' ? statusMovie : statusSeries,
       linkedAniListIds,
-      seriesStatus.data?.exists ?? false,
+      provider === 'radarr' ? movieStatus.data?.exists ?? false : seriesStatus.data?.exists ?? false,
       baseUrl,
       aniTitle,
     );
-  }, [aniTitle, baseUrl, externalId, linkedAniListIds, seriesStatus.data?.exists, statusSeries]);
+  }, [
+    aniTitle,
+    baseUrl,
+    externalId,
+    linkedAniListIds,
+    movieStatus.data?.exists,
+    provider,
+    seriesStatus.data?.exists,
+    statusMovie,
+    statusSeries,
+  ]);
 
   const mappingController = useMappingController({
     service: provider,
     anilistId,
     currentMapping,
-    overrideActive: seriesStatus.data?.overrideActive === true,
+    overrideActive:
+      provider === 'radarr'
+        ? movieStatus.data?.overrideActive === true
+        : seriesStatus.data?.overrideActive === true,
   });
 
   const previewMapping = mappingController.state.selected;
   const showResetPreview = mappingController.state.isDirty;
+  const inLibrary = provider === 'radarr' ? Boolean(movieStatus.data?.exists) : Boolean(seriesStatus.data?.exists);
+  const primaryLabel = currentMapping ? 'Update mapping' : 'Add mapping';
+  const secondaryLabel = 'Exit modal';
 
   const handleSave = async () => {
     try {
       await mappingController.handleSubmit();
+      const target = mappingController.currentMapping?.target ?? previewMapping?.target ?? null;
       toast.showToast({
         title: 'Mapping saved',
-        description: `AniList #${anilistId} now maps to TVDB #${mappingController.currentMapping?.target.id ?? previewMapping?.target.id}.`,
+        description: target
+          ? `AniList #${anilistId} now maps to ${target.kind.toUpperCase()} #${target.id}.`
+          : `AniList #${anilistId} mapping was updated.`,
         variant: 'success',
       });
       onClose();
@@ -129,74 +235,101 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <Dialog.Portal>
-        <Dialog.Overlay
-          className="fixed inset-0 bg-black/60 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out"
-          style={{ zIndex: DIALOG_Z_INDEX }}
+    <Modal open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <ModalContent
+        className="flex h-[75.5vh] w-full max-w-250 flex-col overflow-hidden rounded-none bg-bg-primary p-0 shadow-2xl shadow-black/40 sm:min-h-180 sm:rounded-2xl"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+        }}
+      >
+        <ModalTitle className="sr-only">Edit mapping</ModalTitle>
+        <ModalDescription className="sr-only">
+          Update the {provider === 'radarr' ? 'Radarr' : 'Sonarr'} mapping for AniList entry {anilistId}.
+        </ModalDescription>
+        <Header
+          title={aniTitle}
+          alternateTitles={alternateTitles}
+          titleLanguage={titleLanguage}
+          bannerImage={bannerImage}
+          coverImage={coverImage}
+          anilistIds={[anilistId]}
+          service={provider}
+          inLibrary={inLibrary}
+          format={format}
+          year={year}
+          status={status}
+          activeTab="mapping"
+          onEnterMapping={() => {}}
+          onExitMapping={onClose}
+          onClose={onClose}
         />
-        <Dialog.Content
-          className="fixed left-1/2 top-1/2 h-[90vh] w-[min(1100px,96vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl bg-bg-primary shadow-2xl outline-none"
-          style={{ zIndex: DIALOG_Z_INDEX + 1 }}
-        >
-          <div className="flex items-start justify-between border-b border-border-primary px-6 py-4">
-            <div className="space-y-1">
-              <Dialog.Title className="text-lg font-semibold text-text-primary">Edit mapping</Dialog.Title>
-              <Dialog.Description className="text-sm text-text-secondary">
-                {aniTitle}
-              </Dialog.Description>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="h-8 w-8 text-text-secondary hover:text-text-primary"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
 
-          <div className="grid h-[calc(90vh-120px)] grid-cols-1 gap-6 overflow-hidden p-6 lg:grid-cols-2">
-            <div className="min-h-0 overflow-hidden rounded-xl border border-border-primary bg-bg-secondary/40 p-4">
-              <MappingSearchPanel
-                controller={mappingController}
-                currentMapping={mappingController.currentMapping}
-                baseUrl={baseUrl}
-                autoFocus
-              />
-            </div>
-            <div className="min-h-0 overflow-hidden rounded-xl border border-border-primary bg-bg-secondary/40 p-4">
-              <MappingPreviewPanel
-                aniListEntry={{
-                  id: anilistId,
-                  title: aniTitle,
-                  ...(aniListMedia.data?.coverImage?.large ? { posterUrl: aniListMedia.data.coverImage.large } : {}),
-                }}
-                baseUrl={baseUrl}
-                currentMapping={mappingController.currentMapping}
-                previewMapping={previewMapping}
-                isInMappingMode
-                showResetPreview={showResetPreview}
-                onResetPreview={mappingController.clearSelection}
-                onEditMapping={onClose}
-              />
-            </div>
-          </div>
+        <div className="flex-1 overflow-hidden px-8">
+          <div className="mx-auto flex h-full max-w-250 flex-col gap-6">
+            <div className="grid h-full grid-cols-2 gap-6">
+              <div className="flex h-full flex-col overflow-hidden">
+                <div className="min-h-0 flex-1">
+                  <MappingSearchPanel
+                    controller={mappingController}
+                    currentMapping={mappingController.currentMapping}
+                    provider={provider}
+                    baseUrl={baseUrl}
+                    autoFocus
+                  />
+                </div>
+              </div>
 
-          <div className="flex items-center justify-end gap-3 border-t border-border-primary px-6 py-4">
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={!mappingController.canSubmit || mappingController.isSubmitting}
-              isLoading={mappingController.isSubmitting}
-            >
-              Save mapping
-            </Button>
+              <div className="relative">
+                <div className="sticky top-0 h-full">
+                  <MappingPreviewPanel
+                    aniListEntry={{
+                      id: anilistId,
+                      title: aniTitle,
+                      ...(coverImage ? { posterUrl: coverImage } : {}),
+                    }}
+                    baseUrl={baseUrl}
+                    provider={provider}
+                    currentMapping={mappingController.currentMapping}
+                    previewMapping={previewMapping}
+                    isInMappingMode
+                    exitClosesModal
+                    showResetPreview={showResetPreview}
+                    onResetPreview={mappingController.clearSelection}
+                    onEditMapping={onClose}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        </div>
+
+        <Footer
+          leftContent={mappingController.canRevert ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void mappingController.handleRevertToAutomatic().then(onClose).catch(() => undefined);
+              }}
+              disabled={mappingController.isSubmitting}
+            >
+              Reset to automatic
+            </Button>
+          ) : null}
+          primaryLabel={primaryLabel}
+          primaryDisabled={!mappingController.canSubmit}
+          primaryLoading={mappingController.isSubmitting}
+          onPrimaryClick={() => {
+            void handleSave();
+          }}
+          secondaryLabel={secondaryLabel}
+          onSecondaryClick={onClose}
+          showTertiary={false}
+          tertiaryLabel=""
+          onTertiaryClick={undefined}
+        />
+      </ModalContent>
+    </Modal>
   );
 };

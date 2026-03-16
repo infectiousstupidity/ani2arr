@@ -74,7 +74,7 @@ export default function ConfirmDialog({
 
         <AlertDialog.Content
           className={cn(
-            'fixed left-1/2 top-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 bg-bg-primary p-6 shadow-lg outline-none sm:rounded-lg',
+            'fixed left-1/2 top-1/2 max-h-[calc(100vh-2rem)] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto gap-4 bg-bg-primary p-6 shadow-lg outline-none sm:rounded-lg',
           )}
           style={{ zIndex: CONFIRM_CONTENT_Z_INDEX }}
         >

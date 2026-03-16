@@ -1,7 +1,7 @@
 // src/cache/query-cache.ts
 import type { PersistedClient, Persister } from '@tanstack/query-persist-client-core';
 import type { Query } from '@tanstack/query-core';
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { deleteDB, openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
 const DB_NAME = 'a2a-tanstack-query-db';
 const STORE_NAME = 'tanstack-query-store';
@@ -15,6 +15,28 @@ interface QueryCacheDbSchema extends DBSchema {
 }
 
 let dbPromise: Promise<IDBPDatabase<QueryCacheDbSchema>> | null = null;
+let knownDbExists = false;
+
+const hasPersistedQuerySnapshot = (client: PersistedClient): boolean =>
+  client.clientState.queries.length > 0 || client.clientState.mutations.length > 0;
+
+const detectExistingDb = async (): Promise<boolean> => {
+  const indexedDbWithDatabases = indexedDB as IDBFactory & {
+    databases?: () => Promise<Array<{ name?: string }>>;
+  };
+
+  if (typeof indexedDbWithDatabases.databases !== 'function') {
+    return dbPromise !== null || knownDbExists;
+  }
+
+  try {
+    const databases = await indexedDbWithDatabases.databases();
+    return databases.some(database => database.name === DB_NAME);
+  } catch {
+    return dbPromise !== null || knownDbExists;
+  }
+};
+
 const getDb = (): Promise<IDBPDatabase<QueryCacheDbSchema>> => {
   if (!dbPromise) {
     dbPromise = openDB<QueryCacheDbSchema>(DB_NAME, 1, {
@@ -25,6 +47,8 @@ const getDb = (): Promise<IDBPDatabase<QueryCacheDbSchema>> => {
       },
     });
   }
+
+  knownDbExists = true;
   return dbPromise;
 };
 
@@ -32,16 +56,24 @@ const getDb = (): Promise<IDBPDatabase<QueryCacheDbSchema>> => {
 // Default persister implementation using IndexedDB
 const defaultPersister: Persister = {
   persistClient: async (client) => {
+    if (!hasPersistedQuerySnapshot(client)) {
+      await clearPersistedQueryCache();
+      return;
+    }
+
     const db = await getDb();
     await db.put(STORE_NAME, client, STORE_KEY);
   },
   restoreClient: async () => {
+    if (!(await detectExistingDb())) {
+      return undefined;
+    }
+
     const db = await getDb();
     return db.get(STORE_NAME, STORE_KEY);
   },
   removeClient: async () => {
-    const db = await getDb();
-    await db.delete(STORE_NAME, STORE_KEY);
+    await clearPersistedQueryCache();
   },
 };
 
@@ -69,16 +101,33 @@ export function overrideQueryPersisterForTests(persister: Persister | null): voi
   currentPersister = persister ?? defaultPersister;
 }
 
-// Filter: never persist queries containing Sonarr credentials or metadata
+export async function clearPersistedQueryCache(): Promise<void> {
+  if (dbPromise) {
+    try {
+      const db = await dbPromise;
+      db.close();
+    } finally {
+      dbPromise = null;
+    }
+  }
+
+  await deleteDB(DB_NAME, {
+    blocked() {
+      // Allow the delete to proceed even if a connection lingers.
+    },
+  });
+  knownDbExists = false;
+}
+
+// Filter: never persist queries containing provider credentials or Arr metadata
 const CREDENTIAL_QUERY_PREFIX = ['a2a', 'options'] as const;
-const METADATA_QUERY_PREFIX = ['a2a', 'sonarrMetadata'] as const;
 
 /**
  * Determines which queries should be persisted to IndexedDB in the page context.
  * 
  * EXCLUDED (for security/privacy):
- * - 'options' queries: contain Sonarr URL + API key
- * - 'sonarrMetadata' queries: contain server filesystem paths, quality profile names, tag labels
+ * - 'options' queries: contain provider URLs + API keys
+ * - Arr metadata queries: contain server filesystem paths, quality profile names, tag labels
  * 
  * INCLUDED (safe to persist):
  * - 'seriesStatus' queries: contain only titles, IDs, slugs (no sensitive data)
@@ -96,8 +145,8 @@ export const shouldPersistQuery = (
     return false;
   }
 
-  // Block Sonarr metadata (filesystem paths, quality profiles, tags)
-  if (key[0] === METADATA_QUERY_PREFIX[0] && key[1] === METADATA_QUERY_PREFIX[1]) {
+  // Block Arr metadata (filesystem paths, quality profiles, tags)
+  if (key[0] === 'a2a' && (key[1] === 'sonarrMetadata' || key[1] === 'radarrMetadata')) {
     return false;
   }
 

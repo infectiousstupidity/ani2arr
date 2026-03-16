@@ -2,11 +2,12 @@ import type { MappingOverridesService } from '@/services/mapping/overrides.servi
 import type { StaticMappingProvider } from '@/services/mapping/static-mapping.provider';
 import type { MappingService } from '@/services/mapping';
 import type { SonarrLibrary } from '@/services/library/sonarr';
-import type { LeanSonarrSeries, MappingSummary, MappingSource, MappingStatus } from '@/shared/types';
+import type { RadarrLibrary } from '@/services/library/radarr';
+import type { LeanRadarrMovie, LeanSonarrSeries, MappingSummary, MappingSource, MappingStatus } from '@/shared/types';
 
 export type GetMappingsInput = {
   limit?: number;
-  cursor?: { updatedAt: number; anilistId: number };
+  cursor?: { updatedAt: number; anilistId: number; provider: MappingSummary['provider'] };
   query?: string;
   sources?: MappingSource[];
   providers?: MappingSummary['provider'][];
@@ -17,70 +18,86 @@ type GetMappingsDeps = {
   staticProvider: StaticMappingProvider;
   mappingService: MappingService;
   sonarrLibrary: SonarrLibrary;
+  radarrLibrary: RadarrLibrary;
 };
 
 export async function getMappingsHandler(
   input: GetMappingsInput | undefined,
   deps: GetMappingsDeps,
-): Promise<{ mappings: MappingSummary[]; total: number; nextCursor: { updatedAt: number; anilistId: number } | null }> {
-  const { overridesService, staticProvider, mappingService, sonarrLibrary } = deps;
+): Promise<{
+  mappings: MappingSummary[];
+  total: number;
+  nextCursor: { updatedAt: number; anilistId: number; provider: MappingSummary['provider'] } | null;
+}> {
+  const { overridesService, staticProvider, mappingService, sonarrLibrary, radarrLibrary } = deps;
   const normalizedQuery = input?.query?.trim().toLowerCase() || '';
   const sources =
     input?.sources && input.sources.length > 0
       ? new Set<MappingSource>(input.sources)
-      : new Set<MappingSource>(['manual', 'ignored', 'auto']);
+      : new Set<MappingSource>(['manual', 'rejected', 'blocked', 'ignored', 'auto', 'unresolved']);
   const providers =
     input?.providers && input.providers.length > 0
       ? new Set<MappingSummary['provider']>(input.providers)
-      : new Set<MappingSummary['provider']>(['sonarr']);
-  if (!providers.has('sonarr')) {
-    return { mappings: [], total: 0, nextCursor: null };
-  }
+      : new Set<MappingSummary['provider']>(['sonarr', 'radarr']);
 
   const defaultLimit = normalizedQuery ? 200 : 500;
   const limit = Math.min(Math.max(input?.limit ?? defaultLimit, 1), 2000);
   const cursor = input?.cursor;
 
-  let library: LeanSonarrSeries[] = [];
-  try {
-    library = await sonarrLibrary.getLeanSeriesList();
-  } catch {
-    library = [];
-  }
+  const [library, radarrLibraryItems] = await Promise.all([
+    sonarrLibrary.getLeanSeriesList().catch(() => [] as LeanSonarrSeries[]),
+    radarrLibrary.getLeanMovieList().catch(() => [] as LeanRadarrMovie[]),
+  ]);
 
   const libraryByTvdbId = new Map<number, LeanSonarrSeries>();
   for (const series of library) {
     libraryByTvdbId.set(series.tvdbId, series);
   }
+  const libraryByTmdbId = new Map<number, LeanRadarrMovie>();
+  for (const movie of radarrLibraryItems) {
+    libraryByTmdbId.set(movie.tmdbId, movie);
+  }
 
   const priorityMap: Record<MappingSource, number> = {
+    manual: 6,
+    blocked: 5,
+    rejected: 4,
     ignored: 3,
-    manual: 2,
+    unresolved: 2,
     upstream: 1,
     auto: 0,
   };
 
   type Candidate = {
-    externalId: { id: number; kind: 'tvdb' } | null;
+    provider: MappingSummary['provider'];
+    externalId: MappingSummary['externalId'];
+    suppressedExternalId?: MappingSummary['suppressedExternalId'];
     source: MappingSource;
     updatedAt: number;
     hadResolveAttempt?: boolean;
+    title?: string;
     priority: number;
   };
 
-  const candidates = new Map<number, Candidate>();
-  const applyCandidate = (anilistId: number, candidate: Omit<Candidate, 'priority' | 'updatedAt'> & { updatedAt?: number }) => {
+  const candidates = new Map<string, Candidate>();
+  const applyCandidate = (
+    anilistId: number,
+    candidate: Omit<Candidate, 'priority' | 'updatedAt'> & { updatedAt?: number },
+  ) => {
     if (!Number.isFinite(anilistId)) return;
+    if (!providers.has(candidate.provider)) return;
     if (!sources.has(candidate.source)) return;
     const priority = priorityMap[candidate.source];
-    const existing = candidates.get(anilistId);
+    const key = `${candidate.provider}:${anilistId}`;
+    const existing = candidates.get(key);
     if (existing && existing.priority > priority) return;
-    candidates.set(anilistId, { ...candidate, updatedAt: candidate.updatedAt ?? 0, priority });
+    candidates.set(key, { ...candidate, updatedAt: candidate.updatedAt ?? 0, priority });
   };
 
   const ignores = overridesService.listIgnores();
   for (const ignore of ignores) {
     applyCandidate(ignore.anilistId, {
+      provider: ignore.provider,
       externalId: null,
       source: 'ignored',
       updatedAt: ignore.updatedAt,
@@ -88,10 +105,37 @@ export async function getMappingsHandler(
     });
   }
 
+  const rejectedCandidates = overridesService.listRejectedCandidates();
+  for (const rejected of rejectedCandidates) {
+    if (overridesService.isIgnored(rejected.provider, rejected.anilistId)) continue;
+    applyCandidate(rejected.anilistId, {
+      provider: rejected.provider,
+      externalId: null,
+      suppressedExternalId: rejected.externalId,
+      source: 'rejected',
+      updatedAt: rejected.updatedAt,
+      hadResolveAttempt: true,
+    });
+  }
+
+  const blockedCandidates = overridesService.listBlockedCandidates();
+  for (const blocked of blockedCandidates) {
+    if (overridesService.isIgnored(blocked.provider, blocked.anilistId)) continue;
+    applyCandidate(blocked.anilistId, {
+      provider: blocked.provider,
+      externalId: null,
+      suppressedExternalId: blocked.externalId,
+      source: 'blocked',
+      updatedAt: blocked.updatedAt,
+      hadResolveAttempt: true,
+    });
+  }
+
   const overrides = overridesService.list();
   for (const entry of overrides) {
     applyCandidate(entry.anilistId, {
-      externalId: { id: entry.tvdbId, kind: 'tvdb' },
+      provider: entry.provider,
+      externalId: entry.externalId,
       source: 'manual',
       updatedAt: entry.updatedAt,
       hadResolveAttempt: true,
@@ -101,6 +145,7 @@ export async function getMappingsHandler(
   if (sources.has('upstream')) {
     for (const pair of staticProvider.listAllPairs()) {
       applyCandidate(pair.anilistId, {
+        provider: 'sonarr',
         externalId: { id: pair.tvdbId, kind: 'tvdb' },
         source: 'upstream',
       });
@@ -110,10 +155,23 @@ export async function getMappingsHandler(
   const recorded = mappingService.getRecordedResolvedMappings();
   for (const entry of recorded) {
     applyCandidate(entry.anilistId, {
-      externalId: { id: entry.tvdbId, kind: 'tvdb' },
-      source: entry.source === 'upstream' ? 'upstream' : 'auto',
+      provider: entry.provider,
+      externalId: entry.externalId,
+      source: entry.source,
       updatedAt: entry.updatedAt,
       hadResolveAttempt: entry.source === 'auto',
+    });
+  }
+
+  const unresolved = mappingService.getRecordedUnresolvedMappings();
+  for (const entry of unresolved) {
+    applyCandidate(entry.anilistId, {
+      provider: entry.provider,
+      externalId: null,
+      source: entry.source,
+      updatedAt: entry.updatedAt,
+      hadResolveAttempt: true,
+      ...(entry.title ? { title: entry.title } : {}),
     });
   }
 
@@ -122,45 +180,69 @@ export async function getMappingsHandler(
     const haystackParts: string[] = [
       String(summary.anilistId),
       summary.externalId ? String(summary.externalId.id) : '',
-      summary.providerMeta?.title ?? '',
+      summary.externalId ? (summary.providerMeta?.title ?? '') : '',
     ];
     const haystack = haystackParts.join(' ').toLowerCase();
     return haystack.includes(normalizedQuery);
   };
 
   const results: MappingSummary[] = [];
-  for (const [anilistId, candidate] of candidates.entries()) {
+  for (const [candidateKey, candidate] of candidates.entries()) {
+    const [, rawAniListId] = candidateKey.split(':');
+    const anilistId = Number(rawAniListId);
+    if (!Number.isFinite(anilistId)) continue;
     const externalId = candidate.externalId ?? null;
-    const tvdbId = externalId?.id ?? null;
+    const tvdbId = candidate.provider === 'sonarr' && externalId?.kind === 'tvdb' ? externalId.id : null;
+    const tmdbId = candidate.provider === 'radarr' && externalId?.kind === 'tmdb' ? externalId.id : null;
     const series = tvdbId != null ? libraryByTvdbId.get(tvdbId) ?? null : null;
-    const linkedAniListIds = tvdbId != null ? mappingService.getLinkedAniListIdsForTvdb(tvdbId) : [];
+    const movie = tmdbId != null ? libraryByTmdbId.get(tmdbId) ?? null : null;
+    const linkedAniListIds =
+      externalId ? mappingService.getLinkedAniListIds(candidate.provider, externalId) : [];
     const status: MappingStatus =
-      tvdbId === null ? 'unmapped' : series ? 'in-provider' : 'not-in-provider';
+      externalId === null ? 'unmapped' : series || movie ? 'in-provider' : 'not-in-provider';
 
     const inLibraryCount =
       series?.statistics?.episodeCount ??
-      series?.statistics?.episodeFileCount;
+      series?.statistics?.episodeFileCount ??
+      (movie ? (movie.hasFile ? 1 : 0) : undefined);
     const statusLabel =
       series && typeof (series as { status?: unknown }).status === 'string'
         ? (series as { status?: string }).status
-        : undefined;
-    const providerMeta = series
-      ? {
-          ...(series.title ? { title: series.title } : {}),
-          type: 'series' as const,
-          ...(statusLabel ? { statusLabel } : {}),
-        }
-      : undefined;
+        : movie?.status;
+    const providerMeta =
+      candidate.source === 'rejected' || candidate.source === 'blocked'
+        ? undefined
+        : series
+          ? {
+              ...(series.title ? { title: series.title } : {}),
+              type: 'series' as const,
+              ...(statusLabel ? { statusLabel } : {}),
+            }
+          : movie
+            ? {
+                ...(movie.title ? { title: movie.title } : {}),
+                type: 'movie' as const,
+                ...(statusLabel ? { statusLabel } : {}),
+              }
+            : candidate.title
+              ? {
+                  title: candidate.title,
+                  type: candidate.provider === 'sonarr' ? ('series' as const) : ('movie' as const),
+                }
+              : undefined;
     const hadResolveAttempt =
       candidate.hadResolveAttempt ||
       candidate.source === 'auto' ||
       candidate.source === 'manual' ||
+      candidate.source === 'rejected' ||
+      candidate.source === 'blocked' ||
       candidate.source === 'ignored';
 
     const summary: MappingSummary = {
       anilistId,
-      provider: 'sonarr',
+      provider: candidate.provider,
       externalId,
+      ...(candidate.suppressedExternalId ? { suppressedExternalId: candidate.suppressedExternalId } : {}),
       source: candidate.source,
       status,
       updatedAt: candidate.updatedAt,
@@ -174,7 +256,12 @@ export async function getMappingsHandler(
     }
   }
 
-  results.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0) || a.anilistId - b.anilistId);
+  results.sort(
+    (a, b) =>
+      (b.updatedAt ?? 0) - (a.updatedAt ?? 0) ||
+      a.provider.localeCompare(b.provider) ||
+      a.anilistId - b.anilistId,
+  );
   const total = results.length;
   const filteredByCursor =
     cursor && typeof cursor.updatedAt === 'number'
@@ -182,6 +269,9 @@ export async function getMappingsHandler(
           const ts = summary.updatedAt ?? 0;
           if (ts < cursor.updatedAt) return true;
           if (ts > cursor.updatedAt) return false;
+          const providerDiff = summary.provider.localeCompare(cursor.provider);
+          if (providerDiff > 0) return true;
+          if (providerDiff < 0) return false;
           return summary.anilistId > cursor.anilistId;
         })
       : results;
@@ -192,6 +282,7 @@ export async function getMappingsHandler(
       ? {
           updatedAt: last.updatedAt ?? 0,
           anilistId: last.anilistId,
+          provider: last.provider,
         }
       : null;
 

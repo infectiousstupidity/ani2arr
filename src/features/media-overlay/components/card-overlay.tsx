@@ -1,10 +1,14 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, TriangleAlert, SlidersHorizontal, Plus, Wrench, SquareArrowOutUpRight, RotateCcw } from 'lucide-react';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
-import type { CardOverlayProps } from '@/shared/types';
+import type { CardOverlayProps, CheckMovieStatusResponse, CheckSeriesStatusResponse } from '@/shared/types';
+import { getLibrarySlug, type FolderSlugSource } from '@/services/helpers/path-utils';
+import { getProviderLabel } from '@/services/providers/resolver';
+import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link';
 import { useCardOverlayState } from '../hooks/use-card-overlay-state';
 
 const CardOverlay: React.FC<CardOverlayProps> = memo(({
+  service,
   anilistId,
   title,
   onOpenModal,
@@ -12,7 +16,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   isConfigured,
   defaultForm,
   metadata,
-  sonarrUrl,
+  providerUrl,
   observeTarget,
   badgeVisibility = 'always',
   anchorCorner = 'bottom-left',
@@ -100,6 +104,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     statusData,
     mappingUnavailable,
   } = useCardOverlayState({
+    service,
     anilistId,
     title,
     metadata,
@@ -107,6 +112,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     isConfigured,
     enabled: isVisible && gateOpen,
   });
+  const providerLabel = getProviderLabel(service);
 
   const swallowEvent = useCallback((event: React.MouseEvent<HTMLElement>) => {
     event.preventDefault();
@@ -127,46 +133,70 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
       case 'resolving':
       case 'adding':
         return <RotateCcw className="a2a-card-overlay__symbol a2a-rotate" aria-hidden="true" />;
-      case 'in-sonarr':
+      case 'in-library':
         return <Check className="a2a-card-overlay__symbol" aria-hidden="true" />;
       case 'error':
-        return <TriangleAlert className="a2a-card-overlay__symbol" aria-hidden="true" />;
+        return mappingUnavailable
+          ? <Wrench className="a2a-card-overlay__symbol" aria-hidden="true" />
+          : <TriangleAlert className="a2a-card-overlay__symbol" aria-hidden="true" />;
       default:
         return <Plus className="a2a-card-overlay__symbol" aria-hidden="true" />;
     }
   })();
 
   const tooltipContainer = useMemo(() => (typeof document !== 'undefined' ? document.body : null), []);
-  const showAdvancedButton = overlayState === 'addable' || overlayState === 'in-sonarr' || overlayState === 'error' || overlayState === 'resolving' || overlayState === 'adding';
-  const showExternalButton = (overlayState === 'in-sonarr' || overlayState === 'adding') && Boolean(sonarrUrl);
+  const showAdvancedButton = overlayState === 'addable' || overlayState === 'in-library' || overlayState === 'error' || overlayState === 'resolving' || overlayState === 'adding';
+  const showExternalButton = (overlayState === 'in-library' || overlayState === 'adding') && Boolean(providerUrl);
   const advancedDisabled = overlayState === 'resolving' || overlayState === 'adding' || (overlayState === 'error' && mappingUnavailable);
-  const externalHref = useMemo(() => {
-    if (!sonarrUrl) return null;
-    const normalized = sonarrUrl.replace(/\/$/, '');
-    if (statusData?.series?.titleSlug) {
-      return `${normalized}/series/${statusData.series.titleSlug}`;
+  const seriesStatus = service === 'sonarr' ? (statusData as CheckSeriesStatusResponse | undefined) : undefined;
+  const movieStatus = service === 'radarr' ? (statusData as CheckMovieStatusResponse | undefined) : undefined;
+  const librarySlug = useMemo(() => {
+    if (service === 'radarr') {
+      return getLibrarySlug('radarr', (movieStatus?.movie ?? null) as FolderSlugSource | null);
     }
-    return `${normalized}/add/new?term=${encodeURIComponent(title)}`;
-  }, [sonarrUrl, statusData?.series?.titleSlug, title]);
+    return getLibrarySlug('sonarr', (seriesStatus?.series ?? null) as FolderSlugSource | null);
+  }, [movieStatus?.movie, seriesStatus?.series, service]);
+  const externalHref = useMemo(() => {
+    return buildExternalMediaLink({
+      service,
+      baseUrl: providerUrl ?? '',
+      inLibrary: overlayState === 'in-library' && Boolean(librarySlug),
+      ...(librarySlug ? { librarySlug } : {}),
+      searchTerm: title,
+    });
+  }, [librarySlug, overlayState, providerUrl, service, title]);
 
-  const overrideActive = statusData?.overrideActive === true;
+  const hasMapping =
+    service === 'radarr'
+      ? !mappingUnavailable && movieStatus?.tmdbId != null
+      : !mappingUnavailable && seriesStatus?.tvdbId != null;
+  const manualMappingLabel = hasMapping ? 'Update mapping manually' : 'Find match manually';
+  const manualMappingAriaLabel = hasMapping ? 'Update mapping manually' : 'Find match manually';
 
   const openMappingFix = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    onOpenMappingFix?.(anilistId, title, overrideActive);
-  }, [anilistId, onOpenMappingFix, overrideActive, title]);
+    onOpenMappingFix?.(anilistId, title, !hasMapping);
+  }, [anilistId, hasMapping, onOpenMappingFix, title]);
+
+  const handlePrimaryAction = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    if (mappingUnavailable && onOpenMappingFix) {
+      openMappingFix(event);
+      return;
+    }
+    handleQuickAdd(event);
+  }, [handleQuickAdd, mappingUnavailable, onOpenMappingFix, openMappingFix]);
 
   
 
   // Prebuild stack action nodes
   const actionOpenExternal = (
     showExternalButton && externalHref ? (
-      <TooltipWrapper content="Open in Sonarr" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
+      <TooltipWrapper content={`Open in ${providerLabel}`} side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
         <button
           type="button"
           className="a2a-card-overlay__action a2a-card-overlay__action--external"
-          aria-label="Open in Sonarr"
+          aria-label={`Open in ${providerLabel}`}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -182,8 +212,8 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
 
   const actionFixMapping = (
     onOpenMappingFix ? (
-      <TooltipWrapper content="Fix mapping…" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
-        <button type="button" className="a2a-card-overlay__action a2a-card-overlay__action--fix" aria-label="Fix mapping" onClick={openMappingFix} onMouseDown={swallowEvent}>
+      <TooltipWrapper content={manualMappingLabel} side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
+        <button type="button" className="a2a-card-overlay__action a2a-card-overlay__action--fix" aria-label={manualMappingAriaLabel} onClick={openMappingFix} onMouseDown={swallowEvent}>
           <Wrench aria-hidden="true" className="h-4 w-4" />
         </button>
       </TooltipWrapper>
@@ -192,11 +222,11 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
 
   const actionAdvanced = (
     showAdvancedButton ? (
-      <TooltipWrapper content="Sonarr options" side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
+      <TooltipWrapper content={`${providerLabel} options`} side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
         <button
           type="button"
           className="a2a-card-overlay__action a2a-card-overlay__action--advanced"
-          aria-label="Open Sonarr options"
+          aria-label={`Open ${providerLabel} options`}
           onClick={handleOpenAdvanced}
           onMouseDown={swallowEvent}
           disabled={advancedDisabled}
@@ -210,14 +240,14 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
 
   const renderStackItems = () => {
     const items: React.ReactElement[] = [];
-    const showExternal = (overlayState === 'in-sonarr' || overlayState === 'adding') && !!actionOpenExternal;
+    const showExternal = (overlayState === 'in-library' || overlayState === 'adding') && !!actionOpenExternal;
     if (stackDirection === 'down') {
       if (actionAdvanced) items.push(<span key="advanced">{actionAdvanced}</span>);
       if (actionFixMapping) items.push(<span key="fix">{actionFixMapping}</span>);
       if (showExternal) items.push(<span key="external">{actionOpenExternal}</span>);
     } else {
       // Stack grows upward: the last DOM item sits closest to the anchor.
-      // Desired visual bottom→top = Advanced → Fix mapping → Open in Sonarr.
+      // Desired visual bottom→top = Advanced → Fix mapping → Open in provider.
       // Therefore DOM (top→bottom) must be = Open → Fix mapping → Advanced.
       if (showExternal) items.push(<span key="external">{actionOpenExternal}</span>);
       if (actionFixMapping) items.push(<span key="fix">{actionFixMapping}</span>);
@@ -250,7 +280,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
             className="a2a-card-overlay__quick"
             data-state={overlayState}
             aria-label={quickAddAriaLabel}
-            onClick={handleQuickAdd}
+            onClick={handlePrimaryAction}
             onMouseDown={swallowEvent}
             disabled={quickAddDisabled}
             aria-disabled={quickAddDisabled || undefined}

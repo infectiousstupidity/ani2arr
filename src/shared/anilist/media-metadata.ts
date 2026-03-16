@@ -1,5 +1,5 @@
 // src/shared/anilist/media-metadata.ts
-import type { MediaMetadataHint } from '@/shared/types';
+import type { AniTitles, MediaMetadataHint, AniFormat } from '@/shared/types';
 
 export const normalizeSynonyms = (synonyms?: string[] | null): string[] => {
   if (!Array.isArray(synonyms)) return [];
@@ -98,4 +98,36 @@ export const mergeMetadataHints = (
     relationPrequelIds: null,
     coverImage: null,
   });
+};
+
+type AniListMetadataLike = {
+  titles?: AniTitles | null | undefined;
+  seasonYear?: number | null | undefined;
+  format?: AniFormat | null | undefined;
+  coverImage?: {
+    medium?: string | null | undefined;
+    large?: string | null | undefined;
+  } | null | undefined;
+};
+
+export const metadataHintFromAniListMetadata = (
+  metadata?: AniListMetadataLike | null,
+): MediaMetadataHint | null => {
+  if (!metadata) return null;
+
+  const titles = metadata.titles && Object.keys(metadata.titles).length > 0 ? metadata.titles : null;
+  const coverImage = metadata.coverImage?.large ?? metadata.coverImage?.medium ?? null;
+
+  if (!titles && metadata.seasonYear == null && metadata.format == null && !coverImage) {
+    return null;
+  }
+
+  return {
+    titles,
+    synonyms: null,
+    startYear: metadata.seasonYear ?? null,
+    format: metadata.format ?? null,
+    relationPrequelIds: null,
+    coverImage,
+  };
 };

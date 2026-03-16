@@ -1,6 +1,6 @@
 {
   "name": "ani2arr",
-  "description": " Adds a one-click \"Add to Sonarr\" button to AniList/AniChart pages. The easiest way to get anime from AniList/AniChart to Sonarr.",
+  "description": "Adds one-click Sonarr and Radarr actions to AniList/AniChart pages.",
   "private": true,
   "version": "1.0.1",
   "license": "GPL-3.0-only",

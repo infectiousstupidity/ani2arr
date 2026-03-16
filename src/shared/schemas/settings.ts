@@ -4,11 +4,14 @@ import type { FieldValues } from 'react-hook-form';
 import type {
   BadgeVisibility,
   ExtensionOptions,
+  ProviderAnimePageUiOptions,
+  ProviderBrowseCardUiOptions,
+  RadarrFormState,
   SonarrFormState,
   TitleLanguage,
   UiOptions,
 } from '@/shared/types/options';
-import type { SonarrMonitorOption } from '@/shared/types/providers';
+import type { RadarrMinimumAvailability, SonarrMonitorOption } from '@/shared/types/providers';
 
 // --- Constants ---
 
@@ -44,6 +47,13 @@ const MONITOR_OPTIONS: [SonarrMonitorOption, ...SonarrMonitorOption[]] = [
   'none',
 ];
 
+const MINIMUM_AVAILABILITY_OPTIONS: [RadarrMinimumAvailability, ...RadarrMinimumAvailability[]] = [
+  'announced',
+  'inCinemas',
+  'released',
+  'preDB',
+];
+
 // --- Factories ---
 
 const createDefaultFormState = (): SonarrFormState => ({
@@ -58,20 +68,136 @@ const createDefaultFormState = (): SonarrFormState => ({
   freeformTags: [],
 });
 
+const createDefaultRadarrFormState = (): RadarrFormState => ({
+  qualityProfileId: '',
+  rootFolderPath: '',
+  monitored: true,
+  searchForMovie: true,
+  minimumAvailability: 'released',
+  tags: [],
+  freeformTags: [],
+});
+
+const createDefaultBrowseCardUiOptions = (): ProviderBrowseCardUiOptions => ({
+  enabled: true,
+  visibility: 'always',
+});
+
+const createDefaultAnimePageUiOptions = (): ProviderAnimePageUiOptions => ({
+  enabled: true,
+});
+
 const createDefaultUiOptions = (): UiOptions => ({
-  browseOverlayEnabled: true,
-  badgeVisibility: 'always',
-  headerInjectionEnabled: true,
+  browseCards: {
+    sonarr: createDefaultBrowseCardUiOptions(),
+    radarr: createDefaultBrowseCardUiOptions(),
+  },
+  animePages: {
+    sonarr: createDefaultAnimePageUiOptions(),
+    radarr: createDefaultAnimePageUiOptions(),
+  },
+  schedulerDebugOverlayEnabled: false,
 });
 
 const createDefaultSettingsInternal = (): ExtensionOptions => ({
-  sonarrUrl: '',
-  sonarrApiKey: '',
-  defaults: createDefaultFormState(),
-  titleLanguage: 'english',
+  providers: {
+    sonarr: {
+      url: '',
+      apiKey: '',
+      titleLanguage: 'english',
+      defaults: createDefaultFormState(),
+    },
+    radarr: {
+      url: '',
+      apiKey: '',
+      titleLanguage: 'english',
+      defaults: createDefaultRadarrFormState(),
+    },
+  },
   ui: createDefaultUiOptions(),
   debugLogging: false,
 });
+
+const asRecord = (input: unknown): Record<string, unknown> =>
+  input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+
+const isTitleLanguage = (value: unknown): value is TitleLanguage =>
+  typeof value === 'string' && TITLE_LANGUAGES.includes(value as TitleLanguage);
+
+const isBadgeVisibility = (value: unknown): value is BadgeVisibility =>
+  typeof value === 'string' && BADGE_VISIBILITY_OPTIONS.includes(value as BadgeVisibility);
+
+const migrateLegacyUiOptions = (input: unknown): Record<string, unknown> => {
+  const raw = asRecord(input);
+  const browseCards = asRecord(raw.browseCards);
+  const animePages = asRecord(raw.animePages);
+  const legacyBrowseEnabled = typeof raw.browseOverlayEnabled === 'boolean' ? raw.browseOverlayEnabled : undefined;
+  const legacyBadgeVisibility = isBadgeVisibility(raw.badgeVisibility) ? raw.badgeVisibility : undefined;
+  const legacyHeaderEnabled = typeof raw.headerInjectionEnabled === 'boolean' ? raw.headerInjectionEnabled : undefined;
+
+  const resolveBrowseProvider = (provider: 'sonarr' | 'radarr'): Record<string, unknown> => {
+    const providerRaw = asRecord(browseCards[provider]);
+    return {
+      enabled:
+        typeof providerRaw.enabled === 'boolean'
+          ? providerRaw.enabled
+          : (legacyBrowseEnabled ?? true),
+      visibility: isBadgeVisibility(providerRaw.visibility)
+        ? providerRaw.visibility
+        : (legacyBadgeVisibility ?? 'always'),
+    };
+  };
+
+  const resolveAnimeProvider = (provider: 'sonarr' | 'radarr'): Record<string, unknown> => {
+    const providerRaw = asRecord(animePages[provider]);
+    return {
+      enabled:
+        typeof providerRaw.enabled === 'boolean'
+          ? providerRaw.enabled
+          : (legacyHeaderEnabled ?? true),
+    };
+  };
+
+  return {
+    ...raw,
+    browseCards: {
+      sonarr: resolveBrowseProvider('sonarr'),
+      radarr: resolveBrowseProvider('radarr'),
+    },
+    animePages: {
+      sonarr: resolveAnimeProvider('sonarr'),
+      radarr: resolveAnimeProvider('radarr'),
+    },
+  };
+};
+
+const migrateLegacySettings = (input: unknown): Record<string, unknown> => {
+  const raw = asRecord(input);
+  const providers = asRecord(raw.providers);
+  const sonarr = asRecord(providers.sonarr);
+  const radarr = asRecord(providers.radarr);
+  const legacyTitleLanguage = isTitleLanguage(raw.titleLanguage) ? raw.titleLanguage : 'english';
+
+  return {
+    ...raw,
+    providers: {
+      ...providers,
+      sonarr: {
+        ...sonarr,
+        titleLanguage: isTitleLanguage(sonarr.titleLanguage)
+          ? sonarr.titleLanguage
+          : legacyTitleLanguage,
+      },
+      radarr: {
+        ...radarr,
+        titleLanguage: isTitleLanguage(radarr.titleLanguage)
+          ? radarr.titleLanguage
+          : legacyTitleLanguage,
+      },
+    },
+    ui: migrateLegacyUiOptions(raw.ui),
+  };
+};
 
 // --- Reusable Coercion Schemas ---
 
@@ -128,15 +254,7 @@ const CoerceStringArray = v.pipe(
 
 const SonarrDefaultsSchema = v.pipe(
   v.unknown(),
-  // Pre-process step: Handle legacy migration (tagIds -> tags) and ensure object
-  v.transform((input) => {
-    const obj = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
-    // Legacy support: map tagIds to tags if tags is missing
-    if (obj.tagIds !== undefined && obj.tags === undefined) {
-      return { ...obj, tags: obj.tagIds };
-    }
-    return obj;
-  }),
+  v.transform((input) => (input && typeof input === 'object' ? input : {})),
   v.object({
     qualityProfileId: v.fallback(CoerceQualityProfileId, ''),
     rootFolderPath: SafeString,
@@ -150,25 +268,86 @@ const SonarrDefaultsSchema = v.pipe(
   })
 );
 
-const UiOptionsSchema = v.pipe(
+const RadarrDefaultsSchema = v.pipe(
   v.unknown(),
   v.transform((input) => (input && typeof input === 'object' ? input : {})),
   v.object({
-    browseOverlayEnabled: v.fallback(v.boolean(), true),
-    badgeVisibility: v.fallback(v.picklist(BADGE_VISIBILITY_OPTIONS), 'always'),
-    headerInjectionEnabled: v.fallback(v.boolean(), true),
+    qualityProfileId: v.fallback(CoerceQualityProfileId, ''),
+    rootFolderPath: SafeString,
+    monitored: v.fallback(v.boolean(), true),
+    searchForMovie: v.fallback(v.boolean(), true),
+    minimumAvailability: v.fallback(v.picklist(MINIMUM_AVAILABILITY_OPTIONS), 'released'),
+    tags: v.fallback(CoerceNumberArray, []),
+    freeformTags: v.fallback(CoerceStringArray, []),
+  }),
+);
+
+const ProviderBrowseCardUiOptionsSchema = v.pipe(
+  v.unknown(),
+  v.transform((input) => (input && typeof input === 'object' ? input : {})),
+  v.object({
+    enabled: v.fallback(v.boolean(), true),
+    visibility: v.fallback(v.picklist(BADGE_VISIBILITY_OPTIONS), 'always'),
+  }),
+);
+
+const ProviderAnimePageUiOptionsSchema = v.pipe(
+  v.unknown(),
+  v.transform((input) => (input && typeof input === 'object' ? input : {})),
+  v.object({
+    enabled: v.fallback(v.boolean(), true),
+  }),
+);
+
+const UiOptionsSchema = v.pipe(
+  v.unknown(),
+  v.transform(migrateLegacyUiOptions),
+  v.object({
+    browseCards: v.object({
+      sonarr: v.fallback(ProviderBrowseCardUiOptionsSchema, createDefaultBrowseCardUiOptions()),
+      radarr: v.fallback(ProviderBrowseCardUiOptionsSchema, createDefaultBrowseCardUiOptions()),
+    }),
+    animePages: v.object({
+      sonarr: v.fallback(ProviderAnimePageUiOptionsSchema, createDefaultAnimePageUiOptions()),
+      radarr: v.fallback(ProviderAnimePageUiOptionsSchema, createDefaultAnimePageUiOptions()),
+    }),
+    schedulerDebugOverlayEnabled: v.fallback(v.boolean(), false),
   })
 );
+
+const SonarrSettingsSchema = v.object({
+  url: SafeString,
+  apiKey: SafeString,
+  titleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
+  defaults: v.fallback(SonarrDefaultsSchema, createDefaultFormState()),
+});
+
+const RadarrSettingsSchema = v.object({
+  url: SafeString,
+  apiKey: SafeString,
+  titleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
+  defaults: v.fallback(RadarrDefaultsSchema, createDefaultRadarrFormState()),
+});
 
 // Main Settings Schema
 const ExtensionOptionsSchema = v.pipe(
   v.unknown(),
-  v.transform((input) => (input && typeof input === 'object' ? input : {})),
+  v.transform(migrateLegacySettings),
   v.object({
-    sonarrUrl: SafeString,
-    sonarrApiKey: SafeString,
-    defaults: v.fallback(SonarrDefaultsSchema, createDefaultFormState()),
-    titleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
+    providers: v.object({
+      sonarr: v.fallback(SonarrSettingsSchema, {
+        url: '',
+        apiKey: '',
+        titleLanguage: 'english',
+        defaults: createDefaultFormState(),
+      }),
+      radarr: v.fallback(RadarrSettingsSchema, {
+        url: '',
+        apiKey: '',
+        titleLanguage: 'english',
+        defaults: createDefaultRadarrFormState(),
+      }),
+    }),
     ui: v.fallback(UiOptionsSchema, createDefaultUiOptions()),
     debugLogging: v.fallback(v.boolean(), false),
   })
@@ -183,4 +362,5 @@ export type SettingsFormValues = Settings & FieldValues;
 export const createDefaultSettings = createDefaultSettingsInternal;
 export const defaultSettings = createDefaultSettingsInternal;
 export const defaultSonarrFormState = createDefaultFormState;
+export const defaultRadarrFormState = createDefaultRadarrFormState;
 export const defaultUiOptions = createDefaultUiOptions;

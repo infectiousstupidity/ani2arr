@@ -4,15 +4,24 @@ import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { useTheme } from '@/shared/hooks/common/use-theme';
-import { useSeriesStatus, useAddSeries, usePublicOptions } from '@/shared/queries';
+import { useAddMovie, useAddSeries, useAniListMetadataBatch, useMovieStatus, usePublicOptions, useSeriesStatus } from '@/shared/queries';
 import { useMediaModalProps } from '@/shared/hooks/entrypoints/use-media-modal-props';
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
 import MediaActions, { Status } from '@/shared/ui/media/media-actions';
 import { logger } from '@/shared/utils/logger';
 import { extractMediaMetadataFromDom } from '@/shared/anilist/dom/anilist-dom';
 import { shouldSkipSonarrFormat } from '@/shared/anilist/formats';
-import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
-import type { AniFormat, MediaMetadataHint } from '@/shared/types';
+import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
+import { getLibrarySlug, type FolderSlugSource } from '@/services/helpers/path-utils';
+import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
+import type {
+  AniFormat,
+  CheckMovieStatusResponse,
+  CheckSeriesStatusResponse,
+  MediaMetadataHint,
+  RadarrFormState,
+  SonarrFormState,
+} from '@/shared/types';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
 import '@/shared/styles/base.css';
@@ -209,9 +218,26 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
 
   const mediaModal = useMediaModalState();
   const { data: options, isPending: optionsPending, isError: optionsError } = usePublicOptions();
-  const isConfigured = options?.isConfigured === true;
-  const defaults = options?.defaults ?? null;
-  const uiEnabled = options?.ui?.headerInjectionEnabled ?? true;
+  const hasConfiguredProvider = Boolean(
+    options?.providers.sonarr.isConfigured || options?.providers.radarr.isConfigured,
+  );
+  const metadataBatch = useAniListMetadataBatch([anilistId], {
+    enabled: Number.isFinite(anilistId) && hasConfiguredProvider,
+  });
+  const canonicalMetadata = metadataHintFromAniListMetadata(metadataBatch.data?.metadata?.[0] ?? null);
+  const resolvedMetadata = mergeMetadataHints(canonicalMetadata, metadata);
+  const service = resolveProviderForAniListFormat(resolvedMetadata?.format ?? null);
+  const uiEnabled =
+    service === 'radarr'
+      ? (options?.ui?.animePages.radarr.enabled ?? true)
+      : (options?.ui?.animePages.sonarr.enabled ?? true);
+  const isConfigured =
+    service === 'radarr'
+      ? options?.providers.radarr.isConfigured === true
+      : options?.providers.sonarr.isConfigured === true;
+  const sonarrDefaults: SonarrFormState | null = options?.providers.sonarr.defaults ?? null;
+  const radarrDefaults: RadarrFormState | null = options?.providers.radarr.defaults ?? null;
+  const defaults = service === 'radarr' ? radarrDefaults : sonarrDefaults;
 
   useEffect(() => {
     (async () => {
@@ -223,57 +249,90 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
     })();
   }, []);
 
-  const statusQuery = useSeriesStatus(
-    { anilistId, title, metadata },
+  const seriesStatusQuery = useSeriesStatus(
+    { anilistId, title, metadata: resolvedMetadata },
     {
-      enabled: Boolean(anilistId && isConfigured),
+      enabled: Boolean(anilistId && service === 'sonarr' && isConfigured),
+      force_verify: true,
+      ignoreFailureCache: true,
+      priority: 'high',
+    },
+  );
+  const movieStatusQuery = useMovieStatus(
+    { anilistId, title, metadata: resolvedMetadata },
+    {
+      enabled: Boolean(anilistId && service === 'radarr' && isConfigured),
       force_verify: true,
       ignoreFailureCache: true,
       priority: 'high',
     },
   );
   const addSeriesMutation = useAddSeries();
+  const addMovieMutation = useAddMovie();
+
+  const statusQuery = service === 'radarr' ? movieStatusQuery : seriesStatusQuery;
+  const seriesStatusData = service === 'sonarr' ? (seriesStatusQuery.data as CheckSeriesStatusResponse | undefined) : undefined;
+  const movieStatusData = service === 'radarr' ? (movieStatusQuery.data as CheckMovieStatusResponse | undefined) : undefined;
 
   const handleQuickAdd = () => {
-    if (!isConfigured || !defaults) {
+    if (!service || !isConfigured || !defaults) {
       void browser.runtime
         .sendMessage({
           _a2a: true,
           type: 'OPEN_OPTIONS_PAGE',
-          sectionId: 'sonarr',
+          sectionId: service ?? 'sonarr',
           timestamp: Date.now(),
         })
         .catch(() => {});
       return;
     }
+    if (service === 'radarr') {
+      if (!radarrDefaults) return;
+      addMovieMutation.mutate({
+        anilistId,
+        title,
+        primaryTitleHint: title,
+        metadata: resolvedMetadata,
+        form: { ...radarrDefaults },
+      });
+      return;
+    }
+    if (!sonarrDefaults) return;
     addSeriesMutation.mutate({
       anilistId,
       title,
       primaryTitleHint: title,
-      metadata,
-      form: { ...defaults },
+      metadata: resolvedMetadata,
+      form: { ...sonarrDefaults },
     });
   };
 
-  const mappingUnavailable = statusQuery.data?.anilistTvdbLinkMissing === true;
+  const mappingUnavailable =
+    service === 'radarr'
+      ? movieStatusQuery.data?.anilistTmdbLinkMissing === true
+      : seriesStatusQuery.data?.anilistTvdbLinkMissing === true;
 
   const getStatus = (): Status => {
     if (optionsPending) return 'LOADING';
     if (optionsError) return 'ERROR';
-    if (!isConfigured) return 'ERROR';
+    if (!service || !isConfigured) return 'ERROR';
     // Only show loading if fetching AND we don't have data yet (avoid flash when refetching)
     if (statusQuery.fetchStatus === 'fetching' && !statusQuery.data) return 'LOADING';
     if (statusQuery.isError || mappingUnavailable) return 'ERROR';
-    if (statusQuery.data?.exists || addSeriesMutation.isSuccess) return 'IN';
-    if (addSeriesMutation.isPending) return 'ADDING';
-    if (addSeriesMutation.isError) return 'ERROR';
+    if (statusQuery.data?.exists || (service === 'radarr' ? addMovieMutation.isSuccess : addSeriesMutation.isSuccess)) {
+      return 'IN';
+    }
+    if (service === 'radarr' ? addMovieMutation.isPending : addSeriesMutation.isPending) return 'ADDING';
+    if (service === 'radarr' ? addMovieMutation.isError : addSeriesMutation.isError) return 'ERROR';
     return 'NOT_IN';
   };
 
   const status: Status = getStatus();
 
   const librarySlug =
-    statusQuery.data?.series?.titleSlug ?? addSeriesMutation.data?.titleSlug ?? null;
+    service === 'radarr'
+      ? getLibrarySlug('radarr', (movieStatusData?.movie ?? addMovieMutation.data ?? null) as FolderSlugSource | null)
+      : getLibrarySlug('sonarr', (seriesStatusData?.series ?? addSeriesMutation.data ?? null) as FolderSlugSource | null);
 
   const resolvedSearchTerm = statusQuery.data?.successfulSynonym ?? title;
 
@@ -285,7 +344,16 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
     isOpen: mediaModal.state?.isOpen ?? false,
   });
 
-  const tvdbId = mappingUnavailable ? null : statusQuery.data?.tvdbId ?? null;
+  const externalId =
+    mappingUnavailable
+      ? null
+      : service === 'radarr'
+        ? movieStatusQuery.data?.tmdbId ?? null
+        : seriesStatusQuery.data?.tvdbId ?? null;
+
+  if (!service) {
+    return null;
+  }
 
   if (!uiEnabled) {
     return null;
@@ -295,26 +363,28 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
     <div ref={hostRef} style={{ width: '100%' }}>
       <ConfirmProvider portalContainer={hostElement ?? null}>
         <MediaActions
-          service="sonarr"
+          service={service}
           status={status}
           {...(librarySlug ? { librarySlug } : {})}
           resolvedSearchTerm={resolvedSearchTerm}
-          externalId={tvdbId}
+          externalId={externalId}
+          noAutoMatch={mappingUnavailable}
           onQuickAdd={handleQuickAdd}
           onOpenModal={() => {
             mediaModal.open({
               anilistId,
               title,
               initialTab: 'series',
-              metadata,
+              metadata: resolvedMetadata,
             });
           }}
-          onOpenMappingFix={() => {
+          onOpenMappingFix={(mappingRequired) => {
             mediaModal.open({
               anilistId,
               title,
               initialTab: 'mapping',
-              metadata,
+              initialMappingRequired: mappingRequired ?? mappingUnavailable,
+              metadata: resolvedMetadata,
             });
           }}
           portalContainer={hostElement ?? undefined}
@@ -330,15 +400,17 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
             bannerImage={modalProps.bannerImage}
             coverImage={modalProps.coverImage}
             anilistIds={[mediaModal.state.anilistId]}
-            tvdbId={modalProps.tvdbId}
+            service={modalProps.service}
             inLibrary={modalProps.inLibrary}
             format={modalProps.format}
             year={modalProps.year}
             status={modalProps.status}
             initialTab={mediaModal.state.initialTab ?? 'series'}
+            initialMappingRequired={mediaModal.state.initialMappingRequired ?? false}
             portalContainer={hostElement}
             mappingTabProps={modalProps.mappingTabProps}
             sonarrPanelProps={modalProps.sonarrPanelProps}
+            radarrPanelProps={modalProps.radarrPanelProps}
           />
         )}
       </ConfirmProvider>
@@ -386,12 +458,13 @@ async function mountAnimePageUI(
   if (!title) return;
 
   const domMetadata = extractMediaMetadataFromDom(anilistId);
+  const sidebarFormat = readFormatFromSidebar(document);
   const fallbackMetadata: MediaMetadataHint | null = title
     ? {
         titles: { romaji: title },
         synonyms: [title],
         startYear: null,
-        format: null,
+        format: sidebarFormat,
         relationPrequelIds: null,
       }
     : null;
@@ -442,9 +515,27 @@ export default defineContentScript({
   runAt: 'document_end',
   async main(ctx: ContentScriptContext) {
     const isHeaderInjectionEnabled = async (): Promise<boolean> => {
+      const service = resolveProviderForAniListFormat(readFormatFromSidebar(document));
       try {
         const stored = await browser.storage.local.get('publicOptions');
-        const raw = (stored as { publicOptions?: { ui?: { headerInjectionEnabled?: boolean } } }).publicOptions;
+        const raw = (stored as {
+          publicOptions?: {
+            ui?: {
+              headerInjectionEnabled?: boolean;
+              animePages?: {
+                sonarr?: { enabled?: boolean };
+                radarr?: { enabled?: boolean };
+              };
+            };
+          };
+        }).publicOptions;
+        const providerEnabled =
+          service === 'radarr'
+            ? raw?.ui?.animePages?.radarr?.enabled
+            : raw?.ui?.animePages?.sonarr?.enabled;
+        if (typeof providerEnabled === 'boolean') {
+          return providerEnabled;
+        }
         if (typeof raw?.ui?.headerInjectionEnabled === 'boolean') {
           return raw.ui.headerInjectionEnabled;
         }
