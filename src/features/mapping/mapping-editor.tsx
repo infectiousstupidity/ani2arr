@@ -45,7 +45,7 @@ const buildCurrentMapping = (
     if (statusItem) {
       return toMappingSearchResultFromRadarr(statusItem as RadarrLookupMovie, {
         baseUrl,
-        libraryTmdbIds: inLibrary ? [tmdbId] : [],
+        inLibrary,
         ...(linkedAniListIds?.length
           ? { linkedAniListIdsByTmdbId: { [tmdbId]: linkedAniListIds } }
           : {}),

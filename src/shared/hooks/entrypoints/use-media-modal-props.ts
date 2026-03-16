@@ -150,7 +150,7 @@ function deriveRadarrCurrentMappingFromStatus(
   if (status.movie && 'images' in status.movie) {
     const mapped = toMappingSearchResultFromRadarr(status.movie as RadarrLookupMovie, {
       baseUrl: baseUrl ?? '',
-      libraryTmdbIds: status.exists ? [status.tmdbId] : [],
+      inLibrary: Boolean(status.exists),
     });
     return {
       ...mapped,
