@@ -22,7 +22,7 @@ import type {
  */
 const IdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
 const MappingProviderSchema = v.picklist(['sonarr', 'radarr']);
-const MappingSourceSchema = v.picklist(['manual', 'upstream', 'auto', 'ignored', 'unresolved']);
+const MappingSourceSchema = v.picklist(['manual', 'upstream', 'auto', 'rejected', 'blocked', 'ignored', 'unresolved']);
 const MappingStatusSchema = v.picklist(['unmapped', 'in-provider', 'not-in-provider']);
 
 /**
@@ -131,6 +131,7 @@ export const MappingSummarySchema = v.object({
   anilistId: IdSchema,
   provider: MappingProviderSchema,
   externalId: v.nullable(MappingExternalIdSchema),
+  suppressedExternalId: v.optional(v.nullable(MappingExternalIdSchema)),
   source: MappingSourceSchema,
   status: MappingStatusSchema,
   updatedAt: v.optional(v.number()),
@@ -216,6 +217,30 @@ export const SetMappingIgnoreInputSchema = v.object({
 export const ClearMappingIgnoreInputSchema = v.object({
   anilistId: IdSchema,
   provider: MappingProviderSchema,
+});
+
+export const SetMappingRejectedCandidateInputSchema = v.object({
+  anilistId: IdSchema,
+  provider: MappingProviderSchema,
+  externalId: MappingExternalIdSchema,
+});
+
+export const ClearMappingRejectedCandidateInputSchema = v.object({
+  anilistId: IdSchema,
+  provider: MappingProviderSchema,
+  externalId: MappingExternalIdSchema,
+});
+
+export const SetMappingBlockedCandidateInputSchema = v.object({
+  anilistId: IdSchema,
+  provider: MappingProviderSchema,
+  externalId: MappingExternalIdSchema,
+});
+
+export const ClearMappingBlockedCandidateInputSchema = v.object({
+  anilistId: IdSchema,
+  provider: MappingProviderSchema,
+  externalId: MappingExternalIdSchema,
 });
 
 export const SonarrLookupInputSchema = v.object({
@@ -322,6 +347,10 @@ export type ValidateTvdbInput = v.InferOutput<typeof ValidateTvdbInputSchema>;
 export type ValidateTmdbInput = v.InferOutput<typeof ValidateTmdbInputSchema>;
 export type SetMappingIgnoreInput = v.InferOutput<typeof SetMappingIgnoreInputSchema>;
 export type ClearMappingIgnoreInput = v.InferOutput<typeof ClearMappingIgnoreInputSchema>;
+export type SetMappingRejectedCandidateInput = v.InferOutput<typeof SetMappingRejectedCandidateInputSchema>;
+export type ClearMappingRejectedCandidateInput = v.InferOutput<typeof ClearMappingRejectedCandidateInputSchema>;
+export type SetMappingBlockedCandidateInput = v.InferOutput<typeof SetMappingBlockedCandidateInputSchema>;
+export type ClearMappingBlockedCandidateInput = v.InferOutput<typeof ClearMappingBlockedCandidateInputSchema>;
 export type GetMappingsInput = v.InferOutput<typeof GetMappingsInputSchema>;
 export type MappingSummaryDto = v.InferOutput<typeof MappingSummarySchema>;
 export type MappingCursor = v.InferOutput<typeof MappingCursorSchema>;
@@ -359,16 +388,40 @@ export interface MappingIgnoreItem {
   updatedAt: number;
 }
 
+export interface MappingRejectedCandidateItem {
+  anilistId: number;
+  provider: 'sonarr' | 'radarr';
+  externalId: {
+    id: number;
+    kind: 'tvdb' | 'tmdb';
+  };
+  updatedAt: number;
+}
+
+export interface MappingBlockedCandidateItem {
+  anilistId: number;
+  provider: 'sonarr' | 'radarr';
+  externalId: {
+    id: number;
+    kind: 'tvdb' | 'tmdb';
+  };
+  updatedAt: number;
+}
+
 export interface ExportStoredMappingsOutput {
-  version: 1;
+  version: 2;
   exportedAt: string;
   summary: {
     overrideCount: number;
     ignoreCount: number;
+    rejectedCandidateCount: number;
+    blockedCandidateCount: number;
   };
   mappings: {
     overrides: Record<string, MappingOverrideItem>;
     ignores: Record<string, MappingIgnoreItem>;
+    rejectedCandidates: Record<string, MappingRejectedCandidateItem>;
+    blockedCandidates: Record<string, MappingBlockedCandidateItem>;
   };
 }
 

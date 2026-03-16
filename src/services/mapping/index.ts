@@ -203,6 +203,9 @@ export class MappingService {
         );
       }
       this.clearUnresolvedMapping(provider, anilistId);
+      if (this.isCandidateSuppressed(provider, anilistId, cachedSuccess.value.externalId)) {
+        return null;
+      }
       this.recordResolvedMapping(provider, anilistId, cachedSuccess.value, 'auto');
       return cachedSuccess.value;
     }
@@ -229,6 +232,9 @@ export class MappingService {
       });
       await providerCaches.failure.remove(this.failureCacheKey(provider, anilistId));
       this.clearUnresolvedMapping(provider, anilistId);
+      if (this.isCandidateSuppressed(provider, anilistId, resolved.externalId)) {
+        return null;
+      }
       this.recordResolvedMapping(provider, anilistId, resolved, 'upstream');
       return resolved;
     }
@@ -260,6 +266,9 @@ export class MappingService {
           });
           await providerCaches.failure.remove(this.failureCacheKey(provider, anilistId));
           this.clearUnresolvedMapping(provider, anilistId);
+          if (this.isCandidateSuppressed(provider, anilistId, hinted.externalId)) {
+            return null;
+          }
           this.recordResolvedMapping(provider, anilistId, hinted, 'auto');
           return hinted;
         }
@@ -324,12 +333,15 @@ export class MappingService {
     }
 
     this.clearUnresolvedMapping(provider, anilistId);
-    this.recordResolvedMapping(provider, anilistId, resolved, 'auto');
     await providerCaches.success.write(cacheKey, resolved, {
       staleMs: RESOLVED_PERSIST_MS,
       hardMs: RESOLVED_PERSIST_MS,
     });
     await providerCaches.failure.remove(this.failureCacheKey(provider, anilistId));
+    if (this.isCandidateSuppressed(provider, anilistId, resolved.externalId)) {
+      return null;
+    }
+    this.recordResolvedMapping(provider, anilistId, resolved, 'auto');
     if (import.meta.env.DEV) {
       this.log.debug?.(
         `mapping:network-success provider=${provider} anilistId=${anilistId} ${resolved.externalId.kind}Id=${resolved.externalId.id}${resolved.successfulSynonym ? ` synonym="${resolved.successfulSynonym}"` : ''}`,
@@ -480,6 +492,14 @@ export class MappingService {
     return this.overrides?.isIgnored(provider, anilistId) ?? false;
   }
 
+  public getCandidateSuppression(
+    anilistId: number,
+    externalId: MappingExternalId,
+    provider: MappingProvider = 'sonarr',
+  ): 'blocked' | 'rejected' | null {
+    return this.overrides?.getCandidateSuppression(provider, anilistId, externalId) ?? null;
+  }
+
   public getRecordedResolvedMappings(
     provider?: MappingProvider,
   ): Array<{ anilistId: number; provider: MappingProvider; externalId: MappingExternalId; source: 'auto' | 'upstream'; updatedAt: number }> {
@@ -549,6 +569,14 @@ export class MappingService {
     if (this.unresolvedLedger.delete(provider, anilistId)) {
       this.notifyMappingsChanged?.();
     }
+  }
+
+  private isCandidateSuppressed(
+    provider: MappingProvider,
+    anilistId: number,
+    externalId: MappingExternalId,
+  ): boolean {
+    return this.overrides?.getCandidateSuppression(provider, anilistId, externalId) != null;
   }
 
   private resolveUnresolvedTitle(hints?: ResolveHints): string | undefined {
