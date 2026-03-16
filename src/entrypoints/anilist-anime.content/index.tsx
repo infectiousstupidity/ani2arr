@@ -226,8 +226,11 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   });
   const canonicalMetadata = metadataHintFromAniListMetadata(metadataBatch.data?.metadata?.[0] ?? null);
   const resolvedMetadata = mergeMetadataHints(canonicalMetadata, metadata);
-  const uiEnabled = options?.ui?.headerInjectionEnabled ?? true;
   const service = resolveProviderForAniListFormat(resolvedMetadata?.format ?? null);
+  const uiEnabled =
+    service === 'radarr'
+      ? (options?.ui?.animePages.radarr.enabled ?? true)
+      : (options?.ui?.animePages.sonarr.enabled ?? true);
   const isConfigured =
     service === 'radarr'
       ? options?.providers.radarr.isConfigured === true
@@ -512,9 +515,27 @@ export default defineContentScript({
   runAt: 'document_end',
   async main(ctx: ContentScriptContext) {
     const isHeaderInjectionEnabled = async (): Promise<boolean> => {
+      const service = resolveProviderForAniListFormat(readFormatFromSidebar(document));
       try {
         const stored = await browser.storage.local.get('publicOptions');
-        const raw = (stored as { publicOptions?: { ui?: { headerInjectionEnabled?: boolean } } }).publicOptions;
+        const raw = (stored as {
+          publicOptions?: {
+            ui?: {
+              headerInjectionEnabled?: boolean;
+              animePages?: {
+                sonarr?: { enabled?: boolean };
+                radarr?: { enabled?: boolean };
+              };
+            };
+          };
+        }).publicOptions;
+        const providerEnabled =
+          service === 'radarr'
+            ? raw?.ui?.animePages?.radarr?.enabled
+            : raw?.ui?.animePages?.sonarr?.enabled;
+        if (typeof providerEnabled === 'boolean') {
+          return providerEnabled;
+        }
         if (typeof raw?.ui?.headerInjectionEnabled === 'boolean') {
           return raw.ui.headerInjectionEnabled;
         }
