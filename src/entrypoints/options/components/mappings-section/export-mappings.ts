@@ -12,7 +12,7 @@ export type ExportMappingsFilters = {
 };
 
 export type ExportMappingsPayload = {
-  version: 3;
+  version: 4;
   exportedAt: string;
   filters: ExportMappingsFilters;
   summary: {
@@ -40,6 +40,7 @@ export type ExportMappingsPayload = {
           anilistId: number;
           provider: MappingProvider;
           externalId: MappingExternalId | null;
+          suppressedExternalId?: MappingExternalId | null;
           source: MappingSource;
           status: 'unmapped' | 'in-provider' | 'not-in-provider';
           updatedAt?: number;
@@ -67,7 +68,7 @@ type ExportRow = ExportMappingsPayload['mappings']['rows'][number];
 
 const METADATA_BATCH_SIZE = 100;
 const EXPORT_PAGE_SIZE = 2000;
-const FALLBACK_SOURCES: MappingSource[] = ['manual', 'ignored', 'unresolved', 'auto', 'upstream'];
+const FALLBACK_SOURCES: MappingSource[] = ['manual', 'rejected', 'blocked', 'ignored', 'unresolved', 'auto', 'upstream'];
 
 const resolveTitle = (entry: MappingSummary, metadata?: AniListMetadataDto | null): string =>
   metadata?.titles?.english ||
@@ -204,9 +205,11 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
   const sourcePriority: Record<MappingSource, number> = {
     manual: 0,
     unresolved: 1,
-    ignored: 2,
-    upstream: 3,
-    auto: 4,
+    rejected: 2,
+    blocked: 3,
+    ignored: 4,
+    upstream: 5,
+    auto: 6,
   };
 
   const fallbackTitle = (row: Group) =>
@@ -249,6 +252,7 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
             anilistId: entry.anilistId,
             provider: entry.provider,
             externalId: entry.externalId ?? null,
+            ...(entry.suppressedExternalId ? { suppressedExternalId: entry.suppressedExternalId } : {}),
             source: entry.source,
             status: entry.status,
             ...(entry.updatedAt !== undefined ? { updatedAt: entry.updatedAt } : {}),
@@ -288,7 +292,7 @@ export const buildMappingsExportPayload = async (
   }
 
   return {
-    version: 3,
+    version: 4,
     exportedAt: new Date().toISOString(),
     filters: {
       providers: filters.providers,

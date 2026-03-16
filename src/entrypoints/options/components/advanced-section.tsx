@@ -1,9 +1,8 @@
 // src/entrypoints/options/components/advanced-section.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { browser } from 'wxt/browser';
+import React, { useEffect, useRef, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
+import { RotateCcw } from 'lucide-react';
 import Button from '@/shared/ui/primitives/button';
-import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
@@ -18,7 +17,6 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
   const confirm = useConfirm();
   const toast = useToast();
   const [isResetting, setIsResetting] = useState(false);
-  const version = useMemo(() => browser.runtime.getManifest()?.version ?? 'unknown', []);
   const methods = useFormContext<SettingsFormValues>();
   const debugLogging = Boolean(useWatch({ control: methods.control, name: 'debugLogging' as const }));
   const schedulerDebugOverlayEnabled = Boolean(
@@ -68,7 +66,7 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
       <div>
         <h2 className="text-lg font-semibold text-text-primary">Advanced</h2>
         <p className="text-sm text-text-secondary">
-          Diagnostics and safety tools.
+          Low-frequency controls moved into a clearer, quieter area.
         </p>
       </div>
 
@@ -76,9 +74,9 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
         ref={privacyCardRef}
         id="privacy-permissions"
         tabIndex={-1}
-        className="rounded-2xl border border-border-primary bg-bg-secondary/70 focus:outline-none focus:ring-2 focus:ring-accent-primary/30"
+        className="a2a-settings-panel focus:outline-none focus:ring-2 focus:ring-accent-primary/30"
       >
-        <div className="px-4 py-3 border-b border-border-primary">
+        <div className="a2a-settings-panel__header border-b px-5 py-4">
           <div>
             <h3 className="text-sm font-semibold text-text-primary">Privacy & permissions</h3>
             <p className="mt-1 text-xs text-text-secondary">
@@ -86,7 +84,7 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
             </p>
           </div>
         </div>
-        <div className="space-y-3 px-4 py-4 text-sm text-text-secondary">
+        <div className="space-y-3 px-5 py-5 text-sm text-text-secondary">
           <p>
             ani2arr does not use a developer-operated backend or analytics service. Your Sonarr
             URL, API key, and extension settings are stored locally in the browser.
@@ -101,22 +99,17 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
           </p>
         </div>
       </div>
-      <div className="rounded-2xl border border-border-primary bg-bg-secondary/70">
-        <div className="px-4 py-3 border-b border-border-primary">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary">Diagnostics</h3>
-              <p className="mt-1 text-xs text-text-secondary">
-                Verbose logging and reset controls.
-              </p>
-            </div>
-            <TooltipWrapper content="Debug logging writes verbose messages to the console. Disable for normal use.">
-              <span className="text-[11px] text-text-secondary">Debug</span>
-            </TooltipWrapper>
+      <div className="a2a-settings-panel">
+        <div className="a2a-settings-panel__header border-b px-5 py-4">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">Diagnostics</h3>
+            <p className="mt-1 text-xs text-text-secondary">
+              Destructive and low-frequency actions are de-emphasized.
+            </p>
           </div>
         </div>
-        <div className="space-y-4 px-4 py-4">
-          <div className="flex items-center justify-between gap-4 rounded-xl bg-bg-tertiary/60 px-3 py-2">
+        <div className="space-y-4 px-5 py-5">
+          <div className="a2a-settings-panel__inset flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
             <div>
               <p className="text-sm text-text-primary">Debug logging</p>
               <p className="text-xs text-text-secondary">
@@ -131,7 +124,7 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
             />
           </div>
           {showSchedulerDebugToggle ? (
-            <div className="flex items-center justify-between gap-4 rounded-xl bg-bg-tertiary/60 px-3 py-2">
+            <div className="a2a-settings-panel__inset flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
               <div>
                 <p className="text-sm text-text-primary">Scheduler debug overlay</p>
                 <p className="text-xs text-text-secondary">
@@ -150,18 +143,24 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
               />
             </div>
           ) : null}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-primary pt-3">
-            <Button
-              variant="outline"
-              className="text-error border-error"
-              onClick={handleReset}
-              isLoading={isResetting}
-              disabled={actions.saveState.isPending}
-            >
-              Reset all settings
-            </Button>
-            <p className="text-xs text-text-secondary">Extension version {version}</p>
+        </div>
+      </div>
+
+      <div className="a2a-settings-panel a2a-danger-zone px-5 py-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">Danger zone</h3>
           </div>
+          <Button
+            variant="outline"
+            className="border-error text-error"
+            onClick={handleReset}
+            isLoading={isResetting}
+            disabled={actions.saveState.isPending}
+          >
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Reset all settings
+          </Button>
         </div>
       </div>
     </div>
