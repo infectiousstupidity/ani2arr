@@ -15,27 +15,9 @@ interface QueryCacheDbSchema extends DBSchema {
 }
 
 let dbPromise: Promise<IDBPDatabase<QueryCacheDbSchema>> | null = null;
-let knownDbExists = false;
 
 const hasPersistedQuerySnapshot = (client: PersistedClient): boolean =>
   client.clientState.queries.length > 0 || client.clientState.mutations.length > 0;
-
-const detectExistingDb = async (): Promise<boolean> => {
-  const indexedDbWithDatabases = indexedDB as IDBFactory & {
-    databases?: () => Promise<Array<{ name?: string }>>;
-  };
-
-  if (typeof indexedDbWithDatabases.databases !== 'function') {
-    return dbPromise !== null || knownDbExists;
-  }
-
-  try {
-    const databases = await indexedDbWithDatabases.databases();
-    return databases.some(database => database.name === DB_NAME);
-  } catch {
-    return dbPromise !== null || knownDbExists;
-  }
-};
 
 const getDb = (): Promise<IDBPDatabase<QueryCacheDbSchema>> => {
   if (!dbPromise) {
@@ -47,8 +29,6 @@ const getDb = (): Promise<IDBPDatabase<QueryCacheDbSchema>> => {
       },
     });
   }
-
-  knownDbExists = true;
   return dbPromise;
 };
 
@@ -65,10 +45,6 @@ const defaultPersister: Persister = {
     await db.put(STORE_NAME, client, STORE_KEY);
   },
   restoreClient: async () => {
-    if (!(await detectExistingDb())) {
-      return undefined;
-    }
-
     const db = await getDb();
     return db.get(STORE_NAME, STORE_KEY);
   },
@@ -116,7 +92,6 @@ export async function clearPersistedQueryCache(): Promise<void> {
       // Allow the delete to proceed even if a connection lingers.
     },
   });
-  knownDbExists = false;
 }
 
 // Filter: never persist queries containing provider credentials or Arr metadata
