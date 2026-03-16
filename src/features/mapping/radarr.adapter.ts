@@ -3,7 +3,7 @@ import { getLibrarySlug } from '@/services/helpers/path-utils';
 
 export interface RadarrAdapterOptions {
   baseUrl: string;
-  libraryTmdbIds?: readonly number[];
+  inLibrary: boolean;
   librarySlugByTmdbId?: Readonly<Record<number, string>>;
   linkedAniListIdsByTmdbId?: Readonly<Record<number, readonly number[]>>;
 }
@@ -35,8 +35,7 @@ export function toMappingSearchResultFromRadarr(
   opts: RadarrAdapterOptions,
 ): MappingSearchResult {
   const tmdbId = movie.tmdbId;
-  const librarySet = new Set(opts.libraryTmdbIds ?? []);
-  const inLibrary = librarySet.has(tmdbId);
+  const { inLibrary } = opts;
   const librarySlug =
     opts.librarySlugByTmdbId?.[tmdbId] ??
     (inLibrary ? getLibrarySlug('radarr', movie) ?? undefined : undefined);

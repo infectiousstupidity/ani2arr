@@ -29,10 +29,11 @@ export function useMappingSearch(input: UseMappingSearchInput) {
       const api = getAni2arrApi();
       if (input.service === 'radarr') {
         const { results, libraryTmdbIds, linkedAniListIdsByTmdbId } = await api.searchRadarr({ term: q });
+        const libraryTmdbIdSet = new Set(libraryTmdbIds);
         return results.map((result: RadarrLookupMovie) =>
           toMappingSearchResultFromRadarr(result, {
             baseUrl,
-            libraryTmdbIds,
+            inLibrary: libraryTmdbIdSet.has(result.tmdbId),
             ...(linkedAniListIdsByTmdbId ? { linkedAniListIdsByTmdbId } : {}),
           }),
         );
