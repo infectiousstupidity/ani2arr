@@ -92,8 +92,12 @@ export const queryKeys = {
     ] as const,
   sonarrMetadataRoot: () => providerMetadataRootKey('sonarr'),
   sonarrMetadata: (scope?: string) => [...rootQueryKey, 'sonarrMetadata', scope ?? 'configured'] as const,
+  sonarrConnectionRoot: () => [...rootQueryKey, 'sonarrConnection'] as const,
+  sonarrConnection: (scope?: string) => [...rootQueryKey, 'sonarrConnection', scope ?? 'configured'] as const,
   radarrMetadataRoot: () => providerMetadataRootKey('radarr'),
   radarrMetadata: (scope?: string) => [...rootQueryKey, 'radarrMetadata', scope ?? 'configured'] as const,
+  radarrConnectionRoot: () => [...rootQueryKey, 'radarrConnection'] as const,
+  radarrConnection: (scope?: string) => [...rootQueryKey, 'radarrConnection', scope ?? 'configured'] as const,
   mappingSearch: (service: 'sonarr' | 'radarr', query: string) =>
     [...rootQueryKey, 'mappingSearch', service, query.trim().toLowerCase()] as const,
   mappingOverridesRoot: () => [...rootQueryKey, 'mappingOverrides'] as const,

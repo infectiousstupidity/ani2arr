@@ -60,7 +60,9 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
     queryClient.invalidateQueries({ queryKey: queryKeys.options() });
     queryClient.invalidateQueries({ queryKey: queryKeys.publicOptions() });
     queryClient.invalidateQueries({ queryKey: queryKeys.sonarrMetadataRoot() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.sonarrConnectionRoot() });
     queryClient.invalidateQueries({ queryKey: queryKeys.radarrMetadataRoot() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.radarrConnectionRoot() });
     queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverridesRoot() });
     queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
     queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot('sonarr') });

@@ -34,6 +34,29 @@ export const useRadarrMetadata = (options?: { enabled?: boolean; credentials?: R
   });
 };
 
+export const useRadarrConnectionStatus = (options?: {
+  enabled?: boolean;
+  credentials?: RadarrCredentialsPayload | null;
+}) =>
+  useQuery<{ version: string }, ExtensionError>({
+    queryKey: queryKeys.radarrConnection(
+      options?.credentials?.url && options.credentials.apiKey
+        ? `${options.credentials.url}|${options.credentials.apiKey}`
+        : 'configured',
+    ),
+    queryFn: async () => {
+      if (!options?.credentials) {
+        throw new Error('Radarr credentials are required to verify connection status.');
+      }
+      return getAni2arrApi().testRadarrConnection(options.credentials);
+    },
+    enabled: (options?.enabled ?? true) && Boolean(options?.credentials?.url && options?.credentials.apiKey),
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: 'always',
+    retry: 0,
+  });
+
 export const useMovieStatus = (payload: CheckMovieStatusPayload, options?: {
   enabled?: boolean;
   force_verify?: boolean;

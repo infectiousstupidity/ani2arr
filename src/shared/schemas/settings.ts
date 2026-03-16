@@ -4,6 +4,8 @@ import type { FieldValues } from 'react-hook-form';
 import type {
   BadgeVisibility,
   ExtensionOptions,
+  ProviderAnimePageUiOptions,
+  ProviderBrowseCardUiOptions,
   RadarrFormState,
   SonarrFormState,
   TitleLanguage,
@@ -76,10 +78,24 @@ const createDefaultRadarrFormState = (): RadarrFormState => ({
   freeformTags: [],
 });
 
+const createDefaultBrowseCardUiOptions = (): ProviderBrowseCardUiOptions => ({
+  enabled: true,
+  visibility: 'always',
+});
+
+const createDefaultAnimePageUiOptions = (): ProviderAnimePageUiOptions => ({
+  enabled: true,
+});
+
 const createDefaultUiOptions = (): UiOptions => ({
-  browseOverlayEnabled: true,
-  badgeVisibility: 'always',
-  headerInjectionEnabled: true,
+  browseCards: {
+    sonarr: createDefaultBrowseCardUiOptions(),
+    radarr: createDefaultBrowseCardUiOptions(),
+  },
+  animePages: {
+    sonarr: createDefaultAnimePageUiOptions(),
+    radarr: createDefaultAnimePageUiOptions(),
+  },
   schedulerDebugOverlayEnabled: false,
 });
 
@@ -88,18 +104,100 @@ const createDefaultSettingsInternal = (): ExtensionOptions => ({
     sonarr: {
       url: '',
       apiKey: '',
+      titleLanguage: 'english',
       defaults: createDefaultFormState(),
     },
     radarr: {
       url: '',
       apiKey: '',
+      titleLanguage: 'english',
       defaults: createDefaultRadarrFormState(),
     },
   },
-  titleLanguage: 'english',
   ui: createDefaultUiOptions(),
   debugLogging: false,
 });
+
+const asRecord = (input: unknown): Record<string, unknown> =>
+  input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+
+const isTitleLanguage = (value: unknown): value is TitleLanguage =>
+  typeof value === 'string' && TITLE_LANGUAGES.includes(value as TitleLanguage);
+
+const isBadgeVisibility = (value: unknown): value is BadgeVisibility =>
+  typeof value === 'string' && BADGE_VISIBILITY_OPTIONS.includes(value as BadgeVisibility);
+
+const migrateLegacyUiOptions = (input: unknown): Record<string, unknown> => {
+  const raw = asRecord(input);
+  const browseCards = asRecord(raw.browseCards);
+  const animePages = asRecord(raw.animePages);
+  const legacyBrowseEnabled = typeof raw.browseOverlayEnabled === 'boolean' ? raw.browseOverlayEnabled : undefined;
+  const legacyBadgeVisibility = isBadgeVisibility(raw.badgeVisibility) ? raw.badgeVisibility : undefined;
+  const legacyHeaderEnabled = typeof raw.headerInjectionEnabled === 'boolean' ? raw.headerInjectionEnabled : undefined;
+
+  const resolveBrowseProvider = (provider: 'sonarr' | 'radarr'): Record<string, unknown> => {
+    const providerRaw = asRecord(browseCards[provider]);
+    return {
+      enabled:
+        typeof providerRaw.enabled === 'boolean'
+          ? providerRaw.enabled
+          : (legacyBrowseEnabled ?? true),
+      visibility: isBadgeVisibility(providerRaw.visibility)
+        ? providerRaw.visibility
+        : (legacyBadgeVisibility ?? 'always'),
+    };
+  };
+
+  const resolveAnimeProvider = (provider: 'sonarr' | 'radarr'): Record<string, unknown> => {
+    const providerRaw = asRecord(animePages[provider]);
+    return {
+      enabled:
+        typeof providerRaw.enabled === 'boolean'
+          ? providerRaw.enabled
+          : (legacyHeaderEnabled ?? true),
+    };
+  };
+
+  return {
+    ...raw,
+    browseCards: {
+      sonarr: resolveBrowseProvider('sonarr'),
+      radarr: resolveBrowseProvider('radarr'),
+    },
+    animePages: {
+      sonarr: resolveAnimeProvider('sonarr'),
+      radarr: resolveAnimeProvider('radarr'),
+    },
+  };
+};
+
+const migrateLegacySettings = (input: unknown): Record<string, unknown> => {
+  const raw = asRecord(input);
+  const providers = asRecord(raw.providers);
+  const sonarr = asRecord(providers.sonarr);
+  const radarr = asRecord(providers.radarr);
+  const legacyTitleLanguage = isTitleLanguage(raw.titleLanguage) ? raw.titleLanguage : 'english';
+
+  return {
+    ...raw,
+    providers: {
+      ...providers,
+      sonarr: {
+        ...sonarr,
+        titleLanguage: isTitleLanguage(sonarr.titleLanguage)
+          ? sonarr.titleLanguage
+          : legacyTitleLanguage,
+      },
+      radarr: {
+        ...radarr,
+        titleLanguage: isTitleLanguage(radarr.titleLanguage)
+          ? radarr.titleLanguage
+          : legacyTitleLanguage,
+      },
+    },
+    ui: migrateLegacyUiOptions(raw.ui),
+  };
+};
 
 // --- Reusable Coercion Schemas ---
 
@@ -184,13 +282,35 @@ const RadarrDefaultsSchema = v.pipe(
   }),
 );
 
-const UiOptionsSchema = v.pipe(
+const ProviderBrowseCardUiOptionsSchema = v.pipe(
   v.unknown(),
   v.transform((input) => (input && typeof input === 'object' ? input : {})),
   v.object({
-    browseOverlayEnabled: v.fallback(v.boolean(), true),
-    badgeVisibility: v.fallback(v.picklist(BADGE_VISIBILITY_OPTIONS), 'always'),
-    headerInjectionEnabled: v.fallback(v.boolean(), true),
+    enabled: v.fallback(v.boolean(), true),
+    visibility: v.fallback(v.picklist(BADGE_VISIBILITY_OPTIONS), 'always'),
+  }),
+);
+
+const ProviderAnimePageUiOptionsSchema = v.pipe(
+  v.unknown(),
+  v.transform((input) => (input && typeof input === 'object' ? input : {})),
+  v.object({
+    enabled: v.fallback(v.boolean(), true),
+  }),
+);
+
+const UiOptionsSchema = v.pipe(
+  v.unknown(),
+  v.transform(migrateLegacyUiOptions),
+  v.object({
+    browseCards: v.object({
+      sonarr: v.fallback(ProviderBrowseCardUiOptionsSchema, createDefaultBrowseCardUiOptions()),
+      radarr: v.fallback(ProviderBrowseCardUiOptionsSchema, createDefaultBrowseCardUiOptions()),
+    }),
+    animePages: v.object({
+      sonarr: v.fallback(ProviderAnimePageUiOptionsSchema, createDefaultAnimePageUiOptions()),
+      radarr: v.fallback(ProviderAnimePageUiOptionsSchema, createDefaultAnimePageUiOptions()),
+    }),
     schedulerDebugOverlayEnabled: v.fallback(v.boolean(), false),
   })
 );
@@ -198,33 +318,36 @@ const UiOptionsSchema = v.pipe(
 const SonarrSettingsSchema = v.object({
   url: SafeString,
   apiKey: SafeString,
+  titleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
   defaults: v.fallback(SonarrDefaultsSchema, createDefaultFormState()),
 });
 
 const RadarrSettingsSchema = v.object({
   url: SafeString,
   apiKey: SafeString,
+  titleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
   defaults: v.fallback(RadarrDefaultsSchema, createDefaultRadarrFormState()),
 });
 
 // Main Settings Schema
 const ExtensionOptionsSchema = v.pipe(
   v.unknown(),
-  v.transform((input) => (input && typeof input === 'object' ? input : {})),
+  v.transform(migrateLegacySettings),
   v.object({
     providers: v.object({
       sonarr: v.fallback(SonarrSettingsSchema, {
         url: '',
         apiKey: '',
+        titleLanguage: 'english',
         defaults: createDefaultFormState(),
       }),
       radarr: v.fallback(RadarrSettingsSchema, {
         url: '',
         apiKey: '',
+        titleLanguage: 'english',
         defaults: createDefaultRadarrFormState(),
       }),
     }),
-    titleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
     ui: v.fallback(UiOptionsSchema, createDefaultUiOptions()),
     debugLogging: v.fallback(v.boolean(), false),
   })
