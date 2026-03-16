@@ -37,6 +37,10 @@ import type {
   ExportStoredMappingsOutput,
   SetMappingIgnoreInput,
   ClearMappingIgnoreInput,
+  SetMappingRejectedCandidateInput,
+  ClearMappingRejectedCandidateInput,
+  SetMappingBlockedCandidateInput,
+  ClearMappingBlockedCandidateInput,
   GetMappingsOutput,
   GetMappingsInput,
   GetAniListMetadataInput,
@@ -76,6 +80,10 @@ export interface Ani2arrApi {
   clearMappingOverride(input: ClearMappingOverrideInput): Promise<{ ok: true }>;
   setMappingIgnore(input: SetMappingIgnoreInput): Promise<{ ok: true }>;
   clearMappingIgnore(input: ClearMappingIgnoreInput): Promise<{ ok: true }>;
+  setMappingRejectedCandidate(input: SetMappingRejectedCandidateInput): Promise<{ ok: true }>;
+  clearMappingRejectedCandidate(input: ClearMappingRejectedCandidateInput): Promise<{ ok: true }>;
+  setMappingBlockedCandidate(input: SetMappingBlockedCandidateInput): Promise<{ ok: true }>;
+  clearMappingBlockedCandidate(input: ClearMappingBlockedCandidateInput): Promise<{ ok: true }>;
   searchSonarr(input: SonarrLookupInput): Promise<SonarrLookupOutput>;
   searchRadarr(input: RadarrLookupInput): Promise<RadarrLookupOutput>;
   validateTvdbId(input: ValidateTvdbInput): Promise<ValidateTvdbOutput>;

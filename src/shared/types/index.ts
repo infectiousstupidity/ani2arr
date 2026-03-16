@@ -73,7 +73,9 @@ export type {
 export { ErrorCode, type ExtensionError } from './errors';
 
 export {
+  type MappingBlockedRecord,
   type MappingOverrideRecord,
+  type MappingRejectedRecord,
   type MappingSummary,
   type MappingProvider,
   type MappingSource,

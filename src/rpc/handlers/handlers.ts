@@ -620,6 +620,62 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       return { ok: true as const };
     },
 
+    async setMappingRejectedCandidate(input) {
+      await overridesReady;
+      assertCompatibleExternalId(input.provider, input.externalId);
+      await overridesService.setRejectedCandidate(input.provider, input.anilistId, input.externalId);
+      await mappingService.evictResolved(input.anilistId, input.provider);
+      await bumpLibraryEpoch(input.provider, {
+        anilistId: input.anilistId,
+        externalId: input.externalId,
+        action: 'mapping:rejectCandidate',
+      });
+      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'mapping:rejectCandidate' });
+      return { ok: true as const };
+    },
+
+    async clearMappingRejectedCandidate(input) {
+      await overridesReady;
+      assertCompatibleExternalId(input.provider, input.externalId);
+      await overridesService.clearRejectedCandidate(input.provider, input.anilistId, input.externalId);
+      await mappingService.evictResolved(input.anilistId, input.provider);
+      await bumpLibraryEpoch(input.provider, {
+        anilistId: input.anilistId,
+        externalId: input.externalId,
+        action: 'mapping:clearRejectedCandidate',
+      });
+      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'mapping:clearRejectedCandidate' });
+      return { ok: true as const };
+    },
+
+    async setMappingBlockedCandidate(input) {
+      await overridesReady;
+      assertCompatibleExternalId(input.provider, input.externalId);
+      await overridesService.setBlockedCandidate(input.provider, input.anilistId, input.externalId);
+      await mappingService.evictResolved(input.anilistId, input.provider);
+      await bumpLibraryEpoch(input.provider, {
+        anilistId: input.anilistId,
+        externalId: input.externalId,
+        action: 'mapping:blockCandidate',
+      });
+      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'mapping:blockCandidate' });
+      return { ok: true as const };
+    },
+
+    async clearMappingBlockedCandidate(input) {
+      await overridesReady;
+      assertCompatibleExternalId(input.provider, input.externalId);
+      await overridesService.clearBlockedCandidate(input.provider, input.anilistId, input.externalId);
+      await mappingService.evictResolved(input.anilistId, input.provider);
+      await bumpLibraryEpoch(input.provider, {
+        anilistId: input.anilistId,
+        externalId: input.externalId,
+        action: 'mapping:clearBlockedCandidate',
+      });
+      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'mapping:clearBlockedCandidate' });
+      return { ok: true as const };
+    },
+
     async getMappingOverrides() {
       await overridesReady;
       return overridesService.list();
@@ -685,16 +741,42 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
           },
         ]),
       );
+      const rejectedCandidates = Object.fromEntries(
+        overridesService.listRejectedCandidates().map((entry) => [
+          `${entry.provider}:${entry.anilistId}:${entry.externalId.kind}:${entry.externalId.id}`,
+          {
+            anilistId: entry.anilistId,
+            provider: entry.provider,
+            externalId: entry.externalId,
+            updatedAt: entry.updatedAt,
+          },
+        ]),
+      );
+      const blockedCandidates = Object.fromEntries(
+        overridesService.listBlockedCandidates().map((entry) => [
+          `${entry.provider}:${entry.anilistId}:${entry.externalId.kind}:${entry.externalId.id}`,
+          {
+            anilistId: entry.anilistId,
+            provider: entry.provider,
+            externalId: entry.externalId,
+            updatedAt: entry.updatedAt,
+          },
+        ]),
+      );
       return {
-        version: 1 as const,
+        version: 2 as const,
         exportedAt: new Date().toISOString(),
         summary: {
           overrideCount: Object.keys(overrides).length,
           ignoreCount: Object.keys(ignores).length,
+          rejectedCandidateCount: Object.keys(rejectedCandidates).length,
+          blockedCandidateCount: Object.keys(blockedCandidates).length,
         },
         mappings: {
           overrides,
           ignores,
+          rejectedCandidates,
+          blockedCandidates,
         },
       };
     },

@@ -1,24 +1,33 @@
 // src/services/mapping/overrides.service.ts
 import { browser } from 'wxt/browser';
 import {
+  mappingBlockedCandidatesLocal,
+  mappingBlockedCandidatesSync,
   mappingIgnoresLocal,
   mappingIgnoresSync,
+  mappingRejectedCandidatesLocal,
+  mappingRejectedCandidatesSync,
   mappingOverridesLocal,
   mappingOverridesSync,
+  type MappingCandidateSuppressionEntry,
+  type MappingCandidateSuppressionMap,
   type MappingIgnoreMap,
   type MappingIgnoreEntry,
   type MappingOverrideMap,
   type MappingOverrideEntry,
 } from '@/services/mapping/overrides-storage';
 import type {
+  MappingBlockedRecord,
   MappingExternalId,
   MappingIgnoreRecord,
   MappingOverrideRecord,
   MappingProvider,
+  MappingRejectedRecord,
 } from '@/shared/types';
 
 type MappingRecordKey = `${MappingProvider}:${number}`;
 type ReverseLookupKey = `${MappingProvider}:${MappingExternalId['kind']}:${number}`;
+type MappingCandidateRecordKey = `${MappingProvider}:${number}:${MappingExternalId['kind']}:${number}`;
 
 const isFiniteId = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
@@ -38,6 +47,25 @@ const parseRecordKey = (key: string): { provider: MappingProvider; anilistId: nu
 
 const createReverseLookupKey = (provider: MappingProvider, externalId: MappingExternalId): ReverseLookupKey =>
   `${provider}:${externalId.kind}:${externalId.id}`;
+
+const createCandidateRecordKey = (provider: MappingProvider, anilistId: number, externalId: MappingExternalId): MappingCandidateRecordKey =>
+  `${provider}:${anilistId}:${externalId.kind}:${externalId.id}`;
+
+const parseCandidateRecordKey = (
+  key: string,
+): { provider: MappingProvider; anilistId: number; externalId: MappingExternalId } | null => {
+  const [provider, rawAnilistId, kind, rawExternalId] = key.split(':');
+  const anilistId = Number(rawAnilistId);
+  const externalId = Number(rawExternalId);
+  if (!isMappingProvider(provider) || !isFiniteId(anilistId) || !isFiniteId(externalId) || !isExternalIdKind(kind)) {
+    return null;
+  }
+  return {
+    provider,
+    anilistId,
+    externalId: { id: externalId, kind },
+  };
+};
 
 const normalizeExternalId = (externalId: unknown): MappingExternalId | null => {
   if (!externalId || typeof externalId !== 'object') return null;
@@ -69,22 +97,52 @@ const normalizeIgnoreEntry = (entry: unknown): MappingIgnoreEntry | null => {
   };
 };
 
+const normalizeCandidateSuppressionEntry = (entry: unknown): MappingCandidateSuppressionEntry | null => {
+  if (!entry || typeof entry !== 'object') return null;
+  const candidate = entry as Partial<MappingCandidateSuppressionEntry>;
+  if (!isMappingProvider(candidate.provider)) return null;
+  const externalId = normalizeExternalId(candidate.externalId);
+  if (!externalId) return null;
+  return {
+    provider: candidate.provider,
+    externalId,
+    updatedAt: typeof candidate.updatedAt === 'number' ? candidate.updatedAt : Date.now(),
+  };
+};
+
 export class MappingOverridesService {
   private readonly map = new Map<MappingRecordKey, MappingOverrideEntry>();
   private readonly reverse = new Map<ReverseLookupKey, Set<number>>();
   private readonly ignored = new Map<MappingRecordKey, MappingIgnoreEntry>();
+  private readonly rejectedCandidates = new Map<MappingCandidateRecordKey, MappingCandidateSuppressionEntry>();
+  private readonly blockedCandidates = new Map<MappingCandidateRecordKey, MappingCandidateSuppressionEntry>();
   private initialized = false;
 
   public async init(): Promise<void> {
     if (this.initialized) return;
-    const [syncOverrides, localOverrides, syncIgnores, localIgnores] = await Promise.all([
+    const [
+      syncOverrides,
+      localOverrides,
+      syncIgnores,
+      localIgnores,
+      syncRejectedCandidates,
+      localRejectedCandidates,
+      syncBlockedCandidates,
+      localBlockedCandidates,
+    ] = await Promise.all([
       mappingOverridesSync.getValue(),
       mappingOverridesLocal.getValue(),
       mappingIgnoresSync.getValue(),
       mappingIgnoresLocal.getValue(),
+      mappingRejectedCandidatesSync.getValue(),
+      mappingRejectedCandidatesLocal.getValue(),
+      mappingBlockedCandidatesSync.getValue(),
+      mappingBlockedCandidatesLocal.getValue(),
     ]);
     this.rebuildOverridesFromRecords(syncOverrides, localOverrides);
     this.rebuildIgnoresFromRecords(syncIgnores, localIgnores);
+    this.rebuildRejectedCandidatesFromRecords(syncRejectedCandidates, localRejectedCandidates);
+    this.rebuildBlockedCandidatesFromRecords(syncBlockedCandidates, localBlockedCandidates);
     this.attachWatchers();
     this.initialized = true;
   }
@@ -96,6 +154,17 @@ export class MappingOverridesService {
 
   public isIgnored(provider: MappingProvider, anilistId: number): boolean {
     return this.ignored.has(createRecordKey(provider, anilistId));
+  }
+
+  public getCandidateSuppression(
+    provider: MappingProvider,
+    anilistId: number,
+    externalId: MappingExternalId,
+  ): 'blocked' | 'rejected' | null {
+    const key = createCandidateRecordKey(provider, anilistId, externalId);
+    if (this.blockedCandidates.has(key)) return 'blocked';
+    if (this.rejectedCandidates.has(key)) return 'rejected';
+    return null;
   }
 
   public getLinkedAniListIds(provider: MappingProvider, externalId: MappingExternalId): number[] {
@@ -118,11 +187,24 @@ export class MappingOverridesService {
       this.removeReverse(prev.provider, prev.externalId, anilistId);
     }
 
-    const [syncOverrides, localOverrides, syncIgnores, localIgnores] = await Promise.all([
+    const [
+      syncOverrides,
+      localOverrides,
+      syncIgnores,
+      localIgnores,
+      syncRejectedCandidates,
+      localRejectedCandidates,
+      syncBlockedCandidates,
+      localBlockedCandidates,
+    ] = await Promise.all([
       mappingOverridesSync.getValue(),
       mappingOverridesLocal.getValue(),
       mappingIgnoresSync.getValue(),
       mappingIgnoresLocal.getValue(),
+      mappingRejectedCandidatesSync.getValue(),
+      mappingRejectedCandidatesLocal.getValue(),
+      mappingBlockedCandidatesSync.getValue(),
+      mappingBlockedCandidatesLocal.getValue(),
     ]);
 
     if (this.ignored.has(key)) {
@@ -130,6 +212,14 @@ export class MappingOverridesService {
     }
     if (key in syncIgnores) delete syncIgnores[key];
     if (key in localIgnores) delete localIgnores[key];
+
+    const candidateKey = createCandidateRecordKey(provider, anilistId, externalId);
+    this.rejectedCandidates.delete(candidateKey);
+    this.blockedCandidates.delete(candidateKey);
+    if (candidateKey in syncRejectedCandidates) delete syncRejectedCandidates[candidateKey];
+    if (candidateKey in localRejectedCandidates) delete localRejectedCandidates[candidateKey];
+    if (candidateKey in syncBlockedCandidates) delete syncBlockedCandidates[candidateKey];
+    if (candidateKey in localBlockedCandidates) delete localBlockedCandidates[candidateKey];
 
     this.map.set(key, entry);
     this.addReverse(provider, externalId, anilistId);
@@ -141,6 +231,10 @@ export class MappingOverridesService {
       mappingOverridesLocal.setValue(nextLocal),
       mappingIgnoresSync.setValue(syncIgnores),
       mappingIgnoresLocal.setValue(localIgnores),
+      mappingRejectedCandidatesSync.setValue(syncRejectedCandidates),
+      mappingRejectedCandidatesLocal.setValue(localRejectedCandidates),
+      mappingBlockedCandidatesSync.setValue(syncBlockedCandidates),
+      mappingBlockedCandidatesLocal.setValue(localBlockedCandidates),
     ]);
   }
 
@@ -196,6 +290,22 @@ export class MappingOverridesService {
     ]);
   }
 
+  public async setRejectedCandidate(provider: MappingProvider, anilistId: number, externalId: MappingExternalId): Promise<void> {
+    await this.setCandidateSuppression('rejected', provider, anilistId, externalId);
+  }
+
+  public async clearRejectedCandidate(provider: MappingProvider, anilistId: number, externalId: MappingExternalId): Promise<void> {
+    await this.clearCandidateSuppression('rejected', provider, anilistId, externalId);
+  }
+
+  public async setBlockedCandidate(provider: MappingProvider, anilistId: number, externalId: MappingExternalId): Promise<void> {
+    await this.setCandidateSuppression('blocked', provider, anilistId, externalId);
+  }
+
+  public async clearBlockedCandidate(provider: MappingProvider, anilistId: number, externalId: MappingExternalId): Promise<void> {
+    await this.clearCandidateSuppression('blocked', provider, anilistId, externalId);
+  }
+
   public async clearIgnore(provider: MappingProvider, anilistId: number): Promise<void> {
     const key = createRecordKey(provider, anilistId);
     this.ignored.delete(key);
@@ -244,7 +354,20 @@ export class MappingOverridesService {
     return entries;
   }
 
-  public exportState(): { overrides: MappingOverrideMap; ignores: MappingIgnoreMap } {
+  public listRejectedCandidates(provider?: MappingProvider): MappingRejectedRecord[] {
+    return this.listCandidateSuppressions(this.rejectedCandidates, provider);
+  }
+
+  public listBlockedCandidates(provider?: MappingProvider): MappingBlockedRecord[] {
+    return this.listCandidateSuppressions(this.blockedCandidates, provider);
+  }
+
+  public exportState(): {
+    overrides: MappingOverrideMap;
+    ignores: MappingIgnoreMap;
+    rejectedCandidates: MappingCandidateSuppressionMap;
+    blockedCandidates: MappingCandidateSuppressionMap;
+  } {
     const overrides: MappingOverrideMap = {};
     for (const [key, entry] of this.map.entries()) {
       overrides[key] = {
@@ -262,22 +385,53 @@ export class MappingOverridesService {
       };
     }
 
-    return { overrides, ignores };
+    const rejectedCandidates: MappingCandidateSuppressionMap = {};
+    for (const [key, entry] of this.rejectedCandidates.entries()) {
+      rejectedCandidates[key] = {
+        provider: entry.provider,
+        externalId: entry.externalId,
+        updatedAt: typeof entry.updatedAt === 'number' ? entry.updatedAt : Date.now(),
+      };
+    }
+
+    const blockedCandidates: MappingCandidateSuppressionMap = {};
+    for (const [key, entry] of this.blockedCandidates.entries()) {
+      blockedCandidates[key] = {
+        provider: entry.provider,
+        externalId: entry.externalId,
+        updatedAt: typeof entry.updatedAt === 'number' ? entry.updatedAt : Date.now(),
+      };
+    }
+
+    return { overrides, ignores, rejectedCandidates, blockedCandidates };
   }
 
-  public async importState(state: { overrides: MappingOverrideMap; ignores: MappingIgnoreMap }): Promise<void> {
+  public async importState(state: {
+    overrides: MappingOverrideMap;
+    ignores: MappingIgnoreMap;
+    rejectedCandidates?: MappingCandidateSuppressionMap;
+    blockedCandidates?: MappingCandidateSuppressionMap;
+  }): Promise<void> {
     const overrides = { ...(state.overrides ?? {}) };
     const ignores = { ...(state.ignores ?? {}) };
+    const rejectedCandidates = { ...(state.rejectedCandidates ?? {}) };
+    const blockedCandidates = { ...(state.blockedCandidates ?? {}) };
 
     await Promise.all([
       mappingOverridesSync.setValue(overrides),
       mappingOverridesLocal.setValue(overrides),
       mappingIgnoresSync.setValue(ignores),
       mappingIgnoresLocal.setValue(ignores),
+      mappingRejectedCandidatesSync.setValue(rejectedCandidates),
+      mappingRejectedCandidatesLocal.setValue(rejectedCandidates),
+      mappingBlockedCandidatesSync.setValue(blockedCandidates),
+      mappingBlockedCandidatesLocal.setValue(blockedCandidates),
     ]);
 
     this.rebuildOverridesFromRecords(overrides, overrides);
     this.rebuildIgnoresFromRecords(ignores, ignores);
+    this.rebuildRejectedCandidatesFromRecords(rejectedCandidates, rejectedCandidates);
+    this.rebuildBlockedCandidatesFromRecords(blockedCandidates, blockedCandidates);
   }
 
   public async clearAll(provider?: MappingProvider): Promise<void> {
@@ -285,20 +439,39 @@ export class MappingOverridesService {
       this.map.clear();
       this.reverse.clear();
       this.ignored.clear();
+      this.rejectedCandidates.clear();
+      this.blockedCandidates.clear();
       await Promise.all([
         mappingOverridesSync.setValue({}),
         mappingOverridesLocal.setValue({}),
         mappingIgnoresSync.setValue({}),
         mappingIgnoresLocal.setValue({}),
+        mappingRejectedCandidatesSync.setValue({}),
+        mappingRejectedCandidatesLocal.setValue({}),
+        mappingBlockedCandidatesSync.setValue({}),
+        mappingBlockedCandidatesLocal.setValue({}),
       ]);
       return;
     }
 
-    const [syncOverrides, localOverrides, syncIgnores, localIgnores] = await Promise.all([
+    const [
+      syncOverrides,
+      localOverrides,
+      syncIgnores,
+      localIgnores,
+      syncRejectedCandidates,
+      localRejectedCandidates,
+      syncBlockedCandidates,
+      localBlockedCandidates,
+    ] = await Promise.all([
       mappingOverridesSync.getValue(),
       mappingOverridesLocal.getValue(),
       mappingIgnoresSync.getValue(),
       mappingIgnoresLocal.getValue(),
+      mappingRejectedCandidatesSync.getValue(),
+      mappingRejectedCandidatesLocal.getValue(),
+      mappingBlockedCandidatesSync.getValue(),
+      mappingBlockedCandidatesLocal.getValue(),
     ]);
 
     for (const key of Object.keys(syncOverrides)) {
@@ -313,16 +486,34 @@ export class MappingOverridesService {
     for (const key of Object.keys(localIgnores)) {
       if (key.startsWith(`${provider}:`)) delete localIgnores[key];
     }
+    for (const key of Object.keys(syncRejectedCandidates)) {
+      if (key.startsWith(`${provider}:`)) delete syncRejectedCandidates[key];
+    }
+    for (const key of Object.keys(localRejectedCandidates)) {
+      if (key.startsWith(`${provider}:`)) delete localRejectedCandidates[key];
+    }
+    for (const key of Object.keys(syncBlockedCandidates)) {
+      if (key.startsWith(`${provider}:`)) delete syncBlockedCandidates[key];
+    }
+    for (const key of Object.keys(localBlockedCandidates)) {
+      if (key.startsWith(`${provider}:`)) delete localBlockedCandidates[key];
+    }
 
     await Promise.all([
       mappingOverridesSync.setValue(syncOverrides),
       mappingOverridesLocal.setValue(localOverrides),
       mappingIgnoresSync.setValue(syncIgnores),
       mappingIgnoresLocal.setValue(localIgnores),
+      mappingRejectedCandidatesSync.setValue(syncRejectedCandidates),
+      mappingRejectedCandidatesLocal.setValue(localRejectedCandidates),
+      mappingBlockedCandidatesSync.setValue(syncBlockedCandidates),
+      mappingBlockedCandidatesLocal.setValue(localBlockedCandidates),
     ]);
 
     this.rebuildOverridesFromRecords(syncOverrides, localOverrides);
     this.rebuildIgnoresFromRecords(syncIgnores, localIgnores);
+    this.rebuildRejectedCandidatesFromRecords(syncRejectedCandidates, localRejectedCandidates);
+    this.rebuildBlockedCandidatesFromRecords(syncBlockedCandidates, localBlockedCandidates);
   }
 
   private attachWatchers(): void {
@@ -345,6 +536,20 @@ export class MappingOverridesService {
         changes.ignoredMappingsCache;
       if (ignoreChange?.newValue && typeof ignoreChange.newValue === 'object') {
         this.rebuildIgnoresFromRecords(ignoreChange.newValue as Record<string, MappingIgnoreEntry>);
+      }
+
+      const rejectedChange =
+        changes['sync:rejectedMappingCandidates'] ??
+        changes['local:rejectedMappingCandidatesCache'];
+      if (rejectedChange?.newValue && typeof rejectedChange.newValue === 'object') {
+        this.rebuildRejectedCandidatesFromRecords(rejectedChange.newValue as Record<string, MappingCandidateSuppressionEntry>);
+      }
+
+      const blockedChange =
+        changes['sync:blockedMappingCandidates'] ??
+        changes['local:blockedMappingCandidatesCache'];
+      if (blockedChange?.newValue && typeof blockedChange.newValue === 'object') {
+        this.rebuildBlockedCandidatesFromRecords(blockedChange.newValue as Record<string, MappingCandidateSuppressionEntry>);
       }
     });
   }
@@ -389,6 +594,132 @@ export class MappingOverridesService {
     for (const [key, entry] of merged.entries()) {
       this.ignored.set(key, entry);
     }
+  }
+
+  private rebuildRejectedCandidatesFromRecords(...recordsList: Array<Record<string, MappingCandidateSuppressionEntry>>): void {
+    this.rebuildCandidateSuppressions(this.rejectedCandidates, ...recordsList);
+  }
+
+  private rebuildBlockedCandidatesFromRecords(...recordsList: Array<Record<string, MappingCandidateSuppressionEntry>>): void {
+    this.rebuildCandidateSuppressions(this.blockedCandidates, ...recordsList);
+  }
+
+  private rebuildCandidateSuppressions(
+    target: Map<MappingCandidateRecordKey, MappingCandidateSuppressionEntry>,
+    ...recordsList: Array<Record<string, MappingCandidateSuppressionEntry>>
+  ): void {
+    target.clear();
+    const merged = new Map<MappingCandidateRecordKey, MappingCandidateSuppressionEntry>();
+    for (const records of recordsList) {
+      for (const [key, entry] of Object.entries(records ?? {})) {
+        if (!parseCandidateRecordKey(key)) continue;
+        const normalized = normalizeCandidateSuppressionEntry(entry);
+        if (!normalized) continue;
+        const prev = merged.get(key as MappingCandidateRecordKey);
+        if (!prev || normalized.updatedAt > (prev.updatedAt ?? 0)) {
+          merged.set(key as MappingCandidateRecordKey, normalized);
+        }
+      }
+    }
+    for (const [key, entry] of merged.entries()) {
+      target.set(key, entry);
+    }
+  }
+
+  private listCandidateSuppressions(
+    source: Map<MappingCandidateRecordKey, MappingCandidateSuppressionEntry>,
+    provider?: MappingProvider,
+  ): Array<MappingRejectedRecord | MappingBlockedRecord> {
+    const entries: Array<MappingRejectedRecord | MappingBlockedRecord> = [];
+    for (const [key, entry] of source.entries()) {
+      const parsed = parseCandidateRecordKey(key);
+      if (!parsed) continue;
+      if (provider && parsed.provider !== provider) continue;
+      entries.push({
+        anilistId: parsed.anilistId,
+        provider: parsed.provider,
+        externalId: parsed.externalId,
+        updatedAt: typeof entry.updatedAt === 'number' ? entry.updatedAt : Date.now(),
+      });
+    }
+    entries.sort((a, b) => b.updatedAt - a.updatedAt || a.provider.localeCompare(b.provider) || a.anilistId - b.anilistId);
+    return entries;
+  }
+
+  private async setCandidateSuppression(
+    type: 'rejected' | 'blocked',
+    provider: MappingProvider,
+    anilistId: number,
+    externalId: MappingExternalId,
+  ): Promise<void> {
+    const key = createCandidateRecordKey(provider, anilistId, externalId);
+    const entry: MappingCandidateSuppressionEntry = { provider, externalId, updatedAt: Date.now() };
+    const [
+      syncRejectedCandidates,
+      localRejectedCandidates,
+      syncBlockedCandidates,
+      localBlockedCandidates,
+    ] = await Promise.all([
+      mappingRejectedCandidatesSync.getValue(),
+      mappingRejectedCandidatesLocal.getValue(),
+      mappingBlockedCandidatesSync.getValue(),
+      mappingBlockedCandidatesLocal.getValue(),
+    ]);
+
+    this.rejectedCandidates.delete(key);
+    this.blockedCandidates.delete(key);
+    if (key in syncRejectedCandidates) delete syncRejectedCandidates[key];
+    if (key in localRejectedCandidates) delete localRejectedCandidates[key];
+    if (key in syncBlockedCandidates) delete syncBlockedCandidates[key];
+    if (key in localBlockedCandidates) delete localBlockedCandidates[key];
+
+    const targetMap = type === 'rejected' ? this.rejectedCandidates : this.blockedCandidates;
+    const targetSync = type === 'rejected' ? syncRejectedCandidates : syncBlockedCandidates;
+    const targetLocal = type === 'rejected' ? localRejectedCandidates : localBlockedCandidates;
+    targetMap.set(key, entry);
+    targetSync[key] = entry;
+    targetLocal[key] = entry;
+
+    await Promise.all([
+      mappingRejectedCandidatesSync.setValue(syncRejectedCandidates),
+      mappingRejectedCandidatesLocal.setValue(localRejectedCandidates),
+      mappingBlockedCandidatesSync.setValue(syncBlockedCandidates),
+      mappingBlockedCandidatesLocal.setValue(localBlockedCandidates),
+    ]);
+  }
+
+  private async clearCandidateSuppression(
+    type: 'rejected' | 'blocked',
+    provider: MappingProvider,
+    anilistId: number,
+    externalId: MappingExternalId,
+  ): Promise<void> {
+    const key = createCandidateRecordKey(provider, anilistId, externalId);
+    const [
+      syncRejectedCandidates,
+      localRejectedCandidates,
+      syncBlockedCandidates,
+      localBlockedCandidates,
+    ] = await Promise.all([
+      mappingRejectedCandidatesSync.getValue(),
+      mappingRejectedCandidatesLocal.getValue(),
+      mappingBlockedCandidatesSync.getValue(),
+      mappingBlockedCandidatesLocal.getValue(),
+    ]);
+
+    const targetMap = type === 'rejected' ? this.rejectedCandidates : this.blockedCandidates;
+    const targetSync = type === 'rejected' ? syncRejectedCandidates : syncBlockedCandidates;
+    const targetLocal = type === 'rejected' ? localRejectedCandidates : localBlockedCandidates;
+    targetMap.delete(key);
+    if (key in targetSync) delete targetSync[key];
+    if (key in targetLocal) delete targetLocal[key];
+
+    await Promise.all([
+      mappingRejectedCandidatesSync.setValue(syncRejectedCandidates),
+      mappingRejectedCandidatesLocal.setValue(localRejectedCandidates),
+      mappingBlockedCandidatesSync.setValue(syncBlockedCandidates),
+      mappingBlockedCandidatesLocal.setValue(localBlockedCandidates),
+    ]);
   }
 
   private addReverse(provider: MappingProvider, externalId: MappingExternalId, anilistId: number): void {

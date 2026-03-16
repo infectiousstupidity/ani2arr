@@ -34,7 +34,7 @@ export async function getMappingsHandler(
   const sources =
     input?.sources && input.sources.length > 0
       ? new Set<MappingSource>(input.sources)
-      : new Set<MappingSource>(['manual', 'ignored', 'auto', 'unresolved']);
+      : new Set<MappingSource>(['manual', 'rejected', 'blocked', 'ignored', 'auto', 'unresolved']);
   const providers =
     input?.providers && input.providers.length > 0
       ? new Set<MappingSummary['provider']>(input.providers)
@@ -59,7 +59,9 @@ export async function getMappingsHandler(
   }
 
   const priorityMap: Record<MappingSource, number> = {
-    manual: 4,
+    manual: 6,
+    blocked: 5,
+    rejected: 4,
     ignored: 3,
     unresolved: 2,
     upstream: 1,
@@ -69,6 +71,7 @@ export async function getMappingsHandler(
   type Candidate = {
     provider: MappingSummary['provider'];
     externalId: MappingSummary['externalId'];
+    suppressedExternalId?: MappingSummary['suppressedExternalId'];
     source: MappingSource;
     updatedAt: number;
     hadResolveAttempt?: boolean;
@@ -98,6 +101,32 @@ export async function getMappingsHandler(
       externalId: null,
       source: 'ignored',
       updatedAt: ignore.updatedAt,
+      hadResolveAttempt: true,
+    });
+  }
+
+  const rejectedCandidates = overridesService.listRejectedCandidates();
+  for (const rejected of rejectedCandidates) {
+    if (overridesService.isIgnored(rejected.provider, rejected.anilistId)) continue;
+    applyCandidate(rejected.anilistId, {
+      provider: rejected.provider,
+      externalId: null,
+      suppressedExternalId: rejected.externalId,
+      source: 'rejected',
+      updatedAt: rejected.updatedAt,
+      hadResolveAttempt: true,
+    });
+  }
+
+  const blockedCandidates = overridesService.listBlockedCandidates();
+  for (const blocked of blockedCandidates) {
+    if (overridesService.isIgnored(blocked.provider, blocked.anilistId)) continue;
+    applyCandidate(blocked.anilistId, {
+      provider: blocked.provider,
+      externalId: null,
+      suppressedExternalId: blocked.externalId,
+      source: 'blocked',
+      updatedAt: blocked.updatedAt,
       hadResolveAttempt: true,
     });
   }
@@ -151,7 +180,7 @@ export async function getMappingsHandler(
     const haystackParts: string[] = [
       String(summary.anilistId),
       summary.externalId ? String(summary.externalId.id) : '',
-      summary.providerMeta?.title ?? '',
+      summary.externalId ? (summary.providerMeta?.title ?? '') : '',
     ];
     const haystack = haystackParts.join(' ').toLowerCase();
     return haystack.includes(normalizedQuery);
@@ -180,34 +209,40 @@ export async function getMappingsHandler(
       series && typeof (series as { status?: unknown }).status === 'string'
         ? (series as { status?: string }).status
         : movie?.status;
-    const providerMeta = series
-      ? {
-          ...(series.title ? { title: series.title } : {}),
-          type: 'series' as const,
-          ...(statusLabel ? { statusLabel } : {}),
-        }
-      : movie
-        ? {
-            ...(movie.title ? { title: movie.title } : {}),
-            type: 'movie' as const,
-            ...(statusLabel ? { statusLabel } : {}),
-          }
-      : candidate.title
-        ? {
-            title: candidate.title,
-            type: candidate.provider === 'sonarr' ? ('series' as const) : ('movie' as const),
-          }
-      : undefined;
+    const providerMeta =
+      candidate.source === 'rejected' || candidate.source === 'blocked'
+        ? undefined
+        : series
+          ? {
+              ...(series.title ? { title: series.title } : {}),
+              type: 'series' as const,
+              ...(statusLabel ? { statusLabel } : {}),
+            }
+          : movie
+            ? {
+                ...(movie.title ? { title: movie.title } : {}),
+                type: 'movie' as const,
+                ...(statusLabel ? { statusLabel } : {}),
+              }
+            : candidate.title
+              ? {
+                  title: candidate.title,
+                  type: candidate.provider === 'sonarr' ? ('series' as const) : ('movie' as const),
+                }
+              : undefined;
     const hadResolveAttempt =
       candidate.hadResolveAttempt ||
       candidate.source === 'auto' ||
       candidate.source === 'manual' ||
+      candidate.source === 'rejected' ||
+      candidate.source === 'blocked' ||
       candidate.source === 'ignored';
 
     const summary: MappingSummary = {
       anilistId,
       provider: candidate.provider,
       externalId,
+      ...(candidate.suppressedExternalId ? { suppressedExternalId: candidate.suppressedExternalId } : {}),
       source: candidate.source,
       status,
       updatedAt: candidate.updatedAt,
