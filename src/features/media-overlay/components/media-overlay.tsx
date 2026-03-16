@@ -79,12 +79,13 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
     useA2aBroadcasts();
 
     const { data: publicOptions } = usePublicOptions();
-    const overlaysEnabled = publicOptions?.ui?.browseOverlayEnabled ?? true;
-    const hasConfiguredProvider = Boolean(
-      publicOptions?.providers.sonarr.isConfigured || publicOptions?.providers.radarr.isConfigured,
+    const sonarrBrowseEnabled = publicOptions?.ui?.browseCards.sonarr.enabled ?? true;
+    const radarrBrowseEnabled = publicOptions?.ui?.browseCards.radarr.enabled ?? true;
+    const overlaysEnabled = sonarrBrowseEnabled || radarrBrowseEnabled;
+    const metadataEnabled = Boolean(
+      (sonarrBrowseEnabled && publicOptions?.providers.sonarr.isConfigured) ||
+        (radarrBrowseEnabled && publicOptions?.providers.radarr.isConfigured),
     );
-    const metadataEnabled = overlaysEnabled && hasConfiguredProvider;
-    const badgeVisibility = publicOptions?.ui?.badgeVisibility ?? 'always';
 
     const { cardPortals } = useBrowsePortals({
       cardSelector,
@@ -127,6 +128,13 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
           }
           const providerOptions =
             service === 'radarr' ? publicOptions?.providers.radarr : publicOptions?.providers.sonarr;
+          const providerUiOptions =
+            service === 'radarr' ? publicOptions?.ui?.browseCards.radarr : publicOptions?.ui?.browseCards.sonarr;
+          const providerBrowseEnabled = providerUiOptions?.enabled ?? true;
+          if (!providerBrowseEnabled) {
+            return null;
+          }
+          const badgeVisibility = providerUiOptions?.visibility ?? 'always';
 
           return createPortal(
             <CardOverlay

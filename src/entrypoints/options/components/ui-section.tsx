@@ -1,127 +1,194 @@
-// src/entrypoints/options/components/ui-section.tsx
 import React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
-import TooltipWrapper from '@/shared/ui/primitives/tooltip';
-import type { BadgeVisibility } from '@/shared/types';
+import type { BadgeVisibility, Settings } from '@/shared/types';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import { defaultUiOptions } from '@/shared/schemas/settings';
 
-const BadgeToggle: React.FC<{
-  value: BadgeVisibility;
-  onChange: (value: BadgeVisibility) => void;
-}> = ({ value, onChange }) => {
-  const options: Array<{ value: BadgeVisibility; label: string; description: string }> = [
-    { value: 'always', label: 'Always', description: 'Badges are always visible on cards.' },
-    { value: 'hover', label: 'On hover', description: 'Badges appear when you hover a card.' },
-    { value: 'hidden', label: 'Hidden', description: 'Do not show status badges.' },
-  ];
-  return (
-    <div className="grid gap-2 md:grid-cols-3">
-      {options.map(option => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => onChange(option.value)}
-          className={`flex flex-col items-start rounded-xl border px-3 py-2 text-left text-xs transition-colors ${
-            value === option.value
-              ? 'border-accent-primary/70 bg-accent-primary/20 text-text-primary'
-              : 'border-border-primary bg-bg-tertiary/60 text-text-secondary hover:border-accent-primary/60'
-          }`}
-        >
-          <span className="text-[13px] font-semibold">{option.label}</span>
-          <span className="mt-1 text-[11px] text-text-secondary">{option.description}</span>
-        </button>
-      ))}
+type ProviderKey = 'sonarr' | 'radarr';
+
+const VISIBILITY_OPTIONS: Array<{ value: BadgeVisibility; label: string; description: string }> = [
+  { value: 'always', label: 'Always', description: 'Show actions and status badges on every supported card.' },
+  { value: 'hover', label: 'On hover', description: 'Keep the card cleaner until the pointer is over it.' },
+  { value: 'hidden', label: 'Hidden', description: 'Hide browse-card actions and status badges for this provider.' },
+];
+
+const ProviderVisibilityControl: React.FC<{
+  provider: ProviderKey;
+  title: string;
+  description: string;
+  enabled: boolean;
+  visibility: BadgeVisibility;
+  onToggle: (checked: boolean) => void;
+  onVisibilityChange: (value: BadgeVisibility) => void;
+}> = ({ provider, title, description, enabled, visibility, onToggle, onVisibilityChange }) => (
+  <div className="a2a-settings-panel__inset rounded-2xl p-4">
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <h4 className="text-sm font-semibold text-text-primary">{title}</h4>
+        <p className="mt-1 text-xs text-text-secondary">{description}</p>
+      </div>
+      <label className="flex items-center gap-2 text-xs text-text-secondary">
+        <span>Enabled</span>
+        <input
+          type="checkbox"
+          className="h-4 w-4"
+          checked={enabled}
+          onChange={(event) => onToggle(event.currentTarget.checked)}
+          aria-label={`Enable ${provider} browse cards`}
+        />
+      </label>
     </div>
-  );
-};
+
+    <fieldset className="mt-4 space-y-2" disabled={!enabled}>
+      <legend className="text-xs font-medium text-text-secondary">Visibility</legend>
+      <div className="grid gap-2 md:grid-cols-3">
+        {VISIBILITY_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onVisibilityChange(option.value)}
+            className={`flex flex-col items-start rounded-xl border px-3 py-3 text-left transition-colors ${
+              visibility === option.value
+                ? 'border-accent-primary/70 bg-accent-primary/15 text-text-primary'
+                : 'border-border-primary bg-bg-primary/40 text-text-secondary hover:border-accent-primary/60'
+            }`}
+          >
+            <span className="text-sm font-semibold">{option.label}</span>
+            <span className="mt-1 text-xs text-text-secondary">{option.description}</span>
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  </div>
+);
+
+const ProviderAnimePageControl: React.FC<{
+  provider: ProviderKey;
+  title: string;
+  description: string;
+  enabled: boolean;
+  onToggle: (checked: boolean) => void;
+}> = ({ provider, title, description, enabled, onToggle }) => (
+  <div className="a2a-settings-panel__inset rounded-2xl px-4 py-4">
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <h4 className="text-sm font-semibold text-text-primary">{title}</h4>
+        <p className="mt-1 text-xs text-text-secondary">{description}</p>
+      </div>
+      <input
+        type="checkbox"
+        className="h-4 w-4"
+        checked={enabled}
+        onChange={(event) => onToggle(event.currentTarget.checked)}
+        aria-label={`Enable ${provider} anime page actions`}
+      />
+    </div>
+  </div>
+);
 
 const UiSection: React.FC = () => {
   const methods = useFormContext<SettingsFormValues>();
   const ui = (useWatch<SettingsFormValues>({ control: methods.control, name: 'ui' as const }) ??
     defaultUiOptions()) as SettingsFormValues['ui'];
-  const setUiValue = <K extends keyof SettingsFormValues['ui']>(key: K, value: SettingsFormValues['ui'][K]) => {
-    methods.setValue(
-      'ui',
-      { ...ui, [key]: value } as SettingsFormValues['ui'],
-      { shouldDirty: true },
-    );
+
+  const setUi = (nextUi: Settings['ui']) => {
+    methods.setValue('ui', nextUi as SettingsFormValues['ui'], { shouldDirty: true });
+  };
+
+  const updateBrowseProvider = (
+    provider: ProviderKey,
+    patch: Partial<Settings['ui']['browseCards'][ProviderKey]>,
+  ) => {
+    setUi({
+      ...ui,
+      browseCards: {
+        ...ui.browseCards,
+        [provider]: {
+          ...ui.browseCards[provider],
+          ...patch,
+        },
+      },
+    });
+  };
+
+  const updateAnimeProvider = (
+    provider: ProviderKey,
+    patch: Partial<Settings['ui']['animePages'][ProviderKey]>,
+  ) => {
+    setUi({
+      ...ui,
+      animePages: {
+        ...ui.animePages,
+        [provider]: {
+          ...ui.animePages[provider],
+          ...patch,
+        },
+      },
+    });
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-text-primary">UI &amp; injection</h2>
+        <h2 className="text-lg font-semibold text-text-primary">UI &amp; actions</h2>
         <p className="text-sm text-text-secondary">
-          Control AniList overlays, badges, and injection behaviour.
+          Choose where ani2arr actions appear for Sonarr and Radarr without changing the rest of the extension.
         </p>
       </div>
 
-      <div className="rounded-2xl border border-border-primary bg-bg-secondary/70">
-        <div className="px-4 py-3 border-b border-border-primary">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary">Browse overlays</h3>
-              <p className="mt-1 text-xs text-text-secondary">
-                Status badges and actions on AniList browse/search cards.
-              </p>
-            </div>
-            <TooltipWrapper content="Applies to browse/search overlays injected into AniList and AniChart grids.">
-              <span className="text-[11px] text-text-secondary">Content scripts</span>
-            </TooltipWrapper>
-          </div>
+      <section className="a2a-settings-panel">
+        <div className="a2a-settings-panel__header border-b px-5 py-4">
+          <h3 className="text-sm font-semibold text-text-primary">Browse cards</h3>
+          <p className="mt-1 text-xs text-text-secondary">
+            Control browse and search card actions separately for series and movies.
+          </p>
         </div>
-        <div className="space-y-4 px-4 py-4">
-          <div className="flex items-center justify-between gap-4 rounded-xl bg-bg-tertiary/60 px-3 py-2">
-            <div>
-              <p className="text-sm text-text-primary">Enable overlays</p>
-              <p className="text-xs text-text-secondary">
-                Turn off to hide ani2arr buttons and badges on browse grids.
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              className="h-4 w-4"
-              checked={ui.browseOverlayEnabled}
-              onChange={(e) => setUiValue('browseOverlayEnabled', e.target.checked)}
-            />
-          </div>
-          <fieldset className="space-y-2" disabled={!ui.browseOverlayEnabled}>
-            <legend className="text-xs font-medium text-text-secondary">Badge visibility</legend>
-            <BadgeToggle
-              value={ui.badgeVisibility}
-              onChange={(value) => setUiValue('badgeVisibility', value)}
-            />
-          </fieldset>
+        <div className="space-y-4 px-5 py-5">
+          <ProviderVisibilityControl
+            provider="sonarr"
+            title="Sonarr browse cards"
+            description="Applies to TV, OVA, ONA, and other Sonarr-supported cards on AniList and AniChart."
+            enabled={ui.browseCards.sonarr.enabled}
+            visibility={ui.browseCards.sonarr.visibility}
+            onToggle={(checked) => updateBrowseProvider('sonarr', { enabled: checked })}
+            onVisibilityChange={(value) => updateBrowseProvider('sonarr', { visibility: value })}
+          />
+          <ProviderVisibilityControl
+            provider="radarr"
+            title="Radarr browse cards"
+            description="Applies to movie cards on AniList and AniChart."
+            enabled={ui.browseCards.radarr.enabled}
+            visibility={ui.browseCards.radarr.visibility}
+            onToggle={(checked) => updateBrowseProvider('radarr', { enabled: checked })}
+            onVisibilityChange={(value) => updateBrowseProvider('radarr', { visibility: value })}
+          />
         </div>
-      </div>
+      </section>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-border-primary bg-bg-secondary/70">
-          <div className="px-4 py-3 border-b border-border-primary">
-            <h3 className="text-sm font-semibold text-text-primary">Anime pages</h3>
-            <p className="mt-1 text-xs text-text-secondary">
-              Inject status and actions above the native AniList anime page buttons.
-            </p>
-          </div>
-          <div className="px-4 py-4">
-            <div className="flex items-center justify-between gap-4 rounded-xl bg-bg-tertiary/60 px-3 py-2">
-              <div>
-                <p className="text-sm text-text-primary">Enable header injection</p>
-                <p className="text-xs text-text-secondary">
-                  Show library status and actions in the anime page header.
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                className="h-4 w-4"
-                checked={ui.headerInjectionEnabled}
-                onChange={(e) => setUiValue('headerInjectionEnabled', e.target.checked)}
-              />
-            </div>
-          </div>
+      <section className="a2a-settings-panel">
+        <div className="a2a-settings-panel__header border-b px-5 py-4">
+          <h3 className="text-sm font-semibold text-text-primary">Anime pages</h3>
+          <p className="mt-1 text-xs text-text-secondary">
+            Control the action bar above AniList&apos;s native page buttons for each provider.
+          </p>
         </div>
-      </div>
+        <div className="grid gap-4 px-5 py-5 md:grid-cols-2">
+          <ProviderAnimePageControl
+            provider="sonarr"
+            title="Sonarr anime page actions"
+            description="Show Sonarr status and actions on supported series pages."
+            enabled={ui.animePages.sonarr.enabled}
+            onToggle={(checked) => updateAnimeProvider('sonarr', { enabled: checked })}
+          />
+          <ProviderAnimePageControl
+            provider="radarr"
+            title="Radarr anime page actions"
+            description="Show Radarr status and actions on movie pages."
+            enabled={ui.animePages.radarr.enabled}
+            onToggle={(checked) => updateAnimeProvider('radarr', { enabled: checked })}
+          />
+        </div>
+      </section>
     </div>
   );
 };
