@@ -13,7 +13,7 @@ const SonarrPage: React.FC<{
   <div className="space-y-6">
     <SectionHeader
       title="Sonarr"
-      description="Connection settings and default add options for Sonarr."
+      description="Connection details, preferred title handling, and default add options for Sonarr."
     />
     <SettingsForm
       actions={actions}
@@ -25,3 +25,4 @@ const SonarrPage: React.FC<{
 );
 
 export default SonarrPage;
+

@@ -1,6 +1,17 @@
 // src/rpc/schemas.ts
 import * as v from 'valibot';
-import type { CheckSeriesStatusResponse, MappingSummary, SonarrLookupSeries } from '@/shared/types';
+import type {
+  AniListSchedulerDebugSnapshot,
+  CheckMovieStatusResponse,
+  CheckSeriesStatusResponse,
+  MappingSummary,
+  RadarrLookupMovie,
+  RadarrMovie,
+  RadarrQualityProfile,
+  RadarrRootFolder,
+  RadarrTag,
+  SonarrLookupSeries,
+} from '@/shared/types';
 
 // ============================================================================
 // Shared / Reusable Validators
@@ -11,7 +22,7 @@ import type { CheckSeriesStatusResponse, MappingSummary, SonarrLookupSeries } fr
  */
 const IdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
 const MappingProviderSchema = v.picklist(['sonarr', 'radarr']);
-const MappingSourceSchema = v.picklist(['manual', 'upstream', 'auto', 'ignored']);
+const MappingSourceSchema = v.picklist(['manual', 'upstream', 'auto', 'rejected', 'blocked', 'ignored', 'unresolved']);
 const MappingStatusSchema = v.picklist(['unmapped', 'in-provider', 'not-in-provider']);
 
 /**
@@ -93,10 +104,23 @@ const SonarrFormStateSchema = v.object({
   freeformTags: v.array(v.string()),
 });
 
-const SonarrCredentialsSchema = v.object({
+const RadarrFormStateSchema = v.object({
+  qualityProfileId: v.union([v.number(), v.literal('')]),
+  rootFolderPath: v.string(),
+  monitored: v.boolean(),
+  searchForMovie: v.boolean(),
+  minimumAvailability: v.picklist(['announced', 'inCinemas', 'released', 'preDB']),
+  tags: v.array(v.number()),
+  freeformTags: v.array(v.string()),
+});
+
+const ArrCredentialsSchema = v.object({
   url: createRequiredStringSchema('URL cannot be empty'),
   apiKey: createRequiredStringSchema('API key cannot be empty'),
 });
+
+const SonarrCredentialsSchema = ArrCredentialsSchema;
+const RadarrCredentialsSchema = ArrCredentialsSchema;
 
 const MappingExternalIdSchema = v.object({
   id: IdSchema,
@@ -107,6 +131,7 @@ export const MappingSummarySchema = v.object({
   anilistId: IdSchema,
   provider: MappingProviderSchema,
   externalId: v.nullable(MappingExternalIdSchema),
+  suppressedExternalId: v.optional(v.nullable(MappingExternalIdSchema)),
   source: MappingSourceSchema,
   status: MappingStatusSchema,
   updatedAt: v.optional(v.number()),
@@ -157,22 +182,65 @@ export const UpdateSonarrInputSchema = v.object({
   form: SonarrFormStateSchema,
 });
 
+export const AddRadarrInputSchema = v.object({
+  anilistId: IdSchema,
+  title: createRequiredStringSchema('Title cannot be empty'),
+  primaryTitleHint: v.optional(v.string()),
+  metadata: v.optional(v.nullable(MediaMetadataHintSchema)),
+  form: RadarrFormStateSchema,
+});
+
+export const UpdateRadarrInputSchema = v.object({
+  anilistId: IdSchema,
+  tmdbId: IdSchema,
+  title: createRequiredStringSchema('Title cannot be empty'),
+  form: RadarrFormStateSchema,
+});
+
 export const SetMappingOverrideInputSchema = v.object({
   anilistId: IdSchema,
-  tvdbId: IdSchema,
+  provider: MappingProviderSchema,
+  externalId: MappingExternalIdSchema,
   force: v.optional(v.boolean()),
 });
 
 export const ClearMappingOverrideInputSchema = v.object({
   anilistId: IdSchema,
+  provider: MappingProviderSchema,
 });
 
 export const SetMappingIgnoreInputSchema = v.object({
   anilistId: IdSchema,
+  provider: MappingProviderSchema,
 });
 
 export const ClearMappingIgnoreInputSchema = v.object({
   anilistId: IdSchema,
+  provider: MappingProviderSchema,
+});
+
+export const SetMappingRejectedCandidateInputSchema = v.object({
+  anilistId: IdSchema,
+  provider: MappingProviderSchema,
+  externalId: MappingExternalIdSchema,
+});
+
+export const ClearMappingRejectedCandidateInputSchema = v.object({
+  anilistId: IdSchema,
+  provider: MappingProviderSchema,
+  externalId: MappingExternalIdSchema,
+});
+
+export const SetMappingBlockedCandidateInputSchema = v.object({
+  anilistId: IdSchema,
+  provider: MappingProviderSchema,
+  externalId: MappingExternalIdSchema,
+});
+
+export const ClearMappingBlockedCandidateInputSchema = v.object({
+  anilistId: IdSchema,
+  provider: MappingProviderSchema,
+  externalId: MappingExternalIdSchema,
 });
 
 export const SonarrLookupInputSchema = v.object({
@@ -185,6 +253,10 @@ export const ValidateTvdbInputSchema = v.object({
   tvdbId: IdSchema,
 });
 
+export const ValidateTmdbInputSchema = v.object({
+  tmdbId: IdSchema,
+});
+
 // Array inputs
 export const PrefetchAniListMediaInputSchema = v.array(IdSchema);
 export const GetStaticMappedInputSchema = v.array(IdSchema);
@@ -193,6 +265,7 @@ export const GetStaticMappedInputSchema = v.array(IdSchema);
 export const FetchAniListMediaInputSchema = IdSchema;
 
 export const TestConnectionInputSchema = SonarrCredentialsSchema;
+export const TestRadarrConnectionInputSchema = RadarrCredentialsSchema;
 
 export const GetSonarrMetadataInputSchema = v.optional(
   v.object({
@@ -200,9 +273,22 @@ export const GetSonarrMetadataInputSchema = v.optional(
   }),
 );
 
+export const GetRadarrMetadataInputSchema = v.optional(
+  v.object({
+    credentials: v.optional(RadarrCredentialsSchema),
+  }),
+);
+
+export const RadarrLookupInputSchema = v.object({
+  term: createRequiredStringSchema('Search term cannot be empty'),
+  priority: v.optional(RequestPrioritySchema),
+  force_network: v.optional(v.boolean()),
+});
+
 const MappingCursorSchema = v.object({
   updatedAt: v.number(),
   anilistId: IdSchema,
+  provider: MappingProviderSchema,
 });
 
 export const SearchAniListInputSchema = v.object({
@@ -240,6 +326,7 @@ export const AniListSearchResultSchema = v.object({
 export const GetAniListMetadataInputSchema = v.object({
   ids: v.array(IdSchema),
   refreshStale: v.optional(v.boolean()),
+  fetchMissing: v.optional(v.boolean()),
   maxBatch: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 });
 
@@ -251,12 +338,19 @@ export type ResolveInput = v.InferOutput<typeof ResolveInputSchema>;
 export type StatusInput = v.InferOutput<typeof StatusInputSchema>;
 export type AddInput = v.InferOutput<typeof AddInputSchema>;
 export type UpdateSonarrInput = v.InferOutput<typeof UpdateSonarrInputSchema>;
+export type AddRadarrInput = v.InferOutput<typeof AddRadarrInputSchema>;
+export type UpdateRadarrInput = v.InferOutput<typeof UpdateRadarrInputSchema>;
 export type SetMappingOverrideInput = v.InferOutput<typeof SetMappingOverrideInputSchema>;
 export type ClearMappingOverrideInput = v.InferOutput<typeof ClearMappingOverrideInputSchema>;
 export type SonarrLookupInput = v.InferOutput<typeof SonarrLookupInputSchema>;
 export type ValidateTvdbInput = v.InferOutput<typeof ValidateTvdbInputSchema>;
+export type ValidateTmdbInput = v.InferOutput<typeof ValidateTmdbInputSchema>;
 export type SetMappingIgnoreInput = v.InferOutput<typeof SetMappingIgnoreInputSchema>;
 export type ClearMappingIgnoreInput = v.InferOutput<typeof ClearMappingIgnoreInputSchema>;
+export type SetMappingRejectedCandidateInput = v.InferOutput<typeof SetMappingRejectedCandidateInputSchema>;
+export type ClearMappingRejectedCandidateInput = v.InferOutput<typeof ClearMappingRejectedCandidateInputSchema>;
+export type SetMappingBlockedCandidateInput = v.InferOutput<typeof SetMappingBlockedCandidateInputSchema>;
+export type ClearMappingBlockedCandidateInput = v.InferOutput<typeof ClearMappingBlockedCandidateInputSchema>;
 export type GetMappingsInput = v.InferOutput<typeof GetMappingsInputSchema>;
 export type MappingSummaryDto = v.InferOutput<typeof MappingSummarySchema>;
 export type MappingCursor = v.InferOutput<typeof MappingCursorSchema>;
@@ -264,6 +358,7 @@ export type AniListMetadataDto = v.InferOutput<typeof AniListMetadataSchema>;
 export type SearchAniListInput = v.InferOutput<typeof SearchAniListInputSchema>;
 export type AniListSearchResultDto = v.InferOutput<typeof AniListSearchResultSchema>;
 export type GetAniListMetadataInput = v.InferOutput<typeof GetAniListMetadataInputSchema>;
+export type RadarrLookupInput = v.InferOutput<typeof RadarrLookupInputSchema>;
 
 // ============================================================================
 // Output types
@@ -275,11 +370,59 @@ export interface MappingOutput {
 }
 
 export type StatusOutput = CheckSeriesStatusResponse;
+export type MovieStatusOutput = CheckMovieStatusResponse;
 
 export interface MappingOverrideItem {
   anilistId: number;
-  tvdbId: number;
+  provider: 'sonarr' | 'radarr';
+  externalId: {
+    id: number;
+    kind: 'tvdb' | 'tmdb';
+  };
   updatedAt: number;
+}
+
+export interface MappingIgnoreItem {
+  anilistId: number;
+  provider: 'sonarr' | 'radarr';
+  updatedAt: number;
+}
+
+export interface MappingRejectedCandidateItem {
+  anilistId: number;
+  provider: 'sonarr' | 'radarr';
+  externalId: {
+    id: number;
+    kind: 'tvdb' | 'tmdb';
+  };
+  updatedAt: number;
+}
+
+export interface MappingBlockedCandidateItem {
+  anilistId: number;
+  provider: 'sonarr' | 'radarr';
+  externalId: {
+    id: number;
+    kind: 'tvdb' | 'tmdb';
+  };
+  updatedAt: number;
+}
+
+export interface ExportStoredMappingsOutput {
+  version: 2;
+  exportedAt: string;
+  summary: {
+    overrideCount: number;
+    ignoreCount: number;
+    rejectedCandidateCount: number;
+    blockedCandidateCount: number;
+  };
+  mappings: {
+    overrides: Record<string, MappingOverrideItem>;
+    ignores: Record<string, MappingIgnoreItem>;
+    rejectedCandidates: Record<string, MappingRejectedCandidateItem>;
+    blockedCandidates: Record<string, MappingBlockedCandidateItem>;
+  };
 }
 
 export interface GetMappingsOutput {
@@ -310,7 +453,29 @@ export interface ValidateTvdbOutput {
   inCatalog: boolean;
 }
 
+export interface RadarrLookupOutput {
+  results: RadarrLookupMovie[];
+  libraryTmdbIds: number[];
+  linkedAniListIdsByTmdbId?: Record<number, number[]>;
+}
+
+export interface ValidateTmdbOutput {
+  inLibrary: boolean;
+  inCatalog: boolean;
+}
+
+export interface GetRadarrMetadataOutput {
+  qualityProfiles: RadarrQualityProfile[];
+  rootFolders: RadarrRootFolder[];
+  tags: RadarrTag[];
+}
+
+export type AddRadarrOutput = RadarrMovie;
+export type UpdateRadarrOutput = RadarrMovie;
+
 export interface GetAniListMetadataOutput {
   metadata: AniListMetadataDto[];
   missingIds?: number[];
 }
+
+export type GetAniListSchedulerDebugOutput = AniListSchedulerDebugSnapshot;

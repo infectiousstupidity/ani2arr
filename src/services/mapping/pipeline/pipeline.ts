@@ -2,7 +2,10 @@ import { generateSearchTerms, isSeasonalCanonicalTokens } from './search-term-ge
 import { scoreCandidates } from './scoring';
 import { maybeEarlyStop, pickBest } from './early-stop';
 import type { EvaluationOutcome, EvaluationOutcomeResolved, MappingContext, AniMedia } from './types';
-import { canonicalTitleKey, sanitizeLookupDisplay } from '@/services/mapping/pipeline/matching';
+import {
+  canonicalTitleKeyForProvider,
+  sanitizeLookupDisplayForProvider,
+} from '@/services/mapping/pipeline/matching';
 import { PIPELINE_SOFT_TIME_BUDGET_MS } from '../constants';
 
 
@@ -13,13 +16,14 @@ export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, p
     );
   }
   const mediaYear = media.startDate?.year ?? undefined;
-  const terms = generateSearchTerms(media.title ?? ({} as Record<string, never>), media.synonyms);
+  const provider = ctx.lookupClient.provider;
+  const terms = generateSearchTerms(provider, media.title ?? ({} as Record<string, never>), media.synonyms);
 
   if (primaryTitleHint) {
     const trimmed = primaryTitleHint.trim();
-    const sanitized = sanitizeLookupDisplay(trimmed);
+    const sanitized = sanitizeLookupDisplayForProvider(provider, trimmed);
     if (sanitized) {
-      const canonical = canonicalTitleKey(sanitized);
+      const canonical = canonicalTitleKeyForProvider(provider, sanitized);
       if (canonical) {
         const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
         if (canonicalTokens.length > 0 && !isSeasonalCanonicalTokens(canonicalTokens)) {
@@ -63,7 +67,7 @@ export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, p
       results = await ctx.lookupClient.lookup(term.canonical, term.display, ctx.credentials, opts);
     }
 
-    const scored = scoreCandidates(term, results, mediaYear);
+    const scored = scoreCandidates(provider, term, results, mediaYear);
     overall = overall.concat(scored);
 
     // Mark canonical as seen once we've either looked up or confirmed a cache hit
@@ -74,15 +78,19 @@ export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, p
       scoreThreshold: ctx.limits.scoreThreshold,
     });
     if (early.stop && early.pick) {
+      const externalId = ctx.lookupClient.getExternalId(early.pick.result);
+      if (externalId === null) {
+        continue;
+      }
       const out: EvaluationOutcomeResolved = {
         status: 'resolved',
-        tvdbId: early.pick.result.tvdbId,
+        externalId,
         confidence: early.pick.score,
         successfulSynonym: early.pick.term.display,
       };
       if (import.meta.env.DEV) {
         ctx.log.debug?.(
-          `pipeline:resolved anilistId=${media.id} tvdbId=${out.tvdbId} confidence=${early.pick.score} synonym="${early.pick.term.display}"`,
+          `pipeline:resolved anilistId=${media.id} ${ctx.lookupClient.externalIdKind}Id=${out.externalId} confidence=${early.pick.score} synonym="${early.pick.term.display}"`,
         );
       }
       return out;
@@ -95,15 +103,19 @@ export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, p
   overall.sort((a, b) => b.score - a.score);
   const pick = pickBest(overall, ctx.limits.scoreThreshold);
   if (pick) {
+    const externalId = ctx.lookupClient.getExternalId(pick.result);
+    if (externalId === null) {
+      return { status: 'unresolved', reason: 'missing-external-id' };
+    }
     const out: EvaluationOutcomeResolved = {
       status: 'resolved',
-      tvdbId: pick.result.tvdbId,
+      externalId,
       confidence: pick.score,
       successfulSynonym: pick.term.display,
     };
     if (import.meta.env.DEV) {
       ctx.log.debug?.(
-        `pipeline:resolved anilistId=${media.id} tvdbId=${out.tvdbId} confidence=${pick.score} synonym="${pick.term.display}"`,
+        `pipeline:resolved anilistId=${media.id} ${ctx.lookupClient.externalIdKind}Id=${out.externalId} confidence=${pick.score} synonym="${pick.term.display}"`,
       );
     }
     return out;

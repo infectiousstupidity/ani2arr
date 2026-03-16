@@ -11,8 +11,28 @@ export type {
 } from './anilist';
 
 export type {
+  AniListSchedulerEventType,
+  AniListSchedulerRequestDebug,
+  AniListSchedulerPendingEntryDebug,
+  AniListSchedulerBucketDebug,
+  AniListSchedulerBatchMediaCountsDebug,
+  AniListSchedulerBatchDebug,
+  AniListSchedulerEventDebug,
+  AniListSchedulerLimiterDebug,
+  AniListSchedulerDebugSnapshot,
+} from './anilist-debug';
+
+export type {
+  LeanRadarrMovie,
   MediaService,
   LeanSonarrSeries,
+  RadarrAlternateTitle,
+  RadarrLookupMovie,
+  RadarrMinimumAvailability,
+  RadarrMovie,
+  RadarrQualityProfile,
+  RadarrRootFolder,
+  RadarrTag,
   SonarrAlternateTitle,
   SonarrLookupSeries,
   SonarrMonitorOption,
@@ -25,11 +45,22 @@ export type {
 } from './providers';
 
 export type {
+  ArrCredentialsPayload,
   AddRequestPayload,
+  CheckMovieStatusPayload,
+  CheckMovieStatusResponse,
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
   ExtensionOptions,
   PublicOptions,
+  ProviderPublicOptions,
+  ProviderSettings,
+  RadarrCredentialsPayload,
+  RadarrFormState,
+  RadarrSecrets,
+  RadarrSettings,
+  SonarrPublicSettings,
+  SonarrSettings,
   TitleLanguage,
   SonarrSecrets,
   SonarrCredentialsPayload,
@@ -42,7 +73,9 @@ export type {
 export { ErrorCode, type ExtensionError } from './errors';
 
 export {
+  type MappingBlockedRecord,
   type MappingOverrideRecord,
+  type MappingRejectedRecord,
   type MappingSummary,
   type MappingProvider,
   type MappingSource,

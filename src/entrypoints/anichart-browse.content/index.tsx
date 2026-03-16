@@ -35,7 +35,7 @@ const getSectionHeading = (card: Element): string =>
 
 const shouldSkipCard = (card: Element): boolean => {
   const heading = getSectionHeading(card).toLowerCase();
-  return heading.includes('movie') || heading.includes('music');
+  return heading.includes('music');
 };
 
 const parseYearFromHeading = (heading: string): number | null => {

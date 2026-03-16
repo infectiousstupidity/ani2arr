@@ -1,41 +1,39 @@
 import { API_URL, DEFAULT_RATE_LIMIT_DELAY_MS } from './constants';
 import { AniListHttpError, AniListRateLimitError } from './errors';
+import { toAniListRequestMeta } from './rate-limit';
 
 interface RequestParams<TVariables> {
   query: string;
   variables: TVariables;
 }
 
+export interface AniListResponse<TPayload> {
+  payload: TPayload;
+  meta: ReturnType<typeof toAniListRequestMeta>;
+}
+
 export async function postAniList<TResponse, TVariables extends Record<string, unknown>>(
   params: RequestParams<TVariables>,
-): Promise<TResponse> {
+): Promise<AniListResponse<TResponse>> {
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ query: params.query, variables: params.variables }),
   });
+  const meta = toAniListRequestMeta(response);
 
   if (!response.ok) {
     if (response.status === 429) {
-      const retryAfter = parseRetryAfterMs(response.headers.get('Retry-After'));
-      const delay = typeof retryAfter === 'number' ? Math.max(0, retryAfter) : DEFAULT_RATE_LIMIT_DELAY_MS;
-      throw new AniListRateLimitError(delay);
+      const retryAfterMs = meta.rateLimit.retryAfterMs ?? DEFAULT_RATE_LIMIT_DELAY_MS;
+      const pausedUntil = meta.rateLimit.resetAt ?? (meta.receivedAt + retryAfterMs);
+      throw new AniListRateLimitError(meta, pausedUntil);
     }
 
-    throw new AniListHttpError(response.status);
+    throw new AniListHttpError(response.status, undefined, meta);
   }
 
-  return (await response.json()) as TResponse;
-}
-
-function parseRetryAfterMs(header: string | null): number | null {
-  if (!header) return null;
-  const numeric = Number(header);
-  if (Number.isFinite(numeric) && numeric > 0) {
-    return numeric * 1000;
-  }
-  const parsed = Date.parse(header);
-  if (Number.isNaN(parsed)) return null;
-  const delayMs = parsed - Date.now();
-  return delayMs > 0 ? delayMs : null;
+  return {
+    payload: (await response.json()) as TResponse,
+    meta,
+  };
 }

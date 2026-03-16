@@ -5,6 +5,7 @@ import type { MappingProvider, MappingSummary } from '@/shared/types';
 import type { GetAniListMetadataOutput, GetMappingsInput, GetMappingsOutput } from '@/rpc/schemas';
 import type { MappingTableRowData } from '../components/mapping-table';
 import type { LibraryFilter, MappingSort, SourceFilterSet } from '../components/mapping-toolbar';
+import { normalizeMappingSearchQuery } from '../search-query';
 
 type UseMappingTableDataParams = {
   providerFilters: Set<MappingProvider>;
@@ -12,6 +13,7 @@ type UseMappingTableDataParams = {
   searchQuery: string;
   libraryFilter: LibraryFilter;
   sortOption: MappingSort;
+  limitOverride?: number;
 };
 
 export const useMappingTableData = ({
@@ -20,6 +22,7 @@ export const useMappingTableData = ({
   searchQuery,
   libraryFilter,
   sortOption,
+  limitOverride,
 }: UseMappingTableDataParams) => {
   const debouncedQuery = useDebounced(searchQuery, 250);
 
@@ -30,17 +33,16 @@ export const useMappingTableData = ({
   }, [providerFilters]);
 
   const mappingQueryInput = useMemo<GetMappingsInput>(() => {
-    const trimmedQuery = debouncedQuery.trim();
-    const hasQuery = trimmedQuery.length >= 2;
+    const normalizedQuery = normalizeMappingSearchQuery(debouncedQuery);
     const sourceList: NonNullable<GetMappingsInput>['sources'] =
-      sourceFilters.size > 0 ? Array.from(sourceFilters) : ['manual', 'ignored', 'auto', 'upstream'];
+      sourceFilters.size > 0 ? Array.from(sourceFilters) : ['manual', 'rejected', 'blocked', 'ignored', 'unresolved', 'auto', 'upstream'];
     return {
       providers: providersToQuery,
       sources: sourceList,
-      limit: hasQuery ? 200 : 500,
-      ...(hasQuery ? { query: trimmedQuery } : {}),
+      limit: limitOverride ?? (normalizedQuery ? 200 : 500),
+      ...(normalizedQuery ? { query: normalizedQuery } : {}),
     };
-  }, [debouncedQuery, providersToQuery, sourceFilters]);
+  }, [debouncedQuery, limitOverride, providersToQuery, sourceFilters]);
 
   const mappings = useMappings(mappingQueryInput);
   const mappingPages = useMemo<GetMappingsOutput[]>(() => mappings.data?.pages ?? [], [mappings.data?.pages]);
@@ -78,7 +80,7 @@ export const useMappingTableData = ({
         String(entry.anilistId),
         entry.externalId ? String(entry.externalId.id) : '',
         title.toLowerCase(),
-        entry.providerMeta?.title?.toLowerCase() ?? '',
+        entry.externalId ? (entry.providerMeta?.title?.toLowerCase() ?? '') : '',
         meta?.titles?.english?.toLowerCase() ?? '',
         meta?.titles?.romaji?.toLowerCase() ?? '',
         meta?.titles?.native?.toLowerCase() ?? '',
@@ -151,9 +153,12 @@ export const useMappingTableData = ({
 
     const sourcePriority: Record<MappingSummary['source'], number> = {
       manual: 0,
-      ignored: 1,
-      upstream: 2,
-      auto: 3,
+      unresolved: 1,
+      rejected: 2,
+      blocked: 3,
+      ignored: 4,
+      upstream: 5,
+      auto: 6,
     };
 
     const resolveTitle = (row: MappingTableRowData) => {
@@ -249,6 +254,7 @@ export const useMappingTableData = ({
 
   return {
     mappings,
+    filteredEntryRows,
     tableRows,
     totalAvailable,
     loadedCount,

@@ -2,22 +2,22 @@ import type { SonarrApiService } from '@/clients/sonarr.api';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { UpdateSonarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, SonarrCredentialsPayload, SonarrSeries } from '@/shared/types';
+import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
-import { resolveSonarrTagIds } from '@/rpc/handlers/sonarr-tag-resolver';
 import { buildFolderSlug, joinRootAndSlug, paths } from '@/services/helpers/path-utils';
 
 type UpdateSeriesDeps = {
   sonarrApiService: SonarrApiService;
   sonarrLibrary: SonarrLibrary;
-  ensureConfigured: () => Promise<{ credentials: SonarrCredentialsPayload; options: ExtensionOptions }>;
+  ensureSonarrConfigured: () => Promise<{ credentials: SonarrCredentialsPayload; options: ExtensionOptions }>;
 };
 
 export async function updateSonarrSeriesHandler(
   input: UpdateSonarrInput,
   deps: UpdateSeriesDeps,
 ): Promise<SonarrSeries> {
-  const { sonarrApiService, sonarrLibrary, ensureConfigured } = deps;
-  const { credentials, options } = await ensureConfigured();
+  const { sonarrApiService, sonarrLibrary, ensureSonarrConfigured } = deps;
+  const { credentials, options } = await ensureSonarrConfigured();
 
   if (!input.tvdbId || !Number.isFinite(input.tvdbId)) {
     throw createError(
@@ -49,8 +49,9 @@ export async function updateSonarrSeriesHandler(
       ? input.form.qualityProfileId
       : typeof baseSeries.qualityProfileId === 'number' && Number.isFinite(baseSeries.qualityProfileId)
         ? baseSeries.qualityProfileId
-        : typeof options.defaults.qualityProfileId === 'number' && Number.isFinite(options.defaults.qualityProfileId)
-          ? options.defaults.qualityProfileId
+        : typeof options.providers.sonarr.defaults.qualityProfileId === 'number' &&
+            Number.isFinite(options.providers.sonarr.defaults.qualityProfileId)
+          ? options.providers.sonarr.defaults.qualityProfileId
           : undefined;
 
   const tagsFromForm = Array.isArray(input.form.tags)
@@ -62,13 +63,14 @@ export async function updateSonarrSeriesHandler(
   const freeformTags = Array.isArray(input.form.freeformTags) ? input.form.freeformTags : [];
 
   const existingTags = await sonarrApiService.getTags(credentials);
-  const resolvedTags = await resolveSonarrTagIds(
-    sonarrApiService,
+  const resolvedTags = await resolveArrTagIds({
+    api: sonarrApiService,
     credentials,
-    tagsFromForm,
-    freeformTags,
+    existingIdsFromForm: tagsFromForm,
+    freeformLabelsFromForm: freeformTags,
     existingTags,
-  );
+    serviceLabel: 'Sonarr',
+  });
 
   const resolvedRoot = input.form.rootFolderPath || baseSeries.rootFolderPath || '';
   const slug = buildFolderSlug(baseSeries, input.title);
@@ -81,9 +83,10 @@ export async function updateSonarrSeriesHandler(
     nextPathNormalized !== null &&
     currentPathNormalized !== nextPathNormalized;
 
-  const monitored = (input.form.monitorOption ?? options.defaults.monitorOption) !== 'none';
+  const monitored = (input.form.monitorOption ?? options.providers.sonarr.defaults.monitorOption) !== 'none';
 
-  const resolvedSeriesType = input.form.seriesType ?? baseSeries.seriesType ?? options.defaults.seriesType;
+  const resolvedSeriesType =
+    input.form.seriesType ?? baseSeries.seriesType ?? options.providers.sonarr.defaults.seriesType;
 
   const mergedSeries: SonarrSeries = {
     ...baseSeries,
