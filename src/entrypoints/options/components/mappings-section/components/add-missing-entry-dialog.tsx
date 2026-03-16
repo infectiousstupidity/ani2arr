@@ -87,8 +87,8 @@ const AddMissingEntryDialog: React.FC<AddMissingEntryDialogProps> = ({ open, onC
   return (
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next) handleClose(); }}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 max-h-[calc(100vh-2rem)] w-[min(640px,95vw)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl bg-bg-primary p-6 shadow-2xl outline-none">
+        <Dialog.Overlay className="fixed inset-0 bg-black/60" />
+        <Dialog.Content className="a2a-settings-panel fixed left-1/2 top-1/2 max-h-[calc(100vh-2rem)] w-[min(640px,95vw)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto p-6 outline-none">
           <div className="flex items-start justify-between gap-3">
             <div>
               <Dialog.Title className="text-lg font-semibold text-text-primary">Add missing entry</Dialog.Title>
@@ -113,13 +113,13 @@ const AddMissingEntryDialog: React.FC<AddMissingEntryDialogProps> = ({ open, onC
 
           <div className="mt-6 space-y-3">
             {searchQuery.isFetching || directMedia.isFetching ? (
-              <div className="rounded-lg border border-border-primary bg-bg-secondary/60 p-4 text-sm text-text-secondary">
+              <div className="a2a-settings-panel__inset rounded-2xl p-4 text-sm text-text-secondary">
                 Searching AniList...
               </div>
             ) : null}
 
             {results.length === 0 && !(searchQuery.isFetching || directMedia.isFetching) ? (
-              <div className="rounded-lg border border-dashed border-border-primary/70 bg-bg-secondary/50 p-4 text-sm text-text-secondary">
+              <div className="rounded-2xl border border-dashed border-border-primary/75 bg-bg-primary/25 p-4 text-sm text-text-secondary">
                 {searchTerm.length >= 3 || parsedId !== null
                   ? 'No results found.'
                   : 'Enter at least 3 characters to search.'}
@@ -135,16 +135,16 @@ const AddMissingEntryDialog: React.FC<AddMissingEntryDialogProps> = ({ open, onC
               return (
                 <div
                   key={result.id}
-                  className="flex items-center gap-3 rounded-lg border border-border-primary bg-bg-secondary/60 p-3"
+                  className="a2a-settings-panel__inset flex items-center gap-3 rounded-2xl p-3"
                 >
                   {result.coverImage?.large ? (
                     <img
                       src={result.coverImage.large}
                       alt={title}
-                      className="h-16 w-12 rounded object-cover"
+                      className="h-16 w-12 rounded-xl object-cover"
                     />
                   ) : (
-                    <div className="h-16 w-12 rounded bg-bg-primary" />
+                    <div className="h-16 w-12 rounded-xl bg-bg-primary" />
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold text-text-primary">{title}</div>
