@@ -16,15 +16,16 @@ export class UnresolvedLedger {
   public record(provider: MappingProvider, anilistId: number, title?: string): boolean {
     const key = this.createKey(provider, anilistId);
     const previous = this.entries.get(key);
+    const hasMeaningfulChange = !previous || previous.title !== title;
     const next: UnresolvedLedgerEntry = {
       anilistId,
       provider,
       source: 'unresolved',
-      updatedAt: Date.now(),
+      updatedAt: hasMeaningfulChange ? Date.now() : previous.updatedAt,
       ...(title ? { title } : {}),
     };
     this.entries.set(key, next);
-    return !previous || previous.title !== next.title || previous.updatedAt !== next.updatedAt;
+    return hasMeaningfulChange;
   }
 
   public delete(provider: MappingProvider, anilistId: number): boolean {
