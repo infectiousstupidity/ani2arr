@@ -1,10 +1,16 @@
 @import "tailwindcss";
 
+html,
+body,
+#popup-root {
+  margin: 0;
+  padding: 0;
+}
+
 body {
   width: 360px;
   min-height: 420px;
-  max-height: 600px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 @theme {

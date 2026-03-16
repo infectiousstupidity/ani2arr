@@ -4,7 +4,9 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FormProvider, useForm } from 'react-hook-form';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
+import { browser } from 'wxt/browser';
 import { ChevronRight, ShieldCheck } from 'lucide-react';
+import appIcon from '@/assets/icon.png';
 import ToastProvider from '@/shared/ui/feedback/toast-provider';
 import { SaveSettingsBar } from '@/entrypoints/options/components/settings-form';
 import './style.css';
@@ -14,13 +16,26 @@ import UiSection from '@/entrypoints/options/components/ui-section';
 import AdvancedSection, { type AdvancedPanelId } from '@/entrypoints/options/components/advanced-section';
 import SonarrPage from '@/entrypoints/options/components/sonarr-section';
 import RadarrPage from '@/entrypoints/options/components/radarr-section';
-import { useExtensionOptions } from '@/shared/queries';
+import { useExtensionOptions, useRadarrConnectionStatus, useSonarrConnectionStatus } from '@/shared/queries';
+import { useDisplayedConnectionStatus } from '@/shared/hooks/common/use-displayed-connection-status';
+import {
+  getProviderConnectionStatusAppearance,
+  type ProviderConnectionStatus,
+} from '@/shared/providers/connection-status';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import { useSettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
+import {
+  AdvancedIcon,
+  MappingsIcon,
+  RadarrIcon,
+  SonarrIcon,
+  UiActionsIcon,
+} from '@/entrypoints/options/components/sidebar-icons';
 
 const queryClient = new QueryClient();
+const extensionVersion = browser.runtime.getManifest()?.version ?? 'unknown';
 
 type SectionId = 'sonarr' | 'radarr' | 'mappings' | 'ui' | 'advanced';
 
@@ -31,24 +46,30 @@ interface SectionConfig {
   path: string;
   usesManager: boolean;
   hasInternalSaveBar?: boolean;
+  group: 'services' | 'extension';
+  icon: React.ComponentType<{ className?: string }>;
 }
 
 const sections: SectionConfig[] = [
   {
     id: 'sonarr',
     label: 'Sonarr',
-    description: 'Connect Sonarr and configure default add options.',
+    description: 'Connect Sonarr, review status, and set series defaults.',
     path: '/options/sonarr',
     usesManager: true,
     hasInternalSaveBar: true,
+    group: 'services',
+    icon: SonarrIcon,
   },
   {
     id: 'radarr',
     label: 'Radarr',
-    description: 'Configure Radarr connection and defaults.',
+    description: 'Connect Radarr, review status, and set movie defaults.',
     path: '/options/radarr',
     usesManager: true,
     hasInternalSaveBar: true,
+    group: 'services',
+    icon: RadarrIcon,
   },
   {
     id: 'mappings',
@@ -56,13 +77,17 @@ const sections: SectionConfig[] = [
     description: 'Manage AniList mappings and overrides.',
     path: '/options/mappings',
     usesManager: true,
+    group: 'extension',
+    icon: MappingsIcon,
   },
   {
     id: 'ui',
-    label: 'UI & injection',
-    description: 'Control AniList overlay and injection behaviour.',
+    label: 'UI & actions',
+    description: 'Control provider-specific overlay and page actions.',
     path: '/options/ui',
     usesManager: true,
+    group: 'extension',
+    icon: UiActionsIcon,
   },
   {
     id: 'advanced',
@@ -70,7 +95,14 @@ const sections: SectionConfig[] = [
     description: 'Diagnostics, reset, and upcoming tools.',
     path: '/options/advanced',
     usesManager: true,
+    group: 'extension',
+    icon: AdvancedIcon,
   },
+];
+
+const navGroups: Array<{ title: string; group: SectionConfig['group'] }> = [
+  { title: 'Services', group: 'services' },
+  { title: 'Extension', group: 'extension' },
 ];
 
 const resolveSectionFromHash = (hash: string): SectionId => {
@@ -121,22 +153,35 @@ const extractAdvancedPanelFromHash = (hash: string): AdvancedPanelId => {
 };
 
 const NavItem: React.FC<{
-  id: SectionId;
+  section: SectionConfig;
   active: boolean;
-  label: string;
+  status?: ProviderConnectionStatus;
   onSelect: (id: SectionId) => void;
-}> = ({ id, active, label, onSelect }) => (
+}> = ({ section, active, status, onSelect }) => {
+  const Icon = section.icon;
+  const statusAppearance = status ? getProviderConnectionStatusAppearance(status) : null;
+  const showStatusDot = Boolean(statusAppearance);
+
+  return (
   <button
     type="button"
-    onClick={() => onSelect(id)}
-    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
-      active ? 'bg-bg-secondary text-text-primary' : 'text-text-secondary hover:bg-bg-secondary/60 hover:text-text-primary'
-    }`}
+    onClick={() => onSelect(section.id)}
+    className="a2a-nav-item"
+    data-active={active || undefined}
   >
-    <span>{label}</span>
-    {active ? <span className="h-2 w-2 rounded-full bg-accent-primary" aria-hidden /> : null}
+    <span className="a2a-nav-item__content">
+      <span className="a2a-nav-item__icon">
+        <Icon className="h-4.5 w-4.5" />
+      </span>
+      <span>{section.label}</span>
+      {showStatusDot ? (
+        <span className={`a2a-nav-item__status-dot ${statusAppearance?.dotClassName}`} aria-hidden />
+      ) : null}
+    </span>
+    {active ? <span className="a2a-nav-item__dot" aria-hidden /> : null}
   </button>
-);
+  );
+};
 
 type OptionsContentProps = {
   activeSection: SectionId;
@@ -157,6 +202,54 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
   openPrivacyPanel,
 }) => {
   const actions = useSettingsActions(optionsQuery.data ? { savedSettings: optionsQuery.data } : {});
+  const sonarrConfigured = Boolean(
+    optionsQuery.data?.providers.sonarr.url && optionsQuery.data?.providers.sonarr.apiKey,
+  );
+  const radarrConfigured = Boolean(
+    optionsQuery.data?.providers.radarr.url && optionsQuery.data?.providers.radarr.apiKey,
+  );
+  const sonarrCredentials = sonarrConfigured
+    ? {
+        url: String(optionsQuery.data?.providers.sonarr.url ?? '').trim(),
+        apiKey: String(optionsQuery.data?.providers.sonarr.apiKey ?? '').trim(),
+      }
+    : null;
+  const radarrCredentials = radarrConfigured
+    ? {
+        url: String(optionsQuery.data?.providers.radarr.url ?? '').trim(),
+        apiKey: String(optionsQuery.data?.providers.radarr.apiKey ?? '').trim(),
+      }
+    : null;
+  const sonarrConnectionQuery = useSonarrConnectionStatus({
+    enabled: sonarrConfigured,
+    credentials: sonarrCredentials,
+  });
+  const radarrConnectionQuery = useRadarrConnectionStatus({
+    enabled: radarrConfigured,
+    credentials: radarrCredentials,
+  });
+  const rawSonarrStatus: ProviderConnectionStatus =
+    !sonarrConfigured
+      ? 'not-configured'
+      : sonarrConnectionQuery.isFetching
+        ? 'connecting'
+        : sonarrConnectionQuery.isSuccess
+          ? 'connected'
+          : 'configured';
+  const rawRadarrStatus: ProviderConnectionStatus =
+    !radarrConfigured
+      ? 'not-configured'
+      : radarrConnectionQuery.isFetching
+        ? 'connecting'
+        : radarrConnectionQuery.isSuccess
+          ? 'connected'
+          : 'configured';
+  const sonarrStatus = useDisplayedConnectionStatus(rawSonarrStatus, {
+    fallbackStatus: sonarrConfigured ? 'configured' : 'not-configured',
+  });
+  const radarrStatus = useDisplayedConnectionStatus(rawRadarrStatus, {
+    fallbackStatus: radarrConfigured ? 'configured' : 'not-configured',
+  });
 
   const renderSection = () => {
     switch (activeSection) {
@@ -193,39 +286,74 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
 
   const activeConfig = sections.find(section => section.id === activeSection);
   const shouldShowSaveBar = Boolean(activeConfig?.usesManager && !activeConfig?.hasInternalSaveBar);
+  const showServiceTip = activeSection === 'sonarr' || activeSection === 'radarr';
+  const showPrivacyCard = activeSection !== 'advanced';
 
   return (
-    <div className="min-h-screen bg-bg-primary text-text-primary">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:flex-row md:px-8">
-        <aside className="w-full space-y-4 md:w-64 md:flex-none">
-          <div className="flex items-center gap-3">
-            <img src="/icons/128.png" alt="ani2arr logo" className="h-10 w-10 rounded-lg" />
+    <div className="a2a-options-page min-h-screen text-text-primary">
+      <div className="a2a-options-shell mx-auto flex w-full max-w-375 flex-col gap-8 px-4 py-8 md:px-6 lg:flex-row lg:px-8">
+        <aside className="w-full space-y-5 lg:sticky lg:top-8 lg:max-w-65 lg:flex-none lg:self-start">
+          <div className="flex items-center gap-4">
+            <img src={appIcon} alt="ani2arr" className="a2a-brand-logo" />
             <div>
-              <p className="text-lg font-semibold text-text-primary leading-none">ani2arr</p>
+              <div className="flex items-baseline gap-2 leading-none">
+                <p className="text-lg font-semibold text-text-primary">ani2arr</p>
+                <span className="text-xs font-medium tracking-wide text-text-secondary/80">v{extensionVersion}</span>
+              </div>
+              <p className="mt-1 text-sm text-text-secondary">Extension options</p>
             </div>
           </div>
-          <div className="h-px bg-border-primary" />
-          <nav className="space-y-2">
-            {sections.map(section => (
-              <NavItem
-                key={section.id}
-                id={section.id}
-                label={section.label}
-                active={section.id === activeSection}
-                onSelect={setActiveSection}
-              />
+          <div className="h-px bg-border-primary/70" />
+          <nav className="space-y-5">
+            {navGroups.map((group) => (
+              <div key={group.group}>
+                <div className="a2a-nav-group-label">{group.title}</div>
+                <div className="mt-2 space-y-2">
+                  {sections
+                    .filter((section) => section.group === group.group)
+                    .map((section) => (
+                      <NavItem
+                        key={section.id}
+                        section={section}
+                        active={section.id === activeSection}
+                        {...(section.id === 'sonarr'
+                          ? { status: sonarrStatus }
+                          : section.id === 'radarr'
+                            ? { status: radarrStatus }
+                            : {})}
+                        onSelect={setActiveSection}
+                      />
+                    ))}
+                </div>
+              </div>
             ))}
           </nav>
-          <div className="rounded-lg border border-border-primary bg-bg-secondary/70 p-3 text-xs text-text-secondary">
-            <p className="font-semibold text-text-primary">Tip</p>
-            <p className="mt-1">Settings are global. Per-title behaviour stays in the media modal.</p>
-          </div>
+          {showServiceTip ? (
+            <div className="a2a-sidebar-card p-4 text-xs text-text-secondary">
+              <p className="font-semibold text-text-primary">Tip</p>
+              <p className="mt-1">Settings are global. Per-title behaviour stays in the media modal.</p>
+            </div>
+          ) : null}
           {activeSection === 'mappings' ? (
-            <div className="rounded-lg border border-border-primary bg-bg-secondary/70 p-3 text-xs text-text-secondary">
+            <div className="a2a-sidebar-card p-4 text-xs text-text-secondary">
               <p className="font-semibold text-text-primary">Mappings notes</p>
               <p className="mt-1">
-                <strong className="font-semibold text-text-primary">Ignore mapping</strong> marks an AniList entry as
-                intentionally unmapped, so ani2arr will skip automatic matching until you remove the ignore.
+                <strong className="font-semibold text-text-primary">Not this match</strong> rejects one exact
+                upstream or automatic ID for now. If a different ID resolves later, ani2arr can use that new result.
+              </p>
+              <p className="mt-2">
+                <strong className="font-semibold text-text-primary">Never use this ID</strong> permanently blocks one
+                exact ID for that AniList entry until you remove the block.
+              </p>
+              <p className="mt-2">
+                <strong className="font-semibold text-text-primary">Ignore title entirely</strong> is the strongest
+                option. It stops ani2arr from using upstream or automatic matches for that AniList title until you
+                remove the ignore or save a manual mapping.
+              </p>
+              <p className="mt-2">
+                Saving a mapping for a suppressed or ignored title clears the matching suppression and turns that title into a
+                <strong className="font-semibold text-text-primary"> manual </strong>
+                mapping.
               </p>
               <p className="mt-2">
                 <strong className="font-semibold text-text-primary">Unresolved</strong> entries only appear after
@@ -234,24 +362,26 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
               </p>
             </div>
           ) : null}
-          <button
-            type="button"
-            onClick={openPrivacyPanel}
-            className="flex w-full items-start gap-3 rounded-lg border border-border-primary bg-bg-secondary/40 p-3 text-left transition-colors hover:bg-bg-secondary/70"
-          >
-            <span className="mt-0.5 inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-bg-tertiary text-accent-primary">
-              <ShieldCheck className="h-4 w-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-xs font-semibold text-text-primary">Privacy & permissions</span>
-              <span className="mt-1 block text-xs text-text-secondary">
-                See how ani2arr stores settings, uses Arr API keys, and requests host access.
+          {showPrivacyCard ? (
+            <button
+              type="button"
+              onClick={openPrivacyPanel}
+              className="a2a-sidebar-card flex w-full items-start gap-3 p-4 text-left transition-colors hover:border-accent-primary/50 hover:bg-bg-secondary/90"
+            >
+              <span className="mt-0.5 inline-flex h-9 w-9 flex-none items-center justify-center rounded-2xl bg-bg-tertiary/90 text-accent-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                <ShieldCheck className="h-4 w-4" />
               </span>
-            </span>
-            <ChevronRight className="mt-1 h-4 w-4 flex-none text-text-secondary" />
-          </button>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold text-text-primary">Privacy & permissions</span>
+                <span className="mt-1 block text-xs text-text-secondary">
+                  See how ani2arr stores settings, uses Arr API keys, and requests host access.
+                </span>
+              </span>
+              <ChevronRight className="mt-1 h-4 w-4 flex-none text-text-secondary" />
+            </button>
+          ) : null}
         </aside>
-        <main className="flex-1 space-y-4 pb-12">
+        <main className="flex-1 space-y-6 pb-12">
           {renderSection()}
           {shouldShowSaveBar ? <SaveSettingsBar actions={actions} isLoading={optionsQuery.isLoading} /> : null}
         </main>
@@ -354,3 +484,4 @@ if (rootElement) {
     </React.StrictMode>,
   );
 }
+

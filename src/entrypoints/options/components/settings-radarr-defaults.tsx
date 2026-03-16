@@ -222,8 +222,8 @@ export const RadarrDefaultsSection: React.FC<RadarrDefaultsSectionProps> = ({
   };
 
   return (
-    <section className="rounded-2xl border border-border-primary bg-bg-secondary/70 p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3 border-b border-border-primary pb-3">
+    <section className="a2a-settings-panel p-5 md:p-6">
+      <div className="a2a-settings-panel__header flex items-start justify-between gap-3 border-b pb-4">
         <div>
           <h3 className="text-base font-semibold text-text-primary">Default add options</h3>
           <p className="mt-1 text-xs text-text-secondary">

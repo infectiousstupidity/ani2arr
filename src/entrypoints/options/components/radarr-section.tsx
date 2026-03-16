@@ -12,7 +12,7 @@ const RadarrPage: React.FC<{
   <div className="space-y-6">
     <SectionHeader
       title="Radarr"
-      description="Connection settings and default add options for Radarr."
+      description="Connection details, preferred title handling, and default add options for Radarr."
     />
     <RadarrSettingsForm
       actions={actions}
@@ -23,3 +23,4 @@ const RadarrPage: React.FC<{
 );
 
 export default RadarrPage;
+
