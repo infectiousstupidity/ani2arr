@@ -1,16 +1,24 @@
 import React, { useMemo, useState } from 'react';
 import type { TitleLanguage } from '@/shared/types';
+import {
+  getProviderConnectionStatusAppearance,
+  getProviderConnectionStatusLabel,
+  type ProviderConnectionStatus,
+} from '@/shared/providers/connection-status';
 import { InputField, SelectField } from '../../../shared/ui/form/form';
 import Button from '../../../shared/ui/primitives/button';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import { logger } from '@/shared/utils/logger';
 
-const titleLanguageOptions: Array<{ value: TitleLanguage; label: string }> = [
+export const TITLE_LANGUAGE_OPTIONS: Array<{ value: TitleLanguage; label: string }> = [
   { value: 'english', label: 'English (default)' },
   { value: 'romaji', label: 'Romaji' },
   { value: 'native', label: 'Native' },
 ];
+
+export const TITLE_LANGUAGE_DESCRIPTION =
+  'ani2arr uses this to choose the preferred AniList title for display and as the primary title hint when matching and adding media.';
 
 export const ConnectionStatusBadge: React.FC<{ isConnected: boolean; isTesting: boolean }> = ({
   isConnected,
@@ -42,39 +50,14 @@ export const ConnectionStatusBadge: React.FC<{ isConnected: boolean; isTesting: 
   );
 };
 
-export type ProviderConnectionStatus = 'connected' | 'configured' | 'connecting' | 'not-configured';
-
 export const ProviderConnectionStatusBadge: React.FC<{ status: ProviderConnectionStatus }> = ({
   status,
 }) => {
-  const appearance = useMemo(() => {
-    switch (status) {
-      case 'connected':
-        return {
-          label: 'Connected',
-          className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/40',
-        };
-      case 'configured':
-        return {
-          label: 'Configured',
-          className: 'bg-sky-500/10 text-sky-300 border-sky-500/40',
-        };
-      case 'connecting':
-        return {
-          label: 'Connecting',
-          className: 'bg-amber-500/10 text-amber-300 border-amber-500/40',
-        };
-      default:
-        return {
-          label: 'Not configured',
-          className: 'bg-slate-700/50 text-text-secondary border-border-primary',
-        };
-    }
-  }, [status]);
+  const appearance = useMemo(() => getProviderConnectionStatusAppearance(status), [status]);
 
   return (
-    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold border ${appearance.className}`}>
-      {appearance.label}
+    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold border ${appearance.badgeClassName}`}>
+      {getProviderConnectionStatusLabel(status, { short: true })}
     </span>
   );
 };
@@ -112,6 +95,7 @@ export type ProviderConnectionCardProps = {
   saveState: SaveMutationState;
   isLoading?: boolean;
   children?: React.ReactNode;
+  summaryFields?: Array<{ label: string; value: React.ReactNode }>;
 };
 
 export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
@@ -137,6 +121,7 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
   saveState,
   isLoading,
   children,
+  summaryFields = [],
 }) => {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const confirm = useConfirm();
@@ -163,7 +148,7 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
   const handleDisconnect = async () => {
     const shouldDisconnect = await confirm({
       title: `Disconnect ${providerLabel}?`,
-      description: 'This will remove saved credentials and permissions.',
+      description: 'This removes host access until you reconnect. Your saved URL and API key stay filled in so you can reconnect without re-entering them.',
       confirmText: 'Disconnect',
       cancelText: 'Cancel',
     });
@@ -183,6 +168,65 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
     }
   };
 
+  if (isConnected && !isEditingConnection) {
+    const columnClassName =
+      summaryFields.length >= 3 ? 'md:grid-cols-3' : summaryFields.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1';
+
+    return (
+      <div className="space-y-4">
+        <div className={`grid gap-3 ${columnClassName}`}>
+          {summaryFields.map((field) => (
+            <div
+              key={field.label}
+              className="a2a-settings-panel__inset rounded-2xl px-4 py-4"
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                {field.label}
+              </div>
+              <div className="mt-1 text-sm text-text-primary break-all">
+                {field.value}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-border-primary pt-3 sm:flex-row sm:items-center sm:justify-end">
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button
+              onClick={() => {
+                testConnectionState.reset();
+                onStartEditing();
+              }}
+              variant="secondary"
+              size="sm"
+              type="button"
+              className="w-full sm:w-auto"
+              disabled={Boolean(isLoading)}
+            >
+              Edit details
+            </Button>
+            <Button
+              onClick={handleDisconnect}
+              variant="outline"
+              size="sm"
+              type="button"
+              className="w-full sm:w-auto text-error border-error"
+              isLoading={isDisconnecting}
+              disabled={
+                saveState.isPending ||
+                testConnectionState.isPending ||
+                Boolean(isLoading)
+              }
+              aria-busy={isDisconnecting || saveState.isPending}
+            >
+              Disconnect
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleConnectSubmit} className="space-y-4">
       <InputField
@@ -192,7 +236,7 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         placeholder={urlPlaceholder}
-        disabled={(isConnected && !isEditingConnection) || Boolean(isLoading)}
+        disabled={Boolean(isLoading)}
         description={urlDescription}
       />
 
@@ -203,65 +247,31 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
         value={apiKey}
         onChange={(e) => setApiKey(e.target.value)}
         placeholder={`${providerLabel} API key`}
-        disabled={(isConnected && !isEditingConnection) || Boolean(isLoading)}
+        disabled={Boolean(isLoading)}
       />
 
       {children}
 
       <div className="flex flex-col gap-3 border-t border-border-primary pt-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="flex w-full justify-end gap-2 sm:w-auto">
-          {isConnected && !isEditingConnection ? (
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Button
-                onClick={() => {
-                  testConnectionState.reset();
-                  onStartEditing();
-                }}
-                variant="secondary"
-                size="sm"
-                type="button"
-                className="w-full sm:w-auto"
-                disabled={Boolean(isLoading)}
-              >
-                Edit
-              </Button>
-              <Button
-                onClick={handleDisconnect}
-                variant="outline"
-                size="sm"
-                type="button"
-                className="w-full sm:w-auto text-error border-error"
-                isLoading={isDisconnecting}
-                disabled={
-                  saveState.isPending ||
-                  testConnectionState.isPending ||
-                  Boolean(isLoading)
-                }
-                aria-busy={isDisconnecting || saveState.isPending}
-              >
-                Disconnect
-              </Button>
-            </div>
-          ) : (
-            <Button
-              type="submit"
-              isLoading={testConnectionState.isPending}
-              variant="primary"
-              loadingText="Connecting..."
-              className="w-full sm:w-auto"
-              aria-busy={testConnectionState.isPending}
-              disabled={Boolean(isLoading)}
-            >
-              {getConnectButtonText()}
-            </Button>
-          )}
+          <Button
+            type="submit"
+            isLoading={testConnectionState.isPending}
+            variant="primary"
+            loadingText="Connecting..."
+            className="w-full sm:w-auto"
+            aria-busy={testConnectionState.isPending}
+            disabled={Boolean(isLoading)}
+          >
+            {getConnectButtonText()}
+          </Button>
         </div>
       </div>
     </form>
   );
 };
 
-export const SonarrTitleLanguageField: React.FC<{
+export const ProviderTitleLanguageField: React.FC<{
   titleLanguage: TitleLanguage;
   setTitleLanguage: (value: TitleLanguage) => void;
   selectPortal: HTMLElement | null;
@@ -271,8 +281,11 @@ export const SonarrTitleLanguageField: React.FC<{
     label="Preferred title language"
     value={titleLanguage}
     onValueChange={(v) => setTitleLanguage(v as TitleLanguage)}
-    options={titleLanguageOptions}
+    options={TITLE_LANGUAGE_OPTIONS}
     container={selectPortal}
     disabled={Boolean(isLoading)}
+    description={TITLE_LANGUAGE_DESCRIPTION}
   />
 );
+
+export const SonarrTitleLanguageField = ProviderTitleLanguageField;

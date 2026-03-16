@@ -61,16 +61,17 @@ export function toPublicOptions(settings: ExtensionOptions): PublicOptions {
     providers: {
       sonarr: {
         url: settings.providers.sonarr.url,
+        titleLanguage: settings.providers.sonarr.titleLanguage,
         defaults: settings.providers.sonarr.defaults,
         isConfigured: Boolean(settings.providers.sonarr.url && settings.providers.sonarr.apiKey),
       },
       radarr: {
         url: settings.providers.radarr.url,
+        titleLanguage: settings.providers.radarr.titleLanguage,
         defaults: settings.providers.radarr.defaults,
         isConfigured: Boolean(settings.providers.radarr.url && settings.providers.radarr.apiKey),
       },
     },
-    titleLanguage: settings.titleLanguage,
     ui: settings.ui,
     debugLogging: settings.debugLogging,
   };
@@ -97,7 +98,6 @@ const getRawOptions = async () => {
         apiKey: radarr.apiKey,
       },
     },
-    titleLanguage: pub.titleLanguage,
     ui: pub.ui,
     debugLogging: pub.debugLogging,
   };

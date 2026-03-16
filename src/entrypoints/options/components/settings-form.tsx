@@ -4,7 +4,9 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
 
-import { useSonarrMetadata, queryKeys } from '@/shared/queries';
+import { useSonarrConnectionStatus, useSonarrMetadata, queryKeys } from '@/shared/queries';
+import { useDisplayedConnectionStatus } from '@/shared/hooks/common/use-displayed-connection-status';
+import type { ProviderConnectionStatus } from '@/shared/providers/connection-status';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import {
@@ -82,7 +84,7 @@ function SettingsFormInner({
   // --- Form Watchers ---
   const sonarrUrl = useWatch({ control: methods.control, name: 'providers.sonarr.url' }) ?? '';
   const sonarrApiKey = useWatch({ control: methods.control, name: 'providers.sonarr.apiKey' }) ?? '';
-  const titleLanguage = useWatch({ control: methods.control, name: 'titleLanguage' }) ?? 'english';
+  const titleLanguage = useWatch({ control: methods.control, name: 'providers.sonarr.titleLanguage' }) ?? 'english';
 
   // --- Portal ---
   const selectPortal = useSelectPortal();
@@ -144,18 +146,10 @@ function SettingsFormInner({
     [persistedCredentials],
   );
 
-  const isConnected = Boolean(
+  const hasConfiguredConnection = Boolean(
     hasSavedCredentials ||
       (credentialScope && confirmedScope === credentialScope)
   );
-  const connectionStatus =
-    actions.sonarrTestConnectionState.isPending
-      ? 'connecting'
-      : credentialScope && confirmedScope === credentialScope
-        ? 'connected'
-        : hasSavedCredentials
-          ? 'configured'
-          : 'not-configured';
 
   // Reset confirmed scope if credentials change
   useEffect(() => {
@@ -171,10 +165,10 @@ function SettingsFormInner({
   // Focus URL input on load if not connected
   useEffect(() => {
     if (isLoading) return;
-    if (isConnected) return;
+    if (hasConfiguredConnection) return;
     if (sonarrUrl.trim().length > 0) return;
     sonarrUrlInputRef.current?.focus();
-  }, [isConnected, isLoading, sonarrUrl]);
+  }, [hasConfiguredConnection, isLoading, sonarrUrl]);
 
   // --- Metadata & Defaults ---
   const useConfirmedDraftCredentials = Boolean(formCredentials && confirmedScope === credentialScope);
@@ -190,9 +184,29 @@ function SettingsFormInner({
       ? persistedCredentials
       : null;
 
+  const liveConnectionQuery = useSonarrConnectionStatus({
+    enabled: metadataEnabled,
+    credentials: metadataCredentials,
+  });
+
   const metadataQuery = useSonarrMetadata({
     enabled: metadataEnabled,
     credentials: metadataCredentials,
+  });
+
+  const isConnectionChecking =
+    actions.sonarrTestConnectionState.isPending ||
+    (metadataEnabled && liveConnectionQuery.isFetching);
+  const rawConnectionStatus: ProviderConnectionStatus =
+    isConnectionChecking
+      ? 'connecting'
+      : liveConnectionQuery.isSuccess
+        ? 'connected'
+        : hasSavedCredentials
+          ? 'configured'
+          : 'not-configured';
+  const connectionStatus = useDisplayedConnectionStatus(rawConnectionStatus, {
+    fallbackStatus: hasSavedCredentials ? 'configured' : 'not-configured',
   });
 
   // Auto-select defaults when metadata first loads
@@ -246,7 +260,7 @@ function SettingsFormInner({
 
   const setTitleLanguage = useCallback(
     (value: typeof titleLanguage) => {
-      methods.setValue('titleLanguage', value, { shouldDirty: true });
+      methods.setValue('providers.sonarr.titleLanguage', value, { shouldDirty: true });
     },
     [methods]
   );
@@ -267,16 +281,20 @@ function SettingsFormInner({
       setConfirmedScope(credentialScope);
       
       try {
-        await metadataQuery.refetch();
+        await Promise.all([
+          liveConnectionQuery.refetch(),
+          metadataQuery.refetch(),
+        ]);
       } catch {
         queryClient.invalidateQueries({ queryKey: queryKeys.sonarrMetadataRoot() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.sonarrConnectionRoot() });
       }
       return true;
     } catch (error) {
       logger.error('Connection test failed', error);
       return false;
     }
-  }, [actions.sonarrTestConnectionState, credentialScope, formCredentials, queryClient, metadataQuery]);
+  }, [actions.sonarrTestConnectionState, credentialScope, formCredentials, liveConnectionQuery, queryClient, metadataQuery]);
 
   const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({
@@ -286,21 +304,8 @@ function SettingsFormInner({
 
   const handleDisconnect = useCallback(async () => {
     const currentUrl = sonarrUrl?.trim();
-    const current = methods.getValues();
-    const cleared: Settings = {
-      ...current,
-      providers: {
-        ...current.providers,
-        sonarr: {
-          ...current.providers.sonarr,
-          url: '',
-          apiKey: '',
-        },
-      },
-    };
-
-    await actions.saveState.mutateAsync(cleared);
-    methods.reset(cleared);
+    setConfirmedScope(null);
+    setForceEditing(true);
     actions.sonarrTestConnectionState.reset();
 
     if (currentUrl) {
@@ -316,11 +321,10 @@ function SettingsFormInner({
       }
     }
 
-    queryClient.invalidateQueries({ queryKey: queryKeys.sonarrMetadataRoot() });
+    queryClient.removeQueries({ queryKey: queryKeys.sonarrMetadataRoot() });
+    queryClient.removeQueries({ queryKey: queryKeys.sonarrConnectionRoot() });
   }, [
-    actions.saveState,
     actions.sonarrTestConnectionState,
-    methods,
     queryClient,
     sonarrUrl,
   ]);
@@ -334,12 +338,12 @@ function SettingsFormInner({
   return (
     <>
       <div className="space-y-6">
-        <section className="rounded-2xl border border-border-primary bg-bg-secondary/80 p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3 border-b border-border-primary pb-3">
+        <section className="a2a-settings-panel p-5 md:p-6">
+          <div className="a2a-settings-panel__header flex items-start justify-between gap-3 border-b pb-4">
             <div>
               <h3 className="text-base font-semibold text-text-primary">Connection</h3>
               <p className="mt-1 text-xs text-text-secondary">
-                Sonarr URL, API key, and preferred title language.
+                Connect Sonarr, then set the defaults ani2arr reuses for series actions.
               </p>
             </div>
             <ProviderConnectionStatusBadge status={connectionStatus} />
@@ -367,7 +371,7 @@ function SettingsFormInner({
               urlDescription="Only the exact origin you enter is requested at runtime. Saved credentials stay in browser local storage."
               urlInputRef={sonarrUrlInputRef}
               isEditingConnection={isEditingConnection}
-              isConnected={isConnected}
+              isConnected={hasConfiguredConnection}
               url={String(sonarrUrl)}
               apiKey={String(sonarrApiKey)}
               onStartEditing={() => setForceEditing(true)}
@@ -379,6 +383,18 @@ function SettingsFormInner({
               testConnectionState={actions.sonarrTestConnectionState}
               saveState={actions.saveState}
               isLoading={Boolean(isLoading)}
+              summaryFields={[
+                { label: 'Sonarr URL', value: normalizedUrl || 'Not configured' },
+                {
+                  label: 'Preferred title language',
+                  value:
+                    titleLanguage === 'romaji'
+                      ? 'Romaji'
+                      : titleLanguage === 'native'
+                        ? 'Native'
+                        : 'English',
+                },
+              ]}
             >
               <SonarrTitleLanguageField
                 titleLanguage={titleLanguage}

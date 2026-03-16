@@ -13,10 +13,28 @@ import type { MappingExternalId } from './mapping';
 
 export type BadgeVisibility = 'always' | 'hover' | 'hidden';
 
+export interface ProviderBrowseCardUiOptions {
+  enabled: boolean;
+  visibility: BadgeVisibility;
+}
+
+export interface ProviderAnimePageUiOptions {
+  enabled: boolean;
+}
+
+export interface ProviderUiOptions {
+  sonarr: ProviderBrowseCardUiOptions;
+  radarr: ProviderBrowseCardUiOptions;
+}
+
+export interface ProviderAnimePageOptions {
+  sonarr: ProviderAnimePageUiOptions;
+  radarr: ProviderAnimePageUiOptions;
+}
+
 export interface UiOptions {
-  browseOverlayEnabled: boolean;
-  badgeVisibility: BadgeVisibility;
-  headerInjectionEnabled: boolean;
+  browseCards: ProviderUiOptions;
+  animePages: ProviderAnimePageOptions;
   schedulerDebugOverlayEnabled: boolean;
 }
 
@@ -47,12 +65,14 @@ export type TitleLanguage = 'english' | 'romaji' | 'native';
 export interface SonarrSettings {
   url: string;
   apiKey: string;
+  titleLanguage: TitleLanguage;
   defaults: SonarrFormState;
 }
 
 export interface RadarrSettings {
   url: string;
   apiKey: string;
+  titleLanguage: TitleLanguage;
   defaults: RadarrFormState;
 }
 
@@ -63,19 +83,20 @@ export interface ProviderSettings {
 
 export interface ExtensionOptions {
   providers: ProviderSettings;
-  titleLanguage: TitleLanguage;
   ui: UiOptions;
   debugLogging: boolean;
 }
 
 export interface SonarrPublicSettings {
   url: string;
+  titleLanguage: TitleLanguage;
   defaults: SonarrFormState;
   isConfigured: boolean;
 }
 
 export interface RadarrPublicSettings {
   url: string;
+  titleLanguage: TitleLanguage;
   defaults: RadarrFormState;
   isConfigured: boolean;
 }
@@ -91,7 +112,6 @@ export interface ProviderPublicOptions {
  */
 export interface PublicOptions {
   providers: ProviderPublicOptions;
-  titleLanguage: TitleLanguage;
   ui: UiOptions;
   debugLogging: boolean;
 }

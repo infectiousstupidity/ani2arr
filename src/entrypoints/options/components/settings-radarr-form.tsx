@@ -2,12 +2,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
-import { useRadarrMetadata, queryKeys } from '@/shared/queries';
+import { useRadarrConnectionStatus, useRadarrMetadata, queryKeys } from '@/shared/queries';
+import { useDisplayedConnectionStatus } from '@/shared/hooks/common/use-displayed-connection-status';
+import type { ProviderConnectionStatus } from '@/shared/providers/connection-status';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import { buildRadarrPermissionPattern, requestRadarrPermission, validateApiKey, validateUrl } from '@/shared/radarr/validation';
 import { logger } from '@/shared/utils/logger';
-import { ProviderConnectionCard, ProviderConnectionStatusBadge } from './settings-connection-card';
+import {
+  ProviderConnectionCard,
+  ProviderConnectionStatusBadge,
+  ProviderTitleLanguageField,
+} from './settings-connection-card';
 import { RadarrDefaultsSection } from './settings-radarr-defaults';
 import { SaveSettingsBar } from './settings-form';
 import { useSelectPortal } from './use-select-portal';
@@ -28,6 +34,7 @@ function RadarrSettingsFormInner({
 
   const radarrUrl = useWatch({ control: methods.control, name: 'providers.radarr.url' }) ?? '';
   const radarrApiKey = useWatch({ control: methods.control, name: 'providers.radarr.apiKey' }) ?? '';
+  const titleLanguage = useWatch({ control: methods.control, name: 'providers.radarr.titleLanguage' }) ?? 'english';
 
   const selectPortal = useSelectPortal();
 
@@ -80,15 +87,9 @@ function RadarrSettingsFormInner({
     [persistedCredentials],
   );
 
-  const isConnected = Boolean(hasSavedCredentials || (credentialScope && confirmedScope === credentialScope));
-  const connectionStatus =
-    actions.radarrTestConnectionState.isPending
-      ? 'connecting'
-      : credentialScope && confirmedScope === credentialScope
-        ? 'connected'
-        : hasSavedCredentials
-          ? 'configured'
-          : 'not-configured';
+  const hasConfiguredConnection = Boolean(
+    hasSavedCredentials || (credentialScope && confirmedScope === credentialScope),
+  );
 
   useEffect(() => {
     if (!credentialScope) {
@@ -102,10 +103,10 @@ function RadarrSettingsFormInner({
 
   useEffect(() => {
     if (isLoading) return;
-    if (isConnected) return;
+    if (hasConfiguredConnection) return;
     if (radarrUrl.trim().length > 0) return;
     radarrUrlInputRef.current?.focus();
-  }, [isConnected, isLoading, radarrUrl]);
+  }, [hasConfiguredConnection, isLoading, radarrUrl]);
 
   const useConfirmedDraftCredentials = Boolean(formCredentials && confirmedScope === credentialScope);
   const usePersistedCredentials = Boolean(
@@ -119,9 +120,29 @@ function RadarrSettingsFormInner({
       ? persistedCredentials
       : null;
 
+  const liveConnectionQuery = useRadarrConnectionStatus({
+    enabled: metadataEnabled,
+    credentials: metadataCredentials,
+  });
+
   const metadataQuery = useRadarrMetadata({
     enabled: metadataEnabled,
     credentials: metadataCredentials,
+  });
+
+  const isConnectionChecking =
+    actions.radarrTestConnectionState.isPending ||
+    (metadataEnabled && liveConnectionQuery.isFetching);
+  const rawConnectionStatus: ProviderConnectionStatus =
+    isConnectionChecking
+      ? 'connecting'
+      : liveConnectionQuery.isSuccess
+        ? 'connected'
+        : hasSavedCredentials
+          ? 'configured'
+          : 'not-configured';
+  const connectionStatus = useDisplayedConnectionStatus(rawConnectionStatus, {
+    fallbackStatus: hasSavedCredentials ? 'configured' : 'not-configured',
   });
 
   useEffect(() => {
@@ -170,6 +191,13 @@ function RadarrSettingsFormInner({
     [actions.radarrTestConnectionState, methods],
   );
 
+  const setTitleLanguage = useCallback(
+    (value: typeof titleLanguage) => {
+      methods.setValue('providers.radarr.titleLanguage', value, { shouldDirty: true });
+    },
+    [methods],
+  );
+
   const handleTestConnection = useCallback(async (): Promise<boolean> => {
     if (!formCredentials || !credentialScope) {
       return false;
@@ -186,16 +214,20 @@ function RadarrSettingsFormInner({
       setConfirmedScope(credentialScope);
 
       try {
-        await metadataQuery.refetch();
+        await Promise.all([
+          liveConnectionQuery.refetch(),
+          metadataQuery.refetch(),
+        ]);
       } catch {
         queryClient.invalidateQueries({ queryKey: queryKeys.radarrMetadataRoot() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.radarrConnectionRoot() });
       }
       return true;
     } catch (error) {
       logger.error('Radarr connection test failed', error);
       return false;
     }
-  }, [actions.radarrTestConnectionState, credentialScope, formCredentials, metadataQuery, queryClient]);
+  }, [actions.radarrTestConnectionState, credentialScope, formCredentials, liveConnectionQuery, metadataQuery, queryClient]);
 
   const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.radarrMetadataRoot() });
@@ -203,21 +235,8 @@ function RadarrSettingsFormInner({
 
   const handleDisconnect = useCallback(async () => {
     const currentUrl = radarrUrl?.trim();
-    const current = methods.getValues();
-    const cleared: Settings = {
-      ...current,
-      providers: {
-        ...current.providers,
-        radarr: {
-          ...current.providers.radarr,
-          url: '',
-          apiKey: '',
-        },
-      },
-    };
-
-    await actions.saveState.mutateAsync(cleared);
-    methods.reset(cleared);
+    setConfirmedScope(null);
+    setForceEditing(true);
     actions.radarrTestConnectionState.reset();
 
     if (currentUrl) {
@@ -233,11 +252,10 @@ function RadarrSettingsFormInner({
       }
     }
 
-    queryClient.invalidateQueries({ queryKey: queryKeys.radarrMetadataRoot() });
+    queryClient.removeQueries({ queryKey: queryKeys.radarrMetadataRoot() });
+    queryClient.removeQueries({ queryKey: queryKeys.radarrConnectionRoot() });
   }, [
     actions.radarrTestConnectionState,
-    actions.saveState,
-    methods,
     queryClient,
     radarrUrl,
   ]);
@@ -248,12 +266,12 @@ function RadarrSettingsFormInner({
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-border-primary bg-bg-secondary/80 p-5 shadow-sm">
-        <div className="flex items-start justify-between gap-3 border-b border-border-primary pb-3">
+      <section className="a2a-settings-panel p-5 md:p-6">
+        <div className="a2a-settings-panel__header flex items-start justify-between gap-3 border-b pb-4">
           <div>
             <h3 className="text-base font-semibold text-text-primary">Connection</h3>
             <p className="mt-1 text-xs text-text-secondary">
-              Radarr URL and API key for movie lookups, adds, and updates.
+              Connect Radarr, then set the defaults ani2arr reuses for movie actions.
             </p>
           </div>
           <ProviderConnectionStatusBadge status={connectionStatus} />
@@ -280,7 +298,7 @@ function RadarrSettingsFormInner({
             urlDescription="Only the exact origin you enter is requested at runtime. Saved credentials stay in browser local storage."
             urlInputRef={radarrUrlInputRef}
             isEditingConnection={isEditingConnection}
-            isConnected={isConnected}
+            isConnected={hasConfiguredConnection}
             url={String(radarrUrl)}
             apiKey={String(radarrApiKey)}
             onStartEditing={() => setForceEditing(true)}
@@ -292,7 +310,26 @@ function RadarrSettingsFormInner({
             testConnectionState={actions.radarrTestConnectionState}
             saveState={actions.saveState}
             isLoading={Boolean(isLoading)}
-          />
+            summaryFields={[
+              { label: 'Radarr URL', value: normalizedUrl || 'Not configured' },
+              {
+                label: 'Preferred title language',
+                value:
+                  titleLanguage === 'romaji'
+                    ? 'Romaji'
+                    : titleLanguage === 'native'
+                      ? 'Native'
+                      : 'English',
+              },
+            ]}
+          >
+            <ProviderTitleLanguageField
+              titleLanguage={titleLanguage}
+              setTitleLanguage={setTitleLanguage}
+              selectPortal={selectPortal}
+              isLoading={Boolean(isLoading)}
+            />
+          </ProviderConnectionCard>
         </div>
       </section>
 
@@ -314,3 +351,4 @@ function RadarrSettingsForm(props: RadarrSettingsFormProps): React.JSX.Element {
 }
 
 export default React.memo(RadarrSettingsForm);
+

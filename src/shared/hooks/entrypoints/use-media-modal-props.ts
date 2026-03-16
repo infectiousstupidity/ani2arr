@@ -54,7 +54,7 @@ export interface UseMediaModalPropsInput {
 export interface UseMediaModalPropsResult {
   title: string;
   alternateTitles: Array<{ label: string; value: string }>;
-  titleLanguage: NonNullable<ExtensionOptions['titleLanguage']>;
+  titleLanguage: NonNullable<ExtensionOptions['providers']['sonarr']['titleLanguage']>;
   service: MediaService;
   mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'>;
   sonarrPanelProps: Omit<SonarrPanelProps, 'controller'> | null;
@@ -233,8 +233,10 @@ export function useMediaModalProps(
   const year: number | null =
     apiMedia?.seasonYear ?? apiMedia?.startDate?.year ?? resolvedMetadata?.startYear ?? null;
   const status: MediaStatus | null = apiMedia?.status ?? null;
-  const preferredTitleLanguage: NonNullable<ExtensionOptions['titleLanguage']> =
-    options?.titleLanguage ?? 'english';
+  const preferredTitleLanguage: NonNullable<ExtensionOptions['providers']['sonarr']['titleLanguage']> =
+    service === 'radarr'
+      ? (options?.providers.radarr.titleLanguage ?? 'english')
+      : (options?.providers.sonarr.titleLanguage ?? 'english');
 
   const pickTitle = (...values: Array<string | null | undefined>): string | undefined => {
     for (const value of values) {
