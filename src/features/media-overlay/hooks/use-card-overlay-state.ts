@@ -126,7 +126,6 @@ export const useCardOverlayState = ({
     overlayState === 'in-library' ||
     overlayState === 'resolving' ||
     overlayState === 'adding' ||
-    overlayState === 'disabled' ||
     (overlayState === 'addable' && !defaultForm);
 
   const quickAddTitle = (() => {
@@ -149,7 +148,9 @@ export const useCardOverlayState = ({
   })();
 
   const quickAddAriaLabel =
-    overlayState === 'error' && mappingUnavailable
+    overlayState === 'disabled'
+      ? `Open ${providerLabel} settings`
+      : overlayState === 'error' && mappingUnavailable
       ? `Find ${providerLabel} match manually`
       : overlayState === 'error'
         ? `Retry adding to ${providerLabel}`

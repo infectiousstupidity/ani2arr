@@ -109,7 +109,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
   );
 
   return (
-    <div className={`grid ${externalHref ? 'grid-cols-[1fr_auto] gap-[15px]' : 'grid-cols-1 gap-0'} items-start w-full`}>
+    <div className={`grid ${externalHref ? 'grid-cols-[1fr_auto] gap-3.75' : 'grid-cols-1 gap-0'} items-start w-full`}>
       <Group>
         <Button
           data-testid="a2a-main-action-button"
@@ -119,7 +119,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
           disabled={disableMainAction}
           {...(mainButtonTooltip ? { tooltip: mainButtonTooltip } : {})}
           portalContainer={portalContainer}
-          className="flex-1 w-[calc(100%-34px)] rounded-none h-[35px] text-[14px] text-center px-0 pl-2.5"
+          className="flex-1 w-[calc(100%-34px)] rounded-none h-8.75 text-[14px] text-center px-0 pl-2.5"
           loadingText={getButtonText()}
         >
           {mainButtonText}
@@ -133,7 +133,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
               size="icon"
               variant="primary"
               portalContainer={portalContainer}
-              className="relative rounded-none h-[35px] w-[34px] after:content-[''] after:absolute after:inset-0 after:bg-[rgba(255,255,255,0.14)] after:pointer-events-none"
+              className="relative rounded-none h-8.75 w-8.5 after:content-[''] after:absolute after:inset-0 after:bg-[rgba(255,255,255,0.14)] after:pointer-events-none"
               aria-label="Actions"
             >
               <ChevronDown className="h-4 w-4" />
@@ -143,7 +143,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
           <DropdownItem onSelect={onOpenModal} disabled={externalId === null}>
             {serviceLabel} options
           </DropdownItem>
-          <DropdownItem onSelect={() => { log.debug('Action: Fix mapping clicked'); onOpenMappingFix(!hasMapping); }}>
+          <DropdownItem onSelect={() => { log.debug('Action: Fix mapping clicked'); onOpenMappingFix(!hasMapping); }} disabled={!isServiceConfigured}>
             {manualMappingLabel}
           </DropdownItem>
         </Dropdown>
@@ -156,7 +156,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
           variant="primary"
           tooltip={`Open in ${serviceLabel}`}
           portalContainer={portalContainer}
-          className="h-[35px] w-[35px] rounded-[3px]"
+          className="h-8.75 w-8.75 rounded-[3px]"
           onClick={() => {
             if (inService && librarySlug) {
               log.debug(`Redirecting to ${serviceLabel} library page for slug: ${librarySlug}`);

@@ -211,7 +211,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   );
 
   const actionFixMapping = (
-    onOpenMappingFix ? (
+    onOpenMappingFix && isConfigured ? (
       <TooltipWrapper content={manualMappingLabel} side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
         <button type="button" className="a2a-card-overlay__action a2a-card-overlay__action--fix" aria-label={manualMappingAriaLabel} onClick={openMappingFix} onMouseDown={swallowEvent}>
           <Wrench aria-hidden="true" className="h-4 w-4" />
@@ -291,7 +291,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
       </div>
 
       {/* Vertical action stack */}
-      {(showAdvancedButton || showExternalButton || onOpenMappingFix) && (
+      {(showAdvancedButton || showExternalButton || actionFixMapping) && (
         <div
           className="a2a-card-overlay__stack"
           data-open={stackOpen || undefined}

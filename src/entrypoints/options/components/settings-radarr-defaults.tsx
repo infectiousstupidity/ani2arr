@@ -9,6 +9,7 @@ import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import Button from '@/shared/ui/primitives/button';
 import { RootFolderField } from '@/shared/ui/sonarr-form/components/root-folder-field';
 import { TagsField } from '@/shared/ui/sonarr-form/components/tags-field';
+import { SaveSettingsBar } from './settings-save-bar';
 
 const MINIMUM_AVAILABILITY_OPTIONS: Array<{
   value: RadarrMinimumAvailability;
@@ -246,6 +247,11 @@ export const RadarrDefaultsSection: React.FC<RadarrDefaultsSectionProps> = ({
       </div>
 
       <div className="mt-4">{renderContent()}</div>
+
+      <SaveSettingsBar
+        actions={actions}
+        className="mt-6 border-t border-border-primary pt-4"
+      />
     </section>
   );
 };

@@ -17,6 +17,7 @@ import {
 } from '@/shared/sonarr/validation';
 import Button from '../../../shared/ui/primitives/button';
 import { logger } from '@/shared/utils/logger';
+import { useToast } from '@/shared/ui/feedback/toast-provider';
 
 import {
   ProviderConnectionCard,
@@ -26,6 +27,7 @@ import {
 import { SonarrDefaultsSection } from './settings-sonarr-defaults';
 import type { SonarrFormLayout } from '../../../shared/ui/sonarr-form';
 import { useSelectPortal } from './use-select-portal';
+import { SaveSettingsBar } from './settings-save-bar';
 
 export interface SettingsFormProps {
   actions: SettingsActions;
@@ -33,44 +35,6 @@ export interface SettingsFormProps {
   sonarrFormLayout?: SonarrFormLayout;
   isLoading?: boolean;
 }
-
-export const SaveSettingsBar: React.FC<{
-  actions: SettingsActions;
-  isLoading?: boolean;
-}> = ({ actions, isLoading }) => {
-  const { formState } = useFormContext<Settings>();
-
-  return (
-    <>
-      <div className="flex justify-center">
-        <Button
-          onClick={() => {
-            void actions.handleSave();
-          }}
-          disabled={
-            !formState.isDirty ||
-            actions.sonarrTestConnectionState.isPending ||
-            actions.radarrTestConnectionState.isPending ||
-            isLoading
-          }
-          isLoading={actions.saveState.isPending}
-          aria-busy={actions.saveState.isPending}
-        >
-          Save settings
-        </Button>
-      </div>
-      {actions.saveError ? (
-        <div
-          className="text-center text-sm text-error"
-          role="alert"
-          aria-live="polite"
-        >
-          {actions.saveError}
-        </div>
-      ) : null}
-    </>
-  );
-};
 
 function SettingsFormInner({
   actions,
@@ -80,6 +44,7 @@ function SettingsFormInner({
 }: SettingsFormProps): React.JSX.Element {
   const methods = useFormContext<SettingsFormValues>();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   // --- Form Watchers ---
   const sonarrUrl = useWatch({ control: methods.control, name: 'providers.sonarr.url' }) ?? '';
@@ -278,6 +243,11 @@ function SettingsFormInner({
 
     try {
       await actions.sonarrTestConnectionState.mutateAsync(formCredentials);
+      const saved = await actions.saveProviderConnection('sonarr');
+      if (!saved) {
+        return false;
+      }
+
       setConfirmedScope(credentialScope);
       
       try {
@@ -289,12 +259,18 @@ function SettingsFormInner({
         queryClient.invalidateQueries({ queryKey: queryKeys.sonarrMetadataRoot() });
         queryClient.invalidateQueries({ queryKey: queryKeys.sonarrConnectionRoot() });
       }
+
+      toast.showToast({
+        title: 'Sonarr connected',
+        description: 'Connection details were saved. Save settings to keep any default add option changes.',
+        variant: 'success',
+      });
       return true;
     } catch (error) {
       logger.error('Connection test failed', error);
       return false;
     }
-  }, [actions.sonarrTestConnectionState, credentialScope, formCredentials, liveConnectionQuery, queryClient, metadataQuery]);
+  }, [actions, credentialScope, formCredentials, liveConnectionQuery, metadataQuery, queryClient, toast]);
 
   const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({
@@ -414,8 +390,6 @@ function SettingsFormInner({
           onRefresh={handleRefresh}
           layout={sonarrFormLayout}
         />
-
-        <SaveSettingsBar actions={actions} isLoading={Boolean(isLoading)} />
       </div>
     </>
   );

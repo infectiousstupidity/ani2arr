@@ -9,13 +9,13 @@ import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import { buildRadarrPermissionPattern, requestRadarrPermission, validateApiKey, validateUrl } from '@/shared/radarr/validation';
 import { logger } from '@/shared/utils/logger';
+import { useToast } from '@/shared/ui/feedback/toast-provider';
 import {
   ProviderConnectionCard,
   ProviderConnectionStatusBadge,
   ProviderTitleLanguageField,
 } from './settings-connection-card';
 import { RadarrDefaultsSection } from './settings-radarr-defaults';
-import { SaveSettingsBar } from './settings-form';
 import { useSelectPortal } from './use-select-portal';
 
 export interface RadarrSettingsFormProps {
@@ -31,6 +31,7 @@ function RadarrSettingsFormInner({
 }: RadarrSettingsFormProps): React.JSX.Element {
   const methods = useFormContext<SettingsFormValues>();
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const radarrUrl = useWatch({ control: methods.control, name: 'providers.radarr.url' }) ?? '';
   const radarrApiKey = useWatch({ control: methods.control, name: 'providers.radarr.apiKey' }) ?? '';
@@ -211,6 +212,11 @@ function RadarrSettingsFormInner({
 
     try {
       await actions.radarrTestConnectionState.mutateAsync(formCredentials);
+      const saved = await actions.saveProviderConnection('radarr');
+      if (!saved) {
+        return false;
+      }
+
       setConfirmedScope(credentialScope);
 
       try {
@@ -222,12 +228,18 @@ function RadarrSettingsFormInner({
         queryClient.invalidateQueries({ queryKey: queryKeys.radarrMetadataRoot() });
         queryClient.invalidateQueries({ queryKey: queryKeys.radarrConnectionRoot() });
       }
+
+      toast.showToast({
+        title: 'Radarr connected',
+        description: 'Connection details were saved. Save settings to keep any default add option changes.',
+        variant: 'success',
+      });
       return true;
     } catch (error) {
       logger.error('Radarr connection test failed', error);
       return false;
     }
-  }, [actions.radarrTestConnectionState, credentialScope, formCredentials, liveConnectionQuery, metadataQuery, queryClient]);
+  }, [actions, credentialScope, formCredentials, liveConnectionQuery, metadataQuery, queryClient, toast]);
 
   const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.radarrMetadataRoot() });
@@ -340,8 +352,6 @@ function RadarrSettingsFormInner({
         metadataQuery={metadataQuery}
         onRefresh={handleRefresh}
       />
-
-      <SaveSettingsBar actions={actions} isLoading={Boolean(isLoading)} />
     </div>
   );
 }

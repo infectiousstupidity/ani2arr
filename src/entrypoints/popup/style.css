@@ -10,7 +10,7 @@ body,
 body {
   width: 360px;
   min-height: 420px;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 @theme {
