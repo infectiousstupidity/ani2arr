@@ -8,9 +8,9 @@ import type {
   RadarrTag,
 } from '@/shared/types';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
+import { RootFolderField } from '@/ui/provider-forms/fields/root-folder-field';
+import { TagsField } from '@/ui/provider-forms/fields/tags-field';
 import { cn } from '@/shared/utils/cn';
-import { RootFolderField } from '@/shared/ui/sonarr-form/components/root-folder-field';
-import { TagsField } from '@/shared/ui/sonarr-form/components/tags-field';
 
 export type RadarrFormLayout = 'stacked' | 'grid';
 

@@ -14,8 +14,8 @@ import Button from '@/shared/ui/primitives/button';
 import {
   MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
-} from '@/shared/sonarr/constants';
-import type { SonarrFormLayout } from '@/shared/ui/sonarr-form';
+} from '@/shared/providers/sonarr/constants';
+import type { SonarrFormLayout } from '@/ui/provider-forms/sonarr';
 import { SaveSettingsBar } from './settings-save-bar';
 
 type SonarrDefaultsSectionProps = {

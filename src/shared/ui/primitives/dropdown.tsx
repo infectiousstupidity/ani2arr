@@ -33,7 +33,7 @@ export const DropdownItem: React.FC<{
   children: React.ReactNode;
 }> = ({ onSelect, disabled, children }) => (
   <DropdownMenu.Item
-    className={`text-[14px] leading-[30px] rounded-sm flex items-center px-[17px] select-none ${
+    className={`text-[14px] leading-7.5 rounded-sm flex items-center px-4.25 select-none ${
       disabled
         ? 'opacity-50 cursor-not-allowed text-text-secondary'
         : 'text-text-secondary cursor-pointer hover:bg-accent-primary hover:text-white'

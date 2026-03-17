@@ -2,8 +2,8 @@ import React from 'react';
 import type { BrowseContentAppProps } from '@/features/media-overlay';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
-import { useMediaModalProps } from '@/shared/hooks/entrypoints/use-media-modal-props';
-import { AniListSchedulerDebugOverlay } from './anilist-scheduler-debug-overlay';
+import { useMediaModalProps } from '@/features/media-overlay/hooks/use-media-modal-props';
+import { AniListSchedulerDebugOverlay } from '@/debug/anilist-scheduler-debug-overlay';
 
 export interface BrowseRootProps {
   BrowseContentApp: React.FC<BrowseContentAppProps>;

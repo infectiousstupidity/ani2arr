@@ -14,7 +14,7 @@ import {
   getProviderConnectionStatusAppearance,
   getProviderConnectionStatusLabel,
   type ProviderConnectionStatus,
-} from '@/shared/providers/connection-status';
+} from '@/shared/providers/common/connection-status';
 import type { Settings } from '@/shared/schemas/settings';
 import type { BadgeVisibility, ExtensionOptions } from '@/shared/types';
 import './style.css';

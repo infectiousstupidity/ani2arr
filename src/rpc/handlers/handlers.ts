@@ -23,8 +23,8 @@ import { createError, ErrorCode, logError, normalizeError } from '@/shared/error
 import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/shared/options/storage';
 import { clearAllTtlCaches } from '@/cache/ttl-cache';
 import { clearPersistedQueryCache } from '@/cache/query-cache';
-import { buildRadarrPermissionPattern } from '@/shared/radarr/validation';
-import { buildSonarrPermissionPattern } from '@/shared/sonarr/validation';
+import { buildRadarrPermissionPattern } from '@/shared/providers/radarr/validation';
+import { buildSonarrPermissionPattern } from '@/shared/providers/sonarr/validation';
 import type { getMappingsHandler, GetMappingsInput } from './get-mappings';
 import type { updateRadarrMovieHandler } from './update-movie';
 import type { updateSonarrSeriesHandler } from './update-series';

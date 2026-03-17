@@ -20,7 +20,7 @@ export type {
   AniListSchedulerEventDebug,
   AniListSchedulerLimiterDebug,
   AniListSchedulerDebugSnapshot,
-} from './anilist-debug';
+} from '@/debug/anilist-debug.types';
 
 export type {
   LeanRadarrMovie,
@@ -44,28 +44,38 @@ export type {
   SonarrCutoffList,
 } from './providers';
 
+export type { ArrCredentialsPayload, TitleLanguage } from '@/shared/providers/common/types';
+
 export type {
-  ArrCredentialsPayload,
+  SonarrCredentialsPayload,
+  SonarrFormState,
+  SonarrPublicSettings,
+  SonarrSecrets,
+  SonarrSettings,
+} from '@/shared/providers/sonarr/types';
+
+export type {
+  RadarrCredentialsPayload,
+  RadarrFormState,
+  RadarrPublicSettings,
+  RadarrSecrets,
+  RadarrSettings,
+} from '@/shared/providers/radarr/types';
+
+export type {
   AddRequestPayload,
   CheckMovieStatusPayload,
   CheckMovieStatusResponse,
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
+  TestConnectionPayload,
+} from '@/rpc/types';
+
+export type {
   ExtensionOptions,
   PublicOptions,
   ProviderPublicOptions,
   ProviderSettings,
-  RadarrCredentialsPayload,
-  RadarrFormState,
-  RadarrSecrets,
-  RadarrSettings,
-  SonarrPublicSettings,
-  SonarrSettings,
-  TitleLanguage,
-  SonarrSecrets,
-  SonarrCredentialsPayload,
-  SonarrFormState,
-  TestConnectionPayload,
   UiOptions,
   BadgeVisibility,
 } from './options';

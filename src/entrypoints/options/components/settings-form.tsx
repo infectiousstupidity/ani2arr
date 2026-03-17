@@ -6,7 +6,7 @@ import { browser } from 'wxt/browser';
 
 import { useSonarrConnectionStatus, useSonarrMetadata, queryKeys } from '@/shared/queries';
 import { useDisplayedConnectionStatus } from '@/shared/hooks/common/use-displayed-connection-status';
-import type { ProviderConnectionStatus } from '@/shared/providers/connection-status';
+import type { ProviderConnectionStatus } from '@/shared/providers/common/connection-status';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import {
@@ -14,8 +14,7 @@ import {
   validateApiKey,
   validateUrl,
   buildSonarrPermissionPattern,
-} from '@/shared/sonarr/validation';
-import Button from '../../../shared/ui/primitives/button';
+} from '@/shared/providers/sonarr/validation';
 import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 
@@ -25,9 +24,8 @@ import {
   SonarrTitleLanguageField,
 } from './settings-connection-card';
 import { SonarrDefaultsSection } from './settings-sonarr-defaults';
-import type { SonarrFormLayout } from '../../../shared/ui/sonarr-form';
+import type { SonarrFormLayout } from '@/ui/provider-forms/sonarr';
 import { useSelectPortal } from './use-select-portal';
-import { SaveSettingsBar } from './settings-save-bar';
 
 export interface SettingsFormProps {
   actions: SettingsActions;

@@ -1,17 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
 import { normalizeError } from '@/shared/errors/error-utils';
-import type {
-  CheckMovieStatusPayload,
-  CheckMovieStatusResponse,
-  ExtensionError,
-  PublicOptions,
-  RadarrCredentialsPayload,
-  RadarrFormState,
-  RadarrMovie,
-} from '@/shared/types';
+import { queryKeys } from '@/shared/queries/query-keys';
+import type { CheckMovieStatusPayload, CheckMovieStatusResponse, ExtensionError, PublicOptions } from '@/shared/types';
+import type { RadarrCredentialsPayload, RadarrFormState, RadarrMovie } from './types';
 import type { AddRadarrInput, StatusInput, UpdateRadarrInput } from '@/rpc/schemas';
-import { queryKeys } from './query-keys';
 
 export const useRadarrMetadata = (options?: { enabled?: boolean; credentials?: RadarrCredentialsPayload | null }) => {
   const credentialScope =

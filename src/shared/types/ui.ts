@@ -1,6 +1,8 @@
 import type { MediaMetadataHint } from './anilist';
-import type { BadgeVisibility, RadarrFormState, SonarrFormState } from './options';
-import type { MediaService } from './providers';
+import type { BadgeVisibility } from './options';
+import type { MediaService } from '@/shared/providers/common/types';
+import type { RadarrFormState } from '@/shared/providers/radarr/types';
+import type { SonarrFormState } from '@/shared/providers/sonarr/types';
 import type { MappingExternalId } from './mapping';
 
 export type AnchorCorner = 'bottom-left' | 'top-left';

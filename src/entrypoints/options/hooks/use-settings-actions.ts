@@ -14,13 +14,13 @@ import {
   requestSonarrPermission,
   validateApiKey as validateSonarrApiKey,
   validateUrl as validateSonarrUrl,
-} from '@/shared/sonarr/validation';
+} from '@/shared/providers/sonarr/validation';
 import {
   buildRadarrPermissionPattern,
   requestRadarrPermission,
   validateApiKey as validateRadarrApiKey,
   validateUrl as validateRadarrUrl,
-} from '@/shared/radarr/validation';
+} from '@/shared/providers/radarr/validation';
 import { logger } from '@/shared/utils/logger';
 import { CLIENT_STORAGE_RESET_MESSAGE_TYPE } from '@/shared/utils/client-storage';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';

@@ -2,11 +2,11 @@ import React, { useMemo } from 'react';
 import type { FieldPath, FieldPathValue, UseFormReturn } from 'react-hook-form';
 import type { SonarrFormState, SonarrQualityProfile, SonarrRootFolder, SonarrTag } from '@/shared/types';
 import { SelectField } from '@/shared/ui/form/form';
+import { RootFolderField } from '@/ui/provider-forms/fields/root-folder-field';
+import { TagsField } from '@/ui/provider-forms/fields/tags-field';
 import { cn } from '@/shared/utils/cn';
-import { MONITOR_OPTIONS_WITH_DESCRIPTIONS, SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS } from '@/shared/sonarr/constants';
+import { MONITOR_OPTIONS_WITH_DESCRIPTIONS, SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS } from '@/shared/providers/sonarr/constants';
 import { DEFAULT_CONTAINER_CLASS_NAME, buildFolderSlug } from './helpers';
-import { RootFolderField } from './components/root-folder-field';
-import { TagsField } from './components/tags-field';
 import { TogglesGrid } from './components/toggles-grid';
 import { useSonarrTagSelection } from './use-tag-maps';
 

@@ -1,4 +1,4 @@
-// src/shared/anilist/dom/anilist-dom.ts
+// src/shared/anilist/anilist-dom.ts
 import type { AniFormat, AniTitles, MediaMetadataHint } from '@/shared/types';
 import { normalizeRelationIds, normalizeSynonyms } from '@/shared/anilist/media-metadata';
 

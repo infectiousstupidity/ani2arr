@@ -1,103 +1,17 @@
 // src/shared/schemas/settings.ts
 import * as v from 'valibot';
 import type { FieldValues } from 'react-hook-form';
-import type {
-  BadgeVisibility,
-  ExtensionOptions,
-  ProviderAnimePageUiOptions,
-  ProviderBrowseCardUiOptions,
-  RadarrFormState,
-  SonarrFormState,
-  TitleLanguage,
-  UiOptions,
-} from '@/shared/types/options';
-import type { RadarrMinimumAvailability, SonarrMonitorOption } from '@/shared/types/providers';
+import type { ExtensionOptions } from '@/shared/types/options';
+import { createDefaultSonarrFormState, SonarrSettingsSchema } from './sonarr-schema';
+import { createDefaultRadarrFormState, RadarrSettingsSchema } from './radarr-schema';
+import { createDefaultUiOptions, isTitleLanguage, migrateLegacyUiOptions, UiOptionsSchema } from './ui-schema';
 
-// --- Constants ---
+// --- Helpers ---
 
-const TITLE_LANGUAGES: [TitleLanguage, ...TitleLanguage[]] = [
-  'english',
-  'romaji',
-  'native',
-];
+const asRecord = (input: unknown): Record<string, unknown> =>
+  input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
 
-const BADGE_VISIBILITY_OPTIONS: [BadgeVisibility, ...BadgeVisibility[]] = [
-  'always',
-  'hover',
-  'hidden',
-];
-
-const SERIES_TYPES: [SonarrFormState['seriesType'], ...SonarrFormState['seriesType'][]] = [
-  'standard',
-  'anime',
-  'daily',
-];
-
-const MONITOR_OPTIONS: [SonarrMonitorOption, ...SonarrMonitorOption[]] = [
-  'all',
-  'future',
-  'missing',
-  'existing',
-  'firstSeason',
-  'lastSeason',
-  'pilot',
-  'recent',
-  'monitorSpecials',
-  'unmonitorSpecials',
-  'none',
-];
-
-const MINIMUM_AVAILABILITY_OPTIONS: [RadarrMinimumAvailability, ...RadarrMinimumAvailability[]] = [
-  'announced',
-  'inCinemas',
-  'released',
-  'preDB',
-];
-
-// --- Factories ---
-
-const createDefaultFormState = (): SonarrFormState => ({
-  qualityProfileId: '',
-  rootFolderPath: '',
-  seriesType: 'anime',
-  monitorOption: 'all',
-  seasonFolder: true,
-  searchForMissingEpisodes: true,
-  searchForCutoffUnmet: false,
-  tags: [],
-  freeformTags: [],
-});
-
-const createDefaultRadarrFormState = (): RadarrFormState => ({
-  qualityProfileId: '',
-  rootFolderPath: '',
-  monitored: true,
-  searchForMovie: true,
-  minimumAvailability: 'released',
-  tags: [],
-  freeformTags: [],
-});
-
-const createDefaultBrowseCardUiOptions = (): ProviderBrowseCardUiOptions => ({
-  enabled: true,
-  visibility: 'always',
-});
-
-const createDefaultAnimePageUiOptions = (): ProviderAnimePageUiOptions => ({
-  enabled: true,
-});
-
-const createDefaultUiOptions = (): UiOptions => ({
-  browseCards: {
-    sonarr: createDefaultBrowseCardUiOptions(),
-    radarr: createDefaultBrowseCardUiOptions(),
-  },
-  animePages: {
-    sonarr: createDefaultAnimePageUiOptions(),
-    radarr: createDefaultAnimePageUiOptions(),
-  },
-  schedulerDebugOverlayEnabled: false,
-});
+// --- Factory ---
 
 const createDefaultSettingsInternal = (): ExtensionOptions => ({
   providers: {
@@ -105,7 +19,7 @@ const createDefaultSettingsInternal = (): ExtensionOptions => ({
       url: '',
       apiKey: '',
       titleLanguage: 'english',
-      defaults: createDefaultFormState(),
+      defaults: createDefaultSonarrFormState(),
     },
     radarr: {
       url: '',
@@ -118,58 +32,7 @@ const createDefaultSettingsInternal = (): ExtensionOptions => ({
   debugLogging: false,
 });
 
-const asRecord = (input: unknown): Record<string, unknown> =>
-  input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
-
-const isTitleLanguage = (value: unknown): value is TitleLanguage =>
-  typeof value === 'string' && TITLE_LANGUAGES.includes(value as TitleLanguage);
-
-const isBadgeVisibility = (value: unknown): value is BadgeVisibility =>
-  typeof value === 'string' && BADGE_VISIBILITY_OPTIONS.includes(value as BadgeVisibility);
-
-const migrateLegacyUiOptions = (input: unknown): Record<string, unknown> => {
-  const raw = asRecord(input);
-  const browseCards = asRecord(raw.browseCards);
-  const animePages = asRecord(raw.animePages);
-  const legacyBrowseEnabled = typeof raw.browseOverlayEnabled === 'boolean' ? raw.browseOverlayEnabled : undefined;
-  const legacyBadgeVisibility = isBadgeVisibility(raw.badgeVisibility) ? raw.badgeVisibility : undefined;
-  const legacyHeaderEnabled = typeof raw.headerInjectionEnabled === 'boolean' ? raw.headerInjectionEnabled : undefined;
-
-  const resolveBrowseProvider = (provider: 'sonarr' | 'radarr'): Record<string, unknown> => {
-    const providerRaw = asRecord(browseCards[provider]);
-    return {
-      enabled:
-        typeof providerRaw.enabled === 'boolean'
-          ? providerRaw.enabled
-          : (legacyBrowseEnabled ?? true),
-      visibility: isBadgeVisibility(providerRaw.visibility)
-        ? providerRaw.visibility
-        : (legacyBadgeVisibility ?? 'always'),
-    };
-  };
-
-  const resolveAnimeProvider = (provider: 'sonarr' | 'radarr'): Record<string, unknown> => {
-    const providerRaw = asRecord(animePages[provider]);
-    return {
-      enabled:
-        typeof providerRaw.enabled === 'boolean'
-          ? providerRaw.enabled
-          : (legacyHeaderEnabled ?? true),
-    };
-  };
-
-  return {
-    ...raw,
-    browseCards: {
-      sonarr: resolveBrowseProvider('sonarr'),
-      radarr: resolveBrowseProvider('radarr'),
-    },
-    animePages: {
-      sonarr: resolveAnimeProvider('sonarr'),
-      radarr: resolveAnimeProvider('radarr'),
-    },
-  };
-};
+// --- Migration ---
 
 const migrateLegacySettings = (input: unknown): Record<string, unknown> => {
   const raw = asRecord(input);
@@ -199,137 +62,8 @@ const migrateLegacySettings = (input: unknown): Record<string, unknown> => {
   };
 };
 
-// --- Reusable Coercion Schemas ---
+// --- Composed Settings Schema ---
 
-// Trims strings, falls back to empty string
-const SafeString = v.fallback(
-  v.pipe(v.string(), v.transform((s) => s.trim())),
-  ''
-);
-
-// Handles number | string -> number | ''.
-const CoerceQualityProfileId = v.pipe(
-  v.unknown(),
-  v.transform((input): number | '' => {
-    if (typeof input === 'number' && Number.isFinite(input)) return input;
-    if (typeof input === 'string' && input.trim().length > 0) {
-      const parsed = Number(input);
-      return Number.isFinite(parsed) ? parsed : '';
-    }
-    return '';
-  })
-);
-
-// Handles array | single item -> array. Filters invalid numbers.
-const CoerceNumberArray = v.pipe(
-  v.unknown(),
-  v.transform((input) => {
-    const list = Array.isArray(input) ? input : [input];
-    return list.reduce<number[]>((acc, item) => {
-      const num = Number(item);
-      if (Number.isFinite(num)) acc.push(num);
-      return acc;
-    }, []);
-  }),
-  v.array(v.number())
-);
-
-// Handles array | single item -> array. Trims and filters empty strings.
-const CoerceStringArray = v.pipe(
-  v.unknown(),
-  v.transform((input) => {
-    const list = Array.isArray(input) ? input : [input];
-    return list.reduce<string[]>((acc, item) => {
-      if (typeof item === 'string') {
-        const trimmed = item.trim();
-        if (trimmed) acc.push(trimmed);
-      }
-      return acc;
-    }, []);
-  }),
-  v.array(v.string())
-);
-
-// --- Object Schemas ---
-
-const SonarrDefaultsSchema = v.pipe(
-  v.unknown(),
-  v.transform((input) => (input && typeof input === 'object' ? input : {})),
-  v.object({
-    qualityProfileId: v.fallback(CoerceQualityProfileId, ''),
-    rootFolderPath: SafeString,
-    seriesType: v.fallback(v.picklist(SERIES_TYPES), 'anime'),
-    monitorOption: v.fallback(v.picklist(MONITOR_OPTIONS), 'all'),
-    seasonFolder: v.fallback(v.boolean(), true),
-    searchForMissingEpisodes: v.fallback(v.boolean(), true),
-    searchForCutoffUnmet: v.fallback(v.boolean(), false),
-    tags: v.fallback(CoerceNumberArray, []),
-    freeformTags: v.fallback(CoerceStringArray, []),
-  })
-);
-
-const RadarrDefaultsSchema = v.pipe(
-  v.unknown(),
-  v.transform((input) => (input && typeof input === 'object' ? input : {})),
-  v.object({
-    qualityProfileId: v.fallback(CoerceQualityProfileId, ''),
-    rootFolderPath: SafeString,
-    monitored: v.fallback(v.boolean(), true),
-    searchForMovie: v.fallback(v.boolean(), true),
-    minimumAvailability: v.fallback(v.picklist(MINIMUM_AVAILABILITY_OPTIONS), 'released'),
-    tags: v.fallback(CoerceNumberArray, []),
-    freeformTags: v.fallback(CoerceStringArray, []),
-  }),
-);
-
-const ProviderBrowseCardUiOptionsSchema = v.pipe(
-  v.unknown(),
-  v.transform((input) => (input && typeof input === 'object' ? input : {})),
-  v.object({
-    enabled: v.fallback(v.boolean(), true),
-    visibility: v.fallback(v.picklist(BADGE_VISIBILITY_OPTIONS), 'always'),
-  }),
-);
-
-const ProviderAnimePageUiOptionsSchema = v.pipe(
-  v.unknown(),
-  v.transform((input) => (input && typeof input === 'object' ? input : {})),
-  v.object({
-    enabled: v.fallback(v.boolean(), true),
-  }),
-);
-
-const UiOptionsSchema = v.pipe(
-  v.unknown(),
-  v.transform(migrateLegacyUiOptions),
-  v.object({
-    browseCards: v.object({
-      sonarr: v.fallback(ProviderBrowseCardUiOptionsSchema, createDefaultBrowseCardUiOptions()),
-      radarr: v.fallback(ProviderBrowseCardUiOptionsSchema, createDefaultBrowseCardUiOptions()),
-    }),
-    animePages: v.object({
-      sonarr: v.fallback(ProviderAnimePageUiOptionsSchema, createDefaultAnimePageUiOptions()),
-      radarr: v.fallback(ProviderAnimePageUiOptionsSchema, createDefaultAnimePageUiOptions()),
-    }),
-    schedulerDebugOverlayEnabled: v.fallback(v.boolean(), false),
-  })
-);
-
-const SonarrSettingsSchema = v.object({
-  url: SafeString,
-  apiKey: SafeString,
-  titleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
-  defaults: v.fallback(SonarrDefaultsSchema, createDefaultFormState()),
-});
-
-const RadarrSettingsSchema = v.object({
-  url: SafeString,
-  apiKey: SafeString,
-  titleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
-  defaults: v.fallback(RadarrDefaultsSchema, createDefaultRadarrFormState()),
-});
-
-// Main Settings Schema
 const ExtensionOptionsSchema = v.pipe(
   v.unknown(),
   v.transform(migrateLegacySettings),
@@ -339,7 +73,7 @@ const ExtensionOptionsSchema = v.pipe(
         url: '',
         apiKey: '',
         titleLanguage: 'english',
-        defaults: createDefaultFormState(),
+        defaults: createDefaultSonarrFormState(),
       }),
       radarr: v.fallback(RadarrSettingsSchema, {
         url: '',
@@ -361,6 +95,6 @@ export type SettingsFormValues = Settings & FieldValues;
 
 export const createDefaultSettings = createDefaultSettingsInternal;
 export const defaultSettings = createDefaultSettingsInternal;
-export const defaultSonarrFormState = createDefaultFormState;
+export const defaultSonarrFormState = createDefaultSonarrFormState;
 export const defaultRadarrFormState = createDefaultRadarrFormState;
 export const defaultUiOptions = createDefaultUiOptions;

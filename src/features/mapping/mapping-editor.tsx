@@ -15,7 +15,7 @@ import type {
   SonarrLookupSeries,
   TitleLanguage,
 } from '@/shared/types';
-import { metadataFromMediaObject } from '@/shared/anilist/dom/anilist-dom';
+import { metadataFromMediaObject } from '@/shared/anilist/anilist-dom';
 import { toMappingSearchResultFromRadarr } from './radarr.adapter';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
 import { useToast } from '@/shared/ui/feedback/toast-provider';

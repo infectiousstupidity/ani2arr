@@ -1,6 +1,6 @@
 export type RequestPriority = 'high' | 'normal' | 'low';
 
-import type { MediaService } from './providers';
+import type { MediaService } from '@/shared/providers/common/types';
 
 export type MappingSource = 'manual' | 'upstream' | 'auto' | 'rejected' | 'blocked' | 'ignored' | 'unresolved';
 export type MappingStatus = 'unmapped' | 'in-provider' | 'not-in-provider';

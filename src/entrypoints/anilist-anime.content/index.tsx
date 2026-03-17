@@ -5,12 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useAddMovie, useAddSeries, useAniListMetadataBatch, useMovieStatus, usePublicOptions, useSeriesStatus } from '@/shared/queries';
-import { useMediaModalProps } from '@/shared/hooks/entrypoints/use-media-modal-props';
+import { useMediaModalProps } from '@/features/media-overlay/hooks/use-media-modal-props';
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
-import MediaActions, { Status } from '@/shared/ui/media/media-actions';
+import MediaActions, { Status } from './components/media-actions';
 import { logger } from '@/shared/utils/logger';
-import { extractMediaMetadataFromDom } from '@/shared/anilist/dom/anilist-dom';
-import { shouldSkipSonarrFormat } from '@/shared/anilist/formats';
+import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
+import { shouldSkipMediaFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
 import { getLibrarySlug, type FolderSlugSource } from '@/services/helpers/path-utils';
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
@@ -28,7 +28,7 @@ import '@/shared/styles/base.css';
 import './style.css';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
-import { awaitBackgroundReady } from '@/shared/dom/background-ready';
+import { awaitBackgroundReady } from '@/shared/utils/background-ready';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 
 const log = logger.create('AniList Content');
@@ -195,7 +195,7 @@ function readFormatFromSidebar(doc: Document = document): AniFormat | null {
 }
 
 function shouldSkipByFormat(doc: Document = document): boolean {
-  return shouldSkipSonarrFormat(readFormatFromSidebar(doc));
+  return shouldSkipMediaFormat(readFormatFromSidebar(doc));
 }
 
 /* -------------------------------- React UI -------------------------------- */

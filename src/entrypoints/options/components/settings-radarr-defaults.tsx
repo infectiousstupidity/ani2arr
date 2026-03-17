@@ -6,9 +6,9 @@ import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-a
 import type { useRadarrMetadata } from '@/shared/queries';
 import type { RadarrMinimumAvailability, RadarrQualityProfile, RadarrTag } from '@/shared/types';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
+import { RootFolderField } from '@/ui/provider-forms/fields/root-folder-field';
+import { TagsField } from '@/ui/provider-forms/fields/tags-field';
 import Button from '@/shared/ui/primitives/button';
-import { RootFolderField } from '@/shared/ui/sonarr-form/components/root-folder-field';
-import { TagsField } from '@/shared/ui/sonarr-form/components/tags-field';
 import { SaveSettingsBar } from './settings-save-bar';
 
 const MINIMUM_AVAILABILITY_OPTIONS: Array<{
