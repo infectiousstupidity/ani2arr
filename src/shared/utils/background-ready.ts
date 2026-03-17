@@ -1,4 +1,4 @@
-// src/shared/dom/background-ready.ts
+// src/shared/utils/background-ready.ts
 import { browser } from 'wxt/browser';
 
 /**

@@ -1,9 +1,7 @@
-// src/shared/sonarr/constants.ts
-
 /**
- * @file Defines static, shared constants used throughout the extension.
+ * @file Defines static, shared Sonarr constants used throughout the extension.
  */
-import { SonarrMonitorOption } from '@/shared/types';
+import type { SonarrMonitorOption } from './types';
 
 /**
  * Defines the options and descriptive text for the 'Monitor' dropdown menus
@@ -40,4 +38,4 @@ export const SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS = [
  * NOTE: This is different from the main Sonarr series list cache, which uses a
  * stale-while-revalidate strategy.
  */
-export const SERIES_STATUS_TTL_MS = 5 * 60 * 1_000; // 5 minutes
+export const SERIES_STATUS_TTL_MS = 5 * 60 * 1_000;

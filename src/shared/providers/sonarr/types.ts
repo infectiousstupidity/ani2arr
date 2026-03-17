@@ -1,0 +1,168 @@
+import type { ArrCredentialsPayload, TitleLanguage } from '@/shared/providers/common/types';
+
+export type SonarrMonitorOption =
+  | 'all'
+  | 'future'
+  | 'missing'
+  | 'existing'
+  | 'firstSeason'
+  | 'lastSeason'
+  | 'pilot'
+  | 'recent'
+  | 'monitorSpecials'
+  | 'unmonitorSpecials'
+  | 'none';
+
+export interface SonarrSeries {
+  id: number;
+  title: string;
+  tvdbId: number;
+  titleSlug: string;
+  alternateTitles?: SonarrAlternateTitle[];
+  monitored?: boolean;
+  year?: number;
+  genres?: string[];
+  seasonCount?: number;
+  episodeCount?: number;
+  episodeFileCount?: number;
+  sizeOnDisk?: number;
+  path?: string;
+  rootFolderPath?: string;
+  folder?: string;
+  qualityProfileId?: number;
+  languageProfileId?: number;
+  seasons?: unknown[];
+  seasonFolder?: boolean;
+  monitorNewItems?: 'all' | 'none';
+  addOptions?: {
+    searchForMissingEpisodes?: boolean;
+    monitor?: SonarrMonitorOption;
+  };
+  seriesType?: 'standard' | 'anime' | 'daily';
+  tags?: number[];
+  added?: string;
+  overview?: string;
+  previousAiring?: string | null;
+  network?: string;
+  images?: Array<{ coverType?: string; url?: string | null; remoteUrl?: string | null }>;
+  remotePoster?: string | null;
+  status?: 'continuing' | 'ended' | 'upcoming' | 'deleted';
+  statistics?: {
+    seasonCount?: number;
+    episodeCount?: number;
+    episodeFileCount?: number;
+    sizeOnDisk?: number;
+  };
+}
+
+export interface SonarrAlternateTitle {
+  title?: string | null;
+  sceneSeasonNumber?: number | null;
+  seasonNumber?: number | null;
+  sourceType?: string | null;
+}
+
+export interface SonarrLookupSeries {
+  title: string;
+  tvdbId: number;
+  titleSlug?: string;
+  year?: number;
+  genres?: string[];
+  id?: number;
+  network?: string;
+  seriesType?: 'standard' | 'daily' | 'anime';
+  status?: 'continuing' | 'ended' | 'upcoming' | 'deleted';
+  images?: Array<{ coverType?: string; url?: string | null; remoteUrl?: string | null }>;
+  remotePoster?: string | null;
+  statistics?: {
+    seasonCount?: number;
+    episodeCount?: number;
+    episodeFileCount?: number;
+    totalEpisodeCount?: number;
+  };
+}
+
+export interface LeanSonarrSeries {
+  tvdbId: number;
+  id: number;
+  titleSlug: string;
+  title: string;
+  alternateTitles?: string[];
+  statistics?: {
+    seasonCount?: number;
+    episodeCount?: number;
+    episodeFileCount?: number;
+    totalEpisodeCount?: number;
+    sizeOnDisk?: number;
+    percentOfEpisodes?: number;
+  };
+}
+
+export interface SonarrRootFolder {
+  freeSpace: number;
+  id: number;
+  path: string;
+}
+
+export interface SonarrQualityProfile {
+  id: number;
+  name: string;
+}
+
+export interface SonarrTag {
+  id: number;
+  label: string;
+}
+
+export interface SonarrFormState {
+  qualityProfileId: number | '';
+  rootFolderPath: string;
+  seriesType: 'standard' | 'anime' | 'daily';
+  monitorOption: SonarrMonitorOption;
+  seasonFolder: boolean;
+  searchForMissingEpisodes: boolean;
+  searchForCutoffUnmet: boolean;
+  tags: number[];
+  freeformTags: string[];
+}
+
+export interface SonarrSettings {
+  url: string;
+  apiKey: string;
+  titleLanguage: TitleLanguage;
+  defaults: SonarrFormState;
+}
+
+export interface SonarrPublicSettings {
+  url: string;
+  titleLanguage: TitleLanguage;
+  defaults: SonarrFormState;
+  isConfigured: boolean;
+}
+
+export interface SonarrSecrets {
+  apiKey: string;
+}
+
+export type SonarrCredentialsPayload = ArrCredentialsPayload;
+
+/**
+ * Represents a single item returned by the Sonarr `/wanted/cutoff` endpoint.
+ * The Sonarr API payloads may vary by version; keep this intentionally
+ * permissive while exposing the commonly-used fields.
+ */
+export interface SonarrCutoffItem {
+  id?: number;
+  seriesId?: number;
+  tvdbId?: number;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  title?: string;
+  overview?: string | null;
+  airDate?: string | null;
+  quality?: string | null;
+  sizeOnDisk?: number | null;
+  [key: string]: unknown;
+}
+
+export type SonarrCutoffList = SonarrCutoffItem[];

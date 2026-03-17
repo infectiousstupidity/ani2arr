@@ -4,10 +4,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
 import { useRadarrConnectionStatus, useRadarrMetadata, queryKeys } from '@/shared/queries';
 import { useDisplayedConnectionStatus } from '@/shared/hooks/common/use-displayed-connection-status';
-import type { ProviderConnectionStatus } from '@/shared/providers/connection-status';
+import type { ProviderConnectionStatus } from '@/shared/providers/common/connection-status';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
-import { buildRadarrPermissionPattern, requestRadarrPermission, validateApiKey, validateUrl } from '@/shared/radarr/validation';
+import { buildRadarrPermissionPattern, requestRadarrPermission, validateApiKey, validateUrl } from '@/shared/providers/radarr/validation';
 import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import {

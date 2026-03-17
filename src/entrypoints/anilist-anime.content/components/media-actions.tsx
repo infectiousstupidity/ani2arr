@@ -1,4 +1,4 @@
-// src/shared/ui/media/media-actions.tsx
+// src/entrypoints/anilist-anime.content/components/media-actions.tsx
 import React from 'react';
 import Button from '@/shared/ui/primitives/button';
 import { SquareArrowOutUpRight, ChevronDown } from 'lucide-react';

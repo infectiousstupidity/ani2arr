@@ -5,7 +5,7 @@ import { useAniListMetadataBatch, usePublicOptions } from '@/shared/queries';
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useBrowsePortals } from '../hooks/use-media-portals';
-import { useAnilistBatchPrefetch } from '@/shared/hooks/entrypoints/use-anilist-batch-prefetch';
+import { useAnilistBatchPrefetch } from '../hooks/use-anilist-batch-prefetch';
 import type { BrowseAdapter, ParsedCard, MediaMetadataHint } from '@/shared/types';
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import { CardOverlay } from './card-overlay';

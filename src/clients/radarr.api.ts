@@ -1,7 +1,7 @@
 import { BaseArrClient, type ArrCredentials } from '@/clients/base-arr.client';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { createError, ErrorCode } from '@/shared/errors/error-utils';
-import { hasRadarrPermission } from '@/shared/radarr/validation';
+import { hasRadarrPermission } from '@/shared/providers/radarr/validation';
 import type {
   RadarrLookupMovie,
   RadarrMinimumAvailability,

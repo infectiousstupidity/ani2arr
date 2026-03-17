@@ -1,16 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
 import { normalizeError } from '@/shared/errors/error-utils';
-import type {
-  ExtensionError,
-  SonarrCredentialsPayload,
-  SonarrFormState,
-  SonarrSeries,
-  PublicOptions,
-} from '@/shared/types';
+import { queryKeys } from '@/shared/queries/query-keys';
+import type { ExtensionError, PublicOptions } from '@/shared/types';
+import type { SonarrCredentialsPayload, SonarrFormState, SonarrSeries } from './types';
 import type { AddInput, UpdateSonarrInput } from '@/rpc/schemas';
-import type { TestConnectionPayload } from '@/shared/types/options';
-import { queryKeys } from './query-keys';
+import type { ArrCredentialsPayload } from '@/shared/providers/common/types';
+
+type TestConnectionPayload = ArrCredentialsPayload;
 
 export const useSonarrMetadata = (options?: { enabled?: boolean; credentials?: SonarrCredentialsPayload | null }) => {
   const credentialScope =

@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
-import type { AniListSchedulerDebugSnapshot, ExtensionError } from '@/shared/types';
-import { queryKeys } from './query-keys';
+import type { ExtensionError } from '@/shared/types';
+import { queryKeys } from '@/shared/queries/query-keys';
+import type { AniListSchedulerDebugSnapshot } from './anilist-debug.types';
 
 export const useAniListSchedulerDebug = (options?: { enabled?: boolean; refetchIntervalMs?: number }) => {
   const enabled = options?.enabled ?? true;

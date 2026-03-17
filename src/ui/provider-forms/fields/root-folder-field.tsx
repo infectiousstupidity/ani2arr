@@ -1,14 +1,19 @@
 import React, { useMemo } from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
-import type { SonarrRootFolder } from '@/shared/types';
 import { cn } from '@/shared/utils/cn';
 import { FormField, Label, Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/form/form';
 import { formatFreeSpace, formatRootPathWithSlug } from '../helpers';
 
+type ProviderRootFolder = {
+  freeSpace: number;
+  id: number;
+  path: string;
+};
+
 type RootFolderFieldProps = {
   disabled: boolean;
   value: string;
-  rootFolders: SonarrRootFolder[];
+  rootFolders: ProviderRootFolder[];
   onChange: (value: string) => void;
   portalContainer: HTMLElement | ShadowRoot | null;
   initialFocusRef?: React.RefObject<HTMLButtonElement | null> | undefined;

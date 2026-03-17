@@ -1,4 +1,4 @@
-import type { RequestPriority } from './mapping';
+import type { RequestPriority } from '@/shared/types/mapping';
 
 export type AniListSchedulerEventType =
   | 'request'

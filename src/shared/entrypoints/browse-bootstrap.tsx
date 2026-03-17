@@ -4,7 +4,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
-import { awaitBackgroundReady } from '@/shared/dom/background-ready';
+import { awaitBackgroundReady } from '@/shared/utils/background-ready';
 import { createPersistOptions } from '@/cache/persist-options';
 import { logger } from '@/shared/utils/logger';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';

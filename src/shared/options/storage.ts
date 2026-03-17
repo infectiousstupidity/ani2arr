@@ -15,8 +15,8 @@ import type {
   RadarrSecrets,
   SonarrSecrets,
 } from '@/shared/types';
-import { validateApiKey as validateRadarrApiKey, validateUrl as validateRadarrUrl } from '@/shared/radarr/validation';
-import { validateUrl, validateApiKey } from '@/shared/sonarr/validation';
+import { validateApiKey as validateRadarrApiKey, validateUrl as validateRadarrUrl } from '@/shared/providers/radarr/validation';
+import { validateUrl, validateApiKey } from '@/shared/providers/sonarr/validation';
 import { logger } from '@/shared/utils/logger';
 
 const createDefaultSecrets = (): SonarrSecrets => ({

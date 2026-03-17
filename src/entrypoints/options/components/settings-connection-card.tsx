@@ -4,7 +4,7 @@ import {
   getProviderConnectionStatusAppearance,
   getProviderConnectionStatusLabel,
   type ProviderConnectionStatus,
-} from '@/shared/providers/connection-status';
+} from '@/shared/providers/common/connection-status';
 import { InputField, SelectField } from '../../../shared/ui/form/form';
 import Button from '../../../shared/ui/primitives/button';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';

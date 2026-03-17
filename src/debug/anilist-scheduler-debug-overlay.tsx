@@ -1,6 +1,7 @@
 import React from 'react';
-import { useAniListSchedulerDebug, usePublicOptions } from '@/shared/queries';
-import type { AniListSchedulerBatchDebug, AniListSchedulerBucketDebug } from '@/shared/types';
+import { usePublicOptions } from '@/shared/queries';
+import { useAniListSchedulerDebug } from './anilist-debug.query';
+import type { AniListSchedulerBatchDebug, AniListSchedulerBucketDebug } from './anilist-debug.types';
 
 const MAX_BATCH_SIZE = 50;
 

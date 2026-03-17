@@ -2,7 +2,7 @@
 
 import { BaseArrClient } from '@/clients/base-arr.client';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
-import { hasSonarrPermission } from '@/shared/sonarr/validation';
+import { hasSonarrPermission } from '@/shared/providers/sonarr/validation';
 import type {
   ExtensionOptions,
   SonarrCredentialsPayload,

@@ -1,4 +1,4 @@
-import RadarrForm from "@/shared/ui/radarr-form";
+import RadarrForm from "@/ui/provider-forms/radarr";
 import type { RadarrPanelProps } from "../types";
 
 export function RadarrPanel(props: RadarrPanelProps): React.JSX.Element {

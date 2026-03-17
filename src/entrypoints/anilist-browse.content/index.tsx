@@ -1,6 +1,6 @@
 // src/entrypoints/anilist-browse.content/index.tsx
-import { extractMediaMetadataFromDom } from '@/shared/anilist/dom/anilist-dom';
-import { shouldSkipSonarrFormat } from '@/shared/anilist/formats';
+import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
+import { shouldSkipMediaFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
 import type { MediaMetadataHint } from '@/shared/types';
 import baseStyles from '@/shared/styles/base.css?inline';
@@ -88,7 +88,7 @@ const parseAniListCard = (card: Element): ParsedCard | null => {
   if (!title || !Number.isFinite(anilistId)) return null;
 
   const domMetadata = getCachedDomMetadata(anilistId);
-  if (shouldSkipSonarrFormat(domMetadata?.format ?? null)) return null;
+  if (shouldSkipMediaFormat(domMetadata?.format ?? null)) return null;
 
   const fallbackMetadata: MediaMetadataHint | null = title
     ? {

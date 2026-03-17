@@ -20,7 +20,7 @@ import { useDisplayedConnectionStatus } from '@/shared/hooks/common/use-displaye
 import {
   getProviderConnectionStatusAppearance,
   type ProviderConnectionStatus,
-} from '@/shared/providers/connection-status';
+} from '@/shared/providers/common/connection-status';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import { useSettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
@@ -280,7 +280,6 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
     }
   };
 
-  const activeConfig = sections.find(section => section.id === activeSection);
   const showServiceTip = activeSection === 'sonarr' || activeSection === 'radarr';
   const showPrivacyCard = activeSection !== 'advanced';
 

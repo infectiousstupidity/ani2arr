@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ProviderConnectionStatus } from '@/shared/providers/connection-status';
+import type { ProviderConnectionStatus } from '@/shared/providers/common/connection-status';
 
 type UseDisplayedConnectionStatusOptions = {
   delayMs?: number;
