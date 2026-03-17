@@ -8,7 +8,6 @@ import { browser } from 'wxt/browser';
 import { ChevronRight, ShieldCheck } from 'lucide-react';
 import appIcon from '@/assets/icon.png';
 import ToastProvider from '@/shared/ui/feedback/toast-provider';
-import { SaveSettingsBar } from '@/entrypoints/options/components/settings-form';
 import './style.css';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 import MappingsSection from '@/entrypoints/options/components/mappings-section';
@@ -45,7 +44,6 @@ interface SectionConfig {
   description: string;
   path: string;
   usesManager: boolean;
-  hasInternalSaveBar?: boolean;
   group: 'services' | 'extension';
   icon: React.ComponentType<{ className?: string }>;
 }
@@ -57,7 +55,6 @@ const sections: SectionConfig[] = [
     description: 'Connect Sonarr, review status, and set series defaults.',
     path: '/options/sonarr',
     usesManager: true,
-    hasInternalSaveBar: true,
     group: 'services',
     icon: SonarrIcon,
   },
@@ -67,7 +64,6 @@ const sections: SectionConfig[] = [
     description: 'Connect Radarr, review status, and set movie defaults.',
     path: '/options/radarr',
     usesManager: true,
-    hasInternalSaveBar: true,
     group: 'services',
     icon: RadarrIcon,
   },
@@ -285,7 +281,6 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
   };
 
   const activeConfig = sections.find(section => section.id === activeSection);
-  const shouldShowSaveBar = Boolean(activeConfig?.usesManager && !activeConfig?.hasInternalSaveBar);
   const showServiceTip = activeSection === 'sonarr' || activeSection === 'radarr';
   const showPrivacyCard = activeSection !== 'advanced';
 
@@ -383,7 +378,6 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
         </aside>
         <main className="flex-1 space-y-6 pb-12">
           {renderSection()}
-          {shouldShowSaveBar ? <SaveSettingsBar actions={actions} isLoading={optionsQuery.isLoading} /> : null}
         </main>
       </div>
     </div>

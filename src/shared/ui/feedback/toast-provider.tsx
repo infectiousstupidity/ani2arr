@@ -25,6 +25,18 @@ type ToastContextValue = {
 
 const ToastContext = createContext<ToastContextValue | null>(null)
 
+const toastVariantClassNames: Record<ToastVariant, string> = {
+  info: 'border-accent-primary/28 bg-bg-secondary/96',
+  success: 'border-success/32 bg-success/12',
+  error: 'border-error/32 bg-error/12',
+}
+
+const toastAccentClassNames: Record<ToastVariant, string> = {
+  info: 'bg-accent-primary',
+  success: 'bg-success',
+  error: 'bg-error',
+}
+
 export const useToast = (): ToastContextValue => {
   const ctx = useContext(ToastContext)
   if (!ctx) throw new Error('useToast must be used within ToastProvider')
@@ -64,24 +76,27 @@ export const ToastProvider: React.FC<React.PropsWithChildren> = ({ children }) =
             onOpenChange={(open) => {
               if (!open) dismiss(t.id)
             }}
-            className={`max-w-sm w-full rounded-lg shadow-lg p-3 mb-2 flex items-start gap-3 bg-white dark:bg-gray-800 border ${
-              t.variant === 'success'
-                ? 'border-green-200'
-                : t.variant === 'error'
-                ? 'border-red-200'
-                : 'border-gray-200'
-            }`}
+            className={`mb-2 flex w-full max-w-sm items-start gap-3 rounded-2xl border p-3.5 text-text-primary shadow-[0_18px_44px_rgba(2,8,18,0.28)] backdrop-blur-xl ${toastVariantClassNames[t.variant]}`}
             duration={t.duration}
           >
+            <span
+              className={`mt-0.5 h-2.5 w-2.5 flex-none rounded-full ${toastAccentClassNames[t.variant]}`}
+              aria-hidden
+            />
             <div className="flex-1">
               {t.title ? (
-                <RadixToast.Title className="font-medium text-sm text-gray-900 dark:text-gray-100">{t.title}</RadixToast.Title>
+                <RadixToast.Title className="text-sm font-semibold text-text-primary">{t.title}</RadixToast.Title>
               ) : null}
               {t.description ? (
-                <RadixToast.Description className="text-sm text-gray-700 dark:text-gray-300">{t.description}</RadixToast.Description>
+                <RadixToast.Description className="mt-1 text-sm text-text-secondary">{t.description}</RadixToast.Description>
               ) : null}
             </div>
-            <RadixToast.Close className="text-gray-500 hover:text-gray-700" aria-label="Close">×</RadixToast.Close>
+            <RadixToast.Close
+              className="flex-none rounded-md px-1 text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+              aria-label="Close"
+            >
+              ×
+            </RadixToast.Close>
           </RadixToast.Root>
         ))}
 

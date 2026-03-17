@@ -129,7 +129,7 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
 
   const getConnectButtonText = () => {
     if (testConnectionState.isError) return 'Retry';
-    return 'Connect';
+    return 'Connect and save';
   };
 
   const handleConnectSubmit = async (event: React.FormEvent<HTMLFormElement>) => {

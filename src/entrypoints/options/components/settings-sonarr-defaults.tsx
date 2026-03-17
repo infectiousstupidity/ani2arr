@@ -16,6 +16,7 @@ import {
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
 } from '@/shared/sonarr/constants';
 import type { SonarrFormLayout } from '@/shared/ui/sonarr-form';
+import { SaveSettingsBar } from './settings-save-bar';
 
 type SonarrDefaultsSectionProps = {
   actions: SettingsActions;
@@ -385,6 +386,11 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
       </div>
 
       <div className="mt-4">{renderContent()}</div>
+
+      <SaveSettingsBar
+        actions={actions}
+        className="mt-6 border-t border-border-primary pt-4"
+      />
     </section>
   );
 };
