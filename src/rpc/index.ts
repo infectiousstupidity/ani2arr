@@ -62,7 +62,7 @@ export interface Ani2arrApi {
   fetchAniListMedia(anilistId: number): Promise<AniMedia | null>;
   getStaticMapped(ids: number[]): Promise<number[]>;
   notifySettingsChanged(): Promise<{ ok: true }>;
-  updateDefaults(defaults: SonarrFormState): Promise<{ ok: true }>;
+  updateSonarrDefaults(defaults: SonarrFormState): Promise<{ ok: true }>;
   updateRadarrDefaults(defaults: RadarrFormState): Promise<{ ok: true }>;
   getQualityProfiles(): Promise<SonarrQualityProfile[]>;
   getRootFolders(): Promise<SonarrRootFolder[]>;

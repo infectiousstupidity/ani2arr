@@ -332,7 +332,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       return { ok: true as const };
     },
 
-    async updateDefaults(defaults) {
+    async updateSonarrDefaults(defaults) {
       const current = await getExtensionOptionsSnapshot();
       const next: ExtensionOptions = {
         ...current,

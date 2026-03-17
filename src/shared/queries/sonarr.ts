@@ -108,7 +108,7 @@ export const useUpdateDefaultSettings = () => {
   return useMutation<void, ExtensionError, SonarrFormState>({
     mutationFn: async (defaults: SonarrFormState) => {
       try {
-        await getAni2arrApi().updateDefaults(defaults);
+        await getAni2arrApi().updateSonarrDefaults(defaults);
       } catch (error) {
         throw normalizeError(error);
       }
