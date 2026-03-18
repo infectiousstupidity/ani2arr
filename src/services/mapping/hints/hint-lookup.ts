@@ -11,7 +11,7 @@ import type {
   LookupClientCredentials,
   ProviderLookupClient,
   ProviderLookupResult,
-} from '../provider-lookup.client';
+} from '../lookup';
 
 export async function tryHintLookup<TResult extends ProviderLookupResult>(
   term: string,

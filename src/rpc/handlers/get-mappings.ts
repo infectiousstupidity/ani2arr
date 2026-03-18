@@ -1,5 +1,5 @@
-import type { MappingOverridesService } from '@/services/mapping/overrides.service';
-import type { StaticMappingProvider } from '@/services/mapping/static-mapping.provider';
+import type { MappingOverridesService } from '@/services/mapping/overrides';
+import type { StaticMappingProvider } from '@/services/mapping/static';
 import type { MappingService } from '@/services/mapping';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { RadarrLibrary } from '@/services/library/radarr';

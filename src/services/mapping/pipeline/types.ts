@@ -1,5 +1,5 @@
 import type { SearchTerm } from './search-term-generator';
-import type { StaticMappingProvider } from '../static-mapping.provider';
+import type { StaticMappingProvider } from '../static';
 import type { ScopedLogger } from '@/shared/utils/logger';
 import type { AniMedia, RequestPriority } from '@/shared/types';
 import type { AnilistApiService } from '@/clients/anilist.api';
@@ -7,7 +7,7 @@ import type {
   LookupClientCredentials,
   ProviderLookupClient,
   ProviderLookupResult,
-} from '../provider-lookup.client';
+} from '../lookup';
 
 export interface Candidate<TResult extends ProviderLookupResult = ProviderLookupResult> {
   term: SearchTerm;

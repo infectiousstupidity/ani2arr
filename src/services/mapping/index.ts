@@ -29,14 +29,14 @@ import {
 import { tryHintLookup } from './hints/hint-lookup';
 import { buildMediaFromMetadataHint } from './hints/media-hints';
 import { resolvePrequelStatic } from './hints/prequel-static';
-import { MappingOverridesService } from './overrides.service';
+import { MappingOverridesService } from './overrides';
 import {
   type LookupClientCredentials,
   type ProviderLookupClient,
   type ProviderLookupResult,
-} from './provider-lookup.client';
+} from './lookup';
 import { resolveViaPipeline } from './pipeline/pipeline';
-import { StaticMappingProvider, type StaticMappingPayload } from './static-mapping.provider';
+import { StaticMappingProvider, type StaticMappingPayload } from './static';
 import type { ResolveExternalIdOptions, ResolveHints, ResolveTvdbIdOptions, ResolvedMapping } from './types';
 
 type ProviderCaches = {
@@ -164,9 +164,9 @@ export class MappingService {
     }
 
     const providerCaches = this.caches[provider];
-    const providerLabel = getProviderLabel(provider);
-    const expectedExternalIdKind = this.lookupClients[provider].externalIdKind;
     const cacheKey = this.successCacheKey(provider, anilistId);
+
+    // Override check
     const overrideExternalId = this.overrides?.get(provider, anilistId) ?? null;
     if (overrideExternalId) {
       this.clearUnresolvedMapping(provider, anilistId);
@@ -195,6 +195,7 @@ export class MappingService {
       return { externalId: overrideExternalId };
     }
 
+    // Success cache
     const cachedSuccess = await providerCaches.success.read(cacheKey);
     if (cachedSuccess) {
       if (import.meta.env.DEV) {
@@ -210,6 +211,7 @@ export class MappingService {
       return cachedSuccess.value;
     }
 
+    // Failure cache
     if (!bypassFailureCache) {
       const cachedFailure = await providerCaches.failure.read(this.failureCacheKey(provider, anilistId));
       if (cachedFailure) {
@@ -222,32 +224,24 @@ export class MappingService {
       }
     }
 
+    // Static hit
     const staticHit = this.getUpstreamStaticExternalId(provider, anilistId);
     if (staticHit) {
       incrementCounter('mapping.lookup.static_hit');
-      const resolved: ResolvedMapping = { externalId: staticHit };
-      await providerCaches.success.write(cacheKey, resolved, {
-        staleMs: RESOLVED_PERSIST_MS,
-        hardMs: RESOLVED_PERSIST_MS,
-      });
-      await providerCaches.failure.remove(this.failureCacheKey(provider, anilistId));
-      this.clearUnresolvedMapping(provider, anilistId);
-      if (this.isCandidateSuppressed(provider, anilistId, resolved.externalId)) {
-        return null;
-      }
-      this.recordResolvedMapping(provider, anilistId, resolved, 'upstream');
-      return resolved;
+      return this.acceptResolved(provider, anilistId, { externalId: staticHit }, 'upstream');
     }
 
+    // Network disabled
     if (options.network === 'never') {
       throw createError(
         ErrorCode.VALIDATION_ERROR,
         `AniList ID ${anilistId} requires a network lookup but network access is disabled.`,
-        `Unable to resolve this title without contacting ${providerLabel}.`,
+        `Unable to resolve this title without contacting ${getProviderLabel(provider)}.`,
         { reason: 'network-disabled', provider },
       );
     }
 
+    // Hint lookup
     const hintTerm = options.hints?.primaryTitle?.trim();
     if (hintTerm) {
       try {
@@ -260,23 +254,56 @@ export class MappingService {
           options.forceLookupNetwork === true,
         );
         if (hinted) {
-          await providerCaches.success.write(cacheKey, hinted, {
-            staleMs: RESOLVED_PERSIST_MS,
-            hardMs: RESOLVED_PERSIST_MS,
-          });
-          await providerCaches.failure.remove(this.failureCacheKey(provider, anilistId));
-          this.clearUnresolvedMapping(provider, anilistId);
-          if (this.isCandidateSuppressed(provider, anilistId, hinted.externalId)) {
-            return null;
-          }
-          this.recordResolvedMapping(provider, anilistId, hinted, 'auto');
-          return hinted;
+          return this.acceptResolved(provider, anilistId, hinted, 'auto');
         }
       } catch (error) {
         logError(normalizeError(error), `MappingService:hintLookup:${provider}:${anilistId}`);
       }
     }
 
+    // Network pipeline
+    return this.attemptNetworkResolution(provider, anilistId, options, bypassFailureCache);
+  }
+
+  private async acceptResolved(
+    provider: MappingProvider,
+    anilistId: number,
+    resolved: ResolvedMapping,
+    source: 'auto' | 'upstream',
+  ): Promise<ResolvedMapping | null> {
+    await this.caches[provider].success.write(
+      this.successCacheKey(provider, anilistId),
+      resolved,
+      { staleMs: RESOLVED_PERSIST_MS, hardMs: RESOLVED_PERSIST_MS },
+    );
+    await this.caches[provider].failure.remove(this.failureCacheKey(provider, anilistId));
+    this.clearUnresolvedMapping(provider, anilistId);
+    if (this.isCandidateSuppressed(provider, anilistId, resolved.externalId)) {
+      return null;
+    }
+    this.recordResolvedMapping(provider, anilistId, resolved, source);
+    return resolved;
+  }
+
+  private async cacheFailure(
+    provider: MappingProvider,
+    anilistId: number,
+    error: ExtensionError,
+  ): Promise<void> {
+    const ttl = this.failureTtlsFor(error);
+    await this.caches[provider].failure.write(
+      this.failureCacheKey(provider, anilistId),
+      error,
+      { staleMs: ttl.stale, hardMs: ttl.hard },
+    );
+  }
+
+  private async attemptNetworkResolution(
+    provider: MappingProvider,
+    anilistId: number,
+    options: ResolveExternalIdOptions,
+    bypassFailureCache: boolean,
+  ): Promise<ResolvedMapping | null> {
     let resolved: ResolvedMapping | null;
     try {
       if (import.meta.env.DEV) {
@@ -295,59 +322,37 @@ export class MappingService {
       const normalized = normalizeError(error);
       if (normalized.code === ErrorCode.VALIDATION_ERROR) {
         if (!bypassFailureCache) {
-          const ttl = this.failureTtlsFor(normalized);
-          await providerCaches.failure.write(this.failureCacheKey(provider, anilistId), normalized, {
-            staleMs: ttl.stale,
-            hardMs: ttl.hard,
-          });
+          await this.cacheFailure(provider, anilistId, normalized);
         }
         return null;
       }
 
       if (!bypassFailureCache && this.shouldCacheFailure(normalized)) {
-        const ttl = this.failureTtlsFor(normalized);
-        await providerCaches.failure.write(this.failureCacheKey(provider, anilistId), normalized, {
-          staleMs: ttl.stale,
-          hardMs: ttl.hard,
-        });
+        await this.cacheFailure(provider, anilistId, normalized);
       }
       throw normalized;
     }
 
     if (resolved === null) {
       if (!bypassFailureCache) {
-        const noMatchError = createError(
+        const expectedExternalIdKind = this.lookupClients[provider].externalIdKind;
+        await this.cacheFailure(provider, anilistId, createError(
           ErrorCode.VALIDATION_ERROR,
           `No ${expectedExternalIdKind.toUpperCase()} match found for AniList ID ${anilistId}.`,
           `No matching ${expectedExternalIdKind.toUpperCase()} entry was found.`,
           { reason: 'no-match', provider },
-        );
-        const ttl = this.failureTtlsFor(noMatchError);
-        await providerCaches.failure.write(this.failureCacheKey(provider, anilistId), noMatchError, {
-          staleMs: ttl.stale,
-          hardMs: ttl.hard,
-        });
+        ));
       }
       this.recordUnresolvedMapping(provider, anilistId, options.hints);
       return null;
     }
 
-    this.clearUnresolvedMapping(provider, anilistId);
-    await providerCaches.success.write(cacheKey, resolved, {
-      staleMs: RESOLVED_PERSIST_MS,
-      hardMs: RESOLVED_PERSIST_MS,
-    });
-    await providerCaches.failure.remove(this.failureCacheKey(provider, anilistId));
-    if (this.isCandidateSuppressed(provider, anilistId, resolved.externalId)) {
-      return null;
-    }
-    this.recordResolvedMapping(provider, anilistId, resolved, 'auto');
     if (import.meta.env.DEV) {
       this.log.debug?.(
         `mapping:network-success provider=${provider} anilistId=${anilistId} ${resolved.externalId.kind}Id=${resolved.externalId.id}${resolved.successfulSynonym ? ` synonym="${resolved.successfulSynonym}"` : ''}`,
       );
     }
-    return resolved;
+    return this.acceptResolved(provider, anilistId, resolved, 'auto');
   }
 
   private evictAniListMedia(anilistId: number): void {
