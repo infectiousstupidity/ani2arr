@@ -8,14 +8,10 @@
   <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/">
     <img src="https://img.shields.io/badge/Firefox-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white&labelColor=1f2328&color=1f2328" alt="Firefox">
   </a>
-  <a href="https://chrome.google.com/webstore/detail/your-extension-id">
-    <img src="https://img.shields.io/badge/Chrome-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white&labelColor=1f2328&color=1f2328" alt="Chrome">
-  </a>
   <a href="https://github.com/infectiousstupidity/ani2arr/releases">
     <img src="https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white&labelColor=1f2328&color=1f2328" alt="GitHub">
   </a>
 </p>
-
 
 <h1 align="center">ani2arr</h1>
 <br><br>
@@ -61,6 +57,7 @@ pnpm run dev:firefox
 
 # validate
 pnpm run lint
+pnpm run compile
 pnpm run build
 pnpm run build:firefox
 
@@ -70,7 +67,7 @@ pnpm run zip:firefox
 ```
 
 ## Security & privacy
-- Sonarr and Radarr credentials are stored in `browser.storage.local` on the user's device. See [`src/shared/arr/validation.ts`](src/shared/arr/validation.ts) for shared runtime permission checks.
+- Sonarr and Radarr credentials are stored in `browser.storage.local` on the user's device. See [`src/shared/providers/common/validation.ts`](src/shared/providers/common/validation.ts) for shared URL, API key, and permission validation helpers, plus the provider-specific wrappers in [`src/shared/providers/sonarr/validation.ts`](src/shared/providers/sonarr/validation.ts) and [`src/shared/providers/radarr/validation.ts`](src/shared/providers/radarr/validation.ts).
 - The extension does not use a developer-operated backend or analytics service.
 - Firefox host access is requested for the exact Sonarr or Radarr origin the user enters in settings. Broad optional host patterns are declared only so Firefox can grant those user-chosen origins at runtime.
 - See [`PRIVACY.md`](PRIVACY.md) for the user-facing privacy policy.

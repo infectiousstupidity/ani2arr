@@ -4,11 +4,11 @@ import type { AnilistApiService } from '@/clients/anilist.api';
 import type { RadarrApiService } from '@/clients/radarr.api';
 import type { SonarrApiService } from '@/clients/sonarr.api';
 import type { MappingService } from '@/services/mapping';
-import type { MappingOverridesService } from '@/services/mapping/overrides.service';
+import type { MappingOverridesService } from '@/services/mapping/overrides';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { RadarrLibrary } from '@/services/library/radarr';
 import type { AniListMetadataStore } from '@/services/anilist';
-import type { StaticMappingProvider } from '@/services/mapping/static-mapping.provider';
+import type { StaticMappingProvider } from '@/services/mapping/static';
 import type {
   AniMedia,
   ExtensionOptions,

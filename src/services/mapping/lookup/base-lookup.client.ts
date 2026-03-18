@@ -28,6 +28,22 @@ const LOOKUP_NEGATIVE_HARD_TTL = 48 * 60 * 60 * 1000; // 48 hours
 
 const LOOKUP_LATENCY_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
 
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason: unknown) => void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 export type LookupCaches<TResult> = {
   positive: TtlCache<TResult[]>;
   negative: TtlCache<boolean>;
@@ -126,13 +142,8 @@ export abstract class BaseLookupClient<TResult extends ProviderLookupResult>
     }
 
     // Create a deferred promise and set it as inflight BEFORE any awaits
-    let resolveFn!: (v: TResult[]) => void;
-    let rejectFn!: (e: unknown) => void;
-    const deferred = new Promise<TResult[]>((resolve, reject) => {
-      resolveFn = resolve;
-      rejectFn = reject;
-    });
-    this.inflight.set(canonical, deferred);
+    const deferred = createDeferred<TResult[]>();
+    this.inflight.set(canonical, deferred.promise);
 
     (async () => {
       try {
@@ -141,7 +152,7 @@ export abstract class BaseLookupClient<TResult extends ProviderLookupResult>
           if (positiveHit && !positiveHit.stale) {
             incrementCounter('mapping.lookup.cache_hit');
             this.log.debug(`lookup(${canonical}): returning fresh positive cache (deferred)`);
-            resolveFn(positiveHit.value);
+            deferred.resolve(positiveHit.value);
             return;
           }
 
@@ -149,7 +160,7 @@ export abstract class BaseLookupClient<TResult extends ProviderLookupResult>
           if (negativeHit && !negativeHit.stale) {
             incrementCounter('mapping.lookup.negative_cache_hit');
             this.log.debug(`lookup(${canonical}): returning fresh negative cache (deferred)`);
-            resolveFn([]);
+            deferred.resolve([]);
             return;
           }
         }
@@ -168,15 +179,15 @@ export abstract class BaseLookupClient<TResult extends ProviderLookupResult>
           });
           await this.caches.positive.remove(canonical);
         }
-        resolveFn(results);
+        deferred.resolve(results);
       } catch (error) {
-        rejectFn(normalizeError(error));
+        deferred.reject(normalizeError(error));
       } finally {
         this.inflight.delete(canonical);
       }
     })();
 
-    return deferred;
+    return deferred.promise;
   }
 
   public abstract getExternalId(result: unknown): number | null;

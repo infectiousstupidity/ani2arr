@@ -1,4 +1,4 @@
-// src/services/mapping/static-mapping.provider.ts
+// src/services/mapping/static/static-mapping.provider.ts
 import type { TtlCache } from '@/cache';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
@@ -10,6 +10,7 @@ const FALLBACK_URL = 'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/ma
 const STATIC_SOFT_TTL = 24 * 60 * 60 * 1000; // 1 day
 const STATIC_HARD_TTL = STATIC_SOFT_TTL * 7;
 const CACHE_KEY = 'static';
+const FALLBACK_FETCH: typeof fetch = (...args) => fetch(...args);
 
 export type StaticMappingSource = 'primary' | 'fallback';
 
@@ -46,7 +47,7 @@ export class StaticMappingProvider {
       options.fetch ?? (typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined);
     // Always bind to globalThis so calling via instance (this.fetchImpl) preserves the expected `this`.
     // This avoids: "'fetch' called on an object that does not implement interface Window."
-    this.fetchImpl = rawFetch ? rawFetch.bind(globalThis) : ((...args: Parameters<typeof fetch>) => fetch(...args));
+    this.fetchImpl = rawFetch ? rawFetch.bind(globalThis) : FALLBACK_FETCH;
   }
 
   public async init(): Promise<void> {
@@ -255,13 +256,13 @@ export class StaticMappingProvider {
 
   private coerceId(value: unknown): number | null {
     if (typeof value === 'number' && Number.isFinite(value)) {
-      return value | 0;
+      return Math.trunc(value);
     }
 
     if (typeof value === 'string') {
       const parsed = Number.parseInt(value, 10);
       if (Number.isFinite(parsed)) {
-        return parsed | 0;
+        return Math.trunc(parsed);
       }
     }
 

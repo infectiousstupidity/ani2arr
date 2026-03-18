@@ -2,7 +2,7 @@ import type { MappingProvider } from '@/shared/types';
 import type { ScoredCandidate } from './types';
 import type { SearchTerm } from './search-term-generator';
 import { computeTitleMatchScoreForProvider } from '@/services/mapping/pipeline/matching';
-import type { ProviderLookupResult } from '../provider-lookup.client';
+import type { ProviderLookupResult } from '../lookup';
 
 export function scoreCandidates<TResult extends ProviderLookupResult>(
   provider: MappingProvider,
