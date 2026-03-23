@@ -152,7 +152,6 @@ const BrowseContentApp = createBrowseContentApp(browseAdapter);
 const stylesText = `${baseStyles}\n${browseStyles}`;
 
 const main = createBrowseContentMain({
-  logName: 'AniList Browse Content',
   uiName: 'a2a-browse-root',
   styleAttribute: 'data-a2a-browse',
   shadowStyleAttribute: 'data-a2a-browse-shadow',

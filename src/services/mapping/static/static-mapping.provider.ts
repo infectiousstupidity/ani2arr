@@ -1,5 +1,6 @@
 // src/services/mapping/static/static-mapping.provider.ts
 import type { TtlCache } from '@/lib/storage';
+import { STORAGE_POLICIES } from '@/lib/storage';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 import type { ScopedLogger } from '@/shared/utils/logger';
@@ -7,8 +8,6 @@ import type { ScopedLogger } from '@/shared/utils/logger';
 const PRIMARY_URL = 'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json';
 const FALLBACK_URL = 'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json';
 
-const STATIC_SOFT_TTL = 24 * 60 * 60 * 1000; // 1 day
-const STATIC_HARD_TTL = STATIC_SOFT_TTL * 7;
 const CACHE_KEY = 'static';
 const FALLBACK_FETCH: typeof fetch = (...args) => fetch(...args);
 
@@ -129,8 +128,8 @@ export class StaticMappingProvider {
         CACHE_KEY,
         { pairs },
         {
-          staleMs: STATIC_SOFT_TTL,
-          hardMs: STATIC_HARD_TTL,
+          staleMs: STORAGE_POLICIES.staticMappings.staleMs,
+          hardMs: STORAGE_POLICIES.staticMappings.hardMs,
           ...(nextEtag ? { meta: { etag: nextEtag } } : {}),
         },
       );

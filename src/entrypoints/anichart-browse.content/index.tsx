@@ -151,7 +151,6 @@ const BrowseContentApp = createBrowseContentApp(browseAdapter);
 const stylesText = `${baseStyles}\n${browseStyles}`;
 
 const main = createBrowseContentMain({
-  logName: 'AniChart Browse Content',
   uiName: 'a2a-anichart-root',
   styleAttribute: 'data-a2a-anichart',
   shadowStyleAttribute: 'data-a2a-anichart-shadow',

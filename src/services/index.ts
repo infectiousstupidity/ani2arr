@@ -1,8 +1,14 @@
+// src/services/index.ts
 import { browser } from 'wxt/browser';
 import {
+  anilistMediaCache,
   bumpRevision,
   createTtlCache,
   getExtensionOptionsSnapshot,
+  providerLibraryCaches,
+  radarrLookupCaches,
+  sonarrLookupCaches,
+  staticMappingCaches,
 } from '@/lib/storage';
 import { CACHE_NAMESPACES } from '@/lib/storage/keys';
 import { SonarrApiService } from '@/clients/sonarr.api';
@@ -70,24 +76,15 @@ export const createApiImplementation = (): Ani2arrApi => {
 
   const anilistApiService = bindAll(
     new AnilistApiService({
-      media: createTtlCache<AniMedia>(CACHE_NAMESPACES.anilistMedia),
+      media: anilistMediaCache,
     }),
   );
 
-  const staticProvider = new StaticMappingProvider({
-    primary: createTtlCache<StaticMappingPayload>(CACHE_NAMESPACES.mappingStaticPrimary),
-    fallback: createTtlCache<StaticMappingPayload>(CACHE_NAMESPACES.mappingStaticFallback),
-  });
+  const staticProvider = new StaticMappingProvider(staticMappingCaches);
 
-  const lookupClient = new SonarrLookupClient(sonarrApiService, {
-    positive: createTtlCache<SonarrLookupSeries[]>(CACHE_NAMESPACES.mappingLookupPositiveSonarr),
-    negative: createTtlCache<boolean>(CACHE_NAMESPACES.mappingLookupNegativeSonarr),
-  });
+  const lookupClient = new SonarrLookupClient(sonarrApiService, sonarrLookupCaches);
 
-  const radarrLookupClient = new RadarrLookupClient(radarrApiService, {
-    positive: createTtlCache<RadarrLookupMovie[]>(CACHE_NAMESPACES.mappingLookupPositiveRadarr),
-    negative: createTtlCache<boolean>(CACHE_NAMESPACES.mappingLookupNegativeRadarr),
-  });
+  const radarrLookupClient = new RadarrLookupClient(radarrApiService, radarrLookupCaches);
 
   const overridesService = new MappingOverridesService();
   const overridesReady = overridesService.init();
@@ -185,7 +182,7 @@ export const createApiImplementation = (): Ani2arrApi => {
     new SonarrLibrary(
       sonarrApiService,
       mappingService,
-      { lean: createTtlCache<LeanSonarrSeries[]>(CACHE_NAMESPACES.libraryLeanSonarr) },
+      providerLibraryCaches.sonarr,
       mutation => bumpLibraryRevision('sonarr', { tvdbId: mutation.tvdbId, action: mutation.action }),
     ),
   );
@@ -194,7 +191,7 @@ export const createApiImplementation = (): Ani2arrApi => {
     new RadarrLibrary(
       radarrApiService,
       mappingService,
-      { lean: createTtlCache<LeanRadarrMovie[]>(CACHE_NAMESPACES.libraryLeanRadarr) },
+      providerLibraryCaches.radarr,
       mutation => bumpLibraryRevision('radarr', { tmdbId: mutation.tmdbId, action: mutation.action }),
     ),
   );

@@ -20,6 +20,9 @@ export {
   resetAllRevisions,
 } from './revisions.store';
 
+// Policies
+export { STORAGE_POLICIES } from './policies';
+
 // Mapping user state persistence
 export type {
   MappingOverrideEntry,
@@ -39,6 +42,12 @@ export {
 
 export type { PersistedMapOptions } from '@/services/mapping/overrides/persisted-map';
 export { PersistedMap } from '@/services/mapping/overrides/persisted-map';
+
+// Typed cache wrappers
+export { anilistMediaCache } from './anilist-media.cache';
+export { staticMappingCaches } from './static-mapping.cache';
+export { sonarrLookupCaches, radarrLookupCaches } from './lookup.cache';
+export { providerLibraryCaches } from './provider-library.cache';
 
 // TTL cache primitives
 export type {
