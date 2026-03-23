@@ -2,7 +2,6 @@
 import { useCallback, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
-import { clearPersistedQueryCache } from '@/cache/query-cache';
 import type { MappingProvider } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
 import { queryKeys } from '@/shared/queries';
@@ -54,12 +53,6 @@ export function useA2aBroadcasts(): void {
     await queryClient.cancelQueries();
     queryClient.clear();
     clearA2aSessionStorage();
-
-    try {
-      await clearPersistedQueryCache();
-    } catch (error) {
-      log.warn('Failed to clear persisted query cache.', error instanceof Error ? error.message : String(error));
-    }
   }, [queryClient]);
 
   useEffect(() => {

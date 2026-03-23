@@ -1,12 +1,9 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { QueryClient } from '@tanstack/react-query';
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 import { awaitBackgroundReady } from '@/shared/utils/background-ready';
-import { createPersistOptions } from '@/cache/persist-options';
-import { logger } from '@/shared/utils/logger';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { createShadowRootUi, type ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 
@@ -24,8 +21,6 @@ export interface BrowseBootstrapOptions {
 }
 
 export const createBrowseContentMain = (options: BrowseBootstrapOptions) => {
-  const log = logger.create(options.logName);
-
   return async (ctx: ContentScriptContext): Promise<void> => {
     // Ensure background is awake before rendering and kicking off any RPCs.
     await awaitBackgroundReady();
@@ -39,8 +34,6 @@ export const createBrowseContentMain = (options: BrowseBootstrapOptions) => {
         },
       },
     });
-
-    const persistOptions = createPersistOptions(log);
 
     let ui: ShadowRootContentScriptUi<Root> | null = null;
     let root: Root | null = null;
@@ -97,13 +90,13 @@ export const createBrowseContentMain = (options: BrowseBootstrapOptions) => {
           root = createRoot(container);
           root.render(
             <React.StrictMode>
-              <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+              <QueryClientProvider client={queryClient}>                
                 <TooltipProvider>
                   <ConfirmProvider portalContainer={portalContainer}>
                     {options.renderRoot(portalContainer)}
                   </ConfirmProvider>
                 </TooltipProvider>
-              </PersistQueryClientProvider>
+              </QueryClientProvider>
             </React.StrictMode>,
           );
           return root;
