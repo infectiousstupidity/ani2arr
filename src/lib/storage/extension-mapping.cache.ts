@@ -1,6 +1,8 @@
 /** Typed cache for extension-derived mapping results that are persisted as replaceable cache, not canonical truth. */
 // src/lib/storage/extension-mapping.cache.ts
 
+// TODO: Refactor the mapping service to use this cache.
+
 import { createTtlCache, type CacheHit } from './ttl-cache';
 import { CACHE_NAMESPACES } from './keys';
 import { STORAGE_POLICIES } from './policies';
