@@ -7,14 +7,14 @@ import {
   providerLibraryCaches,
   radarrLookupCaches,
   sonarrLookupCaches,
-  staticMappingCaches,
+  upstreamMappingCaches,
 } from '@/lib/storage';
 import { SonarrApiService } from '@/clients/sonarr.api';
 import { RadarrApiService } from '@/clients/radarr.api';
 import { AnilistApiService } from '@/clients/anilist.api';
 import { MappingService } from './mapping';
 import { MappingOverridesService } from './mapping/overrides';
-import { StaticMappingProvider } from './mapping/static';
+import { UpstreamMappingProvider } from './mapping/upstream';
 import { SonarrLookupClient, RadarrLookupClient } from './mapping/lookup';
 import { SonarrLibrary } from '@/services/library/sonarr';
 import { RadarrLibrary } from '@/services/library/radarr';
@@ -72,7 +72,7 @@ export const createApiImplementation = (): Ani2arrApi => {
     }),
   );
 
-  const staticProvider = new StaticMappingProvider(staticMappingCaches);
+  const staticProvider = new UpstreamMappingProvider(upstreamMappingCaches);
 
   const lookupClient = new SonarrLookupClient(sonarrApiService, sonarrLookupCaches);
 

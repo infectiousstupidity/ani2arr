@@ -1,6 +1,10 @@
+/** Authoritative persistence for user-authored mapping decisions such as overrides, ignores, and candidate suppressions. */
+// src/lib/storage/user-mapping.store.ts
+
 import { storage } from '@wxt-dev/storage';
 import type { MappingExternalId, MappingProvider } from '@/shared/types';
 import { STORAGE_KEYS } from './keys';
+
 
 export interface MappingOverrideEntry {
   provider: MappingProvider;

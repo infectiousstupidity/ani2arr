@@ -1,5 +1,5 @@
 import type { MappingOverridesService } from '@/services/mapping/overrides';
-import type { StaticMappingProvider } from '@/services/mapping/static';
+import type { UpstreamMappingProvider } from '@/services/mapping/upstream';
 import type { MappingService } from '@/services/mapping';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { RadarrLibrary } from '@/services/library/radarr';
@@ -15,7 +15,7 @@ export type GetMappingsInput = {
 
 type GetMappingsDeps = {
   overridesService: MappingOverridesService;
-  staticProvider: StaticMappingProvider;
+  staticProvider: UpstreamMappingProvider;
   mappingService: MappingService;
   sonarrLibrary: SonarrLibrary;
   radarrLibrary: RadarrLibrary;

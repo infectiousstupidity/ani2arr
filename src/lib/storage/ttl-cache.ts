@@ -1,4 +1,6 @@
+/** Generic IndexedDB-backed TTL cache primitive used by typed cache wrappers. */
 // src/lib/storage/ttl-cache.ts
+
 import { deleteDB, openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { logger } from '@/shared/utils/logger';
 

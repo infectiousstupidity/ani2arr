@@ -1,4 +1,4 @@
-// src/services/mapping/static/static-mapping.provider.ts
+// src/services/mapping/upstream/upstream-mapping.provider.ts
 import type { TtlCache } from '@/lib/storage';
 import { STORAGE_POLICIES } from '@/lib/storage';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
@@ -8,31 +8,31 @@ import type { ScopedLogger } from '@/shared/utils/logger';
 const PRIMARY_URL = 'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json';
 const FALLBACK_URL = 'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json';
 
-const CACHE_KEY = 'static';
+const CACHE_KEY = 'upstream';
 const FALLBACK_FETCH: typeof fetch = (...args) => fetch(...args);
 
-export type StaticMappingSource = 'primary' | 'fallback';
+export type UpstreamMappingSource = 'primary' | 'fallback';
 
-export interface StaticMappingPayload {
+export interface upstreamMappingPayload {
   pairs: Record<number, number>;
 }
 
-export interface StaticMappingHit {
+export interface UpstreamMappingHit {
   tvdbId: number;
-  source: StaticMappingSource;
+  source: UpstreamMappingSource;
 }
 
-export interface StaticMappingProviderOptions {
+export interface UpstreamMappingProviderOptions {
   fetch?: typeof fetch;
   scope?: string;
 }
 
-type StaticCaches = {
-  primary: TtlCache<StaticMappingPayload>;
-  fallback: TtlCache<StaticMappingPayload>;
+type UpstreamCaches = {
+  primary: TtlCache<upstreamMappingPayload>;
+  fallback: TtlCache<upstreamMappingPayload>;
 };
 
-export class StaticMappingProvider {
+export class UpstreamMappingProvider {
   private readonly log: ScopedLogger;
   private readonly fetchImpl: typeof fetch;
   private readonly primaryPairs = new Map<number, number>();
@@ -40,8 +40,8 @@ export class StaticMappingProvider {
   private readonly fallbackPairs = new Map<number, number>();
   private readonly fallbackReverse = new Map<number, Set<number>>();
 
-  constructor(private readonly caches: StaticCaches, options: StaticMappingProviderOptions = {}) {
-    this.log = logger.create(options.scope ?? 'StaticMappingProvider');
+  constructor(private readonly caches: UpstreamCaches, options: UpstreamMappingProviderOptions = {}) {
+    this.log = logger.create(options.scope ?? 'UpstreamMappingProvider');
     const rawFetch: typeof fetch | undefined =
       options.fetch ?? (typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined);
     // Always bind to globalThis so calling via instance (this.fetchImpl) preserves the expected `this`.
@@ -53,25 +53,25 @@ export class StaticMappingProvider {
     await Promise.all([this.ensureLoaded('primary'), this.ensureLoaded('fallback')]);
 
     // If nothing is in memory yet (first run, cold cache), perform a blocking
-    // refresh so early lookups can benefit from static pairs and avoid
+    // refresh so early lookups can benefit from upstream pairs and avoid
     // unnecessary upstream requests.
     if (this.primaryPairs.size === 0 && this.fallbackPairs.size === 0) {
       await this.refreshAll().catch(error => {
-        logError(normalizeError(error), 'StaticMappingProvider:init:refreshAll');
+        logError(normalizeError(error), 'UpstreamMappingProvider:init:refreshAll');
       });
       return;
     }
 
     // Otherwise refresh in the background.
     void this.refresh('primary').catch(error => {
-      logError(normalizeError(error), 'StaticMappingProvider:init:primary');
+      logError(normalizeError(error), 'UpstreamMappingProvider:init:primary');
     });
     void this.refresh('fallback').catch(error => {
-      logError(normalizeError(error), 'StaticMappingProvider:init:fallback');
+      logError(normalizeError(error), 'UpstreamMappingProvider:init:fallback');
     });
   }
 
-  public get(anilistId: number): StaticMappingHit | null {
+  public get(anilistId: number): UpstreamMappingHit | null {
     const primary = this.primaryPairs.get(anilistId);
     if (typeof primary === 'number') {
       return { tvdbId: primary, source: 'primary' };
@@ -89,7 +89,7 @@ export class StaticMappingProvider {
     await Promise.all([this.refresh('primary'), this.refresh('fallback')]);
   }
 
-  public async refresh(source: StaticMappingSource): Promise<void> {
+  public async refresh(source: UpstreamMappingSource): Promise<void> {
     const cache = this.cacheFor(source);
     const map = this.mapFor(source);
     const url = this.urlFor(source);
@@ -114,9 +114,9 @@ export class StaticMappingProvider {
       }
 
       if (!response.ok) {
-        const message = `Failed to fetch static mapping (${response.status})`;
+        const message = `Failed to fetch upstream mapping (${response.status})`;
         this.log.warn(`refresh(${source}): ${message}`);
-        throw createError(ErrorCode.NETWORK_ERROR, message, 'Unable to refresh static mappings.');
+        throw createError(ErrorCode.NETWORK_ERROR, message, 'Unable to refresh upstream mappings.');
       }
 
       const payload = (await response.json()) as unknown;
@@ -128,8 +128,8 @@ export class StaticMappingProvider {
         CACHE_KEY,
         { pairs },
         {
-          staleMs: STORAGE_POLICIES.staticMappings.staleMs,
-          hardMs: STORAGE_POLICIES.staticMappings.hardMs,
+          staleMs: STORAGE_POLICIES.upstreamMappings.staleMs,
+          hardMs: STORAGE_POLICIES.upstreamMappings.hardMs,
           ...(nextEtag ? { meta: { etag: nextEtag } } : {}),
         },
       );
@@ -152,7 +152,7 @@ export class StaticMappingProvider {
     ]);
   }
 
-  private async ensureLoaded(source: StaticMappingSource): Promise<void> {
+  private async ensureLoaded(source: UpstreamMappingSource): Promise<void> {
     const map = this.mapFor(source);
     if (map.size > 0) return;
 
@@ -162,19 +162,19 @@ export class StaticMappingProvider {
     }
   }
 
-  private cacheFor(source: StaticMappingSource): TtlCache<StaticMappingPayload> {
+  private cacheFor(source: UpstreamMappingSource): TtlCache<upstreamMappingPayload> {
     return source === 'primary' ? this.caches.primary : this.caches.fallback;
   }
 
-  private mapFor(source: StaticMappingSource): Map<number, number> {
+  private mapFor(source: UpstreamMappingSource): Map<number, number> {
     return source === 'primary' ? this.primaryPairs : this.fallbackPairs;
   }
 
-  private reverseFor(source: StaticMappingSource): Map<number, Set<number>> {
+  private reverseFor(source: UpstreamMappingSource): Map<number, Set<number>> {
     return source === 'primary' ? this.primaryReverse : this.fallbackReverse;
   }
 
-  private urlFor(source: StaticMappingSource): string {
+  private urlFor(source: UpstreamMappingSource): string {
     return source === 'primary' ? PRIMARY_URL : FALLBACK_URL;
   }
 
@@ -281,8 +281,8 @@ export class StaticMappingProvider {
     return Array.from(ids);
   }
 
-  public listAllPairs(): Array<{ anilistId: number; tvdbId: number; source: StaticMappingSource }> {
-    const entries: Array<{ anilistId: number; tvdbId: number; source: StaticMappingSource }> = [];
+  public listAllPairs(): Array<{ anilistId: number; tvdbId: number; source: UpstreamMappingSource }> {
+    const entries: Array<{ anilistId: number; tvdbId: number; source: UpstreamMappingSource }> = [];
     const seen = new Set<number>();
     for (const [anilistId, tvdbId] of this.primaryPairs.entries()) {
       entries.push({ anilistId, tvdbId, source: 'primary' });

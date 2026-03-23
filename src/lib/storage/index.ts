@@ -1,3 +1,4 @@
+/** Central export surface for the storage layer. Re-exports stores, caches, policies, and helpers. */
 // src/lib/storage/index.ts
 
 // Settings store API
@@ -31,21 +32,21 @@ export type {
   MappingIgnoreMap,
   MappingCandidateSuppressionEntry,
   MappingCandidateSuppressionMap,
-} from './mapping-user-state.store';
+} from './user-mapping.store';
 
 export {
   mappingOverridesStorage,
   mappingIgnoresStorage,
   mappingRejectedCandidatesStorage,
   mappingBlockedCandidatesStorage,
-} from './mapping-user-state.store';
+} from './user-mapping.store';
 
 export type { PersistedMapOptions } from './persisted-map';
 export { PersistedMap } from './persisted-map';
 
 // Typed cache wrappers
 export { anilistMediaCache } from './anilist-media.cache';
-export { staticMappingCaches } from './static-mapping.cache';
+export { upstreamMappingCaches } from './upstream-mapping.cache';
 export { sonarrLookupCaches, radarrLookupCaches } from './lookup.cache';
 export { providerLibraryCaches } from './provider-library.cache';
 
@@ -61,3 +62,5 @@ export {
   clearAllTtlCaches,
   createTtlCache,
 } from './ttl-cache';
+
+export { STORAGE_KEYS, REVISION_KEYS } from './keys';
