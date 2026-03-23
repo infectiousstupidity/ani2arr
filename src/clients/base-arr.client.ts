@@ -1,7 +1,6 @@
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 import { AbortError, withRetry } from '@/shared/utils/retry';
-
 export interface ArrCredentials {
   url: string;
   apiKey: string;
@@ -44,8 +43,19 @@ export class BaseArrClient {
     this.etagCache.clear();
   }
 
-  protected invalidateCachedEndpoint(endpoint: string): void {
-    this.etagCache.delete(this.normalizeEndpoint(endpoint));
+  protected invalidateCachedEndpoint(endpoint: string, baseUrl?: string): void {
+    const normalizedEndpoint = this.normalizeEndpoint(endpoint);
+
+    if (baseUrl) {
+      this.etagCache.delete(this.createEtagCacheKey(baseUrl, normalizedEndpoint));
+      return;
+    }
+
+    for (const key of Array.from(this.etagCache.keys())) {
+      if (key.endsWith(`|${normalizedEndpoint}`)) {
+        this.etagCache.delete(key);
+      }
+    }
   }
 
   protected async request<T>(
@@ -79,7 +89,7 @@ export class BaseArrClient {
 
           const method = (fetchOptions.method ?? 'GET').toString().toUpperCase();
           const normalizedEndpoint = this.normalizeEndpoint(endpoint);
-          const cacheKey = normalizedEndpoint;
+          const cacheKey = this.createEtagCacheKey(credentials.url, normalizedEndpoint);
           const isCacheable =
             method === 'GET' &&
             this.cacheableEndpoints.has(normalizedEndpoint) &&
@@ -194,5 +204,10 @@ export class BaseArrClient {
   private normalizeEndpoint(endpoint: string): string {
     const [path] = endpoint.split('?');
     return path ?? endpoint;
+  }
+
+  private createEtagCacheKey(baseUrl: string, normalizedEndpoint: string): string {
+    const origin = new URL(baseUrl).origin;
+    return `${origin}|${normalizedEndpoint}`;
   }
 }

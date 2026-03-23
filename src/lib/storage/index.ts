@@ -40,8 +40,8 @@ export {
   mappingBlockedCandidatesStorage,
 } from './mapping-user-state.store';
 
-export type { PersistedMapOptions } from '@/services/mapping/overrides/persisted-map';
-export { PersistedMap } from '@/services/mapping/overrides/persisted-map';
+export type { PersistedMapOptions } from './persisted-map';
+export { PersistedMap } from './persisted-map';
 
 // Typed cache wrappers
 export { anilistMediaCache } from './anilist-media.cache';
