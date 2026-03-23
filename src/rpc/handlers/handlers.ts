@@ -26,7 +26,6 @@ import {
   setExtensionOptionsSnapshot,
 } from '@/lib/storage';
 import { REVISION_KEYS } from '@/lib/storage/keys';
-import { clearPersistedQueryCache } from '@/cache/query-cache';
 import { buildRadarrPermissionPattern } from '@/shared/providers/radarr/validation';
 import { buildSonarrPermissionPattern } from '@/shared/providers/sonarr/validation';
 import type { getMappingsHandler, GetMappingsInput } from './get-mappings';
@@ -112,7 +111,6 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     ]);
 
     await clearAllTtlCaches();
-    await clearPersistedQueryCache();
     await browser.storage.local.remove([...RESET_REVISION_STORAGE_KEYS]);
   };
 
