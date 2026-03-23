@@ -3,18 +3,16 @@ import { browser } from 'wxt/browser';
 import {
   anilistMediaCache,
   bumpRevision,
-  createTtlCache,
   getExtensionOptionsSnapshot,
   providerLibraryCaches,
   radarrLookupCaches,
   sonarrLookupCaches,
   staticMappingCaches,
 } from '@/lib/storage';
-import { CACHE_NAMESPACES } from '@/lib/storage/keys';
 import { SonarrApiService } from '@/clients/sonarr.api';
 import { RadarrApiService } from '@/clients/radarr.api';
 import { AnilistApiService } from '@/clients/anilist.api';
-import { MappingService, type ResolvedMapping, type StaticMappingPayload } from './mapping';
+import { MappingService } from './mapping';
 import { MappingOverridesService } from './mapping/overrides';
 import { StaticMappingProvider } from './mapping/static';
 import { SonarrLookupClient, RadarrLookupClient } from './mapping/lookup';
@@ -27,15 +25,9 @@ import { updateSonarrSeriesHandler } from '@/rpc/handlers/update-series';
 import { createApiHandlers } from '@/rpc/handlers/handlers';
 
 import type {
-  AniMedia,
-  ExtensionError,
   ExtensionOptions,
-  LeanRadarrMovie,
-  LeanSonarrSeries,
   RadarrCredentialsPayload,
-  RadarrLookupMovie,
   SonarrCredentialsPayload,
-  SonarrLookupSeries,
 } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import type { Ani2arrApi } from '@/rpc';
@@ -134,12 +126,12 @@ export const createApiImplementation = (): Ani2arrApi => {
       },
       {
         sonarr: {
-          success: createTtlCache<ResolvedMapping>(CACHE_NAMESPACES.mappingResolvedSuccessSonarr),
-          failure: createTtlCache<ExtensionError>(CACHE_NAMESPACES.mappingResolvedFailureSonarr),
+          success: new Map(),
+          failure: new Map(),
         },
         radarr: {
-          success: createTtlCache<ResolvedMapping>(CACHE_NAMESPACES.mappingResolvedSuccessRadarr),
-          failure: createTtlCache<ExtensionError>(CACHE_NAMESPACES.mappingResolvedFailureRadarr),
+          success: new Map(),
+          failure: new Map(),
         },
       },
       overridesService,
