@@ -1,6 +1,13 @@
-// src/cache/ttl-cache.ts
+// src/lib/storage/ttl-cache.ts
 import { deleteDB, openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { logger } from '@/shared/utils/logger';
+
+// IndexedDB TTL cache database metadata.
+const TTL_CACHE_DB = {
+  name: 'a2a-cache-db',
+  version: 1,
+  store: 'ttl-cache-store',
+} as const;
 
 const log = logger.create('TtlCache');
 
@@ -32,12 +39,8 @@ export interface TtlCache<T> {
   clear(): Promise<void>;
 }
 
-const DB_NAME = 'a2a-cache-db';
-const STORE_NAME = 'ttl-cache-store';
-const DB_VERSION = 1;
-
 interface CacheDbSchema extends DBSchema {
-  [STORE_NAME]: {
+  [TTL_CACHE_DB.store]: {
     key: string;
     value: CacheEntry<unknown>;
   };
@@ -47,23 +50,23 @@ let dbPromise: Promise<IDBPDatabase<CacheDbSchema>> | null = null;
 const memoryFallback = new Map<string, CacheEntry<unknown>>();
 
 const openCacheDb = (): Promise<IDBPDatabase<CacheDbSchema>> =>
-  openDB<CacheDbSchema>(DB_NAME, DB_VERSION, {
+  openDB<CacheDbSchema>(TTL_CACHE_DB.name, TTL_CACHE_DB.version, {
     upgrade(db) {
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
+      if (!db.objectStoreNames.contains(TTL_CACHE_DB.store)) {
+        db.createObjectStore(TTL_CACHE_DB.store);
       }
     },
   });
 
 const recreateDb = async (): Promise<IDBPDatabase<CacheDbSchema>> => {
-  await deleteDB(DB_NAME);
+  await deleteDB(TTL_CACHE_DB.name);
   return openCacheDb();
 };
 
 const getDb = (): Promise<IDBPDatabase<CacheDbSchema>> => {
   if (!dbPromise) {
     dbPromise = openCacheDb().then(async db => {
-      if (db.objectStoreNames.contains(STORE_NAME)) {
+      if (db.objectStoreNames.contains(TTL_CACHE_DB.store)) {
         return db;
       }
 
@@ -94,7 +97,7 @@ export async function clearAllTtlCaches(): Promise<void> {
     }
   }
 
-  await deleteDB(DB_NAME, {
+  await deleteDB(TTL_CACHE_DB.name, {
     blocked() {
       // Force-close any lingering connections so the delete can proceed.
       // This can happen if a read/write was initiated concurrently.
@@ -125,11 +128,11 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
     }
 
     const db = await getDb();
-    const entry = (await db.get(STORE_NAME, keyFor(key))) as CacheEntry<T> | undefined;
+    const entry = (await db.get(TTL_CACHE_DB.store, keyFor(key))) as CacheEntry<T> | undefined;
     if (!entry) return null;
 
     if (now >= entry.expiresAt) {
-      await db.delete(STORE_NAME, keyFor(key));
+      await db.delete(TTL_CACHE_DB.store, keyFor(key));
       return null;
     }
 
@@ -152,7 +155,7 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
     };
     const memKey = keyFor(key);
     const db = await getDb();
-    await db.put(STORE_NAME, entry, memKey);
+    await db.put(TTL_CACHE_DB.store, entry, memKey);
     // Keep a shadow copy so reads still work if IDB evicts or is inaccessible.
     memoryFallback.set(memKey, entry as CacheEntry<unknown>);
   };
@@ -160,7 +163,7 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
   const remove = async (key: string): Promise<void> => {
     memoryFallback.delete(keyFor(key));
     const db = await getDb();
-    await db.delete(STORE_NAME, keyFor(key));
+    await db.delete(TTL_CACHE_DB.store, keyFor(key));
   };
 
   const clear = async (): Promise<void> => {
@@ -171,8 +174,8 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
       }
     }
     const db = await getDb();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
+    const tx = db.transaction(TTL_CACHE_DB.store, 'readwrite');
+    const store = tx.objectStore(TTL_CACHE_DB.store);
     const range = IDBKeyRange.bound(`${namespace}:`, `${namespace}:\uffff`);
     await store.delete(range);
     await tx.done;
