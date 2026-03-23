@@ -1,10 +1,3 @@
-// src/lib/storage/settings.store.ts
-
-/**
- * @file Defines and exports user-configurable extension settings.
- * Public-facing configuration is stored separately from sensitive
- * Sonarr credentials so that content scripts never touch the API key.
- */
 import { storage } from '@wxt-dev/storage';
 import * as v from 'valibot';
 import { SettingsSchema, createDefaultSettings } from '@/shared/schemas/settings';
@@ -15,46 +8,16 @@ import type {
   RadarrSecrets,
   SonarrSecrets,
 } from '@/shared/types';
-import { validateApiKey as validateRadarrApiKey, validateUrl as validateRadarrUrl } from '@/shared/providers/radarr/validation';
-import { validateUrl, validateApiKey } from '@/shared/providers/sonarr/validation';
+import {
+  validateApiKey as validateRadarrApiKey,
+  validateUrl as validateRadarrUrl,
+} from '@/shared/providers/radarr/validation';
+import { validateUrl as validateSonarrUrl, validateApiKey as validateSonarrApiKey } from '@/shared/providers/sonarr/validation';
 import { logger } from '@/shared/utils/logger';
+import { STORAGE_KEYS } from './keys';
 
-const createDefaultSecrets = (): SonarrSecrets => ({
-  apiKey: '',
-});
-
-const createDefaultRadarrSecrets = (): RadarrSecrets => ({
-  apiKey: '',
-});
-
-/**
- * Public configuration safe for content scripts. This intentionally excludes
- * the Sonarr API key and only mirrors a derived `isConfigured` flag.
- */
-export const publicOptions = storage.defineItem<PublicOptions>('local:publicOptions', {
-  fallback: createDefaultPublicOptions(),
-  version: 1,
-});
-
-/**
- * Sensitive credentials that may only be accessed from privileged contexts.
- */
-export const sonarrSecrets = storage.defineItem<SonarrSecrets>('local:sonarrSecrets', {
-  fallback: createDefaultSecrets(),
-  version: 1,
-});
-
-export const radarrSecrets = storage.defineItem<RadarrSecrets>('local:radarrSecrets', {
-  fallback: createDefaultRadarrSecrets(),
-  version: 1,
-});
-
-export const parseSettings = (raw: unknown): Settings => {
-  const result = v.safeParse(SettingsSchema, raw);
-  if (result.success) return result.output;
-  logger.warn('Storage mismatch, applying defaults', result.issues);
-  return v.parse(SettingsSchema, raw ?? {});
-};
+const createDefaultSonarrSecrets = (): SonarrSecrets => ({ apiKey: '' });
+const createDefaultRadarrSecrets = (): RadarrSecrets => ({ apiKey: '' });
 
 export function toPublicOptions(settings: ExtensionOptions): PublicOptions {
   return {
@@ -81,12 +44,67 @@ function createDefaultPublicOptions(): PublicOptions {
   return toPublicOptions(createDefaultSettings());
 }
 
+export const publicOptions = storage.defineItem<PublicOptions>(STORAGE_KEYS.publicOptions, {
+  fallback: createDefaultPublicOptions(),
+  version: 1,
+});
+
+export const sonarrSecrets = storage.defineItem<SonarrSecrets>(STORAGE_KEYS.sonarrSecrets, {
+  fallback: createDefaultSonarrSecrets(),
+  version: 1,
+});
+
+export const radarrSecrets = storage.defineItem<RadarrSecrets>(STORAGE_KEYS.radarrSecrets, {
+  fallback: createDefaultRadarrSecrets(),
+  version: 1,
+});
+
+export const parseSettings = (raw: unknown): Settings => {
+  const result = v.safeParse(SettingsSchema, raw);
+  if (result.success) return result.output;
+  logger.warn('Storage mismatch, applying defaults', result.issues);
+  return v.parse(SettingsSchema, raw ?? {});
+};
+
+function normalizeUrl(
+  value: string | undefined,
+  label: string,
+  validate: (value: string) => { isValid: boolean; error?: string; normalizedUrl?: string },
+): string {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return '';
+
+  const result = validate(trimmed);
+  if (!result.isValid) {
+    throw new Error(`Invalid ${label} URL: ${result.error ?? 'unknown'}`);
+  }
+
+  return result.normalizedUrl ?? trimmed;
+}
+
+function normalizeApiKey(
+  value: string | undefined,
+  label: string,
+  validate: (value: string) => { isValid: boolean; error?: string },
+): string {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return '';
+
+  const result = validate(trimmed);
+  if (!result.isValid) {
+    throw new Error(`Invalid ${label} API key: ${result.error ?? 'invalid format'}`);
+  }
+
+  return trimmed;
+}
+
 const getRawOptions = async () => {
   const [pub, sonarr, radarr] = await Promise.all([
     publicOptions.getValue(),
     sonarrSecrets.getValue(),
     radarrSecrets.getValue(),
   ]);
+
   return {
     providers: {
       sonarr: {
@@ -103,65 +121,18 @@ const getRawOptions = async () => {
   };
 };
 
-/**
- * Fetches the combined extension options (including secrets) for use in
- * background and options contexts.
- */
 export async function getExtensionOptionsSnapshot(): Promise<Settings> {
-  const raw = await getRawOptions();
-  return parseSettings(raw);
+  return parseSettings(await getRawOptions());
 }
 
-/**
- * Persists the full extension options, splitting the public slice from secrets.
- * Exposes a single call site for writes to keep the boolean mirror in sync.
- */
 export async function setExtensionOptionsSnapshot(options: ExtensionOptions): Promise<void> {
   const parsed = parseSettings(options);
 
-  let sonarrUrl = parsed.providers.sonarr.url ?? '';
-  if (sonarrUrl.trim() !== '') {
-    const vUrl = validateUrl(sonarrUrl);
-    if (!vUrl.isValid) {
-      throw new Error(`Invalid Sonarr URL: ${vUrl.error ?? 'unknown'}`);
-    }
-    sonarrUrl = vUrl.normalizedUrl ?? sonarrUrl.trim();
-  } else {
-    sonarrUrl = '';
-  }
+  const sonarrUrl = normalizeUrl(parsed.providers.sonarr.url, 'Sonarr', validateSonarrUrl);
+  const sonarrApiKey = normalizeApiKey(parsed.providers.sonarr.apiKey, 'Sonarr', validateSonarrApiKey);
 
-  let sonarrApiKey = parsed.providers.sonarr.apiKey ?? '';
-  if (sonarrApiKey.trim() !== '') {
-    const k = validateApiKey(sonarrApiKey);
-    if (!k.isValid) {
-      throw new Error(`Invalid Sonarr API key: ${k.error ?? 'invalid format'}`);
-    }
-    sonarrApiKey = sonarrApiKey.trim();
-  } else {
-    sonarrApiKey = '';
-  }
-
-  let radarrUrl = parsed.providers.radarr.url ?? '';
-  if (radarrUrl.trim() !== '') {
-    const vUrl = validateRadarrUrl(radarrUrl);
-    if (!vUrl.isValid) {
-      throw new Error(`Invalid Radarr URL: ${vUrl.error ?? 'unknown'}`);
-    }
-    radarrUrl = vUrl.normalizedUrl ?? radarrUrl.trim();
-  } else {
-    radarrUrl = '';
-  }
-
-  let radarrApiKey = parsed.providers.radarr.apiKey ?? '';
-  if (radarrApiKey.trim() !== '') {
-    const k = validateRadarrApiKey(radarrApiKey);
-    if (!k.isValid) {
-      throw new Error(`Invalid Radarr API key: ${k.error ?? 'invalid format'}`);
-    }
-    radarrApiKey = radarrApiKey.trim();
-  } else {
-    radarrApiKey = '';
-  }
+  const radarrUrl = normalizeUrl(parsed.providers.radarr.url, 'Radarr', validateRadarrUrl);
+  const radarrApiKey = normalizeApiKey(parsed.providers.radarr.apiKey, 'Radarr', validateRadarrApiKey);
 
   const sanitized: Settings = {
     ...parsed,
@@ -186,12 +157,6 @@ export async function setExtensionOptionsSnapshot(options: ExtensionOptions): Pr
   ]);
 }
 
-/**
- * Returns the current public configuration, merging in default values so
- * callers never have to defensively clone structures.
- */
 export async function getPublicOptionsSnapshot(): Promise<PublicOptions> {
-  const raw = await getRawOptions();
-  const parsed = parseSettings(raw);
-  return toPublicOptions(parsed);
+  return toPublicOptions(parseSettings(await getRawOptions()));
 }

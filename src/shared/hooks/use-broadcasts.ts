@@ -101,34 +101,27 @@ export function useA2aBroadcasts(): void {
     ) => {
       if (areaName !== 'local') return;
 
-      if (changes.libraryEpochSonarr) {
-        const next = changes.libraryEpochSonarr.newValue;
+      if (changes.sonarrLibraryRevision) {
+        const next = changes.sonarrLibraryRevision.newValue;
         if (typeof next === 'number') {
           refreshLibraryQueries('sonarr', next);
         }
       }
 
-      if (changes.libraryEpochRadarr) {
-        const next = changes.libraryEpochRadarr.newValue;
+      if (changes.radarrLibraryRevision) {
+        const next = changes.radarrLibraryRevision.newValue;
         if (typeof next === 'number') {
           refreshLibraryQueries('radarr', next);
         }
       }
 
-      if (changes.libraryEpoch) {
-        const next = changes.libraryEpoch.newValue;
-        if (typeof next === 'number') {
-          refreshLibraryQueries('sonarr', next);
-        }
-      }
-
-      if (changes.settingsEpoch) {
+      if (changes.settingsRevision) {
         refreshSettingsQueries();
-        syncSessionEpoch(SETTINGS_SESSION_KEY, changes.settingsEpoch.newValue);
+        syncSessionEpoch(SETTINGS_SESSION_KEY, changes.settingsRevision.newValue);
       }
 
-      if (changes.mappingsEpoch) {
-        const next = changes.mappingsEpoch.newValue;
+      if (changes.mappingsRevision) {
+        const next = changes.mappingsRevision.newValue;
         if (typeof next === 'number') {
           refreshMappingsQueries(next);
         }
@@ -146,41 +139,44 @@ export function useA2aBroadcasts(): void {
   useEffect(() => {
     (async () => {
       try {
-        const { libraryEpoch, libraryEpochSonarr, libraryEpochRadarr, settingsEpoch, mappingsEpoch } = await browser.storage.local.get({
-          libraryEpoch: 0,
-          libraryEpochSonarr: 0,
-          libraryEpochRadarr: 0,
-          settingsEpoch: 0,
-          mappingsEpoch: 0,
-        });
+      const {
+        sonarrLibraryRevision,
+        radarrLibraryRevision,
+        settingsRevision,
+        mappingsRevision,
+      } = await browser.storage.local.get({
+        sonarrLibraryRevision: 0,
+        radarrLibraryRevision: 0,
+        settingsRevision: 0,
+        mappingsRevision: 0,
+      });
 
-        const sonarrEpoch = typeof libraryEpochSonarr === 'number' ? libraryEpochSonarr : libraryEpoch;
         const previousSonarr = Number(sessionStorage.getItem(LIBRARY_SESSION_KEYS.sonarr) ?? '0');
-        if (typeof sonarrEpoch === 'number' && sonarrEpoch > previousSonarr) {
-          refreshLibraryQueries('sonarr', sonarrEpoch);
-        } else if (!(typeof sonarrEpoch === 'number' && sonarrEpoch > 0)) {
+        if (typeof sonarrLibraryRevision === 'number' && sonarrLibraryRevision > previousSonarr) {
+          refreshLibraryQueries('sonarr', sonarrLibraryRevision);
+        } else if (!(typeof sonarrLibraryRevision === 'number' && sonarrLibraryRevision > 0)) {
           sessionStorage.removeItem(LIBRARY_SESSION_KEYS.sonarr);
         }
 
         const previousRadarr = Number(sessionStorage.getItem(LIBRARY_SESSION_KEYS.radarr) ?? '0');
-        if (typeof libraryEpochRadarr === 'number' && libraryEpochRadarr > previousRadarr) {
-          refreshLibraryQueries('radarr', libraryEpochRadarr);
-        } else if (!(typeof libraryEpochRadarr === 'number' && libraryEpochRadarr > 0)) {
+        if (typeof radarrLibraryRevision === 'number' && radarrLibraryRevision > previousRadarr) {
+          refreshLibraryQueries('radarr', radarrLibraryRevision);
+        } else if (!(typeof radarrLibraryRevision === 'number' && radarrLibraryRevision > 0)) {
           sessionStorage.removeItem(LIBRARY_SESSION_KEYS.radarr);
         }
 
         const previousSettings = Number(sessionStorage.getItem(SETTINGS_SESSION_KEY) ?? '0');
-        if (typeof settingsEpoch === 'number' && settingsEpoch > previousSettings) {
-          syncSessionEpoch(SETTINGS_SESSION_KEY, settingsEpoch);
+        if (typeof settingsRevision === 'number' && settingsRevision > previousSettings) {
+          syncSessionEpoch(SETTINGS_SESSION_KEY, settingsRevision);
           refreshSettingsQueries();
-        } else if (!(typeof settingsEpoch === 'number' && settingsEpoch > 0)) {
+        } else if (!(typeof settingsRevision === 'number' && settingsRevision > 0)) {
           sessionStorage.removeItem(SETTINGS_SESSION_KEY);
         }
 
         const previousMappings = Number(sessionStorage.getItem(MAPPINGS_SESSION_KEY) ?? '0');
-        if (typeof mappingsEpoch === 'number' && mappingsEpoch > previousMappings) {
-          refreshMappingsQueries(mappingsEpoch);
-        } else if (!(typeof mappingsEpoch === 'number' && mappingsEpoch > 0)) {
+        if (typeof mappingsRevision === 'number' && mappingsRevision > previousMappings) {
+          refreshMappingsQueries(mappingsRevision);
+        } else if (!(typeof mappingsRevision === 'number' && mappingsRevision > 0)) {
           sessionStorage.removeItem(MAPPINGS_SESSION_KEY);
         }
       } catch (error) {

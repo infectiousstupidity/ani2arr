@@ -20,8 +20,12 @@ import type {
 } from '@/shared/types';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
-import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/lib/storage';
-import { clearAllTtlCaches } from '@/cache/ttl-cache';
+import {
+  clearAllTtlCaches,
+  getExtensionOptionsSnapshot,
+  setExtensionOptionsSnapshot,
+} from '@/lib/storage';
+import { REVISION_KEYS } from '@/lib/storage/keys';
 import { clearPersistedQueryCache } from '@/cache/query-cache';
 import { buildRadarrPermissionPattern } from '@/shared/providers/radarr/validation';
 import { buildSonarrPermissionPattern } from '@/shared/providers/sonarr/validation';
@@ -29,12 +33,11 @@ import type { getMappingsHandler, GetMappingsInput } from './get-mappings';
 import type { updateRadarrMovieHandler } from './update-movie';
 import type { updateSonarrSeriesHandler } from './update-series';
 
-const RESET_EPOCH_STORAGE_KEYS = [
-  'libraryEpoch',
-  'libraryEpochSonarr',
-  'libraryEpochRadarr',
-  'settingsEpoch',
-  'mappingsEpoch',
+const RESET_REVISION_STORAGE_KEYS = [
+  REVISION_KEYS.sonarrLibrary,
+  REVISION_KEYS.radarrLibrary,
+  REVISION_KEYS.settings,
+  REVISION_KEYS.mappings,
 ] as const;
 
 type CommonDeps = {
@@ -51,8 +54,8 @@ type CommonDeps = {
   ensureSonarrConfigured: () => Promise<{ credentials: SonarrCredentialsPayload; options: ExtensionOptions }>;
   ensureRadarrConfigured: () => Promise<{ credentials: RadarrCredentialsPayload; options: ExtensionOptions }>;
   scheduleLibraryRefresh: (provider: 'sonarr' | 'radarr', optionsHint?: ExtensionOptions) => void;
-  bumpLibraryEpoch: (provider: 'sonarr' | 'radarr', payload?: Record<string, unknown>) => Promise<void>;
-  bumpMappingsEpoch: (payload?: Record<string, unknown>) => Promise<void>;
+  bumpLibraryRevision: (provider: 'sonarr' | 'radarr', payload?: Record<string, unknown>) => Promise<void>;
+  bumpMappingsRevision: (payload?: Record<string, unknown>) => Promise<void>;
   handleOptionsUpdated: (optionsHint?: ExtensionOptions) => Promise<void>;
   getMappings: typeof getMappingsHandler;
   updateMovie: typeof updateRadarrMovieHandler;
@@ -74,15 +77,18 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     ensureSonarrConfigured,
     ensureRadarrConfigured,
     scheduleLibraryRefresh,
-    bumpLibraryEpoch,
-    bumpMappingsEpoch,
+    bumpLibraryRevision,
+    bumpMappingsRevision,
     handleOptionsUpdated,
     getMappings,
     updateMovie,
     updateSeries,
   } = deps;
 
-  const assertCompatibleExternalId = (provider: 'sonarr' | 'radarr', externalId: { id: number; kind: 'tvdb' | 'tmdb' }) => {
+  const assertCompatibleExternalId = (
+    provider: 'sonarr' | 'radarr',
+    externalId: { id: number; kind: 'tvdb' | 'tmdb' },
+  ) => {
     const expectedKind = provider === 'sonarr' ? 'tvdb' : 'tmdb';
     if (externalId.kind !== expectedKind) {
       throw createError(
@@ -107,7 +113,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
     await clearAllTtlCaches();
     await clearPersistedQueryCache();
-    await browser.storage.local.remove([...RESET_EPOCH_STORAGE_KEYS]);
+    await browser.storage.local.remove([...RESET_REVISION_STORAGE_KEYS]);
   };
 
   const removeProviderHostPermissions = async (options: ExtensionOptions): Promise<void> => {
@@ -117,9 +123,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     ];
 
     await Promise.all(removals.map(async ({ provider, url, buildPattern }) => {
-      if (!url) {
-        return;
-      }
+      if (!url) return;
 
       const patternResult = buildPattern(String(url));
       if (!patternResult.ok) {
@@ -171,11 +175,17 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     async getSeriesStatus(input) {
       await ensureSonarrConfigured();
       await overridesReady;
+
       const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
       if (input.title !== undefined) payload.title = input.title;
       if (input.metadata !== undefined) payload.metadata = input.metadata;
 
-      const requestOptions: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean; priority?: RequestPriority } = {};
+      const requestOptions: {
+        force_verify?: boolean;
+        network?: 'never';
+        ignoreFailureCache?: boolean;
+        priority?: RequestPriority;
+      } = {};
       if (input.force_verify) requestOptions.force_verify = true;
       if (input.network) requestOptions.network = input.network;
       if (input.ignoreFailureCache) requestOptions.ignoreFailureCache = true;
@@ -188,11 +198,17 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     async getMovieStatus(input) {
       await ensureRadarrConfigured();
       await overridesReady;
+
       const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
       if (input.title !== undefined) payload.title = input.title;
       if (input.metadata !== undefined) payload.metadata = input.metadata;
 
-      const requestOptions: { force_verify?: boolean; network?: 'never'; ignoreFailureCache?: boolean; priority?: RequestPriority } = {};
+      const requestOptions: {
+        force_verify?: boolean;
+        network?: 'never';
+        ignoreFailureCache?: boolean;
+        priority?: RequestPriority;
+      } = {};
       if (input.force_verify) requestOptions.force_verify = true;
       if (input.network) requestOptions.network = input.network;
       if (input.ignoreFailureCache) requestOptions.ignoreFailureCache = true;
@@ -232,7 +248,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       const created = await sonarrApiService.addSeries(payload, options);
       await sonarrLibrary.addSeriesToCache(created);
       scheduleLibraryRefresh('sonarr', options);
-      await bumpLibraryEpoch('sonarr', { tvdbId: created.tvdbId });
+      await bumpLibraryRevision('sonarr', { tvdbId: created.tvdbId });
       return created;
     },
 
@@ -263,7 +279,8 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
             ? options.providers.radarr.defaults.qualityProfileId
             : undefined;
 
-      const rootFolderPath = input.form.rootFolderPath.trim() || options.providers.radarr.defaults.rootFolderPath.trim();
+      const rootFolderPath =
+        input.form.rootFolderPath.trim() || options.providers.radarr.defaults.rootFolderPath.trim();
 
       if (typeof qualityProfileId !== 'number') {
         throw createError(
@@ -298,9 +315,10 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         },
         credentials,
       );
+
       await radarrLibrary.addMovieToCache(created);
       scheduleLibraryRefresh('radarr', options);
-      await bumpLibraryEpoch('radarr', { tmdbId: created.tmdbId });
+      await bumpLibraryRevision('radarr', { tmdbId: created.tmdbId });
       return created;
     },
 
@@ -311,7 +329,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         ensureSonarrConfigured,
       });
       scheduleLibraryRefresh('sonarr');
-      await bumpLibraryEpoch('sonarr', { tvdbId: updated.tvdbId, action: 'updated' });
+      await bumpLibraryRevision('sonarr', { tvdbId: updated.tvdbId, action: 'updated' });
       return updated;
     },
 
@@ -322,7 +340,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         ensureRadarrConfigured,
       });
       scheduleLibraryRefresh('radarr');
-      await bumpLibraryEpoch('radarr', { tmdbId: updated.tmdbId, action: 'updated' });
+      await bumpLibraryRevision('radarr', { tmdbId: updated.tmdbId, action: 'updated' });
       return updated;
     },
 
@@ -393,17 +411,20 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     async getSonarrMetadata(input) {
       const maybeCredentials = input?.credentials;
       let credentials: SonarrCredentialsPayload;
+
       if (maybeCredentials?.url && maybeCredentials.apiKey) {
         credentials = maybeCredentials;
       } else {
         const ensured = await ensureSonarrConfigured();
         credentials = ensured.credentials;
       }
+
       const [qualityProfiles, rootFolders, tags] = await Promise.all([
         sonarrApiService.getQualityProfiles(credentials),
         sonarrApiService.getRootFolders(credentials),
         sonarrApiService.getTags(credentials),
       ]);
+
       return { qualityProfiles, rootFolders, tags };
     },
 
@@ -461,10 +482,12 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     async searchSonarr(input) {
       const { credentials } = await ensureSonarrConfigured();
       await overridesReady;
+
       const [results, library] = await Promise.all([
         sonarrApiService.lookupSeriesByTerm(input.term, credentials),
         sonarrLibrary.getLeanSeriesList(),
       ]);
+
       const libraryTvdbIds = library.map(s => s.tvdbId);
       const statsMap: Record<number, NonNullable<LeanSonarrSeries['statistics']>> = {};
       for (const s of library) {
@@ -472,6 +495,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
           statsMap[s.tvdbId] = s.statistics;
         }
       }
+
       const linkedAniListIdsByTvdbId: Record<number, number[]> = {};
       if (typeof mappingService.getLinkedAniListIdsForTvdb === 'function') {
         const uniqueTvdbIds = new Set<number>();
@@ -487,6 +511,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
           }
         }
       }
+
       return {
         results,
         libraryTvdbIds,
@@ -498,24 +523,29 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     async searchRadarr(input) {
       const { credentials } = await ensureRadarrConfigured();
       await overridesReady;
+
       const [results, library] = await Promise.all([
         radarrApiService.lookupMovieByTerm(input.term, credentials),
         radarrLibrary.getLeanMovieList(),
       ]);
+
       const libraryTmdbIds = library.map(movie => movie.tmdbId);
       const linkedAniListIdsByTmdbId: Record<number, number[]> = {};
       const uniqueTmdbIds = new Set<number>();
+
       for (const movie of results) {
         if (typeof movie?.tmdbId === 'number' && Number.isFinite(movie.tmdbId)) {
           uniqueTmdbIds.add(movie.tmdbId);
         }
       }
+
       for (const tmdbId of uniqueTmdbIds) {
         const linked = mappingService.getLinkedAniListIds('radarr', { id: tmdbId, kind: 'tmdb' });
         if (linked.length > 0) {
           linkedAniListIdsByTmdbId[tmdbId] = linked;
         }
       }
+
       return {
         results,
         libraryTmdbIds,
@@ -571,6 +601,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
       await overridesService.set(input.provider, input.anilistId, input.externalId);
       await mappingService.evictResolved(input.anilistId, input.provider);
+
       if (input.provider === 'sonarr') {
         const options = await getExtensionOptionsSnapshot();
         if (options?.providers.sonarr.url && options?.providers.sonarr.apiKey) {
@@ -578,12 +609,16 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         }
       }
 
-      await bumpLibraryEpoch(input.provider, {
+      await bumpLibraryRevision(input.provider, {
         anilistId: input.anilistId,
         externalId: input.externalId,
         action: 'override:set',
       });
-      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'override:set' });
+      await bumpMappingsRevision({
+        anilistId: input.anilistId,
+        provider: input.provider,
+        action: 'override:set',
+      });
       return { ok: true as const };
     },
 
@@ -591,14 +626,20 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesReady;
       await overridesService.clear(input.provider, input.anilistId);
       await mappingService.evictResolved(input.anilistId, input.provider);
+
       if (input.provider === 'sonarr') {
         const options = await getExtensionOptionsSnapshot();
         if (options?.providers.sonarr.url && options?.providers.sonarr.apiKey) {
           scheduleLibraryRefresh('sonarr', options);
         }
       }
-      await bumpLibraryEpoch(input.provider, { anilistId: input.anilistId, action: 'override:clear' });
-      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'override:clear' });
+
+      await bumpLibraryRevision(input.provider, { anilistId: input.anilistId, action: 'override:clear' });
+      await bumpMappingsRevision({
+        anilistId: input.anilistId,
+        provider: input.provider,
+        action: 'override:clear',
+      });
       return { ok: true as const };
     },
 
@@ -606,8 +647,12 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesReady;
       await overridesService.setIgnore(input.provider, input.anilistId);
       await mappingService.evictResolved(input.anilistId, input.provider);
-      await bumpLibraryEpoch(input.provider, { anilistId: input.anilistId, action: 'override:ignore' });
-      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'override:ignore' });
+      await bumpLibraryRevision(input.provider, { anilistId: input.anilistId, action: 'override:ignore' });
+      await bumpMappingsRevision({
+        anilistId: input.anilistId,
+        provider: input.provider,
+        action: 'override:ignore',
+      });
       return { ok: true as const };
     },
 
@@ -615,8 +660,12 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesReady;
       await overridesService.clearIgnore(input.provider, input.anilistId);
       await mappingService.evictResolved(input.anilistId, input.provider);
-      await bumpLibraryEpoch(input.provider, { anilistId: input.anilistId, action: 'override:clearIgnore' });
-      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'override:clearIgnore' });
+      await bumpLibraryRevision(input.provider, { anilistId: input.anilistId, action: 'override:clearIgnore' });
+      await bumpMappingsRevision({
+        anilistId: input.anilistId,
+        provider: input.provider,
+        action: 'override:clearIgnore',
+      });
       return { ok: true as const };
     },
 
@@ -625,12 +674,17 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       assertCompatibleExternalId(input.provider, input.externalId);
       await overridesService.setRejectedCandidate(input.provider, input.anilistId, input.externalId);
       await mappingService.evictResolved(input.anilistId, input.provider);
-      await bumpLibraryEpoch(input.provider, {
+
+      await bumpLibraryRevision(input.provider, {
         anilistId: input.anilistId,
         externalId: input.externalId,
         action: 'mapping:rejectCandidate',
       });
-      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'mapping:rejectCandidate' });
+      await bumpMappingsRevision({
+        anilistId: input.anilistId,
+        provider: input.provider,
+        action: 'mapping:rejectCandidate',
+      });
       return { ok: true as const };
     },
 
@@ -639,12 +693,17 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       assertCompatibleExternalId(input.provider, input.externalId);
       await overridesService.clearRejectedCandidate(input.provider, input.anilistId, input.externalId);
       await mappingService.evictResolved(input.anilistId, input.provider);
-      await bumpLibraryEpoch(input.provider, {
+
+      await bumpLibraryRevision(input.provider, {
         anilistId: input.anilistId,
         externalId: input.externalId,
         action: 'mapping:clearRejectedCandidate',
       });
-      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'mapping:clearRejectedCandidate' });
+      await bumpMappingsRevision({
+        anilistId: input.anilistId,
+        provider: input.provider,
+        action: 'mapping:clearRejectedCandidate',
+      });
       return { ok: true as const };
     },
 
@@ -653,12 +712,17 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       assertCompatibleExternalId(input.provider, input.externalId);
       await overridesService.setBlockedCandidate(input.provider, input.anilistId, input.externalId);
       await mappingService.evictResolved(input.anilistId, input.provider);
-      await bumpLibraryEpoch(input.provider, {
+
+      await bumpLibraryRevision(input.provider, {
         anilistId: input.anilistId,
         externalId: input.externalId,
         action: 'mapping:blockCandidate',
       });
-      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'mapping:blockCandidate' });
+      await bumpMappingsRevision({
+        anilistId: input.anilistId,
+        provider: input.provider,
+        action: 'mapping:blockCandidate',
+      });
       return { ok: true as const };
     },
 
@@ -667,12 +731,17 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       assertCompatibleExternalId(input.provider, input.externalId);
       await overridesService.clearBlockedCandidate(input.provider, input.anilistId, input.externalId);
       await mappingService.evictResolved(input.anilistId, input.provider);
-      await bumpLibraryEpoch(input.provider, {
+
+      await bumpLibraryRevision(input.provider, {
         anilistId: input.anilistId,
         externalId: input.externalId,
         action: 'mapping:clearBlockedCandidate',
       });
-      await bumpMappingsEpoch({ anilistId: input.anilistId, provider: input.provider, action: 'mapping:clearBlockedCandidate' });
+      await bumpMappingsRevision({
+        anilistId: input.anilistId,
+        provider: input.provider,
+        action: 'mapping:clearBlockedCandidate',
+      });
       return { ok: true as const };
     },
 
@@ -686,21 +755,21 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       const snapshot = overridesService.exportState();
       const existing = overridesService.list();
       const existingIgnores = overridesService.listIgnores();
+
       try {
         await overridesService.clearAll();
-        await Promise.all(
-          existing.map(entry => mappingService.evictResolved(entry.anilistId, entry.provider)),
-        );
-        await Promise.all(
-          existingIgnores.map(entry => mappingService.evictResolved(entry.anilistId, entry.provider)),
-        );
+        await Promise.all(existing.map(entry => mappingService.evictResolved(entry.anilistId, entry.provider)));
+        await Promise.all(existingIgnores.map(entry => mappingService.evictResolved(entry.anilistId, entry.provider)));
+
         const options = await getExtensionOptionsSnapshot();
         if (options?.providers.sonarr.url && options?.providers.sonarr.apiKey) {
           scheduleLibraryRefresh('sonarr', options);
         }
-        await bumpLibraryEpoch('sonarr', { action: 'override:clearAll' });
-        await bumpLibraryEpoch('radarr', { action: 'override:clearAll' });
-        await bumpMappingsEpoch({ action: 'override:clearAll' });
+
+        await bumpLibraryRevision('sonarr', { action: 'override:clearAll' });
+        await bumpLibraryRevision('radarr', { action: 'override:clearAll' });
+        await bumpMappingsRevision({ action: 'override:clearAll' });
+
         return { ok: true as const };
       } catch (error) {
         try {
@@ -720,8 +789,9 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
     async exportStoredMappings() {
       await overridesReady;
+
       const overrides = Object.fromEntries(
-        overridesService.list().map((entry) => [
+        overridesService.list().map(entry => [
           `${entry.provider}:${entry.anilistId}`,
           {
             anilistId: entry.anilistId,
@@ -731,8 +801,9 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
           },
         ]),
       );
+
       const ignores = Object.fromEntries(
-        overridesService.listIgnores().map((entry) => [
+        overridesService.listIgnores().map(entry => [
           `${entry.provider}:${entry.anilistId}`,
           {
             anilistId: entry.anilistId,
@@ -741,8 +812,9 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
           },
         ]),
       );
+
       const rejectedCandidates = Object.fromEntries(
-        overridesService.listRejectedCandidates().map((entry) => [
+        overridesService.listRejectedCandidates().map(entry => [
           `${entry.provider}:${entry.anilistId}:${entry.externalId.kind}:${entry.externalId.id}`,
           {
             anilistId: entry.anilistId,
@@ -752,8 +824,9 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
           },
         ]),
       );
+
       const blockedCandidates = Object.fromEntries(
-        overridesService.listBlockedCandidates().map((entry) => [
+        overridesService.listBlockedCandidates().map(entry => [
           `${entry.provider}:${entry.anilistId}:${entry.externalId.kind}:${entry.externalId.id}`,
           {
             anilistId: entry.anilistId,
@@ -763,6 +836,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
           },
         ]),
       );
+
       return {
         version: 2 as const,
         exportedAt: new Date().toISOString(),
@@ -783,7 +857,6 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
     async clearPersistentCaches() {
       await clearPersistentCachesInternal();
-
       return { ok: true as const };
     },
 
@@ -816,14 +889,17 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     async getAniListMetadata(input) {
       const ids = Array.isArray(input?.ids) ? input.ids : [];
       const normalizedIds = ids.filter(id => typeof id === 'number' && Number.isFinite(id) && id > 0);
+
       if (normalizedIds.length === 0) {
         return { metadata: [], missingIds: [] };
       }
+
       const result = await anilistMetadataStore.getMetadata(normalizedIds, {
         refreshStale: input?.refreshStale ?? true,
         fetchMissing: input?.fetchMissing ?? true,
         ...(input?.maxBatch !== undefined ? { maxBatch: input.maxBatch } : {}),
       });
+
       return {
         metadata: result.metadata,
         ...(result.missingIds?.length ? { missingIds: result.missingIds } : {}),
