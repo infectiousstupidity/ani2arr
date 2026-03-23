@@ -1,4 +1,4 @@
-import type { TtlCache } from '@/cache';
+import type { TtlCache } from '@/lib/storage';
 import { createError, ErrorCode } from '@/shared/errors/error-utils';
 import type {
   AniListSchedulerBatchDebug,

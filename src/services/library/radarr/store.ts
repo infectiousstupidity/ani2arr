@@ -1,6 +1,6 @@
 import type { ExtensionOptions, LeanRadarrMovie, RadarrMovie } from '@/shared/types';
 import type { LibraryCaches, RadarrClient, TitleIndexer } from './types';
-import { getExtensionOptionsSnapshot } from '@/shared/options/storage';
+import { getExtensionOptionsSnapshot } from '@/lib/storage';
 import { logError, normalizeError } from '@/shared/errors/error-utils';
 import { CACHE_KEY, SOFT_TTL_MS, HARD_TTL_MS, ERROR_TTL_MS } from './constants';
 

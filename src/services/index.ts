@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { createTtlCache } from '@/cache';
+import { createTtlCache } from '@/lib/storage';
 import { CacheNamespaces } from '@/cache/namespaces';
 import { SonarrApiService } from '@/clients/sonarr.api';
 import { RadarrApiService } from '@/clients/radarr.api';
@@ -28,7 +28,7 @@ import type {
   SonarrCredentialsPayload,
   SonarrLookupSeries,
 } from '@/shared/types';
-import { getExtensionOptionsSnapshot } from '@/shared/options/storage';
+import { getExtensionOptionsSnapshot } from '@/lib/storage';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { type Ani2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';

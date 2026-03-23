@@ -1,4 +1,4 @@
-// src/shared/options/storage.ts
+// src/lib/storage/settings.store.ts
 
 /**
  * @file Defines and exports user-configurable extension settings.
