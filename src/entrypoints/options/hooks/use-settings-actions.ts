@@ -25,7 +25,7 @@ import { logger } from '@/shared/utils/logger';
 import { CLIENT_STORAGE_RESET_MESSAGE_TYPE } from '@/shared/utils/client-storage';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import { createDefaultSettings } from '@/shared/schemas/settings';
-import { parseSettings } from '@/shared/options/storage';
+import { parseSettings } from '@/lib/storage';
 import type { ExtensionOptions } from '@/shared/types';
 
 interface UseSettingsActionsParams {

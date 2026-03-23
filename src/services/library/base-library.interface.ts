@@ -1,4 +1,4 @@
-import type { TtlCache } from '@/cache';
+import type { TtlCache } from '@/lib/storage';
 import type { ExtensionOptions, RequestPriority } from '@/shared/types';
 
 export interface LibraryStatusOptions {

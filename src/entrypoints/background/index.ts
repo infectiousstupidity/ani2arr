@@ -6,7 +6,7 @@ import { computeTitleMatchScore } from '@/services/mapping/pipeline/matching';
 import { logger } from '@/shared/utils/logger';
 import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/shared/utils/metrics';
 import { logError, normalizeError } from '@/shared/errors/error-utils';
-import { getExtensionOptionsSnapshot } from '@/shared/options/storage';
+import { getExtensionOptionsSnapshot } from '@/lib/storage';
 import { CLIENT_STORAGE_RESET_MESSAGE_TYPE, CLIENT_STORAGE_RESET_TOPIC } from '@/shared/utils/client-storage';
 
 type OptionsSectionId = 'sonarr' | 'radarr' | 'mappings' | 'ui' | 'advanced';

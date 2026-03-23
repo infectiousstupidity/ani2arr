@@ -20,7 +20,7 @@ import type {
 } from '@/shared/types';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
-import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/shared/options/storage';
+import { getExtensionOptionsSnapshot, setExtensionOptionsSnapshot } from '@/lib/storage';
 import { clearAllTtlCaches } from '@/cache/ttl-cache';
 import { clearPersistedQueryCache } from '@/cache/query-cache';
 import { buildRadarrPermissionPattern } from '@/shared/providers/radarr/validation';

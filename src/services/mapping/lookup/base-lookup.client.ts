@@ -1,4 +1,4 @@
-import type { TtlCache } from '@/cache';
+import type { TtlCache } from '@/lib/storage';
 import PQueue from 'p-queue';
 import type { MappingExternalIdKind, MappingProvider, RequestPriority } from '@/shared/types';
 import { normalizeError } from '@/shared/errors/error-utils';

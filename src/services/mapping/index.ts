@@ -1,4 +1,4 @@
-import type { TtlCache } from '@/cache';
+import type { TtlCache } from '@/lib/storage';
 import type { AnilistApiService } from '@/clients/anilist.api';
 import type {
   AniMedia,
@@ -8,7 +8,7 @@ import type {
   RequestPriority,
 } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
-import { getExtensionOptionsSnapshot } from '@/shared/options/storage';
+import { getExtensionOptionsSnapshot } from '@/lib/storage';
 import { incrementCounter } from '@/shared/utils/metrics';
 import { logger } from '@/shared/utils/logger';
 import { getProviderLabel, resolveProviderForAniListFormat } from '@/services/providers/resolver';
