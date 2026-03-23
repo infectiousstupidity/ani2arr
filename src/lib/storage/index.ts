@@ -38,9 +38,9 @@ export type {
   CacheHit,
   CacheWriteOptions,
   TtlCache,
-} from '@/cache/ttl-cache';
+} from './ttl-cache';
 
 export {
   clearAllTtlCaches,
   createTtlCache,
-} from '@/cache/ttl-cache';
+} from './ttl-cache';

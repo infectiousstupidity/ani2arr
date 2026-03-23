@@ -30,13 +30,6 @@ export const REVISION_KEYS = {
   radarrLibrary: 'radarrLibraryRevision',
 } as const;
 
-// IndexedDB TTL cache database metadata.
-export const TTL_CACHE_DB = {
-  name: 'a2a-cache-db',
-  version: 1,
-  store: 'ttl-cache-store',
-} as const;
-
 // Persistent TTL cache namespaces.
 // Keep currently used namespaces until the consuming cache layer is actually removed.
 export const CACHE_NAMESPACES = {
