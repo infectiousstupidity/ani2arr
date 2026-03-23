@@ -30,7 +30,6 @@ export const REVISION_KEYS = {
 } as const;
 
 // Persistent TTL cache namespaces.
-// Keep currently used namespaces until the consuming cache layer is actually removed.
 export const CACHE_NAMESPACES = {
   // AniList
   anilistMedia: 'anilist:media',
@@ -44,12 +43,6 @@ export const CACHE_NAMESPACES = {
   mappingLookupNegativeSonarr: 'mapping:lookup-negative:sonarr',
   mappingLookupPositiveRadarr: 'mapping:lookup:radarr',
   mappingLookupNegativeRadarr: 'mapping:lookup-negative:radarr',
-
-  // Mapping - currently still used by MappingService
-  mappingResolvedSuccessSonarr: 'mapping:success:sonarr',
-  mappingResolvedFailureSonarr: 'mapping:failure:sonarr',
-  mappingResolvedSuccessRadarr: 'mapping:success:radarr',
-  mappingResolvedFailureRadarr: 'mapping:failure:radarr',
 
   // Provider library
   libraryLeanSonarr: 'library:lean:sonarr',
