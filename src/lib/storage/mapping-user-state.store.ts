@@ -1,5 +1,6 @@
 import { storage } from '@wxt-dev/storage';
 import type { MappingExternalId, MappingProvider } from '@/shared/types';
+import { STORAGE_KEYS } from './keys';
 
 export interface MappingOverrideEntry {
   provider: MappingProvider;
@@ -24,22 +25,22 @@ export interface MappingCandidateSuppressionEntry {
 
 export type MappingCandidateSuppressionMap = Record<string, MappingCandidateSuppressionEntry>;
 
-export const mappingOverridesStorage = storage.defineItem<MappingOverrideMap>('local:mappingOverrides', {
+export const mappingOverridesStorage = storage.defineItem<MappingOverrideMap>(STORAGE_KEYS.mappingOverrides, {
   fallback: {},
   version: 2,
 });
 
-export const mappingIgnoresStorage = storage.defineItem<MappingIgnoreMap>('local:ignoredMappings', {
+export const mappingIgnoresStorage = storage.defineItem<MappingIgnoreMap>(STORAGE_KEYS.mappingIgnores, {
   fallback: {},
   version: 2,
 });
 
 export const mappingRejectedCandidatesStorage = storage.defineItem<MappingCandidateSuppressionMap>(
-  'local:rejectedMappingCandidates',
+  STORAGE_KEYS.mappingRejectedCandidates,
   { fallback: {}, version: 2 },
 );
 
 export const mappingBlockedCandidatesStorage = storage.defineItem<MappingCandidateSuppressionMap>(
-  'local:blockedMappingCandidates',
+  STORAGE_KEYS.mappingBlockedCandidates,
   { fallback: {}, version: 2 },
 );
