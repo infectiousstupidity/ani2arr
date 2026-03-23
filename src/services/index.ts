@@ -1,7 +1,11 @@
 import { browser } from 'wxt/browser';
-import { createTtlCache, getExtensionOptionsSnapshot } from '@/lib/storage';
-import { CACHE_NAMESPACES, REVISION_KEYS } from '@/lib/storage/keys';
-import { SonarrApiService,  } from '@/clients/sonarr.api';
+import {
+  bumpRevision,
+  createTtlCache,
+  getExtensionOptionsSnapshot,
+} from '@/lib/storage';
+import { CACHE_NAMESPACES } from '@/lib/storage/keys';
+import { SonarrApiService } from '@/clients/sonarr.api';
 import { RadarrApiService } from '@/clients/radarr.api';
 import { AnilistApiService } from '@/clients/anilist.api';
 import { MappingService, type ResolvedMapping, type StaticMappingPayload } from './mapping';
@@ -60,20 +64,6 @@ function bindAll<T extends object>(instance: T): T {
   return instance;
 }
 
-const initializeRevision = async (
-  key: typeof REVISION_KEYS[keyof typeof REVISION_KEYS],
-): Promise<number> => {
-  try {
-    const stored = await browser.storage.local.get(key);
-    const value = stored[key];
-    if (typeof value === 'number') return value;
-  } catch (error) {
-    logError(normalizeError(error), `Ani2arrApi:initRevision:${key}`);
-  }
-
-  return 0;
-};
-
 export const createApiImplementation = (): Ani2arrApi => {
   const sonarrApiService = bindAll(new SonarrApiService());
   const radarrApiService = bindAll(new RadarrApiService());
@@ -101,8 +91,6 @@ export const createApiImplementation = (): Ani2arrApi => {
 
   const overridesService = new MappingOverridesService();
   const overridesReady = overridesService.init();
-
-  let mappingsRevision = 0;
 
   const broadcast = async (topic: string, payload?: Record<string, unknown>): Promise<void> => {
     const message = { _a2a: true, topic, payload };
@@ -135,9 +123,7 @@ export const createApiImplementation = (): Ani2arrApi => {
   };
 
   const bumpMappingsRevision = async (payload?: Record<string, unknown>): Promise<void> => {
-    mappingsRevision += 1;
-    const nextRevision = mappingsRevision;
-    await browser.storage.local.set({ [REVISION_KEYS.mappings]: nextRevision });
+    const nextRevision = await bumpRevision('mappings');
     await broadcast('mappings-updated', { epoch: nextRevision, ...payload });
   };
 
@@ -168,34 +154,11 @@ export const createApiImplementation = (): Ani2arrApi => {
 
   const anilistMetadataStore = new AniListMetadataStore(anilistApiService);
 
-  const libraryRevision: Record<LibraryProvider, number> = {
-    sonarr: 0,
-    radarr: 0,
-  };
-
-  let settingsRevision = 0;
-
   void getExtensionOptionsSnapshot()
     .then(options => {
       logger.configure({ enabled: (options?.debugLogging ?? false) || import.meta.env.DEV });
     })
     .catch(() => {});
-
-  void initializeRevision(REVISION_KEYS.sonarrLibrary).then(revision => {
-    libraryRevision.sonarr = revision;
-  });
-
-  void initializeRevision(REVISION_KEYS.radarrLibrary).then(revision => {
-    libraryRevision.radarr = revision;
-  });
-
-  void initializeRevision(REVISION_KEYS.settings).then(revision => {
-    settingsRevision = revision;
-  });
-
-  void initializeRevision(REVISION_KEYS.mappings).then(revision => {
-    mappingsRevision = revision;
-  });
 
   const pendingLibraryRefresh: Record<LibraryProvider, ReturnType<typeof setTimeout> | null> = {
     sonarr: null,
@@ -211,12 +174,10 @@ export const createApiImplementation = (): Ani2arrApi => {
     provider: LibraryProvider,
     payload?: Record<string, unknown>,
   ): Promise<void> => {
-    libraryRevision[provider] += 1;
-    const nextRevision = libraryRevision[provider];
-    const storageKey =
-      provider === 'sonarr' ? REVISION_KEYS.sonarrLibrary : REVISION_KEYS.radarrLibrary;
+    const nextRevision = await bumpRevision(
+      provider === 'sonarr' ? 'sonarrLibrary' : 'radarrLibrary',
+    );
 
-    await browser.storage.local.set({ [storageKey]: nextRevision });
     await broadcast('series-updated', { provider, epoch: nextRevision, ...payload });
   };
 
@@ -239,9 +200,7 @@ export const createApiImplementation = (): Ani2arrApi => {
   );
 
   const bumpSettingsRevision = async (): Promise<void> => {
-    settingsRevision += 1;
-    const nextRevision = settingsRevision;
-    await browser.storage.local.set({ [REVISION_KEYS.settings]: nextRevision });
+    const nextRevision = await bumpRevision('settings');
     await broadcast('settings-changed', { epoch: nextRevision });
   };
 

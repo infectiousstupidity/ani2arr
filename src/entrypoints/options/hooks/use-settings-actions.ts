@@ -22,7 +22,6 @@ import {
   validateUrl as validateRadarrUrl,
 } from '@/shared/providers/radarr/validation';
 import { logger } from '@/shared/utils/logger';
-import { CLIENT_STORAGE_RESET_MESSAGE_TYPE } from '@/shared/utils/client-storage';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import { parseSettings } from '@/lib/storage';
@@ -41,6 +40,8 @@ type PreparedProviderState = {
   permissionPattern: string | null;
 };
 
+const RESET_EXTENSION_STATE_MESSAGE_TYPE = 'a2a:reset-extension-state' as const;
+
 export function useSettingsActions(params: UseSettingsActionsParams) {
   const { savedSettings } = params;
   const methods = useFormContext<SettingsFormValues>();
@@ -57,8 +58,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
 
   useEffect(() => {
     const subscription = methods.watch(() => {
-      // Only clear saveError when it's currently set to avoid unnecessary state updates
-      setSaveError((current) => (current == null ? current : null));
+      setSaveError(current => (current == null ? current : null));
     });
     return () => subscription.unsubscribe();
   }, [methods]);
@@ -419,7 +419,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
     try {
       await browser.runtime.sendMessage({
         _a2a: true,
-        type: CLIENT_STORAGE_RESET_MESSAGE_TYPE,
+        type: RESET_EXTENSION_STATE_MESSAGE_TYPE,
         timestamp: Date.now(),
       });
       methods.reset(defaults as SettingsFormValues);

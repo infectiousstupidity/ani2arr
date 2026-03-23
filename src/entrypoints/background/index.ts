@@ -7,7 +7,6 @@ import { logger } from '@/shared/utils/logger';
 import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/shared/utils/metrics';
 import { logError, normalizeError } from '@/shared/errors/error-utils';
 import { getExtensionOptionsSnapshot } from '@/lib/storage';
-import { CLIENT_STORAGE_RESET_MESSAGE_TYPE, CLIENT_STORAGE_RESET_TOPIC } from '@/shared/utils/client-storage';
 
 type OptionsSectionId = 'sonarr' | 'radarr' | 'mappings' | 'ui' | 'advanced';
 
@@ -16,8 +15,12 @@ type OpenOptionsMessage = {
   sectionId?: OptionsSectionId;
   targetAnilistId?: number;
 };
+
 type MappingRefreshMessage = { type: 'a2a:mapping:refresh' };
-type ResetClientStorageMessage = { type: typeof CLIENT_STORAGE_RESET_MESSAGE_TYPE };
+
+const RESET_EXTENSION_STATE_MESSAGE_TYPE = 'a2a:reset-extension-state' as const;
+type ResetExtensionStateMessage = { type: typeof RESET_EXTENSION_STATE_MESSAGE_TYPE };
+
 type ScoreBatchMessage = {
   type: 'a2a:match:score-batch';
   payload: {
@@ -35,56 +38,23 @@ function isScoreBatchMessage(x: unknown): x is ScoreBatchMessage {
     Array.isArray(m.payload?.candidates)
   );
 }
+
 function isOpenOptionsMessage(x: unknown): x is OpenOptionsMessage {
   return (x as OpenOptionsMessage)?.type === 'OPEN_OPTIONS_PAGE';
 }
+
 function isMappingRefreshMessage(x: unknown): x is MappingRefreshMessage {
   return (x as MappingRefreshMessage)?.type === 'a2a:mapping:refresh';
 }
-function isResetClientStorageMessage(x: unknown): x is ResetClientStorageMessage {
-  return (x as ResetClientStorageMessage)?.type === CLIENT_STORAGE_RESET_MESSAGE_TYPE;
+
+function isResetExtensionStateMessage(x: unknown): x is ResetExtensionStateMessage {
+  return (x as ResetExtensionStateMessage)?.type === RESET_EXTENSION_STATE_MESSAGE_TYPE;
 }
 
 const MAPPING_REFRESH_ALARM = 'a2a:refresh-static-mappings';
 const MAPPING_REFRESH_PERIOD_MIN = 360;
-const CONTENT_SCRIPT_URL_PATTERNS = ['*://anilist.co/*', '*://www.anilist.co/*', '*://anichart.net/*', '*://www.anichart.net/*'];
 
 const log = logger.create('Background');
-
-const broadcastMessageToExtensionContexts = async (
-  message: { _a2a: true; topic: string; payload?: Record<string, unknown> },
-): Promise<void> => {
-  try {
-    await browser.runtime.sendMessage(message);
-  } catch (error) {
-    const normalized = normalizeError(error);
-    if (!normalized.message.includes('Receiving end does not exist')) {
-      logError(normalized, `Background:broadcast:${message.topic}`);
-    }
-  }
-
-  try {
-    const tabs = await browser.tabs.query({ url: CONTENT_SCRIPT_URL_PATTERNS });
-    await Promise.all(
-      tabs.map(async tab => {
-        if (typeof tab.id !== 'number') {
-          return;
-        }
-
-        try {
-          await browser.tabs.sendMessage(tab.id, message);
-        } catch (error) {
-          const normalized = normalizeError(error);
-          if (!normalized.message.includes('Receiving end does not exist')) {
-            logError(normalized, `Background:broadcast:tab:${message.topic}`);
-          }
-        }
-      }),
-    );
-  } catch (error) {
-    logError(normalizeError(error), `Background:broadcast:tabsQuery:${message.topic}`);
-  }
-};
 
 export default defineBackground(() => {
   log.info('Background initializing…');
@@ -96,6 +66,7 @@ export default defineBackground(() => {
     const globalWithMetrics = globalThis as typeof globalThis & {
       __a2aMetrics?: MetricsConsoleApi;
     };
+
     if (!globalWithMetrics.__a2aMetrics) {
       globalWithMetrics.__a2aMetrics = createMetricsConsoleApi();
     }
@@ -136,16 +107,16 @@ export default defineBackground(() => {
     }
   };
 
-  browser.runtime.onInstalled.addListener(async (details) => {
+  browser.runtime.onInstalled.addListener(async details => {
     try {
-      // Do not automatically open the options page during test runs as the
-      // test harness controls navigation and may race with extension startup.
       if (details.reason === 'install' && import.meta.env.MODE !== 'test') {
         browser.runtime.openOptionsPage().catch(() => {});
       }
+
       if (await shouldWarmMappingsCache()) {
         await api.initMappings();
       }
+
       await ensurePeriodicRefresh();
     } catch (error) {
       logError(normalizeError(error), 'Background:onInstalled');
@@ -157,6 +128,7 @@ export default defineBackground(() => {
       if (await shouldWarmMappingsCache()) {
         await api.initMappings();
       }
+
       await ensurePeriodicRefresh();
     } catch (error) {
       logError(normalizeError(error), 'Background:onStartup');
@@ -164,7 +136,7 @@ export default defineBackground(() => {
   });
 
   if (alarmsApi) {
-    alarmsApi.onAlarm.addListener((alarm) => {
+    alarmsApi.onAlarm.addListener(alarm => {
       if (alarm.name === MAPPING_REFRESH_ALARM) {
         void (async () => {
           if (!(await shouldWarmMappingsCache())) {
@@ -180,82 +152,71 @@ export default defineBackground(() => {
 
   browser.runtime.onMessage.addListener(
     (message: unknown, sender?: { id?: string }): Promise<unknown> | void => {
-      // Only accept messages originating from the extension itself and that
-      // explicitly carry the _a2a marker to prevent other origins from
-      // invoking privileged background handlers.
       const senderId = (sender as { id?: string } | undefined)?.id;
       const msg = message as { type?: string; timestamp?: number; _a2a?: boolean } | undefined;
 
       if (senderId !== browser.runtime.id) {
-        // Ignore messages from other extensions/origins or no sender info.
         return;
       }
 
       if (!msg?._a2a) {
-        // Marker missing; ignore.
         return;
       }
 
-      // Lightweight readiness probe so content scripts can wait until the
-      // background has registered services before issuing RPC calls.
       if (msg.type === 'a2a:ping') {
         return Promise.resolve({ ok: true as const });
-    }
+      }
 
-    if (isOpenOptionsMessage(msg)) {
-      const open = async (): Promise<void> => {
-        try {
-          const section =
-            msg.sectionId === 'sonarr' ||
-            msg.sectionId === 'radarr' ||
-            msg.sectionId === 'mappings' ||
-            msg.sectionId === 'ui' ||
-            msg.sectionId === 'advanced'
-              ? msg.sectionId
-              : null;
-
-          const baseUrl = browser.runtime.getURL('/options.html');
-          const targetHash =
-            typeof msg.targetAnilistId === 'number' && Number.isFinite(msg.targetAnilistId)
-              ? `?anilistId=${msg.targetAnilistId}`
-              : '';
-          const url = section
-            ? `${baseUrl}#/options/${section}${targetHash}`
-            : targetHash
-              ? `${baseUrl}#${targetHash}`
-              : baseUrl;
-
-          await browser.tabs.create({ url });
-        } catch {
+      if (isOpenOptionsMessage(msg)) {
+        const open = async (): Promise<void> => {
           try {
-            await browser.runtime.openOptionsPage();
-          } catch {
-            // best-effort only
-          }
-        }
-      };
+            const section =
+              msg.sectionId === 'sonarr' ||
+              msg.sectionId === 'radarr' ||
+              msg.sectionId === 'mappings' ||
+              msg.sectionId === 'ui' ||
+              msg.sectionId === 'advanced'
+                ? msg.sectionId
+                : null;
 
-      void open();
-      return;
-    }
+            const baseUrl = browser.runtime.getURL('/options.html');
+            const targetHash =
+              typeof msg.targetAnilistId === 'number' && Number.isFinite(msg.targetAnilistId)
+                ? `?anilistId=${msg.targetAnilistId}`
+                : '';
+
+            const url = section
+              ? `${baseUrl}#/options/${section}${targetHash}`
+              : targetHash
+                ? `${baseUrl}#${targetHash}`
+                : baseUrl;
+
+            await browser.tabs.create({ url });
+          } catch {
+            try {
+              await browser.runtime.openOptionsPage();
+            } catch {
+              // best-effort only
+            }
+          }
+        };
+
+        void open();
+        return;
+      }
 
       if (isMappingRefreshMessage(msg)) {
         void api.initMappings();
         return Promise.resolve({ ok: true as const });
       }
 
-      if (isResetClientStorageMessage(msg)) {
-        return api.resetExtensionState().then(() =>
-          broadcastMessageToExtensionContexts({
-            _a2a: true,
-            topic: CLIENT_STORAGE_RESET_TOPIC,
-          }).then(() => ({ ok: true as const })),
-        );
+      if (isResetExtensionStateMessage(msg)) {
+        return api.resetExtensionState().then(() => ({ ok: true as const }));
       }
 
       if (isScoreBatchMessage(msg)) {
         const { queryRaw, startYear, candidates } = msg.payload;
-        const scores = candidates.map((c) =>
+        const scores = candidates.map(c =>
           computeTitleMatchScore({
             queryRaw,
             candidateRaw: c.title,
@@ -268,8 +229,6 @@ export default defineBackground(() => {
       }
     },
   );
-
-  
 
   log.info('Background setup complete.');
 });
