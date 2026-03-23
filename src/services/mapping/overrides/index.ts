@@ -6,4 +6,4 @@ export type {
   MappingIgnoreMap,
   MappingCandidateSuppressionEntry,
   MappingCandidateSuppressionMap,
-} from '../../../lib/storage/mapping-user-state.store';
+} from '@/lib/storage';

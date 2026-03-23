@@ -1,14 +1,5 @@
+/** Registry of persistent storage keys, revision keys, and cache namespaces used by the storage layer. */
 // src/lib/storage/keys.ts
-
-/**
- * Central registry for persistent storage keys and cache namespaces.
- *
- * Rules:
- * - Only put real persisted keys or real TTL cache namespaces here.
- * - Keep names domain-oriented and stable.
- * - Do not put React Query keys here.
- * - Do not put sessionStorage keys here.
- */
 
 // WXT / browser.storage.local keys for real extension state.
 export const STORAGE_KEYS = {
@@ -31,20 +22,24 @@ export const REVISION_KEYS = {
 
 // Persistent TTL cache namespaces.
 export const CACHE_NAMESPACES = {
-  // AniList
+  // AniList media
   anilistMedia: 'anilist:media',
 
-  // Mapping - upstream static inputs
-  mappingStaticPrimary: 'mapping:static:primary',
-  mappingStaticFallback: 'mapping:static:fallback',
+  // Upstream mapping sources
+  upstreamMappingPrimary: 'mapping:upstream:primary',
+  upstreamMappingFallback: 'mapping:upstream:fallback',
 
-  // Mapping - provider lookup results
-  mappingLookupPositiveSonarr: 'mapping:lookup:sonarr',
-  mappingLookupNegativeSonarr: 'mapping:lookup-negative:sonarr',
-  mappingLookupPositiveRadarr: 'mapping:lookup:radarr',
-  mappingLookupNegativeRadarr: 'mapping:lookup-negative:radarr',
+  // Provider lookup results
+  providerLookupPositiveSonarr: 'mapping:lookup:sonarr',
+  providerLookupNegativeSonarr: 'mapping:lookup-negative:sonarr',
+  providerLookupPositiveRadarr: 'mapping:lookup:radarr',
+  providerLookupNegativeRadarr: 'mapping:lookup-negative:radarr',
 
-  // Provider library
+  // Extension-derived mapping results
+  extensionMappingSonarr: 'mapping:extension:sonarr',
+  extensionMappingRadarr: 'mapping:extension:radarr',
+
+  // Provider library snapshots
   libraryLeanSonarr: 'library:lean:sonarr',
   libraryLeanRadarr: 'library:lean:radarr',
 } as const;

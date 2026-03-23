@@ -1,4 +1,6 @@
+/** Internal helper for record-backed persisted maps with normalization, rebuild, and watch support. */
 // src/lib/storage/persisted-map.ts
+
 import { browser } from 'wxt/browser';
 import type { WxtStorageItem } from '@wxt-dev/storage';
 

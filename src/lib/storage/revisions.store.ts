@@ -1,3 +1,6 @@
+/** Storage-backed revision counters used for cross-context invalidation and refresh signals. */
+// src/lib/storage/revisions.store.ts
+
 import { browser } from 'wxt/browser';
 import { REVISION_KEYS } from './keys';
 

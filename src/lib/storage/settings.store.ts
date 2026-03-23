@@ -1,3 +1,6 @@
+/** Authoritative persistence for extension settings, public options, and provider secrets. */
+// src/lib/storage/settings.store.ts
+
 import { storage } from '@wxt-dev/storage';
 import * as v from 'valibot';
 import { SettingsSchema, createDefaultSettings } from '@/shared/schemas/settings';

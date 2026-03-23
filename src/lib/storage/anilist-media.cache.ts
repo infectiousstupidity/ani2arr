@@ -1,4 +1,6 @@
+/** Typed cache for AniList media payloads keyed by AniList ID. */
 // src/lib/storage/anilist-media.cache.ts
+
 import { createTtlCache } from './ttl-cache';
 import { CACHE_NAMESPACES } from './keys';
 import type { AniMedia } from '@/shared/types';

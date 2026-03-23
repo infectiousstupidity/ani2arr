@@ -1,3 +1,4 @@
+/** Shared TTL and cache policy constants used by storage-backed caches. */
 // src/lib/storage/policies.ts
 
 export const STORAGE_POLICIES = {
@@ -5,7 +6,7 @@ export const STORAGE_POLICIES = {
     staleMs: 14 * 24 * 60 * 60 * 1000,
     hardMs: 60 * 24 * 60 * 60 * 1000,
   },
-  staticMappings: {
+  upstreamMappings: {
     staleMs: 24 * 60 * 60 * 1000,
     hardMs: 7 * 24 * 60 * 60 * 1000,
   },
@@ -23,4 +24,8 @@ export const STORAGE_POLICIES = {
     errorStaleMs: 5 * 60 * 1000,
     errorHardMs: 10 * 60 * 1000,
   },
+  extensionMapping: {
+  staleMs: 7 * 24 * 60 * 60 * 1000,
+  hardMs: 30 * 24 * 60 * 60 * 1000,
+},
 } as const;

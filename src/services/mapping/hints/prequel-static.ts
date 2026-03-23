@@ -1,11 +1,11 @@
 import type { AnilistApiService } from '@/clients/anilist.api';
 import type { AniMedia } from '@/shared/types';
-import type { StaticMappingProvider } from '../static';
+import type { UpstreamMappingProvider } from '../upstream';
 import type { ResolvedMapping } from '../types';
 
 export async function resolvePrequelStatic(
   media: AniMedia,
-  staticProvider: StaticMappingProvider,
+  staticProvider: UpstreamMappingProvider,
   anilistApi: AnilistApiService,
 ): Promise<ResolvedMapping | null> {
   const directHit = staticProvider.get(media.id);

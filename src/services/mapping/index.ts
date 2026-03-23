@@ -28,7 +28,7 @@ import {
   type ProviderLookupResult,
 } from './lookup';
 import { resolveViaPipeline } from './pipeline/pipeline';
-import { StaticMappingProvider, type StaticMappingPayload } from './static';
+import { UpstreamMappingProvider, type upstreamMappingPayload } from './upstream';
 import type { ResolveExternalIdOptions, ResolveHints, ResolveTvdbIdOptions, ResolvedMapping } from './types';
 
 type ProviderCaches = {
@@ -53,7 +53,7 @@ export class MappingService {
 
   constructor(
     private readonly anilistApi: AnilistApiService,
-    private readonly staticProvider: StaticMappingProvider,
+    private readonly staticProvider: UpstreamMappingProvider,
     private readonly lookupClients: ProviderLookupRegistry,
     private readonly caches: Record<MappingProvider, ProviderCaches>,
     private readonly overrides?: MappingOverridesService,
@@ -619,4 +619,4 @@ export class MappingService {
   }
 }
 
-export type { StaticMappingPayload, ResolvedMapping };
+export type { upstreamMappingPayload, ResolvedMapping };

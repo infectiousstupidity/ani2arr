@@ -34,7 +34,7 @@ import {
   type MappingCandidateSuppressionMap,
 } from '@/lib/storage';
 
-import { STORAGE_KEYS } from '@/lib/storage/keys';
+import { STORAGE_KEYS } from '@/lib/storage';
 
 type ParsedRecordKey = { provider: MappingProvider; anilistId: number };
 type ParsedCandidateKey = { provider: MappingProvider; anilistId: number; externalId: MappingExternalId };

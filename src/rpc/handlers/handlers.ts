@@ -9,7 +9,7 @@ import type { MappingOverridesService } from '@/services/mapping/overrides';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { RadarrLibrary } from '@/services/library/radarr';
 import type { AniListMetadataStore } from '@/services/anilist';
-import type { StaticMappingProvider } from '@/services/mapping/static';
+import type { UpstreamMappingProvider } from '@/services/mapping/upstream';
 import type {
   AniMedia,
   ExtensionOptions,
@@ -39,7 +39,7 @@ type CommonDeps = {
   anilistApiService: AnilistApiService;
   mappingService: MappingService;
   overridesService: MappingOverridesService;
-  staticProvider: StaticMappingProvider;
+  staticProvider: UpstreamMappingProvider;
   sonarrLibrary: SonarrLibrary;
   radarrLibrary: RadarrLibrary;
   anilistMetadataStore: AniListMetadataStore;
