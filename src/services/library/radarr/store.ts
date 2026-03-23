@@ -1,8 +1,8 @@
 import type { ExtensionOptions, LeanRadarrMovie, RadarrMovie } from '@/shared/types';
 import type { LibraryCaches, RadarrClient, TitleIndexer } from './types';
-import { getExtensionOptionsSnapshot } from '@/lib/storage';
+import { getExtensionOptionsSnapshot, STORAGE_POLICIES } from '@/lib/storage';
 import { logError, normalizeError } from '@/shared/errors/error-utils';
-import { CACHE_KEY, SOFT_TTL_MS, HARD_TTL_MS, ERROR_TTL_MS } from './constants';
+import { CACHE_KEY } from './constants';
 
 export class RadarrLibraryStore {
   private inflightRefresh: Promise<LeanRadarrMovie[]> | null = null;
@@ -48,15 +48,18 @@ export class RadarrLibraryStore {
           .map(movie => this.toLeanMovie(movie));
 
         this.indexer.reindex(lean);
-        await this.caches.lean.write(CACHE_KEY, lean, { staleMs: SOFT_TTL_MS, hardMs: HARD_TTL_MS });
+        await this.caches.lean.write(CACHE_KEY, lean, { 
+          staleMs: STORAGE_POLICIES.providerLibrary.staleMs,
+          hardMs: STORAGE_POLICIES.providerLibrary.hardMs
+        });
         return lean;
       } catch (error) {
         const normalized = normalizeError(error);
         logError(normalized, 'RadarrLibraryStore:refreshCache');
 
         await this.caches.lean.write(CACHE_KEY, fallbackList, {
-          staleMs: ERROR_TTL_MS,
-          hardMs: ERROR_TTL_MS * 2,
+          staleMs: STORAGE_POLICIES.providerLibrary.staleMs,
+          hardMs: STORAGE_POLICIES.providerLibrary.hardMs,
           meta: { lastErrorCode: normalized.code },
         });
 
@@ -77,7 +80,10 @@ export class RadarrLibraryStore {
     const idx = current.findIndex(movie => movie.id === newMovie.id);
     const updated = idx >= 0 ? [...current.slice(0, idx), lean, ...current.slice(idx + 1)] : [...current, lean];
     this.indexer.reindex(updated);
-    await this.caches.lean.write(CACHE_KEY, updated, { staleMs: SOFT_TTL_MS, hardMs: HARD_TTL_MS });
+    await this.caches.lean.write(CACHE_KEY, updated, {
+      staleMs: STORAGE_POLICIES.providerLibrary.staleMs,
+      hardMs: STORAGE_POLICIES.providerLibrary.hardMs
+    });
   }
 
   async removeMovieFromCache(tmdbId: number): Promise<void> {
@@ -86,7 +92,10 @@ export class RadarrLibraryStore {
     if (filtered.length === current.length) return;
 
     this.indexer.reindex(filtered);
-    await this.caches.lean.write(CACHE_KEY, filtered, { staleMs: SOFT_TTL_MS, hardMs: HARD_TTL_MS });
+    await this.caches.lean.write(CACHE_KEY, filtered, { 
+      staleMs: STORAGE_POLICIES.providerLibrary.staleMs, 
+      hardMs: STORAGE_POLICIES.providerLibrary.hardMs 
+    });
   }
 
   private ensureIndexes(list: LeanRadarrMovie[]): void {

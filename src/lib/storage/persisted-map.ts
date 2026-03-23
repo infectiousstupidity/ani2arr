@@ -1,3 +1,4 @@
+// src/lib/storage/persisted-map.ts
 import { browser } from 'wxt/browser';
 import type { WxtStorageItem } from '@wxt-dev/storage';
 

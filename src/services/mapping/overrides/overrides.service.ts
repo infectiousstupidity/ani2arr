@@ -6,7 +6,6 @@ import type {
   MappingProvider,
   MappingRejectedRecord,
 } from '@/shared/types';
-import { PersistedMap } from './persisted-map';
 import {
   type MappingRecordKey,
   type MappingCandidateRecordKey,
@@ -26,6 +25,7 @@ import {
   mappingIgnoresStorage,
   mappingRejectedCandidatesStorage,
   mappingBlockedCandidatesStorage,
+  PersistedMap,
   type MappingOverrideEntry,
   type MappingIgnoreEntry,
   type MappingCandidateSuppressionEntry,
@@ -33,6 +33,8 @@ import {
   type MappingIgnoreMap,
   type MappingCandidateSuppressionMap,
 } from '@/lib/storage';
+
+import { STORAGE_KEYS } from '@/lib/storage/keys';
 
 type ParsedRecordKey = { provider: MappingProvider; anilistId: number };
 type ParsedCandidateKey = { provider: MappingProvider; anilistId: number; externalId: MappingExternalId };
@@ -54,25 +56,25 @@ export class MappingOverridesService {
       storage: mappingOverridesStorage,
       parseKey: parseRecordKey,
       normalize: normalizeOverrideEntry,
-      storageChangeKeys: ['local:mappingOverrides'],
+      storageChangeKeys: [STORAGE_KEYS.mappingOverrides],
     });
     this.ignores = new PersistedMap({
       storage: mappingIgnoresStorage,
       parseKey: parseRecordKey,
       normalize: normalizeIgnoreEntry,
-      storageChangeKeys: ['local:ignoredMappings'],
+      storageChangeKeys: [STORAGE_KEYS.mappingIgnores],
     });
     this.rejected = new PersistedMap({
       storage: mappingRejectedCandidatesStorage,
       parseKey: parseCandidateRecordKey,
       normalize: normalizeCandidateSuppressionEntry,
-      storageChangeKeys: ['local:rejectedMappingCandidates'],
+      storageChangeKeys: [STORAGE_KEYS.mappingRejectedCandidates],
     });
     this.blocked = new PersistedMap({
       storage: mappingBlockedCandidatesStorage,
       parseKey: parseCandidateRecordKey,
       normalize: normalizeCandidateSuppressionEntry,
-      storageChangeKeys: ['local:blockedMappingCandidates'],
+      storageChangeKeys: [STORAGE_KEYS.mappingBlockedCandidates],
     });
   }
 
