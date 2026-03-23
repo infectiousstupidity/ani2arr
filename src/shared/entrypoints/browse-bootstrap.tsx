@@ -8,7 +8,6 @@ import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { createShadowRootUi, type ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 
 export interface BrowseBootstrapOptions {
-  logName: string;
   uiName: string;
   styleAttribute: string;
   shadowStyleAttribute: string;

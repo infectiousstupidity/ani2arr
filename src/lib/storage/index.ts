@@ -28,14 +28,14 @@ export type {
   MappingIgnoreMap,
   MappingCandidateSuppressionEntry,
   MappingCandidateSuppressionMap,
-} from '@/services/mapping/overrides/storage';
+} from './mapping-user-state.store';
 
 export {
   mappingOverridesStorage,
   mappingIgnoresStorage,
   mappingRejectedCandidatesStorage,
   mappingBlockedCandidatesStorage,
-} from '@/services/mapping/overrides/storage';
+} from './mapping-user-state.store';
 
 export type { PersistedMapOptions } from '@/services/mapping/overrides/persisted-map';
 export { PersistedMap } from '@/services/mapping/overrides/persisted-map';

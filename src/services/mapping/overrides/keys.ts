@@ -3,7 +3,7 @@ import type {
   MappingCandidateSuppressionEntry,
   MappingIgnoreEntry,
   MappingOverrideEntry,
-} from './storage';
+} from '../../../lib/storage/mapping-user-state.store';
 
 export type MappingRecordKey = `${MappingProvider}:${number}`;
 export type ReverseLookupKey = `${MappingProvider}:${MappingExternalId['kind']}:${number}`;
