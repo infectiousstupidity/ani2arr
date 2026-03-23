@@ -1,4 +1,5 @@
-import type { TtlCache } from '@/lib/storage';
+// src/services/mapping/lookup/base-lookup.client.ts
+import { STORAGE_POLICIES, type TtlCache } from '@/lib/storage';
 import PQueue from 'p-queue';
 import type { MappingExternalIdKind, MappingProvider, RequestPriority } from '@/shared/types';
 import { normalizeError } from '@/shared/errors/error-utils';
@@ -8,8 +9,7 @@ import {
 } from '@/services/mapping/pipeline/matching';
 import { incrementCounter, timeAsync } from '@/shared/utils/metrics';
 import { priorityValue } from '@/shared/utils/priority';
-import { logger } from '@/shared/utils/logger';
-import type { ScopedLogger } from '@/shared/utils/logger';
+import { logger, type ScopedLogger } from '@/shared/utils/logger';
 import type {
   LookupClientCredentials,
   ProviderLookupClient,
@@ -17,14 +17,6 @@ import type {
   ProviderLookupOptions,
   ProviderLookupResult,
 } from './provider-lookup.client';
-
-const LOOKUP_SOFT_TTL = 10 * 60 * 1000; // 10 minutes
-const LOOKUP_HARD_TTL = 30 * 60 * 1000; // 30 minutes
-
-// Negative results (no matches) should not be retried frequently during browsing.
-// Manual retries bypass via forceNetwork.
-const LOOKUP_NEGATIVE_SOFT_TTL = 24 * 60 * 60 * 1000; // 24 hours
-const LOOKUP_NEGATIVE_HARD_TTL = 48 * 60 * 60 * 1000; // 48 hours
 
 const LOOKUP_LATENCY_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
 
@@ -168,14 +160,14 @@ export abstract class BaseLookupClient<TResult extends ProviderLookupResult>
         const results = await this.performLookup(safeTerm, credentials, options.priority);
         if (results.length > 0) {
           await this.caches.positive.write(canonical, results, {
-            staleMs: LOOKUP_SOFT_TTL,
-            hardMs: LOOKUP_HARD_TTL,
+            staleMs: STORAGE_POLICIES.lookupPositive.staleMs,
+            hardMs: STORAGE_POLICIES.lookupPositive.hardMs,
           });
           await this.caches.negative.remove(canonical);
         } else {
           await this.caches.negative.write(canonical, true, {
-            staleMs: LOOKUP_NEGATIVE_SOFT_TTL,
-            hardMs: LOOKUP_NEGATIVE_HARD_TTL,
+            staleMs: STORAGE_POLICIES.lookupNegative.staleMs,
+            hardMs: STORAGE_POLICIES.lookupNegative.hardMs,
           });
           await this.caches.positive.remove(canonical);
         }
