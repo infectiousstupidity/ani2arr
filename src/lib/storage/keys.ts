@@ -22,7 +22,6 @@ export const STORAGE_KEYS = {
 } as const;
 
 // Cross-context invalidation counters.
-// These are derived state, so renaming them is safe as long as all call sites are updated.
 export const REVISION_KEYS = {
   settings: 'settingsRevision',
   mappings: 'mappingsRevision',
@@ -58,5 +57,4 @@ export const CACHE_NAMESPACES = {
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];
-export type RevisionKey = (typeof REVISION_KEYS)[keyof typeof REVISION_KEYS];
 export type CacheNamespace = (typeof CACHE_NAMESPACES)[keyof typeof CACHE_NAMESPACES];

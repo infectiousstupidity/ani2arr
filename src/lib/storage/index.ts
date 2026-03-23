@@ -12,6 +12,14 @@ export {
   getPublicOptionsSnapshot,
 } from './settings.store';
 
+// Revisions
+export type { RevisionKey } from './revisions.store';
+export {
+  getRevision,
+  bumpRevision,
+  resetAllRevisions,
+} from './revisions.store';
+
 // Mapping user state persistence
 export type {
   MappingOverrideEntry,

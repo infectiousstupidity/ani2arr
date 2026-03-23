@@ -1,3 +1,4 @@
+import { browser } from 'wxt/browser';
 import type { Ani2arrApi } from '@/rpc';
 import type { MappingOutput, UpdateRadarrInput, UpdateSonarrInput } from '@/rpc/schemas';
 import type { AnilistApiService } from '@/clients/anilist.api';
@@ -23,21 +24,14 @@ import { createError, ErrorCode, logError, normalizeError } from '@/shared/error
 import {
   clearAllTtlCaches,
   getExtensionOptionsSnapshot,
+  resetAllRevisions,
   setExtensionOptionsSnapshot,
 } from '@/lib/storage';
-import { REVISION_KEYS } from '@/lib/storage/keys';
 import { buildRadarrPermissionPattern } from '@/shared/providers/radarr/validation';
 import { buildSonarrPermissionPattern } from '@/shared/providers/sonarr/validation';
 import type { getMappingsHandler, GetMappingsInput } from './get-mappings';
 import type { updateRadarrMovieHandler } from './update-movie';
 import type { updateSonarrSeriesHandler } from './update-series';
-
-const RESET_REVISION_STORAGE_KEYS = [
-  REVISION_KEYS.sonarrLibrary,
-  REVISION_KEYS.radarrLibrary,
-  REVISION_KEYS.settings,
-  REVISION_KEYS.mappings,
-] as const;
 
 type CommonDeps = {
   sonarrApiService: SonarrApiService;
@@ -111,7 +105,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     ]);
 
     await clearAllTtlCaches();
-    await browser.storage.local.remove([...RESET_REVISION_STORAGE_KEYS]);
+    await resetAllRevisions();
   };
 
   const removeProviderHostPermissions = async (options: ExtensionOptions): Promise<void> => {
