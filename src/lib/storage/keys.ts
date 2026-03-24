@@ -39,6 +39,10 @@ export const CACHE_NAMESPACES = {
   extensionMappingSonarr: 'mapping:extension:sonarr',
   extensionMappingRadarr: 'mapping:extension:radarr',
 
+  // Extension-derived mapping failures
+  extensionMappingFailureSonarr: 'mapping:extension-failure:sonarr',
+  extensionMappingFailureRadarr: 'mapping:extension-failure:radarr',
+
   // Provider library snapshots
   libraryLeanSonarr: 'library:lean:sonarr',
   libraryLeanRadarr: 'library:lean:radarr',

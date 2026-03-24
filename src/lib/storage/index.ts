@@ -46,6 +46,17 @@ export { PersistedMap } from './persisted-map';
 
 // Typed cache wrappers
 export { anilistMediaCache } from './anilist-media.cache';
+export {
+  type ExtensionMappingCacheEntry,
+  readExtensionMapping,
+  writeExtensionMapping,
+  removeExtensionMapping,
+  clearExtensionMappings,
+  readExtensionMappingFailure,
+  writeExtensionMappingFailure,
+  removeExtensionMappingFailure,
+  clearExtensionMappingFailures,
+} from './extension-mapping.cache';
 export { upstreamMappingCaches } from './upstream-mapping.cache';
 export { sonarrLookupCaches, radarrLookupCaches } from './lookup.cache';
 export { providerLibraryCaches } from './provider-library.cache';
@@ -63,4 +74,4 @@ export {
   createTtlCache,
 } from './ttl-cache';
 
-export { STORAGE_KEYS, REVISION_KEYS } from './keys';
+export { STORAGE_KEYS, REVISION_KEYS, CACHE_NAMESPACES } from './keys';

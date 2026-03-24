@@ -124,16 +124,6 @@ export const createApiImplementation = (): Ani2arrApi => {
         sonarr: lookupClient,
         radarr: radarrLookupClient,
       },
-      {
-        sonarr: {
-          success: new Map(),
-          failure: new Map(),
-        },
-        radarr: {
-          success: new Map(),
-          failure: new Map(),
-        },
-      },
       overridesService,
       () => {
         void bumpMappingsRevision();

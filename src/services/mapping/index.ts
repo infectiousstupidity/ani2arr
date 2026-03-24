@@ -7,13 +7,29 @@ import type {
   RequestPriority,
 } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
-import { getExtensionOptionsSnapshot } from '@/lib/storage';
+import {
+  clearExtensionMappingFailures,
+  clearExtensionMappings,
+  getExtensionOptionsSnapshot,
+  readExtensionMapping,
+  readExtensionMappingFailure,
+  removeExtensionMapping,
+  removeExtensionMappingFailure,
+  writeExtensionMapping,
+  writeExtensionMappingFailure,
+} from '@/lib/storage';
 import { incrementCounter } from '@/shared/utils/metrics';
 import { logger } from '@/shared/utils/logger';
 import { getProviderLabel, resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import {
   EARLY_STOP_THRESHOLD,
+  FAILURE_HARD_TTL,
+  FAILURE_SOFT_TTL,
   MAX_SEARCH_TERMS,
+  NETWORK_FAILURE_HARD_TTL,
+  NETWORK_FAILURE_SOFT_TTL,
+  NO_MATCH_HARD_TTL,
+  NO_MATCH_SOFT_TTL,
   ResolvedLedger,
   SCORE_THRESHOLD,
   UnresolvedLedger,
@@ -30,11 +46,6 @@ import {
 import { resolveViaPipeline } from './pipeline/pipeline';
 import { UpstreamMappingStore, type UpstreamMappingPayload } from './upstream';
 import type { ResolveExternalIdOptions, ResolveHints, ResolveTvdbIdOptions, ResolvedMapping } from './types';
-
-type ProviderCaches = {
-  success: Map<string, ResolvedMapping>;
-  failure: Map<string, ExtensionError>;
-};
 
 type ProviderLookupRegistry = Record<
   MappingProvider,
@@ -55,7 +66,6 @@ export class MappingService {
     private readonly anilistApi: AnilistApiService,
     private readonly upstreamMappingStore: UpstreamMappingStore,
     private readonly lookupClients: ProviderLookupRegistry,
-    private readonly caches: Record<MappingProvider, ProviderCaches>,
     private readonly overrides?: MappingOverridesService,
     private readonly notifyMappingsChanged?: () => void,
   ) {}
@@ -64,11 +74,9 @@ export class MappingService {
     await Promise.all([
       this.lookupClients.sonarr.reset(),
       this.lookupClients.radarr.reset(),
+      clearExtensionMappings(),
+      clearExtensionMappingFailures(),
     ]);
-    this.caches.sonarr.success.clear();
-    this.caches.sonarr.failure.clear();
-    this.caches.radarr.success.clear();
-    this.caches.radarr.failure.clear();
     this.inflight.clear();
     this.ledger.clear();
     this.sessionSeenCanonical.sonarr.clear();
@@ -157,9 +165,6 @@ export class MappingService {
       return null;
     }
 
-    const providerCaches = this.caches[provider];
-    const cacheKey = this.successCacheKey(provider, anilistId);
-
     const overrideExternalId = this.overrides?.get(provider, anilistId) ?? null;
     if (overrideExternalId) {
       this.clearUnresolvedMapping(provider, anilistId);
@@ -173,8 +178,17 @@ export class MappingService {
 
         const resolved: ResolvedMapping = { externalId: staticHit };
         this.recordResolvedMapping(provider, anilistId, resolved, 'upstream');
-        providerCaches.success.set(cacheKey, resolved);
-        providerCaches.failure.delete(this.failureCacheKey(provider, anilistId));
+        try {
+          await Promise.all([
+            writeExtensionMapping(provider, anilistId, resolved),
+            removeExtensionMappingFailure(provider, anilistId),
+          ]);
+        } catch (error) {
+          logError(
+            normalizeError(error),
+            `MappingService:persistResolvedOverrideStaticHit:${provider}:${anilistId}`,
+          );
+        }
         return resolved;
       }
 
@@ -186,30 +200,30 @@ export class MappingService {
       return { externalId: overrideExternalId };
     }
 
-    const cachedSuccess = providerCaches.success.get(cacheKey);
+    const cachedSuccess = await readExtensionMapping(provider, anilistId);
     if (cachedSuccess) {
       if (import.meta.env.DEV) {
         this.log.debug?.(
-          `mapping:success-cache-hit provider=${provider} anilistId=${anilistId} ${cachedSuccess.externalId.kind}Id=${cachedSuccess.externalId.id}`,
+          `mapping:success-cache-hit provider=${provider} anilistId=${anilistId} ${cachedSuccess.value.externalId.kind}Id=${cachedSuccess.value.externalId.id}`,
         );
       }
       this.clearUnresolvedMapping(provider, anilistId);
-      if (this.isCandidateSuppressed(provider, anilistId, cachedSuccess.externalId)) {
+      if (this.isCandidateSuppressed(provider, anilistId, cachedSuccess.value.externalId)) {
         return null;
       }
-      this.recordResolvedMapping(provider, anilistId, cachedSuccess, 'auto');
-      return cachedSuccess;
+      this.recordResolvedMapping(provider, anilistId, cachedSuccess.value, 'auto');
+      return cachedSuccess.value;
     }
 
     if (!bypassFailureCache) {
-      const cachedFailure = providerCaches.failure.get(this.failureCacheKey(provider, anilistId));
+      const cachedFailure = await readExtensionMappingFailure(provider, anilistId);
       if (cachedFailure) {
         if (import.meta.env.DEV) {
           this.log.debug?.(
-            `mapping:failure-cache-hit provider=${provider} anilistId=${anilistId} code=${cachedFailure.code}`,
+            `mapping:failure-cache-hit provider=${provider} anilistId=${anilistId} code=${cachedFailure.value.code}`,
           );
         }
-        throw cachedFailure;
+        throw cachedFailure.value;
       }
     }
 
@@ -256,8 +270,19 @@ export class MappingService {
     resolved: ResolvedMapping,
     source: 'auto' | 'upstream',
   ): Promise<ResolvedMapping | null> {
-    this.caches[provider].success.set(this.successCacheKey(provider, anilistId), resolved);
-    this.caches[provider].failure.delete(this.failureCacheKey(provider, anilistId));
+    try {
+      await Promise.all([
+        writeExtensionMapping(provider, anilistId, resolved),
+        removeExtensionMappingFailure(provider, anilistId),
+      ]);
+    } catch (error) {
+      const normalized = normalizeError(error);
+      this.log.error?.(
+        `mapping:persist-resolved-failed provider=${provider} anilistId=${anilistId}`,
+        normalized,
+      );
+      return null;
+    }
     this.clearUnresolvedMapping(provider, anilistId);
     if (this.isCandidateSuppressed(provider, anilistId, resolved.externalId)) {
       return null;
@@ -271,7 +296,11 @@ export class MappingService {
     anilistId: number,
     error: ExtensionError,
   ): Promise<void> {
-    this.caches[provider].failure.set(this.failureCacheKey(provider, anilistId), error);
+    const ttl = this.failureTtlsFor(error);
+    await writeExtensionMappingFailure(provider, anilistId, error, {
+      staleMs: ttl.stale,
+      hardMs: ttl.hard,
+    });
   }
 
   private async attemptNetworkResolution(
@@ -446,21 +475,15 @@ export class MappingService {
     return null;
   }
 
-  private successCacheKey(provider: MappingProvider, anilistId: number): string {
-    return `resolved:${provider}:${anilistId}`;
-  }
-
-  private failureCacheKey(provider: MappingProvider, anilistId: number): string {
-    return `resolved-failure:${provider}:${anilistId}`;
-  }
-
   private inflightKey(provider: MappingProvider, anilistId: number): string {
     return `${provider}:${anilistId}`;
   }
 
   public async evictResolved(anilistId: number, provider: MappingProvider = 'sonarr'): Promise<void> {
-    this.caches[provider].success.delete(this.successCacheKey(provider, anilistId));
-    this.caches[provider].failure.delete(this.failureCacheKey(provider, anilistId));
+    await Promise.all([
+      removeExtensionMapping(provider, anilistId),
+      removeExtensionMappingFailure(provider, anilistId),
+    ]);
     this.inflight.delete(this.inflightKey(provider, anilistId));
     this.evictAniListMedia(anilistId);
     this.ledger.delete(provider, anilistId);
@@ -582,6 +605,16 @@ export class MappingService {
       error.code === ErrorCode.API_ERROR ||
       error.code === ErrorCode.PERMISSION_ERROR
     );
+  }
+
+  private failureTtlsFor(error: ExtensionError): { stale: number; hard: number } {
+    if (error.code === ErrorCode.VALIDATION_ERROR) {
+      return { stale: NO_MATCH_SOFT_TTL, hard: NO_MATCH_HARD_TTL };
+    }
+    if (error.code === ErrorCode.NETWORK_ERROR || error.code === ErrorCode.API_ERROR) {
+      return { stale: NETWORK_FAILURE_SOFT_TTL, hard: NETWORK_FAILURE_HARD_TTL };
+    }
+    return { stale: FAILURE_SOFT_TTL, hard: FAILURE_HARD_TTL };
   }
 
   private async getConfiguredCredentials(provider: MappingProvider): Promise<LookupClientCredentials> {
