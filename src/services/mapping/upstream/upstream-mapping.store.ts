@@ -1,6 +1,7 @@
-// src/services/mapping/upstream/upstream-mapping.provider.ts
+// src/services/mapping/upstream/upstream-mapping-source.ts
 import type { TtlCache } from '@/lib/storage';
 import { STORAGE_POLICIES } from '@/lib/storage';
+import type { UpstreamMappingCaches } from '@/lib/storage/upstream-mapping.cache';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 import type { ScopedLogger } from '@/shared/utils/logger';
@@ -13,7 +14,7 @@ const FALLBACK_FETCH: typeof fetch = (...args) => fetch(...args);
 
 export type UpstreamMappingSource = 'primary' | 'fallback';
 
-export interface upstreamMappingPayload {
+export interface UpstreamMappingPayload {
   pairs: Record<number, number>;
 }
 
@@ -22,17 +23,12 @@ export interface UpstreamMappingHit {
   source: UpstreamMappingSource;
 }
 
-export interface UpstreamMappingProviderOptions {
+export interface UpstreamMappingStoreOptions {
   fetch?: typeof fetch;
   scope?: string;
 }
 
-type UpstreamCaches = {
-  primary: TtlCache<upstreamMappingPayload>;
-  fallback: TtlCache<upstreamMappingPayload>;
-};
-
-export class UpstreamMappingProvider {
+export class UpstreamMappingStore {
   private readonly log: ScopedLogger;
   private readonly fetchImpl: typeof fetch;
   private readonly primaryPairs = new Map<number, number>();
@@ -40,8 +36,8 @@ export class UpstreamMappingProvider {
   private readonly fallbackPairs = new Map<number, number>();
   private readonly fallbackReverse = new Map<number, Set<number>>();
 
-  constructor(private readonly caches: UpstreamCaches, options: UpstreamMappingProviderOptions = {}) {
-    this.log = logger.create(options.scope ?? 'UpstreamMappingProvider');
+  constructor(private readonly caches: UpstreamMappingCaches, options: UpstreamMappingStoreOptions = {}) {
+    this.log = logger.create(options.scope ?? 'UpstreamMappingStore');
     const rawFetch: typeof fetch | undefined =
       options.fetch ?? (typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined);
     // Always bind to globalThis so calling via instance (this.fetchImpl) preserves the expected `this`.
@@ -57,17 +53,17 @@ export class UpstreamMappingProvider {
     // unnecessary upstream requests.
     if (this.primaryPairs.size === 0 && this.fallbackPairs.size === 0) {
       await this.refreshAll().catch(error => {
-        logError(normalizeError(error), 'UpstreamMappingProvider:init:refreshAll');
+        logError(normalizeError(error), 'UpstreamMappingStore:init:refreshAll');
       });
       return;
     }
 
     // Otherwise refresh in the background.
     void this.refresh('primary').catch(error => {
-      logError(normalizeError(error), 'UpstreamMappingProvider:init:primary');
+      logError(normalizeError(error), 'UpstreamMappingStore:init:primary');
     });
     void this.refresh('fallback').catch(error => {
-      logError(normalizeError(error), 'UpstreamMappingProvider:init:fallback');
+      logError(normalizeError(error), 'UpstreamMappingStore:init:fallback');
     });
   }
 
@@ -141,7 +137,7 @@ export class UpstreamMappingProvider {
     }
   }
 
-  public async reset(): Promise<void> {
+  public async clear(): Promise<void> {
     this.primaryPairs.clear();
     this.primaryReverse.clear();
     this.fallbackPairs.clear();
@@ -162,7 +158,7 @@ export class UpstreamMappingProvider {
     }
   }
 
-  private cacheFor(source: UpstreamMappingSource): TtlCache<upstreamMappingPayload> {
+  private cacheFor(source: UpstreamMappingSource): TtlCache<UpstreamMappingPayload> {
     return source === 'primary' ? this.caches.primary : this.caches.fallback;
   }
 

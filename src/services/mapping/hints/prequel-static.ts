@@ -1,14 +1,14 @@
 import type { AnilistApiService } from '@/clients/anilist.api';
 import type { AniMedia } from '@/shared/types';
-import type { UpstreamMappingProvider } from '../upstream';
+import type { UpstreamMappingStore } from '../upstream';
 import type { ResolvedMapping } from '../types';
 
 export async function resolvePrequelStatic(
   media: AniMedia,
-  staticProvider: UpstreamMappingProvider,
+  upstreamMappingStore: UpstreamMappingStore,
   anilistApi: AnilistApiService,
 ): Promise<ResolvedMapping | null> {
-  const directHit = staticProvider.get(media.id);
+  const directHit = upstreamMappingStore.get(media.id);
   if (directHit) {
     return { externalId: { id: directHit.tvdbId, kind: 'tvdb' } };
   }
@@ -19,7 +19,7 @@ export async function resolvePrequelStatic(
     if (visited.has(prequel.id)) {
       continue;
     }
-    const hit = staticProvider.get(prequel.id);
+    const hit = upstreamMappingStore.get(prequel.id);
     if (hit) {
       return { externalId: { id: hit.tvdbId, kind: 'tvdb' } };
     }
