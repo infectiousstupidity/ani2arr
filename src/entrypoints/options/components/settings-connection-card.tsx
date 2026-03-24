@@ -148,7 +148,8 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
   const handleDisconnect = async () => {
     const shouldDisconnect = await confirm({
       title: `Disconnect ${providerLabel}?`,
-      description: 'This removes host access until you reconnect. Your saved URL and API key stay filled in so you can reconnect without re-entering them.',
+      description:
+        'This clears the saved URL and API key and removes host access. You will need to reconnect to use this provider again.',
       confirmText: 'Disconnect',
       cancelText: 'Cancel',
     });
