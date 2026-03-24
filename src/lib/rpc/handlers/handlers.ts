@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
-import type { Ani2arrApi } from '@/rpc';
-import type { MappingOutput, UpdateRadarrInput, UpdateSonarrInput } from '@/rpc/schemas';
+import type { Ani2arrApi } from '@/lib/rpc';
+import type { MappingOutput, UpdateRadarrInput, UpdateSonarrInput } from '@/lib/rpc/schemas';
 import type { AnilistApiService } from '@/clients/anilist.api';
 import type { RadarrApiService } from '@/clients/radarr.api';
 import type { SonarrApiService } from '@/clients/sonarr.api';

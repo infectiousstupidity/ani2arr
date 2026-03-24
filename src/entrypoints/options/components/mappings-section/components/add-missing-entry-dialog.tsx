@@ -6,7 +6,7 @@ import { useDebounced } from '@/shared/hooks/common/use-debounced';
 import { InputField } from '@/shared/ui/form/form';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
-import { getAni2arrApi } from '@/rpc';
+import { getAni2arrApi } from '@/lib/rpc';
 import { useAniListMedia } from '@/shared/queries';
 import type { AniFormat, AniListSearchResult } from '@/shared/types';
 

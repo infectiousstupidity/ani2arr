@@ -19,10 +19,10 @@ import { SonarrLookupClient, RadarrLookupClient } from './mapping/lookup';
 import { SonarrLibrary } from '@/services/library/sonarr';
 import { RadarrLibrary } from '@/services/library/radarr';
 import { AniListMetadataStore } from './anilist';
-import { getMappingsHandler } from '@/rpc/handlers/get-mappings';
-import { updateRadarrMovieHandler } from '@/rpc/handlers/update-movie';
-import { updateSonarrSeriesHandler } from '@/rpc/handlers/update-series';
-import { createApiHandlers } from '@/rpc/handlers/handlers';
+import { getMappingsHandler } from '@/lib/rpc/handlers/get-mappings';
+import { updateRadarrMovieHandler } from '@/lib/rpc/handlers/update-movie';
+import { updateSonarrSeriesHandler } from '@/lib/rpc/handlers/update-series';
+import { createApiHandlers } from '@/lib/rpc/handlers/handlers';
 
 import type {
   ExtensionOptions,
@@ -30,7 +30,7 @@ import type {
   SonarrCredentialsPayload,
 } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
-import type { Ani2arrApi } from '@/rpc';
+import type { Ani2arrApi } from '@/lib/rpc';
 import { logger } from '@/shared/utils/logger';
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 45 * 1000;

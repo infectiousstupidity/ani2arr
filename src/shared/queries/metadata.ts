@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { getAni2arrApi } from '@/rpc';
+import { getAni2arrApi } from '@/lib/rpc';
 import { normalizeError } from '@/shared/errors/error-utils';
 import type { AniMedia, ExtensionError } from '@/shared/types';
-import type { GetAniListMetadataOutput } from '@/rpc/schemas';
+import type { GetAniListMetadataOutput } from '@/lib/rpc/schemas';
 import { queryKeys, normalizeMetadataIds } from './query-keys';
 
 export const useAniListMedia = (
