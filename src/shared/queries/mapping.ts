@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAni2arrApi } from '@/rpc';
+import { getAni2arrApi } from '@/lib/rpc';
 import type {
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
@@ -20,7 +20,7 @@ import type {
   SetMappingRejectedCandidateInput,
   SetMappingOverrideInput,
   StatusInput,
-} from '@/rpc/schemas';
+} from '@/lib/rpc/schemas';
 import { normalizeError } from '@/shared/errors/error-utils';
 import { queryKeys } from './query-keys';
 

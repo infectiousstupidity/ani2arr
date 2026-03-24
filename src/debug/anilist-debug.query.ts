@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getAni2arrApi } from '@/rpc';
+import { getAni2arrApi } from '@/lib/rpc';
 import type { ExtensionError } from '@/shared/types';
 import { queryKeys } from '@/shared/queries/query-keys';
 import type { AniListSchedulerDebugSnapshot } from './anilist-debug.types';

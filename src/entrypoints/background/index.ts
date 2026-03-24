@@ -1,6 +1,6 @@
 // src/entrypoints/background/index.ts
 import { browser } from 'wxt/browser';
-import { registerAni2arrApi, getAni2arrApi } from '@/rpc';
+import { registerAni2arrApi, getAni2arrApi } from '@/lib/rpc';
 import { createApiImplementation } from '@/services';
 import { computeTitleMatchScore } from '@/services/mapping/pipeline/matching';
 import { logger } from '@/shared/utils/logger';
