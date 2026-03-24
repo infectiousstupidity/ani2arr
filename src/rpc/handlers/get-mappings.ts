@@ -1,5 +1,5 @@
 import type { MappingOverridesService } from '@/services/mapping/overrides';
-import type { UpstreamMappingProvider } from '@/services/mapping/upstream';
+import type { UpstreamMappingStore } from '@/services/mapping/upstream';
 import type { MappingService } from '@/services/mapping';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { RadarrLibrary } from '@/services/library/radarr';
@@ -15,7 +15,7 @@ export type GetMappingsInput = {
 
 type GetMappingsDeps = {
   overridesService: MappingOverridesService;
-  staticProvider: UpstreamMappingProvider;
+  upstreamMappingStore: UpstreamMappingStore;
   mappingService: MappingService;
   sonarrLibrary: SonarrLibrary;
   radarrLibrary: RadarrLibrary;
@@ -29,7 +29,7 @@ export async function getMappingsHandler(
   total: number;
   nextCursor: { updatedAt: number; anilistId: number; provider: MappingSummary['provider'] } | null;
 }> {
-  const { overridesService, staticProvider, mappingService, sonarrLibrary, radarrLibrary } = deps;
+  const { overridesService, upstreamMappingStore, mappingService, sonarrLibrary, radarrLibrary } = deps;
   const normalizedQuery = input?.query?.trim().toLowerCase() || '';
   const sources =
     input?.sources && input.sources.length > 0
@@ -143,7 +143,7 @@ export async function getMappingsHandler(
   }
 
   if (sources.has('upstream')) {
-    for (const pair of staticProvider.listAllPairs()) {
+    for (const pair of upstreamMappingStore.listAllPairs()) {
       applyCandidate(pair.anilistId, {
         provider: 'sonarr',
         externalId: { id: pair.tvdbId, kind: 'tvdb' },

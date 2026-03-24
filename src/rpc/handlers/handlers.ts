@@ -9,7 +9,7 @@ import type { MappingOverridesService } from '@/services/mapping/overrides';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { RadarrLibrary } from '@/services/library/radarr';
 import type { AniListMetadataStore } from '@/services/anilist';
-import type { UpstreamMappingProvider } from '@/services/mapping/upstream';
+import type { UpstreamMappingStore } from '@/services/mapping/upstream';
 import type {
   AniMedia,
   ExtensionOptions,
@@ -39,7 +39,7 @@ type CommonDeps = {
   anilistApiService: AnilistApiService;
   mappingService: MappingService;
   overridesService: MappingOverridesService;
-  staticProvider: UpstreamMappingProvider;
+  upstreamMappingStore: UpstreamMappingStore;
   sonarrLibrary: SonarrLibrary;
   radarrLibrary: RadarrLibrary;
   anilistMetadataStore: AniListMetadataStore;
@@ -62,7 +62,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     anilistApiService,
     mappingService,
     overridesService,
-    staticProvider,
+    upstreamMappingStore,
     sonarrLibrary,
     radarrLibrary,
     anilistMetadataStore,
@@ -101,7 +101,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     await Promise.all([
       anilistMetadataStore.clearLocalCache(),
       mappingService.resetLookupState(),
-      staticProvider.reset(),
+      upstreamMappingStore.clear(),
     ]);
 
     await clearAllTtlCaches();
@@ -461,7 +461,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await mappingService.initStaticPairs();
       const hits: number[] = [];
       for (const id of ids) {
-        const hit = staticProvider.get(id);
+        const hit = upstreamMappingStore.get(id);
         if (hit) hits.push(id);
       }
       return hits;
@@ -871,7 +871,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await mappingService.initStaticPairs();
       return getMappings(input as GetMappingsInput, {
         overridesService,
-        staticProvider,
+        upstreamMappingStore,
         mappingService,
         sonarrLibrary,
         radarrLibrary,

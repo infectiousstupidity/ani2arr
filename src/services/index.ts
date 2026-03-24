@@ -14,7 +14,7 @@ import { RadarrApiService } from '@/clients/radarr.api';
 import { AnilistApiService } from '@/clients/anilist.api';
 import { MappingService } from './mapping';
 import { MappingOverridesService } from './mapping/overrides';
-import { UpstreamMappingProvider } from './mapping/upstream';
+import { UpstreamMappingStore } from './mapping/upstream';
 import { SonarrLookupClient, RadarrLookupClient } from './mapping/lookup';
 import { SonarrLibrary } from '@/services/library/sonarr';
 import { RadarrLibrary } from '@/services/library/radarr';
@@ -72,7 +72,7 @@ export const createApiImplementation = (): Ani2arrApi => {
     }),
   );
 
-  const staticProvider = new UpstreamMappingProvider(upstreamMappingCaches);
+  const upstreamMappingStore = new UpstreamMappingStore(upstreamMappingCaches);
 
   const lookupClient = new SonarrLookupClient(sonarrApiService, sonarrLookupCaches);
 
@@ -119,7 +119,7 @@ export const createApiImplementation = (): Ani2arrApi => {
   const mappingService = bindAll(
     new MappingService(
       anilistApiService,
-      staticProvider,
+      upstreamMappingStore,
       {
         sonarr: lookupClient,
         radarr: radarrLookupClient,
@@ -301,7 +301,7 @@ export const createApiImplementation = (): Ani2arrApi => {
     anilistApiService,
     mappingService,
     overridesService,
-    staticProvider,
+    upstreamMappingStore,
     sonarrLibrary,
     radarrLibrary,
     anilistMetadataStore,

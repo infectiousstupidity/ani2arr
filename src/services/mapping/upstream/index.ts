@@ -1,7 +1,7 @@
 export {
-  UpstreamMappingProvider,
-  type upstreamMappingPayload,
+  UpstreamMappingStore,
+  type UpstreamMappingPayload,
   type UpstreamMappingHit,
-  type UpstreamMappingProviderOptions,
+  type UpstreamMappingStoreOptions,
   type UpstreamMappingSource,
-} from './upstream-mapping.provider';
+} from './upstream-mapping.store';

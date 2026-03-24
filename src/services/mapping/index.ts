@@ -28,7 +28,7 @@ import {
   type ProviderLookupResult,
 } from './lookup';
 import { resolveViaPipeline } from './pipeline/pipeline';
-import { UpstreamMappingProvider, type upstreamMappingPayload } from './upstream';
+import { UpstreamMappingStore, type UpstreamMappingPayload } from './upstream';
 import type { ResolveExternalIdOptions, ResolveHints, ResolveTvdbIdOptions, ResolvedMapping } from './types';
 
 type ProviderCaches = {
@@ -53,7 +53,7 @@ export class MappingService {
 
   constructor(
     private readonly anilistApi: AnilistApiService,
-    private readonly staticProvider: UpstreamMappingProvider,
+    private readonly upstreamMappingStore: UpstreamMappingStore,
     private readonly lookupClients: ProviderLookupRegistry,
     private readonly caches: Record<MappingProvider, ProviderCaches>,
     private readonly overrides?: MappingOverridesService,
@@ -79,7 +79,7 @@ export class MappingService {
   }
 
   public initStaticPairs(): Promise<void> {
-    return this.staticProvider.init();
+    return this.upstreamMappingStore.init();
   }
 
   public prioritizeAniListMedia(anilistId: number, options?: { schedule?: boolean }): void {
@@ -409,7 +409,7 @@ export class MappingService {
     }
 
     if (provider === 'sonarr') {
-      const prequelStatic = await resolvePrequelStatic(media, this.staticProvider, this.anilistApi);
+      const prequelStatic = await resolvePrequelStatic(media, this.upstreamMappingStore, this.anilistApi);
       if (prequelStatic) {
         this.recordResolvedMapping(provider, media.id, prequelStatic, 'upstream');
         return prequelStatic;
@@ -422,7 +422,7 @@ export class MappingService {
       {
         anilistApi: this.anilistApi,
         lookupClient,
-        staticProvider: this.staticProvider,
+        upstreamMappingStore: this.upstreamMappingStore,
         credentials,
         ...(typeof priority !== 'undefined' ? { priority } : {}),
         ...(forceLookupNetwork ? { forceLookupNetwork: true } : {}),
@@ -521,7 +521,7 @@ export class MappingService {
       }
     }
     if (provider === 'sonarr' && externalId.kind === 'tvdb') {
-      for (const id of this.staticProvider.getAniListIdsForTvdb(externalId.id)) {
+      for (const id of this.upstreamMappingStore.getAniListIdsForTvdb(externalId.id)) {
         ids.add(id);
       }
     }
@@ -611,7 +611,7 @@ export class MappingService {
     if (provider !== 'sonarr') {
       return null;
     }
-    const hit = this.staticProvider.get(anilistId);
+    const hit = this.upstreamMappingStore.get(anilistId);
     if (!hit) {
       return null;
     }
@@ -619,4 +619,4 @@ export class MappingService {
   }
 }
 
-export type { upstreamMappingPayload, ResolvedMapping };
+export type { UpstreamMappingPayload, ResolvedMapping };

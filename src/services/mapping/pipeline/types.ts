@@ -1,5 +1,5 @@
 import type { SearchTerm } from './search-term-generator';
-import type { UpstreamMappingProvider } from '../upstream';
+import type { UpstreamMappingStore } from '../upstream';
 import type { ScopedLogger } from '@/shared/utils/logger';
 import type { AniMedia, RequestPriority } from '@/shared/types';
 import type { AnilistApiService } from '@/clients/anilist.api';
@@ -43,7 +43,7 @@ export interface MappingContext<
 > {
   anilistApi: AnilistApiService;
   lookupClient: ProviderLookupClient<TCredentials, TResult>;
-  staticProvider: UpstreamMappingProvider;
+  upstreamMappingStore: UpstreamMappingStore;
   credentials: TCredentials;
   /** Priority hint for provider lookups spawned by this context. */
   priority?: RequestPriority;

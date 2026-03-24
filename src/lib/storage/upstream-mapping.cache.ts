@@ -3,9 +3,11 @@
 
 import { createTtlCache } from './ttl-cache';
 import { CACHE_NAMESPACES } from './keys';
-import type { upstreamMappingPayload } from '@/services/mapping';
+import type { UpstreamMappingPayload } from '@/services/mapping/upstream';
 
 export const upstreamMappingCaches = {
-  primary: createTtlCache<upstreamMappingPayload>(CACHE_NAMESPACES.upstreamMappingPrimary),
-  fallback: createTtlCache<upstreamMappingPayload>(CACHE_NAMESPACES.upstreamMappingFallback),
+  primary: createTtlCache<UpstreamMappingPayload>(CACHE_NAMESPACES.upstreamMappingPrimary),
+  fallback: createTtlCache<UpstreamMappingPayload>(CACHE_NAMESPACES.upstreamMappingFallback),
 } as const;
+
+export type UpstreamMappingCaches = typeof upstreamMappingCaches;
