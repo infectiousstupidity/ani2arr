@@ -253,6 +253,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
     ],
   );
 
+  // TODO: Currently this clears both providers' mappings when disconnecting one. Refactor it so these are stored and cleared separately. 
   const disconnectProvider = useCallback(
     async (provider: ProviderKey): Promise<boolean> => {
       if (saveOptions.isPending || sonarrTestConnection.isPending || radarrTestConnection.isPending) {
