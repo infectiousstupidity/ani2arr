@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
-import { browser } from 'wxt/browser';
 import { useRadarrConnectionStatus, useRadarrMetadata, queryKeys } from '@/shared/queries';
 import { useDisplayedConnectionStatus } from '@/shared/hooks/common/use-displayed-connection-status';
 import type { ProviderConnectionStatus } from '@/shared/providers/common/connection-status';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
-import { buildRadarrPermissionPattern, requestRadarrPermission, validateApiKey, validateUrl } from '@/shared/providers/radarr/validation';
+import { requestRadarrPermission, validateApiKey, validateUrl } from '@/shared/providers/radarr/validation';
 import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import {
@@ -246,31 +245,14 @@ function RadarrSettingsFormInner({
   }, [queryClient]);
 
   const handleDisconnect = useCallback(async () => {
-    const currentUrl = radarrUrl?.trim();
-    setConfirmedScope(null);
-    setForceEditing(true);
-    actions.radarrTestConnectionState.reset();
-
-    if (currentUrl) {
-      const permissionPatternResult = buildRadarrPermissionPattern(currentUrl);
-      if (permissionPatternResult.ok) {
-        try {
-          await browser.permissions.remove({
-            origins: [permissionPatternResult.value],
-          });
-        } catch (permError) {
-          logger.warn('Failed to remove Radarr host permission during disconnect.', permError);
-        }
-      }
+    const disconnected = await actions.disconnectProvider('radarr');
+    if (!disconnected) {
+      return;
     }
 
-    queryClient.removeQueries({ queryKey: queryKeys.radarrMetadataRoot() });
-    queryClient.removeQueries({ queryKey: queryKeys.radarrConnectionRoot() });
-  }, [
-    actions.radarrTestConnectionState,
-    queryClient,
-    radarrUrl,
-  ]);
+    setConfirmedScope(null);
+    setForceEditing(true);
+  }, [actions]);
 
   if (isLoading) {
     return <div className="text-center p-8 text-text-secondary">Loading settings...</div>;
@@ -361,4 +343,3 @@ function RadarrSettingsForm(props: RadarrSettingsFormProps): React.JSX.Element {
 }
 
 export default React.memo(RadarrSettingsForm);
-

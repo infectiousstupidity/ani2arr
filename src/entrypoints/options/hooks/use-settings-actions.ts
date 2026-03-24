@@ -76,341 +76,459 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
     queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot('radarr') });
   }, [queryClient]);
 
-  const providerConfigs = useMemo(() => ({
-    sonarr: {
-      label: 'Sonarr',
-      validateUrl: validateSonarrUrl,
-      validateApiKey: validateSonarrApiKey,
-      buildPermissionPattern: buildSonarrPermissionPattern,
-      requestPermission: requestSonarrPermission,
-      testConnectionState: sonarrTestConnection,
-    },
-    radarr: {
-      label: 'Radarr',
-      validateUrl: validateRadarrUrl,
-      validateApiKey: validateRadarrApiKey,
-      buildPermissionPattern: buildRadarrPermissionPattern,
-      requestPermission: requestRadarrPermission,
-      testConnectionState: radarrTestConnection,
-    },
-  }) as const, [radarrTestConnection, sonarrTestConnection]);
-
-  const prepareProvider = useCallback((settings: Settings, provider: ProviderKey): PreparedProviderState => {
-    const config = providerConfigs[provider];
-    const rawUrl = String(settings.providers[provider].url ?? '').trim();
-    const rawApiKey = String(settings.providers[provider].apiKey ?? '').trim();
-
-    if (!rawUrl && !rawApiKey) {
-      return {
-        url: '',
-        apiKey: '',
-        configured: false,
-        permissionPattern: null,
-      };
-    }
-
-    if (!rawUrl || !rawApiKey) {
-      throw new Error(`${config.label}: enter both URL and API key, or leave both blank.`);
-    }
-
-    const urlValidation = config.validateUrl(rawUrl);
-    const apiKeyValidation = config.validateApiKey(rawApiKey);
-
-    if (!urlValidation.isValid || !apiKeyValidation.isValid) {
-      throw new Error(`Please enter a valid ${config.label} URL and API key.`);
-    }
-
-    const normalizedUrl = urlValidation.normalizedUrl ?? rawUrl;
-    const permissionPatternResult = config.buildPermissionPattern(normalizedUrl);
-    if (!permissionPatternResult.ok) {
-      logger.error(`Failed to determine host permission for ${config.label} URL.`, permissionPatternResult.error);
-      throw new Error(`Failed to update ${config.label} host permissions. Please try again.`);
-    }
-
-    return {
-      url: normalizedUrl,
-      apiKey: rawApiKey,
-      configured: true,
-      permissionPattern: permissionPatternResult.value,
-    };
-  }, [providerConfigs]);
-
-  const saveProviderConnection = useCallback(async (provider: ProviderKey): Promise<boolean> => {
-    if (saveOptions.isPending || sonarrTestConnection.isPending || radarrTestConnection.isPending) {
-      return false;
-    }
-
-    setSaveError(null);
-
-    const rawValues = methods.getValues();
-    const nextSettings = parseSettings(rawValues);
-    const previousSettings = savedSettingsRef.current ?? createDefaultSettings();
-
-    let preparedCurrent: PreparedProviderState;
-    let preparedPrevious: PreparedProviderState;
-
-    try {
-      preparedCurrent = prepareProvider(nextSettings, provider);
-      preparedPrevious = prepareProvider(previousSettings, provider);
-    } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Please review the configured provider settings.');
-      return false;
-    }
-
-    if (!preparedCurrent.configured) {
-      setSaveError(`Please enter a valid ${providerConfigs[provider].label} URL and API key.`);
-      return false;
-    }
-
-    const currentProviderSettings = nextSettings.providers[provider];
-    const previousProviderSettings = previousSettings.providers[provider];
-    const credentialsChanged =
-      preparedCurrent.url !== preparedPrevious.url ||
-      preparedCurrent.apiKey !== preparedPrevious.apiKey ||
-      currentProviderSettings.titleLanguage !== previousProviderSettings.titleLanguage;
-
-    if (!credentialsChanged) {
-      return true;
-    }
-
-    const normalizedSettings: Settings = {
-      ...previousSettings,
-      providers: {
-        ...previousSettings.providers,
-        [provider]: {
-          ...currentProviderSettings,
-          ...previousProviderSettings,
-          url: preparedCurrent.url,
-          apiKey: preparedCurrent.apiKey,
-          titleLanguage: currentProviderSettings.titleLanguage,
-        },
-      },
-    };
-
-    try {
-      await saveOptions.mutateAsync(normalizedSettings as ExtensionOptions);
-      savedSettingsRef.current = normalizedSettings;
-
-      methods.resetField(`providers.${provider}.url`, {
-        defaultValue: preparedCurrent.url,
-      });
-      methods.resetField(`providers.${provider}.apiKey`, {
-        defaultValue: preparedCurrent.apiKey,
-      });
-      methods.resetField(`providers.${provider}.titleLanguage`, {
-        defaultValue: currentProviderSettings.titleLanguage,
-      });
-
-      if (
-        preparedPrevious.permissionPattern &&
-        preparedPrevious.permissionPattern !== preparedCurrent.permissionPattern
-      ) {
-        try {
-          await browser.permissions.remove({ origins: [preparedPrevious.permissionPattern] });
-        } catch (error) {
-          logger.warn(`Failed to remove previous ${providerConfigs[provider].label} host permission after provider save.`, error);
-        }
-      }
-
-      queryClient.invalidateQueries({
-        queryKey: provider === 'sonarr' ? queryKeys.sonarrMetadataRoot() : queryKeys.radarrMetadataRoot(),
-      });
-      queryClient.invalidateQueries({
-        queryKey: provider === 'sonarr' ? queryKeys.sonarrConnectionRoot() : queryKeys.radarrConnectionRoot(),
-      });
-      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot(provider) });
-
-      return true;
-    } catch (error) {
-      logger.error(`Failed to save ${providerConfigs[provider].label} connection details.`, error);
-      setSaveError(`Failed to save ${providerConfigs[provider].label} connection details. Please try again.`);
-      return false;
-    }
-  }, [
-    methods,
-    prepareProvider,
-    providerConfigs,
-    queryClient,
-    radarrTestConnection.isPending,
-    saveOptions,
-    sonarrTestConnection.isPending,
-  ]);
-
-  const handleSave = useCallback(async (): Promise<boolean> => {
-    if (saveOptions.isPending || sonarrTestConnection.isPending || radarrTestConnection.isPending) {
-      return false;
-    }
-
-    setSaveError(null);
-
-    const isValid = await methods.trigger();
-    if (!isValid) return false;
-
-    const rawValues = methods.getValues();
-    const nextSettings = parseSettings(rawValues);
-    const previousSettings = savedSettingsRef.current ?? createDefaultSettings();
-
-    if (!methods.formState.isDirty) {
-      return false;
-    }
-
-    let preparedProviders: Record<
-      ProviderKey,
-      PreparedProviderState
-    >;
-
-    try {
-      preparedProviders = {
-        sonarr: prepareProvider(nextSettings, 'sonarr'),
-        radarr: prepareProvider(nextSettings, 'radarr'),
-      };
-    } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Please review the configured provider settings.');
-      return false;
-    }
-
-    const normalizedSettings: Settings = {
-      ...nextSettings,
-      providers: {
-        ...nextSettings.providers,
+  const providerConfigs = useMemo(
+    () =>
+      ({
         sonarr: {
-          ...nextSettings.providers.sonarr,
-          url: preparedProviders.sonarr.url,
-          apiKey: preparedProviders.sonarr.apiKey,
+          label: 'Sonarr',
+          validateUrl: validateSonarrUrl,
+          validateApiKey: validateSonarrApiKey,
+          buildPermissionPattern: buildSonarrPermissionPattern,
+          requestPermission: requestSonarrPermission,
+          testConnectionState: sonarrTestConnection,
         },
         radarr: {
-          ...nextSettings.providers.radarr,
-          url: preparedProviders.radarr.url,
-          apiKey: preparedProviders.radarr.apiKey,
+          label: 'Radarr',
+          validateUrl: validateRadarrUrl,
+          validateApiKey: validateRadarrApiKey,
+          buildPermissionPattern: buildRadarrPermissionPattern,
+          requestPermission: requestRadarrPermission,
+          testConnectionState: radarrTestConnection,
         },
-      },
-    };
+      }) as const,
+    [radarrTestConnection, sonarrTestConnection],
+  );
 
-    const providerStates = (Object.keys(providerConfigs) as ProviderKey[]).map(provider => {
+  const prepareProvider = useCallback(
+    (settings: Settings, provider: ProviderKey): PreparedProviderState => {
       const config = providerConfigs[provider];
-      const current = preparedProviders[provider];
-      const previousUrl = String(previousSettings.providers[provider].url ?? '').trim();
-      const previousApiKey = String(previousSettings.providers[provider].apiKey ?? '').trim();
-      const previousPermissionPatternResult = previousUrl ? config.buildPermissionPattern(previousUrl) : null;
-      const previousPermissionPattern =
-        previousPermissionPatternResult && previousPermissionPatternResult.ok
-          ? previousPermissionPatternResult.value
-          : null;
+      const rawUrl = String(settings.providers[provider].url ?? '').trim();
+      const rawApiKey = String(settings.providers[provider].apiKey ?? '').trim();
 
-      if (previousPermissionPatternResult && !previousPermissionPatternResult.ok) {
-        logger.warn(`Previous ${config.label} URL was invalid; skipping permission cleanup.`, previousPermissionPatternResult.error);
+      if (!rawUrl && !rawApiKey) {
+        return {
+          url: '',
+          apiKey: '',
+          configured: false,
+          permissionPattern: null,
+        };
+      }
+
+      if (!rawUrl || !rawApiKey) {
+        throw new Error(`${config.label}: enter both URL and API key, or leave both blank.`);
+      }
+
+      const urlValidation = config.validateUrl(rawUrl);
+      const apiKeyValidation = config.validateApiKey(rawApiKey);
+
+      if (!urlValidation.isValid || !apiKeyValidation.isValid) {
+        throw new Error(`Please enter a valid ${config.label} URL and API key.`);
+      }
+
+      const normalizedUrl = urlValidation.normalizedUrl ?? rawUrl;
+      const permissionPatternResult = config.buildPermissionPattern(normalizedUrl);
+      if (!permissionPatternResult.ok) {
+        logger.error(
+          `Failed to determine host permission for ${config.label} URL.`,
+          permissionPatternResult.error,
+        );
+        throw new Error(`Failed to update ${config.label} host permissions. Please try again.`);
       }
 
       return {
-        provider,
-        label: config.label,
-        current,
-        credentialsChanged: current.url !== previousUrl || current.apiKey !== previousApiKey,
-        hostChanged: current.permissionPattern !== previousPermissionPattern,
-        previousPermissionPattern,
-        requestPermission: config.requestPermission,
-        testConnectionState: config.testConnectionState,
+        url: normalizedUrl,
+        apiKey: rawApiKey,
+        configured: true,
+        permissionPattern: permissionPatternResult.value,
       };
-    });
+    },
+    [providerConfigs],
+  );
 
-    const grantedPermissions: Array<{ provider: ProviderKey; pattern: string }> = [];
-    let stage: 'permission' | 'test' | 'save' | 'cleanup' | null = null;
-
-    try {
-      sonarrTestConnection.reset();
-      radarrTestConnection.reset();
-
-      for (const state of providerStates) {
-        if (!state.current.configured || !state.hostChanged || !state.current.permissionPattern) {
-          continue;
-        }
-
-        stage = 'permission';
-        const permission = await state.requestPermission(state.current.url);
-        if (!permission.granted) {
-          setSaveError(`${state.label} host permission was not granted.`);
-          return false;
-        }
-        grantedPermissions.push({ provider: state.provider, pattern: state.current.permissionPattern });
+  const saveProviderConnection = useCallback(
+    async (provider: ProviderKey): Promise<boolean> => {
+      if (saveOptions.isPending || sonarrTestConnection.isPending || radarrTestConnection.isPending) {
+        return false;
       }
 
-      for (const state of providerStates) {
-        if (!state.current.configured || !state.credentialsChanged) {
-          continue;
-        }
+      setSaveError(null);
 
-        stage = 'test';
-        await state.testConnectionState.mutateAsync({
-          url: state.current.url,
-          apiKey: state.current.apiKey,
+      const rawValues = methods.getValues();
+      const nextSettings = parseSettings(rawValues);
+      const previousSettings = savedSettingsRef.current ?? createDefaultSettings();
+      const config = providerConfigs[provider];
+
+      let preparedCurrent: PreparedProviderState;
+      let preparedPrevious: PreparedProviderState;
+
+      try {
+        preparedCurrent = prepareProvider(nextSettings, provider);
+        preparedPrevious = prepareProvider(previousSettings, provider);
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : 'Please review the configured provider settings.');
+        return false;
+      }
+
+      if (!preparedCurrent.configured) {
+        setSaveError(`Please enter a valid ${config.label} URL and API key.`);
+        return false;
+      }
+
+      const currentProviderSettings = nextSettings.providers[provider];
+      const previousProviderSettings = previousSettings.providers[provider];
+      const credentialsChanged =
+        preparedCurrent.url !== preparedPrevious.url ||
+        preparedCurrent.apiKey !== preparedPrevious.apiKey ||
+        currentProviderSettings.titleLanguage !== previousProviderSettings.titleLanguage;
+
+      if (!credentialsChanged) {
+        return true;
+      }
+
+      const normalizedSettings: Settings = {
+        ...previousSettings,
+        providers: {
+          ...previousSettings.providers,
+          [provider]: {
+            ...currentProviderSettings,
+            ...previousProviderSettings,
+            url: preparedCurrent.url,
+            apiKey: preparedCurrent.apiKey,
+            titleLanguage: currentProviderSettings.titleLanguage,
+          },
+        },
+      };
+
+      try {
+        await saveOptions.mutateAsync(normalizedSettings as ExtensionOptions);
+        savedSettingsRef.current = normalizedSettings;
+
+        methods.resetField(`providers.${provider}.url`, {
+          defaultValue: preparedCurrent.url,
         });
-      }
+        methods.resetField(`providers.${provider}.apiKey`, {
+          defaultValue: preparedCurrent.apiKey,
+        });
+        methods.resetField(`providers.${provider}.titleLanguage`, {
+          defaultValue: currentProviderSettings.titleLanguage,
+        });
 
-      stage = 'save';
-      await saveOptions.mutateAsync(normalizedSettings as ExtensionOptions);
-      methods.reset(normalizedSettings as SettingsFormValues);
-
-      for (const state of providerStates) {
-        if (!state.previousPermissionPattern || state.previousPermissionPattern === state.current.permissionPattern) {
-          continue;
+        if (
+          preparedPrevious.permissionPattern &&
+          preparedPrevious.permissionPattern !== preparedCurrent.permissionPattern
+        ) {
+          try {
+            await browser.permissions.remove({ origins: [preparedPrevious.permissionPattern] });
+          } catch (error) {
+            logger.warn(
+              `Failed to remove previous ${config.label} host permission after provider save.`,
+              error,
+            );
+          }
         }
 
-        stage = 'cleanup';
-        try {
-          const removed = await browser.permissions.remove({ origins: [state.previousPermissionPattern] });
-          if (!removed) {
-            throw new Error('Permission removal rejected without throwing.');
+        queryClient.invalidateQueries({
+          queryKey: provider === 'sonarr' ? queryKeys.sonarrMetadataRoot() : queryKeys.radarrMetadataRoot(),
+        });
+        queryClient.invalidateQueries({
+          queryKey: provider === 'sonarr' ? queryKeys.sonarrConnectionRoot() : queryKeys.radarrConnectionRoot(),
+        });
+        queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot(provider) });
+
+        return true;
+      } catch (error) {
+        logger.error(`Failed to save ${config.label} connection details.`, error);
+        setSaveError(`Failed to save ${config.label} connection details. Please try again.`);
+        return false;
+      }
+    },
+    [
+      methods,
+      prepareProvider,
+      providerConfigs,
+      queryClient,
+      radarrTestConnection.isPending,
+      saveOptions,
+      sonarrTestConnection.isPending,
+    ],
+  );
+
+  const disconnectProvider = useCallback(
+    async (provider: ProviderKey): Promise<boolean> => {
+      if (saveOptions.isPending || sonarrTestConnection.isPending || radarrTestConnection.isPending) {
+        return false;
+      }
+
+      setSaveError(null);
+
+      const previousSettings = savedSettingsRef.current ?? createDefaultSettings();
+      const previousProviderSettings = previousSettings.providers[provider];
+      const previousUrl = String(previousProviderSettings.url ?? '').trim();
+      const config = providerConfigs[provider];
+
+      const permissionPatternResult = previousUrl
+        ? config.buildPermissionPattern(previousUrl)
+        : null;
+      const previousPermissionPattern =
+        permissionPatternResult && permissionPatternResult.ok
+          ? permissionPatternResult.value
+          : null;
+
+      if (permissionPatternResult && !permissionPatternResult.ok) {
+        logger.warn(
+          `Previous ${config.label} URL was invalid; skipping permission cleanup.`,
+          permissionPatternResult.error,
+        );
+      }
+
+      const normalizedSettings: Settings = {
+        ...previousSettings,
+        providers: {
+          ...previousSettings.providers,
+          [provider]: {
+            ...previousProviderSettings,
+            url: '',
+            apiKey: '',
+          },
+        },
+      };
+
+      try {
+        config.testConnectionState.reset();
+
+        await saveOptions.mutateAsync(normalizedSettings as ExtensionOptions);
+        savedSettingsRef.current = normalizedSettings;
+
+        methods.resetField(`providers.${provider}.url`, {
+          defaultValue: '',
+        });
+        methods.resetField(`providers.${provider}.apiKey`, {
+          defaultValue: '',
+        });
+
+        if (previousPermissionPattern) {
+          try {
+            await browser.permissions.remove({ origins: [previousPermissionPattern] });
+          } catch (error) {
+            logger.warn(
+              `Failed to remove ${config.label} host permission during disconnect.`,
+              error,
+            );
           }
-        } catch (error) {
-          logger.error(`Error removing host permission for previous ${state.label} URL.`, error);
-          setSaveError(`Failed to update ${state.label} host permissions. Please try again.`);
+        }
 
-          await saveOptions.mutateAsync(previousSettings as ExtensionOptions);
-          methods.reset(previousSettings as SettingsFormValues);
+        queryClient.removeQueries({
+          queryKey: provider === 'sonarr' ? queryKeys.sonarrMetadataRoot() : queryKeys.radarrMetadataRoot(),
+        });
+        queryClient.removeQueries({
+          queryKey: provider === 'sonarr' ? queryKeys.sonarrConnectionRoot() : queryKeys.radarrConnectionRoot(),
+        });
+        queryClient.removeQueries({ queryKey: queryKeys.seriesStatusRoot(provider) });
 
-          for (const granted of grantedPermissions) {
-            try {
-              await browser.permissions.remove({ origins: [granted.pattern] });
-            } catch (rollbackError) {
-              logger.warn(`Failed to roll back ${granted.provider} host permission after removal failure.`, rollbackError);
+        invalidateSettingsQueries();
+        return true;
+      } catch (error) {
+        logger.error(`Failed to disconnect ${config.label}.`, error);
+        setSaveError(`Failed to disconnect ${config.label}. Please try again.`);
+        invalidateSettingsQueries();
+        return false;
+      }
+    },
+    [
+      invalidateSettingsQueries,
+      methods,
+      providerConfigs,
+      queryClient,
+      radarrTestConnection.isPending,
+      saveOptions,
+      sonarrTestConnection.isPending,
+    ],
+  );
+
+  const handleSave = useCallback(
+    async (): Promise<boolean> => {
+      if (saveOptions.isPending || sonarrTestConnection.isPending || radarrTestConnection.isPending) {
+        return false;
+      }
+
+      setSaveError(null);
+
+      const isValid = await methods.trigger();
+      if (!isValid) return false;
+
+      const rawValues = methods.getValues();
+      const nextSettings = parseSettings(rawValues);
+      const previousSettings = savedSettingsRef.current ?? createDefaultSettings();
+
+      if (!methods.formState.isDirty) {
+        return false;
+      }
+
+      let preparedProviders: Record<ProviderKey, PreparedProviderState>;
+
+      try {
+        preparedProviders = {
+          sonarr: prepareProvider(nextSettings, 'sonarr'),
+          radarr: prepareProvider(nextSettings, 'radarr'),
+        };
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : 'Please review the configured provider settings.');
+        return false;
+      }
+
+      const normalizedSettings: Settings = {
+        ...nextSettings,
+        providers: {
+          ...nextSettings.providers,
+          sonarr: {
+            ...nextSettings.providers.sonarr,
+            url: preparedProviders.sonarr.url,
+            apiKey: preparedProviders.sonarr.apiKey,
+          },
+          radarr: {
+            ...nextSettings.providers.radarr,
+            url: preparedProviders.radarr.url,
+            apiKey: preparedProviders.radarr.apiKey,
+          },
+        },
+      };
+
+      const providerStates = (Object.keys(providerConfigs) as ProviderKey[]).map(provider => {
+        const config = providerConfigs[provider];
+        const current = preparedProviders[provider];
+        const previousUrl = String(previousSettings.providers[provider].url ?? '').trim();
+        const previousApiKey = String(previousSettings.providers[provider].apiKey ?? '').trim();
+        const previousPermissionPatternResult = previousUrl ? config.buildPermissionPattern(previousUrl) : null;
+        const previousPermissionPattern =
+          previousPermissionPatternResult && previousPermissionPatternResult.ok
+            ? previousPermissionPatternResult.value
+            : null;
+
+        if (previousPermissionPatternResult && !previousPermissionPatternResult.ok) {
+          logger.warn(
+            `Previous ${config.label} URL was invalid; skipping permission cleanup.`,
+            previousPermissionPatternResult.error,
+          );
+        }
+
+        return {
+          provider,
+          label: config.label,
+          current,
+          credentialsChanged: current.url !== previousUrl || current.apiKey !== previousApiKey,
+          hostChanged: current.permissionPattern !== previousPermissionPattern,
+          previousPermissionPattern,
+          requestPermission: config.requestPermission,
+          testConnectionState: config.testConnectionState,
+        };
+      });
+
+      const grantedPermissions: Array<{ provider: ProviderKey; pattern: string }> = [];
+      let stage: 'permission' | 'test' | 'save' | 'cleanup' | null = null;
+
+      try {
+        sonarrTestConnection.reset();
+        radarrTestConnection.reset();
+
+        for (const state of providerStates) {
+          if (!state.current.configured || !state.hostChanged || !state.current.permissionPattern) {
+            continue;
+          }
+
+          stage = 'permission';
+          const permission = await state.requestPermission(state.current.url);
+          if (!permission.granted) {
+            setSaveError(`${state.label} host permission was not granted.`);
+            return false;
+          }
+          grantedPermissions.push({ provider: state.provider, pattern: state.current.permissionPattern });
+        }
+
+        for (const state of providerStates) {
+          if (!state.current.configured || !state.credentialsChanged) {
+            continue;
+          }
+
+          stage = 'test';
+          await state.testConnectionState.mutateAsync({
+            url: state.current.url,
+            apiKey: state.current.apiKey,
+          });
+        }
+
+        stage = 'save';
+        await saveOptions.mutateAsync(normalizedSettings as ExtensionOptions);
+        methods.reset(normalizedSettings as SettingsFormValues);
+
+        for (const state of providerStates) {
+          if (!state.previousPermissionPattern || state.previousPermissionPattern === state.current.permissionPattern) {
+            continue;
+          }
+
+          stage = 'cleanup';
+          try {
+            const removed = await browser.permissions.remove({ origins: [state.previousPermissionPattern] });
+            if (!removed) {
+              throw new Error('Permission removal rejected without throwing.');
             }
+          } catch (error) {
+            logger.error(`Error removing host permission for previous ${state.label} URL.`, error);
+            setSaveError(`Failed to update ${state.label} host permissions. Please try again.`);
+
+            await saveOptions.mutateAsync(previousSettings as ExtensionOptions);
+            methods.reset(previousSettings as SettingsFormValues);
+
+            for (const granted of grantedPermissions) {
+              try {
+                await browser.permissions.remove({ origins: [granted.pattern] });
+              } catch (rollbackError) {
+                logger.warn(
+                  `Failed to roll back ${granted.provider} host permission after removal failure.`,
+                  rollbackError,
+                );
+              }
+            }
+
+            invalidateSettingsQueries();
+            return false;
           }
-
-          invalidateSettingsQueries();
-          return false;
         }
-      }
 
-      invalidateSettingsQueries();
-      return true;
-    } catch (error) {
-      logger.error('useSettingsActions.handleSave caught error', error);
-      if (stage === 'save') {
-        setSaveError('Failed to save settings. Please try again.');
-      } else if (stage === 'test') {
-        setSaveError('Connection test failed. Please check your Arr URLs and API keys.');
-      } else {
-        setSaveError('Failed to update host permissions. Please try again.');
-      }
-
-      for (const granted of grantedPermissions) {
-        try {
-          await browser.permissions.remove({ origins: [granted.pattern] });
-        } catch (rollbackError) {
-          logger.warn(`Failed to roll back ${granted.provider} host permission after save error.`, rollbackError);
+        invalidateSettingsQueries();
+        return true;
+      } catch (error) {
+        logger.error('useSettingsActions.handleSave caught error', error);
+        if (stage === 'save') {
+          setSaveError('Failed to save settings. Please try again.');
+        } else if (stage === 'test') {
+          setSaveError('Connection test failed. Please check your Arr URLs and API keys.');
+        } else {
+          setSaveError('Failed to update host permissions. Please try again.');
         }
+
+        for (const granted of grantedPermissions) {
+          try {
+            await browser.permissions.remove({ origins: [granted.pattern] });
+          } catch (rollbackError) {
+            logger.warn(
+              `Failed to roll back ${granted.provider} host permission after save error.`,
+              rollbackError,
+            );
+          }
+        }
+        return false;
       }
-      return false;
-    }
-  }, [
-    invalidateSettingsQueries,
-    methods,
-    prepareProvider,
-    providerConfigs,
-    radarrTestConnection,
-    saveOptions,
-    sonarrTestConnection,
-  ]);
+    },
+    [
+      invalidateSettingsQueries,
+      methods,
+      prepareProvider,
+      providerConfigs,
+      radarrTestConnection,
+      saveOptions,
+      sonarrTestConnection,
+    ],
+  );
 
   const handleReset = useCallback(async (): Promise<void> => {
     setSaveError(null);
@@ -431,6 +549,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
   return {
     handleSave,
     saveProviderConnection,
+    disconnectProvider,
     handleReset,
     saveError,
     saveState: saveOptions,

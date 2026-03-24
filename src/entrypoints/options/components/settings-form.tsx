@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
-import { browser } from 'wxt/browser';
 
 import { useSonarrConnectionStatus, useSonarrMetadata, queryKeys } from '@/shared/queries';
 import { useDisplayedConnectionStatus } from '@/shared/hooks/common/use-displayed-connection-status';
@@ -13,7 +12,6 @@ import {
   requestSonarrPermission,
   validateApiKey,
   validateUrl,
-  buildSonarrPermissionPattern,
 } from '@/shared/providers/sonarr/validation';
 import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
@@ -58,14 +56,14 @@ function SettingsFormInner({
   const [confirmedScope, setConfirmedScope] = useState<string | null>(null);
 
   const hasSavedCredentials = Boolean(
-    savedSettings?.providers.sonarr.url && savedSettings?.providers.sonarr.apiKey
+    savedSettings?.providers.sonarr.url && savedSettings?.providers.sonarr.apiKey,
   );
 
   const persistedCredentials = useMemo(() => {
     if (!hasSavedCredentials || !savedSettings) return null;
     return {
       url: String(savedSettings.providers.sonarr.url).trim(),
-      apiKey: String(savedSettings.providers.sonarr.apiKey).trim()
+      apiKey: String(savedSettings.providers.sonarr.apiKey).trim(),
     };
   }, [hasSavedCredentials, savedSettings]);
 
@@ -77,12 +75,12 @@ function SettingsFormInner({
       url: validateUrl(String(sonarrUrl)),
       apiKey: validateApiKey(String(sonarrApiKey)),
     }),
-    [sonarrApiKey, sonarrUrl]
+    [sonarrApiKey, sonarrUrl],
   );
 
   const hasValidCredentials =
     credentialValidation.url.isValid && credentialValidation.apiKey.isValid;
-  
+
   const normalizedUrl =
     credentialValidation.url.normalizedUrl ?? String(sonarrUrl).trim();
 
@@ -91,7 +89,7 @@ function SettingsFormInner({
       hasValidCredentials
         ? { url: normalizedUrl, apiKey: String(sonarrApiKey).trim() }
         : null,
-    [hasValidCredentials, normalizedUrl, sonarrApiKey]
+    [hasValidCredentials, normalizedUrl, sonarrApiKey],
   );
 
   const credentialScope = useMemo(
@@ -99,7 +97,7 @@ function SettingsFormInner({
       formCredentials
         ? `${formCredentials.url}|${formCredentials.apiKey}`
         : null,
-    [formCredentials]
+    [formCredentials],
   );
   const persistedCredentialScope = useMemo(
     () =>
@@ -111,7 +109,7 @@ function SettingsFormInner({
 
   const hasConfiguredConnection = Boolean(
     hasSavedCredentials ||
-      (credentialScope && confirmedScope === credentialScope)
+      (credentialScope && confirmedScope === credentialScope),
   );
 
   // Reset confirmed scope if credentials change
@@ -210,7 +208,7 @@ function SettingsFormInner({
       methods.setValue('providers.sonarr.url', value, { shouldDirty: true });
       actions.sonarrTestConnectionState.reset();
     },
-    [actions.sonarrTestConnectionState, methods]
+    [actions.sonarrTestConnectionState, methods],
   );
 
   const setSonarrApiKey = useCallback(
@@ -218,14 +216,14 @@ function SettingsFormInner({
       methods.setValue('providers.sonarr.apiKey', value, { shouldDirty: true });
       actions.sonarrTestConnectionState.reset();
     },
-    [actions.sonarrTestConnectionState, methods]
+    [actions.sonarrTestConnectionState, methods],
   );
 
   const setTitleLanguage = useCallback(
     (value: typeof titleLanguage) => {
       methods.setValue('providers.sonarr.titleLanguage', value, { shouldDirty: true });
     },
-    [methods]
+    [methods],
   );
 
   const handleTestConnection = useCallback(async (): Promise<boolean> => {
@@ -247,7 +245,7 @@ function SettingsFormInner({
       }
 
       setConfirmedScope(credentialScope);
-      
+
       try {
         await Promise.all([
           liveConnectionQuery.refetch(),
@@ -277,31 +275,14 @@ function SettingsFormInner({
   }, [queryClient]);
 
   const handleDisconnect = useCallback(async () => {
-    const currentUrl = sonarrUrl?.trim();
-    setConfirmedScope(null);
-    setForceEditing(true);
-    actions.sonarrTestConnectionState.reset();
-
-    if (currentUrl) {
-      const permissionPatternResult = buildSonarrPermissionPattern(currentUrl);
-      if (permissionPatternResult.ok) {
-        try {
-          await browser.permissions.remove({
-            origins: [permissionPatternResult.value],
-          });
-        } catch (permError) {
-          logger.warn('Failed to remove Sonarr host permission during disconnect.', permError);
-        }
-      }
+    const disconnected = await actions.disconnectProvider('sonarr');
+    if (!disconnected) {
+      return;
     }
 
-    queryClient.removeQueries({ queryKey: queryKeys.sonarrMetadataRoot() });
-    queryClient.removeQueries({ queryKey: queryKeys.sonarrConnectionRoot() });
-  }, [
-    actions.sonarrTestConnectionState,
-    queryClient,
-    sonarrUrl,
-  ]);
+    setConfirmedScope(null);
+    setForceEditing(true);
+  }, [actions]);
 
   if (isLoading) {
     return (
