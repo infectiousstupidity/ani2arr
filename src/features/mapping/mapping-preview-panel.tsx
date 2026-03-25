@@ -199,11 +199,11 @@ const getStatusTone = (
 
 function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
   const { mapping, baseUrl, highlight, currentAniListId, showResetPreview, onResetPreview, portalContainer } = props;
-  const providerLabel = getProviderLabel(mapping.service);
+  const providerLabel = getProviderLabel(mapping.provider);
   const externalLabel = `${mapping.target.kind.toUpperCase()} ${mapping.target.id}`;
 
   const link = buildExternalMediaLink({
-    service: mapping.service,
+    provider: mapping.provider,
     baseUrl,
     inLibrary: mapping.inLibrary,
     ...(mapping.librarySlug ? { librarySlug: mapping.librarySlug } : {}),

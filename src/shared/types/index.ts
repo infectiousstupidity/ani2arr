@@ -24,7 +24,7 @@ export type {
 
 export type {
   LeanRadarrMovie,
-  MediaService,
+  Provider,
   LeanSonarrSeries,
   RadarrAlternateTitle,
   RadarrLookupMovie,
@@ -44,7 +44,7 @@ export type {
   SonarrCutoffList,
 } from './providers';
 
-export type { ArrCredentialsPayload, TitleLanguage } from '@/shared/providers/common/types';
+export type { ProviderCredentials, TitleLanguage } from '@/shared/providers/common/types';
 
 export type {
   SonarrCredentialsPayload,

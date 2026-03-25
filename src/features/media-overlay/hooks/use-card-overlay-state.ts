@@ -5,7 +5,7 @@ import { useAddMovie, useAddSeries, useMovieStatus, useSeriesStatus } from '@/sh
 import type {
   ExtensionError,
   MediaMetadataHint,
-  MediaService,
+  Provider,
   RadarrFormState,
   SonarrFormState,
 } from '@/shared/types';
@@ -14,7 +14,7 @@ import { getProviderLabel } from '@/services/providers/resolver';
 export type OverlayState = 'disabled' | 'in-library' | 'addable' | 'resolving' | 'adding' | 'error';
 
 export interface UseCardOverlayStateParams {
-  service: MediaService;
+  provider: Provider;
   anilistId: number;
   title: string;
   metadata: MediaMetadataHint | null;
@@ -45,7 +45,7 @@ const resolveErrorMessage = (error: unknown): string | null => {
 };
 
 export const useCardOverlayState = ({
-  service,
+  provider,
   anilistId,
   title,
   metadata,
@@ -54,13 +54,13 @@ export const useCardOverlayState = ({
   enabled,
 }: UseCardOverlayStateParams): UseCardOverlayStateResult => {
   const bypassFailureCacheRef = useRef(false);
-  const providerLabel = getProviderLabel(service);
+  const providerLabel = getProviderLabel(provider);
 
   const seriesStatusQuery = useSeriesStatus(
     { anilistId, title, metadata },
     {
       enabled:
-        service === 'sonarr' &&
+        provider === 'sonarr' &&
         (enabled ?? (isConfigured && Number.isFinite(anilistId))) &&
         isConfigured &&
         Number.isFinite(anilistId),
@@ -72,7 +72,7 @@ export const useCardOverlayState = ({
     { anilistId, title, metadata },
     {
       enabled:
-        service === 'radarr' &&
+        provider === 'radarr' &&
         (enabled ?? (isConfigured && Number.isFinite(anilistId))) &&
         isConfigured &&
         Number.isFinite(anilistId),
@@ -83,17 +83,17 @@ export const useCardOverlayState = ({
   const addSeriesMutation = useAddSeries();
   const addMovieMutation = useAddMovie();
 
-  const statusData = service === 'radarr' ? movieStatusQuery.data : seriesStatusQuery.data;
-  const statusHasError = service === 'radarr' ? movieStatusQuery.isError : seriesStatusQuery.isError;
-  const statusError = service === 'radarr' ? movieStatusQuery.error : seriesStatusQuery.error;
-  const statusIsLoading = service === 'radarr' ? movieStatusQuery.isLoading : seriesStatusQuery.isLoading;
-  const fetchStatus = service === 'radarr' ? movieStatusQuery.fetchStatus : seriesStatusQuery.fetchStatus;
-  const refetch = service === 'radarr' ? movieStatusQuery.refetch : seriesStatusQuery.refetch;
-  const isAdding = service === 'radarr' ? addMovieMutation.isPending : addSeriesMutation.isPending;
-  const addSuccess = service === 'radarr' ? addMovieMutation.isSuccess : addSeriesMutation.isSuccess;
-  const addHasError = service === 'radarr' ? addMovieMutation.isError : addSeriesMutation.isError;
-  const addError = service === 'radarr' ? addMovieMutation.error : addSeriesMutation.error;
-  const reset = service === 'radarr' ? addMovieMutation.reset : addSeriesMutation.reset;
+  const statusData = provider === 'radarr' ? movieStatusQuery.data : seriesStatusQuery.data;
+  const statusHasError = provider === 'radarr' ? movieStatusQuery.isError : seriesStatusQuery.isError;
+  const statusError = provider === 'radarr' ? movieStatusQuery.error : seriesStatusQuery.error;
+  const statusIsLoading = provider === 'radarr' ? movieStatusQuery.isLoading : seriesStatusQuery.isLoading;
+  const fetchStatus = provider === 'radarr' ? movieStatusQuery.fetchStatus : seriesStatusQuery.fetchStatus;
+  const refetch = provider === 'radarr' ? movieStatusQuery.refetch : seriesStatusQuery.refetch;
+  const isAdding = provider === 'radarr' ? addMovieMutation.isPending : addSeriesMutation.isPending;
+  const addSuccess = provider === 'radarr' ? addMovieMutation.isSuccess : addSeriesMutation.isSuccess;
+  const addHasError = provider === 'radarr' ? addMovieMutation.isError : addSeriesMutation.isError;
+  const addError = provider === 'radarr' ? addMovieMutation.error : addSeriesMutation.error;
+  const reset = provider === 'radarr' ? addMovieMutation.reset : addSeriesMutation.reset;
 
   useEffect(() => {
     reset();
@@ -102,7 +102,7 @@ export const useCardOverlayState = ({
   const hasPrevData = statusData !== undefined && statusData !== null;
   const isResolving = statusIsLoading || (fetchStatus === 'fetching' && !hasPrevData);
   const mappingUnavailable =
-    service === 'radarr'
+    provider === 'radarr'
       ? movieStatusQuery.data?.anilistTmdbLinkMissing === true
       : seriesStatusQuery.data?.anilistTvdbLinkMissing === true;
   const hasError = addHasError || statusHasError || mappingUnavailable;
@@ -166,7 +166,7 @@ export const useCardOverlayState = ({
           .sendMessage({
             _a2a: true,
             type: 'OPEN_OPTIONS_PAGE',
-            sectionId: service,
+            sectionId: provider,
             timestamp: Date.now(),
           })
           .catch(() => {});
@@ -190,7 +190,7 @@ export const useCardOverlayState = ({
 
         if (addHasError && defaultForm) {
           reset();
-          if (service === 'radarr') {
+          if (provider === 'radarr') {
             addMovieMutation.mutate({
               anilistId,
               title,
@@ -215,7 +215,7 @@ export const useCardOverlayState = ({
         return;
       }
 
-      if (service === 'radarr') {
+      if (provider === 'radarr') {
         addMovieMutation.mutate({
           anilistId,
           title,
@@ -245,7 +245,7 @@ export const useCardOverlayState = ({
       overlayState,
       refetch,
       reset,
-      service,
+      provider,
       statusHasError,
       title,
     ],

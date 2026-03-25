@@ -3,7 +3,7 @@ import { type MouseEventHandler } from "react";
 import { Database, X } from "lucide-react";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import Pill from '@/shared/ui/primitives/pill';
-import type { AniFormat, MediaService, MediaStatus, TitleLanguage } from "@/shared/types";
+import type { AniFormat, Provider, MediaStatus, TitleLanguage } from "@/shared/types";
 import { getProviderLabel } from "@/services/providers/resolver";
 
 export type MediaModalTabId = "series" | "mapping";
@@ -15,7 +15,7 @@ export type HeaderProps = {
   bannerImage: string | null;
   coverImage: string | null;
   anilistIds: number[];
-  service: MediaService;
+  provider: Provider;
   inLibrary: boolean;
   format?: AniFormat | null;
   year?: number | null;
@@ -51,7 +51,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
     titleLanguage,
     bannerImage,
     coverImage,
-    service,
+    provider,
     inLibrary,
     format,
     year,
@@ -66,7 +66,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
   const currentTone = statusTone(status);
   const hasAlternateTitles = alternateTitles.length > 0;
   const tooltipPortal = tooltipContainer ?? null;
-  const providerLabel = getProviderLabel(service);
+  const providerLabel = getProviderLabel(provider);
 
   const titleNode = (
     <h1

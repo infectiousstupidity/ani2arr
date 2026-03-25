@@ -47,7 +47,7 @@ export function toMappingSearchResultFromRadarr(
     : undefined;
 
   return {
-    service: 'radarr',
+    provider: 'radarr',
     target: { id: tmdbId, kind: 'tmdb' },
     title: movie.title,
     ...(typeof movie.year === 'number' ? { year: movie.year } : {}),

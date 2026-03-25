@@ -2,8 +2,8 @@ import { browser } from 'wxt/browser';
 import type { Ani2arrApi } from '@/rpc';
 import type { MappingOutput, UpdateRadarrInput, UpdateSonarrInput } from '@/rpc/schemas';
 import type { AnilistApiService } from '@/clients/anilist.api';
-import type { RadarrApiService } from '@/clients/radarr.api';
-import type { SonarrApiService } from '@/clients/sonarr.api';
+import type { RadarrClient } from '@/integrations/providers/radarr.client';
+import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { MappingService } from '@/services/mapping';
 import type { MappingOverridesService } from '@/services/mapping/overrides';
 import type { SonarrLibrary } from '@/services/library/sonarr';
@@ -29,13 +29,13 @@ import {
 } from '@/storage';
 import { buildRadarrPermissionPattern } from '@/shared/providers/radarr/validation';
 import { buildSonarrPermissionPattern } from '@/shared/providers/sonarr/validation';
-import type { getMappingsHandler, GetMappingsInput } from '../../../rpc/handlers/get-mappings';
-import type { updateRadarrMovieHandler } from '../../../rpc/handlers/update-movie';
-import type { updateSonarrSeriesHandler } from '../../../rpc/handlers/update-series';
+import type { getMappingsHandler, GetMappingsInput } from '@/rpc/handlers/get-mappings';
+import type { updateRadarrMovieHandler } from '@/rpc/handlers/update-movie';
+import type { updateSonarrSeriesHandler } from '@/rpc/handlers/update-series';
 
 type CommonDeps = {
-  sonarrApiService: SonarrApiService;
-  radarrApiService: RadarrApiService;
+  SonarrClient: SonarrClient;
+  RadarrClient: RadarrClient;
   anilistApiService: AnilistApiService;
   mappingService: MappingService;
   overridesService: MappingOverridesService;
@@ -57,8 +57,8 @@ type CommonDeps = {
 
 export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
   const {
-    sonarrApiService,
-    radarrApiService,
+    SonarrClient,
+    RadarrClient,
     anilistApiService,
     mappingService,
     overridesService,
@@ -95,8 +95,8 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
   };
 
   const clearPersistentCachesInternal = async (): Promise<void> => {
-    sonarrApiService.clearEtagCache();
-    radarrApiService.clearEtagCache();
+    SonarrClient.clearEtagCache();
+    RadarrClient.clearEtagCache();
 
     await Promise.all([
       anilistMetadataStore.clearLocalCache(),
@@ -237,7 +237,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         ...(input.metadata ? { metadata: input.metadata } : {}),
       };
 
-      const created = await sonarrApiService.addSeries(payload, options);
+      const created = await SonarrClient.addSeries(payload, options);
       await sonarrLibrary.addSeriesToCache(created);
       scheduleLibraryRefresh('sonarr', options);
       await bumpLibraryRevision('sonarr', { tvdbId: created.tvdbId });
@@ -290,7 +290,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         );
       }
 
-      const created = await radarrApiService.addMovie(
+      const created = await RadarrClient.addMovie(
         {
           title: input.title,
           tmdbId: mapping.externalId.id,
@@ -316,7 +316,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
     async updateSonarrSeries(input: UpdateSonarrInput) {
       const updated = await updateSeries(input, {
-        sonarrApiService,
+        SonarrClient,
         sonarrLibrary,
         ensureSonarrConfigured,
       });
@@ -327,7 +327,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
     async updateRadarrMovie(input: UpdateRadarrInput) {
       const updated = await updateMovie(input, {
-        radarrApiService,
+        RadarrClient,
         radarrLibrary,
         ensureRadarrConfigured,
       });
@@ -378,25 +378,25 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
     async getQualityProfiles() {
       const { credentials } = await ensureSonarrConfigured();
-      return sonarrApiService.getQualityProfiles(credentials);
+      return SonarrClient.getQualityProfiles(credentials);
     },
 
     async getRootFolders() {
       const { credentials } = await ensureSonarrConfigured();
-      return sonarrApiService.getRootFolders(credentials);
+      return SonarrClient.getRootFolders(credentials);
     },
 
     async getTags() {
       const { credentials } = await ensureSonarrConfigured();
-      return sonarrApiService.getTags(credentials);
+      return SonarrClient.getTags(credentials);
     },
 
     testConnection(payload) {
-      return sonarrApiService.testConnection(payload);
+      return SonarrClient.testConnection(payload);
     },
 
     async testRadarrConnection(payload) {
-      const status = await radarrApiService.testConnection(payload);
+      const status = await RadarrClient.testConnection(payload);
       return { version: status.version };
     },
 
@@ -412,9 +412,9 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       }
 
       const [qualityProfiles, rootFolders, tags] = await Promise.all([
-        sonarrApiService.getQualityProfiles(credentials),
-        sonarrApiService.getRootFolders(credentials),
-        sonarrApiService.getTags(credentials),
+        SonarrClient.getQualityProfiles(credentials),
+        SonarrClient.getRootFolders(credentials),
+        SonarrClient.getTags(credentials),
       ]);
 
       return { qualityProfiles, rootFolders, tags };
@@ -426,7 +426,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         maybeCredentials?.url && maybeCredentials.apiKey
           ? maybeCredentials
           : (await ensureRadarrConfigured()).credentials;
-      return radarrApiService.getMetadata(credentials);
+      return RadarrClient.getSetupMetadata(credentials);
     },
 
     async prefetchAniListMedia(ids) {
@@ -476,7 +476,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesReady;
 
       const [results, library] = await Promise.all([
-        sonarrApiService.lookupSeriesByTerm(input.term, credentials),
+        SonarrClient.lookupSeriesByTerm(input.term, credentials),
         sonarrLibrary.getLeanSeriesList(),
       ]);
 
@@ -517,7 +517,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesReady;
 
       const [results, library] = await Promise.all([
-        radarrApiService.lookupMovieByTerm(input.term, credentials),
+        RadarrClient.lookupMovieByTerm(input.term, credentials),
         radarrLibrary.getLeanMovieList(),
       ]);
 
@@ -547,10 +547,10 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
     async validateTvdbId(input) {
       const { credentials } = await ensureSonarrConfigured();
-      const found = await sonarrApiService.getSeriesByTvdbId(input.tvdbId, credentials);
+      const found = await SonarrClient.getSeriesByTvdbId(input.tvdbId, credentials);
       let inCatalog = false;
       try {
-        const hits = await sonarrApiService.lookupSeriesByTerm(`tvdb:${input.tvdbId}`, credentials);
+        const hits = await SonarrClient.lookupSeriesByTerm(`tvdb:${input.tvdbId}`, credentials);
         inCatalog = hits.some(h => h?.tvdbId === input.tvdbId);
       } catch {
         // ignore
@@ -560,10 +560,10 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
     async validateTmdbId(input) {
       const { credentials } = await ensureRadarrConfigured();
-      const found = await radarrApiService.getMovieByTmdbId(input.tmdbId, credentials);
+      const found = await RadarrClient.getMovieByTmdbId(input.tmdbId, credentials);
       let inCatalog = false;
       try {
-        const lookup = await radarrApiService.lookupMovieByTmdbId(input.tmdbId, credentials);
+        const lookup = await RadarrClient.lookupMovieByTmdbId(input.tmdbId, credentials);
         inCatalog = lookup?.tmdbId === input.tmdbId;
       } catch {
         // ignore

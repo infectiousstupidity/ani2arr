@@ -1,6 +1,6 @@
 import type { MediaMetadataHint } from './anilist';
 import type { BadgeVisibility } from './options';
-import type { MediaService } from '@/shared/providers/common/types';
+import type { Provider } from '@/shared/providers/common/types';
 import type { RadarrFormState } from '@/shared/providers/radarr/types';
 import type { SonarrFormState } from '@/shared/providers/sonarr/types';
 import type { MappingExternalId } from './mapping';
@@ -9,7 +9,7 @@ export type AnchorCorner = 'bottom-left' | 'top-left';
 export type StackDirection = 'up' | 'down';
 
 export interface CardOverlayProps {
-  service: MediaService;
+  provider: Provider;
   anilistId: number;
   title: string;
   onOpenModal: (anilistId: number, title: string, metadata: MediaMetadataHint | null) => void;
@@ -57,7 +57,7 @@ export interface BrowseAdapter {
 
 // Normalized view model for search results and current mapping preview
 export interface MappingSearchResult {
-  service: MediaService;
+  provider: Provider;
   target: MappingExternalId;
   title: string;
   year?: number;

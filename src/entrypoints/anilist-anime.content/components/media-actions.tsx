@@ -6,13 +6,13 @@ import { usePublicOptions } from '@/shared/queries';
 import { logger } from '@/shared/utils/logger';
 import Dropdown, { DropdownItem } from '@/shared/ui/primitives/dropdown';
 import { buildExternalMediaLink, type ExternalLinkInput } from '@/shared/utils/build-external-media-link';
-import type { MediaService } from '@/shared/types';
+import type { Provider } from '@/shared/types';
 import { getProviderBaseUrl, getProviderLabel, isProviderConfigured } from '@/services/providers/resolver';
 
 export type Status = 'LOADING' | 'IN' | 'NOT_IN' | 'ERROR' | 'ADDING';
 
 interface MediaActionsProps {
-  service: MediaService;
+  provider: Provider;
   status: Status;
   librarySlug?: string;
   resolvedSearchTerm: string;
@@ -27,7 +27,7 @@ interface MediaActionsProps {
 const log = logger.create('MediaActions');
 
 const MediaActions: React.FC<MediaActionsProps> = ({
-  service,
+  provider,
   status,
   librarySlug,
   resolvedSearchTerm,
@@ -40,7 +40,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 }) => {
   const { data: options } = usePublicOptions();
 
-  const serviceLabel = getProviderLabel(service);
+  const serviceLabel = getProviderLabel(provider);
   const inService = status === 'IN';
   const isLoading = status === 'LOADING' || status === 'ADDING';
   const getButtonText = () => {
@@ -57,7 +57,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
         return `Add to ${serviceLabel}`;
     }
   };
-  const isServiceConfigured = isProviderConfigured(service, options);
+  const isServiceConfigured = isProviderConfigured(provider, options);
   const requiresConfiguration = !isServiceConfigured;
   const shouldOpenManualMatch = noAutoMatch && !inService && !requiresConfiguration;
   const hasMapping = externalId != null;
@@ -76,7 +76,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
         ? onOpenModal
         : onQuickAdd;
 
-  const externalBaseUrl = getProviderBaseUrl(service, options);
+  const externalBaseUrl = getProviderBaseUrl(provider, options);
   const hasExternal = externalBaseUrl.length > 0;
 
   const mainButtonTooltip = requiresConfiguration
@@ -94,7 +94,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
               : undefined;
 
   const linkInput: ExternalLinkInput = {
-    service,
+    provider,
     baseUrl: externalBaseUrl.replace(/\/$/, ''),
     inLibrary: inService && Boolean(librarySlug),
     ...(librarySlug ? { librarySlug } : {}),

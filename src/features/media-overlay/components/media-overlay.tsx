@@ -122,14 +122,14 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
             canonicalMetadataById.get(parsed.anilistId) ?? null,
             parsed.metadata,
           );
-          const service = resolveProviderForAniListFormat(effectiveMetadata?.format ?? null);
-          if (!service) {
+          const provider = resolveProviderForAniListFormat(effectiveMetadata?.format ?? null);
+          if (!provider) {
             return null;
           }
           const providerOptions =
-            service === 'radarr' ? publicOptions?.providers.radarr : publicOptions?.providers.sonarr;
+            provider === 'radarr' ? publicOptions?.providers.radarr : publicOptions?.providers.sonarr;
           const providerUiOptions =
-            service === 'radarr' ? publicOptions?.ui?.browseCards.radarr : publicOptions?.ui?.browseCards.sonarr;
+            provider === 'radarr' ? publicOptions?.ui?.browseCards.radarr : publicOptions?.ui?.browseCards.sonarr;
           const providerBrowseEnabled = providerUiOptions?.enabled ?? true;
           if (!providerBrowseEnabled) {
             return null;
@@ -139,7 +139,7 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
           return createPortal(
             <CardOverlay
               key={parsed.anilistId}
-              service={service}
+              provider={provider}
               anilistId={parsed.anilistId}
               title={parsed.title}
               onOpenModal={(anilistId, title) =>

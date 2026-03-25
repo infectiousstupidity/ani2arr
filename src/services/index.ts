@@ -9,8 +9,8 @@ import {
   sonarrLookupCaches,
   upstreamMappingCaches,
 } from '@/storage';
-import { SonarrApiService } from '@/clients/sonarr.api';
-import { RadarrApiService } from '@/clients/radarr.api';
+import { SonarrClient } from '@/integrations/providers/sonarr.client';
+import { RadarrClient } from '@/integrations/providers/radarr.client';
 import { AnilistApiService } from '@/clients/anilist.api';
 import { MappingService } from './mapping';
 import { MappingOverridesService } from './mapping/overrides';
@@ -63,8 +63,8 @@ function bindAll<T extends object>(instance: T): T {
 }
 
 export const createApiImplementation = (): Ani2arrApi => {
-  const sonarrApiService = bindAll(new SonarrApiService());
-  const radarrApiService = bindAll(new RadarrApiService());
+  const sonarrClient = bindAll(new SonarrClient());
+  const radarrClient = bindAll(new RadarrClient());
 
   const anilistApiService = bindAll(
     new AnilistApiService({
@@ -74,9 +74,9 @@ export const createApiImplementation = (): Ani2arrApi => {
 
   const upstreamMappingStore = new UpstreamMappingStore(upstreamMappingCaches);
 
-  const lookupClient = new SonarrLookupClient(sonarrApiService, sonarrLookupCaches);
+  const lookupClient = new SonarrLookupClient(sonarrClient, sonarrLookupCaches);
 
-  const radarrLookupClient = new RadarrLookupClient(radarrApiService, radarrLookupCaches);
+  const radarrLookupClient = new RadarrLookupClient(radarrClient, radarrLookupCaches);
 
   const overridesService = new MappingOverridesService();
   const overridesReady = overridesService.init();
@@ -162,7 +162,7 @@ export const createApiImplementation = (): Ani2arrApi => {
 
   const sonarrLibrary = bindAll(
     new SonarrLibrary(
-      sonarrApiService,
+      sonarrClient,
       mappingService,
       providerLibraryCaches.sonarr,
       mutation => bumpLibraryRevision('sonarr', { tvdbId: mutation.tvdbId, action: mutation.action }),
@@ -171,7 +171,7 @@ export const createApiImplementation = (): Ani2arrApi => {
 
   const radarrLibrary = bindAll(
     new RadarrLibrary(
-      radarrApiService,
+      radarrClient,
       mappingService,
       providerLibraryCaches.radarr,
       mutation => bumpLibraryRevision('radarr', { tmdbId: mutation.tmdbId, action: mutation.action }),
@@ -256,8 +256,8 @@ export const createApiImplementation = (): Ani2arrApi => {
   };
 
   const handleOptionsUpdated = async (optionsHint?: ExtensionOptions): Promise<void> => {
-    sonarrApiService.clearEtagCache();
-    radarrApiService.clearEtagCache();
+    sonarrClient.clearEtagCache();
+    radarrClient.clearEtagCache();
     logger.configure({ enabled: (optionsHint?.debugLogging ?? false) || import.meta.env.DEV });
 
     await bumpSettingsRevision();
@@ -286,8 +286,8 @@ export const createApiImplementation = (): Ani2arrApi => {
   };
 
   return createApiHandlers({
-    sonarrApiService,
-    radarrApiService,
+    SonarrClient: sonarrClient,
+    RadarrClient: radarrClient,
     anilistApiService,
     mappingService,
     overridesService,

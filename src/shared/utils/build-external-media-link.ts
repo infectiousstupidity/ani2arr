@@ -1,8 +1,8 @@
 // src/shared/utils/build-external-media-link.ts
-import type { MediaService } from '@/shared/types';
+import type { Provider } from '@/shared/types';
 
 export interface ExternalLinkInput {
-  service: MediaService;
+  provider: Provider;
   baseUrl: string;        // absolute; trailing slash trimmed
   inLibrary: boolean;
   librarySlug?: string;
@@ -10,13 +10,13 @@ export interface ExternalLinkInput {
 }
 
 export function buildExternalMediaLink(input: ExternalLinkInput): string | null {
-  const { service, baseUrl, inLibrary, librarySlug, searchTerm } = input;
+  const { provider, baseUrl, inLibrary, librarySlug, searchTerm } = input;
   const root = baseUrl.replace(/\/$/, '');
   if (!root) {
     return null;
   }
 
-  if (service === 'sonarr') {
+  if (provider === 'sonarr') {
     if (inLibrary && librarySlug) return `${root}/series/${librarySlug}`;
     return `${root}/add/new?term=${encodeURIComponent(searchTerm ?? '')}`;
   }

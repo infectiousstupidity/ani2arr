@@ -226,18 +226,18 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   });
   const canonicalMetadata = metadataHintFromAniListMetadata(metadataBatch.data?.metadata?.[0] ?? null);
   const resolvedMetadata = mergeMetadataHints(canonicalMetadata, metadata);
-  const service = resolveProviderForAniListFormat(resolvedMetadata?.format ?? null);
+  const provider = resolveProviderForAniListFormat(resolvedMetadata?.format ?? null);
   const uiEnabled =
-    service === 'radarr'
+    provider === 'radarr'
       ? (options?.ui?.animePages.radarr.enabled ?? true)
       : (options?.ui?.animePages.sonarr.enabled ?? true);
   const isConfigured =
-    service === 'radarr'
+    provider === 'radarr'
       ? options?.providers.radarr.isConfigured === true
       : options?.providers.sonarr.isConfigured === true;
   const sonarrDefaults: SonarrFormState | null = options?.providers.sonarr.defaults ?? null;
   const radarrDefaults: RadarrFormState | null = options?.providers.radarr.defaults ?? null;
-  const defaults = service === 'radarr' ? radarrDefaults : sonarrDefaults;
+  const defaults = provider === 'radarr' ? radarrDefaults : sonarrDefaults;
 
   useEffect(() => {
     (async () => {
@@ -252,7 +252,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   const seriesStatusQuery = useSeriesStatus(
     { anilistId, title, metadata: resolvedMetadata },
     {
-      enabled: Boolean(anilistId && service === 'sonarr' && isConfigured),
+      enabled: Boolean(anilistId && provider === 'sonarr' && isConfigured),
       force_verify: true,
       ignoreFailureCache: true,
       priority: 'high',
@@ -261,7 +261,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   const movieStatusQuery = useMovieStatus(
     { anilistId, title, metadata: resolvedMetadata },
     {
-      enabled: Boolean(anilistId && service === 'radarr' && isConfigured),
+      enabled: Boolean(anilistId && provider === 'radarr' && isConfigured),
       force_verify: true,
       ignoreFailureCache: true,
       priority: 'high',
@@ -270,23 +270,23 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   const addSeriesMutation = useAddSeries();
   const addMovieMutation = useAddMovie();
 
-  const statusQuery = service === 'radarr' ? movieStatusQuery : seriesStatusQuery;
-  const seriesStatusData = service === 'sonarr' ? (seriesStatusQuery.data as CheckSeriesStatusResponse | undefined) : undefined;
-  const movieStatusData = service === 'radarr' ? (movieStatusQuery.data as CheckMovieStatusResponse | undefined) : undefined;
+  const statusQuery = provider === 'radarr' ? movieStatusQuery : seriesStatusQuery;
+  const seriesStatusData = provider === 'sonarr' ? (seriesStatusQuery.data as CheckSeriesStatusResponse | undefined) : undefined;
+  const movieStatusData = provider === 'radarr' ? (movieStatusQuery.data as CheckMovieStatusResponse | undefined) : undefined;
 
   const handleQuickAdd = () => {
-    if (!service || !isConfigured || !defaults) {
+    if (!provider || !isConfigured || !defaults) {
       void browser.runtime
         .sendMessage({
           _a2a: true,
           type: 'OPEN_OPTIONS_PAGE',
-          sectionId: service ?? 'sonarr',
+          sectionId: provider ?? 'sonarr',
           timestamp: Date.now(),
         })
         .catch(() => {});
       return;
     }
-    if (service === 'radarr') {
+    if (provider === 'radarr') {
       if (!radarrDefaults) return;
       addMovieMutation.mutate({
         anilistId,
@@ -308,29 +308,29 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   };
 
   const mappingUnavailable =
-    service === 'radarr'
+    provider === 'radarr'
       ? movieStatusQuery.data?.anilistTmdbLinkMissing === true
       : seriesStatusQuery.data?.anilistTvdbLinkMissing === true;
 
   const getStatus = (): Status => {
     if (optionsPending) return 'LOADING';
     if (optionsError) return 'ERROR';
-    if (!service || !isConfigured) return 'ERROR';
+    if (!provider || !isConfigured) return 'ERROR';
     // Only show loading if fetching AND we don't have data yet (avoid flash when refetching)
     if (statusQuery.fetchStatus === 'fetching' && !statusQuery.data) return 'LOADING';
     if (statusQuery.isError || mappingUnavailable) return 'ERROR';
-    if (statusQuery.data?.exists || (service === 'radarr' ? addMovieMutation.isSuccess : addSeriesMutation.isSuccess)) {
+    if (statusQuery.data?.exists || (provider === 'radarr' ? addMovieMutation.isSuccess : addSeriesMutation.isSuccess)) {
       return 'IN';
     }
-    if (service === 'radarr' ? addMovieMutation.isPending : addSeriesMutation.isPending) return 'ADDING';
-    if (service === 'radarr' ? addMovieMutation.isError : addSeriesMutation.isError) return 'ERROR';
+    if (provider === 'radarr' ? addMovieMutation.isPending : addSeriesMutation.isPending) return 'ADDING';
+    if (provider === 'radarr' ? addMovieMutation.isError : addSeriesMutation.isError) return 'ERROR';
     return 'NOT_IN';
   };
 
   const status: Status = getStatus();
 
   const librarySlug =
-    service === 'radarr'
+    provider === 'radarr'
       ? getLibrarySlug('radarr', (movieStatusData?.movie ?? addMovieMutation.data ?? null) as FolderSlugSource | null)
       : getLibrarySlug('sonarr', (seriesStatusData?.series ?? addSeriesMutation.data ?? null) as FolderSlugSource | null);
 
@@ -347,11 +347,11 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   const externalId =
     mappingUnavailable
       ? null
-      : service === 'radarr'
+      : provider === 'radarr'
         ? movieStatusQuery.data?.tmdbId ?? null
         : seriesStatusQuery.data?.tvdbId ?? null;
 
-  if (!service) {
+  if (!provider) {
     return null;
   }
 
@@ -363,7 +363,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
     <div ref={hostRef} style={{ width: '100%' }}>
       <ConfirmProvider portalContainer={hostElement ?? null}>
         <MediaActions
-          service={service}
+          provider={provider}
           status={status}
           {...(librarySlug ? { librarySlug } : {})}
           resolvedSearchTerm={resolvedSearchTerm}
@@ -400,7 +400,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
             bannerImage={modalProps.bannerImage}
             coverImage={modalProps.coverImage}
             anilistIds={[mediaModal.state.anilistId]}
-            service={modalProps.service}
+            provider={modalProps.provider}
             inLibrary={modalProps.inLibrary}
             format={modalProps.format}
             year={modalProps.year}
@@ -515,7 +515,7 @@ export default defineContentScript({
   runAt: 'document_end',
   async main(ctx: ContentScriptContext) {
     const isHeaderInjectionEnabled = async (): Promise<boolean> => {
-      const service = resolveProviderForAniListFormat(readFormatFromSidebar(document));
+      const provider = resolveProviderForAniListFormat(readFormatFromSidebar(document));
       try {
         const stored = await browser.storage.local.get('publicOptions');
         const raw = (stored as {
@@ -530,7 +530,7 @@ export default defineContentScript({
           };
         }).publicOptions;
         const providerEnabled =
-          service === 'radarr'
+          provider === 'radarr'
             ? raw?.ui?.animePages?.radarr?.enabled
             : raw?.ui?.animePages?.sonarr?.enabled;
         if (typeof providerEnabled === 'boolean') {
