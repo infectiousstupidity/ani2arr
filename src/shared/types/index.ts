@@ -47,7 +47,6 @@ export type {
 export type { ProviderCredentials, TitleLanguage } from '@/shared/providers/common/types';
 
 export type {
-  SonarrCredentialsPayload,
   SonarrFormState,
   SonarrPublicSettings,
   SonarrSecrets,
@@ -55,7 +54,6 @@ export type {
 } from '@/shared/providers/sonarr/types';
 
 export type {
-  RadarrCredentialsPayload,
   RadarrFormState,
   RadarrPublicSettings,
   RadarrSecrets,

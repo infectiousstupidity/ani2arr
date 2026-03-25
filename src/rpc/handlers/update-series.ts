@@ -1,7 +1,7 @@
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { UpdateSonarrInput } from '@/rpc/schemas';
-import type { ExtensionOptions, SonarrCredentialsPayload, SonarrSeries } from '@/shared/types';
+import type { ExtensionOptions, ProviderCredentials, SonarrSeries } from '@/shared/types';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { buildFolderSlug, joinRootAndSlug, paths } from '@/services/helpers/path-utils';
@@ -9,7 +9,7 @@ import { buildFolderSlug, joinRootAndSlug, paths } from '@/services/helpers/path
 type UpdateSeriesDeps = {
   SonarrClient: SonarrClient;
   sonarrLibrary: SonarrLibrary;
-  ensureSonarrConfigured: () => Promise<{ credentials: SonarrCredentialsPayload; options: ExtensionOptions }>;
+  ensureSonarrConfigured: () => Promise<{ credentials: ProviderCredentials; options: ExtensionOptions }>;
 };
 
 export async function updateSonarrSeriesHandler(

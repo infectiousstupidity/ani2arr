@@ -14,11 +14,10 @@ import type {
   AniMedia,
   ExtensionOptions,
   LeanSonarrSeries,
-  RadarrCredentialsPayload,
   RequestPriority,
-  SonarrCredentialsPayload,
   CheckSeriesStatusPayload,
 } from '@/shared/types';
+import type { ProviderCredentials} from '@/shared/providers/common/types';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import {
@@ -44,8 +43,8 @@ type CommonDeps = {
   radarrLibrary: RadarrLibrary;
   anilistMetadataStore: AniListMetadataStore;
   overridesReady: Promise<void>;
-  ensureSonarrConfigured: () => Promise<{ credentials: SonarrCredentialsPayload; options: ExtensionOptions }>;
-  ensureRadarrConfigured: () => Promise<{ credentials: RadarrCredentialsPayload; options: ExtensionOptions }>;
+  ensureSonarrConfigured: () => Promise<{ credentials: ProviderCredentials; options: ExtensionOptions }>;
+  ensureRadarrConfigured: () => Promise<{ credentials: ProviderCredentials; options: ExtensionOptions }>;
   scheduleLibraryRefresh: (provider: 'sonarr' | 'radarr', optionsHint?: ExtensionOptions) => void;
   bumpLibraryRevision: (provider: 'sonarr' | 'radarr', payload?: Record<string, unknown>) => Promise<void>;
   bumpMappingsRevision: (payload?: Record<string, unknown>) => Promise<void>;
@@ -402,7 +401,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
     async getSonarrMetadata(input) {
       const maybeCredentials = input?.credentials;
-      let credentials: SonarrCredentialsPayload;
+      let credentials: ProviderCredentials;
 
       if (maybeCredentials?.url && maybeCredentials.apiKey) {
         credentials = maybeCredentials;

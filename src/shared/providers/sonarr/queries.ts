@@ -3,13 +3,13 @@ import { getAni2arrApi } from '@/rpc';
 import { normalizeError } from '@/shared/errors/error-utils';
 import { queryKeys } from '@/shared/queries/query-keys';
 import type { ExtensionError, PublicOptions } from '@/shared/types';
-import type { SonarrCredentialsPayload, SonarrFormState, SonarrSeries } from './types';
+import type { SonarrFormState, SonarrSeries } from './types';
 import type { AddInput, UpdateSonarrInput } from '@/rpc/schemas';
 import type { ProviderCredentials } from '@/shared/providers/common/types';
 
 type TestConnectionPayload = ProviderCredentials;
 
-export const useSonarrMetadata = (options?: { enabled?: boolean; credentials?: SonarrCredentialsPayload | null }) => {
+export const useSonarrMetadata = (options?: { enabled?: boolean; credentials?: ProviderCredentials | null }) => {
   const credentialScope =
     options?.credentials?.url && options.credentials.apiKey
       ? `${options.credentials.url}|${options.credentials.apiKey}`
@@ -32,7 +32,7 @@ export const useSonarrMetadata = (options?: { enabled?: boolean; credentials?: S
 
 export const useSonarrConnectionStatus = (options?: {
   enabled?: boolean;
-  credentials?: SonarrCredentialsPayload | null;
+  credentials?: ProviderCredentials | null;
 }) => {
   const credentialScope =
     options?.credentials?.url && options.credentials.apiKey

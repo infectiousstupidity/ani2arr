@@ -2,7 +2,6 @@
 import { defineProxyService } from '@webext-core/proxy-service';
 import type {
   AniMedia,
-  RadarrCredentialsPayload,
   RadarrMovie,
   SonarrSeries,
   SonarrRootFolder,
@@ -10,7 +9,7 @@ import type {
   SonarrTag,
   SonarrFormState,
   RadarrFormState,
-  SonarrCredentialsPayload,
+  ProviderCredentials,
 } from '@/shared/types';
 import type {
   GetAniListSchedulerDebugOutput,
@@ -67,14 +66,14 @@ export interface Ani2arrApi {
   getQualityProfiles(): Promise<SonarrQualityProfile[]>;
   getRootFolders(): Promise<SonarrRootFolder[]>;
   getTags(): Promise<SonarrTag[]>;
-  testConnection(payload: SonarrCredentialsPayload): Promise<{ version: string }>;
-  testRadarrConnection(payload: RadarrCredentialsPayload): Promise<{ version: string }>;
-  getSonarrMetadata(input?: { credentials?: SonarrCredentialsPayload }): Promise<{
+  testConnection(payload: ProviderCredentials): Promise<{ version: string }>;
+  testRadarrConnection(payload: ProviderCredentials): Promise<{ version: string }>;
+  getSonarrMetadata(input?: { credentials?: ProviderCredentials }): Promise<{
     qualityProfiles: SonarrQualityProfile[];
     rootFolders: SonarrRootFolder[];
     tags: SonarrTag[];
   }>;
-  getRadarrMetadata(input?: { credentials?: RadarrCredentialsPayload }): Promise<GetRadarrMetadataOutput>;
+  getRadarrMetadata(input?: { credentials?: ProviderCredentials }): Promise<GetRadarrMetadataOutput>;
   initMappings(): Promise<void>;
   setMappingOverride(input: SetMappingOverrideInput): Promise<{ ok: true }>;
   clearMappingOverride(input: ClearMappingOverrideInput): Promise<{ ok: true }>;
