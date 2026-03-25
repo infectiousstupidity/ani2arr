@@ -1,6 +1,6 @@
-export type MediaService = 'sonarr' | 'radarr';
+export type Provider = 'sonarr' | 'radarr';
 
-export interface ArrCredentialsPayload {
+export interface ProviderCredentials {
   url: string;
   apiKey: string;
 }

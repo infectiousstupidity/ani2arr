@@ -1,4 +1,4 @@
-import { BaseArrClient, type ArrCredentials } from '@/clients/base-arr.client';
+import { BaseProviderClient } from '@/integrations/providers/base-provider.client';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { createError, ErrorCode } from '@/shared/errors/error-utils';
 import { hasRadarrPermission } from '@/shared/providers/radarr/validation';
@@ -10,6 +10,7 @@ import type {
   RadarrRootFolder,
   RadarrTag,
 } from '@/shared/types';
+import type { ProviderCredentials } from '@/shared/providers/common/types';
 
 export interface RadarrSystemStatus {
   version: string;
@@ -47,27 +48,27 @@ export interface AddRadarrMoviePayload {
   };
 }
 
-export class RadarrApiService extends BaseArrClient {
+export class RadarrClient extends BaseProviderClient {
   public constructor() {
     super({
-      serviceName: 'Radarr',
-      logScope: 'RadarrApiService',
+      providerName: 'Radarr',
+      logScope: 'RadarrClient',
       cacheableEndpoints: ['movie', 'qualityprofile', 'rootfolder', 'tag'],
-      hasPermission: hasRadarrPermission,
+      hasUrlPermission: hasRadarrPermission,
     });
   }
 
-  public getAllMovies = async (credentials: ArrCredentials): Promise<RadarrMovie[]> => {
+  public getAllMovies = async (credentials: ProviderCredentials): Promise<RadarrMovie[]> => {
     return this.request<RadarrMovie[]>('movie', credentials);
   };
 
-  public getMovieById = async (movieId: number, credentials: ArrCredentials): Promise<RadarrMovie> => {
+  public getMovieById = async (movieId: number, credentials: ProviderCredentials): Promise<RadarrMovie> => {
     return this.request<RadarrMovie>(`movie/${movieId}`, credentials);
   };
 
   public getMovieByTmdbId = async (
     tmdbId: number,
-    credentials: ArrCredentials,
+    credentials: ProviderCredentials,
   ): Promise<RadarrMovie | null> => {
     const qs = new URLSearchParams({ tmdbId: String(tmdbId) }).toString();
     const result = await this.request<RadarrMovie | RadarrMovie[]>(`movie?${qs}`, credentials);
@@ -76,7 +77,7 @@ export class RadarrApiService extends BaseArrClient {
 
   public lookupMovieByTerm = async (
     term: string,
-    credentials: ArrCredentials,
+    credentials: ProviderCredentials,
   ): Promise<RadarrLookupMovie[]> => {
     const qs = new URLSearchParams({ term }).toString();
     return this.request<RadarrLookupMovie[]>(`movie/lookup?${qs}`, credentials);
@@ -84,7 +85,7 @@ export class RadarrApiService extends BaseArrClient {
 
   public lookupMovieByTmdbId = async (
     tmdbId: number,
-    credentials: ArrCredentials,
+    credentials: ProviderCredentials,
   ): Promise<RadarrLookupMovie | null> => {
     const qs = new URLSearchParams({ tmdbId: String(tmdbId) }).toString();
     const result = await this.request<RadarrLookupMovie | RadarrLookupMovie[]>(
@@ -96,7 +97,7 @@ export class RadarrApiService extends BaseArrClient {
 
   public lookupMovieByImdbId = async (
     imdbId: string,
-    credentials: ArrCredentials,
+    credentials: ProviderCredentials,
   ): Promise<RadarrLookupMovie | null> => {
     const trimmed = imdbId.trim();
     if (!trimmed) {
@@ -115,19 +116,19 @@ export class RadarrApiService extends BaseArrClient {
     return this.pickSingleLookupMovie(result, movie => movie.imdbId === trimmed);
   };
 
-  public getRootFolders = async (credentials: ArrCredentials): Promise<RadarrRootFolder[]> => {
+  public getRootFolders = async (credentials: ProviderCredentials): Promise<RadarrRootFolder[]> => {
     return this.request<RadarrRootFolder[]>('rootfolder', credentials);
   };
 
-  public getQualityProfiles = async (credentials: ArrCredentials): Promise<RadarrQualityProfile[]> => {
+  public getQualityProfiles = async (credentials: ProviderCredentials): Promise<RadarrQualityProfile[]> => {
     return this.request<RadarrQualityProfile[]>('qualityprofile', credentials);
   };
 
-  public getTags = async (credentials: ArrCredentials): Promise<RadarrTag[]> => {
+  public getTags = async (credentials: ProviderCredentials): Promise<RadarrTag[]> => {
     return this.request<RadarrTag[]>('tag', credentials);
   };
 
-  public createTag = async (credentials: ArrCredentials, label: string): Promise<RadarrTag> => {
+  public createTag = async (credentials: ProviderCredentials, label: string): Promise<RadarrTag> => {
     const trimmed = label.trim();
     if (!trimmed) {
       throw createError(
@@ -147,8 +148,8 @@ export class RadarrApiService extends BaseArrClient {
     return created;
   };
 
-  public getMetadata = async (
-    credentials: ArrCredentials,
+  public getSetupMetadata = async (
+    credentials: ProviderCredentials,
   ): Promise<{
     qualityProfiles: RadarrQualityProfile[];
     rootFolders: RadarrRootFolder[];
@@ -163,17 +164,17 @@ export class RadarrApiService extends BaseArrClient {
     return { qualityProfiles, rootFolders, tags };
   };
 
-  public getSystemStatus = async (credentials: ArrCredentials): Promise<RadarrSystemStatus> => {
+  public getSystemStatus = async (credentials: ProviderCredentials): Promise<RadarrSystemStatus> => {
     return this.request<RadarrSystemStatus>('system/status', credentials);
   };
 
-  public testConnection = async (credentials: ArrCredentials): Promise<RadarrSystemStatus> => {
+  public testConnection = async (credentials: ProviderCredentials): Promise<RadarrSystemStatus> => {
     return this.getSystemStatus(credentials);
   };
 
   public addMovie = async (
     payload: AddRadarrMoviePayload,
-    credentials: ArrCredentials,
+    credentials: ProviderCredentials,
   ): Promise<RadarrMovie> => {
     const finalTagIds = await resolveArrTagIds({
       api: this,
@@ -218,7 +219,7 @@ export class RadarrApiService extends BaseArrClient {
   public updateMovie = async (
     movieId: number,
     payload: RadarrMovie,
-    credentials: ArrCredentials,
+    credentials: ProviderCredentials,
     options?: { moveFiles?: boolean },
   ): Promise<RadarrMovie> => {
     const qs = new URLSearchParams();
@@ -245,7 +246,7 @@ export class RadarrApiService extends BaseArrClient {
 
   public triggerMovieSearch = async (
     movieIds: number[],
-    credentials: ArrCredentials,
+    credentials: ProviderCredentials,
   ): Promise<RadarrCommandResource> => {
     return this.triggerCommand(
       {
@@ -258,7 +259,7 @@ export class RadarrApiService extends BaseArrClient {
 
   public triggerRefreshMovie = async (
     movieIds: number[],
-    credentials: ArrCredentials,
+    credentials: ProviderCredentials,
   ): Promise<RadarrCommandResource> => {
     return this.triggerCommand(
       {
@@ -274,7 +275,7 @@ export class RadarrApiService extends BaseArrClient {
       name: string;
       movieIds: number[];
     },
-    credentials: ArrCredentials,
+    credentials: ProviderCredentials,
   ): Promise<RadarrCommandResource> {
     if (payload.movieIds.length === 0) {
       throw createError(

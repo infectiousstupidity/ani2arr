@@ -19,7 +19,7 @@ export interface MappingTabProps {
   currentMapping: import("@/shared/types").MappingSearchResult | null;
   overrideActive: boolean;
   otherAniListIds: number[];
-  service: "sonarr" | "radarr";
+  provider: "sonarr" | "radarr";
   controller: UseMappingControllerResult;
   baseUrl: string;
 }

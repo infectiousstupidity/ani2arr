@@ -1,4 +1,4 @@
-import type { ArrCredentialsPayload, TitleLanguage } from '@/shared/providers/common/types';
+import type { ProviderCredentials, TitleLanguage } from '@/shared/providers/common/types';
 
 export type RadarrMinimumAvailability =
   | 'announced'
@@ -137,4 +137,4 @@ export interface RadarrSecrets {
   apiKey: string;
 }
 
-export type RadarrCredentialsPayload = ArrCredentialsPayload;
+export type RadarrCredentialsPayload = ProviderCredentials;

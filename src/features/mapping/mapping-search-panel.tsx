@@ -148,7 +148,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                     }
 
                     const link = buildExternalMediaLink({
-                      service: provider,
+                      provider: provider,
                       baseUrl,
                       inLibrary: result.inLibrary,
                       ...(result.librarySlug ? { librarySlug: result.librarySlug } : {}),

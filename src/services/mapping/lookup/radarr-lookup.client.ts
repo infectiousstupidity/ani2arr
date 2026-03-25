@@ -1,4 +1,4 @@
-import type { RadarrApiService } from '@/clients/radarr.api';
+import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { RadarrLookupMovie } from '@/shared/types';
 import { BaseLookupClient, type LookupCaches } from './base-lookup.client';
 import type { LookupClientCredentials } from './provider-lookup.client';
@@ -7,7 +7,7 @@ export type RadarrLookupCredentials = LookupClientCredentials;
 
 export class RadarrLookupClient extends BaseLookupClient<RadarrLookupMovie> {
   constructor(
-    private readonly radarrApi: RadarrApiService,
+    private readonly radarrApi: RadarrClient,
     caches: LookupCaches<RadarrLookupMovie>,
   ) {
     super('radarr', 'tmdb', 'RadarrLookupClient', caches);

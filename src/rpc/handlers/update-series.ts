@@ -1,4 +1,4 @@
-import type { SonarrApiService } from '@/clients/sonarr.api';
+import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { UpdateSonarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, SonarrCredentialsPayload, SonarrSeries } from '@/shared/types';
@@ -7,7 +7,7 @@ import { createError, ErrorCode, logError, normalizeError } from '@/shared/error
 import { buildFolderSlug, joinRootAndSlug, paths } from '@/services/helpers/path-utils';
 
 type UpdateSeriesDeps = {
-  sonarrApiService: SonarrApiService;
+  SonarrClient: SonarrClient;
   sonarrLibrary: SonarrLibrary;
   ensureSonarrConfigured: () => Promise<{ credentials: SonarrCredentialsPayload; options: ExtensionOptions }>;
 };
@@ -16,7 +16,7 @@ export async function updateSonarrSeriesHandler(
   input: UpdateSonarrInput,
   deps: UpdateSeriesDeps,
 ): Promise<SonarrSeries> {
-  const { sonarrApiService, sonarrLibrary, ensureSonarrConfigured } = deps;
+  const { SonarrClient, sonarrLibrary, ensureSonarrConfigured } = deps;
   const { credentials, options } = await ensureSonarrConfigured();
 
   if (!input.tvdbId || !Number.isFinite(input.tvdbId)) {
@@ -27,7 +27,7 @@ export async function updateSonarrSeriesHandler(
     );
   }
 
-  const existing = await sonarrApiService.getSeriesByTvdbId(input.tvdbId, credentials);
+  const existing = await SonarrClient.getSeriesByTvdbId(input.tvdbId, credentials);
   if (!existing) {
     throw createError(
       ErrorCode.VALIDATION_ERROR,
@@ -38,7 +38,7 @@ export async function updateSonarrSeriesHandler(
 
   let baseSeries: SonarrSeries = existing;
   try {
-    baseSeries = await sonarrApiService.getSeriesById(existing.id, credentials);
+    baseSeries = await SonarrClient.getSeriesById(existing.id, credentials);
   } catch (error) {
     const normalized = normalizeError(error);
     logError(normalized, `Ani2arrApi:updateSeries:fetch:${input.tvdbId}`);
@@ -62,9 +62,9 @@ export async function updateSonarrSeriesHandler(
 
   const freeformTags = Array.isArray(input.form.freeformTags) ? input.form.freeformTags : [];
 
-  const existingTags = await sonarrApiService.getTags(credentials);
+  const existingTags = await SonarrClient.getTags(credentials);
   const resolvedTags = await resolveArrTagIds({
-    api: sonarrApiService,
+    api: SonarrClient,
     credentials,
     existingIdsFromForm: tagsFromForm,
     freeformLabelsFromForm: freeformTags,
@@ -99,7 +99,7 @@ export async function updateSonarrSeriesHandler(
     tags: resolvedTags,
   };
 
-  const updated = await sonarrApiService.updateSeries(baseSeries.id, mergedSeries, credentials, {
+  const updated = await SonarrClient.updateSeries(baseSeries.id, mergedSeries, credentials, {
     moveFiles,
   });
 

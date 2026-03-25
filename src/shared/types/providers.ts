@@ -1,4 +1,4 @@
-export type { MediaService } from '@/shared/providers/common/types';
+export type { Provider } from '@/shared/providers/common/types';
 
 export type {
   LeanSonarrSeries,

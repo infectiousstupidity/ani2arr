@@ -6,7 +6,7 @@ import type {
   CheckSeriesStatusResponse,
   ExtensionOptions,
   MediaMetadataHint,
-  MediaService,
+  Provider,
   MediaStatus,
   RadarrFormState,
   RadarrLookupMovie,
@@ -55,7 +55,7 @@ export interface UseMediaModalPropsResult {
   title: string;
   alternateTitles: Array<{ label: string; value: string }>;
   titleLanguage: NonNullable<ExtensionOptions['providers']['sonarr']['titleLanguage']>;
-  service: MediaService;
+  provider: Provider;
   mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'>;
   sonarrPanelProps: Omit<SonarrPanelProps, 'controller'> | null;
   radarrPanelProps: Omit<RadarrPanelProps, 'controller'> | null;
@@ -130,7 +130,7 @@ function deriveSonarrCurrentMappingFromStatus(
   const title = status.series?.title ?? `TVDB ${tvdbId}`;
 
   return {
-    service: 'sonarr' as const,
+    provider: 'sonarr' as const,
     target: { id: tvdbId, kind: 'tvdb' as const },
     title,
     inLibrary: Boolean(status.exists),
@@ -163,7 +163,7 @@ function deriveRadarrCurrentMappingFromStatus(
   const title = status.movie?.title ?? `TMDB ${tmdbId}`;
 
   return {
-    service: 'radarr' as const,
+    provider: 'radarr' as const,
     target: { id: tmdbId, kind: 'tmdb' as const },
     title,
     inLibrary: Boolean(status.exists),
@@ -189,11 +189,11 @@ export function useMediaModalProps(
   const canonicalMetadata = metadataHintFromAniListMetadata(metadataBatch.data?.metadata?.[0] ?? null);
   const resolvedMetadata = mergeMetadataHints(canonicalMetadata, metadata ?? null);
   const format: AniFormat | null = canonicalMetadata?.format ?? apiMedia?.format ?? resolvedMetadata?.format ?? null;
-  const service = resolveProviderForAniListFormat(format);
+  const provider = resolveProviderForAniListFormat(format);
 
   const isSonarrConfigured = options?.providers.sonarr.isConfigured === true;
   const isRadarrConfigured = options?.providers.radarr.isConfigured === true;
-  const isConfigured = service === 'radarr' ? isRadarrConfigured : isSonarrConfigured;
+  const isConfigured = provider === 'radarr' ? isRadarrConfigured : isSonarrConfigured;
 
   const sonarrStatusQuery = useSeriesStatus(
     {
@@ -202,7 +202,7 @@ export function useMediaModalProps(
       metadata: resolvedMetadata,
     },
     {
-      enabled: Boolean(anilistId && isOpen && service === 'sonarr' && isSonarrConfigured),
+      enabled: Boolean(anilistId && isOpen && provider === 'sonarr' && isSonarrConfigured),
       force_verify: true,
       ignoreFailureCache: true,
       priority: 'high',
@@ -216,7 +216,7 @@ export function useMediaModalProps(
       metadata: resolvedMetadata,
     },
     {
-      enabled: Boolean(anilistId && isOpen && service === 'radarr' && isRadarrConfigured),
+      enabled: Boolean(anilistId && isOpen && provider === 'radarr' && isRadarrConfigured),
       force_verify: true,
       ignoreFailureCache: true,
       priority: 'high',
@@ -234,7 +234,7 @@ export function useMediaModalProps(
     apiMedia?.seasonYear ?? apiMedia?.startDate?.year ?? resolvedMetadata?.startYear ?? null;
   const status: MediaStatus | null = apiMedia?.status ?? null;
   const preferredTitleLanguage: NonNullable<ExtensionOptions['providers']['sonarr']['titleLanguage']> =
-    service === 'radarr'
+    provider === 'radarr'
       ? (options?.providers.radarr.titleLanguage ?? 'english')
       : (options?.providers.sonarr.titleLanguage ?? 'english');
 
@@ -266,34 +266,34 @@ export function useMediaModalProps(
   const addMovieMutation = useAddMovie();
   const updateMovieMutation = useUpdateMovie();
   const sonarrMetadataQuery = useSonarrMetadata({
-    enabled: service === 'sonarr' && isConfigured && isOpen,
+    enabled: provider === 'sonarr' && isConfigured && isOpen,
   });
   const radarrMetadataQuery = useRadarrMetadata({
-    enabled: service === 'radarr' && isConfigured && isOpen,
+    enabled: provider === 'radarr' && isConfigured && isOpen,
   });
   const updateDefaultsMutation = useUpdateDefaultSettings();
   const updateRadarrDefaultsMutation = useUpdateRadarrDefaultSettings();
 
-  const statusQuery = service === 'radarr' ? radarrStatusQuery : sonarrStatusQuery;
+  const statusQuery = provider === 'radarr' ? radarrStatusQuery : sonarrStatusQuery;
   const mappingUnavailable =
-    service === 'radarr'
+    provider === 'radarr'
       ? radarrStatusQuery.data?.anilistTmdbLinkMissing === true
       : sonarrStatusQuery.data?.anilistTvdbLinkMissing === true;
   const externalId = mappingUnavailable
     ? null
-    : service === 'radarr'
+    : provider === 'radarr'
       ? radarrStatusQuery.data?.tmdbId ?? null
       : sonarrStatusQuery.data?.tvdbId ?? null;
 
   const inLibrary = Boolean(
     statusQuery.data?.exists ||
-      (service === 'radarr'
+      (provider === 'radarr'
         ? addMovieMutation.isSuccess || updateMovieMutation.isSuccess
         : addSeriesMutation.isSuccess || updateSeriesMutation.isSuccess),
   );
 
   const linkedAniListIds =
-    service === 'radarr'
+    provider === 'radarr'
       ? radarrStatusQuery.data?.linkedAniListIds ?? []
       : sonarrStatusQuery.data?.linkedAniListIds ?? [];
 
@@ -306,7 +306,7 @@ export function useMediaModalProps(
   const resolvedSonarrRootFolder =
     extractRootFolderPath(fullSonarrSeries, sonarrFolderSlug) ?? sonarrDefaultForm.rootFolderPath;
   const sonarrPanelMode: 'add' | 'edit' =
-    isConfigured && service === 'sonarr' && sonarrStatusQuery.data?.exists ? 'edit' : 'add';
+    isConfigured && provider === 'sonarr' && sonarrStatusQuery.data?.exists ? 'edit' : 'add';
 
   const sonarrInitialForm: SonarrFormState = useMemo(() => {
     if (sonarrPanelMode === 'edit' && fullSonarrSeries) {
@@ -341,7 +341,7 @@ export function useMediaModalProps(
   const resolvedRadarrRootFolder =
     extractRootFolderPath(fullRadarrMovie, radarrFolderSlug) ?? radarrDefaultForm.rootFolderPath;
   const radarrPanelMode: 'add' | 'edit' =
-    isConfigured && service === 'radarr' && radarrStatusQuery.data?.exists ? 'edit' : 'add';
+    isConfigured && provider === 'radarr' && radarrStatusQuery.data?.exists ? 'edit' : 'add';
 
   const radarrInitialForm: RadarrFormState = useMemo(() => {
     if (radarrPanelMode === 'edit' && fullRadarrMovie) {
@@ -364,7 +364,7 @@ export function useMediaModalProps(
     return radarrDefaultForm;
   }, [fullRadarrMovie, radarrDefaultForm, radarrPanelMode, resolvedRadarrRootFolder]);
 
-  if (!anilistId || !title || !service) {
+  if (!anilistId || !title || !provider) {
     return null;
   }
 
@@ -375,19 +375,19 @@ export function useMediaModalProps(
       ...(coverImage ? { posterUrl: coverImage } : {}),
     },
     currentMapping:
-      service === 'radarr'
+      provider === 'radarr'
         ? deriveRadarrCurrentMappingFromStatus(radarrStatusQuery.data, options?.providers.radarr.url)
         : deriveSonarrCurrentMappingFromStatus(sonarrStatusQuery.data, options?.providers.sonarr.url),
     overrideActive:
-      service === 'radarr'
+      provider === 'radarr'
         ? radarrStatusQuery.data?.overrideActive === true
         : sonarrStatusQuery.data?.overrideActive === true,
     otherAniListIds: linkedAniListIds.filter((id: number) => id !== anilistId),
-    service,
+    provider,
   };
 
   const sonarrPanelProps: Omit<SonarrPanelProps, 'controller'> | null =
-    service === 'sonarr'
+    provider === 'sonarr'
       ? {
           mode: sonarrPanelMode,
           anilistId,
@@ -428,7 +428,7 @@ export function useMediaModalProps(
       : null;
 
   const radarrPanelProps: Omit<RadarrPanelProps, 'controller'> | null =
-    service === 'radarr'
+    provider === 'radarr'
       ? {
           mode: radarrPanelMode,
           anilistId,
@@ -472,7 +472,7 @@ export function useMediaModalProps(
     title: resolvedTitle.primary,
     alternateTitles: resolvedTitle.alternates,
     titleLanguage: preferredTitleLanguage,
-    service,
+    provider,
     mappingTabProps,
     sonarrPanelProps,
     radarrPanelProps,

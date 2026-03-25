@@ -7,7 +7,7 @@ import Button from "@/shared/ui/primitives/button";
 import type {
   AniFormat,
   ExtensionError,
-  MediaService,
+  Provider,
   MediaStatus,
   RadarrFormState,
   SonarrFormState,
@@ -61,7 +61,7 @@ export type MediaModalProps = {
   bannerImage: string | null;
   coverImage: string | null;
   anilistIds: number[];
-  service: MediaService;
+  provider: Provider;
   inLibrary: boolean;
   format: AniFormat | null;
   year: number | null;
@@ -87,7 +87,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     bannerImage,
     coverImage,
     anilistIds,
-    service,
+    provider,
     inLibrary,
     format,
     year,
@@ -108,7 +108,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   // Lift state up: manage controller logic in parent
   const mappingController = useMappingController({
     anilistId: mappingTabProps.aniListEntry.id,
-    service: mappingTabProps.service,
+    provider: mappingTabProps.provider,
     currentMapping: mappingTabProps.currentMapping,
     overrideActive: mappingTabProps.overrideActive,
   });
@@ -139,13 +139,13 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
 
   const publicOptions = usePublicOptions();
   const baseUrl =
-    service === 'radarr'
+    provider === 'radarr'
       ? publicOptions.data?.providers.radarr.url ?? ''
       : publicOptions.data?.providers.sonarr.url ?? '';
   const confirm = useConfirm();
-  const providerLabel = getProviderLabel(service);
-  const activePanelMode = service === 'radarr' ? radarrPanelProps?.mode : sonarrPanelProps?.mode;
-  const activeController = service === 'radarr' ? radarrController : sonarrController;
+  const providerLabel = getProviderLabel(provider);
+  const activePanelMode = provider === 'radarr' ? radarrPanelProps?.mode : sonarrPanelProps?.mode;
+  const activeController = provider === 'radarr' ? radarrController : sonarrController;
 
   const handleClose = useCallback(() => {
     onClose();
@@ -298,7 +298,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
       primaryLabel:
         activePanelMode === "edit"
           ? "Save changes"
-          : service === 'radarr'
+          : provider === 'radarr'
             ? "Add movie"
             : "Add series",
       primaryDisabled: !activeController.canSubmit,
@@ -333,7 +333,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     handleMappingSubmit,
     handleConfirmReset,
     mappingController,
-    service,
+    provider,
   ]);
 
   const selectPortalContainer = floatingPortalEl ?? portalContainer ?? null;
@@ -365,7 +365,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           bannerImage={bannerImage}
           coverImage={coverImage}
           anilistIds={anilistIds}
-          service={service}
+          provider={provider}
           inLibrary={inLibrary}
           format={format}
           year={year}
@@ -386,21 +386,21 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                     <MappingSearchPanel
                       controller={mappingController}
                       currentMapping={effectiveCurrentMapping}
-                      provider={mappingTabProps.service}
+                      provider={mappingTabProps.provider}
                       baseUrl={baseUrl}
                       autoFocus={isOpen && viewMode === "mapping"}
                       portalContainer={selectPortalContainer instanceof HTMLElement ? selectPortalContainer : null}
                     />
                   ) : (
                     <>
-                      {service === 'radarr' && radarrPanelProps ? (
+                      {provider === 'radarr' && radarrPanelProps ? (
                         <RadarrPanel
                           {...radarrPanelProps}
                           controller={radarrController}
                           portalContainer={selectPortalContainer}
                         />
                       ) : null}
-                      {service === 'sonarr' && sonarrPanelProps ? (
+                      {provider === 'sonarr' && sonarrPanelProps ? (
                         <SonarrPanel
                           {...sonarrPanelProps}
                           controller={sonarrController}
@@ -416,7 +416,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                   <MappingPreviewPanel
                     aniListEntry={mappingTabProps.aniListEntry}
                     baseUrl={baseUrl}
-                    provider={mappingTabProps.service}
+                    provider={mappingTabProps.provider}
                     currentMapping={effectiveCurrentMapping}
                     previewMapping={previewMapping}
                     isInMappingMode={viewMode === "mapping"}

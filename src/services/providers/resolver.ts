@@ -1,7 +1,7 @@
-import type { AniFormat, MediaService, PublicOptions } from '@/shared/types';
+import type { AniFormat, Provider, PublicOptions } from '@/shared/types';
 
 type ProviderDescriptor = {
-  service: MediaService;
+  service: Provider;
   label: string;
 };
 
@@ -17,7 +17,7 @@ const hasProviderShape = (
   return Boolean(maybeProviders && typeof maybeProviders === 'object');
 };
 
-export const getProviderDescriptor = (service: MediaService): ProviderDescriptor => {
+export const getProviderDescriptor = (service: Provider): ProviderDescriptor => {
   switch (service) {
     case 'sonarr':
       return { service: 'sonarr', label: 'Sonarr' };
@@ -28,16 +28,16 @@ export const getProviderDescriptor = (service: MediaService): ProviderDescriptor
   }
 };
 
-export const getProviderLabel = (service: MediaService): string => getProviderDescriptor(service).label;
+export const getProviderLabel = (service: Provider): string => getProviderDescriptor(service).label;
 
-export const resolveProviderForAniListFormat = (format: AniFormat | null | undefined): MediaService | null => {
+export const resolveProviderForAniListFormat = (format: AniFormat | null | undefined): Provider | null => {
   if (format === 'MOVIE') return 'radarr';
   if (format === 'MUSIC') return null;
   return 'sonarr';
 };
 
 export const isProviderConfigured = (
-  service: MediaService,
+  service: Provider,
   options: unknown,
 ): boolean => {
   if (!hasProviderShape(options)) return false;
@@ -52,7 +52,7 @@ export const isProviderConfigured = (
 };
 
 export const getProviderBaseUrl = (
-  service: MediaService,
+  service: Provider,
   options: unknown,
 ): string => {
   if (!hasProviderShape(options)) return '';

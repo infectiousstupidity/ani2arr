@@ -52,7 +52,7 @@ const buildCurrentMapping = (
       });
     }
     return {
-      service: 'radarr',
+      provider: 'radarr',
       target: { id: tmdbId, kind: 'tmdb' },
       title: fallbackTitle ? `${fallbackTitle} (TMDB ${tmdbId})` : `TMDB ${tmdbId}`,
       inLibrary,
@@ -72,7 +72,7 @@ const buildCurrentMapping = (
     });
   }
   return {
-    service: 'sonarr',
+    provider: 'sonarr',
     target: { id: tvdbId, kind: 'tvdb' },
     title: fallbackTitle ? `${fallbackTitle} (TVDB ${tvdbId})` : `TVDB ${tvdbId}`,
     inLibrary,
@@ -198,7 +198,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
   ]);
 
   const mappingController = useMappingController({
-    service: provider,
+    provider: provider,
     anilistId,
     currentMapping,
     overrideActive:
@@ -253,7 +253,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
           bannerImage={bannerImage}
           coverImage={coverImage}
           anilistIds={[anilistId]}
-          service={provider}
+          provider={provider}
           inLibrary={inLibrary}
           format={format}
           year={year}

@@ -8,7 +8,7 @@ import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link
 import { useCardOverlayState } from '../hooks/use-card-overlay-state';
 
 const CardOverlay: React.FC<CardOverlayProps> = memo(({
-  service,
+  provider,
   anilistId,
   title,
   onOpenModal,
@@ -104,7 +104,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     statusData,
     mappingUnavailable,
   } = useCardOverlayState({
-    service,
+    provider,
     anilistId,
     title,
     metadata,
@@ -112,7 +112,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     isConfigured,
     enabled: isVisible && gateOpen,
   });
-  const providerLabel = getProviderLabel(service);
+  const providerLabel = getProviderLabel(provider);
 
   const swallowEvent = useCallback((event: React.MouseEvent<HTMLElement>) => {
     event.preventDefault();
@@ -148,26 +148,26 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   const showAdvancedButton = overlayState === 'addable' || overlayState === 'in-library' || overlayState === 'error' || overlayState === 'resolving' || overlayState === 'adding';
   const showExternalButton = (overlayState === 'in-library' || overlayState === 'adding') && Boolean(providerUrl);
   const advancedDisabled = overlayState === 'resolving' || overlayState === 'adding' || (overlayState === 'error' && mappingUnavailable);
-  const seriesStatus = service === 'sonarr' ? (statusData as CheckSeriesStatusResponse | undefined) : undefined;
-  const movieStatus = service === 'radarr' ? (statusData as CheckMovieStatusResponse | undefined) : undefined;
+  const seriesStatus = provider === 'sonarr' ? (statusData as CheckSeriesStatusResponse | undefined) : undefined;
+  const movieStatus = provider === 'radarr' ? (statusData as CheckMovieStatusResponse | undefined) : undefined;
   const librarySlug = useMemo(() => {
-    if (service === 'radarr') {
+    if (provider === 'radarr') {
       return getLibrarySlug('radarr', (movieStatus?.movie ?? null) as FolderSlugSource | null);
     }
     return getLibrarySlug('sonarr', (seriesStatus?.series ?? null) as FolderSlugSource | null);
-  }, [movieStatus?.movie, seriesStatus?.series, service]);
+  }, [movieStatus?.movie, seriesStatus?.series, provider]);
   const externalHref = useMemo(() => {
     return buildExternalMediaLink({
-      service,
+      provider,
       baseUrl: providerUrl ?? '',
       inLibrary: overlayState === 'in-library' && Boolean(librarySlug),
       ...(librarySlug ? { librarySlug } : {}),
       searchTerm: title,
     });
-  }, [librarySlug, overlayState, providerUrl, service, title]);
+  }, [librarySlug, overlayState, providerUrl, provider, title]);
 
   const hasMapping =
-    service === 'radarr'
+    provider === 'radarr'
       ? !mappingUnavailable && movieStatus?.tmdbId != null
       : !mappingUnavailable && seriesStatus?.tvdbId != null;
   const manualMappingLabel = hasMapping ? 'Update mapping manually' : 'Find match manually';

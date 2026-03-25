@@ -1,4 +1,4 @@
-import type { RadarrApiService } from '@/clients/radarr.api';
+import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { RadarrLibrary } from '@/services/library/radarr';
 import type { UpdateRadarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, RadarrCredentialsPayload, RadarrMovie } from '@/shared/types';
@@ -7,7 +7,7 @@ import { createError, ErrorCode, logError, normalizeError } from '@/shared/error
 import { buildFolderSlug, joinRootAndSlug, paths } from '@/services/helpers/path-utils';
 
 type UpdateMovieDeps = {
-  radarrApiService: RadarrApiService;
+  RadarrClient: RadarrClient;
   radarrLibrary: RadarrLibrary;
   ensureRadarrConfigured: () => Promise<{
     credentials: RadarrCredentialsPayload;
@@ -19,7 +19,7 @@ export async function updateRadarrMovieHandler(
   input: UpdateRadarrInput,
   deps: UpdateMovieDeps,
 ): Promise<RadarrMovie> {
-  const { radarrApiService, radarrLibrary, ensureRadarrConfigured } = deps;
+  const { RadarrClient, radarrLibrary, ensureRadarrConfigured } = deps;
   const { credentials, options } = await ensureRadarrConfigured();
 
   if (!input.tmdbId || !Number.isFinite(input.tmdbId)) {
@@ -30,7 +30,7 @@ export async function updateRadarrMovieHandler(
     );
   }
 
-  const existing = await radarrApiService.getMovieByTmdbId(input.tmdbId, credentials);
+  const existing = await RadarrClient.getMovieByTmdbId(input.tmdbId, credentials);
   if (!existing) {
     throw createError(
       ErrorCode.VALIDATION_ERROR,
@@ -41,7 +41,7 @@ export async function updateRadarrMovieHandler(
 
   let baseMovie: RadarrMovie = existing;
   try {
-    baseMovie = await radarrApiService.getMovieById(existing.id, credentials);
+    baseMovie = await RadarrClient.getMovieById(existing.id, credentials);
   } catch (error) {
     const normalized = normalizeError(error);
     logError(normalized, `Ani2arrApi:updateMovie:fetch:${input.tmdbId}`);
@@ -81,9 +81,9 @@ export async function updateRadarrMovieHandler(
       : [];
 
   const freeformTags = Array.isArray(input.form.freeformTags) ? input.form.freeformTags : [];
-  const existingTags = await radarrApiService.getTags(credentials);
+  const existingTags = await RadarrClient.getTags(credentials);
   const resolvedTags = await resolveArrTagIds({
-    api: radarrApiService,
+    api: RadarrClient,
     credentials,
     existingIdsFromForm: tagsFromForm,
     freeformLabelsFromForm: freeformTags,
@@ -117,7 +117,7 @@ export async function updateRadarrMovieHandler(
     },
   };
 
-  const updated = await radarrApiService.updateMovie(baseMovie.id, mergedMovie, credentials, {
+  const updated = await RadarrClient.updateMovie(baseMovie.id, mergedMovie, credentials, {
     moveFiles,
   });
 

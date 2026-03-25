@@ -1,18 +1,16 @@
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 import { AbortError, withRetry } from '@/shared/utils/retry';
-export interface ArrCredentials {
-  url: string;
-  apiKey: string;
-}
+import type { ProviderCredentials } from '@/shared/providers/common/types';
 
-interface BaseArrClientOptions {
-  serviceName: string;
+
+interface BaseProviderClientOptions {
+  providerName: string;
   logScope?: string;
   apiBasePath?: string;
   timeoutMs?: number;
   cacheableEndpoints?: Iterable<string>;
-  hasPermission: (url: string) => Promise<boolean>;
+  hasUrlPermission: (url: string) => Promise<boolean>;
 }
 
 type CachedResponse = {
@@ -20,23 +18,23 @@ type CachedResponse = {
   json: unknown;
 };
 
-export class BaseArrClient {
+export class BaseProviderClient {
   protected readonly log;
 
-  private readonly serviceName: string;
+  private readonly providerName: string;
   private readonly apiBasePath: string;
   private readonly timeoutMs: number;
-  private readonly hasPermission: (url: string) => Promise<boolean>;
+  private readonly hasUrlPermission: (url: string) => Promise<boolean>;
   private readonly etagCache = new Map<string, CachedResponse>();
   private readonly cacheableEndpoints: Set<string>;
 
-  public constructor(options: BaseArrClientOptions) {
-    this.serviceName = options.serviceName;
+  public constructor(options: BaseProviderClientOptions) {
+    this.providerName = options.providerName;
     this.apiBasePath = this.normalizeApiBasePath(options.apiBasePath ?? '/api/v3');
     this.timeoutMs = options.timeoutMs ?? 15_000;
-    this.hasPermission = options.hasPermission;
+    this.hasUrlPermission = options.hasUrlPermission;
     this.cacheableEndpoints = new Set(options.cacheableEndpoints ?? []);
-    this.log = logger.create(options.logScope ?? `${options.serviceName}ApiService`);
+    this.log = logger.create(options.logScope ?? `${options.providerName}Client`);
   }
 
   public clearEtagCache(): void {
@@ -60,22 +58,22 @@ export class BaseArrClient {
 
   protected async request<T>(
     endpoint: string,
-    credentials: ArrCredentials,
+    credentials: ProviderCredentials,
     fetchOptions: RequestInit = {},
   ): Promise<T> {
     if (!credentials.url || !credentials.apiKey) {
       throw createError(
         ErrorCode.CONFIGURATION_ERROR,
-        `${this.serviceName} URL or API Key not provided.`,
-        `${this.serviceName} URL or API Key is missing.`,
+        `${this.providerName} URL or API Key not provided.`,
+        `${this.providerName} URL or API Key is missing.`,
       );
     }
 
-    if (!(await this.hasPermission(credentials.url))) {
+    if (!(await this.hasUrlPermission(credentials.url))) {
       throw createError(
         ErrorCode.PERMISSION_ERROR,
-        `Missing permission for ${this.serviceName} URL: ${credentials.url}`,
-        `Permission for the ${this.serviceName} URL is required. Please grant access in the extension options.`,
+        `Missing permission for ${this.providerName} URL: ${credentials.url}`,
+        `Permission for the ${this.providerName} URL is required. Please grant access in the extension options.`,
       );
     }
 
@@ -142,7 +140,7 @@ export class BaseArrClient {
               // ignore non-JSON errors
             }
 
-            const baseMessage = `${this.serviceName} API Error: ${response.status} ${response.statusText}`;
+            const baseMessage = `${this.providerName} API Error: ${response.status} ${response.statusText}`;
             const err = new Error(baseMessage) as Error & {
               retryAfterMs?: number;
               detail?: unknown;
@@ -184,7 +182,7 @@ export class BaseArrClient {
       );
     } catch (error) {
       const normalized = normalizeError(error);
-      logError(normalized, `${this.serviceName}ApiService:request:${endpoint}`);
+        logError(normalized, `${this.providerName}Client:request:${endpoint}`);
       throw normalized;
     }
   }

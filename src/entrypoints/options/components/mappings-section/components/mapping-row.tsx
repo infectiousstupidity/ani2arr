@@ -167,7 +167,7 @@ const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   const providerItem = entry.provider === 'radarr' ? radarrStatus.data?.movie : sonarrStatus.data?.series;
   const providerSlug = getLibrarySlug(entry.provider, providerItem as FolderSlugSource | null);
   const providerLink = buildExternalMediaLink({
-    service: entry.provider,
+    provider: entry.provider,
     baseUrl: providerUrl ?? '',
     inLibrary: Boolean(providerSlug),
     ...(providerSlug ? { librarySlug: providerSlug } : {}),

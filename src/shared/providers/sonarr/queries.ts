@@ -5,9 +5,9 @@ import { queryKeys } from '@/shared/queries/query-keys';
 import type { ExtensionError, PublicOptions } from '@/shared/types';
 import type { SonarrCredentialsPayload, SonarrFormState, SonarrSeries } from './types';
 import type { AddInput, UpdateSonarrInput } from '@/rpc/schemas';
-import type { ArrCredentialsPayload } from '@/shared/providers/common/types';
+import type { ProviderCredentials } from '@/shared/providers/common/types';
 
-type TestConnectionPayload = ArrCredentialsPayload;
+type TestConnectionPayload = ProviderCredentials;
 
 export const useSonarrMetadata = (options?: { enabled?: boolean; credentials?: SonarrCredentialsPayload | null }) => {
   const credentialScope =

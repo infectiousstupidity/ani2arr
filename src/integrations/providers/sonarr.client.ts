@@ -1,11 +1,11 @@
 // src/clients/sonarr.api.ts
 
-import { BaseArrClient } from '@/clients/base-arr.client';
+import { BaseProviderClient } from '@/integrations/providers/base-provider.client';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { hasSonarrPermission } from '@/shared/providers/sonarr/validation';
 import type {
   ExtensionOptions,
-  SonarrCredentialsPayload,
+  ProviderCredentials,
   SonarrSeries,
   SonarrRootFolder,
   SonarrQualityProfile,
@@ -14,23 +14,23 @@ import type {
   SonarrLookupSeries,
 } from '@/shared/types';
 import { createError, ErrorCode } from '@/shared/errors/error-utils';
-export class SonarrApiService extends BaseArrClient {
+export class SonarrClient extends BaseProviderClient {
   public constructor() {
     super({
-      serviceName: 'Sonarr',
-      logScope: 'SonarrApiService',
+      providerName: 'Sonarr',
+      logScope: 'SonarrClient',
       cacheableEndpoints: ['series', 'qualityprofile', 'rootfolder', 'tag'],
-      hasPermission: hasSonarrPermission,
+      hasUrlPermission: hasSonarrPermission,
     });
   }
 
-  public getAllSeries = async (credentials: SonarrCredentialsPayload): Promise<SonarrSeries[]> => {
+  public getAllSeries = async (credentials: ProviderCredentials): Promise<SonarrSeries[]> => {
     return this.request<SonarrSeries[]>('series', credentials);
   };
 
   public getSeriesByTvdbId = async (
     tvdbId: number,
-    credentials: SonarrCredentialsPayload,
+    credentials: ProviderCredentials,
   ): Promise<SonarrSeries | null> => {
     const qs = new URLSearchParams({ tvdbId: String(tvdbId) }).toString();
     const seriesArray = await this.request<SonarrSeries[]>(`series?${qs}`, credentials);
@@ -39,7 +39,7 @@ export class SonarrApiService extends BaseArrClient {
 
   public lookupSeriesByTvdbId = async (
     tvdbId: number,
-    credentials: SonarrCredentialsPayload,
+    credentials: ProviderCredentials,
   ): Promise<SonarrLookupSeries | null> => {
     const hits = await this.lookupSeriesByTerm(`tvdb:${tvdbId}`, credentials);
     return hits.find(hit => hit?.tvdbId === tvdbId) ?? null;
@@ -47,27 +47,17 @@ export class SonarrApiService extends BaseArrClient {
 
   public getSeriesById = async (
     seriesId: number,
-    credentials: SonarrCredentialsPayload,
+    credentials: ProviderCredentials,
   ): Promise<SonarrSeries> => {
     return this.request<SonarrSeries>(`series/${seriesId}`, credentials);
   };
 
   public lookupSeriesByTerm = async (
     term: string,
-    credentials: SonarrCredentialsPayload,
+    credentials: ProviderCredentials,
   ): Promise<SonarrLookupSeries[]> => {
     const qs = new URLSearchParams({ term }).toString();
     return this.request<SonarrLookupSeries[]>(`series/lookup?${qs}`, credentials);
-  };
-
-  /**
-   * Returns the list of series/episodes that are below their cutoff (cutoff-unmet).
-   * Uses the documented `wanted/cutoff` read endpoint.
-   */
-  public getCutoffList = async (
-    credentials: SonarrCredentialsPayload,
-  ): Promise<unknown[]> => {
-    return this.request<unknown[]>('wanted/cutoff', credentials);
   };
 
   /**
@@ -77,7 +67,7 @@ export class SonarrApiService extends BaseArrClient {
    * operations (e.g. missing episode searches).
    */
   public triggerMissingEpisodeSearch = async (
-    credentials: SonarrCredentialsPayload,
+    credentials: ProviderCredentials,
     seriesId?: number,
   ): Promise<unknown> => {
     const body: Record<string, unknown> = { name: 'MissingEpisodeSearch' };
@@ -90,26 +80,26 @@ export class SonarrApiService extends BaseArrClient {
 
   public addSeries = async (
     payload: AddRequestPayload,
-    baseOptions: ExtensionOptions,
+    extensionOptions: ExtensionOptions,
   ): Promise<SonarrSeries> => {
-    const providerOptions = baseOptions.providers.sonarr;
-    const sonarrCreds: SonarrCredentialsPayload = {
-      url: providerOptions.url,
-      apiKey: providerOptions.apiKey,
+    const sonarrSettings = extensionOptions.providers.sonarr;
+    const sonarrCreds: ProviderCredentials = {
+      url: sonarrSettings.url,
+      apiKey: sonarrSettings.apiKey,
     };
 
-    const finalPayload: AddRequestPayload = {
-      ...providerOptions.defaults,
+    const mergedInput: AddRequestPayload = {
+      ...sonarrSettings.defaults,
       ...payload,
     };
 
     const finalTagIds = await resolveArrTagIds({
       api: this,
       credentials: sonarrCreds,
-      existingIdsFromForm: Array.isArray(finalPayload.tags)
-        ? finalPayload.tags.filter(id => typeof id === 'number' && !Number.isNaN(id))
+      existingIdsFromForm: Array.isArray(mergedInput.tags)
+        ? mergedInput.tags.filter(id => typeof id === 'number' && !Number.isNaN(id))
         : [],
-      freeformLabelsFromForm: Array.isArray(finalPayload.freeformTags) ? finalPayload.freeformTags : [],
+      freeformLabelsFromForm: Array.isArray(mergedInput.freeformTags) ? mergedInput.freeformTags : [],
       serviceLabel: 'Sonarr',
     });
 
@@ -118,7 +108,7 @@ export class SonarrApiService extends BaseArrClient {
       metadata: _unusedMetadata,
       freeformTags: _unusedFreeformTags,
       ...payloadForSonarr
-    } = finalPayload;
+    } = mergedInput;
     void _unusedMetadata;
     void _unusedFreeformTags;
 
@@ -126,12 +116,12 @@ export class SonarrApiService extends BaseArrClient {
       ...payloadForSonarr,
       tags: finalTagIds,
       monitored:
-        (finalPayload.monitorOption ?? providerOptions.defaults.monitorOption) !== 'none',
+        (mergedInput.monitorOption ?? sonarrSettings.defaults.monitorOption) !== 'none',
       addOptions: {
         searchForMissingEpisodes:
-          finalPayload.searchForMissingEpisodes ??
-          providerOptions.defaults.searchForMissingEpisodes,
-        monitor: finalPayload.monitorOption ?? providerOptions.defaults.monitorOption,
+          mergedInput.searchForMissingEpisodes ??
+          sonarrSettings.defaults.searchForMissingEpisodes,
+        monitor: mergedInput.monitorOption ?? sonarrSettings.defaults.monitorOption,
       },
     };
 
@@ -144,8 +134,8 @@ export class SonarrApiService extends BaseArrClient {
     // If caller requested a cutoff-unmet search, trigger it post-create. Do not
     // fail the addSeries call if the follow-up search fails; log and continue.
     const shouldRunCutoffSearch =
-      (finalPayload as Partial<AddRequestPayload> & { searchForCutoffUnmet?: boolean })
-        .searchForCutoffUnmet ?? providerOptions.defaults.searchForCutoffUnmet;
+      (mergedInput as Partial<AddRequestPayload> & { searchForCutoffUnmet?: boolean })
+        .searchForCutoffUnmet ?? sonarrSettings.defaults.searchForCutoffUnmet;
 
     if (shouldRunCutoffSearch) {
       try {
@@ -162,7 +152,7 @@ export class SonarrApiService extends BaseArrClient {
   public updateSeries = async (
     seriesId: number,
     payload: SonarrSeries,
-    credentials: SonarrCredentialsPayload,
+    credentials: ProviderCredentials,
     options?: { moveFiles?: boolean },
   ): Promise<SonarrSeries> => {
     const qs = new URLSearchParams();
@@ -183,18 +173,18 @@ export class SonarrApiService extends BaseArrClient {
   };
 
   public getRootFolders = async (
-    credentials: SonarrCredentialsPayload,
+    credentials: ProviderCredentials,
   ): Promise<SonarrRootFolder[]> => {
     return this.request<SonarrRootFolder[]>('rootfolder', credentials);
   };
 
   public getQualityProfiles = async (
-    credentials: SonarrCredentialsPayload,
+    credentials: ProviderCredentials,
   ): Promise<SonarrQualityProfile[]> => {
     return this.request<SonarrQualityProfile[]>('qualityprofile', credentials);
   };
 
-  public getTags = async (credentials: SonarrCredentialsPayload): Promise<SonarrTag[]> => {
+  public getTags = async (credentials: ProviderCredentials): Promise<SonarrTag[]> => {
     return this.request<SonarrTag[]>('tag', credentials);
   };
 
@@ -203,7 +193,7 @@ export class SonarrApiService extends BaseArrClient {
    * Returns the created SonarrTag (including its numeric id).
    */
   public createTag = async (
-    credentials: SonarrCredentialsPayload,
+    credentials: ProviderCredentials,
     label: string,
   ): Promise<SonarrTag> => {
     const trimmed = label.trim();
@@ -227,7 +217,7 @@ export class SonarrApiService extends BaseArrClient {
   };
 
   public testConnection = async (
-    credentials: SonarrCredentialsPayload,
+    credentials: ProviderCredentials,
   ): Promise<{ version: string }> => {
     return this.request<{ version: string }>('system/status', credentials);
   };

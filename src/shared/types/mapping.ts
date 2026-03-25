@@ -1,10 +1,10 @@
 export type RequestPriority = 'high' | 'normal' | 'low';
 
-import type { MediaService } from '@/shared/providers/common/types';
+import type { Provider } from '@/shared/providers/common/types';
 
 export type MappingSource = 'manual' | 'upstream' | 'auto' | 'rejected' | 'blocked' | 'ignored' | 'unresolved';
 export type MappingStatus = 'unmapped' | 'in-provider' | 'not-in-provider';
-export type MappingProvider = MediaService;
+export type MappingProvider = Provider;
 
 export type MappingExternalIdKind = 'tvdb' | 'tmdb';
 

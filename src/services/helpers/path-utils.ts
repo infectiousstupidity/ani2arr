@@ -1,4 +1,4 @@
-import type { MediaService } from '@/shared/types';
+import type { Provider } from '@/shared/types';
 
 /** Minimal shape for building folder slugs from series/movie-like objects. */
 export interface FolderSlugSource {
@@ -80,7 +80,7 @@ export const extractRootFolderPath = (
 };
 
 export const getLibrarySlug = (
-  provider: MediaService,
+  provider: Provider,
   media?: FolderSlugSource | null,
 ): string | null => {
   if (!media) return null;

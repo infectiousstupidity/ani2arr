@@ -8,7 +8,7 @@ import type {
   SonarrSeries,
 } from '@/shared/types/providers';
 import type { MappingExternalId } from '@/shared/types/mapping';
-import type { ArrCredentialsPayload } from '@/shared/providers/common/types';
+import type { ProviderCredentials } from '@/shared/providers/common/types';
 import type { SonarrFormState } from '@/shared/providers/sonarr/types';
 
 /**
@@ -60,4 +60,4 @@ export interface CheckMovieStatusResponse {
   linkedAniListIds?: number[];
 }
 
-export type TestConnectionPayload = ArrCredentialsPayload;
+export type TestConnectionPayload = ProviderCredentials;

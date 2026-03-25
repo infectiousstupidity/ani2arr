@@ -6,7 +6,7 @@ import { useMappingOverrides } from './use-mapping-overrides';
 import type { MappingSearchController } from './types';
 
 export interface UseMappingControllerInput {
-  service: 'sonarr' | 'radarr';
+  provider: 'sonarr' | 'radarr';
   anilistId: number;
   currentMapping: MappingSearchResult | null;
   overrideActive: boolean;
@@ -81,11 +81,11 @@ export function useMappingController(input: UseMappingControllerInput): UseMappi
     isDirty: false,
   } satisfies MappingTabState);
 
-  const overrides = useMappingOverrides(input.anilistId, input.service);
+  const overrides = useMappingOverrides(input.anilistId, input.provider);
 
   const debouncedQuery = useDebounced(state.query, 300);
   const searchQuery = useMappingSearch({
-    service: input.service,
+    service: input.provider,
     query: debouncedQuery,
     enabled: debouncedQuery.trim().length >= 2,
   });
