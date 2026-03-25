@@ -65,6 +65,6 @@ export const SonarrDefaultsSchema = v.pipe(
 export const SonarrSettingsSchema = v.object({
   url: SafeString,
   apiKey: SafeString,
-  titleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
+  providerTitleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
   defaults: v.fallback(SonarrDefaultsSchema, createDefaultSonarrFormState()),
 });

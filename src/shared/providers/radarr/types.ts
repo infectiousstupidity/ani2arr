@@ -1,4 +1,4 @@
-import type { TitleLanguage } from '@/shared/providers/common/types';
+import type { ProviderTitleLanguage } from '@/shared/types/options';
 
 export type RadarrMinimumAvailability =
   | 'announced'
@@ -122,13 +122,13 @@ export interface RadarrFormState {
 export interface RadarrSettings {
   url: string;
   apiKey: string;
-  titleLanguage: TitleLanguage;
+  titleLanguage: ProviderTitleLanguage;
   defaults: RadarrFormState;
 }
 
 export interface RadarrPublicSettings {
   url: string;
-  titleLanguage: TitleLanguage;
+  titleLanguage: ProviderTitleLanguage;
   defaults: RadarrFormState;
   isConfigured: boolean;
 }

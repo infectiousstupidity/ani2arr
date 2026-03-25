@@ -10,7 +10,7 @@ import type {
   RadarrRootFolder,
   RadarrTag,
 } from '@/shared/types';
-import type { ProviderCredentials } from '@/shared/providers/common/types';
+import type { ProviderCredentials } from '@/shared/types/options';
 
 export interface RadarrSystemStatus {
   version: string;

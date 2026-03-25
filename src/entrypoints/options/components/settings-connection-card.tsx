@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { TitleLanguage } from '@/shared/types';
+import type { ProviderTitleLanguage } from '@/shared/types';
 import {
   getProviderConnectionStatusAppearance,
   getProviderConnectionStatusLabel,
@@ -11,7 +11,7 @@ import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import { logger } from '@/shared/utils/logger';
 
-export const TITLE_LANGUAGE_OPTIONS: Array<{ value: TitleLanguage; label: string }> = [
+export const TITLE_LANGUAGE_OPTIONS: Array<{ value: ProviderTitleLanguage; label: string }> = [
   { value: 'english', label: 'English (default)' },
   { value: 'romaji', label: 'Romaji' },
   { value: 'native', label: 'Native' },
@@ -273,15 +273,15 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
 };
 
 export const ProviderTitleLanguageField: React.FC<{
-  titleLanguage: TitleLanguage;
-  setTitleLanguage: (value: TitleLanguage) => void;
+  providerTitleLanguage: ProviderTitleLanguage;
+  setProviderTitleLanguage: (value: ProviderTitleLanguage) => void;
   selectPortal: HTMLElement | null;
   isLoading?: boolean;
-}> = ({ titleLanguage, setTitleLanguage, selectPortal, isLoading }) => (
+}> = ({ providerTitleLanguage, setProviderTitleLanguage, selectPortal, isLoading }) => (
   <SelectField
     label="Preferred title language"
-    value={titleLanguage}
-    onValueChange={(v) => setTitleLanguage(v as TitleLanguage)}
+    value={providerTitleLanguage}
+    onValueChange={(v) => setProviderTitleLanguage(v as ProviderTitleLanguage)}
     options={TITLE_LANGUAGE_OPTIONS}
     container={selectPortal}
     disabled={Boolean(isLoading)}

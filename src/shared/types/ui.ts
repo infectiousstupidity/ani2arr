@@ -1,6 +1,6 @@
 import type { MediaMetadataHint } from './anilist';
 import type { BadgeVisibility } from './options';
-import type { Provider } from '@/shared/providers/common/types';
+import type { Provider } from '@/shared/types/options';
 import type { RadarrFormState } from '@/shared/providers/radarr/types';
 import type { SonarrFormState } from '@/shared/providers/sonarr/types';
 import type { MappingExternalId } from './mapping';

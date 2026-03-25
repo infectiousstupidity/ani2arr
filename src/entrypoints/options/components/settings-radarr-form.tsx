@@ -34,7 +34,7 @@ function RadarrSettingsFormInner({
 
   const radarrUrl = useWatch({ control: methods.control, name: 'providers.radarr.url' }) ?? '';
   const radarrApiKey = useWatch({ control: methods.control, name: 'providers.radarr.apiKey' }) ?? '';
-  const titleLanguage = useWatch({ control: methods.control, name: 'providers.radarr.titleLanguage' }) ?? 'english';
+  const providerTitleLanguage = useWatch({ control: methods.control, name: 'providers.radarr.providerTitleLanguage' }) ?? 'english';
 
   const selectPortal = useSelectPortal();
 
@@ -191,9 +191,9 @@ function RadarrSettingsFormInner({
     [actions.radarrTestConnectionState, methods],
   );
 
-  const setTitleLanguage = useCallback(
-    (value: typeof titleLanguage) => {
-      methods.setValue('providers.radarr.titleLanguage', value, { shouldDirty: true });
+  const setProviderTitleLanguage = useCallback(
+    (value: typeof providerTitleLanguage) => {
+      methods.setValue('providers.radarr.providerTitleLanguage', value, { shouldDirty: true });
     },
     [methods],
   );
@@ -309,17 +309,17 @@ function RadarrSettingsFormInner({
               {
                 label: 'Preferred title language',
                 value:
-                  titleLanguage === 'romaji'
+                  providerTitleLanguage === 'romaji'
                     ? 'Romaji'
-                    : titleLanguage === 'native'
+                    : providerTitleLanguage === 'native'
                       ? 'Native'
                       : 'English',
               },
             ]}
           >
             <ProviderTitleLanguageField
-              titleLanguage={titleLanguage}
-              setTitleLanguage={setTitleLanguage}
+              providerTitleLanguage={providerTitleLanguage}
+              setProviderTitleLanguage={setProviderTitleLanguage}
               selectPortal={selectPortal}
               isLoading={Boolean(isLoading)}
             />

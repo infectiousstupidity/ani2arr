@@ -8,7 +8,7 @@ import type {
   SonarrSeries,
 } from '@/shared/types/providers';
 import type { MappingExternalId } from '@/shared/types/mapping';
-import type { ProviderCredentials } from '@/shared/providers/common/types';
+import type { ProviderCredentials } from '@/shared/types/options';
 import type { SonarrFormState } from '@/shared/providers/sonarr/types';
 
 /**

@@ -45,7 +45,7 @@ function SettingsFormInner({
   // --- Form Watchers ---
   const sonarrUrl = useWatch({ control: methods.control, name: 'providers.sonarr.url' }) ?? '';
   const sonarrApiKey = useWatch({ control: methods.control, name: 'providers.sonarr.apiKey' }) ?? '';
-  const titleLanguage = useWatch({ control: methods.control, name: 'providers.sonarr.titleLanguage' }) ?? 'english';
+  const providerTitleLanguage = useWatch({ control: methods.control, name: 'providers.sonarr.providerTitleLanguage' }) ?? 'english';
 
   // --- Portal ---
   const selectPortal = useSelectPortal();
@@ -219,9 +219,9 @@ function SettingsFormInner({
     [actions.sonarrTestConnectionState, methods],
   );
 
-  const setTitleLanguage = useCallback(
-    (value: typeof titleLanguage) => {
-      methods.setValue('providers.sonarr.titleLanguage', value, { shouldDirty: true });
+  const setProviderTitleLanguage = useCallback(
+    (value: typeof providerTitleLanguage) => {
+      methods.setValue('providers.sonarr.providerTitleLanguage', value, { shouldDirty: true });
     },
     [methods],
   );
@@ -343,17 +343,17 @@ function SettingsFormInner({
                 {
                   label: 'Preferred title language',
                   value:
-                    titleLanguage === 'romaji'
+                    providerTitleLanguage === 'romaji'
                       ? 'Romaji'
-                      : titleLanguage === 'native'
+                      : providerTitleLanguage === 'native'
                         ? 'Native'
                         : 'English',
                 },
               ]}
             >
               <SonarrTitleLanguageField
-                titleLanguage={titleLanguage}
-                setTitleLanguage={setTitleLanguage}
+                providerTitleLanguage={providerTitleLanguage}
+                setProviderTitleLanguage={setProviderTitleLanguage}
                 selectPortal={selectPortal}
                 isLoading={Boolean(isLoading)}
               />

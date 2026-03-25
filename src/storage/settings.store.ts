@@ -27,13 +27,13 @@ export function toPublicOptions(settings: ExtensionOptions): PublicOptions {
     providers: {
       sonarr: {
         url: settings.providers.sonarr.url,
-        titleLanguage: settings.providers.sonarr.titleLanguage,
+        providerTitleLanguage: settings.providers.sonarr.providerTitleLanguage,
         defaults: settings.providers.sonarr.defaults,
         isConfigured: Boolean(settings.providers.sonarr.url && settings.providers.sonarr.apiKey),
       },
       radarr: {
         url: settings.providers.radarr.url,
-        titleLanguage: settings.providers.radarr.titleLanguage,
+        providerTitleLanguage: settings.providers.radarr.providerTitleLanguage,
         defaults: settings.providers.radarr.defaults,
         isConfigured: Boolean(settings.providers.radarr.url && settings.providers.radarr.apiKey),
       },
