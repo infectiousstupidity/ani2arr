@@ -1,7 +1,7 @@
 import type { AniMedia } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
 import { MEDIA_HARD_TTL, MEDIA_SOFT_TTL } from './constants';
-import type { TtlCache } from '@/lib/storage';
+import type { TtlCache } from '@/storage';
 
 const log = logger.create('AniListMediaCache');
 

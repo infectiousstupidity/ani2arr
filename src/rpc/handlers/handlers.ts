@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
-import type { Ani2arrApi } from '@/lib/rpc';
-import type { MappingOutput, UpdateRadarrInput, UpdateSonarrInput } from '@/lib/rpc/schemas';
+import type { Ani2arrApi } from '@/rpc';
+import type { MappingOutput, UpdateRadarrInput, UpdateSonarrInput } from '@/rpc/schemas';
 import type { AnilistApiService } from '@/clients/anilist.api';
 import type { RadarrApiService } from '@/clients/radarr.api';
 import type { SonarrApiService } from '@/clients/sonarr.api';
@@ -26,12 +26,12 @@ import {
   getExtensionOptionsSnapshot,
   resetAllRevisions,
   setExtensionOptionsSnapshot,
-} from '@/lib/storage';
+} from '@/storage';
 import { buildRadarrPermissionPattern } from '@/shared/providers/radarr/validation';
 import { buildSonarrPermissionPattern } from '@/shared/providers/sonarr/validation';
-import type { getMappingsHandler, GetMappingsInput } from './get-mappings';
-import type { updateRadarrMovieHandler } from './update-movie';
-import type { updateSonarrSeriesHandler } from './update-series';
+import type { getMappingsHandler, GetMappingsInput } from '../../../rpc/handlers/get-mappings';
+import type { updateRadarrMovieHandler } from '../../../rpc/handlers/update-movie';
+import type { updateSonarrSeriesHandler } from '../../../rpc/handlers/update-series';
 
 type CommonDeps = {
   sonarrApiService: SonarrApiService;

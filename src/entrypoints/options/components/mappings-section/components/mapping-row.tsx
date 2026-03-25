@@ -8,7 +8,7 @@ import type {
   MappingSource,
   MappingSummary,
 } from '@/shared/types';
-import type { AniListMetadataDto } from '@/lib/rpc/schemas';
+import type { AniListMetadataDto } from '@/rpc/schemas';
 import { useAniListMetadataBatch, useMovieStatus, useSeriesStatus } from '@/shared/queries';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';

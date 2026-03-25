@@ -32,9 +32,9 @@ import {
   type MappingOverrideMap,
   type MappingIgnoreMap,
   type MappingCandidateSuppressionMap,
-} from '@/lib/storage';
+} from '@/storage';
 
-import { STORAGE_KEYS } from '@/lib/storage';
+import { STORAGE_KEYS } from '@/storage';
 
 type ParsedRecordKey = { provider: MappingProvider; anilistId: number };
 type ParsedCandidateKey = { provider: MappingProvider; anilistId: number; externalId: MappingExternalId };

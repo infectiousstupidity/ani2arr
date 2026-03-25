@@ -1,5 +1,5 @@
 import PQueue from 'p-queue';
-import type { TtlCache } from '@/lib/storage';
+import type { TtlCache } from '@/storage';
 import type {
   AniListSchedulerDebugSnapshot,
   AniMedia,

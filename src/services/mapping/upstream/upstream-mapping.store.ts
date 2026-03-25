@@ -1,7 +1,7 @@
 // src/services/mapping/upstream/upstream-mapping-source.ts
-import type { TtlCache } from '@/lib/storage';
-import { STORAGE_POLICIES } from '@/lib/storage';
-import type { UpstreamMappingCaches } from '@/lib/storage/upstream-mapping.cache';
+import type { TtlCache } from '@/storage';
+import { STORAGE_POLICIES } from '@/storage';
+import type { UpstreamMappingCaches } from '@/storage/upstream-mapping.cache';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 import type { ScopedLogger } from '@/shared/utils/logger';

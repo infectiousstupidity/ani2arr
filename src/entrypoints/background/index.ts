@@ -1,12 +1,12 @@
 // src/entrypoints/background/index.ts
 import { browser } from 'wxt/browser';
-import { registerAni2arrApi, getAni2arrApi } from '@/lib/rpc';
+import { registerAni2arrApi, getAni2arrApi } from '@/rpc';
 import { createApiImplementation } from '@/services';
 import { computeTitleMatchScore } from '@/services/mapping/pipeline/matching';
 import { logger } from '@/shared/utils/logger';
 import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/shared/utils/metrics';
 import { logError, normalizeError } from '@/shared/errors/error-utils';
-import { getExtensionOptionsSnapshot } from '@/lib/storage';
+import { getExtensionOptionsSnapshot } from '@/storage';
 
 type OptionsSectionId = 'sonarr' | 'radarr' | 'mappings' | 'ui' | 'advanced';
 

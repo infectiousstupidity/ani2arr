@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getAni2arrApi } from '@/lib/rpc';
+import { getAni2arrApi } from '@/rpc';
 import { queryKeys } from '@/shared/queries';
 import { toMappingSearchResultFromRadarr } from './radarr.adapter';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';

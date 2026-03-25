@@ -1,6 +1,6 @@
 import type { RadarrApiService } from '@/clients/radarr.api';
 import type { RadarrLibrary } from '@/services/library/radarr';
-import type { UpdateRadarrInput } from '@/lib/rpc/schemas';
+import type { UpdateRadarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, RadarrCredentialsPayload, RadarrMovie } from '@/shared/types';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';

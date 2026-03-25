@@ -24,7 +24,7 @@ import {
 import { logger } from '@/shared/utils/logger';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import { createDefaultSettings } from '@/shared/schemas/settings';
-import { parseSettings } from '@/lib/storage';
+import { parseSettings } from '@/storage';
 import type { ExtensionOptions } from '@/shared/types';
 
 interface UseSettingsActionsParams {
