@@ -18,13 +18,13 @@ const createDefaultSettingsInternal = (): ExtensionOptions => ({
     sonarr: {
       url: '',
       apiKey: '',
-      titleLanguage: 'english',
+      providerTitleLanguage: 'english',
       defaults: createDefaultSonarrFormState(),
     },
     radarr: {
       url: '',
       apiKey: '',
-      titleLanguage: 'english',
+      providerTitleLanguage: 'english',
       defaults: createDefaultRadarrFormState(),
     },
   },
@@ -72,13 +72,13 @@ const ExtensionOptionsSchema = v.pipe(
       sonarr: v.fallback(SonarrSettingsSchema, {
         url: '',
         apiKey: '',
-        titleLanguage: 'english',
+        providerTitleLanguage: 'english',
         defaults: createDefaultSonarrFormState(),
       }),
       radarr: v.fallback(RadarrSettingsSchema, {
         url: '',
         apiKey: '',
-        titleLanguage: 'english',
+        providerTitleLanguage: 'english',
         defaults: createDefaultRadarrFormState(),
       }),
     }),

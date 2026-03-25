@@ -1,4 +1,4 @@
-import type { TitleLanguage } from '@/shared/providers/common/types';
+import type { ProviderTitleLanguage } from '@/shared/types/options';
 
 export type SonarrMonitorOption =
   | 'all'
@@ -129,13 +129,13 @@ export interface SonarrFormState {
 export interface SonarrSettings {
   url: string;
   apiKey: string;
-  titleLanguage: TitleLanguage;
+  titleLanguage: ProviderTitleLanguage;
   defaults: SonarrFormState;
 }
 
 export interface SonarrPublicSettings {
   url: string;
-  titleLanguage: TitleLanguage;
+  titleLanguage: ProviderTitleLanguage;
   defaults: SonarrFormState;
   isConfigured: boolean;
 }

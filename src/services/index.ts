@@ -23,7 +23,7 @@ import { getMappingsHandler } from '@/rpc/handlers/get-mappings';
 import { updateRadarrMovieHandler } from '@/rpc/handlers/update-movie';
 import { updateSonarrSeriesHandler } from '@/rpc/handlers/update-series';
 import { createApiHandlers } from '@/rpc/handlers/handlers';
-import type { ProviderCredentials } from '@/shared/providers/common/types';
+import type { ProviderCredentials } from '@/shared/types/options';
 
 import type {
   ExtensionOptions,

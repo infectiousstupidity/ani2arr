@@ -5,7 +5,7 @@ import type {
   ProviderBrowseCardUiOptions,
   UiOptions,
 } from '@/shared/types/options';
-import type { TitleLanguage } from '@/shared/providers/common/types';
+import type { ProviderTitleLanguage } from '@/shared/types/options';
 
 // --- Constants ---
 
@@ -15,7 +15,7 @@ const BADGE_VISIBILITY_OPTIONS: [BadgeVisibility, ...BadgeVisibility[]] = [
   'hidden',
 ];
 
-const TITLE_LANGUAGES: [TitleLanguage, ...TitleLanguage[]] = [
+const TITLE_LANGUAGES: [ProviderTitleLanguage, ...ProviderTitleLanguage[]] = [
   'english',
   'romaji',
   'native',
@@ -52,8 +52,8 @@ const asRecord = (input: unknown): Record<string, unknown> =>
 const isBadgeVisibility = (value: unknown): value is BadgeVisibility =>
   typeof value === 'string' && BADGE_VISIBILITY_OPTIONS.includes(value as BadgeVisibility);
 
-export const isTitleLanguage = (value: unknown): value is TitleLanguage =>
-  typeof value === 'string' && TITLE_LANGUAGES.includes(value as TitleLanguage);
+export const isTitleLanguage = (value: unknown): value is ProviderTitleLanguage =>
+  typeof value === 'string' && TITLE_LANGUAGES.includes(value as ProviderTitleLanguage);
 
 // --- Migration ---
 

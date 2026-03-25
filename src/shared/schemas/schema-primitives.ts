@@ -1,9 +1,9 @@
 import * as v from 'valibot';
-import type { TitleLanguage } from '@/shared/providers/common/types';
+import type { ProviderTitleLanguage } from '@/shared/types/options';
 
 // --- Shared Constants ---
 
-export const TITLE_LANGUAGES: [TitleLanguage, ...TitleLanguage[]] = [
+export const TITLE_LANGUAGES: [ProviderTitleLanguage, ...ProviderTitleLanguage[]] = [
   'english',
   'romaji',
   'native',

@@ -13,7 +13,7 @@ import type {
   MappingSearchResult,
   RadarrLookupMovie,
   SonarrLookupSeries,
-  TitleLanguage,
+  ProviderTitleLanguage,
 } from '@/shared/types';
 import { metadataFromMediaObject } from '@/shared/anilist/anilist-dom';
 import { toMappingSearchResultFromRadarr } from './radarr.adapter';
@@ -128,10 +128,10 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
     });
   }, [aniListMedia.data?.title, aniTitle]);
   const metadataHint = useMemo(() => metadataFromMediaObject(aniListMedia.data), [aniListMedia.data]);
-  const titleLanguage: TitleLanguage =
+  const titleLanguage: ProviderTitleLanguage =
     provider === 'radarr'
-      ? publicOptions.data?.providers.radarr.titleLanguage ?? 'english'
-      : publicOptions.data?.providers.sonarr.titleLanguage ?? 'english';
+      ? publicOptions.data?.providers.radarr.providerTitleLanguage ?? 'english'
+      : publicOptions.data?.providers.sonarr.providerTitleLanguage ?? 'english';
   const coverImage =
     aniListMedia.data?.coverImage?.extraLarge ??
     aniListMedia.data?.coverImage?.large ??

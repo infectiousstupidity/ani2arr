@@ -179,7 +179,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
       const credentialsChanged =
         preparedCurrent.url !== preparedPrevious.url ||
         preparedCurrent.apiKey !== preparedPrevious.apiKey ||
-        currentProviderSettings.titleLanguage !== previousProviderSettings.titleLanguage;
+        currentProviderSettings.providerTitleLanguage !== previousProviderSettings.providerTitleLanguage;
 
       if (!credentialsChanged) {
         return true;
@@ -194,7 +194,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
             ...previousProviderSettings,
             url: preparedCurrent.url,
             apiKey: preparedCurrent.apiKey,
-            titleLanguage: currentProviderSettings.titleLanguage,
+            titleLanguage: currentProviderSettings.providerTitleLanguage,
           },
         },
       };
@@ -209,8 +209,8 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         methods.resetField(`providers.${provider}.apiKey`, {
           defaultValue: preparedCurrent.apiKey,
         });
-        methods.resetField(`providers.${provider}.titleLanguage`, {
-          defaultValue: currentProviderSettings.titleLanguage,
+        methods.resetField(`providers.${provider}.providerTitleLanguage`, {
+          defaultValue: currentProviderSettings.providerTitleLanguage,
         });
 
         if (

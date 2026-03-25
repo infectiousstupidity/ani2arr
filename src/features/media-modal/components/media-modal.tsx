@@ -11,7 +11,7 @@ import type {
   MediaStatus,
   RadarrFormState,
   SonarrFormState,
-  TitleLanguage,
+  ProviderTitleLanguage,
 } from "@/shared/types";
 import { ErrorCode } from "@/shared/types";
 
@@ -57,7 +57,7 @@ export type MediaModalProps = {
 
   title: string;
   alternateTitles: Array<{ label: string; value: string }>;
-  titleLanguage: TitleLanguage;
+  titleLanguage: ProviderTitleLanguage;
   bannerImage: string | null;
   coverImage: string | null;
   anilistIds: number[];

@@ -1,8 +1,8 @@
-import type { AniTitles, TitleLanguage } from '@/shared/types';
+import type { AniTitles, ProviderTitleLanguage } from '@/shared/types';
 
-const LANGUAGE_ORDER: TitleLanguage[] = ['english', 'romaji', 'native'];
+const LANGUAGE_ORDER: ProviderTitleLanguage[] = ['english', 'romaji', 'native'];
 
-const LANGUAGE_LABELS: Record<TitleLanguage, string> = {
+const LANGUAGE_LABELS: Record<ProviderTitleLanguage, string> = {
   english: 'English',
   romaji: 'Romaji',
   native: 'Native',
@@ -16,22 +16,22 @@ const normalizeTitle = (value?: string | null): string | null => {
 
 export interface ResolvedTitlePreference {
   primary: string;
-  usedLanguage: TitleLanguage | 'fallback';
+  usedLanguage: ProviderTitleLanguage | 'fallback';
   alternates: Array<{ label: string; value: string }>;
 }
 
 export const resolveTitlePreference = (params: {
   titles?: AniTitles | null;
-  preferred?: TitleLanguage;
+  preferred?: ProviderTitleLanguage;
   fallback?: string | null;
 }): ResolvedTitlePreference => {
   const preferred = params.preferred ?? 'english';
-  const uniqueOrder = Array.from(new Set<TitleLanguage>([preferred, ...LANGUAGE_ORDER]));
+  const uniqueOrder = Array.from(new Set<ProviderTitleLanguage>([preferred, ...LANGUAGE_ORDER]));
   const titleMap = params.titles ?? {};
   const fallbackTitle = normalizeTitle(params.fallback);
 
   let primary = '';
-  let usedLanguage: TitleLanguage | 'fallback' = 'fallback';
+  let usedLanguage: ProviderTitleLanguage | 'fallback' = 'fallback';
 
   for (const lang of uniqueOrder) {
     const candidate = normalizeTitle(titleMap?.[lang]);

@@ -1,6 +1,6 @@
 export type RequestPriority = 'high' | 'normal' | 'low';
 
-import type { Provider } from '@/shared/providers/common/types';
+import type { Provider } from '@/shared/types/options';
 
 export type MappingSource = 'manual' | 'upstream' | 'auto' | 'rejected' | 'blocked' | 'ignored' | 'unresolved';
 export type MappingStatus = 'unmapped' | 'in-provider' | 'not-in-provider';

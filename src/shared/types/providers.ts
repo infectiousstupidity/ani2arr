@@ -1,4 +1,4 @@
-export type { Provider } from '@/shared/providers/common/types';
+export type { Provider } from '@/shared/types/options';
 
 export type {
   LeanSonarrSeries,

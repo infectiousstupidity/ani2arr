@@ -44,7 +44,7 @@ export type {
   SonarrCutoffList,
 } from './providers';
 
-export type { ProviderCredentials, TitleLanguage } from '@/shared/providers/common/types';
+export type { ProviderCredentials, ProviderTitleLanguage } from '@/shared/types/options';
 
 export type {
   SonarrFormState,
@@ -72,8 +72,8 @@ export type {
 export type {
   ExtensionOptions,
   PublicOptions,
-  ProviderPublicOptions,
-  ProviderSettings,
+  SonarrPublicOptions,
+  RadarrPublicOptions,
   UiOptions,
   BadgeVisibility,
 } from './options';

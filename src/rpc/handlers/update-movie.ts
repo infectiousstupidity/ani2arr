@@ -2,7 +2,7 @@ import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { RadarrLibrary } from '@/services/library/radarr';
 import type { UpdateRadarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, RadarrMovie } from '@/shared/types';
-import type { ProviderCredentials } from '@/shared/providers/common/types';
+import type { ProviderCredentials } from '@/shared/types/options';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { buildFolderSlug, joinRootAndSlug, paths } from '@/services/helpers/path-utils';

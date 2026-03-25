@@ -3,7 +3,7 @@ import { type MouseEventHandler } from "react";
 import { Database, X } from "lucide-react";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import Pill from '@/shared/ui/primitives/pill';
-import type { AniFormat, Provider, MediaStatus, TitleLanguage } from "@/shared/types";
+import type { AniFormat, Provider, MediaStatus, ProviderTitleLanguage } from "@/shared/types";
 import { getProviderLabel } from "@/services/providers/resolver";
 
 export type MediaModalTabId = "series" | "mapping";
@@ -11,7 +11,7 @@ export type MediaModalTabId = "series" | "mapping";
 export type HeaderProps = {
   title: string;
   alternateTitles: Array<{ label: string; value: string }>;
-  titleLanguage: TitleLanguage;
+  titleLanguage: ProviderTitleLanguage;
   bannerImage: string | null;
   coverImage: string | null;
   anilistIds: number[];

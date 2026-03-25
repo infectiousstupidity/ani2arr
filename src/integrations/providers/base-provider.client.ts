@@ -1,7 +1,7 @@
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 import { AbortError, withRetry } from '@/shared/utils/retry';
-import type { ProviderCredentials } from '@/shared/providers/common/types';
+import type { ProviderCredentials } from '@/shared/types/options';
 
 
 interface BaseProviderClientOptions {

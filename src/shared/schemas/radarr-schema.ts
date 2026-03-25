@@ -48,6 +48,6 @@ export const RadarrDefaultsSchema = v.pipe(
 export const RadarrSettingsSchema = v.object({
   url: SafeString,
   apiKey: SafeString,
-  titleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
+  providerTitleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
   defaults: v.fallback(RadarrDefaultsSchema, createDefaultRadarrFormState()),
 });
