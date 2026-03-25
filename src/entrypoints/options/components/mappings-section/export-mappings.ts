@@ -1,5 +1,5 @@
-import { getAni2arrApi } from '@/lib/rpc';
-import type { AniListMetadataDto, GetMappingsInput, MappingCursor } from '@/lib/rpc/schemas';
+import { getAni2arrApi } from '@/rpc';
+import type { AniListMetadataDto, GetMappingsInput, MappingCursor } from '@/rpc/schemas';
 import type { MappingExternalId, MappingProvider, MappingSource, MappingSummary } from '@/shared/types';
 import type { LibraryFilter } from './components/mapping-toolbar';
 import { normalizeMappingSearchQuery } from './search-query';

@@ -17,7 +17,7 @@ import {
   removeExtensionMappingFailure,
   writeExtensionMapping,
   writeExtensionMappingFailure,
-} from '@/lib/storage';
+} from '@/storage';
 import { incrementCounter } from '@/shared/utils/metrics';
 import { logger } from '@/shared/utils/logger';
 import { getProviderLabel, resolveProviderForAniListFormat } from '@/services/providers/resolver';

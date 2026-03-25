@@ -8,7 +8,7 @@ import type {
   SonarrLibraryStatusOptions,
   TitleIndexer,
 } from './types';
-import { getExtensionOptionsSnapshot } from '@/lib/storage';
+import { getExtensionOptionsSnapshot } from '@/storage';
 import { ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { notifyLibraryMutation } from '@/services/library/notify';
 import type { SonarrLibraryStore } from './store';

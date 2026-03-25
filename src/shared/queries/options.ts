@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAni2arrApi } from '@/lib/rpc';
+import { getAni2arrApi } from '@/rpc';
 import {
   getExtensionOptionsSnapshot,
   getPublicOptionsSnapshot,
@@ -10,7 +10,7 @@ import {
   setExtensionOptionsSnapshot,
   sonarrSecrets,
   toPublicOptions,
-} from '@/lib/storage';
+} from '@/storage';
 import type { ExtensionError, ExtensionOptions, PublicOptions } from '@/shared/types';
 import type { Settings } from '@/shared/schemas/settings';
 import { normalizeError } from '@/shared/errors/error-utils';

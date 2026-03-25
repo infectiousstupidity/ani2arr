@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { ParsedCard } from '@/shared/types';
-import { getAni2arrApi } from '@/lib/rpc';
+import { getAni2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';
 
 interface UseAnilistBatchPrefetchParams {

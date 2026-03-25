@@ -1,5 +1,5 @@
 import type { CheckSeriesStatusPayload, MappingProvider, MediaMetadataHint } from '@/shared/types';
-import type { GetMappingsInput } from '@/lib/rpc/schemas';
+import type { GetMappingsInput } from '@/rpc/schemas';
 
 const rootQueryKey = ['a2a'] as const;
 

@@ -1,6 +1,6 @@
 // src/services/library/sonarr/store.ts
 import type { LibraryCaches, LeanSonarrSeries, SonarrClient, SonarrSeries, ExtensionOptions, TitleIndexer } from './types';
-import { getExtensionOptionsSnapshot, STORAGE_POLICIES } from '@/lib/storage';
+import { getExtensionOptionsSnapshot, STORAGE_POLICIES } from '@/storage';
 import { logError, normalizeError } from '@/shared/errors/error-utils';
 import { CACHE_KEY } from './constants';
 

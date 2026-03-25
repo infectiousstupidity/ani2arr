@@ -2,7 +2,7 @@
 import { useCallback, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
-import { REVISION_KEYS, STORAGE_KEYS } from '@/lib/storage';
+import { REVISION_KEYS, STORAGE_KEYS } from '@/storage';
 import type { MappingProvider } from '@/shared/types';
 import { queryKeys } from '@/shared/queries';
 

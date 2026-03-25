@@ -69,7 +69,7 @@ export type {
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
   TestConnectionPayload,
-} from '@/lib/rpc/types';
+} from '@/rpc/types';
 
 export type {
   ExtensionOptions,

@@ -1,6 +1,6 @@
 import type { SonarrApiService } from '@/clients/sonarr.api';
 import type { SonarrLibrary } from '@/services/library/sonarr';
-import type { UpdateSonarrInput } from '@/lib/rpc/schemas';
+import type { UpdateSonarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, SonarrCredentialsPayload, SonarrSeries } from '@/shared/types';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
