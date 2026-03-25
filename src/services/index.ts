@@ -23,11 +23,10 @@ import { getMappingsHandler } from '@/rpc/handlers/get-mappings';
 import { updateRadarrMovieHandler } from '@/rpc/handlers/update-movie';
 import { updateSonarrSeriesHandler } from '@/rpc/handlers/update-series';
 import { createApiHandlers } from '@/rpc/handlers/handlers';
+import type { ProviderCredentials } from '@/shared/providers/common/types';
 
 import type {
   ExtensionOptions,
-  RadarrCredentialsPayload,
-  SonarrCredentialsPayload,
 } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import type { Ani2arrApi } from '@/rpc';
@@ -184,7 +183,7 @@ export const createApiImplementation = (): Ani2arrApi => {
   };
 
   const ensureSonarrConfigured = async (): Promise<{
-    credentials: SonarrCredentialsPayload;
+    credentials: ProviderCredentials;
     options: ExtensionOptions;
   }> => {
     const options = await getExtensionOptionsSnapshot();
@@ -206,7 +205,7 @@ export const createApiImplementation = (): Ani2arrApi => {
   };
 
   const ensureRadarrConfigured = async (): Promise<{
-    credentials: RadarrCredentialsPayload;
+    credentials: ProviderCredentials;
     options: ExtensionOptions;
   }> => {
     const options = await getExtensionOptionsSnapshot();

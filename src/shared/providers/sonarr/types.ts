@@ -1,4 +1,4 @@
-import type { ProviderCredentials, TitleLanguage } from '@/shared/providers/common/types';
+import type { TitleLanguage } from '@/shared/providers/common/types';
 
 export type SonarrMonitorOption =
   | 'all'
@@ -143,8 +143,6 @@ export interface SonarrPublicSettings {
 export interface SonarrSecrets {
   apiKey: string;
 }
-
-export type SonarrCredentialsPayload = ProviderCredentials;
 
 /**
  * Represents a single item returned by the Sonarr `/wanted/cutoff` endpoint.

@@ -3,10 +3,11 @@ import { getAni2arrApi } from '@/rpc';
 import { normalizeError } from '@/shared/errors/error-utils';
 import { queryKeys } from '@/shared/queries/query-keys';
 import type { CheckMovieStatusPayload, CheckMovieStatusResponse, ExtensionError, PublicOptions } from '@/shared/types';
-import type { RadarrCredentialsPayload, RadarrFormState, RadarrMovie } from './types';
+import type { ProviderCredentials } from '@/shared/providers/common/types';
+import type { RadarrFormState, RadarrMovie } from './types';
 import type { AddRadarrInput, StatusInput, UpdateRadarrInput } from '@/rpc/schemas';
 
-export const useRadarrMetadata = (options?: { enabled?: boolean; credentials?: RadarrCredentialsPayload | null }) => {
+export const useRadarrMetadata = (options?: { enabled?: boolean; credentials?: ProviderCredentials | null }) => {
   const credentialScope =
     options?.credentials?.url && options.credentials.apiKey
       ? `${options.credentials.url}|${options.credentials.apiKey}`
@@ -29,7 +30,7 @@ export const useRadarrMetadata = (options?: { enabled?: boolean; credentials?: R
 
 export const useRadarrConnectionStatus = (options?: {
   enabled?: boolean;
-  credentials?: RadarrCredentialsPayload | null;
+  credentials?: ProviderCredentials | null;
 }) =>
   useQuery<{ version: string }, ExtensionError>({
     queryKey: queryKeys.radarrConnection(
@@ -125,8 +126,8 @@ export const useUpdateMovie = () => {
 };
 
 export const useTestRadarrConnection = () =>
-  useMutation<{ version: string }, ExtensionError, RadarrCredentialsPayload>({
-    mutationFn: async (payload: RadarrCredentialsPayload) => {
+  useMutation<{ version: string }, ExtensionError, ProviderCredentials>({
+    mutationFn: async (payload: ProviderCredentials) => {
       try {
         return await getAni2arrApi().testRadarrConnection(payload);
       } catch (error) {
