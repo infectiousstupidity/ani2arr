@@ -6,7 +6,7 @@ import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useBrowsePortals } from '../hooks/use-media-portals';
 import { useAnilistBatchPrefetch } from '../hooks/use-anilist-batch-prefetch';
-import type { BrowseAdapter, ParsedCard, MediaMetadataHint } from '@/shared/types';
+import type { BrowseAdapter, ParsedCard, AniListMediaHint } from '@/shared/types';
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import { CardOverlay } from './card-overlay';
 
@@ -19,7 +19,7 @@ export interface BrowseContentAppProps {
     title: string;
     initialTab?: 'series' | 'mapping';
     initialMappingRequired?: boolean;
-    metadata: MediaMetadataHint | null;
+    metadata: AniListMediaHint | null;
   }): void;
 }
 

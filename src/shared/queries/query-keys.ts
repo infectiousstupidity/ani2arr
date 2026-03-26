@@ -1,4 +1,4 @@
-import type { CheckSeriesStatusPayload, MappingProvider, MediaMetadataHint } from '@/shared/types';
+import type { CheckSeriesStatusPayload, MappingProvider, AniListMediaHint } from '@/shared/types';
 import type { GetMappingsInput } from '@/rpc/schemas';
 
 const rootQueryKey = ['a2a'] as const;
@@ -15,7 +15,7 @@ const normalizeTitleKey = (title?: string) => {
 // 2. undefined vs null inconsistencies
 // 3. Unstable array ordering (prequel IDs)
 // 4. Irrelevant fields (coverImage, etc.)
-const getStableMetadata = (metadata?: MediaMetadataHint | null) => {
+const getStableMetadata = (metadata?: AniListMediaHint | null) => {
   if (!metadata) return null;
   return {
     titles: {

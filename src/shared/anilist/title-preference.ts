@@ -1,4 +1,4 @@
-import type { AniTitles, ProviderTitleLanguage } from '@/shared/types';
+import type { AniListTitles, ProviderTitleLanguage } from '@/shared/types';
 
 const LANGUAGE_ORDER: ProviderTitleLanguage[] = ['english', 'romaji', 'native'];
 
@@ -21,7 +21,7 @@ export interface ResolvedTitlePreference {
 }
 
 export const resolveTitlePreference = (params: {
-  titles?: AniTitles | null;
+  titles?: AniListTitles | null;
   preferred?: ProviderTitleLanguage;
   fallback?: string | null;
 }): ResolvedTitlePreference => {

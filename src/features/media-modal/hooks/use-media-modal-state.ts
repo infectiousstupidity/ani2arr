@@ -1,7 +1,7 @@
 // src/features/media-modal/hooks/use-media-modal-state.ts
 import { useCallback, useState } from "react";
 
-import type { MediaMetadataHint } from "@/shared/types";
+import type { AniListMediaHint } from "@/shared/types";
 
 export type MediaModalTabId = "series" | "mapping";
 
@@ -10,7 +10,7 @@ export type OpenMediaModalInput = {
   title: string;
   initialTab?: MediaModalTabId;
   initialMappingRequired?: boolean;
-  metadata: MediaMetadataHint | null;
+  metadata: AniListMediaHint | null;
 };
 
 export type MediaModalState = {
@@ -19,7 +19,7 @@ export type MediaModalState = {
   title: string;
   initialTab?: MediaModalTabId;
   initialMappingRequired?: boolean;
-  metadata: MediaMetadataHint | null;
+  metadata: AniListMediaHint | null;
 } | null;
 
 export interface UseMediaModalStateResult {

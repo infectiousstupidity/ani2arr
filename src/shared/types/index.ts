@@ -1,13 +1,14 @@
 export type {
-  AniFormat,
-  AniMedia,
-  AniTitles,
-  MediaMetadataHint,
-  MediaStatus,
+  AniListMediaFormat,
+  AniListMedia,
+  AniListTitles,
+  AniListMediaHint,
+  AniListMediaStatus,
+  AniListMediaSeason,
   AniListMetadata,
-  AniListMetadataChunk,
+  AniListMetadataCoverImage,
+  AniListMetadataChunkRef,
   AniListMetadataBundle,
-  AniListSearchResult,
 } from './anilist';
 
 export type {

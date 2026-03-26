@@ -1,8 +1,8 @@
 // src/shared/anilist/anilist-dom.ts
-import type { AniFormat, AniTitles, MediaMetadataHint } from '@/shared/types';
+import type { AniListMediaFormat, AniListTitles, AniListMediaHint } from '@/shared/types';
 import { normalizeRelationIds, normalizeSynonyms } from '@/shared/anilist/media-metadata';
 
-const FORMAT_VALUES: ReadonlySet<AniFormat> = new Set([
+const FORMAT_VALUES: ReadonlySet<AniListMediaFormat> = new Set([
   'TV',
   'TV_SHORT',
   'MOVIE',
@@ -15,10 +15,10 @@ const FORMAT_VALUES: ReadonlySet<AniFormat> = new Set([
   'ONE_SHOT',
 ]);
 
-const coerceTitles = (value: unknown): AniTitles | null => {
+const coerceTitles = (value: unknown): AniListTitles | null => {
   if (!value || typeof value !== 'object') return null;
   const source = value as Record<string, unknown>;
-  const titles: AniTitles = {};
+  const titles: AniListTitles = {};
   if (typeof source.english === 'string' && source.english.trim()) {
     titles.english = source.english.trim();
   }
@@ -41,10 +41,10 @@ const coerceSynonyms = (value: unknown): string[] | null => {
   return normalized.length > 0 ? normalized : null;
 };
 
-const coerceFormat = (value: unknown): AniFormat | null => {
+const coerceFormat = (value: unknown): AniListMediaFormat | null => {
   if (typeof value !== 'string') return null;
   const normalized = value.trim().toUpperCase();
-  return FORMAT_VALUES.has(normalized as AniFormat) ? (normalized as AniFormat) : null;
+  return FORMAT_VALUES.has(normalized as AniListMediaFormat) ? (normalized as AniListMediaFormat) : null;
 };
 
 const coerceStartYear = (value: unknown): number | null => {
@@ -88,7 +88,7 @@ const coerceRelationPrequelIds = (value: unknown): number[] | null => {
   return normalized.length > 0 ? normalized : null;
 };
 
-const metadataFromAny = (value: unknown): MediaMetadataHint | null => {
+const metadataFromAny = (value: unknown): AniListMediaHint | null => {
   if (!value || typeof value !== 'object') return null;
   const source = value as Record<string, unknown>;
   const titles = coerceTitles(source.title);
@@ -107,11 +107,11 @@ const metadataFromAny = (value: unknown): MediaMetadataHint | null => {
     startYear: startYear ?? null,
     format: format ?? null,
     relationPrequelIds: prequelIds ?? null,
-  } satisfies MediaMetadataHint;
+  } satisfies AniListMediaHint;
 };
-export const metadataFromMediaObject = (value: unknown): MediaMetadataHint | null => metadataFromAny(value);
+export const metadataFromMediaObject = (value: unknown): AniListMediaHint | null => metadataFromAny(value);
 
-export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHint | null => {
+export const extractMediaMetadataFromDom = (anilistId: number): AniListMediaHint | null => {
   if (typeof window === 'undefined' || !Number.isFinite(anilistId)) {
     return null;
   }
@@ -119,7 +119,7 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
     const { location, document } = window;
     const hrefIdMatch = location.pathname.match(/\/anime\/(\d+)/);
     const onAnimeDetailPage = hrefIdMatch && Number.parseInt(hrefIdMatch[1]!, 10) === anilistId;
-    const FORMAT_TEXT_MAP = new Map<string, AniFormat>([
+    const FORMAT_TEXT_MAP = new Map<string, AniListMediaFormat>([
       ['tv show', 'TV'],
       ['tv', 'TV'],
       ['tv short', 'TV_SHORT'],
@@ -140,7 +140,7 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
     if (onAnimeDetailPage) {
       const title = document.querySelector('h1')?.textContent?.trim() ?? '';
       const coverImg = document.querySelector<HTMLImageElement>('.cover-wrap .cover');
-      let format: AniFormat | null = null;
+      let format: AniListMediaFormat | null = null;
       const rows = Array.from(document.querySelectorAll<HTMLDivElement>('.sidebar .data .data-set'));
       const formatRow = rows.find(row => row.querySelector('.type')?.textContent?.trim() === 'Format');
       const rawFormat = formatRow?.querySelector('.value')?.textContent ?? '';
@@ -156,7 +156,7 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
       }
       
       if (title || format) {
-        const hint: MediaMetadataHint = {
+        const hint: AniListMediaHint = {
           titles: title ? { romaji: title } : null,
           synonyms: title ? [title] : null,
           startYear: null,
@@ -177,7 +177,7 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
         card?.querySelector<HTMLDivElement>('.title')?.textContent ?? ''
       ).trim() || (cover.getAttribute('title') ?? '').trim() || cover.querySelector('img')?.getAttribute('alt')?.trim() || '';
       
-      let format: AniFormat | null = null;
+      let format: AniListMediaFormat | null = null;
       const infoSpan = card?.querySelector<HTMLSpanElement>('.hover-data .info span');
       const infoText = infoSpan?.textContent;
       if (infoText) {
@@ -188,7 +188,7 @@ export const extractMediaMetadataFromDom = (anilistId: number): MediaMetadataHin
       const cardImg = cover.querySelector('img');
 
       if (title || format) {
-        const hint: MediaMetadataHint = {
+        const hint: AniListMediaHint = {
           titles: title ? { romaji: title } : null,
           synonyms: title ? [title] : null,
           startYear: null,

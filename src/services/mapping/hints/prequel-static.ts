@@ -1,10 +1,10 @@
 import type { AnilistApiService } from '@/clients/anilist.api';
-import type { AniMedia } from '@/shared/types';
+import type { AniListMedia } from '@/shared/types';
 import type { UpstreamMappingStore } from '../upstream';
 import type { ResolvedMapping } from '../types';
 
 export async function resolvePrequelStatic(
-  media: AniMedia,
+  media: AniListMedia,
   upstreamMappingStore: UpstreamMappingStore,
   anilistApi: AnilistApiService,
 ): Promise<ResolvedMapping | null> {

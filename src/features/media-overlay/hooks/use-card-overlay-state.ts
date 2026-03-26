@@ -4,7 +4,7 @@ import { browser } from 'wxt/browser';
 import { useAddMovie, useAddSeries, useMovieStatus, useSeriesStatus } from '@/shared/queries';
 import type {
   ExtensionError,
-  MediaMetadataHint,
+  AniListMediaHint,
   Provider,
   RadarrFormState,
   SonarrFormState,
@@ -17,7 +17,7 @@ export interface UseCardOverlayStateParams {
   provider: Provider;
   anilistId: number;
   title: string;
-  metadata: MediaMetadataHint | null;
+  metadata: AniListMediaHint | null;
   defaultForm: SonarrFormState | RadarrFormState | null;
   isConfigured: boolean;
   enabled?: boolean;

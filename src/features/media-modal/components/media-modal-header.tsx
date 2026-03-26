@@ -3,7 +3,7 @@ import { type MouseEventHandler } from "react";
 import { Database, X } from "lucide-react";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import Pill from '@/shared/ui/primitives/pill';
-import type { AniFormat, Provider, MediaStatus, ProviderTitleLanguage } from "@/shared/types";
+import type { AniListMediaFormat, Provider, AniListMediaStatus, ProviderTitleLanguage } from "@/shared/types";
 import { getProviderLabel } from "@/services/providers/resolver";
 
 export type MediaModalTabId = "series" | "mapping";
@@ -17,9 +17,9 @@ export type HeaderProps = {
   anilistIds: number[];
   provider: Provider;
   inLibrary: boolean;
-  format?: AniFormat | null;
+  format?: AniListMediaFormat | null;
   year?: number | null;
-  status?: MediaStatus | null;
+  status?: AniListMediaStatus | null;
 
   activeTab: MediaModalTabId;
   onEnterMapping: () => void;
@@ -28,17 +28,17 @@ export type HeaderProps = {
   tooltipContainer?: HTMLElement | null;
 };
 
-function formatMediaFormat(format?: AniFormat | null): string | null {
+function formatMediaFormat(format?: AniListMediaFormat | null): string | null {
   return format ? format.replace(/_/g, " ") : null;
 }
 
-function formatMediaStatus(status?: MediaStatus | null): string | null {
+function formatAniListMediaStatus(status?: AniListMediaStatus | null): string | null {
   if (!status) return null;
   const normalized = status.toLowerCase().replace(/_/g, " ");
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function statusTone(status?: MediaStatus | null): "success" | "warning" | "info" {
+function statusTone(status?: AniListMediaStatus | null): "success" | "warning" | "info" {
   if (status === "RELEASING") return "success";
   if (status === "NOT_YET_RELEASED") return "warning";
   return "info";
@@ -62,7 +62,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
 
   const formatLabel = formatMediaFormat(format);
   const yearLabel = year ?? null;
-  const statusLabel = formatMediaStatus(status);
+  const statusLabel = formatAniListMediaStatus(status);
   const currentTone = statusTone(status);
   const hasAlternateTitles = alternateTitles.length > 0;
   const tooltipPortal = tooltipContainer ?? null;

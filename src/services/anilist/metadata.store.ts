@@ -3,9 +3,9 @@ import type { AnilistApiService } from '@/clients/anilist.api';
 import type {
   AniListMetadata,
   AniListMetadataBundle,
-  AniListMetadataChunk,
-  AniMedia,
-  AniTitles,
+  AniListMetadataChunkRef,
+  AniListMedia,
+  AniListTitles,
 } from '@/shared/types';
 import { logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
@@ -26,9 +26,9 @@ const clampBatch = (ids: number[], maxBatch?: number): number[] => {
   return ids.slice(0, limit);
 };
 
-const normalizeTitles = (titles?: AniTitles | null): AniTitles => {
+const normalizeTitles = (titles?: AniListTitles | null): AniListTitles => {
   if (!titles) return {};
-  const normalized: AniTitles = {};
+  const normalized: AniListTitles = {};
   if (titles.english) normalized.english = titles.english;
   if (titles.romaji) normalized.romaji = titles.romaji;
   if (titles.native) normalized.native = titles.native;
@@ -108,7 +108,7 @@ export class AniListMetadataStore {
   }
 
   private async fetchBakedChunk(
-    chunk: AniListMetadataChunk,
+    chunk: AniListMetadataChunkRef,
     generatedAt: number,
   ): Promise<AniListMetadataBundle | null> {
     if (!chunk || typeof chunk.file !== 'string' || chunk.file.length === 0) {
@@ -201,7 +201,7 @@ export class AniListMetadataStore {
     }
   }
 
-  private fromMedia(media: AniMedia): AniListMetadata | null {
+  private fromMedia(media: AniListMedia): AniListMetadata | null {
     if (!media || typeof media.id !== 'number' || !Number.isFinite(media.id)) return null;
     const cover = media.coverImage ?? null;
     const coverImage = cover

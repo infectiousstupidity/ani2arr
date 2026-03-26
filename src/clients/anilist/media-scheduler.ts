@@ -8,7 +8,7 @@ import type {
   AniListSchedulerEventDebug,
   AniListSchedulerPendingEntryDebug,
   AniListSchedulerRequestDebug,
-  AniMedia,
+  AniListMedia,
   RequestPriority,
 } from '@/shared/types';
 import { priorityValue } from '@/shared/utils/priority';
@@ -37,7 +37,7 @@ type Deferred<T> = {
 
 type PendingEntry = {
   id: number;
-  deferred: Deferred<AniMedia>;
+  deferred: Deferred<AniListMedia>;
   priority: RequestPriority;
   forceRefresh: boolean;
   sources: Set<string>;
@@ -47,7 +47,7 @@ type PendingEntry = {
 };
 
 type InflightEntry = {
-  promise: Promise<AniMedia>;
+  promise: Promise<AniListMedia>;
   priority: RequestPriority;
   batchId: number | null;
   requestIds: Set<number>;
@@ -55,7 +55,7 @@ type InflightEntry = {
 };
 
 type MediaSchedulerDeps = {
-  cache?: TtlCache<AniMedia>;
+  cache?: TtlCache<AniListMedia>;
   executor: AniListExecutor;
   limiter: AniListRateLimiter;
   dispatchTask: <T>(task: () => Promise<T>, priority: number) => Promise<T>;
@@ -135,7 +135,7 @@ export class AniListMediaScheduler {
     }
   }
 
-  public async requestSingle(id: number, options: RequestMediaOptions = {}): Promise<AniMedia> {
+  public async requestSingle(id: number, options: RequestMediaOptions = {}): Promise<AniListMedia> {
     const [normalizedId] = this.normalizeIds([id]);
     if (typeof normalizedId !== 'number') {
       throw createError(
@@ -174,12 +174,12 @@ export class AniListMediaScheduler {
     return this.ensureNetworkRequest(normalizedId, normalizedOptions, request.requestId);
   }
 
-  public async requestMedia(ids: number[], options: RequestMediaOptions = {}): Promise<Map<number, AniMedia>> {
+  public async requestMedia(ids: number[], options: RequestMediaOptions = {}): Promise<Map<number, AniListMedia>> {
     const normalizedOptions = this.normalizeOptions(options);
     const uniqueIds = this.normalizeIds(ids);
     const request = this.registerRequest(uniqueIds, normalizedOptions);
-    const results = new Map<number, AniMedia>();
-    const pending = new Map<number, Promise<AniMedia>>();
+    const results = new Map<number, AniListMedia>();
+    const pending = new Map<number, Promise<AniListMedia>>();
 
     for (const id of uniqueIds) {
       if (!normalizedOptions.forceRefresh) {
@@ -314,7 +314,7 @@ export class AniListMediaScheduler {
     return request;
   }
 
-  private async readCachedMedia(id: number): Promise<{ media: AniMedia; stale: boolean } | null> {
+  private async readCachedMedia(id: number): Promise<{ media: AniListMedia; stale: boolean } | null> {
     const cache = this.deps.cache;
     if (!cache) return null;
 
@@ -355,7 +355,7 @@ export class AniListMediaScheduler {
     id: number,
     options: Required<RequestMediaOptions>,
     requestId: number,
-  ): Promise<AniMedia> {
+  ): Promise<AniListMedia> {
     const inflight = this.inflightById.get(id);
     if (inflight) {
       inflight.requestIds.add(requestId);
@@ -403,7 +403,7 @@ export class AniListMediaScheduler {
       return existingPending.deferred.promise;
     }
 
-    const deferred = this.createDeferred<AniMedia>();
+    const deferred = this.createDeferred<AniListMedia>();
     const entry: PendingEntry = {
       id,
       deferred,
@@ -727,7 +727,7 @@ export class AniListMediaScheduler {
     }
   }
 
-  private resolvePendingEntry(entry: PendingEntry, media: AniMedia): void {
+  private resolvePendingEntry(entry: PendingEntry, media: AniListMedia): void {
     this.pendingByPriority.get(entry.priority)?.delete(entry.id);
     this.pendingById.delete(entry.id);
     this.resetBucketIfEmpty(entry.priority);
@@ -791,7 +791,7 @@ export class AniListMediaScheduler {
     return { promise, resolve, reject };
   }
 
-  private countResolvedMedia(counts: AniListSchedulerBatchMediaCountsDebug, format: AniMedia['format']): void {
+  private countResolvedMedia(counts: AniListSchedulerBatchMediaCountsDebug, format: AniListMedia['format']): void {
     switch (format) {
       case 'MOVIE':
         counts.movies += 1;

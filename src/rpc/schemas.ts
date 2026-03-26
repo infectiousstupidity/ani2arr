@@ -1,17 +1,6 @@
+/** Valibot schemas for RPC inputs that cross the extension messaging boundary. */
 // src/rpc/schemas.ts
 import * as v from 'valibot';
-import type {
-  AniListSchedulerDebugSnapshot,
-  CheckMovieStatusResponse,
-  CheckSeriesStatusResponse,
-  MappingSummary,
-  RadarrLookupMovie,
-  RadarrMovie,
-  RadarrQualityProfile,
-  RadarrRootFolder,
-  RadarrTag,
-  SonarrLookupSeries,
-} from '@/shared/types';
 
 // ============================================================================
 // Shared / Reusable Validators
@@ -23,7 +12,6 @@ import type {
 const IdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
 const MappingProviderSchema = v.picklist(['sonarr', 'radarr']);
 const MappingSourceSchema = v.picklist(['manual', 'upstream', 'auto', 'rejected', 'blocked', 'ignored', 'unresolved']);
-const MappingStatusSchema = v.picklist(['unmapped', 'in-provider', 'not-in-provider']);
 
 /**
  * Standard non-empty string validation
@@ -37,18 +25,13 @@ const createRequiredStringSchema = (msg: string = 'Value cannot be empty') =>
 
 const RequestPrioritySchema = v.picklist(['high', 'normal', 'low']);
 
-const AniTitlesSchema = v.object({
+const AniListTitlesSchema = v.object({
   romaji: v.optional(v.string()),
   english: v.optional(v.string()),
   native: v.optional(v.string()),
 });
 
-const AniListMetadataImageSchema = v.object({
-  medium: v.optional(v.nullable(v.string())),
-  large: v.optional(v.nullable(v.string())),
-});
-
-const AniFormatSchema = v.picklist([
+const AniListMediaFormatSchema = v.picklist([
   'TV',
   'TV_SHORT',
   'MOVIE',
@@ -61,19 +44,11 @@ const AniFormatSchema = v.picklist([
   'ONE_SHOT',
 ]);
 
-const AniStatusSchema = v.picklist([
-  'FINISHED',
-  'RELEASING',
-  'NOT_YET_RELEASED',
-  'CANCELLED',
-  'HIATUS',
-]);
-
-const MediaMetadataHintSchema = v.object({
-  titles: v.optional(v.nullable(AniTitlesSchema)),
+const AniListMediaHintSchema = v.object({
+  titles: v.optional(v.nullable(AniListTitlesSchema)),
   synonyms: v.optional(v.nullable(v.array(v.string()))),
   startYear: v.optional(v.nullable(v.number())),
-  format: v.optional(v.nullable(AniFormatSchema)),
+  format: v.optional(v.nullable(AniListMediaFormatSchema)),
   relationPrequelIds: v.optional(v.nullable(v.array(v.number()))),
   coverImage: v.optional(v.nullable(v.string())),
 });
@@ -128,26 +103,6 @@ const MappingExternalIdSchema = v.object({
   kind: v.picklist(['tvdb', 'tmdb']),
 });
 
-export const MappingSummarySchema = v.object({
-  anilistId: IdSchema,
-  provider: MappingProviderSchema,
-  externalId: v.nullable(MappingExternalIdSchema),
-  suppressedExternalId: v.optional(v.nullable(MappingExternalIdSchema)),
-  source: MappingSourceSchema,
-  status: MappingStatusSchema,
-  updatedAt: v.optional(v.number()),
-  linkedAniListIds: v.optional(v.array(IdSchema)),
-  inLibraryCount: v.optional(v.number()),
-  providerMeta: v.optional(
-    v.object({
-      title: v.optional(v.string()),
-      type: v.optional(v.picklist(['series', 'movie'])),
-      statusLabel: v.optional(v.string()),
-    }),
-  ),
-  hadResolveAttempt: v.optional(v.boolean()),
-});
-
 // ============================================================================
 // RPC Input Schemas
 // ============================================================================
@@ -155,7 +110,7 @@ export const MappingSummarySchema = v.object({
 export const ResolveInputSchema = v.object({
   anilistId: IdSchema,
   primaryTitleHint: v.optional(v.string()),
-  metadata: v.optional(v.nullable(MediaMetadataHintSchema)),
+  metadata: v.optional(v.nullable(AniListMediaHintSchema)),
 });
 
 export const StatusInputSchema = v.object({
@@ -164,7 +119,7 @@ export const StatusInputSchema = v.object({
   force_verify: v.optional(v.boolean()),
   network: v.optional(v.literal('never')),
   ignoreFailureCache: v.optional(v.boolean()),
-  metadata: v.optional(v.nullable(MediaMetadataHintSchema)),
+  metadata: v.optional(v.nullable(AniListMediaHintSchema)),
   priority: v.optional(RequestPrioritySchema),
 });
 
@@ -172,7 +127,7 @@ export const AddInputSchema = v.object({
   anilistId: IdSchema,
   title: createRequiredStringSchema('Title cannot be empty'),
   primaryTitleHint: v.optional(v.string()),
-  metadata: v.optional(v.nullable(MediaMetadataHintSchema)),
+  metadata: v.optional(v.nullable(AniListMediaHintSchema)),
   form: SonarrFormStateSchema,
 });
 
@@ -187,7 +142,7 @@ export const AddRadarrInputSchema = v.object({
   anilistId: IdSchema,
   title: createRequiredStringSchema('Title cannot be empty'),
   primaryTitleHint: v.optional(v.string()),
-  metadata: v.optional(v.nullable(MediaMetadataHintSchema)),
+  metadata: v.optional(v.nullable(AniListMediaHintSchema)),
   form: RadarrFormStateSchema,
 });
 
@@ -288,7 +243,7 @@ export const RadarrLookupInputSchema = v.object({
   force_network: v.optional(v.boolean()),
 });
 
-const MappingCursorSchema = v.object({
+export const MappingCursorSchema = v.object({
   updatedAt: v.number(),
   anilistId: IdSchema,
   provider: MappingProviderSchema,
@@ -308,23 +263,6 @@ export const GetMappingsInputSchema = v.optional(
     query: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1))),
   }),
 );
-
-export const AniListMetadataSchema = v.object({
-  id: IdSchema,
-  titles: AniTitlesSchema,
-  seasonYear: v.optional(v.nullable(v.number())),
-  format: v.optional(v.nullable(AniFormatSchema)),
-  coverImage: v.optional(v.nullable(AniListMetadataImageSchema)),
-  updatedAt: v.number(),
-});
-
-export const AniListSearchResultSchema = v.object({
-  id: IdSchema,
-  title: AniTitlesSchema,
-  coverImage: v.optional(v.nullable(AniListMetadataImageSchema)),
-  format: v.optional(v.nullable(AniFormatSchema)),
-  status: v.optional(v.nullable(AniStatusSchema)),
-});
 
 export const GetAniListMetadataInputSchema = v.object({
   ids: v.array(IdSchema),
@@ -355,131 +293,8 @@ export type ClearMappingRejectedCandidateInput = v.InferOutput<typeof ClearMappi
 export type SetMappingBlockedCandidateInput = v.InferOutput<typeof SetMappingBlockedCandidateInputSchema>;
 export type ClearMappingBlockedCandidateInput = v.InferOutput<typeof ClearMappingBlockedCandidateInputSchema>;
 export type GetMappingsInput = v.InferOutput<typeof GetMappingsInputSchema>;
-export type MappingSummaryDto = v.InferOutput<typeof MappingSummarySchema>;
 export type MappingCursor = v.InferOutput<typeof MappingCursorSchema>;
-export type AniListMetadataDto = v.InferOutput<typeof AniListMetadataSchema>;
 export type SearchAniListInput = v.InferOutput<typeof SearchAniListInputSchema>;
-export type AniListSearchResultDto = v.InferOutput<typeof AniListSearchResultSchema>;
 export type GetAniListMetadataInput = v.InferOutput<typeof GetAniListMetadataInputSchema>;
 export type RadarrLookupInput = v.InferOutput<typeof RadarrLookupInputSchema>;
 export type TestProviderConnectionInput = v.InferOutput<typeof TestProviderConnectionInputSchema>;
-
-// ============================================================================
-// Output types
-// ============================================================================
-
-export interface MappingOutput {
-  tvdbId: number | null;
-  successfulSynonym?: string;
-}
-
-export type StatusOutput = CheckSeriesStatusResponse;
-export type MovieStatusOutput = CheckMovieStatusResponse;
-
-export interface MappingOverrideItem {
-  anilistId: number;
-  provider: 'sonarr' | 'radarr';
-  externalId: {
-    id: number;
-    kind: 'tvdb' | 'tmdb';
-  };
-  updatedAt: number;
-}
-
-export interface MappingIgnoreItem {
-  anilistId: number;
-  provider: 'sonarr' | 'radarr';
-  updatedAt: number;
-}
-
-export interface MappingRejectedCandidateItem {
-  anilistId: number;
-  provider: 'sonarr' | 'radarr';
-  externalId: {
-    id: number;
-    kind: 'tvdb' | 'tmdb';
-  };
-  updatedAt: number;
-}
-
-export interface MappingBlockedCandidateItem {
-  anilistId: number;
-  provider: 'sonarr' | 'radarr';
-  externalId: {
-    id: number;
-    kind: 'tvdb' | 'tmdb';
-  };
-  updatedAt: number;
-}
-
-export interface ExportStoredMappingsOutput {
-  version: 2;
-  exportedAt: string;
-  summary: {
-    overrideCount: number;
-    ignoreCount: number;
-    rejectedCandidateCount: number;
-    blockedCandidateCount: number;
-  };
-  mappings: {
-    overrides: Record<string, MappingOverrideItem>;
-    ignores: Record<string, MappingIgnoreItem>;
-    rejectedCandidates: Record<string, MappingRejectedCandidateItem>;
-    blockedCandidates: Record<string, MappingBlockedCandidateItem>;
-  };
-}
-
-export interface GetMappingsOutput {
-  mappings: MappingSummary[];
-  nextCursor?: MappingCursor | null;
-  total?: number;
-}
-
-export interface SonarrLookupOutput {
-  results: SonarrLookupSeries[];
-  libraryTvdbIds: number[];
-  linkedAniListIdsByTvdbId?: Record<number, number[]>;
-  statsMap?: Record<
-    number,
-    {
-      seasonCount?: number;
-      episodeCount?: number;
-      episodeFileCount?: number;
-      totalEpisodeCount?: number;
-      sizeOnDisk?: number;
-      percentOfEpisodes?: number;
-    }
-  >;
-}
-
-export interface ValidateTvdbOutput {
-  inLibrary: boolean;
-  inCatalog: boolean;
-}
-
-export interface RadarrLookupOutput {
-  results: RadarrLookupMovie[];
-  libraryTmdbIds: number[];
-  linkedAniListIdsByTmdbId?: Record<number, number[]>;
-}
-
-export interface ValidateTmdbOutput {
-  inLibrary: boolean;
-  inCatalog: boolean;
-}
-
-export interface GetRadarrMetadataOutput {
-  qualityProfiles: RadarrQualityProfile[];
-  rootFolders: RadarrRootFolder[];
-  tags: RadarrTag[];
-}
-
-export type AddRadarrOutput = RadarrMovie;
-export type UpdateRadarrOutput = RadarrMovie;
-
-export interface GetAniListMetadataOutput {
-  metadata: AniListMetadataDto[];
-  missingIds?: number[];
-}
-
-export type GetAniListSchedulerDebugOutput = AniListSchedulerDebugSnapshot;

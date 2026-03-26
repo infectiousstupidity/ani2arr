@@ -1,7 +1,7 @@
 import type { SearchTerm } from './search-term-generator';
 import type { UpstreamMappingStore } from '../upstream';
 import type { ScopedLogger } from '@/shared/utils/logger';
-import type { AniMedia, RequestPriority } from '@/shared/types';
+import type { AniListMedia, RequestPriority } from '@/shared/types';
 import type { AnilistApiService } from '@/clients/anilist.api';
 import type {
   LookupClientCredentials,
@@ -58,4 +58,4 @@ export interface MappingContext<
   log: ScopedLogger;
 }
 
-export type { AniMedia };
+export type { AniListMedia };

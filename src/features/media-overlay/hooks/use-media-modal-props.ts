@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import type {
-  AniFormat,
-  AniTitles,
+  AniListMediaFormat,
+  AniListTitles,
   CheckMovieStatusResponse,
   CheckSeriesStatusResponse,
   ExtensionOptions,
-  MediaMetadataHint,
+  AniListMediaHint,
   Provider,
-  MediaStatus,
+  AniListMediaStatus,
   RadarrFormState,
   RadarrLookupMovie,
   RadarrMovie,
@@ -46,7 +46,7 @@ import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 export interface UseMediaModalPropsInput {
   anilistId: number | undefined;
   title: string | undefined;
-  metadata: MediaMetadataHint | null | undefined;
+  metadata: AniListMediaHint | null | undefined;
   portalContainer: HTMLElement | ShadowRoot | null;
   isOpen: boolean;
 }
@@ -63,9 +63,9 @@ export interface UseMediaModalPropsResult {
   inLibrary: boolean;
   bannerImage: string | null;
   coverImage: string | null;
-  format: AniFormat | null;
+  format: AniListMediaFormat | null;
   year: number | null;
-  status: MediaStatus | null;
+  status: AniListMediaStatus | null;
 }
 
 const defaultSonarrFormState: SonarrFormState = {
@@ -188,7 +188,7 @@ export function useMediaModalProps(
 
   const canonicalMetadata = metadataHintFromAniListMetadata(metadataBatch.data?.metadata?.[0] ?? null);
   const resolvedMetadata = mergeMetadataHints(canonicalMetadata, metadata ?? null);
-  const format: AniFormat | null = canonicalMetadata?.format ?? apiMedia?.format ?? resolvedMetadata?.format ?? null;
+  const format: AniListMediaFormat | null = canonicalMetadata?.format ?? apiMedia?.format ?? resolvedMetadata?.format ?? null;
   const provider = resolveProviderForAniListFormat(format);
 
   const isSonarrConfigured = options?.providers.sonarr.isConfigured === true;
@@ -232,7 +232,7 @@ export function useMediaModalProps(
   const bannerImage = apiMedia?.bannerImage ?? null;
   const year: number | null =
     apiMedia?.seasonYear ?? apiMedia?.startDate?.year ?? resolvedMetadata?.startYear ?? null;
-  const status: MediaStatus | null = apiMedia?.status ?? null;
+  const status: AniListMediaStatus | null = apiMedia?.status ?? null;
   const preferredTitleLanguage: NonNullable<ExtensionOptions['providers']['sonarr']['providerTitleLanguage']> =
     provider === 'radarr'
       ? (options?.providers.radarr.providerTitleLanguage ?? 'english')
@@ -247,7 +247,7 @@ export function useMediaModalProps(
     return undefined;
   };
 
-  const resolvedTitles: AniTitles = {};
+  const resolvedTitles: AniListTitles = {};
   const english = pickTitle(apiMedia?.title?.english, resolvedMetadata?.titles?.english);
   if (english) resolvedTitles.english = english;
   const romaji = pickTitle(apiMedia?.title?.romaji, resolvedMetadata?.titles?.romaji, title);
