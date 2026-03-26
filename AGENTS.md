@@ -102,6 +102,7 @@ src/
   - transport DTOs in `integrations/`
   - storage-local types in `storage/`
   - only truly cross-cutting types in `shared/types/`
+- Transport-local external API shapes in `integrations/` should prefer a `*Dto` suffix when they represent raw request or response payloads. Do not use GraphQL-specific names like `*Node` as the repo convention unless the upstream term itself is the important concept.
 - Do not recreate identical nested leaf shapes under different owners just to mark a boundary. If the shape and meaning are the same, keep one canonical type.
 - Do not create aliases that just rename an existing type without changing meaning.
 - Split files by responsibility, not line count. Prefer small duplication over abstractions that weaken ownership or increase navigation cost.
