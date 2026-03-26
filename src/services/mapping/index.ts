@@ -1,4 +1,4 @@
-import type { AnilistApiService } from '@/clients/anilist.api';
+import type { AniListMediaService } from '@/core/anilist';
 import type {
   AniListMedia,
   ExtensionError,
@@ -63,7 +63,7 @@ export class MappingService {
   private readonly unresolvedLedger = new UnresolvedLedger();
 
   constructor(
-    private readonly anilistApi: AnilistApiService,
+    private readonly anilistApi: AniListMediaService,
     private readonly upstreamMappingStore: UpstreamMappingStore,
     private readonly lookupClients: ProviderLookupRegistry,
     private readonly overrides?: MappingOverridesService,
