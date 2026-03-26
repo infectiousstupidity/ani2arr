@@ -1,4 +1,6 @@
-// src/shared/hooks/use-settings-actions.ts
+/** Options-page save, connect, disconnect, and reset flows for provider settings. */
+// src/entrypoints/options/hooks/use-settings-actions.ts
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { useFormContext } from 'react-hook-form';
@@ -9,17 +11,14 @@ import {
 } from '@/shared/queries';
 import { useTestProviderConnection } from '@/features/options/use-provider-connection-check';
 import {
-  buildSonarrPermissionPattern,
-  requestSonarrPermission,
-  validateApiKey as validateSonarrApiKey,
-  validateUrl as validateSonarrUrl,
-} from '@/shared/providers/sonarr/validation';
+  validateProviderConnectionApiKey,
+  validateProviderConnectionUrl,
+} from '@/shared/schemas/provider-connection.schema';
 import {
-  buildRadarrPermissionPattern,
-  requestRadarrPermission,
-  validateApiKey as validateRadarrApiKey,
-  validateUrl as validateRadarrUrl,
-} from '@/shared/providers/radarr/validation';
+  getProviderHostPermissionPattern,
+  removeProviderHostPermission,
+  requestProviderHostPermission,
+} from '@/runtime/permissions/provider-host-permissions';
 import { logger } from '@/shared/utils/logger';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import { createDefaultSettings } from '@/shared/schemas/settings';
@@ -80,18 +79,14 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
       ({
         sonarr: {
           label: 'Sonarr',
-          validateUrl: validateSonarrUrl,
-          validateApiKey: validateSonarrApiKey,
-          buildPermissionPattern: buildSonarrPermissionPattern,
-          requestPermission: requestSonarrPermission,
+          buildPermissionPattern: getProviderHostPermissionPattern,
+          requestPermission: requestProviderHostPermission,
           testConnectionState: sonarrTestConnection,
         },
         radarr: {
           label: 'Radarr',
-          validateUrl: validateRadarrUrl,
-          validateApiKey: validateRadarrApiKey,
-          buildPermissionPattern: buildRadarrPermissionPattern,
-          requestPermission: requestRadarrPermission,
+          buildPermissionPattern: getProviderHostPermissionPattern,
+          requestPermission: requestProviderHostPermission,
           testConnectionState: radarrTestConnection,
         },
       }) as const,
@@ -117,14 +112,14 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         throw new Error(`${config.label}: enter both URL and API key, or leave both blank.`);
       }
 
-      const urlValidation = config.validateUrl(rawUrl);
-      const apiKeyValidation = config.validateApiKey(rawApiKey);
+      const urlValidation = validateProviderConnectionUrl(rawUrl);
+      const apiKeyValidation = validateProviderConnectionApiKey(rawApiKey);
 
-      if (!urlValidation.isValid || !apiKeyValidation.isValid) {
+      if (!urlValidation.ok || !apiKeyValidation.ok) {
         throw new Error(`Please enter a valid ${config.label} URL and API key.`);
       }
 
-      const normalizedUrl = urlValidation.normalizedUrl ?? rawUrl;
+      const normalizedUrl = urlValidation.value;
       const permissionPatternResult = config.buildPermissionPattern(normalizedUrl);
       if (!permissionPatternResult.ok) {
         logger.error(
@@ -216,13 +211,14 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
           preparedPrevious.permissionPattern &&
           preparedPrevious.permissionPattern !== preparedCurrent.permissionPattern
         ) {
-          try {
-            await browser.permissions.remove({ origins: [preparedPrevious.permissionPattern] });
-          } catch (error) {
+          const removal = await removeProviderHostPermission(preparedPrevious.url);
+          if (!removal.ok) {
             logger.warn(
               `Failed to remove previous ${config.label} host permission after provider save.`,
-              error,
+              removal.error,
             );
+          } else if (!removal.value.removed) {
+            logger.warn(`Previous ${config.label} host permission removal was rejected after provider save.`);
           }
         }
 
@@ -307,13 +303,14 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         });
 
         if (previousPermissionPattern) {
-          try {
-            await browser.permissions.remove({ origins: [previousPermissionPattern] });
-          } catch (error) {
+          const removal = await removeProviderHostPermission(previousUrl);
+          if (!removal.ok) {
             logger.warn(
               `Failed to remove ${config.label} host permission during disconnect.`,
-              error,
+              removal.error,
             );
+          } else if (!removal.value.removed) {
+            logger.warn(`${config.label} host permission removal was rejected during disconnect.`);
           }
         }
 
@@ -415,6 +412,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
           provider,
           label: config.label,
           current,
+          previousUrl,
           credentialsChanged: current.url !== previousUrl || current.apiKey !== previousApiKey,
           hostChanged: current.permissionPattern !== previousPermissionPattern,
           previousPermissionPattern,
@@ -423,7 +421,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         };
       });
 
-      const grantedPermissions: Array<{ provider: ProviderKey; pattern: string }> = [];
+      const grantedPermissions: Array<{ provider: ProviderKey; url: string }> = [];
       let stage: 'permission' | 'test' | 'save' | 'cleanup' | null = null;
 
       try {
@@ -437,11 +435,15 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
 
           stage = 'permission';
           const permission = await state.requestPermission(state.current.url);
-          if (!permission.granted) {
+          if (!permission.ok) {
+            setSaveError(permission.error);
+            return false;
+          }
+          if (!permission.value.granted) {
             setSaveError(`${state.label} host permission was not granted.`);
             return false;
           }
-          grantedPermissions.push({ provider: state.provider, pattern: state.current.permissionPattern });
+          grantedPermissions.push({ provider: state.provider, url: state.current.url });
         }
 
         for (const state of providerStates) {
@@ -469,25 +471,23 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
           }
 
           stage = 'cleanup';
-          try {
-            const removed = await browser.permissions.remove({ origins: [state.previousPermissionPattern] });
-            if (!removed) {
-              throw new Error('Permission removal rejected without throwing.');
-            }
-          } catch (error) {
-            logger.error(`Error removing host permission for previous ${state.label} URL.`, error);
+          const removal = await removeProviderHostPermission(state.previousUrl);
+          if (!removal.ok || !removal.value.removed) {
+            logger.error(
+              `Error removing host permission for previous ${state.label} URL.`,
+              removal.ok ? 'Permission removal rejected without throwing.' : removal.error,
+            );
             setSaveError(`Failed to update ${state.label} host permissions. Please try again.`);
 
             await saveOptions.mutateAsync(previousSettings as ExtensionOptions);
             methods.reset(previousSettings as SettingsFormValues);
 
             for (const granted of grantedPermissions) {
-              try {
-                await browser.permissions.remove({ origins: [granted.pattern] });
-              } catch (rollbackError) {
+              const rollback = await removeProviderHostPermission(granted.url);
+              if (!rollback.ok) {
                 logger.warn(
                   `Failed to roll back ${granted.provider} host permission after removal failure.`,
-                  rollbackError,
+                  rollback.error,
                 );
               }
             }
@@ -510,12 +510,11 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         }
 
         for (const granted of grantedPermissions) {
-          try {
-            await browser.permissions.remove({ origins: [granted.pattern] });
-          } catch (rollbackError) {
+          const rollback = await removeProviderHostPermission(granted.url);
+          if (!rollback.ok) {
             logger.warn(
               `Failed to roll back ${granted.provider} host permission after save error.`,
-              rollbackError,
+              rollback.error,
             );
           }
         }

@@ -2,9 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRadarrMetadata, queryKeys } from '@/shared/queries';
+import {
+  validateProviderConnectionApiKey,
+  validateProviderConnectionUrl,
+} from '@/shared/schemas/provider-connection.schema';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
-import { requestRadarrPermission, validateApiKey, validateUrl } from '@/shared/providers/radarr/validation';
+import { requestProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
 import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
@@ -58,14 +62,14 @@ function RadarrSettingsFormInner({
 
   const credentialValidation = useMemo(
     () => ({
-      url: validateUrl(String(radarrUrl)),
-      apiKey: validateApiKey(String(radarrApiKey)),
+      url: validateProviderConnectionUrl(String(radarrUrl)),
+      apiKey: validateProviderConnectionApiKey(String(radarrApiKey)),
     }),
     [radarrApiKey, radarrUrl],
   );
 
-  const hasValidCredentials = credentialValidation.url.isValid && credentialValidation.apiKey.isValid;
-  const normalizedUrl = credentialValidation.url.normalizedUrl ?? String(radarrUrl).trim();
+  const hasValidCredentials = credentialValidation.url.ok && credentialValidation.apiKey.ok;
+  const normalizedUrl = credentialValidation.url.ok ? credentialValidation.url.value : String(radarrUrl).trim();
 
   const formCredentials = useMemo(
     () =>
@@ -198,8 +202,12 @@ function RadarrSettingsFormInner({
       return false;
     }
 
-    const permission = await requestRadarrPermission(formCredentials.url);
-    if (!permission.granted) {
+    const permission = await requestProviderHostPermission(formCredentials.url);
+    if (!permission.ok) {
+      logger.warn('Radarr permission request failed, aborting connection test.', permission.error);
+      return false;
+    }
+    if (!permission.value.granted) {
       logger.warn('Radarr permission denied, aborting connection test.');
       return false;
     }

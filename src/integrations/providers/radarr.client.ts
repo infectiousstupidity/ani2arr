@@ -1,7 +1,9 @@
+/** Radarr transport client for raw Arr API requests and mutations. */
+// src/integrations/providers/radarr.client.ts
+
 import { BaseProviderClient } from '@/integrations/providers/base-provider.client';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { createError, ErrorCode } from '@/shared/errors/error-utils';
-import { hasRadarrPermission } from '@/shared/providers/radarr/validation';
 import type {
   RadarrLookupMovie,
   RadarrMinimumAvailability,
@@ -11,6 +13,10 @@ import type {
   RadarrTag,
 } from '@/shared/types';
 import type { ProviderCredentials } from '@/shared/types/options';
+
+type RadarrClientOptions = {
+  hasUrlPermission: (url: string) => Promise<boolean>;
+};
 
 export interface RadarrSystemStatus {
   version: string;
@@ -49,12 +55,12 @@ export interface AddRadarrMoviePayload {
 }
 
 export class RadarrClient extends BaseProviderClient {
-  public constructor() {
+  public constructor(options: RadarrClientOptions) {
     super({
       providerName: 'Radarr',
       logScope: 'RadarrClient',
       cacheableEndpoints: ['movie', 'qualityprofile', 'rootfolder', 'tag'],
-      hasUrlPermission: hasRadarrPermission,
+      hasUrlPermission: options.hasUrlPermission,
     });
   }
 

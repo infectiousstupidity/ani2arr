@@ -9,10 +9,10 @@ import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-a
 import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
 import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
 import {
-  requestSonarrPermission,
-  validateApiKey,
-  validateUrl,
-} from '@/shared/providers/sonarr/validation';
+  validateProviderConnectionApiKey,
+  validateProviderConnectionUrl,
+} from '@/shared/schemas/provider-connection.schema';
+import { requestProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
 import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 
@@ -72,17 +72,17 @@ function SettingsFormInner({
   // --- Credential Validation ---
   const credentialValidation = useMemo(
     () => ({
-      url: validateUrl(String(sonarrUrl)),
-      apiKey: validateApiKey(String(sonarrApiKey)),
+      url: validateProviderConnectionUrl(String(sonarrUrl)),
+      apiKey: validateProviderConnectionApiKey(String(sonarrApiKey)),
     }),
     [sonarrApiKey, sonarrUrl],
   );
 
   const hasValidCredentials =
-    credentialValidation.url.isValid && credentialValidation.apiKey.isValid;
+    credentialValidation.url.ok && credentialValidation.apiKey.ok;
 
   const normalizedUrl =
-    credentialValidation.url.normalizedUrl ?? String(sonarrUrl).trim();
+    credentialValidation.url.ok ? credentialValidation.url.value : String(sonarrUrl).trim();
 
   const formCredentials = useMemo(
     () =>
@@ -226,8 +226,12 @@ function SettingsFormInner({
       return false;
     }
 
-    const permission = await requestSonarrPermission(formCredentials.url);
-    if (!permission.granted) {
+    const permission = await requestProviderHostPermission(formCredentials.url);
+    if (!permission.ok) {
+      logger.warn('Permission request failed, aborting connection test.', permission.error);
+      return false;
+    }
+    if (!permission.value.granted) {
       logger.warn('Permission denied, aborting connection test.');
       return false;
     }

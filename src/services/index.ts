@@ -11,6 +11,7 @@ import {
 } from '@/storage';
 import { SonarrClient } from '@/integrations/providers/sonarr.client';
 import { RadarrClient } from '@/integrations/providers/radarr.client';
+import { hasProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
 import { AnilistApiService } from '@/clients/anilist.api';
 import { MappingService } from './mapping';
 import { MappingOverridesService } from './mapping/overrides';
@@ -62,8 +63,20 @@ function bindAll<T extends object>(instance: T): T {
 }
 
 export const createApiImplementation = (): Ani2arrApi => {
-  const sonarrClient = bindAll(new SonarrClient());
-  const radarrClient = bindAll(new RadarrClient());
+  const createHasUrlPermission =
+    (provider: LibraryProvider) =>
+    async (url: string): Promise<boolean> => {
+      const result = await hasProviderHostPermission(url);
+      if (!result.ok) {
+        logError(normalizeError(result.error), `Ani2arrApi:${provider}:hasUrlPermission`);
+        return false;
+      }
+
+      return result.value;
+    };
+
+  const sonarrClient = bindAll(new SonarrClient({ hasUrlPermission: createHasUrlPermission('sonarr') }));
+  const radarrClient = bindAll(new RadarrClient({ hasUrlPermission: createHasUrlPermission('radarr') }));
 
   const anilistApiService = bindAll(
     new AnilistApiService({
