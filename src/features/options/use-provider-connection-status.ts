@@ -7,12 +7,7 @@
 
 // src/features/options/use-provider-connection-status.ts
 import { useEffect, useRef, useState } from 'react';
-
-export type ProviderConnectionStatus =
-  | 'connected'
-  | 'configured'
-  | 'connecting'
-  | 'not-configured';
+import type { ProviderConnectionStatus } from '@/features/options/provider-connection-status';
 
 export interface UseProviderConnectionStatusInput {
   hasConfiguredCredentials: boolean;

@@ -19,13 +19,14 @@ import { useExtensionOptions } from '@/shared/queries';
 import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
 import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
 import {
-  getProviderConnectionStatusAppearance,
+  getProviderConnectionStatusMeta,
   type ProviderConnectionStatus,
-} from '@/shared/providers/common/connection-status';
+} from '@/features/options/provider-connection-status';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import { useSettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
+import { cn } from '@/shared/utils/cn';
 import {
   AdvancedIcon,
   MappingsIcon,
@@ -156,8 +157,8 @@ const NavItem: React.FC<{
   onSelect: (id: SectionId) => void;
 }> = ({ section, active, status, onSelect }) => {
   const Icon = section.icon;
-  const statusAppearance = status ? getProviderConnectionStatusAppearance(status) : null;
-  const showStatusDot = Boolean(statusAppearance);
+  const statusMeta = status ? getProviderConnectionStatusMeta(status) : null;
+  const showStatusDot = Boolean(statusMeta);
 
   return (
   <button
@@ -172,7 +173,13 @@ const NavItem: React.FC<{
       </span>
       <span>{section.label}</span>
       {showStatusDot ? (
-        <span className={`a2a-nav-item__status-dot ${statusAppearance?.dotClassName}`} aria-hidden />
+        <span
+          className={cn(
+            'a2a-provider-status a2a-provider-status-dot a2a-nav-item__status-dot',
+            statusMeta?.variantClassName,
+          )}
+          aria-hidden
+        />
       ) : null}
     </span>
     {active ? <span className="a2a-nav-item__dot" aria-hidden /> : null}

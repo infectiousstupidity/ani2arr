@@ -347,6 +347,7 @@ Put here:
 * logging helpers
 * metrics helpers
 * generic path helpers only if truly cross-cutting
+* the canonical `cn` class-composition helper at `src/shared/utils/cn.ts`
 
 Do not put here:
 
@@ -681,6 +682,7 @@ If two locations seem valid, prefer the one with the stronger owner.
 * splitting files just to reduce line count
 * creating one-file folders without a real subsystem
 * inventing vague names instead of naming the real thing
+* composing conditional class-name strings directly when the canonical `cn` helper applies
 
 ---
 
