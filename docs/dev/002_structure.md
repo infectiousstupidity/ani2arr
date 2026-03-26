@@ -485,6 +485,10 @@ Prefer:
 * storage-specific types in `storage/`
 * only truly cross-cutting types in `shared/types/`
 
+Transport-local external request and response shapes in `integrations/` should prefer a `*Dto` suffix when the type is a raw boundary payload.
+Do not use `*Node` as the default naming convention for transport types just because the source API is GraphQL.
+Use the upstream term only when that term itself is important to the meaning.
+
 ### Keep one canonical shape when the meaning is identical
 
 Do not recreate an identical leaf shape in multiple owners just to mark a boundary.
