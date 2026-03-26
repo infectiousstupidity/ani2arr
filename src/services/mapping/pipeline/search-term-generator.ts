@@ -1,4 +1,4 @@
-import type { AniTitles, MappingProvider } from '@/shared/types';
+import type { AniListTitles, MappingProvider } from '@/shared/types';
 import {
   canonicalTitleKeyForProvider,
   isOrdinalToken,
@@ -28,7 +28,7 @@ export function isSeasonalCanonicalTokens(tokens: string[]): boolean {
 
 export function generateSearchTerms(
   provider: MappingProvider,
-  titles: AniTitles,
+  titles: AniListTitles,
   synonyms: string[] | undefined,
 ): SearchTerm[] {
   const seen = new Set<string>();

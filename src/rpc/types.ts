@@ -1,15 +1,27 @@
-import type { MediaMetadataHint } from '@/shared/types/anilist';
+/** Plain RPC payload and response types that do not need runtime schemas. */
+// src/rpc/types.ts
+
+import type { AniListMetadata, AniListMediaHint, AniListMediaStatus, AniListMediaFormat, AniListTitles } from '@/shared/types/anilist';
 import type {
   LeanRadarrMovie,
   LeanSonarrSeries,
   RadarrLookupMovie,
+  RadarrQualityProfile,
+  RadarrRootFolder,
+  RadarrTag,
   RadarrMovie,
   SonarrLookupSeries,
+  SonarrRootFolder,
+  SonarrQualityProfile,
   SonarrSeries,
+  SonarrTag,
 } from '@/shared/types/providers';
+import type { AniListSchedulerDebugSnapshot } from '@/debug/anilist-debug.types';
 import type { MappingExternalId } from '@/shared/types/mapping';
 import type { ProviderCredentials } from '@/shared/types/options';
 import type { SonarrFormState } from '@/shared/providers/sonarr/types';
+import type { MappingSummary } from '@/shared/types';
+import type { MappingCursor } from './schemas';
 
 /**
  * Payload used when adding a series.
@@ -19,13 +31,13 @@ export interface AddRequestPayload extends Partial<SonarrFormState> {
   title: string;
   anilistId: number;
   tvdbId?: number;
-  metadata?: MediaMetadataHint | null;
+  metadata?: AniListMediaHint | null;
 }
 
 export interface CheckSeriesStatusPayload {
   anilistId: number;
   title?: string;
-  metadata?: MediaMetadataHint | null;
+  metadata?: AniListMediaHint | null;
 }
 
 export interface CheckSeriesStatusResponse {
@@ -44,7 +56,7 @@ export interface CheckSeriesStatusResponse {
 export interface CheckMovieStatusPayload {
   anilistId: number;
   title?: string;
-  metadata?: MediaMetadataHint | null;
+  metadata?: AniListMediaHint | null;
 }
 
 export interface CheckMovieStatusResponse {
@@ -61,3 +73,132 @@ export interface CheckMovieStatusResponse {
 }
 
 export type TestConnectionPayload = ProviderCredentials;
+
+export interface MappingOutput {
+  tvdbId: number | null;
+  successfulSynonym?: string;
+}
+
+export type StatusOutput = CheckSeriesStatusResponse;
+export type MovieStatusOutput = CheckMovieStatusResponse;
+
+export interface MappingOverrideItem {
+  anilistId: number;
+  provider: 'sonarr' | 'radarr';
+  externalId: {
+    id: number;
+    kind: 'tvdb' | 'tmdb';
+  };
+  updatedAt: number;
+}
+
+export interface MappingIgnoreItem {
+  anilistId: number;
+  provider: 'sonarr' | 'radarr';
+  updatedAt: number;
+}
+
+export interface MappingRejectedCandidateItem {
+  anilistId: number;
+  provider: 'sonarr' | 'radarr';
+  externalId: {
+    id: number;
+    kind: 'tvdb' | 'tmdb';
+  };
+  updatedAt: number;
+}
+
+export interface MappingBlockedCandidateItem {
+  anilistId: number;
+  provider: 'sonarr' | 'radarr';
+  externalId: {
+    id: number;
+    kind: 'tvdb' | 'tmdb';
+  };
+  updatedAt: number;
+}
+
+export interface ExportStoredMappingsOutput {
+  version: 2;
+  exportedAt: string;
+  summary: {
+    overrideCount: number;
+    ignoreCount: number;
+    rejectedCandidateCount: number;
+    blockedCandidateCount: number;
+  };
+  mappings: {
+    overrides: Record<string, MappingOverrideItem>;
+    ignores: Record<string, MappingIgnoreItem>;
+    rejectedCandidates: Record<string, MappingRejectedCandidateItem>;
+    blockedCandidates: Record<string, MappingBlockedCandidateItem>;
+  };
+}
+
+export interface GetMappingsOutput {
+  mappings: MappingSummary[];
+  nextCursor?: MappingCursor | null;
+  total?: number;
+}
+
+export interface SonarrLookupOutput {
+  results: SonarrLookupSeries[];
+  libraryTvdbIds: number[];
+  linkedAniListIdsByTvdbId?: Record<number, number[]>;
+  statsMap?: Record<
+    number,
+    {
+      seasonCount?: number;
+      episodeCount?: number;
+      episodeFileCount?: number;
+      totalEpisodeCount?: number;
+      sizeOnDisk?: number;
+      percentOfEpisodes?: number;
+    }
+  >;
+}
+
+export interface ValidateTvdbOutput {
+  inLibrary: boolean;
+  inCatalog: boolean;
+}
+
+export interface RadarrLookupOutput {
+  results: RadarrLookupMovie[];
+  libraryTmdbIds: number[];
+  linkedAniListIdsByTmdbId?: Record<number, number[]>;
+}
+
+export interface ValidateTmdbOutput {
+  inLibrary: boolean;
+  inCatalog: boolean;
+}
+
+export interface GetRadarrMetadataOutput {
+  qualityProfiles: RadarrQualityProfile[];
+  rootFolders: RadarrRootFolder[];
+  tags: RadarrTag[];
+}
+
+export type AddRadarrOutput = RadarrMovie;
+export type UpdateRadarrOutput = RadarrMovie;
+
+export interface GetAniListMetadataOutput {
+  metadata: AniListMetadata[];
+  missingIds?: number[];
+}
+
+export interface AniListSearchResult {
+  id: number;
+  title: AniListTitles;
+  coverImage?: AniListMetadata['coverImage'] | null;
+  format?: AniListMediaFormat | null;
+  status?: AniListMediaStatus | null;
+}
+
+export type GetAniListSchedulerDebugOutput = AniListSchedulerDebugSnapshot;
+export type SonarrMetadataOutput = {
+  qualityProfiles: SonarrQualityProfile[];
+  rootFolders: SonarrRootFolder[];
+  tags: SonarrTag[];
+};

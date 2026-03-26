@@ -1,3 +1,6 @@
+/** Dialog for adding AniList entries that are missing from the mappings table. */
+// src/entrypoints/options/components/mappings-section/components/add-missing-entry-dialog.tsx
+
 import React, { useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useQuery } from '@tanstack/react-query';
@@ -7,13 +10,14 @@ import { InputField } from '@/shared/ui/form/form';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { getAni2arrApi } from '@/rpc';
+import type { AniListSearchResult } from '@/rpc/types';
 import { useAniListMedia } from '@/shared/queries';
-import type { AniFormat, AniListSearchResult } from '@/shared/types';
+import type { AniListMediaFormat } from '@/shared/types';
 
 type AddMissingEntryDialogProps = {
   open: boolean;
   onClose: () => void;
-  onSelect: (anilistId: number, format: AniFormat | null | undefined) => void;
+  onSelect: (anilistId: number, format: AniListMediaFormat | null | undefined) => void;
 };
 
 const parseAniListIdInput = (input: string): number | null => {

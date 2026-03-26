@@ -1,10 +1,12 @@
+/** Background RPC handler implementations that adapt the API contract to domain services. */
+// src/rpc/handlers/handlers.ts
+
 import type { Ani2arrApi } from '@/rpc';
 import type {
+  AniListSearchResult,
   MappingOutput,
-  TestProviderConnectionInput,
-  UpdateRadarrInput,
-  UpdateSonarrInput,
-} from '@/rpc/schemas';
+} from '@/rpc/types';
+import type { TestProviderConnectionInput, UpdateRadarrInput, UpdateSonarrInput } from '@/rpc/schemas';
 import type { AnilistApiService } from '@/clients/anilist.api';
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
@@ -15,7 +17,7 @@ import type { RadarrLibrary } from '@/services/library/radarr';
 import type { AniListMetadataStore } from '@/services/anilist';
 import type { UpstreamMappingStore } from '@/services/mapping/upstream';
 import type {
-  AniMedia,
+  AniListMedia,
   ExtensionOptions,
   LeanSonarrSeries,
   RequestPriority,
@@ -443,7 +445,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         priority: 'low',
         source: 'browse-prefetch',
       });
-      return Array.from(map.entries()) as Array<[number, AniMedia]>;
+      return Array.from(map.entries()) as Array<[number, AniListMedia]>;
     },
 
     async fetchAniListMedia(anilistId) {
@@ -460,7 +462,14 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     async searchAniList(input) {
       try {
         const request = typeof input.limit === 'number' ? { limit: input.limit } : {};
-        return await anilistApiService.searchMedia(input.search, request);
+        const results = await anilistApiService.searchMedia(input.search, request);
+        return results.map((result): AniListSearchResult => ({
+          id: result.id,
+          title: result.title ?? {},
+          coverImage: result.coverImage ?? null,
+          format: result.format ?? null,
+          status: result.status ?? null,
+        }));
       } catch (error) {
         throw normalizeError(error);
       }

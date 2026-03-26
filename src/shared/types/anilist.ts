@@ -1,6 +1,7 @@
+/** Canonical cross-cutting AniList media, metadata, and hint types shared across app boundaries. */
 // src/shared/types/anilist.ts
 
-export type AniFormat =
+export type AniListMediaFormat =
   | 'TV'
   | 'TV_SHORT'
   | 'MOVIE'
@@ -12,34 +13,34 @@ export type AniFormat =
   | 'NOVEL'
   | 'ONE_SHOT';
 
-export type MediaStatus =
+export type AniListMediaStatus =
   | 'FINISHED'
   | 'RELEASING'
   | 'NOT_YET_RELEASED'
   | 'CANCELLED'
   | 'HIATUS';
 
-export type MediaSeason = 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL';
+export type AniListMediaSeason = 'WINTER' | 'SPRING' | 'SUMMER' | 'FALL';
 
-export interface AniTitles {
+export interface AniListTitles {
   romaji?: string | undefined;
   english?: string | undefined;
   native?: string | undefined;
 }
 
-export interface MediaMetadataHint {
-  titles?: AniTitles | null | undefined;
+export interface AniListMediaHint {
+  titles?: AniListTitles | null | undefined;
   synonyms?: string[] | null | undefined;
   startYear?: number | null | undefined;
-  format?: AniFormat | null | undefined;
+  format?: AniListMediaFormat | null | undefined;
   relationPrequelIds?: number[] | null | undefined;
   coverImage?: string | null | undefined;
 }
 
-export type AniMedia = {
+export type AniListMedia = {
   id: number;
-  format: AniFormat | null;
-  title: AniTitles;
+  format: AniListMediaFormat | null;
+  title: AniListTitles;
   startDate?: { year?: number | null };
   synonyms: string[];
   relations?: {
@@ -60,8 +61,8 @@ export type AniMedia = {
 
   // Metadata Context
   description?: string | null;
-  status?: MediaStatus | null;
-  season?: MediaSeason | null;
+  status?: AniListMediaStatus | null;
+  season?: AniListMediaSeason | null;
   seasonYear?: number | null;
   episodes?: number | null;
   duration?: number | null;
@@ -79,21 +80,21 @@ export type AniMedia = {
   } | null;
 };
 
-export interface AniListMetadataImage {
+export interface AniListMetadataCoverImage {
   medium?: string | null;
   large?: string | null;
 }
 
 export interface AniListMetadata {
   id: number;
-  titles: AniTitles;
+  titles: AniListTitles;
   seasonYear?: number | null;
-  format?: AniFormat | null;
-  coverImage?: AniListMetadataImage | null;
+  format?: AniListMediaFormat | null;
+  coverImage?: AniListMetadataCoverImage | null;
   updatedAt: number;
 }
 
-export interface AniListMetadataChunk {
+export interface AniListMetadataChunkRef {
   file: string;
   count: number;
 }
@@ -101,16 +102,5 @@ export interface AniListMetadataChunk {
 export interface AniListMetadataBundle {
   generatedAt: number;
   entries?: AniListMetadata[];
-  chunks?: AniListMetadataChunk[];
-}
-
-export interface AniListSearchResult {
-  id: number;
-  title: AniTitles;
-  coverImage?: {
-    large?: string | null;
-    medium?: string | null;
-  } | null;
-  format?: AniFormat | null;
-  status?: MediaStatus | null;
+  chunks?: AniListMetadataChunkRef[];
 }

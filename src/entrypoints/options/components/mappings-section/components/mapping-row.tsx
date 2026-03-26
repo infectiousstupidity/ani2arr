@@ -3,12 +3,12 @@ import * as Accordion from '@radix-ui/react-accordion';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Ban, ChevronDown, MoreHorizontal, Pencil, Trash2, Undo2 } from 'lucide-react';
 import type {
+  AniListMetadata,
   MappingExternalId,
   MappingProvider,
   MappingSource,
   MappingSummary,
 } from '@/shared/types';
-import type { AniListMetadataDto } from '@/rpc/schemas';
 import { useAniListMetadataBatch, useMovieStatus, useSeriesStatus } from '@/shared/queries';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
@@ -21,7 +21,7 @@ import { getLibrarySlug, type FolderSlugSource } from '@/services/helpers/path-u
 export type MappingTableEntry = {
   entry: MappingSummary;
   title: string;
-  metadata?: AniListMetadataDto | null | undefined;
+  metadata?: AniListMetadata | null | undefined;
 };
 
 export type MappingTableRowData = {
@@ -76,7 +76,7 @@ const getExternalLink = (provider: MappingProvider, externalId: MappingExternalI
 const MetaSeparator: React.FC = () => <span className="text-text-tertiary/70">·</span>;
 
 const resolveAniListTitle = (
-  metadata: AniListMetadataDto | null | undefined,
+  metadata: AniListMetadata | null | undefined,
   fallback?: string | null,
 ): string => {
   return (
@@ -91,7 +91,7 @@ const resolveAniListTitle = (
 type MappingEntryRowProps = {
   entry: MappingSummary;
   title: string;
-  metadata?: AniListMetadataDto | null | undefined;
+  metadata?: AniListMetadata | null | undefined;
   isMutating: boolean;
   onEdit: (entry: MappingSummary) => void;
   onDeleteOverride: (entry: MappingSummary) => void;
@@ -525,7 +525,7 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
   );
 
   const providedMetadata = useMemo(() => {
-    const map = new Map<number, AniListMetadataDto>();
+    const map = new Map<number, AniListMetadata>();
     for (const { entry, metadata } of row.entries) {
       if (metadata) {
         map.set(entry.anilistId, metadata);
@@ -544,7 +544,7 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
   });
 
   const metadataMap = useMemo(() => {
-    const map = new Map<number, AniListMetadataDto>(providedMetadata);
+    const map = new Map<number, AniListMetadata>(providedMetadata);
     for (const entry of fetchedMetadata.data?.metadata ?? []) {
       map.set(entry.id, entry);
     }

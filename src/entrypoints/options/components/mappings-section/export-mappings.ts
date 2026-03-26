@@ -1,6 +1,6 @@
 import { getAni2arrApi } from '@/rpc';
-import type { AniListMetadataDto, GetMappingsInput, MappingCursor } from '@/rpc/schemas';
-import type { MappingExternalId, MappingProvider, MappingSource, MappingSummary } from '@/shared/types';
+import type { GetMappingsInput, MappingCursor } from '@/rpc/schemas';
+import type { AniListMetadata, MappingExternalId, MappingProvider, MappingSource, MappingSummary } from '@/shared/types';
 import type { LibraryFilter } from './components/mapping-toolbar';
 import { normalizeMappingSearchQuery } from './search-query';
 
@@ -35,7 +35,7 @@ export type ExportMappingsPayload = {
       };
       entries: Array<{
         title: string;
-        metadata?: AniListMetadataDto | null;
+        metadata?: AniListMetadata | null;
         entry: {
           anilistId: number;
           provider: MappingProvider;
@@ -61,7 +61,7 @@ export type ExportMappingsPayload = {
 type EntryRow = {
   entry: MappingSummary;
   title: string;
-  metadata?: AniListMetadataDto | null;
+  metadata?: AniListMetadata | null;
 };
 
 type ExportRow = ExportMappingsPayload['mappings']['rows'][number];
@@ -70,7 +70,7 @@ const METADATA_BATCH_SIZE = 100;
 const EXPORT_PAGE_SIZE = 2000;
 const FALLBACK_SOURCES: MappingSource[] = ['manual', 'rejected', 'blocked', 'ignored', 'unresolved', 'auto', 'upstream'];
 
-const resolveTitle = (entry: MappingSummary, metadata?: AniListMetadataDto | null): string =>
+const resolveTitle = (entry: MappingSummary, metadata?: AniListMetadata | null): string =>
   metadata?.titles?.english ||
   metadata?.titles?.romaji ||
   metadata?.titles?.native ||
@@ -113,7 +113,7 @@ const fetchAllMappings = async (filters: ExportMappingsFilters): Promise<Mapping
   return allMappings;
 };
 
-const fetchMetadataMap = async (mappings: readonly MappingSummary[]): Promise<Map<number, AniListMetadataDto>> => {
+const fetchMetadataMap = async (mappings: readonly MappingSummary[]): Promise<Map<number, AniListMetadata>> => {
   const ids = Array.from(
     new Set(
       mappings
@@ -122,7 +122,7 @@ const fetchMetadataMap = async (mappings: readonly MappingSummary[]): Promise<Ma
     ),
   );
 
-  const metadataMap = new Map<number, AniListMetadataDto>();
+  const metadataMap = new Map<number, AniListMetadata>();
   if (ids.length === 0) {
     return metadataMap;
   }

@@ -1,4 +1,4 @@
-import type { MappingExternalId, MediaMetadataHint, RequestPriority } from '@/shared/types';
+import type { MappingExternalId, AniListMediaHint, RequestPriority } from '@/shared/types';
 
 export interface ResolvedMapping {
   externalId: MappingExternalId;
@@ -7,7 +7,7 @@ export interface ResolvedMapping {
 
 export type ResolveHints = {
   primaryTitle?: string;
-  domMedia?: MediaMetadataHint | null;
+  domMedia?: AniListMediaHint | null;
 };
 
 export type ResolveExternalIdOptions = {

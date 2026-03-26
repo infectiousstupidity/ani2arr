@@ -1,6 +1,10 @@
+/** Executes AniList GraphQL requests and adapts transport DTOs into app-facing results. */
+// src/clients/anilist/executor.ts
+
 import { withRetry, AbortError } from '@/shared/utils/retry';
 import { createError, ErrorCode } from '@/shared/errors/error-utils';
-import type { AniListSearchResult, AniMedia } from '@/shared/types';
+import type { AniListMedia } from '@/shared/types';
+import type { AniListResponseMeta, AniListSearchMediaDto } from '@/integrations/anilist/types';
 import {
   AniListAbortError,
   isAniListAbortError,
@@ -12,7 +16,7 @@ import {
   FIND_MEDIA_BATCH_QUERY,
   SEARCH_MEDIA_QUERY,
 } from './queries';
-import type { AniListRateLimiter, AniListRequestMeta } from './rate-limit';
+import type { AniListRateLimiter } from './rate-limit';
 import type {
   ExtensionErrorLike,
   FindMediaBatchResponse,
@@ -30,8 +34,8 @@ export class AniListExecutor {
     this.limiter = deps.limiter;
   }
 
-  public fetchBatch(ids: number[]): Promise<AniMedia[]> {
-    return this.executeGraphql<FindMediaBatchResponse, AniMedia[]>(
+  public fetchBatch(ids: number[]): Promise<AniListMedia[]> {
+    return this.executeGraphql<FindMediaBatchResponse, AniListMedia[]>(
       () => postAniList({ query: FIND_MEDIA_BATCH_QUERY, variables: { ids } }),
       payload => {
         if (payload?.errors?.length) {
@@ -44,14 +48,14 @@ export class AniListExecutor {
           throw new AniListAbortError(extensionError);
         }
         const media = payload?.data?.Page?.media ?? [];
-        return media.filter((m): m is AniMedia => Boolean(m && typeof m.id === 'number'));
+        return media.filter((m): m is AniListMedia => Boolean(m && typeof m.id === 'number'));
       },
       'AniList request failed.',
     );
   }
 
-  public search(search: string, limit: number): Promise<AniListSearchResult[]> {
-    return this.executeGraphql<SearchMediaResponse, AniListSearchResult[]>(
+  public search(search: string, limit: number): Promise<AniListSearchMediaDto[]> {
+    return this.executeGraphql<SearchMediaResponse, AniListSearchMediaDto[]>(
       () => postAniList({ query: SEARCH_MEDIA_QUERY, variables: { search, perPage: limit } }),
       payload => {
         if (payload?.errors?.length) {
@@ -66,7 +70,7 @@ export class AniListExecutor {
 
         const results = payload?.data?.Page?.media ?? [];
         return results
-          .filter((item): item is AniListSearchResult => typeof item?.id === 'number' && Number.isFinite(item.id))
+          .filter((item): item is AniListSearchMediaDto => typeof item?.id === 'number' && Number.isFinite(item.id))
           .map(item => ({
             id: item.id,
             title: item.title ?? {},
@@ -80,8 +84,8 @@ export class AniListExecutor {
   }
 
   private async executeGraphql<TPayload, TResult>(
-    task: () => Promise<{ payload: TPayload; meta: AniListRequestMeta }>,
-    parse: (payload: TPayload, meta: AniListRequestMeta) => TResult,
+    task: () => Promise<{ payload: TPayload; meta: AniListResponseMeta }>,
+    parse: (payload: TPayload, meta: AniListResponseMeta) => TResult,
     fallbackMessage: string,
   ): Promise<TResult> {
     try {
@@ -93,8 +97,8 @@ export class AniListExecutor {
   }
 
   private requestWithRetry<TPayload>(
-    task: () => Promise<{ payload: TPayload; meta: AniListRequestMeta }>,
-  ): Promise<{ payload: TPayload; meta: AniListRequestMeta }> {
+    task: () => Promise<{ payload: TPayload; meta: AniListResponseMeta }>,
+  ): Promise<{ payload: TPayload; meta: AniListResponseMeta }> {
     return withRetry(async () => {
       const response = await task();
       this.limiter.updateFromSuccess(response.meta);

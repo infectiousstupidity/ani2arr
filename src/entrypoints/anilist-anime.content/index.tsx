@@ -15,10 +15,10 @@ import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/an
 import { getLibrarySlug, type FolderSlugSource } from '@/services/helpers/path-utils';
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import type {
-  AniFormat,
+  AniListMediaFormat,
   CheckMovieStatusResponse,
   CheckSeriesStatusResponse,
-  MediaMetadataHint,
+  AniListMediaHint,
   RadarrFormState,
   SonarrFormState,
 } from '@/shared/types';
@@ -178,7 +178,7 @@ function attachSizeSync(host: HTMLElement): () => void {
   };
 }
 
-function readFormatFromSidebar(doc: Document = document): AniFormat | null {
+function readFormatFromSidebar(doc: Document = document): AniListMediaFormat | null {
   const rows = Array.from(doc.querySelectorAll<HTMLDivElement>('.sidebar .data .data-set'));
   const formatRow = rows.find(r => r.querySelector('.type')?.textContent?.trim() === 'Format');
   const raw = formatRow?.querySelector('.value')?.textContent ?? '';
@@ -203,7 +203,7 @@ function shouldSkipByFormat(doc: Document = document): boolean {
 interface ContentRootProps {
   anilistId: number;
   title: string;
-  metadata: MediaMetadataHint | null;
+  metadata: AniListMediaHint | null;
 }
 
 export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, metadata }) => {
@@ -459,7 +459,7 @@ async function mountAnimePageUI(
 
   const domMetadata = extractMediaMetadataFromDom(anilistId);
   const sidebarFormat = readFormatFromSidebar(document);
-  const fallbackMetadata: MediaMetadataHint | null = title
+  const fallbackMetadata: AniListMediaHint | null = title
     ? {
         titles: { romaji: title },
         synonyms: [title],

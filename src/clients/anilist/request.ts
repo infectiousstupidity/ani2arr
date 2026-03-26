@@ -1,6 +1,7 @@
 import { API_URL, DEFAULT_RATE_LIMIT_DELAY_MS } from './constants';
+import type { AniListResponseMeta } from '@/integrations/anilist/types';
 import { AniListHttpError, AniListRateLimitError } from './errors';
-import { toAniListRequestMeta } from './rate-limit';
+import { toAniListResponseMeta } from './rate-limit';
 
 interface RequestParams<TVariables> {
   query: string;
@@ -9,7 +10,7 @@ interface RequestParams<TVariables> {
 
 export interface AniListResponse<TPayload> {
   payload: TPayload;
-  meta: ReturnType<typeof toAniListRequestMeta>;
+  meta: AniListResponseMeta;
 }
 
 export async function postAniList<TResponse, TVariables extends Record<string, unknown>>(
@@ -20,7 +21,7 @@ export async function postAniList<TResponse, TVariables extends Record<string, u
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ query: params.query, variables: params.variables }),
   });
-  const meta = toAniListRequestMeta(response);
+  const meta = toAniListResponseMeta(response);
 
   if (!response.ok) {
     if (response.status === 429) {

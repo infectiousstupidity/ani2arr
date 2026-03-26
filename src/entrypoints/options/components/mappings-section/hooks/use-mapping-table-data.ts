@@ -1,8 +1,12 @@
+/** Derives mapping table rows, metadata joins, and filter state for the options mappings UI. */
+// src/entrypoints/options/components/mappings-section/hooks/use-mapping-table-data.ts
+
 import { useMemo } from 'react';
 import { useDebounced } from '@/shared/hooks/common/use-debounced';
 import { useAniListMetadataBatch, useMappings } from '@/shared/queries';
 import type { MappingProvider, MappingSummary } from '@/shared/types';
-import type { GetAniListMetadataOutput, GetMappingsInput, GetMappingsOutput } from '@/rpc/schemas';
+import type { GetAniListMetadataOutput, GetMappingsOutput } from '@/rpc/types';
+import type { GetMappingsInput } from '@/rpc/schemas';
 import type { MappingTableRowData } from '../components/mapping-table';
 import type { LibraryFilter, MappingSort, SourceFilterSet } from '../components/mapping-toolbar';
 import { normalizeMappingSearchQuery } from '../search-query';

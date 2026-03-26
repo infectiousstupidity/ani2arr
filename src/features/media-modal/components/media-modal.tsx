@@ -5,10 +5,10 @@ import { Header, type MediaModalTabId } from "./media-modal-header";
 import { Footer } from "./media-modal-footer";
 import Button from "@/shared/ui/primitives/button";
 import type {
-  AniFormat,
+  AniListMediaFormat,
   ExtensionError,
   Provider,
-  MediaStatus,
+  AniListMediaStatus,
   RadarrFormState,
   SonarrFormState,
   ProviderTitleLanguage,
@@ -63,9 +63,9 @@ export type MediaModalProps = {
   anilistIds: number[];
   provider: Provider;
   inLibrary: boolean;
-  format: AniFormat | null;
+  format: AniListMediaFormat | null;
   year: number | null;
-  status: MediaStatus | null;
+  status: AniListMediaStatus | null;
 
   initialTab?: MediaModalTabId;
   initialMappingRequired?: boolean;

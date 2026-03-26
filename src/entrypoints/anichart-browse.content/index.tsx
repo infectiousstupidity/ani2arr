@@ -2,7 +2,7 @@
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
 import { shouldSkipMediaFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
-import type { AniFormat, MediaMetadataHint } from '@/shared/types';
+import type { AniListMediaFormat, AniListMediaHint } from '@/shared/types';
 import baseStyles from '@/shared/styles/base.css?inline';
 import browseStyles from './style.css?inline';
 import {
@@ -43,7 +43,7 @@ const parseYearFromHeading = (heading: string): number | null => {
   return match ? Number.parseInt(match[0], 10) : null;
 };
 
-const inferFormatFromHeading = (heading: string): AniFormat | null => {
+const inferFormatFromHeading = (heading: string): AniListMediaFormat | null => {
   const normalized = heading.toLowerCase();
   if (normalized.includes('short')) return 'TV_SHORT';
   if (normalized.includes('ova')) return 'OVA';
@@ -54,9 +54,9 @@ const inferFormatFromHeading = (heading: string): AniFormat | null => {
   return null;
 };
 
-const metadataCache = new Map<number, MediaMetadataHint | null>();
+const metadataCache = new Map<number, AniListMediaHint | null>();
 
-const getCachedDomMetadata = (anilistId: number): MediaMetadataHint | null => {
+const getCachedDomMetadata = (anilistId: number): AniListMediaHint | null => {
   if (metadataCache.has(anilistId)) {
     return metadataCache.get(anilistId) ?? null;
   }
@@ -90,7 +90,7 @@ const parseAniChartCard = (card: Element): ParsedCard | null => {
 
   const heading = getSectionHeading(card);
   const domMetadata = getCachedDomMetadata(anilistId);
-  const fallbackMetadata: MediaMetadataHint = {
+  const fallbackMetadata: AniListMediaHint = {
     titles: { romaji: title },
     synonyms: [title],
     startYear: parseYearFromHeading(heading),

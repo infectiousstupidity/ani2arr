@@ -1,7 +1,7 @@
 import { generateSearchTerms, isSeasonalCanonicalTokens } from './search-term-generator';
 import { scoreCandidates } from './scoring';
 import { maybeEarlyStop, pickBest } from './early-stop';
-import type { EvaluationOutcome, EvaluationOutcomeResolved, MappingContext, AniMedia } from './types';
+import type { EvaluationOutcome, EvaluationOutcomeResolved, MappingContext, AniListMedia } from './types';
 import {
   canonicalTitleKeyForProvider,
   sanitizeLookupDisplayForProvider,
@@ -9,7 +9,7 @@ import {
 import { PIPELINE_SOFT_TIME_BUDGET_MS } from '../constants';
 
 
-export async function resolveViaPipeline(media: AniMedia, ctx: MappingContext, primaryTitleHint?: string): Promise<EvaluationOutcome> {
+export async function resolveViaPipeline(media: AniListMedia, ctx: MappingContext, primaryTitleHint?: string): Promise<EvaluationOutcome> {
   if (import.meta.env.DEV) {
     ctx.log.debug?.(
       `pipeline:start anilistId=${media.id} priority=${ctx.priority ?? 'normal'}${primaryTitleHint ? ` hint="${primaryTitleHint}"` : ''}`,

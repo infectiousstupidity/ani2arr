@@ -1,11 +1,14 @@
+/** High-level AniList client orchestration for media fetches, caching, and search. */
+// src/clients/anilist/service.ts
+
 import PQueue from 'p-queue';
 import type { TtlCache } from '@/storage';
 import type {
   AniListSchedulerDebugSnapshot,
-  AniMedia,
-  AniListSearchResult,
+  AniListMedia,
   RequestPriority,
 } from '@/shared/types';
+import type { AniListSearchMediaDto } from '@/integrations/anilist/types';
 import { logger } from '@/shared/utils/logger';
 import { priorityValue } from '@/shared/utils/priority';
 import { DEFAULT_PREQUEL_DEPTH, QUEUE_CONCURRENCY } from './constants';
@@ -16,12 +19,12 @@ import { AniListRateLimiter } from './rate-limit';
 export class AnilistApiService {
   private readonly log = logger.create('AniListApiService');
   private readonly queue = new PQueue({ concurrency: QUEUE_CONCURRENCY });
-  private readonly caches: { media: TtlCache<AniMedia> } | undefined;
+  private readonly caches: { media: TtlCache<AniListMedia> } | undefined;
   private readonly limiter = new AniListRateLimiter();
   private readonly executor: AniListExecutor;
   private readonly mediaScheduler: AniListMediaScheduler;
 
-  constructor(caches?: { media: TtlCache<AniMedia> }) {
+  constructor(caches?: { media: TtlCache<AniListMedia> }) {
     this.caches = caches;
     this.executor = new AniListExecutor({
       limiter: this.limiter,
@@ -51,7 +54,7 @@ export class AnilistApiService {
   public fetchMediaWithRelations(
     anilistId: number,
     options?: { priority?: RequestPriority; forceRefresh?: boolean; source?: string },
-  ): Promise<AniMedia> {
+  ): Promise<AniListMedia> {
     const requestOptions: RequestMediaOptions = {
       source: options?.source ?? 'media-detail',
       ...(options?.priority ? { priority: options.priority } : {}),
@@ -62,15 +65,15 @@ export class AnilistApiService {
   }
 
   public async *iteratePrequelChain(
-    seed: AniMedia,
+    seed: AniListMedia,
     options: { includeRoot?: boolean; maxDepth?: number } = {},
-  ): AsyncGenerator<AniMedia> {
+  ): AsyncGenerator<AniListMedia> {
     const includeRoot = options.includeRoot ?? false;
     const maxDepth = options.maxDepth ?? DEFAULT_PREQUEL_DEPTH;
 
     const visited = new Set<number>();
     let depth = 0;
-    let current: AniMedia | null = seed ?? null;
+    let current: AniListMedia | null = seed ?? null;
 
     if (!current) return;
 
@@ -112,7 +115,7 @@ export class AnilistApiService {
   public fetchMediaBatch(
     ids: number[],
     options?: { priority?: RequestPriority; forceRefresh?: boolean; source?: string },
-  ): Promise<Map<number, AniMedia>> {
+  ): Promise<Map<number, AniListMedia>> {
     const requestOptions: RequestMediaOptions = {
       source: options?.source ?? 'media-batch',
       priority: options?.priority ?? 'low',
@@ -122,7 +125,7 @@ export class AnilistApiService {
     return this.mediaScheduler.requestMedia(ids, requestOptions);
   }
 
-  public async searchMedia(search: string, options?: { limit?: number }): Promise<AniListSearchResult[]> {
+  public async searchMedia(search: string, options?: { limit?: number }): Promise<AniListSearchMediaDto[]> {
     const term = search.trim();
     if (!term) return [];
 
@@ -154,7 +157,7 @@ export class AnilistApiService {
     }
   }
 
-  private extractPrequelId(media: AniMedia): number | null {
+  private extractPrequelId(media: AniListMedia): number | null {
     const edges = media.relations?.edges ?? [];
     const prequelEdge = edges.find(edge => edge?.relationType === 'PREQUEL');
     if (!prequelEdge) return null;

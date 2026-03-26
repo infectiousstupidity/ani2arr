@@ -1,11 +1,11 @@
-import type { AniMedia } from '@/shared/types';
+import type { AniListMedia } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
 import { MEDIA_HARD_TTL, MEDIA_SOFT_TTL } from './constants';
 import type { TtlCache } from '@/storage';
 
 const log = logger.create('AniListMediaCache');
 
-export const hasCompleteMediaFields = (media: AniMedia | null | undefined): media is AniMedia => {
+export const hasCompleteMediaFields = (media: AniListMedia | null | undefined): media is AniListMedia => {
   if (!media) return false;
   const cover = media.coverImage;
   const hasCover =
@@ -17,7 +17,7 @@ export const hasCompleteMediaFields = (media: AniMedia | null | undefined): medi
   return hasCover;
 };
 
-export const normalizeMedia = (media: AniMedia): AniMedia => {
+export const normalizeMedia = (media: AniListMedia): AniListMedia => {
   const cover = media.coverImage ?? null;
   return {
     ...media,
@@ -39,15 +39,15 @@ export const normalizeMedia = (media: AniMedia): AniMedia => {
   };
 };
 
-export const sanitizeMedia = (media: AniMedia): AniMedia => {
+export const sanitizeMedia = (media: AniListMedia): AniListMedia => {
   try {
-    return structuredClone(media) as AniMedia;
+    return structuredClone(media) as AniListMedia;
   } catch {
     return media;
   }
 };
 
-export async function cacheMedia(cache: TtlCache<AniMedia> | undefined, id: number, media: AniMedia): Promise<AniMedia> {
+export async function cacheMedia(cache: TtlCache<AniListMedia> | undefined, id: number, media: AniListMedia): Promise<AniListMedia> {
   const normalized = normalizeMedia(media);
   const sanitized = sanitizeMedia(normalized);
   if (!cache) return sanitized;

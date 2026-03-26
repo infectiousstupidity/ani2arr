@@ -2,7 +2,7 @@
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
 import { shouldSkipMediaFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
-import type { MediaMetadataHint } from '@/shared/types';
+import type { AniListMediaHint } from '@/shared/types';
 import baseStyles from '@/shared/styles/base.css?inline';
 import browseStyles from './style.css?inline';
 import {
@@ -39,9 +39,9 @@ const CARD_CONTAINER_SELECTORS = [
   '.page-content',
 ];
 
-const metadataCache = new Map<number, MediaMetadataHint | null>();
+const metadataCache = new Map<number, AniListMediaHint | null>();
 
-const getCachedDomMetadata = (anilistId: number): MediaMetadataHint | null => {
+const getCachedDomMetadata = (anilistId: number): AniListMediaHint | null => {
   if (metadataCache.has(anilistId)) {
     return metadataCache.get(anilistId) ?? null;
   }
@@ -90,7 +90,7 @@ const parseAniListCard = (card: Element): ParsedCard | null => {
   const domMetadata = getCachedDomMetadata(anilistId);
   if (shouldSkipMediaFormat(domMetadata?.format ?? null)) return null;
 
-  const fallbackMetadata: MediaMetadataHint | null = title
+  const fallbackMetadata: AniListMediaHint | null = title
     ? {
         titles: title ? { romaji: title } : null,
         synonyms: title ? [title] : null,

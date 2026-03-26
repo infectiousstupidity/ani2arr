@@ -1,5 +1,5 @@
 // src/shared/anilist/media-metadata.ts
-import type { AniTitles, MediaMetadataHint, AniFormat } from '@/shared/types';
+import type { AniListTitles, AniListMediaHint, AniListMediaFormat } from '@/shared/types';
 
 export const normalizeSynonyms = (synonyms?: string[] | null): string[] => {
   if (!Array.isArray(synonyms)) return [];
@@ -24,11 +24,11 @@ export const normalizeRelationIds = (ids?: number[] | null): number[] => {
   ).sort((a, b) => a - b);
 };
 
-export const metadataEqual = (a?: MediaMetadataHint | null, b?: MediaMetadataHint | null): boolean => {
+export const metadataEqual = (a?: AniListMediaHint | null, b?: AniListMediaHint | null): boolean => {
   if (a === b) return true;
   if (!a || !b) return !a && !b;
 
-  const titlesEqual = (key: keyof NonNullable<MediaMetadataHint['titles']>) => {
+  const titlesEqual = (key: keyof NonNullable<AniListMediaHint['titles']>) => {
     const aTitle = a.titles?.[key] ?? null;
     const bTitle = b.titles?.[key] ?? null;
     return aTitle === bTitle;
@@ -66,13 +66,13 @@ const mergeRelationIds = (a: number[] | null | undefined, b: number[] | null | u
 };
 
 export const mergeMetadataHints = (
-  primary?: MediaMetadataHint | null,
-  secondary?: MediaMetadataHint | null,
-): MediaMetadataHint | null => {
-  const hints = [primary ?? null, secondary ?? null].filter((hint): hint is MediaMetadataHint => !!hint);
+  primary?: AniListMediaHint | null,
+  secondary?: AniListMediaHint | null,
+): AniListMediaHint | null => {
+  const hints = [primary ?? null, secondary ?? null].filter((hint): hint is AniListMediaHint => !!hint);
   if (hints.length === 0) return null;
 
-  return hints.reduce<MediaMetadataHint>((acc, hint) => {
+  return hints.reduce<AniListMediaHint>((acc, hint) => {
     if (!acc.titles && hint.titles) {
       acc.titles = hint.titles;
     }
@@ -101,9 +101,9 @@ export const mergeMetadataHints = (
 };
 
 type AniListMetadataLike = {
-  titles?: AniTitles | null | undefined;
+  titles?: AniListTitles | null | undefined;
   seasonYear?: number | null | undefined;
-  format?: AniFormat | null | undefined;
+  format?: AniListMediaFormat | null | undefined;
   coverImage?: {
     medium?: string | null | undefined;
     large?: string | null | undefined;
@@ -112,7 +112,7 @@ type AniListMetadataLike = {
 
 export const metadataHintFromAniListMetadata = (
   metadata?: AniListMetadataLike | null,
-): MediaMetadataHint | null => {
+): AniListMediaHint | null => {
   if (!metadata) return null;
 
   const titles = metadata.titles && Object.keys(metadata.titles).length > 0 ? metadata.titles : null;

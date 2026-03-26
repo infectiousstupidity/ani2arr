@@ -1,8 +1,11 @@
+/** React Query hooks for AniList media and metadata RPC reads. */
+// src/shared/queries/metadata.ts
+
 import { useQuery } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
 import { normalizeError } from '@/shared/errors/error-utils';
-import type { AniMedia, ExtensionError } from '@/shared/types';
-import type { GetAniListMetadataOutput } from '@/rpc/schemas';
+import type { AniListMedia, ExtensionError } from '@/shared/types';
+import type { GetAniListMetadataOutput } from '@/rpc/types';
 import { queryKeys, normalizeMetadataIds } from './query-keys';
 
 export const useAniListMedia = (
@@ -11,7 +14,7 @@ export const useAniListMedia = (
 ) => {
   const forceRefresh = opts?.forceRefresh ?? false;
 
-  const fetchAniListDirect = async (id: number): Promise<AniMedia | null> => {
+  const fetchAniListDirect = async (id: number): Promise<AniListMedia | null> => {
     const FIND_MEDIA_QUERY = `
       query FindMedia($id: Int) {
         Media(id: $id) {
@@ -42,18 +45,18 @@ export const useAniListMedia = (
       body: JSON.stringify({ query: FIND_MEDIA_QUERY, variables: { id } }),
     });
     if (!response.ok) return null;
-    const payload = (await response.json()) as { data?: { Media?: AniMedia } };
+    const payload = (await response.json()) as { data?: { Media?: AniListMedia } };
     const media = payload?.data?.Media;
     if (!media) return null;
     // sanitize to plain data for React Query cache safety
     try {
-      return JSON.parse(JSON.stringify(media)) as AniMedia;
+      return JSON.parse(JSON.stringify(media)) as AniListMedia;
     } catch {
       return media;
     }
   };
 
-  return useQuery<AniMedia | null, ExtensionError>({
+  return useQuery<AniListMedia | null, ExtensionError>({
     queryKey: queryKeys.aniListMedia(anilistId ?? 0),
     queryFn: async () => {
       if (!anilistId) return null;

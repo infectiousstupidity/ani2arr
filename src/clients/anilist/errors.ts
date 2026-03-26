@@ -1,14 +1,14 @@
 import { AbortError } from '@/shared/utils/retry';
+import type { AniListResponseMeta } from '@/integrations/anilist/types';
 import type { ReturnTypeOfCreateError } from './types';
-import type { AniListRequestMeta } from './rate-limit';
 
 export class AniListRateLimitError extends Error {
   public readonly retryAfterMs: number;
   public readonly pausedUntil: number;
-  public readonly meta: AniListRequestMeta;
+  public readonly meta: AniListResponseMeta;
   public readonly status = 429;
 
-  constructor(meta: AniListRequestMeta, pausedUntil: number) {
+  constructor(meta: AniListResponseMeta, pausedUntil: number) {
     super('AniList rate limit exceeded');
     this.name = 'AniListRateLimitError';
     this.meta = meta;
@@ -19,9 +19,9 @@ export class AniListRateLimitError extends Error {
 
 export class AniListHttpError extends Error {
   public readonly status: number;
-  public readonly meta?: AniListRequestMeta;
+  public readonly meta?: AniListResponseMeta;
 
-  constructor(status: number, message?: string, meta?: AniListRequestMeta) {
+  constructor(status: number, message?: string, meta?: AniListResponseMeta) {
     super(message ?? `AniList API Error: ${status}`);
     this.name = 'AniListHttpError';
     this.status = status;

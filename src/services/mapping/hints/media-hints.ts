@@ -1,15 +1,15 @@
-import type { AniMedia, AniTitles, MediaMetadataHint } from '@/shared/types';
+import type { AniListMedia, AniListTitles, AniListMediaHint } from '@/shared/types';
 
-const normalizeTitles = (titles?: AniTitles | null): AniTitles => {
+const normalizeTitles = (titles?: AniListTitles | null): AniListTitles => {
   if (!titles) return {};
-  const normalized: AniTitles = {};
+  const normalized: AniListTitles = {};
   if (titles.english) normalized.english = titles.english;
   if (titles.romaji) normalized.romaji = titles.romaji;
   if (titles.native) normalized.native = titles.native;
   return normalized;
 };
 
-export function buildMediaFromMetadataHint(anilistId: number, metadata?: MediaMetadataHint | null): AniMedia | null {
+export function buildMediaFromMetadataHint(anilistId: number, metadata?: AniListMediaHint | null): AniListMedia | null {
   if (!metadata) return null;
 
   const titles = normalizeTitles(metadata.titles ?? {});
@@ -58,7 +58,7 @@ export function buildMediaFromMetadataHint(anilistId: number, metadata?: MediaMe
               format: null,
               title: {},
               synonyms: [],
-            } as AniMedia,
+            } as AniListMedia,
           })),
         }
       : undefined;

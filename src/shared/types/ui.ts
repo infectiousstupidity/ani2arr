@@ -1,4 +1,4 @@
-import type { MediaMetadataHint } from './anilist';
+import type { AniListMediaHint } from './anilist';
 import type { BadgeVisibility } from './options';
 import type { Provider } from '@/shared/types/options';
 import type { RadarrFormState } from '@/shared/providers/radarr/types';
@@ -12,11 +12,11 @@ export interface CardOverlayProps {
   provider: Provider;
   anilistId: number;
   title: string;
-  onOpenModal: (anilistId: number, title: string, metadata: MediaMetadataHint | null) => void;
+  onOpenModal: (anilistId: number, title: string, metadata: AniListMediaHint | null) => void;
   onOpenMappingFix?: (anilistId: number, title: string, mappingRequired?: boolean) => void;
   isConfigured: boolean;
   defaultForm: SonarrFormState | RadarrFormState | null;
-  metadata: MediaMetadataHint | null;
+  metadata: AniListMediaHint | null;
   providerUrl: string | null;
   observeTarget?: Element | null;
   badgeVisibility?: BadgeVisibility;
@@ -32,7 +32,7 @@ export interface ParsedCard {
   anilistId: number;
   title: string;
   host: HTMLElement;
-  metadata: MediaMetadataHint | null;
+  metadata: AniListMediaHint | null;
 }
 
 export interface BrowseAdapter {

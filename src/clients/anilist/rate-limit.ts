@@ -1,4 +1,5 @@
 import type { RequestPriority } from '@/shared/types';
+import type { AniListRateLimitMeta, AniListResponseMeta } from '@/integrations/anilist/types';
 import { logger } from '@/shared/utils/logger';
 import {
   DEFAULT_RATE_LIMIT_DELAY_MS,
@@ -15,25 +16,11 @@ export interface AniListRateLimitStateSnapshot {
   last429At: number | null;
 }
 
-export interface AniListRateLimitFields {
-  limit: number | null;
-  remaining: number | null;
-  resetAt: number | null;
-  retryAfterMs: number | null;
-}
-
-export interface AniListRequestMeta {
-  status: number;
-  headers: Record<string, string>;
-  rateLimit: AniListRateLimitFields;
-  receivedAt: number;
-}
-
 type LimiterEventType = 'success' | 'rate-limit' | 'resume';
 type LimiterListener = (
   event: LimiterEventType,
   snapshot: AniListRateLimitStateSnapshot,
-  meta: AniListRequestMeta,
+  meta: AniListResponseMeta,
 ) => void;
 
 const parseHeaderNumber = (value: string | null): number | null => {
@@ -57,7 +44,7 @@ export function parseRetryAfterMs(header: string | null, now = Date.now()): numb
   return delayMs > 0 ? delayMs : null;
 }
 
-export function parseAniListRateLimitHeaders(headers: Headers, now = Date.now()): AniListRateLimitFields {
+export function parseAniListRateLimitHeaders(headers: Headers, now = Date.now()): AniListRateLimitMeta {
   const limit = parseHeaderNumber(headers.get('X-RateLimit-Limit'));
   const remaining = parseHeaderNumber(headers.get('X-RateLimit-Remaining'));
   const resetSeconds = parseHeaderNumber(headers.get('X-RateLimit-Reset'));
@@ -71,7 +58,7 @@ export function parseAniListRateLimitHeaders(headers: Headers, now = Date.now())
   };
 }
 
-export function toAniListRequestMeta(response: Response, now = Date.now()): AniListRequestMeta {
+export function toAniListResponseMeta(response: Response, now = Date.now()): AniListResponseMeta {
   return {
     status: response.status,
     headers: Object.fromEntries(response.headers.entries()),
@@ -94,7 +81,7 @@ export class AniListRateLimiter {
     this.listener = listener;
   }
 
-  public updateFromSuccess(meta: AniListRequestMeta): void {
+  public updateFromSuccess(meta: AniListResponseMeta): void {
     const wasPaused = this.pausedUntil > meta.receivedAt;
     this.applyKnownRateLimit(meta.rateLimit);
 
@@ -119,7 +106,7 @@ export class AniListRateLimiter {
     }
   }
 
-  public updateFromRateLimit(meta: AniListRequestMeta, pausedUntil?: number): number {
+  public updateFromRateLimit(meta: AniListResponseMeta, pausedUntil?: number): number {
     this.applyKnownRateLimit(meta.rateLimit);
 
     const computedPausedUntil =
@@ -191,7 +178,7 @@ export class AniListRateLimiter {
     };
   }
 
-  private applyKnownRateLimit(rateLimit: AniListRateLimitFields): void {
+  private applyKnownRateLimit(rateLimit: AniListRateLimitMeta): void {
     if (typeof rateLimit.limit === 'number') {
       this.lastKnownLimit = rateLimit.limit;
     }

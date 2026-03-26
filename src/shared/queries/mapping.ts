@@ -1,3 +1,6 @@
+/** React Query hooks for mapping-related RPC reads and mutations. */
+// src/shared/queries/mapping.ts
+
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
 import type {
@@ -12,15 +15,14 @@ import type {
   ClearMappingIgnoreInput,
   ClearMappingRejectedCandidateInput,
   ClearMappingOverrideInput,
-  ExportStoredMappingsOutput,
-  GetMappingsInput,
-  GetMappingsOutput,
   SetMappingBlockedCandidateInput,
   SetMappingIgnoreInput,
   SetMappingRejectedCandidateInput,
   SetMappingOverrideInput,
   StatusInput,
 } from '@/rpc/schemas';
+import type { ExportStoredMappingsOutput, GetMappingsOutput } from '@/rpc/types';
+import type { GetMappingsInput } from '@/rpc/schemas';
 import { normalizeError } from '@/shared/errors/error-utils';
 import { queryKeys } from './query-keys';
 

@@ -1,4 +1,4 @@
-import type { AniFormat, Provider, PublicOptions } from '@/shared/types';
+import type { AniListMediaFormat, Provider, PublicOptions } from '@/shared/types';
 
 type ProviderDescriptor = {
   service: Provider;
@@ -30,7 +30,7 @@ export const getProviderDescriptor = (service: Provider): ProviderDescriptor => 
 
 export const getProviderLabel = (service: Provider): string => getProviderDescriptor(service).label;
 
-export const resolveProviderForAniListFormat = (format: AniFormat | null | undefined): Provider | null => {
+export const resolveProviderForAniListFormat = (format: AniListMediaFormat | null | undefined): Provider | null => {
   if (format === 'MOVIE') return 'radarr';
   if (format === 'MUSIC') return null;
   return 'sonarr';

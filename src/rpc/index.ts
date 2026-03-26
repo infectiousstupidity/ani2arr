@@ -1,23 +1,34 @@
+/** Typed RPC contract exposed across extension contexts. */
 // src/rpc/index.ts
 import { defineProxyService } from '@webext-core/proxy-service';
 import type {
-  AniMedia,
+  AniListMedia,
+  ProviderCredentials,
   RadarrMovie,
   SonarrSeries,
-  SonarrRootFolder,
-  SonarrQualityProfile,
-  SonarrTag,
   SonarrFormState,
   RadarrFormState,
-  ProviderCredentials,
 } from '@/shared/types';
 import type {
+  AniListSearchResult,
+  ExportStoredMappingsOutput,
+  GetAniListMetadataOutput,
   GetAniListSchedulerDebugOutput,
-  ResolveInput,
+  GetMappingsOutput,
+  GetRadarrMetadataOutput,
   MappingOutput,
+  MappingOverrideItem,
   MovieStatusOutput,
-  StatusInput,
+  RadarrLookupOutput,
+  SonarrLookupOutput,
+  SonarrMetadataOutput,
   StatusOutput,
+  ValidateTmdbOutput,
+  ValidateTvdbOutput,
+} from './types';
+import type {
+  ResolveInput,
+  StatusInput,
   AddInput,
   AddRadarrInput,
   UpdateSonarrInput,
@@ -25,28 +36,18 @@ import type {
   SetMappingOverrideInput,
   ClearMappingOverrideInput,
   SonarrLookupInput,
-  SonarrLookupOutput,
   RadarrLookupInput,
-  RadarrLookupOutput,
   ValidateTvdbInput,
-  ValidateTvdbOutput,
   ValidateTmdbInput,
-  ValidateTmdbOutput,
-  MappingOverrideItem,
-  ExportStoredMappingsOutput,
   SetMappingIgnoreInput,
   ClearMappingIgnoreInput,
   SetMappingRejectedCandidateInput,
   ClearMappingRejectedCandidateInput,
   SetMappingBlockedCandidateInput,
   ClearMappingBlockedCandidateInput,
-  GetMappingsOutput,
   GetMappingsInput,
   GetAniListMetadataInput,
-  GetAniListMetadataOutput,
-  GetRadarrMetadataOutput,
   SearchAniListInput,
-  AniListSearchResultDto,
   TestProviderConnectionInput,
 } from './schemas';
 
@@ -58,21 +59,17 @@ export interface Ani2arrApi {
   addToRadarr(input: AddRadarrInput): Promise<RadarrMovie>;
   updateSonarrSeries(input: UpdateSonarrInput): Promise<SonarrSeries>;
   updateRadarrMovie(input: UpdateRadarrInput): Promise<RadarrMovie>;
-  prefetchAniListMedia(ids: number[]): Promise<Array<[number, AniMedia]>>;
-  fetchAniListMedia(anilistId: number): Promise<AniMedia | null>;
+  prefetchAniListMedia(ids: number[]): Promise<Array<[number, AniListMedia]>>;
+  fetchAniListMedia(anilistId: number): Promise<AniListMedia | null>;
   getStaticMapped(ids: number[]): Promise<number[]>;
   notifySettingsChanged(): Promise<{ ok: true }>;
   updateSonarrDefaults(defaults: SonarrFormState): Promise<{ ok: true }>;
   updateRadarrDefaults(defaults: RadarrFormState): Promise<{ ok: true }>;
-  getQualityProfiles(): Promise<SonarrQualityProfile[]>;
-  getRootFolders(): Promise<SonarrRootFolder[]>;
-  getTags(): Promise<SonarrTag[]>;
+  getQualityProfiles(): Promise<SonarrMetadataOutput['qualityProfiles']>;
+  getRootFolders(): Promise<SonarrMetadataOutput['rootFolders']>;
+  getTags(): Promise<SonarrMetadataOutput['tags']>;
   testProviderConnection(input: TestProviderConnectionInput): Promise<{ version: string }>;
-  getSonarrMetadata(input?: { credentials?: ProviderCredentials }): Promise<{
-    qualityProfiles: SonarrQualityProfile[];
-    rootFolders: SonarrRootFolder[];
-    tags: SonarrTag[];
-  }>;
+  getSonarrMetadata(input?: { credentials?: ProviderCredentials }): Promise<SonarrMetadataOutput>;
   getRadarrMetadata(input?: { credentials?: ProviderCredentials }): Promise<GetRadarrMetadataOutput>;
   initMappings(): Promise<void>;
   setMappingOverride(input: SetMappingOverrideInput): Promise<{ ok: true }>;
@@ -95,7 +92,7 @@ export interface Ani2arrApi {
   getMappings(input?: GetMappingsInput): Promise<GetMappingsOutput>;
   getAniListMetadata(input: GetAniListMetadataInput): Promise<GetAniListMetadataOutput>;
   getAniListSchedulerDebug(): Promise<GetAniListSchedulerDebugOutput>;
-  searchAniList(input: SearchAniListInput): Promise<AniListSearchResultDto[]>;
+  searchAniList(input: SearchAniListInput): Promise<AniListSearchResult[]>;
 }
 
 export const [registerAni2arrApi, getAni2arrApi] =

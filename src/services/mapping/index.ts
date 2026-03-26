@@ -1,6 +1,6 @@
 import type { AnilistApiService } from '@/clients/anilist.api';
 import type {
-  AniMedia,
+  AniListMedia,
   ExtensionError,
   MappingExternalId,
   MappingProvider,
@@ -423,7 +423,7 @@ export class MappingService {
 
   private async tryResolveWithMedia(
     provider: MappingProvider,
-    media: AniMedia,
+    media: AniListMedia,
     credentials: LookupClientCredentials,
     hints: ResolveHints | undefined,
     priority: RequestPriority | undefined,

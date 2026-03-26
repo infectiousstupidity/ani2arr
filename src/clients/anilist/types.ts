@@ -1,22 +1,28 @@
-import type { AniListSearchResult, AniMedia } from '@/shared/types';
-import type { createError } from '@/shared/errors/error-utils';
+/** AniList transport response wrappers and executor-facing payload types. */
+// src/clients/anilist/types.ts
 
-export type GraphQLError = { message: string; status?: number };
+import type {
+  AniListGraphQLError,
+  AniListMediaDto,
+  AniListMediaPage,
+  AniListSearchPage,
+} from '@/integrations/anilist/types';
+import type { createError } from '@/shared/errors/error-utils';
 
 export type ExtensionErrorLike = ReturnType<typeof createError>;
 export type ReturnTypeOfCreateError = ExtensionErrorLike;
 
 export type FindMediaResponse = {
-  data?: { Media?: AniMedia };
-  errors?: GraphQLError[];
+  data?: { Media?: AniListMediaDto };
+  errors?: AniListGraphQLError[];
 };
 
 export type FindMediaBatchResponse = {
-  data?: { Page?: { media?: AniMedia[] } };
-  errors?: GraphQLError[];
+  data?: { Page?: AniListMediaPage };
+  errors?: AniListGraphQLError[];
 };
 
 export type SearchMediaResponse = {
-  data?: { Page?: { media?: AniListSearchResult[] } };
-  errors?: GraphQLError[];
+  data?: { Page?: AniListSearchPage };
+  errors?: AniListGraphQLError[];
 };
