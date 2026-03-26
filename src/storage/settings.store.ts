@@ -1,9 +1,13 @@
 /** Authoritative persistence for extension settings, public options, and provider secrets. */
-// src/lib/storage/settings.store.ts
+// src/storage/settings.store.ts
 
 import { storage } from '@wxt-dev/storage';
 import * as v from 'valibot';
 import { SettingsSchema, createDefaultSettings } from '@/shared/schemas/settings';
+import {
+  validateProviderConnectionApiKey,
+  validateProviderConnectionUrl,
+} from '@/shared/schemas/provider-connection.schema';
 import type { Settings } from '@/shared/schemas/settings';
 import type {
   ExtensionOptions,
@@ -11,11 +15,6 @@ import type {
   RadarrSecrets,
   SonarrSecrets,
 } from '@/shared/types';
-import {
-  validateApiKey as validateRadarrApiKey,
-  validateUrl as validateRadarrUrl,
-} from '@/shared/providers/radarr/validation';
-import { validateUrl as validateSonarrUrl, validateApiKey as validateSonarrApiKey } from '@/shared/providers/sonarr/validation';
 import { logger } from '@/shared/utils/logger';
 import { STORAGE_KEYS } from './keys';
 
@@ -72,33 +71,31 @@ export const parseSettings = (raw: unknown): Settings => {
 function normalizeUrl(
   value: string | undefined,
   label: string,
-  validate: (value: string) => { isValid: boolean; error?: string; normalizedUrl?: string },
 ): string {
   const trimmed = value?.trim() ?? '';
   if (!trimmed) return '';
 
-  const result = validate(trimmed);
-  if (!result.isValid) {
-    throw new Error(`Invalid ${label} URL: ${result.error ?? 'unknown'}`);
+  const result = validateProviderConnectionUrl(trimmed);
+  if (!result.ok) {
+    throw new Error(`Invalid ${label} URL: ${result.error}`);
   }
 
-  return result.normalizedUrl ?? trimmed;
+  return result.value;
 }
 
 function normalizeApiKey(
   value: string | undefined,
   label: string,
-  validate: (value: string) => { isValid: boolean; error?: string },
 ): string {
   const trimmed = value?.trim() ?? '';
   if (!trimmed) return '';
 
-  const result = validate(trimmed);
-  if (!result.isValid) {
-    throw new Error(`Invalid ${label} API key: ${result.error ?? 'invalid format'}`);
+  const result = validateProviderConnectionApiKey(trimmed);
+  if (!result.ok) {
+    throw new Error(`Invalid ${label} API key: ${result.error}`);
   }
 
-  return trimmed;
+  return result.value;
 }
 
 const getRawOptions = async () => {
@@ -131,11 +128,11 @@ export async function getExtensionOptionsSnapshot(): Promise<Settings> {
 export async function setExtensionOptionsSnapshot(options: ExtensionOptions): Promise<void> {
   const parsed = parseSettings(options);
 
-  const sonarrUrl = normalizeUrl(parsed.providers.sonarr.url, 'Sonarr', validateSonarrUrl);
-  const sonarrApiKey = normalizeApiKey(parsed.providers.sonarr.apiKey, 'Sonarr', validateSonarrApiKey);
+  const sonarrUrl = normalizeUrl(parsed.providers.sonarr.url, 'Sonarr');
+  const sonarrApiKey = normalizeApiKey(parsed.providers.sonarr.apiKey, 'Sonarr');
 
-  const radarrUrl = normalizeUrl(parsed.providers.radarr.url, 'Radarr', validateRadarrUrl);
-  const radarrApiKey = normalizeApiKey(parsed.providers.radarr.apiKey, 'Radarr', validateRadarrApiKey);
+  const radarrUrl = normalizeUrl(parsed.providers.radarr.url, 'Radarr');
+  const radarrApiKey = normalizeApiKey(parsed.providers.radarr.apiKey, 'Radarr');
 
   const sanitized: Settings = {
     ...parsed,

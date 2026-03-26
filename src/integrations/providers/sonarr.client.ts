@@ -1,8 +1,8 @@
-// src/clients/sonarr.api.ts
+/** Sonarr transport client for raw Arr API requests and mutations. */
+// src/integrations/providers/sonarr.client.ts
 
 import { BaseProviderClient } from '@/integrations/providers/base-provider.client';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
-import { hasSonarrPermission } from '@/shared/providers/sonarr/validation';
 import type {
   ExtensionOptions,
   ProviderCredentials,
@@ -14,13 +14,18 @@ import type {
   SonarrLookupSeries,
 } from '@/shared/types';
 import { createError, ErrorCode } from '@/shared/errors/error-utils';
+
+type SonarrClientOptions = {
+  hasUrlPermission: (url: string) => Promise<boolean>;
+};
+
 export class SonarrClient extends BaseProviderClient {
-  public constructor() {
+  public constructor(options: SonarrClientOptions) {
     super({
       providerName: 'Sonarr',
       logScope: 'SonarrClient',
       cacheableEndpoints: ['series', 'qualityprofile', 'rootfolder', 'tag'],
-      hasUrlPermission: hasSonarrPermission,
+      hasUrlPermission: options.hasUrlPermission,
     });
   }
 

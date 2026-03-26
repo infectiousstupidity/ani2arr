@@ -1,4 +1,3 @@
-import { browser } from 'wxt/browser';
 import type { Ani2arrApi } from '@/rpc';
 import type {
   MappingOutput,
@@ -31,8 +30,7 @@ import {
   resetAllRevisions,
   setExtensionOptionsSnapshot,
 } from '@/storage';
-import { buildRadarrPermissionPattern } from '@/shared/providers/radarr/validation';
-import { buildSonarrPermissionPattern } from '@/shared/providers/sonarr/validation';
+import { removeProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
 import type { getMappingsHandler, GetMappingsInput } from '@/rpc/handlers/get-mappings';
 import type { updateRadarrMovieHandler } from '@/rpc/handlers/update-movie';
 import type { updateSonarrSeriesHandler } from '@/rpc/handlers/update-series';
@@ -125,23 +123,24 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
   const removeProviderHostPermissions = async (options: ExtensionOptions): Promise<void> => {
     const removals = [
-      { provider: 'sonarr' as const, url: options.providers.sonarr.url, buildPattern: buildSonarrPermissionPattern },
-      { provider: 'radarr' as const, url: options.providers.radarr.url, buildPattern: buildRadarrPermissionPattern },
+      { provider: 'sonarr' as const, url: options.providers.sonarr.url },
+      { provider: 'radarr' as const, url: options.providers.radarr.url },
     ];
 
-    await Promise.all(removals.map(async ({ provider, url, buildPattern }) => {
+    await Promise.all(removals.map(async ({ provider, url }) => {
       if (!url) return;
 
-      const patternResult = buildPattern(String(url));
-      if (!patternResult.ok) {
-        logError(normalizeError(patternResult.error), `Ani2arrApi:resetExtensionState:${provider}:permissionPattern`);
+      const removal = await removeProviderHostPermission(String(url));
+      if (!removal.ok) {
+        logError(normalizeError(removal.error), `Ani2arrApi:resetExtensionState:${provider}:removePermission`);
         return;
       }
 
-      try {
-        await browser.permissions.remove({ origins: [patternResult.value] });
-      } catch (error) {
-        logError(normalizeError(error), `Ani2arrApi:resetExtensionState:${provider}:removePermission`);
+      if (!removal.value.removed) {
+        logError(
+          normalizeError(new Error(`Permission removal rejected for ${removal.value.pattern}.`)),
+          `Ani2arrApi:resetExtensionState:${provider}:removePermission`,
+        );
       }
     }));
   };
