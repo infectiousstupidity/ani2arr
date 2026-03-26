@@ -7,14 +7,13 @@ import type {
   MappingOutput,
 } from '@/rpc/types';
 import type { TestProviderConnectionInput, UpdateRadarrInput, UpdateSonarrInput } from '@/rpc/schemas';
-import type { AnilistApiService } from '@/clients/anilist.api';
+import type { AniListMediaService, AniListMetadataStore } from '@/core/anilist';
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { MappingService } from '@/services/mapping';
 import type { MappingOverridesService } from '@/services/mapping/overrides';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { RadarrLibrary } from '@/services/library/radarr';
-import type { AniListMetadataStore } from '@/services/anilist';
 import type { UpstreamMappingStore } from '@/services/mapping/upstream';
 import type {
   AniListMedia,
@@ -23,7 +22,7 @@ import type {
   RequestPriority,
   CheckSeriesStatusPayload,
 } from '@/shared/types';
-import type { ProviderCredentials} from '@/shared/types/options';
+import type { ProviderCredentials } from '@/shared/types/options';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import {
@@ -40,7 +39,7 @@ import type { updateSonarrSeriesHandler } from '@/rpc/handlers/update-series';
 type CommonDeps = {
   SonarrClient: SonarrClient;
   RadarrClient: RadarrClient;
-  anilistApiService: AnilistApiService;
+  anilistMediaService: AniListMediaService;
   mappingService: MappingService;
   overridesService: MappingOverridesService;
   upstreamMappingStore: UpstreamMappingStore;
@@ -63,7 +62,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
   const {
     SonarrClient,
     RadarrClient,
-    anilistApiService,
+    anilistMediaService,
     mappingService,
     overridesService,
     upstreamMappingStore,
@@ -441,7 +440,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     },
 
     async prefetchAniListMedia(ids) {
-      const map = await anilistApiService.fetchMediaBatch(ids, {
+      const map = await anilistMediaService.fetchMediaBatch(ids, {
         priority: 'low',
         source: 'browse-prefetch',
       });
@@ -452,7 +451,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       if (typeof anilistId !== 'number' || !Number.isFinite(anilistId) || anilistId <= 0) {
         return null;
       }
-      const media = await anilistApiService.fetchMediaWithRelations(anilistId, {
+      const media = await anilistMediaService.fetchMediaWithRelations(anilistId, {
         priority: 'high',
         source: 'media-modal',
       });
@@ -462,7 +461,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     async searchAniList(input) {
       try {
         const request = typeof input.limit === 'number' ? { limit: input.limit } : {};
-        const results = await anilistApiService.searchMedia(input.search, request);
+        const results = await anilistMediaService.searchMedia(input.search, request);
         return results.map((result): AniListSearchResult => ({
           id: result.id,
           title: result.title ?? {},
@@ -917,7 +916,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
     },
 
     async getAniListSchedulerDebug() {
-      return anilistApiService.getSchedulerDebugSnapshot();
+      return anilistMediaService.getSchedulerDebugSnapshot();
     },
   } satisfies Ani2arrApi;
 

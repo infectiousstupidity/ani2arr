@@ -1,4 +1,4 @@
-import type { AnilistApiService } from '@/clients/anilist.api';
+import type { AniListMediaService } from '@/core/anilist';
 import type { AniListMedia } from '@/shared/types';
 import type { UpstreamMappingStore } from '../upstream';
 import type { ResolvedMapping } from '../types';
@@ -6,7 +6,7 @@ import type { ResolvedMapping } from '../types';
 export async function resolvePrequelStatic(
   media: AniListMedia,
   upstreamMappingStore: UpstreamMappingStore,
-  anilistApi: AnilistApiService,
+  anilistApi: AniListMediaService,
 ): Promise<ResolvedMapping | null> {
   const directHit = upstreamMappingStore.get(media.id);
   if (directHit) {

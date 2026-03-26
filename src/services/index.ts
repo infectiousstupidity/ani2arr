@@ -12,14 +12,13 @@ import {
 import { SonarrClient } from '@/integrations/providers/sonarr.client';
 import { RadarrClient } from '@/integrations/providers/radarr.client';
 import { hasProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
-import { AnilistApiService } from '@/clients/anilist.api';
+import { AniListMediaService, AniListMetadataStore } from '@/core/anilist';
 import { MappingService } from './mapping';
 import { MappingOverridesService } from './mapping/overrides';
 import { UpstreamMappingStore } from './mapping/upstream';
 import { SonarrLookupClient, RadarrLookupClient } from './mapping/lookup';
 import { SonarrLibrary } from '@/services/library/sonarr';
 import { RadarrLibrary } from '@/services/library/radarr';
-import { AniListMetadataStore } from './anilist';
 import { getMappingsHandler } from '@/rpc/handlers/get-mappings';
 import { updateRadarrMovieHandler } from '@/rpc/handlers/update-movie';
 import { updateSonarrSeriesHandler } from '@/rpc/handlers/update-series';
@@ -78,8 +77,8 @@ export const createApiImplementation = (): Ani2arrApi => {
   const sonarrClient = bindAll(new SonarrClient({ hasUrlPermission: createHasUrlPermission('sonarr') }));
   const radarrClient = bindAll(new RadarrClient({ hasUrlPermission: createHasUrlPermission('radarr') }));
 
-  const anilistApiService = bindAll(
-    new AnilistApiService({
+  const anilistMediaService = bindAll(
+    new AniListMediaService({
       media: anilistMediaCache,
     }),
   );
@@ -130,7 +129,7 @@ export const createApiImplementation = (): Ani2arrApi => {
 
   const mappingService = bindAll(
     new MappingService(
-      anilistApiService,
+      anilistMediaService,
       upstreamMappingStore,
       {
         sonarr: lookupClient,
@@ -143,7 +142,7 @@ export const createApiImplementation = (): Ani2arrApi => {
     ),
   );
 
-  const anilistMetadataStore = new AniListMetadataStore(anilistApiService);
+  const anilistMetadataStore = new AniListMetadataStore(anilistMediaService);
 
   void getExtensionOptionsSnapshot()
     .then(options => {
@@ -300,7 +299,7 @@ export const createApiImplementation = (): Ani2arrApi => {
   return createApiHandlers({
     SonarrClient: sonarrClient,
     RadarrClient: radarrClient,
-    anilistApiService,
+    anilistMediaService,
     mappingService,
     overridesService,
     upstreamMappingStore,
