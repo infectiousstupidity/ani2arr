@@ -485,6 +485,26 @@ Prefer:
 * storage-specific types in `storage/`
 * only truly cross-cutting types in `shared/types/`
 
+### Keep one canonical shape when the meaning is identical
+
+Do not recreate an identical leaf shape in multiple owners just to mark a boundary.
+
+Examples:
+
+* if an AniList title shape means the same thing in both transport and app code, keep one canonical owner
+* if an image sub-shape is identical and semantically stable, reuse it instead of creating `FooRecord`, `FooDto`, and `Foo` variants
+
+Create a separate integration-local type only when at least one of these is true:
+
+* the transport shape is actually different
+* the transport meaning is narrower or broader
+* the transport wrapper is specific to one endpoint
+* keeping it separate prevents a real boundary leak
+
+Rule:
+Do not duplicate every nested transport sub-shape automatically.
+Boundary ownership does not justify alias churn by itself.
+
 ### Avoid meaningless aliases
 
 Do not create a new alias just to rename an existing type if the meaning has not changed.
@@ -510,6 +530,30 @@ Examples:
 * an RPC payload intentionally differs from internal domain state
 
 If duplicated, the distinction must be real and documented by naming.
+
+### When to use Valibot
+
+Use Valibot when the code needs runtime validation or coercion.
+
+Good fits:
+
+* RPC input and output shapes
+* persisted settings and imported/exported data
+* browser storage payloads that are read back as unknown
+* external or user-provided data that must be validated before use
+* canonical schema-owned contracts that multiple callers should share
+
+Do not introduce Valibot just to describe an internal TypeScript-only shape.
+
+Usually no schema is needed for:
+
+* private helper return types
+* internal class state
+* debug-only snapshots that never cross a trust boundary
+* small local interfaces used only inside one implementation file
+
+Rule:
+If there is no runtime boundary, no coercion, and no validation need, prefer plain TypeScript types.
 
 ---
 

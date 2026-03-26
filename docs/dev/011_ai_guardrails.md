@@ -96,6 +96,25 @@ Each proposed commit should:
 * Keep RPC schemas near RPC.
 * Keep owner-specific schemas with their owner unless they are truly app-wide.
 
+Use Valibot when runtime validation, coercion, fallbacking, or parsing is actually required.
+
+Good fits:
+
+* RPC payloads
+* persisted settings
+* import/export payloads
+* browser storage reads
+* user-provided or external-system data entering the app
+
+Do not add Valibot for private implementation-only shapes that never cross a trust boundary.
+
+Usually plain TypeScript is enough for:
+
+* internal helper return types
+* private class state
+* internal debug structs
+* local transport bookkeeping that is never parsed from unknown input
+
 ## Forms
 
 * Use `react-hook-form` for forms.
@@ -188,6 +207,7 @@ Agents must actively prevent it.
 * Keep storage types in `storage`.
 * Keep RPC payload and schema-derived types in `rpc`.
 * Put a type in `shared/types` only if it is truly cross-cutting.
+* Do not recreate identical nested leaf shapes across layers just to stamp them as transport, DTO, or record types.
 
 ## Before introducing a new type, check
 
@@ -195,6 +215,7 @@ Agents must actively prevent it.
 2. Is there already a schema that should derive it?
 3. Does the type belong with a stronger owner?
 4. Is this a real new semantic type, or just another alias?
+5. Is this only an identical nested leaf shape that should be reused instead?
 
 If the answer is unclear, propose first.
 
