@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRadarrConnectionStatus, useRadarrMetadata, queryKeys } from '@/shared/queries';
-import { useDisplayedConnectionStatus } from '@/shared/hooks/common/use-displayed-connection-status';
-import type { ProviderConnectionStatus } from '@/shared/providers/common/connection-status';
+import { useRadarrMetadata, queryKeys } from '@/shared/queries';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import { requestRadarrPermission, validateApiKey, validateUrl } from '@/shared/providers/radarr/validation';
 import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
+import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
+import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
 import {
   ProviderConnectionCard,
   ProviderConnectionStatusBadge,
@@ -120,7 +120,8 @@ function RadarrSettingsFormInner({
       ? persistedCredentials
       : null;
 
-  const liveConnectionQuery = useRadarrConnectionStatus({
+  const liveConnectionQuery = useProviderConnectionCheck({
+    provider: 'radarr',
     enabled: metadataEnabled,
     credentials: metadataCredentials,
   });
@@ -133,16 +134,10 @@ function RadarrSettingsFormInner({
   const isConnectionChecking =
     actions.radarrTestConnectionState.isPending ||
     (metadataEnabled && liveConnectionQuery.isFetching);
-  const rawConnectionStatus: ProviderConnectionStatus =
-    isConnectionChecking
-      ? 'connecting'
-      : liveConnectionQuery.isSuccess
-        ? 'connected'
-        : hasSavedCredentials
-          ? 'configured'
-          : 'not-configured';
-  const connectionStatus = useDisplayedConnectionStatus(rawConnectionStatus, {
-    fallbackStatus: hasSavedCredentials ? 'configured' : 'not-configured',
+  const connectionStatus = useProviderConnectionStatus({
+    hasConfiguredCredentials: hasSavedCredentials,
+    isChecking: isConnectionChecking,
+    isConnected: liveConnectionQuery.isSuccess,
   });
 
   useEffect(() => {
@@ -210,7 +205,10 @@ function RadarrSettingsFormInner({
     }
 
     try {
-      await actions.radarrTestConnectionState.mutateAsync(formCredentials);
+      await actions.radarrTestConnectionState.mutateAsync({
+        provider: 'radarr',
+        credentials: formCredentials,
+      });
       const saved = await actions.saveProviderConnection('radarr');
       if (!saved) {
         return false;

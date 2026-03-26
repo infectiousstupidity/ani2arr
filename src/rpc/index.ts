@@ -47,6 +47,7 @@ import type {
   GetRadarrMetadataOutput,
   SearchAniListInput,
   AniListSearchResultDto,
+  TestProviderConnectionInput,
 } from './schemas';
 
 export interface Ani2arrApi {
@@ -66,8 +67,7 @@ export interface Ani2arrApi {
   getQualityProfiles(): Promise<SonarrQualityProfile[]>;
   getRootFolders(): Promise<SonarrRootFolder[]>;
   getTags(): Promise<SonarrTag[]>;
-  testConnection(payload: ProviderCredentials): Promise<{ version: string }>;
-  testRadarrConnection(payload: ProviderCredentials): Promise<{ version: string }>;
+  testProviderConnection(input: TestProviderConnectionInput): Promise<{ version: string }>;
   getSonarrMetadata(input?: { credentials?: ProviderCredentials }): Promise<{
     qualityProfiles: SonarrQualityProfile[];
     rootFolders: SonarrRootFolder[];

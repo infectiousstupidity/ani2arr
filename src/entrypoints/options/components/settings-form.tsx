@@ -3,11 +3,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { useSonarrConnectionStatus, useSonarrMetadata, queryKeys } from '@/shared/queries';
-import { useDisplayedConnectionStatus } from '@/shared/hooks/common/use-displayed-connection-status';
-import type { ProviderConnectionStatus } from '@/shared/providers/common/connection-status';
+import { useSonarrMetadata, queryKeys } from '@/shared/queries';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
+import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
+import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
 import {
   requestSonarrPermission,
   validateApiKey,
@@ -145,7 +145,8 @@ function SettingsFormInner({
       ? persistedCredentials
       : null;
 
-  const liveConnectionQuery = useSonarrConnectionStatus({
+  const liveConnectionQuery = useProviderConnectionCheck({
+    provider: 'sonarr',
     enabled: metadataEnabled,
     credentials: metadataCredentials,
   });
@@ -158,16 +159,10 @@ function SettingsFormInner({
   const isConnectionChecking =
     actions.sonarrTestConnectionState.isPending ||
     (metadataEnabled && liveConnectionQuery.isFetching);
-  const rawConnectionStatus: ProviderConnectionStatus =
-    isConnectionChecking
-      ? 'connecting'
-      : liveConnectionQuery.isSuccess
-        ? 'connected'
-        : hasSavedCredentials
-          ? 'configured'
-          : 'not-configured';
-  const connectionStatus = useDisplayedConnectionStatus(rawConnectionStatus, {
-    fallbackStatus: hasSavedCredentials ? 'configured' : 'not-configured',
+  const connectionStatus = useProviderConnectionStatus({
+    hasConfiguredCredentials: hasSavedCredentials,
+    isChecking: isConnectionChecking,
+    isConnected: liveConnectionQuery.isSuccess,
   });
 
   // Auto-select defaults when metadata first loads
@@ -238,7 +233,10 @@ function SettingsFormInner({
     }
 
     try {
-      await actions.sonarrTestConnectionState.mutateAsync(formCredentials);
+      await actions.sonarrTestConnectionState.mutateAsync({
+        provider: 'sonarr',
+        credentials: formCredentials,
+      });
       const saved = await actions.saveProviderConnection('sonarr');
       if (!saved) {
         return false;

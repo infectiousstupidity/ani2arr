@@ -28,29 +28,6 @@ export const useRadarrMetadata = (options?: { enabled?: boolean; credentials?: P
   });
 };
 
-export const useRadarrConnectionStatus = (options?: {
-  enabled?: boolean;
-  credentials?: ProviderCredentials | null;
-}) =>
-  useQuery<{ version: string }, ExtensionError>({
-    queryKey: queryKeys.radarrConnection(
-      options?.credentials?.url && options.credentials.apiKey
-        ? `${options.credentials.url}|${options.credentials.apiKey}`
-        : 'configured',
-    ),
-    queryFn: async () => {
-      if (!options?.credentials) {
-        throw new Error('Radarr credentials are required to verify connection status.');
-      }
-      return getAni2arrApi().testRadarrConnection(options.credentials);
-    },
-    enabled: (options?.enabled ?? true) && Boolean(options?.credentials?.url && options?.credentials.apiKey),
-    staleTime: 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: 'always',
-    retry: 0,
-  });
-
 export const useMovieStatus = (payload: CheckMovieStatusPayload, options?: {
   enabled?: boolean;
   force_verify?: boolean;
@@ -124,17 +101,6 @@ export const useUpdateMovie = () => {
     },
   });
 };
-
-export const useTestRadarrConnection = () =>
-  useMutation<{ version: string }, ExtensionError, ProviderCredentials>({
-    mutationFn: async (payload: ProviderCredentials) => {
-      try {
-        return await getAni2arrApi().testRadarrConnection(payload);
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-  });
 
 export const useUpdateRadarrDefaultSettings = () => {
   const queryClient = useQueryClient();
