@@ -1,0 +1,44 @@
+/* Provider connection status tokens shared between the popup and options UIs. */
+/* src/shared/styles/provider-connection-status.css */
+
+.a2a-provider-status {
+  --a2a-provider-status-fg: var(--color-text-secondary);
+  --a2a-provider-status-bg: color-mix(in srgb, var(--color-text-secondary) 24%, transparent);
+  --a2a-provider-status-border: color-mix(in srgb, var(--color-border-primary) 72%, var(--color-text-secondary));
+  --a2a-provider-status-dot: var(--color-text-secondary);
+}
+
+.a2a-provider-status--connected {
+  --a2a-provider-status-fg: var(--color-success);
+  --a2a-provider-status-bg: color-mix(in srgb, var(--color-success) 24%, transparent);
+  --a2a-provider-status-border: color-mix(in srgb, var(--color-success) 40%, transparent);
+  --a2a-provider-status-dot: var(--color-success);
+}
+
+.a2a-provider-status--configured {
+  --a2a-provider-status-fg: var(--color-accent-primary);
+  --a2a-provider-status-bg: color-mix(in srgb, var(--color-accent-primary) 24%, transparent);
+  --a2a-provider-status-border: color-mix(in srgb, var(--color-accent-primary) 40%, transparent);
+  --a2a-provider-status-dot: var(--color-accent-primary);
+}
+
+.a2a-provider-status--connecting {
+  --a2a-provider-status-fg: var(--color-warning);
+  --a2a-provider-status-bg: color-mix(in srgb, var(--color-warning) 24%, transparent);
+  --a2a-provider-status-border: color-mix(in srgb, var(--color-warning) 40%, transparent);
+  --a2a-provider-status-dot: var(--color-warning);
+}
+
+.a2a-provider-status-badge {
+  border: 1px solid var(--a2a-provider-status-border);
+  background: var(--a2a-provider-status-bg);
+  color: var(--a2a-provider-status-fg);
+}
+
+.a2a-provider-status-dot {
+  background: var(--a2a-provider-status-dot);
+}
+
+.a2a-provider-status-text {
+  color: var(--a2a-provider-status-fg);
+}

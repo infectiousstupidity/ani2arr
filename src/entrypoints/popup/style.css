@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@/shared/styles/provider-connection-status.css";
 
 html,
 body,
@@ -22,6 +23,7 @@ body {
   --border-primary: #38444d;
   --accent-primary: #3db4f2;
   --accent-hover: #299dd1;
+  --warning: #f2c94c;
   --success: #00ba7c;
   --error: #f91880;
 
@@ -33,6 +35,7 @@ body {
   --color-border-primary: var(--border-primary);
   --color-accent-primary: var(--accent-primary);
   --color-accent-hover: var(--accent-hover);
+  --color-warning: var(--warning);
   --color-success: var(--success);
   --color-error: var(--error);
 }

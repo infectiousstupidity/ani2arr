@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import type { ProviderTitleLanguage } from '@/shared/types';
 import {
-  getProviderConnectionStatusAppearance,
-  getProviderConnectionStatusLabel,
+  getProviderConnectionStatusMeta,
   type ProviderConnectionStatus,
-} from '@/shared/providers/common/connection-status';
+} from '@/features/options/provider-connection-status';
+import { cn } from '@/shared/utils/cn';
 import { InputField, SelectField } from '../../../shared/ui/form/form';
 import Button from '../../../shared/ui/primitives/button';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';
@@ -20,44 +21,19 @@ export const TITLE_LANGUAGE_OPTIONS: Array<{ value: ProviderTitleLanguage; label
 export const TITLE_LANGUAGE_DESCRIPTION =
   'ani2arr uses this to choose the preferred AniList title for display and as the primary title hint when matching and adding media.';
 
-export const ConnectionStatusBadge: React.FC<{ isConnected: boolean; isTesting: boolean }> = ({
-  isConnected,
-  isTesting,
-}) => {
-  const status = useMemo(() => {
-    if (isConnected) {
-      return {
-        label: 'Connected',
-        className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/40',
-      };
-    }
-    if (isTesting) {
-      return {
-        label: 'Connecting',
-        className: 'bg-amber-500/10 text-amber-300 border-amber-500/40',
-      };
-    }
-    return {
-      label: 'Not connected',
-      className: 'bg-slate-700/50 text-text-secondary border-border-primary',
-    };
-  }, [isConnected, isTesting]);
-
-  return (
-    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold border ${status.className}`}>
-      {status.label}
-    </span>
-  );
-};
-
 export const ProviderConnectionStatusBadge: React.FC<{ status: ProviderConnectionStatus }> = ({
   status,
 }) => {
-  const appearance = useMemo(() => getProviderConnectionStatusAppearance(status), [status]);
+  const statusMeta = getProviderConnectionStatusMeta(status);
 
   return (
-    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold border ${appearance.badgeClassName}`}>
-      {getProviderConnectionStatusLabel(status, { short: true })}
+    <span
+      className={cn(
+        'a2a-provider-status a2a-provider-status-badge rounded-full px-3 py-1 text-[11px] font-semibold',
+        statusMeta.variantClassName,
+      )}
+    >
+      {statusMeta.shortLabel}
     </span>
   );
 };

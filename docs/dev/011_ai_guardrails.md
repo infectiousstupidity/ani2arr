@@ -106,6 +106,7 @@ Each proposed commit should:
 
 * Use the repo’s `cn` helper for class composition.
 * Use the canonical helper from `src/shared/utils/cn.ts`.
+* Use it whenever conditional, merged, or optional class names are being composed.
 * Do not introduce duplicate class name helpers.
 * Do not compose Tailwind class strings with new custom helpers unless approved.
 

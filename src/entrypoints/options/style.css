@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@/shared/styles/provider-connection-status.css";
 
 @theme {
   /* Dark Theme */

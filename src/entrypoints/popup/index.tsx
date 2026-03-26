@@ -13,10 +13,9 @@ import { browser } from 'wxt/browser';
 import { ExternalLink } from 'lucide-react';
 import { useExtensionOptions, useSaveOptions } from '@/shared/queries';
 import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
-import {
-  useProviderConnectionStatus,
-  type ProviderConnectionStatus,
-} from '@/features/options/use-provider-connection-status';
+import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
+import { getProviderConnectionStatusMeta } from '@/features/options/provider-connection-status';
+import { cn } from '@/shared/utils/cn';
 import type { Settings } from '@/shared/schemas/settings';
 import type {
   BadgeVisibility,
@@ -36,31 +35,6 @@ const badgeOptions: Array<{ value: BadgeVisibility; label: string }> = [
   { value: 'hover', label: 'On hover' },
   { value: 'hidden', label: 'Hidden' },
 ];
-
-const PROVIDER_CONNECTION_STATUS_META: Record<
-  ProviderConnectionStatus,
-  {
-    dotClassName: string;
-    shortLabel: string;
-  }
-> = {
-  connected: {
-    dotClassName: 'bg-emerald-400',
-    shortLabel: 'Connected',
-  },
-  configured: {
-    dotClassName: 'bg-sky-400',
-    shortLabel: 'Configured',
-  },
-  connecting: {
-    dotClassName: 'bg-amber-400',
-    shortLabel: 'Checking',
-  },
-  'not-configured': {
-    dotClassName: 'bg-slate-400',
-    shortLabel: 'Not set',
-  },
-};
 
 const getConfiguredCredentials = (
   settings: Settings | undefined,
@@ -226,15 +200,20 @@ const QuickSettings: React.FC = () => {
           <p className="text-[11px] uppercase tracking-wide text-text-secondary">Sonarr</p>
           <div className="mt-1 flex items-center gap-2 text-sm">
             {(() => {
-              const meta = PROVIDER_CONNECTION_STATUS_META[sonarrStatus];
+              const meta = getProviderConnectionStatusMeta(sonarrStatus);
               return (
-                <>
+                <span
+                  className={cn(
+                    'a2a-provider-status inline-flex items-center gap-2',
+                    meta.variantClassName,
+                  )}
+                >
                   <span
-                    className={`inline-block h-2.5 w-2.5 rounded-full ${meta.dotClassName}`}
+                    className="a2a-provider-status-dot inline-block h-2.5 w-2.5 rounded-full"
                     aria-hidden
                   />
-                  {meta.shortLabel}
-                </>
+                  <span className="a2a-provider-status-text">{meta.shortLabel}</span>
+                </span>
               );
             })()}
           </div>
@@ -252,15 +231,20 @@ const QuickSettings: React.FC = () => {
           <p className="text-[11px] uppercase tracking-wide text-text-secondary">Radarr</p>
           <div className="mt-1 flex items-center gap-2 text-sm">
             {(() => {
-              const meta = PROVIDER_CONNECTION_STATUS_META[radarrStatus];
+              const meta = getProviderConnectionStatusMeta(radarrStatus);
               return (
-                <>
+                <span
+                  className={cn(
+                    'a2a-provider-status inline-flex items-center gap-2',
+                    meta.variantClassName,
+                  )}
+                >
                   <span
-                    className={`inline-block h-2.5 w-2.5 rounded-full ${meta.dotClassName}`}
+                    className="a2a-provider-status-dot inline-block h-2.5 w-2.5 rounded-full"
                     aria-hidden
                   />
-                  {meta.shortLabel}
-                </>
+                  <span className="a2a-provider-status-text">{meta.shortLabel}</span>
+                </span>
               );
             })()}
           </div>
