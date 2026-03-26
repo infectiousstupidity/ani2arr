@@ -102,6 +102,7 @@ src/
   - transport DTOs in `integrations/`
   - storage-local types in `storage/`
   - only truly cross-cutting types in `shared/types/`
+- Do not recreate identical nested leaf shapes under different owners just to mark a boundary. If the shape and meaning are the same, keep one canonical type.
 - Do not create aliases that just rename an existing type without changing meaning.
 - Split files by responsibility, not line count. Prefer small duplication over abstractions that weaken ownership or increase navigation cost.
 - Do not create folders for speculative growth or symmetry alone.
@@ -125,7 +126,9 @@ import { browser } from 'wxt/browser';
 Update the path comment whenever a file moves.
 
 ## Repo-specific implementation rules
-- Use Valibot where applicable. Prefer deriving types from schemas when the schema is canonical.
+- Use Valibot where runtime validation or coercion is actually needed. Prefer deriving types from schemas when the schema is canonical.
+- Good fits for Valibot: RPC payloads, persisted settings, import/export payloads, browser-storage reads, and user or external input that enters the app as unknown data.
+- Do not add Valibot for private implementation-only shapes such as internal helper returns, internal class state, debug structs, or local bookkeeping with no runtime boundary.
 - Use `react-hook-form` for forms.
 - Use the canonical `cn` helper from `src/shared/utils/cn.ts` for class composition.
 - Use Tailwind consistently and avoid introducing a new visual abstraction layer without a repeated need.
