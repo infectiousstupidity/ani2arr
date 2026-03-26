@@ -64,3 +64,13 @@ export interface AniListMediaPage {
 export interface AniListSearchPage {
   media?: AniListSearchMediaDto[] | null;
 }
+
+export interface FindMediaBatchResponseDto {
+  data?: { Page?: AniListMediaPage };
+  errors?: AniListGraphQLError[];
+}
+
+export interface SearchMediaResponseDto {
+  data?: { Page?: AniListSearchPage };
+  errors?: AniListGraphQLError[];
+}

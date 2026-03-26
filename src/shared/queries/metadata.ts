@@ -14,48 +14,6 @@ export const useAniListMedia = (
 ) => {
   const forceRefresh = opts?.forceRefresh ?? false;
 
-  const fetchAniListDirect = async (id: number): Promise<AniListMedia | null> => {
-    const FIND_MEDIA_QUERY = `
-      query FindMedia($id: Int) {
-        Media(id: $id) {
-          id
-          format
-          title { romaji english native }
-          startDate { year }
-          synonyms
-          description(asHtml: false)
-          episodes
-          duration
-          nextAiringEpisode { episode airingAt }
-          relations { edges { relationType node { id } } }
-          bannerImage
-          coverImage { extraLarge large medium color }
-          status
-          season
-          seasonYear
-          genres
-          studios(isMain: true) { nodes { name } }
-        }
-      }
-    `;
-
-    const response = await fetch('https://graphql.anilist.co', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ query: FIND_MEDIA_QUERY, variables: { id } }),
-    });
-    if (!response.ok) return null;
-    const payload = (await response.json()) as { data?: { Media?: AniListMedia } };
-    const media = payload?.data?.Media;
-    if (!media) return null;
-    // sanitize to plain data for React Query cache safety
-    try {
-      return JSON.parse(JSON.stringify(media)) as AniListMedia;
-    } catch {
-      return media;
-    }
-  };
-
   return useQuery<AniListMedia | null, ExtensionError>({
     queryKey: queryKeys.aniListMedia(anilistId ?? 0),
     queryFn: async () => {
@@ -65,12 +23,6 @@ export const useAniListMedia = (
         const media = await api.fetchAniListMedia(anilistId);
         return media ?? null;
       } catch (error) {
-        // Fallback to direct AniList fetch if messaging/proxy fails (e.g., DataCloneError)
-        const msg = (error as Error | undefined)?.message ?? '';
-        if (msg.includes('DataCloneError') || msg.includes('could not be cloned')) {
-          const direct = await fetchAniListDirect(anilistId);
-          if (direct) return direct;
-        }
         const normalized = normalizeError(error);
         console.error('[useAniListMedia] Failed to fetch AniList media:', normalized);
         throw normalized;

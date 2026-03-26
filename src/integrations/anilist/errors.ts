@@ -1,6 +1,18 @@
-import { AbortError } from '@/shared/utils/retry';
-import type { AniListResponseMeta } from '@/integrations/anilist/types';
-import type { ReturnTypeOfCreateError } from './types';
+/** Transport error types for AniList HTTP and rate-limit failures. */
+// src/integrations/anilist/errors.ts
+
+import type { AniListGraphQLError, AniListResponseMeta } from '@/integrations/anilist/types';
+
+export class AniListGraphqlError extends Error {
+  public readonly errors: AniListGraphQLError[];
+
+  constructor(errors: AniListGraphQLError[]) {
+    const message = errors.map(error => error.message).filter(Boolean).join(', ') || 'Unknown AniList GraphQL error';
+    super(`AniList GraphQL Error: ${message}`);
+    this.name = 'AniListGraphqlError';
+    this.errors = errors;
+  }
+}
 
 export class AniListRateLimitError extends Error {
   public readonly retryAfterMs: number;
@@ -35,15 +47,6 @@ export class AniListHttpError extends Error {
   }
 }
 
-export class AniListAbortError extends AbortError {
-  public readonly extensionError: ReturnTypeOfCreateError;
-
-  constructor(extensionError: ReturnTypeOfCreateError) {
-    super(new Error(extensionError.message));
-    this.extensionError = extensionError;
-  }
-}
-
 export const isRateLimitError = (error: unknown): error is AniListRateLimitError =>
   error instanceof AniListRateLimitError ||
   (
@@ -62,5 +65,11 @@ export const isHttpError = (error: unknown): error is AniListHttpError =>
     (error as { name?: unknown }).name === 'AniListHttpError'
   );
 
-export const isAniListAbortError = (error: unknown): error is AniListAbortError =>
-  error instanceof AniListAbortError;
+export const isGraphqlError = (error: unknown): error is AniListGraphqlError =>
+  error instanceof AniListGraphqlError ||
+  (
+    typeof error === 'object' &&
+    error !== null &&
+    Array.isArray((error as { errors?: unknown }).errors) &&
+    (error as { name?: unknown }).name === 'AniListGraphqlError'
+  );

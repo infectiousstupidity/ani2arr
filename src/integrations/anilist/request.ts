@@ -1,22 +1,28 @@
-import { API_URL, DEFAULT_RATE_LIMIT_DELAY_MS } from './constants';
+/** Low-level AniList GraphQL POST request helper. */
+// src/integrations/anilist/request.ts
+
+import {
+  ANILIST_GRAPHQL_API_URL,
+  DEFAULT_ANILIST_RETRY_AFTER_MS,
+} from '@/integrations/anilist/constants';
+import { AniListHttpError, AniListRateLimitError } from '@/integrations/anilist/errors';
+import { toAniListResponseMeta } from '@/integrations/anilist/rate-limit';
 import type { AniListResponseMeta } from '@/integrations/anilist/types';
-import { AniListHttpError, AniListRateLimitError } from './errors';
-import { toAniListResponseMeta } from './rate-limit';
 
 interface RequestParams<TVariables> {
   query: string;
   variables: TVariables;
 }
 
-export interface AniListResponse<TPayload> {
+export interface AniListRequestResult<TPayload> {
   payload: TPayload;
   meta: AniListResponseMeta;
 }
 
 export async function postAniList<TResponse, TVariables extends Record<string, unknown>>(
   params: RequestParams<TVariables>,
-): Promise<AniListResponse<TResponse>> {
-  const response = await fetch(API_URL, {
+): Promise<AniListRequestResult<TResponse>> {
+  const response = await fetch(ANILIST_GRAPHQL_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ query: params.query, variables: params.variables }),
@@ -25,7 +31,7 @@ export async function postAniList<TResponse, TVariables extends Record<string, u
 
   if (!response.ok) {
     if (response.status === 429) {
-      const retryAfterMs = meta.rateLimit.retryAfterMs ?? DEFAULT_RATE_LIMIT_DELAY_MS;
+      const retryAfterMs = meta.rateLimit.retryAfterMs ?? DEFAULT_ANILIST_RETRY_AFTER_MS;
       const pausedUntil = meta.rateLimit.resetAt ?? (meta.receivedAt + retryAfterMs);
       throw new AniListRateLimitError(meta, pausedUntil);
     }
