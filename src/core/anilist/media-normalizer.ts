@@ -1,7 +1,10 @@
+/** AniList media normalization and cache-write helpers for the domain workflow. */
+// src/core/anilist/media-normalizer.ts
+
+import type { TtlCache } from '@/storage';
 import type { AniListMedia } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
 import { MEDIA_HARD_TTL, MEDIA_SOFT_TTL } from './constants';
-import type { TtlCache } from '@/storage';
 
 const log = logger.create('AniListMediaCache');
 

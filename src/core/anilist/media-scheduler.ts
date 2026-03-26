@@ -1,6 +1,25 @@
+/** AniList media scheduling, pacing, batching, and request execution for the domain workflow. */
+// src/core/anilist/media-scheduler.ts
+
+import { DEFAULT_ANILIST_RETRY_AFTER_MS } from '@/integrations/anilist/constants';
+import {
+  isGraphqlError,
+  isHttpError,
+  isRateLimitError,
+} from '@/integrations/anilist/errors';
+import {
+  fetchAniListMediaBatch,
+  searchAniListMedia,
+} from '@/integrations/anilist/media';
+import type {
+  AniListRateLimitMeta,
+  AniListResponseMeta,
+  AniListSearchMediaDto,
+} from '@/integrations/anilist/types';
 import type { TtlCache } from '@/storage';
 import { createError, ErrorCode } from '@/shared/errors/error-utils';
 import type {
+  AniListMedia,
   AniListSchedulerBatchDebug,
   AniListSchedulerBatchMediaCountsDebug,
   AniListSchedulerBucketDebug,
@@ -8,20 +27,23 @@ import type {
   AniListSchedulerEventDebug,
   AniListSchedulerPendingEntryDebug,
   AniListSchedulerRequestDebug,
-  AniListMedia,
   RequestPriority,
 } from '@/shared/types';
-import { priorityValue } from '@/shared/utils/priority';
 import { logger } from '@/shared/utils/logger';
-import { MAX_BATCH_SIZE } from './constants';
-import type { AniListExecutor } from './executor';
+import { priorityValue } from '@/shared/utils/priority';
+import { AbortError, withRetry } from '@/shared/utils/retry';
+import {
+  LOW_PRIORITY_MIN_DISPATCH_GAP_MS,
+  LOW_PRIORITY_REMAINING_FLOOR,
+  LOW_PRIORITY_REMAINING_RATIO,
+  MAX_BATCH_SIZE,
+} from './constants';
 import {
   cacheMedia,
   hasCompleteMediaFields,
   normalizeMedia,
   sanitizeMedia,
 } from './media-normalizer';
-import type { AniListRateLimiter } from './rate-limit';
 
 export interface RequestMediaOptions {
   priority?: RequestPriority;
@@ -56,10 +78,23 @@ type InflightEntry = {
 
 type MediaSchedulerDeps = {
   cache?: TtlCache<AniListMedia>;
-  executor: AniListExecutor;
-  limiter: AniListRateLimiter;
   dispatchTask: <T>(task: () => Promise<T>, priority: number) => Promise<T>;
 };
+
+type AniListRateLimitStateSnapshot = {
+  pausedUntil: number;
+  lastKnownLimit: number | null;
+  lastKnownRemaining: number | null;
+  lastKnownResetAt: number | null;
+  last429At: number | null;
+};
+
+type LimiterEventType = 'success' | 'rate-limit' | 'resume';
+type LimiterListener = (
+  event: LimiterEventType,
+  snapshot: AniListRateLimitStateSnapshot,
+  meta: AniListResponseMeta,
+) => void;
 
 const PRIORITIES: RequestPriority[] = ['high', 'normal', 'low'];
 const MAX_RECENT_REQUESTS = 80;
@@ -81,8 +116,129 @@ const createEmptyMediaCounts = (): AniListSchedulerBatchMediaCountsDebug => ({
   unknown: 0,
 });
 
+class AniListRateLimiter {
+  private readonly log = logger.create('AniListLimiter');
+  private pausedUntil = 0;
+  private lastKnownLimit: number | null = null;
+  private lastKnownRemaining: number | null = null;
+  private lastKnownResetAt: number | null = null;
+  private last429At: number | null = null;
+  private lastLowDispatchAt: number | null = null;
+  private listener: LimiterListener | null = null;
+
+  public setListener(listener: LimiterListener | null): void {
+    this.listener = listener;
+  }
+
+  public updateFromSuccess(meta: AniListResponseMeta): void {
+    const wasPaused = this.pausedUntil > meta.receivedAt;
+    this.applyKnownRateLimit(meta.rateLimit);
+
+    const { remaining, resetAt } = meta.rateLimit;
+    const fallbackResetAt = meta.receivedAt + DEFAULT_ANILIST_RETRY_AFTER_MS;
+
+    if (typeof remaining === 'number' && remaining <= 0) {
+      this.pausedUntil = Math.max(this.pausedUntil, resetAt ?? fallbackResetAt);
+    } else if (this.pausedUntil <= meta.receivedAt) {
+      this.pausedUntil = 0;
+    }
+
+    if (import.meta.env.DEV) {
+      this.log.debug?.(
+        `anilist:limiter update remaining=${String(this.lastKnownRemaining)} limit=${String(this.lastKnownLimit)} resetAt=${String(this.lastKnownResetAt)} pausedUntil=${this.pausedUntil || 0}`,
+      );
+    }
+
+    this.listener?.('success', this.snapshot(), meta);
+    if (wasPaused && this.pausedUntil <= meta.receivedAt) {
+      this.listener?.('resume', this.snapshot(), meta);
+    }
+  }
+
+  public updateFromRateLimit(meta: AniListResponseMeta, pausedUntil?: number): number {
+    this.applyKnownRateLimit(meta.rateLimit);
+
+    const computedPausedUntil =
+      pausedUntil ??
+      meta.rateLimit.resetAt ??
+      (typeof meta.rateLimit.retryAfterMs === 'number'
+        ? meta.receivedAt + meta.rateLimit.retryAfterMs
+        : meta.receivedAt + DEFAULT_ANILIST_RETRY_AFTER_MS);
+
+    this.pausedUntil = Math.max(this.pausedUntil, computedPausedUntil);
+    this.last429At = meta.receivedAt;
+
+    if (import.meta.env.DEV) {
+      this.log.debug?.(
+        `anilist:limiter rate-limit remaining=${String(this.lastKnownRemaining)} limit=${String(this.lastKnownLimit)} resetAt=${String(this.lastKnownResetAt)} pausedUntil=${this.pausedUntil}`,
+      );
+    }
+
+    this.listener?.('rate-limit', this.snapshot(), meta);
+
+    return this.pausedUntil;
+  }
+
+  public recordDispatch(priority: RequestPriority, at = Date.now()): void {
+    if (priority === 'low') {
+      this.lastLowDispatchAt = at;
+    }
+  }
+
+  public nextDispatchAt(priority: RequestPriority, now = Date.now()): number {
+    const activePauseUntil = this.pausedUntil > now ? this.pausedUntil : 0;
+    let nextAt = activePauseUntil || now;
+
+    if (priority === 'low') {
+      if (this.shouldHoldLowPriority()) {
+        nextAt = Math.max(nextAt, this.lastKnownResetAt ?? activePauseUntil ?? now);
+      }
+
+      if (typeof this.lastLowDispatchAt === 'number') {
+        nextAt = Math.max(nextAt, this.lastLowDispatchAt + LOW_PRIORITY_MIN_DISPATCH_GAP_MS);
+      }
+    }
+
+    return nextAt;
+  }
+
+  public shouldHoldLowPriority(): boolean {
+    if (typeof this.lastKnownRemaining !== 'number') return false;
+
+    const threshold =
+      typeof this.lastKnownLimit === 'number' && this.lastKnownLimit > 0
+        ? Math.max(LOW_PRIORITY_REMAINING_FLOOR, Math.ceil(this.lastKnownLimit * LOW_PRIORITY_REMAINING_RATIO))
+        : LOW_PRIORITY_REMAINING_FLOOR;
+
+    return this.lastKnownRemaining <= threshold;
+  }
+
+  public snapshot(): AniListRateLimitStateSnapshot {
+    return {
+      pausedUntil: this.pausedUntil,
+      lastKnownLimit: this.lastKnownLimit,
+      lastKnownRemaining: this.lastKnownRemaining,
+      lastKnownResetAt: this.lastKnownResetAt,
+      last429At: this.last429At,
+    };
+  }
+
+  private applyKnownRateLimit(rateLimit: AniListRateLimitMeta): void {
+    if (typeof rateLimit.limit === 'number') {
+      this.lastKnownLimit = rateLimit.limit;
+    }
+    if (typeof rateLimit.remaining === 'number') {
+      this.lastKnownRemaining = rateLimit.remaining;
+    }
+    if (typeof rateLimit.resetAt === 'number') {
+      this.lastKnownResetAt = rateLimit.resetAt;
+    }
+  }
+}
+
 export class AniListMediaScheduler {
   private readonly log = logger.create('AniListMediaScheduler');
+  private readonly limiter = new AniListRateLimiter();
   private readonly pendingByPriority = new Map<RequestPriority, Map<number, PendingEntry>>(
     PRIORITIES.map(priority => [priority, new Map<number, PendingEntry>()]),
   );
@@ -100,7 +256,7 @@ export class AniListMediaScheduler {
   private nextEventId = 1;
 
   constructor(private readonly deps: MediaSchedulerDeps) {
-    this.deps.limiter.setListener((event, snapshot, meta) => {
+    this.limiter.setListener((event, snapshot, meta) => {
       if (event === 'success') {
         return;
       }
@@ -233,6 +389,13 @@ export class AniListMediaScheduler {
     return results;
   }
 
+  public searchMedia(search: string, limit: number): Promise<AniListSearchMediaDto[]> {
+    return this.deps.dispatchTask(async () => {
+      await this.waitForLimiterWindow('normal');
+      return this.executeRequest(() => searchAniListMedia(search, limit), 'AniList request failed.');
+    }, priorityValue('normal'));
+  }
+
   public getDebugSnapshot(): AniListSchedulerDebugSnapshot {
     const now = Date.now();
     const pendingBuckets = PRIORITIES.map(priority => {
@@ -264,11 +427,11 @@ export class AniListMediaScheduler {
       recentBatches: [...this.recentBatches].reverse(),
       recentEvents: [...this.recentEvents].reverse(),
       limiter: {
-        ...this.deps.limiter.snapshot(),
-        lowPriorityHeld: this.deps.limiter.shouldHoldLowPriority(),
-        nextDispatchAtHigh: this.deps.limiter.nextDispatchAt('high', now),
-        nextDispatchAtNormal: this.deps.limiter.nextDispatchAt('normal', now),
-        nextDispatchAtLow: this.deps.limiter.nextDispatchAt('low', now),
+        ...this.limiter.snapshot(),
+        lowPriorityHeld: this.limiter.shouldHoldLowPriority(),
+        nextDispatchAtHigh: this.limiter.nextDispatchAt('high', now),
+        nextDispatchAtNormal: this.limiter.nextDispatchAt('normal', now),
+        nextDispatchAtLow: this.limiter.nextDispatchAt('low', now),
       },
     };
   }
@@ -516,7 +679,7 @@ export class AniListMediaScheduler {
       if (!bucket || bucket.size === 0) continue;
 
       const coalescedAt = this.bucketReadyAt.get(priority) ?? now;
-      const limiterAt = this.deps.limiter.nextDispatchAt(priority, now);
+      const limiterAt = this.limiter.nextDispatchAt(priority, now);
       return Math.max(now, coalescedAt, limiterAt);
     }
 
@@ -549,11 +712,11 @@ export class AniListMediaScheduler {
 
       const readyAt = Math.max(
         this.bucketReadyAt.get(priority) ?? now,
-        this.deps.limiter.nextDispatchAt(priority, now),
+        this.limiter.nextDispatchAt(priority, now),
       );
 
       if (readyAt > now) {
-        const holdingLow = priority === 'low' && this.deps.limiter.shouldHoldLowPriority();
+        const holdingLow = priority === 'low' && this.limiter.shouldHoldLowPriority();
         if (holdingLow) {
           this.recordEvent({
             at: now,
@@ -658,7 +821,7 @@ export class AniListMediaScheduler {
     }
     this.resetBucketIfEmpty(priority);
 
-    this.deps.limiter.recordDispatch(priority);
+    this.limiter.recordDispatch(priority);
 
     if (import.meta.env.DEV) {
       this.log.debug?.(
@@ -684,7 +847,7 @@ export class AniListMediaScheduler {
 
     try {
       const medias = await this.deps.dispatchTask(
-        () => this.deps.executor.fetchBatch(requestedIds),
+        () => this.fetchBatch(requestedIds),
         priorityValue(priority),
       );
 
@@ -814,5 +977,136 @@ export class AniListMediaScheduler {
       default:
         counts.other += 1;
     }
+  }
+
+  private async waitForLimiterWindow(priority: RequestPriority): Promise<void> {
+    while (true) {
+      const nextAt = this.limiter.nextDispatchAt(priority);
+      const delay = nextAt - Date.now();
+      if (delay <= 0) {
+        return;
+      }
+
+      if (import.meta.env.DEV) {
+        this.log.debug?.(`anilist:limiter wait priority=${priority} delayMs=${delay}`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  private fetchBatch(ids: number[]): Promise<AniListMedia[]> {
+    return this.executeRequest(() => fetchAniListMediaBatch(ids), 'AniList request failed.');
+  }
+
+  private async executeRequest<TResult>(
+    task: () => Promise<{ data: TResult; meta: AniListResponseMeta }>,
+    fallbackMessage: string,
+  ): Promise<TResult> {
+    try {
+      const response = await this.requestWithRetry(task);
+      return response.data;
+    } catch (error) {
+      return this.handleRequestError(error, fallbackMessage);
+    }
+  }
+
+  private requestWithRetry<TResult>(
+    task: () => Promise<{ data: TResult; meta: AniListResponseMeta }>,
+  ): Promise<{ data: TResult; meta: AniListResponseMeta }> {
+    return withRetry(async () => {
+      const response = await task();
+      this.limiter.updateFromSuccess(response.meta);
+      return response;
+    }, {
+      retries: 3,
+      minTimeout: 0,
+      maxTimeout: 0,
+      extractRetryAfterMs: error => this.extractRetryAfterMs(error),
+      onFailedAttempt: ({ error }) => this.applyRateLimitPause(error),
+      shouldAbort: error => this.shouldAbortRetry(error),
+    });
+  }
+
+  private extractRetryAfterMs(error: unknown): number | undefined {
+    const normalized = this.unwrapAbortError(error);
+    if (isRateLimitError(normalized)) {
+      return Math.max(0, normalized.pausedUntil - Date.now());
+    }
+    return undefined;
+  }
+
+  private applyRateLimitPause(error: unknown): void {
+    const normalized = this.unwrapAbortError(error);
+    if (isRateLimitError(normalized)) {
+      this.limiter.updateFromRateLimit(normalized.meta, normalized.pausedUntil);
+    }
+  }
+
+  private shouldAbortRetry(error: unknown): boolean {
+    const normalized = this.unwrapAbortError(error);
+    if (isGraphqlError(normalized)) return true;
+    if (isHttpError(normalized)) {
+      return normalized.isClientError && normalized.status !== 429;
+    }
+    return false;
+  }
+
+  private unwrapAbortError(error: unknown): unknown {
+    if (error instanceof AbortError) {
+      return (error as AbortError).originalError;
+    }
+    return error;
+  }
+
+  private handleRequestError(error: unknown, fallbackMessage: string): never {
+    const normalized = this.unwrapAbortError(error);
+
+    if (isGraphqlError(normalized)) {
+      throw createError(
+        ErrorCode.API_ERROR,
+        normalized.message,
+        'AniList request failed.',
+      );
+    }
+
+    if (isHttpError(normalized)) {
+      throw createError(
+        ErrorCode.API_ERROR,
+        `AniList API Error: ${normalized.status}`,
+        normalized.status >= 500 ? 'AniList service is temporarily unavailable.' : 'AniList request failed.',
+        { status: normalized.status },
+      );
+    }
+
+    if (isRateLimitError(normalized)) {
+      this.limiter.updateFromRateLimit(normalized.meta, normalized.pausedUntil);
+      throw createError(
+        ErrorCode.API_ERROR,
+        'AniList rate limit exceeded',
+        'AniList request failed.',
+        { retryAfterMs: Math.max(0, normalized.pausedUntil - Date.now()) },
+      );
+    }
+
+    if (normalized instanceof Error) {
+      const withStatus = normalized as Error & { status?: number };
+      if (typeof withStatus.status === 'number') {
+        throw createError(
+          ErrorCode.API_ERROR,
+          `AniList API Error: ${withStatus.status}`,
+          'AniList service is temporarily unavailable.',
+          { status: withStatus.status },
+        );
+      }
+      throw createError(ErrorCode.API_ERROR, normalized.message, fallbackMessage);
+    }
+
+    throw createError(
+      ErrorCode.API_ERROR,
+      'Unexpected error type in AniListMediaScheduler.handleRequestError',
+      fallbackMessage,
+      { originalError: normalized },
+    );
   }
 }
