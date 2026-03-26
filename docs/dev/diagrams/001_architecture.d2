@@ -1,0 +1,214 @@
+direction: right
+
+# ######################################
+# ENTRYPOINTS (WXT SHELLS)
+# ######################################
+
+entrypoints: {
+  label: "entrypoints (WXT shells)"
+  style.fill: "#1e1e2e"
+
+  background: "background.ts\n- startup\n- alarms\n- messaging"
+  content: "content scripts\n(anilist / anichart)"
+  options: "options page"
+}
+
+# ######################################
+# UI LAYER
+# ######################################
+
+ui: {
+  label: "UI Layer"
+  style.fill: "#313244"
+
+  features: {
+    label: "features"
+    media_modal: "media-modal"
+    mapping_explorer: "mapping-explorer"
+    provider_settings: "provider-settings"
+    browse_card: "browse-card"
+  }
+
+  components: {
+    label: "components"
+    primitives: "ui primitives"
+    composites: "reusable composites"
+  }
+}
+
+# ######################################
+# RPC LAYER (BOUNDARY)
+# ######################################
+
+rpc: {
+  label: "RPC Layer (App Boundary)"
+  style.fill: "#45475a"
+
+  contract: "rpc/index.ts\n(Ani2arrApi)"
+  schemas: "schemas.ts"
+  handlers: {
+    label: "handlers"
+    mapping: "mapping handlers"
+    library: "library handlers"
+    provider: "provider handlers"
+    settings: "settings handlers"
+    anilist: "anilist handlers"
+  }
+}
+
+# ######################################
+# CORE (DOMAIN LOGIC)
+# ######################################
+
+core: {
+  label: "core (domain logic)"
+  style.fill: "#585b70"
+
+  mapping: {
+    label: "mapping domain"
+
+    service: "MappingService\n(resolve AniList → TVDB/TMDB)"
+
+    pipeline: {
+      label: "pipeline"
+      scoring: "match scoring"
+      resolution: "candidate resolution"
+    }
+
+    hints: "hint lookup"
+    overrides: "manual overrides"
+    upstream: "upstream mappings"
+    lookup: "provider lookup clients"
+  }
+
+  library: {
+    label: "library domain"
+
+    sonarr: {
+      label: "sonarr library"
+      store: "cache/store"
+      status: "status resolver"
+      indexer: "title index"
+    }
+
+    radarr: {
+      label: "radarr library"
+      store: "cache/store"
+      status: "status resolver"
+      indexer: "title index"
+    }
+
+    shared: "mutation + notify"
+  }
+
+  anilist: {
+    label: "anilist domain"
+    metadata: "metadata store\n(baked + local + refresh)"
+  }
+
+  providers: "provider resolver\n(format → sonarr/radarr)"
+}
+
+# ######################################
+# API (EXTERNAL INTEGRATIONS)
+# ######################################
+
+api: {
+  label: "api (external services)"
+  style.fill: "#6c7086"
+
+  anilist: "AniList API\n(queue + scheduler)"
+  sonarr: "Sonarr API\n(http client)"
+  radarr: "Radarr API\n(http client)"
+  shared: "base arr client\n+ tag resolver"
+}
+
+# ######################################
+# STORAGE (INFRASTRUCTURE)
+# ######################################
+
+storage: {
+  label: "storage (infra)"
+  style.fill: "#7f849c"
+
+  settings: "settings.store"
+  ttl: "ttl-cache"
+  persisted: "persisted-map"
+  mapping_cache: "mapping cache"
+  library_cache: "library cache"
+  keys: "keys + policies"
+}
+
+# ######################################
+# RUNTIME (BROWSER / WXT)
+# ######################################
+
+runtime: {
+  label: "runtime (browser / WXT)"
+  style.fill: "#89b4fa"
+
+  composition: "create-api-implementation\n(service wiring)"
+  messaging: "broadcasts / proxy transport"
+  background: "alarms + lifecycle"
+  permissions: "browser permissions"
+}
+
+# ######################################
+# CONFIG / UTILS / TYPES
+# ######################################
+
+support: {
+  label: "support"
+  style.fill: "#a6adc8"
+
+  config: "config\n(schemas + query keys)"
+  errors: "errors"
+  utils: "utils"
+  types: "shared types"
+}
+
+# ######################################
+# DEPENDENCIES
+# ######################################
+
+# entrypoints
+entrypoints -> ui
+entrypoints -> runtime
+
+# UI → RPC
+ui.features -> rpc.contract
+ui.components -> support.types
+
+# RPC → CORE
+rpc.handlers -> core.mapping
+rpc.handlers -> core.library
+rpc.handlers -> core.anilist
+
+# CORE → API + STORAGE
+core.mapping -> api.anilist
+core.mapping -> api.sonarr
+core.mapping -> api.radarr
+core.mapping -> storage
+
+core.library -> api.sonarr
+core.library -> api.radarr
+core.library -> storage
+
+core.anilist -> api.anilist
+core.anilist -> storage
+
+# RUNTIME → EVERYTHING (composition root)
+runtime.composition -> core.mapping
+runtime.composition -> core.library
+runtime.composition -> core.anilist
+runtime.composition -> api
+runtime.composition -> storage
+runtime.composition -> rpc.handlers
+
+# RPC transport lives in runtime
+runtime.messaging -> rpc.contract
+
+# SUPPORT
+core -> support
+rpc -> support
+api -> support

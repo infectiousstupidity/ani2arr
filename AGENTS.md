@@ -1,42 +1,169 @@
-# ani2arr – Agent Guide
+# ani2arr - Agent Guide
 
-Use this as a quick map; keep it updated when structure or responsibilities change.
+This guide is forward-looking. It summarizes the planned architecture in `docs/dev/`, not the repo's exact current folder layout.
+
+Use it as the quick operational map for AI-assisted work. If the current codebase and `docs/dev/` differ, inspect the real code before editing, but follow `docs/dev/` for placement, naming, ownership, and refactor direction. Do not reinforce legacy structure just because it already exists.
+
+## Read order
+- `docs/dev/001_architecture.md` - top-level ownership and dependency direction.
+- `docs/dev/002_structure.md` - file placement, naming, type ownership, and splitting rules.
+- `docs/dev/004_runtime.md` - what belongs in `runtime/`.
+- `docs/dev/005_ui.md` - `features/` vs `components/` and UI boundaries.
+- `docs/dev/006_rpc.md` - typed app boundary rules.
+- `docs/dev/007_core.md` - domain ownership for mapping, library, and AniList state.
+- `docs/dev/008_storage.md` - storage infrastructure vs domain-owned stores.
+- `docs/dev/009_api.md` - external integrations; target owner is `integrations/`.
+- `docs/dev/010_shared.md` - narrow support-only rules for `shared/`.
+- `docs/dev/011_ai_guardrails.md` - required workflow for agents.
+- `docs/dev/tasks/README.md` and `docs/dev/tasks/_template.md` - use for larger approved work.
 
 ## Snapshot
-- WXT browser extension (Chrome/Firefox) that injects AniList/AniChart overlays and talks to Sonarr and Radarr.
-- Stack: TypeScript (strict), React 19, TanStack Query 5, Radix UI, Tailwind 4.
-- Data flow: UI/features → `src/shared/queries` (React Query + RPC proxy) → `src/rpc/handlers` (background) → `src/services/*` (domain) → `src/clients/*` (external HTTP).
+- WXT browser extension for Chrome/Firefox.
+- Product scope: inject AniList/AniChart UI and connect those flows to Sonarr and Radarr.
+- Stack: TypeScript `strict`, React 19, TanStack Query 5, Valibot, React Hook Form, Radix UI, Tailwind 4.
+- Planned flow: `entrypoints -> features/components -> rpc -> core -> integrations/storage`, with `runtime/` owning browser mechanics and composition.
 
-## Commands (run from repo root)
-- `pnpm run dev` / `pnpm run dev:firefox` – dev server.
-- `pnpm run lint` – must pass.
-- `pnpm run build` – must pass.
-- `pnpm run generate:anilist-metadata` – rebuild baked AniList index.
+## Commands
+- `pnpm run dev`
+- `pnpm run dev:firefox`
+- `pnpm run compile`
+- `pnpm run lint`
+- `pnpm run build`
+- `pnpm run build:firefox`
+- `pnpm run zip`
+- `pnpm run zip:firefox`
+- `pnpm run generate:anilist-metadata`
 
-## Entry points (`src/entrypoints`)
-- `background/` – registers RPC, schedules mapping refresh, message routing.
-- `anilist-anime.content/` – MediaActions on AniList detail pages; routes series to Sonarr and movies to Radarr.
-- `anilist-browse.content/` – overlays on AniList browse/search.
-- `anichart-browse.content/` – overlays on AniChart browse, including movie cards for Radarr.
-- `options/` – options UI (Sonarr, Radarr, mappings, UI, advanced).
+## Planned target structure
 
-## Key paths
-- RPC contracts: `src/rpc/index.ts`, `src/rpc/schemas.ts`
-- RPC handlers: `src/rpc/handlers/*`
-- Clients: `src/clients/anilist/`, `src/clients/sonarr.api.ts`, `src/clients/radarr.api.ts`, `src/clients/base-arr.client.ts`
-- Services: `src/services/mapping/*`, `src/services/anilist/*`, `src/services/library/sonarr/*`, `src/services/library/radarr/*`, `src/services/providers/*`
-- Shared queries: `src/shared/queries/*`
-- Options storage: `src/shared/options/storage.ts`
-- Cache/persistence: `src/cache/query-cache.ts`, `src/cache/persist-options.ts`
-- UI overlays/components: `src/features/media-overlay/*`, `src/features/media-modal/*`, `src/shared/ui/*`
+```text
+src/
+  entrypoints/
+  features/
+  components/
 
-## Conventions
-- Use `@/*` aliases; avoid deep relative paths.
-- Wrap RPC calls in `try/catch` and normalize errors (`src/shared/errors/error-utils.ts`); use `withRetry` for retries.
-- Messages/broadcasts must include `_a2a: true`.
-- Do not store credentials outside `browser.storage.local`; never put secrets in URLs or persisted queries.
-- Adding host permissions requires updating `wxt.config.ts`.
+  runtime/
+  rpc/
+  core/
+  integrations/
+  storage/
+
+  shared/
+    config/
+    errors/
+    utils/
+    types/
+```
+
+## Layer ownership
+- `entrypoints/`: thin WXT shells only. Start shells, mount UI, call bootstrap code. No domain logic.
+- `features/`: feature-local UI, hooks, view state, and helper functions.
+- `components/`: reusable UI primitives and reusable UI composites.
+- `runtime/`: browser/WXT lifecycle, service composition, proxy registration, alarms, broadcasts, messaging, permissions.
+- `rpc/`: typed cross-context app boundary, schemas, handlers, handler-boundary types.
+- `core/`: application domain logic.
+  - `core/mapping/`: AniList -> provider identity resolution.
+  - `core/library/`: provider library state, indexing, existence/status logic.
+  - `core/anilist/`: AniList-derived app state, metadata hydration, refresh policy.
+- `integrations/`: raw AniList, Sonarr, and Radarr transport code, endpoint helpers, DTO normalization, provider API details.
+- `storage/`: persistence and cache infrastructure, storage keys, TTL policies, revision counters, storage-backed cache wrappers.
+- `shared/`: small cross-cutting support only: config, errors, utils, truly cross-cutting types.
+
+## Dependency rules
+- UI goes through the app boundary. `features/` and `components/` must not depend directly on `storage/`, `integrations/`, or `runtime/`.
+- `rpc/` defines the app contract. `runtime/` owns transport wiring, startup, alarms, permissions, and broadcasts.
+- `core/` may depend on `integrations/`, `storage/`, and narrow `shared/` support modules.
+- `integrations/` must not absorb app policy.
+- `shared/` is support-only. If a stronger owner exists, keep the file with that owner.
+- Do not create or expand a giant umbrella bucket such as `lib/`.
+
+## Domain terms
+- Sonarr and Radarr are `providers`.
+- AniList is `anilist`, not a provider.
+- `mapping` means AniList -> provider identity resolution.
+- `library` means provider library state, not mapping state.
+- `upstream mapping source` keeps that exact meaning; do not rename it to `static mapping`.
+- `integrations` means raw external-system code.
+
+## Naming and placement rules
+- Use literal, stable names. Avoid `manager`, `helper`, `common`, `misc`, and similar vague buckets.
+- Required suffixes when applicable:
+  - `*.store.ts`
+  - `*.cache.ts`
+  - `*.schema.ts`
+  - `*.handlers.ts`
+  - `*.resolver.ts`
+  - `*.indexer.ts`
+  - `*.constants.ts`
+- Use `index.ts` only when it is the clear public surface of a folder.
+- Prefer owner-based type placement:
+  - RPC payloads and schema-derived types in `rpc/`
+  - domain types in their `core/` owner
+  - transport DTOs in `integrations/`
+  - storage-local types in `storage/`
+  - only truly cross-cutting types in `shared/types/`
+- Do not create aliases that just rename an existing type without changing meaning.
+- Split files by responsibility, not line count. Prefer small duplication over abstractions that weaken ownership or increase navigation cost.
+- Do not create folders for speculative growth or symmetry alone.
+
+## Source file header convention
+Every source file should begin with:
+1. one concise purpose comment
+2. the relative source path on the next line
+3. one blank line
+4. imports
+
+Example:
+
+```ts
+/** Storage-backed revision counters used for cross-context invalidation and refresh signals. */
+// src/storage/revisions.store.ts
+
+import { browser } from 'wxt/browser';
+```
+
+Update the path comment whenever a file moves.
+
+## Repo-specific implementation rules
+- Use Valibot where applicable. Prefer deriving types from schemas when the schema is canonical.
+- Use `react-hook-form` for forms.
+- Use the canonical `cn` helper from `src/shared/utils/cn.ts` for class composition.
+- Use Tailwind consistently and avoid introducing a new visual abstraction layer without a repeated need.
+- Follow the repo's path alias conventions consistently.
+
+## Structural-change workflow
+- Inspect the relevant code first. Do not guess from folder names alone.
+- Propose before implementing any structural change:
+  - creating or removing folders
+  - moving or renaming files
+  - changing public exports
+  - introducing a new shared type
+  - moving a canonical type to a different owner
+  - introducing a new abstraction layer
+  - changing naming conventions
+  - splitting or merging files
+- Structural proposals should stay concise and cover:
+  - what changes
+  - why the ownership is correct
+  - proposed naming
+  - rejected alternatives
+  - docs/diagrams that must change
+- For non-trivial work, propose a commit split before implementation.
+- Update docs and diagrams when architecture meaning changes.
+- For larger approved work, create or update a task doc in `docs/dev/tasks/` and keep it aligned with the actual implementation if the plan changes.
+
+## Storage-specific rule
+- `storage/` owns storage infrastructure, not every stateful file.
+- A domain-owned `*.store.ts` may still belong in `core/` if it owns hydration, refresh, merge, indexing, or other domain behavior.
+- The word `store` does not determine ownership. Responsibility does.
 
 ## Validation before finish
-- `pnpm run lint` and `pnpm run build` clean.
-- Background responds to ping; options permission flow works; overlays inject once. 
+- Run `pnpm run compile`.
+- Run `pnpm run lint`.
+- Run `pnpm run build` when the change affects shipped code.
+- Verify the specifically touched flow still works.
+- Remove obsolete aliases, dead exports, and stale type re-exports in the area you touched.
+
+## Operating principle
+- Optimize for obvious ownership, low type drift, low navigation cost, stable naming, and clear reviewable diffs.
+- Do not optimize for theoretical elegance, symmetry, or maximum DRY if those make the repo harder to navigate.
