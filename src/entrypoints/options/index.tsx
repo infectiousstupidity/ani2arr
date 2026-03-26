@@ -15,8 +15,9 @@ import UiSection from '@/entrypoints/options/components/ui-section';
 import AdvancedSection, { type AdvancedPanelId } from '@/entrypoints/options/components/advanced-section';
 import SonarrPage from '@/entrypoints/options/components/sonarr-section';
 import RadarrPage from '@/entrypoints/options/components/radarr-section';
-import { useExtensionOptions, useRadarrConnectionStatus, useSonarrConnectionStatus } from '@/shared/queries';
-import { useDisplayedConnectionStatus } from '@/shared/hooks/common/use-displayed-connection-status';
+import { useExtensionOptions } from '@/shared/queries';
+import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
+import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
 import {
   getProviderConnectionStatusAppearance,
   type ProviderConnectionStatus,
@@ -216,35 +217,25 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
         apiKey: String(optionsQuery.data?.providers.radarr.apiKey ?? '').trim(),
       }
     : null;
-  const sonarrConnectionQuery = useSonarrConnectionStatus({
+  const sonarrConnectionQuery = useProviderConnectionCheck({
+    provider: 'sonarr',
     enabled: sonarrConfigured,
     credentials: sonarrCredentials,
   });
-  const radarrConnectionQuery = useRadarrConnectionStatus({
+  const radarrConnectionQuery = useProviderConnectionCheck({
+    provider: 'radarr',
     enabled: radarrConfigured,
     credentials: radarrCredentials,
   });
-  const rawSonarrStatus: ProviderConnectionStatus =
-    !sonarrConfigured
-      ? 'not-configured'
-      : sonarrConnectionQuery.isFetching
-        ? 'connecting'
-        : sonarrConnectionQuery.isSuccess
-          ? 'connected'
-          : 'configured';
-  const rawRadarrStatus: ProviderConnectionStatus =
-    !radarrConfigured
-      ? 'not-configured'
-      : radarrConnectionQuery.isFetching
-        ? 'connecting'
-        : radarrConnectionQuery.isSuccess
-          ? 'connected'
-          : 'configured';
-  const sonarrStatus = useDisplayedConnectionStatus(rawSonarrStatus, {
-    fallbackStatus: sonarrConfigured ? 'configured' : 'not-configured',
+  const sonarrStatus: ProviderConnectionStatus = useProviderConnectionStatus({
+    hasConfiguredCredentials: sonarrConfigured,
+    isChecking: sonarrConnectionQuery.isFetching,
+    isConnected: sonarrConnectionQuery.isSuccess,
   });
-  const radarrStatus = useDisplayedConnectionStatus(rawRadarrStatus, {
-    fallbackStatus: radarrConfigured ? 'configured' : 'not-configured',
+  const radarrStatus: ProviderConnectionStatus = useProviderConnectionStatus({
+    hasConfiguredCredentials: radarrConfigured,
+    isChecking: radarrConnectionQuery.isFetching,
+    isConnected: radarrConnectionQuery.isSuccess,
   });
 
   const renderSection = () => {
@@ -477,4 +468,3 @@ if (rootElement) {
     </React.StrictMode>,
   );
 }
-

@@ -6,9 +6,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   queryKeys,
   useSaveOptions,
-  useTestConnection,
-  useTestRadarrConnection,
 } from '@/shared/queries';
+import { useTestProviderConnection } from '@/features/options/use-provider-connection-check';
 import {
   buildSonarrPermissionPattern,
   requestSonarrPermission,
@@ -47,8 +46,8 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
   const methods = useFormContext<SettingsFormValues>();
   const queryClient = useQueryClient();
   const saveOptions = useSaveOptions();
-  const sonarrTestConnection = useTestConnection();
-  const radarrTestConnection = useTestRadarrConnection();
+  const sonarrTestConnection = useTestProviderConnection();
+  const radarrTestConnection = useTestProviderConnection();
   const [saveError, setSaveError] = useState<string | null>(null);
   const savedSettingsRef = useRef<Settings | undefined>(undefined);
 
@@ -452,8 +451,11 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
 
           stage = 'test';
           await state.testConnectionState.mutateAsync({
-            url: state.current.url,
-            apiKey: state.current.apiKey,
+            provider: state.provider,
+            credentials: {
+              url: state.current.url,
+              apiKey: state.current.apiKey,
+            },
           });
         }
 

@@ -1,6 +1,11 @@
 import { browser } from 'wxt/browser';
 import type { Ani2arrApi } from '@/rpc';
-import type { MappingOutput, UpdateRadarrInput, UpdateSonarrInput } from '@/rpc/schemas';
+import type {
+  MappingOutput,
+  TestProviderConnectionInput,
+  UpdateRadarrInput,
+  UpdateSonarrInput,
+} from '@/rpc/schemas';
 import type { AnilistApiService } from '@/clients/anilist.api';
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
@@ -105,6 +110,17 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
     await clearAllTtlCaches();
     await resetAllRevisions();
+  };
+
+  const testProviderConnectionInternal = async (
+    input: TestProviderConnectionInput,
+  ): Promise<{ version: string }> => {
+    if (input.provider === 'sonarr') {
+      return SonarrClient.testConnection(input.credentials);
+    }
+
+    const status = await RadarrClient.testConnection(input.credentials);
+    return { version: status.version };
   };
 
   const removeProviderHostPermissions = async (options: ExtensionOptions): Promise<void> => {
@@ -390,13 +406,8 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       return SonarrClient.getTags(credentials);
     },
 
-    testConnection(payload) {
-      return SonarrClient.testConnection(payload);
-    },
-
-    async testRadarrConnection(payload) {
-      const status = await RadarrClient.testConnection(payload);
-      return { version: status.version };
+    testProviderConnection(input) {
+      return testProviderConnectionInternal(input);
     },
 
     async getSonarrMetadata(input) {

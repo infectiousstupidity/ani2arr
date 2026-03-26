@@ -118,6 +118,7 @@ const ArrCredentialsSchema = v.object({
   url: createRequiredStringSchema('URL cannot be empty'),
   apiKey: createRequiredStringSchema('API key cannot be empty'),
 });
+const ProviderSchema = v.picklist(['sonarr', 'radarr']);
 
 const SonarrCredentialsSchema = ArrCredentialsSchema;
 const RadarrCredentialsSchema = ArrCredentialsSchema;
@@ -264,8 +265,10 @@ export const GetStaticMappedInputSchema = v.array(IdSchema);
 // Single ID inputs
 export const FetchAniListMediaInputSchema = IdSchema;
 
-export const TestConnectionInputSchema = SonarrCredentialsSchema;
-export const TestRadarrConnectionInputSchema = RadarrCredentialsSchema;
+export const TestProviderConnectionInputSchema = v.object({
+  provider: ProviderSchema,
+  credentials: ArrCredentialsSchema,
+});
 
 export const GetSonarrMetadataInputSchema = v.optional(
   v.object({
@@ -359,6 +362,7 @@ export type SearchAniListInput = v.InferOutput<typeof SearchAniListInputSchema>;
 export type AniListSearchResultDto = v.InferOutput<typeof AniListSearchResultSchema>;
 export type GetAniListMetadataInput = v.InferOutput<typeof GetAniListMetadataInputSchema>;
 export type RadarrLookupInput = v.InferOutput<typeof RadarrLookupInputSchema>;
+export type TestProviderConnectionInput = v.InferOutput<typeof TestProviderConnectionInputSchema>;
 
 // ============================================================================
 // Output types

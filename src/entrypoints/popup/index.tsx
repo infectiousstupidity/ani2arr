@@ -1,28 +1,35 @@
+/**
+ * @file Popup quick settings surface.
+ * Renders lightweight provider status, browse-card toggles, and anime-page
+ * toggles using the canonical options feature connection-check and
+ * connection-status hooks.
+ */
+
+// src/entrypoints/popup/index.ts
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
 import { ExternalLink } from 'lucide-react';
+import { useExtensionOptions, useSaveOptions } from '@/shared/queries';
+import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
 import {
-  useExtensionOptions,
-  useRadarrConnectionStatus,
-  useSaveOptions,
-  useSonarrConnectionStatus,
-} from '@/shared/queries';
-import { useDisplayedConnectionStatus } from '@/shared/hooks/common/use-displayed-connection-status';
-import {
-  getProviderConnectionStatusAppearance,
-  getProviderConnectionStatusLabel,
+  useProviderConnectionStatus,
   type ProviderConnectionStatus,
-} from '@/shared/providers/common/connection-status';
+} from '@/features/options/use-provider-connection-status';
 import type { Settings } from '@/shared/schemas/settings';
-import type { BadgeVisibility, ExtensionOptions } from '@/shared/types';
+import type {
+  BadgeVisibility,
+  ExtensionOptions,
+  Provider,
+  ProviderCredentials,
+} from '@/shared/types';
 import './style.css';
 
 const queryClient = new QueryClient();
 const extensionVersion = browser.runtime.getManifest()?.version ?? 'unknown';
 
-type ProviderKey = 'sonarr' | 'radarr';
+type ProviderKey = Provider;
 
 const badgeOptions: Array<{ value: BadgeVisibility; label: string }> = [
   { value: 'always', label: 'Always' },
@@ -30,70 +37,101 @@ const badgeOptions: Array<{ value: BadgeVisibility; label: string }> = [
   { value: 'hidden', label: 'Hidden' },
 ];
 
+const PROVIDER_CONNECTION_STATUS_META: Record<
+  ProviderConnectionStatus,
+  {
+    dotClassName: string;
+    shortLabel: string;
+  }
+> = {
+  connected: {
+    dotClassName: 'bg-emerald-400',
+    shortLabel: 'Connected',
+  },
+  configured: {
+    dotClassName: 'bg-sky-400',
+    shortLabel: 'Configured',
+  },
+  connecting: {
+    dotClassName: 'bg-amber-400',
+    shortLabel: 'Checking',
+  },
+  'not-configured': {
+    dotClassName: 'bg-slate-400',
+    shortLabel: 'Not set',
+  },
+};
+
+const getConfiguredCredentials = (
+  settings: Settings | undefined,
+  provider: ProviderKey,
+): ProviderCredentials | null => {
+  const providerSettings = settings?.providers[provider];
+  if (!providerSettings?.url || !providerSettings.apiKey) {
+    return null;
+  }
+
+  return {
+    url: String(providerSettings.url).trim(),
+    apiKey: String(providerSettings.apiKey).trim(),
+  };
+};
+
 const QuickSettings: React.FC = () => {
   const optionsQuery = useExtensionOptions();
   const saveOptions = useSaveOptions();
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const settings = optionsQuery.data;
-  const isSonarrConfigured = Boolean(settings?.providers.sonarr.url && settings?.providers.sonarr.apiKey);
-  const isRadarrConfigured = Boolean(settings?.providers.radarr.url && settings?.providers.radarr.apiKey);
+  const sonarrCredentials = getConfiguredCredentials(settings, 'sonarr');
+  const radarrCredentials = getConfiguredCredentials(settings, 'radarr');
+
+  const isSonarrConfigured = Boolean(sonarrCredentials);
+  const isRadarrConfigured = Boolean(radarrCredentials);
   const hasAnyProviderConfigured = isSonarrConfigured || isRadarrConfigured;
   const isLoading = optionsQuery.isLoading;
   const isSaving = saveOptions.isPending;
   const isBusy = isLoading || isSaving;
 
-  const sonarrCredentials = isSonarrConfigured
-    ? {
-        url: String(settings?.providers.sonarr.url ?? '').trim(),
-        apiKey: String(settings?.providers.sonarr.apiKey ?? '').trim(),
-      }
-    : null;
-  const radarrCredentials = isRadarrConfigured
-    ? {
-        url: String(settings?.providers.radarr.url ?? '').trim(),
-        apiKey: String(settings?.providers.radarr.apiKey ?? '').trim(),
-      }
-    : null;
-
-  const sonarrConnectionQuery = useSonarrConnectionStatus({
+  const sonarrConnectionQuery = useProviderConnectionCheck({
+    provider: 'sonarr',
     enabled: isSonarrConfigured,
     credentials: sonarrCredentials,
   });
-  const radarrConnectionQuery = useRadarrConnectionStatus({
+
+  const radarrConnectionQuery = useProviderConnectionCheck({
+    provider: 'radarr',
     enabled: isRadarrConfigured,
     credentials: radarrCredentials,
   });
 
-  const rawSonarrStatus: ProviderConnectionStatus = isLoading
-    ? 'connecting'
-    : !isSonarrConfigured
-      ? 'not-configured'
-      : sonarrConnectionQuery.isFetching
-        ? 'connecting'
-        : sonarrConnectionQuery.isSuccess
-          ? 'connected'
-          : 'configured';
-  const rawRadarrStatus: ProviderConnectionStatus = isLoading
-    ? 'connecting'
-    : !isRadarrConfigured
-      ? 'not-configured'
-      : radarrConnectionQuery.isFetching
-        ? 'connecting'
-        : radarrConnectionQuery.isSuccess
-          ? 'connected'
-          : 'configured';
+  const sonarrStatus = useProviderConnectionStatus(
+    {
+      hasConfiguredCredentials: isSonarrConfigured,
+      isChecking: isLoading || sonarrConnectionQuery.isFetching,
+      isConnected: sonarrConnectionQuery.isSuccess,
+    },
+    {
+      smoothConnecting: false,
+    },
+  );
 
-  const sonarrStatus = useDisplayedConnectionStatus(rawSonarrStatus, {
-    fallbackStatus: isSonarrConfigured ? 'configured' : 'not-configured',
-  });
-  const radarrStatus = useDisplayedConnectionStatus(rawRadarrStatus, {
-    fallbackStatus: isRadarrConfigured ? 'configured' : 'not-configured',
-  });
+  const radarrStatus = useProviderConnectionStatus(
+    {
+      hasConfiguredCredentials: isRadarrConfigured,
+      isChecking: isLoading || radarrConnectionQuery.isFetching,
+      isConnected: radarrConnectionQuery.isSuccess,
+    },
+    {
+      smoothConnecting: false,
+    },
+  );
 
   const updateSettings = async (updater: (current: Settings) => Settings) => {
     if (!settings || isSaving) return;
+
     setSaveError(null);
+
     try {
       await saveOptions.mutateAsync(updater(settings) as ExtensionOptions);
     } catch (error) {
@@ -143,6 +181,7 @@ const QuickSettings: React.FC = () => {
   const openOptionsSectionInTab = (section: 'sonarr' | 'radarr') => {
     const baseUrl = browser.runtime.getURL('/options.html');
     const url = `${baseUrl}#/options/${section}`;
+
     browser.tabs.create({ url }).catch(() => {
       browser.runtime.openOptionsPage().catch(() => {});
     });
@@ -156,7 +195,9 @@ const QuickSettings: React.FC = () => {
           <div>
             <div className="flex items-baseline gap-1.5 leading-none">
               <p className="text-sm font-semibold">ani2arr</p>
-              <span className="text-[10px] font-medium tracking-wide text-text-secondary/80">v{extensionVersion}</span>
+              <span className="text-[10px] font-medium tracking-wide text-text-secondary/80">
+                v{extensionVersion}
+              </span>
             </div>
             <p className="text-xs text-text-secondary">Quick settings</p>
           </div>
@@ -185,19 +226,20 @@ const QuickSettings: React.FC = () => {
           <p className="text-[11px] uppercase tracking-wide text-text-secondary">Sonarr</p>
           <div className="mt-1 flex items-center gap-2 text-sm">
             {(() => {
-              const appearance = getProviderConnectionStatusAppearance(sonarrStatus);
+              const meta = PROVIDER_CONNECTION_STATUS_META[sonarrStatus];
               return (
                 <>
                   <span
-                    className={`inline-block h-2.5 w-2.5 rounded-full ${appearance.dotClassName}`}
+                    className={`inline-block h-2.5 w-2.5 rounded-full ${meta.dotClassName}`}
                     aria-hidden
                   />
-                  {getProviderConnectionStatusLabel(sonarrStatus, { short: sonarrStatus !== 'not-configured' })}
+                  {meta.shortLabel}
                 </>
               );
             })()}
           </div>
         </div>
+
         <div className="relative rounded-xl border border-border-primary bg-bg-secondary/50 px-3 py-2">
           <button
             type="button"
@@ -210,14 +252,14 @@ const QuickSettings: React.FC = () => {
           <p className="text-[11px] uppercase tracking-wide text-text-secondary">Radarr</p>
           <div className="mt-1 flex items-center gap-2 text-sm">
             {(() => {
-              const appearance = getProviderConnectionStatusAppearance(radarrStatus);
+              const meta = PROVIDER_CONNECTION_STATUS_META[radarrStatus];
               return (
                 <>
                   <span
-                    className={`inline-block h-2.5 w-2.5 rounded-full ${appearance.dotClassName}`}
+                    className={`inline-block h-2.5 w-2.5 rounded-full ${meta.dotClassName}`}
                     aria-hidden
                   />
-                  {getProviderConnectionStatusLabel(radarrStatus, { short: radarrStatus !== 'not-configured' })}
+                  {meta.shortLabel}
                 </>
               );
             })()}
@@ -236,8 +278,12 @@ const QuickSettings: React.FC = () => {
         {(['sonarr', 'radarr'] as const).map((provider) => {
           const providerLabel = provider === 'sonarr' ? 'Sonarr' : 'Radarr';
           const providerSettings = settings?.ui.browseCards[provider];
+
           return (
-            <div key={provider} className="rounded-lg border border-border-primary/70 bg-bg-tertiary/40 p-3">
+            <div
+              key={provider}
+              className="rounded-lg border border-border-primary/70 bg-bg-tertiary/40 p-3"
+            >
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold">{providerLabel}</p>
@@ -248,7 +294,9 @@ const QuickSettings: React.FC = () => {
                   checked={providerSettings?.enabled ?? false}
                   disabled={isBusy || !settings}
                   onChange={(event) => {
-                    void updateBrowseProvider(provider, { enabled: event.currentTarget.checked });
+                    void updateBrowseProvider(provider, {
+                      enabled: event.currentTarget.checked,
+                    });
                   }}
                 />
               </div>
@@ -257,6 +305,7 @@ const QuickSettings: React.FC = () => {
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   {badgeOptions.map((option) => {
                     const selected = providerSettings?.visibility === option.value;
+
                     return (
                       <button
                         key={option.value}
@@ -291,8 +340,12 @@ const QuickSettings: React.FC = () => {
         {(['sonarr', 'radarr'] as const).map((provider) => {
           const providerLabel = provider === 'sonarr' ? 'Sonarr' : 'Radarr';
           const enabled = settings?.ui.animePages[provider].enabled ?? false;
+
           return (
-            <div key={`${provider}-anime`} className="flex items-center justify-between rounded-lg bg-bg-tertiary/60 px-3 py-2">
+            <div
+              key={`${provider}-anime`}
+              className="flex items-center justify-between rounded-lg bg-bg-tertiary/60 px-3 py-2"
+            >
               <div>
                 <p className="text-sm">{providerLabel}</p>
                 <p className="text-xs text-text-secondary">
@@ -318,7 +371,8 @@ const QuickSettings: React.FC = () => {
           <div className="rounded-lg border border-border-primary/70 bg-bg-tertiary/40 px-3 py-2">
             <p className="text-sm font-semibold">No provider configured yet</p>
             <p className="mt-1 text-xs text-text-secondary">
-              Configure Sonarr, Radarr, or both in the full settings page to enable add and update actions.
+              Configure Sonarr, Radarr, or both in the full settings page to enable add and
+              update actions.
             </p>
           </div>
         ) : null}
@@ -332,6 +386,7 @@ const QuickSettings: React.FC = () => {
 };
 
 const rootElement = document.getElementById('popup-root');
+
 if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
