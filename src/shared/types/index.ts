@@ -11,6 +11,8 @@ export type {
   AniListMetadataBundle,
 } from './anilist';
 
+export type { ProviderTag } from './provider-tags';
+
 export type {
   AniListSchedulerEventType,
   AniListSchedulerRequestDebug,
