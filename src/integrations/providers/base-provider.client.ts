@@ -1,3 +1,6 @@
+/** Base transport client for provider API requests with permission checks, retries, timeouts, and ETag caching. */
+// src/integrations/providers/base-provider.client.ts
+
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 import { AbortError, withRetry } from '@/shared/utils/retry';
