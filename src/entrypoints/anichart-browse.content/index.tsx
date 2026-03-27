@@ -1,8 +1,9 @@
+/** AniChart browse entrypoint that mounts browse overlays on eligible schedule surfaces. */
 // src/entrypoints/anichart-browse.content/index.tsx
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
 import { shouldSkipMediaFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
-import type { AniListMediaFormat, AniListMediaHint } from '@/shared/types';
+import type { AniListMediaFormat, AniListMediaHint, PublicOptions } from '@/shared/types';
 import baseStyles from '@/shared/styles/base.css?inline';
 import browseStyles from './style.css?inline';
 import {
@@ -23,6 +24,23 @@ const isAniChartSurface = (url: string): boolean => {
   } catch {
     return false;
   }
+};
+
+const isBrowseShellEligible = ({
+  url,
+  publicOptions,
+}: {
+  url: string;
+  publicOptions: PublicOptions;
+}): boolean => {
+  if (!isAniChartSurface(url)) {
+    return false;
+  }
+
+  return (
+    (publicOptions.ui?.browseCards?.sonarr?.enabled ?? true) ||
+    (publicOptions.ui?.browseCards?.radarr?.enabled ?? true)
+  );
 };
 
 const CARD_SELECTOR = '.media-card';
@@ -158,7 +176,7 @@ const main = createBrowseContentMain({
   coverSelector: COVER_SELECTOR,
   containerClassName: DEFAULT_CONTAINER_CLASS,
   processedAttribute: DEFAULT_PROCESSED_ATTRIBUTE,
-  isSurface: isAniChartSurface,
+  isEligible: isBrowseShellEligible,
   renderRoot: (portalContainer) => (
     <BrowseRoot BrowseContentApp={BrowseContentApp} portalContainer={portalContainer} />
   ),

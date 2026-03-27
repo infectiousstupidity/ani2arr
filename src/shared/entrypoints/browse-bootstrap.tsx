@@ -1,9 +1,13 @@
+/** Browse-surface shadow-root mounting composed on top of the runtime content shell. */
+// src/shared/entrypoints/browse-bootstrap.tsx
+
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
-import { awaitBackgroundReady } from '@/runtime/messaging/await-background-ready';
+import { createContentEntrypointShell } from '@/runtime/content-entrypoint-shell';
+import type { PublicOptions } from '@/shared/types';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { createShadowRootUi, type ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 
@@ -15,14 +19,12 @@ export interface BrowseBootstrapOptions {
   coverSelector: string;
   containerClassName: string;
   processedAttribute: string;
-  isSurface: (url: string) => boolean;
+  isEligible: (input: { url: string; publicOptions: PublicOptions }) => boolean | Promise<boolean>;
   renderRoot: (portalContainer: HTMLElement) => React.ReactElement;
 }
 
 export const createBrowseContentMain = (options: BrowseBootstrapOptions) => {
   return async (ctx: ContentScriptContext): Promise<void> => {
-    // Ensure background is awake before rendering and kicking off any RPCs.
-    await awaitBackgroundReady();
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -38,15 +40,13 @@ export const createBrowseContentMain = (options: BrowseBootstrapOptions) => {
     let root: Root | null = null;
 
     const cleanupDomArtifacts = () => {
-      const containers = document.querySelectorAll<HTMLElement>(`.${options.containerClassName}`);
-      if (containers.length === 0) {
-        return;
-      }
+      document
+        .querySelectorAll<HTMLElement>(`[${options.processedAttribute}]`)
+        .forEach(element => element.removeAttribute(options.processedAttribute));
 
-      containers.forEach(container => {
-        container.closest<HTMLElement>(options.coverSelector)?.removeAttribute(options.processedAttribute);
-        container.remove();
-      });
+      document
+        .querySelectorAll<HTMLElement>(`.${options.containerClassName}`)
+        .forEach(container => container.remove());
     };
 
     let globalStyleElement: HTMLStyleElement | null = null;
@@ -115,14 +115,7 @@ export const createBrowseContentMain = (options: BrowseBootstrapOptions) => {
     };
 
     const remove = async () => {
-      if (!ui) {
-        if (document.querySelector(`.${options.containerClassName}`) || shadowStyleElement || globalStyleElement) {
-          cleanupDomArtifacts();
-        }
-        return;
-      }
-
-      ui.remove();
+      ui?.remove();
       ui = null;
       root = null;
       cleanupDomArtifacts();
@@ -132,28 +125,14 @@ export const createBrowseContentMain = (options: BrowseBootstrapOptions) => {
       globalStyleElement = null;
     };
 
-    const handleLocationChange = (url: string) => {
-      if (options.isSurface(url)) void mount();
-      else void remove();
-    };
-
-    handleLocationChange(location.href);
-
-    type LocationChangeEvent = CustomEvent<{ newUrl: URL }>;
-
-    ctx.addEventListener(
-      window,
-      'wxt:locationchange',
-      (ev: Event) => {
-        const e = ev as LocationChangeEvent;
-        const href = e.detail?.newUrl?.href ?? location.href;
-        handleLocationChange(href);
+    const main = createContentEntrypointShell({
+      isEligible: ({ url, publicOptions }) => options.isEligible({ url, publicOptions }),
+      mount: async () => {
+        await mount();
       },
-      { capture: false },
-    );
-
-    ctx.onInvalidated(() => {
-      void remove();
+      remove,
     });
+
+    await main(ctx);
   };
 };
