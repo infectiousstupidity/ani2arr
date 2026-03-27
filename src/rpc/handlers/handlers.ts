@@ -24,7 +24,7 @@ import type {
 } from '@/shared/types';
 import type { ProviderCredentials } from '@/shared/types/options';
 import { createDefaultSettings } from '@/shared/schemas/settings';
-import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import {
   clearAllTtlCaches,
   getExtensionOptionsSnapshot,

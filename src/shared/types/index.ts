@@ -79,8 +79,6 @@ export type {
   BadgeVisibility,
 } from './options';
 
-export { ErrorCode, type ExtensionError } from './errors';
-
 export {
   type MappingBlockedRecord,
   type MappingOverrideRecord,

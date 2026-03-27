@@ -1,5 +1,5 @@
 import { getExtensionOptionsSnapshot } from '@/storage';
-import { ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
+import { ErrorCode, logError, normalizeError } from '@/shared/errors';
 import { notifyLibraryMutation } from '@/services/library/notify';
 import type { RadarrLibraryStore } from './store';
 import type {

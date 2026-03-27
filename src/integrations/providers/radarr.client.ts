@@ -3,7 +3,7 @@
 
 import { BaseProviderClient } from '@/integrations/providers/base-provider.client';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
-import { createError, ErrorCode } from '@/shared/errors/error-utils';
+import { createError, ErrorCode } from '@/shared/errors';
 import type {
   RadarrLookupMovie,
   RadarrMinimumAvailability,

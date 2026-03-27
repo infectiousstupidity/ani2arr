@@ -7,7 +7,7 @@ import type { UpdateRadarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, RadarrMovie } from '@/shared/types';
 import type { ProviderCredentials } from '@/shared/types/options';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
-import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import {
   buildProviderFolderSlug,
   joinRootAndSlug,

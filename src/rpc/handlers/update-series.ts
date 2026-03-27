@@ -6,7 +6,7 @@ import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { UpdateSonarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, ProviderCredentials, SonarrSeries } from '@/shared/types';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
-import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import {
   buildProviderFolderSlug,
   joinRootAndSlug,

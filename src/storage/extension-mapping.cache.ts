@@ -1,10 +1,11 @@
-/** Typed cache for extension-derived mapping results and mapping failures that are persisted as replaceable cache, not canonical truth. */
-// src/lib/storage/extension-mapping.cache.ts
+/** Typed cache for extension-derived mapping results and replaceable mapping failures. */
+// src/storage/extension-mapping.cache.ts
 
 import { createTtlCache, type CacheHit, type CacheWriteOptions } from './ttl-cache';
 import { CACHE_NAMESPACES } from './keys';
 import { STORAGE_POLICIES } from './policies';
-import type { ExtensionError, MappingExternalId, MappingProvider } from '@/shared/types';
+import type { ExtensionError } from '@/shared/errors';
+import type { MappingExternalId, MappingProvider } from '@/shared/types';
 
 export interface ExtensionMappingCacheEntry {
   externalId: MappingExternalId;

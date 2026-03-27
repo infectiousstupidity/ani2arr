@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
-import { normalizeError } from '@/shared/errors/error-utils';
+import { normalizeError, type ExtensionError } from '@/shared/errors';
 import { queryKeys } from '@/shared/queries/query-keys';
-import type { ExtensionError, PublicOptions } from '@/shared/types';
+import type { PublicOptions } from '@/shared/types';
 import type { ProviderCredentials } from '@/shared/types/options';
 import type { SonarrFormState, SonarrSeries } from './types';
 import type { AddInput, UpdateSonarrInput } from '@/rpc/schemas';

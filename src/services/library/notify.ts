@@ -1,4 +1,4 @@
-import { logError, normalizeError } from '@/shared/errors/error-utils';
+import { logError, normalizeError } from '@/shared/errors';
 import type { LibraryMutationEmitter } from './base-library.interface';
 
 export async function notifyLibraryMutation<TPayload>(

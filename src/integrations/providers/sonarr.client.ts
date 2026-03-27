@@ -13,7 +13,7 @@ import type {
   SonarrTag,
   SonarrLookupSeries,
 } from '@/shared/types';
-import { createError, ErrorCode } from '@/shared/errors/error-utils';
+import { createError, ErrorCode } from '@/shared/errors';
 
 type SonarrClientOptions = {
   hasUrlPermission: (url: string) => Promise<boolean>;

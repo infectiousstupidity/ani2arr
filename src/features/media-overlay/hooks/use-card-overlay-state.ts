@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { browser } from 'wxt/browser';
 import { useAddMovie, useAddSeries, useMovieStatus, useSeriesStatus } from '@/shared/queries';
+import type { ExtensionError } from '@/shared/errors';
 import type {
-  ExtensionError,
   AniListMediaHint,
   Provider,
   RadarrFormState,

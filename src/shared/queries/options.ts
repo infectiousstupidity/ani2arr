@@ -11,9 +11,9 @@ import {
   sonarrSecrets,
   toPublicOptions,
 } from '@/storage';
-import type { ExtensionError, ExtensionOptions, PublicOptions } from '@/shared/types';
+import { normalizeError, type ExtensionError } from '@/shared/errors';
+import type { ExtensionOptions, PublicOptions } from '@/shared/types';
 import type { Settings } from '@/shared/schemas/settings';
-import { normalizeError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 import { queryKeys } from './query-keys';
 

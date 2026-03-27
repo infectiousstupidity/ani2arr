@@ -1,4 +1,4 @@
-import { createError, ErrorCode } from '@/shared/errors/error-utils';
+import { createError, ErrorCode } from '@/shared/errors';
 
 type ArrTagLike = {
   id: number;

@@ -5,7 +5,7 @@ import { createApiImplementation } from '@/services';
 import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/debug/metrics';
 import { computeTitleMatchScore } from '@/services/mapping/pipeline/matching';
 import { logger } from '@/shared/utils/logger';
-import { logError, normalizeError } from '@/shared/errors/error-utils';
+import { logError, normalizeError } from '@/shared/errors';
 import { getExtensionOptionsSnapshot } from '@/storage';
 
 type OptionsSectionId = 'sonarr' | 'radarr' | 'mappings' | 'ui' | 'advanced';

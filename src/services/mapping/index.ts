@@ -1,12 +1,17 @@
 import type { AniListMediaService } from '@/core/anilist';
 import type {
   AniListMedia,
-  ExtensionError,
   MappingExternalId,
   MappingProvider,
   RequestPriority,
 } from '@/shared/types';
-import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
+import {
+  createError,
+  ErrorCode,
+  logError,
+  normalizeError,
+  type ExtensionError,
+} from '@/shared/errors';
 import {
   clearExtensionMappingFailures,
   clearExtensionMappings,
