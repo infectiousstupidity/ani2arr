@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
-import { awaitBackgroundReady } from '@/shared/utils/background-ready';
+import { awaitBackgroundReady } from '@/runtime/messaging/await-background-ready';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { createShadowRootUi, type ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 
