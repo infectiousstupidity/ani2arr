@@ -7,6 +7,7 @@ export interface ExternalLinkInput {
   provider: Provider;
   baseUrl: string; // Absolute provider root URL; trailing slash trimmed.
   inLibrary: boolean;
+  /** Provider detail-route slug for `/series/:slug` or `/movie/:slug`, not a filesystem folder name. */
   librarySlug?: string;
   searchTerm?: string;
 }

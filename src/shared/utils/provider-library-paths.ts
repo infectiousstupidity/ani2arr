@@ -24,10 +24,19 @@ const extractProviderFolderSlug = (
   if (!path) return null;
   const normalizedPath = trimTrailingSeparators(path).replace(/\\/g, '/');
   const normalizedRoot = rootFolderPath ? trimTrailingSeparators(rootFolderPath).replace(/\\/g, '/') : null;
+  const normalizedPathLower = normalizedPath.toLowerCase();
+  const normalizedRootLower = normalizedRoot?.toLowerCase() ?? null;
 
-  if (normalizedRoot && normalizedPath.toLowerCase().startsWith(normalizedRoot.toLowerCase())) {
-    const remainder = normalizedPath.slice(normalizedRoot.length).replace(/^\/+/, '');
-    if (remainder.length > 0) return remainder;
+  if (normalizedRoot && normalizedRootLower) {
+    if (normalizedPathLower === normalizedRootLower) {
+      return null;
+    }
+
+    const rootedPrefix = `${normalizedRootLower}/`;
+    if (normalizedPathLower.startsWith(rootedPrefix)) {
+      const remainder = normalizedPath.slice(normalizedRoot.length + 1).replace(/^\/+/, '');
+      if (remainder.length > 0) return remainder;
+    }
   }
 
   const segments = normalizedPath.split('/');
@@ -38,6 +47,23 @@ const extractProviderFolderSlug = (
 export const sanitizeFolderSegment = (segment: string): string => {
   const replaced = segment.replace(/[\\/]+/g, ' ').trim();
   return replaced.replace(/\s+/g, ' ');
+};
+
+export const buildProviderFolderSlugFromTitle = (
+  title?: string | null,
+  media?: { tvdbId?: number | null | undefined; tmdbId?: number | null | undefined } | null,
+): string | null => {
+  const baseTitle = sanitizeFolderSegment(title ?? '');
+  if (!baseTitle) return null;
+
+  if (typeof media?.tvdbId === 'number' && Number.isFinite(media.tvdbId)) {
+    return `${baseTitle} [tvdb-${media.tvdbId}]`;
+  }
+  if (typeof media?.tmdbId === 'number' && Number.isFinite(media.tmdbId)) {
+    return `${baseTitle} [tmdb-${media.tmdbId}]`;
+  }
+
+  return baseTitle;
 };
 
 export const normalizePathForCompare = (input?: string | null): string | null => {
@@ -55,14 +81,8 @@ export const buildProviderFolderSlug = (
   if (media.folderName && media.folderName.trim()) return media.folderName.trim();
   if (media.titleSlug && media.titleSlug.trim()) return media.titleSlug.trim();
 
-  const baseTitle = sanitizeFolderSegment(media.title || fallbackTitle || 'Media');
-  if (typeof media.tvdbId === 'number' && Number.isFinite(media.tvdbId)) {
-    return `${baseTitle} [tvdb-${media.tvdbId}]`;
-  }
-  if (typeof media.tmdbId === 'number' && Number.isFinite(media.tmdbId)) {
-    return `${baseTitle} [tmdb-${media.tmdbId}]`;
-  }
-  return baseTitle;
+  const fromTitle = buildProviderFolderSlugFromTitle(media.title || fallbackTitle || 'Media', media);
+  return fromTitle ?? 'Media';
 };
 
 export const extractProviderRootFolderPath = (

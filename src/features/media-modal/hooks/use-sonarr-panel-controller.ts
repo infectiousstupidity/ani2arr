@@ -5,7 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 
 import type { SonarrFormState } from "@/shared/types";
-import { buildProviderMediaPath, sanitizeFolderSegment } from "@/shared/utils/provider-library-paths";
+import {
+  buildProviderFolderSlugFromTitle,
+  buildProviderMediaPath,
+} from "@/shared/utils/provider-library-paths";
 import type { SonarrPanelBaseProps, SonarrPanelMode } from "../types";
 
 export interface UseSonarrPanelControllerInput {
@@ -38,14 +41,6 @@ export interface UseSonarrPanelControllerResult {
   handleSaveDefaults(): Promise<void>;
 
   computedPath: string | null;
-}
-
-function buildSlug(title: string, tvdbId: number | null): string | null {
-  if (!title) return null;
-  const normalizedTitle = sanitizeFolderSegment(title);
-  if (!normalizedTitle) return null;
-  if (tvdbId == null) return normalizedTitle;
-  return `${normalizedTitle} [tvdb-${tvdbId}]`;
 }
 
 export function useSonarrPanelController(
@@ -118,7 +113,10 @@ export function useSonarrPanelController(
 
   const computedPath = useMemo(
     () => {
-      const slug = mode === "edit" && folderSlug ? folderSlug : buildSlug(title, tvdbId);
+      const slug =
+        mode === "edit" && folderSlug
+          ? folderSlug
+          : buildProviderFolderSlugFromTitle(title, { tvdbId });
       return buildProviderMediaPath(current.rootFolderPath, slug);
     },
     [current.rootFolderPath, folderSlug, mode, title, tvdbId],
