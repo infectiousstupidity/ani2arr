@@ -1,3 +1,6 @@
+/** Builds media modal props from AniList state, provider status, and provider metadata. */
+// src/features/media-overlay/hooks/use-media-modal-props.ts
+
 import { useMemo } from 'react';
 import type {
   AniListMediaFormat,
@@ -36,11 +39,11 @@ import { toMappingSearchResultFromSonarr } from '@/features/mapping/sonarr.adapt
 import { resolveTitlePreference } from '@/shared/anilist/title-preference';
 import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
 import {
-  buildFolderSlug,
-  extractRootFolderPath,
-  getLibrarySlug,
-  type FolderSlugSource,
-} from '@/services/helpers/path-utils';
+  buildProviderFolderSlug,
+  extractProviderRootFolderPath,
+  getProviderLibrarySlug,
+  type ProviderMediaPathSource,
+} from '@/shared/utils/provider-library-paths';
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 
 export interface UseMediaModalPropsInput {
@@ -159,7 +162,7 @@ function deriveRadarrCurrentMappingFromStatus(
   }
 
   const tmdbId = status.tmdbId;
-  const librarySlug = getLibrarySlug('radarr', status.movie as FolderSlugSource | undefined);
+  const librarySlug = getProviderLibrarySlug('radarr', status.movie as ProviderMediaPathSource | undefined);
   const title = status.movie?.title ?? `TMDB ${tmdbId}`;
 
   return {
@@ -302,9 +305,9 @@ export function useMediaModalProps(
 
   const sonarrSeriesFromStatus = sonarrStatusQuery.data?.series;
   const fullSonarrSeries = isFullSonarrSeries(sonarrSeriesFromStatus) ? sonarrSeriesFromStatus : null;
-  const sonarrFolderSlug = fullSonarrSeries ? buildFolderSlug(fullSonarrSeries, resolvedTitle.primary) : null;
+  const sonarrFolderSlug = fullSonarrSeries ? buildProviderFolderSlug(fullSonarrSeries, resolvedTitle.primary) : null;
   const resolvedSonarrRootFolder =
-    extractRootFolderPath(fullSonarrSeries, sonarrFolderSlug) ?? sonarrDefaultForm.rootFolderPath;
+    extractProviderRootFolderPath(fullSonarrSeries, sonarrFolderSlug) ?? sonarrDefaultForm.rootFolderPath;
   const sonarrPanelMode: 'add' | 'edit' =
     isConfigured && provider === 'sonarr' && sonarrStatusQuery.data?.exists ? 'edit' : 'add';
 
@@ -337,9 +340,9 @@ export function useMediaModalProps(
 
   const radarrMovieFromStatus = radarrStatusQuery.data?.movie;
   const fullRadarrMovie = isFullRadarrMovie(radarrMovieFromStatus) ? radarrMovieFromStatus : null;
-  const radarrFolderSlug = fullRadarrMovie ? buildFolderSlug(fullRadarrMovie, resolvedTitle.primary) : null;
+  const radarrFolderSlug = fullRadarrMovie ? buildProviderFolderSlug(fullRadarrMovie, resolvedTitle.primary) : null;
   const resolvedRadarrRootFolder =
-    extractRootFolderPath(fullRadarrMovie, radarrFolderSlug) ?? radarrDefaultForm.rootFolderPath;
+    extractProviderRootFolderPath(fullRadarrMovie, radarrFolderSlug) ?? radarrDefaultForm.rootFolderPath;
   const radarrPanelMode: 'add' | 'edit' =
     isConfigured && provider === 'radarr' && radarrStatusQuery.data?.exists ? 'edit' : 'add';
 

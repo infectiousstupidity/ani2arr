@@ -1,3 +1,6 @@
+/** Renders mapping rows and inline actions for provider-linked AniList mapping entries. */
+// src/entrypoints/options/components/mappings-section/components/mapping-row.tsx
+
 import React, { useMemo } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
@@ -16,7 +19,10 @@ import { cn } from '@/shared/utils/cn';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import SonarrIcon from '@/assets/sonarr.svg';
 import RadarrIcon from '@/assets/radarr.svg';
-import { getLibrarySlug, type FolderSlugSource } from '@/services/helpers/path-utils';
+import {
+  getProviderLibrarySlug,
+  type ProviderMediaPathSource,
+} from '@/shared/utils/provider-library-paths';
 
 export type MappingTableEntry = {
   entry: MappingSummary;
@@ -165,7 +171,7 @@ const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   const metaParts = [formatLabel, anilistYear ? String(anilistYear) : null, providerStatus].filter(Boolean) as string[];
 
   const providerItem = entry.provider === 'radarr' ? radarrStatus.data?.movie : sonarrStatus.data?.series;
-  const providerSlug = getLibrarySlug(entry.provider, providerItem as FolderSlugSource | null);
+  const providerSlug = getProviderLibrarySlug(entry.provider, providerItem as ProviderMediaPathSource | null);
   const providerLink = buildExternalMediaLink({
     provider: entry.provider,
     baseUrl: providerUrl ?? '',

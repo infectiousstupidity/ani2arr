@@ -1,3 +1,6 @@
+/** RPC handler that updates an existing Radarr movie using resolved form and library state. */
+// src/rpc/handlers/update-movie.ts
+
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { RadarrLibrary } from '@/services/library/radarr';
 import type { UpdateRadarrInput } from '@/rpc/schemas';
@@ -5,7 +8,11 @@ import type { ExtensionOptions, RadarrMovie } from '@/shared/types';
 import type { ProviderCredentials } from '@/shared/types/options';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
-import { buildFolderSlug, joinRootAndSlug, paths } from '@/services/helpers/path-utils';
+import {
+  buildProviderFolderSlug,
+  joinRootAndSlug,
+  normalizePathForCompare,
+} from '@/shared/utils/provider-library-paths';
 
 type UpdateMovieDeps = {
   RadarrClient: RadarrClient;
@@ -92,10 +99,10 @@ export async function updateRadarrMovieHandler(
     serviceLabel: 'Radarr',
   });
 
-  const slug = buildFolderSlug(baseMovie, input.title);
+  const slug = buildProviderFolderSlug(baseMovie, input.title);
   const nextPath = joinRootAndSlug(resolvedRoot, slug);
-  const currentPathNormalized = paths.normalizePathForCompare(baseMovie.path);
-  const nextPathNormalized = paths.normalizePathForCompare(nextPath);
+  const currentPathNormalized = normalizePathForCompare(baseMovie.path);
+  const nextPathNormalized = normalizePathForCompare(nextPath);
   const moveFiles =
     currentPathNormalized !== null &&
     nextPathNormalized !== null &&

@@ -15,7 +15,10 @@ import { logger } from '@/shared/utils/logger';
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
 import { shouldSkipMediaFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
-import { getLibrarySlug, type FolderSlugSource } from '@/services/helpers/path-utils';
+import {
+  getProviderLibrarySlug,
+  type ProviderMediaPathSource,
+} from '@/shared/utils/provider-library-paths';
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import type {
   AniListMediaFormat,
@@ -358,8 +361,8 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
 
   const librarySlug =
     provider === 'radarr'
-      ? getLibrarySlug('radarr', (movieStatusData?.movie ?? addMovieMutation.data ?? null) as FolderSlugSource | null)
-      : getLibrarySlug('sonarr', (seriesStatusData?.series ?? addSeriesMutation.data ?? null) as FolderSlugSource | null);
+      ? getProviderLibrarySlug('radarr', (movieStatusData?.movie ?? addMovieMutation.data ?? null) as ProviderMediaPathSource | null)
+      : getProviderLibrarySlug('sonarr', (seriesStatusData?.series ?? addSeriesMutation.data ?? null) as ProviderMediaPathSource | null);
 
   const resolvedSearchTerm = statusQuery.data?.successfulSynonym ?? title;
 

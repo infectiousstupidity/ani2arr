@@ -1,5 +1,8 @@
+/** Adapts Radarr lookup results into mapping-search rows with library-aware links. */
+// src/features/mapping/radarr.adapter.ts
+
 import type { MappingSearchResult, RadarrLookupMovie } from '@/shared/types';
-import { getLibrarySlug } from '@/services/helpers/path-utils';
+import { getProviderLibrarySlug } from '@/shared/utils/provider-library-paths';
 
 export interface RadarrAdapterOptions {
   baseUrl: string;
@@ -38,7 +41,7 @@ export function toMappingSearchResultFromRadarr(
   const { inLibrary } = opts;
   const librarySlug =
     opts.librarySlugByTmdbId?.[tmdbId] ??
-    (inLibrary ? getLibrarySlug('radarr', movie) ?? undefined : undefined);
+    (inLibrary ? getProviderLibrarySlug('radarr', movie) ?? undefined : undefined);
   const posterUrl = pickPoster(movie, opts.baseUrl);
   const linkedAniListIds = Array.isArray(opts.linkedAniListIdsByTmdbId?.[tmdbId])
     ? opts.linkedAniListIdsByTmdbId[tmdbId].filter(

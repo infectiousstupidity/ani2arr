@@ -1,8 +1,14 @@
+/** AniList card overlay actions for quick add, mapping fixes, and provider links. */
+// src/features/media-overlay/components/card-overlay.tsx
+
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, TriangleAlert, SlidersHorizontal, Plus, Wrench, SquareArrowOutUpRight, RotateCcw } from 'lucide-react';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import type { CardOverlayProps, CheckMovieStatusResponse, CheckSeriesStatusResponse } from '@/shared/types';
-import { getLibrarySlug, type FolderSlugSource } from '@/services/helpers/path-utils';
+import {
+  getProviderLibrarySlug,
+  type ProviderMediaPathSource,
+} from '@/shared/utils/provider-library-paths';
 import { getProviderLabel } from '@/services/providers/resolver';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { useCardOverlayState } from '../hooks/use-card-overlay-state';
@@ -152,9 +158,9 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   const movieStatus = provider === 'radarr' ? (statusData as CheckMovieStatusResponse | undefined) : undefined;
   const librarySlug = useMemo(() => {
     if (provider === 'radarr') {
-      return getLibrarySlug('radarr', (movieStatus?.movie ?? null) as FolderSlugSource | null);
+      return getProviderLibrarySlug('radarr', (movieStatus?.movie ?? null) as ProviderMediaPathSource | null);
     }
-    return getLibrarySlug('sonarr', (seriesStatus?.series ?? null) as FolderSlugSource | null);
+    return getProviderLibrarySlug('sonarr', (seriesStatus?.series ?? null) as ProviderMediaPathSource | null);
   }, [movieStatus?.movie, seriesStatus?.series, provider]);
   const externalHref = useMemo(() => {
     return buildExternalMediaLink({
