@@ -7,6 +7,7 @@ import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useAddMovie, useAddSeries, useAniListMetadataBatch, useMovieStatus, usePublicOptions, useSeriesStatus } from '@/shared/queries';
 import { useMediaModalProps } from '@/features/media-overlay/hooks/use-media-modal-props';
 import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
+import { awaitBackgroundReady } from '@/runtime/messaging/await-background-ready';
 import MediaActions, { Status } from './components/media-actions';
 import { logger } from '@/shared/utils/logger';
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
@@ -28,7 +29,6 @@ import '@/shared/styles/base.css';
 import './style.css';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
-import { awaitBackgroundReady } from '@/shared/utils/background-ready';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 
 const log = logger.create('AniList Content');
