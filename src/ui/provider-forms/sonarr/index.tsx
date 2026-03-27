@@ -4,15 +4,14 @@
 import React, { useMemo } from 'react';
 import type { FieldPath, FieldPathValue, UseFormReturn } from 'react-hook-form';
 import type { SonarrFormState, SonarrQualityProfile, SonarrRootFolder, SonarrTag } from '@/shared/types';
+import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
 import { SelectField } from '@/shared/ui/form/form';
 import { buildProviderFolderSlugFromTitle } from '@/shared/utils/provider-library-paths';
 import { RootFolderField } from '@/ui/provider-forms/fields/root-folder-field';
-import { TagsField } from '@/ui/provider-forms/fields/tags-field';
 import { cn } from '@/shared/utils/cn';
 import { MONITOR_OPTIONS_WITH_DESCRIPTIONS, SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS } from '@/shared/providers/sonarr/constants';
 import { DEFAULT_CONTAINER_CLASS_NAME } from './helpers';
 import { TogglesGrid } from './components/toggles-grid';
-import { useSonarrTagSelection } from './use-tag-maps';
 
 export type SonarrFormLayout = 'stacked' | 'grid';
 
@@ -77,14 +76,6 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
     [folderSlug, pathHintTitle, pathHintTvdbId],
   );
 
-  const { allSelectedTagLabels, existingTagLabels, handleTagsChange } = useSonarrTagSelection({
-    availableTags: metadata.tags,
-    selectedTagIds: effectiveValues.tags,
-    selectedFreeformTags: effectiveValues.freeformTags,
-    setTagIds: ids => setFieldValue('tags', ids),
-    setFreeformTags: labels => setFieldValue('freeformTags', labels),
-  });
-
   const qualityProfileOptions = useMemo(() => {
     return metadata.qualityProfiles.map((profile) => ({
       value: String(profile.id),
@@ -138,11 +129,13 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
         container={selectPortal}
       />
 
-      <TagsField
+      <ProviderTagField
+        availableTags={metadata.tags}
         disabled={Boolean(disabled)}
-        value={allSelectedTagLabels}
-        onChange={handleTagsChange}
-        existingTags={existingTagLabels}
+        selectedTagIds={effectiveValues.tags}
+        selectedFreeformTags={effectiveValues.freeformTags}
+        onTagIdsChange={ids => setFieldValue('tags', ids)}
+        onFreeformTagsChange={labels => setFieldValue('freeformTags', labels)}
       />
 
       <TogglesGrid

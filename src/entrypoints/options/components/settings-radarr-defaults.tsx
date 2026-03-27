@@ -1,13 +1,16 @@
-import React, { useCallback, useMemo } from 'react';
+/** Renders Radarr default add settings using shared provider form controls and tag selection UI. */
+// src/entrypoints/options/components/settings-radarr-defaults.tsx
+
+import React from 'react';
 import { Controller, useFormContext } from 'react-hook-form';
 import { RotateCcw } from 'lucide-react';
+import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import type { useRadarrMetadata } from '@/shared/queries';
-import type { RadarrMinimumAvailability, RadarrQualityProfile, RadarrTag } from '@/shared/types';
+import type { RadarrMinimumAvailability, RadarrQualityProfile } from '@/shared/types';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import { RootFolderField } from '@/ui/provider-forms/fields/root-folder-field';
-import { TagsField } from '@/ui/provider-forms/fields/tags-field';
 import Button from '@/shared/ui/primitives/button';
 import { SaveSettingsBar } from './settings-save-bar';
 
@@ -42,60 +45,6 @@ export const RadarrDefaultsSection: React.FC<RadarrDefaultsSectionProps> = ({
   const tagsValue = watch('providers.radarr.defaults.tags');
   const freeformTagsValue = watch('providers.radarr.defaults.freeformTags');
 
-  const tagMaps = useMemo(() => {
-    const idToLabel = new Map<number, string>();
-    const labelToId = new Map<string, number>();
-
-    const availableTags = metadataQuery.data?.tags ?? [];
-    for (const tag of availableTags) {
-      if (tag.label && tag.label.trim().length > 0) {
-        const trimmed = tag.label.trim();
-        idToLabel.set(tag.id, trimmed);
-        labelToId.set(trimmed, tag.id);
-      }
-    }
-
-    return { idToLabel, labelToId };
-  }, [metadataQuery.data?.tags]);
-
-  const currentLabels = useMemo(() => {
-    const existing = (tagsValue ?? [])
-      .map(tagId => tagMaps.idToLabel.get(tagId))
-      .filter((label): label is string => typeof label === 'string' && label.length > 0);
-    const freeform = (freeformTagsValue ?? []).filter(
-      (label): label is string => typeof label === 'string' && label.trim().length > 0,
-    );
-    return Array.from(new Set([...existing, ...freeform]));
-  }, [freeformTagsValue, tagMaps.idToLabel, tagsValue]);
-
-  const handleTagsChange = useCallback(
-    (labels: string[]) => {
-      const uniqueLabels: string[] = [];
-      const seen = new Set<string>();
-
-      for (const label of labels) {
-        if (!label || seen.has(label)) continue;
-        seen.add(label);
-        uniqueLabels.push(label);
-      }
-
-      const tagIds: number[] = [];
-      const freeform: string[] = [];
-      for (const label of uniqueLabels) {
-        const tagId = tagMaps.labelToId.get(label);
-        if (typeof tagId === 'number') {
-          tagIds.push(tagId);
-        } else {
-          freeform.push(label);
-        }
-      }
-
-      setValue('providers.radarr.defaults.tags', tagIds, { shouldDirty: true });
-      setValue('providers.radarr.defaults.freeformTags', freeform, { shouldDirty: true });
-    },
-    [setValue, tagMaps.labelToId],
-  );
-
   const renderContent = () => {
     if (!metadataEnabled) {
       return (
@@ -123,10 +72,6 @@ export const RadarrDefaultsSection: React.FC<RadarrDefaultsSectionProps> = ({
       value: String(profile.id),
       label: profile.name,
     }));
-
-    const existingTagLabels = metadataQuery.data.tags
-      .map((tag: RadarrTag) => tag.label)
-      .filter((label): label is string => typeof label === 'string' && label.trim().length > 0);
 
     return (
       <div className="grid gap-4 md:grid-cols-2">
@@ -178,11 +123,15 @@ export const RadarrDefaultsSection: React.FC<RadarrDefaultsSectionProps> = ({
           )}
         />
 
-        <TagsField
+        <ProviderTagField
+          availableTags={metadataQuery.data.tags}
           disabled={actions.saveState.isPending}
-          value={currentLabels}
-          onChange={handleTagsChange}
-          existingTags={existingTagLabels}
+          selectedTagIds={tagsValue}
+          selectedFreeformTags={freeformTagsValue}
+          onTagIdsChange={tagIds => setValue('providers.radarr.defaults.tags', tagIds, { shouldDirty: true })}
+          onFreeformTagsChange={freeformTags =>
+            setValue('providers.radarr.defaults.freeformTags', freeformTags, { shouldDirty: true })
+          }
         />
 
         <div className="pt-1 md:col-span-2">

@@ -1,3 +1,6 @@
+/** Renders the Radarr provider form using shared field controls and provider tag selection UI. */
+// src/ui/provider-forms/radarr/index.tsx
+
 import React, { useMemo } from 'react';
 import type { FieldPath, FieldPathValue, UseFormReturn } from 'react-hook-form';
 import type {
@@ -7,9 +10,9 @@ import type {
   RadarrRootFolder,
   RadarrTag,
 } from '@/shared/types';
+import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import { RootFolderField } from '@/ui/provider-forms/fields/root-folder-field';
-import { TagsField } from '@/ui/provider-forms/fields/tags-field';
 import { cn } from '@/shared/utils/cn';
 
 export type RadarrFormLayout = 'stacked' | 'grid';
@@ -81,56 +84,6 @@ function RadarrForm(props: RadarrFormProps): React.JSX.Element {
     [metadata.qualityProfiles],
   );
 
-  const tagMaps = useMemo(() => {
-    const idToLabel = new Map<number, string>();
-    const labelToId = new Map<string, number>();
-
-    for (const tag of metadata.tags) {
-      const label = tag.label?.trim();
-      if (!label) continue;
-      idToLabel.set(tag.id, label);
-      labelToId.set(label, tag.id);
-    }
-
-    return { idToLabel, labelToId };
-  }, [metadata.tags]);
-
-  const allSelectedTagLabels = useMemo(() => {
-    const existing = effectiveValues.tags
-      .map(tagId => tagMaps.idToLabel.get(tagId))
-      .filter((label): label is string => typeof label === 'string' && label.length > 0);
-    const freeform = effectiveValues.freeformTags.filter(
-      (label): label is string => typeof label === 'string' && label.trim().length > 0,
-    );
-    return Array.from(new Set([...existing, ...freeform]));
-  }, [effectiveValues.freeformTags, effectiveValues.tags, tagMaps.idToLabel]);
-
-  const existingTagLabels = useMemo(
-    () =>
-      metadata.tags
-        .map(tag => tag.label?.trim())
-        .filter((label): label is string => typeof label === 'string' && label.length > 0),
-    [metadata.tags],
-  );
-
-  const handleTagsChange = (labels: string[]) => {
-    const uniqueLabels = Array.from(new Set(labels.filter(label => label.trim().length > 0)));
-    const tagIds: number[] = [];
-    const freeformTags: string[] = [];
-
-    for (const label of uniqueLabels) {
-      const existingId = tagMaps.labelToId.get(label);
-      if (typeof existingId === 'number') {
-        tagIds.push(existingId);
-      } else {
-        freeformTags.push(label);
-      }
-    }
-
-    setFieldValue('tags', tagIds);
-    setFieldValue('freeformTags', freeformTags);
-  };
-
   const containerClassName = cn(DEFAULT_CONTAINER_CLASS_NAME, layoutClassName, className);
   const selectPortal = portalContainer ?? null;
 
@@ -168,11 +121,13 @@ function RadarrForm(props: RadarrFormProps): React.JSX.Element {
         container={selectPortal}
       />
 
-      <TagsField
+      <ProviderTagField
+        availableTags={metadata.tags}
         disabled={Boolean(disabled)}
-        value={allSelectedTagLabels}
-        onChange={handleTagsChange}
-        existingTags={existingTagLabels}
+        selectedTagIds={effectiveValues.tags}
+        selectedFreeformTags={effectiveValues.freeformTags}
+        onTagIdsChange={ids => setFieldValue('tags', ids)}
+        onFreeformTagsChange={labels => setFieldValue('freeformTags', labels)}
       />
 
       <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2', fullWidthClass)}>
