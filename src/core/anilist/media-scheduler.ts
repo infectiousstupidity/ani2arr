@@ -30,7 +30,7 @@ import type {
   RequestPriority,
 } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
-import { priorityValue } from '@/shared/utils/priority';
+import { priorityValue } from '@/shared/utils/request-priority';
 import { AbortError, withRetry } from '@/shared/utils/retry';
 import {
   LOW_PRIORITY_MIN_DISPATCH_GAP_MS,

@@ -13,7 +13,7 @@ import { useAniListMetadataBatch, useMovieStatus, useSeriesStatus } from '@/shar
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';
-import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link';
+import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import SonarrIcon from '@/assets/sonarr.svg';
 import RadarrIcon from '@/assets/radarr.svg';
 import { getLibrarySlug, type FolderSlugSource } from '@/services/helpers/path-utils';

@@ -8,7 +8,7 @@ import {
   sanitizeLookupDisplayForProvider,
 } from '@/services/mapping/pipeline/matching';
 import { incrementCounter, timeAsync } from '@/debug/metrics';
-import { priorityValue } from '@/shared/utils/priority';
+import { priorityValue } from '@/shared/utils/request-priority';
 import { logger, type ScopedLogger } from '@/shared/utils/logger';
 import type {
   LookupClientCredentials,

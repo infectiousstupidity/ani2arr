@@ -1,8 +1,8 @@
-// src/shared/utils/priority.ts
+/** Maps semantic request priorities to the numeric queue priorities used by scheduled work. */
+// src/shared/utils/request-priority.ts
+
 import type { RequestPriority } from '@/shared/types';
 
-// Map semantic request priority to queue numeric priority.
-// Higher numbers run sooner in PQueue; lower run later.
 export function priorityValue(level?: RequestPriority): number {
   switch (level) {
     case 'high':
@@ -13,4 +13,3 @@ export function priorityValue(level?: RequestPriority): number {
       return 0;
   }
 }
-
