@@ -4,11 +4,11 @@
 import React, { useMemo } from 'react';
 import type { FieldPath, FieldPathValue, UseFormReturn } from 'react-hook-form';
 import type {
+  ProviderTag,
   RadarrFormState,
   RadarrMinimumAvailability,
   RadarrQualityProfile,
   RadarrRootFolder,
-  RadarrTag,
 } from '@/shared/types';
 import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
@@ -20,7 +20,7 @@ export type RadarrFormLayout = 'stacked' | 'grid';
 export interface RadarrFormMetadata {
   qualityProfiles: RadarrQualityProfile[];
   rootFolders: RadarrRootFolder[];
-  tags: RadarrTag[];
+  tags: ProviderTag[];
 }
 
 export interface RadarrFormProps {

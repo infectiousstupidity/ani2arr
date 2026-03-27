@@ -1,4 +1,5 @@
 export type { Provider } from '@/shared/types/options';
+export type { ProviderTag } from '@/shared/types/provider-tags';
 
 export type {
   LeanSonarrSeries,
@@ -10,7 +11,6 @@ export type {
   SonarrQualityProfile,
   SonarrRootFolder,
   SonarrSeries,
-  SonarrTag,
 } from '@/shared/providers/sonarr/types';
 
 export type {
@@ -21,5 +21,4 @@ export type {
   RadarrMovie,
   RadarrQualityProfile,
   RadarrRootFolder,
-  RadarrTag,
 } from '@/shared/providers/radarr/types';

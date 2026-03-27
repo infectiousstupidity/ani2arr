@@ -5,16 +5,15 @@ import type { AniListMetadata, AniListMediaHint, AniListMediaStatus, AniListMedi
 import type {
   LeanRadarrMovie,
   LeanSonarrSeries,
+  ProviderTag,
   RadarrLookupMovie,
   RadarrQualityProfile,
   RadarrRootFolder,
-  RadarrTag,
   RadarrMovie,
   SonarrLookupSeries,
   SonarrRootFolder,
   SonarrQualityProfile,
   SonarrSeries,
-  SonarrTag,
 } from '@/shared/types/providers';
 import type { AniListSchedulerDebugSnapshot } from '@/debug/anilist-debug.types';
 import type { MappingExternalId } from '@/shared/types/mapping';
@@ -177,7 +176,7 @@ export interface ValidateTmdbOutput {
 export interface GetRadarrMetadataOutput {
   qualityProfiles: RadarrQualityProfile[];
   rootFolders: RadarrRootFolder[];
-  tags: RadarrTag[];
+  tags: ProviderTag[];
 }
 
 export type AddRadarrOutput = RadarrMovie;
@@ -200,5 +199,5 @@ export type GetAniListSchedulerDebugOutput = AniListSchedulerDebugSnapshot;
 export type SonarrMetadataOutput = {
   qualityProfiles: SonarrQualityProfile[];
   rootFolders: SonarrRootFolder[];
-  tags: SonarrTag[];
+  tags: ProviderTag[];
 };

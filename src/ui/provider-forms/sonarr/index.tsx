@@ -3,7 +3,7 @@
 
 import React, { useMemo } from 'react';
 import type { FieldPath, FieldPathValue, UseFormReturn } from 'react-hook-form';
-import type { SonarrFormState, SonarrQualityProfile, SonarrRootFolder, SonarrTag } from '@/shared/types';
+import type { ProviderTag, SonarrFormState, SonarrQualityProfile, SonarrRootFolder } from '@/shared/types';
 import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
 import { SelectField } from '@/shared/ui/form/form';
 import { buildProviderFolderSlugFromTitle } from '@/shared/utils/provider-library-paths';
@@ -18,7 +18,7 @@ export type SonarrFormLayout = 'stacked' | 'grid';
 export interface SonarrFormMetadata {
   qualityProfiles: SonarrQualityProfile[];
   rootFolders: SonarrRootFolder[];
-  tags: SonarrTag[];
+  tags: ProviderTag[];
 }
 
 export interface SonarrFormProps {

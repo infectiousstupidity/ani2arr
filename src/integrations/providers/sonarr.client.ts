@@ -5,12 +5,12 @@ import { BaseProviderClient } from '@/integrations/providers/base-provider.clien
 import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import type {
   ExtensionOptions,
+  ProviderTag,
   ProviderCredentials,
   SonarrSeries,
   SonarrRootFolder,
   SonarrQualityProfile,
   AddRequestPayload,
-  SonarrTag,
   SonarrLookupSeries,
 } from '@/shared/types';
 import { createError, ErrorCode } from '@/shared/errors';
@@ -189,18 +189,18 @@ export class SonarrClient extends BaseProviderClient {
     return this.request<SonarrQualityProfile[]>('qualityprofile', credentials);
   };
 
-  public getTags = async (credentials: ProviderCredentials): Promise<SonarrTag[]> => {
-    return this.request<SonarrTag[]>('tag', credentials);
+  public getTags = async (credentials: ProviderCredentials): Promise<ProviderTag[]> => {
+    return this.request<ProviderTag[]>('tag', credentials);
   };
 
   /**
    * Creates a new tag in Sonarr with the given label.
-   * Returns the created SonarrTag (including its numeric id).
+   * Returns the created provider tag (including its numeric id).
    */
   public createTag = async (
     credentials: ProviderCredentials,
     label: string,
-  ): Promise<SonarrTag> => {
+  ): Promise<ProviderTag> => {
     const trimmed = label.trim();
     if (!trimmed) {
       throw createError(
@@ -210,7 +210,7 @@ export class SonarrClient extends BaseProviderClient {
       );
     }
 
-    const created = await this.request<SonarrTag>('tag', credentials, {
+    const created = await this.request<ProviderTag>('tag', credentials, {
       method: 'POST',
       body: JSON.stringify({ label: trimmed }),
     });

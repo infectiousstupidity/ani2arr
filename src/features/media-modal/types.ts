@@ -1,13 +1,12 @@
 // src/features/media-modal/types.ts
 import type {
+  ProviderTag,
   RadarrFormState,
   RadarrQualityProfile,
   RadarrRootFolder,
-  RadarrTag,
   SonarrFormState,
   SonarrQualityProfile,
   SonarrRootFolder,
-  SonarrTag,
 } from "@/shared/types";
 import type { UseMappingControllerResult } from "@/features/mapping";
 import type { UseRadarrPanelControllerResult } from "./hooks/use-radarr-panel-controller";
@@ -41,7 +40,7 @@ export interface SonarrPanelBaseProps {
   metadata: {
     qualityProfiles: SonarrQualityProfile[];
     rootFolders: SonarrRootFolder[];
-    tags: SonarrTag[];
+    tags: ProviderTag[];
   } | null;
 
   sonarrReady: boolean;
@@ -71,7 +70,7 @@ export interface RadarrPanelBaseProps {
   metadata: {
     qualityProfiles: RadarrQualityProfile[];
     rootFolders: RadarrRootFolder[];
-    tags: RadarrTag[];
+    tags: ProviderTag[];
   } | null;
 
   radarrReady: boolean;
