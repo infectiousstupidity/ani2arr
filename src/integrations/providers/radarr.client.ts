@@ -2,7 +2,7 @@
 // src/integrations/providers/radarr.client.ts
 
 import { BaseProviderClient } from '@/integrations/providers/base-provider.client';
-import { resolveArrTagIds } from '@/clients/tag-resolver';
+import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import { createError, ErrorCode } from '@/shared/errors';
 import type {
   RadarrLookupMovie,
@@ -182,7 +182,7 @@ export class RadarrClient extends BaseProviderClient {
     payload: AddRadarrMoviePayload,
     credentials: ProviderCredentials,
   ): Promise<RadarrMovie> => {
-    const finalTagIds = await resolveArrTagIds({
+    const finalTagIds = await resolveProviderTagIds({
       api: this,
       credentials,
       existingIdsFromForm: Array.isArray(payload.tags)

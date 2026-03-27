@@ -1,12 +1,12 @@
 /** RPC handler that updates an existing Radarr movie using resolved form and library state. */
 // src/rpc/handlers/update-movie.ts
 
+import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { RadarrLibrary } from '@/services/library/radarr';
 import type { UpdateRadarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, RadarrMovie } from '@/shared/types';
 import type { ProviderCredentials } from '@/shared/types/options';
-import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import {
   buildProviderFolderSlug,
@@ -90,7 +90,7 @@ export async function updateRadarrMovieHandler(
 
   const freeformTags = Array.isArray(input.form.freeformTags) ? input.form.freeformTags : [];
   const existingTags = await RadarrClient.getTags(credentials);
-  const resolvedTags = await resolveArrTagIds({
+  const resolvedTags = await resolveProviderTagIds({
     api: RadarrClient,
     credentials,
     existingIdsFromForm: tagsFromForm,

@@ -1,11 +1,11 @@
 /** RPC handler that updates an existing Sonarr series using resolved form and library state. */
 // src/rpc/handlers/update-series.ts
 
+import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { UpdateSonarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, ProviderCredentials, SonarrSeries } from '@/shared/types';
-import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import {
   buildProviderFolderSlug,
@@ -70,7 +70,7 @@ export async function updateSonarrSeriesHandler(
   const freeformTags = Array.isArray(input.form.freeformTags) ? input.form.freeformTags : [];
 
   const existingTags = await SonarrClient.getTags(credentials);
-  const resolvedTags = await resolveArrTagIds({
+  const resolvedTags = await resolveProviderTagIds({
     api: SonarrClient,
     credentials,
     existingIdsFromForm: tagsFromForm,

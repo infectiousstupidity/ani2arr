@@ -1,4 +1,8 @@
+/** Shared Radarr transport and form types used across provider-facing flows. */
+// src/shared/providers/radarr/types.ts
+
 import type { ProviderTitleLanguage } from '@/shared/types/options';
+import type { ProviderTag } from '@/shared/types/provider-tags';
 
 export type RadarrMinimumAvailability =
   | 'announced'
@@ -17,10 +21,7 @@ export interface RadarrQualityProfile {
   name: string;
 }
 
-export interface RadarrTag {
-  id: number;
-  label: string;
-}
+export type RadarrTag = ProviderTag;
 
 export interface RadarrAlternateTitle {
   title?: string | null;
