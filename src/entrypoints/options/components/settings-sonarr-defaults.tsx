@@ -1,15 +1,18 @@
-import React, { useMemo, useId, useCallback } from 'react';
+/** Renders Sonarr default add settings using shared provider form controls and tag selection UI. */
+// src/entrypoints/options/components/settings-sonarr-defaults.tsx
+
+import React, { useId } from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown, RotateCcw } from 'lucide-react';
 
+import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
 import type { useSonarrMetadata } from '@/shared/queries';
 import type { SonarrQualityProfile, SonarrRootFolder } from '@/shared/types';
 
-import { FormField, Label, SelectField, SwitchField } from '@/shared/ui/form/form';
-import MultiTagInput from '@/shared/ui/form/multi-tag-input';
+import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import Button from '@/shared/ui/primitives/button';
 import {
   MONITOR_OPTIONS_WITH_DESCRIPTIONS,
@@ -25,10 +28,9 @@ type SonarrDefaultsSectionProps = {
   metadataQuery: ReturnType<typeof useSonarrMetadata>;
   onRefresh: () => void;
   // Allow undefined to match exactOptionalPropertyTypes if enabled in tsconfig
-  layout?: SonarrFormLayout | undefined; 
+  layout?: SonarrFormLayout | undefined;
 };
 
-// --- Helper Functions ---
 function formatRootPath(rootPath: string): string {
   return rootPath.endsWith('/') || rootPath.endsWith('\\')
     ? rootPath.slice(0, -1)
@@ -67,61 +69,8 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
   const rootFolderFieldId = useId();
   const selectPortal = portalContainer ?? null;
 
-  // --- Tag Logic Mapping ---
-  
   const tagsValue = watch('providers.sonarr.defaults.tags');
   const freeformTagsValue = watch('providers.sonarr.defaults.freeformTags');
-  
-  // Memoize the map derivation. Safe access metadataQuery.data?.tags inside to prevent stale closure or dependency warnings.
-  const tagMaps = useMemo(() => {
-    const idToLabel = new Map<number, string>();
-    const labelToId = new Map<string, number>();
-
-    const availableTags = metadataQuery.data?.tags ?? [];
-
-    for (const tag of availableTags) {
-      if (tag.label && tag.label.trim().length > 0) {
-        const trimmed = tag.label.trim();
-        idToLabel.set(tag.id, trimmed);
-        labelToId.set(trimmed, tag.id);
-      }
-    }
-    return { idToLabel, labelToId };
-  }, [metadataQuery.data?.tags]);
-
-  const { idToLabel, labelToId } = tagMaps;
-
-  const currentLabels = useMemo(() => {
-    const existing = (tagsValue ?? [])
-      .map((id) => idToLabel.get(id))
-      .filter((l): l is string => !!l);
-    const freeform = (freeformTagsValue ?? []).filter((l) => !!l.trim());
-    return Array.from(new Set([...existing, ...freeform]));
-  }, [tagsValue, freeformTagsValue, idToLabel]);
-
-  const handleTagsChange = useCallback(
-    (newLabels: string[]) => {
-      const tagIds: number[] = [];
-      const freeform: string[] = [];
-      const seen = new Set<string>();
-
-      for (const label of newLabels) {
-        if (!label || seen.has(label)) continue;
-        seen.add(label);
-        const id = labelToId.get(label);
-        if (id !== undefined) {
-          tagIds.push(id);
-        } else {
-          freeform.push(label);
-        }
-      }
-      setValue('providers.sonarr.defaults.tags', tagIds, { shouldDirty: true });
-      setValue('providers.sonarr.defaults.freeformTags', freeform, { shouldDirty: true });
-    },
-    [labelToId, setValue]
-  );
-
-  // --- Render Content ---
 
   const renderContent = () => {
     if (!metadataEnabled) {
@@ -296,19 +245,16 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
           )}
         />
 
-        {/* Tags (keep same column as Series Type) */}
-        <FormField>
-          <div className="space-y-3">
-            <Label>Tags</Label>
-            <MultiTagInput
-              value={currentLabels}
-              onChange={handleTagsChange}
-              placeholder="Add tags..."
-              disabled={actions.saveState.isPending}
-              existingTags={Array.from(tagMaps.labelToId.keys())}
-            />
-          </div>
-        </FormField>
+        <ProviderTagField
+          availableTags={metadataQuery.data.tags}
+          disabled={actions.saveState.isPending}
+          selectedTagIds={tagsValue}
+          selectedFreeformTags={freeformTagsValue}
+          onTagIdsChange={tagIds => setValue('providers.sonarr.defaults.tags', tagIds, { shouldDirty: true })}
+          onFreeformTagsChange={freeformTags =>
+            setValue('providers.sonarr.defaults.freeformTags', freeformTags, { shouldDirty: true })
+          }
+        />
 
         {/* Toggles */}
         <div className={fullWidthClass ? `pt-1 ${fullWidthClass}` : 'pt-1'}>
