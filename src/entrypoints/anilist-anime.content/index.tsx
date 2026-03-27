@@ -1,5 +1,6 @@
 /** AniList anime-page entrypoint that mounts header actions only for eligible provider pages. */
 // src/entrypoints/anilist-anime.content/index.tsx
+
 import React, { useState, useCallback } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

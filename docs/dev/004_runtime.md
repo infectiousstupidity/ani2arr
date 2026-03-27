@@ -97,6 +97,15 @@ Entrypoints should mainly:
 * call runtime/bootstrap code
 * mount UI
 
+For content entrypoints, `runtime/` owns shell lifecycle orchestration.
+That includes:
+
+* eligibility reevaluation on initial load
+* route-change reevaluation
+* settings-change reevaluation
+* invalidation cleanup
+* removing injected shell DOM when a surface becomes ineligible
+
 They should not become the long-term home for lifecycle or messaging logic.
 
 ---

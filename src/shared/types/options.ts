@@ -1,4 +1,6 @@
+/** Canonical extension settings and public-options types shared across UI and runtime. */
 // src/shared/types/options.ts
+
 import type { SonarrFormState } from '@/shared/providers/sonarr/types';
 import type { RadarrFormState } from '@/shared/providers/radarr/types';
 

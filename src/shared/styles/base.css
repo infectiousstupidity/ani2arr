@@ -1,4 +1,6 @@
-/* src/styles/base.css */
+/* Shared theme tokens and overlay styles used by injected extension UI. */
+/* src/shared/styles/base.css */
+
 @import "tailwindcss";
 
 /* 1) Theme variables scoped to the shadow host */
