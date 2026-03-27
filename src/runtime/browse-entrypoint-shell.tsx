@@ -1,5 +1,5 @@
-/** Browse-surface shadow-root mounting composed on top of the runtime content shell. */
-// src/shared/entrypoints/browse-bootstrap.tsx
+/** Runtime-owned browse entrypoint shell mounting, style injection, and DOM cleanup. */
+// src/runtime/browse-entrypoint-shell.tsx
 
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -11,19 +11,18 @@ import type { PublicOptions } from '@/shared/types';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { createShadowRootUi, type ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 
-export interface BrowseBootstrapOptions {
+export interface BrowseEntrypointShellOptions {
   uiName: string;
   styleAttribute: string;
   shadowStyleAttribute: string;
   stylesText: string;
-  coverSelector: string;
   containerClassName: string;
   processedAttribute: string;
   isEligible: (input: { url: string; publicOptions: PublicOptions }) => boolean | Promise<boolean>;
   renderRoot: (portalContainer: HTMLElement) => React.ReactElement;
 }
 
-export const createBrowseContentMain = (options: BrowseBootstrapOptions) => {
+export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOptions) => {
   return async (ctx: ContentScriptContext): Promise<void> => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -89,7 +88,7 @@ export const createBrowseContentMain = (options: BrowseBootstrapOptions) => {
           root = createRoot(container);
           root.render(
             <React.StrictMode>
-              <QueryClientProvider client={queryClient}>                
+              <QueryClientProvider client={queryClient}>
                 <TooltipProvider>
                   <ConfirmProvider portalContainer={portalContainer}>
                     {options.renderRoot(portalContainer)}
