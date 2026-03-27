@@ -1,5 +1,8 @@
-// src/shared/mapping/sonarr.adapter.ts
+/** Adapts Sonarr lookup results into mapping-search rows with library-aware links. */
+// src/features/mapping/sonarr.adapter.ts
+
 import type { MappingSearchResult, SonarrLookupSeries } from '@/shared/types';
+import { getProviderLibrarySlug } from '@/shared/utils/provider-library-paths';
 
 export interface SonarrAdapterOptions {
   baseUrl: string; // absolute; trailing slash trimmed
@@ -47,7 +50,9 @@ export function toMappingSearchResultFromSonarr(
   const tvdbId = series.tvdbId;
   const librarySet = new Set(opts.libraryTvdbIds ?? []);
   const inLibrary = librarySet.has(tvdbId);
-  const librarySlug = opts.librarySlugByTvdbId?.[tvdbId] ?? (inLibrary ? series.titleSlug : undefined);
+  const librarySlug =
+    opts.librarySlugByTvdbId?.[tvdbId] ??
+    (inLibrary ? getProviderLibrarySlug('sonarr', series) ?? undefined : undefined);
   const year = typeof series.year === 'number' ? series.year : undefined;
   const typeLabel = series.seriesType;
   const posterUrl = pickPoster(series, opts.baseUrl);

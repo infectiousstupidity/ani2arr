@@ -129,7 +129,7 @@ function deriveSonarrCurrentMappingFromStatus(
   }
 
   const tvdbId = status.tvdbId;
-  const librarySlug = status.series?.titleSlug;
+  const librarySlug = getProviderLibrarySlug('sonarr', status.series as ProviderMediaPathSource | undefined);
   const title = status.series?.title ?? `TVDB ${tvdbId}`;
 
   return {

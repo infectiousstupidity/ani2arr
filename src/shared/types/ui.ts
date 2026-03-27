@@ -1,3 +1,6 @@
+/** Shared UI view-model types for overlays, browse cards, and mapping results. */
+// src/shared/types/ui.ts
+
 import type { AniListMediaHint } from './anilist';
 import type { BadgeVisibility } from './options';
 import type { Provider } from '@/shared/types/options';
@@ -65,7 +68,7 @@ export interface MappingSearchResult {
   typeLabel?: string;
   // Whether the item is already in the external library
   inLibrary: boolean;
-  librarySlug?: string; // /series/:slug or /movie/:slug
+  librarySlug?: string; // Provider detail-route slug for /series/:slug or /movie/:slug.
   // Poster/backdrop to show in UI
   posterUrl?: string;
   backdropUrl?: string;

@@ -1,12 +1,16 @@
+/** Renders the Sonarr provider form using shared field controls and path hints. */
+// src/ui/provider-forms/sonarr/index.tsx
+
 import React, { useMemo } from 'react';
 import type { FieldPath, FieldPathValue, UseFormReturn } from 'react-hook-form';
 import type { SonarrFormState, SonarrQualityProfile, SonarrRootFolder, SonarrTag } from '@/shared/types';
 import { SelectField } from '@/shared/ui/form/form';
+import { buildProviderFolderSlugFromTitle } from '@/shared/utils/provider-library-paths';
 import { RootFolderField } from '@/ui/provider-forms/fields/root-folder-field';
 import { TagsField } from '@/ui/provider-forms/fields/tags-field';
 import { cn } from '@/shared/utils/cn';
 import { MONITOR_OPTIONS_WITH_DESCRIPTIONS, SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS } from '@/shared/providers/sonarr/constants';
-import { DEFAULT_CONTAINER_CLASS_NAME, buildFolderSlug } from './helpers';
+import { DEFAULT_CONTAINER_CLASS_NAME } from './helpers';
 import { TogglesGrid } from './components/toggles-grid';
 import { useSonarrTagSelection } from './use-tag-maps';
 
@@ -66,7 +70,10 @@ function SonarrForm(props: SonarrFormProps): React.JSX.Element | null {
   };
 
   const computedSlug = useMemo(
-    () => buildFolderSlug(folderSlug, pathHintTitle, pathHintTvdbId),
+    () =>
+      folderSlug && folderSlug.trim().length > 0
+        ? folderSlug.trim()
+        : buildProviderFolderSlugFromTitle(pathHintTitle, { tvdbId: pathHintTvdbId }),
     [folderSlug, pathHintTitle, pathHintTvdbId],
   );
 
