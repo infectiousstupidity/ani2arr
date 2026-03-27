@@ -28,7 +28,7 @@ import type { ProviderCredentials } from '@/shared/types/options';
 import type {
   ExtensionOptions,
 } from '@/shared/types';
-import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import type { Ani2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';
 

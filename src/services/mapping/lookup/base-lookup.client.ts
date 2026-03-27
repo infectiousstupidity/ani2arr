@@ -2,7 +2,7 @@
 import { STORAGE_POLICIES, type TtlCache } from '@/storage';
 import PQueue from 'p-queue';
 import type { MappingExternalIdKind, MappingProvider, RequestPriority } from '@/shared/types';
-import { normalizeError } from '@/shared/errors/error-utils';
+import { normalizeError } from '@/shared/errors';
 import {
   canonicalTitleKeyForProvider,
   sanitizeLookupDisplayForProvider,

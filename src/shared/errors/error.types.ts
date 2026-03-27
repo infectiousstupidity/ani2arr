@@ -1,3 +1,6 @@
+/** Shared error codes and the canonical extension error contract. */
+// src/shared/errors/error.types.ts
+
 export enum ErrorCode {
   NETWORK_ERROR = 'NETWORK_ERROR',
   VALIDATION_ERROR = 'VALIDATION_ERROR',

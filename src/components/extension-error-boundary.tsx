@@ -4,7 +4,7 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
-import { logError, normalizeError, type ExtensionError } from '@/shared/errors/error-utils';
+import { logError, normalizeError, type ExtensionError } from '@/shared/errors';
 import { logger } from '@/shared/utils/logger';
 
 const errorLogger = logger.create('ErrorBoundary');

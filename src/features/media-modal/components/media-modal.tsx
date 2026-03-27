@@ -6,14 +6,13 @@ import { Footer } from "./media-modal-footer";
 import Button from "@/shared/ui/primitives/button";
 import type {
   AniListMediaFormat,
-  ExtensionError,
   Provider,
   AniListMediaStatus,
   RadarrFormState,
   SonarrFormState,
   ProviderTitleLanguage,
 } from "@/shared/types";
-import { ErrorCode } from "@/shared/types";
+import { ErrorCode, type ExtensionError } from "@/shared/errors";
 
 import { MappingPreviewPanel, MappingSearchPanel } from "@/features/mapping";
 import type { MappingTabProps } from "../types";

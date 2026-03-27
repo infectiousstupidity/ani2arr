@@ -17,7 +17,7 @@ import type {
   AniListSearchMediaDto,
 } from '@/integrations/anilist/types';
 import type { TtlCache } from '@/storage';
-import { createError, ErrorCode } from '@/shared/errors/error-utils';
+import { createError, ErrorCode } from '@/shared/errors';
 import type {
   AniListMedia,
   AniListSchedulerBatchDebug,

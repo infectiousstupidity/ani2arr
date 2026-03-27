@@ -1,10 +1,10 @@
+/** Shared helpers for creating, normalizing, and logging extension errors. */
+// src/shared/errors/error-utils.ts
+
+import { ErrorCode, type ExtensionError } from './error.types';
 import { logger } from '@/shared/utils/logger';
-import { ErrorCode, type ExtensionError } from '@/shared/types';
 
 const errorLogger = logger.create('Error');
-
-export { ErrorCode };
-export type { ExtensionError };
 
 export function createError(
   code: ErrorCode,

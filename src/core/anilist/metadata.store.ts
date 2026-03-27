@@ -9,7 +9,7 @@ import type {
   AniListMedia,
   AniListTitles,
 } from '@/shared/types';
-import { logError, normalizeError } from '@/shared/errors/error-utils';
+import { logError, normalizeError } from '@/shared/errors';
 import { logger } from '@/shared/utils/logger';
 import type { AniListMediaService } from './media.service';
 

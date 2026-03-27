@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
-import { normalizeError } from '@/shared/errors/error-utils';
+import { normalizeError, type ExtensionError } from '@/shared/errors';
 import { queryKeys } from '@/shared/queries/query-keys';
-import type { CheckMovieStatusPayload, CheckMovieStatusResponse, ExtensionError, PublicOptions } from '@/shared/types';
+import type { CheckMovieStatusPayload, CheckMovieStatusResponse, PublicOptions } from '@/shared/types';
 import type { ProviderCredentials } from '@/shared/types/options';
 import type { RadarrFormState, RadarrMovie } from './types';
 import type { AddRadarrInput, StatusInput, UpdateRadarrInput } from '@/rpc/schemas';

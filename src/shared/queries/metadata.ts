@@ -3,8 +3,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
-import { normalizeError } from '@/shared/errors/error-utils';
-import type { AniListMedia, ExtensionError } from '@/shared/types';
+import { normalizeError, type ExtensionError } from '@/shared/errors';
+import type { AniListMedia } from '@/shared/types';
 import type { GetAniListMetadataOutput } from '@/rpc/types';
 import { queryKeys, normalizeMetadataIds } from './query-keys';
 

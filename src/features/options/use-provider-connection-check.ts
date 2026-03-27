@@ -8,9 +8,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
 import type { TestProviderConnectionInput } from '@/rpc/schemas';
-import { normalizeError } from '@/shared/errors/error-utils';
+import { normalizeError, type ExtensionError } from '@/shared/errors';
 import { queryKeys } from '@/shared/queries/query-keys';
-import type { ExtensionError } from '@/shared/types';
 import type { Provider, ProviderCredentials } from '@/shared/types/options';
 
 export interface UseProviderConnectionCheckOptions {

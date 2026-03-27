@@ -9,7 +9,7 @@ import type {
   TitleIndexer,
 } from './types';
 import { getExtensionOptionsSnapshot } from '@/storage';
-import { ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
+import { ErrorCode, logError, normalizeError } from '@/shared/errors';
 import { notifyLibraryMutation } from '@/services/library/notify';
 import type { SonarrLibraryStore } from './store';
 import type { SonarrLibraryMutationEmitter } from './types';
