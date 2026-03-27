@@ -1,8 +1,9 @@
+/** AniList browse entrypoint that mounts browse overlays on eligible browse surfaces. */
 // src/entrypoints/anilist-browse.content/index.tsx
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
 import { shouldSkipMediaFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
-import type { AniListMediaHint } from '@/shared/types';
+import type { AniListMediaHint, PublicOptions } from '@/shared/types';
 import baseStyles from '@/shared/styles/base.css?inline';
 import browseStyles from './style.css?inline';
 import {
@@ -24,6 +25,23 @@ const isBrowseSurface = (url: string): boolean => {
   } catch {
     return false;
   }
+};
+
+const isBrowseShellEligible = ({
+  url,
+  publicOptions,
+}: {
+  url: string;
+  publicOptions: PublicOptions;
+}): boolean => {
+  if (!isBrowseSurface(url)) {
+    return false;
+  }
+
+  return (
+    (publicOptions.ui?.browseCards?.sonarr?.enabled ?? true) ||
+    (publicOptions.ui?.browseCards?.radarr?.enabled ?? true)
+  );
 };
 
 const CARD_SELECTOR = '.media-card';
@@ -159,7 +177,7 @@ const main = createBrowseContentMain({
   coverSelector: COVER_SELECTOR,
   containerClassName: DEFAULT_CONTAINER_CLASS,
   processedAttribute: DEFAULT_PROCESSED_ATTRIBUTE,
-  isSurface: isBrowseSurface,
+  isEligible: isBrowseShellEligible,
   renderRoot: (portalContainer) => (
     <BrowseRoot
       BrowseContentApp={BrowseContentApp}
@@ -174,4 +192,3 @@ export default defineContentScript({
   cssInjectionMode: 'ui',
   main,
 });
-

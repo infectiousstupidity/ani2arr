@@ -1,13 +1,14 @@
+/** AniList anime-page entrypoint that mounts header actions only for eligible provider pages. */
 // src/entrypoints/anilist-anime.content/index.tsx
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useAddMovie, useAddSeries, useAniListMetadataBatch, useMovieStatus, usePublicOptions, useSeriesStatus } from '@/shared/queries';
 import { useMediaModalProps } from '@/features/media-overlay/hooks/use-media-modal-props';
+import { createContentEntrypointShell, type ContentEntrypointShellContext } from '@/runtime/content-entrypoint-shell';
 import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
-import { awaitBackgroundReady } from '@/runtime/messaging/await-background-ready';
 import MediaActions, { Status } from './components/media-actions';
 import { logger } from '@/shared/utils/logger';
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
@@ -27,8 +28,7 @@ import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
 import '@/shared/styles/base.css';
 import './style.css';
-import type { ContentScriptContext } from 'wxt/utils/content-script-context';
-import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
+import { createShadowRootUi, type ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 
 const log = logger.create('AniList Content');
@@ -56,17 +56,53 @@ const SPACER_ID = 'a2a-actions-spacer';
 
 /* --------------------------------- Utils --------------------------------- */
 
-function waitForElement(selector: string, root: ParentNode = document): Promise<Element> {
-  return new Promise((resolve) => {
+function createAbortError(): DOMException {
+  return new DOMException('The operation was aborted.', 'AbortError');
+}
+
+function waitForElement(
+  selector: string,
+  {
+    root = document,
+    signal,
+  }: {
+    root?: ParentNode;
+    signal?: AbortSignal;
+  } = {},
+): Promise<Element> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(createAbortError());
+      return;
+    }
+
     const hit = root.querySelector(selector);
-    if (hit) return resolve(hit);
+    if (hit) {
+      resolve(hit);
+      return;
+    }
+
     const mo = new MutationObserver(() => {
+      if (signal?.aborted) {
+        mo.disconnect();
+        reject(createAbortError());
+        return;
+      }
+
       const el = root.querySelector(selector);
       if (el) {
         mo.disconnect();
+        signal?.removeEventListener('abort', onAbort);
         resolve(el);
       }
     });
+
+    const onAbort = () => {
+      mo.disconnect();
+      reject(createAbortError());
+    };
+
+    signal?.addEventListener('abort', onAbort, { once: true });
     mo.observe(document.body, { childList: true, subtree: true });
   });
 }
@@ -238,16 +274,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   const sonarrDefaults: SonarrFormState | null = options?.providers.sonarr.defaults ?? null;
   const radarrDefaults: RadarrFormState | null = options?.providers.radarr.defaults ?? null;
   const defaults = provider === 'radarr' ? radarrDefaults : sonarrDefaults;
-
-  useEffect(() => {
-    (async () => {
-      try {
-        await awaitBackgroundReady();
-      } catch {
-        // non-blocking probe
-      }
-    })();
-  }, []);
 
   const seriesStatusQuery = useSeriesStatus(
     { anilistId, title, metadata: resolvedMetadata },
@@ -424,32 +450,64 @@ let ui: ShadowRootContentScriptUi<Root> | null = null;
 let stopAnchorKeeper: (() => void) | null = null;
 let stopSizeSync: (() => void) | null = null;
 
-async function mountAnimePageUI(
-  ctx: ContentScriptContext,
-  onMounted: () => void,
-): Promise<void> {
-  const idMatch = location.pathname.match(/\/anime\/(\d+)/);
+const removeAnimeUI = (): void => {
+  try {
+    ui?.remove();
+  } catch (error) {
+    log.error('Error removing UI:', error);
+  }
+  ui = null;
+  stopAnchorKeeper?.();
+  stopAnchorKeeper = null;
+  stopSizeSync?.();
+  stopSizeSync = null;
+  removeLayoutArtifacts();
+};
+
+const resolveAnimePageProvider = async (signal: AbortSignal): Promise<'sonarr' | 'radarr' | null> => {
+  await waitForElement(SIDEBAR_SELECTOR, { signal });
+  return resolveProviderForAniListFormat(readFormatFromSidebar(document));
+};
+
+const isAnimePageShellEligible = async ({
+  url,
+  publicOptions,
+  signal,
+}: Pick<ContentEntrypointShellContext, 'url' | 'publicOptions' | 'signal'>): Promise<boolean> => {
+  if (!ANIME_PAGE.includes(url)) {
+    return false;
+  }
+
+  const provider = await resolveAnimePageProvider(signal);
+  if (!provider) {
+    return false;
+  }
+
+  return provider === 'radarr'
+    ? (publicOptions.ui?.animePages.radarr.enabled ?? true)
+    : (publicOptions.ui?.animePages.sonarr.enabled ?? true);
+};
+
+async function mountAnimePageUI({
+  ctx,
+  url,
+  signal,
+  isCurrent,
+}: ContentEntrypointShellContext): Promise<void> {
+  const idMatch = new URL(url).pathname.match(/\/anime\/(\d+)/);
   const anilistId = idMatch?.[1] ? parseInt(idMatch[1], 10) : null;
   if (!anilistId) return;
 
   await Promise.all([
-    waitForElement(ACTIONS_SELECTOR),
-    waitForElement(SIDEBAR_SELECTOR),
-    waitForElement('h1'),
+    waitForElement(ACTIONS_SELECTOR, { signal }),
+    waitForElement(SIDEBAR_SELECTOR, { signal }),
+    waitForElement('h1', { signal }),
   ]);
 
+  if (!isCurrent()) return;
+
   if (shouldSkipByFormat(document)) {
-    try {
-      ui?.remove();
-    } catch (error) {
-      log.error('Error removing UI on skip:', error);
-    }
-    ui = null;
-    stopAnchorKeeper?.();
-    stopAnchorKeeper = null;
-    stopSizeSync?.();
-    stopSizeSync = null;
-    removeLayoutArtifacts();
+    removeAnimeUI();
     log.debug('AniList page skipped due to format being movie/music');
     return;
   }
@@ -474,6 +532,11 @@ async function mountAnimePageUI(
   stopAnchorKeeper = startAnchorKeeper();
   ensureActionsAnchor();
 
+  if (!isCurrent()) {
+    removeAnimeUI();
+    return;
+  }
+
   if (ui) {
     ui.remove();
     stopSizeSync?.();
@@ -481,7 +544,7 @@ async function mountAnimePageUI(
     stopSizeSync = null;
   }
 
-  ui = await createShadowRootUi(ctx, {
+  const nextUi = await createShadowRootUi(ctx, {
     name: UI_NAME,
     position: 'inline',
     anchor: `#${ANCHOR_ID}`,
@@ -505,102 +568,27 @@ async function mountAnimePageUI(
     },
   });
 
+  if (!isCurrent()) {
+    nextUi.remove();
+    return;
+  }
+
+  ui = nextUi;
   ui.autoMount();
-  onMounted();
 }
 
 export default defineContentScript({
   matches: ['*://anilist.co/*'],
   cssInjectionMode: 'ui',
   runAt: 'document_end',
-  async main(ctx: ContentScriptContext) {
-    const isHeaderInjectionEnabled = async (): Promise<boolean> => {
-      const provider = resolveProviderForAniListFormat(readFormatFromSidebar(document));
-      try {
-        const stored = await browser.storage.local.get('publicOptions');
-        const raw = (stored as {
-          publicOptions?: {
-            ui?: {
-              headerInjectionEnabled?: boolean;
-              animePages?: {
-                sonarr?: { enabled?: boolean };
-                radarr?: { enabled?: boolean };
-              };
-            };
-          };
-        }).publicOptions;
-        const providerEnabled =
-          provider === 'radarr'
-            ? raw?.ui?.animePages?.radarr?.enabled
-            : raw?.ui?.animePages?.sonarr?.enabled;
-        if (typeof providerEnabled === 'boolean') {
-          return providerEnabled;
-        }
-        if (typeof raw?.ui?.headerInjectionEnabled === 'boolean') {
-          return raw.ui.headerInjectionEnabled;
-        }
-      } catch {
-        // Fall back to enabled to preserve existing behavior on transient storage failures.
-      }
-      return true;
-    };
-
-    const removeAnimeUI = () => {
-      try {
-        ui?.remove();
-      } catch (error) {
-        log.error('Error removing UI:', error);
-      }
-      ui = null;
-      stopAnchorKeeper?.();
-      stopAnchorKeeper = null;
-      stopSizeSync?.();
-      stopSizeSync = null;
-      removeLayoutArtifacts();
-    };
-
-    const route = async (url: string) => {
-      if (ANIME_PAGE.includes(url)) {
-        if (!(await isHeaderInjectionEnabled())) {
-          removeAnimeUI();
-          return;
-        }
-        await mountAnimePageUI(ctx, () => {});
-      } else {
-        removeAnimeUI();
-      }
-    };
-
-    await route(location.href);
-
-    type LocationChangeEvent = CustomEvent<{ newUrl: URL }>;
-    ctx.addEventListener(window, 'wxt:locationchange', (ev: Event) => {
-      const event = ev as LocationChangeEvent;
-      const href = event.detail?.newUrl?.href ?? location.href;
-      route(href).catch(error => {
-        log.error('Failed to handle location change:', error);
-      });
-    });
-
-    const onStorageChanged: Parameters<typeof browser.storage.onChanged.addListener>[0] = (
-      changes,
-      areaName,
-    ) => {
-      if (areaName !== 'local') return;
-      if (!changes.publicOptions) return;
-      if (!ANIME_PAGE.includes(location.href)) return;
-      route(location.href).catch(error => {
-        log.error('Failed to apply settings change on AniList anime page.', error);
-      });
-    };
-    browser.storage.onChanged.addListener(onStorageChanged);
-
-    ctx.onInvalidated(() => {
-      browser.storage.onChanged.removeListener(onStorageChanged);
-      removeAnimeUI();
-    });
-  }
-
+  main: createContentEntrypointShell({
+    isEligible: isAnimePageShellEligible,
+    mount: mountAnimePageUI,
+    remove: removeAnimeUI,
+    onError: (error, phase, url) => {
+      log.error(`AniList anime page shell failed during ${phase}.`, { url }, error);
+    },
+  }),
 });
 
 export {
