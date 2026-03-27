@@ -33,7 +33,6 @@ type ProviderKey = Provider;
 const badgeOptions: Array<{ value: BadgeVisibility; label: string }> = [
   { value: 'always', label: 'Always' },
   { value: 'hover', label: 'On hover' },
-  { value: 'hidden', label: 'Hidden' },
 ];
 
 const getConfiguredCredentials = (
@@ -255,7 +254,7 @@ const QuickSettings: React.FC = () => {
         <div>
           <p className="text-sm font-semibold">Browse cards</p>
           <p className="text-xs text-text-secondary">
-            Visibility of browse and search card actions.
+            Enabled controls whether browse-card UI is injected. Visibility applies only while enabled.
           </p>
         </div>
 
@@ -286,7 +285,7 @@ const QuickSettings: React.FC = () => {
               </div>
 
               <div className="mt-3">
-                <div className="mt-2 grid grid-cols-3 gap-2">
+                <div className="mt-2 grid grid-cols-2 gap-2">
                   {badgeOptions.map((option) => {
                     const selected = providerSettings?.visibility === option.value;
 

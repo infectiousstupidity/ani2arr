@@ -10,7 +10,7 @@ export interface ProviderCredentials {
   apiKey: string;
 }
 
-export type BadgeVisibility = 'always' | 'hover' | 'hidden';
+export type BadgeVisibility = 'always' | 'hover';
 
 export interface ProviderBrowseCardUiOptions {
   enabled: boolean;

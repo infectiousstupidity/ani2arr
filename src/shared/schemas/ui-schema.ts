@@ -12,8 +12,8 @@ import type { ProviderTitleLanguage } from '@/shared/types/options';
 const BADGE_VISIBILITY_OPTIONS: [BadgeVisibility, ...BadgeVisibility[]] = [
   'always',
   'hover',
-  'hidden',
 ];
+const LEGACY_BADGE_VISIBILITY_OPTIONS = [...BADGE_VISIBILITY_OPTIONS, 'hidden'] as const;
 
 const TITLE_LANGUAGES: [ProviderTitleLanguage, ...ProviderTitleLanguage[]] = [
   'english',
@@ -49,8 +49,11 @@ export const createDefaultUiOptions = (): UiOptions => ({
 const asRecord = (input: unknown): Record<string, unknown> =>
   input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
 
-const isBadgeVisibility = (value: unknown): value is BadgeVisibility =>
-  typeof value === 'string' && BADGE_VISIBILITY_OPTIONS.includes(value as BadgeVisibility);
+const isLegacyBadgeVisibility = (
+  value: unknown,
+): value is BadgeVisibility | 'hidden' =>
+  typeof value === 'string'
+  && LEGACY_BADGE_VISIBILITY_OPTIONS.includes(value as (typeof LEGACY_BADGE_VISIBILITY_OPTIONS)[number]);
 
 export const isTitleLanguage = (value: unknown): value is ProviderTitleLanguage =>
   typeof value === 'string' && TITLE_LANGUAGES.includes(value as ProviderTitleLanguage);
@@ -62,19 +65,29 @@ export const migrateLegacyUiOptions = (input: unknown): Record<string, unknown> 
   const browseCards = asRecord(raw.browseCards);
   const animePages = asRecord(raw.animePages);
   const legacyBrowseEnabled = typeof raw.browseOverlayEnabled === 'boolean' ? raw.browseOverlayEnabled : undefined;
-  const legacyBadgeVisibility = isBadgeVisibility(raw.badgeVisibility) ? raw.badgeVisibility : undefined;
+  const legacyBadgeVisibility = isLegacyBadgeVisibility(raw.badgeVisibility) ? raw.badgeVisibility : undefined;
   const legacyHeaderEnabled = typeof raw.headerInjectionEnabled === 'boolean' ? raw.headerInjectionEnabled : undefined;
 
   const resolveBrowseProvider = (provider: 'sonarr' | 'radarr'): Record<string, unknown> => {
     const providerRaw = asRecord(browseCards[provider]);
+    const enabled =
+      typeof providerRaw.enabled === 'boolean'
+        ? providerRaw.enabled
+        : (legacyBrowseEnabled ?? true);
+    const visibility = isLegacyBadgeVisibility(providerRaw.visibility)
+      ? providerRaw.visibility
+      : legacyBadgeVisibility;
+
+    if (visibility === 'hidden') {
+      return {
+        enabled: false,
+        visibility: 'always',
+      };
+    }
+
     return {
-      enabled:
-        typeof providerRaw.enabled === 'boolean'
-          ? providerRaw.enabled
-          : (legacyBrowseEnabled ?? true),
-      visibility: isBadgeVisibility(providerRaw.visibility)
-        ? providerRaw.visibility
-        : (legacyBadgeVisibility ?? 'always'),
+      enabled,
+      visibility: visibility ?? 'always',
     };
   };
 
