@@ -5,7 +5,7 @@ import {
   computeTitleMatchScoreForProvider,
   extractCandidateTitleVariants,
 } from '@/services/mapping/pipeline/matching';
-import { incrementCounter } from '@/shared/utils/metrics';
+import { incrementCounter } from '@/debug/metrics';
 import { LOCAL_INDEX_ACCEPTANCE_THRESHOLD } from './constants';
 
 export class SonarrTitleIndexer implements TitleIndexer {
