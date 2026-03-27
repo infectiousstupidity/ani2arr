@@ -2,17 +2,22 @@
 // src/components/extension-error-boundary.tsx
 
 import React from 'react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 import { logError, normalizeError, type ExtensionError } from '@/shared/errors/error-utils';
 import { logger } from '@/shared/utils/logger';
 
 const errorLogger = logger.create('ErrorBoundary');
 
+type ExtensionErrorBoundaryProps = React.PropsWithChildren<{
+  scope?: string;
+}>;
+
 export class ExtensionErrorBoundary extends React.Component<
-  React.PropsWithChildren<object>,
+  ExtensionErrorBoundaryProps,
   { error: ExtensionError | null }
 > {
-  constructor(props: React.PropsWithChildren<object>) {
+  constructor(props: ExtensionErrorBoundaryProps) {
     super(props);
     this.state = { error: null };
   }
@@ -23,22 +28,35 @@ export class ExtensionErrorBoundary extends React.Component<
 
   componentDidCatch(error: unknown, errorInfo: React.ErrorInfo) {
     const normalizedError = normalizeError(error);
-    logError(normalizedError, 'ReactErrorBoundary');
-    errorLogger.error('React error info:', errorInfo);
+    const scope = this.props.scope?.trim();
+    const context = scope ? `ReactErrorBoundary:${scope}` : 'ReactErrorBoundary';
+    logError(normalizedError, context);
+    errorLogger.error('React error info:', {
+      scope: scope ?? 'unknown',
+      componentStack: errorInfo.componentStack,
+    });
   }
 
   render(): React.ReactNode {
     if (this.state.error) {
       return (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm">
-          <p className="font-bold text-red-800">Something went wrong</p>
-          <p className="mt-1 text-red-700">{this.state.error.userMessage}</p>
-          <button
-            onClick={() => this.setState({ error: null })}
-            className="mt-2 rounded bg-red-100 px-3 py-1 text-sm text-red-800 hover:bg-red-200"
-          >
-            Try Again
-          </button>
+        <div className="w-full rounded-2xl border border-border-primary bg-bg-secondary/80 p-4 text-sm text-text-primary shadow-[0_18px_44px_rgba(2,8,18,0.24)] backdrop-blur-sm">
+          <div className="inline-flex items-center gap-2 rounded-full border border-error/30 bg-error/12 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-error">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Extension error
+          </div>
+          <p className="mt-3 text-base font-semibold text-text-primary">Something went wrong</p>
+          <p className="mt-1 leading-relaxed text-text-secondary">{this.state.error.userMessage}</p>
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => this.setState({ error: null })}
+              className="inline-flex items-center gap-2 rounded-lg border border-accent-primary/35 bg-accent-primary/12 px-3 py-1.5 font-medium text-text-primary transition-colors hover:bg-accent-primary/20"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Try again
+            </button>
+          </div>
         </div>
       );
     }
