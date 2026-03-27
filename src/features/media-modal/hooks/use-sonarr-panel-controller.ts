@@ -1,9 +1,11 @@
+/** Controls Sonarr add/edit panel form state, submission, and computed path preview. */
 // src/features/media-modal/hooks/use-sonarr-panel-controller.ts
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 
 import type { SonarrFormState } from "@/shared/types";
-import { buildComputedMediaPath, sanitizeFolderSegment } from "@/services/helpers/path-utils";
+import { buildProviderMediaPath, sanitizeFolderSegment } from "@/shared/utils/provider-library-paths";
 import type { SonarrPanelBaseProps, SonarrPanelMode } from "../types";
 
 export interface UseSonarrPanelControllerInput {
@@ -117,7 +119,7 @@ export function useSonarrPanelController(
   const computedPath = useMemo(
     () => {
       const slug = mode === "edit" && folderSlug ? folderSlug : buildSlug(title, tvdbId);
-      return buildComputedMediaPath(current.rootFolderPath, slug);
+      return buildProviderMediaPath(current.rootFolderPath, slug);
     },
     [current.rootFolderPath, folderSlug, mode, title, tvdbId],
   );

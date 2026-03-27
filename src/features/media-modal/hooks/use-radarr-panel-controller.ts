@@ -1,8 +1,11 @@
+/** Controls Radarr add/edit panel form state, submission, and computed path preview. */
+// src/features/media-modal/hooks/use-radarr-panel-controller.ts
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 
 import type { RadarrFormState } from "@/shared/types";
-import { buildComputedMediaPath } from "@/services/helpers/path-utils";
+import { buildProviderMediaPath } from "@/shared/utils/provider-library-paths";
 import type { RadarrPanelBaseProps, RadarrPanelMode } from "../types";
 
 export interface UseRadarrPanelControllerInput {
@@ -98,7 +101,7 @@ export function useRadarrPanelController(
   }, [current, defaultForm]);
 
   const computedPath = useMemo(
-    () => buildComputedMediaPath(current.rootFolderPath, folderSlug),
+    () => buildProviderMediaPath(current.rootFolderPath, folderSlug),
     [current.rootFolderPath, folderSlug],
   );
 

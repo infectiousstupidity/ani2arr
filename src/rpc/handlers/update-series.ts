@@ -1,10 +1,17 @@
+/** RPC handler that updates an existing Sonarr series using resolved form and library state. */
+// src/rpc/handlers/update-series.ts
+
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { UpdateSonarrInput } from '@/rpc/schemas';
 import type { ExtensionOptions, ProviderCredentials, SonarrSeries } from '@/shared/types';
 import { resolveArrTagIds } from '@/clients/tag-resolver';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors/error-utils';
-import { buildFolderSlug, joinRootAndSlug, paths } from '@/services/helpers/path-utils';
+import {
+  buildProviderFolderSlug,
+  joinRootAndSlug,
+  normalizePathForCompare,
+} from '@/shared/utils/provider-library-paths';
 
 type UpdateSeriesDeps = {
   SonarrClient: SonarrClient;
@@ -73,11 +80,11 @@ export async function updateSonarrSeriesHandler(
   });
 
   const resolvedRoot = input.form.rootFolderPath || baseSeries.rootFolderPath || '';
-  const slug = buildFolderSlug(baseSeries, input.title);
+  const slug = buildProviderFolderSlug(baseSeries, input.title);
   const nextPath = joinRootAndSlug(resolvedRoot, slug);
 
-  const currentPathNormalized = paths.normalizePathForCompare(baseSeries.path);
-  const nextPathNormalized = paths.normalizePathForCompare(nextPath);
+  const currentPathNormalized = normalizePathForCompare(baseSeries.path);
+  const nextPathNormalized = normalizePathForCompare(nextPath);
   const moveFiles =
     currentPathNormalized !== null &&
     nextPathNormalized !== null &&

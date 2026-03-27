@@ -1,7 +1,10 @@
+/** Provider library path and slug helpers shared across UI and RPC code. */
+// src/shared/utils/provider-library-paths.ts
+
 import type { Provider } from '@/shared/types';
 
-/** Minimal shape for building folder slugs from series/movie-like objects. */
-export interface FolderSlugSource {
+/** Minimal provider media shape used to derive provider library slugs and paths. */
+export interface ProviderMediaPathSource {
   path?: string | null;
   rootFolderPath?: string | null;
   folder?: string | null;
@@ -12,14 +15,12 @@ export interface FolderSlugSource {
   tmdbId?: number | null;
 }
 
-export const trimTrailingSeparators = (input: string): string => input.replace(/[\\/]+$/, '').trim();
+const trimTrailingSeparators = (input: string): string => input.replace(/[\\/]+$/, '').trim();
 
-export const normalizePathForCompare = (input?: string | null): string | null => {
-  if (!input) return null;
-  return trimTrailingSeparators(input).replace(/\\/g, '/').toLowerCase();
-};
-
-export const extractFolderSlug = (path?: string | null, rootFolderPath?: string | null): string | null => {
+const extractProviderFolderSlug = (
+  path?: string | null,
+  rootFolderPath?: string | null,
+): string | null => {
   if (!path) return null;
   const normalizedPath = trimTrailingSeparators(path).replace(/\\/g, '/');
   const normalizedRoot = rootFolderPath ? trimTrailingSeparators(rootFolderPath).replace(/\\/g, '/') : null;
@@ -39,8 +40,16 @@ export const sanitizeFolderSegment = (segment: string): string => {
   return replaced.replace(/\s+/g, ' ');
 };
 
-export const buildFolderSlug = (media: FolderSlugSource, fallbackTitle: string): string => {
-  const fromPath = extractFolderSlug(media.path, media.rootFolderPath);
+export const normalizePathForCompare = (input?: string | null): string | null => {
+  if (!input) return null;
+  return trimTrailingSeparators(input).replace(/\\/g, '/').toLowerCase();
+};
+
+export const buildProviderFolderSlug = (
+  media: ProviderMediaPathSource,
+  fallbackTitle: string,
+): string => {
+  const fromPath = extractProviderFolderSlug(media.path, media.rootFolderPath);
   if (fromPath) return fromPath;
   if (media.folder && media.folder.trim()) return media.folder.trim();
   if (media.folderName && media.folderName.trim()) return media.folderName.trim();
@@ -56,8 +65,8 @@ export const buildFolderSlug = (media: FolderSlugSource, fallbackTitle: string):
   return baseTitle;
 };
 
-export const extractRootFolderPath = (
-  media?: FolderSlugSource | null,
+export const extractProviderRootFolderPath = (
+  media?: ProviderMediaPathSource | null,
   slug?: string | null,
 ): string | null => {
   if (!media) return null;
@@ -79,9 +88,9 @@ export const extractRootFolderPath = (
   return normalizedPath.slice(0, lastSlash);
 };
 
-export const getLibrarySlug = (
+export const getProviderLibrarySlug = (
   provider: Provider,
-  media?: FolderSlugSource | null,
+  media?: ProviderMediaPathSource | null,
 ): string | null => {
   if (!media) return null;
   if (media.titleSlug && media.titleSlug.trim()) {
@@ -93,7 +102,7 @@ export const getLibrarySlug = (
   if (provider === 'sonarr' && media.folder && media.folder.trim()) {
     return media.folder.trim();
   }
-  return extractFolderSlug(media.path, media.rootFolderPath);
+  return extractProviderFolderSlug(media.path, media.rootFolderPath);
 };
 
 export const joinRootAndSlug = (rootFolderPath: string, slug: string): string => {
@@ -103,17 +112,10 @@ export const joinRootAndSlug = (rootFolderPath: string, slug: string): string =>
   return `${normalizedRoot}${separator}${slug}`;
 };
 
-export const buildComputedMediaPath = (
+export const buildProviderMediaPath = (
   rootFolderPath: string,
   slug?: string | null,
 ): string | null => {
   if (!rootFolderPath || !slug) return null;
   return joinRootAndSlug(rootFolderPath, slug);
-};
-
-export const paths = {
-  trimTrailingSeparators,
-  normalizePathForCompare,
-  extractFolderSlug,
-  sanitizeFolderSegment,
 };
