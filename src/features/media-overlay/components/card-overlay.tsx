@@ -4,7 +4,7 @@ import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import type { CardOverlayProps, CheckMovieStatusResponse, CheckSeriesStatusResponse } from '@/shared/types';
 import { getLibrarySlug, type FolderSlugSource } from '@/services/helpers/path-utils';
 import { getProviderLabel } from '@/services/providers/resolver';
-import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link';
+import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { useCardOverlayState } from '../hooks/use-card-overlay-state';
 
 const CardOverlay: React.FC<CardOverlayProps> = memo(({

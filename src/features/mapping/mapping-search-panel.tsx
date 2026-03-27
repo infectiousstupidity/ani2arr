@@ -4,7 +4,7 @@ import * as ScrollArea from '@radix-ui/react-scroll-area';
 import Pill from '@/shared/ui/primitives/pill';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import type { MappingProvider, MappingSearchResult } from '@/shared/types';
-import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link';
+import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { getProviderLabel } from '@/services/providers/resolver';
 import type { MappingSearchController } from './types';
 

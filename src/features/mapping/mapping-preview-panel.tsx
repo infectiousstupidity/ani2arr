@@ -5,7 +5,7 @@ import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { MultiMappingInfo } from './multi-mapping-info';
 import { useMappingOverrides, useMovieStatus, useSeriesStatus } from '@/shared/queries';
 import type { MappingOverrideRecord, MappingProvider, MappingSearchResult } from '@/shared/types';
-import { buildExternalMediaLink } from '@/shared/utils/build-external-media-link';
+import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { getProviderLabel } from '@/services/providers/resolver';
 import type { MappingAniListSummary } from './types';
 

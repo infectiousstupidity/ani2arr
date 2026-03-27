@@ -5,7 +5,7 @@ import { SquareArrowOutUpRight, ChevronDown } from 'lucide-react';
 import { usePublicOptions } from '@/shared/queries';
 import { logger } from '@/shared/utils/logger';
 import Dropdown, { DropdownItem } from '@/shared/ui/primitives/dropdown';
-import { buildExternalMediaLink, type ExternalLinkInput } from '@/shared/utils/build-external-media-link';
+import { buildExternalMediaLink, type ExternalLinkInput } from '@/shared/utils/provider-links';
 import type { Provider } from '@/shared/types';
 import { getProviderBaseUrl, getProviderLabel, isProviderConfigured } from '@/services/providers/resolver';
 
