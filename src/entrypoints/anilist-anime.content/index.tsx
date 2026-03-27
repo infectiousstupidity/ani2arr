@@ -6,7 +6,7 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useAddMovie, useAddSeries, useAniListMetadataBatch, useMovieStatus, usePublicOptions, useSeriesStatus } from '@/shared/queries';
 import { useMediaModalProps } from '@/features/media-overlay/hooks/use-media-modal-props';
-import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
+import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
 import MediaActions, { Status } from './components/media-actions';
 import { logger } from '@/shared/utils/logger';
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';

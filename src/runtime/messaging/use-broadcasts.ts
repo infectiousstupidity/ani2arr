@@ -1,4 +1,6 @@
-// src/hooks/use-broadcasts.ts
+/** Syncs query caches with runtime broadcast and storage change signals. */
+// src/runtime/messaging/use-broadcasts.ts
+
 import { useCallback, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';

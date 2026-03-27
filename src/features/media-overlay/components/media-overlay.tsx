@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
 import { useAniListMetadataBatch, usePublicOptions } from '@/shared/queries';
-import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
+import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useBrowsePortals } from '../hooks/use-media-portals';
 import { useAnilistBatchPrefetch } from '../hooks/use-anilist-batch-prefetch';

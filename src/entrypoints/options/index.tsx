@@ -25,7 +25,7 @@ import {
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import { useSettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
-import { useA2aBroadcasts } from '@/shared/hooks/use-broadcasts';
+import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
 import { cn } from '@/shared/utils/cn';
 import {
   AdvancedIcon,
