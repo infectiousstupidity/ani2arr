@@ -9,7 +9,6 @@ type ProviderKey = 'sonarr' | 'radarr';
 const VISIBILITY_OPTIONS: Array<{ value: BadgeVisibility; label: string; description: string }> = [
   { value: 'always', label: 'Always', description: 'Show actions and status badges on every supported card.' },
   { value: 'hover', label: 'On hover', description: 'Keep the card cleaner until the pointer is over it.' },
-  { value: 'hidden', label: 'Hidden', description: 'Hide browse-card actions and status badges for this provider.' },
 ];
 
 const ProviderVisibilityControl: React.FC<{
@@ -40,8 +39,11 @@ const ProviderVisibilityControl: React.FC<{
     </div>
 
     <fieldset className="mt-4 space-y-2" disabled={!enabled}>
-      <legend className="text-xs font-medium text-text-secondary">Visibility</legend>
-      <div className="grid gap-2 md:grid-cols-3">
+      <legend className="text-xs font-medium text-text-secondary">Visibility when enabled</legend>
+      <p className="text-xs text-text-secondary">
+        Enabled controls whether ani2arr injects browse-card UI for this provider. Visibility only changes how an enabled card is shown.
+      </p>
+      <div className="grid gap-2 md:grid-cols-2">
         {VISIBILITY_OPTIONS.map((option) => (
           <button
             key={option.value}
@@ -140,7 +142,7 @@ const UiSection: React.FC = () => {
         <div className="a2a-settings-panel__header border-b px-5 py-4">
           <h3 className="text-sm font-semibold text-text-primary">Browse cards</h3>
           <p className="mt-1 text-xs text-text-secondary">
-            Control browse and search card actions separately for series and movies.
+            Enable browse and search card injection per provider, then choose whether enabled cards stay visible or only appear on hover.
           </p>
         </div>
         <div className="space-y-4 px-5 py-5">
