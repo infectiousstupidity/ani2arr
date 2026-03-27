@@ -5,12 +5,12 @@ import { BaseProviderClient } from '@/integrations/providers/base-provider.clien
 import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import { createError, ErrorCode } from '@/shared/errors';
 import type {
+  ProviderTag,
   RadarrLookupMovie,
   RadarrMinimumAvailability,
   RadarrMovie,
   RadarrQualityProfile,
   RadarrRootFolder,
-  RadarrTag,
 } from '@/shared/types';
 import type { ProviderCredentials } from '@/shared/types/options';
 
@@ -130,11 +130,11 @@ export class RadarrClient extends BaseProviderClient {
     return this.request<RadarrQualityProfile[]>('qualityprofile', credentials);
   };
 
-  public getTags = async (credentials: ProviderCredentials): Promise<RadarrTag[]> => {
-    return this.request<RadarrTag[]>('tag', credentials);
+  public getTags = async (credentials: ProviderCredentials): Promise<ProviderTag[]> => {
+    return this.request<ProviderTag[]>('tag', credentials);
   };
 
-  public createTag = async (credentials: ProviderCredentials, label: string): Promise<RadarrTag> => {
+  public createTag = async (credentials: ProviderCredentials, label: string): Promise<ProviderTag> => {
     const trimmed = label.trim();
     if (!trimmed) {
       throw createError(
@@ -144,7 +144,7 @@ export class RadarrClient extends BaseProviderClient {
       );
     }
 
-    const created = await this.request<RadarrTag>('tag', credentials, {
+    const created = await this.request<ProviderTag>('tag', credentials, {
       method: 'POST',
       body: JSON.stringify({ label: trimmed }),
     });
@@ -159,7 +159,7 @@ export class RadarrClient extends BaseProviderClient {
   ): Promise<{
     qualityProfiles: RadarrQualityProfile[];
     rootFolders: RadarrRootFolder[];
-    tags: RadarrTag[];
+    tags: ProviderTag[];
   }> => {
     const [qualityProfiles, rootFolders, tags] = await Promise.all([
       this.getQualityProfiles(credentials),

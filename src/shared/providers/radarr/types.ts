@@ -2,7 +2,6 @@
 // src/shared/providers/radarr/types.ts
 
 import type { ProviderTitleLanguage } from '@/shared/types/options';
-import type { ProviderTag } from '@/shared/types/provider-tags';
 
 export type RadarrMinimumAvailability =
   | 'announced'
@@ -20,8 +19,6 @@ export interface RadarrQualityProfile {
   id: number;
   name: string;
 }
-
-export type RadarrTag = ProviderTag;
 
 export interface RadarrAlternateTitle {
   title?: string | null;

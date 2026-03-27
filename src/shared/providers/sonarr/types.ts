@@ -2,7 +2,6 @@
 // src/shared/providers/sonarr/types.ts
 
 import type { ProviderTitleLanguage } from '@/shared/types/options';
-import type { ProviderTag } from '@/shared/types/provider-tags';
 
 export type SonarrMonitorOption =
   | 'all'
@@ -112,8 +111,6 @@ export interface SonarrQualityProfile {
   id: number;
   name: string;
 }
-
-export type SonarrTag = ProviderTag;
 
 export interface SonarrFormState {
   qualityProfileId: number | '';
