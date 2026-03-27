@@ -1,4 +1,6 @@
+/** Shared retry wrapper with abort support and caller-controlled backoff overrides. */
 // src/shared/utils/retry.ts
+
 import PRetry, { AbortError } from 'p-retry';
 
 export interface RetryOptions {
@@ -90,4 +92,3 @@ export async function withRetry<T>(task: () => Promise<T>, options: RetryOptions
 }
 
 export { AbortError };
-
