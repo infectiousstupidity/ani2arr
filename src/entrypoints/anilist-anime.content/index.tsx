@@ -5,6 +5,7 @@ import React, { useState, useCallback } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
+import { ExtensionErrorBoundary } from '@/components/extension-error-boundary';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useAddMovie, useAddSeries, useAniListMetadataBatch, useMovieStatus, usePublicOptions, useSeriesStatus } from '@/shared/queries';
 import { useMediaModalProps } from '@/features/media-overlay/hooks/use-media-modal-props';
@@ -557,11 +558,13 @@ async function mountAnimePageUI({
       stopSizeSync = attachSizeSync(shadowHost);
       const root = ReactDOM.createRoot(uiContainer);
       root.render(
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <ContentRoot anilistId={anilistId} title={title} metadata={metadata ?? null} />
-          </TooltipProvider>
-        </QueryClientProvider>,
+        <ExtensionErrorBoundary scope="anilist-anime-root">
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <ContentRoot anilistId={anilistId} title={title} metadata={metadata ?? null} />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </ExtensionErrorBoundary>,
       );
       return root;
     },

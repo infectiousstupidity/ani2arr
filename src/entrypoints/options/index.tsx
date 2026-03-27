@@ -7,6 +7,7 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { browser } from 'wxt/browser';
 import { ChevronRight, ShieldCheck } from 'lucide-react';
 import appIcon from '@/assets/icon.png';
+import { ExtensionErrorBoundary } from '@/components/extension-error-boundary';
 import ToastProvider from '@/shared/ui/feedback/toast-provider';
 import './style.css';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
@@ -463,15 +464,17 @@ const rootElement = document.getElementById('options-root');
 if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <ToastProvider>
-            <ConfirmProvider>
-              <OptionsPage />
-            </ConfirmProvider>
-          </ToastProvider>
-        </TooltipProvider>
-      </QueryClientProvider>
+      <ExtensionErrorBoundary scope="options-root">
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <ToastProvider>
+              <ConfirmProvider>
+                <OptionsPage />
+              </ConfirmProvider>
+            </ToastProvider>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ExtensionErrorBoundary>
     </React.StrictMode>,
   );
 }

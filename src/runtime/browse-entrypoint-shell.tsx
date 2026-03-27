@@ -5,6 +5,7 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
+import { ExtensionErrorBoundary } from '@/components/extension-error-boundary';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 import { createContentEntrypointShell } from '@/runtime/content-entrypoint-shell';
 import type { PublicOptions } from '@/shared/types';
@@ -88,13 +89,15 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
           root = createRoot(container);
           root.render(
             <React.StrictMode>
-              <QueryClientProvider client={queryClient}>
-                <TooltipProvider>
-                  <ConfirmProvider portalContainer={portalContainer}>
-                    {options.renderRoot(portalContainer)}
-                  </ConfirmProvider>
-                </TooltipProvider>
-              </QueryClientProvider>
+              <ExtensionErrorBoundary scope="browse-root">
+                <QueryClientProvider client={queryClient}>
+                  <TooltipProvider>
+                    <ConfirmProvider portalContainer={portalContainer}>
+                      {options.renderRoot(portalContainer)}
+                    </ConfirmProvider>
+                  </TooltipProvider>
+                </QueryClientProvider>
+              </ExtensionErrorBoundary>
             </React.StrictMode>,
           );
           return root;
