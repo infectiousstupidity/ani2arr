@@ -8,14 +8,14 @@ import type { AniListMediaFormat, AniListMediaHint, PublicOptions } from '@/shar
 import baseStyles from '@/shared/styles/base.css?inline';
 import browseStyles from './style.css?inline';
 import {
+  BrowseRoot,
   createBrowseContentApp,
   DEFAULT_CONTAINER_CLASS,
   DEFAULT_PROCESSED_ATTRIBUTE,
   type BrowseAdapter,
   type ParsedCard,
 } from '@/features/media-overlay';
-import { createBrowseContentMain } from '@/shared/entrypoints/browse-bootstrap';
-import { BrowseRoot } from '@/shared/entrypoints/browse-root';
+import { createBrowseEntrypointShell } from '@/runtime/browse-entrypoint-shell';
 
 const isAniChartSurface = (url: string): boolean => {
   try {
@@ -169,12 +169,11 @@ const BrowseContentApp = createBrowseContentApp(browseAdapter);
 
 const stylesText = `${baseStyles}\n${browseStyles}`;
 
-const main = createBrowseContentMain({
+const main = createBrowseEntrypointShell({
   uiName: 'a2a-anichart-root',
   styleAttribute: 'data-a2a-anichart',
   shadowStyleAttribute: 'data-a2a-anichart-shadow',
   stylesText,
-  coverSelector: COVER_SELECTOR,
   containerClassName: DEFAULT_CONTAINER_CLASS,
   processedAttribute: DEFAULT_PROCESSED_ATTRIBUTE,
   isEligible: isBrowseShellEligible,

@@ -1,5 +1,8 @@
+/** Browse overlay root composition for media modal state and scheduler debug rendering. */
+// src/features/media-overlay/components/browse-root.tsx
+
 import React from 'react';
-import type { BrowseContentAppProps } from '@/features/media-overlay';
+import type { BrowseContentAppProps } from './media-overlay';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
 import { useMediaModalProps } from '@/features/media-overlay/hooks/use-media-modal-props';
@@ -11,7 +14,11 @@ export interface BrowseRootProps {
   includeModalKey?: boolean;
 }
 
-export const BrowseRoot: React.FC<BrowseRootProps> = ({ BrowseContentApp, portalContainer, includeModalKey }) => {
+export const BrowseRoot: React.FC<BrowseRootProps> = ({
+  BrowseContentApp,
+  portalContainer,
+  includeModalKey,
+}) => {
   const mediaModal = useMediaModalState();
 
   const modalProps = useMediaModalProps({
