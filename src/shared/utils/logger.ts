@@ -1,9 +1,5 @@
+/** Shared logger with scope prefixes, build-aware levels, and sensitive-value redaction. */
 // src/shared/utils/logger.ts
-
-/**
- * @file Lightweight logging utility that respects the current build mode.
- * Logs are suppressed outside of development unless explicitly enabled.
- */
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
