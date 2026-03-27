@@ -18,7 +18,7 @@ import {
   writeExtensionMapping,
   writeExtensionMappingFailure,
 } from '@/storage';
-import { incrementCounter } from '@/shared/utils/metrics';
+import { incrementCounter } from '@/debug/metrics';
 import { logger } from '@/shared/utils/logger';
 import { getProviderLabel, resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import {

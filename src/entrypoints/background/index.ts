@@ -2,9 +2,9 @@
 import { browser } from 'wxt/browser';
 import { registerAni2arrApi, getAni2arrApi } from '@/rpc';
 import { createApiImplementation } from '@/services';
+import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/debug/metrics';
 import { computeTitleMatchScore } from '@/services/mapping/pipeline/matching';
 import { logger } from '@/shared/utils/logger';
-import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/shared/utils/metrics';
 import { logError, normalizeError } from '@/shared/errors/error-utils';
 import { getExtensionOptionsSnapshot } from '@/storage';
 

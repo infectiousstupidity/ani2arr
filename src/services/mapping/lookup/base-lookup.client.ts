@@ -7,7 +7,7 @@ import {
   canonicalTitleKeyForProvider,
   sanitizeLookupDisplayForProvider,
 } from '@/services/mapping/pipeline/matching';
-import { incrementCounter, timeAsync } from '@/shared/utils/metrics';
+import { incrementCounter, timeAsync } from '@/debug/metrics';
 import { priorityValue } from '@/shared/utils/priority';
 import { logger, type ScopedLogger } from '@/shared/utils/logger';
 import type {
