@@ -1,3 +1,6 @@
+/** Runtime-validated UI settings schema and legacy migration rules for stored UI options. */
+// src/shared/schemas/ui-schema.ts
+
 import * as v from 'valibot';
 import type {
   BadgeVisibility,

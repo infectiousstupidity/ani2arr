@@ -1,11 +1,6 @@
-/**
- * @file Popup quick settings surface.
- * Renders lightweight provider status, browse-card toggles, and anime-page
- * toggles using the canonical options feature connection-check and
- * connection-status hooks.
- */
+/** Popup quick settings surface for provider status plus browse-card and anime-page toggles. */
+// src/entrypoints/popup/index.tsx
 
-// src/entrypoints/popup/index.ts
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

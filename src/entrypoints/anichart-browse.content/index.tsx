@@ -1,5 +1,6 @@
 /** AniChart browse entrypoint that mounts browse overlays on eligible schedule surfaces. */
 // src/entrypoints/anichart-browse.content/index.tsx
+
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
 import { shouldSkipMediaFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints } from '@/shared/anilist/media-metadata';

@@ -1,3 +1,6 @@
+/** Options-page controls for browse-card and anime-page UI enablement and visibility settings. */
+// src/entrypoints/options/components/ui-section.tsx
+
 import React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import type { BadgeVisibility, Settings } from '@/shared/types';
