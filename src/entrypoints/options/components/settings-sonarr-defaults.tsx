@@ -1,24 +1,20 @@
-/** Renders Sonarr default add settings using shared provider form controls and tag selection UI. */
+/** Renders Sonarr default add settings using the shared provider add-options fields. */
 // src/entrypoints/options/components/settings-sonarr-defaults.tsx
 
-import React, { useId } from 'react';
-import { useFormContext, Controller } from 'react-hook-form';
-import * as SelectPrimitive from '@radix-ui/react-select';
-import { Check, ChevronDown, RotateCcw } from 'lucide-react';
+import React from 'react';
+import { useFormContext } from 'react-hook-form';
+import { RotateCcw } from 'lucide-react';
 
-import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
-import type { SettingsFormValues } from '@/shared/schemas/settings';
-import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
-import type { useSonarrMetadata } from '@/shared/queries';
-import type { SonarrQualityProfile, SonarrRootFolder } from '@/shared/types';
-
-import { SelectField, SwitchField } from '@/shared/ui/form/form';
-import Button from '@/shared/ui/primitives/button';
 import {
-  MONITOR_OPTIONS_WITH_DESCRIPTIONS,
-  SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
-} from '@/shared/providers/sonarr/constants';
-import type { SonarrFormLayout } from '@/ui/provider-forms/sonarr';
+  SonarrAddOptionsFields,
+  type SonarrAddOptionsFieldsLayout,
+} from '@/components/provider-add-options/sonarr-add-options-fields';
+import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
+import type { SonarrFormState } from '@/shared/providers/sonarr/types';
+import type { useSonarrMetadata } from '@/shared/queries';
+import type { SettingsFormValues } from '@/shared/schemas/settings';
+import Button from '@/shared/ui/primitives/button';
+
 import { SaveSettingsBar } from './settings-save-bar';
 
 type SonarrDefaultsSectionProps = {
@@ -27,28 +23,8 @@ type SonarrDefaultsSectionProps = {
   metadataEnabled: boolean;
   metadataQuery: ReturnType<typeof useSonarrMetadata>;
   onRefresh: () => void;
-  // Allow undefined to match exactOptionalPropertyTypes if enabled in tsconfig
-  layout?: SonarrFormLayout | undefined;
+  layout?: SonarrAddOptionsFieldsLayout | undefined;
 };
-
-function formatRootPath(rootPath: string): string {
-  return rootPath.endsWith('/') || rootPath.endsWith('\\')
-    ? rootPath.slice(0, -1)
-    : rootPath;
-}
-
-function formatFreeSpace(bytes?: number | null): string | null {
-  if (bytes == null || Number.isNaN(bytes)) return null;
-  const tebibyte = 1024 ** 4;
-  const gibibyte = 1024 ** 3;
-  if (bytes >= tebibyte) {
-    return `${(bytes / tebibyte).toFixed(1)} TiB free`;
-  }
-  if (bytes >= gibibyte) {
-    return `${(bytes / gibibyte).toFixed(1)} GiB free`;
-  }
-  return `${bytes.toLocaleString()} B free`;
-}
 
 export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
   actions,
@@ -58,19 +34,22 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
   onRefresh,
   layout = 'stacked',
 }) => {
-  const { control, watch, setValue } = useFormContext<SettingsFormValues>();
+  const { setValue, watch } = useFormContext<SettingsFormValues>();
+  const defaults = watch('providers.sonarr.defaults');
 
-  const isGridLayout = layout === 'grid';
-  const fullWidthClass = isGridLayout ? 'md:col-span-2' : undefined;
-  const layoutClassName = isGridLayout
-    ? 'grid gap-4 md:grid-cols-2'
-    : 'flex flex-col gap-4';
-
-  const rootFolderFieldId = useId();
-  const selectPortal = portalContainer ?? null;
-
-  const tagsValue = watch('providers.sonarr.defaults.tags');
-  const freeformTagsValue = watch('providers.sonarr.defaults.freeformTags');
+  const setDefaultField = <K extends keyof SonarrFormState>(
+    field: K,
+    value: SonarrFormState[K],
+  ): void => {
+    setValue(
+      'providers.sonarr.defaults',
+      {
+        ...defaults,
+        [field]: value,
+      },
+      { shouldDirty: true, shouldValidate: true },
+    );
+  };
 
   const renderContent = () => {
     if (!metadataEnabled) {
@@ -95,215 +74,15 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
 
     if (!metadataQuery.data) return null;
 
-    const { rootFolders, qualityProfiles } = metadataQuery.data;
-
-    const qualityProfileOptions = qualityProfiles.map((p: SonarrQualityProfile) => ({
-      value: String(p.id),
-      label: p.name,
-    }));
-
     return (
-      <div className={layoutClassName}>
-        {/* Root Folder - Custom Select for Free Space */}
-        <div className={fullWidthClass}>
-          <Controller
-            control={control}
-            name="providers.sonarr.defaults.rootFolderPath"
-            render={({ field }) => {
-              const selectedDisplay = field.value
-                ? formatRootPath(field.value)
-                : undefined;
-
-              return (
-                <div className="space-y-1">
-                  <label
-                    htmlFor={rootFolderFieldId}
-                    className="text-xs font-medium text-text-secondary"
-                  >
-                    Root Folder
-                  </label>
-                  <SelectPrimitive.Root
-                    disabled={actions.saveState.isPending}
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectPrimitive.Trigger
-                      id={rootFolderFieldId}
-                      className="flex h-9 w-full min-w-0 items-center justify-between rounded-md bg-bg-primary px-3 py-2 text-sm text-left text-text-primary placeholder:text-text-primary disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-accent-primary/20"
-                    >
-                      <span className="flex min-w-0 flex-1 items-center overflow-hidden text-ellipsis whitespace-nowrap">
-                        <SelectPrimitive.Value placeholder="Select a folder...">
-                          {selectedDisplay ? (
-                            <span
-                              className="block min-w-0 truncate text-left"
-                              title={selectedDisplay}
-                            >
-                              {selectedDisplay}
-                            </span>
-                          ) : null}
-                        </SelectPrimitive.Value>
-                      </span>
-                      <SelectPrimitive.Icon asChild>
-                        <ChevronDown className="h-4 w-4 opacity-50" />
-                      </SelectPrimitive.Icon>
-                    </SelectPrimitive.Trigger>
-
-                    <SelectPrimitive.Portal
-                      container={selectPortal as HTMLElement | ShadowRoot | null}
-                    >
-                      <SelectPrimitive.Content
-                        className="relative z-50 min-w-(--radix-select-trigger-width) max-w-[90vw] overflow-hidden rounded-md border border-bg-primary bg-bg-secondary text-text-primary shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-                        position="popper"
-                      >
-                        <SelectPrimitive.Viewport className="w-full p-1">
-                          {rootFolders.map((f: SonarrRootFolder) => {
-                            const fullPath = formatRootPath(f.path);
-                            const freeSpaceLabel = formatFreeSpace(f.freeSpace);
-                            return (
-                              <SelectPrimitive.Item
-                                key={f.id}
-                                value={f.path}
-                                className="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-bg-tertiary focus:text-text-primary data-[state=checked]:text-accent-primary"
-                              >
-                                <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                                  <SelectPrimitive.ItemIndicator>
-                                    <Check className="h-4 w-4" />
-                                  </SelectPrimitive.ItemIndicator>
-                                </span>
-                                <SelectPrimitive.ItemText asChild>
-                                  <div className="flex w-full items-center justify-between gap-4">
-                                    <span
-                                      className="min-w-0 truncate text-left"
-                                      title={fullPath}
-                                    >
-                                      {fullPath}
-                                    </span>
-                                    {freeSpaceLabel ? (
-                                      <span className="shrink-0 whitespace-nowrap text-xs text-text-tertiary">
-                                        {freeSpaceLabel}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </SelectPrimitive.ItemText>
-                              </SelectPrimitive.Item>
-                            );
-                          })}
-                        </SelectPrimitive.Viewport>
-                      </SelectPrimitive.Content>
-                    </SelectPrimitive.Portal>
-                  </SelectPrimitive.Root>
-                </div>
-              );
-            }}
-          />
-        </div>
-
-        {/* Monitor */}
-        <Controller
-          control={control}
-          name="providers.sonarr.defaults.monitorOption"
-          render={({ field }) => (
-            <SelectField
-              {...field}
-              label="Monitor"
-              disabled={actions.saveState.isPending}
-              options={MONITOR_OPTIONS_WITH_DESCRIPTIONS}
-              container={selectPortal}
-            />
-          )}
-        />
-
-        {/* Quality Profile */}
-        <Controller
-          control={control}
-          name="providers.sonarr.defaults.qualityProfileId"
-          render={({ field }) => (
-            <SelectField
-              label="Quality Profile"
-              disabled={actions.saveState.isPending}
-              value={String(field.value)}
-              onValueChange={(v) => field.onChange(Number(v))}
-              options={qualityProfileOptions}
-              placeholder="Select a profile..."
-              container={selectPortal}
-            />
-          )}
-        />
-
-        {/* Series Type */}
-        <Controller
-          control={control}
-          name="providers.sonarr.defaults.seriesType"
-          render={({ field }) => (
-            <SelectField
-              {...field}
-              label="Series Type"
-              disabled={actions.saveState.isPending}
-              options={SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
-              container={selectPortal}
-            />
-          )}
-        />
-
-        <ProviderTagField
-          availableTags={metadataQuery.data.tags}
-          disabled={actions.saveState.isPending}
-          selectedTagIds={tagsValue}
-          selectedFreeformTags={freeformTagsValue}
-          onTagIdsChange={tagIds => setValue('providers.sonarr.defaults.tags', tagIds, { shouldDirty: true })}
-          onFreeformTagsChange={freeformTags =>
-            setValue('providers.sonarr.defaults.freeformTags', freeformTags, { shouldDirty: true })
-          }
-        />
-
-        {/* Toggles */}
-        <div className={fullWidthClass ? `pt-1 ${fullWidthClass}` : 'pt-1'}>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Controller
-              control={control}
-              name="providers.sonarr.defaults.seasonFolder"
-              render={({ field }) => (
-                <SwitchField
-                  label="Season Folders"
-                  disabled={actions.saveState.isPending}
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  labelHelp="Organize episodes into per-season subfolders created automatically."
-                  labelHelpContainer={selectPortal}
-                />
-              )}
-            />
-            <Controller
-              control={control}
-              name="providers.sonarr.defaults.searchForMissingEpisodes"
-              render={({ field }) => (
-                <SwitchField
-                  label="Search on Add"
-                  disabled={actions.saveState.isPending}
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  labelHelp="Automatically trigger a search for any missing episodes once the series is added."
-                  labelHelpContainer={selectPortal}
-                />
-              )}
-            />
-            <Controller
-              control={control}
-              name="providers.sonarr.defaults.searchForCutoffUnmet"
-              render={({ field }) => (
-                <SwitchField
-                  label="Cutoff Unmet"
-                  disabled={actions.saveState.isPending}
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  labelHelp="Trigger searches for episodes that are below the quality cutoff to find better releases."
-                  labelHelpContainer={selectPortal}
-                />
-              )}
-            />
-          </div>
-        </div>
-      </div>
+      <SonarrAddOptionsFields
+        values={defaults}
+        metadata={metadataQuery.data}
+        onChange={setDefaultField}
+        disabled={actions.saveState.isPending}
+        portalContainer={portalContainer ?? null}
+        layout={layout}
+      />
     );
   };
 

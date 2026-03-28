@@ -1,6 +1,9 @@
+/** Renders the Sonarr media-modal panel and its reusable add-options fields. */
 // src/features/media-modal/components/sonarr-panel.tsx
-import SonarrForm from "@/ui/provider-forms/sonarr";
-import type { SonarrPanelProps } from "../types";
+
+import { SonarrAddOptionsFields } from '@/components/provider-add-options/sonarr-add-options-fields';
+
+import type { SonarrPanelProps } from '../types';
 
 export function SonarrPanel(props: SonarrPanelProps): React.JSX.Element {
   const {
@@ -45,10 +48,12 @@ export function SonarrPanel(props: SonarrPanelProps): React.JSX.Element {
             </p>
           </div>
         ) : (
-          <SonarrForm
-            form={controller.form}
+          <SonarrAddOptionsFields
+            values={controller.current}
             metadata={metadata}
+            onChange={controller.handleFieldChange}
             disabled={Boolean(disabled) || !sonarrReady}
+            className="w-full rounded-xl bg-bg-secondary p-5"
             portalContainer={portalContainer ?? null}
             computedPath={controller.computedPath}
             pathHintTitle={title}

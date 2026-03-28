@@ -1,4 +1,5 @@
-// src/shared/components/settings-form.tsx
+/** Renders the Sonarr options-page form, connection state, and default add options. */
+// src/entrypoints/options/components/settings-form.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
@@ -21,14 +22,14 @@ import {
   ProviderConnectionStatusBadge,
   SonarrTitleLanguageField,
 } from './settings-connection-card';
+import type { SonarrAddOptionsFieldsLayout } from '@/components/provider-add-options/sonarr-add-options-fields';
 import { SonarrDefaultsSection } from './settings-sonarr-defaults';
-import type { SonarrFormLayout } from '@/ui/provider-forms/sonarr';
 import { useSelectPortal } from './use-select-portal';
 
 export interface SettingsFormProps {
   actions: SettingsActions;
   savedSettings?: Settings;
-  sonarrFormLayout?: SonarrFormLayout;
+  sonarrFormLayout?: SonarrAddOptionsFieldsLayout;
   isLoading?: boolean;
 }
 

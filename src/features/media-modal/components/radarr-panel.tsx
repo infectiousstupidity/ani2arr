@@ -1,5 +1,9 @@
-import RadarrForm from "@/ui/provider-forms/radarr";
-import type { RadarrPanelProps } from "../types";
+/** Renders the Radarr media-modal panel and its reusable add-options fields. */
+// src/features/media-modal/components/radarr-panel.tsx
+
+import { RadarrAddOptionsFields } from '@/components/provider-add-options/radarr-add-options-fields';
+
+import type { RadarrPanelProps } from '../types';
 
 export function RadarrPanel(props: RadarrPanelProps): React.JSX.Element {
   const {
@@ -42,9 +46,10 @@ export function RadarrPanel(props: RadarrPanelProps): React.JSX.Element {
             </p>
           </div>
         ) : (
-          <RadarrForm
-            form={controller.form}
+          <RadarrAddOptionsFields
+            values={controller.current}
             metadata={metadata}
+            onChange={controller.handleFieldChange}
             disabled={Boolean(disabled) || !radarrReady}
             portalContainer={portalContainer ?? null}
             computedPath={controller.computedPath}
