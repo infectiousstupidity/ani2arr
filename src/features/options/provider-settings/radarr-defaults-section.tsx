@@ -1,52 +1,51 @@
-/** Renders Sonarr default add settings using the shared provider add-options fields. */
-// src/entrypoints/options/components/settings-sonarr-defaults.tsx
+/** Radarr provider-settings defaults section backed by shared add-options fields. */
+// src/features/options/provider-settings/radarr-defaults-section.tsx
 
 import React from 'react';
-import { useFormContext } from 'react-hook-form';
+import { useFormContext, useWatch } from 'react-hook-form';
 import { RotateCcw } from 'lucide-react';
 
-import {
-  SonarrAddOptionsFields,
-  type SonarrAddOptionsFieldsLayout,
-} from '@/components/provider-add-options/sonarr-add-options-fields';
-import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
-import type { SonarrFormState } from '@/shared/providers/sonarr/types';
-import type { useSonarrMetadata } from '@/shared/queries';
+import { RadarrAddOptionsFields } from '@/components/provider-add-options/radarr-add-options-fields';
+import type { SettingsActions } from '@/features/options/use-settings-actions';
+import type { RadarrFormState } from '@/shared/providers/radarr/types';
+import type { useRadarrMetadata } from '@/shared/queries';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import Button from '@/shared/ui/primitives/button';
 
-import { SaveSettingsBar } from './settings-save-bar';
+import { SaveSettingsBar } from './save-settings-bar';
 
-type SonarrDefaultsSectionProps = {
+type RadarrDefaultsField = keyof SettingsFormValues['providers']['radarr']['defaults'];
+
+type RadarrDefaultsSectionProps = {
   actions: SettingsActions;
   portalContainer: HTMLElement | null;
   metadataEnabled: boolean;
-  metadataQuery: ReturnType<typeof useSonarrMetadata>;
+  metadataQuery: ReturnType<typeof useRadarrMetadata>;
   onRefresh: () => void;
-  layout?: SonarrAddOptionsFieldsLayout | undefined;
 };
 
-export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
+export const RadarrDefaultsSection: React.FC<RadarrDefaultsSectionProps> = ({
   actions,
   portalContainer,
   metadataEnabled,
   metadataQuery,
   onRefresh,
-  layout = 'stacked',
 }) => {
-  const { setValue, watch } = useFormContext<SettingsFormValues>();
-  const defaults = watch('providers.sonarr.defaults');
+  const methods = useFormContext<SettingsFormValues>();
+  const defaults = useWatch({
+    control: methods.control,
+    name: 'providers.radarr.defaults',
+  });
 
-  const setDefaultField = <K extends keyof SonarrFormState>(
+  const setDefaultField = <K extends RadarrDefaultsField>(
     field: K,
-    value: SonarrFormState[K],
+    value: RadarrFormState[K],
   ): void => {
-    setValue(
-      'providers.sonarr.defaults',
-      {
-        ...defaults,
-        [field]: value,
-      },
+    const path = `providers.radarr.defaults.${field}` as const;
+
+    methods.setValue(
+      path,
+      value as never,
       { shouldDirty: true, shouldValidate: true },
     );
   };
@@ -55,19 +54,19 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
     if (!metadataEnabled) {
       return (
         <div className="rounded-lg border border-dashed border-border-primary/70 bg-bg-tertiary/40 p-4 text-sm text-text-secondary">
-          Enter a valid Sonarr URL and API key to load available folders, profiles, and tags.
+          Enter a valid Radarr URL and API key to load available folders, profiles, and tags.
         </div>
       );
     }
 
     if (metadataQuery.isFetching && !metadataQuery.data) {
-      return <div className="text-center p-8 text-text-secondary">Loading Sonarr data...</div>;
+      return <div className="text-center p-8 text-text-secondary">Loading Radarr data...</div>;
     }
 
     if (metadataQuery.isError) {
       return (
         <div className="rounded-lg border border-dashed border-border-primary/70 bg-bg-tertiary/40 p-4 text-sm text-text-secondary">
-          Failed to load data from Sonarr. Check permissions and try again.
+          Failed to load data from Radarr. Check permissions and try again.
         </div>
       );
     }
@@ -75,13 +74,13 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
     if (!metadataQuery.data) return null;
 
     return (
-      <SonarrAddOptionsFields
+      <RadarrAddOptionsFields
         values={defaults}
         metadata={metadataQuery.data}
         onChange={setDefaultField}
         disabled={actions.saveState.isPending}
         portalContainer={portalContainer ?? null}
-        layout={layout}
+        layout="grid"
       />
     );
   };
@@ -92,7 +91,7 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
         <div>
           <h3 className="text-base font-semibold text-text-primary">Default add options</h3>
           <p className="mt-1 text-xs text-text-secondary">
-            Configure defaults reused by overlays and the media modal.
+            Configure defaults reused by movie overlays and the media modal.
           </p>
         </div>
         <Button
@@ -100,9 +99,9 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
           isLoading={metadataQuery.isRefetching}
           variant="ghost"
           size="icon"
-          tooltip="Refresh data from Sonarr"
+          tooltip="Refresh data from Radarr"
           portalContainer={portalContainer ?? undefined}
-          aria-label="Refresh data from Sonarr"
+          aria-label="Refresh data from Radarr"
           aria-busy={metadataQuery.isRefetching}
           disabled={!metadataEnabled || actions.saveState.isPending}
         >

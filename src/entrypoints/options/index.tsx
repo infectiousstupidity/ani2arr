@@ -14,8 +14,8 @@ import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 import MappingsSection from '@/entrypoints/options/components/mappings-section';
 import UiSection from '@/entrypoints/options/components/ui-section';
 import AdvancedSection, { type AdvancedPanelId } from '@/entrypoints/options/components/advanced-section';
-import SonarrPage from '@/entrypoints/options/components/sonarr-section';
-import RadarrPage from '@/entrypoints/options/components/radarr-section';
+import SonarrPage from '@/features/options/provider-settings/sonarr-page';
+import RadarrPage from '@/features/options/provider-settings/radarr-page';
 import { useExtensionOptions } from '@/shared/queries';
 import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
 import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
@@ -25,7 +25,7 @@ import {
 } from '@/features/options/provider-connection-status';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
-import { useSettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
+import { useSettingsActions } from '@/features/options/use-settings-actions';
 import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
 import { cn } from '@/shared/utils/cn';
 import {

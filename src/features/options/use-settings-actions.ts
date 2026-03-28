@@ -1,5 +1,5 @@
-/** Options-page save, connect, disconnect, and reset flows for provider settings. */
-// src/entrypoints/options/hooks/use-settings-actions.ts
+/** Options-feature save, connect, disconnect, and reset flows for provider settings. */
+// src/features/options/use-settings-actions.ts
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
@@ -248,7 +248,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
     ],
   );
 
-  // TODO: Currently this clears both providers' mappings when disconnecting one. Refactor it so these are stored and cleared separately. 
+  // TODO: Currently this clears both providers' mappings when disconnecting one. Refactor it so these are stored and cleared separately.
   const disconnectProvider = useCallback(
     async (provider: ProviderKey): Promise<boolean> => {
       if (saveOptions.isPending || sonarrTestConnection.isPending || radarrTestConnection.isPending) {

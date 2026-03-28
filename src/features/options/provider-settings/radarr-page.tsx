@@ -1,8 +1,11 @@
+/** Radarr provider-settings page for the options feature. */
+// src/features/options/provider-settings/radarr-page.tsx
+
 import React from 'react';
-import SectionHeader from '@/entrypoints/options/components/section-header';
-import RadarrSettingsForm from '@/entrypoints/options/components/settings-radarr-form';
+import SectionHeader from '@/features/options/section-header';
+import RadarrSettingsPanel from '@/features/options/provider-settings/radarr-settings-panel';
 import type { Settings } from '@/shared/schemas/settings';
-import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
+import type { SettingsActions } from '@/features/options/use-settings-actions';
 
 const RadarrPage: React.FC<{
   actions: SettingsActions;
@@ -14,7 +17,7 @@ const RadarrPage: React.FC<{
       title="Radarr"
       description="Connection details, preferred title handling, and default add options for Radarr."
     />
-    <RadarrSettingsForm
+    <RadarrSettingsPanel
       actions={actions}
       {...(savedSettings ? { savedSettings } : {})}
       isLoading={isLoading}
@@ -23,4 +26,3 @@ const RadarrPage: React.FC<{
 );
 
 export default RadarrPage;
-

@@ -1,3 +1,6 @@
+/** Provider-settings portal container for options-page select menus and tooltips. */
+// src/features/options/provider-settings/use-select-portal.ts
+
 import { useEffect, useState } from 'react';
 
 export const useSelectPortal = () => {

@@ -1,3 +1,6 @@
+/** Provider-settings connection card and title-language controls for Arr providers. */
+// src/features/options/provider-settings/provider-connection-card.tsx
+
 import type React from 'react';
 import { useState } from 'react';
 import type { ProviderTitleLanguage } from '@/shared/types';
@@ -6,8 +9,8 @@ import {
   type ProviderConnectionStatus,
 } from '@/features/options/provider-connection-status';
 import { cn } from '@/shared/utils/cn';
-import { InputField, SelectField } from '../../../shared/ui/form/form';
-import Button from '../../../shared/ui/primitives/button';
+import { InputField, SelectField } from '@/shared/ui/form/form';
+import Button from '@/shared/ui/primitives/button';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import { logger } from '@/shared/utils/logger';

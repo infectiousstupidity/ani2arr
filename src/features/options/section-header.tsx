@@ -1,4 +1,6 @@
-// src/entrypoints/options/components/section-header.tsx
+/** Shared section header for options-page feature sections. */
+// src/features/options/section-header.tsx
+
 import React from 'react';
 
 const SectionHeader: React.FC<{ title: string; description: string }> = ({ title, description }) => (

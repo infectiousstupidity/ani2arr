@@ -1,8 +1,11 @@
+/** Provider-settings save bar for persisting dirty options-form changes. */
+// src/features/options/provider-settings/save-settings-bar.tsx
+
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 
 import type { Settings } from '@/shared/schemas/settings';
-import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
+import type { SettingsActions } from '@/features/options/use-settings-actions';
 import Button from '@/shared/ui/primitives/button';
 
 export const SaveSettingsBar: React.FC<{

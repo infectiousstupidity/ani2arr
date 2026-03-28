@@ -15,7 +15,7 @@ import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import type { MappingProvider, MappingSummary } from '@/shared/types';
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
-import SectionHeader from '@/entrypoints/options/components/section-header';
+import SectionHeader from '@/features/options/section-header';
 import MappingToolbar, {
   getScopeSourceFilters,
   type LibraryFilter,

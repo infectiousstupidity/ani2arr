@@ -1,9 +1,11 @@
-// src/entrypoints/options/components/sonarr-section.tsx
+/** Sonarr provider-settings page for the options feature. */
+// src/features/options/provider-settings/sonarr-page.tsx
+
 import React from 'react';
-import SectionHeader from '@/entrypoints/options/components/section-header';
-import SettingsForm from '@/entrypoints/options/components/settings-form';
+import SectionHeader from '@/features/options/section-header';
+import SonarrSettingsPanel from '@/features/options/provider-settings/sonarr-settings-panel';
 import type { Settings } from '@/shared/schemas/settings';
-import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
+import type { SettingsActions } from '@/features/options/use-settings-actions';
 
 const SonarrPage: React.FC<{
   actions: SettingsActions;
@@ -15,14 +17,13 @@ const SonarrPage: React.FC<{
       title="Sonarr"
       description="Connection details, preferred title handling, and default add options for Sonarr."
     />
-    <SettingsForm
+    <SonarrSettingsPanel
       actions={actions}
       {...(savedSettings ? { savedSettings } : {})}
-      sonarrFormLayout="grid"
+      layout="grid"
       isLoading={isLoading}
     />
   </div>
 );
 
 export default SonarrPage;
-
