@@ -1,3 +1,4 @@
+/** Owns the media modal shell and wires provider-specific panel controllers into the dialog UI. */
 // src/features/media-modal/components/media-modal.tsx
 import { useCallback, useMemo, useState } from "react";
 import { Modal, ModalContent, ModalTitle, ModalDescription } from "./modal";
@@ -35,7 +36,7 @@ const EMPTY_SONARR_FORM: SonarrFormState = {
   monitorOption: 'all',
   seasonFolder: true,
   searchForMissingEpisodes: true,
-  searchForCutoffUnmet: false,
+  searchForCutoffUnmetEpisodes: false,
   tags: [],
   freeformTags: [],
 };

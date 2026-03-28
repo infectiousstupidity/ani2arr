@@ -1,3 +1,6 @@
+/** Canonical Sonarr settings schemas and default factories for persisted provider options. */
+// src/shared/schemas/sonarr-schema.ts
+
 import * as v from 'valibot';
 import type { SonarrFormState, SonarrMonitorOption } from '@/shared/providers/sonarr/types';
 import {
@@ -39,7 +42,7 @@ export const createDefaultSonarrFormState = (): SonarrFormState => ({
   monitorOption: 'all',
   seasonFolder: true,
   searchForMissingEpisodes: true,
-  searchForCutoffUnmet: false,
+  searchForCutoffUnmetEpisodes: false,
   tags: [],
   freeformTags: [],
 });
@@ -56,7 +59,7 @@ export const SonarrDefaultsSchema = v.pipe(
     monitorOption: v.fallback(v.picklist(MONITOR_OPTIONS), 'all'),
     seasonFolder: v.fallback(v.boolean(), true),
     searchForMissingEpisodes: v.fallback(v.boolean(), true),
-    searchForCutoffUnmet: v.fallback(v.boolean(), false),
+    searchForCutoffUnmetEpisodes: v.fallback(v.boolean(), false),
     tags: v.fallback(CoerceNumberArray, []),
     freeformTags: v.fallback(CoerceStringArray, []),
   })

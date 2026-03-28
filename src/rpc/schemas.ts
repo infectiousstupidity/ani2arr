@@ -74,7 +74,7 @@ const SonarrFormStateSchema = v.object({
   monitorOption: SonarrMonitorOptionSchema,
   seasonFolder: v.boolean(),
   searchForMissingEpisodes: v.boolean(),
-  searchForCutoffUnmet: v.boolean(),
+  searchForCutoffUnmetEpisodes: v.boolean(),
   tags: v.array(v.number()),
   freeformTags: v.array(v.string()),
 });

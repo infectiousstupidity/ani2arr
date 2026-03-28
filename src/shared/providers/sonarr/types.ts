@@ -39,6 +39,7 @@ export interface SonarrSeries {
   monitorNewItems?: 'all' | 'none';
   addOptions?: {
     searchForMissingEpisodes?: boolean;
+    searchForCutoffUnmetEpisodes?: boolean;
     monitor?: SonarrMonitorOption;
   };
   seriesType?: 'standard' | 'anime' | 'daily';
@@ -119,7 +120,7 @@ export interface SonarrFormState {
   monitorOption: SonarrMonitorOption;
   seasonFolder: boolean;
   searchForMissingEpisodes: boolean;
-  searchForCutoffUnmet: boolean;
+  searchForCutoffUnmetEpisodes: boolean;
   tags: number[];
   freeformTags: string[];
 }

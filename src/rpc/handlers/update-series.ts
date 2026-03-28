@@ -104,6 +104,12 @@ export async function updateSonarrSeriesHandler(
     seriesType: resolvedSeriesType,
     monitored,
     tags: resolvedTags,
+    addOptions: {
+      ...(baseSeries.addOptions ?? {}),
+      searchForMissingEpisodes: input.form.searchForMissingEpisodes,
+      searchForCutoffUnmetEpisodes: input.form.searchForCutoffUnmetEpisodes,
+      monitor: input.form.monitorOption ?? options.providers.sonarr.defaults.monitorOption,
+    },
   };
 
   const updated = await SonarrClient.updateSeries(baseSeries.id, mergedSeries, credentials, {
