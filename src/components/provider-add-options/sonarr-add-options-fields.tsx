@@ -146,7 +146,7 @@ export function SonarrAddOptionsFields(
           {includeSearchToggle ? (
             <>
               <SwitchField
-                label="Search on Add"
+                label="Search Missing"
                 disabled={disabled}
                 checked={values.searchForMissingEpisodes}
                 onCheckedChange={checked => onChange('searchForMissingEpisodes', checked)}
@@ -156,11 +156,11 @@ export function SonarrAddOptionsFields(
               />
 
               <SwitchField
-                label="Cutoff Unmet"
+                label="Search Cutoff Unmet"
                 disabled={disabled}
-                checked={values.searchForCutoffUnmet}
-                onCheckedChange={checked => onChange('searchForCutoffUnmet', checked)}
-                labelHelp="Trigger searches for episodes that are below the quality cutoff to find better releases."
+                checked={values.searchForCutoffUnmetEpisodes}
+                onCheckedChange={checked => onChange('searchForCutoffUnmetEpisodes', checked)}
+                labelHelp="Ask Sonarr to search for episodes below the quality cutoff during add or update."
                 labelHelpDelay={600}
                 labelHelpContainer={portalContainer ?? null}
               />

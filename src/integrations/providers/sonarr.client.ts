@@ -65,24 +65,6 @@ export class SonarrClient extends BaseProviderClient {
     return this.request<SonarrLookupSeries[]>(`series/lookup?${qs}`, credentials);
   };
 
-  /**
-   * Triggers a Missing Episode search via the Sonarr command queue. If `seriesId`
-   * is provided, the search will be scoped to that series.
-   * This uses the generic `/command` POST API which Sonarr exposes for background
-   * operations (e.g. missing episode searches).
-   */
-  public triggerMissingEpisodeSearch = async (
-    credentials: ProviderCredentials,
-    seriesId?: number,
-  ): Promise<unknown> => {
-    const body: Record<string, unknown> = { name: 'MissingEpisodeSearch' };
-    if (typeof seriesId === 'number') body['seriesId'] = seriesId;
-    return this.request<unknown>('command', credentials, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-  };
-
   public addSeries = async (
     payload: AddRequestPayload,
     extensionOptions: ExtensionOptions,
@@ -126,6 +108,9 @@ export class SonarrClient extends BaseProviderClient {
         searchForMissingEpisodes:
           mergedInput.searchForMissingEpisodes ??
           sonarrSettings.defaults.searchForMissingEpisodes,
+        searchForCutoffUnmetEpisodes:
+          mergedInput.searchForCutoffUnmetEpisodes ??
+          sonarrSettings.defaults.searchForCutoffUnmetEpisodes,
         monitor: mergedInput.monitorOption ?? sonarrSettings.defaults.monitorOption,
       },
     };
@@ -135,21 +120,6 @@ export class SonarrClient extends BaseProviderClient {
       method: 'POST',
       body: JSON.stringify(apiPayload),
     });
-
-    // If caller requested a cutoff-unmet search, trigger it post-create. Do not
-    // fail the addSeries call if the follow-up search fails; log and continue.
-    const shouldRunCutoffSearch =
-      (mergedInput as Partial<AddRequestPayload> & { searchForCutoffUnmet?: boolean })
-        .searchForCutoffUnmet ?? sonarrSettings.defaults.searchForCutoffUnmet;
-
-    if (shouldRunCutoffSearch) {
-      try {
-        // Prefer scoping to the newly created series when possible.
-        await this.triggerMissingEpisodeSearch(sonarrCreds, created.id);
-      } catch (err) {
-        this.log.warn('Failed to trigger cutoff-unmet (missing episode) search', err);
-      }
-    }
 
     return created;
   };
