@@ -1,12 +1,13 @@
-/** Renders the Sonarr options-page form, connection state, and default add options. */
-// src/entrypoints/options/components/settings-form.tsx
+/** Sonarr provider-settings panel for connection state and default add options. */
+// src/features/options/provider-settings/sonarr-settings-panel.tsx
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useSonarrMetadata, queryKeys } from '@/shared/queries';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
-import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
+import type { SettingsActions } from '@/features/options/use-settings-actions';
 import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
 import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
 import {
@@ -21,37 +22,34 @@ import {
   ProviderConnectionCard,
   ProviderConnectionStatusBadge,
   SonarrTitleLanguageField,
-} from './settings-connection-card';
+} from './provider-connection-card';
 import type { SonarrAddOptionsFieldsLayout } from '@/components/provider-add-options/sonarr-add-options-fields';
-import { SonarrDefaultsSection } from './settings-sonarr-defaults';
+import { SonarrDefaultsSection } from './sonarr-defaults-section';
 import { useSelectPortal } from './use-select-portal';
 
-export interface SettingsFormProps {
+export interface SonarrSettingsPanelProps {
   actions: SettingsActions;
   savedSettings?: Settings;
-  sonarrFormLayout?: SonarrAddOptionsFieldsLayout;
+  layout?: SonarrAddOptionsFieldsLayout;
   isLoading?: boolean;
 }
 
-function SettingsFormInner({
+function SonarrSettingsPanelInner({
   actions,
   savedSettings,
-  sonarrFormLayout,
+  layout,
   isLoading,
-}: SettingsFormProps): React.JSX.Element {
+}: SonarrSettingsPanelProps): React.JSX.Element {
   const methods = useFormContext<SettingsFormValues>();
   const queryClient = useQueryClient();
   const toast = useToast();
 
-  // --- Form Watchers ---
   const sonarrUrl = useWatch({ control: methods.control, name: 'providers.sonarr.url' }) ?? '';
   const sonarrApiKey = useWatch({ control: methods.control, name: 'providers.sonarr.apiKey' }) ?? '';
   const providerTitleLanguage = useWatch({ control: methods.control, name: 'providers.sonarr.providerTitleLanguage' }) ?? 'english';
 
-  // --- Portal ---
   const selectPortal = useSelectPortal();
 
-  // --- State & Refs ---
   const sonarrUrlInputRef = useRef<HTMLInputElement | null>(null);
   const [forceEditing, setForceEditing] = useState(false);
   const [confirmedScope, setConfirmedScope] = useState<string | null>(null);
@@ -70,7 +68,6 @@ function SettingsFormInner({
 
   const isEditingConnection = forceEditing || !hasSavedCredentials;
 
-  // --- Credential Validation ---
   const credentialValidation = useMemo(
     () => ({
       url: validateProviderConnectionUrl(String(sonarrUrl)),
@@ -113,7 +110,6 @@ function SettingsFormInner({
       (credentialScope && confirmedScope === credentialScope),
   );
 
-  // Reset confirmed scope if credentials change
   useEffect(() => {
     if (!credentialScope) {
       setConfirmedScope(null);
@@ -124,7 +120,6 @@ function SettingsFormInner({
     }
   }, [credentialScope, confirmedScope]);
 
-  // Focus URL input on load if not connected
   useEffect(() => {
     if (isLoading) return;
     if (hasConfiguredConnection) return;
@@ -132,7 +127,6 @@ function SettingsFormInner({
     sonarrUrlInputRef.current?.focus();
   }, [hasConfiguredConnection, isLoading, sonarrUrl]);
 
-  // --- Metadata & Defaults ---
   const useConfirmedDraftCredentials = Boolean(formCredentials && confirmedScope === credentialScope);
   const usePersistedCredentials = Boolean(
     persistedCredentials &&
@@ -166,7 +160,6 @@ function SettingsFormInner({
     isConnected: liveConnectionQuery.isSuccess,
   });
 
-  // Auto-select defaults when metadata first loads
   useEffect(() => {
     if (!metadataQuery.data) return;
 
@@ -196,8 +189,6 @@ function SettingsFormInner({
       }
     }
   }, [metadataQuery.data, methods]);
-
-  // --- Handlers ---
 
   const setSonarrUrl = useCallback(
     (value: string) => {
@@ -294,91 +285,89 @@ function SettingsFormInner({
   }
 
   return (
-    <>
-      <div className="space-y-6">
-        <section className="a2a-settings-panel p-5 md:p-6">
-          <div className="a2a-settings-panel__header flex items-start justify-between gap-3 border-b pb-4">
-            <div>
-              <h3 className="text-base font-semibold text-text-primary">Connection</h3>
-              <p className="mt-1 text-xs text-text-secondary">
-                Connect Sonarr, then set the defaults ani2arr reuses for series actions.
-              </p>
-            </div>
-            <ProviderConnectionStatusBadge status={connectionStatus} />
+    <div className="space-y-6">
+      <section className="a2a-settings-panel p-5 md:p-6">
+        <div className="a2a-settings-panel__header flex items-start justify-between gap-3 border-b pb-4">
+          <div>
+            <h3 className="text-base font-semibold text-text-primary">Connection</h3>
+            <p className="mt-1 text-xs text-text-secondary">
+              Connect Sonarr, then set the defaults ani2arr reuses for series actions.
+            </p>
           </div>
-          <div className="mt-4">
-            <ProviderConnectionCard
-              providerLabel="Sonarr"
-              urlLabel="Sonarr URL"
-              urlPlaceholder="http://localhost:8989"
-              apiKeyLabel="Sonarr API key"
-              urlHelp={
-                <>
-                  Firefox needs an optional host permission for the exact Sonarr origin you enter here.
-                  ani2arr declares broad optional host patterns so it can request access to your
-                  specific self-hosted server at runtime.
-                </>
-              }
-              apiKeyHelp={
-                <>
-                  The API key lets ani2arr authenticate with your Sonarr server so it can test the
-                  connection, read metadata, and add or update series. It is stored only in browser
-                  local storage and sent only to the Sonarr origin you configure.
-                </>
-              }
-              urlDescription="Only the exact origin you enter is requested at runtime. Saved credentials stay in browser local storage."
-              urlInputRef={sonarrUrlInputRef}
-              isEditingConnection={isEditingConnection}
-              isConnected={hasConfiguredConnection}
-              url={String(sonarrUrl)}
-              apiKey={String(sonarrApiKey)}
-              onStartEditing={() => setForceEditing(true)}
-              onConnectionConfirmed={() => setForceEditing(false)}
-              onDisconnect={handleDisconnect}
-              onTestConnection={handleTestConnection}
-              setUrl={setSonarrUrl}
-              setApiKey={setSonarrApiKey}
-              testConnectionState={actions.sonarrTestConnectionState}
-              saveState={actions.saveState}
+          <ProviderConnectionStatusBadge status={connectionStatus} />
+        </div>
+        <div className="mt-4">
+          <ProviderConnectionCard
+            providerLabel="Sonarr"
+            urlLabel="Sonarr URL"
+            urlPlaceholder="http://localhost:8989"
+            apiKeyLabel="Sonarr API key"
+            urlHelp={
+              <>
+                Firefox needs an optional host permission for the exact Sonarr origin you enter here.
+                ani2arr declares broad optional host patterns so it can request access to your
+                specific self-hosted server at runtime.
+              </>
+            }
+            apiKeyHelp={
+              <>
+                The API key lets ani2arr authenticate with your Sonarr server so it can test the
+                connection, read metadata, and add or update series. It is stored only in browser
+                local storage and sent only to the Sonarr origin you configure.
+              </>
+            }
+            urlDescription="Only the exact origin you enter is requested at runtime. Saved credentials stay in browser local storage."
+            urlInputRef={sonarrUrlInputRef}
+            isEditingConnection={isEditingConnection}
+            isConnected={hasConfiguredConnection}
+            url={String(sonarrUrl)}
+            apiKey={String(sonarrApiKey)}
+            onStartEditing={() => setForceEditing(true)}
+            onConnectionConfirmed={() => setForceEditing(false)}
+            onDisconnect={handleDisconnect}
+            onTestConnection={handleTestConnection}
+            setUrl={setSonarrUrl}
+            setApiKey={setSonarrApiKey}
+            testConnectionState={actions.sonarrTestConnectionState}
+            saveState={actions.saveState}
+            isLoading={Boolean(isLoading)}
+            summaryFields={[
+              { label: 'Sonarr URL', value: normalizedUrl || 'Not configured' },
+              {
+                label: 'Preferred title language',
+                value:
+                  providerTitleLanguage === 'romaji'
+                    ? 'Romaji'
+                    : providerTitleLanguage === 'native'
+                      ? 'Native'
+                      : 'English',
+              },
+            ]}
+          >
+            <SonarrTitleLanguageField
+              providerTitleLanguage={providerTitleLanguage}
+              setProviderTitleLanguage={setProviderTitleLanguage}
+              selectPortal={selectPortal}
               isLoading={Boolean(isLoading)}
-              summaryFields={[
-                { label: 'Sonarr URL', value: normalizedUrl || 'Not configured' },
-                {
-                  label: 'Preferred title language',
-                  value:
-                    providerTitleLanguage === 'romaji'
-                      ? 'Romaji'
-                      : providerTitleLanguage === 'native'
-                        ? 'Native'
-                        : 'English',
-                },
-              ]}
-            >
-              <SonarrTitleLanguageField
-                providerTitleLanguage={providerTitleLanguage}
-                setProviderTitleLanguage={setProviderTitleLanguage}
-                selectPortal={selectPortal}
-                isLoading={Boolean(isLoading)}
-              />
-            </ProviderConnectionCard>
-          </div>
-        </section>
+            />
+          </ProviderConnectionCard>
+        </div>
+      </section>
 
-        <SonarrDefaultsSection
-          actions={actions}
-          portalContainer={selectPortal}
-          metadataEnabled={metadataEnabled}
-          metadataQuery={metadataQuery}
-          onRefresh={handleRefresh}
-          layout={sonarrFormLayout}
-        />
-      </div>
-    </>
+      <SonarrDefaultsSection
+        actions={actions}
+        portalContainer={selectPortal}
+        metadataEnabled={metadataEnabled}
+        metadataQuery={metadataQuery}
+        onRefresh={handleRefresh}
+        layout={layout}
+      />
+    </div>
   );
 }
 
-function SettingsForm(props: SettingsFormProps): React.JSX.Element {
-  return <SettingsFormInner {...props} />;
+function SonarrSettingsPanel(props: SonarrSettingsPanelProps): React.JSX.Element {
+  return <SonarrSettingsPanelInner {...props} />;
 }
 
-export default React.memo(SettingsForm);
+export default React.memo(SonarrSettingsPanel);

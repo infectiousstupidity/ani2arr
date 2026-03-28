@@ -1,3 +1,6 @@
+/** Radarr provider-settings panel for connection state and default add options. */
+// src/features/options/provider-settings/radarr-settings-panel.tsx
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
@@ -7,7 +10,7 @@ import {
   validateProviderConnectionUrl,
 } from '@/shared/schemas/provider-connection.schema';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
-import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
+import type { SettingsActions } from '@/features/options/use-settings-actions';
 import { requestProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
 import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
@@ -17,21 +20,21 @@ import {
   ProviderConnectionCard,
   ProviderConnectionStatusBadge,
   ProviderTitleLanguageField,
-} from './settings-connection-card';
-import { RadarrDefaultsSection } from './settings-radarr-defaults';
+} from './provider-connection-card';
+import { RadarrDefaultsSection } from './radarr-defaults-section';
 import { useSelectPortal } from './use-select-portal';
 
-export interface RadarrSettingsFormProps {
+export interface RadarrSettingsPanelProps {
   actions: SettingsActions;
   savedSettings?: Settings;
   isLoading?: boolean;
 }
 
-function RadarrSettingsFormInner({
+function RadarrSettingsPanelInner({
   actions,
   savedSettings,
   isLoading,
-}: RadarrSettingsFormProps): React.JSX.Element {
+}: RadarrSettingsPanelProps): React.JSX.Element {
   const methods = useFormContext<SettingsFormValues>();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -344,8 +347,8 @@ function RadarrSettingsFormInner({
   );
 }
 
-function RadarrSettingsForm(props: RadarrSettingsFormProps): React.JSX.Element {
-  return <RadarrSettingsFormInner {...props} />;
+function RadarrSettingsPanel(props: RadarrSettingsPanelProps): React.JSX.Element {
+  return <RadarrSettingsPanelInner {...props} />;
 }
 
-export default React.memo(RadarrSettingsForm);
+export default React.memo(RadarrSettingsPanel);
