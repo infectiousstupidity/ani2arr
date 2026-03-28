@@ -1,29 +1,18 @@
-/** Renders Radarr default add settings using shared provider form controls and tag selection UI. */
+/** Renders Radarr default add settings using the shared provider add-options fields. */
 // src/entrypoints/options/components/settings-radarr-defaults.tsx
 
 import React from 'react';
-import { Controller, useFormContext } from 'react-hook-form';
+import { useFormContext } from 'react-hook-form';
 import { RotateCcw } from 'lucide-react';
-import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
-import type { SettingsFormValues } from '@/shared/schemas/settings';
-import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
-import type { useRadarrMetadata } from '@/shared/queries';
-import type { RadarrMinimumAvailability, RadarrQualityProfile } from '@/shared/types';
-import { SelectField, SwitchField } from '@/shared/ui/form/form';
-import { RootFolderField } from '@/ui/provider-forms/fields/root-folder-field';
-import Button from '@/shared/ui/primitives/button';
-import { SaveSettingsBar } from './settings-save-bar';
 
-const MINIMUM_AVAILABILITY_OPTIONS: Array<{
-  value: RadarrMinimumAvailability;
-  label: string;
-  description: string;
-}> = [
-  { value: 'announced', label: 'Announced', description: 'Allow adds before a theatrical or digital date exists.' },
-  { value: 'inCinemas', label: 'In Cinemas', description: 'Wait until the movie has a theatrical release.' },
-  { value: 'released', label: 'Released', description: 'Wait until the movie is officially released.' },
-  { value: 'preDB', label: 'PreDB', description: 'Allow pre-release scene or predb availability.' },
-];
+import { RadarrAddOptionsFields } from '@/components/provider-add-options/radarr-add-options-fields';
+import type { SettingsActions } from '@/entrypoints/options/hooks/use-settings-actions';
+import type { RadarrFormState } from '@/shared/providers/radarr/types';
+import type { useRadarrMetadata } from '@/shared/queries';
+import type { SettingsFormValues } from '@/shared/schemas/settings';
+import Button from '@/shared/ui/primitives/button';
+
+import { SaveSettingsBar } from './settings-save-bar';
 
 type RadarrDefaultsSectionProps = {
   actions: SettingsActions;
@@ -40,10 +29,22 @@ export const RadarrDefaultsSection: React.FC<RadarrDefaultsSectionProps> = ({
   metadataQuery,
   onRefresh,
 }) => {
-  const { control, watch, setValue } = useFormContext<SettingsFormValues>();
+  const { setValue, watch } = useFormContext<SettingsFormValues>();
+  const defaults = watch('providers.radarr.defaults');
 
-  const tagsValue = watch('providers.radarr.defaults.tags');
-  const freeformTagsValue = watch('providers.radarr.defaults.freeformTags');
+  const setDefaultField = <K extends keyof RadarrFormState>(
+    field: K,
+    value: RadarrFormState[K],
+  ): void => {
+    setValue(
+      'providers.radarr.defaults',
+      {
+        ...defaults,
+        [field]: value,
+      },
+      { shouldDirty: true, shouldValidate: true },
+    );
+  };
 
   const renderContent = () => {
     if (!metadataEnabled) {
@@ -68,106 +69,15 @@ export const RadarrDefaultsSection: React.FC<RadarrDefaultsSectionProps> = ({
 
     if (!metadataQuery.data) return null;
 
-    const qualityProfileOptions = metadataQuery.data.qualityProfiles.map((profile: RadarrQualityProfile) => ({
-      value: String(profile.id),
-      label: profile.name,
-    }));
-
     return (
-      <div className="grid gap-4 md:grid-cols-2">
-        <Controller
-          control={control}
-          name="providers.radarr.defaults.rootFolderPath"
-          render={({ field }) => (
-            <RootFolderField
-              disabled={actions.saveState.isPending}
-              value={field.value}
-              rootFolders={metadataQuery.data.rootFolders}
-              onChange={field.onChange}
-              portalContainer={portalContainer}
-              computedSlug={null}
-              displayRootWithSlug={false}
-              fullWidthClass="md:col-span-2"
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="providers.radarr.defaults.qualityProfileId"
-          render={({ field }) => (
-            <SelectField
-              label="Quality Profile"
-              disabled={actions.saveState.isPending}
-              value={String(field.value)}
-              onValueChange={value => field.onChange(Number(value))}
-              options={qualityProfileOptions}
-              placeholder="Select a profile..."
-              container={portalContainer}
-            />
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="providers.radarr.defaults.minimumAvailability"
-          render={({ field }) => (
-            <SelectField
-              label="Minimum Availability"
-              disabled={actions.saveState.isPending}
-              value={field.value}
-              onValueChange={field.onChange}
-              options={MINIMUM_AVAILABILITY_OPTIONS}
-              container={portalContainer}
-            />
-          )}
-        />
-
-        <ProviderTagField
-          availableTags={metadataQuery.data.tags}
-          disabled={actions.saveState.isPending}
-          selectedTagIds={tagsValue}
-          selectedFreeformTags={freeformTagsValue}
-          onTagIdsChange={tagIds => setValue('providers.radarr.defaults.tags', tagIds, { shouldDirty: true })}
-          onFreeformTagsChange={freeformTags =>
-            setValue('providers.radarr.defaults.freeformTags', freeformTags, { shouldDirty: true })
-          }
-        />
-
-        <div className="pt-1 md:col-span-2">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Controller
-              control={control}
-              name="providers.radarr.defaults.monitored"
-              render={({ field }) => (
-                <SwitchField
-                  label="Monitored"
-                  disabled={actions.saveState.isPending}
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  labelHelp="Keep the movie monitored in Radarr so future upgrades remain eligible."
-                  labelHelpContainer={portalContainer}
-                />
-              )}
-            />
-
-            <Controller
-              control={control}
-              name="providers.radarr.defaults.searchForMovie"
-              render={({ field }) => (
-                <SwitchField
-                  label="Search on Add"
-                  disabled={actions.saveState.isPending}
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  labelHelp="Trigger a Radarr search immediately after the movie is added."
-                  labelHelpContainer={portalContainer}
-                />
-              )}
-            />
-          </div>
-        </div>
-      </div>
+      <RadarrAddOptionsFields
+        values={defaults}
+        metadata={metadataQuery.data}
+        onChange={setDefaultField}
+        disabled={actions.saveState.isPending}
+        portalContainer={portalContainer ?? null}
+        layout="grid"
+      />
     );
   };
 

@@ -10,7 +10,7 @@ export type RadarrMinimumAvailability =
   | 'preDB';
 
 export interface RadarrRootFolder {
-  freeSpace: number;
+  freeSpace?: number | null;
   id: number;
   path: string;
 }

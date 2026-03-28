@@ -102,7 +102,7 @@ export interface LeanSonarrSeries {
 }
 
 export interface SonarrRootFolder {
-  freeSpace: number;
+  freeSpace?: number | null;
   id: number;
   path: string;
 }
