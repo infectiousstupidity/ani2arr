@@ -2,6 +2,7 @@
 // src/core/anilist/metadata.store.ts
 
 import { browser } from 'wxt/browser';
+import * as v from 'valibot';
 import type {
   AniListMetadata,
   AniListMetadataBundle,
@@ -9,8 +10,14 @@ import type {
   AniListMedia,
   AniListTitles,
 } from '@/shared/types';
+import { AniListMetadataBundleSchema, AniListMetadataChunkRefSchema, AniListMetadataSchema } from '@/shared/schemas/anilist-metadata.schema';
 import { logError, normalizeError } from '@/shared/errors';
 import { logger } from '@/shared/utils/logger';
+import {
+  RawAniListMetadataBundleSchema,
+  RawAniListMetadataEntrySchema,
+  RawAniListMetadataRecordSchema,
+} from './metadata.schema';
 import type { AniListMediaService } from './media.service';
 
 const days = (n: number): number => n * 24 * 60 * 60 * 1000;
@@ -51,7 +58,7 @@ export class AniListMetadataStore {
     try {
       const response = await fetch(this.toBakedUrl('anilist-static-metadata.json'));
       if (response.ok) {
-        const bundle = (await response.json()) as AniListMetadataBundle;
+        const bundle = this.parseMetadataBundle(await response.json());
         await this.loadBakedMetadata(bundle);
       } else {
         this.log.warn(
@@ -85,9 +92,7 @@ export class AniListMetadataStore {
       return;
     }
 
-    const generatedAt = typeof bundle.generatedAt === 'number' && Number.isFinite(bundle.generatedAt)
-      ? bundle.generatedAt
-      : Date.now();
+    const generatedAt = bundle.generatedAt;
 
     const settled = await Promise.allSettled(
       bundle.chunks.map(chunk => this.fetchBakedChunk(chunk, generatedAt)),
@@ -121,11 +126,7 @@ export class AniListMetadataStore {
       throw new Error(`Failed to load baked chunk ${chunk.file} (${response.status})`);
     }
 
-    const bundle = (await response.json()) as AniListMetadataBundle;
-    return {
-      generatedAt,
-      entries: Array.isArray(bundle.entries) ? bundle.entries : [],
-    };
+    return this.parseMetadataBundle(await response.json(), generatedAt);
   }
 
   private loadBakedBundle(bundle: AniListMetadataBundle | null | undefined): void {
@@ -133,53 +134,76 @@ export class AniListMetadataStore {
       this.log.warn('loadBakedBundle: missing or invalid bundle');
       return;
     }
-    const generatedAt = typeof bundle.generatedAt === 'number' && Number.isFinite(bundle.generatedAt) ? bundle.generatedAt : Date.now();
     for (const entry of bundle.entries) {
-      const normalized = this.normalizeEntry({ ...entry, updatedAt: entry.updatedAt ?? generatedAt });
-      if (normalized) {
-        this.bakedMap.set(normalized.id, normalized);
-      }
+      this.bakedMap.set(entry.id, entry);
     }
     this.log.debug(`loadBakedBundle: loaded ${this.bakedMap.size} entries`);
   }
 
-  private normalizeEntry(raw: Partial<AniListMetadata>): AniListMetadata | null {
-    if (!raw || typeof raw.id !== 'number' || !Number.isFinite(raw.id)) return null;
-    const updatedAt =
-      typeof raw.updatedAt === 'number' && Number.isFinite(raw.updatedAt) ? raw.updatedAt : Date.now();
-    const seasonYear =
-      raw.seasonYear === null || raw.seasonYear === undefined
-        ? null
-        : Number.isFinite(raw.seasonYear)
-          ? Number(raw.seasonYear)
-          : null;
-    const coverImage = raw.coverImage
-      ? {
-          medium: raw.coverImage.medium ?? null,
-          large: raw.coverImage.large ?? null,
-        }
-      : null;
-    return {
-      id: raw.id,
-      titles: normalizeTitles(raw.titles ?? {}),
-      seasonYear,
-      format: raw.format ?? null,
-      coverImage,
-      updatedAt,
+  private normalizeEntry(raw: unknown, fallbackUpdatedAt = Date.now()): AniListMetadata | null {
+    const result = v.safeParse(RawAniListMetadataEntrySchema, raw);
+    if (!result.success) return null;
+
+    const entry = result.output;
+    if (typeof entry.id !== 'number' || !Number.isFinite(entry.id)) return null;
+
+    const normalized = {
+      id: entry.id,
+      titles: normalizeTitles(entry.titles ?? {}),
+      seasonYear: entry.seasonYear ?? null,
+      format: entry.format ?? null,
+      coverImage: entry.coverImage
+        ? {
+            medium: entry.coverImage.medium ?? null,
+            large: entry.coverImage.large ?? null,
+          }
+        : null,
+      updatedAt:
+        typeof entry.updatedAt === 'number' && Number.isFinite(entry.updatedAt)
+          ? entry.updatedAt
+          : fallbackUpdatedAt,
     };
+
+    const parsedMetadata = v.safeParse(AniListMetadataSchema, normalized);
+    return parsedMetadata.success ? parsedMetadata.output : null;
+  }
+
+  private parseMetadataBundle(raw: unknown, fallbackGeneratedAt?: number): AniListMetadataBundle | null {
+    const result = v.safeParse(RawAniListMetadataBundleSchema, raw);
+    if (!result.success) {
+      return null;
+    }
+
+    const generatedAt = fallbackGeneratedAt ?? result.output.generatedAt;
+    const entries = result.output.entries
+      .map(entry => this.normalizeEntry(entry, generatedAt))
+      .filter((entry): entry is AniListMetadata => entry !== null);
+    const chunks = result.output.chunks
+      .map(chunk => {
+        const parsedChunk = v.safeParse(AniListMetadataChunkRefSchema, chunk);
+        return parsedChunk.success ? parsedChunk.output : null;
+      })
+      .filter((chunk): chunk is AniListMetadataChunkRef => chunk !== null);
+
+    const parsedBundle = v.safeParse(AniListMetadataBundleSchema, {
+      generatedAt,
+      ...(entries.length > 0 ? { entries } : {}),
+      ...(chunks.length > 0 ? { chunks } : {}),
+    });
+    return parsedBundle.success ? parsedBundle.output : null;
   }
 
   private async hydrateLocal(): Promise<void> {
     try {
       const stored = await browser.storage.local.get(STORAGE_KEY);
-      const record = stored?.[STORAGE_KEY] as PersistedRecord | undefined;
-      if (!record || typeof record !== 'object') return;
+      const recordResult = v.safeParse(RawAniListMetadataRecordSchema, stored?.[STORAGE_KEY]);
+      if (!recordResult.success) return;
 
       const now = Date.now();
-      for (const [key, value] of Object.entries(record)) {
+      for (const [key, value] of Object.entries(recordResult.output)) {
         const id = Number(key);
         if (!Number.isFinite(id)) continue;
-        const normalized = this.normalizeEntry({ ...value, id });
+        const normalized = this.normalizeEntry({ ...(typeof value === 'object' && value ? value : {}), id });
         if (!normalized) continue;
         if (now - normalized.updatedAt > BAKED_HARD_MS) continue;
         this.localMap.set(id, normalized);

@@ -1,20 +1,21 @@
 /** AniList media endpoint operations built on the raw GraphQL transport. */
 // src/integrations/anilist/media.ts
 
+import * as v from 'valibot';
 import type { AniListMedia } from '@/shared/types';
 import { AniListGraphqlError } from '@/integrations/anilist/errors';
+import {
+  FindMediaBatchResponseDtoSchema,
+  SearchMediaResponseDtoSchema,
+  type AniListGraphQLError,
+  type AniListSearchMediaDto,
+} from '@/integrations/anilist/media.schema';
 import {
   FIND_MEDIA_BATCH_QUERY,
   SEARCH_MEDIA_QUERY,
 } from '@/integrations/anilist/queries';
 import { postAniList } from '@/integrations/anilist/request';
-import type {
-  AniListGraphQLError,
-  AniListResponseMeta,
-  AniListSearchMediaDto,
-  FindMediaBatchResponseDto,
-  SearchMediaResponseDto,
-} from '@/integrations/anilist/types';
+import type { AniListResponseMeta } from '@/integrations/anilist/types';
 
 export interface AniListMediaResult<TData> {
   data: TData;
@@ -28,16 +29,17 @@ const assertNoGraphqlErrors = (errors?: AniListGraphQLError[]): void => {
 };
 
 export async function fetchAniListMediaBatch(ids: number[]): Promise<AniListMediaResult<AniListMedia[]>> {
-  const { payload, meta } = await postAniList<FindMediaBatchResponseDto, { ids: number[] }>({
+  const { payload, meta } = await postAniList<unknown, { ids: number[] }>({
     query: FIND_MEDIA_BATCH_QUERY,
     variables: { ids },
   });
+  const parsedPayload = v.parse(FindMediaBatchResponseDtoSchema, payload);
 
-  assertNoGraphqlErrors(payload?.errors);
+  assertNoGraphqlErrors(parsedPayload.errors);
 
-  const media = payload?.data?.Page?.media ?? [];
+  const media = parsedPayload.data?.Page?.media ?? [];
   return {
-    data: media.filter((item): item is AniListMedia => Boolean(item && typeof item.id === 'number')),
+    data: media,
     meta,
   };
 }
@@ -46,24 +48,17 @@ export async function searchAniListMedia(
   search: string,
   limit: number,
 ): Promise<AniListMediaResult<AniListSearchMediaDto[]>> {
-  const { payload, meta } = await postAniList<SearchMediaResponseDto, { search: string; perPage: number }>({
+  const { payload, meta } = await postAniList<unknown, { search: string; perPage: number }>({
     query: SEARCH_MEDIA_QUERY,
     variables: { search, perPage: limit },
   });
+  const parsedPayload = v.parse(SearchMediaResponseDtoSchema, payload);
 
-  assertNoGraphqlErrors(payload?.errors);
+  assertNoGraphqlErrors(parsedPayload.errors);
 
-  const results = payload?.data?.Page?.media ?? [];
+  const results = parsedPayload.data?.Page?.media ?? [];
   return {
-    data: results
-      .filter((item): item is AniListSearchMediaDto => typeof item?.id === 'number' && Number.isFinite(item.id))
-      .map(item => ({
-        id: item.id,
-        title: item.title ?? {},
-        coverImage: item.coverImage ?? null,
-        format: item.format ?? null,
-        status: item.status ?? null,
-      })),
+    data: results,
     meta,
   };
 }

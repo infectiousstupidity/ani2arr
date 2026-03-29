@@ -8,7 +8,7 @@ import type {
   AniListSchedulerDebugSnapshot,
   RequestPriority,
 } from '@/shared/types';
-import type { AniListSearchMediaDto } from '@/integrations/anilist/types';
+import type { AniListSearchMediaDto } from '@/integrations/anilist/media.schema';
 import { DEFAULT_PREQUEL_DEPTH, QUEUE_CONCURRENCY } from './constants';
 import { AniListMediaScheduler, type RequestMediaOptions } from './media-scheduler';
 
