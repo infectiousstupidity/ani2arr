@@ -16,6 +16,7 @@ import {
 } from '@/shared/schemas/providers/provider-connection.schema';
 import { requestProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
 import { logger } from '@/shared/utils/logger';
+import { getAniListTitleLanguageLabel } from '@/shared/utils/anilist-title-preference';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 
 import {
@@ -336,12 +337,7 @@ function SonarrSettingsPanelInner({
               { label: 'Sonarr URL', value: normalizedUrl || 'Not configured' },
               {
                 label: 'Preferred AniList title language',
-                value:
-                  preferredAniListTitleLanguage === 'romaji'
-                    ? 'Romaji'
-                    : preferredAniListTitleLanguage === 'native'
-                      ? 'Native'
-                      : 'English',
+                value: getAniListTitleLanguageLabel(preferredAniListTitleLanguage),
               },
             ]}
           >

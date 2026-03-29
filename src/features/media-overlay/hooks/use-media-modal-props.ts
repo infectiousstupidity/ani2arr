@@ -40,7 +40,7 @@ import {
 } from '@/shared/queries';
 import { toMappingSearchResultFromRadarr } from '@/features/mapping/radarr.adapter';
 import { toMappingSearchResultFromSonarr } from '@/features/mapping/sonarr.adapter';
-import { resolveTitlePreference } from '@/shared/anilist/title-preference';
+import { resolveTitlePreference } from '@/shared/utils/anilist-title-preference';
 import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
 import {
   buildProviderFolderSlug,

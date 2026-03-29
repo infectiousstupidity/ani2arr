@@ -9,21 +9,16 @@ import {
   type ProviderConnectionStatus,
 } from '@/features/options/provider-connection-status';
 import { cn } from '@/shared/utils/cn';
+import { getAniListTitleLanguageLabel } from '@/shared/utils/anilist-title-preference';
 import { InputField, SelectField } from '@/shared/ui/form/form';
 import Button from '@/shared/ui/primitives/button';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import { logger } from '@/shared/utils/logger';
 
-const TITLE_LANGUAGE_LABELS: Record<AniListTitleLanguage, string> = {
-  english: 'English (default)',
-  romaji: 'Romaji',
-  native: 'Native',
-};
-
 export const TITLE_LANGUAGE_OPTIONS = ANILIST_TITLE_LANGUAGES.map(value => ({
   value,
-  label: TITLE_LANGUAGE_LABELS[value],
+  label: getAniListTitleLanguageLabel(value, { includeDefaultSuffix: true }),
 }));
 
 export const TITLE_LANGUAGE_DESCRIPTION =

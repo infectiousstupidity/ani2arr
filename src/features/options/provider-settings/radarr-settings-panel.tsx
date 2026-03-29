@@ -13,6 +13,7 @@ import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/features/options/use-settings-actions';
 import { requestProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
 import { logger } from '@/shared/utils/logger';
+import { getAniListTitleLanguageLabel } from '@/shared/utils/anilist-title-preference';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
 import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
@@ -318,12 +319,7 @@ function RadarrSettingsPanelInner({
               { label: 'Radarr URL', value: normalizedUrl || 'Not configured' },
               {
                 label: 'Preferred AniList title language',
-                value:
-                  preferredAniListTitleLanguage === 'romaji'
-                    ? 'Romaji'
-                    : preferredAniListTitleLanguage === 'native'
-                      ? 'Native'
-                      : 'English',
+                value: getAniListTitleLanguageLabel(preferredAniListTitleLanguage),
               },
             ]}
           >
