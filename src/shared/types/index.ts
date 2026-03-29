@@ -1,3 +1,6 @@
+/** Public shared type surface for app-wide canonical types. */
+// src/shared/types/index.ts
+
 export type {
   AniListMediaFormat,
   AniListMedia,
@@ -10,8 +13,6 @@ export type {
   AniListMetadataChunkRef,
   AniListMetadataBundle,
 } from './anilist';
-
-export type { ProviderTag } from './provider-tags';
 
 export type {
   AniListSchedulerEventType,
@@ -26,40 +27,32 @@ export type {
 } from '@/debug/anilist-debug.types';
 
 export type {
-  LeanRadarrMovie,
   Provider,
-  LeanSonarrSeries,
+  ProviderCredentials,
   RadarrAlternateTitle,
   RadarrLookupMovie,
-  RadarrMinimumAvailability,
   RadarrMovie,
-  RadarrQualityProfile,
-  RadarrRootFolder,
+  RadarrMovieSnapshot,
   SonarrAlternateTitle,
   SonarrLookupSeries,
-  SonarrMonitorOption,
-  SonarrQualityProfile,
-  SonarrRootFolder,
   SonarrSeries,
-  SonarrCutoffItem,
-  SonarrCutoffList,
+  SonarrSeriesSnapshot,
+  ProviderTag,
+  ProviderQualityProfile,
+  ProviderRootFolder
 } from './providers';
-
-export type { ProviderCredentials, ProviderTitleLanguage } from '@/shared/types/options';
+export type { ProviderTitleLanguage } from './options';
 
 export type {
   SonarrFormState,
-  SonarrPublicSettings,
-  SonarrSecrets,
-  SonarrSettings,
-} from '@/shared/providers/sonarr/types';
+  SonarrMonitorOption,
+  SonarrSeriesType,
+} from '@/shared/schemas/sonarr-settings.schema';
 
 export type {
   RadarrFormState,
-  RadarrPublicSettings,
-  RadarrSecrets,
-  RadarrSettings,
-} from '@/shared/providers/radarr/types';
+  RadarrMinimumAvailability,
+} from '@/shared/schemas/radarr-settings.schema';
 
 export type {
   AddRequestPayload,

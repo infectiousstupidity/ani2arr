@@ -5,19 +5,14 @@ import React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check } from 'lucide-react';
 
+import type { ProviderRootFolder } from '@/shared/types/providers';
 import { FormField, Label, Select, SelectContent, SelectTrigger } from '@/shared/ui/form/form';
 import { cn } from '@/shared/utils/cn';
 import { joinRootAndSlug } from '@/shared/utils/provider-library-paths';
 
-interface ProviderRootFolderOption {
-  id: number;
-  path: string;
-  freeSpace?: number | null;
-}
-
 export interface ProviderRootFolderSelectProps {
   value: string;
-  rootFolders: ReadonlyArray<ProviderRootFolderOption>;
+  rootFolders: ReadonlyArray<ProviderRootFolder>;
   onChange: (value: string) => void;
   disabled?: boolean | undefined;
   portalContainer?: HTMLElement | ShadowRoot | null | undefined;

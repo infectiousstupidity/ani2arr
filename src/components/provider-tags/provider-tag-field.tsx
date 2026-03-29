@@ -3,7 +3,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 
-import type { ProviderTag } from '@/shared/types/provider-tags';
+import type { ProviderTag } from '@/shared/types/providers';
 import { FormField, Label } from '@/shared/ui/form/form';
 import MultiTagInput from '@/shared/ui/form/multi-tag-input';
 

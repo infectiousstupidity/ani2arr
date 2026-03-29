@@ -9,16 +9,20 @@ import type {
   CheckSeriesStatusResponse,
   ExtensionOptions,
   AniListMediaHint,
-  Provider,
   AniListMediaStatus,
-  RadarrFormState,
+} from '@/shared/types';
+import type { RadarrFormState } from '@/shared/schemas/radarr-settings.schema';
+import type { SonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
+import type {
+  Provider,
   RadarrLookupMovie,
   RadarrMovie,
-  SonarrFormState,
   SonarrLookupSeries,
   SonarrSeries,
-} from '@/shared/types';
+} from '@/shared/types/providers';
 import type { MappingTabProps, RadarrPanelProps, SonarrPanelProps } from '@/features/media-modal';
+import { createDefaultRadarrFormState } from '@/shared/schemas/radarr-settings.schema';
+import { createDefaultSonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
 import {
   useAddMovie,
   useAddSeries,
@@ -71,27 +75,9 @@ export interface UseMediaModalPropsResult {
   status: AniListMediaStatus | null;
 }
 
-const defaultSonarrFormState: SonarrFormState = {
-  qualityProfileId: '',
-  rootFolderPath: '',
-  seriesType: 'anime',
-  monitorOption: 'all',
-  seasonFolder: true,
-  searchForMissingEpisodes: true,
-  searchForCutoffUnmetEpisodes: false,
-  tags: [],
-  freeformTags: [],
-};
+const defaultSonarrFormState = createDefaultSonarrFormState();
 
-const defaultRadarrFormState: RadarrFormState = {
-  qualityProfileId: '',
-  rootFolderPath: '',
-  monitored: true,
-  searchForMovie: true,
-  minimumAvailability: 'announced',
-  tags: [],
-  freeformTags: [],
-};
+const defaultRadarrFormState = createDefaultRadarrFormState();
 
 const isFullSonarrSeries = (series: unknown): series is SonarrSeries =>
   Boolean(

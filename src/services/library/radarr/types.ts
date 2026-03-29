@@ -1,11 +1,16 @@
+/** Radarr library domain contracts and local type re-exports. */
+// src/services/library/radarr/types.ts
+
 import type {
   CheckMovieStatusPayload,
   CheckMovieStatusResponse,
-  LeanRadarrMovie,
   MappingExternalId,
+} from '@/shared/types';
+import type {
   RadarrLookupMovie,
   RadarrMovie,
-} from '@/shared/types';
+  RadarrMovieSnapshot,
+} from '@/shared/types/providers';
 import type {
   LibraryCaches as BaseLibraryCaches,
   LibraryMutationEmitter,
@@ -17,7 +22,7 @@ import type { ResolveExternalIdOptions, ResolvedMapping } from '@/services/mappi
 export type {
   CheckMovieStatusPayload,
   CheckMovieStatusResponse,
-  LeanRadarrMovie,
+  RadarrMovieSnapshot,
   MappingExternalId,
   RadarrLookupMovie,
   RadarrMovie,
@@ -39,11 +44,11 @@ export interface MappingResolver {
   getLinkedAniListIds?(provider: 'radarr', externalId: MappingExternalId): number[];
 }
 
-export interface TitleIndexer extends LibraryTitleIndexer<LeanRadarrMovie> {
+export interface TitleIndexer extends LibraryTitleIndexer<RadarrMovieSnapshot> {
   findTmdbIdInIndex(payload: CheckMovieStatusPayload): number | null;
 }
 
-export type LibraryCaches = BaseLibraryCaches<LeanRadarrMovie>;
+export type LibraryCaches = BaseLibraryCaches<RadarrMovieSnapshot>;
 
 export type RadarrLibraryStatusOptions = LibraryStatusOptions;
 

@@ -5,8 +5,8 @@ import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { RadarrLibrary } from '@/services/library/radarr';
 import type { UpdateRadarrInput } from '@/rpc/schemas';
-import type { ExtensionOptions, RadarrMovie } from '@/shared/types';
-import type { ProviderCredentials } from '@/shared/types/options';
+import type { ExtensionOptions } from '@/shared/types';
+import type { ProviderCredentials, RadarrMovie } from '@/shared/types/providers';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import {
   buildProviderFolderSlug,

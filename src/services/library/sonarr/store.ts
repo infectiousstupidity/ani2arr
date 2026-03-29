@@ -1,11 +1,11 @@
 // src/services/library/sonarr/store.ts
-import type { LibraryCaches, LeanSonarrSeries, SonarrClient, SonarrSeries, ExtensionOptions, TitleIndexer } from './types';
+import type { LibraryCaches, SonarrClient, SonarrSeries, ExtensionOptions, TitleIndexer, SonarrSeriesSnapshot } from './types';
 import { getExtensionOptionsSnapshot, STORAGE_POLICIES } from '@/storage';
 import { logError, normalizeError } from '@/shared/errors';
 import { CACHE_KEY } from './constants';
 
 export class SonarrLibraryStore {
-  private inflightRefresh: Promise<LeanSonarrSeries[]> | null = null;
+  private inflightRefresh: Promise<SonarrSeriesSnapshot[]> | null = null;
   private idxInit = false;
 
   constructor(
@@ -14,7 +14,7 @@ export class SonarrLibraryStore {
     private readonly indexer: TitleIndexer
   ) {}
 
-  async getLeanSeriesList(): Promise<LeanSonarrSeries[]> {
+  async getLeanSeriesList(): Promise<SonarrSeriesSnapshot[]> {
     const cached = await this.caches.lean.read(CACHE_KEY);
     if (cached) {
       this.ensureIndexes(cached.value);
@@ -26,7 +26,7 @@ export class SonarrLibraryStore {
     return this.refreshCache();
   }
 
-  async refreshCache(optionsOverride?: ExtensionOptions): Promise<LeanSonarrSeries[]> {
+  async refreshCache(optionsOverride?: ExtensionOptions): Promise<SonarrSeriesSnapshot[]> {
     if (this.inflightRefresh) return this.inflightRefresh;
 
     const job = (async () => {
@@ -43,16 +43,16 @@ export class SonarrLibraryStore {
 
         const credentials = { url: options.providers.sonarr.url, apiKey: options.providers.sonarr.apiKey };
         const full = await this.sonarrClient.getAllSeries(credentials);
-        const lean: LeanSonarrSeries[] = full
+        const snapshots: SonarrSeriesSnapshot[] = full
           .filter(s => typeof s.tvdbId === 'number' && Number.isFinite(s.tvdbId))
-          .map(s => this.toLeanSeries(s));
+          .map(s => this.toSeriesSnapshot(s));
 
-        this.indexer.reindex(lean);
-        await this.caches.lean.write(CACHE_KEY, lean, {
+        this.indexer.reindex(snapshots);
+        await this.caches.lean.write(CACHE_KEY, snapshots, {
           staleMs: STORAGE_POLICIES.providerLibrary.staleMs,
           hardMs: STORAGE_POLICIES.providerLibrary.hardMs,
         });
-        return lean;
+        return snapshots;
       } catch (error) {
         const normalized = normalizeError(error);
         logError(normalized, 'SonarrLibraryStore:refreshCache');
@@ -76,9 +76,10 @@ export class SonarrLibraryStore {
 
   async addSeriesToCache(newSeries: SonarrSeries): Promise<void> {
     const current = await this.getLeanSeriesList();
-    const lean = this.toLeanSeries(newSeries);
+    const snapshot = this.toSeriesSnapshot(newSeries);
     const idx = current.findIndex(s => s.id === newSeries.id);
-    const updated = idx >= 0 ? [...current.slice(0, idx), lean, ...current.slice(idx + 1)] : [...current, lean];
+    const updated =
+      idx >= 0 ? [...current.slice(0, idx), snapshot, ...current.slice(idx + 1)] : [...current, snapshot];
 
     this.indexer.reindex(updated);
     await this.caches.lean.write(CACHE_KEY, updated, { 
@@ -99,7 +100,7 @@ export class SonarrLibraryStore {
     });
   }
 
-  private ensureIndexes(list: LeanSonarrSeries[]): void {
+  private ensureIndexes(list: SonarrSeriesSnapshot[]): void {
     // Rebuild only if empty and we have data
     if (list.length === 0) return;
     if (this.idxInit === true) return;
@@ -107,17 +108,32 @@ export class SonarrLibraryStore {
     this.idxInit = true;
   }
 
-  private toLeanSeries(series: SonarrSeries): LeanSonarrSeries {
+  private toSeriesSnapshot(series: SonarrSeries): SonarrSeriesSnapshot {
     const alternateTitles = Array.isArray(series.alternateTitles)
       ? series.alternateTitles.map(t => t?.title?.trim()).filter((t): t is string => !!t)
       : [];
+
+    const statistics = series.statistics
+      ? {
+          ...(typeof series.statistics.episodeCount === 'number'
+            ? { episodeCount: series.statistics.episodeCount }
+            : {}),
+          ...(typeof series.statistics.episodeFileCount === 'number'
+            ? { episodeFileCount: series.statistics.episodeFileCount }
+            : {}),
+          ...(typeof series.statistics.totalEpisodeCount === 'number'
+            ? { totalEpisodeCount: series.statistics.totalEpisodeCount }
+            : {}),
+        }
+      : undefined;
+
     return {
       tvdbId: series.tvdbId,
       id: series.id,
       titleSlug: series.titleSlug,
       title: series.title,
       ...(alternateTitles.length > 0 ? { alternateTitles } : {}),
-      ...(series.statistics ? { statistics: series.statistics } : {}),
+      ...(statistics ? { statistics } : {}),
     };
   }
 }

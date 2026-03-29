@@ -1,11 +1,12 @@
-import type { ExtensionOptions, LeanRadarrMovie, RadarrMovie } from '@/shared/types';
+import type { ExtensionOptions } from '@/shared/types';
+import type { RadarrMovie, RadarrMovieSnapshot } from '@/shared/types/providers';
 import type { LibraryCaches, RadarrClient, TitleIndexer } from './types';
 import { getExtensionOptionsSnapshot, STORAGE_POLICIES } from '@/storage';
 import { logError, normalizeError } from '@/shared/errors';
 import { CACHE_KEY } from './constants';
 
 export class RadarrLibraryStore {
-  private inflightRefresh: Promise<LeanRadarrMovie[]> | null = null;
+  private inflightRefresh: Promise<RadarrMovieSnapshot[]> | null = null;
   private idxInit = false;
 
   constructor(
@@ -14,7 +15,7 @@ export class RadarrLibraryStore {
     private readonly indexer: TitleIndexer,
   ) {}
 
-  async getLeanMovieList(): Promise<LeanRadarrMovie[]> {
+  async getLeanMovieList(): Promise<RadarrMovieSnapshot[]> {
     const cached = await this.caches.lean.read(CACHE_KEY);
     if (cached) {
       this.ensureIndexes(cached.value);
@@ -26,7 +27,7 @@ export class RadarrLibraryStore {
     return this.refreshCache();
   }
 
-  async refreshCache(optionsOverride?: ExtensionOptions): Promise<LeanRadarrMovie[]> {
+  async refreshCache(optionsOverride?: ExtensionOptions): Promise<RadarrMovieSnapshot[]> {
     if (this.inflightRefresh) return this.inflightRefresh;
 
     const job = (async () => {
@@ -43,7 +44,7 @@ export class RadarrLibraryStore {
 
         const credentials = { url: options.providers.radarr.url, apiKey: options.providers.radarr.apiKey };
         const full = await this.radarrClient.getAllMovies(credentials);
-        const lean: LeanRadarrMovie[] = full
+        const lean: RadarrMovieSnapshot[] = full
           .filter(movie => typeof movie.tmdbId === 'number' && Number.isFinite(movie.tmdbId))
           .map(movie => this.toLeanMovie(movie));
 
@@ -98,14 +99,14 @@ export class RadarrLibraryStore {
     });
   }
 
-  private ensureIndexes(list: LeanRadarrMovie[]): void {
+  private ensureIndexes(list: RadarrMovieSnapshot[]): void {
     if (list.length === 0) return;
     if (this.idxInit === true) return;
     this.indexer.reindex(list);
     this.idxInit = true;
   }
 
-  private toLeanMovie(movie: RadarrMovie): LeanRadarrMovie {
+  private toLeanMovie(movie: RadarrMovie): RadarrMovieSnapshot {
     const alternateTitles = Array.isArray(movie.alternateTitles)
       ? movie.alternateTitles.map(title => title?.title?.trim()).filter((title): title is string => !!title)
       : [];

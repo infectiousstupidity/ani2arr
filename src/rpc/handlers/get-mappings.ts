@@ -3,7 +3,8 @@ import type { UpstreamMappingStore } from '@/services/mapping/upstream';
 import type { MappingService } from '@/services/mapping';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { RadarrLibrary } from '@/services/library/radarr';
-import type { LeanRadarrMovie, LeanSonarrSeries, MappingSummary, MappingSource, MappingStatus } from '@/shared/types';
+import type { MappingSummary, MappingSource, MappingStatus } from '@/shared/types';
+import type { RadarrMovieSnapshot, SonarrSeriesSnapshot } from '@/shared/types/providers';
 
 export type GetMappingsInput = {
   limit?: number;
@@ -45,15 +46,15 @@ export async function getMappingsHandler(
   const cursor = input?.cursor;
 
   const [library, radarrLibraryItems] = await Promise.all([
-    sonarrLibrary.getLeanSeriesList().catch(() => [] as LeanSonarrSeries[]),
-    radarrLibrary.getLeanMovieList().catch(() => [] as LeanRadarrMovie[]),
+    sonarrLibrary.getLeanSeriesList().catch(() => [] as SonarrSeriesSnapshot[]),
+    radarrLibrary.getLeanMovieList().catch(() => [] as RadarrMovieSnapshot[]),
   ]);
 
-  const libraryByTvdbId = new Map<number, LeanSonarrSeries>();
+  const libraryByTvdbId = new Map<number, SonarrSeriesSnapshot>();
   for (const series of library) {
     libraryByTvdbId.set(series.tvdbId, series);
   }
-  const libraryByTmdbId = new Map<number, LeanRadarrMovie>();
+  const libraryByTmdbId = new Map<number, RadarrMovieSnapshot>();
   for (const movie of radarrLibraryItems) {
     libraryByTmdbId.set(movie.tmdbId, movie);
   }

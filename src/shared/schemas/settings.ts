@@ -2,8 +2,8 @@
 import * as v from 'valibot';
 import type { FieldValues } from 'react-hook-form';
 import type { ExtensionOptions } from '@/shared/types/options';
-import { createDefaultSonarrFormState, SonarrSettingsSchema } from './sonarr-schema';
-import { createDefaultRadarrFormState, RadarrSettingsSchema } from './radarr-schema';
+import { createDefaultSonarrFormState, SonarrSettingsSchema } from './sonarr-settings.schema';
+import { createDefaultRadarrFormState, RadarrSettingsSchema } from './radarr-settings.schema';
 import { createDefaultUiOptions, isTitleLanguage, migrateLegacyUiOptions, UiOptionsSchema } from './ui-schema';
 
 // --- Helpers ---

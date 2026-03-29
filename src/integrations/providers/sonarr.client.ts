@@ -3,16 +3,16 @@
 
 import { BaseProviderClient } from '@/integrations/providers/base-provider.client';
 import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
+import type { AddRequestPayload } from '@/rpc/types';
+import type { ExtensionOptions } from '@/shared/types';
 import type {
-  ExtensionOptions,
   ProviderTag,
   ProviderCredentials,
-  SonarrSeries,
-  SonarrRootFolder,
-  SonarrQualityProfile,
-  AddRequestPayload,
+  ProviderQualityProfile,
+  ProviderRootFolder,
   SonarrLookupSeries,
-} from '@/shared/types';
+  SonarrSeries,
+} from '@/shared/types/providers';
 import { createError, ErrorCode } from '@/shared/errors';
 
 type SonarrClientOptions = {
@@ -149,14 +149,14 @@ export class SonarrClient extends BaseProviderClient {
 
   public getRootFolders = async (
     credentials: ProviderCredentials,
-  ): Promise<SonarrRootFolder[]> => {
-    return this.request<SonarrRootFolder[]>('rootfolder', credentials);
+  ): Promise<ProviderRootFolder[]> => {
+    return this.request<ProviderRootFolder[]>('rootfolder', credentials);
   };
 
   public getQualityProfiles = async (
     credentials: ProviderCredentials,
-  ): Promise<SonarrQualityProfile[]> => {
-    return this.request<SonarrQualityProfile[]>('qualityprofile', credentials);
+  ): Promise<ProviderQualityProfile[]> => {
+    return this.request<ProviderQualityProfile[]>('qualityprofile', credentials);
   };
 
   public getTags = async (credentials: ProviderCredentials): Promise<ProviderTag[]> => {

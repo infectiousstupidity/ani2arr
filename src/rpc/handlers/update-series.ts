@@ -5,7 +5,8 @@ import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { UpdateSonarrInput } from '@/rpc/schemas';
-import type { ExtensionOptions, ProviderCredentials, SonarrSeries } from '@/shared/types';
+import type { ExtensionOptions } from '@/shared/types';
+import type { ProviderCredentials, SonarrSeries } from '@/shared/types/providers';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import {
   buildProviderFolderSlug,

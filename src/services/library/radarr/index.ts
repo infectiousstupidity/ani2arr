@@ -2,13 +2,14 @@ import type {
   CheckMovieStatusPayload,
   CheckMovieStatusResponse,
   LibraryCaches,
-  LeanRadarrMovie,
+  RadarrMovieSnapshot,
   MappingResolver,
   RadarrClient,
   RadarrLibraryMutationEmitter,
   RadarrLibraryStatusOptions,
 } from './types';
-import type { ExtensionOptions, RadarrMovie } from '@/shared/types';
+import type { ExtensionOptions } from '@/shared/types';
+import type { RadarrMovie } from '@/shared/types/providers';
 import { RadarrTitleIndexer } from './title-indexer';
 import { RadarrLibraryStore } from './store';
 import { RadarrStatus } from './status';
@@ -28,11 +29,11 @@ export class RadarrLibrary {
     this.status = new RadarrStatus(this.store, this.indexer, mappingResolver, radarrClient, emitLibraryMutation);
   }
 
-  getLeanMovieList(): Promise<LeanRadarrMovie[]> {
+  getLeanMovieList(): Promise<RadarrMovieSnapshot[]> {
     return this.store.getLeanMovieList();
   }
 
-  refreshCache(optionsOverride?: ExtensionOptions): Promise<LeanRadarrMovie[]> {
+  refreshCache(optionsOverride?: ExtensionOptions): Promise<RadarrMovieSnapshot[]> {
     return this.store.refreshCache(optionsOverride);
   }
 

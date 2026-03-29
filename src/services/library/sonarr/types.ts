@@ -1,13 +1,18 @@
 // src/services/library/sonarr/types.ts
+/** Sonarr library domain contracts and local type re-exports. */
+// src/services/library/sonarr/types.ts
+
 import type {
-  LeanSonarrSeries,
-  SonarrLookupSeries,
-  SonarrSeries,
   ExtensionOptions,
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
   RequestPriority,
 } from '@/shared/types';
+import type {
+  SonarrLookupSeries,
+  SonarrSeries,
+  SonarrSeriesSnapshot,
+} from '@/shared/types/providers';
 import type {
   LibraryCaches as BaseLibraryCaches,
   LibraryMutationEmitter,
@@ -16,13 +21,13 @@ import type {
 } from '@/services/library/base-library.interface';
 
 export type {
-  LeanSonarrSeries,
   SonarrLookupSeries,
   SonarrSeries,
   ExtensionOptions,
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
   RequestPriority,
+  SonarrSeriesSnapshot,
 };
 
 export interface SonarrClient {
@@ -49,11 +54,11 @@ export interface MappingResolver {
   getLinkedAniListIdsForTvdb?(tvdbId: number): number[];
 }
 
-export interface TitleIndexer extends LibraryTitleIndexer<LeanSonarrSeries> {
+export interface TitleIndexer extends LibraryTitleIndexer<SonarrSeriesSnapshot> {
   findTvdbIdInIndex(payload: CheckSeriesStatusPayload): number | null;
 }
 
-export type LibraryCaches = BaseLibraryCaches<LeanSonarrSeries>;
+export type LibraryCaches = BaseLibraryCaches<SonarrSeriesSnapshot>;
 
 export type SonarrLibraryStatusOptions = LibraryStatusOptions;
 

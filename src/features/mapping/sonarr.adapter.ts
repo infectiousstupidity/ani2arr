@@ -1,7 +1,8 @@
 /** Adapts Sonarr lookup results into mapping-search rows with library-aware links. */
 // src/features/mapping/sonarr.adapter.ts
 
-import type { MappingSearchResult, SonarrLookupSeries } from '@/shared/types';
+import type { MappingSearchResult } from '@/shared/types';
+import type { SonarrLookupSeries } from '@/shared/types/providers';
 import { getProviderLibrarySlug } from '@/shared/utils/provider-library-paths';
 
 export interface SonarrAdapterOptions {
@@ -9,12 +10,9 @@ export interface SonarrAdapterOptions {
   libraryTvdbIds?: readonly number[];
   librarySlugByTvdbId?: Readonly<Record<number, string>>;
   statsMap?: Readonly<Record<number, {
-    seasonCount?: number;
     episodeCount?: number;
     episodeFileCount?: number;
     totalEpisodeCount?: number;
-    sizeOnDisk?: number;
-    percentOfEpisodes?: number;
   }>>;
   linkedAniListIdsByTvdbId?: Readonly<Record<number, readonly number[]>>;
 }
