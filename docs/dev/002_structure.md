@@ -221,6 +221,7 @@ Put here:
 * status resolution
 * library mutation notifications inside the library domain
 * provider library domain types
+* lean provider library snapshot types such as a `SonarrSeriesSnapshot`
 
 Do not put here:
 
@@ -357,16 +358,22 @@ Do not put here:
 
 Put here:
 
-* truly cross-cutting shared types only
+* canonical shared types whose shape and meaning stay the same across multiple domains
+* canonical full provider resource types reused unchanged across integrations, library flows, and RPC
+* canonical shared projections reused unchanged across multiple domains when no stronger owner adds clarity
 
 Do not put here:
 
-* domain-local types
-* transport-local DTOs
+* domain-local types whose meaning changes outside that domain
+* transport-local DTOs that are endpoint-local
 * aliases that only rename an existing type without adding meaning
 
 Rule:
-If a file has a clear owner elsewhere, do not put it in `shared/`.
+Do not put a type in `shared/types/` just because it is imported widely.
+Put it there when keeping one canonical shared definition is clearer than duplicating the same type under multiple owners.
+Inside `shared/types/`, group related shared contracts behind narrow public surfaces when that improves ownership clarity.
+Example:
+`shared/types/providers` for provider-related shared types and `shared/types/options` for settings-related shared types.
 
 ---
 
@@ -435,6 +442,9 @@ Bad use:
 Rule:
 Prefer direct imports when they are clearer.
 Do not create barrel files automatically.
+When a shared type subsystem has a clear public surface, prefer that subsystem barrel over the top-level `shared/types` barrel.
+Example:
+import provider-related shared types from `@/shared/types/providers` instead of always reaching through `@/shared/types`.
 
 ---
 
@@ -474,7 +484,7 @@ Avoid it aggressively.
 A type should have one canonical home.
 Do not define the same shape in multiple places unless duplication is a deliberate boundary decision.
 
-### Place types with their owner
+### Place types with their owner when the type meaning is owner-local
 
 Prefer:
 
@@ -483,11 +493,19 @@ Prefer:
 * integration DTOs in `integrations/...`
 * RPC types and schemas in `rpc/`
 * storage-specific types in `storage/`
-* only truly cross-cutting types in `shared/types/`
+* canonical shared types in `shared/types/` when the same shape and meaning are reused unchanged across domains
+* schema-derived settings and form types from their schema owner when the schema is canonical
 
 Transport-local external request and response shapes in `integrations/` should prefer a `*Dto` suffix when the type is a raw boundary payload.
 Do not use `*Node` as the default naming convention for transport types just because the source API is GraphQL.
 Use the upstream term only when that term itself is important to the meaning.
+
+This is a repo-wide rule, not a provider-only exception.
+If the same shape and meaning are reused unchanged across two or more domains, keep one canonical type in `shared/types/` instead of duplicating it under multiple owners.
+Only split it into a different owner-local type when the shape, meaning, or boundary responsibility actually changes.
+Canonical ownership and public import surface are separate decisions.
+Example:
+a type may live under `shared/types/providers/common.ts` while consumers import it from `shared/types/providers`.
 
 ### Keep one canonical shape when the meaning is identical
 
@@ -505,9 +523,30 @@ Create a separate integration-local type only when at least one of these is true
 * the transport wrapper is specific to one endpoint
 * keeping it separate prevents a real boundary leak
 
+Create or keep a canonical type in `shared/types/` when all of these are true:
+
+* the same shape is reused across multiple domains
+* the meaning is the same in each of those domains
+* moving it to a single owner would only create import churn without clarifying behavior
+* duplication would create near-identical type variants with no product value
+
+If a shared type subgroup has several related canonical types, give that subgroup one clear public import surface instead of forcing every consumer through the top-level `shared/types` barrel.
+
 Rule:
 Do not duplicate every nested transport sub-shape automatically.
 Boundary ownership does not justify alias churn by itself.
+
+### Import surfaces
+
+Prefer imports from the narrowest stable public surface that matches the type owner.
+
+Prefer:
+
+* provider-related shared types from `shared/types/providers`
+* options and settings types from `shared/types/options`
+* schema-derived types from the schema file when the schema is the canonical owner
+
+Use the top-level `shared/types` barrel as a convenience surface only when a file is consuming multiple unrelated shared type groups and the narrower owner-specific import paths do not add clarity.
 
 ### Avoid meaningless aliases
 
@@ -715,7 +754,8 @@ Use this checklist before creating a file.
 
 * it is small support code with no stronger owner elsewhere
 
-If two locations seem valid, prefer the one with the stronger owner.
+If two locations seem valid, prefer the stronger behavioral owner for logic and workflows.
+For types, prefer one canonical shared definition in `shared/types/` when the shape and meaning are unchanged across domains.
 
 ---
 

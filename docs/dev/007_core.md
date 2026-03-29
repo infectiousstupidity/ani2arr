@@ -80,6 +80,7 @@ Put here:
 * live verification against provider
 * library mutation notifications inside the library domain
 * provider library domain types
+* lean provider library snapshots used for indexing and cached status checks
 
 Do not put here:
 
@@ -162,7 +163,7 @@ Disallowed:
 
 * `core -> ui`
 
-If a file has a stronger owner in `integrations/`, `storage/`, `rpc/`, or `runtime/`, keep it there.
+If a workflow or behavior has a stronger owner in `integrations/`, `storage/`, `rpc/`, or `runtime/`, keep it there.
 
 ---
 
@@ -176,7 +177,14 @@ Prefer:
 * library types in `core/library/`
 * AniList domain types in `core/anilist/`
 
-Do not move domain-local types into `shared/types` unless they are truly cross-cutting.
+Do not move domain-local projections into `shared/types` when the core domain changes the meaning or shape.
+
+If a canonical shared type already exists in `shared/types/` and the meaning is unchanged inside `core/`, reuse it instead of redefining it as a core-local clone.
+Only create a core-local type when the domain shape is genuinely different, such as a normalized projection or domain-only aggregate.
+Example:
+keep a full Sonarr provider resource in `shared/types/`.
+If a snapshot or projection is reused unchanged across storage, library, RPC, or UI consumers, it may also live in `shared/types/`.
+Keep it in `core/library/` only when the library domain is the clear owner of the shape and meaning.
 
 ---
 
