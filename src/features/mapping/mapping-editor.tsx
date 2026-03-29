@@ -19,7 +19,7 @@ import type {
   AniListTitles,
 } from '@/shared/types';
 import { metadataFromMediaObject } from '@/shared/anilist/anilist-dom';
-import { resolveTitlePreference } from '@/shared/anilist/title-preference';
+import { resolveTitlePreference } from '@/shared/utils/anilist-title-preference';
 import { toMappingSearchResultFromRadarr } from './radarr.adapter';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
