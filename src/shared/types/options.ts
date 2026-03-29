@@ -1,7 +1,7 @@
 /** Canonical extension settings and public-options types shared across UI and runtime. */
 // src/shared/types/options.ts
 
-import type { AniListTitleLanguage } from '@/shared/schemas/anilist-title-language.schema';
+import type { AniListTitleLanguage } from '@/shared/schemas/anilist/anilist-title-language.schema';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import type { ProviderCredentials } from '@/shared/types/providers';

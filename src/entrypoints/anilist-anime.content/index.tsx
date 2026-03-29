@@ -14,7 +14,6 @@ import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
 import MediaActions, { Status } from './components/media-actions';
 import { logger } from '@/shared/utils/logger';
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
-import { shouldSkipMediaFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
 import {
   getProviderLibrarySlug,
@@ -236,7 +235,7 @@ function readFormatFromSidebar(doc: Document = document): AniListMediaFormat | n
 }
 
 function shouldSkipByFormat(doc: Document = document): boolean {
-  return shouldSkipMediaFormat(readFormatFromSidebar(doc));
+  return resolveProviderForAniListFormat(readFormatFromSidebar(doc)) === null;
 }
 
 /* -------------------------------- React UI -------------------------------- */

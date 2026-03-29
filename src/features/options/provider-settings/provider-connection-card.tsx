@@ -3,7 +3,7 @@
 
 import type React from 'react';
 import { useState } from 'react';
-import { ANILIST_TITLE_LANGUAGES, type AniListTitleLanguage } from '@/shared/schemas/anilist-title-language.schema';
+import { ANILIST_TITLE_LANGUAGES, type AniListTitleLanguage } from '@/shared/schemas/anilist/anilist-title-language.schema';
 import {
   getProviderConnectionStatusMeta,
   type ProviderConnectionStatus,

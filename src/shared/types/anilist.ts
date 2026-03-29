@@ -8,13 +8,13 @@ import type {
   AniListMediaSeasonSchema,
   AniListMediaStatusSchema,
   AniListTitlesSchema,
-} from '@/shared/schemas/anilist-media.schema';
+} from '@/shared/schemas/anilist/anilist-media.schema';
 import type {
   AniListMetadataBundleSchema,
   AniListMetadataChunkRefSchema,
   AniListMetadataCoverImageSchema,
   AniListMetadataSchema,
-} from '@/shared/schemas/anilist-metadata.schema';
+} from '@/shared/schemas/anilist/anilist-metadata.schema';
 
 export type AniListMediaFormat = InferOutput<typeof AniListMediaFormatSchema>;
 export type AniListMediaStatus = InferOutput<typeof AniListMediaStatusSchema>;

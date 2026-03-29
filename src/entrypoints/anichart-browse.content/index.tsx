@@ -2,7 +2,6 @@
 // src/entrypoints/anichart-browse.content/index.tsx
 
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
-import { shouldSkipMediaFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
 import type { AniListMediaFormat, AniListMediaHint, PublicOptions } from '@/shared/types';
 import baseStyles from '@/shared/styles/base.css?inline';
@@ -16,6 +15,7 @@ import {
   type ParsedCard,
 } from '@/features/media-overlay';
 import { createBrowseEntrypointShell } from '@/runtime/browse-entrypoint-shell';
+import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 
 const isAniChartSurface = (url: string): boolean => {
   try {
@@ -117,7 +117,7 @@ const parseAniChartCard = (card: Element): ParsedCard | null => {
     relationPrequelIds: null,
   };
   const metadata = mergeMetadataHints(domMetadata, fallbackMetadata);
-  if (shouldSkipMediaFormat(metadata?.format ?? null)) return null;
+  if (resolveProviderForAniListFormat(metadata?.format ?? null) === null) return null;
 
   return { anilistId, title, host: cover, metadata: metadata ?? null };
 };

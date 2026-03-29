@@ -41,7 +41,7 @@ export type {
   ProviderQualityProfile,
   ProviderRootFolder
 } from './providers';
-export type { AniListTitleLanguage } from '@/shared/schemas/anilist-title-language.schema';
+export type { AniListTitleLanguage } from '@/shared/schemas/anilist/anilist-title-language.schema';
 
 export type {
   SonarrFormState,
