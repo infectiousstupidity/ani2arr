@@ -20,6 +20,31 @@ export const RADARR_MINIMUM_AVAILABILITY_OPTIONS = [
 export const RadarrMinimumAvailabilitySchema = v.picklist(RADARR_MINIMUM_AVAILABILITY_OPTIONS);
 export type RadarrMinimumAvailability = v.InferOutput<typeof RadarrMinimumAvailabilitySchema>;
 
+const RADARR_MINIMUM_AVAILABILITY_DETAILS = {
+  announced: {
+    label: 'Announced',
+    description: 'Allow adds before a theatrical or digital date exists.',
+  },
+  inCinemas: {
+    label: 'In Cinemas',
+    description: 'Wait until the movie has a theatrical release.',
+  },
+  released: {
+    label: 'Released',
+    description: 'Wait until the movie is officially released.',
+  },
+  preDB: {
+    label: 'PreDB',
+    description: 'Allow pre-release availability.',
+  },
+} satisfies Record<RadarrMinimumAvailability, { label: string; description: string }>;
+
+export const MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS =
+  RADARR_MINIMUM_AVAILABILITY_OPTIONS.map(value => ({
+    value,
+    ...RADARR_MINIMUM_AVAILABILITY_DETAILS[value],
+  }));
+
 /**
  * Strict Radarr form state used once data is already inside the app or has
  * crossed another validated boundary such as RPC.
