@@ -13,7 +13,7 @@ import { useProviderConnectionStatus } from '@/features/options/use-provider-con
 import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,
-} from '@/shared/schemas/provider-connection.schema';
+} from '@/shared/schemas/providers/provider-connection.schema';
 import { requestProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
 import { logger } from '@/shared/utils/logger';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
@@ -21,7 +21,7 @@ import { useToast } from '@/shared/ui/feedback/toast-provider';
 import {
   ProviderConnectionCard,
   ProviderConnectionStatusBadge,
-  SonarrTitleLanguageField,
+  SonarrPreferredAniListTitleLanguageField,
 } from './provider-connection-card';
 import type { SonarrAddOptionsFieldsLayout } from '@/components/provider-add-options/sonarr-add-options-fields';
 import { SonarrDefaultsSection } from './sonarr-defaults-section';
@@ -46,7 +46,8 @@ function SonarrSettingsPanelInner({
 
   const sonarrUrl = useWatch({ control: methods.control, name: 'providers.sonarr.url' }) ?? '';
   const sonarrApiKey = useWatch({ control: methods.control, name: 'providers.sonarr.apiKey' }) ?? '';
-  const providerTitleLanguage = useWatch({ control: methods.control, name: 'providers.sonarr.providerTitleLanguage' }) ?? 'english';
+  const preferredAniListTitleLanguage =
+    useWatch({ control: methods.control, name: 'providers.sonarr.preferredAniListTitleLanguage' }) ?? 'english';
 
   const selectPortal = useSelectPortal();
 
@@ -206,9 +207,9 @@ function SonarrSettingsPanelInner({
     [actions.sonarrTestConnectionState, methods],
   );
 
-  const setProviderTitleLanguage = useCallback(
-    (value: typeof providerTitleLanguage) => {
-      methods.setValue('providers.sonarr.providerTitleLanguage', value, { shouldDirty: true });
+  const setPreferredAniListTitleLanguage = useCallback(
+    (value: typeof preferredAniListTitleLanguage) => {
+      methods.setValue('providers.sonarr.preferredAniListTitleLanguage', value, { shouldDirty: true });
     },
     [methods],
   );
@@ -334,19 +335,19 @@ function SonarrSettingsPanelInner({
             summaryFields={[
               { label: 'Sonarr URL', value: normalizedUrl || 'Not configured' },
               {
-                label: 'Preferred title language',
+                label: 'Preferred AniList title language',
                 value:
-                  providerTitleLanguage === 'romaji'
+                  preferredAniListTitleLanguage === 'romaji'
                     ? 'Romaji'
-                    : providerTitleLanguage === 'native'
+                    : preferredAniListTitleLanguage === 'native'
                       ? 'Native'
                       : 'English',
               },
             ]}
           >
-            <SonarrTitleLanguageField
-              providerTitleLanguage={providerTitleLanguage}
-              setProviderTitleLanguage={setProviderTitleLanguage}
+            <SonarrPreferredAniListTitleLanguageField
+              preferredAniListTitleLanguage={preferredAniListTitleLanguage}
+              setPreferredAniListTitleLanguage={setPreferredAniListTitleLanguage}
               selectPortal={selectPortal}
               isLoading={Boolean(isLoading)}
             />

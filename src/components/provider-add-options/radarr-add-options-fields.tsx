@@ -13,8 +13,8 @@ import type {
 import type {
   RadarrFormState,
   RadarrMinimumAvailability,
-} from '@/shared/schemas/radarr-settings.schema';
-import { MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS } from '@/shared/schemas/radarr-settings.schema';
+} from '@/shared/schemas/providers/radarr-settings.schema';
+import { MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS } from '@/shared/schemas/providers/radarr-settings.schema';
 import { cn } from '@/shared/utils/cn';
 
 import { ProviderRootFolderSelect } from './provider-root-folder-select';

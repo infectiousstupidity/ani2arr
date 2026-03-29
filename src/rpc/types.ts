@@ -16,7 +16,7 @@ import type {
 } from '@/shared/types/providers';
 import type { AniListSchedulerDebugSnapshot } from '@/debug/anilist-debug.types';
 import type { MappingExternalId } from '@/shared/types/mapping';
-import type { SonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
+import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type { MappingSummary } from '@/shared/types';
 import type { MappingCursor } from './schemas';
 

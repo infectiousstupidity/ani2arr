@@ -3,7 +3,7 @@
 
 import type React from 'react';
 import { useState } from 'react';
-import type { ProviderTitleLanguage } from '@/shared/types';
+import { ANILIST_TITLE_LANGUAGES, type AniListTitleLanguage } from '@/shared/schemas/anilist-title-language.schema';
 import {
   getProviderConnectionStatusMeta,
   type ProviderConnectionStatus,
@@ -15,14 +15,19 @@ import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import { logger } from '@/shared/utils/logger';
 
-export const TITLE_LANGUAGE_OPTIONS: Array<{ value: ProviderTitleLanguage; label: string }> = [
-  { value: 'english', label: 'English (default)' },
-  { value: 'romaji', label: 'Romaji' },
-  { value: 'native', label: 'Native' },
-];
+const TITLE_LANGUAGE_LABELS: Record<AniListTitleLanguage, string> = {
+  english: 'English (default)',
+  romaji: 'Romaji',
+  native: 'Native',
+};
+
+export const TITLE_LANGUAGE_OPTIONS = ANILIST_TITLE_LANGUAGES.map(value => ({
+  value,
+  label: TITLE_LANGUAGE_LABELS[value],
+}));
 
 export const TITLE_LANGUAGE_DESCRIPTION =
-  'ani2arr uses this to choose the preferred AniList title for display and as the primary title hint when matching and adding media.';
+  'ani2arr uses this to choose which AniList title variant to show in modal titles.';
 
 export const ProviderConnectionStatusBadge: React.FC<{ status: ProviderConnectionStatus }> = ({
   status,
@@ -251,16 +256,16 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
   );
 };
 
-export const ProviderTitleLanguageField: React.FC<{
-  providerTitleLanguage: ProviderTitleLanguage;
-  setProviderTitleLanguage: (value: ProviderTitleLanguage) => void;
+export const PreferredAniListTitleLanguageField: React.FC<{
+  preferredAniListTitleLanguage: AniListTitleLanguage;
+  setPreferredAniListTitleLanguage: (value: AniListTitleLanguage) => void;
   selectPortal: HTMLElement | null;
   isLoading?: boolean;
-}> = ({ providerTitleLanguage, setProviderTitleLanguage, selectPortal, isLoading }) => (
+}> = ({ preferredAniListTitleLanguage, setPreferredAniListTitleLanguage, selectPortal, isLoading }) => (
   <SelectField
-    label="Preferred title language"
-    value={providerTitleLanguage}
-    onValueChange={(v) => setProviderTitleLanguage(v as ProviderTitleLanguage)}
+    label="Preferred AniList title language"
+    value={preferredAniListTitleLanguage}
+    onValueChange={(value) => setPreferredAniListTitleLanguage(value as AniListTitleLanguage)}
     options={TITLE_LANGUAGE_OPTIONS}
     container={selectPortal}
     disabled={Boolean(isLoading)}
@@ -268,4 +273,4 @@ export const ProviderTitleLanguageField: React.FC<{
   />
 );
 
-export const SonarrTitleLanguageField = ProviderTitleLanguageField;
+export const SonarrPreferredAniListTitleLanguageField = PreferredAniListTitleLanguageField;

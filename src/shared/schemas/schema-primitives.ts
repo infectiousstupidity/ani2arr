@@ -1,13 +1,7 @@
+/** Shared Valibot coercion helpers reused by settings schemas. */
+// src/shared/schemas/schema-primitives.ts
+
 import * as v from 'valibot';
-import type { ProviderTitleLanguage } from '@/shared/types/options';
-
-// --- Shared Constants ---
-
-export const TITLE_LANGUAGES: [ProviderTitleLanguage, ...ProviderTitleLanguage[]] = [
-  'english',
-  'romaji',
-  'native',
-];
 
 // --- Reusable Coercion Schemas ---
 

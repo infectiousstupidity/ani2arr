@@ -1,7 +1,7 @@
 /** Canonical shared Radarr provider resource types reused unchanged across integrations, RPC, and UI flows. */
 // src/shared/types/providers/radarr.ts
 
-import type { RadarrMinimumAvailability } from '@/shared/schemas/radarr-settings.schema';
+import type { RadarrMinimumAvailability } from '@/shared/schemas/providers/radarr-settings.schema';
 
 export interface RadarrAlternateTitle {
   title?: string | null;

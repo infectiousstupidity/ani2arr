@@ -41,18 +41,18 @@ export type {
   ProviderQualityProfile,
   ProviderRootFolder
 } from './providers';
-export type { ProviderTitleLanguage } from './options';
+export type { AniListTitleLanguage } from '@/shared/schemas/anilist-title-language.schema';
 
 export type {
   SonarrFormState,
   SonarrMonitorOption,
   SonarrSeriesType,
-} from '@/shared/schemas/sonarr-settings.schema';
+} from '@/shared/schemas/providers/sonarr-settings.schema';
 
 export type {
   RadarrFormState,
   RadarrMinimumAvailability,
-} from '@/shared/schemas/radarr-settings.schema';
+} from '@/shared/schemas/providers/radarr-settings.schema';
 
 export type {
   AddRequestPayload,

@@ -11,8 +11,8 @@ import type {
   AniListMediaHint,
   AniListMediaStatus,
 } from '@/shared/types';
-import type { RadarrFormState } from '@/shared/schemas/radarr-settings.schema';
-import type { SonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
+import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
+import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type {
   Provider,
   RadarrLookupMovie,
@@ -21,8 +21,8 @@ import type {
   SonarrSeries,
 } from '@/shared/types/providers';
 import type { MappingTabProps, RadarrPanelProps, SonarrPanelProps } from '@/features/media-modal';
-import { createDefaultRadarrFormState } from '@/shared/schemas/radarr-settings.schema';
-import { createDefaultSonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
+import { createDefaultRadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
+import { createDefaultSonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import {
   useAddMovie,
   useAddSeries,
@@ -61,7 +61,7 @@ export interface UseMediaModalPropsInput {
 export interface UseMediaModalPropsResult {
   title: string;
   alternateTitles: Array<{ label: string; value: string }>;
-  titleLanguage: NonNullable<ExtensionOptions['providers']['sonarr']['providerTitleLanguage']>;
+  titleLanguage: NonNullable<ExtensionOptions['providers']['sonarr']['preferredAniListTitleLanguage']>;
   provider: Provider;
   mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'>;
   sonarrPanelProps: Omit<SonarrPanelProps, 'controller'> | null;
@@ -222,10 +222,10 @@ export function useMediaModalProps(
   const year: number | null =
     apiMedia?.seasonYear ?? apiMedia?.startDate?.year ?? resolvedMetadata?.startYear ?? null;
   const status: AniListMediaStatus | null = apiMedia?.status ?? null;
-  const preferredTitleLanguage: NonNullable<ExtensionOptions['providers']['sonarr']['providerTitleLanguage']> =
+  const preferredTitleLanguage: NonNullable<ExtensionOptions['providers']['sonarr']['preferredAniListTitleLanguage']> =
     provider === 'radarr'
-      ? (options?.providers.radarr.providerTitleLanguage ?? 'english')
-      : (options?.providers.sonarr.providerTitleLanguage ?? 'english');
+      ? (options?.providers.radarr.preferredAniListTitleLanguage ?? 'english')
+      : (options?.providers.sonarr.preferredAniListTitleLanguage ?? 'english');
 
   const pickTitle = (...values: Array<string | null | undefined>): string | undefined => {
     for (const value of values) {
@@ -239,7 +239,7 @@ export function useMediaModalProps(
   const resolvedTitles: AniListTitles = {};
   const english = pickTitle(apiMedia?.title?.english, resolvedMetadata?.titles?.english);
   if (english) resolvedTitles.english = english;
-  const romaji = pickTitle(apiMedia?.title?.romaji, resolvedMetadata?.titles?.romaji, title);
+  const romaji = pickTitle(apiMedia?.title?.romaji, resolvedMetadata?.titles?.romaji);
   if (romaji) resolvedTitles.romaji = romaji;
   const native = pickTitle(apiMedia?.title?.native, resolvedMetadata?.titles?.native);
   if (native) resolvedTitles.native = native;
@@ -249,6 +249,8 @@ export function useMediaModalProps(
     preferred: preferredTitleLanguage,
     fallback: title ?? null,
   });
+  const providerRequestTitle = title ?? resolvedTitle.primary;
+  const matchingTitleHint = title ?? undefined;
 
   const addSeriesMutation = useAddSeries();
   const updateSeriesMutation = useUpdateSeries();
@@ -291,7 +293,7 @@ export function useMediaModalProps(
 
   const sonarrSeriesFromStatus = sonarrStatusQuery.data?.series;
   const fullSonarrSeries = isFullSonarrSeries(sonarrSeriesFromStatus) ? sonarrSeriesFromStatus : null;
-  const sonarrFolderSlug = fullSonarrSeries ? buildProviderFolderSlug(fullSonarrSeries, resolvedTitle.primary) : null;
+  const sonarrFolderSlug = fullSonarrSeries ? buildProviderFolderSlug(fullSonarrSeries, providerRequestTitle) : null;
   const resolvedSonarrRootFolder =
     extractProviderRootFolderPath(fullSonarrSeries, sonarrFolderSlug) ?? sonarrDefaultForm.rootFolderPath;
   const sonarrPanelMode: 'add' | 'edit' =
@@ -329,7 +331,7 @@ export function useMediaModalProps(
 
   const radarrMovieFromStatus = radarrStatusQuery.data?.movie;
   const fullRadarrMovie = isFullRadarrMovie(radarrMovieFromStatus) ? radarrMovieFromStatus : null;
-  const radarrFolderSlug = fullRadarrMovie ? buildProviderFolderSlug(fullRadarrMovie, resolvedTitle.primary) : null;
+  const radarrFolderSlug = fullRadarrMovie ? buildProviderFolderSlug(fullRadarrMovie, providerRequestTitle) : null;
   const resolvedRadarrRootFolder =
     extractProviderRootFolderPath(fullRadarrMovie, radarrFolderSlug) ?? radarrDefaultForm.rootFolderPath;
   const radarrPanelMode: 'add' | 'edit' =
@@ -399,7 +401,7 @@ export function useMediaModalProps(
               await updateSeriesMutation.mutateAsync({
                 anilistId,
                 tvdbId: externalId,
-                title: resolvedTitle.primary,
+                title: providerRequestTitle,
                 form,
               });
               return;
@@ -407,8 +409,8 @@ export function useMediaModalProps(
 
             await addSeriesMutation.mutateAsync({
               anilistId,
-              title: resolvedTitle.primary,
-              primaryTitleHint: resolvedTitle.primary,
+              title: providerRequestTitle,
+              ...(matchingTitleHint ? { primaryTitleHint: matchingTitleHint } : {}),
               metadata: resolvedMetadata,
               form,
             });
@@ -440,7 +442,7 @@ export function useMediaModalProps(
               await updateMovieMutation.mutateAsync({
                 anilistId,
                 tmdbId: externalId,
-                title: resolvedTitle.primary,
+                title: providerRequestTitle,
                 form,
               });
               return;
@@ -448,8 +450,8 @@ export function useMediaModalProps(
 
             await addMovieMutation.mutateAsync({
               anilistId,
-              title: resolvedTitle.primary,
-              primaryTitleHint: resolvedTitle.primary,
+              title: providerRequestTitle,
+              ...(matchingTitleHint ? { primaryTitleHint: matchingTitleHint } : {}),
               metadata: resolvedMetadata,
               form,
             });

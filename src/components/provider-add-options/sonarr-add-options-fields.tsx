@@ -8,7 +8,7 @@ import {
   MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
   type SonarrFormState,
-} from '@/shared/schemas/sonarr-settings.schema';
+} from '@/shared/schemas/providers/sonarr-settings.schema';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import type {
   ProviderQualityProfile,

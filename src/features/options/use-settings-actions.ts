@@ -13,7 +13,7 @@ import { useTestProviderConnection } from '@/features/options/use-provider-conne
 import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,
-} from '@/shared/schemas/provider-connection.schema';
+} from '@/shared/schemas/providers/provider-connection.schema';
 import {
   getProviderHostPermissionPattern,
   removeProviderHostPermission,
@@ -173,7 +173,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
       const credentialsChanged =
         preparedCurrent.url !== preparedPrevious.url ||
         preparedCurrent.apiKey !== preparedPrevious.apiKey ||
-        currentProviderSettings.providerTitleLanguage !== previousProviderSettings.providerTitleLanguage;
+        currentProviderSettings.preferredAniListTitleLanguage !== previousProviderSettings.preferredAniListTitleLanguage;
 
       if (!credentialsChanged) {
         return true;
@@ -188,7 +188,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
             ...previousProviderSettings,
             url: preparedCurrent.url,
             apiKey: preparedCurrent.apiKey,
-            titleLanguage: currentProviderSettings.providerTitleLanguage,
+            preferredAniListTitleLanguage: currentProviderSettings.preferredAniListTitleLanguage,
           },
         },
       };
@@ -203,8 +203,8 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         methods.resetField(`providers.${provider}.apiKey`, {
           defaultValue: preparedCurrent.apiKey,
         });
-        methods.resetField(`providers.${provider}.providerTitleLanguage`, {
-          defaultValue: currentProviderSettings.providerTitleLanguage,
+        methods.resetField(`providers.${provider}.preferredAniListTitleLanguage`, {
+          defaultValue: currentProviderSettings.preferredAniListTitleLanguage,
         });
 
         if (

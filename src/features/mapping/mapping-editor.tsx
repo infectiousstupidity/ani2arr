@@ -1,3 +1,6 @@
+/** Mapping modal that shows AniList display titles while editing provider ID overrides. */
+// src/features/mapping/mapping-editor.tsx
+
 import React, { useMemo } from 'react';
 import { useAniListMedia, useMovieStatus, usePublicOptions, useSeriesStatus } from '@/shared/queries';
 import { Footer } from '@/features/media-modal/components/media-modal-footer';
@@ -13,9 +16,10 @@ import type {
   MappingSearchResult,
   RadarrLookupMovie,
   SonarrLookupSeries,
-  ProviderTitleLanguage,
+  AniListTitles,
 } from '@/shared/types';
 import { metadataFromMediaObject } from '@/shared/anilist/anilist-dom';
+import { resolveTitlePreference } from '@/shared/anilist/title-preference';
 import { toMappingSearchResultFromRadarr } from './radarr.adapter';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
@@ -95,7 +99,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
       : publicOptions.data?.providers.sonarr.url ?? '';
 
   const aniListMedia = useAniListMedia(anilistId, { enabled: open });
-  const aniTitle = useMemo(
+  const matchingFallbackTitle = useMemo(
     () =>
       aniListMedia.data?.title?.english ||
       aniListMedia.data?.title?.romaji ||
@@ -103,35 +107,27 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
       `AniList #${anilistId}`,
     [aniListMedia.data, anilistId],
   );
-  const alternateTitles = useMemo(() => {
+  const resolvedTitles = useMemo<AniListTitles>(() => {
     const titles = aniListMedia.data?.title;
-    if (!titles) return [];
-
-    const titleEntries = [
-      { label: 'English', value: titles.english },
-      { label: 'Romaji', value: titles.romaji },
-      { label: 'Native', value: titles.native },
-    ];
-    const normalizedPrimary = aniTitle.trim().toLowerCase();
-    const seen = new Set<string>();
-
-    return titleEntries.filter((entry): entry is { label: string; value: string } => {
-      if (typeof entry.value !== 'string') return false;
-      const value = entry.value.trim();
-      if (!value) return false;
-      const normalizedValue = value.toLowerCase();
-      if (normalizedValue === normalizedPrimary || seen.has(normalizedValue)) {
-        return false;
-      }
-      seen.add(normalizedValue);
-      return true;
-    });
-  }, [aniListMedia.data?.title, aniTitle]);
+    return {
+      ...(titles?.english ? { english: titles.english } : {}),
+      ...(titles?.romaji ? { romaji: titles.romaji } : {}),
+      ...(titles?.native ? { native: titles.native } : {}),
+    };
+  }, [aniListMedia.data?.title]);
   const metadataHint = useMemo(() => metadataFromMediaObject(aniListMedia.data), [aniListMedia.data]);
-  const titleLanguage: ProviderTitleLanguage =
+  const titleLanguage =
     provider === 'radarr'
-      ? publicOptions.data?.providers.radarr.providerTitleLanguage ?? 'english'
-      : publicOptions.data?.providers.sonarr.providerTitleLanguage ?? 'english';
+      ? publicOptions.data?.providers.radarr.preferredAniListTitleLanguage ?? 'english'
+      : publicOptions.data?.providers.sonarr.preferredAniListTitleLanguage ?? 'english';
+  const resolvedTitle = useMemo(
+    () => resolveTitlePreference({
+      titles: resolvedTitles,
+      preferred: titleLanguage,
+      fallback: matchingFallbackTitle,
+    }),
+    [matchingFallbackTitle, resolvedTitles, titleLanguage],
+  );
   const coverImage =
     aniListMedia.data?.coverImage?.extraLarge ??
     aniListMedia.data?.coverImage?.large ??
@@ -143,7 +139,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
   const status = aniListMedia.data?.status ?? null;
 
   const seriesStatus = useSeriesStatus(
-    { anilistId, title: aniTitle, metadata: metadataHint },
+    { anilistId, title: matchingFallbackTitle, metadata: metadataHint },
     {
       enabled: open && provider === 'sonarr',
       force_verify: true,
@@ -152,7 +148,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
     },
   );
   const movieStatus = useMovieStatus(
-    { anilistId, title: aniTitle, metadata: metadataHint },
+    { anilistId, title: matchingFallbackTitle, metadata: metadataHint },
     {
       enabled: open && provider === 'radarr',
       force_verify: true,
@@ -183,15 +179,15 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
       linkedAniListIds,
       provider === 'radarr' ? movieStatus.data?.exists ?? false : seriesStatus.data?.exists ?? false,
       baseUrl,
-      aniTitle,
+      resolvedTitle.primary,
     );
   }, [
-    aniTitle,
     baseUrl,
     externalId,
     linkedAniListIds,
     movieStatus.data?.exists,
     provider,
+    resolvedTitle.primary,
     seriesStatus.data?.exists,
     statusMovie,
     statusSeries,
@@ -247,8 +243,8 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
           Update the {provider === 'radarr' ? 'Radarr' : 'Sonarr'} mapping for AniList entry {anilistId}.
         </ModalDescription>
         <Header
-          title={aniTitle}
-          alternateTitles={alternateTitles}
+          title={resolvedTitle.primary}
+          alternateTitles={resolvedTitle.alternates}
           titleLanguage={titleLanguage}
           bannerImage={bannerImage}
           coverImage={coverImage}
@@ -284,7 +280,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
                   <MappingPreviewPanel
                     aniListEntry={{
                       id: anilistId,
-                      title: aniTitle,
+                      title: resolvedTitle.primary,
                       ...(coverImage ? { posterUrl: coverImage } : {}),
                     }}
                     baseUrl={baseUrl}

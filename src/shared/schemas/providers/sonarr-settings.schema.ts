@@ -2,13 +2,13 @@
 // src/shared/schemas/sonarr-settings.schema.ts
 
 import * as v from 'valibot';
+import { AniListTitleLanguageSchema } from '@/shared/schemas/anilist-title-language.schema';
 import {
   CoerceNumberArray,
   CoerceQualityProfileId,
   CoerceStringArray,
   SafeString,
-  TITLE_LANGUAGES,
-} from './schema-primitives';
+} from '../schema-primitives';
 
 export const SONARR_SERIES_TYPES = ['standard', 'anime', 'daily'] as const;
 export const SONARR_MONITOR_OPTIONS = [
@@ -142,6 +142,6 @@ export const SonarrDefaultsSchema = v.pipe(
 export const SonarrSettingsSchema = v.object({
   url: SafeString,
   apiKey: SafeString,
-  providerTitleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
+  preferredAniListTitleLanguage: v.fallback(AniListTitleLanguageSchema, 'english'),
   defaults: v.fallback(SonarrDefaultsSchema, createDefaultSonarrFormState()),
 });

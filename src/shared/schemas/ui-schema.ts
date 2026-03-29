@@ -8,7 +8,6 @@ import type {
   ProviderBrowseCardUiOptions,
   UiOptions,
 } from '@/shared/types/options';
-import type { ProviderTitleLanguage } from '@/shared/types/options';
 
 // --- Constants ---
 
@@ -17,12 +16,6 @@ const BADGE_VISIBILITY_OPTIONS: [BadgeVisibility, ...BadgeVisibility[]] = [
   'hover',
 ];
 const LEGACY_BADGE_VISIBILITY_OPTIONS = [...BADGE_VISIBILITY_OPTIONS, 'hidden'] as const;
-
-const TITLE_LANGUAGES: [ProviderTitleLanguage, ...ProviderTitleLanguage[]] = [
-  'english',
-  'romaji',
-  'native',
-];
 
 // --- Factories ---
 
@@ -57,9 +50,6 @@ const isLegacyBadgeVisibility = (
 ): value is BadgeVisibility | 'hidden' =>
   typeof value === 'string'
   && LEGACY_BADGE_VISIBILITY_OPTIONS.includes(value as (typeof LEGACY_BADGE_VISIBILITY_OPTIONS)[number]);
-
-export const isTitleLanguage = (value: unknown): value is ProviderTitleLanguage =>
-  typeof value === 'string' && TITLE_LANGUAGES.includes(value as ProviderTitleLanguage);
 
 // --- Migration ---
 
