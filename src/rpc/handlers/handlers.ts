@@ -18,11 +18,10 @@ import type { UpstreamMappingStore } from '@/services/mapping/upstream';
 import type {
   AniListMedia,
   ExtensionOptions,
-  LeanSonarrSeries,
   RequestPriority,
   CheckSeriesStatusPayload,
 } from '@/shared/types';
-import type { ProviderCredentials } from '@/shared/types/options';
+import type { ProviderCredentials, SonarrSeriesSnapshot } from '@/shared/types/providers';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import {
@@ -498,7 +497,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       ]);
 
       const libraryTvdbIds = library.map(s => s.tvdbId);
-      const statsMap: Record<number, NonNullable<LeanSonarrSeries['statistics']>> = {};
+      const statsMap: Record<number, NonNullable<SonarrSeriesSnapshot['statistics']>> = {};
       for (const s of library) {
         if (s.statistics) {
           statsMap[s.tvdbId] = s.statistics;

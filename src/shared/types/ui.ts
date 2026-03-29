@@ -3,9 +3,9 @@
 
 import type { AniListMediaHint } from './anilist';
 import type { BadgeVisibility } from './options';
-import type { Provider } from '@/shared/types/options';
-import type { RadarrFormState } from '@/shared/providers/radarr/types';
-import type { SonarrFormState } from '@/shared/providers/sonarr/types';
+import type { Provider } from '@/shared/types/providers';
+import type { RadarrFormState } from '@/shared/schemas/radarr-settings.schema';
+import type { SonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
 import type { MappingExternalId } from './mapping';
 
 export type AnchorCorner = 'bottom-left' | 'top-left';

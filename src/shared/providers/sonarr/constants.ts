@@ -1,7 +1,7 @@
 /**
  * @file Defines static, shared Sonarr constants used throughout the extension.
  */
-import type { SonarrMonitorOption } from './types';
+import type { SonarrMonitorOption } from '@/shared/schemas/sonarr-settings.schema';
 
 /**
  * Defines the options and descriptive text for the 'Monitor' dropdown menus

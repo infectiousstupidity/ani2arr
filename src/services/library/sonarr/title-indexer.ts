@@ -1,5 +1,5 @@
 // src/services/library/sonarr/title-indexer.ts
-import type { LeanSonarrSeries, TitleIndexer, CheckSeriesStatusPayload } from './types';
+import type { SonarrSeriesSnapshot, TitleIndexer, CheckSeriesStatusPayload } from './types';
 import {
   buildTitleIndexKeysForProvider,
   computeTitleMatchScoreForProvider,
@@ -11,19 +11,19 @@ import { LOCAL_INDEX_ACCEPTANCE_THRESHOLD } from './constants';
 export class SonarrTitleIndexer implements TitleIndexer {
   private tvdbSet: Set<number> = new Set();
   private normalizedTitleIndex: Map<string, number | null> = new Map();
-  private leanSeriesByTvdbId: Map<number, LeanSonarrSeries> = new Map();
+  private seriesByTvdbId: Map<number, SonarrSeriesSnapshot> = new Map();
 
   reset(): void {
     this.tvdbSet.clear();
     this.normalizedTitleIndex.clear();
-    this.leanSeriesByTvdbId.clear();
+    this.seriesByTvdbId.clear();
   }
 
-  bulkIndex(list: LeanSonarrSeries[]): void {
+  bulkIndex(list: SonarrSeriesSnapshot[]): void {
     for (const s of list) this.indexSeries(s);
   }
 
-  reindex(list: LeanSonarrSeries[]): void {
+  reindex(list: SonarrSeriesSnapshot[]): void {
     this.reset();
     this.bulkIndex(list);
   }
@@ -49,7 +49,7 @@ export class SonarrTitleIndexer implements TitleIndexer {
     let sawAmbiguous = false;
     let bestMatch: { tvdbId: number; score: number } | null = null;
 
-    const scoreAgainstSeries = (rawTitle: string, series: LeanSonarrSeries): number => {
+    const scoreAgainstSeries = (rawTitle: string, series: SonarrSeriesSnapshot): number => {
       return computeTitleMatchScoreForProvider({
         provider: 'sonarr',
         queryRaw: rawTitle,
@@ -67,7 +67,7 @@ export class SonarrTitleIndexer implements TitleIndexer {
       for (const key of normalizedVariants) {
         const match = this.normalizedTitleIndex.get(key);
         if (typeof match === 'number' && this.tvdbSet.has(match)) {
-          const series = this.leanSeriesByTvdbId.get(match);
+          const series = this.seriesByTvdbId.get(match);
           if (!series) continue;
           const score = scoreAgainstSeries(rawTitle, series);
           if (score >= LOCAL_INDEX_ACCEPTANCE_THRESHOLD) {
@@ -89,9 +89,9 @@ export class SonarrTitleIndexer implements TitleIndexer {
     return null;
   }
 
-  private indexSeries(series: LeanSonarrSeries): void {
+  private indexSeries(series: SonarrSeriesSnapshot): void {
     this.tvdbSet.add(series.tvdbId);
-    this.leanSeriesByTvdbId.set(series.tvdbId, series);
+    this.seriesByTvdbId.set(series.tvdbId, series);
     const keys = this.buildNormalizedKeysForSeries(series);
     for (const key of keys) {
       const existing = this.normalizedTitleIndex.get(key);
@@ -103,7 +103,7 @@ export class SonarrTitleIndexer implements TitleIndexer {
     }
   }
 
-  private buildNormalizedKeysForSeries(series: LeanSonarrSeries): string[] {
+  private buildNormalizedKeysForSeries(series: SonarrSeriesSnapshot): string[] {
     return this.normalizeTitleCandidates(
       extractCandidateTitleVariants('sonarr', series).map(variant => variant.value),
     );

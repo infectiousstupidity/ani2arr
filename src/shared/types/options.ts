@@ -1,16 +1,11 @@
 /** Canonical extension settings and public-options types shared across UI and runtime. */
 // src/shared/types/options.ts
 
-import type { SonarrFormState } from '@/shared/providers/sonarr/types';
-import type { RadarrFormState } from '@/shared/providers/radarr/types';
+import type { SonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
+import type { RadarrFormState } from '@/shared/schemas/radarr-settings.schema';
+import type { ProviderCredentials } from '@/shared/types/providers';
 
-export type Provider = 'sonarr' | 'radarr';
 export type ProviderTitleLanguage = 'english' | 'romaji' | 'native';
-
-export interface ProviderCredentials {
-  url: string;
-  apiKey: string;
-}
 
 export type BadgeVisibility = 'always' | 'hover';
 

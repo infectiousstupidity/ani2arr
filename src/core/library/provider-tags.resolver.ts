@@ -2,7 +2,7 @@
 // src/core/library/provider-tags.resolver.ts
 
 import { createError, ErrorCode } from '@/shared/errors';
-import type { ProviderTag } from '@/shared/types/provider-tags';
+import type { ProviderTag } from '@/shared/types/providers';
 
 type ProviderTagApi<TCredentials> = {
   getTags(credentials: TCredentials): Promise<ProviderTag[]>;

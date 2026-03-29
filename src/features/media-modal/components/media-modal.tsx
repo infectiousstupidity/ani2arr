@@ -14,6 +14,8 @@ import type {
   ProviderTitleLanguage,
 } from "@/shared/types";
 import { ErrorCode, type ExtensionError } from "@/shared/errors";
+import { createDefaultRadarrFormState } from "@/shared/schemas/radarr-settings.schema";
+import { createDefaultSonarrFormState } from "@/shared/schemas/sonarr-settings.schema";
 
 import { MappingPreviewPanel, MappingSearchPanel } from "@/features/mapping";
 import type { MappingTabProps } from "../types";
@@ -29,27 +31,9 @@ import { getProviderLabel } from "@/services/providers/resolver";
 
 type MediaModalViewMode = "setup" | "mapping";
 
-const EMPTY_SONARR_FORM: SonarrFormState = {
-  qualityProfileId: '',
-  rootFolderPath: '',
-  seriesType: 'anime',
-  monitorOption: 'all',
-  seasonFolder: true,
-  searchForMissingEpisodes: true,
-  searchForCutoffUnmetEpisodes: false,
-  tags: [],
-  freeformTags: [],
-};
+const EMPTY_SONARR_FORM: SonarrFormState = createDefaultSonarrFormState();
 
-const EMPTY_RADARR_FORM: RadarrFormState = {
-  qualityProfileId: '',
-  rootFolderPath: '',
-  monitored: true,
-  searchForMovie: true,
-  minimumAvailability: 'announced',
-  tags: [],
-  freeformTags: [],
-};
+const EMPTY_RADARR_FORM: RadarrFormState = createDefaultRadarrFormState();
 
 export type MediaModalProps = {
   isOpen: boolean;

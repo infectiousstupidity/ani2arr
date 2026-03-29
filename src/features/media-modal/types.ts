@@ -1,13 +1,17 @@
 // src/features/media-modal/types.ts
+/** Shared media-modal panel and mapping prop types. */
+// src/features/media-modal/types.ts
+
 import type {
-  ProviderTag,
   RadarrFormState,
-  RadarrQualityProfile,
-  RadarrRootFolder,
-  SonarrFormState,
-  SonarrQualityProfile,
-  SonarrRootFolder,
-} from "@/shared/types";
+} from '@/shared/schemas/radarr-settings.schema';
+import type { SonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
+import type {
+  ProviderQualityProfile,
+  ProviderRootFolder,
+  ProviderTag,
+} from '@/shared/types/providers';
+import type { MappingSearchResult } from '@/shared/types';
 import type { UseMappingControllerResult } from "@/features/mapping";
 import type { UseRadarrPanelControllerResult } from "./hooks/use-radarr-panel-controller";
 import type { UseSonarrPanelControllerResult } from "./hooks/use-sonarr-panel-controller";
@@ -15,7 +19,7 @@ import type { MappingAniListSummary } from "@/features/mapping";
 
 export interface MappingTabProps {
   aniListEntry: MappingAniListSummary;
-  currentMapping: import("@/shared/types").MappingSearchResult | null;
+  currentMapping: MappingSearchResult | null;
   overrideActive: boolean;
   otherAniListIds: number[];
   provider: "sonarr" | "radarr";
@@ -38,8 +42,8 @@ export interface SonarrPanelBaseProps {
   defaultForm: SonarrFormState;
 
   metadata: {
-    qualityProfiles: SonarrQualityProfile[];
-    rootFolders: SonarrRootFolder[];
+    qualityProfiles: ProviderQualityProfile[];
+    rootFolders: ProviderRootFolder[];
     tags: ProviderTag[];
   } | null;
 
@@ -68,8 +72,8 @@ export interface RadarrPanelBaseProps {
   defaultForm: RadarrFormState;
 
   metadata: {
-    qualityProfiles: RadarrQualityProfile[];
-    rootFolders: RadarrRootFolder[];
+    qualityProfiles: ProviderQualityProfile[];
+    rootFolders: ProviderRootFolder[];
     tags: ProviderTag[];
   } | null;
 

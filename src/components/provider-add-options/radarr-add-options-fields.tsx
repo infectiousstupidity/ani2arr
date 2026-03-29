@@ -6,19 +6,21 @@ import React from 'react';
 import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import type {
+  ProviderQualityProfile,
+  ProviderRootFolder,
+  ProviderTag,
+} from '@/shared/types/providers';
+import type {
   RadarrFormState,
   RadarrMinimumAvailability,
-  RadarrQualityProfile,
-  RadarrRootFolder,
-} from '@/shared/providers/radarr/types';
-import type { ProviderTag } from '@/shared/types/provider-tags';
+} from '@/shared/schemas/radarr-settings.schema';
 import { cn } from '@/shared/utils/cn';
 
 import { ProviderRootFolderSelect } from './provider-root-folder-select';
 
 interface RadarrAddOptionsMetadata {
-  qualityProfiles: ReadonlyArray<RadarrQualityProfile>;
-  rootFolders: ReadonlyArray<RadarrRootFolder>;
+  qualityProfiles: ReadonlyArray<ProviderQualityProfile>;
+  rootFolders: ReadonlyArray<ProviderRootFolder>;
   tags: ReadonlyArray<ProviderTag>;
 }
 

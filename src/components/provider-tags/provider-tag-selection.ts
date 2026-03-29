@@ -1,7 +1,7 @@
 /** Pure label and id mapping helpers for reusable provider tag selection UI. */
 // src/components/provider-tags/provider-tag-selection.ts
 
-import type { ProviderTag } from '@/shared/types/provider-tags';
+import type { ProviderTag } from '@/shared/types/providers';
 
 export interface ProviderTagMaps {
   idToLabel: Map<number, string>;

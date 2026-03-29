@@ -1,24 +1,7 @@
-/** Shared Radarr transport and form types used across provider-facing flows. */
-// src/shared/providers/radarr/types.ts
+/** Canonical shared Radarr provider resource types reused unchanged across integrations, RPC, and UI flows. */
+// src/shared/types/providers/radarr.ts
 
-import type { ProviderTitleLanguage } from '@/shared/types/options';
-
-export type RadarrMinimumAvailability =
-  | 'announced'
-  | 'inCinemas'
-  | 'released'
-  | 'preDB';
-
-export interface RadarrRootFolder {
-  freeSpace?: number | null;
-  id: number;
-  path: string;
-}
-
-export interface RadarrQualityProfile {
-  id: number;
-  name: string;
-}
+import type { RadarrMinimumAvailability } from '@/shared/schemas/radarr-settings.schema';
 
 export interface RadarrAlternateTitle {
   title?: string | null;
@@ -67,6 +50,24 @@ export interface RadarrMovie {
   };
 }
 
+export interface RadarrMovieSnapshot {
+  tmdbId: number;
+  id: number;
+  title: string;
+  titleSlug?: string;
+  sortTitle?: string;
+  originalTitle?: string;
+  folderName?: string;
+  imdbId?: string | null;
+  year?: number;
+  alternateTitles?: string[];
+  monitored?: boolean;
+  minimumAvailability?: RadarrMinimumAvailability;
+  hasFile?: boolean;
+  sizeOnDisk?: number;
+  status?: string;
+}
+
 export interface RadarrLookupMovie {
   title: string;
   tmdbId: number;
@@ -87,50 +88,4 @@ export interface RadarrLookupMovie {
   remotePoster?: string | null;
   hasFile?: boolean;
   id?: number;
-}
-
-export interface LeanRadarrMovie {
-  tmdbId: number;
-  id: number;
-  title: string;
-  titleSlug?: string;
-  sortTitle?: string;
-  originalTitle?: string;
-  folderName?: string;
-  imdbId?: string | null;
-  year?: number;
-  alternateTitles?: string[];
-  monitored?: boolean;
-  minimumAvailability?: RadarrMinimumAvailability;
-  hasFile?: boolean;
-  sizeOnDisk?: number;
-  status?: string;
-}
-
-export interface RadarrFormState {
-  qualityProfileId: number | '';
-  rootFolderPath: string;
-  monitored: boolean;
-  searchForMovie: boolean;
-  minimumAvailability: RadarrMinimumAvailability;
-  tags: number[];
-  freeformTags: string[];
-}
-
-export interface RadarrSettings {
-  url: string;
-  apiKey: string;
-  titleLanguage: ProviderTitleLanguage;
-  defaults: RadarrFormState;
-}
-
-export interface RadarrPublicSettings {
-  url: string;
-  titleLanguage: ProviderTitleLanguage;
-  defaults: RadarrFormState;
-  isConfigured: boolean;
-}
-
-export interface RadarrSecrets {
-  apiKey: string;
 }

@@ -10,7 +10,7 @@ import { getAni2arrApi } from '@/rpc';
 import type { TestProviderConnectionInput } from '@/rpc/schemas';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import { queryKeys } from '@/shared/queries/query-keys';
-import type { Provider, ProviderCredentials } from '@/shared/types/options';
+import type { Provider, ProviderCredentials } from '@/shared/types/providers';
 
 export interface UseProviderConnectionCheckOptions {
   provider: Provider;

@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import { queryKeys } from '@/shared/queries/query-keys';
+import type { SonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
 import type { PublicOptions } from '@/shared/types';
-import type { ProviderCredentials } from '@/shared/types/options';
-import type { SonarrFormState, SonarrSeries } from './types';
+import type { ProviderCredentials, SonarrSeries } from '@/shared/types/providers';
 import type { AddInput, UpdateSonarrInput } from '@/rpc/schemas';
 
 export const useSonarrMetadata = (options?: { enabled?: boolean; credentials?: ProviderCredentials | null }) => {

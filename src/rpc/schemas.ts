@@ -1,6 +1,8 @@
 /** Valibot schemas for RPC inputs that cross the extension messaging boundary. */
 // src/rpc/schemas.ts
 import * as v from 'valibot';
+import { RadarrFormStateSchema } from '@/shared/schemas/radarr-settings.schema';
+import { SonarrFormStateSchema } from '@/shared/schemas/sonarr-settings.schema';
 
 // ============================================================================
 // Shared / Reusable Validators
@@ -51,42 +53,6 @@ const AniListMediaHintSchema = v.object({
   format: v.optional(v.nullable(AniListMediaFormatSchema)),
   relationPrequelIds: v.optional(v.nullable(v.array(v.number()))),
   coverImage: v.optional(v.nullable(v.string())),
-});
-
-const SonarrMonitorOptionSchema = v.picklist([
-  'all',
-  'future',
-  'missing',
-  'existing',
-  'firstSeason',
-  'lastSeason',
-  'pilot',
-  'recent',
-  'monitorSpecials',
-  'unmonitorSpecials',
-  'none',
-]);
-
-const SonarrFormStateSchema = v.object({
-  qualityProfileId: v.union([v.number(), v.literal('')]),
-  rootFolderPath: v.string(),
-  seriesType: v.picklist(['standard', 'anime', 'daily']),
-  monitorOption: SonarrMonitorOptionSchema,
-  seasonFolder: v.boolean(),
-  searchForMissingEpisodes: v.boolean(),
-  searchForCutoffUnmetEpisodes: v.boolean(),
-  tags: v.array(v.number()),
-  freeformTags: v.array(v.string()),
-});
-
-const RadarrFormStateSchema = v.object({
-  qualityProfileId: v.union([v.number(), v.literal('')]),
-  rootFolderPath: v.string(),
-  monitored: v.boolean(),
-  searchForMovie: v.boolean(),
-  minimumAvailability: v.picklist(['announced', 'inCinemas', 'released', 'preDB']),
-  tags: v.array(v.number()),
-  freeformTags: v.array(v.string()),
 });
 
 const ArrCredentialsSchema = v.object({

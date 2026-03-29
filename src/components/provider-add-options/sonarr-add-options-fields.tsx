@@ -10,11 +10,11 @@ import {
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
 } from '@/shared/providers/sonarr/constants';
 import type {
-  SonarrFormState,
-  SonarrQualityProfile,
-  SonarrRootFolder,
-} from '@/shared/providers/sonarr/types';
-import type { ProviderTag } from '@/shared/types/provider-tags';
+  ProviderQualityProfile,
+  ProviderRootFolder,
+  ProviderTag,
+} from '@/shared/types/providers';
+import type { SonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
 import { cn } from '@/shared/utils/cn';
 import { buildProviderFolderSlugFromTitle } from '@/shared/utils/provider-library-paths';
 
@@ -23,8 +23,8 @@ import { ProviderRootFolderSelect } from './provider-root-folder-select';
 export type SonarrAddOptionsFieldsLayout = 'stacked' | 'grid';
 
 interface SonarrAddOptionsMetadata {
-  qualityProfiles: ReadonlyArray<SonarrQualityProfile>;
-  rootFolders: ReadonlyArray<SonarrRootFolder>;
+  qualityProfiles: ReadonlyArray<ProviderQualityProfile>;
+  rootFolders: ReadonlyArray<ProviderRootFolder>;
   tags: ReadonlyArray<ProviderTag>;
 }
 

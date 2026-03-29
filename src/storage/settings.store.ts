@@ -9,14 +9,12 @@ import {
   validateProviderConnectionUrl,
 } from '@/shared/schemas/provider-connection.schema';
 import type { Settings } from '@/shared/schemas/settings';
-import type {
-  ExtensionOptions,
-  PublicOptions,
-  RadarrSecrets,
-  SonarrSecrets,
-} from '@/shared/types';
+import type { ExtensionOptions, PublicOptions } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
 import { STORAGE_KEYS } from './keys';
+
+type SonarrSecrets = { apiKey: string };
+type RadarrSecrets = { apiKey: string };
 
 const createDefaultSonarrSecrets = (): SonarrSecrets => ({ apiKey: '' });
 const createDefaultRadarrSecrets = (): RadarrSecrets => ({ apiKey: '' });

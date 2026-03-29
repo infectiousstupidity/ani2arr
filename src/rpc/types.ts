@@ -3,22 +3,20 @@
 
 import type { AniListMetadata, AniListMediaHint, AniListMediaStatus, AniListMediaFormat, AniListTitles } from '@/shared/types/anilist';
 import type {
-  LeanRadarrMovie,
-  LeanSonarrSeries,
+  ProviderQualityProfile,
+  ProviderRootFolder,
   ProviderTag,
+  ProviderCredentials,
+  RadarrMovieSnapshot,
   RadarrLookupMovie,
-  RadarrQualityProfile,
-  RadarrRootFolder,
   RadarrMovie,
+  SonarrSeriesSnapshot,
   SonarrLookupSeries,
-  SonarrRootFolder,
-  SonarrQualityProfile,
   SonarrSeries,
 } from '@/shared/types/providers';
 import type { AniListSchedulerDebugSnapshot } from '@/debug/anilist-debug.types';
 import type { MappingExternalId } from '@/shared/types/mapping';
-import type { ProviderCredentials } from '@/shared/types/options';
-import type { SonarrFormState } from '@/shared/providers/sonarr/types';
+import type { SonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
 import type { MappingSummary } from '@/shared/types';
 import type { MappingCursor } from './schemas';
 
@@ -45,7 +43,7 @@ export interface CheckSeriesStatusResponse {
   externalId?: MappingExternalId | null;
   successfulSynonym?: string;
   anilistTvdbLinkMissing?: boolean;
-  series?: LeanSonarrSeries | SonarrSeries | SonarrLookupSeries;
+  series?: SonarrSeriesSnapshot | SonarrSeries | SonarrLookupSeries;
   /** True when a manual AniList -> TVDB override is active for this ID. */
   overrideActive?: boolean;
   /** Other AniList IDs currently linked to the same TVDB ID (overrides or static pairs). */
@@ -64,7 +62,7 @@ export interface CheckMovieStatusResponse {
   externalId?: MappingExternalId | null;
   successfulSynonym?: string;
   anilistTmdbLinkMissing?: boolean;
-  movie?: LeanRadarrMovie | RadarrMovie | RadarrLookupMovie;
+  movie?: RadarrMovieSnapshot | RadarrMovie | RadarrLookupMovie;
   /** True when a manual AniList -> TMDB override is active for this ID. */
   overrideActive?: boolean;
   /** Other AniList IDs currently linked to the same TMDB ID. */
@@ -147,12 +145,9 @@ export interface SonarrLookupOutput {
   statsMap?: Record<
     number,
     {
-      seasonCount?: number;
       episodeCount?: number;
       episodeFileCount?: number;
       totalEpisodeCount?: number;
-      sizeOnDisk?: number;
-      percentOfEpisodes?: number;
     }
   >;
 }
@@ -174,8 +169,8 @@ export interface ValidateTmdbOutput {
 }
 
 export interface GetRadarrMetadataOutput {
-  qualityProfiles: RadarrQualityProfile[];
-  rootFolders: RadarrRootFolder[];
+  qualityProfiles: ProviderQualityProfile[];
+  rootFolders: ProviderRootFolder[];
   tags: ProviderTag[];
 }
 
@@ -197,7 +192,7 @@ export interface AniListSearchResult {
 
 export type GetAniListSchedulerDebugOutput = AniListSchedulerDebugSnapshot;
 export type SonarrMetadataOutput = {
-  qualityProfiles: SonarrQualityProfile[];
-  rootFolders: SonarrRootFolder[];
+  qualityProfiles: ProviderQualityProfile[];
+  rootFolders: ProviderRootFolder[];
   tags: ProviderTag[];
 };

@@ -6,6 +6,7 @@ import type {
   CheckSeriesStatusResponse,
   ExtensionOptions,
   SonarrSeries,
+  SonarrSeriesSnapshot,
   SonarrLibraryMutationEmitter,
   SonarrLibraryStatusOptions,
 } from './types';
@@ -28,11 +29,11 @@ export class SonarrLibrary {
     this.status = new SonarrStatus(this.store, this.indexer, mappingResolver, sonarrClient, emitLibraryMutation);
   }
 
-  getLeanSeriesList(): Promise<import('./types').LeanSonarrSeries[]> {
+  getLeanSeriesList(): Promise<SonarrSeriesSnapshot[]> {
     return this.store.getLeanSeriesList();
   }
 
-  refreshCache(optionsOverride?: ExtensionOptions): Promise<import('./types').LeanSonarrSeries[]> {
+  refreshCache(optionsOverride?: ExtensionOptions): Promise<SonarrSeriesSnapshot[]> {
     return this.store.refreshCache(optionsOverride);
   }
 

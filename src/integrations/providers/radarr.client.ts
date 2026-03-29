@@ -4,15 +4,15 @@
 import { BaseProviderClient } from '@/integrations/providers/base-provider.client';
 import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import { createError, ErrorCode } from '@/shared/errors';
+import type { RadarrMinimumAvailability } from '@/shared/schemas/radarr-settings.schema';
 import type {
+  ProviderQualityProfile,
+  ProviderRootFolder,
   ProviderTag,
   RadarrLookupMovie,
-  RadarrMinimumAvailability,
   RadarrMovie,
-  RadarrQualityProfile,
-  RadarrRootFolder,
-} from '@/shared/types';
-import type { ProviderCredentials } from '@/shared/types/options';
+  ProviderCredentials,
+} from '@/shared/types/providers';
 
 type RadarrClientOptions = {
   hasUrlPermission: (url: string) => Promise<boolean>;
@@ -122,12 +122,12 @@ export class RadarrClient extends BaseProviderClient {
     return this.pickSingleLookupMovie(result, movie => movie.imdbId === trimmed);
   };
 
-  public getRootFolders = async (credentials: ProviderCredentials): Promise<RadarrRootFolder[]> => {
-    return this.request<RadarrRootFolder[]>('rootfolder', credentials);
+  public getRootFolders = async (credentials: ProviderCredentials): Promise<ProviderRootFolder[]> => {
+    return this.request<ProviderRootFolder[]>('rootfolder', credentials);
   };
 
-  public getQualityProfiles = async (credentials: ProviderCredentials): Promise<RadarrQualityProfile[]> => {
-    return this.request<RadarrQualityProfile[]>('qualityprofile', credentials);
+  public getQualityProfiles = async (credentials: ProviderCredentials): Promise<ProviderQualityProfile[]> => {
+    return this.request<ProviderQualityProfile[]>('qualityprofile', credentials);
   };
 
   public getTags = async (credentials: ProviderCredentials): Promise<ProviderTag[]> => {
@@ -157,8 +157,8 @@ export class RadarrClient extends BaseProviderClient {
   public getSetupMetadata = async (
     credentials: ProviderCredentials,
   ): Promise<{
-    qualityProfiles: RadarrQualityProfile[];
-    rootFolders: RadarrRootFolder[];
+    qualityProfiles: ProviderQualityProfile[];
+    rootFolders: ProviderRootFolder[];
     tags: ProviderTag[];
   }> => {
     const [qualityProfiles, rootFolders, tags] = await Promise.all([

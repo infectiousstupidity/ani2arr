@@ -1,4 +1,4 @@
-import type { CheckMovieStatusPayload, LeanRadarrMovie, TitleIndexer } from './types';
+import type { CheckMovieStatusPayload, RadarrMovieSnapshot, TitleIndexer } from './types';
 import {
   buildTitleIndexKeysForProvider,
   computeTitleMatchScoreForProvider,
@@ -10,7 +10,7 @@ import { LOCAL_INDEX_ACCEPTANCE_THRESHOLD } from './constants';
 export class RadarrTitleIndexer implements TitleIndexer {
   private tmdbSet: Set<number> = new Set();
   private normalizedTitleIndex: Map<string, number | null> = new Map();
-  private leanMovieByTmdbId: Map<number, LeanRadarrMovie> = new Map();
+  private leanMovieByTmdbId: Map<number, RadarrMovieSnapshot> = new Map();
 
   reset(): void {
     this.tmdbSet.clear();
@@ -18,11 +18,11 @@ export class RadarrTitleIndexer implements TitleIndexer {
     this.leanMovieByTmdbId.clear();
   }
 
-  bulkIndex(list: LeanRadarrMovie[]): void {
+  bulkIndex(list: RadarrMovieSnapshot[]): void {
     for (const movie of list) this.indexMovie(movie);
   }
 
-  reindex(list: LeanRadarrMovie[]): void {
+  reindex(list: RadarrMovieSnapshot[]): void {
     this.reset();
     this.bulkIndex(list);
   }
@@ -48,7 +48,7 @@ export class RadarrTitleIndexer implements TitleIndexer {
     let sawAmbiguous = false;
     let bestMatch: { tmdbId: number; score: number } | null = null;
 
-    const scoreAgainstMovie = (rawTitle: string, movie: LeanRadarrMovie): number => {
+    const scoreAgainstMovie = (rawTitle: string, movie: RadarrMovieSnapshot): number => {
       return computeTitleMatchScoreForProvider({
         provider: 'radarr',
         queryRaw: rawTitle,
@@ -89,7 +89,7 @@ export class RadarrTitleIndexer implements TitleIndexer {
     return null;
   }
 
-  private indexMovie(movie: LeanRadarrMovie): void {
+  private indexMovie(movie: RadarrMovieSnapshot): void {
     this.tmdbSet.add(movie.tmdbId);
     this.leanMovieByTmdbId.set(movie.tmdbId, movie);
     const keys = this.buildNormalizedKeysForMovie(movie);
@@ -103,7 +103,7 @@ export class RadarrTitleIndexer implements TitleIndexer {
     }
   }
 
-  private buildNormalizedKeysForMovie(movie: LeanRadarrMovie): string[] {
+  private buildNormalizedKeysForMovie(movie: RadarrMovieSnapshot): string[] {
     return this.normalizeTitleCandidates(
       extractCandidateTitleVariants('radarr', movie).map(variant => variant.value),
     );
