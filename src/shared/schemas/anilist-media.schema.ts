@@ -1,0 +1,134 @@
+/** Canonical AniList media schemas for shared contracts parsed from AniList responses. */
+// src/shared/schemas/anilist-media.schema.ts
+
+import * as v from 'valibot';
+
+const AniListIdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
+
+export const ANILIST_MEDIA_FORMATS = [
+  'TV',
+  'TV_SHORT',
+  'MOVIE',
+  'SPECIAL',
+  'OVA',
+  'ONA',
+  'MUSIC',
+  'MANGA',
+  'NOVEL',
+  'ONE_SHOT',
+] as const;
+
+export const ANILIST_MEDIA_STATUSES = [
+  'FINISHED',
+  'RELEASING',
+  'NOT_YET_RELEASED',
+  'CANCELLED',
+  'HIATUS',
+] as const;
+
+export const ANILIST_MEDIA_SEASONS = ['WINTER', 'SPRING', 'SUMMER', 'FALL'] as const;
+
+export const AniListMediaFormatSchema = v.picklist(ANILIST_MEDIA_FORMATS);
+export const AniListMediaStatusSchema = v.picklist(ANILIST_MEDIA_STATUSES);
+export const AniListMediaSeasonSchema = v.picklist(ANILIST_MEDIA_SEASONS);
+
+export const AniListTitlesSchema = v.object({
+  romaji: v.optional(v.string()),
+  english: v.optional(v.string()),
+  native: v.optional(v.string()),
+});
+
+const AniListMediaStartDateSchema = v.object({
+  year: v.optional(v.nullable(v.number())),
+});
+
+const AniListMediaRelationNodeSchema = v.object({
+  id: AniListIdSchema,
+});
+
+const AniListMediaRelationEdgeSchema = v.object({
+  relationType: v.string(),
+  node: AniListMediaRelationNodeSchema,
+});
+
+const AniListMediaRelationsSchema = v.object({
+  edges: v.array(AniListMediaRelationEdgeSchema),
+});
+
+const AniListMediaCoverImageSchema = v.object({
+  extraLarge: v.optional(v.nullable(v.string())),
+  large: v.optional(v.nullable(v.string())),
+  medium: v.optional(v.nullable(v.string())),
+  color: v.optional(v.nullable(v.string())),
+});
+
+const AniListMediaNextAiringEpisodeSchema = v.object({
+  episode: v.number(),
+  airingAt: v.number(),
+});
+
+const AniListMediaStudioNodeSchema = v.object({
+  name: v.optional(v.nullable(v.string())),
+});
+
+const AniListMediaStudiosSchema = v.object({
+  nodes: v.optional(v.nullable(v.array(AniListMediaStudioNodeSchema))),
+});
+
+const NormalizedAniListTitlesSchema = v.optional(
+  v.pipe(
+    v.nullable(AniListTitlesSchema),
+    v.transform(value => value ?? {}),
+  ),
+  {},
+);
+
+const NormalizedStringArraySchema = v.optional(
+  v.pipe(
+    v.nullable(v.array(v.string())),
+    v.transform(value => value ?? []),
+  ),
+  [],
+);
+
+const OptionalStartDateSchema = v.optional(
+  v.pipe(
+    v.nullable(AniListMediaStartDateSchema),
+    v.transform(value => value ?? undefined),
+  ),
+  undefined,
+);
+
+const OptionalRelationsSchema = v.optional(
+  v.pipe(
+    v.nullable(AniListMediaRelationsSchema),
+    v.transform(value => value ?? undefined),
+  ),
+  undefined,
+);
+
+export const AniListMediaSchema = v.object({
+  id: AniListIdSchema,
+  format: v.optional(v.nullable(AniListMediaFormatSchema), null),
+  title: NormalizedAniListTitlesSchema,
+  startDate: OptionalStartDateSchema,
+  synonyms: NormalizedStringArraySchema,
+  relations: OptionalRelationsSchema,
+  bannerImage: v.optional(v.nullable(v.string())),
+  coverImage: v.optional(v.nullable(AniListMediaCoverImageSchema)),
+  description: v.optional(v.nullable(v.string())),
+  status: v.optional(v.nullable(AniListMediaStatusSchema)),
+  season: v.optional(v.nullable(AniListMediaSeasonSchema)),
+  seasonYear: v.optional(v.nullable(v.number())),
+  episodes: v.optional(v.nullable(v.number())),
+  duration: v.optional(v.nullable(v.number())),
+  genres: v.optional(v.nullable(v.array(v.string()))),
+  nextAiringEpisode: v.optional(v.nullable(AniListMediaNextAiringEpisodeSchema)),
+  studios: v.optional(v.nullable(AniListMediaStudiosSchema)),
+});
+
+export type AniListMediaFormat = v.InferOutput<typeof AniListMediaFormatSchema>;
+export type AniListMediaStatus = v.InferOutput<typeof AniListMediaStatusSchema>;
+export type AniListMediaSeason = v.InferOutput<typeof AniListMediaSeasonSchema>;
+export type AniListTitles = v.InferOutput<typeof AniListTitlesSchema>;
+export type AniListMedia = v.InferOutput<typeof AniListMediaSchema>;

@@ -11,10 +11,10 @@ import {
   fetchAniListMediaBatch,
   searchAniListMedia,
 } from '@/integrations/anilist/media';
+import type { AniListSearchMediaDto } from '@/integrations/anilist/media.schema';
 import type {
   AniListRateLimitMeta,
   AniListResponseMeta,
-  AniListSearchMediaDto,
 } from '@/integrations/anilist/types';
 import type { TtlCache } from '@/storage';
 import { createError, ErrorCode } from '@/shared/errors';
