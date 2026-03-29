@@ -4,17 +4,17 @@
 import React from 'react';
 
 import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
-import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import {
   MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
-} from '@/shared/providers/sonarr/constants';
+  type SonarrFormState,
+} from '@/shared/schemas/sonarr-settings.schema';
+import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import type {
   ProviderQualityProfile,
   ProviderRootFolder,
   ProviderTag,
 } from '@/shared/types/providers';
-import type { SonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
 import { cn } from '@/shared/utils/cn';
 import { buildProviderFolderSlugFromTitle } from '@/shared/utils/provider-library-paths';
 
