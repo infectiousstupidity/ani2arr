@@ -207,6 +207,8 @@ Agents must actively prevent it.
 * Keep storage types in `storage`.
 * Keep RPC payload and schema-derived types in `rpc`.
 * Put a type in `shared/types` only if it is truly cross-cutting.
+* Prefer narrow stable public surfaces for shared type groups such as `shared/types/providers` or `shared/types/options` instead of routing everything through the top-level `shared/types` barrel.
+* Prefer importing schema-derived types from the schema owner when the schema is canonical.
 * Do not recreate identical nested leaf shapes across layers just to stamp them as transport, DTO, or record types.
 
 ## Before introducing a new type, check

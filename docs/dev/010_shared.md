@@ -19,7 +19,8 @@ This document should be read together with:
 It is not a second architecture root.
 It must not become a dumping ground.
 
-If a file has a clear owner in `runtime/`, `rpc/`, `core/`, `integrations/`, or `storage/`, it belongs with that owner instead.
+If a file has a clear behavioral owner in `runtime/`, `rpc/`, `core/`, `integrations/`, or `storage/`, it belongs with that owner instead.
+If a type is reused unchanged across multiple domains, `shared/types/` may be the clearest canonical home.
 
 ---
 
@@ -91,12 +92,14 @@ Do not put here:
 
 Put here:
 
-* truly cross-cutting shared types only
+* canonical shared types when the same shape and meaning are reused unchanged across multiple domains
+* full provider resource types reused unchanged across integrations, library flows, and RPC
+* canonical shared projections reused unchanged across multiple domains when no stronger owner adds clarity
 
 Do not put here:
 
 * domain-local types
-* transport-local DTOs
+* transport-local DTOs that are endpoint-local or integration-specific
 * storage-local types
 * RPC-local payload types
 * aliases that only rename an existing type without adding meaning
@@ -104,6 +107,31 @@ Do not put here:
 Rule:
 `shared/types/` must stay small.
 Type drift hides here first, so use it sparingly.
+
+Do not read this as "every reused type goes here".
+Use `shared/types/` only when a single canonical shared type is clearly better than duplicating the same shape under multiple owners.
+This applies across the repo, not just to provider resource types.
+Use this as the default rule:
+1. If a type is used in two or more domains with the same shape and meaning, put it in `shared/types/`.
+2. If a type is only used inside one domain, keep it in that domain.
+3. If a type crosses domains but its shape or meaning changes, keep separate types for those distinct roles.
+Example:
+keep a canonical full `SonarrSeries` resource in `shared/types/`.
+If `SonarrSeriesSnapshot` is reused unchanged across storage, library, RPC, and UI consumers, it may also stay in `shared/types/`.
+Keep a snapshot with the library owner only when it is truly a library-local projection.
+
+## Shared type import surfaces
+
+Canonical ownership and import surface are separate decisions.
+
+Use a narrow public surface when a shared type subgroup has a clear owner.
+
+Prefer:
+
+* provider-related shared types from `shared/types/providers`
+* options and settings types from `shared/types/options`
+
+Use the top-level `shared/types` barrel as a convenience surface only when it improves readability for a file consuming several unrelated shared type groups.
 
 ---
 
@@ -144,16 +172,18 @@ Avoid:
 
 Rules:
 
-* a type should have one canonical owner
-* put a type in `shared/types` only if it is truly cross-cutting
+* a type should have one canonical source
+* put a type in `shared/types` when a shared canonical definition is clearer than duplicating the same type under multiple owners
 * do not duplicate a type unless the duplication is a deliberate boundary decision
 * do not create aliases that only rename an existing shape
+* do not force every shared type through one umbrella barrel when a narrower shared public surface is clearer
 
 Before adding a new shared type, ask:
 
 1. Does this type already exist?
-2. Does it have a stronger owner elsewhere?
-3. Is it truly cross-cutting, or just currently reused?
+2. Is the shape and meaning actually the same everywhere it will be used?
+3. Would keeping one canonical shared type avoid useless duplication?
+4. Would an owner-local copy add any real semantic or boundary value?
 
 If unclear, do not default to `shared/types`.
 
@@ -165,7 +195,7 @@ Before placing code in `shared/`, ask:
 
 1. Is this small support code rather than a domain owner?
 2. Is it truly cross-cutting?
-3. Is there no stronger owner elsewhere?
+3. Is this a canonical shared type rather than owner-local behavior?
 4. Will putting it in `shared/` reduce duplication without weakening ownership?
 
 If no, keep it with the stronger owner.
@@ -179,7 +209,7 @@ If no, keep it with the stronger owner.
 * config
 * errors
 * utils
-* truly cross-cutting types
+* canonical shared types whose shape and meaning stay the same across domains
 
 It must stay narrow.
-If ownership is clear, do not put it in `shared/`.
+If behavior ownership is clear, do not put it in `shared/`.

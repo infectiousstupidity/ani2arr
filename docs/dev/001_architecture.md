@@ -63,7 +63,7 @@ Top-level architecture folders should describe responsibility directly.
 
 ### 8. Keep `shared/` narrow and support-only
 
-`shared/` is allowed, but only for small cross-cutting support areas.
+`shared/` is allowed, but only for small cross-cutting support areas and canonical shared types.
 It must not become a second architecture root.
 
 ---
@@ -217,7 +217,7 @@ Includes:
 * config
 * errors
 * utils
-* small set of truly cross-cutting types
+* small set of canonical shared types
 
 Must not become a dumping ground.
 Must not become a second architecture root.
@@ -279,7 +279,11 @@ shared -X-> runtime/core/integrations ownership violations
 
 Note:
 `shared/` is for support code only.
-If a file has a clear owner in runtime, rpc, core, integrations, or storage, it belongs with that owner.
+Do not move code into `shared/` just because it is imported from multiple places.
+But if the same type shape and meaning are reused unchanged across multiple domains, keep one canonical type in `shared/types/` instead of cloning it under multiple owners.
+Within `shared/types/`, prefer narrow public import surfaces when a subsystem has a clear shared owner.
+Example:
+provider-related shared types may be imported from `shared/types/providers`, and settings types from `shared/types/options`, instead of routing everything through one top-level barrel.
 
 ---
 
@@ -374,7 +378,7 @@ Good fits for `shared/`:
 * pure app-wide config
 * shared error helpers
 * small generic utilities
-* truly cross-cutting types
+* canonical reused types whose shape and meaning stay the same across domains
 
 Bad fits for `shared/`:
 
@@ -386,7 +390,10 @@ Bad fits for `shared/`:
 * modules that clearly belong to one owner
 
 Rule:
-If ownership is clear, do not put it in `shared/`.
+If a module has a clear behavioral owner, do not put it in `shared/`.
+If a type has the same shape and meaning across multiple domains, `shared/types/` is the preferred canonical home.
+That does not require one flat import surface.
+If a subgroup inside `shared/types/` has a clear public API, prefer that subgroup import path over a giant umbrella barrel.
 
 ---
 
@@ -437,8 +444,9 @@ No handler logic.
 
 ### 4. `shared/types/` must stay small
 
-Only truly cross-cutting shared types belong here.
-Prefer owner-based type placement.
+Use `shared/types/` for canonical shared types whose shape and meaning are unchanged across domains.
+Do not duplicate identical owner-local types just to mark a boundary.
+Do not collapse unrelated shared type groups into one mixed file just for convenience imports.
 
 ### 5. Storage is infrastructure, not a public convenience layer
 

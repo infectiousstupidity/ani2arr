@@ -67,14 +67,14 @@ src/
   - `core/anilist/`: AniList-derived app state, metadata hydration, refresh policy.
 - `integrations/`: raw AniList, Sonarr, and Radarr transport code, endpoint helpers, DTO normalization, provider API details.
 - `storage/`: persistence and cache infrastructure, storage keys, TTL policies, revision counters, storage-backed cache wrappers.
-- `shared/`: small cross-cutting support only: config, errors, utils, truly cross-cutting types.
+- `shared/`: small cross-cutting support only: config, errors, utils, and canonical shared types reused unchanged across domains.
 
 ## Dependency rules
 - UI goes through the app boundary. `features/` and `components/` must not depend directly on `storage/`, `integrations/`, or `runtime/`.
 - `rpc/` defines the app contract. `runtime/` owns transport wiring, startup, alarms, permissions, and broadcasts.
 - `core/` may depend on `integrations/`, `storage/`, and narrow `shared/` support modules.
 - `integrations/` must not absorb app policy.
-- `shared/` is support-only. If a stronger owner exists, keep the file with that owner.
+- `shared/` is support-only. Do not move code into `shared/` just because it is imported widely, but do keep one canonical type in `shared/types/` when it is reused unchanged across domains and duplicating it under multiple owners would add no meaning or value.
 - Do not create or expand a giant umbrella bucket such as `lib/`.
 
 ## Domain terms
@@ -101,9 +101,14 @@ src/
   - domain types in their `core/` owner
   - transport DTOs in `integrations/`
   - storage-local types in `storage/`
-  - only truly cross-cutting types in `shared/types/`
+  - canonical reused types with unchanged shape and meaning in `shared/types/`
+- Prefer narrow public import surfaces for shared type subsystems:
+  - provider-related shared types from `shared/types/providers`
+  - options and settings types from `shared/types/options`
+  - top-level `shared/types/index.ts` only as a convenience surface when the file is consuming several unrelated shared type groups
 - Transport-local external API shapes in `integrations/` should prefer a `*Dto` suffix when they represent raw request or response payloads. Do not use GraphQL-specific names like `*Node` as the repo convention unless the upstream term itself is the important concept.
 - Do not recreate identical nested leaf shapes under different owners just to mark a boundary. If the shape and meaning are the same, keep one canonical type.
+- Do not create owner-local clones of the same type just for architectural symmetry. If a type is reused across domains with the same shape and meaning, keep it in `shared/types/`. Split a type only when the shape, meaning, or boundary responsibility actually changes.
 - Do not create aliases that just rename an existing type without changing meaning.
 - Split files by responsibility, not line count. Prefer small duplication over abstractions that weaken ownership or increase navigation cost.
 - Do not create folders for speculative growth or symmetry alone.
