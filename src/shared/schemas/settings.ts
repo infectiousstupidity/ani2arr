@@ -1,15 +1,12 @@
+/** Runtime-validated extension settings schema and default factories. */
 // src/shared/schemas/settings.ts
+
 import * as v from 'valibot';
 import type { FieldValues } from 'react-hook-form';
 import type { ExtensionOptions } from '@/shared/types/options';
-import { createDefaultSonarrFormState, SonarrSettingsSchema } from './sonarr-settings.schema';
-import { createDefaultRadarrFormState, RadarrSettingsSchema } from './radarr-settings.schema';
-import { createDefaultUiOptions, isTitleLanguage, migrateLegacyUiOptions, UiOptionsSchema } from './ui-schema';
-
-// --- Helpers ---
-
-const asRecord = (input: unknown): Record<string, unknown> =>
-  input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+import { createDefaultSonarrFormState, SonarrSettingsSchema } from './providers/sonarr-settings.schema';
+import { createDefaultRadarrFormState, RadarrSettingsSchema } from './providers/radarr-settings.schema';
+import { createDefaultUiOptions, UiOptionsSchema } from './ui-schema';
 
 // --- Factory ---
 
@@ -18,13 +15,13 @@ const createDefaultSettingsInternal = (): ExtensionOptions => ({
     sonarr: {
       url: '',
       apiKey: '',
-      providerTitleLanguage: 'english',
+      preferredAniListTitleLanguage: 'english',
       defaults: createDefaultSonarrFormState(),
     },
     radarr: {
       url: '',
       apiKey: '',
-      providerTitleLanguage: 'english',
+      preferredAniListTitleLanguage: 'english',
       defaults: createDefaultRadarrFormState(),
     },
   },
@@ -32,60 +29,26 @@ const createDefaultSettingsInternal = (): ExtensionOptions => ({
   debugLogging: false,
 });
 
-// --- Migration ---
-
-const migrateLegacySettings = (input: unknown): Record<string, unknown> => {
-  const raw = asRecord(input);
-  const providers = asRecord(raw.providers);
-  const sonarr = asRecord(providers.sonarr);
-  const radarr = asRecord(providers.radarr);
-  const legacyTitleLanguage = isTitleLanguage(raw.titleLanguage) ? raw.titleLanguage : 'english';
-
-  return {
-    ...raw,
-    providers: {
-      ...providers,
-      sonarr: {
-        ...sonarr,
-        titleLanguage: isTitleLanguage(sonarr.titleLanguage)
-          ? sonarr.titleLanguage
-          : legacyTitleLanguage,
-      },
-      radarr: {
-        ...radarr,
-        titleLanguage: isTitleLanguage(radarr.titleLanguage)
-          ? radarr.titleLanguage
-          : legacyTitleLanguage,
-      },
-    },
-    ui: migrateLegacyUiOptions(raw.ui),
-  };
-};
-
 // --- Composed Settings Schema ---
 
-const ExtensionOptionsSchema = v.pipe(
-  v.unknown(),
-  v.transform(migrateLegacySettings),
-  v.object({
-    providers: v.object({
-      sonarr: v.fallback(SonarrSettingsSchema, {
-        url: '',
-        apiKey: '',
-        providerTitleLanguage: 'english',
-        defaults: createDefaultSonarrFormState(),
-      }),
-      radarr: v.fallback(RadarrSettingsSchema, {
-        url: '',
-        apiKey: '',
-        providerTitleLanguage: 'english',
-        defaults: createDefaultRadarrFormState(),
-      }),
+const ExtensionOptionsSchema = v.object({
+  providers: v.object({
+    sonarr: v.fallback(SonarrSettingsSchema, {
+      url: '',
+      apiKey: '',
+      preferredAniListTitleLanguage: 'english',
+      defaults: createDefaultSonarrFormState(),
     }),
-    ui: v.fallback(UiOptionsSchema, createDefaultUiOptions()),
-    debugLogging: v.fallback(v.boolean(), false),
-  })
-);
+    radarr: v.fallback(RadarrSettingsSchema, {
+      url: '',
+      apiKey: '',
+      preferredAniListTitleLanguage: 'english',
+      defaults: createDefaultRadarrFormState(),
+    }),
+  }),
+  ui: v.fallback(UiOptionsSchema, createDefaultUiOptions()),
+  debugLogging: v.fallback(v.boolean(), false),
+});
 
 export const SettingsSchema = v.fallback(ExtensionOptionsSchema, createDefaultSettingsInternal());
 

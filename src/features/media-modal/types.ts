@@ -4,8 +4,8 @@
 
 import type {
   RadarrFormState,
-} from '@/shared/schemas/radarr-settings.schema';
-import type { SonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
+} from '@/shared/schemas/providers/radarr-settings.schema';
+import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type {
   ProviderQualityProfile,
   ProviderRootFolder,

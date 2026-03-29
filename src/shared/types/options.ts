@@ -1,11 +1,10 @@
 /** Canonical extension settings and public-options types shared across UI and runtime. */
 // src/shared/types/options.ts
 
-import type { SonarrFormState } from '@/shared/schemas/sonarr-settings.schema';
-import type { RadarrFormState } from '@/shared/schemas/radarr-settings.schema';
+import type { AniListTitleLanguage } from '@/shared/schemas/anilist-title-language.schema';
+import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
+import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import type { ProviderCredentials } from '@/shared/types/providers';
-
-export type ProviderTitleLanguage = 'english' | 'romaji' | 'native';
 
 export type BadgeVisibility = 'always' | 'hover';
 
@@ -35,25 +34,25 @@ export interface UiOptions {
 }
 
 export interface SonarrOptions extends ProviderCredentials {
-  providerTitleLanguage: ProviderTitleLanguage;
+  preferredAniListTitleLanguage: AniListTitleLanguage;
   defaults: SonarrFormState;
 }
 
 export interface RadarrOptions extends ProviderCredentials {
-  providerTitleLanguage: ProviderTitleLanguage;
+  preferredAniListTitleLanguage: AniListTitleLanguage;
   defaults: RadarrFormState;
 }
 
 export interface SonarrPublicOptions {
   url: string;
-  providerTitleLanguage: ProviderTitleLanguage;
+  preferredAniListTitleLanguage: AniListTitleLanguage;
   defaults: SonarrFormState;
   isConfigured: boolean;
 }
 
 export interface RadarrPublicOptions {
   url: string;
-  providerTitleLanguage: ProviderTitleLanguage;
+  preferredAniListTitleLanguage: AniListTitleLanguage;
   defaults: RadarrFormState;
   isConfigured: boolean;
 }

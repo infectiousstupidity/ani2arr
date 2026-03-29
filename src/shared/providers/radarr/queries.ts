@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import { queryKeys } from '@/shared/queries/query-keys';
-import type { RadarrFormState } from '@/shared/schemas/radarr-settings.schema';
+import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import type { CheckMovieStatusPayload, CheckMovieStatusResponse, PublicOptions } from '@/shared/types';
 import type { ProviderCredentials, RadarrMovie } from '@/shared/types/providers';
 import type { AddRadarrInput, StatusInput, UpdateRadarrInput } from '@/rpc/schemas';

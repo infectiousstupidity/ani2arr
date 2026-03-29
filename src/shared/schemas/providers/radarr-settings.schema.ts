@@ -2,13 +2,13 @@
 // src/shared/schemas/radarr-settings.schema.ts
 
 import * as v from 'valibot';
+import { AniListTitleLanguageSchema } from '@/shared/schemas/anilist-title-language.schema';
 import {
   CoerceNumberArray,
   CoerceQualityProfileId,
   CoerceStringArray,
   SafeString,
-  TITLE_LANGUAGES,
-} from './schema-primitives';
+} from '../schema-primitives';
 
 export const RADARR_MINIMUM_AVAILABILITY_OPTIONS = [
   'announced',
@@ -93,6 +93,6 @@ export const RadarrDefaultsSchema = v.pipe(
 export const RadarrSettingsSchema = v.object({
   url: SafeString,
   apiKey: SafeString,
-  providerTitleLanguage: v.fallback(v.picklist(TITLE_LANGUAGES), 'english'),
+  preferredAniListTitleLanguage: v.fallback(AniListTitleLanguageSchema, 'english'),
   defaults: v.fallback(RadarrDefaultsSchema, createDefaultRadarrFormState()),
 });

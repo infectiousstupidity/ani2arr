@@ -5,7 +5,7 @@ import { browser } from 'wxt/browser';
 import {
   normalizeProviderConnectionUrl,
   type ProviderConnectionResult,
-} from '@/shared/schemas/provider-connection.schema';
+} from '@/shared/schemas/providers/provider-connection.schema';
 
 export type ProviderHostPermissionResult<T> = ProviderConnectionResult<T>;
 

@@ -1,7 +1,7 @@
 /** Canonical shared Sonarr provider resource types reused unchanged across integrations, RPC, and UI flows. */
 // src/shared/types/providers/sonarr.ts
 
-import type { SonarrMonitorOption, SonarrSeriesType } from '@/shared/schemas/sonarr-settings.schema';
+import type { SonarrMonitorOption, SonarrSeriesType } from '@/shared/schemas/providers/sonarr-settings.schema';
 
 export interface SonarrAlternateTitle {
   title?: string | null;

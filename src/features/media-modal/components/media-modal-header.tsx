@@ -1,9 +1,11 @@
+/** Media modal header that shows extension-owned AniList titles alongside provider state badges. */
 // src/features/media-modal/components/media-modal-header.tsx
+
 import { type MouseEventHandler } from "react";
 import { Database, X } from "lucide-react";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import Pill from '@/shared/ui/primitives/pill';
-import type { AniListMediaFormat, Provider, AniListMediaStatus, ProviderTitleLanguage } from "@/shared/types";
+import type { AniListMediaFormat, Provider, AniListMediaStatus, AniListTitleLanguage } from "@/shared/types";
 import { getProviderLabel } from "@/services/providers/resolver";
 
 export type MediaModalTabId = "series" | "mapping";
@@ -11,7 +13,7 @@ export type MediaModalTabId = "series" | "mapping";
 export type HeaderProps = {
   title: string;
   alternateTitles: Array<{ label: string; value: string }>;
-  titleLanguage: ProviderTitleLanguage;
+  titleLanguage: AniListTitleLanguage;
   bannerImage: string | null;
   coverImage: string | null;
   anilistIds: number[];
@@ -170,6 +172,5 @@ export function Header(props: HeaderProps): React.JSX.Element {
     </header>
   );
 }
-
 
 

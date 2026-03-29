@@ -4,7 +4,7 @@
 import { BaseProviderClient } from '@/integrations/providers/base-provider.client';
 import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import { createError, ErrorCode } from '@/shared/errors';
-import type { RadarrMinimumAvailability } from '@/shared/schemas/radarr-settings.schema';
+import type { RadarrMinimumAvailability } from '@/shared/schemas/providers/radarr-settings.schema';
 import type {
   ProviderQualityProfile,
   ProviderRootFolder,

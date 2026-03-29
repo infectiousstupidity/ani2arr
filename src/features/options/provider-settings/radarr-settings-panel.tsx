@@ -8,7 +8,7 @@ import { useRadarrMetadata, queryKeys } from '@/shared/queries';
 import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,
-} from '@/shared/schemas/provider-connection.schema';
+} from '@/shared/schemas/providers/provider-connection.schema';
 import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/features/options/use-settings-actions';
 import { requestProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
@@ -19,7 +19,7 @@ import { useProviderConnectionStatus } from '@/features/options/use-provider-con
 import {
   ProviderConnectionCard,
   ProviderConnectionStatusBadge,
-  ProviderTitleLanguageField,
+  PreferredAniListTitleLanguageField,
 } from './provider-connection-card';
 import { RadarrDefaultsSection } from './radarr-defaults-section';
 import { useSelectPortal } from './use-select-portal';
@@ -41,7 +41,8 @@ function RadarrSettingsPanelInner({
 
   const radarrUrl = useWatch({ control: methods.control, name: 'providers.radarr.url' }) ?? '';
   const radarrApiKey = useWatch({ control: methods.control, name: 'providers.radarr.apiKey' }) ?? '';
-  const providerTitleLanguage = useWatch({ control: methods.control, name: 'providers.radarr.providerTitleLanguage' }) ?? 'english';
+  const preferredAniListTitleLanguage =
+    useWatch({ control: methods.control, name: 'providers.radarr.preferredAniListTitleLanguage' }) ?? 'english';
 
   const selectPortal = useSelectPortal();
 
@@ -193,9 +194,9 @@ function RadarrSettingsPanelInner({
     [actions.radarrTestConnectionState, methods],
   );
 
-  const setProviderTitleLanguage = useCallback(
-    (value: typeof providerTitleLanguage) => {
-      methods.setValue('providers.radarr.providerTitleLanguage', value, { shouldDirty: true });
+  const setPreferredAniListTitleLanguage = useCallback(
+    (value: typeof preferredAniListTitleLanguage) => {
+      methods.setValue('providers.radarr.preferredAniListTitleLanguage', value, { shouldDirty: true });
     },
     [methods],
   );
@@ -316,19 +317,19 @@ function RadarrSettingsPanelInner({
             summaryFields={[
               { label: 'Radarr URL', value: normalizedUrl || 'Not configured' },
               {
-                label: 'Preferred title language',
+                label: 'Preferred AniList title language',
                 value:
-                  providerTitleLanguage === 'romaji'
+                  preferredAniListTitleLanguage === 'romaji'
                     ? 'Romaji'
-                    : providerTitleLanguage === 'native'
+                    : preferredAniListTitleLanguage === 'native'
                       ? 'Native'
                       : 'English',
               },
             ]}
           >
-            <ProviderTitleLanguageField
-              providerTitleLanguage={providerTitleLanguage}
-              setProviderTitleLanguage={setProviderTitleLanguage}
+            <PreferredAniListTitleLanguageField
+              preferredAniListTitleLanguage={preferredAniListTitleLanguage}
+              setPreferredAniListTitleLanguage={setPreferredAniListTitleLanguage}
               selectPortal={selectPortal}
               isLoading={Boolean(isLoading)}
             />

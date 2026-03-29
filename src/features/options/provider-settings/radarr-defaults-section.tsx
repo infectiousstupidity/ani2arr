@@ -7,7 +7,7 @@ import { RotateCcw } from 'lucide-react';
 
 import { RadarrAddOptionsFields } from '@/components/provider-add-options/radarr-add-options-fields';
 import type { SettingsActions } from '@/features/options/use-settings-actions';
-import type { RadarrFormState } from '@/shared/schemas/radarr-settings.schema';
+import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import type { useRadarrMetadata } from '@/shared/queries';
 import type { SettingsFormValues } from '@/shared/schemas/settings';
 import Button from '@/shared/ui/primitives/button';

@@ -7,7 +7,7 @@ import { SettingsSchema, createDefaultSettings } from '@/shared/schemas/settings
 import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,
-} from '@/shared/schemas/provider-connection.schema';
+} from '@/shared/schemas/providers/provider-connection.schema';
 import type { Settings } from '@/shared/schemas/settings';
 import type { ExtensionOptions, PublicOptions } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
@@ -24,13 +24,13 @@ export function toPublicOptions(settings: ExtensionOptions): PublicOptions {
     providers: {
       sonarr: {
         url: settings.providers.sonarr.url,
-        providerTitleLanguage: settings.providers.sonarr.providerTitleLanguage,
+        preferredAniListTitleLanguage: settings.providers.sonarr.preferredAniListTitleLanguage,
         defaults: settings.providers.sonarr.defaults,
         isConfigured: Boolean(settings.providers.sonarr.url && settings.providers.sonarr.apiKey),
       },
       radarr: {
         url: settings.providers.radarr.url,
-        providerTitleLanguage: settings.providers.radarr.providerTitleLanguage,
+        preferredAniListTitleLanguage: settings.providers.radarr.preferredAniListTitleLanguage,
         defaults: settings.providers.radarr.defaults,
         isConfigured: Boolean(settings.providers.radarr.url && settings.providers.radarr.apiKey),
       },

@@ -1,5 +1,6 @@
 /** Owns the media modal shell and wires provider-specific panel controllers into the dialog UI. */
 // src/features/media-modal/components/media-modal.tsx
+
 import { useCallback, useMemo, useState } from "react";
 import { Modal, ModalContent, ModalTitle, ModalDescription } from "./modal";
 import { Header, type MediaModalTabId } from "./media-modal-header";
@@ -11,11 +12,11 @@ import type {
   AniListMediaStatus,
   RadarrFormState,
   SonarrFormState,
-  ProviderTitleLanguage,
+  AniListTitleLanguage,
 } from "@/shared/types";
 import { ErrorCode, type ExtensionError } from "@/shared/errors";
-import { createDefaultRadarrFormState } from "@/shared/schemas/radarr-settings.schema";
-import { createDefaultSonarrFormState } from "@/shared/schemas/sonarr-settings.schema";
+import { createDefaultRadarrFormState } from "@/shared/schemas/providers/radarr-settings.schema";
+import { createDefaultSonarrFormState } from "@/shared/schemas/providers/sonarr-settings.schema";
 
 import { MappingPreviewPanel, MappingSearchPanel } from "@/features/mapping";
 import type { MappingTabProps } from "../types";
@@ -41,7 +42,7 @@ export type MediaModalProps = {
 
   title: string;
   alternateTitles: Array<{ label: string; value: string }>;
-  titleLanguage: ProviderTitleLanguage;
+  titleLanguage: AniListTitleLanguage;
   bannerImage: string | null;
   coverImage: string | null;
   anilistIds: number[];

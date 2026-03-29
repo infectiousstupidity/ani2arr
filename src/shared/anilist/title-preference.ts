@@ -1,8 +1,11 @@
-import type { AniListTitles, ProviderTitleLanguage } from '@/shared/types';
+/** Resolves extension-owned AniList display titles and alternate labels from canonical AniList title data. */
+// src/shared/anilist/title-preference.ts
 
-const LANGUAGE_ORDER: ProviderTitleLanguage[] = ['english', 'romaji', 'native'];
+import type { AniListTitles, AniListTitleLanguage } from '@/shared/types';
 
-const LANGUAGE_LABELS: Record<ProviderTitleLanguage, string> = {
+const LANGUAGE_ORDER: AniListTitleLanguage[] = ['english', 'romaji', 'native'];
+
+const LANGUAGE_LABELS: Record<AniListTitleLanguage, string> = {
   english: 'English',
   romaji: 'Romaji',
   native: 'Native',
@@ -16,22 +19,22 @@ const normalizeTitle = (value?: string | null): string | null => {
 
 export interface ResolvedTitlePreference {
   primary: string;
-  usedLanguage: ProviderTitleLanguage | 'fallback';
+  usedLanguage: AniListTitleLanguage | 'fallback';
   alternates: Array<{ label: string; value: string }>;
 }
 
 export const resolveTitlePreference = (params: {
   titles?: AniListTitles | null;
-  preferred?: ProviderTitleLanguage;
+  preferred?: AniListTitleLanguage;
   fallback?: string | null;
 }): ResolvedTitlePreference => {
   const preferred = params.preferred ?? 'english';
-  const uniqueOrder = Array.from(new Set<ProviderTitleLanguage>([preferred, ...LANGUAGE_ORDER]));
+  const uniqueOrder = Array.from(new Set<AniListTitleLanguage>([preferred, ...LANGUAGE_ORDER]));
   const titleMap = params.titles ?? {};
   const fallbackTitle = normalizeTitle(params.fallback);
 
   let primary = '';
-  let usedLanguage: ProviderTitleLanguage | 'fallback' = 'fallback';
+  let usedLanguage: AniListTitleLanguage | 'fallback' = 'fallback';
 
   for (const lang of uniqueOrder) {
     const candidate = normalizeTitle(titleMap?.[lang]);
