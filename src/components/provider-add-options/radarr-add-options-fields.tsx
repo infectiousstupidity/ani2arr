@@ -14,6 +14,7 @@ import type {
   RadarrFormState,
   RadarrMinimumAvailability,
 } from '@/shared/schemas/radarr-settings.schema';
+import { MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS } from '@/shared/schemas/radarr-settings.schema';
 import { cn } from '@/shared/utils/cn';
 
 import { ProviderRootFolderSelect } from './provider-root-folder-select';
@@ -37,29 +38,6 @@ export interface RadarrAddOptionsFieldsProps {
   displayRootWithSlug?: boolean | undefined;
   layout?: 'stacked' | 'grid' | undefined;
 }
-
-const MINIMUM_AVAILABILITY_OPTIONS: Array<{
-  value: RadarrMinimumAvailability;
-  label: string;
-  description: string;
-}> = [
-  {
-    value: 'announced',
-    label: 'Announced',
-    description: 'Allow adds before a theatrical or digital date exists.',
-  },
-  {
-    value: 'inCinemas',
-    label: 'In Cinemas',
-    description: 'Wait until the movie has a theatrical release.',
-  },
-  {
-    value: 'released',
-    label: 'Released',
-    description: 'Wait until the movie is officially released.',
-  },
-  { value: 'preDB', label: 'PreDB', description: 'Allow pre-release availability.' },
-];
 
 export function RadarrAddOptionsFields(
   props: RadarrAddOptionsFieldsProps,
@@ -118,7 +96,7 @@ export function RadarrAddOptionsFields(
         disabled={disabled}
         value={values.minimumAvailability}
         onChange={value => onChange('minimumAvailability', value as RadarrMinimumAvailability)}
-        options={MINIMUM_AVAILABILITY_OPTIONS}
+        options={MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS}
         container={portalContainer ?? null}
       />
 
