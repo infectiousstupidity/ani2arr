@@ -2,7 +2,6 @@
 // src/entrypoints/anilist-browse.content/index.tsx
 
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
-import { shouldSkipMediaFormat } from '@/shared/anilist/formats';
 import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
 import type { AniListMediaHint, PublicOptions } from '@/shared/types';
 import baseStyles from '@/shared/styles/base.css?inline';
@@ -16,6 +15,7 @@ import {
   type ParsedCard,
 } from '@/features/media-overlay';
 import { createBrowseEntrypointShell } from '@/runtime/browse-entrypoint-shell';
+import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 
 const isBrowseSurface = (url: string): boolean => {
   try {
@@ -107,7 +107,7 @@ const parseAniListCard = (card: Element): ParsedCard | null => {
   if (!title || !Number.isFinite(anilistId)) return null;
 
   const domMetadata = getCachedDomMetadata(anilistId);
-  if (shouldSkipMediaFormat(domMetadata?.format ?? null)) return null;
+  if (resolveProviderForAniListFormat(domMetadata?.format ?? null) === null) return null;
 
   const fallbackMetadata: AniListMediaHint | null = title
     ? {

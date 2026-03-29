@@ -10,7 +10,7 @@ import type {
   AniListMedia,
   AniListTitles,
 } from '@/shared/types';
-import { AniListMetadataBundleSchema, AniListMetadataChunkRefSchema, AniListMetadataSchema } from '@/shared/schemas/anilist-metadata.schema';
+import { AniListMetadataBundleSchema, AniListMetadataChunkRefSchema, AniListMetadataSchema } from '@/shared/schemas/anilist/anilist-metadata.schema';
 import { logError, normalizeError } from '@/shared/errors';
 import { logger } from '@/shared/utils/logger';
 import {

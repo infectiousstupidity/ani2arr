@@ -2,8 +2,8 @@
 // src/core/anilist/metadata.schema.ts
 
 import * as v from 'valibot';
-import { AniListMediaFormatSchema, AniListTitlesSchema } from '@/shared/schemas/anilist-media.schema';
-import { AniListMetadataCoverImageSchema } from '@/shared/schemas/anilist-metadata.schema';
+import { AniListMediaFormatSchema, AniListTitlesSchema } from '@/shared/schemas/anilist/anilist-media.schema';
+import { AniListMetadataCoverImageSchema } from '@/shared/schemas/anilist/anilist-metadata.schema';
 
 const AniListIdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
 

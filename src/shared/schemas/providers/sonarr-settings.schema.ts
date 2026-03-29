@@ -2,7 +2,7 @@
 // src/shared/schemas/sonarr-settings.schema.ts
 
 import * as v from 'valibot';
-import { AniListTitleLanguageSchema } from '@/shared/schemas/anilist-title-language.schema';
+import { AniListTitleLanguageSchema } from '@/shared/schemas/anilist/anilist-title-language.schema';
 import {
   CoerceNumberArray,
   CoerceQualityProfileId,

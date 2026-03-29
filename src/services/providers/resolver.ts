@@ -1,3 +1,6 @@
+/** Provider labels, routing, and option lookups for supported providers. */
+// src/services/providers/resolver.ts
+
 import type { AniListMediaFormat, Provider, PublicOptions } from '@/shared/types';
 
 type ProviderDescriptor = {
@@ -31,9 +34,25 @@ export const getProviderDescriptor = (service: Provider): ProviderDescriptor => 
 export const getProviderLabel = (service: Provider): string => getProviderDescriptor(service).label;
 
 export const resolveProviderForAniListFormat = (format: AniListMediaFormat | null | undefined): Provider | null => {
-  if (format === 'MOVIE') return 'radarr';
-  if (format === 'MUSIC') return null;
-  return 'sonarr';
+  switch (format) {
+    case 'MOVIE':
+      return 'radarr';
+    case 'TV':
+    case 'TV_SHORT':
+    case 'SPECIAL':
+    case 'OVA':
+    case 'ONA':
+      return 'sonarr';
+    case 'MUSIC':
+    case 'MANGA':
+    case 'NOVEL':
+    case 'ONE_SHOT':
+    case null:
+    case undefined:
+      return null;
+    default:
+      return null;
+  }
 };
 
 export const isProviderConfigured = (
