@@ -49,8 +49,8 @@ type CommonDeps = {
   ensureSonarrConfigured: () => Promise<{ credentials: ProviderCredentials; options: ExtensionOptions }>;
   ensureRadarrConfigured: () => Promise<{ credentials: ProviderCredentials; options: ExtensionOptions }>;
   scheduleLibraryRefresh: (provider: 'sonarr' | 'radarr', optionsHint?: ExtensionOptions) => void;
-  bumpLibraryRevision: (provider: 'sonarr' | 'radarr', payload?: Record<string, unknown>) => Promise<void>;
-  bumpMappingsRevision: (payload?: Record<string, unknown>) => Promise<void>;
+  bumpLibraryRevision: (provider: 'sonarr' | 'radarr') => Promise<void>;
+  bumpMappingsRevision: () => Promise<void>;
   handleOptionsUpdated: (optionsHint?: ExtensionOptions) => Promise<void>;
   getMappings: typeof getMappingsHandler;
   updateMovie: typeof updateRadarrMovieHandler;
@@ -254,7 +254,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       const created = await SonarrClient.addSeries(payload, options);
       await sonarrLibrary.addSeriesToCache(created);
       scheduleLibraryRefresh('sonarr', options);
-      await bumpLibraryRevision('sonarr', { tvdbId: created.tvdbId });
+      await bumpLibraryRevision('sonarr');
       return created;
     },
 
@@ -324,7 +324,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
 
       await radarrLibrary.addMovieToCache(created);
       scheduleLibraryRefresh('radarr', options);
-      await bumpLibraryRevision('radarr', { tmdbId: created.tmdbId });
+      await bumpLibraryRevision('radarr');
       return created;
     },
 
@@ -335,7 +335,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         ensureSonarrConfigured,
       });
       scheduleLibraryRefresh('sonarr');
-      await bumpLibraryRevision('sonarr', { tvdbId: updated.tvdbId, action: 'updated' });
+      await bumpLibraryRevision('sonarr');
       return updated;
     },
 
@@ -346,7 +346,7 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         ensureRadarrConfigured,
       });
       scheduleLibraryRefresh('radarr');
-      await bumpLibraryRevision('radarr', { tmdbId: updated.tmdbId, action: 'updated' });
+      await bumpLibraryRevision('radarr');
       return updated;
     },
 
@@ -617,16 +617,8 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         }
       }
 
-      await bumpLibraryRevision(input.provider, {
-        anilistId: input.anilistId,
-        externalId: input.externalId,
-        action: 'override:set',
-      });
-      await bumpMappingsRevision({
-        anilistId: input.anilistId,
-        provider: input.provider,
-        action: 'override:set',
-      });
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
       return { ok: true as const };
     },
 
@@ -642,12 +634,8 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
         }
       }
 
-      await bumpLibraryRevision(input.provider, { anilistId: input.anilistId, action: 'override:clear' });
-      await bumpMappingsRevision({
-        anilistId: input.anilistId,
-        provider: input.provider,
-        action: 'override:clear',
-      });
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
       return { ok: true as const };
     },
 
@@ -655,12 +643,8 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesReady;
       await overridesService.setIgnore(input.provider, input.anilistId);
       await mappingService.evictResolved(input.anilistId, input.provider);
-      await bumpLibraryRevision(input.provider, { anilistId: input.anilistId, action: 'override:ignore' });
-      await bumpMappingsRevision({
-        anilistId: input.anilistId,
-        provider: input.provider,
-        action: 'override:ignore',
-      });
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
       return { ok: true as const };
     },
 
@@ -668,12 +652,8 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesReady;
       await overridesService.clearIgnore(input.provider, input.anilistId);
       await mappingService.evictResolved(input.anilistId, input.provider);
-      await bumpLibraryRevision(input.provider, { anilistId: input.anilistId, action: 'override:clearIgnore' });
-      await bumpMappingsRevision({
-        anilistId: input.anilistId,
-        provider: input.provider,
-        action: 'override:clearIgnore',
-      });
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
       return { ok: true as const };
     },
 
@@ -683,16 +663,8 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesService.setRejectedCandidate(input.provider, input.anilistId, input.externalId);
       await mappingService.evictResolved(input.anilistId, input.provider);
 
-      await bumpLibraryRevision(input.provider, {
-        anilistId: input.anilistId,
-        externalId: input.externalId,
-        action: 'mapping:rejectCandidate',
-      });
-      await bumpMappingsRevision({
-        anilistId: input.anilistId,
-        provider: input.provider,
-        action: 'mapping:rejectCandidate',
-      });
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
       return { ok: true as const };
     },
 
@@ -702,16 +674,8 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesService.clearRejectedCandidate(input.provider, input.anilistId, input.externalId);
       await mappingService.evictResolved(input.anilistId, input.provider);
 
-      await bumpLibraryRevision(input.provider, {
-        anilistId: input.anilistId,
-        externalId: input.externalId,
-        action: 'mapping:clearRejectedCandidate',
-      });
-      await bumpMappingsRevision({
-        anilistId: input.anilistId,
-        provider: input.provider,
-        action: 'mapping:clearRejectedCandidate',
-      });
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
       return { ok: true as const };
     },
 
@@ -721,16 +685,8 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesService.setBlockedCandidate(input.provider, input.anilistId, input.externalId);
       await mappingService.evictResolved(input.anilistId, input.provider);
 
-      await bumpLibraryRevision(input.provider, {
-        anilistId: input.anilistId,
-        externalId: input.externalId,
-        action: 'mapping:blockCandidate',
-      });
-      await bumpMappingsRevision({
-        anilistId: input.anilistId,
-        provider: input.provider,
-        action: 'mapping:blockCandidate',
-      });
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
       return { ok: true as const };
     },
 
@@ -740,16 +696,8 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
       await overridesService.clearBlockedCandidate(input.provider, input.anilistId, input.externalId);
       await mappingService.evictResolved(input.anilistId, input.provider);
 
-      await bumpLibraryRevision(input.provider, {
-        anilistId: input.anilistId,
-        externalId: input.externalId,
-        action: 'mapping:clearBlockedCandidate',
-      });
-      await bumpMappingsRevision({
-        anilistId: input.anilistId,
-        provider: input.provider,
-        action: 'mapping:clearBlockedCandidate',
-      });
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
       return { ok: true as const };
     },
 
@@ -774,9 +722,9 @@ export function createApiHandlers(deps: CommonDeps): Ani2arrApi {
           scheduleLibraryRefresh('sonarr', options);
         }
 
-        await bumpLibraryRevision('sonarr', { action: 'override:clearAll' });
-        await bumpLibraryRevision('radarr', { action: 'override:clearAll' });
-        await bumpMappingsRevision({ action: 'override:clearAll' });
+        await bumpLibraryRevision('sonarr');
+        await bumpLibraryRevision('radarr');
+        await bumpMappingsRevision();
 
         return { ok: true as const };
       } catch (error) {

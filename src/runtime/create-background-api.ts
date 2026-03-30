@@ -1,7 +1,6 @@
 /** Runtime-owned composition for the background Ani2arr API implementation. */
 // src/runtime/create-background-api.ts
 
-import { browser } from 'wxt/browser';
 import {
   anilistMediaCache,
   bumpRevision,
@@ -32,12 +31,6 @@ import type { Ani2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 45 * 1000;
-const CONTENT_SCRIPT_URL_PATTERNS = [
-  '*://anilist.co/*',
-  '*://www.anilist.co/*',
-  '*://anichart.net/*',
-  '*://www.anichart.net/*',
-];
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
@@ -89,39 +82,8 @@ export const createBackgroundApi = (): Ani2arrApi => {
   const overridesService = new MappingOverridesService();
   const overridesReady = overridesService.init();
 
-  const broadcast = async (topic: string, payload?: Record<string, unknown>): Promise<void> => {
-    const message = { _a2a: true, topic, payload };
-
-    try {
-      await browser.runtime.sendMessage(message);
-    } catch (error) {
-      const normalized = normalizeError(error);
-      if (normalized.message.includes('Receiving end does not exist')) return;
-      logError(normalized, `Ani2arrApi:broadcast:${topic}`);
-    }
-
-    try {
-      const tabs = await browser.tabs.query({ url: CONTENT_SCRIPT_URL_PATTERNS });
-      await Promise.all(
-        tabs.map(async tab => {
-          if (typeof tab.id !== 'number') return;
-          try {
-            await browser.tabs.sendMessage(tab.id, message);
-          } catch (error) {
-            const normalized = normalizeError(error);
-            if (normalized.message.includes('Receiving end does not exist')) return;
-            logError(normalized, `Ani2arrApi:broadcast:tab:${topic}`);
-          }
-        }),
-      );
-    } catch (error) {
-      logError(normalizeError(error), `Ani2arrApi:broadcast:tabsQuery:${topic}`);
-    }
-  };
-
-  const bumpMappingsRevision = async (payload?: Record<string, unknown>): Promise<void> => {
-    const nextRevision = await bumpRevision('mappings');
-    await broadcast('mappings-updated', { epoch: nextRevision, ...payload });
+  const bumpMappingsRevision = async (): Promise<void> => {
+    await bumpRevision('mappings');
   };
 
   const mappingService = bindAll(
@@ -159,13 +121,10 @@ export const createBackgroundApi = (): Ani2arrApi => {
 
   const bumpLibraryRevision = async (
     provider: Provider,
-    payload?: Record<string, unknown>,
   ): Promise<void> => {
-    const nextRevision = await bumpRevision(
+    await bumpRevision(
       provider === 'sonarr' ? 'sonarrLibrary' : 'radarrLibrary',
     );
-
-    await broadcast('series-updated', { provider, epoch: nextRevision, ...payload });
   };
 
   const sonarrLibrary = bindAll(
@@ -173,7 +132,7 @@ export const createBackgroundApi = (): Ani2arrApi => {
       sonarrClient,
       mappingService,
       providerLibraryCaches.sonarr,
-      mutation => bumpLibraryRevision('sonarr', { tvdbId: mutation.tvdbId, action: mutation.action }),
+      () => bumpLibraryRevision('sonarr'),
     ),
   );
 
@@ -182,14 +141,9 @@ export const createBackgroundApi = (): Ani2arrApi => {
       radarrClient,
       mappingService,
       providerLibraryCaches.radarr,
-      mutation => bumpLibraryRevision('radarr', { tmdbId: mutation.tmdbId, action: mutation.action }),
+      () => bumpLibraryRevision('radarr'),
     ),
   );
-
-  const bumpSettingsRevision = async (): Promise<void> => {
-    const nextRevision = await bumpRevision('settings');
-    await broadcast('settings-changed', { epoch: nextRevision });
-  };
 
   const ensureSonarrConfigured = async (): Promise<{
     credentials: ProviderCredentials;
@@ -268,9 +222,8 @@ export const createBackgroundApi = (): Ani2arrApi => {
     radarrClient.clearEtagCache();
     logger.configure({ enabled: (optionsHint?.debugLogging ?? false) || import.meta.env.DEV });
 
-    await bumpSettingsRevision();
     await mappingService.resetLookupState();
-    await bumpMappingsRevision({ action: 'reset-lookup-state' });
+    await bumpMappingsRevision();
 
     const options = optionsHint ?? (await getExtensionOptionsSnapshot());
     const hasConfiguredProvider = Boolean(

@@ -2,7 +2,7 @@
 // src/features/options/use-settings-actions.ts
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { browser } from 'wxt/browser';
+import { getAni2arrApi } from '@/rpc';
 import { useFormContext } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -37,8 +37,6 @@ type PreparedProviderState = {
   configured: boolean;
   permissionPattern: string | null;
 };
-
-const RESET_EXTENSION_STATE_MESSAGE_TYPE = 'a2a:reset-extension-state' as const;
 
 export function useSettingsActions(params: UseSettingsActionsParams) {
   const { savedSettings } = params;
@@ -537,11 +535,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
     const defaults = createDefaultSettings();
 
     try {
-      await browser.runtime.sendMessage({
-        _a2a: true,
-        type: RESET_EXTENSION_STATE_MESSAGE_TYPE,
-        timestamp: Date.now(),
-      });
+      await getAni2arrApi().resetExtensionState();
       methods.reset(defaults as SettingsFormValues);
     } finally {
       invalidateSettingsQueries();
