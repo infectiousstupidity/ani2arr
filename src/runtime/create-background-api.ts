@@ -21,8 +21,6 @@ import { SonarrLookupClient, RadarrLookupClient } from '@/services/mapping/looku
 import { SonarrLibrary } from '@/services/library/sonarr';
 import { RadarrLibrary } from '@/services/library/radarr';
 import { getMappingsHandler } from '@/rpc/handlers/get-mappings.handlers';
-import { updateRadarrMovieHandler } from '@/rpc/handlers/update-movie.handlers';
-import { updateSonarrSeriesHandler } from '@/rpc/handlers/update-series.handlers';
 import { createApiHandlers } from '@/rpc/handlers';
 import type { Provider, ProviderCredentials } from '@/shared/types/providers';
 import type { ExtensionOptions } from '@/shared/types';
@@ -264,7 +262,5 @@ export const createBackgroundApi = (): Ani2arrApi => {
     bumpMappingsRevision,
     handleOptionsUpdated,
     getMappings: getMappingsHandler,
-    updateMovie: updateRadarrMovieHandler,
-    updateSeries: updateSonarrSeriesHandler,
   });
 };

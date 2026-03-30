@@ -5,8 +5,6 @@ import type { AniListMediaService, AniListMetadataStore } from '@/core/anilist';
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { getMappingsHandler } from '@/rpc/handlers/get-mappings.handlers';
-import type { updateRadarrMovieHandler } from '@/rpc/handlers/update-movie.handlers';
-import type { updateSonarrSeriesHandler } from '@/rpc/handlers/update-series.handlers';
 import type { MappingService } from '@/services/mapping';
 import type { MappingOverridesService } from '@/services/mapping/overrides';
 import type { UpstreamMappingStore } from '@/services/mapping/upstream';
@@ -33,6 +31,4 @@ export type ApiHandlerDeps = {
   bumpMappingsRevision: () => Promise<void>;
   handleOptionsUpdated: (optionsHint?: ExtensionOptions) => Promise<void>;
   getMappings: typeof getMappingsHandler;
-  updateMovie: typeof updateRadarrMovieHandler;
-  updateSeries: typeof updateSonarrSeriesHandler;
 };

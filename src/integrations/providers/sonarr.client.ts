@@ -2,10 +2,7 @@
 // src/integrations/providers/sonarr.client.ts
 
 import { BaseProviderClient } from '@/integrations/providers/base-provider.client';
-import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
-import type { AniListMediaHint } from '@/shared/types/anilist';
-import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-import type { ExtensionOptions } from '@/shared/types';
+import type { SonarrMonitorOption, SonarrSeriesType } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type {
   ProviderTag,
   ProviderCredentials,
@@ -20,11 +17,20 @@ type SonarrClientOptions = {
   hasUrlPermission: (url: string) => Promise<boolean>;
 };
 
-interface AddSonarrSeriesPayload extends Partial<SonarrFormState> {
+export interface AddSonarrSeriesPayload {
   title: string;
-  anilistId: number;
-  tvdbId?: number;
-  metadata?: AniListMediaHint | null;
+  tvdbId: number;
+  qualityProfileId: number;
+  rootFolderPath: string;
+  seasonFolder: boolean;
+  monitored: boolean;
+  seriesType: SonarrSeriesType;
+  tags: number[];
+  addOptions: {
+    monitor: SonarrMonitorOption;
+    searchForMissingEpisodes: boolean;
+    searchForCutoffUnmetEpisodes: boolean;
+  };
 }
 
 export class SonarrClient extends BaseProviderClient {
@@ -75,58 +81,12 @@ export class SonarrClient extends BaseProviderClient {
 
   public addSeries = async (
     payload: AddSonarrSeriesPayload,
-    extensionOptions: ExtensionOptions,
+    credentials: ProviderCredentials,
   ): Promise<SonarrSeries> => {
-    const sonarrSettings = extensionOptions.providers.sonarr;
-    const sonarrCreds: ProviderCredentials = {
-      url: sonarrSettings.url,
-      apiKey: sonarrSettings.apiKey,
-    };
-
-    const mergedInput: AddSonarrSeriesPayload = {
-      ...sonarrSettings.defaults,
-      ...payload,
-    };
-
-    const finalTagIds = await resolveProviderTagIds({
-      api: this,
-      credentials: sonarrCreds,
-      existingIdsFromForm: Array.isArray(mergedInput.tags)
-        ? mergedInput.tags.filter(id => typeof id === 'number' && !Number.isNaN(id))
-        : [],
-      freeformLabelsFromForm: Array.isArray(mergedInput.freeformTags) ? mergedInput.freeformTags : [],
-      serviceLabel: 'Sonarr',
-    });
-
-    // Strip fields that Sonarr does not understand (`metadata`, `freeformTags`) before sending
-    const {
-      metadata: _unusedMetadata,
-      freeformTags: _unusedFreeformTags,
-      ...payloadForSonarr
-    } = mergedInput;
-    void _unusedMetadata;
-    void _unusedFreeformTags;
-
-    const apiPayload = {
-      ...payloadForSonarr,
-      tags: finalTagIds,
-      monitored:
-        (mergedInput.monitorOption ?? sonarrSettings.defaults.monitorOption) !== 'none',
-      addOptions: {
-        searchForMissingEpisodes:
-          mergedInput.searchForMissingEpisodes ??
-          sonarrSettings.defaults.searchForMissingEpisodes,
-        searchForCutoffUnmetEpisodes:
-          mergedInput.searchForCutoffUnmetEpisodes ??
-          sonarrSettings.defaults.searchForCutoffUnmetEpisodes,
-        monitor: mergedInput.monitorOption ?? sonarrSettings.defaults.monitorOption,
-      },
-    };
-
-    this.log.debug('Sending addSeries payload to Sonarr:', apiPayload);
-    const created = await this.request<SonarrSeries>('series', sonarrCreds, {
+    this.log.debug('Sending addSeries payload to Sonarr:', payload);
+    const created = await this.request<SonarrSeries>('series', credentials, {
       method: 'POST',
-      body: JSON.stringify(apiPayload),
+      body: JSON.stringify(payload),
     });
 
     return created;
