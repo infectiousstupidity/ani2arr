@@ -30,5 +30,7 @@ export type ApiHandlerDeps = {
   bumpLibraryRevision: (provider: 'sonarr' | 'radarr') => Promise<void>;
   bumpMappingsRevision: () => Promise<void>;
   handleOptionsUpdated: (optionsHint?: ExtensionOptions) => Promise<void>;
+  clearPersistentCaches: () => Promise<void>;
+  resetExtensionState: () => Promise<void>;
   getMappings: typeof getMappingsHandler;
 };
