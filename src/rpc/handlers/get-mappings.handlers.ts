@@ -1,3 +1,6 @@
+/** RPC handler that builds the mapping review table payload from recorded mapping and library state. */
+// src/rpc/handlers/get-mappings.handlers.ts
+
 import type { MappingOverridesService } from '@/services/mapping/overrides';
 import type { UpstreamMappingStore } from '@/services/mapping/upstream';
 import type { MappingService } from '@/services/mapping';

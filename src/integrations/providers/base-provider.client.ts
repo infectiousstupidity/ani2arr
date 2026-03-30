@@ -6,7 +6,6 @@ import { logger } from '@/shared/utils/logger';
 import { AbortError, withRetry } from '@/shared/utils/retry';
 import type { ProviderCredentials } from '@/shared/types/providers';
 
-
 interface BaseProviderClientOptions {
   providerName: string;
   logScope?: string;
@@ -42,6 +41,23 @@ export class BaseProviderClient {
 
   public clearEtagCache(): void {
     this.etagCache.clear();
+  }
+
+  public async testConnection(
+    credentials: ProviderCredentials,
+  ): Promise<{ version: string }> {
+    const status = await this.request<{ version?: string | null }>('system/status', credentials);
+    const version = status.version?.trim();
+
+    if (!version) {
+      throw createError(
+        ErrorCode.API_ERROR,
+        `${this.providerName} system status did not include a version.`,
+        `${this.providerName} returned an invalid system status response.`,
+      );
+    }
+
+    return { version };
   }
 
   protected invalidateCachedEndpoint(endpoint: string, baseUrl?: string): void {
@@ -185,7 +201,7 @@ export class BaseProviderClient {
       );
     } catch (error) {
       const normalized = normalizeError(error);
-        logError(normalized, `${this.providerName}Client:request:${endpoint}`);
+      logError(normalized, `${this.providerName}Client:request:${endpoint}`);
       throw normalized;
     }
   }

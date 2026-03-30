@@ -18,25 +18,6 @@ type RadarrClientOptions = {
   hasUrlPermission: (url: string) => Promise<boolean>;
 };
 
-export interface RadarrSystemStatus {
-  version: string;
-  appName?: string;
-  instanceName?: string;
-  isDebug?: boolean;
-  isProduction?: boolean;
-  urlBase?: string;
-}
-
-export interface RadarrCommandResource {
-  id?: number;
-  name?: string;
-  state?: string;
-  message?: string | null;
-  startedOn?: string;
-  endedOn?: string;
-  body?: unknown;
-}
-
 export interface AddRadarrMoviePayload {
   title: string;
   tmdbId: number;
@@ -154,30 +135,6 @@ export class RadarrClient extends BaseProviderClient {
     return created;
   };
 
-  public getSetupMetadata = async (
-    credentials: ProviderCredentials,
-  ): Promise<{
-    qualityProfiles: ProviderQualityProfile[];
-    rootFolders: ProviderRootFolder[];
-    tags: ProviderTag[];
-  }> => {
-    const [qualityProfiles, rootFolders, tags] = await Promise.all([
-      this.getQualityProfiles(credentials),
-      this.getRootFolders(credentials),
-      this.getTags(credentials),
-    ]);
-
-    return { qualityProfiles, rootFolders, tags };
-  };
-
-  public getSystemStatus = async (credentials: ProviderCredentials): Promise<RadarrSystemStatus> => {
-    return this.request<RadarrSystemStatus>('system/status', credentials);
-  };
-
-  public testConnection = async (credentials: ProviderCredentials): Promise<RadarrSystemStatus> => {
-    return this.getSystemStatus(credentials);
-  };
-
   public addMovie = async (
     payload: AddRadarrMoviePayload,
     credentials: ProviderCredentials,
@@ -249,57 +206,6 @@ export class RadarrClient extends BaseProviderClient {
 
     return updated;
   };
-
-  public triggerMovieSearch = async (
-    movieIds: number[],
-    credentials: ProviderCredentials,
-  ): Promise<RadarrCommandResource> => {
-    return this.triggerCommand(
-      {
-        name: 'MoviesSearch',
-        movieIds: this.filterNumericIds(movieIds),
-      },
-      credentials,
-    );
-  };
-
-  public triggerRefreshMovie = async (
-    movieIds: number[],
-    credentials: ProviderCredentials,
-  ): Promise<RadarrCommandResource> => {
-    return this.triggerCommand(
-      {
-        name: 'RefreshMovie',
-        movieIds: this.filterNumericIds(movieIds),
-      },
-      credentials,
-    );
-  };
-
-  private async triggerCommand(
-    payload: {
-      name: string;
-      movieIds: number[];
-    },
-    credentials: ProviderCredentials,
-  ): Promise<RadarrCommandResource> {
-    if (payload.movieIds.length === 0) {
-      throw createError(
-        ErrorCode.VALIDATION_ERROR,
-        `${payload.name} requires at least one movie ID.`,
-        'Select at least one movie first.',
-      );
-    }
-
-    return this.request<RadarrCommandResource>('command', credentials, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  }
-
-  private filterNumericIds(ids: number[]): number[] {
-    return ids.filter(id => typeof id === 'number' && Number.isFinite(id));
-  }
 
   private pickSingleMovie(
     result: RadarrMovie | RadarrMovie[],

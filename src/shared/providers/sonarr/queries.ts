@@ -5,7 +5,7 @@ import { queryKeys } from '@/shared/queries/query-keys';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type { PublicOptions } from '@/shared/types';
 import type { ProviderCredentials, SonarrSeries } from '@/shared/types/providers';
-import type { AddInput, UpdateSonarrInput } from '@/rpc/schemas';
+import type { AddSonarrInput, UpdateSonarrInput } from '@/rpc/schemas';
 
 export const useSonarrMetadata = (options?: { enabled?: boolean; credentials?: ProviderCredentials | null }) => {
   const credentialScope =
@@ -30,8 +30,8 @@ export const useSonarrMetadata = (options?: { enabled?: boolean; credentials?: P
 
 export const useAddSeries = () => {
   const queryClient = useQueryClient();
-  return useMutation<SonarrSeries, ExtensionError, AddInput>({
-    mutationFn: async (input: AddInput) => {
+  return useMutation<SonarrSeries, ExtensionError, AddSonarrInput>({
+    mutationFn: async (input: AddSonarrInput) => {
       try {
         return await getAni2arrApi().addToSonarr(input);
       } catch (error) {

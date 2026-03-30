@@ -1,5 +1,5 @@
 /** RPC handler that updates an existing Sonarr series using resolved form and library state. */
-// src/rpc/handlers/update-series.ts
+// src/rpc/handlers/update-series.handlers.ts
 
 import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';

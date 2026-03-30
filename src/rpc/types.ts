@@ -1,12 +1,17 @@
-/** Plain RPC payload and response types that do not need runtime schemas. */
+/** Plain payload and response types used by RPC and adjacent provider flows without runtime schemas. */
 // src/rpc/types.ts
 
-import type { AniListMetadata, AniListMediaHint, AniListMediaStatus, AniListMediaFormat, AniListTitles } from '@/shared/types/anilist';
+import type {
+  AniListMediaFormat,
+  AniListMediaHint,
+  AniListMediaStatus,
+  AniListMetadata,
+  AniListTitles,
+} from '@/shared/types/anilist';
 import type {
   ProviderQualityProfile,
   ProviderRootFolder,
   ProviderTag,
-  ProviderCredentials,
   RadarrMovieSnapshot,
   RadarrLookupMovie,
   RadarrMovie,
@@ -15,21 +20,15 @@ import type {
   SonarrSeries,
 } from '@/shared/types/providers';
 import type { AniListSchedulerDebugSnapshot } from '@/debug/anilist-debug.types';
-import type { MappingExternalId } from '@/shared/types/mapping';
-import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-import type { MappingSummary } from '@/shared/types';
+import type {
+  MappingBlockedRecord,
+  MappingExternalId,
+  MappingIgnoreRecord,
+  MappingOverrideRecord,
+  MappingRejectedRecord,
+  MappingSummary,
+} from '@/shared/types/mapping';
 import type { MappingCursor } from './schemas';
-
-/**
- * Payload used when adding a series.
- * Inherits all Sonarr form fields (including tags/freeformTags) as optional.
- */
-export interface AddRequestPayload extends Partial<SonarrFormState> {
-  title: string;
-  anilistId: number;
-  tvdbId?: number;
-  metadata?: AniListMediaHint | null;
-}
 
 export interface CheckSeriesStatusPayload {
   anilistId: number;
@@ -69,50 +68,9 @@ export interface CheckMovieStatusResponse {
   linkedAniListIds?: number[];
 }
 
-export type TestConnectionPayload = ProviderCredentials;
-
-export interface MappingOutput {
+export interface ResolveMappingOutput {
   tvdbId: number | null;
   successfulSynonym?: string;
-}
-
-export type StatusOutput = CheckSeriesStatusResponse;
-export type MovieStatusOutput = CheckMovieStatusResponse;
-
-export interface MappingOverrideItem {
-  anilistId: number;
-  provider: 'sonarr' | 'radarr';
-  externalId: {
-    id: number;
-    kind: 'tvdb' | 'tmdb';
-  };
-  updatedAt: number;
-}
-
-export interface MappingIgnoreItem {
-  anilistId: number;
-  provider: 'sonarr' | 'radarr';
-  updatedAt: number;
-}
-
-export interface MappingRejectedCandidateItem {
-  anilistId: number;
-  provider: 'sonarr' | 'radarr';
-  externalId: {
-    id: number;
-    kind: 'tvdb' | 'tmdb';
-  };
-  updatedAt: number;
-}
-
-export interface MappingBlockedCandidateItem {
-  anilistId: number;
-  provider: 'sonarr' | 'radarr';
-  externalId: {
-    id: number;
-    kind: 'tvdb' | 'tmdb';
-  };
-  updatedAt: number;
 }
 
 export interface ExportStoredMappingsOutput {
@@ -125,10 +83,10 @@ export interface ExportStoredMappingsOutput {
     blockedCandidateCount: number;
   };
   mappings: {
-    overrides: Record<string, MappingOverrideItem>;
-    ignores: Record<string, MappingIgnoreItem>;
-    rejectedCandidates: Record<string, MappingRejectedCandidateItem>;
-    blockedCandidates: Record<string, MappingBlockedCandidateItem>;
+    overrides: Record<string, MappingOverrideRecord>;
+    ignores: Record<string, MappingIgnoreRecord>;
+    rejectedCandidates: Record<string, MappingRejectedRecord>;
+    blockedCandidates: Record<string, MappingBlockedRecord>;
   };
 }
 
@@ -168,14 +126,11 @@ export interface ValidateTmdbOutput {
   inCatalog: boolean;
 }
 
-export interface GetRadarrMetadataOutput {
+export interface ProviderMetadataOutput {
   qualityProfiles: ProviderQualityProfile[];
   rootFolders: ProviderRootFolder[];
   tags: ProviderTag[];
 }
-
-export type AddRadarrOutput = RadarrMovie;
-export type UpdateRadarrOutput = RadarrMovie;
 
 export interface GetAniListMetadataOutput {
   metadata: AniListMetadata[];
@@ -191,8 +146,3 @@ export interface AniListSearchResult {
 }
 
 export type GetAniListSchedulerDebugOutput = AniListSchedulerDebugSnapshot;
-export type SonarrMetadataOutput = {
-  qualityProfiles: ProviderQualityProfile[];
-  rootFolders: ProviderRootFolder[];
-  tags: ProviderTag[];
-};

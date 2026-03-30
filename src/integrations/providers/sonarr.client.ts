@@ -3,7 +3,8 @@
 
 import { BaseProviderClient } from '@/integrations/providers/base-provider.client';
 import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
-import type { AddRequestPayload } from '@/rpc/types';
+import type { AniListMediaHint } from '@/shared/types/anilist';
+import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type { ExtensionOptions } from '@/shared/types';
 import type {
   ProviderTag,
@@ -18,6 +19,13 @@ import { createError, ErrorCode } from '@/shared/errors';
 type SonarrClientOptions = {
   hasUrlPermission: (url: string) => Promise<boolean>;
 };
+
+interface AddSonarrSeriesPayload extends Partial<SonarrFormState> {
+  title: string;
+  anilistId: number;
+  tvdbId?: number;
+  metadata?: AniListMediaHint | null;
+}
 
 export class SonarrClient extends BaseProviderClient {
   public constructor(options: SonarrClientOptions) {
@@ -66,7 +74,7 @@ export class SonarrClient extends BaseProviderClient {
   };
 
   public addSeries = async (
-    payload: AddRequestPayload,
+    payload: AddSonarrSeriesPayload,
     extensionOptions: ExtensionOptions,
   ): Promise<SonarrSeries> => {
     const sonarrSettings = extensionOptions.providers.sonarr;
@@ -75,7 +83,7 @@ export class SonarrClient extends BaseProviderClient {
       apiKey: sonarrSettings.apiKey,
     };
 
-    const mergedInput: AddRequestPayload = {
+    const mergedInput: AddSonarrSeriesPayload = {
       ...sonarrSettings.defaults,
       ...payload,
     };
@@ -189,11 +197,5 @@ export class SonarrClient extends BaseProviderClient {
     this.invalidateCachedEndpoint('tag');
 
     return created;
-  };
-
-  public testConnection = async (
-    credentials: ProviderCredentials,
-  ): Promise<{ version: string }> => {
-    return this.request<{ version: string }>('system/status', credentials);
   };
 }

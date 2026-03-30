@@ -1,5 +1,5 @@
 /** RPC handler that updates an existing Radarr movie using resolved form and library state. */
-// src/rpc/handlers/update-movie.ts
+// src/rpc/handlers/update-movie.handlers.ts
 
 import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
