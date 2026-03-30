@@ -4,15 +4,21 @@
 import {
   anilistMediaCache,
   bumpRevision,
+  clearAllTtlCaches,
   getExtensionOptionsSnapshot,
   providerLibraryCaches,
   radarrLookupCaches,
+  resetAllRevisions,
+  setExtensionOptionsSnapshot,
   sonarrLookupCaches,
   upstreamMappingCaches,
 } from '@/storage';
 import { SonarrClient } from '@/integrations/providers/sonarr.client';
 import { RadarrClient } from '@/integrations/providers/radarr.client';
-import { hasProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
+import {
+  hasProviderHostPermission,
+  removeProviderHostPermission,
+} from '@/runtime/permissions/provider-host-permissions';
 import { AniListMediaService, AniListMetadataStore } from '@/core/anilist';
 import { MappingService } from '@/services/mapping';
 import { MappingOverridesService } from '@/services/mapping/overrides';
@@ -27,6 +33,7 @@ import type { ExtensionOptions } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import type { Ani2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';
+import { createDefaultSettings } from '@/shared/schemas/settings';
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 45 * 1000;
 
@@ -244,6 +251,56 @@ export const createBackgroundApi = (): Ani2arrApi => {
     ]);
   };
 
+  const clearPersistentCaches = async (): Promise<void> => {
+    sonarrClient.clearEtagCache();
+    radarrClient.clearEtagCache();
+
+    await Promise.all([
+      anilistMetadataStore.clearLocalCache(),
+      mappingService.resetLookupState(),
+      upstreamMappingStore.clear(),
+    ]);
+
+    await clearAllTtlCaches();
+    await resetAllRevisions();
+  };
+
+  const removeConfiguredProviderHostPermissions = async (options: ExtensionOptions): Promise<void> => {
+    const removals = [
+      { provider: 'sonarr' as const, url: options.providers.sonarr.url },
+      { provider: 'radarr' as const, url: options.providers.radarr.url },
+    ];
+
+    await Promise.all(removals.map(async ({ provider, url }) => {
+      if (!url) return;
+
+      const removal = await removeProviderHostPermission(String(url));
+      if (!removal.ok) {
+        logError(normalizeError(removal.error), `Ani2arrApi:resetExtensionState:${provider}:removePermission`);
+        return;
+      }
+
+      if (!removal.value.removed) {
+        logError(
+          normalizeError(new Error(`Permission removal rejected for ${removal.value.pattern}.`)),
+          `Ani2arrApi:resetExtensionState:${provider}:removePermission`,
+        );
+      }
+    }));
+  };
+
+  const resetExtensionState = async (): Promise<void> => {
+    await overridesReady;
+
+    const previousOptions = await getExtensionOptionsSnapshot();
+    const defaults = createDefaultSettings();
+
+    await overridesService.clearAll();
+    await clearPersistentCaches();
+    await setExtensionOptionsSnapshot(defaults);
+    await removeConfiguredProviderHostPermissions(previousOptions);
+  };
+
   return createApiHandlers({
     SonarrClient: sonarrClient,
     RadarrClient: radarrClient,
@@ -261,6 +318,8 @@ export const createBackgroundApi = (): Ani2arrApi => {
     bumpLibraryRevision,
     bumpMappingsRevision,
     handleOptionsUpdated,
+    clearPersistentCaches,
+    resetExtensionState,
     getMappings: getMappingsHandler,
   });
 };
