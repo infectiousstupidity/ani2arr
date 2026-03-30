@@ -1,4 +1,6 @@
-// src/services/index.ts
+/** Runtime-owned composition for the background Ani2arr API implementation. */
+// src/runtime/create-background-api.ts
+
 import { browser } from 'wxt/browser';
 import {
   anilistMediaCache,
@@ -13,21 +15,18 @@ import { SonarrClient } from '@/integrations/providers/sonarr.client';
 import { RadarrClient } from '@/integrations/providers/radarr.client';
 import { hasProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
 import { AniListMediaService, AniListMetadataStore } from '@/core/anilist';
-import { MappingService } from './mapping';
-import { MappingOverridesService } from './mapping/overrides';
-import { UpstreamMappingStore } from './mapping/upstream';
-import { SonarrLookupClient, RadarrLookupClient } from './mapping/lookup';
+import { MappingService } from '@/services/mapping';
+import { MappingOverridesService } from '@/services/mapping/overrides';
+import { UpstreamMappingStore } from '@/services/mapping/upstream';
+import { SonarrLookupClient, RadarrLookupClient } from '@/services/mapping/lookup';
 import { SonarrLibrary } from '@/services/library/sonarr';
 import { RadarrLibrary } from '@/services/library/radarr';
 import { getMappingsHandler } from '@/rpc/handlers/get-mappings';
 import { updateRadarrMovieHandler } from '@/rpc/handlers/update-movie';
 import { updateSonarrSeriesHandler } from '@/rpc/handlers/update-series';
 import { createApiHandlers } from '@/rpc/handlers/handlers';
-import type { ProviderCredentials } from '@/shared/types/providers';
-
-import type {
-  ExtensionOptions,
-} from '@/shared/types';
+import type { Provider, ProviderCredentials } from '@/shared/types/providers';
+import type { ExtensionOptions } from '@/shared/types';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import type { Ani2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';
@@ -39,8 +38,6 @@ const CONTENT_SCRIPT_URL_PATTERNS = [
   '*://anichart.net/*',
   '*://www.anichart.net/*',
 ];
-
-type LibraryProvider = 'sonarr' | 'radarr';
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
@@ -61,9 +58,9 @@ function bindAll<T extends object>(instance: T): T {
   return instance;
 }
 
-export const createApiImplementation = (): Ani2arrApi => {
+export const createBackgroundApi = (): Ani2arrApi => {
   const createHasUrlPermission =
-    (provider: LibraryProvider) =>
+    (provider: Provider) =>
     async (url: string): Promise<boolean> => {
       const result = await hasProviderHostPermission(url);
       if (!result.ok) {
@@ -150,18 +147,18 @@ export const createApiImplementation = (): Ani2arrApi => {
     })
     .catch(() => {});
 
-  const pendingLibraryRefresh: Record<LibraryProvider, ReturnType<typeof setTimeout> | null> = {
+  const pendingLibraryRefresh: Record<Provider, ReturnType<typeof setTimeout> | null> = {
     sonarr: null,
     radarr: null,
   };
 
-  const refreshOptionsHint: Record<LibraryProvider, ExtensionOptions | null> = {
+  const refreshOptionsHint: Record<Provider, ExtensionOptions | null> = {
     sonarr: null,
     radarr: null,
   };
 
   const bumpLibraryRevision = async (
-    provider: LibraryProvider,
+    provider: Provider,
     payload?: Record<string, unknown>,
   ): Promise<void> => {
     const nextRevision = await bumpRevision(
@@ -238,7 +235,7 @@ export const createApiImplementation = (): Ani2arrApi => {
     };
   };
 
-  const scheduleLibraryRefresh = (provider: LibraryProvider, optionsHint?: ExtensionOptions): void => {
+  const scheduleLibraryRefresh = (provider: Provider, optionsHint?: ExtensionOptions): void => {
     if (optionsHint) {
       refreshOptionsHint[provider] = optionsHint;
     }

@@ -1,7 +1,9 @@
+/** Background entrypoint that boots the extension runtime and registers browser-owned listeners. */
 // src/entrypoints/background/index.ts
+
 import { browser } from 'wxt/browser';
 import { registerAni2arrApi, getAni2arrApi } from '@/rpc';
-import { createApiImplementation } from '@/services';
+import { createBackgroundApi } from '@/runtime/create-background-api';
 import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/debug/metrics';
 import { computeTitleMatchScore } from '@/services/mapping/pipeline/matching';
 import { logger } from '@/shared/utils/logger';
@@ -59,7 +61,7 @@ const log = logger.create('Background');
 export default defineBackground(() => {
   log.info('Background initializing…');
 
-  registerAni2arrApi(createApiImplementation());
+  registerAni2arrApi(createBackgroundApi());
   log.info('API services registered.');
 
   if (import.meta.env.DEV) {
