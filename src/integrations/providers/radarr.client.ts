@@ -2,7 +2,6 @@
 // src/integrations/providers/radarr.client.ts
 
 import { BaseProviderClient } from '@/integrations/providers/base-provider.client';
-import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import { createError, ErrorCode } from '@/shared/errors';
 import type { RadarrMinimumAvailability } from '@/shared/schemas/providers/radarr-settings.schema';
 import type {
@@ -26,7 +25,6 @@ export interface AddRadarrMoviePayload {
   monitored?: boolean;
   minimumAvailability?: RadarrMinimumAvailability;
   tags?: number[];
-  freeformTags?: string[];
   path?: string;
   year?: number;
   imdbId?: string | null;
@@ -139,30 +137,18 @@ export class RadarrClient extends BaseProviderClient {
     payload: AddRadarrMoviePayload,
     credentials: ProviderCredentials,
   ): Promise<RadarrMovie> => {
-    const finalTagIds = await resolveProviderTagIds({
-      api: this,
-      credentials,
-      existingIdsFromForm: Array.isArray(payload.tags)
-        ? payload.tags.filter(id => typeof id === 'number' && Number.isFinite(id))
-        : [],
-      freeformLabelsFromForm: Array.isArray(payload.freeformTags) ? payload.freeformTags : [],
-      serviceLabel: 'Radarr',
-    });
-
     const {
-      freeformTags: _unusedFreeformTags,
       addOptions,
       monitored = true,
       minimumAvailability = 'released',
       ...rest
     } = payload;
-    void _unusedFreeformTags;
 
     const apiPayload = {
       ...rest,
       monitored,
       minimumAvailability,
-      tags: finalTagIds,
+      tags: payload.tags ?? [],
       addOptions: {
         searchForMovie: addOptions?.searchForMovie ?? true,
       },

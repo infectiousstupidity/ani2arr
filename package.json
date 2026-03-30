@@ -37,6 +37,7 @@
     "globals": "^16.2.0",
     "tailwindcss": "^4.1.10",
     "terser": "^5.44.0",
+    "typescript": "6.0.2",
     "typescript-eslint": "^8.35.0",
     "wxt": "^0.20.11"
   },
