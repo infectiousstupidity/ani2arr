@@ -39,7 +39,7 @@ export type {
   SonarrSeriesSnapshot,
   ProviderTag,
   ProviderQualityProfile,
-  ProviderRootFolder
+  ProviderRootFolder,
 } from './providers';
 export type { AniListTitleLanguage } from '@/shared/schemas/anilist/anilist-title-language.schema';
 
@@ -55,12 +55,10 @@ export type {
 } from '@/shared/schemas/providers/radarr-settings.schema';
 
 export type {
-  AddRequestPayload,
   CheckMovieStatusPayload,
   CheckMovieStatusResponse,
   CheckSeriesStatusPayload,
   CheckSeriesStatusResponse,
-  TestConnectionPayload,
 } from '@/rpc/types';
 
 export type {

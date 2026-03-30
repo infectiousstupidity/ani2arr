@@ -1,4 +1,5 @@
 // src/shared/anilist/media-metadata.ts
+// TODO: Move or split this out of shared/anilist during the planned architecture refactor; keep reusable AniList metadata-hint helpers under a support owner and place any stronger domain-owned logic with that owner.
 import type { AniListTitles, AniListMediaHint, AniListMediaFormat } from '@/shared/types';
 
 export const normalizeSynonyms = (synonyms?: string[] | null): string[] => {

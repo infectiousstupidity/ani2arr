@@ -1,0 +1,349 @@
+/** RPC handlers for mapping resolution, overrides, exports, and mapping listings. */
+// src/rpc/handlers/mapping.handlers.ts
+
+import type { Ani2arrApi } from '@/rpc';
+import type { ResolveMappingOutput } from '@/rpc/types';
+import { createError, ErrorCode } from '@/shared/errors';
+import type { CheckSeriesStatusPayload } from '@/shared/types';
+import {
+  getExtensionOptionsSnapshot,
+} from '@/storage';
+import type { GetMappingsInput } from './get-mappings.handlers';
+import type { ApiHandlerDeps } from './handler-deps';
+
+type MappingHandlerMethods = Pick<
+  Ani2arrApi,
+  | 'resolveMapping'
+  | 'getStaticMapped'
+  | 'initMappings'
+  | 'setMappingOverride'
+  | 'clearMappingOverride'
+  | 'setMappingIgnore'
+  | 'clearMappingIgnore'
+  | 'setMappingRejectedCandidate'
+  | 'clearMappingRejectedCandidate'
+  | 'setMappingBlockedCandidate'
+  | 'clearMappingBlockedCandidate'
+  | 'getMappingOverrides'
+  | 'clearAllMappingOverrides'
+  | 'exportStoredMappings'
+  | 'getMappings'
+>;
+
+export function createMappingHandlers(deps: ApiHandlerDeps): MappingHandlerMethods {
+  const {
+    mappingService,
+    overridesService,
+    upstreamMappingStore,
+    sonarrLibrary,
+    radarrLibrary,
+    overridesReady,
+    ensureSonarrConfigured,
+    scheduleLibraryRefresh,
+    bumpLibraryRevision,
+    bumpMappingsRevision,
+    getMappings,
+  } = deps;
+
+  const assertCompatibleExternalId = (
+    provider: 'sonarr' | 'radarr',
+    externalId: { id: number; kind: 'tvdb' | 'tmdb' },
+  ) => {
+    const expectedKind = provider === 'sonarr' ? 'tvdb' : 'tmdb';
+    if (externalId.kind !== expectedKind) {
+      throw createError(
+        ErrorCode.VALIDATION_ERROR,
+        `Provider ${provider} requires ${expectedKind.toUpperCase()} mapping IDs.`,
+        provider === 'sonarr'
+          ? 'Sonarr overrides must use TVDB IDs.'
+          : 'Radarr overrides must use TMDB IDs.',
+      );
+    }
+  };
+
+  const handlers: MappingHandlerMethods = {
+    async resolveMapping(input) {
+      await ensureSonarrConfigured();
+      await overridesReady;
+
+      try {
+        const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
+        if (input.primaryTitleHint !== undefined) payload.title = input.primaryTitleHint;
+        if (input.metadata !== undefined) payload.metadata = input.metadata ?? null;
+        const status = await sonarrLibrary.getSeriesStatus(payload, { network: 'never', ignoreFailureCache: true });
+        if (status.exists && typeof status.tvdbId === 'number') {
+          return {
+            tvdbId: status.tvdbId,
+            ...(status.successfulSynonym ? { successfulSynonym: status.successfulSynonym } : {}),
+          } satisfies ResolveMappingOutput;
+        }
+      } catch {
+        // ignore fast-path errors
+      }
+
+      const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {};
+      const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
+      if (input.primaryTitleHint) hints.primaryTitle = input.primaryTitleHint;
+      if (input.metadata) hints.domMedia = input.metadata;
+      if (Object.keys(hints).length > 0) resolveOptions.hints = hints;
+
+      const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
+      return {
+        tvdbId: mapping ? mapping.tvdbId : null,
+        ...(mapping?.successfulSynonym ? { successfulSynonym: mapping.successfulSynonym } : {}),
+      } satisfies ResolveMappingOutput;
+    },
+
+    async getStaticMapped(ids) {
+      await mappingService.initStaticPairs();
+      const hits: number[] = [];
+      for (const id of ids) {
+        const hit = upstreamMappingStore.get(id);
+        if (hit) hits.push(id);
+      }
+      return hits;
+    },
+
+    initMappings() {
+      return mappingService.initStaticPairs();
+    },
+
+    async setMappingOverride(input) {
+      await overridesReady;
+      assertCompatibleExternalId(input.provider, input.externalId);
+
+      if (input.provider === 'sonarr') {
+        const linkedIds =
+          typeof mappingService.getLinkedAniListIdsForTvdb === 'function'
+            ? mappingService.getLinkedAniListIdsForTvdb(input.externalId.id)
+            : [];
+        const conflictingAniListIds = linkedIds.filter(id => id !== input.anilistId);
+        if (conflictingAniListIds.length > 0 && input.force !== true) {
+          throw createError(
+            ErrorCode.VALIDATION_ERROR,
+            `TVDB ID ${input.externalId.id} is already linked to other AniList entries.`,
+            'This TVDB ID is already linked to other AniList entries. Confirm if you want to share it.',
+            { conflictingAniListIds },
+          );
+        }
+      }
+
+      await overridesService.set(input.provider, input.anilistId, input.externalId);
+      await mappingService.evictResolved(input.anilistId, input.provider);
+
+      if (input.provider === 'sonarr') {
+        const options = await getExtensionOptionsSnapshot();
+        if (options?.providers.sonarr.url && options?.providers.sonarr.apiKey) {
+          scheduleLibraryRefresh('sonarr', options);
+        }
+      }
+
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
+      return { ok: true as const };
+    },
+
+    async clearMappingOverride(input) {
+      await overridesReady;
+      await overridesService.clear(input.provider, input.anilistId);
+      await mappingService.evictResolved(input.anilistId, input.provider);
+
+      if (input.provider === 'sonarr') {
+        const options = await getExtensionOptionsSnapshot();
+        if (options?.providers.sonarr.url && options?.providers.sonarr.apiKey) {
+          scheduleLibraryRefresh('sonarr', options);
+        }
+      }
+
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
+      return { ok: true as const };
+    },
+
+    async setMappingIgnore(input) {
+      await overridesReady;
+      await overridesService.setIgnore(input.provider, input.anilistId);
+      await mappingService.evictResolved(input.anilistId, input.provider);
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
+      return { ok: true as const };
+    },
+
+    async clearMappingIgnore(input) {
+      await overridesReady;
+      await overridesService.clearIgnore(input.provider, input.anilistId);
+      await mappingService.evictResolved(input.anilistId, input.provider);
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
+      return { ok: true as const };
+    },
+
+    async setMappingRejectedCandidate(input) {
+      await overridesReady;
+      assertCompatibleExternalId(input.provider, input.externalId);
+      await overridesService.setRejectedCandidate(input.provider, input.anilistId, input.externalId);
+      await mappingService.evictResolved(input.anilistId, input.provider);
+
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
+      return { ok: true as const };
+    },
+
+    async clearMappingRejectedCandidate(input) {
+      await overridesReady;
+      assertCompatibleExternalId(input.provider, input.externalId);
+      await overridesService.clearRejectedCandidate(input.provider, input.anilistId, input.externalId);
+      await mappingService.evictResolved(input.anilistId, input.provider);
+
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
+      return { ok: true as const };
+    },
+
+    async setMappingBlockedCandidate(input) {
+      await overridesReady;
+      assertCompatibleExternalId(input.provider, input.externalId);
+      await overridesService.setBlockedCandidate(input.provider, input.anilistId, input.externalId);
+      await mappingService.evictResolved(input.anilistId, input.provider);
+
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
+      return { ok: true as const };
+    },
+
+    async clearMappingBlockedCandidate(input) {
+      await overridesReady;
+      assertCompatibleExternalId(input.provider, input.externalId);
+      await overridesService.clearBlockedCandidate(input.provider, input.anilistId, input.externalId);
+      await mappingService.evictResolved(input.anilistId, input.provider);
+
+      await bumpLibraryRevision(input.provider);
+      await bumpMappingsRevision();
+      return { ok: true as const };
+    },
+
+    async getMappingOverrides() {
+      await overridesReady;
+      return overridesService.list();
+    },
+
+    async clearAllMappingOverrides() {
+      await overridesReady;
+      const snapshot = overridesService.exportState();
+      const existing = overridesService.list();
+      const existingIgnores = overridesService.listIgnores();
+
+      try {
+        await overridesService.clearAll();
+        await Promise.all(existing.map(entry => mappingService.evictResolved(entry.anilistId, entry.provider)));
+        await Promise.all(existingIgnores.map(entry => mappingService.evictResolved(entry.anilistId, entry.provider)));
+
+        const options = await getExtensionOptionsSnapshot();
+        if (options?.providers.sonarr.url && options?.providers.sonarr.apiKey) {
+          scheduleLibraryRefresh('sonarr', options);
+        }
+
+        await bumpLibraryRevision('sonarr');
+        await bumpLibraryRevision('radarr');
+        await bumpMappingsRevision();
+
+        return { ok: true as const };
+      } catch (error) {
+        try {
+          await overridesService.importState(snapshot);
+        } catch (restoreError) {
+          throw createError(
+            ErrorCode.STORAGE_ERROR,
+            'Failed to clear stored mappings, and rollback failed.',
+            'Failed to clear stored mappings, and the previous mapping state could not be restored.',
+            { cause: restoreError },
+          );
+        }
+
+        throw error;
+      }
+    },
+
+    async exportStoredMappings() {
+      await overridesReady;
+
+      const overrides = Object.fromEntries(
+        overridesService.list().map(entry => [
+          `${entry.provider}:${entry.anilistId}`,
+          {
+            anilistId: entry.anilistId,
+            provider: entry.provider,
+            externalId: entry.externalId,
+            updatedAt: entry.updatedAt,
+          },
+        ]),
+      );
+
+      const ignores = Object.fromEntries(
+        overridesService.listIgnores().map(entry => [
+          `${entry.provider}:${entry.anilistId}`,
+          {
+            anilistId: entry.anilistId,
+            provider: entry.provider,
+            updatedAt: entry.updatedAt,
+          },
+        ]),
+      );
+
+      const rejectedCandidates = Object.fromEntries(
+        overridesService.listRejectedCandidates().map(entry => [
+          `${entry.provider}:${entry.anilistId}:${entry.externalId.kind}:${entry.externalId.id}`,
+          {
+            anilistId: entry.anilistId,
+            provider: entry.provider,
+            externalId: entry.externalId,
+            updatedAt: entry.updatedAt,
+          },
+        ]),
+      );
+
+      const blockedCandidates = Object.fromEntries(
+        overridesService.listBlockedCandidates().map(entry => [
+          `${entry.provider}:${entry.anilistId}:${entry.externalId.kind}:${entry.externalId.id}`,
+          {
+            anilistId: entry.anilistId,
+            provider: entry.provider,
+            externalId: entry.externalId,
+            updatedAt: entry.updatedAt,
+          },
+        ]),
+      );
+
+      return {
+        version: 2 as const,
+        exportedAt: new Date().toISOString(),
+        summary: {
+          overrideCount: Object.keys(overrides).length,
+          ignoreCount: Object.keys(ignores).length,
+          rejectedCandidateCount: Object.keys(rejectedCandidates).length,
+          blockedCandidateCount: Object.keys(blockedCandidates).length,
+        },
+        mappings: {
+          overrides,
+          ignores,
+          rejectedCandidates,
+          blockedCandidates,
+        },
+      };
+    },
+
+    async getMappings(input) {
+      await overridesReady;
+      await mappingService.initStaticPairs();
+      return getMappings(input as GetMappingsInput, {
+        overridesService,
+        upstreamMappingStore,
+        mappingService,
+        sonarrLibrary,
+        radarrLibrary,
+      });
+    },
+  };
+
+  return handlers;
+}

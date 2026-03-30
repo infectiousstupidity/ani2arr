@@ -12,7 +12,7 @@ import { SonarrFormStateSchema } from '@/shared/schemas/providers/sonarr-setting
  * Standard positive integer ID (used for AniList, TVDB, IDs, etc.)
  */
 const IdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
-const MappingProviderSchema = v.picklist(['sonarr', 'radarr']);
+const ProviderSchema = v.picklist(['sonarr', 'radarr']);
 const MappingSourceSchema = v.picklist(['manual', 'upstream', 'auto', 'rejected', 'blocked', 'ignored', 'unresolved']);
 
 /**
@@ -55,14 +55,10 @@ const AniListMediaHintSchema = v.object({
   coverImage: v.optional(v.nullable(v.string())),
 });
 
-const ArrCredentialsSchema = v.object({
+const ProviderCredentialsSchema = v.object({
   url: createRequiredStringSchema('URL cannot be empty'),
   apiKey: createRequiredStringSchema('API key cannot be empty'),
 });
-const ProviderSchema = v.picklist(['sonarr', 'radarr']);
-
-const SonarrCredentialsSchema = ArrCredentialsSchema;
-const RadarrCredentialsSchema = ArrCredentialsSchema;
 
 const MappingExternalIdSchema = v.object({
   id: IdSchema,
@@ -89,7 +85,7 @@ export const StatusInputSchema = v.object({
   priority: v.optional(RequestPrioritySchema),
 });
 
-export const AddInputSchema = v.object({
+export const AddSonarrInputSchema = v.object({
   anilistId: IdSchema,
   title: createRequiredStringSchema('Title cannot be empty'),
   primaryTitleHint: v.optional(v.string()),
@@ -121,47 +117,47 @@ export const UpdateRadarrInputSchema = v.object({
 
 export const SetMappingOverrideInputSchema = v.object({
   anilistId: IdSchema,
-  provider: MappingProviderSchema,
+  provider: ProviderSchema,
   externalId: MappingExternalIdSchema,
   force: v.optional(v.boolean()),
 });
 
 export const ClearMappingOverrideInputSchema = v.object({
   anilistId: IdSchema,
-  provider: MappingProviderSchema,
+  provider: ProviderSchema,
 });
 
 export const SetMappingIgnoreInputSchema = v.object({
   anilistId: IdSchema,
-  provider: MappingProviderSchema,
+  provider: ProviderSchema,
 });
 
 export const ClearMappingIgnoreInputSchema = v.object({
   anilistId: IdSchema,
-  provider: MappingProviderSchema,
+  provider: ProviderSchema,
 });
 
 export const SetMappingRejectedCandidateInputSchema = v.object({
   anilistId: IdSchema,
-  provider: MappingProviderSchema,
+  provider: ProviderSchema,
   externalId: MappingExternalIdSchema,
 });
 
 export const ClearMappingRejectedCandidateInputSchema = v.object({
   anilistId: IdSchema,
-  provider: MappingProviderSchema,
+  provider: ProviderSchema,
   externalId: MappingExternalIdSchema,
 });
 
 export const SetMappingBlockedCandidateInputSchema = v.object({
   anilistId: IdSchema,
-  provider: MappingProviderSchema,
+  provider: ProviderSchema,
   externalId: MappingExternalIdSchema,
 });
 
 export const ClearMappingBlockedCandidateInputSchema = v.object({
   anilistId: IdSchema,
-  provider: MappingProviderSchema,
+  provider: ProviderSchema,
   externalId: MappingExternalIdSchema,
 });
 
@@ -188,18 +184,12 @@ export const FetchAniListMediaInputSchema = IdSchema;
 
 export const TestProviderConnectionInputSchema = v.object({
   provider: ProviderSchema,
-  credentials: ArrCredentialsSchema,
+  credentials: ProviderCredentialsSchema,
 });
 
-export const GetSonarrMetadataInputSchema = v.optional(
+export const GetProviderMetadataInputSchema = v.optional(
   v.object({
-    credentials: v.optional(SonarrCredentialsSchema),
-  }),
-);
-
-export const GetRadarrMetadataInputSchema = v.optional(
-  v.object({
-    credentials: v.optional(RadarrCredentialsSchema),
+    credentials: v.optional(ProviderCredentialsSchema),
   }),
 );
 
@@ -212,7 +202,7 @@ export const RadarrLookupInputSchema = v.object({
 export const MappingCursorSchema = v.object({
   updatedAt: v.number(),
   anilistId: IdSchema,
-  provider: MappingProviderSchema,
+  provider: ProviderSchema,
 });
 
 export const SearchAniListInputSchema = v.object({
@@ -223,7 +213,7 @@ export const SearchAniListInputSchema = v.object({
 export const GetMappingsInputSchema = v.optional(
   v.object({
     sources: v.optional(v.array(MappingSourceSchema)),
-    providers: v.optional(v.array(MappingProviderSchema)),
+    providers: v.optional(v.array(ProviderSchema)),
     limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
     cursor: v.optional(MappingCursorSchema),
     query: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1))),
@@ -243,7 +233,7 @@ export const GetAniListMetadataInputSchema = v.object({
 
 export type ResolveInput = v.InferOutput<typeof ResolveInputSchema>;
 export type StatusInput = v.InferOutput<typeof StatusInputSchema>;
-export type AddInput = v.InferOutput<typeof AddInputSchema>;
+export type AddSonarrInput = v.InferOutput<typeof AddSonarrInputSchema>;
 export type UpdateSonarrInput = v.InferOutput<typeof UpdateSonarrInputSchema>;
 export type AddRadarrInput = v.InferOutput<typeof AddRadarrInputSchema>;
 export type UpdateRadarrInput = v.InferOutput<typeof UpdateRadarrInputSchema>;
@@ -262,5 +252,9 @@ export type GetMappingsInput = v.InferOutput<typeof GetMappingsInputSchema>;
 export type MappingCursor = v.InferOutput<typeof MappingCursorSchema>;
 export type SearchAniListInput = v.InferOutput<typeof SearchAniListInputSchema>;
 export type GetAniListMetadataInput = v.InferOutput<typeof GetAniListMetadataInputSchema>;
+export type PrefetchAniListMediaInput = v.InferOutput<typeof PrefetchAniListMediaInputSchema>;
+export type GetStaticMappedInput = v.InferOutput<typeof GetStaticMappedInputSchema>;
+export type FetchAniListMediaInput = v.InferOutput<typeof FetchAniListMediaInputSchema>;
 export type RadarrLookupInput = v.InferOutput<typeof RadarrLookupInputSchema>;
 export type TestProviderConnectionInput = v.InferOutput<typeof TestProviderConnectionInputSchema>;
+export type GetProviderMetadataInput = v.InferOutput<typeof GetProviderMetadataInputSchema>;

@@ -3,34 +3,35 @@
 import { defineProxyService } from '@webext-core/proxy-service';
 import type {
   AniListMedia,
-  ProviderCredentials,
-  RadarrMovie,
-  SonarrSeries,
   SonarrFormState,
   RadarrFormState,
 } from '@/shared/types';
+import type { MappingOverrideRecord } from '@/shared/types/mapping';
+import type { RadarrMovie, SonarrSeries } from '@/shared/types/providers';
 import type {
   AniListSearchResult,
   ExportStoredMappingsOutput,
   GetAniListMetadataOutput,
   GetAniListSchedulerDebugOutput,
   GetMappingsOutput,
-  GetRadarrMetadataOutput,
-  MappingOutput,
-  MappingOverrideItem,
-  MovieStatusOutput,
+  ProviderMetadataOutput,
+  ResolveMappingOutput,
   RadarrLookupOutput,
   SonarrLookupOutput,
-  SonarrMetadataOutput,
-  StatusOutput,
+  CheckMovieStatusResponse,
+  CheckSeriesStatusResponse,
   ValidateTmdbOutput,
   ValidateTvdbOutput,
 } from './types';
 import type {
   ResolveInput,
   StatusInput,
-  AddInput,
+  AddSonarrInput,
   AddRadarrInput,
+  FetchAniListMediaInput,
+  GetProviderMetadataInput,
+  GetStaticMappedInput,
+  PrefetchAniListMediaInput,
   UpdateSonarrInput,
   UpdateRadarrInput,
   SetMappingOverrideInput,
@@ -52,25 +53,25 @@ import type {
 } from './schemas';
 
 export interface Ani2arrApi {
-  resolveMapping(input: ResolveInput): Promise<MappingOutput>;
-  getSeriesStatus(input: StatusInput): Promise<StatusOutput>;
-  getMovieStatus(input: StatusInput): Promise<MovieStatusOutput>;
-  addToSonarr(input: AddInput): Promise<SonarrSeries>;
+  resolveMapping(input: ResolveInput): Promise<ResolveMappingOutput>;
+  getSeriesStatus(input: StatusInput): Promise<CheckSeriesStatusResponse>;
+  getMovieStatus(input: StatusInput): Promise<CheckMovieStatusResponse>;
+  addToSonarr(input: AddSonarrInput): Promise<SonarrSeries>;
   addToRadarr(input: AddRadarrInput): Promise<RadarrMovie>;
   updateSonarrSeries(input: UpdateSonarrInput): Promise<SonarrSeries>;
   updateRadarrMovie(input: UpdateRadarrInput): Promise<RadarrMovie>;
-  prefetchAniListMedia(ids: number[]): Promise<Array<[number, AniListMedia]>>;
-  fetchAniListMedia(anilistId: number): Promise<AniListMedia | null>;
-  getStaticMapped(ids: number[]): Promise<number[]>;
+  prefetchAniListMedia(ids: PrefetchAniListMediaInput): Promise<Array<[number, AniListMedia]>>;
+  fetchAniListMedia(anilistId: FetchAniListMediaInput): Promise<AniListMedia | null>;
+  getStaticMapped(ids: GetStaticMappedInput): Promise<number[]>;
   notifySettingsChanged(): Promise<{ ok: true }>;
   updateSonarrDefaults(defaults: SonarrFormState): Promise<{ ok: true }>;
   updateRadarrDefaults(defaults: RadarrFormState): Promise<{ ok: true }>;
-  getQualityProfiles(): Promise<SonarrMetadataOutput['qualityProfiles']>;
-  getRootFolders(): Promise<SonarrMetadataOutput['rootFolders']>;
-  getTags(): Promise<SonarrMetadataOutput['tags']>;
+  getQualityProfiles(): Promise<ProviderMetadataOutput['qualityProfiles']>;
+  getRootFolders(): Promise<ProviderMetadataOutput['rootFolders']>;
+  getTags(): Promise<ProviderMetadataOutput['tags']>;
   testProviderConnection(input: TestProviderConnectionInput): Promise<{ version: string }>;
-  getSonarrMetadata(input?: { credentials?: ProviderCredentials }): Promise<SonarrMetadataOutput>;
-  getRadarrMetadata(input?: { credentials?: ProviderCredentials }): Promise<GetRadarrMetadataOutput>;
+  getSonarrMetadata(input?: GetProviderMetadataInput): Promise<ProviderMetadataOutput>;
+  getRadarrMetadata(input?: GetProviderMetadataInput): Promise<ProviderMetadataOutput>;
   initMappings(): Promise<void>;
   setMappingOverride(input: SetMappingOverrideInput): Promise<{ ok: true }>;
   clearMappingOverride(input: ClearMappingOverrideInput): Promise<{ ok: true }>;
@@ -84,7 +85,7 @@ export interface Ani2arrApi {
   searchRadarr(input: RadarrLookupInput): Promise<RadarrLookupOutput>;
   validateTvdbId(input: ValidateTvdbInput): Promise<ValidateTvdbOutput>;
   validateTmdbId(input: ValidateTmdbInput): Promise<ValidateTmdbOutput>;
-  getMappingOverrides(): Promise<MappingOverrideItem[]>;
+  getMappingOverrides(): Promise<MappingOverrideRecord[]>;
   clearAllMappingOverrides(): Promise<{ ok: true }>;
   exportStoredMappings(): Promise<ExportStoredMappingsOutput>;
   clearPersistentCaches(): Promise<{ ok: true }>;

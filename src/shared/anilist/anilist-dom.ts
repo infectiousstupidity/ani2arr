@@ -1,4 +1,5 @@
 // src/shared/anilist/anilist-dom.ts
+// TODO: Split this during the planned architecture refactor; DOM scraping should move to an AniList-specific owner and any non-DOM metadata projection should live with its clearer support or domain owner.
 import type { AniListMediaFormat, AniListTitles, AniListMediaHint } from '@/shared/types';
 import { normalizeRelationIds, normalizeSynonyms } from '@/shared/anilist/media-metadata';
 
