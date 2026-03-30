@@ -5,7 +5,6 @@ import { browser } from 'wxt/browser';
 import { registerAni2arrApi, getAni2arrApi } from '@/rpc';
 import { createBackgroundApi } from '@/runtime/create-background-api';
 import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/debug/metrics';
-import { computeTitleMatchScore } from '@/services/mapping/pipeline/matching';
 import { logger } from '@/shared/utils/logger';
 import { logError, normalizeError } from '@/shared/errors';
 import { getExtensionOptionsSnapshot } from '@/storage';
@@ -18,39 +17,8 @@ type OpenOptionsMessage = {
   targetAnilistId?: number;
 };
 
-type MappingRefreshMessage = { type: 'a2a:mapping:refresh' };
-
-const RESET_EXTENSION_STATE_MESSAGE_TYPE = 'a2a:reset-extension-state' as const;
-type ResetExtensionStateMessage = { type: typeof RESET_EXTENSION_STATE_MESSAGE_TYPE };
-
-type ScoreBatchMessage = {
-  type: 'a2a:match:score-batch';
-  payload: {
-    queryRaw: string;
-    startYear?: number;
-    candidates: Array<{ title: string; year?: number; genres?: string[] }>;
-  };
-};
-
-function isScoreBatchMessage(x: unknown): x is ScoreBatchMessage {
-  const m = x as Partial<ScoreBatchMessage>;
-  return (
-    m?.type === 'a2a:match:score-batch' &&
-    typeof m.payload?.queryRaw === 'string' &&
-    Array.isArray(m.payload?.candidates)
-  );
-}
-
 function isOpenOptionsMessage(x: unknown): x is OpenOptionsMessage {
   return (x as OpenOptionsMessage)?.type === 'OPEN_OPTIONS_PAGE';
-}
-
-function isMappingRefreshMessage(x: unknown): x is MappingRefreshMessage {
-  return (x as MappingRefreshMessage)?.type === 'a2a:mapping:refresh';
-}
-
-function isResetExtensionStateMessage(x: unknown): x is ResetExtensionStateMessage {
-  return (x as ResetExtensionStateMessage)?.type === RESET_EXTENSION_STATE_MESSAGE_TYPE;
 }
 
 const MAPPING_REFRESH_ALARM = 'a2a:refresh-static-mappings';
@@ -205,29 +173,6 @@ export default defineBackground(() => {
 
         void open();
         return;
-      }
-
-      if (isMappingRefreshMessage(msg)) {
-        void api.initMappings();
-        return Promise.resolve({ ok: true as const });
-      }
-
-      if (isResetExtensionStateMessage(msg)) {
-        return api.resetExtensionState().then(() => ({ ok: true as const }));
-      }
-
-      if (isScoreBatchMessage(msg)) {
-        const { queryRaw, startYear, candidates } = msg.payload;
-        const scores = candidates.map(c =>
-          computeTitleMatchScore({
-            queryRaw,
-            candidateRaw: c.title,
-            ...(typeof c.year === 'number' ? { candidateYear: c.year } : {}),
-            ...(typeof startYear === 'number' ? { targetYear: startYear } : {}),
-            ...(Array.isArray(c.genres) ? { candidateGenres: c.genres as readonly string[] } : {}),
-          }),
-        );
-        return Promise.resolve({ scores });
       }
     },
   );

@@ -14,7 +14,6 @@ export const STORAGE_KEYS = {
 
 // Cross-context invalidation counters.
 export const REVISION_KEYS = {
-  settings: 'settingsRevision',
   mappings: 'mappingsRevision',
   sonarrLibrary: 'sonarrLibraryRevision',
   radarrLibrary: 'radarrLibraryRevision',
