@@ -7,9 +7,6 @@ import type { ApiHandlerDeps } from './handler-deps';
 
 type ProviderHandlerMethods = Pick<
   Ani2arrApi,
-  | 'getQualityProfiles'
-  | 'getRootFolders'
-  | 'getTags'
   | 'testProviderConnection'
   | 'getSonarrMetadata'
   | 'getRadarrMetadata'
@@ -38,21 +35,6 @@ export function createProviderHandlers(deps: ApiHandlerDeps): ProviderHandlerMet
   };
 
   const handlers: ProviderHandlerMethods = {
-    async getQualityProfiles() {
-      const { credentials } = await ensureSonarrConfigured();
-      return SonarrClient.getQualityProfiles(credentials);
-    },
-
-    async getRootFolders() {
-      const { credentials } = await ensureSonarrConfigured();
-      return SonarrClient.getRootFolders(credentials);
-    },
-
-    async getTags() {
-      const { credentials } = await ensureSonarrConfigured();
-      return SonarrClient.getTags(credentials);
-    },
-
     testProviderConnection(input) {
       return testProviderConnectionInternal(input);
     },

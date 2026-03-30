@@ -66,9 +66,6 @@ export interface Ani2arrApi {
   notifySettingsChanged(): Promise<{ ok: true }>;
   updateSonarrDefaults(defaults: SonarrFormState): Promise<{ ok: true }>;
   updateRadarrDefaults(defaults: RadarrFormState): Promise<{ ok: true }>;
-  getQualityProfiles(): Promise<ProviderMetadataOutput['qualityProfiles']>;
-  getRootFolders(): Promise<ProviderMetadataOutput['rootFolders']>;
-  getTags(): Promise<ProviderMetadataOutput['tags']>;
   testProviderConnection(input: TestProviderConnectionInput): Promise<{ version: string }>;
   getSonarrMetadata(input?: GetProviderMetadataInput): Promise<ProviderMetadataOutput>;
   getRadarrMetadata(input?: GetProviderMetadataInput): Promise<ProviderMetadataOutput>;
