@@ -5,6 +5,7 @@ import React, { useState, useCallback } from 'react';
 import ReactDOM, { Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
+import type { CheckMovieStatusResponse, CheckSeriesStatusResponse } from '@/rpc/types';
 import { ExtensionErrorBoundary } from '@/components/extension-error-boundary';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useAddMovie, useAddSeries, useAniListMetadataBatch, useMovieStatus, usePublicOptions, useSeriesStatus } from '@/shared/queries';
@@ -22,8 +23,6 @@ import {
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import type {
   AniListMediaFormat,
-  CheckMovieStatusResponse,
-  CheckSeriesStatusResponse,
   AniListMediaHint,
   RadarrFormState,
   SonarrFormState,

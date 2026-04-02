@@ -1,14 +1,14 @@
-// src/services/library/sonarr/title-indexer.ts
-import type { SonarrSeriesSnapshot, TitleIndexer, CheckSeriesStatusPayload } from './types';
+import { incrementCounter } from '@/debug/metrics';
+import type { CheckSeriesStatusPayload } from '@/rpc/types';
 import {
   buildTitleIndexKeysForProvider,
   computeTitleMatchScoreForProvider,
   extractCandidateTitleVariants,
 } from '@/services/mapping/pipeline/matching';
-import { incrementCounter } from '@/debug/metrics';
-import { LOCAL_INDEX_ACCEPTANCE_THRESHOLD } from './constants';
+import type { SonarrSeriesSnapshot } from '@/shared/types/providers';
+import { LOCAL_INDEX_ACCEPTANCE_THRESHOLD } from './library.constants';
 
-export class SonarrTitleIndexer implements TitleIndexer {
+export class SonarrLibraryIndexer {
   private tvdbSet: Set<number> = new Set();
   private normalizedTitleIndex: Map<string, number | null> = new Map();
   private seriesByTvdbId: Map<number, SonarrSeriesSnapshot> = new Map();
@@ -20,7 +20,9 @@ export class SonarrTitleIndexer implements TitleIndexer {
   }
 
   bulkIndex(list: SonarrSeriesSnapshot[]): void {
-    for (const s of list) this.indexSeries(s);
+    for (const series of list) {
+      this.indexSeries(series);
+    }
   }
 
   reindex(list: SonarrSeriesSnapshot[]): void {
@@ -35,14 +37,15 @@ export class SonarrTitleIndexer implements TitleIndexer {
 
     const mediaTitles = payload.metadata?.titles;
     if (mediaTitles) {
-      const { romaji, english, native } = mediaTitles;
-      if (romaji) candidateInputs.add(romaji);
-      if (english) candidateInputs.add(english);
-      if (native) candidateInputs.add(native);
+      if (mediaTitles.romaji) candidateInputs.add(mediaTitles.romaji);
+      if (mediaTitles.english) candidateInputs.add(mediaTitles.english);
+      if (mediaTitles.native) candidateInputs.add(mediaTitles.native);
     }
 
     if (Array.isArray(payload.metadata?.synonyms)) {
-      for (const s of payload.metadata!.synonyms) if (s) candidateInputs.add(s);
+      for (const synonym of payload.metadata.synonyms) {
+        if (synonym) candidateInputs.add(synonym);
+      }
     }
 
     const targetYear = payload.metadata?.startYear ?? undefined;
@@ -71,7 +74,9 @@ export class SonarrTitleIndexer implements TitleIndexer {
           if (!series) continue;
           const score = scoreAgainstSeries(rawTitle, series);
           if (score >= LOCAL_INDEX_ACCEPTANCE_THRESHOLD) {
-            if (!bestMatch || score > bestMatch.score) bestMatch = { tvdbId: match, score };
+            if (!bestMatch || score > bestMatch.score) {
+              bestMatch = { tvdbId: match, score };
+            }
           }
         } else if (match === null) {
           sawAmbiguous = true;
@@ -83,6 +88,7 @@ export class SonarrTitleIndexer implements TitleIndexer {
       incrementCounter('library.index.hit');
       return bestMatch.tvdbId;
     }
+
     if (sawAmbiguous) incrementCounter('library.index.ambiguous');
     else incrementCounter('library.index.miss');
 
@@ -92,7 +98,11 @@ export class SonarrTitleIndexer implements TitleIndexer {
   private indexSeries(series: SonarrSeriesSnapshot): void {
     this.tvdbSet.add(series.tvdbId);
     this.seriesByTvdbId.set(series.tvdbId, series);
-    const keys = this.buildNormalizedKeysForSeries(series);
+
+    const keys = this.normalizeTitleCandidates(
+      extractCandidateTitleVariants('sonarr', series).map(variant => variant.value),
+    );
+
     for (const key of keys) {
       const existing = this.normalizedTitleIndex.get(key);
       if (existing === undefined) {
@@ -103,14 +113,9 @@ export class SonarrTitleIndexer implements TitleIndexer {
     }
   }
 
-  private buildNormalizedKeysForSeries(series: SonarrSeriesSnapshot): string[] {
-    return this.normalizeTitleCandidates(
-      extractCandidateTitleVariants('sonarr', series).map(variant => variant.value),
-    );
-  }
-
   private normalizeTitleCandidates(values: Iterable<string | null | undefined>): string[] {
     const out = new Set<string>();
+
     for (const value of values) {
       if (!value) continue;
       const trimmed = value.trim();
@@ -119,6 +124,7 @@ export class SonarrTitleIndexer implements TitleIndexer {
         if (key) out.add(key);
       }
     }
+
     return Array.from(out);
   }
 }

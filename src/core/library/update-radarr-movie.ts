@@ -2,8 +2,8 @@
 // src/core/library/update-radarr-movie.ts
 
 import { resolveRadarrMovieUpdate } from '@/core/library/provider-update.resolver';
+import type { RadarrLibrary } from '@/core/library/radarr-library';
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
-import type { RadarrLibrary } from '@/services/library/radarr';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import type { ProviderCredentials, RadarrMovie } from '@/shared/types/providers';
 

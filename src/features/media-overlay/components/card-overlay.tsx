@@ -3,8 +3,9 @@
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, TriangleAlert, SlidersHorizontal, Plus, Wrench, SquareArrowOutUpRight, RotateCcw } from 'lucide-react';
+import type { CheckMovieStatusResponse, CheckSeriesStatusResponse } from '@/rpc/types';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
-import type { CardOverlayProps, CheckMovieStatusResponse, CheckSeriesStatusResponse } from '@/shared/types';
+import type { CardOverlayProps } from '@/shared/types';
 import {
   getProviderLibrarySlug,
   type ProviderMediaPathSource,

@@ -2,8 +2,8 @@
 // src/core/library/update-sonarr-series.ts
 
 import { resolveSonarrSeriesUpdate } from '@/core/library/provider-update.resolver';
+import type { SonarrLibrary } from '@/core/library/sonarr-library';
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
-import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type { ProviderCredentials, SonarrSeries } from '@/shared/types/providers';
 

@@ -3,10 +3,9 @@
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
+import type { CheckSeriesStatusPayload, CheckSeriesStatusResponse, ExportStoredMappingsOutput, GetMappingsOutput } from '@/rpc/types';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import type {
-  CheckSeriesStatusPayload,
-  CheckSeriesStatusResponse,
   MappingProvider,
   MappingOverrideRecord,
 } from '@/shared/types';
@@ -21,7 +20,6 @@ import type {
   SetMappingOverrideInput,
   StatusInput,
 } from '@/rpc/schemas';
-import type { ExportStoredMappingsOutput, GetMappingsOutput } from '@/rpc/types';
 import type { GetMappingsInput } from '@/rpc/schemas';
 import { queryKeys } from './query-keys';
 

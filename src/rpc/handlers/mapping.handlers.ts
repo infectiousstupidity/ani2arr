@@ -2,9 +2,8 @@
 // src/rpc/handlers/mapping.handlers.ts
 
 import type { Ani2arrApi } from '@/rpc';
-import type { ResolveMappingOutput } from '@/rpc/types';
+import type { CheckSeriesStatusPayload, ResolveMappingOutput } from '@/rpc/types';
 import { createError, ErrorCode } from '@/shared/errors';
-import type { CheckSeriesStatusPayload } from '@/shared/types';
 import {
   getExtensionOptionsSnapshot,
 } from '@/storage';

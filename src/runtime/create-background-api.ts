@@ -20,12 +20,11 @@ import {
   removeProviderHostPermission,
 } from '@/runtime/permissions/provider-host-permissions';
 import { AniListMediaService, AniListMetadataStore } from '@/core/anilist';
+import { RadarrLibrary, SonarrLibrary } from '@/core/library';
 import { MappingService } from '@/services/mapping';
 import { MappingOverridesService } from '@/services/mapping/overrides';
 import { UpstreamMappingStore } from '@/services/mapping/upstream';
 import { SonarrLookupClient, RadarrLookupClient } from '@/services/mapping/lookup';
-import { SonarrLibrary } from '@/services/library/sonarr';
-import { RadarrLibrary } from '@/services/library/radarr';
 import { getMappingsHandler } from '@/rpc/handlers/get-mappings.handlers';
 import { createApiHandlers } from '@/rpc/handlers';
 import type { Provider, ProviderCredentials } from '@/shared/types/providers';

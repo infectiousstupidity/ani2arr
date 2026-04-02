@@ -1,11 +1,10 @@
 /** RPC handler that builds the mapping review table payload from recorded mapping and library state. */
 // src/rpc/handlers/get-mappings.handlers.ts
 
+import type { RadarrLibrary, SonarrLibrary } from '@/core/library';
 import type { MappingOverridesService } from '@/services/mapping/overrides';
 import type { UpstreamMappingStore } from '@/services/mapping/upstream';
 import type { MappingService } from '@/services/mapping';
-import type { SonarrLibrary } from '@/services/library/sonarr';
-import type { RadarrLibrary } from '@/services/library/radarr';
 import type { MappingSummary, MappingSource, MappingStatus } from '@/shared/types';
 import type { RadarrMovieSnapshot, SonarrSeriesSnapshot } from '@/shared/types/providers';
 
