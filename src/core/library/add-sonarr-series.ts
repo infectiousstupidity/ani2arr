@@ -2,8 +2,8 @@
 // src/core/library/add-sonarr-series.ts
 
 import { resolveSonarrAddPayload } from '@/core/library/provider-add.resolver';
+import type { SonarrLibrary } from '@/core/library/sonarr-library';
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
-import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { MappingService } from '@/services/mapping';
 import type { ResolveTvdbIdOptions } from '@/services/mapping/types';
 import { createError, ErrorCode } from '@/shared/errors';

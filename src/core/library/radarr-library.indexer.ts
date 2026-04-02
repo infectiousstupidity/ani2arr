@@ -1,25 +1,28 @@
-import type { CheckMovieStatusPayload, RadarrMovieSnapshot, TitleIndexer } from './types';
+import { incrementCounter } from '@/debug/metrics';
+import type { CheckMovieStatusPayload } from '@/rpc/types';
 import {
   buildTitleIndexKeysForProvider,
   computeTitleMatchScoreForProvider,
   extractCandidateTitleVariants,
 } from '@/services/mapping/pipeline/matching';
-import { incrementCounter } from '@/debug/metrics';
-import { LOCAL_INDEX_ACCEPTANCE_THRESHOLD } from './constants';
+import type { RadarrMovieSnapshot } from '@/shared/types/providers';
+import { LOCAL_INDEX_ACCEPTANCE_THRESHOLD } from './library.constants';
 
-export class RadarrTitleIndexer implements TitleIndexer {
+export class RadarrLibraryIndexer {
   private tmdbSet: Set<number> = new Set();
   private normalizedTitleIndex: Map<string, number | null> = new Map();
-  private leanMovieByTmdbId: Map<number, RadarrMovieSnapshot> = new Map();
+  private moviesByTmdbId: Map<number, RadarrMovieSnapshot> = new Map();
 
   reset(): void {
     this.tmdbSet.clear();
     this.normalizedTitleIndex.clear();
-    this.leanMovieByTmdbId.clear();
+    this.moviesByTmdbId.clear();
   }
 
   bulkIndex(list: RadarrMovieSnapshot[]): void {
-    for (const movie of list) this.indexMovie(movie);
+    for (const movie of list) {
+      this.indexMovie(movie);
+    }
   }
 
   reindex(list: RadarrMovieSnapshot[]): void {
@@ -34,14 +37,15 @@ export class RadarrTitleIndexer implements TitleIndexer {
 
     const mediaTitles = payload.metadata?.titles;
     if (mediaTitles) {
-      const { romaji, english, native } = mediaTitles;
-      if (romaji) candidateInputs.add(romaji);
-      if (english) candidateInputs.add(english);
-      if (native) candidateInputs.add(native);
+      if (mediaTitles.romaji) candidateInputs.add(mediaTitles.romaji);
+      if (mediaTitles.english) candidateInputs.add(mediaTitles.english);
+      if (mediaTitles.native) candidateInputs.add(mediaTitles.native);
     }
 
     if (Array.isArray(payload.metadata?.synonyms)) {
-      for (const synonym of payload.metadata.synonyms) if (synonym) candidateInputs.add(synonym);
+      for (const synonym of payload.metadata.synonyms) {
+        if (synonym) candidateInputs.add(synonym);
+      }
     }
 
     const targetYear = payload.metadata?.startYear ?? undefined;
@@ -67,11 +71,13 @@ export class RadarrTitleIndexer implements TitleIndexer {
       for (const key of normalizedVariants) {
         const match = this.normalizedTitleIndex.get(key);
         if (typeof match === 'number' && this.tmdbSet.has(match)) {
-          const movie = this.leanMovieByTmdbId.get(match);
+          const movie = this.moviesByTmdbId.get(match);
           if (!movie) continue;
           const score = scoreAgainstMovie(rawTitle, movie);
           if (score >= LOCAL_INDEX_ACCEPTANCE_THRESHOLD) {
-            if (!bestMatch || score > bestMatch.score) bestMatch = { tmdbId: match, score };
+            if (!bestMatch || score > bestMatch.score) {
+              bestMatch = { tmdbId: match, score };
+            }
           }
         } else if (match === null) {
           sawAmbiguous = true;
@@ -83,6 +89,7 @@ export class RadarrTitleIndexer implements TitleIndexer {
       incrementCounter('library.index.hit');
       return bestMatch.tmdbId;
     }
+
     if (sawAmbiguous) incrementCounter('library.index.ambiguous');
     else incrementCounter('library.index.miss');
 
@@ -91,8 +98,12 @@ export class RadarrTitleIndexer implements TitleIndexer {
 
   private indexMovie(movie: RadarrMovieSnapshot): void {
     this.tmdbSet.add(movie.tmdbId);
-    this.leanMovieByTmdbId.set(movie.tmdbId, movie);
-    const keys = this.buildNormalizedKeysForMovie(movie);
+    this.moviesByTmdbId.set(movie.tmdbId, movie);
+
+    const keys = this.normalizeTitleCandidates(
+      extractCandidateTitleVariants('radarr', movie).map(variant => variant.value),
+    );
+
     for (const key of keys) {
       const existing = this.normalizedTitleIndex.get(key);
       if (existing === undefined) {
@@ -103,14 +114,9 @@ export class RadarrTitleIndexer implements TitleIndexer {
     }
   }
 
-  private buildNormalizedKeysForMovie(movie: RadarrMovieSnapshot): string[] {
-    return this.normalizeTitleCandidates(
-      extractCandidateTitleVariants('radarr', movie).map(variant => variant.value),
-    );
-  }
-
   private normalizeTitleCandidates(values: Iterable<string | null | undefined>): string[] {
     const out = new Set<string>();
+
     for (const value of values) {
       if (!value) continue;
       const trimmed = value.trim();
@@ -119,6 +125,7 @@ export class RadarrTitleIndexer implements TitleIndexer {
         if (key) out.add(key);
       }
     }
+
     return Array.from(out);
   }
 }

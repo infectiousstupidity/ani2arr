@@ -2,8 +2,8 @@
 // src/core/library/add-radarr-movie.ts
 
 import { resolveRadarrAddPayload } from '@/core/library/provider-add.resolver';
+import type { RadarrLibrary } from '@/core/library/radarr-library';
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
-import type { RadarrLibrary } from '@/services/library/radarr';
 import type { MappingService } from '@/services/mapping';
 import type { ResolveExternalIdOptions } from '@/services/mapping/types';
 import { createError, ErrorCode } from '@/shared/errors';

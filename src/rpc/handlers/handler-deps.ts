@@ -2,14 +2,13 @@
 // src/rpc/handlers/handler-deps.ts
 
 import type { AniListMediaService, AniListMetadataStore } from '@/core/anilist';
+import type { RadarrLibrary, SonarrLibrary } from '@/core/library';
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { getMappingsHandler } from '@/rpc/handlers/get-mappings.handlers';
 import type { MappingService } from '@/services/mapping';
 import type { MappingOverridesService } from '@/services/mapping/overrides';
 import type { UpstreamMappingStore } from '@/services/mapping/upstream';
-import type { RadarrLibrary } from '@/services/library/radarr';
-import type { SonarrLibrary } from '@/services/library/sonarr';
 import type { ExtensionOptions } from '@/shared/types';
 import type { ProviderCredentials } from '@/shared/types/providers';
 

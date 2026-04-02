@@ -2,11 +2,10 @@
 // src/features/media-overlay/hooks/use-media-modal-props.ts
 
 import { useMemo } from 'react';
+import type { CheckMovieStatusResponse, CheckSeriesStatusResponse } from '@/rpc/types';
 import type {
   AniListMediaFormat,
   AniListTitles,
-  CheckMovieStatusResponse,
-  CheckSeriesStatusResponse,
   ExtensionOptions,
   AniListMediaHint,
   AniListMediaStatus,

@@ -6,7 +6,8 @@ import { addSonarrSeries } from '@/core/library/add-sonarr-series';
 import { updateRadarrMovie } from '@/core/library/update-radarr-movie';
 import { updateSonarrSeries } from '@/core/library/update-sonarr-series';
 import type { Ani2arrApi } from '@/rpc';
-import type { CheckSeriesStatusPayload, RequestPriority } from '@/shared/types';
+import type { CheckMovieStatusPayload, CheckSeriesStatusPayload } from '@/rpc/types';
+import type { RequestPriority } from '@/shared/types';
 import type { ApiHandlerDeps } from './handler-deps';
 
 type LibraryHandlerMethods = Pick<
@@ -61,7 +62,7 @@ export function createLibraryHandlers(deps: ApiHandlerDeps): LibraryHandlerMetho
       await ensureRadarrConfigured();
       await overridesReady;
 
-      const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
+      const payload: CheckMovieStatusPayload = { anilistId: input.anilistId };
       if (input.title !== undefined) payload.title = input.title;
       if (input.metadata !== undefined) payload.metadata = input.metadata;
 

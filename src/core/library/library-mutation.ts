@@ -1,5 +1,5 @@
 import { logError, normalizeError } from '@/shared/errors';
-import type { LibraryMutationEmitter } from './base-library.interface';
+import type { LibraryMutationEmitter } from './library.types';
 
 export async function notifyLibraryMutation<TPayload>(
   scope: string,
@@ -7,6 +7,7 @@ export async function notifyLibraryMutation<TPayload>(
   payload: TPayload,
 ): Promise<void> {
   if (!emit) return;
+
   try {
     await emit(payload);
   } catch (error) {

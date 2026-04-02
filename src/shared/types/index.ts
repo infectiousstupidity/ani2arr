@@ -55,13 +55,6 @@ export type {
 } from '@/shared/schemas/providers/radarr-settings.schema';
 
 export type {
-  CheckMovieStatusPayload,
-  CheckMovieStatusResponse,
-  CheckSeriesStatusPayload,
-  CheckSeriesStatusResponse,
-} from '@/rpc/types';
-
-export type {
   ExtensionOptions,
   PublicOptions,
   SonarrPublicOptions,

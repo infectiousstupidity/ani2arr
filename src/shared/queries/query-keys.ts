@@ -1,4 +1,5 @@
-import type { CheckSeriesStatusPayload, MappingProvider, AniListMediaHint } from '@/shared/types';
+import type { CheckSeriesStatusPayload } from '@/rpc/types';
+import type { MappingProvider, AniListMediaHint } from '@/shared/types';
 import type { GetMappingsInput } from '@/rpc/schemas';
 
 const rootQueryKey = ['a2a'] as const;
