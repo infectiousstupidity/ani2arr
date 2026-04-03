@@ -7,15 +7,13 @@ export type ProviderConnectionStatus =
   | 'connecting'
   | 'not-configured';
 
-export interface ProviderConnectionStatusMeta {
-  label: string;
-  shortLabel: string;
-  variantClassName?: string;
-}
-
 export const PROVIDER_CONNECTION_STATUS_META: Record<
   ProviderConnectionStatus,
-  ProviderConnectionStatusMeta
+  {
+    label: string;
+    shortLabel: string;
+    variantClassName?: string;
+  }
 > = {
   connected: {
     label: 'Connected',
@@ -40,4 +38,8 @@ export const PROVIDER_CONNECTION_STATUS_META: Record<
 
 export const getProviderConnectionStatusMeta = (
   status: ProviderConnectionStatus,
-): ProviderConnectionStatusMeta => PROVIDER_CONNECTION_STATUS_META[status];
+): {
+  label: string;
+  shortLabel: string;
+  variantClassName?: string;
+} => PROVIDER_CONNECTION_STATUS_META[status];

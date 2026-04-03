@@ -1,3 +1,4 @@
+/** Options-page advanced controls for diagnostics, reset actions, and privacy details. */
 // src/entrypoints/options/components/advanced-section.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
@@ -5,8 +6,8 @@ import { RotateCcw } from 'lucide-react';
 import Button from '@/shared/ui/primitives/button';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
-import type { SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/features/options/use-settings-actions';
+import type { ExtensionOptions } from '@/shared/types';
 
 export type AdvancedPanelId = 'privacy' | null;
 
@@ -17,7 +18,7 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
   const confirm = useConfirm();
   const toast = useToast();
   const [isResetting, setIsResetting] = useState(false);
-  const methods = useFormContext<SettingsFormValues>();
+  const methods = useFormContext<ExtensionOptions>();
   const debugLogging = Boolean(useWatch({ control: methods.control, name: 'debugLogging' as const }));
   const schedulerDebugOverlayEnabled = Boolean(
     useWatch({ control: methods.control, name: 'ui.schedulerDebugOverlayEnabled' as const }),
@@ -31,7 +32,7 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
     if (!node) return;
 
     node.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    window.setTimeout(() => node.focus(), 120);
+    globalThis.setTimeout(() => node.focus(), 120);
   }, [focusPanel]);
 
   const handleReset = async () => {

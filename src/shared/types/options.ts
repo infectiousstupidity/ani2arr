@@ -8,59 +8,38 @@ import type { ProviderCredentials } from '@/shared/types/providers';
 
 export type BadgeVisibility = 'always' | 'hover';
 
-export interface ProviderBrowseCardUiOptions {
-  enabled: boolean;
-  visibility: BadgeVisibility;
-}
-
-export interface ProviderAnimePageUiOptions {
-  enabled: boolean;
-}
-
-export interface ProviderUiOptions {
-  sonarr: ProviderBrowseCardUiOptions;
-  radarr: ProviderBrowseCardUiOptions;
-}
-
-export interface ProviderAnimePageOptions {
-  sonarr: ProviderAnimePageUiOptions;
-  radarr: ProviderAnimePageUiOptions;
-}
-
 export interface UiOptions {
-  browseCards: ProviderUiOptions;
-  animePages: ProviderAnimePageOptions;
+  browseCards: {
+    sonarr: {
+      enabled: boolean;
+      visibility: BadgeVisibility;
+    };
+    radarr: {
+      enabled: boolean;
+      visibility: BadgeVisibility;
+    };
+  };
+  animePages: {
+    sonarr: {
+      enabled: boolean;
+    };
+    radarr: {
+      enabled: boolean;
+    };
+  };
   schedulerDebugOverlayEnabled: boolean;
-}
-
-export interface SonarrOptions extends ProviderCredentials {
-  preferredAniListTitleLanguage: AniListTitleLanguage;
-  defaults: SonarrFormState;
-}
-
-export interface RadarrOptions extends ProviderCredentials {
-  preferredAniListTitleLanguage: AniListTitleLanguage;
-  defaults: RadarrFormState;
-}
-
-export interface SonarrPublicOptions {
-  url: string;
-  preferredAniListTitleLanguage: AniListTitleLanguage;
-  defaults: SonarrFormState;
-  isConfigured: boolean;
-}
-
-export interface RadarrPublicOptions {
-  url: string;
-  preferredAniListTitleLanguage: AniListTitleLanguage;
-  defaults: RadarrFormState;
-  isConfigured: boolean;
 }
 
 export interface ExtensionOptions {
   providers: {
-    sonarr: SonarrOptions;
-    radarr: RadarrOptions;
+    sonarr: ProviderCredentials & {
+      preferredAniListTitleLanguage: AniListTitleLanguage;
+      defaults: SonarrFormState;
+    };
+    radarr: ProviderCredentials & {
+      preferredAniListTitleLanguage: AniListTitleLanguage;
+      defaults: RadarrFormState;
+    };
   };
   ui: UiOptions;
   debugLogging: boolean;
@@ -72,8 +51,18 @@ export interface ExtensionOptions {
  */
 export interface PublicOptions {
   providers: {
-    sonarr: SonarrPublicOptions;
-    radarr: RadarrPublicOptions;
+    sonarr: {
+      url: string;
+      preferredAniListTitleLanguage: AniListTitleLanguage;
+      defaults: SonarrFormState;
+      isConfigured: boolean;
+    };
+    radarr: {
+      url: string;
+      preferredAniListTitleLanguage: AniListTitleLanguage;
+      defaults: RadarrFormState;
+      isConfigured: boolean;
+    };
   };
   ui: UiOptions;
   debugLogging: boolean;

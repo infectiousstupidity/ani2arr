@@ -4,12 +4,12 @@
 import React from 'react';
 import SectionHeader from '@/features/options/section-header';
 import SonarrSettingsPanel from '@/features/options/provider-settings/sonarr-settings-panel';
-import type { Settings } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/features/options/use-settings-actions';
+import type { ExtensionOptions } from '@/shared/types';
 
 const SonarrPage: React.FC<{
   actions: SettingsActions;
-  savedSettings?: Settings;
+  savedSettings?: ExtensionOptions;
   isLoading: boolean;
 }> = ({ actions, savedSettings, isLoading }) => (
   <div className="space-y-6">

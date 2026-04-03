@@ -20,16 +20,9 @@ import {
   requestProviderHostPermission,
 } from '@/runtime/permissions/provider-host-permissions';
 import { logger } from '@/shared/utils/logger';
-import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import { parseSettings } from '@/storage';
-import type { ExtensionOptions } from '@/shared/types';
-
-interface UseSettingsActionsParams {
-  savedSettings?: Settings;
-}
-
-type ProviderKey = 'sonarr' | 'radarr';
+import type { ExtensionOptions, Provider } from '@/shared/types';
 
 type PreparedProviderState = {
   url: string;
@@ -38,15 +31,14 @@ type PreparedProviderState = {
   permissionPattern: string | null;
 };
 
-export function useSettingsActions(params: UseSettingsActionsParams) {
-  const { savedSettings } = params;
-  const methods = useFormContext<SettingsFormValues>();
+export function useSettingsActions({ savedSettings }: { savedSettings?: ExtensionOptions }) {
+  const methods = useFormContext<ExtensionOptions>();
   const queryClient = useQueryClient();
   const saveOptions = useSaveOptions();
   const sonarrTestConnection = useTestProviderConnection();
   const radarrTestConnection = useTestProviderConnection();
   const [saveError, setSaveError] = useState<string | null>(null);
-  const savedSettingsRef = useRef<Settings | undefined>(undefined);
+  const savedSettingsRef = useRef<ExtensionOptions | undefined>(undefined);
 
   useEffect(() => {
     savedSettingsRef.current = savedSettings ? parseSettings(savedSettings) : undefined;
@@ -92,7 +84,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
   );
 
   const prepareProvider = useCallback(
-    (settings: Settings, provider: ProviderKey): PreparedProviderState => {
+    (settings: ExtensionOptions, provider: Provider): PreparedProviderState => {
       const config = providerConfigs[provider];
       const rawUrl = String(settings.providers[provider].url ?? '').trim();
       const rawApiKey = String(settings.providers[provider].apiKey ?? '').trim();
@@ -138,7 +130,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
   );
 
   const saveProviderConnection = useCallback(
-    async (provider: ProviderKey): Promise<boolean> => {
+    async (provider: Provider): Promise<boolean> => {
       if (saveOptions.isPending || sonarrTestConnection.isPending || radarrTestConnection.isPending) {
         return false;
       }
@@ -177,7 +169,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         return true;
       }
 
-      const normalizedSettings: Settings = {
+      const normalizedSettings: ExtensionOptions = {
         ...previousSettings,
         providers: {
           ...previousSettings.providers,
@@ -192,7 +184,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
       };
 
       try {
-        await saveOptions.mutateAsync(normalizedSettings as ExtensionOptions);
+        await saveOptions.mutateAsync(normalizedSettings);
         savedSettingsRef.current = normalizedSettings;
 
         methods.resetField(`providers.${provider}.url`, {
@@ -248,7 +240,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
 
   // TODO: Currently this clears both providers' mappings when disconnecting one. Refactor it so these are stored and cleared separately.
   const disconnectProvider = useCallback(
-    async (provider: ProviderKey): Promise<boolean> => {
+    async (provider: Provider): Promise<boolean> => {
       if (saveOptions.isPending || sonarrTestConnection.isPending || radarrTestConnection.isPending) {
         return false;
       }
@@ -275,7 +267,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         );
       }
 
-      const normalizedSettings: Settings = {
+      const normalizedSettings: ExtensionOptions = {
         ...previousSettings,
         providers: {
           ...previousSettings.providers,
@@ -290,7 +282,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
       try {
         config.testConnectionState.reset();
 
-        await saveOptions.mutateAsync(normalizedSettings as ExtensionOptions);
+        await saveOptions.mutateAsync(normalizedSettings);
         savedSettingsRef.current = normalizedSettings;
 
         methods.resetField(`providers.${provider}.url`, {
@@ -359,7 +351,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         return false;
       }
 
-      let preparedProviders: Record<ProviderKey, PreparedProviderState>;
+      let preparedProviders: Record<Provider, PreparedProviderState>;
 
       try {
         preparedProviders = {
@@ -371,7 +363,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         return false;
       }
 
-      const normalizedSettings: Settings = {
+      const normalizedSettings: ExtensionOptions = {
         ...nextSettings,
         providers: {
           ...nextSettings.providers,
@@ -388,7 +380,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         },
       };
 
-      const providerStates = (Object.keys(providerConfigs) as ProviderKey[]).map(provider => {
+      const providerStates = (Object.keys(providerConfigs) as Provider[]).map(provider => {
         const config = providerConfigs[provider];
         const current = preparedProviders[provider];
         const previousUrl = String(previousSettings.providers[provider].url ?? '').trim();
@@ -419,7 +411,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         };
       });
 
-      const grantedPermissions: Array<{ provider: ProviderKey; url: string }> = [];
+      const grantedPermissions: Array<{ provider: Provider; url: string }> = [];
       let stage: 'permission' | 'test' | 'save' | 'cleanup' | null = null;
 
       try {
@@ -460,8 +452,8 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
         }
 
         stage = 'save';
-        await saveOptions.mutateAsync(normalizedSettings as ExtensionOptions);
-        methods.reset(normalizedSettings as SettingsFormValues);
+        await saveOptions.mutateAsync(normalizedSettings);
+        methods.reset(normalizedSettings);
 
         for (const state of providerStates) {
           if (!state.previousPermissionPattern || state.previousPermissionPattern === state.current.permissionPattern) {
@@ -477,8 +469,8 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
             );
             setSaveError(`Failed to update ${state.label} host permissions. Please try again.`);
 
-            await saveOptions.mutateAsync(previousSettings as ExtensionOptions);
-            methods.reset(previousSettings as SettingsFormValues);
+            await saveOptions.mutateAsync(previousSettings);
+            methods.reset(previousSettings);
 
             for (const granted of grantedPermissions) {
               const rollback = await removeProviderHostPermission(granted.url);
@@ -536,7 +528,7 @@ export function useSettingsActions(params: UseSettingsActionsParams) {
 
     try {
       await getAni2arrApi().resetExtensionState();
-      methods.reset(defaults as SettingsFormValues);
+      methods.reset(defaults);
     } finally {
       invalidateSettingsQueries();
     }

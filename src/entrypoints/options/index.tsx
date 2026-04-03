@@ -1,3 +1,4 @@
+/** Options entrypoint wiring for section navigation, form state, and provider settings screens. */
 // src/entrypoints/options/index.tsx
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
@@ -24,10 +25,10 @@ import {
   type ProviderConnectionStatus,
 } from '@/features/options/provider-connection-status';
 import { createDefaultSettings } from '@/shared/schemas/settings';
-import type { SettingsFormValues } from '@/shared/schemas/settings';
 import { useSettingsActions } from '@/features/options/use-settings-actions';
 import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
 import { cn } from '@/shared/utils/cn';
+import type { ExtensionOptions } from '@/shared/types';
 import {
   AdvancedIcon,
   MappingsIcon,
@@ -124,8 +125,41 @@ const resolveSectionFromHash = (hash: string): SectionId => {
 };
 
 const getInitialSection = (): SectionId => {
-  if (typeof window === 'undefined') return 'sonarr';
-  return resolveSectionFromHash(window.location.hash);
+  if (globalThis.window === undefined) return 'sonarr';
+  return resolveSectionFromHash(globalThis.window.location.hash);
+};
+
+const getSectionUrlHash = (
+  sectionId: SectionId,
+  targetAnilistId: number | null,
+  advancedPanel: AdvancedPanelId,
+): string => {
+  const section = sections.find(entry => entry.id === sectionId) ?? sections[0];
+  if (!section) return '/options/sonarr';
+
+  if (sectionId === 'mappings' && typeof targetAnilistId === 'number') {
+    return `${section.path}?anilistId=${targetAnilistId}`;
+  }
+
+  if (sectionId === 'advanced' && advancedPanel === 'privacy') {
+    return `${section.path}?panel=privacy`;
+  }
+
+  return section.path;
+};
+
+const syncOptionsLocation = (
+  sectionId: SectionId,
+  targetAnilistId: number | null,
+  advancedPanel: AdvancedPanelId,
+) => {
+  const section = sections.find(entry => entry.id === sectionId) ?? sections[0];
+  if (!section || globalThis.window === undefined) return;
+
+  const url = new URL(globalThis.window.location.href);
+  url.hash = getSectionUrlHash(sectionId, targetAnilistId, advancedPanel);
+  globalThis.window.history.replaceState(null, '', url);
+  document.title = `ani2arr - ${section.label}`;
 };
 
 const extractTargetAnilistIdFromHash = (hash: string): number | null => {
@@ -248,7 +282,7 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
 
   const renderSection = () => {
     switch (activeSection) {
-      case 'sonarr':
+      case 'sonarr': {
         return (
           <SonarrPage
             actions={actions}
@@ -256,7 +290,8 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
             isLoading={optionsQuery.isLoading}
           />
         );
-      case 'radarr':
+      }
+      case 'radarr': {
         return (
           <RadarrPage
             actions={actions}
@@ -264,19 +299,34 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
             isLoading={optionsQuery.isLoading}
           />
         );
-      case 'mappings':
+      }
+      case 'mappings': {
         return (
           <MappingsSection
-            {...(targetAnilistId !== null ? { targetAnilistId } : {})}
+            {...(targetAnilistId === null ? {} : { targetAnilistId })}
             onClearTargetAnilistId={clearTargetAnilistId}
           />
         );
-      case 'ui':
+      }
+      case 'ui': {
         return <UiSection />;
-      case 'advanced':
-      default:
+      }
+      case 'advanced': {
         return <AdvancedSection actions={actions} focusPanel={advancedPanel} />;
+      }
     }
+  };
+
+  const getSectionStatusProps = (sectionId: SectionId): { status?: ProviderConnectionStatus } => {
+    if (sectionId === 'sonarr') {
+      return { status: sonarrStatus };
+    }
+
+    if (sectionId === 'radarr') {
+      return { status: radarrStatus };
+    }
+
+    return {};
   };
 
   const showServiceTip = activeSection === 'sonarr' || activeSection === 'radarr';
@@ -309,11 +359,7 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
                         key={section.id}
                         section={section}
                         active={section.id === activeSection}
-                        {...(section.id === 'sonarr'
-                          ? { status: sonarrStatus }
-                          : section.id === 'radarr'
-                            ? { status: radarrStatus }
-                            : {})}
+                        {...getSectionStatusProps(section.id)}
                         onSelect={setActiveSection}
                       />
                     ))}
@@ -386,60 +432,59 @@ const OptionsPage: React.FC = React.memo(() => {
   useA2aBroadcasts();
   const [activeSection, setActiveSection] = useState<SectionId>(getInitialSection);
   const [targetAnilistId, setTargetAnilistId] = useState<number | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return extractTargetAnilistIdFromHash(window.location.hash);
+    if (globalThis.window === undefined) return null;
+    return extractTargetAnilistIdFromHash(globalThis.window.location.hash);
   });
   const [advancedPanel, setAdvancedPanel] = useState<AdvancedPanelId>(() => {
-    if (typeof window === 'undefined') return null;
-    return extractAdvancedPanelFromHash(window.location.hash);
+    if (globalThis.window === undefined) return null;
+    return extractAdvancedPanelFromHash(globalThis.window.location.hash);
   });
   const optionsQuery = useExtensionOptions();
-  const methods = useForm<SettingsFormValues>({
-    defaultValues: (optionsQuery.data ?? createDefaultSettings()) as SettingsFormValues,
+  const methods = useForm<ExtensionOptions>({
+    defaultValues: optionsQuery.data ?? createDefaultSettings(),
     mode: 'onChange',
   });
 
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash;
-      setActiveSection(resolveSectionFromHash(hash));
-      setTargetAnilistId(extractTargetAnilistIdFromHash(hash));
-      setAdvancedPanel(extractAdvancedPanelFromHash(hash));
+      const hash = globalThis.window.location.hash;
+      const nextSection = resolveSectionFromHash(hash);
+      const nextTargetAnilistId = extractTargetAnilistIdFromHash(hash);
+      const nextAdvancedPanel = extractAdvancedPanelFromHash(hash);
+
+      setActiveSection(nextSection);
+      setTargetAnilistId(nextTargetAnilistId);
+      setAdvancedPanel(nextAdvancedPanel);
+      syncOptionsLocation(nextSection, nextTargetAnilistId, nextAdvancedPanel);
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+
+    handleHashChange();
+    globalThis.window.addEventListener('hashchange', handleHashChange);
+    return () => globalThis.window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  useEffect(() => {
-    const section = sections.find(entry => entry.id === activeSection) ?? sections[0];
-    if (!section) return;
-    const url = new URL(window.location.href);
-    const query =
-      activeSection === 'mappings' && typeof targetAnilistId === 'number'
-        ? `${section.path}?anilistId=${targetAnilistId}`
-        : activeSection === 'advanced' && advancedPanel === 'privacy'
-          ? `${section.path}?panel=privacy`
-        : section.path;
-    url.hash = query;
-    window.history.replaceState(null, '', url);
-    document.title = `ani2arr - ${section.label}`;
-  }, [activeSection, targetAnilistId, advancedPanel]);
-
   const handleSelectSection = (id: SectionId) => {
+    const nextTargetAnilistId = id === 'mappings' ? targetAnilistId : null;
+    const nextAdvancedPanel = id === 'advanced' ? advancedPanel : null;
     setActiveSection(id);
-    if (id !== 'advanced') {
-      setAdvancedPanel(null);
-    }
+    setAdvancedPanel(nextAdvancedPanel);
+    syncOptionsLocation(id, nextTargetAnilistId, nextAdvancedPanel);
   };
 
   const handleOpenPrivacyPanel = () => {
     setActiveSection('advanced');
     setAdvancedPanel('privacy');
+    syncOptionsLocation('advanced', null, 'privacy');
+  };
+
+  const handleClearTargetAnilistId = () => {
+    setTargetAnilistId(null);
+    syncOptionsLocation(activeSection, null, advancedPanel);
   };
 
   useEffect(() => {
     if (optionsQuery.data && !methods.formState.isDirty) {
-      methods.reset(optionsQuery.data as SettingsFormValues);
+      methods.reset(optionsQuery.data);
     }
   }, [methods, optionsQuery.data]);
 
@@ -450,7 +495,7 @@ const OptionsPage: React.FC = React.memo(() => {
         setActiveSection={handleSelectSection}
         optionsQuery={optionsQuery}
         targetAnilistId={targetAnilistId}
-        clearTargetAnilistId={() => setTargetAnilistId(null)}
+        clearTargetAnilistId={handleClearTargetAnilistId}
         advancedPanel={advancedPanel}
         openPrivacyPanel={handleOpenPrivacyPanel}
       />
@@ -460,7 +505,7 @@ const OptionsPage: React.FC = React.memo(() => {
 OptionsPage.displayName = 'OptionsPage';
 
 // Find the root element and render the app.
-const rootElement = document.getElementById('options-root');
+const rootElement = document.querySelector('#options-root');
 if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>

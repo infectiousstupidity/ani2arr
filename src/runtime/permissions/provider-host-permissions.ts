@@ -7,9 +7,7 @@ import {
   type ProviderConnectionResult,
 } from '@/shared/schemas/providers/provider-connection.schema';
 
-export type ProviderHostPermissionResult<T> = ProviderConnectionResult<T>;
-
-export function getProviderHostPermissionPattern(url: string): ProviderHostPermissionResult<string> {
+export function getProviderHostPermissionPattern(url: string): ProviderConnectionResult<string> {
   const normalized = normalizeProviderConnectionUrl(url);
   if (!normalized.ok) {
     return normalized;
@@ -20,7 +18,7 @@ export function getProviderHostPermissionPattern(url: string): ProviderHostPermi
 
 export async function requestProviderHostPermission(
   url: string,
-): Promise<ProviderHostPermissionResult<{ pattern: string; granted: boolean }>> {
+): Promise<ProviderConnectionResult<{ pattern: string; granted: boolean }>> {
   const pattern = getProviderHostPermissionPattern(url);
   if (!pattern.ok) {
     return pattern;
@@ -39,7 +37,7 @@ export async function requestProviderHostPermission(
 
 export async function hasProviderHostPermission(
   url: string,
-): Promise<ProviderHostPermissionResult<boolean>> {
+): Promise<ProviderConnectionResult<boolean>> {
   const pattern = getProviderHostPermissionPattern(url);
   if (!pattern.ok) {
     return pattern;
@@ -60,7 +58,7 @@ export async function hasProviderHostPermission(
 
 export async function removeProviderHostPermission(
   url: string,
-): Promise<ProviderHostPermissionResult<{ pattern: string; removed: boolean }>> {
+): Promise<ProviderConnectionResult<{ pattern: string; removed: boolean }>> {
   const pattern = getProviderHostPermissionPattern(url);
   if (!pattern.ok) {
     return pattern;

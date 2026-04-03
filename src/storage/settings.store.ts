@@ -8,16 +8,12 @@ import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,
 } from '@/shared/schemas/providers/provider-connection.schema';
-import type { Settings } from '@/shared/schemas/settings';
 import type { ExtensionOptions, PublicOptions } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
 import { STORAGE_KEYS } from './keys';
 
-type SonarrSecrets = { apiKey: string };
-type RadarrSecrets = { apiKey: string };
-
-const createDefaultSonarrSecrets = (): SonarrSecrets => ({ apiKey: '' });
-const createDefaultRadarrSecrets = (): RadarrSecrets => ({ apiKey: '' });
+const createDefaultSonarrSecrets = (): { apiKey: string } => ({ apiKey: '' });
+const createDefaultRadarrSecrets = (): { apiKey: string } => ({ apiKey: '' });
 
 export function toPublicOptions(settings: ExtensionOptions): PublicOptions {
   return {
@@ -49,17 +45,17 @@ export const publicOptions = storage.defineItem<PublicOptions>(STORAGE_KEYS.publ
   version: 1,
 });
 
-export const sonarrSecrets = storage.defineItem<SonarrSecrets>(STORAGE_KEYS.sonarrSecrets, {
+export const sonarrSecrets = storage.defineItem<{ apiKey: string }>(STORAGE_KEYS.sonarrSecrets, {
   fallback: createDefaultSonarrSecrets(),
   version: 1,
 });
 
-export const radarrSecrets = storage.defineItem<RadarrSecrets>(STORAGE_KEYS.radarrSecrets, {
+export const radarrSecrets = storage.defineItem<{ apiKey: string }>(STORAGE_KEYS.radarrSecrets, {
   fallback: createDefaultRadarrSecrets(),
   version: 1,
 });
 
-export const parseSettings = (raw: unknown): Settings => {
+export const parseSettings = (raw: unknown): ExtensionOptions => {
   const result = v.safeParse(SettingsSchema, raw);
   if (result.success) return result.output;
   logger.warn('Storage mismatch, applying defaults', result.issues);
@@ -106,11 +102,11 @@ const getRawOptions = async () => {
   return {
     providers: {
       sonarr: {
-        ...(pub.providers?.sonarr ?? {}),
+        ...pub.providers.sonarr,
         apiKey: sonarr.apiKey,
       },
       radarr: {
-        ...(pub.providers?.radarr ?? {}),
+        ...pub.providers.radarr,
         apiKey: radarr.apiKey,
       },
     },
@@ -119,7 +115,7 @@ const getRawOptions = async () => {
   };
 };
 
-export async function getExtensionOptionsSnapshot(): Promise<Settings> {
+export async function getExtensionOptionsSnapshot(): Promise<ExtensionOptions> {
   return parseSettings(await getRawOptions());
 }
 
@@ -132,7 +128,7 @@ export async function setExtensionOptionsSnapshot(options: ExtensionOptions): Pr
   const radarrUrl = normalizeUrl(parsed.providers.radarr.url, 'Radarr');
   const radarrApiKey = normalizeApiKey(parsed.providers.radarr.apiKey, 'Radarr');
 
-  const sanitized: Settings = {
+  const sanitized: ExtensionOptions = {
     ...parsed,
     providers: {
       sonarr: {
