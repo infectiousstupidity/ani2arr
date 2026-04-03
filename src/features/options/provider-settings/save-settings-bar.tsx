@@ -4,16 +4,16 @@
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 
-import type { Settings } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/features/options/use-settings-actions';
 import Button from '@/shared/ui/primitives/button';
+import type { ExtensionOptions } from '@/shared/types';
 
 export const SaveSettingsBar: React.FC<{
   actions: SettingsActions;
   isLoading?: boolean;
   className?: string;
 }> = ({ actions, isLoading, className }) => {
-  const { formState } = useFormContext<Settings>();
+  const { formState } = useFormContext<ExtensionOptions>();
 
   return (
     <div className={className}>

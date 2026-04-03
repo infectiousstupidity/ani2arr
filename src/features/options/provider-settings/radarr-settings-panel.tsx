@@ -9,7 +9,6 @@ import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,
 } from '@/shared/schemas/providers/provider-connection.schema';
-import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/features/options/use-settings-actions';
 import { requestProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
 import { logger } from '@/shared/utils/logger';
@@ -24,10 +23,11 @@ import {
 } from './provider-connection-card';
 import { RadarrDefaultsSection } from './radarr-defaults-section';
 import { useSelectPortal } from './use-select-portal';
+import type { ExtensionOptions } from '@/shared/types';
 
 export interface RadarrSettingsPanelProps {
   actions: SettingsActions;
-  savedSettings?: Settings;
+  savedSettings?: ExtensionOptions;
   isLoading?: boolean;
 }
 
@@ -36,7 +36,7 @@ function RadarrSettingsPanelInner({
   savedSettings,
   isLoading,
 }: RadarrSettingsPanelProps): React.JSX.Element {
-  const methods = useFormContext<SettingsFormValues>();
+  const methods = useFormContext<ExtensionOptions>();
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -123,11 +123,12 @@ function RadarrSettingsPanelInner({
       (!isEditingConnection || credentialScope === persistedCredentialScope || credentialScope === null),
   );
   const metadataEnabled = usePersistedCredentials || useConfirmedDraftCredentials;
-  const metadataCredentials = useConfirmedDraftCredentials
-    ? formCredentials
-    : usePersistedCredentials
-      ? persistedCredentials
-      : null;
+  let metadataCredentials = null;
+  if (useConfirmedDraftCredentials) {
+    metadataCredentials = formCredentials;
+  } else if (usePersistedCredentials) {
+    metadataCredentials = persistedCredentials;
+  }
 
   const liveConnectionQuery = useProviderConnectionCheck({
     provider: 'radarr',

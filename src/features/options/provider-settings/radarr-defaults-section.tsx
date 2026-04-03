@@ -9,8 +9,8 @@ import { RadarrAddOptionsFields } from '@/components/provider-add-options/radarr
 import type { SettingsActions } from '@/features/options/use-settings-actions';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import type { useRadarrMetadata } from '@/shared/queries';
-import type { SettingsFormValues } from '@/shared/schemas/settings';
 import Button from '@/shared/ui/primitives/button';
+import type { ExtensionOptions } from '@/shared/types';
 
 import { SaveSettingsBar } from './save-settings-bar';
 
@@ -27,13 +27,13 @@ export const RadarrDefaultsSection: React.FC<{
   metadataQuery,
   onRefresh,
 }) => {
-  const methods = useFormContext<SettingsFormValues>();
+  const methods = useFormContext<ExtensionOptions>();
   const defaults = useWatch({
     control: methods.control,
     name: 'providers.radarr.defaults',
   });
 
-  const setDefaultField = <K extends keyof SettingsFormValues['providers']['radarr']['defaults']>(
+  const setDefaultField = <K extends keyof ExtensionOptions['providers']['radarr']['defaults']>(
     field: K,
     value: RadarrFormState[K],
   ): void => {

@@ -31,8 +31,6 @@ export type {
 export type {
   ExtensionOptions,
   PublicOptions,
-  SonarrPublicOptions,
-  RadarrPublicOptions,
   UiOptions,
   BadgeVisibility,
 } from './options';
@@ -59,5 +57,3 @@ export {
   type CardOverlayProps,
   type ParsedCard,
 } from './ui';
-
-export type { Settings } from '@/shared/schemas/settings';

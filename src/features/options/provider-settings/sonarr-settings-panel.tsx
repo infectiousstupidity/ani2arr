@@ -6,7 +6,6 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useSonarrMetadata, queryKeys } from '@/shared/queries';
-import type { Settings, SettingsFormValues } from '@/shared/schemas/settings';
 import type { SettingsActions } from '@/features/options/use-settings-actions';
 import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
 import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
@@ -27,10 +26,11 @@ import {
 import type { SonarrAddOptionsFieldsLayout } from '@/components/provider-add-options/sonarr-add-options-fields';
 import { SonarrDefaultsSection } from './sonarr-defaults-section';
 import { useSelectPortal } from './use-select-portal';
+import type { ExtensionOptions } from '@/shared/types';
 
 export interface SonarrSettingsPanelProps {
   actions: SettingsActions;
-  savedSettings?: Settings;
+  savedSettings?: ExtensionOptions;
   layout?: SonarrAddOptionsFieldsLayout;
   isLoading?: boolean;
 }
@@ -41,7 +41,7 @@ function SonarrSettingsPanelInner({
   layout,
   isLoading,
 }: SonarrSettingsPanelProps): React.JSX.Element {
-  const methods = useFormContext<SettingsFormValues>();
+  const methods = useFormContext<ExtensionOptions>();
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -135,12 +135,12 @@ function SonarrSettingsPanelInner({
       (!isEditingConnection || credentialScope === persistedCredentialScope || credentialScope === null),
   );
   const metadataEnabled = usePersistedCredentials || useConfirmedDraftCredentials;
-
-  const metadataCredentials = useConfirmedDraftCredentials
-    ? formCredentials
-    : usePersistedCredentials
-      ? persistedCredentials
-      : null;
+  let metadataCredentials = null;
+  if (useConfirmedDraftCredentials) {
+    metadataCredentials = formCredentials;
+  } else if (usePersistedCredentials) {
+    metadataCredentials = persistedCredentials;
+  }
 
   const liveConnectionQuery = useProviderConnectionCheck({
     provider: 'sonarr',

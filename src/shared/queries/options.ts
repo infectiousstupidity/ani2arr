@@ -1,3 +1,6 @@
+/** Shared option-query hooks and cache synchronization for private and public option snapshots. */
+// src/shared/queries/options.ts
+
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
@@ -13,7 +16,6 @@ import {
 } from '@/storage';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import type { ExtensionOptions, PublicOptions } from '@/shared/types';
-import type { Settings } from '@/shared/schemas/settings';
 import { logger } from '@/shared/utils/logger';
 import { queryKeys } from './query-keys';
 
@@ -79,7 +81,7 @@ const useSyncPublicOptionsQuery = (queryClient: ReturnType<typeof useQueryClient
 
 export const useExtensionOptions = () => {
   const queryClient = useQueryClient();
-  const query = useQuery<Settings>({
+  const query = useQuery<ExtensionOptions>({
     queryKey: queryKeys.options(),
     queryFn: () => getExtensionOptionsSnapshot(),
     staleTime: Infinity,
@@ -110,7 +112,7 @@ export const usePublicOptions = () => {
 export const useSaveOptions = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<void, ExtensionError, ExtensionOptions, { previousOptions: Settings | undefined }>({
+  return useMutation<void, ExtensionError, ExtensionOptions, { previousOptions: ExtensionOptions | undefined }>({
     mutationFn: async (options: ExtensionOptions) => {
       try {
         await setExtensionOptionsSnapshot(options);
@@ -125,7 +127,7 @@ export const useSaveOptions = () => {
         queryClient.cancelQueries({ queryKey: queryKeys.options() }),
         queryClient.cancelQueries({ queryKey: queryKeys.publicOptions() }),
       ]);
-      const previousOptions = queryClient.getQueryData<Settings>(queryKeys.options());
+      const previousOptions = queryClient.getQueryData<ExtensionOptions>(queryKeys.options());
       const nextSettings = parseSettings(newOptions);
       const nextPublicOptions = toPublicOptions(nextSettings);
       queryClient.setQueryData(queryKeys.options(), nextSettings);

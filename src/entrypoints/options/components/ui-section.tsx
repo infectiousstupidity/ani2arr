@@ -3,11 +3,8 @@
 
 import React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
-import type { BadgeVisibility, Settings } from '@/shared/types';
-import type { SettingsFormValues } from '@/shared/schemas/settings';
+import type { BadgeVisibility, ExtensionOptions, Provider } from '@/shared/types';
 import { defaultUiOptions } from '@/shared/schemas/settings';
-
-type ProviderKey = 'sonarr' | 'radarr';
 
 const VISIBILITY_OPTIONS: Array<{ value: BadgeVisibility; label: string; description: string }> = [
   { value: 'always', label: 'Always', description: 'Show actions and status badges on every supported card.' },
@@ -15,7 +12,7 @@ const VISIBILITY_OPTIONS: Array<{ value: BadgeVisibility; label: string; descrip
 ];
 
 const ProviderVisibilityControl: React.FC<{
-  provider: ProviderKey;
+  provider: Provider;
   title: string;
   description: string;
   enabled: boolean;
@@ -68,7 +65,7 @@ const ProviderVisibilityControl: React.FC<{
 );
 
 const ProviderAnimePageControl: React.FC<{
-  provider: ProviderKey;
+  provider: Provider;
   title: string;
   description: string;
   enabled: boolean;
@@ -92,17 +89,18 @@ const ProviderAnimePageControl: React.FC<{
 );
 
 const UiSection: React.FC = () => {
-  const methods = useFormContext<SettingsFormValues>();
-  const ui = (useWatch<SettingsFormValues>({ control: methods.control, name: 'ui' as const }) ??
-    defaultUiOptions()) as SettingsFormValues['ui'];
+  const methods = useFormContext<ExtensionOptions>();
+  const ui =
+    (useWatch({ control: methods.control, name: 'ui' as const }) as ExtensionOptions['ui'] | undefined) ??
+    defaultUiOptions();
 
-  const setUi = (nextUi: Settings['ui']) => {
-    methods.setValue('ui', nextUi as SettingsFormValues['ui'], { shouldDirty: true });
+  const setUi = (nextUi: ExtensionOptions['ui']) => {
+    methods.setValue('ui', nextUi, { shouldDirty: true });
   };
 
   const updateBrowseProvider = (
-    provider: ProviderKey,
-    patch: Partial<Settings['ui']['browseCards'][ProviderKey]>,
+    provider: Provider,
+    patch: Partial<ExtensionOptions['ui']['browseCards'][Provider]>,
   ) => {
     setUi({
       ...ui,
@@ -117,8 +115,8 @@ const UiSection: React.FC = () => {
   };
 
   const updateAnimeProvider = (
-    provider: ProviderKey,
-    patch: Partial<Settings['ui']['animePages'][ProviderKey]>,
+    provider: Provider,
+    patch: Partial<ExtensionOptions['ui']['animePages'][Provider]>,
   ) => {
     setUi({
       ...ui,

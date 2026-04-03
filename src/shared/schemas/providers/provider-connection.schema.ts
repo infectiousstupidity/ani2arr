@@ -1,16 +1,11 @@
 /** Canonical pure validation and normalization for provider connection credentials. */
-// src/shared/schemas/provider-connection.schema.ts
+// src/shared/schemas/providers/provider-connection.schema.ts
 
 import * as v from 'valibot';
 
 export type ProviderConnectionResult<T> =
   | { ok: true; value: T }
   | { ok: false; error: string };
-
-export type NormalizedProviderConnectionUrl = {
-  normalizedUrl: string;
-  url: URL;
-};
 
 const NonEmptyUrlSchema = v.pipe(
   v.string(),
@@ -28,7 +23,7 @@ function normalizePathname(pathname: string): string {
 
 export function normalizeProviderConnectionUrl(
   input: string,
-): ProviderConnectionResult<NormalizedProviderConnectionUrl> {
+): ProviderConnectionResult<{ normalizedUrl: string; url: URL }> {
   const raw = input.trim();
   const parsedResult = v.safeParse(NonEmptyUrlSchema, raw);
   if (!parsedResult.success) {
@@ -53,7 +48,7 @@ export function normalizeProviderConnectionUrl(
 
   if (parsed.port) {
     const port = Number.parseInt(parsed.port, 10);
-    if (!Number.isFinite(port) || port < 1 || port > 65535) {
+    if (!Number.isFinite(port) || port < 1 || port > 65_535) {
       return { ok: false, error: 'Invalid port.' };
     }
   }

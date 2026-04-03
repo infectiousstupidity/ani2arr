@@ -12,8 +12,8 @@ import {
 import type { SettingsActions } from '@/features/options/use-settings-actions';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type { useSonarrMetadata } from '@/shared/queries';
-import type { SettingsFormValues } from '@/shared/schemas/settings';
 import Button from '@/shared/ui/primitives/button';
+import type { ExtensionOptions } from '@/shared/types';
 
 import { SaveSettingsBar } from './save-settings-bar';
 
@@ -32,13 +32,13 @@ export const SonarrDefaultsSection: React.FC<{
   onRefresh,
   layout = 'stacked',
 }) => {
-  const methods = useFormContext<SettingsFormValues>();
+  const methods = useFormContext<ExtensionOptions>();
   const defaults = useWatch({
     control: methods.control,
     name: 'providers.sonarr.defaults',
   });
 
-  const setDefaultField = <K extends keyof SettingsFormValues['providers']['sonarr']['defaults']>(
+  const setDefaultField = <K extends keyof ExtensionOptions['providers']['sonarr']['defaults']>(
     field: K,
     value: SonarrFormState[K],
   ): void => {

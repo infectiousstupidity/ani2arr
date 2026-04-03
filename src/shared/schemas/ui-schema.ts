@@ -2,12 +2,7 @@
 // src/shared/schemas/ui-schema.ts
 
 import * as v from 'valibot';
-import type {
-  BadgeVisibility,
-  ProviderAnimePageUiOptions,
-  ProviderBrowseCardUiOptions,
-  UiOptions,
-} from '@/shared/types/options';
+import type { BadgeVisibility, UiOptions } from '@/shared/types/options';
 
 // --- Constants ---
 
@@ -19,12 +14,12 @@ const LEGACY_BADGE_VISIBILITY_OPTIONS = [...BADGE_VISIBILITY_OPTIONS, 'hidden'] 
 
 // --- Factories ---
 
-const createDefaultBrowseCardUiOptions = (): ProviderBrowseCardUiOptions => ({
+const createDefaultBrowseCardUiOptions = (): UiOptions['browseCards']['sonarr'] => ({
   enabled: true,
   visibility: 'always',
 });
 
-const createDefaultAnimePageUiOptions = (): ProviderAnimePageUiOptions => ({
+const createDefaultAnimePageUiOptions = (): UiOptions['animePages']['sonarr'] => ({
   enabled: true,
 });
 

@@ -11,7 +11,6 @@ import { useProviderConnectionCheck } from '@/features/options/use-provider-conn
 import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
 import { getProviderConnectionStatusMeta } from '@/features/options/provider-connection-status';
 import { cn } from '@/shared/utils/cn';
-import type { Settings } from '@/shared/schemas/settings';
 import type {
   BadgeVisibility,
   ExtensionOptions,
@@ -23,7 +22,18 @@ import './style.css';
 const queryClient = new QueryClient();
 const extensionVersion = browser.runtime.getManifest()?.version ?? 'unknown';
 
-type ProviderKey = Provider;
+const openFullSettings = () => {
+  browser.runtime.openOptionsPage().catch(() => {});
+};
+
+const openOptionsSectionInTab = (section: 'sonarr' | 'radarr') => {
+  const baseUrl = browser.runtime.getURL('/options.html');
+  const url = `${baseUrl}#/options/${section}`;
+
+  browser.tabs.create({ url }).catch(() => {
+    browser.runtime.openOptionsPage().catch(() => {});
+  });
+};
 
 const badgeOptions: Array<{ value: BadgeVisibility; label: string }> = [
   { value: 'always', label: 'Always' },
@@ -31,8 +41,8 @@ const badgeOptions: Array<{ value: BadgeVisibility; label: string }> = [
 ];
 
 const getConfiguredCredentials = (
-  settings: Settings | undefined,
-  provider: ProviderKey,
+  settings: ExtensionOptions | undefined,
+  provider: Provider,
 ): ProviderCredentials | null => {
   const providerSettings = settings?.providers[provider];
   if (!providerSettings?.url || !providerSettings.apiKey) {
@@ -60,6 +70,12 @@ const QuickSettings: React.FC = () => {
   const isLoading = optionsQuery.isLoading;
   const isSaving = saveOptions.isPending;
   const isBusy = isLoading || isSaving;
+  let statusMessage = saveError;
+  if (isLoading) {
+    statusMessage = 'Loading settings...';
+  } else if (isSaving) {
+    statusMessage = 'Saving...';
+  }
 
   const sonarrConnectionQuery = useProviderConnectionCheck({
     provider: 'sonarr',
@@ -95,21 +111,21 @@ const QuickSettings: React.FC = () => {
     },
   );
 
-  const updateSettings = async (updater: (current: Settings) => Settings) => {
+  const updateSettings = async (updater: (current: ExtensionOptions) => ExtensionOptions) => {
     if (!settings || isSaving) return;
 
     setSaveError(null);
 
     try {
-      await saveOptions.mutateAsync(updater(settings) as ExtensionOptions);
+      await saveOptions.mutateAsync(updater(settings));
     } catch (error) {
       setSaveError((error as Error)?.message ?? 'Failed to save settings.');
     }
   };
 
   const updateBrowseProvider = async (
-    provider: ProviderKey,
-    patch: Partial<Settings['ui']['browseCards'][ProviderKey]>,
+    provider: Provider,
+    patch: Partial<ExtensionOptions['ui']['browseCards'][Provider]>,
   ) => {
     await updateSettings((current) => ({
       ...current,
@@ -126,7 +142,7 @@ const QuickSettings: React.FC = () => {
     }));
   };
 
-  const updateAnimeProvider = async (provider: ProviderKey, enabled: boolean) => {
+  const updateAnimeProvider = async (provider: Provider, enabled: boolean) => {
     await updateSettings((current) => ({
       ...current,
       ui: {
@@ -140,19 +156,6 @@ const QuickSettings: React.FC = () => {
         },
       },
     }));
-  };
-
-  const openFullSettings = () => {
-    browser.runtime.openOptionsPage().catch(() => {});
-  };
-
-  const openOptionsSectionInTab = (section: 'sonarr' | 'radarr') => {
-    const baseUrl = browser.runtime.getURL('/options.html');
-    const url = `${baseUrl}#/options/${section}`;
-
-    browser.tabs.create({ url }).catch(() => {
-      browser.runtime.openOptionsPage().catch(() => {});
-    });
   };
 
   return (
@@ -345,7 +348,7 @@ const QuickSettings: React.FC = () => {
           );
         })}
 
-        {!hasAnyProviderConfigured ? (
+        {hasAnyProviderConfigured ? null : (
           <div className="rounded-lg border border-border-primary/70 bg-bg-tertiary/40 px-3 py-2">
             <p className="text-sm font-semibold">No provider configured yet</p>
             <p className="mt-1 text-xs text-text-secondary">
@@ -353,17 +356,17 @@ const QuickSettings: React.FC = () => {
               update actions.
             </p>
           </div>
-        ) : null}
+        )}
       </section>
 
       <div className="mt-2 min-h-5 text-xs text-text-secondary" role="status" aria-live="polite">
-        {isLoading ? 'Loading settings...' : isSaving ? 'Saving...' : saveError ? saveError : null}
+        {statusMessage}
       </div>
     </div>
   );
 };
 
-const rootElement = document.getElementById('popup-root');
+const rootElement = document.querySelector('#popup-root');
 
 if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
