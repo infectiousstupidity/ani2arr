@@ -17,18 +17,14 @@ import Button from '@/shared/ui/primitives/button';
 
 import { SaveSettingsBar } from './save-settings-bar';
 
-type SonarrDefaultsField = keyof SettingsFormValues['providers']['sonarr']['defaults'];
-
-type SonarrDefaultsSectionProps = {
+export const SonarrDefaultsSection: React.FC<{
   actions: SettingsActions;
   portalContainer: HTMLElement | null;
   metadataEnabled: boolean;
   metadataQuery: ReturnType<typeof useSonarrMetadata>;
   onRefresh: () => void;
   layout?: SonarrAddOptionsFieldsLayout | undefined;
-};
-
-export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
+}> = ({
   actions,
   portalContainer,
   metadataEnabled,
@@ -42,7 +38,7 @@ export const SonarrDefaultsSection: React.FC<SonarrDefaultsSectionProps> = ({
     name: 'providers.sonarr.defaults',
   });
 
-  const setDefaultField = <K extends SonarrDefaultsField>(
+  const setDefaultField = <K extends keyof SettingsFormValues['providers']['sonarr']['defaults']>(
     field: K,
     value: SonarrFormState[K],
   ): void => {

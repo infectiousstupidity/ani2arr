@@ -14,7 +14,7 @@ import type {
   GetAniListMetadataOutput,
   GetAniListSchedulerDebugOutput,
   GetMappingsOutput,
-  ProviderMetadataOutput,
+  ProviderMetadata,
   ResolveMappingOutput,
   RadarrLookupOutput,
   SonarrLookupOutput,
@@ -67,8 +67,8 @@ export interface Ani2arrApi {
   updateSonarrDefaults(defaults: SonarrFormState): Promise<{ ok: true }>;
   updateRadarrDefaults(defaults: RadarrFormState): Promise<{ ok: true }>;
   testProviderConnection(input: TestProviderConnectionInput): Promise<{ version: string }>;
-  getSonarrMetadata(input?: GetProviderMetadataInput): Promise<ProviderMetadataOutput>;
-  getRadarrMetadata(input?: GetProviderMetadataInput): Promise<ProviderMetadataOutput>;
+  getSonarrMetadata(input?: GetProviderMetadataInput): Promise<ProviderMetadata>;
+  getRadarrMetadata(input?: GetProviderMetadataInput): Promise<ProviderMetadata>;
   initMappings(): Promise<void>;
   setMappingOverride(input: SetMappingOverrideInput): Promise<{ ok: true }>;
   clearMappingOverride(input: ClearMappingOverrideInput): Promise<{ ok: true }>;

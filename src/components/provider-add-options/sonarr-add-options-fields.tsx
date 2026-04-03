@@ -11,9 +11,7 @@ import {
 } from '@/shared/schemas/providers/sonarr-settings.schema';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import type {
-  ProviderQualityProfile,
-  ProviderRootFolder,
-  ProviderTag,
+  ProviderMetadata,
 } from '@/shared/types/providers';
 import { cn } from '@/shared/utils/cn';
 import { buildProviderFolderSlugFromTitle } from '@/shared/utils/provider-library-paths';
@@ -22,15 +20,9 @@ import { ProviderRootFolderSelect } from './provider-root-folder-select';
 
 export type SonarrAddOptionsFieldsLayout = 'stacked' | 'grid';
 
-interface SonarrAddOptionsMetadata {
-  qualityProfiles: ReadonlyArray<ProviderQualityProfile>;
-  rootFolders: ReadonlyArray<ProviderRootFolder>;
-  tags: ReadonlyArray<ProviderTag>;
-}
-
 export interface SonarrAddOptionsFieldsProps {
   values: SonarrFormState;
-  metadata: SonarrAddOptionsMetadata;
+  metadata: ProviderMetadata;
   onChange: <K extends keyof SonarrFormState>(field: K, value: SonarrFormState[K]) => void;
   disabled?: boolean | undefined;
   className?: string | undefined;

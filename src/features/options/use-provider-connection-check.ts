@@ -1,9 +1,4 @@
-/**
- * @file Options-local live provider connection check hook.
- * Centralizes Sonarr and Radarr connection verification behind a single
- * provider-aware React Query hook owned by the options feature.
- */
-
+/** Options-local provider connection query and mutation hooks for provider settings. */
 // src/features/options/use-provider-connection-check.ts
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
@@ -11,12 +6,6 @@ import type { TestProviderConnectionInput } from '@/rpc/schemas';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import { queryKeys } from '@/shared/queries/query-keys';
 import type { Provider, ProviderCredentials } from '@/shared/types/providers';
-
-export interface UseProviderConnectionCheckOptions {
-  provider: Provider;
-  credentials?: ProviderCredentials | null;
-  enabled?: boolean;
-}
 
 export const getProviderCredentialScope = (
   credentials?: ProviderCredentials | null,
@@ -26,7 +15,11 @@ export const getProviderCredentialScope = (
     : 'configured';
 
 export const useProviderConnectionCheck = (
-  options: UseProviderConnectionCheckOptions,
+  options: {
+    provider: Provider;
+    credentials?: ProviderCredentials | null;
+    enabled?: boolean;
+  },
 ) =>
   useQuery<{ version: string }, ExtensionError>({
     queryKey:

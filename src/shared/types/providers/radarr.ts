@@ -3,12 +3,6 @@
 
 import type { RadarrMinimumAvailability } from '@/shared/schemas/providers/radarr-settings.schema';
 
-export interface RadarrAlternateTitle {
-  title?: string | null;
-  sourceType?: string | null;
-  movieMetadataId?: number | null;
-}
-
 export interface RadarrMovie {
   id: number;
   title: string;
@@ -17,7 +11,11 @@ export interface RadarrMovie {
   titleSlug?: string;
   sortTitle?: string;
   originalTitle?: string;
-  alternateTitles?: RadarrAlternateTitle[];
+  alternateTitles?: Array<{
+    title?: string | null;
+    sourceType?: string | null;
+    movieMetadataId?: number | null;
+  }>;
   monitored?: boolean;
   year?: number;
   runtime?: number;
@@ -83,7 +81,11 @@ export interface RadarrLookupMovie {
   monitored?: boolean;
   minimumAvailability?: RadarrMinimumAvailability;
   images?: Array<{ coverType?: string; url?: string | null; remoteUrl?: string | null }>;
-  alternateTitles?: RadarrAlternateTitle[];
+  alternateTitles?: Array<{
+    title?: string | null;
+    sourceType?: string | null;
+    movieMetadataId?: number | null;
+  }>;
   folderName?: string;
   remotePoster?: string | null;
   hasFile?: boolean;
