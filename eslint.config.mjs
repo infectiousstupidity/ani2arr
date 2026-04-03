@@ -10,6 +10,7 @@ import reactYouMightNotNeedAnEffect from "eslint-plugin-react-you-might-not-need
 import reactHooks from "eslint-plugin-react-hooks";
 import playwright from "eslint-plugin-playwright";
 import testingLibrary from "eslint-plugin-testing-library";
+import eslintPluginUnicorn from 'eslint-plugin-unicorn';
 
 export default defineConfig([
   autoImports,
@@ -34,6 +35,14 @@ export default defineConfig([
   reactYouMightNotNeedAnEffect.configs.recommended,
   reactHooks.configs["recommended-latest"],
   reactCompilerPlugin.configs.recommended,
+  eslintPluginUnicorn.configs.recommended,
+  {
+    rules: {
+      "unicorn/better-regex": "warn",
+      "unicorn/prevent-abbreviations": "off",
+      "unicorn/no-null": "off",
+    },
+  },
 
   // Project-wide rules
   {

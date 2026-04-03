@@ -19,7 +19,7 @@ web-ext.config.ts
 playwright-report
 test-results
 
-/docs/ideas/
+/docs/local/
 
 # Editor directories and files
 .vscode/*
@@ -37,3 +37,6 @@ test-results
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+.planning
+.codex
