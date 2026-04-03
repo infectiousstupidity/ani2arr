@@ -26,13 +26,9 @@ export { STORAGE_POLICIES } from './policies';
 
 // Mapping user state persistence
 export type {
-  MappingOverrideEntry,
-  MappingOverrideMap,
   MappingIgnoreEntry,
-  MappingIgnoreMap,
-  MappingCandidateSuppressionEntry,
-  MappingCandidateSuppressionMap,
-} from './user-mapping.store';
+  StoredMappingExternalIdEntry,
+} from '@/services/mapping/overrides/types';
 
 export {
   mappingOverridesStorage,

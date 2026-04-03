@@ -56,7 +56,7 @@ export async function getMappingsHandler(
     auto: 0,
   };
 
-  type Candidate = {
+  type MappingCandidate = {
     provider: MappingSummary['provider'];
     externalId: MappingSummary['externalId'];
     suppressedExternalId?: MappingSummary['suppressedExternalId'];
@@ -67,10 +67,10 @@ export async function getMappingsHandler(
     priority: number;
   };
 
-  const candidates = new Map<string, Candidate>();
+  const candidates = new Map<string, MappingCandidate>();
   const applyCandidate = (
     anilistId: number,
-    candidate: Omit<Candidate, 'priority' | 'updatedAt'> & { updatedAt?: number },
+    candidate: Omit<MappingCandidate, 'priority' | 'updatedAt'> & { updatedAt?: number },
   ) => {
     if (!Number.isFinite(anilistId)) return;
     if (!providers.has(candidate.provider)) return;

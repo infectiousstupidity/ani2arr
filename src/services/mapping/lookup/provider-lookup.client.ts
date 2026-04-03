@@ -1,9 +1,9 @@
-import type { MappingExternalIdKind, MappingProvider, RequestPriority } from '@/shared/types';
+/** Provider lookup client types for provider search adapters and cache behavior. */
+// src/services/mapping/lookup/provider-lookup.client.ts
 
-export interface LookupClientCredentials {
-  url: string;
-  apiKey: string;
-}
+import type { MappingExternalIdKind } from '@/shared/types';
+import type { Provider, ProviderCredentials } from '@/shared/types/providers';
+import type { RequestPriority } from '@/shared/types/request-scheduling';
 
 export interface ProviderLookupResult {
   title: string;
@@ -22,10 +22,10 @@ export type ProviderLookupCacheHit<TResult> = {
 };
 
 export interface ProviderLookupClient<
-  TCredentials = LookupClientCredentials,
+  TCredentials = ProviderCredentials,
   TResult extends ProviderLookupResult = ProviderLookupResult,
 > {
-  readonly provider: MappingProvider;
+  readonly provider: Provider;
   readonly externalIdKind: MappingExternalIdKind;
   reset(): Promise<void>;
   readFromCache(canonical: string): Promise<ProviderLookupCacheHit<TResult>>;

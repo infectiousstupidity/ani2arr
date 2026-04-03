@@ -1,4 +1,7 @@
-import type { MappingProvider } from '@/shared/types';
+/** Provider-specific title normalization and matching profile rules for mapping searches. */
+// src/services/mapping/pipeline/matching/profile.ts
+
+import type { Provider } from '@/shared/types';
 import { canonicalTitleKey } from './key';
 import { canonicalizeLookupTerm, stripParenContent } from './normalize';
 import { sanitizeLookupDisplay as sanitizeSonarrLookupDisplay } from './season';
@@ -19,7 +22,7 @@ export interface CandidateTitleVariant {
 }
 
 export interface MatchingProfile {
-  provider: MappingProvider;
+  provider: Provider;
   rareTokenGate: 'hard' | 'none';
   yearExactBonus: number;
   yearOneOffBonus: number;
@@ -88,7 +91,7 @@ function pushSlugVariants(out: CandidateTitleVariant[], seen: Set<string>, value
   const trimmed = toTrimmedString(value);
   if (!trimmed) return;
   pushVariant(out, seen, trimmed, 'titleSlug');
-  const spaced = trimmed.replace(/[-_.]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const spaced = trimmed.replaceAll(/[._-]+/g, ' ').replaceAll(/\s+/g, ' ').trim();
   if (spaced && spaced !== trimmed) {
     pushVariant(out, seen, spaced, 'titleSlug');
   }
@@ -109,7 +112,7 @@ function readAlternateTitles(value: unknown): string[] {
       out.add(nested);
     }
   }
-  return Array.from(out);
+  return [...out];
 }
 
 function extractSonarrCandidateTitleVariants(candidate: unknown): CandidateTitleVariant[] {
@@ -154,26 +157,26 @@ function extractRadarrCandidateTitleVariants(candidate: unknown): CandidateTitle
   return out;
 }
 
-export function getMatchingProfile(provider: MappingProvider): MatchingProfile {
+export function getMatchingProfile(provider: Provider): MatchingProfile {
   return provider === 'radarr' ? RADARR_PROFILE : SONARR_PROFILE;
 }
 
 export function compactTitleKey(term: string): string {
   const canonical = canonicalTitleKey(term);
-  return canonical.replace(/[\s-]+/g, '').trim();
+  return canonical.replaceAll(/[\s-]+/g, '').trim();
 }
 
-export function sanitizeLookupDisplayWithProfile(provider: MappingProvider, rawTitle: string): string {
+export function sanitizeLookupDisplayWithProfile(provider: Provider, rawTitle: string): string {
   return sanitizeLookupDisplayForProvider(provider, rawTitle);
 }
 
 function cleanLookupDisplay(term: string): string {
   if (!term) return '';
   return term
-    .replace(/[\u3010\u3011\u300C\u300D\u300E\u300F\u3014\u3015\u3008\u3009\u300A\u300B]/g, '')
-    .replace(/[“”‟„‚‘’\u2018-\u201F\u275B\u275C]/g, '')
-    .replace(/["']/g, '')
-    .replace(/\s+/g, ' ')
+    .replaceAll(/[\u3008-\u3011\u3014\u3015]/g, '')
+    .replaceAll(/[\u2018-\u201F\u275B\u275C]/g, '')
+    .replaceAll(/["']/g, '')
+    .replaceAll(/\s+/g, ' ')
     .trim();
 }
 
@@ -182,21 +185,21 @@ function sanitizeRadarrLookupDisplay(term: string): string {
   let s = cleanLookupDisplay(term);
 
   // Preserve meaningful content inside ASCII square brackets by unwrapping instead of removing.
-  s = s.replace(/\[([^\]]+)\]/g, '$1');
+  s = s.replaceAll(/\[([^\]]+)]/g, '$1');
 
   const noParens = stripParenContent(s);
-  const normalized = noParens.replace(/\s+/g, ' ').trim();
+  const normalized = noParens.replaceAll(/\s+/g, ' ').trim();
   return /[\p{L}\p{N}]/u.test(normalized) ? normalized : '';
 }
 
-export function sanitizeLookupDisplayForProvider(provider: MappingProvider, rawTitle: string): string {
+export function sanitizeLookupDisplayForProvider(provider: Provider, rawTitle: string): string {
   return provider === 'radarr'
     ? sanitizeRadarrLookupDisplay(rawTitle)
     : sanitizeSonarrLookupDisplay(rawTitle);
 }
 
 export function canonicalTitleKeyForProvider(
-  provider: MappingProvider,
+  provider: Provider,
   rawTitle: string,
   options: { keepYear?: boolean } = {},
 ): string {
@@ -206,7 +209,7 @@ export function canonicalTitleKeyForProvider(
 }
 
 export function canonicalizeLookupTermForProvider(
-  provider: MappingProvider,
+  provider: Provider,
   rawTitle: string,
   options: { keepYear?: boolean } = {},
 ): string {
@@ -215,7 +218,7 @@ export function canonicalizeLookupTermForProvider(
   return canonicalizeLookupTerm(source, options);
 }
 
-export function buildTitleIndexKeysForProvider(provider: MappingProvider, rawTitle: string): string[] {
+export function buildTitleIndexKeysForProvider(provider: Provider, rawTitle: string): string[] {
   const trimmed = rawTitle.trim();
   if (!trimmed) return [];
 
@@ -238,11 +241,11 @@ export function buildTitleIndexKeysForProvider(provider: MappingProvider, rawTit
     }
   }
 
-  return Array.from(out);
+  return [...out];
 }
 
 export function buildQueryTitleVariantsForProvider(
-  provider: MappingProvider,
+  provider: Provider,
   rawTitle: string,
 ): CandidateTitleVariant[] {
   const out: CandidateTitleVariant[] = [];
@@ -258,7 +261,7 @@ export function buildQueryTitleVariantsForProvider(
 }
 
 export function extractCandidateTitleVariants(
-  provider: MappingProvider,
+  provider: Provider,
   candidate: unknown,
 ): CandidateTitleVariant[] {
   return provider === 'radarr'

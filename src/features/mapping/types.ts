@@ -1,5 +1,28 @@
+/** Mapping feature-owned view models and controller contracts for manual mapping UI. */
+// src/features/mapping/types.ts
+
 import type { UseQueryResult } from '@tanstack/react-query';
-import type { MappingSearchResult } from '@/shared/types';
+import type { MappingExternalId } from '@/shared/types';
+import type { Provider } from '@/shared/types/providers';
+
+export interface MappingSearchResult {
+  provider: Provider;
+  target: MappingExternalId;
+  title: string;
+  year?: number;
+  typeLabel?: string;
+  inLibrary: boolean;
+  librarySlug?: string;
+  posterUrl?: string;
+  backdropUrl?: string;
+  statusLabel?: string;
+  networkOrStudio?: string;
+  overview?: string;
+  alternateTitles?: string[];
+  episodeOrMovieCount?: number;
+  fileCount?: number;
+  linkedAniListIds?: number[];
+}
 
 export interface MappingSearchController {
   state: {

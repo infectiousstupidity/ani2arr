@@ -1,16 +1,19 @@
+/** Toolbar controls for filtering, sorting, and bulk mapping-table actions. */
+// src/entrypoints/options/components/mappings-section/components/mapping-toolbar.tsx
+
 import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { ArrowUpDown, Check, ChevronDown, Plus, Search, X } from 'lucide-react';
-import type { MappingProvider, MappingSource } from '@/shared/types';
+import type { Provider, MappingSource } from '@/shared/types';
 import Button from '@/shared/ui/primitives/button';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { cn } from '@/shared/utils/cn';
 
 export type SourceFilterSet = Set<MappingSource>;
-export type ProviderFilterSet = Set<MappingProvider>;
+export type ProviderFilterSet = Set<Provider>;
 export type LibraryFilter = 'all' | 'in-library' | 'not-in-library';
 export type MappingScope = 'all' | 'needs-attention' | 'manual-overrides' | 'suppressed';
-export type ProviderFilter = 'all' | MappingProvider;
+export type ProviderFilter = 'all' | Provider;
 export type SourceFilter = 'all' | MappingSource;
 
 export type MappingSort =
@@ -48,7 +51,7 @@ type MappingToolbarProps = {
   popoverContainer?: HTMLElement | null;
 };
 
-export const providerOptions: { value: MappingProvider; label: string }[] = [
+export const providerOptions: { value: Provider; label: string }[] = [
   { value: 'sonarr', label: 'Sonarr' },
   { value: 'radarr', label: 'Radarr' },
 ];
@@ -153,9 +156,9 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
   const sortLabel = sortOptions.find((option) => option.value === sortOption)?.label ?? 'Sort';
   const sourceOptionsForScope = sourceOptions.filter((option) => getScopeSourceFilters(activeScope).has(option.value));
   const sourceLabel = sourceFilter === 'all'
-    ? activeScope === 'all'
+    ? (activeScope === 'all'
       ? 'Any source'
-      : 'Any in scope'
+      : 'Any in scope')
     : sourceOptions.find((option) => option.value === sourceFilter)?.label ?? 'Source';
 
   return (
@@ -183,7 +186,7 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {!hideActions ? (
+          {hideActions ? null : (
             <>
               <Button variant="outline" size="sm" onClick={onExportMappings} isLoading={isExporting}>
                 Export
@@ -193,9 +196,9 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
                 Add mapping
               </Button>
             </>
-          ) : null}
+          )}
 
-          {!hideSort ? (
+          {hideSort ? null : (
             <Popover.Root open={sortOpen} onOpenChange={setSortOpen}>
               <Popover.Trigger asChild>
                 <Button variant="outline" size="sm" className="gap-2 rounded-xl border-border-primary/80 bg-bg-primary/35 hover:bg-bg-secondary/80">
@@ -247,7 +250,7 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
                 </Popover.Content>
               </Popover.Portal>
             </Popover.Root>
-          ) : null}
+          )}
         </div>
       </div>
 

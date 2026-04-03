@@ -1,17 +1,20 @@
+/** Mapping search panel UI for browsing provider candidates and selecting a manual override target. */
+// src/features/mapping/mapping-search-panel.tsx
+
 import { useCallback, useEffect, useRef, type WheelEvent as ReactWheelEvent } from 'react';
 import { ExternalLink } from 'lucide-react';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
 import Pill from '@/shared/ui/primitives/pill';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
-import type { MappingProvider, MappingSearchResult } from '@/shared/types';
+import type { Provider } from '@/shared/types';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { getProviderLabel } from '@/services/providers/resolver';
-import type { MappingSearchController } from './types';
+import type { MappingSearchController, MappingSearchResult } from './types';
 
 interface MappingSearchPanelProps {
   controller: MappingSearchController;
   currentMapping: MappingSearchResult | null;
-  provider: MappingProvider;
+  provider: Provider;
   baseUrl: string;
   autoFocus?: boolean;
   portalContainer?: HTMLElement | null;
@@ -79,13 +82,13 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
             >
               <div className="py-1">
                 <div className="divide-y divide-border-primary">
-                  {searchQuery.isFetching && !results.length ? (
+                  {searchQuery.isFetching && results.length === 0 ? (
                     <div className="flex h-32 items-center justify-center text-xs text-text-secondary">
                       Searching...
                     </div>
                   ) : null}
 
-                  {!results.length && !searchQuery.isFetching ? (
+                  {results.length === 0 && !searchQuery.isFetching ? (
                     <div className="flex h-32 items-center justify-center px-3 py-6 text-center text-xs text-text-secondary">
                       {hasQuery ? 'No results found.' : `Type to search ${providerLabel}.`}
                     </div>
@@ -186,7 +189,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                             >
                               {result.title}
                             </div>
-                            {metadataPills.length ? (
+                            {metadataPills.length > 0 ? (
                               <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
                                 {metadataPills}
                               </div>

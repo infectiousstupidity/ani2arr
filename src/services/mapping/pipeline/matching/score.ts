@@ -1,4 +1,7 @@
-import type { MappingProvider } from '@/shared/types';
+/** Provider-aware candidate title scoring utilities used by the mapping pipeline. */
+// src/services/mapping/pipeline/matching/score.ts
+
+import type { Provider } from '@/shared/types';
 import {
   WEIGHT_OVERLAP,
   WEIGHT_CHAR_SIM,
@@ -35,7 +38,7 @@ function isAliasVariant(source: CandidateTitleVariant['source']): boolean {
 }
 
 function variantFloor(
-  provider: MappingProvider,
+  provider: Provider,
   variant: CandidateTitleVariant,
   kind: 'exact' | 'compact',
 ): number {
@@ -76,7 +79,7 @@ export function applyVerbosePenalty(score: number, queryTokens: string[], candNo
 }
 
 function applyYearWeightingForProvider(
-  provider: MappingProvider,
+  provider: Provider,
   score: number,
   candidateYear?: number,
   targetYear?: number,
@@ -95,7 +98,7 @@ function applyYearWeightingForProvider(
 }
 
 export function computeTitleMatchScoreForProvider(params: {
-  provider: MappingProvider;
+  provider: Provider;
   queryRaw: string;
   candidate: unknown;
   candidateYear?: number;

@@ -1,11 +1,14 @@
+/** Mapping search hook that adapts provider lookup RPC results into feature view models. */
+// src/features/mapping/use-mapping-search.ts
+
 import { useQuery } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
 import { queryKeys } from '@/shared/queries';
 import { toMappingSearchResultFromRadarr } from './radarr.adapter';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
-import type { MappingSearchResult, SonarrLookupSeries } from '@/shared/types';
+import type { MappingSearchResult } from './types';
 import { usePublicOptions } from '@/shared/queries';
-import type { RadarrLookupMovie } from '@/shared/types';
+import type { RadarrLookupMovie, SonarrLookupSeries } from '@/shared/types';
 
 interface UseMappingSearchInput {
   service: 'sonarr' | 'radarr';

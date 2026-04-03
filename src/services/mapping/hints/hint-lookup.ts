@@ -1,3 +1,6 @@
+/** Hint-based mapping lookup helper for fast title probes outside the full pipeline. */
+// src/services/mapping/hints/hint-lookup.ts
+
 import {
   canonicalTitleKeyForProvider,
   sanitizeLookupDisplayForProvider,
@@ -6,17 +9,14 @@ import { scoreCandidates } from '../pipeline/scoring';
 import { isSeasonalCanonicalTokens } from '../pipeline/search-term-generator';
 import type { ResolvedMapping } from '../types';
 import type { ScopedLogger } from '@/shared/utils/logger';
+import type { ProviderCredentials } from '@/shared/types/providers';
 import { SCORE_THRESHOLD } from '../constants';
-import type {
-  LookupClientCredentials,
-  ProviderLookupClient,
-  ProviderLookupResult,
-} from '../lookup';
+import type { ProviderLookupClient, ProviderLookupResult } from '../lookup';
 
 export async function tryHintLookup<TResult extends ProviderLookupResult>(
   term: string,
-  lookupClient: ProviderLookupClient<LookupClientCredentials, TResult>,
-  credentials: LookupClientCredentials,
+  lookupClient: ProviderLookupClient<ProviderCredentials, TResult>,
+  credentials: ProviderCredentials,
   log: ScopedLogger,
   forceLookupNetwork?: boolean,
 ): Promise<ResolvedMapping | null> {

@@ -4,7 +4,7 @@ import { defineProxyService } from '@webext-core/proxy-service';
 import type { AniListSchedulerDebugSnapshot } from '@/debug/anilist-debug.types';
 import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { SonarrFormState, RadarrFormState } from '@/shared/types';
-import type { MappingOverrideRecord } from '@/shared/types/mapping';
+import type { MappingExternalIdRecord } from '@/shared/types/mapping';
 import type { ProviderMetadata, RadarrMovie, SonarrSeries } from '@/shared/types/providers';
 import type {
   AniListSearchResult,
@@ -72,7 +72,7 @@ export interface Ani2arrApi {
   searchRadarr(input: RadarrLookupInput): Promise<RadarrLookupOutput>;
   validateTvdbId(input: ValidateTvdbInput): Promise<{ inLibrary: boolean; inCatalog: boolean }>;
   validateTmdbId(input: ValidateTmdbInput): Promise<{ inLibrary: boolean; inCatalog: boolean }>;
-  getMappingOverrides(): Promise<MappingOverrideRecord[]>;
+  getMappingOverrides(): Promise<MappingExternalIdRecord[]>;
   clearAllMappingOverrides(): Promise<{ ok: true }>;
   exportStoredMappings(): Promise<ExportStoredMappingsOutput>;
   clearPersistentCaches(): Promise<{ ok: true }>;

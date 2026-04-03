@@ -1,8 +1,11 @@
+/** Mapping override mutation hook for saving and clearing manual provider IDs. */
+// src/features/mapping/use-mapping-overrides.ts
+
 import { useCallback } from 'react';
-import type { MappingExternalId, MappingProvider } from '@/shared/types';
+import type { MappingExternalId, Provider } from '@/shared/types';
 import { useClearMappingOverride, useSetMappingOverride } from '@/shared/queries';
 
-export function useMappingOverrides(anilistId: number, provider: MappingProvider) {
+export function useMappingOverrides(anilistId: number, provider: Provider) {
   const setOverrideMutation = useSetMappingOverride();
   const clearOverrideMutation = useClearMappingOverride();
 

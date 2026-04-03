@@ -6,7 +6,7 @@ import * as Accordion from '@radix-ui/react-accordion';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Ban, ChevronDown, MoreHorizontal, Pencil, Trash2, Undo2 } from 'lucide-react';
 import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.schema';
-import type { MappingExternalId, MappingProvider, MappingSource, MappingSummary } from '@/shared/types';
+import type { MappingExternalId, Provider, MappingSource, MappingSummary } from '@/shared/types';
 import { useAniListMetadataBatch, useMovieStatus, useSeriesStatus } from '@/shared/queries';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
@@ -27,7 +27,7 @@ export type MappingTableEntry = {
 
 export type MappingTableRowData = {
   id: string;
-  provider: MappingProvider;
+  provider: Provider;
   externalId: MappingExternalId | null;
   providerMeta?: MappingSummary['providerMeta'];
   entries: MappingTableEntry[];
@@ -60,12 +60,12 @@ const formatRelativeTime = (timestamp?: number | null): string | null => {
     ['minute', 60],
   ];
   const match = units.find(([, seconds]) => absolute >= seconds);
-  const [unit, secondsPerUnit] = match ?? units[units.length - 1]!;
+  const [unit, secondsPerUnit] = match ?? units.at(-1)!;
   const value = Math.max(1, Math.round(absolute / secondsPerUnit));
   return `${value} ${unit}${value > 1 ? 's' : ''} ago`;
 };
 
-const getExternalLink = (provider: MappingProvider, externalId: MappingExternalId | null) => {
+const getExternalLink = (provider: Provider, externalId: MappingExternalId | null) => {
   if (!externalId) return null;
   if (externalId.kind === 'tvdb') {
     return `https://thetvdb.com/dereferrer/series/${externalId.id}`;
@@ -87,6 +87,29 @@ const resolveAniListTitle = (
     fallback ||
     'Unknown title'
   );
+};
+
+const getEditTooltip = (source: MappingSummary['source']): string => {
+  switch (source) {
+    case 'manual': {
+      return 'Edit the manual mapping for this AniList entry. Saving keeps it as a manual override until you delete it.';
+    }
+    case 'ignored': {
+      return 'Choose a mapping for this ignored AniList entry. Saving clears the ignore and creates a manual mapping.';
+    }
+    case 'rejected': {
+      return 'Choose a manual mapping, or allow this rejected match again from the row actions.';
+    }
+    case 'blocked': {
+      return 'Choose a manual mapping, or remove the permanent block for this exact ID from the row actions.';
+    }
+    case 'unresolved': {
+      return 'Set a mapping for this AniList entry. Saving creates a manual mapping.';
+    }
+    default: {
+      return 'Change the current mapping for this AniList entry. Saving creates a manual mapping.';
+    }
+  }
 };
 
 type MappingEntryRowProps = {
@@ -161,7 +184,7 @@ const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   const anilistYear = metadata?.seasonYear;
   const anilistFormat = metadata?.format;
 
-  const formatLabel = anilistFormat ? anilistFormat.replace(/_/g, ' ') : null;
+  const formatLabel = anilistFormat ? anilistFormat.replaceAll('_', ' ') : null;
   const providerStatus = entry.providerMeta?.statusLabel ?? null;
   const metaParts = [formatLabel, anilistYear ? String(anilistYear) : null, providerStatus].filter(Boolean) as string[];
 
@@ -194,18 +217,7 @@ const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
       : null,
   ].filter((link): link is { label: string; href: string; tooltip: string } => Boolean(link?.href));
 
-  const editTooltip =
-    entry.source === 'manual'
-      ? 'Edit the manual mapping for this AniList entry. Saving keeps it as a manual override until you delete it.'
-      : entry.source === 'ignored'
-        ? 'Choose a mapping for this ignored AniList entry. Saving clears the ignore and creates a manual mapping.'
-        : entry.source === 'rejected'
-          ? 'Choose a manual mapping, or allow this rejected match again from the row actions.'
-          : entry.source === 'blocked'
-            ? 'Choose a manual mapping, or remove the permanent block for this exact ID from the row actions.'
-        : entry.source === 'unresolved'
-          ? 'Set a mapping for this AniList entry. Saving creates a manual mapping.'
-          : 'Change the current mapping for this AniList entry. Saving creates a manual mapping.';
+  const editTooltip = getEditTooltip(entry.source);
 
   const primaryActions: Array<{
     key: string;
@@ -224,59 +236,54 @@ const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
       className:
         'text-accent-primary/85 hover:bg-accent-primary/14 hover:text-accent-primary',
     },
-    ...(entry.source === 'manual'
-      ? [
-          {
+    ...(() => {
+      switch (entry.source) {
+        case 'manual': {
+          return [{
             key: 'delete-mapping',
             icon: Trash2,
             tooltip:
               'Delete the manual mapping. ani2arr will fall back to upstream or automatic matching if one exists; otherwise the title becomes unresolved.',
             ariaLabel: 'Delete mapping',
             onClick: () => onDeleteOverride(entry),
-            className:
-              'text-error/85 hover:bg-error/14 hover:text-error',
-          },
-        ]
-      : entry.source === 'rejected'
-        ? [
-            {
-              key: 'restore-rejected-candidate',
-              icon: Undo2,
-              tooltip:
-                'Allow this rejected match again. ani2arr can use this exact ID if it resolves to it later.',
-              ariaLabel: 'Allow this match again',
-              onClick: () => onClearRejectedCandidate(entry),
-              className:
-                'text-text-secondary hover:bg-bg-primary/45 hover:text-accent-primary',
-            },
-          ]
-        : entry.source === 'blocked'
-          ? [
-              {
-                key: 'restore-blocked-candidate',
-                icon: Ban,
-                tooltip:
-                  'Remove the permanent block for this exact ID and allow ani2arr to use it again.',
-                ariaLabel: 'Allow this ID again',
-                onClick: () => onClearBlockedCandidate(entry),
-                className:
-                  'text-text-secondary hover:bg-bg-primary/45 hover:text-accent-primary',
-              },
-            ]
-          : entry.source === 'ignored'
-            ? [
-                {
-                  key: 'restore-ignore',
-                  icon: Undo2,
-                  tooltip:
-                    'Remove the persistent title ignore and allow ani2arr to use upstream or automatic matching again.',
-                  ariaLabel: 'Remove title ignore',
-                  onClick: () => onClearIgnoreTitle(entry),
-                  className:
-                  'text-text-secondary hover:bg-bg-primary/45 hover:text-accent-primary',
-                },
-              ]
-            : []),
+            className: 'text-error/85 hover:bg-error/14 hover:text-error',
+          }];
+        }
+        case 'rejected': {
+          return [{
+            key: 'restore-rejected-candidate',
+            icon: Undo2,
+            tooltip: 'Allow this rejected match again. ani2arr can use this exact ID if it resolves to it later.',
+            ariaLabel: 'Allow this match again',
+            onClick: () => onClearRejectedCandidate(entry),
+            className: 'text-text-secondary hover:bg-bg-primary/45 hover:text-accent-primary',
+          }];
+        }
+        case 'blocked': {
+          return [{
+            key: 'restore-blocked-candidate',
+            icon: Ban,
+            tooltip: 'Remove the permanent block for this exact ID and allow ani2arr to use it again.',
+            ariaLabel: 'Allow this ID again',
+            onClick: () => onClearBlockedCandidate(entry),
+            className: 'text-text-secondary hover:bg-bg-primary/45 hover:text-accent-primary',
+          }];
+        }
+        case 'ignored': {
+          return [{
+            key: 'restore-ignore',
+            icon: Undo2,
+            tooltip: 'Remove the persistent title ignore and allow ani2arr to use upstream or automatic matching again.',
+            ariaLabel: 'Remove title ignore',
+            onClick: () => onClearIgnoreTitle(entry),
+            className: 'text-text-secondary hover:bg-bg-primary/45 hover:text-accent-primary',
+          }];
+        }
+        default: {
+          return [];
+        }
+      }
+    })(),
   ];
 
   const menuActions: Array<{
@@ -285,19 +292,21 @@ const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
     onSelect: () => void;
     className?: string;
   }> = [
-    ...(entry.source === 'manual'
-      ? []
-      : entry.source === 'rejected'
-        ? [
+    ...(() => {
+      switch (entry.source) {
+        case 'manual':
+        case 'ignored': {
+          return [];
+        }
+        case 'rejected': {
+          return [
             ...(actionableExternalId
-              ? [
-                  {
-                    key: 'block-candidate',
-                    label: 'Never use this ID',
-                    onSelect: () => onBlockCandidate(entry),
-                    className: 'text-error focus:text-error',
-                  },
-                ]
+              ? [{
+                key: 'block-candidate',
+                label: 'Never use this ID',
+                onSelect: () => onBlockCandidate(entry),
+                className: 'text-error focus:text-error',
+              }]
               : []),
             {
               key: 'ignore-title',
@@ -305,41 +314,43 @@ const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
               onSelect: () => onIgnoreTitle(entry),
               className: 'text-warning focus:text-warning',
             },
-          ]
-        : entry.source === 'blocked'
-          ? [
-              {
-                key: 'ignore-title',
-                label: 'Ignore title entirely',
-                onSelect: () => onIgnoreTitle(entry),
-                className: 'text-warning focus:text-warning',
-              },
-            ]
-          : entry.source === 'ignored'
-            ? []
-            : [
-                ...(actionableExternalId
-                  ? [
-                      {
-                        key: 'reject-candidate',
-                        label: 'Not this match',
-                        onSelect: () => onRejectCandidate(entry),
-                      },
-                      {
-                        key: 'block-candidate',
-                        label: 'Never use this ID',
-                        onSelect: () => onBlockCandidate(entry),
-                        className: 'text-error focus:text-error',
-                      },
-                    ]
-                  : []),
+          ];
+        }
+        case 'blocked': {
+          return [{
+            key: 'ignore-title',
+            label: 'Ignore title entirely',
+            onSelect: () => onIgnoreTitle(entry),
+            className: 'text-warning focus:text-warning',
+          }];
+        }
+        default: {
+          return [
+            ...(actionableExternalId
+              ? [
                 {
-                  key: 'ignore-title',
-                  label: 'Ignore title entirely',
-                  onSelect: () => onIgnoreTitle(entry),
-                  className: 'text-warning focus:text-warning',
+                  key: 'reject-candidate',
+                  label: 'Not this match',
+                  onSelect: () => onRejectCandidate(entry),
                 },
-              ]),
+                {
+                  key: 'block-candidate',
+                  label: 'Never use this ID',
+                  onSelect: () => onBlockCandidate(entry),
+                  className: 'text-error focus:text-error',
+                },
+              ]
+              : []),
+            {
+              key: 'ignore-title',
+              label: 'Ignore title entirely',
+              onSelect: () => onIgnoreTitle(entry),
+              className: 'text-warning focus:text-warning',
+            },
+          ];
+        }
+      }
+    })(),
   ];
 
   return (
@@ -403,7 +414,9 @@ const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
         </div>
 
         <div className="flex w-full items-center justify-start md:w-26 md:justify-self-center md:justify-center">
-          {!hideSourceBadge ? (
+          {hideSourceBadge ? (
+            <span className="hidden h-6 w-26 md:block" aria-hidden="true" />
+          ) : (
             <Pill
               small
               tone="default"
@@ -414,8 +427,6 @@ const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
             >
               {sourceBadge.label}
             </Pill>
-          ) : (
-            <span className="hidden h-6 w-26 md:block" aria-hidden="true" />
           )}
         </div>
 
@@ -515,13 +526,11 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
 }) => {
   const anilistIds = useMemo(
     () =>
-      Array.from(
-        new Set(
+      [...new Set(
           row.entries
             .map(({ entry }) => entry.anilistId)
             .filter((id): id is number => Number.isFinite(id)),
-        ),
-      ),
+        )],
     [row.entries],
   );
 
@@ -554,7 +563,7 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
 
   const firstEntry = row.entries[0];
   const firstEntryMetadata = firstEntry ? metadataMap.get(firstEntry.entry.anilistId) ?? firstEntry.metadata ?? null : null;
-  const uniqueSources = Array.from(new Set(row.sources));
+  const uniqueSources = [...new Set(row.sources)];
   const prefersAniListTitle = !row.externalId;
   const preferredProviderTitle = prefersAniListTitle ? null : row.providerMeta?.title;
   const targetTitle =
@@ -570,19 +579,21 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
   const providerLabel = row.provider === 'sonarr' ? 'Sonarr' : 'Radarr';
   const inLibraryCount = row.entries.filter((e) => e.entry.status === 'in-provider').length;
   const hasMapping = Boolean(row.externalId);
-  const linkedLabel = !hasMapping
-    ? uniqueSources.includes('rejected')
-      ? 'Rejected candidate'
-      : uniqueSources.includes('blocked')
-        ? 'Blocked candidate'
-        : uniqueSources.includes('ignored')
-          ? 'Title ignored'
-          : uniqueSources.includes('unresolved')
-            ? 'Unresolved attempt'
-            : 'No target linked'
-    : inLibraryCount > 0
-      ? `${row.entries.length} linked · ${inLibraryCount} in library`
-      : `${row.entries.length} linked`;
+  let linkedLabel = 'No target linked';
+  if (hasMapping) {
+    linkedLabel =
+      inLibraryCount > 0
+        ? `${row.entries.length} linked · ${inLibraryCount} in library`
+        : `${row.entries.length} linked`;
+  } else if (uniqueSources.includes('rejected')) {
+    linkedLabel = 'Rejected candidate';
+  } else if (uniqueSources.includes('blocked')) {
+    linkedLabel = 'Blocked candidate';
+  } else if (uniqueSources.includes('ignored')) {
+    linkedLabel = 'Title ignored';
+  } else if (uniqueSources.includes('unresolved')) {
+    linkedLabel = 'Unresolved attempt';
+  }
   const hasMultipleSources = uniqueSources.length > 1;
 
   const showChildSourceBadges = hasMultipleSources || row.entries.length > 1;

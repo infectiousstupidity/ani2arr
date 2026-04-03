@@ -6,7 +6,6 @@ import type { BadgeVisibility } from './options';
 import type { Provider } from '@/shared/types/providers';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-import type { MappingExternalId } from './mapping';
 
 export type AnchorCorner = 'bottom-left' | 'top-left';
 export type StackDirection = 'up' | 'down';
@@ -56,29 +55,4 @@ export interface BrowseAdapter {
   anchorCorner?: AnchorCorner;
   stackDirection?: StackDirection;
   anchorOffsetX?: number; // px; default -8
-}
-
-// Normalized view model for search results and current mapping preview
-export interface MappingSearchResult {
-  provider: Provider;
-  target: MappingExternalId;
-  title: string;
-  year?: number;
-  // "Anime", "Standard", "Movie" etc. For UI labels only.
-  typeLabel?: string;
-  // Whether the item is already in the external library
-  inLibrary: boolean;
-  librarySlug?: string; // Provider detail-route slug for /series/:slug or /movie/:slug.
-  // Poster/backdrop to show in UI
-  posterUrl?: string;
-  backdropUrl?: string;
-  statusLabel?: string; // "Continuing", "Ended", "Announced"
-  networkOrStudio?: string;
-  overview?: string;
-  alternateTitles?: string[];
-  // For listing or preview
-  episodeOrMovieCount?: number; // Total episodes in series
-  fileCount?: number;           // Downloaded episodes
-  // Multi AniList mapping info
-  linkedAniListIds?: number[];
 }

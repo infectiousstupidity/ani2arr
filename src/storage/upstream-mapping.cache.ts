@@ -9,5 +9,3 @@ export const upstreamMappingCaches = {
   primary: createTtlCache<UpstreamMappingPayload>(CACHE_NAMESPACES.upstreamMappingPrimary),
   fallback: createTtlCache<UpstreamMappingPayload>(CACHE_NAMESPACES.upstreamMappingFallback),
 } as const;
-
-export type UpstreamMappingCaches = typeof upstreamMappingCaches;

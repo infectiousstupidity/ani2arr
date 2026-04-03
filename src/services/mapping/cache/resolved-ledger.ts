@@ -1,12 +1,13 @@
-import type { MappingProvider } from '@/shared/types';
-import type { ResolvedMapping } from '../types';
+/** In-memory ledger of successfully resolved mappings for debug and export surfaces. */
+// src/services/mapping/cache/resolved-ledger.ts
 
-export type ResolvedMappingSource = 'auto' | 'upstream';
+import type { Provider } from '@/shared/types/providers';
+import type { ResolvedMapping } from '../types';
 
 export interface ResolvedLedgerEntry extends ResolvedMapping {
   anilistId: number;
-  provider: MappingProvider;
-  source: ResolvedMappingSource;
+  provider: Provider;
+  source: 'auto' | 'upstream';
   updatedAt: number;
 }
 
@@ -14,10 +15,10 @@ export class ResolvedLedger {
   private readonly entries = new Map<string, ResolvedLedgerEntry>();
 
   public record(
-    provider: MappingProvider,
+    provider: Provider,
     anilistId: number,
     mapping: ResolvedMapping,
-    source: ResolvedMappingSource,
+    source: ResolvedLedgerEntry['source'],
   ): void {
     this.entries.set(this.createKey(provider, anilistId), {
       anilistId,
@@ -29,11 +30,11 @@ export class ResolvedLedger {
     });
   }
 
-  public get(provider: MappingProvider, anilistId: number): ResolvedLedgerEntry | undefined {
+  public get(provider: Provider, anilistId: number): ResolvedLedgerEntry | undefined {
     return this.entries.get(this.createKey(provider, anilistId));
   }
 
-  public delete(provider: MappingProvider, anilistId: number): void {
+  public delete(provider: Provider, anilistId: number): void {
     this.entries.delete(this.createKey(provider, anilistId));
   }
 
@@ -42,10 +43,10 @@ export class ResolvedLedger {
   }
 
   public list(): ResolvedLedgerEntry[] {
-    return Array.from(this.entries.values());
+    return [...this.entries.values()];
   }
 
-  private createKey(provider: MappingProvider, anilistId: number): string {
+  private createKey(provider: Provider, anilistId: number): string {
     return `${provider}:${anilistId}`;
   }
 }

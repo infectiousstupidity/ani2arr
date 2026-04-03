@@ -1,8 +1,9 @@
 /** Adapts Radarr lookup results into mapping-search rows with library-aware links. */
 // src/features/mapping/radarr.adapter.ts
 
-import type { MappingSearchResult, RadarrLookupMovie } from '@/shared/types';
+import type { RadarrLookupMovie } from '@/shared/types';
 import { getProviderLibrarySlug } from '@/shared/utils/provider-library-paths';
+import type { MappingSearchResult } from './types';
 
 export interface RadarrAdapterOptions {
   baseUrl: string;
@@ -69,6 +70,6 @@ export function toMappingSearchResultFromRadarr(
       : {}),
     ...(typeof movie.runtime === 'number' ? { episodeOrMovieCount: movie.runtime } : {}),
     ...(movie.hasFile ? { fileCount: 1 } : {}),
-    ...(linkedAniListIds?.length ? { linkedAniListIds: Array.from(new Set(linkedAniListIds)) } : {}),
+    ...(linkedAniListIds?.length ? { linkedAniListIds: [...new Set(linkedAniListIds)] } : {}),
   };
 }

@@ -16,11 +16,9 @@ import type {
   SonarrSeries,
 } from '@/shared/types/providers';
 import type {
-  MappingBlockedRecord,
+  MappingExternalIdRecord,
   MappingExternalId,
   MappingIgnoreRecord,
-  MappingOverrideRecord,
-  MappingRejectedRecord,
   MappingSummary,
 } from '@/shared/types/mapping';
 import type { MappingCursor } from './schemas';
@@ -61,10 +59,10 @@ export interface ExportStoredMappingsOutput {
     blockedCandidateCount: number;
   };
   mappings: {
-    overrides: Record<string, MappingOverrideRecord>;
+    overrides: Record<string, MappingExternalIdRecord>;
     ignores: Record<string, MappingIgnoreRecord>;
-    rejectedCandidates: Record<string, MappingRejectedRecord>;
-    blockedCandidates: Record<string, MappingBlockedRecord>;
+    rejectedCandidates: Record<string, MappingExternalIdRecord>;
+    blockedCandidates: Record<string, MappingExternalIdRecord>;
   };
 }
 

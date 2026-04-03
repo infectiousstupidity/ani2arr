@@ -1,9 +1,10 @@
+/** Radarr provider lookup client for mapping search requests. */
+// src/services/mapping/lookup/radarr-lookup.client.ts
+
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { RadarrLookupMovie } from '@/shared/types';
+import type { ProviderCredentials } from '@/shared/types/providers';
 import { BaseLookupClient, type LookupCaches } from './base-lookup.client';
-import type { LookupClientCredentials } from './provider-lookup.client';
-
-export type RadarrLookupCredentials = LookupClientCredentials;
 
 export class RadarrLookupClient extends BaseLookupClient<RadarrLookupMovie> {
   constructor(
@@ -22,7 +23,7 @@ export class RadarrLookupClient extends BaseLookupClient<RadarrLookupMovie> {
 
   protected fetchFromApi(
     term: string,
-    credentials: LookupClientCredentials,
+    credentials: ProviderCredentials,
   ): Promise<RadarrLookupMovie[]> {
     return this.radarrApi.lookupMovieByTerm(term, credentials);
   }

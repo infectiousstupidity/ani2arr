@@ -1,23 +1,11 @@
+/** Mapping controller hook for manual mapping search, optimistic state, and override actions. */
+// src/features/mapping/use-mapping-controller.ts
+
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { useDebounced } from '@/shared/hooks/common/use-debounced';
 import { useMappingSearch } from './use-mapping-search';
-import type { MappingSearchResult } from '@/shared/types';
 import { useMappingOverrides } from './use-mapping-overrides';
-import type { MappingSearchController } from './types';
-
-export interface UseMappingControllerInput {
-  provider: 'sonarr' | 'radarr';
-  anilistId: number;
-  currentMapping: MappingSearchResult | null;
-  overrideActive: boolean;
-}
-
-export interface MappingTabState {
-  query: string;
-  lastQuery: string;
-  selected: MappingSearchResult | null;
-  isDirty: boolean;
-}
+import type { MappingSearchController, MappingSearchResult } from './types';
 
 type Action =
   | { type: 'SET_QUERY'; query: string }
@@ -33,28 +21,46 @@ function targetsEqual(
   return a.id === b.id && a.kind === b.kind;
 }
 
-function reducer(state: MappingTabState, action: Action): MappingTabState {
+function reducer(
+  state: {
+    query: string;
+    lastQuery: string;
+    selected: MappingSearchResult | null;
+    isDirty: boolean;
+  },
+  action: Action,
+): {
+  query: string;
+  lastQuery: string;
+  selected: MappingSearchResult | null;
+  isDirty: boolean;
+} {
   switch (action.type) {
-    case 'SET_QUERY':
+    case 'SET_QUERY': {
       return { ...state, query: action.query };
-    case 'SELECT_RESULT':
+    }
+    case 'SELECT_RESULT': {
       return {
         ...state,
         selected: action.result,
         lastQuery: state.query,
         isDirty: action.isDirty,
       };
-    case 'CLEAR_SELECTION':
+    }
+    case 'CLEAR_SELECTION': {
       return { ...state, selected: null, isDirty: false };
-    case 'RESET_FROM_CURRENT':
+    }
+    case 'RESET_FROM_CURRENT': {
       return {
         query: '',
         lastQuery: '',
         selected: null,
         isDirty: false,
       };
-    default:
+    }
+    default: {
       return state;
+    }
   }
 }
 
@@ -73,13 +79,23 @@ export interface UseMappingControllerResult extends MappingSearchController {
   canRevert: boolean;
 }
 
-export function useMappingController(input: UseMappingControllerInput): UseMappingControllerResult {
+export function useMappingController(input: {
+  provider: 'sonarr' | 'radarr';
+  anilistId: number;
+  currentMapping: MappingSearchResult | null;
+  overrideActive: boolean;
+}): UseMappingControllerResult {
   const [state, dispatch] = useReducer(reducer, {
     query: '',
     lastQuery: '',
     selected: null,
     isDirty: false,
-  } satisfies MappingTabState);
+  } satisfies {
+    query: string;
+    lastQuery: string;
+    selected: MappingSearchResult | null;
+    isDirty: boolean;
+  });
 
   const overrides = useMappingOverrides(input.anilistId, input.provider);
 
@@ -187,5 +203,3 @@ export function useMappingController(input: UseMappingControllerInput): UseMappi
     canRevert: hasActiveOverride,
   };
 }
-
-export type { MappingSearchResult };

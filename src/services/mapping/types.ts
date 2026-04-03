@@ -2,25 +2,22 @@
 // src/services/mapping/types.ts
 
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { MappingExternalId, RequestPriority } from '@/shared/types';
+import type { MappingExternalId } from '@/shared/types';
+import type { RequestPriority } from '@/shared/types/request-scheduling';
 
 export interface ResolvedMapping {
   externalId: MappingExternalId;
   successfulSynonym?: string;
 }
 
-export type ResolveHints = {
-  primaryTitle?: string;
-  domMedia?: AniListMediaHint | null;
-};
-
-export type ResolveExternalIdOptions = {
+export interface ResolveExternalIdOptions {
   network?: 'never';
-  hints?: ResolveHints;
+  hints?: {
+    primaryTitle?: string;
+    domMedia?: AniListMediaHint | null;
+  };
   ignoreFailureCache?: boolean;
   priority?: RequestPriority;
   // Force provider lookups to bypass fresh caches (used by anime detail force-verify).
   forceLookupNetwork?: boolean;
-};
-
-export type ResolveTvdbIdOptions = ResolveExternalIdOptions;
+}

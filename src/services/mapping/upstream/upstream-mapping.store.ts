@@ -1,7 +1,9 @@
-// src/services/mapping/upstream/upstream-mapping-source.ts
+/** Upstream mapping store for AniList-to-TVDB static pairs and their cache lifecycle. */
+// src/services/mapping/upstream/upstream-mapping.store.ts
+
 import type { TtlCache } from '@/storage';
 import { STORAGE_POLICIES } from '@/storage';
-import type { UpstreamMappingCaches } from '@/storage/upstream-mapping.cache';
+import { upstreamMappingCaches } from '@/storage/upstream-mapping.cache';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import { logger } from '@/shared/utils/logger';
 import type { ScopedLogger } from '@/shared/utils/logger';
@@ -18,16 +20,6 @@ export interface UpstreamMappingPayload {
   pairs: Record<number, number>;
 }
 
-export interface UpstreamMappingHit {
-  tvdbId: number;
-  source: UpstreamMappingSource;
-}
-
-export interface UpstreamMappingStoreOptions {
-  fetch?: typeof fetch;
-  scope?: string;
-}
-
 export class UpstreamMappingStore {
   private readonly log: ScopedLogger;
   private readonly fetchImpl: typeof fetch;
@@ -36,7 +28,10 @@ export class UpstreamMappingStore {
   private readonly fallbackPairs = new Map<number, number>();
   private readonly fallbackReverse = new Map<number, Set<number>>();
 
-  constructor(private readonly caches: UpstreamMappingCaches, options: UpstreamMappingStoreOptions = {}) {
+  constructor(
+    private readonly caches: typeof upstreamMappingCaches,
+    options: { fetch?: typeof fetch; scope?: string } = {},
+  ) {
     this.log = logger.create(options.scope ?? 'UpstreamMappingStore');
     const rawFetch: typeof fetch | undefined =
       options.fetch ?? (typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined);
@@ -67,7 +62,7 @@ export class UpstreamMappingStore {
     });
   }
 
-  public get(anilistId: number): UpstreamMappingHit | null {
+  public get(anilistId: number): { tvdbId: number; source: UpstreamMappingSource } | null {
     const primary = this.primaryPairs.get(anilistId);
     if (typeof primary === 'number') {
       return { tvdbId: primary, source: 'primary' };
@@ -270,11 +265,11 @@ export class UpstreamMappingStore {
     const collect = (reverse: Map<number, Set<number>>): void => {
       const bucket = reverse.get(tvdbId);
       if (!bucket) return;
-      bucket.forEach(id => ids.add(id));
+      for (const id of bucket) ids.add(id);
     };
     collect(this.primaryReverse);
     collect(this.fallbackReverse);
-    return Array.from(ids);
+    return [...ids];
   }
 
   public listAllPairs(): Array<{ anilistId: number; tvdbId: number; source: UpstreamMappingSource }> {

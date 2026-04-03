@@ -6,9 +6,9 @@ import { getAni2arrApi } from '@/rpc';
 import type { CheckSeriesStatusResponse, ExportStoredMappingsOutput, GetMappingsOutput } from '@/rpc/types';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import type {
-  MappingProvider,
-  MappingOverrideRecord,
+  MappingExternalIdRecord,
 } from '@/shared/types';
+import type { Provider } from '@/shared/types/providers';
 import type {
   ClearMappingBlockedCandidateInput,
   ClearMappingIgnoreInput,
@@ -23,17 +23,15 @@ import type {
 import type { GetMappingsInput } from '@/rpc/schemas';
 import { queryKeys } from './query-keys';
 
-export type SeriesStatusOptions = {
-  enabled?: boolean;
-  force_verify?: boolean;
-  network?: 'never';
-  ignoreFailureCache?: boolean | (() => boolean);
-  priority?: 'high' | 'normal' | (() => 'high' | 'normal' | undefined);
-};
-
 export const useSeriesStatus = (
   payload: Pick<StatusInput, 'anilistId' | 'title' | 'metadata'>,
-  options?: SeriesStatusOptions,
+  options?: {
+    enabled?: boolean;
+    force_verify?: boolean;
+    network?: 'never';
+    ignoreFailureCache?: boolean | (() => boolean);
+    priority?: 'high' | 'normal' | (() => 'high' | 'normal' | undefined);
+  },
 ) => {
   const forceVerify = options?.force_verify === true;
   return useQuery<CheckSeriesStatusResponse, ExtensionError>({
@@ -140,8 +138,8 @@ export const useExportStoredMappings = () =>
     },
   });
 
-export const useMappingOverrides = (provider: MappingProvider | 'all' = 'all') =>
-  useQuery<MappingOverrideRecord[], ExtensionError>({
+export const useMappingOverrides = (provider: Provider | 'all' = 'all') =>
+  useQuery<MappingExternalIdRecord[], ExtensionError>({
     queryKey: queryKeys.mappingOverrides(provider),
     queryFn: async () => {
       const api = getAni2arrApi();
