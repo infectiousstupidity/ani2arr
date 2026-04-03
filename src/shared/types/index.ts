@@ -36,23 +36,20 @@ export type {
 } from './options';
 
 export {
-  type MappingBlockedRecord,
-  type MappingOverrideRecord,
-  type MappingRejectedRecord,
+  type MappingExternalIdRecord,
   type MappingSummary,
-  type MappingProvider,
   type MappingSource,
   type MappingStatus,
   type MappingIgnoreRecord,
   type MappingExternalId,
   type MappingExternalIdKind,
-  type RequestPriority,
 } from './mapping';
+
+export type { RequestPriority } from './request-scheduling';
 
 export {
   type AnchorCorner,
   type StackDirection,
-  type MappingSearchResult,
   type BrowseAdapter,
   type CardOverlayProps,
   type ParsedCard,

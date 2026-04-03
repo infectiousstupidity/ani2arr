@@ -12,8 +12,7 @@ import { MappingSearchPanel } from './mapping-search-panel';
 import { useMappingController } from './use-mapping-controller';
 import type {
   MappingExternalId,
-  MappingProvider,
-  MappingSearchResult,
+  Provider,
   RadarrLookupMovie,
   SonarrLookupSeries,
 } from '@/shared/types';
@@ -23,17 +22,18 @@ import { resolveTitlePreference } from '@/shared/utils/anilist-title-preference'
 import { toMappingSearchResultFromRadarr } from './radarr.adapter';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
+import type { MappingSearchResult } from './types';
 
 interface MappingEditorProps {
   anilistId: number;
   open: boolean;
   onClose: () => void;
   initialExternalId?: MappingExternalId | null;
-  provider: MappingProvider;
+  provider: Provider;
 }
 
 const buildCurrentMapping = (
-  provider: MappingProvider,
+  provider: Provider,
   externalId: MappingExternalId | null | undefined,
   statusItem: SonarrLookupSeries | RadarrLookupMovie | undefined,
   linkedAniListIds: number[] | undefined,
@@ -306,7 +306,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
               variant="outline"
               size="sm"
               onClick={() => {
-                void mappingController.handleRevertToAutomatic().then(onClose).catch(() => undefined);
+                void mappingController.handleRevertToAutomatic().then(onClose).catch(() => {});
               }}
               disabled={mappingController.isSubmitting}
             >

@@ -1,11 +1,14 @@
-import type { MappingProvider } from '@/shared/types';
+/** Candidate scoring pass that ranks provider lookup results against a generated search term. */
+// src/services/mapping/pipeline/scoring.ts
+
+import type { Provider } from '@/shared/types';
 import type { ScoredCandidate } from './types';
 import type { SearchTerm } from './search-term-generator';
 import { computeTitleMatchScoreForProvider } from '@/services/mapping/pipeline/matching';
 import type { ProviderLookupResult } from '../lookup';
 
 export function scoreCandidates<TResult extends ProviderLookupResult>(
-  provider: MappingProvider,
+  provider: Provider,
   term: SearchTerm,
   results: TResult[],
   targetYear?: number,
@@ -23,5 +26,5 @@ export function scoreCandidates<TResult extends ProviderLookupResult>(
     });
     scored.push({ term, result: candidate, score });
   }
-  return scored.sort((a, b) => b.score - a.score);
+  return scored.toSorted((a, b) => b.score - a.score);
 }

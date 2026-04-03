@@ -1,45 +1,41 @@
-import type { MappingExternalId, MappingProvider } from '@/shared/types';
-import type {
-  MappingCandidateSuppressionEntry,
-  MappingIgnoreEntry,
-  MappingOverrideEntry,
-} from '@/storage';
+/** Key helpers and normalizers for persisted mapping override records. */
+// src/services/mapping/overrides/keys.ts
 
-export type MappingRecordKey = `${MappingProvider}:${number}`;
-export type ReverseLookupKey = `${MappingProvider}:${MappingExternalId['kind']}:${number}`;
-export type MappingCandidateRecordKey = `${MappingProvider}:${number}:${MappingExternalId['kind']}:${number}`;
+import type { MappingExternalId } from '@/shared/types';
+import type { Provider } from '@/shared/types/providers';
+import type { MappingIgnoreEntry, StoredMappingExternalIdEntry } from './types';
 
 export const isFiniteId = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 
-export const isMappingProvider = (value: unknown): value is MappingProvider =>
+export const isMappingProvider = (value: unknown): value is Provider =>
   value === 'sonarr' || value === 'radarr';
 
 export const isExternalIdKind = (value: unknown): value is MappingExternalId['kind'] =>
   value === 'tvdb' || value === 'tmdb';
 
-export const createRecordKey = (provider: MappingProvider, anilistId: number): MappingRecordKey =>
+export const createRecordKey = (provider: Provider, anilistId: number): string =>
   `${provider}:${anilistId}`;
 
-export const parseRecordKey = (key: string): { provider: MappingProvider; anilistId: number } | null => {
+export const parseRecordKey = (key: string): { provider: Provider; anilistId: number } | null => {
   const [provider, rawAnilistId] = key.split(':');
   const anilistId = Number(rawAnilistId);
   if (!isMappingProvider(provider) || !isFiniteId(anilistId)) return null;
   return { provider, anilistId };
 };
 
-export const createReverseLookupKey = (provider: MappingProvider, externalId: MappingExternalId): ReverseLookupKey =>
+export const createReverseLookupKey = (provider: Provider, externalId: MappingExternalId): string =>
   `${provider}:${externalId.kind}:${externalId.id}`;
 
 export const createCandidateRecordKey = (
-  provider: MappingProvider,
+  provider: Provider,
   anilistId: number,
   externalId: MappingExternalId,
-): MappingCandidateRecordKey => `${provider}:${anilistId}:${externalId.kind}:${externalId.id}`;
+): string => `${provider}:${anilistId}:${externalId.kind}:${externalId.id}`;
 
 export const parseCandidateRecordKey = (
   key: string,
-): { provider: MappingProvider; anilistId: number; externalId: MappingExternalId } | null => {
+): { provider: Provider; anilistId: number; externalId: MappingExternalId } | null => {
   const [provider, rawAnilistId, kind, rawExternalId] = key.split(':');
   const anilistId = Number(rawAnilistId);
   const externalId = Number(rawExternalId);
@@ -56,9 +52,9 @@ export const normalizeExternalId = (externalId: unknown): MappingExternalId | nu
   return { id: candidate.id, kind: candidate.kind };
 };
 
-export const normalizeOverrideEntry = (entry: unknown): MappingOverrideEntry | null => {
+export const normalizeOverrideEntry = (entry: unknown): StoredMappingExternalIdEntry | null => {
   if (!entry || typeof entry !== 'object') return null;
-  const candidate = entry as Partial<MappingOverrideEntry>;
+  const candidate = entry as Partial<StoredMappingExternalIdEntry>;
   if (!isMappingProvider(candidate.provider)) return null;
   const externalId = normalizeExternalId(candidate.externalId);
   if (!externalId) return null;
@@ -79,9 +75,9 @@ export const normalizeIgnoreEntry = (entry: unknown): MappingIgnoreEntry | null 
   };
 };
 
-export const normalizeCandidateSuppressionEntry = (entry: unknown): MappingCandidateSuppressionEntry | null => {
+export const normalizeCandidateSuppressionEntry = (entry: unknown): StoredMappingExternalIdEntry | null => {
   if (!entry || typeof entry !== 'object') return null;
-  const candidate = entry as Partial<MappingCandidateSuppressionEntry>;
+  const candidate = entry as Partial<StoredMappingExternalIdEntry>;
   if (!isMappingProvider(candidate.provider)) return null;
   const externalId = normalizeExternalId(candidate.externalId);
   if (!externalId) return null;

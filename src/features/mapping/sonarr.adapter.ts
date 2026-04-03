@@ -1,9 +1,9 @@
 /** Adapts Sonarr lookup results into mapping-search rows with library-aware links. */
 // src/features/mapping/sonarr.adapter.ts
 
-import type { MappingSearchResult } from '@/shared/types';
 import type { SonarrLookupSeries } from '@/shared/types/providers';
 import { getProviderLibrarySlug } from '@/shared/utils/provider-library-paths';
+import type { MappingSearchResult } from './types';
 
 export interface SonarrAdapterOptions {
   baseUrl: string; // absolute; trailing slash trimmed
@@ -46,7 +46,7 @@ export function toMappingSearchResultFromSonarr(
   opts: SonarrAdapterOptions,
 ): MappingSearchResult {
   const tvdbId = series.tvdbId;
-  const librarySet = new Set(opts.libraryTvdbIds ?? []);
+  const librarySet = new Set(opts.libraryTvdbIds);
   const inLibrary = librarySet.has(tvdbId);
   const librarySlug =
     opts.librarySlugByTvdbId?.[tvdbId] ??
@@ -84,17 +84,17 @@ export function toMappingSearchResultFromSonarr(
     provider: 'sonarr',
     target: { id: tvdbId, kind: 'tvdb' },
     title: series.title,
-    ...(year !== undefined ? { year } : {}),
+    ...(year === undefined ? {} : { year }),
     ...(typeLabel ? { typeLabel } : {}),
     inLibrary,
     ...(librarySlug ? { librarySlug } : {}),
-    ...(posterUrl !== undefined ? { posterUrl } : {}),
-    ...(statusLabel !== undefined ? { statusLabel } : {}),
-    ...(networkOrStudio !== undefined ? { networkOrStudio } : {}),
-    ...(episodeOrMovieCount !== undefined ? { episodeOrMovieCount } : {}),
-    ...(fileCount !== undefined ? { fileCount } : {}),
+    ...(posterUrl === undefined ? {} : { posterUrl }),
+    ...(statusLabel === undefined ? {} : { statusLabel }),
+    ...(networkOrStudio === undefined ? {} : { networkOrStudio }),
+    ...(episodeOrMovieCount === undefined ? {} : { episodeOrMovieCount }),
+    ...(fileCount === undefined ? {} : { fileCount }),
     ...(overview ? { overview } : {}),
     ...(alternateTitles && alternateTitles.length > 0 ? { alternateTitles } : {}),
-    ...(linkedAniListIds && linkedAniListIds.length > 0 ? { linkedAniListIds: Array.from(new Set(linkedAniListIds)) } : {}),
+    ...(linkedAniListIds && linkedAniListIds.length > 0 ? { linkedAniListIds: [...new Set(linkedAniListIds)] } : {}),
   };
 }

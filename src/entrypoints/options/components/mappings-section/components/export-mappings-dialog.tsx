@@ -1,3 +1,6 @@
+/** Export dialog UI for filtering, previewing, and downloading stored mapping data. */
+// src/entrypoints/options/components/mappings-section/components/export-mappings-dialog.tsx
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -14,14 +17,14 @@ import MappingToolbar, {
   type SourceFilterSet,
 } from './mapping-toolbar';
 import { useMappingTableData } from '../hooks/use-mapping-table-data';
-import type { MappingProvider, MappingSource } from '@/shared/types';
+import type { Provider, MappingSource } from '@/shared/types';
 import type { ExportMappingsFilters } from '../export-mappings';
 import { normalizeMappingSearchQuery } from '../search-query';
 import type { MappingTableRowData } from './mapping-table';
 
 type ExportMappingsDialogProps = {
   open: boolean;
-  providerFilters: Set<MappingProvider>;
+  providerFilters: Set<Provider>;
   sourceFilters: SourceFilterSet;
   searchQuery: string;
   libraryFilter: LibraryFilter;
@@ -30,7 +33,7 @@ type ExportMappingsDialogProps = {
   isExporting: boolean;
 };
 
-const providerOptions: MappingProvider[] = ['sonarr', 'radarr'];
+const providerOptions: Provider[] = ['sonarr', 'radarr'];
 const exportableSourceOptions: MappingSource[] = ['manual', 'rejected', 'blocked', 'ignored', 'unresolved', 'auto', 'upstream'];
 const sourceLabels: Record<MappingSource, string> = {
   manual: 'Manual',
@@ -84,15 +87,15 @@ const deriveSourceFilterFromSourceFilters = (filters: SourceFilterSet): SourceFi
     return 'all';
   }
 
-  return Array.from(filters)[0] ?? 'all';
+  return [...filters][0] ?? 'all';
 };
 
-const deriveProviderFilterFromProviderFilters = (filters: Set<MappingProvider>): ProviderFilter => {
+const deriveProviderFilterFromProviderFilters = (filters: Set<Provider>): ProviderFilter => {
   if (filters.size !== 1) {
     return 'all';
   }
 
-  return Array.from(filters)[0] ?? 'all';
+  return [...filters][0] ?? 'all';
 };
 
 const formatExternalId = (row: MappingTableRowData): string => {
@@ -121,7 +124,7 @@ const matchesPreviewSearch = (row: MappingTableRowData, query: string): boolean 
   const haystack = [
     resolveGroupTitle(row),
     row.provider,
-    row.externalId?.id != null ? String(row.externalId.id) : '',
+    row.externalId?.id == null ? '' : String(row.externalId.id),
     row.externalId?.kind ?? '',
     ...row.sources,
     ...row.entries.flatMap(({ entry, title }) => [
@@ -177,7 +180,7 @@ const ExportPreviewList: React.FC<ExportPreviewListProps> = ({
   const virtualItems = virtualizer.getVirtualItems();
 
   useEffect(() => {
-    const lastItem = virtualItems[virtualItems.length - 1];
+    const lastItem = virtualItems.at(-1);
     if (!lastItem || !hasNextPage || isFetchingNextPage) {
       return;
     }
@@ -305,7 +308,7 @@ export default function ExportMappingsDialog({
   isExporting,
 }: ExportMappingsDialogProps): React.JSX.Element | null {
   const [popoverContainer, setPopoverContainer] = useState<HTMLDivElement | null>(null);
-  const [draftProviderFilters, setDraftProviderFilters] = useState<Set<MappingProvider>>(new Set(providerFilters));
+  const [draftProviderFilters, setDraftProviderFilters] = useState<Set<Provider>>(new Set(providerFilters));
   const [draftSourceFilters, setDraftSourceFilters] = useState<SourceFilterSet>(new Set(sourceFilters));
   const [draftScope, setDraftScope] = useState<MappingScope>(() => deriveScopeFromSourceFilters(new Set(sourceFilters)));
   const [draftSourceFilter, setDraftSourceFilter] = useState<SourceFilter>(() => deriveSourceFilterFromSourceFilters(new Set(sourceFilters)));
@@ -337,16 +340,16 @@ export default function ExportMappingsDialog({
         ...(entry.suppressedExternalId ? { suppressedExternalId: entry.suppressedExternalId } : {}),
         source: entry.source,
         status: entry.status,
-        ...(entry.updatedAt !== undefined ? { updatedAt: entry.updatedAt } : {}),
+        ...(entry.updatedAt === undefined ? {} : { updatedAt: entry.updatedAt }),
         ...(entry.linkedAniListIds ? { linkedAniListIds: entry.linkedAniListIds } : {}),
-        ...(entry.inLibraryCount !== undefined ? { inLibraryCount: entry.inLibraryCount } : {}),
+        ...(entry.inLibraryCount === undefined ? {} : { inLibraryCount: entry.inLibraryCount }),
         ...(entry.providerMeta ? { providerMeta: entry.providerMeta } : {}),
-        ...(entry.hadResolveAttempt !== undefined ? { hadResolveAttempt: entry.hadResolveAttempt } : {}),
+        ...(entry.hadResolveAttempt === undefined ? {} : { hadResolveAttempt: entry.hadResolveAttempt }),
       })),
     [filteredEntryRows],
   );
 
-  const providerCounts = useMemo<Record<MappingProvider, number>>(
+  const providerCounts = useMemo<Record<Provider, number>>(
     () => ({
       sonarr: mappingItems.filter(item => item.provider === 'sonarr').length,
       radarr: mappingItems.filter(item => item.provider === 'radarr').length,
@@ -388,7 +391,7 @@ export default function ExportMappingsDialog({
     void mappings.fetchNextPage();
   }, [mappings, tableRows.length]);
 
-  const toggleProvider = (provider: MappingProvider) => {
+  const toggleProvider = (provider: Provider) => {
     setDraftProviderFilters(prev => {
       const next = new Set(prev);
       if (next.has(provider)) {
@@ -426,8 +429,8 @@ export default function ExportMappingsDialog({
 
   const handleExport = async () => {
     await onExport({
-      providers: Array.from(draftProviderFilters),
-      sources: draftSourceFilters.size > 0 ? Array.from(draftSourceFilters) : exportableSourceOptions,
+      providers: [...draftProviderFilters],
+      sources: draftSourceFilters.size > 0 ? [...draftSourceFilters] : exportableSourceOptions,
       searchQuery: draftSearchQuery.trim(),
       libraryFilter: draftLibraryFilter,
     });
@@ -569,7 +572,7 @@ export default function ExportMappingsDialog({
                   </div>
                 </div>
 
-                {!isPreviewPartial ? (
+                {isPreviewPartial ? null : (
                   <div className="mt-3 flex flex-wrap gap-2 text-xs">
                     {exportableSourceOptions
                       .filter(source => (sourceCounts[source] ?? 0) > 0)
@@ -582,7 +585,7 @@ export default function ExportMappingsDialog({
                         </span>
                       ))}
                   </div>
-                ) : null}
+                )}
 
                 {searchNeedsMoreCharacters ? (
                   <p className="mt-3 text-xs text-warning">

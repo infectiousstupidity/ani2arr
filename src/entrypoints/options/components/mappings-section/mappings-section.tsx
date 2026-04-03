@@ -1,3 +1,6 @@
+/** Options-page mappings section that wires filters, table data, and mapping actions together. */
+// src/entrypoints/options/components/mappings-section/mappings-section.tsx
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { MappingEditor } from '@/features/mapping/mapping-editor';
 import {
@@ -13,7 +16,7 @@ import {
 } from '@/shared/queries';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
-import type { MappingProvider, MappingSummary } from '@/shared/types';
+import type { Provider, MappingSummary } from '@/shared/types';
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import SectionHeader from '@/features/options/section-header';
 import MappingToolbar, {
@@ -57,7 +60,7 @@ const MappingsSection: React.FC<{
   const [isExporting, setIsExporting] = useState(false);
   const [editorState, setEditorState] = useState<{
     anilistId: number;
-    provider: MappingProvider;
+    provider: Provider;
     externalId?: MappingSummary['externalId'] | null;
   } | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -74,7 +77,7 @@ const MappingsSection: React.FC<{
   const sonarrUrl = publicOptions?.providers.sonarr.url ?? null;
   const radarrUrl = publicOptions?.providers.radarr.url ?? null;
 
-  const providerFilters = useMemo<Set<MappingProvider>>(() => {
+  const providerFilters = useMemo<Set<Provider>>(() => {
     if (providerFilter === 'all') return new Set(['sonarr', 'radarr']);
     return new Set([providerFilter]);
   }, [providerFilter]);
@@ -122,39 +125,65 @@ const MappingsSection: React.FC<{
   const hasActiveRefinements = providerFilter !== 'all' || sourceFilter !== 'all' || libraryFilter !== 'all';
 
   const resultsSummaryDetail = useMemo(() => {
-    const scopeLabel =
-      scope === 'all'
-        ? 'All mappings'
-        : scope === 'needs-attention'
-          ? 'Needs attention'
-          : scope === 'manual-overrides'
-            ? 'Overrides'
-            : 'Suppressed';
-    const providerLabel = providerFilter === 'all' ? 'All providers' : providerFilter === 'sonarr' ? 'Sonarr' : 'Radarr';
-    const sourceLabel =
-      sourceFilter === 'all'
-        ? scope === 'all'
-          ? 'Any source'
-          : 'Any source in scope'
-        : sourceFilter === 'manual'
-          ? 'Manual'
-          : sourceFilter === 'auto'
-            ? 'Auto'
-            : sourceFilter === 'upstream'
-              ? 'Upstream'
-              : sourceFilter === 'rejected'
-                ? 'Rejected'
-                : sourceFilter === 'blocked'
-                  ? 'Blocked'
-                  : sourceFilter === 'unresolved'
-                    ? 'Unresolved'
-                    : 'Ignored';
+    let scopeLabel = 'Suppressed';
+    switch (scope) {
+      case 'all': {
+        scopeLabel = 'All mappings';
+        break;
+      }
+      case 'needs-attention': {
+        scopeLabel = 'Needs attention';
+        break;
+      }
+      case 'manual-overrides': {
+        scopeLabel = 'Overrides';
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+    const providerLabel = providerFilter === 'all' ? 'All providers' : (providerFilter === 'sonarr' ? 'Sonarr' : 'Radarr');
+    let sourceLabel = 'Ignored';
+    switch (sourceFilter) {
+      case 'all': {
+        sourceLabel = scope === 'all' ? 'Any source' : 'Any source in scope';
+        break;
+      }
+      case 'manual': {
+        sourceLabel = 'Manual';
+        break;
+      }
+      case 'auto': {
+        sourceLabel = 'Auto';
+        break;
+      }
+      case 'upstream': {
+        sourceLabel = 'Upstream';
+        break;
+      }
+      case 'rejected': {
+        sourceLabel = 'Rejected';
+        break;
+      }
+      case 'blocked': {
+        sourceLabel = 'Blocked';
+        break;
+      }
+      case 'unresolved': {
+        sourceLabel = 'Unresolved';
+        break;
+      }
+      default: {
+        break;
+      }
+    }
     const libraryLabel =
       libraryFilter === 'all'
         ? 'Any library status'
-        : libraryFilter === 'in-library'
+        : (libraryFilter === 'in-library'
           ? 'In library'
-          : 'Missing from library';
+          : 'Missing from library');
     return `${scopeLabel} - ${providerLabel} - ${sourceLabel} - ${libraryLabel}`;
   }, [libraryFilter, providerFilter, scope, sourceFilter]);
 
@@ -343,13 +372,13 @@ const MappingsSection: React.FC<{
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      const stamp = payload.exportedAt.replace(/[:.]/g, '-');
+      const stamp = payload.exportedAt.replaceAll(/[.:]/g, '-');
       link.href = objectUrl;
       link.download = `ani2arr-mappings-${stamp}.json`;
-      document.body.appendChild(link);
+      document.body.append(link);
       link.click();
       link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      globalThis.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
       toast.showToast({
         title: 'Mappings exported',
         description: `Downloaded ${payload.summary.rowCount} mapping groups with ${payload.summary.entryCount} entries.`,

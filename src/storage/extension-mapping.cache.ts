@@ -5,7 +5,7 @@ import { createTtlCache, type CacheHit, type CacheWriteOptions } from './ttl-cac
 import { CACHE_NAMESPACES } from './keys';
 import { STORAGE_POLICIES } from './policies';
 import type { ExtensionError } from '@/shared/errors';
-import type { MappingExternalId, MappingProvider } from '@/shared/types';
+import type { MappingExternalId, Provider } from '@/shared/types';
 
 export interface ExtensionMappingCacheEntry {
   externalId: MappingExternalId;
@@ -23,23 +23,23 @@ const extensionMappingFailureCaches = {
   radarr: createTtlCache<ExtensionError>(CACHE_NAMESPACES.extensionMappingFailureRadarr),
 } as const;
 
-const getExtensionMappingCache = (provider: MappingProvider) =>
+const getExtensionMappingCache = (provider: Provider) =>
   provider === 'radarr' ? extensionMappingCaches.radarr : extensionMappingCaches.sonarr;
 
-const getExtensionMappingFailureCache = (provider: MappingProvider) =>
+const getExtensionMappingFailureCache = (provider: Provider) =>
   provider === 'radarr' ? extensionMappingFailureCaches.radarr : extensionMappingFailureCaches.sonarr;
 
 const createExtensionMappingCacheKey = (anilistId: number): string => `anilist:${anilistId}`;
 
 export async function readExtensionMapping(
-  provider: MappingProvider,
+  provider: Provider,
   anilistId: number,
 ): Promise<CacheHit<ExtensionMappingCacheEntry> | null> {
   return getExtensionMappingCache(provider).read(createExtensionMappingCacheKey(anilistId));
 }
 
 export async function writeExtensionMapping(
-  provider: MappingProvider,
+  provider: Provider,
   anilistId: number,
   entry: Omit<ExtensionMappingCacheEntry, 'updatedAt'>,
 ): Promise<void> {
@@ -57,13 +57,13 @@ export async function writeExtensionMapping(
 }
 
 export async function removeExtensionMapping(
-  provider: MappingProvider,
+  provider: Provider,
   anilistId: number,
 ): Promise<void> {
   await getExtensionMappingCache(provider).remove(createExtensionMappingCacheKey(anilistId));
 }
 
-export async function clearExtensionMappings(provider?: MappingProvider): Promise<void> {
+export async function clearExtensionMappings(provider?: Provider): Promise<void> {
   if (provider) {
     await getExtensionMappingCache(provider).clear();
     return;
@@ -76,14 +76,14 @@ export async function clearExtensionMappings(provider?: MappingProvider): Promis
 }
 
 export async function readExtensionMappingFailure(
-  provider: MappingProvider,
+  provider: Provider,
   anilistId: number,
 ): Promise<CacheHit<ExtensionError> | null> {
   return getExtensionMappingFailureCache(provider).read(createExtensionMappingCacheKey(anilistId));
 }
 
 export async function writeExtensionMappingFailure(
-  provider: MappingProvider,
+  provider: Provider,
   anilistId: number,
   error: ExtensionError,
   cacheOptions: CacheWriteOptions,
@@ -96,13 +96,13 @@ export async function writeExtensionMappingFailure(
 }
 
 export async function removeExtensionMappingFailure(
-  provider: MappingProvider,
+  provider: Provider,
   anilistId: number,
 ): Promise<void> {
   await getExtensionMappingFailureCache(provider).remove(createExtensionMappingCacheKey(anilistId));
 }
 
-export async function clearExtensionMappingFailures(provider?: MappingProvider): Promise<void> {
+export async function clearExtensionMappingFailures(provider?: Provider): Promise<void> {
   if (provider) {
     await getExtensionMappingFailureCache(provider).clear();
     return;

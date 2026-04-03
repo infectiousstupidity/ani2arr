@@ -1,8 +1,12 @@
+/** Shared lookup client base with cache reuse, queueing, and provider search orchestration. */
 // src/services/mapping/lookup/base-lookup.client.ts
+
 import { STORAGE_POLICIES, type TtlCache } from '@/storage';
 import PQueue from 'p-queue';
-import type { MappingExternalIdKind, MappingProvider, RequestPriority } from '@/shared/types';
+import type { MappingExternalIdKind, Provider } from '@/shared/types';
 import { normalizeError } from '@/shared/errors';
+import type { RequestPriority } from '@/shared/types/request-scheduling';
+import type { ProviderCredentials } from '@/shared/types/providers';
 import {
   canonicalTitleKeyForProvider,
   sanitizeLookupDisplayForProvider,
@@ -11,7 +15,6 @@ import { incrementCounter, timeAsync } from '@/debug/metrics';
 import { priorityValue } from '@/shared/utils/request-priority';
 import { logger, type ScopedLogger } from '@/shared/utils/logger';
 import type {
-  LookupClientCredentials,
   ProviderLookupClient,
   ProviderLookupCacheHit,
   ProviderLookupOptions,
@@ -42,17 +45,17 @@ export type LookupCaches<TResult> = {
 };
 
 export abstract class BaseLookupClient<TResult extends ProviderLookupResult>
-  implements ProviderLookupClient<LookupClientCredentials, TResult>
+  implements ProviderLookupClient<ProviderCredentials, TResult>
 {
   protected readonly log: ScopedLogger;
   private readonly inflight = new Map<string, Promise<TResult[]>>();
   private readonly queue = new PQueue({ concurrency: 5 });
 
-  public readonly provider: MappingProvider;
+  public readonly provider: Provider;
   public readonly externalIdKind: MappingExternalIdKind;
 
   constructor(
-    provider: MappingProvider,
+    provider: Provider,
     externalIdKind: MappingExternalIdKind,
     loggerName: string,
     private readonly caches: LookupCaches<TResult>,
@@ -106,7 +109,7 @@ export abstract class BaseLookupClient<TResult extends ProviderLookupResult>
   public async lookup(
     canonicalKey: string,
     rawTerm: string,
-    credentials: LookupClientCredentials,
+    credentials: ProviderCredentials,
     options: ProviderLookupOptions = {},
   ): Promise<TResult[]> {
     const safeTerm = sanitizeLookupDisplayForProvider(this.provider, rawTerm);
@@ -187,12 +190,12 @@ export abstract class BaseLookupClient<TResult extends ProviderLookupResult>
   /** Subclasses supply the actual API call (e.g. Sonarr series lookup, Radarr movie lookup). */
   protected abstract fetchFromApi(
     term: string,
-    credentials: LookupClientCredentials,
+    credentials: ProviderCredentials,
   ): Promise<TResult[]>;
 
   private async performLookup(
     term: string,
-    credentials: LookupClientCredentials,
+    credentials: ProviderCredentials,
     priority?: RequestPriority,
   ): Promise<TResult[]> {
     incrementCounter('mapping.lookup.network_miss');

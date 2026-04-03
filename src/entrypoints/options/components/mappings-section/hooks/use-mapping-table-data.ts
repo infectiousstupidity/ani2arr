@@ -4,7 +4,7 @@
 import { useMemo } from 'react';
 import { useDebounced } from '@/shared/hooks/common/use-debounced';
 import { useAniListMetadataBatch, useMappings } from '@/shared/queries';
-import type { MappingProvider, MappingSummary } from '@/shared/types';
+import type { Provider, MappingSummary } from '@/shared/types';
 import type { GetAniListMetadataOutput, GetMappingsOutput } from '@/rpc/types';
 import type { GetMappingsInput } from '@/rpc/schemas';
 import type { MappingTableRowData } from '../components/mapping-table';
@@ -12,7 +12,7 @@ import type { LibraryFilter, MappingSort, SourceFilterSet } from '../components/
 import { normalizeMappingSearchQuery } from '../search-query';
 
 type UseMappingTableDataParams = {
-  providerFilters: Set<MappingProvider>;
+  providerFilters: Set<Provider>;
   sourceFilters: SourceFilterSet;
   searchQuery: string;
   libraryFilter: LibraryFilter;
@@ -30,16 +30,16 @@ export const useMappingTableData = ({
 }: UseMappingTableDataParams) => {
   const debouncedQuery = useDebounced(searchQuery, 250);
 
-  const providersToQuery = useMemo<MappingProvider[]>(() => {
-    const arr = Array.from(providerFilters);
+  const providersToQuery = useMemo<Provider[]>(() => {
+    const arr = [...providerFilters];
     if (arr.length === 0) return ['sonarr', 'radarr'];
-    return arr.sort() as MappingProvider[];
+    return arr.toSorted() as Provider[];
   }, [providerFilters]);
 
   const mappingQueryInput = useMemo<GetMappingsInput>(() => {
     const normalizedQuery = normalizeMappingSearchQuery(debouncedQuery);
     const sourceList: NonNullable<GetMappingsInput>['sources'] =
-      sourceFilters.size > 0 ? Array.from(sourceFilters) : ['manual', 'rejected', 'blocked', 'ignored', 'unresolved', 'auto', 'upstream'];
+      sourceFilters.size > 0 ? [...sourceFilters] : ['manual', 'rejected', 'blocked', 'ignored', 'unresolved', 'auto', 'upstream'];
     return {
       providers: providersToQuery,
       sources: sourceList,
@@ -57,7 +57,7 @@ export const useMappingTableData = ({
   );
 
   const metadataIds = useMemo(
-    () => Array.from(new Set(mappingEntries.map((entry) => entry.anilistId))),
+    () => [...new Set(mappingEntries.map((entry) => entry.anilistId))],
     [mappingEntries],
   );
   const metadata = useAniListMetadataBatch(metadataIds, { enabled: metadataIds.length > 0 });
@@ -119,7 +119,20 @@ export const useMappingTableData = ({
         : `${entry.provider}:unmapped:${entry.anilistId}`;
 
       const existingGroup = groups.get(key);
-      if (!existingGroup) {
+      if (existingGroup) {
+        if (!existingGroup.providerMeta && entry.providerMeta) {
+          existingGroup.providerMeta = entry.providerMeta;
+        }
+        if (typeof entry.updatedAt === 'number') {
+          existingGroup.updatedAt = Math.max(existingGroup.updatedAt ?? 0, entry.updatedAt);
+        }
+        existingGroup.entries.push({
+          entry,
+          title,
+          metadata: metadataMap.get(entry.anilistId),
+        });
+        existingGroup.sources.add(entry.source);
+      } else {
         const newGroup: Group = {
           id: key,
           provider: entry.provider,
@@ -139,19 +152,6 @@ export const useMappingTableData = ({
         });
         newGroup.sources.add(entry.source);
         groups.set(key, newGroup);
-      } else {
-        if (!existingGroup.providerMeta && entry.providerMeta) {
-          existingGroup.providerMeta = entry.providerMeta;
-        }
-        if (typeof entry.updatedAt === 'number') {
-          existingGroup.updatedAt = Math.max(existingGroup.updatedAt ?? 0, entry.updatedAt);
-        }
-        existingGroup.entries.push({
-          entry,
-          title,
-          metadata: metadataMap.get(entry.anilistId),
-        });
-        existingGroup.sources.add(entry.source);
       }
     }
 
@@ -189,21 +189,23 @@ export const useMappingTableData = ({
 
     const compareTitles = (a: NormalizedRow, b: NormalizedRow) => {
       const diff = resolveTitle(a).localeCompare(resolveTitle(b));
-      return diff !== 0 ? diff : a.sortIndex - b.sortIndex;
+      return diff === 0 ? a.sortIndex - b.sortIndex : diff;
     };
 
-    const rows: NormalizedRow[] = Array.from(groups.values()).map((group) => ({
+    const rows: NormalizedRow[] = [...groups.values()].map((group) => ({
       ...group,
-      entries: group.entries.sort((a, b) => a.title.localeCompare(b.title)),
-      sources: Array.from(group.sources),
+      entries: group.entries.toSorted((a, b) => a.title.localeCompare(b.title)),
+      sources: [...group.sources],
     }));
 
-    const sortedRows = rows.sort((a, b) => {
+    const sortedRows = rows.toSorted((a, b) => {
       switch (sortOption) {
-        case 'title-asc':
+        case 'title-asc': {
           return compareTitles(a, b);
-        case 'title-desc':
+        }
+        case 'title-desc': {
           return compareTitles(b, a);
+        }
         case 'updated-asc': {
           const diff = (a.updatedAt ?? Number.POSITIVE_INFINITY) - (b.updatedAt ?? Number.POSITIVE_INFINITY);
           if (diff !== 0) return diff;
@@ -230,8 +232,9 @@ export const useMappingTableData = ({
           if (rankA !== rankB) return rankA - rankB;
           return compareTitles(a, b);
         }
-        default:
+        default: {
           return a.sortIndex - b.sortIndex;
+        }
       }
     });
 

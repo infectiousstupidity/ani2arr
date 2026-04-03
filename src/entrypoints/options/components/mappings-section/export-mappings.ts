@@ -4,12 +4,12 @@
 import { getAni2arrApi } from '@/rpc';
 import type { GetMappingsInput, MappingCursor } from '@/rpc/schemas';
 import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.schema';
-import type { MappingExternalId, MappingProvider, MappingSource, MappingSummary } from '@/shared/types';
+import type { MappingExternalId, Provider, MappingSource, MappingSummary } from '@/shared/types';
 import type { LibraryFilter } from './components/mapping-toolbar';
 import { normalizeMappingSearchQuery } from './search-query';
 
 export type ExportMappingsFilters = {
-  providers: MappingProvider[];
+  providers: Provider[];
   sources: MappingSource[];
   searchQuery: string;
   libraryFilter: LibraryFilter;
@@ -22,13 +22,13 @@ export type ExportMappingsPayload = {
   summary: {
     rowCount: number;
     entryCount: number;
-    providerCounts: Record<MappingProvider, number>;
+    providerCounts: Record<Provider, number>;
     sourceCounts: Partial<Record<MappingSource, number>>;
   };
   mappings: {
     rows: Array<{
       id: string;
-      provider: MappingProvider;
+      provider: Provider;
       externalId: MappingExternalId | null;
       sources: MappingSource[];
       updatedAt?: number;
@@ -42,7 +42,7 @@ export type ExportMappingsPayload = {
         metadata?: AniListMetadata | null;
         entry: {
           anilistId: number;
-          provider: MappingProvider;
+          provider: Provider;
           externalId: MappingExternalId | null;
           suppressedExternalId?: MappingExternalId | null;
           source: MappingSource;
@@ -118,13 +118,11 @@ const fetchAllMappings = async (filters: ExportMappingsFilters): Promise<Mapping
 };
 
 const fetchMetadataMap = async (mappings: readonly MappingSummary[]): Promise<Map<number, AniListMetadata>> => {
-  const ids = Array.from(
-    new Set(
+  const ids = [...new Set(
       mappings
         .map((mapping) => mapping.anilistId)
         .filter((id): id is number => Number.isFinite(id) && id > 0),
-    ),
-  );
+    )];
 
   const metadataMap = new Map<number, AniListMetadata>();
   if (ids.length === 0) {
@@ -163,7 +161,7 @@ const applyLibraryFilter = (entryRows: EntryRow[], libraryFilter: LibraryFilter)
 const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
   type Group = {
     id: string;
-    provider: MappingProvider;
+    provider: Provider;
     externalId: MappingExternalId | null;
     providerMeta?: MappingSummary['providerMeta'];
     entries: EntryRow[];
@@ -190,7 +188,7 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
         ...(entry.providerMeta ? { providerMeta: entry.providerMeta } : {}),
         entries: [row],
         sources: new Set<MappingSource>([entry.source]),
-        ...(entry.updatedAt !== undefined ? { updatedAt: entry.updatedAt } : {}),
+        ...(entry.updatedAt === undefined ? {} : { updatedAt: entry.updatedAt }),
         sortIndex: order++,
       });
       continue;
@@ -221,15 +219,15 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
     row.entries[0]?.title ||
     (row.externalId ? `${row.externalId.kind.toUpperCase()} #${row.externalId.id}` : 'Unmapped');
 
-  return Array.from(groups.values())
-    .sort((a, b) => {
+  return [...groups.values()]
+    .toSorted((a, b) => {
       const updatedDiff = (b.updatedAt ?? 0) - (a.updatedAt ?? 0);
       if (updatedDiff !== 0) {
         return updatedDiff;
       }
       const sourceDiff =
-        Math.min(...Array.from(a.sources).map((source) => sourcePriority[source])) -
-        Math.min(...Array.from(b.sources).map((source) => sourcePriority[source]));
+        Math.min(...[...a.sources].map((source) => sourcePriority[source])) -
+        Math.min(...[...b.sources].map((source) => sourcePriority[source]));
       if (sourceDiff !== 0) {
         return sourceDiff;
       }
@@ -243,12 +241,11 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
       id: group.id,
       provider: group.provider,
       externalId: group.externalId,
-      sources: Array.from(group.sources),
-      ...(group.updatedAt !== undefined ? { updatedAt: group.updatedAt } : {}),
+      sources: [...group.sources],
+      ...(group.updatedAt === undefined ? {} : { updatedAt: group.updatedAt }),
       ...(group.providerMeta ? { providerMeta: group.providerMeta } : {}),
-      entries: group.entries
-        .slice()
-        .sort((a, b) => a.title.localeCompare(b.title))
+      entries: [...group.entries]
+        .toSorted((a, b) => a.title.localeCompare(b.title))
         .map(({ title, metadata, entry }) => ({
           title,
           ...(metadata ? { metadata } : {}),
@@ -259,11 +256,11 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
             ...(entry.suppressedExternalId ? { suppressedExternalId: entry.suppressedExternalId } : {}),
             source: entry.source,
             status: entry.status,
-            ...(entry.updatedAt !== undefined ? { updatedAt: entry.updatedAt } : {}),
+            ...(entry.updatedAt === undefined ? {} : { updatedAt: entry.updatedAt }),
             ...(entry.linkedAniListIds ? { linkedAniListIds: entry.linkedAniListIds } : {}),
-            ...(entry.inLibraryCount !== undefined ? { inLibraryCount: entry.inLibraryCount } : {}),
+            ...(entry.inLibraryCount === undefined ? {} : { inLibraryCount: entry.inLibraryCount }),
             ...(entry.providerMeta ? { providerMeta: entry.providerMeta } : {}),
-            ...(entry.hadResolveAttempt !== undefined ? { hadResolveAttempt: entry.hadResolveAttempt } : {}),
+            ...(entry.hadResolveAttempt === undefined ? {} : { hadResolveAttempt: entry.hadResolveAttempt }),
           },
         })),
     }));
@@ -287,7 +284,7 @@ export const buildMappingsExportPayload = async (
   const filteredEntryRows = applyLibraryFilter(entryRows, filters.libraryFilter);
   const rows = buildExportRows(filteredEntryRows);
 
-  const providerCounts: Record<MappingProvider, number> = { sonarr: 0, radarr: 0 };
+  const providerCounts: Record<Provider, number> = { sonarr: 0, radarr: 0 };
   const sourceCounts: Partial<Record<MappingSource, number>> = {};
 
   for (const { entry } of filteredEntryRows) {

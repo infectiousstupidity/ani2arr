@@ -1,11 +1,12 @@
-import type { MappingProvider } from '@/shared/types';
+/** In-memory ledger of unresolved mappings for UI summaries and retry flows. */
+// src/services/mapping/cache/unresolved-ledger.ts
 
-export type UnresolvedMappingSource = 'unresolved';
+import type { Provider } from '@/shared/types/providers';
 
 export interface UnresolvedLedgerEntry {
   anilistId: number;
-  provider: MappingProvider;
-  source: UnresolvedMappingSource;
+  provider: Provider;
+  source: 'unresolved';
   updatedAt: number;
   title?: string;
 }
@@ -13,7 +14,7 @@ export interface UnresolvedLedgerEntry {
 export class UnresolvedLedger {
   private readonly entries = new Map<string, UnresolvedLedgerEntry>();
 
-  public record(provider: MappingProvider, anilistId: number, title?: string): boolean {
+  public record(provider: Provider, anilistId: number, title?: string): boolean {
     const key = this.createKey(provider, anilistId);
     const previous = this.entries.get(key);
     const hasMeaningfulChange = !previous || previous.title !== title;
@@ -28,7 +29,7 @@ export class UnresolvedLedger {
     return hasMeaningfulChange;
   }
 
-  public delete(provider: MappingProvider, anilistId: number): boolean {
+  public delete(provider: Provider, anilistId: number): boolean {
     return this.entries.delete(this.createKey(provider, anilistId));
   }
 
@@ -41,10 +42,10 @@ export class UnresolvedLedger {
   }
 
   public list(): UnresolvedLedgerEntry[] {
-    return Array.from(this.entries.values());
+    return [...this.entries.values()];
   }
 
-  private createKey(provider: MappingProvider, anilistId: number): string {
+  private createKey(provider: Provider, anilistId: number): string {
     return `${provider}:${anilistId}`;
   }
 }

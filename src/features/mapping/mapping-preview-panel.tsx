@@ -1,18 +1,21 @@
+/** Mapping preview panel for current and pending manual mapping selections. */
+// src/features/mapping/mapping-preview-panel.tsx
+
 import { ExternalLink, SquarePen, PenOff, X, Settings } from 'lucide-react';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { MultiMappingInfo } from './multi-mapping-info';
 import { useMappingOverrides, useMovieStatus, useSeriesStatus } from '@/shared/queries';
-import type { MappingOverrideRecord, MappingProvider, MappingSearchResult } from '@/shared/types';
+import type { MappingExternalIdRecord, Provider } from '@/shared/types';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { getProviderLabel } from '@/services/providers/resolver';
-import type { MappingAniListSummary } from './types';
+import type { MappingAniListSummary, MappingSearchResult } from './types';
 
 interface MappingPreviewPanelProps {
   aniListEntry: MappingAniListSummary;
   baseUrl: string;
-  provider: MappingProvider;
+  provider: Provider;
   currentMapping: MappingSearchResult | null;
   previewMapping: MappingSearchResult | null;
   isInMappingMode: boolean;
@@ -64,7 +67,7 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
     overrideActiveFromStatus === undefined &&
     Array.isArray(mappingOverrides.data) &&
     mappingOverrides.data.some(
-      (record: MappingOverrideRecord) => record.anilistId === aniListEntry.id && record.provider === provider,
+      (record: MappingExternalIdRecord) => record.anilistId === aniListEntry.id && record.provider === provider,
     );
 
   const isOverridden = overrideActiveFromStatus ?? overrideActiveFromOverrides ?? false;
@@ -336,7 +339,7 @@ function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
             </div>
           </div>
 
-          {metadataPills.length ? (
+          {metadataPills.length > 0 ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {metadataPills}
             </div>

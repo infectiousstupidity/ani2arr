@@ -1,4 +1,3 @@
-// src/features/media-modal/types.ts
 /** Shared media-modal panel and mapping prop types. */
 // src/features/media-modal/types.ts
 
@@ -11,11 +10,9 @@ import type {
   ProviderRootFolder,
   ProviderTag,
 } from '@/shared/types/providers';
-import type { MappingSearchResult } from '@/shared/types';
-import type { UseMappingControllerResult } from "@/features/mapping";
-import type { UseRadarrPanelControllerResult } from "./hooks/use-radarr-panel-controller";
-import type { UseSonarrPanelControllerResult } from "./hooks/use-sonarr-panel-controller";
-import type { MappingAniListSummary } from "@/features/mapping";
+import type { MappingAniListSummary, MappingSearchResult, UseMappingControllerResult } from '@/features/mapping';
+import type { UseRadarrPanelControllerResult } from './hooks/use-radarr-panel-controller';
+import type { UseSonarrPanelControllerResult } from './hooks/use-sonarr-panel-controller';
 
 export interface MappingTabProps {
   aniListEntry: MappingAniListSummary;

@@ -3,7 +3,7 @@
 
 import type { AniListMediaService } from '@/core/anilist';
 import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { MappingExternalId, MappingProvider, RequestPriority } from '@/shared/types';
+import type { MappingExternalId, Provider } from '@/shared/types';
 import {
   createError,
   ErrorCode,
@@ -25,6 +25,8 @@ import {
 import { incrementCounter } from '@/debug/metrics';
 import { logger } from '@/shared/utils/logger';
 import { getProviderLabel, resolveProviderForAniListFormat } from '@/services/providers/resolver';
+import type { RequestPriority } from '@/shared/types/request-scheduling';
+import type { ProviderCredentials } from '@/shared/types/providers';
 import {
   EARLY_STOP_THRESHOLD,
   FAILURE_HARD_TTL,
@@ -42,24 +44,20 @@ import { tryHintLookup } from './hints/hint-lookup';
 import { buildMediaFromMetadataHint } from './hints/media-hints';
 import { resolvePrequelStatic } from './hints/prequel-static';
 import { MappingOverridesService } from './overrides';
-import {
-  type LookupClientCredentials,
-  type ProviderLookupClient,
-  type ProviderLookupResult,
-} from './lookup';
+import { type ProviderLookupClient, type ProviderLookupResult } from './lookup';
 import { resolveViaPipeline } from './pipeline/pipeline';
-import { UpstreamMappingStore, type UpstreamMappingPayload } from './upstream';
-import type { ResolveExternalIdOptions, ResolveHints, ResolveTvdbIdOptions, ResolvedMapping } from './types';
+import { UpstreamMappingStore,  } from './upstream';
+import type { ResolveExternalIdOptions, ResolvedMapping } from './types';
 
 type ProviderLookupRegistry = Record<
-  MappingProvider,
-  ProviderLookupClient<LookupClientCredentials, ProviderLookupResult>
+  Provider,
+  ProviderLookupClient<ProviderCredentials, ProviderLookupResult>
 >;
 
 export class MappingService {
   private readonly log = logger.create('MappingService');
   private readonly inflight = new Map<string, Promise<ResolvedMapping | null>>();
-  private readonly sessionSeenCanonical: Record<MappingProvider, Set<string>> = {
+  private readonly sessionSeenCanonical: Record<Provider, Set<string>> = {
     sonarr: new Set<string>(),
     radarr: new Set<string>(),
   };
@@ -108,7 +106,7 @@ export class MappingService {
   }
 
   public async resolveExternalId(
-    provider: MappingProvider,
+    provider: Provider,
     anilistId: number,
     options: ResolveExternalIdOptions = {},
   ): Promise<ResolvedMapping | null> {
@@ -143,7 +141,7 @@ export class MappingService {
 
   public async resolveTvdbId(
     anilistId: number,
-    options: ResolveTvdbIdOptions = {},
+    options: ResolveExternalIdOptions = {},
   ): Promise<{ tvdbId: number; successfulSynonym?: string } | null> {
     const mapping = await this.resolveExternalId('sonarr', anilistId, options);
     if (!mapping || mapping.externalId.kind !== 'tvdb') {
@@ -156,7 +154,7 @@ export class MappingService {
   }
 
   private async resolveExternalIdInternal(
-    provider: MappingProvider,
+    provider: Provider,
     anilistId: number,
     options: ResolveExternalIdOptions,
     bypassFailureCache: boolean,
@@ -269,7 +267,7 @@ export class MappingService {
   }
 
   private async acceptResolved(
-    provider: MappingProvider,
+    provider: Provider,
     anilistId: number,
     resolved: ResolvedMapping,
     source: 'auto' | 'upstream',
@@ -296,7 +294,7 @@ export class MappingService {
   }
 
   private async cacheFailure(
-    provider: MappingProvider,
+    provider: Provider,
     anilistId: number,
     error: ExtensionError,
   ): Promise<void> {
@@ -308,7 +306,7 @@ export class MappingService {
   }
 
   private async attemptNetworkResolution(
-    provider: MappingProvider,
+    provider: Provider,
     anilistId: number,
     options: ResolveExternalIdOptions,
     bypassFailureCache: boolean,
@@ -380,9 +378,9 @@ export class MappingService {
   }
 
   private async resolveViaNetwork(
-    provider: MappingProvider,
+    provider: Provider,
     anilistId: number,
-    hints: ResolveHints | undefined,
+    hints: ResolveExternalIdOptions['hints'] | undefined,
     priority: RequestPriority | undefined,
     forceLookupNetwork: boolean,
   ): Promise<ResolvedMapping | null> {
@@ -426,10 +424,10 @@ export class MappingService {
   }
 
   private async tryResolveWithMedia(
-    provider: MappingProvider,
+    provider: Provider,
     media: AniListMedia,
-    credentials: LookupClientCredentials,
-    hints: ResolveHints | undefined,
+    credentials: ProviderCredentials,
+    hints: ResolveExternalIdOptions['hints'] | undefined,
     priority: RequestPriority | undefined,
     forceLookupNetwork: boolean,
   ): Promise<ResolvedMapping | null> {
@@ -457,7 +455,7 @@ export class MappingService {
         lookupClient,
         upstreamMappingStore: this.upstreamMappingStore,
         credentials,
-        ...(typeof priority !== 'undefined' ? { priority } : {}),
+        ...(priority === undefined ? {} : { priority }),
         ...(forceLookupNetwork ? { forceLookupNetwork: true } : {}),
         sessionSeenCanonical: this.sessionSeenCanonical[provider],
         limits: {
@@ -479,11 +477,11 @@ export class MappingService {
     return null;
   }
 
-  private inflightKey(provider: MappingProvider, anilistId: number): string {
+  private inflightKey(provider: Provider, anilistId: number): string {
     return `${provider}:${anilistId}`;
   }
 
-  public async evictResolved(anilistId: number, provider: MappingProvider = 'sonarr'): Promise<void> {
+  public async evictResolved(anilistId: number, provider: Provider = 'sonarr'): Promise<void> {
     await Promise.all([
       removeExtensionMapping(provider, anilistId),
       removeExtensionMappingFailure(provider, anilistId),
@@ -494,25 +492,25 @@ export class MappingService {
     this.clearUnresolvedMapping(provider, anilistId);
   }
 
-  public isOverrideActive(anilistId: number, provider: MappingProvider = 'sonarr'): boolean {
+  public isOverrideActive(anilistId: number, provider: Provider = 'sonarr'): boolean {
     return this.overrides?.has(provider, anilistId) ?? false;
   }
 
-  public isIgnored(anilistId: number, provider: MappingProvider = 'sonarr'): boolean {
+  public isIgnored(anilistId: number, provider: Provider = 'sonarr'): boolean {
     return this.overrides?.isIgnored(provider, anilistId) ?? false;
   }
 
   public getCandidateSuppression(
     anilistId: number,
     externalId: MappingExternalId,
-    provider: MappingProvider = 'sonarr',
+    provider: Provider = 'sonarr',
   ): 'blocked' | 'rejected' | null {
     return this.overrides?.getCandidateSuppression(provider, anilistId, externalId) ?? null;
   }
 
   public getRecordedResolvedMappings(
-    provider?: MappingProvider,
-  ): Array<{ anilistId: number; provider: MappingProvider; externalId: MappingExternalId; source: 'auto' | 'upstream'; updatedAt: number }> {
+    provider?: Provider,
+  ): Array<{ anilistId: number; provider: Provider; externalId: MappingExternalId; source: 'auto' | 'upstream'; updatedAt: number }> {
     return this.ledger
       .list()
       .filter(entry => (provider ? entry.provider === provider : true))
@@ -526,8 +524,8 @@ export class MappingService {
   }
 
   public getRecordedUnresolvedMappings(
-    provider?: MappingProvider,
-  ): Array<{ anilistId: number; provider: MappingProvider; source: 'unresolved'; updatedAt: number; title?: string }> {
+    provider?: Provider,
+  ): Array<{ anilistId: number; provider: Provider; source: 'unresolved'; updatedAt: number; title?: string }> {
     return this.unresolvedLedger
       .list()
       .filter(entry => (provider ? entry.provider === provider : true))
@@ -540,7 +538,7 @@ export class MappingService {
       }));
   }
 
-  public getLinkedAniListIds(provider: MappingProvider, externalId: MappingExternalId): number[] {
+  public getLinkedAniListIds(provider: Provider, externalId: MappingExternalId): number[] {
     const ids = new Set<number>();
     if (this.overrides) {
       for (const id of this.overrides.getLinkedAniListIds(provider, externalId)) {
@@ -552,7 +550,7 @@ export class MappingService {
         ids.add(id);
       }
     }
-    return Array.from(ids);
+    return [...ids];
   }
 
   public getLinkedAniListIdsForTvdb(tvdbId: number): number[] {
@@ -560,7 +558,7 @@ export class MappingService {
   }
 
   private recordResolvedMapping(
-    provider: MappingProvider,
+    provider: Provider,
     anilistId: number,
     mapping: ResolvedMapping,
     source: 'auto' | 'upstream',
@@ -568,28 +566,32 @@ export class MappingService {
     this.ledger.record(provider, anilistId, mapping, source);
   }
 
-  private recordUnresolvedMapping(provider: MappingProvider, anilistId: number, hints?: ResolveHints): void {
+  private recordUnresolvedMapping(
+    provider: Provider,
+    anilistId: number,
+    hints?: ResolveExternalIdOptions['hints'],
+  ): void {
     const changed = this.unresolvedLedger.record(provider, anilistId, this.resolveUnresolvedTitle(hints));
     if (changed) {
       this.notifyMappingsChanged?.();
     }
   }
 
-  private clearUnresolvedMapping(provider: MappingProvider, anilistId: number): void {
+  private clearUnresolvedMapping(provider: Provider, anilistId: number): void {
     if (this.unresolvedLedger.delete(provider, anilistId)) {
       this.notifyMappingsChanged?.();
     }
   }
 
   private isCandidateSuppressed(
-    provider: MappingProvider,
+    provider: Provider,
     anilistId: number,
     externalId: MappingExternalId,
   ): boolean {
     return this.overrides?.getCandidateSuppression(provider, anilistId, externalId) != null;
   }
 
-  private resolveUnresolvedTitle(hints?: ResolveHints): string | undefined {
+  private resolveUnresolvedTitle(hints?: ResolveExternalIdOptions['hints']): string | undefined {
     const directTitle = hints?.primaryTitle?.trim();
     if (directTitle) {
       return directTitle;
@@ -621,7 +623,7 @@ export class MappingService {
     return { stale: FAILURE_SOFT_TTL, hard: FAILURE_HARD_TTL };
   }
 
-  private async getConfiguredCredentials(provider: MappingProvider): Promise<LookupClientCredentials> {
+  private async getConfiguredCredentials(provider: Provider): Promise<ProviderCredentials> {
     const options = await getExtensionOptionsSnapshot();
     const config = options?.providers?.[provider];
     if (!config?.url || !config?.apiKey) {
@@ -642,7 +644,7 @@ export class MappingService {
   }
 
   private getUpstreamStaticExternalId(
-    provider: MappingProvider,
+    provider: Provider,
     anilistId: number,
   ): MappingExternalId | null {
     if (provider !== 'sonarr') {
@@ -656,4 +658,7 @@ export class MappingService {
   }
 }
 
-export type { UpstreamMappingPayload, ResolvedMapping };
+
+
+export {type UpstreamMappingPayload} from './upstream';
+export {type ResolvedMapping} from './types';

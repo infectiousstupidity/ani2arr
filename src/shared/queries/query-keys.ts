@@ -3,7 +3,7 @@
 
 import type { StatusInput } from '@/rpc/schemas';
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { MappingProvider } from '@/shared/types';
+import type { Provider } from '@/shared/types';
 import type { GetMappingsInput } from '@/rpc/schemas';
 
 const rootQueryKey = ['a2a'] as const;
@@ -37,12 +37,12 @@ const getStableMetadata = (metadata?: AniListMediaHint | null) => {
   };
 };
 
-const seriesStatusRootKey = (provider: MappingProvider) => [...rootQueryKey, 'seriesStatus', provider] as const;
+const seriesStatusRootKey = (provider: Provider) => [...rootQueryKey, 'seriesStatus', provider] as const;
 
-const seriesStatusBaseKey = (provider: MappingProvider, anilistId: number) =>
+const seriesStatusBaseKey = (provider: Provider, anilistId: number) =>
   [...seriesStatusRootKey(provider), anilistId] as const;
 
-const providerMetadataRootKey = (provider: MappingProvider) =>
+const providerMetadataRootKey = (provider: Provider) =>
   [...rootQueryKey, `${provider}Metadata`] as const;
 
 const normalizeMappingsInput = (input?: GetMappingsInput) => {
@@ -80,12 +80,12 @@ export const queryKeys = {
   publicOptions: () => [...rootQueryKey, 'publicOptions'] as const,
   aniListSchedulerDebug: () => [...rootQueryKey, 'aniListSchedulerDebug'] as const,
   aniListMedia: (anilistId: number) => [...rootQueryKey, 'aniListMedia', anilistId] as const,
-  seriesStatusRoot: (provider: MappingProvider = 'sonarr') => seriesStatusRootKey(provider),
-  seriesStatusBase: (anilistId: number, provider: MappingProvider = 'sonarr') =>
+  seriesStatusRoot: (provider: Provider = 'sonarr') => seriesStatusRootKey(provider),
+  seriesStatusBase: (anilistId: number, provider: Provider = 'sonarr') =>
     seriesStatusBaseKey(provider, anilistId),
   seriesStatus: (
     payload: Pick<StatusInput, 'anilistId' | 'title' | 'metadata'>,
-    provider: MappingProvider = 'sonarr',
+    provider: Provider = 'sonarr',
   ) =>
     [
       ...seriesStatusBaseKey(provider, payload.anilistId),
@@ -107,7 +107,7 @@ export const queryKeys = {
   mappingSearch: (service: 'sonarr' | 'radarr', query: string) =>
     [...rootQueryKey, 'mappingSearch', service, query.trim().toLowerCase()] as const,
   mappingOverridesRoot: () => [...rootQueryKey, 'mappingOverrides'] as const,
-  mappingOverrides: (provider: MappingProvider | 'all' = 'all') =>
+  mappingOverrides: (provider: Provider | 'all' = 'all') =>
     [...rootQueryKey, 'mappingOverrides', provider] as const,
   mappingsRoot: () => [...rootQueryKey, 'mappings'] as const,
   mappings: (input?: GetMappingsInput) => [...rootQueryKey, 'mappings', normalizeMappingsInput(input)] as const,

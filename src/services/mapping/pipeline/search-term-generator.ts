@@ -2,7 +2,7 @@
 // src/services/mapping/pipeline/search-term-generator.ts
 
 import type { AniListTitles } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { MappingProvider } from '@/shared/types';
+import type { Provider } from '@/shared/types';
 import {
   canonicalTitleKeyForProvider,
   isOrdinalToken,
@@ -18,7 +18,7 @@ export interface SearchTerm {
 const SEASON_INDICATORS = new Set(['season', 'part', 'cour']);
 
 // Intentionally permissive — detects Roman numeral-like tokens, not strict validation
-const ROMAN_NUMERAL_RE = /^[ivxlcdm]+$/i;
+const ROMAN_NUMERAL_RE = /^[cdilmvx]+$/i;
 const SEASON_CODE_RE = /^s\d+$/i;
 
 export function isSeasonalCanonicalTokens(tokens: string[]): boolean {
@@ -31,7 +31,7 @@ export function isSeasonalCanonicalTokens(tokens: string[]): boolean {
 }
 
 export function generateSearchTerms(
-  provider: MappingProvider,
+  provider: Provider,
   titles: AniListTitles,
   synonyms: string[] | undefined,
 ): SearchTerm[] {
@@ -78,6 +78,6 @@ export function generateSearchTerms(
   }
 
   return queue
-    .sort((a, b) => (a.priority === b.priority ? a.order - b.order : a.priority - b.priority))
+    .toSorted((a, b) => (a.priority === b.priority ? a.order - b.order : a.priority - b.priority))
     .map(({ canonical, display }) => ({ canonical, display }));
 }

@@ -2,24 +2,12 @@
 // src/services/mapping/pipeline/types.ts
 
 import type { SearchTerm } from './search-term-generator';
-import type { UpstreamMappingStore } from '../upstream';
-import type { ScopedLogger } from '@/shared/utils/logger';
-import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { RequestPriority } from '@/shared/types';
-import type { AniListMediaService } from '@/core/anilist';
-import type {
-  LookupClientCredentials,
-  ProviderLookupClient,
-  ProviderLookupResult,
-} from '../lookup';
-
-export interface Candidate<TResult extends ProviderLookupResult = ProviderLookupResult> {
-  term: SearchTerm;
-  result: TResult;
-}
+import type { ProviderLookupResult } from '../lookup';
 
 export interface ScoredCandidate<TResult extends ProviderLookupResult = ProviderLookupResult>
-  extends Candidate<TResult> {
+{
+  term: SearchTerm;
+  result: TResult;
   /**
    * Confidence score in range [0, 1].
    */
@@ -27,39 +15,16 @@ export interface ScoredCandidate<TResult extends ProviderLookupResult = Provider
   breakdown?: Record<string, number>;
 }
 
-export interface EvaluationOutcomeResolved {
-  status: 'resolved';
-  externalId: number;
-  confidence: number;
-  successfulSynonym?: string;
-}
-
-export interface EvaluationOutcomeUnresolved {
-  status: 'unresolved';
-  reason: string;
-}
-
-export type EvaluationOutcome = EvaluationOutcomeResolved | EvaluationOutcomeUnresolved;
-
-export interface MappingContext<
-  TResult extends ProviderLookupResult = ProviderLookupResult,
-  TCredentials = LookupClientCredentials,
-> {
-  anilistApi: AniListMediaService;
-  lookupClient: ProviderLookupClient<TCredentials, TResult>;
-  upstreamMappingStore: UpstreamMappingStore;
-  credentials: TCredentials;
-  /** Priority hint for provider lookups spawned by this context. */
-  priority?: RequestPriority;
-  /** If true, bypass fresh lookup caches and hit the network. */
-  forceLookupNetwork?: boolean;
-  sessionSeenCanonical: Set<string>;
-  limits: {
-    maxTerms: number;
-    scoreThreshold: number;
-    earlyStopThreshold: number;
+export type EvaluationOutcome =
+  | {
+    status: 'resolved';
+    externalId: number;
+    confidence: number;
+    successfulSynonym?: string;
+  }
+  | {
+    status: 'unresolved';
+    reason: string;
   };
-  log: ScopedLogger;
-}
 
-export type { AniListMedia };
+export {type AniListMedia} from '@/shared/schemas/anilist/anilist-media.schema';

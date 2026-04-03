@@ -1,9 +1,10 @@
+/** Sonarr provider lookup client for mapping search requests. */
+// src/services/mapping/lookup/sonarr-lookup.client.ts
+
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { SonarrLookupSeries } from '@/shared/types';
+import type { ProviderCredentials } from '@/shared/types/providers';
 import { BaseLookupClient, type LookupCaches } from './base-lookup.client';
-import type { LookupClientCredentials } from './provider-lookup.client';
-
-export type SonarrLookupCredentials = LookupClientCredentials;
 
 export class SonarrLookupClient extends BaseLookupClient<SonarrLookupSeries> {
   constructor(
@@ -22,7 +23,7 @@ export class SonarrLookupClient extends BaseLookupClient<SonarrLookupSeries> {
 
   protected fetchFromApi(
     term: string,
-    credentials: LookupClientCredentials,
+    credentials: ProviderCredentials,
   ): Promise<SonarrLookupSeries[]> {
     return this.sonarrApi.lookupSeriesByTerm(term, credentials);
   }

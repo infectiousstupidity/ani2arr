@@ -1,15 +1,42 @@
+/** Mapping pipeline execution for provider lookups, scoring, and final candidate selection. */
+// src/services/mapping/pipeline/pipeline.ts
+
 import { generateSearchTerms, isSeasonalCanonicalTokens } from './search-term-generator';
 import { scoreCandidates } from './scoring';
 import { maybeEarlyStop, pickBest } from './early-stop';
-import type { EvaluationOutcome, EvaluationOutcomeResolved, MappingContext, AniListMedia } from './types';
+import type { EvaluationOutcome, AniListMedia } from './types';
 import {
   canonicalTitleKeyForProvider,
   sanitizeLookupDisplayForProvider,
 } from '@/services/mapping/pipeline/matching';
 import { PIPELINE_SOFT_TIME_BUDGET_MS } from '../constants';
+import type { UpstreamMappingStore } from '../upstream';
+import type { ScopedLogger } from '@/shared/utils/logger';
+import type { RequestPriority } from '@/shared/types/request-scheduling';
+import type { AniListMediaService } from '@/core/anilist';
+import type { ProviderCredentials } from '@/shared/types/providers';
+import type { ProviderLookupClient, ProviderLookupResult } from '../lookup';
 
 
-export async function resolveViaPipeline(media: AniListMedia, ctx: MappingContext, primaryTitleHint?: string): Promise<EvaluationOutcome> {
+export async function resolveViaPipeline(
+  media: AniListMedia,
+  ctx: {
+    anilistApi: AniListMediaService;
+    lookupClient: ProviderLookupClient<ProviderCredentials, ProviderLookupResult>;
+    upstreamMappingStore: UpstreamMappingStore;
+    credentials: ProviderCredentials;
+    priority?: RequestPriority;
+    forceLookupNetwork?: boolean;
+    sessionSeenCanonical: Set<string>;
+    limits: {
+      maxTerms: number;
+      scoreThreshold: number;
+      earlyStopThreshold: number;
+    };
+    log: ScopedLogger;
+  },
+  primaryTitleHint?: string,
+): Promise<EvaluationOutcome> {
   if (import.meta.env.DEV) {
     ctx.log.debug?.(
       `pipeline:start anilistId=${media.id} priority=${ctx.priority ?? 'normal'}${primaryTitleHint ? ` hint="${primaryTitleHint}"` : ''}`,
@@ -28,7 +55,7 @@ export async function resolveViaPipeline(media: AniListMedia, ctx: MappingContex
         const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
         if (canonicalTokens.length > 0 && !isSeasonalCanonicalTokens(canonicalTokens)) {
           const existingIndex = terms.findIndex(t => t.canonical === canonical);
-          if (existingIndex >= 0) terms.splice(existingIndex, 1);
+          if (existingIndex !== -1) terms.splice(existingIndex, 1);
           terms.unshift({ canonical, display: sanitized });
         }
       }
@@ -46,7 +73,7 @@ export async function resolveViaPipeline(media: AniListMedia, ctx: MappingContex
     if (ctx.forceLookupNetwork) {
       // Always hit network on anime detail force-verify
       const opts = {
-        ...(typeof ctx.priority !== 'undefined' ? { priority: ctx.priority } : {}),
+        ...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
         forceNetwork: true as const,
       };
       results = await ctx.lookupClient.lookup(term.canonical, term.display, ctx.credentials, opts);
@@ -54,7 +81,7 @@ export async function resolveViaPipeline(media: AniListMedia, ctx: MappingContex
       const probe = await ctx.lookupClient.readFromCache(term.canonical);
       if (probe.hit === 'none') {
         const opts = {
-          ...(typeof ctx.priority !== 'undefined' ? { priority: ctx.priority } : {}),
+          ...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
         };
         results = await ctx.lookupClient.lookup(term.canonical, term.display, ctx.credentials, opts);
       } else {
@@ -62,13 +89,13 @@ export async function resolveViaPipeline(media: AniListMedia, ctx: MappingContex
       }
     } else {
       const opts = {
-        ...(typeof ctx.priority !== 'undefined' ? { priority: ctx.priority } : {}),
+        ...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
       };
       results = await ctx.lookupClient.lookup(term.canonical, term.display, ctx.credentials, opts);
     }
 
     const scored = scoreCandidates(provider, term, results, mediaYear);
-    overall = overall.concat(scored);
+    overall = [...overall, ...scored];
 
     // Mark canonical as seen once we've either looked up or confirmed a cache hit
     ctx.sessionSeenCanonical.add(term.canonical);
@@ -82,7 +109,7 @@ export async function resolveViaPipeline(media: AniListMedia, ctx: MappingContex
       if (externalId === null) {
         continue;
       }
-      const out: EvaluationOutcomeResolved = {
+      const out: EvaluationOutcome = {
         status: 'resolved',
         externalId,
         confidence: early.pick.score,
@@ -107,7 +134,7 @@ export async function resolveViaPipeline(media: AniListMedia, ctx: MappingContex
     if (externalId === null) {
       return { status: 'unresolved', reason: 'missing-external-id' };
     }
-    const out: EvaluationOutcomeResolved = {
+    const out: EvaluationOutcome = {
       status: 'resolved',
       externalId,
       confidence: pick.score,
