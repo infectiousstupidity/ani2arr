@@ -1,5 +1,9 @@
+/** Sonarr-backed library cache and status lookup logic for series records. */
+// src/core/library/sonarr-library.ts
+
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
-import type { CheckSeriesStatusPayload, CheckSeriesStatusResponse } from '@/rpc/types';
+import type { StatusInput } from '@/rpc/schemas';
+import type { CheckSeriesStatusResponse } from '@/rpc/types';
 import type { MappingService } from '@/services/mapping';
 import { ErrorCode, logError, normalizeError } from '@/shared/errors';
 import type { ExtensionOptions } from '@/shared/types';
@@ -67,7 +71,7 @@ export class SonarrLibrary {
   }
 
   async getSeriesStatus(
-    payload: CheckSeriesStatusPayload,
+    payload: Pick<StatusInput, 'anilistId' | 'title' | 'metadata'>,
     options: LibraryStatusOptions = {},
   ): Promise<CheckSeriesStatusResponse> {
     if (import.meta.env.DEV) {
@@ -219,7 +223,7 @@ export class SonarrLibrary {
 
   private toSeriesSnapshot(series: SonarrSeries): SonarrSeriesSnapshot {
     const alternateTitles = Array.isArray(series.alternateTitles)
-      ? series.alternateTitles.map(title => title?.title?.trim()).filter((title): title is string => Boolean(title))
+      ? (series.alternateTitles.map(title => title?.title?.trim()).filter(Boolean) as string[])
       : [];
 
     const statistics = series.statistics

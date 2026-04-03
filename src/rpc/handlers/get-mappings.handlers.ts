@@ -1,32 +1,17 @@
 /** RPC handler that builds the mapping review table payload from recorded mapping and library state. */
 // src/rpc/handlers/get-mappings.handlers.ts
 
-import type { RadarrLibrary, SonarrLibrary } from '@/core/library';
-import type { MappingOverridesService } from '@/services/mapping/overrides';
-import type { UpstreamMappingStore } from '@/services/mapping/upstream';
-import type { MappingService } from '@/services/mapping';
+import type { GetMappingsInput } from '@/rpc/schemas';
 import type { MappingSummary, MappingSource, MappingStatus } from '@/shared/types';
 import type { RadarrMovieSnapshot, SonarrSeriesSnapshot } from '@/shared/types/providers';
-
-export type GetMappingsInput = {
-  limit?: number;
-  cursor?: { updatedAt: number; anilistId: number; provider: MappingSummary['provider'] };
-  query?: string;
-  sources?: MappingSource[];
-  providers?: MappingSummary['provider'][];
-};
-
-type GetMappingsDeps = {
-  overridesService: MappingOverridesService;
-  upstreamMappingStore: UpstreamMappingStore;
-  mappingService: MappingService;
-  sonarrLibrary: SonarrLibrary;
-  radarrLibrary: RadarrLibrary;
-};
+import type { ApiHandlerDeps } from './handler-deps';
 
 export async function getMappingsHandler(
   input: GetMappingsInput | undefined,
-  deps: GetMappingsDeps,
+  deps: Pick<
+    ApiHandlerDeps,
+    'overridesService' | 'upstreamMappingStore' | 'mappingService' | 'sonarrLibrary' | 'radarrLibrary'
+  >,
 ): Promise<{
   mappings: MappingSummary[];
   total: number;
@@ -197,12 +182,14 @@ export async function getMappingsHandler(
     const externalId = candidate.externalId ?? null;
     const tvdbId = candidate.provider === 'sonarr' && externalId?.kind === 'tvdb' ? externalId.id : null;
     const tmdbId = candidate.provider === 'radarr' && externalId?.kind === 'tmdb' ? externalId.id : null;
-    const series = tvdbId != null ? libraryByTvdbId.get(tvdbId) ?? null : null;
-    const movie = tmdbId != null ? libraryByTmdbId.get(tmdbId) ?? null : null;
+    const series = typeof tvdbId === 'number' ? libraryByTvdbId.get(tvdbId) ?? null : null;
+    const movie = typeof tmdbId === 'number' ? libraryByTmdbId.get(tmdbId) ?? null : null;
     const linkedAniListIds =
       externalId ? mappingService.getLinkedAniListIds(candidate.provider, externalId) : [];
-    const status: MappingStatus =
-      externalId === null ? 'unmapped' : series || movie ? 'in-provider' : 'not-in-provider';
+    let status: MappingStatus = 'unmapped';
+    if (externalId !== null) {
+      status = series || movie ? 'in-provider' : 'not-in-provider';
+    }
 
     const inLibraryCount =
       series?.statistics?.episodeCount ??
@@ -212,27 +199,27 @@ export async function getMappingsHandler(
       series && typeof (series as { status?: unknown }).status === 'string'
         ? (series as { status?: string }).status
         : movie?.status;
-    const providerMeta =
-      candidate.source === 'rejected' || candidate.source === 'blocked'
-        ? undefined
-        : series
-          ? {
-              ...(series.title ? { title: series.title } : {}),
-              type: 'series' as const,
-              ...(statusLabel ? { statusLabel } : {}),
-            }
-          : movie
-            ? {
-                ...(movie.title ? { title: movie.title } : {}),
-                type: 'movie' as const,
-                ...(statusLabel ? { statusLabel } : {}),
-              }
-            : candidate.title
-              ? {
-                  title: candidate.title,
-                  type: candidate.provider === 'sonarr' ? ('series' as const) : ('movie' as const),
-                }
-              : undefined;
+    let providerMeta: MappingSummary['providerMeta'];
+    if (candidate.source !== 'rejected' && candidate.source !== 'blocked') {
+      if (series) {
+        providerMeta = {
+          ...(series.title ? { title: series.title } : {}),
+          type: 'series' as const,
+          ...(statusLabel ? { statusLabel } : {}),
+        };
+      } else if (movie) {
+        providerMeta = {
+          ...(movie.title ? { title: movie.title } : {}),
+          type: 'movie' as const,
+          ...(statusLabel ? { statusLabel } : {}),
+        };
+      } else if (candidate.title) {
+        providerMeta = {
+          title: candidate.title,
+          type: candidate.provider === 'sonarr' ? 'series' : 'movie',
+        };
+      }
+    }
     const hadResolveAttempt =
       candidate.hadResolveAttempt ||
       candidate.source === 'auto' ||
@@ -249,7 +236,7 @@ export async function getMappingsHandler(
       source: candidate.source,
       status,
       updatedAt: candidate.updatedAt,
-      ...(linkedAniListIds.length ? { linkedAniListIds } : {}),
+      ...(linkedAniListIds.length > 0 ? { linkedAniListIds } : {}),
       ...(typeof inLibraryCount === 'number' ? { inLibraryCount } : {}),
       ...(providerMeta ? { providerMeta } : {}),
       ...(hadResolveAttempt ? { hadResolveAttempt: true } : {}),
@@ -279,7 +266,7 @@ export async function getMappingsHandler(
         })
       : results;
   const page = filteredByCursor.slice(0, limit);
-  const last = page[page.length - 1];
+  const last = page.at(-1);
   const nextCursor =
     filteredByCursor.length > page.length && last
       ? {

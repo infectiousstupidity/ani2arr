@@ -9,15 +9,13 @@ import {
 import type { ExtensionOptions } from '@/shared/types';
 import type { ApiHandlerDeps } from './handler-deps';
 
-type OptionsHandlerMethods = Pick<
+export function createOptionsHandlers(deps: ApiHandlerDeps): Pick<
   Ani2arrApi,
   'notifySettingsChanged' | 'updateSonarrDefaults' | 'updateRadarrDefaults'
->;
-
-export function createOptionsHandlers(deps: ApiHandlerDeps): OptionsHandlerMethods {
+> {
   const { handleOptionsUpdated } = deps;
 
-  const handlers: OptionsHandlerMethods = {
+  const handlers = {
     async notifySettingsChanged() {
       const options = await getExtensionOptionsSnapshot();
       await handleOptionsUpdated(options);
@@ -57,7 +55,10 @@ export function createOptionsHandlers(deps: ApiHandlerDeps): OptionsHandlerMetho
       await handleOptionsUpdated(next);
       return { ok: true as const };
     },
-  };
+  } satisfies Pick<
+    Ani2arrApi,
+    'notifySettingsChanged' | 'updateSonarrDefaults' | 'updateRadarrDefaults'
+  >;
 
   return handlers;
 }

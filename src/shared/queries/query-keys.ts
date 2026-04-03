@@ -1,7 +1,7 @@
 /** Shared query keys and stable AniList metadata serialization for query caching. */
 // src/shared/queries/query-keys.ts
 
-import type { CheckSeriesStatusPayload } from '@/rpc/types';
+import type { StatusInput } from '@/rpc/schemas';
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { MappingProvider } from '@/shared/types';
 import type { GetMappingsInput } from '@/rpc/schemas';
@@ -33,7 +33,7 @@ const getStableMetadata = (metadata?: AniListMediaHint | null) => {
     // Limit synonyms to 5 to match backend matching logic and reduce cache fragmentation
     synonyms: (metadata.synonyms || []).slice(0, 5),
     // Sort numeric IDs to ensure array order doesn't affect cache identity
-    relationPrequelIds: (metadata.relationPrequelIds || []).slice().sort((a, b) => a - b),
+    relationPrequelIds: [...(metadata.relationPrequelIds || [])].toSorted((a, b) => a - b),
   };
 };
 
@@ -49,10 +49,10 @@ const normalizeMappingsInput = (input?: GetMappingsInput) => {
   if (!input) return 'default';
   const normalized: Record<string, unknown> = {};
   if (input.sources?.length) {
-    normalized.sources = Array.from(new Set(input.sources)).sort();
+    normalized.sources = [...new Set(input.sources)].toSorted();
   }
   if (input.providers?.length) {
-    normalized.providers = Array.from(new Set(input.providers)).sort();
+    normalized.providers = [...new Set(input.providers)].toSorted();
   }
   if (typeof input.limit === 'number') {
     normalized.limit = input.limit;
@@ -71,9 +71,7 @@ const normalizeMappingsInput = (input?: GetMappingsInput) => {
 };
 
 export const normalizeMetadataIds = (ids: number[]) => {
-  const unique = Array.from(new Set(ids.filter(id => Number.isFinite(id) && id > 0))) as number[];
-  unique.sort((a, b) => a - b);
-  return unique;
+  return [...new Set(ids.filter(id => Number.isFinite(id) && id > 0))].toSorted((a, b) => a - b) as number[];
 };
 
 export const queryKeys = {
@@ -85,7 +83,10 @@ export const queryKeys = {
   seriesStatusRoot: (provider: MappingProvider = 'sonarr') => seriesStatusRootKey(provider),
   seriesStatusBase: (anilistId: number, provider: MappingProvider = 'sonarr') =>
     seriesStatusBaseKey(provider, anilistId),
-  seriesStatus: (payload: CheckSeriesStatusPayload, provider: MappingProvider = 'sonarr') =>
+  seriesStatus: (
+    payload: Pick<StatusInput, 'anilistId' | 'title' | 'metadata'>,
+    provider: MappingProvider = 'sonarr',
+  ) =>
     [
       ...seriesStatusBaseKey(provider, payload.anilistId),
       {

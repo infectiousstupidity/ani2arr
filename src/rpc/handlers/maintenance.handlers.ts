@@ -4,18 +4,16 @@
 import type { Ani2arrApi } from '@/rpc';
 import type { ApiHandlerDeps } from './handler-deps';
 
-type MaintenanceHandlerMethods = Pick<
+export function createMaintenanceHandlers(deps: ApiHandlerDeps): Pick<
   Ani2arrApi,
   'clearPersistentCaches' | 'resetExtensionState'
->;
-
-export function createMaintenanceHandlers(deps: ApiHandlerDeps): MaintenanceHandlerMethods {
+> {
   const {
     clearPersistentCaches: clearPersistentCachesWorkflow,
     resetExtensionState: resetExtensionStateWorkflow,
   } = deps;
 
-  const handlers: MaintenanceHandlerMethods = {
+  const handlers = {
     async clearPersistentCaches() {
       await clearPersistentCachesWorkflow();
       return { ok: true as const };
@@ -25,7 +23,10 @@ export function createMaintenanceHandlers(deps: ApiHandlerDeps): MaintenanceHand
       await resetExtensionStateWorkflow();
       return { ok: true as const };
     },
-  };
+  } satisfies Pick<
+    Ani2arrApi,
+    'clearPersistentCaches' | 'resetExtensionState'
+  >;
 
   return handlers;
 }
