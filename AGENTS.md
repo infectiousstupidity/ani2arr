@@ -1,130 +1,130 @@
-# ani2arr - Agent Guide
+## Scope
 
-Use this as the short operating map for AI-assisted work.
+- This file defines repo-wide rules for Codex.
+- More specific `AGENTS.md` files in subfolders override this file.
+- The structure below is the target shape after the refactor. It is guidance for direction and ownership, not a description of the current codebase.
 
-If the codebase and `docs/dev/` differ, inspect the real code first, then move the repo toward the documented target. Do not preserve accidental structure just because it already exists.
+## Working style
 
-## Read first
-- `docs/dev/001_architecture.md` - layer ownership and dependency direction.
-- `docs/dev/002_structure.md` - placement and naming rules.
-- `docs/dev/006_rpc.md` - RPC boundary rules.
-- `docs/dev/007_core.md` - domain workflow ownership.
-- `docs/dev/009_api.md` - raw integration ownership.
-- `docs/dev/011_ai_guardrails.md` - required workflow for agents.
+- Make the smallest reasonable change that fully solves the task.
+- Prefer direct code, simple control flow, and local reasoning.
+- Read nearby code first. Follow existing patterns only when they still make sense.
+- Do not broaden scope without clear benefit.
+- If the request is ambiguous, choose the smallest safe interpretation and state the assumption briefly.
+- Do not stop at analysis if the task can be completed safely.
 
-## Snapshot
-- WXT browser extension for Chrome and Firefox.
-- Product scope: inject AniList and AniChart UI, then connect those flows to Sonarr and Radarr.
-- Stack: TypeScript `strict`, React 19, TanStack Query 5, Valibot, React Hook Form, Radix UI, Tailwind 4.
-- Target flow: `entrypoints -> features/components -> rpc -> core -> integrations/storage`, with `runtime/` owning browser mechanics and composition.
+## Verification
 
-## Commands
-- `pnpm run dev`
-- `pnpm run dev:firefox`
-- `pnpm run compile`
-- `pnpm run lint`
-- `pnpm run build`
-- `pnpm run build:firefox`
-- `pnpm run zip`
-- `pnpm run zip:firefox`
-- `pnpm run generate:anilist-metadata`
+- Before finishing, run the relevant checks for the files you changed.
+- Do not fix lint errors in files unrelated to your change.
+- Minimum verification:
+  - `pnpm run lint`
+  - `pnpm run compile`
+- If you cannot run a check, say why.
 
-## Target structure
+## Core rules
 
-```text
+- Keep solutions simple, local, and easy to follow.
+- Follow YAGNI, KISS, and pragmatic DRY.
+- Optimize for a small solo-maintained browser extension, not hypothetical future scale.
+- Prefer direct code over extra abstraction layers.
+- Do not add services, managers, coordinators, factories, registries, wrappers, or similar indirection unless they remove clear current complexity.
+- Keep diffs focused. Do not mix the requested change with unrelated cleanup or restructuring.
+- Do not rename, move, or reorganize files unless the task requires it.
+
+## Simplification rule
+
+- Do not assume the current implementation is correct just because it already exists.
+- When working in an area, check whether existing layers, wrappers, aliases, indirection, or abstractions still earn their keep.
+- Prefer removing code, collapsing layers, or inlining logic when that makes the result clearer and does not hurt correctness.
+- If something is over-engineered for the current needs of the project, simplify it instead of preserving it by default.
+- Prefer deletion over replacement when a layer is unnecessary.
+- Treat existing complexity as something to justify, not protect.
+
+## Types
+
+- Keep types with their owning domain.
+- Do not use `shared/types` as a catch-all.
+- Import domain types from `anilist`, `providers`, `mapping`, or `options`.
+- Keep small local types near usage.
+- Extract shared or domain-level types only when there is clear reuse or ownership.
+- If a type is used once, inline it unless the name clearly improves readability or defines a real public contract.
+- Do not add future-proof types, generic wrappers, or shared aliases without current need.
+
+## File rules
+
+- Every new file and every materially edited file must start with this 2-line header:
+
+```ts
+/** Short plain-English description of what this file owns. */
+// src/path/to/file.ts
+````
+
+* Prefer files under 200 LOC.
+* 200 to 300 LOC is acceptable if still easy to scan.
+* Over 300 LOC is a split warning.
+* Split by responsibility, not file size alone.
+* One file should do one clear thing.
+* Split when a file mixes UI, state, data fetching, business logic, or unrelated helpers.
+* Keep small local constants and types near usage.
+* Do not create tiny files or extract abstractions without a clear readability, reuse, or ownership win.
+* A file should be understandable in one pass and describable in one sentence.
+
+## Change discipline
+
+* Preserve behavior unless the task explicitly asks for behavior changes.
+* Keep public shapes and contracts stable unless the task explicitly asks to change them.
+* When refactoring, prefer mechanical cleanup in small slices.
+* When touching shared code, verify the actual callers before changing ownership or abstractions.
+* Do not introduce new layers to prepare for later.
+* Delete dead local shells, aliases, and wrappers when they do not earn their keep.
+* If an existing abstraction remains, it should be justifiable by current usage.
+
+## Target ownership after refactor
+
+```txt
 src/
-  entrypoints/
-  features/
-  components/
-
-  runtime/
-  rpc/
-  core/
-  integrations/
-  storage/
-
-  shared/
-    config/
-    errors/
-    utils/
-    types/
+  entrypoints/   - thin WXT boot files for each extension context
+  rpc/           - typed cross-context API boundary
+  background/    - background-only browser/runtime behavior
+  anilist/       - AniList API, schemas, caching, and AniList-derived logic
+  providers/     - Sonarr/Radarr clients, validation, types, and provider-local library logic
+  mapping/       - matching, overrides, upstream mappings, and resolution pipeline
+  options/       - persisted options schema, types, and store logic
+  options-page/  - options page UI and page-specific workflows
+  content/       - injected site/page adapters and host-surface wiring
+  features/      - reusable product UI modules
+  shared/        - minimal cross-cutting low-level code only
+  debug/         - dev/debug-only helpers
 ```
 
-## Ownership
-- `entrypoints/`: thin WXT shells only.
-- `features/`: feature-local UI, hooks, and view state.
-- `components/`: reusable UI primitives and reusable UI composites.
-- `runtime/`: browser lifecycle, messaging, permissions, alarms, broadcasts, and service composition.
-- `rpc/`: typed cross-context boundary: contract, schemas, handlers, and handler dependency types.
-- `core/`: domain workflows and app rules.
-- `integrations/`: raw AniList, Sonarr, and Radarr transport code.
-- `storage/`: persistence and cache infrastructure.
-- `shared/`: narrow support-only code and canonical shared types.
+## Ownership rules
 
-## Hard rules
-- UI goes through RPC. `features/` and `components/` must not depend directly on `runtime/`, `integrations/`, or `storage/`.
-- Organize `rpc/handlers/` by app capability, not by vendor.
-  Good fits: `library.handlers.ts`, `provider.handlers.ts`, `options.handlers.ts`.
-- RPC handlers stay thin. They may validate input, ensure configuration, call one core workflow, translate boundary errors, and trigger boundary-side refresh or invalidation.
-- RPC handlers must not call other RPC handlers. If logic is shared between handlers, move it into `core/`.
-- `core/` owns reusable workflows and multi-step app behavior such as add, update, mapping, status resolution, and payload resolution.
-- `runtime/` composes services and wires transport. It must not become a second domain layer.
-- `integrations/` owns raw external API details only. It must not absorb app policy.
-- `shared/` is not a fallback bucket. Use it only for truly cross-cutting support code or canonical shared types reused unchanged.
+* Put domain logic in its owning domain first, not in `shared/`.
+* Keep `shared/` small. It is for truly cross-cutting low-level code, not overflow.
+* `features/` is for reusable product UI, not page glue.
+* `options-page/` and `content/` are surface/UI folders.
+* `entrypoints/` should stay thin.
 
-## Domain terms
-- Sonarr and Radarr are `providers`.
-- AniList is `anilist`, not a provider.
-- `mapping` means AniList -> provider identity resolution.
-- `library` means provider library state, not mapping state.
-- `upstream mapping source` keeps that exact meaning.
-- `integrations` means raw external-system code.
+## Response contract
 
-## Naming and placement
-- Use literal, stable names. Avoid `manager`, `helper`, `common`, and `misc`.
-- Required suffixes when applicable:
-  - `*.store.ts`
-  - `*.cache.ts`
-  - `*.schema.ts`
-  - `*.handlers.ts`
-  - `*.resolver.ts`
-  - `*.indexer.ts`
-  - `*.constants.ts`
-- Use `index.ts` only as a clear public surface.
-- Keep type ownership with the strongest owner:
-  - RPC payloads and schema-derived types in `rpc/`
-  - domain types in `core/`
-  - transport DTOs in `integrations/`
-  - storage-local types in `storage/`
-  - canonical reused types with unchanged meaning in `shared/types/`
-- Do not duplicate identical types or create aliases that only rename an existing shape.
-- Split files by responsibility, not line count. Prefer less indirection over perfect symmetry.
+* Be concise.
+* Summarize only the changes you actually made.
+* Include:
 
-## Structural changes
-- Inspect the real code first.
-- Propose before implementing when you are:
-  - creating or removing folders
-  - moving or renaming files
-  - changing public exports
-  - introducing a new shared type
-  - moving a canonical type to a different owner
-  - introducing a new abstraction layer
-  - changing naming conventions
-  - splitting or merging files
-- Keep the proposal short and include:
-  - what changes
-  - why the ownership is correct
-  - proposed naming
-  - rejected alternative
-  - docs or diagrams that must change
+  * what changed
+  * important type or ownership decisions
+  * verification results
+  * blockers or assumptions, if any
+* If you kept an existing abstraction, be able to justify it briefly.
+* If you simplified something, say what was removed, collapsed, or inlined.
+* Do not include long plans, speculative future work, or unrelated recommendations unless asked.
 
-## Validation before finish
-- Run `pnpm run compile`.
-- Run `pnpm run lint`.
-- Run `pnpm run build` when the change affects shipped code.
-- Verify the specifically touched flow still works.
-- Remove dead exports, obsolete aliases, and stale type re-exports in the touched area.
+## Done when
 
-## Operating principle
-- Optimize for obvious ownership, low indirection, low navigation cost, and reviewable diffs.
-- Do not optimize for symmetry, theoretical elegance, or maximum DRY when those make the repo harder to change.
+* The requested change is implemented.
+* Behavior matches the request.
+* Relevant checks pass.
+* No unrelated abstractions or layers were added.
+* Existing complexity touched by the task was simplified where reasonable.
+* New files, names, and extracted types are justified by current usage, not hypothetical future reuse.
