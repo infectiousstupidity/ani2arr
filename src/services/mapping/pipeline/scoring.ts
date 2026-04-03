@@ -1,7 +1,7 @@
 /** Candidate scoring pass that ranks provider lookup results against a generated search term. */
 // src/services/mapping/pipeline/scoring.ts
 
-import type { Provider } from '@/shared/types';
+import type { Provider } from '@/integrations/providers';
 import type { ScoredCandidate } from './types';
 import type { SearchTerm } from './search-term-generator';
 import { computeTitleMatchScoreForProvider } from '@/services/mapping/pipeline/matching';

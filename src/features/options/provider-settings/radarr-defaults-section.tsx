@@ -10,7 +10,7 @@ import type { SettingsActions } from '@/features/options/use-settings-actions';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import type { useRadarrMetadata } from '@/shared/queries';
 import Button from '@/shared/ui/primitives/button';
-import type { ExtensionOptions } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
 
 import { SaveSettingsBar } from './save-settings-bar';
 

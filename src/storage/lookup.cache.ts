@@ -3,7 +3,7 @@
 
 import { createTtlCache } from './ttl-cache';
 import { CACHE_NAMESPACES } from './keys';
-import type { RadarrLookupMovie, SonarrLookupSeries } from '@/shared/types';
+import type { RadarrLookupMovie, SonarrLookupSeries } from '@/integrations/providers';
 
 export const sonarrLookupCaches = {
   positive: createTtlCache<SonarrLookupSeries[]>(CACHE_NAMESPACES.providerLookupPositiveSonarr),

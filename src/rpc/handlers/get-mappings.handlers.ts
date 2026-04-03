@@ -2,8 +2,8 @@
 // src/rpc/handlers/get-mappings.handlers.ts
 
 import type { GetMappingsInput } from '@/rpc/schemas';
-import type { MappingSummary, MappingSource, MappingStatus } from '@/shared/types';
-import type { RadarrMovieSnapshot, SonarrSeriesSnapshot } from '@/shared/types/providers';
+import type { RadarrMovieSnapshot, SonarrSeriesSnapshot } from '@/integrations/providers';
+import type { MappingSummary, MappingSource, MappingStatus } from '@/services/mapping/types';
 import type { ApiHandlerDeps } from './handler-deps';
 
 export async function getMappingsHandler(

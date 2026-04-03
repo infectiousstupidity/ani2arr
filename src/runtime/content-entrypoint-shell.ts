@@ -5,7 +5,7 @@ import { browser } from 'wxt/browser';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { awaitBackgroundReady } from '@/runtime/messaging/await-background-ready';
 import { getPublicOptionsSnapshot, STORAGE_KEYS } from '@/storage';
-import type { PublicOptions } from '@/shared/types';
+import type { PublicOptions } from '@/options';
 
 export interface ContentEntrypointShellContext {
   ctx: ContentScriptContext;
@@ -31,18 +31,21 @@ const PUBLIC_OPTIONS_STORAGE_CHANGE_KEY = STORAGE_KEYS.publicOptions.replace(/^l
 const isAbortError = (error: unknown): boolean =>
   error instanceof DOMException && error.name === 'AbortError';
 
+const removeSafely = async (
+  options: ContentEntrypointShellOptions,
+  url: string,
+): Promise<void> => {
+  try {
+    await options.remove();
+  } catch (error) {
+    options.onError?.(error, 'remove', url);
+  }
+};
+
 export const createContentEntrypointShell = (options: ContentEntrypointShellOptions) => {
   return async (ctx: ContentScriptContext): Promise<void> => {
     let invalidated = false;
     let activeController: AbortController | null = null;
-
-    const removeSafely = async (url: string) => {
-      try {
-        await options.remove();
-      } catch (error) {
-        options.onError?.(error, 'remove', url);
-      }
-    };
 
     const reconcile = async (url: string) => {
       activeController?.abort();
@@ -83,7 +86,7 @@ export const createContentEntrypointShell = (options: ContentEntrypointShellOpti
       if (!shellContext.isCurrent()) return;
 
       if (!eligible) {
-        await removeSafely(url);
+        await removeSafely(options, url);
         return;
       }
 
@@ -92,7 +95,7 @@ export const createContentEntrypointShell = (options: ContentEntrypointShellOpti
         if (!shellContext.isCurrent()) return;
         await options.mount(shellContext);
         if (!shellContext.isCurrent()) {
-          await removeSafely(url);
+          await removeSafely(options, url);
         }
       } catch (error) {
         if (shellContext.signal.aborted || isAbortError(error)) {
@@ -100,7 +103,7 @@ export const createContentEntrypointShell = (options: ContentEntrypointShellOpti
         }
 
         options.onError?.(error, 'mount', url);
-        await removeSafely(url);
+        await removeSafely(options, url);
       }
     };
 
@@ -108,7 +111,7 @@ export const createContentEntrypointShell = (options: ContentEntrypointShellOpti
 
     type LocationChangeEvent = CustomEvent<{ newUrl: URL }>;
 
-    ctx.addEventListener(window, 'wxt:locationchange', (event: Event) => {
+    ctx.addEventListener(globalThis, 'wxt:locationchange', (event: Event) => {
       const locationChangeEvent = event as LocationChangeEvent;
       const nextUrl = locationChangeEvent.detail?.newUrl?.href ?? location.href;
       void reconcile(nextUrl);
@@ -129,7 +132,7 @@ export const createContentEntrypointShell = (options: ContentEntrypointShellOpti
       invalidated = true;
       activeController?.abort();
       browser.storage.onChanged.removeListener(onStorageChanged);
-      void removeSafely(location.href);
+      void removeSafely(options, location.href);
     });
   };
 };

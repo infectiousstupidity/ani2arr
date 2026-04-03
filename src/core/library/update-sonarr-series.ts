@@ -5,7 +5,7 @@ import { resolveSonarrSeriesUpdate } from '@/core/library/provider-update.resolv
 import type { SonarrLibrary } from '@/core/library/sonarr-library';
 import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-import type { ProviderCredentials, SonarrSeries } from '@/shared/types/providers';
+import type { ProviderCredentials, SonarrSeries } from '@/integrations/providers';
 
 type UpdateSonarrSeriesInput = {
   tvdbId: number;

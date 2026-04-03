@@ -5,7 +5,7 @@ import React from 'react';
 import SectionHeader from '@/features/options/section-header';
 import SonarrSettingsPanel from '@/features/options/provider-settings/sonarr-settings-panel';
 import type { SettingsActions } from '@/features/options/use-settings-actions';
-import type { ExtensionOptions } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
 
 const SonarrPage: React.FC<{
   actions: SettingsActions;

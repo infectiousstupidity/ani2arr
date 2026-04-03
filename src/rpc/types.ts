@@ -14,13 +14,13 @@ import type {
   SonarrSeriesSnapshot,
   SonarrLookupSeries,
   SonarrSeries,
-} from '@/shared/types/providers';
+} from '@/integrations/providers';
 import type {
   MappingExternalIdRecord,
   MappingExternalId,
   MappingIgnoreRecord,
   MappingSummary,
-} from '@/shared/types/mapping';
+} from '@/services/mapping/types';
 import type { MappingCursor } from './schemas';
 
 export interface CheckSeriesStatusResponse {

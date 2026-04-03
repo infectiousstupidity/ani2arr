@@ -1,5 +1,5 @@
-/** Canonical shared Sonarr provider resource types reused unchanged across integrations, RPC, and UI flows. */
-// src/shared/types/providers/sonarr.ts
+/** Sonarr resource types owned by the provider integrations domain. */
+// src/integrations/providers/sonarr.types.ts
 
 import type { SonarrMonitorOption, SonarrSeriesType } from '@/shared/schemas/providers/sonarr-settings.schema';
 

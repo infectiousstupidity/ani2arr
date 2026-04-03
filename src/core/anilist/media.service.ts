@@ -6,7 +6,7 @@ import type { TtlCache } from '@/storage';
 import type { AniListSchedulerDebugSnapshot } from '@/debug/anilist-debug.types';
 import type { AniListSearchMediaDto } from '@/integrations/anilist/media.schema';
 import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { RequestPriority } from '@/shared/types';
+import type { RequestPriority } from '@/shared/utils/request-priority';
 import { DEFAULT_PREQUEL_DEPTH, QUEUE_CONCURRENCY } from './constants';
 import { AniListMediaScheduler, type RequestMediaOptions } from './media-scheduler';
 

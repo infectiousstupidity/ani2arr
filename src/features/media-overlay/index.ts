@@ -10,6 +10,6 @@ export {
 export { CardOverlay } from './components/card-overlay';
 export { BrowseRoot } from './components/browse-root';
 
-export type { BrowseAdapter, ParsedCard, BrowseContentAppProps } from './components/media-overlay';
+export type { BrowseAdapter, ParsedCard } from './types';
+export type { BrowseContentAppProps } from './components/media-overlay';
 export type { BrowseRootProps } from './components/browse-root';
-export type { CardOverlayProps } from '@/shared/types';

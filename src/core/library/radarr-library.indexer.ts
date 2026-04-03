@@ -8,7 +8,7 @@ import {
   computeTitleMatchScoreForProvider,
   extractCandidateTitleVariants,
 } from '@/services/mapping/pipeline/matching';
-import type { RadarrMovieSnapshot } from '@/shared/types/providers';
+import type { RadarrMovieSnapshot } from '@/integrations/providers';
 import { LOCAL_INDEX_ACCEPTANCE_THRESHOLD } from './library.constants';
 
 export class RadarrLibraryIndexer {

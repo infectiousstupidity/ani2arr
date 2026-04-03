@@ -2,8 +2,49 @@
 // src/services/mapping/types.ts
 
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { MappingExternalId } from '@/shared/types';
-import type { RequestPriority } from '@/shared/types/request-scheduling';
+import type { Provider } from '@/integrations/providers/types';
+import type { RequestPriority } from '@/shared/utils/request-priority';
+
+export type MappingSource = 'manual' | 'upstream' | 'auto' | 'rejected' | 'blocked' | 'ignored' | 'unresolved';
+export type MappingStatus = 'unmapped' | 'in-provider' | 'not-in-provider';
+
+export type MappingExternalIdKind = 'tvdb' | 'tmdb';
+
+export interface MappingExternalId {
+  id: number;
+  kind: MappingExternalIdKind;
+}
+
+export interface MappingSummary {
+  anilistId: number;
+  provider: Provider;
+  externalId: MappingExternalId | null;
+  suppressedExternalId?: MappingExternalId | null;
+  source: MappingSource;
+  status: MappingStatus;
+  updatedAt?: number;
+  linkedAniListIds?: readonly number[];
+  inLibraryCount?: number;
+  providerMeta?: {
+    title?: string;
+    type?: 'series' | 'movie';
+    statusLabel?: string;
+  };
+  hadResolveAttempt?: boolean;
+}
+
+export interface MappingExternalIdRecord {
+  anilistId: number;
+  provider: Provider;
+  externalId: MappingExternalId;
+  updatedAt: number;
+}
+
+export interface MappingIgnoreRecord {
+  anilistId: number;
+  provider: Provider;
+  updatedAt: number;
+}
 
 export interface ResolvedMapping {
   externalId: MappingExternalId;

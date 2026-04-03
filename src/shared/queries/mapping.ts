@@ -7,8 +7,8 @@ import type { CheckSeriesStatusResponse, ExportStoredMappingsOutput, GetMappings
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import type {
   MappingExternalIdRecord,
-} from '@/shared/types';
-import type { Provider } from '@/shared/types/providers';
+} from '@/services/mapping/types';
+import type { Provider } from '@/integrations/providers';
 import type {
   ClearMappingBlockedCandidateInput,
   ClearMappingIgnoreInput,

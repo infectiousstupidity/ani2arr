@@ -6,7 +6,7 @@ import {
   getExtensionOptionsSnapshot,
   setExtensionOptionsSnapshot,
 } from '@/storage';
-import type { ExtensionOptions } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
 import type { ApiHandlerDeps } from './handler-deps';
 
 export function createOptionsHandlers(deps: ApiHandlerDeps): Pick<

@@ -9,7 +9,7 @@ import type { ResolveExternalIdOptions } from '@/services/mapping/types';
 import { createError, ErrorCode } from '@/shared/errors';
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
-import type { ProviderCredentials, RadarrMovie } from '@/shared/types/providers';
+import type { ProviderCredentials, RadarrMovie } from '@/integrations/providers';
 
 type AddRadarrMovieInput = {
   anilistId: number;

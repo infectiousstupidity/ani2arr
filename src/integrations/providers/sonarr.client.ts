@@ -10,7 +10,7 @@ import type {
   ProviderRootFolder,
   SonarrLookupSeries,
   SonarrSeries,
-} from '@/shared/types/providers';
+} from '@/integrations/providers';
 import { createError, ErrorCode } from '@/shared/errors';
 
 type SonarrClientOptions = {

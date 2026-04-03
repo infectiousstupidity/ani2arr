@@ -1,5 +1,6 @@
 import type { TtlCache } from '@/storage';
-import type { ExtensionOptions, RequestPriority } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
+import type { RequestPriority } from '@/shared/utils/request-priority';
 
 export interface LibraryStatusOptions {
   force_verify?: boolean;

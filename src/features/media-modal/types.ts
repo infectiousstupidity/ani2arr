@@ -9,7 +9,7 @@ import type {
   ProviderQualityProfile,
   ProviderRootFolder,
   ProviderTag,
-} from '@/shared/types/providers';
+} from '@/integrations/providers';
 import type { MappingAniListSummary, MappingSearchResult, UseMappingControllerResult } from '@/features/mapping';
 import type { UseRadarrPanelControllerResult } from './hooks/use-radarr-panel-controller';
 import type { UseSonarrPanelControllerResult } from './hooks/use-sonarr-panel-controller';

@@ -7,7 +7,9 @@ import { browser } from 'wxt/browser';
 import { useAddMovie, useAddSeries, useMovieStatus, useSeriesStatus } from '@/shared/queries';
 import type { ExtensionError } from '@/shared/errors';
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { Provider, RadarrFormState, SonarrFormState } from '@/shared/types';
+import type { Provider } from '@/integrations/providers';
+import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
+import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import { getProviderLabel } from '@/services/providers/resolver';
 
 export type OverlayState = 'disabled' | 'in-library' | 'addable' | 'resolving' | 'adding' | 'error';
@@ -129,31 +131,38 @@ export const useCardOverlayState = ({
 
   const quickAddTitle = (() => {
     switch (overlayState) {
-      case 'in-library':
+      case 'in-library': {
         return `Already in ${providerLabel}`;
-      case 'addable':
+      }
+      case 'addable': {
         return defaultForm ? `Quick add to ${providerLabel}` : 'Defaults unavailable';
-      case 'resolving':
+      }
+      case 'resolving': {
         return `Resolving ${providerLabel} mapping.`;
-      case 'adding':
+      }
+      case 'adding': {
         return `Adding to ${providerLabel}.`;
-      case 'error':
+      }
+      case 'error': {
         return errorMessage ?? `Retry ${providerLabel} add`;
-      case 'disabled':
+      }
+      case 'disabled': {
         return `Configure ${providerLabel} before adding`;
-      default:
+      }
+      default: {
         return providerLabel;
+      }
     }
   })();
 
-  const quickAddAriaLabel =
-    overlayState === 'disabled'
-      ? `Open ${providerLabel} settings`
-      : overlayState === 'error' && mappingUnavailable
-      ? `Find ${providerLabel} match manually`
-      : overlayState === 'error'
-        ? `Retry adding to ${providerLabel}`
-        : quickAddTitle;
+  let quickAddAriaLabel = quickAddTitle;
+  if (overlayState === 'disabled') {
+    quickAddAriaLabel = `Open ${providerLabel} settings`;
+  } else if (overlayState === 'error' && mappingUnavailable) {
+    quickAddAriaLabel = `Find ${providerLabel} match manually`;
+  } else if (overlayState === 'error') {
+    quickAddAriaLabel = `Retry adding to ${providerLabel}`;
+  }
 
   const handleQuickAdd = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {

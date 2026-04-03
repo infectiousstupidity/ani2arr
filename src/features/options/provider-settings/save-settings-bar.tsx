@@ -6,7 +6,7 @@ import { useFormContext } from 'react-hook-form';
 
 import type { SettingsActions } from '@/features/options/use-settings-actions';
 import Button from '@/shared/ui/primitives/button';
-import type { ExtensionOptions } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
 
 export const SaveSettingsBar: React.FC<{
   actions: SettingsActions;

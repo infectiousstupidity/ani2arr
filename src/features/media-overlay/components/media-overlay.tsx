@@ -10,7 +10,7 @@ import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useBrowsePortals } from '../hooks/use-media-portals';
 import { useAnilistBatchPrefetch } from '../hooks/use-anilist-batch-prefetch';
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { BrowseAdapter, ParsedCard } from '@/shared/types';
+import type { BrowseAdapter, ParsedCard } from '@/features/media-overlay/types';
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import { CardOverlay } from './card-overlay';
 
@@ -36,44 +36,32 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
     parseCard,
   } = adapter;
 
-  const ensureContainerImpl = adapter.ensureContainer
-    ? adapter.ensureContainer
-    : (host: HTMLElement) => {
+  const ensureContainerImpl = adapter.ensureContainer ?? ((host: HTMLElement) => {
         const existing = host.querySelector<HTMLElement>(`.${containerClassName}`);
         if (existing) return existing;
         const el = host.ownerDocument.createElement('div');
         el.className = containerClassName;
-        host.appendChild(el);
+        host.append(el);
         return el;
-      };
+      });
 
-  const getContainerForCardImpl = adapter.getContainerForCard
-    ? adapter.getContainerForCard
-    : (card: Element) => card.querySelector<HTMLElement>(`.${containerClassName}`);
+  const getContainerForCardImpl = adapter.getContainerForCard ??
+    ((card: Element) => card.querySelector<HTMLElement>(`.${containerClassName}`));
 
-  const markProcessedImpl = adapter.markProcessed
-    ? adapter.markProcessed
-    : (host: HTMLElement, parsed: ParsedCard) => {
+  const markProcessedImpl = adapter.markProcessed ?? ((host: HTMLElement, parsed: ParsedCard) => {
         host.setAttribute(processedAttribute, String(parsed.anilistId));
-      };
+      });
 
-  const clearProcessedImpl = adapter.clearProcessed
-    ? adapter.clearProcessed
-    : (host: HTMLElement) => {
+  const clearProcessedImpl = adapter.clearProcessed ?? ((host: HTMLElement) => {
         host.removeAttribute(processedAttribute);
-      };
+      });
 
-  const getObserverRoot = adapter.getObserverRoot
-    ? adapter.getObserverRoot
-    : () => document.body ?? document.documentElement;
+  const getObserverRoot = adapter.getObserverRoot ?? (() => document.body ?? document.documentElement);
 
-  const getScanRoot = adapter.getScanRoot
-    ? adapter.getScanRoot
-    : () => (document.querySelector<HTMLElement>('.page-content') ?? document.body ?? null);
+  const getScanRoot = adapter.getScanRoot ??
+    (() => (document.querySelector<HTMLElement>('.page-content') ?? document.body ?? null));
 
-  const getResizeTargets = adapter.resizeObserverTargets
-    ? adapter.resizeObserverTargets
-    : () => (document.body ? [document.body] : []);
+  const getResizeTargets = adapter.resizeObserverTargets ?? (() => (document.body ? [document.body] : []));
 
   const containerSelector = `.${containerClassName}`;
 
@@ -106,7 +94,7 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
       onCardInvalid: adapter.onCardInvalid,
       enabled: overlaysEnabled,
     });
-    const metadataIds = Array.from(new Set(Array.from(cardPortals.values(), parsed => parsed.anilistId)));
+    const metadataIds = [...new Set(Array.from(cardPortals.values(), parsed => parsed.anilistId))];
     const metadataBatch = useAniListMetadataBatch(metadataIds, { enabled: metadataEnabled });
     const canonicalMetadataById = new Map(
       (metadataBatch.data?.metadata ?? []).map(entry => [entry.id, metadataHintFromAniListMetadata(entry)]),
@@ -121,7 +109,7 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
 
     return (
       <div ref={hostRef}>
-        {Array.from(cardPortals.entries()).map(([container, parsed]) => {
+        {[...cardPortals.entries()].map(([container, parsed]) => {
           const effectiveMetadata = mergeMetadataHints(
             canonicalMetadataById.get(parsed.anilistId) ?? null,
             parsed.metadata,
@@ -184,4 +172,3 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
 };
 
 export { CardOverlay } from './card-overlay';
-export type { BrowseAdapter, ParsedCard, CardOverlayProps } from '@/shared/types';

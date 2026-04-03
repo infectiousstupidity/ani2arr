@@ -32,5 +32,3 @@ export const AniListMetadataBundleSchema = v.object({
 });
 
 export type AniListMetadata = v.InferOutput<typeof AniListMetadataSchema>;
-export type AniListMetadataChunkRef = v.InferOutput<typeof AniListMetadataChunkRefSchema>;
-export type AniListMetadataBundle = v.InferOutput<typeof AniListMetadataBundleSchema>;

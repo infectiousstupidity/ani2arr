@@ -12,7 +12,7 @@ import {
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import type {
   ProviderMetadata,
-} from '@/shared/types/providers';
+} from '@/integrations/providers';
 import { cn } from '@/shared/utils/cn';
 import { buildProviderFolderSlugFromTitle } from '@/shared/utils/provider-library-paths';
 

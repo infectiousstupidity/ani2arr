@@ -13,7 +13,7 @@ import type { SettingsActions } from '@/features/options/use-settings-actions';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type { useSonarrMetadata } from '@/shared/queries';
 import Button from '@/shared/ui/primitives/button';
-import type { ExtensionOptions } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
 
 import { SaveSettingsBar } from './save-settings-bar';
 

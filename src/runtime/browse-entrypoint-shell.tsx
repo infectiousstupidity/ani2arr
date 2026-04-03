@@ -8,7 +8,7 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { ExtensionErrorBoundary } from '@/components/extension-error-boundary';
 import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
 import { createContentEntrypointShell } from '@/runtime/content-entrypoint-shell';
-import type { PublicOptions } from '@/shared/types';
+import type { PublicOptions } from '@/options';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { createShadowRootUi, type ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 
@@ -22,6 +22,14 @@ export interface BrowseEntrypointShellOptions {
   isEligible: (input: { url: string; publicOptions: PublicOptions }) => boolean | Promise<boolean>;
   renderRoot: (portalContainer: HTMLElement) => React.ReactElement;
 }
+
+const cleanupDomArtifacts = (options: BrowseEntrypointShellOptions): void => {
+  for (const element of document
+    .querySelectorAll<HTMLElement>(`[${options.processedAttribute}]`)) element.removeAttribute(options.processedAttribute);
+
+  for (const container of document
+    .querySelectorAll<HTMLElement>(`.${options.containerClassName}`)) container.remove();
+};
 
 export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOptions) => {
   return async (ctx: ContentScriptContext): Promise<void> => {
@@ -39,16 +47,6 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
     let ui: ShadowRootContentScriptUi<Root> | null = null;
     let root: Root | null = null;
 
-    const cleanupDomArtifacts = () => {
-      document
-        .querySelectorAll<HTMLElement>(`[${options.processedAttribute}]`)
-        .forEach(element => element.removeAttribute(options.processedAttribute));
-
-      document
-        .querySelectorAll<HTMLElement>(`.${options.containerClassName}`)
-        .forEach(container => container.remove());
-    };
-
     let globalStyleElement: HTMLStyleElement | null = null;
     let shadowStyleElement: HTMLStyleElement | null = null;
 
@@ -59,7 +57,7 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
         globalStyleElement.textContent = options.stylesText;
       }
       if (globalStyleElement && !document.head.contains(globalStyleElement)) {
-        document.head.appendChild(globalStyleElement);
+        document.head.append(globalStyleElement);
       }
     };
 
@@ -70,7 +68,7 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
         shadowStyleElement.textContent = options.stylesText;
       }
       if (shadowStyleElement && shadowStyleElement.getRootNode() !== shadowRoot) {
-        shadowRoot.appendChild(shadowStyleElement);
+        shadowRoot.append(shadowStyleElement);
       }
     };
 
@@ -120,10 +118,10 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
       ui?.remove();
       ui = null;
       root = null;
-      cleanupDomArtifacts();
-      if (shadowStyleElement?.parentNode) shadowStyleElement.parentNode.removeChild(shadowStyleElement);
+      cleanupDomArtifacts(options);
+      if (shadowStyleElement?.parentNode) shadowStyleElement.remove();
       shadowStyleElement = null;
-      if (globalStyleElement?.parentNode) globalStyleElement.parentNode.removeChild(globalStyleElement);
+      if (globalStyleElement?.parentNode) globalStyleElement.remove();
       globalStyleElement = null;
     };
 

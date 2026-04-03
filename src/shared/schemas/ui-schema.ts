@@ -2,7 +2,7 @@
 // src/shared/schemas/ui-schema.ts
 
 import * as v from 'valibot';
-import type { BadgeVisibility, UiOptions } from '@/shared/types/options';
+import type { BadgeVisibility, UiOptions } from '@/options';
 
 // --- Constants ---
 

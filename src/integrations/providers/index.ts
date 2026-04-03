@@ -1,5 +1,5 @@
-/** Public provider type surface for shared provider-common, Sonarr, and Radarr types. */
-// src/shared/types/providers/index.ts
+/** Public provider-domain type surface for provider integrations and UI flows. */
+// src/integrations/providers/index.ts
 
 export type {
   Provider,
@@ -8,16 +8,14 @@ export type {
   ProviderQualityProfile,
   ProviderRootFolder,
   ProviderTag,
-} from './common';
-
+} from './types';
 export type {
   SonarrLookupSeries,
   SonarrSeries,
   SonarrSeriesSnapshot,
-} from './sonarr';
-
+} from './sonarr.types';
 export type {
   RadarrLookupMovie,
   RadarrMovie,
   RadarrMovieSnapshot,
-} from './radarr';
+} from './radarr.types';

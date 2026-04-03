@@ -3,8 +3,8 @@ import { getAni2arrApi } from '@/rpc';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import { queryKeys } from '@/shared/queries/query-keys';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-import type { PublicOptions } from '@/shared/types';
-import type { ProviderCredentials, SonarrSeries } from '@/shared/types/providers';
+import type { PublicOptions } from '@/options';
+import type { ProviderCredentials, SonarrSeries } from '@/integrations/providers';
 import type { AddSonarrInput, UpdateSonarrInput } from '@/rpc/schemas';
 
 export const useSonarrMetadata = (options?: { enabled?: boolean; credentials?: ProviderCredentials | null }) => {

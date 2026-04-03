@@ -7,12 +7,8 @@ import type {
   AniListMedia,
   AniListTitles,
 } from '@/shared/schemas/anilist/anilist-media.schema';
-import type {
-  AniListMetadata,
-  AniListMetadataBundle,
-  AniListMetadataChunkRef,
-} from '@/shared/schemas/anilist/anilist-metadata.schema';
 import { AniListMetadataBundleSchema, AniListMetadataChunkRefSchema, AniListMetadataSchema } from '@/shared/schemas/anilist/anilist-metadata.schema';
+import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.schema';
 import { logError, normalizeError } from '@/shared/errors';
 import { logger } from '@/shared/utils/logger';
 import {
@@ -21,6 +17,9 @@ import {
   RawAniListMetadataRecordSchema,
 } from './metadata.schema';
 import type { AniListMediaService } from './media.service';
+
+type AniListMetadataChunkRef = v.InferOutput<typeof AniListMetadataChunkRefSchema>;
+type AniListMetadataBundle = v.InferOutput<typeof AniListMetadataBundleSchema>;
 
 const days = (n: number): number => n * 24 * 60 * 60 * 1000;
 
@@ -257,7 +256,7 @@ export class AniListMetadataStore {
   }
 
   private async refreshBatch(ids: number[]): Promise<AniListMetadata[]> {
-    const unique = Array.from(new Set(ids.filter(id => Number.isFinite(id) && id > 0)));
+    const unique = [...new Set(ids.filter(id => Number.isFinite(id) && id > 0))];
     if (unique.length === 0) return [];
 
     const pending: number[] = [];
@@ -346,7 +345,7 @@ export class AniListMetadataStore {
     const missingIds = ids.filter(id => Number.isFinite(id) && id > 0 && !metadata.has(id));
 
     return {
-      metadata: Array.from(metadata.values()),
+      metadata: [...metadata.values()],
       ...(missingIds.length > 0 ? { missingIds } : {}),
     };
   }

@@ -17,7 +17,8 @@ import MappingToolbar, {
   type SourceFilterSet,
 } from './mapping-toolbar';
 import { useMappingTableData } from '../hooks/use-mapping-table-data';
-import type { Provider, MappingSource } from '@/shared/types';
+import type { Provider } from '@/integrations/providers';
+import type { MappingSource } from '@/services/mapping/types';
 import type { ExportMappingsFilters } from '../export-mappings';
 import { normalizeMappingSearchQuery } from '../search-query';
 import type { MappingTableRowData } from './mapping-table';

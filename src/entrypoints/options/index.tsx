@@ -28,7 +28,7 @@ import { createDefaultSettings } from '@/shared/schemas/settings';
 import { useSettingsActions } from '@/features/options/use-settings-actions';
 import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
 import { cn } from '@/shared/utils/cn';
-import type { ExtensionOptions } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
 import {
   AdvancedIcon,
   MappingsIcon,

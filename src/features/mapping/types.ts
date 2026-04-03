@@ -2,8 +2,8 @@
 // src/features/mapping/types.ts
 
 import type { UseQueryResult } from '@tanstack/react-query';
-import type { MappingExternalId } from '@/shared/types';
-import type { Provider } from '@/shared/types/providers';
+import type { Provider } from '@/integrations/providers';
+import type { MappingExternalId } from '@/services/mapping/types';
 
 export interface MappingSearchResult {
   provider: Provider;

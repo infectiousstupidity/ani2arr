@@ -1,7 +1,7 @@
 /** Provider-specific title normalization and matching profile rules for mapping searches. */
 // src/services/mapping/pipeline/matching/profile.ts
 
-import type { Provider } from '@/shared/types';
+import type { Provider } from '@/integrations/providers';
 import { canonicalTitleKey } from './key';
 import { canonicalizeLookupTerm, stripParenContent } from './normalize';
 import { sanitizeLookupDisplay as sanitizeSonarrLookupDisplay } from './season';

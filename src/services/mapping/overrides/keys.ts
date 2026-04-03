@@ -1,8 +1,8 @@
 /** Key helpers and normalizers for persisted mapping override records. */
 // src/services/mapping/overrides/keys.ts
 
-import type { MappingExternalId } from '@/shared/types';
-import type { Provider } from '@/shared/types/providers';
+import type { MappingExternalId } from '@/services/mapping/types';
+import type { Provider } from '@/integrations/providers';
 import type { MappingIgnoreEntry, StoredMappingExternalIdEntry } from './types';
 
 export const isFiniteId = (value: unknown): value is number =>

@@ -1,10 +1,10 @@
-/** Canonical extension settings and public-options types shared across UI and runtime. */
-// src/shared/types/options.ts
+/** Canonical extension settings and public-options types owned by the options domain. */
+// src/options/types.ts
 
 import type { AniListTitleLanguage } from '@/shared/schemas/anilist/anilist-title-language.schema';
-import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
-import type { ProviderCredentials } from '@/shared/types/providers';
+import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
+import type { ProviderCredentials } from '@/integrations/providers/types';
 
 export type BadgeVisibility = 'always' | 'hover';
 
@@ -45,10 +45,6 @@ export interface ExtensionOptions {
   debugLogging: boolean;
 }
 
-/**
- * Public-facing configuration data that is safe to expose to content scripts.
- * Secrets like provider API keys are intentionally excluded.
- */
 export interface PublicOptions {
   providers: {
     sonarr: {

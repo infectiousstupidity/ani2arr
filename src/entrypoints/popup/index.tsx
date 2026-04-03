@@ -14,9 +14,11 @@ import { cn } from '@/shared/utils/cn';
 import type {
   BadgeVisibility,
   ExtensionOptions,
+} from '@/options';
+import type {
   Provider,
   ProviderCredentials,
-} from '@/shared/types';
+} from '@/integrations/providers';
 import './style.css';
 
 const queryClient = new QueryClient();

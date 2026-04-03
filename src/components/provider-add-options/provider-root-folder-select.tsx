@@ -5,7 +5,7 @@ import React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check } from 'lucide-react';
 
-import type { ProviderRootFolder } from '@/shared/types/providers';
+import type { ProviderRootFolder } from '@/integrations/providers';
 import { FormField, Label, Select, SelectContent, SelectTrigger } from '@/shared/ui/form/form';
 import { cn } from '@/shared/utils/cn';
 import { joinRootAndSlug } from '@/shared/utils/provider-library-paths';

@@ -6,7 +6,7 @@ import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-import type { ProviderCredentials, RadarrMovie, SonarrSeries } from '@/shared/types/providers';
+import type { ProviderCredentials, RadarrMovie, SonarrSeries } from '@/integrations/providers';
 import {
   buildProviderFolderSlug,
   joinRootAndSlug,
@@ -118,7 +118,7 @@ export async function resolveSonarrSeriesUpdate(
       monitored: form.monitorOption !== 'none',
       tags,
       addOptions: {
-        ...(baseSeries.addOptions ?? {}),
+        ...baseSeries.addOptions,
         monitor: form.monitorOption,
         searchForMissingEpisodes: form.searchForMissingEpisodes,
         searchForCutoffUnmetEpisodes: form.searchForCutoffUnmetEpisodes,
@@ -196,7 +196,7 @@ export async function resolveRadarrMovieUpdate(
       minimumAvailability: form.minimumAvailability,
       tags,
       addOptions: {
-        ...(baseMovie.addOptions ?? {}),
+        ...baseMovie.addOptions,
         searchForMovie: form.searchForMovie,
       },
     },

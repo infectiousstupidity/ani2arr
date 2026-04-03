@@ -7,7 +7,7 @@ import Button from '@/shared/ui/primitives/button';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import type { SettingsActions } from '@/features/options/use-settings-actions';
-import type { ExtensionOptions } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
 
 export type AdvancedPanelId = 'privacy' | null;
 

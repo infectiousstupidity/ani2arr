@@ -3,7 +3,8 @@
 
 import React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
-import type { BadgeVisibility, ExtensionOptions, Provider } from '@/shared/types';
+import type { BadgeVisibility, ExtensionOptions } from '@/options';
+import type { Provider } from '@/integrations/providers';
 import { defaultUiOptions } from '@/shared/schemas/settings';
 
 const VISIBILITY_OPTIONS: Array<{ value: BadgeVisibility; label: string; description: string }> = [

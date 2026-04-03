@@ -4,7 +4,8 @@
 import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { ArrowUpDown, Check, ChevronDown, Plus, Search, X } from 'lucide-react';
-import type { Provider, MappingSource } from '@/shared/types';
+import type { Provider } from '@/integrations/providers';
+import type { MappingSource } from '@/services/mapping/types';
 import Button from '@/shared/ui/primitives/button';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { cn } from '@/shared/utils/cn';

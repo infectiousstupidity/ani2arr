@@ -9,7 +9,7 @@ import type {
   AniListMediaStatus,
   AniListTitles,
 } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { ExtensionOptions } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type {
@@ -18,7 +18,7 @@ import type {
   RadarrMovie,
   SonarrLookupSeries,
   SonarrSeries,
-} from '@/shared/types/providers';
+} from '@/integrations/providers';
 import type { MappingTabProps, RadarrPanelProps, SonarrPanelProps } from '@/features/media-modal';
 import { createDefaultRadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import { createDefaultSonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
@@ -271,9 +271,9 @@ export function useMediaModalProps(
       : sonarrStatusQuery.data?.anilistTvdbLinkMissing === true;
   const externalId = mappingUnavailable
     ? null
-    : provider === 'radarr'
+    : (provider === 'radarr'
       ? radarrStatusQuery.data?.tmdbId ?? null
-      : sonarrStatusQuery.data?.tvdbId ?? null;
+      : sonarrStatusQuery.data?.tvdbId ?? null);
 
   const inLibrary = Boolean(
     statusQuery.data?.exists ||

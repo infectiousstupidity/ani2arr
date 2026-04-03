@@ -3,7 +3,7 @@
 
 import PRetry, { AbortError } from 'p-retry';
 
-export interface RetryOptions {
+interface RetryOptions {
   retries?: number;
   minTimeout?: number;
   maxTimeout?: number;
@@ -64,7 +64,7 @@ export async function withRetry<T>(task: () => Promise<T>, options: RetryOptions
       // We manage sleeping here to honor Retry-After precisely
       onFailedAttempt: async ({ error, attemptNumber }) => {
         try {
-          let waitMs: number | undefined = undefined;
+          let waitMs: number | undefined;
           if (typeof extractRetryAfterMs === 'function') {
             const fromHeader = extractRetryAfterMs(error);
             if (typeof fromHeader === 'number' && Number.isFinite(fromHeader) && fromHeader > 0) {
@@ -91,4 +91,6 @@ export async function withRetry<T>(task: () => Promise<T>, options: RetryOptions
   );
 }
 
-export { AbortError };
+
+
+export {AbortError} from 'p-retry';

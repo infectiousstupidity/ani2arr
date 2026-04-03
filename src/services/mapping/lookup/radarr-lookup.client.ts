@@ -2,8 +2,8 @@
 // src/services/mapping/lookup/radarr-lookup.client.ts
 
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
-import type { RadarrLookupMovie } from '@/shared/types';
-import type { ProviderCredentials } from '@/shared/types/providers';
+import type { RadarrLookupMovie } from '@/integrations/providers';
+import type { ProviderCredentials } from '@/integrations/providers';
 import { BaseLookupClient, type LookupCaches } from './base-lookup.client';
 
 export class RadarrLookupClient extends BaseLookupClient<RadarrLookupMovie> {

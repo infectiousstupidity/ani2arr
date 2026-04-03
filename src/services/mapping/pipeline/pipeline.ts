@@ -12,9 +12,9 @@ import {
 import { PIPELINE_SOFT_TIME_BUDGET_MS } from '../constants';
 import type { UpstreamMappingStore } from '../upstream';
 import type { ScopedLogger } from '@/shared/utils/logger';
-import type { RequestPriority } from '@/shared/types/request-scheduling';
+import type { RequestPriority } from '@/shared/utils/request-priority';
 import type { AniListMediaService } from '@/core/anilist';
-import type { ProviderCredentials } from '@/shared/types/providers';
+import type { ProviderCredentials } from '@/integrations/providers';
 import type { ProviderLookupClient, ProviderLookupResult } from '../lookup';
 
 

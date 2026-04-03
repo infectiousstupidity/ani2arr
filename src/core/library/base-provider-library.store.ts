@@ -1,7 +1,7 @@
 import { getExtensionOptionsSnapshot, STORAGE_POLICIES } from '@/storage';
 import { logError, normalizeError } from '@/shared/errors';
-import type { ExtensionOptions } from '@/shared/types';
-import type { ProviderCredentials } from '@/shared/types/providers';
+import type { ExtensionOptions } from '@/options';
+import type { ProviderCredentials } from '@/integrations/providers';
 import type { ProviderCredentialsResolver, ProviderLibraryCaches } from './library.types';
 
 type StoreIndexer<TSnapshot> = {
@@ -106,7 +106,7 @@ export class BaseProviderLibraryStore<
     const externalId = this.adapter.getExternalId(snapshot);
     const idx = current.findIndex(item => this.adapter.getExternalId(item) === externalId);
     const updated =
-      idx >= 0 ? [...current.slice(0, idx), snapshot, ...current.slice(idx + 1)] : [...current, snapshot];
+      idx === -1 ? [...current, snapshot] : [...current.slice(0, idx), snapshot, ...current.slice(idx + 1)];
 
     this.setIndexedList(updated);
     await this.caches.lean.write(this.adapter.cacheKey, updated, {

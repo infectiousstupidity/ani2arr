@@ -7,7 +7,7 @@ import { updateRadarrMovie } from '@/core/library/update-radarr-movie';
 import { updateSonarrSeries } from '@/core/library/update-sonarr-series';
 import type { Ani2arrApi } from '@/rpc';
 import type { StatusInput } from '@/rpc/schemas';
-import type { RequestPriority } from '@/shared/types';
+import type { RequestPriority } from '@/shared/utils/request-priority';
 import type { ApiHandlerDeps } from './handler-deps';
 
 export function createLibraryHandlers(deps: ApiHandlerDeps): Pick<

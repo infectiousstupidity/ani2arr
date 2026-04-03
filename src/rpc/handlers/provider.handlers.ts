@@ -2,7 +2,7 @@
 // src/rpc/handlers/provider.handlers.ts
 
 import type { Ani2arrApi } from '@/rpc';
-import type { ProviderCredentials, SonarrSeriesSnapshot } from '@/shared/types/providers';
+import type { ProviderCredentials, SonarrSeriesSnapshot } from '@/integrations/providers';
 import type { ApiHandlerDeps } from './handler-deps';
 
 export function createProviderHandlers(deps: ApiHandlerDeps): Pick<

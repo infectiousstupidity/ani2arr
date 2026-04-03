@@ -4,7 +4,7 @@
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
 import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { PublicOptions } from '@/shared/types';
+import type { PublicOptions } from '@/options';
 import baseStyles from '@/shared/styles/base.css?inline';
 import browseStyles from './style.css?inline';
 import {
@@ -103,7 +103,7 @@ const parseAniListCard = (card: Element): ParsedCard | null => {
 
   const href = cover.getAttribute('href') ?? '';
   const idMatch = href.match(/\/anime\/(\d+)/);
-  const anilistId = idMatch ? Number(idMatch[1]) : NaN;
+  const anilistId = idMatch ? Number(idMatch[1]) : Number.NaN;
 
   if (!title || !Number.isFinite(anilistId)) return null;
 
@@ -129,7 +129,7 @@ const ensureOverlayContainer = (cover: HTMLAnchorElement): HTMLElement => {
   if (existing) return existing;
   const el = cover.ownerDocument.createElement('div');
   el.className = DEFAULT_CONTAINER_CLASS;
-  cover.appendChild(el);
+  cover.append(el);
   return el;
 };
 

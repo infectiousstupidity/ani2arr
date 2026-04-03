@@ -2,7 +2,7 @@
 // src/core/library/provider-tags.resolver.ts
 
 import { createError, ErrorCode } from '@/shared/errors';
-import type { ProviderTag } from '@/shared/types/providers';
+import type { ProviderTag } from '@/integrations/providers';
 
 type ProviderTagApi<TCredentials> = {
   getTags(credentials: TCredentials): Promise<ProviderTag[]>;
@@ -67,13 +67,13 @@ export async function resolveProviderTagIds<TCredentials>(
   const labelToId = new Map<string, number>();
   addProviderTagsToMap(existingTags ?? (await api.getTags(credentials)), labelToId);
 
-  const normalizedFreeform = freeformLabelsFromForm.reduce<NormalizedProviderTagLabel[]>((acc, label) => {
+  const normalizedFreeform: NormalizedProviderTagLabel[] = [];
+  for (const label of freeformLabelsFromForm) {
     const normalized = normalizeProviderTagLabel(label);
     if (normalized) {
-      acc.push(normalized);
+      normalizedFreeform.push(normalized);
     }
-    return acc;
-  }, []);
+  }
 
   const labelsToCreate: NormalizedProviderTagLabel[] = [];
   const seenCreateKeys = new Set<string>();

@@ -1,7 +1,7 @@
 /** Provider library path and slug helpers shared across UI and RPC code. */
 // src/shared/utils/provider-library-paths.ts
 
-import type { Provider } from '@/shared/types';
+import type { Provider } from '@/integrations/providers';
 
 /** Minimal provider media shape used to derive provider library slugs and paths. */
 export interface ProviderMediaPathSource {
@@ -15,15 +15,15 @@ export interface ProviderMediaPathSource {
   tmdbId?: number | null;
 }
 
-const trimTrailingSeparators = (input: string): string => input.replace(/[\\/]+$/, '').trim();
+const trimTrailingSeparators = (input: string): string => input.replace(/[/\\]+$/, '').trim();
 
 const extractProviderFolderSlug = (
   path?: string | null,
   rootFolderPath?: string | null,
 ): string | null => {
   if (!path) return null;
-  const normalizedPath = trimTrailingSeparators(path).replace(/\\/g, '/');
-  const normalizedRoot = rootFolderPath ? trimTrailingSeparators(rootFolderPath).replace(/\\/g, '/') : null;
+  const normalizedPath = trimTrailingSeparators(path).replaceAll('\\', '/');
+  const normalizedRoot = rootFolderPath ? trimTrailingSeparators(rootFolderPath).replaceAll('\\', '/') : null;
   const normalizedPathLower = normalizedPath.toLowerCase();
   const normalizedRootLower = normalizedRoot?.toLowerCase() ?? null;
 
@@ -40,13 +40,13 @@ const extractProviderFolderSlug = (
   }
 
   const segments = normalizedPath.split('/');
-  const last = segments[segments.length - 1];
+  const last = segments.at(-1);
   return last?.length ? last : null;
 };
 
 export const sanitizeFolderSegment = (segment: string): string => {
-  const replaced = segment.replace(/[\\/]+/g, ' ').trim();
-  return replaced.replace(/\s+/g, ' ');
+  const replaced = segment.replaceAll(/[/\\]+/g, ' ').trim();
+  return replaced.replaceAll(/\s+/g, ' ');
 };
 
 export const buildProviderFolderSlugFromTitle = (
@@ -68,7 +68,7 @@ export const buildProviderFolderSlugFromTitle = (
 
 export const normalizePathForCompare = (input?: string | null): string | null => {
   if (!input) return null;
-  return trimTrailingSeparators(input).replace(/\\/g, '/').toLowerCase();
+  return trimTrailingSeparators(input).replaceAll('\\', '/').toLowerCase();
 };
 
 export const buildProviderFolderSlug = (

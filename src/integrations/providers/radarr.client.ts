@@ -11,7 +11,7 @@ import type {
   RadarrLookupMovie,
   RadarrMovie,
   ProviderCredentials,
-} from '@/shared/types/providers';
+} from '@/integrations/providers';
 
 type RadarrClientOptions = {
   hasUrlPermission: (url: string) => Promise<boolean>;
@@ -209,7 +209,7 @@ export class RadarrClient extends BaseProviderClient {
     predicate: (movie: RadarrLookupMovie) => boolean,
   ): RadarrLookupMovie | null {
     if (Array.isArray(result)) {
-      return result.find(predicate) ?? result[0] ?? null;
+      return result.find(movie => predicate(movie)) ?? result[0] ?? null;
     }
 
     return result ?? null;

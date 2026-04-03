@@ -1,12 +1,15 @@
+/** Media-overlay portal discovery and lifecycle management for parsed browse cards. */
+// src/features/media-overlay/hooks/use-media-portals.ts
+
 import { useCallback, useEffect, useState } from 'react';
-import type { ParsedCard } from '@/shared/types';
+import type { ParsedCard } from '@/features/media-overlay/types';
 import { metadataEqual } from '@/shared/anilist/media-metadata';
 
 const toElementArray = (value: Iterable<Element> | Element | null | undefined): Element[] => {
   if (!value) return [];
   if (value instanceof Element) return [value];
   try {
-    return Array.from(value).filter((el): el is Element => el instanceof Element);
+    return [...value].filter((el): el is Element => el instanceof Element);
   } catch {
     return [];
   }
@@ -137,7 +140,7 @@ export const useBrowsePortals = ({
       return;
     }
 
-    cards.forEach(card => upsertCard(card));
+    for (const card of cards) upsertCard(card);
     removeStalePortals();
   }, [cardSelector, getScanRoot, removeStalePortals, upsertCard, enabled]);
 
@@ -152,16 +155,16 @@ export const useBrowsePortals = ({
     // Throttle full scans and stale portal cleanup to avoid repeated expensive operations
     // while still processing direct card additions/removals immediately.
     // Uses simple coalescing debounces local to this effect.
-    const fullScanTimerRef = { current: null as number | null };
-    const stalePortalsTimerRef = { current: null as number | null };
+    const fullScanTimerRef = { current: null as ReturnType<typeof globalThis.setTimeout> | null };
+    const stalePortalsTimerRef = { current: null as ReturnType<typeof globalThis.setTimeout> | null };
     const FULL_SCAN_WAIT = 150; // ms
     const STALE_PORTALS_WAIT = 100; // ms
     
     const scheduleFullScan = () => {
       if (fullScanTimerRef.current !== null) {
-        window.clearTimeout(fullScanTimerRef.current);
+        globalThis.clearTimeout(fullScanTimerRef.current);
       }
-      fullScanTimerRef.current = window.setTimeout(() => {
+      fullScanTimerRef.current = globalThis.setTimeout(() => {
         fullScanTimerRef.current = null;
         scanAll();
       }, FULL_SCAN_WAIT);
@@ -169,9 +172,9 @@ export const useBrowsePortals = ({
 
     const scheduleStalePortalsCleanup = () => {
       if (stalePortalsTimerRef.current !== null) {
-        window.clearTimeout(stalePortalsTimerRef.current);
+        globalThis.clearTimeout(stalePortalsTimerRef.current);
       }
-      stalePortalsTimerRef.current = window.setTimeout(() => {
+      stalePortalsTimerRef.current = globalThis.setTimeout(() => {
         stalePortalsTimerRef.current = null;
         removeStalePortals();
       }, STALE_PORTALS_WAIT);
@@ -189,20 +192,18 @@ export const useBrowsePortals = ({
       };
 
       for (const mutation of mutations) {
-        mutation.addedNodes.forEach(node => {
+        for (const node of mutation.addedNodes) {
           if (node instanceof Element && node.matches(cardSelector)) {
             cardsToUpsert.add(node);
-            return;
+            continue;
           }
 
           enqueueCardForNode(node);
 
-          if (!shouldRescan && (node instanceof Element || node instanceof DocumentFragment)) {
-            if (node.querySelector?.(cardSelector)) {
+          if (!shouldRescan && (node instanceof Element || node instanceof DocumentFragment) && node.querySelector?.(cardSelector)) {
               shouldRescan = true;
             }
-          }
-        });
+        }
 
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
           enqueueCardForNode(mutation.target);
@@ -213,21 +214,21 @@ export const useBrowsePortals = ({
         }
 
         if (mutation.removedNodes.length > 0) {
-          mutation.removedNodes.forEach(node => {
+          for (const node of mutation.removedNodes) {
             if (node instanceof Element) {
               if (node.matches(cardSelector)) {
                 onCardInvalid?.(node);
               }
-              node.querySelectorAll(containerSelector).forEach(container => {
+              for (const container of node.querySelectorAll(containerSelector)) {
                 removePortalForContainer(container, false);
-              });
+              }
             }
-          });
+          }
           scheduleStalePortalsCleanup();
         }
       }
 
-      cardsToUpsert.forEach(card => upsertCard(card));
+      for (const card of cardsToUpsert) upsertCard(card);
 
       if (shouldRescan) scheduleFullScan();
     });
@@ -253,11 +254,11 @@ export const useBrowsePortals = ({
         ro.disconnect();
       }
       if (fullScanTimerRef.current !== null) {
-        window.clearTimeout(fullScanTimerRef.current);
+        globalThis.clearTimeout(fullScanTimerRef.current);
         fullScanTimerRef.current = null;
       }
       if (stalePortalsTimerRef.current !== null) {
-        window.clearTimeout(stalePortalsTimerRef.current);
+        globalThis.clearTimeout(stalePortalsTimerRef.current);
         stalePortalsTimerRef.current = null;
       }
     };

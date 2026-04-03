@@ -5,7 +5,7 @@ import { useCallback, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
 import { REVISION_KEYS, STORAGE_KEYS } from '@/storage';
-import type { Provider } from '@/shared/types';
+import type { Provider } from '@/integrations/providers';
 import { queryKeys } from '@/shared/queries';
 
 const PUBLIC_OPTIONS_KEY = queryKeys.publicOptions();

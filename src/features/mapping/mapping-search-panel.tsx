@@ -6,7 +6,7 @@ import { ExternalLink } from 'lucide-react';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
 import Pill from '@/shared/ui/primitives/pill';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
-import type { Provider } from '@/shared/types';
+import type { Provider } from '@/integrations/providers';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { getProviderLabel } from '@/services/providers/resolver';
 import type { MappingSearchController, MappingSearchResult } from './types';

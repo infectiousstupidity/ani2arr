@@ -3,7 +3,7 @@
 
 import { resolveProviderTagIds } from '@/core/library/provider-tags.resolver';
 import { createError, ErrorCode } from '@/shared/errors';
-import type { ProviderCredentials, ProviderTag } from '@/shared/types/providers';
+import type { ProviderCredentials, ProviderTag } from '@/integrations/providers';
 import { normalizePathForCompare } from '@/shared/utils/provider-library-paths';
 
 type ProviderTagMutationApi = {
@@ -34,9 +34,9 @@ export function resolveRequiredQualityProfileId(
   const resolvedValue =
     typeof value === 'number' && Number.isFinite(value)
       ? value
-      : typeof fallback === 'number' && Number.isFinite(fallback)
+      : (typeof fallback === 'number' && Number.isFinite(fallback)
         ? fallback
-        : undefined;
+        : undefined);
 
   if (typeof resolvedValue !== 'number') {
     throw createError(
