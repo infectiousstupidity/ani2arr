@@ -5,11 +5,11 @@ import { useMemo } from 'react';
 import type { CheckMovieStatusResponse, CheckSeriesStatusResponse } from '@/rpc/types';
 import type {
   AniListMediaFormat,
-  AniListTitles,
-  ExtensionOptions,
   AniListMediaHint,
   AniListMediaStatus,
-} from '@/shared/types';
+  AniListTitles,
+} from '@/shared/schemas/anilist/anilist-media.schema';
+import type { ExtensionOptions } from '@/shared/types';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import type {

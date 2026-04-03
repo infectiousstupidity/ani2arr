@@ -1,6 +1,10 @@
+/** Mapping export assembly with optional AniList metadata hydration for CSV-like outputs. */
+// src/entrypoints/options/components/mappings-section/export-mappings.ts
+
 import { getAni2arrApi } from '@/rpc';
 import type { GetMappingsInput, MappingCursor } from '@/rpc/schemas';
-import type { AniListMetadata, MappingExternalId, MappingProvider, MappingSource, MappingSummary } from '@/shared/types';
+import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.schema';
+import type { MappingExternalId, MappingProvider, MappingSource, MappingSummary } from '@/shared/types';
 import type { LibraryFilter } from './components/mapping-toolbar';
 import { normalizeMappingSearchQuery } from './search-query';
 

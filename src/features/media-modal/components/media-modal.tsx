@@ -6,14 +6,12 @@ import { Modal, ModalContent, ModalTitle, ModalDescription } from "./modal";
 import { Header, type MediaModalTabId } from "./media-modal-header";
 import { Footer } from "./media-modal-footer";
 import Button from "@/shared/ui/primitives/button";
+import type { AniListTitleLanguage } from "@/shared/schemas/anilist/anilist-title-language.schema";
 import type {
   AniListMediaFormat,
-  Provider,
   AniListMediaStatus,
-  RadarrFormState,
-  SonarrFormState,
-  AniListTitleLanguage,
-} from "@/shared/types";
+} from "@/shared/schemas/anilist/anilist-media.schema";
+import type { Provider, RadarrFormState, SonarrFormState } from "@/shared/types";
 import { ErrorCode, type ExtensionError } from "@/shared/errors";
 import { createDefaultRadarrFormState } from "@/shared/schemas/providers/radarr-settings.schema";
 import { createDefaultSonarrFormState } from "@/shared/schemas/providers/sonarr-settings.schema";

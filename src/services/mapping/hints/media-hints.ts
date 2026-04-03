@@ -1,4 +1,11 @@
-import type { AniListMedia, AniListTitles, AniListMediaHint } from '@/shared/types';
+/** AniList metadata-hint projection helpers used by mapping resolution. */
+// src/services/mapping/hints/media-hints.ts
+
+import type {
+  AniListMedia,
+  AniListMediaHint,
+  AniListTitles,
+} from '@/shared/schemas/anilist/anilist-media.schema';
 
 const normalizeTitles = (titles?: AniListTitles | null): AniListTitles => {
   if (!titles) return {};

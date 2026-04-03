@@ -5,13 +5,8 @@ import React, { useMemo } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Ban, ChevronDown, MoreHorizontal, Pencil, Trash2, Undo2 } from 'lucide-react';
-import type {
-  AniListMetadata,
-  MappingExternalId,
-  MappingProvider,
-  MappingSource,
-  MappingSummary,
-} from '@/shared/types';
+import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.schema';
+import type { MappingExternalId, MappingProvider, MappingSource, MappingSummary } from '@/shared/types';
 import { useAniListMetadataBatch, useMovieStatus, useSeriesStatus } from '@/shared/queries';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';

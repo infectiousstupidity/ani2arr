@@ -1,15 +1,7 @@
-import type { RequestPriority } from '@/shared/types/mapping';
+/** Debug-only AniList scheduler payload shapes for inspection and overlay rendering. */
+// src/debug/anilist-debug.types.ts
 
-export type AniListSchedulerEventType =
-  | 'request'
-  | 'enqueue'
-  | 'promote'
-  | 'join-inflight'
-  | 'cache-hit'
-  | 'hold'
-  | 'flush'
-  | 'rate-limit'
-  | 'resume';
+import type { RequestPriority } from '@/shared/types/mapping';
 
 export interface AniListSchedulerRequestDebug {
   requestId: number;
@@ -70,7 +62,16 @@ export interface AniListSchedulerBatchDebug {
 export interface AniListSchedulerEventDebug {
   eventId: number;
   at: number;
-  type: AniListSchedulerEventType;
+  type:
+    | 'request'
+    | 'enqueue'
+    | 'promote'
+    | 'join-inflight'
+    | 'cache-hit'
+    | 'hold'
+    | 'flush'
+    | 'rate-limit'
+    | 'resume';
   priority: RequestPriority | null;
   requestId: number | null;
   batchId: number | null;

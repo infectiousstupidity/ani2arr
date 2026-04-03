@@ -19,7 +19,6 @@ import type {
 import type { TtlCache } from '@/storage';
 import { createError, ErrorCode } from '@/shared/errors';
 import type {
-  AniListMedia,
   AniListSchedulerBatchDebug,
   AniListSchedulerBatchMediaCountsDebug,
   AniListSchedulerBucketDebug,
@@ -27,8 +26,9 @@ import type {
   AniListSchedulerEventDebug,
   AniListSchedulerPendingEntryDebug,
   AniListSchedulerRequestDebug,
-  RequestPriority,
-} from '@/shared/types';
+} from '@/debug/anilist-debug.types';
+import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { RequestPriority } from '@/shared/types';
 import { logger } from '@/shared/utils/logger';
 import { priorityValue } from '@/shared/utils/request-priority';
 import { AbortError, withRetry } from '@/shared/utils/retry';

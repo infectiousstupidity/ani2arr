@@ -1,7 +1,9 @@
+/** Media modal open/close state and payload ownership for AniList-driven modal launches. */
 // src/features/media-modal/hooks/use-media-modal-state.ts
+
 import { useCallback, useState } from "react";
 
-import type { AniListMediaHint } from "@/shared/types";
+import type { AniListMediaHint } from "@/shared/schemas/anilist/anilist-media.schema";
 
 export type MediaModalTabId = "series" | "mapping";
 

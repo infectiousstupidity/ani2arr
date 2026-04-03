@@ -1,7 +1,11 @@
+/** Mapping pipeline types for AniList evaluation and provider lookup context. */
+// src/services/mapping/pipeline/types.ts
+
 import type { SearchTerm } from './search-term-generator';
 import type { UpstreamMappingStore } from '../upstream';
 import type { ScopedLogger } from '@/shared/utils/logger';
-import type { AniListMedia, RequestPriority } from '@/shared/types';
+import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { RequestPriority } from '@/shared/types';
 import type { AniListMediaService } from '@/core/anilist';
 import type {
   LookupClientCredentials,

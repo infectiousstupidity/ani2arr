@@ -1,4 +1,8 @@
-import type { MappingExternalId, AniListMediaHint, RequestPriority } from '@/shared/types';
+/** Mapping service input and output types for AniList-driven resolution flows. */
+// src/services/mapping/types.ts
+
+import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { MappingExternalId, RequestPriority } from '@/shared/types';
 
 export interface ResolvedMapping {
   externalId: MappingExternalId;

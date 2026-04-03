@@ -4,12 +4,14 @@
 import { browser } from 'wxt/browser';
 import * as v from 'valibot';
 import type {
+  AniListMedia,
+  AniListTitles,
+} from '@/shared/schemas/anilist/anilist-media.schema';
+import type {
   AniListMetadata,
   AniListMetadataBundle,
   AniListMetadataChunkRef,
-  AniListMedia,
-  AniListTitles,
-} from '@/shared/types';
+} from '@/shared/schemas/anilist/anilist-metadata.schema';
 import { AniListMetadataBundleSchema, AniListMetadataChunkRefSchema, AniListMetadataSchema } from '@/shared/schemas/anilist/anilist-metadata.schema';
 import { logError, normalizeError } from '@/shared/errors';
 import { logger } from '@/shared/utils/logger';
@@ -26,8 +28,6 @@ const STORAGE_KEY = 'local:anilistMetadata';
 const BAKED_STALE_MS = days(45); // 45 days
 const BAKED_HARD_MS = days(120); // 120 days
 const MAX_REFRESH_BATCH = 10;
-
-type PersistedRecord = Record<string, AniListMetadata>;
 
 const clampBatch = (ids: number[], maxBatch?: number): number[] => {
   const limit = Math.max(1, Math.min(maxBatch ?? MAX_REFRESH_BATCH, MAX_REFRESH_BATCH));
@@ -215,7 +215,7 @@ export class AniListMetadataStore {
   }
 
   private async persistLocal(): Promise<void> {
-    const payload: PersistedRecord = {};
+    const payload: Record<string, AniListMetadata> = {};
     for (const [id, entry] of this.localMap.entries()) {
       payload[id] = entry;
     }

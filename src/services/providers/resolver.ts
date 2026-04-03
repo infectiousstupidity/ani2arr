@@ -1,7 +1,8 @@
 /** Provider labels, routing, and option lookups for supported providers. */
 // src/services/providers/resolver.ts
 
-import type { AniListMediaFormat, Provider, PublicOptions } from '@/shared/types';
+import type { AniListMediaFormat } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { Provider, PublicOptions } from '@/shared/types';
 
 type ProviderDescriptor = {
   service: Provider;

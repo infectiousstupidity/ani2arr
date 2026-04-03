@@ -1,11 +1,8 @@
 /** Typed RPC contract exposed across extension contexts. */
 // src/rpc/index.ts
 import { defineProxyService } from '@webext-core/proxy-service';
-import type {
-  AniListMedia,
-  SonarrFormState,
-  RadarrFormState,
-} from '@/shared/types';
+import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { SonarrFormState, RadarrFormState } from '@/shared/types';
 import type { MappingOverrideRecord } from '@/shared/types/mapping';
 import type { RadarrMovie, SonarrSeries } from '@/shared/types/providers';
 import type {
