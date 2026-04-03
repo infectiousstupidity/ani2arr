@@ -9,9 +9,6 @@ import type {
   AniListTitles,
 } from '@/shared/types/anilist';
 import type {
-  ProviderQualityProfile,
-  ProviderRootFolder,
-  ProviderTag,
   RadarrMovieSnapshot,
   RadarrLookupMovie,
   RadarrMovie,
@@ -29,6 +26,8 @@ import type {
   MappingSummary,
 } from '@/shared/types/mapping';
 import type { MappingCursor } from './schemas';
+
+export type { ProviderMetadata } from '@/shared/types/providers';
 
 export interface CheckSeriesStatusPayload {
   anilistId: number;
@@ -124,12 +123,6 @@ export interface RadarrLookupOutput {
 export interface ValidateTmdbOutput {
   inLibrary: boolean;
   inCatalog: boolean;
-}
-
-export interface ProviderMetadataOutput {
-  qualityProfiles: ProviderQualityProfile[];
-  rootFolders: ProviderRootFolder[];
-  tags: ProviderTag[];
 }
 
 export interface GetAniListMetadataOutput {

@@ -3,19 +3,17 @@
 
 import type { SonarrMonitorOption, SonarrSeriesType } from '@/shared/schemas/providers/sonarr-settings.schema';
 
-export interface SonarrAlternateTitle {
-  title?: string | null;
-  sceneSeasonNumber?: number | null;
-  seasonNumber?: number | null;
-  sourceType?: string | null;
-}
-
 export interface SonarrSeries {
   id: number;
   title: string;
   tvdbId: number;
   titleSlug: string;
-  alternateTitles?: SonarrAlternateTitle[];
+  alternateTitles?: Array<{
+    title?: string | null;
+    sceneSeasonNumber?: number | null;
+    seasonNumber?: number | null;
+    sourceType?: string | null;
+  }>;
   monitored?: boolean;
   year?: number;
   genres?: string[];

@@ -4,20 +4,19 @@
 export type {
   Provider,
   ProviderCredentials,
+  ProviderMetadata,
   ProviderQualityProfile,
   ProviderRootFolder,
   ProviderTag,
 } from './common';
 
 export type {
-  SonarrAlternateTitle,
   SonarrLookupSeries,
   SonarrSeries,
   SonarrSeriesSnapshot,
 } from './sonarr';
 
 export type {
-  RadarrAlternateTitle,
   RadarrLookupMovie,
   RadarrMovie,
   RadarrMovieSnapshot,

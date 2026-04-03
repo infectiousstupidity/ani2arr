@@ -41,16 +41,6 @@ export const ProviderConnectionStatusBadge: React.FC<{ status: ProviderConnectio
   );
 };
 
-type ConnectionMutationState = {
-  isError: boolean;
-  isPending: boolean;
-  reset: () => void;
-};
-
-type SaveMutationState = {
-  isPending: boolean;
-};
-
 export type ProviderConnectionCardProps = {
   providerLabel: string;
   urlLabel: string;
@@ -70,8 +60,14 @@ export type ProviderConnectionCardProps = {
   onTestConnection: () => Promise<boolean>;
   setUrl: (value: string) => void;
   setApiKey: (value: string) => void;
-  testConnectionState: ConnectionMutationState;
-  saveState: SaveMutationState;
+  testConnectionState: {
+    isError: boolean;
+    isPending: boolean;
+    reset: () => void;
+  };
+  saveState: {
+    isPending: boolean;
+  };
   isLoading?: boolean;
   children?: React.ReactNode;
   summaryFields?: Array<{ label: string; value: React.ReactNode }>;
@@ -136,8 +132,8 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
     setIsDisconnecting(true);
     try {
       await onDisconnect();
-    } catch (err) {
-      logger.error('Unexpected error during disconnect', err);
+    } catch (error) {
+      logger.error('Unexpected error during disconnect', error);
       toast.showToast({
         title: 'Disconnect failed',
         description: `Failed to disconnect ${providerLabel}. Please try again.`,
@@ -150,7 +146,9 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
 
   if (isConnected && !isEditingConnection) {
     const columnClassName =
-      summaryFields.length >= 3 ? 'md:grid-cols-3' : summaryFields.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1';
+      summaryFields.length >= 3
+        ? 'md:grid-cols-3'
+        : (summaryFields.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1');
 
     return (
       <div className="space-y-4">

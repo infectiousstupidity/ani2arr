@@ -14,17 +14,13 @@ import Button from '@/shared/ui/primitives/button';
 
 import { SaveSettingsBar } from './save-settings-bar';
 
-type RadarrDefaultsField = keyof SettingsFormValues['providers']['radarr']['defaults'];
-
-type RadarrDefaultsSectionProps = {
+export const RadarrDefaultsSection: React.FC<{
   actions: SettingsActions;
   portalContainer: HTMLElement | null;
   metadataEnabled: boolean;
   metadataQuery: ReturnType<typeof useRadarrMetadata>;
   onRefresh: () => void;
-};
-
-export const RadarrDefaultsSection: React.FC<RadarrDefaultsSectionProps> = ({
+}> = ({
   actions,
   portalContainer,
   metadataEnabled,
@@ -37,7 +33,7 @@ export const RadarrDefaultsSection: React.FC<RadarrDefaultsSectionProps> = ({
     name: 'providers.radarr.defaults',
   });
 
-  const setDefaultField = <K extends RadarrDefaultsField>(
+  const setDefaultField = <K extends keyof SettingsFormValues['providers']['radarr']['defaults']>(
     field: K,
     value: RadarrFormState[K],
   ): void => {

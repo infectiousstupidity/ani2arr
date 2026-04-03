@@ -29,11 +29,10 @@ export type {
 export type {
   Provider,
   ProviderCredentials,
-  RadarrAlternateTitle,
+  ProviderMetadata,
   RadarrLookupMovie,
   RadarrMovie,
   RadarrMovieSnapshot,
-  SonarrAlternateTitle,
   SonarrLookupSeries,
   SonarrSeries,
   SonarrSeriesSnapshot,

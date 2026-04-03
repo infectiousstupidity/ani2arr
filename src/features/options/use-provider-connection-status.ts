@@ -1,28 +1,14 @@
-/**
- * @file Options-only provider connection status derivation.
- * Derives the UI-facing provider connection status from persisted configuration
- * and live connection-check state, with optional smoothing for the transient
- * "connecting" state to reduce badge flicker.
- */
-
+/** Options-only provider connection status derivation with optional connecting-state smoothing. */
 // src/features/options/use-provider-connection-status.ts
 import { useEffect, useRef, useState } from 'react';
 import type { ProviderConnectionStatus } from '@/features/options/provider-connection-status';
 
-export interface UseProviderConnectionStatusInput {
-  hasConfiguredCredentials: boolean;
-  isChecking: boolean;
-  isConnected: boolean;
-}
-
-export interface UseProviderConnectionStatusOptions {
-  smoothConnecting?: boolean;
-  delayMs?: number;
-  minVisibleMs?: number;
-}
-
 const getRawProviderConnectionStatus = (
-  input: UseProviderConnectionStatusInput,
+  input: {
+    hasConfiguredCredentials: boolean;
+    isChecking: boolean;
+    isConnected: boolean;
+  },
 ): ProviderConnectionStatus => {
   if (input.isChecking) {
     return 'connecting';
@@ -40,13 +26,25 @@ const getRawProviderConnectionStatus = (
 };
 
 const getFallbackStatus = (
-  input: UseProviderConnectionStatusInput,
+  input: {
+    hasConfiguredCredentials: boolean;
+    isChecking: boolean;
+    isConnected: boolean;
+  },
 ): Exclude<ProviderConnectionStatus, 'connecting'> =>
   input.hasConfiguredCredentials ? 'configured' : 'not-configured';
 
 export const useProviderConnectionStatus = (
-  input: UseProviderConnectionStatusInput,
-  options?: UseProviderConnectionStatusOptions,
+  input: {
+    hasConfiguredCredentials: boolean;
+    isChecking: boolean;
+    isConnected: boolean;
+  },
+  options?: {
+    smoothConnecting?: boolean;
+    delayMs?: number;
+    minVisibleMs?: number;
+  },
 ): ProviderConnectionStatus => {
   const rawStatus = getRawProviderConnectionStatus(input);
   const smoothConnecting = options?.smoothConnecting ?? false;
@@ -72,12 +70,12 @@ export const useProviderConnectionStatus = (
         return;
       }
 
-      const timer = window.setTimeout(() => {
+      const timer = globalThis.setTimeout(() => {
         connectingShownAtRef.current = Date.now();
         setDisplayedStatus('connecting');
       }, delayMs);
 
-      return () => window.clearTimeout(timer);
+      return () => globalThis.clearTimeout(timer);
     }
 
     if (displayedStatus !== 'connecting') {
@@ -90,12 +88,12 @@ export const useProviderConnectionStatus = (
     const elapsed = shownAt ? Date.now() - shownAt : minVisibleMs;
     const remaining = Math.max(0, minVisibleMs - elapsed);
 
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       connectingShownAtRef.current = null;
       setDisplayedStatus(rawStatus);
     }, remaining);
 
-    return () => window.clearTimeout(timer);
+    return () => globalThis.clearTimeout(timer);
   }, [delayMs, displayedStatus, minVisibleMs, rawStatus, smoothConnecting]);
 
   return displayedStatus;

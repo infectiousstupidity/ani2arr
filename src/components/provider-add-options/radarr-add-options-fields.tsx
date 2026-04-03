@@ -6,9 +6,7 @@ import React from 'react';
 import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import type {
-  ProviderQualityProfile,
-  ProviderRootFolder,
-  ProviderTag,
+  ProviderMetadata,
 } from '@/shared/types/providers';
 import type {
   RadarrFormState,
@@ -19,15 +17,9 @@ import { cn } from '@/shared/utils/cn';
 
 import { ProviderRootFolderSelect } from './provider-root-folder-select';
 
-interface RadarrAddOptionsMetadata {
-  qualityProfiles: ReadonlyArray<ProviderQualityProfile>;
-  rootFolders: ReadonlyArray<ProviderRootFolder>;
-  tags: ReadonlyArray<ProviderTag>;
-}
-
 export interface RadarrAddOptionsFieldsProps {
   values: RadarrFormState;
-  metadata: RadarrAddOptionsMetadata;
+  metadata: ProviderMetadata;
   onChange: <K extends keyof RadarrFormState>(field: K, value: RadarrFormState[K]) => void;
   disabled?: boolean | undefined;
   className?: string | undefined;

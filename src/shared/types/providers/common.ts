@@ -23,3 +23,9 @@ export interface ProviderQualityProfile {
   id: number;
   name: string;
 }
+
+export interface ProviderMetadata {
+  qualityProfiles: ProviderQualityProfile[];
+  rootFolders: ProviderRootFolder[];
+  tags: ProviderTag[];
+}
