@@ -2,15 +2,30 @@
 // src/rpc/handlers/mapping.handlers.ts
 
 import type { Ani2arrApi } from '@/rpc';
-import type { CheckSeriesStatusPayload, ResolveMappingOutput } from '@/rpc/types';
+import type { StatusInput, GetMappingsInput } from '@/rpc/schemas';
 import { createError, ErrorCode } from '@/shared/errors';
 import {
   getExtensionOptionsSnapshot,
 } from '@/storage';
-import type { GetMappingsInput } from './get-mappings.handlers';
 import type { ApiHandlerDeps } from './handler-deps';
 
-type MappingHandlerMethods = Pick<
+function assertCompatibleExternalId(
+  provider: 'sonarr' | 'radarr',
+  externalId: { id: number; kind: 'tvdb' | 'tmdb' },
+): void {
+  const expectedKind = provider === 'sonarr' ? 'tvdb' : 'tmdb';
+  if (externalId.kind !== expectedKind) {
+    throw createError(
+      ErrorCode.VALIDATION_ERROR,
+      `Provider ${provider} requires ${expectedKind.toUpperCase()} mapping IDs.`,
+      provider === 'sonarr'
+        ? 'Sonarr overrides must use TVDB IDs.'
+        : 'Radarr overrides must use TMDB IDs.',
+    );
+  }
+}
+
+export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
   Ani2arrApi,
   | 'resolveMapping'
   | 'getStaticMapped'
@@ -27,9 +42,7 @@ type MappingHandlerMethods = Pick<
   | 'clearAllMappingOverrides'
   | 'exportStoredMappings'
   | 'getMappings'
->;
-
-export function createMappingHandlers(deps: ApiHandlerDeps): MappingHandlerMethods {
+> {
   const {
     mappingService,
     overridesService,
@@ -44,29 +57,13 @@ export function createMappingHandlers(deps: ApiHandlerDeps): MappingHandlerMetho
     getMappings,
   } = deps;
 
-  const assertCompatibleExternalId = (
-    provider: 'sonarr' | 'radarr',
-    externalId: { id: number; kind: 'tvdb' | 'tmdb' },
-  ) => {
-    const expectedKind = provider === 'sonarr' ? 'tvdb' : 'tmdb';
-    if (externalId.kind !== expectedKind) {
-      throw createError(
-        ErrorCode.VALIDATION_ERROR,
-        `Provider ${provider} requires ${expectedKind.toUpperCase()} mapping IDs.`,
-        provider === 'sonarr'
-          ? 'Sonarr overrides must use TVDB IDs.'
-          : 'Radarr overrides must use TMDB IDs.',
-      );
-    }
-  };
-
-  const handlers: MappingHandlerMethods = {
+  const handlers = {
     async resolveMapping(input) {
       await ensureSonarrConfigured();
       await overridesReady;
 
       try {
-        const payload: CheckSeriesStatusPayload = { anilistId: input.anilistId };
+        const payload: Pick<StatusInput, 'anilistId' | 'title' | 'metadata'> = { anilistId: input.anilistId };
         if (input.primaryTitleHint !== undefined) payload.title = input.primaryTitleHint;
         if (input.metadata !== undefined) payload.metadata = input.metadata ?? null;
         const status = await sonarrLibrary.getSeriesStatus(payload, { network: 'never', ignoreFailureCache: true });
@@ -74,7 +71,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): MappingHandlerMetho
           return {
             tvdbId: status.tvdbId,
             ...(status.successfulSynonym ? { successfulSynonym: status.successfulSynonym } : {}),
-          } satisfies ResolveMappingOutput;
+          };
         }
       } catch {
         // ignore fast-path errors
@@ -90,7 +87,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): MappingHandlerMetho
       return {
         tvdbId: mapping ? mapping.tvdbId : null,
         ...(mapping?.successfulSynonym ? { successfulSynonym: mapping.successfulSynonym } : {}),
-      } satisfies ResolveMappingOutput;
+      };
     },
 
     async getStaticMapped(ids) {
@@ -342,7 +339,24 @@ export function createMappingHandlers(deps: ApiHandlerDeps): MappingHandlerMetho
         radarrLibrary,
       });
     },
-  };
+  } satisfies Pick<
+    Ani2arrApi,
+    | 'resolveMapping'
+    | 'getStaticMapped'
+    | 'initMappings'
+    | 'setMappingOverride'
+    | 'clearMappingOverride'
+    | 'setMappingIgnore'
+    | 'clearMappingIgnore'
+    | 'setMappingRejectedCandidate'
+    | 'clearMappingRejectedCandidate'
+    | 'setMappingBlockedCandidate'
+    | 'clearMappingBlockedCandidate'
+    | 'getMappingOverrides'
+    | 'clearAllMappingOverrides'
+    | 'exportStoredMappings'
+    | 'getMappings'
+  >;
 
   return handlers;
 }

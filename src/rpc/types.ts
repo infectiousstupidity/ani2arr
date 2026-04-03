@@ -3,7 +3,6 @@
 
 import type {
   AniListMediaFormat,
-  AniListMediaHint,
   AniListTitles,
   AniListMediaStatus,
 } from '@/shared/schemas/anilist/anilist-media.schema';
@@ -16,7 +15,6 @@ import type {
   SonarrLookupSeries,
   SonarrSeries,
 } from '@/shared/types/providers';
-import type { AniListSchedulerDebugSnapshot } from '@/debug/anilist-debug.types';
 import type {
   MappingBlockedRecord,
   MappingExternalId,
@@ -26,14 +24,6 @@ import type {
   MappingSummary,
 } from '@/shared/types/mapping';
 import type { MappingCursor } from './schemas';
-
-export type { ProviderMetadata } from '@/shared/types/providers';
-
-export interface CheckSeriesStatusPayload {
-  anilistId: number;
-  title?: string;
-  metadata?: AniListMediaHint | null;
-}
 
 export interface CheckSeriesStatusResponse {
   exists: boolean;
@@ -48,12 +38,6 @@ export interface CheckSeriesStatusResponse {
   linkedAniListIds?: number[];
 }
 
-export interface CheckMovieStatusPayload {
-  anilistId: number;
-  title?: string;
-  metadata?: AniListMediaHint | null;
-}
-
 export interface CheckMovieStatusResponse {
   exists: boolean;
   tmdbId: number | null;
@@ -65,11 +49,6 @@ export interface CheckMovieStatusResponse {
   overrideActive?: boolean;
   /** Other AniList IDs currently linked to the same TMDB ID. */
   linkedAniListIds?: number[];
-}
-
-export interface ResolveMappingOutput {
-  tvdbId: number | null;
-  successfulSynonym?: string;
 }
 
 export interface ExportStoredMappingsOutput {
@@ -109,20 +88,10 @@ export interface SonarrLookupOutput {
   >;
 }
 
-export interface ValidateTvdbOutput {
-  inLibrary: boolean;
-  inCatalog: boolean;
-}
-
 export interface RadarrLookupOutput {
   results: RadarrLookupMovie[];
   libraryTmdbIds: number[];
   linkedAniListIdsByTmdbId?: Record<number, number[]>;
-}
-
-export interface ValidateTmdbOutput {
-  inLibrary: boolean;
-  inCatalog: boolean;
 }
 
 export interface GetAniListMetadataOutput {
@@ -137,5 +106,3 @@ export interface AniListSearchResult {
   format?: AniListMediaFormat | null;
   status?: AniListMediaStatus | null;
 }
-
-export type GetAniListSchedulerDebugOutput = AniListSchedulerDebugSnapshot;

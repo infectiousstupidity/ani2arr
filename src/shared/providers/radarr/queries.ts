@@ -1,6 +1,9 @@
+/** React Query hooks for Radarr RPC metadata, status, and mutation flows. */
+// src/shared/providers/radarr/queries.ts
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
-import type { CheckMovieStatusPayload, CheckMovieStatusResponse } from '@/rpc/types';
+import type { CheckMovieStatusResponse } from '@/rpc/types';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import { queryKeys } from '@/shared/queries/query-keys';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
@@ -29,13 +32,16 @@ export const useRadarrMetadata = (options?: { enabled?: boolean; credentials?: P
   });
 };
 
-export const useMovieStatus = (payload: CheckMovieStatusPayload, options?: {
-  enabled?: boolean;
-  force_verify?: boolean;
-  network?: 'never';
-  ignoreFailureCache?: boolean | (() => boolean);
-  priority?: 'high' | 'normal' | (() => 'high' | 'normal' | undefined);
-}) =>
+export const useMovieStatus = (
+  payload: Pick<StatusInput, 'anilistId' | 'title' | 'metadata'>,
+  options?: {
+    enabled?: boolean;
+    force_verify?: boolean;
+    network?: 'never';
+    ignoreFailureCache?: boolean | (() => boolean);
+    priority?: 'high' | 'normal' | (() => 'high' | 'normal' | undefined);
+  },
+) =>
   useQuery<CheckMovieStatusResponse, ExtensionError>({
     queryKey: queryKeys.seriesStatus(payload, 'radarr'),
     queryFn: async () => {

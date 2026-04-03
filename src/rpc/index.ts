@@ -1,34 +1,27 @@
 /** Typed RPC contract exposed across extension contexts. */
 // src/rpc/index.ts
 import { defineProxyService } from '@webext-core/proxy-service';
+import type { AniListSchedulerDebugSnapshot } from '@/debug/anilist-debug.types';
 import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { SonarrFormState, RadarrFormState } from '@/shared/types';
 import type { MappingOverrideRecord } from '@/shared/types/mapping';
-import type { RadarrMovie, SonarrSeries } from '@/shared/types/providers';
+import type { ProviderMetadata, RadarrMovie, SonarrSeries } from '@/shared/types/providers';
 import type {
   AniListSearchResult,
   ExportStoredMappingsOutput,
   GetAniListMetadataOutput,
-  GetAniListSchedulerDebugOutput,
   GetMappingsOutput,
-  ProviderMetadata,
-  ResolveMappingOutput,
   RadarrLookupOutput,
   SonarrLookupOutput,
   CheckMovieStatusResponse,
   CheckSeriesStatusResponse,
-  ValidateTmdbOutput,
-  ValidateTvdbOutput,
 } from './types';
 import type {
   ResolveInput,
   StatusInput,
   AddSonarrInput,
   AddRadarrInput,
-  FetchAniListMediaInput,
   GetProviderMetadataInput,
-  GetStaticMappedInput,
-  PrefetchAniListMediaInput,
   UpdateSonarrInput,
   UpdateRadarrInput,
   SetMappingOverrideInput,
@@ -50,16 +43,16 @@ import type {
 } from './schemas';
 
 export interface Ani2arrApi {
-  resolveMapping(input: ResolveInput): Promise<ResolveMappingOutput>;
+  resolveMapping(input: ResolveInput): Promise<{ tvdbId: number | null; successfulSynonym?: string }>;
   getSeriesStatus(input: StatusInput): Promise<CheckSeriesStatusResponse>;
   getMovieStatus(input: StatusInput): Promise<CheckMovieStatusResponse>;
   addToSonarr(input: AddSonarrInput): Promise<SonarrSeries>;
   addToRadarr(input: AddRadarrInput): Promise<RadarrMovie>;
   updateSonarrSeries(input: UpdateSonarrInput): Promise<SonarrSeries>;
   updateRadarrMovie(input: UpdateRadarrInput): Promise<RadarrMovie>;
-  prefetchAniListMedia(ids: PrefetchAniListMediaInput): Promise<Array<[number, AniListMedia]>>;
-  fetchAniListMedia(anilistId: FetchAniListMediaInput): Promise<AniListMedia | null>;
-  getStaticMapped(ids: GetStaticMappedInput): Promise<number[]>;
+  prefetchAniListMedia(ids: number[]): Promise<Array<[number, AniListMedia]>>;
+  fetchAniListMedia(anilistId: number): Promise<AniListMedia | null>;
+  getStaticMapped(ids: number[]): Promise<number[]>;
   notifySettingsChanged(): Promise<{ ok: true }>;
   updateSonarrDefaults(defaults: SonarrFormState): Promise<{ ok: true }>;
   updateRadarrDefaults(defaults: RadarrFormState): Promise<{ ok: true }>;
@@ -77,8 +70,8 @@ export interface Ani2arrApi {
   clearMappingBlockedCandidate(input: ClearMappingBlockedCandidateInput): Promise<{ ok: true }>;
   searchSonarr(input: SonarrLookupInput): Promise<SonarrLookupOutput>;
   searchRadarr(input: RadarrLookupInput): Promise<RadarrLookupOutput>;
-  validateTvdbId(input: ValidateTvdbInput): Promise<ValidateTvdbOutput>;
-  validateTmdbId(input: ValidateTmdbInput): Promise<ValidateTmdbOutput>;
+  validateTvdbId(input: ValidateTvdbInput): Promise<{ inLibrary: boolean; inCatalog: boolean }>;
+  validateTmdbId(input: ValidateTmdbInput): Promise<{ inLibrary: boolean; inCatalog: boolean }>;
   getMappingOverrides(): Promise<MappingOverrideRecord[]>;
   clearAllMappingOverrides(): Promise<{ ok: true }>;
   exportStoredMappings(): Promise<ExportStoredMappingsOutput>;
@@ -86,7 +79,7 @@ export interface Ani2arrApi {
   resetExtensionState(): Promise<{ ok: true }>;
   getMappings(input?: GetMappingsInput): Promise<GetMappingsOutput>;
   getAniListMetadata(input: GetAniListMetadataInput): Promise<GetAniListMetadataOutput>;
-  getAniListSchedulerDebug(): Promise<GetAniListSchedulerDebugOutput>;
+  getAniListSchedulerDebug(): Promise<AniListSchedulerDebugSnapshot>;
   searchAniList(input: SearchAniListInput): Promise<AniListSearchResult[]>;
 }
 

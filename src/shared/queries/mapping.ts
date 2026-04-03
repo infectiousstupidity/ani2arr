@@ -3,7 +3,7 @@
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
-import type { CheckSeriesStatusPayload, CheckSeriesStatusResponse, ExportStoredMappingsOutput, GetMappingsOutput } from '@/rpc/types';
+import type { CheckSeriesStatusResponse, ExportStoredMappingsOutput, GetMappingsOutput } from '@/rpc/types';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import type {
   MappingProvider,
@@ -31,7 +31,10 @@ export type SeriesStatusOptions = {
   priority?: 'high' | 'normal' | (() => 'high' | 'normal' | undefined);
 };
 
-export const useSeriesStatus = (payload: CheckSeriesStatusPayload, options?: SeriesStatusOptions) => {
+export const useSeriesStatus = (
+  payload: Pick<StatusInput, 'anilistId' | 'title' | 'metadata'>,
+  options?: SeriesStatusOptions,
+) => {
   const forceVerify = options?.force_verify === true;
   return useQuery<CheckSeriesStatusResponse, ExtensionError>({
     queryKey: queryKeys.seriesStatus(payload, 'sonarr'),

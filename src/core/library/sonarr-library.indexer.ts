@@ -1,5 +1,8 @@
+/** Sonarr title index used for fast local AniList-to-TVDB matching. */
+// src/core/library/sonarr-library.indexer.ts
+
 import { incrementCounter } from '@/debug/metrics';
-import type { CheckSeriesStatusPayload } from '@/rpc/types';
+import type { StatusInput } from '@/rpc/schemas';
 import {
   buildTitleIndexKeysForProvider,
   computeTitleMatchScoreForProvider,
@@ -30,7 +33,7 @@ export class SonarrLibraryIndexer {
     this.bulkIndex(list);
   }
 
-  findTvdbIdInIndex(payload: CheckSeriesStatusPayload): number | null {
+  findTvdbIdInIndex(payload: Pick<StatusInput, 'title' | 'metadata'>): number | null {
     const candidateInputs = new Set<string>();
 
     if (payload.title) candidateInputs.add(payload.title);
@@ -73,10 +76,8 @@ export class SonarrLibraryIndexer {
           const series = this.seriesByTvdbId.get(match);
           if (!series) continue;
           const score = scoreAgainstSeries(rawTitle, series);
-          if (score >= LOCAL_INDEX_ACCEPTANCE_THRESHOLD) {
-            if (!bestMatch || score > bestMatch.score) {
-              bestMatch = { tvdbId: match, score };
-            }
+          if (score >= LOCAL_INDEX_ACCEPTANCE_THRESHOLD && (!bestMatch || score > bestMatch.score)) {
+            bestMatch = { tvdbId: match, score };
           }
         } else if (match === null) {
           sawAmbiguous = true;
@@ -125,6 +126,6 @@ export class SonarrLibraryIndexer {
       }
     }
 
-    return Array.from(out);
+    return [...out];
   }
 }

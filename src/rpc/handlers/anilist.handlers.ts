@@ -7,25 +7,23 @@ import { normalizeError } from '@/shared/errors';
 import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { ApiHandlerDeps } from './handler-deps';
 
-type AniListHandlerMethods = Pick<
+export function createAnilistHandlers(deps: ApiHandlerDeps): Pick<
   Ani2arrApi,
   | 'prefetchAniListMedia'
   | 'fetchAniListMedia'
   | 'searchAniList'
   | 'getAniListMetadata'
   | 'getAniListSchedulerDebug'
->;
-
-export function createAnilistHandlers(deps: ApiHandlerDeps): AniListHandlerMethods {
+> {
   const { anilistMediaService, anilistMetadataStore } = deps;
 
-  const handlers: AniListHandlerMethods = {
+  const handlers = {
     async prefetchAniListMedia(ids) {
       const map = await anilistMediaService.fetchMediaBatch(ids, {
         priority: 'low',
         source: 'browse-prefetch',
       });
-      return Array.from(map.entries()) as Array<[number, AniListMedia]>;
+      return [...map.entries()] as Array<[number, AniListMedia]>;
     },
 
     async fetchAniListMedia(anilistId) {
@@ -66,19 +64,28 @@ export function createAnilistHandlers(deps: ApiHandlerDeps): AniListHandlerMetho
       const result = await anilistMetadataStore.getMetadata(normalizedIds, {
         refreshStale: input?.refreshStale ?? true,
         fetchMissing: input?.fetchMissing ?? true,
-        ...(input?.maxBatch !== undefined ? { maxBatch: input.maxBatch } : {}),
+        ...(typeof input?.maxBatch === 'number' ? { maxBatch: input.maxBatch } : {}),
       });
 
       return {
         metadata: result.metadata,
-        ...(result.missingIds?.length ? { missingIds: result.missingIds } : {}),
+        ...(Array.isArray(result.missingIds) && result.missingIds.length > 0
+          ? { missingIds: result.missingIds }
+          : {}),
       };
     },
 
     async getAniListSchedulerDebug() {
       return anilistMediaService.getSchedulerDebugSnapshot();
     },
-  };
+  } satisfies Pick<
+    Ani2arrApi,
+    | 'prefetchAniListMedia'
+    | 'fetchAniListMedia'
+    | 'searchAniList'
+    | 'getAniListMetadata'
+    | 'getAniListSchedulerDebug'
+  >;
 
   return handlers;
 }

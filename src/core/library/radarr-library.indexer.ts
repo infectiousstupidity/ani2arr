@@ -1,5 +1,8 @@
+/** Radarr title index used for fast local AniList-to-TMDB matching. */
+// src/core/library/radarr-library.indexer.ts
+
 import { incrementCounter } from '@/debug/metrics';
-import type { CheckMovieStatusPayload } from '@/rpc/types';
+import type { StatusInput } from '@/rpc/schemas';
 import {
   buildTitleIndexKeysForProvider,
   computeTitleMatchScoreForProvider,
@@ -30,7 +33,7 @@ export class RadarrLibraryIndexer {
     this.bulkIndex(list);
   }
 
-  findTmdbIdInIndex(payload: CheckMovieStatusPayload): number | null {
+  findTmdbIdInIndex(payload: Pick<StatusInput, 'title' | 'metadata'>): number | null {
     const candidateInputs = new Set<string>();
 
     if (payload.title) candidateInputs.add(payload.title);
@@ -74,10 +77,8 @@ export class RadarrLibraryIndexer {
           const movie = this.moviesByTmdbId.get(match);
           if (!movie) continue;
           const score = scoreAgainstMovie(rawTitle, movie);
-          if (score >= LOCAL_INDEX_ACCEPTANCE_THRESHOLD) {
-            if (!bestMatch || score > bestMatch.score) {
-              bestMatch = { tmdbId: match, score };
-            }
+          if (score >= LOCAL_INDEX_ACCEPTANCE_THRESHOLD && (!bestMatch || score > bestMatch.score)) {
+            bestMatch = { tmdbId: match, score };
           }
         } else if (match === null) {
           sawAmbiguous = true;
@@ -126,6 +127,6 @@ export class RadarrLibraryIndexer {
       }
     }
 
-    return Array.from(out);
+    return [...out];
   }
 }

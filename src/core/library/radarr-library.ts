@@ -1,5 +1,9 @@
+/** Radarr-backed library cache and status lookup logic for movie records. */
+// src/core/library/radarr-library.ts
+
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
-import type { CheckMovieStatusPayload, CheckMovieStatusResponse } from '@/rpc/types';
+import type { StatusInput } from '@/rpc/schemas';
+import type { CheckMovieStatusResponse } from '@/rpc/types';
 import type { MappingService } from '@/services/mapping';
 import type { ResolveExternalIdOptions } from '@/services/mapping/types';
 import { ErrorCode, logError, normalizeError } from '@/shared/errors';
@@ -68,7 +72,7 @@ export class RadarrLibrary {
   }
 
   async getMovieStatus(
-    payload: CheckMovieStatusPayload,
+    payload: Pick<StatusInput, 'anilistId' | 'title' | 'metadata'>,
     options: LibraryStatusOptions = {},
   ): Promise<CheckMovieStatusResponse> {
     if (import.meta.env.DEV) {
@@ -219,7 +223,7 @@ export class RadarrLibrary {
 
   private toMovieSnapshot(movie: RadarrMovie): RadarrMovieSnapshot {
     const alternateTitles = Array.isArray(movie.alternateTitles)
-      ? movie.alternateTitles.map(title => title?.title?.trim()).filter((title): title is string => Boolean(title))
+      ? (movie.alternateTitles.map(title => title?.title?.trim()).filter(Boolean) as string[])
       : [];
 
     return {

@@ -5,7 +5,7 @@ import type { Ani2arrApi } from '@/rpc';
 import type { ProviderCredentials, SonarrSeriesSnapshot } from '@/shared/types/providers';
 import type { ApiHandlerDeps } from './handler-deps';
 
-type ProviderHandlerMethods = Pick<
+export function createProviderHandlers(deps: ApiHandlerDeps): Pick<
   Ani2arrApi,
   | 'testProviderConnection'
   | 'getSonarrMetadata'
@@ -14,9 +14,7 @@ type ProviderHandlerMethods = Pick<
   | 'searchRadarr'
   | 'validateTvdbId'
   | 'validateTmdbId'
->;
-
-export function createProviderHandlers(deps: ApiHandlerDeps): ProviderHandlerMethods {
+> {
   const {
     SonarrClient,
     RadarrClient,
@@ -28,13 +26,13 @@ export function createProviderHandlers(deps: ApiHandlerDeps): ProviderHandlerMet
     ensureRadarrConfigured,
   } = deps;
 
-  const testProviderConnectionInternal: ProviderHandlerMethods['testProviderConnection'] = async input => {
+  const testProviderConnectionInternal: Ani2arrApi['testProviderConnection'] = async input => {
     return input.provider === 'sonarr'
       ? SonarrClient.testConnection(input.credentials)
       : RadarrClient.testConnection(input.credentials);
   };
 
-  const handlers: ProviderHandlerMethods = {
+  const handlers = {
     testProviderConnection(input) {
       return testProviderConnectionInternal(input);
     },
@@ -61,10 +59,13 @@ export function createProviderHandlers(deps: ApiHandlerDeps): ProviderHandlerMet
 
     async getRadarrMetadata(input) {
       const maybeCredentials = input?.credentials;
-      const credentials =
-        maybeCredentials?.url && maybeCredentials.apiKey
-          ? maybeCredentials
-          : (await ensureRadarrConfigured()).credentials;
+      let credentials: ProviderCredentials;
+      if (maybeCredentials?.url && maybeCredentials.apiKey) {
+        credentials = maybeCredentials;
+      } else {
+        const ensured = await ensureRadarrConfigured();
+        credentials = ensured.credentials;
+      }
 
       const [qualityProfiles, rootFolders, tags] = await Promise.all([
         RadarrClient.getQualityProfiles(credentials),
@@ -174,7 +175,16 @@ export function createProviderHandlers(deps: ApiHandlerDeps): ProviderHandlerMet
       }
       return { inLibrary: !!found, inCatalog };
     },
-  };
+  } satisfies Pick<
+    Ani2arrApi,
+    | 'testProviderConnection'
+    | 'getSonarrMetadata'
+    | 'getRadarrMetadata'
+    | 'searchSonarr'
+    | 'searchRadarr'
+    | 'validateTvdbId'
+    | 'validateTmdbId'
+  >;
 
   return handlers;
 }
