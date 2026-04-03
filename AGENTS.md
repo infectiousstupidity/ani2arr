@@ -20,7 +20,22 @@
 - Minimum verification:
   - `pnpm run lint`
   - `pnpm run compile`
+- Run tests when the change affects existing tested behavior, shared logic, parsing, validation, matching, caching, or anything regression-prone.
 - If you cannot run a check, say why.
+
+## Testing
+
+- Do not add tests by default.
+- Add or update tests when they protect important behavior or prevent likely regressions.
+- Prefer the cheapest test that gives confidence.
+- Prefer unit tests for pure logic.
+- Prefer integration-style tests only when behavior crosses boundaries and a unit test would miss the real risk.
+- Do not add tests for simple presentational UI, trivial wrappers, or obvious pass-through code unless there is a known bug risk.
+- Do not snapshot large UI trees unless there is a clear reason.
+- For bug fixes, prefer adding a focused regression test when practical.
+- For refactors, do not add broad new test suites unless the refactor changes behavior or exposes untested critical logic.
+- Keep tests small, explicit, and easy to maintain.
+- Avoid over-mocking. Test real logic, not implementation detail.
 
 ## Core rules
 
@@ -125,6 +140,7 @@ src/
 * The requested change is implemented.
 * Behavior matches the request.
 * Relevant checks pass.
+* Relevant tests pass when tests exist or were needed for the change.
 * No unrelated abstractions or layers were added.
 * Existing complexity touched by the task was simplified where reasonable.
 * New files, names, and extracted types are justified by current usage, not hypothetical future reuse.
