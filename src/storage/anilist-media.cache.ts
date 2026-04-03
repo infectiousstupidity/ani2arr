@@ -3,6 +3,6 @@
 
 import { createTtlCache } from './ttl-cache';
 import { CACHE_NAMESPACES } from './keys';
-import type { AniListMedia } from '@/shared/types';
+import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
 
 export const anilistMediaCache = createTtlCache<AniListMedia>(CACHE_NAMESPACES.anilistMedia);

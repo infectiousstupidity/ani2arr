@@ -1,10 +1,9 @@
+/** Mapping service orchestration for AniList-to-provider resolution, caching, and persistence. */
+// src/services/mapping/index.ts
+
 import type { AniListMediaService } from '@/core/anilist';
-import type {
-  AniListMedia,
-  MappingExternalId,
-  MappingProvider,
-  RequestPriority,
-} from '@/shared/types';
+import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { MappingExternalId, MappingProvider, RequestPriority } from '@/shared/types';
 import {
   createError,
   ErrorCode,

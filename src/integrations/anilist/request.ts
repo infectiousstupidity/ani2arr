@@ -14,14 +14,9 @@ interface RequestParams<TVariables> {
   variables: TVariables;
 }
 
-export interface AniListRequestResult<TPayload> {
-  payload: TPayload;
-  meta: AniListResponseMeta;
-}
-
 export async function postAniList<TResponse, TVariables extends Record<string, unknown>>(
   params: RequestParams<TVariables>,
-): Promise<AniListRequestResult<TResponse>> {
+): Promise<{ payload: TResponse; meta: AniListResponseMeta }> {
   const response = await fetch(ANILIST_GRAPHQL_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

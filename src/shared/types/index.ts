@@ -2,31 +2,6 @@
 // src/shared/types/index.ts
 
 export type {
-  AniListMediaFormat,
-  AniListMedia,
-  AniListTitles,
-  AniListMediaHint,
-  AniListMediaStatus,
-  AniListMediaSeason,
-  AniListMetadata,
-  AniListMetadataCoverImage,
-  AniListMetadataChunkRef,
-  AniListMetadataBundle,
-} from './anilist';
-
-export type {
-  AniListSchedulerEventType,
-  AniListSchedulerRequestDebug,
-  AniListSchedulerPendingEntryDebug,
-  AniListSchedulerBucketDebug,
-  AniListSchedulerBatchMediaCountsDebug,
-  AniListSchedulerBatchDebug,
-  AniListSchedulerEventDebug,
-  AniListSchedulerLimiterDebug,
-  AniListSchedulerDebugSnapshot,
-} from '@/debug/anilist-debug.types';
-
-export type {
   Provider,
   ProviderCredentials,
   ProviderMetadata,

@@ -1,3 +1,6 @@
+/** Browse overlay composition for parsed cards, metadata hints, and action portals. */
+// src/features/media-overlay/components/media-overlay.tsx
+
 import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
@@ -6,7 +9,8 @@ import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useBrowsePortals } from '../hooks/use-media-portals';
 import { useAnilistBatchPrefetch } from '../hooks/use-anilist-batch-prefetch';
-import type { BrowseAdapter, ParsedCard, AniListMediaHint } from '@/shared/types';
+import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { BrowseAdapter, ParsedCard } from '@/shared/types';
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import { CardOverlay } from './card-overlay';
 

@@ -3,7 +3,8 @@
 
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
 import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
-import type { AniListMediaFormat, AniListMediaHint, PublicOptions } from '@/shared/types';
+import type { AniListMediaFormat, AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { PublicOptions } from '@/shared/types';
 import baseStyles from '@/shared/styles/base.css?inline';
 import browseStyles from './style.css?inline';
 import {

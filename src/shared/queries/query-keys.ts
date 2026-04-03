@@ -1,5 +1,9 @@
+/** Shared query keys and stable AniList metadata serialization for query caching. */
+// src/shared/queries/query-keys.ts
+
 import type { CheckSeriesStatusPayload } from '@/rpc/types';
-import type { MappingProvider, AniListMediaHint } from '@/shared/types';
+import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { MappingProvider } from '@/shared/types';
 import type { GetMappingsInput } from '@/rpc/schemas';
 
 const rootQueryKey = ['a2a'] as const;

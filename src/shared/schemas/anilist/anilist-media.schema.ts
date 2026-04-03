@@ -1,5 +1,5 @@
 /** Canonical AniList media schemas for shared contracts parsed from AniList responses. */
-// src/shared/schemas/anilist-media.schema.ts
+// src/shared/schemas/anilist/anilist-media.schema.ts
 
 import * as v from 'valibot';
 
@@ -129,6 +129,14 @@ export const AniListMediaSchema = v.object({
 
 export type AniListMediaFormat = v.InferOutput<typeof AniListMediaFormatSchema>;
 export type AniListMediaStatus = v.InferOutput<typeof AniListMediaStatusSchema>;
-export type AniListMediaSeason = v.InferOutput<typeof AniListMediaSeasonSchema>;
 export type AniListTitles = v.InferOutput<typeof AniListTitlesSchema>;
 export type AniListMedia = v.InferOutput<typeof AniListMediaSchema>;
+
+export interface AniListMediaHint {
+  titles?: AniListTitles | null | undefined;
+  synonyms?: string[] | null | undefined;
+  startYear?: number | null | undefined;
+  format?: AniListMediaFormat | null | undefined;
+  relationPrequelIds?: number[] | null | undefined;
+  coverImage?: string | null | undefined;
+}

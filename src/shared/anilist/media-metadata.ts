@@ -1,6 +1,10 @@
+/** Shared AniList metadata-hint helpers used by DOM and UI call sites. */
 // src/shared/anilist/media-metadata.ts
-// TODO: Move or split this out of shared/anilist during the planned architecture refactor; keep reusable AniList metadata-hint helpers under a support owner and place any stronger domain-owned logic with that owner.
-import type { AniListTitles, AniListMediaHint, AniListMediaFormat } from '@/shared/types';
+
+import type {
+  AniListMediaHint,
+} from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.schema';
 
 export const normalizeSynonyms = (synonyms?: string[] | null): string[] => {
   if (!Array.isArray(synonyms)) return [];
@@ -101,18 +105,8 @@ export const mergeMetadataHints = (
   });
 };
 
-type AniListMetadataLike = {
-  titles?: AniListTitles | null | undefined;
-  seasonYear?: number | null | undefined;
-  format?: AniListMediaFormat | null | undefined;
-  coverImage?: {
-    medium?: string | null | undefined;
-    large?: string | null | undefined;
-  } | null | undefined;
-};
-
 export const metadataHintFromAniListMetadata = (
-  metadata?: AniListMetadataLike | null,
+  metadata?: AniListMetadata | null,
 ): AniListMediaHint | null => {
   if (!metadata) return null;
 

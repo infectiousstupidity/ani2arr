@@ -7,8 +7,8 @@ import type { SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { MappingService } from '@/services/mapping';
 import type { ResolveTvdbIdOptions } from '@/services/mapping/types';
 import { createError, ErrorCode } from '@/shared/errors';
+import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-import type { AniListMediaHint } from '@/shared/types';
 import type { ProviderCredentials, SonarrSeries } from '@/shared/types/providers';
 
 type AddSonarrSeriesInput = {

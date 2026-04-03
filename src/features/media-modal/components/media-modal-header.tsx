@@ -5,7 +5,9 @@ import { type MouseEventHandler } from "react";
 import { Database, X } from "lucide-react";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import Pill from '@/shared/ui/primitives/pill';
-import type { AniListMediaFormat, Provider, AniListMediaStatus, AniListTitleLanguage } from "@/shared/types";
+import type { AniListTitleLanguage } from "@/shared/schemas/anilist/anilist-title-language.schema";
+import type { AniListMediaFormat, AniListMediaStatus } from "@/shared/schemas/anilist/anilist-media.schema";
+import type { Provider } from "@/shared/types";
 import { getProviderLabel } from "@/services/providers/resolver";
 
 export type MediaModalTabId = "series" | "mapping";
@@ -172,5 +174,4 @@ export function Header(props: HeaderProps): React.JSX.Element {
     </header>
   );
 }
-
 

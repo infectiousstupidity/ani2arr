@@ -59,5 +59,3 @@ export const SearchMediaResponseDtoSchema = v.object({
 
 export type AniListGraphQLError = v.InferOutput<typeof AniListGraphQLErrorSchema>;
 export type AniListSearchMediaDto = v.InferOutput<typeof AniListSearchMediaDtoSchema>;
-export type FindMediaBatchResponseDto = v.InferOutput<typeof FindMediaBatchResponseDtoSchema>;
-export type SearchMediaResponseDto = v.InferOutput<typeof SearchMediaResponseDtoSchema>;

@@ -1,5 +1,5 @@
 /** Canonical AniList metadata schemas for persisted metadata contracts. */
-// src/shared/schemas/anilist-metadata.schema.ts
+// src/shared/schemas/anilist/anilist-metadata.schema.ts
 
 import * as v from 'valibot';
 import { AniListMediaFormatSchema, AniListTitlesSchema } from '@/shared/schemas/anilist/anilist-media.schema';
@@ -31,7 +31,6 @@ export const AniListMetadataBundleSchema = v.object({
   chunks: v.optional(v.array(AniListMetadataChunkRefSchema)),
 });
 
-export type AniListMetadataCoverImage = v.InferOutput<typeof AniListMetadataCoverImageSchema>;
 export type AniListMetadata = v.InferOutput<typeof AniListMetadataSchema>;
 export type AniListMetadataChunkRef = v.InferOutput<typeof AniListMetadataChunkRefSchema>;
 export type AniListMetadataBundle = v.InferOutput<typeof AniListMetadataBundleSchema>;

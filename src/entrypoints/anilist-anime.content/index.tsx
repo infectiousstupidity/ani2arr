@@ -24,9 +24,8 @@ import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import type {
   AniListMediaFormat,
   AniListMediaHint,
-  RadarrFormState,
-  SonarrFormState,
-} from '@/shared/types';
+} from '@/shared/schemas/anilist/anilist-media.schema';
+import type { RadarrFormState, SonarrFormState } from '@/shared/types';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
 import '@/shared/styles/base.css';

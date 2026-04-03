@@ -2,7 +2,7 @@
 // src/core/anilist/media-normalizer.ts
 
 import type { TtlCache } from '@/storage';
-import type { AniListMedia } from '@/shared/types';
+import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
 import { logger } from '@/shared/utils/logger';
 import { MEDIA_HARD_TTL, MEDIA_SOFT_TTL } from './constants';
 

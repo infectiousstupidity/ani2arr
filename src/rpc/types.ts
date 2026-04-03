@@ -4,10 +4,10 @@
 import type {
   AniListMediaFormat,
   AniListMediaHint,
-  AniListMediaStatus,
-  AniListMetadata,
   AniListTitles,
-} from '@/shared/types/anilist';
+  AniListMediaStatus,
+} from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.schema';
 import type {
   RadarrMovieSnapshot,
   RadarrLookupMovie,

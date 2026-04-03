@@ -1,7 +1,8 @@
 /** Resolves AniList display titles and canonical title-language labels for UI callers. */
 // src/shared/utils/anilist-title-preference.ts
 
-import type { AniListTitles, AniListTitleLanguage } from '@/shared/types';
+import type { AniListTitleLanguage } from '@/shared/schemas/anilist/anilist-title-language.schema';
+import type { AniListTitles } from '@/shared/schemas/anilist/anilist-media.schema';
 
 const TITLE_LANGUAGE_ORDER: AniListTitleLanguage[] = ['english', 'romaji', 'native'];
 
@@ -28,17 +29,15 @@ export const getAniListTitleLanguageLabel = (
   return label;
 };
 
-export interface ResolvedTitlePreference {
-  primary: string;
-  usedLanguage: AniListTitleLanguage | 'fallback';
-  alternates: Array<{ label: string; value: string }>;
-}
-
 export const resolveTitlePreference = (params: {
   titles?: AniListTitles | null;
   preferred?: AniListTitleLanguage;
   fallback?: string | null;
-}): ResolvedTitlePreference => {
+}): {
+  primary: string;
+  usedLanguage: AniListTitleLanguage | 'fallback';
+  alternates: Array<{ label: string; value: string }>;
+} => {
   const preferred = params.preferred ?? 'english';
   const uniqueOrder = Array.from(new Set<AniListTitleLanguage>([preferred, ...TITLE_LANGUAGE_ORDER]));
   const titleMap = params.titles ?? {};

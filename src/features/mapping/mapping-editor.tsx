@@ -16,8 +16,8 @@ import type {
   MappingSearchResult,
   RadarrLookupMovie,
   SonarrLookupSeries,
-  AniListTitles,
 } from '@/shared/types';
+import type { AniListTitles } from '@/shared/schemas/anilist/anilist-media.schema';
 import { metadataFromMediaObject } from '@/shared/anilist/anilist-dom';
 import { resolveTitlePreference } from '@/shared/utils/anilist-title-preference';
 import { toMappingSearchResultFromRadarr } from './radarr.adapter';

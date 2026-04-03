@@ -2,7 +2,6 @@
 // src/integrations/anilist/media.ts
 
 import * as v from 'valibot';
-import type { AniListMedia } from '@/shared/types';
 import { AniListGraphqlError } from '@/integrations/anilist/errors';
 import {
   FindMediaBatchResponseDtoSchema,
@@ -16,11 +15,7 @@ import {
 } from '@/integrations/anilist/queries';
 import { postAniList } from '@/integrations/anilist/request';
 import type { AniListResponseMeta } from '@/integrations/anilist/types';
-
-export interface AniListMediaResult<TData> {
-  data: TData;
-  meta: AniListResponseMeta;
-}
+import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
 
 const assertNoGraphqlErrors = (errors?: AniListGraphQLError[]): void => {
   if (errors?.length) {
@@ -28,7 +23,9 @@ const assertNoGraphqlErrors = (errors?: AniListGraphQLError[]): void => {
   }
 };
 
-export async function fetchAniListMediaBatch(ids: number[]): Promise<AniListMediaResult<AniListMedia[]>> {
+export async function fetchAniListMediaBatch(
+  ids: number[],
+): Promise<{ data: AniListMedia[]; meta: AniListResponseMeta }> {
   const { payload, meta } = await postAniList<unknown, { ids: number[] }>({
     query: FIND_MEDIA_BATCH_QUERY,
     variables: { ids },
@@ -47,7 +44,7 @@ export async function fetchAniListMediaBatch(ids: number[]): Promise<AniListMedi
 export async function searchAniListMedia(
   search: string,
   limit: number,
-): Promise<AniListMediaResult<AniListSearchMediaDto[]>> {
+): Promise<{ data: AniListSearchMediaDto[]; meta: AniListResponseMeta }> {
   const { payload, meta } = await postAniList<unknown, { search: string; perPage: number }>({
     query: SEARCH_MEDIA_QUERY,
     variables: { search, perPage: limit },

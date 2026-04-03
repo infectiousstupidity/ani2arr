@@ -1,7 +1,7 @@
 /** Shared UI view-model types for overlays, browse cards, and mapping results. */
 // src/shared/types/ui.ts
 
-import type { AniListMediaHint } from './anilist';
+import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { BadgeVisibility } from './options';
 import type { Provider } from '@/shared/types/providers';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';

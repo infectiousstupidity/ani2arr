@@ -1,14 +1,13 @@
+/** Card overlay state machine for AniList quick-add actions on browse surfaces. */
+// src/features/media-overlay/hooks/use-card-overlay-state.ts
+
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { browser } from 'wxt/browser';
 import { useAddMovie, useAddSeries, useMovieStatus, useSeriesStatus } from '@/shared/queries';
 import type { ExtensionError } from '@/shared/errors';
-import type {
-  AniListMediaHint,
-  Provider,
-  RadarrFormState,
-  SonarrFormState,
-} from '@/shared/types';
+import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { Provider, RadarrFormState, SonarrFormState } from '@/shared/types';
 import { getProviderLabel } from '@/services/providers/resolver';
 
 export type OverlayState = 'disabled' | 'in-library' | 'addable' | 'resolving' | 'adding' | 'error';
