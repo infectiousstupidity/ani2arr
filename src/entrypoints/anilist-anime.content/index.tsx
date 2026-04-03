@@ -25,7 +25,8 @@ import type {
   AniListMediaFormat,
   AniListMediaHint,
 } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { RadarrFormState, SonarrFormState } from '@/shared/types';
+import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
+import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
 import '@/shared/styles/base.css';
@@ -131,7 +132,7 @@ function ensureActionsAnchor(): HTMLElement | null {
     anchor.style.width = 'auto';
     anchor.style.maxWidth = 'none';
     const listRow = actions.querySelector(LIST_ROW_SELECTOR);
-    if (listRow) actions.insertBefore(anchor, listRow);
+    if (listRow) listRow.before(anchor);
     else actions.prepend(anchor);
   }
   return anchor;
@@ -157,7 +158,7 @@ function ensureSidebarSpacer(): HTMLElement | null {
     spacer.style.height = '0px';
     spacer.style.margin = '0';
     const rankings = sidebar.querySelector('.rankings');
-    if (rankings) sidebar.insertBefore(spacer, rankings);
+    if (rankings) rankings.before(spacer);
     else sidebar.prepend(spacer);
   }
   return spacer;
@@ -217,10 +218,10 @@ function attachSizeSync(host: HTMLElement): () => void {
 }
 
 function readFormatFromSidebar(doc: Document = document): AniListMediaFormat | null {
-  const rows = Array.from(doc.querySelectorAll<HTMLDivElement>('.sidebar .data .data-set'));
+  const rows = [...doc.querySelectorAll<HTMLDivElement>('.sidebar .data .data-set')];
   const formatRow = rows.find(r => r.querySelector('.type')?.textContent?.trim() === 'Format');
   const raw = formatRow?.querySelector('.value')?.textContent ?? '';
-  const normalized = raw.replace(/\s+/g, ' ').trim().toLowerCase();
+  const normalized = raw.replaceAll(/\s+/g, ' ').trim().toLowerCase();
   if (!normalized) return null;
   if (normalized.includes('movie')) return 'MOVIE';
   if (normalized.includes('music')) return 'MUSIC';
@@ -375,9 +376,9 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ anilistId, title, meta
   const externalId =
     mappingUnavailable
       ? null
-      : provider === 'radarr'
+      : (provider === 'radarr'
         ? movieStatusQuery.data?.tmdbId ?? null
-        : seriesStatusQuery.data?.tvdbId ?? null;
+        : seriesStatusQuery.data?.tvdbId ?? null);
 
   if (!provider) {
     return null;
@@ -497,7 +498,7 @@ async function mountAnimePageUI({
   isCurrent,
 }: ContentEntrypointShellContext): Promise<void> {
   const idMatch = new URL(url).pathname.match(/\/anime\/(\d+)/);
-  const anilistId = idMatch?.[1] ? parseInt(idMatch[1], 10) : null;
+  const anilistId = idMatch?.[1] ? Number.parseInt(idMatch[1], 10) : null;
   if (!anilistId) return;
 
   await Promise.all([

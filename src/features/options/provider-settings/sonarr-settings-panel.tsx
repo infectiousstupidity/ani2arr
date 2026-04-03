@@ -26,7 +26,7 @@ import {
 import type { SonarrAddOptionsFieldsLayout } from '@/components/provider-add-options/sonarr-add-options-fields';
 import { SonarrDefaultsSection } from './sonarr-defaults-section';
 import { useSelectPortal } from './use-select-portal';
-import type { ExtensionOptions } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
 
 export interface SonarrSettingsPanelProps {
   actions: SettingsActions;

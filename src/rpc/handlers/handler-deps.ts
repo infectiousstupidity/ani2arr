@@ -9,8 +9,8 @@ import type { getMappingsHandler } from '@/rpc/handlers/get-mappings.handlers';
 import type { MappingService } from '@/services/mapping';
 import type { MappingOverridesService } from '@/services/mapping/overrides';
 import type { UpstreamMappingStore } from '@/services/mapping/upstream';
-import type { ExtensionOptions } from '@/shared/types';
-import type { ProviderCredentials } from '@/shared/types/providers';
+import type { ExtensionOptions } from '@/options';
+import type { ProviderCredentials } from '@/integrations/providers';
 
 export type ApiHandlerDeps = {
   SonarrClient: SonarrClient;

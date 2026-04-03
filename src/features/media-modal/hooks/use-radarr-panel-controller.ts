@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 
-import type { RadarrFormState } from "@/shared/types";
+import type { RadarrFormState } from "@/shared/schemas/providers/radarr-settings.schema";
 import { buildProviderMediaPath } from "@/shared/utils/provider-library-paths";
 import type { RadarrPanelBaseProps, RadarrPanelMode } from "../types";
 

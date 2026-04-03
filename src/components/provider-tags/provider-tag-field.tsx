@@ -3,7 +3,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 
-import type { ProviderTag } from '@/shared/types/providers';
+import type { ProviderTag } from '@/integrations/providers';
 import { FormField, Label } from '@/shared/ui/form/form';
 import MultiTagInput from '@/shared/ui/form/multi-tag-input';
 
@@ -43,7 +43,7 @@ export function ProviderTagField(props: ProviderTagFieldProps): React.JSX.Elemen
     [selectedFreeformTags, selectedTagIds, tagMaps.idToLabel],
   );
 
-  const existingTags = useMemo(() => Array.from(tagMaps.labelToId.keys()), [tagMaps.labelToId]);
+  const existingTags = useMemo(() => [...tagMaps.labelToId.keys()], [tagMaps.labelToId]);
 
   const handleChange = useCallback(
     (labels: string[]) => {

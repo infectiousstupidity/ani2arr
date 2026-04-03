@@ -8,7 +8,7 @@ import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,
 } from '@/shared/schemas/providers/provider-connection.schema';
-import type { ExtensionOptions, PublicOptions } from '@/shared/types';
+import type { ExtensionOptions, PublicOptions } from '@/options';
 import { logger } from '@/shared/utils/logger';
 import { STORAGE_KEYS } from './keys';
 

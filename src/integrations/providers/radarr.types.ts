@@ -1,5 +1,5 @@
-/** Canonical shared Radarr provider resource types reused unchanged across integrations, RPC, and UI flows. */
-// src/shared/types/providers/radarr.ts
+/** Radarr resource types owned by the provider integrations domain. */
+// src/integrations/providers/radarr.types.ts
 
 import type { RadarrMinimumAvailability } from '@/shared/schemas/providers/radarr-settings.schema';
 

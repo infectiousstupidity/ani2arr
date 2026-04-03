@@ -4,7 +4,8 @@
 import { useMemo } from 'react';
 import { useDebounced } from '@/shared/hooks/common/use-debounced';
 import { useAniListMetadataBatch, useMappings } from '@/shared/queries';
-import type { Provider, MappingSummary } from '@/shared/types';
+import type { Provider } from '@/integrations/providers';
+import type { MappingSummary } from '@/services/mapping/types';
 import type { GetAniListMetadataOutput, GetMappingsOutput } from '@/rpc/types';
 import type { GetMappingsInput } from '@/rpc/schemas';
 import type { MappingTableRowData } from '../components/mapping-table';

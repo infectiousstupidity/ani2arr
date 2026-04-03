@@ -16,7 +16,8 @@ import {
 } from '@/shared/queries';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
-import type { Provider, MappingSummary } from '@/shared/types';
+import type { Provider } from '@/integrations/providers';
+import type { MappingSummary } from '@/services/mapping/types';
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import SectionHeader from '@/features/options/section-header';
 import MappingToolbar, {

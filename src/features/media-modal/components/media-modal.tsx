@@ -11,7 +11,9 @@ import type {
   AniListMediaFormat,
   AniListMediaStatus,
 } from "@/shared/schemas/anilist/anilist-media.schema";
-import type { Provider, RadarrFormState, SonarrFormState } from "@/shared/types";
+import type { Provider } from "@/integrations/providers";
+import type { RadarrFormState } from "@/shared/schemas/providers/radarr-settings.schema";
+import type { SonarrFormState } from "@/shared/schemas/providers/sonarr-settings.schema";
 import { ErrorCode, type ExtensionError } from "@/shared/errors";
 import { createDefaultRadarrFormState } from "@/shared/schemas/providers/radarr-settings.schema";
 import { createDefaultSonarrFormState } from "@/shared/schemas/providers/sonarr-settings.schema";
@@ -160,7 +162,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     const externalLabel = selected?.target ? `${selected.target.kind.toUpperCase()} ${selected.target.id}` : 'This mapping';
 
     const confirmShare = async (conflictingIds: number[]): Promise<boolean> => {
-      if (!conflictingIds.length) return true;
+      if (conflictingIds.length === 0) return true;
       return confirm({
         title: 'Share this mapping?',
         description: `${externalLabel} is already linked to AniList entr${conflictingIds.length === 1 ? 'y' : 'ies'} ${conflictingIds.join(', ')}. Continue to share this mapping?`,
@@ -281,9 +283,9 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
       primaryLabel:
         activePanelMode === "edit"
           ? "Save changes"
-          : provider === 'radarr'
+          : (provider === 'radarr'
             ? "Add movie"
-            : "Add series",
+            : "Add series"),
       primaryDisabled: !activeController.canSubmit,
       primaryLoading: activeController.isSubmitting,
       onPrimaryClick: () => {

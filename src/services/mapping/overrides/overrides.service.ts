@@ -1,8 +1,8 @@
 /** Mapping override service for persisted manual mappings, ignores, and candidate suppressions. */
 // src/services/mapping/overrides/overrides.service.ts
 
-import type { MappingExternalId, MappingExternalIdRecord, MappingIgnoreRecord } from '@/shared/types';
-import type { Provider } from '@/shared/types/providers';
+import type { MappingExternalId, MappingExternalIdRecord, MappingIgnoreRecord } from '@/services/mapping/types';
+import type { Provider } from '@/integrations/providers';
 import {
   createRecordKey,
   createReverseLookupKey,

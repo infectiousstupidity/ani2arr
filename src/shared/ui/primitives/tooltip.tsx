@@ -1,9 +1,10 @@
-// src/shared/components/tooltip.tsx
+/** Shared tooltip primitives for help affordances and wrapped hover content. */
+// src/shared/ui/primitives/tooltip.tsx
 import React from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { CircleHelp } from 'lucide-react';
 
-export interface TooltipWrapperProps {
+interface TooltipWrapperProps {
   content: React.ReactNode;
   children: React.ReactNode;
   side?: 'top' | 'bottom' | 'left' | 'right';

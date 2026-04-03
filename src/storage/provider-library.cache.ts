@@ -3,7 +3,7 @@
 
 import { createTtlCache } from './ttl-cache';
 import { CACHE_NAMESPACES } from './keys';
-import type { SonarrSeriesSnapshot, RadarrMovieSnapshot } from '@/shared/types/providers';
+import type { SonarrSeriesSnapshot, RadarrMovieSnapshot } from '@/integrations/providers';
 
 export const providerLibraryCaches = {
   sonarr: {

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 
-import type { SonarrFormState } from "@/shared/types";
+import type { SonarrFormState } from "@/shared/schemas/providers/sonarr-settings.schema";
 import {
   buildProviderFolderSlugFromTitle,
   buildProviderMediaPath,

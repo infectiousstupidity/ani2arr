@@ -5,7 +5,7 @@ import { resolveRadarrMovieUpdate } from '@/core/library/provider-update.resolve
 import type { RadarrLibrary } from '@/core/library/radarr-library';
 import type { RadarrClient } from '@/integrations/providers/radarr.client';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
-import type { ProviderCredentials, RadarrMovie } from '@/shared/types/providers';
+import type { ProviderCredentials, RadarrMovie } from '@/integrations/providers';
 
 type UpdateRadarrMovieInput = {
   tmdbId: number;

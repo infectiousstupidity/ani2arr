@@ -1,7 +1,7 @@
 /** Adapts Sonarr lookup results into mapping-search rows with library-aware links. */
 // src/features/mapping/sonarr.adapter.ts
 
-import type { SonarrLookupSeries } from '@/shared/types/providers';
+import type { SonarrLookupSeries } from '@/integrations/providers';
 import { getProviderLibrarySlug } from '@/shared/utils/provider-library-paths';
 import type { MappingSearchResult } from './types';
 

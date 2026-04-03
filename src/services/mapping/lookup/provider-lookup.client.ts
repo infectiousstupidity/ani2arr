@@ -1,9 +1,9 @@
 /** Provider lookup client types for provider search adapters and cache behavior. */
 // src/services/mapping/lookup/provider-lookup.client.ts
 
-import type { MappingExternalIdKind } from '@/shared/types';
-import type { Provider, ProviderCredentials } from '@/shared/types/providers';
-import type { RequestPriority } from '@/shared/types/request-scheduling';
+import type { MappingExternalIdKind } from '@/services/mapping/types';
+import type { Provider, ProviderCredentials } from '@/integrations/providers';
+import type { RequestPriority } from '@/shared/utils/request-priority';
 
 export interface ProviderLookupResult {
   title: string;

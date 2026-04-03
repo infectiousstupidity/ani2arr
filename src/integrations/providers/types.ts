@@ -1,5 +1,5 @@
-/** Canonical provider-common shared types reused across provider integrations, RPC, and UI flows. */
-// src/shared/types/providers/common.ts
+/** Common provider-domain types owned by the provider integrations domain. */
+// src/integrations/providers/types.ts
 
 export type Provider = 'sonarr' | 'radarr';
 

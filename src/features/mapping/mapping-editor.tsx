@@ -12,10 +12,12 @@ import { MappingSearchPanel } from './mapping-search-panel';
 import { useMappingController } from './use-mapping-controller';
 import type {
   MappingExternalId,
+} from '@/services/mapping/types';
+import type {
   Provider,
   RadarrLookupMovie,
   SonarrLookupSeries,
-} from '@/shared/types';
+} from '@/integrations/providers';
 import type { AniListTitles } from '@/shared/schemas/anilist/anilist-media.schema';
 import { metadataFromMediaObject } from '@/shared/anilist/anilist-dom';
 import { resolveTitlePreference } from '@/shared/utils/anilist-title-preference';

@@ -1,8 +1,9 @@
-// src/shared/components/dropdown.tsx
+/** Shared dropdown primitives for menu triggers and item content. */
+// src/shared/ui/primitives/dropdown.tsx
 import React from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 
-export interface DropdownProps {
+interface DropdownProps {
   trigger: React.ReactNode;
   children: React.ReactNode;
   container?: HTMLElement | null;

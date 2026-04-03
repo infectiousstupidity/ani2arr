@@ -3,10 +3,11 @@
 
 import { STORAGE_POLICIES, type TtlCache } from '@/storage';
 import PQueue from 'p-queue';
-import type { MappingExternalIdKind, Provider } from '@/shared/types';
+import type { Provider } from '@/integrations/providers';
+import type { MappingExternalIdKind } from '@/services/mapping/types';
 import { normalizeError } from '@/shared/errors';
-import type { RequestPriority } from '@/shared/types/request-scheduling';
-import type { ProviderCredentials } from '@/shared/types/providers';
+import type { ProviderCredentials } from '@/integrations/providers';
+import type { RequestPriority } from '@/shared/utils/request-priority';
 import {
   canonicalTitleKeyForProvider,
   sanitizeLookupDisplayForProvider,

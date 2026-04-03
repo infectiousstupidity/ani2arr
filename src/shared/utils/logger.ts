@@ -1,9 +1,9 @@
 /** Shared logger with scope prefixes, build-aware levels, and sensitive-value redaction. */
 // src/shared/utils/logger.ts
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-export interface LoggerOptions {
+interface LoggerOptions {
   /** Enable or disable verbose logging (`debug`, `info`, `warn`). */
   enabled?: boolean;
   /** Override individual log levels. */
@@ -113,11 +113,7 @@ function redactObject(
   const out: Record<string, unknown> = {};
 
   for (const [key, val] of Object.entries(obj)) {
-    if (hasSensitiveKey(key)) {
-      out[key] = '[REDACTED]';
-    } else {
-      out[key] = redactValue(val, seen);
-    }
+    out[key] = hasSensitiveKey(key) ? '[REDACTED]' : redactValue(val, seen);
   }
 
   return out;
@@ -182,5 +178,3 @@ export const logger = Object.assign(createScopedLogger(), {
   configure: (options: LoggerOptions) => configureLogger(options),
   isLevelEnabled: (level: LogLevel) => isLevelEnabled(level),
 });
-
-export type Logger = typeof logger;

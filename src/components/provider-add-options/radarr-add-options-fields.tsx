@@ -7,7 +7,7 @@ import { ProviderTagField } from '@/components/provider-tags/provider-tag-field'
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import type {
   ProviderMetadata,
-} from '@/shared/types/providers';
+} from '@/integrations/providers';
 import type {
   RadarrFormState,
   RadarrMinimumAvailability,

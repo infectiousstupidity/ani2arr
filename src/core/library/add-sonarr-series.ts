@@ -9,7 +9,7 @@ import type { ResolveExternalIdOptions } from '@/services/mapping/types';
 import { createError, ErrorCode } from '@/shared/errors';
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-import type { ProviderCredentials, SonarrSeries } from '@/shared/types/providers';
+import type { ProviderCredentials, SonarrSeries } from '@/integrations/providers';
 
 type AddSonarrSeriesInput = {
   anilistId: number;

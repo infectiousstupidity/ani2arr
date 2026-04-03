@@ -2,7 +2,8 @@
 // src/features/mapping/use-mapping-overrides.ts
 
 import { useCallback } from 'react';
-import type { MappingExternalId, Provider } from '@/shared/types';
+import type { Provider } from '@/integrations/providers';
+import type { MappingExternalId } from '@/services/mapping/types';
 import { useClearMappingOverride, useSetMappingOverride } from '@/shared/queries';
 
 export function useMappingOverrides(anilistId: number, provider: Provider) {

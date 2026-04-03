@@ -2,7 +2,7 @@
 // src/shared/schemas/settings.ts
 
 import * as v from 'valibot';
-import type { ExtensionOptions } from '@/shared/types/options';
+import type { ExtensionOptions } from '@/options';
 import { createDefaultSonarrFormState, SonarrSettingsSchema } from './providers/sonarr-settings.schema';
 import { createDefaultRadarrFormState, RadarrSettingsSchema } from './providers/radarr-settings.schema';
 import { createDefaultUiOptions, UiOptionsSchema } from './ui-schema';

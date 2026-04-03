@@ -2,7 +2,8 @@
 // src/services/providers/resolver.ts
 
 import type { AniListMediaFormat } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { Provider, PublicOptions } from '@/shared/types';
+import type { PublicOptions } from '@/options';
+import type { Provider } from '@/integrations/providers';
 
 type ProviderDescriptor = {
   service: Provider;
@@ -23,12 +24,15 @@ const hasProviderShape = (
 
 export const getProviderDescriptor = (service: Provider): ProviderDescriptor => {
   switch (service) {
-    case 'sonarr':
+    case 'sonarr': {
       return { service: 'sonarr', label: 'Sonarr' };
-    case 'radarr':
+    }
+    case 'radarr': {
       return { service: 'radarr', label: 'Radarr' };
-    default:
+    }
+    default: {
       return assertUnreachable(service);
+    }
   }
 };
 
@@ -36,23 +40,27 @@ export const getProviderLabel = (service: Provider): string => getProviderDescri
 
 export const resolveProviderForAniListFormat = (format: AniListMediaFormat | null | undefined): Provider | null => {
   switch (format) {
-    case 'MOVIE':
+    case 'MOVIE': {
       return 'radarr';
+    }
     case 'TV':
     case 'TV_SHORT':
     case 'SPECIAL':
     case 'OVA':
-    case 'ONA':
+    case 'ONA': {
       return 'sonarr';
+    }
     case 'MUSIC':
     case 'MANGA':
     case 'NOVEL':
     case 'ONE_SHOT':
     case null:
-    case undefined:
+    case undefined: {
       return null;
-    default:
+    }
+    default: {
       return null;
+    }
   }
 };
 
@@ -62,12 +70,15 @@ export const isProviderConfigured = (
 ): boolean => {
   if (!hasProviderShape(options)) return false;
   switch (service) {
-    case 'sonarr':
+    case 'sonarr': {
       return options.providers?.sonarr?.isConfigured === true;
-    case 'radarr':
+    }
+    case 'radarr': {
       return options.providers?.radarr?.isConfigured === true;
-    default:
+    }
+    default: {
       return assertUnreachable(service);
+    }
   }
 };
 
@@ -77,11 +88,14 @@ export const getProviderBaseUrl = (
 ): string => {
   if (!hasProviderShape(options)) return '';
   switch (service) {
-    case 'sonarr':
+    case 'sonarr': {
       return options.providers?.sonarr?.url ?? '';
-    case 'radarr':
+    }
+    case 'radarr': {
       return options.providers?.radarr?.url ?? '';
-    default:
+    }
+    default: {
       return assertUnreachable(service);
+    }
   }
 };

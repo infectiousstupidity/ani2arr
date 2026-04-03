@@ -28,7 +28,7 @@ import type {
   AniListSchedulerRequestDebug,
 } from '@/debug/anilist-debug.types';
 import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { RequestPriority } from '@/shared/types';
+import type { RequestPriority } from '@/shared/utils/request-priority';
 import { logger } from '@/shared/utils/logger';
 import { priorityValue } from '@/shared/utils/request-priority';
 import { AbortError, withRetry } from '@/shared/utils/retry';
@@ -369,7 +369,7 @@ export class AniListMediaScheduler {
     }
 
     const settled = await Promise.allSettled(
-      Array.from(pending.entries()).map(async ([queuedId, promise]) => [queuedId, await promise] as const),
+      [...pending.entries()].map(async ([queuedId, promise]) => [queuedId, await promise] as const),
     );
 
     const rejected: unknown[] = [];
@@ -399,8 +399,8 @@ export class AniListMediaScheduler {
   public getDebugSnapshot(): AniListSchedulerDebugSnapshot {
     const now = Date.now();
     const pendingBuckets = PRIORITIES.map(priority => {
-      const entries = Array.from(this.pendingByPriority.get(priority)?.values() ?? []);
-      const logicalRequestIds = Array.from(new Set(entries.flatMap(entry => Array.from(entry.requestIds)))).sort(
+      const entries = [...this.pendingByPriority.get(priority)?.values() ?? []];
+      const logicalRequestIds = [...new Set(entries.flatMap(entry => [...entry.requestIds]))].toSorted(
         (a, b) => a - b,
       );
 
@@ -416,16 +416,16 @@ export class AniListMediaScheduler {
     return {
       generatedAt: now,
       nextFlushAt: this.flushScheduledAt ?? this.computeNextWakeAt(now),
-      inflightIds: Array.from(this.inflightById.keys()).sort((a, b) => a - b),
+      inflightIds: [...this.inflightById.keys()].toSorted((a, b) => a - b),
       pendingCounts: {
         high: this.pendingByPriority.get('high')?.size ?? 0,
         normal: this.pendingByPriority.get('normal')?.size ?? 0,
         low: this.pendingByPriority.get('low')?.size ?? 0,
       },
       pendingBuckets,
-      recentRequests: [...this.recentRequests].reverse(),
-      recentBatches: [...this.recentBatches].reverse(),
-      recentEvents: [...this.recentEvents].reverse(),
+      recentRequests: [...this.recentRequests].toReversed(),
+      recentBatches: [...this.recentBatches].toReversed(),
+      recentEvents: [...this.recentEvents].toReversed(),
       limiter: {
         ...this.limiter.snapshot(),
         lowPriorityHeld: this.limiter.shouldHoldLowPriority(),
@@ -445,7 +445,7 @@ export class AniListMediaScheduler {
   }
 
   private normalizeIds(ids: number[]): number[] {
-    return Array.from(new Set(ids.filter(id => typeof id === 'number' && Number.isFinite(id) && id > 0)));
+    return [...new Set(ids.filter(id => typeof id === 'number' && Number.isFinite(id) && id > 0))];
   }
 
   private registerRequest(ids: number[], options: Required<RequestMediaOptions>): AniListSchedulerRequestDebug {
@@ -744,7 +744,7 @@ export class AniListMediaScheduler {
 
       return {
         priority,
-        entries: Array.from(bucket.values()).slice(0, MAX_BATCH_SIZE),
+        entries: [...bucket.values()].slice(0, MAX_BATCH_SIZE),
       };
     }
 
@@ -762,8 +762,8 @@ export class AniListMediaScheduler {
     let cachedCount = 0;
 
     for (const entry of entries) {
-      entry.requestIds.forEach(requestId => contributorRequestIds.add(requestId));
-      entry.sources.forEach(source => contributorSources.add(source));
+      for (const requestId of entry.requestIds) contributorRequestIds.add(requestId);
+      for (const source of entry.sources) contributorSources.add(source);
 
       if (!entry.forceRefresh) {
         const cached = await this.readCachedMedia(entry.id);
@@ -793,8 +793,8 @@ export class AniListMediaScheduler {
       at: Date.now(),
       completedAt: null,
       priority,
-      contributorRequestIds: Array.from(contributorRequestIds).sort((a, b) => a - b),
-      contributorSources: Array.from(contributorSources).sort(),
+      contributorRequestIds: [...contributorRequestIds].toSorted((a, b) => a - b),
+      contributorSources: [...contributorSources].toSorted(),
       logicalRequestedIdCount,
       uniqueRequestedIdCount: requestedIds.length,
       uniqueSentIdCount: requestedIds.length,
@@ -920,8 +920,8 @@ export class AniListMediaScheduler {
       id: entry.id,
       priority: entry.priority,
       waiterCount: entry.requestIds.size,
-      requestIds: Array.from(entry.requestIds).sort((a, b) => a - b),
-      sources: Array.from(entry.sources).sort(),
+      requestIds: [...entry.requestIds].toSorted((a, b) => a - b),
+      sources: [...entry.sources].toSorted(),
       forceRefresh: entry.forceRefresh,
       enqueuedAt: entry.enqueuedAt,
       promotedFrom: entry.promotedFrom,
@@ -956,26 +956,32 @@ export class AniListMediaScheduler {
 
   private countResolvedMedia(counts: AniListSchedulerBatchMediaCountsDebug, format: AniListMedia['format']): void {
     switch (format) {
-      case 'MOVIE':
+      case 'MOVIE': {
         counts.movies += 1;
         return;
+      }
       case 'TV':
       case 'TV_SHORT':
       case 'OVA':
-      case 'ONA':
+      case 'ONA': {
         counts.series += 1;
         return;
-      case 'SPECIAL':
+      }
+      case 'SPECIAL': {
         counts.specials += 1;
         return;
-      case 'MUSIC':
+      }
+      case 'MUSIC': {
         counts.music += 1;
         return;
-      case null:
+      }
+      case null: {
         counts.unknown += 1;
         return;
-      default:
+      }
+      default: {
         counts.other += 1;
+      }
     }
   }
 

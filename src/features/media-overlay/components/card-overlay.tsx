@@ -5,14 +5,35 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from '
 import { Check, TriangleAlert, SlidersHorizontal, Plus, Wrench, SquareArrowOutUpRight, RotateCcw } from 'lucide-react';
 import type { CheckMovieStatusResponse, CheckSeriesStatusResponse } from '@/rpc/types';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
-import type { CardOverlayProps } from '@/shared/types';
 import {
   getProviderLibrarySlug,
   type ProviderMediaPathSource,
 } from '@/shared/utils/provider-library-paths';
+import type { BadgeVisibility } from '@/options/types';
+import type { Provider } from '@/integrations/providers/types';
+import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
+import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
 import { getProviderLabel } from '@/services/providers/resolver';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { useCardOverlayState } from '../hooks/use-card-overlay-state';
+
+interface CardOverlayProps {
+  provider: Provider;
+  anilistId: number;
+  title: string;
+  onOpenModal: (anilistId: number, title: string, metadata: AniListMediaHint | null) => void;
+  onOpenMappingFix?: (anilistId: number, title: string, mappingRequired?: boolean) => void;
+  isConfigured: boolean;
+  defaultForm: SonarrFormState | RadarrFormState | null;
+  metadata: AniListMediaHint | null;
+  providerUrl: string | null;
+  observeTarget?: Element | null;
+  badgeVisibility?: BadgeVisibility;
+  anchorCorner?: 'bottom-left' | 'top-left';
+  stackDirection?: 'up' | 'down';
+  anchorOffsetX?: number;
+}
 
 const CardOverlay: React.FC<CardOverlayProps> = memo(({
   provider,
@@ -33,13 +54,13 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   const [isVisible, setIsVisible] = useState(false);
   const [gateOpen, setGateOpen] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
-  const gateTimerRef = useRef<number | null>(null);
+  const gateTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const [stackOpen, setStackOpen] = useState(false);
-  const closeTimerRef = useRef<number | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
 
   const openStack = useCallback(() => {
     if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current);
+      globalThis.clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
     setStackOpen(true);
@@ -47,9 +68,9 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
 
   const scheduleCloseStack = useCallback(() => {
     if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current);
+      globalThis.clearTimeout(closeTimerRef.current);
     }
-    closeTimerRef.current = window.setTimeout(() => {
+    closeTimerRef.current = globalThis.setTimeout(() => {
       setStackOpen(false);
       closeTimerRef.current = null;
     }, 160);
@@ -58,7 +79,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   useEffect(() => {
     const target = (observeTarget as Element | undefined) ?? null;
     if (!target || typeof IntersectionObserver === 'undefined') {
-      return undefined;
+      return;
     }
     if (!observerRef.current) {
       observerRef.current = new IntersectionObserver(
@@ -82,22 +103,22 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
     if (!isVisible) {
       setGateOpen(false);
       if (gateTimerRef.current !== null) {
-        window.clearTimeout(gateTimerRef.current);
+        globalThis.clearTimeout(gateTimerRef.current);
         gateTimerRef.current = null;
       }
       return;
     }
     if (gateTimerRef.current !== null) {
-      window.clearTimeout(gateTimerRef.current);
+      globalThis.clearTimeout(gateTimerRef.current);
       gateTimerRef.current = null;
     }
-    gateTimerRef.current = window.setTimeout(() => {
+    gateTimerRef.current = globalThis.setTimeout(() => {
       setGateOpen(true);
       gateTimerRef.current = null;
     }, 125);
     return () => {
       if (gateTimerRef.current !== null) {
-        window.clearTimeout(gateTimerRef.current);
+        globalThis.clearTimeout(gateTimerRef.current);
         gateTimerRef.current = null;
       }
     };
@@ -138,20 +159,24 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(({
   const quickAddIcon = (() => {
     switch (overlayState) {
       case 'resolving':
-      case 'adding':
+      case 'adding': {
         return <RotateCcw className="a2a-card-overlay__symbol a2a-rotate" aria-hidden="true" />;
-      case 'in-library':
+      }
+      case 'in-library': {
         return <Check className="a2a-card-overlay__symbol" aria-hidden="true" />;
-      case 'error':
+      }
+      case 'error': {
         return mappingUnavailable
           ? <Wrench className="a2a-card-overlay__symbol" aria-hidden="true" />
           : <TriangleAlert className="a2a-card-overlay__symbol" aria-hidden="true" />;
-      default:
+      }
+      default: {
         return <Plus className="a2a-card-overlay__symbol" aria-hidden="true" />;
+      }
     }
   })();
 
-  const tooltipContainer = useMemo(() => (typeof document !== 'undefined' ? document.body : null), []);
+  const tooltipContainer = useMemo(() => (typeof document === 'undefined' ? null : document.body), []);
   const showAdvancedButton = overlayState === 'addable' || overlayState === 'in-library' || overlayState === 'error' || overlayState === 'resolving' || overlayState === 'adding';
   const showExternalButton = (overlayState === 'in-library' || overlayState === 'adding') && Boolean(providerUrl);
   const advancedDisabled = overlayState === 'resolving' || overlayState === 'adding' || (overlayState === 'error' && mappingUnavailable);

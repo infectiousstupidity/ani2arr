@@ -22,7 +22,8 @@ import {
 import { logger } from '@/shared/utils/logger';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 import { parseSettings } from '@/storage';
-import type { ExtensionOptions, Provider } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
+import type { Provider } from '@/integrations/providers';
 
 type PreparedProviderState = {
   url: string;

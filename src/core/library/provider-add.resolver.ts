@@ -5,7 +5,7 @@ import type { AddRadarrMoviePayload, RadarrClient } from '@/integrations/provide
 import type { AddSonarrSeriesPayload, SonarrClient } from '@/integrations/providers/sonarr.client';
 import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
 import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-import type { ProviderCredentials } from '@/shared/types/providers';
+import type { ProviderCredentials } from '@/integrations/providers';
 import {
   resolveMutationTagIds,
   resolveRequiredQualityProfileId,

@@ -3,9 +3,10 @@
 import { defineProxyService } from '@webext-core/proxy-service';
 import type { AniListSchedulerDebugSnapshot } from '@/debug/anilist-debug.types';
 import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { SonarrFormState, RadarrFormState } from '@/shared/types';
-import type { MappingExternalIdRecord } from '@/shared/types/mapping';
-import type { ProviderMetadata, RadarrMovie, SonarrSeries } from '@/shared/types/providers';
+import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
+import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
+import type { MappingExternalIdRecord } from '@/services/mapping/types';
+import type { ProviderMetadata, RadarrMovie, SonarrSeries } from '@/integrations/providers';
 import type {
   AniListSearchResult,
   ExportStoredMappingsOutput,

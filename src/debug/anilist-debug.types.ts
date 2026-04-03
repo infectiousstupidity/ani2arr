@@ -1,7 +1,7 @@
 /** Debug-only AniList scheduler payload shapes for inspection and overlay rendering. */
 // src/debug/anilist-debug.types.ts
 
-import type { RequestPriority } from '@/shared/types/request-scheduling';
+import type { RequestPriority } from '@/shared/utils/request-priority';
 
 export interface AniListSchedulerRequestDebug {
   requestId: number;

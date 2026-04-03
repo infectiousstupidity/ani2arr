@@ -1,9 +1,9 @@
 /** Builds provider UI links for opening Sonarr and Radarr entries or prefilled add flows. */
 // src/shared/utils/provider-links.ts
 
-import type { Provider } from '@/shared/types';
+import type { Provider } from '@/integrations/providers/types';
 
-export interface ExternalLinkInput {
+interface ExternalLinkInput {
   provider: Provider;
   baseUrl: string; // Absolute provider root URL; trailing slash trimmed.
   inLibrary: boolean;

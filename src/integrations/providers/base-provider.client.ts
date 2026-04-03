@@ -4,7 +4,7 @@
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import { logger } from '@/shared/utils/logger';
 import { AbortError, withRetry } from '@/shared/utils/retry';
-import type { ProviderCredentials } from '@/shared/types/providers';
+import type { ProviderCredentials } from '@/integrations/providers';
 
 interface BaseProviderClientOptions {
   providerName: string;
@@ -35,7 +35,7 @@ export class BaseProviderClient {
     this.apiBasePath = this.normalizeApiBasePath(options.apiBasePath ?? '/api/v3');
     this.timeoutMs = options.timeoutMs ?? 15_000;
     this.hasUrlPermission = options.hasUrlPermission;
-    this.cacheableEndpoints = new Set(options.cacheableEndpoints ?? []);
+    this.cacheableEndpoints = new Set(options.cacheableEndpoints);
     this.log = logger.create(options.logScope ?? `${options.providerName}Client`);
   }
 
@@ -68,7 +68,7 @@ export class BaseProviderClient {
       return;
     }
 
-    for (const key of Array.from(this.etagCache.keys())) {
+    for (const key of this.etagCache.keys()) {
       if (key.endsWith(`|${normalizedEndpoint}`)) {
         this.etagCache.delete(key);
       }

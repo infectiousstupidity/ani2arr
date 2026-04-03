@@ -1,3 +1,4 @@
+/** Anime-page action group for provider quick add, deep links, and manual mapping entry points. */
 // src/entrypoints/anilist-anime.content/components/media-actions.tsx
 import React from 'react';
 import Button from '@/shared/ui/primitives/button';
@@ -5,8 +6,8 @@ import { SquareArrowOutUpRight, ChevronDown } from 'lucide-react';
 import { usePublicOptions } from '@/shared/queries';
 import { logger } from '@/shared/utils/logger';
 import Dropdown, { DropdownItem } from '@/shared/ui/primitives/dropdown';
-import { buildExternalMediaLink, type ExternalLinkInput } from '@/shared/utils/provider-links';
-import type { Provider } from '@/shared/types';
+import { buildExternalMediaLink } from '@/shared/utils/provider-links';
+import type { Provider } from '@/integrations/providers';
 import { getProviderBaseUrl, getProviderLabel, isProviderConfigured } from '@/services/providers/resolver';
 
 export type Status = 'LOADING' | 'IN' | 'NOT_IN' | 'ERROR' | 'ADDING';
@@ -45,16 +46,21 @@ const MediaActions: React.FC<MediaActionsProps> = ({
   const isLoading = status === 'LOADING' || status === 'ADDING';
   const getButtonText = () => {
     switch (status) {
-      case 'LOADING':
+      case 'LOADING': {
         return `Checking ${serviceLabel}...`;
-      case 'IN':
+      }
+      case 'IN': {
         return `In ${serviceLabel}`;
-      case 'ADDING':
+      }
+      case 'ADDING': {
         return 'Adding...';
-      case 'ERROR':
+      }
+      case 'ERROR': {
         return 'Error';
-      default:
+      }
+      default: {
         return `Add to ${serviceLabel}`;
+      }
     }
   };
   const isServiceConfigured = isProviderConfigured(provider, options);
@@ -64,36 +70,52 @@ const MediaActions: React.FC<MediaActionsProps> = ({
   const manualMappingLabel = hasMapping ? 'Update mapping manually' : 'Find match manually';
   const mainButtonText = requiresConfiguration
     ? `Configure ${serviceLabel}`
-    : shouldOpenManualMatch
+    : (shouldOpenManualMatch
       ? 'Find match'
-      : getButtonText();
+      : getButtonText());
   const disableMainAction = isLoading;
-  const handleMainAction = requiresConfiguration
-    ? onQuickAdd
-    : shouldOpenManualMatch
-      ? () => onOpenMappingFix(true)
-      : inService
-        ? onOpenModal
-        : onQuickAdd;
+  let handleMainAction = onQuickAdd;
+  if (requiresConfiguration) {
+    handleMainAction = onQuickAdd;
+  } else if (shouldOpenManualMatch) {
+    handleMainAction = () => onOpenMappingFix(true);
+  } else if (inService) {
+    handleMainAction = onOpenModal;
+  }
 
   const externalBaseUrl = getProviderBaseUrl(provider, options);
   const hasExternal = externalBaseUrl.length > 0;
 
-  const mainButtonTooltip = requiresConfiguration
-    ? `Open ${serviceLabel} settings to continue.`
-    : shouldOpenManualMatch
-      ? `No automatic ${serviceLabel} match was found. Search manually.`
-      : status === 'IN'
-        ? `Open ${serviceLabel} options`
-        : status === 'LOADING'
-          ? `Checking ${serviceLabel} status...`
-          : status === 'ADDING'
-            ? `Submitting add request to ${serviceLabel}...`
-            : status === 'ERROR'
-              ? 'An error occurred resolving this title.'
-              : undefined;
+  let mainButtonTooltip: string | undefined;
+  if (requiresConfiguration) {
+    mainButtonTooltip = `Open ${serviceLabel} settings to continue.`;
+  } else if (shouldOpenManualMatch) {
+    mainButtonTooltip = `No automatic ${serviceLabel} match was found. Search manually.`;
+  } else {
+    switch (status) {
+      case 'IN': {
+        mainButtonTooltip = `Open ${serviceLabel} options`;
+        break;
+      }
+      case 'LOADING': {
+        mainButtonTooltip = `Checking ${serviceLabel} status...`;
+        break;
+      }
+      case 'ADDING': {
+        mainButtonTooltip = `Submitting add request to ${serviceLabel}...`;
+        break;
+      }
+      case 'ERROR': {
+        mainButtonTooltip = 'An error occurred resolving this title.';
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+  }
 
-  const linkInput: ExternalLinkInput = {
+  const linkInput: Parameters<typeof buildExternalMediaLink>[0] = {
     provider,
     baseUrl: externalBaseUrl.replace(/\/$/, ''),
     inLibrary: inService && Boolean(librarySlug),

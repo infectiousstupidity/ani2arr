@@ -15,7 +15,7 @@ import {
   toPublicOptions,
 } from '@/storage';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
-import type { ExtensionOptions, PublicOptions } from '@/shared/types';
+import type { ExtensionOptions, PublicOptions } from '@/options';
 import { logger } from '@/shared/utils/logger';
 import { queryKeys } from './query-keys';
 

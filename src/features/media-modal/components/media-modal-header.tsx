@@ -7,7 +7,7 @@ import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import Pill from '@/shared/ui/primitives/pill';
 import type { AniListTitleLanguage } from "@/shared/schemas/anilist/anilist-title-language.schema";
 import type { AniListMediaFormat, AniListMediaStatus } from "@/shared/schemas/anilist/anilist-media.schema";
-import type { Provider } from "@/shared/types";
+import type { Provider } from "@/integrations/providers";
 import { getProviderLabel } from "@/services/providers/resolver";
 
 export type MediaModalTabId = "series" | "mapping";
@@ -33,12 +33,12 @@ export type HeaderProps = {
 };
 
 function formatMediaFormat(format?: AniListMediaFormat | null): string | null {
-  return format ? format.replace(/_/g, " ") : null;
+  return format ? format.replaceAll('_', " ") : null;
 }
 
 function formatAniListMediaStatus(status?: AniListMediaStatus | null): string | null {
   if (!status) return null;
-  const normalized = status.toLowerCase().replace(/_/g, " ");
+  const normalized = status.toLowerCase().replaceAll('_', " ");
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
@@ -174,4 +174,3 @@ export function Header(props: HeaderProps): React.JSX.Element {
     </header>
   );
 }
-

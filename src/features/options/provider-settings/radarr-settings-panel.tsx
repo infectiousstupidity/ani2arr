@@ -23,7 +23,7 @@ import {
 } from './provider-connection-card';
 import { RadarrDefaultsSection } from './radarr-defaults-section';
 import { useSelectPortal } from './use-select-portal';
-import type { ExtensionOptions } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
 
 export interface RadarrSettingsPanelProps {
   actions: SettingsActions;

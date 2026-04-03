@@ -27,14 +27,18 @@ import { UpstreamMappingStore } from '@/services/mapping/upstream';
 import { SonarrLookupClient, RadarrLookupClient } from '@/services/mapping/lookup';
 import { getMappingsHandler } from '@/rpc/handlers/get-mappings.handlers';
 import { createApiHandlers } from '@/rpc/handlers';
-import type { Provider, ProviderCredentials } from '@/shared/types/providers';
-import type { ExtensionOptions } from '@/shared/types';
+import type { ExtensionOptions } from '@/options';
+import type { Provider, ProviderCredentials } from '@/integrations/providers';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import type { Ani2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';
 import { createDefaultSettings } from '@/shared/schemas/settings';
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 45 * 1000;
+
+const bumpMappingsRevision = async (): Promise<void> => {
+  await bumpRevision('mappings');
+};
 
 function bindAll<T extends object>(instance: T): T {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
@@ -85,10 +89,6 @@ export const createBackgroundApi = (): Ani2arrApi => {
 
   const overridesService = new MappingOverridesService();
   const overridesReady = overridesService.init();
-
-  const bumpMappingsRevision = async (): Promise<void> => {
-    await bumpRevision('mappings');
-  };
 
   const mappingService = bindAll(
     new MappingService(
