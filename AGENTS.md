@@ -16,10 +16,9 @@
 ## Verification
 
 - Before finishing, run the relevant checks for the files you changed.
-- Do not fix lint errors in files unrelated to your change.
 - Minimum verification:
-  - Run `pnpm run lint:target -- <changed files>` for the files changed in this task - it might be slow or exit with code 1, but still output the lint report properly. 
-  - `pnpm run compile`
+  - Run `pnpm run lint`
+  - Run `pnpm run compile`
 - Run `pnpm run test` for changes affecting tested behavior, shared logic, or regression-prone code.
 - If the touched area has no tests yet, add the smallest focused tests that meaningfully protect the change when practical.
 - If you cannot run a check, say why.
