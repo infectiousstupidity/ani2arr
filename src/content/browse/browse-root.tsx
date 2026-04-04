@@ -1,11 +1,11 @@
-/** Browse overlay root composition for media modal state rendering. */
-// src/features/media-overlay/components/browse-root.tsx
+/** Content-owned browse root composition for media modal rendering. */
+// src/content/browse/browse-root.tsx
 
 import React from 'react';
-import type { BrowseContentAppProps } from './media-overlay';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
-import { useMediaModalProps } from '@/features/media-overlay/hooks/use-media-modal-props';
+import { useMediaModalProps } from '@/content/media-modal/use-media-modal-props';
+import type { BrowseContentAppProps } from './browse-content-app';
 
 export interface BrowseRootProps {
   BrowseContentApp: React.FC<BrowseContentAppProps>;

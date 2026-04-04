@@ -1,10 +1,10 @@
-/** AniList browse-surface metadata prefetch scheduling for visible media cards. */
-// src/features/media-overlay/hooks/use-anilist-batch-prefetch.ts
+/** Content-owned AniList browse metadata prefetch scheduling for visible cards. */
+// src/content/browse/use-anilist-batch-prefetch.ts
 
 import { useEffect, useMemo, useRef } from 'react';
-import type { ParsedCard } from '@/features/media-overlay/types';
 import { getAni2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';
+import type { ParsedCard } from './types';
 
 interface UseAnilistBatchPrefetchParams {
   cardPortals: Map<Element, ParsedCard>;
@@ -13,17 +13,13 @@ interface UseAnilistBatchPrefetchParams {
 
 const log = logger.create('AniList Prefetch');
 
-// Hook to prefetch AniList media data in batches based on card visibility
 export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnilistBatchPrefetchParams): void => {
-  // Enable on AniList browse/search and AniChart season/browse surfaces.
   const surfaceEnabled = globalThis.window !== undefined && (() => {
     const host = (globalThis.location.hostname || '').toLowerCase();
     const p = globalThis.location.pathname || '';
-    // AniList browse/search
     if (host.includes('anilist.co')) {
       return p === '/' || p.startsWith('/home') || p.startsWith('/search');
     }
-    // AniChart season/browse pages (loaded only on anichart entrypoint)
     if (host.includes('anichart.net')) {
       return true;
     }
@@ -43,11 +39,8 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
   const infoBurstCountRef = useRef(0);
   const initLoggedRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof globalThis.setInterval> | null>(null);
-
-  // Stable tick function that doesn't depend on cardPortals
   const tickRef = useRef<(() => Promise<void>) | null>(null);
 
-  // Derive container->ID map from cardPortals as a stable memoized value
   const containerIdMap = useMemo(() => {
     const map = new Map<Element, number>();
     for (const [container, parsed] of cardPortals) {
@@ -56,11 +49,9 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
     return map;
   }, [cardPortals]);
 
-  // Initialize observer and timer once when enabled
   useEffect(() => {
     if (!isEnabled) return;
 
-    // Emit a one-time init at info level to verify hook activation in Firefox
     if (!initLoggedRef.current) {
       initLoggedRef.current = true;
       try {
@@ -70,7 +61,6 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       }
     }
 
-    // Create observer if it doesn't exist
     if (!observerRef.current) {
       observerRef.current = new IntersectionObserver(
         entries => {
@@ -82,7 +72,6 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
             if (!id) continue;
             if (entry.isIntersecting && entry.intersectionRatio >= 0.25) {
               visibleIds.add(id);
-              // Remove from offscreen queue if it becomes visible
               const idx = offscreenQueue.indexOf(id);
               if (idx !== -1) offscreenQueue.splice(idx, 1);
             } else {
@@ -100,7 +89,6 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       );
     }
 
-    // Define the tick function
     tickRef.current = async () => {
       if (!isEnabled) return;
 
@@ -110,7 +98,6 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       const offscreen = offscreenQueueRef.current;
       const staticallyMapped = staticallyMappedRef.current;
 
-      // Prioritize visible ids (cap ~60)
       const visibleCandidates: number[] = [];
       for (const id of visible) {
         if (!prefetched.has(id) && !queued.has(id)) visibleCandidates.push(id);
@@ -121,7 +108,6 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       if (visibleCandidates.length > 0) {
         toFetch = visibleCandidates;
       } else {
-        // Background: offscreen FIFO
         for (const id of offscreen) {
           if (!prefetched.has(id) && !queued.has(id)) toFetch.push(id);
           if (toFetch.length >= 60) break;
@@ -130,7 +116,6 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
 
       if (toFetch.length === 0) return;
 
-      // Filter out IDs that are already covered by static mappings
       try {
         const unknown = toFetch.filter(id => !staticallyMapped.has(id));
         if (unknown.length > 0) {
@@ -144,14 +129,12 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       toFetch = toFetch.filter(id => !staticallyMapped.has(id));
       if (toFetch.length === 0) return;
 
-      // Chunk to 50 per request and process a single chunk per tick
       const chunk = toFetch.slice(0, 50);
       if (import.meta.env.DEV) {
         const visibleArr = [...visible.values()].slice(0, 60);
         log.debug?.(
           `prefetch:tick choose chunk size=${chunk.length} visible_size=${visibleArr.length} offscreen_backlog=${offscreen.length} chunk_ids=[${chunk.join(',')}]`,
         );
-        // Surface the first few ticks at info-level to make discovery easier
         if (infoBurstCountRef.current < 3) {
           infoBurstCountRef.current += 1;
           log.info?.(
@@ -181,7 +164,6 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       }
     };
 
-    // Start the interval timer
     const TICK_MS = 300;
     if (timerRef.current === null) {
       timerRef.current = globalThis.setInterval(() => {
@@ -189,10 +171,8 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       }, TICK_MS);
     }
 
-    // Capture refs for cleanup
     const observedContainers = observedContainersRef.current;
 
-    // Cleanup only on disable or unmount
     return () => {
       if (timerRef.current !== null) {
         globalThis.clearInterval(timerRef.current);
@@ -213,7 +193,6 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
     };
   }, [isEnabled, api]);
 
-  // Incremental observer updates: only observe added containers, unobserve removed ones
   useEffect(() => {
     if (!isEnabled) return;
 
@@ -224,7 +203,6 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
     const observedContainers = observedContainersRef.current;
     const currentContainers = new Set(containerIdMap.keys());
 
-    // Find removed containers and unobserve them
     for (const container of observedContainers) {
       if (!currentContainers.has(container)) {
         try {
@@ -236,7 +214,6 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       }
     }
 
-    // Find added containers and observe them
     for (const container of currentContainers) {
       if (!observedContainers.has(container)) {
         const id = containerIdMap.get(container);

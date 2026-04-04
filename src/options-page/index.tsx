@@ -7,7 +7,7 @@ import { browser } from 'wxt/browser';
 import { ChevronRight, ShieldCheck } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import appIcon from '@/assets/icon.png';
-import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
+import { useA2aBroadcasts } from '@/shared/queries/use-a2a-broadcasts';
 import { createDefaultSettings, type ExtensionOptions, useExtensionOptions, getProviderCredentials } from '@/options';
 import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
 import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';

@@ -1,5 +1,5 @@
 /** Waits for the extension background context to answer a runtime ping before UI work starts. */
-// src/runtime/messaging/await-background-ready.ts
+// src/shared/browser/await-background-ready.ts
 
 import { browser } from 'wxt/browser';
 

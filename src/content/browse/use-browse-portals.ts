@@ -1,9 +1,9 @@
-/** Media-overlay portal discovery and lifecycle management for parsed browse cards. */
-// src/features/media-overlay/hooks/use-media-portals.ts
+/** Content-owned browse portal discovery and lifecycle management. */
+// src/content/browse/use-browse-portals.ts
 
 import { useCallback, useEffect, useState } from 'react';
-import type { ParsedCard } from '@/features/media-overlay/types';
 import { metadataEqual } from '@/anilist/metadata-hints';
+import type { ParsedCard } from './types';
 
 const toElementArray = (value: Iterable<Element> | Element | null | undefined): Element[] => {
   if (!value) return [];
@@ -152,14 +152,11 @@ export const useBrowsePortals = ({
 
     scanAll();
 
-    // Throttle full scans and stale portal cleanup to avoid repeated expensive operations
-    // while still processing direct card additions/removals immediately.
-    // Uses simple coalescing debounces local to this effect.
     const fullScanTimerRef = { current: null as ReturnType<typeof globalThis.setTimeout> | null };
     const stalePortalsTimerRef = { current: null as ReturnType<typeof globalThis.setTimeout> | null };
-    const FULL_SCAN_WAIT = 150; // ms
-    const STALE_PORTALS_WAIT = 100; // ms
-    
+    const FULL_SCAN_WAIT = 150;
+    const STALE_PORTALS_WAIT = 100;
+
     const scheduleFullScan = () => {
       if (fullScanTimerRef.current !== null) {
         globalThis.clearTimeout(fullScanTimerRef.current);
@@ -201,8 +198,8 @@ export const useBrowsePortals = ({
           enqueueCardForNode(node);
 
           if (!shouldRescan && (node instanceof Element || node instanceof DocumentFragment) && node.querySelector?.(cardSelector)) {
-              shouldRescan = true;
-            }
+            shouldRescan = true;
+          }
         }
 
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {

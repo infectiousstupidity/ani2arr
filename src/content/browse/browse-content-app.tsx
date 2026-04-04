@@ -1,18 +1,18 @@
-/** Browse overlay composition for parsed cards, metadata hints, and action portals. */
-// src/features/media-overlay/components/media-overlay.tsx
+/** Content-owned browse overlay composition for parsed cards and action portals. */
+// src/content/browse/browse-content-app.tsx
 
 import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/anilist/metadata-hints';
 import { useAniListMetadataBatch } from '@/shared/queries';
-import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
+import { useA2aBroadcasts } from '@/shared/queries/use-a2a-broadcasts';
 import { useTheme } from '@/shared/hooks/common/use-theme';
-import { useBrowsePortals } from '../hooks/use-media-portals';
-import { useAnilistBatchPrefetch } from '../hooks/use-anilist-batch-prefetch';
+import { useBrowsePortals } from './use-browse-portals';
+import { useAnilistBatchPrefetch } from './use-anilist-batch-prefetch';
 import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
-import type { BrowseAdapter, ParsedCard } from '@/features/media-overlay/types';
+import type { BrowseAdapter, ParsedCard } from './types';
 import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
-import { CardOverlay } from './card-overlay';
+import { CardOverlay } from '@/features/media-overlay/components/card-overlay';
 import { usePublicOptions } from '@/options';
 
 export const DEFAULT_CONTAINER_CLASS = 'a2a-overlay-container';
@@ -38,32 +38,27 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
   } = adapter;
 
   const ensureContainerImpl = adapter.ensureContainer ?? ((host: HTMLElement) => {
-        const existing = host.querySelector<HTMLElement>(`.${containerClassName}`);
-        if (existing) return existing;
-        const el = host.ownerDocument.createElement('div');
-        el.className = containerClassName;
-        host.append(el);
-        return el;
-      });
+    const existing = host.querySelector<HTMLElement>(`.${containerClassName}`);
+    if (existing) return existing;
+    const el = host.ownerDocument.createElement('div');
+    el.className = containerClassName;
+    host.append(el);
+    return el;
+  });
 
-  const getContainerForCardImpl = adapter.getContainerForCard ??
-    ((card: Element) => card.querySelector<HTMLElement>(`.${containerClassName}`));
+  const getContainerForCardImpl = adapter.getContainerForCard ?? ((card: Element) => card.querySelector<HTMLElement>(`.${containerClassName}`));
 
   const markProcessedImpl = adapter.markProcessed ?? ((host: HTMLElement, parsed: ParsedCard) => {
-        host.setAttribute(processedAttribute, String(parsed.anilistId));
-      });
+    host.setAttribute(processedAttribute, String(parsed.anilistId));
+  });
 
   const clearProcessedImpl = adapter.clearProcessed ?? ((host: HTMLElement) => {
-        host.removeAttribute(processedAttribute);
-      });
+    host.removeAttribute(processedAttribute);
+  });
 
   const getObserverRoot = adapter.getObserverRoot ?? (() => document.body ?? document.documentElement);
-
-  const getScanRoot = adapter.getScanRoot ??
-    (() => (document.querySelector<HTMLElement>('.page-content') ?? document.body ?? null));
-
+  const getScanRoot = adapter.getScanRoot ?? (() => (document.querySelector<HTMLElement>('.page-content') ?? document.body ?? null));
   const getResizeTargets = adapter.resizeObserverTargets ?? (() => (document.body ? [document.body] : []));
-
   const containerSelector = `.${containerClassName}`;
 
   const BrowseContentApp: React.FC<BrowseContentAppProps> = ({ onOpenMediaModal }) => {
@@ -101,7 +96,6 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
       (metadataBatch.data?.metadata ?? []).map(entry => [entry.id, metadataHintFromAniListMetadata(entry)]),
     );
 
-    // Prefetch AniList metadata on browse/search pages using viewport-prioritized batching.
     useAnilistBatchPrefetch({ cardPortals, enabled: metadataEnabled });
 
     if (!overlaysEnabled) {
@@ -171,5 +165,3 @@ export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseC
 
   return BrowseContentApp;
 };
-
-export { CardOverlay } from './card-overlay';
