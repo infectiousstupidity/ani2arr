@@ -1,5 +1,5 @@
 /** Syncs query caches with storage-backed invalidation and option storage changes. */
-// src/runtime/messaging/use-broadcasts.ts
+// src/shared/queries/use-a2a-broadcasts.ts
 
 import { useCallback, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';

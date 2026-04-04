@@ -1,5 +1,5 @@
 /** Builds media modal props from AniList state, provider status, and provider metadata. */
-// src/features/media-overlay/hooks/use-media-modal-props.ts
+// src/content/media-modal/use-media-modal-props.ts
 
 import { useMemo } from 'react';
 import type { CheckMovieStatusResponse, CheckSeriesStatusResponse } from '@/rpc/types';

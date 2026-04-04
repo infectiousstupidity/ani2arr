@@ -1,9 +1,9 @@
-/** Runtime-owned shell orchestration for content entrypoints gated by page and public options. */
-// src/runtime/content-entrypoint-shell.ts
+/** Shared content-script shell orchestration for eligibility, remount, and cleanup. */
+// src/content/core/create-content-script-shell.ts
 
 import { browser } from 'wxt/browser';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
-import { awaitBackgroundReady } from '@/runtime/messaging/await-background-ready';
+import { awaitBackgroundReady } from './await-background-ready';
 import { STORAGE_KEYS } from '@/storage';
 import { getPublicOptionsSnapshot, type PublicOptions } from '@/options';
 

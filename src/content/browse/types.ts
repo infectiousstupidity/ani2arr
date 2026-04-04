@@ -1,5 +1,5 @@
-/** Media-overlay owned browse card and adapter contracts for injected browse surfaces. */
-// src/features/media-overlay/types.ts
+/** Browse card and adapter contracts owned by content-surface overlays. */
+// src/content/browse/types.ts
 
 import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 

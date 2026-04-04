@@ -1,5 +1,5 @@
-/** AniList DOM scraping helpers that project page data into AniList-owned hint types. */
-// src/shared/anilist/anilist-dom.ts
+/** AniList DOM scraping helper for page and browse metadata extraction. */
+// src/content/anilist/dom/extract-media-metadata.ts
 
 import type { AniListMediaFormat, AniListMediaHint } from '@/anilist/schemas/media.schema';
 
@@ -22,8 +22,7 @@ export const extractMediaMetadataFromDom = (anilistId: number): AniListMediaHint
       ['music', 'MUSIC'],
     ]);
     const normalizeFormatText = (value: string): string => value.toLowerCase().trim().replace(/\s+series$/, '');
-    
-    // Extract cover image helper
+
     const getCoverImage = (imgEl: HTMLImageElement | null | undefined): string | null => {
       if (!imgEl) return null;
       return imgEl.src || imgEl.dataset.src || null;
@@ -48,7 +47,7 @@ export const extractMediaMetadataFromDom = (anilistId: number): AniListMediaHint
           case normalizedFormat === 'ona': { format = 'ONA'; break; }
         }
       }
-      
+
       if (title || format) {
         const hint: AniListMediaHint = {
           titles: title ? { romaji: title } : null,
@@ -61,7 +60,7 @@ export const extractMediaMetadataFromDom = (anilistId: number): AniListMediaHint
         return hint;
       }
     }
-    
+
     const cover = document.querySelector<HTMLAnchorElement>(`.media-card a.cover[href*="/anime/${anilistId}"]`);
     if (cover) {
       const card = cover.closest('.media-card') as Element | null;
@@ -70,7 +69,7 @@ export const extractMediaMetadataFromDom = (anilistId: number): AniListMediaHint
       ).trim() || (
         card?.querySelector<HTMLDivElement>('.title')?.textContent ?? ''
       ).trim() || (cover.getAttribute('title') ?? '').trim() || cover.querySelector('img')?.getAttribute('alt')?.trim() || '';
-      
+
       let format: AniListMediaFormat | null = null;
       const infoSpan = card?.querySelector<HTMLSpanElement>('.hover-data .info span');
       const infoText = infoSpan?.textContent;

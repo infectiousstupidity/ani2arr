@@ -1,11 +1,7 @@
-/** Runtime-owned composition for the background Ani2arr API implementation. */
-// src/runtime/create-background-api.ts
+/** Background API dependency assembly for the Ani2arr RPC implementation. */
+// src/background/api/create-api-deps.ts
 
-import {
-  bumpRevision,
-  clearAllTtlCaches,
-  resetAllRevisions,
-} from '@/storage';
+import { bumpRevision, clearAllTtlCaches, resetAllRevisions } from '@/storage';
 import { radarrLookupCaches, sonarrLookupCaches } from '@/mapping/lookup/lookup.cache';
 import { upstreamMappingCaches } from '@/mapping/upstream/upstream-mapping.cache';
 import { anilistMediaCache } from '@/anilist/media.cache';
@@ -23,7 +19,6 @@ import { MappingService } from '@/mapping/mapping.service';
 import { MappingOverridesService } from '@/mapping/overrides';
 import { UpstreamMappingStore } from '@/mapping/upstream';
 import { SonarrLookupClient, RadarrLookupClient } from '@/mapping/lookup';
-import { createApiHandlers } from '@/rpc/handlers';
 import {
   createDefaultSettings,
   getExtensionOptionsSnapshot,
@@ -34,7 +29,7 @@ import {
 } from '@/options';
 import type { Provider, ProviderCredentials } from '@/providers';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
-import type { Ani2arrApi } from '@/rpc';
+import type { ApiHandlerDeps } from '@/rpc/handlers/handler-deps';
 import { logger } from '@/shared/utils/logger';
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 45 * 1000;
@@ -43,7 +38,7 @@ const bumpMappingsRevision = async (): Promise<void> => {
   await bumpRevision('mappings');
 };
 
-function bindAll<T extends object>(instance: T): T {
+const bindAll = <T extends object>(instance: T): T => {
   const proto = Object.getPrototypeOf(instance) as Record<string, unknown> | null;
   if (!proto) return instance;
 
@@ -60,9 +55,9 @@ function bindAll<T extends object>(instance: T): T {
   }
 
   return instance;
-}
+};
 
-export const createBackgroundApi = (): Ani2arrApi => {
+export const createApiDeps = (): ApiHandlerDeps => {
   const createHasUrlPermission =
     (provider: Provider) =>
     async (url: string): Promise<boolean> => {
@@ -85,9 +80,7 @@ export const createBackgroundApi = (): Ani2arrApi => {
   );
 
   const upstreamMappingStore = new UpstreamMappingStore(upstreamMappingCaches);
-
   const lookupClient = new SonarrLookupClient(sonarrClient, sonarrLookupCaches);
-
   const radarrLookupClient = new RadarrLookupClient(radarrClient, radarrLookupCaches);
 
   const overridesService = new MappingOverridesService();
@@ -126,12 +119,8 @@ export const createBackgroundApi = (): Ani2arrApi => {
     radarr: null,
   };
 
-  const bumpLibraryRevision = async (
-    provider: Provider,
-  ): Promise<void> => {
-    await bumpRevision(
-      provider === 'sonarr' ? 'sonarrLibrary' : 'radarrLibrary',
-    );
+  const bumpLibraryRevision = async (provider: Provider): Promise<void> => {
+    await bumpRevision(provider === 'sonarr' ? 'sonarrLibrary' : 'radarrLibrary');
   };
 
   const sonarrLibrary = bindAll(
@@ -158,7 +147,11 @@ export const createBackgroundApi = (): Ani2arrApi => {
   const providerNotConfiguredError = (provider: Provider) => {
     const label = provider === 'sonarr' ? 'Sonarr' : 'Radarr';
     const code = provider === 'sonarr' ? ErrorCode.SONARR_NOT_CONFIGURED : ErrorCode.CONFIGURATION_ERROR;
-    return createError(code, `${label} credentials are not configured.`, `Configure your ${label} connection in ani2arr options.`);
+    return createError(
+      code,
+      `${label} credentials are not configured.`,
+      `Configure your ${label} connection in ani2arr options.`,
+    );
   };
 
   const ensureProviderConfigured = async (provider: Provider): Promise<{
@@ -228,15 +221,9 @@ export const createBackgroundApi = (): Ani2arrApi => {
       await mappingService.initStaticPairs();
     }
 
-    await Promise.all([
-      sonarrLibrary.refreshCache(options),
-      radarrLibrary.refreshCache(options),
-    ]);
+    await Promise.all([sonarrLibrary.refreshCache(options), radarrLibrary.refreshCache(options)]);
 
-    await Promise.all([
-      bumpLibraryRevision('sonarr'),
-      bumpLibraryRevision('radarr'),
-    ]);
+    await Promise.all([bumpLibraryRevision('sonarr'), bumpLibraryRevision('radarr')]);
   };
 
   const clearPersistentCaches = async (): Promise<void> => {
@@ -259,22 +246,24 @@ export const createBackgroundApi = (): Ani2arrApi => {
       { provider: 'radarr' as const, url: options.providers.radarr.url },
     ];
 
-    await Promise.all(removals.map(async ({ provider, url }) => {
-      if (!url) return;
+    await Promise.all(
+      removals.map(async ({ provider, url }) => {
+        if (!url) return;
 
-      const removal = await removeProviderHostPermission(String(url));
-      if (!removal.ok) {
-        logError(normalizeError(removal.error), `Ani2arrApi:resetExtensionState:${provider}:removePermission`);
-        return;
-      }
+        const removal = await removeProviderHostPermission(String(url));
+        if (!removal.ok) {
+          logError(normalizeError(removal.error), `Ani2arrApi:resetExtensionState:${provider}:removePermission`);
+          return;
+        }
 
-      if (!removal.value.removed) {
-        logError(
-          normalizeError(new Error(`Permission removal rejected for ${removal.value.pattern}.`)),
-          `Ani2arrApi:resetExtensionState:${provider}:removePermission`,
-        );
-      }
-    }));
+        if (!removal.value.removed) {
+          logError(
+            normalizeError(new Error(`Permission removal rejected for ${removal.value.pattern}.`)),
+            `Ani2arrApi:resetExtensionState:${provider}:removePermission`,
+          );
+        }
+      }),
+    );
   };
 
   const resetExtensionState = async (): Promise<void> => {
@@ -289,7 +278,7 @@ export const createBackgroundApi = (): Ani2arrApi => {
     await removeConfiguredProviderHostPermissions(previousOptions);
   };
 
-  return createApiHandlers({
+  return {
     SonarrClient: sonarrClient,
     RadarrClient: radarrClient,
     anilistMediaService,
@@ -308,5 +297,5 @@ export const createBackgroundApi = (): Ani2arrApi => {
     handleOptionsUpdated,
     clearPersistentCaches,
     resetExtensionState,
-  });
+  };
 };

@@ -1,15 +1,5 @@
-/** Public surface for browse overlay feature factories, UI, and root composition. */
+/** Public surface for reusable card overlay UI and state. */
 // src/features/media-overlay/index.ts
 
-export {
-  createBrowseContentApp,
-  DEFAULT_CONTAINER_CLASS,
-  DEFAULT_PROCESSED_ATTRIBUTE,
-} from './components/media-overlay';
-
 export { CardOverlay } from './components/card-overlay';
-export { BrowseRoot } from './components/browse-root';
-
-export type { BrowseAdapter, ParsedCard } from './types';
-export type { BrowseContentAppProps } from './components/media-overlay';
-export type { BrowseRootProps } from './components/browse-root';
+export { useCardOverlayState } from './hooks/use-card-overlay-state';

@@ -1,5 +1,6 @@
 /** Anime-page action group for provider quick add, deep links, and manual mapping entry points. */
-// src/entrypoints/anilist-anime.content/components/media-actions.tsx
+// src/content/anilist/anime-page/media-actions.tsx
+
 import React from 'react';
 import Button from '@/shared/ui/primitives/button';
 import { SquareArrowOutUpRight, ChevronDown } from 'lucide-react';
@@ -165,7 +166,13 @@ const MediaActions: React.FC<MediaActionsProps> = ({
           <DropdownItem onSelect={onOpenModal} disabled={externalId === null}>
             {serviceLabel} options
           </DropdownItem>
-          <DropdownItem onSelect={() => { log.debug('Action: Fix mapping clicked'); onOpenMappingFix(!hasMapping); }} disabled={!isServiceConfigured}>
+          <DropdownItem
+            onSelect={() => {
+              log.debug('Action: Fix mapping clicked');
+              onOpenMappingFix(!hasMapping);
+            }}
+            disabled={!isServiceConfigured}
+          >
             {manualMappingLabel}
           </DropdownItem>
         </Dropdown>

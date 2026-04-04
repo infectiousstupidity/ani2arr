@@ -1,4 +1,5 @@
-/* Entry-specific overrides for AniChart browse; shared base in '@/styles/base.css' */
+/* AniChart browse surface overrides for content-owned card overlays. */
+/* src/content/anichart/browse/style.css */
 
 /* Allow overlay anchor to extend */
 a.cover { position: relative; overflow: visible !important; }
@@ -7,4 +8,3 @@ a.cover { position: relative; overflow: visible !important; }
 /* Corner offsets for this surface */
 .a2a-card-overlay[data-corner='bottom-left'] { left: var(--badge-offset-x, -8px); bottom: 16px; }
 .a2a-card-overlay[data-corner='top-left'] { left: var(--badge-offset-x, -6px); top: -6px; }
-
