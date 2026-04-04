@@ -28,6 +28,8 @@ import {
   createDefaultSettings,
   getExtensionOptionsSnapshot,
   setExtensionOptionsSnapshot,
+  getProviderCredentials,
+  isProviderConfigured,
   type ExtensionOptions,
 } from '@/options';
 import type { Provider, ProviderCredentials } from '@/providers';
@@ -153,48 +155,34 @@ export const createBackgroundApi = (): Ani2arrApi => {
     ),
   );
 
-  const ensureSonarrConfigured = async (): Promise<{
+  const providerNotConfiguredError = (provider: Provider) => {
+    const label = provider === 'sonarr' ? 'Sonarr' : 'Radarr';
+    const code = provider === 'sonarr' ? ErrorCode.SONARR_NOT_CONFIGURED : ErrorCode.CONFIGURATION_ERROR;
+    return createError(code, `${label} credentials are not configured.`, `Configure your ${label} connection in ani2arr options.`);
+  };
+
+  const ensureProviderConfigured = async (provider: Provider): Promise<{
     credentials: ProviderCredentials;
     options: ExtensionOptions;
   }> => {
     const options = await getExtensionOptionsSnapshot();
-    if (!options?.providers.sonarr.url || !options?.providers.sonarr.apiKey) {
-      throw createError(
-        ErrorCode.SONARR_NOT_CONFIGURED,
-        'Sonarr credentials are not configured.',
-        'Configure your Sonarr connection in ani2arr options.',
-      );
-    }
+    const credentials = getProviderCredentials(options, provider);
+    if (!credentials) throw providerNotConfiguredError(provider);
+    return { credentials, options };
+  };
 
-    return {
-      credentials: {
-        url: options.providers.sonarr.url,
-        apiKey: options.providers.sonarr.apiKey,
-      },
-      options,
-    };
+  const ensureSonarrConfigured = async (): Promise<{
+    credentials: ProviderCredentials;
+    options: ExtensionOptions;
+  }> => {
+    return ensureProviderConfigured('sonarr');
   };
 
   const ensureRadarrConfigured = async (): Promise<{
     credentials: ProviderCredentials;
     options: ExtensionOptions;
   }> => {
-    const options = await getExtensionOptionsSnapshot();
-    if (!options?.providers.radarr.url || !options?.providers.radarr.apiKey) {
-      throw createError(
-        ErrorCode.CONFIGURATION_ERROR,
-        'Radarr credentials are not configured.',
-        'Configure your Radarr connection in ani2arr options.',
-      );
-    }
-
-    return {
-      credentials: {
-        url: options.providers.radarr.url,
-        apiKey: options.providers.radarr.apiKey,
-      },
-      options,
-    };
+    return ensureProviderConfigured('radarr');
   };
 
   const scheduleLibraryRefresh = (provider: Provider, optionsHint?: ExtensionOptions): void => {
@@ -211,13 +199,13 @@ export const createBackgroundApi = (): Ani2arrApi => {
         const options = refreshOptionsHint[provider] ?? (await getExtensionOptionsSnapshot());
         refreshOptionsHint[provider] = null;
 
+        if (!isProviderConfigured(options, provider)) return;
+
         if (provider === 'sonarr') {
-          if (!options?.providers.sonarr.url || !options?.providers.sonarr.apiKey) return;
           await sonarrLibrary.refreshCache(options);
           return;
         }
 
-        if (!options?.providers.radarr.url || !options?.providers.radarr.apiKey) return;
         await radarrLibrary.refreshCache(options);
       } catch (error) {
         logError(normalizeError(error), `Ani2arrApi:debouncedLibraryRefresh:${provider}`);
@@ -234,10 +222,7 @@ export const createBackgroundApi = (): Ani2arrApi => {
     await bumpMappingsRevision();
 
     const options = optionsHint ?? (await getExtensionOptionsSnapshot());
-    const hasConfiguredProvider = Boolean(
-      (options?.providers.sonarr.url && options.providers.sonarr.apiKey) ||
-      (options?.providers.radarr.url && options.providers.radarr.apiKey),
-    );
+    const hasConfiguredProvider = isProviderConfigured(options, 'sonarr') || isProviderConfigured(options, 'radarr');
 
     if (hasConfiguredProvider) {
       await mappingService.initStaticPairs();

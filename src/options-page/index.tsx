@@ -8,7 +8,7 @@ import { ChevronRight, ShieldCheck } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import appIcon from '@/assets/icon.png';
 import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
-import { createDefaultSettings, type ExtensionOptions, useExtensionOptions } from '@/options';
+import { createDefaultSettings, type ExtensionOptions, useExtensionOptions, getProviderCredentials } from '@/options';
 import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
 import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
 import {
@@ -92,22 +92,11 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
   openPrivacyPanel,
 }) => {
   const actions = useSettingsActions(optionsQuery.data ? { savedSettings: optionsQuery.data } : {});
-  const getProviderConnectionConfig = (provider: 'sonarr' | 'radarr') => {
-    const credentials = optionsQuery.data?.providers[provider];
-    const isConfigured = Boolean(credentials?.url && credentials?.apiKey);
-    return {
-      isConfigured,
-      credentials: isConfigured
-        ? {
-            url: String(credentials?.url ?? '').trim(),
-            apiKey: String(credentials?.apiKey ?? '').trim(),
-          }
-        : null,
-    };
-  };
 
-  const sonarrConnection = getProviderConnectionConfig('sonarr');
-  const radarrConnection = getProviderConnectionConfig('radarr');
+  const sonarrCredentials = getProviderCredentials(optionsQuery.data, 'sonarr');
+  const radarrCredentials = getProviderCredentials(optionsQuery.data, 'radarr');
+  const sonarrConnection = { isConfigured: sonarrCredentials !== null, credentials: sonarrCredentials };
+  const radarrConnection = { isConfigured: radarrCredentials !== null, credentials: radarrCredentials };
   const sonarrConnectionQuery = useProviderConnectionCheck({
     provider: 'sonarr',
     enabled: sonarrConnection.isConfigured,

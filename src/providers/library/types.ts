@@ -2,6 +2,7 @@
 // src/providers/library/types.ts
 
 import type { ExtensionOptions } from '@/options';
+import type { ProviderCredentials } from '@/providers/types';
 import type { TtlCache } from '@/storage';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 
@@ -20,4 +21,4 @@ export type LibraryMutationEmitter<TPayload> = (payload: TPayload) => Promise<vo
 
 export type ProviderCredentialsResolver = (
   options: ExtensionOptions,
-) => { url: string; apiKey: string } | null;
+) => ProviderCredentials | null;

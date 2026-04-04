@@ -7,7 +7,7 @@ import { createBackgroundApi } from '@/runtime/create-background-api';
 import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/debug/metrics';
 import { logger } from '@/shared/utils/logger';
 import { logError, normalizeError } from '@/shared/errors';
-import { getExtensionOptionsSnapshot } from '@/options';
+import { getExtensionOptionsSnapshot, isProviderConfigured } from '@/options';
 
 type OptionsSectionId = 'sonarr' | 'radarr' | 'mappings' | 'ui' | 'advanced';
 
@@ -29,10 +29,7 @@ const log = logger.create('Background');
 async function shouldWarmMappingsCache(): Promise<boolean> {
   try {
     const options = await getExtensionOptionsSnapshot();
-    return Boolean(
-      (options.providers.sonarr.url && options.providers.sonarr.apiKey) ||
-      (options.providers.radarr.url && options.providers.radarr.apiKey),
-    );
+    return isProviderConfigured(options, 'sonarr') || isProviderConfigured(options, 'radarr');
   } catch (error) {
     logError(normalizeError(error), 'Background:shouldWarmMappingsCache');
     return false;
