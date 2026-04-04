@@ -18,24 +18,29 @@
 - Before finishing, run the relevant checks for the files you changed.
 - Do not fix lint errors in files unrelated to your change.
 - Minimum verification:
-  - `pnpm run lint`
+  - Run `pnpm run lint:target -- <changed files>` for the files changed in this task - it might be slow or exit with code 1, but still output the lint report properly. 
   - `pnpm run compile`
-- Run tests when the change affects existing tested behavior, shared logic, parsing, validation, matching, caching, or anything regression-prone.
+- Run `pnpm run test` for changes affecting tested behavior, shared logic, or regression-prone code.
+- If the touched area has no tests yet, add the smallest focused tests that meaningfully protect the change when practical.
 - If you cannot run a check, say why.
 
 ## Testing
 
-- Do not add tests by default.
-- Add or update tests when they protect important behavior or prevent likely regressions.
-- Prefer the cheapest test that gives confidence.
-- Prefer unit tests for pure logic.
-- Prefer integration-style tests only when behavior crosses boundaries and a unit test would miss the real risk.
-- Do not add tests for simple presentational UI, trivial wrappers, or obvious pass-through code unless there is a known bug risk.
-- Do not snapshot large UI trees unless there is a clear reason.
-- For bug fixes, prefer adding a focused regression test when practical.
-- For refactors, do not add broad new test suites unless the refactor changes behavior or exposes untested critical logic.
-- Keep tests small, explicit, and easy to maintain.
-- Avoid over-mocking. Test real logic, not implementation detail.
+- Do not backfill a broad test suite.
+- When a task refactors or adds important logic in an untested area, add the smallest focused tests that protect the behavior being changed.
+- For this repo, prioritize tests for:
+  - parsing, validation, and normalization
+  - matching and mapping logic
+  - caching, invalidation, and storage-backed behavior
+  - provider request/response handling
+  - important shared logic
+  - real bug fixes
+- Prefer the cheapest test that gives confidence:
+  - unit tests first
+  - integration-style tests only when a unit test would miss the real risk
+- Do not add E2E, browser-level tests, large snapshots, or tests for simple presentational UI, trivial wrappers, or obvious pass-through code unless the task clearly needs them.
+- Use Vitest with WXT testing support.
+- If important logic changes and no test is added, state why.
 
 ## Core rules
 
