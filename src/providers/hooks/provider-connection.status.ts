@@ -1,7 +1,49 @@
-/** Options-only provider connection status derivation with optional connecting-state smoothing. */
-// src/features/options/use-provider-connection-status.ts
+/** Provider connection status type, display metadata, and smoothing hook. */
+// src/providers/hooks/provider-connection.status.ts
 import { useEffect, useRef, useState } from 'react';
-import type { ProviderConnectionStatus } from '@/features/options/provider-connection-status';
+
+export type ProviderConnectionStatus =
+  | 'connected'
+  | 'configured'
+  | 'connecting'
+  | 'not-configured';
+
+export const PROVIDER_CONNECTION_STATUS_META: Record<
+  ProviderConnectionStatus,
+  {
+    label: string;
+    shortLabel: string;
+    variantClassName?: string;
+  }
+> = {
+  connected: {
+    label: 'Connected',
+    shortLabel: 'Connected',
+    variantClassName: 'a2a-provider-status--connected',
+  },
+  configured: {
+    label: 'Configured',
+    shortLabel: 'Configured',
+    variantClassName: 'a2a-provider-status--configured',
+  },
+  connecting: {
+    label: 'Checking connection',
+    shortLabel: 'Checking',
+    variantClassName: 'a2a-provider-status--connecting',
+  },
+  'not-configured': {
+    label: 'Not configured',
+    shortLabel: 'Not set',
+  },
+};
+
+export const getProviderConnectionStatusMeta = (
+  status: ProviderConnectionStatus,
+): {
+  label: string;
+  shortLabel: string;
+  variantClassName?: string;
+} => PROVIDER_CONNECTION_STATUS_META[status];
 
 const getRawProviderConnectionStatus = (
   input: {
@@ -98,5 +140,3 @@ export const useProviderConnectionStatus = (
 
   return displayedStatus;
 };
-
-export default useProviderConnectionStatus;

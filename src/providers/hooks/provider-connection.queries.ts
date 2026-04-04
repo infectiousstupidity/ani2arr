@@ -1,5 +1,5 @@
-/** Options-local provider connection query and mutation hooks for provider settings. */
-// src/features/options/use-provider-connection-check.ts
+/** Provider connection query and mutation hooks for testing Arr connectivity. */
+// src/providers/hooks/provider-connection.queries.ts
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
 import type { TestProviderConnectionInput } from '@/rpc/schemas';

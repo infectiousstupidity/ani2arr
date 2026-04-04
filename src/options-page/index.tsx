@@ -9,12 +9,12 @@ import { cn } from '@/shared/utils/cn';
 import appIcon from '@/assets/icon.png';
 import { useA2aBroadcasts } from '@/shared/queries/use-a2a-broadcasts';
 import { createDefaultSettings, type ExtensionOptions, useExtensionOptions, getProviderCredentials } from '@/options';
-import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
-import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
+import { useProviderConnectionCheck } from '@/providers/hooks/provider-connection.queries';
+import { useProviderConnectionStatus } from '@/providers/hooks/provider-connection.status';
 import {
   getProviderConnectionStatusMeta,
   type ProviderConnectionStatus,
-} from '@/features/options/provider-connection-status';
+} from '@/providers/hooks/provider-connection.status';
 import { useSettingsActions } from './hooks/use-settings-actions';
 import MappingsSection from './sections/mappings/mappings-section';
 import UiSection from './sections/ui-section';
