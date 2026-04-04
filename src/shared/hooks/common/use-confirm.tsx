@@ -20,7 +20,7 @@ type ConfirmProviderProps = React.PropsWithChildren<{
 
 export const ConfirmProvider: React.FC<ConfirmProviderProps> = ({ children, portalContainer }) => {
   const [open, setOpen] = useState(false);
-  const [opts, setOpts] = useState<ConfirmOptions | undefined>(undefined);
+  const [opts, setOpts] = useState<ConfirmOptions>();
   const [resolver, setResolver] = useState<((value: boolean) => void) | null>(null);
 
   const confirm = useCallback((options?: ConfirmOptions) => {

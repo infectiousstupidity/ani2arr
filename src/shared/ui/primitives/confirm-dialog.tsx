@@ -3,7 +3,7 @@ import Button from '@/shared/ui/primitives/button';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { cn } from '@/shared/utils/cn';
 
-const BASE_CONFIRM_Z_INDEX = 2147483620;
+const BASE_CONFIRM_Z_INDEX = 2_147_483_620;
 const CONFIRM_OVERLAY_Z_INDEX = BASE_CONFIRM_Z_INDEX;
 const CONFIRM_CONTENT_Z_INDEX = BASE_CONFIRM_Z_INDEX + 1;
 

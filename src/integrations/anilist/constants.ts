@@ -2,4 +2,4 @@
 // src/integrations/anilist/constants.ts
 
 export const ANILIST_GRAPHQL_API_URL = 'https://graphql.anilist.co';
-export const DEFAULT_ANILIST_RETRY_AFTER_MS = 5_000;
+export const DEFAULT_ANILIST_RETRY_AFTER_MS = 5000;

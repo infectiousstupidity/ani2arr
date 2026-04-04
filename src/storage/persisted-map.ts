@@ -84,7 +84,7 @@ export class PersistedMap<K extends string, V extends { updatedAt: number }, P =
   }
 
   public async deleteByPrefix(prefix: string): Promise<void> {
-    for (const key of [...this.map.keys()]) {
+    for (const key of this.map.keys()) {
       if (key.startsWith(prefix)) {
         this.map.delete(key);
       }

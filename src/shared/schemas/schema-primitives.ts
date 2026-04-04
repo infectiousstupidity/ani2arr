@@ -29,11 +29,12 @@ export const CoerceNumberArray = v.pipe(
   v.unknown(),
   v.transform((input) => {
     const list = Array.isArray(input) ? input : [input];
-    return list.reduce<number[]>((acc, item) => {
+    const result: number[] = [];
+    for (const item of list) {
       const num = Number(item);
-      if (Number.isFinite(num)) acc.push(num);
-      return acc;
-    }, []);
+      if (Number.isFinite(num)) result.push(num);
+    }
+    return result;
   }),
   v.array(v.number())
 );
@@ -43,13 +44,14 @@ export const CoerceStringArray = v.pipe(
   v.unknown(),
   v.transform((input) => {
     const list = Array.isArray(input) ? input : [input];
-    return list.reduce<string[]>((acc, item) => {
+    const result: string[] = [];
+    for (const item of list) {
       if (typeof item === 'string') {
         const trimmed = item.trim();
-        if (trimmed) acc.push(trimmed);
+        if (trimmed) result.push(trimmed);
       }
-      return acc;
-    }, []);
+    }
+    return result;
   }),
   v.array(v.string())
 );

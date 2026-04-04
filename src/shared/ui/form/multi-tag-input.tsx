@@ -83,7 +83,7 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({
     } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
       e.preventDefault();
       // Safe check to satisfy TypeScript
-      const lastTag = tags[tags.length - 1];
+      const lastTag = tags.at(-1);
       if (lastTag) {
         removeTag(lastTag);
       }

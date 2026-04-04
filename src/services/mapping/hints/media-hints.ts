@@ -22,14 +22,12 @@ export function buildMediaFromMetadataHint(anilistId: number, metadata?: AniList
   const titles = normalizeTitles(metadata.titles ?? {});
 
   const synonyms = Array.isArray(metadata.synonyms)
-    ? Array.from(
-        new Set(
-          metadata.synonyms
-            .filter((value): value is string => typeof value === 'string')
-            .map(value => value.trim())
-            .filter(value => value.length > 0),
-        ),
-      )
+    ? [...new Set(
+        metadata.synonyms
+          .filter((value): value is string => typeof value === 'string')
+          .map(value => value.trim())
+          .filter(value => value.length > 0),
+      )]
     : [];
 
   const startYear =
@@ -70,7 +68,7 @@ export function buildMediaFromMetadataHint(anilistId: number, metadata?: AniList
         }
       : undefined;
 
-  const startDate = startYear != null ? { year: startYear } : undefined;
+  const startDate = startYear == null ? undefined : { year: startYear };
 
   return {
     id: anilistId,

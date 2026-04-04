@@ -38,7 +38,7 @@ export const BrowseRoot: React.FC<BrowseRootProps> = ({
             anilistId,
             title,
             initialTab: initialTab ?? 'series',
-            ...(initialMappingRequired !== undefined ? { initialMappingRequired } : {}),
+            ...(initialMappingRequired === undefined ? {} : { initialMappingRequired }),
             metadata,
           });
         }}
