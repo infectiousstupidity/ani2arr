@@ -6,7 +6,7 @@ import { getAni2arrApi } from '@/rpc';
 import { useFormContext } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/shared/queries';
-import { useTestProviderConnection } from '@/features/options/use-provider-connection-check';
+import { useTestProviderConnection } from '@/providers/hooks/provider-connection.queries';
 import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,

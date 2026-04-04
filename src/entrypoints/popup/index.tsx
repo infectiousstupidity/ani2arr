@@ -6,9 +6,9 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
 import { ExternalLink } from 'lucide-react';
-import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
-import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
-import { getProviderConnectionStatusMeta } from '@/features/options/provider-connection-status';
+import { useProviderConnectionCheck } from '@/providers/hooks/provider-connection.queries';
+import { useProviderConnectionStatus } from '@/providers/hooks/provider-connection.status';
+import { getProviderConnectionStatusMeta } from '@/providers/hooks/provider-connection.status';
 import { cn } from '@/shared/utils/cn';
 import type {
   BadgeVisibility,

@@ -7,8 +7,8 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '@/shared/queries';
 import type { SettingsActions } from '../hooks/use-settings-actions';
-import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
-import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
+import { useProviderConnectionCheck } from '@/providers/hooks/provider-connection.queries';
+import { useProviderConnectionStatus } from '@/providers/hooks/provider-connection.status';
 import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,

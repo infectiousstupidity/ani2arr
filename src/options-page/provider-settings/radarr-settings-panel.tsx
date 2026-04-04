@@ -14,8 +14,8 @@ import { requestProviderHostPermission } from '@/providers/permissions/host-perm
 import { logger } from '@/shared/utils/logger';
 import { getAniListTitleLanguageLabel } from '@/anilist/title-preference';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
-import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
-import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
+import { useProviderConnectionCheck } from '@/providers/hooks/provider-connection.queries';
+import { useProviderConnectionStatus } from '@/providers/hooks/provider-connection.status';
 import {
   ProviderConnectionCard,
   ProviderConnectionStatusBadge,

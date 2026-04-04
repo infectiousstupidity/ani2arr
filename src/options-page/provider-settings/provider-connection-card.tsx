@@ -7,7 +7,7 @@ import { ANILIST_TITLE_LANGUAGES, type AniListTitleLanguage } from '@/anilist/sc
 import {
   getProviderConnectionStatusMeta,
   type ProviderConnectionStatus,
-} from '@/features/options/provider-connection-status';
+} from '@/providers/hooks/provider-connection.status';
 import { cn } from '@/shared/utils/cn';
 import { getAniListTitleLanguageLabel } from '@/anilist/title-preference';
 import { InputField, SelectField } from '@/shared/ui/form/form';
