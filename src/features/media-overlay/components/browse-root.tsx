@@ -1,4 +1,4 @@
-/** Browse overlay root composition for media modal state and scheduler debug rendering. */
+/** Browse overlay root composition for media modal state rendering. */
 // src/features/media-overlay/components/browse-root.tsx
 
 import React from 'react';
@@ -6,7 +6,6 @@ import type { BrowseContentAppProps } from './media-overlay';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
 import { useMediaModalProps } from '@/features/media-overlay/hooks/use-media-modal-props';
-import { AniListSchedulerDebugOverlay } from '@/debug/anilist-scheduler-debug-overlay';
 
 export interface BrowseRootProps {
   BrowseContentApp: React.FC<BrowseContentAppProps>;
@@ -31,7 +30,6 @@ export const BrowseRoot: React.FC<BrowseRootProps> = ({
 
   return (
     <>
-      <AniListSchedulerDebugOverlay />
       <BrowseContentApp
         onOpenMediaModal={({ anilistId, title, initialTab, initialMappingRequired, metadata }) => {
           mediaModal.open({

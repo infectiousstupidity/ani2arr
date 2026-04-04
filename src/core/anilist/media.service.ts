@@ -3,7 +3,6 @@
 
 import PQueue from 'p-queue';
 import type { TtlCache } from '@/storage';
-import type { AniListSchedulerDebugSnapshot } from '@/debug/anilist-debug.types';
 import type { AniListSearchMediaDto } from '@/integrations/anilist/media.schema';
 import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { RequestPriority } from '@/shared/utils/request-priority';
@@ -117,10 +116,6 @@ export class AniListMediaService {
 
     const limit = Math.min(Math.max(options?.limit ?? 8, 1), 25);
     return this.mediaScheduler.searchMedia(term, limit);
-  }
-
-  public getSchedulerDebugSnapshot(): AniListSchedulerDebugSnapshot {
-    return this.mediaScheduler.getDebugSnapshot();
   }
 
   private extractPrequelId(media: AniListMedia): number | null {

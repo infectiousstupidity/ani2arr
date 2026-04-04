@@ -1,7 +1,6 @@
 /** Typed RPC contract exposed across extension contexts. */
 // src/rpc/index.ts
 import { defineProxyService } from '@webext-core/proxy-service';
-import type { AniListSchedulerDebugSnapshot } from '@/debug/anilist-debug.types';
 import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
 import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
@@ -80,7 +79,6 @@ export interface Ani2arrApi {
   resetExtensionState(): Promise<{ ok: true }>;
   getMappings(input?: GetMappingsInput): Promise<GetMappingsOutput>;
   getAniListMetadata(input: GetAniListMetadataInput): Promise<GetAniListMetadataOutput>;
-  getAniListSchedulerDebug(): Promise<AniListSchedulerDebugSnapshot>;
   searchAniList(input: SearchAniListInput): Promise<AniListSearchResult[]>;
 }
 
