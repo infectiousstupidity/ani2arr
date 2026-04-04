@@ -168,7 +168,7 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
 
   const clear = async (): Promise<void> => {
     // Clear namespace slice of the in-memory fallback
-    for (const memKey of Array.from(memoryFallback.keys())) {
+    for (const memKey of memoryFallback.keys()) {
       if (memKey.startsWith(`${namespace}:`)) {
         memoryFallback.delete(memKey);
       }
@@ -176,7 +176,7 @@ export function createTtlCache<T>(namespace: string): TtlCache<T> {
     const db = await getDb();
     const tx = db.transaction(TTL_CACHE_STORE_NAME, 'readwrite');
     const store = tx.objectStore(TTL_CACHE_STORE_NAME);
-    const range = IDBKeyRange.bound(`${namespace}:`, `${namespace}:\uffff`);
+    const range = IDBKeyRange.bound(`${namespace}:`, `${namespace}:\uFFFF`);
     await store.delete(range);
     await tx.done;
   };

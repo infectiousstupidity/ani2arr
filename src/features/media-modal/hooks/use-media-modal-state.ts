@@ -39,8 +39,8 @@ export function useMediaModalState(): UseMediaModalStateResult {
       isOpen: true,
       anilistId: input.anilistId,
       title: input.title,
-      ...(input.initialTab !== undefined ? { initialTab: input.initialTab } : {}),
-      ...(input.initialMappingRequired !== undefined ? { initialMappingRequired: input.initialMappingRequired } : {}),
+      ...(input.initialTab === undefined ? {} : { initialTab: input.initialTab }),
+      ...(input.initialMappingRequired === undefined ? {} : { initialMappingRequired: input.initialMappingRequired }),
       metadata: input.metadata,
     });
   }, []);

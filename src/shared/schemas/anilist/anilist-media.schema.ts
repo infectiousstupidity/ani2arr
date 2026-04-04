@@ -96,7 +96,6 @@ const OptionalStartDateSchema = v.optional(
     v.nullable(AniListMediaStartDateSchema),
     v.transform(value => value ?? undefined),
   ),
-  undefined,
 );
 
 const OptionalRelationsSchema = v.optional(
@@ -104,7 +103,6 @@ const OptionalRelationsSchema = v.optional(
     v.nullable(AniListMediaRelationsSchema),
     v.transform(value => value ?? undefined),
   ),
-  undefined,
 );
 
 export const AniListMediaSchema = v.object({

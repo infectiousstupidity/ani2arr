@@ -20,7 +20,7 @@ export function Modal(
 
 export const ModalTrigger = Dialog.Trigger;
 
-const BASE_MODAL_Z_INDEX = 2147483600;
+const BASE_MODAL_Z_INDEX = 2_147_483_600;
 const MODAL_OVERLAY_Z_INDEX = BASE_MODAL_Z_INDEX;
 const MODAL_CONTENT_Z_INDEX = BASE_MODAL_Z_INDEX + 1;
 

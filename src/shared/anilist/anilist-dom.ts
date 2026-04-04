@@ -118,11 +118,11 @@ const metadataFromAny = (value: unknown): AniListMediaHint | null => {
 export const metadataFromMediaObject = (value: unknown): AniListMediaHint | null => metadataFromAny(value);
 
 export const extractMediaMetadataFromDom = (anilistId: number): AniListMediaHint | null => {
-  if (typeof window === 'undefined' || !Number.isFinite(anilistId)) {
+  if (globalThis.window === undefined || !Number.isFinite(anilistId)) {
     return null;
   }
   try {
-    const { location, document } = window;
+    const { location, document } = globalThis;
     const hrefIdMatch = location.pathname.match(/\/anime\/(\d+)/);
     const onAnimeDetailPage = hrefIdMatch && Number.parseInt(hrefIdMatch[1]!, 10) === anilistId;
     const FORMAT_TEXT_MAP = new Map<string, AniListMediaFormat>([
@@ -147,18 +147,20 @@ export const extractMediaMetadataFromDom = (anilistId: number): AniListMediaHint
       const title = document.querySelector('h1')?.textContent?.trim() ?? '';
       const coverImg = document.querySelector<HTMLImageElement>('.cover-wrap .cover');
       let format: AniListMediaFormat | null = null;
-      const rows = Array.from(document.querySelectorAll<HTMLDivElement>('.sidebar .data .data-set'));
+      const rows = [...document.querySelectorAll<HTMLDivElement>('.sidebar .data .data-set')];
       const formatRow = rows.find(row => row.querySelector('.type')?.textContent?.trim() === 'Format');
       const rawFormat = formatRow?.querySelector('.value')?.textContent ?? '';
-      const normalizedFormat = rawFormat.replace(/\s+/g, ' ').trim().toLowerCase();
+      const normalizedFormat = rawFormat.replaceAll(/\s+/g, ' ').trim().toLowerCase();
       if (normalizedFormat) {
-        if (normalizedFormat.includes('movie')) format = 'MOVIE';
-        else if (normalizedFormat.includes('music')) format = 'MUSIC';
-        else if (normalizedFormat === 'tv short') format = 'TV_SHORT';
-        else if (normalizedFormat === 'tv') format = 'TV';
-        else if (normalizedFormat === 'special') format = 'SPECIAL';
-        else if (normalizedFormat === 'ova') format = 'OVA';
-        else if (normalizedFormat === 'ona') format = 'ONA';
+        switch (true) {
+          case normalizedFormat.includes('movie'): { format = 'MOVIE'; break; }
+          case normalizedFormat.includes('music'): { format = 'MUSIC'; break; }
+          case normalizedFormat === 'tv short': { format = 'TV_SHORT'; break; }
+          case normalizedFormat === 'tv': { format = 'TV'; break; }
+          case normalizedFormat === 'special': { format = 'SPECIAL'; break; }
+          case normalizedFormat === 'ova': { format = 'OVA'; break; }
+          case normalizedFormat === 'ona': { format = 'ONA'; break; }
+        }
       }
       
       if (title || format) {

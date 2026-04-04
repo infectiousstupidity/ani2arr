@@ -9,24 +9,20 @@ import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.
 export const normalizeSynonyms = (synonyms?: string[] | null): string[] => {
   if (!Array.isArray(synonyms)) return [];
 
-  return Array.from(
-    new Set(
+  return [...new Set(
       synonyms
         .filter((value): value is string => typeof value === 'string')
         .map(value => value.trim())
         .filter(value => value.length > 0),
-    ),
-  ).sort();
+    )].toSorted();
 };
 
 export const normalizeRelationIds = (ids?: number[] | null): number[] => {
   if (!Array.isArray(ids)) return [];
 
-  return Array.from(
-    new Set(
+  return [...new Set(
       ids.filter((value): value is number => typeof value === 'number' && Number.isFinite(value)),
-    ),
-  ).sort((a, b) => a - b);
+    )].toSorted((a, b) => a - b);
 };
 
 export const metadataEqual = (a?: AniListMediaHint | null, b?: AniListMediaHint | null): boolean => {
@@ -57,7 +53,7 @@ const mergeSynonyms = (a: string[] | null | undefined, b: string[] | null | unde
     .filter(item => item.length > 0);
 
   if (merged.length === 0) return null;
-  return Array.from(new Set(merged));
+  return [...new Set(merged)];
 };
 
 const mergeRelationIds = (a: number[] | null | undefined, b: number[] | null | undefined): number[] | null => {
@@ -67,7 +63,7 @@ const mergeRelationIds = (a: number[] | null | undefined, b: number[] | null | u
   ].filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
 
   if (merged.length === 0) return null;
-  return Array.from(new Set(merged));
+  return [...new Set(merged)];
 };
 
 export const mergeMetadataHints = (
@@ -77,32 +73,34 @@ export const mergeMetadataHints = (
   const hints = [primary ?? null, secondary ?? null].filter((hint): hint is AniListMediaHint => !!hint);
   if (hints.length === 0) return null;
 
-  return hints.reduce<AniListMediaHint>((acc, hint) => {
-    if (!acc.titles && hint.titles) {
-      acc.titles = hint.titles;
-    }
-    if (!acc.startYear && hint.startYear) {
-      acc.startYear = hint.startYear;
-    }
-    if (!acc.format && hint.format) {
-      acc.format = hint.format;
-    }
-    if (!acc.coverImage && hint.coverImage) {
-      acc.coverImage = hint.coverImage;
-    }
-
-    acc.synonyms = mergeSynonyms(acc.synonyms, hint.synonyms);
-    acc.relationPrequelIds = mergeRelationIds(acc.relationPrequelIds, hint.relationPrequelIds);
-
-    return acc;
-  }, {
+  const result: AniListMediaHint = {
     titles: null,
     synonyms: null,
     startYear: null,
     format: null,
     relationPrequelIds: null,
     coverImage: null,
-  });
+  };
+
+  for (const hint of hints) {
+    if (!result.titles && hint.titles) {
+      result.titles = hint.titles;
+    }
+    if (!result.startYear && hint.startYear) {
+      result.startYear = hint.startYear;
+    }
+    if (!result.format && hint.format) {
+      result.format = hint.format;
+    }
+    if (!result.coverImage && hint.coverImage) {
+      result.coverImage = hint.coverImage;
+    }
+
+    result.synonyms = mergeSynonyms(result.synonyms, hint.synonyms);
+    result.relationPrequelIds = mergeRelationIds(result.relationPrequelIds, hint.relationPrequelIds);
+  }
+
+  return result;
 };
 
 export const metadataHintFromAniListMetadata = (

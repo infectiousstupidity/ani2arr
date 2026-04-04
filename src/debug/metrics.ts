@@ -56,7 +56,7 @@ function ensureHistogram(name: HistogramName, buckets: readonly number[]): Histo
 
   const state: HistogramState = {
     buckets: [...buckets],
-    counts: new Array(buckets.length + 1).fill(0),
+    counts: Array.from({length: buckets.length + 1}, () => 0),
     sum: 0,
     count: 0,
   };

@@ -39,7 +39,7 @@ export const resolveTitlePreference = (params: {
   alternates: Array<{ label: string; value: string }>;
 } => {
   const preferred = params.preferred ?? 'english';
-  const uniqueOrder = Array.from(new Set<AniListTitleLanguage>([preferred, ...TITLE_LANGUAGE_ORDER]));
+  const uniqueOrder = [...new Set<AniListTitleLanguage>([preferred, ...TITLE_LANGUAGE_ORDER])];
   const titleMap = params.titles ?? {};
   const fallbackTitle = normalizeTitle(params.fallback);
 

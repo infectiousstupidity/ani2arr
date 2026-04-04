@@ -8,9 +8,9 @@ const STOPWORDS = new Set([
 
 const YEAR_TOKEN_RE = /^(?:19|20)\d{2}$/;
 
-export const COMBINING_MARKS_RE = /[\u0300-\u036f]/g;
+export const COMBINING_MARKS_RE = /[\u0300-\u036F]/g;
 export const ORDINAL_SUFFIX_RE = /^\d+(?:st|nd|rd|th)$/;
-export const DASH_VARIANTS_RE = /[\u2010-\u2015\u2212\uFF0D\u2043\u30FC]/g;
+export const DASH_VARIANTS_RE = /[\u2010-\u2015\u2043\u2212\u30FC\uFF0D]/g;
 
 export type NormalizeTitleTokensOptions = {
   stripDiacritics?: boolean;
@@ -40,21 +40,20 @@ export function baseNormalizeTitle(term: string, options: { stripDiacritics: boo
 
   let value = term.normalize(normalizedForm);
   if (options.stripDiacritics) {
-    value = value.replace(COMBINING_MARKS_RE, '').replace(/\u00df/g, 'ss');
+    value = value.replaceAll(COMBINING_MARKS_RE, '').replaceAll('\u00DF', 'ss');
   }
 
   return value
     .toLowerCase()
-    .replace(/[\u3000]/g, ' ')
-    .replace(DASH_VARIANTS_RE, '-')
-    .replace(/[~]/g, '-')
-    .replace(/["""']/g, '')
-    .replace(/[\uFFFD]/g, ' ')
-    // eslint-disable-next-line no-control-regex -- sanitize stray BEL characters observed in scraped titles
-    .replace(/\u0007/g, ' ')
-    .replace(/[():[\]{}]/g, ' ')
-    .replace(/[^0-9a-z\u3040-\u30ff\u4e00-\u9faf\s-]/gi, ' ')
-    .replace(/\s+/g, ' ')
+    .replaceAll('\u3000', ' ')
+    .replaceAll(DASH_VARIANTS_RE, '-')
+    .replaceAll('~', '-')
+    .replaceAll(/["'\u201C\u201D]/g, '')
+    .replaceAll('\uFFFD', ' ')
+    .replaceAll('\u0007', ' ')
+    .replaceAll(/[():[\]{}]/g, ' ')
+    .replaceAll(/[^\d\sa-z\u3040-\u30FF\u4E00-\u9FAF-]/gi, ' ')
+    .replaceAll(/\s+/g, ' ')
     .trim();
 }
 
@@ -65,7 +64,7 @@ export function normTitle(s: string): string {
 
 export function stripParenContent(s: string): string {
   // Remove bracketed/parenthetical segments like (..), [..], {..}
-  return s.replace(/\s*[([{].*?[)\]}]\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  return s.replaceAll(/\s*[([{].*?[)\]}]\s*/g, ' ').replaceAll(/\s+/g, ' ').trim();
 }
 
 export function normalizeTitleTokens(
@@ -79,7 +78,7 @@ export function normalizeTitleTokens(
     return { normalized: '', tokens: [] };
   }
 
-  const rawTokens = normalized.replace(/-/g, ' ').split(/\s+/);
+  const rawTokens = normalized.replaceAll('-', ' ').split(/\s+/);
   const tokens: string[] = [];
 
   for (const raw of rawTokens) {
@@ -98,7 +97,7 @@ export function normalizeTitleTokens(
   }
 
   if (!merged.keepYear) {
-    while (tokens.length > 0 && YEAR_TOKEN_RE.test(tokens[tokens.length - 1]!)) {
+    while (tokens.length > 0 && YEAR_TOKEN_RE.test(tokens.at(-1)!)) {
       tokens.pop();
     }
   }
@@ -145,7 +144,7 @@ export function diceBigram(a: string, b: string): number {
 }
 
 export function tokenOverlap(query: string[], cand: string[]): number {
-  if (!query.length || !cand.length) return 0;
+  if (query.length === 0 || cand.length === 0) return 0;
   const setC = new Set(cand);
   let inter = 0;
   for (const q of query) if (setC.has(q)) inter++;
