@@ -1,7 +1,7 @@
 /** Provider-aware candidate title scoring utilities used by the mapping pipeline. */
 // src/services/mapping/pipeline/matching/score.ts
 
-import type { Provider } from '@/integrations/providers';
+import type { Provider } from '@/providers';
 import {
   WEIGHT_OVERLAP,
   WEIGHT_CHAR_SIM,

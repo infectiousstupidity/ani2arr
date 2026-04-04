@@ -1,8 +1,8 @@
 /** Adapts Radarr lookup results into mapping-search rows with library-aware links. */
 // src/features/mapping/radarr.adapter.ts
 
-import type { RadarrLookupMovie } from '@/integrations/providers';
-import { getProviderLibrarySlug } from '@/shared/utils/provider-library-paths';
+import type { RadarrLookupMovie } from '@/providers';
+import { getProviderLibrarySlug } from '@/providers/library/paths';
 import type { MappingSearchResult } from './types';
 
 export interface RadarrAdapterOptions {

@@ -7,12 +7,12 @@ import { RotateCcw } from 'lucide-react';
 
 import { RadarrAddOptionsFields } from '@/components/provider-add-options/radarr-add-options-fields';
 import type { SettingsActions } from '../hooks/use-settings-actions';
-import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
-import type { useRadarrMetadata } from '@/shared/queries';
+import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
 import Button from '@/shared/ui/primitives/button';
 import type { ExtensionOptions } from '@/options';
 
 import { SaveSettingsBar } from './save-settings-bar';
+import type { useRadarrMetadata } from '@/providers/hooks/radarr.queries';
 
 export const RadarrDefaultsSection: React.FC<{
   actions: SettingsActions;

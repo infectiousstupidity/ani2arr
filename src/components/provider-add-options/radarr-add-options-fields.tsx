@@ -7,12 +7,12 @@ import { ProviderTagField } from '@/components/provider-tags/provider-tag-field'
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import type {
   ProviderMetadata,
-} from '@/integrations/providers';
+} from '@/providers';
 import type {
   RadarrFormState,
   RadarrMinimumAvailability,
-} from '@/shared/schemas/providers/radarr-settings.schema';
-import { MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS } from '@/shared/schemas/providers/radarr-settings.schema';
+} from '@/providers/settings/radarr-settings.schema';
+import { MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS } from '@/providers/settings/radarr-settings.schema';
 import { cn } from '@/shared/utils/cn';
 
 import { ProviderRootFolderSelect } from './provider-root-folder-select';

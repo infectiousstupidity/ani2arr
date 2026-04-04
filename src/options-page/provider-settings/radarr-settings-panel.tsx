@@ -4,13 +4,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRadarrMetadata, queryKeys } from '@/shared/queries';
+import { queryKeys } from '@/shared/queries';
 import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,
-} from '@/shared/schemas/providers/provider-connection.schema';
+} from '@/providers/settings/provider-connection.schema';
 import type { SettingsActions } from '../hooks/use-settings-actions';
-import { requestProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
+import { requestProviderHostPermission } from '@/providers/permissions/host-permissions';
 import { logger } from '@/shared/utils/logger';
 import { getAniListTitleLanguageLabel } from '@/shared/utils/anilist-title-preference';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
@@ -24,6 +24,7 @@ import {
 import { RadarrDefaultsSection } from './radarr-defaults-section';
 import { useSelectPortal } from './use-select-portal';
 import type { ExtensionOptions } from '@/options';
+import { useRadarrMetadata } from '@/providers/hooks/radarr.queries';
 
 export interface RadarrSettingsPanelProps {
   actions: SettingsActions;

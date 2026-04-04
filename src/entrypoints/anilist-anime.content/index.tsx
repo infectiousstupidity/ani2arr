@@ -8,7 +8,7 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 import type { CheckMovieStatusResponse, CheckSeriesStatusResponse } from '@/rpc/types';
 import { ExtensionErrorBoundary } from '@/components/extension-error-boundary';
 import { useTheme } from '@/shared/hooks/common/use-theme';
-import { useAddMovie, useAddSeries, useAniListMetadataBatch, useMovieStatus, useSeriesStatus } from '@/shared/queries';
+import { useAniListMetadataBatch } from '@/shared/queries';
 import { useMediaModalProps } from '@/features/media-overlay/hooks/use-media-modal-props';
 import { createContentEntrypointShell, type ContentEntrypointShellContext } from '@/runtime/content-entrypoint-shell';
 import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
@@ -20,14 +20,16 @@ import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/an
 import {
   getProviderLibrarySlug,
   type ProviderMediaPathSource,
-} from '@/shared/utils/provider-library-paths';
-import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
+} from '@/providers/library/paths';
+import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
 import type {
   AniListMediaFormat,
   AniListMediaHint,
 } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
-import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
+import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
+import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
+import { useAddMovie, useMovieStatus } from '@/providers/hooks/radarr.queries';
+import { useAddSeries, useSeriesStatus } from '@/providers/hooks/sonarr.queries';
 import { MediaModal } from '@/features/media-modal';
 import { useMediaModalState } from '@/features/media-modal/hooks/use-media-modal-state';
 import '@/shared/styles/base.css';

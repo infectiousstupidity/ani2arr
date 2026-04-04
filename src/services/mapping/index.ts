@@ -4,7 +4,7 @@
 import type { AniListMediaService } from '@/core/anilist';
 import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
 import { getExtensionOptionsSnapshot } from '@/options';
-import type { Provider, ProviderCredentials } from '@/integrations/providers';
+import type { Provider, ProviderCredentials } from '@/providers';
 import type { MappingExternalId } from './types';
 import {
   createError,
@@ -25,7 +25,7 @@ import {
 } from '@/storage';
 import { incrementCounter } from '@/debug/metrics';
 import { logger } from '@/shared/utils/logger';
-import { getProviderLabel, resolveProviderForAniListFormat } from '@/services/providers/resolver';
+import { getProviderLabel, resolveProviderForAniListFormat } from '@/providers/provider-routing';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 import {
   EARLY_STOP_THRESHOLD,

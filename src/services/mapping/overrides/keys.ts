@@ -2,7 +2,7 @@
 // src/services/mapping/overrides/keys.ts
 
 import type { MappingExternalId } from '@/services/mapping/types';
-import type { Provider } from '@/integrations/providers';
+import type { Provider } from '@/providers';
 import type { MappingIgnoreEntry, StoredMappingExternalIdEntry } from './types';
 
 export const isFiniteId = (value: unknown): value is number =>

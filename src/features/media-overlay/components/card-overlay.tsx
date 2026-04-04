@@ -8,13 +8,13 @@ import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import {
   getProviderLibrarySlug,
   type ProviderMediaPathSource,
-} from '@/shared/utils/provider-library-paths';
+} from '@/providers/library/paths';
 import type { BadgeVisibility } from '@/options/types';
-import type { Provider } from '@/integrations/providers/types';
+import type { Provider } from '@/providers';
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
-import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-import { getProviderLabel } from '@/services/providers/resolver';
+import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
+import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
+import { getProviderLabel } from '@/providers/provider-routing';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { useCardOverlayState } from '../hooks/use-card-overlay-state';
 

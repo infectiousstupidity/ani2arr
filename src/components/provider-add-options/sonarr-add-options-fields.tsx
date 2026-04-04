@@ -8,13 +8,13 @@ import {
   MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
   type SonarrFormState,
-} from '@/shared/schemas/providers/sonarr-settings.schema';
+} from '@/providers/settings/sonarr-settings.schema';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import type {
   ProviderMetadata,
-} from '@/integrations/providers';
+} from '@/providers';
 import { cn } from '@/shared/utils/cn';
-import { buildProviderFolderSlugFromTitle } from '@/shared/utils/provider-library-paths';
+import { buildProviderFolderSlugFromTitle } from '@/providers/library/paths';
 
 import { ProviderRootFolderSelect } from './provider-root-folder-select';
 

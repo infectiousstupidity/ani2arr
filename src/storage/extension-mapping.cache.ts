@@ -5,7 +5,7 @@ import { createTtlCache, type CacheHit, type CacheWriteOptions } from './ttl-cac
 import { CACHE_NAMESPACES } from './keys';
 import { STORAGE_POLICIES } from './policies';
 import type { ExtensionError } from '@/shared/errors';
-import type { Provider } from '@/integrations/providers';
+import type { Provider } from '@/providers';
 import type { MappingExternalId } from '@/services/mapping/types';
 
 export interface ExtensionMappingCacheEntry {

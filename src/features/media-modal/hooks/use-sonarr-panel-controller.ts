@@ -4,11 +4,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 
-import type { SonarrFormState } from "@/shared/schemas/providers/sonarr-settings.schema";
+import type { SonarrFormState } from "@/providers/settings/sonarr-settings.schema";
 import {
   buildProviderFolderSlugFromTitle,
   buildProviderMediaPath,
-} from "@/shared/utils/provider-library-paths";
+} from "@/providers/library/paths";
 import type { SonarrPanelBaseProps, SonarrPanelMode } from "../types";
 
 export interface UseSonarrPanelControllerInput {

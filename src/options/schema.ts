@@ -2,8 +2,8 @@
 // src/options/schema.ts
 
 import * as v from 'valibot';
-import { createDefaultRadarrFormState, RadarrSettingsSchema } from '@/shared/schemas/providers/radarr-settings.schema';
-import { createDefaultSonarrFormState, SonarrSettingsSchema } from '@/shared/schemas/providers/sonarr-settings.schema';
+import { createDefaultRadarrFormState, RadarrSettingsSchema } from '@/providers/settings/radarr-settings.schema';
+import { createDefaultSonarrFormState, SonarrSettingsSchema } from '@/providers/settings/sonarr-settings.schema';
 import type { ExtensionOptions } from './types';
 import { createDefaultUiOptions, UiOptionsSchema } from './ui-schema';
 
@@ -48,6 +48,6 @@ const ExtensionOptionsSchema = v.object({
 export const SettingsSchema = v.fallback(ExtensionOptionsSchema, createDefaultSettingsInternal());
 
 export const createDefaultSettings = createDefaultSettingsInternal;
-export { createDefaultSonarrFormState as defaultSonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-export { createDefaultRadarrFormState as defaultRadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
+export { createDefaultSonarrFormState as defaultSonarrFormState } from '@/providers/settings/sonarr-settings.schema';
+export { createDefaultRadarrFormState as defaultRadarrFormState } from '@/providers/settings/radarr-settings.schema';
 export { createDefaultUiOptions as defaultUiOptions } from './ui-schema';

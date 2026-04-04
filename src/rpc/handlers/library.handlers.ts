@@ -1,10 +1,10 @@
 /** RPC handlers for provider-library status, add, and update flows. */
 // src/rpc/handlers/library.handlers.ts
 
-import { addRadarrMovie } from '@/core/library/add-radarr-movie';
-import { addSonarrSeries } from '@/core/library/add-sonarr-series';
-import { updateRadarrMovie } from '@/core/library/update-radarr-movie';
-import { updateSonarrSeries } from '@/core/library/update-sonarr-series';
+import { addRadarrMovie } from '@/providers/library/radarr-add-movie';
+import { addSonarrSeries } from '@/providers/library/sonarr-add-series';
+import { updateRadarrMovie } from '@/providers/library/radarr-update-movie';
+import { updateSonarrSeries } from '@/providers/library/sonarr-update-series';
 import type { Ani2arrApi } from '@/rpc';
 import type { StatusInput } from '@/rpc/schemas';
 import type { RequestPriority } from '@/shared/utils/request-priority';

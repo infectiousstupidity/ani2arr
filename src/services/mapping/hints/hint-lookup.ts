@@ -9,7 +9,7 @@ import { scoreCandidates } from '../pipeline/scoring';
 import { isSeasonalCanonicalTokens } from '../pipeline/search-term-generator';
 import type { ResolvedMapping } from '../types';
 import type { ScopedLogger } from '@/shared/utils/logger';
-import type { ProviderCredentials } from '@/integrations/providers';
+import type { ProviderCredentials } from '@/providers';
 import { SCORE_THRESHOLD } from '../constants';
 import type { ProviderLookupClient, ProviderLookupResult } from '../lookup';
 

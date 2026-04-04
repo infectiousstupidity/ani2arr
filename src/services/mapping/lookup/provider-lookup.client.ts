@@ -2,7 +2,7 @@
 // src/services/mapping/lookup/provider-lookup.client.ts
 
 import type { MappingExternalIdKind } from '@/services/mapping/types';
-import type { Provider, ProviderCredentials } from '@/integrations/providers';
+import type { Provider, ProviderCredentials } from '@/providers';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 
 export interface ProviderLookupResult {

@@ -10,12 +10,12 @@ import {
   type SonarrAddOptionsFieldsLayout,
 } from '@/components/provider-add-options/sonarr-add-options-fields';
 import type { SettingsActions } from '../hooks/use-settings-actions';
-import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-import type { useSonarrMetadata } from '@/shared/queries';
+import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
 import Button from '@/shared/ui/primitives/button';
 import type { ExtensionOptions } from '@/options';
 
 import { SaveSettingsBar } from './save-settings-bar';
+import type { useSonarrMetadata } from '@/providers/hooks/sonarr.queries';
 
 export const SonarrDefaultsSection: React.FC<{
   actions: SettingsActions;

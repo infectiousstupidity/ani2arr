@@ -11,12 +11,12 @@ import type {
   AniListMediaFormat,
   AniListMediaStatus,
 } from "@/shared/schemas/anilist/anilist-media.schema";
-import type { Provider } from "@/integrations/providers";
-import type { RadarrFormState } from "@/shared/schemas/providers/radarr-settings.schema";
-import type { SonarrFormState } from "@/shared/schemas/providers/sonarr-settings.schema";
+import type { Provider } from "@/providers";
+import type { RadarrFormState } from "@/providers/settings/radarr-settings.schema";
+import type { SonarrFormState } from "@/providers/settings/sonarr-settings.schema";
 import { ErrorCode, type ExtensionError } from "@/shared/errors";
-import { createDefaultRadarrFormState } from "@/shared/schemas/providers/radarr-settings.schema";
-import { createDefaultSonarrFormState } from "@/shared/schemas/providers/sonarr-settings.schema";
+import { createDefaultRadarrFormState } from "@/providers/settings/radarr-settings.schema";
+import { createDefaultSonarrFormState } from "@/providers/settings/sonarr-settings.schema";
 
 import { MappingPreviewPanel, MappingSearchPanel } from "@/features/mapping";
 import type { MappingTabProps } from "../types";
@@ -28,7 +28,7 @@ import { useRadarrPanelController } from "../hooks/use-radarr-panel-controller";
 import { useSonarrPanelController } from "../hooks/use-sonarr-panel-controller";
 import { usePublicOptions } from '@/options';
 import { useConfirm } from "@/shared/hooks/common/use-confirm";
-import { getProviderLabel } from "@/services/providers/resolver";
+import { getProviderLabel } from "@/providers/provider-routing";
 
 type MediaModalViewMode = "setup" | "mapping";
 

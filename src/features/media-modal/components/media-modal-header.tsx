@@ -7,8 +7,8 @@ import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import Pill from '@/shared/ui/primitives/pill';
 import type { AniListTitleLanguage } from "@/shared/schemas/anilist/anilist-title-language.schema";
 import type { AniListMediaFormat, AniListMediaStatus } from "@/shared/schemas/anilist/anilist-media.schema";
-import type { Provider } from "@/integrations/providers";
-import { getProviderLabel } from "@/services/providers/resolver";
+import type { Provider } from "@/providers";
+import { getProviderLabel } from "@/providers/provider-routing";
 
 export type MediaModalTabId = "series" | "mapping";
 

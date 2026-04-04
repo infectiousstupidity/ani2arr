@@ -1,7 +1,7 @@
 /** In-memory ledger of unresolved mappings for UI summaries and retry flows. */
 // src/services/mapping/cache/unresolved-ledger.ts
 
-import type { Provider } from '@/integrations/providers';
+import type { Provider } from '@/providers';
 
 export interface UnresolvedLedgerEntry {
   anilistId: number;

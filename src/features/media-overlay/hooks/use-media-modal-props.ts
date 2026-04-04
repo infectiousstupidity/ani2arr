@@ -10,31 +10,21 @@ import type {
   AniListTitles,
 } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { ExtensionOptions } from '@/options';
-import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
-import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
+import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
+import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
 import type {
   Provider,
   RadarrLookupMovie,
   RadarrMovie,
   SonarrLookupSeries,
   SonarrSeries,
-} from '@/integrations/providers';
+} from '@/providers';
 import type { MappingTabProps, RadarrPanelProps, SonarrPanelProps } from '@/features/media-modal';
-import { createDefaultRadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
-import { createDefaultSonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
+import { createDefaultRadarrFormState } from '@/providers/settings/radarr-settings.schema';
+import { createDefaultSonarrFormState } from '@/providers/settings/sonarr-settings.schema';
 import {
-  useAddMovie,
-  useAddSeries,
   useAniListMedia,
   useAniListMetadataBatch,
-  useMovieStatus,
-  useRadarrMetadata,
-  useSeriesStatus,
-  useSonarrMetadata,
-  useUpdateDefaultSettings,
-  useUpdateMovie,
-  useUpdateRadarrDefaultSettings,
-  useUpdateSeries,
 } from '@/shared/queries';
 import { toMappingSearchResultFromRadarr } from '@/features/mapping/radarr.adapter';
 import { toMappingSearchResultFromSonarr } from '@/features/mapping/sonarr.adapter';
@@ -46,8 +36,22 @@ import {
   extractProviderRootFolderPath,
   getProviderLibrarySlug,
   type ProviderMediaPathSource,
-} from '@/shared/utils/provider-library-paths';
-import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
+} from '@/providers/library/paths';
+import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
+import {
+  useAddMovie,
+  useMovieStatus,
+  useRadarrMetadata,
+  useUpdateRadarrDefaultSettings,
+  useUpdateMovie,
+} from '@/providers/hooks/radarr.queries';
+import {
+  useAddSeries,
+  useSeriesStatus,
+  useSonarrMetadata,
+  useUpdateDefaultSettings,
+  useUpdateSeries,
+} from '@/providers/hooks/sonarr.queries';
 
 export interface UseMediaModalPropsInput {
   anilistId: number | undefined;

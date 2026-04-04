@@ -43,7 +43,7 @@ export {
 } from './extension-mapping.cache';
 export { upstreamMappingCaches } from './upstream-mapping.cache';
 export { sonarrLookupCaches, radarrLookupCaches } from './lookup.cache';
-export { providerLibraryCaches } from './provider-library.cache';
+export { providerLibraryCaches } from '@/providers/library/cache';
 
 // TTL cache primitives
 export type {

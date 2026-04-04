@@ -5,15 +5,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { useSonarrMetadata, queryKeys } from '@/shared/queries';
+import { queryKeys } from '@/shared/queries';
 import type { SettingsActions } from '../hooks/use-settings-actions';
 import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
 import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
 import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,
-} from '@/shared/schemas/providers/provider-connection.schema';
-import { requestProviderHostPermission } from '@/runtime/permissions/provider-host-permissions';
+} from '@/providers/settings/provider-connection.schema';
+import { requestProviderHostPermission } from '@/providers/permissions/host-permissions';
 import { logger } from '@/shared/utils/logger';
 import { getAniListTitleLanguageLabel } from '@/shared/utils/anilist-title-preference';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
@@ -27,6 +27,7 @@ import type { SonarrAddOptionsFieldsLayout } from '@/components/provider-add-opt
 import { SonarrDefaultsSection } from './sonarr-defaults-section';
 import { useSelectPortal } from './use-select-portal';
 import type { ExtensionOptions } from '@/options';
+import { useSonarrMetadata } from '@/providers/hooks/sonarr.queries';
 
 export interface SonarrSettingsPanelProps {
   actions: SettingsActions;

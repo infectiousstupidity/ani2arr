@@ -5,10 +5,10 @@ import React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check } from 'lucide-react';
 
-import type { ProviderRootFolder } from '@/integrations/providers';
+import type { ProviderRootFolder } from '@/providers';
 import { FormField, Label, Select, SelectContent, SelectTrigger } from '@/shared/ui/form/form';
 import { cn } from '@/shared/utils/cn';
-import { joinRootAndSlug } from '@/shared/utils/provider-library-paths';
+import { joinRootAndSlug } from '@/providers/library/paths';
 
 export interface ProviderRootFolderSelectProps {
   value: string;

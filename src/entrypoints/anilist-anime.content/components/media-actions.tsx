@@ -6,8 +6,8 @@ import { SquareArrowOutUpRight, ChevronDown } from 'lucide-react';
 import { logger } from '@/shared/utils/logger';
 import Dropdown, { DropdownItem } from '@/shared/ui/primitives/dropdown';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
-import type { Provider } from '@/integrations/providers';
-import { getProviderBaseUrl, getProviderLabel, isProviderConfigured } from '@/services/providers/resolver';
+import type { Provider } from '@/providers';
+import { getProviderBaseUrl, getProviderLabel, isProviderConfigured } from '@/providers/provider-routing';
 import { usePublicOptions } from '@/options';
 
 export type Status = 'LOADING' | 'IN' | 'NOT_IN' | 'ERROR' | 'ADDING';

@@ -11,7 +11,7 @@ import { useBrowsePortals } from '../hooks/use-media-portals';
 import { useAnilistBatchPrefetch } from '../hooks/use-anilist-batch-prefetch';
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { BrowseAdapter, ParsedCard } from '@/features/media-overlay/types';
-import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
+import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
 import { CardOverlay } from './card-overlay';
 import { usePublicOptions } from '@/options';
 

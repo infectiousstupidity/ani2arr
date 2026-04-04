@@ -10,15 +10,15 @@ import { useTestProviderConnection } from '@/features/options/use-provider-conne
 import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,
-} from '@/shared/schemas/providers/provider-connection.schema';
+} from '@/providers/settings/provider-connection.schema';
 import {
   getProviderHostPermissionPattern,
   removeProviderHostPermission,
   requestProviderHostPermission,
-} from '@/runtime/permissions/provider-host-permissions';
+} from '@/providers/permissions/host-permissions';
 import { logger } from '@/shared/utils/logger';
 import { createDefaultSettings, parseSettings, useSaveOptions, type ExtensionOptions } from '@/options';
-import type { Provider } from '@/integrations/providers';
+import type { Provider } from '@/providers';
 
 type PreparedProviderState = {
   url: string;
