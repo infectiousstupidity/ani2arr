@@ -1,7 +1,7 @@
 /** Media-overlay owned browse card and adapter contracts for injected browse surfaces. */
 // src/features/media-overlay/types.ts
 
-import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 
 type AnchorCorner = 'bottom-left' | 'top-left';
 type StackDirection = 'up' | 'down';

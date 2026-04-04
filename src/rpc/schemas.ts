@@ -1,6 +1,7 @@
 /** Valibot schemas for RPC inputs that cross the extension messaging boundary. */
 // src/rpc/schemas.ts
 import * as v from 'valibot';
+import { AniListMediaHintSchema } from '@/anilist/schemas/media.schema';
 import { RadarrFormStateSchema } from '@/providers/settings/radarr-settings.schema';
 import { SonarrFormStateSchema } from '@/providers/settings/sonarr-settings.schema';
 
@@ -27,33 +28,7 @@ const createRequiredStringSchema = (msg: string = 'Value cannot be empty') =>
 
 const RequestPrioritySchema = v.picklist(['high', 'normal', 'low']);
 
-const AniListTitlesSchema = v.object({
-  romaji: v.optional(v.string()),
-  english: v.optional(v.string()),
-  native: v.optional(v.string()),
-});
 
-const AniListMediaFormatSchema = v.picklist([
-  'TV',
-  'TV_SHORT',
-  'MOVIE',
-  'SPECIAL',
-  'OVA',
-  'ONA',
-  'MUSIC',
-  'MANGA',
-  'NOVEL',
-  'ONE_SHOT',
-]);
-
-const AniListMediaHintSchema = v.object({
-  titles: v.optional(v.nullable(AniListTitlesSchema)),
-  synonyms: v.optional(v.nullable(v.array(v.string()))),
-  startYear: v.optional(v.nullable(v.number())),
-  format: v.optional(v.nullable(AniListMediaFormatSchema)),
-  relationPrequelIds: v.optional(v.nullable(v.array(v.number()))),
-  coverImage: v.optional(v.nullable(v.string())),
-});
 
 const ProviderCredentialsSchema = v.object({
   url: createRequiredStringSchema('URL cannot be empty'),

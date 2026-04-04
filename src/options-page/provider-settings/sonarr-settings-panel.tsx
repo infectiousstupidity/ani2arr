@@ -15,7 +15,7 @@ import {
 } from '@/providers/settings/provider-connection.schema';
 import { requestProviderHostPermission } from '@/providers/permissions/host-permissions';
 import { logger } from '@/shared/utils/logger';
-import { getAniListTitleLanguageLabel } from '@/shared/utils/anilist-title-preference';
+import { getAniListTitleLanguageLabel } from '@/anilist/title-preference';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 
 import {

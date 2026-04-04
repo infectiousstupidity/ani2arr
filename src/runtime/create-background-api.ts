@@ -2,7 +2,6 @@
 // src/runtime/create-background-api.ts
 
 import {
-  anilistMediaCache,
   bumpRevision,
   clearAllTtlCaches,
   radarrLookupCaches,
@@ -10,6 +9,7 @@ import {
   sonarrLookupCaches,
   upstreamMappingCaches,
 } from '@/storage';
+import { anilistMediaCache } from '@/anilist/media.cache';
 import { providerLibraryCaches } from '@/providers/library/cache';
 import { SonarrClient } from '@/providers/clients/sonarr.client';
 import { RadarrClient } from '@/providers/clients/radarr.client';
@@ -17,7 +17,7 @@ import {
   hasProviderHostPermission,
   removeProviderHostPermission,
 } from '@/providers/permissions/host-permissions';
-import { AniListMediaService, AniListMetadataStore } from '@/core/anilist';
+import { AniListMediaService, AniListMetadataStore } from '@/anilist';
 import { RadarrLibrary } from '@/providers/library/radarr-library';
 import { SonarrLibrary } from '@/providers/library/sonarr-library';
 import { MappingService } from '@/services/mapping';

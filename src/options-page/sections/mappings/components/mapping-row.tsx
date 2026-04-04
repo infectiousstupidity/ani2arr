@@ -4,7 +4,7 @@
 import React, { useMemo } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
 import { ChevronDown } from 'lucide-react';
-import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.schema';
+import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type { Provider } from '@/providers';
 import type { MappingExternalId, MappingSource, MappingSummary } from '@/services/mapping/types';
 import { useAniListMetadataBatch } from '@/shared/queries';

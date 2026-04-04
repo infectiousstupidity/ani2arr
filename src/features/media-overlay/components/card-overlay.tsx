@@ -11,7 +11,7 @@ import {
 } from '@/providers/library/paths';
 import type { BadgeVisibility } from '@/options/types';
 import type { Provider } from '@/providers';
-import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
 import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
 import { getProviderLabel } from '@/providers/provider-routing';

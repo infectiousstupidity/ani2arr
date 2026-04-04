@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { ParsedCard } from '@/features/media-overlay/types';
-import { metadataEqual } from '@/shared/anilist/media-metadata';
+import { metadataEqual } from '@/anilist/metadata-hints';
 
 const toElementArray = (value: Iterable<Element> | Element | null | undefined): Element[] => {
   if (!value) return [];

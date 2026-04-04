@@ -12,7 +12,7 @@ import Pill from '@/shared/ui/primitives/pill';
 import { getAni2arrApi } from '@/rpc';
 import type { AniListSearchResult } from '@/rpc/types';
 import { useAniListMedia } from '@/shared/queries';
-import type { AniListMediaFormat } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMediaFormat } from '@/anilist/schemas/media.schema';
 
 type AddMissingEntryDialogProps = {
   open: boolean;

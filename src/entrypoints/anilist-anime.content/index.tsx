@@ -16,7 +16,7 @@ import { usePublicOptions } from '@/options';
 import MediaActions, { Status } from './components/media-actions';
 import { logger } from '@/shared/utils/logger';
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
-import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
+import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/anilist/metadata-hints';
 import {
   getProviderLibrarySlug,
   type ProviderMediaPathSource,
@@ -25,7 +25,7 @@ import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
 import type {
   AniListMediaFormat,
   AniListMediaHint,
-} from '@/shared/schemas/anilist/anilist-media.schema';
+} from '@/anilist/schemas/media.schema';
 import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
 import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
 import { useAddMovie, useMovieStatus } from '@/providers/hooks/radarr.queries';

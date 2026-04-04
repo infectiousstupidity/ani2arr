@@ -5,7 +5,7 @@ import type {
   AniListMedia,
   AniListMediaHint,
   AniListTitles,
-} from '@/shared/schemas/anilist/anilist-media.schema';
+} from '@/anilist/schemas/media.schema';
 
 const normalizeTitles = (titles?: AniListTitles | null): AniListTitles => {
   if (!titles) return {};

@@ -1,7 +1,7 @@
 /** AniList title-driven provider search term generation for the mapping pipeline. */
 // src/services/mapping/pipeline/search-term-generator.ts
 
-import type { AniListTitles } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListTitles } from '@/anilist/schemas/media.schema';
 import type { Provider } from '@/providers';
 import {
   canonicalTitleKeyForProvider,

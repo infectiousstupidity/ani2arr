@@ -3,7 +3,7 @@
 
 import { getAni2arrApi } from '@/rpc';
 import type { GetMappingsInput, MappingCursor } from '@/rpc/schemas';
-import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.schema';
+import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type { Provider } from '@/providers';
 import type { MappingExternalId, MappingSource, MappingSummary } from '@/services/mapping/types';
 import type { LibraryFilter } from './components/mapping-toolbar';

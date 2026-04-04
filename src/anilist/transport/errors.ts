@@ -1,8 +1,8 @@
 /** Transport error types for AniList HTTP and rate-limit failures. */
-// src/integrations/anilist/errors.ts
+// src/anilist/transport/errors.ts
 
-import type { AniListGraphQLError } from '@/integrations/anilist/media.schema';
-import type { AniListResponseMeta } from '@/integrations/anilist/types';
+import type { AniListGraphQLError } from '@/anilist/transport/media-response.schema';
+import type { AniListResponseMeta } from '@/anilist/transport/types';
 
 export class AniListGraphqlError extends Error {
   public readonly errors: AniListGraphQLError[];

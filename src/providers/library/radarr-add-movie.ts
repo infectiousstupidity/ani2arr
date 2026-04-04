@@ -7,7 +7,7 @@ import type { RadarrClient } from '@/providers/clients/radarr.client';
 import type { MappingService } from '@/services/mapping';
 import type { ResolveExternalIdOptions } from '@/services/mapping/types';
 import { createError, ErrorCode } from '@/shared/errors';
-import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
 import type { ProviderCredentials, RadarrMovie } from '@/providers';
 

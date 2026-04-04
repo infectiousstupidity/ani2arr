@@ -1,9 +1,9 @@
 /** Store-local AniList metadata read schemas for baked bundles and browser storage payloads. */
-// src/core/anilist/metadata.schema.ts
+// src/anilist/metadata-store.schema.ts
 
 import * as v from 'valibot';
-import { AniListMediaFormatSchema, AniListTitlesSchema } from '@/shared/schemas/anilist/anilist-media.schema';
-import { AniListMetadataCoverImageSchema } from '@/shared/schemas/anilist/anilist-metadata.schema';
+import { AniListMediaFormatSchema, AniListTitlesSchema } from '@/anilist/schemas/media.schema';
+import { AniListMetadataCoverImageSchema } from '@/anilist/schemas/metadata.schema';
 
 const AniListIdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
 

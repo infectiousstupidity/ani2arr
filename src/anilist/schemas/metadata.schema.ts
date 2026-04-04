@@ -1,8 +1,8 @@
 /** Canonical AniList metadata schemas for persisted metadata contracts. */
-// src/shared/schemas/anilist/anilist-metadata.schema.ts
+// src/anilist/schemas/metadata.schema.ts
 
 import * as v from 'valibot';
-import { AniListMediaFormatSchema, AniListTitlesSchema } from '@/shared/schemas/anilist/anilist-media.schema';
+import { AniListMediaFormatSchema, AniListTitlesSchema } from '@/anilist/schemas/media.schema';
 
 const AniListIdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
 

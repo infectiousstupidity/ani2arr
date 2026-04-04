@@ -1,21 +1,21 @@
 /** AniList metadata hydration, refresh, and persistence workflow for domain-owned metadata state. */
-// src/core/anilist/metadata.store.ts
+// src/anilist/metadata.store.ts
 
 import { browser } from 'wxt/browser';
 import * as v from 'valibot';
 import type {
   AniListMedia,
   AniListTitles,
-} from '@/shared/schemas/anilist/anilist-media.schema';
-import { AniListMetadataBundleSchema, AniListMetadataChunkRefSchema, AniListMetadataSchema } from '@/shared/schemas/anilist/anilist-metadata.schema';
-import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.schema';
+} from '@/anilist/schemas/media.schema';
+import { AniListMetadataBundleSchema, AniListMetadataChunkRefSchema, AniListMetadataSchema } from '@/anilist/schemas/metadata.schema';
+import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import { logError, normalizeError } from '@/shared/errors';
 import { logger } from '@/shared/utils/logger';
 import {
   RawAniListMetadataBundleSchema,
   RawAniListMetadataEntrySchema,
   RawAniListMetadataRecordSchema,
-} from './metadata.schema';
+} from './metadata-store.schema';
 import type { AniListMediaService } from './media.service';
 
 type AniListMetadataChunkRef = v.InferOutput<typeof AniListMetadataChunkRefSchema>;

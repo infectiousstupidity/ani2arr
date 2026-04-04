@@ -29,7 +29,6 @@ export type { PersistedMapOptions } from './persisted-map';
 export { PersistedMap } from './persisted-map';
 
 // Typed cache wrappers
-export { anilistMediaCache } from './anilist-media.cache';
 export {
   type ExtensionMappingCacheEntry,
   readExtensionMapping,

@@ -4,7 +4,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
-import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMedia } from '@/anilist/schemas/media.schema';
 import type { GetAniListMetadataOutput } from '@/rpc/types';
 import { queryKeys, normalizeMetadataIds } from './query-keys';
 

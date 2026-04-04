@@ -1,5 +1,5 @@
 /** Canonical AniList title-language schema and derived type shared across settings and UI. */
-// src/shared/schemas/anilist-title-language.schema.ts
+// src/anilist/schemas/title-language.schema.ts
 
 import * as v from 'valibot';
 

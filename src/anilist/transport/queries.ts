@@ -1,5 +1,5 @@
 /** AniList GraphQL documents used by the transport layer. */
-// src/integrations/anilist/queries.ts
+// src/anilist/transport/queries.ts
 
 export const FIND_MEDIA_BATCH_QUERY = `
   query FindMediaBatch($ids: [Int!]) {

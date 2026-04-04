@@ -4,7 +4,7 @@
 import type { Ani2arrApi } from '@/rpc';
 import type { AniListSearchResult } from '@/rpc/types';
 import { normalizeError } from '@/shared/errors';
-import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMedia } from '@/anilist/schemas/media.schema';
 import type { ApiHandlerDeps } from './handler-deps';
 
 export function createAnilistHandlers(deps: ApiHandlerDeps): Pick<

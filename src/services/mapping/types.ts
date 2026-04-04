@@ -1,7 +1,7 @@
 /** Mapping service input and output types for AniList-driven resolution flows. */
 // src/services/mapping/types.ts
 
-import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { Provider } from '@/providers';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 

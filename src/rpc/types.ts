@@ -5,8 +5,8 @@ import type {
   AniListMediaFormat,
   AniListTitles,
   AniListMediaStatus,
-} from '@/shared/schemas/anilist/anilist-media.schema';
-import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.schema';
+} from '@/anilist/schemas/media.schema';
+import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type {
   RadarrMovieSnapshot,
   RadarrLookupMovie,
