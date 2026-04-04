@@ -16,7 +16,7 @@ import {
   type ParsedCard,
 } from '@/features/media-overlay';
 import { createBrowseEntrypointShell } from '@/runtime/browse-entrypoint-shell';
-import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
+import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
 
 const isAniChartSurface = (url: string): boolean => {
   try {

@@ -1,8 +1,8 @@
 /** Valibot schemas for RPC inputs that cross the extension messaging boundary. */
 // src/rpc/schemas.ts
 import * as v from 'valibot';
-import { RadarrFormStateSchema } from '@/shared/schemas/providers/radarr-settings.schema';
-import { SonarrFormStateSchema } from '@/shared/schemas/providers/sonarr-settings.schema';
+import { RadarrFormStateSchema } from '@/providers/settings/radarr-settings.schema';
+import { SonarrFormStateSchema } from '@/providers/settings/sonarr-settings.schema';
 
 // ============================================================================
 // Shared / Reusable Validators

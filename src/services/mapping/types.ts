@@ -2,7 +2,7 @@
 // src/services/mapping/types.ts
 
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { Provider } from '@/integrations/providers/types';
+import type { Provider } from '@/providers';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 
 export type MappingSource = 'manual' | 'upstream' | 'auto' | 'rejected' | 'blocked' | 'ignored' | 'unresolved';

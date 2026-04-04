@@ -1,7 +1,7 @@
 /** In-memory ledger of successfully resolved mappings for debug and export surfaces. */
 // src/services/mapping/cache/resolved-ledger.ts
 
-import type { Provider } from '@/integrations/providers';
+import type { Provider } from '@/providers';
 import type { ResolvedMapping } from '../types';
 
 export interface ResolvedLedgerEntry extends ResolvedMapping {

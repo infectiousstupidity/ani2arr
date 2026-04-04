@@ -14,7 +14,7 @@ import type { UpstreamMappingStore } from '../upstream';
 import type { ScopedLogger } from '@/shared/utils/logger';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 import type { AniListMediaService } from '@/core/anilist';
-import type { ProviderCredentials } from '@/integrations/providers';
+import type { ProviderCredentials } from '@/providers';
 import type { ProviderLookupClient, ProviderLookupResult } from '../lookup';
 
 

@@ -1,0 +1,230 @@
+/** Base transport client for provider API requests with permission checks, retries, timeouts, and ETag caching. */
+// src/providers/clients/base-provider.client.ts
+
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
+import { logger } from '@/shared/utils/logger';
+import { AbortError, withRetry } from '@/shared/utils/retry';
+import type { ProviderCredentials } from '@/providers';
+
+interface BaseProviderClientOptions {
+  providerName: string;
+  logScope?: string;
+  apiBasePath?: string;
+  timeoutMs?: number;
+  cacheableEndpoints?: Iterable<string>;
+  hasUrlPermission: (url: string) => Promise<boolean>;
+}
+
+type CachedResponse = {
+  etag: string;
+  json: unknown;
+};
+
+export class BaseProviderClient {
+  protected readonly log;
+
+  private readonly providerName: string;
+  private readonly apiBasePath: string;
+  private readonly timeoutMs: number;
+  private readonly hasUrlPermission: (url: string) => Promise<boolean>;
+  private readonly etagCache = new Map<string, CachedResponse>();
+  private readonly cacheableEndpoints: Set<string>;
+
+  public constructor(options: BaseProviderClientOptions) {
+    this.providerName = options.providerName;
+    this.apiBasePath = this.normalizeApiBasePath(options.apiBasePath ?? '/api/v3');
+    this.timeoutMs = options.timeoutMs ?? 15_000;
+    this.hasUrlPermission = options.hasUrlPermission;
+    this.cacheableEndpoints = new Set(options.cacheableEndpoints);
+    this.log = logger.create(options.logScope ?? `${options.providerName}Client`);
+  }
+
+  public clearEtagCache(): void {
+    this.etagCache.clear();
+  }
+
+  public async testConnection(
+    credentials: ProviderCredentials,
+  ): Promise<{ version: string }> {
+    const status = await this.request<{ version?: string | null }>('system/status', credentials);
+    const version = status.version?.trim();
+
+    if (!version) {
+      throw createError(
+        ErrorCode.API_ERROR,
+        `${this.providerName} system status did not include a version.`,
+        `${this.providerName} returned an invalid system status response.`,
+      );
+    }
+
+    return { version };
+  }
+
+  protected invalidateCachedEndpoint(endpoint: string, baseUrl?: string): void {
+    const normalizedEndpoint = this.normalizeEndpoint(endpoint);
+
+    if (baseUrl) {
+      this.etagCache.delete(this.createEtagCacheKey(baseUrl, normalizedEndpoint));
+      return;
+    }
+
+    for (const key of this.etagCache.keys()) {
+      if (key.endsWith(`|${normalizedEndpoint}`)) {
+        this.etagCache.delete(key);
+      }
+    }
+  }
+
+  protected async request<T>(
+    endpoint: string,
+    credentials: ProviderCredentials,
+    fetchOptions: RequestInit = {},
+  ): Promise<T> {
+    if (!credentials.url || !credentials.apiKey) {
+      throw createError(
+        ErrorCode.CONFIGURATION_ERROR,
+        `${this.providerName} URL or API Key not provided.`,
+        `${this.providerName} URL or API Key is missing.`,
+      );
+    }
+
+    if (!(await this.hasUrlPermission(credentials.url))) {
+      throw createError(
+        ErrorCode.PERMISSION_ERROR,
+        `Missing permission for ${this.providerName} URL: ${credentials.url}`,
+        `Permission for the ${this.providerName} URL is required. Please grant access in the extension options.`,
+      );
+    }
+
+    const requestUrl = this.buildRequestUrl(credentials.url, endpoint);
+
+    try {
+      return await withRetry(
+        async () => {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+
+          const method = (fetchOptions.method ?? 'GET').toString().toUpperCase();
+          const normalizedEndpoint = this.normalizeEndpoint(endpoint);
+          const cacheKey = this.createEtagCacheKey(credentials.url, normalizedEndpoint);
+          const isCacheable =
+            method === 'GET' &&
+            this.cacheableEndpoints.has(normalizedEndpoint) &&
+            endpoint === normalizedEndpoint;
+
+          const headers = new Headers(fetchOptions.headers ?? undefined);
+          if (fetchOptions.body) {
+            headers.set('Content-Type', 'application/json');
+          }
+          headers.set('X-Api-Key', credentials.apiKey);
+          if (isCacheable && this.etagCache.has(cacheKey)) {
+            headers.set('If-None-Match', this.etagCache.get(cacheKey)!.etag);
+          }
+
+          const init: RequestInit = {
+            ...fetchOptions,
+            headers,
+            referrerPolicy: 'no-referrer',
+            credentials: 'omit',
+            signal: controller.signal,
+          };
+
+          let response: Response;
+          try {
+            response = await fetch(requestUrl, init);
+          } finally {
+            clearTimeout(timeout);
+          }
+
+          if (!response.ok) {
+            const retryAfterHeader = response.headers.get('Retry-After');
+            let retryAfterMs: number | undefined;
+
+            if (response.status === 429 && retryAfterHeader) {
+              const seconds = Number(retryAfterHeader);
+              if (Number.isFinite(seconds)) {
+                retryAfterMs = Math.max(0, seconds * 1000);
+              } else {
+                const parsedDate = Date.parse(retryAfterHeader);
+                if (!Number.isNaN(parsedDate)) {
+                  retryAfterMs = Math.max(0, parsedDate - Date.now());
+                }
+              }
+            }
+
+            let detail: unknown;
+            try {
+              detail = await response.clone().json();
+            } catch {
+              // ignore non-JSON errors
+            }
+
+            const baseMessage = `${this.providerName} API Error: ${response.status} ${response.statusText}`;
+            const err = new Error(baseMessage) as Error & {
+              retryAfterMs?: number;
+              detail?: unknown;
+            };
+            if (retryAfterMs !== undefined) err.retryAfterMs = retryAfterMs;
+            if (detail !== undefined) err.detail = detail;
+
+            if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+              throw new AbortError(err.message);
+            }
+            throw err;
+          }
+
+          if (response.status === 304 && isCacheable) {
+            const cached = this.etagCache.get(cacheKey)?.json as T | undefined;
+            if (cached !== undefined) return cached;
+          }
+
+          if (response.status === 204) {
+            return {} as T;
+          }
+
+          const isJson = response.headers.get('content-type')?.includes('application/json');
+          const data = isJson ? ((await response.json()) as T) : ({} as T);
+
+          if (isCacheable && isJson) {
+            const nextEtag = response.headers.get('ETag');
+            if (nextEtag) {
+              this.etagCache.set(cacheKey, { etag: nextEtag, json: data });
+            }
+          }
+
+          return data;
+        },
+        {
+          retries: 3,
+          extractRetryAfterMs: error => (error as { retryAfterMs?: number })?.retryAfterMs,
+        },
+      );
+    } catch (error) {
+      const normalized = normalizeError(error);
+      logError(normalized, `${this.providerName}Client:request:${endpoint}`);
+      throw normalized;
+    }
+  }
+
+  private buildRequestUrl(baseUrl: string, endpoint: string): string {
+    const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, '');
+    const normalizedEndpoint = endpoint.replace(/^\/+/, '');
+    return `${normalizedBaseUrl}${this.apiBasePath}/${normalizedEndpoint}`;
+  }
+
+  private normalizeApiBasePath(apiBasePath: string): string {
+    const trimmed = apiBasePath.trim();
+    const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    return withLeadingSlash.replace(/\/+$/, '');
+  }
+
+  private normalizeEndpoint(endpoint: string): string {
+    const [path] = endpoint.split('?');
+    return path ?? endpoint;
+  }
+
+  private createEtagCacheKey(baseUrl: string, normalizedEndpoint: string): string {
+    const origin = new URL(baseUrl).origin;
+    return `${origin}|${normalizedEndpoint}`;
+  }
+}

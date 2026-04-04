@@ -3,7 +3,7 @@
 
 import type { StatusInput } from '@/rpc/schemas';
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { Provider } from '@/integrations/providers';
+import type { Provider } from '@/providers';
 import type { GetMappingsInput } from '@/rpc/schemas';
 
 const rootQueryKey = ['a2a'] as const;

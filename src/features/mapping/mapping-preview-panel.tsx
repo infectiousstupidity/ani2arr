@@ -6,12 +6,14 @@ import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { MultiMappingInfo } from './multi-mapping-info';
-import { useMappingOverrides, useMovieStatus, useSeriesStatus } from '@/shared/queries';
-import type { Provider } from '@/integrations/providers';
+import { useMappingOverrides } from '@/shared/queries';
+import type { Provider } from '@/providers';
 import type { MappingExternalIdRecord } from '@/services/mapping/types';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
-import { getProviderLabel } from '@/services/providers/resolver';
+import { getProviderLabel } from '@/providers/provider-routing';
 import type { MappingAniListSummary, MappingSearchResult } from './types';
+import { useMovieStatus } from '@/providers/hooks/radarr.queries';
+import { useSeriesStatus } from '@/providers/hooks/sonarr.queries';
 
 interface MappingPreviewPanelProps {
   aniListEntry: MappingAniListSummary;

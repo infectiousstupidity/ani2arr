@@ -6,7 +6,7 @@ import * as v from 'valibot';
 import {
   validateProviderConnectionApiKey,
   validateProviderConnectionUrl,
-} from '@/shared/schemas/providers/provider-connection.schema';
+} from '@/providers/settings/provider-connection.schema';
 import { logger } from '@/shared/utils/logger';
 import { STORAGE_KEYS } from '@/storage/keys';
 import { SettingsSchema, createDefaultSettings } from './schema';

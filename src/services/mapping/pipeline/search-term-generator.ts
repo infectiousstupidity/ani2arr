@@ -2,7 +2,7 @@
 // src/services/mapping/pipeline/search-term-generator.ts
 
 import type { AniListTitles } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { Provider } from '@/integrations/providers';
+import type { Provider } from '@/providers';
 import {
   canonicalTitleKeyForProvider,
   isOrdinalToken,

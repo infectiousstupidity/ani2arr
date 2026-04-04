@@ -2,7 +2,7 @@
 // src/services/mapping/overrides/overrides.service.ts
 
 import type { MappingExternalId, MappingExternalIdRecord, MappingIgnoreRecord } from '@/services/mapping/types';
-import type { Provider } from '@/integrations/providers';
+import type { Provider } from '@/providers';
 import {
   createRecordKey,
   createReverseLookupKey,

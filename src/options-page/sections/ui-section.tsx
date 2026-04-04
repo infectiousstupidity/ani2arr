@@ -4,7 +4,7 @@
 import React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { defaultUiOptions, type BadgeVisibility, type ExtensionOptions } from '@/options';
-import type { Provider } from '@/integrations/providers';
+import type { Provider } from '@/providers';
 
 const VISIBILITY_OPTIONS: Array<{ value: BadgeVisibility; label: string; description: string }> = [
   { value: 'always', label: 'Always', description: 'Show actions and status badges on every supported card.' },

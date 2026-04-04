@@ -8,7 +8,7 @@ import { toMappingSearchResultFromRadarr } from './radarr.adapter';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
 import type { MappingSearchResult } from './types';
 import { usePublicOptions } from '@/options';
-import type { RadarrLookupMovie, SonarrLookupSeries } from '@/integrations/providers';
+import type { RadarrLookupMovie, SonarrLookupSeries } from '@/providers';
 
 interface UseMappingSearchInput {
   service: 'sonarr' | 'radarr';

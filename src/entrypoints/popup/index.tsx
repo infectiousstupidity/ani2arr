@@ -18,7 +18,7 @@ import { useExtensionOptions, useSaveOptions } from '@/options';
 import type {
   Provider,
   ProviderCredentials,
-} from '@/integrations/providers';
+} from '@/providers';
 import './style.css';
 
 const queryClient = new QueryClient();

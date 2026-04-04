@@ -14,7 +14,7 @@ import type {
   SonarrSeriesSnapshot,
   SonarrLookupSeries,
   SonarrSeries,
-} from '@/integrations/providers';
+} from '@/providers';
 import type {
   MappingExternalIdRecord,
   MappingExternalId,

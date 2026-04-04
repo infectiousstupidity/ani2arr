@@ -4,13 +4,14 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { browser } from 'wxt/browser';
-import { useAddMovie, useAddSeries, useMovieStatus, useSeriesStatus } from '@/shared/queries';
 import type { ExtensionError } from '@/shared/errors';
 import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
-import type { Provider } from '@/integrations/providers';
-import type { RadarrFormState } from '@/shared/schemas/providers/radarr-settings.schema';
-import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
-import { getProviderLabel } from '@/services/providers/resolver';
+import type { Provider } from '@/providers';
+import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
+import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
+import { getProviderLabel } from '@/providers/provider-routing';
+import { useAddMovie, useMovieStatus } from '@/providers/hooks/radarr.queries';
+import { useAddSeries, useSeriesStatus } from '@/providers/hooks/sonarr.queries';
 
 export type OverlayState = 'disabled' | 'in-library' | 'addable' | 'resolving' | 'adding' | 'error';
 

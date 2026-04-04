@@ -3,13 +3,13 @@
 
 import type {
   RadarrFormState,
-} from '@/shared/schemas/providers/radarr-settings.schema';
-import type { SonarrFormState } from '@/shared/schemas/providers/sonarr-settings.schema';
+} from '@/providers/settings/radarr-settings.schema';
+import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
 import type {
   ProviderQualityProfile,
   ProviderRootFolder,
   ProviderTag,
-} from '@/integrations/providers';
+} from '@/providers';
 import type { MappingAniListSummary, MappingSearchResult, UseMappingControllerResult } from '@/features/mapping';
 import type { UseRadarrPanelControllerResult } from './hooks/use-radarr-panel-controller';
 import type { UseSonarrPanelControllerResult } from './hooks/use-sonarr-panel-controller';

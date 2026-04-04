@@ -5,20 +5,21 @@ import {
   anilistMediaCache,
   bumpRevision,
   clearAllTtlCaches,
-  providerLibraryCaches,
   radarrLookupCaches,
   resetAllRevisions,
   sonarrLookupCaches,
   upstreamMappingCaches,
 } from '@/storage';
-import { SonarrClient } from '@/integrations/providers/sonarr.client';
-import { RadarrClient } from '@/integrations/providers/radarr.client';
+import { providerLibraryCaches } from '@/providers/library/cache';
+import { SonarrClient } from '@/providers/clients/sonarr.client';
+import { RadarrClient } from '@/providers/clients/radarr.client';
 import {
   hasProviderHostPermission,
   removeProviderHostPermission,
-} from '@/runtime/permissions/provider-host-permissions';
+} from '@/providers/permissions/host-permissions';
 import { AniListMediaService, AniListMetadataStore } from '@/core/anilist';
-import { RadarrLibrary, SonarrLibrary } from '@/core/library';
+import { RadarrLibrary } from '@/providers/library/radarr-library';
+import { SonarrLibrary } from '@/providers/library/sonarr-library';
 import { MappingService } from '@/services/mapping';
 import { MappingOverridesService } from '@/services/mapping/overrides';
 import { UpstreamMappingStore } from '@/services/mapping/upstream';
@@ -31,7 +32,7 @@ import {
   setExtensionOptionsSnapshot,
   type ExtensionOptions,
 } from '@/options';
-import type { Provider, ProviderCredentials } from '@/integrations/providers';
+import type { Provider, ProviderCredentials } from '@/providers';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import type { Ani2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';

@@ -5,9 +5,8 @@ import React from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Ban, MoreHorizontal, Pencil, Trash2, Undo2 } from 'lucide-react';
 import type { AniListMetadata } from '@/shared/schemas/anilist/anilist-metadata.schema';
-import type { Provider } from '@/integrations/providers';
+import type { Provider } from '@/providers';
 import type { MappingExternalId, MappingSummary } from '@/services/mapping/types';
-import { useMovieStatus, useSeriesStatus } from '@/shared/queries';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';
@@ -15,7 +14,9 @@ import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import {
   getProviderLibrarySlug,
   type ProviderMediaPathSource,
-} from '@/shared/utils/provider-library-paths';
+} from '@/providers/library/paths';
+import { useMovieStatus } from '@/providers/hooks/radarr.queries';
+import { useSeriesStatus } from '@/providers/hooks/sonarr.queries';
 
 const sourceStyles: Record<MappingSummary['source'], { label: string; className: string }> = {
   manual: { label: 'Manual', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },
