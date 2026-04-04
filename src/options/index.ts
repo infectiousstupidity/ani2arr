@@ -29,6 +29,10 @@ export {
   getPublicOptionsSnapshot,
 } from './store';
 export {
+  getProviderCredentials,
+  isProviderConfigured,
+} from './provider-config';
+export {
   useExtensionOptions,
   usePublicOptions,
   useSaveOptions,

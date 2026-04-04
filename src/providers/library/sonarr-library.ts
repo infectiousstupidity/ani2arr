@@ -8,7 +8,7 @@ import type { MappingService } from '@/mapping/mapping.service';
 import type { MappingOverridesService } from '@/mapping/overrides';
 import type { UpstreamMappingStore } from '@/mapping/upstream';
 import { ErrorCode, logError, normalizeError } from '@/shared/errors';
-import { getExtensionOptionsSnapshot, type ExtensionOptions } from '@/options';
+import { getExtensionOptionsSnapshot, getProviderCredentials, isProviderConfigured, type ExtensionOptions } from '@/options';
 import type { ProviderCredentials, SonarrLookupSeries, SonarrSeries, SonarrSeriesSnapshot } from '@/providers';
 import { BaseProviderLibraryStore } from './base-provider-library.store';
 import { notifyLibraryMutation } from './notify-library-mutation';
@@ -39,10 +39,7 @@ export class SonarrLibrary {
       this.indexer,
       {
         cacheKey: CACHE_KEY,
-        getCredentials: (options) => {
-          const { url, apiKey } = options.providers.sonarr;
-          return url && apiKey ? { url, apiKey } : null;
-        },
+        getCredentials: (options) => getProviderCredentials(options, 'sonarr'),
         fetchAll: async (credentials: ProviderCredentials) => {
           const full = await this.sonarrClient.getAllSeries(credentials);
           return full.filter(series => typeof series.tvdbId === 'number' && Number.isFinite(series.tvdbId));
@@ -84,7 +81,7 @@ export class SonarrLibrary {
 
     const leanList = await this.store.getLeanList();
     const sonarrOptions = await getExtensionOptionsSnapshot();
-    const isConfigured = Boolean(sonarrOptions?.providers.sonarr.url && sonarrOptions?.providers.sonarr.apiKey);
+    const isConfigured = isProviderConfigured(sonarrOptions, 'sonarr');
 
     const normalizedTitle = payload.title?.trim();
     let tvdbId = this.indexer.findTvdbIdInIndex(payload);
@@ -169,10 +166,7 @@ export class SonarrLibrary {
       };
     }
 
-    const credentials = {
-      url: sonarrOptions!.providers.sonarr.url,
-      apiKey: sonarrOptions!.providers.sonarr.apiKey,
-    };
+    const credentials = getProviderCredentials(sonarrOptions, 'sonarr')!;
     const liveSeries = await this.sonarrClient.getSeriesByTvdbId(tvdbId, credentials);
     let lookupSeries: SonarrLookupSeries | null = null;
 

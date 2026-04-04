@@ -3,7 +3,7 @@
 
 import type { AniListMediaService } from '@/anilist';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
-import { getExtensionOptionsSnapshot } from '@/options';
+import { getExtensionOptionsSnapshot, getProviderCredentials } from '@/options';
 import type { Provider, ProviderCredentials } from '@/providers';
 import type { MappingExternalId } from './types';
 import {
@@ -557,8 +557,8 @@ export class MappingService {
 
   private async getConfiguredCredentials(provider: Provider): Promise<ProviderCredentials> {
     const options = await getExtensionOptionsSnapshot();
-    const config = options?.providers?.[provider];
-    if (!config?.url || !config?.apiKey) {
+    const credentials = getProviderCredentials(options, provider);
+    if (!credentials) {
       if (provider === 'sonarr') {
         throw createError(
           ErrorCode.SONARR_NOT_CONFIGURED,
@@ -572,7 +572,7 @@ export class MappingService {
         'Configure your Radarr connection in ani2arr options.',
       );
     }
-    return { url: config.url, apiKey: config.apiKey };
+    return credentials;
   }
 
   private getUpstreamStaticExternalId(

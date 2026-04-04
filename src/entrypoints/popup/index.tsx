@@ -14,10 +14,9 @@ import type {
   BadgeVisibility,
   ExtensionOptions,
 } from '@/options';
-import { useExtensionOptions, useSaveOptions } from '@/options';
+import { useExtensionOptions, useSaveOptions, getProviderCredentials } from '@/options';
 import type {
   Provider,
-  ProviderCredentials,
 } from '@/providers';
 import './style.css';
 
@@ -42,29 +41,14 @@ const badgeOptions: Array<{ value: BadgeVisibility; label: string }> = [
   { value: 'hover', label: 'On hover' },
 ];
 
-const getConfiguredCredentials = (
-  settings: ExtensionOptions | undefined,
-  provider: Provider,
-): ProviderCredentials | null => {
-  const providerSettings = settings?.providers[provider];
-  if (!providerSettings?.url || !providerSettings.apiKey) {
-    return null;
-  }
-
-  return {
-    url: String(providerSettings.url).trim(),
-    apiKey: String(providerSettings.apiKey).trim(),
-  };
-};
-
 const QuickSettings: React.FC = () => {
   const optionsQuery = useExtensionOptions();
   const saveOptions = useSaveOptions();
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const settings = optionsQuery.data;
-  const sonarrCredentials = getConfiguredCredentials(settings, 'sonarr');
-  const radarrCredentials = getConfiguredCredentials(settings, 'radarr');
+  const sonarrCredentials = getProviderCredentials(settings, 'sonarr');
+  const radarrCredentials = getProviderCredentials(settings, 'radarr');
 
   const isSonarrConfigured = Boolean(sonarrCredentials);
   const isRadarrConfigured = Boolean(radarrCredentials);

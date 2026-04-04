@@ -8,7 +8,7 @@ import type { MappingService } from '@/mapping/mapping.service';
 import type { MappingOverridesService } from '@/mapping/overrides';
 import type { ResolveExternalIdOptions } from '@/mapping/types';
 import { ErrorCode, logError, normalizeError } from '@/shared/errors';
-import { getExtensionOptionsSnapshot, type ExtensionOptions } from '@/options';
+import { getExtensionOptionsSnapshot, getProviderCredentials, isProviderConfigured, type ExtensionOptions } from '@/options';
 import type { ProviderCredentials, RadarrLookupMovie, RadarrMovie, RadarrMovieSnapshot } from '@/providers';
 import { BaseProviderLibraryStore } from './base-provider-library.store';
 import { notifyLibraryMutation } from './notify-library-mutation';
@@ -38,10 +38,7 @@ export class RadarrLibrary {
       this.indexer,
       {
         cacheKey: CACHE_KEY,
-        getCredentials: (options) => {
-          const { url, apiKey } = options.providers.radarr;
-          return url && apiKey ? { url, apiKey } : null;
-        },
+        getCredentials: (options) => getProviderCredentials(options, 'radarr'),
         fetchAll: async (credentials: ProviderCredentials) => {
           const full = await this.radarrClient.getAllMovies(credentials);
           return full.filter(movie => typeof movie.tmdbId === 'number' && Number.isFinite(movie.tmdbId));
@@ -83,7 +80,7 @@ export class RadarrLibrary {
 
     const leanList = await this.store.getLeanList();
     const radarrOptions = await getExtensionOptionsSnapshot();
-    const isConfigured = Boolean(radarrOptions?.providers.radarr.url && radarrOptions?.providers.radarr.apiKey);
+    const isConfigured = isProviderConfigured(radarrOptions, 'radarr');
 
     const normalizedTitle = payload.title?.trim();
     let tmdbId = this.indexer.findTmdbIdInIndex(payload);
@@ -164,10 +161,7 @@ export class RadarrLibrary {
       };
     }
 
-    const credentials = {
-      url: radarrOptions!.providers.radarr.url,
-      apiKey: radarrOptions!.providers.radarr.apiKey,
-    };
+    const credentials = getProviderCredentials(radarrOptions, 'radarr')!;
     const liveMovie = await this.radarrClient.getMovieByTmdbId(tmdbId, credentials);
     let lookupMovie: RadarrLookupMovie | null = null;
 

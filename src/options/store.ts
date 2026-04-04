@@ -11,6 +11,7 @@ import { logger } from '@/shared/utils/logger';
 import { STORAGE_KEYS } from '@/storage/keys';
 import { SettingsSchema, createDefaultSettings } from './schema';
 import type { ExtensionOptions, PublicOptions } from './types';
+import { isProviderConfigured } from './provider-config';
 
 const createDefaultSonarrSecrets = (): { apiKey: string } => ({ apiKey: '' });
 const createDefaultRadarrSecrets = (): { apiKey: string } => ({ apiKey: '' });
@@ -22,13 +23,13 @@ export function toPublicOptions(settings: ExtensionOptions): PublicOptions {
         url: settings.providers.sonarr.url,
         preferredAniListTitleLanguage: settings.providers.sonarr.preferredAniListTitleLanguage,
         defaults: settings.providers.sonarr.defaults,
-        isConfigured: Boolean(settings.providers.sonarr.url && settings.providers.sonarr.apiKey),
+        isConfigured: isProviderConfigured(settings, 'sonarr'),
       },
       radarr: {
         url: settings.providers.radarr.url,
         preferredAniListTitleLanguage: settings.providers.radarr.preferredAniListTitleLanguage,
         defaults: settings.providers.radarr.defaults,
-        isConfigured: Boolean(settings.providers.radarr.url && settings.providers.radarr.apiKey),
+        isConfigured: isProviderConfigured(settings, 'radarr'),
       },
     },
     ui: settings.ui,

@@ -3,7 +3,7 @@
 
 import type { Ani2arrApi } from '@/rpc';
 import type { StatusInput } from '@/rpc/schemas';
-import { getExtensionOptionsSnapshot } from '@/options';
+import { getExtensionOptionsSnapshot, isProviderConfigured } from '@/options';
 import { createError, ErrorCode } from '@/shared/errors';
 import { listMappings } from '@/mapping/review/list-mappings';
 import { exportStoredMappings } from '@/mapping/overrides/export-stored-mappings';
@@ -128,7 +128,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
 
       if (input.provider === 'sonarr') {
         const options = await getExtensionOptionsSnapshot();
-        if (options?.providers.sonarr.url && options?.providers.sonarr.apiKey) {
+        if (isProviderConfigured(options, 'sonarr')) {
           scheduleLibraryRefresh('sonarr', options);
         }
       }
@@ -145,7 +145,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
 
       if (input.provider === 'sonarr') {
         const options = await getExtensionOptionsSnapshot();
-        if (options?.providers.sonarr.url && options?.providers.sonarr.apiKey) {
+        if (isProviderConfigured(options, 'sonarr')) {
           scheduleLibraryRefresh('sonarr', options);
         }
       }
@@ -234,7 +234,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
         await Promise.all(existingIgnores.map(entry => mappingService.evictResolved(entry.anilistId, entry.provider)));
 
         const options = await getExtensionOptionsSnapshot();
-        if (options?.providers.sonarr.url && options?.providers.sonarr.apiKey) {
+        if (isProviderConfigured(options, 'sonarr')) {
           scheduleLibraryRefresh('sonarr', options);
         }
 
