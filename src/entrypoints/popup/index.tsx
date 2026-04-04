@@ -6,7 +6,6 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
 import { ExternalLink } from 'lucide-react';
-import { useExtensionOptions, useSaveOptions } from '@/shared/queries';
 import { useProviderConnectionCheck } from '@/features/options/use-provider-connection-check';
 import { useProviderConnectionStatus } from '@/features/options/use-provider-connection-status';
 import { getProviderConnectionStatusMeta } from '@/features/options/provider-connection-status';
@@ -15,6 +14,7 @@ import type {
   BadgeVisibility,
   ExtensionOptions,
 } from '@/options';
+import { useExtensionOptions, useSaveOptions } from '@/options';
 import type {
   Provider,
   ProviderCredentials,

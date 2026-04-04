@@ -2,7 +2,7 @@
 // src/features/mapping/mapping-editor.tsx
 
 import React, { useMemo } from 'react';
-import { useAniListMedia, useMovieStatus, usePublicOptions, useSeriesStatus } from '@/shared/queries';
+import { useAniListMedia, useMovieStatus, useSeriesStatus } from '@/shared/queries';
 import { Footer } from '@/features/media-modal/components/media-modal-footer';
 import { Header } from '@/features/media-modal/components/media-modal-header';
 import { Modal, ModalContent, ModalDescription, ModalTitle } from '@/features/media-modal/components/modal';
@@ -22,6 +22,7 @@ import type { AniListTitles } from '@/shared/schemas/anilist/anilist-media.schem
 import { metadataFromMediaObject } from '@/shared/anilist/anilist-dom';
 import { resolveTitlePreference } from '@/shared/utils/anilist-title-preference';
 import { toMappingSearchResultFromRadarr } from './radarr.adapter';
+import { usePublicOptions } from '@/options';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import type { MappingSearchResult } from './types';

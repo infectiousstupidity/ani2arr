@@ -5,11 +5,9 @@ import {
   anilistMediaCache,
   bumpRevision,
   clearAllTtlCaches,
-  getExtensionOptionsSnapshot,
   providerLibraryCaches,
   radarrLookupCaches,
   resetAllRevisions,
-  setExtensionOptionsSnapshot,
   sonarrLookupCaches,
   upstreamMappingCaches,
 } from '@/storage';
@@ -27,12 +25,16 @@ import { UpstreamMappingStore } from '@/services/mapping/upstream';
 import { SonarrLookupClient, RadarrLookupClient } from '@/services/mapping/lookup';
 import { getMappingsHandler } from '@/rpc/handlers/get-mappings.handlers';
 import { createApiHandlers } from '@/rpc/handlers';
-import type { ExtensionOptions } from '@/options';
+import {
+  createDefaultSettings,
+  getExtensionOptionsSnapshot,
+  setExtensionOptionsSnapshot,
+  type ExtensionOptions,
+} from '@/options';
 import type { Provider, ProviderCredentials } from '@/integrations/providers';
 import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
 import type { Ani2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';
-import { createDefaultSettings } from '@/shared/schemas/settings';
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 45 * 1000;
 

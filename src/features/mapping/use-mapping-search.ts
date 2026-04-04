@@ -7,7 +7,7 @@ import { queryKeys } from '@/shared/queries';
 import { toMappingSearchResultFromRadarr } from './radarr.adapter';
 import { toMappingSearchResultFromSonarr } from './sonarr.adapter';
 import type { MappingSearchResult } from './types';
-import { usePublicOptions } from '@/shared/queries';
+import { usePublicOptions } from '@/options';
 import type { RadarrLookupMovie, SonarrLookupSeries } from '@/integrations/providers';
 
 interface UseMappingSearchInput {

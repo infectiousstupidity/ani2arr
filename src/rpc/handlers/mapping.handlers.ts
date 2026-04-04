@@ -3,10 +3,8 @@
 
 import type { Ani2arrApi } from '@/rpc';
 import type { StatusInput, GetMappingsInput } from '@/rpc/schemas';
+import { getExtensionOptionsSnapshot } from '@/options';
 import { createError, ErrorCode } from '@/shared/errors';
-import {
-  getExtensionOptionsSnapshot,
-} from '@/storage';
 import type { ApiHandlerDeps } from './handler-deps';
 
 function assertCompatibleExternalId(

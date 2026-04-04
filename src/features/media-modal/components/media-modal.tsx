@@ -26,7 +26,7 @@ import type { RadarrPanelProps, SonarrPanelProps } from "../types";
 import { useMappingController } from "@/features/mapping";
 import { useRadarrPanelController } from "../hooks/use-radarr-panel-controller";
 import { useSonarrPanelController } from "../hooks/use-sonarr-panel-controller";
-import { usePublicOptions } from '@/shared/queries';
+import { usePublicOptions } from '@/options';
 import { useConfirm } from "@/shared/hooks/common/use-confirm";
 import { getProviderLabel } from "@/services/providers/resolver";
 

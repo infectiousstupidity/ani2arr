@@ -3,12 +3,12 @@
 import React from 'react';
 import Button from '@/shared/ui/primitives/button';
 import { SquareArrowOutUpRight, ChevronDown } from 'lucide-react';
-import { usePublicOptions } from '@/shared/queries';
 import { logger } from '@/shared/utils/logger';
 import Dropdown, { DropdownItem } from '@/shared/ui/primitives/dropdown';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import type { Provider } from '@/integrations/providers';
 import { getProviderBaseUrl, getProviderLabel, isProviderConfigured } from '@/services/providers/resolver';
+import { usePublicOptions } from '@/options';
 
 export type Status = 'LOADING' | 'IN' | 'NOT_IN' | 'ERROR' | 'ADDING';
 
