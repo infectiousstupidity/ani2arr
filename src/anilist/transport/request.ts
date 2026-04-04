@@ -1,13 +1,13 @@
 /** Low-level AniList GraphQL POST request helper. */
-// src/integrations/anilist/request.ts
+// src/anilist/transport/request.ts
 
 import {
   ANILIST_GRAPHQL_API_URL,
   DEFAULT_ANILIST_RETRY_AFTER_MS,
-} from '@/integrations/anilist/constants';
-import { AniListHttpError, AniListRateLimitError } from '@/integrations/anilist/errors';
-import { toAniListResponseMeta } from '@/integrations/anilist/rate-limit';
-import type { AniListResponseMeta } from '@/integrations/anilist/types';
+} from '@/anilist/transport/constants';
+import { AniListHttpError, AniListRateLimitError } from '@/anilist/transport/errors';
+import { toAniListResponseMeta } from '@/anilist/transport/rate-limit';
+import type { AniListResponseMeta } from '@/anilist/transport/types';
 
 interface RequestParams<TVariables> {
   query: string;

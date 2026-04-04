@@ -5,8 +5,8 @@ import { type MouseEventHandler } from "react";
 import { Database, X } from "lucide-react";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import Pill from '@/shared/ui/primitives/pill';
-import type { AniListTitleLanguage } from "@/shared/schemas/anilist/anilist-title-language.schema";
-import type { AniListMediaFormat, AniListMediaStatus } from "@/shared/schemas/anilist/anilist-media.schema";
+import type { AniListTitleLanguage } from "@/anilist/schemas/title-language.schema";
+import type { AniListMediaFormat, AniListMediaStatus } from "@/anilist/schemas/media.schema";
 import type { Provider } from "@/providers";
 import { getProviderLabel } from "@/providers/provider-routing";
 

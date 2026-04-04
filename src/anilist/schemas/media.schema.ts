@@ -1,5 +1,5 @@
 /** Canonical AniList media schemas for shared contracts parsed from AniList responses. */
-// src/shared/schemas/anilist/anilist-media.schema.ts
+// src/anilist/schemas/media.schema.ts
 
 import * as v from 'valibot';
 
@@ -36,6 +36,15 @@ export const AniListTitlesSchema = v.object({
   romaji: v.optional(v.string()),
   english: v.optional(v.string()),
   native: v.optional(v.string()),
+});
+
+export const AniListMediaHintSchema = v.object({
+  titles: v.optional(v.nullable(AniListTitlesSchema)),
+  synonyms: v.optional(v.nullable(v.array(v.string()))),
+  startYear: v.optional(v.nullable(v.number())),
+  format: v.optional(v.nullable(AniListMediaFormatSchema)),
+  relationPrequelIds: v.optional(v.nullable(v.array(v.number()))),
+  coverImage: v.optional(v.nullable(v.string())),
 });
 
 const AniListMediaStartDateSchema = v.object({
@@ -128,13 +137,5 @@ export const AniListMediaSchema = v.object({
 export type AniListMediaFormat = v.InferOutput<typeof AniListMediaFormatSchema>;
 export type AniListMediaStatus = v.InferOutput<typeof AniListMediaStatusSchema>;
 export type AniListTitles = v.InferOutput<typeof AniListTitlesSchema>;
+export type AniListMediaHint = v.InferOutput<typeof AniListMediaHintSchema>;
 export type AniListMedia = v.InferOutput<typeof AniListMediaSchema>;
-
-export interface AniListMediaHint {
-  titles?: AniListTitles | null | undefined;
-  synonyms?: string[] | null | undefined;
-  startYear?: number | null | undefined;
-  format?: AniListMediaFormat | null | undefined;
-  relationPrequelIds?: number[] | null | undefined;
-  coverImage?: string | null | undefined;
-}

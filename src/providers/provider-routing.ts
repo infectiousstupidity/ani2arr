@@ -1,7 +1,7 @@
 /** Provider labels, routing, and option lookups for supported providers. */
 // src/providers/provider-routing.ts
 
-import type { AniListMediaFormat } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMediaFormat } from '@/anilist/schemas/media.schema';
 import type { PublicOptions } from '@/options';
 import type { Provider } from './types';
 

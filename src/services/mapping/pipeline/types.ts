@@ -27,4 +27,4 @@ export type EvaluationOutcome =
     reason: string;
   };
 
-export {type AniListMedia} from '@/shared/schemas/anilist/anilist-media.schema';
+export {type AniListMedia} from '@/anilist/schemas/media.schema';

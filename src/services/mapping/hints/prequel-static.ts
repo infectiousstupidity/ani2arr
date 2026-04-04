@@ -1,8 +1,8 @@
 /** Static prequel-chain resolution against upstream AniList mappings. */
 // src/services/mapping/hints/prequel-static.ts
 
-import type { AniListMediaService } from '@/core/anilist';
-import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMediaService } from '@/anilist';
+import type { AniListMedia } from '@/anilist/schemas/media.schema';
 import type { UpstreamMappingStore } from '../upstream';
 import type { ResolvedMapping } from '../types';
 

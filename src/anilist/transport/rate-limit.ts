@@ -1,7 +1,7 @@
 /** AniList response metadata and rate-limit header parsing helpers. */
-// src/integrations/anilist/rate-limit.ts
+// src/anilist/transport/rate-limit.ts
 
-import type { AniListRateLimitMeta, AniListResponseMeta } from '@/integrations/anilist/types';
+import type { AniListRateLimitMeta, AniListResponseMeta } from '@/anilist/transport/types';
 
 const parseHeaderNumber = (value: string | null): number | null => {
   if (!value) return null;

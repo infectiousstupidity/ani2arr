@@ -3,7 +3,7 @@
 
 import { useCallback, useState } from "react";
 
-import type { AniListMediaHint } from "@/shared/schemas/anilist/anilist-media.schema";
+import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 
 export type MediaModalTabId = "series" | "mapping";
 

@@ -1,5 +1,5 @@
 /** AniList domain workflow scheduling, cache, and orchestration constants. */
-// src/core/anilist/constants.ts
+// src/anilist/constants.ts
 
 export const QUEUE_CONCURRENCY = 1;
 export const MEDIA_SOFT_TTL = 14 * 24 * 60 * 60 * 1000; // 14 days

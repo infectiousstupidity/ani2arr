@@ -3,13 +3,13 @@
 
 import type React from 'react';
 import { useState } from 'react';
-import { ANILIST_TITLE_LANGUAGES, type AniListTitleLanguage } from '@/shared/schemas/anilist/anilist-title-language.schema';
+import { ANILIST_TITLE_LANGUAGES, type AniListTitleLanguage } from '@/anilist/schemas/title-language.schema';
 import {
   getProviderConnectionStatusMeta,
   type ProviderConnectionStatus,
 } from '@/features/options/provider-connection-status';
 import { cn } from '@/shared/utils/cn';
-import { getAniListTitleLanguageLabel } from '@/shared/utils/anilist-title-preference';
+import { getAniListTitleLanguageLabel } from '@/anilist/title-preference';
 import { InputField, SelectField } from '@/shared/ui/form/form';
 import Button from '@/shared/ui/primitives/button';
 import { useConfirm } from '@/shared/hooks/common/use-confirm';

@@ -7,7 +7,7 @@ import type { SonarrClient } from '@/providers/clients/sonarr.client';
 import type { MappingService } from '@/services/mapping';
 import type { ResolveExternalIdOptions } from '@/services/mapping/types';
 import { createError, ErrorCode } from '@/shared/errors';
-import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
 import type { ProviderCredentials, SonarrSeries } from '@/providers';
 

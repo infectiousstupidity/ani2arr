@@ -2,8 +2,8 @@
 // src/entrypoints/anilist-browse.content/index.tsx
 
 import { extractMediaMetadataFromDom } from '@/shared/anilist/anilist-dom';
-import { mergeMetadataHints } from '@/shared/anilist/media-metadata';
-import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import { mergeMetadataHints } from '@/anilist/metadata-hints';
+import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { PublicOptions } from '@/options';
 import baseStyles from '@/shared/styles/base.css?inline';
 import browseStyles from './style.css?inline';

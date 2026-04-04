@@ -1,10 +1,10 @@
 /** Public AniList domain workflow for media fetches, caching, search, and relation traversal. */
-// src/core/anilist/media.service.ts
+// src/anilist/media.service.ts
 
 import PQueue from 'p-queue';
 import type { TtlCache } from '@/storage';
-import type { AniListSearchMediaDto } from '@/integrations/anilist/media.schema';
-import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListSearchMediaDto } from '@/anilist/transport/media-response.schema';
+import type { AniListMedia } from '@/anilist/schemas/media.schema';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 import { DEFAULT_PREQUEL_DEPTH, QUEUE_CONCURRENCY } from './constants';
 import { AniListMediaScheduler, type RequestMediaOptions } from './media-scheduler';

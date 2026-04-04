@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { browser } from 'wxt/browser';
 import type { ExtensionError } from '@/shared/errors';
-import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { Provider } from '@/providers';
 import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
 import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';

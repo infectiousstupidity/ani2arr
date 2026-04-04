@@ -1,7 +1,7 @@
 /** Shared dependency contract used by focused RPC handler modules. */
 // src/rpc/handlers/handler-deps.ts
 
-import type { AniListMediaService, AniListMetadataStore } from '@/core/anilist';
+import type { AniListMediaService, AniListMetadataStore } from '@/anilist';
 import type { RadarrLibrary } from '@/providers/library/radarr-library';
 import type { SonarrLibrary } from '@/providers/library/sonarr-library';
 import type { RadarrClient } from '@/providers/clients/radarr.client';

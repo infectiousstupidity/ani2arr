@@ -3,13 +3,13 @@
 
 import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
+import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/anilist/metadata-hints';
 import { useAniListMetadataBatch } from '@/shared/queries';
 import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useBrowsePortals } from '../hooks/use-media-portals';
 import { useAnilistBatchPrefetch } from '../hooks/use-anilist-batch-prefetch';
-import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { BrowseAdapter, ParsedCard } from '@/features/media-overlay/types';
 import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
 import { CardOverlay } from './card-overlay';

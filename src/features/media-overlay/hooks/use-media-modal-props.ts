@@ -8,7 +8,7 @@ import type {
   AniListMediaHint,
   AniListMediaStatus,
   AniListTitles,
-} from '@/shared/schemas/anilist/anilist-media.schema';
+} from '@/anilist/schemas/media.schema';
 import type { ExtensionOptions } from '@/options';
 import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
 import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
@@ -28,8 +28,8 @@ import {
 } from '@/shared/queries';
 import { toMappingSearchResultFromRadarr } from '@/features/mapping/radarr.adapter';
 import { toMappingSearchResultFromSonarr } from '@/features/mapping/sonarr.adapter';
-import { resolveTitlePreference } from '@/shared/utils/anilist-title-preference';
-import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
+import { resolveTitlePreference } from '@/anilist/title-preference';
+import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/anilist/metadata-hints';
 import { usePublicOptions } from '@/options';
 import {
   buildProviderFolderSlug,

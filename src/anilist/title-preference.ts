@@ -1,8 +1,8 @@
 /** Resolves AniList display titles and canonical title-language labels for UI callers. */
-// src/shared/utils/anilist-title-preference.ts
+// src/anilist/title-preference.ts
 
-import type { AniListTitleLanguage } from '@/shared/schemas/anilist/anilist-title-language.schema';
-import type { AniListTitles } from '@/shared/schemas/anilist/anilist-media.schema';
+import type { AniListTitleLanguage } from '@/anilist/schemas/title-language.schema';
+import type { AniListTitles } from '@/anilist/schemas/media.schema';
 
 const TITLE_LANGUAGE_ORDER: AniListTitleLanguage[] = ['english', 'romaji', 'native'];
 

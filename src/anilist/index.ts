@@ -1,5 +1,5 @@
-/** Public surface for the AniList domain workflow and metadata state. */
-// src/core/anilist/index.ts
+/** Narrow public AniList domain exports for runtime composition. */
+// src/anilist/index.ts
 
 export { AniListMediaService } from './media.service';
 export { AniListMetadataStore } from './metadata.store';
