@@ -4,8 +4,8 @@
 import { resolveRadarrAddPayload } from './radarr-add-payload';
 import type { RadarrLibrary } from './radarr-library';
 import type { RadarrClient } from '@/providers/clients/radarr.client';
-import type { MappingService } from '@/services/mapping';
-import type { ResolveExternalIdOptions } from '@/services/mapping/types';
+import type { MappingService } from '@/mapping/mapping.service';
+import type { ResolveExternalIdOptions } from '@/mapping/types';
 import { createError, ErrorCode } from '@/shared/errors';
 import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';

@@ -3,7 +3,7 @@
 
 import { useCallback } from 'react';
 import type { Provider } from '@/providers';
-import type { MappingExternalId } from '@/services/mapping/types';
+import type { MappingExternalId } from '@/mapping/types';
 import { useClearMappingOverride, useSetMappingOverride } from '@/shared/queries';
 
 export function useMappingOverrides(anilistId: number, provider: Provider) {

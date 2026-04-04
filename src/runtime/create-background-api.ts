@@ -4,11 +4,10 @@
 import {
   bumpRevision,
   clearAllTtlCaches,
-  radarrLookupCaches,
   resetAllRevisions,
-  sonarrLookupCaches,
-  upstreamMappingCaches,
 } from '@/storage';
+import { radarrLookupCaches, sonarrLookupCaches } from '@/mapping/lookup/lookup.cache';
+import { upstreamMappingCaches } from '@/mapping/upstream/upstream-mapping.cache';
 import { anilistMediaCache } from '@/anilist/media.cache';
 import { providerLibraryCaches } from '@/providers/library/cache';
 import { SonarrClient } from '@/providers/clients/sonarr.client';
@@ -20,11 +19,10 @@ import {
 import { AniListMediaService, AniListMetadataStore } from '@/anilist';
 import { RadarrLibrary } from '@/providers/library/radarr-library';
 import { SonarrLibrary } from '@/providers/library/sonarr-library';
-import { MappingService } from '@/services/mapping';
-import { MappingOverridesService } from '@/services/mapping/overrides';
-import { UpstreamMappingStore } from '@/services/mapping/upstream';
-import { SonarrLookupClient, RadarrLookupClient } from '@/services/mapping/lookup';
-import { getMappingsHandler } from '@/rpc/handlers/get-mappings.handlers';
+import { MappingService } from '@/mapping/mapping.service';
+import { MappingOverridesService } from '@/mapping/overrides';
+import { UpstreamMappingStore } from '@/mapping/upstream';
+import { SonarrLookupClient, RadarrLookupClient } from '@/mapping/lookup';
 import { createApiHandlers } from '@/rpc/handlers';
 import {
   createDefaultSettings,
@@ -138,6 +136,8 @@ export const createBackgroundApi = (): Ani2arrApi => {
     new SonarrLibrary(
       sonarrClient,
       mappingService,
+      overridesService,
+      upstreamMappingStore,
       providerLibraryCaches.sonarr,
       () => bumpLibraryRevision('sonarr'),
     ),
@@ -147,6 +147,7 @@ export const createBackgroundApi = (): Ani2arrApi => {
     new RadarrLibrary(
       radarrClient,
       mappingService,
+      overridesService,
       providerLibraryCaches.radarr,
       () => bumpLibraryRevision('radarr'),
     ),
@@ -322,6 +323,5 @@ export const createBackgroundApi = (): Ani2arrApi => {
     handleOptionsUpdated,
     clearPersistentCaches,
     resetExtensionState,
-    getMappings: getMappingsHandler,
   });
 };

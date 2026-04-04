@@ -6,7 +6,7 @@ import * as Accordion from '@radix-ui/react-accordion';
 import { ChevronDown } from 'lucide-react';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type { Provider } from '@/providers';
-import type { MappingExternalId, MappingSource, MappingSummary } from '@/services/mapping/types';
+import type { MappingExternalId, MappingSource, MappingSummary } from '@/mapping/types';
 import { useAniListMetadataBatch } from '@/shared/queries';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';

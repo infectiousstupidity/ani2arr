@@ -7,7 +7,7 @@ import type { ExportStoredMappingsOutput, GetMappingsOutput } from '@/rpc/types'
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import type {
   MappingExternalIdRecord,
-} from '@/services/mapping/types';
+} from '@/mapping/types';
 import type { Provider } from '@/providers';
 import type {
   ClearMappingBlockedCandidateInput,

@@ -3,6 +3,7 @@
 
 import type { Ani2arrApi } from '@/rpc';
 import type { ProviderCredentials, SonarrSeriesSnapshot } from '@/providers';
+import type { MappingSummary } from '@/mapping/types';
 import type { ApiHandlerDeps } from './handler-deps';
 
 export function createProviderHandlers(deps: ApiHandlerDeps): Pick<
@@ -18,13 +19,27 @@ export function createProviderHandlers(deps: ApiHandlerDeps): Pick<
   const {
     SonarrClient,
     RadarrClient,
-    mappingService,
     sonarrLibrary,
     radarrLibrary,
+    overridesService,
+    upstreamMappingStore,
     overridesReady,
     ensureSonarrConfigured,
     ensureRadarrConfigured,
   } = deps;
+
+  const getLinkedAniListIds = (
+    provider: MappingSummary['provider'],
+    externalId: NonNullable<MappingSummary['externalId']>,
+  ): number[] => {
+    const ids = new Set<number>(overridesService.getLinkedAniListIds(provider, externalId));
+    if (provider === 'sonarr' && externalId.kind === 'tvdb') {
+      for (const id of upstreamMappingStore.getAniListIdsForTvdb(externalId.id)) {
+        ids.add(id);
+      }
+    }
+    return [...ids];
+  };
 
   const testProviderConnectionInternal: Ani2arrApi['testProviderConnection'] = async input => {
     return input.provider === 'sonarr'
@@ -94,18 +109,16 @@ export function createProviderHandlers(deps: ApiHandlerDeps): Pick<
       }
 
       const linkedAniListIdsByTvdbId: Record<number, number[]> = {};
-      if (typeof mappingService.getLinkedAniListIdsForTvdb === 'function') {
-        const uniqueTvdbIds = new Set<number>();
-        for (const series of results) {
-          if (typeof series?.tvdbId === 'number' && Number.isFinite(series.tvdbId)) {
-            uniqueTvdbIds.add(series.tvdbId);
-          }
+      const uniqueTvdbIds = new Set<number>();
+      for (const series of results) {
+        if (typeof series?.tvdbId === 'number' && Number.isFinite(series.tvdbId)) {
+          uniqueTvdbIds.add(series.tvdbId);
         }
-        for (const tvdbId of uniqueTvdbIds) {
-          const linked = mappingService.getLinkedAniListIdsForTvdb(tvdbId);
-          if (linked.length > 0) {
-            linkedAniListIdsByTvdbId[tvdbId] = linked;
-          }
+      }
+      for (const tvdbId of uniqueTvdbIds) {
+        const linked = getLinkedAniListIds('sonarr', { id: tvdbId, kind: 'tvdb' });
+        if (linked.length > 0) {
+          linkedAniListIdsByTvdbId[tvdbId] = linked;
         }
       }
 
@@ -137,7 +150,7 @@ export function createProviderHandlers(deps: ApiHandlerDeps): Pick<
       }
 
       for (const tmdbId of uniqueTmdbIds) {
-        const linked = mappingService.getLinkedAniListIds('radarr', { id: tmdbId, kind: 'tmdb' });
+        const linked = getLinkedAniListIds('radarr', { id: tmdbId, kind: 'tmdb' });
         if (linked.length > 0) {
           linkedAniListIdsByTmdbId[tmdbId] = linked;
         }

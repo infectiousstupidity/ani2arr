@@ -23,6 +23,7 @@ export function createLibraryHandlers(deps: ApiHandlerDeps): Pick<
     SonarrClient,
     RadarrClient,
     mappingService,
+    overridesService,
     sonarrLibrary,
     radarrLibrary,
     overridesReady,
@@ -53,7 +54,7 @@ export function createLibraryHandlers(deps: ApiHandlerDeps): Pick<
       if (input.priority) requestOptions.priority = input.priority;
 
       const status = await sonarrLibrary.getSeriesStatus(payload, requestOptions);
-      return { ...status, overrideActive: mappingService.isOverrideActive(input.anilistId) };
+      return { ...status, overrideActive: overridesService.has('sonarr', input.anilistId) };
     },
 
     async getMovieStatus(input) {
@@ -76,7 +77,7 @@ export function createLibraryHandlers(deps: ApiHandlerDeps): Pick<
       if (input.priority) requestOptions.priority = input.priority;
 
       const status = await radarrLibrary.getMovieStatus(payload, requestOptions);
-      return { ...status, overrideActive: mappingService.isOverrideActive(input.anilistId, 'radarr') };
+      return { ...status, overrideActive: overridesService.has('radarr', input.anilistId) };
     },
 
     async addToSonarr(input) {

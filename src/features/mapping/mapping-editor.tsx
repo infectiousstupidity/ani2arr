@@ -12,7 +12,7 @@ import { MappingSearchPanel } from './mapping-search-panel';
 import { useMappingController } from './use-mapping-controller';
 import type {
   MappingExternalId,
-} from '@/services/mapping/types';
+} from '@/mapping/types';
 import type {
   Provider,
   RadarrLookupMovie,

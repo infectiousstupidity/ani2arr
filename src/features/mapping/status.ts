@@ -1,5 +1,5 @@
 import type { CheckSeriesStatusResponse } from '@/rpc/types';
-import type { MappingStatus } from '@/services/mapping/types';
+import type { MappingStatus } from '@/mapping/types';
 
 export function toMappingStatus(status: CheckSeriesStatusResponse | undefined): MappingStatus {
   const externalId =
