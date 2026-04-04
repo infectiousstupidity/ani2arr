@@ -20,7 +20,7 @@ import type {
   MappingExternalId,
   MappingIgnoreRecord,
   MappingSummary,
-} from '@/services/mapping/types';
+} from '@/mapping/types';
 import type { MappingCursor } from './schemas';
 
 export interface CheckSeriesStatusResponse {

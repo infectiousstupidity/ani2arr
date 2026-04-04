@@ -2,9 +2,11 @@
 // src/rpc/handlers/mapping.handlers.ts
 
 import type { Ani2arrApi } from '@/rpc';
-import type { StatusInput, GetMappingsInput } from '@/rpc/schemas';
+import type { StatusInput } from '@/rpc/schemas';
 import { getExtensionOptionsSnapshot } from '@/options';
 import { createError, ErrorCode } from '@/shared/errors';
+import { listMappings } from '@/mapping/review/list-mappings';
+import { exportStoredMappings } from '@/mapping/overrides/export-stored-mappings';
 import type { ApiHandlerDeps } from './handler-deps';
 
 function assertCompatibleExternalId(
@@ -52,7 +54,6 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
     scheduleLibraryRefresh,
     bumpLibraryRevision,
     bumpMappingsRevision,
-    getMappings,
   } = deps;
 
   const handlers = {
@@ -107,11 +108,11 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
       assertCompatibleExternalId(input.provider, input.externalId);
 
       if (input.provider === 'sonarr') {
-        const linkedIds =
-          typeof mappingService.getLinkedAniListIdsForTvdb === 'function'
-            ? mappingService.getLinkedAniListIdsForTvdb(input.externalId.id)
-            : [];
-        const conflictingAniListIds = linkedIds.filter(id => id !== input.anilistId);
+        const linkedIds = new Set<number>(overridesService.getLinkedAniListIds('sonarr', input.externalId));
+        for (const id of upstreamMappingStore.getAniListIdsForTvdb(input.externalId.id)) {
+          linkedIds.add(id);
+        }
+        const conflictingAniListIds = [...linkedIds].filter(id => id !== input.anilistId);
         if (conflictingAniListIds.length > 0 && input.force !== true) {
           throw createError(
             ErrorCode.VALIDATION_ERROR,
@@ -260,79 +261,15 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
 
     async exportStoredMappings() {
       await overridesReady;
-
-      const overrides = Object.fromEntries(
-        overridesService.list().map(entry => [
-          `${entry.provider}:${entry.anilistId}`,
-          {
-            anilistId: entry.anilistId,
-            provider: entry.provider,
-            externalId: entry.externalId,
-            updatedAt: entry.updatedAt,
-          },
-        ]),
-      );
-
-      const ignores = Object.fromEntries(
-        overridesService.listIgnores().map(entry => [
-          `${entry.provider}:${entry.anilistId}`,
-          {
-            anilistId: entry.anilistId,
-            provider: entry.provider,
-            updatedAt: entry.updatedAt,
-          },
-        ]),
-      );
-
-      const rejectedCandidates = Object.fromEntries(
-        overridesService.listRejectedCandidates().map(entry => [
-          `${entry.provider}:${entry.anilistId}:${entry.externalId.kind}:${entry.externalId.id}`,
-          {
-            anilistId: entry.anilistId,
-            provider: entry.provider,
-            externalId: entry.externalId,
-            updatedAt: entry.updatedAt,
-          },
-        ]),
-      );
-
-      const blockedCandidates = Object.fromEntries(
-        overridesService.listBlockedCandidates().map(entry => [
-          `${entry.provider}:${entry.anilistId}:${entry.externalId.kind}:${entry.externalId.id}`,
-          {
-            anilistId: entry.anilistId,
-            provider: entry.provider,
-            externalId: entry.externalId,
-            updatedAt: entry.updatedAt,
-          },
-        ]),
-      );
-
-      return {
-        version: 2 as const,
-        exportedAt: new Date().toISOString(),
-        summary: {
-          overrideCount: Object.keys(overrides).length,
-          ignoreCount: Object.keys(ignores).length,
-          rejectedCandidateCount: Object.keys(rejectedCandidates).length,
-          blockedCandidateCount: Object.keys(blockedCandidates).length,
-        },
-        mappings: {
-          overrides,
-          ignores,
-          rejectedCandidates,
-          blockedCandidates,
-        },
-      };
+      return exportStoredMappings(overridesService);
     },
 
     async getMappings(input) {
       await overridesReady;
       await mappingService.initStaticPairs();
-      return getMappings(input as GetMappingsInput, {
+      return listMappings(input, {
         overridesService,
         upstreamMappingStore,
-        mappingService,
         sonarrLibrary,
         radarrLibrary,
       });

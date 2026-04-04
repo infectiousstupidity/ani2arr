@@ -3,7 +3,7 @@
 
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { Provider } from '@/providers';
-import type { MappingExternalId } from '@/services/mapping/types';
+import type { MappingExternalId } from '@/mapping/types';
 
 export interface MappingSearchResult {
   provider: Provider;

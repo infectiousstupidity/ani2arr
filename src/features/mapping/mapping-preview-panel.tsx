@@ -8,7 +8,7 @@ import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { MultiMappingInfo } from './multi-mapping-info';
 import { useMappingOverrides } from '@/shared/queries';
 import type { Provider } from '@/providers';
-import type { MappingExternalIdRecord } from '@/services/mapping/types';
+import type { MappingExternalIdRecord } from '@/mapping/types';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { getProviderLabel } from '@/providers/provider-routing';
 import type { MappingAniListSummary, MappingSearchResult } from './types';

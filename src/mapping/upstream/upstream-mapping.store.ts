@@ -1,0 +1,288 @@
+/** Upstream mapping store for AniList-to-TVDB static pairs and their cache lifecycle. */
+// src/mapping/upstream/upstream-mapping.store.ts
+
+import type { TtlCache } from '@/storage/ttl-cache';
+import { STORAGE_POLICIES } from '@/storage/policies';
+import { upstreamMappingCaches } from '@/mapping/upstream/upstream-mapping.cache';
+import { createError, ErrorCode, logError, normalizeError } from '@/shared/errors';
+import { logger } from '@/shared/utils/logger';
+import type { ScopedLogger } from '@/shared/utils/logger';
+
+const PRIMARY_URL = 'https://raw.githubusercontent.com/eliasbenb/PlexAniBridge-Mappings/v2/mappings.json';
+const FALLBACK_URL = 'https://raw.githubusercontent.com/Kometa-Team/Anime-IDs/master/anime_ids.json';
+
+const CACHE_KEY = 'upstream';
+const FALLBACK_FETCH: typeof fetch = (...args) => fetch(...args);
+
+export type UpstreamMappingSource = 'primary' | 'fallback';
+
+export interface UpstreamMappingPayload {
+  pairs: Record<number, number>;
+}
+
+export class UpstreamMappingStore {
+  private readonly log: ScopedLogger;
+  private readonly fetchImpl: typeof fetch;
+  private readonly primaryPairs = new Map<number, number>();
+  private readonly primaryReverse = new Map<number, Set<number>>();
+  private readonly fallbackPairs = new Map<number, number>();
+  private readonly fallbackReverse = new Map<number, Set<number>>();
+
+  constructor(
+    private readonly caches: typeof upstreamMappingCaches,
+    options: { fetch?: typeof fetch; scope?: string } = {},
+  ) {
+    this.log = logger.create(options.scope ?? 'UpstreamMappingStore');
+    const rawFetch: typeof fetch | undefined =
+      options.fetch ?? (typeof globalThis.fetch === 'function' ? globalThis.fetch : undefined);
+    // Always bind to globalThis so calling via instance (this.fetchImpl) preserves the expected `this`.
+    // This avoids: "'fetch' called on an object that does not implement interface Window."
+    this.fetchImpl = rawFetch ? rawFetch.bind(globalThis) : FALLBACK_FETCH;
+  }
+
+  public async init(): Promise<void> {
+    await Promise.all([this.ensureLoaded('primary'), this.ensureLoaded('fallback')]);
+
+    // If nothing is in memory yet (first run, cold cache), perform a blocking
+    // refresh so early lookups can benefit from upstream pairs and avoid
+    // unnecessary upstream requests.
+    if (this.primaryPairs.size === 0 && this.fallbackPairs.size === 0) {
+      await this.refreshAll().catch(error => {
+        logError(normalizeError(error), 'UpstreamMappingStore:init:refreshAll');
+      });
+      return;
+    }
+
+    // Otherwise refresh in the background.
+    void this.refresh('primary').catch(error => {
+      logError(normalizeError(error), 'UpstreamMappingStore:init:primary');
+    });
+    void this.refresh('fallback').catch(error => {
+      logError(normalizeError(error), 'UpstreamMappingStore:init:fallback');
+    });
+  }
+
+  public get(anilistId: number): { tvdbId: number; source: UpstreamMappingSource } | null {
+    const primary = this.primaryPairs.get(anilistId);
+    if (typeof primary === 'number') {
+      return { tvdbId: primary, source: 'primary' };
+    }
+
+    const fallback = this.fallbackPairs.get(anilistId);
+    if (typeof fallback === 'number') {
+      return { tvdbId: fallback, source: 'fallback' };
+    }
+
+    return null;
+  }
+
+  public async refreshAll(): Promise<void> {
+    await Promise.all([this.refresh('primary'), this.refresh('fallback')]);
+  }
+
+  public async refresh(source: UpstreamMappingSource): Promise<void> {
+    const cache = this.cacheFor(source);
+    const map = this.mapFor(source);
+    const url = this.urlFor(source);
+
+    try {
+      const cached = await cache.read(CACHE_KEY);
+      const headers: Record<string, string> = {};
+      const etag = cached?.meta?.etag as string | undefined;
+      if (etag) {
+        headers['If-None-Match'] = etag;
+      }
+
+      this.log.debug(`refresh(${source}): fetching ${url} (etag=${String(etag)})`);
+      const response = await this.fetchImpl(url, { headers });
+
+      if (response.status === 304 && cached) {
+        this.log.debug(`refresh(${source}): not modified`);
+        if (map.size === 0) {
+          this.hydrateMap(map, this.reverseFor(source), cached.value.pairs);
+        }
+        return;
+      }
+
+      if (!response.ok) {
+        const message = `Failed to fetch upstream mapping (${response.status})`;
+        this.log.warn(`refresh(${source}): ${message}`);
+        throw createError(ErrorCode.NETWORK_ERROR, message, 'Unable to refresh upstream mappings.');
+      }
+
+      const payload = (await response.json()) as unknown;
+      const pairs = this.buildPairsFromSource(payload);
+      this.hydrateMap(map, this.reverseFor(source), pairs);
+
+      const nextEtag = response.headers.get('ETag');
+      await cache.write(
+        CACHE_KEY,
+        { pairs },
+        {
+          staleMs: STORAGE_POLICIES.upstreamMappings.staleMs,
+          hardMs: STORAGE_POLICIES.upstreamMappings.hardMs,
+          ...(nextEtag ? { meta: { etag: nextEtag } } : {}),
+        },
+      );
+      this.log.info(`refresh(${source}): stored ${map.size} entries (etag=${String(nextEtag)})`);
+    } catch (error) {
+      const normalized = normalizeError(error);
+      this.log.error(`refresh(${source}): error`, normalized);
+      throw normalized;
+    }
+  }
+
+  public async clear(): Promise<void> {
+    this.primaryPairs.clear();
+    this.primaryReverse.clear();
+    this.fallbackPairs.clear();
+    this.fallbackReverse.clear();
+    await Promise.all([
+      this.caches.primary.remove(CACHE_KEY),
+      this.caches.fallback.remove(CACHE_KEY),
+    ]);
+  }
+
+  private async ensureLoaded(source: UpstreamMappingSource): Promise<void> {
+    const map = this.mapFor(source);
+    if (map.size > 0) return;
+
+    const cached = await this.cacheFor(source).read(CACHE_KEY);
+    if (cached) {
+      this.hydrateMap(map, this.reverseFor(source), cached.value.pairs);
+    }
+  }
+
+  private cacheFor(source: UpstreamMappingSource): TtlCache<UpstreamMappingPayload> {
+    return source === 'primary' ? this.caches.primary : this.caches.fallback;
+  }
+
+  private mapFor(source: UpstreamMappingSource): Map<number, number> {
+    return source === 'primary' ? this.primaryPairs : this.fallbackPairs;
+  }
+
+  private reverseFor(source: UpstreamMappingSource): Map<number, Set<number>> {
+    return source === 'primary' ? this.primaryReverse : this.fallbackReverse;
+  }
+
+  private urlFor(source: UpstreamMappingSource): string {
+    return source === 'primary' ? PRIMARY_URL : FALLBACK_URL;
+  }
+
+  private hydrateMap(
+    map: Map<number, number>,
+    reverse: Map<number, Set<number>>,
+    pairs: Record<number, number>,
+  ): void {
+    map.clear();
+    reverse.clear();
+    for (const [rawKey, rawValue] of Object.entries(pairs)) {
+      const key = this.coerceId(rawKey);
+      const value = this.coerceId(rawValue);
+      if (key != null && value != null) {
+        map.set(key, value);
+        this.addReverse(reverse, value, key);
+      }
+    }
+    this.log.debug(`hydrateMap: populated map with ${map.size} entries`);
+  }
+
+  private addReverse(reverse: Map<number, Set<number>>, tvdbId: number, anilistId: number): void {
+    const bucket = reverse.get(tvdbId);
+    if (bucket) {
+      bucket.add(anilistId);
+      return;
+    }
+    reverse.set(tvdbId, new Set([anilistId]));
+  }
+
+  private buildPairsFromSource(source: unknown): Record<number, number> {
+    const pairs: Record<number, number> = {};
+    if (!source || typeof source !== 'object') {
+      return pairs;
+    }
+
+    if (Array.isArray(source)) {
+      for (const entry of source) {
+        if (!entry || typeof entry !== 'object') continue;
+        const record = entry as Record<string, unknown>;
+        const anilistId = this.coerceId(record.anilist_id ?? record.anilist ?? record.aniId);
+        const tvdbId = this.coerceId(record.tvdb_id ?? record.tvdb ?? record.tvdbid);
+        if (anilistId != null && tvdbId != null) {
+          pairs[anilistId] = tvdbId;
+        }
+      }
+      return pairs;
+    }
+
+    const objectSource = source as Record<string, unknown>;
+    for (const [rawKey, rawValue] of Object.entries(objectSource)) {
+      const record = (typeof rawValue === 'object' && rawValue !== null
+        ? (rawValue as Record<string, unknown>)
+        : null);
+
+      const explicitAni = record?.anilist_id ?? record?.anilist;
+      const anilistId = this.coerceId(explicitAni ?? rawKey);
+
+      const explicitTvdb = record?.tvdb_id ?? record?.tvdb ?? record?.tvdbid;
+      const tvdbId =
+        typeof rawValue === 'number' && Number.isFinite(rawValue)
+          ? rawValue
+          : this.coerceId(explicitTvdb);
+
+      if (anilistId != null && tvdbId != null) {
+        pairs[anilistId] = tvdbId;
+      } else {
+        // Commented out to reduce log noise while keeping the message available
+        // for future debugging.
+        // this.log.debug(
+        //   `buildPairsFromSource: skipped entry ${rawKey} (anilist=${String(anilistId)}, tvdb=${String(tvdbId)})`,
+        // );
+      }
+    }
+
+    return pairs;
+  }
+
+  private coerceId(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return Math.trunc(value);
+    }
+
+    if (typeof value === 'string') {
+      const parsed = Number.parseInt(value, 10);
+      if (Number.isFinite(parsed)) {
+        return Math.trunc(parsed);
+      }
+    }
+
+    return null;
+  }
+
+  public getAniListIdsForTvdb(tvdbId: number): number[] {
+    if (typeof tvdbId !== 'number' || !Number.isFinite(tvdbId)) return [];
+    const ids = new Set<number>();
+    const collect = (reverse: Map<number, Set<number>>): void => {
+      const bucket = reverse.get(tvdbId);
+      if (!bucket) return;
+      for (const id of bucket) ids.add(id);
+    };
+    collect(this.primaryReverse);
+    collect(this.fallbackReverse);
+    return [...ids];
+  }
+
+  public listAllPairs(): Array<{ anilistId: number; tvdbId: number; source: UpstreamMappingSource }> {
+    const entries: Array<{ anilistId: number; tvdbId: number; source: UpstreamMappingSource }> = [];
+    const seen = new Set<number>();
+    for (const [anilistId, tvdbId] of this.primaryPairs.entries()) {
+      entries.push({ anilistId, tvdbId, source: 'primary' });
+      seen.add(anilistId);
+    }
+    for (const [anilistId, tvdbId] of this.fallbackPairs.entries()) {
+      if (seen.has(anilistId)) continue;
+      entries.push({ anilistId, tvdbId, source: 'fallback' });
+    }
+    return entries;
+  }
+}

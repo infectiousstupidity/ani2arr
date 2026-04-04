@@ -4,8 +4,8 @@
 import { resolveSonarrAddPayload } from './sonarr-add-payload';
 import type { SonarrLibrary } from './sonarr-library';
 import type { SonarrClient } from '@/providers/clients/sonarr.client';
-import type { MappingService } from '@/services/mapping';
-import type { ResolveExternalIdOptions } from '@/services/mapping/types';
+import type { MappingService } from '@/mapping/mapping.service';
+import type { ResolveExternalIdOptions } from '@/mapping/types';
 import { createError, ErrorCode } from '@/shared/errors';
 import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';

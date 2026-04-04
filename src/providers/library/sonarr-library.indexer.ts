@@ -7,7 +7,7 @@ import {
   buildTitleIndexKeysForProvider,
   computeTitleMatchScoreForProvider,
   extractCandidateTitleVariants,
-} from '@/services/mapping/pipeline/matching';
+} from '@/mapping/pipeline/matching';
 import type { SonarrSeriesSnapshot } from '@/providers';
 import { LOCAL_INDEX_ACCEPTANCE_THRESHOLD } from './constants';
 

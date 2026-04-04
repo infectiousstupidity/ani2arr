@@ -6,10 +6,9 @@ import type { RadarrLibrary } from '@/providers/library/radarr-library';
 import type { SonarrLibrary } from '@/providers/library/sonarr-library';
 import type { RadarrClient } from '@/providers/clients/radarr.client';
 import type { SonarrClient } from '@/providers/clients/sonarr.client';
-import type { getMappingsHandler } from '@/rpc/handlers/get-mappings.handlers';
-import type { MappingService } from '@/services/mapping';
-import type { MappingOverridesService } from '@/services/mapping/overrides';
-import type { UpstreamMappingStore } from '@/services/mapping/upstream';
+import type { MappingService } from '@/mapping/mapping.service';
+import type { MappingOverridesService } from '@/mapping/overrides';
+import type { UpstreamMappingStore } from '@/mapping/upstream';
 import type { ExtensionOptions } from '@/options';
 import type { ProviderCredentials } from '@/providers';
 
@@ -32,5 +31,4 @@ export type ApiHandlerDeps = {
   handleOptionsUpdated: (optionsHint?: ExtensionOptions) => Promise<void>;
   clearPersistentCaches: () => Promise<void>;
   resetExtensionState: () => Promise<void>;
-  getMappings: typeof getMappingsHandler;
 };

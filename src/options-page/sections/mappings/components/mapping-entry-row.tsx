@@ -6,7 +6,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Ban, MoreHorizontal, Pencil, Trash2, Undo2 } from 'lucide-react';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type { Provider } from '@/providers';
-import type { MappingExternalId, MappingSummary } from '@/services/mapping/types';
+import type { MappingExternalId, MappingSummary } from '@/mapping/types';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';

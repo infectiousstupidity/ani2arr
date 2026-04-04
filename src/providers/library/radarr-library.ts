@@ -4,8 +4,9 @@
 import type { RadarrClient } from '@/providers/clients/radarr.client';
 import type { StatusInput } from '@/rpc/schemas';
 import type { CheckMovieStatusResponse } from '@/rpc/types';
-import type { MappingService } from '@/services/mapping';
-import type { ResolveExternalIdOptions } from '@/services/mapping/types';
+import type { MappingService } from '@/mapping/mapping.service';
+import type { MappingOverridesService } from '@/mapping/overrides';
+import type { ResolveExternalIdOptions } from '@/mapping/types';
 import { ErrorCode, logError, normalizeError } from '@/shared/errors';
 import { getExtensionOptionsSnapshot, type ExtensionOptions } from '@/options';
 import type { ProviderCredentials, RadarrLookupMovie, RadarrMovie, RadarrMovieSnapshot } from '@/providers';
@@ -27,10 +28,8 @@ export class RadarrLibrary {
 
   constructor(
     private readonly radarrClient: RadarrClient,
-    private readonly mappingService: Pick<
-      MappingService,
-      'resolveExternalId' | 'prioritizeAniListMedia' | 'getLinkedAniListIds'
-    >,
+    private readonly mappingService: Pick<MappingService, 'resolveExternalId' | 'prioritizeAniListMedia'>,
+    private readonly overridesService: Pick<MappingOverridesService, 'getLinkedAniListIds'>,
     caches: ProviderLibraryCaches<RadarrMovieSnapshot>,
     private readonly emitLibraryMutation?: LibraryMutationEmitter<RadarrLibraryMutationPayload>,
   ) {
@@ -146,7 +145,7 @@ export class RadarrLibrary {
       return { exists: false, tmdbId: null, externalId: null, anilistTmdbLinkMissing: true };
     }
 
-    const linked = this.mappingService.getLinkedAniListIds?.('radarr', { id: tmdbId, kind: 'tmdb' }) ?? [];
+    const linked = this.overridesService.getLinkedAniListIds('radarr', { id: tmdbId, kind: 'tmdb' });
     if (linked.length > 0) {
       linkedAniListIds = linked;
     }

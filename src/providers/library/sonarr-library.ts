@@ -4,7 +4,9 @@
 import type { SonarrClient } from '@/providers/clients/sonarr.client';
 import type { StatusInput } from '@/rpc/schemas';
 import type { CheckSeriesStatusResponse } from '@/rpc/types';
-import type { MappingService } from '@/services/mapping';
+import type { MappingService } from '@/mapping/mapping.service';
+import type { MappingOverridesService } from '@/mapping/overrides';
+import type { UpstreamMappingStore } from '@/mapping/upstream';
 import { ErrorCode, logError, normalizeError } from '@/shared/errors';
 import { getExtensionOptionsSnapshot, type ExtensionOptions } from '@/options';
 import type { ProviderCredentials, SonarrLookupSeries, SonarrSeries, SonarrSeriesSnapshot } from '@/providers';
@@ -26,10 +28,9 @@ export class SonarrLibrary {
 
   constructor(
     private readonly sonarrClient: SonarrClient,
-    private readonly mappingService: Pick<
-      MappingService,
-      'resolveTvdbId' | 'prioritizeAniListMedia' | 'getLinkedAniListIdsForTvdb'
-    >,
+    private readonly mappingService: Pick<MappingService, 'resolveTvdbId' | 'prioritizeAniListMedia'>,
+    private readonly overridesService: Pick<MappingOverridesService, 'getLinkedAniListIds'>,
+    private readonly upstreamMappingStore: Pick<UpstreamMappingStore, 'getAniListIdsForTvdb'>,
     caches: ProviderLibraryCaches<SonarrSeriesSnapshot>,
     private readonly emitLibraryMutation?: LibraryMutationEmitter<SonarrLibraryMutationPayload>,
   ) {
@@ -146,9 +147,12 @@ export class SonarrLibrary {
       return { exists: false, tvdbId: null, externalId: null, anilistTvdbLinkMissing: true };
     }
 
-    const linked = this.mappingService.getLinkedAniListIdsForTvdb?.(tvdbId) ?? [];
-    if (linked.length > 0) {
-      linkedAniListIds = linked;
+    const linked = new Set<number>(this.overridesService.getLinkedAniListIds('sonarr', { id: tvdbId, kind: 'tvdb' }));
+    for (const id of this.upstreamMappingStore.getAniListIdsForTvdb(tvdbId)) {
+      linked.add(id);
+    }
+    if (linked.size > 0) {
+      linkedAniListIds = [...linked];
     }
 
     const cachedSeries = leanList.find(series => series.tvdbId === tvdbId) ?? null;
