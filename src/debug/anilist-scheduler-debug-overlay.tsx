@@ -1,6 +1,9 @@
+/** Debug overlay for inspecting AniList scheduler batching and queue behavior. */
+// src/debug/anilist-scheduler-debug-overlay.tsx
+
 import React from 'react';
-import { usePublicOptions } from '@/shared/queries';
 import { useAniListSchedulerDebug } from './anilist-debug.query';
+import { usePublicOptions } from '@/options';
 import type { AniListSchedulerBatchDebug, AniListSchedulerBucketDebug } from './anilist-debug.types';
 
 const MAX_BATCH_SIZE = 50;
@@ -31,49 +34,48 @@ const summarizeBucket = (bucket: AniListSchedulerBucketDebug) => {
 };
 
 const summarizeBatches = (batches: AniListSchedulerBatchDebug[]) => {
-  return batches.reduce(
-    (totals, batch) => {
-      const merged = batch.dedupeSavedCount > 0 || batch.contributorRequestIds.length > 1;
+  const totals = {
+    batchCount: 0,
+    mergedBatchCount: 0,
+    logicalRequestCount: 0,
+    mergedRequestCount: 0,
+    idsQueried: 0,
+    logicalIdsRequested: 0,
+    mergeSavings: 0,
+    cacheHits: 0,
+    joinedInflight: 0,
+    largestQuerySize: 0,
+    movies: 0,
+    series: 0,
+    specials: 0,
+    music: 0,
+    otherFormats: 0,
+  };
 
-      totals.batchCount += 1;
-      totals.logicalRequestCount += batch.contributorRequestIds.length;
-      totals.idsQueried += batch.uniqueSentIdCount;
-      totals.logicalIdsRequested += batch.logicalRequestedIdCount;
-      totals.mergeSavings += batch.dedupeSavedCount;
-      totals.cacheHits += batch.cacheHitCount;
-      totals.joinedInflight += batch.joinedInflightCount;
-      totals.largestQuerySize = Math.max(totals.largestQuerySize, batch.uniqueSentIdCount);
-      totals.movies += batch.mediaCounts.movies;
-      totals.series += batch.mediaCounts.series;
-      totals.specials += batch.mediaCounts.specials;
-      totals.music += batch.mediaCounts.music;
-      totals.otherFormats += batch.mediaCounts.other + batch.mediaCounts.unknown;
+  for (const batch of batches) {
+    const merged = batch.dedupeSavedCount > 0 || batch.contributorRequestIds.length > 1;
 
-      if (merged) {
-        totals.mergedBatchCount += 1;
-        totals.mergedRequestCount += batch.contributorRequestIds.length;
-      }
+    totals.batchCount += 1;
+    totals.logicalRequestCount += batch.contributorRequestIds.length;
+    totals.idsQueried += batch.uniqueSentIdCount;
+    totals.logicalIdsRequested += batch.logicalRequestedIdCount;
+    totals.mergeSavings += batch.dedupeSavedCount;
+    totals.cacheHits += batch.cacheHitCount;
+    totals.joinedInflight += batch.joinedInflightCount;
+    totals.largestQuerySize = Math.max(totals.largestQuerySize, batch.uniqueSentIdCount);
+    totals.movies += batch.mediaCounts.movies;
+    totals.series += batch.mediaCounts.series;
+    totals.specials += batch.mediaCounts.specials;
+    totals.music += batch.mediaCounts.music;
+    totals.otherFormats += batch.mediaCounts.other + batch.mediaCounts.unknown;
 
-      return totals;
-    },
-    {
-      batchCount: 0,
-      mergedBatchCount: 0,
-      logicalRequestCount: 0,
-      mergedRequestCount: 0,
-      idsQueried: 0,
-      logicalIdsRequested: 0,
-      mergeSavings: 0,
-      cacheHits: 0,
-      joinedInflight: 0,
-      largestQuerySize: 0,
-      movies: 0,
-      series: 0,
-      specials: 0,
-      music: 0,
-      otherFormats: 0,
-    },
-  );
+    if (merged) {
+      totals.mergedBatchCount += 1;
+      totals.mergedRequestCount += batch.contributorRequestIds.length;
+    }
+  }
+
+  return totals;
 };
 
 const StatCard: React.FC<{ label: string; value: string | number; hint?: string }> = ({

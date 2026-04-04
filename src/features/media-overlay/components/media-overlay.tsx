@@ -4,7 +4,7 @@
 import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
-import { useAniListMetadataBatch, usePublicOptions } from '@/shared/queries';
+import { useAniListMetadataBatch } from '@/shared/queries';
 import { useA2aBroadcasts } from '@/runtime/messaging/use-broadcasts';
 import { useTheme } from '@/shared/hooks/common/use-theme';
 import { useBrowsePortals } from '../hooks/use-media-portals';
@@ -13,6 +13,7 @@ import type { AniListMediaHint } from '@/shared/schemas/anilist/anilist-media.sc
 import type { BrowseAdapter, ParsedCard } from '@/features/media-overlay/types';
 import { resolveProviderForAniListFormat } from '@/services/providers/resolver';
 import { CardOverlay } from './card-overlay';
+import { usePublicOptions } from '@/options';
 
 export const DEFAULT_CONTAINER_CLASS = 'a2a-overlay-container';
 export const DEFAULT_PROCESSED_ATTRIBUTE = 'data-a2a-processed';

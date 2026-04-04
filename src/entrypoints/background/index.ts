@@ -7,7 +7,7 @@ import { createBackgroundApi } from '@/runtime/create-background-api';
 import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/debug/metrics';
 import { logger } from '@/shared/utils/logger';
 import { logError, normalizeError } from '@/shared/errors';
-import { getExtensionOptionsSnapshot } from '@/storage';
+import { getExtensionOptionsSnapshot } from '@/options';
 
 type OptionsSectionId = 'sonarr' | 'radarr' | 'mappings' | 'ui' | 'advanced';
 
@@ -25,6 +25,19 @@ const MAPPING_REFRESH_ALARM = 'a2a:refresh-static-mappings';
 const MAPPING_REFRESH_PERIOD_MIN = 360;
 
 const log = logger.create('Background');
+
+async function shouldWarmMappingsCache(): Promise<boolean> {
+  try {
+    const options = await getExtensionOptionsSnapshot();
+    return Boolean(
+      (options.providers.sonarr.url && options.providers.sonarr.apiKey) ||
+      (options.providers.radarr.url && options.providers.radarr.apiKey),
+    );
+  } catch (error) {
+    logError(normalizeError(error), 'Background:shouldWarmMappingsCache');
+    return false;
+  }
+}
 
 export default defineBackground(() => {
   log.info('Background initializing…');
@@ -45,19 +58,6 @@ export default defineBackground(() => {
   const api = getAni2arrApi();
   const alarmsApi = (browser as unknown as { alarms?: typeof browser.alarms }).alarms;
 
-  const shouldWarmMappingsCache = async (): Promise<boolean> => {
-    try {
-      const options = await getExtensionOptionsSnapshot();
-      return Boolean(
-        (options.providers.sonarr.url && options.providers.sonarr.apiKey) ||
-        (options.providers.radarr.url && options.providers.radarr.apiKey),
-      );
-    } catch (error) {
-      logError(normalizeError(error), 'Background:shouldWarmMappingsCache');
-      return false;
-    }
-  };
-
   const ensurePeriodicRefresh = async (): Promise<void> => {
     if (alarmsApi) {
       const existing = await alarmsApi.get(MAPPING_REFRESH_ALARM);
@@ -70,8 +70,8 @@ export default defineBackground(() => {
     const key = '__a2a_fallback_interval__';
     if (!(globalThis as Record<string, unknown>)[key]) {
       (globalThis as Record<string, unknown>)[key] = globalThis.setInterval(() => {
-        void api.initMappings().catch(err => {
-          logError(normalizeError(err), 'Background:initMappings:interval');
+        void api.initMappings().catch(error => {
+          logError(normalizeError(error), 'Background:initMappings:interval');
         });
       }, MAPPING_REFRESH_PERIOD_MIN * 60 * 1000);
     }
@@ -113,8 +113,8 @@ export default defineBackground(() => {
             return;
           }
           await api.initMappings();
-        })().catch(err => {
-          logError(normalizeError(err), 'Background:initMappings:alarm');
+        })().catch(error => {
+          logError(normalizeError(error), 'Background:initMappings:alarm');
         });
       }
     });
@@ -157,9 +157,7 @@ export default defineBackground(() => {
 
             const url = section
               ? `${baseUrl}#/options/${section}${targetHash}`
-              : targetHash
-                ? `${baseUrl}#${targetHash}`
-                : baseUrl;
+              : (targetHash ? `${baseUrl}#${targetHash}` : baseUrl);
 
             await browser.tabs.create({ url });
           } catch {

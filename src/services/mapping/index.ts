@@ -3,6 +3,7 @@
 
 import type { AniListMediaService } from '@/core/anilist';
 import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
+import { getExtensionOptionsSnapshot } from '@/options';
 import type { Provider, ProviderCredentials } from '@/integrations/providers';
 import type { MappingExternalId } from './types';
 import {
@@ -15,7 +16,6 @@ import {
 import {
   clearExtensionMappingFailures,
   clearExtensionMappings,
-  getExtensionOptionsSnapshot,
   readExtensionMapping,
   readExtensionMappingFailure,
   removeExtensionMapping,

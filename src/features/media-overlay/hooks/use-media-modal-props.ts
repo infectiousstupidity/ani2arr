@@ -28,7 +28,6 @@ import {
   useAniListMedia,
   useAniListMetadataBatch,
   useMovieStatus,
-  usePublicOptions,
   useRadarrMetadata,
   useSeriesStatus,
   useSonarrMetadata,
@@ -41,6 +40,7 @@ import { toMappingSearchResultFromRadarr } from '@/features/mapping/radarr.adapt
 import { toMappingSearchResultFromSonarr } from '@/features/mapping/sonarr.adapter';
 import { resolveTitlePreference } from '@/shared/utils/anilist-title-preference';
 import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/shared/anilist/media-metadata';
+import { usePublicOptions } from '@/options';
 import {
   buildProviderFolderSlug,
   extractProviderRootFolderPath,

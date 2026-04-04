@@ -1,6 +1,9 @@
-import { getExtensionOptionsSnapshot, STORAGE_POLICIES } from '@/storage';
+/** Shared provider-library cache refresh and persistence flow. */
+// src/core/library/base-provider-library.store.ts
+
+import { getExtensionOptionsSnapshot, type ExtensionOptions } from '@/options';
+import { STORAGE_POLICIES } from '@/storage';
 import { logError, normalizeError } from '@/shared/errors';
-import type { ExtensionOptions } from '@/options';
 import type { ProviderCredentials } from '@/integrations/providers';
 import type { ProviderCredentialsResolver, ProviderLibraryCaches } from './library.types';
 

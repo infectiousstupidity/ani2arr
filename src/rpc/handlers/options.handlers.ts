@@ -5,8 +5,8 @@ import type { Ani2arrApi } from '@/rpc';
 import {
   getExtensionOptionsSnapshot,
   setExtensionOptionsSnapshot,
-} from '@/storage';
-import type { ExtensionOptions } from '@/options';
+  type ExtensionOptions,
+} from '@/options';
 import type { ApiHandlerDeps } from './handler-deps';
 
 export function createOptionsHandlers(deps: ApiHandlerDeps): Pick<

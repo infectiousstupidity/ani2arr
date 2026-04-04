@@ -4,8 +4,8 @@
 import { browser } from 'wxt/browser';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { awaitBackgroundReady } from '@/runtime/messaging/await-background-ready';
-import { getPublicOptionsSnapshot, STORAGE_KEYS } from '@/storage';
-import type { PublicOptions } from '@/options';
+import { STORAGE_KEYS } from '@/storage';
+import { getPublicOptionsSnapshot, type PublicOptions } from '@/options';
 
 export interface ContentEntrypointShellContext {
   ctx: ContentScriptContext;

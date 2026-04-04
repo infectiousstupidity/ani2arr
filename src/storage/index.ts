@@ -1,17 +1,5 @@
-/** Central export surface for the storage layer. Re-exports stores, caches, policies, and helpers. */
-// src/lib/storage/index.ts
-
-// Settings store API
-export {
-  publicOptions,
-  sonarrSecrets,
-  radarrSecrets,
-  parseSettings,
-  toPublicOptions,
-  getExtensionOptionsSnapshot,
-  setExtensionOptionsSnapshot,
-  getPublicOptionsSnapshot,
-} from './settings.store';
+/** Central export surface for storage keys, revisions, and cache-backed persistence. */
+// src/storage/index.ts
 
 // Revisions
 export type { RevisionKey } from './revisions.store';
