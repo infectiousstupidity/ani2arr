@@ -1,8 +1,12 @@
+allowBuilds:
+  esbuild: true
+  sharp: true
+  spawn-sync: true
 supportedArchitectures:
+  cpu:
+    - current
+    - x64
   os:
     - current
     - win32
     - linux
-  cpu:
-    - current
-    - x64
