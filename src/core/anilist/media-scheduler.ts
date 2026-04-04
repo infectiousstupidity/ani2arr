@@ -18,15 +18,6 @@ import type {
 } from '@/integrations/anilist/types';
 import type { TtlCache } from '@/storage';
 import { createError, ErrorCode } from '@/shared/errors';
-import type {
-  AniListSchedulerBatchDebug,
-  AniListSchedulerBatchMediaCountsDebug,
-  AniListSchedulerBucketDebug,
-  AniListSchedulerDebugSnapshot,
-  AniListSchedulerEventDebug,
-  AniListSchedulerPendingEntryDebug,
-  AniListSchedulerRequestDebug,
-} from '@/debug/anilist-debug.types';
 import type { AniListMedia } from '@/shared/schemas/anilist/anilist-media.schema';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 import { logger } from '@/shared/utils/logger';
@@ -62,18 +53,11 @@ type PendingEntry = {
   deferred: Deferred<AniListMedia>;
   priority: RequestPriority;
   forceRefresh: boolean;
-  sources: Set<string>;
-  requestIds: Set<number>;
-  enqueuedAt: number;
-  promotedFrom: RequestPriority | null;
 };
 
 type InflightEntry = {
   promise: Promise<AniListMedia>;
   priority: RequestPriority;
-  batchId: number | null;
-  requestIds: Set<number>;
-  sources: Set<string>;
 };
 
 type MediaSchedulerDeps = {
@@ -81,25 +65,7 @@ type MediaSchedulerDeps = {
   dispatchTask: <T>(task: () => Promise<T>, priority: number) => Promise<T>;
 };
 
-type AniListRateLimitStateSnapshot = {
-  pausedUntil: number;
-  lastKnownLimit: number | null;
-  lastKnownRemaining: number | null;
-  lastKnownResetAt: number | null;
-  last429At: number | null;
-};
-
-type LimiterEventType = 'success' | 'rate-limit' | 'resume';
-type LimiterListener = (
-  event: LimiterEventType,
-  snapshot: AniListRateLimitStateSnapshot,
-  meta: AniListResponseMeta,
-) => void;
-
 const PRIORITIES: RequestPriority[] = ['high', 'normal', 'low'];
-const MAX_RECENT_REQUESTS = 80;
-const MAX_RECENT_BATCHES = 40;
-const MAX_RECENT_EVENTS = 160;
 
 const COALESCE_MS: Record<RequestPriority, number> = {
   high: 0,
@@ -107,31 +73,15 @@ const COALESCE_MS: Record<RequestPriority, number> = {
   low: 150,
 };
 
-const createEmptyMediaCounts = (): AniListSchedulerBatchMediaCountsDebug => ({
-  movies: 0,
-  series: 0,
-  specials: 0,
-  music: 0,
-  other: 0,
-  unknown: 0,
-});
-
 class AniListRateLimiter {
   private readonly log = logger.create('AniListLimiter');
   private pausedUntil = 0;
   private lastKnownLimit: number | null = null;
   private lastKnownRemaining: number | null = null;
   private lastKnownResetAt: number | null = null;
-  private last429At: number | null = null;
   private lastLowDispatchAt: number | null = null;
-  private listener: LimiterListener | null = null;
-
-  public setListener(listener: LimiterListener | null): void {
-    this.listener = listener;
-  }
 
   public updateFromSuccess(meta: AniListResponseMeta): void {
-    const wasPaused = this.pausedUntil > meta.receivedAt;
     this.applyKnownRateLimit(meta.rateLimit);
 
     const { remaining, resetAt } = meta.rateLimit;
@@ -148,11 +98,6 @@ class AniListRateLimiter {
         `anilist:limiter update remaining=${String(this.lastKnownRemaining)} limit=${String(this.lastKnownLimit)} resetAt=${String(this.lastKnownResetAt)} pausedUntil=${this.pausedUntil || 0}`,
       );
     }
-
-    this.listener?.('success', this.snapshot(), meta);
-    if (wasPaused && this.pausedUntil <= meta.receivedAt) {
-      this.listener?.('resume', this.snapshot(), meta);
-    }
   }
 
   public updateFromRateLimit(meta: AniListResponseMeta, pausedUntil?: number): number {
@@ -166,15 +111,12 @@ class AniListRateLimiter {
         : meta.receivedAt + DEFAULT_ANILIST_RETRY_AFTER_MS);
 
     this.pausedUntil = Math.max(this.pausedUntil, computedPausedUntil);
-    this.last429At = meta.receivedAt;
 
     if (import.meta.env.DEV) {
       this.log.debug?.(
         `anilist:limiter rate-limit remaining=${String(this.lastKnownRemaining)} limit=${String(this.lastKnownLimit)} resetAt=${String(this.lastKnownResetAt)} pausedUntil=${this.pausedUntil}`,
       );
     }
-
-    this.listener?.('rate-limit', this.snapshot(), meta);
 
     return this.pausedUntil;
   }
@@ -213,16 +155,6 @@ class AniListRateLimiter {
     return this.lastKnownRemaining <= threshold;
   }
 
-  public snapshot(): AniListRateLimitStateSnapshot {
-    return {
-      pausedUntil: this.pausedUntil,
-      lastKnownLimit: this.lastKnownLimit,
-      lastKnownRemaining: this.lastKnownRemaining,
-      lastKnownResetAt: this.lastKnownResetAt,
-      last429At: this.last429At,
-    };
-  }
-
   private applyKnownRateLimit(rateLimit: AniListRateLimitMeta): void {
     if (typeof rateLimit.limit === 'number') {
       this.lastKnownLimit = rateLimit.limit;
@@ -245,43 +177,11 @@ export class AniListMediaScheduler {
   private readonly pendingById = new Map<number, PendingEntry>();
   private readonly bucketReadyAt = new Map<RequestPriority, number>();
   private readonly inflightById = new Map<number, InflightEntry>();
-  private readonly recentRequests: AniListSchedulerRequestDebug[] = [];
-  private readonly recentBatches: AniListSchedulerBatchDebug[] = [];
-  private readonly recentEvents: AniListSchedulerEventDebug[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushScheduledAt: number | null = null;
   private isFlushing = false;
-  private nextRequestId = 1;
-  private nextBatchId = 1;
-  private nextEventId = 1;
 
-  constructor(private readonly deps: MediaSchedulerDeps) {
-    this.limiter.setListener((event, snapshot, meta) => {
-      if (event === 'success') {
-        return;
-      }
-
-      const message = event === 'resume'
-        ? 'Limiter window reopened'
-        : 'AniList rate limit triggered';
-
-      this.recordEvent({
-        at: meta.receivedAt,
-        type: event === 'resume' ? 'resume' : 'rate-limit',
-        priority: null,
-        requestId: null,
-        batchId: null,
-        ids: [],
-        message,
-        details: {
-          pausedUntil: snapshot.pausedUntil,
-          remaining: snapshot.lastKnownRemaining,
-          limit: snapshot.lastKnownLimit,
-          resetAt: snapshot.lastKnownResetAt,
-        },
-      });
-    });
-  }
+  constructor(private readonly deps: MediaSchedulerDeps) {}
 
   public prioritize(ids: number | number[], priority: RequestPriority = 'high'): void {
     for (const id of this.normalizeIds(Array.isArray(ids) ? ids : [ids])) {
@@ -302,38 +202,23 @@ export class AniListMediaScheduler {
     }
 
     const normalizedOptions = this.normalizeOptions(options);
-    const request = this.registerRequest([normalizedId], normalizedOptions);
 
     if (!normalizedOptions.forceRefresh) {
       const cached = await this.readCachedMedia(normalizedId);
       if (cached) {
-        this.recordEvent({
-          at: Date.now(),
-          type: 'cache-hit',
-          priority: normalizedOptions.priority,
-          requestId: request.requestId,
-          batchId: null,
-          ids: [normalizedId],
-          message: 'Satisfied single request from cache',
-          details: {
-            stale: cached.stale,
-          },
-        });
-
         if (cached.stale) {
-          this.refreshInBackground([normalizedId], normalizedOptions);
+          this.refreshInBackground(normalizedId, normalizedOptions);
         }
         return cached.media;
       }
     }
 
-    return this.ensureNetworkRequest(normalizedId, normalizedOptions, request.requestId);
+    return this.ensureNetworkRequest(normalizedId, normalizedOptions);
   }
 
   public async requestMedia(ids: number[], options: RequestMediaOptions = {}): Promise<Map<number, AniListMedia>> {
     const normalizedOptions = this.normalizeOptions(options);
     const uniqueIds = this.normalizeIds(ids);
-    const request = this.registerRequest(uniqueIds, normalizedOptions);
     const results = new Map<number, AniListMedia>();
     const pending = new Map<number, Promise<AniListMedia>>();
 
@@ -342,26 +227,14 @@ export class AniListMediaScheduler {
         const cached = await this.readCachedMedia(id);
         if (cached) {
           results.set(id, cached.media);
-          this.recordEvent({
-            at: Date.now(),
-            type: 'cache-hit',
-            priority: normalizedOptions.priority,
-            requestId: request.requestId,
-            batchId: null,
-            ids: [id],
-            message: 'Satisfied batch member from cache',
-            details: {
-              stale: cached.stale,
-            },
-          });
           if (cached.stale) {
-            this.refreshInBackground([id], normalizedOptions);
+            this.refreshInBackground(id, normalizedOptions);
           }
           continue;
         }
       }
 
-      pending.set(id, this.ensureNetworkRequest(id, normalizedOptions, request.requestId));
+      pending.set(id, this.ensureNetworkRequest(id, normalizedOptions));
     }
 
     if (pending.size === 0) {
@@ -396,46 +269,6 @@ export class AniListMediaScheduler {
     }, priorityValue('normal'));
   }
 
-  public getDebugSnapshot(): AniListSchedulerDebugSnapshot {
-    const now = Date.now();
-    const pendingBuckets = PRIORITIES.map(priority => {
-      const entries = [...this.pendingByPriority.get(priority)?.values() ?? []];
-      const logicalRequestIds = [...new Set(entries.flatMap(entry => [...entry.requestIds]))].toSorted(
-        (a, b) => a - b,
-      );
-
-      return {
-        priority,
-        count: entries.length,
-        ids: entries.map(entry => entry.id),
-        logicalRequestIds,
-        entries: entries.map(entry => this.toPendingEntryDebug(entry)),
-      } satisfies AniListSchedulerBucketDebug;
-    });
-
-    return {
-      generatedAt: now,
-      nextFlushAt: this.flushScheduledAt ?? this.computeNextWakeAt(now),
-      inflightIds: [...this.inflightById.keys()].toSorted((a, b) => a - b),
-      pendingCounts: {
-        high: this.pendingByPriority.get('high')?.size ?? 0,
-        normal: this.pendingByPriority.get('normal')?.size ?? 0,
-        low: this.pendingByPriority.get('low')?.size ?? 0,
-      },
-      pendingBuckets,
-      recentRequests: [...this.recentRequests].toReversed(),
-      recentBatches: [...this.recentBatches].toReversed(),
-      recentEvents: [...this.recentEvents].toReversed(),
-      limiter: {
-        ...this.limiter.snapshot(),
-        lowPriorityHeld: this.limiter.shouldHoldLowPriority(),
-        nextDispatchAtHigh: this.limiter.nextDispatchAt('high', now),
-        nextDispatchAtNormal: this.limiter.nextDispatchAt('normal', now),
-        nextDispatchAtLow: this.limiter.nextDispatchAt('low', now),
-      },
-    };
-  }
-
   private normalizeOptions(options: RequestMediaOptions): Required<RequestMediaOptions> {
     return {
       priority: options.priority ?? 'normal',
@@ -446,35 +279,6 @@ export class AniListMediaScheduler {
 
   private normalizeIds(ids: number[]): number[] {
     return [...new Set(ids.filter(id => typeof id === 'number' && Number.isFinite(id) && id > 0))];
-  }
-
-  private registerRequest(ids: number[], options: Required<RequestMediaOptions>): AniListSchedulerRequestDebug {
-    const request: AniListSchedulerRequestDebug = {
-      requestId: this.nextRequestId++,
-      at: Date.now(),
-      priority: options.priority,
-      source: options.source,
-      ids,
-      forceRefresh: options.forceRefresh,
-    };
-
-    this.pushRecent(this.recentRequests, request, MAX_RECENT_REQUESTS);
-    this.recordEvent({
-      at: request.at,
-      type: 'request',
-      priority: request.priority,
-      requestId: request.requestId,
-      batchId: null,
-      ids,
-      message: `Logical request ${request.requestId} received`,
-      details: {
-        source: request.source,
-        forceRefresh: request.forceRefresh,
-        size: ids.length,
-      },
-    });
-
-    return request;
   }
 
   private async readCachedMedia(id: number): Promise<{ media: AniListMedia; stale: boolean } | null> {
@@ -495,73 +299,30 @@ export class AniListMediaScheduler {
     };
   }
 
-  private refreshInBackground(ids: number[], options: Required<RequestMediaOptions>): void {
-    for (const id of ids) {
-      const refreshRequest = this.registerRequest([id], {
+  private refreshInBackground(id: number, options: Required<RequestMediaOptions>): void {
+    void this
+      .ensureNetworkRequest(id, {
         ...options,
         forceRefresh: true,
         source: `${options.source}:refresh`,
+      })
+      .catch(error => {
+        this.log.warn(`background refresh failed for AniList ID ${id}`, error);
       });
-      void this
-        .ensureNetworkRequest(id, {
-          ...options,
-          forceRefresh: true,
-          source: `${options.source}:refresh`,
-        }, refreshRequest.requestId)
-        .catch(error => {
-          this.log.warn(`background refresh failed for AniList ID ${id}`, error);
-        });
-    }
   }
 
   private ensureNetworkRequest(
     id: number,
     options: Required<RequestMediaOptions>,
-    requestId: number,
   ): Promise<AniListMedia> {
     const inflight = this.inflightById.get(id);
     if (inflight) {
-      inflight.requestIds.add(requestId);
-      inflight.sources.add(options.source);
-      if (inflight.batchId !== null) {
-        const batch = this.recentBatches.find(candidate => candidate.batchId === inflight.batchId);
-        if (batch) {
-          batch.joinedInflightCount += 1;
-        }
-      }
-      this.recordEvent({
-        at: Date.now(),
-        type: 'join-inflight',
-        priority: inflight.priority,
-        requestId,
-        batchId: inflight.batchId,
-        ids: [id],
-        message: `Request ${requestId} joined inflight AniList work`,
-        details: {
-          source: options.source,
-        },
-      });
       return inflight.promise;
     }
 
     const existingPending = this.pendingById.get(id);
     if (existingPending) {
       existingPending.forceRefresh ||= options.forceRefresh;
-      existingPending.sources.add(options.source);
-      existingPending.requestIds.add(requestId);
-      this.recordEvent({
-        at: Date.now(),
-        type: 'enqueue',
-        priority: existingPending.priority,
-        requestId,
-        batchId: null,
-        ids: [id],
-        message: `Request ${requestId} merged into pending AniList entry`,
-        details: {
-          source: options.source,
-          waiterCount: existingPending.requestIds.size,
-        },
-      });
       this.promotePendingEntry(existingPending, options.priority);
       return existingPending.deferred.promise;
     }
@@ -572,10 +333,6 @@ export class AniListMediaScheduler {
       deferred,
       priority: options.priority,
       forceRefresh: options.forceRefresh,
-      sources: new Set([options.source]),
-      requestIds: new Set([requestId]),
-      enqueuedAt: Date.now(),
-      promotedFrom: null,
     };
 
     this.pendingByPriority.get(options.priority)?.set(id, entry);
@@ -584,23 +341,9 @@ export class AniListMediaScheduler {
 
     if (import.meta.env.DEV) {
       this.log.debug?.(
-        `anilist:scheduler enqueue priority=${options.priority} ids=1 pending=${this.pendingByPriority.get(options.priority)?.size ?? 0} source=${options.source}`,
+        `anilist:scheduler enqueue priority=${options.priority} pending=${this.pendingByPriority.get(options.priority)?.size ?? 0} source=${options.source}`,
       );
     }
-
-    this.recordEvent({
-      at: entry.enqueuedAt,
-      type: 'enqueue',
-      priority: entry.priority,
-      requestId,
-      batchId: null,
-      ids: [id],
-      message: `Queued AniList ID ${id}`,
-      details: {
-        source: options.source,
-        pending: this.pendingByPriority.get(options.priority)?.size ?? 0,
-      },
-    });
 
     this.ensureFlushScheduled();
     return deferred.promise;
@@ -617,26 +360,12 @@ export class AniListMediaScheduler {
     this.resetBucketIfEmpty(previousPriority);
 
     entry.priority = nextPriority;
-    entry.promotedFrom = entry.promotedFrom ?? previousPriority;
     this.pendingByPriority.get(nextPriority)?.set(entry.id, entry);
     this.bumpBucketReadyAt(nextPriority, Date.now() + COALESCE_MS[nextPriority]);
 
     if (import.meta.env.DEV) {
-      this.log.debug?.(`anilist:scheduler promote id=${entry.id} priority=${nextPriority}`);
+      this.log.debug?.(`anilist:scheduler promote id=${entry.id} priority=${nextPriority} from=${previousPriority}`);
     }
-
-    this.recordEvent({
-      at: Date.now(),
-      type: 'promote',
-      priority: nextPriority,
-      requestId: null,
-      batchId: null,
-      ids: [entry.id],
-      message: `Promoted AniList ID ${entry.id} to ${nextPriority}`,
-      details: {
-        from: previousPriority,
-      },
-    });
 
     this.ensureFlushScheduled();
   }
@@ -693,10 +422,7 @@ export class AniListMediaScheduler {
     try {
       while (true) {
         const next = this.pickNextChunk();
-        if (!next) {
-          break;
-        }
-
+        if (!next) break;
         await this.dispatchChunk(next.priority, next.entries);
       }
     } finally {
@@ -716,25 +442,7 @@ export class AniListMediaScheduler {
       );
 
       if (readyAt > now) {
-        const holdingLow = priority === 'low' && this.limiter.shouldHoldLowPriority();
-        if (holdingLow) {
-          this.recordEvent({
-            at: now,
-            type: 'hold',
-            priority: 'low',
-            requestId: null,
-            batchId: null,
-            ids: [],
-            message: 'Holding low-priority AniList work',
-            details: {
-              reason: 'remaining-threshold',
-              pending: bucket.size,
-              nextAt: readyAt,
-            },
-          });
-        }
-
-        if (import.meta.env.DEV && holdingLow) {
+        if (import.meta.env.DEV && priority === 'low' && this.limiter.shouldHoldLowPriority()) {
           this.log.debug?.(
             `anilist:scheduler hold priority=low reason=remaining-threshold pending=${bucket.size}`,
           );
@@ -755,25 +463,16 @@ export class AniListMediaScheduler {
     const bucket = this.pendingByPriority.get(priority);
     if (!bucket || entries.length === 0) return;
 
-    const batchId = this.nextBatchId++;
     const readyEntries: PendingEntry[] = [];
-    const contributorRequestIds = new Set<number>();
-    const contributorSources = new Set<string>();
-    let cachedCount = 0;
 
     for (const entry of entries) {
-      for (const requestId of entry.requestIds) contributorRequestIds.add(requestId);
-      for (const source of entry.sources) contributorSources.add(source);
-
       if (!entry.forceRefresh) {
         const cached = await this.readCachedMedia(entry.id);
         if (cached && !cached.stale) {
-          cachedCount += 1;
           this.resolvePendingEntry(entry, cached.media);
           continue;
         }
       }
-
       readyEntries.push(entry);
     }
 
@@ -783,30 +482,6 @@ export class AniListMediaScheduler {
     }
 
     const requestedIds = readyEntries.map(entry => entry.id);
-    const logicalRequestedIdCount = readyEntries.reduce((total, entry) => total + entry.requestIds.size, 0);
-    const promotedIds = readyEntries
-      .filter(entry => entry.promotedFrom !== null)
-      .map(entry => entry.id);
-
-    const batchDebug: AniListSchedulerBatchDebug = {
-      batchId,
-      at: Date.now(),
-      completedAt: null,
-      priority,
-      contributorRequestIds: [...contributorRequestIds].toSorted((a, b) => a - b),
-      contributorSources: [...contributorSources].toSorted(),
-      logicalRequestedIdCount,
-      uniqueRequestedIdCount: requestedIds.length,
-      uniqueSentIdCount: requestedIds.length,
-      dedupeSavedCount: Math.max(0, logicalRequestedIdCount - requestedIds.length),
-      cacheHitCount: cachedCount,
-      joinedInflightCount: 0,
-      requestedIds,
-      sentIds: [],
-      promotedIds,
-      mediaCounts: createEmptyMediaCounts(),
-    };
-    this.pushRecent(this.recentBatches, batchDebug, MAX_RECENT_BATCHES);
 
     for (const entry of readyEntries) {
       bucket.delete(entry.id);
@@ -814,9 +489,6 @@ export class AniListMediaScheduler {
       this.inflightById.set(entry.id, {
         promise: entry.deferred.promise,
         priority,
-        batchId,
-        requestIds: new Set(entry.requestIds),
-        sources: new Set(entry.sources),
       });
     }
     this.resetBucketIfEmpty(priority);
@@ -825,25 +497,9 @@ export class AniListMediaScheduler {
 
     if (import.meta.env.DEV) {
       this.log.debug?.(
-        `anilist:scheduler flush priority=${priority} requested=${entries.length} sent=${requestedIds.length} cached=${cachedCount}`,
+        `anilist:scheduler flush priority=${priority} sent=${requestedIds.length}`,
       );
     }
-
-    this.recordEvent({
-      at: batchDebug.at,
-      type: 'flush',
-      priority,
-      requestId: null,
-      batchId,
-      ids: requestedIds,
-      message: `Dispatching AniList batch ${batchId}`,
-      details: {
-        contributors: batchDebug.contributorRequestIds.length,
-        logicalRequested: batchDebug.logicalRequestedIdCount,
-        dedupeSaved: batchDebug.dedupeSavedCount,
-        cached: batchDebug.cacheHitCount,
-      },
-    });
 
     try {
       const medias = await this.deps.dispatchTask(
@@ -860,14 +516,9 @@ export class AniListMediaScheduler {
         if (!entry) continue;
 
         resolved.add(media.id);
-        batchDebug.sentIds.push(media.id);
-        this.countResolvedMedia(batchDebug.mediaCounts, media.format ?? null);
         entry.deferred.resolve(cached);
         this.clearInflight(entry);
       }
-
-      batchDebug.uniqueSentIdCount = batchDebug.sentIds.length;
-      batchDebug.completedAt = Date.now();
 
       for (const entry of readyEntries) {
         if (resolved.has(entry.id)) continue;
@@ -881,7 +532,6 @@ export class AniListMediaScheduler {
         this.clearInflight(entry);
       }
     } catch (error) {
-      batchDebug.completedAt = Date.now();
       for (const entry of readyEntries) {
         entry.deferred.reject(error);
         this.clearInflight(entry);
@@ -915,35 +565,6 @@ export class AniListMediaScheduler {
     this.bucketReadyAt.set(priority, typeof current === 'number' ? Math.min(current, readyAt) : readyAt);
   }
 
-  private toPendingEntryDebug(entry: PendingEntry): AniListSchedulerPendingEntryDebug {
-    return {
-      id: entry.id,
-      priority: entry.priority,
-      waiterCount: entry.requestIds.size,
-      requestIds: [...entry.requestIds].toSorted((a, b) => a - b),
-      sources: [...entry.sources].toSorted(),
-      forceRefresh: entry.forceRefresh,
-      enqueuedAt: entry.enqueuedAt,
-      promotedFrom: entry.promotedFrom,
-    };
-  }
-
-  private recordEvent(input: Omit<AniListSchedulerEventDebug, 'eventId'>): void {
-    const event: AniListSchedulerEventDebug = {
-      eventId: this.nextEventId++,
-      ...input,
-    };
-
-    this.pushRecent(this.recentEvents, event, MAX_RECENT_EVENTS);
-  }
-
-  private pushRecent<T>(target: T[], item: T, maxSize: number): void {
-    target.push(item);
-    if (target.length > maxSize) {
-      target.splice(0, target.length - maxSize);
-    }
-  }
-
   private createDeferred<TValue>(): Deferred<TValue> {
     let resolve!: (value: TValue | PromiseLike<TValue>) => void;
     let reject!: (reason?: unknown) => void;
@@ -952,37 +573,6 @@ export class AniListMediaScheduler {
       reject = rej;
     });
     return { promise, resolve, reject };
-  }
-
-  private countResolvedMedia(counts: AniListSchedulerBatchMediaCountsDebug, format: AniListMedia['format']): void {
-    switch (format) {
-      case 'MOVIE': {
-        counts.movies += 1;
-        return;
-      }
-      case 'TV':
-      case 'TV_SHORT':
-      case 'OVA':
-      case 'ONA': {
-        counts.series += 1;
-        return;
-      }
-      case 'SPECIAL': {
-        counts.specials += 1;
-        return;
-      }
-      case 'MUSIC': {
-        counts.music += 1;
-        return;
-      }
-      case null: {
-        counts.unknown += 1;
-        return;
-      }
-      default: {
-        counts.other += 1;
-      }
-    }
   }
 
   private async waitForLimiterWindow(priority: RequestPriority): Promise<void> {

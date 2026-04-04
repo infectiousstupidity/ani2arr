@@ -8,5 +8,4 @@ export {
   useSaveOptions,
 } from '@/options';
 export * from './metadata';
-export * from '@/debug/anilist-debug.query';
 export * from './mapping';

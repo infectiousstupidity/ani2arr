@@ -13,7 +13,6 @@ export function createAnilistHandlers(deps: ApiHandlerDeps): Pick<
   | 'fetchAniListMedia'
   | 'searchAniList'
   | 'getAniListMetadata'
-  | 'getAniListSchedulerDebug'
 > {
   const { anilistMediaService, anilistMetadataStore } = deps;
 
@@ -75,16 +74,12 @@ export function createAnilistHandlers(deps: ApiHandlerDeps): Pick<
       };
     },
 
-    async getAniListSchedulerDebug() {
-      return anilistMediaService.getSchedulerDebugSnapshot();
-    },
   } satisfies Pick<
     Ani2arrApi,
     | 'prefetchAniListMedia'
     | 'fetchAniListMedia'
     | 'searchAniList'
     | 'getAniListMetadata'
-    | 'getAniListSchedulerDebug'
   >;
 
   return handlers;

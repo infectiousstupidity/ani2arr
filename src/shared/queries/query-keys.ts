@@ -78,7 +78,6 @@ export const queryKeys = {
   all: rootQueryKey,
   options: () => [...rootQueryKey, 'options'] as const,
   publicOptions: () => [...rootQueryKey, 'publicOptions'] as const,
-  aniListSchedulerDebug: () => [...rootQueryKey, 'aniListSchedulerDebug'] as const,
   aniListMedia: (anilistId: number) => [...rootQueryKey, 'aniListMedia', anilistId] as const,
   seriesStatusRoot: (provider: Provider = 'sonarr') => seriesStatusRootKey(provider),
   seriesStatusBase: (anilistId: number, provider: Provider = 'sonarr') =>
