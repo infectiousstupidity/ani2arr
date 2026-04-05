@@ -2,8 +2,6 @@
 // src/rpc/handlers/anilist.handlers.ts
 
 import type { Ani2arrApi } from '@/rpc';
-import type { AniListSearchResult } from '@/rpc/types';
-import { normalizeError } from '@/shared/errors';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
 import type { ApiHandlerDeps } from './handler-deps';
 
@@ -11,7 +9,6 @@ export function createAnilistHandlers(deps: ApiHandlerDeps): Pick<
   Ani2arrApi,
   | 'prefetchAniListMedia'
   | 'fetchAniListMedia'
-  | 'searchAniList'
   | 'getAniListMetadata'
 > {
   const { anilistMediaService, anilistMetadataStore } = deps;
@@ -34,22 +31,6 @@ export function createAnilistHandlers(deps: ApiHandlerDeps): Pick<
         source: 'media-modal',
       });
       return media ?? null;
-    },
-
-    async searchAniList(input) {
-      try {
-        const request = typeof input.limit === 'number' ? { limit: input.limit } : {};
-        const results = await anilistMediaService.searchMedia(input.search, request);
-        return results.map((result): AniListSearchResult => ({
-          id: result.id,
-          title: result.title ?? {},
-          coverImage: result.coverImage ?? null,
-          format: result.format ?? null,
-          status: result.status ?? null,
-        }));
-      } catch (error) {
-        throw normalizeError(error);
-      }
     },
 
     async getAniListMetadata(input) {
@@ -78,7 +59,6 @@ export function createAnilistHandlers(deps: ApiHandlerDeps): Pick<
     Ani2arrApi,
     | 'prefetchAniListMedia'
     | 'fetchAniListMedia'
-    | 'searchAniList'
     | 'getAniListMetadata'
   >;
 

@@ -8,9 +8,7 @@ import {
 } from '@/anilist/transport/errors';
 import {
   fetchAniListMediaBatch,
-  searchAniListMedia,
 } from '@/anilist/transport/media';
-import type { AniListSearchMediaDto } from '@/anilist/transport/media-response.schema';
 import type {
   AniListResponseMeta,
 } from '@/anilist/transport/types';
@@ -161,13 +159,6 @@ export class AniListMediaScheduler {
     }
 
     return results;
-  }
-
-  public searchMedia(search: string, limit: number): Promise<AniListSearchMediaDto[]> {
-    return this.deps.dispatchTask(async () => {
-      await this.waitForLimiterWindow('normal');
-      return this.executeRequest(() => searchAniListMedia(search, limit), 'AniList request failed.');
-    }, priorityValue('normal'));
   }
 
   private normalizeOptions(options: RequestMediaOptions): Required<RequestMediaOptions> {

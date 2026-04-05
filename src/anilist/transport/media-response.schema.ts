@@ -2,49 +2,19 @@
 // src/anilist/transport/media-response.schema.ts
 
 import * as v from 'valibot';
-import {
-  AniListMediaFormatSchema,
-  AniListMediaSchema,
-  AniListMediaStatusSchema,
-  AniListTitlesSchema,
-} from '@/anilist/schemas/media.schema';
-import { AniListMetadataCoverImageSchema } from '@/anilist/schemas/metadata.schema';
-
-const AniListIdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
+import { AniListMediaSchema } from '@/anilist/schemas/media.schema';
 
 export const AniListGraphQLErrorSchema = v.object({
   message: v.string(),
   status: v.optional(v.number()),
 });
 
-export const AniListSearchMediaDtoSchema = v.object({
-  id: AniListIdSchema,
-  title: v.optional(
-    v.pipe(
-      v.nullable(AniListTitlesSchema),
-      v.transform(value => value ?? {}),
-    ),
-    {},
-  ),
-  coverImage: v.optional(v.nullable(AniListMetadataCoverImageSchema), null),
-  format: v.optional(v.nullable(AniListMediaFormatSchema), null),
-  status: v.optional(v.nullable(AniListMediaStatusSchema), null),
-});
-
 const AniListMediaPageSchema = v.object({
   media: v.optional(v.array(AniListMediaSchema), []),
 });
 
-const AniListSearchPageSchema = v.object({
-  media: v.optional(v.array(AniListSearchMediaDtoSchema), []),
-});
-
 const AniListMediaResponseDataSchema = v.object({
   Page: v.optional(v.nullable(AniListMediaPageSchema)),
-});
-
-const AniListSearchResponseDataSchema = v.object({
-  Page: v.optional(v.nullable(AniListSearchPageSchema)),
 });
 
 export const FindMediaBatchResponseDtoSchema = v.object({
@@ -52,10 +22,4 @@ export const FindMediaBatchResponseDtoSchema = v.object({
   errors: v.optional(v.array(AniListGraphQLErrorSchema)),
 });
 
-export const SearchMediaResponseDtoSchema = v.object({
-  data: v.optional(v.nullable(AniListSearchResponseDataSchema)),
-  errors: v.optional(v.array(AniListGraphQLErrorSchema)),
-});
-
 export type AniListGraphQLError = v.InferOutput<typeof AniListGraphQLErrorSchema>;
-export type AniListSearchMediaDto = v.InferOutput<typeof AniListSearchMediaDtoSchema>;

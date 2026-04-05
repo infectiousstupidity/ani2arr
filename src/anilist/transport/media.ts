@@ -5,13 +5,10 @@ import * as v from 'valibot';
 import { AniListGraphqlError } from '@/anilist/transport/errors';
 import {
   FindMediaBatchResponseDtoSchema,
-  SearchMediaResponseDtoSchema,
   type AniListGraphQLError,
-  type AniListSearchMediaDto,
 } from '@/anilist/transport/media-response.schema';
 import {
   FIND_MEDIA_BATCH_QUERY,
-  SEARCH_MEDIA_QUERY,
 } from '@/anilist/transport/queries';
 import { postAniList } from '@/anilist/transport/request';
 import type { AniListResponseMeta } from '@/anilist/transport/types';
@@ -37,25 +34,6 @@ export async function fetchAniListMediaBatch(
   const media = parsedPayload.data?.Page?.media ?? [];
   return {
     data: media,
-    meta,
-  };
-}
-
-export async function searchAniListMedia(
-  search: string,
-  limit: number,
-): Promise<{ data: AniListSearchMediaDto[]; meta: AniListResponseMeta }> {
-  const { payload, meta } = await postAniList<unknown, { search: string; perPage: number }>({
-    query: SEARCH_MEDIA_QUERY,
-    variables: { search, perPage: limit },
-  });
-  const parsedPayload = v.parse(SearchMediaResponseDtoSchema, payload);
-
-  assertNoGraphqlErrors(parsedPayload.errors);
-
-  const results = parsedPayload.data?.Page?.media ?? [];
-  return {
-    data: results,
     meta,
   };
 }

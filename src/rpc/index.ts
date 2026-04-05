@@ -7,7 +7,6 @@ import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schem
 import type { MappingExternalIdRecord } from '@/mapping/types';
 import type { ProviderMetadata, RadarrMovie, SonarrSeries } from '@/providers';
 import type {
-  AniListSearchResult,
   ExportStoredMappingsOutput,
   GetAniListMetadataOutput,
   GetMappingsOutput,
@@ -38,7 +37,6 @@ import type {
   ClearMappingBlockedCandidateInput,
   GetMappingsInput,
   GetAniListMetadataInput,
-  SearchAniListInput,
   TestProviderConnectionInput,
 } from './schemas';
 
@@ -79,7 +77,6 @@ export interface Ani2arrApi {
   resetExtensionState(): Promise<{ ok: true }>;
   getMappings(input?: GetMappingsInput): Promise<GetMappingsOutput>;
   getAniListMetadata(input: GetAniListMetadataInput): Promise<GetAniListMetadataOutput>;
-  searchAniList(input: SearchAniListInput): Promise<AniListSearchResult[]>;
 }
 
 export const [registerAni2arrApi, getAni2arrApi] =
