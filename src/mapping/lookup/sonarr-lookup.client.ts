@@ -11,10 +11,10 @@ export class SonarrLookupClient extends BaseLookupClient<SonarrLookupSeries> {
     private readonly sonarrApi: SonarrClient,
     caches: LookupCaches<SonarrLookupSeries>,
   ) {
-    super('sonarr', 'tvdb', 'SonarrLookupClient', caches);
+    super('sonarr', 'SonarrLookupClient', caches);
   }
 
-  public getExternalId(result: unknown): number | null {
+  public getProviderId(result: unknown): number | null {
     const candidate = result as { tvdbId?: unknown } | null;
     return typeof candidate?.tvdbId === 'number' && Number.isFinite(candidate.tvdbId)
       ? candidate.tvdbId

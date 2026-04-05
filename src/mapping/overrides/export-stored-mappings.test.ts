@@ -11,7 +11,7 @@ describe('exportStoredMappings', () => {
         {
           anilistId: 1,
           provider: 'sonarr',
-          externalId: { id: 100, kind: 'tvdb' as const },
+          providerId: 100,
           updatedAt: 10,
         },
       ],
@@ -26,7 +26,7 @@ describe('exportStoredMappings', () => {
         {
           anilistId: 3,
           provider: 'sonarr',
-          externalId: { id: 101, kind: 'tvdb' as const },
+          providerId: 101,
           updatedAt: 12,
         },
       ],
@@ -34,13 +34,13 @@ describe('exportStoredMappings', () => {
         {
           anilistId: 4,
           provider: 'radarr',
-          externalId: { id: 102, kind: 'tmdb' as const },
+          providerId: 102,
           updatedAt: 13,
         },
       ],
     });
 
-    expect(output.version).toBe(2);
+    expect(output.version).toBe(3);
     expect(output.summary).toEqual({
       overrideCount: 1,
       ignoreCount: 1,
@@ -50,7 +50,7 @@ describe('exportStoredMappings', () => {
     expect(output.mappings.overrides['sonarr:1']).toEqual({
       anilistId: 1,
       provider: 'sonarr',
-      externalId: { id: 100, kind: 'tvdb' },
+      providerId: 100,
       updatedAt: 10,
     });
     expect(output.mappings.ignores['radarr:2']).toEqual({
@@ -58,16 +58,16 @@ describe('exportStoredMappings', () => {
       provider: 'radarr',
       updatedAt: 11,
     });
-    expect(output.mappings.rejectedCandidates['sonarr:3:tvdb:101']).toEqual({
+    expect(output.mappings.rejectedCandidates['sonarr:3:101']).toEqual({
       anilistId: 3,
       provider: 'sonarr',
-      externalId: { id: 101, kind: 'tvdb' },
+      providerId: 101,
       updatedAt: 12,
     });
-    expect(output.mappings.blockedCandidates['radarr:4:tmdb:102']).toEqual({
+    expect(output.mappings.blockedCandidates['radarr:4:102']).toEqual({
       anilistId: 4,
       provider: 'radarr',
-      externalId: { id: 102, kind: 'tmdb' },
+      providerId: 102,
       updatedAt: 13,
     });
     expect(new Date(output.exportedAt).toString()).not.toBe('Invalid Date');

@@ -5,7 +5,7 @@ import { resolveRadarrAddPayload } from './radarr-add-payload';
 import type { RadarrLibrary } from './radarr-library';
 import type { RadarrClient } from '@/providers/clients/radarr.client';
 import type { MappingService } from '@/mapping/mapping.service';
-import type { ResolveExternalIdOptions } from '@/mapping/types';
+import type { ResolveProviderIdOptions } from '@/mapping/types';
 import { createError, ErrorCode } from '@/shared/errors';
 import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
@@ -23,7 +23,7 @@ type AddRadarrMovieInput = {
 
 type AddRadarrMovieDeps = {
   client: Pick<RadarrClient, 'addMovie' | 'getTags' | 'createTag'>;
-  mappingService: Pick<MappingService, 'resolveExternalId'>;
+  mappingService: Pick<MappingService, 'resolveProviderId'>;
   library: Pick<RadarrLibrary, 'addMovieToCache'>;
 };
 
@@ -33,14 +33,14 @@ export async function addRadarrMovie(
 ): Promise<RadarrMovie> {
   const { client, mappingService, library } = deps;
 
-  const resolveOptions: ResolveExternalIdOptions = { ignoreFailureCache: true };
-  const hints: NonNullable<NonNullable<ResolveExternalIdOptions['hints']>> = {};
+  const resolveOptions: ResolveProviderIdOptions = { ignoreFailureCache: true };
+  const hints: NonNullable<NonNullable<ResolveProviderIdOptions['hints']>> = {};
   if (input.primaryTitleHint) hints.primaryTitle = input.primaryTitleHint;
   if (input.metadata) hints.domMedia = input.metadata;
   if (Object.keys(hints).length > 0) resolveOptions.hints = hints;
 
-  const mapping = await mappingService.resolveExternalId('radarr', input.anilistId, resolveOptions);
-  if (!mapping || mapping.externalId.kind !== 'tmdb') {
+  const mapping = await mappingService.resolveProviderId('radarr', input.anilistId, resolveOptions);
+  if (!mapping) {
     throw createError(
       ErrorCode.VALIDATION_ERROR,
       `Could not resolve AniList ID ${input.anilistId} to a TMDB ID.`,
@@ -54,7 +54,7 @@ export async function addRadarrMovie(
     defaults: input.defaults,
     form: input.form,
     title: input.title,
-    tmdbId: mapping.externalId.id,
+    tmdbId: mapping.providerId,
     ...(typeof input.metadata?.startYear === 'number' ? { year: input.metadata.startYear } : {}),
   });
 

@@ -83,9 +83,9 @@ export const useMappingTableData = ({
         `AniList #${entry.anilistId}`;
       const haystackParts = [
         String(entry.anilistId),
-        entry.externalId ? String(entry.externalId.id) : '',
+        entry.providerId === null ? '' : String(entry.providerId),
         title.toLowerCase(),
-        entry.externalId ? (entry.providerMeta?.title?.toLowerCase() ?? '') : '',
+        entry.providerId === null ? '' : (entry.providerMeta?.title?.toLowerCase() ?? ''),
         meta?.titles?.english?.toLowerCase() ?? '',
         meta?.titles?.romaji?.toLowerCase() ?? '',
         meta?.titles?.native?.toLowerCase() ?? '',
@@ -115,13 +115,13 @@ export const useMappingTableData = ({
     let order = 0;
 
     for (const { entry, title } of filteredEntryRows) {
-      const key = entry.externalId
-        ? `${entry.provider}:${entry.externalId.kind}:${entry.externalId.id}`
-        : `${entry.provider}:unmapped:${entry.anilistId}`;
+      const key = entry.providerId === null
+        ? `${entry.provider}:unmapped:${entry.anilistId}`
+        : `${entry.provider}:${entry.providerId}`;
 
       const existingGroup = groups.get(key);
       if (existingGroup) {
-        if (!existingGroup.providerMeta && entry.providerMeta) {
+        if (existingGroup.providerMeta === undefined && entry.providerMeta) {
           existingGroup.providerMeta = entry.providerMeta;
         }
         if (typeof entry.updatedAt === 'number') {
@@ -137,7 +137,7 @@ export const useMappingTableData = ({
         const newGroup: Group = {
           id: key,
           provider: entry.provider,
-          externalId: entry.externalId ?? null,
+          providerId: entry.providerId ?? null,
           providerMeta: entry.providerMeta,
           entries: [],
           sources: new Set<MappingSummary['source']>(),
@@ -167,9 +167,9 @@ export const useMappingTableData = ({
     };
 
     const resolveTitle = (row: MappingTableRowData) => {
-      const fallback = row.externalId
-        ? `${row.externalId.kind.toUpperCase()} #${row.externalId.id}`
-        : 'Unmapped';
+      const fallback = row.providerId === null
+        ? 'Unmapped'
+        : `${row.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${row.providerId}`;
       return row.providerMeta?.title ?? row.entries[0]?.title ?? fallback;
     };
 

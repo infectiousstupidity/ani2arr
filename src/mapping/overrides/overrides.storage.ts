@@ -2,10 +2,10 @@
 // src/mapping/overrides/overrides.storage.ts
 
 import { storage } from '@wxt-dev/storage';
-import type { StoredMappingExternalIdEntry, MappingIgnoreEntry } from '@/mapping/overrides/types';
+import type { StoredMappingProviderIdEntry, MappingIgnoreEntry } from '@/mapping/overrides/types';
 import { STORAGE_KEYS } from '@/storage/keys';
 
-export const mappingOverridesStorage = storage.defineItem<Record<string, StoredMappingExternalIdEntry>>(STORAGE_KEYS.mappingOverrides, {
+export const mappingOverridesStorage = storage.defineItem<Record<string, StoredMappingProviderIdEntry>>(STORAGE_KEYS.mappingOverrides, {
   fallback: {},
   version: 2,
 });
@@ -15,12 +15,12 @@ export const mappingIgnoresStorage = storage.defineItem<Record<string, MappingIg
   version: 2,
 });
 
-export const mappingRejectedCandidatesStorage = storage.defineItem<Record<string, StoredMappingExternalIdEntry>>(
+export const mappingRejectedCandidatesStorage = storage.defineItem<Record<string, StoredMappingProviderIdEntry>>(
   STORAGE_KEYS.mappingRejectedCandidates,
   { fallback: {}, version: 2 },
 );
 
-export const mappingBlockedCandidatesStorage = storage.defineItem<Record<string, StoredMappingExternalIdEntry>>(
+export const mappingBlockedCandidatesStorage = storage.defineItem<Record<string, StoredMappingProviderIdEntry>>(
   STORAGE_KEYS.mappingBlockedCandidates,
   { fallback: {}, version: 2 },
 );

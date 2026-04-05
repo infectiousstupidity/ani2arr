@@ -6,10 +6,9 @@ import { CACHE_NAMESPACES } from '@/storage/keys';
 import { STORAGE_POLICIES } from '@/storage/policies';
 import type { ExtensionError } from '@/shared/errors';
 import type { Provider } from '@/providers';
-import type { MappingExternalId } from '@/mapping/types';
 
 export interface ExtensionMappingCacheEntry {
-  externalId: MappingExternalId;
+  providerId: number;
   successfulSynonym?: string;
   updatedAt: number;
 }

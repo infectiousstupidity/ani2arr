@@ -11,9 +11,6 @@ import { MappingPreviewPanel } from './mapping-preview-panel';
 import { MappingSearchPanel } from './mapping-search-panel';
 import { useMappingController } from './use-mapping-controller';
 import type {
-  MappingExternalId,
-} from '@/mapping/types';
-import type {
   Provider,
   RadarrLookupMovie,
   SonarrLookupSeries,
@@ -33,24 +30,23 @@ interface MappingEditorProps {
   anilistId: number;
   open: boolean;
   onClose: () => void;
-  initialExternalId?: MappingExternalId | null;
+  initialProviderId?: number | null;
   provider: Provider;
 }
 
 const buildCurrentMapping = (
   provider: Provider,
-  externalId: MappingExternalId | null | undefined,
+  providerId: number | null | undefined,
   statusItem: SonarrLookupSeries | RadarrLookupMovie | undefined,
   linkedAniListIds: number[] | undefined,
   inLibrary: boolean,
   baseUrl: string,
   fallbackTitle?: string,
 ): MappingSearchResult | null => {
-  if (!externalId) return null;
+  if (providerId == null) return null;
 
   if (provider === 'radarr') {
-    if (externalId.kind !== 'tmdb') return null;
-    const tmdbId = externalId.id;
+    const tmdbId = providerId;
     if (statusItem) {
       return toMappingSearchResultFromRadarr(statusItem as RadarrLookupMovie, {
         baseUrl,
@@ -62,15 +58,14 @@ const buildCurrentMapping = (
     }
     return {
       provider: 'radarr',
-      target: { id: tmdbId, kind: 'tmdb' },
+      providerId: tmdbId,
       title: fallbackTitle ? `${fallbackTitle} (TMDB ${tmdbId})` : `TMDB ${tmdbId}`,
       inLibrary,
       ...(linkedAniListIds?.length ? { linkedAniListIds } : {}),
     };
   }
 
-  if (externalId.kind !== 'tvdb') return null;
-  const tvdbId = externalId.id;
+  const tvdbId = providerId;
   if (statusItem) {
     return toMappingSearchResultFromSonarr(statusItem as SonarrLookupSeries, {
       baseUrl,
@@ -82,7 +77,7 @@ const buildCurrentMapping = (
   }
   return {
     provider: 'sonarr',
-    target: { id: tvdbId, kind: 'tvdb' },
+    providerId: tvdbId,
     title: fallbackTitle ? `${fallbackTitle} (TVDB ${tvdbId})` : `TVDB ${tvdbId}`,
     inLibrary,
     ...(linkedAniListIds && linkedAniListIds.length > 0 ? { linkedAniListIds } : {}),
@@ -93,7 +88,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
   anilistId,
   open,
   onClose,
-  initialExternalId,
+  initialProviderId,
   provider,
 }) => {
   const toast = useToast();
@@ -164,22 +159,16 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
 
   const statusSeries = seriesStatus.data?.series as SonarrLookupSeries | undefined;
   const statusMovie = movieStatus.data?.movie as RadarrLookupMovie | undefined;
-  const statusExternalId: MappingExternalId | null =
+  const statusProviderId =
     provider === 'radarr'
-      ? movieStatus.data?.externalId ??
-        (typeof movieStatus.data?.tmdbId === 'number'
-          ? { id: movieStatus.data.tmdbId, kind: 'tmdb' }
-          : null)
-      : seriesStatus.data?.externalId ??
-        (typeof seriesStatus.data?.tvdbId === 'number'
-          ? { id: seriesStatus.data.tvdbId, kind: 'tvdb' }
-          : null);
-  const externalId = statusExternalId ?? initialExternalId ?? null;
+      ? movieStatus.data?.tmdbId ?? null
+      : seriesStatus.data?.tvdbId ?? null;
+  const providerId = statusProviderId ?? initialProviderId ?? null;
   const linkedAniListIds = provider === 'radarr' ? movieStatus.data?.linkedAniListIds : seriesStatus.data?.linkedAniListIds;
   const currentMapping = useMemo<MappingSearchResult | null>(() => {
     return buildCurrentMapping(
       provider,
-      externalId,
+      providerId,
       provider === 'radarr' ? statusMovie : statusSeries,
       linkedAniListIds,
       provider === 'radarr' ? movieStatus.data?.exists ?? false : seriesStatus.data?.exists ?? false,
@@ -188,7 +177,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
     );
   }, [
     baseUrl,
-    externalId,
+    providerId,
     linkedAniListIds,
     movieStatus.data?.exists,
     provider,
@@ -217,11 +206,11 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
   const handleSave = async () => {
     try {
       await mappingController.handleSubmit();
-      const target = mappingController.currentMapping?.target ?? previewMapping?.target ?? null;
+      const target = mappingController.currentMapping ?? previewMapping ?? null;
       toast.showToast({
         title: 'Mapping saved',
         description: target
-          ? `AniList #${anilistId} now maps to ${target.kind.toUpperCase()} #${target.id}.`
+          ? `AniList #${anilistId} now maps to ${target.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${target.providerId}.`
           : `AniList #${anilistId} mapping was updated.`,
         variant: 'success',
       });

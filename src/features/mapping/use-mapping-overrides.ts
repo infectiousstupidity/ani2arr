@@ -3,7 +3,6 @@
 
 import { useCallback } from 'react';
 import type { Provider } from '@/providers';
-import type { MappingExternalId } from '@/mapping/types';
 import { useClearMappingOverride, useSetMappingOverride } from '@/shared/queries';
 
 export function useMappingOverrides(anilistId: number, provider: Provider) {
@@ -11,11 +10,11 @@ export function useMappingOverrides(anilistId: number, provider: Provider) {
   const clearOverrideMutation = useClearMappingOverride();
 
   const setOverride = useCallback(
-    async (target: MappingExternalId, options?: { force?: boolean }) => {
+    async (providerId: number, options?: { force?: boolean }) => {
       await setOverrideMutation.mutateAsync({
         anilistId,
         provider,
-        externalId: target,
+        providerId,
         ...(options?.force ? { force: true } : {}),
       });
     },

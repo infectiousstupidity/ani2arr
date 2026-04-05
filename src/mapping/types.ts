@@ -8,18 +8,11 @@ import type { RequestPriority } from '@/shared/utils/request-priority';
 export type MappingSource = 'manual' | 'upstream' | 'auto' | 'rejected' | 'blocked' | 'ignored' | 'unresolved';
 export type MappingStatus = 'unmapped' | 'in-provider' | 'not-in-provider';
 
-export type MappingExternalIdKind = 'tvdb' | 'tmdb';
-
-export interface MappingExternalId {
-  id: number;
-  kind: MappingExternalIdKind;
-}
-
 export interface MappingSummary {
   anilistId: number;
   provider: Provider;
-  externalId: MappingExternalId | null;
-  suppressedExternalId?: MappingExternalId | null;
+  providerId: number | null;
+  suppressedProviderId?: number | null;
   source: MappingSource;
   status: MappingStatus;
   updatedAt?: number;
@@ -33,10 +26,10 @@ export interface MappingSummary {
   hadResolveAttempt?: boolean;
 }
 
-export interface MappingExternalIdRecord {
+export interface MappingProviderIdRecord {
   anilistId: number;
   provider: Provider;
-  externalId: MappingExternalId;
+  providerId: number;
   updatedAt: number;
 }
 
@@ -47,11 +40,11 @@ export interface MappingIgnoreRecord {
 }
 
 export interface ResolvedMapping {
-  externalId: MappingExternalId;
+  providerId: number;
   successfulSynonym?: string;
 }
 
-export interface ResolveExternalIdOptions {
+export interface ResolveProviderIdOptions {
   network?: 'never';
   hints?: {
     primaryTitle?: string;

@@ -6,7 +6,7 @@ import * as Accordion from '@radix-ui/react-accordion';
 import { ChevronDown } from 'lucide-react';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type { Provider } from '@/providers';
-import type { MappingExternalId, MappingSource, MappingSummary } from '@/mapping/types';
+import type { MappingSource, MappingSummary } from '@/mapping/types';
 import { useAniListMetadataBatch } from '@/shared/queries';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';
@@ -23,7 +23,7 @@ export type MappingTableEntry = {
 export type MappingTableRowData = {
   id: string;
   provider: Provider;
-  externalId: MappingExternalId | null;
+  providerId: number | null;
   providerMeta?: MappingSummary['providerMeta'];
   entries: MappingTableEntry[];
   sources: MappingSource[];
@@ -144,21 +144,21 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
   const firstEntry = row.entries[0];
   const firstEntryMetadata = firstEntry ? metadataMap.get(firstEntry.entry.anilistId) ?? firstEntry.metadata ?? null : null;
   const uniqueSources = [...new Set(row.sources)];
-  const prefersAniListTitle = !row.externalId;
+  const prefersAniListTitle = row.providerId === null;
   const preferredProviderTitle = prefersAniListTitle ? null : row.providerMeta?.title;
   const targetTitle =
     preferredProviderTitle ??
     (firstEntry ? resolveAniListTitle(firstEntryMetadata, firstEntry.title) : null) ??
     row.providerMeta?.title ??
-    (row.externalId ? `${row.externalId.kind.toUpperCase()} #${row.externalId.id}` : 'Unmapped');
-  const externalIdLabel = row.externalId
-    ? `${row.externalId.kind.toUpperCase()} #${row.externalId.id}`
-    : null;
+    (row.providerId === null ? 'Unmapped' : `${row.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${row.providerId}`);
+  const externalIdLabel = row.providerId === null
+    ? null
+    : `${row.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${row.providerId}`;
   const updatedLabel = row.updatedAt ? formatRelativeTime(row.updatedAt) : null;
   const providerIcon = row.provider === 'sonarr' ? SonarrIcon : RadarrIcon;
   const providerLabel = row.provider === 'sonarr' ? 'Sonarr' : 'Radarr';
   const inLibraryCount = row.entries.filter((e) => e.entry.status === 'in-provider').length;
-  const hasMapping = Boolean(row.externalId);
+  const hasMapping = row.providerId !== null;
   let linkedLabel = 'No target linked';
   if (hasMapping) {
     linkedLabel =

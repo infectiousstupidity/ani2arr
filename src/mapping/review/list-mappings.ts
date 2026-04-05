@@ -26,25 +26,25 @@ export interface ListMappingsDeps {
     listRejectedCandidates(): Array<{
       anilistId: number;
       provider: MappingSummary['provider'];
-      externalId: MappingSummary['externalId'];
+      providerId: NonNullable<MappingSummary['providerId']>;
       updatedAt: number;
     }>;
     listBlockedCandidates(): Array<{
       anilistId: number;
       provider: MappingSummary['provider'];
-      externalId: MappingSummary['externalId'];
+      providerId: NonNullable<MappingSummary['providerId']>;
       updatedAt: number;
     }>;
     list(): Array<{
       anilistId: number;
       provider: MappingSummary['provider'];
-      externalId: MappingSummary['externalId'];
+      providerId: NonNullable<MappingSummary['providerId']>;
       updatedAt: number;
     }>;
     isIgnored(provider: MappingSummary['provider'], anilistId: number): boolean;
     getLinkedAniListIds(
       provider: MappingSummary['provider'],
-      externalId: NonNullable<MappingSummary['externalId']>,
+      providerId: NonNullable<MappingSummary['providerId']>,
     ): number[];
   };
   upstreamMappingStore: {
@@ -109,8 +109,8 @@ export async function listMappings(
   type MappingCandidate = {
     anilistId: number;
     provider: MappingSummary['provider'];
-    externalId: MappingSummary['externalId'];
-    suppressedExternalId?: MappingSummary['suppressedExternalId'];
+    providerId: MappingSummary['providerId'];
+    suppressedProviderId?: MappingSummary['suppressedProviderId'];
     source: MappingSource;
     updatedAt: number;
     hadResolveAttempt?: boolean;
@@ -146,7 +146,7 @@ export async function listMappings(
 
   registerEntries(overridesService.listIgnores(), ignore => ({
     provider: ignore.provider,
-    externalId: null,
+    providerId: null,
     source: 'ignored',
     updatedAt: ignore.updatedAt,
     hadResolveAttempt: true,
@@ -159,8 +159,8 @@ export async function listMappings(
     overridesService.listRejectedCandidates(),
     rejected => ({
       provider: rejected.provider,
-      externalId: null,
-      suppressedExternalId: rejected.externalId,
+      providerId: null,
+      suppressedProviderId: rejected.providerId,
       source: 'rejected',
       updatedAt: rejected.updatedAt,
       hadResolveAttempt: true,
@@ -172,8 +172,8 @@ export async function listMappings(
     overridesService.listBlockedCandidates(),
     blocked => ({
       provider: blocked.provider,
-      externalId: null,
-      suppressedExternalId: blocked.externalId,
+      providerId: null,
+      suppressedProviderId: blocked.providerId,
       source: 'blocked',
       updatedAt: blocked.updatedAt,
       hadResolveAttempt: true,
@@ -183,7 +183,7 @@ export async function listMappings(
 
   registerEntries(overridesService.list(), entry => ({
     provider: entry.provider,
-    externalId: entry.externalId,
+    providerId: entry.providerId,
     source: 'manual',
     updatedAt: entry.updatedAt,
     hadResolveAttempt: true,
@@ -194,7 +194,7 @@ export async function listMappings(
     for (const pair of upstreamMappingStore.listAllPairs()) {
       applyCandidate(pair.anilistId, {
         provider: 'sonarr',
-        externalId: { id: pair.tvdbId, kind: 'tvdb' },
+        providerId: pair.tvdbId,
         source: 'upstream',
       });
     }
@@ -202,7 +202,7 @@ export async function listMappings(
 
   registerEntries(resolvedLedger.list(), entry => ({
     provider: entry.provider,
-    externalId: entry.externalId,
+    providerId: entry.providerId,
     source: entry.source,
     updatedAt: entry.updatedAt,
     hadResolveAttempt: entry.source === 'auto',
@@ -210,7 +210,7 @@ export async function listMappings(
 
   registerEntries(unresolvedLedger.list(), entry => ({
     provider: entry.provider,
-    externalId: null,
+    providerId: null,
     source: entry.source,
     updatedAt: entry.updatedAt,
     hadResolveAttempt: true,
@@ -218,10 +218,10 @@ export async function listMappings(
   }));
 
   const matchesQuery = (summary: MappingSummary): boolean => {
-    if (!normalizedQuery) return true;
+    if (normalizedQuery === '') return true;
     const haystackParts: string[] = [
       String(summary.anilistId),
-      summary.externalId ? String(summary.externalId.id) : '',
+      summary.providerId === null ? '' : String(summary.providerId),
       summary.providerMeta?.title ?? '',
     ];
     const haystack = haystackParts.join(' ').toLowerCase();
@@ -230,11 +230,11 @@ export async function listMappings(
 
   const getLinkedAniListIds = (
     provider: MappingSummary['provider'],
-    externalId: NonNullable<MappingSummary['externalId']>,
+    providerId: NonNullable<MappingSummary['providerId']>,
   ): number[] => {
-    const ids = new Set<number>(overridesService.getLinkedAniListIds(provider, externalId));
-    if (provider === 'sonarr' && externalId.kind === 'tvdb') {
-      for (const id of upstreamMappingStore.getAniListIdsForTvdb(externalId.id)) {
+    const ids = new Set<number>(overridesService.getLinkedAniListIds(provider, providerId));
+    if (provider === 'sonarr') {
+      for (const id of upstreamMappingStore.getAniListIdsForTvdb(providerId)) {
         ids.add(id);
       }
     }
@@ -244,14 +244,14 @@ export async function listMappings(
   const results: MappingSummary[] = [];
   for (const candidate of candidates.values()) {
     const anilistId = candidate.anilistId;
-    const externalId = candidate.externalId ?? null;
-    const tvdbId = candidate.provider === 'sonarr' && externalId?.kind === 'tvdb' ? externalId.id : null;
-    const tmdbId = candidate.provider === 'radarr' && externalId?.kind === 'tmdb' ? externalId.id : null;
+    const providerId = candidate.providerId ?? null;
+    const tvdbId = candidate.provider === 'sonarr' ? providerId : null;
+    const tmdbId = candidate.provider === 'radarr' ? providerId : null;
     const series = typeof tvdbId === 'number' ? libraryByTvdbId.get(tvdbId) ?? null : null;
     const movie = typeof tmdbId === 'number' ? libraryByTmdbId.get(tmdbId) ?? null : null;
-    const linkedAniListIds = externalId ? getLinkedAniListIds(candidate.provider, externalId) : [];
+    const linkedAniListIds = providerId === null ? [] : getLinkedAniListIds(candidate.provider, providerId);
     let status: MappingStatus = 'unmapped';
-    if (externalId !== null) {
+    if (providerId !== null) {
       status = series || movie ? 'in-provider' : 'not-in-provider';
     }
 
@@ -264,7 +264,9 @@ export async function listMappings(
         ? (series as { status?: string }).status
         : movie?.status;
     let providerMeta: MappingSummary['providerMeta'];
-    if (candidate.source !== 'rejected' && candidate.source !== 'blocked') {
+    if (candidate.source === 'rejected' || candidate.source === 'blocked') {
+      providerMeta = undefined;
+    } else {
       if (series) {
         providerMeta = {
           ...(series.title ? { title: series.title } : {}),
@@ -295,8 +297,8 @@ export async function listMappings(
     const summary: MappingSummary = {
       anilistId,
       provider: candidate.provider,
-      externalId,
-      ...(candidate.suppressedExternalId ? { suppressedExternalId: candidate.suppressedExternalId } : {}),
+      providerId,
+      ...(candidate.suppressedProviderId === undefined ? {} : { suppressedProviderId: candidate.suppressedProviderId }),
       source: candidate.source,
       status,
       updatedAt: candidate.updatedAt,

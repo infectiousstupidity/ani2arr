@@ -6,7 +6,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Ban, MoreHorizontal, Pencil, Trash2, Undo2 } from 'lucide-react';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type { Provider } from '@/providers';
-import type { MappingExternalId, MappingSummary } from '@/mapping/types';
+import type { MappingSummary } from '@/mapping/types';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';
@@ -28,13 +28,12 @@ const sourceStyles: Record<MappingSummary['source'], { label: string; className:
   ignored: { label: 'Ignored', className: 'bg-error/12 text-error border-error/24' },
 };
 
-const getExternalLink = (provider: Provider, externalId: MappingExternalId | null) => {
-  if (!externalId) return null;
-  if (externalId.kind === 'tvdb') {
-    return `https://thetvdb.com/dereferrer/series/${externalId.id}`;
+const getExternalLink = (provider: Provider, providerId: number | null) => {
+  if (providerId == null) return null;
+  if (provider === 'sonarr') {
+    return `https://thetvdb.com/dereferrer/series/${providerId}`;
   }
-  const tmdbType = provider === 'sonarr' ? 'tv' : 'movie';
-  return `https://www.themoviedb.org/${tmdbType}/${externalId.id}`;
+  return `https://www.themoviedb.org/movie/${providerId}`;
 };
 
 const MetaSeparator: React.FC = () => <span className="text-text-tertiary/70">·</span>;
@@ -96,7 +95,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   hideSourceBadge = false,
 }) => {
   const sourceBadge = sourceStyles[entry.source];
-  const actionableExternalId = entry.externalId ?? entry.suppressedExternalId ?? null;
+  const actionableProviderId = entry.providerId ?? entry.suppressedProviderId ?? null;
 
   const sonarrStatus = useSeriesStatus(
     {
@@ -111,7 +110,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
           }
         : null,
     },
-    { enabled: entry.provider === 'sonarr' && !!entry.externalId, network: 'never' },
+      { enabled: entry.provider === 'sonarr' && entry.providerId !== null, network: 'never' },
   );
 
   const radarrStatus = useMovieStatus(
@@ -127,7 +126,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
           }
         : null,
     },
-    { enabled: entry.provider === 'radarr' && !!entry.externalId, network: 'never' },
+      { enabled: entry.provider === 'radarr' && entry.providerId !== null, network: 'never' },
   );
 
   const anilistCover = metadata?.coverImage?.large ?? metadata?.coverImage?.medium;
@@ -147,7 +146,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
     ...(providerSlug ? { librarySlug: providerSlug } : {}),
     searchTerm: title,
   });
-  const externalLink = getExternalLink(entry.provider, actionableExternalId);
+  const externalLink = getExternalLink(entry.provider, actionableProviderId);
 
   const linkItems: Array<{ label: string; href: string; tooltip: string }> = [
     { label: 'AniList ↗', href: `https://anilist.co/anime/${entry.anilistId}`, tooltip: 'Open on AniList' },
@@ -160,9 +159,9 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
       : null,
     externalLink && (entry.provider !== 'sonarr' || externalLink !== providerLink)
       ? {
-          label: actionableExternalId?.kind === 'tmdb' ? 'TMDB ↗' : 'TVDB ↗',
+          label: entry.provider === 'radarr' ? 'TMDB ↗' : 'TVDB ↗',
           href: externalLink,
-          tooltip: actionableExternalId?.kind === 'tmdb' ? 'Open on TMDB' : 'Open on TVDB',
+          tooltip: entry.provider === 'radarr' ? 'Open on TMDB' : 'Open on TVDB',
         }
       : null,
   ].filter((link): link is { label: string; href: string; tooltip: string } => Boolean(link?.href));
@@ -248,15 +247,16 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
           return [];
         }
         case 'rejected': {
+          const rejectionActions = actionableProviderId === null
+            ? []
+            : [{
+                key: 'block-candidate',
+                label: 'Never use this ID',
+                onSelect: () => onBlockCandidate(entry),
+                className: 'text-error focus:text-error',
+              }];
           return [
-            ...(actionableExternalId
-              ? [{
-                  key: 'block-candidate',
-                  label: 'Never use this ID',
-                  onSelect: () => onBlockCandidate(entry),
-                  className: 'text-error focus:text-error',
-                }]
-              : []),
+            ...rejectionActions,
             {
               key: 'ignore-title',
               label: 'Ignore title entirely',
@@ -274,22 +274,23 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
           }];
         }
         default: {
+          const candidateActions = actionableProviderId === null
+            ? []
+            : [
+                {
+                  key: 'reject-candidate',
+                  label: 'Not this match',
+                  onSelect: () => onRejectCandidate(entry),
+                },
+                {
+                  key: 'block-candidate',
+                  label: 'Never use this ID',
+                  onSelect: () => onBlockCandidate(entry),
+                  className: 'text-error focus:text-error',
+                },
+              ];
           return [
-            ...(actionableExternalId
-              ? [
-                  {
-                    key: 'reject-candidate',
-                    label: 'Not this match',
-                    onSelect: () => onRejectCandidate(entry),
-                  },
-                  {
-                    key: 'block-candidate',
-                    label: 'Never use this ID',
-                    onSelect: () => onBlockCandidate(entry),
-                    className: 'text-error focus:text-error',
-                  },
-                ]
-              : []),
+            ...candidateActions,
             {
               key: 'ignore-title',
               label: 'Ignore title entirely',

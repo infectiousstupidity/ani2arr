@@ -4,5 +4,5 @@
 export { MappingOverridesService } from './overrides.service';
 export type {
   MappingIgnoreEntry,
-  StoredMappingExternalIdEntry,
+  StoredMappingProviderIdEntry,
 } from './types';

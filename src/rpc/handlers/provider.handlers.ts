@@ -30,11 +30,11 @@ export function createProviderHandlers(deps: ApiHandlerDeps): Pick<
 
   const getLinkedAniListIds = (
     provider: MappingSummary['provider'],
-    externalId: NonNullable<MappingSummary['externalId']>,
+    providerId: NonNullable<MappingSummary['providerId']>,
   ): number[] => {
-    const ids = new Set<number>(overridesService.getLinkedAniListIds(provider, externalId));
-    if (provider === 'sonarr' && externalId.kind === 'tvdb') {
-      for (const id of upstreamMappingStore.getAniListIdsForTvdb(externalId.id)) {
+    const ids = new Set<number>(overridesService.getLinkedAniListIds(provider, providerId));
+    if (provider === 'sonarr') {
+      for (const id of upstreamMappingStore.getAniListIdsForTvdb(providerId)) {
         ids.add(id);
       }
     }
@@ -116,7 +116,7 @@ export function createProviderHandlers(deps: ApiHandlerDeps): Pick<
         }
       }
       for (const tvdbId of uniqueTvdbIds) {
-        const linked = getLinkedAniListIds('sonarr', { id: tvdbId, kind: 'tvdb' });
+        const linked = getLinkedAniListIds('sonarr', tvdbId);
         if (linked.length > 0) {
           linkedAniListIdsByTvdbId[tvdbId] = linked;
         }
@@ -150,7 +150,7 @@ export function createProviderHandlers(deps: ApiHandlerDeps): Pick<
       }
 
       for (const tmdbId of uniqueTmdbIds) {
-        const linked = getLinkedAniListIds('radarr', { id: tmdbId, kind: 'tmdb' });
+        const linked = getLinkedAniListIds('radarr', tmdbId);
         if (linked.length > 0) {
           linkedAniListIdsByTmdbId[tmdbId] = linked;
         }

@@ -23,7 +23,7 @@ export class ResolvedLedger {
     this.entries.set(this.createKey(provider, anilistId), {
       anilistId,
       provider,
-      externalId: mapping.externalId,
+      providerId: mapping.providerId,
       ...(mapping.successfulSynonym ? { successfulSynonym: mapping.successfulSynonym } : {}),
       source,
       updatedAt: Date.now(),

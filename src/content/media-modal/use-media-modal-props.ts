@@ -123,7 +123,7 @@ function deriveSonarrCurrentMappingFromStatus(
 
   return {
     provider: 'sonarr' as const,
-    target: { id: tvdbId, kind: 'tvdb' as const },
+    providerId: tvdbId,
     title,
     inLibrary: Boolean(status.exists),
     ...(librarySlug ? { librarySlug } : {}),
@@ -156,7 +156,7 @@ function deriveRadarrCurrentMappingFromStatus(
 
   return {
     provider: 'radarr' as const,
-    target: { id: tmdbId, kind: 'tmdb' as const },
+    providerId: tmdbId,
     title,
     inLibrary: Boolean(status.exists),
     ...(librarySlug ? { librarySlug } : {}),

@@ -52,7 +52,7 @@ export function toMappingSearchResultFromRadarr(
 
   return {
     provider: 'radarr',
-    target: { id: tmdbId, kind: 'tmdb' },
+    providerId: tmdbId,
     title: movie.title,
     ...(typeof movie.year === 'number' ? { year: movie.year } : {}),
     typeLabel: 'Movie',

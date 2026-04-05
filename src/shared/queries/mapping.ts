@@ -6,7 +6,7 @@ import { getAni2arrApi } from '@/rpc';
 import type { ExportStoredMappingsOutput, GetMappingsOutput } from '@/rpc/types';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import type {
-  MappingExternalIdRecord,
+  MappingProviderIdRecord,
 } from '@/mapping/types';
 import type { Provider } from '@/providers';
 import type {
@@ -91,7 +91,7 @@ export const useExportStoredMappings = () =>
   });
 
 export const useMappingOverrides = (provider: Provider | 'all' = 'all') =>
-  useQuery<MappingExternalIdRecord[], ExtensionError>({
+  useQuery<MappingProviderIdRecord[], ExtensionError>({
     queryKey: queryKeys.mappingOverrides(provider),
     queryFn: async () => {
       const api = getAni2arrApi();

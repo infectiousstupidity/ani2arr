@@ -4,7 +4,6 @@
 import { STORAGE_POLICIES, type TtlCache } from '@/storage';
 import PQueue from 'p-queue';
 import type { Provider } from '@/providers';
-import type { MappingExternalIdKind } from '@/mapping/types';
 import { normalizeError } from '@/shared/errors';
 import type { ProviderCredentials } from '@/providers';
 import type { RequestPriority } from '@/shared/utils/request-priority';
@@ -53,16 +52,13 @@ export abstract class BaseLookupClient<TResult extends ProviderLookupResult>
   private readonly queue = new PQueue({ concurrency: 5 });
 
   public readonly provider: Provider;
-  public readonly externalIdKind: MappingExternalIdKind;
 
   constructor(
     provider: Provider,
-    externalIdKind: MappingExternalIdKind,
     loggerName: string,
     private readonly caches: LookupCaches<TResult>,
   ) {
     this.provider = provider;
-    this.externalIdKind = externalIdKind;
     this.log = logger.create(loggerName);
   }
 
@@ -186,7 +182,7 @@ export abstract class BaseLookupClient<TResult extends ProviderLookupResult>
     return deferred.promise;
   }
 
-  public abstract getExternalId(result: unknown): number | null;
+  public abstract getProviderId(result: unknown): number | null;
 
   /** Subclasses supply the actual API call (e.g. Sonarr series lookup, Radarr movie lookup). */
   protected abstract fetchFromApi(

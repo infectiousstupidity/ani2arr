@@ -4,7 +4,7 @@ import { defineProxyService } from '@webext-core/proxy-service';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
 import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
 import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
-import type { MappingExternalIdRecord } from '@/mapping/types';
+import type { MappingProviderIdRecord } from '@/mapping/types';
 import type { ProviderMetadata, RadarrMovie, SonarrSeries } from '@/providers';
 import type {
   ExportStoredMappingsOutput,
@@ -70,7 +70,7 @@ export interface Ani2arrApi {
   searchRadarr(input: RadarrLookupInput): Promise<RadarrLookupOutput>;
   validateTvdbId(input: ValidateTvdbInput): Promise<{ inLibrary: boolean; inCatalog: boolean }>;
   validateTmdbId(input: ValidateTmdbInput): Promise<{ inLibrary: boolean; inCatalog: boolean }>;
-  getMappingOverrides(): Promise<MappingExternalIdRecord[]>;
+  getMappingOverrides(): Promise<MappingProviderIdRecord[]>;
   clearAllMappingOverrides(): Promise<{ ok: true }>;
   exportStoredMappings(): Promise<ExportStoredMappingsOutput>;
   clearPersistentCaches(): Promise<{ ok: true }>;

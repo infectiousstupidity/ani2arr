@@ -18,7 +18,7 @@ export interface ScoredCandidate<TResult extends ProviderLookupResult = Provider
 export type EvaluationOutcome =
   | {
     status: 'resolved';
-    externalId: number;
+    providerId: number;
     confidence: number;
     successfulSynonym?: string;
   }

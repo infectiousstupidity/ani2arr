@@ -5,7 +5,7 @@ import { getAni2arrApi } from '@/rpc';
 import type { GetMappingsInput, MappingCursor } from '@/rpc/schemas';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type { Provider } from '@/providers';
-import type { MappingExternalId, MappingSource, MappingSummary } from '@/mapping/types';
+import type { MappingSource, MappingSummary } from '@/mapping/types';
 import type { LibraryFilter } from './components/mapping-toolbar';
 import { normalizeMappingSearchQuery } from './search-query';
 
@@ -30,7 +30,7 @@ export type ExportMappingsPayload = {
     rows: Array<{
       id: string;
       provider: Provider;
-      externalId: MappingExternalId | null;
+      providerId: number | null;
       sources: MappingSource[];
       updatedAt?: number;
       providerMeta?: {
@@ -44,8 +44,8 @@ export type ExportMappingsPayload = {
         entry: {
           anilistId: number;
           provider: Provider;
-          externalId: MappingExternalId | null;
-          suppressedExternalId?: MappingExternalId | null;
+          providerId: number | null;
+          suppressedProviderId?: number | null;
           source: MappingSource;
           status: 'unmapped' | 'in-provider' | 'not-in-provider';
           updatedAt?: number;
@@ -163,7 +163,7 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
   type Group = {
     id: string;
     provider: Provider;
-    externalId: MappingExternalId | null;
+    providerId: number | null;
     providerMeta?: MappingSummary['providerMeta'];
     entries: EntryRow[];
     sources: Set<MappingSource>;
@@ -176,16 +176,16 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
 
   for (const row of entryRows) {
     const { entry } = row;
-    const key = entry.externalId
-      ? `${entry.provider}:${entry.externalId.kind}:${entry.externalId.id}`
-      : `${entry.provider}:unmapped:${entry.anilistId}`;
+    const key = entry.providerId === null
+      ? `${entry.provider}:unmapped:${entry.anilistId}`
+      : `${entry.provider}:${entry.providerId}`;
 
     const existing = groups.get(key);
-    if (!existing) {
+    if (existing === undefined) {
       groups.set(key, {
         id: key,
         provider: entry.provider,
-        externalId: entry.externalId ?? null,
+        providerId: entry.providerId ?? null,
         ...(entry.providerMeta ? { providerMeta: entry.providerMeta } : {}),
         entries: [row],
         sources: new Set<MappingSource>([entry.source]),
@@ -195,7 +195,7 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
       continue;
     }
 
-    if (!existing.providerMeta && entry.providerMeta) {
+    if (existing.providerMeta === undefined && entry.providerMeta) {
       existing.providerMeta = entry.providerMeta;
     }
     if (typeof entry.updatedAt === 'number') {
@@ -218,7 +218,7 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
   const fallbackTitle = (row: Group) =>
     row.providerMeta?.title ||
     row.entries[0]?.title ||
-    (row.externalId ? `${row.externalId.kind.toUpperCase()} #${row.externalId.id}` : 'Unmapped');
+    (row.providerId === null ? 'Unmapped' : `${row.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${row.providerId}`);
 
   return [...groups.values()]
     .toSorted((a, b) => {
@@ -241,7 +241,7 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
     .map((group) => ({
       id: group.id,
       provider: group.provider,
-      externalId: group.externalId,
+      providerId: group.providerId,
       sources: [...group.sources],
       ...(group.updatedAt === undefined ? {} : { updatedAt: group.updatedAt }),
       ...(group.providerMeta ? { providerMeta: group.providerMeta } : {}),
@@ -253,8 +253,8 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
           entry: {
             anilistId: entry.anilistId,
             provider: entry.provider,
-            externalId: entry.externalId ?? null,
-            ...(entry.suppressedExternalId ? { suppressedExternalId: entry.suppressedExternalId } : {}),
+            providerId: entry.providerId ?? null,
+            ...(entry.suppressedProviderId === undefined ? {} : { suppressedProviderId: entry.suppressedProviderId }),
             source: entry.source,
             status: entry.status,
             ...(entry.updatedAt === undefined ? {} : { updatedAt: entry.updatedAt }),

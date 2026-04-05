@@ -41,15 +41,15 @@ export async function tryHintLookup<TResult extends ProviderLookupResult>(
   const scored = scoreCandidates(provider, { canonical, display: sanitized }, results);
   const top = scored[0];
   if (top && top.score >= SCORE_THRESHOLD) {
-    const externalId = lookupClient.getExternalId(top.result);
-    if (externalId === null) {
+    const providerId = lookupClient.getProviderId(top.result);
+    if (providerId === null) {
       return null;
     }
     log.debug?.(
-      `mapping:hint-hit canonical="${canonical}" ${lookupClient.externalIdKind}Id=${externalId} score=${top.score} synonym="${sanitized}"`,
+      `mapping:hint-hit canonical="${canonical}" providerId=${providerId} score=${top.score} synonym="${sanitized}"`,
     );
     return {
-      externalId: { id: externalId, kind: lookupClient.externalIdKind },
+      providerId,
       successfulSynonym: sanitized,
     };
   }

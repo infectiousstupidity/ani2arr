@@ -2,11 +2,10 @@
 // src/mapping/overrides/types.ts
 
 import type { Provider } from '@/providers';
-import type { MappingExternalId } from '@/mapping/types';
 
-export interface StoredMappingExternalIdEntry {
+export interface StoredMappingProviderIdEntry {
   provider: Provider;
-  externalId: MappingExternalId;
+  providerId: number;
   updatedAt: number;
 }
 
