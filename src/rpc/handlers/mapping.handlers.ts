@@ -20,8 +20,6 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
   | 'clearMappingIgnore'
   | 'setMappingRejectedCandidate'
   | 'clearMappingRejectedCandidate'
-  | 'setMappingBlockedCandidate'
-  | 'clearMappingBlockedCandidate'
   | 'getMappingOverrides'
   | 'clearAllMappingOverrides'
   | 'exportStoredMappings'
@@ -176,26 +174,6 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
       return { ok: true as const };
     },
 
-    async setMappingBlockedCandidate(input) {
-      await overridesReady;
-      await overridesService.setBlockedCandidate(input.provider, input.anilistId, input.providerId);
-      await mappingService.evictResolved(input.anilistId, input.provider);
-
-      await bumpLibraryRevision(input.provider);
-      await bumpMappingsRevision();
-      return { ok: true as const };
-    },
-
-    async clearMappingBlockedCandidate(input) {
-      await overridesReady;
-      await overridesService.clearBlockedCandidate(input.provider, input.anilistId, input.providerId);
-      await mappingService.evictResolved(input.anilistId, input.provider);
-
-      await bumpLibraryRevision(input.provider);
-      await bumpMappingsRevision();
-      return { ok: true as const };
-    },
-
     async getMappingOverrides() {
       await overridesReady;
       return overridesService.list();
@@ -264,8 +242,6 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
     | 'clearMappingIgnore'
     | 'setMappingRejectedCandidate'
     | 'clearMappingRejectedCandidate'
-    | 'setMappingBlockedCandidate'
-    | 'clearMappingBlockedCandidate'
     | 'getMappingOverrides'
     | 'clearAllMappingOverrides'
     | 'exportStoredMappings'

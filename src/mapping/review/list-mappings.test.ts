@@ -22,7 +22,6 @@ describe('listMappings', () => {
         overridesService: {
           listIgnores: () => [],
           listRejectedCandidates: () => [],
-          listBlockedCandidates: () => [],
           list: () => [
             {
               anilistId: 1,
@@ -69,7 +68,6 @@ describe('listMappings', () => {
         overridesService: {
           listIgnores: () => [],
           listRejectedCandidates: () => [],
-          listBlockedCandidates: () => [],
           list: () => [],
           isIgnored: () => false,
           getLinkedAniListIds: () => [],
@@ -93,6 +91,53 @@ describe('listMappings', () => {
       provider: 'radarr',
       source: 'unresolved',
       providerMeta: { title: 'Needle Movie', type: 'movie' },
+    });
+  });
+
+  it('treats suppressed rows as rejected and ignored only', async () => {
+    const result = await listMappings(
+      { limit: 10, sources: ['rejected', 'ignored'] },
+      {
+        overridesService: {
+          listIgnores: () => [
+            {
+              anilistId: 2,
+              provider: 'radarr',
+              updatedAt: 15,
+            },
+          ],
+          listRejectedCandidates: () => [
+            {
+              anilistId: 1,
+              provider: 'sonarr',
+              providerId: 777,
+              updatedAt: 20,
+            },
+          ],
+          list: () => [],
+          isIgnored: () => false,
+          getLinkedAniListIds: () => [],
+        },
+        upstreamMappingStore: {
+          listAllPairs: () => [],
+          getAniListIdsForTvdb: () => [],
+        },
+        sonarrLibrary: {
+          getLeanSeriesList: async () => [],
+        },
+        radarrLibrary: {
+          getLeanMovieList: async () => [],
+        },
+      },
+    );
+
+    expect(result.mappings).toHaveLength(2);
+    expect(result.mappings.map(entry => entry.source).toSorted()).toEqual(['ignored', 'rejected']);
+    expect(result.mappings.find(entry => entry.source === 'rejected')).toMatchObject({
+      anilistId: 1,
+      provider: 'sonarr',
+      providerId: null,
+      suppressedProviderId: 777,
     });
   });
 });

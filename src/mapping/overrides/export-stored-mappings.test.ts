@@ -30,22 +30,13 @@ describe('exportStoredMappings', () => {
           updatedAt: 12,
         },
       ],
-      listBlockedCandidates: () => [
-        {
-          anilistId: 4,
-          provider: 'radarr',
-          providerId: 102,
-          updatedAt: 13,
-        },
-      ],
     });
 
-    expect(output.version).toBe(3);
+    expect(output.version).toBe(4);
     expect(output.summary).toEqual({
       overrideCount: 1,
       ignoreCount: 1,
       rejectedCandidateCount: 1,
-      blockedCandidateCount: 1,
     });
     expect(output.mappings.overrides['sonarr:1']).toEqual({
       anilistId: 1,
@@ -64,12 +55,7 @@ describe('exportStoredMappings', () => {
       providerId: 101,
       updatedAt: 12,
     });
-    expect(output.mappings.blockedCandidates['radarr:4:102']).toEqual({
-      anilistId: 4,
-      provider: 'radarr',
-      providerId: 102,
-      updatedAt: 13,
-    });
+    expect(Object.keys(output.mappings).toSorted()).toEqual(['ignores', 'overrides', 'rejectedCandidates']);
     expect(new Date(output.exportedAt).toString()).not.toBe('Invalid Date');
   });
 });

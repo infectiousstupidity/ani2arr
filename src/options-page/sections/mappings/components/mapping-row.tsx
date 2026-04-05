@@ -34,7 +34,6 @@ const sourceStyles: Record<MappingSummary['source'], { label: string; className:
   manual: { label: 'Manual', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },
   unresolved: { label: 'Unresolved', className: 'bg-warning/14 text-warning border-warning/24' },
   rejected: { label: 'Rejected', className: 'bg-warning/12 text-warning border-warning/20' },
-  blocked: { label: 'Blocked', className: 'bg-error/16 text-error border-error/28' },
   auto: { label: 'Auto', className: 'bg-success/14 text-success border-success/24' },
   upstream: { label: 'Upstream', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
   ignored: { label: 'Ignored', className: 'bg-error/12 text-error border-error/24' },
@@ -82,8 +81,6 @@ type MappingAccordionItemProps = {
   onDeleteOverride: (entry: MappingSummary) => void;
   onRejectCandidate: (entry: MappingSummary) => void;
   onClearRejectedCandidate: (entry: MappingSummary) => void;
-  onBlockCandidate: (entry: MappingSummary) => void;
-  onClearBlockedCandidate: (entry: MappingSummary) => void;
   onIgnoreTitle: (entry: MappingSummary) => void;
   onClearIgnoreTitle: (entry: MappingSummary) => void;
   providerUrl?: string | null;
@@ -98,8 +95,6 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
   onDeleteOverride,
   onRejectCandidate,
   onClearRejectedCandidate,
-  onBlockCandidate,
-  onClearBlockedCandidate,
   onIgnoreTitle,
   onClearIgnoreTitle,
   providerUrl,
@@ -167,8 +162,6 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
         : `${row.entries.length} linked`;
   } else if (uniqueSources.includes('rejected')) {
     linkedLabel = 'Rejected candidate';
-  } else if (uniqueSources.includes('blocked')) {
-    linkedLabel = 'Blocked candidate';
   } else if (uniqueSources.includes('ignored')) {
     linkedLabel = 'Title ignored';
   } else if (uniqueSources.includes('unresolved')) {
@@ -283,8 +276,6 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
                     onDeleteOverride={onDeleteOverride}
                     onRejectCandidate={onRejectCandidate}
                     onClearRejectedCandidate={onClearRejectedCandidate}
-                    onBlockCandidate={onBlockCandidate}
-                    onClearBlockedCandidate={onClearBlockedCandidate}
                     onIgnoreTitle={onIgnoreTitle}
                     onClearIgnoreTitle={onClearIgnoreTitle}
                     providerUrl={providerUrl ?? null}

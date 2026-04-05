@@ -27,8 +27,6 @@ type MappingTableProps = {
   onDeleteOverride: (entry: MappingTableRowData['entries'][number]['entry']) => void;
   onRejectCandidate: (entry: MappingTableRowData['entries'][number]['entry']) => void;
   onClearRejectedCandidate: (entry: MappingTableRowData['entries'][number]['entry']) => void;
-  onBlockCandidate: (entry: MappingTableRowData['entries'][number]['entry']) => void;
-  onClearBlockedCandidate: (entry: MappingTableRowData['entries'][number]['entry']) => void;
   onIgnoreTitle: (entry: MappingTableRowData['entries'][number]['entry']) => void;
   onClearIgnoreTitle: (entry: MappingTableRowData['entries'][number]['entry']) => void;
   isMutating: boolean;
@@ -49,8 +47,6 @@ export const MappingTable: React.FC<MappingTableProps> = ({
   onDeleteOverride,
   onRejectCandidate,
   onClearRejectedCandidate,
-  onBlockCandidate,
-  onClearBlockedCandidate,
   onIgnoreTitle,
   onClearIgnoreTitle,
   isMutating,
@@ -158,8 +154,6 @@ export const MappingTable: React.FC<MappingTableProps> = ({
                     onDeleteOverride={onDeleteOverride}
                     onRejectCandidate={onRejectCandidate}
                     onClearRejectedCandidate={onClearRejectedCandidate}
-                    onBlockCandidate={onBlockCandidate}
-                    onClearBlockedCandidate={onClearBlockedCandidate}
                     onIgnoreTitle={onIgnoreTitle}
                     onClearIgnoreTitle={onClearIgnoreTitle}
                     providerUrl={providerUrl ?? null}
