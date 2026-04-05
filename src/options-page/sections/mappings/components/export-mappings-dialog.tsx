@@ -35,11 +35,10 @@ type ExportMappingsDialogProps = {
 };
 
 const providerOptions: Provider[] = ['sonarr', 'radarr'];
-const exportableSourceOptions: MappingSource[] = ['manual', 'rejected', 'blocked', 'ignored', 'unresolved', 'auto', 'upstream'];
+const exportableSourceOptions: MappingSource[] = ['manual', 'rejected', 'ignored', 'unresolved', 'auto', 'upstream'];
 const sourceLabels: Record<MappingSource, string> = {
   manual: 'Manual',
   rejected: 'Rejected',
-  blocked: 'Blocked',
   ignored: 'Ignored',
   unresolved: 'Unresolved',
   auto: 'Auto',
@@ -48,7 +47,6 @@ const sourceLabels: Record<MappingSource, string> = {
 const sourceBadgeClasses: Record<MappingSource, string> = {
   manual: 'border border-accent-primary/30 bg-accent-primary/16 text-accent-primary',
   rejected: 'border border-warning/20 bg-warning/12 text-warning',
-  blocked: 'border border-error/28 bg-error/16 text-error',
   ignored: 'border border-error/24 bg-error/12 text-error',
   unresolved: 'border border-warning/24 bg-warning/14 text-warning',
   auto: 'border border-success/24 bg-success/14 text-success',

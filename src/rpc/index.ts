@@ -33,8 +33,6 @@ import type {
   ClearMappingIgnoreInput,
   SetMappingRejectedCandidateInput,
   ClearMappingRejectedCandidateInput,
-  SetMappingBlockedCandidateInput,
-  ClearMappingBlockedCandidateInput,
   GetMappingsInput,
   GetAniListMetadataInput,
   TestProviderConnectionInput,
@@ -64,8 +62,6 @@ export interface Ani2arrApi {
   clearMappingIgnore(input: ClearMappingIgnoreInput): Promise<{ ok: true }>;
   setMappingRejectedCandidate(input: SetMappingRejectedCandidateInput): Promise<{ ok: true }>;
   clearMappingRejectedCandidate(input: ClearMappingRejectedCandidateInput): Promise<{ ok: true }>;
-  setMappingBlockedCandidate(input: SetMappingBlockedCandidateInput): Promise<{ ok: true }>;
-  clearMappingBlockedCandidate(input: ClearMappingBlockedCandidateInput): Promise<{ ok: true }>;
   searchSonarr(input: SonarrLookupInput): Promise<SonarrLookupOutput>;
   searchRadarr(input: RadarrLookupInput): Promise<RadarrLookupOutput>;
   validateTvdbId(input: ValidateTvdbInput): Promise<{ inLibrary: boolean; inCatalog: boolean }>;

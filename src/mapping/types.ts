@@ -5,7 +5,7 @@ import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { Provider } from '@/providers';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 
-export type MappingSource = 'manual' | 'upstream' | 'auto' | 'rejected' | 'blocked' | 'ignored' | 'unresolved';
+export type MappingSource = 'manual' | 'upstream' | 'auto' | 'rejected' | 'ignored' | 'unresolved';
 export type MappingStatus = 'unmapped' | 'in-provider' | 'not-in-provider';
 
 export interface MappingSummary {

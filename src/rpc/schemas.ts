@@ -14,7 +14,7 @@ import { SonarrFormStateSchema } from '@/providers/settings/sonarr-settings.sche
  */
 const IdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
 const ProviderSchema = v.picklist(['sonarr', 'radarr']);
-const MappingSourceSchema = v.picklist(['manual', 'upstream', 'auto', 'rejected', 'blocked', 'ignored', 'unresolved']);
+const MappingSourceSchema = v.picklist(['manual', 'upstream', 'auto', 'rejected', 'ignored', 'unresolved']);
 
 /**
  * Standard non-empty string validation
@@ -119,18 +119,6 @@ export const ClearMappingRejectedCandidateInputSchema = v.object({
   providerId: IdSchema,
 });
 
-export const SetMappingBlockedCandidateInputSchema = v.object({
-  anilistId: IdSchema,
-  provider: ProviderSchema,
-  providerId: IdSchema,
-});
-
-export const ClearMappingBlockedCandidateInputSchema = v.object({
-  anilistId: IdSchema,
-  provider: ProviderSchema,
-  providerId: IdSchema,
-});
-
 export const SonarrLookupInputSchema = v.object({
   term: createRequiredStringSchema('Search term cannot be empty'),
   priority: v.optional(RequestPrioritySchema),
@@ -211,8 +199,6 @@ export type SetMappingIgnoreInput = v.InferOutput<typeof SetMappingIgnoreInputSc
 export type ClearMappingIgnoreInput = v.InferOutput<typeof ClearMappingIgnoreInputSchema>;
 export type SetMappingRejectedCandidateInput = v.InferOutput<typeof SetMappingRejectedCandidateInputSchema>;
 export type ClearMappingRejectedCandidateInput = v.InferOutput<typeof ClearMappingRejectedCandidateInputSchema>;
-export type SetMappingBlockedCandidateInput = v.InferOutput<typeof SetMappingBlockedCandidateInputSchema>;
-export type ClearMappingBlockedCandidateInput = v.InferOutput<typeof ClearMappingBlockedCandidateInputSchema>;
 export type GetMappingsInput = v.InferOutput<typeof GetMappingsInputSchema>;
 export type MappingCursor = v.InferOutput<typeof MappingCursorSchema>;
 export type GetAniListMetadataInput = v.InferOutput<typeof GetAniListMetadataInputSchema>;

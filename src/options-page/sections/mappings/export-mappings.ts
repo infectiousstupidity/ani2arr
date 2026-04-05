@@ -73,7 +73,7 @@ type ExportRow = ExportMappingsPayload['mappings']['rows'][number];
 
 const METADATA_BATCH_SIZE = 100;
 const EXPORT_PAGE_SIZE = 2000;
-const FALLBACK_SOURCES: MappingSource[] = ['manual', 'rejected', 'blocked', 'ignored', 'unresolved', 'auto', 'upstream'];
+const FALLBACK_SOURCES: MappingSource[] = ['manual', 'rejected', 'ignored', 'unresolved', 'auto', 'upstream'];
 
 const resolveTitle = (entry: MappingSummary, metadata?: AniListMetadata | null): string =>
   metadata?.titles?.english ||
@@ -209,10 +209,9 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
     manual: 0,
     unresolved: 1,
     rejected: 2,
-    blocked: 3,
-    ignored: 4,
-    upstream: 5,
-    auto: 6,
+    ignored: 3,
+    upstream: 4,
+    auto: 5,
   };
 
   const fallbackTitle = (row: Group) =>

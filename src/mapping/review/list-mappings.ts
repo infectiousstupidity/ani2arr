@@ -29,12 +29,6 @@ export interface ListMappingsDeps {
       providerId: NonNullable<MappingSummary['providerId']>;
       updatedAt: number;
     }>;
-    listBlockedCandidates(): Array<{
-      anilistId: number;
-      provider: MappingSummary['provider'];
-      providerId: NonNullable<MappingSummary['providerId']>;
-      updatedAt: number;
-    }>;
     list(): Array<{
       anilistId: number;
       provider: MappingSummary['provider'];
@@ -72,7 +66,7 @@ export async function listMappings(
   const sources =
     input?.sources && input.sources.length > 0
       ? new Set<MappingSource>(input.sources)
-      : new Set<MappingSource>(['manual', 'rejected', 'blocked', 'ignored', 'auto', 'unresolved']);
+      : new Set<MappingSource>(['manual', 'rejected', 'ignored', 'auto', 'unresolved']);
   const providers =
     input?.providers && input.providers.length > 0
       ? new Set<MappingSummary['provider']>(input.providers)
@@ -98,12 +92,11 @@ export async function listMappings(
 
   const priorityMap: Record<MappingSource, number> = {
     manual: 6,
-    blocked: 5,
-    rejected: 4,
-    ignored: 3,
-    unresolved: 2,
-    upstream: 1,
-    auto: 0,
+    rejected: 5,
+    ignored: 4,
+    unresolved: 3,
+    upstream: 2,
+    auto: 1,
   };
 
   type MappingCandidate = {
@@ -163,19 +156,6 @@ export async function listMappings(
       suppressedProviderId: rejected.providerId,
       source: 'rejected',
       updatedAt: rejected.updatedAt,
-      hadResolveAttempt: true,
-    }),
-    includeSuppressedEntry,
-  );
-
-  registerEntries(
-    overridesService.listBlockedCandidates(),
-    blocked => ({
-      provider: blocked.provider,
-      providerId: null,
-      suppressedProviderId: blocked.providerId,
-      source: 'blocked',
-      updatedAt: blocked.updatedAt,
       hadResolveAttempt: true,
     }),
     includeSuppressedEntry,
@@ -264,7 +244,7 @@ export async function listMappings(
         ? (series as { status?: string }).status
         : movie?.status;
     let providerMeta: MappingSummary['providerMeta'];
-    if (candidate.source === 'rejected' || candidate.source === 'blocked') {
+    if (candidate.source === 'rejected') {
       providerMeta = undefined;
     } else {
       if (series) {
@@ -291,7 +271,6 @@ export async function listMappings(
       candidate.source === 'auto' ||
       candidate.source === 'manual' ||
       candidate.source === 'rejected' ||
-      candidate.source === 'blocked' ||
       candidate.source === 'ignored';
 
     const summary: MappingSummary = {

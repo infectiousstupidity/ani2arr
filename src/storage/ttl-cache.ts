@@ -97,12 +97,7 @@ export async function clearAllTtlCaches(): Promise<void> {
     }
   }
 
-  await deleteDB(TTL_CACHE_DB_NAME, {
-    blocked() {
-      // Force-close any lingering connections so the delete can proceed.
-      // This can happen if a read/write was initiated concurrently.
-    },
-  });
+  await deleteDB(TTL_CACHE_DB_NAME);
 }
 
 export function createTtlCache<T>(namespace: string): TtlCache<T> {

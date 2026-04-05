@@ -3,7 +3,7 @@
 
 import React from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Ban, MoreHorizontal, Pencil, Trash2, Undo2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, Undo2 } from 'lucide-react';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type { Provider } from '@/providers';
 import type { MappingSummary } from '@/mapping/types';
@@ -22,7 +22,6 @@ const sourceStyles: Record<MappingSummary['source'], { label: string; className:
   manual: { label: 'Manual', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },
   unresolved: { label: 'Unresolved', className: 'bg-warning/14 text-warning border-warning/24' },
   rejected: { label: 'Rejected', className: 'bg-warning/12 text-warning border-warning/20' },
-  blocked: { label: 'Blocked', className: 'bg-error/16 text-error border-error/28' },
   auto: { label: 'Auto', className: 'bg-success/14 text-success border-success/24' },
   upstream: { label: 'Upstream', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
   ignored: { label: 'Ignored', className: 'bg-error/12 text-error border-error/24' },
@@ -49,9 +48,6 @@ const getEditTooltip = (source: MappingSummary['source']): string => {
     case 'rejected': {
       return 'Choose a manual mapping, or allow this rejected match again from the row actions.';
     }
-    case 'blocked': {
-      return 'Choose a manual mapping, or remove the permanent block for this exact ID from the row actions.';
-    }
     case 'unresolved': {
       return 'Set a mapping for this AniList entry. Saving creates a manual mapping.';
     }
@@ -70,8 +66,6 @@ export type MappingEntryRowProps = {
   onDeleteOverride: (entry: MappingSummary) => void;
   onRejectCandidate: (entry: MappingSummary) => void;
   onClearRejectedCandidate: (entry: MappingSummary) => void;
-  onBlockCandidate: (entry: MappingSummary) => void;
-  onClearBlockedCandidate: (entry: MappingSummary) => void;
   onIgnoreTitle: (entry: MappingSummary) => void;
   onClearIgnoreTitle: (entry: MappingSummary) => void;
   providerUrl?: string | null;
@@ -87,8 +81,6 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   onDeleteOverride,
   onRejectCandidate,
   onClearRejectedCandidate,
-  onBlockCandidate,
-  onClearBlockedCandidate,
   onIgnoreTitle,
   onClearIgnoreTitle,
   providerUrl,
@@ -207,16 +199,6 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
             className: 'text-text-secondary hover:bg-bg-primary/45 hover:text-accent-primary',
           }];
         }
-        case 'blocked': {
-          return [{
-            key: 'restore-blocked-candidate',
-            icon: Ban,
-            tooltip: 'Remove the permanent block for this exact ID and allow ani2arr to use it again.',
-            ariaLabel: 'Allow this ID again',
-            onClick: () => onClearBlockedCandidate(entry),
-            className: 'text-text-secondary hover:bg-bg-primary/45 hover:text-accent-primary',
-          }];
-        }
         case 'ignored': {
           return [{
             key: 'restore-ignore',
@@ -247,16 +229,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
           return [];
         }
         case 'rejected': {
-          const rejectionActions = actionableProviderId === null
-            ? []
-            : [{
-                key: 'block-candidate',
-                label: 'Never use this ID',
-                onSelect: () => onBlockCandidate(entry),
-                className: 'text-error focus:text-error',
-              }];
           return [
-            ...rejectionActions,
             {
               key: 'ignore-title',
               label: 'Ignore title entirely',
@@ -264,14 +237,6 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
               className: 'text-warning focus:text-warning',
             },
           ];
-        }
-        case 'blocked': {
-          return [{
-            key: 'ignore-title',
-            label: 'Ignore title entirely',
-            onSelect: () => onIgnoreTitle(entry),
-            className: 'text-warning focus:text-warning',
-          }];
         }
         default: {
           const candidateActions = actionableProviderId === null
@@ -281,12 +246,6 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
                   key: 'reject-candidate',
                   label: 'Not this match',
                   onSelect: () => onRejectCandidate(entry),
-                },
-                {
-                  key: 'block-candidate',
-                  label: 'Never use this ID',
-                  onSelect: () => onBlockCandidate(entry),
-                  className: 'text-error focus:text-error',
                 },
               ];
           return [

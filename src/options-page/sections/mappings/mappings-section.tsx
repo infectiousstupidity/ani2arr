@@ -5,11 +5,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { MappingEditor } from '@/features/mapping/mapping-editor';
 import {
   useAniListMedia,
-  useClearMappingBlockedCandidate,
   useClearMappingIgnore,
   useClearMappingRejectedCandidate,
   useClearMappingOverride,
-  useSetMappingBlockedCandidate,
   useSetMappingIgnore,
   useSetMappingRejectedCandidate,
 } from '@/shared/queries';
@@ -46,7 +44,6 @@ const sourceLabels: Record<Exclude<SourceFilter, 'all'>, string> = {
   auto: 'Auto',
   upstream: 'Upstream',
   rejected: 'Rejected',
-  blocked: 'Blocked',
   unresolved: 'Unresolved',
   ignored: 'Ignored',
 };
@@ -60,8 +57,6 @@ const MappingsSection: React.FC<{
   const clearOverride = useClearMappingOverride();
   const setRejectedCandidate = useSetMappingRejectedCandidate();
   const clearRejectedCandidate = useClearMappingRejectedCandidate();
-  const setBlockedCandidate = useSetMappingBlockedCandidate();
-  const clearBlockedCandidate = useClearMappingBlockedCandidate();
   const setIgnore = useSetMappingIgnore();
   const clearIgnore = useClearMappingIgnore();
   const targetMedia = useAniListMedia(targetAnilistId ?? undefined, {
@@ -83,8 +78,6 @@ const MappingsSection: React.FC<{
   const isMutating =
     setRejectedCandidate.isPending ||
     clearRejectedCandidate.isPending ||
-    setBlockedCandidate.isPending ||
-    clearBlockedCandidate.isPending ||
     setIgnore.isPending ||
     clearIgnore.isPending ||
     clearOverride.isPending;
@@ -323,52 +316,6 @@ const MappingsSection: React.FC<{
     [clearRejectedCandidate, runEntryMutation],
   );
 
-  const handleBlockCandidate = useCallback(
-    (entry: MappingSummary) => {
-      const providerId = entry.providerId ?? entry.suppressedProviderId;
-      if (providerId == null) return Promise.resolve();
-      const label = `${entry.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${providerId}`;
-      return runEntryMutation({
-        confirm: {
-          title: 'Block this exact ID?',
-          description: `${label} will never be used again for AniList #${entry.anilistId} until you remove the block.`,
-          confirmText: 'Block ID',
-          cancelText: 'Cancel',
-        },
-        mutate: () => setBlockedCandidate.mutateAsync({ anilistId: entry.anilistId, provider: entry.provider, providerId }),
-        success: {
-          title: 'ID blocked',
-          description: `${label} is now permanently blocked for AniList #${entry.anilistId}.`,
-        },
-        error: {
-          title: 'Block failed',
-          description: 'Unable to block this exact ID.',
-        },
-      });
-    },
-    [runEntryMutation, setBlockedCandidate],
-  );
-
-  const handleClearBlockedCandidate = useCallback(
-    (entry: MappingSummary) => {
-      const providerId = entry.providerId ?? entry.suppressedProviderId;
-      if (providerId == null) return Promise.resolve();
-      const label = `${entry.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${providerId}`;
-      return runEntryMutation({
-        mutate: () => clearBlockedCandidate.mutateAsync({ anilistId: entry.anilistId, provider: entry.provider, providerId }),
-        success: {
-          title: 'ID unblocked',
-          description: `${label} can be used again for AniList #${entry.anilistId}.`,
-        },
-        error: {
-          title: 'Unblock failed',
-          description: 'Unable to remove this ID block.',
-        },
-      });
-    },
-    [clearBlockedCandidate, runEntryMutation],
-  );
-
   const handleEdit = (entry: MappingSummary) => {
     setEditorState({ anilistId: entry.anilistId, providerId: entry.providerId ?? null, provider: entry.provider });
   };
@@ -454,8 +401,6 @@ const MappingsSection: React.FC<{
               onDeleteOverride={handleDeleteOverride}
               onRejectCandidate={handleRejectCandidate}
               onClearRejectedCandidate={handleClearRejectedCandidate}
-              onBlockCandidate={handleBlockCandidate}
-              onClearBlockedCandidate={handleClearBlockedCandidate}
               onIgnoreTitle={handleSetIgnore}
               onClearIgnoreTitle={handleClearIgnore}
               isMutating={isMutating}

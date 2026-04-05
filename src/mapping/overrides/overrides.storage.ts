@@ -19,8 +19,3 @@ export const mappingRejectedCandidatesStorage = storage.defineItem<Record<string
   STORAGE_KEYS.mappingRejectedCandidates,
   { fallback: {}, version: 2 },
 );
-
-export const mappingBlockedCandidatesStorage = storage.defineItem<Record<string, StoredMappingProviderIdEntry>>(
-  STORAGE_KEYS.mappingBlockedCandidates,
-  { fallback: {}, version: 2 },
-);

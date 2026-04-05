@@ -9,7 +9,6 @@ export const STORAGE_KEYS = {
   mappingOverrides: 'local:mappingOverrides',
   mappingIgnores: 'local:ignoredMappings',
   mappingRejectedCandidates: 'local:rejectedMappingCandidates',
-  mappingBlockedCandidates: 'local:blockedMappingCandidates',
 } as const;
 
 // Cross-context invalidation counters.

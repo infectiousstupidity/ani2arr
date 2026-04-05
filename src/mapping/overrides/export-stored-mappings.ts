@@ -7,7 +7,6 @@ type ExportOverridesDeps = {
   list(): MappingProviderIdRecord[];
   listIgnores(): MappingIgnoreRecord[];
   listRejectedCandidates(): MappingProviderIdRecord[];
-  listBlockedCandidates(): MappingProviderIdRecord[];
 };
 
 export async function exportStoredMappings(overridesService: ExportOverridesDeps) {
@@ -46,32 +45,18 @@ export async function exportStoredMappings(overridesService: ExportOverridesDeps
     ]),
   );
 
-  const blockedCandidates = Object.fromEntries(
-    overridesService.listBlockedCandidates().map(entry => [
-      `${entry.provider}:${entry.anilistId}:${entry.providerId}`,
-      {
-        anilistId: entry.anilistId,
-        provider: entry.provider,
-        providerId: entry.providerId,
-        updatedAt: entry.updatedAt,
-      },
-    ]),
-  );
-
   return {
-    version: 3 as const,
+    version: 4 as const,
     exportedAt: new Date().toISOString(),
     summary: {
       overrideCount: Object.keys(overrides).length,
       ignoreCount: Object.keys(ignores).length,
       rejectedCandidateCount: Object.keys(rejectedCandidates).length,
-      blockedCandidateCount: Object.keys(blockedCandidates).length,
     },
     mappings: {
       overrides,
       ignores,
       rejectedCandidates,
-      blockedCandidates,
     },
   };
 }

@@ -18,7 +18,6 @@ import {
   mappingOverridesStorage,
   mappingIgnoresStorage,
   mappingRejectedCandidatesStorage,
-  mappingBlockedCandidatesStorage,
 } from '@/mapping/overrides/overrides.storage';
 import { PersistedMap } from '@/mapping/overrides/persisted-map';
 import type { MappingIgnoreEntry, StoredMappingProviderIdEntry } from './types';
@@ -35,7 +34,6 @@ export class MappingOverridesService {
   private readonly overrides: PersistedMap<string, StoredMappingProviderIdEntry, ParsedRecordKey>;
   private readonly ignores: PersistedMap<string, MappingIgnoreEntry, ParsedRecordKey>;
   private readonly rejected: PersistedMap<string, StoredMappingProviderIdEntry, ParsedCandidateKey>;
-  private readonly blocked: PersistedMap<string, StoredMappingProviderIdEntry, ParsedCandidateKey>;
   private readonly reverse = new Map<string, Set<number>>();
   private initialized = false;
   private writeQueue: Promise<void> = Promise.resolve();
@@ -59,12 +57,6 @@ export class MappingOverridesService {
       normalize: normalizeCandidateSuppressionEntry,
       storageChangeKeys: [STORAGE_KEYS.mappingRejectedCandidates],
     });
-    this.blocked = new PersistedMap({
-      storage: mappingBlockedCandidatesStorage,
-      parseKey: parseCandidateRecordKey,
-      normalize: normalizeCandidateSuppressionEntry,
-      storageChangeKeys: [STORAGE_KEYS.mappingBlockedCandidates],
-    });
   }
 
   public async init(): Promise<void> {
@@ -73,7 +65,6 @@ export class MappingOverridesService {
       this.overrides.load(),
       this.ignores.load(),
       this.rejected.load(),
-      this.blocked.load(),
     ]);
     this.rebuildReverse();
     this.attachWatchers();
@@ -97,9 +88,8 @@ export class MappingOverridesService {
     provider: Provider,
     anilistId: number,
     providerId: number,
-  ): 'blocked' | 'rejected' | null {
+  ): 'rejected' | null {
     const key = createCandidateRecordKey(provider, anilistId, providerId);
-    if (this.blocked.has(key)) return 'blocked';
     if (this.rejected.has(key)) return 'rejected';
     return null;
   }
@@ -122,10 +112,8 @@ export class MappingOverridesService {
       // Clear conflicting ignore
       this.ignores.delete(key);
 
-      // Clear conflicting candidate suppressions
       const candidateKey = createCandidateRecordKey(provider, anilistId, providerId);
       this.rejected.delete(candidateKey);
-      this.blocked.delete(candidateKey);
 
       this.overrides.set(key, entry);
       this.addReverse(provider, providerId, anilistId);
@@ -134,7 +122,6 @@ export class MappingOverridesService {
         this.overrides.persist(),
         this.ignores.persist(),
         this.rejected.persist(),
-        this.blocked.persist(),
       ]);
     });
   }
@@ -177,19 +164,11 @@ export class MappingOverridesService {
   }
 
   public async setRejectedCandidate(provider: Provider, anilistId: number, providerId: number): Promise<void> {
-    await this.setCandidateSuppression('rejected', provider, anilistId, providerId);
+    await this.setCandidateSuppression(provider, anilistId, providerId);
   }
 
   public async clearRejectedCandidate(provider: Provider, anilistId: number, providerId: number): Promise<void> {
-    await this.clearCandidateSuppression('rejected', provider, anilistId, providerId);
-  }
-
-  public async setBlockedCandidate(provider: Provider, anilistId: number, providerId: number): Promise<void> {
-    await this.setCandidateSuppression('blocked', provider, anilistId, providerId);
-  }
-
-  public async clearBlockedCandidate(provider: Provider, anilistId: number, providerId: number): Promise<void> {
-    await this.clearCandidateSuppression('blocked', provider, anilistId, providerId);
+    await this.clearCandidateSuppression(provider, anilistId, providerId);
   }
 
   public list(provider?: Provider): MappingProviderIdRecord[] {
@@ -223,21 +202,15 @@ export class MappingOverridesService {
     return this.listCandidateSuppressions(this.rejected, provider);
   }
 
-  public listBlockedCandidates(provider?: Provider): MappingProviderIdRecord[] {
-    return this.listCandidateSuppressions(this.blocked, provider);
-  }
-
   public exportState(): {
     overrides: Record<string, StoredMappingProviderIdEntry>;
     ignores: Record<string, MappingIgnoreEntry>;
     rejectedCandidates: Record<string, StoredMappingProviderIdEntry>;
-    blockedCandidates: Record<string, StoredMappingProviderIdEntry>;
   } {
     return {
       overrides: this.overrides.toRecord(),
       ignores: this.ignores.toRecord(),
       rejectedCandidates: this.rejected.toRecord(),
-      blockedCandidates: this.blocked.toRecord(),
     };
   }
 
@@ -245,14 +218,12 @@ export class MappingOverridesService {
     overrides: Record<string, StoredMappingProviderIdEntry>;
     ignores: Record<string, MappingIgnoreEntry>;
     rejectedCandidates?: Record<string, StoredMappingProviderIdEntry>;
-    blockedCandidates?: Record<string, StoredMappingProviderIdEntry>;
   }): Promise<void> {
     await this.enqueueWrite(async () => {
       await Promise.all([
         this.overrides.importRecords(state.overrides ?? {}),
         this.ignores.importRecords(state.ignores ?? {}),
         this.rejected.importRecords(state.rejectedCandidates ?? {}),
-        this.blocked.importRecords(state.blockedCandidates ?? {}),
       ]);
       this.rebuildReverse();
     });
@@ -265,7 +236,6 @@ export class MappingOverridesService {
           this.overrides.resetStorage(),
           this.ignores.resetStorage(),
           this.rejected.resetStorage(),
-          this.blocked.resetStorage(),
         ]);
         this.reverse.clear();
         return;
@@ -276,7 +246,6 @@ export class MappingOverridesService {
         this.overrides.deleteByPrefix(prefix),
         this.ignores.deleteByPrefix(prefix),
         this.rejected.deleteByPrefix(prefix),
-        this.blocked.deleteByPrefix(prefix),
       ]);
       this.rebuildReverse();
     });
@@ -304,40 +273,22 @@ export class MappingOverridesService {
     return (parsed) => parsed.provider === provider;
   }
 
-  private async setCandidateSuppression(
-    type: 'rejected' | 'blocked',
-    provider: Provider,
-    anilistId: number,
-    providerId: number,
-  ): Promise<void> {
+  private async setCandidateSuppression(provider: Provider, anilistId: number, providerId: number): Promise<void> {
     await this.enqueueWrite(async () => {
       const key = createCandidateRecordKey(provider, anilistId, providerId);
       const entry: StoredMappingProviderIdEntry = { provider, providerId, updatedAt: Date.now() };
 
-      // Clear from both, then set on target
       this.rejected.delete(key);
-      this.blocked.delete(key);
+      this.rejected.set(key, entry);
 
-      const target = type === 'rejected' ? this.rejected : this.blocked;
-      target.set(key, entry);
-
-      await Promise.all([
-        this.rejected.persist(),
-        this.blocked.persist(),
-      ]);
+      await this.rejected.persist();
     });
   }
 
-  private async clearCandidateSuppression(
-    type: 'rejected' | 'blocked',
-    provider: Provider,
-    anilistId: number,
-    providerId: number,
-  ): Promise<void> {
+  private async clearCandidateSuppression(provider: Provider, anilistId: number, providerId: number): Promise<void> {
     await this.enqueueWrite(async () => {
-      const target = type === 'rejected' ? this.rejected : this.blocked;
-      target.delete(createCandidateRecordKey(provider, anilistId, providerId));
-      await target.persist();
+      this.rejected.delete(createCandidateRecordKey(provider, anilistId, providerId));
+      await this.rejected.persist();
     });
   }
 
@@ -347,7 +298,6 @@ export class MappingOverridesService {
         this.overrides.load(),
         this.ignores.load(),
         this.rejected.load(),
-        this.blocked.load(),
       ]);
       this.rebuildReverse();
     };
@@ -355,7 +305,6 @@ export class MappingOverridesService {
     this.overrides.attachWatcher(() => void rebuildAll());
     this.ignores.attachWatcher(() => void rebuildAll());
     this.rejected.attachWatcher(() => void rebuildAll());
-    this.blocked.attachWatcher(() => void rebuildAll());
   }
 
   private rebuildReverse(): void {

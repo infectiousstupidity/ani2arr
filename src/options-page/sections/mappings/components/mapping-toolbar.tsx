@@ -60,7 +60,6 @@ export const sourceOptions: { value: MappingSource; label: string }[] = [
   { value: 'manual', label: 'Manual' },
   { value: 'unresolved', label: 'Unresolved' },
   { value: 'rejected', label: 'Rejected' },
-  { value: 'blocked', label: 'Blocked' },
   { value: 'ignored', label: 'Ignored' },
   { value: 'auto', label: 'Auto' },
   { value: 'upstream', label: 'Upstream' },
@@ -76,7 +75,7 @@ const scopeDefinitions: Array<{
   {
     value: 'needs-attention',
     label: 'Needs attention',
-    sources: new Set<MappingSource>(['manual', 'rejected', 'blocked', 'ignored', 'unresolved']),
+    sources: new Set<MappingSource>(['manual', 'rejected', 'ignored', 'unresolved']),
   },
   {
     value: 'manual-overrides',
@@ -86,7 +85,7 @@ const scopeDefinitions: Array<{
   {
     value: 'suppressed',
     label: 'Suppressed',
-    sources: new Set<MappingSource>(['rejected', 'blocked', 'ignored']),
+    sources: new Set<MappingSource>(['rejected', 'ignored']),
   },
   {
     value: 'all',
@@ -113,7 +112,7 @@ const sortOptions: { value: MappingSort; label: string; description?: string }[]
   { value: 'title-desc', label: 'Title (Z-A)' },
   { value: 'linked-desc', label: 'Linked (most first)' },
   { value: 'linked-asc', label: 'Linked (fewest first)' },
-  { value: 'source', label: 'Source (manual first)', description: 'Manual -> unresolved -> rejected -> blocked -> ignored -> upstream -> auto' },
+  { value: 'source', label: 'Source (manual first)', description: 'Manual -> unresolved -> rejected -> ignored -> upstream -> auto' },
 ];
 
 const segmentedBaseClassName =

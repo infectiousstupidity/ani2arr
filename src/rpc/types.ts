@@ -42,19 +42,17 @@ export interface CheckMovieStatusResponse {
 }
 
 export interface ExportStoredMappingsOutput {
-  version: 3;
+  version: 4;
   exportedAt: string;
   summary: {
     overrideCount: number;
     ignoreCount: number;
     rejectedCandidateCount: number;
-    blockedCandidateCount: number;
   };
   mappings: {
     overrides: Record<string, MappingProviderIdRecord>;
     ignores: Record<string, MappingIgnoreRecord>;
     rejectedCandidates: Record<string, MappingProviderIdRecord>;
-    blockedCandidates: Record<string, MappingProviderIdRecord>;
   };
 }
 

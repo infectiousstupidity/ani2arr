@@ -10,11 +10,9 @@ import type {
 } from '@/mapping/types';
 import type { Provider } from '@/providers';
 import type {
-  ClearMappingBlockedCandidateInput,
   ClearMappingIgnoreInput,
   ClearMappingRejectedCandidateInput,
   ClearMappingOverrideInput,
-  SetMappingBlockedCandidateInput,
   SetMappingIgnoreInput,
   SetMappingRejectedCandidateInput,
   SetMappingOverrideInput,
@@ -165,42 +163,6 @@ export const useClearMappingRejectedCandidate = () => {
     mutationFn: async (input: ClearMappingRejectedCandidateInput) => {
       try {
         return await getAni2arrApi().clearMappingRejectedCandidate(input);
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId, variables.provider) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverridesRoot() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-    },
-  });
-};
-
-export const useSetMappingBlockedCandidate = () => {
-  const queryClient = useQueryClient();
-  return useMutation<{ ok: true }, ExtensionError, SetMappingBlockedCandidateInput>({
-    mutationFn: async (input: SetMappingBlockedCandidateInput) => {
-      try {
-        return await getAni2arrApi().setMappingBlockedCandidate(input);
-      } catch (error) {
-        throw normalizeError(error);
-      }
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId, variables.provider) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverridesRoot() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-    },
-  });
-};
-
-export const useClearMappingBlockedCandidate = () => {
-  const queryClient = useQueryClient();
-  return useMutation<{ ok: true }, ExtensionError, ClearMappingBlockedCandidateInput>({
-    mutationFn: async (input: ClearMappingBlockedCandidateInput) => {
-      try {
-        return await getAni2arrApi().clearMappingBlockedCandidate(input);
       } catch (error) {
         throw normalizeError(error);
       }
