@@ -43,17 +43,3 @@ export const FIND_MEDIA_BATCH_QUERY = `
     }
   }
 `;
-
-export const SEARCH_MEDIA_QUERY = `
-  query SearchAnime($search: String!, $perPage: Int!) {
-    Page(perPage: $perPage) {
-      media(search: $search, type: ANIME) {
-        id
-        title { english romaji native }
-        coverImage { large medium }
-        format
-        status
-      }
-    }
-  }
-`;

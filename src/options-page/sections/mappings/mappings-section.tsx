@@ -30,7 +30,6 @@ import MappingToolbar, {
   type SourceFilterSet,
 } from './components/mapping-toolbar';
 import { MappingTable } from './components/mapping-table';
-import AddMissingEntryDialog from './components/add-missing-entry-dialog';
 import ExportMappingsDialog from './components/export-mappings-dialog';
 import { buildMappingsExportPayload, type ExportMappingsFilters } from './export-mappings';
 import { useMappingTableData } from './hooks/use-mapping-table-data';
@@ -81,7 +80,6 @@ const MappingsSection: React.FC<{
     provider: Provider;
     externalId?: MappingSummary['externalId'] | null;
   } | null>(null);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const isMutating =
     setRejectedCandidate.isPending ||
     clearRejectedCandidate.isPending ||
@@ -436,7 +434,6 @@ const MappingsSection: React.FC<{
               onLibraryFilterChange={handleLibraryFilterChange}
               onScopeChange={handleScopeChange}
               onClearRefinements={handleClearRefinements}
-              onAddMapping={() => setAddDialogOpen(true)}
               onExportMappings={() => setExportDialogOpen(true)}
               isExporting={isExporting}
             />
@@ -475,28 +472,6 @@ const MappingsSection: React.FC<{
           provider={editorState.provider}
         />
       ) : null}
-
-      <AddMissingEntryDialog
-        open={addDialogOpen}
-        onClose={() => setAddDialogOpen(false)}
-        onSelect={(id, format) => {
-          const provider = resolveProviderForAniListFormat(format);
-          if (!provider) {
-            toast.showToast({
-              title: 'Unsupported format',
-              description: 'This AniList entry does not map to Sonarr or Radarr.',
-              variant: 'info',
-            });
-            setAddDialogOpen(false);
-            return;
-          }
-          if (providerFilter !== provider) {
-            setProviderFilter(provider);
-          }
-          setEditorState({ anilistId: id, provider, externalId: null });
-          setAddDialogOpen(false);
-        }}
-      />
 
       {exportDialogOpen ? (
         <ExportMappingsDialog

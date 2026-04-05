@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { ArrowUpDown, Check, ChevronDown, Plus, Search, X } from 'lucide-react';
+import { ArrowUpDown, Check, ChevronDown, Search, X } from 'lucide-react';
 import type { Provider } from '@/providers';
 import type { MappingSource } from '@/mapping/types';
 import Button from '@/shared/ui/primitives/button';
@@ -44,7 +44,6 @@ type MappingToolbarProps = {
   onLibraryFilterChange: (value: LibraryFilter) => void;
   onScopeChange: (value: MappingScope) => void;
   onClearRefinements: () => void;
-  onAddMapping: () => void;
   onExportMappings: () => void;
   isExporting?: boolean;
   hideActions?: boolean;
@@ -144,7 +143,6 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
   onLibraryFilterChange,
   onScopeChange,
   onClearRefinements,
-  onAddMapping,
   onExportMappings,
   isExporting = false,
   hideActions = false,
@@ -191,10 +189,6 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
             <>
               <Button variant="outline" size="sm" onClick={onExportMappings} isLoading={isExporting}>
                 Export
-              </Button>
-              <Button size="sm" onClick={onAddMapping}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add mapping
               </Button>
             </>
           )}

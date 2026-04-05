@@ -1,11 +1,6 @@
 /** Plain payload and response types used by RPC and adjacent provider flows without runtime schemas. */
 // src/rpc/types.ts
 
-import type {
-  AniListMediaFormat,
-  AniListTitles,
-  AniListMediaStatus,
-} from '@/anilist/schemas/media.schema';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type {
   RadarrMovieSnapshot,
@@ -95,12 +90,4 @@ export interface RadarrLookupOutput {
 export interface GetAniListMetadataOutput {
   metadata: AniListMetadata[];
   missingIds?: number[];
-}
-
-export interface AniListSearchResult {
-  id: number;
-  title: AniListTitles;
-  coverImage?: AniListMetadata['coverImage'] | null;
-  format?: AniListMediaFormat | null;
-  status?: AniListMediaStatus | null;
 }

@@ -513,7 +513,6 @@ export default function ExportMappingsDialog({
                 onLibraryFilterChange={setDraftLibraryFilter}
                 onScopeChange={handleScopeChange}
                 onClearRefinements={handleClearRefinements}
-                onAddMapping={() => {}}
                 onExportMappings={handleExport}
                 hideActions
                 hideSort

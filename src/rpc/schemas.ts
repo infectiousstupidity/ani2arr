@@ -180,11 +180,6 @@ export const MappingCursorSchema = v.object({
   provider: ProviderSchema,
 });
 
-export const SearchAniListInputSchema = v.object({
-  search: createRequiredStringSchema('Search cannot be empty'),
-  limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(25))),
-});
-
 export const GetMappingsInputSchema = v.optional(
   v.object({
     sources: v.optional(v.array(MappingSourceSchema)),
@@ -225,7 +220,6 @@ export type SetMappingBlockedCandidateInput = v.InferOutput<typeof SetMappingBlo
 export type ClearMappingBlockedCandidateInput = v.InferOutput<typeof ClearMappingBlockedCandidateInputSchema>;
 export type GetMappingsInput = v.InferOutput<typeof GetMappingsInputSchema>;
 export type MappingCursor = v.InferOutput<typeof MappingCursorSchema>;
-export type SearchAniListInput = v.InferOutput<typeof SearchAniListInputSchema>;
 export type GetAniListMetadataInput = v.InferOutput<typeof GetAniListMetadataInputSchema>;
 export type RadarrLookupInput = v.InferOutput<typeof RadarrLookupInputSchema>;
 export type TestProviderConnectionInput = v.InferOutput<typeof TestProviderConnectionInputSchema>;

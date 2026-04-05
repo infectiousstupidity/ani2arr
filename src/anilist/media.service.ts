@@ -3,7 +3,6 @@
 
 import PQueue from 'p-queue';
 import type { TtlCache } from '@/storage';
-import type { AniListSearchMediaDto } from '@/anilist/transport/media-response.schema';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 import { DEFAULT_PREQUEL_DEPTH, QUEUE_CONCURRENCY } from './constants';
@@ -108,14 +107,6 @@ export class AniListMediaService {
     };
 
     return this.mediaScheduler.requestMedia(ids, requestOptions);
-  }
-
-  public async searchMedia(search: string, options?: { limit?: number }): Promise<AniListSearchMediaDto[]> {
-    const term = search.trim();
-    if (!term) return [];
-
-    const limit = Math.min(Math.max(options?.limit ?? 8, 1), 25);
-    return this.mediaScheduler.searchMedia(term, limit);
   }
 
   private extractPrequelId(media: AniListMedia): number | null {
