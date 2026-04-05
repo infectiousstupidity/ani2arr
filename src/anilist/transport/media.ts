@@ -2,7 +2,9 @@
 // src/anilist/transport/media.ts
 
 import * as v from 'valibot';
+import { logger } from '@/shared/utils/logger';
 import { AniListGraphqlError } from '@/anilist/transport/errors';
+import { mapFindMediaBatchItem } from '@/anilist/transport/media-batch.mapper';
 import {
   FindMediaBatchResponseDtoSchema,
   type AniListGraphQLError,
@@ -13,6 +15,8 @@ import {
 import { postAniList } from '@/anilist/transport/request';
 import type { AniListResponseMeta } from '@/anilist/transport/types';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
+
+const log = logger.create('AniListTransport');
 
 const assertNoGraphqlErrors = (errors?: AniListGraphQLError[]): void => {
   if (errors?.length) {
@@ -31,7 +35,21 @@ export async function fetchAniListMediaBatch(
 
   assertNoGraphqlErrors(parsedPayload.errors);
 
-  const media = parsedPayload.data?.Page?.media ?? [];
+  const media: AniListMedia[] = [];
+  for (const item of parsedPayload.data?.Page?.media ?? []) {
+    const mappedItem = mapFindMediaBatchItem(item);
+    if (mappedItem.success) {
+      media.push(mappedItem.media);
+      continue;
+    }
+
+    const idLabel = mappedItem.id === null ? 'unknown' : String(mappedItem.id);
+    log.error(
+      `findMediaBatch: dropped invalid media item id=${idLabel} stage=${mappedItem.stage}`,
+      mappedItem.issues,
+    );
+  }
+
   return {
     data: media,
     meta,
