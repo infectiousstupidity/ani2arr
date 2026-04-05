@@ -159,7 +159,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   const handleMappingSubmit = useCallback(async () => {
     const selected = mappingController.state.selected;
     const currentAniListId = mappingTabProps.aniListEntry.id;
-    const externalLabel = selected?.target ? `${selected.target.kind.toUpperCase()} ${selected.target.id}` : 'This mapping';
+    const externalLabel = selected ? `${selected.provider === 'radarr' ? 'TMDB' : 'TVDB'} ${selected.providerId}` : 'This mapping';
 
     const confirmShare = async (conflictingIds: number[]): Promise<boolean> => {
       if (conflictingIds.length === 0) return true;

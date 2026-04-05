@@ -6,7 +6,7 @@ import type { StatusInput } from '@/rpc/schemas';
 import type { CheckMovieStatusResponse } from '@/rpc/types';
 import type { MappingService } from '@/mapping/mapping.service';
 import type { MappingOverridesService } from '@/mapping/overrides';
-import type { ResolveExternalIdOptions } from '@/mapping/types';
+import type { ResolveProviderIdOptions } from '@/mapping/types';
 import { ErrorCode, logError, normalizeError } from '@/shared/errors';
 import { getExtensionOptionsSnapshot, getProviderCredentials, isProviderConfigured, type ExtensionOptions } from '@/options';
 import type { ProviderCredentials, RadarrLookupMovie, RadarrMovie, RadarrMovieSnapshot } from '@/providers';
@@ -28,7 +28,7 @@ export class RadarrLibrary {
 
   constructor(
     private readonly radarrClient: RadarrClient,
-    private readonly mappingService: Pick<MappingService, 'resolveExternalId' | 'prioritizeAniListMedia'>,
+    private readonly mappingService: Pick<MappingService, 'resolveProviderId' | 'prioritizeAniListMedia'>,
     private readonly overridesService: Pick<MappingOverridesService, 'getLinkedAniListIds'>,
     caches: ProviderLibraryCaches<RadarrMovieSnapshot>,
     private readonly emitLibraryMutation?: LibraryMutationEmitter<RadarrLibraryMutationPayload>,
@@ -96,7 +96,7 @@ export class RadarrLibrary {
         }
       }
 
-      const mappingOptions: ResolveExternalIdOptions = {};
+      const mappingOptions: ResolveProviderIdOptions = {};
       if (!isConfigured || options.network === 'never') mappingOptions.network = 'never';
       if (options.ignoreFailureCache) {
         mappingOptions.ignoreFailureCache = true;
@@ -105,7 +105,7 @@ export class RadarrLibrary {
       if (options.priority) mappingOptions.priority = options.priority;
       if (options.force_verify) mappingOptions.forceLookupNetwork = true;
 
-      const hints: NonNullable<ResolveExternalIdOptions['hints']> = {};
+      const hints: NonNullable<ResolveProviderIdOptions['hints']> = {};
       if (normalizedTitle) hints.primaryTitle = normalizedTitle;
       if (payload.metadata) hints.domMedia = payload.metadata;
       if (Object.keys(hints).length > 0) mappingOptions.hints = hints;
@@ -117,9 +117,9 @@ export class RadarrLibrary {
           );
         }
 
-        const mapping = await this.mappingService.resolveExternalId('radarr', payload.anilistId, mappingOptions);
-        if (mapping?.externalId.kind === 'tmdb') {
-          tmdbId = mapping.externalId.id;
+        const mapping = await this.mappingService.resolveProviderId('radarr', payload.anilistId, mappingOptions);
+        if (mapping) {
+          tmdbId = mapping.providerId;
           successfulSynonym = mapping.successfulSynonym;
         }
       } catch (error) {
@@ -128,7 +128,7 @@ export class RadarrLibrary {
           normalized.code === ErrorCode.CONFIGURATION_ERROR ||
           (normalized.code === ErrorCode.VALIDATION_ERROR && normalized.details?.reason === 'network-disabled')
         ) {
-          return { exists: false, tmdbId: null, externalId: null, anilistTmdbLinkMissing: true };
+          return { exists: false, tmdbId: null, anilistTmdbLinkMissing: true };
         }
         logError(normalized, `RadarrLibrary:getMovieStatus:${payload.anilistId}`);
         throw normalized;
@@ -139,10 +139,10 @@ export class RadarrLibrary {
       if (import.meta.env.DEV) {
         console.debug(`[ani2arr | RadarrLibrary] status:result anilistId=${payload.anilistId} outcome=unresolved`);
       }
-      return { exists: false, tmdbId: null, externalId: null, anilistTmdbLinkMissing: true };
+      return { exists: false, tmdbId: null, anilistTmdbLinkMissing: true };
     }
 
-    const linked = this.overridesService.getLinkedAniListIds('radarr', { id: tmdbId, kind: 'tmdb' });
+    const linked = this.overridesService.getLinkedAniListIds('radarr', tmdbId);
     if (linked.length > 0) {
       linkedAniListIds = linked;
     }
@@ -154,7 +154,6 @@ export class RadarrLibrary {
       return {
         exists: existsInCache,
         tmdbId,
-        externalId: { id: tmdbId, kind: 'tmdb' },
         ...(cachedMovie ? { movie: cachedMovie } : {}),
         ...(successfulSynonym ? { successfulSynonym } : {}),
         ...(linkedAniListIds ? { linkedAniListIds } : {}),
@@ -182,7 +181,6 @@ export class RadarrLibrary {
       return {
         exists: true,
         tmdbId,
-        externalId: { id: tmdbId, kind: 'tmdb' },
         movie: liveMovie,
         ...(successfulSynonym ? { successfulSynonym } : {}),
         ...(linkedAniListIds ? { linkedAniListIds } : {}),
@@ -206,7 +204,6 @@ export class RadarrLibrary {
     return {
       exists: false,
       tmdbId,
-      externalId: { id: tmdbId, kind: 'tmdb' },
       ...(lookupMovie ? { movie: lookupMovie } : {}),
       ...(successfulSynonym ? { successfulSynonym } : {}),
       ...(linkedAniListIds ? { linkedAniListIds } : {}),

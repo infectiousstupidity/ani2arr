@@ -8,7 +8,7 @@ import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { MultiMappingInfo } from './multi-mapping-info';
 import { useMappingOverrides } from '@/shared/queries';
 import type { Provider } from '@/providers';
-import type { MappingExternalIdRecord } from '@/mapping/types';
+import type { MappingProviderIdRecord } from '@/mapping/types';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { getProviderLabel } from '@/providers/provider-routing';
 import type { MappingAniListSummary, MappingSearchResult } from './types';
@@ -70,7 +70,7 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
     overrideActiveFromStatus === undefined &&
     Array.isArray(mappingOverrides.data) &&
     mappingOverrides.data.some(
-      (record: MappingExternalIdRecord) => record.anilistId === aniListEntry.id && record.provider === provider,
+      (record: MappingProviderIdRecord) => record.anilistId === aniListEntry.id && record.provider === provider,
     );
 
   const isOverridden = overrideActiveFromStatus ?? overrideActiveFromOverrides ?? false;
@@ -206,7 +206,7 @@ const getStatusTone = (
 function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
   const { mapping, baseUrl, highlight, currentAniListId, showResetPreview, onResetPreview, portalContainer } = props;
   const providerLabel = getProviderLabel(mapping.provider);
-  const externalLabel = `${mapping.target.kind.toUpperCase()} ${mapping.target.id}`;
+  const externalLabel = `${mapping.provider === 'radarr' ? 'TMDB' : 'TVDB'} ${mapping.providerId}`;
 
   const link = buildExternalMediaLink({
     provider: mapping.provider,

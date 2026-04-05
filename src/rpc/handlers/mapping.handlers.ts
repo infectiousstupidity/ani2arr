@@ -9,22 +9,6 @@ import { listMappings } from '@/mapping/review/list-mappings';
 import { exportStoredMappings } from '@/mapping/overrides/export-stored-mappings';
 import type { ApiHandlerDeps } from './handler-deps';
 
-function assertCompatibleExternalId(
-  provider: 'sonarr' | 'radarr',
-  externalId: { id: number; kind: 'tvdb' | 'tmdb' },
-): void {
-  const expectedKind = provider === 'sonarr' ? 'tvdb' : 'tmdb';
-  if (externalId.kind !== expectedKind) {
-    throw createError(
-      ErrorCode.VALIDATION_ERROR,
-      `Provider ${provider} requires ${expectedKind.toUpperCase()} mapping IDs.`,
-      provider === 'sonarr'
-        ? 'Sonarr overrides must use TVDB IDs.'
-        : 'Radarr overrides must use TMDB IDs.',
-    );
-  }
-}
-
 export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
   Ani2arrApi,
   | 'resolveMapping'
@@ -105,25 +89,24 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
 
     async setMappingOverride(input) {
       await overridesReady;
-      assertCompatibleExternalId(input.provider, input.externalId);
 
       if (input.provider === 'sonarr') {
-        const linkedIds = new Set<number>(overridesService.getLinkedAniListIds('sonarr', input.externalId));
-        for (const id of upstreamMappingStore.getAniListIdsForTvdb(input.externalId.id)) {
+        const linkedIds = new Set<number>(overridesService.getLinkedAniListIds('sonarr', input.providerId));
+        for (const id of upstreamMappingStore.getAniListIdsForTvdb(input.providerId)) {
           linkedIds.add(id);
         }
         const conflictingAniListIds = [...linkedIds].filter(id => id !== input.anilistId);
         if (conflictingAniListIds.length > 0 && input.force !== true) {
           throw createError(
             ErrorCode.VALIDATION_ERROR,
-            `TVDB ID ${input.externalId.id} is already linked to other AniList entries.`,
+            `TVDB ID ${input.providerId} is already linked to other AniList entries.`,
             'This TVDB ID is already linked to other AniList entries. Confirm if you want to share it.',
             { conflictingAniListIds },
           );
         }
       }
 
-      await overridesService.set(input.provider, input.anilistId, input.externalId);
+      await overridesService.set(input.provider, input.anilistId, input.providerId);
       await mappingService.evictResolved(input.anilistId, input.provider);
 
       if (input.provider === 'sonarr') {
@@ -175,8 +158,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
 
     async setMappingRejectedCandidate(input) {
       await overridesReady;
-      assertCompatibleExternalId(input.provider, input.externalId);
-      await overridesService.setRejectedCandidate(input.provider, input.anilistId, input.externalId);
+      await overridesService.setRejectedCandidate(input.provider, input.anilistId, input.providerId);
       await mappingService.evictResolved(input.anilistId, input.provider);
 
       await bumpLibraryRevision(input.provider);
@@ -186,8 +168,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
 
     async clearMappingRejectedCandidate(input) {
       await overridesReady;
-      assertCompatibleExternalId(input.provider, input.externalId);
-      await overridesService.clearRejectedCandidate(input.provider, input.anilistId, input.externalId);
+      await overridesService.clearRejectedCandidate(input.provider, input.anilistId, input.providerId);
       await mappingService.evictResolved(input.anilistId, input.provider);
 
       await bumpLibraryRevision(input.provider);
@@ -197,8 +178,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
 
     async setMappingBlockedCandidate(input) {
       await overridesReady;
-      assertCompatibleExternalId(input.provider, input.externalId);
-      await overridesService.setBlockedCandidate(input.provider, input.anilistId, input.externalId);
+      await overridesService.setBlockedCandidate(input.provider, input.anilistId, input.providerId);
       await mappingService.evictResolved(input.anilistId, input.provider);
 
       await bumpLibraryRevision(input.provider);
@@ -208,8 +188,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
 
     async clearMappingBlockedCandidate(input) {
       await overridesReady;
-      assertCompatibleExternalId(input.provider, input.externalId);
-      await overridesService.clearBlockedCandidate(input.provider, input.anilistId, input.externalId);
+      await overridesService.clearBlockedCandidate(input.provider, input.anilistId, input.providerId);
       await mappingService.evictResolved(input.anilistId, input.provider);
 
       await bumpLibraryRevision(input.provider);

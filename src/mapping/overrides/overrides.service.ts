@@ -1,7 +1,7 @@
 /** Mapping override service for persisted manual mappings, ignores, and candidate suppressions. */
 // src/mapping/overrides/overrides.service.ts
 
-import type { MappingExternalId, MappingExternalIdRecord, MappingIgnoreRecord } from '@/mapping/types';
+import type { MappingProviderIdRecord, MappingIgnoreRecord } from '@/mapping/types';
 import type { Provider } from '@/providers';
 import {
   createRecordKey,
@@ -21,21 +21,21 @@ import {
   mappingBlockedCandidatesStorage,
 } from '@/mapping/overrides/overrides.storage';
 import { PersistedMap } from '@/mapping/overrides/persisted-map';
-import type { MappingIgnoreEntry, StoredMappingExternalIdEntry } from './types';
+import type { MappingIgnoreEntry, StoredMappingProviderIdEntry } from './types';
 
 import { STORAGE_KEYS } from '@/storage/keys';
 
 type ParsedRecordKey = { provider: Provider; anilistId: number };
-type ParsedCandidateKey = { provider: Provider; anilistId: number; externalId: MappingExternalId };
+type ParsedCandidateKey = { provider: Provider; anilistId: number; providerId: number };
 
 const OVERRIDE_SORT = (a: { updatedAt: number; provider: string; anilistId: number }, b: { updatedAt: number; provider: string; anilistId: number }) =>
   b.updatedAt - a.updatedAt || a.provider.localeCompare(b.provider) || a.anilistId - b.anilistId;
 
 export class MappingOverridesService {
-  private readonly overrides: PersistedMap<string, StoredMappingExternalIdEntry, ParsedRecordKey>;
+  private readonly overrides: PersistedMap<string, StoredMappingProviderIdEntry, ParsedRecordKey>;
   private readonly ignores: PersistedMap<string, MappingIgnoreEntry, ParsedRecordKey>;
-  private readonly rejected: PersistedMap<string, StoredMappingExternalIdEntry, ParsedCandidateKey>;
-  private readonly blocked: PersistedMap<string, StoredMappingExternalIdEntry, ParsedCandidateKey>;
+  private readonly rejected: PersistedMap<string, StoredMappingProviderIdEntry, ParsedCandidateKey>;
+  private readonly blocked: PersistedMap<string, StoredMappingProviderIdEntry, ParsedCandidateKey>;
   private readonly reverse = new Map<string, Set<number>>();
   private initialized = false;
   private writeQueue: Promise<void> = Promise.resolve();
@@ -80,9 +80,9 @@ export class MappingOverridesService {
     this.initialized = true;
   }
 
-  public get(provider: Provider, anilistId: number): MappingExternalId | null {
+  public get(provider: Provider, anilistId: number): number | null {
     const entry = this.overrides.get(createRecordKey(provider, anilistId));
-    return entry ? entry.externalId : null;
+    return entry ? entry.providerId : null;
   }
 
   public has(provider: Provider, anilistId: number): boolean {
@@ -96,39 +96,39 @@ export class MappingOverridesService {
   public getCandidateSuppression(
     provider: Provider,
     anilistId: number,
-    externalId: MappingExternalId,
+    providerId: number,
   ): 'blocked' | 'rejected' | null {
-    const key = createCandidateRecordKey(provider, anilistId, externalId);
+    const key = createCandidateRecordKey(provider, anilistId, providerId);
     if (this.blocked.has(key)) return 'blocked';
     if (this.rejected.has(key)) return 'rejected';
     return null;
   }
 
-  public getLinkedAniListIds(provider: Provider, externalId: MappingExternalId): number[] {
-    if (!isFiniteId(externalId.id)) return [];
-    const bucket = this.reverse.get(createReverseLookupKey(provider, externalId));
+  public getLinkedAniListIds(provider: Provider, providerId: number): number[] {
+    if (!isFiniteId(providerId)) return [];
+    const bucket = this.reverse.get(createReverseLookupKey(provider, providerId));
     if (!bucket) return [];
     return [...bucket];
   }
 
-  public async set(provider: Provider, anilistId: number, externalId: MappingExternalId): Promise<void> {
+  public async set(provider: Provider, anilistId: number, providerId: number): Promise<void> {
     await this.enqueueWrite(async () => {
       const key = createRecordKey(provider, anilistId);
-      const entry: StoredMappingExternalIdEntry = { provider, externalId, updatedAt: Date.now() };
+      const entry: StoredMappingProviderIdEntry = { provider, providerId, updatedAt: Date.now() };
 
       const prev = this.overrides.get(key);
-      if (prev) this.removeReverse(prev.provider, prev.externalId, anilistId);
+      if (prev) this.removeReverse(prev.provider, prev.providerId, anilistId);
 
       // Clear conflicting ignore
       this.ignores.delete(key);
 
       // Clear conflicting candidate suppressions
-      const candidateKey = createCandidateRecordKey(provider, anilistId, externalId);
+      const candidateKey = createCandidateRecordKey(provider, anilistId, providerId);
       this.rejected.delete(candidateKey);
       this.blocked.delete(candidateKey);
 
       this.overrides.set(key, entry);
-      this.addReverse(provider, externalId, anilistId);
+      this.addReverse(provider, providerId, anilistId);
 
       await Promise.all([
         this.overrides.persist(),
@@ -143,7 +143,7 @@ export class MappingOverridesService {
     await this.enqueueWrite(async () => {
       const key = createRecordKey(provider, anilistId);
       const prev = this.overrides.get(key);
-      if (prev) this.removeReverse(prev.provider, prev.externalId, anilistId);
+      if (prev) this.removeReverse(prev.provider, prev.providerId, anilistId);
       this.overrides.delete(key);
       await this.overrides.persist();
     });
@@ -156,7 +156,7 @@ export class MappingOverridesService {
       // Clear conflicting override
       const override = this.overrides.get(key);
       if (override) {
-        this.removeReverse(override.provider, override.externalId, anilistId);
+        this.removeReverse(override.provider, override.providerId, anilistId);
         this.overrides.delete(key);
       }
 
@@ -176,28 +176,28 @@ export class MappingOverridesService {
     });
   }
 
-  public async setRejectedCandidate(provider: Provider, anilistId: number, externalId: MappingExternalId): Promise<void> {
-    await this.setCandidateSuppression('rejected', provider, anilistId, externalId);
+  public async setRejectedCandidate(provider: Provider, anilistId: number, providerId: number): Promise<void> {
+    await this.setCandidateSuppression('rejected', provider, anilistId, providerId);
   }
 
-  public async clearRejectedCandidate(provider: Provider, anilistId: number, externalId: MappingExternalId): Promise<void> {
-    await this.clearCandidateSuppression('rejected', provider, anilistId, externalId);
+  public async clearRejectedCandidate(provider: Provider, anilistId: number, providerId: number): Promise<void> {
+    await this.clearCandidateSuppression('rejected', provider, anilistId, providerId);
   }
 
-  public async setBlockedCandidate(provider: Provider, anilistId: number, externalId: MappingExternalId): Promise<void> {
-    await this.setCandidateSuppression('blocked', provider, anilistId, externalId);
+  public async setBlockedCandidate(provider: Provider, anilistId: number, providerId: number): Promise<void> {
+    await this.setCandidateSuppression('blocked', provider, anilistId, providerId);
   }
 
-  public async clearBlockedCandidate(provider: Provider, anilistId: number, externalId: MappingExternalId): Promise<void> {
-    await this.clearCandidateSuppression('blocked', provider, anilistId, externalId);
+  public async clearBlockedCandidate(provider: Provider, anilistId: number, providerId: number): Promise<void> {
+    await this.clearCandidateSuppression('blocked', provider, anilistId, providerId);
   }
 
-  public list(provider?: Provider): MappingExternalIdRecord[] {
-    const entries = this.overrides.list<MappingExternalIdRecord>(
+  public list(provider?: Provider): MappingProviderIdRecord[] {
+    const entries = this.overrides.list<MappingProviderIdRecord>(
       (_key, entry, parsed) => ({
         anilistId: parsed.anilistId,
         provider: parsed.provider,
-        externalId: entry.externalId,
+        providerId: entry.providerId,
         updatedAt: entry.updatedAt,
       }),
       this.providerFilter(provider),
@@ -219,19 +219,19 @@ export class MappingOverridesService {
     return entries;
   }
 
-  public listRejectedCandidates(provider?: Provider): MappingExternalIdRecord[] {
+  public listRejectedCandidates(provider?: Provider): MappingProviderIdRecord[] {
     return this.listCandidateSuppressions(this.rejected, provider);
   }
 
-  public listBlockedCandidates(provider?: Provider): MappingExternalIdRecord[] {
+  public listBlockedCandidates(provider?: Provider): MappingProviderIdRecord[] {
     return this.listCandidateSuppressions(this.blocked, provider);
   }
 
   public exportState(): {
-    overrides: Record<string, StoredMappingExternalIdEntry>;
+    overrides: Record<string, StoredMappingProviderIdEntry>;
     ignores: Record<string, MappingIgnoreEntry>;
-    rejectedCandidates: Record<string, StoredMappingExternalIdEntry>;
-    blockedCandidates: Record<string, StoredMappingExternalIdEntry>;
+    rejectedCandidates: Record<string, StoredMappingProviderIdEntry>;
+    blockedCandidates: Record<string, StoredMappingProviderIdEntry>;
   } {
     return {
       overrides: this.overrides.toRecord(),
@@ -242,10 +242,10 @@ export class MappingOverridesService {
   }
 
   public async importState(state: {
-    overrides: Record<string, StoredMappingExternalIdEntry>;
+    overrides: Record<string, StoredMappingProviderIdEntry>;
     ignores: Record<string, MappingIgnoreEntry>;
-    rejectedCandidates?: Record<string, StoredMappingExternalIdEntry>;
-    blockedCandidates?: Record<string, StoredMappingExternalIdEntry>;
+    rejectedCandidates?: Record<string, StoredMappingProviderIdEntry>;
+    blockedCandidates?: Record<string, StoredMappingProviderIdEntry>;
   }): Promise<void> {
     await this.enqueueWrite(async () => {
       await Promise.all([
@@ -283,14 +283,14 @@ export class MappingOverridesService {
   }
 
   private listCandidateSuppressions(
-    source: PersistedMap<string, StoredMappingExternalIdEntry, ParsedCandidateKey>,
+    source: PersistedMap<string, StoredMappingProviderIdEntry, ParsedCandidateKey>,
     provider?: Provider,
-  ): MappingExternalIdRecord[] {
-    const entries = source.list<MappingExternalIdRecord>(
+  ): MappingProviderIdRecord[] {
+    const entries = source.list<MappingProviderIdRecord>(
       (_key, entry, parsed) => ({
         anilistId: parsed.anilistId,
         provider: parsed.provider,
-        externalId: parsed.externalId,
+        providerId: parsed.providerId,
         updatedAt: entry.updatedAt,
       }),
       this.providerFilter(provider),
@@ -308,11 +308,11 @@ export class MappingOverridesService {
     type: 'rejected' | 'blocked',
     provider: Provider,
     anilistId: number,
-    externalId: MappingExternalId,
+    providerId: number,
   ): Promise<void> {
     await this.enqueueWrite(async () => {
-      const key = createCandidateRecordKey(provider, anilistId, externalId);
-      const entry: StoredMappingExternalIdEntry = { provider, externalId, updatedAt: Date.now() };
+      const key = createCandidateRecordKey(provider, anilistId, providerId);
+      const entry: StoredMappingProviderIdEntry = { provider, providerId, updatedAt: Date.now() };
 
       // Clear from both, then set on target
       this.rejected.delete(key);
@@ -332,11 +332,11 @@ export class MappingOverridesService {
     type: 'rejected' | 'blocked',
     provider: Provider,
     anilistId: number,
-    externalId: MappingExternalId,
+    providerId: number,
   ): Promise<void> {
     await this.enqueueWrite(async () => {
       const target = type === 'rejected' ? this.rejected : this.blocked;
-      target.delete(createCandidateRecordKey(provider, anilistId, externalId));
+      target.delete(createCandidateRecordKey(provider, anilistId, providerId));
       await target.persist();
     });
   }
@@ -363,7 +363,7 @@ export class MappingOverridesService {
     for (const [key, entry] of this.overrides.entries()) {
       const parsed = parseRecordKey(key);
       if (!parsed) continue;
-      this.addReverse(parsed.provider, entry.externalId, parsed.anilistId);
+      this.addReverse(parsed.provider, entry.providerId, parsed.anilistId);
     }
   }
 
@@ -374,8 +374,8 @@ export class MappingOverridesService {
     return next;
   }
 
-  private addReverse(provider: Provider, externalId: MappingExternalId, anilistId: number): void {
-    const reverseKey = createReverseLookupKey(provider, externalId);
+  private addReverse(provider: Provider, providerId: number, anilistId: number): void {
+    const reverseKey = createReverseLookupKey(provider, providerId);
     const bucket = this.reverse.get(reverseKey);
     if (bucket) {
       bucket.add(anilistId);
@@ -384,8 +384,8 @@ export class MappingOverridesService {
     this.reverse.set(reverseKey, new Set([anilistId]));
   }
 
-  private removeReverse(provider: Provider, externalId: MappingExternalId, anilistId: number): void {
-    const reverseKey = createReverseLookupKey(provider, externalId);
+  private removeReverse(provider: Provider, providerId: number, anilistId: number): void {
+    const reverseKey = createReverseLookupKey(provider, providerId);
     const bucket = this.reverse.get(reverseKey);
     if (!bucket) return;
     bucket.delete(anilistId);

@@ -11,8 +11,7 @@ import type {
   SonarrSeries,
 } from '@/providers';
 import type {
-  MappingExternalIdRecord,
-  MappingExternalId,
+  MappingProviderIdRecord,
   MappingIgnoreRecord,
   MappingSummary,
 } from '@/mapping/types';
@@ -21,7 +20,6 @@ import type { MappingCursor } from './schemas';
 export interface CheckSeriesStatusResponse {
   exists: boolean;
   tvdbId: number | null;
-  externalId?: MappingExternalId | null;
   successfulSynonym?: string;
   anilistTvdbLinkMissing?: boolean;
   series?: SonarrSeriesSnapshot | SonarrSeries | SonarrLookupSeries;
@@ -34,7 +32,6 @@ export interface CheckSeriesStatusResponse {
 export interface CheckMovieStatusResponse {
   exists: boolean;
   tmdbId: number | null;
-  externalId?: MappingExternalId | null;
   successfulSynonym?: string;
   anilistTmdbLinkMissing?: boolean;
   movie?: RadarrMovieSnapshot | RadarrMovie | RadarrLookupMovie;
@@ -45,7 +42,7 @@ export interface CheckMovieStatusResponse {
 }
 
 export interface ExportStoredMappingsOutput {
-  version: 2;
+  version: 3;
   exportedAt: string;
   summary: {
     overrideCount: number;
@@ -54,10 +51,10 @@ export interface ExportStoredMappingsOutput {
     blockedCandidateCount: number;
   };
   mappings: {
-    overrides: Record<string, MappingExternalIdRecord>;
+    overrides: Record<string, MappingProviderIdRecord>;
     ignores: Record<string, MappingIgnoreRecord>;
-    rejectedCandidates: Record<string, MappingExternalIdRecord>;
-    blockedCandidates: Record<string, MappingExternalIdRecord>;
+    rejectedCandidates: Record<string, MappingProviderIdRecord>;
+    blockedCandidates: Record<string, MappingProviderIdRecord>;
   };
 }
 

@@ -5,7 +5,7 @@ import { resolveSonarrAddPayload } from './sonarr-add-payload';
 import type { SonarrLibrary } from './sonarr-library';
 import type { SonarrClient } from '@/providers/clients/sonarr.client';
 import type { MappingService } from '@/mapping/mapping.service';
-import type { ResolveExternalIdOptions } from '@/mapping/types';
+import type { ResolveProviderIdOptions } from '@/mapping/types';
 import { createError, ErrorCode } from '@/shared/errors';
 import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
@@ -33,8 +33,8 @@ export async function addSonarrSeries(
 ): Promise<SonarrSeries> {
   const { client, mappingService, library } = deps;
 
-  const resolveOptions: ResolveExternalIdOptions = { ignoreFailureCache: true };
-  const hints: NonNullable<ResolveExternalIdOptions['hints']> = {};
+  const resolveOptions: ResolveProviderIdOptions = { ignoreFailureCache: true };
+  const hints: NonNullable<ResolveProviderIdOptions['hints']> = {};
   if (input.primaryTitleHint) hints.primaryTitle = input.primaryTitleHint;
   if (input.metadata) hints.domMedia = input.metadata;
   if (Object.keys(hints).length > 0) resolveOptions.hints = hints;

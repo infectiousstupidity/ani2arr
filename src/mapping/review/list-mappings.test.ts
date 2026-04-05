@@ -13,7 +13,7 @@ describe('listMappings', () => {
   });
 
   it('prefers manual overrides over recorded auto mappings and preserves unresolved entries', async () => {
-    resolvedLedger.record('sonarr', 1, { externalId: { id: 111, kind: 'tvdb' } }, 'auto');
+    resolvedLedger.record('sonarr', 1, { providerId: 111 }, 'auto');
     unresolvedLedger.record('radarr', 2, 'Missing Movie');
 
     const result = await listMappings(
@@ -27,7 +27,7 @@ describe('listMappings', () => {
             {
               anilistId: 1,
               provider: 'sonarr',
-              externalId: { id: 222, kind: 'tvdb' as const },
+              providerId: 222,
               updatedAt: 100,
             },
           ],
@@ -51,7 +51,7 @@ describe('listMappings', () => {
     expect(result.mappings.find(entry => entry.anilistId === 1)).toMatchObject({
       provider: 'sonarr',
       source: 'manual',
-      externalId: { id: 222, kind: 'tvdb' },
+      providerId: 222,
     });
     expect(result.mappings.find(entry => entry.anilistId === 2)).toMatchObject({
       provider: 'radarr',

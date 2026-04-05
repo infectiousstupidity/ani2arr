@@ -100,40 +100,39 @@ const deriveProviderFilterFromProviderFilters = (filters: Set<Provider>): Provid
 };
 
 const formatExternalId = (row: MappingTableRowData): string => {
-  if (!row.externalId) {
+  if (row.providerId === null) {
     return 'No external ID';
   }
-  return `${row.externalId.kind.toUpperCase()} ${row.externalId.id}`;
+  return `${row.provider === 'radarr' ? 'TMDB' : 'TVDB'} ${row.providerId}`;
 };
 
 const resolveGroupTitle = (row: MappingTableRowData): string => {
-  if (row.externalId && row.providerMeta?.title) {
+  if (row.providerId !== null && row.providerMeta?.title) {
     return row.providerMeta.title;
   }
   if (row.entries[0]?.title) {
     return row.entries[0].title;
   }
-  return row.externalId ? `${row.externalId.kind.toUpperCase()} ${row.externalId.id}` : 'Unmapped';
+  return row.providerId === null ? 'Unmapped' : `${row.provider === 'radarr' ? 'TMDB' : 'TVDB'} ${row.providerId}`;
 };
 
 const matchesPreviewSearch = (row: MappingTableRowData, query: string): boolean => {
   const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) {
+  if (normalizedQuery === '') {
     return true;
   }
 
   const haystack = [
     resolveGroupTitle(row),
     row.provider,
-    row.externalId?.id == null ? '' : String(row.externalId.id),
-    row.externalId?.kind ?? '',
+    row.providerId === null ? '' : String(row.providerId),
     ...row.sources,
     ...row.entries.flatMap(({ entry, title }) => [
       title,
       String(entry.anilistId),
       entry.status,
       entry.source,
-      entry.externalId ? (entry.providerMeta?.title ?? '') : '',
+      entry.providerId === null ? '' : (entry.providerMeta?.title ?? ''),
     ]),
   ]
     .filter(Boolean)
@@ -337,8 +336,8 @@ export default function ExportMappingsDialog({
         title,
         anilistId: entry.anilistId,
         provider: entry.provider,
-        externalId: entry.externalId ?? null,
-        ...(entry.suppressedExternalId ? { suppressedExternalId: entry.suppressedExternalId } : {}),
+        providerId: entry.providerId ?? null,
+        ...(entry.suppressedProviderId === undefined ? {} : { suppressedProviderId: entry.suppressedProviderId }),
         source: entry.source,
         status: entry.status,
         ...(entry.updatedAt === undefined ? {} : { updatedAt: entry.updatedAt }),

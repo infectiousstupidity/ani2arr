@@ -35,11 +35,6 @@ const ProviderCredentialsSchema = v.object({
   apiKey: createRequiredStringSchema('API key cannot be empty'),
 });
 
-const MappingExternalIdSchema = v.object({
-  id: IdSchema,
-  kind: v.picklist(['tvdb', 'tmdb']),
-});
-
 // ============================================================================
 // RPC Input Schemas
 // ============================================================================
@@ -93,7 +88,7 @@ export const UpdateRadarrInputSchema = v.object({
 export const SetMappingOverrideInputSchema = v.object({
   anilistId: IdSchema,
   provider: ProviderSchema,
-  externalId: MappingExternalIdSchema,
+  providerId: IdSchema,
   force: v.optional(v.boolean()),
 });
 
@@ -115,25 +110,25 @@ export const ClearMappingIgnoreInputSchema = v.object({
 export const SetMappingRejectedCandidateInputSchema = v.object({
   anilistId: IdSchema,
   provider: ProviderSchema,
-  externalId: MappingExternalIdSchema,
+  providerId: IdSchema,
 });
 
 export const ClearMappingRejectedCandidateInputSchema = v.object({
   anilistId: IdSchema,
   provider: ProviderSchema,
-  externalId: MappingExternalIdSchema,
+  providerId: IdSchema,
 });
 
 export const SetMappingBlockedCandidateInputSchema = v.object({
   anilistId: IdSchema,
   provider: ProviderSchema,
-  externalId: MappingExternalIdSchema,
+  providerId: IdSchema,
 });
 
 export const ClearMappingBlockedCandidateInputSchema = v.object({
   anilistId: IdSchema,
   provider: ProviderSchema,
-  externalId: MappingExternalIdSchema,
+  providerId: IdSchema,
 });
 
 export const SonarrLookupInputSchema = v.object({

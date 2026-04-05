@@ -78,7 +78,7 @@ const MappingsSection: React.FC<{
   const [editorState, setEditorState] = useState<{
     anilistId: number;
     provider: Provider;
-    externalId?: MappingSummary['externalId'] | null;
+    providerId?: MappingSummary['providerId'] | null;
   } | null>(null);
   const isMutating =
     setRejectedCandidate.isPending ||
@@ -285,13 +285,14 @@ const MappingsSection: React.FC<{
 
   const handleRejectCandidate = useCallback(
     (entry: MappingSummary) => {
-      const externalId = entry.externalId ?? entry.suppressedExternalId;
-      if (!externalId) return Promise.resolve();
+      const providerId = entry.providerId ?? entry.suppressedProviderId;
+      if (providerId == null) return Promise.resolve();
+      const label = `${entry.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${providerId}`;
       return runEntryMutation({
-        mutate: () => setRejectedCandidate.mutateAsync({ anilistId: entry.anilistId, provider: entry.provider, externalId }),
+        mutate: () => setRejectedCandidate.mutateAsync({ anilistId: entry.anilistId, provider: entry.provider, providerId }),
         success: {
           title: 'Candidate rejected',
-          description: `${externalId.kind.toUpperCase()} #${externalId.id} will be skipped for AniList #${entry.anilistId}. This entry now stays unresolved until it is matched again, added upstream, or mapped manually.`,
+          description: `${label} will be skipped for AniList #${entry.anilistId}. This entry now stays unresolved until it is matched again, added upstream, or mapped manually.`,
         },
         error: {
           title: 'Reject failed',
@@ -304,13 +305,14 @@ const MappingsSection: React.FC<{
 
   const handleClearRejectedCandidate = useCallback(
     (entry: MappingSummary) => {
-      const externalId = entry.externalId ?? entry.suppressedExternalId;
-      if (!externalId) return Promise.resolve();
+      const providerId = entry.providerId ?? entry.suppressedProviderId;
+      if (providerId == null) return Promise.resolve();
+      const label = `${entry.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${providerId}`;
       return runEntryMutation({
-        mutate: () => clearRejectedCandidate.mutateAsync({ anilistId: entry.anilistId, provider: entry.provider, externalId }),
+        mutate: () => clearRejectedCandidate.mutateAsync({ anilistId: entry.anilistId, provider: entry.provider, providerId }),
         success: {
           title: 'Candidate restored',
-          description: `${externalId.kind.toUpperCase()} #${externalId.id} can be used again for AniList #${entry.anilistId}.`,
+          description: `${label} can be used again for AniList #${entry.anilistId}.`,
         },
         error: {
           title: 'Restore failed',
@@ -323,19 +325,20 @@ const MappingsSection: React.FC<{
 
   const handleBlockCandidate = useCallback(
     (entry: MappingSummary) => {
-      const externalId = entry.externalId ?? entry.suppressedExternalId;
-      if (!externalId) return Promise.resolve();
+      const providerId = entry.providerId ?? entry.suppressedProviderId;
+      if (providerId == null) return Promise.resolve();
+      const label = `${entry.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${providerId}`;
       return runEntryMutation({
         confirm: {
           title: 'Block this exact ID?',
-          description: `${externalId.kind.toUpperCase()} #${externalId.id} will never be used again for AniList #${entry.anilistId} until you remove the block.`,
+          description: `${label} will never be used again for AniList #${entry.anilistId} until you remove the block.`,
           confirmText: 'Block ID',
           cancelText: 'Cancel',
         },
-        mutate: () => setBlockedCandidate.mutateAsync({ anilistId: entry.anilistId, provider: entry.provider, externalId }),
+        mutate: () => setBlockedCandidate.mutateAsync({ anilistId: entry.anilistId, provider: entry.provider, providerId }),
         success: {
           title: 'ID blocked',
-          description: `${externalId.kind.toUpperCase()} #${externalId.id} is now permanently blocked for AniList #${entry.anilistId}.`,
+          description: `${label} is now permanently blocked for AniList #${entry.anilistId}.`,
         },
         error: {
           title: 'Block failed',
@@ -348,13 +351,14 @@ const MappingsSection: React.FC<{
 
   const handleClearBlockedCandidate = useCallback(
     (entry: MappingSummary) => {
-      const externalId = entry.externalId ?? entry.suppressedExternalId;
-      if (!externalId) return Promise.resolve();
+      const providerId = entry.providerId ?? entry.suppressedProviderId;
+      if (providerId == null) return Promise.resolve();
+      const label = `${entry.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${providerId}`;
       return runEntryMutation({
-        mutate: () => clearBlockedCandidate.mutateAsync({ anilistId: entry.anilistId, provider: entry.provider, externalId }),
+        mutate: () => clearBlockedCandidate.mutateAsync({ anilistId: entry.anilistId, provider: entry.provider, providerId }),
         success: {
           title: 'ID unblocked',
-          description: `${externalId.kind.toUpperCase()} #${externalId.id} can be used again for AniList #${entry.anilistId}.`,
+          description: `${label} can be used again for AniList #${entry.anilistId}.`,
         },
         error: {
           title: 'Unblock failed',
@@ -366,7 +370,7 @@ const MappingsSection: React.FC<{
   );
 
   const handleEdit = (entry: MappingSummary) => {
-    setEditorState({ anilistId: entry.anilistId, externalId: entry.externalId ?? null, provider: entry.provider });
+    setEditorState({ anilistId: entry.anilistId, providerId: entry.providerId ?? null, provider: entry.provider });
   };
 
   const handleExport = async (filters: ExportMappingsFilters) => {
@@ -466,7 +470,7 @@ const MappingsSection: React.FC<{
       {editorState ? (
         <MappingEditor
           anilistId={editorState.anilistId}
-          initialExternalId={editorState.externalId ?? null}
+          initialProviderId={editorState.providerId ?? null}
           open
           onClose={handleCloseEditor}
           provider={editorState.provider}

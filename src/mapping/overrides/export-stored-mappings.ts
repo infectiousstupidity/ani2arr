@@ -1,13 +1,13 @@
 /** Mapping-owned serializer for raw stored overrides and suppression records. */
 // src/mapping/overrides/export-stored-mappings.ts
 
-import type { MappingExternalIdRecord, MappingIgnoreRecord } from '@/mapping/types';
+import type { MappingProviderIdRecord, MappingIgnoreRecord } from '@/mapping/types';
 
 type ExportOverridesDeps = {
-  list(): MappingExternalIdRecord[];
+  list(): MappingProviderIdRecord[];
   listIgnores(): MappingIgnoreRecord[];
-  listRejectedCandidates(): MappingExternalIdRecord[];
-  listBlockedCandidates(): MappingExternalIdRecord[];
+  listRejectedCandidates(): MappingProviderIdRecord[];
+  listBlockedCandidates(): MappingProviderIdRecord[];
 };
 
 export async function exportStoredMappings(overridesService: ExportOverridesDeps) {
@@ -17,7 +17,7 @@ export async function exportStoredMappings(overridesService: ExportOverridesDeps
       {
         anilistId: entry.anilistId,
         provider: entry.provider,
-        externalId: entry.externalId,
+        providerId: entry.providerId,
         updatedAt: entry.updatedAt,
       },
     ]),
@@ -36,11 +36,11 @@ export async function exportStoredMappings(overridesService: ExportOverridesDeps
 
   const rejectedCandidates = Object.fromEntries(
     overridesService.listRejectedCandidates().map(entry => [
-      `${entry.provider}:${entry.anilistId}:${entry.externalId.kind}:${entry.externalId.id}`,
+      `${entry.provider}:${entry.anilistId}:${entry.providerId}`,
       {
         anilistId: entry.anilistId,
         provider: entry.provider,
-        externalId: entry.externalId,
+        providerId: entry.providerId,
         updatedAt: entry.updatedAt,
       },
     ]),
@@ -48,18 +48,18 @@ export async function exportStoredMappings(overridesService: ExportOverridesDeps
 
   const blockedCandidates = Object.fromEntries(
     overridesService.listBlockedCandidates().map(entry => [
-      `${entry.provider}:${entry.anilistId}:${entry.externalId.kind}:${entry.externalId.id}`,
+      `${entry.provider}:${entry.anilistId}:${entry.providerId}`,
       {
         anilistId: entry.anilistId,
         provider: entry.provider,
-        externalId: entry.externalId,
+        providerId: entry.providerId,
         updatedAt: entry.updatedAt,
       },
     ]),
   );
 
   return {
-    version: 2 as const,
+    version: 3 as const,
     exportedAt: new Date().toISOString(),
     summary: {
       overrideCount: Object.keys(overrides).length,

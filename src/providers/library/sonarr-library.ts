@@ -130,7 +130,7 @@ export class SonarrLibrary {
           normalized.code === ErrorCode.SONARR_NOT_CONFIGURED ||
           (normalized.code === ErrorCode.VALIDATION_ERROR && normalized.details?.reason === 'network-disabled')
         ) {
-          return { exists: false, tvdbId: null, externalId: null, anilistTvdbLinkMissing: true };
+          return { exists: false, tvdbId: null, anilistTvdbLinkMissing: true };
         }
         logError(normalized, `SonarrLibrary:getSeriesStatus:${payload.anilistId}`);
         throw normalized;
@@ -141,10 +141,10 @@ export class SonarrLibrary {
       if (import.meta.env.DEV) {
         console.debug(`[ani2arr | SonarrLibrary] status:result anilistId=${payload.anilistId} outcome=unresolved`);
       }
-      return { exists: false, tvdbId: null, externalId: null, anilistTvdbLinkMissing: true };
+      return { exists: false, tvdbId: null, anilistTvdbLinkMissing: true };
     }
 
-    const linked = new Set<number>(this.overridesService.getLinkedAniListIds('sonarr', { id: tvdbId, kind: 'tvdb' }));
+    const linked = new Set<number>(this.overridesService.getLinkedAniListIds('sonarr', tvdbId));
     for (const id of this.upstreamMappingStore.getAniListIdsForTvdb(tvdbId)) {
       linked.add(id);
     }
@@ -159,7 +159,6 @@ export class SonarrLibrary {
       return {
         exists: existsInCache,
         tvdbId,
-        externalId: { id: tvdbId, kind: 'tvdb' },
         ...(cachedSeries ? { series: cachedSeries } : {}),
         ...(successfulSynonym ? { successfulSynonym } : {}),
         ...(linkedAniListIds ? { linkedAniListIds } : {}),
@@ -187,7 +186,6 @@ export class SonarrLibrary {
       return {
         exists: true,
         tvdbId,
-        externalId: { id: tvdbId, kind: 'tvdb' },
         series: liveSeries,
         ...(successfulSynonym ? { successfulSynonym } : {}),
         ...(linkedAniListIds ? { linkedAniListIds } : {}),
@@ -211,7 +209,6 @@ export class SonarrLibrary {
     return {
       exists: false,
       tvdbId,
-      externalId: { id: tvdbId, kind: 'tvdb' },
       ...(lookupSeries ? { series: lookupSeries } : {}),
       ...(successfulSynonym ? { successfulSynonym } : {}),
       ...(linkedAniListIds ? { linkedAniListIds } : {}),

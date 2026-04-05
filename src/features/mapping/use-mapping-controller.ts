@@ -14,11 +14,11 @@ type Action =
   | { type: 'RESET_FROM_CURRENT' };
 
 function targetsEqual(
-  a?: MappingSearchResult['target'] | null,
-  b?: MappingSearchResult['target'] | null,
+  a?: Pick<MappingSearchResult, 'provider' | 'providerId'> | null,
+  b?: Pick<MappingSearchResult, 'provider' | 'providerId'> | null,
 ): boolean {
   if (!a || !b) return false;
-  return a.id === b.id && a.kind === b.kind;
+  return a.provider === b.provider && a.providerId === b.providerId;
 }
 
 function reducer(
@@ -116,7 +116,7 @@ export function useMappingController(input: {
       input.overrideActive &&
       optimisticMapping &&
       input.currentMapping &&
-      targetsEqual(optimisticMapping.target, input.currentMapping.target)
+      targetsEqual(optimisticMapping, input.currentMapping)
     ) {
       setOptimisticOverrideState(null);
     }
@@ -130,7 +130,7 @@ export function useMappingController(input: {
       if (
         optimisticMapping &&
         input.currentMapping &&
-        targetsEqual(optimisticMapping.target, input.currentMapping.target)
+        targetsEqual(optimisticMapping, input.currentMapping)
       ) {
         return input.currentMapping;
       }
@@ -143,14 +143,14 @@ export function useMappingController(input: {
     return optimisticMapping ?? null;
   }, [input.currentMapping, optimisticMapping, optimisticOverrideState]);
 
-  const effectiveTarget = effectiveCurrentMapping?.target ?? null;
+  const effectiveTarget = effectiveCurrentMapping ?? null;
 
   const hasActiveOverride = optimisticOverrideState === 'set' || input.overrideActive === true;
 
   const setQuery = useCallback((q: string) => dispatch({ type: 'SET_QUERY', query: q }), []);
   const selectResult = useCallback(
     (r: MappingSearchResult) =>
-      dispatch({ type: 'SELECT_RESULT', result: r, isDirty: !targetsEqual(r?.target ?? null, effectiveTarget) }),
+      dispatch({ type: 'SELECT_RESULT', result: r, isDirty: !targetsEqual(r, effectiveTarget) }),
     [effectiveTarget],
   );
   const clearSelection = useCallback(() => dispatch({ type: 'CLEAR_SELECTION' }), []);
@@ -160,14 +160,14 @@ export function useMappingController(input: {
 
   const canSubmit = Boolean(
     state.selected &&
-    !targetsEqual(state.selected?.target ?? null, effectiveTarget),
+    !targetsEqual(state.selected, effectiveTarget),
   );
 
   const handleSubmit = useCallback(async (options?: { force?: boolean }) => {
     if (!state.selected) return;
     setSubmitting(true);
     try {
-      await overrides.setOverride(state.selected.target, { force: options?.force === true });
+      await overrides.setOverride(state.selected.providerId, { force: options?.force === true });
       setOptimisticOverrideState('set');
       setOptimisticMapping(state.selected);
       dispatch({ type: 'RESET_FROM_CURRENT' });

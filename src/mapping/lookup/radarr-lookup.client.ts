@@ -11,10 +11,10 @@ export class RadarrLookupClient extends BaseLookupClient<RadarrLookupMovie> {
     private readonly radarrApi: RadarrClient,
     caches: LookupCaches<RadarrLookupMovie>,
   ) {
-    super('radarr', 'tmdb', 'RadarrLookupClient', caches);
+    super('radarr', 'RadarrLookupClient', caches);
   }
 
-  public getExternalId(result: unknown): number | null {
+  public getProviderId(result: unknown): number | null {
     const candidate = result as { tmdbId?: unknown } | null;
     return typeof candidate?.tmdbId === 'number' && Number.isFinite(candidate.tmdbId)
       ? candidate.tmdbId
