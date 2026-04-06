@@ -6,6 +6,7 @@ import type { StatusInput } from '@/rpc/schemas';
 import type { CheckSeriesStatusResponse } from '@/rpc/types';
 import type { MappingService } from '@/mapping/mapping.service';
 import type { MappingOverridesService } from '@/mapping/overrides';
+import type { ResolveProviderIdOptions } from '@/mapping/types';
 import type { UpstreamMappingStore } from '@/mapping/upstream';
 import { ErrorCode, logError, normalizeError } from '@/shared/errors';
 import { getExtensionOptionsSnapshot, getProviderCredentials, isProviderConfigured, type ExtensionOptions } from '@/options';
@@ -28,7 +29,7 @@ export class SonarrLibrary {
 
   constructor(
     private readonly sonarrClient: SonarrClient,
-    private readonly mappingService: Pick<MappingService, 'resolveTvdbId' | 'prioritizeAniListMedia'>,
+    private readonly mappingService: Pick<MappingService, 'resolveProviderId' | 'prioritizeAniListMedia'>,
     private readonly overridesService: Pick<MappingOverridesService, 'getLinkedAniListIds'>,
     private readonly upstreamMappingStore: Pick<UpstreamMappingStore, 'getAniListIdsForTvdb'>,
     caches: ProviderLibraryCaches<SonarrSeriesSnapshot>,
@@ -97,7 +98,7 @@ export class SonarrLibrary {
         }
       }
 
-      const mappingOptions: Parameters<MappingService['resolveTvdbId']>[1] = {};
+      const mappingOptions: ResolveProviderIdOptions = {};
       if (!isConfigured || options.network === 'never') mappingOptions.network = 'never';
       if (options.ignoreFailureCache) {
         mappingOptions.ignoreFailureCache = true;
@@ -106,7 +107,7 @@ export class SonarrLibrary {
       if (options.priority) mappingOptions.priority = options.priority;
       if (options.force_verify) mappingOptions.forceLookupNetwork = true;
 
-      const hints: NonNullable<NonNullable<typeof mappingOptions>['hints']> = {};
+      const hints: NonNullable<ResolveProviderIdOptions['hints']> = {};
       if (normalizedTitle) hints.primaryTitle = normalizedTitle;
       if (payload.metadata) hints.domMedia = payload.metadata;
       if (Object.keys(hints).length > 0) mappingOptions.hints = hints;
@@ -118,9 +119,9 @@ export class SonarrLibrary {
           );
         }
 
-        const mapping = await this.mappingService.resolveTvdbId(payload.anilistId, mappingOptions);
+        const mapping = await this.mappingService.resolveProviderId('sonarr', payload.anilistId, mappingOptions);
         if (mapping) {
-          tvdbId = mapping.tvdbId;
+          tvdbId = mapping.providerId;
           successfulSynonym = mapping.successfulSynonym;
         }
       } catch (error) {

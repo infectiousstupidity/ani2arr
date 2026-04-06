@@ -2,6 +2,18 @@
 // src/mapping/mapping.service.test.ts
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  clearExtensionMappingFailures,
+  removeExtensionMappingFailure,
+  writeExtensionMappingFailure,
+} from '@/mapping/cache/extension-mapping.cache';
+import { createError, ErrorCode } from '@/shared/errors';
+import {
+  FAILURE_HARD_TTL,
+  FAILURE_SOFT_TTL,
+  NETWORK_FAILURE_HARD_TTL,
+  NETWORK_FAILURE_SOFT_TTL,
+} from './constants';
 import { MappingService } from './mapping.service';
 
 vi.mock('@/mapping/cache/extension-mapping.cache', () => ({
@@ -35,7 +47,20 @@ type StubResolverStateStore = {
   clear: ReturnType<typeof vi.fn>;
 };
 
+type StubAniListApi = {
+  fetchMediaWithRelations: ReturnType<typeof vi.fn>;
+  prioritize: ReturnType<typeof vi.fn>;
+  removeMediaFromCache: ReturnType<typeof vi.fn>;
+};
+
 const createService = () => {
+  const anilistApi: StubAniListApi = {
+    fetchMediaWithRelations: vi.fn(async () => {
+      throw new Error('Unexpected AniList fetch');
+    }),
+    prioritize: vi.fn(),
+    removeMediaFromCache: vi.fn(async () => {}),
+  };
   const overrides: StubOverrides = {
     isIgnored: vi.fn(() => false),
     get: vi.fn(() => null),
@@ -44,6 +69,7 @@ const createService = () => {
   };
   const upstreamMappingStore = {
     get: vi.fn<(anilistId: number) => { tvdbId: number; source: 'primary' | 'fallback' } | null>(() => null),
+    init: vi.fn(async () => {}),
   };
   const resolverStateStore: StubResolverStateStore = {
     get: vi.fn(async () => null),
@@ -55,20 +81,25 @@ const createService = () => {
     sonarr: { reset: vi.fn(async () => {}) },
     radarr: { reset: vi.fn(async () => {}) },
   };
+  const notifyMappingsChanged = vi.fn();
 
   const service = new MappingService(
-    {} as never,
+    anilistApi as never,
     upstreamMappingStore as never,
     lookupClients as never,
     resolverStateStore as never,
     overrides as never,
+    notifyMappingsChanged,
   );
 
   return {
+    anilistApi,
     service,
     overrides,
     upstreamMappingStore,
     resolverStateStore,
+    lookupClients,
+    notifyMappingsChanged,
   };
 };
 
@@ -241,6 +272,138 @@ describe('MappingService', () => {
         }),
       }),
       expect.any(Object),
+    );
+  });
+
+  it('resolves from metadata hints before fetching AniList media', async () => {
+    const overrides: StubOverrides = {
+      isIgnored: vi.fn(() => false),
+      get: vi.fn(() => null),
+      clear: vi.fn(async () => {}),
+      getCandidateSuppression: vi.fn(() => null),
+    };
+    const upstreamMappingStore = {
+      get: vi.fn(() => null),
+    };
+    const resolverStateStore: StubResolverStateStore = {
+      get: vi.fn(async () => null),
+      set: vi.fn(async () => true),
+      delete: vi.fn(async () => false),
+      clear: vi.fn(async () => false),
+    };
+    const fetchMediaWithRelations = vi.fn(async () => {
+      throw new Error('Unexpected AniList fetch');
+    });
+    const lookupClient = {
+      provider: 'sonarr' as const,
+      reset: vi.fn(async () => {}),
+      readFromCache: vi.fn(async () => ({ results: [], hit: 'none' as const })),
+      lookup: vi.fn(async () => [
+        { title: 'Attack on Titan', tvdbId: 202, year: 2013 },
+      ]),
+      getProviderId: vi.fn((result: { tvdbId?: number }) => result.tvdbId ?? null),
+    };
+
+    const service = new MappingService(
+      {
+        fetchMediaWithRelations,
+        iteratePrequelChain: async function* () {
+          yield* [];
+        },
+      } as never,
+      upstreamMappingStore as never,
+      { sonarr: lookupClient, radarr: { reset: vi.fn(async () => {}) } } as never,
+      resolverStateStore as never,
+      overrides as never,
+    );
+
+    const result = await service.resolveProviderId('sonarr', 77, {
+      hints: {
+        domMedia: {
+          titles: { english: 'Attack on Titan' },
+          startYear: 2013,
+          format: 'TV',
+        },
+      },
+    });
+
+    expect(result).toMatchObject({ providerId: 202, reason: 'exact-title-match' });
+    expect(fetchMediaWithRelations).not.toHaveBeenCalled();
+  });
+
+  it('resets lookup clients, failure cache, resolver state, and notifications', async () => {
+    const { service, lookupClients, resolverStateStore, notifyMappingsChanged } = createService();
+
+    await service.resetLookupState();
+
+    expect(lookupClients.sonarr.reset).toHaveBeenCalledTimes(1);
+    expect(lookupClients.radarr.reset).toHaveBeenCalledTimes(1);
+    expect(clearExtensionMappingFailures).toHaveBeenCalledTimes(1);
+    expect(resolverStateStore.clear).toHaveBeenCalledTimes(1);
+    expect(notifyMappingsChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('delegates static pair initialization to the upstream mapping store', async () => {
+    const { service, upstreamMappingStore } = createService();
+
+    await service.initStaticPairs();
+
+    expect(upstreamMappingStore.init).toHaveBeenCalledTimes(1);
+  });
+
+  it('prioritizes AniList media through the optional API with the requested scheduling mode', () => {
+    const { service, anilistApi } = createService();
+
+    service.prioritizeAniListMedia(99, { schedule: true });
+
+    expect(anilistApi.prioritize).toHaveBeenCalledWith(99, { schedule: true });
+  });
+
+  it('evicts resolved state, clears the failure cache, evicts AniList media, and notifies listeners', async () => {
+    const { service, anilistApi, resolverStateStore, notifyMappingsChanged } = createService();
+
+    await service.evictResolved(44, 'radarr');
+
+    expect(resolverStateStore.delete).toHaveBeenCalledWith('radarr', 44);
+    expect(removeExtensionMappingFailure).toHaveBeenCalledWith('radarr', 44);
+    expect(anilistApi.removeMediaFromCache).toHaveBeenCalledWith(44);
+    expect(notifyMappingsChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('caches network failures with the shorter network TTLs', async () => {
+    const { service, anilistApi } = createService();
+    const error = createError(
+      ErrorCode.NETWORK_ERROR,
+      'Timed out reaching AniList.',
+      'Unable to connect right now.',
+    );
+    anilistApi.fetchMediaWithRelations.mockRejectedValue(error);
+
+    await expect(service.resolveProviderId('sonarr', 12)).rejects.toMatchObject({
+      code: ErrorCode.NETWORK_ERROR,
+    });
+
+    expect(writeExtensionMappingFailure).toHaveBeenCalledWith('sonarr', 12, error, {
+      staleMs: NETWORK_FAILURE_SOFT_TTL,
+      hardMs: NETWORK_FAILURE_HARD_TTL,
+    });
+  });
+
+  it('caches configuration failures with the default failure TTLs', async () => {
+    const { service } = createService();
+
+    await expect(service.resolveProviderId('radarr', 18)).rejects.toMatchObject({
+      code: ErrorCode.CONFIGURATION_ERROR,
+    });
+
+    expect(writeExtensionMappingFailure).toHaveBeenCalledWith(
+      'radarr',
+      18,
+      expect.objectContaining({ code: ErrorCode.CONFIGURATION_ERROR }),
+      {
+        staleMs: FAILURE_SOFT_TTL,
+        hardMs: FAILURE_HARD_TTL,
+      },
     );
   });
 });

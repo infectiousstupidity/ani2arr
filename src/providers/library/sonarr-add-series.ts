@@ -23,7 +23,7 @@ type AddSonarrSeriesInput = {
 
 type AddSonarrSeriesDeps = {
   client: Pick<SonarrClient, 'addSeries' | 'getTags' | 'createTag'>;
-  mappingService: Pick<MappingService, 'resolveTvdbId'>;
+  mappingService: Pick<MappingService, 'resolveProviderId'>;
   library: Pick<SonarrLibrary, 'addSeriesToCache'>;
 };
 
@@ -39,7 +39,7 @@ export async function addSonarrSeries(
   if (input.metadata) hints.domMedia = input.metadata;
   if (Object.keys(hints).length > 0) resolveOptions.hints = hints;
 
-  const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
+  const mapping = await mappingService.resolveProviderId('sonarr', input.anilistId, resolveOptions);
   if (!mapping) {
     throw createError(
       ErrorCode.VALIDATION_ERROR,
@@ -54,7 +54,7 @@ export async function addSonarrSeries(
     defaults: input.defaults,
     form: input.form,
     title: input.title,
-    tvdbId: mapping.tvdbId,
+    tvdbId: mapping.providerId,
   });
 
   const created = await client.addSeries(payload, input.credentials);
