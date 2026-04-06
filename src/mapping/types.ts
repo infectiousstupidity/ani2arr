@@ -4,6 +4,7 @@
 import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { Provider } from '@/providers';
 import type { RequestPriority } from '@/shared/utils/request-priority';
+import type { MappingReviewItem, MappingReviewSummary } from './review/review-types';
 
 /**
  * Legacy row/source classification still used by existing listing and filtering callers.
@@ -16,7 +17,9 @@ import type { RequestPriority } from '@/shared/utils/request-priority';
  * Prefer `acceptedEvidence`, `recentEvaluation`, and `resolverState` when you need
  * precise backend semantics.
  */
-export type MappingSource = 'manual' | 'upstream' | 'auto' | 'rejected' | 'ignored' | 'unresolved';
+export const MAPPING_SOURCE_VALUES = ['manual', 'upstream', 'auto', 'rejected', 'ignored', 'unresolved'] as const;
+
+export type MappingSource = (typeof MAPPING_SOURCE_VALUES)[number];
 
 /**
  * Library-facing status for the effective mapping row.
@@ -118,14 +121,6 @@ export interface MappingRecentEvaluationTrace {
 }
 
 /**
- * Conflict type projected from current effective state and exact upstream truth.
- *
- * These conflicts do not necessarily change the current effective mapping.
- * They explain why a row may need review.
- */
-export type MappingConflictKind = 'manual-upstream-conflict' | 'ignore-upstream-conflict';
-
-/**
  * User-owned suppression kind for a specific rejected candidate.
  *
  * This is intentionally candidate-scoped, not a blanket veto for the whole row.
@@ -190,6 +185,10 @@ export type MappingResolverState =
  *
  * - `resolverState`:
  *   carries the semantic resolver outcome without overloading `source`
+ *
+ * - `reviewSummary` / `reviewItems`:
+ *   projection-time review state derived from effective state, exact upstream truth,
+ *   and resolver-owned inherited evaluation outcomes
  */
 export interface MappingSummary {
   anilistId: number;
@@ -201,8 +200,8 @@ export interface MappingSummary {
   recentEvaluation?: MappingRecentEvaluationTrace;
 
   suppressionKind?: MappingSuppressionKind;
-  exactUpstreamProviderId?: number | null;
-  conflictKind?: MappingConflictKind;
+  reviewSummary?: MappingReviewSummary;
+  reviewItems?: readonly MappingReviewItem[];
   status: MappingStatus;
   updatedAt?: number;
   linkedAniListIds?: readonly number[];

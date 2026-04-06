@@ -17,7 +17,7 @@ export type ExportMappingsFilters = {
 };
 
 export type ExportMappingsPayload = {
-  version: 6;
+  version: 7;
   exportedAt: string;
   filters: ExportMappingsFilters;
   summary: {
@@ -50,8 +50,8 @@ export type ExportMappingsPayload = {
           acceptedEvidence?: MappingSummary['acceptedEvidence'];
           recentEvaluation?: MappingSummary['recentEvaluation'];
           suppressionKind?: MappingSummary['suppressionKind'];
-          exactUpstreamProviderId?: MappingSummary['exactUpstreamProviderId'];
-          conflictKind?: MappingSummary['conflictKind'];
+          reviewSummary?: MappingSummary['reviewSummary'];
+          reviewItems?: MappingSummary['reviewItems'];
           status: 'unmapped' | 'in-provider' | 'not-in-provider';
           updatedAt?: number;
           linkedAniListIds?: readonly number[];
@@ -264,8 +264,8 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
             ...(entry.acceptedEvidence ? { acceptedEvidence: entry.acceptedEvidence } : {}),
             ...(entry.recentEvaluation ? { recentEvaluation: entry.recentEvaluation } : {}),
             ...(entry.suppressionKind ? { suppressionKind: entry.suppressionKind } : {}),
-            ...(entry.exactUpstreamProviderId === undefined ? {} : { exactUpstreamProviderId: entry.exactUpstreamProviderId }),
-            ...(entry.conflictKind ? { conflictKind: entry.conflictKind } : {}),
+            ...(entry.reviewSummary ? { reviewSummary: entry.reviewSummary } : {}),
+            ...(entry.reviewItems ? { reviewItems: entry.reviewItems } : {}),
             status: entry.status,
             ...(entry.updatedAt === undefined ? {} : { updatedAt: entry.updatedAt }),
             ...(entry.linkedAniListIds ? { linkedAniListIds: entry.linkedAniListIds } : {}),
@@ -305,7 +305,7 @@ export const buildMappingsExportPayload = async (
   }
 
   return {
-    version: 6,
+    version: 7,
     exportedAt: new Date().toISOString(),
     filters: {
       providers: filters.providers,
