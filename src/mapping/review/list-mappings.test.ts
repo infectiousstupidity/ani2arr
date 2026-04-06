@@ -46,15 +46,21 @@ describe('listMappings', () => {
             provider: 'sonarr',
             state: 'mapped',
             providerId: 111,
-            acceptedSource: 'auto',
-            acceptedReason: 'fuzzy',
+            acceptedEvidence: {
+              source: 'auto',
+              reason: 'fuzzy-match',
+            },
             updatedAt: 50,
           },
           {
             anilistId: 2,
             provider: 'radarr',
             state: 'unresolved',
-            title: 'Missing Movie',
+            recentEvaluation: {
+              attemptedAt: 75,
+              searchTerms: ['Missing Movie'],
+              candidates: [],
+            },
             updatedAt: 75,
           },
         ]),
@@ -66,8 +72,10 @@ describe('listMappings', () => {
       provider: 'sonarr',
       source: 'upstream',
       providerId: 222,
-      acceptedSource: 'upstream',
-      acceptedReason: 'exact',
+      acceptedEvidence: {
+        source: 'upstream',
+        reason: 'exact-upstream',
+      },
       resolverState: 'mapped',
     });
     expect(result.mappings.find(entry => entry.anilistId === 2)).toMatchObject({
@@ -103,7 +111,11 @@ describe('listMappings', () => {
             anilistId: 44,
             provider: 'radarr',
             state: 'unresolved',
-            title: 'Needle Movie',
+            recentEvaluation: {
+              attemptedAt: 10,
+              searchTerms: ['Needle Movie'],
+              candidates: [],
+            },
             updatedAt: 10,
           },
         ]),
@@ -157,8 +169,10 @@ describe('listMappings', () => {
       provider: 'sonarr',
       providerId: 777,
       source: 'manual',
-      acceptedSource: 'manual',
-      acceptedReason: 'exact',
+      acceptedEvidence: {
+        source: 'manual',
+        reason: 'manual-override',
+      },
       resolverState: 'mapped',
       exactUpstreamProviderId: 555,
       conflictKind: 'manual-upstream-conflict',
@@ -204,8 +218,10 @@ describe('listMappings', () => {
       provider: 'radarr',
       providerId: 1234,
       source: 'manual',
-      acceptedSource: 'manual',
-      acceptedReason: 'exact',
+      acceptedEvidence: {
+        source: 'manual',
+        reason: 'manual-override',
+      },
       resolverState: 'mapped',
     });
     expect(row!.conflictKind).toBeUndefined();
@@ -292,8 +308,10 @@ describe('listMappings', () => {
       provider: 'sonarr',
       providerId: 444,
       source: 'upstream',
-      acceptedSource: 'upstream',
-      acceptedReason: 'exact',
+      acceptedEvidence: {
+        source: 'upstream',
+        reason: 'exact-upstream',
+      },
       suppressedProviderId: 999,
       suppressionKind: 'rejected-candidate',
       resolverState: 'mapped',
@@ -327,18 +345,46 @@ describe('listMappings', () => {
             provider: 'sonarr',
             state: 'mapped',
             providerId: 900,
-            acceptedSource: 'auto',
-            acceptedReason: 'fuzzy',
+            acceptedEvidence: {
+              source: 'auto',
+              reason: 'fuzzy-match',
+            },
+            recentEvaluation: {
+              attemptedAt: 90,
+              searchTerms: ['Auto Candidate'],
+              candidates: [
+                {
+                  providerId: 900,
+                  title: 'Auto Candidate',
+                  source: 'auto',
+                  reason: 'fuzzy-match',
+                  status: 'accepted',
+                  summary: 'Fuzzy title match',
+                  score: 0.81,
+                },
+              ],
+            },
             updatedAt: 90,
           },
           {
             anilistId: 10,
             provider: 'radarr',
             state: 'verification-failed',
-            providerId: 501,
-            candidateSource: 'auto',
-            candidateReason: 'relation',
-            title: 'Needs Verification',
+            recentEvaluation: {
+              attemptedAt: 80,
+              searchTerms: ['Needs Verification'],
+              candidates: [
+                {
+                  providerId: 501,
+                  title: 'Needs Verification',
+                  source: 'auto',
+                  reason: 'verified-inherited',
+                  status: 'suppressed',
+                  summary: 'Inherited from related AniList mapping suppressed',
+                  score: 0.9,
+                },
+              ],
+            },
             updatedAt: 80,
           },
         ]),
@@ -349,16 +395,27 @@ describe('listMappings', () => {
       provider: 'sonarr',
       source: 'auto',
       providerId: 900,
-      acceptedSource: 'auto',
-      acceptedReason: 'fuzzy',
+      acceptedEvidence: {
+        source: 'auto',
+        reason: 'fuzzy-match',
+      },
       resolverState: 'mapped',
     });
     expect(result.mappings.find(entry => entry.anilistId === 10)).toMatchObject({
       provider: 'radarr',
       source: 'unresolved',
       resolverState: 'verification-failed',
-      candidateSource: 'auto',
-      candidateReason: 'relation',
+      recentEvaluation: {
+        attemptedAt: 80,
+        searchTerms: ['Needs Verification'],
+        candidates: [
+          expect.objectContaining({
+            providerId: 501,
+            reason: 'verified-inherited',
+            status: 'suppressed',
+          }),
+        ],
+      },
       providerMeta: { title: 'Needs Verification', type: 'movie' },
     });
     expect(result.mappings.find(entry => entry.anilistId === 10)?.source).toBe('unresolved');

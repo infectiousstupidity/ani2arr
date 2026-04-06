@@ -18,7 +18,11 @@ describe('ResolverStateStore', () => {
     vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
     const unresolvedState = {
       state: 'unresolved',
-      title: 'Title',
+      recentEvaluation: {
+        attemptedAt: 1,
+        searchTerms: ['Title'],
+        candidates: [],
+      },
     } as Omit<ResolverStateRecord, 'updatedAt'>;
 
     expect(
@@ -53,8 +57,10 @@ describe('ResolverStateStore', () => {
     const mappedState = {
       state: 'mapped',
       providerId: 99,
-      acceptedSource: 'auto',
-      acceptedReason: 'fuzzy',
+      acceptedEvidence: {
+        source: 'auto',
+        reason: 'fuzzy-match',
+      },
     } as Omit<ResolverStateRecord, 'updatedAt'>;
 
     await store.set(
@@ -77,5 +83,30 @@ describe('ResolverStateStore', () => {
     expect(await store.list()).toEqual([]);
     expect(persistSpy).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
+  });
+
+  it('round-trips recent evaluation traces, including suppressed candidates', async () => {
+    const unresolvedState = {
+      state: 'unresolved',
+      recentEvaluation: {
+        attemptedAt: 123,
+        searchTerms: ['Needle Movie'],
+        candidates: [
+          {
+            providerId: 555,
+            title: 'Needle Movie',
+            source: 'auto',
+            reason: 'borrowed-base-title-fallback',
+            status: 'suppressed',
+            summary: 'Borrowed base-title fallback suppressed',
+            score: 0.82,
+          },
+        ],
+      },
+    } as Omit<ResolverStateRecord, 'updatedAt'>;
+
+    await store.set('radarr', 44, unresolvedState, { staleMs: 1000, hardMs: 2000 });
+
+    expect(await store.get('radarr', 44)).toMatchObject(unresolvedState);
   });
 });

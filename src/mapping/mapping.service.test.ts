@@ -15,6 +15,12 @@ vi.mock('@/debug/metrics', () => ({
   incrementCounter: vi.fn(),
 }));
 
+vi.mock('@/options', () => ({
+  getExtensionOptionsSnapshot: vi.fn(async () => ({ sonarr: { url: 'http://localhost:8989', apiKey: 'test-key' } })),
+  getProviderCredentials: vi.fn((options: { sonarr?: { url: string; apiKey: string } }, provider: string) =>
+    provider === 'sonarr' ? options.sonarr ?? null : null),
+}));
+
 type StubOverrides = {
   isIgnored: ReturnType<typeof vi.fn>;
   get: ReturnType<typeof vi.fn>;
@@ -78,7 +84,7 @@ describe('MappingService', () => {
 
     const result = await service.resolveProviderId('sonarr', 1);
 
-    expect(result).toMatchObject({ providerId: 222, reason: 'exact' });
+    expect(result).toMatchObject({ providerId: 222, reason: 'exact-upstream' });
     expect(overrides.clear).toHaveBeenCalledWith('sonarr', 1);
     expect(resolverStateStore.set).toHaveBeenCalledWith(
       'sonarr',
@@ -86,8 +92,10 @@ describe('MappingService', () => {
       expect.objectContaining({
         state: 'mapped',
         providerId: 222,
-        acceptedSource: 'upstream',
-        acceptedReason: 'exact',
+        acceptedEvidence: expect.objectContaining({
+          source: 'upstream',
+          reason: 'exact-upstream',
+        }),
       }),
       expect.any(Object),
     );
@@ -100,7 +108,7 @@ describe('MappingService', () => {
 
     const result = await service.resolveProviderId('sonarr', 1);
 
-    expect(result).toMatchObject({ providerId: 222, reason: 'exact' });
+    expect(result).toMatchObject({ providerId: 222, reason: 'manual-override' });
     expect(overrides.clear).not.toHaveBeenCalled();
     expect(resolverStateStore.set).not.toHaveBeenCalled();
   });
@@ -114,15 +122,17 @@ describe('MappingService', () => {
 
     const result = await service.resolveProviderId('sonarr', 7);
 
-    expect(result).toMatchObject({ providerId: 444, reason: 'exact' });
+    expect(result).toMatchObject({ providerId: 444, reason: 'exact-upstream' });
     expect(resolverStateStore.set).toHaveBeenCalledWith(
       'sonarr',
       7,
       expect.objectContaining({
         state: 'mapped',
         providerId: 444,
-        acceptedSource: 'upstream',
-        acceptedReason: 'exact',
+        acceptedEvidence: expect.objectContaining({
+          source: 'upstream',
+          reason: 'exact-upstream',
+        }),
       }),
       expect.any(Object),
     );
@@ -134,14 +144,103 @@ describe('MappingService', () => {
     resolverStateStore.get.mockResolvedValue({
       state: 'mapped',
       providerId: 999,
-      acceptedSource: 'auto',
-      acceptedReason: 'fuzzy',
+      acceptedEvidence: {
+        source: 'auto',
+        reason: 'fuzzy-match',
+      },
       updatedAt: 10,
     });
 
     const result = await service.resolveProviderId('sonarr', 5);
 
-    expect(result).toMatchObject({ providerId: 333, reason: 'exact' });
+    expect(result).toMatchObject({ providerId: 333, reason: 'exact-upstream' });
     expect(resolverStateStore.get).not.toHaveBeenCalled();
+  });
+
+  it('records recent evaluation trace candidates across rejected hint and accepted pipeline results', async () => {
+    const overrides: StubOverrides = {
+      isIgnored: vi.fn(() => false),
+      get: vi.fn(() => null),
+      clear: vi.fn(async () => {}),
+      getCandidateSuppression: vi.fn(
+        (_provider: string, _anilistId: number, providerId: number) => (providerId === 101 ? 'rejected' : null),
+      ),
+    };
+    const upstreamMappingStore = {
+      get: vi.fn(() => null),
+    };
+    const resolverStateStore: StubResolverStateStore = {
+      get: vi.fn(async () => null),
+      set: vi.fn(async () => true),
+      delete: vi.fn(async () => false),
+      clear: vi.fn(async () => false),
+    };
+    let rejectedHintHits = 0;
+    const lookupClient = {
+      provider: 'sonarr' as const,
+      reset: vi.fn(async () => {}),
+      readFromCache: vi.fn(async () => ({ results: [], hit: 'none' as const })),
+      lookup: vi.fn(async (_canonical: string, rawTerm: string) => {
+        if (rawTerm === 'Rejected Hint') {
+          rejectedHintHits += 1;
+          return rejectedHintHits === 1
+            ? [{ title: 'Rejected Hint', tvdbId: 101, year: 2013 }]
+            : [];
+        }
+        return [
+          { title: 'Attack on Titan', tvdbId: 202, year: 2013 },
+          { title: 'Attack Titan', tvdbId: 303, year: 2013 },
+        ];
+      }),
+      getProviderId: vi.fn((result: { tvdbId?: number }) => result.tvdbId ?? null),
+    };
+
+    const service = new MappingService(
+      {
+        fetchMediaWithRelations: vi.fn(async () => ({
+          id: 77,
+          format: 'TV',
+          title: { english: 'Attack on Titan' },
+          synonyms: [],
+          startDate: { year: 2013 },
+        })),
+        iteratePrequelChain: async function* () {
+          yield* [];
+        },
+      } as never,
+      upstreamMappingStore as never,
+      { sonarr: lookupClient, radarr: { reset: vi.fn(async () => {}) } } as never,
+      resolverStateStore as never,
+      overrides as never,
+    );
+
+    const result = await service.resolveProviderId('sonarr', 77, {
+      hints: {
+        primaryTitle: 'Rejected Hint',
+      },
+    });
+
+    expect(result).toMatchObject({ providerId: 202, reason: 'exact-title-match' });
+    expect(resolverStateStore.set).toHaveBeenCalledWith(
+      'sonarr',
+      77,
+      expect.objectContaining({
+        state: 'mapped',
+        providerId: 202,
+        acceptedEvidence: expect.objectContaining({
+          source: 'auto',
+          reason: 'exact-title-match',
+        }),
+        recentEvaluation: expect.objectContaining({
+          searchTerms: ['Rejected Hint', 'Attack on Titan'],
+          candidates: expect.arrayContaining([
+            expect.objectContaining({ providerId: 101, status: 'rejected' }),
+            expect.objectContaining({ providerId: 202, status: 'accepted' }),
+            expect.objectContaining({ providerId: 303, status: 'not-accepted' }),
+          ]),
+        }),
+      }),
+      expect.any(Object),
+    );
   });
 });

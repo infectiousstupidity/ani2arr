@@ -4,7 +4,7 @@
 import { generateSearchTerms, isSeasonalCanonicalTokens } from './search-term-generator';
 import { scoreCandidates } from './scoring';
 import { maybeEarlyStop, pickBest } from './early-stop';
-import type { EvaluationOutcome, AniListMedia } from './types';
+import type { EvaluationOutcome, AniListMedia, PipelineEvaluatedCandidate } from './types';
 import {
   canonicalTitleKeyForProvider,
   sanitizeLookupDisplayForProvider,
@@ -16,6 +16,39 @@ import type { RequestPriority } from '@/shared/utils/request-priority';
 import type { AniListMediaService } from '@/anilist';
 import type { ProviderCredentials } from '@/providers';
 import type { ProviderLookupClient, ProviderLookupResult } from '../lookup';
+
+const TRACE_CANDIDATE_LIMIT = 8;
+
+function addTraceCandidates(
+  registry: Map<number, PipelineEvaluatedCandidate>,
+  scored: ReturnType<typeof scoreCandidates>,
+  lookupClient: ProviderLookupClient<ProviderCredentials, ProviderLookupResult>,
+): void {
+  for (const candidate of scored) {
+    const providerId = lookupClient.getProviderId(candidate.result);
+    if (providerId === null) {
+      continue;
+    }
+
+    const next: PipelineEvaluatedCandidate = {
+      providerId,
+      title: candidate.result.title,
+      reason: candidate.reason,
+      score: candidate.score,
+      searchTerm: candidate.term.display,
+    };
+    const existing = registry.get(providerId);
+    if (!existing || next.score > existing.score) {
+      registry.set(providerId, next);
+    }
+  }
+}
+
+function finalizeTraceCandidates(registry: Map<number, PipelineEvaluatedCandidate>): PipelineEvaluatedCandidate[] {
+  return [...registry.values()]
+    .toSorted((left, right) => right.score - left.score)
+    .slice(0, TRACE_CANDIDATE_LIMIT);
+}
 
 
 export async function resolveViaPipeline(
@@ -45,6 +78,7 @@ export async function resolveViaPipeline(
   const mediaYear = media.startDate?.year ?? undefined;
   const provider = ctx.lookupClient.provider;
   const terms = generateSearchTerms(provider, media.title ?? ({} as Record<string, never>), media.synonyms);
+  const traceCandidates = new Map<number, PipelineEvaluatedCandidate>();
 
   if (primaryTitleHint) {
     const trimmed = primaryTitleHint.trim();
@@ -61,6 +95,7 @@ export async function resolveViaPipeline(
       }
     }
   }
+  const traceSearchTerms = terms.slice(0, ctx.limits.maxTerms).map((term) => term.display);
 
   let overall: ReturnType<typeof scoreCandidates>[number][] = [];
   const start = Date.now();
@@ -96,6 +131,7 @@ export async function resolveViaPipeline(
 
     const scored = scoreCandidates(provider, term, results, mediaYear);
     overall = [...overall, ...scored];
+  addTraceCandidates(traceCandidates, scored, ctx.lookupClient);
 
     // Mark canonical as seen once we've either looked up or confirmed a cache hit
     ctx.sessionSeenCanonical.add(term.canonical);
@@ -115,6 +151,8 @@ export async function resolveViaPipeline(
         reason: early.pick.reason,
         confidence: early.pick.score,
         successfulSynonym: early.pick.term.display,
+        searchTerms: traceSearchTerms,
+        candidates: finalizeTraceCandidates(traceCandidates),
       };
       if (import.meta.env.DEV) {
         ctx.log.debug?.(
@@ -133,7 +171,12 @@ export async function resolveViaPipeline(
   if (pick) {
     const providerId = ctx.lookupClient.getProviderId(pick.result);
     if (providerId === null) {
-      return { status: 'unresolved', reason: 'missing-provider-id' };
+      return {
+        status: 'unresolved',
+        reason: 'missing-provider-id',
+        searchTerms: traceSearchTerms,
+        candidates: finalizeTraceCandidates(traceCandidates),
+      };
     }
     const out: EvaluationOutcome = {
       status: 'resolved',
@@ -141,6 +184,8 @@ export async function resolveViaPipeline(
       reason: pick.reason,
       confidence: pick.score,
       successfulSynonym: pick.term.display,
+      searchTerms: traceSearchTerms,
+      candidates: finalizeTraceCandidates(traceCandidates),
     };
     if (import.meta.env.DEV) {
       ctx.log.debug?.(
@@ -153,5 +198,10 @@ export async function resolveViaPipeline(
   if (import.meta.env.DEV) {
     ctx.log.debug?.(`pipeline:unresolved anilistId=${media.id} reason=low-confidence`);
   }
-  return { status: 'unresolved', reason: 'low-confidence' };
+  return {
+    status: 'unresolved',
+    reason: 'low-confidence',
+    searchTerms: traceSearchTerms,
+    candidates: finalizeTraceCandidates(traceCandidates),
+  };
 }

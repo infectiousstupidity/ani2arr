@@ -5,7 +5,7 @@ import type { SearchTerm } from './search-term-generator';
 import type { MappingAcceptedReason } from '../types';
 import type { ProviderLookupResult } from '../lookup';
 
-export type PipelineMatchReason = Extract<MappingAcceptedReason, 'exact' | 'fuzzy'>;
+export type PipelineMatchReason = Extract<MappingAcceptedReason, 'exact-title-match' | 'fuzzy-match'>;
 
 export interface ScoredCandidate<TResult extends ProviderLookupResult = ProviderLookupResult>
 {
@@ -19,6 +19,14 @@ export interface ScoredCandidate<TResult extends ProviderLookupResult = Provider
   breakdown?: Record<string, number>;
 }
 
+export interface PipelineEvaluatedCandidate {
+  providerId: number;
+  title: string;
+  reason: PipelineMatchReason;
+  score: number;
+  searchTerm: string;
+}
+
 export type EvaluationOutcome =
   | {
     status: 'resolved';
@@ -26,10 +34,14 @@ export type EvaluationOutcome =
     reason: MappingAcceptedReason;
     confidence: number;
     successfulSynonym?: string;
+    searchTerms: string[];
+    candidates: PipelineEvaluatedCandidate[];
   }
   | {
     status: 'unresolved';
     reason: string;
+    searchTerms: string[];
+    candidates: PipelineEvaluatedCandidate[];
   };
 
 export {type AniListMedia} from '@/anilist/schemas/media.schema';

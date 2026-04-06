@@ -124,7 +124,7 @@ export function computeTitleMatchEvidenceForProvider(params: {
   const candidateVariants = extractCandidateTitleVariants(params.provider, params.candidate);
 
   if (queryVariants.length === 0 || candidateVariants.length === 0) {
-    return { score: 0, reason: 'fuzzy' };
+    return { score: 0, reason: 'fuzzy-match' };
   }
 
   let bestScore = 0;
@@ -193,7 +193,7 @@ export function computeTitleMatchEvidenceForProvider(params: {
 
   return {
     score: clampScore(bestScore),
-    reason: bestExact || bestCompact ? 'exact' : 'fuzzy',
+    reason: bestExact || bestCompact ? 'exact-title-match' : 'fuzzy-match',
   };
 }
 

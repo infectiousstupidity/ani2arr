@@ -101,17 +101,29 @@ export async function listMappings(
     providerId: MappingSummary['providerId'];
     suppressedProviderId?: MappingSummary['suppressedProviderId'];
     source: MappingSource;
-    acceptedSource?: MappingSummary['acceptedSource'];
-    acceptedReason?: MappingSummary['acceptedReason'];
-    candidateSource?: MappingSummary['candidateSource'];
-    candidateReason?: MappingSummary['candidateReason'];
+    acceptedEvidence?: MappingSummary['acceptedEvidence'];
+    recentEvaluation?: MappingSummary['recentEvaluation'];
     suppressionKind?: MappingSummary['suppressionKind'];
     exactUpstreamProviderId?: MappingSummary['exactUpstreamProviderId'];
     conflictKind?: MappingSummary['conflictKind'];
     resolverState?: MappingSummary['resolverState'];
     updatedAt: number;
     hadResolveAttempt?: boolean;
-    title?: string;
+  };
+
+  const resolveRecentEvaluationTitle = (
+    recentEvaluation: MappingSummary['recentEvaluation'] | undefined,
+  ): string | undefined => {
+    if (!recentEvaluation) {
+      return undefined;
+    }
+
+    const candidateTitle = recentEvaluation.candidates.find((candidate) => candidate.title)?.title?.trim();
+    if (candidateTitle) {
+      return candidateTitle;
+    }
+
+    return recentEvaluation.searchTerms?.find((term) => term.trim().length > 0)?.trim();
   };
 
   const createKey = (provider: MappingSummary['provider'], anilistId: number): string => `${provider}:${anilistId}`;
@@ -209,9 +221,14 @@ export async function listMappings(
           provider,
           providerId: manual.providerId,
           source: 'upstream',
-          acceptedSource: 'upstream',
-          acceptedReason: 'exact',
+          acceptedEvidence: {
+            source: 'upstream',
+            reason: 'exact-upstream',
+          },
           resolverState: 'mapped',
+          ...(resolverState?.state === 'mapped' && resolverState.recentEvaluation
+            ? { recentEvaluation: resolverState.recentEvaluation }
+            : {}),
           updatedAt: maxUpdatedAt(
             manual.updatedAt,
             resolverState?.state === 'mapped' ? resolverState.updatedAt : undefined,
@@ -228,8 +245,10 @@ export async function listMappings(
         provider,
         providerId: manual.providerId,
         source: 'manual',
-        acceptedSource: 'manual',
-        acceptedReason: 'exact',
+        acceptedEvidence: {
+          source: 'manual',
+          reason: 'manual-override',
+        },
         resolverState: 'mapped',
         exactUpstreamProviderId: upstream?.providerId ?? null,
         ...(upstream ? { conflictKind: 'manual-upstream-conflict' as const } : {}),
@@ -279,9 +298,14 @@ export async function listMappings(
           provider,
           providerId: upstream.providerId,
           source: 'upstream',
-          acceptedSource: 'upstream',
-          acceptedReason: 'exact',
+          acceptedEvidence: {
+            source: 'upstream',
+            reason: 'exact-upstream',
+          },
           resolverState: 'mapped',
+          ...(resolverState?.state === 'mapped' && resolverState.recentEvaluation
+            ? { recentEvaluation: resolverState.recentEvaluation }
+            : {}),
           updatedAt: resolverState?.state === 'mapped' ? resolverState.updatedAt : 0,
         },
         rejected,
@@ -291,12 +315,12 @@ export async function listMappings(
         anilistId,
         provider,
         providerId: resolverState.providerId,
-        source: resolverState.acceptedSource,
-        acceptedSource: resolverState.acceptedSource,
-        acceptedReason: resolverState.acceptedReason,
+        source: resolverState.acceptedEvidence.source,
+        acceptedEvidence: resolverState.acceptedEvidence,
+        ...(resolverState.recentEvaluation ? { recentEvaluation: resolverState.recentEvaluation } : {}),
         resolverState: 'mapped',
         updatedAt: resolverState.updatedAt,
-        hadResolveAttempt: resolverState.acceptedSource === 'auto',
+        hadResolveAttempt: resolverState.acceptedEvidence.source === 'auto',
       };
     } else if (rejected) {
       candidate = {
@@ -316,15 +340,9 @@ export async function listMappings(
         providerId: null,
         source: 'unresolved',
         resolverState: resolverState.state,
-        ...(resolverState.state === 'verification-failed'
-          ? {
-              candidateSource: resolverState.candidateSource,
-              candidateReason: resolverState.candidateReason,
-            }
-          : {}),
+        ...(resolverState.recentEvaluation ? { recentEvaluation: resolverState.recentEvaluation } : {}),
         updatedAt: resolverState.updatedAt,
         hadResolveAttempt: true,
-        ...(resolverState.title ? { title: resolverState.title } : {}),
       };
     }
 
@@ -351,6 +369,8 @@ export async function listMappings(
         ? ''
         : String(summary.exactUpstreamProviderId),
       summary.providerMeta?.title ?? '',
+      ...(summary.recentEvaluation?.searchTerms ?? []),
+      ...((summary.recentEvaluation?.candidates ?? []).map((candidate) => candidate.title ?? String(candidate.providerId))),
     ];
     const haystack = haystackParts.join(' ').toLowerCase();
     return haystack.includes(normalizedQuery);
@@ -407,11 +427,14 @@ export async function listMappings(
           type: 'movie' as const,
           ...(statusLabel ? { statusLabel } : {}),
         };
-      } else if (candidate.title) {
-        providerMeta = {
-          title: candidate.title,
-          type: candidate.provider === 'sonarr' ? 'series' : 'movie',
-        };
+      } else {
+        const evaluationTitle = resolveRecentEvaluationTitle(candidate.recentEvaluation);
+        if (evaluationTitle) {
+          providerMeta = {
+            title: evaluationTitle,
+            type: candidate.provider === 'sonarr' ? 'series' : 'movie',
+          };
+        }
       }
     }
     const hadResolveAttempt =
@@ -427,10 +450,8 @@ export async function listMappings(
       providerId,
       ...(candidate.suppressedProviderId === undefined ? {} : { suppressedProviderId: candidate.suppressedProviderId }),
       source: candidate.source,
-      ...(candidate.acceptedSource ? { acceptedSource: candidate.acceptedSource } : {}),
-      ...(candidate.acceptedReason ? { acceptedReason: candidate.acceptedReason } : {}),
-      ...(candidate.candidateSource ? { candidateSource: candidate.candidateSource } : {}),
-      ...(candidate.candidateReason ? { candidateReason: candidate.candidateReason } : {}),
+      ...(candidate.acceptedEvidence ? { acceptedEvidence: candidate.acceptedEvidence } : {}),
+      ...(candidate.recentEvaluation ? { recentEvaluation: candidate.recentEvaluation } : {}),
       ...(candidate.suppressionKind ? { suppressionKind: candidate.suppressionKind } : {}),
       ...(candidate.exactUpstreamProviderId === undefined ? {} : { exactUpstreamProviderId: candidate.exactUpstreamProviderId }),
       ...(candidate.conflictKind ? { conflictKind: candidate.conflictKind } : {}),
