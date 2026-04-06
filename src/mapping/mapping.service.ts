@@ -43,6 +43,8 @@ import { resolveViaPipeline } from './pipeline/pipeline';
 import { ResolverStateStore } from './resolver-state/resolver-state.store';
 import { UpstreamMappingStore } from './upstream';
 import type {
+  MappingAcceptedReason,
+  MappingAcceptedSource,
   MappingResolvedSource,
   ResolveProviderIdOptions,
   ResolvedMapping,
@@ -187,7 +189,7 @@ export class MappingService {
           logError(normalizeError(error), `MappingService:clearOverride:${provider}:${anilistId}`);
         }
 
-        return this.acceptResolved(provider, anilistId, { providerId: staticProviderId }, 'upstream');
+        return this.acceptResolved(provider, anilistId, { providerId: staticProviderId, reason: 'exact' }, 'upstream');
       }
 
       if (import.meta.env.DEV) {
@@ -195,29 +197,43 @@ export class MappingService {
           `mapping:override-hit provider=${provider} anilistId=${anilistId} providerId=${overrideProviderId}`,
         );
       }
-      return { providerId: overrideProviderId };
+      return { providerId: overrideProviderId, reason: 'exact' };
     }
 
     const staticProviderId = this.getUpstreamStaticProviderId(provider, anilistId);
     if (staticProviderId !== null) {
       incrementCounter('mapping.lookup.static_hit');
-      return this.acceptResolved(provider, anilistId, { providerId: staticProviderId }, 'upstream');
+      return this.acceptResolved(provider, anilistId, { providerId: staticProviderId, reason: 'exact' }, 'upstream');
     }
 
-    const resolverState = await this.resolverStateStore.get(provider, anilistId);
+    let resolverState = await this.resolverStateStore.get(provider, anilistId);
     if (resolverState?.state === 'mapped') {
       if (import.meta.env.DEV) {
         this.log.debug?.(
-          `mapping:resolver-state-hit provider=${provider} anilistId=${anilistId} providerId=${resolverState.providerId} source=${resolverState.source}`,
+          `mapping:resolver-state-hit provider=${provider} anilistId=${anilistId} providerId=${resolverState.providerId} source=${resolverState.acceptedSource} reason=${resolverState.acceptedReason}`,
         );
       }
-      if (this.isCandidateSuppressed(provider, anilistId, resolverState.providerId)) {
-        return null;
+      if (
+        this.isResolvedCandidateSuppressed(
+          provider,
+          anilistId,
+          {
+            providerId: resolverState.providerId,
+            reason: resolverState.acceptedReason,
+            ...(resolverState.successfulSynonym ? { successfulSynonym: resolverState.successfulSynonym } : {}),
+          },
+          resolverState.acceptedSource,
+        )
+      ) {
+        await this.clearResolverState(provider, anilistId);
+        resolverState = null;
+      } else {
+        return {
+          providerId: resolverState.providerId,
+          reason: resolverState.acceptedReason,
+          ...(resolverState.successfulSynonym ? { successfulSynonym: resolverState.successfulSynonym } : {}),
+        };
       }
-      return {
-        providerId: resolverState.providerId,
-        ...(resolverState.successfulSynonym ? { successfulSynonym: resolverState.successfulSynonym } : {}),
-      };
     }
 
     if (!bypassFailureCache) {
@@ -261,7 +277,14 @@ export class MappingService {
           options.forceLookupNetwork === true,
         );
         if (hinted) {
-          return this.acceptResolved(provider, anilistId, hinted, 'auto');
+          if (!this.isResolvedCandidateSuppressed(provider, anilistId, hinted, 'auto')) {
+            return this.acceptResolved(provider, anilistId, hinted, 'auto');
+          }
+          if (import.meta.env.DEV) {
+            this.log.debug?.(
+              `mapping:hint-suppressed provider=${provider} anilistId=${anilistId} providerId=${hinted.providerId} reason=${hinted.reason}`,
+            );
+          }
         }
       } catch (error) {
         logError(normalizeError(error), `MappingService:hintLookup:${provider}:${anilistId}`);
@@ -280,7 +303,8 @@ export class MappingService {
     const mappedState: Omit<Extract<ResolverStateRecord, { state: 'mapped' }>, 'updatedAt'> = {
       state: 'mapped',
       providerId: resolved.providerId,
-      source,
+      acceptedSource: source,
+      acceptedReason: resolved.reason,
       ...(resolved.successfulSynonym ? { successfulSynonym: resolved.successfulSynonym } : {}),
     };
 
@@ -300,9 +324,6 @@ export class MappingService {
         `mapping:persist-resolved-failed provider=${provider} anilistId=${anilistId}`,
         normalized,
       );
-      return null;
-    }
-    if (this.isCandidateSuppressed(provider, anilistId, resolved.providerId)) {
       return null;
     }
     this.notifyMappingsChanged?.();
@@ -424,8 +445,13 @@ export class MappingService {
         priority,
         forceLookupNetwork,
       );
-      if (resolved) {
+      if (resolved && !this.isResolvedCandidateSuppressed(provider, anilistId, resolved, 'auto')) {
         return resolved;
+      }
+      if (resolved && import.meta.env.DEV) {
+        this.log.debug?.(
+          `mapping:metadata-candidate-suppressed provider=${provider} anilistId=${anilistId} providerId=${resolved.providerId} reason=${resolved.reason}`,
+        );
       }
     }
 
@@ -443,8 +469,13 @@ export class MappingService {
       priority,
       forceLookupNetwork,
     );
-    if (apiResolved) {
+    if (apiResolved && !this.isResolvedCandidateSuppressed(provider, anilistId, apiResolved, 'auto')) {
       return apiResolved;
+    }
+    if (apiResolved && import.meta.env.DEV) {
+      this.log.debug?.(
+        `mapping:api-candidate-suppressed provider=${provider} anilistId=${anilistId} providerId=${apiResolved.providerId} reason=${apiResolved.reason}`,
+      );
     }
 
     this.log.debug(`resolveViaNetwork: provider=${provider} no match found for AniList ID ${anilistId}`);
@@ -498,6 +529,7 @@ export class MappingService {
     if (outcome.status === 'resolved') {
       return {
         providerId: outcome.providerId,
+        reason: outcome.reason,
         ...(outcome.successfulSynonym ? { successfulSynonym: outcome.successfulSynonym } : {}),
       };
     }
@@ -542,6 +574,26 @@ export class MappingService {
     providerId: number,
   ): boolean {
     return this.overrides?.getCandidateSuppression(provider, anilistId, providerId) != null;
+  }
+
+  private isResolvedCandidateSuppressed(
+    provider: Provider,
+    anilistId: number,
+    resolved: ResolvedMapping,
+    source: MappingAcceptedSource,
+  ): boolean {
+    return (
+      this.shouldApplyCandidateSuppression(source, resolved.reason) &&
+      this.isCandidateSuppressed(provider, anilistId, resolved.providerId)
+    );
+  }
+
+  private shouldApplyCandidateSuppression(
+    source: MappingAcceptedSource,
+    reason: MappingAcceptedReason,
+  ): boolean {
+    // Exact manual and exact upstream mappings are authoritative and must bypass candidate suppression.
+    return reason !== 'exact' || source === 'auto';
   }
 
   private resolveUnresolvedTitle(hints?: ResolveProviderIdOptions['hints']): string | undefined {

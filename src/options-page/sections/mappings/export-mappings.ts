@@ -17,7 +17,7 @@ export type ExportMappingsFilters = {
 };
 
 export type ExportMappingsPayload = {
-  version: 4;
+  version: 5;
   exportedAt: string;
   filters: ExportMappingsFilters;
   summary: {
@@ -47,6 +47,13 @@ export type ExportMappingsPayload = {
           providerId: number | null;
           suppressedProviderId?: number | null;
           source: MappingSource;
+          acceptedSource?: MappingSummary['acceptedSource'];
+          acceptedReason?: MappingSummary['acceptedReason'];
+          candidateSource?: MappingSummary['candidateSource'];
+          candidateReason?: MappingSummary['candidateReason'];
+          suppressionKind?: MappingSummary['suppressionKind'];
+          exactUpstreamProviderId?: MappingSummary['exactUpstreamProviderId'];
+          conflictKind?: MappingSummary['conflictKind'];
           status: 'unmapped' | 'in-provider' | 'not-in-provider';
           updatedAt?: number;
           linkedAniListIds?: readonly number[];
@@ -56,6 +63,7 @@ export type ExportMappingsPayload = {
             type?: 'series' | 'movie';
             statusLabel?: string;
           };
+          resolverState?: MappingSummary['resolverState'];
           hadResolveAttempt?: boolean;
         };
       }>;
@@ -255,11 +263,19 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
             providerId: entry.providerId ?? null,
             ...(entry.suppressedProviderId === undefined ? {} : { suppressedProviderId: entry.suppressedProviderId }),
             source: entry.source,
+            ...(entry.acceptedSource ? { acceptedSource: entry.acceptedSource } : {}),
+            ...(entry.acceptedReason ? { acceptedReason: entry.acceptedReason } : {}),
+            ...(entry.candidateSource ? { candidateSource: entry.candidateSource } : {}),
+            ...(entry.candidateReason ? { candidateReason: entry.candidateReason } : {}),
+            ...(entry.suppressionKind ? { suppressionKind: entry.suppressionKind } : {}),
+            ...(entry.exactUpstreamProviderId === undefined ? {} : { exactUpstreamProviderId: entry.exactUpstreamProviderId }),
+            ...(entry.conflictKind ? { conflictKind: entry.conflictKind } : {}),
             status: entry.status,
             ...(entry.updatedAt === undefined ? {} : { updatedAt: entry.updatedAt }),
             ...(entry.linkedAniListIds ? { linkedAniListIds: entry.linkedAniListIds } : {}),
             ...(entry.inLibraryCount === undefined ? {} : { inLibraryCount: entry.inLibraryCount }),
             ...(entry.providerMeta ? { providerMeta: entry.providerMeta } : {}),
+            ...(entry.resolverState ? { resolverState: entry.resolverState } : {}),
             ...(entry.hadResolveAttempt === undefined ? {} : { hadResolveAttempt: entry.hadResolveAttempt }),
           },
         })),
@@ -293,7 +309,7 @@ export const buildMappingsExportPayload = async (
   }
 
   return {
-    version: 4,
+    version: 5,
     exportedAt: new Date().toISOString(),
     filters: {
       providers: filters.providers,

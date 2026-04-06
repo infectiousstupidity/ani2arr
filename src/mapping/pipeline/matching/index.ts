@@ -19,6 +19,7 @@ export {
 } from './season';
 
 export {
+  computeTitleMatchEvidenceForProvider,
   computeTitleMatchScoreForProvider,
   computeTitleMatchScore,
   composeBaseScore,

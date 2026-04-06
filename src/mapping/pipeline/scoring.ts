@@ -4,7 +4,7 @@
 import type { Provider } from '@/providers';
 import type { ScoredCandidate } from './types';
 import type { SearchTerm } from './search-term-generator';
-import { computeTitleMatchScoreForProvider } from '@/mapping/pipeline/matching';
+import { computeTitleMatchEvidenceForProvider } from '@/mapping/pipeline/matching';
 import type { ProviderLookupResult } from '../lookup';
 
 export function scoreCandidates<TResult extends ProviderLookupResult>(
@@ -15,7 +15,7 @@ export function scoreCandidates<TResult extends ProviderLookupResult>(
 ): ScoredCandidate<TResult>[] {
   const scored: ScoredCandidate<TResult>[] = [];
   for (const candidate of results) {
-    const score = computeTitleMatchScoreForProvider({
+    const evidence = computeTitleMatchEvidenceForProvider({
       provider,
       queryRaw: term.display,
       candidate,
@@ -24,7 +24,7 @@ export function scoreCandidates<TResult extends ProviderLookupResult>(
       ...(Array.isArray(candidate.genres) ? { candidateGenres: candidate.genres } : {}),
       candidateCount: results.length,
     });
-    scored.push({ term, result: candidate, score });
+    scored.push({ term, result: candidate, score: evidence.score, reason: evidence.reason });
   }
   return scored.toSorted((a, b) => b.score - a.score);
 }

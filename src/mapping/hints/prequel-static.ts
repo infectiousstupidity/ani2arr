@@ -11,11 +11,6 @@ export async function resolvePrequelStatic(
   upstreamMappingStore: UpstreamMappingStore,
   anilistApi: AniListMediaService,
 ): Promise<ResolvedMapping | null> {
-  const directHit = upstreamMappingStore.get(media.id);
-  if (directHit) {
-    return { providerId: directHit.tvdbId };
-  }
-
   const visited = new Set<number>([media.id]);
 
   for await (const prequel of anilistApi.iteratePrequelChain(media)) {
@@ -24,7 +19,7 @@ export async function resolvePrequelStatic(
     }
     const hit = upstreamMappingStore.get(prequel.id);
     if (hit) {
-      return { providerId: hit.tvdbId };
+      return { providerId: hit.tvdbId, reason: 'relation' };
     }
     visited.add(prequel.id);
   }
