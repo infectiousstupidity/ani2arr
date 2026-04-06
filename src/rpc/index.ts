@@ -16,7 +16,6 @@ import type {
   CheckSeriesStatusResponse,
 } from './types';
 import type {
-  ResolveInput,
   StatusInput,
   AddSonarrInput,
   AddRadarrInput,
@@ -39,7 +38,6 @@ import type {
 } from './schemas';
 
 export interface Ani2arrApi {
-  resolveMapping(input: ResolveInput): Promise<{ tvdbId: number | null; successfulSynonym?: string }>;
   getSeriesStatus(input: StatusInput): Promise<CheckSeriesStatusResponse>;
   getMovieStatus(input: StatusInput): Promise<CheckMovieStatusResponse>;
   addToSonarr(input: AddSonarrInput): Promise<SonarrSeries>;

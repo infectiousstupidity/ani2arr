@@ -39,12 +39,6 @@ const ProviderCredentialsSchema = v.object({
 // RPC Input Schemas
 // ============================================================================
 
-export const ResolveInputSchema = v.object({
-  anilistId: IdSchema,
-  primaryTitleHint: v.optional(v.string()),
-  metadata: v.optional(v.nullable(AniListMediaHintSchema)),
-});
-
 export const StatusInputSchema = v.object({
   anilistId: IdSchema,
   title: v.optional(v.string()),
@@ -184,7 +178,6 @@ export const GetAniListMetadataInputSchema = v.object({
 // TypeScript types inferred from schemas
 // ============================================================================
 
-export type ResolveInput = v.InferOutput<typeof ResolveInputSchema>;
 export type StatusInput = v.InferOutput<typeof StatusInputSchema>;
 export type AddSonarrInput = v.InferOutput<typeof AddSonarrInputSchema>;
 export type UpdateSonarrInput = v.InferOutput<typeof UpdateSonarrInputSchema>;

@@ -1,8 +1,7 @@
-/** RPC handlers for mapping resolution, overrides, exports, and mapping listings. */
+/** RPC handlers for mapping overrides, exports, and mapping listings. */
 // src/rpc/handlers/mapping.handlers.ts
 
 import type { Ani2arrApi } from '@/rpc';
-import type { StatusInput } from '@/rpc/schemas';
 import { getExtensionOptionsSnapshot, isProviderConfigured } from '@/options';
 import { createError, ErrorCode } from '@/shared/errors';
 import { listMappings } from '@/mapping/review/list-mappings';
@@ -11,7 +10,6 @@ import type { ApiHandlerDeps } from './handler-deps';
 
 export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
   Ani2arrApi,
-  | 'resolveMapping'
   | 'getStaticMapped'
   | 'initMappings'
   | 'setMappingOverride'
@@ -33,45 +31,12 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
     sonarrLibrary,
     radarrLibrary,
     overridesReady,
-    ensureSonarrConfigured,
     scheduleLibraryRefresh,
     bumpLibraryRevision,
     bumpMappingsRevision,
   } = deps;
 
   const handlers = {
-    async resolveMapping(input) {
-      await ensureSonarrConfigured();
-      await overridesReady;
-
-      try {
-        const payload: Pick<StatusInput, 'anilistId' | 'title' | 'metadata'> = { anilistId: input.anilistId };
-        if (input.primaryTitleHint !== undefined) payload.title = input.primaryTitleHint;
-        if (input.metadata !== undefined) payload.metadata = input.metadata ?? null;
-        const status = await sonarrLibrary.getSeriesStatus(payload, { network: 'never', ignoreFailureCache: true });
-        if (status.exists && typeof status.tvdbId === 'number') {
-          return {
-            tvdbId: status.tvdbId,
-            ...(status.successfulSynonym ? { successfulSynonym: status.successfulSynonym } : {}),
-          };
-        }
-      } catch {
-        // ignore fast-path errors
-      }
-
-      const resolveOptions: Parameters<typeof mappingService.resolveTvdbId>[1] = {};
-      const hints: NonNullable<Parameters<typeof mappingService.resolveTvdbId>[1]>['hints'] = {};
-      if (input.primaryTitleHint) hints.primaryTitle = input.primaryTitleHint;
-      if (input.metadata) hints.domMedia = input.metadata;
-      if (Object.keys(hints).length > 0) resolveOptions.hints = hints;
-
-      const mapping = await mappingService.resolveTvdbId(input.anilistId, resolveOptions);
-      return {
-        tvdbId: mapping ? mapping.tvdbId : null,
-        ...(mapping?.successfulSynonym ? { successfulSynonym: mapping.successfulSynonym } : {}),
-      };
-    },
-
     async getStaticMapped(ids) {
       await mappingService.initStaticPairs();
       const hits: number[] = [];
@@ -235,7 +200,6 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
     },
   } satisfies Pick<
     Ani2arrApi,
-    | 'resolveMapping'
     | 'getStaticMapped'
     | 'initMappings'
     | 'setMappingOverride'
