@@ -49,7 +49,8 @@ const resolverStateEquals = (left: ResolverStateRecord, right: ResolverStateReco
       return (
         right.state === 'mapped' &&
         left.providerId === right.providerId &&
-        left.source === right.source &&
+        left.acceptedSource === right.acceptedSource &&
+        left.acceptedReason === right.acceptedReason &&
         left.successfulSynonym === right.successfulSynonym
       );
     }
@@ -57,7 +58,8 @@ const resolverStateEquals = (left: ResolverStateRecord, right: ResolverStateReco
       return (
         right.state === 'verification-failed' &&
         left.providerId === right.providerId &&
-        left.source === right.source &&
+        left.candidateSource === right.candidateSource &&
+        left.candidateReason === right.candidateReason &&
         left.title === right.title &&
         left.successfulSynonym === right.successfulSynonym
       );
@@ -239,7 +241,8 @@ export class ResolverStateStore {
         return {
           state: 'mapped',
           providerId: record.providerId,
-          source: record.source,
+          acceptedSource: record.acceptedSource,
+          acceptedReason: record.acceptedReason,
           ...(record.successfulSynonym ? { successfulSynonym: record.successfulSynonym } : {}),
           updatedAt: record.updatedAt,
         };
@@ -248,7 +251,8 @@ export class ResolverStateStore {
         return {
           state: 'verification-failed',
           providerId: record.providerId,
-          source: record.source,
+          candidateSource: record.candidateSource,
+          candidateReason: record.candidateReason,
           ...(record.title ? { title: record.title } : {}),
           ...(record.successfulSynonym ? { successfulSynonym: record.successfulSynonym } : {}),
           updatedAt: record.updatedAt,

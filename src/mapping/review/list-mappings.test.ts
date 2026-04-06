@@ -12,7 +12,7 @@ const createResolverStateStore = (
 });
 
 describe('listMappings', () => {
-  it('prefers manual overrides over recorded auto mappings and preserves unresolved entries', async () => {
+  it('collapses matching manual overrides into exact upstream truth and preserves unresolved entries', async () => {
     const result = await listMappings(
       { limit: 10 },
       {
@@ -31,7 +31,7 @@ describe('listMappings', () => {
           getLinkedAniListIds: () => [],
         },
         upstreamMappingStore: {
-          listAllPairs: () => [],
+          listAllPairs: () => [{ anilistId: 1, tvdbId: 222 }],
           getAniListIdsForTvdb: () => [],
         },
         sonarrLibrary: {
@@ -46,7 +46,8 @@ describe('listMappings', () => {
             provider: 'sonarr',
             state: 'mapped',
             providerId: 111,
-            source: 'auto',
+            acceptedSource: 'auto',
+            acceptedReason: 'fuzzy',
             updatedAt: 50,
           },
           {
@@ -63,8 +64,11 @@ describe('listMappings', () => {
     expect(result.total).toBe(2);
     expect(result.mappings.find(entry => entry.anilistId === 1)).toMatchObject({
       provider: 'sonarr',
-      source: 'manual',
+      source: 'upstream',
       providerId: 222,
+      acceptedSource: 'upstream',
+      acceptedReason: 'exact',
+      resolverState: 'mapped',
     });
     expect(result.mappings.find(entry => entry.anilistId === 2)).toMatchObject({
       provider: 'radarr',
@@ -115,19 +119,14 @@ describe('listMappings', () => {
     });
   });
 
-  it('treats suppressed rows as rejected and ignored only', async () => {
+  it('keeps manual overrides effective when they disagree with exact upstream truth', async () => {
     const result = await listMappings(
-      { limit: 10, sources: ['rejected', 'ignored'] },
+      { limit: 10 },
       {
         overridesService: {
-          listIgnores: () => [
-            {
-              anilistId: 2,
-              provider: 'radarr',
-              updatedAt: 15,
-            },
-          ],
-          listRejectedCandidates: () => [
+          listIgnores: () => [],
+          listRejectedCandidates: () => [],
+          list: () => [
             {
               anilistId: 1,
               provider: 'sonarr',
@@ -135,7 +134,52 @@ describe('listMappings', () => {
               updatedAt: 20,
             },
           ],
-          list: () => [],
+          isIgnored: () => false,
+          getLinkedAniListIds: () => [],
+        },
+        upstreamMappingStore: {
+          listAllPairs: () => [{ anilistId: 1, tvdbId: 555 }],
+          getAniListIdsForTvdb: () => [],
+        },
+        sonarrLibrary: {
+          getLeanSeriesList: async () => [],
+        },
+        radarrLibrary: {
+          getLeanMovieList: async () => [],
+        },
+        resolverStateStore: createResolverStateStore(),
+      },
+    );
+
+    expect(result.mappings).toHaveLength(1);
+    expect(result.mappings[0]).toMatchObject({
+      anilistId: 1,
+      provider: 'sonarr',
+      providerId: 777,
+      source: 'manual',
+      acceptedSource: 'manual',
+      acceptedReason: 'exact',
+      resolverState: 'mapped',
+      exactUpstreamProviderId: 555,
+      conflictKind: 'manual-upstream-conflict',
+    });
+  });
+
+  it('projects manual overrides without upstream conflicts when no exact upstream exists', async () => {
+    const result = await listMappings(
+      { limit: 10 },
+      {
+        overridesService: {
+          listIgnores: () => [],
+          listRejectedCandidates: () => [],
+          list: () => [
+            {
+              anilistId: 3,
+              provider: 'radarr',
+              providerId: 1234,
+              updatedAt: 30,
+            },
+          ],
           isIgnored: () => false,
           getLinkedAniListIds: () => [],
         },
@@ -153,13 +197,106 @@ describe('listMappings', () => {
       },
     );
 
-    expect(result.mappings).toHaveLength(2);
-    expect(result.mappings.map(entry => entry.source).toSorted()).toEqual(['ignored', 'rejected']);
-    expect(result.mappings.find(entry => entry.source === 'rejected')).toMatchObject({
-      anilistId: 1,
+    expect(result.mappings).toHaveLength(1);
+    const row = result.mappings[0];
+    expect(row).toMatchObject({
+      anilistId: 3,
+      provider: 'radarr',
+      providerId: 1234,
+      source: 'manual',
+      acceptedSource: 'manual',
+      acceptedReason: 'exact',
+      resolverState: 'mapped',
+    });
+    expect(row!.conflictKind).toBeUndefined();
+    expect(row!.exactUpstreamProviderId).toBeNull();
+  });
+
+  it('keeps ignores effective while surfacing exact upstream conflicts', async () => {
+    const result = await listMappings(
+      { limit: 10 },
+      {
+        overridesService: {
+          listIgnores: () => [
+            {
+              anilistId: 2,
+              provider: 'sonarr',
+              updatedAt: 15,
+            },
+          ],
+          listRejectedCandidates: () => [],
+          list: () => [],
+          isIgnored: () => true,
+          getLinkedAniListIds: () => [],
+        },
+        upstreamMappingStore: {
+          listAllPairs: () => [{ anilistId: 2, tvdbId: 333 }],
+          getAniListIdsForTvdb: () => [],
+        },
+        sonarrLibrary: {
+          getLeanSeriesList: async () => [],
+        },
+        radarrLibrary: {
+          getLeanMovieList: async () => [],
+        },
+        resolverStateStore: createResolverStateStore(),
+      },
+    );
+
+    expect(result.mappings).toHaveLength(1);
+    expect(result.mappings[0]).toMatchObject({
+      anilistId: 2,
       provider: 'sonarr',
       providerId: null,
-      suppressedProviderId: 777,
+      source: 'ignored',
+      exactUpstreamProviderId: 333,
+      conflictKind: 'ignore-upstream-conflict',
+    });
+  });
+
+  it('does not let rejected candidates hide exact upstream truth', async () => {
+    const result = await listMappings(
+      { limit: 10 },
+      {
+        overridesService: {
+          listIgnores: () => [],
+          listRejectedCandidates: () => [
+            {
+              anilistId: 7,
+              provider: 'sonarr',
+              providerId: 999,
+              updatedAt: 25,
+            },
+          ],
+          list: () => [],
+          isIgnored: () => false,
+          getLinkedAniListIds: () => [],
+        },
+        upstreamMappingStore: {
+          listAllPairs: () => [{ anilistId: 7, tvdbId: 444 }],
+          getAniListIdsForTvdb: () => [],
+        },
+        sonarrLibrary: {
+          getLeanSeriesList: async () => [],
+        },
+        radarrLibrary: {
+          getLeanMovieList: async () => [],
+        },
+        resolverStateStore: createResolverStateStore(),
+      },
+    );
+
+    expect(result.mappings).toHaveLength(1);
+    expect(result.mappings[0]).toMatchObject({
+      anilistId: 7,
+      provider: 'sonarr',
+      providerId: 444,
+      source: 'upstream',
+      acceptedSource: 'upstream',
+      acceptedReason: 'exact',
+      suppressedProviderId: 999,
+      suppressionKind: 'rejected-candidate',
+      resolverState: 'mapped',
     });
   });
 
@@ -188,8 +325,10 @@ describe('listMappings', () => {
           {
             anilistId: 9,
             provider: 'sonarr',
-            state: 'ambiguous',
-            title: 'Conflicted Show',
+            state: 'mapped',
+            providerId: 900,
+            acceptedSource: 'auto',
+            acceptedReason: 'fuzzy',
             updatedAt: 90,
           },
           {
@@ -197,7 +336,8 @@ describe('listMappings', () => {
             provider: 'radarr',
             state: 'verification-failed',
             providerId: 501,
-            source: 'auto',
+            candidateSource: 'auto',
+            candidateReason: 'relation',
             title: 'Needs Verification',
             updatedAt: 80,
           },
@@ -207,17 +347,20 @@ describe('listMappings', () => {
 
     expect(result.mappings.find(entry => entry.anilistId === 9)).toMatchObject({
       provider: 'sonarr',
-      source: 'unresolved',
-      resolverState: 'ambiguous',
-      providerMeta: { title: 'Conflicted Show', type: 'series' },
+      source: 'auto',
+      providerId: 900,
+      acceptedSource: 'auto',
+      acceptedReason: 'fuzzy',
+      resolverState: 'mapped',
     });
     expect(result.mappings.find(entry => entry.anilistId === 10)).toMatchObject({
       provider: 'radarr',
       source: 'unresolved',
       resolverState: 'verification-failed',
+      candidateSource: 'auto',
+      candidateReason: 'relation',
       providerMeta: { title: 'Needs Verification', type: 'movie' },
     });
-    expect(result.mappings.find(entry => entry.anilistId === 9)?.source).toBe('unresolved');
     expect(result.mappings.find(entry => entry.anilistId === 10)?.source).toBe('unresolved');
   });
 });

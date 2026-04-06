@@ -50,6 +50,7 @@ export async function tryHintLookup<TResult extends ProviderLookupResult>(
     );
     return {
       providerId,
+      reason: 'title',
       successfulSynonym: sanitized,
     };
   }

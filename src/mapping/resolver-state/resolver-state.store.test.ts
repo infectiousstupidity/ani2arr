@@ -53,7 +53,8 @@ describe('ResolverStateStore', () => {
     const mappedState = {
       state: 'mapped',
       providerId: 99,
-      source: 'auto',
+      acceptedSource: 'auto',
+      acceptedReason: 'fuzzy',
     } as Omit<ResolverStateRecord, 'updatedAt'>;
 
     await store.set(

@@ -112,6 +112,7 @@ export async function resolveViaPipeline(
       const out: EvaluationOutcome = {
         status: 'resolved',
         providerId,
+        reason: early.pick.reason,
         confidence: early.pick.score,
         successfulSynonym: early.pick.term.display,
       };
@@ -137,6 +138,7 @@ export async function resolveViaPipeline(
     const out: EvaluationOutcome = {
       status: 'resolved',
       providerId,
+      reason: pick.reason,
       confidence: pick.score,
       successfulSynonym: pick.term.display,
     };

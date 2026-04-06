@@ -70,7 +70,7 @@ export async function listMappings(
   const sources =
     input?.sources && input.sources.length > 0
       ? new Set<MappingSource>(input.sources)
-      : new Set<MappingSource>(['manual', 'rejected', 'ignored', 'auto', 'unresolved']);
+      : new Set<MappingSource>(['manual', 'rejected', 'ignored', 'auto', 'upstream', 'unresolved']);
   const providers =
     input?.providers && input.providers.length > 0
       ? new Set<MappingSummary['provider']>(input.providers)
@@ -95,131 +95,261 @@ export async function listMappings(
     libraryByTmdbId.set(movie.tmdbId, movie);
   }
 
-  const priorityMap: Record<MappingSource, number> = {
-    manual: 6,
-    rejected: 5,
-    ignored: 4,
-    unresolved: 3,
-    upstream: 2,
-    auto: 1,
-  };
-
   type MappingCandidate = {
     anilistId: number;
     provider: MappingSummary['provider'];
     providerId: MappingSummary['providerId'];
     suppressedProviderId?: MappingSummary['suppressedProviderId'];
     source: MappingSource;
+    acceptedSource?: MappingSummary['acceptedSource'];
+    acceptedReason?: MappingSummary['acceptedReason'];
+    candidateSource?: MappingSummary['candidateSource'];
+    candidateReason?: MappingSummary['candidateReason'];
+    suppressionKind?: MappingSummary['suppressionKind'];
+    exactUpstreamProviderId?: MappingSummary['exactUpstreamProviderId'];
+    conflictKind?: MappingSummary['conflictKind'];
     resolverState?: MappingSummary['resolverState'];
     updatedAt: number;
     hadResolveAttempt?: boolean;
     title?: string;
-    priority: number;
   };
 
-  const candidates = new Map<string, MappingCandidate>();
-  const applyCandidate = (
-    anilistId: number,
-    candidate: Omit<MappingCandidate, 'anilistId' | 'priority' | 'updatedAt'> & { updatedAt?: number },
-  ) => {
-    if (!Number.isFinite(anilistId)) return;
-    if (!providers.has(candidate.provider)) return;
-    if (!sources.has(candidate.source)) return;
-    const priority = priorityMap[candidate.source];
-    const key = `${candidate.provider}:${anilistId}`;
-    const existing = candidates.get(key);
-    if (existing && existing.priority > priority) return;
-    candidates.set(key, { ...candidate, anilistId, updatedAt: candidate.updatedAt ?? 0, priority });
+  const createKey = (provider: MappingSummary['provider'], anilistId: number): string => `${provider}:${anilistId}`;
+  const maxUpdatedAt = (...values: Array<number | undefined>): number => {
+    let max = 0;
+    for (const value of values) {
+      if (typeof value === 'number') {
+        max = Math.max(max, value);
+      }
+    }
+    return max;
   };
-
-  const registerEntries = <T extends { anilistId: number }>(
-    entries: T[],
-    toCandidate: (entry: T) => Omit<MappingCandidate, 'anilistId' | 'priority' | 'updatedAt'> & { updatedAt?: number },
-    shouldInclude?: (entry: T) => boolean,
-  ): void => {
-    for (const entry of entries) {
-      if (shouldInclude && !shouldInclude(entry)) continue;
-      applyCandidate(entry.anilistId, toCandidate(entry));
+  const setLatest = <T extends { updatedAt: number }>(map: Map<string, T>, key: string, entry: T): void => {
+    const existing = map.get(key);
+    if (!existing || entry.updatedAt >= existing.updatedAt) {
+      map.set(key, entry);
     }
   };
 
-  registerEntries(overridesService.listIgnores(), ignore => ({
-    provider: ignore.provider,
-    providerId: null,
-    source: 'ignored',
-    updatedAt: ignore.updatedAt,
-    hadResolveAttempt: true,
-  }));
+  const ignoreByKey = new Map<string, ReturnType<ListMappingsDeps['overridesService']['listIgnores']>[number]>();
+  const rejectedByKey = new Map<string, ReturnType<ListMappingsDeps['overridesService']['listRejectedCandidates']>[number]>();
+  const manualByKey = new Map<string, ReturnType<ListMappingsDeps['overridesService']['list']>[number]>();
+  const resolverStateByKey = new Map<string, Awaited<ReturnType<ListMappingsDeps['resolverStateStore']['list']>>[number]>();
+  const upstreamByKey = new Map<string, { anilistId: number; provider: 'sonarr'; providerId: number }>();
+  const keys = new Set<string>();
 
-  const includeSuppressedEntry = (entry: { provider: MappingSummary['provider']; anilistId: number }) =>
-    !overridesService.isIgnored(entry.provider, entry.anilistId);
+  for (const ignore of overridesService.listIgnores()) {
+    if (!providers.has(ignore.provider)) continue;
+    const key = createKey(ignore.provider, ignore.anilistId);
+    setLatest(ignoreByKey, key, ignore);
+    keys.add(key);
+  }
 
-  registerEntries(
-    overridesService.listRejectedCandidates(),
-    rejected => ({
-      provider: rejected.provider,
-      providerId: null,
-      suppressedProviderId: rejected.providerId,
-      source: 'rejected',
-      resolverState: undefined,
-      updatedAt: rejected.updatedAt,
-      hadResolveAttempt: true,
-    }),
-    includeSuppressedEntry,
-  );
+  for (const rejected of overridesService.listRejectedCandidates()) {
+    if (!providers.has(rejected.provider)) continue;
+    const key = createKey(rejected.provider, rejected.anilistId);
+    setLatest(rejectedByKey, key, rejected);
+    keys.add(key);
+  }
 
-  registerEntries(overridesService.list(), entry => ({
-    provider: entry.provider,
-    providerId: entry.providerId,
-    source: 'manual',
-    resolverState: undefined,
-    updatedAt: entry.updatedAt,
-    hadResolveAttempt: true,
-  }));
+  for (const manual of overridesService.list()) {
+    if (!providers.has(manual.provider)) continue;
+    const key = createKey(manual.provider, manual.anilistId);
+    setLatest(manualByKey, key, manual);
+    keys.add(key);
+  }
 
-  const includeUpstream = sources.has('upstream') && providers.has('sonarr');
-  if (includeUpstream) {
+  if (providers.has('sonarr')) {
     for (const pair of upstreamMappingStore.listAllPairs()) {
-      applyCandidate(pair.anilistId, {
+      const key = createKey('sonarr', pair.anilistId);
+      upstreamByKey.set(key, {
+        anilistId: pair.anilistId,
         provider: 'sonarr',
         providerId: pair.tvdbId,
-        source: 'upstream',
-        resolverState: undefined,
       });
+      keys.add(key);
     }
   }
-  
-  // `source` stays on the legacy review projection contract for filters and existing UI.
-  // Non-mapped resolver outcomes are grouped under `unresolved`; callers must read
-  // `resolverState` to distinguish unresolved, ambiguous, and verification-failed.
-  registerEntries(resolverStates, entry => {
-    if (entry.state === 'mapped') {
-      return {
-        provider: entry.provider,
-        providerId: entry.providerId,
-        source: entry.source,
-        resolverState: 'mapped',
-        updatedAt: entry.updatedAt,
-        hadResolveAttempt: entry.source === 'auto',
-      };
+
+  for (const resolverState of resolverStates) {
+    if (!providers.has(resolverState.provider)) continue;
+    const key = createKey(resolverState.provider, resolverState.anilistId);
+    resolverStateByKey.set(key, resolverState);
+    keys.add(key);
+  }
+
+  const withRejectedConflict = (
+    candidate: MappingCandidate,
+    rejected: ReturnType<ListMappingsDeps['overridesService']['listRejectedCandidates']>[number] | undefined,
+  ): MappingCandidate => {
+    if (!rejected) {
+      return candidate;
     }
 
     return {
-      provider: entry.provider,
-      providerId: null,
-      source: 'unresolved',
-      resolverState: entry.state,
-      updatedAt: entry.updatedAt,
-      hadResolveAttempt: true,
-      ...(entry.title ? { title: entry.title } : {}),
+      ...candidate,
+      suppressedProviderId: rejected.providerId,
+      suppressionKind: 'rejected-candidate',
+      updatedAt: maxUpdatedAt(candidate.updatedAt, rejected.updatedAt),
     };
-  });
+  };
+
+  const buildManualCandidate = (
+    anilistId: number,
+    provider: MappingSummary['provider'],
+    manual: ReturnType<ListMappingsDeps['overridesService']['list']>[number],
+    upstream: { anilistId: number; provider: 'sonarr'; providerId: number } | undefined,
+    rejected: ReturnType<ListMappingsDeps['overridesService']['listRejectedCandidates']>[number] | undefined,
+    resolverState: Awaited<ReturnType<ListMappingsDeps['resolverStateStore']['list']>>[number] | undefined,
+  ): MappingCandidate => {
+    if (upstream && upstream.providerId === manual.providerId) {
+      return withRejectedConflict(
+        {
+          anilistId,
+          provider,
+          providerId: manual.providerId,
+          source: 'upstream',
+          acceptedSource: 'upstream',
+          acceptedReason: 'exact',
+          resolverState: 'mapped',
+          updatedAt: maxUpdatedAt(
+            manual.updatedAt,
+            resolverState?.state === 'mapped' ? resolverState.updatedAt : undefined,
+          ),
+          hadResolveAttempt: true,
+        },
+        rejected,
+      );
+    }
+
+    return withRejectedConflict(
+      {
+        anilistId,
+        provider,
+        providerId: manual.providerId,
+        source: 'manual',
+        acceptedSource: 'manual',
+        acceptedReason: 'exact',
+        resolverState: 'mapped',
+        exactUpstreamProviderId: upstream?.providerId ?? null,
+        ...(upstream ? { conflictKind: 'manual-upstream-conflict' as const } : {}),
+        updatedAt: manual.updatedAt,
+        hadResolveAttempt: true,
+      },
+      rejected,
+    );
+  };
+
+  const candidates: MappingCandidate[] = [];
+  for (const key of keys) {
+    const [provider, rawAniListId] = key.split(':') as [MappingSummary['provider'], string];
+    const anilistId = Number.parseInt(rawAniListId, 10);
+    if (!Number.isFinite(anilistId) || !providers.has(provider)) {
+      continue;
+    }
+
+    const ignore = ignoreByKey.get(key);
+    const rejected = rejectedByKey.get(key);
+    const manual = manualByKey.get(key);
+    const upstream = provider === 'sonarr' ? upstreamByKey.get(key) : undefined;
+    const resolverState = resolverStateByKey.get(key);
+
+    let candidate: MappingCandidate | null = null;
+
+    if (manual) {
+      candidate = buildManualCandidate(anilistId, provider, manual, upstream, rejected, resolverState);
+    } else if (ignore) {
+      candidate = withRejectedConflict(
+        {
+          anilistId,
+          provider,
+          providerId: null,
+          source: 'ignored',
+          exactUpstreamProviderId: upstream?.providerId ?? null,
+          ...(upstream ? { conflictKind: 'ignore-upstream-conflict' as const } : {}),
+          updatedAt: ignore.updatedAt,
+          hadResolveAttempt: true,
+        },
+        rejected,
+      );
+    } else if (upstream) {
+      candidate = withRejectedConflict(
+        {
+          anilistId,
+          provider,
+          providerId: upstream.providerId,
+          source: 'upstream',
+          acceptedSource: 'upstream',
+          acceptedReason: 'exact',
+          resolverState: 'mapped',
+          updatedAt: resolverState?.state === 'mapped' ? resolverState.updatedAt : 0,
+        },
+        rejected,
+      );
+    } else if (resolverState?.state === 'mapped') {
+      candidate = {
+        anilistId,
+        provider,
+        providerId: resolverState.providerId,
+        source: resolverState.acceptedSource,
+        acceptedSource: resolverState.acceptedSource,
+        acceptedReason: resolverState.acceptedReason,
+        resolverState: 'mapped',
+        updatedAt: resolverState.updatedAt,
+        hadResolveAttempt: resolverState.acceptedSource === 'auto',
+      };
+    } else if (rejected) {
+      candidate = {
+        anilistId,
+        provider,
+        providerId: null,
+        suppressedProviderId: rejected.providerId,
+        source: 'rejected',
+        suppressionKind: 'rejected-candidate',
+        updatedAt: rejected.updatedAt,
+        hadResolveAttempt: true,
+      };
+    } else if (resolverState) {
+      candidate = {
+        anilistId,
+        provider,
+        providerId: null,
+        source: 'unresolved',
+        resolverState: resolverState.state,
+        ...(resolverState.state === 'verification-failed'
+          ? {
+              candidateSource: resolverState.candidateSource,
+              candidateReason: resolverState.candidateReason,
+            }
+          : {}),
+        updatedAt: resolverState.updatedAt,
+        hadResolveAttempt: true,
+        ...(resolverState.title ? { title: resolverState.title } : {}),
+      };
+    }
+
+    if (!candidate) {
+      continue;
+    }
+
+    if (!sources.has(candidate.source)) {
+      continue;
+    }
+
+    candidates.push(candidate);
+  }
 
   const matchesQuery = (summary: MappingSummary): boolean => {
     if (normalizedQuery === '') return true;
     const haystackParts: string[] = [
       String(summary.anilistId),
       summary.providerId === null ? '' : String(summary.providerId),
+      summary.suppressedProviderId === null || summary.suppressedProviderId === undefined
+        ? ''
+        : String(summary.suppressedProviderId),
+      summary.exactUpstreamProviderId === null || summary.exactUpstreamProviderId === undefined
+        ? ''
+        : String(summary.exactUpstreamProviderId),
       summary.providerMeta?.title ?? '',
     ];
     const haystack = haystackParts.join(' ').toLowerCase();
@@ -240,7 +370,7 @@ export async function listMappings(
   };
 
   const results: MappingSummary[] = [];
-  for (const candidate of candidates.values()) {
+  for (const candidate of candidates) {
     const anilistId = candidate.anilistId;
     const providerId = candidate.providerId ?? null;
     const tvdbId = candidate.provider === 'sonarr' ? providerId : null;
@@ -297,6 +427,13 @@ export async function listMappings(
       providerId,
       ...(candidate.suppressedProviderId === undefined ? {} : { suppressedProviderId: candidate.suppressedProviderId }),
       source: candidate.source,
+      ...(candidate.acceptedSource ? { acceptedSource: candidate.acceptedSource } : {}),
+      ...(candidate.acceptedReason ? { acceptedReason: candidate.acceptedReason } : {}),
+      ...(candidate.candidateSource ? { candidateSource: candidate.candidateSource } : {}),
+      ...(candidate.candidateReason ? { candidateReason: candidate.candidateReason } : {}),
+      ...(candidate.suppressionKind ? { suppressionKind: candidate.suppressionKind } : {}),
+      ...(candidate.exactUpstreamProviderId === undefined ? {} : { exactUpstreamProviderId: candidate.exactUpstreamProviderId }),
+      ...(candidate.conflictKind ? { conflictKind: candidate.conflictKind } : {}),
       status,
       updatedAt: candidate.updatedAt,
       ...(linkedAniListIds.length > 0 ? { linkedAniListIds } : {}),

@@ -2,6 +2,7 @@
 // src/mapping/pipeline/matching/score.ts
 
 import type { Provider } from '@/providers';
+import type { PipelineMatchReason } from '../types';
 import {
   WEIGHT_OVERLAP,
   WEIGHT_CHAR_SIM,
@@ -106,11 +107,25 @@ export function computeTitleMatchScoreForProvider(params: {
   candidateGenres?: readonly string[];
   candidateCount?: number;
 }): number {
+  return computeTitleMatchEvidenceForProvider(params).score;
+}
+
+export function computeTitleMatchEvidenceForProvider(params: {
+  provider: Provider;
+  queryRaw: string;
+  candidate: unknown;
+  candidateYear?: number;
+  targetYear?: number;
+  candidateGenres?: readonly string[];
+  candidateCount?: number;
+}): { score: number; reason: PipelineMatchReason } {
   const profile = getMatchingProfile(params.provider);
   const queryVariants = buildQueryTitleVariantsForProvider(params.provider, params.queryRaw);
   const candidateVariants = extractCandidateTitleVariants(params.provider, params.candidate);
 
-  if (queryVariants.length === 0 || candidateVariants.length === 0) return 0;
+  if (queryVariants.length === 0 || candidateVariants.length === 0) {
+    return { score: 0, reason: 'fuzzy' };
+  }
 
   let bestScore = 0;
   let bestExact = false;
@@ -176,7 +191,10 @@ export function computeTitleMatchScoreForProvider(params: {
     bestScore += profile.singleResultBoost;
   }
 
-  return clampScore(bestScore);
+  return {
+    score: clampScore(bestScore),
+    reason: bestExact || bestCompact ? 'exact' : 'fuzzy',
+  };
 }
 
 export function computeTitleMatchScore(params: {
