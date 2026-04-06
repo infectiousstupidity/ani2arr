@@ -106,7 +106,7 @@ export class MappingService {
       );
     }
 
-    const bypassFailureCache = options.ignoreFailureCache === true;
+    const bypassCachedResolutionState = options.ignoreFailureCache === true;
     const inflightKey = this.inflightKey(provider, anilistId);
     const existing = this.inflight.get(inflightKey);
     if (existing) {
@@ -156,7 +156,7 @@ export class MappingService {
       provider,
       anilistId,
       options,
-      bypassFailureCache,
+      bypassCachedResolutionState,
     );
     this.inflight.set(inflightKey, promise);
 
