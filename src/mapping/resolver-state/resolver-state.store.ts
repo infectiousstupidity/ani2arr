@@ -4,7 +4,12 @@
 import { storage } from '@wxt-dev/storage';
 import type { Provider } from '@/providers';
 import { STORAGE_KEYS } from '@/storage/keys';
-import type { ResolverStateRecord } from '@/mapping/types';
+import type {
+  MappingAcceptedEvidence,
+  MappingEvaluationCandidate,
+  MappingRecentEvaluationTrace,
+  ResolverStateRecord,
+} from '@/mapping/types';
 
 type ResolverStateTtl = {
   staleMs: number;
@@ -20,7 +25,7 @@ const resolverStateStorage = storage.defineItem<Record<string, StoredResolverSta
   STORAGE_KEYS.mappingResolverState,
   {
     fallback: {},
-    version: 1,
+    version: 2,
   },
 );
 
@@ -39,6 +44,67 @@ const parseResolverStateKey = (key: string): { provider: Provider; anilistId: nu
   return { provider, anilistId };
 };
 
+const acceptedEvidenceEquals = (
+  left: MappingAcceptedEvidence,
+  right: MappingAcceptedEvidence,
+): boolean => (
+  left.source === right.source &&
+  left.reason === right.reason &&
+  left.successfulTitle === right.successfulTitle &&
+  left.immediateSourceAniListId === right.immediateSourceAniListId &&
+  left.chainAnchorAniListId === right.chainAnchorAniListId
+);
+
+const evaluationCandidateEquals = (
+  left: MappingEvaluationCandidate,
+  right: MappingEvaluationCandidate,
+): boolean => (
+  left.providerId === right.providerId &&
+  left.title === right.title &&
+  left.source === right.source &&
+  left.reason === right.reason &&
+  left.status === right.status &&
+  left.summary === right.summary &&
+  left.score === right.score
+);
+
+const recentEvaluationEquals = (
+  left: MappingRecentEvaluationTrace | undefined,
+  right: MappingRecentEvaluationTrace | undefined,
+): boolean => {
+  if (!left && !right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  if (left.attemptedAt !== right.attemptedAt) {
+    return false;
+  }
+
+  const leftTerms = left.searchTerms ?? [];
+  const rightTerms = right.searchTerms ?? [];
+  if (leftTerms.length !== rightTerms.length) {
+    return false;
+  }
+  for (const [index, leftTerm] of leftTerms.entries()) {
+    if (leftTerm !== rightTerms[index]) {
+      return false;
+    }
+  }
+
+  if (left.candidates.length !== right.candidates.length) {
+    return false;
+  }
+  for (const [index, candidate] of left.candidates.entries()) {
+    if (!evaluationCandidateEquals(candidate, right.candidates[index]!)) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 const resolverStateEquals = (left: ResolverStateRecord, right: ResolverStateRecord): boolean => {
   if (left.state !== right.state || left.updatedAt !== right.updatedAt) {
     return false;
@@ -49,23 +115,12 @@ const resolverStateEquals = (left: ResolverStateRecord, right: ResolverStateReco
       return (
         right.state === 'mapped' &&
         left.providerId === right.providerId &&
-        left.acceptedSource === right.acceptedSource &&
-        left.acceptedReason === right.acceptedReason &&
-        left.successfulSynonym === right.successfulSynonym
-      );
-    }
-    case 'verification-failed': {
-      return (
-        right.state === 'verification-failed' &&
-        left.providerId === right.providerId &&
-        left.candidateSource === right.candidateSource &&
-        left.candidateReason === right.candidateReason &&
-        left.title === right.title &&
-        left.successfulSynonym === right.successfulSynonym
+        acceptedEvidenceEquals(left.acceptedEvidence, right.acceptedEvidence) &&
+        recentEvaluationEquals(left.recentEvaluation, right.recentEvaluation)
       );
     }
     default: {
-      return right.state === left.state && left.title === right.title;
+      return right.state === left.state && recentEvaluationEquals(left.recentEvaluation, right.recentEvaluation);
     }
   }
 };
@@ -241,27 +296,15 @@ export class ResolverStateStore {
         return {
           state: 'mapped',
           providerId: record.providerId,
-          acceptedSource: record.acceptedSource,
-          acceptedReason: record.acceptedReason,
-          ...(record.successfulSynonym ? { successfulSynonym: record.successfulSynonym } : {}),
-          updatedAt: record.updatedAt,
-        };
-      }
-      case 'verification-failed': {
-        return {
-          state: 'verification-failed',
-          providerId: record.providerId,
-          candidateSource: record.candidateSource,
-          candidateReason: record.candidateReason,
-          ...(record.title ? { title: record.title } : {}),
-          ...(record.successfulSynonym ? { successfulSynonym: record.successfulSynonym } : {}),
+          acceptedEvidence: record.acceptedEvidence,
+          ...(record.recentEvaluation ? { recentEvaluation: record.recentEvaluation } : {}),
           updatedAt: record.updatedAt,
         };
       }
       default: {
         return {
           state: record.state,
-          ...(record.title ? { title: record.title } : {}),
+          ...(record.recentEvaluation ? { recentEvaluation: record.recentEvaluation } : {}),
           updatedAt: record.updatedAt,
         };
       }

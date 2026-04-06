@@ -44,7 +44,11 @@ import { ResolverStateStore } from './resolver-state/resolver-state.store';
 import { UpstreamMappingStore } from './upstream';
 import type {
   MappingAcceptedReason,
+  MappingAcceptedEvidence,
   MappingAcceptedSource,
+  MappingEvaluationCandidate,
+  MappingEvaluationCandidateStatus,
+  MappingRecentEvaluationTrace,
   MappingResolvedSource,
   ResolveProviderIdOptions,
   ResolvedMapping,
@@ -63,6 +67,125 @@ type AniListPrioritizeApi = {
 type AniListCacheEvictApi = {
   removeMediaFromCache: (id: number) => Promise<void>;
 };
+
+type ResolutionAttempt = {
+  resolved: ResolvedMapping | null;
+  recentEvaluation?: MappingRecentEvaluationTrace;
+};
+
+const RECENT_TRACE_CANDIDATE_LIMIT = 8;
+
+const candidateStatusPriority: Record<MappingEvaluationCandidateStatus, number> = {
+  accepted: 4,
+  rejected: 3,
+  suppressed: 2,
+  'not-accepted': 1,
+};
+
+function describeAcceptanceReason(reason: MappingAcceptedReason): string {
+  switch (reason) {
+    case 'exact-upstream': {
+      return 'Exact upstream mapping';
+    }
+    case 'manual-override': {
+      return 'Manual override';
+    }
+    case 'exact-title-match': {
+      return 'Exact title match';
+    }
+    case 'verified-inherited': {
+      return 'Inherited from related AniList mapping';
+    }
+    case 'fuzzy-match': {
+      return 'Fuzzy title match';
+    }
+    case 'borrowed-base-title-fallback': {
+      return 'Borrowed base-title fallback';
+    }
+  }
+}
+
+function describeCandidate(reason: MappingAcceptedReason, status: MappingEvaluationCandidateStatus): string {
+  const base = describeAcceptanceReason(reason);
+  switch (status) {
+    case 'accepted': {
+      return base;
+    }
+    case 'rejected': {
+      return `${base} rejected by candidate suppression`;
+    }
+    case 'suppressed': {
+      return `${base} suppressed`;
+    }
+    case 'not-accepted': {
+      return `${base} not accepted`;
+    }
+  }
+}
+
+function mergeTraceCandidates(
+  candidates: readonly MappingEvaluationCandidate[],
+): MappingEvaluationCandidate[] {
+  const byProviderId = new Map<number, MappingEvaluationCandidate>();
+
+  for (const candidate of candidates) {
+    const existing = byProviderId.get(candidate.providerId);
+    if (!existing) {
+      byProviderId.set(candidate.providerId, candidate);
+      continue;
+    }
+
+    const existingPriority = candidateStatusPriority[existing.status];
+    const nextPriority = candidateStatusPriority[candidate.status];
+    if (
+      nextPriority > existingPriority ||
+      (nextPriority === existingPriority && (candidate.score ?? 0) > (existing.score ?? 0))
+    ) {
+      byProviderId.set(candidate.providerId, candidate);
+    }
+  }
+
+  return [...byProviderId.values()]
+    .toSorted((left, right) => {
+      const statusDiff = candidateStatusPriority[right.status] - candidateStatusPriority[left.status];
+      if (statusDiff !== 0) {
+        return statusDiff;
+      }
+      return (right.score ?? 0) - (left.score ?? 0);
+    })
+    .slice(0, RECENT_TRACE_CANDIDATE_LIMIT);
+}
+
+function mergeRecentEvaluations(
+  ...traces: Array<MappingRecentEvaluationTrace | undefined>
+): MappingRecentEvaluationTrace | undefined {
+  const searchTerms: string[] = [];
+  const searchTermSeen = new Set<string>();
+  const candidates: MappingEvaluationCandidate[] = [];
+
+  for (const trace of traces) {
+    if (!trace) {
+      continue;
+    }
+    for (const searchTerm of trace.searchTerms ?? []) {
+      if (!searchTermSeen.has(searchTerm)) {
+        searchTerms.push(searchTerm);
+        searchTermSeen.add(searchTerm);
+      }
+    }
+    candidates.push(...trace.candidates);
+  }
+
+  if (searchTerms.length === 0 && candidates.length === 0) {
+    return undefined;
+  }
+
+  return {
+    attemptedAt: Date.now(),
+    ...(searchTerms.length > 0 ? { searchTerms } : {}),
+    candidates: mergeTraceCandidates(candidates),
+  };
+}
 
 function canPrioritizeAniListMedia(api: AniListMediaService): api is AniListMediaService & AniListPrioritizeApi {
   return typeof (api as { prioritize?: unknown }).prioritize === 'function';
@@ -189,7 +312,12 @@ export class MappingService {
           logError(normalizeError(error), `MappingService:clearOverride:${provider}:${anilistId}`);
         }
 
-        return this.acceptResolved(provider, anilistId, { providerId: staticProviderId, reason: 'exact' }, 'upstream');
+        return this.acceptResolved(
+          provider,
+          anilistId,
+          { providerId: staticProviderId, reason: 'exact-upstream' },
+          'upstream',
+        );
       }
 
       if (import.meta.env.DEV) {
@@ -197,20 +325,25 @@ export class MappingService {
           `mapping:override-hit provider=${provider} anilistId=${anilistId} providerId=${overrideProviderId}`,
         );
       }
-      return { providerId: overrideProviderId, reason: 'exact' };
+      return { providerId: overrideProviderId, reason: 'manual-override' };
     }
 
     const staticProviderId = this.getUpstreamStaticProviderId(provider, anilistId);
     if (staticProviderId !== null) {
       incrementCounter('mapping.lookup.static_hit');
-      return this.acceptResolved(provider, anilistId, { providerId: staticProviderId, reason: 'exact' }, 'upstream');
+      return this.acceptResolved(
+        provider,
+        anilistId,
+        { providerId: staticProviderId, reason: 'exact-upstream' },
+        'upstream',
+      );
     }
 
     let resolverState = await this.resolverStateStore.get(provider, anilistId);
     if (resolverState?.state === 'mapped') {
       if (import.meta.env.DEV) {
         this.log.debug?.(
-          `mapping:resolver-state-hit provider=${provider} anilistId=${anilistId} providerId=${resolverState.providerId} source=${resolverState.acceptedSource} reason=${resolverState.acceptedReason}`,
+          `mapping:resolver-state-hit provider=${provider} anilistId=${anilistId} providerId=${resolverState.providerId} source=${resolverState.acceptedEvidence.source} reason=${resolverState.acceptedEvidence.reason}`,
         );
       }
       if (
@@ -219,10 +352,12 @@ export class MappingService {
           anilistId,
           {
             providerId: resolverState.providerId,
-            reason: resolverState.acceptedReason,
-            ...(resolverState.successfulSynonym ? { successfulSynonym: resolverState.successfulSynonym } : {}),
+            reason: resolverState.acceptedEvidence.reason,
+            ...(resolverState.acceptedEvidence.successfulTitle
+              ? { successfulSynonym: resolverState.acceptedEvidence.successfulTitle }
+              : {}),
           },
-          resolverState.acceptedSource,
+          resolverState.acceptedEvidence.source,
         )
       ) {
         await this.clearResolverState(provider, anilistId);
@@ -230,8 +365,10 @@ export class MappingService {
       } else {
         return {
           providerId: resolverState.providerId,
-          reason: resolverState.acceptedReason,
-          ...(resolverState.successfulSynonym ? { successfulSynonym: resolverState.successfulSynonym } : {}),
+          reason: resolverState.acceptedEvidence.reason,
+          ...(resolverState.acceptedEvidence.successfulTitle
+            ? { successfulSynonym: resolverState.acceptedEvidence.successfulTitle }
+            : {}),
         };
       }
     }
@@ -265,6 +402,7 @@ export class MappingService {
       );
     }
 
+    let seededRecentEvaluation: MappingRecentEvaluationTrace | undefined;
     const hintTerm = options.hints?.primaryTitle?.trim();
     if (hintTerm) {
       try {
@@ -278,8 +416,33 @@ export class MappingService {
         );
         if (hinted) {
           if (!this.isResolvedCandidateSuppressed(provider, anilistId, hinted, 'auto')) {
-            return this.acceptResolved(provider, anilistId, hinted, 'auto');
+            const recentEvaluation = this.createSingleCandidateTrace(
+              hinted,
+              'auto',
+              'accepted',
+              [hintTerm],
+              hinted.successfulSynonym,
+            );
+            return this.acceptResolved(
+              provider,
+              anilistId,
+              {
+                ...hinted,
+                ...(recentEvaluation ? { recentEvaluation } : {}),
+              },
+              'auto',
+            );
           }
+          seededRecentEvaluation = mergeRecentEvaluations(
+            seededRecentEvaluation,
+            this.createSingleCandidateTrace(
+              hinted,
+              'auto',
+              'rejected',
+              [hintTerm],
+              hinted.successfulSynonym,
+            ),
+          );
           if (import.meta.env.DEV) {
             this.log.debug?.(
               `mapping:hint-suppressed provider=${provider} anilistId=${anilistId} providerId=${hinted.providerId} reason=${hinted.reason}`,
@@ -291,7 +454,13 @@ export class MappingService {
       }
     }
 
-    return this.attemptNetworkResolution(provider, anilistId, options, bypassFailureCache);
+    return this.attemptNetworkResolution(
+      provider,
+      anilistId,
+      options,
+      bypassFailureCache,
+      seededRecentEvaluation,
+    );
   }
 
   private async acceptResolved(
@@ -303,9 +472,8 @@ export class MappingService {
     const mappedState: Omit<Extract<ResolverStateRecord, { state: 'mapped' }>, 'updatedAt'> = {
       state: 'mapped',
       providerId: resolved.providerId,
-      acceptedSource: source,
-      acceptedReason: resolved.reason,
-      ...(resolved.successfulSynonym ? { successfulSynonym: resolved.successfulSynonym } : {}),
+      acceptedEvidence: this.buildAcceptedEvidence(source, resolved),
+      ...(resolved.recentEvaluation ? { recentEvaluation: resolved.recentEvaluation } : {}),
     };
 
     try {
@@ -347,15 +515,16 @@ export class MappingService {
     anilistId: number,
     options: ResolveProviderIdOptions,
     bypassFailureCache: boolean,
+    seededRecentEvaluation?: MappingRecentEvaluationTrace,
   ): Promise<ResolvedMapping | null> {
-    let resolved: ResolvedMapping | null;
+    let attempt: ResolutionAttempt;
     try {
       if (import.meta.env.DEV) {
         this.log.debug?.(
           `mapping:network-start provider=${provider} anilistId=${anilistId} priority=${options.priority ?? 'normal'}`,
         );
       }
-      resolved = await this.resolveViaNetwork(
+      attempt = await this.resolveViaNetwork(
         provider,
         anilistId,
         options.hints,
@@ -365,13 +534,15 @@ export class MappingService {
     } catch (error) {
       const normalized = normalizeError(error);
       if (normalized.code === ErrorCode.VALIDATION_ERROR) {
+        const fallbackTrace = this.createRecentEvaluationTrace(this.resolveUnresolvedSearchTerms(options.hints), []);
+        const recentEvaluation = mergeRecentEvaluations(seededRecentEvaluation, fallbackTrace);
         await this.recordResolverState(
           provider,
           anilistId,
           {
             state: 'unresolved',
-            ...(this.resolveUnresolvedTitle(options.hints)
-              ? { title: this.resolveUnresolvedTitle(options.hints) }
+            ...(recentEvaluation
+              ? { recentEvaluation }
               : {}),
           },
           {
@@ -389,14 +560,20 @@ export class MappingService {
       throw normalized;
     }
 
-    if (resolved === null) {
+    const recentEvaluation = mergeRecentEvaluations(
+      seededRecentEvaluation,
+      attempt.recentEvaluation,
+      this.createRecentEvaluationTrace(this.resolveUnresolvedSearchTerms(options.hints), []),
+    );
+
+    if (attempt.resolved === null) {
       await this.recordResolverState(
         provider,
         anilistId,
         {
           state: 'unresolved',
-          ...(this.resolveUnresolvedTitle(options.hints)
-            ? { title: this.resolveUnresolvedTitle(options.hints) }
+          ...(recentEvaluation
+            ? { recentEvaluation }
             : {}),
         },
         {
@@ -410,10 +587,18 @@ export class MappingService {
 
     if (import.meta.env.DEV) {
       this.log.debug?.(
-        `mapping:network-success provider=${provider} anilistId=${anilistId} providerId=${resolved.providerId}${resolved.successfulSynonym ? ` synonym="${resolved.successfulSynonym}"` : ''}`,
+        `mapping:network-success provider=${provider} anilistId=${anilistId} providerId=${attempt.resolved.providerId}${attempt.resolved.successfulSynonym ? ` synonym="${attempt.resolved.successfulSynonym}"` : ''}`,
       );
     }
-    return this.acceptResolved(provider, anilistId, resolved, 'auto');
+    return this.acceptResolved(
+      provider,
+      anilistId,
+      {
+        ...attempt.resolved,
+        ...(recentEvaluation ? { recentEvaluation } : {}),
+      },
+      'auto',
+    );
   }
 
   private evictAniListMedia(anilistId: number): void {
@@ -432,12 +617,13 @@ export class MappingService {
     hints: ResolveProviderIdOptions['hints'] | undefined,
     priority: RequestPriority | undefined,
     forceLookupNetwork: boolean,
-  ): Promise<ResolvedMapping | null> {
+  ): Promise<ResolutionAttempt> {
     const credentials = await this.getConfiguredCredentials(provider);
+    let recentEvaluation: MappingRecentEvaluationTrace | undefined;
 
     const metadataMedia = buildMediaFromMetadataHint(anilistId, hints?.domMedia);
     if (metadataMedia) {
-      const resolved = await this.tryResolveWithMedia(
+      const metadataAttempt = await this.tryResolveWithMedia(
         provider,
         metadataMedia,
         credentials,
@@ -445,13 +631,29 @@ export class MappingService {
         priority,
         forceLookupNetwork,
       );
-      if (resolved && !this.isResolvedCandidateSuppressed(provider, anilistId, resolved, 'auto')) {
-        return resolved;
-      }
-      if (resolved && import.meta.env.DEV) {
-        this.log.debug?.(
-          `mapping:metadata-candidate-suppressed provider=${provider} anilistId=${anilistId} providerId=${resolved.providerId} reason=${resolved.reason}`,
+      if (metadataAttempt.resolved) {
+        if (!this.isResolvedCandidateSuppressed(provider, anilistId, metadataAttempt.resolved, 'auto')) {
+          const mergedRecentEvaluation = mergeRecentEvaluations(recentEvaluation, metadataAttempt.recentEvaluation);
+          return {
+            resolved: metadataAttempt.resolved,
+            ...(mergedRecentEvaluation ? { recentEvaluation: mergedRecentEvaluation } : {}),
+          };
+        }
+        recentEvaluation = mergeRecentEvaluations(
+          recentEvaluation,
+          this.rewriteTraceCandidateStatus(
+            metadataAttempt.recentEvaluation,
+            metadataAttempt.resolved.providerId,
+            'rejected',
+          ),
         );
+      }
+      if (metadataAttempt.resolved && import.meta.env.DEV) {
+        this.log.debug?.(
+          `mapping:metadata-candidate-suppressed provider=${provider} anilistId=${anilistId} providerId=${metadataAttempt.resolved.providerId} reason=${metadataAttempt.resolved.reason}`,
+        );
+      } else {
+        recentEvaluation = mergeRecentEvaluations(recentEvaluation, metadataAttempt.recentEvaluation);
       }
     }
 
@@ -461,7 +663,7 @@ export class MappingService {
         ? { source: 'mapping-resolve' }
         : { priority, source: 'mapping-resolve' },
     );
-    const apiResolved = await this.tryResolveWithMedia(
+    const apiAttempt = await this.tryResolveWithMedia(
       provider,
       apiMedia,
       credentials,
@@ -469,17 +671,33 @@ export class MappingService {
       priority,
       forceLookupNetwork,
     );
-    if (apiResolved && !this.isResolvedCandidateSuppressed(provider, anilistId, apiResolved, 'auto')) {
-      return apiResolved;
-    }
-    if (apiResolved && import.meta.env.DEV) {
-      this.log.debug?.(
-        `mapping:api-candidate-suppressed provider=${provider} anilistId=${anilistId} providerId=${apiResolved.providerId} reason=${apiResolved.reason}`,
+    if (apiAttempt.resolved) {
+      if (!this.isResolvedCandidateSuppressed(provider, anilistId, apiAttempt.resolved, 'auto')) {
+        const mergedRecentEvaluation = mergeRecentEvaluations(recentEvaluation, apiAttempt.recentEvaluation);
+        return {
+          resolved: apiAttempt.resolved,
+          ...(mergedRecentEvaluation ? { recentEvaluation: mergedRecentEvaluation } : {}),
+        };
+      }
+      recentEvaluation = mergeRecentEvaluations(
+        recentEvaluation,
+        this.rewriteTraceCandidateStatus(
+          apiAttempt.recentEvaluation,
+          apiAttempt.resolved.providerId,
+          'rejected',
+        ),
       );
+    }
+    if (apiAttempt.resolved && import.meta.env.DEV) {
+      this.log.debug?.(
+        `mapping:api-candidate-suppressed provider=${provider} anilistId=${anilistId} providerId=${apiAttempt.resolved.providerId} reason=${apiAttempt.resolved.reason}`,
+      );
+    } else {
+      recentEvaluation = mergeRecentEvaluations(recentEvaluation, apiAttempt.recentEvaluation);
     }
 
     this.log.debug(`resolveViaNetwork: provider=${provider} no match found for AniList ID ${anilistId}`);
-    return null;
+    return { resolved: null, ...(recentEvaluation ? { recentEvaluation } : {}) };
   }
 
   private async tryResolveWithMedia(
@@ -489,19 +707,23 @@ export class MappingService {
     hints: ResolveProviderIdOptions['hints'] | undefined,
     priority: RequestPriority | undefined,
     forceLookupNetwork: boolean,
-  ): Promise<ResolvedMapping | null> {
+  ): Promise<ResolutionAttempt> {
     const routedProvider = resolveProviderForAniListFormat(media.format);
     if (routedProvider !== provider) {
       this.log.debug(
         `tryResolveWithMedia: provider mismatch for AniList ID ${media.id} format='${String(media.format)}' expected=${provider} actual=${String(routedProvider)}`,
       );
-      return null;
+      return { resolved: null };
     }
 
     if (provider === 'sonarr') {
       const prequelStatic = await resolvePrequelStatic(media, this.upstreamMappingStore, this.anilistApi);
       if (prequelStatic) {
-        return prequelStatic;
+        const recentEvaluation = this.createSingleCandidateTrace(prequelStatic, 'auto', 'accepted');
+        return {
+          resolved: prequelStatic,
+          ...(recentEvaluation ? { recentEvaluation } : {}),
+        };
       }
     }
 
@@ -527,13 +749,21 @@ export class MappingService {
     );
 
     if (outcome.status === 'resolved') {
+      const recentEvaluation = this.createPipelineRecentEvaluation(outcome);
       return {
-        providerId: outcome.providerId,
-        reason: outcome.reason,
-        ...(outcome.successfulSynonym ? { successfulSynonym: outcome.successfulSynonym } : {}),
+        resolved: {
+          providerId: outcome.providerId,
+          reason: outcome.reason,
+          ...(outcome.successfulSynonym ? { successfulSynonym: outcome.successfulSynonym } : {}),
+        },
+        ...(recentEvaluation ? { recentEvaluation } : {}),
       };
     }
-    return null;
+    const recentEvaluation = this.createPipelineRecentEvaluation(outcome);
+    return {
+      resolved: null,
+      ...(recentEvaluation ? { recentEvaluation } : {}),
+    };
   }
 
   private inflightKey(provider: Provider, anilistId: number): string {
@@ -589,23 +819,116 @@ export class MappingService {
   }
 
   private shouldApplyCandidateSuppression(
-    source: MappingAcceptedSource,
+    _source: MappingAcceptedSource,
     reason: MappingAcceptedReason,
   ): boolean {
     // Exact manual and exact upstream mappings are authoritative and must bypass candidate suppression.
-    return reason !== 'exact' || source === 'auto';
+    return reason !== 'manual-override' && reason !== 'exact-upstream';
   }
 
-  private resolveUnresolvedTitle(hints?: ResolveProviderIdOptions['hints']): string | undefined {
+  private resolveUnresolvedSearchTerms(hints?: ResolveProviderIdOptions['hints']): string[] {
     const directTitle = hints?.primaryTitle?.trim();
     if (directTitle) {
-      return directTitle;
+      return [directTitle];
     }
     const titles = hints?.domMedia?.titles;
     const metadataTitle = [titles?.english, titles?.romaji, titles?.native]
       .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
       ?.trim();
-    return metadataTitle || undefined;
+    return metadataTitle ? [metadataTitle] : [];
+  }
+
+  private buildAcceptedEvidence(
+    source: MappingAcceptedSource,
+    resolved: ResolvedMapping,
+  ): MappingAcceptedEvidence {
+    return {
+      source,
+      reason: resolved.reason,
+      ...(resolved.successfulSynonym ? { successfulTitle: resolved.successfulSynonym } : {}),
+      ...(resolved.immediateSourceAniListId ? { immediateSourceAniListId: resolved.immediateSourceAniListId } : {}),
+      ...(resolved.chainAnchorAniListId ? { chainAnchorAniListId: resolved.chainAnchorAniListId } : {}),
+    };
+  }
+
+  private createRecentEvaluationTrace(
+    searchTerms: readonly string[],
+    candidates: readonly MappingEvaluationCandidate[],
+  ): MappingRecentEvaluationTrace | undefined {
+    if (searchTerms.length === 0 && candidates.length === 0) {
+      return undefined;
+    }
+
+    return {
+      attemptedAt: Date.now(),
+      ...(searchTerms.length > 0 ? { searchTerms: [...searchTerms] } : {}),
+      candidates: mergeTraceCandidates(candidates),
+    };
+  }
+
+  private createSingleCandidateTrace(
+    resolved: ResolvedMapping,
+    source: MappingAcceptedSource,
+    status: MappingEvaluationCandidateStatus,
+    searchTerms: readonly string[] = [],
+    title?: string,
+  ): MappingRecentEvaluationTrace | undefined {
+    return this.createRecentEvaluationTrace(searchTerms, [
+      {
+        providerId: resolved.providerId,
+        ...(title ? { title } : {}),
+        source,
+        reason: resolved.reason,
+        status,
+        summary: describeCandidate(resolved.reason, status),
+      },
+    ]);
+  }
+
+  private rewriteTraceCandidateStatus(
+    trace: MappingRecentEvaluationTrace | undefined,
+    providerId: number,
+    status: MappingEvaluationCandidateStatus,
+  ): MappingRecentEvaluationTrace | undefined {
+    if (!trace) {
+      return undefined;
+    }
+
+    const candidates = trace.candidates.map((candidate) => (
+      candidate.providerId === providerId
+        ? {
+            ...candidate,
+            status,
+            summary: describeCandidate(candidate.reason, status),
+          }
+        : candidate
+    ));
+
+    return this.createRecentEvaluationTrace(trace.searchTerms ?? [], candidates);
+  }
+
+  private createPipelineRecentEvaluation(
+    outcome: Awaited<ReturnType<typeof resolveViaPipeline>>,
+  ): MappingRecentEvaluationTrace | undefined {
+    return this.createRecentEvaluationTrace(
+      outcome.searchTerms,
+      outcome.candidates.map((candidate) => {
+        const status: MappingEvaluationCandidateStatus =
+          outcome.status === 'resolved' && candidate.providerId === outcome.providerId
+            ? 'accepted'
+            : 'not-accepted';
+
+        return {
+          providerId: candidate.providerId,
+          title: candidate.title,
+          source: 'auto',
+          reason: candidate.reason,
+          status,
+          summary: describeCandidate(candidate.reason, status),
+          score: candidate.score,
+        };
+      }),
+    );
   }
 
   private shouldCacheFailure(error: ExtensionError): boolean {

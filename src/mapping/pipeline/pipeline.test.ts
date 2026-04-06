@@ -56,8 +56,16 @@ describe('resolveViaPipeline', () => {
     expect(result).toMatchObject({
       status: 'resolved',
       providerId: 101,
-      reason: 'exact',
+      reason: 'exact-title-match',
+      searchTerms: ['Attack on Titan'],
     });
+    expect(result.candidates).toEqual([
+      expect.objectContaining({
+        providerId: 101,
+        reason: 'exact-title-match',
+        searchTerm: 'Attack on Titan',
+      }),
+    ]);
   });
 
   it('returns fuzzy when the winning candidate only matches approximately', async () => {
@@ -81,7 +89,15 @@ describe('resolveViaPipeline', () => {
     expect(result).toMatchObject({
       status: 'resolved',
       providerId: 202,
-      reason: 'fuzzy',
+      reason: 'fuzzy-match',
+      searchTerms: ['Attack on Titan'],
     });
+    expect(result.candidates).toEqual([
+      expect.objectContaining({
+        providerId: 202,
+        reason: 'fuzzy-match',
+        searchTerm: 'Attack on Titan',
+      }),
+    ]);
   });
 });

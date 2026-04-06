@@ -12,14 +12,21 @@ export async function resolvePrequelStatic(
   anilistApi: AniListMediaService,
 ): Promise<ResolvedMapping | null> {
   const visited = new Set<number>([media.id]);
+  let chainAnchorAniListId: number | undefined;
 
   for await (const prequel of anilistApi.iteratePrequelChain(media)) {
     if (visited.has(prequel.id)) {
       continue;
     }
+    chainAnchorAniListId ??= prequel.id;
     const hit = upstreamMappingStore.get(prequel.id);
     if (hit) {
-      return { providerId: hit.tvdbId, reason: 'relation' };
+      return {
+        providerId: hit.tvdbId,
+        reason: 'verified-inherited',
+        immediateSourceAniListId: prequel.id,
+        ...(chainAnchorAniListId ? { chainAnchorAniListId } : {}),
+      };
     }
     visited.add(prequel.id);
   }

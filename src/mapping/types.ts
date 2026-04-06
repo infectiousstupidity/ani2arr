@@ -13,7 +13,7 @@ import type { RequestPriority } from '@/shared/utils/request-priority';
  * - `rejected`, `ignored` describe user-owned suppression rows
  * - `unresolved` describes rows where resolution was attempted but nothing was accepted
  *
- * Prefer `acceptedSource`, `acceptedReason`, and `resolverState` when you need
+ * Prefer `acceptedEvidence`, `recentEvaluation`, and `resolverState` when you need
  * precise backend semantics.
  */
 export type MappingSource = 'manual' | 'upstream' | 'auto' | 'rejected' | 'ignored' | 'unresolved';
@@ -47,11 +47,18 @@ export type MappingAcceptedSource = 'manual' | 'upstream' | 'auto';
  * Reason answers "why was it accepted?"
  *
  * Examples:
- * - `source: 'upstream'` + `reason: 'exact'`
- * - `source: 'auto'` + `reason: 'relation'`
- * - `source: 'auto'` + `reason: 'fuzzy'`
+ * - `source: 'upstream'` + `reason: 'exact-upstream'`
+ * - `source: 'manual'` + `reason: 'manual-override'`
+ * - `source: 'auto'` + `reason: 'verified-inherited'`
+ * - `source: 'auto'` + `reason: 'fuzzy-match'`
  */
-export type MappingAcceptedReason = 'exact' | 'relation' | 'title' | 'fuzzy';
+export type MappingAcceptedReason =
+  | 'exact-upstream'
+  | 'manual-override'
+  | 'exact-title-match'
+  | 'verified-inherited'
+  | 'fuzzy-match'
+  | 'borrowed-base-title-fallback';
 
 /**
  * Source of an automated resolver result.
@@ -65,9 +72,39 @@ export type MappingAcceptedReason = 'exact' | 'relation' | 'title' | 'fuzzy';
  * - candidate results that the resolver proposed before final acceptance
  *
  * Do not use this for user overrides. Manual overrides should use
- * `MappingAcceptedSource` and appear as `acceptedSource: 'manual'`.
+ * `MappingAcceptedSource` via `acceptedEvidence.source`.
  */
 export type MappingResolvedSource = Exclude<MappingAcceptedSource, 'manual'>;
+
+/** Small accepted-evidence payload for explaining why one mapping is effective. */
+export interface MappingAcceptedEvidence {
+  source: MappingAcceptedSource;
+  reason: MappingAcceptedReason;
+  successfulTitle?: string;
+  immediateSourceAniListId?: number;
+  chainAnchorAniListId?: number;
+}
+
+/** Candidate disposition recorded in the most recent resolver evaluation trace. */
+export type MappingEvaluationCandidateStatus = 'accepted' | 'rejected' | 'suppressed' | 'not-accepted';
+
+/** Compact candidate explanation kept in the most recent evaluation trace only. */
+export interface MappingEvaluationCandidate {
+  providerId: number;
+  title?: string;
+  source: MappingAcceptedSource;
+  reason: MappingAcceptedReason;
+  status: MappingEvaluationCandidateStatus;
+  summary: string;
+  score?: number;
+}
+
+/** Small, rebuildable trace of the most recent resolver evaluation attempt. */
+export interface MappingRecentEvaluationTrace {
+  attemptedAt: number;
+  searchTerms?: readonly string[];
+  candidates: readonly MappingEvaluationCandidate[];
+}
 
 /**
  * Conflict type projected from current effective state and exact upstream truth.
@@ -134,16 +171,11 @@ export type MappingResolverState =
  * - `source`:
  *   legacy row classification kept for existing callers
  *
- * - `acceptedSource` / `acceptedReason`:
- *   describe the currently effective accepted mapping and are only meaningful when
- *   the row has an accepted mapping, typically alongside `resolverState: 'mapped'`
- *   or a manual effective state
+ * - `acceptedEvidence`:
+ *   explains why the effective mapping exists when the row is currently mapped
  *
- * - `candidateSource` / `candidateReason`:
- *   describe a resolver-proposed candidate that was strong enough to matter, but did
- *   not become the effective accepted mapping
- *   this is mainly useful for states like `verification-failed`, where the resolver
- *   had a concrete candidate but could not complete verification
+ * - `recentEvaluation`:
+ *   compact trace of the most recent resolver attempt for inspect and suggestion UIs
  *
  * - `resolverState`:
  *   carries the semantic resolver outcome without overloading `source`
@@ -154,51 +186,8 @@ export interface MappingSummary {
   providerId: number | null;
   suppressedProviderId?: number | null;
   source: MappingSource;
-
-  /**
-   * Source of the currently effective accepted mapping.
-   *
-   * Populated when this row has an accepted effective mapping.
-   * Examples:
-   * - manual override row -> `manual`
-   * - exact upstream row -> `upstream`
-   * - resolver-accepted row -> `auto`
-   *
-   * Not used for unresolved-style outcomes.
-   */
-  acceptedSource?: MappingAcceptedSource;
-
-  /**
-   * Reason the currently effective mapping was accepted.
-   *
-   * Populated together with `acceptedSource` when this row has an accepted mapping.
-   * This explains why the effective mapping was accepted, not merely where it came from.
-   */
-  acceptedReason?: MappingAcceptedReason;
-
-  /**
-   * Source of a concrete resolver candidate that mattered, but did not become the
-   * current effective accepted mapping.
-   *
-   * This is mainly used for proposed automated candidates, such as a candidate that
-   * reached verification and then ended in `verification-failed`.
-   *
-   * Because this field is resolver-owned, it intentionally excludes `manual`.
-   */
-  candidateSource?: MappingResolvedSource;
-
-  /**
-   * Reason associated with `candidateSource`.
-   *
-   * This explains why the resolver considered that candidate plausible enough to carry
-   * forward, even though it did not become the effective accepted mapping.
-   *
-   * Typical use:
-   * - `resolverState: 'verification-failed'`
-   * - `candidateSource: 'auto'`
-   * - `candidateReason: 'relation'`
-   */
-  candidateReason?: MappingAcceptedReason;
+  acceptedEvidence?: MappingAcceptedEvidence;
+  recentEvaluation?: MappingRecentEvaluationTrace;
 
   suppressionKind?: MappingSuppressionKind;
   exactUpstreamProviderId?: number | null;
@@ -242,59 +231,42 @@ export interface ResolvedMapping {
   providerId: number;
   reason: MappingAcceptedReason;
   successfulSynonym?: string;
+  recentEvaluation?: MappingRecentEvaluationTrace;
+  immediateSourceAniListId?: number;
+  chainAnchorAniListId?: number;
 }
 
 /**
  * Persisted or cached semantic resolver state for one `provider + anilistId`.
  *
  * Important distinction:
- * - `acceptedSource` / `acceptedReason` are only used for successful mapped outcomes
- * - `candidateSource` / `candidateReason` are used when the resolver had a concrete
- *   candidate but could not turn it into an accepted mapping
+ * - `acceptedEvidence` is only used for successful mapped outcomes
+ * - `recentEvaluation` is the rebuildable explanation cache for the latest attempt
  */
 export type ResolverStateRecord =
   /**
    * Resolver accepted a final mapping.
    *
-   * `acceptedSource` / `acceptedReason` describe the effective accepted result.
-   * There is no candidate-only field here because the candidate became the accepted mapping.
+   * `acceptedEvidence` describes the effective accepted result.
    */
   | {
       state: 'mapped';
       providerId: number;
-      acceptedSource: MappingResolvedSource;
-      acceptedReason: MappingAcceptedReason;
-      successfulSynonym?: string;
+      acceptedEvidence: MappingAcceptedEvidence;
+      recentEvaluation?: MappingRecentEvaluationTrace;
       updatedAt: number;
     }
 
   /**
-   * Resolver completed without an accepted mapping and without a concrete candidate
-   * that needs separate candidate metadata.
+   * Resolver completed without an accepted mapping.
    *
    * - `unresolved`: nothing acceptable was found
    * - `ambiguous`: more than one plausible answer remained
+   * - `verification-failed`: a plausible candidate existed, but final verification failed
    */
   | {
-      state: 'unresolved' | 'ambiguous';
-      title?: string;
-      updatedAt: number;
-    }
-
-  /**
-   * Resolver had a concrete candidate it wanted to verify, but verification could not
-   * be completed.
-   *
-   * `candidateSource` / `candidateReason` describe that proposed, not-finally-accepted
-   * candidate. They are not accepted fields because the mapping did not become effective.
-   */
-  | {
-      state: 'verification-failed';
-      providerId: number;
-      candidateSource: MappingResolvedSource;
-      candidateReason: MappingAcceptedReason;
-      title?: string;
-      successfulSynonym?: string;
+      state: 'unresolved' | 'ambiguous' | 'verification-failed';
+      recentEvaluation?: MappingRecentEvaluationTrace;
       updatedAt: number;
     };
 
