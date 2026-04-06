@@ -1,6 +1,7 @@
 /** RPC handlers for mapping overrides, exports, and mapping listings. */
 // src/rpc/handlers/mapping.handlers.ts
 
+import { getMappingInspection } from '@/mapping/inspection/get-mapping-inspection';
 import type { Ani2arrApi } from '@/rpc';
 import { getExtensionOptionsSnapshot, isProviderConfigured } from '@/options';
 import { createError, ErrorCode } from '@/shared/errors';
@@ -22,6 +23,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
   | 'clearAllMappingOverrides'
   | 'exportStoredMappings'
   | 'getMappings'
+  | 'getMappingInspection'
 > {
   const {
     mappingService,
@@ -198,6 +200,19 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
         radarrLibrary,
       });
     },
+
+    async getMappingInspection(input) {
+      await overridesReady;
+      await mappingService.initStaticPairs();
+      return getMappingInspection(input, {
+        overridesService,
+        resolverStateStore,
+        upstreamMappingStore,
+        anilistMetadataStore: deps.anilistMetadataStore,
+        sonarrLibrary,
+        radarrLibrary,
+      });
+    },
   } satisfies Pick<
     Ani2arrApi,
     | 'getStaticMapped'
@@ -212,6 +227,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
     | 'clearAllMappingOverrides'
     | 'exportStoredMappings'
     | 'getMappings'
+    | 'getMappingInspection'
   >;
 
   return handlers;

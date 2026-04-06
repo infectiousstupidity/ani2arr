@@ -319,17 +319,20 @@ export async function listMappings(
         rejected,
       );
     } else if (resolverState?.state === 'mapped') {
-      candidate = {
-        anilistId,
-        provider,
-        providerId: resolverState.providerId,
-        source: resolverState.acceptedEvidence.source,
-        acceptedEvidence: resolverState.acceptedEvidence,
-        ...(resolverState.recentEvaluation ? { recentEvaluation: resolverState.recentEvaluation } : {}),
-        resolverState: 'mapped',
-        updatedAt: resolverState.updatedAt,
-        hadResolveAttempt: resolverState.acceptedEvidence.source === 'auto',
-      };
+      candidate = withRejectedConflict(
+        {
+          anilistId,
+          provider,
+          providerId: resolverState.providerId,
+          source: resolverState.acceptedEvidence.source,
+          acceptedEvidence: resolverState.acceptedEvidence,
+          ...(resolverState.recentEvaluation ? { recentEvaluation: resolverState.recentEvaluation } : {}),
+          resolverState: 'mapped',
+          updatedAt: resolverState.updatedAt,
+          hadResolveAttempt: resolverState.acceptedEvidence.source === 'auto',
+        },
+        rejected,
+      );
     } else if (rejected) {
       candidate = {
         anilistId,
@@ -427,10 +430,7 @@ export async function listMappings(
       series?.statistics?.episodeCount ??
       series?.statistics?.episodeFileCount ??
       (movie ? (movie.hasFile ? 1 : 0) : undefined);
-    const statusLabel =
-      series && typeof (series as { status?: unknown }).status === 'string'
-        ? (series as { status?: string }).status
-        : movie?.status;
+    const statusLabel = series?.status ?? movie?.status;
     let providerMeta: MappingSummary['providerMeta'];
     if (candidate.source === 'rejected') {
       providerMeta = undefined;

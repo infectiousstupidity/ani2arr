@@ -3,7 +3,7 @@
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAni2arrApi } from '@/rpc';
-import type { ExportStoredMappingsOutput, GetMappingsOutput } from '@/rpc/types';
+import type { ExportStoredMappingsOutput, GetMappingInspectionOutput, GetMappingsOutput } from '@/rpc/types';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import type {
   MappingProviderIdRecord,
@@ -35,6 +35,7 @@ export const useSetMappingOverride = () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides(variables.provider) });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides('all') });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingInspection(variables.provider, variables.anilistId) });
     },
   });
 };
@@ -54,6 +55,7 @@ export const useClearMappingOverride = () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides(variables.provider) });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides('all') });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingInspection(variables.provider, variables.anilistId) });
     },
   });
 };
@@ -73,6 +75,7 @@ export const useClearAllMappingOverrides = () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot('sonarr') });
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot('radarr') });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingInspectionRoot() });
     },
   });
 };
@@ -116,6 +119,7 @@ export const useSetMappingIgnore = () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides(variables.provider) });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides('all') });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingInspection(variables.provider, variables.anilistId) });
     },
   });
 };
@@ -135,6 +139,7 @@ export const useClearMappingIgnore = () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides(variables.provider) });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverrides('all') });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingInspection(variables.provider, variables.anilistId) });
     },
   });
 };
@@ -153,6 +158,7 @@ export const useSetMappingRejectedCandidate = () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId, variables.provider) });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverridesRoot() });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingInspection(variables.provider, variables.anilistId) });
     },
   });
 };
@@ -171,6 +177,7 @@ export const useClearMappingRejectedCandidate = () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusBase(variables.anilistId, variables.provider) });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingOverridesRoot() });
       queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mappingInspection(variables.provider, variables.anilistId) });
     },
   });
 };
@@ -193,4 +200,20 @@ export const useMappings = (input?: GetMappingsInput) =>
     gcTime: 2 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     meta: { persist: false },
+  });
+
+export const useMappingInspection = (provider: Provider, anilistId: number) =>
+  useQuery<GetMappingInspectionOutput, ExtensionError>({
+    queryKey: queryKeys.mappingInspection(provider, anilistId),
+    queryFn: async () => {
+      try {
+        return await getAni2arrApi().getMappingInspection({ provider, anilistId });
+      } catch (error) {
+        throw normalizeError(error);
+      }
+    },
+    enabled: Number.isFinite(anilistId) && anilistId > 0,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });

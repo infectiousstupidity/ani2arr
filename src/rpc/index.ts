@@ -9,6 +9,7 @@ import type { ProviderMetadata, RadarrMovie, SonarrSeries } from '@/providers';
 import type {
   ExportStoredMappingsOutput,
   GetAniListMetadataOutput,
+  GetMappingInspectionOutput,
   GetMappingsOutput,
   RadarrLookupOutput,
   SonarrLookupOutput,
@@ -33,6 +34,7 @@ import type {
   SetMappingRejectedCandidateInput,
   ClearMappingRejectedCandidateInput,
   GetMappingsInput,
+  GetMappingInspectionInput,
   GetAniListMetadataInput,
   TestProviderConnectionInput,
 } from './schemas';
@@ -70,6 +72,7 @@ export interface Ani2arrApi {
   clearPersistentCaches(): Promise<{ ok: true }>;
   resetExtensionState(): Promise<{ ok: true }>;
   getMappings(input?: GetMappingsInput): Promise<GetMappingsOutput>;
+  getMappingInspection(input: GetMappingInspectionInput): Promise<GetMappingInspectionOutput>;
   getAniListMetadata(input: GetAniListMetadataInput): Promise<GetAniListMetadataOutput>;
 }
 

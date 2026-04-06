@@ -242,6 +242,7 @@ export class SonarrLibrary {
       title: series.title,
       titleSlug: series.titleSlug,
       ...(alternateTitles === undefined ? {} : { alternateTitles }),
+      ...(series.status === undefined ? {} : { status: series.status }),
       ...(statistics === undefined ? {} : { statistics }),
     };
   }
