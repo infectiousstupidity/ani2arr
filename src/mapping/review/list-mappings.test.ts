@@ -174,8 +174,26 @@ describe('listMappings', () => {
         reason: 'manual-override',
       },
       resolverState: 'mapped',
-      exactUpstreamProviderId: 555,
-      conflictKind: 'manual-upstream-conflict',
+      reviewSummary: {
+        count: 1,
+        primaryReason: 'manual-upstream-disagreement',
+        reasons: ['manual-upstream-disagreement'],
+      },
+      reviewItems: [
+        expect.objectContaining({
+          reason: 'manual-upstream-disagreement',
+          current: expect.objectContaining({
+            source: 'manual',
+            providerId: 777,
+            acceptedReason: 'manual-override',
+          }),
+          proposed: expect.objectContaining({
+            source: 'upstream',
+            providerId: 555,
+            acceptedReason: 'exact-upstream',
+          }),
+        }),
+      ],
     });
   });
 
@@ -224,8 +242,8 @@ describe('listMappings', () => {
       },
       resolverState: 'mapped',
     });
-    expect(row!.conflictKind).toBeUndefined();
-    expect(row!.exactUpstreamProviderId).toBeNull();
+    expect(row!.reviewSummary).toBeUndefined();
+    expect(row!.reviewItems).toBeUndefined();
   });
 
   it('keeps ignores effective while surfacing exact upstream conflicts', async () => {
@@ -265,8 +283,25 @@ describe('listMappings', () => {
       provider: 'sonarr',
       providerId: null,
       source: 'ignored',
-      exactUpstreamProviderId: 333,
-      conflictKind: 'ignore-upstream-conflict',
+      reviewSummary: {
+        count: 1,
+        primaryReason: 'ignored-but-exact-upstream',
+        reasons: ['ignored-but-exact-upstream'],
+      },
+      reviewItems: [
+        expect.objectContaining({
+          reason: 'ignored-but-exact-upstream',
+          current: expect.objectContaining({
+            source: 'ignored',
+            providerId: null,
+          }),
+          proposed: expect.objectContaining({
+            source: 'upstream',
+            providerId: 333,
+            acceptedReason: 'exact-upstream',
+          }),
+        }),
+      ],
     });
   });
 
@@ -318,7 +353,7 @@ describe('listMappings', () => {
     });
   });
 
-  it('projects explicit resolver states without rebuilding them from ledgers', async () => {
+  it('projects verification-failed inherited review without changing the unresolved effective state', async () => {
     const result = await listMappings(
       { limit: 10 },
       {
@@ -405,6 +440,26 @@ describe('listMappings', () => {
       provider: 'radarr',
       source: 'unresolved',
       resolverState: 'verification-failed',
+      reviewSummary: {
+        count: 1,
+        primaryReason: 'verification-failed-inherited-candidate',
+        reasons: ['verification-failed-inherited-candidate'],
+      },
+      reviewItems: [
+        expect.objectContaining({
+          reason: 'verification-failed-inherited-candidate',
+          current: expect.objectContaining({
+            source: 'unresolved',
+            providerId: null,
+            resolverState: 'verification-failed',
+          }),
+          proposed: expect.objectContaining({
+            source: 'auto',
+            providerId: 501,
+            acceptedReason: 'verified-inherited',
+          }),
+        }),
+      ],
       recentEvaluation: {
         attemptedAt: 80,
         searchTerms: ['Needs Verification'],
@@ -419,5 +474,101 @@ describe('listMappings', () => {
       providerMeta: { title: 'Needs Verification', type: 'movie' },
     });
     expect(result.mappings.find(entry => entry.anilistId === 10)?.source).toBe('unresolved');
+  });
+
+  it('projects ambiguous inherited conflicts as review items instead of hiding them in unresolved traces', async () => {
+    const result = await listMappings(
+      { limit: 10 },
+      {
+        overridesService: {
+          listIgnores: () => [],
+          listRejectedCandidates: () => [],
+          list: () => [],
+          isIgnored: () => false,
+          getLinkedAniListIds: () => [],
+        },
+        upstreamMappingStore: {
+          listAllPairs: () => [],
+          getAniListIdsForTvdb: () => [],
+        },
+        sonarrLibrary: {
+          getLeanSeriesList: async () => [],
+        },
+        radarrLibrary: {
+          getLeanMovieList: async () => [],
+        },
+        resolverStateStore: createResolverStateStore([
+          {
+            anilistId: 12,
+            provider: 'sonarr',
+            state: 'ambiguous',
+            recentEvaluation: {
+              attemptedAt: 120,
+              candidates: [
+                {
+                  providerId: 701,
+                  title: 'Anchor A',
+                  source: 'auto',
+                  reason: 'verified-inherited',
+                  status: 'not-accepted',
+                  summary: 'Inherited candidate ambiguous: conflicting trusted relation anchors proposed different provider IDs.',
+                  inheritedVerification: {
+                    reason: 'Conflicting trusted relation anchors proposed different provider IDs.',
+                    positiveSignals: [],
+                    contradictions: [],
+                    immediateSourceAniListId: 11,
+                    chainAnchorAniListId: 10,
+                  },
+                },
+                {
+                  providerId: 702,
+                  title: 'Anchor B',
+                  source: 'auto',
+                  reason: 'verified-inherited',
+                  status: 'not-accepted',
+                  summary: 'Inherited candidate ambiguous: conflicting trusted relation anchors proposed different provider IDs.',
+                  inheritedVerification: {
+                    reason: 'Conflicting trusted relation anchors proposed different provider IDs.',
+                    positiveSignals: [],
+                    contradictions: [],
+                    immediateSourceAniListId: 9,
+                    chainAnchorAniListId: 8,
+                  },
+                },
+              ],
+            },
+            updatedAt: 120,
+          },
+        ]),
+      },
+    );
+
+    expect(result.mappings).toHaveLength(1);
+    expect(result.mappings[0]).toMatchObject({
+      anilistId: 12,
+      provider: 'sonarr',
+      providerId: null,
+      source: 'unresolved',
+      resolverState: 'ambiguous',
+      reviewSummary: {
+        count: 1,
+        primaryReason: 'ambiguous-inherited-conflict',
+        reasons: ['ambiguous-inherited-conflict'],
+      },
+      reviewItems: [
+        expect.objectContaining({
+          reason: 'ambiguous-inherited-conflict',
+          current: expect.objectContaining({
+            source: 'unresolved',
+            providerId: null,
+            resolverState: 'ambiguous',
+          }),
+          conflicts: [
+            expect.objectContaining({ source: 'auto', providerId: 701, acceptedReason: 'verified-inherited' }),
+            expect.objectContaining({ source: 'auto', providerId: 702, acceptedReason: 'verified-inherited' }),
+          ],
+        }),
+      ],
+    });
   });
 });

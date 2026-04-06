@@ -2,6 +2,7 @@
 // src/rpc/schemas.ts
 import * as v from 'valibot';
 import { AniListMediaHintSchema } from '@/anilist/schemas/media.schema';
+import { MAPPING_SOURCE_VALUES } from '@/mapping/types';
 import { RadarrFormStateSchema } from '@/providers/settings/radarr-settings.schema';
 import { SonarrFormStateSchema } from '@/providers/settings/sonarr-settings.schema';
 
@@ -14,7 +15,7 @@ import { SonarrFormStateSchema } from '@/providers/settings/sonarr-settings.sche
  */
 const IdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
 const ProviderSchema = v.picklist(['sonarr', 'radarr']);
-const MappingSourceSchema = v.picklist(['manual', 'upstream', 'auto', 'rejected', 'ignored', 'unresolved']);
+const MappingSourceSchema = v.picklist(MAPPING_SOURCE_VALUES);
 
 /**
  * Standard non-empty string validation

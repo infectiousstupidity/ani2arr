@@ -3,6 +3,7 @@
 
 import type { RadarrMovieSnapshot, SonarrSeriesSnapshot } from '@/providers';
 import type { MappingSummary, MappingSource, MappingStatus, ResolverStateRecord } from '@/mapping/types';
+import { projectMappingReview } from './project-review';
 
 export interface ListMappingsCursor {
   updatedAt: number;
@@ -104,8 +105,7 @@ export async function listMappings(
     acceptedEvidence?: MappingSummary['acceptedEvidence'];
     recentEvaluation?: MappingSummary['recentEvaluation'];
     suppressionKind?: MappingSummary['suppressionKind'];
-    exactUpstreamProviderId?: MappingSummary['exactUpstreamProviderId'];
-    conflictKind?: MappingSummary['conflictKind'];
+    exactUpstreamMatchProviderId?: number | null;
     resolverState?: MappingSummary['resolverState'];
     updatedAt: number;
     hadResolveAttempt?: boolean;
@@ -250,8 +250,7 @@ export async function listMappings(
           reason: 'manual-override',
         },
         resolverState: 'mapped',
-        exactUpstreamProviderId: upstream?.providerId ?? null,
-        ...(upstream ? { conflictKind: 'manual-upstream-conflict' as const } : {}),
+        exactUpstreamMatchProviderId: upstream?.providerId ?? null,
         updatedAt: manual.updatedAt,
         hadResolveAttempt: true,
       },
@@ -284,8 +283,7 @@ export async function listMappings(
           provider,
           providerId: null,
           source: 'ignored',
-          exactUpstreamProviderId: upstream?.providerId ?? null,
-          ...(upstream ? { conflictKind: 'ignore-upstream-conflict' as const } : {}),
+          exactUpstreamMatchProviderId: upstream?.providerId ?? null,
           updatedAt: ignore.updatedAt,
           hadResolveAttempt: true,
         },
@@ -359,16 +357,26 @@ export async function listMappings(
 
   const matchesQuery = (summary: MappingSummary): boolean => {
     if (normalizedQuery === '') return true;
+    const reviewHaystackParts = (summary.reviewItems ?? []).flatMap((item) => [
+      item.reason,
+      item.summary,
+      item.current.providerId === null ? '' : String(item.current.providerId),
+      item.proposed?.providerId === undefined || item.proposed.providerId === null
+        ? ''
+        : String(item.proposed.providerId),
+      ...((item.conflicts ?? []).flatMap(conflict => [
+        conflict.providerId === null ? '' : String(conflict.providerId),
+      ])),
+    ]);
     const haystackParts: string[] = [
       String(summary.anilistId),
       summary.providerId === null ? '' : String(summary.providerId),
       summary.suppressedProviderId === null || summary.suppressedProviderId === undefined
         ? ''
         : String(summary.suppressedProviderId),
-      summary.exactUpstreamProviderId === null || summary.exactUpstreamProviderId === undefined
-        ? ''
-        : String(summary.exactUpstreamProviderId),
       summary.providerMeta?.title ?? '',
+      ...(summary.reviewSummary?.reasons ?? []),
+      ...reviewHaystackParts,
       ...(summary.recentEvaluation?.searchTerms ?? []),
       ...((summary.recentEvaluation?.candidates ?? []).map((candidate) => candidate.title ?? String(candidate.providerId))),
     ];
@@ -443,6 +451,16 @@ export async function listMappings(
       candidate.source === 'manual' ||
       candidate.source === 'rejected' ||
       candidate.source === 'ignored';
+    const reviewProjection = projectMappingReview({
+      source: candidate.source,
+      providerId,
+      ...(candidate.acceptedEvidence ? { acceptedEvidence: candidate.acceptedEvidence } : {}),
+      ...(candidate.recentEvaluation ? { recentEvaluation: candidate.recentEvaluation } : {}),
+      ...(candidate.resolverState ? { resolverState: candidate.resolverState } : {}),
+      ...(candidate.exactUpstreamMatchProviderId === undefined
+        ? {}
+        : { exactUpstreamMatchProviderId: candidate.exactUpstreamMatchProviderId }),
+    });
 
     const summary: MappingSummary = {
       anilistId,
@@ -453,8 +471,8 @@ export async function listMappings(
       ...(candidate.acceptedEvidence ? { acceptedEvidence: candidate.acceptedEvidence } : {}),
       ...(candidate.recentEvaluation ? { recentEvaluation: candidate.recentEvaluation } : {}),
       ...(candidate.suppressionKind ? { suppressionKind: candidate.suppressionKind } : {}),
-      ...(candidate.exactUpstreamProviderId === undefined ? {} : { exactUpstreamProviderId: candidate.exactUpstreamProviderId }),
-      ...(candidate.conflictKind ? { conflictKind: candidate.conflictKind } : {}),
+      ...(reviewProjection.reviewSummary ? { reviewSummary: reviewProjection.reviewSummary } : {}),
+      ...(reviewProjection.reviewItems ? { reviewItems: reviewProjection.reviewItems } : {}),
       status,
       updatedAt: candidate.updatedAt,
       ...(linkedAniListIds.length > 0 ? { linkedAniListIds } : {}),

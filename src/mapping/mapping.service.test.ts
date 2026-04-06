@@ -503,6 +503,11 @@ describe('MappingService', () => {
       }),
       expect.any(Object),
     );
+
+    const persistedState = resolverStateStore.set.mock.calls[0]?.[2];
+    expect(persistedState).not.toHaveProperty('reviewNeeded');
+    expect(persistedState).not.toHaveProperty('reviewSummary');
+    expect(persistedState).not.toHaveProperty('reviewItems');
   });
 
   it('resets lookup clients, failure cache, resolver state, and notifications', async () => {
