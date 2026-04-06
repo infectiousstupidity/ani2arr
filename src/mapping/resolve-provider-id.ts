@@ -104,7 +104,7 @@ export async function resolveProviderIdInternal(
   provider: Provider,
   anilistId: number,
   options: ResolveProviderIdOptions,
-  bypassFailureCache: boolean,
+  bypassCachedResolutionState: boolean,
 ): Promise<ResolvedMapping | null> {
   if (deps.overrides?.isIgnored(provider, anilistId)) {
     await deps.clearResolverState(provider, anilistId);
@@ -186,7 +186,7 @@ export async function resolveProviderIdInternal(
     }
   }
 
-  if (!bypassFailureCache) {
+  if (!bypassCachedResolutionState) {
     const cachedFailure = await readExtensionMappingFailure(provider, anilistId);
     if (cachedFailure) {
       if (import.meta.env.DEV) {
@@ -272,7 +272,7 @@ export async function resolveProviderIdInternal(
     provider,
     anilistId,
     options,
-    bypassFailureCache,
+    bypassCachedResolutionState,
     seededRecentEvaluation,
   );
 }
@@ -282,7 +282,7 @@ async function attemptNetworkResolution(
   provider: Provider,
   anilistId: number,
   options: ResolveProviderIdOptions,
-  bypassFailureCache: boolean,
+  bypassCachedResolutionState: boolean,
   seededRecentEvaluation?: MappingRecentEvaluationTrace,
 ): Promise<ResolvedMapping | null> {
   let attempt: ResolutionAttempt;
@@ -321,7 +321,7 @@ async function attemptNetworkResolution(
       return null;
     }
 
-    if (!bypassFailureCache && shouldCacheFailure(normalized)) {
+    if (!bypassCachedResolutionState && shouldCacheFailure(normalized)) {
       await cacheFailure(provider, anilistId, normalized);
     }
     throw normalized;
