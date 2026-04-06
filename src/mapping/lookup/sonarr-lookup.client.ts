@@ -21,6 +21,13 @@ export class SonarrLookupClient extends BaseLookupClient<SonarrLookupSeries> {
       : null;
   }
 
+  public lookupExactByProviderId(
+    providerId: number,
+    credentials: ProviderCredentials,
+  ): Promise<SonarrLookupSeries | null> {
+    return this.sonarrApi.lookupSeriesByTvdbId(providerId, credentials);
+  }
+
   protected fetchFromApi(
     term: string,
     credentials: ProviderCredentials,

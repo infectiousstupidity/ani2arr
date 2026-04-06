@@ -158,6 +158,7 @@ export function createSingleCandidateTrace(
       reason: resolved.reason,
       status,
       summary: describeCandidate(resolved.reason, status),
+      ...(resolved.inheritedVerification ? { inheritedVerification: resolved.inheritedVerification } : {}),
     },
   ]);
 }

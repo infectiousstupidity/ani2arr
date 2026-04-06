@@ -29,7 +29,7 @@ import {
 } from './constants';
 import { tryHintLookup } from './hints/hint-lookup';
 import { buildMediaFromMetadataHint } from './hints/media-hints';
-import { resolvePrequelStatic } from './hints/prequel-static';
+import { attemptVerifiedInheritedSonarrResolution } from './hints/verified-inheritance';
 import type { ProviderLookupClient, ProviderLookupResult } from './lookup';
 import type { MappingOverridesService } from './overrides';
 import { resolveViaPipeline } from './pipeline/pipeline';
@@ -55,6 +55,7 @@ import type {
   ResolvedMapping,
   ResolverStateRecord,
 } from './types';
+import type { SonarrLookupSeries } from '@/providers';
 
 type ProviderLookupRegistry = Record<
   Provider,
@@ -64,6 +65,7 @@ type ProviderLookupRegistry = Record<
 type ResolutionAttempt = {
   resolved: ResolvedMapping | null;
   recentEvaluation?: MappingRecentEvaluationTrace;
+  terminalState?: Exclude<ResolverStateRecord['state'], 'mapped' | 'unresolved'>;
 };
 
 type MappingOverrideReads = Pick<MappingOverridesService, 'isIgnored' | 'get' | 'clear'>;
@@ -334,11 +336,12 @@ async function attemptNetworkResolution(
   );
 
   if (attempt.resolved === null) {
+    const terminalState = attempt.terminalState ?? 'unresolved';
     await deps.recordResolverState(
       provider,
       anilistId,
       {
-        state: 'unresolved',
+        state: terminalState,
         ...(recentEvaluation ? { recentEvaluation } : {}),
       },
       {
@@ -430,7 +433,11 @@ async function resolveViaNetwork(
       hints,
       priority,
       forceLookupNetwork,
+        false,
     );
+      if (metadataAttempt.terminalState) {
+        return metadataAttempt;
+      }
     const resolvedFromMetadata = applyAttempt('metadata', metadataAttempt);
     if (resolvedFromMetadata) {
       return resolvedFromMetadata;
@@ -451,7 +458,11 @@ async function resolveViaNetwork(
     hints,
     priority,
     forceLookupNetwork,
+    true,
   );
+  if (apiAttempt.terminalState) {
+    return apiAttempt;
+  }
   const resolvedFromApi = applyAttempt('api', apiAttempt);
   if (resolvedFromApi) {
     return resolvedFromApi;
@@ -469,6 +480,7 @@ async function tryResolveWithMedia(
   hints: ResolveProviderIdOptions['hints'] | undefined,
   priority: RequestPriority | undefined,
   forceLookupNetwork: boolean,
+  allowInheritedTraversal: boolean,
 ): Promise<ResolutionAttempt> {
   const routedProvider = resolveProviderForAniListFormat(media.format);
   if (routedProvider !== provider) {
@@ -478,14 +490,76 @@ async function tryResolveWithMedia(
     return { resolved: null };
   }
 
-  if (provider === 'sonarr') {
-    const prequelStatic = await resolvePrequelStatic(media, deps.upstreamMappingStore, deps.anilistApi);
-    if (prequelStatic) {
-      const recentEvaluation = createSingleCandidateTrace(prequelStatic, 'auto', 'accepted');
+  let recentEvaluation: MappingRecentEvaluationTrace | undefined;
+
+  if (provider === 'sonarr' && allowInheritedTraversal) {
+    const inheritedAttempt = await attemptVerifiedInheritedSonarrResolution({
+      media,
+      anilistApi: deps.anilistApi,
+      upstreamMappingStore: deps.upstreamMappingStore,
+      lookupClient: deps.lookupClients.sonarr as ProviderLookupClient<ProviderCredentials, SonarrLookupSeries>,
+      credentials,
+      ...(deps.overrides ? { overrides: deps.overrides } : {}),
+    });
+
+    recentEvaluation = mergeRecentEvaluations(recentEvaluation, inheritedAttempt.recentEvaluation);
+
+    if (inheritedAttempt.status === 'accepted') {
+      if (!deps.isResolvedCandidateSuppressed(provider, media.id, inheritedAttempt.resolved, 'auto')) {
+        return {
+          resolved: inheritedAttempt.resolved,
+          ...(recentEvaluation ? { recentEvaluation } : {}),
+        };
+      }
+
+      recentEvaluation = mergeRecentEvaluations(
+        recentEvaluation,
+        rewriteTraceCandidateStatus(
+          createSingleCandidateTrace(inheritedAttempt.resolved, 'auto', 'accepted'),
+          inheritedAttempt.resolved.providerId,
+          'rejected',
+        ),
+      );
+    }
+
+    if (inheritedAttempt.status === 'ambiguous' || inheritedAttempt.status === 'verification-failed') {
       return {
-        resolved: prequelStatic,
+        resolved: null,
+        terminalState: inheritedAttempt.status,
         ...(recentEvaluation ? { recentEvaluation } : {}),
       };
+    }
+
+    if (inheritedAttempt.status === 'rejected' && inheritedAttempt.borrowedBaseTitle) {
+      const borrowed = await tryHintLookup(
+        inheritedAttempt.borrowedBaseTitle,
+        deps.lookupClients.sonarr,
+        credentials,
+        deps.log,
+        forceLookupNetwork,
+      );
+      if (borrowed) {
+        const borrowedTrace = createSingleCandidateTrace(
+          borrowed,
+          'auto',
+          'accepted',
+          [inheritedAttempt.borrowedBaseTitle],
+          borrowed.successfulSynonym,
+        );
+        recentEvaluation = mergeRecentEvaluations(recentEvaluation, borrowedTrace);
+
+        if (!deps.isResolvedCandidateSuppressed(provider, media.id, borrowed, 'auto')) {
+          return {
+            resolved: borrowed,
+            ...(recentEvaluation ? { recentEvaluation } : {}),
+          };
+        }
+
+        recentEvaluation = mergeRecentEvaluations(
+          recentEvaluation,
+          rewriteTraceCandidateStatus(borrowedTrace, borrowed.providerId, 'rejected'),
+        );
+      }
     }
   }
 
@@ -511,7 +585,7 @@ async function tryResolveWithMedia(
   );
 
   if (outcome.status === 'resolved') {
-    const recentEvaluation = createPipelineRecentEvaluation(outcome);
+    recentEvaluation = mergeRecentEvaluations(recentEvaluation, createPipelineRecentEvaluation(outcome));
     return {
       resolved: {
         providerId: outcome.providerId,
@@ -521,7 +595,7 @@ async function tryResolveWithMedia(
       ...(recentEvaluation ? { recentEvaluation } : {}),
     };
   }
-  const recentEvaluation = createPipelineRecentEvaluation(outcome);
+  recentEvaluation = mergeRecentEvaluations(recentEvaluation, createPipelineRecentEvaluation(outcome));
   return {
     resolved: null,
     ...(recentEvaluation ? { recentEvaluation } : {}),

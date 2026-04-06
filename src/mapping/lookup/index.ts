@@ -7,6 +7,6 @@ export {
   type ProviderLookupCacheHit,
   type ProviderLookupOptions,
   type ProviderLookupResult,
-} from './provider-lookup.client';
+} from './provider-lookup.types';
 export { SonarrLookupClient } from './sonarr-lookup.client';
 export { RadarrLookupClient } from './radarr-lookup.client';

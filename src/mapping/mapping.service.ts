@@ -279,6 +279,7 @@ export class MappingService {
       ...(resolved.successfulSynonym ? { successfulTitle: resolved.successfulSynonym } : {}),
       ...(resolved.immediateSourceAniListId ? { immediateSourceAniListId: resolved.immediateSourceAniListId } : {}),
       ...(resolved.chainAnchorAniListId ? { chainAnchorAniListId: resolved.chainAnchorAniListId } : {}),
+      ...(resolved.inheritedVerification ? { inheritedVerification: resolved.inheritedVerification } : {}),
     };
   }
 

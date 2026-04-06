@@ -60,6 +60,15 @@ export type MappingAcceptedReason =
   | 'fuzzy-match'
   | 'borrowed-base-title-fallback';
 
+/** Structured inherited-verification details kept with accepted or recent evaluation data. */
+export interface MappingInheritedVerificationDetails {
+  reason: string;
+  positiveSignals: readonly string[];
+  contradictions: readonly string[];
+  immediateSourceAniListId?: number;
+  chainAnchorAniListId?: number;
+}
+
 /**
  * Source of an automated resolver result.
  *
@@ -83,6 +92,7 @@ export interface MappingAcceptedEvidence {
   successfulTitle?: string;
   immediateSourceAniListId?: number;
   chainAnchorAniListId?: number;
+  inheritedVerification?: MappingInheritedVerificationDetails;
 }
 
 /** Candidate disposition recorded in the most recent resolver evaluation trace. */
@@ -97,6 +107,7 @@ export interface MappingEvaluationCandidate {
   status: MappingEvaluationCandidateStatus;
   summary: string;
   score?: number;
+  inheritedVerification?: MappingInheritedVerificationDetails;
 }
 
 /** Small, rebuildable trace of the most recent resolver evaluation attempt. */
@@ -234,6 +245,7 @@ export interface ResolvedMapping {
   recentEvaluation?: MappingRecentEvaluationTrace;
   immediateSourceAniListId?: number;
   chainAnchorAniListId?: number;
+  inheritedVerification?: MappingInheritedVerificationDetails;
 }
 
 /**

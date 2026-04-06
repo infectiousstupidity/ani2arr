@@ -331,6 +331,180 @@ describe('MappingService', () => {
     expect(fetchMediaWithRelations).not.toHaveBeenCalled();
   });
 
+  it('falls back to a borrowed base-title lookup after inherited verification rejects the relation candidate', async () => {
+    const overrides: StubOverrides = {
+      isIgnored: vi.fn(() => false),
+      get: vi.fn((provider: string, anilistId: number) => (
+        provider === 'sonarr' && anilistId === 88 ? 111 : null
+      )),
+      clear: vi.fn(async () => {}),
+      getCandidateSuppression: vi.fn(() => null),
+    };
+    const upstreamMappingStore = {
+      get: vi.fn(() => null),
+    };
+    const resolverStateStore: StubResolverStateStore = {
+      get: vi.fn(async () => null),
+      set: vi.fn(async () => true),
+      delete: vi.fn(async () => false),
+      clear: vi.fn(async () => false),
+    };
+    const fetchMediaWithRelations = vi.fn(async (anilistId: number) => {
+      if (anilistId === 77) {
+        return {
+          id: 77,
+          format: 'TV',
+          title: { english: 'Bleach: Thousand-Year Blood War' },
+          synonyms: [],
+          relations: {
+            edges: [{ relationType: 'PREQUEL', node: { id: 88 } }],
+          },
+        };
+      }
+      if (anilistId === 88) {
+        return {
+          id: 88,
+          format: 'TV',
+          title: { english: 'Bleach Season 2' },
+          synonyms: [],
+          relations: { edges: [] },
+        };
+      }
+      throw new Error(`Unexpected AniList fetch ${anilistId}`);
+    });
+    const lookupClient = {
+      provider: 'sonarr' as const,
+      reset: vi.fn(async () => {}),
+      readFromCache: vi.fn(async () => ({ results: [], hit: 'none' as const })),
+      lookup: vi.fn(async (_canonical: string, rawTerm: string) => {
+        if (rawTerm === 'Bleach') {
+          return [{ title: 'Bleach', tvdbId: 222, year: 2004 }];
+        }
+        return [];
+      }),
+      lookupExactByProviderId: vi.fn(async () => ({
+        title: 'Naruto',
+        tvdbId: 111,
+      })),
+      getProviderId: vi.fn((result: { tvdbId?: number }) => result.tvdbId ?? null),
+    };
+
+    const service = new MappingService(
+      {
+        fetchMediaWithRelations,
+      } as never,
+      upstreamMappingStore as never,
+      { sonarr: lookupClient, radarr: { reset: vi.fn(async () => {}) } } as never,
+      resolverStateStore as never,
+      overrides as never,
+    );
+
+    const result = await service.resolveProviderId('sonarr', 77);
+
+    expect(result).toMatchObject({ providerId: 222, reason: 'borrowed-base-title-fallback' });
+    expect(resolverStateStore.set).toHaveBeenCalledWith(
+      'sonarr',
+      77,
+      expect.objectContaining({
+        state: 'mapped',
+        providerId: 222,
+        acceptedEvidence: expect.objectContaining({
+          source: 'auto',
+          reason: 'borrowed-base-title-fallback',
+        }),
+        recentEvaluation: expect.objectContaining({
+          candidates: expect.arrayContaining([
+            expect.objectContaining({ providerId: 111, status: 'not-accepted', reason: 'verified-inherited' }),
+            expect.objectContaining({ providerId: 222, status: 'accepted', reason: 'borrowed-base-title-fallback' }),
+          ]),
+        }),
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('records verification-failed instead of auto-accepting an inherited relation candidate when exact verification cannot complete', async () => {
+    const overrides: StubOverrides = {
+      isIgnored: vi.fn(() => false),
+      get: vi.fn(() => null),
+      clear: vi.fn(async () => {}),
+      getCandidateSuppression: vi.fn(() => null),
+    };
+    const upstreamMappingStore = {
+      get: vi.fn((anilistId: number) => (anilistId === 91 ? { tvdbId: 333, source: 'primary' as const } : null)),
+    };
+    const resolverStateStore: StubResolverStateStore = {
+      get: vi.fn(async () => null),
+      set: vi.fn(async () => true),
+      delete: vi.fn(async () => false),
+      clear: vi.fn(async () => false),
+    };
+    const fetchMediaWithRelations = vi.fn(async (anilistId: number) => {
+      if (anilistId === 90) {
+        return {
+          id: 90,
+          format: 'TV',
+          title: { english: 'Attack on Titan Final Season' },
+          synonyms: [],
+          relations: {
+            edges: [{ relationType: 'PREQUEL', node: { id: 91 } }],
+          },
+        };
+      }
+      if (anilistId === 91) {
+        return {
+          id: 91,
+          format: 'TV',
+          title: { english: 'Attack on Titan Season 3' },
+          synonyms: [],
+          relations: { edges: [] },
+        };
+      }
+      throw new Error(`Unexpected AniList fetch ${anilistId}`);
+    });
+    const lookupClient = {
+      provider: 'sonarr' as const,
+      reset: vi.fn(async () => {}),
+      readFromCache: vi.fn(async () => ({ results: [], hit: 'none' as const })),
+      lookup: vi.fn(async () => [{ title: 'Attack on Titan', tvdbId: 444, year: 2013 }]),
+      lookupExactByProviderId: vi.fn(async () => {
+        throw createError(
+          ErrorCode.NETWORK_ERROR,
+          'Timed out reaching Sonarr.',
+          'Unable to verify the inherited series right now.',
+        );
+      }),
+      getProviderId: vi.fn((result: { tvdbId?: number }) => result.tvdbId ?? null),
+    };
+
+    const service = new MappingService(
+      {
+        fetchMediaWithRelations,
+      } as never,
+      upstreamMappingStore as never,
+      { sonarr: lookupClient, radarr: { reset: vi.fn(async () => {}) } } as never,
+      resolverStateStore as never,
+      overrides as never,
+    );
+
+    const result = await service.resolveProviderId('sonarr', 90);
+
+    expect(result).toBeNull();
+    expect(resolverStateStore.set).toHaveBeenCalledWith(
+      'sonarr',
+      90,
+      expect.objectContaining({
+        state: 'verification-failed',
+        recentEvaluation: expect.objectContaining({
+          candidates: expect.arrayContaining([
+            expect.objectContaining({ providerId: 333, reason: 'verified-inherited', status: 'not-accepted' }),
+          ]),
+        }),
+      }),
+      expect.any(Object),
+    );
+  });
+
   it('resets lookup clients, failure cache, resolver state, and notifications', async () => {
     const { service, lookupClients, resolverStateStore, notifyMappingsChanged } = createService();
 
