@@ -7,6 +7,7 @@ import { STORAGE_KEYS } from '@/storage/keys';
 import type {
   MappingAcceptedEvidence,
   MappingEvaluationCandidate,
+  MappingInheritedVerificationDetails,
   MappingRecentEvaluationTrace,
   ResolverStateRecord,
 } from '@/mapping/types';
@@ -52,8 +53,48 @@ const acceptedEvidenceEquals = (
   left.reason === right.reason &&
   left.successfulTitle === right.successfulTitle &&
   left.immediateSourceAniListId === right.immediateSourceAniListId &&
-  left.chainAnchorAniListId === right.chainAnchorAniListId
+  left.chainAnchorAniListId === right.chainAnchorAniListId &&
+  inheritedVerificationEquals(left.inheritedVerification, right.inheritedVerification)
 );
+
+const inheritedVerificationEquals = (
+  left: MappingInheritedVerificationDetails | undefined,
+  right: MappingInheritedVerificationDetails | undefined,
+): boolean => {
+  if (!left && !right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  if (
+    left.reason !== right.reason ||
+    left.immediateSourceAniListId !== right.immediateSourceAniListId ||
+    left.chainAnchorAniListId !== right.chainAnchorAniListId
+  ) {
+    return false;
+  }
+
+  if (left.positiveSignals.length !== right.positiveSignals.length) {
+    return false;
+  }
+  for (const [index, signal] of left.positiveSignals.entries()) {
+    if (signal !== right.positiveSignals[index]) {
+      return false;
+    }
+  }
+
+  if (left.contradictions.length !== right.contradictions.length) {
+    return false;
+  }
+  for (const [index, contradiction] of left.contradictions.entries()) {
+    if (contradiction !== right.contradictions[index]) {
+      return false;
+    }
+  }
+
+  return true;
+};
 
 const evaluationCandidateEquals = (
   left: MappingEvaluationCandidate,
@@ -65,7 +106,8 @@ const evaluationCandidateEquals = (
   left.reason === right.reason &&
   left.status === right.status &&
   left.summary === right.summary &&
-  left.score === right.score
+  left.score === right.score &&
+  inheritedVerificationEquals(left.inheritedVerification, right.inheritedVerification)
 );
 
 const recentEvaluationEquals = (

@@ -19,7 +19,7 @@ import type {
   ProviderLookupCacheHit,
   ProviderLookupOptions,
   ProviderLookupResult,
-} from './provider-lookup.client';
+} from './provider-lookup.types';
 
 const LOOKUP_LATENCY_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
 

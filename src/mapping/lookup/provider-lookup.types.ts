@@ -1,5 +1,5 @@
-/** Provider lookup client types for provider search adapters and cache behavior. */
-// src/mapping/lookup/provider-lookup.client.ts
+/** Mapping-owned lookup contracts and result shapes for provider search adapters. */
+// src/mapping/lookup/provider-lookup.types.ts
 
 import type { Provider, ProviderCredentials } from '@/providers';
 import type { RequestPriority } from '@/shared/utils/request-priority';
@@ -27,6 +27,10 @@ export interface ProviderLookupClient<
   readonly provider: Provider;
   reset(): Promise<void>;
   readFromCache(canonical: string): Promise<ProviderLookupCacheHit<TResult>>;
+  lookupExactByProviderId?(
+    providerId: number,
+    credentials: TCredentials,
+  ): Promise<TResult | null>;
   lookup(
     canonicalKey: string,
     rawTerm: string,
