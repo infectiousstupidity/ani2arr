@@ -2,7 +2,16 @@
 // src/mapping/review/list-mappings.ts
 
 import type { RadarrMovieSnapshot, SonarrSeriesSnapshot } from '@/providers';
-import type { MappingSummary, MappingSource, MappingStatus, ResolverStateRecord } from '@/mapping/types';
+import {
+  getMappingSummarySource,
+  type MappingAcceptedEvidence,
+  type MappingRecentEvaluationTrace,
+  type MappingLibraryStatus,
+  type MappingStatus,
+  type MappingSummary,
+  type MappingSource,
+  type ResolverStateRecord,
+} from '@/mapping/types';
 import { projectMappingReview } from './project-review';
 
 export interface ListMappingsCursor {
@@ -102,17 +111,17 @@ export async function listMappings(
     providerId: MappingSummary['providerId'];
     suppressedProviderId?: MappingSummary['suppressedProviderId'];
     source: MappingSource;
-    acceptedEvidence?: MappingSummary['acceptedEvidence'];
-    recentEvaluation?: MappingSummary['recentEvaluation'];
+    acceptedEvidence?: MappingAcceptedEvidence;
+    recentEvaluation?: MappingRecentEvaluationTrace;
     suppressionKind?: MappingSummary['suppressionKind'];
     exactUpstreamMatchProviderId?: number | null;
-    resolverState?: MappingSummary['resolverState'];
+    resolverState?: ResolverStateRecord['state'];
     updatedAt: number;
     hadResolveAttempt?: boolean;
   };
 
   const resolveRecentEvaluationTitle = (
-    recentEvaluation: MappingSummary['recentEvaluation'] | undefined,
+    recentEvaluation: MappingRecentEvaluationTrace | undefined,
   ): string | undefined => {
     if (!recentEvaluation) {
       return undefined;
@@ -201,7 +210,7 @@ export async function listMappings(
     return {
       ...candidate,
       suppressedProviderId: rejected.providerId,
-      suppressionKind: 'rejected-candidate',
+      suppressionKind: candidate.suppressionKind ?? 'rejected-candidate',
       updatedAt: maxUpdatedAt(candidate.updatedAt, rejected.updatedAt),
     };
   };
@@ -283,6 +292,7 @@ export async function listMappings(
           provider,
           providerId: null,
           source: 'ignored',
+          suppressionKind: 'ignored-entry',
           exactUpstreamMatchProviderId: upstream?.providerId ?? null,
           updatedAt: ignore.updatedAt,
           hadResolveAttempt: true,
@@ -348,14 +358,13 @@ export async function listMappings(
       continue;
     }
 
-    if (!sources.has(candidate.source)) {
-      continue;
-    }
-
     candidates.push(candidate);
   }
 
-  const matchesQuery = (summary: MappingSummary): boolean => {
+  const matchesQuery = (
+    summary: MappingSummary,
+    recentEvaluation: MappingCandidate['recentEvaluation'],
+  ): boolean => {
     if (normalizedQuery === '') return true;
     const reviewHaystackParts = (summary.reviewItems ?? []).flatMap((item) => [
       item.reason,
@@ -374,11 +383,15 @@ export async function listMappings(
       summary.suppressedProviderId === null || summary.suppressedProviderId === undefined
         ? ''
         : String(summary.suppressedProviderId),
+      summary.status,
+      summary.libraryStatus,
+      summary.effectiveSource ?? '',
+      summary.effectiveReason ?? '',
       summary.providerMeta?.title ?? '',
       ...(summary.reviewSummary?.reasons ?? []),
       ...reviewHaystackParts,
-      ...(summary.recentEvaluation?.searchTerms ?? []),
-      ...((summary.recentEvaluation?.candidates ?? []).map((candidate) => candidate.title ?? String(candidate.providerId))),
+      ...(recentEvaluation?.searchTerms ?? []),
+      ...((recentEvaluation?.candidates ?? []).map((candidate) => candidate.title ?? String(candidate.providerId))),
     ];
     const haystack = haystackParts.join(' ').toLowerCase();
     return haystack.includes(normalizedQuery);
@@ -406,10 +419,9 @@ export async function listMappings(
     const series = typeof tvdbId === 'number' ? libraryByTvdbId.get(tvdbId) ?? null : null;
     const movie = typeof tmdbId === 'number' ? libraryByTmdbId.get(tmdbId) ?? null : null;
     const linkedAniListIds = providerId === null ? [] : getLinkedAniListIds(candidate.provider, providerId);
-    let status: MappingStatus = 'unmapped';
-    if (providerId !== null) {
-      status = series || movie ? 'in-provider' : 'not-in-provider';
-    }
+    const libraryStatus: MappingLibraryStatus = providerId === null
+      ? 'unmapped'
+      : (series || movie ? 'in-provider' : 'not-in-provider');
 
     const inLibraryCount =
       series?.statistics?.episodeCount ??
@@ -462,26 +474,41 @@ export async function listMappings(
         : { exactUpstreamMatchProviderId: candidate.exactUpstreamMatchProviderId }),
     });
 
+    let status: MappingStatus;
+    if (reviewProjection.reviewSummary) {
+      status = 'needs-review';
+    } else if (providerId === null) {
+      status = candidate.suppressionKind ? 'suppressed' : 'unresolved';
+    } else if (libraryStatus === 'in-provider') {
+      status = 'in-library';
+    } else {
+      status = 'can-add';
+    }
+
     const summary: MappingSummary = {
       anilistId,
       provider: candidate.provider,
       providerId,
       ...(candidate.suppressedProviderId === undefined ? {} : { suppressedProviderId: candidate.suppressedProviderId }),
-      source: candidate.source,
-      ...(candidate.acceptedEvidence ? { acceptedEvidence: candidate.acceptedEvidence } : {}),
-      ...(candidate.recentEvaluation ? { recentEvaluation: candidate.recentEvaluation } : {}),
+      status,
+      libraryStatus,
+      ...(candidate.acceptedEvidence?.source ? { effectiveSource: candidate.acceptedEvidence.source } : {}),
+      ...(candidate.acceptedEvidence?.reason ? { effectiveReason: candidate.acceptedEvidence.reason } : {}),
       ...(candidate.suppressionKind ? { suppressionKind: candidate.suppressionKind } : {}),
       ...(reviewProjection.reviewSummary ? { reviewSummary: reviewProjection.reviewSummary } : {}),
       ...(reviewProjection.reviewItems ? { reviewItems: reviewProjection.reviewItems } : {}),
-      status,
       updatedAt: candidate.updatedAt,
       ...(linkedAniListIds.length > 0 ? { linkedAniListIds } : {}),
       ...(typeof inLibraryCount === 'number' ? { inLibraryCount } : {}),
       ...(providerMeta ? { providerMeta } : {}),
-      ...(candidate.resolverState ? { resolverState: candidate.resolverState } : {}),
+      ...(candidate.resolverState ? { resolverOutcome: candidate.resolverState } : {}),
       ...(hadResolveAttempt ? { hadResolveAttempt: true } : {}),
     };
-    if (matchesQuery(summary)) {
+    if (!sources.has(getMappingSummarySource(summary))) {
+      continue;
+    }
+
+    if (matchesQuery(summary, candidate.recentEvaluation)) {
       results.push(summary);
     }
   }

@@ -1,7 +1,10 @@
-import type { CheckSeriesStatusResponse } from '@/rpc/types';
-import type { MappingStatus } from '@/mapping/types';
+/** Converts provider library status responses into mapping-library status values. */
+// src/features/mapping/status.ts
 
-export function toMappingStatus(status: CheckSeriesStatusResponse | undefined): MappingStatus {
+import type { CheckSeriesStatusResponse } from '@/rpc/types';
+import type { MappingLibraryStatus } from '@/mapping/types';
+
+export function toMappingStatus(status: CheckSeriesStatusResponse | undefined): MappingLibraryStatus {
   if (!(typeof status?.tvdbId === 'number' && Number.isFinite(status.tvdbId))) return 'unmapped';
   return status?.exists ? 'in-provider' : 'not-in-provider';
 }

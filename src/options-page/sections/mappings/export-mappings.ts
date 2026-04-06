@@ -5,7 +5,7 @@ import { getAni2arrApi } from '@/rpc';
 import type { GetMappingsInput, MappingCursor } from '@/rpc/schemas';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type { Provider } from '@/providers';
-import type { MappingSource, MappingSummary } from '@/mapping/types';
+import { getMappingSummarySource, type MappingSource, type MappingSummary } from '@/mapping/types';
 import type { LibraryFilter } from './components/mapping-toolbar';
 import { normalizeMappingSearchQuery } from './search-query';
 
@@ -17,7 +17,7 @@ export type ExportMappingsFilters = {
 };
 
 export type ExportMappingsPayload = {
-  version: 7;
+  version: 8;
   exportedAt: string;
   filters: ExportMappingsFilters;
   summary: {
@@ -47,12 +47,13 @@ export type ExportMappingsPayload = {
           providerId: number | null;
           suppressedProviderId?: number | null;
           source: MappingSource;
-          acceptedEvidence?: MappingSummary['acceptedEvidence'];
-          recentEvaluation?: MappingSummary['recentEvaluation'];
+          status: MappingSummary['status'];
+          libraryStatus: MappingSummary['libraryStatus'];
+          effectiveSource?: MappingSummary['effectiveSource'];
+          effectiveReason?: MappingSummary['effectiveReason'];
           suppressionKind?: MappingSummary['suppressionKind'];
           reviewSummary?: MappingSummary['reviewSummary'];
           reviewItems?: MappingSummary['reviewItems'];
-          status: 'unmapped' | 'in-provider' | 'not-in-provider';
           updatedAt?: number;
           linkedAniListIds?: readonly number[];
           inLibraryCount?: number;
@@ -61,7 +62,7 @@ export type ExportMappingsPayload = {
             type?: 'series' | 'movie';
             statusLabel?: string;
           };
-          resolverState?: MappingSummary['resolverState'];
+          resolverOutcome?: MappingSummary['resolverOutcome'];
           hadResolveAttempt?: boolean;
         };
       }>;
@@ -159,10 +160,10 @@ const applyLibraryFilter = (entryRows: EntryRow[], libraryFilter: LibraryFilter)
 
   const predicate =
     libraryFilter === 'in-library'
-      ? (status: MappingSummary['status']) => status === 'in-provider'
-      : (status: MappingSummary['status']) => status !== 'in-provider';
+      ? (status: MappingSummary['libraryStatus']) => status === 'in-provider'
+      : (status: MappingSummary['libraryStatus']) => status !== 'in-provider';
 
-  return entryRows.filter(({ entry }) => predicate(entry.status));
+  return entryRows.filter(({ entry }) => predicate(entry.libraryStatus));
 };
 
 const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
@@ -194,7 +195,7 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
         providerId: entry.providerId ?? null,
         ...(entry.providerMeta ? { providerMeta: entry.providerMeta } : {}),
         entries: [row],
-        sources: new Set<MappingSource>([entry.source]),
+        sources: new Set<MappingSource>([getMappingSummarySource(entry)]),
         ...(entry.updatedAt === undefined ? {} : { updatedAt: entry.updatedAt }),
         sortIndex: order++,
       });
@@ -208,7 +209,7 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
       existing.updatedAt = Math.max(existing.updatedAt ?? 0, entry.updatedAt);
     }
     existing.entries.push(row);
-    existing.sources.add(entry.source);
+    existing.sources.add(getMappingSummarySource(entry));
   }
 
   const sourcePriority: Record<MappingSource, number> = {
@@ -260,18 +261,19 @@ const buildExportRows = (entryRows: readonly EntryRow[]): ExportRow[] => {
             provider: entry.provider,
             providerId: entry.providerId ?? null,
             ...(entry.suppressedProviderId === undefined ? {} : { suppressedProviderId: entry.suppressedProviderId }),
-            source: entry.source,
-            ...(entry.acceptedEvidence ? { acceptedEvidence: entry.acceptedEvidence } : {}),
-            ...(entry.recentEvaluation ? { recentEvaluation: entry.recentEvaluation } : {}),
+            source: getMappingSummarySource(entry),
+            status: entry.status,
+            libraryStatus: entry.libraryStatus,
+            ...(entry.effectiveSource ? { effectiveSource: entry.effectiveSource } : {}),
+            ...(entry.effectiveReason ? { effectiveReason: entry.effectiveReason } : {}),
             ...(entry.suppressionKind ? { suppressionKind: entry.suppressionKind } : {}),
             ...(entry.reviewSummary ? { reviewSummary: entry.reviewSummary } : {}),
             ...(entry.reviewItems ? { reviewItems: entry.reviewItems } : {}),
-            status: entry.status,
             ...(entry.updatedAt === undefined ? {} : { updatedAt: entry.updatedAt }),
             ...(entry.linkedAniListIds ? { linkedAniListIds: entry.linkedAniListIds } : {}),
             ...(entry.inLibraryCount === undefined ? {} : { inLibraryCount: entry.inLibraryCount }),
             ...(entry.providerMeta ? { providerMeta: entry.providerMeta } : {}),
-            ...(entry.resolverState ? { resolverState: entry.resolverState } : {}),
+            ...(entry.resolverOutcome ? { resolverOutcome: entry.resolverOutcome } : {}),
             ...(entry.hadResolveAttempt === undefined ? {} : { hadResolveAttempt: entry.hadResolveAttempt }),
           },
         })),
@@ -301,11 +303,12 @@ export const buildMappingsExportPayload = async (
 
   for (const { entry } of filteredEntryRows) {
     providerCounts[entry.provider] += 1;
-    sourceCounts[entry.source] = (sourceCounts[entry.source] ?? 0) + 1;
+    const source = getMappingSummarySource(entry);
+    sourceCounts[source] = (sourceCounts[source] ?? 0) + 1;
   }
 
   return {
-    version: 7,
+    version: 8,
     exportedAt: new Date().toISOString(),
     filters: {
       providers: filters.providers,
