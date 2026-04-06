@@ -30,7 +30,7 @@ export type MappingTableRowData = {
   updatedAt?: number;
 };
 
-const sourceStyles: Record<MappingSummary['source'], { label: string; className: string }> = {
+const sourceStyles: Record<MappingSource, { label: string; className: string }> = {
   manual: { label: 'Manual', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },
   unresolved: { label: 'Unresolved', className: 'bg-warning/14 text-warning border-warning/24' },
   rejected: { label: 'Rejected', className: 'bg-warning/12 text-warning border-warning/20' },
@@ -152,7 +152,7 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
   const updatedLabel = row.updatedAt ? formatRelativeTime(row.updatedAt) : null;
   const providerIcon = row.provider === 'sonarr' ? SonarrIcon : RadarrIcon;
   const providerLabel = row.provider === 'sonarr' ? 'Sonarr' : 'Radarr';
-  const inLibraryCount = row.entries.filter((e) => e.entry.status === 'in-provider').length;
+  const inLibraryCount = row.entries.filter((e) => e.entry.libraryStatus === 'in-provider').length;
   const hasMapping = row.providerId !== null;
   let linkedLabel = 'No target linked';
   if (hasMapping) {

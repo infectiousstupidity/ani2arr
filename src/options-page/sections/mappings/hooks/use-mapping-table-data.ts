@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { useDebounced } from '@/shared/hooks/common/use-debounced';
 import { useAniListMetadataBatch, useMappings } from '@/shared/queries';
 import type { Provider } from '@/providers';
-import type { MappingSummary } from '@/mapping/types';
+import { getMappingSummarySource, type MappingSource, type MappingSummary } from '@/mapping/types';
 import type { GetAniListMetadataOutput, GetMappingsOutput } from '@/rpc/types';
 import type { GetMappingsInput } from '@/rpc/schemas';
 import type { MappingTableRowData } from '../components/mapping-table';
@@ -84,8 +84,14 @@ export const useMappingTableData = ({
       const haystackParts = [
         String(entry.anilistId),
         entry.providerId === null ? '' : String(entry.providerId),
+        entry.suppressedProviderId == null ? '' : String(entry.suppressedProviderId),
+        entry.status,
+        entry.libraryStatus,
+        entry.effectiveSource ?? '',
+        entry.effectiveReason ?? '',
         title.toLowerCase(),
         entry.providerId === null ? '' : (entry.providerMeta?.title?.toLowerCase() ?? ''),
+        ...(entry.reviewSummary?.reasons ?? []),
         meta?.titles?.english?.toLowerCase() ?? '',
         meta?.titles?.romaji?.toLowerCase() ?? '',
         meta?.titles?.native?.toLowerCase() ?? '',
@@ -98,15 +104,15 @@ export const useMappingTableData = ({
     if (libraryFilter === 'all') return entryRows;
     const predicate =
       libraryFilter === 'in-library'
-        ? (status: MappingSummary['status']) => status === 'in-provider'
-        : (status: MappingSummary['status']) => status !== 'in-provider';
-    return entryRows.filter(({ entry }) => predicate(entry.status));
+        ? (status: MappingSummary['libraryStatus']) => status === 'in-provider'
+        : (status: MappingSummary['libraryStatus']) => status !== 'in-provider';
+    return entryRows.filter(({ entry }) => predicate(entry.libraryStatus));
   }, [entryRows, libraryFilter]);
 
   const tableRows = useMemo<MappingTableRowData[]>(() => {
     type Group = Omit<MappingTableRowData, 'sources'> & {
       sortIndex: number;
-      sources: Set<MappingSummary['source']>;
+      sources: Set<MappingSource>;
     };
 
     type NormalizedRow = MappingTableRowData & { sortIndex: number };
@@ -132,7 +138,7 @@ export const useMappingTableData = ({
           title,
           metadata: metadataMap.get(entry.anilistId),
         });
-        existingGroup.sources.add(entry.source);
+        existingGroup.sources.add(getMappingSummarySource(entry));
       } else {
         const newGroup: Group = {
           id: key,
@@ -140,7 +146,7 @@ export const useMappingTableData = ({
           providerId: entry.providerId ?? null,
           providerMeta: entry.providerMeta,
           entries: [],
-          sources: new Set<MappingSummary['source']>(),
+          sources: new Set<MappingSource>(),
           sortIndex: order++,
         };
         if (entry.updatedAt !== undefined) {
@@ -151,12 +157,12 @@ export const useMappingTableData = ({
           title,
           metadata: metadataMap.get(entry.anilistId),
         });
-        newGroup.sources.add(entry.source);
+        newGroup.sources.add(getMappingSummarySource(entry));
         groups.set(key, newGroup);
       }
     }
 
-    const sourcePriority: Record<MappingSummary['source'], number> = {
+    const sourcePriority: Record<MappingSource, number> = {
       manual: 0,
       unresolved: 1,
       rejected: 2,
@@ -172,7 +178,7 @@ export const useMappingTableData = ({
       return row.providerMeta?.title ?? row.entries[0]?.title ?? fallback;
     };
 
-    const getSourceRank = (sources: MappingSummary['source'][]) => {
+    const getSourceRank = (sources: MappingSource[]) => {
       if (sources.length === 0) return Number.MAX_SAFE_INTEGER;
       return Math.min(...sources.map((source) => sourcePriority[source] ?? Number.MAX_SAFE_INTEGER));
     };
@@ -180,7 +186,7 @@ export const useMappingTableData = ({
     const getLinkedStats = (row: MappingTableRowData) => {
       let inLibrary = 0;
       for (const { entry } of row.entries) {
-        if (entry.status === 'in-provider') {
+        if (entry.libraryStatus === 'in-provider') {
           inLibrary += 1;
         }
       }

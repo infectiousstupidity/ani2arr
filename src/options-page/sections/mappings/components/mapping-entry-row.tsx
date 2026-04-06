@@ -6,7 +6,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { MoreHorizontal, Pencil, Trash2, Undo2 } from 'lucide-react';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type { Provider } from '@/providers';
-import type { MappingSummary } from '@/mapping/types';
+import { getMappingSummarySource, type MappingSource, type MappingSummary } from '@/mapping/types';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';
@@ -18,13 +18,21 @@ import {
 import { useMovieStatus } from '@/providers/hooks/radarr.queries';
 import { useSeriesStatus } from '@/providers/hooks/sonarr.queries';
 
-const sourceStyles: Record<MappingSummary['source'], { label: string; className: string }> = {
+const sourceStyles: Record<MappingSource, { label: string; className: string }> = {
   manual: { label: 'Manual', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },
   unresolved: { label: 'Unresolved', className: 'bg-warning/14 text-warning border-warning/24' },
   rejected: { label: 'Rejected', className: 'bg-warning/12 text-warning border-warning/20' },
   auto: { label: 'Auto', className: 'bg-success/14 text-success border-success/24' },
   upstream: { label: 'Upstream', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
   ignored: { label: 'Ignored', className: 'bg-error/12 text-error border-error/24' },
+};
+
+const statusStyles: Record<MappingSummary['status'], { label: string; className: string }> = {
+  'needs-review': { label: 'Needs review', className: 'bg-warning/14 text-warning border-warning/24' },
+  'in-library': { label: 'In library', className: 'bg-success/14 text-success border-success/24' },
+  'can-add': { label: 'Can add', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },
+  suppressed: { label: 'Suppressed', className: 'bg-error/12 text-error border-error/24' },
+  unresolved: { label: 'Unresolved', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
 };
 
 const getExternalLink = (provider: Provider, providerId: number | null) => {
@@ -37,7 +45,7 @@ const getExternalLink = (provider: Provider, providerId: number | null) => {
 
 const MetaSeparator: React.FC = () => <span className="text-text-tertiary/70">·</span>;
 
-const getEditTooltip = (source: MappingSummary['source']): string => {
+const getEditTooltip = (source: MappingSource): string => {
   switch (source) {
     case 'manual': {
       return 'Edit the manual mapping for this AniList entry. Saving keeps it as a manual override until you delete it.';
@@ -86,7 +94,9 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   providerUrl,
   hideSourceBadge = false,
 }) => {
-  const sourceBadge = sourceStyles[entry.source];
+  const entrySource = getMappingSummarySource(entry);
+  const sourceBadge = sourceStyles[entrySource];
+  const statusBadge = statusStyles[entry.status];
   const actionableProviderId = entry.providerId ?? entry.suppressedProviderId ?? null;
 
   const sonarrStatus = useSeriesStatus(
@@ -158,7 +168,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
       : null,
   ].filter((link): link is { label: string; href: string; tooltip: string } => Boolean(link?.href));
 
-  const editTooltip = getEditTooltip(entry.source);
+  const editTooltip = getEditTooltip(entrySource);
 
   const primaryActions: Array<{
     key: string;
@@ -177,7 +187,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
       className: 'text-accent-primary/85 hover:bg-accent-primary/14 hover:text-accent-primary',
     },
     ...(() => {
-      switch (entry.source) {
+      switch (entrySource) {
         case 'manual': {
           return [{
             key: 'delete-mapping',
@@ -223,7 +233,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
     className?: string;
   }> = [
     ...(() => {
-      switch (entry.source) {
+      switch (entrySource) {
         case 'manual':
         case 'ignored': {
           return [];
@@ -323,20 +333,30 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
         </div>
 
         <div className="flex w-full items-center justify-start md:w-26 md:justify-self-center md:justify-center">
-          {hideSourceBadge ? (
-            <span className="hidden h-6 w-26 md:block" aria-hidden="true" />
-          ) : (
+          <div className="flex flex-wrap items-center gap-1.5 md:justify-center">
             <Pill
               small
               tone="default"
               className={cn(
                 'justify-center border text-[10px] uppercase tracking-[0.08em] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
-                sourceBadge.className,
+                statusBadge.className,
               )}
             >
-              {sourceBadge.label}
+              {statusBadge.label}
             </Pill>
-          )}
+            {hideSourceBadge ? null : (
+              <Pill
+                small
+                tone="default"
+                className={cn(
+                  'justify-center border text-[10px] uppercase tracking-[0.08em] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+                  sourceBadge.className,
+                )}
+              >
+                {sourceBadge.label}
+              </Pill>
+            )}
+          </div>
         </div>
 
         <div className="col-span-full flex items-center justify-end gap-1 md:col-span-1 md:col-start-auto">

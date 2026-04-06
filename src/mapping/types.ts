@@ -6,29 +6,16 @@ import type { Provider } from '@/providers';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 import type { MappingReviewItem, MappingReviewSummary } from './review/review-types';
 
-/**
- * Legacy row/source classification still used by existing listing and filtering callers.
- *
- * This is broader and less precise than the newer accepted/candidate fields:
- * - `manual`, `upstream`, `auto` describe effective mapped rows
- * - `rejected`, `ignored` describe user-owned suppression rows
- * - `unresolved` describes rows where resolution was attempted but nothing was accepted
- *
- * Prefer `acceptedEvidence`, `recentEvaluation`, and `resolverState` when you need
- * precise backend semantics.
- */
+/** Secondary explanation tags used for filtering, badges, and export summaries. */
 export const MAPPING_SOURCE_VALUES = ['manual', 'upstream', 'auto', 'rejected', 'ignored', 'unresolved'] as const;
 
 export type MappingSource = (typeof MAPPING_SOURCE_VALUES)[number];
 
-/**
- * Library-facing status for the effective mapping row.
- *
- * - `unmapped`: no effective providerId is currently active for the row
- * - `in-provider`: the effective providerId exists in the provider library
- * - `not-in-provider`: the effective providerId is known, but is not in the provider library
- */
-export type MappingStatus = 'unmapped' | 'in-provider' | 'not-in-provider';
+/** Primary user-facing status for one projected mapping summary row. */
+export type MappingStatus = 'needs-review' | 'in-library' | 'can-add' | 'suppressed' | 'unresolved';
+
+/** Provider-library presence for the effective provider identity, kept separate from user-facing status. */
+export type MappingLibraryStatus = 'unmapped' | 'in-provider' | 'not-in-provider';
 
 /**
  * Source of an accepted mapping.
@@ -121,11 +108,9 @@ export interface MappingRecentEvaluationTrace {
 }
 
 /**
- * User-owned suppression kind for a specific rejected candidate.
- *
- * This is intentionally candidate-scoped, not a blanket veto for the whole row.
+ * User-owned suppression kind for the effective row state.
  */
-export type MappingSuppressionKind = 'rejected-candidate';
+export type MappingSuppressionKind = 'ignored-entry' | 'rejected-candidate';
 
 /**
  * Final semantic result of trying to resolve one `provider + anilistId`.
@@ -171,38 +156,20 @@ export type MappingResolverState =
   | 'verification-failed';
 
 /**
- * Review projection for the effective mapping state of one `provider + anilistId`.
- *
- * Field groups:
- * - `source`:
- *   legacy row classification kept for existing callers
- *
- * - `acceptedEvidence`:
- *   explains why the effective mapping exists when the row is currently mapped
- *
- * - `recentEvaluation`:
- *   compact trace of the most recent resolver attempt for inspect and suggestion UIs
- *
- * - `resolverState`:
- *   carries the semantic resolver outcome without overloading `source`
- *
- * - `reviewSummary` / `reviewItems`:
- *   projection-time review state derived from effective state, exact upstream truth,
- *   and resolver-owned inherited evaluation outcomes
+ * Identity-first review summary for one `provider + anilistId`.
  */
 export interface MappingSummary {
   anilistId: number;
   provider: Provider;
   providerId: number | null;
   suppressedProviderId?: number | null;
-  source: MappingSource;
-  acceptedEvidence?: MappingAcceptedEvidence;
-  recentEvaluation?: MappingRecentEvaluationTrace;
-
+  status: MappingStatus;
+  libraryStatus: MappingLibraryStatus;
+  effectiveSource?: MappingAcceptedSource;
+  effectiveReason?: MappingAcceptedReason;
   suppressionKind?: MappingSuppressionKind;
   reviewSummary?: MappingReviewSummary;
   reviewItems?: readonly MappingReviewItem[];
-  status: MappingStatus;
   updatedAt?: number;
   linkedAniListIds?: readonly number[];
   inLibraryCount?: number;
@@ -211,9 +178,29 @@ export interface MappingSummary {
     type?: 'series' | 'movie';
     statusLabel?: string;
   };
-  resolverState?: MappingResolverState;
+  resolverOutcome?: MappingResolverState;
   hadResolveAttempt?: boolean;
 }
+
+export const getMappingSummarySource = (
+  summary: Pick<MappingSummary, 'effectiveSource' | 'suppressionKind'>,
+): MappingSource => {
+  if (summary.effectiveSource) {
+    return summary.effectiveSource;
+  }
+
+  switch (summary.suppressionKind) {
+    case 'ignored-entry': {
+      return 'ignored';
+    }
+    case 'rejected-candidate': {
+      return 'rejected';
+    }
+    default: {
+      return 'unresolved';
+    }
+  }
+};
 
 /** Persisted manual mapping or rejected candidate record keyed by provider and AniList entry. */
 export interface MappingProviderIdRecord {

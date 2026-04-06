@@ -18,7 +18,7 @@ import MappingToolbar, {
 } from './mapping-toolbar';
 import { useMappingTableData } from '../hooks/use-mapping-table-data';
 import type { Provider } from '@/providers';
-import type { MappingSource } from '@/mapping/types';
+import { getMappingSummarySource, type MappingSource } from '@/mapping/types';
 import type { ExportMappingsFilters } from '../export-mappings';
 import { normalizeMappingSearchQuery } from '../search-query';
 import type { MappingTableRowData } from './mapping-table';
@@ -52,10 +52,15 @@ const sourceBadgeClasses: Record<MappingSource, string> = {
   auto: 'border border-success/24 bg-success/14 text-success',
   upstream: 'border border-border-primary/70 bg-bg-primary/46 text-text-secondary',
 };
-const statusLabels: Record<'unmapped' | 'in-provider' | 'not-in-provider', string> = {
-  unmapped: 'Unmapped',
-  'in-provider': 'In library',
-  'not-in-provider': 'Not in library',
+const statusLabels: Record<
+  'needs-review' | 'in-library' | 'can-add' | 'suppressed' | 'unresolved',
+  string
+> = {
+  'needs-review': 'Needs review',
+  'in-library': 'In library',
+  'can-add': 'Can add',
+  suppressed: 'Suppressed',
+  unresolved: 'Unresolved',
 };
 const PREVIEW_ROW_HEIGHT = 76;
 const PREVIEW_ENTRY_HEIGHT = 58;
@@ -129,7 +134,10 @@ const matchesPreviewSearch = (row: MappingTableRowData, query: string): boolean 
       title,
       String(entry.anilistId),
       entry.status,
-      entry.source,
+      entry.libraryStatus,
+      getMappingSummarySource(entry),
+      entry.effectiveSource ?? '',
+      entry.effectiveReason ?? '',
       entry.providerId === null ? '' : (entry.providerMeta?.title ?? ''),
     ]),
   ]
@@ -273,7 +281,7 @@ const ExportPreviewList: React.FC<ExportPreviewListProps> = ({
                               <span className="text-text-tertiary">·</span>
                               <span>{statusLabels[entry.status]}</span>
                               <span className="text-text-tertiary">·</span>
-                              <span>{sourceLabels[entry.source]}</span>
+                              <span>{sourceLabels[getMappingSummarySource(entry)]}</span>
                             </div>
                           </div>
                         </div>
@@ -336,8 +344,11 @@ export default function ExportMappingsDialog({
         provider: entry.provider,
         providerId: entry.providerId ?? null,
         ...(entry.suppressedProviderId === undefined ? {} : { suppressedProviderId: entry.suppressedProviderId }),
-        source: entry.source,
+        source: getMappingSummarySource(entry),
         status: entry.status,
+        libraryStatus: entry.libraryStatus,
+        ...(entry.effectiveSource ? { effectiveSource: entry.effectiveSource } : {}),
+        ...(entry.effectiveReason ? { effectiveReason: entry.effectiveReason } : {}),
         ...(entry.updatedAt === undefined ? {} : { updatedAt: entry.updatedAt }),
         ...(entry.linkedAniListIds ? { linkedAniListIds: entry.linkedAniListIds } : {}),
         ...(entry.inLibraryCount === undefined ? {} : { inLibraryCount: entry.inLibraryCount }),
