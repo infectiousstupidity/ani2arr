@@ -28,6 +28,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
   const {
     mappingService,
     overridesService,
+    resolverStateStore,
     upstreamMappingStore,
     sonarrLibrary,
     radarrLibrary,
@@ -226,6 +227,7 @@ export function createMappingHandlers(deps: ApiHandlerDeps): Pick<
       await mappingService.initStaticPairs();
       return listMappings(input, {
         overridesService,
+        resolverStateStore,
         upstreamMappingStore,
         sonarrLibrary,
         radarrLibrary,

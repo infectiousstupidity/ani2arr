@@ -1,21 +1,18 @@
 /** Tests for the mapping review projection and paging logic. */
 // src/mapping/review/list-mappings.test.ts
 
-import { beforeEach, describe, expect, it } from 'vitest';
-import { resolvedLedger } from '@/mapping/ledger/resolved-ledger';
-import { unresolvedLedger } from '@/mapping/ledger/unresolved-ledger';
+import { describe, expect, it } from 'vitest';
+import type { ResolverStateRecord } from '@/mapping/types';
 import { listMappings } from './list-mappings';
 
+const createResolverStateStore = (
+  entries: Array<ResolverStateRecord & { anilistId: number; provider: 'sonarr' | 'radarr' }> = [],
+) => ({
+  list: async () => entries,
+});
+
 describe('listMappings', () => {
-  beforeEach(() => {
-    resolvedLedger.clear();
-    unresolvedLedger.clear();
-  });
-
   it('prefers manual overrides over recorded auto mappings and preserves unresolved entries', async () => {
-    resolvedLedger.record('sonarr', 1, { providerId: 111 }, 'auto');
-    unresolvedLedger.record('radarr', 2, 'Missing Movie');
-
     const result = await listMappings(
       { limit: 10 },
       {
@@ -43,6 +40,23 @@ describe('listMappings', () => {
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
+        resolverStateStore: createResolverStateStore([
+          {
+            anilistId: 1,
+            provider: 'sonarr',
+            state: 'mapped',
+            providerId: 111,
+            source: 'auto',
+            updatedAt: 50,
+          },
+          {
+            anilistId: 2,
+            provider: 'radarr',
+            state: 'unresolved',
+            title: 'Missing Movie',
+            updatedAt: 75,
+          },
+        ]),
       },
     );
 
@@ -60,8 +74,6 @@ describe('listMappings', () => {
   });
 
   it('matches unresolved entries by their captured title query', async () => {
-    unresolvedLedger.record('radarr', 44, 'Needle Movie');
-
     const result = await listMappings(
       { limit: 10, query: 'needle' },
       {
@@ -82,6 +94,15 @@ describe('listMappings', () => {
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
+        resolverStateStore: createResolverStateStore([
+          {
+            anilistId: 44,
+            provider: 'radarr',
+            state: 'unresolved',
+            title: 'Needle Movie',
+            updatedAt: 10,
+          },
+        ]),
       },
     );
 
@@ -128,6 +149,7 @@ describe('listMappings', () => {
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
+        resolverStateStore: createResolverStateStore(),
       },
     );
 
@@ -139,5 +161,63 @@ describe('listMappings', () => {
       providerId: null,
       suppressedProviderId: 777,
     });
+  });
+
+  it('projects explicit resolver states without rebuilding them from ledgers', async () => {
+    const result = await listMappings(
+      { limit: 10 },
+      {
+        overridesService: {
+          listIgnores: () => [],
+          listRejectedCandidates: () => [],
+          list: () => [],
+          isIgnored: () => false,
+          getLinkedAniListIds: () => [],
+        },
+        upstreamMappingStore: {
+          listAllPairs: () => [],
+          getAniListIdsForTvdb: () => [],
+        },
+        sonarrLibrary: {
+          getLeanSeriesList: async () => [],
+        },
+        radarrLibrary: {
+          getLeanMovieList: async () => [],
+        },
+        resolverStateStore: createResolverStateStore([
+          {
+            anilistId: 9,
+            provider: 'sonarr',
+            state: 'ambiguous',
+            title: 'Conflicted Show',
+            updatedAt: 90,
+          },
+          {
+            anilistId: 10,
+            provider: 'radarr',
+            state: 'verification-failed',
+            providerId: 501,
+            source: 'auto',
+            title: 'Needs Verification',
+            updatedAt: 80,
+          },
+        ]),
+      },
+    );
+
+    expect(result.mappings.find(entry => entry.anilistId === 9)).toMatchObject({
+      provider: 'sonarr',
+      source: 'unresolved',
+      resolverState: 'ambiguous',
+      providerMeta: { title: 'Conflicted Show', type: 'series' },
+    });
+    expect(result.mappings.find(entry => entry.anilistId === 10)).toMatchObject({
+      provider: 'radarr',
+      source: 'unresolved',
+      resolverState: 'verification-failed',
+      providerMeta: { title: 'Needs Verification', type: 'movie' },
+    });
+    expect(result.mappings.find(entry => entry.anilistId === 9)?.source).toBe('unresolved');
+    expect(result.mappings.find(entry => entry.anilistId === 10)?.source).toBe('unresolved');
   });
 });

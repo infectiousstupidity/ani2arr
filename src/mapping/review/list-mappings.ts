@@ -2,9 +2,7 @@
 // src/mapping/review/list-mappings.ts
 
 import type { RadarrMovieSnapshot, SonarrSeriesSnapshot } from '@/providers';
-import type { MappingSummary, MappingSource, MappingStatus } from '@/mapping/types';
-import { resolvedLedger } from '@/mapping/ledger/resolved-ledger';
-import { unresolvedLedger } from '@/mapping/ledger/unresolved-ledger';
+import type { MappingSummary, MappingSource, MappingStatus, ResolverStateRecord } from '@/mapping/types';
 
 export interface ListMappingsCursor {
   updatedAt: number;
@@ -51,6 +49,12 @@ export interface ListMappingsDeps {
   radarrLibrary: {
     getLeanMovieList(): Promise<RadarrMovieSnapshot[]>;
   };
+  resolverStateStore: {
+    list(provider?: MappingSummary['provider']): Promise<Array<ResolverStateRecord & {
+      anilistId: number;
+      provider: MappingSummary['provider'];
+    }>>;
+  };
 }
 
 export async function listMappings(
@@ -61,7 +65,7 @@ export async function listMappings(
   total: number;
   nextCursor: ListMappingsCursor | null;
 }> {
-  const { overridesService, upstreamMappingStore, sonarrLibrary, radarrLibrary } = deps;
+  const { overridesService, upstreamMappingStore, sonarrLibrary, radarrLibrary, resolverStateStore } = deps;
   const normalizedQuery = input?.query?.trim().toLowerCase() || '';
   const sources =
     input?.sources && input.sources.length > 0
@@ -76,9 +80,10 @@ export async function listMappings(
   const limit = Math.min(Math.max(input?.limit ?? defaultLimit, 1), 2000);
   const cursor = input?.cursor;
 
-  const [library, radarrLibraryItems] = await Promise.all([
+  const [library, radarrLibraryItems, resolverStates] = await Promise.all([
     sonarrLibrary.getLeanSeriesList().catch(() => [] as SonarrSeriesSnapshot[]),
     radarrLibrary.getLeanMovieList().catch(() => [] as RadarrMovieSnapshot[]),
+    resolverStateStore.list(),
   ]);
 
   const libraryByTvdbId = new Map<number, SonarrSeriesSnapshot>();
@@ -105,6 +110,7 @@ export async function listMappings(
     providerId: MappingSummary['providerId'];
     suppressedProviderId?: MappingSummary['suppressedProviderId'];
     source: MappingSource;
+    resolverState?: MappingSummary['resolverState'];
     updatedAt: number;
     hadResolveAttempt?: boolean;
     title?: string;
@@ -155,6 +161,7 @@ export async function listMappings(
       providerId: null,
       suppressedProviderId: rejected.providerId,
       source: 'rejected',
+      resolverState: undefined,
       updatedAt: rejected.updatedAt,
       hadResolveAttempt: true,
     }),
@@ -165,6 +172,7 @@ export async function listMappings(
     provider: entry.provider,
     providerId: entry.providerId,
     source: 'manual',
+    resolverState: undefined,
     updatedAt: entry.updatedAt,
     hadResolveAttempt: true,
   }));
@@ -176,26 +184,36 @@ export async function listMappings(
         provider: 'sonarr',
         providerId: pair.tvdbId,
         source: 'upstream',
+        resolverState: undefined,
       });
     }
   }
+  
+  // `source` stays on the legacy review projection contract for filters and existing UI.
+  // Non-mapped resolver outcomes are grouped under `unresolved`; callers must read
+  // `resolverState` to distinguish unresolved, ambiguous, and verification-failed.
+  registerEntries(resolverStates, entry => {
+    if (entry.state === 'mapped') {
+      return {
+        provider: entry.provider,
+        providerId: entry.providerId,
+        source: entry.source,
+        resolverState: 'mapped',
+        updatedAt: entry.updatedAt,
+        hadResolveAttempt: entry.source === 'auto',
+      };
+    }
 
-  registerEntries(resolvedLedger.list(), entry => ({
-    provider: entry.provider,
-    providerId: entry.providerId,
-    source: entry.source,
-    updatedAt: entry.updatedAt,
-    hadResolveAttempt: entry.source === 'auto',
-  }));
-
-  registerEntries(unresolvedLedger.list(), entry => ({
-    provider: entry.provider,
-    providerId: null,
-    source: entry.source,
-    updatedAt: entry.updatedAt,
-    hadResolveAttempt: true,
-    ...(entry.title ? { title: entry.title } : {}),
-  }));
+    return {
+      provider: entry.provider,
+      providerId: null,
+      source: 'unresolved',
+      resolverState: entry.state,
+      updatedAt: entry.updatedAt,
+      hadResolveAttempt: true,
+      ...(entry.title ? { title: entry.title } : {}),
+    };
+  });
 
   const matchesQuery = (summary: MappingSummary): boolean => {
     if (normalizedQuery === '') return true;
@@ -284,6 +302,7 @@ export async function listMappings(
       ...(linkedAniListIds.length > 0 ? { linkedAniListIds } : {}),
       ...(typeof inLibraryCount === 'number' ? { inLibraryCount } : {}),
       ...(providerMeta ? { providerMeta } : {}),
+      ...(candidate.resolverState ? { resolverState: candidate.resolverState } : {}),
       ...(hadResolveAttempt ? { hadResolveAttempt: true } : {}),
     };
     if (matchesQuery(summary)) {
