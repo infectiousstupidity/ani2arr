@@ -1,79 +1,20 @@
-/** Typed cache for extension-derived mapping results and replaceable mapping failures. */
+/** Operational mapping-failure cache used for transient provider and transport errors. */
 // src/mapping/cache/extension-mapping.cache.ts
 
 import { createTtlCache, type CacheHit, type CacheWriteOptions } from '@/storage/ttl-cache';
 import { CACHE_NAMESPACES } from '@/storage/keys';
-import { STORAGE_POLICIES } from '@/storage/policies';
 import type { ExtensionError } from '@/shared/errors';
 import type { Provider } from '@/providers';
-
-export interface ExtensionMappingCacheEntry {
-  providerId: number;
-  successfulSynonym?: string;
-  updatedAt: number;
-}
-
-const extensionMappingCaches = {
-  sonarr: createTtlCache<ExtensionMappingCacheEntry>(CACHE_NAMESPACES.extensionMappingSonarr),
-  radarr: createTtlCache<ExtensionMappingCacheEntry>(CACHE_NAMESPACES.extensionMappingRadarr),
-} as const;
 
 const extensionMappingFailureCaches = {
   sonarr: createTtlCache<ExtensionError>(CACHE_NAMESPACES.extensionMappingFailureSonarr),
   radarr: createTtlCache<ExtensionError>(CACHE_NAMESPACES.extensionMappingFailureRadarr),
 } as const;
 
-const getExtensionMappingCache = (provider: Provider) =>
-  provider === 'radarr' ? extensionMappingCaches.radarr : extensionMappingCaches.sonarr;
-
 const getExtensionMappingFailureCache = (provider: Provider) =>
   provider === 'radarr' ? extensionMappingFailureCaches.radarr : extensionMappingFailureCaches.sonarr;
 
 const createExtensionMappingCacheKey = (anilistId: number): string => `anilist:${anilistId}`;
-
-export async function readExtensionMapping(
-  provider: Provider,
-  anilistId: number,
-): Promise<CacheHit<ExtensionMappingCacheEntry> | null> {
-  return getExtensionMappingCache(provider).read(createExtensionMappingCacheKey(anilistId));
-}
-
-export async function writeExtensionMapping(
-  provider: Provider,
-  anilistId: number,
-  entry: Omit<ExtensionMappingCacheEntry, 'updatedAt'>,
-): Promise<void> {
-  await getExtensionMappingCache(provider).write(
-    createExtensionMappingCacheKey(anilistId),
-    {
-      ...entry,
-      updatedAt: Date.now(),
-    },
-    {
-      staleMs: STORAGE_POLICIES.extensionMapping.staleMs,
-      hardMs: STORAGE_POLICIES.extensionMapping.hardMs,
-    },
-  );
-}
-
-export async function removeExtensionMapping(
-  provider: Provider,
-  anilistId: number,
-): Promise<void> {
-  await getExtensionMappingCache(provider).remove(createExtensionMappingCacheKey(anilistId));
-}
-
-export async function clearExtensionMappings(provider?: Provider): Promise<void> {
-  if (provider) {
-    await getExtensionMappingCache(provider).clear();
-    return;
-  }
-
-  await Promise.all([
-    extensionMappingCaches.sonarr.clear(),
-    extensionMappingCaches.radarr.clear(),
-  ]);
-}
 
 export async function readExtensionMappingFailure(
   provider: Provider,

@@ -1,5 +1,5 @@
 /** Registry of persistent storage keys, revision keys, and cache namespaces used by the storage layer. */
-// src/lib/storage/keys.ts
+// src/storage/keys.ts
 
 // WXT / browser.storage.local keys for real extension state.
 export const STORAGE_KEYS = {
@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   mappingOverrides: 'local:mappingOverrides',
   mappingIgnores: 'local:ignoredMappings',
   mappingRejectedCandidates: 'local:rejectedMappingCandidates',
+  mappingResolverState: 'local:mappingResolverState',
 } as const;
 
 // Cross-context invalidation counters.
@@ -32,10 +33,6 @@ export const CACHE_NAMESPACES = {
   providerLookupNegativeSonarr: 'mapping:lookup-negative:sonarr',
   providerLookupPositiveRadarr: 'mapping:lookup:radarr',
   providerLookupNegativeRadarr: 'mapping:lookup-negative:radarr',
-
-  // Extension-derived mapping results
-  extensionMappingSonarr: 'mapping:extension:sonarr',
-  extensionMappingRadarr: 'mapping:extension:radarr',
 
   // Extension-derived mapping failures
   extensionMappingFailureSonarr: 'mapping:extension-failure:sonarr',

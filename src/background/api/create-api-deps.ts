@@ -17,6 +17,7 @@ import { RadarrLibrary } from '@/providers/library/radarr-library';
 import { SonarrLibrary } from '@/providers/library/sonarr-library';
 import { MappingService } from '@/mapping/mapping.service';
 import { MappingOverridesService } from '@/mapping/overrides';
+import { ResolverStateStore } from '@/mapping/resolver-state/resolver-state.store';
 import { UpstreamMappingStore } from '@/mapping/upstream';
 import { SonarrLookupClient, RadarrLookupClient } from '@/mapping/lookup';
 import {
@@ -85,6 +86,7 @@ export const createApiDeps = (): ApiHandlerDeps => {
 
   const overridesService = new MappingOverridesService();
   const overridesReady = overridesService.init();
+  const resolverStateStore = new ResolverStateStore();
 
   const mappingService = bindAll(
     new MappingService(
@@ -94,6 +96,7 @@ export const createApiDeps = (): ApiHandlerDeps => {
         sonarr: lookupClient,
         radarr: radarrLookupClient,
       },
+      resolverStateStore,
       overridesService,
       () => {
         void bumpMappingsRevision();
@@ -284,6 +287,7 @@ export const createApiDeps = (): ApiHandlerDeps => {
     anilistMediaService,
     mappingService,
     overridesService,
+    resolverStateStore,
     upstreamMappingStore,
     sonarrLibrary,
     radarrLibrary,

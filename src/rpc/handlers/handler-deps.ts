@@ -8,6 +8,7 @@ import type { RadarrClient } from '@/providers/clients/radarr.client';
 import type { SonarrClient } from '@/providers/clients/sonarr.client';
 import type { MappingService } from '@/mapping/mapping.service';
 import type { MappingOverridesService } from '@/mapping/overrides';
+import type { ResolverStateStore } from '@/mapping/resolver-state/resolver-state.store';
 import type { UpstreamMappingStore } from '@/mapping/upstream';
 import type { ExtensionOptions } from '@/options';
 import type { ProviderCredentials } from '@/providers';
@@ -18,6 +19,7 @@ export type ApiHandlerDeps = {
   anilistMediaService: AniListMediaService;
   mappingService: MappingService;
   overridesService: MappingOverridesService;
+  resolverStateStore: ResolverStateStore;
   upstreamMappingStore: UpstreamMappingStore;
   sonarrLibrary: SonarrLibrary;
   radarrLibrary: RadarrLibrary;

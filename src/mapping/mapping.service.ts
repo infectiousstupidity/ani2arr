@@ -14,17 +14,14 @@ import {
 } from '@/shared/errors';
 import {
   clearExtensionMappingFailures,
-  clearExtensionMappings,
-  readExtensionMapping,
   readExtensionMappingFailure,
-  removeExtensionMapping,
   removeExtensionMappingFailure,
-  writeExtensionMapping,
   writeExtensionMappingFailure,
 } from '@/mapping/cache/extension-mapping.cache';
 import { incrementCounter } from '@/debug/metrics';
 import { logger } from '@/shared/utils/logger';
 import { getProviderLabel, resolveProviderForAniListFormat } from '@/providers/provider-routing';
+import { STORAGE_POLICIES } from '@/storage/policies';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 import {
   EARLY_STOP_THRESHOLD,
@@ -43,10 +40,14 @@ import { resolvePrequelStatic } from './hints/prequel-static';
 import { MappingOverridesService } from './overrides';
 import { type ProviderLookupClient, type ProviderLookupResult } from './lookup';
 import { resolveViaPipeline } from './pipeline/pipeline';
+import { ResolverStateStore } from './resolver-state/resolver-state.store';
 import { UpstreamMappingStore } from './upstream';
-import type { ResolveProviderIdOptions, ResolvedMapping } from './types';
-import { resolvedLedger } from '@/mapping/ledger/resolved-ledger';
-import { unresolvedLedger } from '@/mapping/ledger/unresolved-ledger';
+import type {
+  MappingResolvedSource,
+  ResolveProviderIdOptions,
+  ResolvedMapping,
+  ResolverStateRecord,
+} from './types';
 
 type ProviderLookupRegistry = Record<
   Provider,
@@ -81,6 +82,7 @@ export class MappingService {
     private readonly anilistApi: AniListMediaService,
     private readonly upstreamMappingStore: UpstreamMappingStore,
     private readonly lookupClients: ProviderLookupRegistry,
+    private readonly resolverStateStore: ResolverStateStore,
     private readonly overrides?: MappingOverridesService,
     private readonly notifyMappingsChanged?: () => void,
   ) {}
@@ -89,16 +91,13 @@ export class MappingService {
     await Promise.all([
       this.lookupClients.sonarr.reset(),
       this.lookupClients.radarr.reset(),
-      clearExtensionMappings(),
       clearExtensionMappingFailures(),
+      this.resolverStateStore.clear(),
     ]);
     this.inflight.clear();
-    resolvedLedger.clear();
     this.sessionSeenCanonical.sonarr.clear();
     this.sessionSeenCanonical.radarr.clear();
-    if (unresolvedLedger.clear()) {
-      this.notifyMappingsChanged?.();
-    }
+    this.notifyMappingsChanged?.();
   }
 
   public initStaticPairs(): Promise<void> {
@@ -170,7 +169,7 @@ export class MappingService {
     bypassFailureCache: boolean,
   ): Promise<ResolvedMapping | null> {
     if (this.overrides?.isIgnored(provider, anilistId)) {
-      this.clearUnresolvedMapping(provider, anilistId);
+      await this.clearResolverState(provider, anilistId);
       if (import.meta.env.DEV) {
         this.log.debug?.(`mapping:ignored provider=${provider} anilistId=${anilistId}`);
       }
@@ -179,7 +178,7 @@ export class MappingService {
 
     const overrideProviderId = this.overrides?.get(provider, anilistId) ?? null;
     if (overrideProviderId !== null) {
-      this.clearUnresolvedMapping(provider, anilistId);
+      await this.clearResolverState(provider, anilistId);
       const staticProviderId = this.getUpstreamStaticProviderId(provider, anilistId);
       if (staticProviderId !== null && staticProviderId === overrideProviderId) {
         try {
@@ -199,19 +198,26 @@ export class MappingService {
       return { providerId: overrideProviderId };
     }
 
-    const cachedSuccess = await readExtensionMapping(provider, anilistId);
-    if (cachedSuccess) {
+    const staticProviderId = this.getUpstreamStaticProviderId(provider, anilistId);
+    if (staticProviderId !== null) {
+      incrementCounter('mapping.lookup.static_hit');
+      return this.acceptResolved(provider, anilistId, { providerId: staticProviderId }, 'upstream');
+    }
+
+    const resolverState = await this.resolverStateStore.get(provider, anilistId);
+    if (resolverState?.state === 'mapped') {
       if (import.meta.env.DEV) {
         this.log.debug?.(
-          `mapping:success-cache-hit provider=${provider} anilistId=${anilistId} providerId=${cachedSuccess.value.providerId}`,
+          `mapping:resolver-state-hit provider=${provider} anilistId=${anilistId} providerId=${resolverState.providerId} source=${resolverState.source}`,
         );
       }
-      this.clearUnresolvedMapping(provider, anilistId);
-      if (this.isCandidateSuppressed(provider, anilistId, cachedSuccess.value.providerId)) {
+      if (this.isCandidateSuppressed(provider, anilistId, resolverState.providerId)) {
         return null;
       }
-      this.recordResolvedMapping(provider, anilistId, cachedSuccess.value, 'auto');
-      return cachedSuccess.value;
+      return {
+        providerId: resolverState.providerId,
+        ...(resolverState.successfulSynonym ? { successfulSynonym: resolverState.successfulSynonym } : {}),
+      };
     }
 
     if (!bypassFailureCache) {
@@ -224,12 +230,14 @@ export class MappingService {
         }
         throw cachedFailure.value;
       }
-    }
-
-    const staticProviderId = this.getUpstreamStaticProviderId(provider, anilistId);
-    if (staticProviderId !== null) {
-      incrementCounter('mapping.lookup.static_hit');
-      return this.acceptResolved(provider, anilistId, { providerId: staticProviderId }, 'upstream');
+      if (resolverState) {
+        if (import.meta.env.DEV) {
+          this.log.debug?.(
+            `mapping:resolver-state-terminal provider=${provider} anilistId=${anilistId} state=${resolverState.state}`,
+          );
+        }
+        return null;
+      }
     }
 
     if (options.network === 'never') {
@@ -267,11 +275,23 @@ export class MappingService {
     provider: Provider,
     anilistId: number,
     resolved: ResolvedMapping,
-    source: 'auto' | 'upstream',
+    source: MappingResolvedSource,
   ): Promise<ResolvedMapping | null> {
+    const mappedState: Omit<Extract<ResolverStateRecord, { state: 'mapped' }>, 'updatedAt'> = {
+      state: 'mapped',
+      providerId: resolved.providerId,
+      source,
+      ...(resolved.successfulSynonym ? { successfulSynonym: resolved.successfulSynonym } : {}),
+    };
+
     try {
       await Promise.all([
-        writeExtensionMapping(provider, anilistId, resolved),
+        this.resolverStateStore.set(
+          provider,
+          anilistId,
+          mappedState,
+          STORAGE_POLICIES.extensionMapping,
+        ),
         removeExtensionMappingFailure(provider, anilistId),
       ]);
     } catch (error) {
@@ -282,11 +302,10 @@ export class MappingService {
       );
       return null;
     }
-    this.clearUnresolvedMapping(provider, anilistId);
     if (this.isCandidateSuppressed(provider, anilistId, resolved.providerId)) {
       return null;
     }
-    this.recordResolvedMapping(provider, anilistId, resolved, source);
+    this.notifyMappingsChanged?.();
     return resolved;
   }
 
@@ -325,9 +344,21 @@ export class MappingService {
     } catch (error) {
       const normalized = normalizeError(error);
       if (normalized.code === ErrorCode.VALIDATION_ERROR) {
-        if (!bypassFailureCache) {
-          await this.cacheFailure(provider, anilistId, normalized);
-        }
+        await this.recordResolverState(
+          provider,
+          anilistId,
+          {
+            state: 'unresolved',
+            ...(this.resolveUnresolvedTitle(options.hints)
+              ? { title: this.resolveUnresolvedTitle(options.hints) }
+              : {}),
+          },
+          {
+            staleMs: NO_MATCH_SOFT_TTL,
+            hardMs: NO_MATCH_HARD_TTL,
+          },
+        );
+        await removeExtensionMappingFailure(provider, anilistId);
         return null;
       }
 
@@ -338,19 +369,21 @@ export class MappingService {
     }
 
     if (resolved === null) {
-      if (!bypassFailureCache) {
-        await this.cacheFailure(
-          provider,
-          anilistId,
-          createError(
-            ErrorCode.VALIDATION_ERROR,
-            `No provider match found for AniList ID ${anilistId}.`,
-            `No matching ${getProviderLabel(provider)} entry was found.`,
-            { reason: 'no-match', provider },
-          ),
-        );
-      }
-      this.recordUnresolvedMapping(provider, anilistId, options.hints);
+      await this.recordResolverState(
+        provider,
+        anilistId,
+        {
+          state: 'unresolved',
+          ...(this.resolveUnresolvedTitle(options.hints)
+            ? { title: this.resolveUnresolvedTitle(options.hints) }
+            : {}),
+        },
+        {
+          staleMs: NO_MATCH_SOFT_TTL,
+          hardMs: NO_MATCH_HARD_TTL,
+        },
+      );
+      await removeExtensionMappingFailure(provider, anilistId);
       return null;
     }
 
@@ -437,7 +470,6 @@ export class MappingService {
     if (provider === 'sonarr') {
       const prequelStatic = await resolvePrequelStatic(media, this.upstreamMappingStore, this.anilistApi);
       if (prequelStatic) {
-        this.recordResolvedMapping(provider, media.id, prequelStatic, 'upstream');
         return prequelStatic;
       }
     }
@@ -478,37 +510,28 @@ export class MappingService {
 
   public async evictResolved(anilistId: number, provider: Provider = 'sonarr'): Promise<void> {
     await Promise.all([
-      removeExtensionMapping(provider, anilistId),
+      this.resolverStateStore.delete(provider, anilistId),
       removeExtensionMappingFailure(provider, anilistId),
     ]);
     this.inflight.delete(this.inflightKey(provider, anilistId));
     this.evictAniListMedia(anilistId);
-    resolvedLedger.delete(provider, anilistId);
-    this.clearUnresolvedMapping(provider, anilistId);
+    this.notifyMappingsChanged?.();
   }
 
-  private recordResolvedMapping(
+  private async recordResolverState(
     provider: Provider,
     anilistId: number,
-    mapping: ResolvedMapping,
-    source: 'auto' | 'upstream',
-  ): void {
-    resolvedLedger.record(provider, anilistId, mapping, source);
-  }
-
-  private recordUnresolvedMapping(
-    provider: Provider,
-    anilistId: number,
-    hints?: ResolveProviderIdOptions['hints'],
-  ): void {
-    const changed = unresolvedLedger.record(provider, anilistId, this.resolveUnresolvedTitle(hints));
+    state: Omit<ResolverStateRecord, 'updatedAt'>,
+    ttl: { staleMs: number; hardMs: number },
+  ): Promise<void> {
+    const changed = await this.resolverStateStore.set(provider, anilistId, state, ttl);
     if (changed) {
       this.notifyMappingsChanged?.();
     }
   }
 
-  private clearUnresolvedMapping(provider: Provider, anilistId: number): void {
-    if (unresolvedLedger.delete(provider, anilistId)) {
+  private async clearResolverState(provider: Provider, anilistId: number): Promise<void> {
+    if (await this.resolverStateStore.delete(provider, anilistId)) {
       this.notifyMappingsChanged?.();
     }
   }
@@ -535,18 +558,15 @@ export class MappingService {
 
   private shouldCacheFailure(error: ExtensionError): boolean {
     return (
-      error.code === ErrorCode.VALIDATION_ERROR ||
       error.code === ErrorCode.CONFIGURATION_ERROR ||
       error.code === ErrorCode.NETWORK_ERROR ||
       error.code === ErrorCode.API_ERROR ||
-      error.code === ErrorCode.PERMISSION_ERROR
+      error.code === ErrorCode.PERMISSION_ERROR ||
+      error.code === ErrorCode.SONARR_NOT_CONFIGURED
     );
   }
 
   private failureTtlsFor(error: ExtensionError): { stale: number; hard: number } {
-    if (error.code === ErrorCode.VALIDATION_ERROR) {
-      return { stale: NO_MATCH_SOFT_TTL, hard: NO_MATCH_HARD_TTL };
-    }
     if (error.code === ErrorCode.NETWORK_ERROR || error.code === ErrorCode.API_ERROR) {
       return { stale: NETWORK_FAILURE_SOFT_TTL, hard: NETWORK_FAILURE_HARD_TTL };
     }
