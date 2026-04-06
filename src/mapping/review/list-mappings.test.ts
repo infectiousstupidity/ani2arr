@@ -366,6 +366,66 @@ describe('listMappings', () => {
     expect(getMappingSummarySource(result.mappings[0]!)).toBe('upstream');
   });
 
+  it('preserves rejected-candidate suppression on mapped resolver-state rows', async () => {
+    const result = await listMappings(
+      { limit: 10 },
+      {
+        overridesService: {
+          listIgnores: () => [],
+          listRejectedCandidates: () => [
+            {
+              anilistId: 8,
+              provider: 'sonarr',
+              providerId: 901,
+              updatedAt: 95,
+            },
+          ],
+          list: () => [],
+          isIgnored: () => false,
+          getLinkedAniListIds: () => [],
+        },
+        upstreamMappingStore: {
+          listAllPairs: () => [],
+          getAniListIdsForTvdb: () => [],
+        },
+        sonarrLibrary: {
+          getLeanSeriesList: async () => [],
+        },
+        radarrLibrary: {
+          getLeanMovieList: async () => [],
+        },
+        resolverStateStore: createResolverStateStore([
+          {
+            anilistId: 8,
+            provider: 'sonarr',
+            state: 'mapped',
+            providerId: 900,
+            acceptedEvidence: {
+              source: 'auto',
+              reason: 'fuzzy-match',
+            },
+            updatedAt: 90,
+          },
+        ]),
+      },
+    );
+
+    expect(result.mappings).toHaveLength(1);
+    expect(result.mappings[0]).toMatchObject({
+      anilistId: 8,
+      provider: 'sonarr',
+      providerId: 900,
+      suppressedProviderId: 901,
+      suppressionKind: 'rejected-candidate',
+      status: 'can-add',
+      libraryStatus: 'not-in-provider',
+      effectiveSource: 'auto',
+      effectiveReason: 'fuzzy-match',
+      resolverOutcome: 'mapped',
+    });
+    expect(getMappingSummarySource(result.mappings[0]!)).toBe('auto');
+  });
+
   it('projects verification-failed inherited review without changing the unresolved effective state', async () => {
     const result = await listMappings(
       { limit: 10 },

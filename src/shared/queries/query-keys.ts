@@ -110,5 +110,8 @@ export const queryKeys = {
     [...rootQueryKey, 'mappingOverrides', provider] as const,
   mappingsRoot: () => [...rootQueryKey, 'mappings'] as const,
   mappings: (input?: GetMappingsInput) => [...rootQueryKey, 'mappings', normalizeMappingsInput(input)] as const,
+  mappingInspectionRoot: () => [...rootQueryKey, 'mappingInspection'] as const,
+  mappingInspection: (provider: Provider, anilistId: number) =>
+    [...rootQueryKey, 'mappingInspection', provider, anilistId] as const,
   aniListMetadata: (ids: number[]) => [...rootQueryKey, 'aniListMetadata', normalizeMetadataIds(ids)] as const,
 };

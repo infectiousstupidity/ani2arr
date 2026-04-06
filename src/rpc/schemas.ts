@@ -168,6 +168,11 @@ export const GetMappingsInputSchema = v.optional(
   }),
 );
 
+export const GetMappingInspectionInputSchema = v.object({
+  anilistId: IdSchema,
+  provider: ProviderSchema,
+});
+
 export const GetAniListMetadataInputSchema = v.object({
   ids: v.array(IdSchema),
   refreshStale: v.optional(v.boolean()),
@@ -194,6 +199,7 @@ export type ClearMappingIgnoreInput = v.InferOutput<typeof ClearMappingIgnoreInp
 export type SetMappingRejectedCandidateInput = v.InferOutput<typeof SetMappingRejectedCandidateInputSchema>;
 export type ClearMappingRejectedCandidateInput = v.InferOutput<typeof ClearMappingRejectedCandidateInputSchema>;
 export type GetMappingsInput = v.InferOutput<typeof GetMappingsInputSchema>;
+export type GetMappingInspectionInput = v.InferOutput<typeof GetMappingInspectionInputSchema>;
 export type MappingCursor = v.InferOutput<typeof MappingCursorSchema>;
 export type GetAniListMetadataInput = v.InferOutput<typeof GetAniListMetadataInputSchema>;
 export type RadarrLookupInput = v.InferOutput<typeof RadarrLookupInputSchema>;

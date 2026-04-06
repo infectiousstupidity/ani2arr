@@ -58,6 +58,7 @@ export interface SonarrSeriesSnapshot {
   title: string;
   titleSlug: string;
   alternateTitles?: string[];
+  status?: 'continuing' | 'ended' | 'upcoming' | 'deleted';
   statistics?: {
     episodeCount?: number;
     episodeFileCount?: number;

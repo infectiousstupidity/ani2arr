@@ -15,6 +15,7 @@ import type {
   MappingIgnoreRecord,
   MappingSummary,
 } from '@/mapping/types';
+import type { MappingInspectionPayload } from '@/mapping/inspection/inspection-types';
 import type { MappingCursor } from './schemas';
 
 export interface CheckSeriesStatusResponse {
@@ -61,6 +62,8 @@ export interface GetMappingsOutput {
   nextCursor?: MappingCursor | null;
   total?: number;
 }
+
+export type GetMappingInspectionOutput = MappingInspectionPayload;
 
 export interface SonarrLookupOutput {
   results: SonarrLookupSeries[];
