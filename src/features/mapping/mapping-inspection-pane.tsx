@@ -1,17 +1,17 @@
-/** Inspection-first left pane for mapping mode while keeping manual search available. */
+/** Shared mapping left pane with persistent search and inspection context. */
 // src/features/mapping/mapping-inspection-pane.tsx
 
-import { useMemo, useState } from 'react';
-import Button from '@/shared/ui/primitives/button';
+import { useCallback, useMemo, useRef, type WheelEvent as ReactWheelEvent } from 'react';
+import * as ScrollArea from '@radix-ui/react-scroll-area';
 import Pill from '@/shared/ui/primitives/pill';
 import { useMappingInspection } from '@/shared/queries';
-import { cn } from '@/shared/utils/cn';
 import type {
   MappingInspectionCandidate,
   MappingInspectionPayload,
   MappingInspectionSuggestedCandidates,
 } from '@/mapping/inspection/inspection-types';
 import type { Provider } from '@/providers';
+import { getProviderLabel } from '@/providers/provider-routing';
 import { MappingSearchPanel } from './mapping-search-panel';
 import type { MappingSearchController, MappingSearchResult } from './types';
 
@@ -101,23 +101,34 @@ export function applySuggestedCandidateSearchShortcut(
   return nextQuery;
 }
 
-export function shouldShowManualSearch(input: {
-  currentMapping: MappingSearchResult | null;
+export function isSearchModeQuery(query: string): boolean {
+  return query.length > 0;
+}
+
+export function isSearchQueryTooShort(query: string): boolean {
+  return isSearchModeQuery(query) && query.trim().length < 2;
+}
+
+export function handleSearchEscapeKeyDown(input: {
   query: string;
-  selected: MappingSearchResult | null;
-  manualSearchRequested: boolean;
+  setQuery: (query: string) => void;
+  event: {
+    key: string;
+    stopPropagation(): void;
+  };
 }): boolean {
-  return (
-    input.manualSearchRequested ||
-    input.currentMapping == null ||
-    input.query.trim().length > 0 ||
-    input.selected !== null
-  );
+  if (input.event.key !== 'Escape' || !isSearchModeQuery(input.query)) {
+    return false;
+  }
+
+  input.setQuery('');
+  input.event.stopPropagation();
+  return true;
 }
 
 function Section(props: { title: string; children: React.ReactNode }): React.JSX.Element {
   return (
-    <section className="space-y-2 rounded-xl border border-border-primary/70 bg-bg-primary/35 p-3">
+    <section className="space-y-2 border-t border-border-primary/60 pt-4 first:border-t-0 first:pt-0">
       <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">{props.title}</h3>
       {props.children}
     </section>
@@ -161,7 +172,7 @@ export function MappingInspectionPaneContent(props: MappingInspectionPaneContent
       <Section title="Why this mapping exists">
         <div className="space-y-2">
           {inspection.whyThisExists.map((item, index) => (
-            <div key={`${item.kind}-${index}`} className="rounded-lg border border-border-primary/60 bg-bg-secondary/55 p-3">
+            <div key={`${item.kind}-${index}`} className="rounded-lg bg-bg-secondary/45 px-3 py-2.5">
               <p className="text-sm font-medium text-text-primary">{item.summary}</p>
               {item.details?.length ? (
                 <ul className="mt-2 space-y-1 text-xs text-text-secondary">
@@ -184,7 +195,7 @@ export function MappingInspectionPaneContent(props: MappingInspectionPaneContent
                 href={`https://anilist.co/anime/${entry.anilistId}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-between rounded-lg border border-border-primary/60 bg-bg-secondary/55 px-3 py-2 text-sm hover:bg-bg-secondary/75"
+                className="flex items-center justify-between rounded-lg bg-bg-secondary/45 px-3 py-2 text-sm transition-colors hover:bg-bg-secondary/65"
               >
                 <div className="min-w-0">
                   <div className="truncate font-medium text-text-primary">
@@ -217,9 +228,9 @@ export function MappingInspectionPaneContent(props: MappingInspectionPaneContent
               ) : null}
             </div>
             {inspection.review.items?.map((item, index) => (
-              <div key={`${item.reason}-${index}`} className="rounded-lg border border-border-primary/60 bg-bg-secondary/55 p-3">
-                <p className="text-sm font-medium text-text-primary">{item.summary}</p>
-              </div>
+                <div key={`${item.reason}-${index}`} className="rounded-lg bg-bg-secondary/45 px-3 py-2.5">
+                  <p className="text-sm font-medium text-text-primary">{item.summary}</p>
+                </div>
             ))}
           </div>
         ) : (
@@ -247,7 +258,7 @@ export function MappingInspectionPaneContent(props: MappingInspectionPaneContent
                       key={`${group.key}-${candidate.providerId}`}
                       type="button"
                       onClick={() => onUseSuggestion(candidate)}
-                      className="w-full rounded-lg border border-border-primary/60 bg-bg-secondary/55 px-3 py-3 text-left transition-colors hover:bg-bg-secondary/75"
+                      className="w-full rounded-lg bg-bg-secondary/45 px-3 py-3 text-left transition-colors hover:bg-bg-secondary/65"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="text-sm font-medium text-text-primary">
@@ -276,80 +287,111 @@ export function MappingInspectionPaneContent(props: MappingInspectionPaneContent
 export function MappingInspectionPane(props: MappingInspectionPaneProps): React.JSX.Element {
   const { anilistId, provider, controller, currentMapping, baseUrl, portalContainer } = props;
   const inspectionQuery = useMappingInspection(provider, anilistId);
-  const [manualSearchRequested, setManualSearchRequested] = useState(false);
+  const providerLabel = getProviderLabel(provider);
+  const providerIdLabel = getProviderIdLabel(provider);
+  const searchMode = isSearchModeQuery(controller.state.query);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
 
-  const manualSearchVisible = shouldShowManualSearch({
-    currentMapping,
-    query: controller.state.query,
-    selected: controller.state.selected,
-    manualSearchRequested,
-  });
+  const handleWheelCapture = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return;
+    }
 
-  const autoFocusSearch =
-    manualSearchVisible &&
-    (manualSearchRequested || currentMapping == null || controller.state.query.trim().length > 0 || controller.state.selected !== null);
-  const manualSearchHidden = !manualSearchVisible;
+    const canScrollY = viewport.scrollHeight > viewport.clientHeight;
+    const canScrollX = viewport.scrollWidth > viewport.clientWidth;
+
+    if (!canScrollY && !canScrollX) {
+      return;
+    }
+
+    viewport.scrollBy({ top: event.deltaY, left: event.deltaX });
+    event.preventDefault();
+  }, []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
-      <div
-        className={cn(
-          'rounded-xl border border-border-primary/70 bg-bg-secondary/45 p-4',
-          manualSearchVisible ? 'max-h-[48%] shrink-0 overflow-y-auto pr-2' : 'flex-1 overflow-y-auto pr-2',
-        )}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">Mapping context</p>
-            <p className="text-xs text-text-secondary">
-              Understand the current mapping before using manual search to change it.
-            </p>
-          </div>
-          {manualSearchHidden ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => setManualSearchRequested(true)}>
-              Search manually
-            </Button>
-          ) : null}
+    <div
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border-primary/70 bg-bg-primary/30"
+      onKeyDownCapture={(event) => {
+        handleSearchEscapeKeyDown({
+          query: controller.state.query,
+          setQuery: controller.setQuery,
+          event,
+        });
+      }}
+    >
+      <div className="shrink-0 border-b border-border-primary/60 bg-bg-secondary/35 p-4">
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">Mapping search</p>
+          <p className="text-xs text-text-secondary">
+            {searchMode
+              ? `Searching ${providerLabel} updates the preview on the right.`
+              : 'Inspect the current mapping context below, or start typing to search manually.'}
+          </p>
         </div>
-
-        {inspectionQuery.isPending && !inspectionQuery.data ? (
-          <div className="mt-4 rounded-xl border border-border-primary/60 bg-bg-primary/35 px-3 py-8 text-center text-sm text-text-secondary">
-            Loading mapping context...
-          </div>
-        ) : null}
-
-        {inspectionQuery.error && !inspectionQuery.data ? (
-          <div className="mt-4 rounded-xl border border-warning/24 bg-warning/8 px-3 py-4 text-sm text-text-secondary">
-            Mapping inspection is unavailable right now. Manual search is still available below.
-          </div>
-        ) : null}
-
-        {inspectionQuery.data ? (
-          <div className="mt-4">
-            <MappingInspectionPaneContent
-              inspection={inspectionQuery.data}
-              provider={provider}
-              onUseSuggestion={(candidate) => {
-                applySuggestedCandidateSearchShortcut(controller, candidate, inspectionQuery.data.suggestedCandidates);
-                setManualSearchRequested(true);
-              }}
-            />
-          </div>
-        ) : null}
-      </div>
-
-      {manualSearchVisible ? (
-        <div className="min-h-0 flex-1">
-          <MappingSearchPanel
-            controller={controller}
-            currentMapping={currentMapping}
-            provider={provider}
-            baseUrl={baseUrl}
-            autoFocus={autoFocusSearch}
-            portalContainer={portalContainer ?? null}
+        <div className="mt-3">
+          <input
+            value={controller.state.query}
+            onChange={(event) => controller.setQuery(event.target.value)}
+            placeholder={`Search ${providerLabel} / ${providerIdLabel}`}
+            className="w-full rounded-lg bg-bg-secondary px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-accent-primary focus:outline-none"
           />
         </div>
-      ) : null}
+      </div>
+
+      <div className="min-h-0 flex-1">
+        <ScrollArea.Root className="h-full w-full" onWheelCapture={handleWheelCapture}>
+          <ScrollArea.Viewport
+            ref={viewportRef}
+            className="h-full w-full [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          >
+            <div className="p-4">
+              {searchMode ? (
+                <MappingSearchPanel
+                  controller={controller}
+                  currentMapping={currentMapping}
+                  provider={provider}
+                  baseUrl={baseUrl}
+                  portalContainer={portalContainer ?? null}
+                />
+              ) : (
+                <div className="space-y-4">
+                  {inspectionQuery.isPending && !inspectionQuery.data ? (
+                    <div className="rounded-xl bg-bg-secondary/45 px-3 py-8 text-center text-sm text-text-secondary">
+                      Loading mapping context...
+                    </div>
+                  ) : null}
+
+                  {inspectionQuery.error && !inspectionQuery.data ? (
+                    <div className="rounded-xl bg-warning/8 px-3 py-4 text-sm text-text-secondary">
+                      Mapping inspection is unavailable right now. Search is still available above.
+                    </div>
+                  ) : null}
+
+                  {inspectionQuery.data ? (
+                    <MappingInspectionPaneContent
+                      inspection={inspectionQuery.data}
+                      provider={provider}
+                      onUseSuggestion={(candidate) => {
+                        applySuggestedCandidateSearchShortcut(controller, candidate, inspectionQuery.data.suggestedCandidates);
+                      }}
+                    />
+                  ) : null}
+                </div>
+              )}
+            </div>
+          </ScrollArea.Viewport>
+
+          <ScrollArea.Scrollbar
+            orientation="vertical"
+            className="flex w-2.5 select-none touch-none p-0.5"
+          >
+            <ScrollArea.Thumb className="flex-1 rounded bg-border-primary/40" />
+          </ScrollArea.Scrollbar>
+
+          <ScrollArea.Corner />
+        </ScrollArea.Root>
+      </div>
     </div>
   );
 }
