@@ -3,13 +3,22 @@
 
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MappingInspectionPayload } from '@/mapping/inspection/inspection-types';
 import type { MappingSearchController } from './types';
+const { mockUseMappingInspection } = vi.hoisted(() => ({
+  mockUseMappingInspection: vi.fn(),
+}));
+
+vi.mock('@/shared/queries', () => ({
+  useMappingInspection: mockUseMappingInspection,
+}));
+
 import {
   applySuggestedCandidateSearchShortcut,
+  handleSearchEscapeKeyDown,
   MappingInspectionPaneContent,
-  shouldShowManualSearch,
+  MappingInspectionPane,
 } from './mapping-inspection-pane';
 
 const createInspectionPayload = (
@@ -47,7 +56,98 @@ const createInspectionPayload = (
   ...overrides,
 });
 
+const createController = (overrides?: Partial<MappingSearchController>): MappingSearchController => ({
+  state: {
+    query: '',
+    selected: null,
+    lastQuery: '',
+    isDirty: false,
+    ...overrides?.state,
+  },
+  searchQuery: {
+    data: [],
+    isFetching: false,
+    ...overrides?.searchQuery,
+  },
+  setQuery: overrides?.setQuery ?? vi.fn(),
+  selectResult: overrides?.selectResult ?? vi.fn(),
+});
+
+beforeEach(() => {
+  mockUseMappingInspection.mockReset();
+  mockUseMappingInspection.mockReturnValue({
+    isPending: false,
+    error: null,
+    data: createInspectionPayload(),
+  });
+});
+
 describe('mapping inspection pane', () => {
+  it('always renders the search input, even when a current mapping exists', () => {
+    const view = renderToStaticMarkup(
+      React.createElement(MappingInspectionPane, {
+        anilistId: 101,
+        provider: 'sonarr',
+        controller: createController(),
+        currentMapping: {
+          provider: 'sonarr',
+          providerId: 777,
+          title: 'Current Mapping',
+          inLibrary: true,
+        },
+        baseUrl: 'https://example.com',
+      }),
+    );
+
+    expect(view).toContain('placeholder="Search Sonarr / TVDB"');
+  });
+
+  it('renders the inspection body when the query is empty', () => {
+    const view = renderToStaticMarkup(
+      React.createElement(MappingInspectionPane, {
+        anilistId: 101,
+        provider: 'sonarr',
+        controller: createController({
+          state: {
+            query: '',
+            selected: null,
+            lastQuery: '',
+            isDirty: false,
+          },
+        }),
+        currentMapping: null,
+        baseUrl: 'https://example.com',
+      }),
+    );
+
+    expect(view).toContain('Why this mapping exists');
+    expect(view).toContain('No effective mapping is currently stored for this AniList entry.');
+    expect(view).not.toContain('No results found.');
+  });
+
+  it('renders search mode only when the query is non-empty', () => {
+    const view = renderToStaticMarkup(
+      React.createElement(MappingInspectionPane, {
+        anilistId: 101,
+        provider: 'sonarr',
+        controller: createController({
+          state: {
+            query: 'ab',
+            selected: null,
+            lastQuery: '',
+            isDirty: false,
+          },
+        }),
+        currentMapping: null,
+        baseUrl: 'https://example.com',
+      }),
+    );
+
+    expect(view).toContain('No results found.');
+    expect(view).not.toContain('Why this mapping exists');
+    expect(view).not.toContain('No effective mapping is currently stored for this AniList entry.');
+  });
+
   it('renders unresolved inspection payloads with the empty linked-entry state', () => {
     const view = renderToStaticMarkup(
       React.createElement(MappingInspectionPaneContent, {
@@ -208,24 +308,61 @@ describe('mapping inspection pane', () => {
     expect(selectResult).not.toHaveBeenCalled();
   });
 
-  it('keeps manual search immediately reachable when there is no current mapping', () => {
-    expect(shouldShowManualSearch({
-      currentMapping: null,
-      query: '',
-      selected: null,
-      manualSearchRequested: false,
-    })).toBe(true);
+  it('clears a non-empty query on Escape and stops propagation', () => {
+    const setQuery = vi.fn();
+    const stopPropagation = vi.fn();
 
-    expect(shouldShowManualSearch({
-      currentMapping: {
-        provider: 'sonarr',
-        providerId: 777,
-        title: 'Current Mapping',
-        inLibrary: true,
+    const handled = handleSearchEscapeKeyDown({
+      query: 'naruto',
+      setQuery,
+      event: {
+        key: 'Escape',
+        stopPropagation,
       },
+    });
+
+    expect(handled).toBe(true);
+    expect(setQuery).toHaveBeenCalledWith('');
+    expect(stopPropagation).toHaveBeenCalledOnce();
+  });
+
+  it('lets Escape bubble when the query is already empty', () => {
+    const setQuery = vi.fn();
+    const stopPropagation = vi.fn();
+
+    const handled = handleSearchEscapeKeyDown({
       query: '',
-      selected: null,
-      manualSearchRequested: false,
-    })).toBe(false);
+      setQuery,
+      event: {
+        key: 'Escape',
+        stopPropagation,
+      },
+    });
+
+    expect(handled).toBe(false);
+    expect(setQuery).not.toHaveBeenCalled();
+    expect(stopPropagation).not.toHaveBeenCalled();
+  });
+
+  it('shows the minimum-character message for a too-short query', () => {
+    const view = renderToStaticMarkup(
+      React.createElement(MappingInspectionPane, {
+        anilistId: 101,
+        provider: 'sonarr',
+        controller: createController({
+          state: {
+            query: 'a',
+            selected: null,
+            lastQuery: '',
+            isDirty: false,
+          },
+        }),
+        currentMapping: null,
+        baseUrl: 'https://example.com',
+      }),
+    );
+
+    expect(view).toContain('Enter at least 2 characters to search Sonarr.');
+    expect(view).not.toContain('No results found.');
   });
 });

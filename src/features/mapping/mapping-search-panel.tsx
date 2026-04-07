@@ -1,9 +1,7 @@
-/** Mapping search panel UI for browsing provider candidates and selecting a manual override target. */
+/** Mapping search results renderer for manual mapping selection. */
 // src/features/mapping/mapping-search-panel.tsx
 
-import { useCallback, useEffect, useRef, type WheelEvent as ReactWheelEvent } from 'react';
 import { ExternalLink } from 'lucide-react';
-import * as ScrollArea from '@radix-ui/react-scroll-area';
 import Pill from '@/shared/ui/primitives/pill';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import type { Provider } from '@/providers';
@@ -16,85 +14,45 @@ interface MappingSearchPanelProps {
   currentMapping: MappingSearchResult | null;
   provider: Provider;
   baseUrl: string;
-  autoFocus?: boolean;
   portalContainer?: HTMLElement | null;
 }
 
 export function MappingSearchPanel(props: MappingSearchPanelProps) {
-  const { controller, currentMapping, provider, baseUrl, autoFocus = false, portalContainer } = props;
-  const { state, setQuery, selectResult, searchQuery } = controller;
+  const { controller, currentMapping, provider, baseUrl, portalContainer } = props;
+  const { state, selectResult, searchQuery } = controller;
   const results = searchQuery.data ?? [];
   const selected = state.selected;
-  const hasQuery = state.query.trim().length > 0;
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const hasQuery = state.query.length > 0;
+  const trimmedQuery = state.query.trim();
+  const showMinimumCharacterMessage = hasQuery && trimmedQuery.length < 2;
+  const canRenderSearchState = showMinimumCharacterMessage === false;
+  const showSearchingState = canRenderSearchState && searchQuery.isFetching && results.length === 0;
+  const showEmptyState = canRenderSearchState && searchQuery.isFetching === false && results.length === 0;
   const providerLabel = getProviderLabel(provider);
 
-  const handleWheelCapture = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    const canScrollY = viewport.scrollHeight > viewport.clientHeight;
-    const canScrollX = viewport.scrollWidth > viewport.clientWidth;
-    if (!canScrollY && !canScrollX) return;
-    viewport.scrollBy({ top: event.deltaY, left: event.deltaX });
-    event.preventDefault();
-  }, []);
-
-  useEffect(() => {
-    if (!autoFocus) return;
-    inputRef.current?.focus();
-  }, [autoFocus]);
-
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="pb-1">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-              Manual search
-            </p>
-            <p className="text-xs text-text-secondary">
-              {`Search ${providerLabel} manually; selecting a result updates the preview on the right.`}
-            </p>
+    <div className="overflow-hidden rounded-xl bg-bg-secondary/70 shadow-inner ring-1 ring-inset ring-border-primary/60">
+      <div className="divide-y divide-border-primary/70">
+        {showMinimumCharacterMessage ? (
+          <div className="px-3 py-6 text-center text-xs text-text-secondary">
+            {`Enter at least 2 characters to search ${providerLabel}.`}
           </div>
-        </div>
-      </div>
+        ) : null}
 
-      <div className="space-y-2">
-        <input
-          ref={inputRef}
-          value={state.query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={`Search ${providerLabel} / ${provider === 'radarr' ? 'TMDB' : 'TVDB'}`}
-          className="w-full rounded-lg bg-bg-secondary px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-accent-primary focus:outline-none"
-        />
-      </div>
+        {showSearchingState ? (
+          <div className="px-3 py-6 text-center text-xs text-text-secondary">
+            Searching...
+          </div>
+        ) : null}
 
-      <div className="flex-1 min-h-0 overflow-hidden rounded-xl bg-bg-secondary/80 shadow-inner">
-        <ScrollArea.Root
-          className="h-full w-full"
-          onWheelCapture={handleWheelCapture}
-        >
-          <div className="flex h-full">
-            <ScrollArea.Viewport
-              ref={viewportRef}
-              className="h-full flex-1 overflow-y-auto"
-            >
-              <div className="py-1">
-                <div className="divide-y divide-border-primary">
-                  {searchQuery.isFetching && results.length === 0 ? (
-                    <div className="flex h-32 items-center justify-center text-xs text-text-secondary">
-                      Searching...
-                    </div>
-                  ) : null}
+        {showEmptyState ? (
+          <div className="px-3 py-6 text-center text-xs text-text-secondary">
+            {hasQuery ? 'No results found.' : `Type to search ${providerLabel} manually.`}
+          </div>
+        ) : null}
 
-                  {results.length === 0 && !searchQuery.isFetching ? (
-                    <div className="flex h-32 items-center justify-center px-3 py-6 text-center text-xs text-text-secondary">
-                      {hasQuery ? 'No results found.' : `Type to search ${providerLabel} manually.`}
-                    </div>
-                  ) : null}
-
-                  {results.map((result) => {
+        {canRenderSearchState
+          ? results.map((result) => {
                     const isCurrent =
                       currentMapping &&
                       result.providerId === currentMapping.providerId;
@@ -209,21 +167,8 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                         ) : null}
                       </div>
                     );
-                  })}
-                </div>
-              </div>
-            </ScrollArea.Viewport>
-
-            <ScrollArea.Scrollbar
-              orientation="vertical"
-              className="flex w-2.5 select-none touch-none p-0.5"
-            >
-              <ScrollArea.Thumb className="flex-1 rounded bg-border-primary/40" />
-            </ScrollArea.Scrollbar>
-
-            <ScrollArea.Corner />
-          </div>
-        </ScrollArea.Root>
+                  })
+          : null}
       </div>
     </div>
   );
