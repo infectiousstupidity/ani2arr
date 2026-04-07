@@ -62,6 +62,7 @@ export function SonarrAddOptionsFields(
   const layoutClassName = isGridLayout
     ? 'grid gap-4 md:grid-cols-2'
     : 'flex flex-col gap-4';
+  const modalSelectTriggerClassName = 'border border-border-primary/60 bg-bg-tertiary text-text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
   const computedSlug =
     folderSlug && folderSlug.trim().length > 0
       ? folderSlug.trim()
@@ -81,6 +82,7 @@ export function SonarrAddOptionsFields(
         portalContainer={portalContainer ?? null}
         initialFocusRef={initialFocusRef}
         className={fullWidthClass}
+        triggerClassName={modalSelectTriggerClassName}
         computedSlug={computedSlug}
         displayRootWithSlug={displayRootWithSlug}
         computedPath={computedPath}
@@ -93,6 +95,7 @@ export function SonarrAddOptionsFields(
         onChange={value => onChange('monitorOption', value as SonarrFormState['monitorOption'])}
         options={MONITOR_OPTIONS_WITH_DESCRIPTIONS}
         container={portalContainer ?? null}
+        triggerClassName={modalSelectTriggerClassName}
       />
 
       <SelectField
@@ -103,6 +106,7 @@ export function SonarrAddOptionsFields(
         options={qualityProfileOptions}
         placeholder="Select a profile..."
         container={portalContainer ?? null}
+        triggerClassName={modalSelectTriggerClassName}
       />
 
       <SelectField
@@ -112,6 +116,7 @@ export function SonarrAddOptionsFields(
         onChange={value => onChange('seriesType', value as SonarrFormState['seriesType'])}
         options={SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
         container={portalContainer ?? null}
+        triggerClassName={modalSelectTriggerClassName}
       />
 
       <ProviderTagField
@@ -133,6 +138,8 @@ export function SonarrAddOptionsFields(
             labelHelp="Organize episodes into per-season subfolders created automatically."
             labelHelpDelay={600}
             labelHelpContainer={portalContainer ?? null}
+            layout="inline"
+            labelClassName="text-sm font-medium text-text-primary"
           />
 
           {includeSearchToggle ? (
@@ -145,16 +152,20 @@ export function SonarrAddOptionsFields(
                 labelHelp="Automatically trigger a search for any missing episodes once the series is added."
                 labelHelpDelay={600}
                 labelHelpContainer={portalContainer ?? null}
+                layout="inline"
+                labelClassName="text-sm font-medium text-text-primary"
               />
 
               <SwitchField
-                label="Search Cutoff Unmet"
+                label="Search Cutoff"
                 disabled={disabled}
                 checked={values.searchForCutoffUnmetEpisodes}
                 onCheckedChange={checked => onChange('searchForCutoffUnmetEpisodes', checked)}
                 labelHelp="Ask Sonarr to search for episodes below the quality cutoff during add or update."
                 labelHelpDelay={600}
                 labelHelpContainer={portalContainer ?? null}
+                layout="inline"
+                labelClassName="text-sm font-medium text-text-primary"
               />
             </>
           ) : null}

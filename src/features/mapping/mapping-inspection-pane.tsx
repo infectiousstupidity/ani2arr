@@ -35,8 +35,9 @@ interface MappingInspectionPaneContentProps {
 
 type SuggestedCandidateGroup = {
   key: 'accepted' | 'rejected' | 'suppressed' | 'notAccepted';
-  label: string;
+  label: string | null;
   tone: 'success' | 'warning' | 'accent' | 'muted';
+  getRowLabel?: (candidate: MappingInspectionCandidate) => string | null;
   items: readonly MappingInspectionCandidate[];
 };
 
@@ -44,34 +45,20 @@ export const formatToken = (value: string): string => value.replaceAll('-', ' ')
 
 const getProviderIdLabel = (provider: Provider): 'TMDB' | 'TVDB' => (provider === 'radarr' ? 'TMDB' : 'TVDB');
 
-const getStatusTone = (
-  status: MappingInspectionPayload['effectiveMapping']['status'],
-): 'success' | 'warning' | 'info' | 'muted' => {
-  switch (status) {
-    case 'in-library': {
-      return 'success';
-    }
-    case 'needs-review':
-    case 'suppressed': {
-      return 'warning';
-    }
-    case 'can-add': {
-      return 'info';
-    }
-    default: {
-      return 'muted';
-    }
-  }
-};
-
 const getSuggestedCandidateGroups = (
   suggestedCandidates: MappingInspectionSuggestedCandidates,
 ): SuggestedCandidateGroup[] => {
   const groups: SuggestedCandidateGroup[] = [
-    { key: 'accepted', label: 'Accepted trace', tone: 'success', items: suggestedCandidates.accepted },
-    { key: 'rejected', label: 'Rejected trace', tone: 'warning', items: suggestedCandidates.rejected },
-    { key: 'suppressed', label: 'Suppressed trace', tone: 'accent', items: suggestedCandidates.suppressed },
-    { key: 'notAccepted', label: 'Other candidates', tone: 'muted', items: suggestedCandidates.notAccepted },
+    { key: 'accepted', label: 'Current match', tone: 'success', items: suggestedCandidates.accepted },
+    { key: 'rejected', label: 'Rejected match', tone: 'warning', items: suggestedCandidates.rejected },
+    { key: 'suppressed', label: 'Suppressed candidate', tone: 'accent', items: suggestedCandidates.suppressed },
+    {
+      key: 'notAccepted',
+      label: null,
+      tone: 'muted',
+      getRowLabel: (candidate) => candidate.reason ? formatToken(candidate.reason) : null,
+      items: suggestedCandidates.notAccepted,
+    },
   ];
 
   return groups.filter(group => group.items.length > 0);
@@ -132,9 +119,19 @@ export function handleSearchEscapeKeyDown(input: {
 function Section(props: { title: string; children: React.ReactNode }): React.JSX.Element {
   return (
     <section className="space-y-2 border-t border-border-primary/60 pt-4 first:border-t-0 first:pt-0">
-      <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">{props.title}</h3>
+      <h3 className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">{props.title}</h3>
       {props.children}
     </section>
+  );
+}
+
+function CodeBlock(props: { lines: Array<string | null | undefined> }): React.JSX.Element {
+  const content = props.lines.filter(Boolean).join('\n');
+
+  return (
+    <pre className="overflow-x-auto rounded-lg bg-bg-primary/25 px-3 py-3 font-mono text-[11px] leading-5 whitespace-pre-wrap text-text-secondary">
+      {content}
+    </pre>
   );
 }
 
@@ -158,38 +155,42 @@ export function MappingInspectionSuggestedShortcuts(props: {
     <div className="space-y-4">
       <section className="space-y-2">
         <div className="space-y-1">
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">Suggested matches</h3>
+          <h3 className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">Suggested matches</h3>
           <p className="text-xs text-text-secondary">
             {inspection.suggestedCandidates.searchTerms?.length
-              ? `Trace terms: ${inspection.suggestedCandidates.searchTerms.join(', ')}`
+              ? `Search terms used: ${inspection.suggestedCandidates.searchTerms.join(', ')}`
               : 'Use a recent candidate below, or start typing to search manually.'}
           </p>
         </div>
 
         {suggestedRows.length > 0 ? (
-          <div className="overflow-hidden rounded-xl bg-bg-secondary/45 shadow-inner ring-1 ring-inset ring-border-primary/50">
+          <div className="overflow-hidden rounded-xl border border-border-primary/50 bg-bg-secondary/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
             <div className="divide-y divide-border-primary/60">
-              {suggestedRows.map(({ group, item }) => (
-                <button
-                  key={`${group.key}-${item.providerId}`}
-                  type="button"
-                  onClick={() => onUseSuggestion(item)}
-                  className="flex w-full items-start justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-bg-primary/35"
-                >
-                  <div className="min-w-0 space-y-2">
-                    <div className="truncate text-sm font-semibold text-text-primary">
-                      {item.title ?? `${providerIdLabel} ${item.providerId}`}
+              {suggestedRows.map(({ group, item }) => {
+                const rowLabel = group.getRowLabel?.(item) ?? group.label;
+
+                return (
+                  <button
+                    key={`${group.key}-${item.providerId}`}
+                    type="button"
+                    onClick={() => onUseSuggestion(item)}
+                    className="flex w-full items-start justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-bg-primary/35"
+                  >
+                    <div className="min-w-0 space-y-2">
+                      <div className="truncate text-sm font-semibold text-text-primary">
+                        {item.title ?? `${providerIdLabel} ${item.providerId}`}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {rowLabel ? <Pill small tone={group.tone}>{rowLabel}</Pill> : null}
+                        <Pill small tone="muted" className="font-mono text-text-primary">
+                          {`${providerIdLabel} ${item.providerId}`}
+                        </Pill>
+                      </div>
+                      <p className="text-xs text-text-secondary">{item.summary}</p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Pill small tone={group.tone}>{group.label}</Pill>
-                      <Pill small tone="muted" className="font-mono text-text-primary">
-                        {`${providerIdLabel} ${item.providerId}`}
-                      </Pill>
-                    </div>
-                    <p className="text-xs text-text-secondary">{item.summary}</p>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : (
@@ -199,7 +200,7 @@ export function MappingInspectionSuggestedShortcuts(props: {
         )}
       </section>
 
-      <div className="rounded-xl bg-bg-secondary/30 px-3 py-3 text-xs text-text-secondary">
+      <div className="rounded-xl bg-bg-secondary/20 px-3 py-3 text-xs text-text-secondary">
         Search results on the left update the preview on the right without replacing the current mapping until you confirm.
       </div>
     </div>
@@ -209,50 +210,57 @@ export function MappingInspectionSuggestedShortcuts(props: {
 export function MappingInspectionPaneContent(props: MappingInspectionPaneContentProps): React.JSX.Element {
   const { inspection, provider, onUseSuggestion } = props;
   const providerIdLabel = getProviderIdLabel(provider);
-  const hasEffectiveMapping = inspection.effectiveMapping.providerId != null;
   const hasReview = inspection.review.needsReview;
   const candidateGroups = useMemo(
     () => getSuggestedCandidateGroups(inspection.suggestedCandidates),
     [inspection.suggestedCandidates],
   );
   const hasSuggestedCandidates = candidateGroups.length > 0;
+  const currentContextLines = [
+    `aniListId: ${inspection.effectiveMapping.anilistId}`,
+    `provider: ${provider}`,
+    `status: ${formatToken(inspection.effectiveMapping.status)}`,
+    inspection.effectiveMapping.providerId == null
+      ? 'providerId: none'
+      : `providerId: ${providerIdLabel} ${inspection.effectiveMapping.providerId}`,
+    inspection.effectiveMapping.effectiveSource
+      ? `source: ${formatToken(inspection.effectiveMapping.effectiveSource)}`
+      : null,
+    inspection.effectiveMapping.effectiveReason
+      ? `reason: ${formatToken(inspection.effectiveMapping.effectiveReason)}`
+      : null,
+    inspection.effectiveMapping.resolverOutcome
+      ? `resolverOutcome: ${formatToken(inspection.effectiveMapping.resolverOutcome)}`
+      : null,
+    inspection.effectiveMapping.suppressionKind
+      ? `suppression: ${formatToken(inspection.effectiveMapping.suppressionKind)}`
+      : null,
+  ];
 
   return (
     <div className="space-y-4">
       <Section title="Current context">
-        <div className="flex flex-wrap items-center gap-2">
-          <Pill small tone={getStatusTone(inspection.effectiveMapping.status)}>
-            {formatToken(inspection.effectiveMapping.status)}
-          </Pill>
-          {hasEffectiveMapping ? (
-            <Pill small tone="muted" className="font-mono text-text-primary">
-              {`${providerIdLabel} ${inspection.effectiveMapping.providerId}`}
-            </Pill>
-          ) : null}
-          {inspection.effectiveMapping.effectiveSource ? (
-            <Pill small tone="info">{formatToken(inspection.effectiveMapping.effectiveSource)}</Pill>
-          ) : null}
-        </div>
-        <p className="text-sm text-text-secondary">
-          {hasEffectiveMapping
-            ? 'Inspection reflects the currently effective mapping context.'
-            : 'No effective mapping is currently stored for this AniList entry.'}
-        </p>
+        <CodeBlock lines={currentContextLines} />
       </Section>
 
       <Section title="Why this mapping exists">
         <div className="space-y-2">
           {inspection.whyThisExists.map((item, index) => (
-            <div key={`${item.kind}-${index}`} className="rounded-lg bg-bg-secondary/45 px-3 py-2.5">
-              <p className="text-sm font-medium text-text-primary">{item.summary}</p>
-              {item.details?.length ? (
-                <ul className="mt-2 space-y-1 text-xs text-text-secondary">
-                  {item.details.map((detail, detailIndex) => (
-                    <li key={`${detail}-${detailIndex}`}>{detail}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
+            <CodeBlock
+              key={`${item.kind}-${index}`}
+              lines={[
+                `kind: ${formatToken(item.kind)}`,
+                item.source ? `source: ${formatToken(item.source)}` : null,
+                item.reason ? `reason: ${formatToken(item.reason)}` : null,
+                item.resolverOutcome ? `resolverOutcome: ${formatToken(item.resolverOutcome)}` : null,
+                item.reviewReason ? `reviewReason: ${formatToken(item.reviewReason)}` : null,
+                item.suppressedProviderId ? `suppressedProviderId: ${item.suppressedProviderId}` : null,
+                item.immediateSourceAniListId ? `immediateSourceAniListId: ${item.immediateSourceAniListId}` : null,
+                item.chainAnchorAniListId ? `chainAnchorAniListId: ${item.chainAnchorAniListId}` : null,
+                `summary: ${item.summary}`,
+                ...(item.details ?? []).map((detail) => `detail: ${detail}`),
+              ]}
+            />
           ))}
         </div>
       </Section>
@@ -266,21 +274,17 @@ export function MappingInspectionPaneContent(props: MappingInspectionPaneContent
                 href={`https://anilist.co/anime/${entry.anilistId}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-between rounded-lg bg-bg-secondary/45 px-3 py-2 text-sm transition-colors hover:bg-bg-secondary/65"
+                className="block transition-opacity hover:opacity-100"
               >
-                <div className="min-w-0">
-                  <div className="truncate font-medium text-text-primary">
-                    {entry.title ?? `AniList #${entry.anilistId}`}
-                  </div>
-                  <div className="mt-0.5 text-xs text-text-secondary">
-                    {entry.format ? formatToken(entry.format) : 'Unknown format'}
-                    {entry.year ? ` · ${entry.year}` : ''}
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {entry.relation === 'current' ? <Pill small tone="accent">Current</Pill> : null}
-                  <Pill small tone="muted" className="font-mono text-text-primary">{`AniList ${entry.anilistId}`}</Pill>
-                </div>
+                <CodeBlock
+                  lines={[
+                    `aniListId: ${entry.anilistId}`,
+                    `title: ${entry.title ?? `AniList #${entry.anilistId}`}`,
+                    `format: ${entry.format ? formatToken(entry.format) : 'Unknown format'}`,
+                    entry.year ? `year: ${entry.year}` : null,
+                    entry.relation ? `relation: ${entry.relation}` : null,
+                  ]}
+                />
               </a>
             ))}
           </div>
@@ -292,52 +296,57 @@ export function MappingInspectionPaneContent(props: MappingInspectionPaneContent
       <Section title="Review state">
         {hasReview ? (
           <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Pill small tone="warning">Needs review</Pill>
-              {inspection.review.summary ? (
-                <Pill small tone="muted">{`${inspection.review.summary.count} item${inspection.review.summary.count === 1 ? '' : 's'}`}</Pill>
-              ) : null}
-            </div>
+            <CodeBlock
+              lines={[
+                'needsReview: true',
+                inspection.review.summary ? `count: ${inspection.review.summary.count}` : null,
+                ...(inspection.review.summary?.reasons ?? []).map((reason) => `reason: ${formatToken(reason)}`),
+              ]}
+            />
             {inspection.review.items?.map((item, index) => (
-                <div key={`${item.reason}-${index}`} className="rounded-lg bg-bg-secondary/45 px-3 py-2.5">
-                  <p className="text-sm font-medium text-text-primary">{item.summary}</p>
-                </div>
+                <CodeBlock
+                  key={`${item.reason}-${index}`}
+                  lines={[
+                    `reason: ${formatToken(item.reason)}`,
+                    `summary: ${item.summary}`,
+                    item.current.providerId == null ? null : `currentProviderId: ${item.current.providerId}`,
+                    item.proposed?.providerId == null ? null : `proposedProviderId: ${item.proposed.providerId}`,
+                  ]}
+                />
             ))}
           </div>
         ) : (
-          <p className="text-sm text-text-secondary">No review flags are currently attached to this mapping.</p>
+          <CodeBlock lines={['needsReview: false']} />
         )}
       </Section>
 
       <Section title="Suggested candidates">
         {inspection.suggestedCandidates.searchTerms?.length ? (
-          <p className="text-xs text-text-secondary">
-            {`Last trace searched: ${inspection.suggestedCandidates.searchTerms.join(', ')}`}
-          </p>
+          <CodeBlock lines={[`searchTerms: ${inspection.suggestedCandidates.searchTerms.join(', ')}`]} />
         ) : null}
         {hasSuggestedCandidates ? (
           <div className="space-y-3">
             {candidateGroups.map((group) => (
               <div key={group.key} className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Pill small tone={group.tone}>{group.label}</Pill>
-                  <span className="text-xs text-text-secondary">{`${group.items.length} candidate${group.items.length === 1 ? '' : 's'}`}</span>
-                </div>
+                {group.label ? (
+                  <div className="flex items-center gap-2">
+                    <Pill small tone={group.tone}>{group.label}</Pill>
+                    <span className="text-xs text-text-secondary">{`${group.items.length} candidate${group.items.length === 1 ? '' : 's'}`}</span>
+                  </div>
+                ) : null}
                 <div className="space-y-2">
                   {group.items.map((candidate) => {
+                    const candidateLines = [
+                      `title: ${candidate.title ?? `${providerIdLabel} ${candidate.providerId}`}`,
+                      `providerId: ${providerIdLabel} ${candidate.providerId}`,
+                      `status: ${formatToken(candidate.status)}`,
+                      `source: ${formatToken(candidate.source)}`,
+                      `reason: ${formatToken(candidate.reason)}`,
+                      `summary: ${candidate.summary}`,
+                    ];
+
                     const candidateContent = (
-                      <>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="text-sm font-medium text-text-primary">
-                            {candidate.title ?? `${providerIdLabel} ${candidate.providerId}`}
-                          </div>
-                          <Pill small tone="muted" className="font-mono text-text-primary">
-                            {`${providerIdLabel} ${candidate.providerId}`}
-                          </Pill>
-                          <Pill small tone="info">{formatToken(candidate.status)}</Pill>
-                        </div>
-                        <p className="mt-1 text-xs text-text-secondary">{candidate.summary}</p>
-                      </>
+                      <CodeBlock lines={candidateLines} />
                     );
 
                     if (onUseSuggestion) {
@@ -346,7 +355,7 @@ export function MappingInspectionPaneContent(props: MappingInspectionPaneContent
                           key={`${group.key}-${candidate.providerId}`}
                           type="button"
                           onClick={() => onUseSuggestion(candidate)}
-                          className="w-full rounded-lg bg-bg-secondary/45 px-3 py-3 text-left transition-colors hover:bg-bg-secondary/65"
+                          className="w-full text-left transition-opacity hover:opacity-100"
                         >
                           {candidateContent}
                         </button>
@@ -356,7 +365,7 @@ export function MappingInspectionPaneContent(props: MappingInspectionPaneContent
                     return (
                       <div
                         key={`${group.key}-${candidate.providerId}`}
-                        className="rounded-lg bg-bg-secondary/45 px-3 py-3"
+                        className="w-full"
                       >
                         {candidateContent}
                       </div>
@@ -401,7 +410,7 @@ export function MappingInspectionPane(props: MappingInspectionPaneProps): React.
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col overflow-hidden"
+      className="flex h-full min-h-0 flex-col overflow-hidden px-4 pt-4"
       onKeyDownCapture={(event) => {
         handleSearchEscapeKeyDown({
           query: controller.state.query,
@@ -410,7 +419,7 @@ export function MappingInspectionPane(props: MappingInspectionPaneProps): React.
         });
       }}
     >
-      <div className="shrink-0 rounded-xl bg-bg-secondary/28 p-4">
+      <div className="shrink-0 pb-4">
         {onExitMapping ? (
           <Button
             type="button"
@@ -424,7 +433,7 @@ export function MappingInspectionPane(props: MappingInspectionPaneProps): React.
           </Button>
         ) : null}
         <div className="space-y-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">Mapping search</p>
+          <p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">Mapping search</p>
           <p className="text-xs text-text-secondary">
             {searchMode
               ? `Searching ${providerLabel} updates the preview on the right.`
@@ -435,8 +444,8 @@ export function MappingInspectionPane(props: MappingInspectionPaneProps): React.
           <input
             value={controller.state.query}
             onChange={(event) => controller.setQuery(event.target.value)}
-            placeholder={`Search ${providerLabel} / ${providerIdLabel}`}
-            className="w-full rounded-lg bg-bg-secondary px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-accent-primary focus:outline-none"
+            placeholder={`Search ${providerLabel} / ${providerIdLabel}...`}
+            className="w-full rounded-xl border border-border-primary/60 bg-bg-tertiary/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-accent-primary focus:outline-none"
           />
         </div>
       </div>
@@ -447,7 +456,7 @@ export function MappingInspectionPane(props: MappingInspectionPaneProps): React.
             ref={viewportRef}
             className="h-full w-full [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
-            <div className="p-4">
+            <div className="pb-4 pr-1">
               {searchMode ? (
                 <MappingSearchPanel
                   controller={controller}

@@ -1,3 +1,4 @@
+/** Renders the media modal footer actions for setup and mapping flows. */
 // src/features/media-modal/components/media-modal-footer.tsx
 import type { ReactNode } from "react";
 import Button from "@/shared/ui/primitives/button";
@@ -37,7 +38,7 @@ export function Footer(props: FooterProps): React.JSX.Element {
   } = props;
 
   return (
-    <footer className="flex flex-wrap items-center justify-between gap-3 border-border-primary bg-bg-primary px-8 py-4">
+    <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border-primary/50 bg-bg-primary px-8 py-4">
       <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
         {leftContent}
       </div>

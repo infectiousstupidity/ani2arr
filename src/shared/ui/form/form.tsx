@@ -1,4 +1,5 @@
-// src/shared/components/form.tsx
+/** Owns shared form primitives and opt-in field composition helpers. */
+// src/shared/ui/form/form.tsx
 import React, { createContext, useContext, useId } from 'react';
 import * as LabelPrimitive from '@radix-ui/react-label';
 import * as SelectPrimitive from '@radix-ui/react-select';
@@ -155,8 +156,10 @@ interface FieldProps {
 
 export const InputField = React.forwardRef<
   HTMLInputElement,
-  FieldProps & React.ComponentProps<typeof Input>
->(({ label, className, description, labelHelp, labelHelpDelay, labelHelpContainer, ...props }, ref) => {
+  FieldProps & React.ComponentProps<typeof Input> & {
+    inputClassName?: string;
+  }
+>(({ label, className, description, labelHelp, labelHelpDelay, labelHelpContainer, inputClassName, ...props }, ref) => {
   const descriptionId = useId();
 
   return (
@@ -176,6 +179,7 @@ export const InputField = React.forwardRef<
         )}
         <Input
           ref={ref}
+          className={inputClassName}
           {...props}
           aria-describedby={description ? descriptionId : undefined}
         />
@@ -194,6 +198,11 @@ type SwitchFieldExtraProps = {
   labelHelp?: React.ReactNode;
   labelHelpDelay?: number;
   labelHelpContainer?: HTMLElement | ShadowRoot | null;
+  layout?: 'stacked' | 'inline';
+  containerClassName?: string;
+  labelClassName?: string;
+  switchClassName?: string;
+  descriptionClassName?: string;
   /**
    * Custom onChange handler (value: boolean) to replace standard DOM onChange
    */
@@ -212,6 +221,11 @@ export const SwitchField = React.forwardRef<
       labelHelp,
       labelHelpDelay,
       labelHelpContainer,
+      layout = 'stacked',
+      containerClassName,
+      labelClassName,
+      switchClassName,
+      descriptionClassName,
       onChange,
       onCheckedChange,
       ...props
@@ -226,14 +240,50 @@ export const SwitchField = React.forwardRef<
       ...(effectiveOnCheckedChange ? { onCheckedChange: effectiveOnCheckedChange } : {}),
     };
 
+    if (layout === 'inline') {
+      return (
+        <FormField>
+          <div className={className}>
+            <div className={`flex items-center justify-between gap-4 ${containerClassName ?? ''}`}>
+              <div className="min-w-0 flex-1">
+                {labelHelp ? (
+                  <div className="flex items-center gap-2">
+                    <Label className={`mb-0 text-sm text-text-primary ${labelClassName ?? ''}`}>{label}</Label>
+                    <HelpTooltip
+                      content={labelHelp}
+                      container={labelHelpContainer ?? null}
+                      delayDuration={labelHelpDelay ?? 500}
+                    />
+                  </div>
+                ) : (
+                  <Label className={`mb-0 text-sm text-text-primary ${labelClassName ?? ''}`}>{label}</Label>
+                )}
+                {description && (
+                  <div id={descriptionId} className={`mt-1 text-xs text-text-secondary ${descriptionClassName ?? ''}`}>
+                    {description}
+                  </div>
+                )}
+              </div>
+              <Switch
+                ref={ref}
+                {...switchProps}
+                className={switchClassName}
+                aria-describedby={description ? descriptionId : undefined}
+              />
+            </div>
+          </div>
+        </FormField>
+      );
+    }
+
     return (
       <FormField>
         <div
-          className={`flex flex-col items-center justify-center rounded-lg bg-bg-tertiary p-3 text-center ${className}`}
+          className={`flex flex-col items-center justify-center rounded-lg bg-bg-tertiary p-3 text-center ${containerClassName ?? ''} ${className}`}
         >
           {labelHelp ? (
             <div className="mb-2 flex items-center gap-2">
-              <Label className="mb-0 text-xs text-text-secondary">{label}</Label>
+              <Label className={`mb-0 text-xs text-text-secondary ${labelClassName ?? ''}`}>{label}</Label>
               <HelpTooltip
                 content={labelHelp}
                 container={labelHelpContainer ?? null}
@@ -241,15 +291,16 @@ export const SwitchField = React.forwardRef<
               />
             </div>
           ) : (
-            <Label className="mb-2 text-xs text-text-secondary">{label}</Label>
+            <Label className={`mb-2 text-xs text-text-secondary ${labelClassName ?? ''}`}>{label}</Label>
           )}
           <Switch
             ref={ref}
             {...switchProps}
+            className={switchClassName}
             aria-describedby={description ? descriptionId : undefined}
           />
           {description && (
-            <div id={descriptionId} className="mt-1 text-xs text-text-secondary">
+            <div id={descriptionId} className={`mt-1 text-xs text-text-secondary ${descriptionClassName ?? ''}`}>
               {description}
             </div>
           )}

@@ -58,11 +58,11 @@ export function MappingLinkedEntries(props: MappingLinkedEntriesProps): React.JS
   });
 
   return (
-    <section className="mt-4 space-y-2">
-      <p className="text-xs font-medium text-amber-100">
+    <section className="space-y-2">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
         {`Mapped to ${rows.length} other AniList entr${rows.length === 1 ? 'y' : 'ies'}`}
       </p>
-      <div className="max-h-48 overflow-y-auto rounded-xl bg-bg-secondary/35">
+      <div className="max-h-48 overflow-y-auto rounded-xl bg-bg-primary/20">
         <div className="divide-y divide-border-primary/50">
           {rows.map((row) => (
             <a
@@ -70,7 +70,7 @@ export function MappingLinkedEntries(props: MappingLinkedEntriesProps): React.JS
               href={`https://anilist.co/anime/${row.anilistId}`}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-bg-primary/25"
+              className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-bg-primary/35"
             >
               <div className="h-12 w-9 shrink-0 overflow-hidden rounded-md bg-bg-primary/65">
                 {row.posterUrl ? (

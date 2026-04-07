@@ -74,7 +74,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
 
   const titleNode = (
     <h1
-      className={`truncate text-xl font-semibold tracking-tight text-text-primary drop-shadow-lg ${
+      className={`text-xl font-semibold leading-tight tracking-tight text-text-primary drop-shadow-lg ${
         hasAlternateTitles ? "cursor-help" : ""
       }`}
     >
@@ -120,8 +120,8 @@ export function Header(props: HeaderProps): React.JSX.Element {
               )}
             </div>
 
-            <div className="min-w-0 flex-1 space-y-3 mt-auto pb-5">
-              <div className="flex flex-wrap items-start gap-3">
+            <div className="mt-auto min-w-0 flex-1 space-y-2 pb-5">
+              <div className="min-w-0">
                 {hasAlternateTitles ? (
                   <TooltipWrapper
                     content={(
@@ -148,14 +148,12 @@ export function Header(props: HeaderProps): React.JSX.Element {
                 ) : (
                   titleNode
                 )}
-                {formatLabel ? (
-                  <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white/80 shadow-sm">
-                    {formatLabel}
-                  </span>
-                ) : null}
               </div>
 
               <div className="flex flex-wrap items-center gap-2 text-[12px] font-medium text-text-secondary">
+                {formatLabel ? (
+                  <Pill tone="muted" className="uppercase text-text-primary">{formatLabel}</Pill>
+                ) : null}
                 {yearLabel ? (
                   <Pill tone="muted" className="uppercase">{String(yearLabel)}</Pill>
                 ) : null}
