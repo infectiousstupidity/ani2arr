@@ -272,6 +272,7 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
               <div className="relative">
                 <div className="sticky top-0 h-full">
                   <MappingPreviewPanel
+                    provider={provider}
                     aniListEntry={{
                       id: anilistId,
                       title: resolvedTitle.primary,
@@ -282,7 +283,6 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
                     previewMapping={previewMapping}
                     isOverridden={mappingController.canRevert}
                     isInMappingMode
-                    exitClosesModal
                     showResetPreview={showResetPreview}
                     onResetPreview={mappingController.clearSelection}
                     onEditMapping={onClose}

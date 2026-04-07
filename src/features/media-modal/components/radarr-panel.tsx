@@ -1,4 +1,4 @@
-/** Renders the Radarr media-modal panel and its reusable add-options fields. */
+/** Renders the Radarr setup surface used by the media modal action area. */
 // src/features/media-modal/components/radarr-panel.tsx
 
 import { RadarrAddOptionsFields } from '@/components/provider-add-options/radarr-add-options-fields';
@@ -16,7 +16,7 @@ export function RadarrPanel(props: RadarrPanelProps): React.JSX.Element {
     folderSlug,
   } = props;
 
-  const headerTitle = mode === "edit" ? "Manage movie" : "New movie setup";
+  const headerTitle = mode === "edit" ? 'Update Radarr options' : 'Setup Radarr options';
   const headerDescription =
     mode === "edit"
       ? "Update configuration or move files to a new location."

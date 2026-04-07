@@ -375,6 +375,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                       currentMapping={effectiveCurrentMapping}
                       provider={mappingTabProps.provider}
                       baseUrl={baseUrl}
+                      onExitMapping={handleExitMapping}
                       portalContainer={selectPortalContainer instanceof HTMLElement ? selectPortalContainer : null}
                     />
                   ) : (
@@ -400,13 +401,13 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
               <div className="relative">
                 <div className="sticky top-0">
                   <MappingPreviewPanel
+                    provider={mappingTabProps.provider}
                     aniListEntry={mappingTabProps.aniListEntry}
                     baseUrl={baseUrl}
                     currentMapping={effectiveCurrentMapping}
                     previewMapping={previewMapping}
                     isOverridden={mappingController.canRevert}
                     isInMappingMode={viewMode === "mapping"}
-                    exitClosesModal={mappingRequiresResolution}
                     showResetPreview={showResetPreview}
                     onResetPreview={mappingController.clearSelection}
                     onEditMapping={() => {

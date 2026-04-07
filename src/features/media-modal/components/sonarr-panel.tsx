@@ -1,4 +1,4 @@
-/** Renders the Sonarr media-modal panel and its reusable add-options fields. */
+/** Renders the Sonarr setup surface used by the media modal action area. */
 // src/features/media-modal/components/sonarr-panel.tsx
 
 import { SonarrAddOptionsFields } from '@/components/provider-add-options/sonarr-add-options-fields';
@@ -18,7 +18,7 @@ export function SonarrPanel(props: SonarrPanelProps): React.JSX.Element {
     folderSlug,
   } = props;
 
-  const headerTitle = mode === "edit" ? "Manage series" : "New series setup";
+  const headerTitle = mode === "edit" ? 'Update Sonarr options' : 'Setup Sonarr options';
   const headerDescription =
     mode === "edit"
       ? "Update configuration or move files to a new location."
@@ -53,7 +53,7 @@ export function SonarrPanel(props: SonarrPanelProps): React.JSX.Element {
             metadata={metadata}
             onChange={controller.handleFieldChange}
             disabled={Boolean(disabled) || !sonarrReady}
-            className="w-full rounded-xl bg-bg-secondary p-5"
+            className="w-full"
             portalContainer={portalContainer ?? null}
             computedPath={controller.computedPath}
             pathHintTitle={title}
