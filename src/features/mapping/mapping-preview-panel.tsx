@@ -6,21 +6,16 @@ import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { MultiMappingInfo } from './multi-mapping-info';
-import { useMappingOverrides } from '@/shared/queries';
-import type { Provider } from '@/providers';
-import type { MappingProviderIdRecord } from '@/mapping/types';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { getProviderLabel } from '@/providers/provider-routing';
 import type { MappingAniListSummary, MappingSearchResult } from './types';
-import { useMovieStatus } from '@/providers/hooks/radarr.queries';
-import { useSeriesStatus } from '@/providers/hooks/sonarr.queries';
 
 interface MappingPreviewPanelProps {
   aniListEntry: MappingAniListSummary;
   baseUrl: string;
-  provider: Provider;
   currentMapping: MappingSearchResult | null;
   previewMapping: MappingSearchResult | null;
+  isOverridden: boolean;
   isInMappingMode: boolean;
   exitClosesModal?: boolean;
   showResetPreview: boolean;
@@ -33,9 +28,9 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
   const {
     aniListEntry,
     baseUrl,
-    provider,
     currentMapping,
     previewMapping,
+    isOverridden,
     showResetPreview,
     onResetPreview,
     onEditMapping,
@@ -55,25 +50,6 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
 
   const hasPreviewMapping = Boolean(previewMapping);
   const showEmptyState = !hasPreviewMapping && !hasCurrentMapping;
-  const { data: seriesStatus } = useSeriesStatus(
-    { anilistId: aniListEntry.id },
-    { enabled: provider === 'sonarr' },
-  );
-  const { data: movieStatus } = useMovieStatus(
-    { anilistId: aniListEntry.id },
-    { enabled: provider === 'radarr' },
-  );
-  const mappingOverrides = useMappingOverrides(provider);
-
-  const overrideActiveFromStatus = provider === 'radarr' ? movieStatus?.overrideActive : seriesStatus?.overrideActive;
-  const overrideActiveFromOverrides =
-    overrideActiveFromStatus === undefined &&
-    Array.isArray(mappingOverrides.data) &&
-    mappingOverrides.data.some(
-      (record: MappingProviderIdRecord) => record.anilistId === aniListEntry.id && record.provider === provider,
-    );
-
-  const isOverridden = overrideActiveFromStatus ?? overrideActiveFromOverrides ?? false;
   const overrideTooltip = isOverridden
     ? 'Manual override is active for this AniList entry.'
     : 'Using the automatic AniList mapping.';
@@ -167,8 +143,8 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
         ) : null}
 
         {showEmptyState ? (
-          <div className="flex min-h-[260px] items-center justify-center rounded-xl border border-dashed border-border-primary bg-bg-tertiary/60 px-3 text-center text-sm text-text-secondary">
-            No mapping yet. Use the search to pick the correct provider entry.
+          <div className="flex min-h-65 items-center justify-center rounded-xl border border-dashed border-border-primary bg-bg-tertiary/60 px-3 text-center text-sm text-text-secondary">
+            No mapping yet. Use manual search to pick the correct provider entry.
           </div>
         ) : null}
       </div>
@@ -280,7 +256,7 @@ function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
 
   return (
     <div
-      className={`relative min-h-[230px] overflow-hidden rounded-xl bg-bg-secondary shadow-lg shadow-black/30 ${
+      className={`relative min-h-57.5 overflow-hidden rounded-xl bg-bg-secondary shadow-lg shadow-black/30 ${
         highlight === 'preview' ? 'ring-1 ring-inset ring-accent-primary/40' : ''
       }`}
     >

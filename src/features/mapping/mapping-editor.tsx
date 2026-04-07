@@ -7,8 +7,8 @@ import { Footer } from '@/features/media-modal/components/media-modal-footer';
 import { Header } from '@/features/media-modal/components/media-modal-header';
 import { Modal, ModalContent, ModalDescription, ModalTitle } from '@/features/media-modal/components/modal';
 import Button from '@/shared/ui/primitives/button';
+import { MappingInspectionPane } from './mapping-inspection-pane';
 import { MappingPreviewPanel } from './mapping-preview-panel';
-import { MappingSearchPanel } from './mapping-search-panel';
 import { useMappingController } from './use-mapping-controller';
 import type {
   Provider,
@@ -259,12 +259,12 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
             <div className="grid h-full grid-cols-2 gap-6">
               <div className="flex h-full flex-col overflow-hidden">
                 <div className="min-h-0 flex-1">
-                  <MappingSearchPanel
+                  <MappingInspectionPane
+                    anilistId={anilistId}
                     controller={mappingController}
                     currentMapping={mappingController.currentMapping}
                     provider={provider}
                     baseUrl={baseUrl}
-                    autoFocus
                   />
                 </div>
               </div>
@@ -278,9 +278,9 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
                       ...(coverImage ? { posterUrl: coverImage } : {}),
                     }}
                     baseUrl={baseUrl}
-                    provider={provider}
                     currentMapping={mappingController.currentMapping}
                     previewMapping={previewMapping}
+                    isOverridden={mappingController.canRevert}
                     isInMappingMode
                     exitClosesModal
                     showResetPreview={showResetPreview}

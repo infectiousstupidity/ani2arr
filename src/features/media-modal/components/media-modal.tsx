@@ -18,7 +18,8 @@ import { ErrorCode, type ExtensionError } from "@/shared/errors";
 import { createDefaultRadarrFormState } from "@/providers/settings/radarr-settings.schema";
 import { createDefaultSonarrFormState } from "@/providers/settings/sonarr-settings.schema";
 
-import { MappingPreviewPanel, MappingSearchPanel } from "@/features/mapping";
+import { MappingPreviewPanel } from "@/features/mapping";
+import { MappingInspectionPane } from "@/features/mapping/mapping-inspection-pane";
 import type { MappingTabProps } from "../types";
 import { RadarrPanel } from "./radarr-panel";
 import { SonarrPanel } from "./sonarr-panel";
@@ -368,12 +369,12 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
               <div className="flex h-full flex-col overflow-hidden">
                 <div className="flex-1 min-h-0">
                   {viewMode === "mapping" ? (
-                    <MappingSearchPanel
+                    <MappingInspectionPane
+                      anilistId={mappingTabProps.aniListEntry.id}
                       controller={mappingController}
                       currentMapping={effectiveCurrentMapping}
                       provider={mappingTabProps.provider}
                       baseUrl={baseUrl}
-                      autoFocus={isOpen && viewMode === "mapping"}
                       portalContainer={selectPortalContainer instanceof HTMLElement ? selectPortalContainer : null}
                     />
                   ) : (
@@ -401,9 +402,9 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                   <MappingPreviewPanel
                     aniListEntry={mappingTabProps.aniListEntry}
                     baseUrl={baseUrl}
-                    provider={mappingTabProps.provider}
                     currentMapping={effectiveCurrentMapping}
                     previewMapping={previewMapping}
+                    isOverridden={mappingController.canRevert}
                     isInMappingMode={viewMode === "mapping"}
                     exitClosesModal={mappingRequiresResolution}
                     showResetPreview={showResetPreview}

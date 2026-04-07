@@ -51,10 +51,10 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-              Mapping search
+              Manual search
             </p>
             <p className="text-xs text-text-secondary">
-              {`Find the right ${provider === 'radarr' ? 'TMDB' : 'TVDB'} entry; your selection updates the preview on the right.`}
+              {`Search ${providerLabel} manually; selecting a result updates the preview on the right.`}
             </p>
           </div>
         </div>
@@ -90,7 +90,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
 
                   {results.length === 0 && !searchQuery.isFetching ? (
                     <div className="flex h-32 items-center justify-center px-3 py-6 text-center text-xs text-text-secondary">
-                      {hasQuery ? 'No results found.' : `Type to search ${providerLabel}.`}
+                      {hasQuery ? 'No results found.' : `Type to search ${providerLabel} manually.`}
                     </div>
                   ) : null}
 
