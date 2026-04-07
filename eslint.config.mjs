@@ -41,6 +41,10 @@ export default defineConfig([
       "unicorn/better-regex": "warn",
       "unicorn/prevent-abbreviations": "off",
       "unicorn/no-null": "off",
+      "complexity": ["warn", 20],
+      "max-depth": ["warn", 4],
+      "max-nested-callbacks": ["warn", 4],
+      "max-params": ["warn", { max: 4 }],
     },
   },
 

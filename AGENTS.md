@@ -1,74 +1,35 @@
-## Scope
-
-- This file defines repo-wide rules for Codex.
-- More specific `AGENTS.md` files in subfolders override this file.
-- The structure below is the target shape after the refactor. It is guidance for direction and ownership, not a description of the current codebase.
-
-## Working style
+## Working rules
 
 - Make the smallest reasonable change that fully solves the task.
+- Read nearby code first. Check real callers before changing shared code. Follow existing patterns only when they still make sense.
 - Prefer direct code, simple control flow, and local reasoning.
-- Read nearby code first. Follow existing patterns only when they still make sense.
 - Do not broaden scope without clear benefit.
 - If the request is ambiguous, choose the smallest safe interpretation and state the assumption briefly.
+- If required context is recoverable from the repo, tests, or available tools, retrieve it instead of guessing.
 - Do not stop at analysis if the task can be completed safely.
+- Ask before irreversible or high-impact actions not clearly requested.
 
-## Verification
-
-- Before finishing, run the relevant checks for the files you changed.
-- Minimum verification:
-  - Run `pnpm run lint`
-  - Run `pnpm run compile`
-- Run `pnpm run test` for changes affecting tested behavior, shared logic, or regression-prone code.
-- If the touched area has no tests yet, add the smallest focused tests that meaningfully protect the change when practical.
-- If you cannot run a check, say why.
-
-## Testing
-
-- Do not backfill a broad test suite.
-- When a task refactors or adds important logic in an untested area, add the smallest focused tests that protect the behavior being changed.
-- For this repo, prioritize tests for:
-  - parsing, validation, and normalization
-  - matching and mapping logic
-  - caching, invalidation, and storage-backed behavior
-  - provider request/response handling
-  - important shared logic
-  - real bug fixes
-- Prefer the cheapest test that gives confidence:
-  - unit tests first
-  - integration-style tests only when a unit test would miss the real risk
-- Do not add E2E, browser-level tests, large snapshots, or tests for simple presentational UI, trivial wrappers, or obvious pass-through code unless the task clearly needs them.
-- Use Vitest with WXT testing support.
-- If important logic changes and no test is added, state why.
-
-## Core rules
+## Design rules
 
 - Keep solutions simple, local, and easy to follow.
 - Follow YAGNI, KISS, and pragmatic DRY.
 - Optimize for a small solo-maintained browser extension, not hypothetical future scale.
-- Prefer direct code over extra abstraction layers.
+- Prefer removing code, collapsing layers, or inlining logic when that makes the result clearer without hurting correctness.
+- Do not keep complexity just because it already exists.
 - Do not add services, managers, coordinators, factories, registries, wrappers, or similar indirection unless they remove clear current complexity.
-- Keep diffs focused. Do not mix the requested change with unrelated cleanup or restructuring.
-- Do not rename, move, or reorganize files unless the task requires it.
+- Prefer flat, easy-to-scan control flow over nested branching.
+- Split by responsibility before adding more cases to a complex function or file.
+- Treat lint warnings about complexity, nesting, callbacks, and parameter count as design feedback.
 
-## Simplification rule
-
-- Do not assume the current implementation is correct just because it already exists.
-- When working in an area, check whether existing layers, wrappers, aliases, indirection, or abstractions still earn their keep.
-- Prefer removing code, collapsing layers, or inlining logic when that makes the result clearer and does not hurt correctness.
-- If something is over-engineered for the current needs of the project, simplify it instead of preserving it by default.
-- Prefer deletion over replacement when a layer is unnecessary.
-- Treat existing complexity as something to justify, not protect.
-
-## Types
+## Types and ownership
 
 - Keep types with their owning domain.
 - Do not use `shared/types` as a catch-all.
-- Import domain types from `anilist`, `providers`, `mapping`, or `options`.
-- Keep small local types near usage.
-- Extract shared or domain-level types only when there is clear reuse or ownership.
-- If a type is used once, inline it unless the name clearly improves readability or defines a real public contract.
-- Do not add future-proof types, generic wrappers, or shared aliases without current need.
+- Put domain logic in its owning domain first, not in `shared/`.
+- Keep `shared/` minimal and truly cross-cutting.
+- Keep small local types, constants, and helpers near usage.
+- Extract shared types or helpers only when there is clear reuse or a real public contract.
+- If a type is used once, inline it unless the name clearly improves readability.
 
 ## File rules
 
@@ -77,27 +38,38 @@
 ```ts
 /** Short plain-English description of what this file owns. */
 // src/path/to/file.ts
-````
+```
 
 * Prefer files under 200 LOC.
 * 200 to 300 LOC is acceptable if still easy to scan.
 * Over 300 LOC is a split warning.
-* Split by responsibility, not file size alone.
 * One file should do one clear thing.
-* Split when a file mixes UI, state, data fetching, business logic, or unrelated helpers.
-* Keep small local constants and types near usage.
-* Do not create tiny files or extract abstractions without a clear readability, reuse, or ownership win.
-* A file should be understandable in one pass and describable in one sentence.
+* Split by responsibility, not file size alone.
+* Avoid both enterprise layering and god files.
+* "Smallest reasonable change" does not mean "keep everything in one file".
 
 ## Change discipline
 
 * Preserve behavior unless the task explicitly asks for behavior changes.
 * Keep public shapes and contracts stable unless the task explicitly asks to change them.
-* When refactoring, prefer mechanical cleanup in small slices.
-* When touching shared code, verify the actual callers before changing ownership or abstractions.
-* Do not introduce new layers to prepare for later.
-* Delete dead local shells, aliases, and wrappers when they do not earn their keep.
-* If an existing abstraction remains, it should be justifiable by current usage.
+* Keep diffs focused. Do not mix requested work with unrelated cleanup.
+* Do not rename, move, or broadly reorganize files unless the task requires it.
+* Small local splits are allowed when they directly improve ownership, readability, or file responsibility.
+* Delete dead aliases, wrappers, and local shells when they no longer earn their keep.
+
+## Verification
+
+* Before finishing, run the cheapest relevant checks for the files you changed.
+* Default verification:
+
+  * `pnpm run lint`
+  * `pnpm run compile`
+* Tests are expensive. Do not add or run them by default just for ceremony.
+* Run tests only for behavior changes, bug fixes, shared logic, regression-prone code, or important mapping, parsing, caching, storage, validation, or provider behavior when tests are the cheapest meaningful protection.
+* Prefer targeted tests over broad suites.
+* Prefer unit tests first.
+* Do not add E2E, browser-level tests, large snapshots, or tests for trivial UI, thin wrappers, or obvious pass-through code unless the task clearly needs them.
+* If you skip tests or cannot run a check, state why briefly.
 
 ## Target ownership after refactor
 
@@ -117,34 +89,25 @@ src/
   debug/         - dev/debug-only helpers
 ```
 
-## Ownership rules
-
-* Put domain logic in its owning domain first, not in `shared/`.
-* Keep `shared/` small. It is for truly cross-cutting low-level code, not overflow.
-* `features/` is for reusable product UI, not page glue.
-* `options-page/` and `content/` are surface/UI folders.
-* `entrypoints/` should stay thin.
-
 ## Response contract
 
 * Be concise.
-* Summarize only the changes you actually made.
+* Summarize only what you actually changed.
 * Include:
-
   * what changed
   * important type or ownership decisions
   * verification results
   * blockers or assumptions, if any
-* If you kept an existing abstraction, be able to justify it briefly.
-* If you simplified something, say what was removed, collapsed, or inlined.
+* Briefly justify any abstraction you kept.
+* Briefly state what was removed, collapsed, or inlined if you simplified something.
 * Do not include long plans, speculative future work, or unrelated recommendations unless asked.
 
 ## Done when
 
 * The requested change is implemented.
 * Behavior matches the request.
+* Relevant callers were checked.
 * Relevant checks pass.
-* Relevant tests pass when tests exist or were needed for the change.
+* Relevant tests pass when tests were needed and run.
 * No unrelated abstractions or layers were added.
-* Existing complexity touched by the task was simplified where reasonable.
-* New files, names, and extracted types are justified by current usage, not hypothetical future reuse.
+* Complexity touched by the task was simplified where reasonable.
