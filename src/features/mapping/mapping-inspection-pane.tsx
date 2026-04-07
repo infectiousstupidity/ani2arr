@@ -1,9 +1,11 @@
-/** Shared mapping left pane with persistent search and inspection context. */
+/** Shared mapping left pane with search-first mapping controls and reusable diagnostics content. */
 // src/features/mapping/mapping-inspection-pane.tsx
 
 import { useCallback, useMemo, useRef, type WheelEvent as ReactWheelEvent } from 'react';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
+import { ArrowLeft } from 'lucide-react';
 import Pill from '@/shared/ui/primitives/pill';
+import Button from '@/shared/ui/primitives/button';
 import { useMappingInspection } from '@/shared/queries';
 import type {
   MappingInspectionCandidate,
@@ -21,13 +23,14 @@ interface MappingInspectionPaneProps {
   controller: MappingSearchController;
   currentMapping: MappingSearchResult | null;
   baseUrl: string;
+  onExitMapping?: () => void;
   portalContainer?: HTMLElement | null;
 }
 
 interface MappingInspectionPaneContentProps {
   inspection: MappingInspectionPayload;
   provider: Provider;
-  onUseSuggestion: (candidate: MappingInspectionCandidate) => void;
+  onUseSuggestion?: (candidate: MappingInspectionCandidate) => void;
 }
 
 type SuggestedCandidateGroup = {
@@ -37,7 +40,7 @@ type SuggestedCandidateGroup = {
   items: readonly MappingInspectionCandidate[];
 };
 
-const formatToken = (value: string): string => value.replaceAll('-', ' ').replaceAll('_', ' ');
+export const formatToken = (value: string): string => value.replaceAll('-', ' ').replaceAll('_', ' ');
 
 const getProviderIdLabel = (provider: Provider): 'TMDB' | 'TVDB' => (provider === 'radarr' ? 'TMDB' : 'TVDB');
 
@@ -132,6 +135,74 @@ function Section(props: { title: string; children: React.ReactNode }): React.JSX
       <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">{props.title}</h3>
       {props.children}
     </section>
+  );
+}
+
+export function MappingInspectionSuggestedShortcuts(props: {
+  inspection: MappingInspectionPayload;
+  provider: Provider;
+  onUseSuggestion: (candidate: MappingInspectionCandidate) => void;
+}): React.JSX.Element {
+  const { inspection, provider, onUseSuggestion } = props;
+  const providerIdLabel = getProviderIdLabel(provider);
+  const groups = useMemo(
+    () => getSuggestedCandidateGroups(inspection.suggestedCandidates),
+    [inspection.suggestedCandidates],
+  );
+  const suggestedRows = useMemo(
+    () => groups.flatMap((group) => group.items.slice(0, group.key === 'accepted' ? 2 : 3).map((item) => ({ group, item }))).slice(0, 6),
+    [groups],
+  );
+
+  return (
+    <div className="space-y-4">
+      <section className="space-y-2">
+        <div className="space-y-1">
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">Suggested matches</h3>
+          <p className="text-xs text-text-secondary">
+            {inspection.suggestedCandidates.searchTerms?.length
+              ? `Trace terms: ${inspection.suggestedCandidates.searchTerms.join(', ')}`
+              : 'Use a recent candidate below, or start typing to search manually.'}
+          </p>
+        </div>
+
+        {suggestedRows.length > 0 ? (
+          <div className="overflow-hidden rounded-xl bg-bg-secondary/45 shadow-inner ring-1 ring-inset ring-border-primary/50">
+            <div className="divide-y divide-border-primary/60">
+              {suggestedRows.map(({ group, item }) => (
+                <button
+                  key={`${group.key}-${item.providerId}`}
+                  type="button"
+                  onClick={() => onUseSuggestion(item)}
+                  className="flex w-full items-start justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-bg-primary/35"
+                >
+                  <div className="min-w-0 space-y-2">
+                    <div className="truncate text-sm font-semibold text-text-primary">
+                      {item.title ?? `${providerIdLabel} ${item.providerId}`}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Pill small tone={group.tone}>{group.label}</Pill>
+                      <Pill small tone="muted" className="font-mono text-text-primary">
+                        {`${providerIdLabel} ${item.providerId}`}
+                      </Pill>
+                    </div>
+                    <p className="text-xs text-text-secondary">{item.summary}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl bg-bg-secondary/35 px-3 py-4 text-sm text-text-secondary">
+            No recent candidate trace is available yet. Start typing to search manually.
+          </div>
+        )}
+      </section>
+
+      <div className="rounded-xl bg-bg-secondary/30 px-3 py-3 text-xs text-text-secondary">
+        Search results on the left update the preview on the right without replacing the current mapping until you confirm.
+      </div>
+    </div>
   );
 }
 
@@ -253,25 +324,44 @@ export function MappingInspectionPaneContent(props: MappingInspectionPaneContent
                   <span className="text-xs text-text-secondary">{`${group.items.length} candidate${group.items.length === 1 ? '' : 's'}`}</span>
                 </div>
                 <div className="space-y-2">
-                  {group.items.map((candidate) => (
-                    <button
-                      key={`${group.key}-${candidate.providerId}`}
-                      type="button"
-                      onClick={() => onUseSuggestion(candidate)}
-                      className="w-full rounded-lg bg-bg-secondary/45 px-3 py-3 text-left transition-colors hover:bg-bg-secondary/65"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm font-medium text-text-primary">
-                          {candidate.title ?? `${providerIdLabel} ${candidate.providerId}`}
+                  {group.items.map((candidate) => {
+                    const candidateContent = (
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="text-sm font-medium text-text-primary">
+                            {candidate.title ?? `${providerIdLabel} ${candidate.providerId}`}
+                          </div>
+                          <Pill small tone="muted" className="font-mono text-text-primary">
+                            {`${providerIdLabel} ${candidate.providerId}`}
+                          </Pill>
+                          <Pill small tone="info">{formatToken(candidate.status)}</Pill>
                         </div>
-                        <Pill small tone="muted" className="font-mono text-text-primary">
-                          {`${providerIdLabel} ${candidate.providerId}`}
-                        </Pill>
-                        <Pill small tone="info">{formatToken(candidate.status)}</Pill>
+                        <p className="mt-1 text-xs text-text-secondary">{candidate.summary}</p>
+                      </>
+                    );
+
+                    if (onUseSuggestion) {
+                      return (
+                        <button
+                          key={`${group.key}-${candidate.providerId}`}
+                          type="button"
+                          onClick={() => onUseSuggestion(candidate)}
+                          className="w-full rounded-lg bg-bg-secondary/45 px-3 py-3 text-left transition-colors hover:bg-bg-secondary/65"
+                        >
+                          {candidateContent}
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={`${group.key}-${candidate.providerId}`}
+                        className="rounded-lg bg-bg-secondary/45 px-3 py-3"
+                      >
+                        {candidateContent}
                       </div>
-                      <p className="mt-1 text-xs text-text-secondary">{candidate.summary}</p>
-                    </button>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -285,7 +375,7 @@ export function MappingInspectionPaneContent(props: MappingInspectionPaneContent
 }
 
 export function MappingInspectionPane(props: MappingInspectionPaneProps): React.JSX.Element {
-  const { anilistId, provider, controller, currentMapping, baseUrl, portalContainer } = props;
+  const { anilistId, provider, controller, currentMapping, baseUrl, onExitMapping, portalContainer } = props;
   const inspectionQuery = useMappingInspection(provider, anilistId);
   const providerLabel = getProviderLabel(provider);
   const providerIdLabel = getProviderIdLabel(provider);
@@ -311,7 +401,7 @@ export function MappingInspectionPane(props: MappingInspectionPaneProps): React.
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border-primary/70 bg-bg-primary/30"
+      className="flex h-full min-h-0 flex-col overflow-hidden"
       onKeyDownCapture={(event) => {
         handleSearchEscapeKeyDown({
           query: controller.state.query,
@@ -320,13 +410,25 @@ export function MappingInspectionPane(props: MappingInspectionPaneProps): React.
         });
       }}
     >
-      <div className="shrink-0 border-b border-border-primary/60 bg-bg-secondary/35 p-4">
+      <div className="shrink-0 rounded-xl bg-bg-secondary/28 p-4">
+        {onExitMapping ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onExitMapping}
+            className="-ml-2 mb-3 h-auto px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary"
+          >
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+            Back to setup
+          </Button>
+        ) : null}
         <div className="space-y-1">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">Mapping search</p>
           <p className="text-xs text-text-secondary">
             {searchMode
               ? `Searching ${providerLabel} updates the preview on the right.`
-              : 'Inspect the current mapping context below, or start typing to search manually.'}
+              : `Pick a recent ${providerIdLabel} match below, or start typing to search manually.`}
           </p>
         </div>
         <div className="mt-3">
@@ -358,18 +460,18 @@ export function MappingInspectionPane(props: MappingInspectionPaneProps): React.
                 <div className="space-y-4">
                   {inspectionQuery.isPending && !inspectionQuery.data ? (
                     <div className="rounded-xl bg-bg-secondary/45 px-3 py-8 text-center text-sm text-text-secondary">
-                      Loading mapping context...
+                      Loading suggested matches...
                     </div>
                   ) : null}
 
                   {inspectionQuery.error && !inspectionQuery.data ? (
                     <div className="rounded-xl bg-warning/8 px-3 py-4 text-sm text-text-secondary">
-                      Mapping inspection is unavailable right now. Search is still available above.
+                      Mapping diagnostics are unavailable right now. Search is still available above.
                     </div>
                   ) : null}
 
                   {inspectionQuery.data ? (
-                    <MappingInspectionPaneContent
+                    <MappingInspectionSuggestedShortcuts
                       inspection={inspectionQuery.data}
                       provider={provider}
                       onUseSuggestion={(candidate) => {

@@ -1,23 +1,27 @@
 /** Mapping preview panel for current and pending manual mapping selections. */
 // src/features/mapping/mapping-preview-panel.tsx
 
-import { ExternalLink, SquarePen, PenOff, X, Settings } from 'lucide-react';
+import * as Accordion from '@radix-ui/react-accordion';
+import { ChevronDown, ExternalLink, X, Settings } from 'lucide-react';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
-import { MultiMappingInfo } from './multi-mapping-info';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
+import type { Provider } from '@/providers';
 import { getProviderLabel } from '@/providers/provider-routing';
+import { useMappingInspection } from '@/shared/queries';
+import { MappingInspectionPaneContent } from './mapping-inspection-pane';
+import { MappingLinkedEntries } from './mapping-linked-entries';
 import type { MappingAniListSummary, MappingSearchResult } from './types';
 
 interface MappingPreviewPanelProps {
+  provider: Provider;
   aniListEntry: MappingAniListSummary;
   baseUrl: string;
   currentMapping: MappingSearchResult | null;
   previewMapping: MappingSearchResult | null;
   isOverridden: boolean;
   isInMappingMode: boolean;
-  exitClosesModal?: boolean;
   showResetPreview: boolean;
   onResetPreview: () => void;
   onEditMapping: () => void;
@@ -26,6 +30,7 @@ interface MappingPreviewPanelProps {
 
 export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.Element {
   const {
+    provider,
     aniListEntry,
     baseUrl,
     currentMapping,
@@ -35,24 +40,46 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
     onResetPreview,
     onEditMapping,
     isInMappingMode,
-    exitClosesModal = false,
     portalContainer,
   } = props;
 
+  const inspectionQuery = useMappingInspection(provider, aniListEntry.id);
   const hasCurrentMapping = Boolean(currentMapping);
-  const EditIcon = isInMappingMode ? PenOff : SquarePen;
-  const editTooltip = isInMappingMode
-    ? (exitClosesModal ? 'Exit modal' : 'Exit mapping mode')
-    : (hasCurrentMapping ? 'Edit current mapping ID' : 'Add mapping ID');
-  const editAriaLabel = isInMappingMode
-    ? (exitClosesModal ? 'Exit modal' : 'Exit mapping mode')
-    : (hasCurrentMapping ? 'Edit current mapping ID' : 'Add mapping ID');
-
   const hasPreviewMapping = Boolean(previewMapping);
-  const showEmptyState = !hasPreviewMapping && !hasCurrentMapping;
+  const isSetupMode = isInMappingMode === false;
+  const activeMapping = previewMapping ?? currentMapping;
+  const showEmptyState = !activeMapping;
   const overrideTooltip = isOverridden
     ? 'Manual override is active for this AniList entry.'
     : 'Using the automatic AniList mapping.';
+  const providerIdLabel = provider === 'radarr' ? 'TMDB' : 'TVDB';
+  let eyebrowLabel = `MATCHED ${providerIdLabel} TARGET`;
+  if (isInMappingMode) {
+    eyebrowLabel = `CURRENT ${providerIdLabel} TARGET`;
+  }
+  if (hasPreviewMapping) {
+    eyebrowLabel = 'PREVIEWING REPLACEMENT';
+  }
+  const overwriteLabel = hasPreviewMapping && currentMapping ? currentMapping.title : null;
+
+  const openMappingSettings = () => {
+    try {
+      void browser.runtime.sendMessage({
+        _a2a: true,
+        type: 'OPEN_OPTIONS_PAGE',
+        sectionId: 'mappings',
+        targetAnilistId: aniListEntry.id,
+        timestamp: Date.now(),
+      });
+    } catch {
+      // best-effort only
+    }
+  };
+
+  const linkedAniListIds = hasPreviewMapping
+    ? (previewMapping?.linkedAniListIds ?? [])
+    : (inspectionQuery.data?.providerContext.linkedAniListIds ?? currentMapping?.linkedAniListIds ?? []);
+  const linkedAniListEntries = hasPreviewMapping ? undefined : inspectionQuery.data?.linkedAniListEntries;
 
   return (
     <div className="flex h-full flex-col">
@@ -60,7 +87,7 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-              CURRENT MAPPING FOR
+              {eyebrowLabel}
             </p>
             <div className="flex items-center text-xs text-text-secondary">
               <Pill small tone="muted" className="font-mono text-text-primary">{`AniList ${aniListEntry.id}`}</Pill>
@@ -72,39 +99,13 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="inline-flex items-center gap-1">
+          {isInMappingMode ? (
+            <div className="flex items-center gap-2">
               <Button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onEditMapping();
-                }}
-                variant="ghost"
-                size="icon"
-                tooltip={editTooltip}
-                portalContainer={portalContainer ?? undefined}
-                className="h-8 w-8 text-text-secondary hover:text-text-primary"
-                aria-label={editAriaLabel}
-              >
-                <EditIcon className="h-4 w-4" />
-              </Button>
-
-              <Button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  try {
-                    void browser.runtime.sendMessage({
-                      _a2a: true,
-                      type: 'OPEN_OPTIONS_PAGE',
-                      sectionId: 'mappings',
-                      targetAnilistId: aniListEntry.id,
-                      timestamp: Date.now(),
-                    });
-                  } catch {
-                    // best-effort only
-                  }
+                  openMappingSettings();
                 }}
                 variant="ghost"
                 size="icon"
@@ -116,44 +117,86 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
                 <Settings className="h-4 w-4" />
               </Button>
             </div>
-          </div>
+          ) : null}
         </div>
       </div>
 
-      <div className="flex-1 space-y-4">
-        {hasCurrentMapping && currentMapping ? (
-          <MappingPreviewCard
-            mapping={currentMapping}
-            baseUrl={baseUrl}
-            currentAniListId={aniListEntry.id}
-            portalContainer={portalContainer ?? null}
-          />
+      <div className="flex-1 min-h-0 space-y-4 overflow-y-auto pr-1">
+        {overwriteLabel ? (
+          <div className="space-y-1 rounded-xl bg-bg-secondary/25 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">Overwriting</p>
+            <p className="text-sm font-medium text-text-primary">{overwriteLabel}</p>
+          </div>
         ) : null}
 
-        {hasPreviewMapping && previewMapping ? (
+        {activeMapping ? (
           <MappingPreviewCard
-            mapping={previewMapping}
+            mapping={activeMapping}
             baseUrl={baseUrl}
-            currentAniListId={aniListEntry.id}
-            highlight="preview"
             showResetPreview={showResetPreview}
             onResetPreview={onResetPreview}
             portalContainer={portalContainer ?? null}
+            {...(hasPreviewMapping ? { highlight: 'preview' as const } : {})}
+          />
+        ) : null}
+
+        {isSetupMode ? (
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={onEditMapping}>
+              {hasCurrentMapping ? 'Edit match' : 'Add match'}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={openMappingSettings}>
+              Settings
+            </Button>
+          </div>
+        ) : null}
+
+        {activeMapping ? (
+          <MappingLinkedEntries
+            currentAniListId={aniListEntry.id}
+            linkedAniListIds={linkedAniListIds}
+            {...(linkedAniListEntries ? { entries: linkedAniListEntries } : {})}
           />
         ) : null}
 
         {showEmptyState ? (
           <div className="flex min-h-65 items-center justify-center rounded-xl border border-dashed border-border-primary bg-bg-tertiary/60 px-3 text-center text-sm text-text-secondary">
-            No mapping yet. Use manual search to pick the correct provider entry.
+            No mapping yet. Use mapping mode to search for the correct provider entry.
           </div>
         ) : null}
-      </div>
 
-      {hasPreviewMapping && hasCurrentMapping ? (
-        <p className="mt-3 text-[11px] text-text-secondary">
-          Saving will replace the current mapping for this AniList entry.
-        </p>
-      ) : null}
+        {isInMappingMode ? (
+          <Accordion.Root type="single" collapsible>
+            <Accordion.Item value="diagnostics" className="overflow-hidden rounded-xl bg-bg-secondary/25">
+              <Accordion.Header>
+                <Accordion.Trigger className="group flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm font-medium text-text-primary">
+                  <span>View Match Diagnostics & Logs</span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                </Accordion.Trigger>
+              </Accordion.Header>
+              <Accordion.Content className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+                <div className="border-t border-border-primary/50 px-3 py-4">
+                  {inspectionQuery.isPending && !inspectionQuery.data ? (
+                    <div className="rounded-xl bg-bg-secondary/35 px-3 py-6 text-sm text-text-secondary">
+                      Loading mapping diagnostics...
+                    </div>
+                  ) : null}
+
+                  {inspectionQuery.error && !inspectionQuery.data ? (
+                    <div className="rounded-xl bg-warning/8 px-3 py-4 text-sm text-text-secondary">
+                      Mapping diagnostics are unavailable right now.
+                    </div>
+                  ) : null}
+
+                  {inspectionQuery.data ? (
+                    <MappingInspectionPaneContent inspection={inspectionQuery.data} provider={provider} />
+                  ) : null}
+                </div>
+              </Accordion.Content>
+            </Accordion.Item>
+          </Accordion.Root>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -162,7 +205,6 @@ interface MappingPreviewCardProps {
   mapping: MappingSearchResult;
   baseUrl: string;
   highlight?: 'preview';
-  currentAniListId: number;
   showResetPreview?: boolean;
   onResetPreview?: () => void;
   portalContainer?: HTMLElement | null;
@@ -180,7 +222,7 @@ const getStatusTone = (
 };
 
 function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
-  const { mapping, baseUrl, highlight, currentAniListId, showResetPreview, onResetPreview, portalContainer } = props;
+  const { mapping, baseUrl, highlight, showResetPreview, onResetPreview, portalContainer } = props;
   const providerLabel = getProviderLabel(mapping.provider);
   const externalLabel = `${mapping.provider === 'radarr' ? 'TMDB' : 'TVDB'} ${mapping.providerId}`;
 
@@ -200,23 +242,7 @@ function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
     </Pill>
   );
 
-  const hasMultipleLinked = Array.isArray(mapping.linkedAniListIds) && mapping.linkedAniListIds.length > 1;
-
-  metadataPills.push(
-    hasMultipleLinked ? (
-      <TooltipWrapper
-        key="tvdb"
-        content={<MultiMappingInfo currentAniListId={currentAniListId} linkedAniListIds={mapping.linkedAniListIds ?? []} />}
-        side="top"
-        sideOffset={6}
-        container={portalContainer ?? null}
-      >
-        {tvdbPill}
-      </TooltipWrapper>
-    ) : (
-      tvdbPill
-    ),
-  );
+  metadataPills.push(tvdbPill);
 
   if (typeof mapping.year === 'number' && Number.isFinite(mapping.year) && mapping.year > 0) {
     metadataPills.push(
@@ -244,15 +270,11 @@ function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
 
   if (mapping.inLibrary) {
     metadataPills.push(
-      <Pill key="library" small tone="success">{`In ${providerLabel}${
+      <Pill key="library" small tone="success" className="border-transparent bg-success/85 text-white">{`In ${providerLabel}${
         mapping.fileCount ? ` - ${mapping.fileCount} eps` : ''
       }`}</Pill>,
     );
   }
-
-  const otherLinkedIds = Array.isArray(mapping.linkedAniListIds)
-    ? mapping.linkedAniListIds.filter((id) => id !== currentAniListId)
-    : [];
 
   return (
     <div
@@ -329,13 +351,6 @@ function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
           </div>
         </div>
       </div>
-
-      {otherLinkedIds.length > 0 ? (
-        <div className="px-5 pb-4 text-[10px] text-amber-200">
-          Warning: Linked to {otherLinkedIds.length} other AniList entr
-          {otherLinkedIds.length === 1 ? 'y' : 'ies'}
-        </div>
-      ) : null}
     </div>
   );
 }

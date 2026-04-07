@@ -1,4 +1,4 @@
-/** Mapping search results renderer for manual mapping selection. */
+/** Mapping search results renderer for manual mapping selection and replacement preview. */
 // src/features/mapping/mapping-search-panel.tsx
 
 import { ExternalLink } from 'lucide-react';
@@ -84,7 +84,12 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
 
                     if (result.inLibrary) {
                       metadataPills.push(
-                        <Pill key="library" small tone="success" className="uppercase tracking-wide">
+                        <Pill
+                          key="library"
+                          small
+                          tone="success"
+                          className="border-transparent bg-success/85 text-white uppercase tracking-wide"
+                        >
                           {`In ${providerLabel}`}
                         </Pill>,
                       );
@@ -92,7 +97,12 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
 
                     if (Array.isArray(result.linkedAniListIds) && result.linkedAniListIds.length > 0) {
                       metadataPills.push(
-                        <Pill key="linked" small tone="warning" className="text-[10px] font-semibold uppercase tracking-wide">
+                        <Pill
+                          key="linked"
+                          small
+                          tone="warning"
+                          className="border-transparent bg-amber-300/20 text-amber-100 text-[10px] font-semibold uppercase tracking-wide"
+                        >
                           {`Linked to ${result.linkedAniListIds.length} AniList entr${result.linkedAniListIds.length === 1 ? 'y' : 'ies'}`}
                         </Pill>,
                       );
@@ -100,7 +110,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
 
                     if (isCurrent) {
                       metadataPills.push(
-                        <Pill key="current" small tone="blue" className="uppercase tracking-wide">
+                        <Pill key="current" small tone="blue" className="border-transparent bg-blue-500/80 text-white uppercase tracking-wide">
                           Current mapping
                         </Pill>,
                       );
@@ -119,7 +129,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                         key={`${result.provider}-${result.providerId}`}
                         className={`group flex items-center gap-3 px-3 py-3 transition-colors ${
                           isSelected
-                            ? 'bg-accent-primary/15 ring-1 ring-inset ring-accent-primary/30'
+                            ? 'bg-accent-primary/18 ring-1 ring-inset ring-accent-primary/35'
                             : 'hover:bg-bg-primary/50'
                         }`}
                       >

@@ -19,6 +19,7 @@ import {
   handleSearchEscapeKeyDown,
   MappingInspectionPaneContent,
   MappingInspectionPane,
+  MappingInspectionSuggestedShortcuts,
 } from './mapping-inspection-pane';
 
 const createInspectionPayload = (
@@ -102,7 +103,7 @@ describe('mapping inspection pane', () => {
     expect(view).toContain('placeholder="Search Sonarr / TVDB"');
   });
 
-  it('renders the inspection body when the query is empty', () => {
+  it('renders suggested shortcuts instead of the full diagnostics body when the query is empty', () => {
     const view = renderToStaticMarkup(
       React.createElement(MappingInspectionPane, {
         anilistId: 101,
@@ -120,9 +121,10 @@ describe('mapping inspection pane', () => {
       }),
     );
 
-    expect(view).toContain('Why this mapping exists');
-    expect(view).toContain('No effective mapping is currently stored for this AniList entry.');
+    expect(view).toContain('Suggested matches');
+    expect(view).toContain('No recent candidate trace is available yet. Start typing to search manually.');
     expect(view).not.toContain('No results found.');
+    expect(view).not.toContain('Why this mapping exists');
   });
 
   it('renders search mode only when the query is non-empty', () => {
@@ -263,6 +265,49 @@ describe('mapping inspection pane', () => {
     expect(view).toContain('Rejected trace');
     expect(view).toContain('Accepted fuzzy candidate');
     expect(view).toContain('Rejected fuzzy candidate');
+  });
+
+  it('renders compact suggested shortcuts from the inspection trace', () => {
+    const inspection = createInspectionPayload({
+      suggestedCandidates: {
+        searchTerms: ['Shared Title'],
+        accepted: [
+          {
+            providerId: 700,
+            title: 'Shared Title',
+            source: 'auto',
+            reason: 'fuzzy-match',
+            status: 'accepted',
+            summary: 'Accepted fuzzy candidate',
+          },
+        ],
+        rejected: [
+          {
+            providerId: 701,
+            title: 'Wrong Title',
+            source: 'auto',
+            reason: 'fuzzy-match',
+            status: 'rejected',
+            summary: 'Rejected fuzzy candidate',
+          },
+        ],
+        suppressed: [],
+        notAccepted: [],
+      },
+    });
+
+    const view = renderToStaticMarkup(
+      React.createElement(MappingInspectionSuggestedShortcuts, {
+        inspection,
+        provider: 'sonarr',
+        onUseSuggestion: () => {},
+      }),
+    );
+
+    expect(view).toContain('Suggested matches');
+    expect(view).toContain('Shared Title');
+    expect(view).toContain('Wrong Title');
+    expect(view).toContain('Trace terms: Shared Title');
   });
 
   it('uses suggested candidates to prefill search without selecting a replacement directly', () => {
