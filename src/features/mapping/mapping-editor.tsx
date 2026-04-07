@@ -281,7 +281,6 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
                     baseUrl={baseUrl}
                     currentMapping={mappingController.currentMapping}
                     previewMapping={previewMapping}
-                    isOverridden={mappingController.canRevert}
                     isInMappingMode
                     showResetPreview={showResetPreview}
                     onResetPreview={mappingController.clearSelection}

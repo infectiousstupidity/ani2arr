@@ -18,6 +18,7 @@ export interface ProviderRootFolderSelectProps {
   portalContainer?: HTMLElement | ShadowRoot | null | undefined;
   initialFocusRef?: React.RefObject<HTMLButtonElement | null> | undefined;
   className?: string | undefined;
+  triggerClassName?: string | undefined;
   computedSlug?: string | null | undefined;
   displayRootWithSlug?: boolean | undefined;
   computedPath?: string | null | undefined;
@@ -63,6 +64,7 @@ export function ProviderRootFolderSelect(
     portalContainer,
     initialFocusRef,
     className,
+    triggerClassName,
     computedSlug,
     displayRootWithSlug = false,
     computedPath,
@@ -78,7 +80,7 @@ export function ProviderRootFolderSelect(
         <div className={cn('space-y-1', className)}>
           <Label>Root Folder</Label>
           <Select disabled={disabled} value={value} onValueChange={onChange}>
-            <SelectTrigger ref={initialFocusRef ?? undefined}>
+            <SelectTrigger ref={initialFocusRef ?? undefined} className={triggerClassName}>
               <span className="flex min-w-0 flex-1 items-center overflow-hidden text-ellipsis whitespace-nowrap">
                 <SelectPrimitive.Value placeholder="Select a folder...">
                   {selectedRootDisplay ? (

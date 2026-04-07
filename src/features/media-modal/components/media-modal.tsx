@@ -4,7 +4,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Modal, ModalContent, ModalTitle, ModalDescription } from "./modal";
 import { Header, type MediaModalTabId } from "./media-modal-header";
-import { Footer } from "./media-modal-footer";
+import { Footer, type FooterProps } from "./media-modal-footer";
 import Button from "@/shared/ui/primitives/button";
 import type { AniListTitleLanguage } from "@/anilist/schemas/title-language.schema";
 import type {
@@ -248,11 +248,8 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   const previewMapping = showResetPreview ? selectedMapping : null;
 
   // Compute footer state directly in parent based on view mode
-  const footerState = useMemo(() => {
+  const footerState = useMemo<FooterProps>(() => {
     if (viewMode === "mapping") {
-      const primaryLabel = mappingRequiresResolution ? 'Add mapping' : 'Update mapping';
-      const secondaryLabel = mappingRequiresResolution ? 'Exit modal' : 'Exit mapping';
-
       return {
         leftContent: mappingController.canRevert ? (
           <Button
@@ -266,17 +263,21 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
             Reset to automatic
           </Button>
         ) : null,
-        primaryLabel,
+        primaryLabel: 'Confirm Selection',
         primaryDisabled: !mappingController.canSubmit,
         primaryLoading: mappingController.isSubmitting,
         onPrimaryClick: () => {
           void handleMappingSubmit();
         },
-        secondaryLabel,
-        onSecondaryClick: handleExitMapping,
         showTertiary: false,
         tertiaryLabel: '',
         onTertiaryClick: undefined,
+        ...(mappingRequiresResolution
+          ? {
+              secondaryLabel: 'Exit modal',
+              onSecondaryClick: handleExitMapping,
+            }
+          : {}),
       };
     }
 
@@ -406,7 +407,6 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                     baseUrl={baseUrl}
                     currentMapping={effectiveCurrentMapping}
                     previewMapping={previewMapping}
-                    isOverridden={mappingController.canRevert}
                     isInMappingMode={viewMode === "mapping"}
                     showResetPreview={showResetPreview}
                     onResetPreview={mappingController.clearSelection}

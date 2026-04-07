@@ -25,21 +25,21 @@ export function SonarrPanel(props: SonarrPanelProps): React.JSX.Element {
       : "Choose the root folder and monitoring options for this series.";
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="pb-4">
+    <div className="flex h-full min-h-0 flex-col px-4 pt-4">
+      <div className="shrink-0 pb-4">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
+            <p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">
               {headerTitle}
             </p>
-            <p className="text-xs text-text-secondary">
+            <p className="text-xs leading-5 text-text-secondary">
               {headerDescription}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0">
+      <div className="min-h-0 flex-1">
         {!sonarrReady || !metadata ? (
           <div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-sm text-text-secondary">
             <p>Configure Sonarr to enable {mode === "edit" ? "editing" : "adding"} series.</p>

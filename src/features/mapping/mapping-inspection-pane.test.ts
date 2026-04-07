@@ -100,7 +100,7 @@ describe('mapping inspection pane', () => {
       }),
     );
 
-    expect(view).toContain('placeholder="Search Sonarr / TVDB"');
+    expect(view).toContain('placeholder="Search Sonarr / TVDB..."');
   });
 
   it('renders suggested shortcuts instead of the full diagnostics body when the query is empty', () => {
@@ -221,7 +221,7 @@ describe('mapping inspection pane', () => {
       }),
     );
 
-    expect(view).toContain('Needs review');
+    expect(view).toContain('needsReview: true');
     expect(view).toContain('Manual mapping conflicts with exact upstream mapping.');
   });
 
@@ -261,8 +261,8 @@ describe('mapping inspection pane', () => {
       }),
     );
 
-    expect(view).toContain('Accepted trace');
-    expect(view).toContain('Rejected trace');
+    expect(view).toContain('Current match');
+    expect(view).toContain('Rejected match');
     expect(view).toContain('Accepted fuzzy candidate');
     expect(view).toContain('Rejected fuzzy candidate');
   });
@@ -307,7 +307,7 @@ describe('mapping inspection pane', () => {
     expect(view).toContain('Suggested matches');
     expect(view).toContain('Shared Title');
     expect(view).toContain('Wrong Title');
-    expect(view).toContain('Trace terms: Shared Title');
+    expect(view).toContain('Search terms used: Shared Title');
   });
 
   it('uses suggested candidates to prefill search without selecting a replacement directly', () => {

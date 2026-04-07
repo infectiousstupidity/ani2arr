@@ -53,6 +53,7 @@ export function RadarrAddOptionsFields(
   const layoutClassName = isGridLayout
     ? 'grid gap-4 md:grid-cols-2'
     : 'flex flex-col gap-4';
+  const modalSelectTriggerClassName = 'border border-border-primary/60 bg-bg-tertiary text-text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
   const qualityProfileOptions = metadata.qualityProfiles.map(profile => ({
     value: String(profile.id),
     label: profile.name,
@@ -68,6 +69,7 @@ export function RadarrAddOptionsFields(
         portalContainer={portalContainer ?? null}
         initialFocusRef={initialFocusRef}
         className={fullWidthClass}
+        triggerClassName={modalSelectTriggerClassName}
         computedSlug={folderSlug ?? null}
         displayRootWithSlug={displayRootWithSlug}
         computedPath={computedPath}
@@ -81,6 +83,7 @@ export function RadarrAddOptionsFields(
         options={qualityProfileOptions}
         placeholder="Select a profile..."
         container={portalContainer ?? null}
+        triggerClassName={modalSelectTriggerClassName}
       />
 
       <SelectField
@@ -90,6 +93,7 @@ export function RadarrAddOptionsFields(
         onChange={value => onChange('minimumAvailability', value as RadarrMinimumAvailability)}
         options={MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS}
         container={portalContainer ?? null}
+        triggerClassName={modalSelectTriggerClassName}
       />
 
       <ProviderTagField
@@ -110,6 +114,8 @@ export function RadarrAddOptionsFields(
             onCheckedChange={checked => onChange('monitored', checked)}
             labelHelp="Keep the movie monitored in Radarr so future upgrades remain eligible."
             labelHelpContainer={portalContainer ?? null}
+            layout="inline"
+            labelClassName="text-sm font-medium text-text-primary"
           />
           <SwitchField
             label="Search on Add"
@@ -118,6 +124,8 @@ export function RadarrAddOptionsFields(
             onCheckedChange={checked => onChange('searchForMovie', checked)}
             labelHelp="Trigger a Radarr search immediately after the movie is added."
             labelHelpContainer={portalContainer ?? null}
+            layout="inline"
+            labelClassName="text-sm font-medium text-text-primary"
           />
         </div>
       </div>

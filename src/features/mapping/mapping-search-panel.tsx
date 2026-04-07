@@ -9,6 +9,10 @@ import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import { getProviderLabel } from '@/providers/provider-routing';
 import type { MappingSearchController, MappingSearchResult } from './types';
 
+function shouldShowTypeLabel(result: MappingSearchResult): boolean {
+  return result.provider === 'sonarr' && Boolean(result.typeLabel) && result.inLibrary;
+}
+
 interface MappingSearchPanelProps {
   controller: MappingSearchController;
   currentMapping: MappingSearchResult | null;
@@ -31,7 +35,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
   const providerLabel = getProviderLabel(provider);
 
   return (
-    <div className="overflow-hidden rounded-xl bg-bg-secondary/70 shadow-inner ring-1 ring-inset ring-border-primary/60">
+    <div className="overflow-hidden rounded-xl border border-border-primary/60 bg-bg-secondary/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
       <div className="divide-y divide-border-primary/70">
         {showMinimumCharacterMessage ? (
           <div className="px-3 py-6 text-center text-xs text-text-secondary">
@@ -74,7 +78,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                       );
                     }
 
-                    if (result.typeLabel) {
+                    if (shouldShowTypeLabel(result)) {
                       metadataPills.push(
                         <Pill key="type" small tone="muted" className="text-text-secondary">
                           {result.typeLabel}
@@ -110,8 +114,8 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
 
                     if (isCurrent) {
                       metadataPills.push(
-                        <Pill key="current" small tone="blue" className="border-transparent bg-blue-500/80 text-white uppercase tracking-wide">
-                          Current mapping
+                        <Pill key="current" small tone="success" className="border-transparent bg-success/85 text-white uppercase tracking-wide">
+                          Current match
                         </Pill>,
                       );
                     }
@@ -130,7 +134,7 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                         className={`group flex items-center gap-3 px-3 py-3 transition-colors ${
                           isSelected
                             ? 'bg-accent-primary/18 ring-1 ring-inset ring-accent-primary/35'
-                            : 'hover:bg-bg-primary/50'
+                            : 'hover:bg-bg-primary/45'
                         }`}
                       >
                         <button

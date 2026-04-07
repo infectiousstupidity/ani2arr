@@ -5,7 +5,6 @@ import * as Accordion from '@radix-ui/react-accordion';
 import { ChevronDown, ExternalLink, X, Settings } from 'lucide-react';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
-import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import type { Provider } from '@/providers';
 import { getProviderLabel } from '@/providers/provider-routing';
@@ -20,7 +19,6 @@ interface MappingPreviewPanelProps {
   baseUrl: string;
   currentMapping: MappingSearchResult | null;
   previewMapping: MappingSearchResult | null;
-  isOverridden: boolean;
   isInMappingMode: boolean;
   showResetPreview: boolean;
   onResetPreview: () => void;
@@ -35,7 +33,6 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
     baseUrl,
     currentMapping,
     previewMapping,
-    isOverridden,
     showResetPreview,
     onResetPreview,
     onEditMapping,
@@ -49,18 +46,8 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
   const isSetupMode = isInMappingMode === false;
   const activeMapping = previewMapping ?? currentMapping;
   const showEmptyState = !activeMapping;
-  const overrideTooltip = isOverridden
-    ? 'Manual override is active for this AniList entry.'
-    : 'Using the automatic AniList mapping.';
   const providerIdLabel = provider === 'radarr' ? 'TMDB' : 'TVDB';
-  let eyebrowLabel = `MATCHED ${providerIdLabel} TARGET`;
-  if (isInMappingMode) {
-    eyebrowLabel = `CURRENT ${providerIdLabel} TARGET`;
-  }
-  if (hasPreviewMapping) {
-    eyebrowLabel = 'PREVIEWING REPLACEMENT';
-  }
-  const overwriteLabel = hasPreviewMapping && currentMapping ? currentMapping.title : null;
+  const headingLabel = hasPreviewMapping ? 'PREVIEWING TARGET' : `${providerIdLabel} TARGET`;
 
   const openMappingSettings = () => {
     try {
@@ -82,52 +69,39 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
   const linkedAniListEntries = hasPreviewMapping ? undefined : inspectionQuery.data?.linkedAniListEntries;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="pb-4">
+    <div className="flex h-full min-h-0 flex-col rounded-2xl bg-bg-secondary/30 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+      <div className="shrink-0 pb-4">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-              {eyebrowLabel}
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">
+              {headingLabel}
             </p>
-            <div className="flex items-center text-xs text-text-secondary">
-              <Pill small tone="muted" className="font-mono text-text-primary">{`AniList ${aniListEntry.id}`}</Pill>
-              <TooltipWrapper content={overrideTooltip} container={portalContainer ?? null}>
-                <Pill small tone={isOverridden ? 'accent' : 'info'} className="ml-2">
-                  {isOverridden ? 'Manual' : 'Auto'}
-                </Pill>
-              </TooltipWrapper>
-            </div>
+            {hasPreviewMapping && currentMapping ? (
+              <p className="text-xs leading-5 text-text-secondary">
+                Overwriting <span className="font-medium text-text-primary">{currentMapping.title}</span>
+              </p>
+            ) : null}
           </div>
 
-          {isInMappingMode ? (
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openMappingSettings();
-                }}
-                variant="ghost"
-                size="icon"
-                tooltip="Open Mapping & Overrides settings in the options page"
-                portalContainer={portalContainer ?? undefined}
-                className="h-8 w-8 text-text-secondary hover:text-text-primary"
-                aria-label="Open Mapping & Overrides settings"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : null}
+          <Button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              openMappingSettings();
+            }}
+            variant="ghost"
+            size="icon"
+            tooltip="Open Mapping & Overrides settings in the options page"
+            portalContainer={portalContainer ?? undefined}
+            className="h-8 w-8 text-text-secondary hover:text-text-primary"
+            aria-label="Open Mapping & Overrides settings"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 space-y-4 overflow-y-auto pr-1">
-        {overwriteLabel ? (
-          <div className="space-y-1 rounded-xl bg-bg-secondary/25 px-3 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">Overwriting</p>
-            <p className="text-sm font-medium text-text-primary">{overwriteLabel}</p>
-          </div>
-        ) : null}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
 
         {activeMapping ? (
           <MappingPreviewCard
@@ -144,9 +118,6 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" onClick={onEditMapping}>
               {hasCurrentMapping ? 'Edit match' : 'Add match'}
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={openMappingSettings}>
-              Settings
             </Button>
           </div>
         ) : null}
@@ -167,7 +138,7 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
 
         {isInMappingMode ? (
           <Accordion.Root type="single" collapsible>
-            <Accordion.Item value="diagnostics" className="overflow-hidden rounded-xl bg-bg-secondary/25">
+            <Accordion.Item value="diagnostics" className="overflow-hidden rounded-xl border border-border-primary/50 bg-bg-primary/18">
               <Accordion.Header>
                 <Accordion.Trigger className="group flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm font-medium text-text-primary">
                   <span>View Match Diagnostics & Logs</span>
@@ -175,22 +146,24 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
                 </Accordion.Trigger>
               </Accordion.Header>
               <Accordion.Content className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
-                <div className="border-t border-border-primary/50 px-3 py-4">
-                  {inspectionQuery.isPending && !inspectionQuery.data ? (
-                    <div className="rounded-xl bg-bg-secondary/35 px-3 py-6 text-sm text-text-secondary">
+                <div className="border-t border-border-primary/50 px-3 py-3">
+                  <div className="max-h-48 overflow-y-auto pr-1">
+                    {inspectionQuery.isPending && !inspectionQuery.data ? (
+                      <div className="rounded-xl bg-bg-secondary/35 px-3 py-6 text-sm text-text-secondary">
                       Loading mapping diagnostics...
-                    </div>
-                  ) : null}
+                      </div>
+                    ) : null}
 
-                  {inspectionQuery.error && !inspectionQuery.data ? (
-                    <div className="rounded-xl bg-warning/8 px-3 py-4 text-sm text-text-secondary">
+                    {inspectionQuery.error && !inspectionQuery.data ? (
+                      <div className="rounded-xl bg-warning/8 px-3 py-4 text-sm text-text-secondary">
                       Mapping diagnostics are unavailable right now.
-                    </div>
-                  ) : null}
+                      </div>
+                    ) : null}
 
-                  {inspectionQuery.data ? (
-                    <MappingInspectionPaneContent inspection={inspectionQuery.data} provider={provider} />
-                  ) : null}
+                    {inspectionQuery.data ? (
+                      <MappingInspectionPaneContent inspection={inspectionQuery.data} provider={provider} />
+                    ) : null}
+                  </div>
                 </div>
               </Accordion.Content>
             </Accordion.Item>
@@ -278,11 +251,11 @@ function MappingPreviewCard(props: MappingPreviewCardProps): React.JSX.Element {
 
   return (
     <div
-      className={`relative min-h-57.5 overflow-hidden rounded-xl bg-bg-secondary shadow-lg shadow-black/30 ${
+      className={`relative overflow-hidden rounded-2xl border border-border-primary/70 bg-bg-primary/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] ${
         highlight === 'preview' ? 'ring-1 ring-inset ring-accent-primary/40' : ''
       }`}
     >
-      <div className="flex gap-5 p-5">
+      <div className="flex gap-5 p-4">
         <div className="h-44 w-32 shrink-0 overflow-hidden rounded-lg bg-bg-primary shadow-inner">
           {mapping.posterUrl ? (
             <img
