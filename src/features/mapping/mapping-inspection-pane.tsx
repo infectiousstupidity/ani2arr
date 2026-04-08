@@ -3,9 +3,7 @@
 
 import { useCallback, useMemo, useRef, type WheelEvent as ReactWheelEvent } from 'react';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
-import { ArrowLeft } from 'lucide-react';
 import Pill from '@/shared/ui/primitives/pill';
-import Button from '@/shared/ui/primitives/button';
 import { useMappingInspection } from '@/shared/queries';
 import type {
   MappingInspectionCandidate,
@@ -23,7 +21,6 @@ interface MappingInspectionPaneProps {
   controller: MappingSearchController;
   currentMapping: MappingSearchResult | null;
   baseUrl: string;
-  onExitMapping?: () => void;
   portalContainer?: HTMLElement | null;
 }
 
@@ -375,7 +372,7 @@ export function MappingInspectionPaneContent(props: MappingInspectionPaneContent
 }
 
 export function MappingInspectionPane(props: MappingInspectionPaneProps): React.JSX.Element {
-  const { anilistId, provider, controller, currentMapping, baseUrl, onExitMapping, portalContainer } = props;
+  const { anilistId, provider, controller, currentMapping, baseUrl, portalContainer } = props;
   const inspectionQuery = useMappingInspection(provider, anilistId);
   const providerLabel = getProviderLabel(provider);
   const providerIdLabel = getProviderIdLabel(provider);
@@ -411,18 +408,6 @@ export function MappingInspectionPane(props: MappingInspectionPaneProps): React.
       }}
     >
       <div className="shrink-0 pb-4">
-        {onExitMapping ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onExitMapping}
-            className="-ml-2 mb-3 h-auto px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary"
-          >
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-            Back to setup
-          </Button>
-        ) : null}
         <div className="space-y-1">
           <p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">{`Search ${providerLabel} database`}</p>
           <p className="text-xs text-text-secondary">

@@ -3,9 +3,8 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { Modal, ModalContent, ModalTitle, ModalDescription } from "./modal";
-import { Header, type MediaModalTabId } from "./media-modal-header";
+import { Header } from "./media-modal-header";
 import { Footer, type FooterProps } from "./media-modal-footer";
-import { MediaModalFaceoffStrip } from "./media-modal-faceoff-strip";
 import Button from "@/shared/ui/primitives/button";
 import type { AniListTitleLanguage } from "@/anilist/schemas/title-language.schema";
 import type {
@@ -19,7 +18,7 @@ import { ErrorCode, type ExtensionError } from "@/shared/errors";
 import { createDefaultRadarrFormState } from "@/providers/settings/radarr-settings.schema";
 import { createDefaultSonarrFormState } from "@/providers/settings/sonarr-settings.schema";
 
-import { MappingPreviewPanel } from "@/features/mapping";
+import { MappingPreviewPanel, type MappingSearchResult } from "@/features/mapping";
 import { MappingInspectionPane } from "@/features/mapping/mapping-inspection-pane";
 import type { MappingTabProps } from "../types";
 import { RadarrPanel } from "./radarr-panel";
@@ -33,10 +32,15 @@ import { useConfirm } from "@/shared/hooks/common/use-confirm";
 import { getProviderLabel } from "@/providers/provider-routing";
 
 type MediaModalViewMode = "setup" | "mapping";
+type MediaModalTabId = "series" | "mapping";
 
 const EMPTY_SONARR_FORM: SonarrFormState = createDefaultSonarrFormState();
 
 const EMPTY_RADARR_FORM: RadarrFormState = createDefaultRadarrFormState();
+
+const MODAL_WORKSPACE_WIDTH_CLASS_NAME = "mx-auto w-full max-w-250";
+const MODAL_WORKSPACE_GRID_CLASS_NAME =
+  "grid h-full min-h-0 grid-cols-1 gap-y-4 lg:grid-cols-[minmax(0,1fr)_8.5rem_minmax(0,1fr)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-0 lg:gap-y-2";
 
 export type MediaModalProps = {
   isOpen: boolean;
@@ -62,6 +66,8 @@ export type MediaModalProps = {
   mappingTabProps: Omit<MappingTabProps, 'controller' | 'baseUrl'>;
   sonarrPanelProps: Omit<SonarrPanelProps, 'controller'> | null;
   radarrPanelProps: Omit<RadarrPanelProps, 'controller'> | null;
+  onMappingSaved?: (input: { anilistId: number; mapping: MappingSearchResult | null }) => void;
+  onMappingSaveError?: (input: { anilistId: number; error: Error }) => void;
 };
 
 export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
@@ -69,22 +75,19 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     isOpen,
     onClose,
     title,
-    alternateTitles,
-    titleLanguage,
     bannerImage,
     coverImage,
-    anilistIds,
     provider,
-    inLibrary,
     format,
     year,
-    status,
     initialTab = "series",
     initialMappingRequired = false,
     portalContainer,
     mappingTabProps,
     sonarrPanelProps,
     radarrPanelProps,
+    onMappingSaved,
+    onMappingSaveError,
   } = props;
 
   const [floatingPortalEl, setFloatingPortalEl] = useState<HTMLDivElement | null>(null);
@@ -190,6 +193,10 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
 
     const attemptSubmit = async (force?: boolean) => {
       await mappingController.handleSubmit(force ? { force: true } : undefined);
+      onMappingSaved?.({
+        anilistId: currentAniListId,
+        mapping: mappingController.currentMapping ?? selected ?? null,
+      });
       setViewMode("setup");
     };
 
@@ -200,7 +207,11 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
       try {
         await attemptSubmit(true);
         return;
-      } catch {
+      } catch (error) {
+        onMappingSaveError?.({
+          anilistId: currentAniListId,
+          error: error instanceof Error ? error : new Error("Unable to save mapping."),
+        });
         // Leave mapping mode if submission fails.
         return;
       }
@@ -220,13 +231,21 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
         try {
           await attemptSubmit(true);
           return;
-        } catch {
+        } catch (retryError) {
+          onMappingSaveError?.({
+            anilistId: currentAniListId,
+            error: retryError instanceof Error ? retryError : new Error("Unable to save mapping."),
+          });
           return;
         }
       }
+      onMappingSaveError?.({
+        anilistId: currentAniListId,
+        error: normalized instanceof Error ? normalized : new Error("Unable to save mapping."),
+      });
       // Leave mapping mode unchanged on other errors.
     }
-  }, [confirm, mappingController, mappingTabProps.aniListEntry.id]);
+  }, [confirm, mappingController, mappingTabProps.aniListEntry.id, onMappingSaveError, onMappingSaved]);
 
   // Handle ESC key: exit mapping mode first, then allow modal close
   const handleEscapeKeyDown = useCallback((event: KeyboardEvent) => {
@@ -245,7 +264,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
     }
     const shouldReset = await confirm({
       title: 'Reset mapping override?',
-      description: 'This will remove the manual override and return to the automatic match for this title.',
+      description: 'This will remove the manual override and return to the automatic mapping for this title.',
       confirmText: 'Reset mapping',
       cancelText: 'Keep override',
     });
@@ -262,6 +281,8 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
 
   const showResetPreview = viewMode === "mapping" && mappingController.canSubmit && Boolean(selectedMapping);
   const previewMapping = showResetPreview ? selectedMapping : null;
+  const modeSwitchLabel = viewMode === "mapping" ? "Back to setup" : "Change mapping";
+  const handleModeSwitch = viewMode === "mapping" ? handleExitMapping : handleEnterMapping;
 
   // Compute footer state directly in parent based on view mode
   const footerState = useMemo<FooterProps>(() => {
@@ -363,40 +384,24 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
         </ModalDescription>
         <Header
           title={title}
-          alternateTitles={alternateTitles}
-          titleLanguage={titleLanguage}
           bannerImage={bannerImage}
           coverImage={coverImage}
-          anilistIds={anilistIds}
+          anilistId={mappingTabProps.aniListEntry.id}
           provider={provider}
-          inLibrary={inLibrary}
           format={format}
           year={year}
-          status={status}
-          activeTab={viewMode === "mapping" ? "mapping" : "series"}
-          onEnterMapping={handleEnterMapping}
-          onExitMapping={handleExitMapping}
+          baseUrl={baseUrl}
+          currentMapping={effectiveCurrentMapping}
+          workspaceClassName={MODAL_WORKSPACE_WIDTH_CLASS_NAME}
           onClose={handleClose}
           onOpenSettings={handleOpenMappingSettings}
           tooltipContainer={tooltipContainer}
-          content={(
-            <MediaModalFaceoffStrip
-              sourceTitle={title}
-              sourceCoverImage={coverImage}
-              sourceFormat={format}
-              sourceYear={year}
-              sourceAniListId={mappingTabProps.aniListEntry.id}
-              provider={provider}
-              baseUrl={baseUrl}
-              currentMapping={effectiveCurrentMapping}
-            />
-          )}
         />
         <div className="relative flex-1 overflow-hidden px-4 sm:px-8">
-          <div className="mx-auto flex h-full max-w-250 flex-col">
+          <div className={`${MODAL_WORKSPACE_WIDTH_CLASS_NAME} flex h-full flex-col`}>
             <div className="min-h-0 flex-1 pt-5 pb-4 sm:pt-6">
-              <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.96fr)]">
-                <div className="flex h-full flex-col overflow-hidden">
+              <div className={MODAL_WORKSPACE_GRID_CLASS_NAME}>
+                <div className="order-1 flex h-full flex-col overflow-hidden lg:col-start-1 lg:row-start-2">
                   <div className="flex-1 min-h-0">
                     {viewMode === "mapping" ? (
                       <MappingInspectionPane
@@ -405,7 +410,6 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                         currentMapping={effectiveCurrentMapping}
                         provider={mappingTabProps.provider}
                         baseUrl={baseUrl}
-                        onExitMapping={handleExitMapping}
                         portalContainer={selectPortalContainer instanceof HTMLElement ? selectPortalContainer : null}
                       />
                     ) : (
@@ -429,7 +433,19 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                   </div>
                 </div>
 
-                <div className="relative min-h-0">
+                <div className="order-2 flex justify-center lg:col-start-3 lg:row-start-1 lg:items-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleModeSwitch}
+                    className="h-8 rounded-lg border border-border-primary/40 bg-bg-primary/12 px-3 text-sm font-medium text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)] hover:border-border-primary/60 hover:bg-bg-secondary/45 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/45 focus-visible:ring-offset-0"
+                  >
+                    {modeSwitchLabel}
+                  </Button>
+                </div>
+
+                <div className="order-3 relative min-h-0 lg:col-start-3 lg:row-start-2">
                   <div className="h-full lg:sticky lg:top-0">
                     <MappingPreviewPanel
                       provider={mappingTabProps.provider}
@@ -440,13 +456,6 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
                       isInMappingMode={viewMode === "mapping"}
                       showResetPreview={showResetPreview}
                       onResetPreview={mappingController.clearSelection}
-                      onEditMapping={() => {
-                        if (viewMode === "mapping") {
-                          handleExitMapping();
-                        } else {
-                          handleEnterMapping();
-                        }
-                      }}
                       portalContainer={selectPortalContainer instanceof HTMLElement ? selectPortalContainer : null}
                     />
                   </div>
