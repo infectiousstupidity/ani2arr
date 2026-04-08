@@ -2,7 +2,8 @@
 // src/options-page/sections/mappings/mappings-section.tsx
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { MappingEditor } from '@/features/mapping/mapping-editor';
+import { MediaModal } from '@/features/media-modal';
+import { useMediaModalProps } from '@/features/media-modal/use-media-modal-props';
 import {
   useAniListMedia,
   useClearMappingIgnore,
@@ -85,6 +86,15 @@ const MappingsSection: React.FC<{
   const { data: publicOptions } = usePublicOptions();
   const sonarrUrl = publicOptions?.providers.sonarr.url ?? null;
   const radarrUrl = publicOptions?.providers.radarr.url ?? null;
+  const editorModalProps = useMediaModalProps({
+    anilistId: editorState?.anilistId,
+    title: undefined,
+    metadata: null,
+    portalContainer: null,
+    isOpen: editorState != null,
+    providerOverride: editorState?.provider,
+    initialProviderId: editorState?.providerId ?? null,
+  });
 
   const providerFilters = useMemo<Set<Provider>>(() => {
     if (providerFilter === 'all') return new Set(['sonarr', 'radarr']);
@@ -412,13 +422,42 @@ const MappingsSection: React.FC<{
         </div>
       </section>
 
-      {editorState ? (
-        <MappingEditor
-          anilistId={editorState.anilistId}
-          initialProviderId={editorState.providerId ?? null}
-          open
+      {editorState && editorModalProps ? (
+        <MediaModal
+          key={`mapping-modal-${editorState.anilistId}-${editorState.provider}`}
+          isOpen
           onClose={handleCloseEditor}
-          provider={editorState.provider}
+          title={editorModalProps.title}
+          alternateTitles={editorModalProps.alternateTitles}
+          titleLanguage={editorModalProps.titleLanguage}
+          bannerImage={editorModalProps.bannerImage}
+          coverImage={editorModalProps.coverImage}
+          anilistIds={[editorState.anilistId]}
+          provider={editorModalProps.provider}
+          inLibrary={editorModalProps.inLibrary}
+          format={editorModalProps.format}
+          year={editorModalProps.year}
+          status={editorModalProps.status}
+          initialTab="mapping"
+          mappingTabProps={editorModalProps.mappingTabProps}
+          sonarrPanelProps={editorModalProps.sonarrPanelProps}
+          radarrPanelProps={editorModalProps.radarrPanelProps}
+          onMappingSaved={({ anilistId, mapping }) => {
+            toast.showToast({
+              title: 'Mapping saved',
+              description: mapping
+                ? `AniList #${anilistId} now maps to ${mapping.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${mapping.providerId}.`
+                : `AniList #${anilistId} mapping was updated.`,
+              variant: 'success',
+            });
+          }}
+          onMappingSaveError={({ error }) => {
+            toast.showToast({
+              title: 'Save failed',
+              description: error.message ?? 'Unable to save mapping.',
+              variant: 'error',
+            });
+          }}
         />
       ) : null}
 

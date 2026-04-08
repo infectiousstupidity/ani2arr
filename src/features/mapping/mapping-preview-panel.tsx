@@ -23,7 +23,6 @@ interface MappingPreviewPanelProps {
   isInMappingMode: boolean;
   showResetPreview: boolean;
   onResetPreview: () => void;
-  onEditMapping: () => void;
   portalContainer?: HTMLElement | null;
 }
 
@@ -139,7 +138,6 @@ function MappingPreviewPanelBody(props: {
   previewMapping: MappingSearchResult | null;
   showResetPreview: boolean;
   onResetPreview: () => void;
-  onEditMapping: () => void;
   portalContainer: HTMLElement | null | undefined;
   inspectionData: MappingInspectionPayload | undefined;
   inspectionPending: boolean;
@@ -155,7 +153,6 @@ function MappingPreviewPanelBody(props: {
     previewMapping,
     showResetPreview,
     onResetPreview,
-    onEditMapping,
     portalContainer,
     inspectionData,
     inspectionPending,
@@ -197,25 +194,13 @@ function MappingPreviewPanelBody(props: {
     <div className="flex min-h-0 flex-1 flex-col gap-4 pr-1">
       {viewState.showSetupContext && currentMapping ? (
         <div className="rounded-xl border border-border-primary/50 bg-bg-primary/14 p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1 space-y-2">
-              {detailRows.map((row) => (
-                <div key={row.label} className="flex items-baseline justify-between gap-4 text-sm">
-                  <span className="text-text-secondary">{row.label}</span>
-                  <span className="text-right font-medium text-text-primary">{row.value}</span>
-                </div>
-              ))}
-            </div>
-
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={onEditMapping}
-              className="shrink-0 text-text-secondary hover:text-text-primary"
-            >
-              {`Change ${providerLabel} match`}
-            </Button>
+          <div className="min-w-0 flex-1 space-y-2">
+            {detailRows.map((row) => (
+              <div key={row.label} className="flex items-baseline justify-between gap-4 text-sm">
+                <span className="text-text-secondary">{row.label}</span>
+                <span className="text-right font-medium text-text-primary">{row.value}</span>
+              </div>
+            ))}
           </div>
         </div>
       ) : null}
@@ -276,7 +261,6 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
     previewMapping,
     showResetPreview,
     onResetPreview,
-    onEditMapping,
     isInMappingMode,
     portalContainer,
   } = props;
@@ -304,7 +288,6 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
         previewMapping={previewMapping}
         showResetPreview={showResetPreview}
         onResetPreview={onResetPreview}
-        onEditMapping={onEditMapping}
         portalContainer={portalContainer}
         inspectionData={inspectionQuery.data}
         inspectionPending={inspectionQuery.isPending}

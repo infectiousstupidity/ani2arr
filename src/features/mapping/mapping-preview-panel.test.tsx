@@ -83,7 +83,6 @@ describe('mapping preview panel', () => {
         isInMappingMode: false,
         showResetPreview: false,
         onResetPreview: vi.fn(),
-        onEditMapping: vi.fn(),
       }),
     );
 
@@ -94,7 +93,7 @@ describe('mapping preview panel', () => {
     expect(view).toContain('38');
     expect(view).toContain('Type');
     expect(view).toContain('Anime');
-    expect(view).toContain('Change Sonarr match');
+    expect(view).not.toContain('Change Sonarr match');
     expect(view).toContain('View Advanced Diagnostics');
     expect(view).not.toContain('Current Target');
   });
@@ -123,7 +122,6 @@ describe('mapping preview panel', () => {
         isInMappingMode: true,
         showResetPreview: true,
         onResetPreview: vi.fn(),
-        onEditMapping: vi.fn(),
       }),
     );
 
