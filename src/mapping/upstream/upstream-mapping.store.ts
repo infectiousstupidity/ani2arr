@@ -20,6 +20,38 @@ export interface UpstreamMappingPayload {
   pairs: Record<number, number>;
 }
 
+const coerceId = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isFinite(parsed)) {
+      return Math.trunc(parsed);
+    }
+  }
+
+  return null;
+};
+
+const resolveAniListId = (
+  source: UpstreamMappingSource,
+  record: Record<string, unknown> | null,
+  rawKey?: string,
+): number | null => {
+  const explicitAni = record?.anilist_id ?? record?.anilist ?? record?.aniId;
+  if (explicitAni !== undefined) {
+    return coerceId(explicitAni);
+  }
+
+  if (source === 'fallback') {
+    return null;
+  }
+
+  return rawKey === undefined ? null : coerceId(rawKey);
+};
+
 export class UpstreamMappingStore {
   private readonly log: ScopedLogger;
   private readonly fetchImpl: typeof fetch;
@@ -111,7 +143,7 @@ export class UpstreamMappingStore {
       }
 
       const payload = (await response.json()) as unknown;
-      const pairs = this.buildPairsFromSource(payload);
+      const pairs = this.buildPairsFromSource(source, payload);
       this.hydrateMap(map, this.reverseFor(source), pairs);
 
       const nextEtag = response.headers.get('ETag');
@@ -177,8 +209,8 @@ export class UpstreamMappingStore {
     map.clear();
     reverse.clear();
     for (const [rawKey, rawValue] of Object.entries(pairs)) {
-      const key = this.coerceId(rawKey);
-      const value = this.coerceId(rawValue);
+      const key = coerceId(rawKey);
+      const value = coerceId(rawValue);
       if (key != null && value != null) {
         map.set(key, value);
         this.addReverse(reverse, value, key);
@@ -196,18 +228,21 @@ export class UpstreamMappingStore {
     reverse.set(tvdbId, new Set([anilistId]));
   }
 
-  private buildPairsFromSource(source: unknown): Record<number, number> {
+  private buildPairsFromSource(
+    source: UpstreamMappingSource,
+    payload: unknown,
+  ): Record<number, number> {
     const pairs: Record<number, number> = {};
-    if (!source || typeof source !== 'object') {
+    if (!payload || typeof payload !== 'object') {
       return pairs;
     }
 
-    if (Array.isArray(source)) {
-      for (const entry of source) {
+    if (Array.isArray(payload)) {
+      for (const entry of payload) {
         if (!entry || typeof entry !== 'object') continue;
         const record = entry as Record<string, unknown>;
-        const anilistId = this.coerceId(record.anilist_id ?? record.anilist ?? record.aniId);
-        const tvdbId = this.coerceId(record.tvdb_id ?? record.tvdb ?? record.tvdbid);
+        const anilistId = resolveAniListId(source, record);
+        const tvdbId = coerceId(record.tvdb_id ?? record.tvdb ?? record.tvdbid);
         if (anilistId != null && tvdbId != null) {
           pairs[anilistId] = tvdbId;
         }
@@ -215,20 +250,19 @@ export class UpstreamMappingStore {
       return pairs;
     }
 
-    const objectSource = source as Record<string, unknown>;
+    const objectSource = payload as Record<string, unknown>;
     for (const [rawKey, rawValue] of Object.entries(objectSource)) {
       const record = (typeof rawValue === 'object' && rawValue !== null
         ? (rawValue as Record<string, unknown>)
         : null);
 
-      const explicitAni = record?.anilist_id ?? record?.anilist;
-      const anilistId = this.coerceId(explicitAni ?? rawKey);
+      const anilistId = resolveAniListId(source, record, rawKey);
 
       const explicitTvdb = record?.tvdb_id ?? record?.tvdb ?? record?.tvdbid;
       const tvdbId =
         typeof rawValue === 'number' && Number.isFinite(rawValue)
           ? rawValue
-          : this.coerceId(explicitTvdb);
+          : coerceId(explicitTvdb);
 
       if (anilistId != null && tvdbId != null) {
         pairs[anilistId] = tvdbId;
@@ -242,21 +276,6 @@ export class UpstreamMappingStore {
     }
 
     return pairs;
-  }
-
-  private coerceId(value: unknown): number | null {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return Math.trunc(value);
-    }
-
-    if (typeof value === 'string') {
-      const parsed = Number.parseInt(value, 10);
-      if (Number.isFinite(parsed)) {
-        return Math.trunc(parsed);
-      }
-    }
-
-    return null;
   }
 
   public getAniListIdsForTvdb(tvdbId: number): number[] {
