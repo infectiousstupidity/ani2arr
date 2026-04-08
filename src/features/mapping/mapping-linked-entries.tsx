@@ -12,6 +12,7 @@ interface MappingLinkedEntriesProps {
   currentAniListId: number;
   linkedAniListIds: readonly number[];
   entries?: readonly MappingInspectionLinkedAniListEntry[];
+  className?: string;
 }
 
 type LinkedEntryRow = {
@@ -31,7 +32,7 @@ function titleFromMetadata(metadata: AniListMetadata | undefined, fallback?: str
 }
 
 export function MappingLinkedEntries(props: MappingLinkedEntriesProps): React.JSX.Element | null {
-  const { currentAniListId, linkedAniListIds, entries = [] } = props;
+  const { currentAniListId, linkedAniListIds, entries = [], className } = props;
   const otherLinkedIds = [...new Set(linkedAniListIds.filter((id) => id !== currentAniListId))];
   const metadataQuery = useAniListMetadataBatch(otherLinkedIds, {
     enabled: otherLinkedIds.length > 0,
@@ -58,11 +59,11 @@ export function MappingLinkedEntries(props: MappingLinkedEntriesProps): React.JS
   });
 
   return (
-    <section className="space-y-2">
+    <section className={className ?? 'space-y-2'}>
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
         {`Also linked AniList entr${rows.length === 1 ? 'y' : 'ies'}`}
       </p>
-      <div className="max-h-48 overflow-y-auto rounded-xl border border-border-primary/50 bg-bg-primary/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+      <div className="min-h-0 overflow-y-auto rounded-xl border border-border-primary/50 bg-bg-primary/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
         <div className="divide-y divide-border-primary/50">
           {rows.map((row) => (
             <a

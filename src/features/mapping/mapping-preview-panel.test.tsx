@@ -75,6 +75,8 @@ describe('mapping preview panel', () => {
           provider: 'sonarr',
           providerId: 700,
           title: 'Current Target',
+          typeLabel: 'anime',
+          fileCount: 38,
           inLibrary: true,
         },
         previewMapping: null,
@@ -85,7 +87,13 @@ describe('mapping preview panel', () => {
       }),
     );
 
-    expect(view).toContain('ADDITIONAL CONTEXT');
+    expect(view).toContain('CURRENT TARGET DETAILS');
+    expect(view).toContain('In library');
+    expect(view).toContain('Yes');
+    expect(view).toContain('Episodes');
+    expect(view).toContain('38');
+    expect(view).toContain('Type');
+    expect(view).toContain('Anime');
     expect(view).toContain('Change Sonarr match');
     expect(view).toContain('View Advanced Diagnostics');
     expect(view).not.toContain('Current Target');
@@ -120,7 +128,6 @@ describe('mapping preview panel', () => {
     );
 
     expect(view).toContain('PREVIEWING SONARR MATCH');
-    expect(view).toContain('Replacing');
     expect(view).toContain('Confirm selection to replace the current Sonarr target above.');
     expect(view).toContain('Preview Target');
     expect(view).toContain('View Advanced Diagnostics');

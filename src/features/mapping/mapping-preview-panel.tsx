@@ -29,13 +29,21 @@ interface MappingPreviewPanelProps {
 
 type MappingPreviewPanelViewState = {
   headingLabel: string;
-  headingDescription: React.JSX.Element | null;
   linkedAniListIds: readonly number[];
   linkedAniListEntries: MappingInspectionPayload['linkedAniListEntries'] | undefined;
   showPreviewCard: boolean;
   showSetupContext: boolean;
   showMappingPrompt: boolean;
 };
+
+type MappingDetailRow = {
+  label: string;
+  value: string;
+};
+
+function formatDetailValue(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
 
 const getMappingPreviewPanelViewState = (input: {
   inspectionData: MappingInspectionPayload | undefined;
@@ -49,33 +57,14 @@ const getMappingPreviewPanelViewState = (input: {
   const showPreviewCard = Boolean(!isSetupMode && previewMapping);
   const showSetupContext = isSetupMode;
   const showMappingPrompt = Boolean(!isSetupMode && !previewMapping);
-  const isPreviewingNewTarget = Boolean(
-    previewMapping && (!currentMapping || previewMapping.providerId !== currentMapping.providerId),
-  );
 
   let headingLabel = `PREVIEWING ${providerLabel.toUpperCase()} MATCH`;
   if (isSetupMode) {
-    headingLabel = 'ADDITIONAL CONTEXT';
-  }
-
-  let headingDescription: React.JSX.Element | null = null;
-  if (showSetupContext) {
-    headingDescription = (
-      <p className="text-xs leading-5 text-text-secondary">
-        Linked AniList entries and diagnostics for the current {providerLabel} target shown above.
-      </p>
-    );
-  } else if (isPreviewingNewTarget && currentMapping) {
-    headingDescription = (
-      <p className="text-xs leading-5 text-text-secondary">
-        Replacing <span className="font-medium text-text-primary">{currentMapping.title}</span>
-      </p>
-    );
+    headingLabel = 'CURRENT TARGET DETAILS';
   }
 
   return {
     headingLabel,
-    headingDescription,
     linkedAniListIds: showSetupContext
       ? (inspectionData?.providerContext.linkedAniListIds ?? currentMapping?.linkedAniListIds ?? [])
       : (previewMapping?.linkedAniListIds ?? []),
@@ -88,16 +77,12 @@ const getMappingPreviewPanelViewState = (input: {
 
 function MappingPreviewPanelHeader(props: {
   headingLabel: string;
-  headingDescription: React.JSX.Element | null;
 }): React.JSX.Element {
   return (
     <div className="shrink-0 pb-4">
-      <div className="space-y-1">
-        <p className="text-[11px] font-semibold leading-none tracking-[0.16em] text-text-secondary uppercase">
-          {props.headingLabel}
-        </p>
-        {props.headingDescription}
-      </div>
+      <p className="text-[11px] font-semibold leading-none tracking-[0.16em] text-text-secondary uppercase">
+        {props.headingLabel}
+      </p>
     </div>
   );
 }
@@ -150,6 +135,7 @@ function MappingPreviewPanelBody(props: {
   providerLabel: string;
   aniListEntryId: number;
   baseUrl: string;
+  currentMapping: MappingSearchResult | null;
   previewMapping: MappingSearchResult | null;
   showResetPreview: boolean;
   onResetPreview: () => void;
@@ -165,6 +151,7 @@ function MappingPreviewPanelBody(props: {
     providerLabel,
     aniListEntryId,
     baseUrl,
+    currentMapping,
     previewMapping,
     showResetPreview,
     onResetPreview,
@@ -176,8 +163,63 @@ function MappingPreviewPanelBody(props: {
     provider,
   } = props;
 
+  const detailRows: MappingDetailRow[] = [];
+
+  if (currentMapping) {
+    detailRows.push({
+      label: 'In library',
+      value: currentMapping.inLibrary ? 'Yes' : 'No',
+    });
+
+    if (currentMapping.fileCount !== undefined) {
+      detailRows.push({
+        label: 'Episodes',
+        value: String(currentMapping.fileCount),
+      });
+    }
+
+    if (currentMapping.typeLabel) {
+      detailRows.push({
+        label: 'Type',
+        value: formatDetailValue(currentMapping.typeLabel),
+      });
+    }
+
+    if (currentMapping.statusLabel) {
+      detailRows.push({
+        label: 'Status',
+        value: formatDetailValue(currentMapping.statusLabel),
+      });
+    }
+  }
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 pr-1">
+      {viewState.showSetupContext && currentMapping ? (
+        <div className="rounded-xl border border-border-primary/50 bg-bg-primary/14 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-2">
+              {detailRows.map((row) => (
+                <div key={row.label} className="flex items-baseline justify-between gap-4 text-sm">
+                  <span className="text-text-secondary">{row.label}</span>
+                  <span className="text-right font-medium text-text-primary">{row.value}</span>
+                </div>
+              ))}
+            </div>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onEditMapping}
+              className="shrink-0 text-text-secondary hover:text-text-primary"
+            >
+              {`Change ${providerLabel} match`}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {viewState.showPreviewCard ? (
         <div className="rounded-xl border border-border-primary/50 bg-bg-primary/14 p-3">
           <div className="flex items-center gap-2 text-accent-primary">
@@ -198,16 +240,9 @@ function MappingPreviewPanelBody(props: {
         />
       ) : null}
 
-      {viewState.showSetupContext ? (
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" onClick={onEditMapping} className="self-start">
-            {`Change ${providerLabel} match`}
-          </Button>
-        </div>
-      ) : null}
-
       {viewState.linkedAniListIds.length > 0 ? (
         <MappingLinkedEntries
+          className="flex min-h-0 flex-1 flex-col space-y-2"
           currentAniListId={aniListEntryId}
           linkedAniListIds={viewState.linkedAniListIds}
           {...(viewState.linkedAniListEntries ? { entries: viewState.linkedAniListEntries } : {})}
@@ -215,17 +250,19 @@ function MappingPreviewPanelBody(props: {
       ) : null}
 
       {viewState.showMappingPrompt ? (
-        <div className="flex min-h-65 items-center justify-center rounded-xl border border-dashed border-border-primary bg-bg-tertiary/60 px-3 text-center text-sm text-text-secondary">
+        <div className="flex min-h-65 flex-1 items-center justify-center rounded-xl border border-dashed border-border-primary bg-bg-tertiary/60 px-3 text-center text-sm text-text-secondary">
           Select a search result to preview how it would replace the current {providerLabel} target shown above.
         </div>
       ) : null}
 
-      <MappingPreviewDiagnostics
-        inspectionData={inspectionData}
-        inspectionPending={inspectionPending}
-        inspectionError={inspectionError}
-        provider={provider}
-      />
+      <div className="mt-auto shrink-0">
+        <MappingPreviewDiagnostics
+          inspectionData={inspectionData}
+          inspectionPending={inspectionPending}
+          inspectionError={inspectionError}
+          provider={provider}
+        />
+      </div>
     </div>
   );
 }
@@ -256,16 +293,14 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
 
   return (
     <div className="flex h-full min-h-0 flex-col rounded-2xl bg-bg-secondary/34 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-      <MappingPreviewPanelHeader
-        headingLabel={viewState.headingLabel}
-        headingDescription={viewState.headingDescription}
-      />
+      <MappingPreviewPanelHeader headingLabel={viewState.headingLabel} />
 
       <MappingPreviewPanelBody
         viewState={viewState}
         providerLabel={providerLabel}
         aniListEntryId={aniListEntry.id}
         baseUrl={baseUrl}
+        currentMapping={currentMapping}
         previewMapping={previewMapping}
         showResetPreview={showResetPreview}
         onResetPreview={onResetPreview}
