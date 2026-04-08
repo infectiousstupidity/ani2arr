@@ -16,15 +16,15 @@ export function RadarrPanel(props: RadarrPanelProps): React.JSX.Element {
     folderSlug,
   } = props;
 
-  const headerTitle = mode === "edit" ? 'Update Radarr options' : 'Setup Radarr options';
+  const headerTitle = 'Radarr configuration';
   const headerDescription =
     mode === "edit"
-      ? "Update configuration or move files to a new location."
-      : "Choose the root folder and add options for this movie.";
+      ? 'Update the folder and quality settings for this source match.'
+      : 'Choose the root folder and add options for this movie.';
 
   return (
-    <div className="flex h-full min-h-0 flex-col px-4 pt-4">
-      <div className="shrink-0 pb-4">
+    <div className="flex h-full min-h-0 flex-col px-4 pt-2">
+      <div className="shrink-0 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">

@@ -2,7 +2,6 @@
 // src/features/mapping/mapping-search-panel.tsx
 
 import { ExternalLink } from 'lucide-react';
-import Pill from '@/shared/ui/primitives/pill';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import type { Provider } from '@/providers';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
@@ -10,7 +9,7 @@ import { getProviderLabel } from '@/providers/provider-routing';
 import type { MappingSearchController, MappingSearchResult } from './types';
 
 function shouldShowTypeLabel(result: MappingSearchResult): boolean {
-  return result.provider === 'sonarr' && Boolean(result.typeLabel) && result.inLibrary;
+  return result.provider === 'sonarr' && Boolean(result.typeLabel);
 }
 
 interface MappingSearchPanelProps {
@@ -64,61 +63,22 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                       selected &&
                       result.providerId === selected.providerId;
 
-                    const metadataPills: React.ReactNode[] = [
-                      <Pill key="tvdb" small tone="muted" className="font-mono text-text-primary">
-                        {`${provider === 'radarr' ? 'TMDB' : 'TVDB'} ${result.providerId}`}
-                      </Pill>,
-                    ];
+                    const metadataItems = [
+                      `${provider === 'radarr' ? 'TMDB' : 'TVDB'} ${result.providerId}`,
+                      result.year ? String(result.year) : null,
+                      shouldShowTypeLabel(result) ? result.typeLabel ?? null : null,
+                    ].filter(Boolean);
 
-                    if (result.year) {
-                      metadataPills.push(
-                        <Pill key="year" small tone="muted">
-                          {result.year}
-                        </Pill>,
-                      );
-                    }
+                    const linkedWarning = Array.isArray(result.linkedAniListIds) && result.linkedAniListIds.length > 0
+                      ? `Linked to ${result.linkedAniListIds.length} AniList entr${result.linkedAniListIds.length === 1 ? 'y' : 'ies'}`
+                      : null;
 
-                    if (shouldShowTypeLabel(result)) {
-                      metadataPills.push(
-                        <Pill key="type" small tone="muted" className="text-text-secondary">
-                          {result.typeLabel}
-                        </Pill>,
-                      );
-                    }
-
-                    if (result.inLibrary) {
-                      metadataPills.push(
-                        <Pill
-                          key="library"
-                          small
-                          tone="success"
-                          className="border-transparent bg-success/85 text-white uppercase tracking-wide"
-                        >
-                          {`In ${providerLabel}`}
-                        </Pill>,
-                      );
-                    }
-
-                    if (Array.isArray(result.linkedAniListIds) && result.linkedAniListIds.length > 0) {
-                      metadataPills.push(
-                        <Pill
-                          key="linked"
-                          small
-                          tone="warning"
-                          className="border-transparent bg-amber-300/20 text-amber-100 text-[10px] font-semibold uppercase tracking-wide"
-                        >
-                          {`Linked to ${result.linkedAniListIds.length} AniList entr${result.linkedAniListIds.length === 1 ? 'y' : 'ies'}`}
-                        </Pill>,
-                      );
-                    }
-
-                    if (isCurrent) {
-                      metadataPills.push(
-                        <Pill key="current" small tone="success" className="border-transparent bg-success/85 text-white uppercase tracking-wide">
-                          Current match
-                        </Pill>,
-                      );
-                    }
+                    const statusItems = [
+                      isCurrent ? 'Current match' : null,
+                      result.inLibrary
+                        ? `In ${providerLabel}${provider === 'sonarr' && result.fileCount ? ` - ${result.fileCount} eps` : ''}`
+                        : null,
+                    ].filter(Boolean);
 
                     const link = buildExternalMediaLink({
                       provider: provider,
@@ -131,10 +91,10 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                     return (
                       <div
                         key={`${result.provider}-${result.providerId}`}
-                        className={`group flex items-center gap-3 px-3 py-3 transition-colors ${
+                        className={`group flex items-center gap-3 border-l-2 px-3 py-3 transition-colors ${
                           isSelected
-                            ? 'bg-accent-primary/18 ring-1 ring-inset ring-accent-primary/35'
-                            : 'hover:bg-bg-primary/45'
+                            ? 'border-l-accent-primary bg-white/8'
+                            : 'border-l-transparent hover:bg-bg-primary/45'
                         }`}
                       >
                         <button
@@ -154,14 +114,36 @@ export function MappingSearchPanel(props: MappingSearchPanelProps) {
                           <div className="min-w-0 flex-1 space-y-2">
                             <div
                               className={`text-sm font-semibold leading-tight ${
-                                isSelected ? 'text-accent-primary' : 'text-text-primary'
+                                isSelected ? 'text-text-primary' : 'text-text-primary'
                               } line-clamp-2`}
                             >
                               {result.title}
                             </div>
-                            {metadataPills.length > 0 ? (
-                              <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-                                {metadataPills}
+                            {metadataItems.length > 0 ? (
+                              <div className="flex flex-wrap items-center gap-1 text-xs text-text-secondary">
+                                {metadataItems.map((item, index) => (
+                                  <span key={`${result.providerId}-${item}-${index}`} className="contents">
+                                    {index > 0 ? <span aria-hidden="true">•</span> : null}
+                                    <span className={index === 0 ? 'font-mono text-text-primary' : undefined}>{item}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                            {linkedWarning ? (
+                              <div className="text-[11px] font-medium text-amber-100/85">
+                                {linkedWarning}
+                              </div>
+                            ) : null}
+                            {statusItems.length > 0 ? (
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium">
+                                {statusItems.map((item, index) => (
+                                  <span
+                                    key={`${result.providerId}-status-${index}`}
+                                    className={index === 0 && isCurrent ? 'text-success' : 'text-text-secondary'}
+                                  >
+                                    {item}
+                                  </span>
+                                ))}
                               </div>
                             ) : null}
                           </div>

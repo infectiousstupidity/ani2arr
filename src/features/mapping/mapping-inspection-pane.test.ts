@@ -121,8 +121,8 @@ describe('mapping inspection pane', () => {
       }),
     );
 
-    expect(view).toContain('Suggested matches');
-    expect(view).toContain('No recent candidate trace is available yet. Start typing to search manually.');
+    expect(view).toContain('Recent suggestions');
+    expect(view).toContain('No recent suggestions are available yet. Start typing to search manually.');
     expect(view).not.toContain('No results found.');
     expect(view).not.toContain('Why this mapping exists');
   });
@@ -304,10 +304,10 @@ describe('mapping inspection pane', () => {
       }),
     );
 
-    expect(view).toContain('Suggested matches');
+    expect(view).toContain('Recent suggestions');
     expect(view).toContain('Shared Title');
     expect(view).toContain('Wrong Title');
-    expect(view).toContain('Search terms used: Shared Title');
+    expect(view).toContain('Recent searches: Shared Title');
   });
 
   it('uses suggested candidates to prefill search without selecting a replacement directly', () => {

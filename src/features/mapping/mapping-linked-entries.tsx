@@ -60,9 +60,9 @@ export function MappingLinkedEntries(props: MappingLinkedEntriesProps): React.JS
   return (
     <section className="space-y-2">
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-        {`Mapped to ${rows.length} other AniList entr${rows.length === 1 ? 'y' : 'ies'}`}
+        {`Also linked AniList entr${rows.length === 1 ? 'y' : 'ies'}`}
       </p>
-      <div className="max-h-48 overflow-y-auto rounded-xl bg-bg-primary/20">
+      <div className="max-h-48 overflow-y-auto rounded-xl border border-border-primary/50 bg-bg-primary/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
         <div className="divide-y divide-border-primary/50">
           {rows.map((row) => (
             <a

@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Modal, ModalContent, ModalTitle, ModalDescription } from "./modal";
 import { Header, type MediaModalTabId } from "./media-modal-header";
 import { Footer, type FooterProps } from "./media-modal-footer";
+import { MediaModalFaceoffStrip } from "./media-modal-faceoff-strip";
 import Button from "@/shared/ui/primitives/button";
 import type { AniListTitleLanguage } from "@/anilist/schemas/title-language.schema";
 import type {
@@ -132,6 +133,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   const providerLabel = getProviderLabel(provider);
   const activePanelMode = provider === 'radarr' ? radarrPanelProps?.mode : sonarrPanelProps?.mode;
   const activeController = provider === 'radarr' ? radarrController : sonarrController;
+  const tooltipContainer = floatingPortalEl ?? (portalContainer instanceof HTMLElement ? portalContainer : null);
 
   const handleClose = useCallback(() => {
     onClose();
@@ -144,6 +146,20 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
   const handleEnterMapping = useCallback(() => {
     setViewMode("mapping");
   }, []);
+
+  const handleOpenMappingSettings = useCallback(() => {
+    try {
+      void browser.runtime.sendMessage({
+        _a2a: true,
+        type: 'OPEN_OPTIONS_PAGE',
+        sectionId: 'mappings',
+        targetAnilistId: mappingTabProps.aniListEntry.id,
+        timestamp: Date.now(),
+      });
+    } catch {
+      // best-effort only
+    }
+  }, [mappingTabProps.aniListEntry.id]);
 
   const effectiveCurrentMapping = mappingController.currentMapping ?? mappingTabProps.currentMapping ?? null;
   const mappingRequiresResolution = initialMappingRequired && effectiveCurrentMapping == null;
@@ -340,7 +356,7 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
         }}
         onEscapeKeyDown={handleEscapeKeyDown}
       >
-        {/* Accessible dialog title/description for screen readers. Visual title handled by Header. */}
+        {/* Accessible dialog title/description for screen readers. Visual title handled by the face-off strip. */}
         <ModalTitle className="sr-only">{title}</ModalTitle>
         <ModalDescription className="sr-only">
           Configure {providerLabel} options or update ID mapping for this AniList entry.
@@ -361,64 +377,79 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
           onEnterMapping={handleEnterMapping}
           onExitMapping={handleExitMapping}
           onClose={handleClose}
-          tooltipContainer={floatingPortalEl ?? (portalContainer instanceof HTMLElement ? portalContainer : null)}
+          onOpenSettings={handleOpenMappingSettings}
+          tooltipContainer={tooltipContainer}
+          content={(
+            <MediaModalFaceoffStrip
+              sourceTitle={title}
+              sourceCoverImage={coverImage}
+              sourceFormat={format}
+              sourceYear={year}
+              sourceAniListId={mappingTabProps.aniListEntry.id}
+              provider={provider}
+              baseUrl={baseUrl}
+              currentMapping={effectiveCurrentMapping}
+            />
+          )}
         />
-        {/* Content Area - split view with sticky preview and inline content */}
-        <div className="flex-1 overflow-hidden px-8">
-          <div className="mx-auto flex h-full max-w-250 flex-col gap-6">
-            <div className="grid h-full grid-cols-2 gap-6">
-              <div className="flex h-full flex-col overflow-hidden">
-                <div className="flex-1 min-h-0">
-                  {viewMode === "mapping" ? (
-                    <MappingInspectionPane
-                      anilistId={mappingTabProps.aniListEntry.id}
-                      controller={mappingController}
-                      currentMapping={effectiveCurrentMapping}
+        <div className="relative flex-1 overflow-hidden px-4 sm:px-8">
+          <div className="mx-auto flex h-full max-w-250 flex-col">
+            <div className="min-h-0 flex-1 pt-5 pb-4 sm:pt-6">
+              <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.96fr)]">
+                <div className="flex h-full flex-col overflow-hidden">
+                  <div className="flex-1 min-h-0">
+                    {viewMode === "mapping" ? (
+                      <MappingInspectionPane
+                        anilistId={mappingTabProps.aniListEntry.id}
+                        controller={mappingController}
+                        currentMapping={effectiveCurrentMapping}
+                        provider={mappingTabProps.provider}
+                        baseUrl={baseUrl}
+                        onExitMapping={handleExitMapping}
+                        portalContainer={selectPortalContainer instanceof HTMLElement ? selectPortalContainer : null}
+                      />
+                    ) : (
+                      <>
+                        {provider === 'radarr' && radarrPanelProps ? (
+                          <RadarrPanel
+                            {...radarrPanelProps}
+                            controller={radarrController}
+                            portalContainer={selectPortalContainer}
+                          />
+                        ) : null}
+                        {provider === 'sonarr' && sonarrPanelProps ? (
+                          <SonarrPanel
+                            {...sonarrPanelProps}
+                            controller={sonarrController}
+                            portalContainer={selectPortalContainer}
+                          />
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="relative min-h-0">
+                  <div className="h-full lg:sticky lg:top-0">
+                    <MappingPreviewPanel
                       provider={mappingTabProps.provider}
+                      aniListEntry={mappingTabProps.aniListEntry}
                       baseUrl={baseUrl}
-                      onExitMapping={handleExitMapping}
+                      currentMapping={effectiveCurrentMapping}
+                      previewMapping={previewMapping}
+                      isInMappingMode={viewMode === "mapping"}
+                      showResetPreview={showResetPreview}
+                      onResetPreview={mappingController.clearSelection}
+                      onEditMapping={() => {
+                        if (viewMode === "mapping") {
+                          handleExitMapping();
+                        } else {
+                          handleEnterMapping();
+                        }
+                      }}
                       portalContainer={selectPortalContainer instanceof HTMLElement ? selectPortalContainer : null}
                     />
-                  ) : (
-                    <>
-                      {provider === 'radarr' && radarrPanelProps ? (
-                        <RadarrPanel
-                          {...radarrPanelProps}
-                          controller={radarrController}
-                          portalContainer={selectPortalContainer}
-                        />
-                      ) : null}
-                      {provider === 'sonarr' && sonarrPanelProps ? (
-                        <SonarrPanel
-                          {...sonarrPanelProps}
-                          controller={sonarrController}
-                          portalContainer={selectPortalContainer}
-                        />
-                      ) : null}
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="relative">
-                <div className="sticky top-0">
-                  <MappingPreviewPanel
-                    provider={mappingTabProps.provider}
-                    aniListEntry={mappingTabProps.aniListEntry}
-                    baseUrl={baseUrl}
-                    currentMapping={effectiveCurrentMapping}
-                    previewMapping={previewMapping}
-                    isInMappingMode={viewMode === "mapping"}
-                    showResetPreview={showResetPreview}
-                    onResetPreview={mappingController.clearSelection}
-                    onEditMapping={() => {
-                      if (viewMode === "mapping") {
-                        handleExitMapping();
-                      } else {
-                        handleEnterMapping();
-                      }
-                    }}
-                    portalContainer={selectPortalContainer instanceof HTMLElement ? selectPortalContainer : null}
-                  />
+                  </div>
                 </div>
               </div>
             </div>
