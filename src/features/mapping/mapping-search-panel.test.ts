@@ -28,7 +28,7 @@ const createController = (results: MappingSearchResult[]): MappingSearchControll
 });
 
 describe('mapping search panel', () => {
-  it('hides Sonarr series-type pills for results that are not already in the library', () => {
+  it('shows Sonarr type metadata for results even when they are not already in the library', () => {
     const view = renderToStaticMarkup(
       React.createElement(MappingSearchPanel, {
         controller: createController([
@@ -46,7 +46,7 @@ describe('mapping search panel', () => {
       }),
     );
 
-    expect(view).not.toContain('standard');
+    expect(view).toContain('standard');
   });
 
   it('keeps Sonarr series-type pills for results that already exist in the library', () => {

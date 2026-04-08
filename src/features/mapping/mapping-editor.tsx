@@ -1,7 +1,8 @@
 /** Mapping modal that shows AniList display titles while editing provider ID overrides. */
 // src/features/mapping/mapping-editor.tsx
 
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
+import { MediaModalFaceoffStrip } from '@/features/media-modal/components/media-modal-faceoff-strip';
 import { useAniListMedia } from '@/shared/queries';
 import { Footer } from '@/features/media-modal/components/media-modal-footer';
 import { Header } from '@/features/media-modal/components/media-modal-header';
@@ -203,6 +204,20 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
   const primaryLabel = currentMapping ? 'Update mapping' : 'Add mapping';
   const secondaryLabel = 'Exit modal';
 
+  const handleOpenMappingSettings = useCallback(() => {
+    try {
+      void browser.runtime.sendMessage({
+        _a2a: true,
+        type: 'OPEN_OPTIONS_PAGE',
+        sectionId: 'mappings',
+        targetAnilistId: anilistId,
+        timestamp: Date.now(),
+      });
+    } catch {
+      // best-effort only
+    }
+  }, [anilistId]);
+
   const handleSave = async () => {
     try {
       await mappingController.handleSubmit();
@@ -252,40 +267,55 @@ export const MappingEditor: React.FC<MappingEditorProps> = ({
           onEnterMapping={() => {}}
           onExitMapping={onClose}
           onClose={onClose}
+          onOpenSettings={handleOpenMappingSettings}
+          content={(
+            <MediaModalFaceoffStrip
+              sourceTitle={resolvedTitle.primary}
+              sourceCoverImage={coverImage}
+              sourceFormat={format}
+              sourceYear={year}
+              sourceAniListId={anilistId}
+              provider={provider}
+              baseUrl={baseUrl}
+              currentMapping={currentMapping}
+            />
+          )}
         />
 
-        <div className="flex-1 overflow-hidden px-8">
-          <div className="mx-auto flex h-full max-w-250 flex-col gap-6">
-            <div className="grid h-full grid-cols-2 gap-6">
-              <div className="flex h-full flex-col overflow-hidden">
-                <div className="min-h-0 flex-1">
-                  <MappingInspectionPane
-                    anilistId={anilistId}
-                    controller={mappingController}
-                    currentMapping={mappingController.currentMapping}
-                    provider={provider}
-                    baseUrl={baseUrl}
-                  />
+        <div className="relative flex-1 overflow-hidden px-4 sm:px-8">
+          <div className="mx-auto flex h-full max-w-250 flex-col">
+            <div className="min-h-0 flex-1 pt-5 pb-4 sm:pt-6">
+              <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.96fr)]">
+                <div className="flex h-full flex-col overflow-hidden">
+                  <div className="min-h-0 flex-1">
+                    <MappingInspectionPane
+                      anilistId={anilistId}
+                      controller={mappingController}
+                      currentMapping={mappingController.currentMapping}
+                      provider={provider}
+                      baseUrl={baseUrl}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="relative">
-                <div className="sticky top-0 h-full">
-                  <MappingPreviewPanel
-                    provider={provider}
-                    aniListEntry={{
-                      id: anilistId,
-                      title: resolvedTitle.primary,
-                      ...(coverImage ? { posterUrl: coverImage } : {}),
-                    }}
-                    baseUrl={baseUrl}
-                    currentMapping={mappingController.currentMapping}
-                    previewMapping={previewMapping}
-                    isInMappingMode
-                    showResetPreview={showResetPreview}
-                    onResetPreview={mappingController.clearSelection}
-                    onEditMapping={onClose}
-                  />
+                <div className="relative min-h-0">
+                  <div className="h-full lg:sticky lg:top-0">
+                    <MappingPreviewPanel
+                      provider={provider}
+                      aniListEntry={{
+                        id: anilistId,
+                        title: resolvedTitle.primary,
+                        ...(coverImage ? { posterUrl: coverImage } : {}),
+                      }}
+                      baseUrl={baseUrl}
+                      currentMapping={mappingController.currentMapping}
+                      previewMapping={previewMapping}
+                      isInMappingMode
+                      showResetPreview={showResetPreview}
+                      onResetPreview={mappingController.clearSelection}
+                      onEditMapping={onClose}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

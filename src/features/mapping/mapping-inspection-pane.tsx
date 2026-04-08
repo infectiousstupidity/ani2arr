@@ -155,12 +155,7 @@ export function MappingInspectionSuggestedShortcuts(props: {
     <div className="space-y-4">
       <section className="space-y-2">
         <div className="space-y-1">
-          <h3 className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">Suggested matches</h3>
-          <p className="text-xs text-text-secondary">
-            {inspection.suggestedCandidates.searchTerms?.length
-              ? `Search terms used: ${inspection.suggestedCandidates.searchTerms.join(', ')}`
-              : 'Use a recent candidate below, or start typing to search manually.'}
-          </p>
+          <h3 className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">Recent suggestions</h3>
         </div>
 
         {suggestedRows.length > 0 ? (
@@ -195,14 +190,10 @@ export function MappingInspectionSuggestedShortcuts(props: {
           </div>
         ) : (
           <div className="rounded-xl bg-bg-secondary/35 px-3 py-4 text-sm text-text-secondary">
-            No recent candidate trace is available yet. Start typing to search manually.
+            No recent suggestions are available yet. Start typing to search manually.
           </div>
         )}
       </section>
-
-      <div className="rounded-xl bg-bg-secondary/20 px-3 py-3 text-xs text-text-secondary">
-        Search results on the left update the preview on the right without replacing the current mapping until you confirm.
-      </div>
     </div>
   );
 }
@@ -433,11 +424,11 @@ export function MappingInspectionPane(props: MappingInspectionPaneProps): React.
           </Button>
         ) : null}
         <div className="space-y-1">
-          <p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">Mapping search</p>
+          <p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">{`Search ${providerLabel} database`}</p>
           <p className="text-xs text-text-secondary">
             {searchMode
-              ? `Searching ${providerLabel} updates the preview on the right.`
-              : `Pick a recent ${providerIdLabel} match below, or start typing to search manually.`}
+              ? 'Search results update the target preview on the right.'
+              : 'Use a recent suggestion below, or start typing to search manually.'}
           </p>
         </div>
         <div className="mt-3">
@@ -469,13 +460,13 @@ export function MappingInspectionPane(props: MappingInspectionPaneProps): React.
                 <div className="space-y-4">
                   {inspectionQuery.isPending && !inspectionQuery.data ? (
                     <div className="rounded-xl bg-bg-secondary/45 px-3 py-8 text-center text-sm text-text-secondary">
-                      Loading suggested matches...
+                      Loading recent suggestions...
                     </div>
                   ) : null}
 
                   {inspectionQuery.error && !inspectionQuery.data ? (
                     <div className="rounded-xl bg-warning/8 px-3 py-4 text-sm text-text-secondary">
-                      Mapping diagnostics are unavailable right now. Search is still available above.
+                      Suggestions are unavailable right now. Search is still available above.
                     </div>
                   ) : null}
 

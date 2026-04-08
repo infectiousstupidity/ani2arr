@@ -2,13 +2,14 @@
 // src/features/mapping/mapping-preview-panel.tsx
 
 import * as Accordion from '@radix-ui/react-accordion';
-import { ChevronDown, ExternalLink, X, Settings } from 'lucide-react';
+import { ArrowDown, ChevronDown, ExternalLink, X } from 'lucide-react';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { buildExternalMediaLink } from '@/shared/utils/provider-links';
 import type { Provider } from '@/providers';
 import { getProviderLabel } from '@/providers/provider-routing';
 import { useMappingInspection } from '@/shared/queries';
+import type { MappingInspectionPayload } from '@/mapping/inspection/inspection-types';
 import { MappingInspectionPaneContent } from './mapping-inspection-pane';
 import { MappingLinkedEntries } from './mapping-linked-entries';
 import type { MappingAniListSummary, MappingSearchResult } from './types';
@@ -26,6 +27,209 @@ interface MappingPreviewPanelProps {
   portalContainer?: HTMLElement | null;
 }
 
+type MappingPreviewPanelViewState = {
+  headingLabel: string;
+  headingDescription: React.JSX.Element | null;
+  linkedAniListIds: readonly number[];
+  linkedAniListEntries: MappingInspectionPayload['linkedAniListEntries'] | undefined;
+  showPreviewCard: boolean;
+  showSetupContext: boolean;
+  showMappingPrompt: boolean;
+};
+
+const getMappingPreviewPanelViewState = (input: {
+  inspectionData: MappingInspectionPayload | undefined;
+  providerLabel: string;
+  currentMapping: MappingSearchResult | null;
+  previewMapping: MappingSearchResult | null;
+  isInMappingMode: boolean;
+}): MappingPreviewPanelViewState => {
+  const { inspectionData, providerLabel, currentMapping, previewMapping, isInMappingMode } = input;
+  const isSetupMode = isInMappingMode === false;
+  const showPreviewCard = Boolean(!isSetupMode && previewMapping);
+  const showSetupContext = isSetupMode;
+  const showMappingPrompt = Boolean(!isSetupMode && !previewMapping);
+  const isPreviewingNewTarget = Boolean(
+    previewMapping && (!currentMapping || previewMapping.providerId !== currentMapping.providerId),
+  );
+
+  let headingLabel = `PREVIEWING ${providerLabel.toUpperCase()} MATCH`;
+  if (isSetupMode) {
+    headingLabel = 'ADDITIONAL CONTEXT';
+  }
+
+  let headingDescription: React.JSX.Element | null = null;
+  if (showSetupContext) {
+    headingDescription = (
+      <p className="text-xs leading-5 text-text-secondary">
+        Linked AniList entries and diagnostics for the current {providerLabel} target shown above.
+      </p>
+    );
+  } else if (isPreviewingNewTarget && currentMapping) {
+    headingDescription = (
+      <p className="text-xs leading-5 text-text-secondary">
+        Replacing <span className="font-medium text-text-primary">{currentMapping.title}</span>
+      </p>
+    );
+  }
+
+  return {
+    headingLabel,
+    headingDescription,
+    linkedAniListIds: showSetupContext
+      ? (inspectionData?.providerContext.linkedAniListIds ?? currentMapping?.linkedAniListIds ?? [])
+      : (previewMapping?.linkedAniListIds ?? []),
+    linkedAniListEntries: showSetupContext ? inspectionData?.linkedAniListEntries : undefined,
+    showPreviewCard,
+    showSetupContext,
+    showMappingPrompt,
+  };
+};
+
+function MappingPreviewPanelHeader(props: {
+  headingLabel: string;
+  headingDescription: React.JSX.Element | null;
+}): React.JSX.Element {
+  return (
+    <div className="shrink-0 pb-4">
+      <div className="space-y-1">
+        <p className="text-[11px] font-semibold leading-none tracking-[0.16em] text-text-secondary uppercase">
+          {props.headingLabel}
+        </p>
+        {props.headingDescription}
+      </div>
+    </div>
+  );
+}
+
+function MappingPreviewDiagnostics(props: {
+  inspectionData: MappingInspectionPayload | undefined;
+  inspectionPending: boolean;
+  inspectionError: boolean;
+  provider: Provider;
+}): React.JSX.Element {
+  const { inspectionData, inspectionPending, inspectionError, provider } = props;
+
+  return (
+    <Accordion.Root type="single" collapsible>
+      <Accordion.Item value="diagnostics" className="overflow-hidden rounded-xl border border-border-primary/50 bg-bg-primary/18">
+        <Accordion.Header>
+          <Accordion.Trigger className="group flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm font-medium text-text-primary">
+            <span>View Advanced Diagnostics</span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 group-data-[state=open]:rotate-180" />
+          </Accordion.Trigger>
+        </Accordion.Header>
+        <Accordion.Content className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+          <div className="border-t border-border-primary/50 px-3 py-3">
+            <div className="max-h-48 overflow-y-auto pr-1">
+              {inspectionPending && !inspectionData ? (
+                <div className="rounded-xl bg-bg-secondary/35 px-3 py-6 text-sm text-text-secondary">
+                  Loading mapping diagnostics...
+                </div>
+              ) : null}
+
+              {inspectionError && !inspectionData ? (
+                <div className="rounded-xl bg-warning/8 px-3 py-4 text-sm text-text-secondary">
+                  Mapping diagnostics are unavailable right now.
+                </div>
+              ) : null}
+
+              {inspectionData ? (
+                <MappingInspectionPaneContent inspection={inspectionData} provider={provider} />
+              ) : null}
+            </div>
+          </div>
+        </Accordion.Content>
+      </Accordion.Item>
+    </Accordion.Root>
+  );
+}
+
+function MappingPreviewPanelBody(props: {
+  viewState: MappingPreviewPanelViewState;
+  providerLabel: string;
+  aniListEntryId: number;
+  baseUrl: string;
+  previewMapping: MappingSearchResult | null;
+  showResetPreview: boolean;
+  onResetPreview: () => void;
+  onEditMapping: () => void;
+  portalContainer: HTMLElement | null | undefined;
+  inspectionData: MappingInspectionPayload | undefined;
+  inspectionPending: boolean;
+  inspectionError: boolean;
+  provider: Provider;
+}): React.JSX.Element {
+  const {
+    viewState,
+    providerLabel,
+    aniListEntryId,
+    baseUrl,
+    previewMapping,
+    showResetPreview,
+    onResetPreview,
+    onEditMapping,
+    portalContainer,
+    inspectionData,
+    inspectionPending,
+    inspectionError,
+    provider,
+  } = props;
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+      {viewState.showPreviewCard ? (
+        <div className="rounded-xl border border-border-primary/50 bg-bg-primary/14 p-3">
+          <div className="flex items-center gap-2 text-accent-primary">
+            <ArrowDown className="h-4 w-4 shrink-0" />
+            <p className="text-sm font-medium text-text-primary">Confirm selection to replace the current {providerLabel} target above.</p>
+          </div>
+        </div>
+      ) : null}
+
+      {viewState.showPreviewCard && previewMapping ? (
+        <MappingPreviewCard
+          mapping={previewMapping}
+          baseUrl={baseUrl}
+          showResetPreview={showResetPreview}
+          onResetPreview={onResetPreview}
+          portalContainer={portalContainer ?? null}
+          highlight="preview"
+        />
+      ) : null}
+
+      {viewState.showSetupContext ? (
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" onClick={onEditMapping} className="self-start">
+            {`Change ${providerLabel} match`}
+          </Button>
+        </div>
+      ) : null}
+
+      {viewState.linkedAniListIds.length > 0 ? (
+        <MappingLinkedEntries
+          currentAniListId={aniListEntryId}
+          linkedAniListIds={viewState.linkedAniListIds}
+          {...(viewState.linkedAniListEntries ? { entries: viewState.linkedAniListEntries } : {})}
+        />
+      ) : null}
+
+      {viewState.showMappingPrompt ? (
+        <div className="flex min-h-65 items-center justify-center rounded-xl border border-dashed border-border-primary bg-bg-tertiary/60 px-3 text-center text-sm text-text-secondary">
+          Select a search result to preview how it would replace the current {providerLabel} target shown above.
+        </div>
+      ) : null}
+
+      <MappingPreviewDiagnostics
+        inspectionData={inspectionData}
+        inspectionPending={inspectionPending}
+        inspectionError={inspectionError}
+        provider={provider}
+      />
+    </div>
+  );
+}
+
 export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.Element {
   const {
     provider,
@@ -41,135 +245,37 @@ export function MappingPreviewPanel(props: MappingPreviewPanelProps): React.JSX.
   } = props;
 
   const inspectionQuery = useMappingInspection(provider, aniListEntry.id);
-  const hasCurrentMapping = Boolean(currentMapping);
-  const hasPreviewMapping = Boolean(previewMapping);
-  const isSetupMode = isInMappingMode === false;
-  const activeMapping = previewMapping ?? currentMapping;
-  const showEmptyState = !activeMapping;
-  const providerIdLabel = provider === 'radarr' ? 'TMDB' : 'TVDB';
-  const headingLabel = hasPreviewMapping ? 'PREVIEWING TARGET' : `${providerIdLabel} TARGET`;
-
-  const openMappingSettings = () => {
-    try {
-      void browser.runtime.sendMessage({
-        _a2a: true,
-        type: 'OPEN_OPTIONS_PAGE',
-        sectionId: 'mappings',
-        targetAnilistId: aniListEntry.id,
-        timestamp: Date.now(),
-      });
-    } catch {
-      // best-effort only
-    }
-  };
-
-  const linkedAniListIds = hasPreviewMapping
-    ? (previewMapping?.linkedAniListIds ?? [])
-    : (inspectionQuery.data?.providerContext.linkedAniListIds ?? currentMapping?.linkedAniListIds ?? []);
-  const linkedAniListEntries = hasPreviewMapping ? undefined : inspectionQuery.data?.linkedAniListEntries;
+  const providerLabel = getProviderLabel(provider);
+  const viewState = getMappingPreviewPanelViewState({
+    inspectionData: inspectionQuery.data,
+    providerLabel,
+    currentMapping,
+    previewMapping,
+    isInMappingMode,
+  });
 
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-2xl bg-bg-secondary/30 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-      <div className="shrink-0 pb-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">
-              {headingLabel}
-            </p>
-            {hasPreviewMapping && currentMapping ? (
-              <p className="text-xs leading-5 text-text-secondary">
-                Overwriting <span className="font-medium text-text-primary">{currentMapping.title}</span>
-              </p>
-            ) : null}
-          </div>
+    <div className="flex h-full min-h-0 flex-col rounded-2xl bg-bg-secondary/34 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+      <MappingPreviewPanelHeader
+        headingLabel={viewState.headingLabel}
+        headingDescription={viewState.headingDescription}
+      />
 
-          <Button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              openMappingSettings();
-            }}
-            variant="ghost"
-            size="icon"
-            tooltip="Open Mapping & Overrides settings in the options page"
-            portalContainer={portalContainer ?? undefined}
-            className="h-8 w-8 text-text-secondary hover:text-text-primary"
-            aria-label="Open Mapping & Overrides settings"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
-
-        {activeMapping ? (
-          <MappingPreviewCard
-            mapping={activeMapping}
-            baseUrl={baseUrl}
-            showResetPreview={showResetPreview}
-            onResetPreview={onResetPreview}
-            portalContainer={portalContainer ?? null}
-            {...(hasPreviewMapping ? { highlight: 'preview' as const } : {})}
-          />
-        ) : null}
-
-        {isSetupMode ? (
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onEditMapping}>
-              {hasCurrentMapping ? 'Edit match' : 'Add match'}
-            </Button>
-          </div>
-        ) : null}
-
-        {activeMapping ? (
-          <MappingLinkedEntries
-            currentAniListId={aniListEntry.id}
-            linkedAniListIds={linkedAniListIds}
-            {...(linkedAniListEntries ? { entries: linkedAniListEntries } : {})}
-          />
-        ) : null}
-
-        {showEmptyState ? (
-          <div className="flex min-h-65 items-center justify-center rounded-xl border border-dashed border-border-primary bg-bg-tertiary/60 px-3 text-center text-sm text-text-secondary">
-            No mapping yet. Use mapping mode to search for the correct provider entry.
-          </div>
-        ) : null}
-
-        {isInMappingMode ? (
-          <Accordion.Root type="single" collapsible>
-            <Accordion.Item value="diagnostics" className="overflow-hidden rounded-xl border border-border-primary/50 bg-bg-primary/18">
-              <Accordion.Header>
-                <Accordion.Trigger className="group flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm font-medium text-text-primary">
-                  <span>View Match Diagnostics & Logs</span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                </Accordion.Trigger>
-              </Accordion.Header>
-              <Accordion.Content className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
-                <div className="border-t border-border-primary/50 px-3 py-3">
-                  <div className="max-h-48 overflow-y-auto pr-1">
-                    {inspectionQuery.isPending && !inspectionQuery.data ? (
-                      <div className="rounded-xl bg-bg-secondary/35 px-3 py-6 text-sm text-text-secondary">
-                      Loading mapping diagnostics...
-                      </div>
-                    ) : null}
-
-                    {inspectionQuery.error && !inspectionQuery.data ? (
-                      <div className="rounded-xl bg-warning/8 px-3 py-4 text-sm text-text-secondary">
-                      Mapping diagnostics are unavailable right now.
-                      </div>
-                    ) : null}
-
-                    {inspectionQuery.data ? (
-                      <MappingInspectionPaneContent inspection={inspectionQuery.data} provider={provider} />
-                    ) : null}
-                  </div>
-                </div>
-              </Accordion.Content>
-            </Accordion.Item>
-          </Accordion.Root>
-        ) : null}
-      </div>
+      <MappingPreviewPanelBody
+        viewState={viewState}
+        providerLabel={providerLabel}
+        aniListEntryId={aniListEntry.id}
+        baseUrl={baseUrl}
+        previewMapping={previewMapping}
+        showResetPreview={showResetPreview}
+        onResetPreview={onResetPreview}
+        onEditMapping={onEditMapping}
+        portalContainer={portalContainer}
+        inspectionData={inspectionQuery.data}
+        inspectionPending={inspectionQuery.isPending}
+        inspectionError={Boolean(inspectionQuery.error)}
+        provider={provider}
+      />
     </div>
   );
 }

@@ -18,15 +18,15 @@ export function SonarrPanel(props: SonarrPanelProps): React.JSX.Element {
     folderSlug,
   } = props;
 
-  const headerTitle = mode === "edit" ? 'Update Sonarr options' : 'Setup Sonarr options';
+  const headerTitle = 'Sonarr configuration';
   const headerDescription =
     mode === "edit"
-      ? "Update configuration or move files to a new location."
-      : "Choose the root folder and monitoring options for this series.";
+      ? 'Update the folder and monitoring settings for this source match.'
+      : 'Choose the root folder and monitoring settings for this series.';
 
   return (
-    <div className="flex h-full min-h-0 flex-col px-4 pt-4">
-      <div className="shrink-0 pb-4">
+    <div className="flex h-full min-h-0 flex-col px-4 pt-2">
+      <div className="shrink-0 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">

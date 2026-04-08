@@ -1,14 +1,12 @@
-/** Media modal header that shows extension-owned AniList titles alongside provider state badges. */
+/** Renders atmospheric banner chrome and its overlaid comparison stage. */
 // src/features/media-modal/components/media-modal-header.tsx
 
-import { type MouseEventHandler } from "react";
-import { Database, X } from "lucide-react";
-import TooltipWrapper from "@/shared/ui/primitives/tooltip";
-import Pill from '@/shared/ui/primitives/pill';
+import { type MouseEventHandler, type ReactNode } from "react";
+import { Settings, X } from "lucide-react";
 import type { AniListTitleLanguage } from "@/anilist/schemas/title-language.schema";
 import type { AniListMediaFormat, AniListMediaStatus } from "@/anilist/schemas/media.schema";
 import type { Provider } from "@/providers";
-import { getProviderLabel } from "@/providers/provider-routing";
+import Button from "@/shared/ui/primitives/button";
 
 export type MediaModalTabId = "series" | "mapping";
 
@@ -29,146 +27,74 @@ export type HeaderProps = {
   onEnterMapping: () => void;
   onExitMapping: () => void;
   onClose: MouseEventHandler<HTMLButtonElement>;
+  onOpenSettings?: () => void;
   tooltipContainer?: HTMLElement | null;
+  content?: ReactNode;
 };
-
-function formatMediaFormat(format?: AniListMediaFormat | null): string | null {
-  return format ? format.replaceAll('_', " ") : null;
-}
-
-function formatAniListMediaStatus(status?: AniListMediaStatus | null): string | null {
-  if (!status) return null;
-  const normalized = status.toLowerCase().replaceAll('_', " ");
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
-
-function statusTone(status?: AniListMediaStatus | null): "success" | "warning" | "info" {
-  if (status === "RELEASING") return "success";
-  if (status === "NOT_YET_RELEASED") return "warning";
-  return "info";
-}
 
 export function Header(props: HeaderProps): React.JSX.Element {
   const {
-    title,
-    alternateTitles,
-    titleLanguage,
     bannerImage,
-    coverImage,
-    provider,
-    inLibrary,
-    format,
-    year,
-    status,
     onClose,
+    onOpenSettings,
     tooltipContainer,
+    content,
   } = props;
 
-  const formatLabel = formatMediaFormat(format);
-  const yearLabel = year ?? null;
-  const statusLabel = formatAniListMediaStatus(status);
-  const currentTone = statusTone(status);
-  const hasAlternateTitles = alternateTitles.length > 0;
-  const tooltipPortal = tooltipContainer ?? null;
-  const providerLabel = getProviderLabel(provider);
-
-  const titleNode = (
-    <h1
-      className={`text-xl font-semibold leading-tight tracking-tight text-text-primary drop-shadow-lg ${
-        hasAlternateTitles ? "cursor-help" : ""
-      }`}
-    >
-      {title}
-    </h1>
-  );
+  const headerIconButtonClassName = 'rounded-full bg-bg-secondary/80 p-1.5 text-text-secondary backdrop-blur hover:bg-bg-tertiary hover:text-text-primary';
 
   return (
-    <header className="relative mb-12">
+    <header className="relative shrink-0">
       <div
-        className="relative h-50 w-full overflow-hidden bg-bg-tertiary bg-cover bg-center bg-no-repeat shadow-[inset_0_0_250px_#121722]"
+        className="relative h-60 w-full overflow-hidden bg-bg-tertiary sm:h-64"
         style={{
           backgroundImage: bannerImage ? `url(${bannerImage})` : undefined,
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundSize: 'cover',
         }}
       >
-        <div className="absolute inset-0 bg-linear-to-r from-[rgba(31,40,53,0.78)] via-[rgba(31,40,53,0.64)] to-[rgba(31,40,53,0.44)]" />
-        <div className="absolute inset-0 bg-linear-to-b from-transparent via-[rgba(14,22,39,0.32)] to-[rgba(14,22,39,0.52)]" />
+        <div className="absolute inset-0 bg-linear-to-r from-[rgba(11,22,34,0.9)] via-[rgba(11,22,34,0.72)] to-[rgba(11,22,34,0.38)]" />
+        <div className="absolute inset-0 bg-linear-to-b from-[rgba(5,12,20,0.08)] via-[rgba(11,22,34,0.28)] to-[rgba(11,22,34,0.72)]" />
+        <div className="absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent via-bg-primary/75 to-bg-primary" />
+        <div className="absolute inset-0 shadow-[inset_0_0_180px_rgba(11,22,34,0.58)]" />
       </div>
 
-      <div className="absolute inset-x-0 top-0 z-10 flex flex-col">
-        <div className="flex items-start justify-between px-8 pt-4">
-          <button
+      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-end gap-2 px-4 pt-4 sm:px-6">
+        {onOpenSettings ? (
+          <Button
             type="button"
-            aria-label="Close"
-            onClick={onClose}
-            className="ml-auto rounded-full bg-bg-secondary/80 p-1.5 text-text-secondary backdrop-blur hover:bg-bg-tertiary hover:text-text-primary"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenSettings();
+            }}
+            variant="ghost"
+            size="icon"
+            tooltip="Open Mapping & Overrides settings in the options page"
+            portalContainer={tooltipContainer ?? undefined}
+            className={headerIconButtonClassName}
+            aria-label="Open Mapping & Overrides settings"
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="mt-auto px-8 pb-14">
-          <div className="flex items-start gap-4">
-            <div className="hidden h-37.5 w-27.5 shrink-0 overflow-hidden rounded-xl border border-border-primary/60 bg-bg-tertiary/80 shadow-lg sm:block relative z-20 translate-y-8">
-              {coverImage ? (
-                <img
-                  src={coverImage}
-                  alt={title}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="h-full w-full bg-bg-tertiary" />
-              )}
-            </div>
-
-            <div className="mt-auto min-w-0 flex-1 space-y-2 pb-5">
-              <div className="min-w-0">
-                {hasAlternateTitles ? (
-                  <TooltipWrapper
-                    content={(
-                      <div className="space-y-1">
-                        {alternateTitles.map(alt => (
-                          <div key={`${titleLanguage}-${alt.label}`} className="space-y-0.5">
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-                              {alt.label}
-                            </div>
-                            <div className="text-sm text-white leading-tight">
-                              {alt.value}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    side="top"
-                    align="start"
-                    sideOffset={10}
-                    container={tooltipPortal}
-                  >
-                    {titleNode}
-                  </TooltipWrapper>
-                ) : (
-                  titleNode
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 text-[12px] font-medium text-text-secondary">
-                {formatLabel ? (
-                  <Pill tone="muted" className="uppercase text-text-primary">{formatLabel}</Pill>
-                ) : null}
-                {yearLabel ? (
-                  <Pill tone="muted" className="uppercase">{String(yearLabel)}</Pill>
-                ) : null}
-                {statusLabel ? (
-                  <Pill tone={currentTone} className="uppercase">{statusLabel}</Pill>
-                ) : null}
-                {inLibrary ? (
-                  <Pill tone="success" icon={Database} className="uppercase">{`In ${providerLabel}`}</Pill>
-                ) : null}
-                <span className="flex-1" />
-              </div>
-            </div>
-          </div>
-        </div>
+            <Settings className="h-4 w-4" />
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          variant="ghost"
+          size="icon"
+          className={headerIconButtonClassName}
+        >
+          <X className="h-4 w-4" />
+        </Button>
       </div>
+
+      {content ? (
+        <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-5 sm:px-8 sm:pb-7">
+          {content}
+        </div>
+      ) : null}
     </header>
   );
 }
