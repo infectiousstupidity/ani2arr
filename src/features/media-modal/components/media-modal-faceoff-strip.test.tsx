@@ -21,6 +21,8 @@ describe('media modal faceoff strip', () => {
           provider: 'sonarr',
           providerId: 700,
           title: 'Current Target',
+          year: 2024,
+          typeLabel: 'anime',
           inLibrary: true,
         },
       }),
@@ -28,10 +30,13 @@ describe('media modal faceoff strip', () => {
 
     expect(view).toContain('SOURCE: ANILIST');
     expect(view).toContain('Source Title');
-    expect(view).toContain('AniList 101');
+    expect(view).toContain('TV · 2024');
+    expect(view).toContain('AniList · 101');
     expect(view).toContain('TARGET: SONARR');
     expect(view).toContain('Current Target');
+    expect(view).toContain('TVDB · 700');
     expect(view).not.toContain('No match selected');
+    expect(view).not.toContain('In Sonarr');
   });
 
   it('renders the preview target when a new mapping is selected', () => {
@@ -48,6 +53,8 @@ describe('media modal faceoff strip', () => {
           provider: 'radarr',
           providerId: 800,
           title: 'Current Movie',
+          year: 2022,
+          typeLabel: 'Movie',
           inLibrary: false,
         },
       }),
@@ -55,6 +62,7 @@ describe('media modal faceoff strip', () => {
 
     expect(view).toContain('TARGET: RADARR');
     expect(view).toContain('Current Movie');
-    expect(view).toContain('Current target');
+    expect(view).toContain('Movie · 2022');
+    expect(view).toContain('TMDB · 800');
   });
 });

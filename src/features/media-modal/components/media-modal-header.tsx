@@ -41,7 +41,7 @@ export function Header(props: HeaderProps): React.JSX.Element {
     content,
   } = props;
 
-  const headerIconButtonClassName = 'rounded-full bg-bg-secondary/80 p-1.5 text-text-secondary backdrop-blur hover:bg-bg-tertiary hover:text-text-primary';
+  const headerIconButtonClassName = 'rounded-full p-1.5 text-text-secondary hover:text-text-primary';
 
   return (
     <header className="relative shrink-0">
