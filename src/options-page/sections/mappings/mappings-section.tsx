@@ -16,11 +16,12 @@ import { useConfirm } from '@/shared/hooks/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import { PROVIDERS, getProviderIdentityIdLabel, parseProviderIdentity } from '@/providers';
 import type { Provider } from '@/providers';
-import type { MappingSummary } from '@/mapping/queries/list-mappings';
+import type { MappingListRow } from '@/mapping/queries/list-mappings';
 import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
 import SectionHeader from '../../components/section-header';
 import { usePublicOptions } from '@/options';
-import MappingToolbar, {
+import {
+	MappingToolbar,
   getScopeEntryKindFilters,
   type EntryKindFilter,
   type EntryKindFilterSet,
@@ -215,7 +216,7 @@ const MappingsSection: React.FC<{
   );
 
   const handleDeleteManualMapping = useCallback(
-    (entry: MappingSummary) =>
+    (entry: MappingListRow) =>
       runEntryMutation({
         confirm: {
           title: 'Remove manual mapping?',
@@ -237,7 +238,7 @@ const MappingsSection: React.FC<{
   );
 
   const handleSetIgnore = useCallback(
-    (entry: MappingSummary) =>
+    (entry: MappingListRow) =>
       runEntryMutation({
         confirm: {
           title: 'Ignore this title entirely?',
@@ -259,7 +260,7 @@ const MappingsSection: React.FC<{
   );
 
   const handleClearIgnore = useCallback(
-    (entry: MappingSummary) =>
+    (entry: MappingListRow) =>
       runEntryMutation({
         mutate: () => clearIgnore.mutateAsync({ anilistId: entry.anilistId, provider: entry.provider }),
         success: {
@@ -275,7 +276,7 @@ const MappingsSection: React.FC<{
   );
 
   const handleRejectCandidate = useCallback(
-    (entry: MappingSummary) => {
+    (entry: MappingListRow) => {
       const providerId = entry.providerId ?? entry.suppressedProviderId;
       if (providerId == null) return Promise.resolve();
       const providerIdentity = parseProviderIdentity(entry.provider, providerId);
@@ -296,7 +297,7 @@ const MappingsSection: React.FC<{
   );
 
   const handleClearRejectedCandidate = useCallback(
-    (entry: MappingSummary) => {
+    (entry: MappingListRow) => {
       const providerId = entry.providerId ?? entry.suppressedProviderId;
       if (providerId == null) return Promise.resolve();
       const providerIdentity = parseProviderIdentity(entry.provider, providerId);
@@ -316,7 +317,7 @@ const MappingsSection: React.FC<{
     [clearRejectedCandidate, runEntryMutation],
   );
 
-  const handleEdit = (entry: MappingSummary) => {
+  const handleEdit = (entry: MappingListRow) => {
     setEditorState({ anilistId: entry.anilistId, provider: entry.provider });
   };
 

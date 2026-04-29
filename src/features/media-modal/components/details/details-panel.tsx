@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import type { AniListId } from "@/anilist";
-import type { MappingInspectionPayload } from "@/mapping/queries/mapping-details";
+import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
 import type { Provider } from "@/providers";
 import { useMediaModalContext } from "../../context";
@@ -11,7 +11,7 @@ import { MappingInspectionLogs } from "./logs-tab";
 import { MappingPreviewDetails } from "./details-tab";
 
 type MappingInspectionQuery = {
-  data: MappingInspectionPayload | undefined;
+  data: MappingDetailsPayload | undefined;
   error: unknown;
   isPending: boolean;
 };

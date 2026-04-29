@@ -24,7 +24,7 @@ import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import type { BadgeVisibility } from "@/options/types";
 import type { Provider } from "@/providers";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
-import type { MappingIdentity } from "@/mapping/types";
+import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import { getProviderLabel } from "@/providers/provider-labels";
 import type {
 	RadarrFormState,
@@ -45,7 +45,7 @@ interface CardOverlayProps {
 	onOpenMapping?: (snapshot: MediaModalLaunchSnapshot) => void;
 	isConfigured: boolean;
 	defaultForm: SonarrFormState | RadarrFormState | null;
-	mappedIdentity?: MappingIdentity | null;
+	mappedIdentity?: EffectiveMappingPresence | null;
 	metadata: AniListMediaHint | null;
 	providerUrl: string | null;
 	observeTarget?: Element | null;

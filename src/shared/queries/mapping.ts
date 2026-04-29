@@ -20,9 +20,8 @@ import type {
 } from "@/rpc/types";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
-import type { MappingProviderIdRecord } from "@/mapping/types";
-import type { ProviderTargetId } from "@/providers";
-import type { Provider } from "@/providers";
+import type { PersistedProviderMappingRecord } from "@/mapping/manual";
+import type { Provider, ProviderTargetId } from "@/providers";
 import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
@@ -331,7 +330,9 @@ function invalidateMappingMutationQueries(
 		queryKey: queryKeys.manualMappings("all"),
 	});
 	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-	queryClient.invalidateQueries({ queryKey: queryKeys.mappingIdentitiesRoot() });
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.mappingIdentitiesRoot(),
+	});
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingInspection(input.provider, input.anilistId),
 	});
@@ -445,11 +446,13 @@ export const useClearManualMapping = () => {
 						variables.provider,
 					),
 				},
-				(status) => applyClearedManualMappingToStatus(status, variables.provider),
+				(status) =>
+					applyClearedManualMappingToStatus(status, variables.provider),
 			);
 			queryClient.setQueryData<GetMappingInspectionOutput>(
 				queryKeys.mappingInspection(variables.provider, variables.anilistId),
-				(inspection) => applyClearedManualMappingToInspection(inspection, variables),
+				(inspection) =>
+					applyClearedManualMappingToInspection(inspection, variables),
 			);
 
 			return context;
@@ -503,7 +506,7 @@ export const useClearAllManualMappings = () => {
 };
 
 export const useManualMappings = (provider: Provider | "all" = "all") =>
-	useQuery<MappingProviderIdRecord[], ExtensionError>({
+	useQuery<PersistedProviderMappingRecord[], ExtensionError>({
 		queryKey: queryKeys.manualMappings(provider),
 		queryFn: async () => {
 			const api = getAni2arrApi();

@@ -48,13 +48,13 @@ import {
 } from '../resolution-policy';
 import type { AnibridgeMappingStore } from '../upstream';
 import type {
-  MappingAcceptedSource,
-  MappingRecentEvaluationTrace,
+  AcceptedMappingSource,
+  RecentMappingEvaluationTrace,
 } from "../types";
 import type {
   AutoMappingSource,
   AutoMappingOptions,
-  AcceptedAutoMapping,
+  AcceptedAutoMappingResult,
   AutoMappingRecord,
 } from './types';
 
@@ -64,8 +64,8 @@ type ProviderLookupRegistry = Record<
 >;
 
 type ResolutionAttempt = {
-  resolved: AcceptedAutoMapping | null;
-  recentEvaluation?: MappingRecentEvaluationTrace;
+  resolved: AcceptedAutoMappingResult | null;
+  recentEvaluation?: RecentMappingEvaluationTrace;
   terminalState?: Exclude<AutoMappingRecord['state'], 'mapped' | 'unresolved'>;
 };
 
@@ -101,9 +101,9 @@ type ResolveAutoMappingDeps = {
   acceptResolved: (
     provider: Provider,
     anilistId: AniListId,
-    resolved: AcceptedAutoMapping,
+    resolved: AcceptedAutoMappingResult,
     source: AutoMappingSource,
-  ) => Promise<AcceptedAutoMapping | null>;
+  ) => Promise<AcceptedAutoMappingResult | null>;
   recordAutoMapping: (
     provider: Provider,
     anilistId: AniListId,
@@ -115,8 +115,8 @@ type ResolveAutoMappingDeps = {
   isResolvedCandidateSuppressed: (
     provider: Provider,
     anilistId: AniListId,
-    resolved: AcceptedAutoMapping,
-    source: MappingAcceptedSource,
+    resolved: AcceptedAutoMappingResult,
+    source: AcceptedMappingSource,
   ) => boolean;
 };
 
@@ -125,7 +125,7 @@ export async function resolveAutoMapping(
   provider: Provider,
   anilistId: AniListId,
   options: AutoMappingOptions,
-): Promise<AcceptedAutoMapping | null> {
+): Promise<AcceptedAutoMappingResult | null> {
   const request: AutoMappingRequest = {
     provider,
     anilistId,
@@ -141,7 +141,7 @@ export async function resolveAutoMapping(
   const cachedFailureOrTerminal = await readCachedFailureOrTerminalState(
     deps,
     request,
-    cachedAutoMapping.resolverState,
+    cachedAutoMapping.autoMappingRecord,
   );
   if (cachedFailureOrTerminal.handled) {
     return cachedFailureOrTerminal.resolved;
@@ -168,36 +168,36 @@ async function readUsableCachedAutoMapping(
   deps: ResolveAutoMappingDeps,
   request: AutoMappingRequest,
 ): Promise<
-  | { handled: true; resolved: AcceptedAutoMapping }
-  | { handled: false; resolverState: AutoMappingRecord | null }
+  | { handled: true; resolved: AcceptedAutoMappingResult }
+  | { handled: false; autoMappingRecord: AutoMappingRecord | null }
 > {
   const { provider, anilistId } = request;
-  const resolverState = await deps.autoMappingStore.get(provider, anilistId);
-  if (resolverState?.state !== 'mapped') {
-    return { handled: false, resolverState };
+  const autoMappingRecord = await deps.autoMappingStore.get(provider, anilistId);
+  if (autoMappingRecord?.state !== 'mapped') {
+    return { handled: false, autoMappingRecord };
   }
 
-  if (resolverState.acceptedEvidence.source !== 'auto') {
+  if (autoMappingRecord.acceptedEvidence.source !== 'auto') {
     await deps.clearAutoMapping(provider, anilistId);
-    return { handled: false, resolverState: null };
+    return { handled: false, autoMappingRecord: null };
   }
 
   const resolved = {
-    providerId: resolverState.providerId,
-    reason: resolverState.acceptedEvidence.reason,
-    ...(resolverState.acceptedEvidence.successfulTitle
-      ? { successfulSynonym: resolverState.acceptedEvidence.successfulTitle }
+    providerId: autoMappingRecord.providerId,
+    reason: autoMappingRecord.acceptedEvidence.reason,
+    ...(autoMappingRecord.acceptedEvidence.successfulTitle
+      ? { successfulSynonym: autoMappingRecord.acceptedEvidence.successfulTitle }
       : {}),
   };
 
-  if (deps.isResolvedCandidateSuppressed(provider, anilistId, resolved, resolverState.acceptedEvidence.source)) {
+  if (deps.isResolvedCandidateSuppressed(provider, anilistId, resolved, autoMappingRecord.acceptedEvidence.source)) {
     await deps.clearAutoMapping(provider, anilistId);
-    return { handled: false, resolverState: null };
+    return { handled: false, autoMappingRecord: null };
   }
 
   if (import.meta.env.DEV) {
     deps.log.debug?.(
-      `mapping:auto-mapping-hit provider=${provider} anilistId=${anilistId} providerId=${resolverState.providerId} source=${resolverState.acceptedEvidence.source} reason=${resolverState.acceptedEvidence.reason}`,
+      `mapping:auto-mapping-hit provider=${provider} anilistId=${anilistId} providerId=${autoMappingRecord.providerId} source=${autoMappingRecord.acceptedEvidence.source} reason=${autoMappingRecord.acceptedEvidence.reason}`,
     );
   }
   return { handled: true, resolved };
@@ -206,7 +206,7 @@ async function readUsableCachedAutoMapping(
 async function readCachedFailureOrTerminalState(
   deps: ResolveAutoMappingDeps,
   request: AutoMappingRequest,
-  resolverState: AutoMappingRecord | null,
+  autoMappingRecord: AutoMappingRecord | null,
 ): Promise<{ handled: true; resolved: null } | { handled: false }> {
   const { provider, anilistId, bypassCachedResolutionState } = request;
   if (bypassCachedResolutionState) {
@@ -223,10 +223,10 @@ async function readCachedFailureOrTerminalState(
     throw cachedFailure.value;
   }
 
-  if (resolverState) {
+  if (autoMappingRecord) {
     if (import.meta.env.DEV) {
       deps.log.debug?.(
-        `mapping:auto-mapping-terminal provider=${provider} anilistId=${anilistId} state=${resolverState.state}`,
+        `mapping:auto-mapping-terminal provider=${provider} anilistId=${anilistId} state=${autoMappingRecord.state}`,
       );
     }
     return { handled: true, resolved: null };
@@ -239,8 +239,8 @@ async function tryResolvePrimaryTitleHint(
   deps: ResolveAutoMappingDeps,
   request: AutoMappingRequest,
 ): Promise<
-  | { handled: true; resolved: AcceptedAutoMapping | null }
-  | { handled: false; seededRecentEvaluation?: MappingRecentEvaluationTrace }
+  | { handled: true; resolved: AcceptedAutoMappingResult | null }
+  | { handled: false; seededRecentEvaluation?: RecentMappingEvaluationTrace }
 > {
   const { provider, anilistId, options } = request;
   const hintTerm = options.hints?.primaryTitle?.trim();
@@ -306,8 +306,8 @@ async function tryResolvePrimaryTitleHint(
 async function attemptNetworkResolution(
   deps: ResolveAutoMappingDeps,
   request: AutoMappingRequest,
-  seededRecentEvaluation?: MappingRecentEvaluationTrace,
-): Promise<AcceptedAutoMapping | null> {
+  seededRecentEvaluation?: RecentMappingEvaluationTrace,
+): Promise<AcceptedAutoMappingResult | null> {
   const { provider, anilistId, options, bypassCachedResolutionState } = request;
   let attempt: ResolutionAttempt;
   try {
@@ -399,7 +399,7 @@ async function resolveViaNetwork(
     priority: options.priority,
     forceLookupNetwork: options.forceLookupNetwork === true,
   };
-  let recentEvaluation: MappingRecentEvaluationTrace | undefined;
+  let recentEvaluation: RecentMappingEvaluationTrace | undefined;
 
   const applyAttempt = (
     label: 'metadata' | 'api',
@@ -484,7 +484,7 @@ async function tryResolveWithMedia(
     return { resolved: null };
   }
 
-  let recentEvaluation: MappingRecentEvaluationTrace | undefined;
+  let recentEvaluation: RecentMappingEvaluationTrace | undefined;
 
   const inheritedResolution = await tryVerifiedInheritedResolution(deps, context);
   if (inheritedResolution.handled) {
@@ -536,7 +536,7 @@ async function tryVerifiedInheritedResolution(
   context: MediaResolutionContext,
 ): Promise<
   | { handled: true; attempt: ResolutionAttempt }
-  | { handled: false; recentEvaluation?: MappingRecentEvaluationTrace }
+  | { handled: false; recentEvaluation?: RecentMappingEvaluationTrace }
 > {
   const { provider, media } = context;
   if (provider !== 'sonarr' || !context.allowInheritedTraversal) {

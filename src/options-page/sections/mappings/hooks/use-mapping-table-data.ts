@@ -7,8 +7,8 @@ import { useAniListMetadataBatch, useMappings } from "@/shared/queries";
 import type { AniListId } from "@/anilist";
 import { PROVIDERS, parseProviderIdentity, type Provider } from "@/providers";
 import { getProviderIdentityIdLabel } from "@/providers/provider-labels";
-import type { MappingEntryKind } from "@/mapping/types";
-import type { MappingSummary } from "@/mapping/queries/list-mappings";
+import type { EffectiveMappingKind } from "@/mapping/types";
+import type { MappingListRow } from "@/mapping/queries/list-mappings";
 import type { GetAniListMetadataOutput, GetMappingsOutput } from "@/rpc/types";
 import type { GetMappingsInput } from "@/rpc/schemas";
 import type { MappingTableRowData } from "../components/mapping-table";
@@ -95,10 +95,10 @@ export const useMappingTableData = ({
 		return map;
 	}, [metadata.data?.metadata]);
 
-	type EntryRow = { entry: MappingSummary; title: string; haystack: string };
+	type EntryRow = { entry: MappingListRow; title: string; haystack: string };
 
 	const entryRows = useMemo<EntryRow[]>(() => {
-		return mappingEntries.map((entry: MappingSummary) => {
+		return mappingEntries.map((entry: MappingListRow) => {
 			const meta = metadataMap.get(entry.anilistId);
 			const title =
 				meta?.titles?.english ||
@@ -136,10 +136,10 @@ export const useMappingTableData = ({
 		if (libraryFilter === "all") return entryRows;
 		const predicate =
 			libraryFilter === "in-library"
-				? (entry: MappingSummary) =>
+				? (entry: MappingListRow) =>
 						entry.providerMappingState === "mapped" &&
 						entry.isInLibrary === true
-				: (entry: MappingSummary) =>
+				: (entry: MappingListRow) =>
 						entry.providerMappingState === "mapped" &&
 						entry.isInLibrary === false;
 		return entryRows.filter(({ entry }) => predicate(entry));
@@ -148,7 +148,7 @@ export const useMappingTableData = ({
 	const tableRows = useMemo<MappingTableRowData[]>(() => {
 		type Group = Omit<MappingTableRowData, "entryKinds"> & {
 			sortIndex: number;
-			entryKinds: Set<MappingEntryKind>;
+			entryKinds: Set<EffectiveMappingKind>;
 		};
 
 		type NormalizedRow = MappingTableRowData & { sortIndex: number };
@@ -190,7 +190,7 @@ export const useMappingTableData = ({
 							: parseProviderIdentity(entry.provider, entry.providerId),
 					providerMeta: entry.providerMeta,
 					entries: [],
-					entryKinds: new Set<MappingEntryKind>(),
+					entryKinds: new Set<EffectiveMappingKind>(),
 					sortIndex: order++,
 				};
 				if (entry.updatedAt !== undefined) {
@@ -206,7 +206,7 @@ export const useMappingTableData = ({
 			}
 		}
 
-		const entryKindPriority: Record<MappingEntryKind, number> = {
+		const entryKindPriority: Record<EffectiveMappingKind, number> = {
 			manual: 0,
 			unmapped: 1,
 			unknown: 2,
@@ -224,7 +224,7 @@ export const useMappingTableData = ({
 			return row.providerMeta?.title ?? row.entries[0]?.title ?? fallback;
 		};
 
-		const getEntryKindRank = (entryKinds: MappingEntryKind[]) => {
+		const getEntryKindRank = (entryKinds: EffectiveMappingKind[]) => {
 			if (entryKinds.length === 0) return Number.MAX_SAFE_INTEGER;
 			return Math.min(
 				...entryKinds.map(

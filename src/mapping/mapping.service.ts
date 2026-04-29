@@ -28,13 +28,13 @@ import { shouldApplyCandidateSuppression } from './resolution-policy';
 import { AnibridgeMappingStore } from './upstream';
 import { buildEffectiveMapping } from './effective-mapping';
 import type {
-  MappingAcceptedEvidence,
-  MappingAcceptedSource,
+  AcceptedMappingEvidence,
+  AcceptedMappingSource,
 } from "./types";
 import type {
   AutoMappingSource,
   AutoMappingOptions,
-  AcceptedAutoMapping,
+  AcceptedAutoMappingResult,
   AutoMappingRecord,
 } from './auto-mapping/types';
 
@@ -61,7 +61,7 @@ function canEvictAniListMedia(api: AniListMediaService): api is AniListMediaServ
 
 export class MappingService {
   private readonly log = logger.create('MappingService');
-  private readonly inflight = new Map<string, Promise<AcceptedAutoMapping | null>>();
+  private readonly inflight = new Map<string, Promise<AcceptedAutoMappingResult | null>>();
   private readonly sessionSeenCanonical: Record<Provider, Set<string>> = {
     sonarr: new Set<string>(),
     radarr: new Set<string>(),
@@ -125,7 +125,7 @@ export class MappingService {
     provider: P,
     anilistId: AniListId,
     options: AutoMappingOptions = {},
-  ): Promise<(AcceptedAutoMapping & { providerId: ProviderIdFor<P> }) | null> {
+  ): Promise<(AcceptedAutoMappingResult & { providerId: ProviderIdFor<P> }) | null> {
     if (import.meta.env.DEV) {
       this.log.debug?.(
         `mapping:start provider=${provider} anilistId=${anilistId} priority=${options.priority ?? 'normal'} network=${options.network ?? 'allow'} ignoreFailureCache=${String(options.ignoreFailureCache === true)}`,
@@ -134,7 +134,7 @@ export class MappingService {
 
     const precedenceResult = await this.resolveAuthoritativeMapping(provider, anilistId);
     if (precedenceResult.handled) {
-      return precedenceResult.resolved as (AcceptedAutoMapping & { providerId: ProviderIdFor<P> }) | null;
+      return precedenceResult.resolved as (AcceptedAutoMappingResult & { providerId: ProviderIdFor<P> }) | null;
     }
 
     const inflightKey = this.inflightKey(provider, anilistId);
@@ -143,7 +143,7 @@ export class MappingService {
       if (options.priority === 'high') {
         this.prioritizeAniListMedia(anilistId, { schedule: false });
       }
-      return existing as Promise<(AcceptedAutoMapping & { providerId: ProviderIdFor<P> }) | null>;
+      return existing as Promise<(AcceptedAutoMappingResult & { providerId: ProviderIdFor<P> }) | null>;
     }
 
     const promise = resolveAutoMapping(
@@ -194,7 +194,7 @@ export class MappingService {
       })
       .catch(() => {});
 
-    return promise as Promise<(AcceptedAutoMapping & { providerId: ProviderIdFor<P> }) | null>;
+    return promise as Promise<(AcceptedAutoMappingResult & { providerId: ProviderIdFor<P> }) | null>;
   }
 
   public getAutoMapping(
@@ -207,7 +207,7 @@ export class MappingService {
   private async resolveAuthoritativeMapping(
     provider: Provider,
     anilistId: AniListId,
-  ): Promise<{ handled: true; resolved: AcceptedAutoMapping | null } | { handled: false }> {
+  ): Promise<{ handled: true; resolved: AcceptedAutoMappingResult | null } | { handled: false }> {
     const manualProviderId = this.manualMappings?.get(provider, anilistId) ?? null;
     const upstreamProviderIds = this.getAnibridgeProviderIds(provider, anilistId);
     const effectiveMapping = buildEffectiveMapping({
@@ -278,9 +278,9 @@ export class MappingService {
   private async acceptResolved(
     provider: Provider,
     anilistId: AniListId,
-    resolved: AcceptedAutoMapping,
+    resolved: AcceptedAutoMappingResult,
     source: AutoMappingSource,
-  ): Promise<AcceptedAutoMapping | null> {
+  ): Promise<AcceptedAutoMappingResult | null> {
     const mappedState: Omit<Extract<AutoMappingRecord, { state: 'mapped' }>, 'updatedAt'> = {
       state: 'mapped',
       providerId: resolved.providerId,
@@ -368,8 +368,8 @@ export class MappingService {
   private isResolvedCandidateSuppressed(
     provider: Provider,
     anilistId: AniListId,
-    resolved: AcceptedAutoMapping,
-    source: MappingAcceptedSource,
+    resolved: AcceptedAutoMappingResult,
+    source: AcceptedMappingSource,
   ): boolean {
     return (
       shouldApplyCandidateSuppression(source, resolved.reason) &&
@@ -378,9 +378,9 @@ export class MappingService {
   }
 
   private buildAcceptedEvidence(
-    source: MappingAcceptedSource,
-    resolved: AcceptedAutoMapping,
-  ): MappingAcceptedEvidence {
+    source: AcceptedMappingSource,
+    resolved: AcceptedAutoMappingResult,
+  ): AcceptedMappingEvidence {
     return {
       source,
       reason: resolved.reason,
@@ -429,5 +429,5 @@ export class MappingService {
   }
 }
 
-export { type AnibridgeProviderMappingPayload } from './upstream';
-export { type AcceptedAutoMapping } from './auto-mapping/types';
+export { type AnibridgeMappingPayload } from './upstream';
+export { type AcceptedAutoMappingResult } from './auto-mapping/types';

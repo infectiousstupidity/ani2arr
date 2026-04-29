@@ -35,7 +35,7 @@ import {
 	buildMovieStatusResponseFromLibraryStatus,
 	buildSeriesStatusResponseFromLibraryStatus,
 } from "@/providers/library/status-response-adapter";
-import type { MappingIdentity } from "@/mapping/types";
+import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import {
 	buildProviderActionModel,
 	deriveProviderActionSummary,
@@ -59,7 +59,7 @@ export interface UseCardOverlayStateParams {
 	metadata: AniListMediaHint | null;
 	defaultForm: SonarrFormState | RadarrFormState | null;
 	isConfigured: boolean;
-	mappedIdentity?: MappingIdentity | null;
+	mappedIdentity?: EffectiveMappingPresence | null;
 	enabled?: boolean;
 	onOpenMapping?: (snapshot: MediaModalLaunchSnapshot) => void;
 }

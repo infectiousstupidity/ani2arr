@@ -16,22 +16,18 @@ import {
 	type TvdbId,
 } from "@/providers";
 import type {
-	MappingAcceptedEvidence,
-	MappingAcceptedReason,
-	MappingAcceptedSource,
-	MappingEntryKind,
-	MappingEvaluationCandidateStatus,
-	MappingInheritedVerificationDetails,
-	MappingRecentEvaluationTrace,
-	MappingSuppressionKind,
-	MappingUnknownReason,
-	ProviderMappingState,
+	AcceptedMappingEvidence,
+	AcceptedMappingReason,
+	AcceptedMappingSource,
+	MappingCandidateEvaluationStatus,
+	InheritedMappingVerificationDetails,
+	RecentMappingEvaluationTrace,
 } from "@/mapping/types";
 import type {
 	AutoMappingRecord,
 	AutoMappingStatus,
 } from "@/mapping/auto-mapping/types";
-import { buildEffectiveMappingCandidate } from "@/mapping/effective-mapping";
+import { buildEffectiveMapping, type EffectiveMapping } from "@/mapping/effective-mapping";
 import {
 	collectLinkedAniListIds,
 	getMappingSource,
@@ -42,12 +38,12 @@ import {
 } from "@/providers/library/types";
 import { deriveMappingRowStatus } from "@/features/provider-action";
 import type {
-	MappingReviewItem,
-	MappingReviewReason,
-	MappingReviewSummary,
+	MappingIssue,
+	MappingIssueReason,
+	MappingIssuesSummary,
 } from "./mapping-issues";
-import { projectMappingReview } from "./mapping-issues";
-import type { MappingRowStatus } from "./list-mappings";
+import { projectMappingIssues } from "./mapping-issues";
+import type { MappingListRowStatus } from "./list-mappings";
 
 export interface GetMappingInspectionInput {
 	provider: Provider;
@@ -107,9 +103,7 @@ export interface GetMappingInspectionDeps {
 	};
 }
 
-type InspectionCandidate = ReturnType<typeof buildEffectiveMappingCandidate>;
-
-export interface MappingInspectionLibrarySummary {
+interface MappingDetailsLibrarySnapshot {
 	isInLibrary: boolean | null;
 	title?: string;
 	type?: "series" | "movie";
@@ -118,27 +112,7 @@ export interface MappingInspectionLibrarySummary {
 	libraryUnknownReason?: LibraryUnknownReason;
 }
 
-export interface MappingInspectionEffectiveMapping {
-	provider: Provider;
-	anilistId: AniListId;
-	providerId: ProviderTargetId | null;
-	providerMappingState: ProviderMappingState;
-	isInLibrary: boolean | null;
-	suppressedProviderId?: ProviderTargetId | null;
-	mappingRowStatus: MappingRowStatus;
-	mappingEntryKind: MappingEntryKind;
-	mappingSource?: MappingAcceptedSource;
-	mappingReason?: MappingAcceptedReason;
-	resolverOutcome?: AutoMappingStatus;
-	suppressionKind?: MappingSuppressionKind;
-	mappingUnknownReason?: MappingUnknownReason;
-	libraryUnknownReason?: LibraryUnknownReason;
-	hadResolveAttempt?: boolean;
-	evidence?: MappingAcceptedEvidence;
-	library?: MappingInspectionLibrarySummary;
-}
-
-export interface MappingInspectionLinkedAniListEntry {
+interface MappingDetailsLinkedAniListEntry {
 	anilistId: AniListId;
 	title?: string;
 	format?: AniListMediaFormat | null;
@@ -146,63 +120,70 @@ export interface MappingInspectionLinkedAniListEntry {
 	relation?: "current";
 }
 
-export interface MappingInspectionExplanationItem {
+interface MappingDetailsExplanationItem {
 	kind: "effective-source" | "suppression" | "resolver-outcome" | "review";
 	summary: string;
-	source?: MappingAcceptedSource;
-	reason?: MappingAcceptedReason;
+	source?: AcceptedMappingSource;
+	reason?: AcceptedMappingReason;
 	resolverOutcome?: AutoMappingStatus;
-	reviewReason?: MappingReviewReason;
+	reviewReason?: MappingIssueReason;
 	suppressedProviderId?: ProviderTargetId;
 	immediateSourceAniListId?: AniListId;
 	chainAnchorAniListId?: AniListId;
 	details?: readonly string[];
 }
 
-export interface MappingInspectionCandidate {
+interface MappingDetailsCandidateEvaluation {
 	providerId: ProviderTargetId;
 	title?: string;
-	source: MappingAcceptedSource;
-	reason: MappingAcceptedReason;
-	status: MappingEvaluationCandidateStatus;
+	source: AcceptedMappingSource;
+	reason: AcceptedMappingReason;
+	status: MappingCandidateEvaluationStatus;
 	summary: string;
 	score?: number;
-	inheritedVerification?: MappingInheritedVerificationDetails;
+	inheritedVerification?: InheritedMappingVerificationDetails;
 }
 
-export interface MappingInspectionSuggestedCandidates {
+interface MappingDetailsCandidateGroups {
 	attemptedAt?: number;
 	searchTerms?: readonly string[];
-	accepted: readonly MappingInspectionCandidate[];
-	rejected: readonly MappingInspectionCandidate[];
-	suppressed: readonly MappingInspectionCandidate[];
-	notAccepted: readonly MappingInspectionCandidate[];
+	accepted: readonly MappingDetailsCandidateEvaluation[];
+	rejected: readonly MappingDetailsCandidateEvaluation[];
+	suppressed: readonly MappingDetailsCandidateEvaluation[];
+	notAccepted: readonly MappingDetailsCandidateEvaluation[];
 }
 
-export interface MappingInspectionReviewDetail {
+interface MappingDetailsReview {
 	needsReview: boolean;
-	summary?: MappingReviewSummary;
-	items?: readonly MappingReviewItem[];
+	summary?: MappingIssuesSummary;
+	items?: readonly MappingIssue[];
 }
 
-export interface MappingInspectionProviderContext {
+interface MappingDetailsProviderLinks {
 	provider: Provider;
 	providerId: ProviderTargetId | null;
 	linkedAniListIds: readonly AniListId[];
 	linkedAniListCount: number;
 }
 
-export interface MappingInspectionPayload {
-	effectiveMapping: MappingInspectionEffectiveMapping;
-	providerContext: MappingInspectionProviderContext;
-	linkedAniListEntries: readonly MappingInspectionLinkedAniListEntry[];
-	whyThisMapping: readonly MappingInspectionExplanationItem[];
-	suggestedCandidates: MappingInspectionSuggestedCandidates;
-	review: MappingInspectionReviewDetail;
+export interface MappingDetailsPayload {
+	effectiveMapping: EffectiveMapping & {
+		isInLibrary: boolean | null;
+		mappingRowStatus: MappingListRowStatus;
+		resolverOutcome?: AutoMappingStatus;
+		libraryUnknownReason?: LibraryUnknownReason;
+		evidence?: AcceptedMappingEvidence;
+		library?: MappingDetailsLibrarySnapshot;
+	};
+	providerContext: MappingDetailsProviderLinks;
+	linkedAniListEntries: readonly MappingDetailsLinkedAniListEntry[];
+	whyThisMapping: readonly MappingDetailsExplanationItem[];
+	suggestedCandidates: MappingDetailsCandidateGroups;
+	review: MappingDetailsReview;
 }
 
 const resolveRecentEvaluationTitle = (
-	recentEvaluation: MappingRecentEvaluationTrace | undefined,
+	recentEvaluation: RecentMappingEvaluationTrace | undefined,
 ): string | undefined => {
 	if (!recentEvaluation) {
 		return undefined;
@@ -222,12 +203,12 @@ const resolveRecentEvaluationTitle = (
 
 const buildLibrarySummary = (
 	provider: Provider,
-	providerMappingState: InspectionCandidate["providerMappingState"],
+	providerMappingState: EffectiveMapping["providerMappingState"],
 	isInLibrary: boolean | null,
 	libraryEntry: SonarrSeriesSnapshot | RadarrMovieSnapshot | null,
-	recentEvaluation: MappingRecentEvaluationTrace | undefined,
+	recentEvaluation: RecentMappingEvaluationTrace | undefined,
 	libraryUnknownReason?: "library-check-failed",
-): MappingInspectionLibrarySummary => {
+): MappingDetailsLibrarySnapshot => {
 	const fallbackTitle = resolveRecentEvaluationTitle(recentEvaluation);
 
 	if (libraryEntry === null) {
@@ -277,9 +258,9 @@ const buildLibrarySummary = (
 };
 
 const buildSuggestedCandidates = (
-	recentEvaluation: MappingRecentEvaluationTrace | undefined,
-): MappingInspectionSuggestedCandidates => {
-	const suggested: MappingInspectionSuggestedCandidates = {
+	recentEvaluation: RecentMappingEvaluationTrace | undefined,
+): MappingDetailsCandidateGroups => {
+	const suggested: MappingDetailsCandidateGroups = {
 		...(recentEvaluation?.attemptedAt
 			? { attemptedAt: recentEvaluation.attemptedAt }
 			: {}),
@@ -293,7 +274,7 @@ const buildSuggestedCandidates = (
 	};
 
 	for (const candidate of recentEvaluation?.candidates ?? []) {
-		const projected: MappingInspectionCandidate = {
+		const projected: MappingDetailsCandidateEvaluation = {
 			providerId: candidate.providerId,
 			...(candidate.title ? { title: candidate.title } : {}),
 			source: candidate.source,
@@ -329,7 +310,7 @@ const buildSuggestedCandidates = (
 	return suggested;
 };
 
-const formatReviewReason = (reason: MappingReviewReason): string => {
+const formatReviewReason = (reason: MappingIssueReason): string => {
 	switch (reason) {
 		case "manual-upstream-disagreement": {
 			return "Manual mapping conflicts with exact upstream mapping.";
@@ -347,10 +328,10 @@ const formatReviewReason = (reason: MappingReviewReason): string => {
 };
 
 const buildExplanationItems = (
-	candidate: InspectionCandidate,
-	reviewReasons: readonly MappingReviewReason[],
-): MappingInspectionExplanationItem[] => {
-	const items: MappingInspectionExplanationItem[] = [];
+	candidate: EffectiveMapping,
+	reviewReasons: readonly MappingIssueReason[],
+): MappingDetailsExplanationItem[] => {
+	const items: MappingDetailsExplanationItem[] = [];
 	const evidence = candidate.acceptedEvidence;
 
 	if (evidence) {
@@ -434,9 +415,9 @@ const buildExplanationItems = (
 		});
 	}
 
-	if (candidate.resolverState && candidate.resolverState !== "mapped") {
+	if (candidate.autoMappingStatus && candidate.autoMappingStatus !== "mapped") {
 		let summary = "No effective mapping is currently resolved.";
-		switch (candidate.resolverState) {
+		switch (candidate.autoMappingStatus) {
 			case "ambiguous": {
 				summary = "Resolution is currently ambiguous.";
 				break;
@@ -455,7 +436,7 @@ const buildExplanationItems = (
 		items.push({
 			kind: "resolver-outcome",
 			summary,
-			resolverOutcome: candidate.resolverState,
+			resolverOutcome: candidate.autoMappingStatus,
 		});
 	}
 
@@ -482,7 +463,7 @@ const buildLinkedAniListEntries = (
 	anilistId: AniListId,
 	linkedAniListIds: readonly AniListId[],
 	metadataById: Map<AniListId, AniListMetadata>,
-): MappingInspectionLinkedAniListEntry[] =>
+): MappingDetailsLinkedAniListEntry[] =>
 	linkedAniListIds.map((linkedAniListId) => {
 		const metadata = metadataById.get(linkedAniListId);
 		const title = metadata
@@ -503,7 +484,7 @@ const buildLinkedAniListEntries = (
 export async function getMappingInspection(
 	input: GetMappingInspectionInput,
 	deps: GetMappingInspectionDeps,
-): Promise<MappingInspectionPayload> {
+): Promise<MappingDetailsPayload> {
 	const [mappingSource, seriesListResult, movieListResult] = await Promise.all([
 		getMappingSource(input.provider, input.anilistId, deps),
 		input.provider === "sonarr"
@@ -526,7 +507,7 @@ export async function getMappingInspection(
 				}),
 	]);
 
-	const candidate = buildEffectiveMappingCandidate({
+	const candidate = buildEffectiveMapping({
 		provider: input.provider,
 		anilistId: input.anilistId,
 		manualProviderId: mappingSource.manualMappedProviderId,
@@ -601,7 +582,7 @@ export async function getMappingInspection(
 		linkedMetadata.metadata.map((entry) => [entry.id, entry] as const),
 	);
 
-	const reviewProjection = projectMappingReview({
+	const reviewProjection = projectMappingIssues({
 		mappingEntryKind: candidate.mappingEntryKind,
 		providerId: candidate.providerId,
 		...(candidate.acceptedEvidence
@@ -610,8 +591,8 @@ export async function getMappingInspection(
 		...(candidate.recentEvaluation
 			? { recentEvaluation: candidate.recentEvaluation }
 			: {}),
-		...(candidate.resolverState
-			? { resolverState: candidate.resolverState }
+		...(candidate.autoMappingStatus
+			? { autoMappingStatus: candidate.autoMappingStatus }
 			: {}),
 		...(candidate.exactUpstreamMatchProviderId === undefined
 			? {}
@@ -649,8 +630,8 @@ export async function getMappingInspection(
 			...(candidate.acceptedEvidence?.reason
 				? { mappingReason: candidate.acceptedEvidence.reason }
 				: {}),
-			...(candidate.resolverState
-				? { resolverOutcome: candidate.resolverState }
+			...(candidate.autoMappingStatus
+				? { resolverOutcome: candidate.autoMappingStatus }
 				: {}),
 			...(candidate.suppressionKind
 				? { suppressionKind: candidate.suppressionKind }

@@ -3,6 +3,6 @@
 
 export { ManualMappingService } from './manual-mapping.service';
 export type {
-  MappingIgnoreEntry,
-  StoredMappingProviderIdEntry,
+  PersistedMappingIgnoreRecord,
+  PersistedProviderMappingRecord,
 } from './types';

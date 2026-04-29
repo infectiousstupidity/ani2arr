@@ -3,10 +3,10 @@
 
 import type { ProviderTargetId } from '@/providers';
 import type { SearchTerm } from './search-term-generator';
-import type { MappingAcceptedReason } from '../types';
+import type { AcceptedMappingReason } from '../types';
 import type { ProviderLookupResult } from '../lookup';
 
-export type PipelineMatchReason = Extract<MappingAcceptedReason, 'exact-title-match' | 'fuzzy-match'>;
+export type PipelineMatchReason = Extract<AcceptedMappingReason, 'exact-title-match' | 'fuzzy-match'>;
 
 export interface ScoredCandidate<TResult extends ProviderLookupResult = ProviderLookupResult>
 {
@@ -32,7 +32,7 @@ export type EvaluationOutcome =
   | {
     status: 'resolved';
     providerId: ProviderTargetId;
-    reason: MappingAcceptedReason;
+    reason: AcceptedMappingReason;
     confidence: number;
     successfulSynonym?: string;
     searchTerms: string[];

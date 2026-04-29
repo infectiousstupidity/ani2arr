@@ -8,8 +8,8 @@ import type { ProviderCredentials, SonarrLookupSeries, TvdbId } from '@/provider
 import { createRecentEvaluationTrace } from '../recent-evaluation';
 import type { AnibridgeMappingStore } from '../upstream';
 import type { ProviderLookupClient } from '../lookup';
-import type { MappingInheritedVerificationDetails, MappingRecentEvaluationTrace } from '../types';
-import type { AcceptedAutoMapping } from '../auto-mapping/types';
+import type { InheritedMappingVerificationDetails, RecentMappingEvaluationTrace } from '../types';
+import type { AcceptedAutoMappingResult } from '../auto-mapping/types';
 import { verifyInheritedSonarrCandidate } from './inherited-verifier';
 
 const INHERITANCE_MAX_DEPTH = 5;
@@ -35,21 +35,21 @@ type ExactSonarrLookupClient = ProviderLookupClient<ProviderCredentials, SonarrL
 export type InheritedResolutionAttempt =
   | {
       status: 'none';
-      recentEvaluation?: MappingRecentEvaluationTrace;
+      recentEvaluation?: RecentMappingEvaluationTrace;
     }
   | {
       status: 'accepted';
-      resolved: AcceptedAutoMapping;
-      recentEvaluation?: MappingRecentEvaluationTrace;
+      resolved: AcceptedAutoMappingResult;
+      recentEvaluation?: RecentMappingEvaluationTrace;
     }
   | {
       status: 'rejected';
       borrowedBaseTitle?: string;
-      recentEvaluation?: MappingRecentEvaluationTrace;
+      recentEvaluation?: RecentMappingEvaluationTrace;
     }
   | {
       status: 'ambiguous' | 'verification-failed';
-      recentEvaluation?: MappingRecentEvaluationTrace;
+      recentEvaluation?: RecentMappingEvaluationTrace;
     };
 
 function extractRelationIds(media: AniListMedia): AniListId[] {
@@ -95,8 +95,8 @@ function buildInheritedTrace(
   title: string | undefined,
   status: 'accepted' | 'not-accepted',
   summary: string,
-  inheritedVerification: MappingInheritedVerificationDetails,
-): MappingRecentEvaluationTrace | undefined {
+  inheritedVerification: InheritedMappingVerificationDetails,
+): RecentMappingEvaluationTrace | undefined {
   return createRecentEvaluationTrace([], [
     {
       providerId: proposal.providerId,
@@ -110,7 +110,7 @@ function buildInheritedTrace(
   ]);
 }
 
-function buildConflictTrace(proposals: readonly InheritedProposal[]): MappingRecentEvaluationTrace | undefined {
+function buildConflictTrace(proposals: readonly InheritedProposal[]): RecentMappingEvaluationTrace | undefined {
   return createRecentEvaluationTrace([], proposals.map(proposal => ({
     providerId: proposal.providerId,
     ...(proposal.borrowedBaseTitle ? { title: proposal.borrowedBaseTitle } : {}),
@@ -248,7 +248,7 @@ export async function attemptVerifiedInheritedSonarrResolution(input: {
     verification.details,
   );
   if (verification.verdict === 'accept') {
-    const resolved: AcceptedAutoMapping = {
+    const resolved: AcceptedAutoMappingResult = {
       providerId: proposal.providerId,
       reason: 'verified-inherited',
       immediateSourceAniListId: proposal.immediateSourceAniListId,

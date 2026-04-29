@@ -27,12 +27,12 @@ const ANIBRIDGE_MAPPINGS_URL =
 const CACHE_KEY = "upstream";
 const DEFAULT_FETCH: typeof fetch = (...args) => fetch(...args);
 
-export type AnibridgeProviderMappingPayload = {
+export type AnibridgeMappingPayload = {
 	sonarr: Record<number, number[]>;
 	radarr: Record<number, number[]>;
 };
 
-export type AnibridgeProviderPair =
+export type AnibridgeMappingPair =
 	| { provider: "sonarr"; anilistId: AniListId; providerId: TvdbId }
 	| { provider: "radarr"; anilistId: AniListId; providerId: TmdbId };
 
@@ -42,7 +42,7 @@ type MappingDescriptor = {
 	scope?: string;
 };
 
-const emptyPayload = (): AnibridgeProviderMappingPayload => ({
+const emptyPayload = (): AnibridgeMappingPayload => ({
 	sonarr: {},
 	radarr: {},
 });
@@ -76,7 +76,7 @@ const parseDescriptor = (value: string): MappingDescriptor | null => {
 };
 
 const addProviderPayloadPair = (
-	payload: AnibridgeProviderMappingPayload,
+	payload: AnibridgeMappingPayload,
 	provider: "sonarr" | "radarr",
 	anilistId: AniListId,
 	providerId: TvdbId | TmdbId,
@@ -89,7 +89,7 @@ const addProviderPayloadPair = (
 
 export const buildProviderMappingsFromAnibridgePayload = (
 	payload: unknown,
-): AnibridgeProviderMappingPayload => {
+): AnibridgeMappingPayload => {
 	const normalized = emptyPayload();
 	if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
 		return normalized;
@@ -187,7 +187,7 @@ export class AnibridgeMappingStore {
 	private readonly radarrReverse = new Map<TmdbId, Set<AniListId>>();
 
 	constructor(
-		private readonly cache: TtlCache<AnibridgeProviderMappingPayload> = anibridgeMappingCache,
+		private readonly cache: TtlCache<AnibridgeMappingPayload> = anibridgeMappingCache,
 		options: { fetch?: typeof fetch; scope?: string } = {},
 	) {
 		this.log = logger.create(options.scope ?? "AnibridgeMappingStore");
@@ -238,8 +238,8 @@ export class AnibridgeMappingStore {
 		return [...(this.radarrReverse.get(tmdbId) ?? [])];
 	}
 
-	public listAllProviderPairs(): AnibridgeProviderPair[] {
-		const entries: AnibridgeProviderPair[] = [];
+	public listAllProviderPairs(): AnibridgeMappingPair[] {
+		const entries: AnibridgeMappingPair[] = [];
 
 		for (const [anilistId, providerIds] of this.sonarrPairs.entries()) {
 			for (const providerId of providerIds) {
@@ -331,7 +331,7 @@ export class AnibridgeMappingStore {
 		}
 	}
 
-	private hydrate(payload: AnibridgeProviderMappingPayload): void {
+	private hydrate(payload: AnibridgeMappingPayload): void {
 		this.sonarrPairs.clear();
 		this.radarrPairs.clear();
 		this.sonarrReverse.clear();

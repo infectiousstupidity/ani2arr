@@ -6,21 +6,21 @@ import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
 import type { ProviderTargetId } from '@/providers';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 import type {
-  MappingAcceptedEvidence,
-  MappingAcceptedReason,
-  MappingAcceptedSource,
-  MappingInheritedVerificationDetails,
-  MappingRecentEvaluationTrace,
+  AcceptedMappingEvidence,
+  AcceptedMappingReason,
+  AcceptedMappingSource,
+  InheritedMappingVerificationDetails,
+  RecentMappingEvaluationTrace,
 } from '@/mapping/types';
 
 /**
  * Source of an automated resolver result.
  *
- * This is a narrower version of `MappingAcceptedSource` that intentionally excludes
+ * This is a narrower version of `AcceptedMappingSource` that intentionally excludes
  * `manual`, because manual mappings are user-owned, not resolver-produced
  * candidates or resolver-accepted results.
  */
-export type AutoMappingSource = Exclude<MappingAcceptedSource, 'manual'>;
+export type AutoMappingSource = Exclude<AcceptedMappingSource, 'manual'>;
 
 /**
  * Final semantic result of trying to auto-map one `provider + anilistId`.
@@ -37,14 +37,14 @@ export type AutoMappingStatus =
   | 'verification-failed';
 
 /** Successful auto-mapping result returned by the resolver. */
-export interface AcceptedAutoMapping {
+export interface AcceptedAutoMappingResult {
   providerId: ProviderTargetId;
-  reason: MappingAcceptedReason;
+  reason: AcceptedMappingReason;
   successfulSynonym?: string;
-  recentEvaluation?: MappingRecentEvaluationTrace;
+  recentEvaluation?: RecentMappingEvaluationTrace;
   immediateSourceAniListId?: AniListId;
   chainAnchorAniListId?: AniListId;
-  inheritedVerification?: MappingInheritedVerificationDetails;
+  inheritedVerification?: InheritedMappingVerificationDetails;
 }
 
 /**
@@ -58,13 +58,13 @@ export type AutoMappingRecord =
   | {
       state: 'mapped';
       providerId: ProviderTargetId;
-      acceptedEvidence: MappingAcceptedEvidence;
-      recentEvaluation?: MappingRecentEvaluationTrace;
+      acceptedEvidence: AcceptedMappingEvidence;
+      recentEvaluation?: RecentMappingEvaluationTrace;
       updatedAt: number;
     }
   | {
       state: Exclude<AutoMappingStatus, 'mapped'>;
-      recentEvaluation?: MappingRecentEvaluationTrace;
+      recentEvaluation?: RecentMappingEvaluationTrace;
       updatedAt: number;
     };
 

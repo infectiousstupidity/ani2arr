@@ -4,6 +4,6 @@
 export {
   buildProviderMappingsFromAnibridgePayload,
   AnibridgeMappingStore,
-  type AnibridgeProviderMappingPayload,
-  type AnibridgeProviderPair,
+  type AnibridgeMappingPayload,
+  type AnibridgeMappingPair,
 } from './anibridge-mapping.store';

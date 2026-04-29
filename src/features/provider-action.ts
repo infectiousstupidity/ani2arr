@@ -1,11 +1,11 @@
 /** Shared provider action state derivation for content entry points. */
 
-import type { MappingSuppressionKind, ProviderMappingState } from '@/mapping/types';
-import type { MappingRowStatus } from '@/mapping/queries/list-mappings';
-import type { MappingReviewSummary } from '@/mapping/queries/mapping-issues';
+import type { MappingSuppressionKind, EffectiveMappingState } from '@/mapping/types';
+import type { MappingListRowStatus } from '@/mapping/queries/list-mappings';
+import type { MappingIssuesSummary } from '@/mapping/queries/mapping-issues';
 
 type SteadyProviderActionState = Extract<
-  MappingRowStatus,
+  MappingListRowStatus,
   'in-library' | 'can-add' | 'unmapped' | 'unknown'
 >;
 
@@ -41,11 +41,11 @@ export interface ProviderActionModel extends ProviderActionSummary {
 }
 
 export const deriveMappingRowStatus = (input: {
-  reviewSummary?: MappingReviewSummary;
+  reviewSummary?: MappingIssuesSummary;
   suppressionKind?: MappingSuppressionKind;
-  providerMappingState: ProviderMappingState;
+  providerMappingState: EffectiveMappingState;
   isInLibrary: boolean | null;
-}): MappingRowStatus => {
+}): MappingListRowStatus => {
   if (input.reviewSummary) {
     return 'needs-review';
   }
@@ -68,7 +68,7 @@ export const deriveMappingRowStatus = (input: {
 };
 
 function toSteadyProviderActionState(input: {
-  providerMappingState: ProviderMappingState | null | undefined;
+  providerMappingState: EffectiveMappingState | null | undefined;
   isInLibrary: boolean | null;
 }): SteadyProviderActionState {
   if (!input.providerMappingState) {
@@ -96,7 +96,7 @@ function toSteadyProviderActionState(input: {
 export function deriveProviderActionSummary(input: {
   isConfigured: boolean;
   isChecking: boolean;
-  providerMappingState: ProviderMappingState | null | undefined;
+  providerMappingState: EffectiveMappingState | null | undefined;
   isInLibrary: boolean | null;
   hasStatusError: boolean;
   isAdding: boolean;

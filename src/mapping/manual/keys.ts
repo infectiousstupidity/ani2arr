@@ -8,7 +8,7 @@ import {
   type Provider,
   type ProviderIdFor,
 } from '@/providers';
-import type { MappingIgnoreEntry, StoredMappingProviderIdEntry } from './types';
+import type { StoredMappingIgnoreEntry, StoredProviderMappingEntry } from './types';
 
 export const isFiniteId = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
@@ -69,9 +69,9 @@ export const parseCandidateRecordKey = (
   return providerId === null ? null : { provider, anilistId, providerId };
 };
 
-export const normalizeManualMappingEntry = (entry: unknown): StoredMappingProviderIdEntry | null => {
+export const normalizeManualMappingEntry = (entry: unknown): StoredProviderMappingEntry | null => {
   if (!entry || typeof entry !== 'object') return null;
-  const candidate = entry as Partial<StoredMappingProviderIdEntry>;
+  const candidate = entry as Partial<StoredProviderMappingEntry>;
   if (!isMappingProvider(candidate.provider)) return null;
   const updatedAt = typeof candidate.updatedAt === 'number' ? candidate.updatedAt : Date.now();
   if (candidate.provider === 'sonarr') {
@@ -82,9 +82,9 @@ export const normalizeManualMappingEntry = (entry: unknown): StoredMappingProvid
   return providerId === null ? null : { provider: candidate.provider, providerId, updatedAt };
 };
 
-export const normalizeIgnoreEntry = (entry: unknown): MappingIgnoreEntry | null => {
+export const normalizeIgnoreEntry = (entry: unknown): StoredMappingIgnoreEntry | null => {
   if (!entry || typeof entry !== 'object') return null;
-  const candidate = entry as Partial<MappingIgnoreEntry>;
+  const candidate = entry as Partial<StoredMappingIgnoreEntry>;
   if (!isMappingProvider(candidate.provider)) return null;
   return {
     provider: candidate.provider,
@@ -92,9 +92,9 @@ export const normalizeIgnoreEntry = (entry: unknown): MappingIgnoreEntry | null 
   };
 };
 
-export const normalizeCandidateSuppressionEntry = (entry: unknown): StoredMappingProviderIdEntry | null => {
+export const normalizeCandidateSuppressionEntry = (entry: unknown): StoredProviderMappingEntry | null => {
   if (!entry || typeof entry !== 'object') return null;
-  const candidate = entry as Partial<StoredMappingProviderIdEntry>;
+  const candidate = entry as Partial<StoredProviderMappingEntry>;
   if (!isMappingProvider(candidate.provider)) return null;
   const updatedAt = typeof candidate.updatedAt === 'number' ? candidate.updatedAt : Date.now();
   if (candidate.provider === 'sonarr') {

@@ -4,24 +4,24 @@
 import type { ProviderTargetId } from '@/providers';
 import type { EvaluationOutcome } from './pipeline/types';
 import type {
-  MappingAcceptedReason,
-  MappingAcceptedSource,
-  MappingEvaluationCandidate,
-  MappingEvaluationCandidateStatus,
-  MappingRecentEvaluationTrace,
+  AcceptedMappingReason,
+  AcceptedMappingSource,
+  MappingCandidateEvaluation,
+  MappingCandidateEvaluationStatus,
+  RecentMappingEvaluationTrace,
 } from "./types";
-import type { AcceptedAutoMapping } from './auto-mapping/types';
+import type { AcceptedAutoMappingResult } from './auto-mapping/types';
 
 const RECENT_TRACE_CANDIDATE_LIMIT = 8;
 
-const candidateStatusPriority: Record<MappingEvaluationCandidateStatus, number> = {
+const candidateStatusPriority: Record<MappingCandidateEvaluationStatus, number> = {
   accepted: 4,
   rejected: 3,
   suppressed: 2,
   'not-accepted': 1,
 };
 
-export function describeAcceptanceReason(reason: MappingAcceptedReason): string {
+export function describeAcceptanceReason(reason: AcceptedMappingReason): string {
   switch (reason) {
     case 'exact-upstream': {
       return 'Exact upstream mapping';
@@ -45,8 +45,8 @@ export function describeAcceptanceReason(reason: MappingAcceptedReason): string 
 }
 
 export function describeCandidate(
-  reason: MappingAcceptedReason,
-  status: MappingEvaluationCandidateStatus,
+  reason: AcceptedMappingReason,
+  status: MappingCandidateEvaluationStatus,
 ): string {
   const base = describeAcceptanceReason(reason);
   switch (status) {
@@ -66,9 +66,9 @@ export function describeCandidate(
 }
 
 export function mergeTraceCandidates(
-  candidates: readonly MappingEvaluationCandidate[],
-): MappingEvaluationCandidate[] {
-  const byProviderId = new Map<number, MappingEvaluationCandidate>();
+  candidates: readonly MappingCandidateEvaluation[],
+): MappingCandidateEvaluation[] {
+  const byProviderId = new Map<number, MappingCandidateEvaluation>();
 
   for (const candidate of candidates) {
     const existing = byProviderId.get(candidate.providerId);
@@ -99,11 +99,11 @@ export function mergeTraceCandidates(
 }
 
 export function mergeRecentEvaluations(
-  ...traces: Array<MappingRecentEvaluationTrace | undefined>
-): MappingRecentEvaluationTrace | undefined {
+  ...traces: Array<RecentMappingEvaluationTrace | undefined>
+): RecentMappingEvaluationTrace | undefined {
   const searchTerms: string[] = [];
   const searchTermSeen = new Set<string>();
-  const candidates: MappingEvaluationCandidate[] = [];
+  const candidates: MappingCandidateEvaluation[] = [];
 
   for (const trace of traces) {
     if (!trace) {
@@ -131,8 +131,8 @@ export function mergeRecentEvaluations(
 
 export function createRecentEvaluationTrace(
   searchTerms: readonly string[],
-  candidates: readonly MappingEvaluationCandidate[],
-): MappingRecentEvaluationTrace | undefined {
+  candidates: readonly MappingCandidateEvaluation[],
+): RecentMappingEvaluationTrace | undefined {
   if (searchTerms.length === 0 && candidates.length === 0) {
     return undefined;
   }
@@ -145,12 +145,12 @@ export function createRecentEvaluationTrace(
 }
 
 export function createSingleCandidateTrace(
-  resolved: AcceptedAutoMapping,
-  source: MappingAcceptedSource,
-  status: MappingEvaluationCandidateStatus,
+  resolved: AcceptedAutoMappingResult,
+  source: AcceptedMappingSource,
+  status: MappingCandidateEvaluationStatus,
   searchTerms: readonly string[] = [],
   title?: string,
-): MappingRecentEvaluationTrace | undefined {
+): RecentMappingEvaluationTrace | undefined {
   return createRecentEvaluationTrace(searchTerms, [
     {
       providerId: resolved.providerId,
@@ -165,10 +165,10 @@ export function createSingleCandidateTrace(
 }
 
 export function rewriteTraceCandidateStatus(
-  trace: MappingRecentEvaluationTrace | undefined,
+  trace: RecentMappingEvaluationTrace | undefined,
   providerId: ProviderTargetId,
-  status: MappingEvaluationCandidateStatus,
-): MappingRecentEvaluationTrace | undefined {
+  status: MappingCandidateEvaluationStatus,
+): RecentMappingEvaluationTrace | undefined {
   if (!trace) {
     return undefined;
   }
@@ -188,11 +188,11 @@ export function rewriteTraceCandidateStatus(
 
 export function createPipelineRecentEvaluation(
   outcome: EvaluationOutcome,
-): MappingRecentEvaluationTrace | undefined {
+): RecentMappingEvaluationTrace | undefined {
   return createRecentEvaluationTrace(
     outcome.searchTerms,
     outcome.candidates.map((candidate) => {
-      const status: MappingEvaluationCandidateStatus =
+      const status: MappingCandidateEvaluationStatus =
         outcome.status === 'resolved' && candidate.providerId === outcome.providerId
           ? 'accepted'
           : 'not-accepted';

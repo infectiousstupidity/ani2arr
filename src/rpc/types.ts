@@ -12,15 +12,15 @@ import type {
 	ProviderTargetId,
 } from "@/providers";
 import type {
-	MappingAcceptedReason,
-	MappingAcceptedSource,
-	MappingIdentity,
+	AcceptedMappingReason,
+	AcceptedMappingSource,
 	MappingUnknownReason,
-	ProviderMappingState,
+	EffectiveMappingState,
 } from "@/mapping/types";
-import type { MappingSummary } from "@/mapping/queries/list-mappings";
+import type { MappingListRow } from "@/mapping/queries/list-mappings";
+import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import type { AutoMappingStatus } from "@/mapping/auto-mapping/types";
-import type { MappingInspectionPayload } from "@/mapping/queries/mapping-details";
+import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
 import type { LibraryUnknownReason } from "@/providers/library/types";
 import type { MappingCursor } from "./schemas";
 export type {
@@ -31,11 +31,11 @@ export type {
 
 interface ProviderStatusResponseBase {
 	providerId: ProviderTargetId | null;
-	providerMappingState: ProviderMappingState;
+	providerMappingState: EffectiveMappingState;
 	isInLibrary: boolean | null;
 	successfulSynonym?: string;
-	mappingSource?: MappingAcceptedSource;
-	mappingReason?: MappingAcceptedReason;
+	mappingSource?: AcceptedMappingSource;
+	mappingReason?: AcceptedMappingReason;
 	resolverOutcome?: AutoMappingStatus;
 	mappingUnknownReason?: MappingUnknownReason;
 	libraryUnknownReason?: LibraryUnknownReason;
@@ -54,14 +54,14 @@ export interface CheckMovieStatusResponse extends ProviderStatusResponseBase {
 }
 
 export interface GetMappingsOutput {
-	mappings: MappingSummary[];
+	mappings: MappingListRow[];
 	nextCursor?: MappingCursor | null;
 	total?: number;
 }
 
-export type GetMappingIdentitiesOutput = MappingIdentity[];
+export type GetMappingIdentitiesOutput = EffectiveMappingPresence[];
 
-export type GetMappingInspectionOutput = MappingInspectionPayload;
+export type GetMappingInspectionOutput = MappingDetailsPayload;
 
 export interface SonarrLookupOutput {
 	results: SonarrLookupSeries[];

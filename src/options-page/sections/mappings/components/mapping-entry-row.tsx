@@ -8,8 +8,8 @@ import { buildAniListAnimeUrl } from '@/anilist/anilist-links';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import { parseProviderIdentity } from '@/providers';
 import type { ProviderIdentity } from '@/providers';
-import type { MappingEntryKind } from '@/mapping/types';
-import type { MappingSummary } from '@/mapping/queries/list-mappings';
+import type { EffectiveMappingKind } from '@/mapping/types';
+import type { MappingListRow } from '@/mapping/queries/list-mappings';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';
@@ -21,7 +21,7 @@ import {
 import { useMovieStatus } from '@/providers/hooks/radarr.queries';
 import { useSeriesStatus } from '@/providers/hooks/sonarr.queries';
 
-const entryKindStyles: Record<MappingEntryKind, { label: string; className: string }> = {
+const entryKindStyles: Record<EffectiveMappingKind, { label: string; className: string }> = {
   manual: { label: 'Manual', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },
   unmapped: { label: 'Unmapped', className: 'bg-warning/14 text-warning border-warning/24' },
   unknown: { label: 'Unknown', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
@@ -31,7 +31,7 @@ const entryKindStyles: Record<MappingEntryKind, { label: string; className: stri
   ignored: { label: 'Ignored', className: 'bg-error/12 text-error border-error/24' },
 };
 
-const statusStyles: Record<MappingSummary['mappingRowStatus'], { label: string; className: string }> = {
+const statusStyles: Record<MappingListRow['mappingRowStatus'], { label: string; className: string }> = {
   'needs-review': { label: 'Needs review', className: 'bg-warning/14 text-warning border-warning/24' },
   'in-library': { label: 'In library', className: 'bg-success/14 text-success border-success/24' },
   'can-add': { label: 'Can add', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },
@@ -50,7 +50,7 @@ const getExternalLink = (identity: ProviderIdentity | null) => {
 
 const MetaSeparator: React.FC = () => <span className="text-text-tertiary/70">·</span>;
 
-const getEditTooltip = (entryKind: MappingEntryKind): string => {
+const getEditTooltip = (entryKind: EffectiveMappingKind): string => {
   switch (entryKind) {
     case 'manual': {
       return 'Edit the manual mapping for this AniList entry. Saving keeps it as a manual mapping until you delete it.';
@@ -74,16 +74,16 @@ const getEditTooltip = (entryKind: MappingEntryKind): string => {
 };
 
 export type MappingEntryRowProps = {
-  entry: MappingSummary;
+  entry: MappingListRow;
   title: string;
   metadata?: AniListMetadata | null | undefined;
   isMutating: boolean;
-  onEdit: (entry: MappingSummary) => void;
-  onDeleteManualMapping: (entry: MappingSummary) => void;
-  onRejectCandidate: (entry: MappingSummary) => void;
-  onClearRejectedCandidate: (entry: MappingSummary) => void;
-  onIgnoreTitle: (entry: MappingSummary) => void;
-  onClearIgnoreTitle: (entry: MappingSummary) => void;
+  onEdit: (entry: MappingListRow) => void;
+  onDeleteManualMapping: (entry: MappingListRow) => void;
+  onRejectCandidate: (entry: MappingListRow) => void;
+  onClearRejectedCandidate: (entry: MappingListRow) => void;
+  onIgnoreTitle: (entry: MappingListRow) => void;
+  onClearIgnoreTitle: (entry: MappingListRow) => void;
   providerUrl?: string | null;
   hideSourceBadge?: boolean;
 };
