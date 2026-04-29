@@ -10,7 +10,7 @@ import {
 } from '@/mapping/types';
 import type { AutoMappingRecord } from '@/mapping/auto-mapping/types';
 import { buildEffectiveMappingCandidate } from '@/mapping/effective-mapping';
-import { collectLinkedAniListIds, getMappingFacts } from '@/mapping/mapping-facts';
+import { collectLinkedAniListIds, getMappingSource } from '@/mapping/mapping-sources';
 import { deriveLibraryUnknownReason } from '@/providers/library/types';
 import { deriveMappingRowStatus } from '@/features/provider-action';
 import { projectMappingReview } from '@/mapping/review/project-review';
@@ -343,8 +343,8 @@ export async function getMappingInspection(
   input: GetMappingInspectionInput,
   deps: GetMappingInspectionDeps,
 ): Promise<MappingInspectionPayload> {
-  const [facts, seriesListResult, movieListResult] = await Promise.all([
-    getMappingFacts(input.provider, input.anilistId, deps),
+  const [mappingSource, seriesListResult, movieListResult] = await Promise.all([
+    getMappingSource(input.provider, input.anilistId, deps),
     input.provider === 'sonarr'
       ? deps.sonarrLibrary.getLeanSeriesList().then(
           (items) => ({ ok: true as const, items }),
@@ -362,11 +362,11 @@ export async function getMappingInspection(
   const candidate = buildEffectiveMappingCandidate({
     provider: input.provider,
     anilistId: input.anilistId,
-    manualProviderId: facts.manualProviderId,
-    ignored: facts.ignored,
-    upstreamProviderIds: facts.upstreamProviderIds,
-    rejectedProviderId: facts.rejectedProviderId,
-    resolverState: facts.autoMappingRecord,
+    manualProviderId: mappingSource.manualMappedProviderId,
+    ignored: mappingSource.ignored,
+    upstreamProviderIds: mappingSource.upstreamProviderIds,
+    rejectedCandidateProviderId: mappingSource.rejectedCandidateProviderId,
+    autoMappingRecord: mappingSource.autoMappingRecord,
   });
 
   let libraryEntry: SonarrSeriesSnapshot | RadarrMovieSnapshot | null = null;

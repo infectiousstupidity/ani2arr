@@ -5,20 +5,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseAniListId, type AniListId } from '@/anilist';
 import type { ProviderTargetId } from '@/providers';
 import {
-  clearExtensionMappingFailures,
-  removeExtensionMappingFailure,
-  writeExtensionMappingFailure,
-} from '@/mapping/cache/extension-mapping.cache';
+  clearAutoMappingFailures,
+  removeAutoMappingFailure,
+  writeAutoMappingFailure,
+} from '@/mapping/auto-mapping/failure.cache';
 import { createError, ErrorCode } from '@/shared/errors';
 import { MappingService } from './mapping.service';
 
 const aid = parseAniListId;
 
-vi.mock('@/mapping/cache/extension-mapping.cache', () => ({
-  clearExtensionMappingFailures: vi.fn(async () => {}),
-  readExtensionMappingFailure: vi.fn(async () => null),
-  removeExtensionMappingFailure: vi.fn(async () => {}),
-  writeExtensionMappingFailure: vi.fn(async () => {}),
+vi.mock('@/mapping/auto-mapping/failure.cache', () => ({
+  clearAutoMappingFailures: vi.fn(async () => {}),
+  readAutoMappingFailure: vi.fn(async () => null),
+  removeAutoMappingFailure: vi.fn(async () => {}),
+  writeAutoMappingFailure: vi.fn(async () => {}),
 }));
 
 vi.mock('@/debug/metrics', () => ({
@@ -559,7 +559,7 @@ describe('MappingService', () => {
 
     expect(lookupClients.sonarr.reset).toHaveBeenCalledTimes(1);
     expect(lookupClients.radarr.reset).toHaveBeenCalledTimes(1);
-    expect(clearExtensionMappingFailures).toHaveBeenCalledTimes(1);
+    expect(clearAutoMappingFailures).toHaveBeenCalledTimes(1);
     expect(autoMappingStore.clear).toHaveBeenCalledTimes(1);
     expect(notifyMappingsChanged).toHaveBeenCalledTimes(1);
   });
@@ -586,7 +586,7 @@ describe('MappingService', () => {
     await service.evictResolved(aid(44), 'radarr');
 
     expect(autoMappingStore.delete).toHaveBeenCalledWith('radarr', 44);
-    expect(removeExtensionMappingFailure).toHaveBeenCalledWith('radarr', 44);
+    expect(removeAutoMappingFailure).toHaveBeenCalledWith('radarr', 44);
     expect(anilistApi.removeMediaFromCache).toHaveBeenCalledWith(44);
     expect(notifyMappingsChanged).toHaveBeenCalledTimes(1);
   });
@@ -604,7 +604,7 @@ describe('MappingService', () => {
       code: ErrorCode.NETWORK_ERROR,
     });
 
-    expect(writeExtensionMappingFailure).toHaveBeenCalledWith('sonarr', 12, error);
+    expect(writeAutoMappingFailure).toHaveBeenCalledWith('sonarr', 12, error);
   });
 
   it('caches configuration failures with the default failure TTLs', async () => {
@@ -614,7 +614,7 @@ describe('MappingService', () => {
       code: ErrorCode.CONFIGURATION_ERROR,
     });
 
-    expect(writeExtensionMappingFailure).toHaveBeenCalledWith(
+    expect(writeAutoMappingFailure).toHaveBeenCalledWith(
       'radarr',
       18,
       expect.objectContaining({ code: ErrorCode.CONFIGURATION_ERROR }),

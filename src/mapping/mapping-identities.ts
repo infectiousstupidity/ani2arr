@@ -4,7 +4,7 @@ import type { AnibridgeProviderPair } from '@/mapping/upstream';
 import type { MappingIdentity } from '@/mapping/types';
 import type { AutoMappingRecord } from '@/mapping/auto-mapping/types';
 import { buildEffectiveMapping } from './effective-mapping';
-import { getMappingFacts } from './mapping-facts';
+import { getMappingSource } from './mapping-sources';
 
 export interface GetMappingIdentitiesDeps {
   manualMappingService: {
@@ -70,9 +70,9 @@ export async function getMappingIdentities(
     keys.add(createKey(pair.provider, pair.anilistId));
   }
 
-  for (const resolverState of await deps.autoMappingStore.list()) {
-    if (!requestedIds.has(resolverState.anilistId)) continue;
-    const key = createKey(resolverState.provider, resolverState.anilistId);
+  for (const autoMappingRecord of await deps.autoMappingStore.list()) {
+    if (!requestedIds.has(autoMappingRecord.anilistId)) continue;
+    const key = createKey(autoMappingRecord.provider, autoMappingRecord.anilistId);
     keys.add(key);
   }
 
@@ -81,16 +81,16 @@ export async function getMappingIdentities(
     for (const provider of PROVIDERS) {
       const key = createKey(provider, anilistId);
       if (!keys.has(key)) continue;
-      const facts = await getMappingFacts(provider, anilistId, deps);
+      const mappingSource = await getMappingSource(provider, anilistId, deps);
 
       const identity = buildEffectiveMapping({
         provider,
         anilistId,
-        manualProviderId: facts.manualProviderId,
-        ignored: facts.ignored,
-        upstreamProviderIds: facts.upstreamProviderIds,
-        rejectedProviderId: facts.rejectedProviderId,
-        resolverState: facts.autoMappingRecord,
+        manualProviderId: mappingSource.manualMappedProviderId,
+        ignored: mappingSource.ignored,
+        upstreamProviderIds: mappingSource.upstreamProviderIds,
+        rejectedCandidateProviderId: mappingSource.rejectedCandidateProviderId,
+        autoMappingRecord: mappingSource.autoMappingRecord,
       });
       identities.push(toMappingIdentity(identity));
     }
