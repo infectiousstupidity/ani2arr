@@ -1,17 +1,20 @@
 /** Shared query keys and stable AniList metadata serialization for query caching. */
 // src/shared/queries/query-keys.ts
 
-import type { StatusInput } from '@/rpc/schemas';
-import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
-import type { Provider } from '@/providers';
-import type { GetMappingsInput } from '@/rpc/schemas';
+import type { AniListId } from "@/anilist";
+import { isAniListId } from "@/anilist/anilist-id";
+import type { StatusInput, GetMappingsInput } from "@/rpc/schemas";
+import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
+import { validateProviderConnectionUrl } from "@/providers/settings/provider-connection.schema";
+import type { ProviderTargetId } from "@/providers";
+import type { Provider } from "@/providers";
 
-const rootQueryKey = ['a2a'] as const;
+const rootQueryKey = ["a2a"] as const;
 
 // Normalize strings to ensure "Show Name" and "show name " hit the same cache
 const normalizeTitleKey = (title?: string) => {
-  const trimmed = title?.trim();
-  return trimmed ? trimmed.toLowerCase() : '::';
+	const trimmed = title?.trim();
+	return trimmed ? trimmed.toLowerCase() : "::";
 };
 
 // Create a deterministic subset of metadata for cache stability.
@@ -21,97 +24,143 @@ const normalizeTitleKey = (title?: string) => {
 // 3. Unstable array ordering (prequel IDs)
 // 4. Irrelevant fields (coverImage, etc.)
 const getStableMetadata = (metadata?: AniListMediaHint | null) => {
-  if (!metadata) return null;
-  return {
-    titles: {
-      english: metadata.titles?.english?.trim() || null,
-      romaji: metadata.titles?.romaji?.trim() || null,
-      native: metadata.titles?.native?.trim() || null,
-    },
-    startYear: metadata.startYear ?? null,
-    format: metadata.format ?? null,
-    // Limit synonyms to 5 to match backend matching logic and reduce cache fragmentation
-    synonyms: (metadata.synonyms || []).slice(0, 5),
-    // Sort numeric IDs to ensure array order doesn't affect cache identity
-    relationPrequelIds: [...(metadata.relationPrequelIds || [])].toSorted((a, b) => a - b),
-  };
+	if (!metadata) return null;
+	return {
+		titles: {
+			english: metadata.titles?.english?.trim() || null,
+			romaji: metadata.titles?.romaji?.trim() || null,
+			native: metadata.titles?.native?.trim() || null,
+		},
+		startYear: metadata.startYear ?? null,
+		format: metadata.format ?? null,
+		// Limit synonyms to 5 to match backend matching logic and reduce cache fragmentation
+		synonyms: (metadata.synonyms || []).slice(0, 5),
+		// Sort numeric IDs to ensure array order doesn't affect cache identity
+		relationPrequelIds: [...(metadata.relationPrequelIds || [])].toSorted(
+			(a, b) => a - b,
+		),
+	};
 };
 
-const seriesStatusRootKey = (provider: Provider) => [...rootQueryKey, 'seriesStatus', provider] as const;
+const seriesStatusRootKey = (provider: Provider) =>
+	[...rootQueryKey, "seriesStatus", provider] as const;
 
-const seriesStatusBaseKey = (provider: Provider, anilistId: number) =>
-  [...seriesStatusRootKey(provider), anilistId] as const;
+const seriesStatusBaseKey = (provider: Provider, anilistId: AniListId) =>
+	[...seriesStatusRootKey(provider), anilistId] as const;
 
 const providerMetadataRootKey = (provider: Provider) =>
-  [...rootQueryKey, `${provider}Metadata`] as const;
+	[...rootQueryKey, `${provider}Metadata`] as const;
 
 const normalizeMappingsInput = (input?: GetMappingsInput) => {
-  if (!input) return 'default';
-  const normalized: Record<string, unknown> = {};
-  if (input.sources?.length) {
-    normalized.sources = [...new Set(input.sources)].toSorted();
-  }
-  if (input.providers?.length) {
-    normalized.providers = [...new Set(input.providers)].toSorted();
-  }
-  if (typeof input.limit === 'number') {
-    normalized.limit = input.limit;
-  }
-  if (input.query && input.query.trim()) {
-    normalized.query = input.query.trim().toLowerCase();
-  }
-  if (input.cursor) {
-    normalized.cursor = {
-      updatedAt: input.cursor.updatedAt,
-      anilistId: input.cursor.anilistId,
-      provider: input.cursor.provider,
-    };
-  }
-  return normalized;
+	if (!input) return "default";
+	const normalized: Record<string, unknown> = {};
+	if (input.entryKinds?.length) {
+		normalized.entryKinds = [...new Set(input.entryKinds)].toSorted();
+	}
+	if (input.providers?.length) {
+		normalized.providers = [...new Set(input.providers)].toSorted();
+	}
+	if (typeof input.limit === "number") {
+		normalized.limit = input.limit;
+	}
+	if (input.query && input.query.trim()) {
+		normalized.query = input.query.trim().toLowerCase();
+	}
+	if (input.cursor) {
+		normalized.cursor = {
+			updatedAt: input.cursor.updatedAt,
+			anilistId: input.cursor.anilistId,
+			provider: input.cursor.provider,
+		};
+	}
+	return normalized;
 };
 
-export const normalizeMetadataIds = (ids: number[]) => {
-  return [...new Set(ids.filter(id => Number.isFinite(id) && id > 0))].toSorted((a, b) => a - b) as number[];
+export const normalizeMetadataIds = (
+	ids: readonly AniListId[],
+): AniListId[] => {
+	return [...new Set(ids.filter(isAniListId))].toSorted((a, b) => a - b);
+};
+
+export const getProviderQueryScope = (
+	credentials?: { url: string; apiKey?: string } | null,
+): string => {
+	// Query identity must stay non-secret. Never include apiKey or secret-derived values here.
+	const rawUrl = credentials?.url?.trim();
+	if (!rawUrl) return "configured";
+
+	const normalizedUrl = validateProviderConnectionUrl(rawUrl);
+	return normalizedUrl.ok ? normalizedUrl.value : rawUrl;
 };
 
 export const queryKeys = {
-  all: rootQueryKey,
-  options: () => [...rootQueryKey, 'options'] as const,
-  publicOptions: () => [...rootQueryKey, 'publicOptions'] as const,
-  aniListMedia: (anilistId: number) => [...rootQueryKey, 'aniListMedia', anilistId] as const,
-  seriesStatusRoot: (provider: Provider = 'sonarr') => seriesStatusRootKey(provider),
-  seriesStatusBase: (anilistId: number, provider: Provider = 'sonarr') =>
-    seriesStatusBaseKey(provider, anilistId),
-  seriesStatus: (
-    payload: Pick<StatusInput, 'anilistId' | 'title' | 'metadata'>,
-    provider: Provider = 'sonarr',
-  ) =>
-    [
-      ...seriesStatusBaseKey(provider, payload.anilistId),
-      {
-        // TanStack Query hashes this object. By using normalized inputs,
-        // we ensure cache hits across different contexts (e.g. Card vs Page).
-        title: normalizeTitleKey(payload.title),
-        metadata: getStableMetadata(payload.metadata),
-      },
-    ] as const,
-  sonarrMetadataRoot: () => providerMetadataRootKey('sonarr'),
-  sonarrMetadata: (scope?: string) => [...rootQueryKey, 'sonarrMetadata', scope ?? 'configured'] as const,
-  sonarrConnectionRoot: () => [...rootQueryKey, 'sonarrConnection'] as const,
-  sonarrConnection: (scope?: string) => [...rootQueryKey, 'sonarrConnection', scope ?? 'configured'] as const,
-  radarrMetadataRoot: () => providerMetadataRootKey('radarr'),
-  radarrMetadata: (scope?: string) => [...rootQueryKey, 'radarrMetadata', scope ?? 'configured'] as const,
-  radarrConnectionRoot: () => [...rootQueryKey, 'radarrConnection'] as const,
-  radarrConnection: (scope?: string) => [...rootQueryKey, 'radarrConnection', scope ?? 'configured'] as const,
-  mappingSearch: (service: 'sonarr' | 'radarr', query: string) =>
-    [...rootQueryKey, 'mappingSearch', service, query.trim().toLowerCase()] as const,
-  mappingOverridesRoot: () => [...rootQueryKey, 'mappingOverrides'] as const,
-  mappingOverrides: (provider: Provider | 'all' = 'all') =>
-    [...rootQueryKey, 'mappingOverrides', provider] as const,
-  mappingsRoot: () => [...rootQueryKey, 'mappings'] as const,
-  mappings: (input?: GetMappingsInput) => [...rootQueryKey, 'mappings', normalizeMappingsInput(input)] as const,
-  mappingInspectionRoot: () => [...rootQueryKey, 'mappingInspection'] as const,
-  mappingInspection: (provider: Provider, anilistId: number) =>
-    [...rootQueryKey, 'mappingInspection', provider, anilistId] as const,
-  aniListMetadata: (ids: number[]) => [...rootQueryKey, 'aniListMetadata', normalizeMetadataIds(ids)] as const,
+	all: rootQueryKey,
+	options: () => [...rootQueryKey, "options"] as const,
+	publicOptions: () => [...rootQueryKey, "publicOptions"] as const,
+	aniListMedia: (anilistId: AniListId) =>
+		[...rootQueryKey, "aniListMedia", anilistId] as const,
+	seriesStatusRoot: (provider: Provider = "sonarr") =>
+		seriesStatusRootKey(provider),
+	seriesStatusBase: (anilistId: AniListId, provider: Provider = "sonarr") =>
+		seriesStatusBaseKey(provider, anilistId),
+	seriesStatus: (
+		payload: Pick<StatusInput, "anilistId" | "title" | "metadata">,
+		provider: Provider = "sonarr",
+	) =>
+		[
+			...seriesStatusBaseKey(provider, payload.anilistId),
+			{
+				// TanStack Query hashes this object. By using normalized inputs,
+				// we ensure cache hits across different contexts (e.g. Card vs Page).
+				title: normalizeTitleKey(payload.title),
+				metadata: getStableMetadata(payload.metadata),
+			},
+		] as const,
+	providerLibraryStatus: (
+		provider: Provider,
+		anilistId: AniListId,
+		providerId: ProviderTargetId,
+	) =>
+		[
+			...seriesStatusBaseKey(provider, anilistId),
+			"providerLibraryStatus",
+			providerId,
+		] as const,
+	sonarrMetadataRoot: () => providerMetadataRootKey("sonarr"),
+	sonarrMetadata: (scope?: string) =>
+		[...rootQueryKey, "sonarrMetadata", scope ?? "configured"] as const,
+	sonarrConnectionRoot: () => [...rootQueryKey, "sonarrConnection"] as const,
+	sonarrConnection: (scope?: string) =>
+		[...rootQueryKey, "sonarrConnection", scope ?? "configured"] as const,
+	radarrMetadataRoot: () => providerMetadataRootKey("radarr"),
+	radarrMetadata: (scope?: string) =>
+		[...rootQueryKey, "radarrMetadata", scope ?? "configured"] as const,
+	radarrConnectionRoot: () => [...rootQueryKey, "radarrConnection"] as const,
+	radarrConnection: (scope?: string) =>
+		[...rootQueryKey, "radarrConnection", scope ?? "configured"] as const,
+	mappingSearchRoot: (provider?: Provider) =>
+		provider
+			? ([...rootQueryKey, "mappingSearch", provider] as const)
+			: ([...rootQueryKey, "mappingSearch"] as const),
+	mappingSearch: (service: "sonarr" | "radarr", query: string) =>
+		[
+			...rootQueryKey,
+			"mappingSearch",
+			service,
+			query.trim().toLowerCase(),
+		] as const,
+	manualMappingsRoot: () => [...rootQueryKey, "manualMappings"] as const,
+	manualMappings: (provider: Provider | "all" = "all") =>
+		[...rootQueryKey, "manualMappings", provider] as const,
+	mappingsRoot: () => [...rootQueryKey, "mappings"] as const,
+	mappings: (input?: GetMappingsInput) =>
+		[...rootQueryKey, "mappings", normalizeMappingsInput(input)] as const,
+	mappingIdentitiesRoot: () => [...rootQueryKey, "mappingIdentities"] as const,
+	mappingIdentities: (ids: readonly AniListId[]) =>
+		[...rootQueryKey, "mappingIdentities", normalizeMetadataIds(ids)] as const,
+	mappingInspectionRoot: () => [...rootQueryKey, "mappingInspection"] as const,
+	mappingInspection: (provider: Provider, anilistId: AniListId) =>
+		[...rootQueryKey, "mappingInspection", provider, anilistId] as const,
+	aniListMetadata: (ids: readonly AniListId[]) =>
+		[...rootQueryKey, "aniListMetadata", normalizeMetadataIds(ids)] as const,
 };

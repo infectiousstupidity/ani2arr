@@ -3,13 +3,8 @@
 
 import type { ExtensionError } from '@/shared/errors';
 import { ErrorCode } from '@/shared/errors';
-import {
-  FAILURE_HARD_TTL,
-  FAILURE_SOFT_TTL,
-  NETWORK_FAILURE_HARD_TTL,
-  NETWORK_FAILURE_SOFT_TTL,
-} from './constants';
-import type { MappingAcceptedReason, MappingAcceptedSource, ResolveProviderIdOptions } from './types';
+import type { MappingAcceptedReason, MappingAcceptedSource } from './types';
+import type { AutoMappingOptions } from './auto-mapping/types';
 
 export function shouldApplyCandidateSuppression(
   _source: MappingAcceptedSource,
@@ -20,7 +15,7 @@ export function shouldApplyCandidateSuppression(
 }
 
 export function resolveUnresolvedSearchTerms(
-  hints?: ResolveProviderIdOptions['hints'],
+  hints?: AutoMappingOptions['hints'],
 ): string[] {
   const directTitle = hints?.primaryTitle?.trim();
   if (directTitle) {
@@ -41,11 +36,4 @@ export function shouldCacheFailure(error: ExtensionError): boolean {
     error.code === ErrorCode.PERMISSION_ERROR ||
     error.code === ErrorCode.SONARR_NOT_CONFIGURED
   );
-}
-
-export function failureTtlsFor(error: ExtensionError): { stale: number; hard: number } {
-  if (error.code === ErrorCode.NETWORK_ERROR || error.code === ErrorCode.API_ERROR) {
-    return { stale: NETWORK_FAILURE_SOFT_TTL, hard: NETWORK_FAILURE_HARD_TTL };
-  }
-  return { stale: FAILURE_SOFT_TTL, hard: FAILURE_HARD_TTL };
 }

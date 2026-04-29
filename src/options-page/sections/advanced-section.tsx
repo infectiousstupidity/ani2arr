@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { RotateCcw } from 'lucide-react';
 import Button from '@/shared/ui/primitives/button';
-import { useConfirm } from '@/shared/hooks/common/use-confirm';
+import { useConfirm } from '@/shared/hooks/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import type { SettingsActions } from '../hooks/use-settings-actions';
 import type { ExtensionOptions } from '@/options';
@@ -38,7 +38,7 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
   const handleReset = async () => {
     const shouldReset = await confirm({
       title: 'Reset all settings?',
-      description: 'This clears ani2arr configuration, stored mapping overrides, cached page data, granted permissions, and session state. Sonarr and Radarr libraries are not affected.',
+      description: 'This clears ani2arr configuration, stored manual mappings, cached page data, granted permissions, and session state. Sonarr and Radarr libraries are not affected.',
       confirmText: 'Reset',
       cancelText: 'Cancel',
     });
@@ -157,7 +157,7 @@ const AdvancedSection: React.FC<{ actions: SettingsActions; focusPanel?: Advance
             className="border-error text-error"
             onClick={handleReset}
             isLoading={isResetting}
-            disabled={actions.saveState.isPending}
+            disabled={actions.isBusy || isResetting}
           >
             <RotateCcw className="mr-2 h-4 w-4" />
             Reset all settings

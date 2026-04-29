@@ -1,6 +1,7 @@
 /** Sonarr inherited-candidate verification against exact provider metadata. */
 // src/mapping/hints/inherited-verifier.ts
 
+import type { AniListId } from '@/anilist';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
 import {
   extractCandidateTitleVariants,
@@ -8,7 +9,7 @@ import {
   sanitizeLookupDisplayForProvider,
   stripSeasonalSuffixes,
 } from '@/mapping/pipeline/matching';
-import type { ProviderCredentials, SonarrLookupSeries } from '@/providers';
+import type { ProviderCredentials, SonarrLookupSeries, TvdbId } from '@/providers';
 import type { ProviderLookupClient } from '../lookup';
 import type { MappingInheritedVerificationDetails } from '../types';
 
@@ -17,10 +18,10 @@ const ROMAN_NUMERAL_RE = /^[cdilmvx]+$/i;
 const SEASON_CODE_RE = /^s\d+$/i;
 
 type InheritedProposal = {
-  providerId: number;
+  providerId: TvdbId;
   borrowedBaseTitle?: string;
-  immediateSourceAniListId: number;
-  chainAnchorAniListId: number;
+  immediateSourceAniListId: AniListId;
+  chainAnchorAniListId: AniListId;
 };
 
 type ExactSonarrLookupClient = Pick<

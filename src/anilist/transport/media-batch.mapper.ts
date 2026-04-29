@@ -2,6 +2,7 @@
 // src/anilist/transport/media-batch.mapper.ts
 
 import * as v from 'valibot';
+import { isAniListId, parseAniListIdOrNull, type AniListId } from '@/anilist/anilist-id';
 import {
   AniListMediaSchema,
   ANILIST_MEDIA_FORMATS,
@@ -17,7 +18,7 @@ import {
 
 export type FindMediaBatchItemMappingResult =
   | { success: true; media: AniListMedia }
-  | { success: false; id: number | null; stage: 'dto' | 'canonical'; issues: unknown[] };
+  | { success: false; id: AniListId | null; stage: 'dto' | 'canonical'; issues: unknown[] };
 
 const mapTitles = (titles?: FindMediaBatchMediaDto['title'] | null): AniListTitles => {
   if (!titles) {
@@ -43,7 +44,7 @@ const mapRelations = (relations?: FindMediaBatchMediaDto['relations'] | null) =>
   const edges = (relations.edges ?? []).flatMap(edge => {
     if (!edge || typeof edge.relationType !== 'string') return [];
     const nodeId = edge.node?.id;
-    if (typeof nodeId !== 'number' || !Number.isFinite(nodeId) || !Number.isInteger(nodeId) || nodeId < 1) return [];
+    if (!isAniListId(nodeId)) return [];
     return [{ relationType: edge.relationType, node: { id: nodeId } }];
   });
   return { edges };
@@ -74,13 +75,13 @@ const mapStudios = (studios?: FindMediaBatchMediaDto['studios'] | null) => {
   return { nodes };
 };
 
-const extractAniListId = (input: unknown): number | null => {
+const extractAniListId = (input: unknown): AniListId | null => {
   if (typeof input !== 'object' || input === null) {
     return null;
   }
 
   const id = (input as { id?: unknown }).id;
-  return typeof id === 'number' && Number.isFinite(id) ? id : null;
+  return isAniListId(id) ? id : null;
 };
 
 const toCanonicalCandidate = (media: FindMediaBatchMediaDto) => {
@@ -121,7 +122,7 @@ export const mapFindMediaBatchItem = (input: unknown): FindMediaBatchItemMapping
   if (!parsedMedia.success) {
     return {
       success: false,
-      id: parsedDto.output.id ?? null,
+      id: parseAniListIdOrNull(parsedDto.output.id),
       stage: 'canonical',
       issues: [...parsedMedia.issues],
     };

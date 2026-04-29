@@ -1,68 +1,64 @@
 /** Syncs query caches with storage-backed invalidation and option storage changes. */
 // src/shared/queries/use-a2a-broadcasts.ts
 
-import { useCallback, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { browser } from 'wxt/browser';
-import { REVISION_KEYS, STORAGE_KEYS } from '@/storage';
-import type { Provider } from '@/providers';
-import { queryKeys } from '@/shared/queries';
+import { useCallback, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { browser } from "wxt/browser";
+import { PUBLIC_OPTIONS_CHANGE_KEY } from "@/options";
+import type { Provider } from "@/providers";
+import {
+	MAPPINGS_REVISION_CHANGE_KEY,
+	RADARR_LIBRARY_REVISION_CHANGE_KEY,
+	SONARR_LIBRARY_REVISION_CHANGE_KEY,
+} from "@/shared/sync/revisions";
+import { queryKeys } from "@/shared/queries";
 
 const PUBLIC_OPTIONS_KEY = queryKeys.publicOptions();
 
-const toBrowserStorageChangeKey = (storageKey: string): string => storageKey.replace(/^local:/, '');
-
-const PUBLIC_OPTIONS_STORAGE_CHANGE_KEY = toBrowserStorageChangeKey(STORAGE_KEYS.publicOptions);
-const SONARR_SECRETS_STORAGE_CHANGE_KEY = toBrowserStorageChangeKey(STORAGE_KEYS.sonarrSecrets);
-const RADARR_SECRETS_STORAGE_CHANGE_KEY = toBrowserStorageChangeKey(STORAGE_KEYS.radarrSecrets);
-
 export function useA2aBroadcasts(): void {
-  const queryClient = useQueryClient();
+	const queryClient = useQueryClient();
 
-  const refreshSettingsQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: PUBLIC_OPTIONS_KEY });
-  }, [queryClient]);
+	const refreshSettingsQueries = useCallback(() => {
+		queryClient.invalidateQueries({ queryKey: PUBLIC_OPTIONS_KEY });
+	}, [queryClient]);
 
-  const refreshMappingsQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-  }, [queryClient]);
+	const refreshMappingsQueries = useCallback(() => {
+		queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+	}, [queryClient]);
 
-  const refreshLibraryQueries = useCallback(
-    (provider: Provider) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seriesStatusRoot(provider) });
-    },
-    [queryClient],
-  );
+	const refreshLibraryQueries = useCallback(
+		(provider: Provider) => {
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.seriesStatusRoot(provider),
+			});
+		},
+		[queryClient],
+	);
 
-  useEffect(() => {
-    const onStorageChanged: Parameters<typeof browser.storage.onChanged.addListener>[0] = (
-      changes,
-      areaName,
-    ) => {
-      if (areaName !== 'local') return;
+	useEffect(() => {
+		const onStorageChanged: Parameters<
+			typeof browser.storage.onChanged.addListener
+		>[0] = (changes, areaName) => {
+			if (areaName !== "local") return;
 
-      if (changes[REVISION_KEYS.sonarrLibrary]) {
-        refreshLibraryQueries('sonarr');
-      }
+			if (changes[SONARR_LIBRARY_REVISION_CHANGE_KEY]) {
+				refreshLibraryQueries("sonarr");
+			}
 
-      if (changes[REVISION_KEYS.radarrLibrary]) {
-        refreshLibraryQueries('radarr');
-      }
+			if (changes[RADARR_LIBRARY_REVISION_CHANGE_KEY]) {
+				refreshLibraryQueries("radarr");
+			}
 
-      if (changes[REVISION_KEYS.mappings]) {
-        refreshMappingsQueries();
-      }
+			if (changes[MAPPINGS_REVISION_CHANGE_KEY]) {
+				refreshMappingsQueries();
+			}
 
-      if (
-        changes[PUBLIC_OPTIONS_STORAGE_CHANGE_KEY] ||
-        changes[SONARR_SECRETS_STORAGE_CHANGE_KEY] ||
-        changes[RADARR_SECRETS_STORAGE_CHANGE_KEY]
-      ) {
-        refreshSettingsQueries();
-      }
-    };
+			if (changes[PUBLIC_OPTIONS_CHANGE_KEY]) {
+				refreshSettingsQueries();
+			}
+		};
 
-    browser.storage.onChanged.addListener(onStorageChanged);
-    return () => browser.storage.onChanged.removeListener(onStorageChanged);
-  }, [refreshLibraryQueries, refreshMappingsQueries, refreshSettingsQueries]);
+		browser.storage.onChanged.addListener(onStorageChanged);
+		return () => browser.storage.onChanged.removeListener(onStorageChanged);
+	}, [refreshLibraryQueries, refreshMappingsQueries, refreshSettingsQueries]);
 }

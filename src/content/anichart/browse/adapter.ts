@@ -1,12 +1,10 @@
 /** AniChart browse surface adapter for card parsing and portal placement. */
 // src/content/anichart/browse/adapter.ts
 
-import { mergeMetadataHints } from '@/anilist/metadata-hints';
-import type { AniListMediaFormat, AniListMediaHint } from '@/anilist/schemas/media.schema';
-import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
-import { extractMediaMetadataFromDom } from '@/content/anilist/dom/extract-media-metadata';
+import { parseAniListIdOrNull } from '@/anilist/anilist-id';
+import { parseAniListMediaFormatLabel } from '@/anilist/schemas/media.schema';
 import { DEFAULT_CONTAINER_CLASS, DEFAULT_PROCESSED_ATTRIBUTE } from '@/content/browse/browse-content-app';
-import type { BrowseAdapter, ParsedCard } from '@/content/browse/types';
+import type { BrowseAdapter, HostMediaTarget } from '@/content/browse/types';
 
 const CARD_SELECTOR = '.media-card';
 const COVER_SELECTOR = 'a.cover';
@@ -19,41 +17,7 @@ const shouldSkipCard = (card: Element): boolean => {
   return heading.includes('music');
 };
 
-const parseYearFromHeading = (heading: string): number | null => {
-  const match = heading.match(/(19|20|21)\d{2}/);
-  return match ? Number.parseInt(match[0], 10) : null;
-};
-
-const inferFormatFromHeading = (heading: string): AniListMediaFormat | null => {
-  const normalized = heading.toLowerCase();
-  if (normalized.includes('short')) return 'TV_SHORT';
-  if (normalized.includes('ova')) return 'OVA';
-  if (normalized.includes('ona')) return 'ONA';
-  if (normalized.includes('special')) return 'SPECIAL';
-  if (normalized.includes('movie')) return 'MOVIE';
-  if (normalized.includes('tv')) return 'TV';
-  return null;
-};
-
-const metadataCache = new Map<number, AniListMediaHint | null>();
-
-const getCachedDomMetadata = (anilistId: number): AniListMediaHint | null => {
-  if (metadataCache.has(anilistId)) {
-    return metadataCache.get(anilistId) ?? null;
-  }
-  const metadata = extractMediaMetadataFromDom(anilistId);
-  metadataCache.set(anilistId, metadata ?? null);
-  return metadata ?? null;
-};
-
-const extractTitle = (card: Element, cover: HTMLAnchorElement): string =>
-  (card.querySelector<HTMLElement>('.overlay .title')?.textContent ?? '').trim() ||
-  (cover.getAttribute('title') ?? '').trim() ||
-  cover.querySelector('img')?.getAttribute('alt')?.trim() ||
-  (card.querySelector<HTMLElement>('.data .header .title')?.textContent ?? '').trim() ||
-  '';
-
-const parseAniChartCard = (card: Element): ParsedCard | null => {
+const parseAniChartCard = (card: Element): HostMediaTarget | null => {
   const cover = card.querySelector<HTMLAnchorElement>(COVER_SELECTOR);
   if (!cover) return null;
 
@@ -63,25 +27,16 @@ const parseAniChartCard = (card: Element): ParsedCard | null => {
 
   const href = cover.getAttribute('href') ?? '';
   const idMatch = href.match(/anilist\.co\/anime\/(\d+)/i);
-  const anilistId = idMatch ? Number(idMatch[1]) : Number.NaN;
-  if (!Number.isFinite(anilistId)) return null;
-
-  const title = extractTitle(card, cover);
-  if (!title) return null;
+  const anilistId = parseAniListIdOrNull(idMatch ? Number(idMatch[1]) : Number.NaN);
+  if (!anilistId) return null;
 
   const heading = getSectionHeading(card);
-  const domMetadata = getCachedDomMetadata(anilistId);
-  const fallbackMetadata: AniListMediaHint = {
-    titles: { romaji: title },
-    synonyms: [title],
-    startYear: parseYearFromHeading(heading),
-    format: inferFormatFromHeading(heading),
-    relationPrequelIds: null,
-  };
-  const metadata = mergeMetadataHints(domMetadata, fallbackMetadata);
-  if (resolveProviderForAniListFormat(metadata?.format ?? null) === null) return null;
 
-  return { anilistId, title, host: cover, metadata: metadata ?? null };
+  return {
+    anilistId,
+    format: parseAniListMediaFormatLabel(heading),
+    mountTarget: cover,
+  };
 };
 
 const ensureOverlayContainer = (cover: HTMLAnchorElement): HTMLElement => {

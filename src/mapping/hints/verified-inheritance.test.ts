@@ -2,8 +2,9 @@
 // src/mapping/hints/verified-inheritance.test.ts
 
 import { describe, expect, it, vi } from 'vitest';
+import { parseAniListId, type AniListId } from '@/anilist';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
-import type { ProviderCredentials, SonarrLookupSeries } from '@/providers';
+import { parseTvdbId, type ProviderCredentials, type SonarrLookupSeries } from '@/providers';
 import { verifyInheritedSonarrCandidate } from './inherited-verifier';
 import { attemptVerifiedInheritedSonarrResolution } from './verified-inheritance';
 
@@ -12,23 +13,26 @@ const TEST_CREDENTIALS: ProviderCredentials = {
   apiKey: 'test-key',
 };
 
+const aid = parseAniListId;
+const tvdb = parseTvdbId;
+
 function createMedia(
   id: number,
   title: string,
   relations: Array<{ relationType: 'PREQUEL' | 'SEQUEL'; id: number }> = [],
 ): AniListMedia {
   return {
-    id,
+    id: aid(id),
     format: 'TV',
     title: { english: title },
     synonyms: [],
     relations: {
       edges: relations.map(relation => ({
         relationType: relation.relationType,
-        node: { id: relation.id },
+        node: { id: aid(relation.id) },
       })),
     },
-  } as AniListMedia;
+  };
 }
 
 describe('verifyInheritedSonarrCandidate', () => {
@@ -36,15 +40,15 @@ describe('verifyInheritedSonarrCandidate', () => {
     const result = await verifyInheritedSonarrCandidate(
       createMedia(1, 'Attack on Titan Final Season'),
       {
-        providerId: 100,
+        providerId: tvdb(100),
         borrowedBaseTitle: 'Attack on Titan',
-        immediateSourceAniListId: 2,
-        chainAnchorAniListId: 2,
+        immediateSourceAniListId: aid(2),
+        chainAnchorAniListId: aid(2),
       },
       {
         lookupExactByProviderId: vi.fn(async () => ({
           title: 'Attack on Titan',
-          tvdbId: 100,
+          tvdbId: tvdb(100),
         } satisfies SonarrLookupSeries)),
       },
       TEST_CREDENTIALS,
@@ -59,15 +63,15 @@ describe('verifyInheritedSonarrCandidate', () => {
     const result = await verifyInheritedSonarrCandidate(
       createMedia(1, 'Bleach'),
       {
-        providerId: 100,
+        providerId: tvdb(100),
         borrowedBaseTitle: 'Bleach',
-        immediateSourceAniListId: 2,
-        chainAnchorAniListId: 2,
+        immediateSourceAniListId: aid(2),
+        chainAnchorAniListId: aid(2),
       },
       {
         lookupExactByProviderId: vi.fn(async () => ({
           title: 'Naruto',
-          tvdbId: 100,
+          tvdbId: tvdb(100),
         } satisfies SonarrLookupSeries)),
       },
       TEST_CREDENTIALS,
@@ -83,14 +87,14 @@ describe('verifyInheritedSonarrCandidate', () => {
     const result = await verifyInheritedSonarrCandidate(
       createMedia(1, 'Special'),
       {
-        providerId: 100,
-        immediateSourceAniListId: 2,
-        chainAnchorAniListId: 2,
+        providerId: tvdb(100),
+        immediateSourceAniListId: aid(2),
+        chainAnchorAniListId: aid(2),
       },
       {
         lookupExactByProviderId: vi.fn(async () => ({
           title: 'Special',
-          tvdbId: 100,
+          tvdbId: tvdb(100),
         } satisfies SonarrLookupSeries)),
       },
       TEST_CREDENTIALS,
@@ -110,27 +114,22 @@ describe('attemptVerifiedInheritedSonarrResolution', () => {
       [4, createMedia(4, 'Attack on Titan Season 2')],
     ]);
 
-    const exactLookup = vi.fn(async (providerId: number) => ({
-      title: providerId === 200 ? 'Attack on Titan' : 'Wrong Show',
+    const exactLookup = vi.fn(async (providerId: ReturnType<typeof tvdb>) => ({
+      title: providerId === tvdb(200) ? 'Attack on Titan' : 'Wrong Show',
       tvdbId: providerId,
     } satisfies SonarrLookupSeries));
 
     const result = await attemptVerifiedInheritedSonarrResolution({
       media: mediaById.get(1)!,
       anilistApi: {
-        fetchMediaWithRelations: vi.fn(async (id: number) => mediaById.get(id)!),
+        fetchMediaWithRelations: vi.fn(async (id: AniListId) => mediaById.get(id)!),
       } as never,
-      upstreamMappingStore: {
-        get: vi.fn((anilistId: number) => {
-          if (anilistId === 4) {
-            return { tvdbId: 400, source: 'primary' as const };
-          }
-          return null;
-        }),
+      anibridgeMappingStore: {
+        getSonarrCandidates: vi.fn((anilistId: AniListId) => (anilistId === 4 ? [tvdb(400)] : [])),
       } as never,
-      overrides: {
+      manualMappings: {
         isIgnored: vi.fn(() => false),
-        get: vi.fn((_: 'sonarr', anilistId: number) => (anilistId === 2 ? 200 : null)),
+        get: vi.fn((_: 'sonarr', anilistId: AniListId) => (anilistId === 2 ? tvdb(200) : null)),
       },
       lookupClient: {
         provider: 'sonarr',
@@ -146,12 +145,12 @@ describe('attemptVerifiedInheritedSonarrResolution', () => {
     expect(result).toMatchObject({
       status: 'accepted',
       resolved: {
-        providerId: 200,
+          providerId: tvdb(200),
         immediateSourceAniListId: 2,
         chainAnchorAniListId: 2,
       },
     });
-    expect(exactLookup).toHaveBeenCalledWith(200, TEST_CREDENTIALS);
+    expect(exactLookup).toHaveBeenCalledWith(tvdb(200), TEST_CREDENTIALS);
   });
 
   it('returns ambiguous when nearest trusted anchors disagree', async () => {
@@ -168,17 +167,13 @@ describe('attemptVerifiedInheritedSonarrResolution', () => {
     const result = await attemptVerifiedInheritedSonarrResolution({
       media: mediaById.get(1)!,
       anilistApi: {
-        fetchMediaWithRelations: vi.fn(async (id: number) => mediaById.get(id)!),
+        fetchMediaWithRelations: vi.fn(async (id: AniListId) => mediaById.get(id)!),
       } as never,
-      upstreamMappingStore: {
-        get: vi.fn((anilistId: number) => {
-          if (anilistId === 2) {
-            return { tvdbId: 200, source: 'primary' as const };
-          }
-          if (anilistId === 3) {
-            return { tvdbId: 300, source: 'primary' as const };
-          }
-          return null;
+      anibridgeMappingStore: {
+        getSonarrCandidates: vi.fn((anilistId: AniListId) => {
+          if (anilistId === 2) return [tvdb(200)];
+          if (anilistId === 3) return [tvdb(300)];
+          return [];
         }),
       } as never,
       lookupClient: {
@@ -206,12 +201,12 @@ describe('attemptVerifiedInheritedSonarrResolution', () => {
     const result = await attemptVerifiedInheritedSonarrResolution({
       media: mediaById.get(1)!,
       anilistApi: {
-        fetchMediaWithRelations: vi.fn(async (id: number) => mediaById.get(id)!),
+        fetchMediaWithRelations: vi.fn(async (id: AniListId) => mediaById.get(id)!),
       } as never,
-      upstreamMappingStore: {
-        get: vi.fn((anilistId: number) => (anilistId === 4 ? { tvdbId: 400, source: 'primary' as const } : null)),
+      anibridgeMappingStore: {
+        getSonarrCandidates: vi.fn((anilistId: AniListId) => (anilistId === 4 ? [tvdb(400)] : [])),
       } as never,
-      overrides: {
+      manualMappings: {
         isIgnored: vi.fn(() => false),
         get: vi.fn(() => null),
       },
@@ -243,14 +238,14 @@ describe('attemptVerifiedInheritedSonarrResolution', () => {
     const result = await attemptVerifiedInheritedSonarrResolution({
       media: mediaById.get(1)!,
       anilistApi: {
-        fetchMediaWithRelations: vi.fn(async (id: number) => mediaById.get(id)!),
+        fetchMediaWithRelations: vi.fn(async (id: AniListId) => mediaById.get(id)!),
       } as never,
-      upstreamMappingStore: {
-        get: vi.fn((anilistId: number) => (anilistId === 3 ? { tvdbId: 300, source: 'primary' as const } : null)),
+      anibridgeMappingStore: {
+        getSonarrCandidates: vi.fn((anilistId: AniListId) => (anilistId === 3 ? [tvdb(300)] : [])),
       } as never,
-      overrides: {
-        isIgnored: vi.fn((_: 'sonarr', anilistId: number) => anilistId === 2),
-        get: vi.fn((_: 'sonarr', anilistId: number) => (anilistId === 2 ? 200 : null)),
+      manualMappings: {
+        isIgnored: vi.fn((_: 'sonarr', anilistId: AniListId) => anilistId === 2),
+        get: vi.fn((_: 'sonarr', anilistId: AniListId) => (anilistId === 2 ? tvdb(200) : null)),
       },
       lookupClient: {
         provider: 'sonarr',
@@ -258,14 +253,14 @@ describe('attemptVerifiedInheritedSonarrResolution', () => {
         readFromCache: vi.fn(async () => ({ results: [], hit: 'none' as const })),
         lookup: vi.fn(async () => []),
         getProviderId: vi.fn(() => null),
-        lookupExactByProviderId: vi.fn(async () => ({ title: 'Trusted Upstream Anchor', tvdbId: 300 } satisfies SonarrLookupSeries)),
+        lookupExactByProviderId: vi.fn(async () => ({ title: 'Trusted Upstream Anchor', tvdbId: tvdb(300) } satisfies SonarrLookupSeries)),
       },
       credentials: TEST_CREDENTIALS,
     });
 
     expect(result).toMatchObject({
       status: 'accepted',
-      resolved: { providerId: 300 },
+      resolved: { providerId: tvdb(300) },
     });
   });
 });

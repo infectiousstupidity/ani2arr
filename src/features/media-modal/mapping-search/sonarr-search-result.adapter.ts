@@ -1,0 +1,126 @@
+/** Adapts Sonarr lookup payloads into shared manual-mapping result rows. */
+// src/features/media-modal/mapping-search/sonarr-search-result.adapter.ts
+
+import { parseAniListIdOrNull, type AniListId } from "@/anilist";
+import { parseTvdbId, type SonarrLookupSeries } from "@/providers";
+import { getProviderRouteSlug } from "@/providers/library/paths";
+import type { MappingSearchResult } from "./types";
+
+export interface SonarrAdapterOptions {
+	baseUrl: string; // absolute; trailing slash trimmed
+	libraryTvdbIds?: readonly number[];
+	providerRouteSlugByTvdbId?: Readonly<Record<number, string>>;
+	statsMap?: Readonly<
+		Record<
+			number,
+			{
+				episodeCount?: number;
+				episodeFileCount?: number;
+				totalEpisodeCount?: number;
+			}
+		>
+	>;
+	linkedAniListIdsByTvdbId?: Readonly<Record<number, readonly number[]>>;
+}
+
+const joinUrl = (root: string, path?: string | null): string | undefined => {
+	if (!path) return undefined;
+	const trimmedRoot = root.replace(/\/$/, "");
+	if (/^https?:\/\//i.test(path)) return path;
+	const normalized = path.startsWith("/") ? path : `/${path}`;
+	return `${trimmedRoot}${normalized}`;
+};
+
+const pickPoster = (
+	series: SonarrLookupSeries,
+	baseUrl: string,
+): string | undefined => {
+	const images = Array.isArray(series.images) ? series.images : [];
+	const poster = images.find(
+		(img) => (img?.coverType || "").toLowerCase() === "poster",
+	);
+
+	if (poster) {
+		// Prefer local/proxy URL if available so it matches Sonarr dashboard
+		if (poster.url && baseUrl) {
+			return joinUrl(baseUrl, poster.url);
+		}
+		return poster.remoteUrl ?? undefined;
+	}
+
+	if (series.remotePoster) return series.remotePoster;
+	return undefined;
+};
+
+export function toMappingSearchResultFromSonarr(
+	series: SonarrLookupSeries,
+	opts: SonarrAdapterOptions,
+): MappingSearchResult {
+	const tvdbId = parseTvdbId(series.tvdbId);
+	const librarySet = new Set(opts.libraryTvdbIds);
+	const isInLibrary = librarySet.has(tvdbId);
+	const providerRouteSlug =
+		opts.providerRouteSlugByTvdbId?.[tvdbId] ??
+		(isInLibrary
+			? (getProviderRouteSlug("sonarr", series) ?? undefined)
+			: undefined);
+	const year = typeof series.year === "number" ? series.year : undefined;
+	const typeLabel = series.seriesType;
+	const posterUrl = pickPoster(series, opts.baseUrl);
+	const statusLabel = series.status;
+	const networkOrStudio = series.network;
+
+	// Merge cached statistics if available. Prefer cache over lookup endpoint's zeroed stats.
+	// The lookup endpoint returns statistics: { episodeFileCount: 0, ... } for library items.
+	const hasLookupStats =
+		series.statistics && (series.statistics.episodeFileCount ?? 0) > 0;
+	const stats = hasLookupStats
+		? series.statistics
+		: isInLibrary && opts.statsMap?.[tvdbId]
+			? opts.statsMap[tvdbId]
+			: series.statistics;
+	const episodeOrMovieCount = stats?.episodeCount ?? stats?.totalEpisodeCount;
+	const fileCount = stats?.episodeFileCount;
+
+	// Extract additional rich fields (using any cast if types are partial in source)
+	const s = series as any;
+	const overview = typeof s.overview === "string" ? s.overview : undefined;
+	const alternateTitles = Array.isArray(s.alternateTitles)
+		? s.alternateTitles
+				.map((t: any) => t?.title)
+				.filter(
+					(t: unknown): t is string => typeof t === "string" && t.length > 0,
+				)
+		: undefined;
+	const linkedAniListIds = Array.isArray(
+		opts.linkedAniListIdsByTvdbId?.[tvdbId],
+	)
+		? opts
+				.linkedAniListIdsByTvdbId![
+					tvdbId
+				]!.map((id) => parseAniListIdOrNull(id))
+				.filter((id): id is AniListId => id !== null)
+		: undefined;
+
+	return {
+		provider: "sonarr",
+		providerId: tvdbId,
+		title: series.title,
+		...(year === undefined ? {} : { year }),
+		...(typeLabel ? { typeLabel } : {}),
+		isInLibrary,
+		...(providerRouteSlug ? { providerRouteSlug } : {}),
+		...(posterUrl === undefined ? {} : { posterUrl }),
+		...(statusLabel === undefined ? {} : { statusLabel }),
+		...(networkOrStudio === undefined ? {} : { networkOrStudio }),
+		...(episodeOrMovieCount === undefined ? {} : { episodeOrMovieCount }),
+		...(fileCount === undefined ? {} : { fileCount }),
+		...(overview ? { overview } : {}),
+		...(alternateTitles && alternateTitles.length > 0
+			? { alternateTitles }
+			: {}),
+		...(linkedAniListIds && linkedAniListIds.length > 0
+			? { linkedAniListIds: [...new Set(linkedAniListIds)] }
+			: {}),
+	};
+}

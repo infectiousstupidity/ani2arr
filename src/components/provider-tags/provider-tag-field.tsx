@@ -3,7 +3,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 
-import type { ProviderTag } from '@/providers';
+import type { ProviderTag, ProviderTagId } from '@/providers';
 import { FormField, Label } from '@/shared/ui/form/form';
 import MultiTagInput from '@/shared/ui/form/multi-tag-input';
 
@@ -15,12 +15,12 @@ import {
 
 interface ProviderTagFieldProps {
   availableTags: ReadonlyArray<ProviderTag>;
-  selectedTagIds?: ReadonlyArray<number> | undefined;
+  selectedTagIds?: ReadonlyArray<ProviderTagId> | undefined;
   selectedFreeformTags?: ReadonlyArray<string> | undefined;
   disabled?: boolean | undefined;
   label?: string | undefined;
   placeholder?: string | undefined;
-  onTagIdsChange: (tagIds: number[]) => void;
+  onTagIdsChange: (tagIds: ProviderTagId[]) => void;
   onFreeformTagsChange: (freeformTags: string[]) => void;
 }
 
@@ -43,15 +43,13 @@ export function ProviderTagField(props: ProviderTagFieldProps): React.JSX.Elemen
     [selectedFreeformTags, selectedTagIds, tagMaps.idToLabel],
   );
 
-  const existingTags = useMemo(() => [...tagMaps.labelToId.keys()], [tagMaps.labelToId]);
-
   const handleChange = useCallback(
     (labels: string[]) => {
-      const { tagIds, freeformTags } = splitProviderTagLabels(labels, tagMaps.labelToId);
+      const { tagIds, freeformTags } = splitProviderTagLabels(labels, tagMaps.lookupKeyToId);
       onTagIdsChange(tagIds);
       onFreeformTagsChange(freeformTags);
     },
-    [onFreeformTagsChange, onTagIdsChange, tagMaps.labelToId],
+    [onFreeformTagsChange, onTagIdsChange, tagMaps.lookupKeyToId],
   );
 
   return (
@@ -63,7 +61,7 @@ export function ProviderTagField(props: ProviderTagFieldProps): React.JSX.Elemen
           onChange={handleChange}
           placeholder={placeholder}
           disabled={disabled}
-          existingTags={existingTags}
+          existingTags={tagMaps.existingLabels}
         />
       </div>
     </FormField>

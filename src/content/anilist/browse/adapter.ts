@@ -1,12 +1,10 @@
 /** AniList browse surface adapter for card parsing and portal placement. */
 // src/content/anilist/browse/adapter.ts
 
-import { mergeMetadataHints } from '@/anilist/metadata-hints';
-import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
-import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
-import { extractMediaMetadataFromDom } from '@/content/anilist/dom/extract-media-metadata';
+import { parseAniListIdOrNull } from '@/anilist/anilist-id';
+import { parseAniListMediaFormatLabel } from '@/anilist/schemas/media.schema';
 import { DEFAULT_CONTAINER_CLASS, DEFAULT_PROCESSED_ATTRIBUTE } from '@/content/browse/browse-content-app';
-import type { BrowseAdapter, ParsedCard } from '@/content/browse/types';
+import type { BrowseAdapter, HostMediaTarget } from '@/content/browse/types';
 
 const CARD_SELECTOR = '.media-card';
 const COVER_SELECTOR = 'a.cover';
@@ -17,17 +15,6 @@ const CARD_CONTAINER_SELECTORS = [
   '.media-card-wrap',
   '.page-content',
 ];
-
-const metadataCache = new Map<number, AniListMediaHint | null>();
-
-const getCachedDomMetadata = (anilistId: number): AniListMediaHint | null => {
-  if (metadataCache.has(anilistId)) {
-    return metadataCache.get(anilistId) ?? null;
-  }
-  const metadata = extractMediaMetadataFromDom(anilistId);
-  metadataCache.set(anilistId, metadata ?? null);
-  return metadata ?? null;
-};
 
 const findCardContainer = (): HTMLElement | null => {
   for (const selector of CARD_CONTAINER_SELECTORS) {
@@ -49,38 +36,21 @@ const findCardContainer = (): HTMLElement | null => {
   return document.querySelector<HTMLElement>('.page-content');
 };
 
-const parseAniListCard = (card: Element): ParsedCard | null => {
+const parseAniListCard = (card: Element): HostMediaTarget | null => {
   const cover = card.querySelector<HTMLAnchorElement>(COVER_SELECTOR);
   if (!cover) return null;
 
-  const title =
-    (card.querySelector<HTMLDivElement>('.title a')?.textContent ?? '').trim() ||
-    (card.querySelector<HTMLDivElement>('.title')?.textContent ?? '').trim() ||
-    cover.getAttribute('title')?.trim() ||
-    cover.querySelector('img')?.getAttribute('alt')?.trim() ||
-    '';
-
   const href = cover.getAttribute('href') ?? '';
   const idMatch = href.match(/\/anime\/(\d+)/);
-  const anilistId = idMatch ? Number(idMatch[1]) : Number.NaN;
 
-  if (!title || !Number.isFinite(anilistId)) return null;
+  const anilistId = parseAniListIdOrNull(idMatch ? Number(idMatch[1]) : Number.NaN);
+  if (!anilistId) return null;
 
-  const domMetadata = getCachedDomMetadata(anilistId);
-  if (resolveProviderForAniListFormat(domMetadata?.format ?? null) === null) return null;
+  const format = parseAniListMediaFormatLabel(
+    card.querySelector<HTMLSpanElement>('.hover-data .info span')?.textContent,
+  );
 
-  const fallbackMetadata: AniListMediaHint | null = title
-    ? {
-        titles: { romaji: title },
-        synonyms: [title],
-        startYear: null,
-        format: domMetadata?.format ?? null,
-        relationPrequelIds: null,
-      }
-    : null;
-  const metadata = mergeMetadataHints(domMetadata, fallbackMetadata);
-
-  return { anilistId, title, host: cover, metadata: metadata ?? null };
+  return { anilistId, format, mountTarget: cover };
 };
 
 const ensureOverlayContainer = (cover: HTMLAnchorElement): HTMLElement => {

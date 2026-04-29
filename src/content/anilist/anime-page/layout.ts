@@ -1,7 +1,7 @@
 /** DOM and layout helpers for the AniList anime-page surface. */
 // src/content/anilist/anime-page/layout.ts
 
-import type { AniListMediaFormat } from '@/anilist/schemas/media.schema';
+import { parseAniListMediaFormatLabel, type AniListMediaFormat } from '@/anilist/schemas/media.schema';
 import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
 
 export const ACTIONS_SELECTOR = '.header .cover-wrap .actions, .cover-wrap .actions';
@@ -176,16 +176,7 @@ export function readFormatFromSidebar(doc: Document = document): AniListMediaFor
   const rows = [...doc.querySelectorAll<HTMLDivElement>('.sidebar .data .data-set')];
   const formatRow = rows.find(r => r.querySelector('.type')?.textContent?.trim() === 'Format');
   const raw = formatRow?.querySelector('.value')?.textContent ?? '';
-  const normalized = raw.replaceAll(/\s+/g, ' ').trim().toLowerCase();
-  if (!normalized) return null;
-  if (normalized.includes('movie')) return 'MOVIE';
-  if (normalized.includes('music')) return 'MUSIC';
-  if (normalized === 'tv short') return 'TV_SHORT';
-  if (normalized === 'tv') return 'TV';
-  if (normalized === 'special') return 'SPECIAL';
-  if (normalized === 'ova') return 'OVA';
-  if (normalized === 'ona') return 'ONA';
-  return null;
+  return parseAniListMediaFormatLabel(raw);
 }
 
 function shouldSkipByFormat(doc: Document = document): boolean {

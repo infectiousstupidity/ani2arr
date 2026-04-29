@@ -2,19 +2,15 @@
 // src/options-page/provider-settings/save-settings-bar.tsx
 
 import React from 'react';
-import { useFormContext } from 'react-hook-form';
 
 import type { SettingsActions } from '../hooks/use-settings-actions';
 import Button from '@/shared/ui/primitives/button';
-import type { ExtensionOptions } from '@/options';
 
 export const SaveSettingsBar: React.FC<{
   actions: SettingsActions;
   isLoading?: boolean;
   className?: string;
 }> = ({ actions, isLoading, className }) => {
-  const { formState } = useFormContext<ExtensionOptions>();
-
   return (
     <div className={className}>
       <div className="flex justify-end">
@@ -23,9 +19,8 @@ export const SaveSettingsBar: React.FC<{
             void actions.handleSave();
           }}
           disabled={
-            !formState.isDirty ||
-            actions.sonarrTestConnectionState.isPending ||
-            actions.radarrTestConnectionState.isPending ||
+            !actions.hasUnsavedChanges ||
+            actions.isBusy ||
             isLoading
           }
           isLoading={actions.saveState.isPending}

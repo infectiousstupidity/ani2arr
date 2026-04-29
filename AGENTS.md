@@ -1,133 +1,184 @@
-## Working rules
+# AGENTS.md
 
-- Make the smallest reasonable change that fully solves the task.
-- Read nearby code first. Check real callers before changing shared code.
-- Follow existing patterns only when they still make sense. Existing complexity is not a precedent.
-- Prefer direct code, simple control flow, and local reasoning.
-- Do not broaden scope without clear benefit.
-- If the request is ambiguous, choose the smallest safe interpretation and state the assumption briefly.
-- If required context is recoverable from the repo, tests, or available tools, retrieve it instead of guessing.
-- Do not stop at analysis if the task can be completed safely.
-- Ask before irreversible or high-impact actions not clearly requested.
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-## Design rules
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
-- Keep solutions simple, local, and easy to follow.
-- Follow YAGNI, KISS, and pragmatic DRY.
-- Optimize for a small solo-maintained browser extension, not hypothetical future scale.
-- Prefer removing code, collapsing layers, or inlining logic when that makes the result clearer without hurting correctness.
-- Do not keep complexity just because it already exists.
-- Do not add services, managers, coordinators, factories, registries, wrappers, or similar indirection unless they remove clear current complexity.
-- Prefer flat, easy-to-scan control flow over nested branching.
-- Split by responsibility before adding more cases to a complex function or file.
-- Prefer thin orchestration functions and small pure helpers.
-- If a function does multiple phases, split by phase. Typical phases include normalization, loading, indexing, projection, filtering, sorting, and paging.
-- Do not hide complexity inside nested local helpers inside an already-large function. Extract them to module scope when they carry real logic.
-- Use a params object or split the helper before exceeding 4 parameters.
-- "Smallest reasonable change" does not justify leaving touched design warnings unresolved.
+Tests are extremely expensive as a solo hobby developer - so only implement the highest value tests.
 
-## Lint-driven guardrails
+For refactors, first look for code that can be deleted, merged, or inlined.
+Do not start by extracting new layers.
 
-- Treat lint warnings about complexity, depth, nested callbacks, and parameter count as design feedback that must usually be acted on when touching that code.
-- Do not leave touched `complexity`, `max-depth`, `max-nested-callbacks`, or `max-params` warnings unresolved unless doing so is clearly lower risk than refactoring. If you keep one, state why briefly.
-- If a touched function trips a complexity warning, refactor it before finishing.
-- If a touched helper trips a parameter-count warning, replace the argument list with a small context object or split the helper.
-- If a touched function is hard to scan top to bottom, split it even if lint has not fired yet.
+## 1. Think Before Coding
 
-## Types and ownership
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
 
-- Keep types with their owning domain.
-- Do not use `shared/types` as a catch-all.
-- Put domain logic in its owning domain first, not in `shared/`.
-- Keep `shared/` minimal and truly cross-cutting.
-- Keep small local types, constants, and helpers near usage.
-- Extract shared types or helpers only when there is clear reuse or a real public contract.
-- If a type is used once, inline it unless the name clearly improves readability.
-- Prefer module-local helper types for refactors over broad exported shells.
+Before implementing:
 
-## File rules
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
 
-- Every new file and every materially edited file must start with this 2-line header:
+## 2. Simplicity First
 
-```ts
-/** Short plain-English description of what this file owns. */
-// src/path/to/file.ts
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
 ```
 
-- Prefer files under 200 LOC.
-- 200 to 300 LOC is acceptable if still easy to scan.
-- Over 300 LOC is a split warning.
-- One file should do one clear thing.
-- Split by responsibility, not file size alone.
-- Avoid both enterprise layering and god files.
-- "Smallest reasonable change" does not mean "keep everything in one file".
-- Small local helper files are allowed when they clearly reduce complexity without creating a new layer.
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-## Change discipline
+---
 
-- Preserve behavior unless the task explicitly asks for behavior changes.
-- Keep public shapes and contracts stable unless the task explicitly asks to change them.
-- Keep diffs focused. Do not mix requested work with unrelated cleanup.
-- Do not rename, move, or broadly reorganize files unless the task requires it.
-- Small local splits are allowed when they directly improve ownership, readability, or file responsibility.
-- Delete dead aliases, wrappers, and local shells when they no longer earn their keep.
-- Remove dead code you touch if it is safe and directly adjacent.
-- When refactoring touched code, prefer extraction and simplification over adding another branch.
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
-## Verification
+## Output style: visual-first, token-tight
 
-- Before finishing, run the cheapest relevant checks for the files you changed.
-- Default verification:
+For all non-trivial outputs, prefer compact ASCII diagrams before prose.
 
-  - `pnpm run lint`
-  - `pnpm run compile`
-- Tests are expensive. Do not add or run them by default just for ceremony.
-- Run tests only for behavior changes, bug fixes, shared logic, regression-prone code, or important mapping, parsing, caching, storage, validation, or provider behavior when tests are the cheapest meaningful protection.
-- Prefer targeted tests over broad suites.
-- Prefer unit tests first.
-- Do not add E2E, browser-level tests, large snapshots, or tests for trivial UI, thin wrappers, or obvious pass-through code unless the task clearly needs them.
-- If you skip tests or cannot run a check, state why briefly.
-- Lint and compile are not optional sign-off steps for touched code unless the environment prevents them. State that briefly if so.
+Use diagrams when the response involves:
 
-## Target ownership after refactor
+- codebase review
+- implementation plans
+- architecture
+- data flow
+- state ownership
+- storage/cache/invalidation
+- UI/component structure
+- bug causes
+- refactors
+- proposal comparisons
+- tradeoffs
 
-```txt
-src/
-  entrypoints/   - thin WXT boot files for each extension context
-  rpc/           - typed cross-context API boundary
-  background/    - background-only browser/runtime behavior
-  anilist/       - AniList API, schemas, caching, and AniList-derived logic
-  providers/     - Sonarr/Radarr clients, validation, types, and provider-local library logic
-  mapping/       - matching, overrides, upstream mappings, and resolution pipeline
-  options/       - persisted options schema, types, and store logic
-  options-page/  - options page UI and page-specific workflows
-  content/       - injected site/page adapters and host-surface wiring
-  features/      - reusable product UI modules
-  shared/        - minimal cross-cutting low-level code only
-  debug/         - dev/debug-only helpers
+Default structure:
+
+1. ASCII diagram
+2. Short explanation
+3. Recommendation or plan
+4. Files/components affected
+5. Risks/checks
+
+Keep output concise:
+
+- no filler
+- no motivational language
+- no repeated summaries
+- no long introductions
+- no obvious restatements
+- no giant diagrams when a small one works
+- no prose wall before the diagram
+
+Do not use full caveman style. Use clear technical English. Fragments are allowed only when they improve readability.
+
+Prefer concrete value-trace diagrams over abstract architecture diagrams.
+
+Good targets:
+
+- where a value starts
+- where it is validated
+- where it is stored/cached
+- where it is passed
+- where it is used as a key
+- where it is transformed
+- what UI/behavior it affects
+- what can refresh
+- what can reset
+- who owns it
+
+Avoid abstract phrases unless immediately grounded:
+
+- "source of truth"
+- "derived state"
+- "form identity"
+- "local ownership"
+- "controller"
+- "invalidation"
+- "abstraction boundary"
+
+When using one of those phrases, include:
+
+- concrete value
+- concrete file/hook/component
+- what changes it
+- what breaks if it changes incorrectly
+
+Example:
+
+```text
++----------------------+
+| AniListId extracted  |
+| from page/card       |
++----------+-----------+
+           |
+           v
++----------------------+
+| Parsed/validated     |
+| as AniListId         |
++----------+-----------+
+           |
+           +-------------------+
+           |                   |
+           v                   v
++------------------+  +------------------+
+| Mapping lookup   |  | Metadata query   |
++--------+---------+  +------------------+
+         |
+         v
++------------------+
+| Provider ID      |
+| TVDB/TMDB        |
++--------+---------+
+         |
+         v
++------------------+
+| Provider status  |
+| Sonarr/Radarr    |
++--------+---------+
+         |
+         v
++------------------+
+| Modal behavior   |
++------------------+
 ```
-
-## Response contract
-
-- Be concise.
-- Summarize only what you actually changed.
-- Include:
-  - what changed
-  - important type or ownership decisions
-  - verification results
-  - blockers or assumptions, if any
-- Briefly justify any abstraction you kept.
-- Briefly state what was removed, collapsed, or inlined if you simplified something.
-- If you kept a touched complex function or large file mostly intact, briefly justify why.
-- Do not include long plans, speculative future work, or unrelated recommendations unless asked.
-
-## Done when
-
-- The requested change is implemented.
-- Behavior matches the request.
-- Relevant callers were checked.
-- Relevant checks pass.
-- Relevant tests pass when tests were needed and run.
-- No unrelated abstractions or layers were added.
-- Touched complexity was simplified where reasonable.
-- Touched design warnings were resolved or briefly justified.

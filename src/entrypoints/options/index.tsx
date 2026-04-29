@@ -5,7 +5,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { ExtensionErrorBoundary } from '@/components/extension-error-boundary';
-import { ConfirmProvider } from '@/shared/hooks/common/use-confirm';
+import { ConfirmProvider } from '@/shared/hooks/use-confirm';
 import ToastProvider from '@/shared/ui/feedback/toast-provider';
 import { OptionsPage } from '@/options-page';
 

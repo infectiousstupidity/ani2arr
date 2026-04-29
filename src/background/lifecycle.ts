@@ -2,7 +2,7 @@
 // src/background/lifecycle.ts
 
 import { browser } from 'wxt/browser';
-import { getExtensionOptionsSnapshot, isProviderConfigured } from '@/options';
+import { getExtensionOptionsSnapshot, hasConfiguredProviderCredentials } from '@/options';
 import { logError, normalizeError } from '@/shared/errors';
 import { logger } from '@/shared/utils/logger';
 
@@ -14,7 +14,7 @@ const log = logger.create('Background');
 async function shouldWarmMappingsCache(): Promise<boolean> {
   try {
     const options = await getExtensionOptionsSnapshot();
-    return isProviderConfigured(options, 'sonarr') || isProviderConfigured(options, 'radarr');
+    return hasConfiguredProviderCredentials(options, 'sonarr') || hasConfiguredProviderCredentials(options, 'radarr');
   } catch (error) {
     logError(normalizeError(error), 'Background:shouldWarmMappingsCache');
     return false;

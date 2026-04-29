@@ -4,39 +4,34 @@
 import type React from 'react';
 import { useState } from 'react';
 import { ANILIST_TITLE_LANGUAGES, type AniListTitleLanguage } from '@/anilist/schemas/title-language.schema';
-import {
-  getProviderConnectionStatusMeta,
-  type ProviderConnectionStatus,
-} from '@/providers/hooks/provider-connection.status';
+import type { ProviderStatusView } from '@/providers/hooks/provider-connection.status';
 import { cn } from '@/shared/utils/cn';
 import { getAniListTitleLanguageLabel } from '@/anilist/title-preference';
 import { InputField, SelectField } from '@/shared/ui/form/form';
 import Button from '@/shared/ui/primitives/button';
-import { useConfirm } from '@/shared/hooks/common/use-confirm';
+import { useConfirm } from '@/shared/hooks/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import { logger } from '@/shared/utils/logger';
 
-export const TITLE_LANGUAGE_OPTIONS = ANILIST_TITLE_LANGUAGES.map(value => ({
+const TITLE_LANGUAGE_OPTIONS = ANILIST_TITLE_LANGUAGES.map(value => ({
   value,
   label: getAniListTitleLanguageLabel(value, { includeDefaultSuffix: true }),
 }));
 
-export const TITLE_LANGUAGE_DESCRIPTION =
+const TITLE_LANGUAGE_DESCRIPTION =
   'ani2arr uses this to choose which AniList title variant to show in modal titles.';
 
-export const ProviderConnectionStatusBadge: React.FC<{ status: ProviderConnectionStatus }> = ({
+export const ProviderConnectionStatusBadge: React.FC<{ status: ProviderStatusView }> = ({
   status,
 }) => {
-  const statusMeta = getProviderConnectionStatusMeta(status);
-
   return (
     <span
       className={cn(
         'a2a-provider-status a2a-provider-status-badge rounded-full px-3 py-1 text-[11px] font-semibold',
-        statusMeta.variantClassName,
+        status.variantClassName,
       )}
     >
-      {statusMeta.shortLabel}
+      {status.shortLabel}
     </span>
   );
 };
@@ -51,7 +46,7 @@ export type ProviderConnectionCardProps = {
   urlDescription?: React.ReactNode;
   urlInputRef: React.RefObject<HTMLInputElement | null>;
   isEditingConnection: boolean;
-  isConnected: boolean;
+  isConfigured: boolean;
   url: string;
   apiKey: string;
   onStartEditing: () => void;
@@ -65,10 +60,9 @@ export type ProviderConnectionCardProps = {
     isPending: boolean;
     reset: () => void;
   };
-  saveState: {
-    isPending: boolean;
-  };
+  isConnectDisabled?: boolean;
   isLoading?: boolean;
+  isBusy?: boolean;
   children?: React.ReactNode;
   summaryFields?: Array<{ label: string; value: React.ReactNode }>;
 };
@@ -83,7 +77,7 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
   urlDescription,
   urlInputRef,
   isEditingConnection,
-  isConnected,
+  isConfigured,
   url,
   apiKey,
   onStartEditing,
@@ -93,14 +87,16 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
   setUrl,
   setApiKey,
   testConnectionState,
-  saveState,
+  isConnectDisabled = false,
   isLoading,
+  isBusy,
   children,
   summaryFields = [],
 }) => {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const confirm = useConfirm();
   const toast = useToast();
+  const isInteractionDisabled = Boolean(isLoading || isBusy);
 
   const getConnectButtonText = () => {
     if (testConnectionState.isError) return 'Retry';
@@ -110,7 +106,7 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
   const handleConnectSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if ((isConnected && !isEditingConnection) || testConnectionState.isPending) {
+    if ((isConfigured && !isEditingConnection) || isInteractionDisabled) {
       return;
     }
 
@@ -144,7 +140,7 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
     }
   };
 
-  if (isConnected && !isEditingConnection) {
+  if (isConfigured && !isEditingConnection) {
     const columnClassName =
       summaryFields.length >= 3
         ? 'md:grid-cols-3'
@@ -179,7 +175,7 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
               size="sm"
               type="button"
               className="w-full sm:w-auto"
-              disabled={Boolean(isLoading)}
+              disabled={isInteractionDisabled}
             >
               Edit details
             </Button>
@@ -190,12 +186,8 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
               type="button"
               className="w-full sm:w-auto text-error border-error"
               isLoading={isDisconnecting}
-              disabled={
-                saveState.isPending ||
-                testConnectionState.isPending ||
-                Boolean(isLoading)
-              }
-              aria-busy={isDisconnecting || saveState.isPending}
+              disabled={isInteractionDisabled}
+              aria-busy={isDisconnecting || isInteractionDisabled}
             >
               Disconnect
             </Button>
@@ -214,7 +206,7 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         placeholder={urlPlaceholder}
-        disabled={Boolean(isLoading)}
+        disabled={isInteractionDisabled}
         description={urlDescription}
       />
 
@@ -225,7 +217,7 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
         value={apiKey}
         onChange={(e) => setApiKey(e.target.value)}
         placeholder={`${providerLabel} API key`}
-        disabled={Boolean(isLoading)}
+        disabled={isInteractionDisabled}
       />
 
       {children}
@@ -239,7 +231,7 @@ export const ProviderConnectionCard: React.FC<ProviderConnectionCardProps> = ({
             loadingText="Connecting..."
             className="w-full sm:w-auto"
             aria-busy={testConnectionState.isPending}
-            disabled={Boolean(isLoading)}
+            disabled={isInteractionDisabled || isConnectDisabled}
           >
             {getConnectButtonText()}
           </Button>
@@ -253,15 +245,20 @@ export const PreferredAniListTitleLanguageField: React.FC<{
   preferredAniListTitleLanguage: AniListTitleLanguage;
   setPreferredAniListTitleLanguage: (value: AniListTitleLanguage) => void;
   selectPortal: HTMLElement | null;
-  isLoading?: boolean;
-}> = ({ preferredAniListTitleLanguage, setPreferredAniListTitleLanguage, selectPortal, isLoading }) => (
+  isDisabled?: boolean;
+}> = ({
+  preferredAniListTitleLanguage,
+  setPreferredAniListTitleLanguage,
+  selectPortal,
+  isDisabled,
+}) => (
   <SelectField
     label="Preferred AniList title language"
     value={preferredAniListTitleLanguage}
     onValueChange={(value) => setPreferredAniListTitleLanguage(value as AniListTitleLanguage)}
     options={TITLE_LANGUAGE_OPTIONS}
     container={selectPortal}
-    disabled={Boolean(isLoading)}
+    disabled={Boolean(isDisabled)}
     description={TITLE_LANGUAGE_DESCRIPTION}
   />
 );

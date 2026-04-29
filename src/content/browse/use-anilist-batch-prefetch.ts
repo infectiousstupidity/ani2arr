@@ -1,39 +1,126 @@
 /** Content-owned AniList browse metadata prefetch scheduling for visible cards. */
 // src/content/browse/use-anilist-batch-prefetch.ts
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
+import type { AniListId } from '@/anilist';
 import { getAni2arrApi } from '@/rpc';
 import { logger } from '@/shared/utils/logger';
-import type { ParsedCard } from './types';
+import type { HostMediaTarget } from './types';
 
 interface UseAnilistBatchPrefetchParams {
-  cardPortals: Map<Element, ParsedCard>;
+  cardPortals: Map<Element, HostMediaTarget>;
   enabled?: boolean;
 }
 
 const log = logger.create('AniList Prefetch');
 
-export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnilistBatchPrefetchParams): void => {
-  const surfaceEnabled = globalThis.window !== undefined && (() => {
-    const host = (globalThis.location.hostname || '').toLowerCase();
-    const p = globalThis.location.pathname || '';
-    if (host.includes('anilist.co')) {
-      return p === '/' || p.startsWith('/home') || p.startsWith('/search');
-    }
-    if (host.includes('anichart.net')) {
-      return true;
-    }
+function isSupportedPrefetchSurface(): boolean {
+  if (globalThis.window === undefined) {
     return false;
-  })();
+  }
+
+  const host = (globalThis.location.hostname || '').toLowerCase();
+  const path = globalThis.location.pathname || '';
+  if (host.includes('anilist.co')) {
+    return path === '/' || path.startsWith('/home') || path.startsWith('/search');
+  }
+
+  return host.includes('anichart.net');
+}
+
+function collectPrefetchCandidates(input: {
+  prefetched: Set<AniListId>;
+  queued: Set<AniListId>;
+  visible: Set<AniListId>;
+  offscreen: AniListId[];
+}): AniListId[] {
+  const visibleCandidates: AniListId[] = [];
+  for (const id of input.visible) {
+    if (!input.prefetched.has(id) && !input.queued.has(id)) {
+      visibleCandidates.push(id);
+    }
+    if (visibleCandidates.length >= 60) {
+      break;
+    }
+  }
+
+  if (visibleCandidates.length > 0) {
+    return visibleCandidates;
+  }
+
+  const offscreenCandidates: AniListId[] = [];
+  for (const id of input.offscreen) {
+    if (!input.prefetched.has(id) && !input.queued.has(id)) {
+      offscreenCandidates.push(id);
+    }
+    if (offscreenCandidates.length >= 60) {
+      break;
+    }
+  }
+
+  return offscreenCandidates;
+}
+
+async function filterKnownMappedIds(input: {
+  ids: AniListId[];
+  knownMapped: Set<AniListId>;
+  api: ReturnType<typeof getAni2arrApi>;
+}): Promise<AniListId[]> {
+  const unknown = input.ids.filter((id) => !input.knownMapped.has(id));
+  if (unknown.length === 0) {
+    return input.ids.filter((id) => !input.knownMapped.has(id));
+  }
+
+  try {
+    const identities = await input.api.getMappingIdentities(unknown);
+    for (const identity of identities) {
+      if (identity.providerMappingState === 'mapped' && identity.providerId !== null) {
+        input.knownMapped.add(identity.anilistId);
+      }
+    }
+  } catch {
+    // ignore mapping presence failures; proceed with best-effort prefetch
+  }
+
+  return input.ids.filter((id) => !input.knownMapped.has(id));
+}
+
+function logPrefetchChunk(input: {
+  chunk: AniListId[];
+  visible: Set<AniListId>;
+  offscreen: AniListId[];
+  infoBurstCountRef: MutableRefObject<number>;
+}): void {
+  if (!import.meta.env.DEV) {
+    return;
+  }
+
+  const visibleArr = [...input.visible.values()].slice(0, 60);
+  log.debug?.(
+    `prefetch:tick choose chunk size=${input.chunk.length} visible_size=${visibleArr.length} offscreen_backlog=${input.offscreen.length} chunk_ids=[${input.chunk.join(',')}]`,
+  );
+
+  if (input.infoBurstCountRef.current >= 3) {
+    return;
+  }
+
+  input.infoBurstCountRef.current += 1;
+  log.info?.(
+    `prefetch:tick size=${input.chunk.length} visible_size=${visibleArr.length} offscreen_backlog=${input.offscreen.length}`,
+  );
+}
+
+export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnilistBatchPrefetchParams): void => {
+  const surfaceEnabled = isSupportedPrefetchSurface();
   const isEnabled = enabled && surfaceEnabled;
   const api = useMemo(() => getAni2arrApi(), []);
 
-  const idByContainerRef = useRef<WeakMap<Element, number>>(new WeakMap());
-  const visibleIdsRef = useRef<Set<number>>(new Set());
-  const prefetchedIdsRef = useRef<Set<number>>(new Set());
-  const queuedIdsRef = useRef<Set<number>>(new Set());
-  const staticallyMappedRef = useRef<Set<number>>(new Set());
-  const offscreenQueueRef = useRef<number[]>([]);
+  const idByContainerRef = useRef<WeakMap<Element, AniListId>>(new WeakMap());
+  const visibleIdsRef = useRef<Set<AniListId>>(new Set());
+  const prefetchedIdsRef = useRef<Set<AniListId>>(new Set());
+  const queuedIdsRef = useRef<Set<AniListId>>(new Set());
+  const knownMappedRef = useRef<Set<AniListId>>(new Set());
+  const offscreenQueueRef = useRef<AniListId[]>([]);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const observedContainersRef = useRef<Set<Element>>(new Set());
   const infoBurstCountRef = useRef(0);
@@ -42,7 +129,7 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
   const tickRef = useRef<(() => Promise<void>) | null>(null);
 
   const containerIdMap = useMemo(() => {
-    const map = new Map<Element, number>();
+    const map = new Map<Element, AniListId>();
     for (const [container, parsed] of cardPortals) {
       map.set(container, parsed.anilistId);
     }
@@ -96,52 +183,30 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
       const queued = queuedIdsRef.current;
       const visible = visibleIdsRef.current;
       const offscreen = offscreenQueueRef.current;
-      const staticallyMapped = staticallyMappedRef.current;
-
-      const visibleCandidates: number[] = [];
-      for (const id of visible) {
-        if (!prefetched.has(id) && !queued.has(id)) visibleCandidates.push(id);
-        if (visibleCandidates.length >= 60) break;
-      }
-
-      let toFetch: number[] = [];
-      if (visibleCandidates.length > 0) {
-        toFetch = visibleCandidates;
-      } else {
-        for (const id of offscreen) {
-          if (!prefetched.has(id) && !queued.has(id)) toFetch.push(id);
-          if (toFetch.length >= 60) break;
-        }
-      }
+      const knownMapped = knownMappedRef.current;
+      let toFetch = collectPrefetchCandidates({
+        prefetched,
+        queued,
+        visible,
+        offscreen,
+      });
 
       if (toFetch.length === 0) return;
 
-      try {
-        const unknown = toFetch.filter(id => !staticallyMapped.has(id));
-        if (unknown.length > 0) {
-          const mapped = await api.getStaticMapped(unknown);
-          for (const id of mapped) staticallyMapped.add(id);
-        }
-      } catch {
-        // ignore mapping presence failures; proceed with best-effort prefetch
-      }
-
-      toFetch = toFetch.filter(id => !staticallyMapped.has(id));
+      toFetch = await filterKnownMappedIds({
+        ids: toFetch,
+        knownMapped,
+        api,
+      });
       if (toFetch.length === 0) return;
 
       const chunk = toFetch.slice(0, 50);
-      if (import.meta.env.DEV) {
-        const visibleArr = [...visible.values()].slice(0, 60);
-        log.debug?.(
-          `prefetch:tick choose chunk size=${chunk.length} visible_size=${visibleArr.length} offscreen_backlog=${offscreen.length} chunk_ids=[${chunk.join(',')}]`,
-        );
-        if (infoBurstCountRef.current < 3) {
-          infoBurstCountRef.current += 1;
-          log.info?.(
-            `prefetch:tick size=${chunk.length} visible_size=${visibleArr.length} offscreen_backlog=${offscreen.length}`,
-          );
-        }
-      }
+      logPrefetchChunk({
+        chunk,
+        visible,
+        offscreen,
+        infoBurstCountRef,
+      });
 
       for (const id of chunk) {
         queued.add(id);

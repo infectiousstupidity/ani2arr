@@ -6,18 +6,15 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
 import { ExternalLink } from 'lucide-react';
-import { useProviderConnectionCheck } from '@/providers/hooks/provider-connection.queries';
-import { useProviderConnectionStatus } from '@/providers/hooks/provider-connection.status';
-import { getProviderConnectionStatusMeta } from '@/providers/hooks/provider-connection.status';
+import { useStoredProviderStatus } from '@/providers/hooks/provider-connection.status';
+import { getProviderLabel } from '@/providers/provider-labels';
 import { cn } from '@/shared/utils/cn';
 import type {
   BadgeVisibility,
   ExtensionOptions,
 } from '@/options';
-import { useExtensionOptions, useSaveOptions, getProviderCredentials } from '@/options';
-import type {
-  Provider,
-} from '@/providers';
+import { useExtensionOptions, useSaveOptions } from '@/options';
+import { PROVIDERS, type Provider } from '@/providers';
 import './style.css';
 
 const queryClient = new QueryClient();
@@ -47,12 +44,10 @@ const QuickSettings: React.FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const settings = optionsQuery.data;
-  const sonarrCredentials = getProviderCredentials(settings, 'sonarr');
-  const radarrCredentials = getProviderCredentials(settings, 'radarr');
-
-  const isSonarrConfigured = Boolean(sonarrCredentials);
-  const isRadarrConfigured = Boolean(radarrCredentials);
-  const hasAnyProviderConfigured = isSonarrConfigured || isRadarrConfigured;
+  const sonarrStatus = useStoredProviderStatus('sonarr');
+  const radarrStatus = useStoredProviderStatus('radarr');
+  const hasAnyProviderConfigured =
+    sonarrStatus.isProviderConfigured || radarrStatus.isProviderConfigured;
   const isLoading = optionsQuery.isLoading;
   const isSaving = saveOptions.isPending;
   const isBusy = isLoading || isSaving;
@@ -62,40 +57,6 @@ const QuickSettings: React.FC = () => {
   } else if (isSaving) {
     statusMessage = 'Saving...';
   }
-
-  const sonarrConnectionQuery = useProviderConnectionCheck({
-    provider: 'sonarr',
-    enabled: isSonarrConfigured,
-    credentials: sonarrCredentials,
-  });
-
-  const radarrConnectionQuery = useProviderConnectionCheck({
-    provider: 'radarr',
-    enabled: isRadarrConfigured,
-    credentials: radarrCredentials,
-  });
-
-  const sonarrStatus = useProviderConnectionStatus(
-    {
-      hasConfiguredCredentials: isSonarrConfigured,
-      isChecking: isLoading || sonarrConnectionQuery.isFetching,
-      isConnected: sonarrConnectionQuery.isSuccess,
-    },
-    {
-      smoothConnecting: false,
-    },
-  );
-
-  const radarrStatus = useProviderConnectionStatus(
-    {
-      hasConfiguredCredentials: isRadarrConfigured,
-      isChecking: isLoading || radarrConnectionQuery.isFetching,
-      isConnected: radarrConnectionQuery.isSuccess,
-    },
-    {
-      smoothConnecting: false,
-    },
-  );
 
   const updateSettings = async (updater: (current: ExtensionOptions) => ExtensionOptions) => {
     if (!settings || isSaving) return;
@@ -182,23 +143,18 @@ const QuickSettings: React.FC = () => {
           </button>
           <p className="text-[11px] uppercase tracking-wide text-text-secondary">Sonarr</p>
           <div className="mt-1 flex items-center gap-2 text-sm">
-            {(() => {
-              const meta = getProviderConnectionStatusMeta(sonarrStatus);
-              return (
-                <span
-                  className={cn(
-                    'a2a-provider-status inline-flex items-center gap-2',
-                    meta.variantClassName,
-                  )}
-                >
-                  <span
-                    className="a2a-provider-status-dot inline-block h-2.5 w-2.5 rounded-full"
-                    aria-hidden
-                  />
-                  <span className="a2a-provider-status-text">{meta.shortLabel}</span>
-                </span>
-              );
-            })()}
+            <span
+              className={cn(
+                'a2a-provider-status inline-flex items-center gap-2',
+                sonarrStatus.variantClassName,
+              )}
+            >
+              <span
+                className="a2a-provider-status-dot inline-block h-2.5 w-2.5 rounded-full"
+                aria-hidden
+              />
+              <span className="a2a-provider-status-text">{sonarrStatus.shortLabel}</span>
+            </span>
           </div>
         </div>
 
@@ -213,23 +169,18 @@ const QuickSettings: React.FC = () => {
           </button>
           <p className="text-[11px] uppercase tracking-wide text-text-secondary">Radarr</p>
           <div className="mt-1 flex items-center gap-2 text-sm">
-            {(() => {
-              const meta = getProviderConnectionStatusMeta(radarrStatus);
-              return (
-                <span
-                  className={cn(
-                    'a2a-provider-status inline-flex items-center gap-2',
-                    meta.variantClassName,
-                  )}
-                >
-                  <span
-                    className="a2a-provider-status-dot inline-block h-2.5 w-2.5 rounded-full"
-                    aria-hidden
-                  />
-                  <span className="a2a-provider-status-text">{meta.shortLabel}</span>
-                </span>
-              );
-            })()}
+            <span
+              className={cn(
+                'a2a-provider-status inline-flex items-center gap-2',
+                radarrStatus.variantClassName,
+              )}
+            >
+              <span
+                className="a2a-provider-status-dot inline-block h-2.5 w-2.5 rounded-full"
+                aria-hidden
+              />
+              <span className="a2a-provider-status-text">{radarrStatus.shortLabel}</span>
+            </span>
           </div>
         </div>
       </section>
@@ -242,8 +193,8 @@ const QuickSettings: React.FC = () => {
           </p>
         </div>
 
-        {(['sonarr', 'radarr'] as const).map((provider) => {
-          const providerLabel = provider === 'sonarr' ? 'Sonarr' : 'Radarr';
+        {PROVIDERS.map((provider) => {
+          const providerLabel = getProviderLabel(provider);
           const providerSettings = settings?.ui.browseCards[provider];
 
           return (
@@ -304,8 +255,8 @@ const QuickSettings: React.FC = () => {
           </p>
         </div>
 
-        {(['sonarr', 'radarr'] as const).map((provider) => {
-          const providerLabel = provider === 'sonarr' ? 'Sonarr' : 'Radarr';
+        {PROVIDERS.map((provider) => {
+          const providerLabel = getProviderLabel(provider);
           const enabled = settings?.ui.animePages[provider].enabled ?? false;
 
           return (

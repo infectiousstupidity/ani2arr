@@ -4,17 +4,15 @@
 import React from 'react';
 
 import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
+import { parseProviderQualityProfileId, type ProviderMetadata } from '@/providers';
+import type { ProviderSetupPathPreview } from '@/providers/library/paths';
 import {
   MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
   type SonarrFormState,
-} from '@/providers/settings/sonarr-settings.schema';
+} from '@/providers/settings/provider-settings.schema';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
-import type {
-  ProviderMetadata,
-} from '@/providers';
 import { cn } from '@/shared/utils/cn';
-import { buildProviderFolderSlugFromTitle } from '@/providers/library/paths';
 
 import { ProviderRootFolderSelect } from './provider-root-folder-select';
 
@@ -28,12 +26,8 @@ export interface SonarrAddOptionsFieldsProps {
   className?: string | undefined;
   portalContainer?: HTMLElement | ShadowRoot | null | undefined;
   initialFocusRef?: React.RefObject<HTMLButtonElement | null> | undefined;
-  computedPath?: string | null | undefined;
-  pathHintTitle?: string | undefined;
-  pathHintTvdbId?: number | null | undefined;
+  pathPreview?: ProviderSetupPathPreview | undefined;
   includeSearchToggle?: boolean | undefined;
-  displayRootWithSlug?: boolean | undefined;
-  folderSlug?: string | null | undefined;
   layout?: SonarrAddOptionsFieldsLayout | undefined;
 }
 
@@ -48,12 +42,8 @@ export function SonarrAddOptionsFields(
     className,
     portalContainer,
     initialFocusRef,
-    computedPath,
-    pathHintTitle,
-    pathHintTvdbId,
+    pathPreview,
     includeSearchToggle = true,
-    displayRootWithSlug = false,
-    folderSlug,
     layout = 'stacked',
   } = props;
 
@@ -63,36 +53,38 @@ export function SonarrAddOptionsFields(
     ? 'grid gap-4 md:grid-cols-2'
     : 'flex flex-col gap-4';
   const modalSelectTriggerClassName = 'border border-border-primary/60 bg-bg-tertiary text-text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
-  const computedSlug =
-    folderSlug && folderSlug.trim().length > 0
-      ? folderSlug.trim()
-      : buildProviderFolderSlugFromTitle(pathHintTitle, { tvdbId: pathHintTvdbId });
   const qualityProfileOptions = metadata.qualityProfiles.map(profile => ({
     value: String(profile.id),
     label: profile.name,
   }));
+  const monitor = values.addOptions?.monitor ?? '';
+  const searchForMissingEpisodes = values.addOptions?.searchForMissingEpisodes ?? false;
+  const searchForCutoffUnmetEpisodes =
+    values.addOptions?.searchForCutoffUnmetEpisodes ?? false;
 
   return (
     <div className={cn(layoutClassName, className)}>
       <ProviderRootFolderSelect
         disabled={disabled}
-        value={values.rootFolderPath}
+        value={values.rootFolderPath ?? ''}
         rootFolders={metadata.rootFolders}
         onChange={value => onChange('rootFolderPath', value)}
         portalContainer={portalContainer ?? null}
         initialFocusRef={initialFocusRef}
         className={fullWidthClass}
         triggerClassName={modalSelectTriggerClassName}
-        computedSlug={computedSlug}
-        displayRootWithSlug={displayRootWithSlug}
-        computedPath={computedPath}
+        pathPreview={pathPreview}
       />
 
       <SelectField
         label="Monitor"
         disabled={disabled}
-        value={values.monitorOption}
-        onChange={value => onChange('monitorOption', value as SonarrFormState['monitorOption'])}
+        value={monitor}
+        onChange={value =>
+          onChange('addOptions', {
+            ...values.addOptions,
+            monitor: value as NonNullable<SonarrFormState['addOptions']>['monitor'],
+          })}
         options={MONITOR_OPTIONS_WITH_DESCRIPTIONS}
         container={portalContainer ?? null}
         triggerClassName={modalSelectTriggerClassName}
@@ -101,8 +93,11 @@ export function SonarrAddOptionsFields(
       <SelectField
         label="Quality Profile"
         disabled={disabled}
-        value={String(values.qualityProfileId)}
-        onChange={value => onChange('qualityProfileId', Number(value))}
+        value={values.qualityProfileId === undefined ? '' : String(values.qualityProfileId)}
+        onChange={value => {
+          const num = Number(value);
+          onChange('qualityProfileId', !value || Number.isNaN(num) ? undefined : parseProviderQualityProfileId(num));
+        }}
         options={qualityProfileOptions}
         placeholder="Select a profile..."
         container={portalContainer ?? null}
@@ -112,7 +107,7 @@ export function SonarrAddOptionsFields(
       <SelectField
         label="Series Type"
         disabled={disabled}
-        value={values.seriesType}
+        value={values.seriesType ?? ''}
         onChange={value => onChange('seriesType', value as SonarrFormState['seriesType'])}
         options={SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
         container={portalContainer ?? null}
@@ -122,7 +117,7 @@ export function SonarrAddOptionsFields(
       <ProviderTagField
         availableTags={metadata.tags}
         disabled={disabled}
-        selectedTagIds={values.tags}
+        selectedTagIds={values.tags ?? []}
         selectedFreeformTags={values.freeformTags}
         onTagIdsChange={tagIds => onChange('tags', tagIds)}
         onFreeformTagsChange={freeformTags => onChange('freeformTags', freeformTags)}
@@ -133,7 +128,7 @@ export function SonarrAddOptionsFields(
           <SwitchField
             label="Season Folders"
             disabled={disabled}
-            checked={values.seasonFolder}
+            checked={values.seasonFolder ?? false}
             onCheckedChange={checked => onChange('seasonFolder', checked)}
             labelHelp="Organize episodes into per-season subfolders created automatically."
             labelHelpDelay={600}
@@ -147,8 +142,12 @@ export function SonarrAddOptionsFields(
               <SwitchField
                 label="Search Missing"
                 disabled={disabled}
-                checked={values.searchForMissingEpisodes}
-                onCheckedChange={checked => onChange('searchForMissingEpisodes', checked)}
+                checked={searchForMissingEpisodes}
+                onCheckedChange={checked =>
+                  onChange('addOptions', {
+                    ...values.addOptions,
+                    searchForMissingEpisodes: checked,
+                  })}
                 labelHelp="Automatically trigger a search for any missing episodes once the series is added."
                 labelHelpDelay={600}
                 labelHelpContainer={portalContainer ?? null}
@@ -159,8 +158,12 @@ export function SonarrAddOptionsFields(
               <SwitchField
                 label="Search Cutoff"
                 disabled={disabled}
-                checked={values.searchForCutoffUnmetEpisodes}
-                onCheckedChange={checked => onChange('searchForCutoffUnmetEpisodes', checked)}
+                checked={searchForCutoffUnmetEpisodes}
+                onCheckedChange={checked =>
+                  onChange('addOptions', {
+                    ...values.addOptions,
+                    searchForCutoffUnmetEpisodes: checked,
+                  })}
                 labelHelp="Ask Sonarr to search for episodes below the quality cutoff during add or update."
                 labelHelpDelay={600}
                 labelHelpContainer={portalContainer ?? null}

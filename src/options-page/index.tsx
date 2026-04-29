@@ -1,21 +1,26 @@
 /** Options page shell, routing, and page-specific state. */
 // src/options-page/index.tsx
 
-import React, { useEffect, useState } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 import { browser } from 'wxt/browser';
 import { ChevronRight, ShieldCheck } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import appIcon from '@/assets/icon.png';
+import type { AniListId } from '@/anilist';
 import { useA2aBroadcasts } from '@/shared/queries/use-a2a-broadcasts';
-import { createDefaultSettings, type ExtensionOptions, useExtensionOptions, getProviderCredentials } from '@/options';
-import { useProviderConnectionCheck } from '@/providers/hooks/provider-connection.queries';
-import { useProviderConnectionStatus } from '@/providers/hooks/provider-connection.status';
 import {
-  getProviderConnectionStatusMeta,
-  type ProviderConnectionStatus,
+  createDefaultExtensionOptions,
+  parseExtensionOptions,
+  type ExtensionOptions,
+  useExtensionOptions,
+} from '@/options';
+import {
+  useStoredProviderStatus,
+  type ProviderStatusView,
 } from '@/providers/hooks/provider-connection.status';
 import { useSettingsActions } from './hooks/use-settings-actions';
+import { shouldResetSettingsFormFromSavedSnapshot } from './hooks/provider-settings-actions.shared';
 import MappingsSection from './sections/mappings/mappings-section';
 import UiSection from './sections/ui-section';
 import AdvancedSection from './sections/advanced-section';
@@ -39,11 +44,10 @@ const extensionVersion = browser.runtime.getManifest()?.version ?? 'unknown';
 const NavItem: React.FC<{
   section: SectionConfig;
   active: boolean;
-  status?: ProviderConnectionStatus;
+  status?: ProviderStatusView;
   onSelect: (id: SectionId) => void;
 }> = ({ section, active, status, onSelect }) => {
   const Icon = section.icon;
-  const statusMeta = status ? getProviderConnectionStatusMeta(status) : null;
 
   return (
     <button
@@ -57,11 +61,11 @@ const NavItem: React.FC<{
           <Icon className="h-4.5 w-4.5" />
         </span>
         <span>{section.label}</span>
-        {statusMeta ? (
+        {status ? (
           <span
             className={cn(
               'a2a-provider-status a2a-provider-status-dot a2a-nav-item__status-dot',
-              statusMeta.variantClassName,
+              status.variantClassName,
             )}
             aria-hidden
           />
@@ -76,7 +80,7 @@ type OptionsContentProps = {
   activeSection: SectionId;
   setActiveSection: (id: SectionId) => void;
   optionsQuery: ReturnType<typeof useExtensionOptions>;
-  targetAnilistId: number | null;
+  targetAnilistId: AniListId | null;
   clearTargetAnilistId: () => void;
   advancedPanel: AdvancedPanelId;
   openPrivacyPanel: () => void;
@@ -92,31 +96,8 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
   openPrivacyPanel,
 }) => {
   const actions = useSettingsActions(optionsQuery.data ? { savedSettings: optionsQuery.data } : {});
-
-  const sonarrCredentials = getProviderCredentials(optionsQuery.data, 'sonarr');
-  const radarrCredentials = getProviderCredentials(optionsQuery.data, 'radarr');
-  const sonarrConnection = { isConfigured: sonarrCredentials !== null, credentials: sonarrCredentials };
-  const radarrConnection = { isConfigured: radarrCredentials !== null, credentials: radarrCredentials };
-  const sonarrConnectionQuery = useProviderConnectionCheck({
-    provider: 'sonarr',
-    enabled: sonarrConnection.isConfigured,
-    credentials: sonarrConnection.credentials,
-  });
-  const radarrConnectionQuery = useProviderConnectionCheck({
-    provider: 'radarr',
-    enabled: radarrConnection.isConfigured,
-    credentials: radarrConnection.credentials,
-  });
-  const sonarrStatus: ProviderConnectionStatus = useProviderConnectionStatus({
-    hasConfiguredCredentials: sonarrConnection.isConfigured,
-    isChecking: sonarrConnectionQuery.isFetching,
-    isConnected: sonarrConnectionQuery.isSuccess,
-  });
-  const radarrStatus: ProviderConnectionStatus = useProviderConnectionStatus({
-    hasConfiguredCredentials: radarrConnection.isConfigured,
-    isChecking: radarrConnectionQuery.isFetching,
-    isConnected: radarrConnectionQuery.isSuccess,
-  });
+  const sonarrStatus = useStoredProviderStatus('sonarr');
+  const radarrStatus = useStoredProviderStatus('radarr');
 
   const renderSection = () => {
     switch (activeSection) {
@@ -155,7 +136,7 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
     }
   };
 
-  const getSectionStatusProps = (sectionId: SectionId): { status?: ProviderConnectionStatus } => {
+  const getSectionStatusProps = (sectionId: SectionId): { status?: ProviderStatusView } => {
     if (sectionId === 'sonarr') return { status: sonarrStatus };
     if (sectionId === 'radarr') return { status: radarrStatus };
     return {};
@@ -257,10 +238,10 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
   );
 };
 
-export const OptionsPage: React.FC = React.memo(() => {
+export const OptionsPage: React.FC = memo(() => {
   useA2aBroadcasts();
   const [activeSection, setActiveSection] = useState<SectionId>(getInitialSection);
-  const [targetAnilistId, setTargetAnilistId] = useState<number | null>(() => {
+  const [targetAnilistId, setTargetAnilistId] = useState<AniListId | null>(() => {
     if (globalThis.window === undefined) return null;
     return extractTargetAnilistIdFromHash(globalThis.window.location.hash);
   });
@@ -270,9 +251,10 @@ export const OptionsPage: React.FC = React.memo(() => {
   });
   const optionsQuery = useExtensionOptions();
   const methods = useForm<ExtensionOptions>({
-    defaultValues: optionsQuery.data ?? createDefaultSettings(),
+    defaultValues: optionsQuery.data ?? createDefaultExtensionOptions(),
     mode: 'onChange',
   });
+  const previousSavedSettingsRef = useRef<ExtensionOptions | undefined>(undefined);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -312,9 +294,24 @@ export const OptionsPage: React.FC = React.memo(() => {
   };
 
   useEffect(() => {
-    if (optionsQuery.data && !methods.formState.isDirty) {
-      methods.reset(optionsQuery.data);
+    if (!optionsQuery.data) {
+      return;
     }
+
+    const nextSettings = optionsQuery.data;
+    const previousSavedSettings = previousSavedSettingsRef.current;
+    previousSavedSettingsRef.current = nextSettings;
+
+    if (
+      !shouldResetSettingsFormFromSavedSnapshot(
+        parseExtensionOptions(methods.getValues()),
+        previousSavedSettings,
+      )
+    ) {
+      return;
+    }
+
+    methods.reset(nextSettings);
   }, [methods, optionsQuery.data]);
 
   return (

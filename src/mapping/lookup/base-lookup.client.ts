@@ -1,11 +1,10 @@
 /** Shared lookup client base with cache reuse, queueing, and provider search orchestration. */
 // src/mapping/lookup/base-lookup.client.ts
 
-import { STORAGE_POLICIES, type TtlCache } from '@/storage';
+import type { TtlCache } from '@/shared/cache/ttl-cache';
 import PQueue from 'p-queue';
-import type { Provider } from '@/providers';
+import type { Provider, ProviderCredentials, ProviderTargetId  } from '@/providers';
 import { normalizeError } from '@/shared/errors';
-import type { ProviderCredentials } from '@/providers';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 import {
   canonicalTitleKeyForProvider,
@@ -20,6 +19,7 @@ import type {
   ProviderLookupOptions,
   ProviderLookupResult,
 } from './provider-lookup.types';
+import { LOOKUP_CACHE_TTL } from './lookup.cache';
 
 const LOOKUP_LATENCY_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
 
@@ -160,14 +160,14 @@ export abstract class BaseLookupClient<TResult extends ProviderLookupResult>
         const results = await this.performLookup(safeTerm, credentials, options.priority);
         if (results.length > 0) {
           await this.caches.positive.write(canonical, results, {
-            staleMs: STORAGE_POLICIES.lookupPositive.staleMs,
-            hardMs: STORAGE_POLICIES.lookupPositive.hardMs,
+            staleMs: LOOKUP_CACHE_TTL.positive.staleMs,
+            hardMs: LOOKUP_CACHE_TTL.positive.hardMs,
           });
           await this.caches.negative.remove(canonical);
         } else {
           await this.caches.negative.write(canonical, true, {
-            staleMs: STORAGE_POLICIES.lookupNegative.staleMs,
-            hardMs: STORAGE_POLICIES.lookupNegative.hardMs,
+            staleMs: LOOKUP_CACHE_TTL.negative.staleMs,
+            hardMs: LOOKUP_CACHE_TTL.negative.hardMs,
           });
           await this.caches.positive.remove(canonical);
         }
@@ -182,7 +182,7 @@ export abstract class BaseLookupClient<TResult extends ProviderLookupResult>
     return deferred.promise;
   }
 
-  public abstract getProviderId(result: unknown): number | null;
+  public abstract getProviderId(result: unknown): ProviderTargetId | null;
 
   /** Subclasses supply the actual API call (e.g. Sonarr series lookup, Radarr movie lookup). */
   protected abstract fetchFromApi(

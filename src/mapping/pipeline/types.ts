@@ -1,6 +1,7 @@
 /** Mapping pipeline types for AniList evaluation and provider lookup context. */
 // src/mapping/pipeline/types.ts
 
+import type { ProviderTargetId } from '@/providers';
 import type { SearchTerm } from './search-term-generator';
 import type { MappingAcceptedReason } from '../types';
 import type { ProviderLookupResult } from '../lookup';
@@ -20,7 +21,7 @@ export interface ScoredCandidate<TResult extends ProviderLookupResult = Provider
 }
 
 export interface PipelineEvaluatedCandidate {
-  providerId: number;
+  providerId: ProviderTargetId;
   title: string;
   reason: PipelineMatchReason;
   score: number;
@@ -30,7 +31,7 @@ export interface PipelineEvaluatedCandidate {
 export type EvaluationOutcome =
   | {
     status: 'resolved';
-    providerId: number;
+    providerId: ProviderTargetId;
     reason: MappingAcceptedReason;
     confidence: number;
     successfulSynonym?: string;

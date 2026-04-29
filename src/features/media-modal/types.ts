@@ -1,88 +1,132 @@
-/** Shared media-modal panel and mapping prop types. */
+/** Media modal public and shared prop types. */
 // src/features/media-modal/types.ts
 
+import type { AniListId } from "@/anilist";
 import type {
-  RadarrFormState,
-} from '@/providers/settings/radarr-settings.schema';
-import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
+	AniListMediaHint,
+	AniListMediaFormat,
+} from "@/anilist/schemas/media.schema";
+import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
 import type {
-  ProviderQualityProfile,
-  ProviderRootFolder,
-  ProviderTag,
-} from '@/providers';
-import type { MappingAniListSummary, MappingSearchResult, UseMappingControllerResult } from '@/features/mapping';
-import type { UseRadarrPanelControllerResult } from './hooks/use-radarr-panel-controller';
-import type { UseSonarrPanelControllerResult } from './hooks/use-sonarr-panel-controller';
+	CheckMovieStatusResponse,
+	CheckSeriesStatusResponse,
+} from "@/rpc/types";
+import type { ProviderMetadata } from "@/providers";
+import type {
+	RadarrFormState,
+	SonarrFormState,
+} from "@/providers/settings/provider-settings.schema";
+import type {
+	RadarrLaunchSnapshot,
+	SonarrLaunchSnapshot,
+} from "./launch-snapshot";
 
-export interface MappingTabProps {
-  aniListEntry: MappingAniListSummary;
-  currentMapping: MappingSearchResult | null;
-  overrideActive: boolean;
-  otherAniListIds: number[];
-  provider: "sonarr" | "radarr";
-  controller: UseMappingControllerResult;
-  baseUrl: string;
-}
+export type MediaModalView = "setup" | "mapping";
+export type MediaModalSetupMode = "add" | "edit";
+export type MediaModalOpenSource = "content" | "options-page";
 
-export type SonarrPanelMode = "add" | "edit";
-export type RadarrPanelMode = "add" | "edit";
-
-export interface SonarrPanelBaseProps {
-  mode: SonarrPanelMode;
-
-  anilistId: number;
-  title: string;
-  tvdbId: number | null;
-  folderSlug?: string | null;
-
-  initialForm: SonarrFormState;
-  defaultForm: SonarrFormState;
-
-  metadata: {
-    qualityProfiles: ProviderQualityProfile[];
-    rootFolders: ProviderRootFolder[];
-    tags: ProviderTag[];
-  } | null;
-
-  sonarrReady: boolean;
-  disabled?: boolean;
-
-  portalContainer?: HTMLElement | ShadowRoot | null;
-
-  onSubmit(form: SonarrFormState): Promise<void>;
-  onSaveDefaults(form: SonarrFormState): Promise<void>;
-}
-
-export type SonarrPanelProps = SonarrPanelBaseProps & {
-  controller: UseSonarrPanelControllerResult;
+export type AniListHeaderData = {
+	title: string;
+	bannerImage: string | null;
+	coverImage: string | null;
+	format: AniListMediaFormat | null;
+	year: number | null;
 };
 
-export interface RadarrPanelBaseProps {
-  mode: RadarrPanelMode;
+export type ProviderStatus =
+	| CheckSeriesStatusResponse
+	| CheckMovieStatusResponse
+	| null
+	| undefined;
 
-  anilistId: number;
-  title: string;
-  tmdbId: number | null;
-  folderSlug?: string | null;
+export type MediaModalBaseData = {
+	anilistId: AniListId;
+	baseUrl: string;
+	isConfigured: boolean;
+	anilistHeaderData: AniListHeaderData;
+	manualMappingActive: boolean;
+	currentMapping: MappingSearchResult | null;
+	resolvedMetadata: AniListMediaHint | null;
+	providerRequestTitle: string;
+	fallbackLookupTitle?: string;
+	verificationSettled: boolean;
+	verificationFailed: boolean;
+};
 
-  initialForm: RadarrFormState;
-  defaultForm: RadarrFormState;
+export type RadarrMediaModalData = MediaModalBaseData & {
+	provider: "radarr";
+	rawProviderStatus: CheckMovieStatusResponse | null;
+	providerMetadata: ProviderMetadata | null;
+	storedDefaults: RadarrFormState;
+};
 
-  metadata: {
-    qualityProfiles: ProviderQualityProfile[];
-    rootFolders: ProviderRootFolder[];
-    tags: ProviderTag[];
-  } | null;
+export type SonarrMediaModalData = MediaModalBaseData & {
+	provider: "sonarr";
+	rawProviderStatus: CheckSeriesStatusResponse | null;
+	providerMetadata: ProviderMetadata | null;
+	storedDefaults: SonarrFormState;
+};
 
-  radarrReady: boolean;
-  disabled?: boolean;
+export type MediaModalData = RadarrMediaModalData | SonarrMediaModalData;
 
-  portalContainer?: HTMLElement | ShadowRoot | null;
+type MediaModalStateBase = {
+	anilistId: AniListId;
+	initialView?: MediaModalView;
+	openSource: MediaModalOpenSource;
+	launchTitle?: string;
+	launchMetadata?: AniListMediaHint | null;
+};
 
-  onSubmit(form: RadarrFormState): Promise<void>;
-  onSaveDefaults(form: RadarrFormState): Promise<void>;
-}
+export type SonarrMediaModalState = MediaModalStateBase & {
+	provider: "sonarr";
+	launchStatus?: CheckSeriesStatusResponse | null;
+	launchSnapshot?: SonarrLaunchSnapshot | null;
+};
 
-export type RadarrPanelProps = RadarrPanelBaseProps & {
-  controller: UseRadarrPanelControllerResult;
+export type RadarrMediaModalState = MediaModalStateBase & {
+	provider: "radarr";
+	launchStatus?: CheckMovieStatusResponse | null;
+	launchSnapshot?: RadarrLaunchSnapshot | null;
+};
+
+export type MediaModalState =
+	| SonarrMediaModalState
+	| RadarrMediaModalState
+	| null;
+
+export type MediaModalOpenState = Exclude<MediaModalState, null>;
+
+export type MediaModalContainer = HTMLElement | ShadowRoot;
+
+export type MappingSavedHandler = (input: {
+	anilistId: AniListId;
+	mapping: MappingSearchResult | null;
+}) => void;
+
+export type MappingSaveErrorHandler = (input: {
+	anilistId: AniListId;
+	error: Error;
+}) => void;
+
+export type MediaModalSharedProps = {
+	onClose: () => void;
+	container?: MediaModalContainer;
+	onMappingSaved?: MappingSavedHandler;
+	onMappingSaveError?: MappingSaveErrorHandler;
+};
+
+export type MediaModalProps = MediaModalSharedProps & {
+	state: MediaModalState;
+};
+
+export type ProviderModalProps = MediaModalSharedProps & {
+	state: MediaModalOpenState;
+};
+
+export type SonarrProviderModalProps = MediaModalSharedProps & {
+	state: SonarrMediaModalState;
+};
+
+export type RadarrProviderModalProps = MediaModalSharedProps & {
+	state: RadarrMediaModalState;
 };

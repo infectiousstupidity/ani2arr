@@ -3,42 +3,25 @@
 
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAni2arrApi } from '@/rpc';
 import { normalizeError, type ExtensionError } from '@/shared/errors';
 import { logger } from '@/shared/utils/logger';
 import { queryKeys } from '@/shared/queries/query-keys';
 import {
   getExtensionOptionsSnapshot,
   getPublicOptionsSnapshot,
-  parseSettings,
-  publicOptions,
-  radarrSecrets,
+  parseExtensionOptions,
   setExtensionOptionsSnapshot,
-  sonarrSecrets,
   toPublicOptions,
+  watchExtensionOptionsSnapshot,
+  watchPublicOptionsSnapshot,
 } from './store';
 import type { ExtensionOptions, PublicOptions } from './types';
 
 const useSyncExtensionOptionsQuery = (queryClient: ReturnType<typeof useQueryClient>): void => {
   useEffect(() => {
-    const refreshOptions = async () => {
-      const snapshot = await getExtensionOptionsSnapshot();
+    return watchExtensionOptionsSnapshot(snapshot => {
       queryClient.setQueryData(queryKeys.options(), snapshot);
-    };
-    const unsubscribes = [
-      publicOptions.watch(() => {
-        void refreshOptions();
-      }),
-      sonarrSecrets.watch(() => {
-        void refreshOptions();
-      }),
-      radarrSecrets.watch(() => {
-        void refreshOptions();
-      }),
-    ];
-    return () => {
-      for (const unsubscribe of unsubscribes) unsubscribe();
-    };
+    });
   }, [queryClient]);
 };
 
@@ -46,30 +29,19 @@ const useSyncPublicOptionsQuery = (queryClient: ReturnType<typeof useQueryClient
   useEffect(() => {
     let active = true;
 
-    const refreshPublicOptions = async () => {
-      const snapshot = await getPublicOptionsSnapshot();
+    const applyPublicOptionsSnapshot = (snapshot: PublicOptions) => {
       if (!active) return;
       queryClient.setQueryData(queryKeys.publicOptions(), snapshot);
       logger.configure({ enabled: snapshot.debugLogging || import.meta.env.DEV });
     };
 
-    const unsubscribes = [
-      publicOptions.watch(() => {
-        void refreshPublicOptions();
-      }),
-      sonarrSecrets.watch(() => {
-        void refreshPublicOptions();
-      }),
-      radarrSecrets.watch(() => {
-        void refreshPublicOptions();
-      }),
-    ];
+    const unsubscribe = watchPublicOptionsSnapshot(applyPublicOptionsSnapshot);
 
-    void refreshPublicOptions();
+    void getPublicOptionsSnapshot().then(applyPublicOptionsSnapshot);
 
     return () => {
       active = false;
-      for (const unsubscribe of unsubscribes) unsubscribe();
+      unsubscribe();
     };
   }, [queryClient]);
 };
@@ -109,7 +81,6 @@ export const useSaveOptions = () => {
     mutationFn: async (options: ExtensionOptions) => {
       try {
         await setExtensionOptionsSnapshot(options);
-        await getAni2arrApi().notifySettingsChanged();
       } catch (error) {
         throw normalizeError(error);
       }
@@ -120,7 +91,7 @@ export const useSaveOptions = () => {
         queryClient.cancelQueries({ queryKey: queryKeys.publicOptions() }),
       ]);
       const previousOptions = queryClient.getQueryData<ExtensionOptions>(queryKeys.options());
-      const nextSettings = parseSettings(newOptions);
+      const nextSettings = parseExtensionOptions(newOptions);
       const nextPublicOptions = toPublicOptions(nextSettings);
       queryClient.setQueryData(queryKeys.options(), nextSettings);
       queryClient.setQueryData(queryKeys.publicOptions(), nextPublicOptions);
@@ -128,7 +99,7 @@ export const useSaveOptions = () => {
     },
     onError: (_err, _newOptions, context) => {
       if (context?.previousOptions) {
-        const fallback = parseSettings(context.previousOptions);
+        const fallback = parseExtensionOptions(context.previousOptions);
         queryClient.setQueryData(queryKeys.options(), fallback);
         queryClient.setQueryData(queryKeys.publicOptions(), toPublicOptions(fallback));
       }

@@ -1,10 +1,11 @@
 /** AniList media normalization and cache-write helpers for the domain workflow. */
 // src/anilist/media-normalizer.ts
 
-import type { TtlCache } from '@/storage';
+import type { TtlCache } from '@/shared/cache/ttl-cache';
+import type { AniListId } from '@/anilist';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
 import { logger } from '@/shared/utils/logger';
-import { MEDIA_HARD_TTL, MEDIA_SOFT_TTL } from './constants';
+import { ANILIST_MEDIA_CACHE_TTL } from './media.cache';
 
 const log = logger.create('AniListMediaCache');
 
@@ -50,16 +51,15 @@ export const sanitizeMedia = (media: AniListMedia): AniListMedia => {
   }
 };
 
-export async function cacheMedia(cache: TtlCache<AniListMedia> | undefined, id: number, media: AniListMedia): Promise<AniListMedia> {
+export async function cacheMedia(cache: TtlCache<AniListMedia> | undefined, id: AniListId, media: AniListMedia): Promise<AniListMedia> {
   const normalized = normalizeMedia(media);
   const sanitized = sanitizeMedia(normalized);
   if (!cache) return sanitized;
 
   try {
     await cache.write(String(id), sanitized, {
-      staleMs: MEDIA_SOFT_TTL,
-      hardMs: MEDIA_HARD_TTL,
-      meta: { cachedAt: Date.now() },
+      staleMs: ANILIST_MEDIA_CACHE_TTL.staleMs,
+      hardMs: ANILIST_MEDIA_CACHE_TTL.hardMs,
     });
   } catch (error) {
     const name = (error as { name?: string } | null | undefined)?.name ?? '';

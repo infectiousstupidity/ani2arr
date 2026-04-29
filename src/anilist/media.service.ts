@@ -2,7 +2,8 @@
 // src/anilist/media.service.ts
 
 import PQueue from 'p-queue';
-import type { TtlCache } from '@/storage';
+import type { AniListId } from './types';
+import type { TtlCache } from '@/shared/cache/ttl-cache';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 import { DEFAULT_PREQUEL_DEPTH, QUEUE_CONCURRENCY } from './constants';
@@ -21,7 +22,7 @@ export class AniListMediaService {
     });
   }
 
-  public prioritize(ids: number | number[], options?: { schedule?: boolean }): void {
+  public prioritize(ids: AniListId | AniListId[], options?: { schedule?: boolean }): void {
     this.mediaScheduler.prioritize(ids, 'high');
 
     if (options?.schedule !== true) return;
@@ -36,7 +37,7 @@ export class AniListMediaService {
   }
 
   public fetchMediaWithRelations(
-    anilistId: number,
+    anilistId: AniListId,
     options?: { priority?: RequestPriority; forceRefresh?: boolean; source?: string },
   ): Promise<AniListMedia> {
     const requestOptions: RequestMediaOptions = {
@@ -55,7 +56,7 @@ export class AniListMediaService {
     const includeRoot = options.includeRoot ?? false;
     const maxDepth = options.maxDepth ?? DEFAULT_PREQUEL_DEPTH;
 
-    const visited = new Set<number>();
+    const visited = new Set<AniListId>();
     let depth = 0;
     let current: AniListMedia | null = seed ?? null;
 
@@ -85,7 +86,7 @@ export class AniListMediaService {
     }
   }
 
-  public async removeMediaFromCache(anilistId: number): Promise<void> {
+  public async removeMediaFromCache(anilistId: AniListId): Promise<void> {
     const cache = this.caches?.media;
     if (!cache) return;
 
@@ -97,9 +98,9 @@ export class AniListMediaService {
   }
 
   public fetchMediaBatch(
-    ids: number[],
+    ids: AniListId[],
     options?: { priority?: RequestPriority; forceRefresh?: boolean; source?: string },
-  ): Promise<Map<number, AniListMedia>> {
+  ): Promise<Map<AniListId, AniListMedia>> {
     const requestOptions: RequestMediaOptions = {
       source: options?.source ?? 'media-batch',
       priority: options?.priority ?? 'low',
@@ -109,12 +110,12 @@ export class AniListMediaService {
     return this.mediaScheduler.requestMedia(ids, requestOptions);
   }
 
-  private extractPrequelId(media: AniListMedia): number | null {
+  private extractPrequelId(media: AniListMedia): AniListId | null {
     const edges = media.relations?.edges ?? [];
     const prequelEdge = edges.find(edge => edge?.relationType === 'PREQUEL');
     if (!prequelEdge) return null;
 
     const id = prequelEdge.node?.id;
-    return typeof id === 'number' && Number.isFinite(id) ? id : null;
+    return id ?? null;
   }
 }

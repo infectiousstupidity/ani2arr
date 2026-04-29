@@ -2,38 +2,39 @@
 // src/options/index.ts
 
 export type {
-  BadgeVisibility,
-  ExtensionOptions,
-  PublicOptions,
-  UiOptions,
-} from './types';
+	BadgeVisibility,
+	ExtensionOptions,
+	PublicOptions,
+	UiOptions,
+} from "./types";
 export {
-  SettingsSchema,
-  createDefaultSettings,
-  defaultRadarrFormState,
-  defaultSonarrFormState,
-  defaultUiOptions,
-} from './schema';
+	ExtensionOptionsSchema,
+	createDefaultExtensionOptions,
+	defaultRadarrFormState,
+	defaultSonarrFormState,
+	defaultUiOptions,
+} from "./schema";
+export { UiOptionsSchema, createDefaultUiOptions } from "./ui-schema";
 export {
-  UiOptionsSchema,
-  createDefaultUiOptions,
-} from './ui-schema';
+	PUBLIC_OPTIONS_CHANGE_KEY,
+	parseExtensionOptions,
+	toPublicOptions,
+	getExtensionOptionsSnapshot,
+	setExtensionOptionsSnapshot,
+	getPublicOptionsSnapshot,
+	watchExtensionOptionsSnapshot,
+	watchPublicOptionsSnapshot,
+} from "./store";
 export {
-  publicOptions,
-  sonarrSecrets,
-  radarrSecrets,
-  parseSettings,
-  toPublicOptions,
-  getExtensionOptionsSnapshot,
-  setExtensionOptionsSnapshot,
-  getPublicOptionsSnapshot,
-} from './store';
+	getProviderConnectionDraft,
+	getProviderCredentials,
+	normalizeProviderConnectionInput,
+	normalizeProviderConnectionSettings,
+	hasConfiguredProviderCredentials,
+} from "./provider-config";
+export type { NormalizedProviderConnection } from "./provider-config";
 export {
-  getProviderCredentials,
-  isProviderConfigured,
-} from './provider-config';
-export {
-  useExtensionOptions,
-  usePublicOptions,
-  useSaveOptions,
-} from './queries';
+	useExtensionOptions,
+	usePublicOptions,
+	useSaveOptions,
+} from "./queries";

@@ -14,6 +14,7 @@ import {
 } from '@/anilist/transport/queries';
 import { postAniList } from '@/anilist/transport/request';
 import type { AniListResponseMeta } from '@/anilist/transport/types';
+import type { AniListId } from '@/anilist/anilist-id';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
 
 const log = logger.create('AniListTransport');
@@ -25,9 +26,9 @@ const assertNoGraphqlErrors = (errors?: AniListGraphQLError[]): void => {
 };
 
 export async function fetchAniListMediaBatch(
-  ids: number[],
+  ids: AniListId[],
 ): Promise<{ data: AniListMedia[]; meta: AniListResponseMeta }> {
-  const { payload, meta } = await postAniList<unknown, { ids: number[] }>({
+  const { payload, meta } = await postAniList<unknown, { ids: AniListId[] }>({
     query: FIND_MEDIA_BATCH_QUERY,
     variables: { ids },
   });

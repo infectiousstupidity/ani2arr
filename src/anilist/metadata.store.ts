@@ -7,14 +7,15 @@ import type {
   AniListMedia,
   AniListTitles,
 } from '@/anilist/schemas/media.schema';
+import { isAniListId, type AniListId } from '@/anilist/anilist-id';
 import { AniListMetadataBundleSchema, AniListMetadataChunkRefSchema, AniListMetadataSchema } from '@/anilist/schemas/metadata.schema';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import { logError, normalizeError } from '@/shared/errors';
+import { createTtlCache, type TtlCache } from '@/shared/cache/ttl-cache';
 import { logger } from '@/shared/utils/logger';
 import {
   RawAniListMetadataBundleSchema,
   RawAniListMetadataEntrySchema,
-  RawAniListMetadataRecordSchema,
 } from './metadata-store.schema';
 import type { AniListMediaService } from './media.service';
 
@@ -23,12 +24,14 @@ type AniListMetadataBundle = v.InferOutput<typeof AniListMetadataBundleSchema>;
 
 const days = (n: number): number => n * 24 * 60 * 60 * 1000;
 
-const STORAGE_KEY = 'local:anilistMetadata';
-const BAKED_STALE_MS = days(45); // 45 days
-const BAKED_HARD_MS = days(120); // 120 days
+const METADATA_OVERLAY_CACHE_NAMESPACE = 'anilist:metadata-overlay';
+const METADATA_OVERLAY_STALE_MS = days(45);
+const METADATA_OVERLAY_HARD_MS = days(120);
 const MAX_REFRESH_BATCH = 10;
 
-const clampBatch = (ids: number[], maxBatch?: number): number[] => {
+const metadataOverlayCache = createTtlCache<AniListMetadata>(METADATA_OVERLAY_CACHE_NAMESPACE);
+
+const clampBatch = (ids: AniListId[], maxBatch?: number): AniListId[] => {
   const limit = Math.max(1, Math.min(maxBatch ?? MAX_REFRESH_BATCH, MAX_REFRESH_BATCH));
   return ids.slice(0, limit);
 };
@@ -44,12 +47,15 @@ const normalizeTitles = (titles?: AniListTitles | null): AniListTitles => {
 
 export class AniListMetadataStore {
   private readonly log = logger.create('AniListMetadataStore');
-  private readonly bakedMap = new Map<number, AniListMetadata>();
-  private readonly localMap = new Map<number, AniListMetadata>();
-  private readonly inflight = new Map<number, Promise<AniListMetadata | null>>();
+  private readonly bakedMap = new Map<AniListId, AniListMetadata>();
+  private readonly localMap = new Map<AniListId, AniListMetadata>();
+  private readonly inflight = new Map<AniListId, Promise<AniListMetadata | null>>();
   private readonly ready: Promise<void>;
 
-  constructor(private readonly anilistApi: AniListMediaService) {
+  constructor(
+    private readonly anilistApi: AniListMediaService,
+    private readonly overlayCache: TtlCache<AniListMetadata> = metadataOverlayCache,
+  ) {
     this.ready = this.init();
   }
 
@@ -67,7 +73,6 @@ export class AniListMetadataStore {
     } catch (error) {
       logError(normalizeError(error), 'AniListMetadataStore:init:fetchStatic');
     }
-    await this.hydrateLocal();
   }
 
   private toBakedUrl(file: string): string {
@@ -144,7 +149,7 @@ export class AniListMetadataStore {
     if (!result.success) return null;
 
     const entry = result.output;
-    if (typeof entry.id !== 'number' || !Number.isFinite(entry.id)) return null;
+    if (!entry.id) return null;
 
     const normalized = {
       id: entry.id,
@@ -192,41 +197,7 @@ export class AniListMetadataStore {
     return parsedBundle.success ? parsedBundle.output : null;
   }
 
-  private async hydrateLocal(): Promise<void> {
-    try {
-      const stored = await browser.storage.local.get(STORAGE_KEY);
-      const recordResult = v.safeParse(RawAniListMetadataRecordSchema, stored?.[STORAGE_KEY]);
-      if (!recordResult.success) return;
-
-      const now = Date.now();
-      for (const [key, value] of Object.entries(recordResult.output)) {
-        const id = Number(key);
-        if (!Number.isFinite(id)) continue;
-        const normalized = this.normalizeEntry({ ...(typeof value === 'object' && value ? value : {}), id });
-        if (!normalized) continue;
-        if (now - normalized.updatedAt > BAKED_HARD_MS) continue;
-        this.localMap.set(id, normalized);
-      }
-      this.log.debug(`hydrateLocal: loaded ${this.localMap.size} refreshed entries`);
-    } catch (error) {
-      logError(normalizeError(error), 'AniListMetadataStore:hydrateLocal');
-    }
-  }
-
-  private async persistLocal(): Promise<void> {
-    const payload: Record<string, AniListMetadata> = {};
-    for (const [id, entry] of this.localMap.entries()) {
-      payload[id] = entry;
-    }
-    try {
-      await browser.storage.local.set({ [STORAGE_KEY]: payload });
-    } catch (error) {
-      logError(normalizeError(error), 'AniListMetadataStore:persistLocal');
-    }
-  }
-
   private fromMedia(media: AniListMedia): AniListMetadata | null {
-    if (!media || typeof media.id !== 'number' || !Number.isFinite(media.id)) return null;
     const cover = media.coverImage ?? null;
     const coverImage = cover
       ? {
@@ -246,20 +217,51 @@ export class AniListMetadataStore {
   }
 
   private isStale(entry: AniListMetadata, now: number): boolean {
-    return now - entry.updatedAt >= BAKED_STALE_MS;
+    return now - entry.updatedAt >= METADATA_OVERLAY_STALE_MS;
   }
 
-  private bestFor(id: number): AniListMetadata | null {
+  private async readOverlay(id: AniListId): Promise<AniListMetadata | null> {
     const local = this.localMap.get(id);
+    if (local) return local;
+    try {
+      const cached = await this.overlayCache.read(String(id));
+      if (!cached) return null;
+      const normalized = this.normalizeEntry({ ...cached.value, id });
+      if (!normalized) return null;
+      this.localMap.set(id, normalized);
+      return normalized;
+    } catch (error) {
+      logError(normalizeError(error), 'AniListMetadataStore:readOverlay');
+      return null;
+    }
+  }
+
+  private async writeOverlay(entries: AniListMetadata[]): Promise<void> {
+    try {
+      await Promise.all(
+        entries.map(entry =>
+          this.overlayCache.write(String(entry.id), entry, {
+            staleMs: METADATA_OVERLAY_STALE_MS,
+            hardMs: METADATA_OVERLAY_HARD_MS,
+          }),
+        ),
+      );
+    } catch (error) {
+      logError(normalizeError(error), 'AniListMetadataStore:writeOverlay');
+    }
+  }
+
+  private async bestFor(id: AniListId): Promise<AniListMetadata | null> {
+    const local = await this.readOverlay(id);
     if (local) return local;
     return this.bakedMap.get(id) ?? null;
   }
 
-  private async refreshBatch(ids: number[]): Promise<AniListMetadata[]> {
-    const unique = [...new Set(ids.filter(id => Number.isFinite(id) && id > 0))];
+  private async refreshBatch(ids: AniListId[]): Promise<AniListMetadata[]> {
+    const unique = [...new Set(ids.filter(isAniListId))];
     if (unique.length === 0) return [];
 
-    const pending: number[] = [];
+    const pending: AniListId[] = [];
     for (const id of unique) {
       if (this.inflight.has(id)) continue;
       pending.push(id);
@@ -286,7 +288,7 @@ export class AniListMetadataStore {
           }
         }
         if (refreshed.length > 0) {
-          void this.persistLocal();
+          void this.writeOverlay(refreshed);
         }
         return refreshed;
       })
@@ -310,20 +312,20 @@ export class AniListMetadataStore {
   }
 
   public async getMetadata(
-    ids: number[],
+    ids: AniListId[],
     options?: { refreshStale?: boolean; maxBatch?: number; fetchMissing?: boolean },
-  ): Promise<{ metadata: AniListMetadata[]; missingIds?: number[] }> {
+  ): Promise<{ metadata: AniListMetadata[]; missingIds?: AniListId[] }> {
     await this.ready;
     const refreshStale = options?.refreshStale ?? true;
     const maxBatch = options?.maxBatch;
     const fetchMissing = options?.fetchMissing ?? true;
     const now = Date.now();
-    const metadata = new Map<number, AniListMetadata>();
-    const refreshIds: number[] = [];
+    const metadata = new Map<AniListId, AniListMetadata>();
+    const refreshIds: AniListId[] = [];
 
     for (const id of ids) {
-      if (!Number.isFinite(id) || id <= 0) continue;
-      const entry = this.bestFor(id);
+      if (!isAniListId(id)) continue;
+      const entry = await this.bestFor(id);
       if (entry) {
         metadata.set(id, entry);
         if (refreshStale && this.isStale(entry, now) && !this.inflight.has(id)) {
@@ -342,7 +344,7 @@ export class AniListMetadataStore {
       }
     }
 
-    const missingIds = ids.filter(id => Number.isFinite(id) && id > 0 && !metadata.has(id));
+    const missingIds = ids.filter(id => isAniListId(id) && !metadata.has(id));
 
     return {
       metadata: [...metadata.values()],
@@ -356,7 +358,7 @@ export class AniListMetadataStore {
     this.inflight.clear();
 
     try {
-      await browser.storage.local.remove(STORAGE_KEY);
+      await this.overlayCache.clear();
     } catch (error) {
       logError(normalizeError(error), 'AniListMetadataStore:clearLocalCache');
       throw error;

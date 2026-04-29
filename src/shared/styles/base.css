@@ -123,12 +123,12 @@
 .a2a-card-overlay__symbol { width: 16px; height: 16px; color: #ffffff; stroke-width: 1.5; }
 
 /* Quick add states */
-.a2a-card-overlay__quick[data-state='addable'],
-.a2a-card-overlay__quick[data-state='resolving'],
+.a2a-card-overlay__quick[data-state='can-add'],
+.a2a-card-overlay__quick[data-state='checking'],
 .a2a-card-overlay__quick[data-state='adding'] { background: #53A7FF; color: #ffffff; }
 .a2a-card-overlay__quick[data-state='in-library'] { background: #5CCD7A; color: #ffffff; cursor: default; }
 .a2a-card-overlay__quick[data-state='error'] { background: #FF6B6B; color: #ffffff; }
-.a2a-card-overlay__quick[data-state='disabled'] { background: #1a2230; color: #E4ECF5; box-shadow: none; }
+.a2a-card-overlay__quick[data-state='unconfigured'] { background: #1a2230; color: #E4ECF5; box-shadow: none; }
 .a2a-rotate { animation: a2a-spin 1s linear infinite; }
 
 /* Action stack */

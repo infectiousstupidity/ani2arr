@@ -1,100 +1,112 @@
 /** Shared library-mutation helpers for provider add and update flows. */
 // src/providers/library/mutation-helpers.ts
 
-import { createError, ErrorCode } from '@/shared/errors';
-import type { ProviderCredentials, ProviderTag } from '@/providers';
-import { normalizePathForCompare } from './paths';
-import { resolveProviderTagIds } from './tag-ids';
+import { createError, ErrorCode } from "@/shared/errors";
+import { getProviderLabel } from "@/providers/provider-labels";
+import type {
+	Provider,
+	ProviderCredentials,
+	ProviderQualityProfileId,
+	ProviderTag,
+	ProviderTagId,
+} from "@/providers";
+import { normalizePathForCompare } from "./paths";
+import { resolveProviderTagIds } from "./tag-ids";
 
 type ProviderTagMutationApi = {
-  getTags(credentials: ProviderCredentials): Promise<ProviderTag[]>;
-  createTag(credentials: ProviderCredentials, label: string): Promise<ProviderTag>;
+	getTags(credentials: ProviderCredentials): Promise<ProviderTag[]>;
+	createTag(
+		credentials: ProviderCredentials,
+		label: string,
+	): Promise<ProviderTag>;
 };
 
 type ResolveRequiredQualityProfileIdInput = {
-  value: number | '';
-  fallback: number | '' | undefined;
-  providerLabel: 'Sonarr' | 'Radarr';
-  entityLabel: 'series' | 'movie';
-  actionLabel: 'add' | 'update';
+	value: ProviderQualityProfileId | undefined;
+	fallback: ProviderQualityProfileId | undefined;
+	provider: Provider;
+	entityLabel: "series" | "movie";
+	actionLabel: "add" | "update";
 };
 
 type ResolveRequiredRootFolderPathInput = {
-  value: string;
-  fallback: string | undefined;
-  providerLabel: 'Sonarr' | 'Radarr';
-  entityLabel: 'series' | 'movie';
-  actionLabel: 'add' | 'update';
+	value: string | undefined;
+	fallback: string | undefined;
+	provider: Provider;
+	entityLabel: "series" | "movie";
+	actionLabel: "add" | "update";
 };
 
 export function resolveRequiredQualityProfileId(
-  input: ResolveRequiredQualityProfileIdInput,
-): number {
-  const { value, fallback, providerLabel, entityLabel, actionLabel } = input;
-  const resolvedValue =
-    typeof value === 'number' && Number.isFinite(value)
-      ? value
-      : (typeof fallback === 'number' && Number.isFinite(fallback)
-        ? fallback
-        : undefined);
+	input: ResolveRequiredQualityProfileIdInput,
+): ProviderQualityProfileId {
+	const { value, fallback, provider, entityLabel, actionLabel } = input;
+	const providerLabel = getProviderLabel(provider);
+	const resolvedValue =
+		typeof value === "number" && Number.isFinite(value)
+			? value
+			: typeof fallback === "number" && Number.isFinite(fallback)
+				? fallback
+				: undefined;
 
-  if (typeof resolvedValue !== 'number') {
-    throw createError(
-      ErrorCode.VALIDATION_ERROR,
-      `Missing ${providerLabel} quality profile for ${actionLabel}.`,
-      `Select a ${providerLabel} quality profile before ${actionLabel === 'add' ? 'adding' : 'updating'} this ${entityLabel}.`,
-    );
-  }
+	if (typeof resolvedValue !== "number") {
+		throw createError(
+			ErrorCode.VALIDATION_ERROR,
+			`Missing ${providerLabel} quality profile for ${actionLabel}.`,
+			`Select a ${providerLabel} quality profile before ${actionLabel === "add" ? "adding" : "updating"} this ${entityLabel}.`,
+		);
+	}
 
-  return resolvedValue;
+	return resolvedValue;
 }
 
 export function resolveRequiredRootFolderPath(
-  input: ResolveRequiredRootFolderPathInput,
+	input: ResolveRequiredRootFolderPathInput,
 ): string {
-  const { value, fallback, providerLabel, entityLabel, actionLabel } = input;
-  const resolvedValue = value.trim() || fallback?.trim() || '';
+	const { value, fallback, provider, entityLabel, actionLabel } = input;
+	const providerLabel = getProviderLabel(provider);
+	const resolvedValue = value?.trim() || fallback?.trim() || "";
 
-  if (!resolvedValue) {
-    throw createError(
-      ErrorCode.VALIDATION_ERROR,
-      `Missing ${providerLabel} root folder for ${actionLabel}.`,
-      `Select a ${providerLabel} root folder before ${actionLabel === 'add' ? 'adding' : 'updating'} this ${entityLabel}.`,
-    );
-  }
+	if (!resolvedValue) {
+		throw createError(
+			ErrorCode.VALIDATION_ERROR,
+			`Missing ${providerLabel} root folder for ${actionLabel}.`,
+			`Select a ${providerLabel} root folder before ${actionLabel === "add" ? "adding" : "updating"} this ${entityLabel}.`,
+		);
+	}
 
-  return resolvedValue;
+	return resolvedValue;
 }
 
 export async function resolveMutationTagIds(
-  api: ProviderTagMutationApi,
-  credentials: ProviderCredentials,
-  existingIdsFromForm: number[],
-  freeformLabelsFromForm: string[],
-  serviceLabel: 'Sonarr' | 'Radarr',
-): Promise<number[]> {
-  const existingTags = await api.getTags(credentials);
+	api: ProviderTagMutationApi,
+	credentials: ProviderCredentials,
+	existingIdsFromForm: ProviderTagId[] | undefined,
+	freeformLabelsFromForm: string[] | undefined,
+	provider: Provider,
+): Promise<ProviderTagId[]> {
+	const existingTags = await api.getTags(credentials);
 
-  return resolveProviderTagIds({
-    api,
-    credentials,
-    existingIdsFromForm,
-    freeformLabelsFromForm,
-    existingTags,
-    serviceLabel,
-  });
+	return resolveProviderTagIds({
+		api,
+		credentials,
+		existingIdsFromForm: existingIdsFromForm ?? [],
+		freeformLabelsFromForm: freeformLabelsFromForm ?? [],
+		existingTags,
+		providerLabel: getProviderLabel(provider),
+	});
 }
 
 export function shouldMoveProviderFiles(
-  currentPath: string | null | undefined,
-  nextPath: string,
+	currentPath: string | null | undefined,
+	nextPath: string,
 ): boolean {
-  const currentPathNormalized = normalizePathForCompare(currentPath);
-  const nextPathNormalized = normalizePathForCompare(nextPath);
+	const currentPathNormalized = normalizePathForCompare(currentPath);
+	const nextPathNormalized = normalizePathForCompare(nextPath);
 
-  return (
-    currentPathNormalized !== null &&
-    nextPathNormalized !== null &&
-    currentPathNormalized !== nextPathNormalized
-  );
+	return (
+		currentPathNormalized !== null &&
+		nextPathNormalized !== null &&
+		currentPathNormalized !== nextPathNormalized
+	);
 }

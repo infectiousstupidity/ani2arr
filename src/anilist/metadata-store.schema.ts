@@ -2,10 +2,9 @@
 // src/anilist/metadata-store.schema.ts
 
 import * as v from 'valibot';
+import { AniListIdSchema } from '@/anilist/anilist-id';
 import { AniListMediaFormatSchema, AniListTitlesSchema } from '@/anilist/schemas/media.schema';
 import { AniListMetadataCoverImageSchema } from '@/anilist/schemas/metadata.schema';
-
-const AniListIdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
 
 export const RawAniListMetadataEntrySchema = v.object({
   id: v.optional(AniListIdSchema),
@@ -21,5 +20,3 @@ export const RawAniListMetadataBundleSchema = v.object({
   entries: v.optional(v.array(v.unknown()), []),
   chunks: v.optional(v.array(v.unknown()), []),
 });
-
-export const RawAniListMetadataRecordSchema = v.record(v.string(), v.unknown());
