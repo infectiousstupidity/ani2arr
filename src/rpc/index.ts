@@ -8,7 +8,6 @@ import type {
 	SonarrFormState,
 } from "@/providers/settings/provider-settings.schema";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
-import type { PersistedProviderMappingRecord } from "@/mapping/manual";
 import type {
 	Provider,
 	ProviderMetadata,
@@ -105,8 +104,6 @@ export interface Ani2arrApi {
 	validateTmdbId(
 		input: ValidateTmdbInput,
 	): Promise<{ isInLibrary: boolean; inCatalog: boolean }>;
-	getManualMappings(): Promise<PersistedProviderMappingRecord[]>;
-	clearAllManualMappings(): Promise<{ ok: true }>;
 	clearPersistentCaches(): Promise<{ ok: true }>;
 	resetExtensionState(): Promise<{ ok: true }>;
 	getMappings(input?: GetMappingsInput): Promise<GetMappingsOutput>;

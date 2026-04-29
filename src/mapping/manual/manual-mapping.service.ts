@@ -210,33 +210,6 @@ export class ManualMappingService {
     return this.listCandidateSuppressions(this.rejectedCandidates, provider);
   }
 
-  public exportState(): {
-    manualMappings: Record<string, StoredProviderMappingEntry>;
-    ignoredMappings: Record<string, StoredMappingIgnoreEntry>;
-    rejectedCandidates: Record<string, StoredProviderMappingEntry>;
-  } {
-    return {
-      manualMappings: this.manualMappings.toRecord(),
-      ignoredMappings: this.ignoredMappings.toRecord(),
-      rejectedCandidates: this.rejectedCandidates.toRecord(),
-    };
-  }
-
-  public async importState(state: {
-    manualMappings: Record<string, StoredProviderMappingEntry>;
-    ignoredMappings: Record<string, StoredMappingIgnoreEntry>;
-    rejectedCandidates?: Record<string, StoredProviderMappingEntry>;
-  }): Promise<void> {
-    await this.enqueueWrite(async () => {
-      await Promise.all([
-        this.manualMappings.importRecords(state.manualMappings ?? {}),
-        this.ignoredMappings.importRecords(state.ignoredMappings ?? {}),
-        this.rejectedCandidates.importRecords(state.rejectedCandidates ?? {}),
-      ]);
-      this.rebuildReverse();
-    });
-  }
-
   public async clearAll(provider?: Provider): Promise<void> {
     await this.enqueueWrite(async () => {
       if (!provider) {

@@ -1,4 +1,4 @@
-/** RPC handlers for manual mappings, exports, and mapping listings. */
+/** RPC handlers for manual mapping decisions and mapping listings. */
 // src/rpc/handlers/mapping.handlers.ts
 
 import * as v from "valibot";
@@ -37,8 +37,6 @@ export function createMappingHandlers(
 	| "clearMappingIgnore"
 	| "setMappingRejectedCandidate"
 	| "clearMappingRejectedCandidate"
-	| "getManualMappings"
-	| "clearAllManualMappings"
 	| "getMappings"
 	| "getMappingInspection"
 > {
@@ -268,56 +266,6 @@ export function createMappingHandlers(
 			return { ok: true as const };
 		},
 
-		async getManualMappings() {
-			await manualMappingsReady;
-			return manualMappingService.list();
-		},
-
-		async clearAllManualMappings() {
-			await manualMappingsReady;
-			const snapshot = manualMappingService.exportState();
-			const existing = manualMappingService.list();
-			const existingIgnores = manualMappingService.listIgnores();
-
-			try {
-				await manualMappingService.clearAll();
-				await Promise.all(
-					existing.map((entry) =>
-						mappingService.evictResolved(entry.anilistId, entry.provider),
-					),
-				);
-				await Promise.all(
-					existingIgnores.map((entry) =>
-						mappingService.evictResolved(entry.anilistId, entry.provider),
-					),
-				);
-
-				const options = await getExtensionOptionsSnapshot();
-				if (hasConfiguredProviderCredentials(options, "sonarr")) {
-					scheduleLibraryRefresh("sonarr", options);
-				}
-
-				await bumpLibraryRevision("sonarr");
-				await bumpLibraryRevision("radarr");
-				await bumpMappingsRevision();
-
-				return { ok: true as const };
-			} catch (error) {
-				try {
-					await manualMappingService.importState(snapshot);
-				} catch (restoreError) {
-					throw createError(
-						ErrorCode.STORAGE_ERROR,
-						"Failed to clear stored mappings, and rollback failed.",
-						"Failed to clear stored mappings, and the previous mapping state could not be restored.",
-						{ cause: restoreError },
-					);
-				}
-
-				throw error;
-			}
-		},
-
 		async getMappings(input) {
 			const parsedInput = v.parse(GetMappingsInputSchema, input);
 			await manualMappingsReady;
@@ -355,8 +303,6 @@ export function createMappingHandlers(
 		| "clearMappingIgnore"
 		| "setMappingRejectedCandidate"
 		| "clearMappingRejectedCandidate"
-		| "getManualMappings"
-		| "clearAllManualMappings"
 		| "getMappings"
 		| "getMappingInspection"
 	>;

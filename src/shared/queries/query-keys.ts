@@ -149,9 +149,6 @@ export const queryKeys = {
 			service,
 			query.trim().toLowerCase(),
 		] as const,
-	manualMappingsRoot: () => [...rootQueryKey, "manualMappings"] as const,
-	manualMappings: (provider: Provider | "all" = "all") =>
-		[...rootQueryKey, "manualMappings", provider] as const,
 	mappingsRoot: () => [...rootQueryKey, "mappings"] as const,
 	mappings: (input?: GetMappingsInput) =>
 		[...rootQueryKey, "mappings", normalizeMappingsInput(input)] as const,
