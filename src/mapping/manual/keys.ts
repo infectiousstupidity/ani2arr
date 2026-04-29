@@ -1,106 +1,121 @@
 /** Key helpers and normalizers for persisted manual mapping records. */
 // src/mapping/manual/keys.ts
 
-import { parseAniListIdOrNull, type AniListId } from '@/anilist';
+import { parseAniListIdOrNull, type AniListId } from "@/anilist";
 import {
-  parseTmdbIdOrNull,
-  parseTvdbIdOrNull,
-  type Provider,
-  type ProviderIdFor,
-} from '@/providers';
-import type { StoredMappingIgnoreEntry, StoredProviderMappingEntry } from './types';
-
-export const isFiniteId = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value);
+	parseProviderId,
+	type Provider,
+	type ProviderIdFor,
+} from "@/providers";
+import type { ManualMappingKey, StoredManualMapping } from "./types";
 
 export const isMappingProvider = (value: unknown): value is Provider =>
-  value === 'sonarr' || value === 'radarr';
+	value === "sonarr" || value === "radarr";
 
-const parseAniListIdFromKeyPart = (value: string | undefined): AniListId | null => {
-  if (!value || !/^\d+$/.test(value)) return null;
-  return parseAniListIdOrNull(Number(value));
+const parseAniListIdFromKeyPart = (
+	value: string | undefined,
+): AniListId | null => {
+	if (!value || !/^\d+$/.test(value)) return null;
+	return parseAniListIdOrNull(Number(value));
 };
 
-export const createRecordKey = (provider: Provider, anilistId: AniListId): string =>
-  `${provider}:${anilistId}`;
+export const createManualMappingKey = (
+	provider: Provider,
+	anilistId: AniListId,
+): ManualMappingKey => `${provider}:${anilistId}`;
 
-export const parseRecordKey = (key: string): { provider: Provider; anilistId: AniListId } | null => {
-  const [provider, rawAnilistId] = key.split(':');
-  const anilistId = parseAniListIdFromKeyPart(rawAnilistId);
-  if (!isMappingProvider(provider) || anilistId === null) return null;
-  return { provider, anilistId };
+export const parseManualMappingKey = (
+	key: string,
+): { provider: Provider; anilistId: AniListId } | null => {
+	const parts = key.split(":");
+	if (parts.length !== 2) return null;
+	const [provider, rawAniListId] = parts;
+	const anilistId = parseAniListIdFromKeyPart(rawAniListId);
+	if (!isMappingProvider(provider) || anilistId === null) return null;
+	return { provider, anilistId };
 };
-
-function parseProviderTargetId(provider: 'sonarr', value: unknown): ProviderIdFor<'sonarr'> | null;
-function parseProviderTargetId(provider: 'radarr', value: unknown): ProviderIdFor<'radarr'> | null;
-function parseProviderTargetId(provider: Provider, value: unknown): ProviderIdFor<Provider> | null {
-  return provider === 'sonarr'
-    ? parseTvdbIdOrNull(value)
-    : parseTmdbIdOrNull(value);
-}
 
 export const createReverseLookupKey = <P extends Provider>(
-  provider: P,
-  providerId: ProviderIdFor<P>,
-): string =>
-  `${provider}:${providerId}`;
+	provider: P,
+	providerId: ProviderIdFor<P>,
+): string => `${provider}:${providerId}`;
 
-export const createCandidateRecordKey = <P extends Provider>(
-  provider: P,
-  anilistId: AniListId,
-  providerId: ProviderIdFor<P>,
-): string => `${provider}:${anilistId}:${providerId}`;
+const finiteTimestampOrNull = (value: unknown): number | null =>
+	typeof value === "number" && Number.isFinite(value) ? value : null;
 
-export const parseCandidateRecordKey = (
-  key: string,
-): ({ provider: 'sonarr'; anilistId: AniListId; providerId: ProviderIdFor<'sonarr'> }
-  | { provider: 'radarr'; anilistId: AniListId; providerId: ProviderIdFor<'radarr'> }) | null => {
-  const [provider, rawAnilistId, rawProviderId] = key.split(':');
-  const anilistId = parseAniListIdFromKeyPart(rawAnilistId);
-  if (!isMappingProvider(provider) || anilistId === null || rawProviderId === undefined) {
-    return null;
-  }
-  const numericProviderId = Number(rawProviderId);
-  if (provider === 'sonarr') {
-    const providerId = parseTvdbIdOrNull(numericProviderId);
-    return providerId === null ? null : { provider, anilistId, providerId };
-  }
-  const providerId = parseTmdbIdOrNull(numericProviderId);
-  return providerId === null ? null : { provider, anilistId, providerId };
+const normalizeRejectedProviderIds = (
+	input: unknown,
+): Record<string, number> | undefined => {
+	if (!input || typeof input !== "object" || Array.isArray(input)) {
+		return undefined;
+	}
+
+	const rejectedProviderIds: Record<string, number> = {};
+	for (const [rawProviderId, rawUpdatedAt] of Object.entries(
+		input as Record<string, unknown>,
+	)) {
+		const numericProviderId = Number(rawProviderId);
+		if (!Number.isSafeInteger(numericProviderId) || numericProviderId <= 0) {
+			continue;
+		}
+		const updatedAt = finiteTimestampOrNull(rawUpdatedAt);
+		if (updatedAt === null) {
+			continue;
+		}
+		rejectedProviderIds[String(numericProviderId)] = updatedAt;
+	}
+
+	return Object.keys(rejectedProviderIds).length > 0
+		? rejectedProviderIds
+		: undefined;
 };
 
-export const normalizeManualMappingEntry = (entry: unknown): StoredProviderMappingEntry | null => {
-  if (!entry || typeof entry !== 'object') return null;
-  const candidate = entry as Partial<StoredProviderMappingEntry>;
-  if (!isMappingProvider(candidate.provider)) return null;
-  const updatedAt = typeof candidate.updatedAt === 'number' ? candidate.updatedAt : Date.now();
-  if (candidate.provider === 'sonarr') {
-    const providerId = parseProviderTargetId(candidate.provider, candidate.providerId);
-    return providerId === null ? null : { provider: candidate.provider, providerId, updatedAt };
-  }
-  const providerId = parseProviderTargetId(candidate.provider, candidate.providerId);
-  return providerId === null ? null : { provider: candidate.provider, providerId, updatedAt };
-};
+export const normalizeStoredManualMapping = (
+	provider: Provider,
+	entry: unknown,
+): StoredManualMapping | null => {
+	if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+		return null;
+	}
 
-export const normalizeIgnoreEntry = (entry: unknown): StoredMappingIgnoreEntry | null => {
-  if (!entry || typeof entry !== 'object') return null;
-  const candidate = entry as Partial<StoredMappingIgnoreEntry>;
-  if (!isMappingProvider(candidate.provider)) return null;
-  return {
-    provider: candidate.provider,
-    updatedAt: typeof candidate.updatedAt === 'number' ? candidate.updatedAt : Date.now(),
-  };
-};
+	const candidate = entry as Partial<StoredManualMapping>;
+	if (candidate.v !== 2) {
+		return null;
+	}
 
-export const normalizeCandidateSuppressionEntry = (entry: unknown): StoredProviderMappingEntry | null => {
-  if (!entry || typeof entry !== 'object') return null;
-  const candidate = entry as Partial<StoredProviderMappingEntry>;
-  if (!isMappingProvider(candidate.provider)) return null;
-  const updatedAt = typeof candidate.updatedAt === 'number' ? candidate.updatedAt : Date.now();
-  if (candidate.provider === 'sonarr') {
-    const providerId = parseProviderTargetId(candidate.provider, candidate.providerId);
-    return providerId === null ? null : { provider: candidate.provider, providerId, updatedAt };
-  }
-  const providerId = parseProviderTargetId(candidate.provider, candidate.providerId);
-  return providerId === null ? null : { provider: candidate.provider, providerId, updatedAt };
+	const updatedAt = finiteTimestampOrNull(candidate.updatedAt);
+	if (updatedAt === null) {
+		return null;
+	}
+
+	const providerId = parseProviderId(
+		provider,
+		candidate.providerId,
+	);
+	const mappedAt =
+		providerId === null
+			? null
+			: (finiteTimestampOrNull(candidate.mappedAt) ?? updatedAt);
+	const ignoredAt = finiteTimestampOrNull(candidate.ignoredAt);
+	const rejectedProviderIds = normalizeRejectedProviderIds(
+		candidate.rejectedProviderIds,
+	);
+
+	if (
+		providerId === null &&
+		ignoredAt === null &&
+		rejectedProviderIds === undefined
+	) {
+		return null;
+	}
+
+	return {
+		v: 2,
+		...(providerId === null
+			? {}
+			: { providerId, mappedAt: mappedAt! }),
+		...(ignoredAt === null ? {} : { ignoredAt }),
+		...(rejectedProviderIds === undefined ? {} : { rejectedProviderIds }),
+		updatedAt,
+	};
 };

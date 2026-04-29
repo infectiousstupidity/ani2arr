@@ -5,7 +5,11 @@ import { useCallback, useState } from "react";
 import type { AniListId } from "@/anilist";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
 import type { EffectiveMappingKind } from "@/mapping/types";
-import { parseProviderIdentity, type Provider, type ProviderTargetId } from "@/providers";
+import {
+	parseProviderIdentity,
+	type Provider,
+	type ProviderId,
+} from "@/providers";
 import { useDebounced } from "@/shared/hooks/use-debounced";
 import {
 	useClearManualMapping,
@@ -18,8 +22,8 @@ import { useMappingSearch } from "./use-mapping-search";
 
 type AuthoritativeMappingState = {
 	mappingEntryKind: EffectiveMappingKind;
-	suppressedProviderId?: ProviderTargetId | null;
-	providerId: ProviderTargetId | null;
+	suppressedProviderId?: ProviderId | null;
+	providerId: ProviderId | null;
 };
 
 export interface MappingControllerState {
@@ -35,8 +39,8 @@ export interface MappingControllerState {
 	canIgnoreTitle: boolean;
 	canRejectCandidate: boolean;
 	canClearRejectedCandidate: boolean;
-	rejectCandidateProviderId: ProviderTargetId | null;
-	clearRejectedCandidateProviderId: ProviderTargetId | null;
+	rejectCandidateProviderId: ProviderId | null;
+	clearRejectedCandidateProviderId: ProviderId | null;
 	isSubmitting: boolean;
 	isReverting: boolean;
 	isIgnoring: boolean;
@@ -100,7 +104,7 @@ export function isSelectedDraftDirty(input: {
 function getRejectCandidateProviderId(input: {
 	authoritativeMapping: AuthoritativeMappingState | null | undefined;
 	manualMappingActive: boolean;
-}): ProviderTargetId | null {
+}): ProviderId | null {
 	if (input.manualMappingActive) {
 		return null;
 	}
@@ -123,7 +127,7 @@ function getRejectCandidateProviderId(input: {
 
 function getClearRejectedCandidateProviderId(
 	authoritativeMapping: AuthoritativeMappingState | null | undefined,
-): ProviderTargetId | null {
+): ProviderId | null {
 	return authoritativeMapping?.suppressedProviderId ?? null;
 }
 

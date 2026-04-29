@@ -6,20 +6,18 @@ import {
 	parseProviderIdentity,
 	PROVIDERS,
 	type ProviderIdFor,
-	type ProviderTargetId,
+	type ProviderId,
 	type RadarrMovieSnapshot,
 	type SonarrSeriesSnapshot,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
-import type {
-	EffectiveMappingKind,
-} from "@/mapping/types";
-import type {
-	AutoMappingRecord,
-	AutoMappingStatus,
-} from "@/mapping/auto-mapping/types";
-import { buildEffectiveMapping, type EffectiveMapping } from "@/mapping/effective-mapping";
+import type { EffectiveMappingKind } from "@/mapping/types";
+import type { AutoMappingRecord } from "@/mapping/auto-mapping/types";
+import {
+	buildEffectiveMapping,
+	type EffectiveMapping,
+} from "@/mapping/effective-mapping";
 import {
 	deriveLibraryUnknownReason,
 	type LibraryUnknownReason,
@@ -179,9 +177,9 @@ const setLatest = <T extends { updatedAt: number }>(
 };
 
 const resolveCandidateUpdatedAt = (input: {
-	manual?: { providerId: ProviderTargetId; updatedAt: number };
+	manual?: { providerId: ProviderId; updatedAt: number };
 	ignored?: { updatedAt: number };
-	upstream?: { providerId: ProviderTargetId } | undefined;
+	upstream?: { providerId: ProviderId } | undefined;
 	rejected?: { updatedAt: number } | undefined;
 	autoMappingRecord?: (AutoMappingRecord & { updatedAt: number }) | undefined;
 }): number => {
@@ -331,7 +329,7 @@ export async function listMappings(
 		{
 			anilistId: AniListId;
 			provider: MappingListRow["provider"];
-			providerId: ProviderTargetId;
+			providerId: ProviderId;
 		}
 	>();
 	const keys = new Set<string>();
@@ -477,7 +475,7 @@ export async function listMappings(
 
 	const getLinkedAniListIds = (
 		provider: MappingListRow["provider"],
-		providerId: ProviderTargetId,
+		providerId: ProviderId,
 	): AniListId[] => {
 		const identity = parseProviderIdentity(provider, providerId);
 		if (identity.provider === "sonarr") {

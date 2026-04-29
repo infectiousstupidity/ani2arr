@@ -9,7 +9,7 @@ import type {
 	SonarrSeriesSnapshot,
 	SonarrLookupSeries,
 	SonarrSeries,
-	ProviderTargetId,
+	ProviderId,
 } from "@/providers";
 import type {
 	AcceptedMappingReason,
@@ -30,7 +30,7 @@ export type {
 } from "@/providers/library/types";
 
 interface ProviderStatusResponseBase {
-	providerId: ProviderTargetId | null;
+	providerId: ProviderId | null;
 	providerMappingState: EffectiveMappingState;
 	isInLibrary: boolean | null;
 	successfulSynonym?: string;

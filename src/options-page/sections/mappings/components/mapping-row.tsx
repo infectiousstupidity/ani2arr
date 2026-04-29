@@ -6,7 +6,7 @@ import * as Accordion from '@radix-ui/react-accordion';
 import { ChevronDown } from 'lucide-react';
 import type { AniListId } from '@/anilist';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
-import type { Provider, ProviderIdentity, ProviderTargetId } from '@/providers';
+import type { Provider, ProviderIdentity, ProviderId } from '@/providers';
 import {
   getProviderIdentityIdLabel,
   getProviderIdentityLabel,
@@ -30,7 +30,7 @@ export type MappingTableEntry = {
 export type MappingTableRowData = {
   id: string;
   provider: Provider;
-  providerId: ProviderTargetId | null;
+  providerId: ProviderId | null;
   providerIdentity: ProviderIdentity | null;
   providerMeta?: MappingListRow['providerMeta'];
   entries: MappingTableEntry[];

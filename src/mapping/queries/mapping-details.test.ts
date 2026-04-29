@@ -7,7 +7,7 @@ import {
 	parseSonarrSeriesId,
 	parseTmdbId,
 	parseTvdbId,
-	type ProviderTargetId,
+	type ProviderId,
 	type RadarrMovieSnapshot,
 	type SonarrSeriesSnapshot,
 } from "@/providers";
@@ -24,16 +24,16 @@ const tmdb = parseTmdbId;
 const sonarrSeriesId = parseSonarrSeriesId;
 
 const createDeps = (manualMappings?: {
-	manualProviderId?: ProviderTargetId | null;
+	manualProviderId?: ProviderId | null;
 	ignored?: boolean;
 	rejectedCandidates?: Array<{
 		anilistId: AniListId;
 		provider: "sonarr" | "radarr";
-		providerId: ProviderTargetId;
+		providerId: ProviderId;
 		updatedAt: number;
 	}>;
 	linkedAniListIds?: AniListId[];
-	upstreamProviderIds?: ProviderTargetId[];
+	upstreamProviderIds?: ProviderId[];
 	upstreamLinkedAniListIds?: AniListId[];
 	autoMappingStatus?: AutoMappingRecord | null;
 	autoMappingRecordList?: Array<

@@ -1,17 +1,17 @@
 /** Auto-mapping resolver result and persistence types. */
 // src/mapping/auto-mapping/types.ts
 
-import type { AniListId } from '@/anilist';
-import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
-import type { ProviderTargetId } from '@/providers';
-import type { RequestPriority } from '@/shared/utils/request-priority';
+import type { AniListId } from "@/anilist";
+import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
+import type { ProviderId } from "@/providers";
+import type { RequestPriority } from "@/shared/utils/request-priority";
 import type {
-  AcceptedMappingEvidence,
-  AcceptedMappingReason,
-  AcceptedMappingSource,
-  InheritedMappingVerificationDetails,
-  RecentMappingEvaluationTrace,
-} from '@/mapping/types';
+	AcceptedMappingEvidence,
+	AcceptedMappingReason,
+	AcceptedMappingSource,
+	InheritedMappingVerificationDetails,
+	RecentMappingEvaluationTrace,
+} from "@/mapping/types";
 
 /**
  * Source of an automated resolver result.
@@ -20,7 +20,7 @@ import type {
  * `manual`, because manual mappings are user-owned, not resolver-produced
  * candidates or resolver-accepted results.
  */
-export type AutoMappingSource = Exclude<AcceptedMappingSource, 'manual'>;
+export type AutoMappingSource = Exclude<AcceptedMappingSource, "manual">;
 
 /**
  * Final semantic result of trying to auto-map one `provider + anilistId`.
@@ -31,20 +31,20 @@ export type AutoMappingSource = Exclude<AcceptedMappingSource, 'manual'>;
  * - `verification-failed` = plausible answer exists, but verification could not be completed
  */
 export type AutoMappingStatus =
-  | 'mapped'
-  | 'unresolved'
-  | 'ambiguous'
-  | 'verification-failed';
+	| "mapped"
+	| "unresolved"
+	| "ambiguous"
+	| "verification-failed";
 
 /** Successful auto-mapping result returned by the resolver. */
 export interface AcceptedAutoMappingResult {
-  providerId: ProviderTargetId;
-  reason: AcceptedMappingReason;
-  successfulSynonym?: string;
-  recentEvaluation?: RecentMappingEvaluationTrace;
-  immediateSourceAniListId?: AniListId;
-  chainAnchorAniListId?: AniListId;
-  inheritedVerification?: InheritedMappingVerificationDetails;
+	providerId: ProviderId;
+	reason: AcceptedMappingReason;
+	successfulSynonym?: string;
+	recentEvaluation?: RecentMappingEvaluationTrace;
+	immediateSourceAniListId?: AniListId;
+	chainAnchorAniListId?: AniListId;
+	inheritedVerification?: InheritedMappingVerificationDetails;
 }
 
 /**
@@ -55,18 +55,18 @@ export interface AcceptedAutoMappingResult {
  * - `recentEvaluation` is the rebuildable explanation cache for the latest attempt
  */
 export type AutoMappingRecord =
-  | {
-      state: 'mapped';
-      providerId: ProviderTargetId;
-      acceptedEvidence: AcceptedMappingEvidence;
-      recentEvaluation?: RecentMappingEvaluationTrace;
-      updatedAt: number;
-    }
-  | {
-      state: Exclude<AutoMappingStatus, 'mapped'>;
-      recentEvaluation?: RecentMappingEvaluationTrace;
-      updatedAt: number;
-    };
+	| {
+			state: "mapped";
+			providerId: ProviderId;
+			acceptedEvidence: AcceptedMappingEvidence;
+			recentEvaluation?: RecentMappingEvaluationTrace;
+			updatedAt: number;
+	  }
+	| {
+			state: Exclude<AutoMappingStatus, "mapped">;
+			recentEvaluation?: RecentMappingEvaluationTrace;
+			updatedAt: number;
+	  };
 
 /**
  * Options that influence provider-id resolution for one AniList entry.
@@ -75,13 +75,13 @@ export type AutoMappingRecord =
  * semantic meaning of resolver outcomes.
  */
 export interface AutoMappingOptions {
-  network?: 'never';
-  hints?: {
-    primaryTitle?: string;
-    domMedia?: AniListMediaHint | null;
-  };
-  ignoreFailureCache?: boolean;
-  priority?: RequestPriority;
-  /** Force provider lookups to bypass fresh caches, used by anime-detail force-verify flows. */
-  forceLookupNetwork?: boolean;
+	network?: "never";
+	hints?: {
+		primaryTitle?: string;
+		domMedia?: AniListMediaHint | null;
+	};
+	ignoreFailureCache?: boolean;
+	priority?: RequestPriority;
+	/** Force provider lookups to bypass fresh caches, used by anime-detail force-verify flows. */
+	forceLookupNetwork?: boolean;
 }

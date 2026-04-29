@@ -11,7 +11,7 @@ import {
 	type SonarrSeriesSnapshot,
 	type Provider,
 	type ProviderIdFor,
-	type ProviderTargetId,
+	type ProviderId,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
@@ -63,7 +63,7 @@ export interface GetMappingInspectionDeps {
 		listRejectedCandidates(provider?: Provider): Array<{
 			anilistId: AniListId;
 			provider: Provider;
-			providerId: ProviderTargetId;
+			providerId: ProviderId;
 			updatedAt: number;
 		}>;
 		getLinkedAniListIds<P extends Provider>(
@@ -130,14 +130,14 @@ interface MappingDetailsExplanationItem {
 	reason?: AcceptedMappingReason;
 	resolverOutcome?: AutoMappingStatus;
 	reviewReason?: MappingIssueReason;
-	suppressedProviderId?: ProviderTargetId;
+	suppressedProviderId?: ProviderId;
 	immediateSourceAniListId?: AniListId;
 	chainAnchorAniListId?: AniListId;
 	details?: readonly string[];
 }
 
 interface MappingDetailsCandidateEvaluation {
-	providerId: ProviderTargetId;
+	providerId: ProviderId;
 	title?: string;
 	source: AcceptedMappingSource;
 	reason: AcceptedMappingReason;
@@ -164,7 +164,7 @@ interface MappingDetailsReview {
 
 interface MappingDetailsProviderLinks {
 	provider: Provider;
-	providerId: ProviderTargetId | null;
+	providerId: ProviderId | null;
 	linkedAniListIds: readonly AniListId[];
 	linkedAniListCount: number;
 }

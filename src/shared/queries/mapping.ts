@@ -20,7 +20,7 @@ import type {
 } from "@/rpc/types";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
-import type { Provider, ProviderTargetId } from "@/providers";
+import type { Provider, ProviderId } from "@/providers";
 import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
@@ -64,13 +64,13 @@ type SetManualMappingMutationInput = SetManualMappingInput & {
 };
 
 type ProviderIdentityLike = {
-	tvdbId?: ProviderTargetId;
-	tmdbId?: ProviderTargetId;
+	tvdbId?: ProviderId;
+	tmdbId?: ProviderId;
 };
 
 function getMutationProviderId(
 	input: SetManualMappingMutationInput,
-): ProviderTargetId | null {
+): ProviderId | null {
 	if (input.optimisticMapping) {
 		return input.optimisticMapping.providerId;
 	}
@@ -125,7 +125,7 @@ function clearProviderMedia<TStatus extends ProviderStatusCacheValue>(
 function applyManualMappingToStatus(
 	status: ProviderStatusCacheValue | undefined,
 	input: SetManualMappingMutationInput,
-	providerId: ProviderTargetId,
+	providerId: ProviderId,
 ): ProviderStatusCacheValue | undefined {
 	if (!status) {
 		return status;
@@ -182,7 +182,7 @@ function getLinkedAniListIds(
 function applyManualMappingToInspection(
 	inspection: GetMappingInspectionOutput | undefined,
 	input: SetManualMappingMutationInput,
-	providerId: ProviderTargetId,
+	providerId: ProviderId,
 ): GetMappingInspectionOutput | undefined {
 	if (!inspection) {
 		return inspection;

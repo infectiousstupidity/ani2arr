@@ -7,7 +7,7 @@ import type { Provider } from "./types";
 
 export type TvdbId = Brand<number, "TvdbId">;
 export type TmdbId = Brand<number, "TmdbId">;
-export type ProviderTargetId = TvdbId | TmdbId;
+export type ProviderId = TvdbId | TmdbId;
 
 export type SonarrSeriesId = Brand<number, "SonarrSeriesId">;
 export type RadarrMovieId = Brand<number, "RadarrMovieId">;
@@ -94,6 +94,15 @@ export function parseTmdbIdOrNull(value: unknown): TmdbId | null {
 }
 
 export const TmdbIdSchema = createPositiveIntegerIdSchema<TmdbId>();
+
+export function parseProviderId(
+	provider: Provider,
+	value: unknown,
+): ProviderId | null {
+	return provider === "sonarr"
+		? parseTvdbIdOrNull(value)
+		: parseTmdbIdOrNull(value);
+}
 
 export function parseProviderIdentity(
 	provider: "sonarr",
