@@ -8,7 +8,7 @@ import type { AniListId } from "@/anilist";
 import { PROVIDERS, parseProviderIdentity, type Provider } from "@/providers";
 import { getProviderIdentityIdLabel } from "@/providers/provider-labels";
 import type { MappingEntryKind } from "@/mapping/types";
-import type { MappingSummary } from "@/mapping/ui/mapping-list-types";
+import type { MappingSummary } from "@/mapping/queries/list-mappings";
 import type { GetAniListMetadataOutput, GetMappingsOutput } from "@/rpc/types";
 import type { GetMappingsInput } from "@/rpc/schemas";
 import type { MappingTableRowData } from "../components/mapping-table";

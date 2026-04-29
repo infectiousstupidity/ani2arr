@@ -6,7 +6,7 @@ import type {
   MappingInspectionCandidate,
   MappingInspectionPayload,
   MappingInspectionSuggestedCandidates,
-} from '@/mapping/inspection/inspection-types';
+} from '@/mapping/queries/mapping-details';
 import type { Provider } from '@/providers';
 import { getProviderIdLabel } from '@/providers/provider-labels';
 import Pill from '@/shared/ui/primitives/pill';

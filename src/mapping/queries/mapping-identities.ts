@@ -3,8 +3,8 @@ import { PROVIDERS, type Provider, type ProviderIdFor, type ProviderTargetId, ty
 import type { AnibridgeProviderPair } from '@/mapping/upstream';
 import type { MappingIdentity } from '@/mapping/types';
 import type { AutoMappingRecord } from '@/mapping/auto-mapping/types';
-import { buildEffectiveMapping } from './effective-mapping';
-import { getMappingSource } from './mapping-sources';
+import { buildEffectiveMapping } from '../effective-mapping';
+import { getMappingSource } from '../mapping-sources';
 
 export interface GetMappingIdentitiesDeps {
   manualMappingService: {

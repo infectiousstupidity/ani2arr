@@ -1,10 +1,11 @@
 /** Builds one mapping-owned inspection payload without re-running provider resolution. */
-// src/mapping/inspection/get-mapping-inspection.ts
+// src/mapping/queries/mapping-details.ts
 // eslint-disable-max-params
 
 import type { AniListId } from "@/anilist";
 import { resolveTitlePreference } from "@/anilist/title-preference";
 import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
+import type { AniListMediaFormat } from "@/anilist/schemas/media.schema";
 import {
 	type RadarrMovieSnapshot,
 	type SonarrSeriesSnapshot,
@@ -14,25 +15,39 @@ import {
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
-import { type MappingRecentEvaluationTrace } from "@/mapping/types";
-import type { AutoMappingRecord } from "@/mapping/auto-mapping/types";
+import type {
+	MappingAcceptedEvidence,
+	MappingAcceptedReason,
+	MappingAcceptedSource,
+	MappingEntryKind,
+	MappingEvaluationCandidateStatus,
+	MappingInheritedVerificationDetails,
+	MappingRecentEvaluationTrace,
+	MappingSuppressionKind,
+	MappingUnknownReason,
+	ProviderMappingState,
+} from "@/mapping/types";
+import type {
+	AutoMappingRecord,
+	AutoMappingStatus,
+} from "@/mapping/auto-mapping/types";
 import { buildEffectiveMappingCandidate } from "@/mapping/effective-mapping";
 import {
 	collectLinkedAniListIds,
 	getMappingSource,
 } from "@/mapping/mapping-sources";
-import { deriveLibraryUnknownReason } from "@/providers/library/types";
+import {
+	deriveLibraryUnknownReason,
+	type LibraryUnknownReason,
+} from "@/providers/library/types";
 import { deriveMappingRowStatus } from "@/features/provider-action";
-import { projectMappingReview } from "@/mapping/review/project-review";
-import type { MappingReviewReason } from "@/mapping/review/review-types";
 import type {
-	MappingInspectionCandidate,
-	MappingInspectionExplanationItem,
-	MappingInspectionLinkedAniListEntry,
-	MappingInspectionLibrarySummary,
-	MappingInspectionPayload,
-	MappingInspectionSuggestedCandidates,
-} from "./inspection-types";
+	MappingReviewItem,
+	MappingReviewReason,
+	MappingReviewSummary,
+} from "./mapping-issues";
+import { projectMappingReview } from "./mapping-issues";
+import type { MappingRowStatus } from "./list-mappings";
 
 export interface GetMappingInspectionInput {
 	provider: Provider;
@@ -93,6 +108,98 @@ export interface GetMappingInspectionDeps {
 }
 
 type InspectionCandidate = ReturnType<typeof buildEffectiveMappingCandidate>;
+
+export interface MappingInspectionLibrarySummary {
+	isInLibrary: boolean | null;
+	title?: string;
+	type?: "series" | "movie";
+	statusLabel?: string;
+	inLibraryCount?: number;
+	libraryUnknownReason?: LibraryUnknownReason;
+}
+
+export interface MappingInspectionEffectiveMapping {
+	provider: Provider;
+	anilistId: AniListId;
+	providerId: ProviderTargetId | null;
+	providerMappingState: ProviderMappingState;
+	isInLibrary: boolean | null;
+	suppressedProviderId?: ProviderTargetId | null;
+	mappingRowStatus: MappingRowStatus;
+	mappingEntryKind: MappingEntryKind;
+	mappingSource?: MappingAcceptedSource;
+	mappingReason?: MappingAcceptedReason;
+	resolverOutcome?: AutoMappingStatus;
+	suppressionKind?: MappingSuppressionKind;
+	mappingUnknownReason?: MappingUnknownReason;
+	libraryUnknownReason?: LibraryUnknownReason;
+	hadResolveAttempt?: boolean;
+	evidence?: MappingAcceptedEvidence;
+	library?: MappingInspectionLibrarySummary;
+}
+
+export interface MappingInspectionLinkedAniListEntry {
+	anilistId: AniListId;
+	title?: string;
+	format?: AniListMediaFormat | null;
+	year?: number | null;
+	relation?: "current";
+}
+
+export interface MappingInspectionExplanationItem {
+	kind: "effective-source" | "suppression" | "resolver-outcome" | "review";
+	summary: string;
+	source?: MappingAcceptedSource;
+	reason?: MappingAcceptedReason;
+	resolverOutcome?: AutoMappingStatus;
+	reviewReason?: MappingReviewReason;
+	suppressedProviderId?: ProviderTargetId;
+	immediateSourceAniListId?: AniListId;
+	chainAnchorAniListId?: AniListId;
+	details?: readonly string[];
+}
+
+export interface MappingInspectionCandidate {
+	providerId: ProviderTargetId;
+	title?: string;
+	source: MappingAcceptedSource;
+	reason: MappingAcceptedReason;
+	status: MappingEvaluationCandidateStatus;
+	summary: string;
+	score?: number;
+	inheritedVerification?: MappingInheritedVerificationDetails;
+}
+
+export interface MappingInspectionSuggestedCandidates {
+	attemptedAt?: number;
+	searchTerms?: readonly string[];
+	accepted: readonly MappingInspectionCandidate[];
+	rejected: readonly MappingInspectionCandidate[];
+	suppressed: readonly MappingInspectionCandidate[];
+	notAccepted: readonly MappingInspectionCandidate[];
+}
+
+export interface MappingInspectionReviewDetail {
+	needsReview: boolean;
+	summary?: MappingReviewSummary;
+	items?: readonly MappingReviewItem[];
+}
+
+export interface MappingInspectionProviderContext {
+	provider: Provider;
+	providerId: ProviderTargetId | null;
+	linkedAniListIds: readonly AniListId[];
+	linkedAniListCount: number;
+}
+
+export interface MappingInspectionPayload {
+	effectiveMapping: MappingInspectionEffectiveMapping;
+	providerContext: MappingInspectionProviderContext;
+	linkedAniListEntries: readonly MappingInspectionLinkedAniListEntry[];
+	whyThisMapping: readonly MappingInspectionExplanationItem[];
+	suggestedCandidates: MappingInspectionSuggestedCandidates;
+	review: MappingInspectionReviewDetail;
+}
 
 const resolveRecentEvaluationTitle = (
 	recentEvaluation: MappingRecentEvaluationTrace | undefined,

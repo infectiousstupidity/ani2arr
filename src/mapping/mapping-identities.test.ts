@@ -3,7 +3,7 @@ import { parseAniListId, type AniListId } from '@/anilist';
 import { parseTmdbId, parseTvdbId } from '@/providers';
 import type { AnibridgeProviderPair } from '@/mapping/upstream';
 import type { AutoMappingRecord } from '@/mapping/auto-mapping/types';
-import { getMappingIdentities, type GetMappingIdentitiesDeps } from './mapping-identities';
+import { getMappingIdentities, type GetMappingIdentitiesDeps } from './queries/mapping-identities';
 
 const aid = parseAniListId;
 const tvdb = parseTvdbId;

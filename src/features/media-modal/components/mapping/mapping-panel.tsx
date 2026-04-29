@@ -3,7 +3,7 @@
 
 import { useCallback, useRef, type WheelEvent as ReactWheelEvent } from "react";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import type { MappingInspectionPayload } from "@/mapping/inspection/inspection-types";
+import type { MappingInspectionPayload } from "@/mapping/queries/mapping-details";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
 import { getProviderIdLabel } from "@/providers/provider-labels";
 import { useMediaModalContext } from "../../context";
