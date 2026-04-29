@@ -2,15 +2,17 @@ import type { AniListId } from '@/anilist';
 import { parseProviderIdentity, type Provider, type ProviderIdFor, type ProviderTargetId, type TmdbId, type TvdbId } from '@/providers';
 import type { AutoMappingRecord } from './auto-mapping/types';
 
-export interface MappingFacts {
-  manualProviderId: ProviderTargetId | null;
+export interface MappingSource {
+  provider: Provider;
+  anilistId: AniListId;
+  manualMappedProviderId: ProviderTargetId | null;
   ignored: boolean;
   upstreamProviderIds: readonly ProviderTargetId[];
-  rejectedProviderId: ProviderTargetId | null;
+  rejectedCandidateProviderId: ProviderTargetId | null;
   autoMappingRecord: AutoMappingRecord | null;
 }
 
-export interface MappingFactsDeps {
+export interface MappingSourceDeps {
   manualMappingService: {
     get<P extends Provider>(provider: P, anilistId: AniListId): ProviderIdFor<P> | null;
     isIgnored(provider: Provider, anilistId: AniListId): boolean;
@@ -43,7 +45,17 @@ export interface LinkedAniListIdsDeps {
   };
 }
 
-const latestRejectedProviderId = (
+const getUpstreamProviderIds = (
+  provider: Provider,
+  anilistId: AniListId,
+  deps: MappingSourceDeps,
+): readonly ProviderTargetId[] => (
+  provider === 'sonarr'
+    ? deps.anibridgeMappingStore.getSonarrCandidates(anilistId)
+    : deps.anibridgeMappingStore.getRadarrCandidates(anilistId)
+);
+
+const latestRejectedCandidateProviderId = (
   rejected: Array<{ anilistId: AniListId; providerId: ProviderTargetId; updatedAt: number }>,
   anilistId: AniListId,
 ): ProviderTargetId | null => (
@@ -52,21 +64,21 @@ const latestRejectedProviderId = (
     .toSorted((left, right) => right.updatedAt - left.updatedAt)[0]?.providerId ?? null
 );
 
-export async function getMappingFacts(
+export async function getMappingSource(
   provider: Provider,
   anilistId: AniListId,
-  deps: MappingFactsDeps,
-): Promise<MappingFacts> {
+  deps: MappingSourceDeps,
+): Promise<MappingSource> {
   const rejected = deps.manualMappingService.listRejectedCandidates(provider);
   const autoMappingRecord = await deps.autoMappingStore.get(provider, anilistId);
 
   return {
-    manualProviderId: deps.manualMappingService.get(provider, anilistId),
+    provider,
+    anilistId,
+    manualMappedProviderId: deps.manualMappingService.get(provider, anilistId),
     ignored: deps.manualMappingService.isIgnored(provider, anilistId),
-    upstreamProviderIds: provider === 'sonarr'
-      ? deps.anibridgeMappingStore.getSonarrCandidates(anilistId)
-      : deps.anibridgeMappingStore.getRadarrCandidates(anilistId),
-    rejectedProviderId: latestRejectedProviderId(rejected, anilistId),
+    upstreamProviderIds: getUpstreamProviderIds(provider, anilistId, deps),
+    rejectedCandidateProviderId: latestRejectedCandidateProviderId(rejected, anilistId),
     autoMappingRecord,
   };
 }

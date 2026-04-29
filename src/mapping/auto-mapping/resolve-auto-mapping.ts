@@ -4,10 +4,10 @@
 import type { AniListId, AniListMediaService  } from '@/anilist';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
 import {
-  readExtensionMappingFailure,
-  removeExtensionMappingFailure,
-  writeExtensionMappingFailure,
-} from '@/mapping/cache/extension-mapping.cache';
+  readAutoMappingFailure,
+  removeAutoMappingFailure,
+  writeAutoMappingFailure,
+} from './failure.cache';
 import type { Provider, ProviderCredentials, SonarrLookupSeries  } from '@/providers';
 import { getProviderLabel } from '@/providers/provider-labels';
 import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
@@ -69,6 +69,25 @@ type ResolutionAttempt = {
   terminalState?: Exclude<AutoMappingRecord['state'], 'mapped' | 'unresolved'>;
 };
 
+type AutoMappingRequest = {
+  provider: Provider;
+  anilistId: AniListId;
+  options: AutoMappingOptions;
+  bypassCachedResolutionState: boolean;
+};
+
+type NetworkResolutionContext = AutoMappingRequest & {
+  credentials: ProviderCredentials;
+  hints: AutoMappingOptions['hints'] | undefined;
+  priority: RequestPriority | undefined;
+  forceLookupNetwork: boolean;
+};
+
+type MediaResolutionContext = NetworkResolutionContext & {
+  media: AniListMedia;
+  allowInheritedTraversal: boolean;
+};
+
 type ManualMappingReads = Pick<ManualMappingService, 'isIgnored' | 'get'>;
 
 type ResolveAutoMappingDeps = {
@@ -106,62 +125,26 @@ export async function resolveAutoMapping(
   provider: Provider,
   anilistId: AniListId,
   options: AutoMappingOptions,
-  bypassCachedResolutionState: boolean,
 ): Promise<AcceptedAutoMapping | null> {
-  let resolverState = await deps.autoMappingStore.get(provider, anilistId);
-  if (resolverState?.state === 'mapped') {
-    if (resolverState.acceptedEvidence.source !== 'auto') {
-      await deps.clearAutoMapping(provider, anilistId);
-      resolverState = null;
-    } else if (
-      deps.isResolvedCandidateSuppressed(
-        provider,
-        anilistId,
-        {
-          providerId: resolverState.providerId,
-          reason: resolverState.acceptedEvidence.reason,
-          ...(resolverState.acceptedEvidence.successfulTitle
-            ? { successfulSynonym: resolverState.acceptedEvidence.successfulTitle }
-            : {}),
-        },
-        resolverState.acceptedEvidence.source,
-      )
-    ) {
-      await deps.clearAutoMapping(provider, anilistId);
-      resolverState = null;
-    } else {
-      if (import.meta.env.DEV) {
-        deps.log.debug?.(
-          `mapping:auto-mapping-hit provider=${provider} anilistId=${anilistId} providerId=${resolverState.providerId} source=${resolverState.acceptedEvidence.source} reason=${resolverState.acceptedEvidence.reason}`,
-        );
-      }
-      return {
-        providerId: resolverState.providerId,
-        reason: resolverState.acceptedEvidence.reason,
-        ...(resolverState.acceptedEvidence.successfulTitle
-          ? { successfulSynonym: resolverState.acceptedEvidence.successfulTitle }
-          : {}),
-      };
-    }
+  const request: AutoMappingRequest = {
+    provider,
+    anilistId,
+    options,
+    bypassCachedResolutionState: options.ignoreFailureCache === true,
+  };
+
+  const cachedAutoMapping = await readUsableCachedAutoMapping(deps, request);
+  if (cachedAutoMapping.handled) {
+    return cachedAutoMapping.resolved;
   }
-  if (!bypassCachedResolutionState) {
-    const cachedFailure = await readExtensionMappingFailure(provider, anilistId);
-    if (cachedFailure) {
-      if (import.meta.env.DEV) {
-        deps.log.debug?.(
-          `mapping:failure-cache-hit provider=${provider} anilistId=${anilistId} code=${cachedFailure.value.code}`,
-        );
-      }
-      throw cachedFailure.value;
-    }
-    if (resolverState) {
-      if (import.meta.env.DEV) {
-        deps.log.debug?.(
-          `mapping:auto-mapping-terminal provider=${provider} anilistId=${anilistId} state=${resolverState.state}`,
-        );
-      }
-      return null;
-    }
+
+  const cachedFailureOrTerminal = await readCachedFailureOrTerminalState(
+    deps,
+    request,
+    cachedAutoMapping.resolverState,
+  );
+  if (cachedFailureOrTerminal.handled) {
+    return cachedFailureOrTerminal.resolved;
   }
 
   if (options.network === 'never') {
@@ -173,76 +156,159 @@ export async function resolveAutoMapping(
     );
   }
 
-  let seededRecentEvaluation: MappingRecentEvaluationTrace | undefined;
-  const hintTerm = options.hints?.primaryTitle?.trim();
-  if (hintTerm) {
-    try {
-      const credentials = await deps.getConfiguredCredentials(provider);
-      const hinted = await tryHintLookup(
-        hintTerm,
-        deps.lookupClients[provider],
-        credentials,
-        deps.log,
-        options.forceLookupNetwork === true,
-      );
-      if (hinted) {
-        if (!deps.isResolvedCandidateSuppressed(provider, anilistId, hinted, 'auto')) {
-          const recentEvaluation = createSingleCandidateTrace(
-            hinted,
-            'auto',
-            'accepted',
-            [hintTerm],
-            hinted.successfulSynonym,
-          );
-          return deps.acceptResolved(
-            provider,
-            anilistId,
-            {
-              ...hinted,
-              ...(recentEvaluation ? { recentEvaluation } : {}),
-            },
-            'auto',
-          );
-        }
-        seededRecentEvaluation = mergeRecentEvaluations(
-          seededRecentEvaluation,
-          createSingleCandidateTrace(
-            hinted,
-            'auto',
-            'rejected',
-            [hintTerm],
-            hinted.successfulSynonym,
-          ),
-        );
-        if (import.meta.env.DEV) {
-          deps.log.debug?.(
-            `mapping:hint-suppressed provider=${provider} anilistId=${anilistId} providerId=${hinted.providerId} reason=${hinted.reason}`,
-          );
-        }
-      }
-    } catch (error) {
-      logError(normalizeError(error), `MappingService:hintLookup:${provider}:${anilistId}`);
-    }
+  const hintResolution = await tryResolvePrimaryTitleHint(deps, request);
+  if (hintResolution.handled) {
+    return hintResolution.resolved;
   }
 
-  return attemptNetworkResolution(
-    deps,
-    provider,
-    anilistId,
-    options,
-    bypassCachedResolutionState,
-    seededRecentEvaluation,
-  );
+  return attemptNetworkResolution(deps, request, hintResolution.seededRecentEvaluation);
+}
+
+async function readUsableCachedAutoMapping(
+  deps: ResolveAutoMappingDeps,
+  request: AutoMappingRequest,
+): Promise<
+  | { handled: true; resolved: AcceptedAutoMapping }
+  | { handled: false; resolverState: AutoMappingRecord | null }
+> {
+  const { provider, anilistId } = request;
+  const resolverState = await deps.autoMappingStore.get(provider, anilistId);
+  if (resolverState?.state !== 'mapped') {
+    return { handled: false, resolverState };
+  }
+
+  if (resolverState.acceptedEvidence.source !== 'auto') {
+    await deps.clearAutoMapping(provider, anilistId);
+    return { handled: false, resolverState: null };
+  }
+
+  const resolved = {
+    providerId: resolverState.providerId,
+    reason: resolverState.acceptedEvidence.reason,
+    ...(resolverState.acceptedEvidence.successfulTitle
+      ? { successfulSynonym: resolverState.acceptedEvidence.successfulTitle }
+      : {}),
+  };
+
+  if (deps.isResolvedCandidateSuppressed(provider, anilistId, resolved, resolverState.acceptedEvidence.source)) {
+    await deps.clearAutoMapping(provider, anilistId);
+    return { handled: false, resolverState: null };
+  }
+
+  if (import.meta.env.DEV) {
+    deps.log.debug?.(
+      `mapping:auto-mapping-hit provider=${provider} anilistId=${anilistId} providerId=${resolverState.providerId} source=${resolverState.acceptedEvidence.source} reason=${resolverState.acceptedEvidence.reason}`,
+    );
+  }
+  return { handled: true, resolved };
+}
+
+async function readCachedFailureOrTerminalState(
+  deps: ResolveAutoMappingDeps,
+  request: AutoMappingRequest,
+  resolverState: AutoMappingRecord | null,
+): Promise<{ handled: true; resolved: null } | { handled: false }> {
+  const { provider, anilistId, bypassCachedResolutionState } = request;
+  if (bypassCachedResolutionState) {
+    return { handled: false };
+  }
+
+  const cachedFailure = await readAutoMappingFailure(provider, anilistId);
+  if (cachedFailure) {
+    if (import.meta.env.DEV) {
+      deps.log.debug?.(
+        `mapping:failure-cache-hit provider=${provider} anilistId=${anilistId} code=${cachedFailure.value.code}`,
+      );
+    }
+    throw cachedFailure.value;
+  }
+
+  if (resolverState) {
+    if (import.meta.env.DEV) {
+      deps.log.debug?.(
+        `mapping:auto-mapping-terminal provider=${provider} anilistId=${anilistId} state=${resolverState.state}`,
+      );
+    }
+    return { handled: true, resolved: null };
+  }
+
+  return { handled: false };
+}
+
+async function tryResolvePrimaryTitleHint(
+  deps: ResolveAutoMappingDeps,
+  request: AutoMappingRequest,
+): Promise<
+  | { handled: true; resolved: AcceptedAutoMapping | null }
+  | { handled: false; seededRecentEvaluation?: MappingRecentEvaluationTrace }
+> {
+  const { provider, anilistId, options } = request;
+  const hintTerm = options.hints?.primaryTitle?.trim();
+  if (!hintTerm) {
+    return { handled: false };
+  }
+
+  try {
+    const credentials = await deps.getConfiguredCredentials(provider);
+    const hinted = await tryHintLookup(
+      hintTerm,
+      deps.lookupClients[provider],
+      credentials,
+      deps.log,
+      options.forceLookupNetwork === true,
+    );
+    if (!hinted) {
+      return { handled: false };
+    }
+
+    if (!deps.isResolvedCandidateSuppressed(provider, anilistId, hinted, 'auto')) {
+      const recentEvaluation = createSingleCandidateTrace(
+        hinted,
+        'auto',
+        'accepted',
+        [hintTerm],
+        hinted.successfulSynonym,
+      );
+      const resolved = await deps.acceptResolved(
+        provider,
+        anilistId,
+        {
+          ...hinted,
+          ...(recentEvaluation ? { recentEvaluation } : {}),
+        },
+        'auto',
+      );
+      return { handled: true, resolved };
+    }
+
+    if (import.meta.env.DEV) {
+      deps.log.debug?.(
+        `mapping:hint-suppressed provider=${provider} anilistId=${anilistId} providerId=${hinted.providerId} reason=${hinted.reason}`,
+      );
+    }
+    const seededRecentEvaluation = createSingleCandidateTrace(
+      hinted,
+      'auto',
+      'rejected',
+      [hintTerm],
+      hinted.successfulSynonym,
+    );
+    return {
+      handled: false,
+      ...(seededRecentEvaluation ? { seededRecentEvaluation } : {}),
+    };
+  } catch (error) {
+    logError(normalizeError(error), `MappingService:hintLookup:${provider}:${anilistId}`);
+    return { handled: false };
+  }
 }
 
 async function attemptNetworkResolution(
   deps: ResolveAutoMappingDeps,
-  provider: Provider,
-  anilistId: AniListId,
-  options: AutoMappingOptions,
-  bypassCachedResolutionState: boolean,
+  request: AutoMappingRequest,
   seededRecentEvaluation?: MappingRecentEvaluationTrace,
 ): Promise<AcceptedAutoMapping | null> {
+  const { provider, anilistId, options, bypassCachedResolutionState } = request;
   let attempt: ResolutionAttempt;
   try {
     if (import.meta.env.DEV) {
@@ -250,14 +316,7 @@ async function attemptNetworkResolution(
         `mapping:network-start provider=${provider} anilistId=${anilistId} priority=${options.priority ?? 'normal'}`,
       );
     }
-    attempt = await resolveViaNetwork(
-      deps,
-      provider,
-      anilistId,
-      options.hints,
-      options.priority,
-      options.forceLookupNetwork === true,
-    );
+    attempt = await resolveViaNetwork(deps, request);
   } catch (error) {
     const normalized = normalizeError(error);
     if (normalized.code === ErrorCode.VALIDATION_ERROR) {
@@ -272,7 +331,7 @@ async function attemptNetworkResolution(
         },
         UNRESOLVED_AUTO_MAPPING_TTL,
       );
-      await removeExtensionMappingFailure(provider, anilistId);
+      await removeAutoMappingFailure(provider, anilistId);
       return null;
     }
 
@@ -299,7 +358,7 @@ async function attemptNetworkResolution(
       },
       UNRESOLVED_AUTO_MAPPING_TTL,
     );
-    await removeExtensionMappingFailure(provider, anilistId);
+    await removeAutoMappingFailure(provider, anilistId);
     return null;
   }
 
@@ -324,18 +383,22 @@ async function cacheFailure(
   anilistId: AniListId,
   error: ExtensionError,
 ): Promise<void> {
-  await writeExtensionMappingFailure(provider, anilistId, error);
+  await writeAutoMappingFailure(provider, anilistId, error);
 }
 
 async function resolveViaNetwork(
   deps: ResolveAutoMappingDeps,
-  provider: Provider,
-  anilistId: AniListId,
-  hints: AutoMappingOptions['hints'] | undefined,
-  priority: RequestPriority | undefined,
-  forceLookupNetwork: boolean,
+  request: AutoMappingRequest,
 ): Promise<ResolutionAttempt> {
+  const { provider, anilistId, options } = request;
   const credentials = await deps.getConfiguredCredentials(provider);
+  const context: NetworkResolutionContext = {
+    ...request,
+    credentials,
+    hints: options.hints,
+    priority: options.priority,
+    forceLookupNetwork: options.forceLookupNetwork === true,
+  };
   let recentEvaluation: MappingRecentEvaluationTrace | undefined;
 
   const applyAttempt = (
@@ -369,18 +432,13 @@ async function resolveViaNetwork(
     return null;
   };
 
-  const metadataMedia = buildMediaFromMetadataHint(anilistId, hints?.domMedia);
+  const metadataMedia = buildMediaFromMetadataHint(anilistId, context.hints?.domMedia);
   if (metadataMedia) {
-    const metadataAttempt = await tryResolveWithMedia(
-      deps,
-      provider,
-      metadataMedia,
-      credentials,
-      hints,
-      priority,
-      forceLookupNetwork,
-      false,
-    );
+    const metadataAttempt = await tryResolveWithMedia(deps, {
+      ...context,
+      media: metadataMedia,
+      allowInheritedTraversal: false,
+    });
     if (metadataAttempt.terminalState) {
       return metadataAttempt;
     }
@@ -392,20 +450,15 @@ async function resolveViaNetwork(
 
   const anilistMediaWithRelations = await deps.anilistApi.fetchMediaWithRelations(
     anilistId,
-    priority === undefined
+    context.priority === undefined
       ? { source: 'mapping-resolve' }
-      : { priority, source: 'mapping-resolve' },
+      : { priority: context.priority, source: 'mapping-resolve' },
   );
-  const apiAttempt = await tryResolveWithMedia(
-    deps,
-    provider,
-    anilistMediaWithRelations,
-    credentials,
-    hints,
-    priority,
-    forceLookupNetwork,
-    true,
-  );
+  const apiAttempt = await tryResolveWithMedia(deps, {
+    ...context,
+    media: anilistMediaWithRelations,
+    allowInheritedTraversal: true,
+  });
   if (apiAttempt.terminalState) {
     return apiAttempt;
   }
@@ -420,14 +473,9 @@ async function resolveViaNetwork(
 
 async function tryResolveWithMedia(
   deps: ResolveAutoMappingDeps,
-  provider: Provider,
-  media: AniListMedia,
-  credentials: ProviderCredentials,
-  hints: AutoMappingOptions['hints'] | undefined,
-  priority: RequestPriority | undefined,
-  forceLookupNetwork: boolean,
-  allowInheritedTraversal: boolean,
+  context: MediaResolutionContext,
 ): Promise<ResolutionAttempt> {
+  const { provider, media } = context;
   const routedProvider = resolveProviderForAniListFormat(media.format);
   if (routedProvider !== provider) {
     deps.log.debug?.(
@@ -438,76 +486,11 @@ async function tryResolveWithMedia(
 
   let recentEvaluation: MappingRecentEvaluationTrace | undefined;
 
-  if (provider === 'sonarr' && allowInheritedTraversal) {
-    const inheritedAttempt = await attemptVerifiedInheritedSonarrResolution({
-      media,
-      anilistApi: deps.anilistApi,
-      anibridgeMappingStore: deps.anibridgeMappingStore,
-      lookupClient: deps.lookupClients.sonarr as ProviderLookupClient<ProviderCredentials, SonarrLookupSeries>,
-      credentials,
-      ...(deps.manualMappings ? { manualMappings: deps.manualMappings } : {}),
-    });
-
-    recentEvaluation = mergeRecentEvaluations(recentEvaluation, inheritedAttempt.recentEvaluation);
-
-    if (inheritedAttempt.status === 'accepted') {
-      if (!deps.isResolvedCandidateSuppressed(provider, media.id, inheritedAttempt.resolved, 'auto')) {
-        return {
-          resolved: inheritedAttempt.resolved,
-          ...(recentEvaluation ? { recentEvaluation } : {}),
-        };
-      }
-
-      recentEvaluation = mergeRecentEvaluations(
-        recentEvaluation,
-        rewriteTraceCandidateStatus(
-          createSingleCandidateTrace(inheritedAttempt.resolved, 'auto', 'accepted'),
-          inheritedAttempt.resolved.providerId,
-          'rejected',
-        ),
-      );
-    }
-
-    if (inheritedAttempt.status === 'ambiguous' || inheritedAttempt.status === 'verification-failed') {
-      return {
-        resolved: null,
-        terminalState: inheritedAttempt.status,
-        ...(recentEvaluation ? { recentEvaluation } : {}),
-      };
-    }
-
-    if (inheritedAttempt.status === 'rejected' && inheritedAttempt.borrowedBaseTitle) {
-      const borrowed = await tryHintLookup(
-        inheritedAttempt.borrowedBaseTitle,
-        deps.lookupClients.sonarr,
-        credentials,
-        deps.log,
-        forceLookupNetwork,
-      );
-      if (borrowed) {
-        const borrowedTrace = createSingleCandidateTrace(
-          borrowed,
-          'auto',
-          'accepted',
-          [inheritedAttempt.borrowedBaseTitle],
-          borrowed.successfulSynonym,
-        );
-        recentEvaluation = mergeRecentEvaluations(recentEvaluation, borrowedTrace);
-
-        if (!deps.isResolvedCandidateSuppressed(provider, media.id, borrowed, 'auto')) {
-          return {
-            resolved: borrowed,
-            ...(recentEvaluation ? { recentEvaluation } : {}),
-          };
-        }
-
-        recentEvaluation = mergeRecentEvaluations(
-          recentEvaluation,
-          rewriteTraceCandidateStatus(borrowedTrace, borrowed.providerId, 'rejected'),
-        );
-      }
-    }
+  const inheritedResolution = await tryVerifiedInheritedResolution(deps, context);
+  if (inheritedResolution.handled) {
+    return inheritedResolution.attempt;
   }
+  recentEvaluation = inheritedResolution.recentEvaluation;
 
   const lookupClient = deps.lookupClients[provider];
   const outcome = await resolveViaPipeline(
@@ -516,9 +499,9 @@ async function tryResolveWithMedia(
       anilistApi: deps.anilistApi,
       lookupClient,
       anibridgeMappingStore: deps.anibridgeMappingStore,
-      credentials,
-      ...(priority === undefined ? {} : { priority }),
-      ...(forceLookupNetwork ? { forceLookupNetwork: true } : {}),
+      credentials: context.credentials,
+      ...(context.priority === undefined ? {} : { priority: context.priority }),
+      ...(context.forceLookupNetwork ? { forceLookupNetwork: true } : {}),
       sessionSeenCanonical: deps.sessionSeenCanonical[provider],
       limits: {
         maxTerms: MAX_SEARCH_TERMS,
@@ -527,7 +510,7 @@ async function tryResolveWithMedia(
       },
       log: deps.log,
     },
-    hints?.primaryTitle,
+    context.hints?.primaryTitle,
   );
 
   if (outcome.status === 'resolved') {
@@ -545,5 +528,104 @@ async function tryResolveWithMedia(
   return {
     resolved: null,
     ...(recentEvaluation ? { recentEvaluation } : {}),
+  };
+}
+
+async function tryVerifiedInheritedResolution(
+  deps: ResolveAutoMappingDeps,
+  context: MediaResolutionContext,
+): Promise<
+  | { handled: true; attempt: ResolutionAttempt }
+  | { handled: false; recentEvaluation?: MappingRecentEvaluationTrace }
+> {
+  const { provider, media } = context;
+  if (provider !== 'sonarr' || !context.allowInheritedTraversal) {
+    return { handled: false };
+  }
+
+  const inheritedAttempt = await attemptVerifiedInheritedSonarrResolution({
+    media,
+    anilistApi: deps.anilistApi,
+    anibridgeMappingStore: deps.anibridgeMappingStore,
+    lookupClient: deps.lookupClients.sonarr as ProviderLookupClient<ProviderCredentials, SonarrLookupSeries>,
+    credentials: context.credentials,
+    ...(deps.manualMappings ? { manualMappings: deps.manualMappings } : {}),
+  });
+
+  let recentEvaluation = inheritedAttempt.recentEvaluation;
+
+  if (inheritedAttempt.status === 'accepted') {
+    if (!deps.isResolvedCandidateSuppressed(provider, media.id, inheritedAttempt.resolved, 'auto')) {
+      return {
+        handled: true,
+        attempt: {
+          resolved: inheritedAttempt.resolved,
+          ...(recentEvaluation ? { recentEvaluation } : {}),
+        },
+      };
+    }
+
+    recentEvaluation = mergeRecentEvaluations(
+      recentEvaluation,
+      rewriteTraceCandidateStatus(
+        createSingleCandidateTrace(inheritedAttempt.resolved, 'auto', 'accepted'),
+        inheritedAttempt.resolved.providerId,
+        'rejected',
+      ),
+    );
+  }
+
+  if (inheritedAttempt.status === 'ambiguous' || inheritedAttempt.status === 'verification-failed') {
+    return {
+      handled: true,
+      attempt: {
+        resolved: null,
+        terminalState: inheritedAttempt.status,
+        ...(recentEvaluation ? { recentEvaluation } : {}),
+      },
+    };
+  }
+
+  if (inheritedAttempt.status !== 'rejected' || !inheritedAttempt.borrowedBaseTitle) {
+    return { handled: false, ...(recentEvaluation ? { recentEvaluation } : {}) };
+  }
+
+  const borrowed = await tryHintLookup(
+    inheritedAttempt.borrowedBaseTitle,
+    deps.lookupClients.sonarr,
+    context.credentials,
+    deps.log,
+    context.forceLookupNetwork,
+  );
+  if (!borrowed) {
+    return { handled: false, ...(recentEvaluation ? { recentEvaluation } : {}) };
+  }
+
+  const borrowedTrace = createSingleCandidateTrace(
+    borrowed,
+    'auto',
+    'accepted',
+    [inheritedAttempt.borrowedBaseTitle],
+    borrowed.successfulSynonym,
+  );
+  recentEvaluation = mergeRecentEvaluations(recentEvaluation, borrowedTrace);
+
+  if (!deps.isResolvedCandidateSuppressed(provider, media.id, borrowed, 'auto')) {
+    return {
+      handled: true,
+      attempt: {
+        resolved: borrowed,
+        ...(recentEvaluation ? { recentEvaluation } : {}),
+      },
+    };
+  }
+
+  const rejectedRecentEvaluation = mergeRecentEvaluations(
+    recentEvaluation,
+    rewriteTraceCandidateStatus(borrowedTrace, borrowed.providerId, 'rejected'),
+  );
+  return {
+    handled: false,
+    ...(rejectedRecentEvaluation ? { recentEvaluation: rejectedRecentEvaluation } : {}),
   };
 }
