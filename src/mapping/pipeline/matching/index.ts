@@ -13,7 +13,6 @@ export {
 } from './normalize';
 
 export {
-  stripSeasonalSuffixes,
   stripTrailingOrdinalOrNumber,
   sanitizeLookupDisplay,
 } from './season';
@@ -43,11 +42,6 @@ export { canonicalTitleKey } from './key';
 export {
   getMatchingProfile,
   compactTitleKey,
-  sanitizeLookupDisplayForProvider,
-  sanitizeLookupDisplayWithProfile,
-  canonicalTitleKeyForProvider,
-  canonicalizeLookupTermForProvider,
-  buildTitleIndexKeysForProvider,
   buildQueryTitleVariantsForProvider,
   extractCandidateTitleVariants,
 } from './profile';

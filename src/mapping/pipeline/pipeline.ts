@@ -4,6 +4,7 @@
 import {
 	generateSearchTerms,
 	isSeasonalCanonicalTokens,
+	type SearchTerm,
 } from "./search-term-generator";
 import { scoreCandidates } from "./scoring";
 import { maybeEarlyStop, pickBest } from "./early-stop";
@@ -15,16 +16,203 @@ import type {
 import {
 	canonicalTitleKeyForProvider,
 	sanitizeLookupDisplayForProvider,
-} from "@/mapping/pipeline/matching";
+} from "@/mapping/title-normalization";
 import { PIPELINE_SOFT_TIME_BUDGET_MS } from "../auto-mapping/constants";
 import type { AnibridgeMappingStore } from "../upstream-mapping";
 import type { ScopedLogger } from "@/shared/utils/logger";
 import type { RequestPriority } from "@/shared/utils/request-priority";
 import type { AniListMediaService } from "@/anilist";
-import type { ProviderCredentials } from "@/providers";
-import type { ProviderLookupClient, ProviderLookupResult } from "../lookup";
+import type { Provider, ProviderCredentials } from "@/providers";
+import type {
+	ProviderLookupClient,
+	ProviderLookupOptions,
+	ProviderLookupResult,
+} from "../lookup";
 
 const TRACE_CANDIDATE_LIMIT = 8;
+
+type PipelineContext = {
+	anilistApi: AniListMediaService;
+	lookupClient: ProviderLookupClient<ProviderCredentials, ProviderLookupResult>;
+	anibridgeMappingStore: AnibridgeMappingStore;
+	credentials: ProviderCredentials;
+	priority?: RequestPriority;
+	forceLookupNetwork?: boolean;
+	sessionSeenCanonical: Set<string>;
+	limits: {
+		maxTerms: number;
+		scoreThreshold: number;
+		earlyStopThreshold: number;
+	};
+	log: ScopedLogger;
+};
+
+type ScoredPipelineCandidate = ReturnType<typeof scoreCandidates>[number];
+
+function isSearchableCanonical(canonical: string): boolean {
+	const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
+	return (
+		canonicalTokens.length > 0 && !isSeasonalCanonicalTokens(canonicalTokens)
+	);
+}
+
+function searchTermFromHint(
+	provider: Provider,
+	primaryTitleHint?: string,
+): SearchTerm | undefined {
+	if (!primaryTitleHint) {
+		return undefined;
+	}
+
+	const sanitized = sanitizeLookupDisplayForProvider(
+		provider,
+		primaryTitleHint.trim(),
+	);
+	if (!sanitized) {
+		return undefined;
+	}
+
+	const canonical = canonicalTitleKeyForProvider(provider, sanitized);
+	if (!canonical || !isSearchableCanonical(canonical)) {
+		return undefined;
+	}
+
+	return { canonical, display: sanitized };
+}
+
+function buildSearchTerms(
+	media: AniListMedia,
+	provider: Provider,
+	primaryTitleHint?: string,
+): SearchTerm[] {
+	const generatedTerms = generateSearchTerms(
+		provider,
+		media.title ?? ({} as Record<string, never>),
+		media.synonyms,
+	);
+	const hintTerm = searchTermFromHint(provider, primaryTitleHint);
+	if (!hintTerm) {
+		return generatedTerms;
+	}
+
+	return [
+		hintTerm,
+		...generatedTerms.filter((term) => term.canonical !== hintTerm.canonical),
+	];
+}
+
+function lookupOptions(
+	ctx: PipelineContext,
+	forceNetwork = false,
+): ProviderLookupOptions {
+	return {
+		...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
+		...(forceNetwork ? { forceNetwork: true } : {}),
+	};
+}
+
+async function lookupForTerm(
+	term: SearchTerm,
+	ctx: PipelineContext,
+): Promise<ProviderLookupResult[]> {
+	if (ctx.forceLookupNetwork) {
+		return ctx.lookupClient.lookup(
+			term.canonical,
+			term.display,
+			ctx.credentials,
+			lookupOptions(ctx, true),
+		);
+	}
+
+	if (ctx.sessionSeenCanonical.has(term.canonical)) {
+		const probe = await ctx.lookupClient.readFromCache(term.canonical);
+		if (probe.hit !== "none") {
+			return probe.results;
+		}
+	}
+
+	return ctx.lookupClient.lookup(
+		term.canonical,
+		term.display,
+		ctx.credentials,
+		lookupOptions(ctx),
+	);
+}
+
+function resolvedOutcome(
+	pick: ScoredPipelineCandidate,
+	ctx: PipelineContext,
+	searchTerms: string[],
+	traceCandidates: Map<number, PipelineEvaluatedCandidate>,
+): EvaluationOutcome | undefined {
+	const providerId = ctx.lookupClient.getProviderId(pick.result);
+	if (providerId === null) {
+		return undefined;
+	}
+
+	return {
+		status: "resolved",
+		providerId,
+		reason: pick.reason,
+		confidence: pick.score,
+		successfulSynonym: pick.term.display,
+		searchTerms,
+		candidates: finalizeTraceCandidates(traceCandidates),
+	};
+}
+
+function unresolvedOutcome(
+	reason: string,
+	searchTerms: string[],
+	traceCandidates: Map<number, PipelineEvaluatedCandidate>,
+): EvaluationOutcome {
+	return {
+		status: "unresolved",
+		reason,
+		searchTerms,
+		candidates: finalizeTraceCandidates(traceCandidates),
+	};
+}
+
+function logStart(
+	media: AniListMedia,
+	ctx: PipelineContext,
+	primaryTitleHint?: string,
+): void {
+	if (!import.meta.env.DEV) {
+		return;
+	}
+
+	ctx.log.debug?.(
+		`pipeline:start anilistId=${media.id} priority=${ctx.priority ?? "normal"}${primaryTitleHint ? ` hint="${primaryTitleHint}"` : ""}`,
+	);
+}
+
+function logResolved(
+	media: AniListMedia,
+	ctx: PipelineContext,
+	out: EvaluationOutcome,
+): void {
+	if (!import.meta.env.DEV || out.status !== "resolved") {
+		return;
+	}
+
+	ctx.log.debug?.(
+		`pipeline:resolved anilistId=${media.id} providerId=${out.providerId} confidence=${out.confidence} synonym="${out.successfulSynonym}"`,
+	);
+}
+
+function logUnresolved(
+	media: AniListMedia,
+	ctx: PipelineContext,
+	reason: string,
+): void {
+	if (!import.meta.env.DEV) {
+		return;
+	}
+
+	ctx.log.debug?.(`pipeline:unresolved anilistId=${media.id} reason=${reason}`);
+}
 
 function addTraceCandidates(
 	registry: Map<number, PipelineEvaluatedCandidate>,
@@ -61,113 +249,28 @@ function finalizeTraceCandidates(
 
 export async function resolveViaPipeline(
 	media: AniListMedia,
-	ctx: {
-		anilistApi: AniListMediaService;
-		lookupClient: ProviderLookupClient<
-			ProviderCredentials,
-			ProviderLookupResult
-		>;
-		anibridgeMappingStore: AnibridgeMappingStore;
-		credentials: ProviderCredentials;
-		priority?: RequestPriority;
-		forceLookupNetwork?: boolean;
-		sessionSeenCanonical: Set<string>;
-		limits: {
-			maxTerms: number;
-			scoreThreshold: number;
-			earlyStopThreshold: number;
-		};
-		log: ScopedLogger;
-	},
+	ctx: PipelineContext,
 	primaryTitleHint?: string,
 ): Promise<EvaluationOutcome> {
-	if (import.meta.env.DEV) {
-		ctx.log.debug?.(
-			`pipeline:start anilistId=${media.id} priority=${ctx.priority ?? "normal"}${primaryTitleHint ? ` hint="${primaryTitleHint}"` : ""}`,
-		);
-	}
+	logStart(media, ctx, primaryTitleHint);
+
 	const mediaYear = media.startDate?.year ?? undefined;
 	const provider = ctx.lookupClient.provider;
-	const terms = generateSearchTerms(
-		provider,
-		media.title ?? ({} as Record<string, never>),
-		media.synonyms,
-	);
+	const terms = buildSearchTerms(media, provider, primaryTitleHint);
 	const traceCandidates = new Map<number, PipelineEvaluatedCandidate>();
-
-	if (primaryTitleHint) {
-		const trimmed = primaryTitleHint.trim();
-		const sanitized = sanitizeLookupDisplayForProvider(provider, trimmed);
-		if (sanitized) {
-			const canonical = canonicalTitleKeyForProvider(provider, sanitized);
-			if (canonical) {
-				const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
-				if (
-					canonicalTokens.length > 0 &&
-					!isSeasonalCanonicalTokens(canonicalTokens)
-				) {
-					const existingIndex = terms.findIndex(
-						(t) => t.canonical === canonical,
-					);
-					if (existingIndex !== -1) terms.splice(existingIndex, 1);
-					terms.unshift({ canonical, display: sanitized });
-				}
-			}
-		}
-	}
 	const traceSearchTerms = terms
 		.slice(0, ctx.limits.maxTerms)
 		.map((term) => term.display);
 
-	let overall: ReturnType<typeof scoreCandidates>[number][] = [];
+	const overall: ScoredPipelineCandidate[] = [];
 	const start = Date.now();
 
 	for (const term of terms.slice(0, ctx.limits.maxTerms)) {
 		if (!term.canonical) continue;
 
-		const seenInSession = ctx.sessionSeenCanonical.has(term.canonical);
-		let results;
-		if (ctx.forceLookupNetwork) {
-			// Always hit network on anime detail force-verify
-			const opts = {
-				...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
-				forceNetwork: true as const,
-			};
-			results = await ctx.lookupClient.lookup(
-				term.canonical,
-				term.display,
-				ctx.credentials,
-				opts,
-			);
-		} else if (seenInSession) {
-			const probe = await ctx.lookupClient.readFromCache(term.canonical);
-			if (probe.hit === "none") {
-				const opts = {
-					...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
-				};
-				results = await ctx.lookupClient.lookup(
-					term.canonical,
-					term.display,
-					ctx.credentials,
-					opts,
-				);
-			} else {
-				results = probe.results;
-			}
-		} else {
-			const opts = {
-				...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
-			};
-			results = await ctx.lookupClient.lookup(
-				term.canonical,
-				term.display,
-				ctx.credentials,
-				opts,
-			);
-		}
-
+		const results = await lookupForTerm(term, ctx);
 		const scored = scoreCandidates(provider, term, results, mediaYear);
-		overall = [...overall, ...scored];
+		overall.push(...scored);
 		addTraceCandidates(traceCandidates, scored, ctx.lookupClient);
 
 		// Mark canonical as seen once we've either looked up or confirmed a cache hit
@@ -178,24 +281,16 @@ export async function resolveViaPipeline(
 			scoreThreshold: ctx.limits.scoreThreshold,
 		});
 		if (early.stop && early.pick) {
-			const providerId = ctx.lookupClient.getProviderId(early.pick.result);
-			if (providerId === null) {
+			const out = resolvedOutcome(
+				early.pick,
+				ctx,
+				traceSearchTerms,
+				traceCandidates,
+			);
+			if (!out) {
 				continue;
 			}
-			const out: EvaluationOutcome = {
-				status: "resolved",
-				providerId,
-				reason: early.pick.reason,
-				confidence: early.pick.score,
-				successfulSynonym: early.pick.term.display,
-				searchTerms: traceSearchTerms,
-				candidates: finalizeTraceCandidates(traceCandidates),
-			};
-			if (import.meta.env.DEV) {
-				ctx.log.debug?.(
-					`pipeline:resolved anilistId=${media.id} providerId=${out.providerId} confidence=${early.pick.score} synonym="${early.pick.term.display}"`,
-				);
-			}
+			logResolved(media, ctx, out);
 			return out;
 		}
 
@@ -206,41 +301,18 @@ export async function resolveViaPipeline(
 	overall.sort((a, b) => b.score - a.score);
 	const pick = pickBest(overall, ctx.limits.scoreThreshold);
 	if (pick) {
-		const providerId = ctx.lookupClient.getProviderId(pick.result);
-		if (providerId === null) {
-			return {
-				status: "unresolved",
-				reason: "missing-provider-id",
-				searchTerms: traceSearchTerms,
-				candidates: finalizeTraceCandidates(traceCandidates),
-			};
-		}
-		const out: EvaluationOutcome = {
-			status: "resolved",
-			providerId,
-			reason: pick.reason,
-			confidence: pick.score,
-			successfulSynonym: pick.term.display,
-			searchTerms: traceSearchTerms,
-			candidates: finalizeTraceCandidates(traceCandidates),
-		};
-		if (import.meta.env.DEV) {
-			ctx.log.debug?.(
-				`pipeline:resolved anilistId=${media.id} providerId=${out.providerId} confidence=${pick.score} synonym="${pick.term.display}"`,
+		const out = resolvedOutcome(pick, ctx, traceSearchTerms, traceCandidates);
+		if (!out) {
+			return unresolvedOutcome(
+				"missing-provider-id",
+				traceSearchTerms,
+				traceCandidates,
 			);
 		}
+		logResolved(media, ctx, out);
 		return out;
 	}
 
-	if (import.meta.env.DEV) {
-		ctx.log.debug?.(
-			`pipeline:unresolved anilistId=${media.id} reason=low-confidence`,
-		);
-	}
-	return {
-		status: "unresolved",
-		reason: "low-confidence",
-		searchTerms: traceSearchTerms,
-		candidates: finalizeTraceCandidates(traceCandidates),
-	};
+	logUnresolved(media, ctx, "low-confidence");
+	return unresolvedOutcome("low-confidence", traceSearchTerms, traceCandidates);
 }

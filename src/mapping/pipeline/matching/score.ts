@@ -20,7 +20,24 @@ import {
   extractCandidateTitleVariants,
   getMatchingProfile,
   type CandidateTitleVariant,
+  type MatchingProfile,
 } from './profile';
+
+type TitleMatchParams = {
+  provider: Provider;
+  queryRaw: string;
+  candidate: unknown;
+  candidateYear?: number;
+  targetYear?: number;
+  candidateGenres?: readonly string[];
+  candidateCount?: number;
+};
+
+type TitleVariantPairEvidence = {
+  score: number;
+  exactNormalized: boolean;
+  exactCompact: boolean;
+};
 
 function hasRareTokenIntersection(query: string[], cand: string[]): boolean {
   const setC = new Set(cand.filter(t => t.length >= RARE_TOKEN_MIN_LEN));
@@ -98,27 +115,53 @@ function applyYearWeightingForProvider(
   return score * profile.yearFarMismatchFactor;
 }
 
-export function computeTitleMatchScoreForProvider(params: {
+function scoreTitleVariantPair(params: {
   provider: Provider;
-  queryRaw: string;
-  candidate: unknown;
+  profile: MatchingProfile;
+  queryNorm: string;
+  queryTokens: string[];
+  queryCompact: string;
+  candidateVariant: CandidateTitleVariant;
   candidateYear?: number;
   targetYear?: number;
-  candidateGenres?: readonly string[];
-  candidateCount?: number;
-}): number {
+}): TitleVariantPairEvidence | null {
+  const candidateNorm = normTitle(params.candidateVariant.value);
+  if (!candidateNorm) return null;
+
+  const candidateTokens = tokenize(candidateNorm);
+  const candidateCompact = compactTitleKey(params.candidateVariant.value);
+  const exactNormalized = params.queryNorm === candidateNorm;
+  const exactCompact = Boolean(params.queryCompact) && params.queryCompact === candidateCompact;
+
+  if (
+    params.profile.rareTokenGate === 'hard' &&
+    !exactNormalized &&
+    !exactCompact &&
+    !hasRareTokenIntersection(params.queryTokens, candidateTokens)
+  ) {
+    return null;
+  }
+
+  let score = composeBaseScore(params.queryNorm, candidateNorm, params.queryTokens, candidateTokens);
+
+  if (exactNormalized) {
+    score = Math.max(score, variantFloor(params.provider, params.candidateVariant, 'exact'));
+  }
+  if (exactCompact) {
+    score = Math.max(score, variantFloor(params.provider, params.candidateVariant, 'compact'));
+  }
+
+  score = applyYearWeightingForProvider(params.provider, score, params.candidateYear, params.targetYear);
+  score = applyVerbosePenalty(score, params.queryTokens, candidateNorm, params.queryNorm);
+
+  return { score: clampScore(score), exactNormalized, exactCompact };
+}
+
+export function computeTitleMatchScoreForProvider(params: TitleMatchParams): number {
   return computeTitleMatchEvidenceForProvider(params).score;
 }
 
-export function computeTitleMatchEvidenceForProvider(params: {
-  provider: Provider;
-  queryRaw: string;
-  candidate: unknown;
-  candidateYear?: number;
-  targetYear?: number;
-  candidateGenres?: readonly string[];
-  candidateCount?: number;
-}): { score: number; reason: PipelineMatchReason } {
+export function computeTitleMatchEvidenceForProvider(params: TitleMatchParams): { score: number; reason: PipelineMatchReason } {
   const profile = getMatchingProfile(params.provider);
   const queryVariants = buildQueryTitleVariantsForProvider(params.provider, params.queryRaw);
   const candidateVariants = extractCandidateTitleVariants(params.provider, params.candidate);
@@ -127,9 +170,11 @@ export function computeTitleMatchEvidenceForProvider(params: {
     return { score: 0, reason: 'fuzzy-match' };
   }
 
-  let bestScore = 0;
-  let bestExact = false;
-  let bestCompact = false;
+  let best: TitleVariantPairEvidence = {
+    score: 0,
+    exactNormalized: false,
+    exactCompact: false,
+  };
 
   for (const queryVariant of queryVariants) {
     const queryNorm = normTitle(queryVariant.value);
@@ -139,61 +184,38 @@ export function computeTitleMatchEvidenceForProvider(params: {
     if (!queryNorm) continue;
 
     for (const candidateVariant of candidateVariants) {
-      const candidateNorm = normTitle(candidateVariant.value);
-      if (!candidateNorm) continue;
-
-      const candidateTokens = tokenize(candidateNorm);
-      const candidateCompact = compactTitleKey(candidateVariant.value);
-      const exactNormalized = queryNorm === candidateNorm;
-      const exactCompact = Boolean(queryCompact) && queryCompact === candidateCompact;
-
-      if (
-        profile.rareTokenGate === 'hard' &&
-        !exactNormalized &&
-        !exactCompact &&
-        !hasRareTokenIntersection(queryTokens, candidateTokens)
-      ) {
-        continue;
-      }
-
-      let score = composeBaseScore(queryNorm, candidateNorm, queryTokens, candidateTokens);
-
-      if (exactNormalized) {
-        score = Math.max(score, variantFloor(params.provider, candidateVariant, 'exact'));
-      }
-      if (exactCompact) {
-        score = Math.max(score, variantFloor(params.provider, candidateVariant, 'compact'));
-      }
-
-      score = applyYearWeightingForProvider(params.provider, score, params.candidateYear, params.targetYear);
-      score = applyVerbosePenalty(score, queryTokens, candidateNorm, queryNorm);
-      score = clampScore(score);
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestExact = exactNormalized;
-        bestCompact = exactCompact;
+      const scored = scoreTitleVariantPair({
+        provider: params.provider,
+        profile,
+        queryNorm,
+        queryTokens,
+        queryCompact,
+        candidateVariant,
+        ...(typeof params.candidateYear === 'number' ? { candidateYear: params.candidateYear } : {}),
+        ...(typeof params.targetYear === 'number' ? { targetYear: params.targetYear } : {}),
+      });
+      if (scored && scored.score > best.score) {
+        best = scored;
       }
     }
   }
 
-  bestScore = applyGenrePenalty(bestScore, params.candidateGenres);
+  let score = applyGenrePenalty(best.score, params.candidateGenres);
 
   if (
     params.provider === 'radarr' &&
     params.candidateCount === 1 &&
-    bestScore >= profile.singleResultFloor &&
+    score >= profile.singleResultFloor &&
     params.targetYear !== undefined &&
     params.candidateYear !== undefined &&
-    params.targetYear === params.candidateYear &&
-    (bestExact || bestCompact || bestScore >= profile.singleResultFloor)
+    params.targetYear === params.candidateYear
   ) {
-    bestScore += profile.singleResultBoost;
+    score += profile.singleResultBoost;
   }
 
   return {
-    score: clampScore(bestScore),
-    reason: bestExact || bestCompact ? 'exact-title-match' : 'fuzzy-match',
+    score: clampScore(score),
+    reason: best.exactNormalized || best.exactCompact ? 'exact-title-match' : 'fuzzy-match',
   };
 }
 

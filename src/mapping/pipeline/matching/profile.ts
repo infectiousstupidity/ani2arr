@@ -2,9 +2,8 @@
 // src/mapping/pipeline/matching/profile.ts
 
 import type { Provider } from '@/providers';
+import { sanitizeLookupDisplayForProvider } from '@/mapping/title-normalization';
 import { canonicalTitleKey } from './key';
-import { canonicalizeLookupTerm, stripParenContent } from './normalize';
-import { sanitizeLookupDisplay as sanitizeSonarrLookupDisplay } from './season';
 
 export type CandidateTitleVariantSource =
   | 'title'
@@ -34,7 +33,6 @@ export interface MatchingProfile {
   compactAliasFloor: number;
   singleResultBoost: number;
   singleResultFloor: number;
-  compactIndexKeys: boolean;
 }
 
 const SONARR_PROFILE: MatchingProfile = {
@@ -50,7 +48,6 @@ const SONARR_PROFILE: MatchingProfile = {
   compactAliasFloor: 0.86,
   singleResultBoost: 0,
   singleResultFloor: 1,
-  compactIndexKeys: false,
 };
 
 const RADARR_PROFILE: MatchingProfile = {
@@ -66,7 +63,6 @@ const RADARR_PROFILE: MatchingProfile = {
   compactAliasFloor: 0.94,
   singleResultBoost: 0.04,
   singleResultFloor: 0.82,
-  compactIndexKeys: true,
 };
 
 function toTrimmedString(value: unknown): string | null {
@@ -164,84 +160,6 @@ export function getMatchingProfile(provider: Provider): MatchingProfile {
 export function compactTitleKey(term: string): string {
   const canonical = canonicalTitleKey(term);
   return canonical.replaceAll(/[\s-]+/g, '').trim();
-}
-
-export function sanitizeLookupDisplayWithProfile(provider: Provider, rawTitle: string): string {
-  return sanitizeLookupDisplayForProvider(provider, rawTitle);
-}
-
-function cleanLookupDisplay(term: string): string {
-  if (!term) return '';
-  return term
-    .replaceAll(/[\u3008-\u3011\u3014\u3015]/g, '')
-    .replaceAll(/[\u2018-\u201F\u275B\u275C]/g, '')
-    .replaceAll(/["']/g, '')
-    .replaceAll(/\s+/g, ' ')
-    .trim();
-}
-
-function sanitizeRadarrLookupDisplay(term: string): string {
-  if (!term) return '';
-  let s = cleanLookupDisplay(term);
-
-  // Preserve meaningful content inside ASCII square brackets by unwrapping instead of removing.
-  s = s.replaceAll(/\[([^\]]+)]/g, '$1');
-
-  const noParens = stripParenContent(s);
-  const normalized = noParens.replaceAll(/\s+/g, ' ').trim();
-  return /[\p{L}\p{N}]/u.test(normalized) ? normalized : '';
-}
-
-export function sanitizeLookupDisplayForProvider(provider: Provider, rawTitle: string): string {
-  return provider === 'radarr'
-    ? sanitizeRadarrLookupDisplay(rawTitle)
-    : sanitizeSonarrLookupDisplay(rawTitle);
-}
-
-export function canonicalTitleKeyForProvider(
-  provider: Provider,
-  rawTitle: string,
-  options: { keepYear?: boolean } = {},
-): string {
-  const sanitized = sanitizeLookupDisplayForProvider(provider, rawTitle);
-  const source = sanitized || stripParenContent(rawTitle).trim() || rawTitle.trim();
-  return canonicalTitleKey(source, options);
-}
-
-export function canonicalizeLookupTermForProvider(
-  provider: Provider,
-  rawTitle: string,
-  options: { keepYear?: boolean } = {},
-): string {
-  const sanitized = sanitizeLookupDisplayForProvider(provider, rawTitle);
-  const source = sanitized || stripParenContent(rawTitle).trim() || rawTitle.trim();
-  return canonicalizeLookupTerm(source, options);
-}
-
-export function buildTitleIndexKeysForProvider(provider: Provider, rawTitle: string): string[] {
-  const trimmed = rawTitle.trim();
-  if (!trimmed) return [];
-
-  const profile = getMatchingProfile(provider);
-  const out = new Set<string>();
-  const candidates = new Set<string>([trimmed]);
-  const sanitized = sanitizeLookupDisplayForProvider(provider, trimmed);
-  const stripped = stripParenContent(trimmed);
-
-  if (sanitized) candidates.add(sanitized);
-  if (stripped) candidates.add(stripped);
-
-  for (const candidate of candidates) {
-    const canonical = canonicalizeLookupTermForProvider(provider, candidate);
-    if (canonical) out.add(`title:${canonical}`);
-
-    if (profile.compactIndexKeys) {
-      const compact = compactTitleKey(candidate);
-      if (compact) out.add(`compact:${compact}`);
-    }
-  }
-
-  return [...out];
 }
 
 export function buildQueryTitleVariantsForProvider(

@@ -4,7 +4,7 @@
 import {
 	canonicalTitleKeyForProvider,
 	sanitizeLookupDisplayForProvider,
-} from "@/mapping/pipeline/matching";
+} from "@/mapping/title-normalization";
 import { scoreCandidates } from "../pipeline/scoring";
 import { isSeasonalCanonicalTokens } from "../pipeline/search-term-generator";
 import type { AcceptedAutoMappingResult } from "../auto-mapping/types";
@@ -13,13 +13,18 @@ import type { ProviderCredentials } from "@/providers";
 import { SCORE_THRESHOLD } from "../auto-mapping/constants";
 import type { ProviderLookupClient, ProviderLookupResult } from "../lookup";
 
+export interface HintLookupOptions {
+	credentials: ProviderCredentials;
+	log: ScopedLogger;
+	forceLookupNetwork?: boolean;
+}
+
 export async function tryHintLookup<TResult extends ProviderLookupResult>(
 	term: string,
 	lookupClient: ProviderLookupClient<ProviderCredentials, TResult>,
-	credentials: ProviderCredentials,
-	log: ScopedLogger,
-	forceLookupNetwork?: boolean,
+	options: HintLookupOptions,
 ): Promise<AcceptedAutoMappingResult | null> {
+	const { credentials, log, forceLookupNetwork } = options;
 	const provider = lookupClient.provider;
 	const trimmed = term.trim();
 	const sanitized = sanitizeLookupDisplayForProvider(provider, trimmed);

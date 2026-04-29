@@ -9,7 +9,7 @@ import type { RequestPriority } from "@/shared/utils/request-priority";
 import {
 	canonicalTitleKeyForProvider,
 	sanitizeLookupDisplayForProvider,
-} from "@/mapping/pipeline/matching";
+} from "@/mapping/title-normalization";
 import { incrementCounter, timeAsync } from "@/debug/metrics";
 import { priorityValue } from "@/shared/utils/request-priority";
 import { logger, type ScopedLogger } from "@/shared/utils/logger";
