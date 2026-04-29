@@ -6,7 +6,10 @@ import type {
 	SonarrSeries,
 } from "@/providers/sonarr.types";
 import type { TvdbId } from "@/providers/provider-id";
-import type { SonarrSeriesApi } from "@/providers/schemas/sonarr.schemas";
+import type {
+	SonarrLookupSeriesApi,
+	SonarrSeriesApi,
+} from "@/providers/schemas/sonarr.schemas";
 
 function normalizeText(value: string | null | undefined): string | undefined {
 	const trimmed = value?.trim();
@@ -73,20 +76,21 @@ export function toSonarrSeries(raw: SonarrSeriesApi): SonarrSeries {
 	}) as SonarrSeries;
 }
 
-export function toSonarrLookupSeries(raw: SonarrSeriesApi): SonarrLookupSeries {
-	const series = toSonarrSeries(raw);
+export function toSonarrLookupSeries(
+	raw: SonarrLookupSeriesApi,
+): SonarrLookupSeries {
 	return omitUndefinedProperties({
-		title: series.title,
-		tvdbId: series.tvdbId,
-		titleSlug: series.titleSlug,
-		year: series.year,
-		genres: series.genres,
-		id: series.id,
-		network: series.network,
-		seriesType: series.seriesType,
-		status: series.status,
-		images: series.images,
-		remotePoster: series.remotePoster,
-		statistics: series.statistics,
+		title: normalizeText(raw.title) ?? `Sonarr series ${raw.tvdbId}`,
+		tvdbId: raw.tvdbId,
+		titleSlug: normalizeText(raw.titleSlug),
+		year: raw.year,
+		genres: raw.genres ?? undefined,
+		id: raw.id,
+		network: normalizeText(raw.network),
+		seriesType: raw.seriesType,
+		status: raw.status,
+		images: raw.images ?? undefined,
+		remotePoster: raw.remotePoster,
+		statistics: raw.statistics,
 	}) as SonarrLookupSeries;
 }

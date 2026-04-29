@@ -18,6 +18,7 @@ import {
 	ProviderTagApiSchema,
 } from "@/providers/schemas/provider-shared.schemas";
 import {
+	SonarrLookupSeriesApiArraySchema,
 	SonarrSeriesApiArraySchema,
 	SonarrSeriesApiSchema,
 } from "@/providers/schemas/sonarr.schemas";
@@ -122,7 +123,7 @@ export class SonarrClient extends BaseProviderClient {
 		const series = await this.requestParsed(
 			`series/lookup?${qs}`,
 			credentials,
-			SonarrSeriesApiArraySchema,
+			SonarrLookupSeriesApiArraySchema,
 		);
 		return series.map((item) => toSonarrLookupSeries(item));
 	};
