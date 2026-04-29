@@ -10,7 +10,10 @@ import {
 	ProviderTagApiSchema,
 } from "./provider-shared.schemas";
 import { RadarrMovieApiSchema } from "./radarr.schemas";
-import { SonarrSeriesApiSchema } from "./sonarr.schemas";
+import {
+	SonarrLookupSeriesApiSchema,
+	SonarrSeriesApiSchema,
+} from "./sonarr.schemas";
 
 describe("provider shared API schemas", () => {
 	it("accepts nullable root folder path and freeSpace bytes", () => {
@@ -108,6 +111,38 @@ describe("SonarrSeriesApiSchema", () => {
 		).toThrow();
 		expect(() =>
 			v.parse(SonarrSeriesApiSchema, { ...valid, tags: [0] }),
+		).toThrow();
+	});
+});
+
+describe("SonarrLookupSeriesApiSchema", () => {
+	it("accepts Sonarr lookup results without full library-only fields", () => {
+		const parsed = v.parse(SonarrLookupSeriesApiSchema, {
+			title: "One-Punch Man",
+			tvdbId: 293_088,
+			titleSlug: "one-punch-man",
+			year: 2015,
+			genres: ["Action", "Animation", "Anime"],
+			status: "continuing",
+			statistics: {
+				seasonCount: 3,
+				episodeFileCount: 0,
+				episodeCount: 0,
+				totalEpisodeCount: 0,
+				sizeOnDisk: 0,
+			},
+		});
+
+		expect(parsed.tvdbId).toBe(293_088);
+		expect(parsed.title).toBe("One-Punch Man");
+	});
+
+	it("rejects invalid TVDB IDs in lookup results", () => {
+		expect(() =>
+			v.parse(SonarrLookupSeriesApiSchema, {
+				title: "Series",
+				tvdbId: 0,
+			}),
 		).toThrow();
 	});
 });

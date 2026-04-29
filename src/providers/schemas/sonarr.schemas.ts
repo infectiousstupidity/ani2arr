@@ -103,6 +103,25 @@ export const SonarrSeriesApiSchema = v.object({
 
 export const SonarrSeriesApiArraySchema = v.array(SonarrSeriesApiSchema);
 
+export const SonarrLookupSeriesApiSchema = v.object({
+	id: v.optional(SonarrSeriesIdSchema),
+	title: ProviderNullableStringSchema,
+	tvdbId: TvdbIdSchema,
+	titleSlug: ProviderOptionalNullableStringSchema,
+	year: v.optional(ProviderIntegerSchema),
+	genres: ProviderOptionalNullableStringArraySchema,
+	network: ProviderOptionalNullableStringSchema,
+	images: v.optional(v.nullable(v.array(SonarrMediaCoverApiSchema))),
+	remotePoster: ProviderOptionalNullableStringSchema,
+	status: v.optional(SonarrSeriesStatusApiSchema),
+	statistics: v.optional(SonarrStatisticsApiSchema),
+	seriesType: v.optional(v.picklist(SONARR_SERIES_TYPES)),
+});
+
+export const SonarrLookupSeriesApiArraySchema = v.array(
+	SonarrLookupSeriesApiSchema,
+);
+
 export type SonarrSeriesStatusApi = v.InferOutput<
 	typeof SonarrSeriesStatusApiSchema
 >;
@@ -110,3 +129,6 @@ export type SonarrNewItemMonitorApi = v.InferOutput<
 	typeof SonarrNewItemMonitorApiSchema
 >;
 export type SonarrSeriesApi = v.InferOutput<typeof SonarrSeriesApiSchema>;
+export type SonarrLookupSeriesApi = v.InferOutput<
+	typeof SonarrLookupSeriesApiSchema
+>;
