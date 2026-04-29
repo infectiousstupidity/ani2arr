@@ -34,7 +34,7 @@ import {
 import {
 	collectLinkedAniListIds,
 	getMappingSource,
-} from "@/mapping/mapping-sources";
+} from "@/mapping/queries/mapping-sources";
 import {
 	deriveLibraryUnknownReason,
 	type LibraryUnknownReason,

@@ -1,5 +1,5 @@
 /** Search thresholds used across mapping resolution. */
-// src/mapping/constants.ts
+// src/mapping/auto-mapping/constants.ts
 
 // Scoring thresholds for mapping resolution.
 /** Minimum score for a candidate to be considered a valid match. */

@@ -7,9 +7,9 @@ import type { SonarrLibrary } from "@/providers/library/sonarr-library";
 import type { RadarrClient } from "@/providers/clients/radarr.client";
 import type { SonarrClient } from "@/providers/clients/sonarr.client";
 import type { MappingService } from "@/mapping/mapping.service";
-import type { ManualMappingService } from "@/mapping/manual";
+import type { ManualMappingService } from "@/mapping/manual-mapping";
 import type { AutoMappingStore } from "@/mapping/auto-mapping/auto-mapping.store";
-import type { AnibridgeMappingStore } from "@/mapping/upstream";
+import type { AnibridgeMappingStore } from "@/mapping/upstream-mapping";
 import type { ExtensionOptions } from "@/options";
 import type { Provider, ProviderCredentials } from "@/providers";
 

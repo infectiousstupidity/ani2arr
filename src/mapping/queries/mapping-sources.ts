@@ -1,3 +1,4 @@
+// src/mapping/queries/mapping-sources.ts
 import type { AniListId } from "@/anilist";
 import {
 	parseProviderIdentity,
@@ -7,7 +8,7 @@ import {
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
-import type { AutoMappingRecord } from "./auto-mapping/types";
+import type { AutoMappingRecord } from "../auto-mapping/types";
 
 export interface CollectedMappingSources {
 	provider: Provider;

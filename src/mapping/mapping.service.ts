@@ -24,7 +24,7 @@ import {
 	removeAutoMappingFailure,
 } from "./auto-mapping/failure.cache";
 import { logger } from "@/shared/utils/logger";
-import { ManualMappingService } from "./manual";
+import { ManualMappingService } from "./manual-mapping";
 import { type ProviderLookupClient, type ProviderLookupResult } from "./lookup";
 import { resolveAutoMapping } from "./auto-mapping/resolve-auto-mapping";
 import {
@@ -33,7 +33,7 @@ import {
 	AutoMappingStore,
 } from "./auto-mapping/auto-mapping.store";
 import { shouldApplyCandidateSuppression } from "./resolution-policy";
-import { AnibridgeMappingStore } from "./upstream";
+import { AnibridgeMappingStore } from "./upstream-mapping";
 import { buildEffectiveMapping } from "./effective-mapping";
 import type { AcceptedMappingEvidence, AcceptedMappingSource } from "./types";
 import type {
@@ -528,5 +528,5 @@ export class MappingService {
 	}
 }
 
-export { type AnibridgeMappingPayload } from "./upstream";
+export { type AnibridgeMappingPayload } from "./upstream-mapping";
 export { type AcceptedAutoMappingResult } from "./auto-mapping/types";

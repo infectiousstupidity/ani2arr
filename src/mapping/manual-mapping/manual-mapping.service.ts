@@ -1,5 +1,5 @@
 /** Manual mapping service for persisted manual mappings, ignored mappings, and rejected candidates. */
-// src/mapping/manual/manual-mapping.service.ts
+// src/mapping/manual-mapping/manual-mapping.service.ts
 
 import { storage } from "@wxt-dev/storage";
 import { browser } from "wxt/browser";

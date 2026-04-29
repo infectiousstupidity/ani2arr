@@ -7,13 +7,13 @@ import {
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
-import type { AnibridgeMappingPair } from "@/mapping/upstream";
+import type { AnibridgeMappingPair } from "@/mapping/upstream-mapping";
 import type { AutoMappingRecord } from "@/mapping/auto-mapping/types";
 import {
 	buildEffectiveMapping,
 	type EffectiveMapping,
 } from "../effective-mapping";
-import { getMappingSource } from "../mapping-sources";
+import { getMappingSource } from "./mapping-sources";
 
 export type EffectiveMappingPresence = Pick<
 	EffectiveMapping,

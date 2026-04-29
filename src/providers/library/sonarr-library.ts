@@ -7,9 +7,9 @@ import type { StatusInput } from "@/rpc/schemas";
 import type { CheckSeriesStatusResponse } from "@/rpc/types";
 import { buildSeriesStatusResponseFromLibraryStatus } from "@/providers/library/status-response-adapter";
 import type { MappingService } from "@/mapping/mapping.service";
-import type { ManualMappingService } from "@/mapping/manual";
+import type { ManualMappingService } from "@/mapping/manual-mapping";
 import type { AutoMappingOptions } from "@/mapping/auto-mapping/types";
-import type { AnibridgeMappingStore } from "@/mapping/upstream";
+import type { AnibridgeMappingStore } from "@/mapping/upstream-mapping";
 import { ErrorCode, logError, normalizeError } from "@/shared/errors";
 import {
 	getExtensionOptionsSnapshot,
@@ -18,7 +18,6 @@ import {
 	type ExtensionOptions,
 } from "@/options";
 import {
-	parseTvdbIdOrNull,
 	type ProviderCredentials,
 	type SonarrLookupSeries,
 	type SonarrSeries,
@@ -27,7 +26,6 @@ import {
 } from "@/providers";
 import { BaseProviderLibraryStore } from "./base-provider-library.store";
 import { notifyLibraryMutation } from "./notify-library-mutation";
-import { SonarrLibraryIndexer } from "./sonarr-library.indexer";
 import type {
 	LibraryMutationEmitter,
 	LibraryStatusOptions,
@@ -43,7 +41,6 @@ type SonarrLibraryMutationPayload = {
 };
 
 export class SonarrLibrary {
-	private readonly indexer = new SonarrLibraryIndexer();
 	private readonly store: BaseProviderLibraryStore<
 		SonarrSeries,
 		SonarrSeriesSnapshot,
@@ -69,7 +66,6 @@ export class SonarrLibrary {
 	) {
 		this.store = new BaseProviderLibraryStore(
 			caches,
-			this.indexer,
 			{
 				cacheKey: CACHE_KEY,
 				getCredentials: (options) => getProviderCredentials(options, "sonarr"),
@@ -272,14 +268,14 @@ export class SonarrLibrary {
 			);
 		}
 
-		await this.store.getLeanList();
 		const sonarrOptions = await getExtensionOptionsSnapshot();
-		const isConfigured = hasConfiguredProviderCredentials(sonarrOptions, "sonarr");
+		const isConfigured = hasConfiguredProviderCredentials(
+			sonarrOptions,
+			"sonarr",
+		);
 
 		const normalizedTitle = payload.title?.trim();
-		let tvdbId: TvdbId | null = parseTvdbIdOrNull(
-			this.indexer.findTvdbIdInIndex(payload),
-		);
+		let tvdbId: TvdbId | null = null;
 		let successfulSynonym: string | undefined;
 		let mappingReason: CheckSeriesStatusResponse["mappingReason"];
 		let mappingSource: CheckSeriesStatusResponse["mappingSource"];

@@ -10,11 +10,6 @@ import type {
 } from "./types";
 import { PROVIDER_LIBRARY_CACHE_TTL } from "./cache";
 
-type StoreIndexer<TSnapshot> = {
-	reset(): void;
-	reindex(list: TSnapshot[]): void;
-};
-
 type BaseProviderLibraryStoreAdapter<
 	TFullEntry,
 	TSnapshot,
@@ -33,11 +28,9 @@ export class BaseProviderLibraryStore<
 	TProviderId extends number,
 > {
 	private inflightRefresh: Promise<TSnapshot[]> | null = null;
-	private indexesReady = false;
 
 	constructor(
 		private readonly caches: ProviderLibraryCaches<TSnapshot>,
-		private readonly indexer: StoreIndexer<TSnapshot>,
 		private readonly adapter: BaseProviderLibraryStoreAdapter<
 			TFullEntry,
 			TSnapshot,
@@ -49,7 +42,6 @@ export class BaseProviderLibraryStore<
 	async getLeanList(): Promise<TSnapshot[]> {
 		const cached = await this.caches.lean.read(this.adapter.cacheKey);
 		if (cached) {
-			this.ensureIndexes(cached.value);
 			if (cached.stale && !this.inflightRefresh) {
 				this.refreshCache().catch((error) => {
 					logError(normalizeError(error), `${this.logScope}:backgroundRefresh`);
@@ -76,8 +68,6 @@ export class BaseProviderLibraryStore<
 				const credentials = this.adapter.getCredentials(options);
 
 				if (!credentials) {
-					this.indexer.reset();
-					this.indexesReady = false;
 					await this.caches.lean.remove(this.adapter.cacheKey);
 					return [];
 				}
@@ -89,7 +79,6 @@ export class BaseProviderLibraryStore<
 						Number.isFinite(this.adapter.getProviderId(snapshot)),
 					);
 
-				this.setIndexedList(snapshots);
 				await this.caches.lean.write(this.adapter.cacheKey, snapshots, {
 					staleMs: PROVIDER_LIBRARY_CACHE_TTL.normal.staleMs,
 					hardMs: PROVIDER_LIBRARY_CACHE_TTL.normal.hardMs,
@@ -106,7 +95,6 @@ export class BaseProviderLibraryStore<
 					meta: { lastErrorCode: normalized.code },
 				});
 
-				this.setIndexedList(fallbackList);
 				return fallbackList;
 			} finally {
 				this.inflightRefresh = null;
@@ -129,7 +117,6 @@ export class BaseProviderLibraryStore<
 				? [...current, snapshot]
 				: [...current.slice(0, idx), snapshot, ...current.slice(idx + 1)];
 
-		this.setIndexedList(updated);
 		await this.caches.lean.write(this.adapter.cacheKey, updated, {
 			staleMs: PROVIDER_LIBRARY_CACHE_TTL.normal.staleMs,
 			hardMs: PROVIDER_LIBRARY_CACHE_TTL.normal.hardMs,
@@ -143,20 +130,9 @@ export class BaseProviderLibraryStore<
 		);
 		if (filtered.length === current.length) return;
 
-		this.setIndexedList(filtered);
 		await this.caches.lean.write(this.adapter.cacheKey, filtered, {
 			staleMs: PROVIDER_LIBRARY_CACHE_TTL.normal.staleMs,
 			hardMs: PROVIDER_LIBRARY_CACHE_TTL.normal.hardMs,
 		});
-	}
-
-	private ensureIndexes(list: TSnapshot[]): void {
-		if (list.length === 0 || this.indexesReady) return;
-		this.setIndexedList(list);
-	}
-
-	private setIndexedList(list: TSnapshot[]): void {
-		this.indexer.reindex(list);
-		this.indexesReady = true;
 	}
 }

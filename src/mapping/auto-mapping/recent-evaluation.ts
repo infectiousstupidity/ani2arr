@@ -1,16 +1,16 @@
 /** Pure helpers for recent mapping-evaluation traces and candidate summaries. */
-// src/mapping/recent-evaluation.ts
+// src/mapping/auto-mapping/recent-evaluation.ts
 
 import type { ProviderId } from "@/providers";
-import type { EvaluationOutcome } from "./pipeline/types";
+import type { EvaluationOutcome } from "../pipeline/types";
 import type {
 	AcceptedMappingReason,
 	AcceptedMappingSource,
 	MappingCandidateEvaluation,
 	MappingCandidateEvaluationStatus,
 	RecentMappingEvaluationTrace,
-} from "./types";
-import type { AcceptedAutoMappingResult } from "./auto-mapping/types";
+} from "../types";
+import type { AcceptedAutoMappingResult } from "./types";
 
 const RECENT_TRACE_CANDIDATE_LIMIT = 8;
 
