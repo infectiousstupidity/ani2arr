@@ -1,42 +1,35 @@
-/** Manual mapping-owned persisted entry types for manual mappings, ignored mappings, and rejected candidates. */
+/** Manual mapping-owned persisted entry types. */
 // src/mapping/manual/types.ts
 
-import type { AniListId } from '@/anilist';
-import type { Provider, TmdbId, TvdbId } from '@/providers';
+import type { AniListId } from "@/anilist";
+import type { Provider, ProviderId } from "@/providers";
 
-export type PersistedProviderMappingRecord =
-  | {
-      anilistId: AniListId;
-      provider: 'sonarr';
-      providerId: TvdbId;
-      updatedAt: number;
-    }
-  | {
-      anilistId: AniListId;
-      provider: 'radarr';
-      providerId: TmdbId;
-      updatedAt: number;
-    };
+export interface PersistedProviderMappingRecord {
+	anilistId: AniListId;
+	provider: Provider;
+	providerId: ProviderId;
+	updatedAt: number;
+}
 
 export interface PersistedMappingIgnoreRecord {
-  anilistId: AniListId;
-  provider: Provider;
-  updatedAt: number;
+	anilistId: AniListId;
+	provider: Provider;
+	updatedAt: number;
 }
 
-export type StoredProviderMappingEntry =
-  | {
-      provider: 'sonarr';
-      providerId: TvdbId;
-      updatedAt: number;
-    }
-  | {
-      provider: 'radarr';
-      providerId: TmdbId;
-      updatedAt: number;
-    };
+export type ManualMappingKey = `${Provider}:${number}`;
 
-export interface StoredMappingIgnoreEntry {
-  provider: Provider;
-  updatedAt: number;
+// One user-authored mapping decision for one provider + AniList entry.
+export interface StoredManualMapping {
+	v: 2;
+	providerId?: number;
+	mappedAt?: number;
+	ignoredAt?: number;
+	rejectedProviderIds?: Record<string, number>;
+	updatedAt: number;
 }
+
+export type StoredManualMappings = Record<
+	ManualMappingKey,
+	StoredManualMapping
+>;

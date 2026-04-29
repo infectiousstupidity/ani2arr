@@ -1,339 +1,458 @@
 /** Manual mapping service for persisted manual mappings, ignored mappings, and rejected candidates. */
 // src/mapping/manual/manual-mapping.service.ts
 
-import type { AniListId } from '@/anilist';
-import { parseProviderIdentity, type Provider, type ProviderIdFor, type ProviderTargetId, type TmdbId, type TvdbId } from '@/providers';
+import { storage } from "@wxt-dev/storage";
+import { browser } from "wxt/browser";
+import type { AniListId } from "@/anilist";
 import {
-  createRecordKey,
-  createReverseLookupKey,
-  createCandidateRecordKey,
-  isFiniteId,
-  parseRecordKey,
-} from './keys';
-import { createManualMappingPersistedMaps } from '@/mapping/manual/manual-mapping.storage';
-import { PersistedMap } from '@/mapping/manual/persisted-map';
+	type Provider,
+	type ProviderIdFor,
+	type ProviderId,
+	parseProviderId,
+} from "@/providers";
+import {
+	createManualMappingKey,
+	createReverseLookupKey,
+	normalizeStoredManualMapping,
+	parseManualMappingKey,
+} from "./keys";
 import type {
-  PersistedMappingIgnoreRecord,
-  PersistedProviderMappingRecord,
-  StoredMappingIgnoreEntry,
-  StoredProviderMappingEntry,
-} from './types';
+	ManualMappingKey,
+	PersistedMappingIgnoreRecord,
+	PersistedProviderMappingRecord,
+	StoredManualMapping,
+	StoredManualMappings,
+} from "./types";
 
-type ParsedRecordKey = { provider: Provider; anilistId: AniListId };
-type ParsedCandidateKey =
-  | { provider: 'sonarr'; anilistId: AniListId; providerId: TvdbId }
-  | { provider: 'radarr'; anilistId: AniListId; providerId: TmdbId };
+export const MANUAL_MAPPINGS_STORAGE_KEY = "local:manualMappings";
+export const MANUAL_MAPPINGS_CHANGE_KEY = "manualMappings";
 
-const toProviderIdRecord = (
-  input: { anilistId: AniListId; updatedAt: number } & (
-    | { provider: 'sonarr'; providerId: TvdbId }
-    | { provider: 'radarr'; providerId: TmdbId }
-  ),
-): PersistedProviderMappingRecord => input;
+const manualMappingsStorage = storage.defineItem<StoredManualMappings>(
+	MANUAL_MAPPINGS_STORAGE_KEY,
+	{
+		fallback: {} as StoredManualMappings,
+		version: 2,
+	},
+);
 
-const MANUAL_MAPPING_SORT = (a: { updatedAt: number; provider: string; anilistId: AniListId }, b: { updatedAt: number; provider: string; anilistId: AniListId }) =>
-  b.updatedAt - a.updatedAt || a.provider.localeCompare(b.provider) || a.anilistId - b.anilistId;
+const MANUAL_MAPPING_SORT = (
+	a: { updatedAt: number; provider: string; anilistId: AniListId },
+	b: { updatedAt: number; provider: string; anilistId: AniListId },
+) =>
+	b.updatedAt - a.updatedAt ||
+	a.provider.localeCompare(b.provider) ||
+	a.anilistId - b.anilistId;
+
+const isRecordEmpty = (record: StoredManualMapping): boolean =>
+	record.providerId === undefined &&
+	record.ignoredAt === undefined &&
+	Object.keys(record.rejectedProviderIds ?? {}).length === 0;
 
 export class ManualMappingService {
-  private readonly manualMappings: PersistedMap<string, StoredProviderMappingEntry, ParsedRecordKey>;
-  private readonly ignoredMappings: PersistedMap<string, StoredMappingIgnoreEntry, ParsedRecordKey>;
-  private readonly rejectedCandidates: PersistedMap<string, StoredProviderMappingEntry, ParsedCandidateKey>;
-  private readonly reverse = new Map<string, Set<AniListId>>();
-  private initialized = false;
-  private writeQueue: Promise<void> = Promise.resolve();
+	private readonly manualMappings = new Map<
+		ManualMappingKey,
+		StoredManualMapping
+	>();
+	private readonly reverse = new Map<string, Set<AniListId>>();
+	private initialized = false;
+	private writeQueue: Promise<void> = Promise.resolve();
 
-  constructor() {
-    const maps = createManualMappingPersistedMaps();
-    this.manualMappings = maps.manualMappings;
-    this.ignoredMappings = maps.ignoredMappings;
-    this.rejectedCandidates = maps.rejectedCandidates;
-  }
+	public async init(): Promise<void> {
+		if (this.initialized) return;
+		await this.load();
+		this.rebuildReverse();
+		this.attachWatcher();
+		this.initialized = true;
+	}
 
-  public async init(): Promise<void> {
-    if (this.initialized) return;
-    await Promise.all([
-      this.manualMappings.load(),
-      this.ignoredMappings.load(),
-      this.rejectedCandidates.load(),
-    ]);
-    this.rebuildReverse();
-    this.attachWatchers();
-    this.initialized = true;
-  }
+	public get<P extends Provider>(
+		provider: P,
+		anilistId: AniListId,
+	): ProviderIdFor<P> | null {
+		const entry = this.manualMappings.get(
+			createManualMappingKey(provider, anilistId),
+		);
+		if (entry?.providerId === undefined) return null;
+		return parseProviderId(
+			provider,
+			entry.providerId,
+		) as ProviderIdFor<P> | null;
+	}
 
-  public get(provider: 'sonarr', anilistId: AniListId): TvdbId | null;
-  public get(provider: 'radarr', anilistId: AniListId): TmdbId | null;
-  public get(provider: Provider, anilistId: AniListId): ProviderTargetId | null;
-  public get(provider: Provider, anilistId: AniListId): ProviderTargetId | null {
-    const entry = this.manualMappings.get(createRecordKey(provider, anilistId));
-    return entry?.provider === provider ? entry.providerId : null;
-  }
+	public has(provider: Provider, anilistId: AniListId): boolean {
+		return this.get(provider, anilistId) !== null;
+	}
 
-  public has(provider: Provider, anilistId: AniListId): boolean {
-    return this.manualMappings.has(createRecordKey(provider, anilistId));
-  }
+	public isIgnored(provider: Provider, anilistId: AniListId): boolean {
+		return (
+			this.manualMappings.get(createManualMappingKey(provider, anilistId))
+				?.ignoredAt !== undefined
+		);
+	}
 
-  public isIgnored(provider: Provider, anilistId: AniListId): boolean {
-    return this.ignoredMappings.has(createRecordKey(provider, anilistId));
-  }
+	public getCandidateSuppression<P extends Provider>(
+		provider: P,
+		anilistId: AniListId,
+		providerId: ProviderIdFor<P>,
+	): "rejected" | null {
+		const entry = this.manualMappings.get(
+			createManualMappingKey(provider, anilistId),
+		);
+		return entry?.rejectedProviderIds?.[String(providerId)] === undefined
+			? null
+			: "rejected";
+	}
 
-  public getCandidateSuppression<P extends Provider>(
-    provider: P,
-    anilistId: AniListId,
-    providerId: ProviderIdFor<P>,
-  ): 'rejected' | null {
-    const key = createCandidateRecordKey(provider, anilistId, providerId);
-    if (this.rejectedCandidates.has(key)) return 'rejected';
-    return null;
-  }
+	public getLinkedAniListIds<P extends Provider>(
+		provider: P,
+		providerId: ProviderIdFor<P>,
+	): AniListId[] {
+		const bucket = this.reverse.get(
+			createReverseLookupKey(provider, providerId),
+		);
+		if (!bucket) return [];
+		return [...bucket];
+	}
 
-  public getLinkedAniListIds<P extends Provider>(provider: P, providerId: ProviderIdFor<P>): AniListId[] {
-    if (!isFiniteId(providerId)) return [];
-    const bucket = this.reverse.get(createReverseLookupKey(provider, providerId));
-    if (!bucket) return [];
-    return [...bucket];
-  }
+	public async set<P extends Provider>(
+		provider: P,
+		anilistId: AniListId,
+		providerId: ProviderIdFor<P>,
+	): Promise<void> {
+		await this.enqueueWrite(async () => {
+			const key = createManualMappingKey(provider, anilistId);
+			const now = Date.now();
+			const previous = this.manualMappings.get(key);
+			if (previous?.providerId !== undefined) {
+				const previousProviderId = parseProviderId(
+					provider,
+					previous.providerId,
+				);
+				if (previousProviderId !== null) {
+					this.removeReverse(provider, previousProviderId, anilistId);
+				}
+			}
 
-  public async set<P extends Provider>(provider: P, anilistId: AniListId, providerId: ProviderIdFor<P>): Promise<void> {
-    await this.enqueueWrite(async () => {
-      const key = createRecordKey(provider, anilistId);
-      const entry = { ...parseProviderIdentity(provider, providerId), updatedAt: Date.now() };
+			const rejectedProviderIds = { ...previous?.rejectedProviderIds };
+			delete rejectedProviderIds[String(providerId)];
 
-      const prev = this.manualMappings.get(key);
-      if (prev) this.removeReverse(prev.provider, prev.providerId, anilistId);
+			const next: StoredManualMapping = {
+				v: 2,
+				providerId,
+				mappedAt: now,
+				...(Object.keys(rejectedProviderIds).length > 0
+					? { rejectedProviderIds }
+					: {}),
+				updatedAt: now,
+			};
 
-      // Clear conflicting ignore.
-      this.ignoredMappings.delete(key);
+			this.manualMappings.set(key, next);
+			this.addReverse(provider, providerId, anilistId);
+			await this.persist();
+		});
+	}
 
-      const candidateKey = createCandidateRecordKey(provider, anilistId, providerId);
-      this.rejectedCandidates.delete(candidateKey);
+	public async clear(provider: Provider, anilistId: AniListId): Promise<void> {
+		await this.enqueueWrite(async () => {
+			const key = createManualMappingKey(provider, anilistId);
+			const entry = this.manualMappings.get(key);
+			if (!entry) return;
 
-      this.manualMappings.set(key, entry);
-      this.addReverse(provider, providerId, anilistId);
+			if (entry.providerId !== undefined) {
+				const providerId = parseProviderId(provider, entry.providerId);
+				if (providerId !== null) {
+					this.removeReverse(provider, providerId, anilistId);
+				}
+			}
 
-      await Promise.all([
-        this.manualMappings.persist(),
-        this.ignoredMappings.persist(),
-        this.rejectedCandidates.persist(),
-      ]);
-    });
-  }
+			delete entry.providerId;
+			delete entry.mappedAt;
+			entry.updatedAt = Date.now();
+			this.saveOrDeleteEmptyRecord(key, entry);
+			await this.persist();
+		});
+	}
 
-  public async clear(provider: Provider, anilistId: AniListId): Promise<void> {
-    await this.enqueueWrite(async () => {
-      const key = createRecordKey(provider, anilistId);
-      const prev = this.manualMappings.get(key);
-      if (prev) this.removeReverse(prev.provider, prev.providerId, anilistId);
-      this.manualMappings.delete(key);
-      await this.manualMappings.persist();
-    });
-  }
+	public async setIgnore(
+		provider: Provider,
+		anilistId: AniListId,
+	): Promise<void> {
+		await this.enqueueWrite(async () => {
+			const key = createManualMappingKey(provider, anilistId);
+			const now = Date.now();
+			const entry = this.getOrCreateRecord(key, now);
 
-  public async setIgnore(provider: Provider, anilistId: AniListId): Promise<void> {
-    await this.enqueueWrite(async () => {
-      const key = createRecordKey(provider, anilistId);
+			if (entry.providerId !== undefined) {
+				const providerId = parseProviderId(provider, entry.providerId);
+				if (providerId !== null) {
+					this.removeReverse(provider, providerId, anilistId);
+				}
+			}
 
-      // Clear conflicting manual mapping.
-      const manualMapping = this.manualMappings.get(key);
-      if (manualMapping) {
-        this.removeReverse(manualMapping.provider, manualMapping.providerId, anilistId);
-        this.manualMappings.delete(key);
-      }
+			delete entry.providerId;
+			delete entry.mappedAt;
+			entry.ignoredAt = now;
+			entry.updatedAt = now;
+			this.manualMappings.set(key, entry);
+			await this.persist();
+		});
+	}
 
-      this.ignoredMappings.set(key, { provider, updatedAt: Date.now() });
+	public async clearIgnore(
+		provider: Provider,
+		anilistId: AniListId,
+	): Promise<void> {
+		await this.enqueueWrite(async () => {
+			const key = createManualMappingKey(provider, anilistId);
+			const entry = this.manualMappings.get(key);
+			if (!entry) return;
 
-      await Promise.all([
-        this.manualMappings.persist(),
-        this.ignoredMappings.persist(),
-      ]);
-    });
-  }
+			delete entry.ignoredAt;
+			entry.updatedAt = Date.now();
+			this.saveOrDeleteEmptyRecord(key, entry);
+			await this.persist();
+		});
+	}
 
-  public async clearIgnore(provider: Provider, anilistId: AniListId): Promise<void> {
-    await this.enqueueWrite(async () => {
-      this.ignoredMappings.delete(createRecordKey(provider, anilistId));
-      await this.ignoredMappings.persist();
-    });
-  }
+	public async setRejectedCandidate<P extends Provider>(
+		provider: P,
+		anilistId: AniListId,
+		providerId: ProviderIdFor<P>,
+	): Promise<void> {
+		await this.enqueueWrite(async () => {
+			const key = createManualMappingKey(provider, anilistId);
+			const now = Date.now();
+			const entry = this.getOrCreateRecord(key, now);
 
-  public async setRejectedCandidate<P extends Provider>(
-    provider: P,
-    anilistId: AniListId,
-    providerId: ProviderIdFor<P>,
-  ): Promise<void> {
-    await this.setCandidateSuppression(provider, anilistId, providerId);
-  }
+			entry.rejectedProviderIds = {
+				...entry.rejectedProviderIds,
+				[String(providerId)]: now,
+			};
+			entry.updatedAt = now;
+			this.manualMappings.set(key, entry);
+			await this.persist();
+		});
+	}
 
-  public async clearRejectedCandidate<P extends Provider>(
-    provider: P,
-    anilistId: AniListId,
-    providerId: ProviderIdFor<P>,
-  ): Promise<void> {
-    await this.clearCandidateSuppression(provider, anilistId, providerId);
-  }
+	public async clearRejectedCandidate<P extends Provider>(
+		provider: P,
+		anilistId: AniListId,
+		providerId: ProviderIdFor<P>,
+	): Promise<void> {
+		await this.enqueueWrite(async () => {
+			const key = createManualMappingKey(provider, anilistId);
+			const entry = this.manualMappings.get(key);
+			if (!entry?.rejectedProviderIds) return;
 
-  public list(provider?: Provider): PersistedProviderMappingRecord[] {
-    const entries = this.manualMappings.list<PersistedProviderMappingRecord>(
-      (_key, entry, parsed) => entry.provider === 'sonarr'
-        ? toProviderIdRecord({
-            anilistId: parsed.anilistId,
-            provider: entry.provider,
-            providerId: entry.providerId,
-            updatedAt: entry.updatedAt,
-          })
-        : toProviderIdRecord({
-            anilistId: parsed.anilistId,
-            provider: entry.provider,
-            providerId: entry.providerId,
-            updatedAt: entry.updatedAt,
-          }),
-      this.providerFilter(provider),
-    );
-    entries.sort(MANUAL_MAPPING_SORT);
-    return entries;
-  }
+			delete entry.rejectedProviderIds[String(providerId)];
+			if (Object.keys(entry.rejectedProviderIds).length === 0) {
+				delete entry.rejectedProviderIds;
+			}
+			entry.updatedAt = Date.now();
+			this.saveOrDeleteEmptyRecord(key, entry);
+			await this.persist();
+		});
+	}
 
-  public listIgnores(provider?: Provider): PersistedMappingIgnoreRecord[] {
-    const entries = this.ignoredMappings.list<PersistedMappingIgnoreRecord>(
-      (_key, entry, parsed) => ({
-        anilistId: parsed.anilistId,
-        provider: parsed.provider,
-        updatedAt: entry.updatedAt,
-      }),
-      this.providerFilter(provider),
-    );
-    entries.sort(MANUAL_MAPPING_SORT);
-    return entries;
-  }
+	public list(provider?: Provider): PersistedProviderMappingRecord[] {
+		const entries: PersistedProviderMappingRecord[] = [];
+		for (const [key, entry] of this.manualMappings.entries()) {
+			const parsed = parseManualMappingKey(key);
+			if (
+				!parsed ||
+				(provider && parsed.provider !== provider) ||
+				entry.providerId === undefined
+			) {
+				continue;
+			}
+			const providerId = parseProviderId(parsed.provider, entry.providerId);
+			if (providerId !== null) {
+				entries.push({
+					anilistId: parsed.anilistId,
+					provider: parsed.provider,
+					providerId,
+					updatedAt: entry.mappedAt ?? entry.updatedAt,
+				});
+			}
+		}
+		entries.sort(MANUAL_MAPPING_SORT);
+		return entries;
+	}
 
-  public listRejectedCandidates(provider?: Provider): PersistedProviderMappingRecord[] {
-    return this.listCandidateSuppressions(this.rejectedCandidates, provider);
-  }
+	public listIgnores(provider?: Provider): PersistedMappingIgnoreRecord[] {
+		const entries: PersistedMappingIgnoreRecord[] = [];
+		for (const [key, entry] of this.manualMappings.entries()) {
+			const parsed = parseManualMappingKey(key);
+			if (
+				!parsed ||
+				(provider && parsed.provider !== provider) ||
+				entry.ignoredAt === undefined
+			) {
+				continue;
+			}
+			entries.push({
+				anilistId: parsed.anilistId,
+				provider: parsed.provider,
+				updatedAt: entry.ignoredAt,
+			});
+		}
+		entries.sort(MANUAL_MAPPING_SORT);
+		return entries;
+	}
 
-  public async clearAll(provider?: Provider): Promise<void> {
-    await this.enqueueWrite(async () => {
-      if (!provider) {
-        await Promise.all([
-          this.manualMappings.resetStorage(),
-          this.ignoredMappings.resetStorage(),
-          this.rejectedCandidates.resetStorage(),
-        ]);
-        this.reverse.clear();
-        return;
-      }
+	public listRejectedCandidates(
+		provider?: Provider,
+	): PersistedProviderMappingRecord[] {
+		const entries: PersistedProviderMappingRecord[] = [];
+		for (const [key, entry] of this.manualMappings.entries()) {
+			const parsed = parseManualMappingKey(key);
+			if (
+				!parsed ||
+				(provider && parsed.provider !== provider) ||
+				!entry.rejectedProviderIds
+			) {
+				continue;
+			}
+			for (const [rawProviderId, updatedAt] of Object.entries(
+				entry.rejectedProviderIds,
+			)) {
+				const providerId = parseProviderId(
+					parsed.provider,
+					Number(rawProviderId),
+				);
+				if (providerId !== null) {
+					entries.push({
+						anilistId: parsed.anilistId,
+						provider: parsed.provider,
+						providerId,
+						updatedAt,
+					});
+				}
+			}
+		}
+		entries.sort(MANUAL_MAPPING_SORT);
+		return entries;
+	}
 
-      const prefix = `${provider}:`;
-      await Promise.all([
-        this.manualMappings.deleteByPrefix(prefix),
-        this.ignoredMappings.deleteByPrefix(prefix),
-        this.rejectedCandidates.deleteByPrefix(prefix),
-      ]);
-      this.rebuildReverse();
-    });
-  }
+	public async clearAll(provider?: Provider): Promise<void> {
+		await this.enqueueWrite(async () => {
+			if (!provider) {
+				this.manualMappings.clear();
+				this.reverse.clear();
+				await this.persist();
+				return;
+			}
 
-  private listCandidateSuppressions(
-    source: PersistedMap<string, StoredProviderMappingEntry, ParsedCandidateKey>,
-    provider?: Provider,
-  ): PersistedProviderMappingRecord[] {
-    const entries = source.list<PersistedProviderMappingRecord>(
-      (_key, entry, parsed) => parsed.provider === 'sonarr'
-        ? toProviderIdRecord({
-            anilistId: parsed.anilistId,
-            provider: parsed.provider,
-            providerId: parsed.providerId,
-            updatedAt: entry.updatedAt,
-          })
-        : toProviderIdRecord({
-            anilistId: parsed.anilistId,
-            provider: parsed.provider,
-            providerId: parsed.providerId,
-            updatedAt: entry.updatedAt,
-          }),
-      this.providerFilter(provider),
-    );
-    entries.sort(MANUAL_MAPPING_SORT);
-    return entries;
-  }
+			const prefix = `${provider}:`;
+			for (const key of this.manualMappings.keys()) {
+				if (key.startsWith(prefix)) {
+					this.manualMappings.delete(key);
+				}
+			}
+			this.rebuildReverse();
+			await this.persist();
+		});
+	}
 
-  private providerFilter(provider: Provider | undefined): ((parsed: { provider: Provider }) => boolean) | undefined {
-    if (!provider) return undefined;
-    return (parsed) => parsed.provider === provider;
-  }
+	private async load(): Promise<void> {
+		const records = await manualMappingsStorage.getValue();
+		this.rebuild(records);
+	}
 
-  private async setCandidateSuppression<P extends Provider>(
-    provider: P,
-    anilistId: AniListId,
-    providerId: ProviderIdFor<P>,
-  ): Promise<void> {
-    await this.enqueueWrite(async () => {
-      const key = createCandidateRecordKey(provider, anilistId, providerId);
-      const entry = { ...parseProviderIdentity(provider, providerId), updatedAt: Date.now() };
+	private rebuild(records: StoredManualMappings): void {
+		this.manualMappings.clear();
+		for (const [key, entry] of Object.entries(records ?? {})) {
+			const parsed = parseManualMappingKey(key);
+			if (!parsed) continue;
+			const normalized = normalizeStoredManualMapping(parsed.provider, entry);
+			if (!normalized) continue;
+			this.manualMappings.set(key as ManualMappingKey, normalized);
+		}
+	}
 
-      this.rejectedCandidates.delete(key);
-      this.rejectedCandidates.set(key, entry);
+	private async persist(): Promise<void> {
+		const records: StoredManualMappings = {};
+		for (const [key, value] of this.manualMappings.entries()) {
+			records[key] = value;
+		}
+		await manualMappingsStorage.setValue(records);
+	}
 
-      await this.rejectedCandidates.persist();
-    });
-  }
+	private attachWatcher(): void {
+		browser.storage.onChanged.addListener((changes, area) => {
+			if (area !== "local" || !(MANUAL_MAPPINGS_CHANGE_KEY in changes)) return;
+			void this.load().then(() => {
+				this.rebuildReverse();
+			});
+		});
+	}
 
-  private async clearCandidateSuppression<P extends Provider>(
-    provider: P,
-    anilistId: AniListId,
-    providerId: ProviderIdFor<P>,
-  ): Promise<void> {
-    await this.enqueueWrite(async () => {
-      this.rejectedCandidates.delete(createCandidateRecordKey(provider, anilistId, providerId));
-      await this.rejectedCandidates.persist();
-    });
-  }
+	private rebuildReverse(): void {
+		this.reverse.clear();
+		for (const [key, entry] of this.manualMappings.entries()) {
+			if (entry.providerId === undefined) continue;
+			const parsed = parseManualMappingKey(key);
+			if (!parsed) continue;
+			const providerId = parseProviderId(parsed.provider, entry.providerId);
+			if (providerId !== null) {
+				this.addReverse(parsed.provider, providerId, parsed.anilistId);
+			}
+		}
+	}
 
-  private attachWatchers(): void {
-    const rebuildAll = async () => {
-      await Promise.all([
-        this.manualMappings.load(),
-        this.ignoredMappings.load(),
-        this.rejectedCandidates.load(),
-      ]);
-      this.rebuildReverse();
-    };
+	private getOrCreateRecord(
+		key: ManualMappingKey,
+		now: number,
+	): StoredManualMapping {
+		const existing = this.manualMappings.get(key);
+		if (existing) return existing;
+		return { v: 2, updatedAt: now };
+	}
 
-    this.manualMappings.attachWatcher(() => void rebuildAll());
-    this.ignoredMappings.attachWatcher(() => void rebuildAll());
-    this.rejectedCandidates.attachWatcher(() => void rebuildAll());
-  }
+	private saveOrDeleteEmptyRecord(
+		key: ManualMappingKey,
+		entry: StoredManualMapping,
+	): void {
+		if (isRecordEmpty(entry)) {
+			this.manualMappings.delete(key);
+		} else {
+			this.manualMappings.set(key, entry);
+		}
+	}
 
-  private rebuildReverse(): void {
-    this.reverse.clear();
-    for (const [key, entry] of this.manualMappings.entries()) {
-      const parsed = parseRecordKey(key);
-      if (!parsed) continue;
-      this.addReverse(parsed.provider, entry.providerId, parsed.anilistId);
-    }
-  }
+	private enqueueWrite<T>(operation: () => Promise<T>): Promise<T> {
+		const pending = this.writeQueue.catch(() => {});
+		const next = pending.then(operation);
+		this.writeQueue = next.then(
+			() => {},
+			() => {},
+		);
+		return next;
+	}
 
-  private enqueueWrite<T>(operation: () => Promise<T>): Promise<T> {
-    const pending = this.writeQueue.catch(() => {});
-    const next = pending.then(operation);
-    this.writeQueue = next.then(() => {}, () => {});
-    return next;
-  }
+	private addReverse(
+		provider: Provider,
+		providerId: ProviderId,
+		anilistId: AniListId,
+	): void {
+		const reverseKey = createReverseLookupKey(provider, providerId);
+		const bucket = this.reverse.get(reverseKey);
+		if (bucket) {
+			bucket.add(anilistId);
+			return;
+		}
+		this.reverse.set(reverseKey, new Set([anilistId]));
+	}
 
-  private addReverse(provider: Provider, providerId: ProviderTargetId, anilistId: AniListId): void {
-    const reverseKey = createReverseLookupKey(provider, providerId);
-    const bucket = this.reverse.get(reverseKey);
-    if (bucket) {
-      bucket.add(anilistId);
-      return;
-    }
-    this.reverse.set(reverseKey, new Set([anilistId]));
-  }
-
-  private removeReverse(provider: Provider, providerId: ProviderTargetId, anilistId: AniListId): void {
-    const reverseKey = createReverseLookupKey(provider, providerId);
-    const bucket = this.reverse.get(reverseKey);
-    if (!bucket) return;
-    bucket.delete(anilistId);
-    if (bucket.size === 0) this.reverse.delete(reverseKey);
-  }
+	private removeReverse(
+		provider: Provider,
+		providerId: ProviderId,
+		anilistId: AniListId,
+	): void {
+		const reverseKey = createReverseLookupKey(provider, providerId);
+		const bucket = this.reverse.get(reverseKey);
+		if (!bucket) return;
+		bucket.delete(anilistId);
+		if (bucket.size === 0) this.reverse.delete(reverseKey);
+	}
 }

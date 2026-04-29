@@ -6,8 +6,7 @@ import { isAniListId } from "@/anilist/anilist-id";
 import type { StatusInput, GetMappingsInput } from "@/rpc/schemas";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import { validateProviderConnectionUrl } from "@/providers/settings/provider-connection.schema";
-import type { ProviderTargetId } from "@/providers";
-import type { Provider } from "@/providers";
+import type { Provider, ProviderId } from "@/providers";
 
 const rootQueryKey = ["a2a"] as const;
 
@@ -119,7 +118,7 @@ export const queryKeys = {
 	providerLibraryStatus: (
 		provider: Provider,
 		anilistId: AniListId,
-		providerId: ProviderTargetId,
+		providerId: ProviderId,
 	) =>
 		[
 			...seriesStatusBaseKey(provider, anilistId),

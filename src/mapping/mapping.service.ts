@@ -9,7 +9,7 @@ import {
 	type Provider,
 	type ProviderCredentials,
 	type ProviderIdFor,
-	type ProviderTargetId,
+	type ProviderId,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
@@ -438,7 +438,7 @@ export class MappingService {
 	private isCandidateSuppressed(
 		provider: Provider,
 		anilistId: AniListId,
-		providerId: ProviderTargetId,
+		providerId: ProviderId,
 	): boolean {
 		const identity = parseProviderIdentity(provider, providerId);
 		return (
@@ -517,11 +517,11 @@ export class MappingService {
 	private getAnibridgeProviderIds(
 		provider: Provider,
 		anilistId: AniListId,
-	): ProviderTargetId[];
+	): ProviderId[];
 	private getAnibridgeProviderIds(
 		provider: Provider,
 		anilistId: AniListId,
-	): ProviderTargetId[] {
+	): ProviderId[] {
 		return provider === "sonarr"
 			? this.anibridgeMappingStore.getSonarrCandidates(anilistId)
 			: this.anibridgeMappingStore.getRadarrCandidates(anilistId);
