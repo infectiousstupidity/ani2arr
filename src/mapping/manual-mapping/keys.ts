@@ -1,5 +1,5 @@
 /** Key helpers and normalizers for persisted manual mapping records. */
-// src/mapping/manual/keys.ts
+// src/mapping/manual-mapping/keys.ts
 
 import { parseAniListIdOrNull, type AniListId } from "@/anilist";
 import {
@@ -88,10 +88,7 @@ export const normalizeStoredManualMapping = (
 		return null;
 	}
 
-	const providerId = parseProviderId(
-		provider,
-		candidate.providerId,
-	);
+	const providerId = parseProviderId(provider, candidate.providerId);
 	const mappedAt =
 		providerId === null
 			? null
@@ -111,9 +108,7 @@ export const normalizeStoredManualMapping = (
 
 	return {
 		v: 2,
-		...(providerId === null
-			? {}
-			: { providerId, mappedAt: mappedAt! }),
+		...(providerId === null ? {} : { providerId, mappedAt: mappedAt! }),
 		...(ignoredAt === null ? {} : { ignoredAt }),
 		...(rejectedProviderIds === undefined ? {} : { rejectedProviderIds }),
 		updatedAt,

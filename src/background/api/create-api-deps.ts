@@ -11,7 +11,7 @@ import {
 	radarrLookupCaches,
 	sonarrLookupCaches,
 } from "@/mapping/lookup/lookup.cache";
-import { anibridgeMappingCache } from "@/mapping/upstream/anibridge-mapping.cache";
+import { anibridgeMappingCache } from "@/mapping/upstream-mapping/anibridge-mapping.cache";
 import { anilistMediaCache } from "@/anilist/media.cache";
 import { providerLibraryCaches } from "@/providers/library/cache";
 import { SonarrClient } from "@/providers/clients/sonarr.client";
@@ -24,9 +24,9 @@ import { AniListMediaService, AniListMetadataStore } from "@/anilist";
 import { RadarrLibrary } from "@/providers/library/radarr-library";
 import { SonarrLibrary } from "@/providers/library/sonarr-library";
 import { MappingService } from "@/mapping/mapping.service";
-import { ManualMappingService } from "@/mapping/manual";
+import { ManualMappingService } from "@/mapping/manual-mapping";
 import { AutoMappingStore } from "@/mapping/auto-mapping/auto-mapping.store";
-import { AnibridgeMappingStore } from "@/mapping/upstream";
+import { AnibridgeMappingStore } from "@/mapping/upstream-mapping";
 import { SonarrLookupClient, RadarrLookupClient } from "@/mapping/lookup";
 import {
 	createDefaultExtensionOptions,

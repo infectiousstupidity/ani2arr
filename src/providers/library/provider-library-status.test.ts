@@ -114,6 +114,82 @@ describe("provider-target library status", () => {
 		await configureProviders();
 	});
 
+	it("does not treat a cached Sonarr same-title library item as an effective mapping", async () => {
+		const mappingService = createMappingService();
+		mappingService.resolveProviderId.mockResolvedValue(null);
+		mappingService.getAutoMapping.mockResolvedValue(null);
+		const series = createSonarrSnapshot({ title: "Known Series" });
+		const client = {
+			getAllSeries: vi.fn(),
+			getSeriesByTvdbId: vi.fn(),
+			lookupSeriesByTvdbId: vi.fn(),
+		} as unknown as SonarrClient;
+		const library = new SonarrLibrary(
+			client,
+			mappingService,
+			createManualMappingService(),
+			createSonarrUpstreamStore(),
+			createCaches([series]),
+		);
+
+		const status = await library.getSeriesStatus({
+			anilistId: parseAniListId(10),
+			title: "Known Series",
+		});
+
+		expect(status).toMatchObject({
+			providerId: null,
+			providerMappingState: "unmapped",
+			isInLibrary: null,
+		});
+		expect(mappingService.resolveProviderId).toHaveBeenCalledWith(
+			"sonarr",
+			parseAniListId(10),
+			expect.objectContaining({
+				hints: expect.objectContaining({ primaryTitle: "Known Series" }),
+			}),
+		);
+		expect(client.getSeriesByTvdbId).not.toHaveBeenCalled();
+	});
+
+	it("does not treat a cached Radarr same-title library item as an effective mapping", async () => {
+		const mappingService = createMappingService();
+		mappingService.resolveProviderId.mockResolvedValue(null);
+		mappingService.getAutoMapping.mockResolvedValue(null);
+		const movie = createRadarrSnapshot({ title: "Known Movie" });
+		const client = {
+			getAllMovies: vi.fn(),
+			getMovieByTmdbId: vi.fn(),
+			lookupMovieByTmdbId: vi.fn(),
+		} as unknown as RadarrClient;
+		const library = new RadarrLibrary(
+			client,
+			mappingService,
+			createManualMappingService(),
+			createRadarrUpstreamStore(),
+			createCaches([movie]),
+		);
+
+		const status = await library.getMovieStatus({
+			anilistId: parseAniListId(11),
+			title: "Known Movie",
+		});
+
+		expect(status).toMatchObject({
+			providerId: null,
+			providerMappingState: "unmapped",
+			isInLibrary: null,
+		});
+		expect(mappingService.resolveProviderId).toHaveBeenCalledWith(
+			"radarr",
+			parseAniListId(11),
+			expect.objectContaining({
+				hints: expect.objectContaining({ primaryTitle: "Known Movie" }),
+			}),
+		);
+		expect(client.getMovieByTmdbId).not.toHaveBeenCalled();
+	});
+
 	it("returns in-library for a known Sonarr TVDB ID from the lean cache without resolving mapping", async () => {
 		const mappingService = createMappingService();
 		const series = createSonarrSnapshot();

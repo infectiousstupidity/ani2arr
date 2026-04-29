@@ -1,207 +1,246 @@
 /** Mapping pipeline execution for provider lookups, scoring, and final candidate selection. */
 // src/mapping/pipeline/pipeline.ts
 
-import { generateSearchTerms, isSeasonalCanonicalTokens } from './search-term-generator';
-import { scoreCandidates } from './scoring';
-import { maybeEarlyStop, pickBest } from './early-stop';
-import type { EvaluationOutcome, AniListMedia, PipelineEvaluatedCandidate } from './types';
 import {
-  canonicalTitleKeyForProvider,
-  sanitizeLookupDisplayForProvider,
-} from '@/mapping/pipeline/matching';
-import { PIPELINE_SOFT_TIME_BUDGET_MS } from '../constants';
-import type { AnibridgeMappingStore } from '../upstream';
-import type { ScopedLogger } from '@/shared/utils/logger';
-import type { RequestPriority } from '@/shared/utils/request-priority';
-import type { AniListMediaService } from '@/anilist';
-import type { ProviderCredentials } from '@/providers';
-import type { ProviderLookupClient, ProviderLookupResult } from '../lookup';
+	generateSearchTerms,
+	isSeasonalCanonicalTokens,
+} from "./search-term-generator";
+import { scoreCandidates } from "./scoring";
+import { maybeEarlyStop, pickBest } from "./early-stop";
+import type {
+	EvaluationOutcome,
+	AniListMedia,
+	PipelineEvaluatedCandidate,
+} from "./types";
+import {
+	canonicalTitleKeyForProvider,
+	sanitizeLookupDisplayForProvider,
+} from "@/mapping/pipeline/matching";
+import { PIPELINE_SOFT_TIME_BUDGET_MS } from "../auto-mapping/constants";
+import type { AnibridgeMappingStore } from "../upstream-mapping";
+import type { ScopedLogger } from "@/shared/utils/logger";
+import type { RequestPriority } from "@/shared/utils/request-priority";
+import type { AniListMediaService } from "@/anilist";
+import type { ProviderCredentials } from "@/providers";
+import type { ProviderLookupClient, ProviderLookupResult } from "../lookup";
 
 const TRACE_CANDIDATE_LIMIT = 8;
 
 function addTraceCandidates(
-  registry: Map<number, PipelineEvaluatedCandidate>,
-  scored: ReturnType<typeof scoreCandidates>,
-  lookupClient: ProviderLookupClient<ProviderCredentials, ProviderLookupResult>,
+	registry: Map<number, PipelineEvaluatedCandidate>,
+	scored: ReturnType<typeof scoreCandidates>,
+	lookupClient: ProviderLookupClient<ProviderCredentials, ProviderLookupResult>,
 ): void {
-  for (const candidate of scored) {
-    const providerId = lookupClient.getProviderId(candidate.result);
-    if (providerId === null) {
-      continue;
-    }
+	for (const candidate of scored) {
+		const providerId = lookupClient.getProviderId(candidate.result);
+		if (providerId === null) {
+			continue;
+		}
 
-    const next: PipelineEvaluatedCandidate = {
-      providerId,
-      title: candidate.result.title,
-      reason: candidate.reason,
-      score: candidate.score,
-      searchTerm: candidate.term.display,
-    };
-    const existing = registry.get(providerId);
-    if (!existing || next.score > existing.score) {
-      registry.set(providerId, next);
-    }
-  }
+		const next: PipelineEvaluatedCandidate = {
+			providerId,
+			title: candidate.result.title,
+			reason: candidate.reason,
+			score: candidate.score,
+			searchTerm: candidate.term.display,
+		};
+		const existing = registry.get(providerId);
+		if (!existing || next.score > existing.score) {
+			registry.set(providerId, next);
+		}
+	}
 }
 
-function finalizeTraceCandidates(registry: Map<number, PipelineEvaluatedCandidate>): PipelineEvaluatedCandidate[] {
-  return [...registry.values()]
-    .toSorted((left, right) => right.score - left.score)
-    .slice(0, TRACE_CANDIDATE_LIMIT);
+function finalizeTraceCandidates(
+	registry: Map<number, PipelineEvaluatedCandidate>,
+): PipelineEvaluatedCandidate[] {
+	return [...registry.values()]
+		.toSorted((left, right) => right.score - left.score)
+		.slice(0, TRACE_CANDIDATE_LIMIT);
 }
-
 
 export async function resolveViaPipeline(
-  media: AniListMedia,
-  ctx: {
-    anilistApi: AniListMediaService;
-    lookupClient: ProviderLookupClient<ProviderCredentials, ProviderLookupResult>;
-    anibridgeMappingStore: AnibridgeMappingStore;
-    credentials: ProviderCredentials;
-    priority?: RequestPriority;
-    forceLookupNetwork?: boolean;
-    sessionSeenCanonical: Set<string>;
-    limits: {
-      maxTerms: number;
-      scoreThreshold: number;
-      earlyStopThreshold: number;
-    };
-    log: ScopedLogger;
-  },
-  primaryTitleHint?: string,
+	media: AniListMedia,
+	ctx: {
+		anilistApi: AniListMediaService;
+		lookupClient: ProviderLookupClient<
+			ProviderCredentials,
+			ProviderLookupResult
+		>;
+		anibridgeMappingStore: AnibridgeMappingStore;
+		credentials: ProviderCredentials;
+		priority?: RequestPriority;
+		forceLookupNetwork?: boolean;
+		sessionSeenCanonical: Set<string>;
+		limits: {
+			maxTerms: number;
+			scoreThreshold: number;
+			earlyStopThreshold: number;
+		};
+		log: ScopedLogger;
+	},
+	primaryTitleHint?: string,
 ): Promise<EvaluationOutcome> {
-  if (import.meta.env.DEV) {
-    ctx.log.debug?.(
-      `pipeline:start anilistId=${media.id} priority=${ctx.priority ?? 'normal'}${primaryTitleHint ? ` hint="${primaryTitleHint}"` : ''}`,
-    );
-  }
-  const mediaYear = media.startDate?.year ?? undefined;
-  const provider = ctx.lookupClient.provider;
-  const terms = generateSearchTerms(provider, media.title ?? ({} as Record<string, never>), media.synonyms);
-  const traceCandidates = new Map<number, PipelineEvaluatedCandidate>();
+	if (import.meta.env.DEV) {
+		ctx.log.debug?.(
+			`pipeline:start anilistId=${media.id} priority=${ctx.priority ?? "normal"}${primaryTitleHint ? ` hint="${primaryTitleHint}"` : ""}`,
+		);
+	}
+	const mediaYear = media.startDate?.year ?? undefined;
+	const provider = ctx.lookupClient.provider;
+	const terms = generateSearchTerms(
+		provider,
+		media.title ?? ({} as Record<string, never>),
+		media.synonyms,
+	);
+	const traceCandidates = new Map<number, PipelineEvaluatedCandidate>();
 
-  if (primaryTitleHint) {
-    const trimmed = primaryTitleHint.trim();
-    const sanitized = sanitizeLookupDisplayForProvider(provider, trimmed);
-    if (sanitized) {
-      const canonical = canonicalTitleKeyForProvider(provider, sanitized);
-      if (canonical) {
-        const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
-        if (canonicalTokens.length > 0 && !isSeasonalCanonicalTokens(canonicalTokens)) {
-          const existingIndex = terms.findIndex(t => t.canonical === canonical);
-          if (existingIndex !== -1) terms.splice(existingIndex, 1);
-          terms.unshift({ canonical, display: sanitized });
-        }
-      }
-    }
-  }
-  const traceSearchTerms = terms.slice(0, ctx.limits.maxTerms).map((term) => term.display);
+	if (primaryTitleHint) {
+		const trimmed = primaryTitleHint.trim();
+		const sanitized = sanitizeLookupDisplayForProvider(provider, trimmed);
+		if (sanitized) {
+			const canonical = canonicalTitleKeyForProvider(provider, sanitized);
+			if (canonical) {
+				const canonicalTokens = canonical.split(/\s+/).filter(Boolean);
+				if (
+					canonicalTokens.length > 0 &&
+					!isSeasonalCanonicalTokens(canonicalTokens)
+				) {
+					const existingIndex = terms.findIndex(
+						(t) => t.canonical === canonical,
+					);
+					if (existingIndex !== -1) terms.splice(existingIndex, 1);
+					terms.unshift({ canonical, display: sanitized });
+				}
+			}
+		}
+	}
+	const traceSearchTerms = terms
+		.slice(0, ctx.limits.maxTerms)
+		.map((term) => term.display);
 
-  let overall: ReturnType<typeof scoreCandidates>[number][] = [];
-  const start = Date.now();
+	let overall: ReturnType<typeof scoreCandidates>[number][] = [];
+	const start = Date.now();
 
-  for (const term of terms.slice(0, ctx.limits.maxTerms)) {
-    if (!term.canonical) continue;
+	for (const term of terms.slice(0, ctx.limits.maxTerms)) {
+		if (!term.canonical) continue;
 
-    const seenInSession = ctx.sessionSeenCanonical.has(term.canonical);
-    let results;
-    if (ctx.forceLookupNetwork) {
-      // Always hit network on anime detail force-verify
-      const opts = {
-        ...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
-        forceNetwork: true as const,
-      };
-      results = await ctx.lookupClient.lookup(term.canonical, term.display, ctx.credentials, opts);
-    } else if (seenInSession) {
-      const probe = await ctx.lookupClient.readFromCache(term.canonical);
-      if (probe.hit === 'none') {
-        const opts = {
-          ...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
-        };
-        results = await ctx.lookupClient.lookup(term.canonical, term.display, ctx.credentials, opts);
-      } else {
-        results = probe.results;
-      }
-    } else {
-      const opts = {
-        ...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
-      };
-      results = await ctx.lookupClient.lookup(term.canonical, term.display, ctx.credentials, opts);
-    }
+		const seenInSession = ctx.sessionSeenCanonical.has(term.canonical);
+		let results;
+		if (ctx.forceLookupNetwork) {
+			// Always hit network on anime detail force-verify
+			const opts = {
+				...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
+				forceNetwork: true as const,
+			};
+			results = await ctx.lookupClient.lookup(
+				term.canonical,
+				term.display,
+				ctx.credentials,
+				opts,
+			);
+		} else if (seenInSession) {
+			const probe = await ctx.lookupClient.readFromCache(term.canonical);
+			if (probe.hit === "none") {
+				const opts = {
+					...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
+				};
+				results = await ctx.lookupClient.lookup(
+					term.canonical,
+					term.display,
+					ctx.credentials,
+					opts,
+				);
+			} else {
+				results = probe.results;
+			}
+		} else {
+			const opts = {
+				...(ctx.priority === undefined ? {} : { priority: ctx.priority }),
+			};
+			results = await ctx.lookupClient.lookup(
+				term.canonical,
+				term.display,
+				ctx.credentials,
+				opts,
+			);
+		}
 
-    const scored = scoreCandidates(provider, term, results, mediaYear);
-    overall = [...overall, ...scored];
-  addTraceCandidates(traceCandidates, scored, ctx.lookupClient);
+		const scored = scoreCandidates(provider, term, results, mediaYear);
+		overall = [...overall, ...scored];
+		addTraceCandidates(traceCandidates, scored, ctx.lookupClient);
 
-    // Mark canonical as seen once we've either looked up or confirmed a cache hit
-    ctx.sessionSeenCanonical.add(term.canonical);
+		// Mark canonical as seen once we've either looked up or confirmed a cache hit
+		ctx.sessionSeenCanonical.add(term.canonical);
 
-    const early = maybeEarlyStop(scored, {
-      earlyStopThreshold: ctx.limits.earlyStopThreshold,
-      scoreThreshold: ctx.limits.scoreThreshold,
-    });
-    if (early.stop && early.pick) {
-      const providerId = ctx.lookupClient.getProviderId(early.pick.result);
-      if (providerId === null) {
-        continue;
-      }
-      const out: EvaluationOutcome = {
-        status: 'resolved',
-        providerId,
-        reason: early.pick.reason,
-        confidence: early.pick.score,
-        successfulSynonym: early.pick.term.display,
-        searchTerms: traceSearchTerms,
-        candidates: finalizeTraceCandidates(traceCandidates),
-      };
-      if (import.meta.env.DEV) {
-        ctx.log.debug?.(
-          `pipeline:resolved anilistId=${media.id} providerId=${out.providerId} confidence=${early.pick.score} synonym="${early.pick.term.display}"`,
-        );
-      }
-      return out;
-    }
+		const early = maybeEarlyStop(scored, {
+			earlyStopThreshold: ctx.limits.earlyStopThreshold,
+			scoreThreshold: ctx.limits.scoreThreshold,
+		});
+		if (early.stop && early.pick) {
+			const providerId = ctx.lookupClient.getProviderId(early.pick.result);
+			if (providerId === null) {
+				continue;
+			}
+			const out: EvaluationOutcome = {
+				status: "resolved",
+				providerId,
+				reason: early.pick.reason,
+				confidence: early.pick.score,
+				successfulSynonym: early.pick.term.display,
+				searchTerms: traceSearchTerms,
+				candidates: finalizeTraceCandidates(traceCandidates),
+			};
+			if (import.meta.env.DEV) {
+				ctx.log.debug?.(
+					`pipeline:resolved anilistId=${media.id} providerId=${out.providerId} confidence=${early.pick.score} synonym="${early.pick.term.display}"`,
+				);
+			}
+			return out;
+		}
 
-    // Optional soft time budget guard (kept minimal per constraints)
-    if (Date.now() - start > PIPELINE_SOFT_TIME_BUDGET_MS) break;
-  }
+		// Optional soft time budget guard (kept minimal per constraints)
+		if (Date.now() - start > PIPELINE_SOFT_TIME_BUDGET_MS) break;
+	}
 
-  overall.sort((a, b) => b.score - a.score);
-  const pick = pickBest(overall, ctx.limits.scoreThreshold);
-  if (pick) {
-    const providerId = ctx.lookupClient.getProviderId(pick.result);
-    if (providerId === null) {
-      return {
-        status: 'unresolved',
-        reason: 'missing-provider-id',
-        searchTerms: traceSearchTerms,
-        candidates: finalizeTraceCandidates(traceCandidates),
-      };
-    }
-    const out: EvaluationOutcome = {
-      status: 'resolved',
-      providerId,
-      reason: pick.reason,
-      confidence: pick.score,
-      successfulSynonym: pick.term.display,
-      searchTerms: traceSearchTerms,
-      candidates: finalizeTraceCandidates(traceCandidates),
-    };
-    if (import.meta.env.DEV) {
-      ctx.log.debug?.(
-        `pipeline:resolved anilistId=${media.id} providerId=${out.providerId} confidence=${pick.score} synonym="${pick.term.display}"`,
-      );
-    }
-    return out;
-  }
+	overall.sort((a, b) => b.score - a.score);
+	const pick = pickBest(overall, ctx.limits.scoreThreshold);
+	if (pick) {
+		const providerId = ctx.lookupClient.getProviderId(pick.result);
+		if (providerId === null) {
+			return {
+				status: "unresolved",
+				reason: "missing-provider-id",
+				searchTerms: traceSearchTerms,
+				candidates: finalizeTraceCandidates(traceCandidates),
+			};
+		}
+		const out: EvaluationOutcome = {
+			status: "resolved",
+			providerId,
+			reason: pick.reason,
+			confidence: pick.score,
+			successfulSynonym: pick.term.display,
+			searchTerms: traceSearchTerms,
+			candidates: finalizeTraceCandidates(traceCandidates),
+		};
+		if (import.meta.env.DEV) {
+			ctx.log.debug?.(
+				`pipeline:resolved anilistId=${media.id} providerId=${out.providerId} confidence=${pick.score} synonym="${pick.term.display}"`,
+			);
+		}
+		return out;
+	}
 
-  if (import.meta.env.DEV) {
-    ctx.log.debug?.(`pipeline:unresolved anilistId=${media.id} reason=low-confidence`);
-  }
-  return {
-    status: 'unresolved',
-    reason: 'low-confidence',
-    searchTerms: traceSearchTerms,
-    candidates: finalizeTraceCandidates(traceCandidates),
-  };
+	if (import.meta.env.DEV) {
+		ctx.log.debug?.(
+			`pipeline:unresolved anilistId=${media.id} reason=low-confidence`,
+		);
+	}
+	return {
+		status: "unresolved",
+		reason: "low-confidence",
+		searchTerms: traceSearchTerms,
+		candidates: finalizeTraceCandidates(traceCandidates),
+	};
 }

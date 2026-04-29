@@ -7,7 +7,7 @@ import type { StatusInput } from "@/rpc/schemas";
 import type { CheckMovieStatusResponse } from "@/rpc/types";
 import { buildMovieStatusResponseFromLibraryStatus } from "@/providers/library/status-response-adapter";
 import type { MappingService } from "@/mapping/mapping.service";
-import type { ManualMappingService } from "@/mapping/manual";
+import type { ManualMappingService } from "@/mapping/manual-mapping";
 import type { AutoMappingOptions } from "@/mapping/auto-mapping/types";
 import { ErrorCode, logError, normalizeError } from "@/shared/errors";
 import {
@@ -17,7 +17,6 @@ import {
 	type ExtensionOptions,
 } from "@/options";
 import {
-	parseTmdbIdOrNull,
 	type ProviderCredentials,
 	type RadarrLookupMovie,
 	type RadarrMovie,
@@ -26,14 +25,13 @@ import {
 } from "@/providers";
 import { BaseProviderLibraryStore } from "./base-provider-library.store";
 import { notifyLibraryMutation } from "./notify-library-mutation";
-import { RadarrLibraryIndexer } from "./radarr-library.indexer";
 import type {
 	LibraryMutationEmitter,
 	LibraryStatusOptions,
 	ProviderLibraryCaches,
 	RadarrLibraryStatus,
 } from "./types";
-import type { AnibridgeMappingStore } from "@/mapping/upstream";
+import type { AnibridgeMappingStore } from "@/mapping/upstream-mapping";
 
 const CACHE_KEY = "radarr:lean-movies";
 
@@ -43,7 +41,6 @@ type RadarrLibraryMutationPayload = {
 };
 
 export class RadarrLibrary {
-	private readonly indexer = new RadarrLibraryIndexer();
 	private readonly store: BaseProviderLibraryStore<
 		RadarrMovie,
 		RadarrMovieSnapshot,
@@ -69,7 +66,6 @@ export class RadarrLibrary {
 	) {
 		this.store = new BaseProviderLibraryStore(
 			caches,
-			this.indexer,
 			{
 				cacheKey: CACHE_KEY,
 				getCredentials: (options) => getProviderCredentials(options, "radarr"),
@@ -268,14 +264,14 @@ export class RadarrLibrary {
 			);
 		}
 
-		await this.store.getLeanList();
 		const radarrOptions = await getExtensionOptionsSnapshot();
-		const isConfigured = hasConfiguredProviderCredentials(radarrOptions, "radarr");
+		const isConfigured = hasConfiguredProviderCredentials(
+			radarrOptions,
+			"radarr",
+		);
 
 		const normalizedTitle = payload.title?.trim();
-		let tmdbId: TmdbId | null = parseTmdbIdOrNull(
-			this.indexer.findTmdbIdInIndex(payload),
-		);
+		let tmdbId: TmdbId | null = null;
 		let successfulSynonym: string | undefined;
 		let mappingReason: CheckMovieStatusResponse["mappingReason"];
 		let mappingSource: CheckMovieStatusResponse["mappingSource"];

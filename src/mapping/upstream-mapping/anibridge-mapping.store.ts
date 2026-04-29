@@ -1,5 +1,5 @@
 /** Anibridge mapping store for normalized AniList-to-provider mappings. */
-// src/mapping/upstream/anibridge-mapping.store.ts
+// src/mapping/upstream-mapping/anibridge-mapping.store.ts
 
 import type { TtlCache } from "@/shared/cache/ttl-cache";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist";
@@ -12,7 +12,7 @@ import {
 import {
 	ANIBRIDGE_MAPPING_CACHE_TTL,
 	anibridgeMappingCache,
-} from "@/mapping/upstream/anibridge-mapping.cache";
+} from "@/mapping/upstream-mapping/anibridge-mapping.cache";
 import {
 	createError,
 	ErrorCode,
