@@ -13,7 +13,7 @@ import {
   getProviderLabel,
 } from '@/providers/provider-labels';
 import type { MappingEntryKind } from '@/mapping/types';
-import type { MappingSummary } from '@/mapping/ui/mapping-list-types';
+import type { MappingSummary } from '@/mapping/queries/list-mappings';
 import { useAniListMetadataBatch } from '@/shared/queries';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';

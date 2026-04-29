@@ -3,13 +3,13 @@
 
 import * as v from "valibot";
 import { AniListIdSchema, type AniListId } from "@/anilist/anilist-id";
-import { getMappingInspection } from "@/mapping/inspection/get-mapping-inspection";
-import { getMappingIdentities } from "@/mapping/mapping-identities";
+import { getMappingInspection } from "@/mapping/queries/mapping-details";
+import { getMappingIdentities } from "@/mapping/queries/mapping-identities";
 import type { Ani2arrApi } from "@/rpc";
 import { getExtensionOptionsSnapshot, hasConfiguredProviderCredentials } from "@/options";
 import type { TmdbId, TvdbId } from "@/providers";
 import { createError, ErrorCode } from "@/shared/errors";
-import { listMappings } from "@/mapping/review/list-mappings";
+import { listMappings } from "@/mapping/queries/list-mappings";
 import {
 	ClearMappingIgnoreInputSchema,
 	ClearManualMappingInputSchema,

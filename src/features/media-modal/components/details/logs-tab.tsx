@@ -3,7 +3,7 @@
 
 import { buildAniListAnimeUrl } from '@/anilist/anilist-links';
 import Pill from '@/shared/ui/primitives/pill';
-import type { MappingInspectionPayload } from '@/mapping/inspection/inspection-types';
+import type { MappingInspectionPayload } from '@/mapping/queries/mapping-details';
 import type { Provider } from '@/providers';
 import { getProviderIdLabel } from '@/providers/provider-labels';
 import {

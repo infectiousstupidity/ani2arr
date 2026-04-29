@@ -4,7 +4,7 @@
 import type {
 	MappingInspectionCandidate,
 	MappingInspectionSuggestedCandidates,
-} from "@/mapping/inspection/inspection-types";
+} from "@/mapping/queries/mapping-details";
 
 type SuggestedCandidateTone =
 	| "muted"

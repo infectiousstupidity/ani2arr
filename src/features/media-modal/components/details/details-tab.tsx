@@ -4,7 +4,7 @@
 import { ArrowDown, ExternalLink, X } from 'lucide-react';
 import { useMediaModalContext } from '../../context';
 import type { AniListId } from '@/anilist';
-import type { MappingInspectionLinkedAniListEntry } from '@/mapping/inspection/inspection-types';
+import type { MappingInspectionLinkedAniListEntry } from '@/mapping/queries/mapping-details';
 import type { MappingSearchResult } from '@/features/media-modal/mapping-search/types';
 import type { Provider } from '@/providers';
 import { getProviderIdLabel, getProviderLabel } from '@/providers/provider-labels';

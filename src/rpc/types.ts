@@ -18,9 +18,9 @@ import type {
 	MappingUnknownReason,
 	ProviderMappingState,
 } from "@/mapping/types";
-import type { MappingSummary } from "@/mapping/ui/mapping-list-types";
+import type { MappingSummary } from "@/mapping/queries/list-mappings";
 import type { AutoMappingStatus } from "@/mapping/auto-mapping/types";
-import type { MappingInspectionPayload } from "@/mapping/inspection/inspection-types";
+import type { MappingInspectionPayload } from "@/mapping/queries/mapping-details";
 import type { LibraryUnknownReason } from "@/providers/library/types";
 import type { MappingCursor } from "./schemas";
 export type {

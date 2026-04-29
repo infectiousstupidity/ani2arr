@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import type { AniListId } from "@/anilist";
-import type { MappingInspectionPayload } from "@/mapping/inspection/inspection-types";
+import type { MappingInspectionPayload } from "@/mapping/queries/mapping-details";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
 import type { Provider } from "@/providers";
 import { useMediaModalContext } from "../../context";

@@ -9,7 +9,7 @@ import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import { parseProviderIdentity } from '@/providers';
 import type { ProviderIdentity } from '@/providers';
 import type { MappingEntryKind } from '@/mapping/types';
-import type { MappingSummary } from '@/mapping/ui/mapping-list-types';
+import type { MappingSummary } from '@/mapping/queries/list-mappings';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';

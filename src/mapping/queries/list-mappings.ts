@@ -1,5 +1,5 @@
 /** Mapping-owned projection for review-table summaries and paging over recorded mapping state. */
-// src/mapping/review/list-mappings.ts
+// src/mapping/queries/list-mappings.ts
 
 import { parseAniListIdOrNull, type AniListId } from "@/anilist";
 import {
@@ -12,13 +12,60 @@ import {
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
-import type { MappingEntryKind } from "@/mapping/types";
-import type { MappingSummary } from "@/mapping/ui/mapping-list-types";
-import type { AutoMappingRecord } from "@/mapping/auto-mapping/types";
+import type {
+	MappingEntryKind,
+	MappingIdentity,
+	MappingSuppressionKind,
+	MappingUnknownReason,
+} from "@/mapping/types";
+import type {
+	AutoMappingRecord,
+	AutoMappingStatus,
+} from "@/mapping/auto-mapping/types";
 import { buildEffectiveMappingCandidate } from "@/mapping/effective-mapping";
-import { deriveLibraryUnknownReason } from "@/providers/library/types";
+import {
+	deriveLibraryUnknownReason,
+	type LibraryUnknownReason,
+} from "@/providers/library/types";
 import { deriveMappingRowStatus } from "@/features/provider-action";
-import { projectMappingReview } from "./project-review";
+import {
+	projectMappingReview,
+	type MappingReviewItem,
+	type MappingReviewSummary,
+} from "./mapping-issues";
+
+/** Primary user-facing status for one projected mapping summary row. */
+export type MappingRowStatus =
+	| "needs-review"
+	| "in-library"
+	| "can-add"
+	| "suppressed"
+	| "unmapped"
+	| "unknown";
+
+/**
+ * Enriched options-page/RPC summary row for one `provider + anilistId`.
+ */
+export interface MappingSummary extends MappingIdentity {
+	isInLibrary: boolean | null;
+	suppressedProviderId?: ProviderTargetId | null;
+	mappingRowStatus: MappingRowStatus;
+	suppressionKind?: MappingSuppressionKind;
+	reviewSummary?: MappingReviewSummary;
+	reviewItems?: readonly MappingReviewItem[];
+	updatedAt?: number;
+	linkedAniListIds?: readonly AniListId[];
+	inLibraryCount?: number;
+	providerMeta?: {
+		title?: string;
+		type?: "series" | "movie";
+		statusLabel?: string;
+	};
+	resolverOutcome?: AutoMappingStatus;
+	mappingUnknownReason?: MappingUnknownReason;
+	libraryUnknownReason?: LibraryUnknownReason;
+	hadResolveAttempt?: boolean;
+}
 
 export interface ListMappingsCursor {
 	updatedAt: number;

@@ -16,7 +16,7 @@ import { useConfirm } from '@/shared/hooks/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import { PROVIDERS, getProviderIdentityIdLabel, parseProviderIdentity } from '@/providers';
 import type { Provider } from '@/providers';
-import type { MappingSummary } from '@/mapping/ui/mapping-list-types';
+import type { MappingSummary } from '@/mapping/queries/list-mappings';
 import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
 import SectionHeader from '../../components/section-header';
 import { usePublicOptions } from '@/options';

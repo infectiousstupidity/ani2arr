@@ -6,7 +6,7 @@ import { parseAniListId, type AniListId } from '@/anilist';
 import { parseSonarrSeriesId, parseTmdbId, parseTvdbId, type ProviderTargetId, type RadarrMovieSnapshot, type SonarrSeriesSnapshot  } from '@/providers';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import type { AutoMappingRecord } from '@/mapping/auto-mapping/types';
-import { getMappingInspection, type GetMappingInspectionDeps } from './get-mapping-inspection';
+import { getMappingInspection, type GetMappingInspectionDeps } from '../queries/mapping-details';
 
 const aid = parseAniListId;
 const tvdb = parseTvdbId;

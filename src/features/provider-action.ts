@@ -1,8 +1,8 @@
 /** Shared provider action state derivation for content entry points. */
 
 import type { MappingSuppressionKind, ProviderMappingState } from '@/mapping/types';
-import type { MappingRowStatus } from '@/mapping/ui/mapping-list-types';
-import type { MappingReviewSummary } from '@/mapping/review/review-types';
+import type { MappingRowStatus } from '@/mapping/queries/list-mappings';
+import type { MappingReviewSummary } from '@/mapping/queries/mapping-issues';
 
 type SteadyProviderActionState = Extract<
   MappingRowStatus,
