@@ -12,8 +12,8 @@ import {
   getProviderIdentityLabel,
   getProviderLabel,
 } from '@/providers/provider-labels';
-import type { MappingEntryKind } from '@/mapping/types';
-import type { MappingSummary } from '@/mapping/queries/list-mappings';
+import type { EffectiveMappingKind } from '@/mapping/types';
+import type { MappingListRow } from '@/mapping/queries/list-mappings';
 import { useAniListMetadataBatch } from '@/shared/queries';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';
@@ -22,7 +22,7 @@ import RadarrIcon from '@/assets/radarr.svg';
 import { MappingEntryRow } from './mapping-entry-row';
 
 export type MappingTableEntry = {
-  entry: MappingSummary;
+  entry: MappingListRow;
   title: string;
   metadata?: AniListMetadata | null | undefined;
 };
@@ -32,13 +32,13 @@ export type MappingTableRowData = {
   provider: Provider;
   providerId: ProviderTargetId | null;
   providerIdentity: ProviderIdentity | null;
-  providerMeta?: MappingSummary['providerMeta'];
+  providerMeta?: MappingListRow['providerMeta'];
   entries: MappingTableEntry[];
-  entryKinds: MappingEntryKind[];
+  entryKinds: EffectiveMappingKind[];
   updatedAt?: number;
 };
 
-const entryKindStyles: Record<MappingEntryKind, { label: string; className: string }> = {
+const entryKindStyles: Record<EffectiveMappingKind, { label: string; className: string }> = {
   manual: { label: 'Manual', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },
   unmapped: { label: 'Unmapped', className: 'bg-warning/14 text-warning border-warning/24' },
   unknown: { label: 'Unknown', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
@@ -86,12 +86,12 @@ type MappingAccordionItemProps = {
   rowIndex: number;
   isMutating: boolean;
   isExpanded: boolean;
-  onEdit: (entry: MappingSummary) => void;
-  onDeleteManualMapping: (entry: MappingSummary) => void;
-  onRejectCandidate: (entry: MappingSummary) => void;
-  onClearRejectedCandidate: (entry: MappingSummary) => void;
-  onIgnoreTitle: (entry: MappingSummary) => void;
-  onClearIgnoreTitle: (entry: MappingSummary) => void;
+  onEdit: (entry: MappingListRow) => void;
+  onDeleteManualMapping: (entry: MappingListRow) => void;
+  onRejectCandidate: (entry: MappingListRow) => void;
+  onClearRejectedCandidate: (entry: MappingListRow) => void;
+  onIgnoreTitle: (entry: MappingListRow) => void;
+  onClearIgnoreTitle: (entry: MappingListRow) => void;
   providerUrl?: string | null;
 };
 

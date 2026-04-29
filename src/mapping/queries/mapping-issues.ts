@@ -4,20 +4,20 @@
 import type { AniListId } from '@/anilist';
 import type { ProviderTargetId } from '@/providers';
 import type {
-  MappingAcceptedEvidence,
-  MappingAcceptedReason,
-  MappingEntryKind,
-  MappingRecentEvaluationTrace,
+  AcceptedMappingEvidence,
+  AcceptedMappingReason,
+  EffectiveMappingKind,
+  RecentMappingEvaluationTrace,
 } from '@/mapping/types';
 import type { AutoMappingStatus } from '@/mapping/auto-mapping/types';
 
-export type MappingReviewReason =
+export type MappingIssueReason =
   | 'manual-upstream-disagreement'
   | 'ignored-but-exact-upstream'
   | 'verification-failed-inherited-candidate'
   | 'ambiguous-inherited-conflict';
 
-export type MappingReviewAction =
+export type MappingIssueAction =
   | 'keep-current'
   | 'use-exact-upstream'
   | 'clear-ignore'
@@ -25,42 +25,28 @@ export type MappingReviewAction =
   | 'inspect-candidates'
   | 'set-manual-mapping';
 
-export interface MappingReviewState {
-  mappingEntryKind: MappingEntryKind;
+type MappingIssueMappingSnapshot = {
+  mappingEntryKind: EffectiveMappingKind;
   providerId: ProviderTargetId | null;
-  resolverState?: AutoMappingStatus;
-  acceptedReason?: MappingAcceptedReason;
+  autoMappingStatus?: AutoMappingStatus;
+  acceptedReason?: AcceptedMappingReason;
   immediateSourceAniListId?: AniListId;
   chainAnchorAniListId?: AniListId;
-}
+};
 
-export interface MappingReviewItem {
-  reason: MappingReviewReason;
+export interface MappingIssue {
+  reason: MappingIssueReason;
   summary: string;
-  current: MappingReviewState;
-  proposed?: MappingReviewState;
-  conflicts?: readonly MappingReviewState[];
-  actions: readonly MappingReviewAction[];
+  current: MappingIssueMappingSnapshot;
+  proposed?: MappingIssueMappingSnapshot;
+  conflicts?: readonly MappingIssueMappingSnapshot[];
+  actions: readonly MappingIssueAction[];
 }
 
-export interface MappingReviewSummary {
+export interface MappingIssuesSummary {
   count: number;
-  primaryReason: MappingReviewReason;
-  reasons: readonly MappingReviewReason[];
-}
-
-export interface ProjectMappingReviewInput {
-  mappingEntryKind: MappingEntryKind;
-  providerId: ProviderTargetId | null;
-  acceptedEvidence?: MappingAcceptedEvidence;
-  recentEvaluation?: MappingRecentEvaluationTrace;
-  resolverState?: AutoMappingStatus;
-  exactUpstreamMatchProviderId?: ProviderTargetId | null;
-}
-
-export interface ProjectMappingReviewOutput {
-  reviewSummary?: MappingReviewSummary;
-  reviewItems?: readonly MappingReviewItem[];
+  primaryReason: MappingIssueReason;
+  reasons: readonly MappingIssueReason[];
 }
 
 type InheritedCandidateProjection = {
@@ -70,23 +56,23 @@ type InheritedCandidateProjection = {
 };
 
 const buildReviewState = (input: {
-  mappingEntryKind: MappingReviewState['mappingEntryKind'];
+  mappingEntryKind: MappingIssueMappingSnapshot['mappingEntryKind'];
   providerId: ProviderTargetId | null;
-  resolverState?: MappingReviewState['resolverState'] | undefined;
-  acceptedReason?: MappingReviewState['acceptedReason'] | undefined;
+  autoMappingStatus?: MappingIssueMappingSnapshot['autoMappingStatus'] | undefined;
+  acceptedReason?: MappingIssueMappingSnapshot['acceptedReason'] | undefined;
   immediateSourceAniListId?: AniListId | undefined;
   chainAnchorAniListId?: AniListId | undefined;
-}): MappingReviewState => ({
+}): MappingIssueMappingSnapshot => ({
   mappingEntryKind: input.mappingEntryKind,
   providerId: input.providerId,
-  ...(input.resolverState ? { resolverState: input.resolverState } : {}),
+  ...(input.autoMappingStatus ? { autoMappingStatus: input.autoMappingStatus } : {}),
   ...(input.acceptedReason ? { acceptedReason: input.acceptedReason } : {}),
   ...(input.immediateSourceAniListId ? { immediateSourceAniListId: input.immediateSourceAniListId } : {}),
   ...(input.chainAnchorAniListId ? { chainAnchorAniListId: input.chainAnchorAniListId } : {}),
 });
 
 const getInheritedCandidates = (
-  recentEvaluation: MappingRecentEvaluationTrace | undefined,
+  recentEvaluation: RecentMappingEvaluationTrace | undefined,
 ): InheritedCandidateProjection[] => {
   if (!recentEvaluation) {
     return [];
@@ -113,12 +99,12 @@ const getInheritedCandidates = (
   return candidates;
 };
 
-const buildSummary = (reviewItems: readonly MappingReviewItem[]): MappingReviewSummary | undefined => {
+const buildSummary = (reviewItems: readonly MappingIssue[]): MappingIssuesSummary | undefined => {
   if (reviewItems.length === 0) {
     return undefined;
   }
 
-  const reasons: MappingReviewSummary['reasons'] = [...new Set(reviewItems.map(item => item.reason))];
+  const reasons: MappingIssuesSummary['reasons'] = [...new Set(reviewItems.map(item => item.reason))];
   return {
     count: reviewItems.length,
     primaryReason: reviewItems[0]!.reason,
@@ -126,18 +112,28 @@ const buildSummary = (reviewItems: readonly MappingReviewItem[]): MappingReviewS
   };
 };
 
-export function projectMappingReview(
-  input: ProjectMappingReviewInput,
-): ProjectMappingReviewOutput {
+export function projectMappingIssues(
+  input: {
+    mappingEntryKind: EffectiveMappingKind;
+    providerId: ProviderTargetId | null;
+    acceptedEvidence?: AcceptedMappingEvidence;
+    recentEvaluation?: RecentMappingEvaluationTrace;
+    autoMappingStatus?: AutoMappingStatus;
+    exactUpstreamMatchProviderId?: ProviderTargetId | null;
+  },
+): {
+  reviewSummary?: MappingIssuesSummary;
+  reviewItems?: readonly MappingIssue[];
+} {
   const current = buildReviewState({
     mappingEntryKind: input.mappingEntryKind,
     providerId: input.providerId,
-    resolverState: input.resolverState,
+    autoMappingStatus: input.autoMappingStatus,
     acceptedReason: input.acceptedEvidence?.reason,
     immediateSourceAniListId: input.acceptedEvidence?.immediateSourceAniListId,
     chainAnchorAniListId: input.acceptedEvidence?.chainAnchorAniListId,
   });
-  const reviewItems: MappingReviewItem[] = [];
+  const reviewItems: MappingIssue[] = [];
 
   if (
     input.mappingEntryKind === 'manual' &&
@@ -152,7 +148,7 @@ export function projectMappingReview(
       proposed: buildReviewState({
         mappingEntryKind: 'upstream',
         providerId: input.exactUpstreamMatchProviderId,
-        resolverState: 'mapped',
+        autoMappingStatus: 'mapped',
         acceptedReason: 'exact-upstream',
       }),
       actions: ['keep-current', 'use-exact-upstream'],
@@ -167,7 +163,7 @@ export function projectMappingReview(
       proposed: buildReviewState({
         mappingEntryKind: 'upstream',
         providerId: input.exactUpstreamMatchProviderId,
-        resolverState: 'mapped',
+        autoMappingStatus: 'mapped',
         acceptedReason: 'exact-upstream',
       }),
       actions: ['keep-current', 'clear-ignore'],
@@ -176,7 +172,7 @@ export function projectMappingReview(
 
   const inheritedCandidates = getInheritedCandidates(input.recentEvaluation);
 
-  if (input.resolverState === 'verification-failed' && inheritedCandidates.length > 0) {
+  if (input.autoMappingStatus === 'verification-failed' && inheritedCandidates.length > 0) {
     const candidate = inheritedCandidates[0]!;
     reviewItems.push({
       reason: 'verification-failed-inherited-candidate',
@@ -193,7 +189,7 @@ export function projectMappingReview(
     });
   }
 
-  if (input.resolverState === 'ambiguous' && inheritedCandidates.length > 1) {
+  if (input.autoMappingStatus === 'ambiguous' && inheritedCandidates.length > 1) {
     reviewItems.push({
       reason: 'ambiguous-inherited-conflict',
       summary: 'Inherited relation anchors proposed conflicting provider IDs.',

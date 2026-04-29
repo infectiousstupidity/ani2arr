@@ -5,17 +5,17 @@ import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { ArrowUpDown, Check, ChevronDown, Search, X } from 'lucide-react';
 import { getProviderLabel, PROVIDERS, type Provider } from '@/providers';
-import type { MappingEntryKind } from '@/mapping/types';
+import type { EffectiveMappingKind } from '@/mapping/types';
 import Button from '@/shared/ui/primitives/button';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { cn } from '@/shared/utils/cn';
 
-export type EntryKindFilterSet = Set<MappingEntryKind>;
+export type EntryKindFilterSet = Set<EffectiveMappingKind>;
 export type ProviderFilterSet = Set<Provider>;
 export type LibraryFilter = 'all' | 'in-library' | 'not-in-library';
 export type MappingScope = 'all' | 'needs-attention' | 'manual-mappings' | 'suppressed';
 export type ProviderFilter = 'all' | Provider;
-export type EntryKindFilter = 'all' | MappingEntryKind;
+export type EntryKindFilter = 'all' | EffectiveMappingKind;
 
 export type MappingSort =
   | 'updated-desc'
@@ -52,7 +52,7 @@ type MappingToolbarProps = {
 export const providerOptions: { value: Provider; label: string }[] =
   PROVIDERS.map((provider) => ({ value: provider, label: getProviderLabel(provider) }));
 
-export const entryKindOptions: { value: MappingEntryKind; label: string }[] = [
+export const entryKindOptions: { value: EffectiveMappingKind; label: string }[] = [
   { value: 'manual', label: 'Manual' },
   { value: 'unmapped', label: 'Unmapped' },
   { value: 'unknown', label: 'Unknown' },
@@ -72,22 +72,22 @@ const scopeDefinitions: Array<{
   {
     value: 'needs-attention',
     label: 'Needs attention',
-    entryKinds: new Set<MappingEntryKind>(['manual', 'rejected', 'ignored', 'unmapped', 'unknown']),
+    entryKinds: new Set<EffectiveMappingKind>(['manual', 'rejected', 'ignored', 'unmapped', 'unknown']),
   },
   {
     value: 'manual-mappings',
     label: 'Manual mappings',
-    entryKinds: new Set<MappingEntryKind>(['manual']),
+    entryKinds: new Set<EffectiveMappingKind>(['manual']),
   },
   {
     value: 'suppressed',
     label: 'Suppressed',
-    entryKinds: new Set<MappingEntryKind>(['rejected', 'ignored']),
+    entryKinds: new Set<EffectiveMappingKind>(['rejected', 'ignored']),
   },
   {
     value: 'all',
     label: 'All mappings',
-    entryKinds: new Set<MappingEntryKind>(ALL_MAPPING_ENTRY_KINDS),
+    entryKinds: new Set<EffectiveMappingKind>(ALL_MAPPING_ENTRY_KINDS),
   },
 ];
 

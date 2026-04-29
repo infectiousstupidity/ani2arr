@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseAniListId, type AniListId } from '@/anilist';
 import { parseTmdbId, parseTvdbId } from '@/providers';
-import type { AnibridgeProviderPair } from '@/mapping/upstream';
+import type { AnibridgeMappingPair } from '@/mapping/upstream';
 import type { AutoMappingRecord } from '@/mapping/auto-mapping/types';
 import { getMappingIdentities, type GetMappingIdentitiesDeps } from './queries/mapping-identities';
 
@@ -11,9 +11,9 @@ const tmdb = parseTmdbId;
 
 const createDeps = (input: {
   ignores?: Array<{ anilistId: AniListId; provider: 'sonarr' | 'radarr' }>;
-  manuals?: AnibridgeProviderPair[];
-  upstream?: AnibridgeProviderPair[];
-  resolverStates?: Array<AutoMappingRecord & { anilistId: AniListId; provider: 'sonarr' | 'radarr' }>;
+  manuals?: AnibridgeMappingPair[];
+  upstream?: AnibridgeMappingPair[];
+  autoMappingRecords?: Array<AutoMappingRecord & { anilistId: AniListId; provider: 'sonarr' | 'radarr' }>;
 }): GetMappingIdentitiesDeps => ({
   manualMappingService: {
     get: ((provider, anilistId) => (input.manuals ?? [])
@@ -27,18 +27,18 @@ const createDeps = (input: {
   anibridgeMappingStore: {
     listAllProviderPairs: () => input.upstream ?? [],
     getSonarrCandidates: (anilistId) => (input.upstream ?? [])
-      .filter((entry): entry is Extract<AnibridgeProviderPair, { provider: 'sonarr' }> =>
+      .filter((entry): entry is Extract<AnibridgeMappingPair, { provider: 'sonarr' }> =>
         entry.provider === 'sonarr' && entry.anilistId === anilistId)
       .map(entry => entry.providerId),
     getRadarrCandidates: (anilistId) => (input.upstream ?? [])
-      .filter((entry): entry is Extract<AnibridgeProviderPair, { provider: 'radarr' }> =>
+      .filter((entry): entry is Extract<AnibridgeMappingPair, { provider: 'radarr' }> =>
         entry.provider === 'radarr' && entry.anilistId === anilistId)
       .map(entry => entry.providerId),
   },
   autoMappingStore: {
-    get: async (provider, anilistId) => (input.resolverStates ?? [])
+    get: async (provider, anilistId) => (input.autoMappingRecords ?? [])
       .find(entry => entry.provider === provider && entry.anilistId === anilistId) ?? null,
-    list: async () => input.resolverStates ?? [],
+    list: async () => input.autoMappingRecords ?? [],
   },
 });
 
@@ -55,7 +55,7 @@ describe('getMappingIdentities', () => {
         upstream: [
           { anilistId: aid(2), provider: 'sonarr', providerId: tvdb(222) },
         ],
-        resolverStates: [
+        autoMappingRecords: [
           {
             anilistId: aid(2),
             provider: 'sonarr',

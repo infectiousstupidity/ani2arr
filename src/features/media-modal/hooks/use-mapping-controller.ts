@@ -4,7 +4,7 @@
 import { useCallback, useState } from "react";
 import type { AniListId } from "@/anilist";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
-import type { MappingEntryKind } from "@/mapping/types";
+import type { EffectiveMappingKind } from "@/mapping/types";
 import { parseProviderIdentity, type Provider, type ProviderTargetId } from "@/providers";
 import { useDebounced } from "@/shared/hooks/use-debounced";
 import {
@@ -17,7 +17,7 @@ import {
 import { useMappingSearch } from "./use-mapping-search";
 
 type AuthoritativeMappingState = {
-	mappingEntryKind: MappingEntryKind;
+	mappingEntryKind: EffectiveMappingKind;
 	suppressedProviderId?: ProviderTargetId | null;
 	providerId: ProviderTargetId | null;
 };

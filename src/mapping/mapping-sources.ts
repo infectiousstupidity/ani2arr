@@ -2,7 +2,7 @@ import type { AniListId } from '@/anilist';
 import { parseProviderIdentity, type Provider, type ProviderIdFor, type ProviderTargetId, type TmdbId, type TvdbId } from '@/providers';
 import type { AutoMappingRecord } from './auto-mapping/types';
 
-export interface MappingSource {
+export interface CollectedMappingSources {
   provider: Provider;
   anilistId: AniListId;
   manualMappedProviderId: ProviderTargetId | null;
@@ -12,7 +12,7 @@ export interface MappingSource {
   autoMappingRecord: AutoMappingRecord | null;
 }
 
-export interface MappingSourceDeps {
+export interface CollectMappingSourcesDeps {
   manualMappingService: {
     get<P extends Provider>(provider: P, anilistId: AniListId): ProviderIdFor<P> | null;
     isIgnored(provider: Provider, anilistId: AniListId): boolean;
@@ -32,7 +32,7 @@ export interface MappingSourceDeps {
   };
 }
 
-export interface LinkedAniListIdsDeps {
+export interface CollectLinkedAniListIdsDeps {
   manualMappingService: {
     getLinkedAniListIds<P extends Provider>(provider: P, providerId: ProviderIdFor<P>): AniListId[];
   };
@@ -48,7 +48,7 @@ export interface LinkedAniListIdsDeps {
 const getUpstreamProviderIds = (
   provider: Provider,
   anilistId: AniListId,
-  deps: MappingSourceDeps,
+  deps: CollectMappingSourcesDeps,
 ): readonly ProviderTargetId[] => (
   provider === 'sonarr'
     ? deps.anibridgeMappingStore.getSonarrCandidates(anilistId)
@@ -67,8 +67,8 @@ const latestRejectedCandidateProviderId = (
 export async function getMappingSource(
   provider: Provider,
   anilistId: AniListId,
-  deps: MappingSourceDeps,
-): Promise<MappingSource> {
+  deps: CollectMappingSourcesDeps,
+): Promise<CollectedMappingSources> {
   const rejected = deps.manualMappingService.listRejectedCandidates(provider);
   const autoMappingRecord = await deps.autoMappingStore.get(provider, anilistId);
 
@@ -86,7 +86,7 @@ export async function getMappingSource(
 export async function collectLinkedAniListIds(
   provider: Provider,
   providerId: ProviderTargetId,
-  deps: LinkedAniListIdsDeps,
+  deps: CollectLinkedAniListIdsDeps,
 ): Promise<AniListId[]> {
   const identity = parseProviderIdentity(provider, providerId);
   const ids = new Set<AniListId>();

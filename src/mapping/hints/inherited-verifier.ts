@@ -11,7 +11,7 @@ import {
 } from '@/mapping/pipeline/matching';
 import type { ProviderCredentials, SonarrLookupSeries, TvdbId } from '@/providers';
 import type { ProviderLookupClient } from '../lookup';
-import type { MappingInheritedVerificationDetails } from '../types';
+import type { InheritedMappingVerificationDetails } from '../types';
 
 const SEASON_INDICATORS = new Set(['season', 'part', 'cour']);
 const ROMAN_NUMERAL_RE = /^[cdilmvx]+$/i;
@@ -32,7 +32,7 @@ type ExactSonarrLookupClient = Pick<
 export interface InheritedVerificationResult {
   verdict: 'accept' | 'reject' | 'ambiguous' | 'verification-failed';
   title?: string;
-  details: MappingInheritedVerificationDetails;
+  details: InheritedMappingVerificationDetails;
 }
 
 function collectCurrentTitles(media: AniListMedia): string[] {
@@ -172,7 +172,7 @@ export async function verifyInheritedSonarrCandidate(
     contradictions.push('Exact Sonarr titles conflict with the current and trusted related AniList title families.');
   }
 
-  const details: MappingInheritedVerificationDetails = {
+  const details: InheritedMappingVerificationDetails = {
     reason:
       contradictions.length > 0
         ? contradictions[0]!

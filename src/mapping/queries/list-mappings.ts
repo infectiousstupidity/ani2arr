@@ -13,29 +13,26 @@ import {
 	type TvdbId,
 } from "@/providers";
 import type {
-	MappingEntryKind,
-	MappingIdentity,
-	MappingSuppressionKind,
-	MappingUnknownReason,
+	EffectiveMappingKind,
 } from "@/mapping/types";
 import type {
 	AutoMappingRecord,
 	AutoMappingStatus,
 } from "@/mapping/auto-mapping/types";
-import { buildEffectiveMappingCandidate } from "@/mapping/effective-mapping";
+import { buildEffectiveMapping, type EffectiveMapping } from "@/mapping/effective-mapping";
 import {
 	deriveLibraryUnknownReason,
 	type LibraryUnknownReason,
 } from "@/providers/library/types";
 import { deriveMappingRowStatus } from "@/features/provider-action";
 import {
-	projectMappingReview,
-	type MappingReviewItem,
-	type MappingReviewSummary,
+	projectMappingIssues,
+	type MappingIssue,
+	type MappingIssuesSummary,
 } from "./mapping-issues";
 
 /** Primary user-facing status for one projected mapping summary row. */
-export type MappingRowStatus =
+export type MappingListRowStatus =
 	| "needs-review"
 	| "in-library"
 	| "can-add"
@@ -46,13 +43,11 @@ export type MappingRowStatus =
 /**
  * Enriched options-page/RPC summary row for one `provider + anilistId`.
  */
-export interface MappingSummary extends MappingIdentity {
+export interface MappingListRow extends EffectiveMapping {
 	isInLibrary: boolean | null;
-	suppressedProviderId?: ProviderTargetId | null;
-	mappingRowStatus: MappingRowStatus;
-	suppressionKind?: MappingSuppressionKind;
-	reviewSummary?: MappingReviewSummary;
-	reviewItems?: readonly MappingReviewItem[];
+	mappingRowStatus: MappingListRowStatus;
+	reviewSummary?: MappingIssuesSummary;
+	reviewItems?: readonly MappingIssue[];
 	updatedAt?: number;
 	linkedAniListIds?: readonly AniListId[];
 	inLibraryCount?: number;
@@ -61,21 +56,18 @@ export interface MappingSummary extends MappingIdentity {
 		type?: "series" | "movie";
 		statusLabel?: string;
 	};
-	resolverOutcome?: AutoMappingStatus;
-	mappingUnknownReason?: MappingUnknownReason;
 	libraryUnknownReason?: LibraryUnknownReason;
-	hadResolveAttempt?: boolean;
 }
 
 export interface ListMappingsCursor {
 	updatedAt: number;
 	anilistId: AniListId;
-	provider: MappingSummary["provider"];
+	provider: MappingListRow["provider"];
 }
 
 export interface ListMappingsInput {
-	entryKinds?: MappingEntryKind[] | undefined;
-	providers?: MappingSummary["provider"][] | undefined;
+	entryKinds?: EffectiveMappingKind[] | undefined;
+	providers?: MappingListRow["provider"][] | undefined;
 	limit?: number | undefined;
 	cursor?: ListMappingsCursor | undefined;
 	query?: string | undefined;
@@ -85,26 +77,26 @@ export interface ListMappingsDeps {
 	manualMappingService: {
 		listIgnores(): Array<{
 			anilistId: AniListId;
-			provider: MappingSummary["provider"];
+			provider: MappingListRow["provider"];
 			updatedAt: number;
 		}>;
 		listRejectedCandidates(): Array<{
 			anilistId: AniListId;
-			provider: MappingSummary["provider"];
-			providerId: NonNullable<MappingSummary["providerId"]>;
+			provider: MappingListRow["provider"];
+			providerId: NonNullable<MappingListRow["providerId"]>;
 			updatedAt: number;
 		}>;
 		list(): Array<{
 			anilistId: AniListId;
-			provider: MappingSummary["provider"];
-			providerId: NonNullable<MappingSummary["providerId"]>;
+			provider: MappingListRow["provider"];
+			providerId: NonNullable<MappingListRow["providerId"]>;
 			updatedAt: number;
 		}>;
 		isIgnored(
-			provider: MappingSummary["provider"],
+			provider: MappingListRow["provider"],
 			anilistId: AniListId,
 		): boolean;
-		getLinkedAniListIds<P extends MappingSummary["provider"]>(
+		getLinkedAniListIds<P extends MappingListRow["provider"]>(
 			provider: P,
 			providerId: ProviderIdFor<P>,
 		): AniListId[];
@@ -126,18 +118,18 @@ export interface ListMappingsDeps {
 		getLeanMovieList(): Promise<RadarrMovieSnapshot[]>;
 	};
 	autoMappingStore: {
-		list(provider?: MappingSummary["provider"]): Promise<
+		list(provider?: MappingListRow["provider"]): Promise<
 			Array<
 				AutoMappingRecord & {
 					anilistId: AniListId;
-					provider: MappingSummary["provider"];
+					provider: MappingListRow["provider"];
 				}
 			>
 		>;
 	};
 }
 
-type ProjectedCandidate = ReturnType<typeof buildEffectiveMappingCandidate> & {
+type EffectiveMappingWithUpdatedAt = EffectiveMapping & {
 	updatedAt: number;
 };
 
@@ -161,7 +153,7 @@ const resolveRecentEvaluationTitle = (
 };
 
 const createKey = (
-	provider: MappingSummary["provider"],
+	provider: MappingListRow["provider"],
 	anilistId: AniListId,
 ): string => `${provider}:${anilistId}`;
 
@@ -241,7 +233,7 @@ const resolveCandidateUpdatedAt = (input: {
 };
 
 const resolveIsInLibrary = (input: {
-	providerMappingState: MappingSummary["providerMappingState"];
+	providerMappingState: MappingListRow["providerMappingState"];
 	hasLibraryMatch: boolean;
 	libraryLookupFailed: boolean;
 }): boolean | null => {
@@ -261,7 +253,7 @@ export async function listMappings(
 	input: ListMappingsInput | undefined,
 	deps: ListMappingsDeps,
 ): Promise<{
-	mappings: MappingSummary[];
+	mappings: MappingListRow[];
 	total: number;
 	nextCursor: ListMappingsCursor | null;
 }> {
@@ -275,8 +267,8 @@ export async function listMappings(
 	const normalizedQuery = input?.query?.trim().toLowerCase() || "";
 	const entryKinds =
 		input?.entryKinds && input.entryKinds.length > 0
-			? new Set<MappingEntryKind>(input.entryKinds)
-			: new Set<MappingEntryKind>([
+			? new Set<EffectiveMappingKind>(input.entryKinds)
+			: new Set<EffectiveMappingKind>([
 					"manual",
 					"rejected",
 					"ignored",
@@ -287,8 +279,8 @@ export async function listMappings(
 				]);
 	const providers =
 		input?.providers && input.providers.length > 0
-			? new Set<MappingSummary["provider"]>(input.providers)
-			: new Set<MappingSummary["provider"]>(PROVIDERS);
+			? new Set<MappingListRow["provider"]>(input.providers)
+			: new Set<MappingListRow["provider"]>(PROVIDERS);
 
 	const defaultLimit = normalizedQuery ? 200 : 500;
 	const limit = Math.min(Math.max(input?.limit ?? defaultLimit, 1), 2000);
@@ -338,7 +330,7 @@ export async function listMappings(
 		string,
 		{
 			anilistId: AniListId;
-			provider: MappingSummary["provider"];
+			provider: MappingListRow["provider"];
 			providerId: ProviderTargetId;
 		}
 	>();
@@ -387,10 +379,10 @@ export async function listMappings(
 		keys.add(key);
 	}
 
-	const candidates: ProjectedCandidate[] = [];
+	const candidates: EffectiveMappingWithUpdatedAt[] = [];
 	for (const key of keys) {
 		const [provider, rawAniListId] = key.split(":") as [
-			MappingSummary["provider"],
+			MappingListRow["provider"],
 			string,
 		];
 		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
@@ -417,7 +409,7 @@ export async function listMappings(
 					};
 		const manualMappedProviderId = manual?.providerId ?? null;
 		const autoMappingRecord = autoMappingRecordByKey.get(key);
-		const candidate = buildEffectiveMappingCandidate({
+		const candidate = buildEffectiveMapping({
 			provider,
 			anilistId,
 			manualProviderId: manualMappedProviderId,
@@ -440,7 +432,7 @@ export async function listMappings(
 	}
 
 	const matchesQuery = (
-		summary: MappingSummary,
+		summary: MappingListRow,
 		recentEvaluation: AutoMappingRecord["recentEvaluation"],
 	): boolean => {
 		if (normalizedQuery === "") return true;
@@ -484,7 +476,7 @@ export async function listMappings(
 	};
 
 	const getLinkedAniListIds = (
-		provider: MappingSummary["provider"],
+		provider: MappingListRow["provider"],
 		providerId: ProviderTargetId,
 	): AniListId[] => {
 		const identity = parseProviderIdentity(provider, providerId);
@@ -517,7 +509,7 @@ export async function listMappings(
 		}
 	};
 
-	const results: MappingSummary[] = [];
+	const results: MappingListRow[] = [];
 	for (const candidate of candidates) {
 		const providerId = candidate.providerId ?? null;
 		const tvdbId = candidate.provider === "sonarr" ? providerId : null;
@@ -552,7 +544,7 @@ export async function listMappings(
 			series?.statistics?.episodeFileCount ??
 			(movie ? (movie.hasFile ? 1 : 0) : undefined);
 		const statusLabel = series?.status ?? movie?.status;
-		let providerMeta: MappingSummary["providerMeta"];
+		let providerMeta: MappingListRow["providerMeta"];
 		if (candidate.mappingEntryKind === "rejected") {
 			providerMeta = undefined;
 		} else if (series) {
@@ -579,7 +571,7 @@ export async function listMappings(
 			}
 		}
 
-		const reviewProjection = projectMappingReview({
+		const reviewProjection = projectMappingIssues({
 			mappingEntryKind: candidate.mappingEntryKind,
 			providerId,
 			...(candidate.acceptedEvidence
@@ -588,8 +580,8 @@ export async function listMappings(
 			...(candidate.recentEvaluation
 				? { recentEvaluation: candidate.recentEvaluation }
 				: {}),
-			...(candidate.resolverState
-				? { resolverState: candidate.resolverState }
+			...(candidate.autoMappingStatus
+				? { autoMappingStatus: candidate.autoMappingStatus }
 				: {}),
 			...(candidate.exactUpstreamMatchProviderId === undefined
 				? {}
@@ -609,7 +601,7 @@ export async function listMappings(
 			isInLibrary,
 		});
 
-		const summary: MappingSummary = {
+		const summary: MappingListRow = {
 			anilistId: candidate.anilistId,
 			provider: candidate.provider,
 			providerId,
@@ -639,8 +631,8 @@ export async function listMappings(
 			...(linkedAniListIds.length > 0 ? { linkedAniListIds } : {}),
 			...(typeof inLibraryCount === "number" ? { inLibraryCount } : {}),
 			...(providerMeta ? { providerMeta } : {}),
-			...(candidate.resolverState
-				? { resolverOutcome: candidate.resolverState }
+			...(candidate.autoMappingStatus
+				? { resolverOutcome: candidate.autoMappingStatus }
 				: {}),
 			...(candidate.mappingUnknownReason
 				? { mappingUnknownReason: candidate.mappingUnknownReason }

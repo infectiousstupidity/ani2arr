@@ -4,7 +4,7 @@
 import { ArrowDown, ExternalLink, X } from 'lucide-react';
 import { useMediaModalContext } from '../../context';
 import type { AniListId } from '@/anilist';
-import type { MappingInspectionLinkedAniListEntry } from '@/mapping/queries/mapping-details';
+import type { MappingDetailsPayload } from '@/mapping/queries/mapping-details';
 import type { MappingSearchResult } from '@/features/media-modal/mapping-search/types';
 import type { Provider } from '@/providers';
 import { getProviderIdLabel, getProviderLabel } from '@/providers/provider-labels';
@@ -13,6 +13,8 @@ import Pill from '@/shared/ui/primitives/pill';
 import { buildProviderOpenUrl } from '@/providers/provider-links';
 import { MappingLinkedEntries } from './linked-entries';
 
+type MappingDetailsLinkedAniListEntry = MappingDetailsPayload['linkedAniListEntries'][number];
+
 type MappingPreviewDetailsProps = {
   aniListEntryId: AniListId;
   effectiveMapping: MappingSearchResult | null;
@@ -20,7 +22,7 @@ type MappingPreviewDetailsProps = {
   isInMappingMode: boolean;
   showResetPreview: boolean;
   onResetPreview: () => void;
-  linkedAniListEntries: readonly MappingInspectionLinkedAniListEntry[];
+  linkedAniListEntries: readonly MappingDetailsLinkedAniListEntry[];
 };
 
 type MappingDetailRow = {

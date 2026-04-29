@@ -2,7 +2,7 @@
 // src/mapping/upstream/anibridge-mapping.cache.ts
 
 import { createTtlCache } from '@/shared/cache/ttl-cache';
-import type { AnibridgeProviderMappingPayload } from './anibridge-mapping.store';
+import type { AnibridgeMappingPayload } from './anibridge-mapping.store';
 
 export const ANIBRIDGE_MAPPING_CACHE_TTL = {
   staleMs: 24 * 60 * 60 * 1000,
@@ -11,6 +11,6 @@ export const ANIBRIDGE_MAPPING_CACHE_TTL = {
 
 const ANIBRIDGE_MAPPING_CACHE_NAMESPACE = 'mapping:upstream:providers';
 
-export const anibridgeMappingCache = createTtlCache<AnibridgeProviderMappingPayload>(
+export const anibridgeMappingCache = createTtlCache<AnibridgeMappingPayload>(
   ANIBRIDGE_MAPPING_CACHE_NAMESPACE,
 );

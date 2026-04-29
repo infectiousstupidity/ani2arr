@@ -1,8 +1,8 @@
 /** Builds combined status responses from provider-library status plus mapping labels. */
 
 import type {
-	MappingAcceptedReason,
-	MappingAcceptedSource,
+	AcceptedMappingReason,
+	AcceptedMappingSource,
 } from "@/mapping/types";
 import type { TmdbId, TvdbId } from "@/providers";
 import type {
@@ -16,8 +16,8 @@ import type {
 
 export function buildSeriesStatusResponseFromLibraryStatus(input: {
 	providerId: TvdbId;
-	mappingSource?: MappingAcceptedSource;
-	mappingReason?: MappingAcceptedReason;
+	mappingSource?: AcceptedMappingSource;
+	mappingReason?: AcceptedMappingReason;
 	libraryStatus: SonarrLibraryStatus;
 }): CheckSeriesStatusResponse {
 	return {
@@ -41,8 +41,8 @@ export function buildSeriesStatusResponseFromLibraryStatus(input: {
 
 export function buildMovieStatusResponseFromLibraryStatus(input: {
 	providerId: TmdbId;
-	mappingSource?: MappingAcceptedSource;
-	mappingReason?: MappingAcceptedReason;
+	mappingSource?: AcceptedMappingSource;
+	mappingReason?: AcceptedMappingReason;
 	libraryStatus: RadarrLibraryStatus;
 }): CheckMovieStatusResponse {
 	return {

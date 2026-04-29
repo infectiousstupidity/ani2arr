@@ -5,10 +5,10 @@ import { storage } from '@wxt-dev/storage';
 import { parseAniListIdOrNull, type AniListId } from '@/anilist';
 import type { Provider } from '@/providers';
 import type {
-  MappingAcceptedEvidence,
-  MappingEvaluationCandidate,
-  MappingInheritedVerificationDetails,
-  MappingRecentEvaluationTrace,
+  AcceptedMappingEvidence,
+  MappingCandidateEvaluation,
+  InheritedMappingVerificationDetails,
+  RecentMappingEvaluationTrace,
 } from '@/mapping/types';
 import type { AutoMappingRecord } from './types';
 
@@ -57,8 +57,8 @@ const parseAutoMappingKey = (key: string): { provider: Provider; anilistId: AniL
 };
 
 const acceptedEvidenceEquals = (
-  left: MappingAcceptedEvidence,
-  right: MappingAcceptedEvidence,
+  left: AcceptedMappingEvidence,
+  right: AcceptedMappingEvidence,
 ): boolean => (
   left.source === right.source &&
   left.reason === right.reason &&
@@ -69,8 +69,8 @@ const acceptedEvidenceEquals = (
 );
 
 const inheritedVerificationEquals = (
-  left: MappingInheritedVerificationDetails | undefined,
-  right: MappingInheritedVerificationDetails | undefined,
+  left: InheritedMappingVerificationDetails | undefined,
+  right: InheritedMappingVerificationDetails | undefined,
 ): boolean => {
   if (!left && !right) {
     return true;
@@ -108,8 +108,8 @@ const inheritedVerificationEquals = (
 };
 
 const evaluationCandidateEquals = (
-  left: MappingEvaluationCandidate,
-  right: MappingEvaluationCandidate,
+  left: MappingCandidateEvaluation,
+  right: MappingCandidateEvaluation,
 ): boolean => (
   left.providerId === right.providerId &&
   left.title === right.title &&
@@ -122,8 +122,8 @@ const evaluationCandidateEquals = (
 );
 
 const recentEvaluationEquals = (
-  left: MappingRecentEvaluationTrace | undefined,
-  right: MappingRecentEvaluationTrace | undefined,
+  left: RecentMappingEvaluationTrace | undefined,
+  right: RecentMappingEvaluationTrace | undefined,
 ): boolean => {
   if (!left && !right) {
     return true;

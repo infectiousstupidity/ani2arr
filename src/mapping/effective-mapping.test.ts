@@ -104,7 +104,6 @@ describe('buildEffectiveMapping', () => {
       mappingSource: 'auto',
       mappingReason: 'fuzzy-match',
       autoMappingStatus: 'mapped',
-      resolverState: 'mapped',
     });
   });
 
@@ -136,7 +135,6 @@ describe('buildEffectiveMapping', () => {
       providerMappingState: 'unmapped',
       mappingEntryKind: 'unmapped',
       autoMappingStatus: 'unresolved',
-      resolverState: 'unresolved',
       hadResolveAttempt: true,
     });
   });
@@ -153,7 +151,6 @@ describe('buildEffectiveMapping', () => {
       mappingEntryKind: 'unknown',
       mappingUnknownReason: 'ambiguous',
       autoMappingStatus: 'ambiguous',
-      resolverState: 'ambiguous',
     });
   });
 
@@ -172,7 +169,6 @@ describe('buildEffectiveMapping', () => {
       mappingEntryKind: 'unknown',
       mappingUnknownReason: 'ambiguous',
       autoMappingStatus: 'ambiguous',
-      resolverState: 'ambiguous',
     });
   });
 
@@ -191,7 +187,6 @@ describe('buildEffectiveMapping', () => {
       mappingEntryKind: 'unknown',
       mappingUnknownReason: 'verification-failed',
       autoMappingStatus: 'verification-failed',
-      resolverState: 'verification-failed',
     });
   });
 });

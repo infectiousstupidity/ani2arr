@@ -18,7 +18,7 @@ import { CardOverlay } from "@/features/media-overlay/components/card-overlay";
 import { usePublicOptions } from "@/options";
 import type { Provider } from "@/providers";
 import { useMappingIdentities } from "@/shared/queries/mapping";
-import type { MappingIdentity } from "@/mapping/types";
+import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 
 export const DEFAULT_CONTAINER_CLASS = "a2a-overlay-container";
 export const DEFAULT_PROCESSED_ATTRIBUTE = "data-a2a-processed";
@@ -74,9 +74,9 @@ function getLaunchTitle(input: {
 }
 
 function getMappedIdentityByAniListId(
-	identities: readonly MappingIdentity[],
-): Map<AniListId, MappingIdentity> {
-	const identitiesById = new Map<AniListId, MappingIdentity>();
+	identities: readonly EffectiveMappingPresence[],
+): Map<AniListId, EffectiveMappingPresence> {
+	const identitiesById = new Map<AniListId, EffectiveMappingPresence>();
 	for (const identity of identities) {
 		if (
 			identity.providerMappingState === "mapped" &&
@@ -97,7 +97,7 @@ function renderBrowseCardPortal(input: {
 		AniListId,
 		ReturnType<typeof metadataHintFromAniListMetadata>
 	>;
-	mappedIdentityByAniListId: Map<AniListId, MappingIdentity>;
+	mappedIdentityByAniListId: Map<AniListId, EffectiveMappingPresence>;
 	publicOptions: Awaited<ReturnType<typeof usePublicOptions>>["data"];
 	onOpenMediaModal(input: MediaModalOpenState): void;
 	adapter: BrowseAdapter;

@@ -2,19 +2,18 @@
 // src/features/media-modal/components/mapping/suggested-candidates.tsx
 
 import { useMemo } from 'react';
-import type {
-  MappingInspectionCandidate,
-  MappingInspectionPayload,
-  MappingInspectionSuggestedCandidates,
-} from '@/mapping/queries/mapping-details';
+import type { MappingDetailsPayload } from '@/mapping/queries/mapping-details';
 import type { Provider } from '@/providers';
 import { getProviderIdLabel } from '@/providers/provider-labels';
 import Pill from '@/shared/ui/primitives/pill';
 import { getSuggestedCandidateGroups } from '../../helpers';
 
+type MappingDetailsCandidateEvaluation = MappingDetailsPayload['suggestedCandidates']['accepted'][number];
+type MappingDetailsCandidateGroups = MappingDetailsPayload['suggestedCandidates'];
+
 export function getSuggestedCandidatePrefill(
-  candidate: MappingInspectionCandidate,
-  suggestedCandidates: MappingInspectionSuggestedCandidates,
+  candidate: MappingDetailsCandidateEvaluation,
+  suggestedCandidates: MappingDetailsCandidateGroups,
 ): string {
   const candidateTitle = candidate.title?.trim();
   if (candidateTitle) {
@@ -31,8 +30,8 @@ export function getSuggestedCandidatePrefill(
 
 export function applySuggestedCandidateSearchShortcut(
   setQuery: (query: string) => void,
-  candidate: MappingInspectionCandidate,
-  suggestedCandidates: MappingInspectionSuggestedCandidates,
+  candidate: MappingDetailsCandidateEvaluation,
+  suggestedCandidates: MappingDetailsCandidateGroups,
 ): string {
   const nextQuery = getSuggestedCandidatePrefill(candidate, suggestedCandidates);
   setQuery(nextQuery);
@@ -40,9 +39,9 @@ export function applySuggestedCandidateSearchShortcut(
 }
 
 export function MappingInspectionSuggestedShortcuts(props: {
-  inspection: MappingInspectionPayload;
+  inspection: MappingDetailsPayload;
   provider: Provider;
-  onUseSuggestion: (candidate: MappingInspectionCandidate) => void;
+  onUseSuggestion: (candidate: MappingDetailsCandidateEvaluation) => void;
 }): React.JSX.Element {
   const { inspection, provider, onUseSuggestion } = props;
   const providerIdLabel = getProviderIdLabel(provider);

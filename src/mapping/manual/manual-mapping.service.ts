@@ -2,7 +2,6 @@
 // src/mapping/manual/manual-mapping.service.ts
 
 import type { AniListId } from '@/anilist';
-import type { MappingProviderIdRecord, MappingIgnoreRecord } from '@/mapping/types';
 import { parseProviderIdentity, type Provider, type ProviderIdFor, type ProviderTargetId, type TmdbId, type TvdbId } from '@/providers';
 import {
   createRecordKey,
@@ -13,7 +12,12 @@ import {
 } from './keys';
 import { createManualMappingPersistedMaps } from '@/mapping/manual/manual-mapping.storage';
 import { PersistedMap } from '@/mapping/manual/persisted-map';
-import type { MappingIgnoreEntry, StoredMappingProviderIdEntry } from './types';
+import type {
+  PersistedMappingIgnoreRecord,
+  PersistedProviderMappingRecord,
+  StoredMappingIgnoreEntry,
+  StoredProviderMappingEntry,
+} from './types';
 
 type ParsedRecordKey = { provider: Provider; anilistId: AniListId };
 type ParsedCandidateKey =
@@ -25,15 +29,15 @@ const toProviderIdRecord = (
     | { provider: 'sonarr'; providerId: TvdbId }
     | { provider: 'radarr'; providerId: TmdbId }
   ),
-): MappingProviderIdRecord => input;
+): PersistedProviderMappingRecord => input;
 
 const MANUAL_MAPPING_SORT = (a: { updatedAt: number; provider: string; anilistId: AniListId }, b: { updatedAt: number; provider: string; anilistId: AniListId }) =>
   b.updatedAt - a.updatedAt || a.provider.localeCompare(b.provider) || a.anilistId - b.anilistId;
 
 export class ManualMappingService {
-  private readonly manualMappings: PersistedMap<string, StoredMappingProviderIdEntry, ParsedRecordKey>;
-  private readonly ignoredMappings: PersistedMap<string, MappingIgnoreEntry, ParsedRecordKey>;
-  private readonly rejectedCandidates: PersistedMap<string, StoredMappingProviderIdEntry, ParsedCandidateKey>;
+  private readonly manualMappings: PersistedMap<string, StoredProviderMappingEntry, ParsedRecordKey>;
+  private readonly ignoredMappings: PersistedMap<string, StoredMappingIgnoreEntry, ParsedRecordKey>;
+  private readonly rejectedCandidates: PersistedMap<string, StoredProviderMappingEntry, ParsedCandidateKey>;
   private readonly reverse = new Map<string, Set<AniListId>>();
   private initialized = false;
   private writeQueue: Promise<void> = Promise.resolve();
@@ -168,8 +172,8 @@ export class ManualMappingService {
     await this.clearCandidateSuppression(provider, anilistId, providerId);
   }
 
-  public list(provider?: Provider): MappingProviderIdRecord[] {
-    const entries = this.manualMappings.list<MappingProviderIdRecord>(
+  public list(provider?: Provider): PersistedProviderMappingRecord[] {
+    const entries = this.manualMappings.list<PersistedProviderMappingRecord>(
       (_key, entry, parsed) => entry.provider === 'sonarr'
         ? toProviderIdRecord({
             anilistId: parsed.anilistId,
@@ -189,8 +193,8 @@ export class ManualMappingService {
     return entries;
   }
 
-  public listIgnores(provider?: Provider): MappingIgnoreRecord[] {
-    const entries = this.ignoredMappings.list<MappingIgnoreRecord>(
+  public listIgnores(provider?: Provider): PersistedMappingIgnoreRecord[] {
+    const entries = this.ignoredMappings.list<PersistedMappingIgnoreRecord>(
       (_key, entry, parsed) => ({
         anilistId: parsed.anilistId,
         provider: parsed.provider,
@@ -202,14 +206,14 @@ export class ManualMappingService {
     return entries;
   }
 
-  public listRejectedCandidates(provider?: Provider): MappingProviderIdRecord[] {
+  public listRejectedCandidates(provider?: Provider): PersistedProviderMappingRecord[] {
     return this.listCandidateSuppressions(this.rejectedCandidates, provider);
   }
 
   public exportState(): {
-    manualMappings: Record<string, StoredMappingProviderIdEntry>;
-    ignoredMappings: Record<string, MappingIgnoreEntry>;
-    rejectedCandidates: Record<string, StoredMappingProviderIdEntry>;
+    manualMappings: Record<string, StoredProviderMappingEntry>;
+    ignoredMappings: Record<string, StoredMappingIgnoreEntry>;
+    rejectedCandidates: Record<string, StoredProviderMappingEntry>;
   } {
     return {
       manualMappings: this.manualMappings.toRecord(),
@@ -219,9 +223,9 @@ export class ManualMappingService {
   }
 
   public async importState(state: {
-    manualMappings: Record<string, StoredMappingProviderIdEntry>;
-    ignoredMappings: Record<string, MappingIgnoreEntry>;
-    rejectedCandidates?: Record<string, StoredMappingProviderIdEntry>;
+    manualMappings: Record<string, StoredProviderMappingEntry>;
+    ignoredMappings: Record<string, StoredMappingIgnoreEntry>;
+    rejectedCandidates?: Record<string, StoredProviderMappingEntry>;
   }): Promise<void> {
     await this.enqueueWrite(async () => {
       await Promise.all([
@@ -256,10 +260,10 @@ export class ManualMappingService {
   }
 
   private listCandidateSuppressions(
-    source: PersistedMap<string, StoredMappingProviderIdEntry, ParsedCandidateKey>,
+    source: PersistedMap<string, StoredProviderMappingEntry, ParsedCandidateKey>,
     provider?: Provider,
-  ): MappingProviderIdRecord[] {
-    const entries = source.list<MappingProviderIdRecord>(
+  ): PersistedProviderMappingRecord[] {
+    const entries = source.list<PersistedProviderMappingRecord>(
       (_key, entry, parsed) => parsed.provider === 'sonarr'
         ? toProviderIdRecord({
             anilistId: parsed.anilistId,

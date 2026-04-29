@@ -1,29 +1,35 @@
 import type { AniListId } from '@/anilist';
 import type { Provider, ProviderTargetId } from '@/providers';
 import type {
-  MappingAcceptedEvidence,
-  MappingIdentity,
+  AcceptedMappingEvidence,
+  AcceptedMappingReason,
+  AcceptedMappingSource,
+  EffectiveMappingKind,
+  EffectiveMappingState,
   MappingSuppressionKind,
   MappingUnknownReason,
 } from '@/mapping/types';
 import type { AutoMappingRecord } from '@/mapping/auto-mapping/types';
 
-export interface EffectiveMappingWithSuppression extends MappingIdentity {
-  acceptedEvidence?: MappingAcceptedEvidence;
+export interface EffectiveMapping {
+  anilistId: AniListId;
+  provider: Provider;
+  providerId: ProviderTargetId | null;
+  providerMappingState: EffectiveMappingState;
+  mappingEntryKind: EffectiveMappingKind;
+  mappingSource?: AcceptedMappingSource;
+  mappingReason?: AcceptedMappingReason;
+  acceptedEvidence?: AcceptedMappingEvidence;
   recentEvaluation?: AutoMappingRecord['recentEvaluation'];
   suppressedProviderId?: ProviderTargetId | null;
   suppressionKind?: MappingSuppressionKind;
   exactUpstreamMatchProviderId?: ProviderTargetId | null;
   autoMappingStatus?: AutoMappingRecord['state'];
-  /** @deprecated Use autoMappingStatus. Kept for existing response projections. */
-  resolverState?: AutoMappingRecord['state'];
   mappingUnknownReason?: MappingUnknownReason;
   hadResolveAttempt?: boolean;
 }
 
-export type EffectiveMapping = Omit<EffectiveMappingWithSuppression, 'suppressedProviderId' | 'suppressionKind'>;
-
-export interface EffectiveMappingInput {
+interface BuildEffectiveMappingInput {
   provider: Provider;
   anilistId: AniListId;
   manualProviderId: ProviderTargetId | null;
@@ -34,9 +40,9 @@ export interface EffectiveMappingInput {
 }
 
 const withRejectedSuppression = (
-  effectiveMapping: EffectiveMappingWithSuppression,
+  effectiveMapping: EffectiveMapping,
   rejectedCandidateProviderId: ProviderTargetId | null | undefined,
-): EffectiveMappingWithSuppression => (
+): EffectiveMapping => (
   rejectedCandidateProviderId == null
     ? effectiveMapping
     : {
@@ -51,7 +57,7 @@ const shouldApplyRejectedSuppression = (effectiveMapping: EffectiveMapping): boo
 );
 
 const buildManualEffectiveMapping = (
-  input: EffectiveMappingInput,
+  input: BuildEffectiveMappingInput,
   upstreamProviderId: ProviderTargetId | null,
 ): EffectiveMapping | null => {
   const { provider, anilistId, manualProviderId, autoMappingRecord } = input;
@@ -76,7 +82,6 @@ const buildManualEffectiveMapping = (
         ? { recentEvaluation: autoMappingRecord.recentEvaluation }
         : {}),
       autoMappingStatus: 'mapped',
-      resolverState: 'mapped',
       hadResolveAttempt: true,
     };
   }
@@ -94,7 +99,6 @@ const buildManualEffectiveMapping = (
       reason: 'manual-override',
     },
     autoMappingStatus: 'mapped',
-    resolverState: 'mapped',
     exactUpstreamMatchProviderId: upstreamProviderId,
     hadResolveAttempt: true,
   };
@@ -116,9 +120,9 @@ export const autoMappingStatusToUnknownReason = (
   }
 };
 
-export function buildEffectiveMapping(
-  input: EffectiveMappingInput,
-): EffectiveMapping {
+const buildEffectiveMappingWithoutSuppression = (
+  input: BuildEffectiveMappingInput,
+): EffectiveMapping => {
   const { provider, anilistId, ignored, upstreamProviderIds, rejectedCandidateProviderId, autoMappingRecord } = input;
   const upstreamProviderId = upstreamProviderIds.length === 1 ? upstreamProviderIds[0]! : null;
   const hasAmbiguousUpstream = upstreamProviderIds.length > 1;
@@ -157,7 +161,6 @@ export function buildEffectiveMapping(
         ? { recentEvaluation: autoMappingRecord.recentEvaluation }
         : {}),
       autoMappingStatus: 'mapped',
-      resolverState: 'mapped',
     };
   }
 
@@ -169,7 +172,6 @@ export function buildEffectiveMapping(
       providerMappingState: 'unknown',
       mappingEntryKind: 'unknown',
       autoMappingStatus: 'ambiguous',
-      resolverState: 'ambiguous',
       mappingUnknownReason: 'ambiguous',
       hadResolveAttempt: true,
     };
@@ -187,7 +189,6 @@ export function buildEffectiveMapping(
       acceptedEvidence: autoMappingRecord.acceptedEvidence,
       ...(autoMappingRecord.recentEvaluation ? { recentEvaluation: autoMappingRecord.recentEvaluation } : {}),
       autoMappingStatus: 'mapped',
-      resolverState: 'mapped',
       hadResolveAttempt: autoMappingRecord.acceptedEvidence.source === 'auto',
     };
   }
@@ -213,7 +214,6 @@ export function buildEffectiveMapping(
       mappingEntryKind: mappingUnknownReason ? 'unknown' : 'unmapped',
       ...(autoMappingRecord.recentEvaluation ? { recentEvaluation: autoMappingRecord.recentEvaluation } : {}),
       autoMappingStatus: autoMappingRecord.state,
-      resolverState: autoMappingRecord.state,
       ...(mappingUnknownReason ? { mappingUnknownReason } : {}),
       hadResolveAttempt: true,
     };
@@ -227,13 +227,13 @@ export function buildEffectiveMapping(
     mappingEntryKind: 'unmapped',
     hadResolveAttempt: false,
   };
-}
+};
 
-export function buildEffectiveMappingCandidate(
-  input: EffectiveMappingInput,
-): EffectiveMappingWithSuppression {
-  const effectiveMapping = buildEffectiveMapping(input);
-  const effectiveMappingWithSuppression: EffectiveMappingWithSuppression = effectiveMapping.mappingEntryKind === 'ignored'
+export function buildEffectiveMapping(
+  input: BuildEffectiveMappingInput,
+): EffectiveMapping {
+  const effectiveMapping = buildEffectiveMappingWithoutSuppression(input);
+  const effectiveMappingWithSuppression: EffectiveMapping = effectiveMapping.mappingEntryKind === 'ignored'
     ? { ...effectiveMapping, suppressionKind: 'ignored-entry' }
     : effectiveMapping;
   if (!shouldApplyRejectedSuppression(effectiveMapping)) {

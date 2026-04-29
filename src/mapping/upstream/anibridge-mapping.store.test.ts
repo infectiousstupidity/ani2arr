@@ -8,7 +8,7 @@ import { parseTmdbId, parseTvdbId } from '@/providers';
 import {
   buildProviderMappingsFromAnibridgePayload,
   AnibridgeMappingStore,
-  type AnibridgeProviderMappingPayload,
+  type AnibridgeMappingPayload,
 } from './anibridge-mapping.store';
 
 type MemoryCache<T> = TtlCache<T> & {
@@ -61,7 +61,7 @@ const notModifiedResponse = (): Response => ({
 const aid = parseAniListId;
 
 const createStore = (payload: unknown) => {
-  const cache = createMemoryCache<AnibridgeProviderMappingPayload>();
+  const cache = createMemoryCache<AnibridgeMappingPayload>();
   const fetchImpl: typeof fetch = async () => createResponse(payload);
 
   return {
@@ -72,7 +72,7 @@ const createStore = (payload: unknown) => {
 
 describe('AnibridgeMappingStore', () => {
   it('hydrates provider-aware cache payloads into forward and reverse indexes', async () => {
-    const cache = createMemoryCache<AnibridgeProviderMappingPayload>();
+    const cache = createMemoryCache<AnibridgeMappingPayload>();
     await cache.write(
       'upstream',
       {
@@ -115,7 +115,7 @@ describe('AnibridgeMappingStore', () => {
   });
 
   it('deduplicates cached IDs during hydration', async () => {
-    const cache = createMemoryCache<AnibridgeProviderMappingPayload>();
+    const cache = createMemoryCache<AnibridgeMappingPayload>();
     await cache.write(
       'upstream',
       {
@@ -149,7 +149,7 @@ describe('AnibridgeMappingStore', () => {
         },
       }),
     );
-    const cache = createMemoryCache<AnibridgeProviderMappingPayload>();
+    const cache = createMemoryCache<AnibridgeMappingPayload>();
     const store = new AnibridgeMappingStore(cache, { fetch: fetchImpl });
 
     await store.init();
@@ -168,7 +168,7 @@ describe('AnibridgeMappingStore', () => {
   });
 
   it('hydrates warm cache before starting the refresh flow', async () => {
-    const cache = createMemoryCache<AnibridgeProviderMappingPayload>();
+    const cache = createMemoryCache<AnibridgeMappingPayload>();
     await cache.write(
       'upstream',
       {
@@ -286,7 +286,7 @@ describe('AnibridgeMappingStore', () => {
   });
 
   it('skips malformed IDs while hydrating normalized cache payloads', async () => {
-    const cache = createMemoryCache<AnibridgeProviderMappingPayload>();
+    const cache = createMemoryCache<AnibridgeMappingPayload>();
     await cache.write(
       'upstream',
       {
@@ -301,7 +301,7 @@ describe('AnibridgeMappingStore', () => {
         radarr: {
           182_255: [424_537],
         },
-      } as unknown as AnibridgeProviderMappingPayload,
+      } as unknown as AnibridgeMappingPayload,
       { staleMs: 60_000, hardMs: 120_000 },
     );
 

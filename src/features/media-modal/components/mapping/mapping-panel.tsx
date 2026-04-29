@@ -3,7 +3,7 @@
 
 import { useCallback, useRef, type WheelEvent as ReactWheelEvent } from "react";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import type { MappingInspectionPayload } from "@/mapping/queries/mapping-details";
+import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
 import { getProviderIdLabel } from "@/providers/provider-labels";
 import { useMediaModalContext } from "../../context";
@@ -14,7 +14,7 @@ import {
 } from "./suggested-candidates";
 
 type MappingInspectionQuery = {
-  data: MappingInspectionPayload | undefined;
+  data: MappingDetailsPayload | undefined;
   error: unknown;
   isPending: boolean;
 };

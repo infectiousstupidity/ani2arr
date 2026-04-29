@@ -3,12 +3,12 @@
 
 import type { ExtensionError } from '@/shared/errors';
 import { ErrorCode } from '@/shared/errors';
-import type { MappingAcceptedReason, MappingAcceptedSource } from './types';
+import type { AcceptedMappingReason, AcceptedMappingSource } from './types';
 import type { AutoMappingOptions } from './auto-mapping/types';
 
 export function shouldApplyCandidateSuppression(
-  _source: MappingAcceptedSource,
-  reason: MappingAcceptedReason,
+  _source: AcceptedMappingSource,
+  reason: AcceptedMappingReason,
 ): boolean {
   // Exact manual and exact upstream mappings are authoritative and must bypass candidate suppression.
   return reason !== 'manual-override' && reason !== 'exact-upstream';

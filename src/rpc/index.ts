@@ -7,7 +7,8 @@ import type {
 	RadarrFormState,
 	SonarrFormState,
 } from "@/providers/settings/provider-settings.schema";
-import type { MappingIdentity, MappingProviderIdRecord } from "@/mapping/types";
+import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
+import type { PersistedProviderMappingRecord } from "@/mapping/manual";
 import type {
 	Provider,
 	ProviderMetadata,
@@ -67,7 +68,7 @@ export interface Ani2arrApi {
 		ids: AniListId[],
 	): Promise<Array<[AniListId, AniListMedia]>>;
 	fetchAniListMedia(anilistId: AniListId): Promise<AniListMedia | null>;
-	getMappingIdentities(ids: AniListId[]): Promise<MappingIdentity[]>;
+	getMappingIdentities(ids: AniListId[]): Promise<EffectiveMappingPresence[]>;
 	/** @deprecated Use getMappingIdentities for provider-aware known mapping lookup. */
 	getStaticMapped(ids: AniListId[]): Promise<AniListId[]>;
 	notifyProviderConnectionChanged(input?: {
@@ -104,7 +105,7 @@ export interface Ani2arrApi {
 	validateTmdbId(
 		input: ValidateTmdbInput,
 	): Promise<{ isInLibrary: boolean; inCatalog: boolean }>;
-	getManualMappings(): Promise<MappingProviderIdRecord[]>;
+	getManualMappings(): Promise<PersistedProviderMappingRecord[]>;
 	clearAllManualMappings(): Promise<{ ok: true }>;
 	clearPersistentCaches(): Promise<{ ok: true }>;
 	resetExtensionState(): Promise<{ ok: true }>;

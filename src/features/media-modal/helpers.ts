@@ -1,10 +1,11 @@
 /** Owns small media-modal formatting helpers for mapping inspection UI. */
 // src/features/media-modal/helpers.ts
 
-import type {
-	MappingInspectionCandidate,
-	MappingInspectionSuggestedCandidates,
-} from "@/mapping/queries/mapping-details";
+import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
+
+type MappingDetailsCandidateEvaluation =
+	MappingDetailsPayload["suggestedCandidates"]["accepted"][number];
+type MappingDetailsCandidateGroups = MappingDetailsPayload["suggestedCandidates"];
 
 type SuggestedCandidateTone =
 	| "muted"
@@ -29,18 +30,18 @@ export type SuggestedCandidateGroup = {
 	key: SuggestedCandidateGroupKey;
 	label: string;
 	tone: SuggestedCandidateTone;
-	items: readonly MappingInspectionCandidate[];
-	getRowLabel?: (candidate: MappingInspectionCandidate) => string;
+	items: readonly MappingDetailsCandidateEvaluation[];
+	getRowLabel?: (candidate: MappingDetailsCandidateEvaluation) => string;
 };
 
 function hasItems(
-	items: readonly MappingInspectionCandidate[] | undefined,
-): items is readonly MappingInspectionCandidate[] {
+	items: readonly MappingDetailsCandidateEvaluation[] | undefined,
+): items is readonly MappingDetailsCandidateEvaluation[] {
 	return Array.isArray(items) && items.length > 0;
 }
 
 export function getSuggestedCandidateGroups(
-	suggestedCandidates: MappingInspectionSuggestedCandidates,
+	suggestedCandidates: MappingDetailsCandidateGroups,
 ): SuggestedCandidateGroup[] {
 	const groups: SuggestedCandidateGroup[] = [];
 

@@ -2,7 +2,7 @@
 // src/mapping/manual/manual-mapping.storage.ts
 
 import { storage } from '@wxt-dev/storage';
-import type { StoredMappingProviderIdEntry, MappingIgnoreEntry } from '@/mapping/manual/types';
+import type { StoredProviderMappingEntry, StoredMappingIgnoreEntry } from '@/mapping/manual/types';
 import { PersistedMap } from '@/mapping/manual/persisted-map';
 import {
   normalizeCandidateSuppressionEntry,
@@ -30,36 +30,36 @@ type ParsedCandidateKey =
   | { provider: 'sonarr'; anilistId: AniListId; providerId: TvdbId }
   | { provider: 'radarr'; anilistId: AniListId; providerId: TmdbId };
 
-const manualMappingsStorage = storage.defineItem<Record<string, StoredMappingProviderIdEntry>>(MANUAL_MAPPINGS_STORAGE_KEY, {
+const manualMappingsStorage = storage.defineItem<Record<string, StoredProviderMappingEntry>>(MANUAL_MAPPINGS_STORAGE_KEY, {
   fallback: {},
   version: 2,
 });
 
-const ignoredManualMappingsStorage = storage.defineItem<Record<string, MappingIgnoreEntry>>(IGNORED_MANUAL_MAPPINGS_STORAGE_KEY, {
+const ignoredManualMappingsStorage = storage.defineItem<Record<string, StoredMappingIgnoreEntry>>(IGNORED_MANUAL_MAPPINGS_STORAGE_KEY, {
   fallback: {},
   version: 2,
 });
 
-const mappingRejectedCandidatesStorage = storage.defineItem<Record<string, StoredMappingProviderIdEntry>>(
+const mappingRejectedCandidatesStorage = storage.defineItem<Record<string, StoredProviderMappingEntry>>(
   MAPPING_REJECTED_CANDIDATES_STORAGE_KEY,
   { fallback: {}, version: 2 },
 );
 
 export function createManualMappingPersistedMaps() {
   return {
-    manualMappings: new PersistedMap<string, StoredMappingProviderIdEntry, ParsedRecordKey>({
+    manualMappings: new PersistedMap<string, StoredProviderMappingEntry, ParsedRecordKey>({
       storage: manualMappingsStorage,
       parseKey: parseRecordKey,
       normalize: normalizeManualMappingEntry,
       storageChangeKeys: [MANUAL_MAPPINGS_CHANGE_KEY],
     }),
-    ignoredMappings: new PersistedMap<string, MappingIgnoreEntry, ParsedRecordKey>({
+    ignoredMappings: new PersistedMap<string, StoredMappingIgnoreEntry, ParsedRecordKey>({
       storage: ignoredManualMappingsStorage,
       parseKey: parseRecordKey,
       normalize: normalizeIgnoreEntry,
       storageChangeKeys: [IGNORED_MANUAL_MAPPINGS_CHANGE_KEY],
     }),
-    rejectedCandidates: new PersistedMap<string, StoredMappingProviderIdEntry, ParsedCandidateKey>({
+    rejectedCandidates: new PersistedMap<string, StoredProviderMappingEntry, ParsedCandidateKey>({
       storage: mappingRejectedCandidatesStorage,
       parseKey: parseCandidateRecordKey,
       normalize: normalizeCandidateSuppressionEntry,

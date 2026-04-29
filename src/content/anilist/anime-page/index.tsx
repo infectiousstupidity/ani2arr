@@ -48,7 +48,7 @@ import {
 } from "@/providers/provider-routing";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type { HostMediaTarget } from "@/content/browse/types";
-import type { MappingIdentity } from "@/mapping/types";
+import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import type {
 	RadarrFormState,
 	SonarrFormState,
@@ -159,9 +159,9 @@ interface AnimePageActionViewModel {
 }
 
 function getMappedIdentityFromIdentities(
-	identities: readonly MappingIdentity[],
+	identities: readonly EffectiveMappingPresence[],
 	anilistId: AniListId,
-): MappingIdentity | null {
+): EffectiveMappingPresence | null {
 	return (
 		identities.find(
 			(identity) =>
@@ -173,7 +173,7 @@ function getMappedIdentityFromIdentities(
 }
 
 function getMappedProviderFromIdentities(
-	identities: readonly MappingIdentity[],
+	identities: readonly EffectiveMappingPresence[],
 	anilistId: AniListId,
 ): Provider | null {
 	return getMappedIdentityFromIdentities(identities, anilistId)?.provider ?? null;

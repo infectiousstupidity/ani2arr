@@ -7,7 +7,7 @@ import {
 } from '@/mapping/pipeline/matching';
 import { scoreCandidates } from '../pipeline/scoring';
 import { isSeasonalCanonicalTokens } from '../pipeline/search-term-generator';
-import type { AcceptedAutoMapping } from '../auto-mapping/types';
+import type { AcceptedAutoMappingResult } from '../auto-mapping/types';
 import type { ScopedLogger } from '@/shared/utils/logger';
 import type { ProviderCredentials } from '@/providers';
 import { SCORE_THRESHOLD } from '../constants';
@@ -19,7 +19,7 @@ export async function tryHintLookup<TResult extends ProviderLookupResult>(
   credentials: ProviderCredentials,
   log: ScopedLogger,
   forceLookupNetwork?: boolean,
-): Promise<AcceptedAutoMapping | null> {
+): Promise<AcceptedAutoMappingResult | null> {
   const provider = lookupClient.provider;
   const trimmed = term.trim();
   const sanitized = sanitizeLookupDisplayForProvider(provider, trimmed);
