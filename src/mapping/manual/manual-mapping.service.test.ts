@@ -32,14 +32,6 @@ describe('ManualMappingService', () => {
       }),
     ]);
 
-    const exported = service.exportState();
-    expect(Object.keys(exported).toSorted()).toEqual(['ignoredMappings', 'manualMappings', 'rejectedCandidates']);
-    expect(exported.rejectedCandidates['sonarr:10:200']).toMatchObject({
-      provider: 'sonarr',
-      providerId: 200,
-      updatedAt: expect.any(Number),
-    });
-
     await service.clearRejectedCandidate('sonarr', aid(10), tvdb(200));
 
     expect(service.getCandidateSuppression('sonarr', aid(10), tvdb(200))).toBeNull();

@@ -20,7 +20,6 @@ import type {
 } from "@/rpc/types";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
-import type { PersistedProviderMappingRecord } from "@/mapping/manual";
 import type { Provider, ProviderTargetId } from "@/providers";
 import type {
 	ClearMappingIgnoreInput,
@@ -323,12 +322,6 @@ function invalidateMappingMutationQueries(
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.seriesStatusBase(input.anilistId, input.provider),
 	});
-	queryClient.invalidateQueries({
-		queryKey: queryKeys.manualMappings(input.provider),
-	});
-	queryClient.invalidateQueries({
-		queryKey: queryKeys.manualMappings("all"),
-	});
 	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingIdentitiesRoot(),
@@ -474,50 +467,6 @@ export const useClearManualMapping = () => {
 	});
 };
 
-export const useClearAllManualMappings = () => {
-	const queryClient = useQueryClient();
-	return useMutation<{ ok: true }, ExtensionError>({
-		mutationFn: async () => {
-			try {
-				return await getAni2arrApi().clearAllManualMappings();
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.manualMappingsRoot(),
-			});
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seriesStatusRoot("sonarr"),
-			});
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seriesStatusRoot("radarr"),
-			});
-			queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.mappingInspectionRoot(),
-			});
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.mappingIdentitiesRoot(),
-			});
-		},
-	});
-};
-
-export const useManualMappings = (provider: Provider | "all" = "all") =>
-	useQuery<PersistedProviderMappingRecord[], ExtensionError>({
-		queryKey: queryKeys.manualMappings(provider),
-		queryFn: async () => {
-			const api = getAni2arrApi();
-			const records = await api.getManualMappings();
-			if (provider === "all") return records;
-			return records.filter((record) => record.provider === provider);
-		},
-		staleTime: 5 * 60 * 1000,
-		refetchOnWindowFocus: false,
-	});
-
 export const useSetMappingIgnore = () => {
 	const queryClient = useQueryClient();
 	return useMutation<{ ok: true }, ExtensionError, SetMappingIgnoreInput>({
@@ -534,12 +483,6 @@ export const useSetMappingIgnore = () => {
 					variables.anilistId,
 					variables.provider,
 				),
-			});
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.manualMappings(variables.provider),
-			});
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.manualMappings("all"),
 			});
 			queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
 			queryClient.invalidateQueries({
@@ -571,12 +514,6 @@ export const useClearMappingIgnore = () => {
 					variables.anilistId,
 					variables.provider,
 				),
-			});
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.manualMappings(variables.provider),
-			});
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.manualMappings("all"),
 			});
 			queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
 			queryClient.invalidateQueries({
@@ -613,9 +550,6 @@ export const useSetMappingRejectedCandidate = () => {
 					variables.provider,
 				),
 			});
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.manualMappingsRoot(),
-			});
 			queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
 			queryClient.invalidateQueries({
 				queryKey: queryKeys.mappingIdentitiesRoot(),
@@ -650,9 +584,6 @@ export const useClearMappingRejectedCandidate = () => {
 					variables.anilistId,
 					variables.provider,
 				),
-			});
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.manualMappingsRoot(),
 			});
 			queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
 			queryClient.invalidateQueries({

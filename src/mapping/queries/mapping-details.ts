@@ -27,7 +27,10 @@ import type {
 	AutoMappingRecord,
 	AutoMappingStatus,
 } from "@/mapping/auto-mapping/types";
-import { buildEffectiveMapping, type EffectiveMapping } from "@/mapping/effective-mapping";
+import {
+	buildEffectiveMapping,
+	type EffectiveMapping,
+} from "@/mapping/effective-mapping";
 import {
 	collectLinkedAniListIds,
 	getMappingSource,
@@ -362,7 +365,7 @@ const buildExplanationItems = (
 				break;
 			}
 			case "manual-override": {
-				summary = "Manual manual mapping is currently effective.";
+				summary = "Manual mapping is currently effective.";
 				break;
 			}
 			case "exact-title-match": {

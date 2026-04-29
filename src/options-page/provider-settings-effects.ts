@@ -40,7 +40,6 @@ export function invalidateAllSettingsQueries(queryClient: QueryClient): void {
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingSearchRoot("radarr"),
 	});
-	queryClient.invalidateQueries({ queryKey: queryKeys.manualMappingsRoot() });
 	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingInspectionRoot(),

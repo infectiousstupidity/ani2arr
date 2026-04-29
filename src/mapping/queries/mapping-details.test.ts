@@ -395,7 +395,7 @@ describe("getMappingInspection", () => {
 			expect.arrayContaining([
 				expect.objectContaining({
 					kind: "effective-source",
-					summary: "Manual manual mapping is currently effective.",
+					summary: "Manual mapping is currently effective.",
 				}),
 				expect.objectContaining({
 					kind: "review",

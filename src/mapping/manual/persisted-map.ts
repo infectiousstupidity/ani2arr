@@ -107,14 +107,6 @@ export class PersistedMap<K extends string, V extends { updatedAt: number }, P =
     return entries;
   }
 
-  public toRecord(): Record<string, V> {
-    const record: Record<string, V> = {};
-    for (const [key, value] of this.map.entries()) {
-      record[key] = value;
-    }
-    return record;
-  }
-
   public rebuild(records: Record<string, V>): void {
     this.map.clear();
     for (const [key, entry] of Object.entries(records ?? {})) {
@@ -123,10 +115,5 @@ export class PersistedMap<K extends string, V extends { updatedAt: number }, P =
       if (!normalized) continue;
       this.map.set(key as K, normalized);
     }
-  }
-
-  public async importRecords(records: Record<string, V>): Promise<void> {
-    this.rebuild(records);
-    await this.persist();
   }
 }
