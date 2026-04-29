@@ -2,9 +2,8 @@
 // src/anilist/schemas/metadata.schema.ts
 
 import * as v from 'valibot';
+import { AniListIdSchema } from '@/anilist/anilist-id';
 import { AniListMediaFormatSchema, AniListTitlesSchema } from '@/anilist/schemas/media.schema';
-
-const AniListIdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
 
 export const AniListMetadataCoverImageSchema = v.object({
   medium: v.optional(v.nullable(v.string())),

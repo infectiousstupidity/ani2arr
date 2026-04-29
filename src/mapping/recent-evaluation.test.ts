@@ -2,6 +2,7 @@
 // src/mapping/recent-evaluation.test.ts
 
 import { describe, expect, it } from 'vitest';
+import { parseTvdbId } from '@/providers';
 import {
   createRecentEvaluationTrace,
   createSingleCandidateTrace,
@@ -10,11 +11,13 @@ import {
   rewriteTraceCandidateStatus,
 } from './recent-evaluation';
 
+const tvdb = parseTvdbId;
+
 describe('recent-evaluation helpers', () => {
   it('prefers the highest-priority candidate status for the same provider ID', () => {
     const merged = mergeTraceCandidates([
       {
-        providerId: 44,
+        providerId: tvdb(44),
         source: 'auto',
         reason: 'fuzzy-match',
         status: 'not-accepted',
@@ -22,7 +25,7 @@ describe('recent-evaluation helpers', () => {
         score: 0.99,
       },
       {
-        providerId: 44,
+        providerId: tvdb(44),
         source: 'auto',
         reason: 'fuzzy-match',
         status: 'accepted',
@@ -33,7 +36,7 @@ describe('recent-evaluation helpers', () => {
 
     expect(merged).toEqual([
       expect.objectContaining({
-        providerId: 44,
+        providerId: tvdb(44),
         status: 'accepted',
         summary: 'Fuzzy title match',
       }),
@@ -43,7 +46,7 @@ describe('recent-evaluation helpers', () => {
   it('merges search terms and deduplicates candidate entries across traces', () => {
     const first = createRecentEvaluationTrace(['First', 'Shared'], [
       {
-        providerId: 10,
+        providerId: tvdb(10),
         source: 'auto',
         reason: 'exact-title-match',
         status: 'not-accepted',
@@ -53,7 +56,7 @@ describe('recent-evaluation helpers', () => {
     ]);
     const second = createRecentEvaluationTrace(['Shared', 'Second'], [
       {
-        providerId: 10,
+        providerId: tvdb(10),
         source: 'auto',
         reason: 'exact-title-match',
         status: 'rejected',
@@ -61,7 +64,7 @@ describe('recent-evaluation helpers', () => {
         score: 0.2,
       },
       {
-        providerId: 20,
+        providerId: tvdb(20),
         source: 'auto',
         reason: 'fuzzy-match',
         status: 'not-accepted',
@@ -75,28 +78,28 @@ describe('recent-evaluation helpers', () => {
     expect(merged).toMatchObject({
       searchTerms: ['First', 'Shared', 'Second'],
       candidates: [
-        expect.objectContaining({ providerId: 10, status: 'rejected' }),
-        expect.objectContaining({ providerId: 20, status: 'not-accepted' }),
+        expect.objectContaining({ providerId: tvdb(10), status: 'rejected' }),
+        expect.objectContaining({ providerId: tvdb(20), status: 'not-accepted' }),
       ],
     });
   });
 
   it('rewrites accepted trace candidates to rejected with the matching summary text', () => {
     const trace = createSingleCandidateTrace(
-      { providerId: 77, reason: 'fuzzy-match' },
+      { providerId: tvdb(77), reason: 'fuzzy-match' },
       'auto',
       'accepted',
       ['Attack on Titan'],
       'Attack on Titan',
     );
 
-    const rewritten = rewriteTraceCandidateStatus(trace, 77, 'rejected');
+    const rewritten = rewriteTraceCandidateStatus(trace, tvdb(77), 'rejected');
 
     expect(rewritten).toMatchObject({
       searchTerms: ['Attack on Titan'],
       candidates: [
         expect.objectContaining({
-          providerId: 77,
+          providerId: tvdb(77),
           status: 'rejected',
           summary: 'Fuzzy title match rejected by candidate suppression',
         }),

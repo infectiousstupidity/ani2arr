@@ -4,51 +4,56 @@
 import React from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { MoreHorizontal, Pencil, Trash2, Undo2 } from 'lucide-react';
+import { buildAniListAnimeUrl } from '@/anilist/anilist-links';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
-import type { Provider } from '@/providers';
-import { getMappingSummarySource, type MappingSource, type MappingSummary } from '@/mapping/types';
+import { parseProviderIdentity } from '@/providers';
+import type { ProviderIdentity } from '@/providers';
+import type { MappingEntryKind } from '@/mapping/types';
+import type { MappingSummary } from '@/mapping/ui/mapping-list-types';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';
-import { buildExternalMediaLink } from '@/shared/utils/provider-links';
+import { buildProviderOpenUrl } from '@/providers/provider-links';
 import {
-  getProviderLibrarySlug,
+  getProviderRouteSlug,
   type ProviderMediaPathSource,
 } from '@/providers/library/paths';
 import { useMovieStatus } from '@/providers/hooks/radarr.queries';
 import { useSeriesStatus } from '@/providers/hooks/sonarr.queries';
 
-const sourceStyles: Record<MappingSource, { label: string; className: string }> = {
+const entryKindStyles: Record<MappingEntryKind, { label: string; className: string }> = {
   manual: { label: 'Manual', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },
-  unresolved: { label: 'Unresolved', className: 'bg-warning/14 text-warning border-warning/24' },
+  unmapped: { label: 'Unmapped', className: 'bg-warning/14 text-warning border-warning/24' },
+  unknown: { label: 'Unknown', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
   rejected: { label: 'Rejected', className: 'bg-warning/12 text-warning border-warning/20' },
   auto: { label: 'Auto', className: 'bg-success/14 text-success border-success/24' },
   upstream: { label: 'Upstream', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
   ignored: { label: 'Ignored', className: 'bg-error/12 text-error border-error/24' },
 };
 
-const statusStyles: Record<MappingSummary['status'], { label: string; className: string }> = {
+const statusStyles: Record<MappingSummary['mappingRowStatus'], { label: string; className: string }> = {
   'needs-review': { label: 'Needs review', className: 'bg-warning/14 text-warning border-warning/24' },
   'in-library': { label: 'In library', className: 'bg-success/14 text-success border-success/24' },
   'can-add': { label: 'Can add', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },
   suppressed: { label: 'Suppressed', className: 'bg-error/12 text-error border-error/24' },
-  unresolved: { label: 'Unresolved', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
+  unmapped: { label: 'Unmapped', className: 'bg-warning/14 text-warning border-warning/24' },
+  unknown: { label: 'Unknown', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
 };
 
-const getExternalLink = (provider: Provider, providerId: number | null) => {
-  if (providerId == null) return null;
-  if (provider === 'sonarr') {
-    return `https://thetvdb.com/dereferrer/series/${providerId}`;
+const getExternalLink = (identity: ProviderIdentity | null) => {
+  if (identity == null) return null;
+  if (identity.provider === 'sonarr') {
+    return `https://thetvdb.com/dereferrer/series/${identity.providerId}`;
   }
-  return `https://www.themoviedb.org/movie/${providerId}`;
+  return `https://www.themoviedb.org/movie/${identity.providerId}`;
 };
 
 const MetaSeparator: React.FC = () => <span className="text-text-tertiary/70">·</span>;
 
-const getEditTooltip = (source: MappingSource): string => {
-  switch (source) {
+const getEditTooltip = (entryKind: MappingEntryKind): string => {
+  switch (entryKind) {
     case 'manual': {
-      return 'Edit the manual mapping for this AniList entry. Saving keeps it as a manual override until you delete it.';
+      return 'Edit the manual mapping for this AniList entry. Saving keeps it as a manual mapping until you delete it.';
     }
     case 'ignored': {
       return 'Choose a mapping for this ignored AniList entry. Saving clears the ignore and creates a manual mapping.';
@@ -56,8 +61,11 @@ const getEditTooltip = (source: MappingSource): string => {
     case 'rejected': {
       return 'Choose a manual mapping, or allow this rejected match again from the row actions.';
     }
-    case 'unresolved': {
+    case 'unmapped': {
       return 'Set a mapping for this AniList entry. Saving creates a manual mapping.';
+    }
+    case 'unknown': {
+      return 'Mapping status is unknown right now. Saving a manual mapping bypasses the failed lookup state.';
     }
     default: {
       return 'Change the current mapping for this AniList entry. Saving creates a manual mapping.';
@@ -71,7 +79,7 @@ export type MappingEntryRowProps = {
   metadata?: AniListMetadata | null | undefined;
   isMutating: boolean;
   onEdit: (entry: MappingSummary) => void;
-  onDeleteOverride: (entry: MappingSummary) => void;
+  onDeleteManualMapping: (entry: MappingSummary) => void;
   onRejectCandidate: (entry: MappingSummary) => void;
   onClearRejectedCandidate: (entry: MappingSummary) => void;
   onIgnoreTitle: (entry: MappingSummary) => void;
@@ -86,7 +94,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   metadata,
   isMutating,
   onEdit,
-  onDeleteOverride,
+  onDeleteManualMapping,
   onRejectCandidate,
   onClearRejectedCandidate,
   onIgnoreTitle,
@@ -94,10 +102,13 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   providerUrl,
   hideSourceBadge = false,
 }) => {
-  const entrySource = getMappingSummarySource(entry);
-  const sourceBadge = sourceStyles[entrySource];
-  const statusBadge = statusStyles[entry.status];
+  const entryKind = entry.mappingEntryKind;
+  const entryKindBadge = entryKindStyles[entryKind];
+  const statusBadge = statusStyles[entry.mappingRowStatus];
   const actionableProviderId = entry.providerId ?? entry.suppressedProviderId ?? null;
+  const actionableProviderIdentity = actionableProviderId == null
+    ? null
+    : parseProviderIdentity(entry.provider, actionableProviderId);
 
   const sonarrStatus = useSeriesStatus(
     {
@@ -140,18 +151,18 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   const metaParts = [formatLabel, anilistYear ? String(anilistYear) : null, providerStatus].filter(Boolean) as string[];
 
   const providerItem = entry.provider === 'radarr' ? radarrStatus.data?.movie : sonarrStatus.data?.series;
-  const providerSlug = getProviderLibrarySlug(entry.provider, providerItem as ProviderMediaPathSource | null);
-  const providerLink = buildExternalMediaLink({
+  const providerRouteSlug = getProviderRouteSlug(entry.provider, providerItem as ProviderMediaPathSource | null);
+  const providerLink = buildProviderOpenUrl({
     provider: entry.provider,
     baseUrl: providerUrl ?? '',
-    inLibrary: Boolean(providerSlug),
-    ...(providerSlug ? { librarySlug: providerSlug } : {}),
+    isInLibrary: entry.isInLibrary === true && Boolean(providerRouteSlug),
+    ...(providerRouteSlug ? { providerRouteSlug } : {}),
     searchTerm: title,
   });
-  const externalLink = getExternalLink(entry.provider, actionableProviderId);
+  const externalLink = getExternalLink(actionableProviderIdentity);
 
   const linkItems: Array<{ label: string; href: string; tooltip: string }> = [
-    { label: 'AniList ↗', href: `https://anilist.co/anime/${entry.anilistId}`, tooltip: 'Open on AniList' },
+    { label: 'AniList ↗', href: buildAniListAnimeUrl(entry.anilistId), tooltip: 'Open on AniList' },
     providerLink
       ? {
           label: entry.provider === 'sonarr' ? 'Sonarr ↗' : 'Radarr ↗',
@@ -168,7 +179,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
       : null,
   ].filter((link): link is { label: string; href: string; tooltip: string } => Boolean(link?.href));
 
-  const editTooltip = getEditTooltip(entrySource);
+  const editTooltip = getEditTooltip(entryKind);
 
   const primaryActions: Array<{
     key: string;
@@ -187,15 +198,15 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
       className: 'text-accent-primary/85 hover:bg-accent-primary/14 hover:text-accent-primary',
     },
     ...(() => {
-      switch (entrySource) {
+      switch (entryKind) {
         case 'manual': {
           return [{
             key: 'delete-mapping',
             icon: Trash2,
             tooltip:
-              'Delete the manual mapping. ani2arr will fall back to upstream or automatic matching if one exists; otherwise the title becomes unresolved.',
+              'Delete the manual mapping. ani2arr will fall back to upstream or automatic matching if one exists; otherwise the title becomes unmapped.',
             ariaLabel: 'Delete mapping',
-            onClick: () => onDeleteOverride(entry),
+            onClick: () => onDeleteManualMapping(entry),
             className: 'text-error/85 hover:bg-error/14 hover:text-error',
           }];
         }
@@ -233,7 +244,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
     className?: string;
   }> = [
     ...(() => {
-      switch (entrySource) {
+      switch (entryKind) {
         case 'manual':
         case 'ignored': {
           return [];
@@ -350,10 +361,10 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
                 tone="default"
                 className={cn(
                   'justify-center border text-[10px] uppercase tracking-[0.08em] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
-                  sourceBadge.className,
+                  entryKindBadge.className,
                 )}
               >
-                {sourceBadge.label}
+                {entryKindBadge.label}
               </Pill>
             )}
           </div>

@@ -2,8 +2,7 @@
 // src/options/types.ts
 
 import type { AniListTitleLanguage } from '@/anilist/schemas/title-language.schema';
-import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
-import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
+import type { RadarrFormState, SonarrFormState  } from '@/providers/settings/provider-settings.schema';
 import type { ProviderCredentials } from '@/providers';
 
 export type BadgeVisibility = 'always' | 'hover';

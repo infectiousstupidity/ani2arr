@@ -1,19 +1,18 @@
 /** Builds one mapping-owned inspection payload without re-running provider resolution. */
 // src/mapping/inspection/get-mapping-inspection.ts
 
+import type { AniListId } from '@/anilist';
 import { resolveTitlePreference } from '@/anilist/title-preference';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
-import type { RadarrMovieSnapshot, SonarrSeriesSnapshot } from '@/providers';
-import type { Provider } from '@/providers';
+import { type RadarrMovieSnapshot, type SonarrSeriesSnapshot, type Provider, type ProviderIdFor, type ProviderTargetId, type TmdbId, type TvdbId  } from '@/providers';
 import {
-  type MappingAcceptedEvidence,
-  type MappingLibraryStatus,
   type MappingRecentEvaluationTrace,
-  type MappingSource,
-  type MappingStatus,
-  type MappingSuppressionKind,
-  type ResolverStateRecord,
 } from '@/mapping/types';
+import type { AutoMappingRecord } from '@/mapping/auto-mapping/types';
+import { buildEffectiveMappingCandidate } from '@/mapping/effective-mapping';
+import { collectLinkedAniListIds, getMappingFacts } from '@/mapping/mapping-facts';
+import { deriveLibraryUnknownReason } from '@/providers/library/types';
+import { deriveMappingRowStatus } from '@/features/provider-action';
 import { projectMappingReview } from '@/mapping/review/project-review';
 import type { MappingReviewReason } from '@/mapping/review/review-types';
 import type {
@@ -27,28 +26,30 @@ import type {
 
 export interface GetMappingInspectionInput {
   provider: Provider;
-  anilistId: number;
+  anilistId: AniListId;
 }
 
 export interface GetMappingInspectionDeps {
-  overridesService: {
-    get(provider: Provider, anilistId: number): number | null;
-    isIgnored(provider: Provider, anilistId: number): boolean;
+  manualMappingService: {
+    get<P extends Provider>(provider: P, anilistId: AniListId): ProviderIdFor<P> | null;
+    isIgnored(provider: Provider, anilistId: AniListId): boolean;
     listRejectedCandidates(provider?: Provider): Array<{
-      anilistId: number;
+      anilistId: AniListId;
       provider: Provider;
-      providerId: number;
+      providerId: ProviderTargetId;
       updatedAt: number;
     }>;
-    getLinkedAniListIds(provider: Provider, providerId: number): number[];
+    getLinkedAniListIds<P extends Provider>(provider: P, providerId: ProviderIdFor<P>): AniListId[];
   };
-  upstreamMappingStore: {
-    get(anilistId: number): { tvdbId: number; source: 'primary' | 'fallback' } | null;
-    getAniListIdsForTvdb(tvdbId: number): number[];
+  anibridgeMappingStore: {
+    getSonarrCandidates(anilistId: AniListId): TvdbId[];
+    getRadarrCandidates(anilistId: AniListId): TmdbId[];
+    getAniListIdsForTvdb(tvdbId: TvdbId): AniListId[];
+    getAniListIdsForTmdb(tmdbId: TmdbId): AniListId[];
   };
-  resolverStateStore: {
-    get(provider: Provider, anilistId: number): Promise<ResolverStateRecord | null>;
-    list(provider?: Provider): Promise<Array<ResolverStateRecord & { anilistId: number; provider: Provider }>>;
+  autoMappingStore: {
+    get(provider: Provider, anilistId: AniListId): Promise<AutoMappingRecord | null>;
+    list(provider?: Provider): Promise<Array<AutoMappingRecord & { anilistId: AniListId; provider: Provider }>>;
   };
   anilistMetadataStore: {
     getMetadata(
@@ -64,19 +65,7 @@ export interface GetMappingInspectionDeps {
   };
 }
 
-type InspectionCandidate = {
-  provider: Provider;
-  anilistId: number;
-  providerId: number | null;
-  source: MappingSource;
-  acceptedEvidence?: MappingAcceptedEvidence;
-  recentEvaluation?: MappingRecentEvaluationTrace;
-  suppressionKind?: MappingSuppressionKind;
-  suppressedProviderId?: number | null;
-  exactUpstreamMatchProviderId?: number | null;
-  resolverState?: ResolverStateRecord['state'];
-  hadResolveAttempt?: boolean;
-};
+type InspectionCandidate = ReturnType<typeof buildEffectiveMappingCandidate>;
 
 const resolveRecentEvaluationTitle = (
   recentEvaluation: MappingRecentEvaluationTrace | undefined,
@@ -93,170 +82,20 @@ const resolveRecentEvaluationTitle = (
   return recentEvaluation.searchTerms?.find((term) => term.trim().length > 0)?.trim();
 };
 
-const latestRejectedCandidate = (
-  rejected: Array<{ anilistId: number; provider: Provider; providerId: number; updatedAt: number }>,
-  anilistId: number,
-): { anilistId: number; provider: Provider; providerId: number; updatedAt: number } | undefined => (
-  rejected
-    .filter((entry) => entry.anilistId === anilistId)
-    .toSorted((left, right) => right.updatedAt - left.updatedAt)[0]
-);
-
-const withRejectedConflict = (
-  candidate: InspectionCandidate,
-  rejected: { providerId: number } | undefined,
-): InspectionCandidate => {
-  if (!rejected) {
-    return candidate;
-  }
-
-  return {
-    ...candidate,
-    suppressedProviderId: rejected.providerId,
-    suppressionKind: candidate.suppressionKind ?? 'rejected-candidate',
-  };
-};
-
-const buildInspectionCandidate = (
-  input: GetMappingInspectionInput,
-  state: {
-    manualProviderId: number | null;
-    ignored: boolean;
-    upstreamProviderId: number | null;
-    rejected: { providerId: number } | undefined;
-    resolverState: ResolverStateRecord | null;
-  },
-): InspectionCandidate => {
-  if (state.manualProviderId !== null) {
-    if (state.upstreamProviderId !== null && state.upstreamProviderId === state.manualProviderId) {
-      return withRejectedConflict(
-        {
-          ...input,
-          providerId: state.manualProviderId,
-          source: 'upstream',
-          acceptedEvidence: {
-            source: 'upstream',
-            reason: 'exact-upstream',
-          },
-          ...(state.resolverState?.state === 'mapped' && state.resolverState.recentEvaluation
-            ? { recentEvaluation: state.resolverState.recentEvaluation }
-            : {}),
-          resolverState: 'mapped',
-          hadResolveAttempt: true,
-        },
-        state.rejected,
-      );
-    }
-
-    return withRejectedConflict(
-      {
-        ...input,
-        providerId: state.manualProviderId,
-        source: 'manual',
-        acceptedEvidence: {
-          source: 'manual',
-          reason: 'manual-override',
-        },
-        resolverState: 'mapped',
-        exactUpstreamMatchProviderId: state.upstreamProviderId,
-        hadResolveAttempt: true,
-      },
-      state.rejected,
-    );
-  }
-
-  if (state.ignored) {
-    return withRejectedConflict(
-      {
-        ...input,
-        providerId: null,
-        source: 'ignored',
-        suppressionKind: 'ignored-entry',
-        exactUpstreamMatchProviderId: state.upstreamProviderId,
-        hadResolveAttempt: true,
-      },
-      state.rejected,
-    );
-  }
-
-  if (state.upstreamProviderId !== null) {
-    return withRejectedConflict(
-      {
-        ...input,
-        providerId: state.upstreamProviderId,
-        source: 'upstream',
-        acceptedEvidence: {
-          source: 'upstream',
-          reason: 'exact-upstream',
-        },
-        ...(state.resolverState?.state === 'mapped' && state.resolverState.recentEvaluation
-          ? { recentEvaluation: state.resolverState.recentEvaluation }
-          : {}),
-        resolverState: 'mapped',
-      },
-      state.rejected,
-    );
-  }
-
-  if (state.resolverState?.state === 'mapped') {
-    return withRejectedConflict(
-      {
-        ...input,
-        providerId: state.resolverState.providerId,
-        source: state.resolverState.acceptedEvidence.source,
-        acceptedEvidence: state.resolverState.acceptedEvidence,
-        ...(state.resolverState.recentEvaluation ? { recentEvaluation: state.resolverState.recentEvaluation } : {}),
-        resolverState: 'mapped',
-        hadResolveAttempt: state.resolverState.acceptedEvidence.source === 'auto',
-      },
-      state.rejected,
-    );
-  }
-
-  if (state.rejected) {
-    return {
-      ...input,
-      providerId: null,
-      source: 'rejected',
-      suppressedProviderId: state.rejected.providerId,
-      suppressionKind: 'rejected-candidate',
-      hadResolveAttempt: true,
-    };
-  }
-
-  if (state.resolverState) {
-    return {
-      ...input,
-      providerId: null,
-      source: 'unresolved',
-      ...(state.resolverState.recentEvaluation ? { recentEvaluation: state.resolverState.recentEvaluation } : {}),
-      resolverState: state.resolverState.state,
-      hadResolveAttempt: true,
-    };
-  }
-
-  return {
-    ...input,
-    providerId: null,
-    source: 'unresolved',
-    hadResolveAttempt: false,
-  };
-};
-
 const buildLibrarySummary = (
   provider: Provider,
-  providerId: number | null,
+  providerMappingState: InspectionCandidate['providerMappingState'],
+  isInLibrary: boolean | null,
   libraryEntry: SonarrSeriesSnapshot | RadarrMovieSnapshot | null,
   recentEvaluation: MappingRecentEvaluationTrace | undefined,
+  libraryUnknownReason?: 'library-check-failed',
 ): MappingInspectionLibrarySummary => {
-  const status: MappingLibraryStatus = providerId === null
-    ? 'unmapped'
-    : (libraryEntry ? 'in-provider' : 'not-in-provider');
   const fallbackTitle = resolveRecentEvaluationTitle(recentEvaluation);
 
   if (libraryEntry === null) {
     return {
-      status,
+      isInLibrary: providerMappingState === 'mapped' ? isInLibrary : null,
+      ...(libraryUnknownReason ? { libraryUnknownReason } : {}),
       ...(fallbackTitle
         ? {
             title: fallbackTitle,
@@ -276,11 +115,12 @@ const buildLibrarySummary = (
     }
 
     return {
-      status,
+      isInLibrary,
       ...(series.title ? { title: series.title } : {}),
       type: 'series',
       ...(series.status ? { statusLabel: series.status } : {}),
       ...(inLibraryCount === undefined ? {} : { inLibraryCount }),
+      ...(libraryUnknownReason ? { libraryUnknownReason } : {}),
     };
   }
 
@@ -288,11 +128,12 @@ const buildLibrarySummary = (
   const inLibraryCount = movie.hasFile === undefined ? undefined : (movie.hasFile ? 1 : 0);
 
   return {
-    status,
+    isInLibrary,
     ...(movie.title ? { title: movie.title } : {}),
     type: 'movie',
     ...(movie.status ? { statusLabel: movie.status } : {}),
     ...(inLibraryCount === undefined ? {} : { inLibraryCount }),
+    ...(libraryUnknownReason ? { libraryUnknownReason } : {}),
   };
 };
 
@@ -393,7 +234,7 @@ const buildExplanationItems = (
         break;
       }
       case 'manual-override': {
-        summary = 'Manual mapping override is currently effective.';
+        summary = 'Manual manual mapping is currently effective.';
         break;
       }
       case 'exact-title-match': {
@@ -480,9 +321,9 @@ const buildExplanationItems = (
 };
 
 const buildLinkedAniListEntries = (
-  anilistId: number,
-  linkedAniListIds: readonly number[],
-  metadataById: Map<number, AniListMetadata>,
+  anilistId: AniListId,
+  linkedAniListIds: readonly AniListId[],
+  metadataById: Map<AniListId, AniListMetadata>,
 ): MappingInspectionLinkedAniListEntry[] => linkedAniListIds.map((linkedAniListId) => {
   const metadata = metadataById.get(linkedAniListId);
   const title = metadata
@@ -498,67 +339,68 @@ const buildLinkedAniListEntries = (
   };
 });
 
-async function collectLinkedAniListIds(
-  provider: Provider,
-  providerId: number,
-  deps: GetMappingInspectionDeps,
-): Promise<number[]> {
-  const ids = new Set<number>(deps.overridesService.getLinkedAniListIds(provider, providerId));
-  if (provider === 'sonarr') {
-    for (const id of deps.upstreamMappingStore.getAniListIdsForTvdb(providerId)) {
-      ids.add(id);
-    }
-  }
-
-  const resolverStates = await deps.resolverStateStore.list(provider);
-  for (const resolverState of resolverStates) {
-    if (resolverState.state === 'mapped' && resolverState.providerId === providerId) {
-      ids.add(resolverState.anilistId);
-    }
-  }
-
-  return [...ids].toSorted((left, right) => left - right);
-}
-
 export async function getMappingInspection(
   input: GetMappingInspectionInput,
   deps: GetMappingInspectionDeps,
 ): Promise<MappingInspectionPayload> {
-  const manualProviderId = deps.overridesService.get(input.provider, input.anilistId);
-  const ignored = deps.overridesService.isIgnored(input.provider, input.anilistId);
-  const upstreamProviderId = input.provider === 'sonarr'
-    ? deps.upstreamMappingStore.get(input.anilistId)?.tvdbId ?? null
-    : null;
-  const rejected = latestRejectedCandidate(
-    deps.overridesService.listRejectedCandidates(input.provider),
-    input.anilistId,
-  );
-
-  const [resolverState, seriesList, movieList] = await Promise.all([
-    deps.resolverStateStore.get(input.provider, input.anilistId),
+  const [facts, seriesListResult, movieListResult] = await Promise.all([
+    getMappingFacts(input.provider, input.anilistId, deps),
     input.provider === 'sonarr'
-      ? deps.sonarrLibrary.getLeanSeriesList()
-      : Promise.resolve([] as SonarrSeriesSnapshot[]),
+      ? deps.sonarrLibrary.getLeanSeriesList().then(
+          (items) => ({ ok: true as const, items }),
+          () => ({ ok: false as const, items: [] as SonarrSeriesSnapshot[] }),
+        )
+      : Promise.resolve({ ok: true as const, items: [] as SonarrSeriesSnapshot[] }),
     input.provider === 'radarr'
-      ? deps.radarrLibrary.getLeanMovieList()
-      : Promise.resolve([] as RadarrMovieSnapshot[]),
+      ? deps.radarrLibrary.getLeanMovieList().then(
+          (items) => ({ ok: true as const, items }),
+          () => ({ ok: false as const, items: [] as RadarrMovieSnapshot[] }),
+        )
+      : Promise.resolve({ ok: true as const, items: [] as RadarrMovieSnapshot[] }),
   ]);
 
-  const candidate = buildInspectionCandidate(input, {
-    manualProviderId,
-    ignored,
-    upstreamProviderId,
-    rejected,
-    resolverState,
+  const candidate = buildEffectiveMappingCandidate({
+    provider: input.provider,
+    anilistId: input.anilistId,
+    manualProviderId: facts.manualProviderId,
+    ignored: facts.ignored,
+    upstreamProviderIds: facts.upstreamProviderIds,
+    rejectedProviderId: facts.rejectedProviderId,
+    resolverState: facts.autoMappingRecord,
   });
 
   let libraryEntry: SonarrSeriesSnapshot | RadarrMovieSnapshot | null = null;
   if (candidate.providerId !== null) {
     libraryEntry = input.provider === 'sonarr'
-      ? (seriesList.find((series) => series.tvdbId === candidate.providerId) ?? null)
-      : (movieList.find((movie) => movie.tmdbId === candidate.providerId) ?? null);
+      ? (seriesListResult.items.find((series) => series.tvdbId === candidate.providerId) ?? null)
+      : (movieListResult.items.find((movie) => movie.tmdbId === candidate.providerId) ?? null);
   }
-  const library = buildLibrarySummary(input.provider, candidate.providerId, libraryEntry, candidate.recentEvaluation);
+  const libraryLookupFailed =
+    candidate.providerId !== null &&
+    ((input.provider === 'sonarr' && !seriesListResult.ok) || (input.provider === 'radarr' && !movieListResult.ok));
+  let isInLibrary: boolean | null = null;
+  if (candidate.providerMappingState === 'mapped') {
+    if (libraryEntry) {
+      isInLibrary = true;
+    } else if (libraryLookupFailed) {
+      isInLibrary = null;
+    } else {
+      isInLibrary = false;
+    }
+  }
+  const libraryUnknownReason = deriveLibraryUnknownReason({
+    providerMappingState: candidate.providerMappingState,
+    isInLibrary,
+    ...(libraryLookupFailed ? { libraryUnknownReason: 'library-check-failed' as const } : {}),
+  });
+  const library = buildLibrarySummary(
+    input.provider,
+    candidate.providerMappingState,
+    isInLibrary,
+    libraryEntry,
+    candidate.recentEvaluation,
+    libraryUnknownReason,
+  );
   const linkedAniListIds = candidate.providerId === null
     ? []
     : await collectLinkedAniListIds(input.provider, candidate.providerId, deps);
@@ -574,7 +416,7 @@ export async function getMappingInspection(
   const metadataById = new Map(linkedMetadata.metadata.map((entry) => [entry.id, entry] as const));
 
   const reviewProjection = projectMappingReview({
-    source: candidate.source,
+    mappingEntryKind: candidate.mappingEntryKind,
     providerId: candidate.providerId,
     ...(candidate.acceptedEvidence ? { acceptedEvidence: candidate.acceptedEvidence } : {}),
     ...(candidate.recentEvaluation ? { recentEvaluation: candidate.recentEvaluation } : {}),
@@ -584,29 +426,29 @@ export async function getMappingInspection(
       : { exactUpstreamMatchProviderId: candidate.exactUpstreamMatchProviderId }),
   });
 
-  let status: MappingStatus;
-  if (reviewProjection.reviewSummary) {
-    status = 'needs-review';
-  } else if (candidate.providerId === null) {
-    status = candidate.suppressionKind ? 'suppressed' : 'unresolved';
-  } else if (library.status === 'in-provider') {
-    status = 'in-library';
-  } else {
-    status = 'can-add';
-  }
+  const mappingRowStatus = deriveMappingRowStatus({
+    ...(reviewProjection.reviewSummary ? { reviewSummary: reviewProjection.reviewSummary } : {}),
+    ...(candidate.suppressionKind ? { suppressionKind: candidate.suppressionKind } : {}),
+    providerMappingState: candidate.providerMappingState,
+    isInLibrary,
+  });
 
   return {
     effectiveMapping: {
       provider: input.provider,
       anilistId: input.anilistId,
       providerId: candidate.providerId,
+      providerMappingState: candidate.providerMappingState,
+      isInLibrary,
       ...(candidate.suppressedProviderId === undefined ? {} : { suppressedProviderId: candidate.suppressedProviderId }),
-      status,
-      libraryStatus: library.status,
-      ...(candidate.acceptedEvidence?.source ? { effectiveSource: candidate.acceptedEvidence.source } : {}),
-      ...(candidate.acceptedEvidence?.reason ? { effectiveReason: candidate.acceptedEvidence.reason } : {}),
+      mappingRowStatus,
+      mappingEntryKind: candidate.mappingEntryKind,
+      ...(candidate.acceptedEvidence?.source ? { mappingSource: candidate.acceptedEvidence.source } : {}),
+      ...(candidate.acceptedEvidence?.reason ? { mappingReason: candidate.acceptedEvidence.reason } : {}),
       ...(candidate.resolverState ? { resolverOutcome: candidate.resolverState } : {}),
       ...(candidate.suppressionKind ? { suppressionKind: candidate.suppressionKind } : {}),
+      ...(candidate.mappingUnknownReason ? { mappingUnknownReason: candidate.mappingUnknownReason } : {}),
+      ...(libraryUnknownReason ? { libraryUnknownReason } : {}),
       ...(candidate.hadResolveAttempt ? { hadResolveAttempt: true } : {}),
       ...(candidate.acceptedEvidence ? { evidence: candidate.acceptedEvidence } : {}),
       library,
@@ -618,7 +460,7 @@ export async function getMappingInspection(
       linkedAniListCount: linkedIdsWithCurrent.length,
     },
     linkedAniListEntries: buildLinkedAniListEntries(input.anilistId, linkedIdsWithCurrent, metadataById),
-    whyThisExists: buildExplanationItems(
+    whyThisMapping: buildExplanationItems(
       candidate,
       reviewProjection.reviewSummary?.reasons ?? [],
     ),

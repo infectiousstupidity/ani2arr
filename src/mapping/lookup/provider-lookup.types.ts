@@ -1,7 +1,7 @@
 /** Mapping-owned lookup contracts and result shapes for provider search adapters. */
 // src/mapping/lookup/provider-lookup.types.ts
 
-import type { Provider, ProviderCredentials } from '@/providers';
+import type { Provider, ProviderCredentials, ProviderTargetId } from '@/providers';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 
 export interface ProviderLookupResult {
@@ -23,12 +23,13 @@ export type ProviderLookupCacheHit<TResult> = {
 export interface ProviderLookupClient<
   TCredentials = ProviderCredentials,
   TResult extends ProviderLookupResult = ProviderLookupResult,
+  TTargetId extends ProviderTargetId = ProviderTargetId,
 > {
   readonly provider: Provider;
   reset(): Promise<void>;
   readFromCache(canonical: string): Promise<ProviderLookupCacheHit<TResult>>;
   lookupExactByProviderId?(
-    providerId: number,
+    providerId: TTargetId,
     credentials: TCredentials,
   ): Promise<TResult | null>;
   lookup(
@@ -37,5 +38,5 @@ export interface ProviderLookupClient<
     credentials: TCredentials,
     options?: ProviderLookupOptions,
   ): Promise<TResult[]>;
-  getProviderId(result: unknown): number | null;
+  getProviderId(result: unknown): TTargetId | null;
 }

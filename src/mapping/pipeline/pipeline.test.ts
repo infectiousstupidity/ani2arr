@@ -2,11 +2,15 @@
 // src/mapping/pipeline/pipeline.test.ts
 
 import { describe, expect, it, vi } from 'vitest';
+import { parseAniListId } from '@/anilist';
+import { parseTvdbId } from '@/providers';
 import type { AniListMedia } from './types';
 import { resolveViaPipeline } from './pipeline';
 import type { ProviderLookupClient, ProviderLookupResult } from '../lookup';
 
 type SonarrLookupResult = ProviderLookupResult & { tvdbId: number };
+const aid = parseAniListId;
+const tvdb = parseTvdbId;
 
 const createLookupClient = (
   results: SonarrLookupResult[],
@@ -17,17 +21,17 @@ const createLookupClient = (
   lookup: async () => results,
   getProviderId: (result: unknown) =>
     typeof (result as Partial<SonarrLookupResult>).tvdbId === 'number'
-      ? (result as SonarrLookupResult).tvdbId
+      ? tvdb((result as SonarrLookupResult).tvdbId)
       : null,
 });
 
 const createMedia = (title: string, year = 2013): AniListMedia => ({
-  id: 1,
+  id: aid(1),
   format: 'TV',
   title: { english: title },
   synonyms: [],
   startDate: { year },
-} as AniListMedia);
+});
 
 const TEST_CREDENTIALS = {
   url: 'http://localhost:8989',
@@ -41,7 +45,7 @@ describe('resolveViaPipeline', () => {
       {
         anilistApi: {} as never,
         lookupClient: createLookupClient([{ title: 'Attack on Titan', tvdbId: 101, year: 2013 }]),
-        upstreamMappingStore: {} as never,
+        anibridgeMappingStore: {} as never,
         credentials: TEST_CREDENTIALS,
         sessionSeenCanonical: new Set<string>(),
         limits: {
@@ -74,7 +78,7 @@ describe('resolveViaPipeline', () => {
       {
         anilistApi: {} as never,
         lookupClient: createLookupClient([{ title: 'Attack Titan', tvdbId: 202, year: 2013 }]),
-        upstreamMappingStore: {} as never,
+        anibridgeMappingStore: {} as never,
         credentials: TEST_CREDENTIALS,
         sessionSeenCanonical: new Set<string>(),
         limits: {

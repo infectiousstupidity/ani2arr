@@ -1,167 +1,329 @@
 /** Content-owned browse overlay composition for parsed cards and action portals. */
 // src/content/browse/browse-content-app.tsx
 
-import React, { useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { mergeMetadataHints, metadataHintFromAniListMetadata } from '@/anilist/metadata-hints';
-import { useAniListMetadataBatch } from '@/shared/queries';
-import { useA2aBroadcasts } from '@/shared/queries/use-a2a-broadcasts';
-import { useTheme } from '@/shared/hooks/common/use-theme';
-import { useBrowsePortals } from './use-browse-portals';
-import { useAnilistBatchPrefetch } from './use-anilist-batch-prefetch';
-import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
-import type { BrowseAdapter, ParsedCard } from './types';
-import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
-import { CardOverlay } from '@/features/media-overlay/components/card-overlay';
-import { usePublicOptions } from '@/options';
+import React, { useRef } from "react";
+import { createPortal } from "react-dom";
+import type { AniListId } from "@/anilist";
+import { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
+import type { MediaModalLaunchSnapshot } from "@/features/media-modal/launch-snapshot";
+import { useAniListMetadataBatch } from "@/shared/queries";
+import { useA2aBroadcasts } from "@/shared/queries/use-a2a-broadcasts";
+import { useTheme } from "@/shared/hooks/use-theme";
+import { useBrowsePortals } from "./use-browse-portals";
+import { useAnilistBatchPrefetch } from "./use-anilist-batch-prefetch";
+import type { MediaModalOpenState } from "@/features/media-modal";
+import type { BrowseAdapter, HostMediaTarget } from "./types";
+import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
+import { CardOverlay } from "@/features/media-overlay/components/card-overlay";
+import { usePublicOptions } from "@/options";
+import type { Provider } from "@/providers";
+import { useMappingIdentities } from "@/shared/queries/mapping";
+import type { MappingIdentity } from "@/mapping/types";
 
-export const DEFAULT_CONTAINER_CLASS = 'a2a-overlay-container';
-export const DEFAULT_PROCESSED_ATTRIBUTE = 'data-a2a-processed';
+export const DEFAULT_CONTAINER_CLASS = "a2a-overlay-container";
+export const DEFAULT_PROCESSED_ATTRIBUTE = "data-a2a-processed";
 
 export interface BrowseContentAppProps {
-  onOpenMediaModal(input: {
-    anilistId: number;
-    title: string;
-    initialTab?: 'series' | 'mapping';
-    initialMappingRequired?: boolean;
-    metadata: AniListMediaHint | null;
-  }): void;
+	onOpenMediaModal(input: MediaModalOpenState): void;
 }
 
-export const createBrowseContentApp = (adapter: BrowseAdapter): React.FC<BrowseContentAppProps> => {
-  const {
-    cardSelector,
-    containerClassName = DEFAULT_CONTAINER_CLASS,
-    processedAttribute = DEFAULT_PROCESSED_ATTRIBUTE,
-    mutationObserverInit = { childList: true, subtree: true, attributes: true, attributeFilter: ['href'] },
-    parseCard,
-  } = adapter;
+function createDefaultContainer(
+	host: HTMLElement,
+	containerClassName: string,
+): HTMLElement {
+	const existing = host.querySelector<HTMLElement>(`.${containerClassName}`);
+	if (existing) return existing;
+	const el = host.ownerDocument.createElement("div");
+	el.className = containerClassName;
+	host.append(el);
+	return el;
+}
 
-  const ensureContainerImpl = adapter.ensureContainer ?? ((host: HTMLElement) => {
-    const existing = host.querySelector<HTMLElement>(`.${containerClassName}`);
-    if (existing) return existing;
-    const el = host.ownerDocument.createElement('div');
-    el.className = containerClassName;
-    host.append(el);
-    return el;
-  });
+function getProviderBrowseSettings(
+	provider: Provider,
+	publicOptions: Awaited<ReturnType<typeof usePublicOptions>>["data"],
+) {
+	const providerOptions =
+		provider === "radarr"
+			? publicOptions?.providers.radarr
+			: publicOptions?.providers.sonarr;
+	const providerUiOptions =
+		provider === "radarr"
+			? publicOptions?.ui?.browseCards.radarr
+			: publicOptions?.ui?.browseCards.sonarr;
 
-  const getContainerForCardImpl = adapter.getContainerForCard ?? ((card: Element) => card.querySelector<HTMLElement>(`.${containerClassName}`));
+	return {
+		providerOptions,
+		providerUiOptions,
+		providerBrowseEnabled: providerUiOptions?.enabled ?? true,
+		badgeVisibility: providerUiOptions?.visibility ?? "always",
+	};
+}
 
-  const markProcessedImpl = adapter.markProcessed ?? ((host: HTMLElement, parsed: ParsedCard) => {
-    host.setAttribute(processedAttribute, String(parsed.anilistId));
-  });
+function getLaunchTitle(input: {
+	anilistId: AniListId;
+	metadata: ReturnType<typeof metadataHintFromAniListMetadata>;
+}): string {
+	const titles = input.metadata?.titles;
+	return (
+		titles?.english?.trim() ||
+		titles?.romaji?.trim() ||
+		titles?.native?.trim() ||
+		`AniList #${input.anilistId}`
+	);
+}
 
-  const clearProcessedImpl = adapter.clearProcessed ?? ((host: HTMLElement) => {
-    host.removeAttribute(processedAttribute);
-  });
+function getMappedIdentityByAniListId(
+	identities: readonly MappingIdentity[],
+): Map<AniListId, MappingIdentity> {
+	const identitiesById = new Map<AniListId, MappingIdentity>();
+	for (const identity of identities) {
+		if (
+			identity.providerMappingState === "mapped" &&
+			identity.providerId !== null &&
+			!identitiesById.has(identity.anilistId)
+		) {
+			identitiesById.set(identity.anilistId, identity);
+		}
+	}
 
-  const getObserverRoot = adapter.getObserverRoot ?? (() => document.body ?? document.documentElement);
-  const getScanRoot = adapter.getScanRoot ?? (() => (document.querySelector<HTMLElement>('.page-content') ?? document.body ?? null));
-  const getResizeTargets = adapter.resizeObserverTargets ?? (() => (document.body ? [document.body] : []));
-  const containerSelector = `.${containerClassName}`;
+	return identitiesById;
+}
 
-  const BrowseContentApp: React.FC<BrowseContentAppProps> = ({ onOpenMediaModal }) => {
-    const hostRef = useRef<HTMLDivElement>(null);
-    useTheme(hostRef);
-    useA2aBroadcasts();
+function renderBrowseCardPortal(input: {
+	container: Element;
+	parsed: HostMediaTarget;
+	canonicalMetadataById: Map<
+		AniListId,
+		ReturnType<typeof metadataHintFromAniListMetadata>
+	>;
+	mappedIdentityByAniListId: Map<AniListId, MappingIdentity>;
+	publicOptions: Awaited<ReturnType<typeof usePublicOptions>>["data"];
+	onOpenMediaModal(input: MediaModalOpenState): void;
+	adapter: BrowseAdapter;
+}) {
+	const effectiveMetadata =
+		input.canonicalMetadataById.get(input.parsed.anilistId) ?? null;
+	const mappedIdentity = input.mappedIdentityByAniListId.get(
+		input.parsed.anilistId,
+	);
+	const provider =
+		mappedIdentity?.provider ??
+		resolveProviderForAniListFormat(input.parsed.format);
+	if (!provider) {
+		return null;
+	}
+	const launchTitle = getLaunchTitle({
+		anilistId: input.parsed.anilistId,
+		metadata: effectiveMetadata,
+	});
 
-    const { data: publicOptions } = usePublicOptions();
-    const sonarrBrowseEnabled = publicOptions?.ui?.browseCards.sonarr.enabled ?? true;
-    const radarrBrowseEnabled = publicOptions?.ui?.browseCards.radarr.enabled ?? true;
-    const overlaysEnabled = sonarrBrowseEnabled || radarrBrowseEnabled;
-    const metadataEnabled = Boolean(
-      (sonarrBrowseEnabled && publicOptions?.providers.sonarr.isConfigured) ||
-        (radarrBrowseEnabled && publicOptions?.providers.radarr.isConfigured),
-    );
+	const { providerOptions, providerBrowseEnabled, badgeVisibility } =
+		getProviderBrowseSettings(provider, input.publicOptions);
+	if (!providerBrowseEnabled) {
+		return null;
+	}
 
-    const { cardPortals } = useBrowsePortals({
-      cardSelector,
-      containerSelector,
-      parseCard,
-      ensureContainer: ensureContainerImpl,
-      getContainerForCard: getContainerForCardImpl,
-      markProcessed: markProcessedImpl,
-      clearProcessed: clearProcessedImpl,
-      getObserverRoot,
-      getScanRoot,
-      getResizeTargets,
-      mutationObserverInit,
-      onCardInvalid: adapter.onCardInvalid,
-      enabled: overlaysEnabled,
-    });
-    const metadataIds = [...new Set(Array.from(cardPortals.values(), parsed => parsed.anilistId))];
-    const metadataBatch = useAniListMetadataBatch(metadataIds, { enabled: metadataEnabled });
-    const canonicalMetadataById = new Map(
-      (metadataBatch.data?.metadata ?? []).map(entry => [entry.id, metadataHintFromAniListMetadata(entry)]),
-    );
+	return createPortal(
+		<CardOverlay
+			key={input.parsed.anilistId}
+			provider={provider}
+			anilistId={input.parsed.anilistId}
+			title={launchTitle}
+			onOpenModal={(launchSnapshot: MediaModalLaunchSnapshot) => {
+				if (provider === "radarr") {
+					input.onOpenMediaModal({
+						anilistId: input.parsed.anilistId,
+						provider: "radarr",
+						initialView: "setup",
+						openSource: "content",
+						launchTitle,
+						launchMetadata: effectiveMetadata,
+						launchSnapshot:
+							launchSnapshot.provider === "radarr" ? launchSnapshot : null,
+					});
+					return;
+				}
 
-    useAnilistBatchPrefetch({ cardPortals, enabled: metadataEnabled });
+				input.onOpenMediaModal({
+					anilistId: input.parsed.anilistId,
+					provider: "sonarr",
+					initialView: "setup",
+					openSource: "content",
+					launchTitle,
+					launchMetadata: effectiveMetadata,
+					launchSnapshot:
+							launchSnapshot.provider === "sonarr" ? launchSnapshot : null,
+				});
+			}}
+			onOpenMapping={(launchSnapshot: MediaModalLaunchSnapshot) => {
+				if (provider === "radarr") {
+					input.onOpenMediaModal({
+						anilistId: input.parsed.anilistId,
+						provider: "radarr",
+						initialView: "mapping",
+						openSource: "content",
+						launchTitle,
+						launchMetadata: effectiveMetadata,
+						launchSnapshot:
+							launchSnapshot.provider === "radarr" ? launchSnapshot : null,
+					});
+					return;
+				}
 
-    if (!overlaysEnabled) {
-      return <div ref={hostRef} />;
-    }
+				input.onOpenMediaModal({
+					anilistId: input.parsed.anilistId,
+					provider: "sonarr",
+					initialView: "mapping",
+					openSource: "content",
+					launchTitle,
+					launchMetadata: effectiveMetadata,
+					launchSnapshot:
+							launchSnapshot.provider === "sonarr" ? launchSnapshot : null,
+				});
+			}}
+			isConfigured={Boolean(providerOptions?.isConfigured)}
+			defaultForm={providerOptions?.defaults ?? null}
+			mappedIdentity={mappedIdentity ?? null}
+			metadata={effectiveMetadata}
+			providerUrl={providerOptions?.url ?? null}
+			observeTarget={input.container}
+			badgeVisibility={badgeVisibility}
+			anchorCorner={input.adapter.anchorCorner ?? "bottom-left"}
+			stackDirection={input.adapter.stackDirection ?? "up"}
+			anchorOffsetX={input.adapter.anchorOffsetX ?? -8}
+		/>,
+		input.container,
+	);
+}
 
-    return (
-      <div ref={hostRef}>
-        {[...cardPortals.entries()].map(([container, parsed]) => {
-          const effectiveMetadata = mergeMetadataHints(
-            canonicalMetadataById.get(parsed.anilistId) ?? null,
-            parsed.metadata,
-          );
-          const provider = resolveProviderForAniListFormat(effectiveMetadata?.format ?? null);
-          if (!provider) {
-            return null;
-          }
-          const providerOptions =
-            provider === 'radarr' ? publicOptions?.providers.radarr : publicOptions?.providers.sonarr;
-          const providerUiOptions =
-            provider === 'radarr' ? publicOptions?.ui?.browseCards.radarr : publicOptions?.ui?.browseCards.sonarr;
-          const providerBrowseEnabled = providerUiOptions?.enabled ?? true;
-          if (!providerBrowseEnabled) {
-            return null;
-          }
-          const badgeVisibility = providerUiOptions?.visibility ?? 'always';
+export const createBrowseContentApp = (
+	adapter: BrowseAdapter,
+): React.FC<BrowseContentAppProps> => {
+	const {
+		cardSelector,
+		containerClassName = DEFAULT_CONTAINER_CLASS,
+		processedAttribute = DEFAULT_PROCESSED_ATTRIBUTE,
+		mutationObserverInit = {
+			childList: true,
+			subtree: true,
+			attributes: true,
+			attributeFilter: ["href"],
+		},
+		parseCard,
+	} = adapter;
 
-          return createPortal(
-            <CardOverlay
-              key={parsed.anilistId}
-              provider={provider}
-              anilistId={parsed.anilistId}
-              title={parsed.title}
-              onOpenModal={(anilistId, title) =>
-                onOpenMediaModal({
-                  anilistId,
-                  title,
-                  initialTab: 'series',
-                  metadata: effectiveMetadata,
-                })
-              }
-              onOpenMappingFix={(anilistId, title, mappingRequired) =>
-                onOpenMediaModal({
-                  anilistId,
-                  title,
-                  initialTab: 'mapping',
-                  initialMappingRequired: mappingRequired ?? false,
-                  metadata: effectiveMetadata,
-                })
-              }
-              isConfigured={Boolean(providerOptions?.isConfigured)}
-              defaultForm={providerOptions?.defaults ?? null}
-              metadata={effectiveMetadata}
-              providerUrl={providerOptions?.url ?? null}
-              observeTarget={container}
-              badgeVisibility={badgeVisibility}
-              anchorCorner={adapter?.anchorCorner ?? 'bottom-left'}
-              stackDirection={adapter?.stackDirection ?? 'up'}
-              anchorOffsetX={adapter?.anchorOffsetX ?? -8}
-            />,
-            container,
-          );
-        })}
-      </div>
-    );
-  };
+	const ensureContainerImpl =
+		adapter.ensureContainer ??
+		((mountTarget: HTMLElement) => createDefaultContainer(mountTarget, containerClassName));
 
-  return BrowseContentApp;
+	const getContainerForCardImpl =
+		adapter.getContainerForCard ??
+		((card: Element) =>
+			card.querySelector<HTMLElement>(`.${containerClassName}`));
+
+	const markProcessedImpl =
+		adapter.markProcessed ??
+		((mountTarget: HTMLElement, parsed: HostMediaTarget) => {
+			mountTarget.setAttribute(processedAttribute, String(parsed.anilistId));
+		});
+
+	const clearProcessedImpl =
+		adapter.clearProcessed ??
+		((mountTarget: HTMLElement) => {
+			mountTarget.removeAttribute(processedAttribute);
+		});
+
+	const getObserverRoot =
+		adapter.getObserverRoot ??
+		(() => document.body ?? document.documentElement);
+	const getScanRoot =
+		adapter.getScanRoot ??
+		(() =>
+			document.querySelector<HTMLElement>(".page-content") ??
+			document.body ??
+			null);
+	const getResizeTargets =
+		adapter.resizeObserverTargets ??
+		(() => (document.body ? [document.body] : []));
+	const containerSelector = `.${containerClassName}`;
+
+	const BrowseContentApp: React.FC<BrowseContentAppProps> = ({
+		onOpenMediaModal,
+	}) => {
+		const hostRef = useRef<HTMLDivElement>(null);
+		useTheme(hostRef);
+		useA2aBroadcasts();
+
+		const { data: publicOptions } = usePublicOptions();
+		const sonarrBrowseEnabled =
+			publicOptions?.ui?.browseCards.sonarr.enabled ?? true;
+		const radarrBrowseEnabled =
+			publicOptions?.ui?.browseCards.radarr.enabled ?? true;
+		const overlaysEnabled = sonarrBrowseEnabled || radarrBrowseEnabled;
+		const metadataEnabled = Boolean(
+			(sonarrBrowseEnabled && publicOptions?.providers.sonarr.isConfigured) ||
+			(radarrBrowseEnabled && publicOptions?.providers.radarr.isConfigured),
+		);
+
+		const { cardPortals } = useBrowsePortals({
+			cardSelector,
+			containerSelector,
+			parseCard,
+			ensureContainer: ensureContainerImpl,
+			getContainerForCard: getContainerForCardImpl,
+			markProcessed: markProcessedImpl,
+			clearProcessed: clearProcessedImpl,
+			getObserverRoot,
+			getScanRoot,
+			getResizeTargets,
+			mutationObserverInit,
+			onCardInvalid: adapter.onCardInvalid,
+			enabled: overlaysEnabled,
+		});
+		const metadataIds = [
+			...new Set(
+				Array.from(cardPortals.values(), (parsed) => parsed.anilistId),
+			),
+		];
+		const mappingIdentities = useMappingIdentities(metadataIds, {
+			enabled: overlaysEnabled,
+		});
+		const mappedIdentityByAniListId = getMappedIdentityByAniListId(
+			mappingIdentities.data ?? [],
+		);
+		const metadataBatch = useAniListMetadataBatch(metadataIds, {
+			enabled: metadataEnabled,
+		});
+		const canonicalMetadataById = new Map(
+			(metadataBatch.data?.metadata ?? []).map((entry) => [
+				entry.id,
+				metadataHintFromAniListMetadata(entry),
+			]),
+		);
+
+		useAnilistBatchPrefetch({ cardPortals, enabled: metadataEnabled });
+
+		if (!overlaysEnabled) {
+			return <div ref={hostRef} />;
+		}
+
+		return (
+			<div ref={hostRef}>
+				{[...cardPortals.entries()].map(([container, parsed]) => {
+					return renderBrowseCardPortal({
+						container,
+						parsed,
+						canonicalMetadataById,
+						mappedIdentityByAniListId,
+						publicOptions,
+						onOpenMediaModal,
+						adapter,
+					});
+				})}
+			</div>
+		);
+	};
+
+	return BrowseContentApp;
 };

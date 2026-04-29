@@ -2,8 +2,7 @@
 // src/content/browse/use-browse-portals.ts
 
 import { useCallback, useEffect, useState } from 'react';
-import { metadataEqual } from '@/anilist/metadata-hints';
-import type { ParsedCard } from './types';
+import type { HostMediaTarget } from './types';
 
 const toElementArray = (value: Iterable<Element> | Element | null | undefined): Element[] => {
   if (!value) return [];
@@ -15,14 +14,57 @@ const toElementArray = (value: Iterable<Element> | Element | null | undefined): 
   }
 };
 
+function enqueueCardForNode(
+  node: Node | null | undefined,
+  cardSelector: string,
+  cardsToUpsert: Set<Element>,
+): void {
+  if (!node) return;
+  const element = node instanceof Element ? node : node.parentElement;
+  const card = element?.closest(cardSelector);
+  if (card) {
+    cardsToUpsert.add(card);
+  }
+}
+
+function shouldNodeTriggerRescan(
+  node: Node,
+  cardSelector: string,
+): boolean {
+  return (
+    (node instanceof Element || node instanceof DocumentFragment) &&
+    Boolean(node.querySelector?.(cardSelector))
+  );
+}
+
+function handleRemovedNode(input: {
+  node: Node;
+  cardSelector: string;
+  containerSelector: string;
+  onCardInvalid?: (card: Element) => void;
+  removePortalForContainer(container: Element, removeDom?: boolean): void;
+}): void {
+  if (!(input.node instanceof Element)) {
+    return;
+  }
+
+  if (input.node.matches(input.cardSelector)) {
+    input.onCardInvalid?.(input.node);
+  }
+
+  for (const container of input.node.querySelectorAll(input.containerSelector)) {
+    input.removePortalForContainer(container, false);
+  }
+}
+
 export interface UseBrowsePortalsParams {
   cardSelector: string;
   containerSelector: string;
-  parseCard(card: Element): ParsedCard | null;
-  ensureContainer(host: HTMLElement, card: Element): HTMLElement;
+  parseCard(card: Element): HostMediaTarget | null;
+  ensureContainer(mountTarget: HTMLElement, card: Element): HTMLElement;
   getContainerForCard(card: Element): HTMLElement | null;
-  markProcessed(host: HTMLElement, parsed: ParsedCard): void;
-  clearProcessed(host: HTMLElement): void;
+  markProcessed(mountTarget: HTMLElement, parsed: HostMediaTarget): void;
+  clearProcessed(mountTarget: HTMLElement): void;
   getObserverRoot(): Node | null;
   getScanRoot(): Element | null;
   getResizeTargets(): Iterable<Element> | Element | null;
@@ -32,7 +74,7 @@ export interface UseBrowsePortalsParams {
 }
 
 export interface UseBrowsePortalsResult {
-  cardPortals: Map<Element, ParsedCard>;
+  cardPortals: Map<Element, HostMediaTarget>;
 }
 
 export const useBrowsePortals = ({
@@ -50,7 +92,7 @@ export const useBrowsePortals = ({
   onCardInvalid,
   enabled = true,
 }: UseBrowsePortalsParams): UseBrowsePortalsResult => {
-  const [cardPortals, setCardPortals] = useState<Map<Element, ParsedCard>>(new Map());
+  const [cardPortals, setCardPortals] = useState<Map<Element, HostMediaTarget>>(new Map());
 
   useEffect(() => {
     if (!enabled) {
@@ -64,7 +106,7 @@ export const useBrowsePortals = ({
       const next = new Map(prev);
       const parsed = next.get(container);
       if (parsed) {
-        clearProcessed(parsed.host);
+        clearProcessed(parsed.mountTarget);
       }
       next.delete(container);
       return next;
@@ -82,7 +124,7 @@ export const useBrowsePortals = ({
       const next = new Map(prev);
       for (const [container, parsed] of prev.entries()) {
         if (typeof document !== 'undefined' && !document.contains(container)) {
-          clearProcessed(parsed.host);
+          clearProcessed(parsed.mountTarget);
           next.delete(container);
           changed = true;
         }
@@ -102,17 +144,16 @@ export const useBrowsePortals = ({
       return;
     }
 
-    const container = ensureContainer(parsed.host, card);
-    markProcessed(parsed.host, parsed);
+    const container = ensureContainer(parsed.mountTarget, card);
+    markProcessed(parsed.mountTarget, parsed);
 
     setCardPortals(prev => {
       const existing = prev.get(container);
       if (
         existing &&
         existing.anilistId === parsed.anilistId &&
-        existing.title === parsed.title &&
-        existing.host === parsed.host &&
-        metadataEqual(existing.metadata, parsed.metadata)
+        existing.format === parsed.format &&
+        existing.mountTarget === parsed.mountTarget
       ) {
         return prev;
       }
@@ -177,16 +218,9 @@ export const useBrowsePortals = ({
       }, STALE_PORTALS_WAIT);
     };
 
-    const mo = new MutationObserver(mutations => {
+    const mo = new MutationObserver((mutations) => {
       let shouldRescan = false;
       const cardsToUpsert = new Set<Element>();
-
-      const enqueueCardForNode = (node: Node | null | undefined) => {
-        if (!node) return;
-        const element = node instanceof Element ? node : node.parentElement;
-        const card = element?.closest(cardSelector);
-        if (card) cardsToUpsert.add(card);
-      };
 
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
@@ -195,31 +229,30 @@ export const useBrowsePortals = ({
             continue;
           }
 
-          enqueueCardForNode(node);
+          enqueueCardForNode(node, cardSelector, cardsToUpsert);
 
-          if (!shouldRescan && (node instanceof Element || node instanceof DocumentFragment) && node.querySelector?.(cardSelector)) {
+          if (!shouldRescan && shouldNodeTriggerRescan(node, cardSelector)) {
             shouldRescan = true;
           }
         }
 
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          enqueueCardForNode(mutation.target);
+          enqueueCardForNode(mutation.target, cardSelector, cardsToUpsert);
         }
 
         if (mutation.type === 'attributes' && mutation.target instanceof Element) {
-          enqueueCardForNode(mutation.target);
+          enqueueCardForNode(mutation.target, cardSelector, cardsToUpsert);
         }
 
         if (mutation.removedNodes.length > 0) {
           for (const node of mutation.removedNodes) {
-            if (node instanceof Element) {
-              if (node.matches(cardSelector)) {
-                onCardInvalid?.(node);
-              }
-              for (const container of node.querySelectorAll(containerSelector)) {
-                removePortalForContainer(container, false);
-              }
-            }
+            handleRemovedNode({
+              node,
+              cardSelector,
+              containerSelector,
+              ...(onCardInvalid ? { onCardInvalid } : {}),
+              removePortalForContainer,
+            });
           }
           scheduleStalePortalsCleanup();
         }

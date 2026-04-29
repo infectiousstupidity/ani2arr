@@ -4,8 +4,7 @@
 import { browser } from 'wxt/browser';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { awaitBackgroundReady } from './await-background-ready';
-import { STORAGE_KEYS } from '@/storage';
-import { getPublicOptionsSnapshot, type PublicOptions } from '@/options';
+import { getPublicOptionsSnapshot, PUBLIC_OPTIONS_CHANGE_KEY, type PublicOptions } from '@/options';
 
 export interface ContentEntrypointShellContext {
   ctx: ContentScriptContext;
@@ -25,8 +24,6 @@ export interface ContentEntrypointShellOptions {
     url: string,
   ) => void;
 }
-
-const PUBLIC_OPTIONS_STORAGE_CHANGE_KEY = STORAGE_KEYS.publicOptions.replace(/^local:/, '');
 
 const isAbortError = (error: unknown): boolean =>
   error instanceof DOMException && error.name === 'AbortError';
@@ -122,7 +119,7 @@ export const createContentEntrypointShell = (options: ContentEntrypointShellOpti
       areaName,
     ) => {
       if (areaName !== 'local') return;
-      if (!changes[PUBLIC_OPTIONS_STORAGE_CHANGE_KEY]) return;
+      if (!changes[PUBLIC_OPTIONS_CHANGE_KEY]) return;
       void reconcile(location.href);
     };
 

@@ -2,8 +2,6 @@
 // src/anilist/constants.ts
 
 export const QUEUE_CONCURRENCY = 1;
-export const MEDIA_SOFT_TTL = 14 * 24 * 60 * 60 * 1000; // 14 days
-export const MEDIA_HARD_TTL = 60 * 24 * 60 * 60 * 1000; // 60 days
 export const DEFAULT_PREQUEL_DEPTH = 5;
 export const MAX_BATCH_SIZE = 50;
 export const LOW_PRIORITY_MIN_DISPATCH_GAP_MS = 350;

@@ -1,6 +1,7 @@
 /** AniList metadata-hint projection helpers used by mapping resolution. */
 // src/mapping/hints/media-hints.ts
 
+import { parseAniListIdOrNull, type AniListId } from '@/anilist';
 import type {
   AniListMedia,
   AniListMediaHint,
@@ -16,7 +17,7 @@ const normalizeTitles = (titles?: AniListTitles | null): AniListTitles => {
   return normalized;
 };
 
-export function buildMediaFromMetadataHint(anilistId: number, metadata?: AniListMediaHint | null): AniListMedia | null {
+export function buildMediaFromMetadataHint(anilistId: AniListId, metadata?: AniListMediaHint | null): AniListMedia | null {
   if (!metadata) return null;
 
   const titles = normalizeTitles(metadata.titles ?? {});
@@ -38,9 +39,9 @@ export function buildMediaFromMetadataHint(anilistId: number, metadata?: AniList
   const format = metadata.format ?? null;
 
   const relationIds = Array.isArray(metadata.relationPrequelIds)
-    ? metadata.relationPrequelIds.filter(
-        (value): value is number => typeof value === 'number' && Number.isFinite(value),
-      )
+    ? metadata.relationPrequelIds
+        .map((value) => parseAniListIdOrNull(value))
+        .filter((value): value is AniListId => value !== null)
     : [];
 
   if (
@@ -56,14 +57,14 @@ export function buildMediaFromMetadataHint(anilistId: number, metadata?: AniList
   const relations =
     relationIds.length > 0
       ? {
-          edges: relationIds.map(id => ({
+          edges: relationIds.map(anilistId => ({
             relationType: 'PREQUEL',
             node: {
-              id,
+              id: anilistId,
               format: null,
               title: {},
               synonyms: [],
-            } as AniListMedia,
+            },
           })),
         }
       : undefined;

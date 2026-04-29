@@ -4,9 +4,16 @@
 import React, { useMemo } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
 import { ChevronDown } from 'lucide-react';
+import type { AniListId } from '@/anilist';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
-import type { Provider } from '@/providers';
-import type { MappingSource, MappingSummary } from '@/mapping/types';
+import type { Provider, ProviderIdentity, ProviderTargetId } from '@/providers';
+import {
+  getProviderIdentityIdLabel,
+  getProviderIdentityLabel,
+  getProviderLabel,
+} from '@/providers/provider-labels';
+import type { MappingEntryKind } from '@/mapping/types';
+import type { MappingSummary } from '@/mapping/ui/mapping-list-types';
 import { useAniListMetadataBatch } from '@/shared/queries';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';
@@ -23,16 +30,18 @@ export type MappingTableEntry = {
 export type MappingTableRowData = {
   id: string;
   provider: Provider;
-  providerId: number | null;
+  providerId: ProviderTargetId | null;
+  providerIdentity: ProviderIdentity | null;
   providerMeta?: MappingSummary['providerMeta'];
   entries: MappingTableEntry[];
-  sources: MappingSource[];
+  entryKinds: MappingEntryKind[];
   updatedAt?: number;
 };
 
-const sourceStyles: Record<MappingSource, { label: string; className: string }> = {
+const entryKindStyles: Record<MappingEntryKind, { label: string; className: string }> = {
   manual: { label: 'Manual', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },
-  unresolved: { label: 'Unresolved', className: 'bg-warning/14 text-warning border-warning/24' },
+  unmapped: { label: 'Unmapped', className: 'bg-warning/14 text-warning border-warning/24' },
+  unknown: { label: 'Unknown', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
   rejected: { label: 'Rejected', className: 'bg-warning/12 text-warning border-warning/20' },
   auto: { label: 'Auto', className: 'bg-success/14 text-success border-success/24' },
   upstream: { label: 'Upstream', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
@@ -78,7 +87,7 @@ type MappingAccordionItemProps = {
   isMutating: boolean;
   isExpanded: boolean;
   onEdit: (entry: MappingSummary) => void;
-  onDeleteOverride: (entry: MappingSummary) => void;
+  onDeleteManualMapping: (entry: MappingSummary) => void;
   onRejectCandidate: (entry: MappingSummary) => void;
   onClearRejectedCandidate: (entry: MappingSummary) => void;
   onIgnoreTitle: (entry: MappingSummary) => void;
@@ -92,7 +101,7 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
   isMutating,
   isExpanded,
   onEdit,
-  onDeleteOverride,
+  onDeleteManualMapping,
   onRejectCandidate,
   onClearRejectedCandidate,
   onIgnoreTitle,
@@ -103,14 +112,13 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
     () =>
       [...new Set(
           row.entries
-            .map(({ entry }) => entry.anilistId)
-            .filter((id): id is number => Number.isFinite(id)),
+            .map(({ entry }) => entry.anilistId),
         )],
     [row.entries],
   );
 
   const providedMetadata = useMemo(() => {
-    const map = new Map<number, AniListMetadata>();
+    const map = new Map<AniListId, AniListMetadata>();
     for (const { entry, metadata } of row.entries) {
       if (metadata) {
         map.set(entry.anilistId, metadata);
@@ -129,7 +137,7 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
   });
 
   const metadataMap = useMemo(() => {
-    const map = new Map<number, AniListMetadata>(providedMetadata);
+    const map = new Map<AniListId, AniListMetadata>(providedMetadata);
     for (const entry of fetchedMetadata.data?.metadata ?? []) {
       map.set(entry.id, entry);
     }
@@ -138,21 +146,21 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
 
   const firstEntry = row.entries[0];
   const firstEntryMetadata = firstEntry ? metadataMap.get(firstEntry.entry.anilistId) ?? firstEntry.metadata ?? null : null;
-  const uniqueSources = [...new Set(row.sources)];
+  const uniqueEntryKinds = [...new Set(row.entryKinds)];
   const prefersAniListTitle = row.providerId === null;
   const preferredProviderTitle = prefersAniListTitle ? null : row.providerMeta?.title;
   const targetTitle =
     preferredProviderTitle ??
     (firstEntry ? resolveAniListTitle(firstEntryMetadata, firstEntry.title) : null) ??
     row.providerMeta?.title ??
-    (row.providerId === null ? 'Unmapped' : `${row.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${row.providerId}`);
-  const externalIdLabel = row.providerId === null
+    (row.providerIdentity === null ? 'Unmapped' : getProviderIdentityIdLabel(row.providerIdentity));
+  const providerIdLabel = row.providerIdentity === null
     ? null
-    : `${row.provider === 'radarr' ? 'TMDB' : 'TVDB'} #${row.providerId}`;
+    : getProviderIdentityLabel(row.providerIdentity);
   const updatedLabel = row.updatedAt ? formatRelativeTime(row.updatedAt) : null;
   const providerIcon = row.provider === 'sonarr' ? SonarrIcon : RadarrIcon;
-  const providerLabel = row.provider === 'sonarr' ? 'Sonarr' : 'Radarr';
-  const inLibraryCount = row.entries.filter((e) => e.entry.libraryStatus === 'in-provider').length;
+  const providerLabel = getProviderLabel(row.provider);
+  const inLibraryCount = row.entries.filter((e) => e.entry.isInLibrary === true).length;
   const hasMapping = row.providerId !== null;
   let linkedLabel = 'No target linked';
   if (hasMapping) {
@@ -160,16 +168,18 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
       inLibraryCount > 0
         ? `${row.entries.length} linked · ${inLibraryCount} in library`
         : `${row.entries.length} linked`;
-  } else if (uniqueSources.includes('rejected')) {
+  } else if (uniqueEntryKinds.includes('rejected')) {
     linkedLabel = 'Rejected candidate';
-  } else if (uniqueSources.includes('ignored')) {
+  } else if (uniqueEntryKinds.includes('ignored')) {
     linkedLabel = 'Title ignored';
-  } else if (uniqueSources.includes('unresolved')) {
-    linkedLabel = 'Unresolved attempt';
+  } else if (uniqueEntryKinds.includes('unknown')) {
+    linkedLabel = 'Unknown status';
+  } else if (uniqueEntryKinds.includes('unmapped')) {
+    linkedLabel = 'Unmapped';
   }
-  const hasMultipleSources = uniqueSources.length > 1;
+  const hasMultipleEntryKinds = uniqueEntryKinds.length > 1;
 
-  const showChildSourceBadges = hasMultipleSources || row.entries.length > 1;
+  const showChildSourceBadges = hasMultipleEntryKinds || row.entries.length > 1;
   const rowBaseBg =
     rowIndex % 2 === 0
       ? 'bg-bg-primary/10'
@@ -206,8 +216,8 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
                     {targetTitle}
                   </div>
                   <div className="mt-0.5 text-xs text-text-secondary">
-                    {externalIdLabel ? (
-                      <span className="font-mono">{externalIdLabel}</span>
+                    {providerIdLabel ? (
+                      <span className="font-mono">{providerIdLabel}</span>
                     ) : (
                       <span className="italic text-text-tertiary">No mapping</span>
                     )}
@@ -218,20 +228,20 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
               <div className="hidden text-xs text-text-secondary md:block">{linkedLabel}</div>
 
               <div className="flex min-w-0 items-center gap-1.5">
-                {hasMultipleSources ? (
+                {hasMultipleEntryKinds ? (
                   <Pill
                     small
                     tone="default"
                     className="border border-warning/24 bg-warning/14 text-warning"
-                    title={uniqueSources.map((source) => sourceStyles[source].label).join(' / ')}
+                    title={uniqueEntryKinds.map((entryKind) => entryKindStyles[entryKind].label).join(' / ')}
                   >
                     Multi
                   </Pill>
                 ) : (
-                  uniqueSources.map((source) => {
-                    const badge = sourceStyles[source];
+                  uniqueEntryKinds.map((entryKind) => {
+                    const badge = entryKindStyles[entryKind];
                     return (
-                      <Pill key={source} small tone="default" className={cn('border', badge.className)}>
+                      <Pill key={entryKind} small tone="default" className={cn('border', badge.className)}>
                         {badge.label}
                       </Pill>
                     );
@@ -273,7 +283,7 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
                     metadata={resolvedMetadata}
                     isMutating={isMutating}
                     onEdit={onEdit}
-                    onDeleteOverride={onDeleteOverride}
+                    onDeleteManualMapping={onDeleteManualMapping}
                     onRejectCandidate={onRejectCandidate}
                     onClearRejectedCandidate={onClearRejectedCandidate}
                     onIgnoreTitle={onIgnoreTitle}

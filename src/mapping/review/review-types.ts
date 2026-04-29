@@ -1,11 +1,13 @@
 /** Mapping-owned review projection types for backend conflict and follow-up state. */
 // src/mapping/review/review-types.ts
 
+import type { AniListId } from '@/anilist';
+import type { ProviderTargetId } from '@/providers';
 import type {
   MappingAcceptedReason,
-  MappingResolverState,
-  MappingSource,
+  MappingEntryKind,
 } from '@/mapping/types';
+import type { AutoMappingStatus } from '@/mapping/auto-mapping/types';
 
 export type MappingReviewReason =
   | 'manual-upstream-disagreement'
@@ -22,12 +24,12 @@ export type MappingReviewAction =
   | 'set-manual-mapping';
 
 export interface MappingReviewState {
-  source: MappingSource;
-  providerId: number | null;
-  resolverState?: MappingResolverState;
+  mappingEntryKind: MappingEntryKind;
+  providerId: ProviderTargetId | null;
+  resolverState?: AutoMappingStatus;
   acceptedReason?: MappingAcceptedReason;
-  immediateSourceAniListId?: number;
-  chainAnchorAniListId?: number;
+  immediateSourceAniListId?: AniListId;
+  chainAnchorAniListId?: AniListId;
 }
 
 export interface MappingReviewItem {

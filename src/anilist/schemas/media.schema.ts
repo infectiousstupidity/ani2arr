@@ -2,8 +2,7 @@
 // src/anilist/schemas/media.schema.ts
 
 import * as v from 'valibot';
-
-const AniListIdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
+import { AniListIdSchema } from '@/anilist/anilist-id';
 
 export const ANILIST_MEDIA_FORMATS = [
   'TV',
@@ -17,6 +16,64 @@ export const ANILIST_MEDIA_FORMATS = [
   'NOVEL',
   'ONE_SHOT',
 ] as const;
+
+type AniListMediaFormatValue = (typeof ANILIST_MEDIA_FORMATS)[number];
+
+const ANILIST_MEDIA_FORMAT_SET = new Set<string>(ANILIST_MEDIA_FORMATS);
+
+export const isAniListMediaFormat = (value: unknown): value is AniListMediaFormatValue => (
+  typeof value === 'string' && ANILIST_MEDIA_FORMAT_SET.has(value)
+);
+
+export const parseAniListMediaFormat = (value: unknown): AniListMediaFormatValue | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.trim().toUpperCase();
+  return isAniListMediaFormat(normalized) ? normalized : null;
+};
+
+const normalizeMediaFormatLabel = (value: string): string =>
+  value
+    .toLowerCase()
+    .replaceAll(/\s+/g, ' ')
+    .replaceAll(/\s*\/\s*/g, ' / ')
+    .trim();
+
+export const parseAniListMediaFormatLabel = (label: string | null | undefined): AniListMediaFormatValue | null => {
+  const normalized = normalizeMediaFormatLabel(label ?? '');
+  switch (normalized) {
+    case 'tv':
+    case 'tv show': {
+      return 'TV';
+    }
+    case 'tv short':
+    case 'tv shorts': {
+      return 'TV_SHORT';
+    }
+    case 'movie':
+    case 'movies': {
+      return 'MOVIE';
+    }
+    case 'music': {
+      return 'MUSIC';
+    }
+    case 'ova': {
+      return 'OVA';
+    }
+    case 'ona': {
+      return 'ONA';
+    }
+    case 'special':
+    case 'specials':
+    case 'ova / ona / special': {
+      return 'SPECIAL';
+    }
+    default: {
+      return null;
+    }
+  }
+};
 
 export const ANILIST_MEDIA_STATUSES = [
   'FINISHED',

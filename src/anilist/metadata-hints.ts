@@ -1,7 +1,7 @@
 /** Shared AniList metadata-hint helpers for pure transforms and metadata derivation. */
 // src/anilist/metadata-hints.ts
 
-import type { AniListMediaFormat, AniListMediaHint, AniListTitles } from '@/anilist/schemas/media.schema';
+import { parseAniListMediaFormat, type AniListMediaFormat, type AniListMediaHint, type AniListTitles } from '@/anilist/schemas/media.schema';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 
 export const normalizeSynonyms = (synonyms?: string[] | null): string[] => {
@@ -123,19 +123,6 @@ export const metadataHintFromAniListMetadata = (
   };
 };
 
-const ANILIST_MEDIA_FORMATS = new Set<AniListMediaFormat>([
-  'TV',
-  'TV_SHORT',
-  'MOVIE',
-  'SPECIAL',
-  'OVA',
-  'ONA',
-  'MUSIC',
-  'MANGA',
-  'NOVEL',
-  'ONE_SHOT',
-]);
-
 const coerceTitles = (value: unknown): AniListTitles | null => {
   if (!value || typeof value !== 'object') return null;
   const source = value as Record<string, unknown>;
@@ -163,9 +150,7 @@ const coerceSynonyms = (value: unknown): string[] | null => {
 };
 
 const coerceFormat = (value: unknown): AniListMediaFormat | null => {
-  if (typeof value !== 'string') return null;
-  const normalized = value.trim().toUpperCase();
-  return ANILIST_MEDIA_FORMATS.has(normalized as AniListMediaFormat) ? (normalized as AniListMediaFormat) : null;
+  return parseAniListMediaFormat(value);
 };
 
 const coerceStartYear = (value: unknown): number | null => {

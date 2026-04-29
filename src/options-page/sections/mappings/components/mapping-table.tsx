@@ -24,7 +24,7 @@ type MappingTableProps = {
   isFetchingNextPage: boolean;
   onLoadMore: () => void;
   onEdit: (entry: MappingTableRowData['entries'][number]['entry']) => void;
-  onDeleteOverride: (entry: MappingTableRowData['entries'][number]['entry']) => void;
+  onDeleteManualMapping: (entry: MappingTableRowData['entries'][number]['entry']) => void;
   onRejectCandidate: (entry: MappingTableRowData['entries'][number]['entry']) => void;
   onClearRejectedCandidate: (entry: MappingTableRowData['entries'][number]['entry']) => void;
   onIgnoreTitle: (entry: MappingTableRowData['entries'][number]['entry']) => void;
@@ -44,7 +44,7 @@ export const MappingTable: React.FC<MappingTableProps> = ({
   isFetchingNextPage,
   onLoadMore,
   onEdit,
-  onDeleteOverride,
+  onDeleteManualMapping,
   onRejectCandidate,
   onClearRejectedCandidate,
   onIgnoreTitle,
@@ -151,7 +151,7 @@ export const MappingTable: React.FC<MappingTableProps> = ({
                     isMutating={isMutating}
                     isExpanded={isExpanded}
                     onEdit={onEdit}
-                    onDeleteOverride={onDeleteOverride}
+                    onDeleteManualMapping={onDeleteManualMapping}
                     onRejectCandidate={onRejectCandidate}
                     onClearRejectedCandidate={onClearRejectedCandidate}
                     onIgnoreTitle={onIgnoreTitle}

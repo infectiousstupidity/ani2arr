@@ -1,4 +1,4 @@
-/** Reusable provider root-folder select with free-space labels and optional slug preview. */
+/** Reusable provider root-folder select with free-space labels and one preview object. */
 // src/components/provider-add-options/provider-root-folder-select.tsx
 
 import React from 'react';
@@ -6,9 +6,9 @@ import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check } from 'lucide-react';
 
 import type { ProviderRootFolder } from '@/providers';
+import type { ProviderSetupPathPreview } from '@/providers/library/paths';
 import { FormField, Label, Select, SelectContent, SelectTrigger } from '@/shared/ui/form/form';
 import { cn } from '@/shared/utils/cn';
-import { joinRootAndSlug } from '@/providers/library/paths';
 
 export interface ProviderRootFolderSelectProps {
   value: string;
@@ -19,9 +19,7 @@ export interface ProviderRootFolderSelectProps {
   initialFocusRef?: React.RefObject<HTMLButtonElement | null> | undefined;
   className?: string | undefined;
   triggerClassName?: string | undefined;
-  computedSlug?: string | null | undefined;
-  displayRootWithSlug?: boolean | undefined;
-  computedPath?: string | null | undefined;
+  pathPreview?: ProviderSetupPathPreview | undefined;
 }
 
 function formatFreeSpace(bytes?: number | null): string | null {
@@ -41,18 +39,6 @@ function formatFreeSpace(bytes?: number | null): string | null {
   return `${bytes.toLocaleString()} B free`;
 }
 
-function getRootDisplayPath(
-  rootPath: string,
-  computedSlug?: string | null,
-  displayRootWithSlug?: boolean,
-): string {
-  if (!rootPath || !displayRootWithSlug || !computedSlug) {
-    return rootPath;
-  }
-
-  return joinRootAndSlug(rootPath, computedSlug);
-}
-
 export function ProviderRootFolderSelect(
   props: ProviderRootFolderSelectProps,
 ): React.JSX.Element {
@@ -65,14 +51,19 @@ export function ProviderRootFolderSelect(
     initialFocusRef,
     className,
     triggerClassName,
-    computedSlug,
-    displayRootWithSlug = false,
-    computedPath,
+    pathPreview,
   } = props;
 
-  const selectedRootDisplay = value
-    ? getRootDisplayPath(value, computedSlug, displayRootWithSlug)
-    : null;
+  const triggerDisplayPath = (pathPreview?.previewPath ?? value) || null;
+  const currentPath = pathPreview?.existingPath ?? null;
+  const previewPath = pathPreview?.previewPath ?? null;
+  const folderSlug = pathPreview?.folderSlug ?? null;
+  const willMove = pathPreview?.willMove ?? false;
+  const isEditMode = !!currentPath;
+  const shouldShowPathPreview = !isEditMode && !!previewPath;
+  const shouldShowNextPath = isEditMode && willMove && !!previewPath;
+  const shouldShowCreateHelper = !isEditMode && !!folderSlug && !!previewPath;
+  const shouldShowMoveHelper = isEditMode && willMove;
 
   return (
     <>
@@ -83,9 +74,9 @@ export function ProviderRootFolderSelect(
             <SelectTrigger ref={initialFocusRef ?? undefined} className={triggerClassName}>
               <span className="flex min-w-0 flex-1 items-center overflow-hidden text-ellipsis whitespace-nowrap">
                 <SelectPrimitive.Value placeholder="Select a folder...">
-                  {selectedRootDisplay ? (
-                    <span className="block min-w-0 truncate text-left" title={selectedRootDisplay}>
-                      {selectedRootDisplay}
+                  {triggerDisplayPath ? (
+                    <span className="block min-w-0 truncate text-left" title={triggerDisplayPath}>
+                      {triggerDisplayPath}
                     </span>
                   ) : null}
                 </SelectPrimitive.Value>
@@ -94,11 +85,6 @@ export function ProviderRootFolderSelect(
 
             <SelectContent className="max-w-[90vw]" container={portalContainer ?? null}>
               {rootFolders.map(folder => {
-                const fullPath = getRootDisplayPath(
-                  folder.path,
-                  computedSlug,
-                  displayRootWithSlug,
-                );
                 const freeSpaceLabel = formatFreeSpace(folder.freeSpace);
 
                 return (
@@ -114,8 +100,8 @@ export function ProviderRootFolderSelect(
                     </span>
                     <SelectPrimitive.ItemText asChild>
                       <div className="flex w-full items-center justify-between gap-4">
-                        <span className="min-w-0 truncate text-left" title={fullPath || undefined}>
-                          {fullPath}
+                        <span className="min-w-0 truncate text-left" title={folder.path || undefined}>
+                          {folder.path}
                         </span>
                         {freeSpaceLabel ? (
                           <span className="shrink-0 whitespace-nowrap text-xs text-text-tertiary">
@@ -132,10 +118,45 @@ export function ProviderRootFolderSelect(
         </div>
       </FormField>
 
-      {computedSlug ? (
+      {currentPath ? (
         <div className={cn('space-y-1', className)}>
-          <p className="text-xs text-text-secondary" title={computedPath ?? undefined}>
-            &apos;{computedSlug}&apos; subfolder will be created automatically.
+          <p className="text-xs text-text-secondary">Current path</p>
+          <p className="break-all text-xs text-text-primary" title={currentPath}>
+            {currentPath}
+          </p>
+        </div>
+      ) : null}
+
+      {shouldShowPathPreview ? (
+        <div className={cn('space-y-1', className)}>
+          <p className="text-xs text-text-secondary">Path preview</p>
+          <p className="break-all text-xs text-text-primary" title={previewPath ?? undefined}>
+            {previewPath}
+          </p>
+        </div>
+      ) : null}
+
+      {shouldShowNextPath ? (
+        <div className={cn('space-y-1', className)}>
+          <p className="text-xs text-text-secondary">Next path</p>
+          <p className="break-all text-xs text-text-primary" title={previewPath ?? undefined}>
+            {previewPath}
+          </p>
+        </div>
+      ) : null}
+
+      {shouldShowCreateHelper ? (
+        <div className={cn('space-y-1', className)}>
+          <p className="text-xs text-text-secondary" title={previewPath ?? undefined}>
+            &apos;{folderSlug}&apos; subfolder will be created automatically.
+          </p>
+        </div>
+      ) : null}
+
+      {shouldShowMoveHelper ? (
+        <div className={cn('space-y-1', className)}>
+          <p className="text-xs text-text-secondary" title={previewPath ?? undefined}>
+            This item will move to the displayed path when you save.
           </p>
         </div>
       ) : null}

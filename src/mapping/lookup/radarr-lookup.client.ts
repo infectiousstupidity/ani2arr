@@ -2,8 +2,7 @@
 // src/mapping/lookup/radarr-lookup.client.ts
 
 import type { RadarrClient } from '@/providers/clients/radarr.client';
-import type { RadarrLookupMovie } from '@/providers';
-import type { ProviderCredentials } from '@/providers';
+import { parseTmdbIdOrNull, type RadarrLookupMovie, type ProviderCredentials, type TmdbId } from '@/providers';
 import { BaseLookupClient, type LookupCaches } from './base-lookup.client';
 
 export class RadarrLookupClient extends BaseLookupClient<RadarrLookupMovie> {
@@ -14,11 +13,9 @@ export class RadarrLookupClient extends BaseLookupClient<RadarrLookupMovie> {
     super('radarr', 'RadarrLookupClient', caches);
   }
 
-  public getProviderId(result: unknown): number | null {
+  public getProviderId(result: unknown): TmdbId | null {
     const candidate = result as { tmdbId?: unknown } | null;
-    return typeof candidate?.tmdbId === 'number' && Number.isFinite(candidate.tmdbId)
-      ? candidate.tmdbId
-      : null;
+    return parseTmdbIdOrNull(candidate?.tmdbId);
   }
 
   protected fetchFromApi(

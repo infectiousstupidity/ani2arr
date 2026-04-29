@@ -12,9 +12,11 @@ import {
 import type {
   AniListResponseMeta,
 } from '@/anilist/transport/types';
-import type { TtlCache } from '@/storage';
+import type { TtlCache } from '@/shared/cache/ttl-cache';
 import { createError, ErrorCode } from '@/shared/errors';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
+import type { AniListId } from '@/anilist/anilist-id';
+import { isAniListId } from '@/anilist/anilist-id';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 import { logger } from '@/shared/utils/logger';
 import { priorityValue } from '@/shared/utils/request-priority';
@@ -43,7 +45,7 @@ type Deferred<T> = {
 };
 
 type PendingEntry = {
-  id: number;
+  id: AniListId;
   deferred: Deferred<AniListMedia>;
   priority: RequestPriority;
   forceRefresh: boolean;
@@ -70,19 +72,19 @@ const COALESCE_MS: Record<RequestPriority, number> = {
 export class AniListMediaScheduler {
   private readonly log = logger.create('AniListMediaScheduler');
   private readonly limiter = new AniListRateLimiter();
-  private readonly pendingByPriority = new Map<RequestPriority, Map<number, PendingEntry>>(
-    PRIORITIES.map(priority => [priority, new Map<number, PendingEntry>()]),
+  private readonly pendingByPriority = new Map<RequestPriority, Map<AniListId, PendingEntry>>(
+    PRIORITIES.map(priority => [priority, new Map<AniListId, PendingEntry>()]),
   );
-  private readonly pendingById = new Map<number, PendingEntry>();
+  private readonly pendingById = new Map<AniListId, PendingEntry>();
   private readonly bucketReadyAt = new Map<RequestPriority, number>();
-  private readonly inflightById = new Map<number, InflightEntry>();
+  private readonly inflightById = new Map<AniListId, InflightEntry>();
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushScheduledAt: number | null = null;
   private isFlushing = false;
 
   constructor(private readonly deps: MediaSchedulerDeps) {}
 
-  public prioritize(ids: number | number[], priority: RequestPriority = 'high'): void {
+  public prioritize(ids: AniListId | AniListId[], priority: RequestPriority = 'high'): void {
     for (const id of this.normalizeIds(Array.isArray(ids) ? ids : [ids])) {
       const pending = this.pendingById.get(id);
       if (!pending) continue;
@@ -90,9 +92,9 @@ export class AniListMediaScheduler {
     }
   }
 
-  public async requestSingle(id: number, options: RequestMediaOptions = {}): Promise<AniListMedia> {
+  public async requestSingle(id: AniListId, options: RequestMediaOptions = {}): Promise<AniListMedia> {
     const [normalizedId] = this.normalizeIds([id]);
-    if (typeof normalizedId !== 'number') {
+    if (!normalizedId) {
       throw createError(
         ErrorCode.VALIDATION_ERROR,
         `Invalid AniList ID ${String(id)}`,
@@ -115,11 +117,11 @@ export class AniListMediaScheduler {
     return this.ensureNetworkRequest(normalizedId, normalizedOptions);
   }
 
-  public async requestMedia(ids: number[], options: RequestMediaOptions = {}): Promise<Map<number, AniListMedia>> {
+  public async requestMedia(ids: AniListId[], options: RequestMediaOptions = {}): Promise<Map<AniListId, AniListMedia>> {
     const normalizedOptions = this.normalizeOptions(options);
     const uniqueIds = this.normalizeIds(ids);
-    const results = new Map<number, AniListMedia>();
-    const pending = new Map<number, Promise<AniListMedia>>();
+    const results = new Map<AniListId, AniListMedia>();
+    const pending = new Map<AniListId, Promise<AniListMedia>>();
 
     for (const id of uniqueIds) {
       if (!normalizedOptions.forceRefresh) {
@@ -169,11 +171,11 @@ export class AniListMediaScheduler {
     };
   }
 
-  private normalizeIds(ids: number[]): number[] {
-    return [...new Set(ids.filter(id => typeof id === 'number' && Number.isFinite(id) && id > 0))];
+  private normalizeIds(ids: AniListId[]): AniListId[] {
+    return [...new Set(ids.filter(isAniListId))];
   }
 
-  private async readCachedMedia(id: number): Promise<{ media: AniListMedia; stale: boolean } | null> {
+  private async readCachedMedia(id: AniListId): Promise<{ media: AniListMedia; stale: boolean } | null> {
     const cache = this.deps.cache;
     if (!cache) return null;
 
@@ -191,7 +193,7 @@ export class AniListMediaScheduler {
     };
   }
 
-  private refreshInBackground(id: number, options: Required<RequestMediaOptions>): void {
+  private refreshInBackground(id: AniListId, options: Required<RequestMediaOptions>): void {
     void this
       .ensureNetworkRequest(id, {
         ...options,
@@ -204,7 +206,7 @@ export class AniListMediaScheduler {
   }
 
   private ensureNetworkRequest(
-    id: number,
+    id: AniListId,
     options: Required<RequestMediaOptions>,
   ): Promise<AniListMedia> {
     const inflight = this.inflightById.get(id);
@@ -399,7 +401,7 @@ export class AniListMediaScheduler {
         priorityValue(priority),
       );
 
-      const resolved = new Set<number>();
+      const resolved = new Set<AniListId>();
       for (const media of medias) {
         if (!media || typeof media.id !== 'number') continue;
 
@@ -483,7 +485,7 @@ export class AniListMediaScheduler {
     }
   }
 
-  private fetchBatch(ids: number[]): Promise<AniListMedia[]> {
+  private fetchBatch(ids: AniListId[]): Promise<AniListMedia[]> {
     return this.executeRequest(() => fetchAniListMediaBatch(ids), 'AniList request failed.');
   }
 

@@ -3,6 +3,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AniListResponseMeta } from '@/anilist/transport/types';
+import { parseAniListId, type AniListId } from '@/anilist/anilist-id';
 
 const { postAniListMock } = vi.hoisted(() => ({
   postAniListMock: vi.fn(),
@@ -25,6 +26,8 @@ const META: AniListResponseMeta = {
   },
   receivedAt: 0,
 };
+
+const ids = (values: number[]): AniListId[] => values.map(parseAniListId);
 
 afterEach(() => {
   postAniListMock.mockReset();
@@ -54,7 +57,7 @@ describe('AniList batch media transport', () => {
       meta: META,
     });
 
-    const result = await fetchAniListMediaBatch([101, 102]);
+    const result = await fetchAniListMediaBatch(ids([101, 102]));
 
     expect(result.data).toEqual([
       {
@@ -96,7 +99,7 @@ describe('AniList batch media transport', () => {
       meta: META,
     });
 
-    const result = await fetchAniListMediaBatch([201, 202]);
+    const result = await fetchAniListMediaBatch(ids([201, 202]));
 
     expect(result.data).toEqual([
       {
@@ -116,7 +119,7 @@ describe('AniList batch media transport', () => {
       meta: META,
     });
 
-    await expect(fetchAniListMediaBatch([301])).rejects.toThrow('AniList GraphQL Error: AniList exploded');
+    await expect(fetchAniListMediaBatch(ids([301]))).rejects.toThrow('AniList GraphQL Error: AniList exploded');
   });
 
   it('fails fast for malformed response envelopes', async () => {
@@ -131,7 +134,7 @@ describe('AniList batch media transport', () => {
       meta: META,
     });
 
-    await expect(fetchAniListMediaBatch([401])).rejects.toThrow();
+    await expect(fetchAniListMediaBatch(ids([401]))).rejects.toThrow();
   });
 
   it('drops null and invalid relation edges instead of failing the item', async () => {
@@ -161,7 +164,7 @@ describe('AniList batch media transport', () => {
       meta: META,
     });
 
-    const result = await fetchAniListMediaBatch([501]);
+    const result = await fetchAniListMediaBatch(ids([501]));
     expect(result.data).toHaveLength(1);
     expect(result.data[0]!.relations).toEqual({
       edges: [{ relationType: 'SEQUEL', node: { id: 200 } }],
@@ -187,7 +190,7 @@ describe('AniList batch media transport', () => {
       meta: META,
     });
 
-    const result = await fetchAniListMediaBatch([601]);
+    const result = await fetchAniListMediaBatch(ids([601]));
     expect(result.data).toHaveLength(1);
     expect(result.data[0]!.nextAiringEpisode).toBeNull();
   });
@@ -212,7 +215,7 @@ describe('AniList batch media transport', () => {
       meta: META,
     });
 
-    const result = await fetchAniListMediaBatch([701]);
+    const result = await fetchAniListMediaBatch(ids([701]));
     expect(result.data).toHaveLength(1);
     expect(result.data[0]!.format).toBeNull();
     expect(result.data[0]!.status).toBeNull();
@@ -239,7 +242,7 @@ describe('AniList batch media transport', () => {
       meta: META,
     });
 
-    const result = await fetchAniListMediaBatch([801]);
+    const result = await fetchAniListMediaBatch(ids([801]));
     expect(result.data).toHaveLength(1);
     expect(result.data[0]!.synonyms).toEqual(['Alpha', 'Beta']);
     expect(result.data[0]!.genres).toEqual(['Action', 'Drama']);

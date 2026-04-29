@@ -4,15 +4,14 @@
 import React from 'react';
 
 import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
+import { parseProviderQualityProfileId, type ProviderMetadata } from '@/providers';
+import type { ProviderSetupPathPreview } from '@/providers/library/paths';
+import {
+  MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS,
+  type RadarrFormState,
+  type RadarrMinimumAvailability,
+} from '@/providers/settings/provider-settings.schema';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
-import type {
-  ProviderMetadata,
-} from '@/providers';
-import type {
-  RadarrFormState,
-  RadarrMinimumAvailability,
-} from '@/providers/settings/radarr-settings.schema';
-import { MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS } from '@/providers/settings/radarr-settings.schema';
 import { cn } from '@/shared/utils/cn';
 
 import { ProviderRootFolderSelect } from './provider-root-folder-select';
@@ -25,9 +24,7 @@ export interface RadarrAddOptionsFieldsProps {
   className?: string | undefined;
   portalContainer?: HTMLElement | ShadowRoot | null | undefined;
   initialFocusRef?: React.RefObject<HTMLButtonElement | null> | undefined;
-  computedPath?: string | null | undefined;
-  folderSlug?: string | null | undefined;
-  displayRootWithSlug?: boolean | undefined;
+  pathPreview?: ProviderSetupPathPreview | undefined;
   layout?: 'stacked' | 'grid' | undefined;
 }
 
@@ -42,9 +39,7 @@ export function RadarrAddOptionsFields(
     className,
     portalContainer,
     initialFocusRef,
-    computedPath,
-    folderSlug,
-    displayRootWithSlug = false,
+    pathPreview,
     layout = 'stacked',
   } = props;
 
@@ -58,28 +53,30 @@ export function RadarrAddOptionsFields(
     value: String(profile.id),
     label: profile.name,
   }));
+  const searchForMovie = values.addOptions?.searchForMovie ?? false;
 
   return (
     <div className={cn(layoutClassName, className)}>
       <ProviderRootFolderSelect
         disabled={disabled}
-        value={values.rootFolderPath}
+        value={values.rootFolderPath ?? ''}
         rootFolders={metadata.rootFolders}
         onChange={value => onChange('rootFolderPath', value)}
         portalContainer={portalContainer ?? null}
         initialFocusRef={initialFocusRef}
         className={fullWidthClass}
         triggerClassName={modalSelectTriggerClassName}
-        computedSlug={folderSlug ?? null}
-        displayRootWithSlug={displayRootWithSlug}
-        computedPath={computedPath}
+        pathPreview={pathPreview}
       />
 
       <SelectField
         label="Quality Profile"
         disabled={disabled}
-        value={String(values.qualityProfileId)}
-        onChange={value => onChange('qualityProfileId', Number(value))}
+        value={values.qualityProfileId === undefined ? '' : String(values.qualityProfileId)}
+        onChange={value => {
+          const num = Number(value);
+          onChange('qualityProfileId', !value || Number.isNaN(num) ? undefined : parseProviderQualityProfileId(num));
+        }}
         options={qualityProfileOptions}
         placeholder="Select a profile..."
         container={portalContainer ?? null}
@@ -89,7 +86,7 @@ export function RadarrAddOptionsFields(
       <SelectField
         label="Minimum Availability"
         disabled={disabled}
-        value={values.minimumAvailability}
+        value={values.minimumAvailability ?? ''}
         onChange={value => onChange('minimumAvailability', value as RadarrMinimumAvailability)}
         options={MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS}
         container={portalContainer ?? null}
@@ -99,7 +96,7 @@ export function RadarrAddOptionsFields(
       <ProviderTagField
         availableTags={metadata.tags}
         disabled={disabled}
-        selectedTagIds={values.tags}
+        selectedTagIds={values.tags ?? []}
         selectedFreeformTags={values.freeformTags}
         onTagIdsChange={tagIds => onChange('tags', tagIds)}
         onFreeformTagsChange={freeformTags => onChange('freeformTags', freeformTags)}
@@ -110,7 +107,7 @@ export function RadarrAddOptionsFields(
           <SwitchField
             label="Monitored"
             disabled={disabled}
-            checked={values.monitored}
+            checked={values.monitored ?? false}
             onCheckedChange={checked => onChange('monitored', checked)}
             labelHelp="Keep the movie monitored in Radarr so future upgrades remain eligible."
             labelHelpContainer={portalContainer ?? null}
@@ -120,8 +117,9 @@ export function RadarrAddOptionsFields(
           <SwitchField
             label="Search on Add"
             disabled={disabled}
-            checked={values.searchForMovie}
-            onCheckedChange={checked => onChange('searchForMovie', checked)}
+            checked={searchForMovie}
+            onCheckedChange={checked =>
+              onChange('addOptions', { ...values.addOptions, searchForMovie: checked })}
             labelHelp="Trigger a Radarr search immediately after the movie is added."
             labelHelpContainer={portalContainer ?? null}
             layout="inline"

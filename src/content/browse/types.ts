@@ -1,27 +1,27 @@
 /** Browse card and adapter contracts owned by content-surface overlays. */
 // src/content/browse/types.ts
 
-import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
+import type { AniListId } from '@/anilist';
+import type { AniListMediaFormat } from '@/anilist/schemas/media.schema';
 
 type AnchorCorner = 'bottom-left' | 'top-left';
 type StackDirection = 'up' | 'down';
 
-export interface ParsedCard {
-  anilistId: number;
-  title: string;
-  host: HTMLElement;
-  metadata: AniListMediaHint | null;
+export interface HostMediaTarget {
+  anilistId: AniListId;
+  format: AniListMediaFormat | null;
+  mountTarget: HTMLElement;
 }
 
 export interface BrowseAdapter {
   cardSelector: string;
   containerClassName?: string;
   processedAttribute?: string;
-  parseCard(card: Element): ParsedCard | null;
-  ensureContainer?(host: HTMLElement, card: Element): HTMLElement;
+  parseCard(card: Element): HostMediaTarget | null;
+  ensureContainer?(mountTarget: HTMLElement, card: Element): HTMLElement;
   getContainerForCard?(card: Element): HTMLElement | null;
-  markProcessed?(host: HTMLElement, parsed: ParsedCard): void;
-  clearProcessed?(host: HTMLElement): void;
+  markProcessed?(mountTarget: HTMLElement, parsed: HostMediaTarget): void;
+  clearProcessed?(mountTarget: HTMLElement): void;
   onCardInvalid?(card: Element): void;
   getObserverRoot?(): Node | null;
   getScanRoot?(): Element | null;

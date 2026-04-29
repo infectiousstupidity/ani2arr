@@ -10,7 +10,7 @@ import {
   type SonarrAddOptionsFieldsLayout,
 } from '@/components/provider-add-options/sonarr-add-options-fields';
 import type { SettingsActions } from '../hooks/use-settings-actions';
-import type { SonarrFormState } from '@/providers/settings/sonarr-settings.schema';
+import type { SonarrFormState } from '@/providers/settings/provider-settings.schema';
 import Button from '@/shared/ui/primitives/button';
 import type { ExtensionOptions } from '@/options';
 
@@ -79,7 +79,7 @@ export const SonarrDefaultsSection: React.FC<{
         values={defaults}
         metadata={metadataQuery.data}
         onChange={setDefaultField}
-        disabled={actions.saveState.isPending}
+        disabled={actions.isBusy}
         portalContainer={portalContainer ?? null}
         layout={layout}
       />
@@ -101,10 +101,10 @@ export const SonarrDefaultsSection: React.FC<{
           variant="ghost"
           size="icon"
           tooltip="Refresh data from Sonarr"
-          portalContainer={portalContainer ?? undefined}
+          tooltipContainer={portalContainer ?? undefined}
           aria-label="Refresh data from Sonarr"
           aria-busy={metadataQuery.isRefetching}
-          disabled={!metadataEnabled || actions.saveState.isPending}
+          disabled={!metadataEnabled || actions.isBusy}
         >
           <RotateCcw />
         </Button>

@@ -2,51 +2,76 @@
 // src/mapping/review/list-mappings.test.ts
 
 import { describe, expect, it } from 'vitest';
-import type { SonarrSeriesSnapshot } from '@/providers';
-import { getMappingSummarySource, type ResolverStateRecord } from '@/mapping/types';
-import { listMappings } from './list-mappings';
+import { parseAniListId, type AniListId } from '@/anilist';
+import { parseTvdbId, type SonarrSeriesSnapshot, type TmdbId, type TvdbId } from '@/providers';
+import type { AutoMappingRecord } from '@/mapping/auto-mapping/types';
+import { listMappings, type ListMappingsDeps } from './list-mappings';
 
-const createResolverStateStore = (
-  entries: Array<ResolverStateRecord & { anilistId: number; provider: 'sonarr' | 'radarr' }> = [],
+const aid = parseAniListId;
+const tvdb = parseTvdbId;
+
+type TestProviderMapping =
+  | { provider: 'sonarr'; anilistId: AniListId; providerId: TvdbId }
+  | { provider: 'radarr'; anilistId: AniListId; providerId: TmdbId };
+
+const createAutoMappingStore = (
+  entries: Array<AutoMappingRecord & { anilistId: AniListId; provider: 'sonarr' | 'radarr' }> = [],
 ) => ({
   list: async () => entries,
 });
 
+const createAnibridgeStore = (
+  providerMappings: TestProviderMapping[] = [],
+): ListMappingsDeps['anibridgeMappingStore'] => ({
+  listAllProviderPairs: () => providerMappings,
+  getSonarrCandidates: (anilistId: AniListId) => providerMappings
+    .filter((providerMapping): providerMapping is Extract<TestProviderMapping, { provider: 'sonarr' }> =>
+      providerMapping.provider === 'sonarr' && providerMapping.anilistId === anilistId)
+    .map(providerMapping => providerMapping.providerId),
+  getRadarrCandidates: (anilistId: AniListId) => providerMappings
+    .filter((providerMapping): providerMapping is Extract<TestProviderMapping, { provider: 'radarr' }> =>
+      providerMapping.provider === 'radarr' && providerMapping.anilistId === anilistId)
+    .map(providerMapping => providerMapping.providerId),
+  getAniListIdsForTvdb: (tvdbId: TvdbId) => providerMappings
+    .filter(providerMapping => providerMapping.provider === 'sonarr' && providerMapping.providerId === tvdbId)
+    .map(providerMapping => providerMapping.anilistId),
+  getAniListIdsForTmdb: (tmdbId: TmdbId) => providerMappings
+    .filter(providerMapping => providerMapping.provider === 'radarr' && providerMapping.providerId === tmdbId)
+    .map(providerMapping => providerMapping.anilistId),
+});
+
 describe('listMappings', () => {
-  it('collapses matching manual overrides into exact upstream truth and preserves unresolved entries', async () => {
+  it('collapses matching manual mappings into exact upstream truth and preserves unresolved entries', async () => {
     const result = await listMappings(
       { limit: 10 },
       {
-        overridesService: {
+        manualMappingService: {
           listIgnores: () => [],
           listRejectedCandidates: () => [],
           list: () => [
             {
-              anilistId: 1,
+              anilistId: aid(1),
               provider: 'sonarr',
-              providerId: 222,
+              providerId: tvdb(222),
               updatedAt: 100,
             },
           ],
           isIgnored: () => false,
           getLinkedAniListIds: () => [],
         },
-        upstreamMappingStore: {
-          listAllPairs: () => [{ anilistId: 1, tvdbId: 222 }],
-          getAniListIdsForTvdb: () => [],
-        },
+        anibridgeMappingStore: createAnibridgeStore([{ provider: 'sonarr', anilistId: aid(1), providerId: tvdb(222) }]),
         sonarrLibrary: {
           getLeanSeriesList: async () => [],
         },
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
-        resolverStateStore: createResolverStateStore([
+        autoMappingStore: createAutoMappingStore([
           {
-            anilistId: 1,
+            anilistId: aid(1),
             provider: 'sonarr',
             state: 'mapped',
-            providerId: 111,
+            providerId: tvdb(111),
             acceptedEvidence: {
               source: 'auto',
               reason: 'fuzzy-match',
@@ -54,7 +79,7 @@ describe('listMappings', () => {
             updatedAt: 50,
           },
           {
-            anilistId: 2,
+            anilistId: aid(2),
             provider: 'radarr',
             state: 'unresolved',
             recentEvaluation: {
@@ -72,50 +97,47 @@ describe('listMappings', () => {
     const upstreamRow = result.mappings.find(entry => entry.anilistId === 1);
     expect(upstreamRow).toMatchObject({
       provider: 'sonarr',
-      status: 'can-add',
-      libraryStatus: 'not-in-provider',
-      providerId: 222,
-      effectiveSource: 'upstream',
-      effectiveReason: 'exact-upstream',
+      mappingRowStatus: 'can-add',
+      isInLibrary: false,
+      providerId: tvdb(222),
+      mappingSource: 'upstream',
+      mappingReason: 'exact-upstream',
       resolverOutcome: 'mapped',
     });
-    expect(getMappingSummarySource(upstreamRow!)).toBe('upstream');
+    expect(upstreamRow?.mappingEntryKind).toBe('upstream');
 
     const unresolvedRow = result.mappings.find(entry => entry.anilistId === 2);
     expect(unresolvedRow).toMatchObject({
       provider: 'radarr',
-      status: 'unresolved',
-      libraryStatus: 'unmapped',
+      mappingRowStatus: 'unmapped',
+      isInLibrary: null,
       providerMeta: { title: 'Missing Movie', type: 'movie' },
       resolverOutcome: 'unresolved',
     });
-    expect(getMappingSummarySource(unresolvedRow!)).toBe('unresolved');
+    expect(unresolvedRow?.mappingEntryKind).toBe('unmapped');
   });
 
   it('matches unresolved entries by their captured title query', async () => {
     const result = await listMappings(
       { limit: 10, query: 'needle' },
       {
-        overridesService: {
+        manualMappingService: {
           listIgnores: () => [],
           listRejectedCandidates: () => [],
           list: () => [],
           isIgnored: () => false,
           getLinkedAniListIds: () => [],
         },
-        upstreamMappingStore: {
-          listAllPairs: () => [],
-          getAniListIdsForTvdb: () => [],
-        },
+        anibridgeMappingStore: createAnibridgeStore(),
         sonarrLibrary: {
           getLeanSeriesList: async () => [],
         },
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
-        resolverStateStore: createResolverStateStore([
+        autoMappingStore: createAutoMappingStore([
           {
-            anilistId: 44,
+            anilistId: aid(44),
             provider: 'radarr',
             state: 'unresolved',
             recentEvaluation: {
@@ -131,57 +153,54 @@ describe('listMappings', () => {
 
     expect(result.total).toBe(1);
     expect(result.mappings[0]).toMatchObject({
-      anilistId: 44,
+      anilistId: aid(44),
       provider: 'radarr',
-      status: 'unresolved',
-      libraryStatus: 'unmapped',
+      mappingRowStatus: 'unmapped',
+      isInLibrary: null,
       providerMeta: { title: 'Needle Movie', type: 'movie' },
       resolverOutcome: 'unresolved',
     });
-    expect(getMappingSummarySource(result.mappings[0]!)).toBe('unresolved');
+    expect(result.mappings[0]?.mappingEntryKind).toBe('unmapped');
   });
 
-  it('keeps manual overrides effective when they disagree with exact upstream truth', async () => {
+  it('keeps manual mappings effective when they disagree with exact upstream truth', async () => {
     const result = await listMappings(
       { limit: 10 },
       {
-        overridesService: {
+        manualMappingService: {
           listIgnores: () => [],
           listRejectedCandidates: () => [],
           list: () => [
             {
-              anilistId: 1,
+              anilistId: aid(1),
               provider: 'sonarr',
-              providerId: 777,
+              providerId: tvdb(777),
               updatedAt: 20,
             },
           ],
           isIgnored: () => false,
           getLinkedAniListIds: () => [],
         },
-        upstreamMappingStore: {
-          listAllPairs: () => [{ anilistId: 1, tvdbId: 555 }],
-          getAniListIdsForTvdb: () => [],
-        },
+        anibridgeMappingStore: createAnibridgeStore([{ provider: 'sonarr', anilistId: aid(1), providerId: tvdb(555) }]),
         sonarrLibrary: {
           getLeanSeriesList: async () => [],
         },
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
-        resolverStateStore: createResolverStateStore(),
+        autoMappingStore: createAutoMappingStore(),
       },
     );
 
     expect(result.mappings).toHaveLength(1);
     expect(result.mappings[0]).toMatchObject({
-      anilistId: 1,
+      anilistId: aid(1),
       provider: 'sonarr',
-      providerId: 777,
-      status: 'needs-review',
-      libraryStatus: 'not-in-provider',
-      effectiveSource: 'manual',
-      effectiveReason: 'manual-override',
+      providerId: tvdb(777),
+      mappingRowStatus: 'needs-review',
+      isInLibrary: false,
+      mappingSource: 'manual',
+      mappingReason: 'manual-override',
       resolverOutcome: 'mapped',
       reviewSummary: {
         count: 1,
@@ -192,78 +211,75 @@ describe('listMappings', () => {
         expect.objectContaining({
           reason: 'manual-upstream-disagreement',
           current: expect.objectContaining({
-            source: 'manual',
-            providerId: 777,
+            mappingEntryKind: 'manual',
+            providerId: tvdb(777),
             acceptedReason: 'manual-override',
           }),
           proposed: expect.objectContaining({
-            source: 'upstream',
-            providerId: 555,
+            mappingEntryKind: 'upstream',
+            providerId: tvdb(555),
             acceptedReason: 'exact-upstream',
           }),
         }),
       ],
     });
-    expect(getMappingSummarySource(result.mappings[0]!)).toBe('manual');
+    expect(result.mappings[0]?.mappingEntryKind).toBe('manual');
   });
 
-  it('projects manual overrides without upstream conflicts when no exact upstream exists', async () => {
+  it('projects manual mappings without upstream conflicts when no exact upstream exists', async () => {
     const result = await listMappings(
       { limit: 10 },
       {
-        overridesService: {
+        manualMappingService: {
           listIgnores: () => [],
           listRejectedCandidates: () => [],
           list: () => [
             {
-              anilistId: 3,
+              anilistId: aid(3),
               provider: 'radarr',
-              providerId: 1234,
+              providerId: tvdb(1234),
               updatedAt: 30,
             },
           ],
           isIgnored: () => false,
           getLinkedAniListIds: () => [],
         },
-        upstreamMappingStore: {
-          listAllPairs: () => [],
-          getAniListIdsForTvdb: () => [],
-        },
+        anibridgeMappingStore: createAnibridgeStore(),
         sonarrLibrary: {
           getLeanSeriesList: async () => [],
         },
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
-        resolverStateStore: createResolverStateStore(),
+        autoMappingStore: createAutoMappingStore(),
       },
     );
 
     expect(result.mappings).toHaveLength(1);
     const row = result.mappings[0];
     expect(row).toMatchObject({
-      anilistId: 3,
+      anilistId: aid(3),
       provider: 'radarr',
-      providerId: 1234,
-      status: 'can-add',
-      libraryStatus: 'not-in-provider',
-      effectiveSource: 'manual',
-      effectiveReason: 'manual-override',
+      providerId: tvdb(1234),
+      mappingRowStatus: 'can-add',
+      isInLibrary: false,
+      mappingSource: 'manual',
+      mappingReason: 'manual-override',
       resolverOutcome: 'mapped',
     });
     expect(row!.reviewSummary).toBeUndefined();
     expect(row!.reviewItems).toBeUndefined();
-    expect(getMappingSummarySource(row!)).toBe('manual');
+    expect(row?.mappingEntryKind).toBe('manual');
   });
 
   it('keeps ignores effective while surfacing exact upstream conflicts', async () => {
     const result = await listMappings(
       { limit: 10 },
       {
-        overridesService: {
+        manualMappingService: {
           listIgnores: () => [
             {
-              anilistId: 2,
+              anilistId: aid(2),
               provider: 'sonarr',
               updatedAt: 15,
             },
@@ -273,27 +289,24 @@ describe('listMappings', () => {
           isIgnored: () => true,
           getLinkedAniListIds: () => [],
         },
-        upstreamMappingStore: {
-          listAllPairs: () => [{ anilistId: 2, tvdbId: 333 }],
-          getAniListIdsForTvdb: () => [],
-        },
+        anibridgeMappingStore: createAnibridgeStore([{ provider: 'sonarr', anilistId: aid(2), providerId: tvdb(333) }]),
         sonarrLibrary: {
           getLeanSeriesList: async () => [],
         },
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
-        resolverStateStore: createResolverStateStore(),
+        autoMappingStore: createAutoMappingStore(),
       },
     );
 
     expect(result.mappings).toHaveLength(1);
     expect(result.mappings[0]).toMatchObject({
-      anilistId: 2,
+      anilistId: aid(2),
       provider: 'sonarr',
       providerId: null,
-      status: 'needs-review',
-      libraryStatus: 'unmapped',
+      mappingRowStatus: 'needs-review',
+      isInLibrary: null,
       suppressionKind: 'ignored-entry',
       reviewSummary: {
         count: 1,
@@ -304,31 +317,31 @@ describe('listMappings', () => {
         expect.objectContaining({
           reason: 'ignored-but-exact-upstream',
           current: expect.objectContaining({
-            source: 'ignored',
+            mappingEntryKind: 'ignored',
             providerId: null,
           }),
           proposed: expect.objectContaining({
-            source: 'upstream',
-            providerId: 333,
+            mappingEntryKind: 'upstream',
+            providerId: tvdb(333),
             acceptedReason: 'exact-upstream',
           }),
         }),
       ],
     });
-    expect(getMappingSummarySource(result.mappings[0]!)).toBe('ignored');
+    expect(result.mappings[0]?.mappingEntryKind).toBe('ignored');
   });
 
   it('does not let rejected candidates hide exact upstream truth', async () => {
     const result = await listMappings(
       { limit: 10 },
       {
-        overridesService: {
+        manualMappingService: {
           listIgnores: () => [],
           listRejectedCandidates: () => [
             {
-              anilistId: 7,
+              anilistId: aid(7),
               provider: 'sonarr',
-              providerId: 999,
+              providerId: tvdb(999),
               updatedAt: 25,
             },
           ],
@@ -336,47 +349,44 @@ describe('listMappings', () => {
           isIgnored: () => false,
           getLinkedAniListIds: () => [],
         },
-        upstreamMappingStore: {
-          listAllPairs: () => [{ anilistId: 7, tvdbId: 444 }],
-          getAniListIdsForTvdb: () => [],
-        },
+        anibridgeMappingStore: createAnibridgeStore([{ provider: 'sonarr', anilistId: aid(7), providerId: tvdb(444) }]),
         sonarrLibrary: {
           getLeanSeriesList: async () => [],
         },
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
-        resolverStateStore: createResolverStateStore(),
+        autoMappingStore: createAutoMappingStore(),
       },
     );
 
     expect(result.mappings).toHaveLength(1);
     expect(result.mappings[0]).toMatchObject({
-      anilistId: 7,
+      anilistId: aid(7),
       provider: 'sonarr',
-      providerId: 444,
-      status: 'can-add',
-      libraryStatus: 'not-in-provider',
-      effectiveSource: 'upstream',
-      effectiveReason: 'exact-upstream',
-      suppressedProviderId: 999,
-      suppressionKind: 'rejected-candidate',
+      providerId: tvdb(444),
+      mappingRowStatus: 'can-add',
+      isInLibrary: false,
+      mappingSource: 'upstream',
+      mappingReason: 'exact-upstream',
       resolverOutcome: 'mapped',
     });
-    expect(getMappingSummarySource(result.mappings[0]!)).toBe('upstream');
+    expect(result.mappings[0]?.suppressedProviderId).toBeUndefined();
+    expect(result.mappings[0]?.suppressionKind).toBeUndefined();
+    expect(result.mappings[0]?.mappingEntryKind).toBe('upstream');
   });
 
-  it('preserves rejected-candidate suppression on mapped resolver-state rows', async () => {
+  it('preserves rejected-candidate suppression on mapped auto-mapping rows', async () => {
     const result = await listMappings(
       { limit: 10 },
       {
-        overridesService: {
+        manualMappingService: {
           listIgnores: () => [],
           listRejectedCandidates: () => [
             {
-              anilistId: 8,
+              anilistId: aid(8),
               provider: 'sonarr',
-              providerId: 901,
+              providerId: tvdb(901),
               updatedAt: 95,
             },
           ],
@@ -384,22 +394,19 @@ describe('listMappings', () => {
           isIgnored: () => false,
           getLinkedAniListIds: () => [],
         },
-        upstreamMappingStore: {
-          listAllPairs: () => [],
-          getAniListIdsForTvdb: () => [],
-        },
+        anibridgeMappingStore: createAnibridgeStore(),
         sonarrLibrary: {
           getLeanSeriesList: async () => [],
         },
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
-        resolverStateStore: createResolverStateStore([
+        autoMappingStore: createAutoMappingStore([
           {
-            anilistId: 8,
+            anilistId: aid(8),
             provider: 'sonarr',
             state: 'mapped',
-            providerId: 900,
+            providerId: tvdb(900),
             acceptedEvidence: {
               source: 'auto',
               reason: 'fuzzy-match',
@@ -412,47 +419,44 @@ describe('listMappings', () => {
 
     expect(result.mappings).toHaveLength(1);
     expect(result.mappings[0]).toMatchObject({
-      anilistId: 8,
+      anilistId: aid(8),
       provider: 'sonarr',
-      providerId: 900,
+      providerId: tvdb(900),
       suppressedProviderId: 901,
       suppressionKind: 'rejected-candidate',
-      status: 'can-add',
-      libraryStatus: 'not-in-provider',
-      effectiveSource: 'auto',
-      effectiveReason: 'fuzzy-match',
+      mappingRowStatus: 'suppressed',
+      isInLibrary: false,
+      mappingSource: 'auto',
+      mappingReason: 'fuzzy-match',
       resolverOutcome: 'mapped',
     });
-    expect(getMappingSummarySource(result.mappings[0]!)).toBe('auto');
+    expect(result.mappings[0]?.mappingEntryKind).toBe('auto');
   });
 
   it('projects verification-failed inherited review without changing the unresolved effective state', async () => {
     const result = await listMappings(
       { limit: 10 },
       {
-        overridesService: {
+        manualMappingService: {
           listIgnores: () => [],
           listRejectedCandidates: () => [],
           list: () => [],
           isIgnored: () => false,
           getLinkedAniListIds: () => [],
         },
-        upstreamMappingStore: {
-          listAllPairs: () => [],
-          getAniListIdsForTvdb: () => [],
-        },
+        anibridgeMappingStore: createAnibridgeStore(),
         sonarrLibrary: {
           getLeanSeriesList: async () => [],
         },
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
-        resolverStateStore: createResolverStateStore([
+        autoMappingStore: createAutoMappingStore([
           {
-            anilistId: 9,
+            anilistId: aid(9),
             provider: 'sonarr',
             state: 'mapped',
-            providerId: 900,
+            providerId: tvdb(900),
             acceptedEvidence: {
               source: 'auto',
               reason: 'fuzzy-match',
@@ -462,7 +466,7 @@ describe('listMappings', () => {
               searchTerms: ['Auto Candidate'],
               candidates: [
                 {
-                  providerId: 900,
+                  providerId: tvdb(900),
                   title: 'Auto Candidate',
                   source: 'auto',
                   reason: 'fuzzy-match',
@@ -475,7 +479,7 @@ describe('listMappings', () => {
             updatedAt: 90,
           },
           {
-            anilistId: 10,
+            anilistId: aid(10),
             provider: 'radarr',
             state: 'verification-failed',
             recentEvaluation: {
@@ -483,7 +487,7 @@ describe('listMappings', () => {
               searchTerms: ['Needs Verification'],
               candidates: [
                 {
-                  providerId: 501,
+                  providerId: tvdb(501),
                   title: 'Needs Verification',
                   source: 'auto',
                   reason: 'verified-inherited',
@@ -502,20 +506,20 @@ describe('listMappings', () => {
     const autoRow = result.mappings.find(entry => entry.anilistId === 9);
     expect(autoRow).toMatchObject({
       provider: 'sonarr',
-      status: 'can-add',
-      libraryStatus: 'not-in-provider',
-      providerId: 900,
-      effectiveSource: 'auto',
-      effectiveReason: 'fuzzy-match',
+      mappingRowStatus: 'can-add',
+      isInLibrary: false,
+      providerId: tvdb(900),
+      mappingSource: 'auto',
+      mappingReason: 'fuzzy-match',
       resolverOutcome: 'mapped',
     });
-    expect(getMappingSummarySource(autoRow!)).toBe('auto');
+    expect(autoRow?.mappingEntryKind).toBe('auto');
 
     const verificationFailedRow = result.mappings.find(entry => entry.anilistId === 10);
     expect(verificationFailedRow).toMatchObject({
       provider: 'radarr',
-      status: 'needs-review',
-      libraryStatus: 'unmapped',
+      mappingRowStatus: 'needs-review',
+      isInLibrary: null,
       resolverOutcome: 'verification-failed',
       reviewSummary: {
         count: 1,
@@ -526,53 +530,50 @@ describe('listMappings', () => {
         expect.objectContaining({
           reason: 'verification-failed-inherited-candidate',
           current: expect.objectContaining({
-            source: 'unresolved',
+            mappingEntryKind: 'unknown',
             providerId: null,
             resolverState: 'verification-failed',
           }),
           proposed: expect.objectContaining({
-            source: 'auto',
-            providerId: 501,
+            mappingEntryKind: 'auto',
+            providerId: tvdb(501),
             acceptedReason: 'verified-inherited',
           }),
         }),
       ],
       providerMeta: { title: 'Needs Verification', type: 'movie' },
     });
-    expect(getMappingSummarySource(verificationFailedRow!)).toBe('unresolved');
+    expect(verificationFailedRow?.mappingEntryKind).toBe('unknown');
   });
 
   it('projects ambiguous inherited conflicts as review items instead of hiding them in unresolved traces', async () => {
     const result = await listMappings(
       { limit: 10 },
       {
-        overridesService: {
+        manualMappingService: {
           listIgnores: () => [],
           listRejectedCandidates: () => [],
           list: () => [],
           isIgnored: () => false,
           getLinkedAniListIds: () => [],
         },
-        upstreamMappingStore: {
-          listAllPairs: () => [],
-          getAniListIdsForTvdb: () => [],
-        },
+        anibridgeMappingStore: createAnibridgeStore(),
         sonarrLibrary: {
           getLeanSeriesList: async () => [],
         },
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
-        resolverStateStore: createResolverStateStore([
+        autoMappingStore: createAutoMappingStore([
           {
-            anilistId: 12,
+            anilistId: aid(12),
             provider: 'sonarr',
             state: 'ambiguous',
             recentEvaluation: {
               attemptedAt: 120,
               candidates: [
                 {
-                  providerId: 701,
+                  providerId: tvdb(701),
                   title: 'Anchor A',
                   source: 'auto',
                   reason: 'verified-inherited',
@@ -582,12 +583,12 @@ describe('listMappings', () => {
                     reason: 'Conflicting trusted relation anchors proposed different provider IDs.',
                     positiveSignals: [],
                     contradictions: [],
-                    immediateSourceAniListId: 11,
-                    chainAnchorAniListId: 10,
+                    immediateSourceAniListId: aid(11),
+                    chainAnchorAniListId: aid(10),
                   },
                 },
                 {
-                  providerId: 702,
+                  providerId: tvdb(702),
                   title: 'Anchor B',
                   source: 'auto',
                   reason: 'verified-inherited',
@@ -597,8 +598,8 @@ describe('listMappings', () => {
                     reason: 'Conflicting trusted relation anchors proposed different provider IDs.',
                     positiveSignals: [],
                     contradictions: [],
-                    immediateSourceAniListId: 9,
-                    chainAnchorAniListId: 8,
+                    immediateSourceAniListId: aid(9),
+                    chainAnchorAniListId: aid(8),
                   },
                 },
               ],
@@ -611,11 +612,11 @@ describe('listMappings', () => {
 
     expect(result.mappings).toHaveLength(1);
     expect(result.mappings[0]).toMatchObject({
-      anilistId: 12,
+      anilistId: aid(12),
       provider: 'sonarr',
       providerId: null,
-      status: 'needs-review',
-      libraryStatus: 'unmapped',
+      mappingRowStatus: 'needs-review',
+      isInLibrary: null,
       resolverOutcome: 'ambiguous',
       reviewSummary: {
         count: 1,
@@ -626,42 +627,39 @@ describe('listMappings', () => {
         expect.objectContaining({
           reason: 'ambiguous-inherited-conflict',
           current: expect.objectContaining({
-            source: 'unresolved',
+            mappingEntryKind: 'unknown',
             providerId: null,
             resolverState: 'ambiguous',
           }),
           conflicts: [
-            expect.objectContaining({ source: 'auto', providerId: 701, acceptedReason: 'verified-inherited' }),
-            expect.objectContaining({ source: 'auto', providerId: 702, acceptedReason: 'verified-inherited' }),
+            expect.objectContaining({ mappingEntryKind: 'auto', providerId: tvdb(701), acceptedReason: 'verified-inherited' }),
+            expect.objectContaining({ mappingEntryKind: 'auto', providerId: tvdb(702), acceptedReason: 'verified-inherited' }),
           ],
         }),
       ],
     });
-    expect(getMappingSummarySource(result.mappings[0]!)).toBe('unresolved');
+    expect(result.mappings[0]?.mappingEntryKind).toBe('unknown');
   });
 
   it('projects linked provider identity groups and in-library status as first-class summary fields', async () => {
     const result = await listMappings(
       { limit: 10 },
       {
-        overridesService: {
+        manualMappingService: {
           listIgnores: () => [],
           listRejectedCandidates: () => [],
           list: () => [
             {
-              anilistId: 15,
+              anilistId: aid(15),
               provider: 'sonarr',
-              providerId: 222,
+              providerId: tvdb(222),
               updatedAt: 30,
             },
           ],
           isIgnored: () => false,
-          getLinkedAniListIds: () => [15, 16],
+          getLinkedAniListIds: () => [aid(15), aid(16)],
         },
-        upstreamMappingStore: {
-          listAllPairs: () => [{ anilistId: 16, tvdbId: 222 }],
-          getAniListIdsForTvdb: () => [16],
-        },
+        anibridgeMappingStore: createAnibridgeStore([{ provider: 'sonarr', anilistId: aid(16), providerId: tvdb(222) }]),
         sonarrLibrary: {
           getLeanSeriesList: async () => [
             {
@@ -677,20 +675,20 @@ describe('listMappings', () => {
         radarrLibrary: {
           getLeanMovieList: async () => [],
         },
-        resolverStateStore: createResolverStateStore(),
+        autoMappingStore: createAutoMappingStore(),
       },
     );
 
     expect(result.mappings[0]).toMatchObject({
-      anilistId: 15,
+      anilistId: aid(15),
       provider: 'sonarr',
-      providerId: 222,
-      status: 'in-library',
-      libraryStatus: 'in-provider',
-      effectiveSource: 'manual',
-      effectiveReason: 'manual-override',
+      providerId: tvdb(222),
+      mappingRowStatus: 'in-library',
+      isInLibrary: true,
+      mappingSource: 'manual',
+      mappingReason: 'manual-override',
       resolverOutcome: 'mapped',
-      linkedAniListIds: [15, 16],
+      linkedAniListIds: [aid(15), aid(16)],
       inLibraryCount: 12,
       providerMeta: {
         title: 'Linked Show',

@@ -4,18 +4,18 @@
 import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { ArrowUpDown, Check, ChevronDown, Search, X } from 'lucide-react';
-import type { Provider } from '@/providers';
-import type { MappingSource } from '@/mapping/types';
+import { getProviderLabel, PROVIDERS, type Provider } from '@/providers';
+import type { MappingEntryKind } from '@/mapping/types';
 import Button from '@/shared/ui/primitives/button';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { cn } from '@/shared/utils/cn';
 
-export type SourceFilterSet = Set<MappingSource>;
+export type EntryKindFilterSet = Set<MappingEntryKind>;
 export type ProviderFilterSet = Set<Provider>;
 export type LibraryFilter = 'all' | 'in-library' | 'not-in-library';
-export type MappingScope = 'all' | 'needs-attention' | 'manual-overrides' | 'suppressed';
+export type MappingScope = 'all' | 'needs-attention' | 'manual-mappings' | 'suppressed';
 export type ProviderFilter = 'all' | Provider;
-export type SourceFilter = 'all' | MappingSource;
+export type EntryKindFilter = 'all' | MappingEntryKind;
 
 export type MappingSort =
   | 'updated-desc'
@@ -29,7 +29,7 @@ export type MappingSort =
 type MappingToolbarProps = {
   searchQuery: string;
   providerFilter: ProviderFilter;
-  sourceFilter: SourceFilter;
+  entryKindFilter: EntryKindFilter;
   sortOption: MappingSort;
   libraryFilter: LibraryFilter;
   activeScope: MappingScope;
@@ -39,58 +39,55 @@ type MappingToolbarProps = {
   searchPlaceholder?: string;
   onSearchQueryChange: (value: string) => void;
   onProviderFilterChange: (value: ProviderFilter) => void;
-  onSourceFilterChange: (value: SourceFilter) => void;
+  onEntryKindFilterChange: (value: EntryKindFilter) => void;
   onSortChange: (value: MappingSort) => void;
   onLibraryFilterChange: (value: LibraryFilter) => void;
   onScopeChange: (value: MappingScope) => void;
   onClearRefinements: () => void;
-  onExportMappings: () => void;
-  isExporting?: boolean;
   hideActions?: boolean;
   hideSort?: boolean;
   popoverContainer?: HTMLElement | null;
 };
 
-export const providerOptions: { value: Provider; label: string }[] = [
-  { value: 'sonarr', label: 'Sonarr' },
-  { value: 'radarr', label: 'Radarr' },
-];
+export const providerOptions: { value: Provider; label: string }[] =
+  PROVIDERS.map((provider) => ({ value: provider, label: getProviderLabel(provider) }));
 
-export const sourceOptions: { value: MappingSource; label: string }[] = [
+export const entryKindOptions: { value: MappingEntryKind; label: string }[] = [
   { value: 'manual', label: 'Manual' },
-  { value: 'unresolved', label: 'Unresolved' },
+  { value: 'unmapped', label: 'Unmapped' },
+  { value: 'unknown', label: 'Unknown' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'ignored', label: 'Ignored' },
   { value: 'auto', label: 'Auto' },
   { value: 'upstream', label: 'Upstream' },
 ];
 
-export const ALL_MAPPING_SOURCES = sourceOptions.map((option) => option.value);
+export const ALL_MAPPING_ENTRY_KINDS = entryKindOptions.map((option) => option.value);
 
 const scopeDefinitions: Array<{
   value: MappingScope;
   label: string;
-  sources: SourceFilterSet;
+  entryKinds: EntryKindFilterSet;
 }> = [
   {
     value: 'needs-attention',
     label: 'Needs attention',
-    sources: new Set<MappingSource>(['manual', 'rejected', 'ignored', 'unresolved']),
+    entryKinds: new Set<MappingEntryKind>(['manual', 'rejected', 'ignored', 'unmapped', 'unknown']),
   },
   {
-    value: 'manual-overrides',
-    label: 'Overrides',
-    sources: new Set<MappingSource>(['manual']),
+    value: 'manual-mappings',
+    label: 'Manual mappings',
+    entryKinds: new Set<MappingEntryKind>(['manual']),
   },
   {
     value: 'suppressed',
     label: 'Suppressed',
-    sources: new Set<MappingSource>(['rejected', 'ignored']),
+    entryKinds: new Set<MappingEntryKind>(['rejected', 'ignored']),
   },
   {
     value: 'all',
     label: 'All mappings',
-    sources: new Set<MappingSource>(ALL_MAPPING_SOURCES),
+    entryKinds: new Set<MappingEntryKind>(ALL_MAPPING_ENTRY_KINDS),
   },
 ];
 
@@ -100,9 +97,9 @@ const libraryOptions: { value: LibraryFilter; label: string }[] = [
   { value: 'not-in-library', label: 'Missing from library' },
 ];
 
-export const getScopeSourceFilters = (scope: MappingScope): SourceFilterSet => {
+export const getScopeEntryKindFilters = (scope: MappingScope): EntryKindFilterSet => {
   const match = scopeDefinitions.find((definition) => definition.value === scope);
-  return new Set(match?.sources ?? ALL_MAPPING_SOURCES);
+  return new Set(match?.entryKinds ?? ALL_MAPPING_ENTRY_KINDS);
 };
 
 const sortOptions: { value: MappingSort; label: string; description?: string }[] = [
@@ -112,7 +109,7 @@ const sortOptions: { value: MappingSort; label: string; description?: string }[]
   { value: 'title-desc', label: 'Title (Z-A)' },
   { value: 'linked-desc', label: 'Linked (most first)' },
   { value: 'linked-asc', label: 'Linked (fewest first)' },
-  { value: 'source', label: 'Source (manual first)', description: 'Manual -> unresolved -> rejected -> ignored -> upstream -> auto' },
+  { value: 'source', label: 'Source (manual first)', description: 'Manual -> unmapped -> unknown -> rejected -> ignored -> upstream -> auto' },
 ];
 
 const segmentedBaseClassName =
@@ -127,7 +124,7 @@ const showSegmentedItemClassName =
 export const MappingToolbar: React.FC<MappingToolbarProps> = ({
   searchQuery,
   providerFilter,
-  sourceFilter,
+  entryKindFilter,
   sortOption,
   libraryFilter,
   activeScope,
@@ -137,27 +134,25 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
   searchPlaceholder = 'Search title, AniList ID, or target ID',
   onSearchQueryChange,
   onProviderFilterChange,
-  onSourceFilterChange,
+  onEntryKindFilterChange,
   onSortChange,
   onLibraryFilterChange,
   onScopeChange,
   onClearRefinements,
-  onExportMappings,
-  isExporting = false,
   hideActions = false,
   hideSort = false,
   popoverContainer,
 }) => {
   const [sortOpen, setSortOpen] = useState(false);
-  const [sourceOpen, setSourceOpen] = useState(false);
+  const [entryKindOpen, setEntryKindOpen] = useState(false);
 
   const sortLabel = sortOptions.find((option) => option.value === sortOption)?.label ?? 'Sort';
-  const sourceOptionsForScope = sourceOptions.filter((option) => getScopeSourceFilters(activeScope).has(option.value));
-  const sourceLabel = sourceFilter === 'all'
+  const entryKindOptionsForScope = entryKindOptions.filter((option) => getScopeEntryKindFilters(activeScope).has(option.value));
+  const entryKindLabel = entryKindFilter === 'all'
     ? (activeScope === 'all'
-      ? 'Any source'
+      ? 'Any kind'
       : 'Any in scope')
-    : sourceOptions.find((option) => option.value === sourceFilter)?.label ?? 'Source';
+    : entryKindOptions.find((option) => option.value === entryKindFilter)?.label ?? 'Entry kind';
 
   return (
     <div className="space-y-4">
@@ -186,9 +181,6 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           {hideActions ? null : (
             <>
-              <Button variant="outline" size="sm" onClick={onExportMappings} isLoading={isExporting}>
-                Export
-              </Button>
             </>
           )}
 
@@ -305,12 +297,12 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
           </div>
 
           <div className="space-y-1">
-            <div className="text-sm font-medium text-text-secondary">Mapping source</div>
-            <Popover.Root open={sourceOpen} onOpenChange={setSourceOpen}>
+            <div className="text-sm font-medium text-text-secondary">Entry kind</div>
+            <Popover.Root open={entryKindOpen} onOpenChange={setEntryKindOpen}>
               <Popover.Trigger asChild>
                 <Button variant="outline" size="sm" className="w-full justify-between gap-2 rounded-xl border-border-primary/80 bg-bg-primary/35 hover:bg-bg-secondary/80">
-                  <span>{sourceLabel}</span>
-                  <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', sourceOpen && 'rotate-180')} />
+                  <span>{entryKindLabel}</span>
+                  <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', entryKindOpen && 'rotate-180')} />
                 </Button>
               </Popover.Trigger>
               <Popover.Portal container={popoverContainer ?? undefined}>
@@ -324,30 +316,30 @@ export const MappingToolbar: React.FC<MappingToolbarProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        onSourceFilterChange('all');
-                        setSourceOpen(false);
+                        onEntryKindFilterChange('all');
+                        setEntryKindOpen(false);
                       }}
                       className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-bg-tertiary/90"
                     >
                       <div className={cn(
                         'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
-                        sourceFilter === 'all'
+                        entryKindFilter === 'all'
                           ? 'border-accent-primary bg-accent-primary'
                           : 'border-border-primary bg-bg-primary',
                       )}>
-                        {sourceFilter === 'all' ? <Check className="h-3 w-3 text-white" /> : null}
+                        {entryKindFilter === 'all' ? <Check className="h-3 w-3 text-white" /> : null}
                       </div>
-                      <span className="text-text-primary">{activeScope === 'all' ? 'Any source' : 'Any in current scope'}</span>
+                      <span className="text-text-primary">{activeScope === 'all' ? 'Any kind' : 'Any in current scope'}</span>
                     </button>
-                    {sourceOptionsForScope.map((option) => {
-                      const isSelected = sourceFilter === option.value;
+                    {entryKindOptionsForScope.map((option) => {
+                      const isSelected = entryKindFilter === option.value;
                       return (
                         <button
                           key={option.value}
                           type="button"
                           onClick={() => {
-                            onSourceFilterChange(option.value);
-                            setSourceOpen(false);
+                            onEntryKindFilterChange(option.value);
+                            setEntryKindOpen(false);
                           }}
                           className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-bg-tertiary/90"
                         >

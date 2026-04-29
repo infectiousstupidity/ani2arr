@@ -4,126 +4,129 @@
 import React from 'react';
 import Button from '@/shared/ui/primitives/button';
 import { SquareArrowOutUpRight, ChevronDown } from 'lucide-react';
-import { logger } from '@/shared/utils/logger';
-import Dropdown, { DropdownItem } from '@/shared/ui/primitives/dropdown';
-import { buildExternalMediaLink } from '@/shared/utils/provider-links';
+import { Dropdown, DropdownItem } from '@/shared/ui/primitives/dropdown';
 import type { Provider } from '@/providers';
-import { getProviderBaseUrl, getProviderLabel, isProviderConfigured } from '@/providers/provider-routing';
-import { usePublicOptions } from '@/options';
-
-export type Status = 'LOADING' | 'IN' | 'NOT_IN' | 'ERROR' | 'ADDING';
+import { getProviderLabel } from '@/providers/provider-labels';
+import type { ProviderActionModel } from '@/features/provider-action';
 
 interface MediaActionsProps {
   provider: Provider;
-  status: Status;
-  librarySlug?: string;
-  resolvedSearchTerm: string;
-  externalId: number | null | undefined;
-  noAutoMatch?: boolean;
-  onQuickAdd: () => void;
-  onOpenModal: () => void;
-  onOpenMappingFix: (mappingRequired?: boolean) => void;
+  actionModel: ProviderActionModel;
+  externalHref: string | null;
+  onPrimaryAction: () => void;
+  onOpenSetup: () => void;
+  onOpenMapping: () => void;
   portalContainer?: HTMLElement | undefined;
 }
 
-const log = logger.create('MediaActions');
+function getPrimaryButtonText(input: {
+  providerLabel: string;
+  actionModel: ProviderActionModel;
+}): string {
+  const { providerLabel, actionModel } = input;
+
+  switch (actionModel.state) {
+    case 'unconfigured': {
+      return `Configure ${providerLabel}`;
+    }
+    case 'checking': {
+      return `Checking ${providerLabel}...`;
+    }
+    case 'in-library': {
+      return `In ${providerLabel}`;
+    }
+    case 'can-add': {
+      return `Add to ${providerLabel}`;
+    }
+    case 'unmapped': {
+      return 'Find match';
+    }
+    case 'unknown': {
+      return 'Retry check';
+    }
+    case 'adding': {
+      return 'Adding...';
+    }
+    case 'error': {
+      return actionModel.primaryAction === 'retry-add'
+        ? 'Retry add'
+        : 'Retry check';
+    }
+    default: {
+      return providerLabel;
+    }
+  }
+}
+
+function getPrimaryButtonTooltip(input: {
+  providerLabel: string;
+  actionModel: ProviderActionModel;
+}): string | undefined {
+  const { providerLabel, actionModel } = input;
+
+  switch (actionModel.state) {
+    case 'unconfigured': {
+      return `Open ${providerLabel} settings to continue.`;
+    }
+    case 'checking': {
+      return `Checking ${providerLabel} status...`;
+    }
+    case 'in-library': {
+      return `Already in ${providerLabel}`;
+    }
+    case 'unmapped': {
+      return `No automatic ${providerLabel} match was found. Search manually.`;
+    }
+    case 'unknown': {
+      return `Unable to determine ${providerLabel} status right now. Retry the check.`;
+    }
+    case 'adding': {
+      return `Submitting add request to ${providerLabel}...`;
+    }
+    case 'error': {
+      return actionModel.primaryAction === 'retry-add'
+        ? `Unable to add this title to ${providerLabel}. Retry the add.`
+        : `Unable to determine ${providerLabel} status right now. Retry the check.`;
+    }
+    default: {
+      return undefined;
+    }
+  }
+}
+
+function getLoadingText(input: {
+  providerLabel: string;
+  actionModel: ProviderActionModel;
+}): string {
+  return input.actionModel.state === 'adding'
+    ? 'Adding...'
+    : `Checking ${input.providerLabel}...`;
+}
 
 const MediaActions: React.FC<MediaActionsProps> = ({
   provider,
-  status,
-  librarySlug,
-  resolvedSearchTerm,
-  externalId,
-  noAutoMatch = false,
-  onQuickAdd,
-  onOpenModal,
-  onOpenMappingFix,
+  actionModel,
+  externalHref,
+  onPrimaryAction,
+  onOpenSetup,
+  onOpenMapping,
   portalContainer,
 }) => {
-  const { data: options } = usePublicOptions();
-
-  const serviceLabel = getProviderLabel(provider);
-  const inService = status === 'IN';
-  const isLoading = status === 'LOADING' || status === 'ADDING';
-  const getButtonText = () => {
-    switch (status) {
-      case 'LOADING': {
-        return `Checking ${serviceLabel}...`;
-      }
-      case 'IN': {
-        return `In ${serviceLabel}`;
-      }
-      case 'ADDING': {
-        return 'Adding...';
-      }
-      case 'ERROR': {
-        return 'Error';
-      }
-      default: {
-        return `Add to ${serviceLabel}`;
-      }
-    }
-  };
-  const isServiceConfigured = isProviderConfigured(provider, options);
-  const requiresConfiguration = !isServiceConfigured;
-  const shouldOpenManualMatch = noAutoMatch && !inService && !requiresConfiguration;
-  const hasMapping = externalId != null;
-  const manualMappingLabel = hasMapping ? 'Update mapping manually' : 'Find match manually';
-  const mainButtonText = requiresConfiguration
-    ? `Configure ${serviceLabel}`
-    : (shouldOpenManualMatch
-      ? 'Find match'
-      : getButtonText());
-  const disableMainAction = isLoading;
-  let handleMainAction = onQuickAdd;
-  if (requiresConfiguration) {
-    handleMainAction = onQuickAdd;
-  } else if (shouldOpenManualMatch) {
-    handleMainAction = () => onOpenMappingFix(true);
-  } else if (inService) {
-    handleMainAction = onOpenModal;
-  }
-
-  const externalBaseUrl = getProviderBaseUrl(provider, options);
-  const hasExternal = externalBaseUrl.length > 0;
-
-  let mainButtonTooltip: string | undefined;
-  if (requiresConfiguration) {
-    mainButtonTooltip = `Open ${serviceLabel} settings to continue.`;
-  } else if (shouldOpenManualMatch) {
-    mainButtonTooltip = `No automatic ${serviceLabel} match was found. Search manually.`;
-  } else {
-    switch (status) {
-      case 'IN': {
-        mainButtonTooltip = `Open ${serviceLabel} options`;
-        break;
-      }
-      case 'LOADING': {
-        mainButtonTooltip = `Checking ${serviceLabel} status...`;
-        break;
-      }
-      case 'ADDING': {
-        mainButtonTooltip = `Submitting add request to ${serviceLabel}...`;
-        break;
-      }
-      case 'ERROR': {
-        mainButtonTooltip = 'An error occurred resolving this title.';
-        break;
-      }
-      default: {
-        break;
-      }
-    }
-  }
-
-  const linkInput: Parameters<typeof buildExternalMediaLink>[0] = {
-    provider,
-    baseUrl: externalBaseUrl.replace(/\/$/, ''),
-    inLibrary: inService && Boolean(librarySlug),
-    ...(librarySlug ? { librarySlug } : {}),
-    ...(resolvedSearchTerm ? { searchTerm: resolvedSearchTerm } : {}),
-  };
-  const externalHref = hasExternal ? buildExternalMediaLink(linkInput) : null;
+  const providerLabel = getProviderLabel(provider);
+  const isLoading =
+    actionModel.state === 'checking' || actionModel.state === 'adding';
+  const hasMenu = actionModel.showSetupAction || actionModel.showMappingAction;
+  const manualMappingLabel = actionModel.hasMapping
+    ? 'Update mapping manually'
+    : 'Find match manually';
+  const primaryButtonText = getPrimaryButtonText({
+    providerLabel,
+    actionModel,
+  });
+  const primaryButtonTooltip = getPrimaryButtonTooltip({
+    providerLabel,
+    actionModel,
+  });
 
   const Group: React.FC<React.PropsWithChildren> = ({ children }) => (
     <div className="relative flex items-stretch rounded-[3px] overflow-hidden" role="group" style={{ width: '100%' }}>
@@ -132,73 +135,70 @@ const MediaActions: React.FC<MediaActionsProps> = ({
   );
 
   return (
-    <div className={`grid ${externalHref ? 'grid-cols-[1fr_auto] gap-3.75' : 'grid-cols-1 gap-0'} items-start w-full`}>
+    <div className={`grid ${actionModel.showExternalAction && externalHref ? 'grid-cols-[1fr_auto] gap-3.75' : 'grid-cols-1 gap-0'} items-start w-full`}>
       <Group>
         <Button
           data-testid="a2a-main-action-button"
           size="md"
-          onClick={handleMainAction}
+          onClick={onPrimaryAction}
           isLoading={isLoading}
-          disabled={disableMainAction}
-          {...(mainButtonTooltip ? { tooltip: mainButtonTooltip } : {})}
-          portalContainer={portalContainer}
-          className="flex-1 w-[calc(100%-34px)] rounded-none h-8.75 text-[14px] text-center px-0 pl-2.5"
-          loadingText={getButtonText()}
+          disabled={actionModel.disablePrimaryAction}
+          {...(primaryButtonTooltip ? { tooltip: primaryButtonTooltip } : {})}
+          tooltipContainer={portalContainer}
+          className={`h-8.75 text-[14px] text-center px-0 pl-2.5 ${
+            hasMenu
+              ? 'flex-1 w-[calc(100%-34px)] rounded-none'
+              : 'w-full rounded-[3px]'
+          }`}
+          loadingText={getLoadingText({ providerLabel, actionModel })}
         >
-          {mainButtonText}
+          {primaryButtonText}
         </Button>
 
-        <Dropdown
-          container={portalContainer ?? null}
-          trigger={
-            <Button
-              data-testid="a2a-actions-dropdown"
-              size="icon"
-              variant="primary"
-              portalContainer={portalContainer}
-              className="relative rounded-none h-8.75 w-8.5 after:content-[''] after:absolute after:inset-0 after:bg-[rgba(255,255,255,0.14)] after:pointer-events-none"
-              aria-label="Actions"
-            >
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-          }
-        >
-          <DropdownItem onSelect={onOpenModal} disabled={externalId === null}>
-            {serviceLabel} options
-          </DropdownItem>
-          <DropdownItem
-            onSelect={() => {
-              log.debug('Action: Fix mapping clicked');
-              onOpenMappingFix(!hasMapping);
-            }}
-            disabled={!isServiceConfigured}
+        {hasMenu ? (
+          <Dropdown
+            container={portalContainer ?? null}
+            trigger={
+              <Button
+                data-testid="a2a-actions-dropdown"
+                size="icon"
+                variant="primary"
+                tooltipContainer={portalContainer}
+                className="relative rounded-none h-8.75 w-8.5 after:content-[''] after:absolute after:inset-0 after:bg-[rgba(255,255,255,0.14)] after:pointer-events-none"
+                aria-label="Actions"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            }
           >
-            {manualMappingLabel}
-          </DropdownItem>
-        </Dropdown>
+            {actionModel.showSetupAction ? (
+              <DropdownItem onSelect={onOpenSetup}>
+                {providerLabel} options
+              </DropdownItem>
+            ) : null}
+            {actionModel.showMappingAction ? (
+              <DropdownItem onSelect={onOpenMapping}>
+                {manualMappingLabel}
+              </DropdownItem>
+            ) : null}
+          </Dropdown>
+        ) : null}
       </Group>
 
-      {externalHref && (
+      {actionModel.showExternalAction && externalHref ? (
         <Button
           asChild
           size="icon"
           variant="primary"
-          tooltip={`Open in ${serviceLabel}`}
-          portalContainer={portalContainer}
+          tooltip={`Open in ${providerLabel}`}
+          tooltipContainer={portalContainer}
           className="h-8.75 w-8.75 rounded-[3px]"
-          onClick={() => {
-            if (inService && librarySlug) {
-              log.debug(`Redirecting to ${serviceLabel} library page for slug: ${librarySlug}`);
-            } else {
-              log.debug(`Redirecting to ${serviceLabel} Add with term: ${resolvedSearchTerm}`);
-            }
-          }}
         >
           <a href={externalHref} target="_blank" rel="noopener noreferrer">
             <SquareArrowOutUpRight className="h-4 w-4" />
           </a>
         </Button>
-      )}
+      ) : null}
     </div>
   );
 };

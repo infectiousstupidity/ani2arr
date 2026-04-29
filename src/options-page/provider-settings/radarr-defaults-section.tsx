@@ -7,7 +7,7 @@ import { RotateCcw } from 'lucide-react';
 
 import { RadarrAddOptionsFields } from '@/components/provider-add-options/radarr-add-options-fields';
 import type { SettingsActions } from '../hooks/use-settings-actions';
-import type { RadarrFormState } from '@/providers/settings/radarr-settings.schema';
+import type { RadarrFormState } from '@/providers/settings/provider-settings.schema';
 import Button from '@/shared/ui/primitives/button';
 import type { ExtensionOptions } from '@/options';
 
@@ -74,7 +74,7 @@ export const RadarrDefaultsSection: React.FC<{
         values={defaults}
         metadata={metadataQuery.data}
         onChange={setDefaultField}
-        disabled={actions.saveState.isPending}
+        disabled={actions.isBusy}
         portalContainer={portalContainer ?? null}
         layout="grid"
       />
@@ -96,10 +96,10 @@ export const RadarrDefaultsSection: React.FC<{
           variant="ghost"
           size="icon"
           tooltip="Refresh data from Radarr"
-          portalContainer={portalContainer ?? undefined}
+          tooltipContainer={portalContainer ?? undefined}
           aria-label="Refresh data from Radarr"
           aria-busy={metadataQuery.isRefetching}
-          disabled={!metadataEnabled || actions.saveState.isPending}
+          disabled={!metadataEnabled || actions.isBusy}
         >
           <RotateCcw />
         </Button>

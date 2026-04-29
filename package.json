@@ -37,16 +37,19 @@
     "@wxt-dev/module-react": "^1.1.3",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9.36.0",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import-x": "^4.16.2",
     "eslint-plugin-playwright": "^2.2.2",
     "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-compiler": "^19.1.0-rc.2",
-    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
     "eslint-plugin-react-you-might-not-need-an-effect": "^0.5.2",
     "eslint-plugin-testing-library": "^7.13.3",
     "eslint-plugin-unicorn": "^64.0.0",
     "globals": "^16.2.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
+    "prettier": "3.8.3",
     "tailwindcss": "^4.1.10",
     "terser": "^5.44.0",
     "typescript": "^5.9.3",
@@ -89,5 +92,10 @@
     "tailwind-merge": "^3.4.0",
     "valibot": "^1.2.0"
   },
+	"pnpm": {
+		"overrides": {
+			"zod-validation-error": "^4.0.0"
+		}
+	},
   "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319"
 }

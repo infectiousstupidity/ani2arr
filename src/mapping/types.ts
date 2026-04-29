@@ -1,28 +1,39 @@
 /** Mapping service input and output types for AniList-driven resolution flows. */
 // src/mapping/types.ts
 
-import type { AniListMediaHint } from '@/anilist/schemas/media.schema';
-import type { Provider } from '@/providers';
-import type { RequestPriority } from '@/shared/utils/request-priority';
-import type { MappingReviewItem, MappingReviewSummary } from './review/review-types';
+import type { AniListId } from '@/anilist';
+import type { Provider, ProviderIdentity, ProviderTargetId } from '@/providers';
 
-/** Secondary explanation tags used for filtering, badges, and export summaries. */
-export const MAPPING_SOURCE_VALUES = ['manual', 'upstream', 'auto', 'rejected', 'ignored', 'unresolved'] as const;
+/** Derived entry kinds used by review/filter/table surfaces. */
+export const MAPPING_ENTRY_KIND_VALUES = [
+  'manual',
+  'upstream',
+  'auto',
+  'ignored',
+  'rejected',
+  'unmapped',
+  'unknown',
+] as const;
 
-export type MappingSource = (typeof MAPPING_SOURCE_VALUES)[number];
+export type MappingEntryKind = (typeof MAPPING_ENTRY_KIND_VALUES)[number];
 
-/** Primary user-facing status for one projected mapping summary row. */
-export type MappingStatus = 'needs-review' | 'in-library' | 'can-add' | 'suppressed' | 'unresolved';
+/** Canonical mapping-resolution truth for one provider + AniList entry. */
+export type ProviderMappingState = 'mapped' | 'unmapped' | 'unknown';
 
-/** Provider-library presence for the effective provider identity, kept separate from user-facing status. */
-export type MappingLibraryStatus = 'unmapped' | 'in-provider' | 'not-in-provider';
+/** Semantic reason why mapping state is unknown. */
+export type MappingUnknownReason =
+  | 'provider-not-configured'
+  | 'network-disabled'
+  | 'lookup-failed'
+  | 'ambiguous'
+  | 'verification-failed';
 
 /**
  * Source of an accepted mapping.
  *
  * This describes how the currently effective mapping became accepted.
  *
- * - `manual`: user-created exact override
+ * - `manual`: user-created exact manual mapping
  * - `upstream`: exact upstream mapping
  * - `auto`: resolver-accepted mapping from automated logic such as lookup,
  *   verified inheritance, or fallback matching
@@ -55,33 +66,17 @@ export interface MappingInheritedVerificationDetails {
   reason: string;
   positiveSignals: readonly string[];
   contradictions: readonly string[];
-  immediateSourceAniListId?: number;
-  chainAnchorAniListId?: number;
+  immediateSourceAniListId?: AniListId;
+  chainAnchorAniListId?: AniListId;
 }
-
-/**
- * Source of an automated resolver result.
- *
- * This is a narrower version of `MappingAcceptedSource` that intentionally excludes
- * `manual`, because manual mappings are user-owned overrides, not resolver-produced
- * candidates or resolver-accepted results.
- *
- * Use this type for resolver-owned fields such as:
- * - accepted automated results
- * - candidate results that the resolver proposed before final acceptance
- *
- * Do not use this for user overrides. Manual overrides should use
- * `MappingAcceptedSource` via `acceptedEvidence.source`.
- */
-export type MappingResolvedSource = Exclude<MappingAcceptedSource, 'manual'>;
 
 /** Small accepted-evidence payload for explaining why one mapping is effective. */
 export interface MappingAcceptedEvidence {
   source: MappingAcceptedSource;
   reason: MappingAcceptedReason;
   successfulTitle?: string;
-  immediateSourceAniListId?: number;
-  chainAnchorAniListId?: number;
+  immediateSourceAniListId?: AniListId;
+  chainAnchorAniListId?: AniListId;
   inheritedVerification?: MappingInheritedVerificationDetails;
 }
 
@@ -90,7 +85,7 @@ export type MappingEvaluationCandidateStatus = 'accepted' | 'rejected' | 'suppre
 
 /** Compact candidate explanation kept in the most recent evaluation trace only. */
 export interface MappingEvaluationCandidate {
-  providerId: number;
+  providerId: ProviderTargetId;
   title?: string;
   source: MappingAcceptedSource;
   reason: MappingAcceptedReason;
@@ -112,176 +107,26 @@ export interface MappingRecentEvaluationTrace {
  */
 export type MappingSuppressionKind = 'ignored-entry' | 'rejected-candidate';
 
-/**
- * Final semantic result of trying to resolve one `provider + anilistId`.
- *
- * Decision rules:
- * - `mapped`:
- *   a candidate `providerId` was accepted.
- *
- * - `unresolved`:
- *   resolution was attempted, but there was no acceptable candidate to take forward.
- *   This is used when the result is effectively "nothing good enough was found".
- *   Examples:
- *   - no search results
- *   - only weak fuzzy matches
- *   - inherited candidate was rejected, fallback ran, and nothing else was accepted
- *
- * - `ambiguous`:
- *   there are one or more plausible candidates, but the resolver cannot choose a single
- *   correct one with confidence.
- *   This is used when the result is "there may be a match, but it is unclear which one".
- *   Examples:
- *   - two inherited anchors point to different provider IDs
- *   - verifier finds no hard contradiction, but not enough positive evidence to accept
- *   - multiple strong candidates remain materially tied
- *
- * - `verification-failed`:
- *   the resolver had a strong candidate it wanted to verify, but could not complete the
- *   verification step due to an operational problem.
- *   This is used when the result is "this might be correct, but verification could not be completed".
- *   Examples:
- *   - exact provider lookup needed for verification failed due to network/API error
- *   - provider returned unusable verification data for a strong inherited candidate
- *
- * Important:
- * - `unresolved` = no acceptable answer
- * - `ambiguous` = too many plausible answers
- * - `verification-failed` = plausible answer exists, but verification could not be completed
- */
-export type MappingResolverState =
-  | 'mapped'
-  | 'unresolved'
-  | 'ambiguous'
-  | 'verification-failed';
-
-/**
- * Identity-first review summary for one `provider + anilistId`.
- */
-export interface MappingSummary {
-  anilistId: number;
+/** Canonical mapping identity for one `provider + anilistId`. */
+export interface MappingIdentity {
+  anilistId: AniListId;
   provider: Provider;
-  providerId: number | null;
-  suppressedProviderId?: number | null;
-  status: MappingStatus;
-  libraryStatus: MappingLibraryStatus;
-  effectiveSource?: MappingAcceptedSource;
-  effectiveReason?: MappingAcceptedReason;
-  suppressionKind?: MappingSuppressionKind;
-  reviewSummary?: MappingReviewSummary;
-  reviewItems?: readonly MappingReviewItem[];
-  updatedAt?: number;
-  linkedAniListIds?: readonly number[];
-  inLibraryCount?: number;
-  providerMeta?: {
-    title?: string;
-    type?: 'series' | 'movie';
-    statusLabel?: string;
-  };
-  resolverOutcome?: MappingResolverState;
-  hadResolveAttempt?: boolean;
+  providerId: ProviderTargetId | null;
+  providerMappingState: ProviderMappingState;
+  mappingEntryKind: MappingEntryKind;
+  mappingSource?: MappingAcceptedSource;
+  mappingReason?: MappingAcceptedReason;
 }
-
-export const getMappingSummarySource = (
-  summary: Pick<MappingSummary, 'effectiveSource' | 'suppressionKind'>,
-): MappingSource => {
-  if (summary.effectiveSource) {
-    return summary.effectiveSource;
-  }
-
-  switch (summary.suppressionKind) {
-    case 'ignored-entry': {
-      return 'ignored';
-    }
-    case 'rejected-candidate': {
-      return 'rejected';
-    }
-    default: {
-      return 'unresolved';
-    }
-  }
-};
 
 /** Persisted manual mapping or rejected candidate record keyed by provider and AniList entry. */
-export interface MappingProviderIdRecord {
-  anilistId: number;
-  provider: Provider;
-  providerId: number;
+export type MappingProviderIdRecord = ProviderIdentity & {
+  anilistId: AniListId;
   updatedAt: number;
-}
+};
 
 /** Persisted ignore record for one provider and AniList entry. */
 export interface MappingIgnoreRecord {
-  anilistId: number;
+  anilistId: AniListId;
   provider: Provider;
   updatedAt: number;
-}
-
-/**
- * Accepted mapping result returned by the resolver.
- *
- * This represents a successful accepted mapping only.
- * Non-accepted semantic outcomes are represented by `MappingResolverState` and
- * `ResolverStateRecord`, not by this type.
- */
-export interface ResolvedMapping {
-  providerId: number;
-  reason: MappingAcceptedReason;
-  successfulSynonym?: string;
-  recentEvaluation?: MappingRecentEvaluationTrace;
-  immediateSourceAniListId?: number;
-  chainAnchorAniListId?: number;
-  inheritedVerification?: MappingInheritedVerificationDetails;
-}
-
-/**
- * Persisted or cached semantic resolver state for one `provider + anilistId`.
- *
- * Important distinction:
- * - `acceptedEvidence` is only used for successful mapped outcomes
- * - `recentEvaluation` is the rebuildable explanation cache for the latest attempt
- */
-export type ResolverStateRecord =
-  /**
-   * Resolver accepted a final mapping.
-   *
-   * `acceptedEvidence` describes the effective accepted result.
-   */
-  | {
-      state: 'mapped';
-      providerId: number;
-      acceptedEvidence: MappingAcceptedEvidence;
-      recentEvaluation?: MappingRecentEvaluationTrace;
-      updatedAt: number;
-    }
-
-  /**
-   * Resolver completed without an accepted mapping.
-   *
-   * - `unresolved`: nothing acceptable was found
-   * - `ambiguous`: more than one plausible answer remained
-   * - `verification-failed`: a plausible candidate existed, but final verification failed
-   */
-  | {
-      state: 'unresolved' | 'ambiguous' | 'verification-failed';
-      recentEvaluation?: MappingRecentEvaluationTrace;
-      updatedAt: number;
-    };
-
-/**
- * Options that influence provider-id resolution for one AniList entry.
- *
- * These control network usage, hinting, and lookup freshness, but do not change the
- * semantic meaning of resolver outcomes.
- */
-export interface ResolveProviderIdOptions {
-  network?: 'never';
-  hints?: {
-    primaryTitle?: string;
-    domMedia?: AniListMediaHint | null;
-  };
-  ignoreFailureCache?: boolean;
-  priority?: RequestPriority;
-  /** Force provider lookups to bypass fresh caches, used by anime-detail force-verify flows. */
-  forceLookupNetwork?: boolean;
 }

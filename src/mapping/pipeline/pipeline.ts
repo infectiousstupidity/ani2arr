@@ -10,7 +10,7 @@ import {
   sanitizeLookupDisplayForProvider,
 } from '@/mapping/pipeline/matching';
 import { PIPELINE_SOFT_TIME_BUDGET_MS } from '../constants';
-import type { UpstreamMappingStore } from '../upstream';
+import type { AnibridgeMappingStore } from '../upstream';
 import type { ScopedLogger } from '@/shared/utils/logger';
 import type { RequestPriority } from '@/shared/utils/request-priority';
 import type { AniListMediaService } from '@/anilist';
@@ -56,7 +56,7 @@ export async function resolveViaPipeline(
   ctx: {
     anilistApi: AniListMediaService;
     lookupClient: ProviderLookupClient<ProviderCredentials, ProviderLookupResult>;
-    upstreamMappingStore: UpstreamMappingStore;
+    anibridgeMappingStore: AnibridgeMappingStore;
     credentials: ProviderCredentials;
     priority?: RequestPriority;
     forceLookupNetwork?: boolean;

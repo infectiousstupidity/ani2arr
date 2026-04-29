@@ -1,19 +1,23 @@
 /** Mapping-owned inspection payload types for inspect-and-fix detail reads. */
 // src/mapping/inspection/inspection-types.ts
 
+import type { AniListId } from '@/anilist';
 import type { AniListMediaFormat } from '@/anilist/schemas/media.schema';
-import type { Provider } from '@/providers';
+import type { Provider, ProviderTargetId } from '@/providers';
 import type {
   MappingAcceptedEvidence,
   MappingAcceptedReason,
   MappingAcceptedSource,
   MappingEvaluationCandidateStatus,
   MappingInheritedVerificationDetails,
-  MappingLibraryStatus,
-  MappingResolverState,
-  MappingStatus,
+  MappingEntryKind,
+  MappingUnknownReason,
+  ProviderMappingState,
   MappingSuppressionKind,
 } from '@/mapping/types';
+import type { MappingRowStatus } from '@/mapping/ui/mapping-list-types';
+import type { AutoMappingStatus } from '@/mapping/auto-mapping/types';
+import type { LibraryUnknownReason } from '@/providers/library/types';
 import type {
   MappingReviewItem,
   MappingReviewReason,
@@ -21,31 +25,36 @@ import type {
 } from '@/mapping/review/review-types';
 
 export interface MappingInspectionLibrarySummary {
-  status: MappingLibraryStatus;
+  isInLibrary: boolean | null;
   title?: string;
   type?: 'series' | 'movie';
   statusLabel?: string;
   inLibraryCount?: number;
+  libraryUnknownReason?: LibraryUnknownReason;
 }
 
 export interface MappingInspectionEffectiveMapping {
   provider: Provider;
-  anilistId: number;
-  providerId: number | null;
-  suppressedProviderId?: number | null;
-  status: MappingStatus;
-  libraryStatus: MappingLibraryStatus;
-  effectiveSource?: MappingAcceptedSource;
-  effectiveReason?: MappingAcceptedReason;
-  resolverOutcome?: MappingResolverState;
+  anilistId: AniListId;
+  providerId: ProviderTargetId | null;
+  providerMappingState: ProviderMappingState;
+  isInLibrary: boolean | null;
+  suppressedProviderId?: ProviderTargetId | null;
+  mappingRowStatus: MappingRowStatus;
+  mappingEntryKind: MappingEntryKind;
+  mappingSource?: MappingAcceptedSource;
+  mappingReason?: MappingAcceptedReason;
+  resolverOutcome?: AutoMappingStatus;
   suppressionKind?: MappingSuppressionKind;
+  mappingUnknownReason?: MappingUnknownReason;
+  libraryUnknownReason?: LibraryUnknownReason;
   hadResolveAttempt?: boolean;
   evidence?: MappingAcceptedEvidence;
   library?: MappingInspectionLibrarySummary;
 }
 
 export interface MappingInspectionLinkedAniListEntry {
-  anilistId: number;
+  anilistId: AniListId;
   title?: string;
   format?: AniListMediaFormat | null;
   year?: number | null;
@@ -57,16 +66,16 @@ export interface MappingInspectionExplanationItem {
   summary: string;
   source?: MappingAcceptedSource;
   reason?: MappingAcceptedReason;
-  resolverOutcome?: MappingResolverState;
+  resolverOutcome?: AutoMappingStatus;
   reviewReason?: MappingReviewReason;
-  suppressedProviderId?: number;
-  immediateSourceAniListId?: number;
-  chainAnchorAniListId?: number;
+  suppressedProviderId?: ProviderTargetId;
+  immediateSourceAniListId?: AniListId;
+  chainAnchorAniListId?: AniListId;
   details?: readonly string[];
 }
 
 export interface MappingInspectionCandidate {
-  providerId: number;
+  providerId: ProviderTargetId;
   title?: string;
   source: MappingAcceptedSource;
   reason: MappingAcceptedReason;
@@ -93,8 +102,8 @@ export interface MappingInspectionReviewDetail {
 
 export interface MappingInspectionProviderContext {
   provider: Provider;
-  providerId: number | null;
-  linkedAniListIds: readonly number[];
+  providerId: ProviderTargetId | null;
+  linkedAniListIds: readonly AniListId[];
   linkedAniListCount: number;
 }
 
@@ -102,7 +111,7 @@ export interface MappingInspectionPayload {
   effectiveMapping: MappingInspectionEffectiveMapping;
   providerContext: MappingInspectionProviderContext;
   linkedAniListEntries: readonly MappingInspectionLinkedAniListEntry[];
-  whyThisExists: readonly MappingInspectionExplanationItem[];
+  whyThisMapping: readonly MappingInspectionExplanationItem[];
   suggestedCandidates: MappingInspectionSuggestedCandidates;
   review: MappingInspectionReviewDetail;
 }

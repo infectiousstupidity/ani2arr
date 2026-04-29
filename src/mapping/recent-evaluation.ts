@@ -1,6 +1,7 @@
 /** Pure helpers for recent mapping-evaluation traces and candidate summaries. */
 // src/mapping/recent-evaluation.ts
 
+import type { ProviderTargetId } from '@/providers';
 import type { EvaluationOutcome } from './pipeline/types';
 import type {
   MappingAcceptedReason,
@@ -8,8 +9,8 @@ import type {
   MappingEvaluationCandidate,
   MappingEvaluationCandidateStatus,
   MappingRecentEvaluationTrace,
-  ResolvedMapping,
-} from './types';
+} from "./types";
+import type { AcceptedAutoMapping } from './auto-mapping/types';
 
 const RECENT_TRACE_CANDIDATE_LIMIT = 8;
 
@@ -26,7 +27,7 @@ export function describeAcceptanceReason(reason: MappingAcceptedReason): string 
       return 'Exact upstream mapping';
     }
     case 'manual-override': {
-      return 'Manual override';
+      return 'Manual mapping';
     }
     case 'exact-title-match': {
       return 'Exact title match';
@@ -144,7 +145,7 @@ export function createRecentEvaluationTrace(
 }
 
 export function createSingleCandidateTrace(
-  resolved: ResolvedMapping,
+  resolved: AcceptedAutoMapping,
   source: MappingAcceptedSource,
   status: MappingEvaluationCandidateStatus,
   searchTerms: readonly string[] = [],
@@ -165,7 +166,7 @@ export function createSingleCandidateTrace(
 
 export function rewriteTraceCandidateStatus(
   trace: MappingRecentEvaluationTrace | undefined,
-  providerId: number,
+  providerId: ProviderTargetId,
   status: MappingEvaluationCandidateStatus,
 ): MappingRecentEvaluationTrace | undefined {
   if (!trace) {

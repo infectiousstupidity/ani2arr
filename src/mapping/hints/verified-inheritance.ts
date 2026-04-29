@@ -1,14 +1,15 @@
 /** Sonarr-only trusted relation inheritance and explicit inherited-candidate decisions. */
 // src/mapping/hints/verified-inheritance.ts
 
-import type { AniListMediaService } from '@/anilist';
+import { parseAniListIdOrNull, type AniListId, type AniListMediaService  } from '@/anilist';
 import type { AniListMedia } from '@/anilist/schemas/media.schema';
 import { sanitizeLookupDisplayForProvider } from '@/mapping/pipeline/matching';
-import type { ProviderCredentials, SonarrLookupSeries } from '@/providers';
+import type { ProviderCredentials, SonarrLookupSeries, TvdbId } from '@/providers';
 import { createRecentEvaluationTrace } from '../recent-evaluation';
-import type { UpstreamMappingStore } from '../upstream';
+import type { AnibridgeMappingStore } from '../upstream';
 import type { ProviderLookupClient } from '../lookup';
-import type { MappingInheritedVerificationDetails, MappingRecentEvaluationTrace, ResolvedMapping } from '../types';
+import type { MappingInheritedVerificationDetails, MappingRecentEvaluationTrace } from '../types';
+import type { AcceptedAutoMapping } from '../auto-mapping/types';
 import { verifyInheritedSonarrCandidate } from './inherited-verifier';
 
 const INHERITANCE_MAX_DEPTH = 5;
@@ -16,16 +17,16 @@ const RELATION_TYPES = new Set(['PREQUEL', 'SEQUEL']);
 
 type TrustedAnchorSource = 'manual' | 'upstream';
 
-type MappingOverrideReads = {
-  isIgnored(provider: 'sonarr', anilistId: number): boolean;
-  get(provider: 'sonarr', anilistId: number): number | null;
+type ManualMappingReads = {
+  isIgnored(provider: 'sonarr', anilistId: AniListId): boolean;
+  get(provider: 'sonarr', anilistId: AniListId): TvdbId | null;
 };
 
 type InheritedProposal = {
-  providerId: number;
+  providerId: TvdbId;
   anchorSource: TrustedAnchorSource;
-  immediateSourceAniListId: number;
-  chainAnchorAniListId: number;
+  immediateSourceAniListId: AniListId;
+  chainAnchorAniListId: AniListId;
   borrowedBaseTitle?: string;
 };
 
@@ -38,7 +39,7 @@ export type InheritedResolutionAttempt =
     }
   | {
       status: 'accepted';
-      resolved: ResolvedMapping;
+      resolved: AcceptedAutoMapping;
       recentEvaluation?: MappingRecentEvaluationTrace;
     }
   | {
@@ -51,17 +52,17 @@ export type InheritedResolutionAttempt =
       recentEvaluation?: MappingRecentEvaluationTrace;
     };
 
-function extractRelationIds(media: AniListMedia): number[] {
-  const ids = new Set<number>();
+function extractRelationIds(media: AniListMedia): AniListId[] {
+  const ids = new Set<AniListId>();
 
   for (const edge of media.relations?.edges ?? []) {
     if (!edge || !RELATION_TYPES.has(edge.relationType)) {
       continue;
     }
 
-    const id = edge.node?.id;
-    if (typeof id === 'number' && Number.isFinite(id)) {
-      ids.add(id);
+    const anilistId = parseAniListIdOrNull(edge.node?.id);
+    if (anilistId) {
+      ids.add(anilistId);
     }
   }
 
@@ -128,22 +129,22 @@ function buildConflictTrace(proposals: readonly InheritedProposal[]): MappingRec
 }
 
 function selectTrustedAnchor(
-  anilistId: number,
-  upstreamMappingStore: UpstreamMappingStore,
-  overrides?: MappingOverrideReads,
-): { providerId: number; source: TrustedAnchorSource } | null {
-  if (overrides?.isIgnored('sonarr', anilistId)) {
+  anilistId: AniListId,
+  anibridgeMappingStore: AnibridgeMappingStore,
+  manualMappings?: ManualMappingReads,
+): { providerId: TvdbId; source: TrustedAnchorSource } | null {
+  if (manualMappings?.isIgnored('sonarr', anilistId)) {
     return null;
   }
 
-  const manualProviderId = overrides?.get('sonarr', anilistId) ?? null;
+  const manualProviderId = manualMappings?.get('sonarr', anilistId) ?? null;
   if (manualProviderId !== null) {
     return { providerId: manualProviderId, source: 'manual' };
   }
 
-  const upstream = upstreamMappingStore.get(anilistId);
-  if (upstream) {
-    return { providerId: upstream.tvdbId, source: 'upstream' };
+  const anibridgeProviderIds = anibridgeMappingStore.getSonarrCandidates(anilistId);
+  if (anibridgeProviderIds.length === 1) {
+    return { providerId: anibridgeProviderIds[0]!, source: 'upstream' };
   }
 
   return null;
@@ -152,15 +153,15 @@ function selectTrustedAnchor(
 async function collectNearestProposals(
   media: AniListMedia,
   anilistApi: AniListMediaService,
-  upstreamMappingStore: UpstreamMappingStore,
-  overrides?: MappingOverrideReads,
+  anibridgeMappingStore: AnibridgeMappingStore,
+  manualMappings?: ManualMappingReads,
   maxDepth = INHERITANCE_MAX_DEPTH,
 ): Promise<InheritedProposal[]> {
-  const visited = new Set<number>([media.id]);
-  let frontier: Array<{ media: AniListMedia; firstHopAniListId?: number }> = [{ media }];
+  const visited = new Set<AniListId>([media.id]);
+  let frontier: Array<{ media: AniListMedia; firstHopAniListId?: AniListId }> = [{ media }];
 
   for (let depth = 1; depth <= maxDepth; depth += 1) {
-    const nextFrontier: Array<{ media: AniListMedia; firstHopAniListId?: number }> = [];
+    const nextFrontier: Array<{ media: AniListMedia; firstHopAniListId?: AniListId }> = [];
     const proposals: InheritedProposal[] = [];
 
     for (const entry of frontier) {
@@ -174,7 +175,7 @@ async function collectNearestProposals(
           source: 'verified-inheritance',
         });
         const firstHopAniListId = entry.firstHopAniListId ?? relatedMedia.id;
-        const anchor = selectTrustedAnchor(relatedMedia.id, upstreamMappingStore, overrides);
+        const anchor = selectTrustedAnchor(relatedMedia.id, anibridgeMappingStore, manualMappings);
         if (anchor) {
           const borrowedBaseTitle = buildBorrowedBaseTitle(relatedMedia);
           proposals.push({
@@ -205,8 +206,8 @@ async function collectNearestProposals(
 export async function attemptVerifiedInheritedSonarrResolution(input: {
   media: AniListMedia;
   anilistApi: AniListMediaService;
-  upstreamMappingStore: UpstreamMappingStore;
-  overrides?: MappingOverrideReads;
+  anibridgeMappingStore: AnibridgeMappingStore;
+  manualMappings?: ManualMappingReads;
   lookupClient: ExactSonarrLookupClient;
   credentials: ProviderCredentials;
   maxDepth?: number;
@@ -214,8 +215,8 @@ export async function attemptVerifiedInheritedSonarrResolution(input: {
   const proposals = await collectNearestProposals(
     input.media,
     input.anilistApi,
-    input.upstreamMappingStore,
-    input.overrides,
+    input.anibridgeMappingStore,
+    input.manualMappings,
     input.maxDepth,
   );
   if (proposals.length === 0) {
@@ -247,7 +248,7 @@ export async function attemptVerifiedInheritedSonarrResolution(input: {
     verification.details,
   );
   if (verification.verdict === 'accept') {
-    const resolved: ResolvedMapping = {
+    const resolved: AcceptedAutoMapping = {
       providerId: proposal.providerId,
       reason: 'verified-inherited',
       immediateSourceAniListId: proposal.immediateSourceAniListId,

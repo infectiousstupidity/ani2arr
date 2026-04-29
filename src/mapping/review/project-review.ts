@@ -1,12 +1,14 @@
 /** Projects review-worthy mapping conflicts from effective state and resolver traces. */
 // src/mapping/review/project-review.ts
 
+import type { AniListId } from '@/anilist';
+import type { ProviderTargetId } from '@/providers';
 import type {
   MappingAcceptedEvidence,
+  MappingEntryKind,
   MappingRecentEvaluationTrace,
-  MappingResolverState,
-  MappingSource,
 } from '@/mapping/types';
+import type { AutoMappingStatus } from '@/mapping/auto-mapping/types';
 import type {
   MappingReviewItem,
   MappingReviewState,
@@ -14,12 +16,12 @@ import type {
 } from './review-types';
 
 export interface ProjectMappingReviewInput {
-  source: MappingSource;
-  providerId: number | null;
+  mappingEntryKind: MappingEntryKind;
+  providerId: ProviderTargetId | null;
   acceptedEvidence?: MappingAcceptedEvidence;
   recentEvaluation?: MappingRecentEvaluationTrace;
-  resolverState?: MappingResolverState;
-  exactUpstreamMatchProviderId?: number | null;
+  resolverState?: AutoMappingStatus;
+  exactUpstreamMatchProviderId?: ProviderTargetId | null;
 }
 
 export interface ProjectMappingReviewOutput {
@@ -28,20 +30,20 @@ export interface ProjectMappingReviewOutput {
 }
 
 type InheritedCandidateProjection = {
-  providerId: number;
-  immediateSourceAniListId?: number;
-  chainAnchorAniListId?: number;
+  providerId: ProviderTargetId;
+  immediateSourceAniListId?: AniListId;
+  chainAnchorAniListId?: AniListId;
 };
 
 const buildReviewState = (input: {
-  source: MappingReviewState['source'];
-  providerId: number | null;
+  mappingEntryKind: MappingReviewState['mappingEntryKind'];
+  providerId: ProviderTargetId | null;
   resolverState?: MappingReviewState['resolverState'] | undefined;
   acceptedReason?: MappingReviewState['acceptedReason'] | undefined;
-  immediateSourceAniListId?: number | undefined;
-  chainAnchorAniListId?: number | undefined;
+  immediateSourceAniListId?: AniListId | undefined;
+  chainAnchorAniListId?: AniListId | undefined;
 }): MappingReviewState => ({
-  source: input.source,
+  mappingEntryKind: input.mappingEntryKind,
   providerId: input.providerId,
   ...(input.resolverState ? { resolverState: input.resolverState } : {}),
   ...(input.acceptedReason ? { acceptedReason: input.acceptedReason } : {}),
@@ -94,7 +96,7 @@ export function projectMappingReview(
   input: ProjectMappingReviewInput,
 ): ProjectMappingReviewOutput {
   const current = buildReviewState({
-    source: input.source,
+    mappingEntryKind: input.mappingEntryKind,
     providerId: input.providerId,
     resolverState: input.resolverState,
     acceptedReason: input.acceptedEvidence?.reason,
@@ -104,7 +106,7 @@ export function projectMappingReview(
   const reviewItems: MappingReviewItem[] = [];
 
   if (
-    input.source === 'manual' &&
+    input.mappingEntryKind === 'manual' &&
     input.providerId !== null &&
     typeof input.exactUpstreamMatchProviderId === 'number' &&
     input.exactUpstreamMatchProviderId !== input.providerId
@@ -114,7 +116,7 @@ export function projectMappingReview(
       summary: 'Manual mapping disagrees with exact upstream mapping.',
       current,
       proposed: buildReviewState({
-        source: 'upstream',
+        mappingEntryKind: 'upstream',
         providerId: input.exactUpstreamMatchProviderId,
         resolverState: 'mapped',
         acceptedReason: 'exact-upstream',
@@ -123,13 +125,13 @@ export function projectMappingReview(
     });
   }
 
-  if (input.source === 'ignored' && typeof input.exactUpstreamMatchProviderId === 'number') {
+  if (input.mappingEntryKind === 'ignored' && typeof input.exactUpstreamMatchProviderId === 'number') {
     reviewItems.push({
       reason: 'ignored-but-exact-upstream',
       summary: 'Ignored title now has an exact upstream mapping available.',
       current,
       proposed: buildReviewState({
-        source: 'upstream',
+        mappingEntryKind: 'upstream',
         providerId: input.exactUpstreamMatchProviderId,
         resolverState: 'mapped',
         acceptedReason: 'exact-upstream',
@@ -147,7 +149,7 @@ export function projectMappingReview(
       summary: 'Inherited candidate could not be operationally verified.',
       current,
       proposed: buildReviewState({
-        source: 'auto',
+        mappingEntryKind: 'auto',
         providerId: candidate.providerId,
         acceptedReason: 'verified-inherited',
         immediateSourceAniListId: candidate.immediateSourceAniListId,
@@ -163,7 +165,7 @@ export function projectMappingReview(
       summary: 'Inherited relation anchors proposed conflicting provider IDs.',
       current,
       conflicts: inheritedCandidates.map(candidate => buildReviewState({
-        source: 'auto',
+        mappingEntryKind: 'auto',
         providerId: candidate.providerId,
         acceptedReason: 'verified-inherited',
         immediateSourceAniListId: candidate.immediateSourceAniListId,
