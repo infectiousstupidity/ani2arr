@@ -5,9 +5,11 @@ import type { AniListTitles } from '@/anilist/schemas/media.schema';
 import type { Provider } from '@/providers';
 import {
   canonicalTitleKeyForProvider,
+  sanitizeLookupDisplayForProvider,
+} from '@/mapping/title-normalization';
+import {
   isOrdinalToken,
   stripParenContent,
-  sanitizeLookupDisplayForProvider,
 } from '@/mapping/pipeline/matching';
 
 export interface SearchTerm {

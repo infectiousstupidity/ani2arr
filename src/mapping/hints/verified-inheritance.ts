@@ -7,7 +7,7 @@ import {
 	type AniListMediaService,
 } from "@/anilist";
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
-import { sanitizeLookupDisplayForProvider } from "@/mapping/pipeline/matching";
+import { sanitizeLookupDisplayForProvider } from "@/mapping/title-normalization";
 import type {
 	ProviderCredentials,
 	SonarrLookupSeries,
@@ -16,12 +16,12 @@ import type {
 import { createRecentEvaluationTrace } from "../auto-mapping/recent-evaluation";
 import type { AnibridgeMappingStore } from "../upstream-mapping";
 import type { ProviderLookupClient } from "../lookup";
-import type {
-	InheritedMappingVerificationDetails,
-	RecentMappingEvaluationTrace,
-} from "../types";
+import type { RecentMappingEvaluationTrace } from "../types";
 import type { AcceptedAutoMappingResult } from "../auto-mapping/types";
-import { verifyInheritedSonarrCandidate } from "./inherited-verifier";
+import {
+	verifyInheritedSonarrCandidate,
+	type InheritedVerificationResult,
+} from "./inherited-verifier";
 
 const INHERITANCE_MAX_DEPTH = 5;
 const RELATION_TYPES = new Set(["PREQUEL", "SEQUEL"]);
@@ -45,6 +45,21 @@ type ExactSonarrLookupClient = ProviderLookupClient<
 	ProviderCredentials,
 	SonarrLookupSeries
 >;
+
+type InheritedTraceInput = {
+	proposal: InheritedProposal;
+	verification: InheritedVerificationResult;
+	status: "accepted" | "not-accepted";
+	summary: string;
+};
+
+type NearestProposalSearchInput = {
+	media: AniListMedia;
+	anilistApi: AniListMediaService;
+	anibridgeMappingStore: AnibridgeMappingStore;
+	manualMappings?: ManualMappingReads;
+	maxDepth?: number;
+};
 
 export type InheritedResolutionAttempt =
 	| {
@@ -104,24 +119,23 @@ function buildBorrowedBaseTitle(media: AniListMedia): string | undefined {
 	return undefined;
 }
 
-function buildInheritedTrace(
-	proposal: InheritedProposal,
-	title: string | undefined,
-	status: "accepted" | "not-accepted",
-	summary: string,
-	inheritedVerification: InheritedMappingVerificationDetails,
-): RecentMappingEvaluationTrace | undefined {
+function buildInheritedTrace({
+	proposal,
+	verification,
+	status,
+	summary,
+}: InheritedTraceInput): RecentMappingEvaluationTrace | undefined {
 	return createRecentEvaluationTrace(
 		[],
 		[
 			{
 				providerId: proposal.providerId,
-				...(title ? { title } : {}),
+				...(verification.title ? { title: verification.title } : {}),
 				source: "auto",
 				reason: "verified-inherited",
 				status,
 				summary,
-				inheritedVerification,
+				inheritedVerification: verification.details,
 			},
 		],
 	);
@@ -177,13 +191,13 @@ function selectTrustedAnchor(
 	return null;
 }
 
-async function collectNearestProposals(
-	media: AniListMedia,
-	anilistApi: AniListMediaService,
-	anibridgeMappingStore: AnibridgeMappingStore,
-	manualMappings?: ManualMappingReads,
+async function collectNearestProposals({
+	media,
+	anilistApi,
+	anibridgeMappingStore,
+	manualMappings,
 	maxDepth = INHERITANCE_MAX_DEPTH,
-): Promise<InheritedProposal[]> {
+}: NearestProposalSearchInput): Promise<InheritedProposal[]> {
 	const visited = new Set<AniListId>([media.id]);
 	let frontier: Array<{ media: AniListMedia; firstHopAniListId?: AniListId }> =
 		[{ media }];
@@ -250,13 +264,13 @@ export async function attemptVerifiedInheritedSonarrResolution(input: {
 	credentials: ProviderCredentials;
 	maxDepth?: number;
 }): Promise<InheritedResolutionAttempt> {
-	const proposals = await collectNearestProposals(
-		input.media,
-		input.anilistApi,
-		input.anibridgeMappingStore,
-		input.manualMappings,
-		input.maxDepth,
-	);
+	const proposals = await collectNearestProposals({
+		media: input.media,
+		anilistApi: input.anilistApi,
+		anibridgeMappingStore: input.anibridgeMappingStore,
+		...(input.manualMappings ? { manualMappings: input.manualMappings } : {}),
+		...(input.maxDepth === undefined ? {} : { maxDepth: input.maxDepth }),
+	});
 	if (proposals.length === 0) {
 		return { status: "none" };
 	}
@@ -282,13 +296,12 @@ export async function attemptVerifiedInheritedSonarrResolution(input: {
 		input.credentials,
 	);
 
-	const acceptedTrace = buildInheritedTrace(
+	const acceptedTrace = buildInheritedTrace({
 		proposal,
-		verification.title,
-		"accepted",
-		"Inherited candidate accepted after exact Sonarr verification.",
-		verification.details,
-	);
+		verification,
+		status: "accepted",
+		summary: "Inherited candidate accepted after exact Sonarr verification.",
+	});
 	if (verification.verdict === "accept") {
 		const resolved: AcceptedAutoMappingResult = {
 			providerId: proposal.providerId,
@@ -306,13 +319,12 @@ export async function attemptVerifiedInheritedSonarrResolution(input: {
 	}
 
 	if (verification.verdict === "reject") {
-		const rejectedTrace = buildInheritedTrace(
+		const rejectedTrace = buildInheritedTrace({
 			proposal,
-			verification.title,
-			"not-accepted",
-			`Inherited candidate rejected: ${verification.details.reason}`,
-			verification.details,
-		);
+			verification,
+			status: "not-accepted",
+			summary: `Inherited candidate rejected: ${verification.details.reason}`,
+		});
 		return {
 			status: "rejected",
 			...(proposal.borrowedBaseTitle
@@ -323,26 +335,24 @@ export async function attemptVerifiedInheritedSonarrResolution(input: {
 	}
 
 	if (verification.verdict === "ambiguous") {
-		const ambiguousTrace = buildInheritedTrace(
+		const ambiguousTrace = buildInheritedTrace({
 			proposal,
-			verification.title,
-			"not-accepted",
-			`Inherited candidate ambiguous: ${verification.details.reason}`,
-			verification.details,
-		);
+			verification,
+			status: "not-accepted",
+			summary: `Inherited candidate ambiguous: ${verification.details.reason}`,
+		});
 		return {
 			status: "ambiguous",
 			...(ambiguousTrace ? { recentEvaluation: ambiguousTrace } : {}),
 		};
 	}
 
-	const failedTrace = buildInheritedTrace(
+	const failedTrace = buildInheritedTrace({
 		proposal,
-		verification.title,
-		"not-accepted",
-		`Inherited candidate could not be verified: ${verification.details.reason}`,
-		verification.details,
-	);
+		verification,
+		status: "not-accepted",
+		summary: `Inherited candidate could not be verified: ${verification.details.reason}`,
+	});
 	return {
 		status: "verification-failed",
 		...(failedTrace ? { recentEvaluation: failedTrace } : {}),

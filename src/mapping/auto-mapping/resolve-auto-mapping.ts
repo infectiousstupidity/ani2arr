@@ -275,9 +275,11 @@ async function tryResolvePrimaryTitleHint(
 		const hinted = await tryHintLookup(
 			hintTerm,
 			deps.lookupClients[provider],
-			credentials,
-			deps.log,
-			options.forceLookupNetwork === true,
+			{
+				credentials,
+				log: deps.log,
+				forceLookupNetwork: options.forceLookupNetwork === true,
+			},
 		);
 		if (!hinted) {
 			return { handled: false };
@@ -683,9 +685,11 @@ async function tryVerifiedInheritedResolution(
 	const borrowed = await tryHintLookup(
 		inheritedAttempt.borrowedBaseTitle,
 		deps.lookupClients.sonarr,
-		context.credentials,
-		deps.log,
-		context.forceLookupNetwork,
+		{
+			credentials: context.credentials,
+			log: deps.log,
+			forceLookupNetwork: context.forceLookupNetwork,
+		},
 	);
 	if (!borrowed) {
 		return {
