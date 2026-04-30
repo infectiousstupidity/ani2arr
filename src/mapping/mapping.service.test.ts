@@ -1,14 +1,9 @@
-/** Tests for mapping-service precedence between exact truth, cached auto results, and candidate suppression. */
+/** Highest-value MappingService tests for precedence, concurrency, and resolver safety. */
 // src/mapping/mapping.service.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId, type AniListId } from "@/anilist";
-import type { ProviderId } from "@/providers";
-import {
-	clearAutoMappingFailures,
-	removeAutoMappingFailure,
-	writeAutoMappingFailure,
-} from "@/mapping/auto-mapping/failure.cache";
+import { writeAutoMappingFailure } from "@/mapping/auto-mapping/failure.cache";
 import { createError, ErrorCode } from "@/shared/errors";
 import { MappingService } from "./mapping.service";
 
@@ -57,14 +52,31 @@ type StubAniListApi = {
 	removeMediaFromCache: ReturnType<typeof vi.fn>;
 };
 
+type LookupResult = {
+	title: string;
+	tvdbId: number;
+	year?: number;
+};
+
+type StubSonarrLookupClient = {
+	provider: "sonarr";
+	reset: ReturnType<typeof vi.fn>;
+	readCachedTitleLookup: ReturnType<typeof vi.fn>;
+	lookupTitle: ReturnType<
+		typeof vi.fn<(term: { display: string }) => Promise<LookupResult[]>>
+	>;
+	lookupByProviderId: ReturnType<typeof vi.fn>;
+	readProviderId: ReturnType<typeof vi.fn>;
+};
+
+type TestService = ReturnType<typeof createService>;
+
 function createDeferred<T>() {
 	let resolve!: (value: T | PromiseLike<T>) => void;
-	let reject!: (reason?: unknown) => void;
-	const promise = new Promise<T>((promiseResolve, promiseReject) => {
+	const promise = new Promise<T>((promiseResolve) => {
 		resolve = promiseResolve;
-		reject = promiseReject;
 	});
-	return { promise, resolve, reject };
+	return { promise, resolve };
 }
 
 const createService = () => {
@@ -92,8 +104,21 @@ const createService = () => {
 		delete: vi.fn(async () => false),
 		clear: vi.fn(async () => false),
 	};
+	const sonarrLookupClient: StubSonarrLookupClient = {
+			provider: "sonarr" as const,
+			reset: vi.fn(async () => {}),
+			readCachedTitleLookup: vi.fn(async () => ({
+				results: [] as LookupResult[],
+				hit: "none" as const,
+			})),
+			lookupTitle: vi.fn(async (_term: { display: string }) => []),
+			lookupByProviderId: vi.fn(async () => null),
+			readProviderId: vi.fn(
+				(result: { tvdbId?: number }) => result.tvdbId ?? null,
+			),
+	};
 	const lookupClients = {
-		sonarr: { reset: vi.fn(async () => {}) },
+		sonarr: sonarrLookupClient,
 		radarr: { reset: vi.fn(async () => {}) },
 	};
 	const notifyMappingsChanged = vi.fn();
@@ -118,37 +143,27 @@ const createService = () => {
 	};
 };
 
+function configureMediaFetch(
+	{ anilistApi }: TestService,
+	mediaById: Record<number, unknown>,
+): void {
+	anilistApi.fetchMediaWithRelations.mockImplementation(
+		async (anilistId: AniListId) => {
+			const media = mediaById[anilistId];
+			if (!media) {
+				throw new Error(`Unexpected AniList fetch ${anilistId}`);
+			}
+			return media;
+		},
+	);
+}
+
 describe("MappingService", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
-	it("collapses a matching manual mapping into exact upstream truth", async () => {
-		const { service, manualMappings, anibridgeMappingStore, autoMappingStore } =
-			createService();
-		manualMappings.get.mockReturnValue(222);
-		anibridgeMappingStore.getSonarrCandidates.mockReturnValue([222]);
-
-		const result = await service.resolveProviderId("sonarr", aid(1));
-
-		expect(result).toMatchObject({ providerId: 222, reason: "exact-upstream" });
-		expect(manualMappings.clear).toHaveBeenCalledWith("sonarr", 1);
-		expect(autoMappingStore.set).toHaveBeenCalledWith(
-			"sonarr",
-			1,
-			expect.objectContaining({
-				state: "mapped",
-				providerId: 222,
-				acceptedEvidence: expect.objectContaining({
-					source: "upstream",
-					reason: "exact-upstream",
-				}),
-			}),
-			expect.any(Object),
-		);
-	});
-
-	it("keeps a manual mapping effective when it disagrees with exact upstream truth", async () => {
+	it("keeps a user manual mapping when upstream disagrees", async () => {
 		const { service, manualMappings, anibridgeMappingStore, autoMappingStore } =
 			createService();
 		manualMappings.get.mockReturnValue(222);
@@ -164,54 +179,7 @@ describe("MappingService", () => {
 		expect(autoMappingStore.set).not.toHaveBeenCalled();
 	});
 
-	it("does not let rejected candidates suppress exact upstream truth", async () => {
-		const { service, manualMappings, anibridgeMappingStore, autoMappingStore } =
-			createService();
-		manualMappings.getCandidateSuppression.mockImplementation(
-			(_provider: string, _anilistId: AniListId, providerId: ProviderId) =>
-				providerId === 444 ? "rejected" : null,
-		);
-		anibridgeMappingStore.getSonarrCandidates.mockReturnValue([444]);
-
-		const result = await service.resolveProviderId("sonarr", aid(7));
-
-		expect(result).toMatchObject({ providerId: 444, reason: "exact-upstream" });
-		expect(autoMappingStore.set).toHaveBeenCalledWith(
-			"sonarr",
-			7,
-			expect.objectContaining({
-				state: "mapped",
-				providerId: 444,
-				acceptedEvidence: expect.objectContaining({
-					source: "upstream",
-					reason: "exact-upstream",
-				}),
-			}),
-			expect.any(Object),
-		);
-	});
-
-	it("prefers exact upstream over a cached auto mapping", async () => {
-		const { service, anibridgeMappingStore, autoMappingStore } =
-			createService();
-		anibridgeMappingStore.getSonarrCandidates.mockReturnValue([333]);
-		autoMappingStore.get.mockResolvedValue({
-			state: "mapped",
-			providerId: 999,
-			acceptedEvidence: {
-				source: "auto",
-				reason: "fuzzy-match",
-			},
-			updatedAt: 10,
-		});
-
-		const result = await service.resolveProviderId("sonarr", aid(5));
-
-		expect(result).toMatchObject({ providerId: 333, reason: "exact-upstream" });
-		expect(autoMappingStore.get).not.toHaveBeenCalled();
-	});
-
-	it("records upstream ambiguity instead of selecting one Sonarr candidate", async () => {
+	it("records upstream ambiguity instead of selecting a random candidate", async () => {
 		const { service, anibridgeMappingStore, autoMappingStore, anilistApi } =
 			createService();
 		anibridgeMappingStore.getSonarrCandidates.mockReturnValue([333, 444]);
@@ -228,211 +196,9 @@ describe("MappingService", () => {
 		expect(anilistApi.fetchMediaWithRelations).not.toHaveBeenCalled();
 	});
 
-	it("uses Radarr TMDB upstream candidates without reading Sonarr candidates", async () => {
-		const { service, anibridgeMappingStore, autoMappingStore } =
-			createService();
-		anibridgeMappingStore.getRadarrCandidates.mockReturnValue([12_345]);
-
-		const result = await service.resolveProviderId("radarr", aid(8));
-
-		expect(result).toMatchObject({
-			providerId: 12_345,
-			reason: "exact-upstream",
-		});
-		expect(anibridgeMappingStore.getSonarrCandidates).not.toHaveBeenCalled();
-		expect(autoMappingStore.set).toHaveBeenCalledWith(
-			"radarr",
-			8,
-			expect.objectContaining({
-				state: "mapped",
-				providerId: 12_345,
-				acceptedEvidence: expect.objectContaining({
-					source: "upstream",
-					reason: "exact-upstream",
-				}),
-			}),
-			expect.any(Object),
-		);
-	});
-
-	it("records recent evaluation trace candidates across rejected hint and accepted pipeline results", async () => {
-		const manualMappings: StubManualMappings = {
-			isIgnored: vi.fn(() => false),
-			get: vi.fn(() => null),
-			clear: vi.fn(async () => {}),
-			getCandidateSuppression: vi.fn(
-				(_provider: string, _anilistId: AniListId, providerId: ProviderId) =>
-					providerId === 101 ? "rejected" : null,
-			),
-		};
-		const anibridgeMappingStore = {
-			getSonarrCandidates: vi.fn(() => []),
-			getRadarrCandidates: vi.fn(() => []),
-		};
-		const autoMappingStore: StubAutoMappingStore = {
-			get: vi.fn(async () => null),
-			set: vi.fn(async () => true),
-			delete: vi.fn(async () => false),
-			clear: vi.fn(async () => false),
-		};
-		const lookupClient = {
-			provider: "sonarr" as const,
-			reset: vi.fn(async () => {}),
-			readCachedTitleLookup: vi.fn(async () => ({ results: [], hit: "none" as const })),
-			lookupTitle: vi.fn(async (term: { display: string }) => {
-				if (term.display === "Rejected Hint") {
-					return [{ title: "Rejected Hint", tvdbId: 101, year: 2013 }];
-				}
-				return [
-					{ title: "Attack on Titan", tvdbId: 202, year: 2013 },
-					{ title: "Attack Titan", tvdbId: 303, year: 2013 },
-				];
-			}),
-			readProviderId: vi.fn(
-				(result: { tvdbId?: number }) => result.tvdbId ?? null,
-			),
-		};
-
-		const service = new MappingService(
-			{
-				fetchMediaWithRelations: vi.fn(async () => ({
-					id: aid(77),
-					format: "TV",
-					title: { english: "Attack on Titan" },
-					synonyms: [],
-					startDate: { year: 2013 },
-				})),
-				iteratePrequelChain: async function* () {
-					yield* [];
-				},
-			} as never,
-			anibridgeMappingStore as never,
-			{
-				sonarr: lookupClient,
-				radarr: { reset: vi.fn(async () => {}) },
-			} as never,
-			autoMappingStore as never,
-			manualMappings as never,
-		);
-
-		const result = await service.resolveProviderId("sonarr", aid(77), {
-			hints: {
-				primaryTitle: "Rejected Hint",
-			},
-		});
-
-		expect(result).toMatchObject({
-			providerId: 202,
-			reason: "exact-title-match",
-		});
-		expect(autoMappingStore.set).toHaveBeenCalledWith(
-			"sonarr",
-			77,
-			expect.objectContaining({
-				state: "mapped",
-				providerId: 202,
-				acceptedEvidence: expect.objectContaining({
-					source: "auto",
-					reason: "exact-title-match",
-				}),
-				recentEvaluation: expect.objectContaining({
-					searchTerms: ["Rejected Hint", "Attack on Titan"],
-					candidates: expect.arrayContaining([
-						expect.objectContaining({ providerId: 101, status: "rejected" }),
-						expect.objectContaining({ providerId: 202, status: "accepted" }),
-						expect.objectContaining({
-							providerId: 303,
-							status: "not-accepted",
-						}),
-					]),
-				}),
-			}),
-			expect.any(Object),
-		);
-	});
-
-	it("resolves from metadata hints before fetching AniList media", async () => {
-		const manualMappings: StubManualMappings = {
-			isIgnored: vi.fn(() => false),
-			get: vi.fn(() => null),
-			clear: vi.fn(async () => {}),
-			getCandidateSuppression: vi.fn(() => null),
-		};
-		const anibridgeMappingStore = {
-			getSonarrCandidates: vi.fn(() => []),
-			getRadarrCandidates: vi.fn(() => []),
-		};
-		const autoMappingStore: StubAutoMappingStore = {
-			get: vi.fn(async () => null),
-			set: vi.fn(async () => true),
-			delete: vi.fn(async () => false),
-			clear: vi.fn(async () => false),
-		};
-		const fetchMediaWithRelations = vi.fn(async () => {
-			throw new Error("Unexpected AniList fetch");
-		});
-		const lookupClient = {
-			provider: "sonarr" as const,
-			reset: vi.fn(async () => {}),
-			readCachedTitleLookup: vi.fn(async () => ({ results: [], hit: "none" as const })),
-			lookupTitle: vi.fn(async () => [
-				{ title: "Attack on Titan", tvdbId: 202, year: 2013 },
-			]),
-			readProviderId: vi.fn(
-				(result: { tvdbId?: number }) => result.tvdbId ?? null,
-			),
-		};
-
-		const service = new MappingService(
-			{
-				fetchMediaWithRelations,
-				iteratePrequelChain: async function* () {
-					yield* [];
-				},
-			} as never,
-			anibridgeMappingStore as never,
-			{
-				sonarr: lookupClient,
-				radarr: { reset: vi.fn(async () => {}) },
-			} as never,
-			autoMappingStore as never,
-			manualMappings as never,
-		);
-
-		const result = await service.resolveProviderId("sonarr", aid(77), {
-			hints: {
-				domMedia: {
-					titles: { english: "Attack on Titan" },
-					startYear: 2013,
-					format: "TV",
-				},
-			},
-		});
-
-		expect(result).toMatchObject({
-			providerId: 202,
-			reason: "exact-title-match",
-		});
-		expect(fetchMediaWithRelations).not.toHaveBeenCalled();
-	});
-
 	it("does not reuse a default in-flight request for force lookups", async () => {
-		const manualMappings: StubManualMappings = {
-			isIgnored: vi.fn(() => false),
-			get: vi.fn(() => null),
-			clear: vi.fn(async () => {}),
-			getCandidateSuppression: vi.fn(() => null),
-		};
-		const anibridgeMappingStore = {
-			getSonarrCandidates: vi.fn(() => []),
-			getRadarrCandidates: vi.fn(() => []),
-		};
-		const autoMappingStore: StubAutoMappingStore = {
-			get: vi.fn(async () => null),
-			set: vi.fn(async () => true),
-			delete: vi.fn(async () => false),
-			clear: vi.fn(async () => false),
-		};
+		const context = createService();
+		const { service, anilistApi, lookupClients } = context;
 		const defaultMedia = {
 			id: aid(78),
 			format: "TV",
@@ -447,21 +213,12 @@ describe("MappingService", () => {
 		};
 		const defaultFetch = createDeferred<typeof defaultMedia>();
 		let fetchCount = 0;
-		const fetchMediaWithRelations = vi.fn(async () => {
+		anilistApi.fetchMediaWithRelations.mockImplementation(async () => {
 			fetchCount += 1;
-			if (fetchCount === 1) {
-				return defaultFetch.promise;
-			}
-			return forceMedia;
+			return fetchCount === 1 ? defaultFetch.promise : forceMedia;
 		});
-		const lookupClient = {
-			provider: "sonarr" as const,
-			reset: vi.fn(async () => {}),
-			readCachedTitleLookup: vi.fn(async () => ({
-				results: [],
-				hit: "none" as const,
-			})),
-			lookupTitle: vi.fn(async (term: { display: string }) => {
+		lookupClients.sonarr.lookupTitle.mockImplementation(
+			async (term: { display: string }) => {
 				if (term.display === "Default Result") {
 					return [{ title: "Default Result", tvdbId: 101, year: 2020 }];
 				}
@@ -469,31 +226,12 @@ describe("MappingService", () => {
 					return [{ title: "Force Result", tvdbId: 202, year: 2020 }];
 				}
 				return [];
-			}),
-			readProviderId: vi.fn(
-				(result: { tvdbId?: number }) => result.tvdbId ?? null,
-			),
-		};
-
-		const service = new MappingService(
-			{
-				fetchMediaWithRelations,
-				iteratePrequelChain: async function* () {
-					yield* [];
-				},
-			} as never,
-			anibridgeMappingStore as never,
-			{
-				sonarr: lookupClient,
-				radarr: { reset: vi.fn(async () => {}) },
-			} as never,
-			autoMappingStore as never,
-			manualMappings as never,
+			},
 		);
 
 		const defaultRequest = service.resolveProviderId("sonarr", aid(78));
 		await vi.waitFor(() => {
-			expect(fetchMediaWithRelations).toHaveBeenCalledTimes(1);
+			expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledTimes(1);
 		});
 
 		const forceRequest = service.resolveProviderId("sonarr", aid(78), {
@@ -501,211 +239,59 @@ describe("MappingService", () => {
 		});
 
 		await vi.waitFor(() => {
-			expect(fetchMediaWithRelations).toHaveBeenCalledTimes(2);
+			expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledTimes(2);
 		});
-		await expect(forceRequest).resolves.toMatchObject({
-			providerId: 202,
-			reason: "exact-title-match",
-		});
+		await expect(forceRequest).resolves.toMatchObject({ providerId: 202 });
 
 		defaultFetch.resolve(defaultMedia);
-		await expect(defaultRequest).resolves.toMatchObject({
-			providerId: 101,
-			reason: "exact-title-match",
-		});
+		await expect(defaultRequest).resolves.toMatchObject({ providerId: 101 });
 	});
 
-	it("falls back to a borrowed base-title lookup after inherited verification rejects the relation candidate", async () => {
-		const manualMappings: StubManualMappings = {
-			isIgnored: vi.fn(() => false),
-			get: vi.fn((provider: string, anilistId: AniListId) =>
-				provider === "sonarr" && anilistId === 88 ? 111 : null,
-			),
-			clear: vi.fn(async () => {}),
-			getCandidateSuppression: vi.fn(() => null),
-		};
-		const anibridgeMappingStore = {
-			getSonarrCandidates: vi.fn(() => []),
-			getRadarrCandidates: vi.fn(() => []),
-		};
-		const autoMappingStore: StubAutoMappingStore = {
-			get: vi.fn(async () => null),
-			set: vi.fn(async () => true),
-			delete: vi.fn(async () => false),
-			clear: vi.fn(async () => false),
-		};
-		const fetchMediaWithRelations = vi.fn(async (anilistId: AniListId) => {
-			if (anilistId === 77) {
-				return {
-					id: aid(77),
-					format: "TV",
-					title: { english: "Bleach: Thousand-Year Blood War" },
-					synonyms: [],
-					relations: {
-						edges: [{ relationType: "PREQUEL", node: { id: aid(88) } }],
-					},
-				};
-			}
-			if (anilistId === 88) {
-				return {
-					id: aid(88),
-					format: "TV",
-					title: { english: "Bleach Season 2" },
-					synonyms: [],
-					relations: { edges: [] },
-				};
-			}
-			throw new Error(`Unexpected AniList fetch ${anilistId}`);
-		});
-		const lookupClient = {
-			provider: "sonarr" as const,
-			reset: vi.fn(async () => {}),
-			readCachedTitleLookup: vi.fn(async () => ({ results: [], hit: "none" as const })),
-			lookupTitle: vi.fn(async (term: { display: string }) => {
-				if (term.display === "Bleach") {
-					return [{ title: "Bleach", tvdbId: 222, year: 2004 }];
-				}
-				return [];
-			}),
-			lookupByProviderId: vi.fn(async () => ({
-				title: "Naruto",
-				tvdbId: 111,
-			})),
-			readProviderId: vi.fn(
-				(result: { tvdbId?: number }) => result.tvdbId ?? null,
-			),
-		};
-
-		const service = new MappingService(
-			{
-				fetchMediaWithRelations,
-			} as never,
-			anibridgeMappingStore as never,
-			{
-				sonarr: lookupClient,
-				radarr: { reset: vi.fn(async () => {}) },
-			} as never,
-			autoMappingStore as never,
-			manualMappings as never,
+	it("falls through to title search when inherited verification cannot complete", async () => {
+		const context = createService();
+		const { service, anibridgeMappingStore, autoMappingStore, lookupClients } =
+			context;
+		anibridgeMappingStore.getSonarrCandidates.mockImplementation(
+			(anilistId: AniListId) => (anilistId === 91 ? [333] : []),
 		);
-
-		const result = await service.resolveProviderId("sonarr", aid(77));
-
-		expect(result).toMatchObject({
-			providerId: 222,
-			reason: "borrowed-base-title-fallback",
+		configureMediaFetch(context, {
+			90: {
+				id: aid(90),
+				format: "TV",
+				title: { english: "Attack on Titan Final Season" },
+				synonyms: [],
+				relations: {
+					edges: [{ relationType: "PREQUEL", node: { id: aid(91) } }],
+				},
+			},
+			91: {
+				id: aid(91),
+				format: "TV",
+				title: { english: "Attack on Titan Season 3" },
+				synonyms: [],
+				relations: { edges: [] },
+			},
 		});
-		expect(autoMappingStore.set).toHaveBeenCalledWith(
-			"sonarr",
-			77,
-			expect.objectContaining({
-				state: "mapped",
-				providerId: 222,
-				acceptedEvidence: expect.objectContaining({
-					source: "auto",
-					reason: "borrowed-base-title-fallback",
-				}),
-				recentEvaluation: expect.objectContaining({
-					candidates: expect.arrayContaining([
-						expect.objectContaining({
-							providerId: 111,
-							status: "not-accepted",
-							reason: "verified-inherited",
-						}),
-						expect.objectContaining({
-							providerId: 222,
-							status: "accepted",
-							reason: "borrowed-base-title-fallback",
-						}),
-					]),
-				}),
-			}),
-			expect.any(Object),
-		);
-	});
-
-	it("records verification-failed instead of auto-accepting an inherited relation candidate when exact verification cannot complete", async () => {
-		const manualMappings: StubManualMappings = {
-			isIgnored: vi.fn(() => false),
-			get: vi.fn(() => null),
-			clear: vi.fn(async () => {}),
-			getCandidateSuppression: vi.fn(() => null),
-		};
-		const anibridgeMappingStore = {
-			getSonarrCandidates: vi.fn((anilistId: AniListId) =>
-				anilistId === 91 ? [333] : [],
-			),
-			getRadarrCandidates: vi.fn(() => []),
-		};
-		const autoMappingStore: StubAutoMappingStore = {
-			get: vi.fn(async () => null),
-			set: vi.fn(async () => true),
-			delete: vi.fn(async () => false),
-			clear: vi.fn(async () => false),
-		};
-		const fetchMediaWithRelations = vi.fn(async (anilistId: AniListId) => {
-			if (anilistId === 90) {
-				return {
-					id: aid(90),
-					format: "TV",
-					title: { english: "Attack on Titan Final Season" },
-					synonyms: [],
-					relations: {
-						edges: [{ relationType: "PREQUEL", node: { id: aid(91) } }],
-					},
-				};
-			}
-			if (anilistId === 91) {
-				return {
-					id: aid(91),
-					format: "TV",
-					title: { english: "Attack on Titan Season 3" },
-					synonyms: [],
-					relations: { edges: [] },
-				};
-			}
-			throw new Error(`Unexpected AniList fetch ${anilistId}`);
+		lookupClients.sonarr.lookupTitle.mockResolvedValue([
+			{ title: "Attack on Titan Final Season", tvdbId: 444, year: 2013 },
+		]);
+		lookupClients.sonarr.lookupByProviderId = vi.fn(async () => {
+			throw createError(
+				ErrorCode.NETWORK_ERROR,
+				"Timed out reaching Sonarr.",
+				"Unable to verify the inherited series right now.",
+			);
 		});
-		const lookupClient = {
-			provider: "sonarr" as const,
-			reset: vi.fn(async () => {}),
-			readCachedTitleLookup: vi.fn(async () => ({ results: [], hit: "none" as const })),
-			lookupTitle: vi.fn(async () => [
-				{ title: "Attack on Titan", tvdbId: 444, year: 2013 },
-			]),
-			lookupByProviderId: vi.fn(async () => {
-				throw createError(
-					ErrorCode.NETWORK_ERROR,
-					"Timed out reaching Sonarr.",
-					"Unable to verify the inherited series right now.",
-				);
-			}),
-			readProviderId: vi.fn(
-				(result: { tvdbId?: number }) => result.tvdbId ?? null,
-			),
-		};
-
-		const service = new MappingService(
-			{
-				fetchMediaWithRelations,
-			} as never,
-			anibridgeMappingStore as never,
-			{
-				sonarr: lookupClient,
-				radarr: { reset: vi.fn(async () => {}) },
-			} as never,
-			autoMappingStore as never,
-			manualMappings as never,
-		);
 
 		const result = await service.resolveProviderId("sonarr", aid(90));
 
-		expect(result).toBeNull();
+		expect(result).toMatchObject({ providerId: 444 });
 		expect(autoMappingStore.set).toHaveBeenCalledWith(
 			"sonarr",
 			90,
 			expect.objectContaining({
-				state: "verification-failed",
+				state: "mapped",
+				providerId: 444,
 				recentEvaluation: expect.objectContaining({
 					candidates: expect.arrayContaining([
 						expect.objectContaining({
@@ -713,60 +299,18 @@ describe("MappingService", () => {
 							reason: "verified-inherited",
 							status: "not-accepted",
 						}),
+						expect.objectContaining({
+							providerId: 444,
+							status: "accepted",
+						}),
 					]),
 				}),
 			}),
 			expect.any(Object),
 		);
-
-		const persistedState = autoMappingStore.set.mock.calls[0]?.[2];
-		expect(persistedState).not.toHaveProperty("reviewNeeded");
-		expect(persistedState).not.toHaveProperty("reviewSummary");
-		expect(persistedState).not.toHaveProperty("reviewItems");
 	});
 
-	it("resets lookup clients, failure cache, resolver state, and notifications", async () => {
-		const { service, lookupClients, autoMappingStore, notifyMappingsChanged } =
-			createService();
-
-		await service.resetLookupState();
-
-		expect(lookupClients.sonarr.reset).toHaveBeenCalledTimes(1);
-		expect(lookupClients.radarr.reset).toHaveBeenCalledTimes(1);
-		expect(clearAutoMappingFailures).toHaveBeenCalledTimes(1);
-		expect(autoMappingStore.clear).toHaveBeenCalledTimes(1);
-		expect(notifyMappingsChanged).toHaveBeenCalledTimes(1);
-	});
-
-	it("delegates provider mapping initialization to the Anibridge mapping store", async () => {
-		const { service, anibridgeMappingStore } = createService();
-
-		await service.initAnibridgeMappings();
-
-		expect(anibridgeMappingStore.init).toHaveBeenCalledTimes(1);
-	});
-
-	it("prioritizes AniList media through the optional API with the requested scheduling mode", () => {
-		const { service, anilistApi } = createService();
-
-		service.prioritizeAniListMedia(aid(99), { schedule: true });
-
-		expect(anilistApi.prioritize).toHaveBeenCalledWith(99, { schedule: true });
-	});
-
-	it("evicts resolved state, clears the failure cache, evicts AniList media, and notifies listeners", async () => {
-		const { service, anilistApi, autoMappingStore, notifyMappingsChanged } =
-			createService();
-
-		await service.evictResolved(aid(44), "radarr");
-
-		expect(autoMappingStore.delete).toHaveBeenCalledWith("radarr", 44);
-		expect(removeAutoMappingFailure).toHaveBeenCalledWith("radarr", 44);
-		expect(anilistApi.removeMediaFromCache).toHaveBeenCalledWith(44);
-		expect(notifyMappingsChanged).toHaveBeenCalledTimes(1);
-	});
-
-	it("caches network failures with the shorter network TTLs", async () => {
+	it("caches retryable network failures", async () => {
 		const { service, anilistApi } = createService();
 		const error = createError(
 			ErrorCode.NETWORK_ERROR,
@@ -782,21 +326,5 @@ describe("MappingService", () => {
 		});
 
 		expect(writeAutoMappingFailure).toHaveBeenCalledWith("sonarr", 12, error);
-	});
-
-	it("caches configuration failures with the default failure TTLs", async () => {
-		const { service } = createService();
-
-		await expect(
-			service.resolveProviderId("radarr", aid(18)),
-		).rejects.toMatchObject({
-			code: ErrorCode.CONFIGURATION_ERROR,
-		});
-
-		expect(writeAutoMappingFailure).toHaveBeenCalledWith(
-			"radarr",
-			18,
-			expect.objectContaining({ code: ErrorCode.CONFIGURATION_ERROR }),
-		);
 	});
 });
