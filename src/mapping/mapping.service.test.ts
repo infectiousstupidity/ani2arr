@@ -310,6 +310,78 @@ describe("MappingService", () => {
 		);
 	});
 
+	it("uses a rejected inherited relation title as a borrowed fallback search term", async () => {
+		const context = createService();
+		const { service, anibridgeMappingStore, autoMappingStore, lookupClients } =
+			context;
+		anibridgeMappingStore.getSonarrCandidates.mockImplementation(
+			(anilistId: AniListId) => (anilistId === 91 ? [333] : []),
+		);
+		configureMediaFetch(context, {
+			90: {
+				id: aid(90),
+				format: "TV",
+				title: { english: "Season 2" },
+				synonyms: [],
+				relations: {
+					edges: [{ relationType: "PREQUEL", node: { id: aid(91) } }],
+				},
+			},
+			91: {
+				id: aid(91),
+				format: "TV",
+				title: { english: "Needle Bloom" },
+				synonyms: [],
+				relations: { edges: [] },
+			},
+		});
+		lookupClients.sonarr.lookupByProviderId = vi.fn(async () => ({
+			title: "Unrelated",
+			tvdbId: 333,
+		}));
+		lookupClients.sonarr.lookupTitle.mockImplementation(
+			async (term: { display: string }) =>
+				term.display === "Needle Bloom"
+					? [{ title: "Needle Bloom", tvdbId: 444, year: 2020 }]
+					: [],
+		);
+
+		const result = await service.resolveProviderId("sonarr", aid(90));
+
+		expect(result).toMatchObject({
+			providerId: 444,
+			reason: "borrowed-base-title-fallback",
+		});
+		expect(lookupClients.sonarr.lookupTitle).toHaveBeenCalledWith(
+			expect.objectContaining({ display: "Needle Bloom" }),
+			expect.any(Object),
+			expect.any(Object),
+		);
+		expect(autoMappingStore.set).toHaveBeenCalledWith(
+			"sonarr",
+			90,
+			expect.objectContaining({
+				state: "mapped",
+				providerId: 444,
+				recentEvaluation: expect.objectContaining({
+					candidates: expect.arrayContaining([
+						expect.objectContaining({
+							providerId: 333,
+							reason: "verified-inherited",
+							status: "not-accepted",
+						}),
+						expect.objectContaining({
+							providerId: 444,
+							reason: "borrowed-base-title-fallback",
+							status: "accepted",
+						}),
+					]),
+				}),
+			}),
+			expect.any(Object),
+		);
+	});
+
 	it("caches retryable network failures", async () => {
 		const { service, anilistApi } = createService();
 		const error = createError(
