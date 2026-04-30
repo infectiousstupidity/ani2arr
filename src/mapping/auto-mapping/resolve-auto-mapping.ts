@@ -72,7 +72,6 @@ type ProviderTitleLookupRegistry = Record<
 type ResolutionAttempt = {
 	resolved: AcceptedAutoMappingResult | null;
 	recentEvaluation?: RecentMappingEvaluationTrace;
-	terminalState?: Exclude<AutoMappingRecord["state"], "mapped" | "unresolved">;
 };
 
 type AutoMappingRequest = {
@@ -301,12 +300,11 @@ async function attemptNetworkResolution(
 	);
 
 	if (attempt.resolved === null) {
-		const terminalState = attempt.terminalState ?? "unresolved";
 		await deps.recordAutoMapping(
 			provider,
 			anilistId,
 			{
-				state: terminalState,
+				state: "unresolved",
 				...(recentEvaluation ? { recentEvaluation } : {}),
 			},
 			UNRESOLVED_AUTO_MAPPING_TTL,
@@ -409,9 +407,6 @@ async function resolveViaNetwork(
 			media: metadataMedia,
 			allowInheritedTraversal: false,
 		});
-		if (metadataAttempt.terminalState) {
-			return metadataAttempt;
-		}
 		const resolvedFromMetadata = applyAttempt("metadata", metadataAttempt);
 		if (resolvedFromMetadata) {
 			return resolvedFromMetadata;
@@ -430,9 +425,6 @@ async function resolveViaNetwork(
 		media: anilistMediaWithRelations,
 		allowInheritedTraversal: true,
 	});
-	if (apiAttempt.terminalState) {
-		return apiAttempt;
-	}
 	const resolvedFromApi = applyAttempt("api", apiAttempt);
 	if (resolvedFromApi) {
 		return resolvedFromApi;
@@ -577,20 +569,6 @@ async function tryVerifiedInheritedResolution(
 				"rejected",
 			),
 		);
-	}
-
-	if (
-		inheritedAttempt.status === "ambiguous" ||
-		inheritedAttempt.status === "verification-failed"
-	) {
-		return {
-			handled: true,
-			attempt: {
-				resolved: null,
-				terminalState: inheritedAttempt.status,
-				...(recentEvaluation ? { recentEvaluation } : {}),
-			},
-		};
 	}
 
 	if (
