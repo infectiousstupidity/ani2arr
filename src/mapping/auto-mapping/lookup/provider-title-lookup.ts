@@ -163,12 +163,11 @@ export function createProviderTitleLookup<
 		return { results: [], hit: "none" };
 	};
 
-	const lookupTitle = (
+	const lookupNetwork = (
 		term: TitleSearchTerm,
 		credentials: ProviderCredentials,
 		options: TitleLookupOptions = {},
 	): Promise<TResult[]> => {
-		const forceNetwork = options.forceNetwork === true;
 		const existing = inflight.get(term.canonical);
 		if (existing) {
 			log.debug(
@@ -180,26 +179,6 @@ export function createProviderTitleLookup<
 
 		const promise = (async (): Promise<TResult[]> => {
 			try {
-				if (!forceNetwork) {
-					const positiveHit = await config.caches.positive.read(term.canonical);
-					if (positiveHit && !positiveHit.stale) {
-						incrementCounter("mapping.lookup.cache_hit");
-						log.debug(
-							`lookupTitle(${term.canonical}): returning fresh positive cache`,
-						);
-						return positiveHit.value;
-					}
-
-					const negativeHit = await config.caches.negative.read(term.canonical);
-					if (negativeHit && !negativeHit.stale) {
-						incrementCounter("mapping.lookup.negative_cache_hit");
-						log.debug(
-							`lookupTitle(${term.canonical}): returning fresh negative cache`,
-						);
-						return [];
-					}
-				}
-
 				const results = await fetchQueuedTitleResults(
 					term.display,
 					credentials,
@@ -228,6 +207,43 @@ export function createProviderTitleLookup<
 
 		inflight.set(term.canonical, promise);
 		return promise;
+	};
+
+	const lookupTitle = (
+		term: TitleSearchTerm,
+		credentials: ProviderCredentials,
+		options: TitleLookupOptions = {},
+	): Promise<TResult[]> => {
+		const forceNetwork = options.forceNetwork === true;
+		if (forceNetwork) {
+			return lookupNetwork(term, credentials, options);
+		}
+
+		return (async (): Promise<TResult[]> => {
+			try {
+				const positiveHit = await config.caches.positive.read(term.canonical);
+				if (positiveHit && !positiveHit.stale) {
+					incrementCounter("mapping.lookup.cache_hit");
+					log.debug(
+						`lookupTitle(${term.canonical}): returning fresh positive cache`,
+					);
+					return positiveHit.value;
+				}
+
+				const negativeHit = await config.caches.negative.read(term.canonical);
+				if (negativeHit && !negativeHit.stale) {
+					incrementCounter("mapping.lookup.negative_cache_hit");
+					log.debug(
+						`lookupTitle(${term.canonical}): returning fresh negative cache`,
+					);
+					return [];
+				}
+
+				return lookupNetwork(term, credentials, options);
+			} catch (error) {
+				throw normalizeError(error);
+			}
+		})();
 	};
 
 	const lookup: ProviderTitleLookup<TResult, TProviderId> = {

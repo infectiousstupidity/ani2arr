@@ -138,6 +138,42 @@ describe("createProviderTitleLookup", () => {
 		expect(fetchTitleResults).toHaveBeenCalledTimes(1);
 	});
 
+	it("forceNetwork does not reuse a normal lookup pending on cache", async () => {
+		const cached = [{ title: "Cached", id: 1 }];
+		const network = [{ title: "Network", id: 2 }];
+		let releaseCacheRead!: () => void;
+		let markCacheReadStarted!: () => void;
+		const cacheReadStarted = new Promise<void>((resolve) => {
+			markCacheReadStarted = resolve;
+		});
+		const blockedCacheRead = new Promise<void>((resolve) => {
+			releaseCacheRead = resolve;
+		});
+		const { lookup, positive, fetchTitleResults } = createLookup({
+			positive: cacheHit(cached),
+			fetch: vi.fn(async () => network),
+		});
+		positive.read.mockImplementationOnce(async () => {
+			markCacheReadStarted();
+			await blockedCacheRead;
+			return cacheHit(cached);
+		});
+
+		const normal = lookup.lookupTitle(TERM, TEST_CREDENTIALS);
+		await cacheReadStarted;
+		const force = lookup.lookupTitle(TERM, TEST_CREDENTIALS, {
+			forceNetwork: true,
+		});
+		await vi.waitFor(() => expect(fetchTitleResults).toHaveBeenCalledTimes(1));
+		releaseCacheRead();
+
+		await expect(Promise.all([normal, force])).resolves.toEqual([
+			cached,
+			network,
+		]);
+		expect(fetchTitleResults).toHaveBeenCalledTimes(1);
+	});
+
 	it("reset clears caches", async () => {
 		const { lookup, positive, negative } = createLookup({});
 
@@ -158,8 +194,8 @@ describe("createProviderTitleLookup", () => {
 		const { lookup } = createLookup({ fetch: fetchTitleResults });
 
 		const pending = lookup.lookupTitle(TERM, TEST_CREDENTIALS);
-		const cached = lookup.readCachedTitleLookup(TERM.canonical);
 		await vi.waitFor(() => expect(fetchTitleResults).toHaveBeenCalledTimes(1));
+		const cached = lookup.readCachedTitleLookup(TERM.canonical);
 		resolveFetch([{ title: "Attack on Titan", id: 1 }]);
 
 		await expect(pending).resolves.toEqual([
