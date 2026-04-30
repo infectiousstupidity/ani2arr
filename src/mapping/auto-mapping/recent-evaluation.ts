@@ -209,10 +209,11 @@ export function createPipelineRecentEvaluation(
 		outcome.searchTerms,
 		outcome.candidates.map((candidate) => {
 			const status: MappingCandidateEvaluationStatus =
-				outcome.status === "resolved" &&
+				candidate.status ??
+				(outcome.status === "resolved" &&
 				candidate.providerId === outcome.providerId
 					? "accepted"
-					: "not-accepted";
+					: "not-accepted");
 
 			return {
 				providerId: candidate.providerId,

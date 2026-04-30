@@ -44,11 +44,9 @@ const TEST_CREDENTIALS = {
 describe("searchAutoMappingCandidates", () => {
 	it("returns exact when the winning candidate is an exact title match", async () => {
 		const result = await searchAutoMappingCandidates(createMedia("Attack on Titan"), {
-			anilistApi: {} as never,
 			lookupClient: createLookupClient([
 				{ title: "Attack on Titan", tvdbId: 101, year: 2013 },
 			]),
-			anibridgeMappingStore: {} as never,
 			credentials: TEST_CREDENTIALS,
 			sessionSeenCanonical: new Set<string>(),
 			limits: {
@@ -76,11 +74,9 @@ describe("searchAutoMappingCandidates", () => {
 
 	it("returns fuzzy when the winning candidate only matches approximately", async () => {
 		const result = await searchAutoMappingCandidates(createMedia("Attack on Titan"), {
-			anilistApi: {} as never,
 			lookupClient: createLookupClient([
 				{ title: "Attack Titan", tvdbId: 202, year: 2013 },
 			]),
-			anibridgeMappingStore: {} as never,
 			credentials: TEST_CREDENTIALS,
 			sessionSeenCanonical: new Set<string>(),
 			limits: {
