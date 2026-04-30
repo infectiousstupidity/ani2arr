@@ -18,7 +18,6 @@ import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import {
 	createError,
 	ErrorCode,
-	logError,
 	normalizeError,
 	type ExtensionError,
 } from "@/shared/errors";
@@ -165,16 +164,7 @@ export async function resolveAutoMapping(
 		);
 	}
 
-	const hintResolution = await tryResolvePrimaryTitleHint(deps, request);
-	if (hintResolution.handled) {
-		return hintResolution.resolved;
-	}
-
-	return attemptNetworkResolution(
-		deps,
-		request,
-		hintResolution.seededRecentEvaluation,
-	);
+	return attemptNetworkResolution(deps, request);
 }
 
 async function readUsableCachedAutoMapping(
@@ -260,87 +250,9 @@ async function readCachedFailureOrTerminalState(
 	return { handled: false };
 }
 
-async function tryResolvePrimaryTitleHint(
-	deps: ResolveAutoMappingDeps,
-	request: AutoMappingRequest,
-): Promise<
-	| { handled: true; resolved: AcceptedAutoMappingResult | null }
-	| { handled: false; seededRecentEvaluation?: RecentMappingEvaluationTrace }
-> {
-	const { provider, anilistId, options } = request;
-	const hintTerm = options.hints?.primaryTitle?.trim();
-	if (!hintTerm) {
-		return { handled: false };
-	}
-
-	try {
-		const credentials = await deps.getConfiguredCredentials(provider);
-		const hinted = await tryTitleLookup(
-			hintTerm,
-			deps.lookupClients[provider],
-			{
-				credentials,
-				log: deps.log,
-				forceLookupNetwork: options.forceLookupNetwork === true,
-			},
-		);
-		if (!hinted) {
-			return { handled: false };
-		}
-
-		if (
-			!deps.isResolvedCandidateSuppressed(provider, anilistId, hinted, "auto")
-		) {
-			const recentEvaluation = createSingleCandidateTrace({
-				resolved: hinted,
-				source: "auto",
-				status: "accepted",
-				searchTerms: [hintTerm],
-				...(hinted.successfulSynonym
-					? { title: hinted.successfulSynonym }
-					: {}),
-			});
-			const resolved = await deps.acceptResolved(
-				provider,
-				anilistId,
-				{
-					...hinted,
-					...(recentEvaluation ? { recentEvaluation } : {}),
-				},
-				"auto",
-			);
-			return { handled: true, resolved };
-		}
-
-		if (import.meta.env.DEV) {
-			deps.log.debug?.(
-				`mapping:hint-suppressed provider=${provider} anilistId=${anilistId} providerId=${hinted.providerId} reason=${hinted.reason}`,
-			);
-		}
-		const seededRecentEvaluation = createSingleCandidateTrace({
-			resolved: hinted,
-			source: "auto",
-			status: "rejected",
-			searchTerms: [hintTerm],
-			...(hinted.successfulSynonym ? { title: hinted.successfulSynonym } : {}),
-		});
-		return {
-			handled: false,
-			...(seededRecentEvaluation ? { seededRecentEvaluation } : {}),
-		};
-	} catch (error) {
-		logError(
-			normalizeError(error),
-			`MappingService:hintLookup:${provider}:${anilistId}`,
-		);
-		return { handled: false };
-	}
-}
-
 async function attemptNetworkResolution(
 	deps: ResolveAutoMappingDeps,
 	request: AutoMappingRequest,
-	seededRecentEvaluation?: RecentMappingEvaluationTrace,
 ): Promise<AcceptedAutoMappingResult | null> {
 	const { provider, anilistId, options, bypassCachedResolutionState } = request;
 	let attempt: ResolutionAttempt;
@@ -359,7 +271,6 @@ async function attemptNetworkResolution(
 				[],
 			);
 			const recentEvaluation = mergeRecentEvaluations(
-				seededRecentEvaluation,
 				fallbackTrace,
 			);
 			await deps.recordAutoMapping(
@@ -382,7 +293,6 @@ async function attemptNetworkResolution(
 	}
 
 	const recentEvaluation = mergeRecentEvaluations(
-		seededRecentEvaluation,
 		attempt.recentEvaluation,
 		createRecentEvaluationTrace(
 			resolveUnresolvedSearchTerms(options.hints),
@@ -566,6 +476,16 @@ async function tryResolveWithMedia(
 			credentials: context.credentials,
 			...(context.priority === undefined ? {} : { priority: context.priority }),
 			...(context.forceLookupNetwork ? { forceLookupNetwork: true } : {}),
+			isCandidateSuppressed: (providerId) =>
+				deps.isResolvedCandidateSuppressed(
+					provider,
+					media.id,
+					{
+						providerId,
+						reason: "exact-title-match",
+					},
+					"auto",
+				),
 			sessionSeenCanonical: deps.sessionSeenCanonical[provider],
 			limits: {
 				maxTerms: MAX_SEARCH_TERMS,

@@ -275,17 +275,13 @@ describe("MappingService", () => {
 			delete: vi.fn(async () => false),
 			clear: vi.fn(async () => false),
 		};
-		let rejectedHintHits = 0;
 		const lookupClient = {
 			provider: "sonarr" as const,
 			reset: vi.fn(async () => {}),
 			readCachedTitleLookup: vi.fn(async () => ({ results: [], hit: "none" as const })),
 			lookupTitle: vi.fn(async (term: { display: string }) => {
 				if (term.display === "Rejected Hint") {
-					rejectedHintHits += 1;
-					return rejectedHintHits === 1
-						? [{ title: "Rejected Hint", tvdbId: 101, year: 2013 }]
-						: [];
+					return [{ title: "Rejected Hint", tvdbId: 101, year: 2013 }];
 				}
 				return [
 					{ title: "Attack on Titan", tvdbId: 202, year: 2013 },

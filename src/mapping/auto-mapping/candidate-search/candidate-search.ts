@@ -26,6 +26,7 @@ type CandidateSearchContext = {
 	credentials: ProviderCredentials;
 	priority?: RequestPriority;
 	forceLookupNetwork?: boolean;
+	isCandidateSuppressed?: (providerId: ProviderId) => boolean;
 	sessionSeenCanonical: Set<string>;
 	limits: {
 		maxTerms: number;
@@ -41,6 +42,7 @@ export interface SearchedCandidate {
 	reason: Extract<AcceptedMappingReason, "exact-title-match" | "fuzzy-match">;
 	score: number;
 	searchTerm: string;
+	status?: "rejected";
 }
 
 export type CandidateSearchOutcome =
@@ -243,6 +245,7 @@ function addTraceCandidates(
 	registry: Map<number, SearchedCandidate>,
 	scored: ReturnType<typeof scoreTitleMatches>,
 	lookupClient: ProviderTitleLookup<ProviderTitleResult>,
+	isCandidateSuppressed?: (providerId: ProviderId) => boolean,
 ): void {
 	for (const candidate of scored) {
 		const providerId = lookupClient.readProviderId(candidate.result);
@@ -256,6 +259,9 @@ function addTraceCandidates(
 			reason: candidate.reason,
 			score: candidate.score,
 			searchTerm: candidate.term.display,
+			...(isCandidateSuppressed?.(providerId)
+				? { status: "rejected" as const }
+				: {}),
 		};
 		const existing = registry.get(providerId);
 		if (!existing || next.score > existing.score) {
@@ -270,6 +276,20 @@ function finalizeTraceCandidates(
 	return [...registry.values()]
 		.toSorted((left, right) => right.score - left.score)
 		.slice(0, TRACE_CANDIDATE_LIMIT);
+}
+
+function filterSuppressedCandidates(
+	scored: ScoredSearchCandidate[],
+	ctx: CandidateSearchContext,
+): ScoredSearchCandidate[] {
+	if (!ctx.isCandidateSuppressed) {
+		return scored;
+	}
+
+	return scored.filter((candidate) => {
+		const providerId = ctx.lookupClient.readProviderId(candidate.result);
+		return providerId !== null && !ctx.isCandidateSuppressed?.(providerId);
+	});
 }
 
 export async function searchAutoMappingCandidates(
@@ -295,13 +315,19 @@ export async function searchAutoMappingCandidates(
 
 		const results = await lookupForTerm(term, ctx);
 		const scored = scoreTitleMatches(provider, term, results, mediaYear);
-		overall.push(...scored);
-		addTraceCandidates(traceCandidates, scored, ctx.lookupClient);
+		const acceptedScored = filterSuppressedCandidates(scored, ctx);
+		overall.push(...acceptedScored);
+		addTraceCandidates(
+			traceCandidates,
+			scored,
+			ctx.lookupClient,
+			ctx.isCandidateSuppressed,
+		);
 
 		// Mark canonical as seen once we've either looked up or confirmed a cache hit
 		ctx.sessionSeenCanonical.add(term.canonical);
 
-		const early = pickEarlySearchResult(scored, {
+		const early = pickEarlySearchResult(acceptedScored, {
 			earlyStopThreshold: ctx.limits.earlyStopThreshold,
 			scoreThreshold: ctx.limits.scoreThreshold,
 		});
