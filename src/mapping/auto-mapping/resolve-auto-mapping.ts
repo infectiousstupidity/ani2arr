@@ -28,7 +28,6 @@ import {
 	MAX_SEARCH_TERMS,
 	SCORE_THRESHOLD,
 } from "./constants";
-import { tryTitleLookup } from "./lookup/title-lookup";
 import { buildMediaFromMetadata } from "./metadata-hints";
 import { attemptVerifiedInheritedSonarrResolution } from "./inheritance/verified-inheritance";
 import type {
@@ -54,6 +53,7 @@ import {
 } from "../resolution-policy";
 import type { AnibridgeMappingStore } from "../upstream-mapping";
 import type {
+	AcceptedMappingReason,
 	AcceptedMappingSource,
 	RecentMappingEvaluationTrace,
 } from "../types";
@@ -468,13 +468,26 @@ async function tryResolveWithMedia(
 			credentials: context.credentials,
 			...(context.priority === undefined ? {} : { priority: context.priority }),
 			...(context.forceLookupNetwork ? { forceLookupNetwork: true } : {}),
-			isCandidateSuppressed: (providerId) =>
+			...(inheritedResolution.borrowedBaseTitle
+				? {
+						preferredTerms: [
+							{
+								rawTitle: inheritedResolution.borrowedBaseTitle,
+								acceptedReason: "borrowed-base-title-fallback",
+							},
+						],
+					}
+				: {}),
+			isCandidateSuppressed: (
+				providerId,
+				reason: AcceptedMappingReason,
+			) =>
 				deps.isResolvedCandidateSuppressed(
 					provider,
 					media.id,
 					{
 						providerId,
-						reason: "exact-title-match",
+						reason,
 					},
 					"auto",
 				),
@@ -520,7 +533,11 @@ async function tryVerifiedInheritedResolution(
 	context: MediaResolutionContext,
 ): Promise<
 	| { handled: true; attempt: ResolutionAttempt }
-	| { handled: false; recentEvaluation?: RecentMappingEvaluationTrace }
+	| {
+			handled: false;
+			recentEvaluation?: RecentMappingEvaluationTrace;
+			borrowedBaseTitle?: string;
+	  }
 > {
 	const { provider, media } = context;
 	if (provider !== "sonarr" || !context.allowInheritedTraversal) {
@@ -581,53 +598,9 @@ async function tryVerifiedInheritedResolution(
 		};
 	}
 
-	const borrowed = await tryTitleLookup(
-		inheritedAttempt.borrowedBaseTitle,
-		deps.lookupClients.sonarr,
-		{
-			credentials: context.credentials,
-			log: deps.log,
-			forceLookupNetwork: context.forceLookupNetwork,
-		},
-	);
-	if (!borrowed) {
-		return {
-			handled: false,
-			...(recentEvaluation ? { recentEvaluation } : {}),
-		};
-	}
-
-	const borrowedTrace = createSingleCandidateTrace({
-		resolved: borrowed,
-		source: "auto",
-		status: "accepted",
-		searchTerms: [inheritedAttempt.borrowedBaseTitle],
-		...(borrowed.successfulSynonym
-			? { title: borrowed.successfulSynonym }
-			: {}),
-	});
-	recentEvaluation = mergeRecentEvaluations(recentEvaluation, borrowedTrace);
-
-	if (
-		!deps.isResolvedCandidateSuppressed(provider, media.id, borrowed, "auto")
-	) {
-		return {
-			handled: true,
-			attempt: {
-				resolved: borrowed,
-				...(recentEvaluation ? { recentEvaluation } : {}),
-			},
-		};
-	}
-
-	const rejectedRecentEvaluation = mergeRecentEvaluations(
-		recentEvaluation,
-		rewriteTraceCandidateStatus(borrowedTrace, borrowed.providerId, "rejected"),
-	);
 	return {
 		handled: false,
-		...(rejectedRecentEvaluation
-			? { recentEvaluation: rejectedRecentEvaluation }
-			: {}),
+		borrowedBaseTitle: inheritedAttempt.borrowedBaseTitle,
+		...(recentEvaluation ? { recentEvaluation } : {}),
 	};
 }

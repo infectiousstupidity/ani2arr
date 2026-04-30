@@ -26,7 +26,11 @@ type CandidateSearchContext = {
 	credentials: ProviderCredentials;
 	priority?: RequestPriority;
 	forceLookupNetwork?: boolean;
-	isCandidateSuppressed?: (providerId: ProviderId) => boolean;
+	isCandidateSuppressed?: (
+		providerId: ProviderId,
+		reason: AcceptedMappingReason,
+	) => boolean;
+	preferredTerms?: PreferredSearchTerm[];
 	sessionSeenCanonical: Set<string>;
 	limits: {
 		maxTerms: number;
@@ -36,10 +40,15 @@ type CandidateSearchContext = {
 	log: ScopedLogger;
 };
 
+export type PreferredSearchTerm = {
+	rawTitle: string;
+	acceptedReason: AcceptedMappingReason;
+};
+
 export interface SearchedCandidate {
 	providerId: ProviderId;
 	title: string;
-	reason: Extract<AcceptedMappingReason, "exact-title-match" | "fuzzy-match">;
+	reason: AcceptedMappingReason;
 	score: number;
 	searchTerm: string;
 	status?: "rejected";
@@ -62,7 +71,15 @@ export type CandidateSearchOutcome =
 			candidates: SearchedCandidate[];
 	  };
 
-type ScoredSearchCandidate = ReturnType<typeof scoreTitleMatches>[number];
+type ScoredTitleCandidate = ReturnType<typeof scoreTitleMatches>[number];
+type ScoredSearchCandidate = ScoredTitleCandidate & {
+	acceptedReason: AcceptedMappingReason;
+};
+
+type SearchTermEntry = {
+	term: TitleSearchTerm;
+	acceptedReasonOverride?: AcceptedMappingReason;
+};
 
 type EarlyStopLimits = {
 	earlyStopThreshold: number;
@@ -99,35 +116,52 @@ function pickBestSearchResult(
 	return undefined;
 }
 
-function searchTermFromHint(
-	provider: Provider,
-	primaryTitleHint?: string,
-): TitleSearchTerm | undefined {
-	if (!primaryTitleHint) {
-		return undefined;
-	}
-	return makeTitleSearchTerm(provider, primaryTitleHint);
-}
-
 function buildSearchTerms(
 	media: AniListMedia,
 	provider: Provider,
 	primaryTitleHint?: string,
-): TitleSearchTerm[] {
+	preferredTerms: readonly PreferredSearchTerm[] = [],
+): SearchTermEntry[] {
 	const generatedTerms = makeTitleSearchTerms(
 		provider,
 		media.title ?? ({} as Record<string, never>),
 		media.synonyms,
 	);
-	const hintTerm = searchTermFromHint(provider, primaryTitleHint);
-	if (!hintTerm) {
-		return generatedTerms;
+	const terms: SearchTermEntry[] = [];
+	const seen = new Set<string>();
+
+	const register = (
+		term: TitleSearchTerm | undefined,
+		acceptedReasonOverride?: AcceptedMappingReason,
+	) => {
+		if (!term || seen.has(term.canonical)) {
+			return;
+		}
+		seen.add(term.canonical);
+		terms.push({
+			term,
+			...(acceptedReasonOverride ? { acceptedReasonOverride } : {}),
+		});
+	};
+
+	for (const preferred of preferredTerms) {
+		register(
+			makeTitleSearchTerm(provider, preferred.rawTitle),
+			preferred.acceptedReason,
+		);
 	}
 
-	return [
-		hintTerm,
-		...generatedTerms.filter((term) => term.canonical !== hintTerm.canonical),
-	];
+	register(
+		primaryTitleHint
+			? makeTitleSearchTerm(provider, primaryTitleHint)
+			: undefined,
+	);
+
+	for (const term of generatedTerms) {
+		register(term);
+	}
+
+	return terms;
 }
 
 function lookupOptions(
@@ -180,7 +214,7 @@ function resolvedOutcome(
 	return {
 		status: "resolved",
 		providerId,
-		reason: pick.reason,
+		reason: pick.acceptedReason,
 		confidence: pick.score,
 		successfulSynonym: pick.term.display,
 		searchTerms,
@@ -243,9 +277,12 @@ function logUnresolved(
 
 function addTraceCandidates(
 	registry: Map<number, SearchedCandidate>,
-	scored: ReturnType<typeof scoreTitleMatches>,
+	scored: ScoredSearchCandidate[],
 	lookupClient: ProviderTitleLookup<ProviderTitleResult>,
-	isCandidateSuppressed?: (providerId: ProviderId) => boolean,
+	isCandidateSuppressed?: (
+		providerId: ProviderId,
+		reason: AcceptedMappingReason,
+	) => boolean,
 ): void {
 	for (const candidate of scored) {
 		const providerId = lookupClient.readProviderId(candidate.result);
@@ -256,10 +293,10 @@ function addTraceCandidates(
 		const next: SearchedCandidate = {
 			providerId,
 			title: candidate.result.title,
-			reason: candidate.reason,
+			reason: candidate.acceptedReason,
 			score: candidate.score,
 			searchTerm: candidate.term.display,
-			...(isCandidateSuppressed?.(providerId)
+			...(isCandidateSuppressed?.(providerId, candidate.acceptedReason)
 				? { status: "rejected" as const }
 				: {}),
 		};
@@ -288,7 +325,10 @@ function filterSuppressedCandidates(
 
 	return scored.filter((candidate) => {
 		const providerId = ctx.lookupClient.readProviderId(candidate.result);
-		return providerId !== null && !ctx.isCandidateSuppressed?.(providerId);
+		return (
+			providerId !== null &&
+			!ctx.isCandidateSuppressed?.(providerId, candidate.acceptedReason)
+		);
 	});
 }
 
@@ -301,20 +341,33 @@ export async function searchAutoMappingCandidates(
 
 	const mediaYear = media.startDate?.year ?? undefined;
 	const provider = ctx.lookupClient.provider;
-	const terms = buildSearchTerms(media, provider, primaryTitleHint);
+	const terms = buildSearchTerms(
+		media,
+		provider,
+		primaryTitleHint,
+		ctx.preferredTerms,
+	);
 	const traceCandidates = new Map<number, SearchedCandidate>();
 	const traceSearchTerms = terms
 		.slice(0, ctx.limits.maxTerms)
-		.map((term) => term.display);
+		.map(({ term }) => term.display);
 
 	const overall: ScoredSearchCandidate[] = [];
 	const start = Date.now();
 
-	for (const term of terms.slice(0, ctx.limits.maxTerms)) {
+	for (const { term, acceptedReasonOverride } of terms.slice(
+		0,
+		ctx.limits.maxTerms,
+	)) {
 		if (!term.canonical) continue;
 
 		const results = await lookupForTerm(term, ctx);
-		const scored = scoreTitleMatches(provider, term, results, mediaYear);
+		const scored = scoreTitleMatches(provider, term, results, mediaYear).map(
+			(candidate): ScoredSearchCandidate => ({
+				...candidate,
+				acceptedReason: acceptedReasonOverride ?? candidate.reason,
+			}),
+		);
 		const acceptedScored = filterSuppressedCandidates(scored, ctx);
 		overall.push(...acceptedScored);
 		addTraceCandidates(
