@@ -1,23 +1,21 @@
 /** Sonarr inherited-candidate verification against exact provider metadata. */
-// src/mapping/hints/inherited-verifier.ts
+// src/mapping/auto-mapping/inheritance/inherited-verifier.ts
 
 import type { AniListId } from "@/anilist";
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
+import { readResultTitleVariants } from "@/mapping/auto-mapping/title/title-matching";
 import {
-	extractCandidateTitleVariants,
 	normalizeTitleTokens,
-} from "@/mapping/pipeline/matching";
-import {
 	sanitizeLookupDisplayForProvider,
 	stripSeasonalSuffixes,
-} from "@/mapping/title-normalization";
+} from "@/mapping/auto-mapping/title/title-normalization";
 import type {
 	ProviderCredentials,
 	SonarrLookupSeries,
 	TvdbId,
 } from "@/providers";
-import type { ProviderLookupClient } from "../lookup";
-import type { InheritedMappingVerificationDetails } from "../types";
+import type { ProviderTitleLookup } from "../lookup/provider-title-lookup";
+import type { InheritedMappingVerificationDetails } from "../../types";
 
 const SEASON_INDICATORS = new Set(["season", "part", "cour"]);
 const ROMAN_NUMERAL_RE = /^[cdilmvx]+$/i;
@@ -31,8 +29,8 @@ type InheritedProposal = {
 };
 
 type ExactSonarrLookupClient = Pick<
-	ProviderLookupClient<ProviderCredentials, SonarrLookupSeries>,
-	"lookupExactByProviderId"
+	ProviderTitleLookup<SonarrLookupSeries>,
+	"lookupByProviderId"
 >;
 
 export interface InheritedVerificationResult {
@@ -170,7 +168,7 @@ export async function verifyInheritedSonarrCandidate(
 	lookupClient: ExactSonarrLookupClient,
 	credentials: ProviderCredentials,
 ): Promise<InheritedVerificationResult> {
-	if (typeof lookupClient.lookupExactByProviderId !== "function") {
+	if (typeof lookupClient.lookupByProviderId !== "function") {
 		return createFailureResult(
 			"Sonarr exact verification is unavailable for inherited mapping.",
 			proposal,
@@ -179,7 +177,7 @@ export async function verifyInheritedSonarrCandidate(
 
 	let exactLookup: SonarrLookupSeries | null;
 	try {
-		exactLookup = await lookupClient.lookupExactByProviderId(
+		exactLookup = await lookupClient.lookupByProviderId(
 			proposal.providerId,
 			credentials,
 		);
@@ -197,7 +195,7 @@ export async function verifyInheritedSonarrCandidate(
 		);
 	}
 
-	const providerTitles = extractCandidateTitleVariants(
+	const providerTitles = readResultTitleVariants(
 		"sonarr",
 		exactLookup,
 	).map((variant) => variant.value);

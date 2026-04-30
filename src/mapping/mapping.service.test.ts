@@ -57,6 +57,16 @@ type StubAniListApi = {
 	removeMediaFromCache: ReturnType<typeof vi.fn>;
 };
 
+function createDeferred<T>() {
+	let resolve!: (value: T | PromiseLike<T>) => void;
+	let reject!: (reason?: unknown) => void;
+	const promise = new Promise<T>((promiseResolve, promiseReject) => {
+		resolve = promiseResolve;
+		reject = promiseReject;
+	});
+	return { promise, resolve, reject };
+}
+
 const createService = () => {
 	const anilistApi: StubAniListApi = {
 		fetchMediaWithRelations: vi.fn(async () => {
@@ -269,9 +279,9 @@ describe("MappingService", () => {
 		const lookupClient = {
 			provider: "sonarr" as const,
 			reset: vi.fn(async () => {}),
-			readFromCache: vi.fn(async () => ({ results: [], hit: "none" as const })),
-			lookup: vi.fn(async (_canonical: string, rawTerm: string) => {
-				if (rawTerm === "Rejected Hint") {
+			readCachedTitleLookup: vi.fn(async () => ({ results: [], hit: "none" as const })),
+			lookupTitle: vi.fn(async (term: { display: string }) => {
+				if (term.display === "Rejected Hint") {
 					rejectedHintHits += 1;
 					return rejectedHintHits === 1
 						? [{ title: "Rejected Hint", tvdbId: 101, year: 2013 }]
@@ -282,7 +292,7 @@ describe("MappingService", () => {
 					{ title: "Attack Titan", tvdbId: 303, year: 2013 },
 				];
 			}),
-			getProviderId: vi.fn(
+			readProviderId: vi.fn(
 				(result: { tvdbId?: number }) => result.tvdbId ?? null,
 			),
 		};
@@ -368,11 +378,11 @@ describe("MappingService", () => {
 		const lookupClient = {
 			provider: "sonarr" as const,
 			reset: vi.fn(async () => {}),
-			readFromCache: vi.fn(async () => ({ results: [], hit: "none" as const })),
-			lookup: vi.fn(async () => [
+			readCachedTitleLookup: vi.fn(async () => ({ results: [], hit: "none" as const })),
+			lookupTitle: vi.fn(async () => [
 				{ title: "Attack on Titan", tvdbId: 202, year: 2013 },
 			]),
-			getProviderId: vi.fn(
+			readProviderId: vi.fn(
 				(result: { tvdbId?: number }) => result.tvdbId ?? null,
 			),
 		};
@@ -408,6 +418,105 @@ describe("MappingService", () => {
 			reason: "exact-title-match",
 		});
 		expect(fetchMediaWithRelations).not.toHaveBeenCalled();
+	});
+
+	it("does not reuse a default in-flight request for force lookups", async () => {
+		const manualMappings: StubManualMappings = {
+			isIgnored: vi.fn(() => false),
+			get: vi.fn(() => null),
+			clear: vi.fn(async () => {}),
+			getCandidateSuppression: vi.fn(() => null),
+		};
+		const anibridgeMappingStore = {
+			getSonarrCandidates: vi.fn(() => []),
+			getRadarrCandidates: vi.fn(() => []),
+		};
+		const autoMappingStore: StubAutoMappingStore = {
+			get: vi.fn(async () => null),
+			set: vi.fn(async () => true),
+			delete: vi.fn(async () => false),
+			clear: vi.fn(async () => false),
+		};
+		const defaultMedia = {
+			id: aid(78),
+			format: "TV",
+			title: { english: "Default Result" },
+			synonyms: [],
+		};
+		const forceMedia = {
+			id: aid(78),
+			format: "TV",
+			title: { english: "Force Result" },
+			synonyms: [],
+		};
+		const defaultFetch = createDeferred<typeof defaultMedia>();
+		let fetchCount = 0;
+		const fetchMediaWithRelations = vi.fn(async () => {
+			fetchCount += 1;
+			if (fetchCount === 1) {
+				return defaultFetch.promise;
+			}
+			return forceMedia;
+		});
+		const lookupClient = {
+			provider: "sonarr" as const,
+			reset: vi.fn(async () => {}),
+			readCachedTitleLookup: vi.fn(async () => ({
+				results: [],
+				hit: "none" as const,
+			})),
+			lookupTitle: vi.fn(async (term: { display: string }) => {
+				if (term.display === "Default Result") {
+					return [{ title: "Default Result", tvdbId: 101, year: 2020 }];
+				}
+				if (term.display === "Force Result") {
+					return [{ title: "Force Result", tvdbId: 202, year: 2020 }];
+				}
+				return [];
+			}),
+			readProviderId: vi.fn(
+				(result: { tvdbId?: number }) => result.tvdbId ?? null,
+			),
+		};
+
+		const service = new MappingService(
+			{
+				fetchMediaWithRelations,
+				iteratePrequelChain: async function* () {
+					yield* [];
+				},
+			} as never,
+			anibridgeMappingStore as never,
+			{
+				sonarr: lookupClient,
+				radarr: { reset: vi.fn(async () => {}) },
+			} as never,
+			autoMappingStore as never,
+			manualMappings as never,
+		);
+
+		const defaultRequest = service.resolveProviderId("sonarr", aid(78));
+		await vi.waitFor(() => {
+			expect(fetchMediaWithRelations).toHaveBeenCalledTimes(1);
+		});
+
+		const forceRequest = service.resolveProviderId("sonarr", aid(78), {
+			forceLookupNetwork: true,
+		});
+
+		await vi.waitFor(() => {
+			expect(fetchMediaWithRelations).toHaveBeenCalledTimes(2);
+		});
+		await expect(forceRequest).resolves.toMatchObject({
+			providerId: 202,
+			reason: "exact-title-match",
+		});
+
+		defaultFetch.resolve(defaultMedia);
+		await expect(defaultRequest).resolves.toMatchObject({
+			providerId: 101,
+			reason: "exact-title-match",
+		});
 	});
 
 	it("falls back to a borrowed base-title lookup after inherited verification rejects the relation candidate", async () => {
@@ -455,18 +564,18 @@ describe("MappingService", () => {
 		const lookupClient = {
 			provider: "sonarr" as const,
 			reset: vi.fn(async () => {}),
-			readFromCache: vi.fn(async () => ({ results: [], hit: "none" as const })),
-			lookup: vi.fn(async (_canonical: string, rawTerm: string) => {
-				if (rawTerm === "Bleach") {
+			readCachedTitleLookup: vi.fn(async () => ({ results: [], hit: "none" as const })),
+			lookupTitle: vi.fn(async (term: { display: string }) => {
+				if (term.display === "Bleach") {
 					return [{ title: "Bleach", tvdbId: 222, year: 2004 }];
 				}
 				return [];
 			}),
-			lookupExactByProviderId: vi.fn(async () => ({
+			lookupByProviderId: vi.fn(async () => ({
 				title: "Naruto",
 				tvdbId: 111,
 			})),
-			getProviderId: vi.fn(
+			readProviderId: vi.fn(
 				(result: { tvdbId?: number }) => result.tvdbId ?? null,
 			),
 		};
@@ -564,18 +673,18 @@ describe("MappingService", () => {
 		const lookupClient = {
 			provider: "sonarr" as const,
 			reset: vi.fn(async () => {}),
-			readFromCache: vi.fn(async () => ({ results: [], hit: "none" as const })),
-			lookup: vi.fn(async () => [
+			readCachedTitleLookup: vi.fn(async () => ({ results: [], hit: "none" as const })),
+			lookupTitle: vi.fn(async () => [
 				{ title: "Attack on Titan", tvdbId: 444, year: 2013 },
 			]),
-			lookupExactByProviderId: vi.fn(async () => {
+			lookupByProviderId: vi.fn(async () => {
 				throw createError(
 					ErrorCode.NETWORK_ERROR,
 					"Timed out reaching Sonarr.",
 					"Unable to verify the inherited series right now.",
 				);
 			}),
-			getProviderId: vi.fn(
+			readProviderId: vi.fn(
 				(result: { tvdbId?: number }) => result.tvdbId ?? null,
 			),
 		};

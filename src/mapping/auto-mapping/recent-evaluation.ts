@@ -2,7 +2,7 @@
 // src/mapping/auto-mapping/recent-evaluation.ts
 
 import type { ProviderId } from "@/providers";
-import type { EvaluationOutcome } from "../pipeline/types";
+import type { CandidateSearchOutcome } from "./candidate-search/candidate-search";
 import type {
 	AcceptedMappingReason,
 	AcceptedMappingSource,
@@ -22,6 +22,14 @@ const candidateStatusPriority: Record<
 	rejected: 3,
 	suppressed: 2,
 	"not-accepted": 1,
+};
+
+type CreateSingleCandidateTraceOptions = {
+	resolved: AcceptedAutoMappingResult;
+	source: AcceptedMappingSource;
+	status: MappingCandidateEvaluationStatus;
+	searchTerms?: readonly string[];
+	title?: string;
 };
 
 export function describeAcceptanceReason(
@@ -153,12 +161,10 @@ export function createRecentEvaluationTrace(
 }
 
 export function createSingleCandidateTrace(
-	resolved: AcceptedAutoMappingResult,
-	source: AcceptedMappingSource,
-	status: MappingCandidateEvaluationStatus,
-	searchTerms: readonly string[] = [],
-	title?: string,
+	options: CreateSingleCandidateTraceOptions,
 ): RecentMappingEvaluationTrace | undefined {
+	const { resolved, source, status, searchTerms = [], title } = options;
+
 	return createRecentEvaluationTrace(searchTerms, [
 		{
 			providerId: resolved.providerId,
@@ -197,7 +203,7 @@ export function rewriteTraceCandidateStatus(
 }
 
 export function createPipelineRecentEvaluation(
-	outcome: EvaluationOutcome,
+	outcome: CandidateSearchOutcome,
 ): RecentMappingEvaluationTrace | undefined {
 	return createRecentEvaluationTrace(
 		outcome.searchTerms,
