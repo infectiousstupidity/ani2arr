@@ -247,6 +247,47 @@ describe("MappingService", () => {
 		await expect(defaultRequest).resolves.toMatchObject({ providerId: 101 });
 	});
 
+	it("bypasses stored mapped auto results for force lookups", async () => {
+		const context = createService();
+		const { service, anilistApi, autoMappingStore, lookupClients } = context;
+		autoMappingStore.get.mockResolvedValue({
+			state: "mapped",
+			providerId: 101,
+			acceptedEvidence: {
+				source: "auto",
+				reason: "exact-title-match",
+			},
+			updatedAt: Date.now(),
+		});
+		configureMediaFetch(context, {
+			78: {
+				id: aid(78),
+				format: "TV",
+				title: { english: "Fresh Result" },
+				synonyms: [],
+			},
+		});
+		lookupClients.sonarr.lookupTitle.mockResolvedValue([
+			{ title: "Fresh Result", tvdbId: 202, year: 2020 },
+		]);
+
+		const result = await service.resolveProviderId("sonarr", aid(78), {
+			forceLookupNetwork: true,
+		});
+
+		expect(result).toMatchObject({ providerId: 202 });
+		expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledTimes(1);
+		expect(autoMappingStore.set).toHaveBeenCalledWith(
+			"sonarr",
+			78,
+			expect.objectContaining({
+				state: "mapped",
+				providerId: 202,
+			}),
+			expect.any(Object),
+		);
+	});
+
 	it("falls through to title search when inherited verification cannot complete", async () => {
 		const context = createService();
 		const { service, anibridgeMappingStore, autoMappingStore, lookupClients } =
