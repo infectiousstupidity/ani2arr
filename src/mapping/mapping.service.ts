@@ -25,7 +25,10 @@ import {
 } from "./auto-mapping/failure.cache";
 import { logger } from "@/shared/utils/logger";
 import { ManualMappingService } from "./manual-mapping";
-import { type ProviderLookupClient, type ProviderLookupResult } from "./lookup";
+import type {
+	ProviderTitleLookup,
+	ProviderTitleResult,
+} from "./auto-mapping/lookup/provider-title-lookup";
 import { resolveAutoMapping } from "./auto-mapping/resolve-auto-mapping";
 import {
 	MAPPED_AUTO_MAPPING_TTL,
@@ -43,9 +46,9 @@ import type {
 	AutoMappingRecord,
 } from "./auto-mapping/types";
 
-type ProviderLookupRegistry = Record<
+type ProviderTitleLookupRegistry = Record<
 	Provider,
-	ProviderLookupClient<ProviderCredentials, ProviderLookupResult>
+	ProviderTitleLookup<ProviderTitleResult>
 >;
 
 type AniListPrioritizeApi = {
@@ -74,6 +77,16 @@ function canEvictAniListMedia(
 	);
 }
 
+function canShareInflight(options: AutoMappingOptions): boolean {
+	return (
+		options.hints === undefined &&
+		options.network === undefined &&
+		options.ignoreFailureCache !== true &&
+		options.forceLookupNetwork !== true &&
+		options.priority === undefined
+	);
+}
+
 export class MappingService {
 	private readonly log = logger.create("MappingService");
 	private readonly inflight = new Map<
@@ -84,11 +97,11 @@ export class MappingService {
 		sonarr: new Set<string>(),
 		radarr: new Set<string>(),
 	};
-
+	// eslint-disable-next-line max-params
 	constructor(
 		private readonly anilistApi: AniListMediaService,
 		private readonly anibridgeMappingStore: AnibridgeMappingStore,
-		private readonly lookupClients: ProviderLookupRegistry,
+		private readonly lookupClients: ProviderTitleLookupRegistry,
 		private readonly autoMappingStore: AutoMappingStore,
 		private readonly manualMappings?: ManualMappingService,
 		private readonly notifyMappingsChanged?: () => void,
@@ -167,15 +180,17 @@ export class MappingService {
 				| null;
 		}
 
-		const inflightKey = this.inflightKey(provider, anilistId);
-		const existing = this.inflight.get(inflightKey);
-		if (existing) {
-			if (options.priority === "high") {
-				this.prioritizeAniListMedia(anilistId, { schedule: false });
+		const shareInflight = canShareInflight(options);
+		const inflightKey = shareInflight
+			? this.inflightKey(provider, anilistId)
+			: null;
+		if (inflightKey) {
+			const existing = this.inflight.get(inflightKey);
+			if (existing) {
+				return existing as Promise<
+					(AcceptedAutoMappingResult & { providerId: ProviderIdFor<P> }) | null
+				>;
 			}
-			return existing as Promise<
-				(AcceptedAutoMappingResult & { providerId: ProviderIdFor<P> }) | null
-			>;
 		}
 
 		const promise = resolveAutoMapping(
@@ -227,6 +242,12 @@ export class MappingService {
 			anilistId,
 			options,
 		);
+		if (!inflightKey) {
+			return promise as Promise<
+				(AcceptedAutoMappingResult & { providerId: ProviderIdFor<P> }) | null
+			>;
+		}
+
 		this.inflight.set(inflightKey, promise);
 
 		promise

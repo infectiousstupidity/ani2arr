@@ -29,12 +29,15 @@ import {
 	MAX_SEARCH_TERMS,
 	SCORE_THRESHOLD,
 } from "./constants";
-import { tryHintLookup } from "../hints/hint-lookup";
-import { buildMediaFromMetadataHint } from "../hints/media-hints";
-import { attemptVerifiedInheritedSonarrResolution } from "../hints/verified-inheritance";
-import type { ProviderLookupClient, ProviderLookupResult } from "../lookup";
+import { tryTitleLookup } from "./lookup/title-lookup";
+import { buildMediaFromMetadata } from "./metadata-hints";
+import { attemptVerifiedInheritedSonarrResolution } from "./inheritance/verified-inheritance";
+import type {
+	ProviderTitleLookup,
+	ProviderTitleResult,
+} from "./lookup/provider-title-lookup";
 import type { ManualMappingService } from "../manual-mapping";
-import { resolveViaPipeline } from "../pipeline/pipeline";
+import { searchAutoMappingCandidates } from "./candidate-search/candidate-search";
 import {
 	createPipelineRecentEvaluation,
 	createRecentEvaluationTrace,
@@ -62,9 +65,9 @@ import type {
 	AutoMappingRecord,
 } from "./types";
 
-type ProviderLookupRegistry = Record<
+type ProviderTitleLookupRegistry = Record<
 	Provider,
-	ProviderLookupClient<ProviderCredentials, ProviderLookupResult>
+	ProviderTitleLookup<ProviderTitleResult>
 >;
 
 type ResolutionAttempt = {
@@ -97,7 +100,7 @@ type ManualMappingReads = Pick<ManualMappingService, "isIgnored" | "get">;
 type ResolveAutoMappingDeps = {
 	anilistApi: AniListMediaService;
 	anibridgeMappingStore: AnibridgeMappingStore;
-	lookupClients: ProviderLookupRegistry;
+	lookupClients: ProviderTitleLookupRegistry;
 	autoMappingStore: Pick<AutoMappingStore, "get">;
 	log: ScopedLogger;
 	sessionSeenCanonical: Record<Provider, Set<string>>;
@@ -272,7 +275,7 @@ async function tryResolvePrimaryTitleHint(
 
 	try {
 		const credentials = await deps.getConfiguredCredentials(provider);
-		const hinted = await tryHintLookup(
+		const hinted = await tryTitleLookup(
 			hintTerm,
 			deps.lookupClients[provider],
 			{
@@ -288,13 +291,15 @@ async function tryResolvePrimaryTitleHint(
 		if (
 			!deps.isResolvedCandidateSuppressed(provider, anilistId, hinted, "auto")
 		) {
-			const recentEvaluation = createSingleCandidateTrace(
-				hinted,
-				"auto",
-				"accepted",
-				[hintTerm],
-				hinted.successfulSynonym,
-			);
+			const recentEvaluation = createSingleCandidateTrace({
+				resolved: hinted,
+				source: "auto",
+				status: "accepted",
+				searchTerms: [hintTerm],
+				...(hinted.successfulSynonym
+					? { title: hinted.successfulSynonym }
+					: {}),
+			});
 			const resolved = await deps.acceptResolved(
 				provider,
 				anilistId,
@@ -312,13 +317,13 @@ async function tryResolvePrimaryTitleHint(
 				`mapping:hint-suppressed provider=${provider} anilistId=${anilistId} providerId=${hinted.providerId} reason=${hinted.reason}`,
 			);
 		}
-		const seededRecentEvaluation = createSingleCandidateTrace(
-			hinted,
-			"auto",
-			"rejected",
-			[hintTerm],
-			hinted.successfulSynonym,
-		);
+		const seededRecentEvaluation = createSingleCandidateTrace({
+			resolved: hinted,
+			source: "auto",
+			status: "rejected",
+			searchTerms: [hintTerm],
+			...(hinted.successfulSynonym ? { title: hinted.successfulSynonym } : {}),
+		});
 		return {
 			handled: false,
 			...(seededRecentEvaluation ? { seededRecentEvaluation } : {}),
@@ -484,7 +489,7 @@ async function resolveViaNetwork(
 		return null;
 	};
 
-	const metadataMedia = buildMediaFromMetadataHint(
+	const metadataMedia = buildMediaFromMetadata(
 		anilistId,
 		context.hints?.domMedia,
 	);
@@ -554,12 +559,10 @@ async function tryResolveWithMedia(
 	recentEvaluation = inheritedResolution.recentEvaluation;
 
 	const lookupClient = deps.lookupClients[provider];
-	const outcome = await resolveViaPipeline(
+	const outcome = await searchAutoMappingCandidates(
 		media,
 		{
-			anilistApi: deps.anilistApi,
 			lookupClient,
-			anibridgeMappingStore: deps.anibridgeMappingStore,
 			credentials: context.credentials,
 			...(context.priority === undefined ? {} : { priority: context.priority }),
 			...(context.forceLookupNetwork ? { forceLookupNetwork: true } : {}),
@@ -616,10 +619,8 @@ async function tryVerifiedInheritedResolution(
 		media,
 		anilistApi: deps.anilistApi,
 		anibridgeMappingStore: deps.anibridgeMappingStore,
-		lookupClient: deps.lookupClients.sonarr as ProviderLookupClient<
-			ProviderCredentials,
-			SonarrLookupSeries
-		>,
+		lookupClient: deps.lookupClients
+			.sonarr as ProviderTitleLookup<SonarrLookupSeries>,
 		credentials: context.credentials,
 		...(deps.manualMappings ? { manualMappings: deps.manualMappings } : {}),
 	});
@@ -647,11 +648,11 @@ async function tryVerifiedInheritedResolution(
 		recentEvaluation = mergeRecentEvaluations(
 			recentEvaluation,
 			rewriteTraceCandidateStatus(
-				createSingleCandidateTrace(
-					inheritedAttempt.resolved,
-					"auto",
-					"accepted",
-				),
+				createSingleCandidateTrace({
+					resolved: inheritedAttempt.resolved,
+					source: "auto",
+					status: "accepted",
+				}),
 				inheritedAttempt.resolved.providerId,
 				"rejected",
 			),
@@ -682,7 +683,7 @@ async function tryVerifiedInheritedResolution(
 		};
 	}
 
-	const borrowed = await tryHintLookup(
+	const borrowed = await tryTitleLookup(
 		inheritedAttempt.borrowedBaseTitle,
 		deps.lookupClients.sonarr,
 		{
@@ -698,13 +699,15 @@ async function tryVerifiedInheritedResolution(
 		};
 	}
 
-	const borrowedTrace = createSingleCandidateTrace(
-		borrowed,
-		"auto",
-		"accepted",
-		[inheritedAttempt.borrowedBaseTitle],
-		borrowed.successfulSynonym,
-	);
+	const borrowedTrace = createSingleCandidateTrace({
+		resolved: borrowed,
+		source: "auto",
+		status: "accepted",
+		searchTerms: [inheritedAttempt.borrowedBaseTitle],
+		...(borrowed.successfulSynonym
+			? { title: borrowed.successfulSynonym }
+			: {}),
+	});
 	recentEvaluation = mergeRecentEvaluations(recentEvaluation, borrowedTrace);
 
 	if (

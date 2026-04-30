@@ -94,13 +94,13 @@ describe("recent-evaluation helpers", () => {
 	});
 
 	it("rewrites accepted trace candidates to rejected with the matching summary text", () => {
-		const trace = createSingleCandidateTrace(
-			{ providerId: tvdb(77), reason: "fuzzy-match" },
-			"auto",
-			"accepted",
-			["Attack on Titan"],
-			"Attack on Titan",
-		);
+		const trace = createSingleCandidateTrace({
+			resolved: { providerId: tvdb(77), reason: "fuzzy-match" },
+			source: "auto",
+			status: "accepted",
+			searchTerms: ["Attack on Titan"],
+			title: "Attack on Titan",
+		});
 
 		const rewritten = rewriteTraceCandidateStatus(trace, tvdb(77), "rejected");
 

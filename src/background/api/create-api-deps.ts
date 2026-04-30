@@ -8,9 +8,9 @@ import {
 	resetAllRevisions,
 } from "@/shared/sync/revisions";
 import {
-	radarrLookupCaches,
-	sonarrLookupCaches,
-} from "@/mapping/lookup/lookup.cache";
+	radarrTitleLookupCaches,
+	sonarrTitleLookupCaches,
+} from "@/mapping/auto-mapping/lookup/lookup.cache";
 import { anibridgeMappingCache } from "@/mapping/upstream-mapping/anibridge-mapping.cache";
 import { anilistMediaCache } from "@/anilist/media.cache";
 import { providerLibraryCaches } from "@/providers/library/cache";
@@ -27,7 +27,10 @@ import { MappingService } from "@/mapping/mapping.service";
 import { ManualMappingService } from "@/mapping/manual-mapping";
 import { AutoMappingStore } from "@/mapping/auto-mapping/auto-mapping.store";
 import { AnibridgeMappingStore } from "@/mapping/upstream-mapping";
-import { SonarrLookupClient, RadarrLookupClient } from "@/mapping/lookup";
+import {
+	createRadarrTitleLookup,
+	createSonarrTitleLookup,
+} from "@/mapping/auto-mapping/lookup/provider-title-lookup";
 import {
 	createDefaultExtensionOptions,
 	getExtensionOptionsSnapshot,
@@ -107,10 +110,13 @@ export const createApiDeps = (): ApiHandlerDeps => {
 	const anibridgeMappingStore = new AnibridgeMappingStore(
 		anibridgeMappingCache,
 	);
-	const lookupClient = new SonarrLookupClient(sonarrClient, sonarrLookupCaches);
-	const radarrLookupClient = new RadarrLookupClient(
+	const lookupClient = createSonarrTitleLookup(
+		sonarrClient,
+		sonarrTitleLookupCaches,
+	);
+	const radarrLookupClient = createRadarrTitleLookup(
 		radarrClient,
-		radarrLookupCaches,
+		radarrTitleLookupCaches,
 	);
 
 	const manualMappingService = new ManualMappingService();

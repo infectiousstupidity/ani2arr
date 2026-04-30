@@ -1,5 +1,5 @@
 /** Sonarr-only trusted relation inheritance and explicit inherited-candidate decisions. */
-// src/mapping/hints/verified-inheritance.ts
+// src/mapping/auto-mapping/inheritance/verified-inheritance.ts
 
 import {
 	parseAniListIdOrNull,
@@ -7,17 +7,17 @@ import {
 	type AniListMediaService,
 } from "@/anilist";
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
-import { sanitizeLookupDisplayForProvider } from "@/mapping/title-normalization";
+import { sanitizeLookupDisplayForProvider } from "@/mapping/auto-mapping/title/title-normalization";
 import type {
 	ProviderCredentials,
 	SonarrLookupSeries,
 	TvdbId,
 } from "@/providers";
-import { createRecentEvaluationTrace } from "../auto-mapping/recent-evaluation";
-import type { AnibridgeMappingStore } from "../upstream-mapping";
-import type { ProviderLookupClient } from "../lookup";
-import type { RecentMappingEvaluationTrace } from "../types";
-import type { AcceptedAutoMappingResult } from "../auto-mapping/types";
+import { createRecentEvaluationTrace } from "../recent-evaluation";
+import type { AnibridgeMappingStore } from "../../upstream-mapping";
+import type { ProviderTitleLookup } from "../lookup/provider-title-lookup";
+import type { RecentMappingEvaluationTrace } from "../../types";
+import type { AcceptedAutoMappingResult } from "../types";
 import {
 	verifyInheritedSonarrCandidate,
 	type InheritedVerificationResult,
@@ -41,8 +41,7 @@ type InheritedProposal = {
 	borrowedBaseTitle?: string;
 };
 
-type ExactSonarrLookupClient = ProviderLookupClient<
-	ProviderCredentials,
+type ExactSonarrLookupClient = ProviderTitleLookup<
 	SonarrLookupSeries
 >;
 
