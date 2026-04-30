@@ -209,6 +209,10 @@ async function readUsableCachedAutoMapping(
 		return { handled: false, autoMappingRecord: null };
 	}
 
+	if (request.options.forceLookupNetwork === true) {
+		return { handled: false, autoMappingRecord: null };
+	}
+
 	if (import.meta.env.DEV) {
 		deps.log.debug?.(
 			`mapping:auto-mapping-hit provider=${provider} anilistId=${anilistId} providerId=${autoMappingRecord.providerId} source=${autoMappingRecord.acceptedEvidence.source} reason=${autoMappingRecord.acceptedEvidence.reason}`,
