@@ -2,6 +2,7 @@
 // src/mapping/auto-mapping/auto-mapping.store.test.ts
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { browser } from "wxt/browser";
 import { parseAniListId } from "@/anilist";
 import type { AutoMappingRecord } from "./types";
 import { AutoMappingStore } from "./auto-mapping.store";
@@ -92,6 +93,40 @@ describe("AutoMappingStore", () => {
 		await expect(store.get("radarr", aid(2))).resolves.toMatchObject({
 			state: "mapped",
 			providerId: 202,
+		});
+	});
+
+	it("sanitizes legacy recent-evaluation payloads when records are read", async () => {
+		await browser.storage.local.set({
+			"autoMappings:v2": {
+				"sonarr:1": {
+					state: "mapped",
+					providerId: 101,
+					acceptedEvidence: {
+						source: "auto",
+						reason: "fuzzy-match",
+					},
+					recentEvaluation: {
+						attemptedAt: 1,
+						searchTerms: ["legacy"],
+						candidates: [],
+					},
+					updatedAt: 10,
+					expiresAt: Date.now() + 60_000,
+				},
+			},
+		});
+
+		const legacyStore = new AutoMappingStore();
+
+		await expect(legacyStore.get("sonarr", aid(1))).resolves.toEqual({
+			state: "mapped",
+			providerId: 101,
+			acceptedEvidence: {
+				source: "auto",
+				reason: "fuzzy-match",
+			},
+			updatedAt: 10,
 		});
 	});
 });

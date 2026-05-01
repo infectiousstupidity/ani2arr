@@ -19,7 +19,6 @@ import {
 } from "../title/title-search";
 import { scoreTitleMatches } from "../title/title-matching";
 
-const TRACE_CANDIDATE_LIMIT = 8;
 const MIN_WINNER_SCORE_MARGIN = 0.02;
 
 type CandidateSearchContext = {
@@ -39,15 +38,6 @@ type CandidateSearchContext = {
 	log: ScopedLogger;
 };
 
-export interface SearchedCandidate {
-	providerId: ProviderId;
-	title: string;
-	reason: AcceptedMappingReason;
-	score: number;
-	searchTerm: string;
-	status?: "rejected";
-}
-
 export type CandidateSearchOutcome =
 	| {
 			status: "resolved";
@@ -55,14 +45,10 @@ export type CandidateSearchOutcome =
 			reason: AcceptedMappingReason;
 			confidence: number;
 			successfulSynonym?: string;
-			searchTerms: string[];
-			candidates: SearchedCandidate[];
 	  }
 	| {
 			status: "unresolved";
 			reason: string;
-			searchTerms: string[];
-			candidates: SearchedCandidate[];
 	  };
 
 type ScoredTitleCandidate = ReturnType<typeof scoreTitleMatches>[number];
@@ -216,8 +202,6 @@ function hasUniqueWinnerMargin(
 function resolvedOutcome(
 	pick: ScoredSearchCandidate,
 	ctx: CandidateSearchContext,
-	searchTerms: string[],
-	traceCandidates: Map<number, SearchedCandidate>,
 ): CandidateSearchOutcome | undefined {
 	const providerId = ctx.lookupClient.readProviderId(pick.result);
 	if (providerId === null) {
@@ -230,21 +214,13 @@ function resolvedOutcome(
 		reason: pick.acceptedReason,
 		confidence: pick.score,
 		successfulSynonym: pick.term.display,
-		searchTerms,
-		candidates: finalizeTraceCandidates(traceCandidates),
 	};
 }
 
-function unresolvedOutcome(
-	reason: string,
-	searchTerms: string[],
-	traceCandidates: Map<number, SearchedCandidate>,
-): CandidateSearchOutcome {
+function unresolvedOutcome(reason: string): CandidateSearchOutcome {
 	return {
 		status: "unresolved",
 		reason,
-		searchTerms,
-		candidates: finalizeTraceCandidates(traceCandidates),
 	};
 }
 
@@ -288,46 +264,6 @@ function logUnresolved(
 	ctx.log.debug?.(`pipeline:unresolved anilistId=${media.id} reason=${reason}`);
 }
 
-function addTraceCandidates(
-	registry: Map<number, SearchedCandidate>,
-	scored: ScoredSearchCandidate[],
-	lookupClient: ProviderTitleLookup<ProviderTitleResult>,
-	isCandidateSuppressed?: (
-		providerId: ProviderId,
-		reason: AcceptedMappingReason,
-	) => boolean,
-): void {
-	for (const candidate of scored) {
-		const providerId = lookupClient.readProviderId(candidate.result);
-		if (providerId === null) {
-			continue;
-		}
-
-		const next: SearchedCandidate = {
-			providerId,
-			title: candidate.result.title,
-			reason: candidate.acceptedReason,
-			score: candidate.score,
-			searchTerm: candidate.term.display,
-			...(isCandidateSuppressed?.(providerId, candidate.acceptedReason)
-				? { status: "rejected" as const }
-				: {}),
-		};
-		const existing = registry.get(providerId);
-		if (!existing || next.score > existing.score) {
-			registry.set(providerId, next);
-		}
-	}
-}
-
-function finalizeTraceCandidates(
-	registry: Map<number, SearchedCandidate>,
-): SearchedCandidate[] {
-	return [...registry.values()]
-		.toSorted((left, right) => right.score - left.score)
-		.slice(0, TRACE_CANDIDATE_LIMIT);
-}
-
 function filterSuppressedCandidates(
 	scored: ScoredSearchCandidate[],
 	ctx: CandidateSearchContext,
@@ -359,10 +295,6 @@ export async function searchAutoMappingCandidates(
 		provider,
 		primaryTitleHint,
 	);
-	const traceCandidates = new Map<number, SearchedCandidate>();
-	const traceSearchTerms = terms
-		.slice(0, ctx.limits.maxTerms)
-		.map(({ term }) => term.display);
 
 	const overall: ScoredSearchCandidate[] = [];
 	const start = Date.now();
@@ -382,12 +314,6 @@ export async function searchAutoMappingCandidates(
 		);
 		const acceptedScored = filterSuppressedCandidates(scored, ctx);
 		overall.push(...acceptedScored);
-		addTraceCandidates(
-			traceCandidates,
-			scored,
-			ctx.lookupClient,
-			ctx.isCandidateSuppressed,
-		);
 
 		const early = pickEarlySearchResult(
 			acceptedScored,
@@ -398,12 +324,7 @@ export async function searchAutoMappingCandidates(
 			},
 		);
 		if (early.stop && early.pick) {
-			const out = resolvedOutcome(
-				early.pick,
-				ctx,
-				traceSearchTerms,
-				traceCandidates,
-			);
+			const out = resolvedOutcome(early.pick, ctx);
 			if (!out) {
 				continue;
 			}
@@ -422,18 +343,14 @@ export async function searchAutoMappingCandidates(
 		ctx.limits.scoreThreshold,
 	);
 	if (pick) {
-		const out = resolvedOutcome(pick, ctx, traceSearchTerms, traceCandidates);
+		const out = resolvedOutcome(pick, ctx);
 		if (!out) {
-			return unresolvedOutcome(
-				"missing-provider-id",
-				traceSearchTerms,
-				traceCandidates,
-			);
+			return unresolvedOutcome("missing-provider-id");
 		}
 		logResolved(media, ctx, out);
 		return out;
 	}
 
 	logUnresolved(media, ctx, "low-confidence");
-	return unresolvedOutcome("low-confidence", traceSearchTerms, traceCandidates);
+	return unresolvedOutcome("low-confidence");
 }

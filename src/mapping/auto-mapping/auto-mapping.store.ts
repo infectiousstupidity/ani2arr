@@ -4,12 +4,8 @@
 import { storage } from '@wxt-dev/storage';
 import PQueue from 'p-queue';
 import { parseAniListIdOrNull, type AniListId } from '@/anilist';
-import type { Provider } from '@/providers';
-import type {
-  AcceptedMappingEvidence,
-  MappingCandidateEvaluation,
-  RecentMappingEvaluationTrace,
-} from '@/mapping/types';
+import type { Provider, ProviderId } from '@/providers';
+import type { AcceptedMappingEvidence } from '@/mapping/types';
 import type { AutoMappingRecord } from './types';
 
 type AutoMappingTtl = {
@@ -65,56 +61,6 @@ const acceptedEvidenceEquals = (
   left.successfulTitle === right.successfulTitle
 );
 
-const evaluationCandidateEquals = (
-  left: MappingCandidateEvaluation,
-  right: MappingCandidateEvaluation,
-): boolean => (
-  left.providerId === right.providerId &&
-  left.title === right.title &&
-  left.source === right.source &&
-  left.reason === right.reason &&
-  left.status === right.status &&
-  left.summary === right.summary &&
-  left.score === right.score
-);
-
-const recentEvaluationEquals = (
-  left: RecentMappingEvaluationTrace | undefined,
-  right: RecentMappingEvaluationTrace | undefined,
-): boolean => {
-  if (!left && !right) {
-    return true;
-  }
-  if (!left || !right) {
-    return false;
-  }
-  if (left.attemptedAt !== right.attemptedAt) {
-    return false;
-  }
-
-  const leftTerms = left.searchTerms ?? [];
-  const rightTerms = right.searchTerms ?? [];
-  if (leftTerms.length !== rightTerms.length) {
-    return false;
-  }
-  for (const [index, leftTerm] of leftTerms.entries()) {
-    if (leftTerm !== rightTerms[index]) {
-      return false;
-    }
-  }
-
-  if (left.candidates.length !== right.candidates.length) {
-    return false;
-  }
-  for (const [index, candidate] of left.candidates.entries()) {
-    if (!evaluationCandidateEquals(candidate, right.candidates[index]!)) {
-      return false;
-    }
-  }
-
-  return true;
-};
-
 const autoMappingEquals = (left: AutoMappingRecord, right: AutoMappingRecord): boolean => {
   if (left.state !== right.state || left.updatedAt !== right.updatedAt) {
     return false;
@@ -125,14 +71,35 @@ const autoMappingEquals = (left: AutoMappingRecord, right: AutoMappingRecord): b
       return (
         right.state === 'mapped' &&
         left.providerId === right.providerId &&
-        acceptedEvidenceEquals(left.acceptedEvidence, right.acceptedEvidence) &&
-        recentEvaluationEquals(left.recentEvaluation, right.recentEvaluation)
+        acceptedEvidenceEquals(left.acceptedEvidence, right.acceptedEvidence)
       );
     }
     default: {
-      return right.state === left.state && recentEvaluationEquals(left.recentEvaluation, right.recentEvaluation);
+      return right.state === left.state;
     }
   }
+};
+
+const sanitizeStoredRecord = (value: StoredAutoMappingRecord): StoredAutoMappingRecord | null => {
+  if (value.state === 'mapped') {
+    return {
+      state: 'mapped',
+      providerId: value.providerId as ProviderId,
+      acceptedEvidence: value.acceptedEvidence,
+      updatedAt: value.updatedAt,
+      expiresAt: value.expiresAt,
+    };
+  }
+
+  if (value.state === 'unresolved' || value.state === 'ambiguous') {
+    return {
+      state: value.state,
+      updatedAt: value.updatedAt,
+      expiresAt: value.expiresAt,
+    };
+  }
+
+  return null;
 };
 
 export class AutoMappingStore {
@@ -287,7 +254,10 @@ export class AutoMappingStore {
       if (!parseAutoMappingKey(key)) {
         continue;
       }
-      this.records.set(key, value);
+      const sanitized = sanitizeStoredRecord(value);
+      if (sanitized) {
+        this.records.set(key, sanitized);
+      }
     }
   }
 
@@ -319,14 +289,12 @@ export class AutoMappingStore {
           state: 'mapped',
           providerId: record.providerId,
           acceptedEvidence: record.acceptedEvidence,
-          ...(record.recentEvaluation ? { recentEvaluation: record.recentEvaluation } : {}),
           updatedAt: record.updatedAt,
         };
       }
       default: {
         return {
           state: record.state,
-          ...(record.recentEvaluation ? { recentEvaluation: record.recentEvaluation } : {}),
           updatedAt: record.updatedAt,
         };
       }

@@ -1,4 +1,4 @@
-/** Renders the left workspace mapping flow with search and suggestion shortcuts. */
+/** Renders the left workspace mapping flow with manual provider search. */
 // src/features/media-modal/components/mapping/mapping-panel.tsx
 
 import { useCallback, useRef, type WheelEvent as ReactWheelEvent } from "react";
@@ -8,10 +8,6 @@ import type { MappingSearchResult } from "@/features/media-modal/mapping-search/
 import { getProviderIdLabel } from "@/providers/provider-labels";
 import { useMediaModalContext } from "../../context";
 import { MappingSearchPanel } from "./search-results";
-import {
-  applySuggestedCandidateSearchShortcut,
-  MappingInspectionSuggestedShortcuts,
-} from "./suggested-candidates";
 
 type MappingInspectionQuery = {
   data: MappingDetailsPayload | undefined;
@@ -37,7 +33,6 @@ export function MappingPanel(props: MappingPanelProps): React.JSX.Element {
     isSearching,
     selectedResult,
     effectiveMapping,
-    inspectionQuery,
     onQueryChange,
     onSelectResult,
   } = props;
@@ -45,7 +40,6 @@ export function MappingPanel(props: MappingPanelProps): React.JSX.Element {
   const providerIdLabel = getProviderIdLabel(provider);
   const isSearchMode = query.trim().length > 0;
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const inspection = inspectionQuery.data ?? null;
 
   const handleWheelCapture = useCallback(
     (event: ReactWheelEvent<HTMLDivElement>) => {
@@ -74,11 +68,7 @@ export function MappingPanel(props: MappingPanelProps): React.JSX.Element {
           <p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">
             {`Search ${providerLabel} database`}
           </p>
-          <p className="text-xs text-text-secondary">
-            {isSearchMode
-              ? "Search results update the target preview on the right."
-              : "Use a recent suggestion below, or start typing to search manually."}
-          </p>
+          <p className="text-xs text-text-secondary">Search results update the target preview on the right.</p>
         </div>
 
         <div className="mt-3">
@@ -108,32 +98,8 @@ export function MappingPanel(props: MappingPanelProps): React.JSX.Element {
                   onSelectResult={onSelectResult}
                 />
               ) : (
-                <div className="space-y-4">
-                  {inspectionQuery.isPending && !inspection ? (
-                    <div className="rounded-xl bg-bg-secondary/45 px-3 py-8 text-center text-sm text-text-secondary">
-                      Loading recent suggestions...
-                    </div>
-                  ) : null}
-
-                  {inspectionQuery.error && !inspection ? (
-                    <div className="rounded-xl bg-warning/8 px-3 py-4 text-sm text-text-secondary">
-                      Suggestions are unavailable right now. Search is still available above.
-                    </div>
-                  ) : null}
-
-                  {inspection ? (
-                    <MappingInspectionSuggestedShortcuts
-                      inspection={inspection}
-                      provider={provider}
-                      onUseSuggestion={(candidate) => {
-                        applySuggestedCandidateSearchShortcut(
-                          onQueryChange,
-                          candidate,
-                          inspection.suggestedCandidates,
-                        );
-                      }}
-                    />
-                  ) : null}
+                <div className="rounded-xl bg-bg-secondary/35 px-3 py-4 text-sm text-text-secondary">
+                  Start typing to search manually.
                 </div>
               )}
             </div>

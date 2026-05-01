@@ -19,8 +19,6 @@ import type {
 	AcceptedMappingEvidence,
 	AcceptedMappingReason,
 	AcceptedMappingSource,
-	MappingCandidateEvaluationStatus,
-	RecentMappingEvaluationTrace,
 } from "@/mapping/types";
 import type {
 	AutoMappingRecord,
@@ -133,24 +131,6 @@ interface MappingDetailsExplanationItem {
 	details?: readonly string[];
 }
 
-interface MappingDetailsCandidateEvaluation {
-	providerId: ProviderId;
-	title?: string;
-	source: AcceptedMappingSource;
-	reason: AcceptedMappingReason;
-	status: MappingCandidateEvaluationStatus;
-	summary: string;
-	score?: number;
-}
-
-interface MappingDetailsCandidateGroups {
-	attemptedAt?: number;
-	searchTerms?: readonly string[];
-	accepted: readonly MappingDetailsCandidateEvaluation[];
-	rejected: readonly MappingDetailsCandidateEvaluation[];
-	notAccepted: readonly MappingDetailsCandidateEvaluation[];
-}
-
 interface MappingDetailsReview {
 	needsReview: boolean;
 	summary?: MappingIssuesSummary;
@@ -176,49 +156,27 @@ export interface MappingDetailsPayload {
 	providerContext: MappingDetailsProviderLinks;
 	linkedAniListEntries: readonly MappingDetailsLinkedAniListEntry[];
 	whyThisMapping: readonly MappingDetailsExplanationItem[];
-	suggestedCandidates: MappingDetailsCandidateGroups;
 	review: MappingDetailsReview;
 }
 
-const resolveRecentEvaluationTitle = (
-	recentEvaluation: RecentMappingEvaluationTrace | undefined,
-): string | undefined => {
-	if (!recentEvaluation) {
-		return undefined;
-	}
-
-	const candidateTitle = recentEvaluation.candidates
-		.find((candidate) => candidate.title)
-		?.title?.trim();
-	if (candidateTitle) {
-		return candidateTitle;
-	}
-
-	return recentEvaluation.searchTerms
-		?.find((term) => term.trim().length > 0)
-		?.trim();
-};
-
-const buildLibrarySummary = (
-	provider: Provider,
-	providerMappingState: EffectiveMapping["providerMappingState"],
-	isInLibrary: boolean | null,
-	libraryEntry: SonarrSeriesSnapshot | RadarrMovieSnapshot | null,
-	recentEvaluation: RecentMappingEvaluationTrace | undefined,
-	libraryUnknownReason?: "library-check-failed",
-): MappingDetailsLibrarySnapshot => {
-	const fallbackTitle = resolveRecentEvaluationTitle(recentEvaluation);
-
+const buildLibrarySummary = (input: {
+	provider: Provider;
+	providerMappingState: EffectiveMapping["providerMappingState"];
+	isInLibrary: boolean | null;
+	libraryEntry: SonarrSeriesSnapshot | RadarrMovieSnapshot | null;
+	libraryUnknownReason?: "library-check-failed";
+}): MappingDetailsLibrarySnapshot => {
+	const {
+		provider,
+		providerMappingState,
+		isInLibrary,
+		libraryEntry,
+		libraryUnknownReason,
+	} = input;
 	if (libraryEntry === null) {
 		return {
 			isInLibrary: providerMappingState === "mapped" ? isInLibrary : null,
 			...(libraryUnknownReason ? { libraryUnknownReason } : {}),
-			...(fallbackTitle
-				? {
-						title: fallbackTitle,
-						type: provider === "sonarr" ? "series" : "movie",
-					}
-				: {}),
 		};
 	}
 
@@ -242,8 +200,10 @@ const buildLibrarySummary = (
 	}
 
 	const movie = libraryEntry as RadarrMovieSnapshot;
-	const inLibraryCount =
-		movie.hasFile === undefined ? undefined : movie.hasFile ? 1 : 0;
+	let inLibraryCount: number | undefined;
+	if (movie.hasFile !== undefined) {
+		inLibraryCount = movie.hasFile ? 1 : 0;
+	}
 
 	return {
 		isInLibrary,
@@ -253,51 +213,6 @@ const buildLibrarySummary = (
 		...(inLibraryCount === undefined ? {} : { inLibraryCount }),
 		...(libraryUnknownReason ? { libraryUnknownReason } : {}),
 	};
-};
-
-const buildSuggestedCandidates = (
-	recentEvaluation: RecentMappingEvaluationTrace | undefined,
-): MappingDetailsCandidateGroups => {
-	const suggested: MappingDetailsCandidateGroups = {
-		...(recentEvaluation?.attemptedAt
-			? { attemptedAt: recentEvaluation.attemptedAt }
-			: {}),
-		...(recentEvaluation?.searchTerms
-			? { searchTerms: recentEvaluation.searchTerms }
-			: {}),
-		accepted: [],
-		rejected: [],
-		notAccepted: [],
-	};
-
-	for (const candidate of recentEvaluation?.candidates ?? []) {
-		const projected: MappingDetailsCandidateEvaluation = {
-			providerId: candidate.providerId,
-			...(candidate.title ? { title: candidate.title } : {}),
-			source: candidate.source,
-			reason: candidate.reason,
-			status: candidate.status,
-			summary: candidate.summary,
-			...(candidate.score === undefined ? {} : { score: candidate.score }),
-		};
-
-		switch (candidate.status) {
-			case "accepted": {
-				suggested.accepted = [...suggested.accepted, projected];
-				break;
-			}
-			case "rejected": {
-				suggested.rejected = [...suggested.rejected, projected];
-				break;
-			}
-			case "not-accepted": {
-				suggested.notAccepted = [...suggested.notAccepted, projected];
-				break;
-			}
-		}
-	}
-
-	return suggested;
 };
 
 const formatReviewReason = (reason: MappingIssueReason): string => {
@@ -498,14 +413,13 @@ export async function getMappingInspection(
 			? { libraryUnknownReason: "library-check-failed" as const }
 			: {}),
 	});
-	const library = buildLibrarySummary(
-		input.provider,
-		candidate.providerMappingState,
+	const library = buildLibrarySummary({
+		provider: input.provider,
+		providerMappingState: candidate.providerMappingState,
 		isInLibrary,
 		libraryEntry,
-		candidate.recentEvaluation,
 		libraryUnknownReason,
-	);
+	});
 	const linkedAniListIds =
 		candidate.providerId === null
 			? []
@@ -607,7 +521,6 @@ export async function getMappingInspection(
 			candidate,
 			reviewProjection.reviewSummary?.reasons ?? [],
 		),
-		suggestedCandidates: buildSuggestedCandidates(candidate.recentEvaluation),
 		review: {
 			needsReview: reviewProjection.reviewSummary !== undefined,
 			...(reviewProjection.reviewSummary
