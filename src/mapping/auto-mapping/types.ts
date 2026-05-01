@@ -8,7 +8,6 @@ import type {
 	AcceptedMappingEvidence,
 	AcceptedMappingReason,
 	AcceptedMappingSource,
-	RecentMappingEvaluationTrace,
 } from "@/mapping/types";
 
 /**
@@ -34,7 +33,6 @@ export interface AcceptedAutoMappingResult {
 	providerId: ProviderId;
 	reason: AcceptedMappingReason;
 	successfulSynonym?: string;
-	recentEvaluation?: RecentMappingEvaluationTrace;
 }
 
 /**
@@ -42,19 +40,16 @@ export interface AcceptedAutoMappingResult {
  *
  * Important distinction:
  * - `acceptedEvidence` is only used for successful mapped outcomes
- * - `recentEvaluation` is the rebuildable explanation cache for the latest attempt
  */
 export type AutoMappingRecord =
 	| {
 			state: "mapped";
 			providerId: ProviderId;
 			acceptedEvidence: AcceptedMappingEvidence;
-			recentEvaluation?: RecentMappingEvaluationTrace;
 			updatedAt: number;
 	  }
 	| {
 			state: Exclude<AutoMappingStatus, "mapped">;
-			recentEvaluation?: RecentMappingEvaluationTrace;
 			updatedAt: number;
 	  };
 

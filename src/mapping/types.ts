@@ -1,8 +1,6 @@
 /** Mapping service input and output types for AniList-driven resolution flows. */
 // src/mapping/types.ts
 
-import type { ProviderId } from "@/providers";
-
 /** Derived entry kinds used by review/filter/table surfaces. */
 export const MAPPING_ENTRY_KIND_VALUES = [
 	"manual",
@@ -60,30 +58,6 @@ export interface AcceptedMappingEvidence {
 	source: AcceptedMappingSource;
 	reason: AcceptedMappingReason;
 	successfulTitle?: string;
-}
-
-/** Candidate disposition recorded in the most recent resolver evaluation trace. */
-export type MappingCandidateEvaluationStatus =
-	| "accepted"
-	| "rejected"
-	| "not-accepted";
-
-/** Compact candidate explanation kept in the most recent evaluation trace only. */
-export interface MappingCandidateEvaluation {
-	providerId: ProviderId;
-	title?: string;
-	source: AcceptedMappingSource;
-	reason: AcceptedMappingReason;
-	status: MappingCandidateEvaluationStatus;
-	summary: string;
-	score?: number;
-}
-
-/** Small, rebuildable trace of the most recent resolver evaluation attempt. */
-export interface RecentMappingEvaluationTrace {
-	attemptedAt: number;
-	searchTerms?: readonly string[];
-	candidates: readonly MappingCandidateEvaluation[];
 }
 
 /**

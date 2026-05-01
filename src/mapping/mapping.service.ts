@@ -377,9 +377,6 @@ export class MappingService {
 			state: "mapped",
 			providerId: resolved.providerId,
 			acceptedEvidence: buildAcceptedMappingEvidence(source, resolved),
-			...(resolved.recentEvaluation
-				? { recentEvaluation: resolved.recentEvaluation }
-				: {}),
 		};
 
 		try {

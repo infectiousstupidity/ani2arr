@@ -119,11 +119,6 @@ describe("listMappings", () => {
 						anilistId: aid(2),
 						provider: "radarr",
 						state: "unresolved",
-						recentEvaluation: {
-							attemptedAt: 75,
-							searchTerms: ["Missing Movie"],
-							candidates: [],
-						},
 						updatedAt: 75,
 					},
 				]),
@@ -150,56 +145,9 @@ describe("listMappings", () => {
 			provider: "radarr",
 			mappingRowStatus: "unmapped",
 			isInLibrary: null,
-			providerMeta: { title: "Missing Movie", type: "movie" },
 			resolverOutcome: "unresolved",
 		});
 		expect(unresolvedRow?.mappingEntryKind).toBe("unmapped");
-	});
-
-	it("matches unresolved entries by their captured title query", async () => {
-		const result = await listMappings(
-			{ limit: 10, query: "needle" },
-			{
-				manualMappingService: {
-					listIgnores: () => [],
-					listRejectedCandidates: () => [],
-					list: () => [],
-					isIgnored: () => false,
-					getLinkedAniListIds: () => [],
-				},
-				anibridgeMappingStore: createAnibridgeStore(),
-				sonarrLibrary: {
-					getLeanSeriesList: async () => [],
-				},
-				radarrLibrary: {
-					getLeanMovieList: async () => [],
-				},
-				autoMappingStore: createAutoMappingStore([
-					{
-						anilistId: aid(44),
-						provider: "radarr",
-						state: "unresolved",
-						recentEvaluation: {
-							attemptedAt: 10,
-							searchTerms: ["Needle Movie"],
-							candidates: [],
-						},
-						updatedAt: 10,
-					},
-				]),
-			},
-		);
-
-		expect(result.total).toBe(1);
-		expect(result.mappings[0]).toMatchObject({
-			anilistId: aid(44),
-			provider: "radarr",
-			mappingRowStatus: "unmapped",
-			isInLibrary: null,
-			providerMeta: { title: "Needle Movie", type: "movie" },
-			resolverOutcome: "unresolved",
-		});
-		expect(result.mappings[0]?.mappingEntryKind).toBe("unmapped");
 	});
 
 	it("keeps manual mappings effective when they disagree with exact upstream truth", async () => {

@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from "vitest";
 import { parseAniListId, type AniListId } from "@/anilist";
 import {
 	parseSonarrSeriesId,
-	parseTmdbId,
 	parseTvdbId,
 	type ProviderId,
 	type RadarrMovieSnapshot,
@@ -20,7 +19,6 @@ import {
 
 const aid = parseAniListId;
 const tvdb = parseTvdbId;
-const tmdb = parseTmdbId;
 const sonarrSeriesId = parseSonarrSeriesId;
 
 const createDeps = (manualMappings?: {
@@ -205,97 +203,6 @@ describe("getMappingInspection", () => {
 		);
 	});
 
-	it("projects suggested candidates from recent evaluation traces without requiring a new resolution run", async () => {
-		const deps = createDeps({
-			autoMappingStatus: {
-				state: "mapped",
-				providerId: tmdb(900),
-				acceptedEvidence: {
-					source: "auto",
-					reason: "fuzzy-match",
-					successfulTitle: "Auto Candidate",
-				},
-				recentEvaluation: {
-					attemptedAt: 90,
-					searchTerms: ["Auto Candidate"],
-					candidates: [
-						{
-							providerId: tmdb(900),
-							title: "Auto Candidate",
-							source: "auto",
-							reason: "fuzzy-match",
-							status: "accepted",
-							summary: "Fuzzy title match",
-							score: 0.81,
-						},
-						{
-							providerId: tmdb(901),
-							title: "Wrong Match",
-							source: "auto",
-							reason: "fuzzy-match",
-							status: "rejected",
-							summary: "Fuzzy title match rejected by candidate suppression",
-							score: 0.6,
-						},
-						{
-							providerId: tmdb(902),
-							title: "Suppressed Match",
-							source: "auto",
-							reason: "fuzzy-match",
-							status: "not-accepted",
-							summary: "Fuzzy title match not accepted",
-						},
-						{
-							providerId: tmdb(903),
-							title: "Runner Up",
-							source: "auto",
-							reason: "exact-title-match",
-							status: "not-accepted",
-							summary: "Exact title match not accepted",
-							score: 0.72,
-						},
-					],
-				},
-				updatedAt: 90,
-			},
-		});
-
-		const payload = await getMappingInspection(
-			{ provider: "radarr", anilistId: aid(10) },
-			deps,
-		);
-
-		expect(payload.suggestedCandidates).toMatchObject({
-			attemptedAt: 90,
-			searchTerms: ["Auto Candidate"],
-			accepted: [
-				expect.objectContaining({ providerId: tvdb(900), status: "accepted" }),
-			],
-			rejected: [
-				expect.objectContaining({ providerId: tvdb(901), status: "rejected" }),
-			],
-			notAccepted: [
-				expect.objectContaining({
-					providerId: tvdb(902),
-					status: "not-accepted",
-				}),
-				expect.objectContaining({
-					providerId: tvdb(903),
-					status: "not-accepted",
-				}),
-			],
-		});
-		expect(payload.whyThisMapping).toContainEqual(
-			expect.objectContaining({
-				kind: "effective-source",
-				summary: "Fuzzy fallback match is currently effective.",
-				source: "auto",
-				reason: "fuzzy-match",
-				details: ['Matched with title "Auto Candidate".'],
-			}),
-		);
-	});
-
 	it("preserves rejected-candidate suppression on mapped auto-mapping inspection payloads", async () => {
 		const deps = createDeps({
 			rejectedCandidates: [
@@ -428,11 +335,6 @@ describe("getMappingInspection", () => {
 				linkedAniListCount: 0,
 			},
 			linkedAniListEntries: [],
-			suggestedCandidates: {
-				accepted: [],
-				rejected: [],
-				notAccepted: [],
-			},
 			review: {
 				needsReview: false,
 			},

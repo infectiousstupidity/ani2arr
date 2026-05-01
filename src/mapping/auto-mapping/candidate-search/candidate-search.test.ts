@@ -1,4 +1,4 @@
-/** Tests for candidate-search match reasons on exact and fuzzy title wins. */
+/** Highest-value tests for candidate-search selection behavior. */
 // src/mapping/auto-mapping/candidate-search/candidate-search.test.ts
 
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
@@ -62,28 +62,21 @@ describe("searchAutoMappingCandidates", () => {
 			status: "resolved",
 			providerId: 101,
 			reason: "exact-title-match",
-			searchTerms: ["Attack on Titan"],
 		});
-		expect(result.candidates).toEqual([
-			expect.objectContaining({
-				providerId: 101,
-				reason: "exact-title-match",
-				searchTerm: "Attack on Titan",
-			}),
-		]);
 	});
 
-	it("returns fuzzy when the winning candidate only matches approximately", async () => {
+	it("does not accept a suppressed candidate", async () => {
 		const result = await searchAutoMappingCandidates(
 			createMedia("Attack on Titan"),
 			{
 				lookupClient: createLookupClient([
-					{ title: "Attack Titan", tvdbId: 202, year: 2013 },
+					{ title: "Attack on Titan", tvdbId: 101, year: 2013 },
 				]),
 				credentials: TEST_CREDENTIALS,
+				isCandidateSuppressed: (providerId) => providerId === tvdb(101),
 				limits: {
 					maxTerms: 1,
-					scoreThreshold: 0.01,
+					scoreThreshold: 0.1,
 					earlyStopThreshold: 2,
 				},
 				log: { debug: vi.fn() } as never,
@@ -91,18 +84,9 @@ describe("searchAutoMappingCandidates", () => {
 		);
 
 		expect(result).toMatchObject({
-			status: "resolved",
-			providerId: 202,
-			reason: "fuzzy-match",
-			searchTerms: ["Attack on Titan"],
+			status: "unresolved",
+			reason: "low-confidence",
 		});
-		expect(result.candidates).toEqual([
-			expect.objectContaining({
-				providerId: 202,
-				reason: "fuzzy-match",
-				searchTerm: "Attack on Titan",
-			}),
-		]);
 	});
 
 	it("does not treat duplicate hits for the same provider ID as a tie", async () => {

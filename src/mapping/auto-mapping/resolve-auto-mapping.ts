@@ -21,20 +21,12 @@ import type {
 } from "./lookup/provider-title-lookup";
 import { searchAutoMappingCandidates } from "./candidate-search/candidate-search";
 import {
-	createPipelineRecentEvaluation,
-	createRecentEvaluationTrace,
-	mergeRecentEvaluations,
-	rewriteTraceCandidateStatus,
-} from "./recent-evaluation";
-import {
 	UNRESOLVED_AUTO_MAPPING_TTL,
 	type AutoMappingStore,
 } from "./auto-mapping.store";
-import { resolveUnresolvedSearchTerms } from "../resolution-policy";
 import type {
 	AcceptedMappingReason,
 	AcceptedMappingSource,
-	RecentMappingEvaluationTrace,
 } from "../types";
 import type {
 	AutoMappingSource,
@@ -50,7 +42,7 @@ type ProviderTitleLookupRegistry = Record<
 
 type ResolutionAttempt = {
 	resolved: AcceptedAutoMappingResult | null;
-	recentEvaluation?: RecentMappingEvaluationTrace;
+	confidence?: number;
 };
 
 type AutoMappingRequest = {
@@ -232,19 +224,16 @@ async function attemptNetworkResolution(
 	} catch (error) {
 		const normalized = normalizeError(error);
 		if (normalized.code === ErrorCode.VALIDATION_ERROR) {
-			const fallbackTrace = createRecentEvaluationTrace(
-				resolveUnresolvedSearchTerms(options.hints),
-				[],
-			);
-			const recentEvaluation = mergeRecentEvaluations(fallbackTrace);
 			await deps.recordAutoMapping(
 				provider,
 				anilistId,
 				{
 					state: "unresolved",
-					...(recentEvaluation ? { recentEvaluation } : {}),
 				},
 				UNRESOLVED_AUTO_MAPPING_TTL,
+			);
+			deps.log.debug?.(
+				`mapping:auto-resolution-outcome provider=${provider} anilistId=${anilistId} state=unresolved reason=validation-error`,
 			);
 			return null;
 		}
@@ -252,27 +241,24 @@ async function attemptNetworkResolution(
 		throw normalized;
 	}
 
-	const recentEvaluation = mergeRecentEvaluations(
-		attempt.recentEvaluation,
-		createRecentEvaluationTrace(
-			resolveUnresolvedSearchTerms(options.hints),
-			[],
-		),
-	);
-
 	if (attempt.resolved === null) {
 		await deps.recordAutoMapping(
 			provider,
 			anilistId,
 			{
 				state: "unresolved",
-				...(recentEvaluation ? { recentEvaluation } : {}),
 			},
 			UNRESOLVED_AUTO_MAPPING_TTL,
+		);
+		deps.log.debug?.(
+			`mapping:auto-resolution-outcome provider=${provider} anilistId=${anilistId} state=unresolved reason=no-match`,
 		);
 		return null;
 	}
 
+	deps.log.debug?.(
+		`mapping:auto-resolution-outcome provider=${provider} anilistId=${anilistId} state=mapped providerId=${attempt.resolved.providerId} reason=${attempt.resolved.reason}${attempt.confidence === undefined ? "" : ` confidence=${attempt.confidence.toFixed(3)}`}`,
+	);
 	if (import.meta.env.DEV) {
 		deps.log.debug?.(
 			`mapping:network-success provider=${provider} anilistId=${anilistId} providerId=${attempt.resolved.providerId}${attempt.resolved.successfulSynonym ? ` synonym="${attempt.resolved.successfulSynonym}"` : ""}`,
@@ -283,7 +269,6 @@ async function attemptNetworkResolution(
 		anilistId,
 		{
 			...attempt.resolved,
-			...(recentEvaluation ? { recentEvaluation } : {}),
 		},
 		"auto",
 	);
@@ -302,7 +287,6 @@ async function resolveViaNetwork(
 		priority: options.priority,
 		forceLookupNetwork: options.forceLookupNetwork === true,
 	};
-	let recentEvaluation: RecentMappingEvaluationTrace | undefined;
 
 	const applyAttempt = (
 		label: "metadata" | "api",
@@ -311,36 +295,20 @@ async function resolveViaNetwork(
 		const resolved = attempt.resolved;
 
 		if (resolved === null) {
-			recentEvaluation = mergeRecentEvaluations(
-				recentEvaluation,
-				attempt.recentEvaluation,
-			);
 			return null;
 		}
 
 		if (
 			!deps.isResolvedCandidateSuppressed(provider, anilistId, resolved, "auto")
 		) {
-			const mergedRecentEvaluation = mergeRecentEvaluations(
-				recentEvaluation,
-				attempt.recentEvaluation,
-			);
 			return {
 				resolved,
-				...(mergedRecentEvaluation
-					? { recentEvaluation: mergedRecentEvaluation }
-					: {}),
+				...(attempt.confidence === undefined
+					? {}
+					: { confidence: attempt.confidence }),
 			};
 		}
 
-		recentEvaluation = mergeRecentEvaluations(
-			recentEvaluation,
-			rewriteTraceCandidateStatus(
-				attempt.recentEvaluation,
-				resolved.providerId,
-				"rejected",
-			),
-		);
 		if (import.meta.env.DEV) {
 			deps.log.debug?.(
 				`mapping:${label}-candidate-suppressed provider=${provider} anilistId=${anilistId} providerId=${resolved.providerId} reason=${resolved.reason}`,
@@ -383,7 +351,7 @@ async function resolveViaNetwork(
 	deps.log.debug?.(
 		`resolveViaNetwork: provider=${provider} no match found for AniList ID ${anilistId}`,
 	);
-	return { resolved: null, ...(recentEvaluation ? { recentEvaluation } : {}) };
+	return { resolved: null };
 }
 
 async function tryResolveWithMedia(
@@ -398,8 +366,6 @@ async function tryResolveWithMedia(
 		);
 		return { resolved: null };
 	}
-
-	let recentEvaluation: RecentMappingEvaluationTrace | undefined;
 
 	const lookupClient = deps.lookupClients[provider];
 	const outcome = await searchAutoMappingCandidates(
@@ -430,10 +396,6 @@ async function tryResolveWithMedia(
 	);
 
 	if (outcome.status === "resolved") {
-		recentEvaluation = mergeRecentEvaluations(
-			recentEvaluation,
-			createPipelineRecentEvaluation(outcome),
-		);
 		return {
 			resolved: {
 				providerId: outcome.providerId,
@@ -442,15 +404,8 @@ async function tryResolveWithMedia(
 					? { successfulSynonym: outcome.successfulSynonym }
 					: {}),
 			},
-			...(recentEvaluation ? { recentEvaluation } : {}),
+			confidence: outcome.confidence,
 		};
 	}
-	recentEvaluation = mergeRecentEvaluations(
-		recentEvaluation,
-		createPipelineRecentEvaluation(outcome),
-	);
-	return {
-		resolved: null,
-		...(recentEvaluation ? { recentEvaluation } : {}),
-	};
+	return { resolved: null };
 }

@@ -20,7 +20,6 @@ export interface EffectiveMapping {
 	mappingSource?: AcceptedMappingSource;
 	mappingReason?: AcceptedMappingReason;
 	acceptedEvidence?: AcceptedMappingEvidence;
-	recentEvaluation?: AutoMappingRecord["recentEvaluation"];
 	suppressedProviderId?: ProviderId | null;
 	suppressionKind?: MappingSuppressionKind;
 	exactUpstreamMatchProviderId?: ProviderId | null;
@@ -62,7 +61,7 @@ const buildManualEffectiveMapping = (
 	input: BuildEffectiveMappingInput,
 	upstreamProviderId: ProviderId | null,
 ): EffectiveMapping | null => {
-	const { provider, anilistId, manualProviderId, autoMappingRecord } = input;
+	const { provider, anilistId, manualProviderId } = input;
 	if (manualProviderId === null) {
 		return null;
 	}
@@ -80,10 +79,6 @@ const buildManualEffectiveMapping = (
 				source: "upstream",
 				reason: "exact-upstream",
 			},
-			...(autoMappingRecord?.state === "mapped" &&
-			autoMappingRecord.recentEvaluation
-				? { recentEvaluation: autoMappingRecord.recentEvaluation }
-				: {}),
 			autoMappingStatus: "mapped",
 			hadResolveAttempt: true,
 		};
@@ -168,10 +163,6 @@ const buildEffectiveMappingWithoutSuppression = (
 				source: "upstream",
 				reason: "exact-upstream",
 			},
-			...(autoMappingRecord?.state === "mapped" &&
-			autoMappingRecord.recentEvaluation
-				? { recentEvaluation: autoMappingRecord.recentEvaluation }
-				: {}),
 			autoMappingStatus: "mapped",
 		};
 	}
@@ -199,9 +190,6 @@ const buildEffectiveMappingWithoutSuppression = (
 			mappingSource: autoMappingRecord.acceptedEvidence.source,
 			mappingReason: autoMappingRecord.acceptedEvidence.reason,
 			acceptedEvidence: autoMappingRecord.acceptedEvidence,
-			...(autoMappingRecord.recentEvaluation
-				? { recentEvaluation: autoMappingRecord.recentEvaluation }
-				: {}),
 			autoMappingStatus: "mapped",
 			hadResolveAttempt: autoMappingRecord.acceptedEvidence.source === "auto",
 		};
@@ -228,9 +216,6 @@ const buildEffectiveMappingWithoutSuppression = (
 			providerId: null,
 			providerMappingState: mappingUnknownReason ? "unknown" : "unmapped",
 			mappingEntryKind: mappingUnknownReason ? "unknown" : "unmapped",
-			...(autoMappingRecord.recentEvaluation
-				? { recentEvaluation: autoMappingRecord.recentEvaluation }
-				: {}),
 			autoMappingStatus: autoMappingRecord.state,
 			...(mappingUnknownReason ? { mappingUnknownReason } : {}),
 			hadResolveAttempt: true,

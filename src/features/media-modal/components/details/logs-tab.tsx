@@ -2,14 +2,10 @@
 // src/features/media-modal/components/details/logs-tab.tsx
 
 import { buildAniListAnimeUrl } from '@/anilist/anilist-links';
-import Pill from '@/shared/ui/primitives/pill';
 import type { MappingDetailsPayload } from '@/mapping/queries/mapping-details';
 import type { Provider } from '@/providers';
 import { getProviderIdLabel } from '@/providers/provider-labels';
-import {
-  formatToken,
-  getSuggestedCandidateGroups,
-} from '../../helpers';
+import { formatToken } from '../../helpers';
 
 type MappingInspectionLogsProps = {
   inspection: MappingDetailsPayload;
@@ -41,8 +37,6 @@ export function MappingInspectionLogs(props: MappingInspectionLogsProps): React.
   const { inspection, provider } = props;
   const providerIdLabel = getProviderIdLabel(provider);
   const hasReview = inspection.review.needsReview;
-  const candidateGroups = getSuggestedCandidateGroups(inspection.suggestedCandidates);
-  const hasSuggestedCandidates = candidateGroups.length > 0;
   const currentContextLines = [
     `aniListId: ${inspection.effectiveMapping.anilistId}`,
     `provider: ${provider}`,
@@ -157,49 +151,6 @@ export function MappingInspectionLogs(props: MappingInspectionLogsProps): React.
           </div>
         ) : (
           <CodeBlock lines={['needsReview: false']} />
-        )}
-      </Section>
-
-      <Section title="Suggested candidates">
-        {inspection.suggestedCandidates.searchTerms?.length ? (
-          <CodeBlock lines={[`searchTerms: ${inspection.suggestedCandidates.searchTerms.join(', ')}`]} />
-        ) : null}
-        {hasSuggestedCandidates ? (
-          <div className="space-y-3">
-            {candidateGroups.map((group) => (
-              <div key={group.key} className="space-y-2">
-                {group.label ? (
-                  <div className="flex items-center gap-2">
-                    <Pill small tone={group.tone}>
-                      {group.label}
-                    </Pill>
-                    <span className="text-xs text-text-secondary">
-                      {`${group.items.length} candidate${group.items.length === 1 ? '' : 's'}`}
-                    </span>
-                  </div>
-                ) : null}
-                <div className="space-y-2">
-                  {group.items.map((candidate) => (
-                    <CodeBlock
-                      key={`${group.key}-${candidate.providerId}`}
-                      lines={[
-                        `title: ${candidate.title ?? `${providerIdLabel} ${candidate.providerId}`}`,
-                        `providerId: ${providerIdLabel} ${candidate.providerId}`,
-                        `status: ${formatToken(candidate.status)}`,
-                        `source: ${formatToken(candidate.source)}`,
-                        `reason: ${formatToken(candidate.reason)}`,
-                        `summary: ${candidate.summary}`,
-                      ]}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-text-secondary">
-            No recent candidate trace is available yet. Use manual search if you need to change this mapping.
-          </p>
         )}
       </Section>
     </div>

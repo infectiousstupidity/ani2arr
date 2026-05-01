@@ -131,25 +131,6 @@ type EffectiveMappingWithUpdatedAt = EffectiveMapping & {
 	updatedAt: number;
 };
 
-const resolveRecentEvaluationTitle = (
-	recentEvaluation: AutoMappingRecord["recentEvaluation"],
-): string | undefined => {
-	if (!recentEvaluation) {
-		return undefined;
-	}
-
-	const candidateTitle = recentEvaluation.candidates
-		.find((candidate) => candidate.title)
-		?.title?.trim();
-	if (candidateTitle) {
-		return candidateTitle;
-	}
-
-	return recentEvaluation.searchTerms
-		?.find((term) => term.trim().length > 0)
-		?.trim();
-};
-
 const createKey = (
 	provider: MappingListRow["provider"],
 	anilistId: AniListId,
@@ -429,10 +410,7 @@ export async function listMappings(
 		});
 	}
 
-	const matchesQuery = (
-		summary: MappingListRow,
-		recentEvaluation: AutoMappingRecord["recentEvaluation"],
-	): boolean => {
+	const matchesQuery = (summary: MappingListRow): boolean => {
 		if (normalizedQuery === "") return true;
 		const reviewHaystackParts = (summary.reviewItems ?? []).flatMap((item) => [
 			item.reason,
@@ -465,10 +443,6 @@ export async function listMappings(
 			summary.providerMeta?.title ?? "",
 			...(summary.reviewSummary?.reasons ?? []),
 			...reviewHaystackParts,
-			...(recentEvaluation?.searchTerms ?? []),
-			...(recentEvaluation?.candidates ?? []).map(
-				(candidate) => candidate.title ?? String(candidate.providerId),
-			),
 		];
 		return haystackParts.join(" ").toLowerCase().includes(normalizedQuery);
 	};
@@ -557,16 +531,6 @@ export async function listMappings(
 				type: "movie",
 				...(statusLabel ? { statusLabel } : {}),
 			};
-		} else {
-			const evaluationTitle = resolveRecentEvaluationTitle(
-				candidate.recentEvaluation,
-			);
-			if (evaluationTitle) {
-				providerMeta = {
-					title: evaluationTitle,
-					type: candidate.provider === "sonarr" ? "series" : "movie",
-				};
-			}
 		}
 
 		const reviewProjection = projectMappingIssues({
@@ -640,7 +604,7 @@ export async function listMappings(
 			continue;
 		}
 
-		if (matchesQuery(summary, candidate.recentEvaluation)) {
+		if (matchesQuery(summary)) {
 			results.push(summary);
 		}
 	}
