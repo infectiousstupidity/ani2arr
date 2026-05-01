@@ -147,11 +147,6 @@ async function readUsableCachedAutoMapping(
 		return { handled: false, autoMappingRecord };
 	}
 
-	if (autoMappingRecord.acceptedEvidence.source !== "auto") {
-		await deps.clearAutoMapping(provider, anilistId);
-		return { handled: false, autoMappingRecord: null };
-	}
-
 	const resolved = {
 		providerId: autoMappingRecord.providerId,
 		reason: autoMappingRecord.acceptedEvidence.reason,

@@ -97,8 +97,8 @@ describe("getMappingInspection", () => {
 					state: "mapped",
 					providerId: tvdb(222),
 					acceptedEvidence: {
-						source: "upstream",
-						reason: "exact-upstream",
+						source: "auto",
+						reason: "fuzzy-match",
 					},
 					updatedAt: 10,
 				},
