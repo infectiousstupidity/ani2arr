@@ -37,10 +37,7 @@ export interface TitleLookupOptions {
 	priority?: RequestPriority;
 }
 
-export type TitleLookupCaches<TResult> = {
-	positive: TtlCache<TResult[]>;
-	negative: TtlCache<boolean>;
-};
+export type TitleLookupCaches<TResult> = TtlCache<TResult[]>;
 
 export interface ProviderTitleLookup<
 	TResult extends ProviderTitleResult = ProviderTitleResult,
@@ -139,8 +136,7 @@ export function createProviderTitleLookup<
 		}
 
 		const generation = resetGeneration;
-		let promise!: Promise<TResult[]>;
-		promise = (async (): Promise<TResult[]> => {
+		const promise = (async (): Promise<TResult[]> => {
 			try {
 				const results = await fetchQueuedTitleResults(
 					term.display,
@@ -150,30 +146,26 @@ export function createProviderTitleLookup<
 				if (generation !== resetGeneration) {
 					return results;
 				}
-				if (results.length > 0) {
-					await config.caches.positive.write(term.canonical, results, {
-						staleMs: TITLE_LOOKUP_CACHE_TTL.positive.staleMs,
-						hardMs: TITLE_LOOKUP_CACHE_TTL.positive.hardMs,
-					});
-					await config.caches.negative.remove(term.canonical);
-				} else {
-					await config.caches.negative.write(term.canonical, true, {
-						staleMs: TITLE_LOOKUP_CACHE_TTL.negative.staleMs,
-						hardMs: TITLE_LOOKUP_CACHE_TTL.negative.hardMs,
-					});
-					await config.caches.positive.remove(term.canonical);
-				}
+				const ttl =
+					results.length > 0
+						? TITLE_LOOKUP_CACHE_TTL.results
+						: TITLE_LOOKUP_CACHE_TTL.emptyResults;
+				await config.caches.write(term.canonical, results, {
+					staleMs: ttl.staleMs,
+					hardMs: ttl.hardMs,
+				});
 				return results;
 			} catch (error) {
 				throw normalizeError(error);
-			} finally {
-				if (inflight.get(inflightKey) === promise) {
-					inflight.delete(inflightKey);
-				}
 			}
 		})();
 
 		inflight.set(inflightKey, promise);
+		void promise.finally(() => {
+			if (inflight.get(inflightKey) === promise) {
+				inflight.delete(inflightKey);
+			}
+		});
 		return promise;
 	};
 
@@ -189,22 +181,11 @@ export function createProviderTitleLookup<
 
 		return (async (): Promise<TResult[]> => {
 			try {
-				const positiveHit = await config.caches.positive.read(term.canonical);
-				if (positiveHit && !positiveHit.stale) {
+				const cached = await config.caches.read(term.canonical);
+				if (cached && !cached.stale) {
 					incrementCounter("mapping.lookup.cache_hit");
-					log.debug(
-						`lookupTitle(${term.canonical}): returning fresh positive cache`,
-					);
-					return positiveHit.value;
-				}
-
-				const negativeHit = await config.caches.negative.read(term.canonical);
-				if (negativeHit && !negativeHit.stale) {
-					incrementCounter("mapping.lookup.negative_cache_hit");
-					log.debug(
-						`lookupTitle(${term.canonical}): returning fresh negative cache`,
-					);
-					return [];
+					log.debug(`lookupTitle(${term.canonical}): returning fresh cache`);
+					return cached.value;
 				}
 
 				return lookupNetwork(term, credentials, options);
@@ -219,10 +200,7 @@ export function createProviderTitleLookup<
 		reset: async () => {
 			resetGeneration += 1;
 			inflight.clear();
-			await Promise.all([
-				config.caches.positive.clear(),
-				config.caches.negative.clear(),
-			]);
+			await config.caches.clear();
 		},
 		lookupTitle,
 		readProviderId: config.readProviderId,
