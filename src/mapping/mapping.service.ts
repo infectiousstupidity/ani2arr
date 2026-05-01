@@ -95,8 +95,8 @@ export class MappingService {
 	private readonly anibridgeMappingStore: AnibridgeMappingStore;
 	private readonly lookupClients: ProviderTitleLookupRegistry;
 	private readonly autoMappingStore: AutoMappingStore;
-	private readonly manualMappings?: ManualMappingService;
-	private readonly notifyMappingsChanged?: () => void;
+	private readonly manualMappings: ManualMappingService | undefined;
+	private readonly notifyMappingsChanged: (() => void) | undefined;
 	private readonly inflight = new AutoMappingInflightRequests();
 	private readonly autoMappingPersistence = new AutoMappingPersistenceGuard();
 	constructor(deps: MappingServiceDeps) {
