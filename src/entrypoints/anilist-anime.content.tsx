@@ -1,5 +1,5 @@
 /** Thin AniList anime-page content entrypoint that delegates to the page owner. */
-// src/entrypoints/anilist-anime.content/index.tsx
+// src/entrypoints/anilist-anime.content.tsx
 
 import { main } from '@/content/anilist/anime-page';
 
