@@ -588,7 +588,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({
 				isConfigured,
 			}) && mappedIdentity === null,
 			force_verify: true,
-			ignoreFailureCache: true,
 			priority: "high",
 		},
 	);
@@ -601,7 +600,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({
 				isConfigured,
 			}) && mappedIdentity === null,
 			force_verify: true,
-			ignoreFailureCache: true,
 			priority: "high",
 		},
 	);

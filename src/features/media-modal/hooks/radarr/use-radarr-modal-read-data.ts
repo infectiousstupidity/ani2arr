@@ -150,7 +150,6 @@ export function useRadarrModalReadData(input: {
 	const radarrStatus = useMovieStatus(statusPayload, {
 		enabled: isConfigured,
 		force_verify: shouldForceVerify,
-		ignoreFailureCache: shouldForceVerify,
 	});
 
 	const hasUsableVerifiedStatus =

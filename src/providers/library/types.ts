@@ -33,7 +33,6 @@ export const deriveLibraryUnknownReason = (input: {
 export interface LibraryStatusOptions {
 	force_verify?: boolean;
 	network?: "never";
-	ignoreFailureCache?: boolean;
 	priority?: RequestPriority;
 }
 

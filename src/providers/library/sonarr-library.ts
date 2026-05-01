@@ -304,10 +304,6 @@ export class SonarrLibrary {
 			}
 
 			const mappingOptions: AutoMappingOptions = {};
-			if (options.ignoreFailureCache) {
-				mappingOptions.ignoreFailureCache = true;
-				mappingOptions.forceLookupNetwork = true;
-			}
 			if (options.priority) mappingOptions.priority = options.priority;
 			if (options.force_verify) mappingOptions.forceLookupNetwork = true;
 
@@ -319,7 +315,7 @@ export class SonarrLibrary {
 			try {
 				if (import.meta.env.DEV) {
 					console.debug(
-						`[ani2arr | SonarrLibrary] status:lookup-start anilistId=${payload.anilistId} priority=${options.priority ?? "normal"} network=${options.network ?? "allow"} ignoreFailureCache=${String(options.ignoreFailureCache === true)}`,
+						`[ani2arr | SonarrLibrary] status:lookup-start anilistId=${payload.anilistId} priority=${options.priority ?? "normal"} network=${options.network ?? "allow"} force_verify=${String(options.force_verify === true)}`,
 					);
 				}
 

@@ -3,7 +3,6 @@
 
 import type { AniListId, AniListMediaService } from "@/anilist";
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
-import { readAutoMappingFailure } from "./failure.cache";
 import type {
 	Provider,
 	ProviderCredentials,
@@ -38,10 +37,7 @@ import {
 	UNRESOLVED_AUTO_MAPPING_TTL,
 	type AutoMappingStore,
 } from "./auto-mapping.store";
-import {
-	resolveUnresolvedSearchTerms,
-	shouldCacheFailure,
-} from "../resolution-policy";
+import { resolveUnresolvedSearchTerms } from "../resolution-policy";
 import type { AnibridgeMappingStore } from "../upstream-mapping";
 import type {
 	AcceptedMappingReason,
@@ -106,15 +102,6 @@ type ResolveAutoMappingDeps = {
 		ttl: { hardMs: number },
 	) => Promise<void>;
 	clearAutoMapping: (provider: Provider, anilistId: AniListId) => Promise<void>;
-	recordAutoMappingFailure: (
-		provider: Provider,
-		anilistId: AniListId,
-		error: ReturnType<typeof normalizeError>,
-	) => Promise<void>;
-	removeAutoMappingFailure: (
-		provider: Provider,
-		anilistId: AniListId,
-	) => Promise<void>;
 	getConfiguredCredentials: (
 		provider: Provider,
 	) => Promise<ProviderCredentials>;
@@ -136,9 +123,7 @@ export async function resolveAutoMapping(
 		provider,
 		anilistId,
 		options,
-		bypassCachedResolutionState:
-			options.ignoreFailureCache === true ||
-			options.forceLookupNetwork === true,
+		bypassCachedResolutionState: options.forceLookupNetwork === true,
 	};
 
 	const cachedAutoMapping = await readUsableCachedAutoMapping(deps, request);
@@ -146,13 +131,13 @@ export async function resolveAutoMapping(
 		return cachedAutoMapping.resolved;
 	}
 
-	const cachedFailureOrTerminal = await readCachedFailureOrTerminalState(
+	const cachedTerminalState = await readCachedTerminalState(
 		deps,
 		request,
 		cachedAutoMapping.autoMappingRecord,
 	);
-	if (cachedFailureOrTerminal.handled) {
-		return cachedFailureOrTerminal.resolved;
+	if (cachedTerminalState.handled) {
+		return cachedTerminalState.resolved;
 	}
 
 	if (options.network === "never") {
@@ -222,7 +207,7 @@ async function readUsableCachedAutoMapping(
 	return { handled: true, resolved };
 }
 
-async function readCachedFailureOrTerminalState(
+async function readCachedTerminalState(
 	deps: ResolveAutoMappingDeps,
 	request: AutoMappingRequest,
 	autoMappingRecord: AutoMappingRecord | null,
@@ -230,16 +215,6 @@ async function readCachedFailureOrTerminalState(
 	const { provider, anilistId, bypassCachedResolutionState } = request;
 	if (bypassCachedResolutionState) {
 		return { handled: false };
-	}
-
-	const cachedFailure = await readAutoMappingFailure(provider, anilistId);
-	if (cachedFailure) {
-		if (import.meta.env.DEV) {
-			deps.log.debug?.(
-				`mapping:failure-cache-hit provider=${provider} anilistId=${anilistId} code=${cachedFailure.value.code}`,
-			);
-		}
-		throw cachedFailure.value;
 	}
 
 	if (autoMappingRecord) {
@@ -258,7 +233,7 @@ async function attemptNetworkResolution(
 	deps: ResolveAutoMappingDeps,
 	request: AutoMappingRequest,
 ): Promise<AcceptedAutoMappingResult | null> {
-	const { provider, anilistId, options, bypassCachedResolutionState } = request;
+	const { provider, anilistId, options } = request;
 	let attempt: ResolutionAttempt;
 	try {
 		if (import.meta.env.DEV) {
@@ -284,13 +259,9 @@ async function attemptNetworkResolution(
 				},
 				UNRESOLVED_AUTO_MAPPING_TTL,
 			);
-			await deps.removeAutoMappingFailure(provider, anilistId);
 			return null;
 		}
 
-		if (!bypassCachedResolutionState && shouldCacheFailure(normalized)) {
-			await deps.recordAutoMappingFailure(provider, anilistId, normalized);
-		}
 		throw normalized;
 	}
 
@@ -312,7 +283,6 @@ async function attemptNetworkResolution(
 			},
 			UNRESOLVED_AUTO_MAPPING_TTL,
 		);
-		await deps.removeAutoMappingFailure(provider, anilistId);
 		return null;
 	}
 

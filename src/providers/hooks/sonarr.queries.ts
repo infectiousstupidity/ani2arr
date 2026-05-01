@@ -55,9 +55,8 @@ export const useSeriesStatus = (
 	payload: Pick<StatusInput, "anilistId" | "title" | "metadata">,
 	options?: {
 		enabled?: boolean;
-		force_verify?: boolean;
+		force_verify?: boolean | (() => boolean);
 		network?: "never";
-		ignoreFailureCache?: boolean | (() => boolean);
 		priority?: "high" | "normal" | (() => "high" | "normal" | undefined);
 	},
 ) => {
@@ -72,18 +71,15 @@ export const useSeriesStatus = (
 			if (payload.metadata !== undefined) {
 				request.metadata = payload.metadata;
 			}
-			if (options?.force_verify) {
+			const shouldForceVerify =
+				typeof options?.force_verify === "function"
+					? options.force_verify()
+					: options?.force_verify === true;
+			if (shouldForceVerify) {
 				request.force_verify = true;
 			}
 			if (options?.network) {
 				request.network = options.network;
-			}
-			const bypassFailureCache =
-				typeof options?.ignoreFailureCache === "function"
-					? options.ignoreFailureCache()
-					: options?.ignoreFailureCache === true;
-			if (bypassFailureCache) {
-				request.ignoreFailureCache = true;
 			}
 			const prio =
 				typeof options?.priority === "function"

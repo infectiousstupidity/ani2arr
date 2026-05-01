@@ -58,7 +58,6 @@ export const StatusInputSchema = v.object({
 	title: v.optional(v.string()),
 	force_verify: v.optional(v.boolean()),
 	network: v.optional(v.literal("never")),
-	ignoreFailureCache: v.optional(v.boolean()),
 	metadata: v.optional(v.nullable(AniListMediaHintSchema)),
 	priority: v.optional(RequestPrioritySchema),
 });

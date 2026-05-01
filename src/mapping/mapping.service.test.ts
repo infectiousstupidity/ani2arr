@@ -3,18 +3,10 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId, type AniListId } from "@/anilist";
-import { writeAutoMappingFailure } from "@/mapping/auto-mapping/failure.cache";
 import { createError, ErrorCode } from "@/shared/errors";
 import { MappingService } from "./mapping.service";
 
 const aid = parseAniListId;
-
-vi.mock("@/mapping/auto-mapping/failure.cache", () => ({
-	clearAutoMappingFailures: vi.fn(async () => {}),
-	readAutoMappingFailure: vi.fn(async () => null),
-	removeAutoMappingFailure: vi.fn(async () => {}),
-	writeAutoMappingFailure: vi.fn(async () => {}),
-}));
 
 vi.mock("@/debug/metrics", () => ({
 	incrementCounter: vi.fn(),
@@ -491,14 +483,25 @@ describe("MappingService", () => {
 		);
 	});
 
-	it("caches retryable network failures", async () => {
-		const { service, anilistApi } = createService();
+	it("retries resolution after a retryable network failure", async () => {
+		const { service, anilistApi, lookupClients } = createService();
 		const error = createError(
 			ErrorCode.NETWORK_ERROR,
 			"Timed out reaching AniList.",
 			"Unable to connect right now.",
 		);
-		anilistApi.fetchMediaWithRelations.mockRejectedValue(error);
+		const media = {
+			id: aid(12),
+			format: "TV",
+			title: { english: "Recovered Result" },
+			synonyms: [],
+		};
+		anilistApi.fetchMediaWithRelations
+			.mockRejectedValueOnce(error)
+			.mockResolvedValueOnce(media);
+		lookupClients.sonarr.lookupTitle.mockResolvedValue([
+			{ title: "Recovered Result", tvdbId: 1212, year: 2020 },
+		]);
 
 		await expect(
 			service.resolveProviderId("sonarr", aid(12)),
@@ -506,6 +509,9 @@ describe("MappingService", () => {
 			code: ErrorCode.NETWORK_ERROR,
 		});
 
-		expect(writeAutoMappingFailure).toHaveBeenCalledWith("sonarr", 12, error);
+		await expect(service.resolveProviderId("sonarr", aid(12))).resolves.toMatchObject({
+			providerId: 1212,
+		});
+		expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledTimes(2);
 	});
 });
