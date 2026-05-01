@@ -242,8 +242,8 @@ describe("getMappingInspection", () => {
 							title: "Suppressed Match",
 							source: "auto",
 							reason: "verified-inherited",
-							status: "suppressed",
-							summary: "Inherited candidate suppressed",
+							status: "not-accepted",
+							summary: "Inherited candidate not accepted",
 						},
 						{
 							providerId: tmdb(903),
@@ -274,13 +274,11 @@ describe("getMappingInspection", () => {
 			rejected: [
 				expect.objectContaining({ providerId: tvdb(901), status: "rejected" }),
 			],
-			suppressed: [
+			notAccepted: [
 				expect.objectContaining({
 					providerId: tvdb(902),
-					status: "suppressed",
+					status: "not-accepted",
 				}),
-			],
-			notAccepted: [
 				expect.objectContaining({
 					providerId: tvdb(903),
 					status: "not-accepted",
@@ -433,7 +431,6 @@ describe("getMappingInspection", () => {
 			suggestedCandidates: {
 				accepted: [],
 				rejected: [],
-				suppressed: [],
 				notAccepted: [],
 			},
 			review: {

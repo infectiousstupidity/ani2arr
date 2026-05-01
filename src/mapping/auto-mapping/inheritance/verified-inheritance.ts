@@ -156,6 +156,7 @@ function buildConflictTrace(
 			summary:
 				"Inherited candidate ambiguous: conflicting trusted relation anchors proposed different provider IDs.",
 			inheritedVerification: {
+				verdict: "ambiguous",
 				reason:
 					"Conflicting trusted relation anchors proposed different provider IDs.",
 				positiveSignals: [],

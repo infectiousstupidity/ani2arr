@@ -185,6 +185,9 @@ export class AnibridgeMappingStore {
 	private readonly radarrPairs = new Map<AniListId, Set<TmdbId>>();
 	private readonly sonarrReverse = new Map<TvdbId, Set<AniListId>>();
 	private readonly radarrReverse = new Map<TmdbId, Set<AniListId>>();
+	private initPromise: Promise<void> | null = null;
+	private refreshPromise: Promise<void> | null = null;
+	private hasQueuedInitRefresh = false;
 
 	constructor(
 		private readonly cache: TtlCache<AnibridgeMappingPayload> = anibridgeMappingCache,
@@ -197,7 +200,14 @@ export class AnibridgeMappingStore {
 		this.fetchImpl = rawFetch ? rawFetch.bind(globalThis) : DEFAULT_FETCH;
 	}
 
-	public async init(): Promise<void> {
+	public init(): Promise<void> {
+		this.initPromise ??= this.initOnce().finally(() => {
+			this.initPromise = null;
+		});
+		return this.initPromise;
+	}
+
+	private async initOnce(): Promise<void> {
 		await this.ensureLoaded();
 
 		if (this.sonarrPairs.size === 0 && this.radarrPairs.size === 0) {
@@ -207,9 +217,12 @@ export class AnibridgeMappingStore {
 			return;
 		}
 
-		void this.refresh().catch((error) => {
-			logError(normalizeError(error), "AnibridgeMappingStore:init");
-		});
+		if (!this.hasQueuedInitRefresh) {
+			this.hasQueuedInitRefresh = true;
+			void this.refresh().catch((error) => {
+				logError(normalizeError(error), "AnibridgeMappingStore:init");
+			});
+		}
 	}
 
 	public getSonarrCandidates(anilistId: AniListId): TvdbId[] {
@@ -218,16 +231,6 @@ export class AnibridgeMappingStore {
 
 	public getRadarrCandidates(anilistId: AniListId): TmdbId[] {
 		return [...(this.radarrPairs.get(anilistId) ?? [])];
-	}
-
-	public getUniqueSonarrCandidate(anilistId: AniListId): TvdbId | null {
-		const candidates = this.getSonarrCandidates(anilistId);
-		return candidates.length === 1 ? candidates[0]! : null;
-	}
-
-	public getUniqueRadarrCandidate(anilistId: AniListId): TmdbId | null {
-		const candidates = this.getRadarrCandidates(anilistId);
-		return candidates.length === 1 ? candidates[0]! : null;
 	}
 
 	public getAniListIdsForTvdb(tvdbId: TvdbId): AniListId[] {
@@ -256,11 +259,14 @@ export class AnibridgeMappingStore {
 		return entries;
 	}
 
-	public async refreshAll(): Promise<void> {
-		await this.refresh();
+	public refresh(): Promise<void> {
+		this.refreshPromise ??= this.refreshInternal().finally(() => {
+			this.refreshPromise = null;
+		});
+		return this.refreshPromise;
 	}
 
-	public async refresh(): Promise<void> {
+	private async refreshInternal(): Promise<void> {
 		try {
 			const cached = await this.cache.read(CACHE_KEY);
 			const headers: Record<string, string> = {};
@@ -319,6 +325,7 @@ export class AnibridgeMappingStore {
 		this.radarrPairs.clear();
 		this.sonarrReverse.clear();
 		this.radarrReverse.clear();
+		this.hasQueuedInitRefresh = false;
 		await this.cache.remove(CACHE_KEY);
 	}
 

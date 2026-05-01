@@ -20,6 +20,7 @@ import {
 import { scoreTitleMatches } from "../title/title-matching";
 
 const TRACE_CANDIDATE_LIMIT = 8;
+const MIN_WINNER_SCORE_MARGIN = 0.02;
 
 type CandidateSearchContext = {
 	lookupClient: ProviderTitleLookup<ProviderTitleResult>;
@@ -31,7 +32,6 @@ type CandidateSearchContext = {
 		reason: AcceptedMappingReason,
 	) => boolean;
 	preferredTerms?: PreferredSearchTerm[];
-	sessionSeenCanonical: Set<string>;
 	limits: {
 		maxTerms: number;
 		scoreThreshold: number;
@@ -86,20 +86,46 @@ type EarlyStopLimits = {
 	scoreThreshold: number;
 };
 
+function bestByProviderId(
+	candidates: ScoredSearchCandidate[],
+	lookupClient: ProviderTitleLookup<ProviderTitleResult>,
+): ScoredSearchCandidate[] {
+	const best = new Map<ProviderId, ScoredSearchCandidate>();
+
+	for (const candidate of candidates) {
+		const providerId = lookupClient.readProviderId(candidate.result);
+		if (providerId === null) {
+			continue;
+		}
+		const existing = best.get(providerId);
+		if (!existing || candidate.score > existing.score) {
+			best.set(providerId, candidate);
+		}
+	}
+
+	return [...best.values()].toSorted((left, right) => right.score - left.score);
+}
+
 function pickEarlySearchResult(
 	batch: ScoredSearchCandidate[],
+	lookupClient: ProviderTitleLookup<ProviderTitleResult>,
 	limits: EarlyStopLimits,
 ): { stop: boolean; pick?: ScoredSearchCandidate } {
-	if (batch.length === 0) return { stop: false };
-	const top = batch[0];
-	const second = batch[1];
-	if (top && top.score >= limits.earlyStopThreshold) {
+	const providerWinners = bestByProviderId(batch, lookupClient);
+	if (providerWinners.length === 0) return { stop: false };
+	const top = providerWinners[0];
+	const second = providerWinners[1];
+	if (
+		top &&
+		top.score >= limits.earlyStopThreshold &&
+		hasUniqueWinnerMargin(top, second)
+	) {
 		return { stop: true, pick: top };
 	}
 	if (
 		top &&
 		top.score >= limits.scoreThreshold &&
-		(!second || top.score > second.score)
+		hasUniqueWinnerMargin(top, second)
 	) {
 		return { stop: false, pick: top };
 	}
@@ -108,11 +134,20 @@ function pickEarlySearchResult(
 
 function pickBestSearchResult(
 	overall: ScoredSearchCandidate[],
+	lookupClient: ProviderTitleLookup<ProviderTitleResult>,
 	scoreThreshold: number,
 ): ScoredSearchCandidate | undefined {
-	if (overall.length === 0) return undefined;
-	const top = overall[0];
-	if (top && top.score >= scoreThreshold) return top;
+	const providerWinners = bestByProviderId(overall, lookupClient);
+	if (providerWinners.length === 0) return undefined;
+	const top = providerWinners[0];
+	const second = providerWinners[1];
+	if (
+		top &&
+		top.score >= scoreThreshold &&
+		hasUniqueWinnerMargin(top, second)
+	) {
+		return top;
+	}
 	return undefined;
 }
 
@@ -178,26 +213,18 @@ async function lookupForTerm(
 	term: TitleSearchTerm,
 	ctx: CandidateSearchContext,
 ): Promise<ProviderTitleResult[]> {
-	if (ctx.forceLookupNetwork) {
-		return ctx.lookupClient.lookupTitle(
-			term,
-			ctx.credentials,
-			lookupOptions(ctx, true),
-		);
-	}
-
-	if (ctx.sessionSeenCanonical.has(term.canonical)) {
-		const probe = await ctx.lookupClient.readCachedTitleLookup(term.canonical);
-		if (probe.hit !== "none") {
-			return probe.results;
-		}
-	}
-
 	return ctx.lookupClient.lookupTitle(
 		term,
 		ctx.credentials,
-		lookupOptions(ctx),
+		lookupOptions(ctx, ctx.forceLookupNetwork === true),
 	);
+}
+
+function hasUniqueWinnerMargin(
+	top: ScoredSearchCandidate,
+	second: ScoredSearchCandidate | undefined,
+): boolean {
+	return !second || top.score - second.score >= MIN_WINNER_SCORE_MARGIN;
 }
 
 function resolvedOutcome(
@@ -377,13 +404,14 @@ export async function searchAutoMappingCandidates(
 			ctx.isCandidateSuppressed,
 		);
 
-		// Mark canonical as seen once we've either looked up or confirmed a cache hit
-		ctx.sessionSeenCanonical.add(term.canonical);
-
-		const early = pickEarlySearchResult(acceptedScored, {
-			earlyStopThreshold: ctx.limits.earlyStopThreshold,
-			scoreThreshold: ctx.limits.scoreThreshold,
-		});
+		const early = pickEarlySearchResult(
+			acceptedScored,
+			ctx.lookupClient,
+			{
+				earlyStopThreshold: ctx.limits.earlyStopThreshold,
+				scoreThreshold: ctx.limits.scoreThreshold,
+			},
+		);
 		if (early.stop && early.pick) {
 			const out = resolvedOutcome(
 				early.pick,
@@ -403,7 +431,11 @@ export async function searchAutoMappingCandidates(
 	}
 
 	overall.sort((a, b) => b.score - a.score);
-	const pick = pickBestSearchResult(overall, ctx.limits.scoreThreshold);
+	const pick = pickBestSearchResult(
+		overall,
+		ctx.lookupClient,
+		ctx.limits.scoreThreshold,
+	);
 	if (pick) {
 		const out = resolvedOutcome(pick, ctx, traceSearchTerms, traceCandidates);
 		if (!out) {

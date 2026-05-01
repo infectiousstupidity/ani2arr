@@ -183,7 +183,7 @@ describe("createProviderTitleLookup", () => {
 		expect(negative.clear).toHaveBeenCalledTimes(1);
 	});
 
-	it("readCachedTitleLookup returns inflight results", async () => {
+	it("does not write old lookup results after reset", async () => {
 		let resolveFetch!: (results: TestResult[]) => void;
 		const fetchTitleResults = vi.fn(
 			() =>
@@ -191,20 +191,22 @@ describe("createProviderTitleLookup", () => {
 					resolveFetch = resolve;
 				}),
 		);
-		const { lookup } = createLookup({ fetch: fetchTitleResults });
+		const { lookup, positive, negative } = createLookup({
+			fetch: fetchTitleResults,
+		});
 
 		const pending = lookup.lookupTitle(TERM, TEST_CREDENTIALS);
 		await vi.waitFor(() => expect(fetchTitleResults).toHaveBeenCalledTimes(1));
-		const cached = lookup.readCachedTitleLookup(TERM.canonical);
+		await lookup.reset();
+		positive.write.mockClear();
+		negative.write.mockClear();
 		resolveFetch([{ title: "Attack on Titan", id: 1 }]);
 
 		await expect(pending).resolves.toEqual([
 			{ title: "Attack on Titan", id: 1 },
 		]);
-		await expect(cached).resolves.toEqual({
-			results: [{ title: "Attack on Titan", id: 1 }],
-			hit: "inflight",
-		});
+		expect(positive.write).not.toHaveBeenCalled();
+		expect(negative.write).not.toHaveBeenCalled();
 	});
 });
 

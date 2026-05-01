@@ -114,9 +114,6 @@ export const autoMappingStatusToUnknownReason = (
 		case "ambiguous": {
 			return "ambiguous";
 		}
-		case "verification-failed": {
-			return "verification-failed";
-		}
 		default: {
 			return undefined;
 		}

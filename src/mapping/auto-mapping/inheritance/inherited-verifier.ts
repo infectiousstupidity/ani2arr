@@ -153,6 +153,7 @@ function createFailureResult(
 	return {
 		verdict: "verification-failed",
 		details: {
+			verdict: "verification-failed",
 			reason,
 			positiveSignals: [],
 			contradictions: [],
@@ -232,12 +233,24 @@ export async function verifyInheritedSonarrCandidate(
 	const titlePayload = providerTitles[0] ? { title: providerTitles[0] } : {};
 
 	if (contradictions.length > 0) {
-		return { verdict: "reject", details, ...titlePayload };
+		return {
+			verdict: "reject",
+			details: { ...details, verdict: "reject" },
+			...titlePayload,
+		};
 	}
 
 	if (positiveSignals.length > 0) {
-		return { verdict: "accept", details, ...titlePayload };
+		return {
+			verdict: "accept",
+			details: { ...details, verdict: "accept" },
+			...titlePayload,
+		};
 	}
 
-	return { verdict: "ambiguous", details, ...titlePayload };
+	return {
+		verdict: "ambiguous",
+		details: { ...details, verdict: "ambiguous" },
+		...titlePayload,
+	};
 }

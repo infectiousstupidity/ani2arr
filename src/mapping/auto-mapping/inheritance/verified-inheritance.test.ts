@@ -166,10 +166,6 @@ describe("attemptVerifiedInheritedSonarrResolution", () => {
 			lookupClient: {
 				provider: "sonarr",
 				reset: vi.fn(async () => {}),
-				readCachedTitleLookup: vi.fn(async () => ({
-					results: [],
-					hit: "none" as const,
-				})),
 				lookupTitle: vi.fn(async () => []),
 				readProviderId: vi.fn(() => null),
 				lookupByProviderId: exactLookup,
@@ -219,10 +215,6 @@ describe("attemptVerifiedInheritedSonarrResolution", () => {
 			lookupClient: {
 				provider: "sonarr",
 				reset: vi.fn(async () => {}),
-				readCachedTitleLookup: vi.fn(async () => ({
-					results: [],
-					hit: "none" as const,
-				})),
 				lookupTitle: vi.fn(async () => []),
 				readProviderId: vi.fn(() => null),
 				lookupByProviderId: exactLookup,
@@ -270,10 +262,6 @@ describe("attemptVerifiedInheritedSonarrResolution", () => {
 			lookupClient: {
 				provider: "sonarr",
 				reset: vi.fn(async () => {}),
-				readCachedTitleLookup: vi.fn(async () => ({
-					results: [],
-					hit: "none" as const,
-				})),
 				lookupTitle: vi.fn(async () => []),
 				readProviderId: vi.fn(() => null),
 				lookupByProviderId: vi.fn(async () => null),
@@ -321,10 +309,6 @@ describe("attemptVerifiedInheritedSonarrResolution", () => {
 			lookupClient: {
 				provider: "sonarr",
 				reset: vi.fn(async () => {}),
-				readCachedTitleLookup: vi.fn(async () => ({
-					results: [],
-					hit: "none" as const,
-				})),
 				lookupTitle: vi.fn(async () => []),
 				readProviderId: vi.fn(() => null),
 				lookupByProviderId: vi.fn(
