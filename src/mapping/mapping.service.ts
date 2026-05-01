@@ -33,10 +33,11 @@ import {
 import { shouldApplyCandidateSuppression } from "./resolution-policy";
 import { AnibridgeMappingStore } from "./upstream-mapping";
 import { buildEffectiveMapping } from "./effective-mapping";
-import type { AcceptedMappingEvidence, AcceptedMappingSource } from "./types";
+import type { AcceptedMappingSource } from "./types";
 import type {
 	AutoMappingSource,
 	AutoMappingOptions,
+	AutoMappingEvidence,
 	AcceptedAutoMappingResult,
 	AutoMappingRecord,
 } from "./auto-mapping/types";
@@ -380,12 +381,15 @@ export class MappingService {
 		};
 
 		try {
-			await this.autoMappingStore.set(
+			const changed = await this.autoMappingStore.set(
 				provider,
 				anilistId,
 				mappedState,
 				MAPPED_AUTO_MAPPING_TTL,
 			);
+			if (changed) {
+				this.notifyMappingsChanged?.();
+			}
 		} catch (error) {
 			const normalized = normalizeError(error);
 			this.log.error?.(
@@ -394,7 +398,6 @@ export class MappingService {
 			);
 			return null;
 		}
-		this.notifyMappingsChanged?.();
 		return resolved;
 	}
 
@@ -496,9 +499,9 @@ export class MappingService {
 }
 
 function buildAcceptedMappingEvidence(
-	source: AcceptedMappingSource,
+	source: AutoMappingSource,
 	resolved: AcceptedAutoMappingResult,
-): AcceptedMappingEvidence {
+): AutoMappingEvidence {
 	return {
 		source,
 		reason: resolved.reason,

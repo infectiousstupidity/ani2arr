@@ -7,17 +7,16 @@ import type { RequestPriority } from "@/shared/utils/request-priority";
 import type {
 	AcceptedMappingEvidence,
 	AcceptedMappingReason,
-	AcceptedMappingSource,
 } from "@/mapping/types";
 
 /**
  * Source of an automated resolver result.
- *
- * This is a narrower version of `AcceptedMappingSource` that intentionally excludes
- * `manual`, because manual mappings are user-owned, not resolver-produced
- * candidates or resolver-accepted results.
  */
-export type AutoMappingSource = Exclude<AcceptedMappingSource, "manual">;
+export type AutoMappingSource = "auto";
+
+export type AutoMappingEvidence = AcceptedMappingEvidence & {
+	source: AutoMappingSource;
+};
 
 /**
  * Final semantic result of trying to auto-map one `provider + anilistId`.
@@ -45,7 +44,7 @@ export type AutoMappingRecord =
 	| {
 			state: "mapped";
 			providerId: ProviderId;
-			acceptedEvidence: AcceptedMappingEvidence;
+			acceptedEvidence: AutoMappingEvidence;
 			updatedAt: number;
 	  }
 	| {

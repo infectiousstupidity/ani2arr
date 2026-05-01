@@ -82,6 +82,11 @@ const autoMappingEquals = (left: AutoMappingRecord, right: AutoMappingRecord): b
 
 const sanitizeStoredRecord = (value: StoredAutoMappingRecord): StoredAutoMappingRecord | null => {
   if (value.state === 'mapped') {
+    const acceptedEvidence = value.acceptedEvidence as { source?: unknown } | undefined;
+    if (acceptedEvidence?.source !== 'auto') {
+      return null;
+    }
+
     return {
       state: 'mapped',
       providerId: value.providerId as ProviderId,

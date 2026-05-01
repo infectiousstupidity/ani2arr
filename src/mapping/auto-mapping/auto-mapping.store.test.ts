@@ -114,6 +114,16 @@ describe("AutoMappingStore", () => {
 					updatedAt: 10,
 					expiresAt: Date.now() + 60_000,
 				},
+				"sonarr:2": {
+					state: "mapped",
+					providerId: 202,
+					acceptedEvidence: {
+						source: "upstream",
+						reason: "exact-upstream",
+					},
+					updatedAt: 10,
+					expiresAt: Date.now() + 60_000,
+				},
 			},
 		});
 
@@ -128,5 +138,6 @@ describe("AutoMappingStore", () => {
 			},
 			updatedAt: 10,
 		});
+		await expect(legacyStore.get("sonarr", aid(2))).resolves.toBeNull();
 	});
 });
