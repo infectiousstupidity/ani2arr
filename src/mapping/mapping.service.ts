@@ -19,11 +19,6 @@ import {
 	logError,
 	normalizeError,
 } from "@/shared/errors";
-import {
-	clearAutoMappingFailures,
-	removeAutoMappingFailure,
-	writeAutoMappingFailure,
-} from "./auto-mapping/failure.cache";
 import { logger } from "@/shared/utils/logger";
 import { ManualMappingService } from "./manual-mapping";
 import type {
@@ -116,7 +111,6 @@ export class MappingService {
 			await Promise.all([
 				this.lookupClients.sonarr.reset(),
 				this.lookupClients.radarr.reset(),
-				clearAutoMappingFailures(),
 				this.autoMappingStore.clear(),
 			]);
 			this.notifyMappingsChanged?.();
@@ -128,7 +122,6 @@ export class MappingService {
 
 		await Promise.all([
 			this.lookupClients[provider].reset(),
-			clearAutoMappingFailures(provider),
 			this.autoMappingStore.clear(provider),
 		]);
 
@@ -163,7 +156,7 @@ export class MappingService {
 	> {
 		if (import.meta.env.DEV) {
 			this.log.debug?.(
-				`mapping:start provider=${provider} anilistId=${anilistId} priority=${options.priority ?? "normal"} network=${options.network ?? "allow"} ignoreFailureCache=${String(options.ignoreFailureCache === true)}`,
+				`mapping:start provider=${provider} anilistId=${anilistId} priority=${options.priority ?? "normal"} network=${options.network ?? "allow"}`,
 			);
 		}
 
@@ -234,29 +227,6 @@ export class MappingService {
 						return Promise.resolve();
 					}
 					return this.clearAutoMapping(resolvedProvider, resolvedAniListId);
-				},
-				recordAutoMappingFailure: (
-					resolvedProvider,
-					resolvedAniListId,
-					error,
-				) => {
-					if (!canPersistAutoMappingResult()) {
-						return Promise.resolve();
-					}
-					return this.recordAutoMappingFailure(
-						resolvedProvider,
-						resolvedAniListId,
-						error,
-					);
-				},
-				removeAutoMappingFailure: (resolvedProvider, resolvedAniListId) => {
-					if (!canPersistAutoMappingResult()) {
-						return Promise.resolve();
-					}
-					return this.removeAutoMappingFailure(
-						resolvedProvider,
-						resolvedAniListId,
-					);
 				},
 				getConfiguredCredentials: (resolvedProvider) =>
 					this.getConfiguredCredentials(resolvedProvider),
@@ -410,16 +380,13 @@ export class MappingService {
 				: {}),
 		};
 
-		try {
-			await Promise.all([
-				this.autoMappingStore.set(
+			try {
+				await this.autoMappingStore.set(
 					provider,
 					anilistId,
 					mappedState,
 					MAPPED_AUTO_MAPPING_TTL,
-				),
-				removeAutoMappingFailure(provider, anilistId),
-			]);
+				);
 		} catch (error) {
 			const normalized = normalizeError(error);
 			this.log.error?.(
@@ -448,10 +415,7 @@ export class MappingService {
 	): Promise<void> {
 		this.autoMappingPersistence.invalidateEntry(provider, anilistId);
 		this.inflight.delete(provider, anilistId);
-		await Promise.all([
-			this.autoMappingStore.delete(provider, anilistId),
-			removeAutoMappingFailure(provider, anilistId),
-		]);
+		await this.autoMappingStore.delete(provider, anilistId);
 		this.evictAniListMedia(anilistId);
 		this.notifyMappingsChanged?.();
 	}
@@ -481,21 +445,6 @@ export class MappingService {
 		if (changed) {
 			this.notifyMappingsChanged?.();
 		}
-	}
-
-	private async recordAutoMappingFailure(
-		provider: Provider,
-		anilistId: AniListId,
-		error: Parameters<typeof writeAutoMappingFailure>[2],
-	): Promise<void> {
-		await writeAutoMappingFailure(provider, anilistId, error);
-	}
-
-	private async removeAutoMappingFailure(
-		provider: Provider,
-		anilistId: AniListId,
-	): Promise<void> {
-		await removeAutoMappingFailure(provider, anilistId);
 	}
 
 	private isCandidateSuppressed(

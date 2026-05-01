@@ -68,7 +68,6 @@ function canShareInflight(options: AutoMappingOptions): boolean {
 	return (
 		options.hints === undefined &&
 		options.network === undefined &&
-		options.ignoreFailureCache !== true &&
 		options.forceLookupNetwork !== true &&
 		options.priority === undefined
 	);

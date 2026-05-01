@@ -55,13 +55,13 @@ export const useMovieStatus = (
 	payload: Pick<StatusInput, "anilistId" | "title" | "metadata">,
 	options?: {
 		enabled?: boolean;
-		force_verify?: boolean;
+		force_verify?: boolean | (() => boolean);
 		network?: "never";
-		ignoreFailureCache?: boolean | (() => boolean);
 		priority?: "high" | "normal" | (() => "high" | "normal" | undefined);
 	},
-) =>
-	useQuery<CheckMovieStatusResponse, ExtensionError>({
+) => {
+	const forceVerify = options?.force_verify === true;
+	return useQuery<CheckMovieStatusResponse, ExtensionError>({
 		queryKey: queryKeys.seriesStatus(payload, "radarr"),
 		queryFn: async () => {
 			const request: StatusInput = { anilistId: payload.anilistId };
@@ -71,18 +71,15 @@ export const useMovieStatus = (
 			if (payload.metadata !== undefined) {
 				request.metadata = payload.metadata;
 			}
-			if (options?.force_verify) {
+			const shouldForceVerify =
+				typeof options?.force_verify === "function"
+					? options.force_verify()
+					: options?.force_verify === true;
+			if (shouldForceVerify) {
 				request.force_verify = true;
 			}
 			if (options?.network) {
 				request.network = options.network;
-			}
-			const bypassFailureCache =
-				typeof options?.ignoreFailureCache === "function"
-					? options.ignoreFailureCache()
-					: options?.ignoreFailureCache === true;
-			if (bypassFailureCache) {
-				request.ignoreFailureCache = true;
 			}
 			const priority =
 				typeof options?.priority === "function"
@@ -94,10 +91,11 @@ export const useMovieStatus = (
 			return getAni2arrApi().getMovieStatus(request);
 		},
 		enabled: !!payload.anilistId && (options?.enabled ?? true),
-		staleTime: options?.force_verify ? 0 : 5 * 60 * 1000,
+		staleTime: forceVerify ? 0 : 5 * 60 * 1000,
 		refetchOnWindowFocus: false,
 		meta: { persist: false },
 	});
+};
 
 export const useMovieLibraryStatus = (
 	payload: Pick<MovieLibraryStatusInput, "anilistId" | "providerId"> | null,

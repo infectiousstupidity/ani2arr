@@ -75,7 +75,6 @@ export interface AutoMappingOptions {
 		primaryTitle?: string;
 		domMedia?: AniListMediaHint | null;
 	};
-	ignoreFailureCache?: boolean;
 	priority?: RequestPriority;
 	/** Force provider lookups to bypass fresh caches, used by anime-detail force-verify flows. */
 	forceLookupNetwork?: boolean;

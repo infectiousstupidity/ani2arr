@@ -227,15 +227,15 @@ function selectOverlayAddSelection(input: {
 }
 
 function retryOverlayStatus(input: {
-	bypassFailureCacheRef: { current: boolean };
+	forceVerifyStatusRef: { current: boolean };
 	refetch: OverlayStatusQuery["refetch"];
 }): void {
-	input.bypassFailureCacheRef.current = true;
+	input.forceVerifyStatusRef.current = true;
 	void input
 		.refetch({ throwOnError: false })
 		.catch(() => {})
 		.finally(() => {
-			input.bypassFailureCacheRef.current = false;
+			input.forceVerifyStatusRef.current = false;
 		});
 }
 
@@ -284,7 +284,7 @@ function runOverlayPrimaryAction(input: {
 	launchSnapshot: MediaModalLaunchSnapshot;
 	addHasError: boolean;
 	reset: () => void;
-	bypassFailureCacheRef: { current: boolean };
+	forceVerifyStatusRef: { current: boolean };
 	refetch: OverlayStatusQuery["refetch"];
 	addMovieMutation: ReturnType<typeof useAddMovie>;
 	addSeriesMutation: ReturnType<typeof useAddSeries>;
@@ -313,7 +313,7 @@ function runOverlayPrimaryAction(input: {
 		}
 		case "retry-status": {
 			retryOverlayStatus({
-				bypassFailureCacheRef: input.bypassFailureCacheRef,
+				forceVerifyStatusRef: input.forceVerifyStatusRef,
 				refetch: input.refetch,
 			});
 			return;
@@ -403,7 +403,7 @@ export const useCardOverlayState = ({
 	enabled,
 	onOpenMapping,
 }: UseCardOverlayStateParams): UseCardOverlayStateResult => {
-	const bypassFailureCacheRef = useRef(false);
+	const forceVerifyStatusRef = useRef(false);
 	const providerLabel = getProviderLabel(provider);
 	const canQuickAdd = defaultForm !== null;
 	const statusEnabled = (enabled ?? isConfigured) && isConfigured;
@@ -424,7 +424,7 @@ export const useCardOverlayState = ({
 		{ anilistId, title, metadata },
 		{
 			enabled: provider === "sonarr" && statusEnabled && !hasMappedIdentity,
-			ignoreFailureCache: () => bypassFailureCacheRef.current,
+			force_verify: () => forceVerifyStatusRef.current,
 		},
 	);
 
@@ -432,7 +432,7 @@ export const useCardOverlayState = ({
 		{ anilistId, title, metadata },
 		{
 			enabled: provider === "radarr" && statusEnabled && !hasMappedIdentity,
-			ignoreFailureCache: () => bypassFailureCacheRef.current,
+			force_verify: () => forceVerifyStatusRef.current,
 		},
 	);
 	const seriesLibraryStatusQuery = useSeriesLibraryStatus(
@@ -658,7 +658,7 @@ export const useCardOverlayState = ({
 				launchSnapshot,
 				addHasError,
 				reset,
-				bypassFailureCacheRef,
+				forceVerifyStatusRef,
 				refetch: statusQuery.refetch,
 				addMovieMutation,
 				addSeriesMutation,

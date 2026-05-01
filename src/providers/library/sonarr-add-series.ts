@@ -34,7 +34,7 @@ export async function addSonarrSeries(
 ): Promise<SonarrSeries> {
 	const { client, mappingService, library } = deps;
 
-	const resolveOptions: AutoMappingOptions = { ignoreFailureCache: true };
+	const resolveOptions: AutoMappingOptions = { forceLookupNetwork: true };
 	const hints: NonNullable<AutoMappingOptions["hints"]> = {};
 	if (input.primaryTitleHint) hints.primaryTitle = input.primaryTitleHint;
 	if (input.metadata) hints.domMedia = input.metadata;

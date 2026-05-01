@@ -60,17 +60,14 @@ export function createLibraryHandlers(
 			if (parsedInput.metadata !== undefined)
 				payload.metadata = parsedInput.metadata;
 
-			const requestOptions: {
-				force_verify?: boolean;
-				network?: "never";
-				ignoreFailureCache?: boolean;
-				priority?: RequestPriority;
-			} = {};
-			if (parsedInput.force_verify) requestOptions.force_verify = true;
-			if (parsedInput.network) requestOptions.network = parsedInput.network;
-			if (parsedInput.ignoreFailureCache)
-				requestOptions.ignoreFailureCache = true;
-			if (parsedInput.priority) requestOptions.priority = parsedInput.priority;
+				const requestOptions: {
+					force_verify?: boolean;
+					network?: "never";
+					priority?: RequestPriority;
+				} = {};
+				if (parsedInput.force_verify) requestOptions.force_verify = true;
+				if (parsedInput.network) requestOptions.network = parsedInput.network;
+				if (parsedInput.priority) requestOptions.priority = parsedInput.priority;
 
 			const status = await sonarrLibrary.getSeriesStatus(
 				payload,
@@ -93,17 +90,14 @@ export function createLibraryHandlers(
 			if (parsedInput.metadata !== undefined)
 				payload.metadata = parsedInput.metadata;
 
-			const requestOptions: {
-				force_verify?: boolean;
-				network?: "never";
-				ignoreFailureCache?: boolean;
-				priority?: RequestPriority;
-			} = {};
-			if (parsedInput.force_verify) requestOptions.force_verify = true;
-			if (parsedInput.network) requestOptions.network = parsedInput.network;
-			if (parsedInput.ignoreFailureCache)
-				requestOptions.ignoreFailureCache = true;
-			if (parsedInput.priority) requestOptions.priority = parsedInput.priority;
+				const requestOptions: {
+					force_verify?: boolean;
+					network?: "never";
+					priority?: RequestPriority;
+				} = {};
+				if (parsedInput.force_verify) requestOptions.force_verify = true;
+				if (parsedInput.network) requestOptions.network = parsedInput.network;
+				if (parsedInput.priority) requestOptions.priority = parsedInput.priority;
 
 			const status = await radarrLibrary.getMovieStatus(
 				payload,

@@ -34,7 +34,7 @@ export async function addRadarrMovie(
 ): Promise<RadarrMovie> {
 	const { client, mappingService, library } = deps;
 
-	const resolveOptions: AutoMappingOptions = { ignoreFailureCache: true };
+	const resolveOptions: AutoMappingOptions = { forceLookupNetwork: true };
 	const hints: NonNullable<NonNullable<AutoMappingOptions["hints"]>> = {};
 	if (input.primaryTitleHint) hints.primaryTitle = input.primaryTitleHint;
 	if (input.metadata) hints.domMedia = input.metadata;

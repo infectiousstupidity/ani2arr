@@ -150,7 +150,6 @@ export function useSonarrModalReadData(input: {
 	const sonarrStatus = useSeriesStatus(statusPayload, {
 		enabled: isConfigured,
 		force_verify: shouldForceVerify,
-		ignoreFailureCache: shouldForceVerify,
 	});
 
 	const hasUsableVerifiedStatus =
