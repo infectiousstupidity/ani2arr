@@ -8,7 +8,6 @@ import type { Provider } from '@/providers';
 import type {
   AcceptedMappingEvidence,
   MappingCandidateEvaluation,
-  InheritedMappingVerificationDetails,
   RecentMappingEvaluationTrace,
 } from '@/mapping/types';
 import type { AutoMappingRecord } from './types';
@@ -21,7 +20,7 @@ type StoredAutoMappingRecord = AutoMappingRecord & {
   expiresAt: number;
 };
 
-const AUTO_MAPPING_STORAGE_KEY = 'local:autoMappings';
+const AUTO_MAPPING_STORAGE_KEY = 'local:autoMappings:v2';
 
 export const MAPPED_AUTO_MAPPING_TTL = {
   hardMs: 30 * 24 * 60 * 60 * 1000,
@@ -63,51 +62,8 @@ const acceptedEvidenceEquals = (
 ): boolean => (
   left.source === right.source &&
   left.reason === right.reason &&
-  left.successfulTitle === right.successfulTitle &&
-  left.immediateSourceAniListId === right.immediateSourceAniListId &&
-  left.chainAnchorAniListId === right.chainAnchorAniListId &&
-  inheritedVerificationEquals(left.inheritedVerification, right.inheritedVerification)
+  left.successfulTitle === right.successfulTitle
 );
-
-const inheritedVerificationEquals = (
-  left: InheritedMappingVerificationDetails | undefined,
-  right: InheritedMappingVerificationDetails | undefined,
-): boolean => {
-  if (!left && !right) {
-    return true;
-  }
-  if (!left || !right) {
-    return false;
-  }
-  if (
-    left.verdict !== right.verdict ||
-    left.reason !== right.reason ||
-    left.immediateSourceAniListId !== right.immediateSourceAniListId ||
-    left.chainAnchorAniListId !== right.chainAnchorAniListId
-  ) {
-    return false;
-  }
-
-  if (left.positiveSignals.length !== right.positiveSignals.length) {
-    return false;
-  }
-  for (const [index, signal] of left.positiveSignals.entries()) {
-    if (signal !== right.positiveSignals[index]) {
-      return false;
-    }
-  }
-
-  if (left.contradictions.length !== right.contradictions.length) {
-    return false;
-  }
-  for (const [index, contradiction] of left.contradictions.entries()) {
-    if (contradiction !== right.contradictions[index]) {
-      return false;
-    }
-  }
-
-  return true;
-};
 
 const evaluationCandidateEquals = (
   left: MappingCandidateEvaluation,
@@ -119,8 +75,7 @@ const evaluationCandidateEquals = (
   left.reason === right.reason &&
   left.status === right.status &&
   left.summary === right.summary &&
-  left.score === right.score &&
-  inheritedVerificationEquals(left.inheritedVerification, right.inheritedVerification)
+  left.score === right.score
 );
 
 const recentEvaluationEquals = (

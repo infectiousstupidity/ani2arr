@@ -20,7 +20,6 @@ import type {
 	AcceptedMappingReason,
 	AcceptedMappingSource,
 	MappingCandidateEvaluationStatus,
-	InheritedMappingVerificationDetails,
 	RecentMappingEvaluationTrace,
 } from "@/mapping/types";
 import type {
@@ -131,8 +130,6 @@ interface MappingDetailsExplanationItem {
 	resolverOutcome?: AutoMappingStatus;
 	reviewReason?: MappingIssueReason;
 	suppressedProviderId?: ProviderId;
-	immediateSourceAniListId?: AniListId;
-	chainAnchorAniListId?: AniListId;
 	details?: readonly string[];
 }
 
@@ -144,7 +141,6 @@ interface MappingDetailsCandidateEvaluation {
 	status: MappingCandidateEvaluationStatus;
 	summary: string;
 	score?: number;
-	inheritedVerification?: InheritedMappingVerificationDetails;
 }
 
 interface MappingDetailsCandidateGroups {
@@ -283,9 +279,6 @@ const buildSuggestedCandidates = (
 			status: candidate.status,
 			summary: candidate.summary,
 			...(candidate.score === undefined ? {} : { score: candidate.score }),
-			...(candidate.inheritedVerification
-				? { inheritedVerification: candidate.inheritedVerification }
-				: {}),
 		};
 
 		switch (candidate.status) {
@@ -315,12 +308,6 @@ const formatReviewReason = (reason: MappingIssueReason): string => {
 		case "ignored-but-exact-upstream": {
 			return "Ignored entry now has an exact upstream mapping.";
 		}
-		case "verification-failed-inherited-candidate": {
-			return "A strong inherited candidate could not be operationally verified.";
-		}
-		case "ambiguous-inherited-conflict": {
-			return "Inherited relation anchors proposed conflicting provider IDs.";
-		}
 	}
 };
 
@@ -335,21 +322,6 @@ const buildExplanationItems = (
 		const details: string[] = [];
 		if (evidence.successfulTitle) {
 			details.push(`Matched with title "${evidence.successfulTitle}".`);
-		}
-		if (evidence.immediateSourceAniListId) {
-			details.push(
-				`Immediate source AniList ID ${evidence.immediateSourceAniListId}.`,
-			);
-		}
-		if (evidence.chainAnchorAniListId) {
-			details.push(`Chain anchor AniList ID ${evidence.chainAnchorAniListId}.`);
-		}
-		if (evidence.inheritedVerification) {
-			details.push(
-				evidence.inheritedVerification.reason,
-				...evidence.inheritedVerification.positiveSignals,
-				...evidence.inheritedVerification.contradictions,
-			);
 		}
 
 		let summary = "Accepted mapping is currently effective.";
@@ -366,17 +338,8 @@ const buildExplanationItems = (
 				summary = "Automatic exact title match is currently effective.";
 				break;
 			}
-			case "verified-inherited": {
-				summary =
-					"Inherited mapping from a related AniList entry was verified and accepted.";
-				break;
-			}
 			case "fuzzy-match": {
 				summary = "Fuzzy fallback match is currently effective.";
-				break;
-			}
-			case "borrowed-base-title-fallback": {
-				summary = "Borrowed base-title fallback match is currently effective.";
 				break;
 			}
 		}
@@ -386,12 +349,6 @@ const buildExplanationItems = (
 			summary,
 			source: evidence.source,
 			reason: evidence.reason,
-			...(evidence.immediateSourceAniListId
-				? { immediateSourceAniListId: evidence.immediateSourceAniListId }
-				: {}),
-			...(evidence.chainAnchorAniListId
-				? { chainAnchorAniListId: evidence.chainAnchorAniListId }
-				: {}),
 			...(details.length > 0 ? { details } : {}),
 		});
 	}
@@ -579,9 +536,6 @@ export async function getMappingInspection(
 		providerId: candidate.providerId,
 		...(candidate.acceptedEvidence
 			? { acceptedEvidence: candidate.acceptedEvidence }
-			: {}),
-		...(candidate.recentEvaluation
-			? { recentEvaluation: candidate.recentEvaluation }
 			: {}),
 		...(candidate.autoMappingStatus
 			? { autoMappingStatus: candidate.autoMappingStatus }

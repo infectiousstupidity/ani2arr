@@ -44,14 +44,8 @@ export function describeAcceptanceReason(
 		case "exact-title-match": {
 			return "Exact title match";
 		}
-		case "verified-inherited": {
-			return "Inherited from related AniList mapping";
-		}
 		case "fuzzy-match": {
 			return "Fuzzy title match";
-		}
-		case "borrowed-base-title-fallback": {
-			return "Borrowed base-title fallback";
 		}
 	}
 }
@@ -169,9 +163,6 @@ export function createSingleCandidateTrace(
 			reason: resolved.reason,
 			status,
 			summary: describeCandidate(resolved.reason, status),
-			...(resolved.inheritedVerification
-				? { inheritedVerification: resolved.inheritedVerification }
-				: {}),
 		},
 	]);
 }

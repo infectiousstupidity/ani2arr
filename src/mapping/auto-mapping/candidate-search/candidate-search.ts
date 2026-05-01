@@ -31,18 +31,12 @@ type CandidateSearchContext = {
 		providerId: ProviderId,
 		reason: AcceptedMappingReason,
 	) => boolean;
-	preferredTerms?: PreferredSearchTerm[];
 	limits: {
 		maxTerms: number;
 		scoreThreshold: number;
 		earlyStopThreshold: number;
 	};
 	log: ScopedLogger;
-};
-
-export type PreferredSearchTerm = {
-	rawTitle: string;
-	acceptedReason: AcceptedMappingReason;
 };
 
 export interface SearchedCandidate {
@@ -155,7 +149,6 @@ function buildSearchTerms(
 	media: AniListMedia,
 	provider: Provider,
 	primaryTitleHint?: string,
-	preferredTerms: readonly PreferredSearchTerm[] = [],
 ): SearchTermEntry[] {
 	const generatedTerms = makeTitleSearchTerms(
 		provider,
@@ -178,13 +171,6 @@ function buildSearchTerms(
 			...(acceptedReasonOverride ? { acceptedReasonOverride } : {}),
 		});
 	};
-
-	for (const preferred of preferredTerms) {
-		register(
-			makeTitleSearchTerm(provider, preferred.rawTitle),
-			preferred.acceptedReason,
-		);
-	}
 
 	register(
 		primaryTitleHint
@@ -372,7 +358,6 @@ export async function searchAutoMappingCandidates(
 		media,
 		provider,
 		primaryTitleHint,
-		ctx.preferredTerms,
 	);
 	const traceCandidates = new Map<number, SearchedCandidate>();
 	const traceSearchTerms = terms

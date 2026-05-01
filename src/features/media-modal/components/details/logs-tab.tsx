@@ -95,8 +95,6 @@ export function MappingInspectionLogs(props: MappingInspectionLogsProps): React.
                 item.resolverOutcome ? `resolverOutcome: ${formatToken(item.resolverOutcome)}` : null,
                 item.reviewReason ? `reviewReason: ${formatToken(item.reviewReason)}` : null,
                 item.suppressedProviderId ? `suppressedProviderId: ${item.suppressedProviderId}` : null,
-                item.immediateSourceAniListId ? `immediateSourceAniListId: ${item.immediateSourceAniListId}` : null,
-                item.chainAnchorAniListId ? `chainAnchorAniListId: ${item.chainAnchorAniListId}` : null,
                 `summary: ${item.summary}`,
                 ...(item.details ?? []).map((detail) => `detail: ${detail}`),
               ]}

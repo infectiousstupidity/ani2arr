@@ -189,11 +189,9 @@ export class MappingService {
 		const promise = resolveAutoMapping(
 			{
 				anilistApi: this.anilistApi,
-				anibridgeMappingStore: this.anibridgeMappingStore,
 				lookupClients: this.lookupClients,
 				autoMappingStore: this.autoMappingStore,
 				log: this.log,
-				...(this.manualMappings ? { manualMappings: this.manualMappings } : {}),
 				acceptResolved: (
 					resolvedProvider,
 					resolvedAniListId,
@@ -509,15 +507,6 @@ function buildAcceptedMappingEvidence(
 		reason: resolved.reason,
 		...(resolved.successfulSynonym
 			? { successfulTitle: resolved.successfulSynonym }
-			: {}),
-		...(resolved.immediateSourceAniListId
-			? { immediateSourceAniListId: resolved.immediateSourceAniListId }
-			: {}),
-		...(resolved.chainAnchorAniListId
-			? { chainAnchorAniListId: resolved.chainAnchorAniListId }
-			: {}),
-		...(resolved.inheritedVerification
-			? { inheritedVerification: resolved.inheritedVerification }
 			: {}),
 	};
 }

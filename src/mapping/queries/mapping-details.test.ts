@@ -111,7 +111,7 @@ describe("getMappingInspection", () => {
 					providerId: tvdb(222),
 					acceptedEvidence: {
 						source: "auto",
-						reason: "verified-inherited",
+						reason: "fuzzy-match",
 					},
 					updatedAt: 9,
 				},
@@ -241,9 +241,9 @@ describe("getMappingInspection", () => {
 							providerId: tmdb(902),
 							title: "Suppressed Match",
 							source: "auto",
-							reason: "verified-inherited",
+							reason: "fuzzy-match",
 							status: "not-accepted",
-							summary: "Inherited candidate not accepted",
+							summary: "Fuzzy title match not accepted",
 						},
 						{
 							providerId: tmdb(903),

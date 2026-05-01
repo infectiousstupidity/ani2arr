@@ -575,9 +575,6 @@ export async function listMappings(
 			...(candidate.acceptedEvidence
 				? { acceptedEvidence: candidate.acceptedEvidence }
 				: {}),
-			...(candidate.recentEvaluation
-				? { recentEvaluation: candidate.recentEvaluation }
-				: {}),
 			...(candidate.autoMappingStatus
 				? { autoMappingStatus: candidate.autoMappingStatus }
 				: {}),
