@@ -8,8 +8,8 @@ import {
 	resetAllRevisions,
 } from "@/shared/sync/revisions";
 import {
-	radarrTitleLookupCaches,
-	sonarrTitleLookupCaches,
+	radarrTitleLookupCache,
+	sonarrTitleLookupCache,
 } from "@/mapping/auto-mapping/lookup/lookup.cache";
 import { anibridgeMappingCache } from "@/mapping/upstream-mapping/anibridge-mapping.cache";
 import { anilistMediaCache } from "@/anilist/media.cache";
@@ -112,11 +112,11 @@ export const createApiDeps = (): ApiHandlerDeps => {
 	);
 	const lookupClient = createSonarrTitleLookup(
 		sonarrClient,
-		sonarrTitleLookupCaches,
+		sonarrTitleLookupCache,
 	);
 	const radarrLookupClient = createRadarrTitleLookup(
 		radarrClient,
-		radarrTitleLookupCaches,
+		radarrTitleLookupCache,
 	);
 
 	const manualMappingService = new ManualMappingService();
