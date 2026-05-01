@@ -12,18 +12,6 @@ vi.mock("@/debug/metrics", () => ({
 	incrementCounter: vi.fn(),
 }));
 
-vi.mock("@/options", () => ({
-	getExtensionOptionsSnapshot: vi.fn(async () => ({
-		sonarr: { url: "http://localhost:8989", apiKey: "test-key" },
-	})),
-	getProviderCredentials: vi.fn(
-		(
-			options: { sonarr?: { url: string; apiKey: string } },
-			provider: string,
-		) => (provider === "sonarr" ? (options.sonarr ?? null) : null),
-	),
-}));
-
 type StubManualMappings = {
 	isIgnored: ReturnType<typeof vi.fn>;
 	get: ReturnType<typeof vi.fn>;
@@ -109,12 +97,17 @@ const createService = () => {
 		radarr: { reset: vi.fn(async () => {}) },
 	};
 	const notifyMappingsChanged = vi.fn();
+	const getConfiguredCredentials = vi.fn(async () => ({
+		url: "http://localhost:8989",
+		apiKey: "test-key",
+	}));
 
 	const service = new MappingService({
 		anilistApi: anilistApi as never,
 		anibridgeMappingStore: anibridgeMappingStore as never,
 		lookupClients: lookupClients as never,
 		autoMappingStore: autoMappingStore as never,
+		getConfiguredCredentials,
 		manualMappings: manualMappings as never,
 		notifyMappingsChanged,
 	});
@@ -126,6 +119,7 @@ const createService = () => {
 		anibridgeMappingStore,
 		autoMappingStore,
 		lookupClients,
+		getConfiguredCredentials,
 		notifyMappingsChanged,
 	};
 };

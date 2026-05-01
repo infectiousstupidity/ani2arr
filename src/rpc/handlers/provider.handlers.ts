@@ -57,8 +57,7 @@ export function createProviderHandlers(
 		manualMappingService,
 		anibridgeMappingStore,
 		manualMappingsReady,
-		ensureSonarrConfigured,
-		ensureRadarrConfigured,
+		providerConfig,
 	} = deps;
 
 	const getLinkedSonarrAniListIds = (tvdbId: TvdbId): number[] => {
@@ -103,14 +102,10 @@ export function createProviderHandlers(
 		async getSonarrMetadata(input) {
 			const parsedInput = v.parse(GetProviderMetadataInputSchema, input);
 			const maybeCredentials = parsedInput?.credentials;
-			let credentials: ProviderCredentials;
-
-			if (maybeCredentials?.url && maybeCredentials.apiKey) {
-				credentials = normalizeInputCredentials("sonarr", maybeCredentials);
-			} else {
-				const ensured = await ensureSonarrConfigured();
-				credentials = ensured.credentials;
-			}
+			const credentials: ProviderCredentials =
+				maybeCredentials?.url && maybeCredentials.apiKey
+					? normalizeInputCredentials("sonarr", maybeCredentials)
+					: await providerConfig.requireCredentials("sonarr");
 
 			const [qualityProfiles, rootFolders, tags] = await Promise.all([
 				SonarrClient.getQualityProfiles(credentials),
@@ -124,13 +119,10 @@ export function createProviderHandlers(
 		async getRadarrMetadata(input) {
 			const parsedInput = v.parse(GetProviderMetadataInputSchema, input);
 			const maybeCredentials = parsedInput?.credentials;
-			let credentials: ProviderCredentials;
-			if (maybeCredentials?.url && maybeCredentials.apiKey) {
-				credentials = normalizeInputCredentials("radarr", maybeCredentials);
-			} else {
-				const ensured = await ensureRadarrConfigured();
-				credentials = ensured.credentials;
-			}
+			const credentials: ProviderCredentials =
+				maybeCredentials?.url && maybeCredentials.apiKey
+					? normalizeInputCredentials("radarr", maybeCredentials)
+					: await providerConfig.requireCredentials("radarr");
 
 			const [qualityProfiles, rootFolders, tags] = await Promise.all([
 				RadarrClient.getQualityProfiles(credentials),
@@ -143,7 +135,7 @@ export function createProviderHandlers(
 
 		async searchSonarr(input) {
 			const parsedInput = v.parse(SonarrLookupInputSchema, input);
-			const { credentials } = await ensureSonarrConfigured();
+			const credentials = await providerConfig.requireCredentials("sonarr");
 			await manualMappingsReady;
 
 			const [results, library] = await Promise.all([
@@ -189,7 +181,7 @@ export function createProviderHandlers(
 
 		async searchRadarr(input) {
 			const parsedInput = v.parse(RadarrLookupInputSchema, input);
-			const { credentials } = await ensureRadarrConfigured();
+			const credentials = await providerConfig.requireCredentials("radarr");
 			await manualMappingsReady;
 
 			const [results, library] = await Promise.all([
@@ -226,7 +218,7 @@ export function createProviderHandlers(
 
 		async validateTvdbId(input) {
 			const parsedInput = v.parse(ValidateTvdbInputSchema, input);
-			const { credentials } = await ensureSonarrConfigured();
+			const credentials = await providerConfig.requireCredentials("sonarr");
 			const found = await SonarrClient.getSeriesByTvdbId(
 				parsedInput.tvdbId,
 				credentials,
@@ -246,7 +238,7 @@ export function createProviderHandlers(
 
 		async validateTmdbId(input) {
 			const parsedInput = v.parse(ValidateTmdbInputSchema, input);
-			const { credentials } = await ensureRadarrConfigured();
+			const credentials = await providerConfig.requireCredentials("radarr");
 			const found = await RadarrClient.getMovieByTmdbId(
 				parsedInput.tmdbId,
 				credentials,

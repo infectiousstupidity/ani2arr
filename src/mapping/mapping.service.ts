@@ -3,7 +3,6 @@
 
 import type { AniListId, AniListMediaService } from "@/anilist";
 import { incrementCounter } from "@/debug/metrics";
-import { getExtensionOptionsSnapshot, getProviderCredentials } from "@/options";
 import {
 	parseProviderIdentity,
 	type Provider,
@@ -14,8 +13,6 @@ import {
 	type TvdbId,
 } from "@/providers";
 import {
-	createError,
-	ErrorCode,
 	logError,
 	normalizeError,
 } from "@/shared/errors";
@@ -54,6 +51,9 @@ type MappingServiceDeps = {
 	anibridgeMappingStore: AnibridgeMappingStore;
 	lookupClients: ProviderTitleLookupRegistry;
 	autoMappingStore: AutoMappingStore;
+	getConfiguredCredentials: (
+		provider: Provider,
+	) => Promise<ProviderCredentials>;
 	manualMappings?: ManualMappingService;
 	notifyMappingsChanged?: () => void;
 };
@@ -90,6 +90,9 @@ export class MappingService {
 	private readonly anibridgeMappingStore: AnibridgeMappingStore;
 	private readonly lookupClients: ProviderTitleLookupRegistry;
 	private readonly autoMappingStore: AutoMappingStore;
+	private readonly getConfiguredCredentials: (
+		provider: Provider,
+	) => Promise<ProviderCredentials>;
 	private readonly manualMappings: ManualMappingService | undefined;
 	private readonly notifyMappingsChanged: (() => void) | undefined;
 	private readonly inflight = new AutoMappingInflightRequests();
@@ -99,6 +102,7 @@ export class MappingService {
 		this.anibridgeMappingStore = deps.anibridgeMappingStore;
 		this.lookupClients = deps.lookupClients;
 		this.autoMappingStore = deps.autoMappingStore;
+		this.getConfiguredCredentials = deps.getConfiguredCredentials;
 		this.manualMappings = deps.manualMappings;
 		this.notifyMappingsChanged = deps.notifyMappingsChanged;
 	}
@@ -380,13 +384,13 @@ export class MappingService {
 				: {}),
 		};
 
-			try {
-				await this.autoMappingStore.set(
-					provider,
-					anilistId,
-					mappedState,
-					MAPPED_AUTO_MAPPING_TTL,
-				);
+		try {
+			await this.autoMappingStore.set(
+				provider,
+				anilistId,
+				mappedState,
+				MAPPED_AUTO_MAPPING_TTL,
+			);
 		} catch (error) {
 			const normalized = normalizeError(error);
 			this.log.error?.(
@@ -472,28 +476,6 @@ export class MappingService {
 			shouldApplyCandidateSuppression(source, resolved.reason) &&
 			this.isCandidateSuppressed(provider, anilistId, resolved.providerId)
 		);
-	}
-
-	private async getConfiguredCredentials(
-		provider: Provider,
-	): Promise<ProviderCredentials> {
-		const options = await getExtensionOptionsSnapshot();
-		const credentials = getProviderCredentials(options, provider);
-		if (!credentials) {
-			if (provider === "sonarr") {
-				throw createError(
-					ErrorCode.SONARR_NOT_CONFIGURED,
-					"Sonarr credentials are not configured.",
-					"Configure your Sonarr connection in ani2arr options.",
-				);
-			}
-			throw createError(
-				ErrorCode.CONFIGURATION_ERROR,
-				"Radarr credentials are not configured.",
-				"Configure your Radarr connection in ani2arr options.",
-			);
-		}
-		return credentials;
 	}
 
 	private getAnibridgeProviderIds(
