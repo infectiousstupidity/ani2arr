@@ -2,6 +2,7 @@
 // src/mapping/auto-mapping/auto-mapping.store.ts
 
 import { storage } from '@wxt-dev/storage';
+import PQueue from 'p-queue';
 import { parseAniListIdOrNull, type AniListId } from '@/anilist';
 import type { Provider } from '@/providers';
 import type {
@@ -79,6 +80,7 @@ const inheritedVerificationEquals = (
     return false;
   }
   if (
+    left.verdict !== right.verdict ||
     left.reason !== right.reason ||
     left.immediateSourceAniListId !== right.immediateSourceAniListId ||
     left.chainAnchorAniListId !== right.chainAnchorAniListId
@@ -180,6 +182,7 @@ const autoMappingEquals = (left: AutoMappingRecord, right: AutoMappingRecord): b
 
 export class AutoMappingStore {
   private readonly records = new Map<string, StoredAutoMappingRecord>();
+  private readonly writeQueue = new PQueue({ concurrency: 1 });
   private initPromise: Promise<void> | null = null;
   private hasPendingExpiryCleanup = false;
 
@@ -201,40 +204,42 @@ export class AutoMappingStore {
   }
 
   public async list(provider?: Provider): Promise<Array<AutoMappingRecord & { provider: Provider; anilistId: AniListId }>> {
-    await this.ensureLoaded();
-    const now = Date.now();
-    let pruned = false;
-    const entries: Array<AutoMappingRecord & { provider: Provider; anilistId: AniListId }> = [];
+    return this.runWrite(async () => {
+      await this.ensureLoaded();
+      const now = Date.now();
+      let pruned = false;
+      const entries: Array<AutoMappingRecord & { provider: Provider; anilistId: AniListId }> = [];
 
-    for (const [key, entry] of this.records.entries()) {
-      const parsed = parseAutoMappingKey(key);
-      if (!parsed) {
-        continue;
+      for (const [key, entry] of this.records.entries()) {
+        const parsed = parseAutoMappingKey(key);
+        if (!parsed) {
+          continue;
+        }
+        if (provider && parsed.provider !== provider) {
+          continue;
+        }
+        if (now >= entry.expiresAt) {
+          this.records.delete(key);
+          pruned = true;
+          continue;
+        }
+        entries.push({
+          provider: parsed.provider,
+          anilistId: parsed.anilistId,
+          ...this.toPublicRecord(entry),
+        });
       }
-      if (provider && parsed.provider !== provider) {
-        continue;
+
+      if (pruned) {
+        this.hasPendingExpiryCleanup = true;
       }
-      if (now >= entry.expiresAt) {
-        this.records.delete(key);
-        pruned = true;
-        continue;
+
+      if (this.hasPendingExpiryCleanup) {
+        await this.persist();
       }
-      entries.push({
-        provider: parsed.provider,
-        anilistId: parsed.anilistId,
-        ...this.toPublicRecord(entry),
-      });
-    }
 
-    if (pruned) {
-      this.hasPendingExpiryCleanup = true;
-    }
-
-    if (this.hasPendingExpiryCleanup) {
-      await this.persist();
-    }
-
-    return entries;
+      return entries;
+    });
   }
 
   public async set<TState extends AutoMappingRecord['state']>(
@@ -243,64 +248,74 @@ export class AutoMappingStore {
     record: Omit<Extract<AutoMappingRecord, { state: TState }>, 'updatedAt'>,
     ttl: AutoMappingTtl,
   ): Promise<boolean> {
-    await this.ensureLoaded();
-    const key = createAutoMappingKey(provider, anilistId);
-    const previous = this.records.get(key);
-    const nextRecord = {
-      ...record,
-      updatedAt: this.resolveUpdatedAt(previous, record),
-    } as AutoMappingRecord;
-    const now = Date.now();
-    const next: StoredAutoMappingRecord = {
-      ...nextRecord,
-      expiresAt: now + ttl.hardMs,
-    };
-    const changed = !previous || !autoMappingEquals(this.toPublicRecord(previous), nextRecord);
+    return this.runWrite(async () => {
+      await this.ensureLoaded();
+      const key = createAutoMappingKey(provider, anilistId);
+      const previous = this.records.get(key);
+      const nextRecord = {
+        ...record,
+        updatedAt: this.resolveUpdatedAt(previous, record),
+      } as AutoMappingRecord;
+      const now = Date.now();
+      const next: StoredAutoMappingRecord = {
+        ...nextRecord,
+        expiresAt: now + ttl.hardMs,
+      };
+      const changed = !previous || !autoMappingEquals(this.toPublicRecord(previous), nextRecord);
 
-    this.records.set(key, next);
-    await this.persist();
-    return changed;
+      this.records.set(key, next);
+      await this.persist();
+      return changed;
+    });
   }
 
   public async delete(provider: Provider, anilistId: AniListId): Promise<boolean> {
-    await this.ensureLoaded();
-    const deleted = this.records.delete(createAutoMappingKey(provider, anilistId));
-    if (deleted) {
-      await this.persist();
-    }
-    return deleted;
+    return this.runWrite(async () => {
+      await this.ensureLoaded();
+      const deleted = this.records.delete(createAutoMappingKey(provider, anilistId));
+      if (deleted) {
+        await this.persist();
+      }
+      return deleted;
+    });
   }
 
   public async clear(provider?: Provider): Promise<boolean> {
-    await this.ensureLoaded();
+    return this.runWrite(async () => {
+      await this.ensureLoaded();
 
-    if (!provider) {
-      if (this.records.size === 0) {
-        return false;
+      if (!provider) {
+        if (this.records.size === 0) {
+          return false;
+        }
+        this.records.clear();
+        await this.persist();
+        return true;
       }
-      this.records.clear();
-      await this.persist();
-      return true;
-    }
 
-    let changed = false;
-    const keysToDelete: string[] = [];
-    for (const key of this.records.keys()) {
-      const parsed = parseAutoMappingKey(key);
-      if (parsed?.provider === provider) {
-        keysToDelete.push(key);
+      let changed = false;
+      const keysToDelete: string[] = [];
+      for (const key of this.records.keys()) {
+        const parsed = parseAutoMappingKey(key);
+        if (parsed?.provider === provider) {
+          keysToDelete.push(key);
+        }
       }
-    }
 
-    for (const key of keysToDelete) {
-      this.records.delete(key);
-      changed = true;
-    }
+      for (const key of keysToDelete) {
+        this.records.delete(key);
+        changed = true;
+      }
 
-    if (changed) {
-      await this.persist();
-    }
-    return changed;
+      if (changed) {
+        await this.persist();
+      }
+      return changed;
+    });
+  }
+
+  private runWrite<T>(write: () => Promise<T>): Promise<T> {
+    return this.writeQueue.add(write);
   }
 
   private async ensureLoaded(): Promise<void> {

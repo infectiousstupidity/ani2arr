@@ -3,11 +3,7 @@
 
 import type { AniListId, AniListMediaService } from "@/anilist";
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
-import {
-	readAutoMappingFailure,
-	removeAutoMappingFailure,
-	writeAutoMappingFailure,
-} from "./failure.cache";
+import { readAutoMappingFailure } from "./failure.cache";
 import type {
 	Provider,
 	ProviderCredentials,
@@ -15,12 +11,7 @@ import type {
 } from "@/providers";
 import { getProviderLabel } from "@/providers/provider-labels";
 import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
-import {
-	createError,
-	ErrorCode,
-	normalizeError,
-	type ExtensionError,
-} from "@/shared/errors";
+import { createError, ErrorCode, normalizeError } from "@/shared/errors";
 import type { RequestPriority } from "@/shared/utils/request-priority";
 import type { ScopedLogger } from "@/shared/utils/logger";
 import {
@@ -101,7 +92,6 @@ type ResolveAutoMappingDeps = {
 	lookupClients: ProviderTitleLookupRegistry;
 	autoMappingStore: Pick<AutoMappingStore, "get">;
 	log: ScopedLogger;
-	sessionSeenCanonical: Record<Provider, Set<string>>;
 	manualMappings?: ManualMappingReads;
 	acceptResolved: (
 		provider: Provider,
@@ -116,6 +106,15 @@ type ResolveAutoMappingDeps = {
 		ttl: { hardMs: number },
 	) => Promise<void>;
 	clearAutoMapping: (provider: Provider, anilistId: AniListId) => Promise<void>;
+	recordAutoMappingFailure: (
+		provider: Provider,
+		anilistId: AniListId,
+		error: ReturnType<typeof normalizeError>,
+	) => Promise<void>;
+	removeAutoMappingFailure: (
+		provider: Provider,
+		anilistId: AniListId,
+	) => Promise<void>;
 	getConfiguredCredentials: (
 		provider: Provider,
 	) => Promise<ProviderCredentials>;
@@ -137,7 +136,9 @@ export async function resolveAutoMapping(
 		provider,
 		anilistId,
 		options,
-		bypassCachedResolutionState: options.ignoreFailureCache === true,
+		bypassCachedResolutionState:
+			options.ignoreFailureCache === true ||
+			options.forceLookupNetwork === true,
 	};
 
 	const cachedAutoMapping = await readUsableCachedAutoMapping(deps, request);
@@ -273,9 +274,7 @@ async function attemptNetworkResolution(
 				resolveUnresolvedSearchTerms(options.hints),
 				[],
 			);
-			const recentEvaluation = mergeRecentEvaluations(
-				fallbackTrace,
-			);
+			const recentEvaluation = mergeRecentEvaluations(fallbackTrace);
 			await deps.recordAutoMapping(
 				provider,
 				anilistId,
@@ -285,12 +284,12 @@ async function attemptNetworkResolution(
 				},
 				UNRESOLVED_AUTO_MAPPING_TTL,
 			);
-			await removeAutoMappingFailure(provider, anilistId);
+			await deps.removeAutoMappingFailure(provider, anilistId);
 			return null;
 		}
 
 		if (!bypassCachedResolutionState && shouldCacheFailure(normalized)) {
-			await cacheFailure(provider, anilistId, normalized);
+			await deps.recordAutoMappingFailure(provider, anilistId, normalized);
 		}
 		throw normalized;
 	}
@@ -313,7 +312,7 @@ async function attemptNetworkResolution(
 			},
 			UNRESOLVED_AUTO_MAPPING_TTL,
 		);
-		await removeAutoMappingFailure(provider, anilistId);
+		await deps.removeAutoMappingFailure(provider, anilistId);
 		return null;
 	}
 
@@ -331,14 +330,6 @@ async function attemptNetworkResolution(
 		},
 		"auto",
 	);
-}
-
-async function cacheFailure(
-	provider: Provider,
-	anilistId: AniListId,
-	error: ExtensionError,
-): Promise<void> {
-	await writeAutoMappingFailure(provider, anilistId, error);
 }
 
 async function resolveViaNetwork(
@@ -482,10 +473,7 @@ async function tryResolveWithMedia(
 						],
 					}
 				: {}),
-			isCandidateSuppressed: (
-				providerId,
-				reason: AcceptedMappingReason,
-			) =>
+			isCandidateSuppressed: (providerId, reason: AcceptedMappingReason) =>
 				deps.isResolvedCandidateSuppressed(
 					provider,
 					media.id,
@@ -495,7 +483,6 @@ async function tryResolveWithMedia(
 					},
 					"auto",
 				),
-			sessionSeenCanonical: deps.sessionSeenCanonical[provider],
 			limits: {
 				maxTerms: MAX_SEARCH_TERMS,
 				scoreThreshold: SCORE_THRESHOLD,

@@ -25,8 +25,7 @@ export type MappingUnknownReason =
 	| "provider-not-configured"
 	| "network-disabled"
 	| "lookup-failed"
-	| "ambiguous"
-	| "verification-failed";
+	| "ambiguous";
 
 /**
  * Source of an accepted mapping.
@@ -63,6 +62,7 @@ export type AcceptedMappingReason =
 
 /** Structured inherited-verification details kept with accepted or recent evaluation data. */
 export interface InheritedMappingVerificationDetails {
+	verdict?: "accept" | "reject" | "ambiguous" | "verification-failed";
 	reason: string;
 	positiveSignals: readonly string[];
 	contradictions: readonly string[];
@@ -84,7 +84,6 @@ export interface AcceptedMappingEvidence {
 export type MappingCandidateEvaluationStatus =
 	| "accepted"
 	| "rejected"
-	| "suppressed"
 	| "not-accepted";
 
 /** Compact candidate explanation kept in the most recent evaluation trace only. */

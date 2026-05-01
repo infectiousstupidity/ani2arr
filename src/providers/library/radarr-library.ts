@@ -242,13 +242,6 @@ export class RadarrLibrary {
 					resolverOutcome: "ambiguous",
 				};
 			}
-			if (resolverState?.state === "verification-failed") {
-				return {
-					providerMappingState: "unknown",
-					mappingUnknownReason: "verification-failed",
-					resolverOutcome: "verification-failed",
-				};
-			}
 			return {
 				providerMappingState: "unmapped",
 				...(resolverState?.state === "unresolved"

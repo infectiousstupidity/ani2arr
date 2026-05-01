@@ -20,7 +20,6 @@ const createLookupClient = (
 ): ProviderTitleLookup<SonarrLookupResult> => ({
 	provider: "sonarr",
 	reset: async () => {},
-	readCachedTitleLookup: async () => ({ results: [], hit: "none" }),
 	lookupTitle: async () => results,
 	readProviderId: (result: unknown) =>
 		typeof (result as Partial<SonarrLookupResult>).tvdbId === "number"
@@ -43,19 +42,21 @@ const TEST_CREDENTIALS = {
 
 describe("searchAutoMappingCandidates", () => {
 	it("returns exact when the winning candidate is an exact title match", async () => {
-		const result = await searchAutoMappingCandidates(createMedia("Attack on Titan"), {
-			lookupClient: createLookupClient([
-				{ title: "Attack on Titan", tvdbId: 101, year: 2013 },
-			]),
-			credentials: TEST_CREDENTIALS,
-			sessionSeenCanonical: new Set<string>(),
-			limits: {
-				maxTerms: 1,
-				scoreThreshold: 0.1,
-				earlyStopThreshold: 2,
+		const result = await searchAutoMappingCandidates(
+			createMedia("Attack on Titan"),
+			{
+				lookupClient: createLookupClient([
+					{ title: "Attack on Titan", tvdbId: 101, year: 2013 },
+				]),
+				credentials: TEST_CREDENTIALS,
+				limits: {
+					maxTerms: 1,
+					scoreThreshold: 0.1,
+					earlyStopThreshold: 2,
+				},
+				log: { debug: vi.fn() } as never,
 			},
-			log: { debug: vi.fn() } as never,
-		});
+		);
 
 		expect(result).toMatchObject({
 			status: "resolved",
@@ -73,19 +74,21 @@ describe("searchAutoMappingCandidates", () => {
 	});
 
 	it("returns fuzzy when the winning candidate only matches approximately", async () => {
-		const result = await searchAutoMappingCandidates(createMedia("Attack on Titan"), {
-			lookupClient: createLookupClient([
-				{ title: "Attack Titan", tvdbId: 202, year: 2013 },
-			]),
-			credentials: TEST_CREDENTIALS,
-			sessionSeenCanonical: new Set<string>(),
-			limits: {
-				maxTerms: 1,
-				scoreThreshold: 0.01,
-				earlyStopThreshold: 2,
+		const result = await searchAutoMappingCandidates(
+			createMedia("Attack on Titan"),
+			{
+				lookupClient: createLookupClient([
+					{ title: "Attack Titan", tvdbId: 202, year: 2013 },
+				]),
+				credentials: TEST_CREDENTIALS,
+				limits: {
+					maxTerms: 1,
+					scoreThreshold: 0.01,
+					earlyStopThreshold: 2,
+				},
+				log: { debug: vi.fn() } as never,
 			},
-			log: { debug: vi.fn() } as never,
-		});
+		);
 
 		expect(result).toMatchObject({
 			status: "resolved",
@@ -100,5 +103,76 @@ describe("searchAutoMappingCandidates", () => {
 				searchTerm: "Attack on Titan",
 			}),
 		]);
+	});
+
+	it("does not treat duplicate hits for the same provider ID as a tie", async () => {
+		let callCount = 0;
+		const lookupClient: ProviderTitleLookup<SonarrLookupResult> = {
+			provider: "sonarr",
+			reset: async () => {},
+			lookupTitle: async () => {
+				callCount += 1;
+				return [
+					{
+						title: callCount === 1 ? "Needle Bloom" : "Needle Bloom!",
+						tvdbId: 303,
+						year: 2020,
+					},
+				];
+			},
+			readProviderId: (result: unknown) =>
+				typeof (result as Partial<SonarrLookupResult>).tvdbId === "number"
+					? tvdb((result as SonarrLookupResult).tvdbId)
+					: null,
+		};
+
+		const result = await searchAutoMappingCandidates(
+			{
+				...createMedia("Needle Bloom", 2020),
+				title: {
+					english: "Needle Bloom",
+					romaji: "Needle Bloom!",
+				},
+			},
+			{
+				lookupClient,
+				credentials: TEST_CREDENTIALS,
+				limits: {
+					maxTerms: 2,
+					scoreThreshold: 0.1,
+					earlyStopThreshold: 2,
+				},
+				log: { debug: vi.fn() } as never,
+			},
+		);
+
+		expect(result).toMatchObject({
+			status: "resolved",
+			providerId: 303,
+		});
+	});
+
+	it("leaves near-tied different provider IDs unresolved", async () => {
+		const result = await searchAutoMappingCandidates(
+			createMedia("Needle Bloom", 2020),
+			{
+				lookupClient: createLookupClient([
+					{ title: "Needle Bloom", tvdbId: 303, year: 2020 },
+					{ title: "Needle Bloom!", tvdbId: 404, year: 2020 },
+				]),
+				credentials: TEST_CREDENTIALS,
+				limits: {
+					maxTerms: 1,
+					scoreThreshold: 0.1,
+					earlyStopThreshold: 2,
+				},
+				log: { debug: vi.fn() } as never,
+			},
+		);
+
+		expect(result).toMatchObject({
+			status: "unresolved",
+			reason: "low-confidence",
+		});
 	});
 });

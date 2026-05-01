@@ -84,7 +84,6 @@ export interface TitleMatchCandidate<
 	 */
 	score: number;
 	reason: TitleMatchReason;
-	breakdown?: Record<string, number>;
 }
 
 const SONARR_PROFILE: TitleMatchProfile = {
@@ -278,15 +277,15 @@ export function readResultTitleVariants(
 		: readSonarrResultTitleVariants(candidate);
 }
 
-function hasRareTokenIntersection(query: string[], candidate: string[]): boolean {
+function hasRareTokenIntersection(
+	query: string[],
+	candidate: string[],
+): boolean {
 	const candidateTokens = new Set(
 		candidate.filter((token) => token.length >= RARE_TOKEN_MIN_LENGTH),
 	);
 	for (const token of query) {
-		if (
-			token.length >= RARE_TOKEN_MIN_LENGTH &&
-			candidateTokens.has(token)
-		) {
+		if (token.length >= RARE_TOKEN_MIN_LENGTH && candidateTokens.has(token)) {
 			return true;
 		}
 	}
@@ -457,7 +456,10 @@ function scoreTitleMatch(params: TitleMatchParams): {
 	reason: TitleMatchReason;
 } {
 	const profile = getTitleMatchProfile(params.provider);
-	const queryVariants = makeQueryTitleVariants(params.provider, params.queryRaw);
+	const queryVariants = makeQueryTitleVariants(
+		params.provider,
+		params.queryRaw,
+	);
 	const candidateVariants = readResultTitleVariants(
 		params.provider,
 		params.candidate,

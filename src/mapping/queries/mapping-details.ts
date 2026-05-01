@@ -152,7 +152,6 @@ interface MappingDetailsCandidateGroups {
 	searchTerms?: readonly string[];
 	accepted: readonly MappingDetailsCandidateEvaluation[];
 	rejected: readonly MappingDetailsCandidateEvaluation[];
-	suppressed: readonly MappingDetailsCandidateEvaluation[];
 	notAccepted: readonly MappingDetailsCandidateEvaluation[];
 }
 
@@ -272,7 +271,6 @@ const buildSuggestedCandidates = (
 			: {}),
 		accepted: [],
 		rejected: [],
-		suppressed: [],
 		notAccepted: [],
 	};
 
@@ -297,10 +295,6 @@ const buildSuggestedCandidates = (
 			}
 			case "rejected": {
 				suggested.rejected = [...suggested.rejected, projected];
-				break;
-			}
-			case "suppressed": {
-				suggested.suppressed = [...suggested.suppressed, projected];
 				break;
 			}
 			case "not-accepted": {
@@ -423,11 +417,6 @@ const buildExplanationItems = (
 		switch (candidate.autoMappingStatus) {
 			case "ambiguous": {
 				summary = "Resolution is currently ambiguous.";
-				break;
-			}
-			case "verification-failed": {
-				summary =
-					"A strong inherited candidate could not be operationally verified.";
 				break;
 			}
 			case "unresolved": {

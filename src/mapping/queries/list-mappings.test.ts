@@ -478,7 +478,7 @@ describe("listMappings", () => {
 		expect(result.mappings[0]?.mappingEntryKind).toBe("auto");
 	});
 
-	it("projects verification-failed inherited review without changing the unresolved effective state", async () => {
+	it("projects unverified inherited review without changing the unresolved effective state", async () => {
 		const result = await listMappings(
 			{ limit: 10 },
 			{
@@ -526,7 +526,7 @@ describe("listMappings", () => {
 					{
 						anilistId: aid(10),
 						provider: "radarr",
-						state: "verification-failed",
+						state: "unresolved",
 						recentEvaluation: {
 							attemptedAt: 80,
 							searchTerms: ["Needs Verification"],
@@ -536,13 +536,42 @@ describe("listMappings", () => {
 									title: "Needs Verification",
 									source: "auto",
 									reason: "verified-inherited",
-									status: "suppressed",
-									summary: "Inherited from related AniList mapping suppressed",
+									status: "not-accepted",
+									summary:
+										"Inherited candidate could not be verified: Sonarr lookup failed.",
+									inheritedVerification: {
+										verdict: "verification-failed",
+										reason: "Sonarr lookup failed.",
+										positiveSignals: [],
+										contradictions: [],
+									},
 									score: 0.9,
 								},
 							],
 						},
 						updatedAt: 80,
+					},
+					{
+						anilistId: aid(11),
+						provider: "radarr",
+						state: "unresolved",
+						recentEvaluation: {
+							attemptedAt: 70,
+							searchTerms: ["Legacy Verification"],
+							candidates: [
+								{
+									providerId: tvdb(502),
+									title: "Legacy Verification",
+									source: "auto",
+									reason: "verified-inherited",
+									status: "not-accepted",
+									summary:
+										"Inherited candidate could not be verified: legacy cached trace.",
+									score: 0.9,
+								},
+							],
+						},
+						updatedAt: 70,
 					},
 				]),
 			},
@@ -567,7 +596,7 @@ describe("listMappings", () => {
 			provider: "radarr",
 			mappingRowStatus: "needs-review",
 			isInLibrary: null,
-			resolverOutcome: "verification-failed",
+			resolverOutcome: "unresolved",
 			reviewSummary: {
 				count: 1,
 				primaryReason: "verification-failed-inherited-candidate",
@@ -577,9 +606,9 @@ describe("listMappings", () => {
 				expect.objectContaining({
 					reason: "verification-failed-inherited-candidate",
 					current: expect.objectContaining({
-						mappingEntryKind: "unknown",
+						mappingEntryKind: "unmapped",
 						providerId: null,
-						autoMappingStatus: "verification-failed",
+						autoMappingStatus: "unresolved",
 					}),
 					proposed: expect.objectContaining({
 						mappingEntryKind: "auto",
@@ -590,7 +619,15 @@ describe("listMappings", () => {
 			],
 			providerMeta: { title: "Needs Verification", type: "movie" },
 		});
-		expect(verificationFailedRow?.mappingEntryKind).toBe("unknown");
+		expect(verificationFailedRow?.mappingEntryKind).toBe("unmapped");
+
+		const legacyRow = result.mappings.find((entry) => entry.anilistId === 11);
+		expect(legacyRow).toMatchObject({
+			provider: "radarr",
+			mappingRowStatus: "unmapped",
+			resolverOutcome: "unresolved",
+		});
+		expect(legacyRow?.reviewSummary).toBeUndefined();
 	});
 
 	it("projects ambiguous inherited conflicts as review items instead of hiding them in unresolved traces", async () => {

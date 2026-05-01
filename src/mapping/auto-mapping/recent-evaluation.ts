@@ -20,7 +20,6 @@ const candidateStatusPriority: Record<
 > = {
 	accepted: 4,
 	rejected: 3,
-	suppressed: 2,
 	"not-accepted": 1,
 };
 
@@ -68,9 +67,6 @@ export function describeCandidate(
 		}
 		case "rejected": {
 			return `${base} rejected by candidate suppression`;
-		}
-		case "suppressed": {
-			return `${base} suppressed`;
 		}
 		case "not-accepted": {
 			return `${base} not accepted`;

@@ -124,19 +124,19 @@ export const createApiDeps = (): ApiHandlerDeps => {
 	const autoMappingStore = new AutoMappingStore();
 
 	const mappingService = bindAll(
-		new MappingService(
-			anilistMediaService,
+		new MappingService({
+			anilistApi: anilistMediaService,
 			anibridgeMappingStore,
-			{
+			lookupClients: {
 				sonarr: lookupClient,
 				radarr: radarrLookupClient,
 			},
 			autoMappingStore,
-			manualMappingService,
-			() => {
+			manualMappings: manualMappingService,
+			notifyMappingsChanged: () => {
 				void bumpMappingsRevision();
 			},
-		),
+		}),
 	);
 
 	const anilistMetadataStore = new AniListMetadataStore(anilistMediaService);

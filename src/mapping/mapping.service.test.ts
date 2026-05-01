@@ -61,7 +61,6 @@ type LookupResult = {
 type StubSonarrLookupClient = {
 	provider: "sonarr";
 	reset: ReturnType<typeof vi.fn>;
-	readCachedTitleLookup: ReturnType<typeof vi.fn>;
 	lookupTitle: ReturnType<
 		typeof vi.fn<(term: { display: string }) => Promise<LookupResult[]>>
 	>;
@@ -105,17 +104,13 @@ const createService = () => {
 		clear: vi.fn(async () => false),
 	};
 	const sonarrLookupClient: StubSonarrLookupClient = {
-			provider: "sonarr" as const,
-			reset: vi.fn(async () => {}),
-			readCachedTitleLookup: vi.fn(async () => ({
-				results: [] as LookupResult[],
-				hit: "none" as const,
-			})),
-			lookupTitle: vi.fn(async (_term: { display: string }) => []),
-			lookupByProviderId: vi.fn(async () => null),
-			readProviderId: vi.fn(
-				(result: { tvdbId?: number }) => result.tvdbId ?? null,
-			),
+		provider: "sonarr" as const,
+		reset: vi.fn(async () => {}),
+		lookupTitle: vi.fn(async (_term: { display: string }) => []),
+		lookupByProviderId: vi.fn(async () => null),
+		readProviderId: vi.fn(
+			(result: { tvdbId?: number }) => result.tvdbId ?? null,
+		),
 	};
 	const lookupClients = {
 		sonarr: sonarrLookupClient,
@@ -123,14 +118,14 @@ const createService = () => {
 	};
 	const notifyMappingsChanged = vi.fn();
 
-	const service = new MappingService(
-		anilistApi as never,
-		anibridgeMappingStore as never,
-		lookupClients as never,
-		autoMappingStore as never,
-		manualMappings as never,
+	const service = new MappingService({
+		anilistApi: anilistApi as never,
+		anibridgeMappingStore: anibridgeMappingStore as never,
+		lookupClients: lookupClients as never,
+		autoMappingStore: autoMappingStore as never,
+		manualMappings: manualMappings as never,
 		notifyMappingsChanged,
-	);
+	});
 
 	return {
 		anilistApi,
@@ -247,6 +242,43 @@ describe("MappingService", () => {
 		await expect(defaultRequest).resolves.toMatchObject({ providerId: 101 });
 	});
 
+	it("does not let an old resolver write after provider reset", async () => {
+		const context = createService();
+		const {
+			service,
+			anilistApi,
+			lookupClients,
+			autoMappingStore,
+			notifyMappingsChanged,
+		} = context;
+		const media = {
+			id: aid(79),
+			format: "TV",
+			title: { english: "Old Credentials Result" },
+			synonyms: [],
+		};
+		const pendingFetch = createDeferred<typeof media>();
+		anilistApi.fetchMediaWithRelations.mockResolvedValue(pendingFetch.promise);
+		lookupClients.sonarr.lookupTitle.mockResolvedValue([
+			{ title: "Old Credentials Result", tvdbId: 303, year: 2020 },
+		]);
+
+		const request = service.resolveProviderId("sonarr", aid(79));
+		await vi.waitFor(() => {
+			expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledTimes(1);
+		});
+		notifyMappingsChanged.mockClear();
+
+		await service.resetLookupState("sonarr");
+		expect(notifyMappingsChanged).toHaveBeenCalledTimes(1);
+		notifyMappingsChanged.mockClear();
+
+		pendingFetch.resolve(media);
+		await expect(request).resolves.toBeNull();
+		expect(autoMappingStore.set).not.toHaveBeenCalled();
+		expect(notifyMappingsChanged).not.toHaveBeenCalled();
+	});
+
 	it("bypasses stored mapped auto results for force lookups", async () => {
 		const context = createService();
 		const { service, anilistApi, autoMappingStore, lookupClients } = context;
@@ -283,6 +315,42 @@ describe("MappingService", () => {
 			expect.objectContaining({
 				state: "mapped",
 				providerId: 202,
+			}),
+			expect.any(Object),
+		);
+	});
+
+	it("bypasses stored terminal auto results for force lookups", async () => {
+		const context = createService();
+		const { service, anilistApi, autoMappingStore, lookupClients } = context;
+		autoMappingStore.get.mockResolvedValue({
+			state: "unresolved",
+			updatedAt: Date.now(),
+		});
+		configureMediaFetch(context, {
+			81: {
+				id: aid(81),
+				format: "TV",
+				title: { english: "Recovered Result" },
+				synonyms: [],
+			},
+		});
+		lookupClients.sonarr.lookupTitle.mockResolvedValue([
+			{ title: "Recovered Result", tvdbId: 404, year: 2020 },
+		]);
+
+		const result = await service.resolveProviderId("sonarr", aid(81), {
+			forceLookupNetwork: true,
+		});
+
+		expect(result).toMatchObject({ providerId: 404 });
+		expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledTimes(1);
+		expect(autoMappingStore.set).toHaveBeenCalledWith(
+			"sonarr",
+			81,
+			expect.objectContaining({
+				state: "mapped",
+				providerId: 404,
 			}),
 			expect.any(Object),
 		);

@@ -5,7 +5,8 @@ import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
 
 type MappingDetailsCandidateEvaluation =
 	MappingDetailsPayload["suggestedCandidates"]["accepted"][number];
-type MappingDetailsCandidateGroups = MappingDetailsPayload["suggestedCandidates"];
+type MappingDetailsCandidateGroups =
+	MappingDetailsPayload["suggestedCandidates"];
 
 type SuggestedCandidateTone =
 	| "muted"
@@ -23,7 +24,6 @@ export function formatToken(value: string): string {
 export type SuggestedCandidateGroupKey =
 	| "accepted"
 	| "rejected"
-	| "suppressed"
 	| "notAccepted";
 
 export type SuggestedCandidateGroup = {
@@ -62,16 +62,6 @@ export function getSuggestedCandidateGroups(
 			tone: "warning",
 			items: suggestedCandidates.rejected,
 			getRowLabel: () => "Rejected",
-		});
-	}
-
-	if (hasItems(suggestedCandidates.suppressed)) {
-		groups.push({
-			key: "suppressed",
-			label: "Suppressed",
-			tone: "muted",
-			items: suggestedCandidates.suppressed,
-			getRowLabel: () => "Suppressed",
 		});
 	}
 

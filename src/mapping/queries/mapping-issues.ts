@@ -53,6 +53,7 @@ type InheritedCandidateProjection = {
 	providerId: ProviderId;
 	immediateSourceAniListId?: AniListId;
 	chainAnchorAniListId?: AniListId;
+	verificationFailed: boolean;
 };
 
 const buildReviewState = (input: {
@@ -98,6 +99,8 @@ const getInheritedCandidates = (
 		seen.add(candidate.providerId);
 		candidates.push({
 			providerId: candidate.providerId,
+			verificationFailed:
+				candidate.inheritedVerification?.verdict === "verification-failed",
 			...(candidate.inheritedVerification?.immediateSourceAniListId
 				? {
 						immediateSourceAniListId:
@@ -193,12 +196,15 @@ export function projectMappingIssues(input: {
 	}
 
 	const inheritedCandidates = getInheritedCandidates(input.recentEvaluation);
+	const unverifiedInheritedCandidates = inheritedCandidates.filter(
+		(candidate) => candidate.verificationFailed,
+	);
 
 	if (
-		input.autoMappingStatus === "verification-failed" &&
-		inheritedCandidates.length > 0
+		input.autoMappingStatus === "unresolved" &&
+		unverifiedInheritedCandidates.length > 0
 	) {
-		const candidate = inheritedCandidates[0]!;
+		const candidate = unverifiedInheritedCandidates[0]!;
 		reviewItems.push({
 			reason: "verification-failed-inherited-candidate",
 			summary: "Inherited candidate could not be operationally verified.",

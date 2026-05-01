@@ -105,8 +105,7 @@ describe("AnibridgeMappingStore", () => {
 		await store.init();
 
 		expect(store.getSonarrCandidates(aid(182_255))).toEqual([424_536, 424_537]);
-		expect(store.getUniqueSonarrCandidate(aid(182_255))).toBeNull();
-		expect(store.getUniqueRadarrCandidate(aid(1001))).toBe(12_345);
+		expect(store.getRadarrCandidates(aid(1001))).toEqual([12_345]);
 		expect(
 			store
 				.getAniListIdsForTvdb(parseTvdbId(424_536))
@@ -174,8 +173,8 @@ describe("AnibridgeMappingStore", () => {
 		await store.init();
 
 		expect(fetchImpl).toHaveBeenCalledTimes(1);
-		expect(store.getUniqueSonarrCandidate(aid(154_587))).toBe(424_536);
-		expect(store.getUniqueRadarrCandidate(aid(170_068))).toBe(12_345);
+		expect(store.getSonarrCandidates(aid(154_587))).toEqual([424_536]);
+		expect(store.getRadarrCandidates(aid(170_068))).toEqual([12_345]);
 		expect(cache.peek("upstream")?.value).toEqual({
 			sonarr: {
 				154_587: [424_536],
@@ -186,7 +185,7 @@ describe("AnibridgeMappingStore", () => {
 		});
 	});
 
-	it("hydrates warm cache before starting the refresh flow", async () => {
+	it("queues only one init-triggered refresh for warm cache", async () => {
 		const cache = createMemoryCache<AnibridgeMappingPayload>();
 		await cache.write(
 			"upstream",
@@ -204,9 +203,12 @@ describe("AnibridgeMappingStore", () => {
 		const store = new AnibridgeMappingStore(cache, { fetch: fetchImpl });
 
 		await store.init();
+		await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+		await store.init();
 
-		expect(store.getUniqueSonarrCandidate(aid(154_587))).toBe(424_536);
-		expect(store.getUniqueRadarrCandidate(aid(170_068))).toBe(12_345);
+		expect(store.getSonarrCandidates(aid(154_587))).toEqual([424_536]);
+		expect(store.getRadarrCandidates(aid(170_068))).toEqual([12_345]);
+		expect(fetchImpl).toHaveBeenCalledTimes(1);
 	});
 
 	it("persists normalized provider payloads from anibridge descriptor records", async () => {
@@ -227,8 +229,8 @@ describe("AnibridgeMappingStore", () => {
 
 		await store.refresh();
 
-		expect(store.getUniqueSonarrCandidate(aid(170_068))).toBe(424_536);
-		expect(store.getUniqueRadarrCandidate(aid(170_068))).toBe(12_345);
+		expect(store.getSonarrCandidates(aid(170_068))).toEqual([424_536]);
+		expect(store.getRadarrCandidates(aid(170_068))).toEqual([12_345]);
 		expect(cache.peek("upstream")?.value).toEqual({
 			sonarr: {
 				154_587: [424_536],

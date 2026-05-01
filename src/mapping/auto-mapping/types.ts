@@ -28,13 +28,8 @@ export type AutoMappingSource = Exclude<AcceptedMappingSource, "manual">;
  * Important:
  * - `unresolved` = no acceptable answer
  * - `ambiguous` = too many plausible answers
- * - `verification-failed` = plausible answer exists, but verification could not be completed
  */
-export type AutoMappingStatus =
-	| "mapped"
-	| "unresolved"
-	| "ambiguous"
-	| "verification-failed";
+export type AutoMappingStatus = "mapped" | "unresolved" | "ambiguous";
 
 /** Successful auto-mapping result returned by the resolver. */
 export interface AcceptedAutoMappingResult {
