@@ -35,20 +35,14 @@ import {
 	createDefaultExtensionOptions,
 	getExtensionOptionsSnapshot,
 	setExtensionOptionsSnapshot,
-	getProviderCredentials,
 	hasConfiguredProviderCredentials,
 	type ExtensionOptions,
 } from "@/options";
-import type { Provider, ProviderCredentials } from "@/providers";
-import { getProviderLabel } from "@/providers/provider-labels";
-import {
-	createError,
-	ErrorCode,
-	logError,
-	normalizeError,
-} from "@/shared/errors";
+import type { Provider } from "@/providers";
+import { logError, normalizeError } from "@/shared/errors";
 import type { ApiHandlerDeps } from "@/rpc/handlers/handler-deps";
 import { logger } from "@/shared/utils/logger";
+import { createProviderConfigReader } from "./provider-config-reader";
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 45 * 1000;
 
@@ -79,6 +73,8 @@ const bindAll = <T extends object>(instance: T): T => {
 };
 
 export const createApiDeps = (): ApiHandlerDeps => {
+	const providerConfig = createProviderConfigReader();
+
 	const createHasUrlPermission =
 		(provider: Provider) =>
 		async (url: string): Promise<boolean> => {
@@ -132,6 +128,7 @@ export const createApiDeps = (): ApiHandlerDeps => {
 				radarr: radarrLookupClient,
 			},
 			autoMappingStore,
+			getConfiguredCredentials: providerConfig.requireCredentials,
 			manualMappings: manualMappingService,
 			notifyMappingsChanged: () => {
 				void bumpMappingsRevision();
@@ -208,45 +205,6 @@ export const createApiDeps = (): ApiHandlerDeps => {
 			() => bumpLibraryRevision("radarr"),
 		),
 	);
-
-	const providerNotConfiguredError = (provider: Provider) => {
-		const label = getProviderLabel(provider);
-		const code =
-			provider === "sonarr"
-				? ErrorCode.SONARR_NOT_CONFIGURED
-				: ErrorCode.CONFIGURATION_ERROR;
-		return createError(
-			code,
-			`${label} credentials are not configured.`,
-			`Configure your ${label} connection in ani2arr options.`,
-		);
-	};
-
-	const ensureProviderConfigured = async (
-		provider: Provider,
-	): Promise<{
-		credentials: ProviderCredentials;
-		options: ExtensionOptions;
-	}> => {
-		const options = await getExtensionOptionsSnapshot();
-		const credentials = getProviderCredentials(options, provider);
-		if (!credentials) throw providerNotConfiguredError(provider);
-		return { credentials, options };
-	};
-
-	const ensureSonarrConfigured = async (): Promise<{
-		credentials: ProviderCredentials;
-		options: ExtensionOptions;
-	}> => {
-		return ensureProviderConfigured("sonarr");
-	};
-
-	const ensureRadarrConfigured = async (): Promise<{
-		credentials: ProviderCredentials;
-		options: ExtensionOptions;
-	}> => {
-		return ensureProviderConfigured("radarr");
-	};
 
 	const scheduleLibraryRefresh = (
 		provider: Provider,
@@ -399,8 +357,7 @@ export const createApiDeps = (): ApiHandlerDeps => {
 		radarrLibrary,
 		anilistMetadataStore,
 		manualMappingsReady,
-		ensureSonarrConfigured,
-		ensureRadarrConfigured,
+		providerConfig,
 		scheduleLibraryRefresh,
 		bumpLibraryRevision,
 		bumpMappingsRevision,

@@ -6,7 +6,6 @@ import { AniListIdSchema, type AniListId } from "@/anilist/anilist-id";
 import { getMappingInspection } from "@/mapping/queries/mapping-details";
 import { getMappingIdentities } from "@/mapping/queries/mapping-identities";
 import type { Ani2arrApi } from "@/rpc";
-import { getExtensionOptionsSnapshot, hasConfiguredProviderCredentials } from "@/options";
 import type { TmdbId, TvdbId } from "@/providers";
 import { createError, ErrorCode } from "@/shared/errors";
 import { listMappings } from "@/mapping/queries/list-mappings";
@@ -48,6 +47,7 @@ export function createMappingHandlers(
 		sonarrLibrary,
 		radarrLibrary,
 		manualMappingsReady,
+		providerConfig,
 		scheduleLibraryRefresh,
 		bumpLibraryRevision,
 		bumpMappingsRevision,
@@ -160,9 +160,9 @@ export function createMappingHandlers(
 			);
 
 			if (parsedInput.provider === "sonarr") {
-				const options = await getExtensionOptionsSnapshot();
-				if (hasConfiguredProviderCredentials(options, "sonarr")) {
-					scheduleLibraryRefresh("sonarr", options);
+				const credentials = await providerConfig.get("sonarr");
+				if (credentials) {
+					scheduleLibraryRefresh("sonarr");
 				}
 			}
 
@@ -181,9 +181,9 @@ export function createMappingHandlers(
 			);
 
 			if (parsedInput.provider === "sonarr") {
-				const options = await getExtensionOptionsSnapshot();
-				if (hasConfiguredProviderCredentials(options, "sonarr")) {
-					scheduleLibraryRefresh("sonarr", options);
+				const credentials = await providerConfig.get("sonarr");
+				if (credentials) {
+					scheduleLibraryRefresh("sonarr");
 				}
 			}
 

@@ -42,8 +42,7 @@ export function createLibraryHandlers(
 		sonarrLibrary,
 		radarrLibrary,
 		manualMappingsReady,
-		ensureSonarrConfigured,
-		ensureRadarrConfigured,
+		providerConfig,
 		scheduleLibraryRefresh,
 		bumpLibraryRevision,
 	} = deps;
@@ -129,7 +128,7 @@ export function createLibraryHandlers(
 
 		async addToSonarr(input) {
 			const parsedInput = v.parse(AddSonarrInputSchema, input);
-			const { credentials, options } = await ensureSonarrConfigured();
+			const { credentials, options } = await providerConfig.require("sonarr");
 			await manualMappingsReady;
 			const created = await addSonarrSeries(
 				{
@@ -158,7 +157,7 @@ export function createLibraryHandlers(
 
 		async addToRadarr(input) {
 			const parsedInput = v.parse(AddRadarrInputSchema, input);
-			const { credentials, options } = await ensureRadarrConfigured();
+			const { credentials, options } = await providerConfig.require("radarr");
 			await manualMappingsReady;
 			const created = await addRadarrMovie(
 				{
@@ -187,7 +186,7 @@ export function createLibraryHandlers(
 
 		async updateSonarrSeries(input) {
 			const parsedInput = v.parse(UpdateSonarrInputSchema, input);
-			const { credentials } = await ensureSonarrConfigured();
+			const credentials = await providerConfig.requireCredentials("sonarr");
 			try {
 				const updated = await updateSonarrSeries(
 					{
@@ -219,7 +218,7 @@ export function createLibraryHandlers(
 
 		async updateRadarrMovie(input) {
 			const parsedInput = v.parse(UpdateRadarrInputSchema, input);
-			const { credentials } = await ensureRadarrConfigured();
+			const credentials = await providerConfig.requireCredentials("radarr");
 			const updated = await updateRadarrMovie(
 				{
 					tmdbId: parsedInput.tmdbId,

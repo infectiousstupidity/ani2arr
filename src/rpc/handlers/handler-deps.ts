@@ -11,7 +11,8 @@ import type { ManualMappingService } from "@/mapping/manual-mapping";
 import type { AutoMappingStore } from "@/mapping/auto-mapping/auto-mapping.store";
 import type { AnibridgeMappingStore } from "@/mapping/upstream-mapping";
 import type { ExtensionOptions } from "@/options";
-import type { Provider, ProviderCredentials } from "@/providers";
+import type { Provider } from "@/providers";
+import type { ProviderConfigReader } from "@/background/api/provider-config-reader";
 
 export type ApiHandlerDeps = {
 	SonarrClient: SonarrClient;
@@ -25,14 +26,7 @@ export type ApiHandlerDeps = {
 	radarrLibrary: RadarrLibrary;
 	anilistMetadataStore: AniListMetadataStore;
 	manualMappingsReady: Promise<void>;
-	ensureSonarrConfigured: () => Promise<{
-		credentials: ProviderCredentials;
-		options: ExtensionOptions;
-	}>;
-	ensureRadarrConfigured: () => Promise<{
-		credentials: ProviderCredentials;
-		options: ExtensionOptions;
-	}>;
+	providerConfig: ProviderConfigReader;
 	scheduleLibraryRefresh: (
 		provider: Provider,
 		optionsHint?: ExtensionOptions,
