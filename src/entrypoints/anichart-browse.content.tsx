@@ -1,5 +1,5 @@
 /** Thin WXT boot file for the AniChart browse content script. */
-// src/entrypoints/anichart-browse.content/index.tsx
+// src/entrypoints/anichart-browse.content.tsx
 
 import { main } from '@/content/anichart/browse';
 
