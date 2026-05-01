@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 import { parseAniListId } from "@/anilist/anilist-id";
 import { parseTmdbId, parseTvdbId } from "@/providers";
 import {
+	AddRadarrInputSchema,
+	AddSonarrInputSchema,
 	ClearMappingRejectedCandidateInputSchema,
 	SetManualMappingInputSchema,
 	SetMappingRejectedCandidateInputSchema,
@@ -72,7 +74,7 @@ describe("RPC provider ID schemas", () => {
 		}
 	});
 
-	it("parses TVDB and TMDB IDs for update and validation inputs", () => {
+	it("parses TVDB and TMDB IDs for add, update, and validation inputs", () => {
 		const anilistId = parseAniListId(100);
 		const tvdbId = parseTvdbId(200);
 		const tmdbId = parseTmdbId(300);
@@ -82,6 +84,22 @@ describe("RPC provider ID schemas", () => {
 			tags: [],
 		};
 
+		expect(
+			v.parse(AddSonarrInputSchema, {
+				anilistId,
+				tvdbId,
+				title: "Series",
+				form,
+			}).tvdbId,
+		).toBe(tvdbId);
+		expect(
+			v.parse(AddRadarrInputSchema, {
+				anilistId,
+				tmdbId,
+				title: "Movie",
+				form,
+			}).tmdbId,
+		).toBe(tmdbId);
 		expect(
 			v.parse(UpdateSonarrInputSchema, {
 				anilistId,
@@ -112,8 +130,32 @@ describe("RPC provider ID schemas", () => {
 		expect(v.parse(ValidateTmdbInputSchema, { tmdbId }).tmdbId).toBe(tmdbId);
 	});
 
-	it("rejects invalid TVDB and TMDB validation IDs", () => {
+	it("rejects invalid TVDB and TMDB add and validation IDs", () => {
 		for (const value of INVALID_PROVIDER_IDS) {
+			expect(() =>
+				v.parse(AddSonarrInputSchema, {
+					anilistId: 100,
+					tvdbId: value,
+					title: "Series",
+					form: {
+						rootFolderPath: "/media",
+						qualityProfileId: 1,
+						tags: [],
+					},
+				}),
+			).toThrow();
+			expect(() =>
+				v.parse(AddRadarrInputSchema, {
+					anilistId: 100,
+					tmdbId: value,
+					title: "Movie",
+					form: {
+						rootFolderPath: "/media",
+						qualityProfileId: 1,
+						tags: [],
+					},
+				}),
+			).toThrow();
 			expect(() =>
 				v.parse(ValidateTvdbInputSchema, { tvdbId: value }),
 			).toThrow();

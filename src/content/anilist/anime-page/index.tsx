@@ -257,6 +257,7 @@ function quickAddAnimePageProvider(input: {
 	anilistId: AniListId;
 	title: string;
 	resolvedMetadata: AniListMediaHint | null;
+	providerStatusData: AnimePageStatusData | undefined;
 	addSeriesMutation: ReturnType<typeof useAddSeries>;
 	addMovieMutation: ReturnType<typeof useAddMovie>;
 }): void {
@@ -266,8 +267,14 @@ function quickAddAnimePageProvider(input: {
 	}
 
 	if (input.provider === "radarr") {
+		const tmdbId = parseTmdbIdOrNull(input.providerStatusData?.providerId);
+		if (tmdbId === null) {
+			return;
+		}
+
 		input.addMovieMutation.mutate({
 			anilistId: input.anilistId,
+			tmdbId,
 			title: input.title,
 			primaryTitleHint: input.title,
 			metadata: input.resolvedMetadata,
@@ -276,8 +283,14 @@ function quickAddAnimePageProvider(input: {
 		return;
 	}
 
+	const tvdbId = parseTvdbIdOrNull(input.providerStatusData?.providerId);
+	if (tvdbId === null) {
+		return;
+	}
+
 	input.addSeriesMutation.mutate({
 		anilistId: input.anilistId,
+		tvdbId,
 		title: input.title,
 		primaryTitleHint: input.title,
 		metadata: input.resolvedMetadata,
@@ -441,6 +454,7 @@ function runAnimePagePrimaryAction(input: {
 				anilistId: input.anilistId,
 				title: input.title,
 				resolvedMetadata: input.resolvedMetadata,
+				providerStatusData: input.providerStatusData,
 				addSeriesMutation: input.addSeriesMutation,
 				addMovieMutation: input.addMovieMutation,
 			});

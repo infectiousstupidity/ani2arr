@@ -74,7 +74,10 @@ export function useRadarrSetupActions({
 					...payload,
 					tmdbId: setupTarget.tmdbId,
 				})
-			: addMovie.mutateAsync(payload));
+			: addMovie.mutateAsync({
+					...payload,
+					tmdbId: setupTarget.tmdbId,
+				}));
 
 		onClose();
 	};

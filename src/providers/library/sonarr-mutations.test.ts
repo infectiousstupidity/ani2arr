@@ -8,12 +8,87 @@ import {
 	parseSonarrSeriesId,
 	parseTvdbId,
 } from "@/providers";
-import { updateSonarrSeries } from "./sonarr-mutations";
+import { addSonarrSeries, updateSonarrSeries } from "./sonarr-mutations";
 
 const credentials = {
 	url: "https://sonarr.example.test",
 	apiKey: "secret",
 };
+
+describe("addSonarrSeries", () => {
+	it("uses the supplied TVDB ID, adds the series, and updates the cache", async () => {
+		const tvdbId = parseTvdbId(34);
+		const createdSeries = {
+			id: parseSonarrSeriesId(12),
+			title: "Example Series",
+			tvdbId,
+			titleSlug: "example-series",
+			qualityProfileId: parseProviderQualityProfileId(99),
+			rootFolderPath: "/series",
+			path: "/series/Example Series [tvdb-34]",
+			monitored: true,
+			seriesType: "anime" as const,
+			seasonFolder: true,
+			tags: [parseProviderTagId(7)],
+		};
+		const client = {
+			addSeries: vi.fn(async () => createdSeries),
+			getSeriesByTvdbId: vi.fn(),
+			getSeriesById: vi.fn(),
+			getTags: vi.fn(async () => [{ id: parseProviderTagId(7), label: "Keep" }]),
+			createTag: vi.fn(),
+			updateSeries: vi.fn(),
+			applyMonitoringAction: vi.fn(),
+		};
+		const cache = {
+			addSeriesToCache: vi.fn(async () => {}),
+		};
+
+		const result = await addSonarrSeries(
+			{
+				tvdbId,
+				title: "Example Series",
+				form: {
+					rootFolderPath: "/series",
+					qualityProfileId: parseProviderQualityProfileId(99),
+					seriesType: "anime",
+					seasonFolder: true,
+					tags: [parseProviderTagId(7)],
+					freeformTags: [],
+					addOptions: {
+						monitor: "all",
+						searchForMissingEpisodes: true,
+						searchForCutoffUnmetEpisodes: false,
+					},
+				},
+				defaults: { freeformTags: [] },
+				credentials,
+			},
+			{ client, cache },
+		);
+
+		expect(result).toBe(createdSeries);
+		expect(client.addSeries).toHaveBeenCalledWith(
+			{
+				title: "Example Series",
+				tvdbId,
+				qualityProfileId: parseProviderQualityProfileId(99),
+				rootFolderPath: "/series",
+				seasonFolder: true,
+				monitored: true,
+				seriesType: "anime",
+				tags: [parseProviderTagId(7)],
+				addOptions: {
+					monitor: "all",
+					searchForMissingEpisodes: true,
+					searchForCutoffUnmetEpisodes: false,
+				},
+			},
+			credentials,
+		);
+		expect(cache.addSeriesToCache).toHaveBeenCalledWith(createdSeries);
+	});
+});
 
 describe("updateSonarrSeries", () => {
 	it("merges the form, omits add options, moves files, applies monitoring, refreshes, and updates the cache", async () => {

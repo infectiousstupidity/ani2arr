@@ -76,6 +76,7 @@ export const MovieLibraryStatusInputSchema = v.object({
 
 export const AddSonarrInputSchema = v.object({
 	anilistId: AniListIdSchema,
+	tvdbId: TvdbIdSchema,
 	title: createRequiredStringSchema("Title cannot be empty"),
 	primaryTitleHint: v.optional(v.string()),
 	metadata: v.optional(v.nullable(AniListMediaHintSchema)),
@@ -92,6 +93,7 @@ export const UpdateSonarrInputSchema = v.object({
 
 export const AddRadarrInputSchema = v.object({
 	anilistId: AniListIdSchema,
+	tmdbId: TmdbIdSchema,
 	title: createRequiredStringSchema("Title cannot be empty"),
 	primaryTitleHint: v.optional(v.string()),
 	metadata: v.optional(v.nullable(AniListMediaHintSchema)),

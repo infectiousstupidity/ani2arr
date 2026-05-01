@@ -245,6 +245,7 @@ function runOverlayQuickAdd(input: {
 	title: string;
 	metadata: AniListMediaHint | null;
 	defaultForm: SonarrFormState | RadarrFormState | null;
+	statusData: OverlayStatusData | undefined;
 	addMovieMutation: ReturnType<typeof useAddMovie>;
 	addSeriesMutation: ReturnType<typeof useAddSeries>;
 }): void {
@@ -253,8 +254,14 @@ function runOverlayQuickAdd(input: {
 	}
 
 	if (input.provider === "radarr") {
+		const tmdbId = parseTmdbIdOrNull(input.statusData?.providerId);
+		if (tmdbId === null) {
+			return;
+		}
+
 		input.addMovieMutation.mutate({
 			anilistId: input.anilistId,
+			tmdbId,
 			title: input.title,
 			primaryTitleHint: input.title,
 			metadata: input.metadata,
@@ -263,8 +270,14 @@ function runOverlayQuickAdd(input: {
 		return;
 	}
 
+	const tvdbId = parseTvdbIdOrNull(input.statusData?.providerId);
+	if (tvdbId === null) {
+		return;
+	}
+
 	input.addSeriesMutation.mutate({
 		anilistId: input.anilistId,
+		tvdbId,
 		title: input.title,
 		primaryTitleHint: input.title,
 		metadata: input.metadata,
@@ -282,6 +295,7 @@ function runOverlayPrimaryAction(input: {
 	title: string;
 	metadata: AniListMediaHint | null;
 	launchSnapshot: MediaModalLaunchSnapshot;
+	statusData: OverlayStatusData | undefined;
 	addHasError: boolean;
 	reset: () => void;
 	forceVerifyStatusRef: { current: boolean };
@@ -328,6 +342,7 @@ function runOverlayPrimaryAction(input: {
 				title: input.title,
 				metadata: input.metadata,
 				defaultForm: input.defaultForm,
+				statusData: input.statusData,
 				addMovieMutation: input.addMovieMutation,
 				addSeriesMutation: input.addSeriesMutation,
 			});
@@ -340,6 +355,7 @@ function runOverlayPrimaryAction(input: {
 				title: input.title,
 				metadata: input.metadata,
 				defaultForm: input.defaultForm,
+				statusData: input.statusData,
 				addMovieMutation: input.addMovieMutation,
 				addSeriesMutation: input.addSeriesMutation,
 			});
@@ -656,6 +672,7 @@ export const useCardOverlayState = ({
 				title,
 				metadata,
 				launchSnapshot,
+				statusData,
 				addHasError,
 				reset,
 				forceVerifyStatusRef,
@@ -675,6 +692,7 @@ export const useCardOverlayState = ({
 			metadata,
 			onOpenMapping,
 			provider,
+			statusData,
 			statusQuery.refetch,
 			launchSnapshot,
 			title,

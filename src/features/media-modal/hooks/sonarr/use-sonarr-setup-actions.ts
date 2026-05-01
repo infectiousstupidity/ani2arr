@@ -89,7 +89,10 @@ export function useSonarrSetupActions({
 					tvdbId: setupTarget.tvdbId,
 					monitoringAction,
 				})
-			: addSeries.mutateAsync(payload));
+			: addSeries.mutateAsync({
+					...payload,
+					tvdbId: setupTarget.tvdbId,
+				}));
 
 		onClose();
 	};
