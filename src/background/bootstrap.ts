@@ -2,7 +2,6 @@
 // src/background/bootstrap.ts
 
 import { registerAni2arrApi, getAni2arrApi } from '@/rpc';
-import { createMetricsConsoleApi, type MetricsConsoleApi } from '@/debug/metrics';
 import { logger } from '@/shared/utils/logger';
 import { createBackgroundApi } from './api/create-background-api';
 import { installBackgroundLifecycle } from './lifecycle';
@@ -15,16 +14,6 @@ export const bootstrapBackground = (): void => {
 
   registerAni2arrApi(createBackgroundApi());
   log.info('API services registered.');
-
-  if (import.meta.env.DEV) {
-    const globalWithMetrics = globalThis as typeof globalThis & {
-      __a2aMetrics?: MetricsConsoleApi;
-    };
-
-    if (!globalWithMetrics.__a2aMetrics) {
-      globalWithMetrics.__a2aMetrics = createMetricsConsoleApi();
-    }
-  }
 
   const api = getAni2arrApi();
   installBackgroundLifecycle(api);

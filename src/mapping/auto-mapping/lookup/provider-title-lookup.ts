@@ -18,13 +18,10 @@ import {
 } from "@/providers";
 import { normalizeError } from "@/shared/errors";
 import type { RequestPriority } from "@/shared/utils/request-priority";
-import { incrementCounter, timeAsync } from "@/debug/metrics";
 import { priorityValue } from "@/shared/utils/request-priority";
 import { logger } from "@/shared/utils/logger";
 import type { TitleSearchTerm } from "@/mapping/auto-mapping/title/title-search";
 import { TITLE_LOOKUP_CACHE_TTL } from "./lookup.cache";
-
-const TITLE_LOOKUP_LATENCY_BUCKETS = [50, 100, 250, 500, 1000, 2000, 5000];
 
 export interface ProviderTitleResult {
 	title: string;
@@ -91,30 +88,23 @@ export function createProviderTitleLookup<
 		credentials: ProviderCredentials,
 		priority?: RequestPriority,
 	): Promise<TResult[]> => {
-		incrementCounter("mapping.lookup.network_miss");
-		return timeAsync(
-			"mapping.lookup.latency",
-			TITLE_LOOKUP_LATENCY_BUCKETS,
-			async () => {
-				try {
-					if (import.meta.env.DEV) {
-						log.debug?.(
-							`lookup:queue term='${term}' priority=${priority ?? "normal"} prioValue=${priorityValue(priority)}`,
-						);
-					}
-					const results = await (queue.add(
-						() => config.fetchTitleResults(term, credentials),
-						{ priority: priorityValue(priority) },
-					) as Promise<TResult[]>);
-					log.debug(
-						`fetchQueuedTitleResults: term='${term}' resultCount=${results.length}`,
-					);
-					return results;
-				} catch (error) {
-					throw normalizeError(error);
-				}
-			},
-		);
+		try {
+			if (import.meta.env.DEV) {
+				log.debug?.(
+					`lookup:queue term='${term}' priority=${priority ?? "normal"} prioValue=${priorityValue(priority)}`,
+				);
+			}
+			const results = await (queue.add(
+				() => config.fetchTitleResults(term, credentials),
+				{ priority: priorityValue(priority) },
+			) as Promise<TResult[]>);
+			log.debug(
+				`fetchQueuedTitleResults: term='${term}' resultCount=${results.length}`,
+			);
+			return results;
+		} catch (error) {
+			throw normalizeError(error);
+		}
 	};
 
 	const lookupNetwork = (
@@ -131,7 +121,6 @@ export function createProviderTitleLookup<
 			log.debug(
 				`lookupTitle(${term.canonical}): existing inflight found; reusing`,
 			);
-			incrementCounter("mapping.lookup.inflight_reuse");
 			return existing;
 		}
 
@@ -183,7 +172,6 @@ export function createProviderTitleLookup<
 			try {
 				const cached = await config.caches.read(term.canonical);
 				if (cached && !cached.stale) {
-					incrementCounter("mapping.lookup.cache_hit");
 					log.debug(`lookupTitle(${term.canonical}): returning fresh cache`);
 					return cached.value;
 				}

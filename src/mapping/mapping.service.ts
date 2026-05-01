@@ -2,7 +2,6 @@
 // src/mapping/mapping.service.ts
 
 import type { AniListId, AniListMediaService } from "@/anilist";
-import { incrementCounter } from "@/debug/metrics";
 import {
 	parseProviderIdentity,
 	type Provider,
@@ -12,10 +11,7 @@ import {
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
-import {
-	logError,
-	normalizeError,
-} from "@/shared/errors";
+import { logError, normalizeError } from "@/shared/errors";
 import { logger } from "@/shared/utils/logger";
 import { ManualMappingService } from "./manual-mapping";
 import type {
@@ -344,7 +340,6 @@ export class MappingService {
 				}
 			}
 
-			incrementCounter("mapping.lookup.static_hit");
 			return {
 				handled: true,
 				resolved: {
