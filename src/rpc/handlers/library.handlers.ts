@@ -2,10 +2,14 @@
 // src/rpc/handlers/library.handlers.ts
 
 import * as v from "valibot";
-import { addRadarrMovie } from "@/providers/library/radarr-add-movie";
-import { addSonarrSeries } from "@/providers/library/sonarr-add-series";
-import { updateRadarrMovie } from "@/providers/library/radarr-update-movie";
-import { updateSonarrSeries } from "@/providers/library/sonarr-update-series";
+import {
+	addRadarrMovie,
+	updateRadarrMovie,
+} from "@/providers/library/radarr-mutations";
+import {
+	addSonarrSeries,
+	updateSonarrSeries,
+} from "@/providers/library/sonarr-mutations";
 import type { Ani2arrApi } from "@/rpc";
 import {
 	AddRadarrInputSchema,
@@ -147,7 +151,7 @@ export function createLibraryHandlers(
 				{
 					client: SonarrClient,
 					mappingService,
-					library: sonarrLibrary,
+					cache: sonarrLibrary,
 				},
 			);
 			scheduleLibraryRefresh("sonarr", options);
@@ -176,7 +180,7 @@ export function createLibraryHandlers(
 				{
 					client: RadarrClient,
 					mappingService,
-					library: radarrLibrary,
+					cache: radarrLibrary,
 				},
 			);
 			scheduleLibraryRefresh("radarr", options);
@@ -200,7 +204,7 @@ export function createLibraryHandlers(
 					},
 					{
 						client: SonarrClient,
-						library: sonarrLibrary,
+						cache: sonarrLibrary,
 					},
 				);
 				scheduleLibraryRefresh("sonarr");
@@ -228,7 +232,7 @@ export function createLibraryHandlers(
 				},
 				{
 					client: RadarrClient,
-					library: radarrLibrary,
+					cache: radarrLibrary,
 				},
 			);
 			scheduleLibraryRefresh("radarr");
