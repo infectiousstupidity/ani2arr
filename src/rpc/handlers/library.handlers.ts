@@ -41,7 +41,6 @@ export function createLibraryHandlers(
 	const {
 		SonarrClient,
 		RadarrClient,
-		mappingService,
 		manualMappingService,
 		sonarrLibrary,
 		radarrLibrary,
@@ -136,21 +135,14 @@ export function createLibraryHandlers(
 			await manualMappingsReady;
 			const created = await addSonarrSeries(
 				{
-					anilistId: parsedInput.anilistId,
+					tvdbId: parsedInput.tvdbId,
 					title: parsedInput.title,
 					form: parsedInput.form,
 					defaults: options.providers.sonarr.defaults,
 					credentials,
-					...(parsedInput.primaryTitleHint === undefined
-						? {}
-						: { primaryTitleHint: parsedInput.primaryTitleHint }),
-					...(parsedInput.metadata === undefined
-						? {}
-						: { metadata: parsedInput.metadata }),
 				},
 				{
 					client: SonarrClient,
-					mappingService,
 					cache: sonarrLibrary,
 				},
 			);
@@ -165,21 +157,17 @@ export function createLibraryHandlers(
 			await manualMappingsReady;
 			const created = await addRadarrMovie(
 				{
-					anilistId: parsedInput.anilistId,
+					tmdbId: parsedInput.tmdbId,
 					title: parsedInput.title,
 					form: parsedInput.form,
 					defaults: options.providers.radarr.defaults,
 					credentials,
-					...(parsedInput.primaryTitleHint === undefined
-						? {}
-						: { primaryTitleHint: parsedInput.primaryTitleHint }),
 					...(parsedInput.metadata === undefined
 						? {}
 						: { metadata: parsedInput.metadata }),
 				},
 				{
 					client: RadarrClient,
-					mappingService,
 					cache: radarrLibrary,
 				},
 			);

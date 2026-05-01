@@ -1,9 +1,7 @@
 /** Radarr add and update workflows for provider library mutations. */
 // src/providers/library/radarr-mutations.ts
 
-import type { AniListId } from "@/anilist";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
-import type { MappingService } from "@/mapping/mapping.service";
 import type {
 	AddRadarrMoviePayload,
 	RadarrClient,
@@ -15,7 +13,6 @@ import type {
 	RadarrMovieId,
 	TmdbId,
 } from "@/providers";
-import type { AutoMappingOptions } from "@/mapping/auto-mapping/types";
 import {
 	createError,
 	ErrorCode,
@@ -31,9 +28,8 @@ import {
 } from "./mutation-helpers";
 
 type AddRadarrMovieInput = {
-	anilistId: AniListId;
+	tmdbId: TmdbId;
 	title: string;
-	primaryTitleHint?: string;
 	metadata?: AniListMediaHint | null;
 	form: RadarrFormState;
 	defaults: RadarrFormState;
@@ -57,7 +53,6 @@ type RadarrMutationDeps = {
 		| "createTag"
 		| "updateMovie"
 	>;
-	mappingService: Pick<MappingService, "resolveProviderId">;
 	cache: {
 		addMovieToCache(movie: RadarrMovie): Promise<void>;
 	};
@@ -94,26 +89,7 @@ export async function addRadarrMovie(
 	input: AddRadarrMovieInput,
 	deps: RadarrMutationDeps,
 ): Promise<RadarrMovie> {
-	const { client, mappingService, cache } = deps;
-
-	const resolveOptions: AutoMappingOptions = { forceLookupNetwork: true };
-	const hints: NonNullable<NonNullable<AutoMappingOptions["hints"]>> = {};
-	if (input.primaryTitleHint) hints.primaryTitle = input.primaryTitleHint;
-	if (input.metadata) hints.domMedia = input.metadata;
-	if (Object.keys(hints).length > 0) resolveOptions.hints = hints;
-
-	const mapping = await mappingService.resolveProviderId(
-		"radarr",
-		input.anilistId,
-		resolveOptions,
-	);
-	if (!mapping) {
-		throw createError(
-			ErrorCode.VALIDATION_ERROR,
-			`Could not resolve AniList ID ${input.anilistId} to a TMDB ID.`,
-			"Unable to add this movie to Radarr because no matching TMDB entry was found.",
-		);
-	}
+	const { client, cache } = deps;
 
 	const payload = await resolveRadarrAddPayload({
 		api: client,
@@ -121,7 +97,7 @@ export async function addRadarrMovie(
 		defaults: input.defaults,
 		form: input.form,
 		title: input.title,
-		tmdbId: mapping.providerId,
+		tmdbId: input.tmdbId,
 		...(typeof input.metadata?.startYear === "number"
 			? { year: input.metadata.startYear }
 			: {}),
@@ -134,7 +110,7 @@ export async function addRadarrMovie(
 
 export async function updateRadarrMovie(
 	input: UpdateRadarrMovieInput,
-	deps: Omit<RadarrMutationDeps, "mappingService">,
+	deps: RadarrMutationDeps,
 ): Promise<RadarrMovie> {
 	const { client, cache } = deps;
 

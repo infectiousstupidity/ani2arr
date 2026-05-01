@@ -1,9 +1,6 @@
 /** Sonarr add and update workflows for provider library mutations. */
 // src/providers/library/sonarr-mutations.ts
 
-import type { AniListId } from "@/anilist";
-import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
-import type { MappingService } from "@/mapping/mapping.service";
 import type {
 	AddSonarrSeriesPayload,
 	SonarrClient,
@@ -18,7 +15,6 @@ import type {
 	SonarrSeriesId,
 	TvdbId,
 } from "@/providers";
-import type { AutoMappingOptions } from "@/mapping/auto-mapping/types";
 import {
 	createError,
 	ErrorCode,
@@ -34,10 +30,8 @@ import {
 } from "./mutation-helpers";
 
 type AddSonarrSeriesInput = {
-	anilistId: AniListId;
+	tvdbId: TvdbId;
 	title: string;
-	primaryTitleHint?: string;
-	metadata?: AniListMediaHint | null;
 	form: SonarrFormState;
 	defaults: SonarrFormState;
 	credentials: ProviderCredentials;
@@ -62,7 +56,6 @@ type SonarrMutationDeps = {
 		| "updateSeries"
 		| "applyMonitoringAction"
 	>;
-	mappingService: Pick<MappingService, "resolveProviderId">;
 	cache: {
 		addSeriesToCache(series: SonarrSeries): Promise<void>;
 	};
@@ -98,26 +91,7 @@ export async function addSonarrSeries(
 	input: AddSonarrSeriesInput,
 	deps: SonarrMutationDeps,
 ): Promise<SonarrSeries> {
-	const { client, mappingService, cache } = deps;
-
-	const resolveOptions: AutoMappingOptions = { forceLookupNetwork: true };
-	const hints: NonNullable<AutoMappingOptions["hints"]> = {};
-	if (input.primaryTitleHint) hints.primaryTitle = input.primaryTitleHint;
-	if (input.metadata) hints.domMedia = input.metadata;
-	if (Object.keys(hints).length > 0) resolveOptions.hints = hints;
-
-	const mapping = await mappingService.resolveProviderId(
-		"sonarr",
-		input.anilistId,
-		resolveOptions,
-	);
-	if (!mapping) {
-		throw createError(
-			ErrorCode.VALIDATION_ERROR,
-			`Could not resolve AniList ID ${input.anilistId} to a TVDB ID.`,
-			"Unable to add this series to Sonarr because no matching TVDB entry was found.",
-		);
-	}
+	const { client, cache } = deps;
 
 	const payload = await resolveSonarrAddPayload({
 		api: client,
@@ -125,7 +99,7 @@ export async function addSonarrSeries(
 		defaults: input.defaults,
 		form: input.form,
 		title: input.title,
-		tvdbId: mapping.providerId,
+		tvdbId: input.tvdbId,
 	});
 
 	const created = await client.addSeries(payload, input.credentials);
@@ -135,7 +109,7 @@ export async function addSonarrSeries(
 
 export async function updateSonarrSeries(
 	input: UpdateSonarrSeriesInput,
-	deps: Omit<SonarrMutationDeps, "mappingService">,
+	deps: SonarrMutationDeps,
 ): Promise<SonarrSeries> {
 	const { client, cache } = deps;
 
