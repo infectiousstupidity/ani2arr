@@ -1,7 +1,6 @@
 /** Auto-mapping resolver result and persistence types. */
 // src/mapping/auto-mapping/types.ts
 
-import type { AniListId } from "@/anilist";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type { ProviderId } from "@/providers";
 import type { RequestPriority } from "@/shared/utils/request-priority";
@@ -9,7 +8,6 @@ import type {
 	AcceptedMappingEvidence,
 	AcceptedMappingReason,
 	AcceptedMappingSource,
-	InheritedMappingVerificationDetails,
 	RecentMappingEvaluationTrace,
 } from "@/mapping/types";
 
@@ -37,9 +35,6 @@ export interface AcceptedAutoMappingResult {
 	reason: AcceptedMappingReason;
 	successfulSynonym?: string;
 	recentEvaluation?: RecentMappingEvaluationTrace;
-	immediateSourceAniListId?: AniListId;
-	chainAnchorAniListId?: AniListId;
-	inheritedVerification?: InheritedMappingVerificationDetails;
 }
 
 /**

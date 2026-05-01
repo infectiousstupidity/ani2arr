@@ -3,11 +3,7 @@
 
 import type { AniListId, AniListMediaService } from "@/anilist";
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
-import type {
-	Provider,
-	ProviderCredentials,
-	SonarrLookupSeries,
-} from "@/providers";
+import type { Provider, ProviderCredentials } from "@/providers";
 import { getProviderLabel } from "@/providers/provider-labels";
 import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import { createError, ErrorCode, normalizeError } from "@/shared/errors";
@@ -19,17 +15,14 @@ import {
 	SCORE_THRESHOLD,
 } from "./constants";
 import { buildMediaFromMetadata } from "./metadata-hints";
-import { attemptVerifiedInheritedSonarrResolution } from "./inheritance/verified-inheritance";
 import type {
 	ProviderTitleLookup,
 	ProviderTitleResult,
 } from "./lookup/provider-title-lookup";
-import type { ManualMappingService } from "../manual-mapping";
 import { searchAutoMappingCandidates } from "./candidate-search/candidate-search";
 import {
 	createPipelineRecentEvaluation,
 	createRecentEvaluationTrace,
-	createSingleCandidateTrace,
 	mergeRecentEvaluations,
 	rewriteTraceCandidateStatus,
 } from "./recent-evaluation";
@@ -38,7 +31,6 @@ import {
 	type AutoMappingStore,
 } from "./auto-mapping.store";
 import { resolveUnresolvedSearchTerms } from "../resolution-policy";
-import type { AnibridgeMappingStore } from "../upstream-mapping";
 import type {
 	AcceptedMappingReason,
 	AcceptedMappingSource,
@@ -77,18 +69,13 @@ type NetworkResolutionContext = AutoMappingRequest & {
 
 type MediaResolutionContext = NetworkResolutionContext & {
 	media: AniListMedia;
-	allowInheritedTraversal: boolean;
 };
-
-type ManualMappingReads = Pick<ManualMappingService, "isIgnored" | "get">;
 
 type ResolveAutoMappingDeps = {
 	anilistApi: AniListMediaService;
-	anibridgeMappingStore: AnibridgeMappingStore;
 	lookupClients: ProviderTitleLookupRegistry;
 	autoMappingStore: Pick<AutoMappingStore, "get">;
 	log: ScopedLogger;
-	manualMappings?: ManualMappingReads;
 	acceptResolved: (
 		provider: Provider,
 		anilistId: AniListId,
@@ -370,7 +357,6 @@ async function resolveViaNetwork(
 		const metadataAttempt = await tryResolveWithMedia(deps, {
 			...context,
 			media: metadataMedia,
-			allowInheritedTraversal: false,
 		});
 		const resolvedFromMetadata = applyAttempt("metadata", metadataAttempt);
 		if (resolvedFromMetadata) {
@@ -388,7 +374,6 @@ async function resolveViaNetwork(
 	const apiAttempt = await tryResolveWithMedia(deps, {
 		...context,
 		media: anilistMediaWithRelations,
-		allowInheritedTraversal: true,
 	});
 	const resolvedFromApi = applyAttempt("api", apiAttempt);
 	if (resolvedFromApi) {
@@ -416,15 +401,6 @@ async function tryResolveWithMedia(
 
 	let recentEvaluation: RecentMappingEvaluationTrace | undefined;
 
-	const inheritedResolution = await tryVerifiedInheritedResolution(
-		deps,
-		context,
-	);
-	if (inheritedResolution.handled) {
-		return inheritedResolution.attempt;
-	}
-	recentEvaluation = inheritedResolution.recentEvaluation;
-
 	const lookupClient = deps.lookupClients[provider];
 	const outcome = await searchAutoMappingCandidates(
 		media,
@@ -433,16 +409,6 @@ async function tryResolveWithMedia(
 			credentials: context.credentials,
 			...(context.priority === undefined ? {} : { priority: context.priority }),
 			...(context.forceLookupNetwork ? { forceLookupNetwork: true } : {}),
-			...(inheritedResolution.borrowedBaseTitle
-				? {
-						preferredTerms: [
-							{
-								rawTitle: inheritedResolution.borrowedBaseTitle,
-								acceptedReason: "borrowed-base-title-fallback",
-							},
-						],
-					}
-				: {}),
 			isCandidateSuppressed: (providerId, reason: AcceptedMappingReason) =>
 				deps.isResolvedCandidateSuppressed(
 					provider,
@@ -485,83 +451,6 @@ async function tryResolveWithMedia(
 	);
 	return {
 		resolved: null,
-		...(recentEvaluation ? { recentEvaluation } : {}),
-	};
-}
-
-async function tryVerifiedInheritedResolution(
-	deps: ResolveAutoMappingDeps,
-	context: MediaResolutionContext,
-): Promise<
-	| { handled: true; attempt: ResolutionAttempt }
-	| {
-			handled: false;
-			recentEvaluation?: RecentMappingEvaluationTrace;
-			borrowedBaseTitle?: string;
-	  }
-> {
-	const { provider, media } = context;
-	if (provider !== "sonarr" || !context.allowInheritedTraversal) {
-		return { handled: false };
-	}
-
-	const inheritedAttempt = await attemptVerifiedInheritedSonarrResolution({
-		media,
-		anilistApi: deps.anilistApi,
-		anibridgeMappingStore: deps.anibridgeMappingStore,
-		lookupClient: deps.lookupClients
-			.sonarr as ProviderTitleLookup<SonarrLookupSeries>,
-		credentials: context.credentials,
-		...(deps.manualMappings ? { manualMappings: deps.manualMappings } : {}),
-	});
-
-	let recentEvaluation = inheritedAttempt.recentEvaluation;
-
-	if (inheritedAttempt.status === "accepted") {
-		if (
-			!deps.isResolvedCandidateSuppressed(
-				provider,
-				media.id,
-				inheritedAttempt.resolved,
-				"auto",
-			)
-		) {
-			return {
-				handled: true,
-				attempt: {
-					resolved: inheritedAttempt.resolved,
-					...(recentEvaluation ? { recentEvaluation } : {}),
-				},
-			};
-		}
-
-		recentEvaluation = mergeRecentEvaluations(
-			recentEvaluation,
-			rewriteTraceCandidateStatus(
-				createSingleCandidateTrace({
-					resolved: inheritedAttempt.resolved,
-					source: "auto",
-					status: "accepted",
-				}),
-				inheritedAttempt.resolved.providerId,
-				"rejected",
-			),
-		);
-	}
-
-	if (
-		inheritedAttempt.status !== "rejected" ||
-		!inheritedAttempt.borrowedBaseTitle
-	) {
-		return {
-			handled: false,
-			...(recentEvaluation ? { recentEvaluation } : {}),
-		};
-	}
-
-	return {
-		handled: false,
-		borrowedBaseTitle: inheritedAttempt.borrowedBaseTitle,
 		...(recentEvaluation ? { recentEvaluation } : {}),
 	};
 }

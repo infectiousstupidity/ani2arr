@@ -1,37 +1,28 @@
 /** Projects review-worthy mapping conflicts from effective state and resolver traces. */
 // src/mapping/queries/mapping-issues.ts
 
-import type { AniListId } from "@/anilist";
 import type { ProviderId } from "@/providers";
 import type {
 	AcceptedMappingEvidence,
 	AcceptedMappingReason,
 	EffectiveMappingKind,
-	RecentMappingEvaluationTrace,
 } from "@/mapping/types";
 import type { AutoMappingStatus } from "@/mapping/auto-mapping/types";
 
 export type MappingIssueReason =
 	| "manual-upstream-disagreement"
-	| "ignored-but-exact-upstream"
-	| "verification-failed-inherited-candidate"
-	| "ambiguous-inherited-conflict";
+	| "ignored-but-exact-upstream";
 
 export type MappingIssueAction =
 	| "keep-current"
 	| "use-exact-upstream"
-	| "clear-ignore"
-	| "retry-resolution"
-	| "inspect-candidates"
-	| "set-manual-mapping";
+	| "clear-ignore";
 
 type MappingIssueMappingSnapshot = {
 	mappingEntryKind: EffectiveMappingKind;
 	providerId: ProviderId | null;
 	autoMappingStatus?: AutoMappingStatus;
 	acceptedReason?: AcceptedMappingReason;
-	immediateSourceAniListId?: AniListId;
-	chainAnchorAniListId?: AniListId;
 };
 
 export interface MappingIssue {
@@ -49,13 +40,6 @@ export interface MappingIssuesSummary {
 	reasons: readonly MappingIssueReason[];
 }
 
-type InheritedCandidateProjection = {
-	providerId: ProviderId;
-	immediateSourceAniListId?: AniListId;
-	chainAnchorAniListId?: AniListId;
-	verificationFailed: boolean;
-};
-
 const buildReviewState = (input: {
 	mappingEntryKind: MappingIssueMappingSnapshot["mappingEntryKind"];
 	providerId: ProviderId | null;
@@ -63,8 +47,6 @@ const buildReviewState = (input: {
 		| MappingIssueMappingSnapshot["autoMappingStatus"]
 		| undefined;
 	acceptedReason?: MappingIssueMappingSnapshot["acceptedReason"] | undefined;
-	immediateSourceAniListId?: AniListId | undefined;
-	chainAnchorAniListId?: AniListId | undefined;
 }): MappingIssueMappingSnapshot => ({
 	mappingEntryKind: input.mappingEntryKind,
 	providerId: input.providerId,
@@ -72,52 +54,7 @@ const buildReviewState = (input: {
 		? { autoMappingStatus: input.autoMappingStatus }
 		: {}),
 	...(input.acceptedReason ? { acceptedReason: input.acceptedReason } : {}),
-	...(input.immediateSourceAniListId
-		? { immediateSourceAniListId: input.immediateSourceAniListId }
-		: {}),
-	...(input.chainAnchorAniListId
-		? { chainAnchorAniListId: input.chainAnchorAniListId }
-		: {}),
 });
-
-const getInheritedCandidates = (
-	recentEvaluation: RecentMappingEvaluationTrace | undefined,
-): InheritedCandidateProjection[] => {
-	if (!recentEvaluation) {
-		return [];
-	}
-
-	const candidates: InheritedCandidateProjection[] = [];
-	const seen = new Set<number>();
-	for (const candidate of recentEvaluation.candidates) {
-		if (
-			candidate.reason !== "verified-inherited" ||
-			seen.has(candidate.providerId)
-		) {
-			continue;
-		}
-		seen.add(candidate.providerId);
-		candidates.push({
-			providerId: candidate.providerId,
-			verificationFailed:
-				candidate.inheritedVerification?.verdict === "verification-failed",
-			...(candidate.inheritedVerification?.immediateSourceAniListId
-				? {
-						immediateSourceAniListId:
-							candidate.inheritedVerification.immediateSourceAniListId,
-					}
-				: {}),
-			...(candidate.inheritedVerification?.chainAnchorAniListId
-				? {
-						chainAnchorAniListId:
-							candidate.inheritedVerification.chainAnchorAniListId,
-					}
-				: {}),
-		});
-	}
-
-	return candidates;
-};
 
 const buildSummary = (
 	reviewItems: readonly MappingIssue[],
@@ -140,7 +77,6 @@ export function projectMappingIssues(input: {
 	mappingEntryKind: EffectiveMappingKind;
 	providerId: ProviderId | null;
 	acceptedEvidence?: AcceptedMappingEvidence;
-	recentEvaluation?: RecentMappingEvaluationTrace;
 	autoMappingStatus?: AutoMappingStatus;
 	exactUpstreamMatchProviderId?: ProviderId | null;
 }): {
@@ -152,8 +88,6 @@ export function projectMappingIssues(input: {
 		providerId: input.providerId,
 		autoMappingStatus: input.autoMappingStatus,
 		acceptedReason: input.acceptedEvidence?.reason,
-		immediateSourceAniListId: input.acceptedEvidence?.immediateSourceAniListId,
-		chainAnchorAniListId: input.acceptedEvidence?.chainAnchorAniListId,
 	});
 	const reviewItems: MappingIssue[] = [];
 
@@ -192,52 +126,6 @@ export function projectMappingIssues(input: {
 				acceptedReason: "exact-upstream",
 			}),
 			actions: ["keep-current", "clear-ignore"],
-		});
-	}
-
-	const inheritedCandidates = getInheritedCandidates(input.recentEvaluation);
-	const unverifiedInheritedCandidates = inheritedCandidates.filter(
-		(candidate) => candidate.verificationFailed,
-	);
-
-	if (
-		input.autoMappingStatus === "unresolved" &&
-		unverifiedInheritedCandidates.length > 0
-	) {
-		const candidate = unverifiedInheritedCandidates[0]!;
-		reviewItems.push({
-			reason: "verification-failed-inherited-candidate",
-			summary: "Inherited candidate could not be operationally verified.",
-			current,
-			proposed: buildReviewState({
-				mappingEntryKind: "auto",
-				providerId: candidate.providerId,
-				acceptedReason: "verified-inherited",
-				immediateSourceAniListId: candidate.immediateSourceAniListId,
-				chainAnchorAniListId: candidate.chainAnchorAniListId,
-			}),
-			actions: ["retry-resolution", "set-manual-mapping"],
-		});
-	}
-
-	if (
-		input.autoMappingStatus === "ambiguous" &&
-		inheritedCandidates.length > 1
-	) {
-		reviewItems.push({
-			reason: "ambiguous-inherited-conflict",
-			summary: "Inherited relation anchors proposed conflicting provider IDs.",
-			current,
-			conflicts: inheritedCandidates.map((candidate) =>
-				buildReviewState({
-					mappingEntryKind: "auto",
-					providerId: candidate.providerId,
-					acceptedReason: "verified-inherited",
-					immediateSourceAniListId: candidate.immediateSourceAniListId,
-					chainAnchorAniListId: candidate.chainAnchorAniListId,
-				}),
-			),
-			actions: ["inspect-candidates", "set-manual-mapping"],
 		});
 	}
 

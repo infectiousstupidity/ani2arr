@@ -1,7 +1,6 @@
 /** Mapping service input and output types for AniList-driven resolution flows. */
 // src/mapping/types.ts
 
-import type { AniListId } from "@/anilist";
 import type { ProviderId } from "@/providers";
 
 /** Derived entry kinds used by review/filter/table surfaces. */
@@ -34,8 +33,7 @@ export type MappingUnknownReason =
  *
  * - `manual`: user-created exact manual mapping
  * - `upstream`: exact upstream mapping
- * - `auto`: resolver-accepted mapping from automated logic such as lookup,
- *   verified inheritance, or fallback matching
+ * - `auto`: resolver-accepted mapping from automated lookup or fallback matching
  */
 export type AcceptedMappingSource = "manual" | "upstream" | "auto";
 
@@ -49,35 +47,19 @@ export type AcceptedMappingSource = "manual" | "upstream" | "auto";
  * Examples:
  * - `source: 'upstream'` + `reason: 'exact-upstream'`
  * - `source: 'manual'` + `reason: 'manual-override'`
- * - `source: 'auto'` + `reason: 'verified-inherited'`
  * - `source: 'auto'` + `reason: 'fuzzy-match'`
  */
 export type AcceptedMappingReason =
 	| "exact-upstream"
 	| "manual-override"
 	| "exact-title-match"
-	| "verified-inherited"
-	| "fuzzy-match"
-	| "borrowed-base-title-fallback";
-
-/** Structured inherited-verification details kept with accepted or recent evaluation data. */
-export interface InheritedMappingVerificationDetails {
-	verdict?: "accept" | "reject" | "ambiguous" | "verification-failed";
-	reason: string;
-	positiveSignals: readonly string[];
-	contradictions: readonly string[];
-	immediateSourceAniListId?: AniListId;
-	chainAnchorAniListId?: AniListId;
-}
+	| "fuzzy-match";
 
 /** Small accepted-evidence payload for explaining why one mapping is effective. */
 export interface AcceptedMappingEvidence {
 	source: AcceptedMappingSource;
 	reason: AcceptedMappingReason;
 	successfulTitle?: string;
-	immediateSourceAniListId?: AniListId;
-	chainAnchorAniListId?: AniListId;
-	inheritedVerification?: InheritedMappingVerificationDetails;
 }
 
 /** Candidate disposition recorded in the most recent resolver evaluation trace. */
@@ -95,7 +77,6 @@ export interface MappingCandidateEvaluation {
 	status: MappingCandidateEvaluationStatus;
 	summary: string;
 	score?: number;
-	inheritedVerification?: InheritedMappingVerificationDetails;
 }
 
 /** Small, rebuildable trace of the most recent resolver evaluation attempt. */
