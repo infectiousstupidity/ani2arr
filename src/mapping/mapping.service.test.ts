@@ -8,10 +8,6 @@ import { MappingService } from "./mapping.service";
 
 const aid = parseAniListId;
 
-vi.mock("@/debug/metrics", () => ({
-	incrementCounter: vi.fn(),
-}));
-
 type StubManualMappings = {
 	isIgnored: ReturnType<typeof vi.fn>;
 	get: ReturnType<typeof vi.fn>;
