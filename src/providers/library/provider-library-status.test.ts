@@ -9,44 +9,65 @@ import {
 	parseSonarrSeriesId,
 	parseTmdbId,
 	parseTvdbId,
+	type RadarrMovie,
 	type RadarrMovieSnapshot,
 	type SonarrSeries,
 	type SonarrSeriesSnapshot,
 } from "@/providers";
 import type { RadarrClient } from "@/providers/clients/radarr.client";
 import type { SonarrClient } from "@/providers/clients/sonarr.client";
-import type { TtlCache } from "@/shared/cache/ttl-cache";
+import type {
+	CacheHit,
+	TtlCache,
+} from "@/shared/cache/ttl-cache";
+import { PROVIDER_LIBRARY_CACHE_TTL } from "./cache";
 import { RadarrLibrary } from "./radarr-library";
 import { SonarrLibrary } from "./sonarr-library";
 import type { ProviderLibraryCaches } from "./types";
 
-function createMemoryCache<T>(initialValue: T): TtlCache<T> {
-	let value: T | undefined = initialValue;
-	return {
-		read: vi.fn(async () =>
-			value === undefined
-				? null
-				: {
-						value,
-						stale: false,
-						staleAt: Date.now() + 60_000,
-						expiresAt: Date.now() + 120_000,
-					},
-		),
-		write: vi.fn(async (_key, nextValue) => {
+type CacheMode = "miss" | "fresh" | "stale";
+
+function createMemoryCache<T>(
+	initialValue: T | undefined,
+	mode: CacheMode = initialValue === undefined ? "miss" : "fresh",
+): TtlCache<T> & { value: () => T | undefined } {
+	let value = initialValue;
+	let currentMode = mode;
+
+	const cache = {
+		read: vi.fn(async (): Promise<CacheHit<T> | null> => {
+			if (currentMode === "miss" || value === undefined) return null;
+			return {
+				value,
+				stale: currentMode === "stale",
+				staleAt: Date.now() - (currentMode === "stale" ? 1 : -60_000),
+				expiresAt: Date.now() + 120_000,
+			};
+		}),
+		write: vi.fn(async (_key: string, nextValue: T) => {
 			value = nextValue;
+			currentMode = "fresh";
 		}),
 		remove: vi.fn(async () => {
 			value = undefined;
+			currentMode = "miss";
 		}),
 		clear: vi.fn(async () => {
 			value = undefined;
+			currentMode = "miss";
 		}),
+		value: () => value,
 	};
+	return cache;
 }
 
-function createCaches<T>(initialList: T[]): ProviderLibraryCaches<T> {
-	return { lean: createMemoryCache(initialList) };
+function createCaches<T>(
+	initialList?: T[],
+	mode?: CacheMode,
+): ProviderLibraryCaches<T> & {
+	lean: TtlCache<T[]> & { value: () => T[] | undefined };
+} {
+	return { lean: createMemoryCache(initialList, mode) };
 }
 
 const createMappingService = () => ({
@@ -89,6 +110,15 @@ function createSonarrSnapshot(
 	};
 }
 
+function createRadarrMovie(input?: Partial<RadarrMovie>): RadarrMovie {
+	return {
+		id: parseRadarrMovieId(20),
+		tmdbId: parseTmdbId(456),
+		title: "Known Movie",
+		...input,
+	};
+}
+
 function createRadarrSnapshot(
 	input?: Partial<RadarrMovieSnapshot>,
 ): RadarrMovieSnapshot {
@@ -100,13 +130,41 @@ function createRadarrSnapshot(
 	};
 }
 
-async function configureProviders(): Promise<void> {
+async function configureProviders(configured = true): Promise<void> {
 	const options = createDefaultExtensionOptions();
-	options.providers.sonarr.url = "http://sonarr.local";
-	options.providers.sonarr.apiKey = "sonarr-key";
-	options.providers.radarr.url = "http://radarr.local";
-	options.providers.radarr.apiKey = "radarr-key";
+	if (configured) {
+		options.providers.sonarr.url = "http://sonarr.local";
+		options.providers.sonarr.apiKey = "sonarr-key";
+		options.providers.radarr.url = "http://radarr.local";
+		options.providers.radarr.apiKey = "radarr-key";
+	}
 	await setExtensionOptionsSnapshot(options);
+}
+
+function createSonarrLibrary(
+	client: Partial<SonarrClient>,
+	caches: ProviderLibraryCaches<SonarrSeriesSnapshot>,
+): SonarrLibrary {
+	return new SonarrLibrary({
+		sonarrClient: client as SonarrClient,
+		mappingService: createMappingService(),
+		manualMappingService: createManualMappingService(),
+		anibridgeMappingStore: createSonarrUpstreamStore(),
+		caches,
+	});
+}
+
+function createRadarrLibrary(
+	client: Partial<RadarrClient>,
+	caches: ProviderLibraryCaches<RadarrMovieSnapshot>,
+): RadarrLibrary {
+	return new RadarrLibrary({
+		radarrClient: client as RadarrClient,
+		mappingService: createMappingService(),
+		manualMappingService: createManualMappingService(),
+		anibridgeMappingStore: createRadarrUpstreamStore(),
+		caches,
+	});
 }
 
 describe("provider-target library status", () => {
@@ -114,23 +172,22 @@ describe("provider-target library status", () => {
 		await configureProviders();
 	});
 
-	it("does not treat a cached Sonarr same-title library item as an effective mapping", async () => {
+	it("does not treat a cached same-title Sonarr item as an effective mapping", async () => {
 		const mappingService = createMappingService();
 		mappingService.resolveProviderId.mockResolvedValue(null);
 		mappingService.getAutoMapping.mockResolvedValue(null);
-		const series = createSonarrSnapshot({ title: "Known Series" });
 		const client = {
 			getAllSeries: vi.fn(),
 			getSeriesByTvdbId: vi.fn(),
 			lookupSeriesByTvdbId: vi.fn(),
 		} as unknown as SonarrClient;
-		const library = new SonarrLibrary(
-			client,
+		const library = new SonarrLibrary({
+			sonarrClient: client,
 			mappingService,
-			createManualMappingService(),
-			createSonarrUpstreamStore(),
-			createCaches([series]),
-		);
+			manualMappingService: createManualMappingService(),
+			anibridgeMappingStore: createSonarrUpstreamStore(),
+			caches: createCaches([createSonarrSnapshot({ title: "Known Series" })]),
+		});
 
 		const status = await library.getSeriesStatus({
 			anilistId: parseAniListId(10),
@@ -142,256 +199,174 @@ describe("provider-target library status", () => {
 			providerMappingState: "unmapped",
 			isInLibrary: null,
 		});
-		expect(mappingService.resolveProviderId).toHaveBeenCalledWith(
-			"sonarr",
-			parseAniListId(10),
-			expect.objectContaining({
-				hints: expect.objectContaining({ primaryTitle: "Known Series" }),
-			}),
-		);
 		expect(client.getSeriesByTvdbId).not.toHaveBeenCalled();
 	});
+});
 
-	it("does not treat a cached Radarr same-title library item as an effective mapping", async () => {
-		const mappingService = createMappingService();
-		mappingService.resolveProviderId.mockResolvedValue(null);
-		mappingService.getAutoMapping.mockResolvedValue(null);
-		const movie = createRadarrSnapshot({ title: "Known Movie" });
-		const client = {
-			getAllMovies: vi.fn(),
-			getMovieByTmdbId: vi.fn(),
-			lookupMovieByTmdbId: vi.fn(),
-		} as unknown as RadarrClient;
-		const library = new RadarrLibrary(
-			client,
-			mappingService,
-			createManualMappingService(),
-			createRadarrUpstreamStore(),
-			createCaches([movie]),
-		);
-
-		const status = await library.getMovieStatus({
-			anilistId: parseAniListId(11),
-			title: "Known Movie",
-		});
-
-		expect(status).toMatchObject({
-			providerId: null,
-			providerMappingState: "unmapped",
-			isInLibrary: null,
-		});
-		expect(mappingService.resolveProviderId).toHaveBeenCalledWith(
-			"radarr",
-			parseAniListId(11),
-			expect.objectContaining({
-				hints: expect.objectContaining({ primaryTitle: "Known Movie" }),
-			}),
-		);
-		expect(client.getMovieByTmdbId).not.toHaveBeenCalled();
+describe("provider library cache", () => {
+	beforeEach(async () => {
+		await configureProviders();
+		vi.restoreAllMocks();
 	});
 
-	it("returns in-library for a known Sonarr TVDB ID from the lean cache without resolving mapping", async () => {
-		const mappingService = createMappingService();
-		const series = createSonarrSnapshot();
-		const client = {
-			getAllSeries: vi.fn(),
-			getSeriesByTvdbId: vi.fn(),
-			lookupSeriesByTvdbId: vi.fn(),
-		} as unknown as SonarrClient;
-		const library = new SonarrLibrary(
-			client,
-			mappingService,
-			createManualMappingService(),
-			createSonarrUpstreamStore(),
-			createCaches([series]),
-		);
+	it("refreshes a missing Sonarr cache from the provider and writes lean snapshots", async () => {
+		const series = createSonarrSeries();
+		const client = { getAllSeries: vi.fn(async () => [series]) };
+		const caches = createCaches<SonarrSeriesSnapshot>();
+		const library = createSonarrLibrary(client, caches);
 
-		const status = await library.getSeriesLibraryStatus({
-			anilistId: parseAniListId(1),
-			providerId: series.tvdbId,
-		});
+		await expect(library.getLeanSeriesList()).resolves.toEqual([
+			createSonarrSnapshot(),
+		]);
 
-		expect(status).toMatchObject({
-			anilistId: 1,
-			provider: "sonarr",
-			providerId: series.tvdbId,
-			isInLibrary: true,
-			series,
-		});
-		expect(mappingService.resolveProviderId).not.toHaveBeenCalled();
-		expect(client.getSeriesByTvdbId).not.toHaveBeenCalled();
-	});
-
-	it("returns not-in-library for a known Sonarr TVDB ID missing from the lean cache", async () => {
-		const mappingService = createMappingService();
-		const tvdbId = parseTvdbId(124);
-		const client = {
-			getAllSeries: vi.fn(),
-			getSeriesByTvdbId: vi.fn(),
-			lookupSeriesByTvdbId: vi.fn(),
-		} as unknown as SonarrClient;
-		const library = new SonarrLibrary(
-			client,
-			mappingService,
-			createManualMappingService(),
-			createSonarrUpstreamStore(),
-			createCaches<SonarrSeriesSnapshot>([]),
-		);
-
-		const status = await library.getSeriesLibraryStatus({
-			anilistId: parseAniListId(2),
-			providerId: tvdbId,
-		});
-
-		expect(status).toEqual({
-			anilistId: 2,
-			provider: "sonarr",
-			providerId: tvdbId,
-			isInLibrary: false,
-		});
-		expect(mappingService.resolveProviderId).not.toHaveBeenCalled();
-		expect(client.getSeriesByTvdbId).not.toHaveBeenCalled();
-	});
-
-	it("force-verifies Sonarr by exact TVDB ID and updates the cache when found live", async () => {
-		const mappingService = createMappingService();
-		const liveSeries = createSonarrSeries({ tvdbId: parseTvdbId(125) });
-		const client = {
-			getAllSeries: vi.fn(),
-			getSeriesByTvdbId: vi.fn(async () => liveSeries),
-			lookupSeriesByTvdbId: vi.fn(),
-		} as unknown as SonarrClient;
-		const caches = createCaches<SonarrSeriesSnapshot>([]);
-		const library = new SonarrLibrary(
-			client,
-			mappingService,
-			createManualMappingService(),
-			createSonarrUpstreamStore(),
-			caches,
-		);
-
-		const status = await library.getSeriesLibraryStatus({
-			anilistId: parseAniListId(3),
-			providerId: liveSeries.tvdbId,
-			forceVerify: true,
-		});
-
-		expect(client.getSeriesByTvdbId).toHaveBeenCalledWith(
-			liveSeries.tvdbId,
+		expect(client.getAllSeries).toHaveBeenCalledWith(
 			expect.objectContaining({ apiKey: "sonarr-key" }),
 		);
-		expect(caches.lean.write).toHaveBeenCalled();
-		expect(status).toMatchObject({
-			anilistId: 3,
-			provider: "sonarr",
-			providerId: liveSeries.tvdbId,
-			isInLibrary: true,
-			series: liveSeries,
-		});
-		expect(mappingService.resolveProviderId).not.toHaveBeenCalled();
+		expect(caches.lean.write).toHaveBeenCalledWith(
+			expect.any(String),
+			[createSonarrSnapshot()],
+			PROVIDER_LIBRARY_CACHE_TTL.normal,
+		);
+		const written = caches.lean.value()?.[0] as unknown as Record<
+			string,
+			unknown
+		>;
+		expect(written).not.toHaveProperty("alternateTitles");
+		expect(written).not.toHaveProperty("status");
+		expect(written).not.toHaveProperty("statistics");
 	});
 
-	it("returns in-library for a known Radarr TMDB ID from the lean cache without resolving mapping", async () => {
-		const mappingService = createMappingService();
-		const movie = createRadarrSnapshot();
-		const client = {
-			getAllMovies: vi.fn(),
-			getMovieByTmdbId: vi.fn(),
-			lookupMovieByTmdbId: vi.fn(),
-		} as unknown as RadarrClient;
-		const library = new RadarrLibrary(
-			client,
-			mappingService,
-			createManualMappingService(),
-			createRadarrUpstreamStore(),
-			createCaches([movie]),
-		);
+	it("refreshes a missing Radarr cache from the provider and writes lean snapshots", async () => {
+		const movie = createRadarrMovie();
+		const client = { getAllMovies: vi.fn(async () => [movie]) };
+		const caches = createCaches<RadarrMovieSnapshot>();
+		const library = createRadarrLibrary(client, caches);
 
-		const status = await library.getMovieLibraryStatus({
-			anilistId: parseAniListId(4),
-			providerId: movie.tmdbId,
-		});
+		await expect(library.getLeanMovieList()).resolves.toEqual([
+			createRadarrSnapshot(),
+		]);
 
-		expect(status).toMatchObject({
-			anilistId: 4,
-			provider: "radarr",
-			providerId: movie.tmdbId,
-			isInLibrary: true,
-			movie,
-		});
-		expect(mappingService.resolveProviderId).not.toHaveBeenCalled();
-		expect(client.getMovieByTmdbId).not.toHaveBeenCalled();
-	});
-
-	it("returns not-in-library for a known Radarr TMDB ID missing from the lean cache", async () => {
-		const mappingService = createMappingService();
-		const tmdbId = parseTmdbId(457);
-		const client = {
-			getAllMovies: vi.fn(),
-			getMovieByTmdbId: vi.fn(),
-			lookupMovieByTmdbId: vi.fn(),
-		} as unknown as RadarrClient;
-		const library = new RadarrLibrary(
-			client,
-			mappingService,
-			createManualMappingService(),
-			createRadarrUpstreamStore(),
-			createCaches<RadarrMovieSnapshot>([]),
-		);
-
-		const status = await library.getMovieLibraryStatus({
-			anilistId: parseAniListId(5),
-			providerId: tmdbId,
-		});
-
-		expect(status).toEqual({
-			anilistId: 5,
-			provider: "radarr",
-			providerId: tmdbId,
-			isInLibrary: false,
-		});
-		expect(mappingService.resolveProviderId).not.toHaveBeenCalled();
-		expect(client.getMovieByTmdbId).not.toHaveBeenCalled();
-	});
-
-	it("force-verifies Radarr by exact TMDB ID and removes stale cache entries when missing live", async () => {
-		const mappingService = createMappingService();
-		const cachedMovie = createRadarrSnapshot({ tmdbId: parseTmdbId(458) });
-		const client = {
-			getAllMovies: vi.fn(),
-			getMovieByTmdbId: vi.fn(async () => null),
-			lookupMovieByTmdbId: vi.fn(async () => null),
-		} as unknown as RadarrClient;
-		const caches = createCaches([cachedMovie]);
-		const library = new RadarrLibrary(
-			client,
-			mappingService,
-			createManualMappingService(),
-			createRadarrUpstreamStore(),
-			caches,
-		);
-
-		const status = await library.getMovieLibraryStatus({
-			anilistId: parseAniListId(6),
-			providerId: cachedMovie.tmdbId,
-			forceVerify: true,
-		});
-
-		expect(client.getMovieByTmdbId).toHaveBeenCalledWith(
-			cachedMovie.tmdbId,
+		expect(client.getAllMovies).toHaveBeenCalledWith(
 			expect.objectContaining({ apiKey: "radarr-key" }),
 		);
 		expect(caches.lean.write).toHaveBeenCalledWith(
 			expect.any(String),
-			[],
-			expect.any(Object),
+			[createRadarrSnapshot()],
+			PROVIDER_LIBRARY_CACHE_TTL.normal,
 		);
-		expect(status).toEqual({
-			anilistId: 6,
-			provider: "radarr",
-			providerId: cachedMovie.tmdbId,
-			isInLibrary: false,
+		const written = caches.lean.value()?.[0] as unknown as Record<
+			string,
+			unknown
+		>;
+		expect(written).not.toHaveProperty("titleSlug");
+		expect(written).not.toHaveProperty("sortTitle");
+		expect(written).not.toHaveProperty("movieFile");
+	});
+
+	it("returns stale Sonarr data immediately while refreshing in the background", async () => {
+		const stale = createSonarrSnapshot({ title: "Stale Series" });
+		const fresh = createSonarrSeries({ title: "Fresh Series" });
+		const client = { getAllSeries: vi.fn(async () => [fresh]) };
+		const caches = createCaches([stale], "stale");
+		const library = createSonarrLibrary(client, caches);
+
+		await expect(library.getLeanSeriesList()).resolves.toEqual([stale]);
+
+		await vi.waitFor(() => {
+			expect(caches.lean.write).toHaveBeenCalledWith(
+				expect.any(String),
+				[createSonarrSnapshot({ title: "Fresh Series" })],
+				PROVIDER_LIBRARY_CACHE_TTL.normal,
+			);
 		});
-		expect(mappingService.resolveProviderId).not.toHaveBeenCalled();
+	});
+
+	it("returns stale Radarr data immediately while refreshing in the background", async () => {
+		const stale = createRadarrSnapshot({ title: "Stale Movie" });
+		const fresh = createRadarrMovie({ title: "Fresh Movie" });
+		const client = { getAllMovies: vi.fn(async () => [fresh]) };
+		const caches = createCaches([stale], "stale");
+		const library = createRadarrLibrary(client, caches);
+
+		await expect(library.getLeanMovieList()).resolves.toEqual([stale]);
+
+		await vi.waitFor(() => {
+			expect(caches.lean.write).toHaveBeenCalledWith(
+				expect.any(String),
+				[createRadarrSnapshot({ title: "Fresh Movie" })],
+				PROVIDER_LIBRARY_CACHE_TTL.normal,
+			);
+		});
+	});
+
+	it("returns fallback data and writes short error TTL when refresh fails", async () => {
+		const fallback = createSonarrSnapshot();
+		const client = {
+			getAllSeries: vi.fn(async () => {
+				throw new Error("provider unavailable");
+			}),
+		};
+		const caches = createCaches([fallback], "fresh");
+		const library = createSonarrLibrary(client, caches);
+
+		await expect(library.refreshCache()).resolves.toEqual([fallback]);
+
+		expect(caches.lean.write).toHaveBeenCalledWith(
+			expect.any(String),
+			[fallback],
+			expect.objectContaining({
+				staleMs: PROVIDER_LIBRARY_CACHE_TTL.error.staleMs,
+				hardMs: PROVIDER_LIBRARY_CACHE_TTL.error.hardMs,
+				meta: expect.objectContaining({ lastErrorCode: expect.any(String) }),
+			}),
+		);
+	});
+
+	it("clears provider caches when credentials are missing", async () => {
+		await configureProviders(false);
+		const sonarrClient = { getAllSeries: vi.fn() };
+		const sonarrCaches = createCaches([createSonarrSnapshot()]);
+		const sonarrLibrary = createSonarrLibrary(sonarrClient, sonarrCaches);
+		const radarrClient = { getAllMovies: vi.fn() };
+		const radarrCaches = createCaches([createRadarrSnapshot()]);
+		const radarrLibrary = createRadarrLibrary(radarrClient, radarrCaches);
+
+		await expect(sonarrLibrary.refreshCache()).resolves.toEqual([]);
+		await expect(radarrLibrary.refreshCache()).resolves.toEqual([]);
+
+		expect(sonarrCaches.lean.remove).toHaveBeenCalled();
+		expect(radarrCaches.lean.remove).toHaveBeenCalled();
+		expect(sonarrClient.getAllSeries).not.toHaveBeenCalled();
+		expect(radarrClient.getAllMovies).not.toHaveBeenCalled();
+	});
+
+	it("upserts and removes Sonarr cache entries by TVDB ID", async () => {
+		const caches = createCaches([createSonarrSnapshot({ title: "Old" })]);
+		const library = createSonarrLibrary({}, caches);
+
+		await library.addSeriesToCache(createSonarrSeries({ title: "New" }));
+		await library.addSeriesToCache(
+			createSonarrSeries({ tvdbId: parseTvdbId(124), title: "Other" }),
+		);
+		await library.removeSeriesFromCache(parseTvdbId(123));
+
+		expect(caches.lean.value()).toEqual([
+			createSonarrSnapshot({ tvdbId: parseTvdbId(124), title: "Other" }),
+		]);
+	});
+
+	it("upserts and removes Radarr cache entries by TMDB ID", async () => {
+		const caches = createCaches([createRadarrSnapshot({ title: "Old" })]);
+		const library = createRadarrLibrary({}, caches);
+
+		await library.addMovieToCache(createRadarrMovie({ title: "New" }));
+		await library.addMovieToCache(
+			createRadarrMovie({ tmdbId: parseTmdbId(457), title: "Other" }),
+		);
+		await library.removeMovieFromCache(parseTmdbId(456));
+
+		expect(caches.lean.value()).toEqual([
+			createRadarrSnapshot({ tmdbId: parseTmdbId(457), title: "Other" }),
+		]);
 	});
 });

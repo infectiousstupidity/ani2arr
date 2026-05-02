@@ -418,7 +418,7 @@ export async function getMappingInspection(
 		providerMappingState: candidate.providerMappingState,
 		isInLibrary,
 		libraryEntry,
-		libraryUnknownReason,
+		...(libraryUnknownReason ? { libraryUnknownReason } : {}),
 	});
 	const linkedAniListIds =
 		candidate.providerId === null

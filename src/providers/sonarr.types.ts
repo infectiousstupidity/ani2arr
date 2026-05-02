@@ -80,12 +80,12 @@ export interface SonarrSeriesSnapshot {
 }
 
 export interface SonarrLookupSeries {
+	id?: SonarrSeriesId;
 	title: string;
 	tvdbId: TvdbId;
 	titleSlug?: string;
 	year?: number;
 	genres?: string[];
-	id?: SonarrSeriesId;
 	network?: string;
 	seriesType?: SonarrSeriesType;
 	status?: "continuing" | "ended" | "upcoming" | "deleted";

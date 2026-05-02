@@ -77,6 +77,7 @@ export interface RadarrMovieSnapshot {
 }
 
 export interface RadarrLookupMovie {
+	id?: RadarrMovieId;
 	title: string;
 	tmdbId: TmdbId;
 	imdbId?: string | null;
@@ -103,5 +104,4 @@ export interface RadarrLookupMovie {
 	folderName?: string;
 	remotePoster?: string | null;
 	hasFile?: boolean;
-	id?: RadarrMovieId;
 }

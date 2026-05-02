@@ -163,15 +163,6 @@ export const createApiDeps = (): ApiHandlerDeps => {
 		await bumpProviderLibraryRevision(provider);
 	};
 
-	const clearProviderClientCache = (provider: Provider): void => {
-		if (provider === "sonarr") {
-			sonarrClient.clearEtagCache();
-			return;
-		}
-
-		radarrClient.clearEtagCache();
-	};
-
 	const refreshProviderLibrary = async (
 		provider: Provider,
 		options: ExtensionOptions,
@@ -185,25 +176,25 @@ export const createApiDeps = (): ApiHandlerDeps => {
 	};
 
 	const sonarrLibrary = bindAll(
-		new SonarrLibrary(
+		new SonarrLibrary({
 			sonarrClient,
 			mappingService,
 			manualMappingService,
 			anibridgeMappingStore,
-			providerLibraryCaches.sonarr,
-			() => bumpLibraryRevision("sonarr"),
-		),
+			caches: providerLibraryCaches.sonarr,
+			emitLibraryMutation: () => bumpLibraryRevision("sonarr"),
+		}),
 	);
 
 	const radarrLibrary = bindAll(
-		new RadarrLibrary(
+		new RadarrLibrary({
 			radarrClient,
 			mappingService,
 			manualMappingService,
 			anibridgeMappingStore,
-			providerLibraryCaches.radarr,
-			() => bumpLibraryRevision("radarr"),
-		),
+			caches: providerLibraryCaches.radarr,
+			emitLibraryMutation: () => bumpLibraryRevision("radarr"),
+		}),
 	);
 
 	const scheduleLibraryRefresh = (
@@ -259,10 +250,6 @@ export const createApiDeps = (): ApiHandlerDeps => {
 			return;
 		}
 
-		for (const provider of changedProviders) {
-			clearProviderClientCache(provider);
-		}
-
 		await Promise.all(
 			changedProviders.map(async (provider) => {
 				await mappingService.resetLookupState(provider);
@@ -285,9 +272,6 @@ export const createApiDeps = (): ApiHandlerDeps => {
 	};
 
 	const clearPersistentCaches = async (): Promise<void> => {
-		sonarrClient.clearEtagCache();
-		radarrClient.clearEtagCache();
-
 		await Promise.all([
 			anilistMetadataStore.clearLocalCache(),
 			mappingService.resetLookupState(),

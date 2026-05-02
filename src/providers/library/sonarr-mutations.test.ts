@@ -168,10 +168,6 @@ describe("updateSonarrSeries", () => {
 		expect(client.updateSeries).toHaveBeenCalledWith(
 			seriesId,
 			{
-				id: seriesId,
-				title: "Example Series",
-				tvdbId,
-				titleSlug: "example-series",
 				qualityProfileId: parseProviderQualityProfileId(99),
 				rootFolderPath: "/series-4k",
 				path: "/series-4k/Example Series [tvdb-34]",
@@ -183,6 +179,14 @@ describe("updateSonarrSeries", () => {
 			credentials,
 			{ moveFiles: true },
 		);
+		const updatePatch = (
+			client.updateSeries.mock.calls[0] as unknown[] | undefined
+		)?.[1] as Record<string, unknown> | undefined;
+		expect(updatePatch).not.toHaveProperty("title");
+		expect(updatePatch).not.toHaveProperty("tvdbId");
+		expect(updatePatch).not.toHaveProperty("titleSlug");
+		expect(updatePatch).not.toHaveProperty("addOptions");
+		expect(updatePatch).not.toHaveProperty("statistics");
 		expect(client.applyMonitoringAction).toHaveBeenCalledWith(
 			seriesId,
 			"all",

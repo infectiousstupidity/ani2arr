@@ -16,14 +16,12 @@ import {
 	hasConfiguredProviderCredentials,
 	type ExtensionOptions,
 } from "@/options";
-import {
-	type ProviderCredentials,
-	type RadarrLookupMovie,
-	type RadarrMovie,
-	type RadarrMovieSnapshot,
-	type TmdbId,
+import type {
+	RadarrLookupMovie,
+	RadarrMovie,
+	RadarrMovieSnapshot,
+	TmdbId,
 } from "@/providers";
-import { BaseProviderLibraryStore } from "./base-provider-library.store";
 import { notifyLibraryMutation } from "./notify-library-mutation";
 import type {
 	LibraryMutationEmitter,
@@ -32,6 +30,7 @@ import type {
 	RadarrLibraryStatus,
 } from "./types";
 import type { AnibridgeMappingStore } from "@/mapping/upstream-mapping";
+import { PROVIDER_LIBRARY_CACHE_TTL } from "./cache";
 
 const CACHE_KEY = "radarr:lean-movies";
 
@@ -40,65 +39,151 @@ type RadarrLibraryMutationPayload = {
 	action: "added" | "removed";
 };
 
-export class RadarrLibrary {
-	private readonly store: BaseProviderLibraryStore<
-		RadarrMovie,
-		RadarrMovieSnapshot,
-		TmdbId
-	>;
+type RadarrStatusPayload = Pick<
+	StatusInput,
+	"anilistId" | "title" | "metadata"
+>;
 
-	constructor(
-		private readonly radarrClient: RadarrClient,
-		private readonly mappingService: Pick<
-			MappingService,
-			"resolveProviderId" | "prioritizeAniListMedia" | "getAutoMapping"
-		>,
-		private readonly manualMappingService: Pick<
-			ManualMappingService,
-			"getLinkedAniListIds"
-		>,
-		private readonly anibridgeMappingStore: Pick<
-			AnibridgeMappingStore,
-			"getAniListIdsForTmdb"
-		>,
-		caches: ProviderLibraryCaches<RadarrMovieSnapshot>,
-		private readonly emitLibraryMutation?: LibraryMutationEmitter<RadarrLibraryMutationPayload>,
-	) {
-		this.store = new BaseProviderLibraryStore(
-			caches,
-			{
-				cacheKey: CACHE_KEY,
-				getCredentials: (options) => getProviderCredentials(options, "radarr"),
-				fetchAll: async (credentials: ProviderCredentials) => {
-					const full = await this.radarrClient.getAllMovies(credentials);
-					return full.filter(
+type RadarrMappingResult =
+	| {
+			kind: "mapped";
+			tmdbId: TmdbId;
+			successfulSynonym?: string;
+			mappingReason?: CheckMovieStatusResponse["mappingReason"];
+			mappingSource?: CheckMovieStatusResponse["mappingSource"];
+	  }
+	| { kind: "unmapped" }
+	| { kind: "failed"; response: CheckMovieStatusResponse };
+
+type RadarrLibraryDeps = {
+	radarrClient: RadarrClient;
+	mappingService: Pick<
+		MappingService,
+		"resolveProviderId" | "prioritizeAniListMedia" | "getAutoMapping"
+	>;
+	manualMappingService: Pick<ManualMappingService, "getLinkedAniListIds">;
+	anibridgeMappingStore: Pick<AnibridgeMappingStore, "getAniListIdsForTmdb">;
+	caches: ProviderLibraryCaches<RadarrMovieSnapshot>;
+	emitLibraryMutation?: LibraryMutationEmitter<RadarrLibraryMutationPayload>;
+};
+
+export class RadarrLibrary {
+	private inflightRefresh: Promise<RadarrMovieSnapshot[]> | null = null;
+	private readonly radarrClient: RadarrClient;
+	private readonly mappingService: Pick<
+		MappingService,
+		"resolveProviderId" | "prioritizeAniListMedia" | "getAutoMapping"
+	>;
+	private readonly manualMappingService: Pick<
+		ManualMappingService,
+		"getLinkedAniListIds"
+	>;
+	private readonly anibridgeMappingStore: Pick<
+		AnibridgeMappingStore,
+		"getAniListIdsForTmdb"
+	>;
+	private readonly caches: ProviderLibraryCaches<RadarrMovieSnapshot>;
+	private readonly emitLibraryMutation:
+		| LibraryMutationEmitter<RadarrLibraryMutationPayload>
+		| undefined;
+
+	constructor(deps: RadarrLibraryDeps) {
+		this.radarrClient = deps.radarrClient;
+		this.mappingService = deps.mappingService;
+		this.manualMappingService = deps.manualMappingService;
+		this.anibridgeMappingStore = deps.anibridgeMappingStore;
+		this.caches = deps.caches;
+		this.emitLibraryMutation = deps.emitLibraryMutation;
+	}
+
+	async getLeanMovieList(): Promise<RadarrMovieSnapshot[]> {
+		const cached = await this.caches.lean.read(CACHE_KEY);
+		if (cached) {
+			if (cached.stale && !this.inflightRefresh) {
+				this.refreshCache().catch((error) => {
+					logError(normalizeError(error), `RadarrLibrary:backgroundRefresh`);
+				});
+			}
+			return cached.value;
+		}
+		return this.refreshCache();
+	}
+
+	async refreshCache(
+		optionsOverride?: ExtensionOptions,
+	): Promise<RadarrMovieSnapshot[]> {
+		if (this.inflightRefresh) return this.inflightRefresh;
+
+		this.inflightRefresh = (async () => {
+			const cached = await this.caches.lean.read(CACHE_KEY);
+			const fallbackList = cached?.value ?? [];
+
+			try {
+				const options =
+					optionsOverride ?? (await getExtensionOptionsSnapshot());
+				const credentials = getProviderCredentials(options, "radarr");
+
+				if (!credentials) {
+					await this.caches.lean.remove(CACHE_KEY);
+					return [];
+				}
+
+				const fullEntries = await this.radarrClient.getAllMovies(credentials);
+				const snapshots = fullEntries
+					.filter(
 						(movie) =>
 							typeof movie.tmdbId === "number" && Number.isFinite(movie.tmdbId),
-					);
-				},
-				toSnapshot: (movie: RadarrMovie) => this.toMovieSnapshot(movie),
-				getProviderId: (snapshot: RadarrMovieSnapshot) => snapshot.tmdbId,
-			},
-			"RadarrLibraryStore",
+					)
+					.map((movie) => this.toMovieSnapshot(movie));
+
+				await this.caches.lean.write(
+					CACHE_KEY,
+					snapshots,
+					PROVIDER_LIBRARY_CACHE_TTL.normal,
+				);
+				return snapshots;
+			} catch (error) {
+				const normalized = normalizeError(error);
+				logError(normalized, `RadarrLibrary:refreshCache`);
+				await this.caches.lean.write(CACHE_KEY, fallbackList, {
+					...PROVIDER_LIBRARY_CACHE_TTL.error,
+					meta: { lastErrorCode: normalized.code },
+				});
+				return fallbackList;
+			} finally {
+				this.inflightRefresh = null;
+			}
+		})();
+
+		return this.inflightRefresh;
+	}
+
+	async addMovieToCache(newMovie: RadarrMovie): Promise<void> {
+		const current = await this.getLeanMovieList();
+		const snapshot = this.toMovieSnapshot(newMovie);
+		const idx = current.findIndex((item) => item.tmdbId === snapshot.tmdbId);
+		const updated =
+			idx === -1
+				? [...current, snapshot]
+				: [...current.slice(0, idx), snapshot, ...current.slice(idx + 1)];
+
+		await this.caches.lean.write(
+			CACHE_KEY,
+			updated,
+			PROVIDER_LIBRARY_CACHE_TTL.normal,
 		);
 	}
 
-	getLeanMovieList(): Promise<RadarrMovieSnapshot[]> {
-		return this.store.getLeanList();
-	}
+	async removeMovieFromCache(tmdbId: TmdbId): Promise<void> {
+		const current = await this.getLeanMovieList();
+		const filtered = current.filter((item) => item.tmdbId !== tmdbId);
+		if (filtered.length === current.length) return;
 
-	refreshCache(
-		optionsOverride?: ExtensionOptions,
-	): Promise<RadarrMovieSnapshot[]> {
-		return this.store.refreshCache(optionsOverride);
-	}
-
-	addMovieToCache(newMovie: RadarrMovie): Promise<void> {
-		return this.store.addToCache(newMovie);
-	}
-
-	removeMovieFromCache(tmdbId: TmdbId): Promise<void> {
-		return this.store.removeFromCache(tmdbId);
+		await this.caches.lean.write(
+			CACHE_KEY,
+			filtered,
+			PROVIDER_LIBRARY_CACHE_TTL.normal,
+		);
 	}
 
 	async getMovieLibraryStatus(input: {
@@ -106,7 +191,7 @@ export class RadarrLibrary {
 		providerId: TmdbId;
 		forceVerify?: boolean;
 	}): Promise<RadarrLibraryStatus> {
-		const leanList = await this.store.getLeanList();
+		const leanList = await this.getLeanMovieList();
 		const radarrOptions = await getExtensionOptionsSnapshot();
 		const isConfigured = hasConfiguredProviderCredentials(
 			radarrOptions,
@@ -148,7 +233,7 @@ export class RadarrLibrary {
 		if (liveMovie) {
 			let cacheMutated = false;
 			if (!existsInCache) {
-				await this.store.addToCache(liveMovie);
+				await this.addMovieToCache(liveMovie);
 				cacheMutated = true;
 			}
 
@@ -186,7 +271,7 @@ export class RadarrLibrary {
 		}
 
 		if (existsInCache) {
-			await this.store.removeFromCache(tmdbId);
+			await this.removeMovieFromCache(tmdbId);
 			await notifyLibraryMutation(
 				"RadarrLibrary:notifyLibraryMutation",
 				this.emitLibraryMutation,
@@ -207,55 +292,10 @@ export class RadarrLibrary {
 	}
 
 	async getMovieStatus(
-		payload: Pick<StatusInput, "anilistId" | "title" | "metadata">,
+		payload: RadarrStatusPayload,
 		options: LibraryStatusOptions = {},
 	): Promise<CheckMovieStatusResponse> {
-		const resolveMappingSource = (
-			reason: NonNullable<CheckMovieStatusResponse["mappingReason"]>,
-		) => {
-			switch (reason) {
-				case "manual-override": {
-					return "manual" as const;
-				}
-				case "exact-upstream": {
-					return "upstream" as const;
-				}
-				default: {
-					return "auto" as const;
-				}
-			}
-		};
-		const resolveUnknownOutcome = async (): Promise<
-			Pick<
-				CheckMovieStatusResponse,
-				"providerMappingState" | "mappingUnknownReason" | "resolverOutcome"
-			>
-		> => {
-			const resolverState = await this.mappingService.getAutoMapping(
-				"radarr",
-				payload.anilistId,
-			);
-			if (resolverState?.state === "ambiguous") {
-				return {
-					providerMappingState: "unknown",
-					mappingUnknownReason: "ambiguous",
-					resolverOutcome: "ambiguous",
-				};
-			}
-			return {
-				providerMappingState: "unmapped",
-				...(resolverState?.state === "unresolved"
-					? { resolverOutcome: "unresolved" as const }
-					: {}),
-			};
-		};
-		if (import.meta.env.DEV) {
-			const priority = options.priority ?? "normal";
-			const network = options.network ?? "allow";
-			console.debug(
-				`[ani2arr | RadarrLibrary] status:start anilistId=${payload.anilistId} priority=${priority} network=${network} force_verify=${String(options.force_verify === true)}`,
-			);
-		}
+		this.logMovieStatusStart(payload, options);
 
 		const radarrOptions = await getExtensionOptionsSnapshot();
 		const isConfigured = hasConfiguredProviderCredentials(
@@ -263,150 +303,249 @@ export class RadarrLibrary {
 			"radarr",
 		);
 
-		const normalizedTitle = payload.title?.trim();
-		let tmdbId: TmdbId | null = null;
-		let successfulSynonym: string | undefined;
-		let mappingReason: CheckMovieStatusResponse["mappingReason"];
-		let mappingSource: CheckMovieStatusResponse["mappingSource"];
-		let linkedAniListIds: number[] | undefined;
-
-		if (tmdbId === null) {
-			if (options.priority === "high") {
-				try {
-					this.mappingService.prioritizeAniListMedia?.(payload.anilistId, {
-						schedule: false,
-					});
-				} catch {
-					// best-effort
-				}
-			}
-
-			if (!isConfigured) {
-				return {
-					providerId: null,
-					providerMappingState: "unknown",
-					isInLibrary: null,
-					mappingUnknownReason: "provider-not-configured",
-				};
-			}
-
-			if (options.network === "never") {
-				return {
-					providerId: null,
-					providerMappingState: "unknown",
-					isInLibrary: null,
-					mappingUnknownReason: "network-disabled",
-				};
-			}
-
-			const mappingOptions: AutoMappingOptions = {};
-			if (options.priority) mappingOptions.priority = options.priority;
-			if (options.force_verify) mappingOptions.forceLookupNetwork = true;
-
-			const hints: NonNullable<AutoMappingOptions["hints"]> = {};
-			if (normalizedTitle) hints.primaryTitle = normalizedTitle;
-			if (payload.metadata) hints.domMedia = payload.metadata;
-			if (Object.keys(hints).length > 0) mappingOptions.hints = hints;
-
-			try {
-				if (import.meta.env.DEV) {
-					console.debug(
-						`[ani2arr | RadarrLibrary] status:lookup-start anilistId=${payload.anilistId} priority=${options.priority ?? "normal"} network=${options.network ?? "allow"} force_verify=${String(options.force_verify === true)}`,
-					);
-				}
-
-				const mapping = await this.mappingService.resolveProviderId(
-					"radarr",
-					payload.anilistId,
-					mappingOptions,
-				);
-				if (mapping) {
-					tmdbId = mapping.providerId;
-					successfulSynonym = mapping.successfulSynonym;
-					mappingReason = mapping.reason;
-					mappingSource = resolveMappingSource(mapping.reason);
-				}
-			} catch (error) {
-				const normalized = normalizeError(error);
-				if (
-					normalized.code === ErrorCode.CONFIGURATION_ERROR ||
-					(normalized.code === ErrorCode.VALIDATION_ERROR &&
-						normalized.details?.reason === "network-disabled")
-				) {
-					return {
-						providerId: null,
-						providerMappingState: "unknown",
-						isInLibrary: null,
-						mappingUnknownReason:
-							normalized.details?.reason === "network-disabled"
-								? "network-disabled"
-								: "provider-not-configured",
-					};
-				}
-				logError(
-					normalized,
-					`RadarrLibrary:getMovieStatus:${payload.anilistId}`,
-				);
-				return {
-					providerId: null,
-					providerMappingState: "unknown",
-					isInLibrary: null,
-					mappingUnknownReason: "lookup-failed",
-				};
-			}
-		}
-
-		if (tmdbId === null) {
-			const unresolved = await resolveUnknownOutcome();
-			if (import.meta.env.DEV) {
-				console.debug(
-					`[ani2arr | RadarrLibrary] status:result anilistId=${payload.anilistId} outcome=unresolved`,
-				);
-			}
+		if (!isConfigured) {
 			return {
 				providerId: null,
+				providerMappingState: "unknown",
 				isInLibrary: null,
-				...unresolved,
+				mappingUnknownReason: "provider-not-configured",
 			};
 		}
 
+		if (options.network === "never") {
+			return {
+				providerId: null,
+				providerMappingState: "unknown",
+				isInLibrary: null,
+				mappingUnknownReason: "network-disabled",
+			};
+		}
+
+		const mapping = await this.resolveMovieMapping(
+			payload,
+			payload.title?.trim(),
+			options,
+		);
+		if (mapping.kind === "failed") return mapping.response;
+		if (mapping.kind === "unmapped") return this.resolveUnmappedMovie(payload);
+
+		return this.buildMappedMovieStatus(payload.anilistId, mapping, options);
+	}
+
+	private async resolveUnmappedMovie(
+		payload: RadarrStatusPayload,
+	): Promise<CheckMovieStatusResponse> {
+		const unresolved = await this.resolveUnknownMovieOutcome(payload.anilistId);
+		if (import.meta.env.DEV) {
+			console.debug(
+				`[ani2arr | RadarrLibrary] status:result anilistId=${payload.anilistId} outcome=unresolved`,
+			);
+		}
+		return {
+			providerId: null,
+			isInLibrary: null,
+			...unresolved,
+		};
+	}
+
+	private async buildMappedMovieStatus(
+		anilistId: AniListId,
+		mapping: Extract<RadarrMappingResult, { kind: "mapped" }>,
+		options: LibraryStatusOptions,
+	): Promise<CheckMovieStatusResponse> {
+		const libraryStatus = await this.getMovieLibraryStatus({
+			anilistId,
+			providerId: mapping.tmdbId,
+			forceVerify: options.force_verify === true,
+		});
+		const status = buildMovieStatusResponseFromLibraryStatus({
+			providerId: mapping.tmdbId,
+			...(mapping.mappingSource
+				? { mappingSource: mapping.mappingSource }
+				: {}),
+			...(mapping.mappingReason
+				? { mappingReason: mapping.mappingReason }
+				: {}),
+			libraryStatus,
+		});
+		const linkedAniListIds = this.getLinkedAniListIds(mapping.tmdbId);
+
+		return {
+			...status,
+			...(mapping.successfulSynonym
+				? { successfulSynonym: mapping.successfulSynonym }
+				: {}),
+			...(linkedAniListIds ? { linkedAniListIds } : {}),
+		};
+	}
+
+	private logMovieStatusStart(
+		payload: RadarrStatusPayload,
+		options: LibraryStatusOptions,
+	): void {
+		if (!import.meta.env.DEV) return;
+
+		const priority = options.priority ?? "normal";
+		const network = options.network ?? "allow";
+		console.debug(
+			`[ani2arr | RadarrLibrary] status:start anilistId=${payload.anilistId} priority=${priority} network=${network} force_verify=${String(options.force_verify === true)}`,
+		);
+	}
+
+	private async resolveMovieMapping(
+		payload: RadarrStatusPayload,
+		normalizedTitle: string | undefined,
+		options: LibraryStatusOptions,
+	): Promise<RadarrMappingResult> {
+		if (options.priority === "high") {
+			try {
+				this.mappingService.prioritizeAniListMedia?.(payload.anilistId, {
+					schedule: false,
+				});
+			} catch {
+				// best-effort
+			}
+		}
+
+		try {
+			this.logMovieLookupStart(payload, options);
+			const mapping = await this.mappingService.resolveProviderId(
+				"radarr",
+				payload.anilistId,
+				this.buildMappingOptions(payload, normalizedTitle, options),
+			);
+			if (!mapping) return { kind: "unmapped" };
+
+			return {
+				kind: "mapped",
+				tmdbId: mapping.providerId,
+				...(mapping.successfulSynonym
+					? { successfulSynonym: mapping.successfulSynonym }
+					: {}),
+				mappingReason: mapping.reason,
+				mappingSource: this.resolveMappingSource(mapping.reason),
+			};
+		} catch (error) {
+			const response = this.toMovieMappingErrorResponse(error, payload);
+			return { kind: "failed", response };
+		}
+	}
+
+	private buildMappingOptions(
+		payload: RadarrStatusPayload,
+		normalizedTitle: string | undefined,
+		options: LibraryStatusOptions,
+	): AutoMappingOptions {
+		const mappingOptions: AutoMappingOptions = {};
+		if (options.priority) mappingOptions.priority = options.priority;
+		if (options.force_verify) mappingOptions.forceLookupNetwork = true;
+
+		const hints: NonNullable<AutoMappingOptions["hints"]> = {};
+		if (normalizedTitle) hints.primaryTitle = normalizedTitle;
+		if (payload.metadata) hints.domMedia = payload.metadata;
+		if (Object.keys(hints).length > 0) mappingOptions.hints = hints;
+		return mappingOptions;
+	}
+
+	private logMovieLookupStart(
+		payload: RadarrStatusPayload,
+		options: LibraryStatusOptions,
+	): void {
+		if (!import.meta.env.DEV) return;
+
+		console.debug(
+			`[ani2arr | RadarrLibrary] status:lookup-start anilistId=${payload.anilistId} priority=${options.priority ?? "normal"} network=${options.network ?? "allow"} force_verify=${String(options.force_verify === true)}`,
+		);
+	}
+
+	private toMovieMappingErrorResponse(
+		error: unknown,
+		payload: RadarrStatusPayload,
+	): CheckMovieStatusResponse {
+		const normalized = normalizeError(error);
+		if (
+			normalized.code === ErrorCode.CONFIGURATION_ERROR ||
+			(normalized.code === ErrorCode.VALIDATION_ERROR &&
+				normalized.details?.reason === "network-disabled")
+		) {
+			return {
+				providerId: null,
+				providerMappingState: "unknown",
+				isInLibrary: null,
+				mappingUnknownReason:
+					normalized.details?.reason === "network-disabled"
+						? "network-disabled"
+						: "provider-not-configured",
+			};
+		}
+
+		logError(normalized, `RadarrLibrary:getMovieStatus:${payload.anilistId}`);
+		return {
+			providerId: null,
+			providerMappingState: "unknown",
+			isInLibrary: null,
+			mappingUnknownReason: "lookup-failed",
+		};
+	}
+
+	private resolveMappingSource(
+		reason: NonNullable<CheckMovieStatusResponse["mappingReason"]>,
+	): NonNullable<CheckMovieStatusResponse["mappingSource"]> {
+		switch (reason) {
+			case "manual-override": {
+				return "manual";
+			}
+			case "exact-upstream": {
+				return "upstream";
+			}
+			default: {
+				return "auto";
+			}
+		}
+	}
+
+	private async resolveUnknownMovieOutcome(
+		anilistId: AniListId,
+	): Promise<
+		Pick<
+			CheckMovieStatusResponse,
+			"providerMappingState" | "mappingUnknownReason" | "resolverOutcome"
+		>
+	> {
+		const resolverState = await this.mappingService.getAutoMapping(
+			"radarr",
+			anilistId,
+		);
+		if (resolverState?.state === "ambiguous") {
+			return {
+				providerMappingState: "unknown",
+				mappingUnknownReason: "ambiguous",
+				resolverOutcome: "ambiguous",
+			};
+		}
+		return {
+			providerMappingState: "unmapped",
+			...(resolverState?.state === "unresolved"
+				? { resolverOutcome: "unresolved" as const }
+				: {}),
+		};
+	}
+
+	private getLinkedAniListIds(tmdbId: TmdbId): number[] | undefined {
 		const linked = new Set<number>(
 			this.manualMappingService.getLinkedAniListIds("radarr", tmdbId),
 		);
 		for (const id of this.anibridgeMappingStore.getAniListIdsForTmdb(tmdbId)) {
 			linked.add(id);
 		}
-		if (linked.size > 0) {
-			linkedAniListIds = [...linked];
-		}
-
-		const libraryStatus = await this.getMovieLibraryStatus({
-			anilistId: payload.anilistId,
-			providerId: tmdbId,
-			forceVerify: options.force_verify === true,
-		});
-
-		const status = buildMovieStatusResponseFromLibraryStatus({
-			providerId: tmdbId,
-			...(mappingSource ? { mappingSource } : {}),
-			...(mappingReason ? { mappingReason } : {}),
-			libraryStatus,
-		});
-
-		return {
-			...status,
-			...(successfulSynonym ? { successfulSynonym } : {}),
-			...(linkedAniListIds ? { linkedAniListIds } : {}),
-		};
+		return linked.size > 0 ? [...linked] : undefined;
 	}
 
 	private toMovieSnapshot(movie: RadarrMovie): RadarrMovieSnapshot {
 		const alternateTitles = Array.isArray(movie.alternateTitles)
 			? movie.alternateTitles
 					.map((entry) => entry?.title?.trim())
-					.filter(
-						(value): value is string => value !== undefined && value !== "",
-					)
+					.filter((value): value is string => !!value)
 			: undefined;
 
 		return {
