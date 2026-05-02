@@ -5,7 +5,7 @@ import type { ComponentProps } from "react";
 import { SonarrAddOptionsFields } from "@/components/provider-add-options/sonarr-add-options-fields";
 import { SonarrEditOptionsFields } from "@/components/provider-add-options/sonarr-edit-options-fields";
 import { BaseProviderSetupPanel } from "./provider-setup-panel";
-import type { SonarrSetupFormRenderState } from "./sonarr-setup-form";
+import type { SonarrSetupFormState } from "../../hooks/sonarr/use-sonarr-setup-form";
 
 type SonarrProviderMetadata = ComponentProps<
 	typeof SonarrAddOptionsFields
@@ -16,7 +16,7 @@ type SonarrPortalContainer = ComponentProps<
 
 interface SonarrSetupPaneProps {
 	formId: string;
-	formState: SonarrSetupFormRenderState | null;
+	formState: SonarrSetupFormState | null;
 	isConfigured: boolean;
 	metadata: SonarrProviderMetadata | null;
 	mode: "add" | "edit";

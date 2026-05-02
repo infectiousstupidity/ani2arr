@@ -84,14 +84,11 @@ const hasEditableSonarrFields = (value: Record<string, unknown>): boolean =>
 	hasEditableProviderFields(value) &&
 	typeof value.seriesType === "string" &&
 	typeof value.seasonFolder === "boolean" &&
-	typeof value.monitored === "boolean" &&
-	Array.isArray(value.tags);
+	typeof value.monitored === "boolean";
 
 const hasEditableRadarrFields = (value: Record<string, unknown>): boolean =>
 	hasEditableProviderFields(value) &&
-	typeof value.monitored === "boolean" &&
-	typeof value.minimumAvailability === "string" &&
-	Array.isArray(value.tags);
+	typeof value.monitored === "boolean";
 
 const isFullSonarrSeries = (value: unknown): value is SonarrSeries =>
 	isRecord(value) &&

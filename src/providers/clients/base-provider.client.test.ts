@@ -1,10 +1,8 @@
-/** Tests for schema-aware provider base transport behavior. */
+/** Tests for provider base transport behavior. */
 // src/providers/clients/base-provider.client.test.ts
 
-import * as v from "valibot";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ErrorCode } from "@/shared/errors";
-import { TvdbIdSchema } from "@/providers/provider-id";
 import type { ProviderCredentials } from "@/providers";
 import { BaseProviderClient } from "./base-provider.client";
 
@@ -16,20 +14,18 @@ const credentials: ProviderCredentials = {
 class TestProviderClient extends BaseProviderClient {
 	public constructor(
 		hasUrlPermission: (url: string) => Promise<boolean> = async () => true,
+		timeoutMs?: number,
 	) {
 		super({
 			providerName: "Testarr",
 			logScope: "TestProviderClient",
-			cacheableEndpoints: ["resource"],
 			hasUrlPermission,
+			...(timeoutMs === undefined ? {} : { timeoutMs }),
 		});
 	}
 
-	public requestResource<TSchema extends v.GenericSchema>(
-		endpoint: string,
-		schema: TSchema,
-	): Promise<v.InferOutput<TSchema>> {
-		return this.requestParsed(endpoint, credentials, schema);
+	public requestResource(endpoint: string): Promise<unknown> {
+		return this.requestJson(endpoint, credentials);
 	}
 
 	public deleteResource(endpoint: string): Promise<void> {
@@ -51,20 +47,17 @@ describe("BaseProviderClient", () => {
 	afterEach(() => {
 		vi.unstubAllGlobals();
 		vi.restoreAllMocks();
+		vi.useRealTimers();
 	});
 
-	it("parses successful JSON responses with the supplied schema", async () => {
+	it("returns JSON with API key and secure fetch options", async () => {
 		const fetchMock = vi
 			.fn<typeof fetch>()
 			.mockResolvedValueOnce(createJsonResponse({ id: 123, title: null }));
 		vi.stubGlobal("fetch", fetchMock);
 		const client = new TestProviderClient();
-		const schema = v.object({
-			id: TvdbIdSchema,
-			title: v.nullable(v.string()),
-		});
 
-		await expect(client.requestResource("resource", schema)).resolves.toEqual({
+		await expect(client.requestResource("resource")).resolves.toEqual({
 			id: 123,
 			title: null,
 		});
@@ -80,61 +73,72 @@ describe("BaseProviderClient", () => {
 		expect((requestInit?.headers as Headers).get("X-Api-Key")).toBe("secret");
 	});
 
-	it("caches parsed data for cacheable ETag responses", async () => {
-		const fetchMock = vi
-			.fn<typeof fetch>()
-			.mockResolvedValueOnce(
-				createJsonResponse(
-					{ version: " 1.0.0 " },
-					{ headers: { ETag: '"resource-v1"' } },
-				),
-			)
-			.mockResolvedValueOnce(new Response(null, { status: 304 }));
+	it("checks URL permission before fetching", async () => {
+		const fetchMock = vi.fn<typeof fetch>();
 		vi.stubGlobal("fetch", fetchMock);
-		const client = new TestProviderClient();
-		const schema = v.pipe(
-			v.object({ version: v.string() }),
-			v.transform((input) => ({
-				version: input.version.trim(),
-				parsed: true as const,
-			})),
-		);
+		const hasUrlPermission = vi.fn().mockResolvedValue(false);
+		const client = new TestProviderClient(hasUrlPermission);
 
-		const first = await client.requestResource("resource", schema);
-		const second = await client.requestResource("resource", schema);
-
-		expect(first).toEqual({ version: "1.0.0", parsed: true });
-		expect(second).toEqual(first);
-		expect(fetchMock).toHaveBeenCalledTimes(2);
-		expect(
-			(fetchMock.mock.calls[1]?.[1]?.headers as Headers).get("If-None-Match"),
-		).toBe('"resource-v1"');
-	});
-
-	it("fails at the client boundary when response IDs do not match the schema", async () => {
-		const fetchMock = vi
-			.fn<typeof fetch>()
-			.mockResolvedValueOnce(createJsonResponse({ id: 0 }));
-		vi.stubGlobal("fetch", fetchMock);
-		const client = new TestProviderClient();
-		const schema = v.object({ id: TvdbIdSchema });
-
-		await expect(
-			client.requestResource("resource", schema),
-		).rejects.toMatchObject({
-			code: ErrorCode.API_ERROR,
-			userMessage: "Testarr returned an invalid API response.",
+		await expect(client.requestResource("resource")).rejects.toMatchObject({
+			code: ErrorCode.PERMISSION_ERROR,
+			userMessage:
+				"Permission for the Testarr URL is required. Please grant access in the extension options.",
 		});
-		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(hasUrlPermission).toHaveBeenCalledWith("https://provider.example");
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
-	it("allows no-body endpoints to return void", async () => {
+	it("rejects invalid and empty JSON responses", async () => {
+		for (const response of [
+			new Response("ok", { headers: { "Content-Type": "text/plain" } }),
+			new Response("{", { headers: { "Content-Type": "application/json" } }),
+		]) {
+			const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(response);
+			vi.stubGlobal("fetch", fetchMock);
+			const client = new TestProviderClient();
+
+			await expect(client.requestResource("resource")).rejects.toMatchObject({
+				code: ErrorCode.API_ERROR,
+				userMessage: "Testarr returned an invalid API response.",
+			});
+
+			vi.unstubAllGlobals();
+		}
+
 		const fetchMock = vi
 			.fn<typeof fetch>()
-			.mockResolvedValueOnce(new Response(null, { status: 204 }));
+			.mockResolvedValue(new Response(null, { status: 204 }));
 		vi.stubGlobal("fetch", fetchMock);
 		const client = new TestProviderClient();
 
 		await expect(client.deleteResource("resource")).resolves.toBeUndefined();
+		await expect(client.requestResource("resource")).rejects.toMatchObject({
+			code: ErrorCode.API_ERROR,
+			userMessage: "Testarr returned an empty API response.",
+		});
+	});
+
+	it("aborts requests after the configured timeout", async () => {
+		vi.useFakeTimers();
+		const fetchMock = vi.fn<typeof fetch>().mockImplementation(
+			(_url, init) =>
+				new Promise((_resolve, reject) => {
+					init?.signal?.addEventListener("abort", () => {
+						reject(new Error("request aborted"));
+					});
+				}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		const client = new TestProviderClient(async () => true, 10);
+
+		const request = expect(
+			client.requestResource("resource"),
+		).rejects.toMatchObject({
+			code: ErrorCode.UNKNOWN_ERROR,
+			userMessage: "An unexpected error occurred. Please try again.",
+		});
+		await vi.advanceTimersByTimeAsync(10);
+
+		await request;
 	});
 });

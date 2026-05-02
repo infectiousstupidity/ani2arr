@@ -4,7 +4,7 @@
 import type { ComponentProps } from "react";
 import { RadarrAddOptionsFields } from "@/components/provider-add-options/radarr-add-options-fields";
 import { BaseProviderSetupPanel } from "./provider-setup-panel";
-import type { RadarrSetupFormRenderState } from "./radarr-setup-form";
+import type { RadarrSetupFormState } from "../../hooks/radarr/use-radarr-setup-form";
 
 type RadarrProviderMetadata = ComponentProps<
 	typeof RadarrAddOptionsFields
@@ -15,7 +15,7 @@ type RadarrPortalContainer = ComponentProps<
 
 interface RadarrSetupPaneProps {
 	formId: string;
-	formState: RadarrSetupFormRenderState | null;
+	formState: RadarrSetupFormState | null;
 	isConfigured: boolean;
 	metadata: RadarrProviderMetadata | null;
 	mode: "add" | "edit";

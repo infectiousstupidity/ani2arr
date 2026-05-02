@@ -1,7 +1,6 @@
 /** Provider-library support types owned by the provider domain. */
 // src/providers/library/types.ts
 
-import type { ExtensionOptions } from "@/options";
 import type { AniListId } from "@/anilist";
 import type {
 	RadarrLookupMovie,
@@ -13,7 +12,6 @@ import type {
 	TmdbId,
 	TvdbId,
 } from "@/providers";
-import type { ProviderCredentials } from "@/providers/types";
 import type { TtlCache } from "@/shared/cache/ttl-cache";
 import type { RequestPriority } from "@/shared/utils/request-priority";
 
@@ -63,7 +61,3 @@ export type ProviderLibraryStatus = SonarrLibraryStatus | RadarrLibraryStatus;
 export type LibraryMutationEmitter<TPayload> = (
 	payload: TPayload,
 ) => Promise<void> | void;
-
-export type ProviderCredentialsResolver = (
-	options: ExtensionOptions,
-) => ProviderCredentials | null;

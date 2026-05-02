@@ -157,20 +157,24 @@ describe("updateRadarrMovie", () => {
 		expect(client.updateMovie).toHaveBeenCalledWith(
 			movieId,
 			{
-				...existingMovie,
 				qualityProfileId: parseProviderQualityProfileId(99),
 				rootFolderPath: "/movies-4k",
 				path: "/movies-4k/Example Movie [tmdb-34]",
 				monitored: false,
 				minimumAvailability: "released",
 				tags: [parseProviderTagId(7)],
-				addOptions: {
-					searchForMovie: false,
-				},
 			},
 			credentials,
 			{ moveFiles: true },
 		);
+		const updatePatch = (
+			client.updateMovie.mock.calls[0] as unknown[] | undefined
+		)?.[1] as Record<string, unknown> | undefined;
+		expect(updatePatch).not.toHaveProperty("title");
+		expect(updatePatch).not.toHaveProperty("tmdbId");
+		expect(updatePatch).not.toHaveProperty("titleSlug");
+		expect(updatePatch).not.toHaveProperty("addOptions");
+		expect(updatePatch).not.toHaveProperty("movieFile");
 		expect(cache.addMovieToCache).toHaveBeenCalledWith(updatedMovie);
 	});
 });

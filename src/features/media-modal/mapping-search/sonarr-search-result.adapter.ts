@@ -23,6 +23,16 @@ export interface SonarrAdapterOptions {
 	linkedAniListIdsByTvdbId?: Readonly<Record<number, readonly number[]>>;
 }
 
+type SonarrLookupSeriesExtra = SonarrLookupSeries & {
+	overview?: unknown;
+	alternateTitles?: unknown;
+};
+
+type SonarrResultStats = {
+	episodeOrMovieCount?: number;
+	fileCount?: number;
+};
+
 const joinUrl = (root: string, path?: string | null): string | undefined => {
 	if (!path) return undefined;
 	const trimmedRoot = root.replace(/\/$/, "");
@@ -52,6 +62,76 @@ const pickPoster = (
 	return undefined;
 };
 
+function resolveProviderRouteSlug(
+	series: SonarrLookupSeries,
+	opts: SonarrAdapterOptions,
+	tvdbId: number,
+	isInLibrary: boolean,
+): string | undefined {
+	const cachedSlug = opts.providerRouteSlugByTvdbId?.[tvdbId];
+	if (cachedSlug) return cachedSlug;
+	return isInLibrary
+		? (getProviderRouteSlug("sonarr", series) ?? undefined)
+		: undefined;
+}
+
+function resolveStats(
+	series: SonarrLookupSeries,
+	opts: SonarrAdapterOptions,
+	tvdbId: number,
+	isInLibrary: boolean,
+): SonarrResultStats {
+	const lookupStats = series.statistics;
+	const hasLookupStats = (lookupStats?.episodeFileCount ?? 0) > 0;
+	const cachedStats = isInLibrary ? opts.statsMap?.[tvdbId] : undefined;
+	const stats = hasLookupStats ? lookupStats : (cachedStats ?? lookupStats);
+	const episodeOrMovieCount = stats?.episodeCount ?? stats?.totalEpisodeCount;
+
+	return {
+		...(episodeOrMovieCount === undefined ? {} : { episodeOrMovieCount }),
+		...(stats?.episodeFileCount === undefined
+			? {}
+			: { fileCount: stats.episodeFileCount }),
+	};
+}
+
+function readOverview(series: SonarrLookupSeriesExtra): string | undefined {
+	return typeof series.overview === "string" ? series.overview : undefined;
+}
+
+function readAlternateTitles(
+	series: SonarrLookupSeriesExtra,
+): string[] | undefined {
+	if (!Array.isArray(series.alternateTitles)) return undefined;
+
+	const titles = series.alternateTitles
+		.map((item) =>
+			item !== null &&
+			typeof item === "object" &&
+			"title" in item &&
+			typeof item.title === "string"
+				? item.title
+				: undefined,
+		)
+		.filter((title): title is string => title !== undefined && title.length > 0);
+
+	return titles.length > 0 ? titles : undefined;
+}
+
+function resolveLinkedAniListIds(
+	opts: SonarrAdapterOptions,
+	tvdbId: number,
+): AniListId[] | undefined {
+	const linkedIds = opts.linkedAniListIdsByTvdbId?.[tvdbId];
+	if (!Array.isArray(linkedIds)) return undefined;
+
+	const parsed = linkedIds
+		.map((id) => parseAniListIdOrNull(id))
+		.filter((id): id is AniListId => id !== null);
+
+	return parsed.length > 0 ? [...new Set(parsed)] : undefined;
+}
+
 export function toMappingSearchResultFromSonarr(
 	series: SonarrLookupSeries,
 	opts: SonarrAdapterOptions,
@@ -59,48 +139,27 @@ export function toMappingSearchResultFromSonarr(
 	const tvdbId = parseTvdbId(series.tvdbId);
 	const librarySet = new Set(opts.libraryTvdbIds);
 	const isInLibrary = librarySet.has(tvdbId);
-	const providerRouteSlug =
-		opts.providerRouteSlugByTvdbId?.[tvdbId] ??
-		(isInLibrary
-			? (getProviderRouteSlug("sonarr", series) ?? undefined)
-			: undefined);
+	const providerRouteSlug = resolveProviderRouteSlug(
+		series,
+		opts,
+		tvdbId,
+		isInLibrary,
+	);
 	const year = typeof series.year === "number" ? series.year : undefined;
 	const typeLabel = series.seriesType;
 	const posterUrl = pickPoster(series, opts.baseUrl);
 	const statusLabel = series.status;
 	const networkOrStudio = series.network;
-
-	// Merge cached statistics if available. Prefer cache over lookup endpoint's zeroed stats.
-	// The lookup endpoint returns statistics: { episodeFileCount: 0, ... } for library items.
-	const hasLookupStats =
-		series.statistics && (series.statistics.episodeFileCount ?? 0) > 0;
-	const stats = hasLookupStats
-		? series.statistics
-		: isInLibrary && opts.statsMap?.[tvdbId]
-			? opts.statsMap[tvdbId]
-			: series.statistics;
-	const episodeOrMovieCount = stats?.episodeCount ?? stats?.totalEpisodeCount;
-	const fileCount = stats?.episodeFileCount;
-
-	// Extract additional rich fields (using any cast if types are partial in source)
-	const s = series as any;
-	const overview = typeof s.overview === "string" ? s.overview : undefined;
-	const alternateTitles = Array.isArray(s.alternateTitles)
-		? s.alternateTitles
-				.map((t: any) => t?.title)
-				.filter(
-					(t: unknown): t is string => typeof t === "string" && t.length > 0,
-				)
-		: undefined;
-	const linkedAniListIds = Array.isArray(
-		opts.linkedAniListIdsByTvdbId?.[tvdbId],
-	)
-		? opts
-				.linkedAniListIdsByTvdbId![
-					tvdbId
-				]!.map((id) => parseAniListIdOrNull(id))
-				.filter((id): id is AniListId => id !== null)
-		: undefined;
+	const { episodeOrMovieCount, fileCount } = resolveStats(
+		series,
+		opts,
+		tvdbId,
+		isInLibrary,
+	);
+	const extra = series as SonarrLookupSeriesExtra;
+	const overview = readOverview(extra);
+	const alternateTitles = readAlternateTitles(extra);
+	const linkedAniListIds = resolveLinkedAniListIds(opts, tvdbId);
 
 	return {
 		provider: "sonarr",

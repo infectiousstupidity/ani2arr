@@ -5,6 +5,7 @@ import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type {
 	AddRadarrMoviePayload,
 	RadarrClient,
+	UpdateRadarrMoviePatch,
 } from "@/providers/clients/radarr.client";
 import type { RadarrFormState } from "@/providers/settings/provider-settings.schema";
 import type {
@@ -81,7 +82,7 @@ type ResolveRadarrMovieUpdateInput = {
 
 type ResolvedRadarrMovieUpdate = {
 	movieId: RadarrMovieId;
-	payload: RadarrMovie;
+	patch: UpdateRadarrMoviePatch;
 	moveFiles: boolean;
 };
 
@@ -124,7 +125,7 @@ export async function updateRadarrMovie(
 
 	const updated = await client.updateMovie(
 		resolvedUpdate.movieId,
-		resolvedUpdate.payload,
+		resolvedUpdate.patch,
 		input.credentials,
 		{ moveFiles: resolvedUpdate.moveFiles },
 	);
@@ -156,13 +157,13 @@ async function resolveRadarrAddPayload(
 		actionLabel: "add",
 	});
 
-	const tags = await resolveMutationTagIds(
+	const tags = await resolveMutationTagIds({
 		api,
 		credentials,
-		form.tags,
-		form.freeformTags,
-		"radarr",
-	);
+		existingIdsFromForm: form.tags,
+		freeformLabelsFromForm: form.freeformTags,
+		provider: "radarr",
+	});
 
 	return {
 		title,
@@ -225,19 +226,16 @@ async function resolveRadarrMovieUpdate(
 		actionLabel: "update",
 	});
 
-	const tags = await resolveMutationTagIds(
+	const tags = await resolveMutationTagIds({
 		api,
 		credentials,
-		form.tags,
-		form.freeformTags,
-		"radarr",
-	);
+		existingIdsFromForm: form.tags,
+		freeformLabelsFromForm: form.freeformTags,
+		provider: "radarr",
+	});
 	const monitored = form.monitored ?? baseMovie.monitored;
 	const minimumAvailability =
 		form.minimumAvailability ?? baseMovie.minimumAvailability;
-	const searchForMovie =
-		form.addOptions?.searchForMovie ?? baseMovie.addOptions?.searchForMovie;
-
 	const nextPath = joinRootAndSlug(
 		rootFolderPath,
 		buildProviderFolderSlug(baseMovie, title),
@@ -247,18 +245,13 @@ async function resolveRadarrMovieUpdate(
 	return {
 		movieId: baseMovie.id,
 		moveFiles,
-		payload: {
-			...baseMovie,
+		patch: {
 			qualityProfileId,
 			rootFolderPath,
 			path: nextPath,
 			...(monitored === undefined ? {} : { monitored }),
 			...(minimumAvailability === undefined ? {} : { minimumAvailability }),
 			tags,
-			addOptions: {
-				...baseMovie.addOptions,
-				...(searchForMovie === undefined ? {} : { searchForMovie }),
-			},
 		},
 	};
 }

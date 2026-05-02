@@ -37,17 +37,26 @@ type ResolveRequiredRootFolderPathInput = {
 	actionLabel: "add" | "update";
 };
 
+type ResolveMutationTagIdsInput = {
+	api: ProviderTagMutationApi;
+	credentials: ProviderCredentials;
+	existingIdsFromForm: ProviderTagId[] | undefined;
+	freeformLabelsFromForm: string[] | undefined;
+	provider: Provider;
+};
+
 export function resolveRequiredQualityProfileId(
 	input: ResolveRequiredQualityProfileIdInput,
 ): ProviderQualityProfileId {
 	const { value, fallback, provider, entityLabel, actionLabel } = input;
 	const providerLabel = getProviderLabel(provider);
-	const resolvedValue =
-		typeof value === "number" && Number.isFinite(value)
-			? value
-			: typeof fallback === "number" && Number.isFinite(fallback)
-				? fallback
-				: undefined;
+	let resolvedValue: ProviderQualityProfileId | undefined;
+
+	if (typeof value === "number" && Number.isFinite(value)) {
+		resolvedValue = value;
+	} else if (typeof fallback === "number" && Number.isFinite(fallback)) {
+		resolvedValue = fallback;
+	}
 
 	if (typeof resolvedValue !== "number") {
 		throw createError(
@@ -79,12 +88,15 @@ export function resolveRequiredRootFolderPath(
 }
 
 export async function resolveMutationTagIds(
-	api: ProviderTagMutationApi,
-	credentials: ProviderCredentials,
-	existingIdsFromForm: ProviderTagId[] | undefined,
-	freeformLabelsFromForm: string[] | undefined,
-	provider: Provider,
+	input: ResolveMutationTagIdsInput,
 ): Promise<ProviderTagId[]> {
+	const {
+		api,
+		credentials,
+		existingIdsFromForm,
+		freeformLabelsFromForm,
+		provider,
+	} = input;
 	const existingTags = await api.getTags(credentials);
 
 	return resolveProviderTagIds({

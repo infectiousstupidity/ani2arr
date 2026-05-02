@@ -17,9 +17,9 @@ export interface ProviderTag {
 }
 
 export interface ProviderRootFolder {
-	freeSpace?: number | null;
 	id: number;
 	path: string;
+	freeSpace?: number | null;
 }
 
 export interface ProviderQualityProfile {

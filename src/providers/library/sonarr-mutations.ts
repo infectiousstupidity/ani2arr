@@ -4,6 +4,7 @@
 import type {
 	AddSonarrSeriesPayload,
 	SonarrClient,
+	UpdateSonarrSeriesPatch,
 } from "@/providers/clients/sonarr.client";
 import type {
 	SonarrEditMonitoringAction,
@@ -83,7 +84,7 @@ type ResolveSonarrSeriesUpdateInput = {
 
 type ResolvedSonarrSeriesUpdate = {
 	seriesId: SonarrSeriesId;
-	payload: SonarrSeries;
+	patch: UpdateSonarrSeriesPatch;
 	moveFiles: boolean;
 };
 
@@ -123,7 +124,7 @@ export async function updateSonarrSeries(
 
 	const updated = await client.updateSeries(
 		resolvedUpdate.seriesId,
-		resolvedUpdate.payload,
+		resolvedUpdate.patch,
 		input.credentials,
 		{ moveFiles: resolvedUpdate.moveFiles },
 	);
@@ -196,13 +197,13 @@ async function resolveSonarrAddPayload(
 		actionLabel: "add",
 	});
 
-	const tags = await resolveMutationTagIds(
+	const tags = await resolveMutationTagIds({
 		api,
 		credentials,
-		form.tags,
-		form.freeformTags,
-		"sonarr",
-	);
+		existingIdsFromForm: form.tags,
+		freeformLabelsFromForm: form.freeformTags,
+		provider: "sonarr",
+	});
 
 	if (seasonFolder === undefined) {
 		throw createError(
@@ -302,13 +303,13 @@ async function resolveSonarrSeriesUpdate(
 		actionLabel: "update",
 	});
 
-	const tags = await resolveMutationTagIds(
+	const tags = await resolveMutationTagIds({
 		api,
 		credentials,
-		form.tags,
-		form.freeformTags,
-		"sonarr",
-	);
+		existingIdsFromForm: form.tags,
+		freeformLabelsFromForm: form.freeformTags,
+		provider: "sonarr",
+	});
 	const seasonFolder = form.seasonFolder ?? baseSeries.seasonFolder;
 	const seriesType = form.seriesType ?? baseSeries.seriesType;
 	const monitored = form.monitored ?? baseSeries.monitored;
@@ -318,14 +319,11 @@ async function resolveSonarrSeriesUpdate(
 		buildProviderFolderSlug(baseSeries, title),
 	);
 	const moveFiles = shouldMoveProviderFiles(baseSeries.path, nextPath);
-	const { addOptions, ...baseSeriesWithoutAddOptions } = baseSeries;
-	void addOptions;
 
 	return {
 		seriesId: baseSeries.id,
 		moveFiles,
-		payload: {
-			...baseSeriesWithoutAddOptions,
+		patch: {
 			qualityProfileId,
 			rootFolderPath,
 			path: nextPath,

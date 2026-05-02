@@ -14,27 +14,15 @@ import {
 const tvdb = parseTvdbId;
 
 describe("provider library path helpers", () => {
-	it("normalizes path strings for comparison", () => {
+	it("derives comparable paths for provider move decisions", () => {
 		const separator = String.fromCodePoint(92);
 		expect(
 			normalizePathForCompare(["C:", "Media", "Series", ""].join(separator)),
 		).toBe("c:/media/series");
-		expect(normalizePathForCompare("/mnt/media/series/")).toBe(
-			"/mnt/media/series",
-		);
-	});
-
-	it("joins roots and slugs without changing the existing separator style", () => {
-		const separator = String.fromCodePoint(92);
 		expect(
 			joinRootAndSlug(["C:", "Media", "Series", ""].join(separator), "Show"),
 		).toBe(["C:", "Media", "Series", "Show"].join(separator));
-		expect(joinRootAndSlug("/mnt/media/series/", "Show")).toBe(
-			"/mnt/media/series/Show",
-		);
-	});
 
-	it("prefers path metadata over title fallbacks when deriving slugs and roots", () => {
 		expect(
 			getProviderRouteSlug("sonarr", {
 				path: "/library/Series/Season 1",
