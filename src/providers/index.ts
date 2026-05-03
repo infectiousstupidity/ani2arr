@@ -68,7 +68,5 @@ export {
 	getProviderLabel,
 } from "./provider-labels";
 export {
-	getProviderBaseUrl,
-	isProviderConfigured,
 	resolveProviderForAniListFormat,
 } from "./provider-routing";

@@ -41,11 +41,8 @@ import {
 	getProviderRouteSlug,
 	type ProviderMediaPathSource,
 } from "@/providers/library/paths";
-import {
-	getProviderBaseUrl,
-	isProviderConfigured,
-	resolveProviderForAniListFormat,
-} from "@/providers/provider-routing";
+import { getProviderBaseUrl } from "@/options/provider-config";
+import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type { HostMediaTarget } from "@/content/browse/types";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
@@ -589,7 +586,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({
 		resolvedMetadata?.titles?.native?.trim() ||
 		`AniList #${anilistId}`;
 	const isConfigured = provider
-		? isProviderConfigured(provider, options)
+		? options?.providers[provider]?.isConfigured === true
 		: false;
 	const defaults = getAnimePageDefaults({ provider, options });
 

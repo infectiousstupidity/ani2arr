@@ -7,7 +7,7 @@ import { toMappingSearchResultFromSonarr } from "@/features/media-modal/mapping-
 import { usePublicOptions } from "@/options";
 import { useRadarrLookupSearch } from "@/providers/hooks/radarr.queries";
 import { useSonarrLookupSearch } from "@/providers/hooks/sonarr.queries";
-import { getProviderBaseUrl } from "@/providers/provider-routing";
+import { getProviderBaseUrl } from "@/options/provider-config";
 import type { RadarrLookupOutput, SonarrLookupOutput } from "@/rpc/types";
 import type { Provider } from "@/providers";
 
