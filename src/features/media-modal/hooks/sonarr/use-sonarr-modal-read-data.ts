@@ -14,7 +14,7 @@ import {
 	useSeriesStatus,
 	useSonarrMetadata,
 } from "@/providers/hooks/sonarr.queries";
-import { getProviderBaseUrl } from "@/providers/provider-routing";
+import { getProviderBaseUrl } from "@/options/provider-config";
 import { useAniListMedia, useAniListMetadataBatch } from "@/shared/queries";
 import * as manualMappingHelpers from "@/features/media-modal/mapping-search/current-mapping";
 import {

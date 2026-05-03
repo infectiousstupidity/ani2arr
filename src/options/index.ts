@@ -28,6 +28,7 @@ export {
 export {
 	getProviderConnectionDraft,
 	getProviderCredentials,
+	getProviderBaseUrl,
 	normalizeProviderConnectionInput,
 	normalizeProviderConnectionSettings,
 	hasConfiguredProviderCredentials,
