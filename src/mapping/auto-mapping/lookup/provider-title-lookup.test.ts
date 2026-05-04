@@ -9,6 +9,7 @@ import type {
 } from "@/shared/cache/ttl-cache";
 import type { TitleSearchTerm } from "@/mapping/auto-mapping/title/title-search";
 import {
+	createSonarrTitleLookup,
 	createProviderTitleLookup,
 	type ProviderTitleResult,
 } from "./provider-title-lookup";
@@ -164,5 +165,24 @@ describe("createProviderTitleLookup", () => {
 		]);
 		expect(cache.clear).toHaveBeenCalledTimes(1);
 		expect(cache.write).not.toHaveBeenCalled();
+	});
+});
+
+describe("createSonarrTitleLookup", () => {
+	it("looks up exact TVDB matches with Sonarr's term lookup", async () => {
+		const lookupSeries = vi.fn(async () => [
+			{ title: "Wrong Series", tvdbId: parseTvdbId(2) },
+			{ title: "Attack on Titan", tvdbId: parseTvdbId(1) },
+		]);
+		const lookup = createSonarrTitleLookup(
+			{ lookupSeries } as never,
+			createCache(),
+		);
+
+		await expect(
+			lookup.lookupByProviderId?.(parseTvdbId(1), TEST_CREDENTIALS),
+		).resolves.toEqual({ title: "Attack on Titan", tvdbId: parseTvdbId(1) });
+
+		expect(lookupSeries).toHaveBeenCalledWith("tvdb:1", TEST_CREDENTIALS);
 	});
 });

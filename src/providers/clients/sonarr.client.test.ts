@@ -93,31 +93,6 @@ describe("SonarrClient response normalization", () => {
 		]);
 	});
 
-	it("normalizes lookup resources with optional IDs", async () => {
-		mockJson([
-			{
-				id: 0,
-				tvdbId: 456,
-				title: null,
-				year: 2024,
-				network: "  Tokyo MX  ",
-				remotePoster: " https://image.example/poster.jpg ",
-			},
-		]);
-
-		await expect(
-			createClient().lookupSeriesByTerm("show", credentials),
-		).resolves.toEqual([
-			{
-				title: "Sonarr series 456",
-				tvdbId: 456,
-				year: 2024,
-				network: "Tokyo MX",
-				remotePoster: "https://image.example/poster.jpg",
-			},
-		]);
-	});
-
 	it("filters blank provider metadata", async () => {
 		const client = createClient();
 

@@ -6,6 +6,7 @@ import type { RadarrLibrary } from "@/providers/library/radarr-library";
 import type { SonarrLibrary } from "@/providers/library/sonarr-library";
 import type { RadarrClient } from "@/providers/clients/radarr.client";
 import type { SonarrClient } from "@/providers/clients/sonarr.client";
+import type { SonarrClient as CurrentSonarrClient } from "@/providers/sonarr/client";
 import type { MappingService } from "@/mapping/mapping.service";
 import type { ManualMappingService } from "@/mapping/manual-mapping";
 import type { AutoMappingStore } from "@/mapping/auto-mapping/auto-mapping.store";
@@ -16,6 +17,10 @@ import type { ProviderConfigReader } from "@/background/api/provider-config-read
 
 export type ApiHandlerDeps = {
 	SonarrClient: SonarrClient;
+	sonarrLookupClient: Pick<
+		CurrentSonarrClient,
+		"lookupSeries" | "getSeriesByTvdbId"
+	>;
 	RadarrClient: RadarrClient;
 	anilistMediaService: AniListMediaService;
 	mappingService: MappingService;
