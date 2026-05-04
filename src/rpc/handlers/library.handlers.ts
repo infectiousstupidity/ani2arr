@@ -21,9 +21,36 @@ import {
 	UpdateSonarrInputSchema,
 	type StatusInput,
 } from "@/rpc/schemas";
-import { normalizeError } from "@/shared/errors";
+import type { CheckSeriesStatusResponse } from "@/rpc/types";
+import { buildSeriesStatusResponseFromLibraryStatus } from "@/providers/library/status-response-adapter";
+import type { AutoMappingOptions } from "@/mapping/auto-mapping/types";
+import { ErrorCode, logError, normalizeError } from "@/shared/errors";
 import type { RequestPriority } from "@/shared/utils/request-priority";
+import type { AniListId } from "@/anilist";
+import type { TvdbId } from "@/providers";
 import type { ApiHandlerDeps } from "./handler-deps";
+
+type SonarrStatusPayload = Pick<
+	StatusInput,
+	"anilistId" | "title" | "metadata"
+>;
+
+type SonarrStatusOptions = {
+	force_verify?: boolean;
+	network?: "never";
+	priority?: RequestPriority;
+};
+
+type SonarrMappingResult =
+	| {
+			kind: "mapped";
+			tvdbId: TvdbId;
+			successfulSynonym?: string;
+			mappingReason?: CheckSeriesStatusResponse["mappingReason"];
+			mappingSource?: CheckSeriesStatusResponse["mappingSource"];
+	  }
+	| { kind: "unmapped" }
+	| { kind: "failed"; response: CheckSeriesStatusResponse };
 
 export function createLibraryHandlers(
 	deps: ApiHandlerDeps,
@@ -41,7 +68,9 @@ export function createLibraryHandlers(
 	const {
 		SonarrClient,
 		RadarrClient,
+		mappingService,
 		manualMappingService,
+		anibridgeMappingStore,
 		sonarrLibrary,
 		radarrLibrary,
 		manualMappingsReady,
@@ -62,22 +91,24 @@ export function createLibraryHandlers(
 			if (parsedInput.metadata !== undefined)
 				payload.metadata = parsedInput.metadata;
 
-				const requestOptions: {
-					force_verify?: boolean;
-					network?: "never";
-					priority?: RequestPriority;
-				} = {};
-				if (parsedInput.force_verify) requestOptions.force_verify = true;
-				if (parsedInput.network) requestOptions.network = parsedInput.network;
-				if (parsedInput.priority) requestOptions.priority = parsedInput.priority;
-
-			const status = await sonarrLibrary.getSeriesStatus(
+			const requestOptions = buildStatusOptions(parsedInput);
+			const status = await getSeriesStatusFromMappingAndLibrary(
 				payload,
 				requestOptions,
+				{
+					mappingService,
+					manualMappingService,
+					anibridgeMappingStore,
+					sonarrLibrary,
+					providerConfig,
+				},
 			);
 			return {
 				...status,
-				manualMappingActive: manualMappingService.has("sonarr", parsedInput.anilistId),
+				manualMappingActive: manualMappingService.has(
+					"sonarr",
+					parsedInput.anilistId,
+				),
 			};
 		},
 
@@ -240,4 +271,279 @@ export function createLibraryHandlers(
 	>;
 
 	return handlers;
+}
+
+function buildStatusOptions(input: StatusInput): SonarrStatusOptions {
+	const options: SonarrStatusOptions = {};
+	if (input.force_verify) options.force_verify = true;
+	if (input.network) options.network = input.network;
+	if (input.priority) options.priority = input.priority;
+	return options;
+}
+
+async function getSeriesStatusFromMappingAndLibrary(
+	payload: SonarrStatusPayload,
+	options: SonarrStatusOptions,
+	deps: Pick<
+		ApiHandlerDeps,
+		| "mappingService"
+		| "manualMappingService"
+		| "anibridgeMappingStore"
+		| "sonarrLibrary"
+		| "providerConfig"
+	>,
+): Promise<CheckSeriesStatusResponse> {
+	logSeriesStatusStart(payload, options);
+
+	const credentials = await deps.providerConfig.get("sonarr");
+	if (!credentials) {
+		return {
+			providerId: null,
+			providerMappingState: "unknown",
+			isInLibrary: null,
+			mappingUnknownReason: "provider-not-configured",
+		};
+	}
+
+	if (options.network === "never") {
+		return {
+			providerId: null,
+			providerMappingState: "unknown",
+			isInLibrary: null,
+			mappingUnknownReason: "network-disabled",
+		};
+	}
+
+	const mapping = await resolveSeriesMapping(
+		payload,
+		payload.title?.trim(),
+		options,
+		deps,
+	);
+	if (mapping.kind === "failed") return mapping.response;
+	if (mapping.kind === "unmapped") return resolveUnmappedSeries(payload, deps);
+
+	return buildMappedSeriesStatus(payload.anilistId, mapping, options, deps);
+}
+
+async function resolveUnmappedSeries(
+	payload: SonarrStatusPayload,
+	deps: Pick<ApiHandlerDeps, "mappingService">,
+): Promise<CheckSeriesStatusResponse> {
+	const unresolved = await resolveUnknownSeriesOutcome(
+		payload.anilistId,
+		deps,
+	);
+	if (import.meta.env.DEV) {
+		console.debug(
+			`[ani2arr | SonarrStatus] result anilistId=${payload.anilistId} outcome=unresolved`,
+		);
+	}
+	return {
+		providerId: null,
+		isInLibrary: null,
+		...unresolved,
+	};
+}
+
+async function buildMappedSeriesStatus(
+	anilistId: AniListId,
+	mapping: Extract<SonarrMappingResult, { kind: "mapped" }>,
+	options: SonarrStatusOptions,
+	deps: Pick<
+		ApiHandlerDeps,
+		"sonarrLibrary" | "manualMappingService" | "anibridgeMappingStore"
+	>,
+): Promise<CheckSeriesStatusResponse> {
+	const libraryStatus = await deps.sonarrLibrary.getSeriesLibraryStatus({
+		anilistId,
+		providerId: mapping.tvdbId,
+		forceVerify: options.force_verify === true,
+	});
+	const status = buildSeriesStatusResponseFromLibraryStatus({
+		providerId: mapping.tvdbId,
+		...(mapping.mappingSource ? { mappingSource: mapping.mappingSource } : {}),
+		...(mapping.mappingReason ? { mappingReason: mapping.mappingReason } : {}),
+		libraryStatus,
+	});
+	const linkedAniListIds = getLinkedAniListIds(mapping.tvdbId, deps);
+
+	return {
+		...status,
+		...(mapping.successfulSynonym
+			? { successfulSynonym: mapping.successfulSynonym }
+			: {}),
+		...(linkedAniListIds ? { linkedAniListIds } : {}),
+	};
+}
+
+function logSeriesStatusStart(
+	payload: SonarrStatusPayload,
+	options: SonarrStatusOptions,
+): void {
+	if (!import.meta.env.DEV) return;
+
+	const priority = options.priority ?? "normal";
+	const network = options.network ?? "allow";
+	console.debug(
+		`[ani2arr | SonarrStatus] start anilistId=${payload.anilistId} priority=${priority} network=${network} force_verify=${String(options.force_verify === true)}`,
+	);
+}
+
+async function resolveSeriesMapping(
+	payload: SonarrStatusPayload,
+	normalizedTitle: string | undefined,
+	options: SonarrStatusOptions,
+	deps: Pick<ApiHandlerDeps, "mappingService">,
+): Promise<SonarrMappingResult> {
+	if (options.priority === "high") {
+		try {
+			deps.mappingService.prioritizeAniListMedia?.(payload.anilistId, {
+				schedule: false,
+			});
+		} catch {
+			// best-effort
+		}
+	}
+
+	try {
+		logSeriesLookupStart(payload, options);
+		const mapping = await deps.mappingService.resolveProviderId(
+			"sonarr",
+			payload.anilistId,
+			buildMappingOptions(payload, normalizedTitle, options),
+		);
+		if (!mapping) return { kind: "unmapped" };
+
+		return {
+			kind: "mapped",
+			tvdbId: mapping.providerId,
+			...(mapping.successfulSynonym
+				? { successfulSynonym: mapping.successfulSynonym }
+				: {}),
+			mappingReason: mapping.reason,
+			mappingSource: resolveMappingSource(mapping.reason),
+		};
+	} catch (error) {
+		const response = toSeriesMappingErrorResponse(error, payload);
+		return { kind: "failed", response };
+	}
+}
+
+function buildMappingOptions(
+	payload: SonarrStatusPayload,
+	normalizedTitle: string | undefined,
+	options: SonarrStatusOptions,
+): AutoMappingOptions {
+	const mappingOptions: AutoMappingOptions = {};
+	if (options.priority) mappingOptions.priority = options.priority;
+	if (options.force_verify) mappingOptions.forceLookupNetwork = true;
+
+	const hints: NonNullable<AutoMappingOptions["hints"]> = {};
+	if (normalizedTitle) hints.primaryTitle = normalizedTitle;
+	if (payload.metadata) hints.domMedia = payload.metadata;
+	if (Object.keys(hints).length > 0) mappingOptions.hints = hints;
+	return mappingOptions;
+}
+
+function logSeriesLookupStart(
+	payload: SonarrStatusPayload,
+	options: SonarrStatusOptions,
+): void {
+	if (!import.meta.env.DEV) return;
+
+	console.debug(
+		`[ani2arr | SonarrStatus] lookup-start anilistId=${payload.anilistId} priority=${options.priority ?? "normal"} network=${options.network ?? "allow"} force_verify=${String(options.force_verify === true)}`,
+	);
+}
+
+function toSeriesMappingErrorResponse(
+	error: unknown,
+	payload: SonarrStatusPayload,
+): CheckSeriesStatusResponse {
+	const normalized = normalizeError(error);
+	if (
+		normalized.code === ErrorCode.CONFIGURATION_ERROR ||
+		normalized.code === ErrorCode.SONARR_NOT_CONFIGURED ||
+		(normalized.code === ErrorCode.VALIDATION_ERROR &&
+			normalized.details?.reason === "network-disabled")
+	) {
+		return {
+			providerId: null,
+			providerMappingState: "unknown",
+			isInLibrary: null,
+			mappingUnknownReason:
+				normalized.details?.reason === "network-disabled"
+					? "network-disabled"
+					: "provider-not-configured",
+		};
+	}
+
+	logError(normalized, `SonarrStatus:getSeriesStatus:${payload.anilistId}`);
+	return {
+		providerId: null,
+		providerMappingState: "unknown",
+		isInLibrary: null,
+		mappingUnknownReason: "lookup-failed",
+	};
+}
+
+function resolveMappingSource(
+	reason: NonNullable<CheckSeriesStatusResponse["mappingReason"]>,
+): NonNullable<CheckSeriesStatusResponse["mappingSource"]> {
+	switch (reason) {
+		case "manual-override": {
+			return "manual";
+		}
+		case "exact-upstream": {
+			return "upstream";
+		}
+		default: {
+			return "auto";
+		}
+	}
+}
+
+async function resolveUnknownSeriesOutcome(
+	anilistId: AniListId,
+	deps: Pick<ApiHandlerDeps, "mappingService">,
+): Promise<
+	Pick<
+		CheckSeriesStatusResponse,
+		"providerMappingState" | "mappingUnknownReason" | "resolverOutcome"
+	>
+> {
+	const resolverState = await deps.mappingService.getAutoMapping(
+		"sonarr",
+		anilistId,
+	);
+	if (resolverState?.state === "ambiguous") {
+		return {
+			providerMappingState: "unknown",
+			mappingUnknownReason: "ambiguous",
+			resolverOutcome: "ambiguous",
+		};
+	}
+	return {
+		providerMappingState: "unmapped",
+		...(resolverState?.state === "unresolved"
+			? { resolverOutcome: "unresolved" as const }
+			: {}),
+	};
+}
+
+function getLinkedAniListIds(
+	tvdbId: TvdbId,
+	deps: Pick<
+		ApiHandlerDeps,
+		"manualMappingService" | "anibridgeMappingStore"
+	>,
+): number[] | undefined {
+	const linked = new Set<number>(
+		deps.manualMappingService.getLinkedAniListIds("sonarr", tvdbId),
+	);
+	for (const id of deps.anibridgeMappingStore.getAniListIdsForTvdb(tvdbId)) {
+		linked.add(id);
+	}
+	return linked.size > 0 ? [...linked] : undefined;
 }

@@ -4,18 +4,23 @@ import {
 	createDefaultExtensionOptions,
 	setExtensionOptionsSnapshot,
 } from "@/options";
+import { createLibraryHandlers } from "@/rpc/handlers/library.handlers";
 import {
+	parseProviderQualityProfileId,
 	parseRadarrMovieId,
 	parseSonarrSeriesId,
 	parseTmdbId,
 	parseTvdbId,
+	type ProviderCredentials,
 	type RadarrMovie,
 	type RadarrMovieSnapshot,
 	type SonarrSeries,
 	type SonarrSeriesSnapshot,
+	type TvdbId,
 } from "@/providers";
 import type { RadarrClient } from "@/providers/clients/radarr.client";
-import type { SonarrClient } from "@/providers/clients/sonarr.client";
+import { SonarrLibrary as SonarrSeriesLibrary } from "@/providers/sonarr/library";
+import type { SonarrLookupSeries } from "@/providers/sonarr/types";
 import type {
 	CacheHit,
 	TtlCache,
@@ -24,6 +29,18 @@ import { PROVIDER_LIBRARY_CACHE_TTL } from "./cache";
 import { RadarrLibrary } from "./radarr-library";
 import { SonarrLibrary } from "./sonarr-library";
 import type { ProviderLibraryCaches } from "./types";
+
+type SonarrClientStub = {
+	getSeries?: (credentials: ProviderCredentials) => Promise<unknown[]>;
+	getSeriesByTvdbId?: (
+		tvdbId: TvdbId,
+		credentials: ProviderCredentials,
+	) => Promise<unknown | null>;
+	lookupSeries?: (
+		term: string,
+		credentials: ProviderCredentials,
+	) => Promise<SonarrLookupSeries[]>;
+};
 
 type CacheMode = "miss" | "fresh" | "stale";
 
@@ -78,6 +95,7 @@ const createMappingService = () => ({
 
 const createManualMappingService = () => ({
 	getLinkedAniListIds: vi.fn(() => []),
+	has: vi.fn(() => false),
 });
 
 const createSonarrUpstreamStore = () => ({
@@ -94,6 +112,25 @@ function createSonarrSeries(input?: Partial<SonarrSeries>): SonarrSeries {
 		tvdbId: parseTvdbId(123),
 		title: "Known Series",
 		titleSlug: "known-series",
+		monitored: true,
+		path: "/tv/Known Series",
+		rootFolderPath: "/tv",
+		qualityProfileId: parseProviderQualityProfileId(1),
+		seasonFolder: true,
+		monitorNewItems: "all",
+		seriesType: "anime",
+		tags: [],
+		...input,
+	};
+}
+
+function createSonarrLookupSeries(
+	input?: Partial<SonarrLookupSeries>,
+): SonarrLookupSeries {
+	return {
+		title: "Lookup Series",
+		tvdbId: parseTvdbId(123),
+		folder: "Lookup Series",
 		...input,
 	};
 }
@@ -142,15 +179,24 @@ async function configureProviders(configured = true): Promise<void> {
 }
 
 function createSonarrLibrary(
-	client: Partial<SonarrClient>,
+	client: SonarrClientStub,
 	caches: ProviderLibraryCaches<SonarrSeriesSnapshot>,
 ): SonarrLibrary {
+	const seriesLibrary = new SonarrSeriesLibrary({
+		client: {
+			getSeries: (credentials) =>
+				(client.getSeries?.(credentials) ?? Promise.resolve([])) as never,
+			getSeriesByTvdbId: (tvdbId, credentials) =>
+				(client.getSeriesByTvdbId?.(tvdbId, credentials) ??
+					Promise.resolve(null)) as never,
+		},
+		cache: caches.lean as never,
+	});
+
 	return new SonarrLibrary({
-		sonarrClient: client as SonarrClient,
-		mappingService: createMappingService(),
-		manualMappingService: createManualMappingService(),
-		anibridgeMappingStore: createSonarrUpstreamStore(),
-		caches,
+		seriesLibrary,
+		lookupSeries: (term, credentials) =>
+			client.lookupSeries?.(term, credentials) ?? Promise.resolve([]),
 	});
 }
 
@@ -167,29 +213,34 @@ function createRadarrLibrary(
 	});
 }
 
-describe("provider-target library status", () => {
+describe("series status orchestration", () => {
 	beforeEach(async () => {
 		await configureProviders();
 	});
 
-	it("does not treat a cached same-title Sonarr item as an effective mapping", async () => {
+	it("returns unmapped status without checking Sonarr library", async () => {
 		const mappingService = createMappingService();
 		mappingService.resolveProviderId.mockResolvedValue(null);
 		mappingService.getAutoMapping.mockResolvedValue(null);
-		const client = {
-			getAllSeries: vi.fn(),
-			getSeriesByTvdbId: vi.fn(),
-			lookupSeriesByTvdbId: vi.fn(),
-		} as unknown as SonarrClient;
-		const library = new SonarrLibrary({
-			sonarrClient: client,
+		const getSeriesLibraryStatus = vi.fn();
+		const handlers = createLibraryHandlers({
+			SonarrClient: {},
+			RadarrClient: {},
 			mappingService,
 			manualMappingService: createManualMappingService(),
 			anibridgeMappingStore: createSonarrUpstreamStore(),
-			caches: createCaches([createSonarrSnapshot({ title: "Known Series" })]),
-		});
+			sonarrLibrary: { getSeriesLibraryStatus },
+			radarrLibrary: {},
+			manualMappingsReady: Promise.resolve(),
+			providerConfig: {
+				get: vi.fn(async () => ({
+					url: "http://sonarr.local",
+					apiKey: "sonarr-key",
+				}) satisfies ProviderCredentials),
+			},
+		} as never);
 
-		const status = await library.getSeriesStatus({
+		const status = await handlers.getSeriesStatus({
 			anilistId: parseAniListId(10),
 			title: "Known Series",
 		});
@@ -199,7 +250,7 @@ describe("provider-target library status", () => {
 			providerMappingState: "unmapped",
 			isInLibrary: null,
 		});
-		expect(client.getSeriesByTvdbId).not.toHaveBeenCalled();
+		expect(getSeriesLibraryStatus).not.toHaveBeenCalled();
 	});
 });
 
@@ -209,31 +260,33 @@ describe("provider library cache", () => {
 		vi.restoreAllMocks();
 	});
 
-	it("refreshes a missing Sonarr cache from the provider and writes lean snapshots", async () => {
+	it("force-verifies a mapped Sonarr hit and updates the cache", async () => {
 		const series = createSonarrSeries();
-		const client = { getAllSeries: vi.fn(async () => [series]) };
+		const client = {
+			getSeries: vi.fn(async () => []),
+			getSeriesByTvdbId: vi.fn(async () => series),
+			lookupSeries: vi.fn(),
+		};
 		const caches = createCaches<SonarrSeriesSnapshot>();
 		const library = createSonarrLibrary(client, caches);
 
-		await expect(library.getLeanSeriesList()).resolves.toEqual([
-			createSonarrSnapshot(),
-		]);
+		await expect(
+			library.getSeriesLibraryStatus({
+				anilistId: parseAniListId(10),
+				providerId: parseTvdbId(123),
+				forceVerify: true,
+			}),
+		).resolves.toMatchObject({
+			isInLibrary: true,
+			series: createSonarrSnapshot(),
+		});
 
-		expect(client.getAllSeries).toHaveBeenCalledWith(
+		expect(client.getSeriesByTvdbId).toHaveBeenCalledWith(
+			parseTvdbId(123),
 			expect.objectContaining({ apiKey: "sonarr-key" }),
 		);
-		expect(caches.lean.write).toHaveBeenCalledWith(
-			expect.any(String),
-			[createSonarrSnapshot()],
-			PROVIDER_LIBRARY_CACHE_TTL.normal,
-		);
-		const written = caches.lean.value()?.[0] as unknown as Record<
-			string,
-			unknown
-		>;
-		expect(written).not.toHaveProperty("alternateTitles");
-		expect(written).not.toHaveProperty("status");
-		expect(written).not.toHaveProperty("statistics");
+		expect(caches.lean.value()).toEqual([createSonarrSnapshot()]);
+		expect(client.lookupSeries).not.toHaveBeenCalled();
 	});
 
 	it("refreshes a missing Radarr cache from the provider and writes lean snapshots", async () => {
@@ -263,22 +316,31 @@ describe("provider library cache", () => {
 		expect(written).not.toHaveProperty("movieFile");
 	});
 
-	it("returns stale Sonarr data immediately while refreshing in the background", async () => {
-		const stale = createSonarrSnapshot({ title: "Stale Series" });
-		const fresh = createSonarrSeries({ title: "Fresh Series" });
-		const client = { getAllSeries: vi.fn(async () => [fresh]) };
-		const caches = createCaches([stale], "stale");
+	it("force-verifies a mapped Sonarr miss, removes stale cache, and uses term lookup", async () => {
+		const client = {
+			getSeries: vi.fn(async () => []),
+			getSeriesByTvdbId: vi.fn(async () => null),
+			lookupSeries: vi.fn(async () => [createSonarrLookupSeries()]),
+		};
+		const caches = createCaches([createSonarrSnapshot({ title: "Stale" })]);
 		const library = createSonarrLibrary(client, caches);
 
-		await expect(library.getLeanSeriesList()).resolves.toEqual([stale]);
-
-		await vi.waitFor(() => {
-			expect(caches.lean.write).toHaveBeenCalledWith(
-				expect.any(String),
-				[createSonarrSnapshot({ title: "Fresh Series" })],
-				PROVIDER_LIBRARY_CACHE_TTL.normal,
-			);
+		await expect(
+			library.getSeriesLibraryStatus({
+				anilistId: parseAniListId(10),
+				providerId: parseTvdbId(123),
+				forceVerify: true,
+			}),
+		).resolves.toMatchObject({
+			isInLibrary: false,
+			series: { title: "Lookup Series", tvdbId: parseTvdbId(123) },
 		});
+
+		expect(client.lookupSeries).toHaveBeenCalledWith(
+			"tvdb:123",
+			expect.objectContaining({ apiKey: "sonarr-key" }),
+		);
+		expect(caches.lean.value()).toEqual([]);
 	});
 
 	it("returns stale Radarr data immediately while refreshing in the background", async () => {
@@ -299,32 +361,9 @@ describe("provider library cache", () => {
 		});
 	});
 
-	it("returns fallback data and writes short error TTL when refresh fails", async () => {
-		const fallback = createSonarrSnapshot();
-		const client = {
-			getAllSeries: vi.fn(async () => {
-				throw new Error("provider unavailable");
-			}),
-		};
-		const caches = createCaches([fallback], "fresh");
-		const library = createSonarrLibrary(client, caches);
-
-		await expect(library.refreshCache()).resolves.toEqual([fallback]);
-
-		expect(caches.lean.write).toHaveBeenCalledWith(
-			expect.any(String),
-			[fallback],
-			expect.objectContaining({
-				staleMs: PROVIDER_LIBRARY_CACHE_TTL.error.staleMs,
-				hardMs: PROVIDER_LIBRARY_CACHE_TTL.error.hardMs,
-				meta: expect.objectContaining({ lastErrorCode: expect.any(String) }),
-			}),
-		);
-	});
-
 	it("clears provider caches when credentials are missing", async () => {
 		await configureProviders(false);
-		const sonarrClient = { getAllSeries: vi.fn() };
+		const sonarrClient = { getSeries: vi.fn() };
 		const sonarrCaches = createCaches([createSonarrSnapshot()]);
 		const sonarrLibrary = createSonarrLibrary(sonarrClient, sonarrCaches);
 		const radarrClient = { getAllMovies: vi.fn() };
@@ -336,7 +375,7 @@ describe("provider library cache", () => {
 
 		expect(sonarrCaches.lean.remove).toHaveBeenCalled();
 		expect(radarrCaches.lean.remove).toHaveBeenCalled();
-		expect(sonarrClient.getAllSeries).not.toHaveBeenCalled();
+		expect(sonarrClient.getSeries).not.toHaveBeenCalled();
 		expect(radarrClient.getAllMovies).not.toHaveBeenCalled();
 	});
 

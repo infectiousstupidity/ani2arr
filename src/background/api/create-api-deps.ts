@@ -15,6 +15,8 @@ import { anibridgeMappingCache } from "@/mapping/upstream-mapping/anibridge-mapp
 import { anilistMediaCache } from "@/anilist/media.cache";
 import { providerLibraryCaches } from "@/providers/library/cache";
 import { SonarrClient } from "@/providers/clients/sonarr.client";
+import { SonarrClient as NewSonarrClient } from "@/providers/sonarr/client";
+import { SonarrLibrary as SonarrSeriesLibrary } from "@/providers/sonarr/library";
 import { RadarrClient } from "@/providers/clients/radarr.client";
 import {
 	hasProviderHostPermission,
@@ -93,8 +95,16 @@ export const createApiDeps = (): ApiHandlerDeps => {
 	const sonarrClient = bindAll(
 		new SonarrClient({ hasUrlPermission: createHasUrlPermission("sonarr") }),
 	);
+	const newSonarrClient = bindAll(
+		new NewSonarrClient({
+			hasUrlPermission: createHasUrlPermission("sonarr"),
+		}),
+	);
 	const radarrClient = bindAll(
 		new RadarrClient({ hasUrlPermission: createHasUrlPermission("radarr") }),
+	);
+	const sonarrSeriesLibrary = bindAll(
+		new SonarrSeriesLibrary({ client: newSonarrClient }),
 	);
 
 	const anilistMediaService = bindAll(
@@ -177,11 +187,8 @@ export const createApiDeps = (): ApiHandlerDeps => {
 
 	const sonarrLibrary = bindAll(
 		new SonarrLibrary({
-			sonarrClient,
-			mappingService,
-			manualMappingService,
-			anibridgeMappingStore,
-			caches: providerLibraryCaches.sonarr,
+			seriesLibrary: sonarrSeriesLibrary,
+			lookupSeries: newSonarrClient.lookupSeries.bind(newSonarrClient),
 			emitLibraryMutation: () => bumpLibraryRevision("sonarr"),
 		}),
 	);

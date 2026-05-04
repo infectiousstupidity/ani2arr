@@ -1,20 +1,32 @@
 import { createTtlCache, type TtlCache } from "@/shared/cache/ttl-cache";
+import { normalizeError } from "@/shared/errors";
 import type { ProviderCredentials } from "../types";
 import type { SonarrClient } from "./client";
 import type { SonarrSeries, SonarrSeriesSnapshot, TvdbId } from "./types";
 
 const SONARR_SERIES_CACHE_KEY = "series";
 const SONARR_SERIES_CACHE_TTL = {
-	staleMs: 60 * 60 * 1000,
-	hardMs: 24 * 60 * 60 * 1000,
+	normal: {
+		staleMs: 60 * 60 * 1000,
+		hardMs: 24 * 60 * 60 * 1000,
+	},
+	error: {
+		staleMs: 5 * 60 * 1000,
+		hardMs: 10 * 60 * 1000,
+	},
 };
 
 const defaultSeriesSnapshotCache = createTtlCache<SonarrSeriesSnapshot[]>(
 	"sonarr:series-snapshots",
 );
 
+type SonarrLibraryClient = Pick<
+	SonarrClient,
+	"getSeries" | "getSeriesByTvdbId"
+>;
+
 type SonarrLibraryDeps = {
-	client: Pick<SonarrClient, "getSeries" | "getSeriesByTvdbId">;
+	client: SonarrLibraryClient;
 	cache?: TtlCache<SonarrSeriesSnapshot[]>;
 };
 
@@ -48,6 +60,9 @@ export class SonarrLibrary {
 		if (this.refreshPromise) return this.refreshPromise;
 
 		this.refreshPromise = (async () => {
+			const cached = await this.cache.read(SONARR_SERIES_CACHE_KEY);
+			const fallback = cached?.value ?? [];
+
 			try {
 				const series = await this.client.getSeries(credentials);
 				const snapshots = series.map((element) =>
@@ -57,10 +72,17 @@ export class SonarrLibrary {
 				await this.cache.write(
 					SONARR_SERIES_CACHE_KEY,
 					snapshots,
-					SONARR_SERIES_CACHE_TTL,
+					SONARR_SERIES_CACHE_TTL.normal,
 				);
 
 				return snapshots;
+			} catch (error) {
+				const normalized = normalizeError(error);
+				await this.cache.write(SONARR_SERIES_CACHE_KEY, fallback, {
+					...SONARR_SERIES_CACHE_TTL.error,
+					meta: { lastErrorCode: normalized.code },
+				});
+				return fallback;
 			} finally {
 				this.refreshPromise = null;
 			}
@@ -84,12 +106,13 @@ export class SonarrLibrary {
 		return this.client.getSeriesByTvdbId(tvdbId, credentials);
 	}
 
-	public async upsertSeriesSnapshot(series: SonarrSeries): Promise<void> {
-		const snapshot = toSonarrSeriesSnapshot(series);
+	public async upsertSeriesSnapshot(
+		snapshot: SonarrSeriesSnapshot,
+	): Promise<void> {
 		const cached = await this.cache.read(SONARR_SERIES_CACHE_KEY);
 		const current = cached?.value ?? [];
 		const existingIndex = current.findIndex(
-			(item) => item.tvdbId === series.tvdbId,
+			(item) => item.tvdbId === snapshot.tvdbId,
 		);
 		const next =
 			existingIndex === -1
@@ -103,7 +126,7 @@ export class SonarrLibrary {
 		await this.cache.write(
 			SONARR_SERIES_CACHE_KEY,
 			next,
-			SONARR_SERIES_CACHE_TTL,
+			SONARR_SERIES_CACHE_TTL.normal,
 		);
 	}
 
@@ -117,7 +140,7 @@ export class SonarrLibrary {
 		await this.cache.write(
 			SONARR_SERIES_CACHE_KEY,
 			next,
-			SONARR_SERIES_CACHE_TTL,
+			SONARR_SERIES_CACHE_TTL.normal,
 		);
 	}
 
