@@ -11,13 +11,11 @@ import {
 	parseProviderQualityProfileId,
 	parseProviderTagId,
 	parseSonarrSeriesId,
-	parseSonarrSeriesIdOrNull,
 	parseTvdbId,
 	type ProviderCredentials,
 	type ProviderTag,
 	type ProviderQualityProfile,
 	type ProviderRootFolder,
-	type SonarrLookupSeries,
 	type SonarrSeries,
 	type ProviderQualityProfileId,
 	type ProviderTagId,
@@ -81,31 +79,12 @@ export class SonarrClient extends BaseProviderClient {
 		return match ? readSonarrSeriesResource(match) : null;
 	};
 
-	public lookupSeriesByTvdbId = async (
-		tvdbId: TvdbId,
-		credentials: ProviderCredentials,
-	): Promise<SonarrLookupSeries | null> => {
-		const hits = await this.lookupSeriesByTerm(`tvdb:${tvdbId}`, credentials);
-		return hits.find((hit) => hit.tvdbId === tvdbId) ?? null;
-	};
-
 	public getSeriesById = async (
 		seriesId: SonarrSeriesId,
 		credentials: ProviderCredentials,
 	): Promise<SonarrSeries> => {
 		const json = await this.requestJson(`series/${seriesId}`, credentials);
 		return readSonarrSeriesResource(json);
-	};
-
-	public lookupSeriesByTerm = async (
-		term: string,
-		credentials: ProviderCredentials,
-	): Promise<SonarrLookupSeries[]> => {
-		const qs = new URLSearchParams({ term }).toString();
-		const json = await this.requestJson(`series/lookup?${qs}`, credentials);
-		return Array.isArray(json)
-			? json.map((element) => readSonarrLookupSeriesResource(element))
-			: [];
 	};
 
 	public addSeries = async (
@@ -226,11 +205,7 @@ export class SonarrClient extends BaseProviderClient {
 type ProviderRecord = Record<string, unknown>;
 type SonarrAddOptions = NonNullable<SonarrSeries["addOptions"]>;
 type SonarrSeriesStatus = NonNullable<SonarrSeries["status"]>;
-type SonarrLookupStatus = NonNullable<SonarrLookupSeries["status"]>;
 type SonarrSeriesTypeValue = NonNullable<SonarrSeries["seriesType"]>;
-type SonarrLookupSeriesTypeValue = NonNullable<
-	SonarrLookupSeries["seriesType"]
->;
 
 function asRecord(value: unknown): ProviderRecord {
 	return value && typeof value === "object" ? (value as ProviderRecord) : {};
@@ -394,32 +369,6 @@ function readSonarrSeriesResource(raw: unknown): SonarrSeries {
 		...(typeof resource.status === "string"
 			? { status: resource.status as SonarrSeriesStatus }
 			: {}),
-		...ifDefined("statistics", statistics),
-	};
-}
-
-function readSonarrLookupSeriesResource(raw: unknown): SonarrLookupSeries {
-	const resource = asRecord(raw);
-	const tvdbId = parseTvdbId(resource.tvdbId);
-	const id = parseSonarrSeriesIdOrNull(resource.id);
-	const statistics = readStatistics(resource.statistics);
-
-	return {
-		title: trimmedString(resource.title) ?? `Sonarr series ${tvdbId}`,
-		tvdbId,
-		...(id === null ? {} : { id }),
-		...ifDefined("titleSlug", trimmedString(resource.titleSlug)),
-		...ifDefined("year", numberValue(resource.year)),
-		...ifDefined("genres", stringArray(resource.genres)),
-		...ifDefined("network", trimmedString(resource.network)),
-		...(typeof resource.seriesType === "string"
-			? { seriesType: resource.seriesType as SonarrLookupSeriesTypeValue }
-			: {}),
-		...(typeof resource.status === "string"
-			? { status: resource.status as SonarrLookupStatus }
-			: {}),
-		...ifDefined("images", readMediaCovers(resource.images)),
-		...ifDefined("remotePoster", trimmedString(resource.remotePoster)),
 		...ifDefined("statistics", statistics),
 	};
 }

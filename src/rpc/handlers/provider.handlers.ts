@@ -7,10 +7,12 @@ import {
 	parseTmdbIdOrNull,
 	parseTvdbIdOrNull,
 	type ProviderCredentials,
+	type SonarrLookupSeries,
 	type SonarrSeriesSnapshot,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
+import type { SonarrLookupSeries as NewSonarrLookupSeries } from "@/providers/sonarr/types";
 import { normalizeProviderConnectionInput } from "@/options";
 import {
 	GetProviderMetadataInputSchema,
@@ -51,6 +53,7 @@ export function createProviderHandlers(
 > {
 	const {
 		SonarrClient,
+		sonarrLookupClient,
 		RadarrClient,
 		sonarrLibrary,
 		radarrLibrary,
@@ -139,7 +142,11 @@ export function createProviderHandlers(
 			await manualMappingsReady;
 
 			const [results, library] = await Promise.all([
-				SonarrClient.lookupSeriesByTerm(parsedInput.term, credentials),
+				sonarrLookupClient
+					.lookupSeries(parsedInput.term, credentials)
+					.then((hits) =>
+						hits.map((hit) => toLegacySonarrLookupSeries(hit)),
+					),
 				sonarrLibrary.getLeanSeriesList(),
 			]);
 
@@ -219,13 +226,13 @@ export function createProviderHandlers(
 		async validateTvdbId(input) {
 			const parsedInput = v.parse(ValidateTvdbInputSchema, input);
 			const credentials = await providerConfig.requireCredentials("sonarr");
-			const found = await SonarrClient.getSeriesByTvdbId(
+			const found = await sonarrLookupClient.getSeriesByTvdbId(
 				parsedInput.tvdbId,
 				credentials,
 			);
 			let inCatalog = false;
 			try {
-				const hits = await SonarrClient.lookupSeriesByTerm(
+				const hits = await sonarrLookupClient.lookupSeries(
 					`tvdb:${parsedInput.tvdbId}`,
 					credentials,
 				);
@@ -267,4 +274,49 @@ export function createProviderHandlers(
 	>;
 
 	return handlers;
+}
+
+function toLegacySonarrLookupSeries(
+	series: NewSonarrLookupSeries,
+): SonarrLookupSeries {
+	const images = series.images?.map((image) => ({
+		...(image.coverType === undefined ? {} : { coverType: image.coverType }),
+		...(image.url === undefined ? {} : { url: image.url }),
+		...(image.remoteUrl === undefined ? {} : { remoteUrl: image.remoteUrl }),
+	}));
+	const statistics = series.statistics
+		? {
+				...(series.statistics.seasonCount === undefined
+					? {}
+					: { seasonCount: series.statistics.seasonCount }),
+				...(series.statistics.episodeCount === undefined
+					? {}
+					: { episodeCount: series.statistics.episodeCount }),
+				...(series.statistics.episodeFileCount === undefined
+					? {}
+					: { episodeFileCount: series.statistics.episodeFileCount }),
+				...(series.statistics.totalEpisodeCount === undefined
+					? {}
+					: { totalEpisodeCount: series.statistics.totalEpisodeCount }),
+			}
+		: undefined;
+
+	return {
+		...(series.id === undefined ? {} : { id: series.id }),
+		title: series.title,
+		tvdbId: series.tvdbId,
+		...(series.titleSlug === undefined ? {} : { titleSlug: series.titleSlug }),
+		...(series.year === undefined ? {} : { year: series.year }),
+		...(series.genres === undefined ? {} : { genres: series.genres }),
+		...(series.network === undefined ? {} : { network: series.network }),
+		...(series.seriesType === undefined
+			? {}
+			: { seriesType: series.seriesType }),
+		...(series.status === undefined ? {} : { status: series.status }),
+		...(images === undefined ? {} : { images }),
+		...(series.remotePoster === undefined
+			? {}
+			: { remotePoster: series.remotePoster }),
+		...(statistics === undefined ? {} : { statistics }),
+	};
 }

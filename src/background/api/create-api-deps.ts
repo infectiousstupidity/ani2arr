@@ -14,8 +14,8 @@ import {
 import { anibridgeMappingCache } from "@/mapping/upstream-mapping/anibridge-mapping.cache";
 import { anilistMediaCache } from "@/anilist/media.cache";
 import { providerLibraryCaches } from "@/providers/library/cache";
-import { SonarrClient } from "@/providers/clients/sonarr.client";
-import { SonarrClient as NewSonarrClient } from "@/providers/sonarr/client";
+import { SonarrClient as LegacySonarrClient } from "@/providers/clients/sonarr.client";
+import { SonarrClient } from "@/providers/sonarr/client";
 import { SonarrLibrary as SonarrSeriesLibrary } from "@/providers/sonarr/library";
 import { RadarrClient } from "@/providers/clients/radarr.client";
 import {
@@ -92,11 +92,13 @@ export const createApiDeps = (): ApiHandlerDeps => {
 			return result.value;
 		};
 
-	const sonarrClient = bindAll(
-		new SonarrClient({ hasUrlPermission: createHasUrlPermission("sonarr") }),
+	const legacySonarrClient = bindAll(
+		new LegacySonarrClient({
+			hasUrlPermission: createHasUrlPermission("sonarr"),
+		}),
 	);
-	const newSonarrClient = bindAll(
-		new NewSonarrClient({
+	const sonarrClient = bindAll(
+		new SonarrClient({
 			hasUrlPermission: createHasUrlPermission("sonarr"),
 		}),
 	);
@@ -104,7 +106,7 @@ export const createApiDeps = (): ApiHandlerDeps => {
 		new RadarrClient({ hasUrlPermission: createHasUrlPermission("radarr") }),
 	);
 	const sonarrSeriesLibrary = bindAll(
-		new SonarrSeriesLibrary({ client: newSonarrClient }),
+		new SonarrSeriesLibrary({ client: sonarrClient }),
 	);
 
 	const anilistMediaService = bindAll(
@@ -188,7 +190,7 @@ export const createApiDeps = (): ApiHandlerDeps => {
 	const sonarrLibrary = bindAll(
 		new SonarrLibrary({
 			seriesLibrary: sonarrSeriesLibrary,
-			lookupSeries: newSonarrClient.lookupSeries.bind(newSonarrClient),
+			lookupSeries: sonarrClient.lookupSeries.bind(sonarrClient),
 			emitLibraryMutation: () => bumpLibraryRevision("sonarr"),
 		}),
 	);
@@ -337,7 +339,8 @@ export const createApiDeps = (): ApiHandlerDeps => {
 	};
 
 	return {
-		SonarrClient: sonarrClient,
+		SonarrClient: legacySonarrClient,
+		sonarrLookupClient: sonarrClient,
 		RadarrClient: radarrClient,
 		anilistMediaService,
 		mappingService,
