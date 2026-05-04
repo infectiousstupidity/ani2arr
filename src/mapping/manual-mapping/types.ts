@@ -2,12 +2,13 @@
 // src/mapping/manual/types.ts
 
 import type { AniListId } from "@/anilist";
-import type { Provider, ProviderId } from "@/providers";
+import type { Provider } from "@/providers";
+import type { ProviderExternalId } from "@/mapping/types";
 
 export interface PersistedProviderMappingRecord {
 	anilistId: AniListId;
 	provider: Provider;
-	providerId: ProviderId;
+	providerId: ProviderExternalId;
 	updatedAt: number;
 }
 

@@ -5,7 +5,7 @@ import { useCallback, useRef, type WheelEvent as ReactWheelEvent } from "react";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
-import { getProviderIdLabel } from "@/providers/provider-labels";
+import { getProviderExternalIdLabel } from "@/providers/provider-labels";
 import { useMediaModalContext } from "../../context";
 import { MappingSearchPanel } from "./search-results";
 
@@ -37,7 +37,7 @@ export function MappingPanel(props: MappingPanelProps): React.JSX.Element {
     onSelectResult,
   } = props;
   const { provider, providerLabel } = useMediaModalContext();
-  const providerIdLabel = getProviderIdLabel(provider);
+  const providerIdLabel = getProviderExternalIdLabel(provider);
   const isSearchMode = query.trim().length > 0;
   const viewportRef = useRef<HTMLDivElement | null>(null);
 

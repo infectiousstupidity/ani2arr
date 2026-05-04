@@ -6,10 +6,10 @@ import { parseAniListId, type AniListId } from "@/anilist";
 import {
 	parseSonarrSeriesId,
 	parseTvdbId,
-	type ProviderId,
 	type RadarrMovieSnapshot,
 	type SonarrSeriesSnapshot,
 } from "@/providers";
+import type { ProviderExternalId } from "@/mapping/types";
 import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
 import type { AutoMappingRecord } from "@/mapping/auto-mapping/types";
 import {
@@ -22,16 +22,16 @@ const tvdb = parseTvdbId;
 const sonarrSeriesId = parseSonarrSeriesId;
 
 const createDeps = (manualMappings?: {
-	manualProviderId?: ProviderId | null;
+	manualProviderId?: ProviderExternalId | null;
 	ignored?: boolean;
 	rejectedCandidates?: Array<{
 		anilistId: AniListId;
 		provider: "sonarr" | "radarr";
-		providerId: ProviderId;
+		providerId: ProviderExternalId;
 		updatedAt: number;
 	}>;
 	linkedAniListIds?: AniListId[];
-	upstreamProviderIds?: ProviderId[];
+	upstreamProviderIds?: ProviderExternalId[];
 	upstreamLinkedAniListIds?: AniListId[];
 	autoMappingStatus?: AutoMappingRecord | null;
 	autoMappingRecordList?: Array<

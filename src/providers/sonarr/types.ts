@@ -1,0 +1,89 @@
+/** Sonarr provider-domain types inferred from Valibot boundary schemas. */
+// src/providers/sonarr/types.ts
+
+import type * as v from "valibot";
+
+import type {
+	AddSonarrSeriesInputSchema,
+	SonarrAlternateTitlesSchema,
+	SonarrAddPayloadOptionsSchema,
+	SonarrAddOptionsSchema,
+	SonarrEditMonitoringActionSchema,
+	SonarrEditOptionsSchema,
+	SonarrImageSchema,
+	SonarrLookupCacheRowSchema,
+	SonarrLookupSeriesSchema,
+	SonarrMonitorNewItemsOptionSchema,
+	SonarrMonitorOptionSchema,
+	SonarrQualityProfileSchema,
+	SonarrRootFolderSchema,
+	SonarrSeasonSchema,
+	SonarrSeriesSchema,
+	SonarrSeriesSnapshotSchema,
+	SonarrSeriesStatusSchema,
+	SonarrSeriesTypeSchema,
+	SonarrTagSchema,
+	UpdateSonarrSeriesInputSchema,
+} from "./schemas";
+
+export type SonarrSeriesType = v.InferOutput<typeof SonarrSeriesTypeSchema>;
+export type SonarrMonitorOption = v.InferOutput<
+	typeof SonarrMonitorOptionSchema
+>;
+export type SonarrEditMonitoringAction = v.InferOutput<
+	typeof SonarrEditMonitoringActionSchema
+>;
+export type SonarrMonitorNewItemsOption = v.InferOutput<
+	typeof SonarrMonitorNewItemsOptionSchema
+>;
+export type SonarrSeriesStatus = v.InferOutput<typeof SonarrSeriesStatusSchema>;
+
+export type SonarrAlternateTitles = v.InferOutput<
+	typeof SonarrAlternateTitlesSchema
+>;
+export type SonarrSeason = v.InferOutput<typeof SonarrSeasonSchema>;
+export type SonarrImage = v.InferOutput<typeof SonarrImageSchema>;
+
+export type SonarrSeries = v.InferOutput<typeof SonarrSeriesSchema>;
+export type SonarrLookupSeries = v.InferOutput<typeof SonarrLookupSeriesSchema>;
+
+export type SonarrRootFolder = v.InferOutput<typeof SonarrRootFolderSchema>;
+export type SonarrQualityProfile = v.InferOutput<
+	typeof SonarrQualityProfileSchema
+>;
+export type SonarrTag = v.InferOutput<typeof SonarrTagSchema>;
+
+export type SonarrAddOptions = v.InferOutput<typeof SonarrAddOptionsSchema>;
+export type SonarrAddPayloadOptions = v.InferOutput<
+	typeof SonarrAddPayloadOptionsSchema
+>;
+export type SonarrAddDefaults = SonarrAddOptions;
+export type SonarrAddDraft = {
+	options: SonarrAddOptions;
+	saveAsDefaults: boolean;
+};
+
+export type SonarrEditOptions = v.InferOutput<typeof SonarrEditOptionsSchema>;
+
+export type AddSonarrSeriesInput = v.InferOutput<
+	typeof AddSonarrSeriesInputSchema
+>;
+
+export type UpdateSonarrSeriesInput = v.InferOutput<
+	typeof UpdateSonarrSeriesInputSchema
+>;
+
+export type SonarrSeriesSnapshot = v.InferOutput<
+	typeof SonarrSeriesSnapshotSchema
+>;
+
+export type SonarrLookupCacheRow = v.InferOutput<
+	typeof SonarrLookupCacheRowSchema
+>;
+
+export {
+	type ProviderQualityProfileId as SonarrQualityProfileId,
+	type ProviderTagId as SonarrTagId,
+	type SonarrSeriesId,
+	type TvdbId,
+} from "../schemas";

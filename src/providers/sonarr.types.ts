@@ -10,7 +10,7 @@ import type {
 	ProviderTagId,
 	SonarrSeriesId,
 	TvdbId,
-} from "./provider-id";
+} from "./schemas";
 
 export interface SonarrSeries {
 	id: SonarrSeriesId;

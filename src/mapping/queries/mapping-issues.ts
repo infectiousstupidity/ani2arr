@@ -1,11 +1,11 @@
 /** Projects review-worthy mapping conflicts from effective state and resolver traces. */
 // src/mapping/queries/mapping-issues.ts
 
-import type { ProviderId } from "@/providers";
 import type {
 	AcceptedMappingEvidence,
 	AcceptedMappingReason,
 	EffectiveMappingKind,
+	ProviderExternalId,
 } from "@/mapping/types";
 import type { AutoMappingStatus } from "@/mapping/auto-mapping/types";
 
@@ -20,7 +20,7 @@ export type MappingIssueAction =
 
 type MappingIssueMappingSnapshot = {
 	mappingEntryKind: EffectiveMappingKind;
-	providerId: ProviderId | null;
+	providerId: ProviderExternalId | null;
 	autoMappingStatus?: AutoMappingStatus;
 	acceptedReason?: AcceptedMappingReason;
 };
@@ -42,7 +42,7 @@ export interface MappingIssuesSummary {
 
 const buildReviewState = (input: {
 	mappingEntryKind: MappingIssueMappingSnapshot["mappingEntryKind"];
-	providerId: ProviderId | null;
+	providerId: ProviderExternalId | null;
 	autoMappingStatus?:
 		| MappingIssueMappingSnapshot["autoMappingStatus"]
 		| undefined;
@@ -75,10 +75,10 @@ const buildSummary = (
 
 export function projectMappingIssues(input: {
 	mappingEntryKind: EffectiveMappingKind;
-	providerId: ProviderId | null;
+	providerId: ProviderExternalId | null;
 	acceptedEvidence?: AcceptedMappingEvidence;
 	autoMappingStatus?: AutoMappingStatus;
-	exactUpstreamMatchProviderId?: ProviderId | null;
+	exactUpstreamMatchProviderId?: ProviderExternalId | null;
 }): {
 	reviewSummary?: MappingIssuesSummary;
 	reviewItems?: readonly MappingIssue[];

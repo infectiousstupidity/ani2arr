@@ -9,13 +9,13 @@ import type {
 	SonarrSeriesSnapshot,
 	SonarrLookupSeries,
 	SonarrSeries,
-	ProviderId,
 } from "@/providers";
 import type {
 	AcceptedMappingReason,
 	AcceptedMappingSource,
 	MappingUnknownReason,
 	EffectiveMappingState,
+	ProviderExternalId,
 } from "@/mapping/types";
 import type { MappingListRow } from "@/mapping/queries/list-mappings";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
@@ -30,7 +30,7 @@ export type {
 } from "@/providers/library/types";
 
 interface ProviderStatusResponseBase {
-	providerId: ProviderId | null;
+	providerId: ProviderExternalId | null;
 	providerMappingState: EffectiveMappingState;
 	isInLibrary: boolean | null;
 	successfulSynonym?: string;

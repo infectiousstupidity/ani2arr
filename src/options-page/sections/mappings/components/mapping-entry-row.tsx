@@ -6,9 +6,11 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { MoreHorizontal, Pencil, Trash2, Undo2 } from 'lucide-react';
 import { buildAniListAnimeUrl } from '@/anilist/anilist-links';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
-import { parseProviderIdentity } from '@/providers';
-import type { ProviderIdentity } from '@/providers';
-import type { EffectiveMappingKind } from '@/mapping/types';
+import {
+  createProviderMappingTarget,
+  type EffectiveMappingKind,
+  type ProviderMappingTarget,
+} from '@/mapping/types';
 import type { MappingListRow } from '@/mapping/queries/list-mappings';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
@@ -40,12 +42,12 @@ const statusStyles: Record<MappingListRow['mappingRowStatus'], { label: string; 
   unknown: { label: 'Unknown', className: 'bg-bg-primary/46 text-text-secondary border-border-primary/70' },
 };
 
-const getExternalLink = (identity: ProviderIdentity | null) => {
-  if (identity == null) return null;
-  if (identity.provider === 'sonarr') {
-    return `https://thetvdb.com/dereferrer/series/${identity.providerId}`;
+const getExternalLink = (target: ProviderMappingTarget | null) => {
+  if (target == null) return null;
+  if (target.provider === 'sonarr') {
+    return `https://thetvdb.com/dereferrer/series/${target.providerId}`;
   }
-  return `https://www.themoviedb.org/movie/${identity.providerId}`;
+  return `https://www.themoviedb.org/movie/${target.providerId}`;
 };
 
 const MetaSeparator: React.FC = () => <span className="text-text-tertiary/70">·</span>;
@@ -106,9 +108,9 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   const entryKindBadge = entryKindStyles[entryKind];
   const statusBadge = statusStyles[entry.mappingRowStatus];
   const actionableProviderId = entry.providerId ?? entry.suppressedProviderId ?? null;
-  const actionableProviderIdentity = actionableProviderId == null
+  const actionableProviderTarget = actionableProviderId == null
     ? null
-    : parseProviderIdentity(entry.provider, actionableProviderId);
+    : createProviderMappingTarget(entry.provider, actionableProviderId);
 
   const sonarrStatus = useSeriesStatus(
     {
@@ -159,7 +161,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
     ...(providerRouteSlug ? { providerRouteSlug } : {}),
     searchTerm: title,
   });
-  const externalLink = getExternalLink(actionableProviderIdentity);
+  const externalLink = getExternalLink(actionableProviderTarget);
 
   const linkItems: Array<{ label: string; href: string; tooltip: string }> = [
     { label: 'AniList ↗', href: buildAniListAnimeUrl(entry.anilistId), tooltip: 'Open on AniList' },

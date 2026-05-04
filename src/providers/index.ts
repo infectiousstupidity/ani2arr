@@ -25,8 +25,6 @@ export {
 	isTvdbId,
 	parseProviderQualityProfileId,
 	parseProviderQualityProfileIdOrNull,
-	parseProviderId,
-	parseProviderIdentity,
 	parseProviderTagId,
 	parseProviderTagIdOrNull,
 	parseRadarrMovieId,
@@ -37,20 +35,15 @@ export {
 	parseTmdbIdOrNull,
 	parseTvdbId,
 	parseTvdbIdOrNull,
-} from "./provider-id";
+} from "./schemas";
 export type {
-	ProviderIdFor,
-	ProviderIdentity,
 	ProviderQualityProfileId,
-	ProviderId,
 	ProviderTagId,
-	RadarrIdentity,
 	RadarrMovieId,
-	SonarrIdentity,
 	SonarrSeriesId,
 	TmdbId,
 	TvdbId,
-} from "./provider-id";
+} from "./schemas";
 export type {
 	RadarrLookupMovie,
 	RadarrMovie,
@@ -62,11 +55,9 @@ export type {
 	SonarrSeriesSnapshot,
 } from "./sonarr.types";
 export {
-	getProviderIdLabel,
-	getProviderIdentityIdLabel,
-	getProviderIdentityLabel,
+	formatProviderExternalId,
+	formatProviderTarget,
+	getProviderExternalIdLabel,
 	getProviderLabel,
 } from "./provider-labels";
-export {
-	resolveProviderForAniListFormat,
-} from "./provider-routing";
+export { resolveProviderForAniListFormat } from "./provider-routing";

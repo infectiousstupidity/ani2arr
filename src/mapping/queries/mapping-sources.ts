@@ -1,22 +1,23 @@
 // src/mapping/queries/mapping-sources.ts
 import type { AniListId } from "@/anilist";
 import {
-	parseProviderIdentity,
 	type Provider,
-	type ProviderIdFor,
-	type ProviderId,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
+import {
+	parseProviderExternalId,
+	type ProviderExternalId,
+} from "@/mapping/types";
 import type { AutoMappingRecord } from "../auto-mapping/types";
 
 export interface CollectedMappingSources {
 	provider: Provider;
 	anilistId: AniListId;
-	manualMappedProviderId: ProviderId | null;
+	manualMappedProviderId: ProviderExternalId | null;
 	ignored: boolean;
-	upstreamProviderIds: readonly ProviderId[];
-	rejectedCandidateProviderId: ProviderId | null;
+	upstreamProviderIds: readonly ProviderExternalId[];
+	rejectedCandidateProviderId: ProviderExternalId | null;
 	autoMappingRecord: AutoMappingRecord | null;
 }
 
@@ -25,12 +26,12 @@ export interface CollectMappingSourcesDeps {
 		get<P extends Provider>(
 			provider: P,
 			anilistId: AniListId,
-		): ProviderIdFor<P> | null;
+		): ProviderExternalId | null;
 		isIgnored(provider: Provider, anilistId: AniListId): boolean;
 		listRejectedCandidates(provider?: Provider): Array<{
 			anilistId: AniListId;
 			provider: Provider;
-			providerId: ProviderId;
+			providerId: ProviderExternalId;
 			updatedAt: number;
 		}>;
 	};
@@ -50,7 +51,7 @@ export interface CollectLinkedAniListIdsDeps {
 	manualMappingService: {
 		getLinkedAniListIds<P extends Provider>(
 			provider: P,
-			providerId: ProviderIdFor<P>,
+			providerId: ProviderExternalId,
 		): AniListId[];
 	};
 	anibridgeMappingStore: {
@@ -70,7 +71,7 @@ const getUpstreamProviderIds = (
 	provider: Provider,
 	anilistId: AniListId,
 	deps: CollectMappingSourcesDeps,
-): readonly ProviderId[] =>
+): readonly ProviderExternalId[] =>
 	provider === "sonarr"
 		? deps.anibridgeMappingStore.getSonarrCandidates(anilistId)
 		: deps.anibridgeMappingStore.getRadarrCandidates(anilistId);
@@ -78,11 +79,11 @@ const getUpstreamProviderIds = (
 const latestRejectedCandidateProviderId = (
 	rejected: Array<{
 		anilistId: AniListId;
-		providerId: ProviderId;
+		providerId: ProviderExternalId;
 		updatedAt: number;
 	}>,
 	anilistId: AniListId,
-): ProviderId | null =>
+): ProviderExternalId | null =>
 	rejected
 		.filter((entry) => entry.anilistId === anilistId)
 		.toSorted((left, right) => right.updatedAt - left.updatedAt)[0]
@@ -115,44 +116,41 @@ export async function getMappingSource(
 
 export async function collectLinkedAniListIds(
 	provider: Provider,
-	providerId: ProviderId,
+	providerId: ProviderExternalId,
 	deps: CollectLinkedAniListIdsDeps,
 ): Promise<AniListId[]> {
-	const identity = parseProviderIdentity(provider, providerId);
 	const ids = new Set<AniListId>();
 
-	if (identity.provider === "sonarr") {
+	if (provider === "sonarr") {
+		const tvdbId = parseProviderExternalId("sonarr", providerId);
+		if (tvdbId === null) return [];
 		for (const id of deps.manualMappingService.getLinkedAniListIds(
-			identity.provider,
-			identity.providerId,
+			provider,
+			tvdbId,
 		)) {
 			ids.add(id);
 		}
-		for (const id of deps.anibridgeMappingStore.getAniListIdsForTvdb(
-			identity.providerId,
-		)) {
+		for (const id of deps.anibridgeMappingStore.getAniListIdsForTvdb(tvdbId)) {
 			ids.add(id);
 		}
 	} else {
+		const tmdbId = parseProviderExternalId("radarr", providerId);
+		if (tmdbId === null) return [];
 		for (const id of deps.manualMappingService.getLinkedAniListIds(
-			identity.provider,
-			identity.providerId,
+			provider,
+			tmdbId,
 		)) {
 			ids.add(id);
 		}
-		for (const id of deps.anibridgeMappingStore.getAniListIdsForTmdb(
-			identity.providerId,
-		)) {
+		for (const id of deps.anibridgeMappingStore.getAniListIdsForTmdb(tmdbId)) {
 			ids.add(id);
 		}
 	}
 
-	for (const autoMapping of await deps.autoMappingStore.list(
-		identity.provider,
-	)) {
+	for (const autoMapping of await deps.autoMappingStore.list(provider)) {
 		if (
 			autoMapping.state === "mapped" &&
-			autoMapping.providerId === identity.providerId
+			autoMapping.providerId === providerId
 		) {
 			ids.add(autoMapping.anilistId);
 		}

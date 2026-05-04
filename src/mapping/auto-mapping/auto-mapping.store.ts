@@ -4,8 +4,8 @@
 import { storage } from '@wxt-dev/storage';
 import PQueue from 'p-queue';
 import { parseAniListIdOrNull, type AniListId } from '@/anilist';
-import type { Provider, ProviderId } from '@/providers';
-import type { AcceptedMappingEvidence } from '@/mapping/types';
+import type { Provider } from '@/providers';
+import type { AcceptedMappingEvidence, ProviderExternalId } from '@/mapping/types';
 import type { AutoMappingRecord } from './types';
 
 type AutoMappingTtl = {
@@ -89,7 +89,7 @@ const sanitizeStoredRecord = (value: StoredAutoMappingRecord): StoredAutoMapping
 
     return {
       state: 'mapped',
-      providerId: value.providerId as ProviderId,
+      providerId: value.providerId as ProviderExternalId,
       acceptedEvidence: value.acceptedEvidence,
       updatedAt: value.updatedAt,
       expiresAt: value.expiresAt,

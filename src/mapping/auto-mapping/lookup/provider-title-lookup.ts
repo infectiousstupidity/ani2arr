@@ -10,12 +10,12 @@ import {
 	parseTvdbIdOrNull,
 	type Provider,
 	type ProviderCredentials,
-	type ProviderId,
 	type RadarrLookupMovie,
 	type SonarrLookupSeries,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
+import type { ProviderExternalId } from "@/mapping/types";
 import { normalizeError } from "@/shared/errors";
 import type { RequestPriority } from "@/shared/utils/request-priority";
 import { priorityValue } from "@/shared/utils/request-priority";
@@ -38,7 +38,7 @@ export type TitleLookupCaches<TResult> = TtlCache<TResult[]>;
 
 export interface ProviderTitleLookup<
 	TResult extends ProviderTitleResult = ProviderTitleResult,
-	TProviderId extends ProviderId = ProviderId,
+	TProviderId extends ProviderExternalId = ProviderExternalId,
 > {
 	readonly provider: Provider;
 	reset(): Promise<void>;
@@ -56,7 +56,7 @@ export interface ProviderTitleLookup<
 
 type ProviderTitleLookupConfig<
 	TResult extends ProviderTitleResult,
-	TProviderId extends ProviderId,
+	TProviderId extends ProviderExternalId,
 > = {
 	provider: Provider;
 	loggerName: string;
@@ -74,7 +74,7 @@ type ProviderTitleLookupConfig<
 
 export function createProviderTitleLookup<
 	TResult extends ProviderTitleResult,
-	TProviderId extends ProviderId,
+	TProviderId extends ProviderExternalId,
 >(
 	config: ProviderTitleLookupConfig<TResult, TProviderId>,
 ): ProviderTitleLookup<TResult, TProviderId> {

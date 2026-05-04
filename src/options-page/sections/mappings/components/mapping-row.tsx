@@ -6,13 +6,17 @@ import * as Accordion from '@radix-ui/react-accordion';
 import { ChevronDown } from 'lucide-react';
 import type { AniListId } from '@/anilist';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
-import type { Provider, ProviderIdentity, ProviderId } from '@/providers';
+import type { Provider } from '@/providers';
 import {
-  getProviderIdentityIdLabel,
-  getProviderIdentityLabel,
+  formatProviderExternalId,
+  formatProviderTarget,
   getProviderLabel,
 } from '@/providers/provider-labels';
-import type { EffectiveMappingKind } from '@/mapping/types';
+import type {
+  EffectiveMappingKind,
+  ProviderExternalId,
+  ProviderMappingTarget,
+} from '@/mapping/types';
 import type { MappingListRow } from '@/mapping/queries/list-mappings';
 import { useAniListMetadataBatch } from '@/shared/queries';
 import Pill from '@/shared/ui/primitives/pill';
@@ -30,8 +34,8 @@ export type MappingTableEntry = {
 export type MappingTableRowData = {
   id: string;
   provider: Provider;
-  providerId: ProviderId | null;
-  providerIdentity: ProviderIdentity | null;
+  providerId: ProviderExternalId | null;
+  providerIdentity: ProviderMappingTarget | null;
   providerMeta?: MappingListRow['providerMeta'];
   entries: MappingTableEntry[];
   entryKinds: EffectiveMappingKind[];
@@ -153,10 +157,12 @@ export const MappingAccordionItem: React.FC<MappingAccordionItemProps> = ({
     preferredProviderTitle ??
     (firstEntry ? resolveAniListTitle(firstEntryMetadata, firstEntry.title) : null) ??
     row.providerMeta?.title ??
-    (row.providerIdentity === null ? 'Unmapped' : getProviderIdentityIdLabel(row.providerIdentity));
+    (row.providerIdentity === null
+      ? 'Unmapped'
+      : formatProviderExternalId(row.providerIdentity.provider, row.providerIdentity.providerId));
   const providerIdLabel = row.providerIdentity === null
     ? null
-    : getProviderIdentityLabel(row.providerIdentity);
+    : formatProviderTarget(row.providerIdentity);
   const updatedLabel = row.updatedAt ? formatRelativeTime(row.updatedAt) : null;
   const providerIcon = row.provider === 'sonarr' ? SonarrIcon : RadarrIcon;
   const providerLabel = getProviderLabel(row.provider);

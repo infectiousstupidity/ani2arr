@@ -14,8 +14,9 @@ import {
 } from '@/shared/queries';
 import { useConfirm } from '@/shared/hooks/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
-import { PROVIDERS, getProviderIdentityIdLabel, parseProviderIdentity } from '@/providers';
+import { PROVIDERS, formatProviderExternalId } from '@/providers';
 import type { Provider } from '@/providers';
+import { createProviderMappingTarget } from '@/mapping/types';
 import type { MappingListRow } from '@/mapping/queries/list-mappings';
 import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
 import SectionHeader from '../../components/section-header';
@@ -279,10 +280,11 @@ const MappingsSection: React.FC<{
     (entry: MappingListRow) => {
       const providerId = entry.providerId ?? entry.suppressedProviderId;
       if (providerId == null) return Promise.resolve();
-      const providerIdentity = parseProviderIdentity(entry.provider, providerId);
-      const label = getProviderIdentityIdLabel(providerIdentity);
+      const target = createProviderMappingTarget(entry.provider, providerId);
+      if (target === null) return Promise.resolve();
+      const label = formatProviderExternalId(target.provider, target.providerId);
       return runEntryMutation({
-        mutate: () => setRejectedCandidate.mutateAsync({ anilistId: entry.anilistId, ...providerIdentity }),
+        mutate: () => setRejectedCandidate.mutateAsync({ anilistId: entry.anilistId, ...target }),
         success: {
           title: 'Candidate rejected',
           description: `${label} will be skipped for AniList #${entry.anilistId}. This entry now stays unmapped until it is matched again, added upstream, or mapped manually.`,
@@ -300,10 +302,11 @@ const MappingsSection: React.FC<{
     (entry: MappingListRow) => {
       const providerId = entry.providerId ?? entry.suppressedProviderId;
       if (providerId == null) return Promise.resolve();
-      const providerIdentity = parseProviderIdentity(entry.provider, providerId);
-      const label = getProviderIdentityIdLabel(providerIdentity);
+      const target = createProviderMappingTarget(entry.provider, providerId);
+      if (target === null) return Promise.resolve();
+      const label = formatProviderExternalId(target.provider, target.providerId);
       return runEntryMutation({
-        mutate: () => clearRejectedCandidate.mutateAsync({ anilistId: entry.anilistId, ...providerIdentity }),
+        mutate: () => clearRejectedCandidate.mutateAsync({ anilistId: entry.anilistId, ...target }),
         success: {
           title: 'Candidate restored',
           description: `${label} can be used again for AniList #${entry.anilistId}.`,
@@ -394,7 +397,7 @@ const MappingsSection: React.FC<{
             toast.showToast({
               title: 'Mapping saved',
               description: mapping
-                ? `AniList #${anilistId} now maps to ${getProviderIdentityIdLabel(mapping)}.`
+                ? `AniList #${anilistId} now maps to ${formatProviderExternalId(mapping.provider, mapping.providerId)}.`
                 : `AniList #${anilistId} mapping was updated.`,
               variant: 'success',
             });

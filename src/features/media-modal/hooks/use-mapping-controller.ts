@@ -4,12 +4,12 @@
 import { useCallback, useState } from "react";
 import type { AniListId } from "@/anilist";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
-import type { EffectiveMappingKind } from "@/mapping/types";
 import {
-	parseProviderIdentity,
-	type Provider,
-	type ProviderId,
-} from "@/providers";
+	createProviderMappingTarget,
+	type EffectiveMappingKind,
+	type ProviderExternalId,
+} from "@/mapping/types";
+import type { Provider } from "@/providers";
 import { useDebounced } from "@/shared/hooks/use-debounced";
 import {
 	useClearManualMapping,
@@ -22,8 +22,8 @@ import { useMappingSearch } from "./use-mapping-search";
 
 type AuthoritativeMappingState = {
 	mappingEntryKind: EffectiveMappingKind;
-	suppressedProviderId?: ProviderId | null;
-	providerId: ProviderId | null;
+	suppressedProviderId?: ProviderExternalId | null;
+	providerId: ProviderExternalId | null;
 };
 
 export interface MappingControllerState {
@@ -39,8 +39,8 @@ export interface MappingControllerState {
 	canIgnoreTitle: boolean;
 	canRejectCandidate: boolean;
 	canClearRejectedCandidate: boolean;
-	rejectCandidateProviderId: ProviderId | null;
-	clearRejectedCandidateProviderId: ProviderId | null;
+	rejectCandidateProviderId: ProviderExternalId | null;
+	clearRejectedCandidateProviderId: ProviderExternalId | null;
 	isSubmitting: boolean;
 	isReverting: boolean;
 	isIgnoring: boolean;
@@ -104,7 +104,7 @@ export function isSelectedDraftDirty(input: {
 function getRejectCandidateProviderId(input: {
 	authoritativeMapping: AuthoritativeMappingState | null | undefined;
 	manualMappingActive: boolean;
-}): ProviderId | null {
+}): ProviderExternalId | null {
 	if (input.manualMappingActive) {
 		return null;
 	}
@@ -127,7 +127,7 @@ function getRejectCandidateProviderId(input: {
 
 function getClearRejectedCandidateProviderId(
 	authoritativeMapping: AuthoritativeMappingState | null | undefined,
-): ProviderId | null {
+): ProviderExternalId | null {
 	return authoritativeMapping?.suppressedProviderId ?? null;
 }
 
@@ -217,10 +217,17 @@ export function useMediaModalMappingController(input: {
 			if (!selectedDraft) {
 				return false;
 			}
+			const target = createProviderMappingTarget(
+				selectedDraft.provider,
+				selectedDraft.providerId,
+			);
+			if (target === null) {
+				return false;
+			}
 
 			await setManualMappingMutation.mutateAsync({
 				anilistId: input.anilistId,
-				...parseProviderIdentity(input.provider, selectedDraft.providerId),
+				...target,
 				...(options?.force === undefined ? {} : { force: options.force }),
 				optimisticMapping: selectedDraft,
 			});
@@ -230,7 +237,6 @@ export function useMediaModalMappingController(input: {
 		[
 			scopedDraft.selectedDraft,
 			input.anilistId,
-			input.provider,
 			resetDraft,
 			setManualMappingMutation,
 		],
@@ -257,10 +263,17 @@ export function useMediaModalMappingController(input: {
 		if (rejectCandidateProviderId == null) {
 			return false;
 		}
+		const target = createProviderMappingTarget(
+			input.provider,
+			rejectCandidateProviderId,
+		);
+		if (target === null) {
+			return false;
+		}
 
 		await setRejectedCandidateMutation.mutateAsync({
 			anilistId: input.anilistId,
-			...parseProviderIdentity(input.provider, rejectCandidateProviderId),
+			...target,
 		});
 		return true;
 	}, [
@@ -274,13 +287,17 @@ export function useMediaModalMappingController(input: {
 		if (clearRejectedCandidateProviderId == null) {
 			return false;
 		}
+		const target = createProviderMappingTarget(
+			input.provider,
+			clearRejectedCandidateProviderId,
+		);
+		if (target === null) {
+			return false;
+		}
 
 		await clearRejectedCandidateMutation.mutateAsync({
 			anilistId: input.anilistId,
-			...parseProviderIdentity(
-				input.provider,
-				clearRejectedCandidateProviderId,
-			),
+			...target,
 		});
 		return true;
 	}, [

@@ -3,16 +3,17 @@
 
 import { parseAniListIdOrNull, type AniListId } from "@/anilist";
 import {
-	parseProviderIdentity,
 	PROVIDERS,
-	type ProviderIdFor,
-	type ProviderId,
 	type RadarrMovieSnapshot,
 	type SonarrSeriesSnapshot,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
-import type { EffectiveMappingKind } from "@/mapping/types";
+import {
+	parseProviderExternalId,
+	type EffectiveMappingKind,
+	type ProviderExternalId,
+} from "@/mapping/types";
 import type { AutoMappingRecord } from "@/mapping/auto-mapping/types";
 import {
 	buildEffectiveMapping,
@@ -96,7 +97,7 @@ export interface ListMappingsDeps {
 		): boolean;
 		getLinkedAniListIds<P extends MappingListRow["provider"]>(
 			provider: P,
-			providerId: ProviderIdFor<P>,
+			providerId: ProviderExternalId,
 		): AniListId[];
 	};
 	anibridgeMappingStore: {
@@ -158,9 +159,9 @@ const setLatest = <T extends { updatedAt: number }>(
 };
 
 const resolveCandidateUpdatedAt = (input: {
-	manual?: { providerId: ProviderId; updatedAt: number };
+	manual?: { providerId: ProviderExternalId; updatedAt: number };
 	ignored?: { updatedAt: number };
-	upstream?: { providerId: ProviderId } | undefined;
+	upstream?: { providerId: ProviderExternalId } | undefined;
 	rejected?: { updatedAt: number } | undefined;
 	autoMappingRecord?: (AutoMappingRecord & { updatedAt: number }) | undefined;
 }): number => {
@@ -310,7 +311,7 @@ export async function listMappings(
 		{
 			anilistId: AniListId;
 			provider: MappingListRow["provider"];
-			providerId: ProviderId;
+			providerId: ProviderExternalId;
 		}
 	>();
 	const keys = new Set<string>();
@@ -449,32 +450,25 @@ export async function listMappings(
 
 	const getLinkedAniListIds = (
 		provider: MappingListRow["provider"],
-		providerId: ProviderId,
+		providerId: ProviderExternalId,
 	): AniListId[] => {
-		const identity = parseProviderIdentity(provider, providerId);
-		if (identity.provider === "sonarr") {
+		if (provider === "sonarr") {
+			const tvdbId = parseProviderExternalId("sonarr", providerId);
+			if (tvdbId === null) return [];
 			const ids = new Set<AniListId>(
-				manualMappingService.getLinkedAniListIds(
-					identity.provider,
-					identity.providerId,
-				),
+				manualMappingService.getLinkedAniListIds(provider, tvdbId),
 			);
-			for (const id of anibridgeMappingStore.getAniListIdsForTvdb(
-				identity.providerId,
-			)) {
+			for (const id of anibridgeMappingStore.getAniListIdsForTvdb(tvdbId)) {
 				ids.add(id);
 			}
 			return [...ids];
 		} else {
+			const tmdbId = parseProviderExternalId("radarr", providerId);
+			if (tmdbId === null) return [];
 			const ids = new Set<AniListId>(
-				manualMappingService.getLinkedAniListIds(
-					identity.provider,
-					identity.providerId,
-				),
+				manualMappingService.getLinkedAniListIds(provider, tmdbId),
 			);
-			for (const id of anibridgeMappingStore.getAniListIdsForTmdb(
-				identity.providerId,
-			)) {
+			for (const id of anibridgeMappingStore.getAniListIdsForTmdb(tmdbId)) {
 				ids.add(id);
 			}
 			return [...ids];
