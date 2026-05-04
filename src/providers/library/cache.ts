@@ -2,7 +2,7 @@
 // src/providers/library/cache.ts
 
 import { createTtlCache } from "@/shared/cache/ttl-cache";
-import type { SonarrSeriesSnapshot, RadarrMovieSnapshot } from "@/providers";
+import type { RadarrMovieSnapshot } from "@/providers";
 
 export const PROVIDER_LIBRARY_CACHE_TTL = {
 	normal: {
@@ -16,16 +16,10 @@ export const PROVIDER_LIBRARY_CACHE_TTL = {
 } as const;
 
 const PROVIDER_LIBRARY_CACHE_IDS = {
-	sonarrLean: "library:lean:sonarr",
 	radarrLean: "library:lean:radarr",
 } as const;
 
 export const providerLibraryCaches = {
-	sonarr: {
-		lean: createTtlCache<SonarrSeriesSnapshot[]>(
-			PROVIDER_LIBRARY_CACHE_IDS.sonarrLean,
-		),
-	},
 	radarr: {
 		lean: createTtlCache<RadarrMovieSnapshot[]>(
 			PROVIDER_LIBRARY_CACHE_IDS.radarrLean,

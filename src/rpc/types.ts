@@ -45,6 +45,7 @@ interface ProviderStatusResponseBase {
 	linkedAniListIds?: number[];
 }
 
+// TODO: Rename to GetSeriesStatusOutput when the paired Radarr status cleanup happens.
 export interface CheckSeriesStatusResponse extends ProviderStatusResponseBase {
 	series?: SonarrSeriesSnapshot | SonarrSeries | SonarrLookupSeries;
 }
