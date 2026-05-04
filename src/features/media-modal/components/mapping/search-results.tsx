@@ -5,7 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import { useMediaModalContext } from '../../context';
 import TooltipWrapper from '@/shared/ui/primitives/tooltip';
 import { buildProviderOpenUrl } from '@/providers/provider-links';
-import { getProviderIdLabel } from '@/providers/provider-labels';
+import { getProviderExternalIdLabel } from '@/providers/provider-labels';
 import type { MappingSearchResult } from '@/features/media-modal/mapping-search/types';
 import type { Provider } from '@/providers';
 
@@ -24,7 +24,7 @@ function getMetadataItems(input: {
   const { result, provider } = input;
 
   return [
-    `${getProviderIdLabel(provider)} ${result.providerId}`,
+    `${getProviderExternalIdLabel(provider)} ${result.providerId}`,
     result.year ? String(result.year) : null,
     shouldShowTypeLabel(result) ? result.typeLabel ?? null : null,
   ];

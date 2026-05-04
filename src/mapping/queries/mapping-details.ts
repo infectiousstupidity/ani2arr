@@ -10,8 +10,6 @@ import {
 	type RadarrMovieSnapshot,
 	type SonarrSeriesSnapshot,
 	type Provider,
-	type ProviderIdFor,
-	type ProviderId,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
@@ -19,6 +17,7 @@ import type {
 	AcceptedMappingEvidence,
 	AcceptedMappingReason,
 	AcceptedMappingSource,
+	ProviderExternalId,
 } from "@/mapping/types";
 import type {
 	AutoMappingRecord,
@@ -55,17 +54,17 @@ export interface GetMappingInspectionDeps {
 		get<P extends Provider>(
 			provider: P,
 			anilistId: AniListId,
-		): ProviderIdFor<P> | null;
+		): ProviderExternalId | null;
 		isIgnored(provider: Provider, anilistId: AniListId): boolean;
 		listRejectedCandidates(provider?: Provider): Array<{
 			anilistId: AniListId;
 			provider: Provider;
-			providerId: ProviderId;
+			providerId: ProviderExternalId;
 			updatedAt: number;
 		}>;
 		getLinkedAniListIds<P extends Provider>(
 			provider: P,
-			providerId: ProviderIdFor<P>,
+			providerId: ProviderExternalId,
 		): AniListId[];
 	};
 	anibridgeMappingStore: {
@@ -127,7 +126,7 @@ interface MappingDetailsExplanationItem {
 	reason?: AcceptedMappingReason;
 	resolverOutcome?: AutoMappingStatus;
 	reviewReason?: MappingIssueReason;
-	suppressedProviderId?: ProviderId;
+	suppressedProviderId?: ProviderExternalId;
 	details?: readonly string[];
 }
 
@@ -139,7 +138,7 @@ interface MappingDetailsReview {
 
 interface MappingDetailsProviderLinks {
 	provider: Provider;
-	providerId: ProviderId | null;
+	providerId: ProviderExternalId | null;
 	linkedAniListIds: readonly AniListId[];
 	linkedAniListCount: number;
 }

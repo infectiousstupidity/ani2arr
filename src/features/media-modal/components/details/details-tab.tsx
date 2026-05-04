@@ -7,7 +7,7 @@ import type { AniListId } from '@/anilist';
 import type { MappingDetailsPayload } from '@/mapping/queries/mapping-details';
 import type { MappingSearchResult } from '@/features/media-modal/mapping-search/types';
 import type { Provider } from '@/providers';
-import { getProviderIdLabel, getProviderLabel } from '@/providers/provider-labels';
+import { formatProviderExternalId, getProviderLabel } from '@/providers/provider-labels';
 import Button from '@/shared/ui/primitives/button';
 import Pill from '@/shared/ui/primitives/pill';
 import { buildProviderOpenUrl } from '@/providers/provider-links';
@@ -55,7 +55,7 @@ function MappingPreviewCard(props: {
 }): React.JSX.Element {
   const { mapping, providerLabel, baseUrl, showResetPreview, onResetPreview, contentContainer } = props;
   const tooltipContainer = contentContainer ?? undefined;
-  const providerIdLabel = `${getProviderLabel(mapping.provider)} · ${getProviderIdLabel(mapping.provider)} ${mapping.providerId}`;
+  const providerIdLabel = `${getProviderLabel(mapping.provider)} · ${formatProviderExternalId(mapping.provider, mapping.providerId)}`;
   const link = buildProviderOpenUrl({
     provider: mapping.provider,
     baseUrl,

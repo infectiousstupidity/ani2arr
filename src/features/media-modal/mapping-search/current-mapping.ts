@@ -8,17 +8,17 @@ import type {
 } from "@/rpc/types";
 import type {
 	Provider,
-	ProviderId,
 	RadarrLookupMovie,
 	SonarrLookupSeries,
 	TmdbId,
 	TvdbId,
 } from "@/providers";
+import type { ProviderExternalId } from "@/mapping/types";
 import {
 	getProviderRouteSlug,
 	type ProviderMediaPathSource,
 } from "@/providers/library/paths";
-import { getProviderIdLabel } from "@/providers/provider-labels";
+import { getProviderExternalIdLabel } from "@/providers/provider-labels";
 import { toMappingSearchResultFromRadarr } from "./radarr-search-result.adapter";
 import { toMappingSearchResultFromSonarr } from "./sonarr-search-result.adapter";
 import type { MappingSearchResult } from "./types";
@@ -51,13 +51,13 @@ const parseLinkedAniListIds = (
 
 function buildFallbackMapping(input: {
 	provider: Provider;
-	providerId: ProviderId;
+	providerId: ProviderExternalId;
 	title?: string | undefined;
 	isInLibrary: boolean;
 	providerRouteSlug?: string | null | undefined;
 	linkedAniListIds?: AniListId[] | undefined;
 }): MappingSearchResult {
-	const providerLabel = getProviderIdLabel(input.provider);
+	const providerLabel = getProviderExternalIdLabel(input.provider);
 
 	return {
 		provider: input.provider,

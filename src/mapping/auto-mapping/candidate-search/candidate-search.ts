@@ -2,8 +2,11 @@
 // src/mapping/auto-mapping/candidate-search/candidate-search.ts
 
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
-import type { AcceptedMappingReason } from "@/mapping/types";
-import type { Provider, ProviderCredentials, ProviderId } from "@/providers";
+import type {
+	AcceptedMappingReason,
+	ProviderExternalId,
+} from "@/mapping/types";
+import type { Provider, ProviderCredentials } from "@/providers";
 import type { ScopedLogger } from "@/shared/utils/logger";
 import type { RequestPriority } from "@/shared/utils/request-priority";
 import { PIPELINE_SOFT_TIME_BUDGET_MS } from "../constants";
@@ -27,7 +30,7 @@ type CandidateSearchContext = {
 	priority?: RequestPriority;
 	forceLookupNetwork?: boolean;
 	isCandidateSuppressed?: (
-		providerId: ProviderId,
+		providerId: ProviderExternalId,
 		reason: AcceptedMappingReason,
 	) => boolean;
 	limits: {
@@ -41,7 +44,7 @@ type CandidateSearchContext = {
 export type CandidateSearchOutcome =
 	| {
 			status: "resolved";
-			providerId: ProviderId;
+			providerId: ProviderExternalId;
 			reason: AcceptedMappingReason;
 			confidence: number;
 			successfulSynonym?: string;
@@ -70,7 +73,7 @@ function bestByProviderId(
 	candidates: ScoredSearchCandidate[],
 	lookupClient: ProviderTitleLookup<ProviderTitleResult>,
 ): ScoredSearchCandidate[] {
-	const best = new Map<ProviderId, ScoredSearchCandidate>();
+	const best = new Map<ProviderExternalId, ScoredSearchCandidate>();
 
 	for (const candidate of candidates) {
 		const providerId = lookupClient.readProviderId(candidate.result);

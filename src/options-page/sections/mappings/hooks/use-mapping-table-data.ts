@@ -5,9 +5,12 @@ import { useMemo } from "react";
 import { useDebounced } from "@/shared/hooks/use-debounced";
 import { useAniListMetadataBatch, useMappings } from "@/shared/queries";
 import type { AniListId } from "@/anilist";
-import { PROVIDERS, parseProviderIdentity, type Provider } from "@/providers";
-import { getProviderIdentityIdLabel } from "@/providers/provider-labels";
-import type { EffectiveMappingKind } from "@/mapping/types";
+import { PROVIDERS, type Provider } from "@/providers";
+import { formatProviderExternalId } from "@/providers/provider-labels";
+import {
+	createProviderMappingTarget,
+	type EffectiveMappingKind,
+} from "@/mapping/types";
 import type { MappingListRow } from "@/mapping/queries/list-mappings";
 import type { GetAniListMetadataOutput, GetMappingsOutput } from "@/rpc/types";
 import type { GetMappingsInput } from "@/rpc/schemas";
@@ -187,7 +190,10 @@ export const useMappingTableData = ({
 					providerIdentity:
 						entry.providerId == null
 							? null
-							: parseProviderIdentity(entry.provider, entry.providerId),
+							: createProviderMappingTarget(
+									entry.provider,
+									entry.providerId,
+								),
 					providerMeta: entry.providerMeta,
 					entries: [],
 					entryKinds: new Set<EffectiveMappingKind>(),
@@ -217,10 +223,13 @@ export const useMappingTableData = ({
 		};
 
 		const resolveTitle = (row: MappingTableRowData) => {
-			const fallback =
-				row.providerIdentity === null
-					? "Unmapped"
-					: getProviderIdentityIdLabel(row.providerIdentity);
+				const fallback =
+					row.providerIdentity === null
+						? "Unmapped"
+						: formatProviderExternalId(
+								row.providerIdentity.provider,
+								row.providerIdentity.providerId,
+							);
 			return row.providerMeta?.title ?? row.entries[0]?.title ?? fallback;
 		};
 

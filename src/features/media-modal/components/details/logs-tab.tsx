@@ -4,7 +4,7 @@
 import { buildAniListAnimeUrl } from '@/anilist/anilist-links';
 import type { MappingDetailsPayload } from '@/mapping/queries/mapping-details';
 import type { Provider } from '@/providers';
-import { getProviderIdLabel } from '@/providers/provider-labels';
+import { getProviderExternalIdLabel } from '@/providers/provider-labels';
 import { formatToken } from '../../helpers';
 
 type MappingInspectionLogsProps = {
@@ -35,7 +35,7 @@ function CodeBlock(props: { lines: Array<string | null | undefined> }): React.JS
 
 export function MappingInspectionLogs(props: MappingInspectionLogsProps): React.JSX.Element {
   const { inspection, provider } = props;
-  const providerIdLabel = getProviderIdLabel(provider);
+  const providerIdLabel = getProviderExternalIdLabel(provider);
   const hasReview = inspection.review.needsReview;
   const currentContextLines = [
     `aniListId: ${inspection.effectiveMapping.anilistId}`,

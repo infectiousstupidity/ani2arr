@@ -1,7 +1,7 @@
 /** Common provider-domain types owned by the provider domain. */
 // src/providers/types.ts
 
-import type { ProviderQualityProfileId, ProviderTagId } from "./provider-id";
+import type { ProviderQualityProfileId, ProviderTagId } from "./schemas";
 
 export const PROVIDERS = ["sonarr", "radarr"] as const;
 export type Provider = (typeof PROVIDERS)[number];

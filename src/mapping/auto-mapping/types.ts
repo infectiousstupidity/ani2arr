@@ -2,11 +2,11 @@
 // src/mapping/auto-mapping/types.ts
 
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
-import type { ProviderId } from "@/providers";
 import type { RequestPriority } from "@/shared/utils/request-priority";
 import type {
 	AcceptedMappingEvidence,
 	AcceptedMappingReason,
+	ProviderExternalId,
 } from "@/mapping/types";
 
 /**
@@ -29,7 +29,7 @@ export type AutoMappingStatus = "mapped" | "unresolved" | "ambiguous";
 
 /** Successful auto-mapping result returned by the resolver. */
 export interface AcceptedAutoMappingResult {
-	providerId: ProviderId;
+	providerId: ProviderExternalId;
 	reason: AcceptedMappingReason;
 	successfulSynonym?: string;
 }
@@ -43,7 +43,7 @@ export interface AcceptedAutoMappingResult {
 export type AutoMappingRecord =
 	| {
 			state: "mapped";
-			providerId: ProviderId;
+			providerId: ProviderExternalId;
 			acceptedEvidence: AutoMappingEvidence;
 			updatedAt: number;
 	  }

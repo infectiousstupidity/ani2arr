@@ -8,7 +8,7 @@ import { buildAniListAnimeUrl } from "@/anilist/anilist-links";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
 import type { Provider } from "@/providers";
 import {
-  getProviderIdentityIdLabel,
+  formatProviderExternalId,
   getProviderLabel,
 } from "@/providers/provider-labels";
 import { buildProviderOpenUrl } from "@/providers/provider-links";
@@ -181,9 +181,9 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
       ])
     : null;
 
-  const providerIdLine = effectiveMapping
-    ? getProviderIdentityIdLabel(effectiveMapping)
-    : null;
+	  const providerIdLine = effectiveMapping
+	    ? formatProviderExternalId(effectiveMapping.provider, effectiveMapping.providerId)
+	    : null;
 
   const providerLink = effectiveMapping
     ? buildProviderOpenUrl({

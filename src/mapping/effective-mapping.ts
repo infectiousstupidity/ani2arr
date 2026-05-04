@@ -1,5 +1,5 @@
 import type { AniListId } from "@/anilist";
-import type { Provider, ProviderId } from "@/providers";
+import type { Provider } from "@/providers";
 import type {
 	AcceptedMappingEvidence,
 	AcceptedMappingReason,
@@ -8,21 +8,22 @@ import type {
 	EffectiveMappingState,
 	MappingSuppressionKind,
 	MappingUnknownReason,
+	ProviderExternalId,
 } from "@/mapping/types";
 import type { AutoMappingRecord } from "@/mapping/auto-mapping/types";
 
 export interface EffectiveMapping {
 	anilistId: AniListId;
 	provider: Provider;
-	providerId: ProviderId | null;
+	providerId: ProviderExternalId | null;
 	providerMappingState: EffectiveMappingState;
 	mappingEntryKind: EffectiveMappingKind;
 	mappingSource?: AcceptedMappingSource;
 	mappingReason?: AcceptedMappingReason;
 	acceptedEvidence?: AcceptedMappingEvidence;
-	suppressedProviderId?: ProviderId | null;
+	suppressedProviderId?: ProviderExternalId | null;
 	suppressionKind?: MappingSuppressionKind;
-	exactUpstreamMatchProviderId?: ProviderId | null;
+	exactUpstreamMatchProviderId?: ProviderExternalId | null;
 	autoMappingStatus?: AutoMappingRecord["state"];
 	mappingUnknownReason?: MappingUnknownReason;
 	hadResolveAttempt?: boolean;
@@ -31,16 +32,16 @@ export interface EffectiveMapping {
 interface BuildEffectiveMappingInput {
 	provider: Provider;
 	anilistId: AniListId;
-	manualProviderId: ProviderId | null;
+	manualProviderId: ProviderExternalId | null;
 	ignored: boolean;
-	upstreamProviderIds: readonly ProviderId[];
-	rejectedCandidateProviderId?: ProviderId | null;
+	upstreamProviderIds: readonly ProviderExternalId[];
+	rejectedCandidateProviderId?: ProviderExternalId | null;
 	autoMappingRecord: AutoMappingRecord | null;
 }
 
 const withRejectedSuppression = (
 	effectiveMapping: EffectiveMapping,
-	rejectedCandidateProviderId: ProviderId | null | undefined,
+	rejectedCandidateProviderId: ProviderExternalId | null | undefined,
 ): EffectiveMapping =>
 	rejectedCandidateProviderId == null
 		? effectiveMapping
@@ -59,7 +60,7 @@ const shouldApplyRejectedSuppression = (
 
 const buildManualEffectiveMapping = (
 	input: BuildEffectiveMappingInput,
-	upstreamProviderId: ProviderId | null,
+	upstreamProviderId: ProviderExternalId | null,
 ): EffectiveMapping | null => {
 	const { provider, anilistId, manualProviderId } = input;
 	if (manualProviderId === null) {

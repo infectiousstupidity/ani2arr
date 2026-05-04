@@ -4,12 +4,11 @@
 import { storage } from "@wxt-dev/storage";
 import { browser } from "wxt/browser";
 import type { AniListId } from "@/anilist";
+import type { Provider } from "@/providers";
 import {
-	type Provider,
-	type ProviderIdFor,
-	type ProviderId,
-	parseProviderId,
-} from "@/providers";
+	parseProviderExternalId,
+	type ProviderExternalId,
+} from "@/mapping/types";
 import {
 	createManualMappingKey,
 	createReverseLookupKey,
@@ -65,18 +64,15 @@ export class ManualMappingService {
 		this.initialized = true;
 	}
 
-	public get<P extends Provider>(
-		provider: P,
+	public get(
+		provider: Provider,
 		anilistId: AniListId,
-	): ProviderIdFor<P> | null {
+	): ProviderExternalId | null {
 		const entry = this.manualMappings.get(
 			createManualMappingKey(provider, anilistId),
 		);
 		if (entry?.providerId === undefined) return null;
-		return parseProviderId(
-			provider,
-			entry.providerId,
-		) as ProviderIdFor<P> | null;
+		return parseProviderExternalId(provider, entry.providerId);
 	}
 
 	public has(provider: Provider, anilistId: AniListId): boolean {
@@ -90,10 +86,10 @@ export class ManualMappingService {
 		);
 	}
 
-	public getCandidateSuppression<P extends Provider>(
-		provider: P,
+	public getCandidateSuppression(
+		provider: Provider,
 		anilistId: AniListId,
-		providerId: ProviderIdFor<P>,
+		providerId: ProviderExternalId,
 	): "rejected" | null {
 		const entry = this.manualMappings.get(
 			createManualMappingKey(provider, anilistId),
@@ -103,9 +99,9 @@ export class ManualMappingService {
 			: "rejected";
 	}
 
-	public getLinkedAniListIds<P extends Provider>(
-		provider: P,
-		providerId: ProviderIdFor<P>,
+	public getLinkedAniListIds(
+		provider: Provider,
+		providerId: ProviderExternalId,
 	): AniListId[] {
 		const bucket = this.reverse.get(
 			createReverseLookupKey(provider, providerId),
@@ -114,17 +110,17 @@ export class ManualMappingService {
 		return [...bucket];
 	}
 
-	public async set<P extends Provider>(
-		provider: P,
+	public async set(
+		provider: Provider,
 		anilistId: AniListId,
-		providerId: ProviderIdFor<P>,
+		providerId: ProviderExternalId,
 	): Promise<void> {
 		await this.enqueueWrite(async () => {
 			const key = createManualMappingKey(provider, anilistId);
 			const now = Date.now();
 			const previous = this.manualMappings.get(key);
 			if (previous?.providerId !== undefined) {
-				const previousProviderId = parseProviderId(
+				const previousProviderId = parseProviderExternalId(
 					provider,
 					previous.providerId,
 				);
@@ -159,7 +155,7 @@ export class ManualMappingService {
 			if (!entry) return;
 
 			if (entry.providerId !== undefined) {
-				const providerId = parseProviderId(provider, entry.providerId);
+				const providerId = parseProviderExternalId(provider, entry.providerId);
 				if (providerId !== null) {
 					this.removeReverse(provider, providerId, anilistId);
 				}
@@ -183,7 +179,7 @@ export class ManualMappingService {
 			const entry = this.getOrCreateRecord(key, now);
 
 			if (entry.providerId !== undefined) {
-				const providerId = parseProviderId(provider, entry.providerId);
+				const providerId = parseProviderExternalId(provider, entry.providerId);
 				if (providerId !== null) {
 					this.removeReverse(provider, providerId, anilistId);
 				}
@@ -214,10 +210,10 @@ export class ManualMappingService {
 		});
 	}
 
-	public async setRejectedCandidate<P extends Provider>(
-		provider: P,
+	public async setRejectedCandidate(
+		provider: Provider,
 		anilistId: AniListId,
-		providerId: ProviderIdFor<P>,
+		providerId: ProviderExternalId,
 	): Promise<void> {
 		await this.enqueueWrite(async () => {
 			const key = createManualMappingKey(provider, anilistId);
@@ -234,10 +230,10 @@ export class ManualMappingService {
 		});
 	}
 
-	public async clearRejectedCandidate<P extends Provider>(
-		provider: P,
+	public async clearRejectedCandidate(
+		provider: Provider,
 		anilistId: AniListId,
-		providerId: ProviderIdFor<P>,
+		providerId: ProviderExternalId,
 	): Promise<void> {
 		await this.enqueueWrite(async () => {
 			const key = createManualMappingKey(provider, anilistId);
@@ -265,7 +261,10 @@ export class ManualMappingService {
 			) {
 				continue;
 			}
-			const providerId = parseProviderId(parsed.provider, entry.providerId);
+			const providerId = parseProviderExternalId(
+				parsed.provider,
+				entry.providerId,
+			);
 			if (providerId !== null) {
 				entries.push({
 					anilistId: parsed.anilistId,
@@ -316,7 +315,7 @@ export class ManualMappingService {
 			for (const [rawProviderId, updatedAt] of Object.entries(
 				entry.rejectedProviderIds,
 			)) {
-				const providerId = parseProviderId(
+				const providerId = parseProviderExternalId(
 					parsed.provider,
 					Number(rawProviderId),
 				);
@@ -393,7 +392,10 @@ export class ManualMappingService {
 			if (entry.providerId === undefined) continue;
 			const parsed = parseManualMappingKey(key);
 			if (!parsed) continue;
-			const providerId = parseProviderId(parsed.provider, entry.providerId);
+			const providerId = parseProviderExternalId(
+				parsed.provider,
+				entry.providerId,
+			);
 			if (providerId !== null) {
 				this.addReverse(parsed.provider, providerId, parsed.anilistId);
 			}
@@ -432,7 +434,7 @@ export class ManualMappingService {
 
 	private addReverse(
 		provider: Provider,
-		providerId: ProviderId,
+		providerId: ProviderExternalId,
 		anilistId: AniListId,
 	): void {
 		const reverseKey = createReverseLookupKey(provider, providerId);
@@ -446,7 +448,7 @@ export class ManualMappingService {
 
 	private removeReverse(
 		provider: Provider,
-		providerId: ProviderId,
+		providerId: ProviderExternalId,
 		anilistId: AniListId,
 	): void {
 		const reverseKey = createReverseLookupKey(provider, providerId);

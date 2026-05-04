@@ -2,11 +2,10 @@ import type { AniListId } from "@/anilist";
 import {
 	PROVIDERS,
 	type Provider,
-	type ProviderIdFor,
-	type ProviderId,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
+import type { ProviderExternalId } from "@/mapping/types";
 import type { AnibridgeMappingPair } from "@/mapping/upstream-mapping";
 import type { AutoMappingRecord } from "@/mapping/auto-mapping/types";
 import {
@@ -31,19 +30,19 @@ export interface GetMappingIdentitiesDeps {
 		get<P extends Provider>(
 			provider: P,
 			anilistId: AniListId,
-		): ProviderIdFor<P> | null;
+		): ProviderExternalId | null;
 		isIgnored(provider: Provider, anilistId: AniListId): boolean;
 		listRejectedCandidates(provider?: Provider): Array<{
 			anilistId: AniListId;
 			provider: Provider;
-			providerId: ProviderId;
+			providerId: ProviderExternalId;
 			updatedAt: number;
 		}>;
 		listIgnores(): Array<{ anilistId: AniListId; provider: Provider }>;
 		list(): Array<{
 			anilistId: AniListId;
 			provider: Provider;
-			providerId: ProviderId;
+			providerId: ProviderExternalId;
 		}>;
 	};
 	anibridgeMappingStore: {

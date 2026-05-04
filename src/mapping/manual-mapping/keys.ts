@@ -2,11 +2,11 @@
 // src/mapping/manual-mapping/keys.ts
 
 import { parseAniListIdOrNull, type AniListId } from "@/anilist";
+import type { Provider } from "@/providers";
 import {
-	parseProviderId,
-	type Provider,
-	type ProviderIdFor,
-} from "@/providers";
+	parseProviderExternalId,
+	type ProviderExternalId,
+} from "@/mapping/types";
 import type { ManualMappingKey, StoredManualMapping } from "./types";
 
 export const isMappingProvider = (value: unknown): value is Provider =>
@@ -35,9 +35,9 @@ export const parseManualMappingKey = (
 	return { provider, anilistId };
 };
 
-export const createReverseLookupKey = <P extends Provider>(
-	provider: P,
-	providerId: ProviderIdFor<P>,
+export const createReverseLookupKey = (
+	provider: Provider,
+	providerId: ProviderExternalId,
 ): string => `${provider}:${providerId}`;
 
 const finiteTimestampOrNull = (value: unknown): number | null =>
@@ -88,7 +88,7 @@ export const normalizeStoredManualMapping = (
 		return null;
 	}
 
-	const providerId = parseProviderId(provider, candidate.providerId);
+	const providerId = parseProviderExternalId(provider, candidate.providerId);
 	const mappedAt =
 		providerId === null
 			? null

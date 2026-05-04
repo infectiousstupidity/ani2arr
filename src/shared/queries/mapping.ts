@@ -20,7 +20,8 @@ import type {
 } from "@/rpc/types";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
-import type { Provider, ProviderId } from "@/providers";
+import type { Provider } from "@/providers";
+import type { ProviderExternalId } from "@/mapping/types";
 import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
@@ -63,22 +64,22 @@ type SetManualMappingMutationInput = SetManualMappingInput & {
 	optimisticMapping?: MappingSearchResult;
 };
 
-type ProviderIdentityLike = {
-	tvdbId?: ProviderId;
-	tmdbId?: ProviderId;
+type ProviderIdFields = {
+	tvdbId?: ProviderExternalId;
+	tmdbId?: ProviderExternalId;
 };
 
 function getMutationProviderId(
 	input: SetManualMappingMutationInput,
-): ProviderId | null {
+): ProviderExternalId | null {
 	if (input.optimisticMapping) {
 		return input.optimisticMapping.providerId;
 	}
 
-	const identity = input as ProviderIdentityLike;
+	const ids = input as ProviderIdFields;
 	return input.provider === "sonarr"
-		? (identity.tvdbId ?? null)
-		: (identity.tmdbId ?? null);
+		? (ids.tvdbId ?? null)
+		: (ids.tmdbId ?? null);
 }
 
 function toSetManualMappingRequest(
@@ -125,7 +126,7 @@ function clearProviderMedia<TStatus extends ProviderStatusCacheValue>(
 function applyManualMappingToStatus(
 	status: ProviderStatusCacheValue | undefined,
 	input: SetManualMappingMutationInput,
-	providerId: ProviderId,
+	providerId: ProviderExternalId,
 ): ProviderStatusCacheValue | undefined {
 	if (!status) {
 		return status;
@@ -182,7 +183,7 @@ function getLinkedAniListIds(
 function applyManualMappingToInspection(
 	inspection: GetMappingInspectionOutput | undefined,
 	input: SetManualMappingMutationInput,
-	providerId: ProviderId,
+	providerId: ProviderExternalId,
 ): GetMappingInspectionOutput | undefined {
 	if (!inspection) {
 		return inspection;

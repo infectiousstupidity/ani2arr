@@ -7,7 +7,7 @@ import type {
 	ProviderTagId,
 	RadarrMovieId,
 	TmdbId,
-} from "./provider-id";
+} from "./schemas";
 
 export interface RadarrMovie {
 	id: RadarrMovieId;

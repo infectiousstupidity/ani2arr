@@ -1,13 +1,11 @@
 /** Branded provider-domain IDs, validators, and schemas. */
-// src/providers/provider-id.ts
+// src/providers/schemas.ts
 
 import * as v from "valibot";
 import type { Brand } from "@/shared/types/brand";
-import type { Provider } from "./types";
 
 export type TvdbId = Brand<number, "TvdbId">;
 export type TmdbId = Brand<number, "TmdbId">;
-export type ProviderId = TvdbId | TmdbId;
 
 export type SonarrSeriesId = Brand<number, "SonarrSeriesId">;
 export type RadarrMovieId = Brand<number, "RadarrMovieId">;
@@ -17,22 +15,6 @@ export type ProviderQualityProfileId = Brand<
 	"ProviderQualityProfileId"
 >;
 export type ProviderTagId = Brand<number, "ProviderTagId">;
-
-export type SonarrIdentity = {
-	provider: "sonarr";
-	providerId: TvdbId;
-};
-
-export type RadarrIdentity = {
-	provider: "radarr";
-	providerId: TmdbId;
-};
-
-export type ProviderIdentity = SonarrIdentity | RadarrIdentity;
-
-export type ProviderIdFor<P extends Provider> = P extends "sonarr"
-	? TvdbId
-	: TmdbId;
 
 function isPositiveIntegerId(value: unknown): value is number {
 	return (
@@ -94,36 +76,6 @@ export function parseTmdbIdOrNull(value: unknown): TmdbId | null {
 }
 
 export const TmdbIdSchema = createPositiveIntegerIdSchema<TmdbId>();
-
-export function parseProviderId(
-	provider: Provider,
-	value: unknown,
-): ProviderId | null {
-	return provider === "sonarr"
-		? parseTvdbIdOrNull(value)
-		: parseTmdbIdOrNull(value);
-}
-
-export function parseProviderIdentity(
-	provider: "sonarr",
-	providerId: unknown,
-): SonarrIdentity;
-export function parseProviderIdentity(
-	provider: "radarr",
-	providerId: unknown,
-): RadarrIdentity;
-export function parseProviderIdentity(
-	provider: Provider,
-	providerId: unknown,
-): ProviderIdentity;
-export function parseProviderIdentity(
-	provider: Provider,
-	providerId: unknown,
-): ProviderIdentity {
-	return provider === "sonarr"
-		? { provider, providerId: parseTvdbId(providerId) }
-		: { provider, providerId: parseTmdbId(providerId) };
-}
 
 export function isSonarrSeriesId(value: unknown): value is SonarrSeriesId {
 	return isPositiveIntegerId(value);

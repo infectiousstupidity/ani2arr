@@ -5,7 +5,7 @@ import { AniListTitleLanguageSchema } from "@/anilist/schemas/title-language.sch
 import {
 	ProviderQualityProfileIdSchema,
 	ProviderTagIdSchema,
-} from "@/providers/provider-id";
+} from "@/providers/schemas";
 
 // ============================================================================
 // 1. SHARED BASE FIELDS

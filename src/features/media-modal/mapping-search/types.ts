@@ -2,7 +2,8 @@
 // src/features/media-modal/mapping-search/types.ts
 
 import type { AniListId } from "@/anilist";
-import type { ProviderId, TmdbId, TvdbId } from "@/providers";
+import type { TmdbId, TvdbId } from "@/providers";
+import type { ProviderExternalId } from "@/mapping/types";
 
 interface MappingSearchResultBase {
 	title: string;
@@ -26,5 +27,5 @@ export type MappingSearchResult =
 	| ({ provider: "radarr"; providerId: TmdbId } & MappingSearchResultBase);
 
 export type AnyMappingSearchResult = MappingSearchResultBase & {
-	providerId: ProviderId;
+	providerId: ProviderExternalId;
 };

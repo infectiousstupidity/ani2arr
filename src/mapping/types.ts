@@ -1,6 +1,54 @@
 /** Mapping service input and output types for AniList-driven resolution flows. */
 // src/mapping/types.ts
 
+import {
+	parseTmdbIdOrNull,
+	parseTvdbIdOrNull,
+	type TmdbId,
+	type TvdbId,
+} from "@/providers/schemas";
+import type { Provider } from "@/providers/types";
+
+export type ProviderExternalId = TvdbId | TmdbId;
+
+export type ProviderMappingTarget =
+	| { provider: "sonarr"; providerId: TvdbId }
+	| { provider: "radarr"; providerId: TmdbId };
+
+export function parseProviderExternalId(
+	provider: "sonarr",
+	value: unknown,
+): TvdbId | null;
+export function parseProviderExternalId(
+	provider: "radarr",
+	value: unknown,
+): TmdbId | null;
+export function parseProviderExternalId(
+	provider: Provider,
+	value: unknown,
+): ProviderExternalId | null;
+export function parseProviderExternalId(
+	provider: Provider,
+	value: unknown,
+): ProviderExternalId | null {
+	return provider === "sonarr"
+		? parseTvdbIdOrNull(value)
+		: parseTmdbIdOrNull(value);
+}
+
+export function createProviderMappingTarget(
+	provider: Provider,
+	value: unknown,
+): ProviderMappingTarget | null {
+	if (provider === "sonarr") {
+		const providerId = parseTvdbIdOrNull(value);
+		return providerId === null ? null : { provider, providerId };
+	}
+
+	const providerId = parseTmdbIdOrNull(value);
+	return providerId === null ? null : { provider, providerId };
+}
+
 /** Derived entry kinds used by review/filter/table surfaces. */
 export const MAPPING_ENTRY_KIND_VALUES = [
 	"manual",
