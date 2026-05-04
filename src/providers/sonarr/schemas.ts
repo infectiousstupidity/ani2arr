@@ -159,11 +159,17 @@ export const SonarrSeriesSchema = v.object({
 	statistics: v.optional(SonarrStatisticsSchema),
 });
 
+// GET /series/{id}/folder response used when previewing/saving path changes.
+export const SonarrGeneratedFolderSchema = v.object({
+	folder: v.string(),
+});
+
 // GET /rootfolder option row for add/edit forms.
 export const SonarrRootFolderSchema = v.object({
 	id: v.number(),
 	path: v.string(),
 	freeSpace: v.optional(v.nullable(v.number())),
+	accessible: v.optional(v.boolean()),
 });
 
 // GET /qualityprofile option row for add/edit forms.

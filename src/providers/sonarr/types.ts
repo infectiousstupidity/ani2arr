@@ -10,6 +10,7 @@ import type {
 	SonarrAddOptionsSchema,
 	SonarrEditMonitoringActionSchema,
 	SonarrEditOptionsSchema,
+	SonarrGeneratedFolderSchema,
 	SonarrImageSchema,
 	SonarrLookupCacheRowSchema,
 	SonarrLookupSeriesSchema,
@@ -46,6 +47,9 @@ export type SonarrImage = v.InferOutput<typeof SonarrImageSchema>;
 
 export type SonarrSeries = v.InferOutput<typeof SonarrSeriesSchema>;
 export type SonarrLookupSeries = v.InferOutput<typeof SonarrLookupSeriesSchema>;
+export type SonarrGeneratedFolder = v.InferOutput<
+	typeof SonarrGeneratedFolderSchema
+>;
 
 export type SonarrRootFolder = v.InferOutput<typeof SonarrRootFolderSchema>;
 export type SonarrQualityProfile = v.InferOutput<
