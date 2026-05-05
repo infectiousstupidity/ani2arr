@@ -82,9 +82,11 @@ const hasEditableProviderFields = (value: Record<string, unknown>): boolean =>
 
 const hasEditableSonarrFields = (value: Record<string, unknown>): boolean =>
 	hasEditableProviderFields(value) &&
+	typeof value.path === "string" &&
 	typeof value.seriesType === "string" &&
 	typeof value.seasonFolder === "boolean" &&
-	typeof value.monitored === "boolean";
+	typeof value.monitored === "boolean" &&
+	(value.monitorNewItems === "all" || value.monitorNewItems === "none");
 
 const hasEditableRadarrFields = (value: Record<string, unknown>): boolean =>
 	hasEditableProviderFields(value) &&

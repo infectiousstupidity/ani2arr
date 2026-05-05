@@ -58,7 +58,7 @@ function trimToNull(value?: string | null): string | null {
 	return trimmed.length > 0 ? trimmed : null;
 }
 
-const extractProviderFolderSlug = (
+export const extractProviderFolderSlug = (
 	path?: string | null,
 	rootFolderPath?: string | null,
 ): string | null => {

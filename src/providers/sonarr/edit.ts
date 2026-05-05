@@ -21,7 +21,7 @@ import {
 	normalizeError,
 } from "@/shared/errors";
 import {
-	buildProviderFolderSlug,
+	extractProviderFolderSlug,
 	joinRootAndSlug,
 	normalizePathForCompare,
 } from "../library/paths";
@@ -73,7 +73,6 @@ export async function updateSonarrSeries(
 		api: deps.client,
 		credentials: input.credentials,
 		form: input.form,
-		title: input.title,
 		tvdbId: input.tvdbId,
 	});
 
@@ -122,10 +121,9 @@ async function resolveSonarrSeriesUpdate(input: {
 	>;
 	credentials: ProviderCredentials;
 	form: SonarrFormState;
-	title: string;
 	tvdbId: TvdbId;
 }): Promise<ResolvedSonarrSeriesUpdate> {
-	const { api, credentials, form, title, tvdbId } = input;
+	const { api, credentials, form, tvdbId } = input;
 
 	if (!Number.isFinite(tvdbId)) {
 		throw createError(
@@ -169,10 +167,21 @@ async function resolveSonarrSeriesUpdate(input: {
 	const seasonFolder = form.seasonFolder ?? baseSeries.seasonFolder;
 	const seriesType = form.seriesType ?? baseSeries.seriesType;
 	const monitored = form.monitored ?? baseSeries.monitored;
-	const nextPath = joinRootAndSlug(
-		rootFolderPath,
-		buildProviderFolderSlug(baseSeries, title),
+	const monitorNewItems = form.monitorNewItems ?? baseSeries.monitorNewItems;
+	const folderSlug = extractProviderFolderSlug(
+		baseSeries.path,
+		baseSeries.rootFolderPath,
 	);
+
+	if (!folderSlug) {
+		throw createError(
+			ErrorCode.VALIDATION_ERROR,
+			"Missing Sonarr series folder for update.",
+			"Unable to update this series because its current folder path is unknown.",
+		);
+	}
+
+	const nextPath = joinRootAndSlug(rootFolderPath, folderSlug);
 	const moveFiles = shouldMoveProviderFiles(baseSeries.path, nextPath);
 
 	return {
@@ -185,6 +194,7 @@ async function resolveSonarrSeriesUpdate(input: {
 			seasonFolder,
 			seriesType,
 			monitored,
+			monitorNewItems,
 			tags,
 		}),
 	};

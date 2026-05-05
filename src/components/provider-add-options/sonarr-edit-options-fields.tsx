@@ -11,6 +11,7 @@ import {
 import type { ProviderSetupPathPreview } from "@/providers/library/paths";
 import {
 	EDIT_MONITOR_ACTION_OPTIONS_WITH_DESCRIPTIONS,
+	MONITOR_NEW_ITEMS_OPTIONS_WITH_DESCRIPTIONS,
 	SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
 	type SonarrEditMonitoringAction,
 	type SonarrFormState,
@@ -116,7 +117,22 @@ export function SonarrEditOptionsFields(
 			/>
 
 			<SelectField
-				label="Monitoring Action"
+				label="Monitor New Seasons"
+				disabled={disabled}
+				value={values.monitorNewItems ?? ""}
+				onChange={(value) =>
+					onChange(
+						"monitorNewItems",
+						value as SonarrFormState["monitorNewItems"],
+					)
+				}
+				options={MONITOR_NEW_ITEMS_OPTIONS_WITH_DESCRIPTIONS}
+				container={portalContainer ?? null}
+				triggerClassName={modalSelectTriggerClassName}
+			/>
+
+			<SelectField
+				label="Monitor Episodes"
 				disabled={disabled}
 				value={monitoringAction}
 				onChange={(value) =>
