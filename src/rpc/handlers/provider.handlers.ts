@@ -306,6 +306,7 @@ function toLegacySonarrLookupSeries(
 		title: series.title,
 		tvdbId: series.tvdbId,
 		...(series.titleSlug === undefined ? {} : { titleSlug: series.titleSlug }),
+		folder: series.folder,
 		...(series.year === undefined ? {} : { year: series.year }),
 		...(series.genres === undefined ? {} : { genres: series.genres }),
 		...(series.network === undefined ? {} : { network: series.network }),

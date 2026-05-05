@@ -21,9 +21,10 @@ import {
 	normalizeError,
 } from "@/shared/errors";
 import {
-	extractProviderFolderSlug,
-	joinRootAndSlug,
-	normalizePathForCompare,
+	extractPathLeaf,
+	extractRelativeFolder,
+	joinRootAndFolder,
+	shouldMoveProviderFiles,
 } from "../library/paths";
 import { resolveSonarrTagIds } from "./tags";
 
@@ -168,12 +169,13 @@ async function resolveSonarrSeriesUpdate(input: {
 	const seriesType = form.seriesType ?? baseSeries.seriesType;
 	const monitored = form.monitored ?? baseSeries.monitored;
 	const monitorNewItems = form.monitorNewItems ?? baseSeries.monitorNewItems;
-	const folderSlug = extractProviderFolderSlug(
-		baseSeries.path,
-		baseSeries.rootFolderPath,
-	);
+	const folderName =
+		extractRelativeFolder(
+			baseSeries.path,
+			baseSeries.rootFolderPath,
+		) ?? extractPathLeaf(baseSeries.path);
 
-	if (!folderSlug) {
+	if (!folderName) {
 		throw createError(
 			ErrorCode.VALIDATION_ERROR,
 			"Missing Sonarr series folder for update.",
@@ -181,7 +183,7 @@ async function resolveSonarrSeriesUpdate(input: {
 		);
 	}
 
-	const nextPath = joinRootAndSlug(rootFolderPath, folderSlug);
+	const nextPath = joinRootAndFolder(rootFolderPath, folderName);
 	const moveFiles = shouldMoveProviderFiles(baseSeries.path, nextPath);
 
 	return {
@@ -235,18 +237,4 @@ function resolveRequiredRootFolderPath(input: {
 	}
 
 	return resolvedValue;
-}
-
-function shouldMoveProviderFiles(
-	currentPath: string | null | undefined,
-	nextPath: string,
-): boolean {
-	const currentPathNormalized = normalizePathForCompare(currentPath);
-	const nextPathNormalized = normalizePathForCompare(nextPath);
-
-	return (
-		currentPathNormalized !== null &&
-		nextPathNormalized !== null &&
-		currentPathNormalized !== nextPathNormalized
-	);
 }

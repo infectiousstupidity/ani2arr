@@ -33,7 +33,7 @@ export type SonarrSetupTarget = {
 	initialFormDraft: SonarrFormState;
 	initialMonitoringAction: SonarrEditMonitoringAction;
 } & (
-	| { setupMode: "add" }
+	| { setupMode: "add"; providerFolderName?: string | undefined }
 	| {
 			setupMode: "edit";
 			seriesId: SonarrSeries["id"];
@@ -49,7 +49,7 @@ export type RadarrSetupTarget = {
 	targetTitle: string;
 	initialFormDraft: RadarrFormState;
 } & (
-	| { setupMode: "add" }
+	| { setupMode: "add"; providerFolderName?: string | undefined }
 	| {
 			setupMode: "edit";
 			movieId: RadarrMovie["id"];
@@ -64,6 +64,7 @@ type SonarrSetupTargetCandidateInput = {
 	status: CheckSeriesStatusResponse | null | undefined;
 	targetTitle: string;
 	storedDefaults: Partial<SonarrFormState> | null | undefined;
+	providerFolderName?: string | null | undefined;
 };
 
 type RadarrSetupTargetCandidateInput = {
@@ -71,6 +72,7 @@ type RadarrSetupTargetCandidateInput = {
 	status: CheckMovieStatusResponse | null | undefined;
 	targetTitle: string;
 	storedDefaults: Partial<RadarrFormState> | null | undefined;
+	providerFolderName?: string | null | undefined;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -91,6 +93,20 @@ const hasEditableSonarrFields = (value: Record<string, unknown>): boolean =>
 const hasEditableRadarrFields = (value: Record<string, unknown>): boolean =>
 	hasEditableProviderFields(value) &&
 	typeof value.monitored === "boolean";
+
+const readProviderFolderName = (value: unknown): string | undefined => {
+	if (!isRecord(value) || typeof value.folder !== "string") return undefined;
+
+	const folder = value.folder.trim();
+	return folder.length > 0 ? folder : undefined;
+};
+
+const readProviderFolderNameFromMovie = (value: unknown): string | undefined => {
+	if (!isRecord(value) || typeof value.folderName !== "string") return undefined;
+
+	const folderName = value.folderName.trim();
+	return folderName.length > 0 ? folderName : undefined;
+};
 
 const isFullSonarrSeries = (value: unknown): value is SonarrSeries =>
 	isRecord(value) &&
@@ -160,6 +176,7 @@ export function getRadarrSetupTargetCandidateStatus({
 
 export function createSonarrSetupTargetCandidate({
 	anilistId,
+	providerFolderName,
 	status,
 	storedDefaults,
 	targetTitle,
@@ -191,6 +208,10 @@ export function createSonarrSetupTargetCandidate({
 
 	const tvdbId = parseTvdbIdOrNull(status.providerId);
 	if (tvdbId === null) return null;
+	const lookupFolderName =
+		providerFolderName?.trim() ||
+		readProviderFolderName(status.series) ||
+		undefined;
 
 	return {
 		provider: "sonarr",
@@ -201,11 +222,15 @@ export function createSonarrSetupTargetCandidate({
 		targetTitle,
 		initialFormDraft: buildSonarrAddDraft(storedDefaults),
 		initialMonitoringAction: "noChange",
+		...(lookupFolderName === undefined
+			? {}
+			: { providerFolderName: lookupFolderName }),
 	};
 }
 
 export function createRadarrSetupTargetCandidate({
 	anilistId,
+	providerFolderName,
 	status,
 	storedDefaults,
 	targetTitle,
@@ -235,6 +260,10 @@ export function createRadarrSetupTargetCandidate({
 
 	const tmdbId = parseTmdbIdOrNull(status.providerId);
 	if (tmdbId === null) return null;
+	const lookupFolderName =
+		providerFolderName?.trim() ||
+		readProviderFolderNameFromMovie(status.movie) ||
+		undefined;
 
 	return {
 		provider: "radarr",
@@ -244,5 +273,8 @@ export function createRadarrSetupTargetCandidate({
 		tmdbId,
 		targetTitle,
 		initialFormDraft: buildRadarrAddDraft(storedDefaults),
+		...(lookupFolderName === undefined
+			? {}
+			: { providerFolderName: lookupFolderName }),
 	};
 }

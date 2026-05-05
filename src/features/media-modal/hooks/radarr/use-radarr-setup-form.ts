@@ -4,9 +4,13 @@
 import { useEffect, useMemo, useRef, type FormEvent } from "react";
 import { useForm, type Path, type PathValue } from "react-hook-form";
 
-import { deriveProviderSetupPathPreview } from "@/providers/library/paths";
+import type { ProviderRootFolderPathPreview } from "@/components/provider-add-options/provider-root-folder-select";
 import type { RadarrFormState } from "@/providers/settings/provider-settings.schema";
 
+import {
+	buildAddPathPreview,
+	buildEditPathPreview,
+} from "../../provider-path-preview";
 import type { RadarrSetupTarget } from "../../setup-target";
 
 export type RadarrSetupFormState = {
@@ -18,7 +22,7 @@ export type RadarrSetupFormState = {
 	handleSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 	isBusy: boolean;
 	isDirty: boolean;
-	pathPreview: ReturnType<typeof deriveProviderSetupPathPreview>;
+	pathPreview: ProviderRootFolderPathPreview;
 };
 
 type UseRadarrSetupFormInput = {
@@ -38,7 +42,6 @@ function getInitialValues(
 
 export function useRadarrSetupForm({
 	target,
-	providerRequestTitle,
 	storedDefaults,
 	isSubmitting,
 	onSubmitDraft,
@@ -87,23 +90,17 @@ export function useRadarrSetupForm({
 		const selectedRootFolderPath = currentDraft.rootFolderPath ?? null;
 
 		if (target.setupMode === "edit") {
-			return deriveProviderSetupPathPreview({
-				mode: "edit",
-				provider: "radarr",
-				title: target.targetTitle,
+			return buildEditPathPreview({
 				selectedRootFolderPath,
 				existingMedia: target.existingItem,
 			});
 		}
 
-		return deriveProviderSetupPathPreview({
-			mode: "add",
-			provider: "radarr",
-			title: providerRequestTitle,
+		return buildAddPathPreview({
 			selectedRootFolderPath,
-			providerIdHint: target.tmdbId,
+			providerFolderName: target.providerFolderName,
 		});
-	}, [currentDraft.rootFolderPath, providerRequestTitle, target]);
+	}, [currentDraft.rootFolderPath, target]);
 
 	if (target === null || pathPreview === null) {
 		return null;

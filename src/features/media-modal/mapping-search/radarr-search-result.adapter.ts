@@ -3,7 +3,7 @@
 
 import { parseAniListIdOrNull, type AniListId } from '@/anilist';
 import { parseTmdbId, type RadarrLookupMovie } from '@/providers';
-import { getProviderRouteSlug } from '@/providers/library/paths';
+import { getProviderRouteSlug } from '@/providers/provider-route-slug';
 import type { MappingSearchResult } from './types';
 
 export interface RadarrAdapterOptions {
@@ -55,6 +55,7 @@ export function toMappingSearchResultFromRadarr(
     provider: 'radarr',
     providerId: tmdbId,
     title: movie.title,
+    ...(movie.folderName ? { providerFolderName: movie.folderName } : {}),
     ...(typeof movie.year === 'number' ? { year: movie.year } : {}),
     typeLabel: 'Movie',
     isInLibrary,

@@ -6,9 +6,17 @@ import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check } from 'lucide-react';
 
 import type { ProviderRootFolder } from '@/providers';
-import { buildProviderMediaPath, type ProviderSetupPathPreview } from '@/providers/library/paths';
 import { FormField, Label, Select, SelectContent, SelectTrigger } from '@/shared/ui/form/form';
 import { cn } from '@/shared/utils/cn';
+
+export interface ProviderRootFolderPathPreview {
+  mode: 'add' | 'edit';
+  currentPath?: string | null | undefined;
+  selectedPreviewPath?: string | null | undefined;
+  folderName?: string | null | undefined;
+  willMove?: boolean | undefined;
+  getRootFolderDisplayPath?: ((rootFolderPath: string) => string) | undefined;
+}
 
 export interface ProviderRootFolderSelectProps {
   value: string;
@@ -19,7 +27,7 @@ export interface ProviderRootFolderSelectProps {
   initialFocusRef?: React.RefObject<HTMLButtonElement | null> | undefined;
   className?: string | undefined;
   triggerClassName?: string | undefined;
-  pathPreview?: ProviderSetupPathPreview | undefined;
+  pathPreview?: ProviderRootFolderPathPreview | undefined;
 }
 
 function formatFreeSpace(bytes?: number | null): string | null {
@@ -55,18 +63,19 @@ export function ProviderRootFolderSelect(
     pathPreview,
   } = props;
 
-  const triggerDisplayPath = (pathPreview?.previewPath ?? value) || null;
-  const currentPath = pathPreview?.existingPath ?? null;
-  const previewPath = pathPreview?.previewPath ?? null;
-  const folderSlug = pathPreview?.folderSlug ?? null;
+  const triggerDisplayPath = (pathPreview?.selectedPreviewPath ?? value) || null;
+  const currentPath = pathPreview?.currentPath ?? null;
+  const previewPath = pathPreview?.selectedPreviewPath ?? null;
+  const folderName = pathPreview?.folderName ?? null;
   const willMove = pathPreview?.willMove ?? false;
-  const isEditMode = !!currentPath;
+  const isEditMode = pathPreview?.mode === 'edit';
   const shouldShowPathPreview = !isEditMode && !!previewPath;
   const shouldShowNextPath = isEditMode && willMove && !!previewPath;
-  const shouldShowCreateHelper = !isEditMode && !!folderSlug && !!previewPath;
+  const shouldShowCreateHelper = !isEditMode && !!folderName && !!previewPath;
   const shouldShowMoveHelper = isEditMode && willMove;
-  const getFolderDisplayPath = (rootFolderPath: string): string =>
-    folderSlug ? buildProviderMediaPath(rootFolderPath, folderSlug) ?? rootFolderPath : rootFolderPath;
+  const getFolderDisplayPath =
+    pathPreview?.getRootFolderDisplayPath ??
+    ((rootFolderPath: string): string => rootFolderPath);
 
   return (
     <>
@@ -124,7 +133,7 @@ export function ProviderRootFolderSelect(
 
       {currentPath ? (
         <div className={cn('space-y-1', className)}>
-          <p className="text-xs text-text-secondary">Current path</p>
+          <p className="text-xs text-text-secondary">Path</p>
           <p className="break-all text-xs text-text-primary" title={currentPath}>
             {currentPath}
           </p>
@@ -152,7 +161,7 @@ export function ProviderRootFolderSelect(
       {shouldShowCreateHelper ? (
         <div className={cn('space-y-1', className)}>
           <p className="text-xs text-text-secondary" title={previewPath ?? undefined}>
-            &apos;{folderSlug}&apos; subfolder will be created automatically.
+            &apos;{folderName}&apos; subfolder will be created automatically.
           </p>
         </div>
       ) : null}

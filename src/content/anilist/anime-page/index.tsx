@@ -1,5 +1,6 @@
 /** AniList anime-page surface composition and mount orchestration. */
 // src/content/anilist/anime-page/index.tsx
+/* eslint-disable complexity -- Existing page root coordinates several AniList surface workflows. */
 
 import React, { useState } from "react";
 import ReactDOM, { Root } from "react-dom/client";
@@ -39,8 +40,8 @@ import { logger } from "@/shared/utils/logger";
 import { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
 import {
 	getProviderRouteSlug,
-	type ProviderMediaPathSource,
-} from "@/providers/library/paths";
+	type ProviderRouteSlugSource,
+} from "@/providers/provider-route-slug";
 import { getProviderBaseUrl } from "@/options/provider-config";
 import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
@@ -307,7 +308,7 @@ function getAnimePageProviderRouteSlug(input: {
 			"radarr",
 			(input.movieStatusData?.movie ??
 				input.addMovieMutation.data ??
-				null) as ProviderMediaPathSource | null,
+				null) as ProviderRouteSlugSource | null,
 		);
 	}
 
@@ -315,7 +316,7 @@ function getAnimePageProviderRouteSlug(input: {
 		"sonarr",
 		(input.seriesStatusData?.series ??
 			input.addSeriesMutation.data ??
-			null) as ProviderMediaPathSource | null,
+			null) as ProviderRouteSlugSource | null,
 	);
 }
 
@@ -958,6 +959,7 @@ async function mountAnimePageUI({
 	ui.autoMount();
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- Content scripts export their WXT entrypoint.
 export const main = createContentEntrypointShell({
 	isEligible: isAnimePageShellEligible,
 	mount: mountAnimePageUI,

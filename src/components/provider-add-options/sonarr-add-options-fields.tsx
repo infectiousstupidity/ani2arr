@@ -5,7 +5,6 @@ import React from 'react';
 
 import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
 import { parseProviderQualityProfileId, type ProviderMetadata } from '@/providers';
-import type { ProviderSetupPathPreview } from '@/providers/library/paths';
 import {
   MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
@@ -14,7 +13,7 @@ import {
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import { cn } from '@/shared/utils/cn';
 
-import { ProviderRootFolderSelect } from './provider-root-folder-select';
+import { ProviderRootFolderSelect, type ProviderRootFolderPathPreview } from './provider-root-folder-select';
 
 export type SonarrAddOptionsFieldsLayout = 'stacked' | 'grid';
 
@@ -26,7 +25,7 @@ export interface SonarrAddOptionsFieldsProps {
   className?: string | undefined;
   portalContainer?: HTMLElement | ShadowRoot | null | undefined;
   initialFocusRef?: React.RefObject<HTMLButtonElement | null> | undefined;
-  pathPreview?: ProviderSetupPathPreview | undefined;
+  pathPreview?: ProviderRootFolderPathPreview | undefined;
   includeSearchToggle?: boolean | undefined;
   layout?: SonarrAddOptionsFieldsLayout | undefined;
 }

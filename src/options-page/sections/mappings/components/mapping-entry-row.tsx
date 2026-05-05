@@ -1,5 +1,6 @@
 /** Renders one AniList mapping entry row with inline provider and suppression actions. */
 // src/options-page/sections/mappings/components/mapping-entry-row.tsx
+/* eslint-disable complexity -- Existing row combines mapping status, provider status, and actions. */
 
 import React from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
@@ -18,8 +19,8 @@ import { cn } from '@/shared/utils/cn';
 import { buildProviderOpenUrl } from '@/providers/provider-links';
 import {
   getProviderRouteSlug,
-  type ProviderMediaPathSource,
-} from '@/providers/library/paths';
+  type ProviderRouteSlugSource,
+} from '@/providers/provider-route-slug';
 import { useMovieStatus } from '@/providers/hooks/radarr.queries';
 import { useSeriesStatus } from '@/providers/hooks/sonarr.queries';
 
@@ -153,7 +154,7 @@ export const MappingEntryRow: React.FC<MappingEntryRowProps> = ({
   const metaParts = [formatLabel, anilistYear ? String(anilistYear) : null, providerStatus].filter(Boolean) as string[];
 
   const providerItem = entry.provider === 'radarr' ? radarrStatus.data?.movie : sonarrStatus.data?.series;
-  const providerRouteSlug = getProviderRouteSlug(entry.provider, providerItem as ProviderMediaPathSource | null);
+  const providerRouteSlug = getProviderRouteSlug(entry.provider, providerItem as ProviderRouteSlugSource | null);
   const providerLink = buildProviderOpenUrl({
     provider: entry.provider,
     baseUrl: providerUrl ?? '',

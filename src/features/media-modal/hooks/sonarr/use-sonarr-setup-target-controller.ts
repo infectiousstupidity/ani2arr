@@ -20,6 +20,7 @@ type SonarrMappingTarget =
 			provider: string | null;
 			providerId: TvdbIdInput;
 			title?: string | null;
+			providerFolderName?: string | null;
 	  }
 	| null
 	| undefined;
@@ -80,6 +81,7 @@ export function useSonarrSetupTargetController({
 			}),
 			targetTitle: mapping.title ?? providerRequestTitle,
 			storedDefaults,
+			providerFolderName: mapping.providerFolderName,
 		});
 	};
 
