@@ -7,7 +7,7 @@ import {
 	extractRelativeFolder,
 	joinRootAndFolder,
 	shouldMoveProviderFiles,
-} from "@/providers/library/paths";
+} from "@/providers/provider-media-paths";
 
 type EditPreviewSource = {
 	path?: string | null;

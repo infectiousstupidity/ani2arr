@@ -1,5 +1,5 @@
 /** Tests for low-level provider path math helpers. */
-// src/providers/library/paths.test.ts
+// src/providers/provider-media-paths.test.ts
 
 import { describe, expect, it } from "vitest";
 import {
@@ -8,7 +8,7 @@ import {
 	joinRootAndFolder,
 	normalizePathForCompare,
 	shouldMoveProviderFiles,
-} from "./paths";
+} from "./provider-media-paths";
 
 describe("provider library path helpers", () => {
 	it("normalizes paths for comparison", () => {

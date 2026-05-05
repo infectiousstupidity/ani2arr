@@ -1,5 +1,5 @@
 /** Low-level provider path math for joining, extraction, normalization, and move checks. */
-// src/providers/library/paths.ts
+// src/providers/provider-media-paths.ts
 
 const trimTrailingSeparators = (input: string): string =>
 	input.trim().replace(/[/\\]+$/, "");
@@ -42,8 +42,12 @@ export function extractRelativeFolder(
 	const trimmedRoot = trimToNull(rootFolderPath);
 	if (trimmedPath === null || trimmedRoot === null) return null;
 
-	const normalizedPath = normalizeSeparators(trimTrailingSeparators(trimmedPath));
-	const normalizedRoot = normalizeSeparators(trimTrailingSeparators(trimmedRoot));
+	const normalizedPath = normalizeSeparators(
+		trimTrailingSeparators(trimmedPath),
+	);
+	const normalizedRoot = normalizeSeparators(
+		trimTrailingSeparators(trimmedRoot),
+	);
 	const normalizedPathLower = normalizedPath.toLowerCase();
 	const normalizedRootLower = normalizedRoot.toLowerCase();
 
