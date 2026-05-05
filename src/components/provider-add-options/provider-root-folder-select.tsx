@@ -6,7 +6,7 @@ import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check } from 'lucide-react';
 
 import type { ProviderRootFolder } from '@/providers';
-import type { ProviderSetupPathPreview } from '@/providers/library/paths';
+import { buildProviderMediaPath, type ProviderSetupPathPreview } from '@/providers/library/paths';
 import { FormField, Label, Select, SelectContent, SelectTrigger } from '@/shared/ui/form/form';
 import { cn } from '@/shared/utils/cn';
 
@@ -38,7 +38,8 @@ function formatFreeSpace(bytes?: number | null): string | null {
 
   return `${bytes.toLocaleString()} B free`;
 }
-
+// TODO: Clean up and simplify this component later.
+// eslint-disable-next-line complexity -- Existing select keeps preview, move, and helper states together.
 export function ProviderRootFolderSelect(
   props: ProviderRootFolderSelectProps,
 ): React.JSX.Element {
@@ -64,6 +65,8 @@ export function ProviderRootFolderSelect(
   const shouldShowNextPath = isEditMode && willMove && !!previewPath;
   const shouldShowCreateHelper = !isEditMode && !!folderSlug && !!previewPath;
   const shouldShowMoveHelper = isEditMode && willMove;
+  const getFolderDisplayPath = (rootFolderPath: string): string =>
+    folderSlug ? buildProviderMediaPath(rootFolderPath, folderSlug) ?? rootFolderPath : rootFolderPath;
 
   return (
     <>
@@ -86,6 +89,7 @@ export function ProviderRootFolderSelect(
             <SelectContent className="max-w-[90vw]" container={portalContainer ?? null}>
               {rootFolders.map(folder => {
                 const freeSpaceLabel = formatFreeSpace(folder.freeSpace);
+                const displayPath = getFolderDisplayPath(folder.path);
 
                 return (
                   <SelectPrimitive.Item
@@ -100,8 +104,8 @@ export function ProviderRootFolderSelect(
                     </span>
                     <SelectPrimitive.ItemText asChild>
                       <div className="flex w-full items-center justify-between gap-4">
-                        <span className="min-w-0 truncate text-left" title={folder.path || undefined}>
-                          {folder.path}
+                        <span className="min-w-0 truncate text-left" title={displayPath || undefined}>
+                          {displayPath}
                         </span>
                         {freeSpaceLabel ? (
                           <span className="shrink-0 whitespace-nowrap text-xs text-text-tertiary">

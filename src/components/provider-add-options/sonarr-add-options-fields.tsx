@@ -30,7 +30,8 @@ export interface SonarrAddOptionsFieldsProps {
   includeSearchToggle?: boolean | undefined;
   layout?: SonarrAddOptionsFieldsLayout | undefined;
 }
-
+// TODO: Clean up and simplify this component later.
+// eslint-disable-next-line complexity -- Existing add form keeps Sonarr field wiring in one reusable component.
 export function SonarrAddOptionsFields(
   props: SonarrAddOptionsFieldsProps,
 ): React.JSX.Element {
@@ -77,7 +78,7 @@ export function SonarrAddOptionsFields(
       />
 
       <SelectField
-        label="Monitor"
+        label="Monitor Episodes"
         disabled={disabled}
         value={monitor}
         onChange={value =>

@@ -48,6 +48,7 @@ export function buildSonarrEditDraft(series: SonarrSeries): SonarrEditDraft {
 			monitored: series.monitored,
 			seriesType: series.seriesType,
 			seasonFolder: series.seasonFolder,
+			monitorNewItems: series.monitorNewItems,
 			tags: series.tags,
 			freeformTags: [],
 		}),

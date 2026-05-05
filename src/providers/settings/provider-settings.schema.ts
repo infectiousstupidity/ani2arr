@@ -52,11 +52,18 @@ export const SONARR_EDIT_MONITORING_ACTIONS = [
 	"noChange",
 	...SONARR_MONITOR_OPTIONS,
 ] as const;
+export const SONARR_MONITOR_NEW_ITEMS_OPTIONS = ["all", "none"] as const;
 export const SonarrEditMonitoringActionSchema = v.picklist(
 	SONARR_EDIT_MONITORING_ACTIONS,
 );
 export type SonarrEditMonitoringAction = v.InferOutput<
 	typeof SonarrEditMonitoringActionSchema
+>;
+export const SonarrMonitorNewItemsOptionSchema = v.picklist(
+	SONARR_MONITOR_NEW_ITEMS_OPTIONS,
+);
+export type SonarrMonitorNewItemsOption = v.InferOutput<
+	typeof SonarrMonitorNewItemsOptionSchema
 >;
 
 const SonarrProviderFieldEntries = {
@@ -76,6 +83,7 @@ export const SonarrDefaultsSchema = v.object(SonarrProviderFieldEntries);
 
 export const SonarrFormStateSchema = v.object({
 	...SonarrProviderFieldEntries,
+	monitorNewItems: v.optional(SonarrMonitorNewItemsOptionSchema),
 	freeformTags: FreeformTagsSchema,
 });
 export type SonarrFormState = v.InferOutput<typeof SonarrFormStateSchema>;
@@ -236,6 +244,21 @@ export const EDIT_MONITOR_ACTION_OPTIONS_WITH_DESCRIPTIONS =
 			: {
 					value,
 					...SONARR_MONITOR_OPTION_DETAILS[value],
+			},
+	);
+
+export const MONITOR_NEW_ITEMS_OPTIONS_WITH_DESCRIPTIONS =
+	SONARR_MONITOR_NEW_ITEMS_OPTIONS.map((value) =>
+		value === "all"
+			? {
+					value,
+					label: "All",
+					description: "Monitor episodes from new seasons.",
+				}
+			: {
+					value,
+					label: "None",
+					description: "Do not monitor episodes from new seasons.",
 				},
 	);
 
