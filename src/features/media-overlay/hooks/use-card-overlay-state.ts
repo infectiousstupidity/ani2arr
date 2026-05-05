@@ -35,7 +35,7 @@ import type {
 import {
 	buildMovieStatusResponseFromLibraryStatus,
 	buildSeriesStatusResponseFromLibraryStatus,
-} from "@/providers/library/status-response-adapter";
+} from "@/rpc/status-response-adapter";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import {
 	buildProviderActionModel,

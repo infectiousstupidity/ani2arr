@@ -9,10 +9,10 @@ import type {
 import type {
 	Provider,
 	RadarrLookupMovie,
-	SonarrLookupSeries,
 	TmdbId,
 	TvdbId,
 } from "@/providers";
+import type { SonarrLookupSeries } from "@/providers/sonarr/types";
 import type { ProviderExternalId } from "@/mapping/types";
 import {
 	getProviderRouteSlug,

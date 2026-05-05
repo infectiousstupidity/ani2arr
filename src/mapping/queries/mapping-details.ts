@@ -8,11 +8,11 @@ import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
 import type { AniListMediaFormat } from "@/anilist/schemas/media.schema";
 import {
 	type RadarrMovieSnapshot,
-	type SonarrSeriesSnapshot,
 	type Provider,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
+import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import type {
 	AcceptedMappingEvidence,
 	AcceptedMappingReason,
@@ -344,6 +344,7 @@ const buildLinkedAniListEntries = (
 		};
 	});
 
+// eslint-disable-next-line complexity
 export async function getMappingInspection(
 	input: GetMappingInspectionInput,
 	deps: GetMappingInspectionDeps,

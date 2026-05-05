@@ -20,7 +20,7 @@ import type {
 import {
 	buildMovieStatusResponseFromLibraryStatus,
 	buildSeriesStatusResponseFromLibraryStatus,
-} from "@/providers/library/status-response-adapter";
+} from "@/rpc/status-response-adapter";
 import { ExtensionErrorBoundary } from "@/components/extension-error-boundary";
 import { useTheme } from "@/shared/hooks/use-theme";
 import { useAniListMetadataBatch } from "@/shared/queries";

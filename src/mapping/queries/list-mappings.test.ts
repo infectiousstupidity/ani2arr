@@ -5,10 +5,10 @@ import { describe, expect, it } from "vitest";
 import { parseAniListId, type AniListId } from "@/anilist";
 import {
 	parseTvdbId,
-	type SonarrSeriesSnapshot,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
+import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import type { AutoMappingRecord } from "@/mapping/auto-mapping/types";
 import { listMappings, type ListMappingsDeps } from "./list-mappings";
 

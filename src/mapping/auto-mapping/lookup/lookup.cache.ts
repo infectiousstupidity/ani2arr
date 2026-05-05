@@ -2,7 +2,8 @@
 // src/mapping/auto-mapping/lookup/lookup.cache.ts
 
 import { createTtlCache } from "@/shared/cache/ttl-cache";
-import type { RadarrLookupMovie, SonarrLookupSeries } from "@/providers";
+import type { RadarrLookupMovie } from "@/providers";
+import type { SonarrLookupSeries } from "@/providers/sonarr/types";
 
 export const TITLE_LOOKUP_CACHE_TTL = {
 	results: {

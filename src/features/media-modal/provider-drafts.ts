@@ -1,6 +1,7 @@
 /** Pure draft builders for media modal add and edit setup flows. */
 
-import type { RadarrMovie, SonarrSeries } from "@/providers";
+import type { RadarrMovie } from "@/providers";
+import type { SonarrSeries } from "@/providers/sonarr/types";
 import {
 	normalizeRadarrFormState,
 	normalizeSonarrFormState,

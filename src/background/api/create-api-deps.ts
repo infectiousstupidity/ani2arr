@@ -15,7 +15,7 @@ import { anibridgeMappingCache } from "@/mapping/upstream-mapping/anibridge-mapp
 import { anilistMediaCache } from "@/anilist/media.cache";
 import { providerLibraryCaches } from "@/providers/library/cache";
 import { SonarrClient } from "@/providers/sonarr/client";
-import { SonarrLibrary as SonarrSeriesLibrary } from "@/providers/sonarr/library";
+import { SonarrLibrary } from "@/providers/sonarr/library";
 import { RadarrClient } from "@/providers/clients/radarr.client";
 import {
 	hasProviderHostPermission,
@@ -23,7 +23,6 @@ import {
 } from "@/providers/settings/host-permissions";
 import { AniListMediaService, AniListMetadataStore } from "@/anilist";
 import { RadarrLibrary } from "@/providers/library/radarr-library";
-import { SonarrLibrary } from "@/providers/library/sonarr-library";
 import { MappingService } from "@/mapping/mapping.service";
 import { ManualMappingService } from "@/mapping/manual-mapping";
 import { AutoMappingStore } from "@/mapping/auto-mapping/auto-mapping.store";
@@ -34,6 +33,7 @@ import {
 } from "@/mapping/auto-mapping/lookup/provider-title-lookup";
 import {
 	createDefaultExtensionOptions,
+	getProviderCredentials,
 	getExtensionOptionsSnapshot,
 	setExtensionOptionsSnapshot,
 	hasConfiguredProviderCredentials,
@@ -100,7 +100,7 @@ export const createApiDeps = (): ApiHandlerDeps => {
 		new RadarrClient({ hasUrlPermission: createHasUrlPermission("radarr") }),
 	);
 	const sonarrSeriesLibrary = bindAll(
-		new SonarrSeriesLibrary({ client: sonarrClient }),
+		new SonarrLibrary({ client: sonarrClient }),
 	);
 
 	const anilistMediaService = bindAll(
@@ -174,20 +174,20 @@ export const createApiDeps = (): ApiHandlerDeps => {
 		options: ExtensionOptions,
 	): Promise<void> => {
 		if (provider === "sonarr") {
-			await sonarrLibrary.refreshCache(options);
+			const credentials = getProviderCredentials(options, "sonarr");
+			if (!credentials) {
+				await sonarrLibrary.clearSeriesSnapshotCache();
+				return;
+			}
+
+			await sonarrLibrary.refreshSeriesSnapshots(credentials);
 			return;
 		}
 
 		await radarrLibrary.refreshCache(options);
 	};
 
-	const sonarrLibrary = bindAll(
-		new SonarrLibrary({
-			seriesLibrary: sonarrSeriesLibrary,
-			lookupSeries: sonarrClient.lookupSeries.bind(sonarrClient),
-			emitLibraryMutation: () => bumpLibraryRevision("sonarr"),
-		}),
-	);
+	const sonarrLibrary = sonarrSeriesLibrary;
 
 	const radarrLibrary = bindAll(
 		new RadarrLibrary({
@@ -221,7 +221,7 @@ export const createApiDeps = (): ApiHandlerDeps => {
 				if (!hasConfiguredProviderCredentials(options, provider)) return;
 
 				if (provider === "sonarr") {
-					await sonarrLibrary.refreshCache(options);
+					await refreshProviderLibrary("sonarr", options);
 					return;
 				}
 

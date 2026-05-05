@@ -16,7 +16,8 @@ import {
 	type SonarrFormState,
 } from "@/providers/settings/provider-settings.schema";
 import type { PublicOptions } from "@/options";
-import type { ProviderCredentials, SonarrSeries } from "@/providers";
+import type { ProviderCredentials } from "@/providers";
+import type { SonarrSeries } from "@/providers/sonarr/types";
 import type {
 	AddSonarrInput,
 	SeriesLibraryStatusInput,

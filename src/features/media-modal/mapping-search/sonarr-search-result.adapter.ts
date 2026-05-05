@@ -2,7 +2,8 @@
 // src/features/media-modal/mapping-search/sonarr-search-result.adapter.ts
 
 import { parseAniListIdOrNull, type AniListId } from "@/anilist";
-import { parseTvdbId, type SonarrLookupSeries } from "@/providers";
+import { parseTvdbId } from "@/providers";
+import type { SonarrLookupSeries } from "@/providers/sonarr/types";
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import type { MappingSearchResult } from "./types";
 
@@ -14,9 +15,9 @@ export interface SonarrAdapterOptions {
 		Record<
 			number,
 			{
-				episodeCount?: number;
-				episodeFileCount?: number;
-				totalEpisodeCount?: number;
+				episodeCount?: number | undefined;
+				episodeFileCount?: number | undefined;
+				totalEpisodeCount?: number | undefined;
 			}
 		>
 	>;
@@ -105,14 +106,7 @@ function readAlternateTitles(
 	if (!Array.isArray(series.alternateTitles)) return undefined;
 
 	const titles = series.alternateTitles
-		.map((item) =>
-			item !== null &&
-			typeof item === "object" &&
-			"title" in item &&
-			typeof item.title === "string"
-				? item.title
-				: undefined,
-		)
+		.map((item) => (typeof item === "string" ? item : undefined))
 		.filter((title): title is string => title !== undefined && title.length > 0);
 
 	return titles.length > 0 ? titles : undefined;
