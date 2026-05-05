@@ -25,7 +25,7 @@ import {
 	extractRelativeFolder,
 	joinRootAndFolder,
 	shouldMoveProviderFiles,
-} from "./paths";
+} from "../provider-media-paths";
 import {
 	resolveMutationTagIds,
 	resolveRequiredQualityProfileId,

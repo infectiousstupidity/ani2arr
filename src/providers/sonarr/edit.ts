@@ -23,7 +23,7 @@ import {
 import {
 	joinRootAndFolder,
 	shouldMoveProviderFiles,
-} from "../library/paths";
+} from "../provider-media-paths";
 import { resolveSonarrTagIds } from "./tags";
 
 export type SonarrSeriesChanges = Partial<SonarrEditOptions>;
@@ -96,7 +96,10 @@ export async function updateSonarrSeries(
 			input.monitoringAction,
 			input.credentials,
 		);
-		return deps.client.getSeriesById(resolvedUpdate.seriesId, input.credentials);
+		return deps.client.getSeriesById(
+			resolvedUpdate.seriesId,
+			input.credentials,
+		);
 	} catch (error) {
 		const normalized = normalizeError(error);
 		throw createError(

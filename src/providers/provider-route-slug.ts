@@ -2,10 +2,7 @@
 // src/providers/provider-route-slug.ts
 
 import type { Provider } from "./types";
-import {
-	extractPathLeaf,
-	extractRelativeFolder,
-} from "./library/paths";
+import { extractPathLeaf, extractRelativeFolder } from "./provider-media-paths";
 
 export interface ProviderRouteSlugSource {
 	titleSlug?: string | null | undefined;
@@ -32,7 +29,9 @@ export function getProviderRouteSlug(
 	if (titleSlug) return titleSlug;
 
 	const providerFolder =
-		provider === "radarr" ? trimToNull(media.folderName) : trimToNull(media.folder);
+		provider === "radarr"
+			? trimToNull(media.folderName)
+			: trimToNull(media.folder);
 	if (providerFolder) return providerFolder;
 
 	return (
