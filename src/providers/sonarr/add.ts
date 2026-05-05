@@ -17,8 +17,6 @@ import { createError, ErrorCode } from "@/shared/errors";
 import { resolveSonarrTagIds } from "./tags";
 
 export type AddSonarrSeriesPayload = {
-	title: string;
-	tvdbId: TvdbId;
 	rootFolderPath: string;
 	qualityProfileId: SonarrQualityProfileId;
 	seriesType: SonarrSeriesType;
@@ -26,7 +24,7 @@ export type AddSonarrSeriesPayload = {
 	monitored: boolean;
 	tags: SonarrTagId[];
 	addOptions: SonarrAddPayloadOptions;
-};
+} & SonarrLookupSeries;
 
 type AddSonarrSeriesInput = {
 	tvdbId: TvdbId;
@@ -37,7 +35,10 @@ type AddSonarrSeriesInput = {
 };
 
 type AddSonarrSeriesDeps = {
-	client: Pick<SonarrClient, "addSeries" | "getTags" | "createTag">;
+	client: Pick<
+		SonarrClient,
+		"lookupSeries" | "addSeries" | "getTags" | "createTag"
+	>;
 };
 
 export function buildAddSonarrSeriesPayload(
@@ -54,8 +55,7 @@ export function buildAddSonarrSeriesPayload(
 	},
 ): AddSonarrSeriesPayload {
 	return {
-		title: series.title,
-		tvdbId: series.tvdbId,
+		...series,
 		rootFolderPath: options.rootFolderPath,
 		addOptions: {
 			monitor: options.monitor,
@@ -87,14 +87,14 @@ export async function addSonarrSeries(
 }
 
 async function resolveSonarrAddPayload(input: {
-	api: Pick<SonarrClient, "getTags" | "createTag">;
+	api: Pick<SonarrClient, "lookupSeries" | "getTags" | "createTag">;
 	credentials: ProviderCredentials;
 	defaults: SonarrFormState;
 	form: SonarrFormState;
 	title: string;
 	tvdbId: TvdbId;
 }): Promise<AddSonarrSeriesPayload> {
-	const { api, credentials, defaults, form, title, tvdbId } = input;
+	const { api, credentials, defaults, form, tvdbId } = input;
 	const monitor = form.addOptions?.monitor ?? defaults.addOptions?.monitor;
 	const seasonFolder = form.seasonFolder ?? defaults.seasonFolder;
 	const seriesType = form.seriesType ?? defaults.seriesType;
@@ -151,6 +151,19 @@ async function resolveSonarrAddPayload(input: {
 		);
 	}
 
+	const lookupResults = await api.lookupSeries(`tvdb:${tvdbId}`, credentials);
+	const series =
+		lookupResults.find((candidate) => candidate.tvdbId === tvdbId) ?? null;
+
+	if (!series) {
+		throw createError(
+			ErrorCode.VALIDATION_ERROR,
+			`Sonarr lookup did not return a series for TVDB ID ${tvdbId}.`,
+			"Sonarr could not find this series in its lookup catalog.",
+			{ tvdbId },
+		);
+	}
+
 	const tags = await resolveSonarrTagIds({
 		api,
 		credentials,
@@ -158,21 +171,16 @@ async function resolveSonarrAddPayload(input: {
 		freeformLabelsFromForm: form.freeformTags,
 	});
 
-	return {
-		title,
-		tvdbId,
+	return buildAddSonarrSeriesPayload(series, {
 		qualityProfileId,
 		rootFolderPath,
 		seasonFolder,
-		monitored: monitor !== "none",
 		seriesType,
 		tags,
-		addOptions: {
-			monitor,
-			searchForMissingEpisodes,
-			searchForCutoffUnmetEpisodes,
-		},
-	};
+		monitor,
+		searchForMissingEpisodes,
+		searchForCutoffUnmetEpisodes,
+	});
 }
 
 function resolveRequiredQualityProfileId(input: {

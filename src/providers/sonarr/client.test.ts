@@ -62,6 +62,7 @@ describe("SonarrClient mutations", () => {
 		const payload: AddSonarrSeriesPayload = {
 			title: "Existing Series",
 			tvdbId: parseTvdbId(123),
+			folder: "Existing Series",
 			qualityProfileId: parseProviderQualityProfileId(2),
 			rootFolderPath: "/anime-4k",
 			seasonFolder: true,
