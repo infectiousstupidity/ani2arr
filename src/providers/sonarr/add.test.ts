@@ -20,7 +20,7 @@ describe("addSonarrSeries", () => {
 		const tvdbId = parseTvdbId(34);
 		const createdSeries = {
 			id: parseSonarrSeriesId(12),
-			title: "Example Series",
+			title: "Lookup Series",
 			tvdbId,
 			titleSlug: "example-series",
 			qualityProfileId: parseProviderQualityProfileId(99),
@@ -32,10 +32,23 @@ describe("addSonarrSeries", () => {
 			seasonFolder: true,
 			tags: [parseProviderTagId(7), parseProviderTagId(8)],
 		};
+		const lookupSeries = {
+			title: "Lookup Series",
+			tvdbId,
+			titleSlug: "lookup-series",
+			folder: "Lookup Series [tvdb-34]",
+		};
 		const client = {
+			lookupSeries: vi.fn(async () => [
+				{ ...lookupSeries, tvdbId: parseTvdbId(35) },
+				lookupSeries,
+			]),
 			addSeries: vi.fn(async () => createdSeries),
 			getTags: vi.fn(async () => [{ id: parseProviderTagId(7), label: "Keep" }]),
-			createTag: vi.fn(async () => ({ id: parseProviderTagId(8), label: "new-tag" })),
+			createTag: vi.fn(async () => ({
+				id: parseProviderTagId(8),
+				label: "new-tag",
+			})),
 		};
 
 		const result = await addSonarrSeries(
@@ -62,10 +75,11 @@ describe("addSonarrSeries", () => {
 		);
 
 		expect(result).toBe(createdSeries);
+		expect(client.lookupSeries).toHaveBeenCalledWith("tvdb:34", credentials);
 		expect(client.createTag).toHaveBeenCalledWith(credentials, "new-tag");
 		expect(client.addSeries).toHaveBeenCalledWith(
 			{
-				title: "Example Series",
+				...lookupSeries,
 				tvdbId,
 				qualityProfileId: parseProviderQualityProfileId(99),
 				rootFolderPath: "/series",
@@ -85,6 +99,13 @@ describe("addSonarrSeries", () => {
 
 	it("does not add the series when tag creation fails", async () => {
 		const client = {
+			lookupSeries: vi.fn(async () => [
+				{
+					title: "Example Series",
+					tvdbId: parseTvdbId(34),
+					folder: "Example Series [tvdb-34]",
+				},
+			]),
 			addSeries: vi.fn(),
 			getTags: vi.fn(async () => []),
 			createTag: vi.fn(async () => {
@@ -119,8 +140,54 @@ describe("addSonarrSeries", () => {
 		expect(client.addSeries).not.toHaveBeenCalled();
 	});
 
+	it("does not resolve tags or add when Sonarr lookup has no matching TVDB result", async () => {
+		const client = {
+			lookupSeries: vi.fn(async () => [
+				{
+					title: "Different Series",
+					tvdbId: parseTvdbId(35),
+					folder: "Different Series [tvdb-35]",
+				},
+			]),
+			addSeries: vi.fn(),
+			getTags: vi.fn(async () => []),
+			createTag: vi.fn(),
+		};
+
+		await expect(
+			addSonarrSeries(
+				{
+					tvdbId: parseTvdbId(34),
+					title: "Example Series",
+					form: {
+						rootFolderPath: "/series",
+						qualityProfileId: parseProviderQualityProfileId(99),
+						seriesType: "anime",
+						seasonFolder: true,
+						tags: [],
+						freeformTags: ["New Tag"],
+						addOptions: {
+							monitor: "all",
+							searchForMissingEpisodes: true,
+							searchForCutoffUnmetEpisodes: false,
+						},
+					},
+					defaults: { freeformTags: [] },
+					credentials,
+				},
+				{ client },
+			),
+		).rejects.toMatchObject({
+			code: "VALIDATION_ERROR",
+		});
+		expect(client.getTags).not.toHaveBeenCalled();
+		expect(client.createTag).not.toHaveBeenCalled();
+		expect(client.addSeries).not.toHaveBeenCalled();
+	});
+
 	it("does not resolve or create tags when required add fields are missing", async () => {
 		const client = {
+			lookupSeries: vi.fn(async () => []),
 			addSeries: vi.fn(),
 			getTags: vi.fn(async () => []),
 			createTag: vi.fn(),

@@ -1,3 +1,6 @@
+/** Sonarr provider-domain library snapshot cache and TVDB lookup helpers. */
+// src/providers/sonarr/library.ts
+
 import { createTtlCache, type TtlCache } from "@/shared/cache/ttl-cache";
 import { normalizeError } from "@/shared/errors";
 import type { ProviderCredentials } from "../types";

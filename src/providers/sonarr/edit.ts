@@ -21,8 +21,6 @@ import {
 	normalizeError,
 } from "@/shared/errors";
 import {
-	extractPathLeaf,
-	extractRelativeFolder,
 	joinRootAndFolder,
 	shouldMoveProviderFiles,
 } from "../library/paths";
@@ -43,6 +41,7 @@ type UpdateSonarrSeriesDeps = {
 		SonarrClient,
 		| "getSeriesByTvdbId"
 		| "getSeriesById"
+		| "getGeneratedSeriesFolder"
 		| "getTags"
 		| "createTag"
 		| "updateSeries"
@@ -118,7 +117,11 @@ export async function updateSonarrSeries(
 async function resolveSonarrSeriesUpdate(input: {
 	api: Pick<
 		SonarrClient,
-		"getSeriesByTvdbId" | "getSeriesById" | "getTags" | "createTag"
+		| "getSeriesByTvdbId"
+		| "getSeriesById"
+		| "getGeneratedSeriesFolder"
+		| "getTags"
+		| "createTag"
 	>;
 	credentials: ProviderCredentials;
 	form: SonarrFormState;
@@ -169,21 +172,18 @@ async function resolveSonarrSeriesUpdate(input: {
 	const seriesType = form.seriesType ?? baseSeries.seriesType;
 	const monitored = form.monitored ?? baseSeries.monitored;
 	const monitorNewItems = form.monitorNewItems ?? baseSeries.monitorNewItems;
-	const folderName =
-		extractRelativeFolder(
-			baseSeries.path,
-			baseSeries.rootFolderPath,
-		) ?? extractPathLeaf(baseSeries.path);
-
-	if (!folderName) {
-		throw createError(
-			ErrorCode.VALIDATION_ERROR,
-			"Missing Sonarr series folder for update.",
-			"Unable to update this series because its current folder path is unknown.",
-		);
-	}
-
-	const nextPath = joinRootAndFolder(rootFolderPath, folderName);
+	const rootFolderChanged = shouldMoveProviderFiles(
+		baseSeries.rootFolderPath,
+		rootFolderPath,
+	);
+	const nextPath = rootFolderChanged
+		? await resolveMovedSeriesPath({
+				api,
+				credentials,
+				rootFolderPath,
+				seriesId: baseSeries.id,
+			})
+		: baseSeries.path;
 	const moveFiles = shouldMoveProviderFiles(baseSeries.path, nextPath);
 
 	return {
@@ -200,6 +200,29 @@ async function resolveSonarrSeriesUpdate(input: {
 			tags,
 		}),
 	};
+}
+
+async function resolveMovedSeriesPath(input: {
+	api: Pick<SonarrClient, "getGeneratedSeriesFolder">;
+	credentials: ProviderCredentials;
+	rootFolderPath: string;
+	seriesId: SonarrSeriesId;
+}): Promise<string> {
+	const generated = await input.api.getGeneratedSeriesFolder(
+		input.seriesId,
+		input.credentials,
+	);
+	const folderName = generated.folder.trim();
+
+	if (!folderName) {
+		throw createError(
+			ErrorCode.VALIDATION_ERROR,
+			"Missing Sonarr series folder for update.",
+			"Unable to update this series because Sonarr did not return a generated folder name.",
+		);
+	}
+
+	return joinRootAndFolder(input.rootFolderPath, folderName);
 }
 
 function resolveRequiredQualityProfileId(input: {

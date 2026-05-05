@@ -38,7 +38,7 @@ describe("updateSonarrSeries", () => {
 			...existingSeries,
 			qualityProfileId: parseProviderQualityProfileId(99),
 			rootFolderPath: "/series-4k",
-			path: "/series-4k/anime1",
+			path: "/series-4k/Example Series [tvdb-34]",
 			monitored: false,
 			monitorNewItems: "none" as const,
 			seriesType: "anime" as const,
@@ -55,6 +55,9 @@ describe("updateSonarrSeries", () => {
 				.fn()
 				.mockResolvedValueOnce(existingSeries)
 				.mockResolvedValueOnce(refreshedSeries),
+			getGeneratedSeriesFolder: vi.fn(async () => ({
+				folder: "Example Series [tvdb-34]",
+			})),
 			getTags: vi.fn(async () => [{ id: parseProviderTagId(7), label: "Keep" }]),
 			createTag: vi.fn(),
 			updateSeries: vi.fn(async () => updatedSeries),
@@ -88,7 +91,7 @@ describe("updateSonarrSeries", () => {
 				...existingSeries,
 				qualityProfileId: parseProviderQualityProfileId(99),
 				rootFolderPath: "/series-4k",
-				path: "/series-4k/anime1",
+				path: "/series-4k/Example Series [tvdb-34]",
 				monitored: false,
 				monitorNewItems: "none",
 				seriesType: "anime",
@@ -101,6 +104,10 @@ describe("updateSonarrSeries", () => {
 		expect(client.applyMonitoringAction).toHaveBeenCalledWith(
 			seriesId,
 			"all",
+			credentials,
+		);
+		expect(client.getGeneratedSeriesFolder).toHaveBeenCalledWith(
+			seriesId,
 			credentials,
 		);
 		expect(client.getSeriesById).toHaveBeenCalledTimes(2);
@@ -126,6 +133,7 @@ describe("updateSonarrSeries", () => {
 		const client = {
 			getSeriesByTvdbId: vi.fn(async () => existingSeries),
 			getSeriesById: vi.fn(async () => existingSeries),
+			getGeneratedSeriesFolder: vi.fn(),
 			getTags: vi.fn(async () => []),
 			createTag: vi.fn(),
 			updateSeries: vi.fn(async () => existingSeries),
@@ -158,5 +166,6 @@ describe("updateSonarrSeries", () => {
 			},
 		});
 		expect(client.updateSeries).toHaveBeenCalledOnce();
+		expect(client.getGeneratedSeriesFolder).not.toHaveBeenCalled();
 	});
 });
