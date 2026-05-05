@@ -5,7 +5,6 @@ import type { AniListMediaService, AniListMetadataStore } from "@/anilist";
 import type { RadarrLibrary } from "@/providers/library/radarr-library";
 import type { SonarrLibrary } from "@/providers/library/sonarr-library";
 import type { RadarrClient } from "@/providers/clients/radarr.client";
-import type { SonarrClient } from "@/providers/clients/sonarr.client";
 import type { SonarrClient as CurrentSonarrClient } from "@/providers/sonarr/client";
 import type { MappingService } from "@/mapping/mapping.service";
 import type { ManualMappingService } from "@/mapping/manual-mapping";
@@ -16,8 +15,6 @@ import type { Provider } from "@/providers";
 import type { ProviderConfigReader } from "@/background/api/provider-config-reader";
 
 export type ApiHandlerDeps = {
-	/** LEGACY: Used by Sonarr connection testing until it moves to the new Sonarr client. */
-	SonarrClient: SonarrClient;
 	sonarrClient: CurrentSonarrClient;
 	sonarrLookupClient: Pick<
 		CurrentSonarrClient,

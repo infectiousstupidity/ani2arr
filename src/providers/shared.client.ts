@@ -1,3 +1,6 @@
+/** Shared Arr provider API client for common transport and connection checks. */
+// src/providers/shared.client.ts
+
 import { createError, ErrorCode } from "@/shared/errors";
 import type { ProviderCredentials } from "./types";
 
@@ -20,6 +23,23 @@ export class ProviderApiClient {
 		this.providerName = options.providerName;
 		this.apiBasePath = normalizeApiBasePath(options.apiBasePath);
 		this.hasUrlPermission = options.hasUrlPermission;
+	}
+
+	public async testConnection(
+		credentials: ProviderCredentials,
+	): Promise<{ version: string }> {
+		const json = await this.requestJson("system/status", credentials);
+		const version = readVersion(json);
+
+		if (!version) {
+			throw createError(
+				ErrorCode.API_ERROR,
+				`${this.providerName} system status did not include a version.`,
+				`${this.providerName} returned an invalid system status response.`,
+			);
+		}
+
+		return { version };
 	}
 
 	protected async requestJson(
@@ -134,4 +154,10 @@ function normalizeApiBasePath(apiBasePath: string): string {
 	const trimmed = apiBasePath.trim();
 	const path = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 	return path.replace(/\/+$/, "");
+}
+
+function readVersion(value: unknown): string | undefined {
+	if (!value || typeof value !== "object") return undefined;
+	const version = (value as Record<string, unknown>).version;
+	return typeof version === "string" ? version.trim() || undefined : undefined;
 }

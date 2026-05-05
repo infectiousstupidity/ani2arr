@@ -27,15 +27,9 @@ describe("createSonarrHandlers", () => {
 			getRootFolders: vi.fn(async () => rootFolders),
 			getTags: vi.fn(async () => tags),
 		};
-		const legacySonarrClient = {
-			getQualityProfiles: vi.fn(),
-			getRootFolders: vi.fn(),
-			getTags: vi.fn(),
-		};
 
 		const handlers = createSonarrHandlers({
 			sonarrClient,
-			SonarrClient: legacySonarrClient,
 			providerConfig: {
 				requireCredentials: vi.fn(),
 			},
@@ -52,8 +46,5 @@ describe("createSonarrHandlers", () => {
 		expect(sonarrClient.getQualityProfiles).toHaveBeenCalledWith(credentials);
 		expect(sonarrClient.getRootFolders).toHaveBeenCalledWith(credentials);
 		expect(sonarrClient.getTags).toHaveBeenCalledWith(credentials);
-		expect(legacySonarrClient.getQualityProfiles).not.toHaveBeenCalled();
-		expect(legacySonarrClient.getRootFolders).not.toHaveBeenCalled();
-		expect(legacySonarrClient.getTags).not.toHaveBeenCalled();
 	});
 });
