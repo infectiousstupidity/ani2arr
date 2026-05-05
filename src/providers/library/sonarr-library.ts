@@ -36,6 +36,8 @@ type SonarrLibraryMutationPayload = {
 	action: "added" | "removed";
 };
 
+type CacheableSonarrSeries = SonarrSeries | NewSonarrSeries;
+
 type SonarrLibraryDeps = {
 	seriesLibrary: SonarrSeriesLibrary;
 	lookupSeries: (
@@ -86,9 +88,9 @@ export class SonarrLibrary {
 		return snapshots.map((element) => toLegacySeriesSnapshot(element));
 	}
 
-	async addSeriesToCache(newSeries: SonarrSeries): Promise<void> {
+	async addSeriesToCache(newSeries: CacheableSonarrSeries): Promise<void> {
 		await this.seriesLibrary.upsertSeriesSnapshot(
-			legacySeriesToSnapshot(newSeries),
+			seriesToSnapshot(newSeries),
 		);
 	}
 
@@ -209,6 +211,7 @@ export class SonarrLibrary {
 function toLegacySeriesSnapshot(
 	series: NewSonarrSeriesSnapshot,
 ): SonarrSeriesSnapshot {
+	// LEGACY: Library status still exposes the old snapshot DTO until RPC/status callers consume provider-domain snapshots.
 	const statistics = series.statistics
 		? {
 				...(series.statistics.episodeCount === undefined
@@ -237,6 +240,7 @@ function toLegacySeriesSnapshot(
 }
 
 function toLegacyLookupSeries(series: NewSonarrLookupSeries): SonarrLookupSeries {
+	// LEGACY: Status responses still expose the old lookup DTO until mapping/status callers consume provider-domain lookup rows.
 	const images = series.images?.map((image) => ({
 		...(image.coverType === undefined ? {} : { coverType: image.coverType }),
 		...(image.url === undefined ? {} : { url: image.url }),
@@ -279,10 +283,8 @@ function toLegacyLookupSeries(series: NewSonarrLookupSeries): SonarrLookupSeries
 	};
 }
 
-function legacySeriesToSnapshot(series: SonarrSeries): SonarrSeriesSnapshot {
-	const alternateTitles = series.alternateTitles
-		?.map((entry) => entry.title?.trim())
-		.filter((title): title is string => !!title);
+function seriesToSnapshot(series: CacheableSonarrSeries): SonarrSeriesSnapshot {
+	const alternateTitles = normalizeAlternateTitles(series.alternateTitles);
 
 	return toLegacySeriesSnapshot({
 		id: series.id,
@@ -295,4 +297,17 @@ function legacySeriesToSnapshot(series: SonarrSeries): SonarrSeriesSnapshot {
 			? {}
 			: { statistics: series.statistics }),
 	});
+}
+
+function normalizeAlternateTitles(
+	titles: CacheableSonarrSeries["alternateTitles"],
+): string[] | undefined {
+	if (!Array.isArray(titles)) return undefined;
+
+	return titles
+		.map((entry) => {
+			if (typeof entry === "string") return entry.trim();
+			return entry.title?.trim() ?? "";
+		})
+		.filter((title): title is string => !!title);
 }

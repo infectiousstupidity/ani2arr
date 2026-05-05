@@ -1,11 +1,8 @@
-/** Tests for Sonarr client response normalization. */
+/** LEGACY: Tests for the legacy Sonarr client metadata response normalization until metadata moves to src/providers/sonarr. */
 // src/providers/clients/sonarr.client.test.ts
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-	parseProviderQualityProfileId,
-	parseProviderTagId,
-	parseSonarrSeriesId,
 	type ProviderCredentials,
 } from "@/providers";
 import { SonarrClient } from "./sonarr.client";
@@ -26,15 +23,6 @@ function mockJson(body: unknown): void {
 		"fetch",
 		vi.fn<typeof fetch>().mockResolvedValueOnce(createJsonResponse(body)),
 	);
-}
-
-function mockJsonSequence(...bodies: unknown[]): ReturnType<typeof vi.fn> {
-	const fetchMock = vi.fn<typeof fetch>();
-	for (const body of bodies) {
-		fetchMock.mockResolvedValueOnce(createJsonResponse(body));
-	}
-	vi.stubGlobal("fetch", fetchMock);
-	return fetchMock;
 }
 
 function createClient(): SonarrClient {
@@ -128,79 +116,6 @@ describe("SonarrClient response normalization", () => {
 		await expect(createClient().getAllSeries(credentials)).rejects.toThrow(
 			"Invalid TVDB ID",
 		);
-	});
-
-	it("fetches the raw series, shallow-merges the patch, puts the full resource, and normalizes the response", async () => {
-		const fetchMock = mockJsonSequence(
-			{
-				id: 10,
-				tvdbId: 123,
-				title: "Existing Series",
-				titleSlug: "existing-series",
-				qualityProfileId: 1,
-				rootFolderPath: "/anime",
-				path: "/anime/Existing Series",
-				monitored: true,
-				statistics: { episodeCount: 12 },
-				customArrField: "preserved",
-			},
-			{
-				id: 10,
-				tvdbId: 123,
-				title: "Existing Series",
-				titleSlug: "existing-series",
-				qualityProfileId: 2,
-				rootFolderPath: "/anime-4k",
-				path: "/anime-4k/Existing Series",
-				monitored: false,
-				tags: [7],
-			},
-		);
-
-		const result = await createClient().updateSeries(
-			parseSonarrSeriesId(10),
-			{
-				qualityProfileId: parseProviderQualityProfileId(2),
-				rootFolderPath: "/anime-4k",
-				path: "/anime-4k/Existing Series",
-				monitored: false,
-				tags: [parseProviderTagId(7)],
-			},
-			credentials,
-			{ moveFiles: true },
-		);
-
-		expect(result).toMatchObject({
-			id: 10,
-			tvdbId: 123,
-			qualityProfileId: 2,
-			rootFolderPath: "/anime-4k",
-			path: "/anime-4k/Existing Series",
-			monitored: false,
-			tags: [7],
-		});
-		expect(fetchMock.mock.calls[0]?.[0]).toBe(
-			"https://sonarr.example/api/v3/series/10",
-		);
-		expect((fetchMock.mock.calls[0]?.[1] as RequestInit).method).toBeUndefined();
-		expect(fetchMock.mock.calls[1]?.[0]).toBe(
-			"https://sonarr.example/api/v3/series/10?moveFiles=true",
-		);
-		expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe("PUT");
-		const putOptions = fetchMock.mock.calls[1]?.[1] as RequestInit;
-		expect(JSON.parse(String(putOptions.body))).toEqual({
-			id: 10,
-			tvdbId: 123,
-			title: "Existing Series",
-			titleSlug: "existing-series",
-			qualityProfileId: 2,
-			rootFolderPath: "/anime-4k",
-			path: "/anime-4k/Existing Series",
-			monitored: false,
-			statistics: { episodeCount: 12 },
-			customArrField: "preserved",
-			tags: [7],
-		});
 	});
 
 });

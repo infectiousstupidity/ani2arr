@@ -6,10 +6,8 @@ import {
 	addRadarrMovie,
 	updateRadarrMovie,
 } from "@/providers/library/radarr-mutations";
-import {
-	addSonarrSeries,
-	updateSonarrSeries,
-} from "@/providers/library/sonarr-mutations";
+import { addSonarrSeries } from "@/providers/sonarr/add";
+import { updateSonarrSeries } from "@/providers/sonarr/edit";
 import type { Ani2arrApi } from "@/rpc";
 import {
 	AddRadarrInputSchema,
@@ -27,7 +25,8 @@ import type { AutoMappingOptions } from "@/mapping/auto-mapping/types";
 import { ErrorCode, logError, normalizeError } from "@/shared/errors";
 import type { RequestPriority } from "@/shared/utils/request-priority";
 import type { AniListId } from "@/anilist";
-import type { TvdbId } from "@/providers";
+import type { SonarrSeries, TvdbId } from "@/providers";
+import type { SonarrSeries as NewSonarrSeries } from "@/providers/sonarr/types";
 import type { ApiHandlerDeps } from "./handler-deps";
 
 type SonarrStatusPayload = Pick<
@@ -66,7 +65,7 @@ export function createLibraryHandlers(
 	| "updateRadarrMovie"
 > {
 	const {
-		SonarrClient,
+		sonarrClient,
 		RadarrClient,
 		mappingService,
 		manualMappingService,
@@ -173,13 +172,13 @@ export function createLibraryHandlers(
 					credentials,
 				},
 				{
-					client: SonarrClient,
-					cache: sonarrLibrary,
+					client: sonarrClient,
 				},
 			);
+			await sonarrLibrary.addSeriesToCache(created);
 			scheduleLibraryRefresh("sonarr", options);
 			await bumpLibraryRevision("sonarr");
-			return created;
+			return toLegacySonarrSeries(created);
 		},
 
 		async addToRadarr(input) {
@@ -222,13 +221,13 @@ export function createLibraryHandlers(
 							: { monitoringAction: parsedInput.monitoringAction }),
 					},
 					{
-						client: SonarrClient,
-						cache: sonarrLibrary,
+						client: sonarrClient,
 					},
 				);
+				await sonarrLibrary.addSeriesToCache(updated);
 				scheduleLibraryRefresh("sonarr");
 				await bumpLibraryRevision("sonarr");
-				return updated;
+				return toLegacySonarrSeries(updated);
 			} catch (error) {
 				const normalized = normalizeError(error);
 				if (normalized.details?.partialSuccess === true) {
@@ -271,6 +270,67 @@ export function createLibraryHandlers(
 	>;
 
 	return handlers;
+}
+
+function toLegacySonarrSeries(series: NewSonarrSeries): SonarrSeries {
+	// LEGACY: RPC still returns the old public SonarrSeries shape until callers consume the provider-domain type.
+	const alternateTitles = series.alternateTitles?.map((title) => ({ title }));
+	const images = series.images?.map((image) => ({
+		...(image.coverType === undefined ? {} : { coverType: image.coverType }),
+		...(image.url === undefined ? {} : { url: image.url }),
+		...(image.remoteUrl === undefined ? {} : { remoteUrl: image.remoteUrl }),
+	}));
+	const statistics = series.statistics
+		? {
+				...(series.statistics.seasonCount === undefined
+					? {}
+					: { seasonCount: series.statistics.seasonCount }),
+				...(series.statistics.episodeCount === undefined
+					? {}
+					: { episodeCount: series.statistics.episodeCount }),
+				...(series.statistics.episodeFileCount === undefined
+					? {}
+					: { episodeFileCount: series.statistics.episodeFileCount }),
+				...(series.statistics.totalEpisodeCount === undefined
+					? {}
+					: { totalEpisodeCount: series.statistics.totalEpisodeCount }),
+				...(series.statistics.sizeOnDisk === undefined
+					? {}
+					: { sizeOnDisk: series.statistics.sizeOnDisk }),
+			}
+		: undefined;
+
+	return {
+		id: series.id,
+		title: series.title,
+		tvdbId: series.tvdbId,
+		titleSlug: series.titleSlug,
+		...(alternateTitles === undefined ? {} : { alternateTitles }),
+		monitored: series.monitored,
+		...(series.year === undefined ? {} : { year: series.year }),
+		...(series.seasonCount === undefined
+			? {}
+			: { seasonCount: series.seasonCount }),
+		...(series.episodeCount === undefined
+			? {}
+			: { episodeCount: series.episodeCount }),
+		...(series.episodeFileCount === undefined
+			? {}
+			: { episodeFileCount: series.episodeFileCount }),
+		...(series.sizeOnDisk === undefined ? {} : { sizeOnDisk: series.sizeOnDisk }),
+		path: series.path,
+		rootFolderPath: series.rootFolderPath,
+		qualityProfileId: series.qualityProfileId,
+		...(series.seasons === undefined ? {} : { seasons: series.seasons }),
+		seasonFolder: series.seasonFolder,
+		monitorNewItems: series.monitorNewItems,
+		seriesType: series.seriesType,
+		tags: series.tags,
+		...(series.overview === undefined ? {} : { overview: series.overview }),
+		...(images === undefined ? {} : { images }),
+		...(series.status === undefined ? {} : { status: series.status }),
+		...(statistics === undefined ? {} : { statistics }),
+	};
 }
 
 function buildStatusOptions(input: StatusInput): SonarrStatusOptions {

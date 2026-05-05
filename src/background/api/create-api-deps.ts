@@ -14,6 +14,7 @@ import {
 import { anibridgeMappingCache } from "@/mapping/upstream-mapping/anibridge-mapping.cache";
 import { anilistMediaCache } from "@/anilist/media.cache";
 import { providerLibraryCaches } from "@/providers/library/cache";
+/** LEGACY: Old Sonarr client remains for metadata and connection until that slice migrates. */
 import { SonarrClient as LegacySonarrClient } from "@/providers/clients/sonarr.client";
 import { SonarrClient } from "@/providers/sonarr/client";
 import { SonarrLibrary as SonarrSeriesLibrary } from "@/providers/sonarr/library";
@@ -340,6 +341,7 @@ export const createApiDeps = (): ApiHandlerDeps => {
 
 	return {
 		SonarrClient: legacySonarrClient,
+		sonarrClient,
 		sonarrLookupClient: sonarrClient,
 		RadarrClient: radarrClient,
 		anilistMediaService,
