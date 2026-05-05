@@ -10,7 +10,6 @@ import type {
 	ProviderTag,
 	ProviderTagId,
 } from "@/providers";
-import { normalizePathForCompare } from "./paths";
 import { resolveProviderTagIds } from "./tag-ids";
 
 type ProviderTagMutationApi = {
@@ -107,18 +106,4 @@ export async function resolveMutationTagIds(
 		existingTags,
 		providerLabel: getProviderLabel(provider),
 	});
-}
-
-export function shouldMoveProviderFiles(
-	currentPath: string | null | undefined,
-	nextPath: string,
-): boolean {
-	const currentPathNormalized = normalizePathForCompare(currentPath);
-	const nextPathNormalized = normalizePathForCompare(nextPath);
-
-	return (
-		currentPathNormalized !== null &&
-		nextPathNormalized !== null &&
-		currentPathNormalized !== nextPathNormalized
-	);
 }

@@ -1,43 +1,62 @@
-/** Tests for provider library path and slug helpers. */
+/** Tests for low-level provider path math helpers. */
 // src/providers/library/paths.test.ts
 
 import { describe, expect, it } from "vitest";
-import { parseTvdbId } from "@/providers";
 import {
-	buildProviderFolderSlugFromTitle,
-	extractProviderRootFolderPath,
-	getProviderRouteSlug,
-	joinRootAndSlug,
+	extractPathLeaf,
+	extractRelativeFolder,
+	joinRootAndFolder,
 	normalizePathForCompare,
+	shouldMoveProviderFiles,
 } from "./paths";
 
-const tvdb = parseTvdbId;
-
 describe("provider library path helpers", () => {
-	it("derives comparable paths for provider move decisions", () => {
+	it("normalizes paths for comparison", () => {
 		const separator = String.fromCodePoint(92);
-		expect(
-			normalizePathForCompare(["C:", "Media", "Series", ""].join(separator)),
-		).toBe("c:/media/series");
-		expect(
-			joinRootAndSlug(["C:", "Media", "Series", ""].join(separator), "Show"),
-		).toBe(["C:", "Media", "Series", "Show"].join(separator));
 
+		expect(normalizePathForCompare(`/Root/Path/Anime/`)).toBe(
+			"/root/path/anime",
+		);
 		expect(
-			getProviderRouteSlug("sonarr", {
-				path: "/library/Series/Season 1",
-				rootFolderPath: "/library",
-			}),
-		).toBe("Series/Season 1");
+			normalizePathForCompare(["Root", "Path", "Anime", ""].join(separator)),
+		).toBe("root/path/anime");
+	});
 
+	it("joins root folders with known provider folders", () => {
+		const separator = String.fromCodePoint(92);
+
+		expect(joinRootAndFolder("/rootpath/2/", "/anime1")).toBe(
+			"/rootpath/2/anime1",
+		);
 		expect(
-			extractProviderRootFolderPath(
-				{ path: "/library/Series/Season 1" },
-				"Series/Season 1",
-			),
-		).toBe("/library");
+			joinRootAndFolder(["C:", "Media", "TV", ""].join(separator), "Anime1"),
+		).toBe(["C:", "Media", "TV", "Anime1"].join(separator));
+	});
+
+	it("extracts relative folders and preserves nested suffixes", () => {
+		expect(extractRelativeFolder("/media/tv/Anime1", "/media/tv")).toBe(
+			"Anime1",
+		);
+		expect(extractRelativeFolder("/media/tv/A/Anime1", "/media/tv")).toBe(
+			"A/Anime1",
+		);
+		expect(extractRelativeFolder("/other/tv/Anime1", "/media/tv")).toBeNull();
+		expect(extractRelativeFolder("/media/tv", "/media/tv")).toBeNull();
+	});
+
+	it("extracts path leaves as edit-only fallback", () => {
+		expect(extractPathLeaf("/path/to/anime1/")).toBe("anime1");
+		expect(extractPathLeaf("")).toBeNull();
+	});
+
+	it("compares move destinations only when both paths exist", () => {
+		expect(shouldMoveProviderFiles(null, "/media/tv/anime")).toBe(false);
+		expect(shouldMoveProviderFiles("/media/tv/anime", null)).toBe(false);
 		expect(
-			buildProviderFolderSlugFromTitle("My Show", { tvdbId: tvdb(123) }),
-		).toBe("My Show [tvdb-123]");
+			shouldMoveProviderFiles("/media/tv/anime/", String.raw`\media\tv\anime`),
+		).toBe(false);
+		expect(shouldMoveProviderFiles("/media/tv/anime", "/media/4k/anime")).toBe(
+			true,
+		);
 	});
 });

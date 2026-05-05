@@ -20,6 +20,7 @@ type RadarrMappingTarget =
 			provider: string | null;
 			providerId: TmdbIdInput;
 			title?: string | null;
+			providerFolderName?: string | null;
 	  }
 	| null
 	| undefined;
@@ -80,6 +81,7 @@ export function useRadarrSetupTargetController({
 			}),
 			targetTitle: mapping.title ?? providerRequestTitle,
 			storedDefaults,
+			providerFolderName: mapping.providerFolderName,
 		});
 	};
 

@@ -5,7 +5,6 @@ import React from 'react';
 
 import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
 import { parseProviderQualityProfileId, type ProviderMetadata } from '@/providers';
-import type { ProviderSetupPathPreview } from '@/providers/library/paths';
 import {
   MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS,
   type RadarrFormState,
@@ -14,7 +13,7 @@ import {
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import { cn } from '@/shared/utils/cn';
 
-import { ProviderRootFolderSelect } from './provider-root-folder-select';
+import { ProviderRootFolderSelect, type ProviderRootFolderPathPreview } from './provider-root-folder-select';
 
 export interface RadarrAddOptionsFieldsProps {
   values: RadarrFormState;
@@ -24,7 +23,7 @@ export interface RadarrAddOptionsFieldsProps {
   className?: string | undefined;
   portalContainer?: HTMLElement | ShadowRoot | null | undefined;
   initialFocusRef?: React.RefObject<HTMLButtonElement | null> | undefined;
-  pathPreview?: ProviderSetupPathPreview | undefined;
+  pathPreview?: ProviderRootFolderPathPreview | undefined;
   layout?: 'stacked' | 'grid' | undefined;
 }
 

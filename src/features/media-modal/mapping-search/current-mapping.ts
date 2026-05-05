@@ -16,8 +16,8 @@ import type {
 import type { ProviderExternalId } from "@/mapping/types";
 import {
 	getProviderRouteSlug,
-	type ProviderMediaPathSource,
-} from "@/providers/library/paths";
+	type ProviderRouteSlugSource,
+} from "@/providers/provider-route-slug";
 import { getProviderExternalIdLabel } from "@/providers/provider-labels";
 import { toMappingSearchResultFromRadarr } from "./radarr-search-result.adapter";
 import { toMappingSearchResultFromSonarr } from "./sonarr-search-result.adapter";
@@ -49,11 +49,40 @@ const parseLinkedAniListIds = (
 	return parsed.length > 0 ? parsed : undefined;
 };
 
+const readSonarrFolderName = (value: unknown): string | undefined => {
+	if (
+		typeof value !== "object" ||
+		value === null ||
+		!("folder" in value) ||
+		typeof value.folder !== "string"
+	) {
+		return undefined;
+	}
+
+	const folder = value.folder.trim();
+	return folder.length > 0 ? folder : undefined;
+};
+
+const readRadarrFolderName = (value: unknown): string | undefined => {
+	if (
+		typeof value !== "object" ||
+		value === null ||
+		!("folderName" in value) ||
+		typeof value.folderName !== "string"
+	) {
+		return undefined;
+	}
+
+	const folderName = value.folderName.trim();
+	return folderName.length > 0 ? folderName : undefined;
+};
+
 function buildFallbackMapping(input: {
 	provider: Provider;
 	providerId: ProviderExternalId;
 	title?: string | undefined;
 	isInLibrary: boolean;
+	providerFolderName?: string | undefined;
 	providerRouteSlug?: string | null | undefined;
 	linkedAniListIds?: AniListId[] | undefined;
 }): MappingSearchResult {
@@ -66,6 +95,9 @@ function buildFallbackMapping(input: {
 			? `${input.title} (${providerLabel} ${input.providerId})`
 			: `${providerLabel} ${input.providerId}`,
 		isInLibrary: input.isInLibrary,
+		...(input.providerFolderName
+			? { providerFolderName: input.providerFolderName }
+			: {}),
 		...(input.providerRouteSlug
 			? { providerRouteSlug: input.providerRouteSlug }
 			: {}),
@@ -110,9 +142,10 @@ function deriveRadarrCurrentMapping(input: {
 			movie?.title ??
 			(statusProviderId == null ? input.fallbackTitle : undefined),
 		isInLibrary,
+		providerFolderName: readRadarrFolderName(movie),
 		providerRouteSlug: getProviderRouteSlug(
 			"radarr",
-			movie as ProviderMediaPathSource | undefined,
+			movie as ProviderRouteSlugSource | undefined,
 		),
 		linkedAniListIds,
 	});
@@ -153,9 +186,10 @@ function deriveSonarrCurrentMapping(input: {
 			series?.title ??
 			(statusProviderId == null ? input.fallbackTitle : undefined),
 		isInLibrary,
+		providerFolderName: readSonarrFolderName(series),
 		providerRouteSlug: getProviderRouteSlug(
 			"sonarr",
-			series as ProviderMediaPathSource | undefined,
+			series as ProviderRouteSlugSource | undefined,
 		),
 		linkedAniListIds,
 	});

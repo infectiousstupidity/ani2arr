@@ -3,7 +3,7 @@
 
 import { parseAniListIdOrNull, type AniListId } from "@/anilist";
 import { parseTvdbId, type SonarrLookupSeries } from "@/providers";
-import { getProviderRouteSlug } from "@/providers/library/paths";
+import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import type { MappingSearchResult } from "./types";
 
 export interface SonarrAdapterOptions {
@@ -165,6 +165,7 @@ export function toMappingSearchResultFromSonarr(
 		provider: "sonarr",
 		providerId: tvdbId,
 		title: series.title,
+		...(series.folder ? { providerFolderName: series.folder } : {}),
 		...(year === undefined ? {} : { year }),
 		...(typeLabel ? { typeLabel } : {}),
 		isInLibrary,

@@ -1,5 +1,6 @@
 /** Overlay-owned provider action state for AniList browse surfaces. */
 // src/features/media-overlay/hooks/use-card-overlay-state.ts
+/* eslint-disable complexity, react-hooks/preserve-manual-memoization -- Existing overlay hook coordinates provider status, add, and mapping state. */
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
@@ -49,8 +50,8 @@ import {
 } from "@/features/media-modal/launch-snapshot";
 import {
 	getProviderRouteSlug,
-	type ProviderMediaPathSource,
-} from "@/providers/library/paths";
+	type ProviderRouteSlugSource,
+} from "@/providers/provider-route-slug";
 
 export interface UseCardOverlayStateParams {
 	provider: Provider;
@@ -396,7 +397,7 @@ function getOverlayProviderRouteSlug(input: {
 			"radarr",
 			((input.statusData as ReturnType<typeof useMovieStatus>["data"])?.movie ??
 				input.addedMedia ??
-				null) as ProviderMediaPathSource | null,
+				null) as ProviderRouteSlugSource | null,
 		);
 	}
 
@@ -404,7 +405,7 @@ function getOverlayProviderRouteSlug(input: {
 		"sonarr",
 		((input.statusData as ReturnType<typeof useSeriesStatus>["data"])?.series ??
 			input.addedMedia ??
-			null) as ProviderMediaPathSource | null,
+			null) as ProviderRouteSlugSource | null,
 	);
 }
 

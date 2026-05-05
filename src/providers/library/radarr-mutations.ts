@@ -20,12 +20,16 @@ import {
 	logError,
 	normalizeError,
 } from "@/shared/errors";
-import { buildProviderFolderSlug, joinRootAndSlug } from "./paths";
+import {
+	extractPathLeaf,
+	extractRelativeFolder,
+	joinRootAndFolder,
+	shouldMoveProviderFiles,
+} from "./paths";
 import {
 	resolveMutationTagIds,
 	resolveRequiredQualityProfileId,
 	resolveRequiredRootFolderPath,
-	shouldMoveProviderFiles,
 } from "./mutation-helpers";
 
 type AddRadarrMovieInput = {
@@ -183,7 +187,7 @@ async function resolveRadarrAddPayload(
 async function resolveRadarrMovieUpdate(
 	input: ResolveRadarrMovieUpdateInput,
 ): Promise<ResolvedRadarrMovieUpdate> {
-	const { api, credentials, form, title, tmdbId } = input;
+	const { api, credentials, form, tmdbId } = input;
 
 	if (!Number.isFinite(tmdbId)) {
 		throw createError(
@@ -236,10 +240,19 @@ async function resolveRadarrMovieUpdate(
 	const monitored = form.monitored ?? baseMovie.monitored;
 	const minimumAvailability =
 		form.minimumAvailability ?? baseMovie.minimumAvailability;
-	const nextPath = joinRootAndSlug(
-		rootFolderPath,
-		buildProviderFolderSlug(baseMovie, title),
-	);
+	const folderName =
+		extractRelativeFolder(baseMovie.path, baseMovie.rootFolderPath) ??
+		extractPathLeaf(baseMovie.path);
+
+	if (!folderName) {
+		throw createError(
+			ErrorCode.VALIDATION_ERROR,
+			"Missing Radarr movie folder for update.",
+			"Unable to update this movie because its current folder path is unknown.",
+		);
+	}
+
+	const nextPath = joinRootAndFolder(rootFolderPath, folderName);
 	const moveFiles = shouldMoveProviderFiles(baseMovie.path, nextPath);
 
 	return {

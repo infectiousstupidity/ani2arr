@@ -84,6 +84,7 @@ export interface SonarrLookupSeries {
 	title: string;
 	tvdbId: TvdbId;
 	titleSlug?: string;
+	folder?: string;
 	year?: number;
 	genres?: string[];
 	network?: string;

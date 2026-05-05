@@ -213,13 +213,3 @@ function resolveRequiredRootFolderPath(input: {
 
 	return resolvedValue;
 }
-
-export function buildSonarrAddPathPreview(
-	rootFolderPath: string,
-	series: SonarrLookupSeries,
-): string {
-	const root = rootFolderPath.replace(/[/\\]+$/, "");
-	const separator = root.includes("\\") ? "\\" : "/";
-
-	return `${root}${separator}${series.folder}`;
-}

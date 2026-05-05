@@ -4,12 +4,16 @@
 import { useEffect, useMemo, useRef, type FormEvent } from "react";
 import { useForm, type Path, type PathValue } from "react-hook-form";
 
-import { deriveProviderSetupPathPreview } from "@/providers/library/paths";
 import type {
 	SonarrEditMonitoringAction,
 	SonarrFormState,
 } from "@/providers/settings/provider-settings.schema";
 
+import type { ProviderRootFolderPathPreview } from "@/components/provider-add-options/provider-root-folder-select";
+import {
+	buildAddPathPreview,
+	buildEditPathPreview,
+} from "../../provider-path-preview";
 import type { SonarrSetupTarget } from "../../setup-target";
 
 type SonarrSetupFormValues = SonarrFormState & {
@@ -27,7 +31,7 @@ export type SonarrSetupFormState = {
 	handleSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 	isBusy: boolean;
 	isDirty: boolean;
-	pathPreview: ReturnType<typeof deriveProviderSetupPathPreview>;
+	pathPreview: ProviderRootFolderPathPreview;
 };
 
 type UseSonarrSetupFormInput = {
@@ -59,7 +63,6 @@ function getDraft(values: SonarrSetupFormValues): SonarrFormState {
 
 export function useSonarrSetupForm({
 	target,
-	providerRequestTitle,
 	storedDefaults,
 	isSubmitting,
 	onSubmitDraft,
@@ -119,23 +122,17 @@ export function useSonarrSetupForm({
 		const selectedRootFolderPath = currentDraft.rootFolderPath ?? null;
 
 		if (target.setupMode === "edit") {
-			return deriveProviderSetupPathPreview({
-				mode: "edit",
-				provider: "sonarr",
-				title: target.targetTitle,
+			return buildEditPathPreview({
 				selectedRootFolderPath,
 				existingMedia: target.existingItem,
 			});
 		}
 
-		return deriveProviderSetupPathPreview({
-			mode: "add",
-			provider: "sonarr",
-			title: providerRequestTitle,
+		return buildAddPathPreview({
 			selectedRootFolderPath,
-			providerIdHint: target.tvdbId,
+			providerFolderName: target.providerFolderName,
 		});
-	}, [currentDraft.rootFolderPath, providerRequestTitle, target]);
+	}, [currentDraft.rootFolderPath, target]);
 
 	if (target === null || pathPreview === null) {
 		return null;

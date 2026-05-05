@@ -7,6 +7,7 @@ import type { ProviderExternalId } from "@/mapping/types";
 
 interface MappingSearchResultBase {
 	title: string;
+	providerFolderName?: string;
 	year?: number;
 	typeLabel?: string;
 	isInLibrary: boolean;
