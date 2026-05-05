@@ -4,7 +4,7 @@ import {
 	validateProviderConnectionApiKey,
 	validateProviderConnectionUrl,
 } from "@/providers/settings/provider-connection.schema";
-import { shouldEnableProviderMetadata } from "../hooks/provider-settings-actions.shared";
+import { shouldEnableProviderFormOptions } from "../hooks/provider-settings-actions.shared";
 
 function getSavedCredentials(
 	savedSettings: ExtensionOptions | undefined,
@@ -61,7 +61,7 @@ export function deriveProviderPanelConnectionState(input: {
 	isEditingConnection: boolean;
 	isProviderConfigured: boolean;
 	hasConnectionChanges: boolean;
-	metadataEnabled: boolean;
+	formOptionsEnabled: boolean;
 	normalizedUrl: string;
 	shouldAutofocusUrl: boolean;
 } {
@@ -82,7 +82,7 @@ export function deriveProviderPanelConnectionState(input: {
 			(savedCredentials === null ||
 				formCredentials.url !== savedCredentials.url ||
 				formCredentials.apiKey !== savedCredentials.apiKey),
-		metadataEnabled: shouldEnableProviderMetadata({
+		formOptionsEnabled: shouldEnableProviderFormOptions({
 			savedCredentials,
 			formCredentials,
 			isEditingConnection,

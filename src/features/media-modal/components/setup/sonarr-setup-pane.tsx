@@ -7,9 +7,9 @@ import { SonarrEditOptionsFields } from "@/components/provider-add-options/sonar
 import { BaseProviderSetupPanel } from "./provider-setup-panel";
 import type { SonarrSetupFormState } from "../../hooks/sonarr/use-sonarr-setup-form";
 
-type SonarrProviderMetadata = ComponentProps<
+type SonarrProviderFormOptions = ComponentProps<
 	typeof SonarrAddOptionsFields
->["metadata"];
+>["formOptions"];
 type SonarrPortalContainer = ComponentProps<
 	typeof SonarrAddOptionsFields
 >["portalContainer"];
@@ -18,7 +18,7 @@ interface SonarrSetupPaneProps {
 	formId: string;
 	formState: SonarrSetupFormState | null;
 	isConfigured: boolean;
-	metadata: SonarrProviderMetadata | null;
+	formOptions: SonarrProviderFormOptions | null;
 	mode: "add" | "edit";
 	portalContainer: SonarrPortalContainer;
 	setupMutationsBlocked: boolean;
@@ -60,7 +60,7 @@ export function SonarrSetupPane({
 	formId,
 	formState,
 	isConfigured,
-	metadata,
+	formOptions,
 	mode,
 	portalContainer,
 	setupMutationsBlocked,
@@ -78,11 +78,11 @@ export function SonarrSetupPane({
 		<BaseProviderSetupPanel
 			providerName="Sonarr"
 			isConfigured={isConfigured}
-			hasMetadata={!!metadata}
+			hasFormOptions={!!formOptions}
 			statusNotice={statusNotice}
 			headerDescription={getHeaderDescription(mode)}
 		>
-			{formState && metadata ? (
+			{formState && formOptions ? (
 				mode === "edit" ? (
 					<SonarrEditOptionsFields
 						values={formState.currentDraft}
@@ -91,7 +91,7 @@ export function SonarrSetupPane({
 						onMonitoringActionChange={formState.handleMonitoringActionChange}
 						disabled={formState.isBusy || setupMutationsBlocked}
 						portalContainer={portalContainer}
-						metadata={metadata}
+						formOptions={formOptions}
 						pathPreview={formState.pathPreview}
 						layout="stacked"
 					/>
@@ -101,7 +101,7 @@ export function SonarrSetupPane({
 						onChange={formState.handleFieldChange}
 						disabled={formState.isBusy || setupMutationsBlocked}
 						portalContainer={portalContainer}
-						metadata={metadata}
+						formOptions={formOptions}
 						pathPreview={formState.pathPreview}
 						layout="stacked"
 						includeSearchToggle={true}

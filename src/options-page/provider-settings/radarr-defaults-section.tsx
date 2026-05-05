@@ -12,19 +12,19 @@ import Button from '@/shared/ui/primitives/button';
 import type { ExtensionOptions } from '@/options';
 
 import { SaveSettingsBar } from './save-settings-bar';
-import type { useRadarrMetadata } from '@/providers/hooks/radarr.queries';
+import type { useRadarrFormOptions } from '@/providers/hooks/radarr.queries';
 
 export const RadarrDefaultsSection: React.FC<{
   actions: SettingsActions;
   portalContainer: HTMLElement | null;
-  metadataEnabled: boolean;
-  metadataQuery: ReturnType<typeof useRadarrMetadata>;
+  formOptionsEnabled: boolean;
+  formOptionsQuery: ReturnType<typeof useRadarrFormOptions>;
   onRefresh: () => void;
 }> = ({
   actions,
   portalContainer,
-  metadataEnabled,
-  metadataQuery,
+  formOptionsEnabled,
+  formOptionsQuery,
   onRefresh,
 }) => {
   const methods = useFormContext<ExtensionOptions>();
@@ -47,7 +47,7 @@ export const RadarrDefaultsSection: React.FC<{
   };
 
   const renderContent = () => {
-    if (!metadataEnabled) {
+    if (!formOptionsEnabled) {
       return (
         <div className="rounded-lg border border-dashed border-border-primary/70 bg-bg-tertiary/40 p-4 text-sm text-text-secondary">
           Enter a valid Radarr URL and API key to load available folders, profiles, and tags.
@@ -55,11 +55,11 @@ export const RadarrDefaultsSection: React.FC<{
       );
     }
 
-    if (metadataQuery.isFetching && !metadataQuery.data) {
+    if (formOptionsQuery.isFetching && !formOptionsQuery.data) {
       return <div className="text-center p-8 text-text-secondary">Loading Radarr data...</div>;
     }
 
-    if (metadataQuery.isError) {
+    if (formOptionsQuery.isError) {
       return (
         <div className="rounded-lg border border-dashed border-border-primary/70 bg-bg-tertiary/40 p-4 text-sm text-text-secondary">
           Failed to load data from Radarr. Check permissions and try again.
@@ -67,12 +67,12 @@ export const RadarrDefaultsSection: React.FC<{
       );
     }
 
-    if (!metadataQuery.data) return null;
+    if (!formOptionsQuery.data) return null;
 
     return (
       <RadarrAddOptionsFields
         values={defaults}
-        metadata={metadataQuery.data}
+        formOptions={formOptionsQuery.data}
         onChange={setDefaultField}
         disabled={actions.isBusy}
         portalContainer={portalContainer ?? null}
@@ -92,14 +92,14 @@ export const RadarrDefaultsSection: React.FC<{
         </div>
         <Button
           onClick={onRefresh}
-          isLoading={metadataQuery.isRefetching}
+          isLoading={formOptionsQuery.isRefetching}
           variant="ghost"
           size="icon"
           tooltip="Refresh data from Radarr"
           tooltipContainer={portalContainer ?? undefined}
           aria-label="Refresh data from Radarr"
-          aria-busy={metadataQuery.isRefetching}
-          disabled={!metadataEnabled || actions.isBusy}
+          aria-busy={formOptionsQuery.isRefetching}
+          disabled={!formOptionsEnabled || actions.isBusy}
         >
           <RotateCcw />
         </Button>

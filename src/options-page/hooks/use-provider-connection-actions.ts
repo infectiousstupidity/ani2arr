@@ -22,7 +22,7 @@ import { getProviderLabel } from "@/providers/provider-labels";
 import type {
 	Provider,
 	ProviderCredentials,
-	ProviderMetadata,
+	ProviderFormOptions,
 } from "@/providers";
 import {
 	invalidateProviderDependentQueries,
@@ -56,20 +56,20 @@ function seedProviderConnectionQueries(input: {
 	queryClient: QueryClient;
 	provider: Provider;
 	credentials: ProviderCredentials;
-	metadata: ProviderMetadata;
+	formOptions: ProviderFormOptions;
 	connectionInfo: ProviderConnectionInfo;
 }): void {
-	const { queryClient, provider, credentials, metadata, connectionInfo } =
+	const { queryClient, provider, credentials, formOptions, connectionInfo } =
 		input;
 	const scope = getProviderQueryScope(credentials);
 
 	if (provider === "sonarr") {
-		queryClient.setQueryData(queryKeys.sonarrMetadata(scope), metadata);
+		queryClient.setQueryData(queryKeys.sonarrFormOptions(scope), formOptions);
 		queryClient.setQueryData(queryKeys.sonarrConnection(scope), connectionInfo);
 		return;
 	}
 
-	queryClient.setQueryData(queryKeys.radarrMetadata(scope), metadata);
+	queryClient.setQueryData(queryKeys.radarrFormOptions(scope), formOptions);
 	queryClient.setQueryData(queryKeys.radarrConnection(scope), connectionInfo);
 }
 
@@ -119,12 +119,12 @@ export function useProviderConnectionActions({
 		[],
 	);
 
-	const fetchProviderMetadata = useCallback(
+	const fetchProviderFormOptions = useCallback(
 		async (provider: Provider, credentials: ProviderCredentials) => {
 			const api = getAni2arrApi();
 			return provider === "sonarr"
-				? api.getSonarrMetadata({ credentials })
-				: api.getRadarrMetadata({ credentials });
+				? api.getSonarrFormOptions({ credentials })
+				: api.getRadarrFormOptions({ credentials });
 		},
 		[],
 	);
@@ -135,7 +135,7 @@ export function useProviderConnectionActions({
 			input?: {
 				currentConnectionOverride?: ProviderCredentials;
 				defaultsOverride?: ProviderDefaults;
-				metadataOverride?: ProviderMetadata;
+				formOptionsOverride?: ProviderFormOptions;
 				connectionInfoOverride?: ProviderConnectionInfo;
 			},
 		): Promise<boolean> => {
@@ -221,7 +221,7 @@ export function useProviderConnectionActions({
 			setSavedSettings(normalizedSettings);
 			methods.reset(mergedFormSettings);
 
-			if (input?.metadataOverride && input.connectionInfoOverride) {
+			if (input?.formOptionsOverride && input.connectionInfoOverride) {
 				seedProviderConnectionQueries({
 					queryClient,
 					provider,
@@ -229,7 +229,7 @@ export function useProviderConnectionActions({
 						url: normalizedSettings.providers[provider].url,
 						apiKey: normalizedSettings.providers[provider].apiKey,
 					},
-					metadata: input.metadataOverride,
+					formOptions: input.formOptionsOverride,
 					connectionInfo: input.connectionInfoOverride,
 				});
 			}
@@ -314,9 +314,9 @@ export function useProviderConnectionActions({
 					return false;
 				}
 
-				let metadata;
+				let formOptions;
 				try {
-					metadata = await fetchProviderMetadata(
+					formOptions = await fetchProviderFormOptions(
 						provider,
 						normalizedConnection,
 					);
@@ -333,18 +333,18 @@ export function useProviderConnectionActions({
 						? bootstrapProviderDefaults(
 								"sonarr",
 								nextSettings.providers.sonarr.defaults,
-								metadata,
+								formOptions,
 							)
 						: bootstrapProviderDefaults(
 								"radarr",
 								nextSettings.providers.radarr.defaults,
-								metadata,
+								formOptions,
 							);
 
 				return saveProviderConnection(provider, {
 					currentConnectionOverride: normalizedConnection,
 					defaultsOverride: bootstrappedDefaults,
-					metadataOverride: metadata,
+					formOptionsOverride: formOptions,
 					connectionInfoOverride: connectionInfo,
 				});
 			})().finally(() => {
@@ -357,7 +357,7 @@ export function useProviderConnectionActions({
 			return connectRequest;
 		},
 		[
-			fetchProviderMetadata,
+			fetchProviderFormOptions,
 			isBusy,
 			methods,
 			radarrTestConnectionState,

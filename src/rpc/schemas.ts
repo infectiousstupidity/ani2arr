@@ -178,7 +178,7 @@ export const NotifyProviderConnectionChangedInputSchema = v.optional(
 	}),
 );
 
-export const GetProviderMetadataInputSchema = v.optional(
+export const GetProviderFormOptionsInputSchema = v.optional(
 	v.object({
 		credentials: v.optional(ProviderCredentialsSchema),
 	}),
@@ -269,8 +269,8 @@ export type RadarrLookupInput = v.InferOutput<typeof RadarrLookupInputSchema>;
 export type TestProviderConnectionInput = v.InferOutput<
 	typeof TestProviderConnectionInputSchema
 >;
-export type GetProviderMetadataInput = v.InferOutput<
-	typeof GetProviderMetadataInputSchema
+export type GetProviderFormOptionsInput = v.InferOutput<
+	typeof GetProviderFormOptionsInputSchema
 >;
 export type NotifyProviderConnectionChangedInput = v.InferOutput<
 	typeof NotifyProviderConnectionChangedInputSchema

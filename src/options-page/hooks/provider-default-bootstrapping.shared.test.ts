@@ -5,7 +5,7 @@ import {
 	bootstrapSonarrDefaults,
 } from "./provider-default-bootstrapping.shared";
 
-const metadata = {
+const formOptions = {
 	qualityProfiles: [
 		{ id: parseProviderQualityProfileId(10), name: "Default Profile" },
 	],
@@ -14,8 +14,8 @@ const metadata = {
 };
 
 describe("provider default bootstrapping", () => {
-	it("fills missing Sonarr defaults from provider metadata", () => {
-		expect(bootstrapSonarrDefaults(undefined, metadata)).toMatchObject({
+	it("fills missing Sonarr defaults from provider form options", () => {
+		expect(bootstrapSonarrDefaults(undefined, formOptions)).toMatchObject({
 			qualityProfileId: parseProviderQualityProfileId(10),
 			rootFolderPath: "/media/library",
 			seriesType: "anime",
@@ -36,7 +36,7 @@ describe("provider default bootstrapping", () => {
 					rootFolderPath: "/custom/root",
 					monitored: true,
 				},
-				metadata,
+				formOptions,
 			),
 		).toMatchObject({
 			qualityProfileId: parseProviderQualityProfileId(99),
@@ -55,7 +55,7 @@ describe("provider default bootstrapping", () => {
 						searchForMissingEpisodes: false,
 					},
 				},
-				metadata,
+				formOptions,
 			),
 		).toMatchObject({
 			qualityProfileId: parseProviderQualityProfileId(10),
@@ -71,7 +71,7 @@ describe("provider default bootstrapping", () => {
 	});
 
 	it("fills missing Radarr defaults with baseline selections", () => {
-		expect(bootstrapRadarrDefaults(undefined, metadata)).toMatchObject({
+		expect(bootstrapRadarrDefaults(undefined, formOptions)).toMatchObject({
 			qualityProfileId: parseProviderQualityProfileId(10),
 			rootFolderPath: "/media/library",
 			monitored: true,

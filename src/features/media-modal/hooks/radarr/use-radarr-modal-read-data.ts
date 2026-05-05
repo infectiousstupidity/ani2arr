@@ -12,7 +12,7 @@ import { defaultRadarrFormState, usePublicOptions } from "@/options";
 import type { CheckMovieStatusResponse } from "@/rpc/types";
 import {
 	useMovieStatus,
-	useRadarrMetadata,
+	useRadarrFormOptions,
 } from "@/providers/hooks/radarr.queries";
 import { getProviderBaseUrl } from "@/options/provider-config";
 import { useAniListMedia, useAniListMetadataBatch } from "@/shared/queries";
@@ -128,7 +128,7 @@ export function useRadarrModalReadData(input: {
 	]);
 
 	const isConfigured = options?.providers.radarr.isConfigured === true;
-	const radarrMetadata = useRadarrMetadata({ enabled: isConfigured });
+	const radarrFormOptions = useRadarrFormOptions({ enabled: isConfigured });
 
 	const statusPayload = useMemo(
 		() => ({
@@ -209,7 +209,7 @@ export function useRadarrModalReadData(input: {
 			verificationSettled,
 			verificationFailed,
 			storedDefaults,
-			providerMetadata: radarrMetadata.data ?? null,
+			providerFormOptions: radarrFormOptions.data ?? null,
 		};
 	}, [
 		anilistId,
@@ -223,7 +223,7 @@ export function useRadarrModalReadData(input: {
 		launchTitle,
 		options?.providers.radarr.defaults,
 		providerRequestTitle,
-		radarrMetadata.data,
+		radarrFormOptions.data,
 		shouldForceVerify,
 		radarrStatus.isError,
 		resolvedMetadata,

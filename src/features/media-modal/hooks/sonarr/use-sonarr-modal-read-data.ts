@@ -12,7 +12,7 @@ import { defaultSonarrFormState, usePublicOptions } from "@/options";
 import type { CheckSeriesStatusResponse } from "@/rpc/types";
 import {
 	useSeriesStatus,
-	useSonarrMetadata,
+	useSonarrFormOptions,
 } from "@/providers/hooks/sonarr.queries";
 import { getProviderBaseUrl } from "@/options/provider-config";
 import { useAniListMedia, useAniListMetadataBatch } from "@/shared/queries";
@@ -128,7 +128,7 @@ export function useSonarrModalReadData(input: {
 	]);
 
 	const isConfigured = options?.providers.sonarr.isConfigured === true;
-	const sonarrMetadata = useSonarrMetadata({ enabled: isConfigured });
+	const sonarrFormOptions = useSonarrFormOptions({ enabled: isConfigured });
 
 	const statusPayload = useMemo(
 		() => ({
@@ -209,7 +209,7 @@ export function useSonarrModalReadData(input: {
 			verificationSettled,
 			verificationFailed,
 			storedDefaults,
-			providerMetadata: sonarrMetadata.data ?? null,
+			providerFormOptions: sonarrFormOptions.data ?? null,
 		};
 	}, [
 		options?.providers.sonarr.defaults,
@@ -228,6 +228,6 @@ export function useSonarrModalReadData(input: {
 		providerStatus,
 		currentMapping,
 		fallbackTitle,
-		sonarrMetadata.data,
+		sonarrFormOptions.data,
 	]);
 }

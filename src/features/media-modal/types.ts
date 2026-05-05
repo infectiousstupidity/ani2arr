@@ -11,7 +11,7 @@ import type {
 	CheckMovieStatusResponse,
 	CheckSeriesStatusResponse,
 } from "@/rpc/types";
-import type { ProviderMetadata } from "@/providers";
+import type { ProviderFormOptions } from "@/providers";
 import type {
 	RadarrFormState,
 	SonarrFormState,
@@ -56,14 +56,14 @@ export type MediaModalBaseData = {
 export type RadarrMediaModalData = MediaModalBaseData & {
 	provider: "radarr";
 	rawProviderStatus: CheckMovieStatusResponse | null;
-	providerMetadata: ProviderMetadata | null;
+	providerFormOptions: ProviderFormOptions | null;
 	storedDefaults: RadarrFormState;
 };
 
 export type SonarrMediaModalData = MediaModalBaseData & {
 	provider: "sonarr";
 	rawProviderStatus: CheckSeriesStatusResponse | null;
-	providerMetadata: ProviderMetadata | null;
+	providerFormOptions: ProviderFormOptions | null;
 	storedDefaults: SonarrFormState;
 };
 

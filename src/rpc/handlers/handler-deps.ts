@@ -16,7 +16,7 @@ import type { Provider } from "@/providers";
 import type { ProviderConfigReader } from "@/background/api/provider-config-reader";
 
 export type ApiHandlerDeps = {
-	/** LEGACY: Used by provider metadata/connection handlers until those move to the new Sonarr client. */
+	/** LEGACY: Used by Sonarr connection testing until it moves to the new Sonarr client. */
 	SonarrClient: SonarrClient;
 	sonarrClient: CurrentSonarrClient;
 	sonarrLookupClient: Pick<

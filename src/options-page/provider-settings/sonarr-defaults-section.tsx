@@ -15,20 +15,20 @@ import Button from '@/shared/ui/primitives/button';
 import type { ExtensionOptions } from '@/options';
 
 import { SaveSettingsBar } from './save-settings-bar';
-import type { useSonarrMetadata } from '@/providers/hooks/sonarr.queries';
+import type { useSonarrFormOptions } from '@/providers/hooks/sonarr.queries';
 
 export const SonarrDefaultsSection: React.FC<{
   actions: SettingsActions;
   portalContainer: HTMLElement | null;
-  metadataEnabled: boolean;
-  metadataQuery: ReturnType<typeof useSonarrMetadata>;
+  formOptionsEnabled: boolean;
+  formOptionsQuery: ReturnType<typeof useSonarrFormOptions>;
   onRefresh: () => void;
   layout?: SonarrAddOptionsFieldsLayout | undefined;
 }> = ({
   actions,
   portalContainer,
-  metadataEnabled,
-  metadataQuery,
+  formOptionsEnabled,
+  formOptionsQuery,
   onRefresh,
   layout = 'stacked',
 }) => {
@@ -52,7 +52,7 @@ export const SonarrDefaultsSection: React.FC<{
   };
 
   const renderContent = () => {
-    if (!metadataEnabled) {
+    if (!formOptionsEnabled) {
       return (
         <div className="rounded-lg border border-dashed border-border-primary/70 bg-bg-tertiary/40 p-4 text-sm text-text-secondary">
           Enter a valid Sonarr URL and API key to load available folders, profiles, and tags.
@@ -60,11 +60,11 @@ export const SonarrDefaultsSection: React.FC<{
       );
     }
 
-    if (metadataQuery.isFetching && !metadataQuery.data) {
+    if (formOptionsQuery.isFetching && !formOptionsQuery.data) {
       return <div className="text-center p-8 text-text-secondary">Loading Sonarr data...</div>;
     }
 
-    if (metadataQuery.isError) {
+    if (formOptionsQuery.isError) {
       return (
         <div className="rounded-lg border border-dashed border-border-primary/70 bg-bg-tertiary/40 p-4 text-sm text-text-secondary">
           Failed to load data from Sonarr. Check permissions and try again.
@@ -72,12 +72,12 @@ export const SonarrDefaultsSection: React.FC<{
       );
     }
 
-    if (!metadataQuery.data) return null;
+    if (!formOptionsQuery.data) return null;
 
     return (
       <SonarrAddOptionsFields
         values={defaults}
-        metadata={metadataQuery.data}
+        formOptions={formOptionsQuery.data}
         onChange={setDefaultField}
         disabled={actions.isBusy}
         portalContainer={portalContainer ?? null}
@@ -97,14 +97,14 @@ export const SonarrDefaultsSection: React.FC<{
         </div>
         <Button
           onClick={onRefresh}
-          isLoading={metadataQuery.isRefetching}
+          isLoading={formOptionsQuery.isRefetching}
           variant="ghost"
           size="icon"
           tooltip="Refresh data from Sonarr"
           tooltipContainer={portalContainer ?? undefined}
           aria-label="Refresh data from Sonarr"
-          aria-busy={metadataQuery.isRefetching}
-          disabled={!metadataEnabled || actions.isBusy}
+          aria-busy={formOptionsQuery.isRefetching}
+          disabled={!formOptionsEnabled || actions.isBusy}
         >
           <RotateCcw />
         </Button>

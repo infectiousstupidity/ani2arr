@@ -24,7 +24,7 @@ import type {
 	UpdateRadarrInput,
 } from "@/rpc/schemas";
 
-export const useRadarrMetadata = (options?: {
+export const useRadarrFormOptions = (options?: {
 	enabled?: boolean;
 	credentials?: ProviderCredentials | null;
 }) => {
@@ -33,13 +33,13 @@ export const useRadarrMetadata = (options?: {
 		: undefined;
 
 	return useQuery({
-		queryKey: queryKeys.radarrMetadata(
+		queryKey: queryKeys.radarrFormOptions(
 			getProviderQueryScope(options?.credentials),
 		),
 		queryFn: async () => {
 			try {
 				const api = getAni2arrApi();
-				return await api.getRadarrMetadata(request);
+				return await api.getRadarrFormOptions(request);
 			} catch (error) {
 				throw normalizeError(error);
 			}

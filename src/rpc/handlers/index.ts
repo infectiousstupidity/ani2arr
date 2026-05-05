@@ -9,12 +9,16 @@ import { createMaintenanceHandlers } from "./maintenance.handlers";
 import { createMappingHandlers } from "./mapping.handlers";
 import { createOptionsHandlers } from "./options.handlers";
 import { createProviderHandlers } from "./provider.handlers";
+import { createRadarrHandlers } from "./radarr.handlers";
+import { createSonarrHandlers } from "./sonarr.handlers";
 
 export function createApiHandlers(deps: ApiHandlerDeps): Ani2arrApi {
 	return {
 		...createOptionsHandlers(deps),
 		...createLibraryHandlers(deps),
 		...createProviderHandlers(deps),
+		...createSonarrHandlers(deps),
+		...createRadarrHandlers(deps),
 		...createMappingHandlers(deps),
 		...createAnilistHandlers(deps),
 		...createMaintenanceHandlers(deps),
