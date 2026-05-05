@@ -24,7 +24,7 @@ import type {
 	UpdateSonarrInput,
 } from "@/rpc/schemas";
 
-export const useSonarrMetadata = (options?: {
+export const useSonarrFormOptions = (options?: {
 	enabled?: boolean;
 	credentials?: ProviderCredentials | null;
 }) => {
@@ -33,13 +33,13 @@ export const useSonarrMetadata = (options?: {
 		: undefined;
 
 	return useQuery({
-		queryKey: queryKeys.sonarrMetadata(
+		queryKey: queryKeys.sonarrFormOptions(
 			getProviderQueryScope(options?.credentials),
 		),
 		queryFn: async () => {
 			try {
 				const api = getAni2arrApi();
-				return await api.getSonarrMetadata(request);
+				return await api.getSonarrFormOptions(request);
 			} catch (error) {
 				throw normalizeError(error);
 			}

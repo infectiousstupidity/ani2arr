@@ -10,7 +10,7 @@ import type {
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import type {
 	Provider,
-	ProviderMetadata,
+	ProviderFormOptions,
 	RadarrMovie,
 	SonarrSeries,
 } from "@/providers";
@@ -31,7 +31,7 @@ import type {
 	MovieLibraryStatusInput,
 	AddSonarrInput,
 	AddRadarrInput,
-	GetProviderMetadataInput,
+	GetProviderFormOptionsInput,
 	UpdateSonarrInput,
 	UpdateRadarrInput,
 	SetManualMappingInput,
@@ -79,12 +79,12 @@ export interface Ani2arrApi {
 	testProviderConnection(
 		input: TestProviderConnectionInput,
 	): Promise<{ version: string }>;
-	getSonarrMetadata(
-		input?: GetProviderMetadataInput,
-	): Promise<ProviderMetadata>;
-	getRadarrMetadata(
-		input?: GetProviderMetadataInput,
-	): Promise<ProviderMetadata>;
+	getSonarrFormOptions(
+		input?: GetProviderFormOptionsInput,
+	): Promise<ProviderFormOptions>;
+	getRadarrFormOptions(
+		input?: GetProviderFormOptionsInput,
+	): Promise<ProviderFormOptions>;
 	initMappings(): Promise<void>;
 	setManualMapping(input: SetManualMappingInput): Promise<{ ok: true }>;
 	clearManualMapping(input: ClearManualMappingInput): Promise<{ ok: true }>;

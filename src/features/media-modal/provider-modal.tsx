@@ -171,7 +171,7 @@ function SonarrProviderModal({
 					formId="sonarr-setup-form"
 					formState={setupFormState}
 					isConfigured={data.isConfigured}
-					metadata={data.providerMetadata ?? null}
+					formOptions={data.providerFormOptions ?? null}
 					mode={setupMode}
 					portalContainer={contentContainer}
 					setupMutationsBlocked={setupActions.setupMutationsBlocked}
@@ -260,7 +260,7 @@ function RadarrProviderModal({
 					formId="radarr-setup-form"
 					formState={setupFormState}
 					isConfigured={data.isConfigured}
-					metadata={data.providerMetadata ?? null}
+					formOptions={data.providerFormOptions ?? null}
 					mode={setupMode}
 					portalContainer={contentContainer}
 					setupMutationsBlocked={setupActions.setupMutationsBlocked}

@@ -5,7 +5,7 @@ export { PROVIDERS } from "./types";
 export type {
 	Provider,
 	ProviderCredentials,
-	ProviderMetadata,
+	ProviderFormOptions,
 	ProviderQualityProfile,
 	ProviderRootFolder,
 	ProviderTag,

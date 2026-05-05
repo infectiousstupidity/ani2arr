@@ -28,7 +28,7 @@ import type { SonarrAddOptionsFieldsLayout } from "@/components/provider-add-opt
 import { SonarrDefaultsSection } from "./sonarr-defaults-section";
 import { useSelectPortal } from "./use-select-portal";
 import type { ExtensionOptions } from "@/options";
-import { useSonarrMetadata } from "@/providers/hooks/sonarr.queries";
+import { useSonarrFormOptions } from "@/providers/hooks/sonarr.queries";
 import { deriveProviderPanelConnectionState } from "./provider-settings-panel-state.shared";
 
 export interface SonarrSettingsPanelProps {
@@ -69,7 +69,7 @@ const SonarrSettingsPanel: React.FC<SonarrSettingsPanelProps> = ({
 		isEditingConnection,
 		isProviderConfigured,
 		hasConnectionChanges,
-		metadataEnabled,
+		formOptionsEnabled,
 		normalizedUrl,
 		shouldAutofocusUrl,
 	} = useMemo(
@@ -92,23 +92,23 @@ const SonarrSettingsPanel: React.FC<SonarrSettingsPanelProps> = ({
 
 		sonarrUrlInputRef.current?.focus();
 	}, [shouldAutofocusUrl]);
-	const metadataCredentials =
-		metadataEnabled && savedCredentials ? savedCredentials : null;
+	const formOptionsCredentials =
+		formOptionsEnabled && savedCredentials ? savedCredentials : null;
 
 	const liveConnectionQuery = useProviderConnectionCheck({
 		provider: "sonarr",
-		enabled: metadataEnabled,
-		credentials: metadataCredentials,
+		enabled: formOptionsEnabled,
+		credentials: formOptionsCredentials,
 	});
 
-	const metadataQuery = useSonarrMetadata({
-		enabled: metadataEnabled,
-		credentials: metadataCredentials,
+	const formOptionsQuery = useSonarrFormOptions({
+		enabled: formOptionsEnabled,
+		credentials: formOptionsCredentials,
 	});
 
 	const isCheckingProviderConnection =
 		actions.sonarrTestConnectionState.isPending ||
-		(metadataEnabled && liveConnectionQuery.isFetching);
+		(formOptionsEnabled && liveConnectionQuery.isFetching);
 	const isConnectDisabled =
 		!hasConnectionChanges ||
 		!formCredentials ||
@@ -167,7 +167,7 @@ const SonarrSettingsPanel: React.FC<SonarrSettingsPanelProps> = ({
 
 	const handleRefresh = useCallback(() => {
 		queryClient.invalidateQueries({
-			queryKey: queryKeys.sonarrMetadataRoot(),
+			queryKey: queryKeys.sonarrFormOptionsRoot(),
 		});
 	}, [queryClient]);
 
@@ -220,7 +220,7 @@ const SonarrSettingsPanel: React.FC<SonarrSettingsPanelProps> = ({
 						apiKeyHelp={
 							<>
 								The API key lets ani2arr authenticate with your Sonarr server so
-								it can test the connection, read metadata, and add or update
+								it can test the connection, read available options, and add or update
 								series. It is stored only in browser local storage and sent only
 								to the Sonarr origin you configure.
 							</>
@@ -266,8 +266,8 @@ const SonarrSettingsPanel: React.FC<SonarrSettingsPanelProps> = ({
 			<SonarrDefaultsSection
 				actions={actions}
 				portalContainer={selectPortal}
-				metadataEnabled={metadataEnabled}
-				metadataQuery={metadataQuery}
+				formOptionsEnabled={formOptionsEnabled}
+				formOptionsQuery={formOptionsQuery}
 				onRefresh={handleRefresh}
 				layout={layout}
 			/>

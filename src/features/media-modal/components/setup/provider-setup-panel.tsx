@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 export function BaseProviderSetupPanel(props: {
 	providerName: string;
 	isConfigured: boolean;
-	hasMetadata: boolean;
+	hasFormOptions: boolean;
 	headerDescription: string;
 	statusNotice?: ReactNode;
 	children: ReactNode;
@@ -14,7 +14,7 @@ export function BaseProviderSetupPanel(props: {
 	const {
 		providerName,
 		isConfigured,
-		hasMetadata,
+		hasFormOptions,
 		headerDescription,
 		statusNotice,
 		children,
@@ -36,11 +36,11 @@ export function BaseProviderSetupPanel(props: {
 			</div>
 
 			<div className="min-h-0 flex-1">
-				{!isConfigured || !hasMetadata ? (
+				{!isConfigured || !hasFormOptions ? (
 					<div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-sm text-text-secondary">
 						<p>
 							Connect {providerName} in the extension options to load provider
-							metadata.
+							form options.
 						</p>
 						<p className="text-xs">
 							Add your {providerName} URL and API key, then return here to

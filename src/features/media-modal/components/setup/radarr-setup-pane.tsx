@@ -6,9 +6,9 @@ import { RadarrAddOptionsFields } from "@/components/provider-add-options/radarr
 import { BaseProviderSetupPanel } from "./provider-setup-panel";
 import type { RadarrSetupFormState } from "../../hooks/radarr/use-radarr-setup-form";
 
-type RadarrProviderMetadata = ComponentProps<
+type RadarrProviderFormOptions = ComponentProps<
 	typeof RadarrAddOptionsFields
->["metadata"];
+>["formOptions"];
 type RadarrPortalContainer = ComponentProps<
 	typeof RadarrAddOptionsFields
 >["portalContainer"];
@@ -17,7 +17,7 @@ interface RadarrSetupPaneProps {
 	formId: string;
 	formState: RadarrSetupFormState | null;
 	isConfigured: boolean;
-	metadata: RadarrProviderMetadata | null;
+	formOptions: RadarrProviderFormOptions | null;
 	mode: "add" | "edit";
 	portalContainer: RadarrPortalContainer;
 	setupMutationsBlocked: boolean;
@@ -59,7 +59,7 @@ export function RadarrSetupPane({
 	formId,
 	formState,
 	isConfigured,
-	metadata,
+	formOptions,
 	mode,
 	portalContainer,
 	setupMutationsBlocked,
@@ -77,17 +77,17 @@ export function RadarrSetupPane({
 		<BaseProviderSetupPanel
 			providerName="Radarr"
 			isConfigured={isConfigured}
-			hasMetadata={!!metadata}
+			hasFormOptions={!!formOptions}
 			statusNotice={statusNotice}
 			headerDescription={getHeaderDescription(mode)}
 		>
-			{formState && metadata ? (
+			{formState && formOptions ? (
 				<RadarrAddOptionsFields
 					values={formState.currentDraft}
 					onChange={formState.handleFieldChange}
 					disabled={formState.isBusy || setupMutationsBlocked}
 					portalContainer={portalContainer}
-					metadata={metadata}
+					formOptions={formOptions}
 					pathPreview={formState.pathPreview}
 					layout="stacked"
 				/>

@@ -48,8 +48,8 @@ const seriesStatusRootKey = (provider: Provider) =>
 const seriesStatusBaseKey = (provider: Provider, anilistId: AniListId) =>
 	[...seriesStatusRootKey(provider), anilistId] as const;
 
-const providerMetadataRootKey = (provider: Provider) =>
-	[...rootQueryKey, `${provider}Metadata`] as const;
+const providerFormOptionsRootKey = (provider: Provider) =>
+	[...rootQueryKey, `${provider}FormOptions`] as const;
 
 const normalizeMappingsInput = (input?: GetMappingsInput) => {
 	if (!input) return "default";
@@ -126,15 +126,15 @@ export const queryKeys = {
 			"providerLibraryStatus",
 			providerId,
 		] as const,
-	sonarrMetadataRoot: () => providerMetadataRootKey("sonarr"),
-	sonarrMetadata: (scope?: string) =>
-		[...rootQueryKey, "sonarrMetadata", scope ?? "configured"] as const,
+	sonarrFormOptionsRoot: () => providerFormOptionsRootKey("sonarr"),
+	sonarrFormOptions: (scope?: string) =>
+		[...rootQueryKey, "sonarrFormOptions", scope ?? "configured"] as const,
 	sonarrConnectionRoot: () => [...rootQueryKey, "sonarrConnection"] as const,
 	sonarrConnection: (scope?: string) =>
 		[...rootQueryKey, "sonarrConnection", scope ?? "configured"] as const,
-	radarrMetadataRoot: () => providerMetadataRootKey("radarr"),
-	radarrMetadata: (scope?: string) =>
-		[...rootQueryKey, "radarrMetadata", scope ?? "configured"] as const,
+	radarrFormOptionsRoot: () => providerFormOptionsRootKey("radarr"),
+	radarrFormOptions: (scope?: string) =>
+		[...rootQueryKey, "radarrFormOptions", scope ?? "configured"] as const,
 	radarrConnectionRoot: () => [...rootQueryKey, "radarrConnection"] as const,
 	radarrConnection: (scope?: string) =>
 		[...rootQueryKey, "radarrConnection", scope ?? "configured"] as const,

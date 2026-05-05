@@ -14,10 +14,10 @@ export type ProviderConnectionChangeInput = {
 
 function getProviderQueryKeys(provider: Provider) {
 	return {
-		metadata:
+		formOptions:
 			provider === "sonarr"
-				? queryKeys.sonarrMetadataRoot()
-				: queryKeys.radarrMetadataRoot(),
+				? queryKeys.sonarrFormOptionsRoot()
+				: queryKeys.radarrFormOptionsRoot(),
 		connection:
 			provider === "sonarr"
 				? queryKeys.sonarrConnectionRoot()
@@ -30,9 +30,9 @@ function getProviderQueryKeys(provider: Provider) {
 export function invalidateAllSettingsQueries(queryClient: QueryClient): void {
 	queryClient.invalidateQueries({ queryKey: queryKeys.options() });
 	queryClient.invalidateQueries({ queryKey: queryKeys.publicOptions() });
-	queryClient.invalidateQueries({ queryKey: queryKeys.sonarrMetadataRoot() });
+	queryClient.invalidateQueries({ queryKey: queryKeys.sonarrFormOptionsRoot() });
 	queryClient.invalidateQueries({ queryKey: queryKeys.sonarrConnectionRoot() });
-	queryClient.invalidateQueries({ queryKey: queryKeys.radarrMetadataRoot() });
+	queryClient.invalidateQueries({ queryKey: queryKeys.radarrFormOptionsRoot() });
 	queryClient.invalidateQueries({ queryKey: queryKeys.radarrConnectionRoot() });
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingSearchRoot("sonarr"),
@@ -57,7 +57,7 @@ export function invalidateProviderQueries(
 	provider: Provider,
 ): void {
 	const keys = getProviderQueryKeys(provider);
-	queryClient.invalidateQueries({ queryKey: keys.metadata });
+	queryClient.invalidateQueries({ queryKey: keys.formOptions });
 	queryClient.invalidateQueries({ queryKey: keys.connection });
 	queryClient.invalidateQueries({ queryKey: keys.status });
 	queryClient.invalidateQueries({ queryKey: keys.search });
@@ -68,7 +68,7 @@ export function removeProviderQueries(
 	provider: Provider,
 ): void {
 	const keys = getProviderQueryKeys(provider);
-	queryClient.removeQueries({ queryKey: keys.metadata });
+	queryClient.removeQueries({ queryKey: keys.formOptions });
 	queryClient.removeQueries({ queryKey: keys.connection });
 	queryClient.removeQueries({ queryKey: keys.status });
 	queryClient.removeQueries({ queryKey: keys.search });
@@ -78,6 +78,7 @@ export function invalidateProviderDependentQueries(
 	queryClient: QueryClient,
 	_provider: Provider,
 ): void {
+	void _provider;
 	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingInspectionRoot(),

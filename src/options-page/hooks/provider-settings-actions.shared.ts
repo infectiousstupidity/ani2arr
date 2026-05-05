@@ -123,7 +123,7 @@ export function credentialsMatchSaved(
 	);
 }
 
-export function shouldEnableProviderMetadata(input: {
+export function shouldEnableProviderFormOptions(input: {
 	savedCredentials: ProviderCredentials | null;
 	formCredentials: ProviderCredentials | null;
 	isEditingConnection: boolean;

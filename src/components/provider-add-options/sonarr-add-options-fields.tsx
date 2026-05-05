@@ -4,7 +4,7 @@
 import React from 'react';
 
 import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
-import { parseProviderQualityProfileId, type ProviderMetadata } from '@/providers';
+import { parseProviderQualityProfileId, type ProviderFormOptions } from '@/providers';
 import {
   MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
@@ -19,7 +19,7 @@ export type SonarrAddOptionsFieldsLayout = 'stacked' | 'grid';
 
 export interface SonarrAddOptionsFieldsProps {
   values: SonarrFormState;
-  metadata: ProviderMetadata;
+  formOptions: ProviderFormOptions;
   onChange: <K extends keyof SonarrFormState>(field: K, value: SonarrFormState[K]) => void;
   disabled?: boolean | undefined;
   className?: string | undefined;
@@ -36,7 +36,7 @@ export function SonarrAddOptionsFields(
 ): React.JSX.Element {
   const {
     values,
-    metadata,
+    formOptions,
     onChange,
     disabled = false,
     className,
@@ -53,7 +53,7 @@ export function SonarrAddOptionsFields(
     ? 'grid gap-4 md:grid-cols-2'
     : 'flex flex-col gap-4';
   const modalSelectTriggerClassName = 'border border-border-primary/60 bg-bg-tertiary text-text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
-  const qualityProfileOptions = metadata.qualityProfiles.map(profile => ({
+  const qualityProfileOptions = formOptions.qualityProfiles.map(profile => ({
     value: String(profile.id),
     label: profile.name,
   }));
@@ -67,7 +67,7 @@ export function SonarrAddOptionsFields(
       <ProviderRootFolderSelect
         disabled={disabled}
         value={values.rootFolderPath ?? ''}
-        rootFolders={metadata.rootFolders}
+        rootFolders={formOptions.rootFolders}
         onChange={value => onChange('rootFolderPath', value)}
         portalContainer={portalContainer ?? null}
         initialFocusRef={initialFocusRef}
@@ -115,7 +115,7 @@ export function SonarrAddOptionsFields(
       />
 
       <ProviderTagField
-        availableTags={metadata.tags}
+        availableTags={formOptions.tags}
         disabled={disabled}
         selectedTagIds={values.tags ?? []}
         selectedFreeformTags={values.freeformTags}

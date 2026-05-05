@@ -5,7 +5,7 @@ import {
 	credentialsMatchSaved,
 	hasUnsavedSettingsChanges,
 	mergeProviderSettingsIntoForm,
-	shouldEnableProviderMetadata,
+	shouldEnableProviderFormOptions,
 	shouldResetSettingsFormFromSavedSnapshot,
 } from "./provider-settings-actions.shared";
 
@@ -89,21 +89,21 @@ describe("provider settings state helpers", () => {
 		};
 
 		expect(
-			shouldEnableProviderMetadata({
+			shouldEnableProviderFormOptions({
 				savedCredentials,
 				formCredentials: savedCredentials,
 				isEditingConnection: false,
 			}),
 		).toBe(true);
 		expect(
-			shouldEnableProviderMetadata({
+			shouldEnableProviderFormOptions({
 				savedCredentials,
 				formCredentials: savedCredentials,
 				isEditingConnection: true,
 			}),
 		).toBe(true);
 		expect(
-			shouldEnableProviderMetadata({
+			shouldEnableProviderFormOptions({
 				savedCredentials,
 				formCredentials: {
 					url: savedCredentials.url,
@@ -113,7 +113,7 @@ describe("provider settings state helpers", () => {
 			}),
 		).toBe(false);
 		expect(
-			shouldEnableProviderMetadata({
+			shouldEnableProviderFormOptions({
 				savedCredentials: null,
 				formCredentials: savedCredentials,
 				isEditingConnection: false,

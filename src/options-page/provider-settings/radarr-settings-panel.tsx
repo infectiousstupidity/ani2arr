@@ -25,7 +25,7 @@ import {
 import { RadarrDefaultsSection } from "./radarr-defaults-section";
 import { useSelectPortal } from "./use-select-portal";
 import type { ExtensionOptions } from "@/options";
-import { useRadarrMetadata } from "@/providers/hooks/radarr.queries";
+import { useRadarrFormOptions } from "@/providers/hooks/radarr.queries";
 import { deriveProviderPanelConnectionState } from "./provider-settings-panel-state.shared";
 
 export interface RadarrSettingsPanelProps {
@@ -64,7 +64,7 @@ const RadarrSettingsPanel: React.FC<RadarrSettingsPanelProps> = ({
 		isEditingConnection,
 		isProviderConfigured,
 		hasConnectionChanges,
-		metadataEnabled,
+		formOptionsEnabled,
 		normalizedUrl,
 		shouldAutofocusUrl,
 	} = useMemo(
@@ -87,23 +87,23 @@ const RadarrSettingsPanel: React.FC<RadarrSettingsPanelProps> = ({
 
 		radarrUrlInputRef.current?.focus();
 	}, [shouldAutofocusUrl]);
-	const metadataCredentials =
-		metadataEnabled && savedCredentials ? savedCredentials : null;
+	const formOptionsCredentials =
+		formOptionsEnabled && savedCredentials ? savedCredentials : null;
 
 	const liveConnectionQuery = useProviderConnectionCheck({
 		provider: "radarr",
-		enabled: metadataEnabled,
-		credentials: metadataCredentials,
+		enabled: formOptionsEnabled,
+		credentials: formOptionsCredentials,
 	});
 
-	const metadataQuery = useRadarrMetadata({
-		enabled: metadataEnabled,
-		credentials: metadataCredentials,
+	const formOptionsQuery = useRadarrFormOptions({
+		enabled: formOptionsEnabled,
+		credentials: formOptionsCredentials,
 	});
 
 	const isCheckingProviderConnection =
 		actions.radarrTestConnectionState.isPending ||
-		(metadataEnabled && liveConnectionQuery.isFetching);
+		(formOptionsEnabled && liveConnectionQuery.isFetching);
 	const isConnectDisabled =
 		!hasConnectionChanges ||
 		!formCredentials ||
@@ -161,7 +161,7 @@ const RadarrSettingsPanel: React.FC<RadarrSettingsPanelProps> = ({
 	}, [actions, formCredentials, toast]);
 
 	const handleRefresh = useCallback(() => {
-		queryClient.invalidateQueries({ queryKey: queryKeys.radarrMetadataRoot() });
+		queryClient.invalidateQueries({ queryKey: queryKeys.radarrFormOptionsRoot() });
 	}, [queryClient]);
 
 	const handleDisconnect = useCallback(async () => {
@@ -212,7 +212,7 @@ const RadarrSettingsPanel: React.FC<RadarrSettingsPanelProps> = ({
 						apiKeyHelp={
 							<>
 								The API key lets ani2arr authenticate with your Radarr server so
-								it can test the connection, read metadata, and add or update
+								it can test the connection, read available options, and add or update
 								movies. It is stored only in browser local storage and sent only
 								to the Radarr origin you configure.
 							</>
@@ -258,8 +258,8 @@ const RadarrSettingsPanel: React.FC<RadarrSettingsPanelProps> = ({
 			<RadarrDefaultsSection
 				actions={actions}
 				portalContainer={selectPortal}
-				metadataEnabled={metadataEnabled}
-				metadataQuery={metadataQuery}
+				formOptionsEnabled={formOptionsEnabled}
+				formOptionsQuery={formOptionsQuery}
 				onRefresh={handleRefresh}
 			/>
 		</div>

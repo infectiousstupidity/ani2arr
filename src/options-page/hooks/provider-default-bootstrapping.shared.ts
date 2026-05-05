@@ -5,7 +5,7 @@ import {
 	createDefaultRadarrFormState,
 	createDefaultSonarrFormState,
 } from "@/options/schema";
-import type { Provider, ProviderMetadata } from "@/providers";
+import type { Provider, ProviderFormOptions } from "@/providers";
 import {
 	normalizeRadarrFormState,
 	normalizeSonarrFormState,
@@ -15,7 +15,7 @@ import {
 
 export function bootstrapSonarrDefaults(
 	defaults: Partial<SonarrFormState> | null | undefined,
-	metadata: ProviderMetadata,
+	formOptions: ProviderFormOptions,
 ): SonarrFormState {
 	const baseDefaults = createDefaultSonarrFormState();
 	const normalizedDefaults = normalizeSonarrFormState({
@@ -26,8 +26,8 @@ export function bootstrapSonarrDefaults(
 			...defaults?.addOptions,
 		},
 	});
-	const firstQualityProfileId = metadata.qualityProfiles[0]?.id;
-	const firstRootFolderPath = metadata.rootFolders[0]?.path;
+	const firstQualityProfileId = formOptions.qualityProfiles[0]?.id;
+	const firstRootFolderPath = formOptions.rootFolders[0]?.path;
 
 	return normalizeSonarrFormState({
 		...normalizedDefaults,
@@ -39,7 +39,7 @@ export function bootstrapSonarrDefaults(
 
 export function bootstrapRadarrDefaults(
 	defaults: Partial<RadarrFormState> | null | undefined,
-	metadata: ProviderMetadata,
+	formOptions: ProviderFormOptions,
 ): RadarrFormState {
 	const baseDefaults = createDefaultRadarrFormState();
 	const normalizedDefaults = normalizeRadarrFormState({
@@ -50,8 +50,8 @@ export function bootstrapRadarrDefaults(
 			...defaults?.addOptions,
 		},
 	});
-	const firstQualityProfileId = metadata.qualityProfiles[0]?.id;
-	const firstRootFolderPath = metadata.rootFolders[0]?.path;
+	const firstQualityProfileId = formOptions.qualityProfiles[0]?.id;
+	const firstRootFolderPath = formOptions.rootFolders[0]?.path;
 
 	return normalizeRadarrFormState({
 		...normalizedDefaults,
@@ -64,12 +64,12 @@ export function bootstrapRadarrDefaults(
 export function bootstrapProviderDefaults(
 	provider: "sonarr",
 	defaults: Partial<SonarrFormState> | null | undefined,
-	metadata: ProviderMetadata,
+	formOptions: ProviderFormOptions,
 ): SonarrFormState;
 export function bootstrapProviderDefaults(
 	provider: "radarr",
 	defaults: Partial<RadarrFormState> | null | undefined,
-	metadata: ProviderMetadata,
+	formOptions: ProviderFormOptions,
 ): RadarrFormState;
 export function bootstrapProviderDefaults(
 	provider: Provider,
@@ -78,9 +78,9 @@ export function bootstrapProviderDefaults(
 		| Partial<RadarrFormState>
 		| null
 		| undefined,
-	metadata: ProviderMetadata,
+	formOptions: ProviderFormOptions,
 ): SonarrFormState | RadarrFormState {
 	return provider === "sonarr"
-		? bootstrapSonarrDefaults(defaults as Partial<SonarrFormState>, metadata)
-		: bootstrapRadarrDefaults(defaults as Partial<RadarrFormState>, metadata);
+		? bootstrapSonarrDefaults(defaults as Partial<SonarrFormState>, formOptions)
+		: bootstrapRadarrDefaults(defaults as Partial<RadarrFormState>, formOptions);
 }
