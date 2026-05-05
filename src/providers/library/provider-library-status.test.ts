@@ -224,7 +224,6 @@ describe("series status orchestration", () => {
 		mappingService.getAutoMapping.mockResolvedValue(null);
 		const getSeriesLibraryStatus = vi.fn();
 		const handlers = createLibraryHandlers({
-			SonarrClient: {},
 			RadarrClient: {},
 			mappingService,
 			manualMappingService: createManualMappingService(),
