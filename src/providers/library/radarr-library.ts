@@ -5,7 +5,6 @@ import type { RadarrClient } from "@/providers/clients/radarr.client";
 import type { AniListId } from "@/anilist";
 import type { StatusInput } from "@/rpc/schemas";
 import type { CheckMovieStatusResponse } from "@/rpc/types";
-import { buildMovieStatusResponseFromLibraryStatus } from "@/providers/library/status-response-adapter";
 import type { MappingService } from "@/mapping/mapping.service";
 import type { ManualMappingService } from "@/mapping/manual-mapping";
 import type { AutoMappingOptions } from "@/mapping/auto-mapping/types";
@@ -38,6 +37,25 @@ type RadarrLibraryMutationPayload = {
 	tmdbId: TmdbId;
 	action: "added" | "removed";
 };
+
+function buildMovieStatusResponseFromLibraryStatus(input: {
+	providerId: TmdbId;
+	mappingSource?: CheckMovieStatusResponse["mappingSource"];
+	mappingReason?: CheckMovieStatusResponse["mappingReason"];
+	libraryStatus: RadarrLibraryStatus;
+}): CheckMovieStatusResponse {
+	return {
+		providerId: input.providerId,
+		providerMappingState: "mapped",
+		isInLibrary: input.libraryStatus.isInLibrary,
+		...(input.libraryStatus.movie ? { movie: input.libraryStatus.movie } : {}),
+		...(input.libraryStatus.libraryUnknownReason
+			? { libraryUnknownReason: input.libraryStatus.libraryUnknownReason }
+			: {}),
+		...(input.mappingSource ? { mappingSource: input.mappingSource } : {}),
+		...(input.mappingReason ? { mappingReason: input.mappingReason } : {}),
+	};
+}
 
 type RadarrStatusPayload = Pick<
 	StatusInput,

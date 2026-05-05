@@ -16,16 +16,12 @@ describe("provider drafts", () => {
 			titleSlug: "example-series",
 			qualityProfileId: parseProviderQualityProfileId(33),
 			rootFolderPath: "/media/series",
+			path: "/media/series/Example Series",
 			monitored: true,
 			monitorNewItems: "none",
 			seriesType: "anime",
 			seasonFolder: true,
 			tags: [parseProviderTagId(44)],
-			addOptions: {
-				monitor: "all",
-				searchForMissingEpisodes: true,
-				searchForCutoffUnmetEpisodes: true,
-			},
 		});
 
 		expect(draft.form).toMatchObject({

@@ -8,11 +8,11 @@ import {
 } from "./library/paths";
 
 export interface ProviderRouteSlugSource {
-	titleSlug?: string | null;
-	folder?: string | null;
-	folderName?: string | null;
-	path?: string | null;
-	rootFolderPath?: string | null;
+	titleSlug?: string | null | undefined;
+	folder?: string | null | undefined;
+	folderName?: string | null | undefined;
+	path?: string | null | undefined;
+	rootFolderPath?: string | null | undefined;
 }
 
 function trimToNull(value?: string | null): string | null {

@@ -270,11 +270,20 @@ export function createMappingHandlers(
 			const parsedInput = v.parse(GetMappingsInputSchema, input);
 			await manualMappingsReady;
 			await mappingService.initAnibridgeMappings();
+			const sonarrCredentials = await providerConfig.get("sonarr");
 			return listMappings(parsedInput, {
 				manualMappingService,
 				autoMappingStore,
 				anibridgeMappingStore: anibridgeMappingStoreWithAniListIds,
-				sonarrLibrary,
+				sonarrLibrary: {
+					getLeanSeriesList: async () => {
+						if (!sonarrCredentials) {
+							await sonarrLibrary.clearSeriesSnapshotCache();
+							return [];
+						}
+						return sonarrLibrary.getSeriesSnapshots(sonarrCredentials);
+					},
+				},
 				radarrLibrary,
 			});
 		},
@@ -283,12 +292,21 @@ export function createMappingHandlers(
 			const parsedInput = v.parse(GetMappingInspectionInputSchema, input);
 			await manualMappingsReady;
 			await mappingService.initAnibridgeMappings();
+			const sonarrCredentials = await providerConfig.get("sonarr");
 			return getMappingInspection(parsedInput, {
 				manualMappingService,
 				autoMappingStore,
 				anibridgeMappingStore: anibridgeMappingStoreWithAniListIds,
 				anilistMetadataStore: deps.anilistMetadataStore,
-				sonarrLibrary,
+				sonarrLibrary: {
+					getLeanSeriesList: async () => {
+						if (!sonarrCredentials) {
+							await sonarrLibrary.clearSeriesSnapshotCache();
+							return [];
+						}
+						return sonarrLibrary.getSeriesSnapshots(sonarrCredentials);
+					},
+				},
 				radarrLibrary,
 			});
 		},

@@ -3,7 +3,7 @@
 
 import type { AniListMediaService, AniListMetadataStore } from "@/anilist";
 import type { RadarrLibrary } from "@/providers/library/radarr-library";
-import type { SonarrLibrary } from "@/providers/library/sonarr-library";
+import type { SonarrLibrary } from "@/providers/sonarr/library";
 import type { RadarrClient } from "@/providers/clients/radarr.client";
 import type { SonarrClient as CurrentSonarrClient } from "@/providers/sonarr/client";
 import type { MappingService } from "@/mapping/mapping.service";

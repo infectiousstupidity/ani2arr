@@ -5,10 +5,10 @@ import { parseAniListIdOrNull, type AniListId } from "@/anilist";
 import {
 	PROVIDERS,
 	type RadarrMovieSnapshot,
-	type SonarrSeriesSnapshot,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
+import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import {
 	parseProviderExternalId,
 	type EffectiveMappingKind,

@@ -6,11 +6,7 @@ import type {
 	RadarrLookupMovie,
 	RadarrMovie,
 	RadarrMovieSnapshot,
-	SonarrLookupSeries,
-	SonarrSeries,
-	SonarrSeriesSnapshot,
 	TmdbId,
-	TvdbId,
 } from "@/providers";
 import type { TtlCache } from "@/shared/cache/ttl-cache";
 import type { RequestPriority } from "@/shared/utils/request-priority";
@@ -38,15 +34,6 @@ export interface ProviderLibraryCaches<TSnapshot> {
 	lean: TtlCache<TSnapshot[]>;
 }
 
-export interface SonarrLibraryStatus {
-	anilistId: AniListId;
-	provider: "sonarr";
-	providerId: TvdbId;
-	isInLibrary: boolean | null;
-	series?: SonarrSeriesSnapshot | SonarrSeries | SonarrLookupSeries;
-	libraryUnknownReason?: LibraryUnknownReason;
-}
-
 export interface RadarrLibraryStatus {
 	anilistId: AniListId;
 	provider: "radarr";
@@ -55,8 +42,6 @@ export interface RadarrLibraryStatus {
 	movie?: RadarrMovieSnapshot | RadarrMovie | RadarrLookupMovie;
 	libraryUnknownReason?: LibraryUnknownReason;
 }
-
-export type ProviderLibraryStatus = SonarrLibraryStatus | RadarrLibraryStatus;
 
 export type LibraryMutationEmitter<TPayload> = (
 	payload: TPayload,

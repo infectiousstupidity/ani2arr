@@ -7,11 +7,9 @@ import {
 	parseTvdbIdOrNull,
 	type ProviderCredentials,
 	type ProviderRootFolder,
-	type SonarrLookupSeries,
-	type SonarrSeriesSnapshot,
 	type TvdbId,
 } from "@/providers";
-import type { SonarrLookupSeries as NewSonarrLookupSeries } from "@/providers/sonarr/types";
+import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import {
 	GetProviderFormOptionsInputSchema,
 	SonarrLookupInputSchema,
@@ -76,12 +74,8 @@ export function createSonarrHandlers(
 			await manualMappingsReady;
 
 			const [results, library] = await Promise.all([
-				sonarrLookupClient
-					.lookupSeries(parsedInput.term, credentials)
-					.then((hits) =>
-						hits.map((hit) => toLegacySonarrLookupSeries(hit)),
-					),
-				sonarrLibrary.getLeanSeriesList(),
+				sonarrLookupClient.lookupSeries(parsedInput.term, credentials),
+				sonarrLibrary.getSeriesSnapshots(credentials),
 			]);
 
 			const libraryTvdbIds = library.map((s) => s.tvdbId);
@@ -157,50 +151,4 @@ function toProviderRootFolder(rootFolder: {
 				path: rootFolder.path,
 				freeSpace: rootFolder.freeSpace,
 			};
-}
-
-function toLegacySonarrLookupSeries(
-	series: NewSonarrLookupSeries,
-): SonarrLookupSeries {
-	const images = series.images?.map((image) => ({
-		...(image.coverType === undefined ? {} : { coverType: image.coverType }),
-		...(image.url === undefined ? {} : { url: image.url }),
-		...(image.remoteUrl === undefined ? {} : { remoteUrl: image.remoteUrl }),
-	}));
-	const statistics = series.statistics
-		? {
-				...(series.statistics.seasonCount === undefined
-					? {}
-					: { seasonCount: series.statistics.seasonCount }),
-				...(series.statistics.episodeCount === undefined
-					? {}
-					: { episodeCount: series.statistics.episodeCount }),
-				...(series.statistics.episodeFileCount === undefined
-					? {}
-					: { episodeFileCount: series.statistics.episodeFileCount }),
-				...(series.statistics.totalEpisodeCount === undefined
-					? {}
-					: { totalEpisodeCount: series.statistics.totalEpisodeCount }),
-			}
-		: undefined;
-
-	return {
-		...(series.id === undefined ? {} : { id: series.id }),
-		title: series.title,
-		tvdbId: series.tvdbId,
-		...(series.titleSlug === undefined ? {} : { titleSlug: series.titleSlug }),
-		folder: series.folder,
-		...(series.year === undefined ? {} : { year: series.year }),
-		...(series.genres === undefined ? {} : { genres: series.genres }),
-		...(series.network === undefined ? {} : { network: series.network }),
-		...(series.seriesType === undefined
-			? {}
-			: { seriesType: series.seriesType }),
-		...(series.status === undefined ? {} : { status: series.status }),
-		...(images === undefined ? {} : { images }),
-		...(series.remotePoster === undefined
-			? {}
-			: { remotePoster: series.remotePoster }),
-		...(statistics === undefined ? {} : { statistics }),
-	};
 }

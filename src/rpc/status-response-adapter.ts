@@ -1,4 +1,5 @@
 /** Builds combined status responses from provider-library status plus mapping labels. */
+// src/rpc/status-response-adapter.ts
 
 import type {
 	AcceptedMappingReason,
@@ -8,11 +9,9 @@ import type { TmdbId, TvdbId } from "@/providers";
 import type {
 	CheckMovieStatusResponse,
 	CheckSeriesStatusResponse,
-} from "@/rpc/types";
-import type {
 	RadarrLibraryStatus,
 	SonarrLibraryStatus,
-} from "@/providers/library/types";
+} from "@/rpc/types";
 
 export function buildSeriesStatusResponseFromLibraryStatus(input: {
 	providerId: TvdbId;
@@ -30,12 +29,8 @@ export function buildSeriesStatusResponseFromLibraryStatus(input: {
 		...(input.libraryStatus.libraryUnknownReason
 			? { libraryUnknownReason: input.libraryStatus.libraryUnknownReason }
 			: {}),
-		...(input.mappingSource
-			? { mappingSource: input.mappingSource }
-			: {}),
-		...(input.mappingReason
-			? { mappingReason: input.mappingReason }
-			: {}),
+		...(input.mappingSource ? { mappingSource: input.mappingSource } : {}),
+		...(input.mappingReason ? { mappingReason: input.mappingReason } : {}),
 	};
 }
 
@@ -53,11 +48,7 @@ export function buildMovieStatusResponseFromLibraryStatus(input: {
 		...(input.libraryStatus.libraryUnknownReason
 			? { libraryUnknownReason: input.libraryStatus.libraryUnknownReason }
 			: {}),
-		...(input.mappingSource
-			? { mappingSource: input.mappingSource }
-			: {}),
-		...(input.mappingReason
-			? { mappingReason: input.mappingReason }
-			: {}),
+		...(input.mappingSource ? { mappingSource: input.mappingSource } : {}),
+		...(input.mappingReason ? { mappingReason: input.mappingReason } : {}),
 	};
 }

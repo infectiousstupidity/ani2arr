@@ -7,8 +7,8 @@ import {
 	parseSonarrSeriesId,
 	parseTvdbId,
 	type RadarrMovieSnapshot,
-	type SonarrSeriesSnapshot,
 } from "@/providers";
+import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import type { ProviderExternalId } from "@/mapping/types";
 import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
 import type { AutoMappingRecord } from "@/mapping/auto-mapping/types";

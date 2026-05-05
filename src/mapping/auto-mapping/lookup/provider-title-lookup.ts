@@ -5,14 +5,13 @@ import type { TtlCache } from "@/shared/cache/ttl-cache";
 import PQueue from "p-queue";
 import type { RadarrClient } from "@/providers/clients/radarr.client";
 import type { SonarrClient } from "@/providers/sonarr/client";
-import type { SonarrLookupSeries as NewSonarrLookupSeries } from "@/providers/sonarr/types";
+import type { SonarrLookupSeries } from "@/providers/sonarr/types";
 import {
 	parseTmdbIdOrNull,
 	parseTvdbIdOrNull,
 	type Provider,
 	type ProviderCredentials,
 	type RadarrLookupMovie,
-	type SonarrLookupSeries,
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
@@ -26,8 +25,8 @@ import { TITLE_LOOKUP_CACHE_TTL } from "./lookup.cache";
 
 export interface ProviderTitleResult {
 	title: string;
-	year?: number;
-	genres?: string[];
+	year?: number | undefined;
+	genres?: string[] | undefined;
 }
 
 export interface TitleLookupOptions {
@@ -211,11 +210,7 @@ export function createSonarrTitleLookup(
 		loggerName: "SonarrTitleLookup",
 		caches,
 		fetchTitleResults: (term, credentials) =>
-			sonarrApi
-				.lookupSeries(term, credentials)
-				.then((results) =>
-					results.map((result) => toLegacySonarrLookupSeries(result)),
-				),
+			sonarrApi.lookupSeries(term, credentials),
 		readProviderId: (result) => {
 			const candidate = result as { tvdbId?: unknown } | null;
 			return parseTvdbIdOrNull(candidate?.tvdbId);
@@ -223,54 +218,9 @@ export function createSonarrTitleLookup(
 		lookupByProviderId: async (providerId, credentials) => {
 			const hits = await sonarrApi.lookupSeries(`tvdb:${providerId}`, credentials);
 			const hit = hits.find((element) => element.tvdbId === providerId) ?? null;
-			return hit ? toLegacySonarrLookupSeries(hit) : null;
+			return hit;
 		},
 	});
-}
-
-function toLegacySonarrLookupSeries(
-	series: NewSonarrLookupSeries,
-): SonarrLookupSeries {
-	const images = series.images?.map((image) => ({
-		...(image.coverType === undefined ? {} : { coverType: image.coverType }),
-		...(image.url === undefined ? {} : { url: image.url }),
-		...(image.remoteUrl === undefined ? {} : { remoteUrl: image.remoteUrl }),
-	}));
-	const statistics = series.statistics
-		? {
-				...(series.statistics.seasonCount === undefined
-					? {}
-					: { seasonCount: series.statistics.seasonCount }),
-				...(series.statistics.episodeCount === undefined
-					? {}
-					: { episodeCount: series.statistics.episodeCount }),
-				...(series.statistics.episodeFileCount === undefined
-					? {}
-					: { episodeFileCount: series.statistics.episodeFileCount }),
-				...(series.statistics.totalEpisodeCount === undefined
-					? {}
-					: { totalEpisodeCount: series.statistics.totalEpisodeCount }),
-			}
-		: undefined;
-
-	return {
-		...(series.id === undefined ? {} : { id: series.id }),
-		title: series.title,
-		tvdbId: series.tvdbId,
-		...(series.titleSlug === undefined ? {} : { titleSlug: series.titleSlug }),
-		...(series.year === undefined ? {} : { year: series.year }),
-		...(series.genres === undefined ? {} : { genres: series.genres }),
-		...(series.network === undefined ? {} : { network: series.network }),
-		...(series.seriesType === undefined
-			? {}
-			: { seriesType: series.seriesType }),
-		...(series.status === undefined ? {} : { status: series.status }),
-		...(images === undefined ? {} : { images }),
-		...(series.remotePoster === undefined
-			? {}
-			: { remotePoster: series.remotePoster }),
-		...(statistics === undefined ? {} : { statistics }),
-	};
 }
 
 export function createRadarrTitleLookup(

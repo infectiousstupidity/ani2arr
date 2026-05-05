@@ -12,8 +12,8 @@ import type {
 	Provider,
 	ProviderFormOptions,
 	RadarrMovie,
-	SonarrSeries,
 } from "@/providers";
+import type { SonarrSeries } from "@/providers/sonarr/types";
 import type {
 	GetAniListMetadataOutput,
 	GetMappingInspectionOutput,

@@ -14,20 +14,24 @@ import {
 	type ProviderCredentials,
 	type RadarrMovie,
 	type RadarrMovieSnapshot,
-	type SonarrSeries,
-	type SonarrSeriesSnapshot,
 	type TvdbId,
 } from "@/providers";
 import type { RadarrClient } from "@/providers/clients/radarr.client";
-import { SonarrLibrary as SonarrSeriesLibrary } from "@/providers/sonarr/library";
-import type { SonarrLookupSeries } from "@/providers/sonarr/types";
+import {
+	SonarrLibrary as SonarrSeriesLibrary,
+	toSonarrSeriesSnapshot,
+} from "@/providers/sonarr/library";
+import type {
+	SonarrLookupSeries,
+	SonarrSeries,
+	SonarrSeriesSnapshot,
+} from "@/providers/sonarr/types";
 import type {
 	CacheHit,
 	TtlCache,
 } from "@/shared/cache/ttl-cache";
 import { PROVIDER_LIBRARY_CACHE_TTL } from "./cache";
 import { RadarrLibrary } from "./radarr-library";
-import { SonarrLibrary } from "./sonarr-library";
 import type { ProviderLibraryCaches } from "./types";
 
 type SonarrClientStub = {
@@ -181,8 +185,8 @@ async function configureProviders(configured = true): Promise<void> {
 function createSonarrLibrary(
 	client: SonarrClientStub,
 	caches: ProviderLibraryCaches<SonarrSeriesSnapshot>,
-): SonarrLibrary {
-	const seriesLibrary = new SonarrSeriesLibrary({
+): SonarrSeriesLibrary {
+	return new SonarrSeriesLibrary({
 		client: {
 			getSeries: (credentials) =>
 				(client.getSeries?.(credentials) ?? Promise.resolve([])) as never,
@@ -192,12 +196,27 @@ function createSonarrLibrary(
 		},
 		cache: caches.lean as never,
 	});
+}
 
-	return new SonarrLibrary({
-		seriesLibrary,
-		lookupSeries: (term, credentials) =>
-			client.lookupSeries?.(term, credentials) ?? Promise.resolve([]),
-	});
+function createSonarrStatusHandlers(
+	client: SonarrClientStub,
+	library: SonarrSeriesLibrary,
+) {
+	return createLibraryHandlers({
+		sonarrClient: {
+			lookupSeries: (term: string, credentials: ProviderCredentials) =>
+				client.lookupSeries?.(term, credentials) ?? Promise.resolve([]),
+		},
+		sonarrLibrary: library,
+		providerConfig: {
+			get: vi.fn(async () => ({
+				url: "http://sonarr.local",
+				apiKey: "sonarr-key",
+			}) satisfies ProviderCredentials),
+		},
+		bumpLibraryRevision: vi.fn(async () => {}),
+		manualMappingsReady: Promise.resolve(),
+	} as never);
 }
 
 function createRadarrLibrary(
@@ -222,13 +241,13 @@ describe("series status orchestration", () => {
 		const mappingService = createMappingService();
 		mappingService.resolveProviderId.mockResolvedValue(null);
 		mappingService.getAutoMapping.mockResolvedValue(null);
-		const getSeriesLibraryStatus = vi.fn();
-		const handlers = createLibraryHandlers({
-			RadarrClient: {},
+			const getSeriesLibraryStatus = vi.fn();
+			const handlers = createLibraryHandlers({
+				RadarrClient: {},
 			mappingService,
-			manualMappingService: createManualMappingService(),
-			anibridgeMappingStore: createSonarrUpstreamStore(),
-			sonarrLibrary: { getSeriesLibraryStatus },
+				manualMappingService: createManualMappingService(),
+				anibridgeMappingStore: createSonarrUpstreamStore(),
+				sonarrLibrary: { findSeriesByTvdbId: getSeriesLibraryStatus },
 			radarrLibrary: {},
 			manualMappingsReady: Promise.resolve(),
 			providerConfig: {
@@ -268,9 +287,10 @@ describe("provider library cache", () => {
 		};
 		const caches = createCaches<SonarrSeriesSnapshot>();
 		const library = createSonarrLibrary(client, caches);
+		const handlers = createSonarrStatusHandlers(client, library);
 
 		await expect(
-			library.getSeriesLibraryStatus({
+			handlers.getSeriesLibraryStatus({
 				anilistId: parseAniListId(10),
 				providerId: parseTvdbId(123),
 				forceVerify: true,
@@ -323,9 +343,10 @@ describe("provider library cache", () => {
 		};
 		const caches = createCaches([createSonarrSnapshot({ title: "Stale" })]);
 		const library = createSonarrLibrary(client, caches);
+		const handlers = createSonarrStatusHandlers(client, library);
 
 		await expect(
-			library.getSeriesLibraryStatus({
+			handlers.getSeriesLibraryStatus({
 				anilistId: parseAniListId(10),
 				providerId: parseTvdbId(123),
 				forceVerify: true,
@@ -362,19 +383,13 @@ describe("provider library cache", () => {
 
 	it("clears provider caches when credentials are missing", async () => {
 		await configureProviders(false);
-		const sonarrClient = { getSeries: vi.fn() };
-		const sonarrCaches = createCaches([createSonarrSnapshot()]);
-		const sonarrLibrary = createSonarrLibrary(sonarrClient, sonarrCaches);
 		const radarrClient = { getAllMovies: vi.fn() };
 		const radarrCaches = createCaches([createRadarrSnapshot()]);
 		const radarrLibrary = createRadarrLibrary(radarrClient, radarrCaches);
 
-		await expect(sonarrLibrary.refreshCache()).resolves.toEqual([]);
 		await expect(radarrLibrary.refreshCache()).resolves.toEqual([]);
 
-		expect(sonarrCaches.lean.remove).toHaveBeenCalled();
 		expect(radarrCaches.lean.remove).toHaveBeenCalled();
-		expect(sonarrClient.getSeries).not.toHaveBeenCalled();
 		expect(radarrClient.getAllMovies).not.toHaveBeenCalled();
 	});
 
@@ -382,11 +397,15 @@ describe("provider library cache", () => {
 		const caches = createCaches([createSonarrSnapshot({ title: "Old" })]);
 		const library = createSonarrLibrary({}, caches);
 
-		await library.addSeriesToCache(createSonarrSeries({ title: "New" }));
-		await library.addSeriesToCache(
-			createSonarrSeries({ tvdbId: parseTvdbId(124), title: "Other" }),
+		await library.upsertSeriesSnapshot(
+			toSonarrSeriesSnapshot(createSonarrSeries({ title: "New" })),
 		);
-		await library.removeSeriesFromCache(parseTvdbId(123));
+		await library.upsertSeriesSnapshot(
+			toSonarrSeriesSnapshot(
+				createSonarrSeries({ tvdbId: parseTvdbId(124), title: "Other" }),
+			),
+		);
+		await library.removeSeriesSnapshot(parseTvdbId(123));
 
 		expect(caches.lean.value()).toEqual([
 			createSonarrSnapshot({ tvdbId: parseTvdbId(124), title: "Other" }),

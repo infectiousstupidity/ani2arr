@@ -49,11 +49,6 @@ export type {
 	RadarrMovie,
 	RadarrMovieSnapshot,
 } from "./radarr.types";
-export type {
-	SonarrLookupSeries,
-	SonarrSeries,
-	SonarrSeriesSnapshot,
-} from "./sonarr.types";
 export {
 	formatProviderExternalId,
 	formatProviderTarget,

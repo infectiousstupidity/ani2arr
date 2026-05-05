@@ -1,7 +1,8 @@
 /** Pure setup-target rules for media modal add and edit flows. */
 
 import type { AniListId } from "@/anilist";
-import type { RadarrMovie, SonarrSeries, TmdbId, TvdbId } from "@/providers";
+import type { RadarrMovie, TmdbId, TvdbId } from "@/providers";
+import type { SonarrSeries } from "@/providers/sonarr/types";
 import {
 	isRadarrMovieId,
 	isSonarrSeriesId,

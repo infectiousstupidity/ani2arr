@@ -2,14 +2,18 @@
 // src/rpc/types.ts
 
 import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
+import type { AniListId } from "@/anilist";
 import type {
 	RadarrMovieSnapshot,
 	RadarrLookupMovie,
 	RadarrMovie,
-	SonarrSeriesSnapshot,
+} from "@/providers";
+import type {
 	SonarrLookupSeries,
 	SonarrSeries,
-} from "@/providers";
+	SonarrSeriesSnapshot,
+	TvdbId,
+} from "@/providers/sonarr/types";
 import type {
 	AcceptedMappingReason,
 	AcceptedMappingSource,
@@ -23,11 +27,20 @@ import type { AutoMappingStatus } from "@/mapping/auto-mapping/types";
 import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
 import type { LibraryUnknownReason } from "@/providers/library/types";
 import type { MappingCursor } from "./schemas";
-export type {
-	ProviderLibraryStatus,
-	RadarrLibraryStatus,
-	SonarrLibraryStatus,
-} from "@/providers/library/types";
+export type { RadarrLibraryStatus } from "@/providers/library/types";
+
+export interface SonarrLibraryStatus {
+	anilistId: AniListId;
+	provider: "sonarr";
+	providerId: TvdbId;
+	isInLibrary: boolean | null;
+	series?: SonarrSeriesSnapshot | SonarrSeries | SonarrLookupSeries;
+	libraryUnknownReason?: LibraryUnknownReason;
+}
+
+export type ProviderLibraryStatus =
+	| SonarrLibraryStatus
+	| import("@/providers/library/types").RadarrLibraryStatus;
 
 interface ProviderStatusResponseBase {
 	providerId: ProviderExternalId | null;
@@ -71,9 +84,9 @@ export interface SonarrLookupOutput {
 	statsMap?: Record<
 		number,
 		{
-			episodeCount?: number;
-			episodeFileCount?: number;
-			totalEpisodeCount?: number;
+			episodeCount?: number | undefined;
+			episodeFileCount?: number | undefined;
+			totalEpisodeCount?: number | undefined;
 		}
 	>;
 }
