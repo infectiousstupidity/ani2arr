@@ -1,12 +1,7 @@
-/** Sonarr transport client for raw Arr API requests and mutations. */
+/** LEGACY: Sonarr transport client kept for metadata and connection requests until those move to src/providers/sonarr. */
 // src/providers/clients/sonarr.client.ts
 
 import { BaseProviderClient } from "./base-provider.client";
-import { createError, ErrorCode } from "@/shared/errors";
-import type {
-	SonarrMonitorOption,
-	SonarrSeriesType,
-} from "@/providers/settings/provider-settings.schema";
 import {
 	parseProviderQualityProfileId,
 	parseProviderTagId,
@@ -17,37 +12,10 @@ import {
 	type ProviderQualityProfile,
 	type ProviderRootFolder,
 	type SonarrSeries,
-	type ProviderQualityProfileId,
 	type ProviderTagId,
 	type SonarrSeriesId,
 	type TvdbId,
 } from "@/providers";
-
-export interface AddSonarrSeriesPayload {
-	title: string;
-	tvdbId: TvdbId;
-	qualityProfileId: ProviderQualityProfileId;
-	rootFolderPath: string;
-	seasonFolder: boolean;
-	monitored: boolean;
-	seriesType: SonarrSeriesType;
-	tags: ProviderTagId[];
-	addOptions: {
-		monitor: SonarrMonitorOption;
-		searchForMissingEpisodes: boolean;
-		searchForCutoffUnmetEpisodes: boolean;
-	};
-}
-
-export interface UpdateSonarrSeriesPatch {
-	qualityProfileId: ProviderQualityProfileId;
-	rootFolderPath: string;
-	path: string;
-	tags: ProviderTagId[];
-	monitored?: boolean;
-	seasonFolder?: boolean;
-	seriesType?: SonarrSeriesType;
-}
 
 export class SonarrClient extends BaseProviderClient {
 	public constructor(options: {
@@ -87,68 +55,6 @@ export class SonarrClient extends BaseProviderClient {
 		return readSonarrSeriesResource(json);
 	};
 
-	public addSeries = async (
-		payload: AddSonarrSeriesPayload,
-		credentials: ProviderCredentials,
-	): Promise<SonarrSeries> => {
-		this.log.debug("Sending addSeries payload to Sonarr:", payload);
-		const json = await this.requestJson("series", credentials, {
-			method: "POST",
-			body: JSON.stringify(payload),
-		});
-		return readSonarrSeriesResource(json);
-	};
-
-	public updateSeries = async (
-		seriesId: SonarrSeriesId,
-		patch: UpdateSonarrSeriesPatch,
-		credentials: ProviderCredentials,
-		options?: { moveFiles?: boolean },
-	): Promise<SonarrSeries> => {
-		const currentRaw = await this.requestJson(`series/${seriesId}`, credentials);
-		if (!isProviderRecord(currentRaw)) {
-			throw createError(
-				ErrorCode.API_ERROR,
-				`Sonarr returned an invalid series resource for ${seriesId}.`,
-				"Sonarr returned an invalid series response.",
-			);
-		}
-
-		const payload = { ...currentRaw, ...patch };
-		const qs = new URLSearchParams();
-		if (options?.moveFiles) qs.set("moveFiles", "true");
-		const endpoint =
-			qs.size > 0
-				? `series/${seriesId}?${qs.toString()}`
-				: `series/${seriesId}`;
-
-		this.log.debug("Sending updateSeries payload to Sonarr:", {
-			seriesId,
-			moveFiles: options?.moveFiles,
-			payload,
-		});
-		const json = await this.requestJson(endpoint, credentials, {
-			method: "PUT",
-			body: JSON.stringify(payload),
-		});
-		return readSonarrSeriesResource(json);
-	};
-
-	public applyMonitoringAction = async (
-		seriesId: SonarrSeriesId,
-		monitor: SonarrMonitorOption,
-		credentials: ProviderCredentials,
-	): Promise<void> => {
-		this.log.debug("Sending Sonarr monitoring action:", { seriesId, monitor });
-		await this.requestVoid("seasonpass", credentials, {
-			method: "POST",
-			body: JSON.stringify({
-				series: [{ id: seriesId }],
-				monitoringOptions: { monitor },
-			}),
-		});
-	};
-
 	public getRootFolders = async (
 		credentials: ProviderCredentials,
 	): Promise<ProviderRootFolder[]> => {
@@ -179,25 +85,6 @@ export class SonarrClient extends BaseProviderClient {
 			? json.map((element) => readProviderTag(element)).filter((t) => t.label)
 			: [];
 	};
-
-	public createTag = async (
-		credentials: ProviderCredentials,
-		label: string,
-	): Promise<ProviderTag> => {
-		const trimmed = label.trim();
-		if (!trimmed)
-			throw createError(
-				ErrorCode.VALIDATION_ERROR,
-				"Tag label is empty.",
-				"Tag label cannot be empty.",
-			);
-
-		const json = await this.requestJson("tag", credentials, {
-			method: "POST",
-			body: JSON.stringify({ label: trimmed }),
-		});
-		return readProviderTag(json);
-	};
 }
 
 // --- Private Resource Readers ---
@@ -209,10 +96,6 @@ type SonarrSeriesTypeValue = NonNullable<SonarrSeries["seriesType"]>;
 
 function asRecord(value: unknown): ProviderRecord {
 	return value && typeof value === "object" ? (value as ProviderRecord) : {};
-}
-
-function isProviderRecord(value: unknown): value is ProviderRecord {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function trimmedString(value: unknown): string | undefined {

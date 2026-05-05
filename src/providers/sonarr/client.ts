@@ -1,3 +1,6 @@
+/** Sonarr provider-domain API client for typed Sonarr v3 transport operations. */
+// src/providers/sonarr/client.ts
+
 import * as v from "valibot";
 
 import { ProviderApiClient } from "../shared.client";
@@ -117,7 +120,7 @@ export class SonarrClient extends ProviderApiClient {
 		monitor: SonarrMonitorOption,
 		credentials: ProviderCredentials,
 	): Promise<void> {
-		await this.requestVoid("seasonPass", credentials, {
+		await this.requestVoid("seasonpass", credentials, {
 			method: "POST",
 			json: {
 				series: [{ id: seriesId }],
@@ -146,8 +149,8 @@ export class SonarrClient extends ProviderApiClient {
 	}
 
 	public async createTag(
-		label: string,
 		credentials: ProviderCredentials,
+		label: string,
 	): Promise<SonarrTag> {
 		const trimmed = label.trim();
 		if (!trimmed) throw new Error("Tag label cannot be empty.");

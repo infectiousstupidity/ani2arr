@@ -1,6 +1,59 @@
-import type { SonarrEditOptions, SonarrSeries } from "./types";
+/** Sonarr edit workflow for full-resource update saves and monitoring actions. */
+// src/providers/sonarr/edit.ts
+
+import type {
+	SonarrEditOptions,
+	SonarrQualityProfileId,
+	SonarrSeries,
+	SonarrSeriesId,
+	TvdbId,
+} from "./types";
+import type { SonarrClient } from "./client";
+import type { ProviderCredentials } from "../types";
+import type {
+	SonarrEditMonitoringAction,
+	SonarrFormState,
+} from "../settings/provider-settings.schema";
+import {
+	createError,
+	ErrorCode,
+	logError,
+	normalizeError,
+} from "@/shared/errors";
+import {
+	buildProviderFolderSlug,
+	joinRootAndSlug,
+	normalizePathForCompare,
+} from "../library/paths";
+import { resolveSonarrTagIds } from "./tags";
 
 export type SonarrSeriesChanges = Partial<SonarrEditOptions>;
+
+type UpdateSonarrSeriesInput = {
+	tvdbId: TvdbId;
+	title: string;
+	form: SonarrFormState;
+	monitoringAction?: SonarrEditMonitoringAction;
+	credentials: ProviderCredentials;
+};
+
+type UpdateSonarrSeriesDeps = {
+	client: Pick<
+		SonarrClient,
+		| "getSeriesByTvdbId"
+		| "getSeriesById"
+		| "getTags"
+		| "createTag"
+		| "updateSeries"
+		| "applyMonitoringAction"
+	>;
+};
+
+type ResolvedSonarrSeriesUpdate = {
+	seriesId: SonarrSeriesId;
+	payload: SonarrSeries;
+	moveFiles: boolean;
+};
 
 export function buildUpdateSonarrSeriesPayload(
 	series: SonarrSeries,
@@ -10,4 +63,180 @@ export function buildUpdateSonarrSeriesPayload(
 		...series,
 		...changes,
 	};
+}
+
+export async function updateSonarrSeries(
+	input: UpdateSonarrSeriesInput,
+	deps: UpdateSonarrSeriesDeps,
+): Promise<SonarrSeries> {
+	const resolvedUpdate = await resolveSonarrSeriesUpdate({
+		api: deps.client,
+		credentials: input.credentials,
+		form: input.form,
+		title: input.title,
+		tvdbId: input.tvdbId,
+	});
+
+	const updated = await deps.client.updateSeries(
+		resolvedUpdate.seriesId,
+		resolvedUpdate.payload,
+		input.credentials,
+		{ moveFiles: resolvedUpdate.moveFiles },
+	);
+
+	if (
+		input.monitoringAction === undefined ||
+		input.monitoringAction === "noChange"
+	) {
+		return updated;
+	}
+
+	try {
+		await deps.client.applyMonitoringAction(
+			resolvedUpdate.seriesId,
+			input.monitoringAction,
+			input.credentials,
+		);
+		return deps.client.getSeriesById(resolvedUpdate.seriesId, input.credentials);
+	} catch (error) {
+		const normalized = normalizeError(error);
+		throw createError(
+			normalized.code,
+			`Updated Sonarr series ${resolvedUpdate.seriesId}, but applying monitoring action '${input.monitoringAction}' failed: ${normalized.message}`,
+			`The series was updated, but Sonarr could not apply the monitoring action. ${normalized.userMessage}`,
+			{
+				...normalized.details,
+				partialSuccess: true,
+				step: "monitoringAction",
+				monitoringAction: input.monitoringAction,
+				seriesId: resolvedUpdate.seriesId,
+			},
+		);
+	}
+}
+
+async function resolveSonarrSeriesUpdate(input: {
+	api: Pick<
+		SonarrClient,
+		"getSeriesByTvdbId" | "getSeriesById" | "getTags" | "createTag"
+	>;
+	credentials: ProviderCredentials;
+	form: SonarrFormState;
+	title: string;
+	tvdbId: TvdbId;
+}): Promise<ResolvedSonarrSeriesUpdate> {
+	const { api, credentials, form, title, tvdbId } = input;
+
+	if (!Number.isFinite(tvdbId)) {
+		throw createError(
+			ErrorCode.VALIDATION_ERROR,
+			"Missing or invalid TVDB ID for update.",
+			"Unable to update this series because its TVDB ID is unknown.",
+		);
+	}
+
+	const existing = await api.getSeriesByTvdbId(tvdbId, credentials);
+	if (!existing) {
+		throw createError(
+			ErrorCode.VALIDATION_ERROR,
+			`Series with TVDB ID ${tvdbId} not found in Sonarr.`,
+			"Cannot edit because this series is not present in your Sonarr library.",
+		);
+	}
+
+	let baseSeries: SonarrSeries = existing;
+	try {
+		baseSeries = await api.getSeriesById(existing.id, credentials);
+	} catch (error) {
+		const normalized = normalizeError(error);
+		logError(normalized, `Ani2arrApi:updateSeries:fetch:${tvdbId}`);
+	}
+
+	const qualityProfileId = resolveRequiredQualityProfileId({
+		value: form.qualityProfileId,
+		fallback: baseSeries.qualityProfileId,
+	});
+	const rootFolderPath = resolveRequiredRootFolderPath({
+		value: form.rootFolderPath,
+		fallback: baseSeries.rootFolderPath,
+	});
+	const tags = await resolveSonarrTagIds({
+		api,
+		credentials,
+		existingIdsFromForm: form.tags,
+		freeformLabelsFromForm: form.freeformTags,
+	});
+	const seasonFolder = form.seasonFolder ?? baseSeries.seasonFolder;
+	const seriesType = form.seriesType ?? baseSeries.seriesType;
+	const monitored = form.monitored ?? baseSeries.monitored;
+	const nextPath = joinRootAndSlug(
+		rootFolderPath,
+		buildProviderFolderSlug(baseSeries, title),
+	);
+	const moveFiles = shouldMoveProviderFiles(baseSeries.path, nextPath);
+
+	return {
+		seriesId: baseSeries.id,
+		moveFiles,
+		payload: buildUpdateSonarrSeriesPayload(baseSeries, {
+			qualityProfileId,
+			rootFolderPath,
+			path: nextPath,
+			seasonFolder,
+			seriesType,
+			monitored,
+			tags,
+		}),
+	};
+}
+
+function resolveRequiredQualityProfileId(input: {
+	value: SonarrQualityProfileId | undefined;
+	fallback: SonarrQualityProfileId | undefined;
+}): SonarrQualityProfileId {
+	const resolvedValue =
+		typeof input.value === "number" && Number.isFinite(input.value)
+			? input.value
+			: input.fallback;
+
+	if (typeof resolvedValue !== "number" || !Number.isFinite(resolvedValue)) {
+		throw createError(
+			ErrorCode.VALIDATION_ERROR,
+			"Missing Sonarr quality profile for update.",
+			"Select a Sonarr quality profile before updating this series.",
+		);
+	}
+
+	return resolvedValue;
+}
+
+function resolveRequiredRootFolderPath(input: {
+	value: string | undefined;
+	fallback: string | undefined;
+}): string {
+	const resolvedValue = input.value?.trim() || input.fallback?.trim() || "";
+
+	if (!resolvedValue) {
+		throw createError(
+			ErrorCode.VALIDATION_ERROR,
+			"Missing Sonarr root folder for update.",
+			"Select a Sonarr root folder before updating this series.",
+		);
+	}
+
+	return resolvedValue;
+}
+
+function shouldMoveProviderFiles(
+	currentPath: string | null | undefined,
+	nextPath: string,
+): boolean {
+	const currentPathNormalized = normalizePathForCompare(currentPath);
+	const nextPathNormalized = normalizePathForCompare(nextPath);
+
+	return (
+		currentPathNormalized !== null &&
+		nextPathNormalized !== null &&
+		currentPathNormalized !== nextPathNormalized
+	);
 }

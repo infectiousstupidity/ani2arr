@@ -1,0 +1,159 @@
+/** Tests for Sonarr edit workflow full-payload updates and monitoring actions. */
+// src/providers/sonarr/edit.test.ts
+
+import { describe, expect, it, vi } from "vitest";
+import {
+	parseProviderQualityProfileId,
+	parseProviderTagId,
+	parseSonarrSeriesId,
+	parseTvdbId,
+} from "@/providers";
+import { updateSonarrSeries } from "./edit";
+
+const credentials = {
+	url: "https://sonarr.example.test",
+	apiKey: "secret",
+};
+
+describe("updateSonarrSeries", () => {
+	it("sends a merged full series payload, applies monitoring, and returns the refreshed series", async () => {
+		const seriesId = parseSonarrSeriesId(12);
+		const tvdbId = parseTvdbId(34);
+		const existingSeries = {
+			id: seriesId,
+			title: "Example Series",
+			tvdbId,
+			titleSlug: "example-series",
+			qualityProfileId: parseProviderQualityProfileId(56),
+			rootFolderPath: "/series",
+			path: "/series/Example Series [tvdb-34]",
+			monitored: true,
+			monitorNewItems: "all" as const,
+			seriesType: "standard" as const,
+			seasonFolder: true,
+			tags: [parseProviderTagId(1)],
+			statistics: { episodeCount: 12 },
+		};
+		const updatedSeries = {
+			...existingSeries,
+			qualityProfileId: parseProviderQualityProfileId(99),
+			rootFolderPath: "/series-4k",
+			path: "/series-4k/Example Series [tvdb-34]",
+			monitored: false,
+			seriesType: "anime" as const,
+			seasonFolder: false,
+			tags: [parseProviderTagId(7)],
+		};
+		const refreshedSeries = {
+			...updatedSeries,
+			monitored: true,
+		};
+		const client = {
+			getSeriesByTvdbId: vi.fn(async () => existingSeries),
+			getSeriesById: vi
+				.fn()
+				.mockResolvedValueOnce(existingSeries)
+				.mockResolvedValueOnce(refreshedSeries),
+			getTags: vi.fn(async () => [{ id: parseProviderTagId(7), label: "Keep" }]),
+			createTag: vi.fn(),
+			updateSeries: vi.fn(async () => updatedSeries),
+			applyMonitoringAction: vi.fn(async () => {}),
+		};
+
+		const result = await updateSonarrSeries(
+			{
+				tvdbId,
+				title: "Example Series",
+				form: {
+					rootFolderPath: "/series-4k",
+					qualityProfileId: parseProviderQualityProfileId(99),
+					monitored: false,
+					seriesType: "anime",
+					seasonFolder: false,
+					tags: [parseProviderTagId(7)],
+					freeformTags: [],
+				},
+				monitoringAction: "all",
+				credentials,
+			},
+			{ client },
+		);
+
+		expect(result).toBe(refreshedSeries);
+		expect(client.updateSeries).toHaveBeenCalledWith(
+			seriesId,
+			{
+				...existingSeries,
+				qualityProfileId: parseProviderQualityProfileId(99),
+				rootFolderPath: "/series-4k",
+				path: "/series-4k/Example Series [tvdb-34]",
+				monitored: false,
+				seriesType: "anime",
+				seasonFolder: false,
+				tags: [parseProviderTagId(7)],
+			},
+			credentials,
+			{ moveFiles: true },
+		);
+		expect(client.applyMonitoringAction).toHaveBeenCalledWith(
+			seriesId,
+			"all",
+			credentials,
+		);
+		expect(client.getSeriesById).toHaveBeenCalledTimes(2);
+	});
+
+	it("throws a partial-success error when monitoring action fails after update", async () => {
+		const seriesId = parseSonarrSeriesId(12);
+		const tvdbId = parseTvdbId(34);
+		const existingSeries = {
+			id: seriesId,
+			title: "Example Series",
+			tvdbId,
+			titleSlug: "example-series",
+			qualityProfileId: parseProviderQualityProfileId(56),
+			rootFolderPath: "/series",
+			path: "/series/Example Series [tvdb-34]",
+			monitored: true,
+			monitorNewItems: "all" as const,
+			seriesType: "standard" as const,
+			seasonFolder: true,
+			tags: [],
+		};
+		const client = {
+			getSeriesByTvdbId: vi.fn(async () => existingSeries),
+			getSeriesById: vi.fn(async () => existingSeries),
+			getTags: vi.fn(async () => []),
+			createTag: vi.fn(),
+			updateSeries: vi.fn(async () => existingSeries),
+			applyMonitoringAction: vi.fn(async () => {
+				throw new Error("Season pass failed");
+			}),
+		};
+
+		await expect(
+			updateSonarrSeries(
+				{
+					tvdbId,
+					title: "Example Series",
+					form: {
+						rootFolderPath: "/series",
+						qualityProfileId: parseProviderQualityProfileId(56),
+						tags: [],
+						freeformTags: [],
+					},
+					monitoringAction: "all",
+					credentials,
+				},
+				{ client },
+			),
+		).rejects.toMatchObject({
+			details: {
+				partialSuccess: true,
+				step: "monitoringAction",
+				seriesId,
+			},
+		});
+		expect(client.updateSeries).toHaveBeenCalledOnce();
+	});
+});
