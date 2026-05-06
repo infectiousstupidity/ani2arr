@@ -1,11 +1,17 @@
 /** Sonarr provider-domain library snapshot cache and TVDB lookup helpers. */
 // src/providers/sonarr/library.ts
 
+import type { LibraryUnknownReason } from "@/mapping/library-status";
 import { createTtlCache, type TtlCache } from "@/shared/cache/ttl-cache";
-import { normalizeError } from "@/shared/errors";
+import { logError, normalizeError } from "@/shared/errors";
 import type { ProviderCredentials } from "../types";
 import type { SonarrClient } from "./client";
-import type { SonarrSeries, SonarrSeriesSnapshot, TvdbId } from "./types";
+import type {
+	SonarrLookupSeries,
+	SonarrSeries,
+	SonarrSeriesSnapshot,
+	TvdbId,
+} from "./types";
 
 const SONARR_SERIES_CACHE_KEY = "series";
 const SONARR_SERIES_CACHE_TTL = {
@@ -25,13 +31,21 @@ const defaultSeriesSnapshotCache = createTtlCache<SonarrSeriesSnapshot[]>(
 
 type SonarrLibraryClient = Pick<
 	SonarrClient,
-	"getSeries" | "getSeriesByTvdbId"
+	"getSeries" | "getSeriesByTvdbId" | "lookupSeries"
 >;
 
 type SonarrLibraryDeps = {
 	client: SonarrLibraryClient;
 	cache?: TtlCache<SonarrSeriesSnapshot[]>;
 };
+
+export interface SonarrSeriesLibraryStatus {
+	provider: "sonarr";
+	providerId: TvdbId;
+	isInLibrary: boolean | null;
+	series?: SonarrSeriesSnapshot | SonarrSeries | SonarrLookupSeries;
+	libraryUnknownReason?: LibraryUnknownReason;
+}
 
 export class SonarrLibrary {
 	private readonly client: SonarrLibraryDeps["client"];
@@ -107,6 +121,81 @@ export class SonarrLibrary {
 		credentials: ProviderCredentials,
 	): Promise<SonarrSeries | null> {
 		return this.client.getSeriesByTvdbId(tvdbId, credentials);
+	}
+
+	public async getSeriesLibraryStatusByTvdbId(input: {
+		tvdbId: TvdbId;
+		credentials: ProviderCredentials;
+		forceVerify?: boolean;
+		onCacheChanged?: () => Promise<void> | void;
+	}): Promise<SonarrSeriesLibraryStatus> {
+		const { credentials, tvdbId } = input;
+		const snapshots = await this.getSeriesSnapshots(credentials);
+		const cachedSeries =
+			snapshots.find((series) => series.tvdbId === tvdbId) ?? null;
+		const existsInCache = cachedSeries !== null;
+
+		if (input.forceVerify !== true) {
+			return {
+				provider: "sonarr",
+				providerId: tvdbId,
+				isInLibrary: existsInCache,
+				...(cachedSeries ? { series: cachedSeries } : {}),
+			};
+		}
+
+		try {
+			const liveSeries = await this.findSeriesByTvdbId(tvdbId, credentials);
+
+			if (liveSeries) {
+				const snapshot = toSonarrSeriesSnapshot(liveSeries);
+				if (!existsInCache) {
+					await this.upsertSeriesSnapshot(snapshot);
+					await input.onCacheChanged?.();
+				}
+
+				return {
+					provider: "sonarr",
+					providerId: tvdbId,
+					isInLibrary: true,
+					series: snapshot,
+				};
+			}
+		} catch (error) {
+			logError(
+				normalizeError(error),
+				`SonarrLibrary:getSeriesLibraryStatusByTvdbId:library:${tvdbId}`,
+			);
+			return {
+				provider: "sonarr",
+				providerId: tvdbId,
+				isInLibrary: null,
+				libraryUnknownReason: "library-check-failed",
+			};
+		}
+
+		let lookupSeries: SonarrLookupSeries | null = null;
+		try {
+			const hits = await this.client.lookupSeries(`tvdb:${tvdbId}`, credentials);
+			lookupSeries = hits.find((hit) => hit.tvdbId === tvdbId) ?? null;
+		} catch (error) {
+			logError(
+				normalizeError(error),
+				`SonarrLibrary:getSeriesLibraryStatusByTvdbId:lookup:${tvdbId}`,
+			);
+		}
+
+		if (existsInCache) {
+			await this.removeSeriesSnapshot(tvdbId);
+			await input.onCacheChanged?.();
+		}
+
+		return {
+			provider: "sonarr",
+			providerId: tvdbId,
+			isInLibrary: false,
+			...(lookupSeries ? { series: lookupSeries } : {}),
+		};
 	}
 
 	public async upsertSeriesSnapshot(

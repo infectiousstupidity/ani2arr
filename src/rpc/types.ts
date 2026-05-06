@@ -8,11 +8,11 @@ import type {
 	RadarrLookupMovie,
 	RadarrMovie,
 } from "@/providers";
+import type { SonarrSeriesLibraryStatus } from "@/providers/sonarr/library";
 import type {
 	SonarrLookupSeries,
 	SonarrSeries,
 	SonarrSeriesSnapshot,
-	TvdbId,
 } from "@/providers/sonarr/types";
 import type {
 	AcceptedMappingReason,
@@ -25,22 +25,21 @@ import type { MappingListRow } from "@/mapping/queries/list-mappings";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import type { AutoMappingStatus } from "@/mapping/auto-mapping/types";
 import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
-import type { LibraryUnknownReason } from "@/providers/library/types";
+import type { LibraryUnknownReason } from "@/mapping/library-status";
+import type { RadarrMovieLibraryStatus } from "@/providers/library/types";
 import type { MappingCursor } from "./schemas";
-export type { RadarrLibraryStatus } from "@/providers/library/types";
 
-export interface SonarrLibraryStatus {
+export interface SonarrLibraryStatus extends SonarrSeriesLibraryStatus {
 	anilistId: AniListId;
-	provider: "sonarr";
-	providerId: TvdbId;
-	isInLibrary: boolean | null;
-	series?: SonarrSeriesSnapshot | SonarrSeries | SonarrLookupSeries;
-	libraryUnknownReason?: LibraryUnknownReason;
+}
+
+export interface RadarrLibraryStatus extends RadarrMovieLibraryStatus {
+	anilistId: AniListId;
 }
 
 export type ProviderLibraryStatus =
 	| SonarrLibraryStatus
-	| import("@/providers/library/types").RadarrLibraryStatus;
+	| RadarrLibraryStatus;
 
 interface ProviderStatusResponseBase {
 	providerId: ProviderExternalId | null;

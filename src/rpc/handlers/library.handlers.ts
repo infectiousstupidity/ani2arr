@@ -8,7 +8,10 @@ import {
 } from "@/providers/library/radarr-mutations";
 import { addSonarrSeries } from "@/providers/sonarr/add";
 import { updateSonarrSeries } from "@/providers/sonarr/edit";
-import { toSonarrSeriesSnapshot } from "@/providers/sonarr/library";
+import {
+	toSonarrSeriesSnapshot,
+	type SonarrSeriesLibraryStatus,
+} from "@/providers/sonarr/library";
 import type { Ani2arrApi } from "@/rpc";
 import {
 	AddRadarrInputSchema,
@@ -29,8 +32,7 @@ import type { AutoMappingOptions } from "@/mapping/auto-mapping/types";
 import { ErrorCode, logError, normalizeError } from "@/shared/errors";
 import type { RequestPriority } from "@/shared/utils/request-priority";
 import type { AniListId } from "@/anilist";
-import type { ProviderCredentials, TvdbId } from "@/providers";
-import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
+import type { TvdbId } from "@/providers";
 import type { ApiHandlerDeps } from "./handler-deps";
 
 type SonarrStatusPayload = Pick<
@@ -38,7 +40,7 @@ type SonarrStatusPayload = Pick<
 	"anilistId" | "title" | "metadata"
 >;
 
-type SonarrStatusOptions = {
+type ProviderStatusOptions = {
 	force_verify?: boolean;
 	network?: "never";
 	priority?: RequestPriority;
@@ -102,7 +104,6 @@ export function createLibraryHandlers(
 					mappingService,
 					manualMappingService,
 					anibridgeMappingStore,
-					sonarrClient,
 					sonarrLibrary,
 					providerConfig,
 					bumpLibraryRevision,
@@ -128,14 +129,7 @@ export function createLibraryHandlers(
 			if (parsedInput.metadata !== undefined)
 				payload.metadata = parsedInput.metadata;
 
-				const requestOptions: {
-					force_verify?: boolean;
-					network?: "never";
-					priority?: RequestPriority;
-				} = {};
-				if (parsedInput.force_verify) requestOptions.force_verify = true;
-				if (parsedInput.network) requestOptions.network = parsedInput.network;
-				if (parsedInput.priority) requestOptions.priority = parsedInput.priority;
+			const requestOptions = buildStatusOptions(parsedInput);
 
 			const status = await radarrLibrary.getMovieStatus(
 				payload,
@@ -143,17 +137,19 @@ export function createLibraryHandlers(
 			);
 			return {
 				...status,
-				manualMappingActive: manualMappingService.has("radarr", parsedInput.anilistId),
+				manualMappingActive: manualMappingService.has(
+					"radarr",
+					parsedInput.anilistId,
+				),
 			};
 		},
 
 		async getSeriesLibraryStatus(input) {
 			const parsedInput = v.parse(SeriesLibraryStatusInputSchema, input);
-			return getSeriesLibraryStatusFromSonarr({
+			return getSonarrLibraryStatusForRpc({
 				anilistId: parsedInput.anilistId,
-				providerId: parsedInput.providerId,
+				tvdbId: parsedInput.providerId,
 				forceVerify: parsedInput.forceVerify === true,
-				sonarrClient,
 				sonarrLibrary,
 				providerConfig,
 				bumpLibraryRevision,
@@ -162,11 +158,14 @@ export function createLibraryHandlers(
 
 		async getMovieLibraryStatus(input) {
 			const parsedInput = v.parse(MovieLibraryStatusInputSchema, input);
-			return radarrLibrary.getMovieLibraryStatus({
-				anilistId: parsedInput.anilistId,
+			const status = await radarrLibrary.getMovieLibraryStatus({
 				providerId: parsedInput.providerId,
 				forceVerify: parsedInput.forceVerify === true,
 			});
+			return {
+				anilistId: parsedInput.anilistId,
+				...status,
+			};
 		},
 
 		async addToSonarr(input) {
@@ -286,127 +285,62 @@ export function createLibraryHandlers(
 	return handlers;
 }
 
-function buildStatusOptions(input: StatusInput): SonarrStatusOptions {
-	const options: SonarrStatusOptions = {};
+function buildStatusOptions(input: StatusInput): ProviderStatusOptions {
+	const options: ProviderStatusOptions = {};
 	if (input.force_verify) options.force_verify = true;
 	if (input.network) options.network = input.network;
 	if (input.priority) options.priority = input.priority;
 	return options;
 }
 
-async function getLeanSonarrSeriesList(input: {
-	credentials: ProviderCredentials | null;
-	sonarrLibrary: ApiHandlerDeps["sonarrLibrary"];
-}): Promise<SonarrSeriesSnapshot[]> {
-	if (!input.credentials) {
-		await input.sonarrLibrary.clearSeriesSnapshotCache();
-		return [];
-	}
-
-	return input.sonarrLibrary.getSeriesSnapshots(input.credentials);
-}
-
-async function getSeriesLibraryStatusFromSonarr(input: {
+async function getSonarrLibraryStatusForRpc(input: {
 	anilistId: AniListId;
-	providerId: TvdbId;
+	tvdbId: TvdbId;
 	forceVerify?: boolean;
-	sonarrClient: ApiHandlerDeps["sonarrClient"];
 	sonarrLibrary: ApiHandlerDeps["sonarrLibrary"];
 	providerConfig: ApiHandlerDeps["providerConfig"];
 	bumpLibraryRevision: ApiHandlerDeps["bumpLibraryRevision"];
 }): Promise<SonarrLibraryStatus> {
 	const credentials = await input.providerConfig.get("sonarr");
-	const leanList = await getLeanSonarrSeriesList({
+	if (!credentials) {
+		await input.sonarrLibrary.clearSeriesSnapshotCache();
+		return {
+			anilistId: input.anilistId,
+			provider: "sonarr",
+			providerId: input.tvdbId,
+			isInLibrary: false,
+		};
+	}
+
+	const status = await input.sonarrLibrary.getSeriesLibraryStatusByTvdbId({
+		tvdbId: input.tvdbId,
 		credentials,
-		sonarrLibrary: input.sonarrLibrary,
+		...(input.forceVerify === undefined
+			? {}
+			: { forceVerify: input.forceVerify }),
+		onCacheChanged: () => input.bumpLibraryRevision("sonarr"),
 	});
-	const tvdbId = input.providerId;
-	const cachedSeries =
-		leanList.find((series) => series.tvdbId === tvdbId) ?? null;
-	const existsInCache = cachedSeries !== null;
+	return toSonarrLibraryStatus(input.anilistId, status);
+}
 
-	if (!credentials || input.forceVerify !== true) {
-		return {
-			anilistId: input.anilistId,
-			provider: "sonarr",
-			providerId: tvdbId,
-			isInLibrary: existsInCache,
-			...(cachedSeries ? { series: cachedSeries } : {}),
-		};
-	}
-
-	try {
-		const liveSeries = await input.sonarrLibrary.findSeriesByTvdbId(
-			tvdbId,
-			credentials,
-		);
-
-		if (liveSeries) {
-			const snapshot = toSonarrSeriesSnapshot(liveSeries);
-			if (!existsInCache) {
-				await input.sonarrLibrary.upsertSeriesSnapshot(snapshot);
-				await input.bumpLibraryRevision("sonarr");
-			}
-
-			return {
-				anilistId: input.anilistId,
-				provider: "sonarr",
-				providerId: tvdbId,
-				isInLibrary: true,
-				series: snapshot,
-			};
-		}
-	} catch (error) {
-		logError(
-			normalizeError(error),
-			`SonarrStatus:getSeriesLibraryStatus:library:${tvdbId}`,
-		);
-		return {
-			anilistId: input.anilistId,
-			provider: "sonarr",
-			providerId: tvdbId,
-			isInLibrary: null,
-			libraryUnknownReason: "library-check-failed",
-		};
-	}
-
-	let lookupSeries: SonarrLibraryStatus["series"] | null = null;
-	try {
-		const hits = await input.sonarrClient.lookupSeries(
-			`tvdb:${tvdbId}`,
-			credentials,
-		);
-		lookupSeries = hits.find((hit) => hit.tvdbId === tvdbId) ?? null;
-	} catch (error) {
-		logError(
-			normalizeError(error),
-			`SonarrStatus:getSeriesLibraryStatus:lookup:${tvdbId}`,
-		);
-	}
-
-	if (existsInCache) {
-		await input.sonarrLibrary.removeSeriesSnapshot(tvdbId);
-		await input.bumpLibraryRevision("sonarr");
-	}
-
+function toSonarrLibraryStatus(
+	anilistId: AniListId,
+	status: SonarrSeriesLibraryStatus,
+): SonarrLibraryStatus {
 	return {
-		anilistId: input.anilistId,
-		provider: "sonarr",
-		providerId: tvdbId,
-		isInLibrary: false,
-		...(lookupSeries ? { series: lookupSeries } : {}),
+		anilistId,
+		...status,
 	};
 }
 
 async function getSeriesStatusFromMappingAndLibrary(
 	payload: SonarrStatusPayload,
-	options: SonarrStatusOptions,
+	options: ProviderStatusOptions,
 	deps: Pick<
 		ApiHandlerDeps,
 		| "mappingService"
 		| "manualMappingService"
 		| "anibridgeMappingStore"
-		| "sonarrClient"
 		| "sonarrLibrary"
 		| "providerConfig"
 		| "bumpLibraryRevision"
@@ -468,10 +402,9 @@ async function resolveUnmappedSeries(
 async function buildMappedSeriesStatus(
 	anilistId: AniListId,
 	mapping: Extract<SonarrMappingResult, { kind: "mapped" }>,
-	options: SonarrStatusOptions,
+	options: ProviderStatusOptions,
 	deps: Pick<
 		ApiHandlerDeps,
-		| "sonarrClient"
 		| "sonarrLibrary"
 		| "providerConfig"
 		| "manualMappingService"
@@ -479,11 +412,10 @@ async function buildMappedSeriesStatus(
 		| "bumpLibraryRevision"
 	>,
 ): Promise<CheckSeriesStatusResponse> {
-	const libraryStatus = await getSeriesLibraryStatusFromSonarr({
+	const libraryStatus = await getSonarrLibraryStatusForRpc({
 		anilistId,
-		providerId: mapping.tvdbId,
+		tvdbId: mapping.tvdbId,
 		forceVerify: options.force_verify === true,
-		sonarrClient: deps.sonarrClient,
 		sonarrLibrary: deps.sonarrLibrary,
 		providerConfig: deps.providerConfig,
 		bumpLibraryRevision: deps.bumpLibraryRevision,
@@ -507,7 +439,7 @@ async function buildMappedSeriesStatus(
 
 function logSeriesStatusStart(
 	payload: SonarrStatusPayload,
-	options: SonarrStatusOptions,
+	options: ProviderStatusOptions,
 ): void {
 	if (!import.meta.env.DEV) return;
 
@@ -521,7 +453,7 @@ function logSeriesStatusStart(
 async function resolveSeriesMapping(
 	payload: SonarrStatusPayload,
 	normalizedTitle: string | undefined,
-	options: SonarrStatusOptions,
+	options: ProviderStatusOptions,
 	deps: Pick<ApiHandlerDeps, "mappingService">,
 ): Promise<SonarrMappingResult> {
 	if (options.priority === "high") {
@@ -561,7 +493,7 @@ async function resolveSeriesMapping(
 function buildMappingOptions(
 	payload: SonarrStatusPayload,
 	normalizedTitle: string | undefined,
-	options: SonarrStatusOptions,
+	options: ProviderStatusOptions,
 ): AutoMappingOptions {
 	const mappingOptions: AutoMappingOptions = {};
 	if (options.priority) mappingOptions.priority = options.priority;
@@ -576,7 +508,7 @@ function buildMappingOptions(
 
 function logSeriesLookupStart(
 	payload: SonarrStatusPayload,
-	options: SonarrStatusOptions,
+	options: ProviderStatusOptions,
 ): void {
 	if (!import.meta.env.DEV) return;
 

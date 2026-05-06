@@ -7,6 +7,7 @@ export { SonarrClient } from "./client";
 export { buildUpdateSonarrSeriesPayload, updateSonarrSeries } from "./edit";
 export type { SonarrSeriesChanges } from "./edit";
 export { SonarrLibrary, toSonarrSeriesSnapshot } from "./library";
+export type { SonarrSeriesLibraryStatus } from "./library";
 export * from "./schemas";
 export {
 	normalizeSonarrTagLabel,
