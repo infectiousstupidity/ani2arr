@@ -10,7 +10,7 @@ import {
 	type ProviderCredentials,
 } from "@/providers";
 import { SonarrClient } from "./client";
-import type { AddSonarrSeriesPayload } from "./add";
+import type { SonarrAddSeriesPayload } from "./add";
 import type { SonarrSeries } from "./types";
 
 const credentials: ProviderCredentials = {
@@ -59,7 +59,7 @@ describe("SonarrClient mutations", () => {
 
 	it("posts add series payloads", async () => {
 		const fetchMock = mockJson(series);
-		const payload: AddSonarrSeriesPayload = {
+		const payload: SonarrAddSeriesPayload = {
 			title: "Existing Series",
 			tvdbId: parseTvdbId(123),
 			folder: "Existing Series",
@@ -92,6 +92,7 @@ describe("SonarrClient mutations", () => {
 		const fetchMock = vi.fn<typeof fetch>();
 		fetchMock
 			.mockResolvedValueOnce(createJsonResponse(series))
+			.mockResolvedValueOnce(new Response(null, { status: 200 }))
 			.mockResolvedValueOnce(new Response(null, { status: 200 }));
 		vi.stubGlobal("fetch", fetchMock);
 
@@ -100,7 +101,10 @@ describe("SonarrClient mutations", () => {
 				moveFiles: true,
 			}),
 		).resolves.toEqual(series);
-		await createClient().applyMonitoringAction(series.id, "all", credentials);
+		await createClient().setSeriesMonitorMode(series.id, "all", credentials);
+		await createClient().setSeriesMonitorMode(series.id, "none", credentials, {
+			monitored: false,
+		});
 
 		expect(fetchMock.mock.calls[0]?.[0]).toBe(
 			"https://sonarr.example/api/v3/series/10?moveFiles=true",
@@ -116,6 +120,11 @@ describe("SonarrClient mutations", () => {
 		expect(JSON.parse(String(monitoringRequest.body))).toEqual({
 			series: [{ id: series.id }],
 			monitoringOptions: { monitor: "all" },
+		});
+		const unmonitorRequest = fetchMock.mock.calls[2]?.[1] as RequestInit;
+		expect(JSON.parse(String(unmonitorRequest.body))).toEqual({
+			series: [{ id: series.id, monitored: false }],
+			monitoringOptions: { monitor: "none" },
 		});
 	});
 });

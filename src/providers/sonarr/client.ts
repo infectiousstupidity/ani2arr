@@ -1,11 +1,11 @@
-/** Sonarr provider-domain API client for typed Sonarr v3 transport operations. */
+/** Small Sonarr API client for the /api/v3 endpoints ani2arr uses. */
 // src/providers/sonarr/client.ts
 
 import * as v from "valibot";
 
 import { ProviderApiClient } from "../shared.client";
 import type { ProviderCredentials } from "../types";
-import type { AddSonarrSeriesPayload } from "./add";
+import type { SonarrAddSeriesPayload } from "./add";
 import {
 	SonarrGeneratedFolderSchema,
 	SonarrLookupSeriesSchema,
@@ -39,14 +39,14 @@ export class SonarrClient extends ProviderApiClient {
 		});
 	}
 
-	public async getSeries(
+	public async getAllSeries(
 		credentials: ProviderCredentials,
 	): Promise<SonarrSeries[]> {
 		const json = await this.requestJson("series", credentials);
 		return v.parse(v.array(SonarrSeriesSchema), json);
 	}
 
-	public async getSeriesByTvdbId(
+	public async findSeriesByTvdbId(
 		tvdbId: TvdbId,
 		credentials: ProviderCredentials,
 	): Promise<SonarrSeries | null> {
@@ -64,7 +64,7 @@ export class SonarrClient extends ProviderApiClient {
 		return v.parse(SonarrSeriesSchema, json);
 	}
 
-	public async getGeneratedSeriesFolder(
+	public async getSeriesFolderName(
 		seriesId: SonarrSeriesId,
 		credentials: ProviderCredentials,
 	): Promise<SonarrGeneratedFolder> {
@@ -82,7 +82,7 @@ export class SonarrClient extends ProviderApiClient {
 	}
 
 	public async addSeries(
-		payload: AddSonarrSeriesPayload,
+		payload: SonarrAddSeriesPayload,
 		credentials: ProviderCredentials,
 	): Promise<SonarrSeries> {
 		const json = await this.requestJson("series", credentials, {
@@ -115,15 +115,21 @@ export class SonarrClient extends ProviderApiClient {
 		return v.parse(SonarrSeriesSchema, json);
 	}
 
-	public async applyMonitoringAction(
+	public async setSeriesMonitorMode(
 		seriesId: SonarrSeriesId,
 		monitor: SonarrMonitorOption,
 		credentials: ProviderCredentials,
+		options?: { monitored?: boolean },
 	): Promise<void> {
+		const series =
+			options?.monitored === undefined
+				? [{ id: seriesId }]
+				: [{ id: seriesId, monitored: options.monitored }];
+
 		await this.requestVoid("seasonpass", credentials, {
 			method: "POST",
 			json: {
-				series: [{ id: seriesId }],
+				series,
 				monitoringOptions: { monitor },
 			},
 		});
@@ -149,8 +155,8 @@ export class SonarrClient extends ProviderApiClient {
 	}
 
 	public async createTag(
-		credentials: ProviderCredentials,
 		label: string,
+		credentials: ProviderCredentials,
 	): Promise<SonarrTag> {
 		const trimmed = label.trim();
 		if (!trimmed) throw new Error("Tag label cannot be empty.");

@@ -16,7 +16,7 @@ import type { SonarrFormState } from "../settings/provider-settings.schema";
 import { createError, ErrorCode } from "@/shared/errors";
 import { resolveSonarrTagIds } from "./tags";
 
-export type AddSonarrSeriesPayload = {
+export type SonarrAddSeriesPayload = {
 	rootFolderPath: string;
 	qualityProfileId: SonarrQualityProfileId;
 	seriesType: SonarrSeriesType;
@@ -48,12 +48,12 @@ export function buildAddSonarrSeriesPayload(
 		qualityProfileId: SonarrQualityProfileId;
 		seriesType: SonarrSeriesType;
 		seasonFolder: boolean;
-		monitor: AddSonarrSeriesPayload["addOptions"]["monitor"];
+		monitor: SonarrAddSeriesPayload["addOptions"]["monitor"];
 		searchForMissingEpisodes: boolean;
 		searchForCutoffUnmetEpisodes: boolean;
 		tags: SonarrTagId[];
 	},
-): AddSonarrSeriesPayload {
+): SonarrAddSeriesPayload {
 	return {
 		...series,
 		rootFolderPath: options.rootFolderPath,
@@ -93,7 +93,7 @@ async function resolveSonarrAddPayload(input: {
 	form: SonarrFormState;
 	title: string;
 	tvdbId: TvdbId;
-}): Promise<AddSonarrSeriesPayload> {
+}): Promise<SonarrAddSeriesPayload> {
 	const { api, credentials, defaults, form, tvdbId } = input;
 	const monitor = form.addOptions?.monitor ?? defaults.addOptions?.monitor;
 	const seasonFolder = form.seasonFolder ?? defaults.seasonFolder;

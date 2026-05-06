@@ -31,7 +31,7 @@ const defaultSeriesSnapshotCache = createTtlCache<SonarrSeriesSnapshot[]>(
 
 type SonarrLibraryClient = Pick<
 	SonarrClient,
-	"getSeries" | "getSeriesByTvdbId" | "lookupSeries"
+	"getAllSeries" | "findSeriesByTvdbId" | "lookupSeries"
 >;
 
 type SonarrLibraryDeps = {
@@ -81,7 +81,7 @@ export class SonarrLibrary {
 			const fallback = cached?.value ?? [];
 
 			try {
-				const series = await this.client.getSeries(credentials);
+				const series = await this.client.getAllSeries(credentials);
 				const snapshots = series.map((element) =>
 					toSonarrSeriesSnapshot(element),
 				);
@@ -120,7 +120,7 @@ export class SonarrLibrary {
 		tvdbId: TvdbId,
 		credentials: ProviderCredentials,
 	): Promise<SonarrSeries | null> {
-		return this.client.getSeriesByTvdbId(tvdbId, credentials);
+		return this.client.findSeriesByTvdbId(tvdbId, credentials);
 	}
 
 	public async getSeriesLibraryStatusByTvdbId(input: {

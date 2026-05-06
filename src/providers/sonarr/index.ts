@@ -2,7 +2,7 @@
 // src/providers/sonarr/index.ts
 
 export { addSonarrSeries, buildAddSonarrSeriesPayload } from "./add";
-export type { AddSonarrSeriesPayload } from "./add";
+export type { SonarrAddSeriesPayload } from "./add";
 export { SonarrClient } from "./client";
 export { buildUpdateSonarrSeriesPayload, updateSonarrSeries } from "./edit";
 export type { SonarrSeriesChanges } from "./edit";

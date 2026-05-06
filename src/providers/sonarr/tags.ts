@@ -57,7 +57,7 @@ export async function resolveSonarrTagIds(
 	for (const label of labelsToResolve) {
 		if (labelToId.has(label.key)) continue;
 
-		const created = await api.createTag(credentials, label.displayLabel);
+		const created = await api.createTag(label.displayLabel, credentials);
 		const createdLabel = normalizeSonarrTagLabel(created.label);
 		if (
 			createdLabel === null ||
