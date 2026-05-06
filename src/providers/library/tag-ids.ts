@@ -1,4 +1,4 @@
-/** Provider tag lookup and creation workflow for library mutations. */
+/** LEGACY: Radarr tag logic retained until Radarr moves into src/providers/radarr. */
 // src/providers/library/tag-ids.ts
 
 import { createError, ErrorCode } from "@/shared/errors";

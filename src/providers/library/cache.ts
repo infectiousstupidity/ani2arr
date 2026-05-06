@@ -1,4 +1,4 @@
-/** Typed cache for lean Sonarr and Radarr library snapshots used for status checks and enrichment. */
+/** LEGACY: Radarr library cache logic retained until Radarr moves into src/providers/radarr. */
 // src/providers/library/cache.ts
 
 import { createTtlCache } from "@/shared/cache/ttl-cache";

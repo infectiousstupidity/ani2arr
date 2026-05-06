@@ -1,4 +1,4 @@
-/** Safe provider-library mutation notification helper. */
+/** LEGACY: Radarr library mutation notification logic retained until Radarr moves into src/providers/radarr. */
 // src/providers/library/notify-library-mutation.ts
 
 import { logError, normalizeError } from "@/shared/errors";

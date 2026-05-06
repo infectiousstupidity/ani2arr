@@ -1,4 +1,4 @@
-/** Shared Arr provider API client for common transport and connection checks. */
+/** Shared Sonarr and Radarr API client for common transport and connection checks. */
 // src/providers/shared.client.ts
 
 import { createError, ErrorCode } from "@/shared/errors";
