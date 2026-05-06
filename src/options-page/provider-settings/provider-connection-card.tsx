@@ -4,7 +4,7 @@
 import type React from 'react';
 import { useState } from 'react';
 import { ANILIST_TITLE_LANGUAGES, type AniListTitleLanguage } from '@/anilist/schemas/title-language.schema';
-import type { ProviderStatusView } from '@/providers/hooks/provider-connection.status';
+import type { ProviderConnectionStatusView } from '@/queries/provider-connection';
 import { cn } from '@/shared/utils/cn';
 import { getAniListTitleLanguageLabel } from '@/anilist/title-preference';
 import { InputField, SelectField } from '@/shared/ui/form/form';
@@ -21,7 +21,7 @@ const TITLE_LANGUAGE_OPTIONS = ANILIST_TITLE_LANGUAGES.map(value => ({
 const TITLE_LANGUAGE_DESCRIPTION =
   'ani2arr uses this to choose which AniList title variant to show in modal titles.';
 
-export const ProviderConnectionStatusBadge: React.FC<{ status: ProviderStatusView }> = ({
+export const ProviderConnectionStatusBadge: React.FC<{ status: ProviderConnectionStatusView }> = ({
   status,
 }) => {
   return (

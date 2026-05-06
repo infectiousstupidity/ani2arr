@@ -11,14 +11,15 @@ import type { AniListId } from '@/anilist';
 import { useA2aBroadcasts } from '@/shared/queries/use-a2a-broadcasts';
 import {
   createDefaultExtensionOptions,
+  getProviderCredentials,
   parseExtensionOptions,
   type ExtensionOptions,
   useExtensionOptions,
 } from '@/options';
 import {
-  useStoredProviderStatus,
-  type ProviderStatusView,
-} from '@/providers/hooks/provider-connection.status';
+  useProviderConnectionStatus,
+  type ProviderConnectionStatusView,
+} from '@/queries/provider-connection';
 import { useSettingsActions } from './hooks/use-settings-actions';
 import { shouldResetSettingsFormFromSavedSnapshot } from './hooks/provider-settings-actions.shared';
 import MappingsSection from './sections/mappings/mappings-section';
@@ -44,7 +45,7 @@ const extensionVersion = browser.runtime.getManifest()?.version ?? 'unknown';
 const NavItem: React.FC<{
   section: SectionConfig;
   active: boolean;
-  status?: ProviderStatusView;
+  status?: ProviderConnectionStatusView;
   onSelect: (id: SectionId) => void;
 }> = ({ section, active, status, onSelect }) => {
   const Icon = section.icon;
@@ -96,8 +97,14 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
   openPrivacyPanel,
 }) => {
   const actions = useSettingsActions(optionsQuery.data ? { savedSettings: optionsQuery.data } : {});
-  const sonarrStatus = useStoredProviderStatus('sonarr');
-  const radarrStatus = useStoredProviderStatus('radarr');
+  const sonarrStatus = useProviderConnectionStatus(
+    'sonarr',
+    getProviderCredentials(optionsQuery.data, 'sonarr'),
+  );
+  const radarrStatus = useProviderConnectionStatus(
+    'radarr',
+    getProviderCredentials(optionsQuery.data, 'radarr'),
+  );
 
   const renderSection = () => {
     switch (activeSection) {
@@ -136,7 +143,7 @@ const OptionsContent: React.FC<OptionsContentProps> = ({
     }
   };
 
-  const getSectionStatusProps = (sectionId: SectionId): { status?: ProviderStatusView } => {
+  const getSectionStatusProps = (sectionId: SectionId): { status?: ProviderConnectionStatusView } => {
     if (sectionId === 'sonarr') return { status: sonarrStatus };
     if (sectionId === 'radarr') return { status: radarrStatus };
     return {};

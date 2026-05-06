@@ -2,18 +2,22 @@
 // src/entrypoints/popup/index.tsx
 
 import React, { useState } from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { browser } from 'wxt/browser';
 import { ExternalLink } from 'lucide-react';
-import { useStoredProviderStatus } from '@/providers/hooks/provider-connection.status';
+import { useProviderConnectionStatus } from '@/queries/provider-connection';
 import { getProviderLabel } from '@/providers/provider-labels';
 import { cn } from '@/shared/utils/cn';
 import type {
   BadgeVisibility,
   ExtensionOptions,
 } from '@/options';
-import { useExtensionOptions, useSaveOptions } from '@/options';
+import {
+  getProviderCredentials,
+  useExtensionOptions,
+  useSaveOptions,
+} from '@/options';
 import { PROVIDERS, type Provider } from '@/providers';
 import './style.css';
 
@@ -38,14 +42,20 @@ const badgeOptions: Array<{ value: BadgeVisibility; label: string }> = [
   { value: 'hover', label: 'On hover' },
 ];
 
-const QuickSettings: React.FC = () => {
+export const QuickSettings: React.FC = () => {
   const optionsQuery = useExtensionOptions();
   const saveOptions = useSaveOptions();
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const settings = optionsQuery.data;
-  const sonarrStatus = useStoredProviderStatus('sonarr');
-  const radarrStatus = useStoredProviderStatus('radarr');
+  const sonarrStatus = useProviderConnectionStatus(
+    'sonarr',
+    getProviderCredentials(settings, 'sonarr'),
+  );
+  const radarrStatus = useProviderConnectionStatus(
+    'radarr',
+    getProviderCredentials(settings, 'radarr'),
+  );
   const hasAnyProviderConfigured =
     sonarrStatus.isProviderConfigured || radarrStatus.isProviderConfigured;
   const isLoading = optionsQuery.isLoading;
@@ -306,7 +316,7 @@ const QuickSettings: React.FC = () => {
 const rootElement = document.querySelector('#popup-root');
 
 if (rootElement) {
-  ReactDOM.createRoot(rootElement).render(
+  createRoot(rootElement).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <QuickSettings />

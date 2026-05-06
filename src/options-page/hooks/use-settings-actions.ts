@@ -9,7 +9,7 @@ import {
 	useSaveOptions,
 	type ExtensionOptions,
 } from "@/options";
-import { useTestProviderConnection } from "@/providers/hooks/provider-connection.queries";
+import { useTestProviderConnection } from "@/queries/provider-connection";
 import { logger } from "@/shared/utils/logger";
 import { hasUnsavedSettingsChanges } from "./provider-settings-actions.shared";
 import { useProviderConnectionActions } from "./use-provider-connection-actions";
