@@ -1,6 +1,53 @@
+/** Focused tests for provider host permission pattern derivation and requests. */
+// src/providers/settings/host-permissions.test.ts
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
-import { requestProviderHostPermission } from "./host-permissions";
+import {
+	getProviderHostPermissionPattern,
+	requestProviderHostPermission,
+} from "./host-permissions";
+
+describe("getProviderHostPermissionPattern", () => {
+	it("uses the browser origin instead of the provider URL path", () => {
+		expect(
+			getProviderHostPermissionPattern("https://arr.example/sonarr///"),
+		).toEqual({
+			ok: true,
+			value: "https://arr.example/*",
+		});
+	});
+
+	it("treats different ports as different permission origins", () => {
+		expect(
+			getProviderHostPermissionPattern("http://192.168.50.166:8181"),
+		).toEqual({
+			ok: true,
+			value: "http://192.168.50.166:8181/*",
+		});
+		expect(
+			getProviderHostPermissionPattern("http://192.168.50.166:8282"),
+		).toEqual({
+			ok: true,
+			value: "http://192.168.50.166:8282/*",
+		});
+	});
+
+	it("treats different subdomains as different permission origins", () => {
+		expect(getProviderHostPermissionPattern("https://sonarr.example.com")).toEqual(
+			{
+				ok: true,
+				value: "https://sonarr.example.com/*",
+			},
+		);
+		expect(getProviderHostPermissionPattern("https://radarr.example.com")).toEqual(
+			{
+				ok: true,
+				value: "https://radarr.example.com/*",
+			},
+		);
+	});
+});
 
 describe("requestProviderHostPermission", () => {
 	afterEach(() => {
@@ -41,8 +88,12 @@ describe("requestProviderHostPermission", () => {
 					}),
 			);
 
-		const first = requestProviderHostPermission("https://radarr.example:7878");
-		const second = requestProviderHostPermission("https://radarr.example:7878");
+		const first = requestProviderHostPermission(
+			"https://arr.example:7878/sonarr",
+		);
+		const second = requestProviderHostPermission(
+			"https://arr.example:7878/radarr",
+		);
 
 		expect(requestSpy).toHaveBeenCalledTimes(1);
 
@@ -51,14 +102,14 @@ describe("requestProviderHostPermission", () => {
 		await expect(first).resolves.toEqual({
 			ok: true,
 			value: {
-				pattern: "https://radarr.example:7878/*",
+				pattern: "https://arr.example:7878/*",
 				granted: true,
 			},
 		});
 		await expect(second).resolves.toEqual({
 			ok: true,
 			value: {
-				pattern: "https://radarr.example:7878/*",
+				pattern: "https://arr.example:7878/*",
 				granted: true,
 			},
 		});

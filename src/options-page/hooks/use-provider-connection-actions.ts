@@ -245,7 +245,7 @@ export function useProviderConnectionActions({
 			await cleanupPreviousPermission(
 				provider,
 				previousConnection,
-				currentConnection,
+				normalizedSettings,
 				"save",
 			);
 
@@ -432,7 +432,7 @@ export function useProviderConnectionActions({
 			await cleanupPreviousPermission(
 				provider,
 				previousConnection,
-				null,
+				normalizedSettings,
 				"disconnect",
 			);
 			removeProviderQueries(queryClient, provider);

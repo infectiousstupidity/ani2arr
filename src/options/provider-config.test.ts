@@ -84,7 +84,7 @@ describe("normalizeProviderConnectionSettings", () => {
 		expect(normalizeProviderConnectionSettings(settings, "radarr")).toEqual({
 			url: "https://radarr.example/api",
 			apiKey: "key-123",
-			permissionPattern: "https://radarr.example/api/*",
+			permissionPattern: "https://radarr.example/*",
 		});
 	});
 
