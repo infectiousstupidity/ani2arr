@@ -64,11 +64,6 @@ type SetManualMappingMutationInput = SetManualMappingInput & {
 	optimisticMapping?: MappingSearchResult;
 };
 
-type ProviderIdFields = {
-	tvdbId?: ProviderExternalId;
-	tmdbId?: ProviderExternalId;
-};
-
 function getMutationProviderId(
 	input: SetManualMappingMutationInput,
 ): ProviderExternalId | null {
@@ -76,10 +71,7 @@ function getMutationProviderId(
 		return input.optimisticMapping.providerId;
 	}
 
-	const ids = input as ProviderIdFields;
-	return input.provider === "sonarr"
-		? (ids.tvdbId ?? null)
-		: (ids.tmdbId ?? null);
+	return input.providerId;
 }
 
 function toSetManualMappingRequest(

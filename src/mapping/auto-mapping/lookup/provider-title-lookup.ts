@@ -215,11 +215,8 @@ export function createSonarrTitleLookup(
 			const candidate = result as { tvdbId?: unknown } | null;
 			return parseTvdbIdOrNull(candidate?.tvdbId);
 		},
-		lookupByProviderId: async (providerId, credentials) => {
-			const hits = await sonarrApi.lookupSeries(`tvdb:${providerId}`, credentials);
-			const hit = hits.find((element) => element.tvdbId === providerId) ?? null;
-			return hit;
-		},
+		lookupByProviderId: (tvdbId, credentials) =>
+			sonarrApi.lookupSeriesByTvdbId(tvdbId, credentials),
 	});
 }
 

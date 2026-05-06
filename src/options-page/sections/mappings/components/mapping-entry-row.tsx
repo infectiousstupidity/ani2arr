@@ -22,7 +22,7 @@ import {
   type ProviderRouteSlugSource,
 } from '@/providers/provider-route-slug';
 import { useMovieStatus } from '@/providers/hooks/radarr.queries';
-import { useSeriesStatus } from '@/providers/hooks/sonarr.queries';
+import { useSeriesStatus } from '@/queries/sonarr';
 
 const entryKindStyles: Record<EffectiveMappingKind, { label: string; className: string }> = {
   manual: { label: 'Manual', className: 'bg-accent-primary/16 text-accent-primary border-accent-primary/30' },

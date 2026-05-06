@@ -3,7 +3,6 @@
 
 import type { AniListId } from "@/anilist";
 import type { TmdbId, TvdbId } from "@/providers";
-import type { ProviderExternalId } from "@/mapping/types";
 
 interface MappingSearchResultBase {
 	title: string;
@@ -26,7 +25,3 @@ interface MappingSearchResultBase {
 export type MappingSearchResult =
 	| ({ provider: "sonarr"; providerId: TvdbId } & MappingSearchResultBase)
 	| ({ provider: "radarr"; providerId: TmdbId } & MappingSearchResultBase);
-
-export type AnyMappingSearchResult = MappingSearchResultBase & {
-	providerId: ProviderExternalId;
-};

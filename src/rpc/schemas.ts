@@ -68,8 +68,7 @@ export const SeriesLibraryStatusInputSchema = v.object({
 });
 
 export const MovieLibraryStatusInputSchema = v.object({
-	anilistId: AniListIdSchema,
-	providerId: TmdbIdSchema,
+	tmdbId: TmdbIdSchema,
 	forceVerify: v.optional(v.boolean()),
 });
 

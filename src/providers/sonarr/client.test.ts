@@ -57,6 +57,33 @@ describe("SonarrClient mutations", () => {
 		vi.restoreAllMocks();
 	});
 
+	it("looks up catalog series by TVDB ID", async () => {
+		const fetchMock = mockJson([
+			{
+				title: "Wrong Series",
+				tvdbId: parseTvdbId(456),
+				folder: "Wrong Series",
+			},
+			{
+				title: "Existing Series",
+				tvdbId: parseTvdbId(123),
+				folder: "Existing Series",
+			},
+		]);
+
+		await expect(
+			createClient().lookupSeriesByTvdbId(parseTvdbId(123), credentials),
+		).resolves.toEqual({
+			title: "Existing Series",
+			tvdbId: parseTvdbId(123),
+			folder: "Existing Series",
+		});
+
+		expect(fetchMock.mock.calls[0]?.[0]).toBe(
+			"https://sonarr.example/api/v3/series/lookup?term=tvdb%3A123",
+		);
+	});
+
 	it("posts add series payloads", async () => {
 		const fetchMock = mockJson(series);
 		const payload: SonarrAddSeriesPayload = {

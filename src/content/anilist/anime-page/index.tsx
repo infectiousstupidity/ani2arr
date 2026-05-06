@@ -56,8 +56,11 @@ import {
 	useMovieLibraryStatus,
 	useMovieStatus,
 } from "@/providers/hooks/radarr.queries";
-import { useAddSeries, useSeriesLibraryStatus } from "@/queries/sonarr";
-import { useSeriesStatus } from "@/providers/hooks/sonarr.queries";
+import {
+	useAddSeries,
+	useSeriesLibraryStatus,
+	useSeriesStatus,
+} from "@/queries/sonarr";
 import { MediaModal } from "@/features/media-modal";
 import {
 	createLaunchSnapshot,
@@ -624,7 +627,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({
 		mappedRadarrProviderId
 			? {
 					anilistId,
-					providerId: mappedRadarrProviderId,
+					tmdbId: mappedRadarrProviderId,
 				}
 			: null,
 		{

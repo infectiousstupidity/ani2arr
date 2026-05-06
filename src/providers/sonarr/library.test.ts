@@ -97,7 +97,7 @@ describe("SonarrLibrary library status", () => {
 		const client = {
 			getAllSeries: vi.fn(async () => []),
 			findSeriesByTvdbId: vi.fn(async () => series),
-			lookupSeries: vi.fn(),
+			lookupSeriesByTvdbId: vi.fn(),
 		};
 		const onCacheChanged = vi.fn();
 		const library = new SonarrLibrary({ client, cache });
@@ -120,7 +120,7 @@ describe("SonarrLibrary library status", () => {
 			parseTvdbId(123),
 			credentials,
 		);
-		expect(client.lookupSeries).not.toHaveBeenCalled();
+		expect(client.lookupSeriesByTvdbId).not.toHaveBeenCalled();
 		expect(cache.value()).toEqual([toSonarrSeriesSnapshot(series)]);
 		expect(onCacheChanged).toHaveBeenCalledTimes(1);
 	});
@@ -132,7 +132,7 @@ describe("SonarrLibrary library status", () => {
 		const client = {
 			getAllSeries: vi.fn(async () => []),
 			findSeriesByTvdbId: vi.fn(async () => null),
-			lookupSeries: vi.fn(async () => [createLookupSeries()]),
+			lookupSeriesByTvdbId: vi.fn(async () => createLookupSeries()),
 		};
 		const onCacheChanged = vi.fn();
 		const library = new SonarrLibrary({ client, cache });
@@ -151,7 +151,10 @@ describe("SonarrLibrary library status", () => {
 			series: { title: "Lookup Series", tvdbId: parseTvdbId(123) },
 		});
 
-		expect(client.lookupSeries).toHaveBeenCalledWith("tvdb:123", credentials);
+		expect(client.lookupSeriesByTvdbId).toHaveBeenCalledWith(
+			parseTvdbId(123),
+			credentials,
+		);
 		expect(cache.value()).toEqual([]);
 		expect(onCacheChanged).toHaveBeenCalledTimes(1);
 	});

@@ -2,7 +2,6 @@
 // src/rpc/types.ts
 
 import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
-import type { AniListId } from "@/anilist";
 import type {
 	RadarrMovieSnapshot,
 	RadarrLookupMovie,
@@ -25,12 +24,7 @@ import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identit
 import type { AutoMappingStatus } from "@/mapping/auto-mapping/types";
 import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
 import type { LibraryUnknownReason } from "@/mapping/library-status";
-import type { RadarrMovieLibraryStatus } from "@/providers/library/types";
 import type { MappingCursor } from "./schemas";
-
-export interface RadarrLibraryStatus extends RadarrMovieLibraryStatus {
-	anilistId: AniListId;
-}
 
 interface ProviderStatusResponseBase {
 	providerId: ProviderExternalId | null;
