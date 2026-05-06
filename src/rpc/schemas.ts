@@ -63,8 +63,7 @@ export const StatusInputSchema = v.object({
 });
 
 export const SeriesLibraryStatusInputSchema = v.object({
-	anilistId: AniListIdSchema,
-	providerId: TvdbIdSchema,
+	tvdbId: TvdbIdSchema,
 	forceVerify: v.optional(v.boolean()),
 });
 

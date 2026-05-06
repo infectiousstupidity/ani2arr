@@ -8,7 +8,6 @@ import type {
 	RadarrLookupMovie,
 	RadarrMovie,
 } from "@/providers";
-import type { SonarrSeriesLibraryStatus } from "@/providers/sonarr/library";
 import type {
 	SonarrLookupSeries,
 	SonarrSeries,
@@ -29,17 +28,9 @@ import type { LibraryUnknownReason } from "@/mapping/library-status";
 import type { RadarrMovieLibraryStatus } from "@/providers/library/types";
 import type { MappingCursor } from "./schemas";
 
-export interface SonarrLibraryStatus extends SonarrSeriesLibraryStatus {
-	anilistId: AniListId;
-}
-
 export interface RadarrLibraryStatus extends RadarrMovieLibraryStatus {
 	anilistId: AniListId;
 }
-
-export type ProviderLibraryStatus =
-	| SonarrLibraryStatus
-	| RadarrLibraryStatus;
 
 interface ProviderStatusResponseBase {
 	providerId: ProviderExternalId | null;

@@ -13,6 +13,7 @@ import type {
 	ProviderFormOptions,
 	RadarrMovie,
 } from "@/providers";
+import type { SonarrSeriesLibraryStatus } from "@/providers/sonarr/library";
 import type { SonarrSeries } from "@/providers/sonarr/types";
 import type {
 	GetAniListMetadataOutput,
@@ -22,7 +23,6 @@ import type {
 	SonarrLookupOutput,
 	CheckMovieStatusResponse,
 	CheckSeriesStatusResponse,
-	SonarrLibraryStatus,
 	RadarrLibraryStatus,
 } from "./types";
 import type {
@@ -55,7 +55,7 @@ export interface Ani2arrApi {
 	getMovieStatus(input: StatusInput): Promise<CheckMovieStatusResponse>;
 	getSeriesLibraryStatus(
 		input: SeriesLibraryStatusInput,
-	): Promise<SonarrLibraryStatus>;
+	): Promise<SonarrSeriesLibraryStatus>;
 	getMovieLibraryStatus(
 		input: MovieLibraryStatusInput,
 	): Promise<RadarrLibraryStatus>;
