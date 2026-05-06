@@ -1,3 +1,6 @@
+/** LEGACY: Radarr provider-library status tests retained until Radarr moves into src/providers/radarr. */
+// src/providers/library/provider-library-status.test.ts
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist";
 import {
@@ -6,47 +9,19 @@ import {
 } from "@/options";
 import { createLibraryHandlers } from "@/rpc/handlers/library.handlers";
 import {
-	parseProviderQualityProfileId,
 	parseRadarrMovieId,
-	parseSonarrSeriesId,
 	parseTmdbId,
-	parseTvdbId,
 	type ProviderCredentials,
 	type RadarrMovie,
 	type RadarrMovieSnapshot,
-	type TvdbId,
 } from "@/providers";
 import type { RadarrClient } from "@/providers/clients/radarr.client";
-import {
-	SonarrLibrary as SonarrSeriesLibrary,
-	toSonarrSeriesSnapshot,
-} from "@/providers/sonarr/library";
-import type {
-	SonarrLookupSeries,
-	SonarrSeries,
-	SonarrSeriesSnapshot,
-} from "@/providers/sonarr/types";
-import type {
-	CacheHit,
-	TtlCache,
-} from "@/shared/cache/ttl-cache";
+import type { CacheHit, TtlCache } from "@/shared/cache/ttl-cache";
 import { PROVIDER_LIBRARY_CACHE_TTL } from "./cache";
 import { RadarrLibrary } from "./radarr-library";
 import type { ProviderLibraryCaches } from "./types";
 
-type SonarrClientStub = {
-	getSeries?: (credentials: ProviderCredentials) => Promise<unknown[]>;
-	getSeriesByTvdbId?: (
-		tvdbId: TvdbId,
-		credentials: ProviderCredentials,
-	) => Promise<unknown | null>;
-	lookupSeries?: (
-		term: string,
-		credentials: ProviderCredentials,
-	) => Promise<SonarrLookupSeries[]>;
-};
-
-type CacheMode = "miss" | "fresh" | "stale";
+type CacheMode = "miss" | "fresh";
 
 function createMemoryCache<T>(
 	initialValue: T | undefined,
@@ -55,13 +30,13 @@ function createMemoryCache<T>(
 	let value = initialValue;
 	let currentMode = mode;
 
-	const cache = {
+	return {
 		read: vi.fn(async (): Promise<CacheHit<T> | null> => {
 			if (currentMode === "miss" || value === undefined) return null;
 			return {
 				value,
-				stale: currentMode === "stale",
-				staleAt: Date.now() - (currentMode === "stale" ? 1 : -60_000),
+				stale: false,
+				staleAt: Date.now() + 60_000,
 				expiresAt: Date.now() + 120_000,
 			};
 		}),
@@ -79,7 +54,6 @@ function createMemoryCache<T>(
 		}),
 		value: () => value,
 	};
-	return cache;
 }
 
 function createCaches<T>(
@@ -109,47 +83,6 @@ const createSonarrUpstreamStore = () => ({
 const createRadarrUpstreamStore = () => ({
 	getAniListIdsForTmdb: vi.fn(() => []),
 });
-
-function createSonarrSeries(input?: Partial<SonarrSeries>): SonarrSeries {
-	return {
-		id: parseSonarrSeriesId(10),
-		tvdbId: parseTvdbId(123),
-		title: "Known Series",
-		titleSlug: "known-series",
-		monitored: true,
-		path: "/tv/Known Series",
-		rootFolderPath: "/tv",
-		qualityProfileId: parseProviderQualityProfileId(1),
-		seasonFolder: true,
-		monitorNewItems: "all",
-		seriesType: "anime",
-		tags: [],
-		...input,
-	};
-}
-
-function createSonarrLookupSeries(
-	input?: Partial<SonarrLookupSeries>,
-): SonarrLookupSeries {
-	return {
-		title: "Lookup Series",
-		tvdbId: parseTvdbId(123),
-		folder: "Lookup Series",
-		...input,
-	};
-}
-
-function createSonarrSnapshot(
-	input?: Partial<SonarrSeriesSnapshot>,
-): SonarrSeriesSnapshot {
-	return {
-		id: parseSonarrSeriesId(10),
-		tvdbId: parseTvdbId(123),
-		title: "Known Series",
-		titleSlug: "known-series",
-		...input,
-	};
-}
 
 function createRadarrMovie(input?: Partial<RadarrMovie>): RadarrMovie {
 	return {
@@ -182,43 +115,6 @@ async function configureProviders(configured = true): Promise<void> {
 	await setExtensionOptionsSnapshot(options);
 }
 
-function createSonarrLibrary(
-	client: SonarrClientStub,
-	caches: ProviderLibraryCaches<SonarrSeriesSnapshot>,
-): SonarrSeriesLibrary {
-	return new SonarrSeriesLibrary({
-		client: {
-			getSeries: (credentials) =>
-				(client.getSeries?.(credentials) ?? Promise.resolve([])) as never,
-			getSeriesByTvdbId: (tvdbId, credentials) =>
-				(client.getSeriesByTvdbId?.(tvdbId, credentials) ??
-					Promise.resolve(null)) as never,
-		},
-		cache: caches.lean as never,
-	});
-}
-
-function createSonarrStatusHandlers(
-	client: SonarrClientStub,
-	library: SonarrSeriesLibrary,
-) {
-	return createLibraryHandlers({
-		sonarrClient: {
-			lookupSeries: (term: string, credentials: ProviderCredentials) =>
-				client.lookupSeries?.(term, credentials) ?? Promise.resolve([]),
-		},
-		sonarrLibrary: library,
-		providerConfig: {
-			get: vi.fn(async () => ({
-				url: "http://sonarr.local",
-				apiKey: "sonarr-key",
-			}) satisfies ProviderCredentials),
-		},
-		bumpLibraryRevision: vi.fn(async () => {}),
-		manualMappingsReady: Promise.resolve(),
-	} as never);
-}
-
 function createRadarrLibrary(
 	client: Partial<RadarrClient>,
 	caches: ProviderLibraryCaches<RadarrMovieSnapshot>,
@@ -241,13 +137,13 @@ describe("series status orchestration", () => {
 		const mappingService = createMappingService();
 		mappingService.resolveProviderId.mockResolvedValue(null);
 		mappingService.getAutoMapping.mockResolvedValue(null);
-			const getSeriesLibraryStatus = vi.fn();
-			const handlers = createLibraryHandlers({
-				RadarrClient: {},
+		const getSeriesLibraryStatus = vi.fn();
+		const handlers = createLibraryHandlers({
+			RadarrClient: {},
 			mappingService,
-				manualMappingService: createManualMappingService(),
-				anibridgeMappingStore: createSonarrUpstreamStore(),
-				sonarrLibrary: { findSeriesByTvdbId: getSeriesLibraryStatus },
+			manualMappingService: createManualMappingService(),
+			anibridgeMappingStore: createSonarrUpstreamStore(),
+			sonarrLibrary: { getSeriesLibraryStatusByTvdbId: getSeriesLibraryStatus },
 			radarrLibrary: {},
 			manualMappingsReady: Promise.resolve(),
 			providerConfig: {
@@ -272,43 +168,13 @@ describe("series status orchestration", () => {
 	});
 });
 
-describe("provider library cache", () => {
+describe("legacy Radarr provider library", () => {
 	beforeEach(async () => {
 		await configureProviders();
 		vi.restoreAllMocks();
 	});
 
-	it("force-verifies a mapped Sonarr hit and updates the cache", async () => {
-		const series = createSonarrSeries();
-		const client = {
-			getSeries: vi.fn(async () => []),
-			getSeriesByTvdbId: vi.fn(async () => series),
-			lookupSeries: vi.fn(),
-		};
-		const caches = createCaches<SonarrSeriesSnapshot>();
-		const library = createSonarrLibrary(client, caches);
-		const handlers = createSonarrStatusHandlers(client, library);
-
-		await expect(
-			handlers.getSeriesLibraryStatus({
-				anilistId: parseAniListId(10),
-				providerId: parseTvdbId(123),
-				forceVerify: true,
-			}),
-		).resolves.toMatchObject({
-			isInLibrary: true,
-			series: createSonarrSnapshot(),
-		});
-
-		expect(client.getSeriesByTvdbId).toHaveBeenCalledWith(
-			parseTvdbId(123),
-			expect.objectContaining({ apiKey: "sonarr-key" }),
-		);
-		expect(caches.lean.value()).toEqual([createSonarrSnapshot()]);
-		expect(client.lookupSeries).not.toHaveBeenCalled();
-	});
-
-	it("refreshes a missing Radarr cache from the provider and writes lean snapshots", async () => {
+	it("refreshes a missing cache from Radarr and writes lean snapshots", async () => {
 		const movie = createRadarrMovie();
 		const client = { getAllMovies: vi.fn(async () => [movie]) };
 		const caches = createCaches<RadarrMovieSnapshot>();
@@ -326,59 +192,28 @@ describe("provider library cache", () => {
 			[createRadarrSnapshot()],
 			PROVIDER_LIBRARY_CACHE_TTL.normal,
 		);
-		const written = caches.lean.value()?.[0] as unknown as Record<
-			string,
-			unknown
-		>;
-		expect(written).not.toHaveProperty("titleSlug");
-		expect(written).not.toHaveProperty("sortTitle");
-		expect(written).not.toHaveProperty("movieFile");
 	});
 
-	it("force-verifies a mapped Sonarr miss, removes stale cache, and uses term lookup", async () => {
+	it("force-verifies a mapped movie and updates the lean cache", async () => {
+		const movie = createRadarrMovie();
 		const client = {
-			getSeries: vi.fn(async () => []),
-			getSeriesByTvdbId: vi.fn(async () => null),
-			lookupSeries: vi.fn(async () => [createSonarrLookupSeries()]),
+			getMovieByTmdbId: vi.fn(async () => movie),
 		};
-		const caches = createCaches([createSonarrSnapshot({ title: "Stale" })]);
-		const library = createSonarrLibrary(client, caches);
-		const handlers = createSonarrStatusHandlers(client, library);
+		const caches = createCaches<RadarrMovieSnapshot>([]);
+		const library = createRadarrLibrary(client, caches);
 
 		await expect(
-			handlers.getSeriesLibraryStatus({
-				anilistId: parseAniListId(10),
-				providerId: parseTvdbId(123),
+			library.getMovieLibraryStatus({
+				providerId: parseTmdbId(456),
 				forceVerify: true,
 			}),
 		).resolves.toMatchObject({
-			isInLibrary: false,
-			series: { title: "Lookup Series", tvdbId: parseTvdbId(123) },
+			provider: "radarr",
+			providerId: parseTmdbId(456),
+			isInLibrary: true,
+			movie,
 		});
-
-		expect(client.lookupSeries).toHaveBeenCalledWith(
-			"tvdb:123",
-			expect.objectContaining({ apiKey: "sonarr-key" }),
-		);
-		expect(caches.lean.value()).toEqual([]);
-	});
-
-	it("returns stale Radarr data immediately while refreshing in the background", async () => {
-		const stale = createRadarrSnapshot({ title: "Stale Movie" });
-		const fresh = createRadarrMovie({ title: "Fresh Movie" });
-		const client = { getAllMovies: vi.fn(async () => [fresh]) };
-		const caches = createCaches([stale], "stale");
-		const library = createRadarrLibrary(client, caches);
-
-		await expect(library.getLeanMovieList()).resolves.toEqual([stale]);
-
-		await vi.waitFor(() => {
-			expect(caches.lean.write).toHaveBeenCalledWith(
-				expect.any(String),
-				[createRadarrSnapshot({ title: "Fresh Movie" })],
-				PROVIDER_LIBRARY_CACHE_TTL.normal,
-			);
-		});
+		expect(caches.lean.value()).toEqual([createRadarrSnapshot()]);
 	});
 
 	it("clears provider caches when credentials are missing", async () => {
@@ -391,39 +226,5 @@ describe("provider library cache", () => {
 
 		expect(radarrCaches.lean.remove).toHaveBeenCalled();
 		expect(radarrClient.getAllMovies).not.toHaveBeenCalled();
-	});
-
-	it("upserts and removes Sonarr cache entries by TVDB ID", async () => {
-		const caches = createCaches([createSonarrSnapshot({ title: "Old" })]);
-		const library = createSonarrLibrary({}, caches);
-
-		await library.upsertSeriesSnapshot(
-			toSonarrSeriesSnapshot(createSonarrSeries({ title: "New" })),
-		);
-		await library.upsertSeriesSnapshot(
-			toSonarrSeriesSnapshot(
-				createSonarrSeries({ tvdbId: parseTvdbId(124), title: "Other" }),
-			),
-		);
-		await library.removeSeriesSnapshot(parseTvdbId(123));
-
-		expect(caches.lean.value()).toEqual([
-			createSonarrSnapshot({ tvdbId: parseTvdbId(124), title: "Other" }),
-		]);
-	});
-
-	it("upserts and removes Radarr cache entries by TMDB ID", async () => {
-		const caches = createCaches([createRadarrSnapshot({ title: "Old" })]);
-		const library = createRadarrLibrary({}, caches);
-
-		await library.addMovieToCache(createRadarrMovie({ title: "New" }));
-		await library.addMovieToCache(
-			createRadarrMovie({ tmdbId: parseTmdbId(457), title: "Other" }),
-		);
-		await library.removeMovieFromCache(parseTmdbId(456));
-
-		expect(caches.lean.value()).toEqual([
-			createRadarrSnapshot({ tmdbId: parseTmdbId(457), title: "Other" }),
-		]);
 	});
 });

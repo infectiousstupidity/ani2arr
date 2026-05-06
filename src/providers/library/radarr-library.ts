@@ -1,4 +1,4 @@
-/** Radarr-backed library cache and status lookup logic for movie records. */
+/** LEGACY: Radarr-backed library cache and status lookup until Radarr moves into src/providers/radarr. */
 // src/providers/library/radarr-library.ts
 
 import type { RadarrClient } from "@/providers/clients/radarr.client";
@@ -24,14 +24,21 @@ import type {
 import { notifyLibraryMutation } from "./notify-library-mutation";
 import type {
 	LibraryMutationEmitter,
-	LibraryStatusOptions,
 	ProviderLibraryCaches,
-	RadarrLibraryStatus,
+	RadarrMovieLibraryStatus,
 } from "./types";
 import type { AnibridgeMappingStore } from "@/mapping/upstream-mapping";
 import { PROVIDER_LIBRARY_CACHE_TTL } from "./cache";
+import type { RequestPriority } from "@/shared/utils/request-priority";
 
 const CACHE_KEY = "radarr:lean-movies";
+
+/** LEGACY: Radarr status request options retained until Radarr moves into src/providers/radarr. */
+interface LibraryStatusOptions {
+	force_verify?: boolean;
+	network?: "never";
+	priority?: RequestPriority;
+}
 
 type RadarrLibraryMutationPayload = {
 	tmdbId: TmdbId;
@@ -42,7 +49,7 @@ function buildMovieStatusResponseFromLibraryStatus(input: {
 	providerId: TmdbId;
 	mappingSource?: CheckMovieStatusResponse["mappingSource"];
 	mappingReason?: CheckMovieStatusResponse["mappingReason"];
-	libraryStatus: RadarrLibraryStatus;
+	libraryStatus: RadarrMovieLibraryStatus;
 }): CheckMovieStatusResponse {
 	return {
 		providerId: input.providerId,
@@ -205,10 +212,9 @@ export class RadarrLibrary {
 	}
 
 	async getMovieLibraryStatus(input: {
-		anilistId: AniListId;
 		providerId: TmdbId;
 		forceVerify?: boolean;
-	}): Promise<RadarrLibraryStatus> {
+	}): Promise<RadarrMovieLibraryStatus> {
 		const leanList = await this.getLeanMovieList();
 		const radarrOptions = await getExtensionOptionsSnapshot();
 		const isConfigured = hasConfiguredProviderCredentials(
@@ -222,7 +228,6 @@ export class RadarrLibrary {
 
 		if (!isConfigured || input.forceVerify !== true) {
 			return {
-				anilistId: input.anilistId,
 				provider: "radarr",
 				providerId: tmdbId,
 				isInLibrary: existsInCache,
@@ -240,7 +245,6 @@ export class RadarrLibrary {
 				`RadarrLibrary:getMovieLibraryStatus:library:${tmdbId}`,
 			);
 			return {
-				anilistId: input.anilistId,
 				provider: "radarr",
 				providerId: tmdbId,
 				isInLibrary: null,
@@ -267,7 +271,6 @@ export class RadarrLibrary {
 			}
 
 			return {
-				anilistId: input.anilistId,
 				provider: "radarr",
 				providerId: tmdbId,
 				isInLibrary: true,
@@ -301,7 +304,6 @@ export class RadarrLibrary {
 		}
 
 		return {
-			anilistId: input.anilistId,
 			provider: "radarr",
 			providerId: tmdbId,
 			isInLibrary: false,
@@ -372,7 +374,6 @@ export class RadarrLibrary {
 		options: LibraryStatusOptions,
 	): Promise<CheckMovieStatusResponse> {
 		const libraryStatus = await this.getMovieLibraryStatus({
-			anilistId,
 			providerId: mapping.tmdbId,
 			forceVerify: options.force_verify === true,
 		});

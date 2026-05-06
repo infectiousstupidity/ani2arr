@@ -1,4 +1,4 @@
-/** Shared library-mutation helpers for provider add and update flows. */
+/** LEGACY: Radarr mutation helpers retained until Radarr moves into src/providers/radarr. */
 // src/providers/library/mutation-helpers.ts
 
 import { createError, ErrorCode } from "@/shared/errors";

@@ -34,7 +34,7 @@ import {
 import {
 	deriveLibraryUnknownReason,
 	type LibraryUnknownReason,
-} from "@/providers/library/types";
+} from "@/mapping/library-status";
 import { deriveMappingRowStatus } from "@/features/provider-action";
 import type {
 	MappingIssue,
