@@ -14,8 +14,10 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/shared/queries";
 import type { SettingsActions } from "../hooks/use-settings-actions";
-import { useProviderConnectionCheck } from "@/providers/hooks/provider-connection.queries";
-import { deriveProviderStatus } from "@/providers/hooks/provider-connection.status";
+import {
+	deriveProviderConnectionStatusView,
+	useProviderConnectionCheck,
+} from "@/queries/provider-connection";
 import { getAniListTitleLanguageLabel } from "@/anilist/title-preference";
 import { useToast } from "@/shared/ui/feedback/toast-provider";
 
@@ -113,7 +115,7 @@ const SonarrSettingsPanel: React.FC<SonarrSettingsPanelProps> = ({
 		!hasConnectionChanges ||
 		!formCredentials ||
 		actions.connectPendingState.sonarr;
-	const connectionStatus = deriveProviderStatus({
+	const connectionStatus = deriveProviderConnectionStatusView({
 		isProviderConfigured: isProviderConfigured,
 		isCheckingProviderConnection,
 		isProviderConnected: liveConnectionQuery.isSuccess,

@@ -15,8 +15,10 @@ import { queryKeys } from "@/shared/queries";
 import type { SettingsActions } from "../hooks/use-settings-actions";
 import { getAniListTitleLanguageLabel } from "@/anilist/title-preference";
 import { useToast } from "@/shared/ui/feedback/toast-provider";
-import { useProviderConnectionCheck } from "@/providers/hooks/provider-connection.queries";
-import { deriveProviderStatus } from "@/providers/hooks/provider-connection.status";
+import {
+	deriveProviderConnectionStatusView,
+	useProviderConnectionCheck,
+} from "@/queries/provider-connection";
 import {
 	ProviderConnectionCard,
 	ProviderConnectionStatusBadge,
@@ -108,7 +110,7 @@ const RadarrSettingsPanel: React.FC<RadarrSettingsPanelProps> = ({
 		!hasConnectionChanges ||
 		!formCredentials ||
 		actions.connectPendingState.radarr;
-	const connectionStatus = deriveProviderStatus({
+	const connectionStatus = deriveProviderConnectionStatusView({
 		isProviderConfigured: isProviderConfigured,
 		isCheckingProviderConnection,
 		isProviderConnected: liveConnectionQuery.isSuccess,
