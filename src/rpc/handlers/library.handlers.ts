@@ -23,10 +23,7 @@ import {
 	UpdateSonarrInputSchema,
 	type StatusInput,
 } from "@/rpc/schemas";
-import type {
-	CheckSeriesStatusResponse,
-	SonarrLibraryStatus,
-} from "@/rpc/types";
+import type { CheckSeriesStatusResponse } from "@/rpc/types";
 import { buildSeriesStatusResponseFromLibraryStatus } from "@/rpc/status-response-adapter";
 import type { AutoMappingOptions } from "@/mapping/auto-mapping/types";
 import { ErrorCode, logError, normalizeError } from "@/shared/errors";
@@ -147,8 +144,7 @@ export function createLibraryHandlers(
 		async getSeriesLibraryStatus(input) {
 			const parsedInput = v.parse(SeriesLibraryStatusInputSchema, input);
 			return getSonarrLibraryStatusForRpc({
-				anilistId: parsedInput.anilistId,
-				tvdbId: parsedInput.providerId,
+				tvdbId: parsedInput.tvdbId,
 				forceVerify: parsedInput.forceVerify === true,
 				sonarrLibrary,
 				providerConfig,
@@ -294,18 +290,16 @@ function buildStatusOptions(input: StatusInput): ProviderStatusOptions {
 }
 
 async function getSonarrLibraryStatusForRpc(input: {
-	anilistId: AniListId;
 	tvdbId: TvdbId;
 	forceVerify?: boolean;
 	sonarrLibrary: ApiHandlerDeps["sonarrLibrary"];
 	providerConfig: ApiHandlerDeps["providerConfig"];
 	bumpLibraryRevision: ApiHandlerDeps["bumpLibraryRevision"];
-}): Promise<SonarrLibraryStatus> {
+}): Promise<SonarrSeriesLibraryStatus> {
 	const credentials = await input.providerConfig.get("sonarr");
 	if (!credentials) {
 		await input.sonarrLibrary.clearSeriesSnapshotCache();
 		return {
-			anilistId: input.anilistId,
 			provider: "sonarr",
 			providerId: input.tvdbId,
 			isInLibrary: false,
@@ -320,17 +314,7 @@ async function getSonarrLibraryStatusForRpc(input: {
 			: { forceVerify: input.forceVerify }),
 		onCacheChanged: () => input.bumpLibraryRevision("sonarr"),
 	});
-	return toSonarrLibraryStatus(input.anilistId, status);
-}
-
-function toSonarrLibraryStatus(
-	anilistId: AniListId,
-	status: SonarrSeriesLibraryStatus,
-): SonarrLibraryStatus {
-	return {
-		anilistId,
-		...status,
-	};
+	return status;
 }
 
 async function getSeriesStatusFromMappingAndLibrary(
@@ -413,7 +397,6 @@ async function buildMappedSeriesStatus(
 	>,
 ): Promise<CheckSeriesStatusResponse> {
 	const libraryStatus = await getSonarrLibraryStatusForRpc({
-		anilistId,
 		tvdbId: mapping.tvdbId,
 		forceVerify: options.force_verify === true,
 		sonarrLibrary: deps.sonarrLibrary,

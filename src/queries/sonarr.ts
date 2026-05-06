@@ -1,11 +1,12 @@
-/** React Query hooks for Sonarr form options and series mutations over RPC. */
+/** React Query hooks for Sonarr form options, library status, and mutations over RPC. */
 // src/queries/sonarr.ts
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAni2arrApi } from "@/rpc";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
 import { getProviderQueryScope, queryKeys } from "@/shared/queries/query-keys";
-import type { ProviderCredentials } from "@/providers";
+import type { ProviderCredentials, TvdbId } from "@/providers";
+import type { SonarrSeriesLibraryStatus } from "@/providers/sonarr/library";
 import type { SonarrSeries } from "@/providers/sonarr/types";
 import type { AddSonarrInput, UpdateSonarrInput } from "@/rpc/schemas";
 
@@ -33,6 +34,32 @@ export const useSonarrFormOptions = (options?: {
 		staleTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
 		retry: 1,
+	});
+};
+
+export const useSeriesLibraryStatus = (
+	tvdbId: TvdbId | null,
+	options?: {
+		enabled?: boolean;
+		forceVerify?: boolean;
+	},
+) => {
+	const forceVerify = options?.forceVerify === true;
+	return useQuery<SonarrSeriesLibraryStatus, ExtensionError>({
+		queryKey: queryKeys.sonarrSeriesLibraryStatus(tvdbId),
+		queryFn: async () => {
+			if (!tvdbId) {
+				throw new Error("TVDB ID is required");
+			}
+			return getAni2arrApi().getSeriesLibraryStatus({
+				tvdbId,
+				...(forceVerify ? { forceVerify } : {}),
+			});
+		},
+		enabled: !!tvdbId && (options?.enabled ?? true),
+		staleTime: forceVerify ? 0 : 5 * 60 * 1000,
+		refetchOnWindowFocus: false,
+		meta: { persist: false },
 	});
 };
 
