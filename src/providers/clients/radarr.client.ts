@@ -1,4 +1,4 @@
-/** Radarr transport client for raw Arr API requests and mutations. */
+/** LEGACY: Radarr transport client for raw Arr API requests and mutations until Radarr moves into src/providers/radarr. */
 // src/providers/clients/radarr.client.ts
 
 import { BaseProviderClient } from "./base-provider.client";

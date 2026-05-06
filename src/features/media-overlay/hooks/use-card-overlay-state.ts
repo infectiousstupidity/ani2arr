@@ -23,8 +23,8 @@ import {
 	useMovieLibraryStatus,
 	useMovieStatus,
 } from "@/providers/hooks/radarr.queries";
+import { useAddSeries } from "@/queries/sonarr";
 import {
-	useAddSeries,
 	useSeriesLibraryStatus,
 	useSeriesStatus,
 } from "@/providers/hooks/sonarr.queries";
@@ -556,26 +556,23 @@ export const useCardOverlayState = ({
 	const { isAdding, addSucceeded, addHasError, addError, reset, addedMedia } =
 		addSelection;
 	const statusData = statusQuery.data;
-	const launchSnapshot = useMemo(
-		() => {
-			if (provider === "radarr") {
-				return createLaunchSnapshot({
-					provider: "radarr",
-					status: (statusData as CheckMovieStatusResponse | undefined) ?? null,
-					source: statusData ? "cache" : "unknown",
-					verifiedAt: null,
-				});
-			}
-
+	const launchSnapshot = useMemo(() => {
+		if (provider === "radarr") {
 			return createLaunchSnapshot({
-				provider: "sonarr",
-				status: (statusData as CheckSeriesStatusResponse | undefined) ?? null,
+				provider: "radarr",
+				status: (statusData as CheckMovieStatusResponse | undefined) ?? null,
 				source: statusData ? "cache" : "unknown",
 				verifiedAt: null,
 			});
-		},
-		[provider, statusData],
-	);
+		}
+
+		return createLaunchSnapshot({
+			provider: "sonarr",
+			status: (statusData as CheckSeriesStatusResponse | undefined) ?? null,
+			source: statusData ? "cache" : "unknown",
+			verifiedAt: null,
+		});
+	}, [provider, statusData]);
 
 	useEffect(() => {
 		reset();

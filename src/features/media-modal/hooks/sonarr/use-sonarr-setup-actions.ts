@@ -2,10 +2,7 @@
 // src/features/media-modal/hooks/use-sonarr-setup-actions.ts
 
 import type { AniListId } from "@/anilist";
-import {
-	useAddSeries,
-	useUpdateSeries,
-} from "@/providers/hooks/sonarr.queries";
+import { useAddSeries, useUpdateSeries } from "@/queries/sonarr";
 import {
 	type SonarrEditMonitoringAction,
 	type SonarrFormState,

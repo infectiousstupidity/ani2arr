@@ -56,8 +56,8 @@ import {
 	useMovieLibraryStatus,
 	useMovieStatus,
 } from "@/providers/hooks/radarr.queries";
+import { useAddSeries } from "@/queries/sonarr";
 import {
-	useAddSeries,
 	useSeriesLibraryStatus,
 	useSeriesStatus,
 } from "@/providers/hooks/sonarr.queries";

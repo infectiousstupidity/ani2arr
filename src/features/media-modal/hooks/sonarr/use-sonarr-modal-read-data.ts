@@ -10,10 +10,8 @@ import {
 import { resolveTitlePreference } from "@/anilist/title-preference";
 import { defaultSonarrFormState, usePublicOptions } from "@/options";
 import type { CheckSeriesStatusResponse } from "@/rpc/types";
-import {
-	useSeriesStatus,
-	useSonarrFormOptions,
-} from "@/providers/hooks/sonarr.queries";
+import { useSonarrFormOptions } from "@/queries/sonarr";
+import { useSeriesStatus } from "@/providers/hooks/sonarr.queries";
 import { getProviderBaseUrl } from "@/options/provider-config";
 import { useAniListMedia, useAniListMetadataBatch } from "@/shared/queries";
 import * as manualMappingHelpers from "@/features/media-modal/mapping-search/current-mapping";

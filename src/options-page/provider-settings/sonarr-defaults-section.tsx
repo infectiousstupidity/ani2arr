@@ -15,7 +15,7 @@ import Button from '@/shared/ui/primitives/button';
 import type { ExtensionOptions } from '@/options';
 
 import { SaveSettingsBar } from './save-settings-bar';
-import type { useSonarrFormOptions } from '@/providers/hooks/sonarr.queries';
+import type { useSonarrFormOptions } from '@/queries/sonarr';
 
 export const SonarrDefaultsSection: React.FC<{
   actions: SettingsActions;

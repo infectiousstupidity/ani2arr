@@ -55,7 +55,9 @@ export function adaptRadarrLookupSearch(
 	);
 }
 
-export function useMappingSearch(input: UseMappingSearchInput): UseMappingSearchResult {
+export function useMappingSearch(
+	input: UseMappingSearchInput,
+): UseMappingSearchResult {
 	const query = input.query.trim();
 	const enabled = input.enabled && query.length >= 2;
 
@@ -74,13 +76,17 @@ export function useMappingSearch(input: UseMappingSearchInput): UseMappingSearch
 
 	if (input.provider === "radarr") {
 		return {
-			data: radarrSearch.data ? adaptRadarrLookupSearch(radarrSearch.data, baseUrl) : undefined,
+			data: radarrSearch.data
+				? adaptRadarrLookupSearch(radarrSearch.data, baseUrl)
+				: undefined,
 			isFetching: radarrSearch.isFetching,
 		};
 	}
 
 	return {
-		data: sonarrSearch.data ? adaptSonarrLookupSearch(sonarrSearch.data, baseUrl) : undefined,
+		data: sonarrSearch.data
+			? adaptSonarrLookupSearch(sonarrSearch.data, baseUrl)
+			: undefined,
 		isFetching: sonarrSearch.isFetching,
 	};
 }

@@ -1,4 +1,4 @@
-/** Base transport client for provider API requests. Boring HTTP wrapper. */
+/** LEGACY: Base transport client for Radarr until Radarr moves into src/providers/radarr. */
 // src/providers/clients/base-provider.client.ts
 
 import {

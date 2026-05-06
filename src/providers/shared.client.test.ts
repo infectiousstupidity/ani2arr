@@ -1,4 +1,4 @@
-/** Tests for shared Arr provider transport and connection checks. */
+/** Tests for shared Sonarr and Radarr provider transport and connection checks. */
 // src/providers/shared.client.test.ts
 
 import { afterEach, describe, expect, it, vi } from "vitest";
