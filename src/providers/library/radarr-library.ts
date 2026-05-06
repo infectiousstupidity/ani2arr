@@ -212,7 +212,7 @@ export class RadarrLibrary {
 	}
 
 	async getMovieLibraryStatus(input: {
-		providerId: TmdbId;
+		tmdbId: TmdbId;
 		forceVerify?: boolean;
 	}): Promise<RadarrMovieLibraryStatus> {
 		const leanList = await this.getLeanMovieList();
@@ -221,7 +221,7 @@ export class RadarrLibrary {
 			radarrOptions,
 			"radarr",
 		);
-		const tmdbId = input.providerId;
+		const tmdbId = input.tmdbId;
 		const cachedMovie =
 			leanList.find((movie) => movie.tmdbId === tmdbId) ?? null;
 		const existsInCache = cachedMovie !== null;
@@ -374,7 +374,7 @@ export class RadarrLibrary {
 		options: LibraryStatusOptions,
 	): Promise<CheckMovieStatusResponse> {
 		const libraryStatus = await this.getMovieLibraryStatus({
-			providerId: mapping.tmdbId,
+			tmdbId: mapping.tmdbId,
 			forceVerify: options.force_verify === true,
 		});
 		const status = buildMovieStatusResponseFromLibraryStatus({

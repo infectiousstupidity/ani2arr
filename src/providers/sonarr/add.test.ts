@@ -39,10 +39,7 @@ describe("addSonarrSeries", () => {
 			folder: "Lookup Series [tvdb-34]",
 		};
 		const client = {
-			lookupSeries: vi.fn(async () => [
-				{ ...lookupSeries, tvdbId: parseTvdbId(35) },
-				lookupSeries,
-			]),
+			lookupSeriesByTvdbId: vi.fn(async () => lookupSeries),
 			addSeries: vi.fn(async () => createdSeries),
 			getTags: vi.fn(async () => [{ id: parseProviderTagId(7), label: "Keep" }]),
 			createTag: vi.fn(async () => ({
@@ -75,8 +72,8 @@ describe("addSonarrSeries", () => {
 		);
 
 		expect(result).toBe(createdSeries);
-		expect(client.lookupSeries).toHaveBeenCalledWith("tvdb:34", credentials);
-		expect(client.createTag).toHaveBeenCalledWith(credentials, "new-tag");
+		expect(client.lookupSeriesByTvdbId).toHaveBeenCalledWith(tvdbId, credentials);
+		expect(client.createTag).toHaveBeenCalledWith("new-tag", credentials);
 		expect(client.addSeries).toHaveBeenCalledWith(
 			{
 				...lookupSeries,
@@ -99,13 +96,11 @@ describe("addSonarrSeries", () => {
 
 	it("does not add the series when tag creation fails", async () => {
 		const client = {
-			lookupSeries: vi.fn(async () => [
-				{
-					title: "Example Series",
-					tvdbId: parseTvdbId(34),
-					folder: "Example Series [tvdb-34]",
-				},
-			]),
+			lookupSeriesByTvdbId: vi.fn(async () => ({
+				title: "Example Series",
+				tvdbId: parseTvdbId(34),
+				folder: "Example Series [tvdb-34]",
+			})),
 			addSeries: vi.fn(),
 			getTags: vi.fn(async () => []),
 			createTag: vi.fn(async () => {
@@ -142,13 +137,7 @@ describe("addSonarrSeries", () => {
 
 	it("does not resolve tags or add when Sonarr lookup has no matching TVDB result", async () => {
 		const client = {
-			lookupSeries: vi.fn(async () => [
-				{
-					title: "Different Series",
-					tvdbId: parseTvdbId(35),
-					folder: "Different Series [tvdb-35]",
-				},
-			]),
+			lookupSeriesByTvdbId: vi.fn(async () => null),
 			addSeries: vi.fn(),
 			getTags: vi.fn(async () => []),
 			createTag: vi.fn(),
@@ -187,7 +176,7 @@ describe("addSonarrSeries", () => {
 
 	it("does not resolve or create tags when required add fields are missing", async () => {
 		const client = {
-			lookupSeries: vi.fn(async () => []),
+			lookupSeriesByTvdbId: vi.fn(async () => null),
 			addSeries: vi.fn(),
 			getTags: vi.fn(async () => []),
 			createTag: vi.fn(),

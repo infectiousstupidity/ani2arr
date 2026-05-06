@@ -154,14 +154,10 @@ export function createLibraryHandlers(
 
 		async getMovieLibraryStatus(input) {
 			const parsedInput = v.parse(MovieLibraryStatusInputSchema, input);
-			const status = await radarrLibrary.getMovieLibraryStatus({
-				providerId: parsedInput.providerId,
+			return radarrLibrary.getMovieLibraryStatus({
+				tmdbId: parsedInput.tmdbId,
 				forceVerify: parsedInput.forceVerify === true,
 			});
-			return {
-				anilistId: parsedInput.anilistId,
-				...status,
-			};
 		},
 
 		async addToSonarr(input) {

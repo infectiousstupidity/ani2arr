@@ -123,11 +123,11 @@ export function createSonarrHandlers(
 			);
 			let inCatalog = false;
 			try {
-				const hits = await sonarrLookupClient.lookupSeries(
-					`tvdb:${parsedInput.tvdbId}`,
+				const lookup = await sonarrLookupClient.lookupSeriesByTvdbId(
+					parsedInput.tvdbId,
 					credentials,
 				);
-				inCatalog = hits.some((h) => h?.tvdbId === parsedInput.tvdbId);
+				inCatalog = lookup !== null;
 			} catch {
 				// ignore
 			}

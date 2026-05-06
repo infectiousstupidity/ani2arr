@@ -170,12 +170,12 @@ describe("createProviderTitleLookup", () => {
 
 describe("createSonarrTitleLookup", () => {
 	it("looks up exact TVDB matches with Sonarr's term lookup", async () => {
-		const lookupSeries = vi.fn(async () => [
-			{ title: "Wrong Series", tvdbId: parseTvdbId(2) },
-			{ title: "Attack on Titan", tvdbId: parseTvdbId(1) },
-		]);
+		const lookupSeriesByTvdbId = vi.fn(async () => ({
+			title: "Attack on Titan",
+			tvdbId: parseTvdbId(1),
+		}));
 		const lookup = createSonarrTitleLookup(
-			{ lookupSeries } as never,
+			{ lookupSeriesByTvdbId } as never,
 			createCache(),
 		);
 
@@ -183,6 +183,9 @@ describe("createSonarrTitleLookup", () => {
 			lookup.lookupByProviderId?.(parseTvdbId(1), TEST_CREDENTIALS),
 		).resolves.toEqual({ title: "Attack on Titan", tvdbId: parseTvdbId(1) });
 
-		expect(lookupSeries).toHaveBeenCalledWith("tvdb:1", TEST_CREDENTIALS);
+		expect(lookupSeriesByTvdbId).toHaveBeenCalledWith(
+			parseTvdbId(1),
+			TEST_CREDENTIALS,
+		);
 	});
 });

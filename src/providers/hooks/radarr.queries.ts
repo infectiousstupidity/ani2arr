@@ -2,12 +2,13 @@
 // src/providers/hooks/radarr.queries.ts
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AniListId } from "@/anilist";
 import { getAni2arrApi } from "@/rpc";
 import type {
 	CheckMovieStatusResponse,
-	RadarrLibraryStatus,
 	RadarrLookupOutput,
 } from "@/rpc/types";
+import type { RadarrMovieLibraryStatus } from "@/providers/radarr/library";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
 import { getProviderQueryScope, queryKeys } from "@/shared/queries/query-keys";
 import {
@@ -98,19 +99,22 @@ export const useMovieStatus = (
 };
 
 export const useMovieLibraryStatus = (
-	payload: Pick<MovieLibraryStatusInput, "anilistId" | "providerId"> | null,
+	payload: {
+		anilistId: AniListId;
+		tmdbId: MovieLibraryStatusInput["tmdbId"];
+	} | null,
 	options?: {
 		enabled?: boolean;
 		forceVerify?: boolean;
 	},
 ) => {
 	const forceVerify = options?.forceVerify === true;
-	return useQuery<RadarrLibraryStatus, ExtensionError>({
+	return useQuery<RadarrMovieLibraryStatus, ExtensionError>({
 		queryKey: payload
 			? queryKeys.providerLibraryStatus(
 					"radarr",
 					payload.anilistId,
-					payload.providerId,
+					payload.tmdbId,
 				)
 			: [...queryKeys.seriesStatusRoot("radarr"), "providerLibraryStatus", null],
 		queryFn: async () => {
@@ -118,8 +122,7 @@ export const useMovieLibraryStatus = (
 				throw new Error("Movie library status payload is required");
 			}
 			const request: MovieLibraryStatusInput = {
-				anilistId: payload.anilistId,
-				providerId: payload.providerId,
+				tmdbId: payload.tmdbId,
 			};
 			if (forceVerify) {
 				request.forceVerify = true;
@@ -128,7 +131,7 @@ export const useMovieLibraryStatus = (
 		},
 		enabled:
 			!!payload?.anilistId &&
-			!!payload.providerId &&
+			!!payload.tmdbId &&
 			(options?.enabled ?? true),
 		staleTime: forceVerify ? 0 : 5 * 60 * 1000,
 		refetchOnWindowFocus: false,

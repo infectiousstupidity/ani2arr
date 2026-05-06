@@ -81,6 +81,14 @@ export class SonarrClient extends ProviderApiClient {
 		return v.parse(v.array(SonarrLookupSeriesSchema), json);
 	}
 
+	public async lookupSeriesByTvdbId(
+		tvdbId: TvdbId,
+		credentials: ProviderCredentials,
+	): Promise<SonarrLookupSeries | null> {
+		const hits = await this.lookupSeries(`tvdb:${tvdbId}`, credentials);
+		return hits.find((series) => series.tvdbId === tvdbId) ?? null;
+	}
+
 	public async addSeries(
 		payload: SonarrAddSeriesPayload,
 		credentials: ProviderCredentials,

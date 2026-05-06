@@ -31,7 +31,7 @@ const defaultSeriesSnapshotCache = createTtlCache<SonarrSeriesSnapshot[]>(
 
 type SonarrLibraryClient = Pick<
 	SonarrClient,
-	"getAllSeries" | "findSeriesByTvdbId" | "lookupSeries"
+	"getAllSeries" | "findSeriesByTvdbId" | "lookupSeriesByTvdbId"
 >;
 
 type SonarrLibraryDeps = {
@@ -176,8 +176,7 @@ export class SonarrLibrary {
 
 		let lookupSeries: SonarrLookupSeries | null = null;
 		try {
-			const hits = await this.client.lookupSeries(`tvdb:${tvdbId}`, credentials);
-			lookupSeries = hits.find((hit) => hit.tvdbId === tvdbId) ?? null;
+			lookupSeries = await this.client.lookupSeriesByTvdbId(tvdbId, credentials);
 		} catch (error) {
 			logError(
 				normalizeError(error),

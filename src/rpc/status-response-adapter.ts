@@ -7,11 +7,11 @@ import type {
 	AcceptedMappingSource,
 } from "@/mapping/types";
 import type { TmdbId, TvdbId } from "@/providers";
+import type { RadarrMovieLibraryStatus } from "@/providers/radarr/library";
 import type { SonarrSeriesLibraryStatus } from "@/providers/sonarr/library";
 import type {
 	CheckMovieStatusResponse,
 	CheckSeriesStatusResponse,
-	RadarrLibraryStatus,
 } from "@/rpc/types";
 
 export function buildSeriesStatusResponseFromLibraryStatus(input: {
@@ -39,7 +39,7 @@ export function buildMovieStatusResponseFromLibraryStatus(input: {
 	providerId: TmdbId;
 	mappingSource?: AcceptedMappingSource;
 	mappingReason?: AcceptedMappingReason;
-	libraryStatus: RadarrLibraryStatus;
+	libraryStatus: RadarrMovieLibraryStatus;
 }): CheckMovieStatusResponse {
 	return {
 		providerId: input.providerId,

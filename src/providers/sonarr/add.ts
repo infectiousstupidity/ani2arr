@@ -37,7 +37,7 @@ type AddSonarrSeriesInput = {
 type AddSonarrSeriesDeps = {
 	client: Pick<
 		SonarrClient,
-		"lookupSeries" | "addSeries" | "getTags" | "createTag"
+		"lookupSeriesByTvdbId" | "addSeries" | "getTags" | "createTag"
 	>;
 };
 
@@ -87,7 +87,7 @@ export async function addSonarrSeries(
 }
 
 async function resolveSonarrAddPayload(input: {
-	api: Pick<SonarrClient, "lookupSeries" | "getTags" | "createTag">;
+	api: Pick<SonarrClient, "lookupSeriesByTvdbId" | "getTags" | "createTag">;
 	credentials: ProviderCredentials;
 	defaults: SonarrFormState;
 	form: SonarrFormState;
@@ -151,9 +151,7 @@ async function resolveSonarrAddPayload(input: {
 		);
 	}
 
-	const lookupResults = await api.lookupSeries(`tvdb:${tvdbId}`, credentials);
-	const series =
-		lookupResults.find((candidate) => candidate.tvdbId === tvdbId) ?? null;
+	const series = await api.lookupSeriesByTvdbId(tvdbId, credentials);
 
 	if (!series) {
 		throw createError(

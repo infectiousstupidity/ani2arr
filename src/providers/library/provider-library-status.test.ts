@@ -204,7 +204,7 @@ describe("legacy Radarr provider library", () => {
 
 		await expect(
 			library.getMovieLibraryStatus({
-				providerId: parseTmdbId(456),
+				tmdbId: parseTmdbId(456),
 				forceVerify: true,
 			}),
 		).resolves.toMatchObject({

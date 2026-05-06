@@ -18,7 +18,7 @@ export type ApiHandlerDeps = {
 	sonarrClient: CurrentSonarrClient;
 	sonarrLookupClient: Pick<
 		CurrentSonarrClient,
-		"lookupSeries" | "findSeriesByTvdbId"
+		"lookupSeries" | "findSeriesByTvdbId" | "lookupSeriesByTvdbId"
 	>;
 	RadarrClient: RadarrClient;
 	anilistMediaService: AniListMediaService;

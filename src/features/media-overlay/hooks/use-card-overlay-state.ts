@@ -23,8 +23,11 @@ import {
 	useMovieLibraryStatus,
 	useMovieStatus,
 } from "@/providers/hooks/radarr.queries";
-import { useAddSeries, useSeriesLibraryStatus } from "@/queries/sonarr";
-import { useSeriesStatus } from "@/providers/hooks/sonarr.queries";
+import {
+	useAddSeries,
+	useSeriesLibraryStatus,
+	useSeriesStatus,
+} from "@/queries/sonarr";
 import type {
 	CheckMovieStatusResponse,
 	CheckSeriesStatusResponse,
@@ -463,7 +466,7 @@ export const useCardOverlayState = ({
 		mappedRadarrProviderId
 			? {
 					anilistId,
-					providerId: mappedRadarrProviderId,
+					tmdbId: mappedRadarrProviderId,
 				}
 			: null,
 		{
