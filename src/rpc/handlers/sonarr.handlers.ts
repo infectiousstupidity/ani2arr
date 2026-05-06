@@ -117,7 +117,7 @@ export function createSonarrHandlers(
 		async validateTvdbId(input) {
 			const parsedInput = v.parse(ValidateTvdbInputSchema, input);
 			const credentials = await providerConfig.requireCredentials("sonarr");
-			const found = await sonarrLookupClient.getSeriesByTvdbId(
+			const found = await sonarrLookupClient.findSeriesByTvdbId(
 				parsedInput.tvdbId,
 				credentials,
 			);

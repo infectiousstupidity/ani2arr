@@ -50,18 +50,18 @@ describe("updateSonarrSeries", () => {
 			monitored: true,
 		};
 		const client = {
-			getSeriesByTvdbId: vi.fn(async () => existingSeries),
+			findSeriesByTvdbId: vi.fn(async () => existingSeries),
 			getSeriesById: vi
 				.fn()
 				.mockResolvedValueOnce(existingSeries)
 				.mockResolvedValueOnce(refreshedSeries),
-			getGeneratedSeriesFolder: vi.fn(async () => ({
+			getSeriesFolderName: vi.fn(async () => ({
 				folder: "Example Series [tvdb-34]",
 			})),
 			getTags: vi.fn(async () => [{ id: parseProviderTagId(7), label: "Keep" }]),
 			createTag: vi.fn(),
 			updateSeries: vi.fn(async () => updatedSeries),
-			applyMonitoringAction: vi.fn(async () => {}),
+			setSeriesMonitorMode: vi.fn(async () => {}),
 		};
 
 		const result = await updateSonarrSeries(
@@ -101,12 +101,12 @@ describe("updateSonarrSeries", () => {
 			credentials,
 			{ moveFiles: true },
 		);
-		expect(client.applyMonitoringAction).toHaveBeenCalledWith(
+		expect(client.setSeriesMonitorMode).toHaveBeenCalledWith(
 			seriesId,
 			"all",
 			credentials,
 		);
-		expect(client.getGeneratedSeriesFolder).toHaveBeenCalledWith(
+		expect(client.getSeriesFolderName).toHaveBeenCalledWith(
 			seriesId,
 			credentials,
 		);
@@ -131,13 +131,13 @@ describe("updateSonarrSeries", () => {
 			tags: [],
 		};
 		const client = {
-			getSeriesByTvdbId: vi.fn(async () => existingSeries),
+			findSeriesByTvdbId: vi.fn(async () => existingSeries),
 			getSeriesById: vi.fn(async () => existingSeries),
-			getGeneratedSeriesFolder: vi.fn(),
+			getSeriesFolderName: vi.fn(),
 			getTags: vi.fn(async () => []),
 			createTag: vi.fn(),
 			updateSeries: vi.fn(async () => existingSeries),
-			applyMonitoringAction: vi.fn(async () => {
+			setSeriesMonitorMode: vi.fn(async () => {
 				throw new Error("Season pass failed");
 			}),
 		};
@@ -166,6 +166,6 @@ describe("updateSonarrSeries", () => {
 			},
 		});
 		expect(client.updateSeries).toHaveBeenCalledOnce();
-		expect(client.getGeneratedSeriesFolder).not.toHaveBeenCalled();
+		expect(client.getSeriesFolderName).not.toHaveBeenCalled();
 	});
 });

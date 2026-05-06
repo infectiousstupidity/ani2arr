@@ -39,13 +39,13 @@ type UpdateSonarrSeriesInput = {
 type UpdateSonarrSeriesDeps = {
 	client: Pick<
 		SonarrClient,
-		| "getSeriesByTvdbId"
+		| "findSeriesByTvdbId"
 		| "getSeriesById"
-		| "getGeneratedSeriesFolder"
+		| "getSeriesFolderName"
 		| "getTags"
 		| "createTag"
 		| "updateSeries"
-		| "applyMonitoringAction"
+		| "setSeriesMonitorMode"
 	>;
 };
 
@@ -91,7 +91,7 @@ export async function updateSonarrSeries(
 	}
 
 	try {
-		await deps.client.applyMonitoringAction(
+		await deps.client.setSeriesMonitorMode(
 			resolvedUpdate.seriesId,
 			input.monitoringAction,
 			input.credentials,
@@ -120,9 +120,9 @@ export async function updateSonarrSeries(
 async function resolveSonarrSeriesUpdate(input: {
 	api: Pick<
 		SonarrClient,
-		| "getSeriesByTvdbId"
+		| "findSeriesByTvdbId"
 		| "getSeriesById"
-		| "getGeneratedSeriesFolder"
+		| "getSeriesFolderName"
 		| "getTags"
 		| "createTag"
 	>;
@@ -140,7 +140,7 @@ async function resolveSonarrSeriesUpdate(input: {
 		);
 	}
 
-	const existing = await api.getSeriesByTvdbId(tvdbId, credentials);
+	const existing = await api.findSeriesByTvdbId(tvdbId, credentials);
 	if (!existing) {
 		throw createError(
 			ErrorCode.VALIDATION_ERROR,
@@ -206,12 +206,12 @@ async function resolveSonarrSeriesUpdate(input: {
 }
 
 async function resolveMovedSeriesPath(input: {
-	api: Pick<SonarrClient, "getGeneratedSeriesFolder">;
+	api: Pick<SonarrClient, "getSeriesFolderName">;
 	credentials: ProviderCredentials;
 	rootFolderPath: string;
 	seriesId: SonarrSeriesId;
 }): Promise<string> {
-	const generated = await input.api.getGeneratedSeriesFolder(
+	const generated = await input.api.getSeriesFolderName(
 		input.seriesId,
 		input.credentials,
 	);

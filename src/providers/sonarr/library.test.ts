@@ -95,8 +95,8 @@ describe("SonarrLibrary library status", () => {
 		const series = createSonarrSeries();
 		const cache = createMemoryCache<SonarrSeriesSnapshot[]>([]);
 		const client = {
-			getSeries: vi.fn(async () => []),
-			getSeriesByTvdbId: vi.fn(async () => series),
+			getAllSeries: vi.fn(async () => []),
+			findSeriesByTvdbId: vi.fn(async () => series),
 			lookupSeries: vi.fn(),
 		};
 		const onCacheChanged = vi.fn();
@@ -116,7 +116,7 @@ describe("SonarrLibrary library status", () => {
 			series: createSnapshot(),
 		});
 
-		expect(client.getSeriesByTvdbId).toHaveBeenCalledWith(
+		expect(client.findSeriesByTvdbId).toHaveBeenCalledWith(
 			parseTvdbId(123),
 			credentials,
 		);
@@ -130,8 +130,8 @@ describe("SonarrLibrary library status", () => {
 			createSnapshot({ title: "Stale" }),
 		]);
 		const client = {
-			getSeries: vi.fn(async () => []),
-			getSeriesByTvdbId: vi.fn(async () => null),
+			getAllSeries: vi.fn(async () => []),
+			findSeriesByTvdbId: vi.fn(async () => null),
 			lookupSeries: vi.fn(async () => [createLookupSeries()]),
 		};
 		const onCacheChanged = vi.fn();
