@@ -18,6 +18,7 @@ import { SonarrClient } from "@/providers/sonarr/client";
 import { SonarrLibrary } from "@/providers/sonarr/library";
 import { RadarrClient } from "@/providers/clients/radarr.client";
 import {
+	getProviderHostPermissionPattern,
 	hasProviderHostPermission,
 	removeProviderHostPermission,
 } from "@/providers/settings/host-permissions";
@@ -288,16 +289,33 @@ export const createApiDeps = (): ApiHandlerDeps => {
 	const removeConfiguredProviderHostPermissions = async (
 		options: ExtensionOptions,
 	): Promise<void> => {
-		const removals = [
+		const configuredUrls = [
 			{ provider: "sonarr" as const, url: options.providers.sonarr.url },
 			{ provider: "radarr" as const, url: options.providers.radarr.url },
 		];
+		const removalsByPattern = new Map<
+			string,
+			{ provider: Provider; url: string }
+		>();
+
+		for (const { provider, url } of configuredUrls) {
+			if (!url) continue;
+
+			const pattern = getProviderHostPermissionPattern(String(url));
+			if (!pattern.ok) {
+				logError(
+					normalizeError(pattern.error),
+					`Ani2arrApi:resetExtensionState:${provider}:removePermission`,
+				);
+				continue;
+			}
+
+			removalsByPattern.set(pattern.value, { provider, url: String(url) });
+		}
 
 		await Promise.all(
-			removals.map(async ({ provider, url }) => {
-				if (!url) return;
-
-				const removal = await removeProviderHostPermission(String(url));
+			[...removalsByPattern.values()].map(async ({ provider, url }) => {
+				const removal = await removeProviderHostPermission(url);
 				if (!removal.ok) {
 					logError(
 						normalizeError(removal.error),

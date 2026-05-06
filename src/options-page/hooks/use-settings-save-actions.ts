@@ -195,8 +195,12 @@ export function useSettingsSaveActions({
 		);
 
 		// Post-save cleanup and invalidation
-		for (const { provider, current, previous, changed } of providerStates) {
-			await cleanupPreviousPermission(provider, previous, current);
+		for (const { provider, previous, changed } of providerStates) {
+			await cleanupPreviousPermission(
+				provider,
+				previous,
+				normalizedSettings,
+			);
 
 			if (changed) {
 				invalidateProviderQueries(queryClient, provider);

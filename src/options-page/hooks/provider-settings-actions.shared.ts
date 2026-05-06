@@ -12,7 +12,7 @@ import {
 	type NormalizedProviderConnection,
 } from "@/options";
 import { getProviderLabel } from "@/providers/provider-labels";
-import type { Provider, ProviderCredentials } from "@/providers";
+import { PROVIDERS, type Provider, type ProviderCredentials } from "@/providers";
 import {
 	removeProviderHostPermission,
 	requestProviderHostPermission,
@@ -296,10 +296,25 @@ export async function requestPermissionForCredentialsOrSetError(
 export async function cleanupPreviousPermission(
 	provider: Provider,
 	previous: NormalizedProviderConnection | null,
-	current: NormalizedProviderConnection | null,
+	currentSettings: ExtensionOptions,
 	context: "save" | "disconnect" = "save",
 ): Promise<void> {
-	if (!previous || previous.permissionPattern === current?.permissionPattern) {
+	if (!previous) {
+		return;
+	}
+
+	const activePermissionPatterns = new Set(
+		PROVIDERS.map((configuredProvider) =>
+			normalizeProviderConnectionSettings(
+				currentSettings,
+				configuredProvider,
+			),
+		)
+			.filter((connection) => connection !== null)
+			.map((connection) => connection.permissionPattern),
+	);
+
+	if (activePermissionPatterns.has(previous.permissionPattern)) {
 		return;
 	}
 

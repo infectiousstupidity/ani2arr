@@ -1,5 +1,5 @@
 /** Browser host-permission helpers for validated provider connection URLs. */
-// src/providers/permissions/host-permissions.ts
+// src/providers/settings/host-permissions.ts
 
 import { browser } from "wxt/browser";
 import {
@@ -20,7 +20,7 @@ export function getProviderHostPermissionPattern(
 		return normalized;
 	}
 
-	return { ok: true, value: `${normalized.value.normalizedUrl}/*` };
+	return { ok: true, value: `${normalized.value.url.origin}/*` };
 }
 
 export async function requestProviderHostPermission(
@@ -57,14 +57,7 @@ export async function requestProviderHostPermission(
 
 	pendingPermissionRequests.set(pattern.value, requestPromise);
 
-	try {
-		return await requestPromise;
-	} catch {
-		return {
-			ok: false as const,
-			error: `Permission request for origin '${pattern.value}' failed unexpectedly.`,
-		};
-	}
+	return requestPromise;
 }
 
 export async function hasProviderHostPermission(
