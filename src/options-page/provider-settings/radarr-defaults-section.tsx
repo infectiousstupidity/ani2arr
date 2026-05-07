@@ -5,7 +5,7 @@ import React from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { RotateCcw } from 'lucide-react';
 
-import { RadarrAddOptionsFields } from '@/components/provider-add-options/radarr-add-options-fields';
+import { RadarrAddOptionsFields } from '@/features/provider-setup/radarr-add-options-fields';
 import type { SettingsActions } from '../hooks/use-settings-actions';
 import type { RadarrFormState } from '@/providers/radarr/form-state';
 import Button from '@/shared/ui/primitives/button';

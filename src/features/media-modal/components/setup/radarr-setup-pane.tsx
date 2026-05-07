@@ -2,8 +2,8 @@
 // src/features/media-modal/components/setup/radarr-setup-pane.tsx
 
 import type { ComponentProps } from "react";
-import { RadarrAddOptionsFields } from "@/components/provider-add-options/radarr-add-options-fields";
-import { RadarrEditOptionsFields } from "@/components/provider-add-options/radarr-edit-options-fields";
+import { RadarrAddOptionsFields } from "@/features/provider-setup/radarr-add-options-fields";
+import { RadarrEditOptionsFields } from "@/features/provider-setup/radarr-edit-options-fields";
 import { BaseProviderSetupPanel } from "./provider-setup-panel";
 import type { RadarrSetupFormState } from "../../hooks/radarr/use-radarr-setup-form";
 

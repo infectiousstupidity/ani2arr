@@ -2,8 +2,8 @@
 // src/features/media-modal/components/setup/sonarr-setup-pane.tsx
 
 import type { ComponentProps } from "react";
-import { SonarrAddOptionsFields } from "@/components/provider-add-options/sonarr-add-options-fields";
-import { SonarrEditOptionsFields } from "@/components/provider-add-options/sonarr-edit-options-fields";
+import { SonarrAddOptionsFields } from "@/features/provider-setup/sonarr-add-options-fields";
+import { SonarrEditOptionsFields } from "@/features/provider-setup/sonarr-edit-options-fields";
 import { BaseProviderSetupPanel } from "./provider-setup-panel";
 import type { SonarrSetupFormState } from "../../hooks/sonarr/use-sonarr-setup-form";
 

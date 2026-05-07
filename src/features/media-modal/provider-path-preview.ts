@@ -1,7 +1,7 @@
 /** Builds provider setup path preview props from provider-owned folder data. */
 // src/features/media-modal/provider-path-preview.ts
 
-import type { ProviderRootFolderPathPreview } from "@/components/provider-add-options/provider-root-folder-select";
+import type { ProviderRootFolderPathPreview } from "@/features/provider-setup/provider-root-folder-select";
 import {
 	extractPathLeaf,
 	extractRelativeFolder,
