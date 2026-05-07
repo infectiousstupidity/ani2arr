@@ -28,7 +28,7 @@ import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import { getProviderLabel } from "@/providers/provider-labels";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
-import type { RadarrFormState } from "@/providers/settings/provider-settings.schema";
+import type { RadarrFormState } from "@/providers/radarr/form-state";
 import { buildProviderOpenUrl } from "@/providers/provider-links";
 import { useCardOverlayState } from "../hooks/use-card-overlay-state";
 import {

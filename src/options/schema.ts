@@ -8,22 +8,11 @@ import {
 	createDefaultSonarrFormState as createDefaultSonarrFormStateValue,
 } from "@/providers/sonarr/form-state";
 import {
+	createDefaultRadarrFormState,
 	RadarrDefaultsSchema,
-	RadarrSettingsSchema,
-	normalizeRadarrFormState,
-} from "@/providers/settings/provider-settings.schema";
+} from "@/providers/radarr/form-state";
 import type { ExtensionOptions } from "./types";
 import { createDefaultUiOptions, UiOptionsSchema } from "./ui-schema";
-
-export const createDefaultRadarrFormState = () =>
-	normalizeRadarrFormState({
-		...v.parse(RadarrDefaultsSchema, {}),
-		monitored: true,
-		minimumAvailability: "released",
-		addOptions: {
-			searchForMovie: true,
-		},
-	});
 
 const createDefaultSonarrProviderSettings = () => ({
 	url: "",
@@ -50,7 +39,12 @@ const SonarrProviderSettingsSchema = v.object({
 });
 
 const RadarrProviderSettingsSchema = v.object({
-	...RadarrSettingsSchema.entries,
+	url: v.string(),
+	apiKey: v.string(),
+	preferredAniListTitleLanguage: v.fallback(
+		AniListTitleLanguageSchema,
+		"english",
+	),
 	defaults: v.fallback(RadarrDefaultsSchema, createDefaultRadarrFormState()),
 });
 
@@ -87,5 +81,8 @@ export { createDefaultSonarrFormState } from "@/providers/sonarr/form-state";
 export {
 	createDefaultSonarrFormState as defaultSonarrFormState,
 } from "@/providers/sonarr/form-state";
-export { createDefaultRadarrFormState as defaultRadarrFormState };
+export {
+	createDefaultRadarrFormState,
+	createDefaultRadarrFormState as defaultRadarrFormState,
+} from "@/providers/radarr/form-state";
 export { createDefaultUiOptions as defaultUiOptions } from "./ui-schema";

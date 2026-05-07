@@ -9,7 +9,7 @@ import {
   MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS,
   type RadarrFormState,
   type RadarrMinimumAvailability,
-} from '@/providers/settings/provider-settings.schema';
+} from '@/providers/radarr/form-state';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import { cn } from '@/shared/utils/cn';
 

@@ -15,7 +15,7 @@ import {
 } from "@/providers";
 import { getProviderLabel } from "@/providers/provider-labels";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
-import type { RadarrFormState } from "@/providers/settings/provider-settings.schema";
+import type { RadarrFormState } from "@/providers/radarr/form-state";
 import {
 	useAddMovie,
 	useMovieLibraryStatus,

@@ -4,7 +4,7 @@ import { defineProxyService } from "@webext-core/proxy-service";
 import type { AniListId } from "@/anilist";
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
-import type { RadarrFormState } from "@/providers/settings/provider-settings.schema";
+import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import type {
 	Provider,

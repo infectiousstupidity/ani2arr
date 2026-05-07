@@ -3,7 +3,7 @@
 
 import { BaseProviderClient } from "./base-provider.client";
 import { createError, ErrorCode } from "@/shared/errors";
-import type { RadarrMinimumAvailability } from "@/providers/settings/provider-settings.schema";
+import type { RadarrMinimumAvailability } from "@/providers/radarr/form-state";
 import {
 	parseProviderQualityProfileId,
 	parseProviderTagId,

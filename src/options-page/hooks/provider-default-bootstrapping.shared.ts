@@ -13,7 +13,7 @@ import {
 import {
 	normalizeRadarrFormState,
 	type RadarrFormState,
-} from "@/providers/settings/provider-settings.schema";
+} from "@/providers/radarr/form-state";
 
 export function bootstrapSonarrDefaults(
 	defaults: Partial<SonarrFormState> | null | undefined,

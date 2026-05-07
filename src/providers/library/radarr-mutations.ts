@@ -7,7 +7,7 @@ import type {
 	RadarrClient,
 	UpdateRadarrMoviePatch,
 } from "@/providers/clients/radarr.client";
-import type { RadarrFormState } from "@/providers/settings/provider-settings.schema";
+import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type {
 	ProviderCredentials,
 	RadarrMovie,
