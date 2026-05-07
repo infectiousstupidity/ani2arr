@@ -6,6 +6,7 @@ import type { Ani2arrApi } from "@/rpc";
 import {
 	parseTmdbIdOrNull,
 	type ProviderCredentials,
+	type ProviderFormOptions,
 	type TmdbId,
 } from "@/providers";
 import {
@@ -56,7 +57,19 @@ export function createRadarrHandlers(
 				RadarrClient.getTags(credentials),
 			]);
 
-			return { qualityProfiles, rootFolders, tags };
+			const formOptions: ProviderFormOptions = {
+				qualityProfiles,
+				rootFolders: rootFolders.map((folder) => ({
+					id: folder.id,
+					path: folder.path,
+					...(folder.freeSpace === undefined
+						? {}
+						: { freeSpace: folder.freeSpace }),
+				})),
+				tags,
+			};
+
+			return formOptions;
 		},
 
 		async searchRadarr(input) {
@@ -65,7 +78,7 @@ export function createRadarrHandlers(
 			await manualMappingsReady;
 
 			const [results, library] = await Promise.all([
-				RadarrClient.lookupMovieByTerm(parsedInput.term, credentials),
+				RadarrClient.lookupMovies(parsedInput.term, credentials),
 				radarrLibrary.getLeanMovieList(),
 			]);
 
@@ -99,7 +112,7 @@ export function createRadarrHandlers(
 		async validateTmdbId(input) {
 			const parsedInput = v.parse(ValidateTmdbInputSchema, input);
 			const credentials = await providerConfig.requireCredentials("radarr");
-			const found = await RadarrClient.getMovieByTmdbId(
+			const found = await RadarrClient.findMovieByTmdbId(
 				parsedInput.tmdbId,
 				credentials,
 			);

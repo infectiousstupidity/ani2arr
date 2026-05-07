@@ -2,10 +2,8 @@
 // src/rpc/handlers/library.handlers.ts
 
 import * as v from "valibot";
-import {
-	addRadarrMovie,
-	updateRadarrMovie,
-} from "@/providers/library/radarr-mutations";
+import { addRadarrMovie } from "@/providers/radarr/add";
+import { updateRadarrMovie } from "@/providers/radarr/edit";
 import { addSonarrSeries } from "@/providers/sonarr/add";
 import { updateSonarrSeries } from "@/providers/sonarr/edit";
 import {
@@ -191,19 +189,15 @@ export function createLibraryHandlers(
 			const created = await addRadarrMovie(
 				{
 					tmdbId: parsedInput.tmdbId,
-					title: parsedInput.title,
 					form: parsedInput.form,
 					defaults: options.providers.radarr.defaults,
 					credentials,
-					...(parsedInput.metadata === undefined
-						? {}
-						: { metadata: parsedInput.metadata }),
 				},
 				{
 					client: RadarrClient,
-					cache: radarrLibrary,
 				},
 			);
+			await radarrLibrary.addMovieToCache(created);
 			scheduleLibraryRefresh("radarr", options);
 			await bumpLibraryRevision("radarr");
 			return created;
@@ -249,15 +243,14 @@ export function createLibraryHandlers(
 			const updated = await updateRadarrMovie(
 				{
 					tmdbId: parsedInput.tmdbId,
-					title: parsedInput.title,
 					form: parsedInput.form,
 					credentials,
 				},
 				{
 					client: RadarrClient,
-					cache: radarrLibrary,
 				},
 			);
+			await radarrLibrary.addMovieToCache(updated);
 			scheduleLibraryRefresh("radarr");
 			await bumpLibraryRevision("radarr");
 			return updated;

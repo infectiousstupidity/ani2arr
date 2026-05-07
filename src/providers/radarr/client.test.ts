@@ -177,7 +177,10 @@ describe("RadarrClient", () => {
 			tmdbId: parseTmdbId(456),
 			qualityProfileId: parseProviderQualityProfileId(2),
 			rootFolderPath: "/movies-4k",
+			monitored: true,
+			minimumAvailability: "released",
 			tags: [parseProviderTagId(7)],
+			addOptions: { searchForMovie: true },
 		};
 
 		await expect(createClient().addMovie(payload, credentials)).resolves.toEqual(

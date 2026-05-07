@@ -1,7 +1,7 @@
 /** LEGACY: Radarr-backed library cache and status lookup until Radarr moves into src/providers/radarr. */
 // src/providers/library/radarr-library.ts
 
-import type { RadarrClient } from "@/providers/clients/radarr.client";
+import type { RadarrClient } from "@/providers/radarr/client";
 import type { AniListId } from "@/anilist";
 import type { StatusInput } from "@/rpc/schemas";
 import type { CheckMovieStatusResponse } from "@/rpc/types";
@@ -238,7 +238,7 @@ export class RadarrLibrary {
 		const credentials = getProviderCredentials(radarrOptions, "radarr")!;
 		let liveMovie: RadarrMovie | null = null;
 		try {
-			liveMovie = await this.radarrClient.getMovieByTmdbId(tmdbId, credentials);
+			liveMovie = await this.radarrClient.findMovieByTmdbId(tmdbId, credentials);
 		} catch (error) {
 			logError(
 				normalizeError(error),

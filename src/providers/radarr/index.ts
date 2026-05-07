@@ -1,8 +1,14 @@
 /** Public exports for the Radarr provider-domain implementation. */
 // src/providers/radarr/index.ts
 
-export type { RadarrAddMoviePayload } from "./add";
+export {
+	addRadarrMovie,
+	buildAddRadarrMoviePayload,
+	type RadarrAddMoviePayload,
+} from "./add";
 export { RadarrClient } from "./client";
+export { buildUpdateRadarrMoviePayload, updateRadarrMovie } from "./edit";
 export type { RadarrMovieLibraryStatus } from "./library";
 export * from "./schemas";
+export { normalizeRadarrTagLabel, resolveRadarrTagIds } from "./tags";
 export type * from "./types";
