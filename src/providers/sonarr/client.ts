@@ -14,10 +14,10 @@ import {
 	SonarrSeriesSchema,
 	SonarrTagSchema,
 } from "./schemas";
+import type { SonarrMonitorOption } from "./schemas";
 import type {
 	SonarrGeneratedFolder,
 	SonarrLookupSeries,
-	SonarrMonitorOption,
 	SonarrQualityProfile,
 	SonarrRootFolder,
 	SonarrSeries,

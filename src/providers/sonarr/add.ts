@@ -6,11 +6,11 @@ import type {
 	SonarrLookupSeries,
 	SonarrQualityProfileId,
 	SonarrSeries,
-	SonarrSeriesType,
 	SonarrTagId,
 	TvdbId,
 } from "./types";
 import type { SonarrClient } from "./client";
+import type { SonarrSeriesType } from "./schemas";
 import type { ProviderCredentials } from "../types";
 import type { SonarrFormState } from "./form-state";
 import { createError, ErrorCode } from "@/shared/errors";
