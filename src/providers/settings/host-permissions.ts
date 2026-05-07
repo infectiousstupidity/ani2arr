@@ -5,7 +5,7 @@ import { browser } from "wxt/browser";
 import {
 	normalizeProviderConnectionUrl,
 	type ProviderConnectionResult,
-} from "@/providers/settings/provider-connection.schema";
+} from "@/providers/settings/provider-connection.validation";
 
 const pendingPermissionRequests = new Map<
 	string,
@@ -20,7 +20,7 @@ export function getProviderHostPermissionPattern(
 		return normalized;
 	}
 
-	return { ok: true, value: `${normalized.value.url.origin}/*` };
+	return { ok: true, value: `${normalized.value.origin}/*` };
 }
 
 export async function requestProviderHostPermission(

@@ -5,7 +5,6 @@ import type { AniListId } from "@/anilist";
 import { isAniListId } from "@/anilist/anilist-id";
 import type { StatusInput, GetMappingsInput } from "@/rpc/schemas";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
-import { validateProviderConnectionUrl } from "@/providers/settings/provider-connection.schema";
 import type { Provider, TvdbId } from "@/providers";
 import type { ProviderExternalId } from "@/mapping/types";
 
@@ -80,17 +79,6 @@ export const normalizeMetadataIds = (
 	ids: readonly AniListId[],
 ): AniListId[] => {
 	return [...new Set(ids.filter(isAniListId))].toSorted((a, b) => a - b);
-};
-
-export const getProviderQueryScope = (
-	credentials?: { url: string; apiKey?: string } | null,
-): string => {
-	// Query identity must stay non-secret. Never include apiKey or secret-derived values here.
-	const rawUrl = credentials?.url?.trim();
-	if (!rawUrl) return "configured";
-
-	const normalizedUrl = validateProviderConnectionUrl(rawUrl);
-	return normalizedUrl.ok ? normalizedUrl.value : rawUrl;
 };
 
 export const queryKeys = {
