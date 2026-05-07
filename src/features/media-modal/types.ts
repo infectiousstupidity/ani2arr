@@ -12,10 +12,8 @@ import type {
 	CheckSeriesStatusResponse,
 } from "@/rpc/types";
 import type { ProviderFormOptions } from "@/providers";
-import type {
-	RadarrFormState,
-	SonarrFormState,
-} from "@/providers/settings/provider-settings.schema";
+import type { SonarrFormState } from "@/providers/sonarr/form-state";
+import type { RadarrFormState } from "@/providers/settings/provider-settings.schema";
 import type {
 	RadarrLaunchSnapshot,
 	SonarrLaunchSnapshot,

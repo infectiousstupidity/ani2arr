@@ -7,10 +7,12 @@ import {
 } from "@/options/schema";
 import type { Provider, ProviderFormOptions } from "@/providers";
 import {
-	normalizeRadarrFormState,
 	normalizeSonarrFormState,
-	type RadarrFormState,
 	type SonarrFormState,
+} from "@/providers/sonarr/form-state";
+import {
+	normalizeRadarrFormState,
+	type RadarrFormState,
 } from "@/providers/settings/provider-settings.schema";
 
 export function bootstrapSonarrDefaults(

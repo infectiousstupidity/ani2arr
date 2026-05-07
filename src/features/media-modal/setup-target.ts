@@ -1,4 +1,5 @@
 /** Pure setup-target rules for media modal add and edit flows. */
+// src/features/media-modal/setup-target.ts
 
 import type { AniListId } from "@/anilist";
 import type { RadarrMovie, TmdbId, TvdbId } from "@/providers";
@@ -9,10 +10,10 @@ import {
 	parseTmdbIdOrNull,
 	parseTvdbIdOrNull,
 } from "@/providers";
+import type { SonarrFormState } from "@/providers/sonarr/form-state";
+import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
 import type {
 	RadarrFormState,
-	SonarrEditMonitoringAction,
-	SonarrFormState,
 } from "@/providers/settings/provider-settings.schema";
 import type {
 	CheckMovieStatusResponse,

@@ -5,10 +5,10 @@ import { AniListIdSchema } from "@/anilist/anilist-id";
 import { AniListMediaHintSchema } from "@/anilist/schemas/media.schema";
 import { MAPPING_ENTRY_KIND_VALUES } from "@/mapping/types";
 import { PROVIDERS, TmdbIdSchema, TvdbIdSchema } from "@/providers";
+import { SonarrFormStateSchema } from "@/providers/sonarr/form-state";
+import { SonarrEditMonitoringActionSchema } from "@/providers/sonarr/schemas";
 import {
 	RadarrFormStateSchema,
-	SonarrEditMonitoringActionSchema,
-	SonarrFormStateSchema,
 } from "@/providers/settings/provider-settings.schema";
 
 // ============================================================================

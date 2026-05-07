@@ -10,7 +10,7 @@ import {
   type SonarrAddOptionsFieldsLayout,
 } from '@/components/provider-add-options/sonarr-add-options-fields';
 import type { SettingsActions } from '../hooks/use-settings-actions';
-import type { SonarrFormState } from '@/providers/settings/provider-settings.schema';
+import type { SonarrFormState } from '@/providers/sonarr/form-state';
 import Button from '@/shared/ui/primitives/button';
 import type { ExtensionOptions } from '@/options';
 

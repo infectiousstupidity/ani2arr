@@ -43,19 +43,27 @@ export const SONARR_SERIES_STATUSES = [
 
 // Static Sonarr series type used by add defaults, add payloads, and edit saves.
 export const SonarrSeriesTypeSchema = v.picklist(SONARR_SERIES_TYPES);
+export type SonarrSeriesType = v.InferOutput<typeof SonarrSeriesTypeSchema>;
 
 // Add-time monitoring choice. Sonarr supports "unknown", but ani2arr never sends it.
 export const SonarrMonitorOptionSchema = v.picklist(SONARR_MONITOR_OPTIONS);
+export type SonarrMonitorOption = v.InferOutput<typeof SonarrMonitorOptionSchema>;
 
 // UI-only edit action for applying Sonarr's season pass monitoring endpoint.
 export const SonarrEditMonitoringActionSchema = v.picklist(
 	SONARR_EDIT_MONITORING_ACTIONS,
 );
+export type SonarrEditMonitoringAction = v.InferOutput<
+	typeof SonarrEditMonitoringActionSchema
+>;
 
 // Edit field for how Sonarr should monitor future seasons.
 export const SonarrMonitorNewItemsOptionSchema = v.picklist(
 	SONARR_MONITOR_NEW_ITEMS_OPTIONS,
 );
+export type SonarrMonitorNewItemsOption = v.InferOutput<
+	typeof SonarrMonitorNewItemsOptionSchema
+>;
 
 // Display/cache status returned on Sonarr series and lookup results.
 export const SonarrSeriesStatusSchema = v.picklist(SONARR_SERIES_STATUSES);

@@ -1,5 +1,6 @@
 /** AniList card overlay actions for quick add, mapping fixes, and provider links. */
 // src/features/media-overlay/components/card-overlay.tsx
+/* eslint-disable react-hooks/set-state-in-effect -- Existing visibility gate resets local overlay state when the card closes. */
 
 import React, {
 	memo,
@@ -26,10 +27,8 @@ import type { Provider } from "@/providers";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import { getProviderLabel } from "@/providers/provider-labels";
-import type {
-	RadarrFormState,
-	SonarrFormState,
-} from "@/providers/settings/provider-settings.schema";
+import type { SonarrFormState } from "@/providers/sonarr/form-state";
+import type { RadarrFormState } from "@/providers/settings/provider-settings.schema";
 import { buildProviderOpenUrl } from "@/providers/provider-links";
 import { useCardOverlayState } from "../hooks/use-card-overlay-state";
 import {

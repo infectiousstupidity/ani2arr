@@ -12,7 +12,7 @@ import type {
 } from "./types";
 import type { SonarrClient } from "./client";
 import type { ProviderCredentials } from "../types";
-import type { SonarrFormState } from "../settings/provider-settings.schema";
+import type { SonarrFormState } from "./form-state";
 import { createError, ErrorCode } from "@/shared/errors";
 import { resolveSonarrTagIds } from "./tags";
 

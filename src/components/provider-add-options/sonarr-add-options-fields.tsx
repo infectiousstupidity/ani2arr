@@ -5,11 +5,11 @@ import React from 'react';
 
 import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
 import { parseProviderQualityProfileId, type ProviderFormOptions } from '@/providers';
+import type { SonarrFormState } from '@/providers/sonarr/form-state';
 import {
   MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
-  type SonarrFormState,
-} from '@/providers/settings/provider-settings.schema';
+} from './sonarr-options';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import { cn } from '@/shared/utils/cn';
 

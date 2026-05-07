@@ -4,10 +4,12 @@
 import { storage } from '@wxt-dev/storage';
 import * as v from 'valibot';
 import {
-  normalizeRadarrFormState,
-  stripRadarrFormStateForDefaults,
   normalizeSonarrFormState,
   stripSonarrFormStateForDefaults,
+} from '@/providers/sonarr/form-state';
+import {
+  normalizeRadarrFormState,
+  stripRadarrFormStateForDefaults,
 } from '@/providers/settings/provider-settings.schema';
 import { isAniListTitleLanguage } from '@/anilist/schemas/title-language.schema';
 import { logger } from '@/shared/utils/logger';

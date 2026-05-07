@@ -8,9 +8,9 @@ import {
 	setExtensionOptionsSnapshot,
 	type ExtensionOptions,
 } from "@/options";
+import { normalizeSonarrFormState } from "@/providers/sonarr/form-state";
 import {
 	normalizeRadarrFormState,
-	normalizeSonarrFormState,
 } from "@/providers/settings/provider-settings.schema";
 import { NotifyProviderConnectionChangedInputSchema } from "@/rpc/schemas";
 import type { ApiHandlerDeps } from "./handler-deps";
