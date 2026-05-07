@@ -1,3 +1,6 @@
+/** Tests default option bootstrapping from provider form metadata. */
+// src/options-page/hooks/provider-default-bootstrapping.shared.test.ts
+
 import { describe, expect, it } from "vitest";
 import { parseProviderQualityProfileId } from "@/providers";
 import {
@@ -34,14 +37,19 @@ describe("provider default bootstrapping", () => {
 				{
 					qualityProfileId: parseProviderQualityProfileId(99),
 					rootFolderPath: "/custom/root",
-					monitored: true,
+					addOptions: {
+						monitor: "movieAndCollection",
+					},
 				},
 				formOptions,
 			),
 		).toMatchObject({
 			qualityProfileId: parseProviderQualityProfileId(99),
 			rootFolderPath: "/custom/root",
-			monitored: true,
+			addOptions: {
+				monitor: "movieAndCollection",
+				searchForMovie: true,
+			},
 		});
 	});
 
@@ -74,9 +82,9 @@ describe("provider default bootstrapping", () => {
 		expect(bootstrapRadarrDefaults(undefined, formOptions)).toMatchObject({
 			qualityProfileId: parseProviderQualityProfileId(10),
 			rootFolderPath: "/media/library",
-			monitored: true,
 			minimumAvailability: "released",
 			addOptions: {
+				monitor: "movieOnly",
 				searchForMovie: true,
 			},
 		});

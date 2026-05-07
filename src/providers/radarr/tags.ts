@@ -18,7 +18,7 @@ type NormalizedRadarrTagLabel = {
 	key: string;
 };
 
-export function normalizeRadarrTagLabel(
+function normalizeRadarrTagLabel(
 	label: string | null | undefined,
 ): NormalizedRadarrTagLabel | null {
 	if (typeof label !== "string") return null;

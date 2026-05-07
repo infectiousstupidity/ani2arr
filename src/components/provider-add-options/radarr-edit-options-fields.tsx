@@ -1,5 +1,5 @@
-/** Reusable Radarr add-options fields shared by modal and settings flows. */
-// src/components/provider-add-options/radarr-add-options-fields.tsx
+/** Reusable Radarr edit fields for existing-movie flows. */
+// src/components/provider-add-options/radarr-edit-options-fields.tsx
 
 import React from 'react';
 
@@ -8,18 +8,14 @@ import { parseProviderQualityProfileId, type ProviderFormOptions } from '@/provi
 import {
   type RadarrFormState,
   type RadarrMinimumAvailability,
-  type RadarrMovieMonitor,
 } from '@/providers/radarr/form-state';
 import { SelectField, SwitchField } from '@/shared/ui/form/form';
 import { cn } from '@/shared/utils/cn';
 
 import { ProviderRootFolderSelect, type ProviderRootFolderPathPreview } from './provider-root-folder-select';
-import {
-  MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS,
-  RADARR_MOVIE_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
-} from './radarr-options';
+import { MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS } from './radarr-options';
 
-export interface RadarrAddOptionsFieldsProps {
+export interface RadarrEditOptionsFieldsProps {
   values: RadarrFormState;
   formOptions: ProviderFormOptions;
   onChange: <K extends keyof RadarrFormState>(field: K, value: RadarrFormState[K]) => void;
@@ -31,8 +27,8 @@ export interface RadarrAddOptionsFieldsProps {
   layout?: 'stacked' | 'grid' | undefined;
 }
 
-export function RadarrAddOptionsFields(
-  props: RadarrAddOptionsFieldsProps,
+export function RadarrEditOptionsFields(
+  props: RadarrEditOptionsFieldsProps,
 ): React.JSX.Element {
   const {
     values,
@@ -56,7 +52,6 @@ export function RadarrAddOptionsFields(
     value: String(profile.id),
     label: profile.name,
   }));
-  const searchForMovie = values.addOptions?.searchForMovie ?? false;
 
   return (
     <div className={cn(layoutClassName, className)}>
@@ -107,27 +102,12 @@ export function RadarrAddOptionsFields(
 
       <div className={cn('pt-1', fullWidthClass)}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <SelectField
-            label="Monitor"
-            disabled={disabled}
-            value={values.addOptions?.monitor ?? ''}
-            onChange={value =>
-              onChange('addOptions', {
-                ...values.addOptions,
-                monitor: value as RadarrMovieMonitor,
-              })}
-            options={RADARR_MOVIE_MONITOR_OPTIONS_WITH_DESCRIPTIONS}
-            container={portalContainer ?? null}
-            triggerClassName={modalSelectTriggerClassName}
-          />
-
           <SwitchField
-            label="Search on Add"
+            label="Monitored"
             disabled={disabled}
-            checked={searchForMovie}
-            onCheckedChange={checked =>
-              onChange('addOptions', { ...values.addOptions, searchForMovie: checked })}
-            labelHelp="Trigger a Radarr search immediately after the movie is added."
+            checked={values.monitored ?? false}
+            onCheckedChange={checked => onChange('monitored', checked)}
+            labelHelp="Keep the movie monitored in Radarr so future upgrades remain eligible."
             labelHelpContainer={portalContainer ?? null}
             layout="inline"
             labelClassName="text-sm font-medium text-text-primary"

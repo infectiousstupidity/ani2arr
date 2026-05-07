@@ -39,7 +39,6 @@ export function buildRadarrEditDraft(movie: RadarrMovie): RadarrFormState {
 		monitored: movie.monitored,
 		minimumAvailability: movie.minimumAvailability,
 		tags: movie.tags,
-		addOptions: movie.addOptions,
 		freeformTags: [],
 	});
 }

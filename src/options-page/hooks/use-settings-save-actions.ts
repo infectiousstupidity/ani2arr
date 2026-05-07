@@ -168,10 +168,20 @@ export function useSettingsSaveActions({
 		const updatedProviderSettings: ExtensionOptions["providers"] =
 			{} as ExtensionOptions["providers"];
 		for (const state of providerStates) {
-			updatedProviderSettings[state.provider] = buildNormalizedProviderSettings(
+			if (state.provider === "sonarr") {
+				updatedProviderSettings.sonarr = buildNormalizedProviderSettings(
+					previousSettings,
+					nextSettings,
+					"sonarr",
+					state.current,
+				);
+				continue;
+			}
+
+			updatedProviderSettings.radarr = buildNormalizedProviderSettings(
 				previousSettings,
 				nextSettings,
-				state.provider,
+				"radarr",
 				state.current,
 			);
 		}

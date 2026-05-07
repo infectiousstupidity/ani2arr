@@ -112,14 +112,6 @@ export class RadarrLibrary {
 		return this.refreshPromise;
 	}
 
-	public async findMovieSnapshotByTmdbId(
-		tmdbId: TmdbId,
-		credentials: ProviderCredentials,
-	): Promise<RadarrMovieSnapshot | null> {
-		const snapshots = await this.getMovieSnapshots(credentials);
-		return snapshots.find((movie) => movie.tmdbId === tmdbId) ?? null;
-	}
-
 	public async findMovieByTmdbId(
 		tmdbId: TmdbId,
 		credentials: ProviderCredentials,

@@ -41,7 +41,7 @@ type AddSonarrSeriesDeps = {
 	>;
 };
 
-export function buildAddSonarrSeriesPayload(
+function buildAddSonarrSeriesPayload(
 	series: SonarrLookupSeries,
 	options: {
 		rootFolderPath: string;

@@ -19,16 +19,19 @@ describe("addRadarrMovie", () => {
 	it("looks up the movie by TMDB, builds the add payload, resolves tags, and returns the created movie", async () => {
 		const tmdbId = parseTmdbId(34);
 		const lookupMovie = {
+			id: parseRadarrMovieId(1),
 			title: "Lookup Movie",
 			tmdbId,
 			imdbId: "tt0034",
 			titleSlug: "lookup-movie",
 			year: 2025,
 			remotePoster: "https://image.example/poster.jpg",
+			alternateTitles: [{ title: "Preserved Title" }],
+			ratings: { imdb: { value: 8.1 } },
 		};
 		const createdMovie = {
-			id: parseRadarrMovieId(12),
 			...lookupMovie,
+			id: parseRadarrMovieId(12),
 			qualityProfileId: parseProviderQualityProfileId(99),
 			rootFolderPath: "/movies",
 			path: "/movies/Lookup Movie [tmdb-34]",
@@ -52,11 +55,11 @@ describe("addRadarrMovie", () => {
 				form: {
 					rootFolderPath: "/movies",
 					qualityProfileId: parseProviderQualityProfileId(99),
-					monitored: true,
 					minimumAvailability: "released",
 					tags: [parseProviderTagId(7)],
 					freeformTags: ["New Tag"],
 					addOptions: {
+						monitor: "movieAndCollection",
 						searchForMovie: false,
 					},
 				},
@@ -67,17 +70,30 @@ describe("addRadarrMovie", () => {
 		);
 
 		expect(result).toBe(createdMovie);
+		expect(lookupMovie).toEqual({
+			id: parseRadarrMovieId(1),
+			title: "Lookup Movie",
+			tmdbId,
+			imdbId: "tt0034",
+			titleSlug: "lookup-movie",
+			year: 2025,
+			remotePoster: "https://image.example/poster.jpg",
+			alternateTitles: [{ title: "Preserved Title" }],
+			ratings: { imdb: { value: 8.1 } },
+		});
 		expect(client.lookupMovieByTmdbId).toHaveBeenCalledWith(tmdbId, credentials);
 		expect(client.createTag).toHaveBeenCalledWith("new-tag", credentials);
 		expect(client.addMovie).toHaveBeenCalledWith(
 			{
 				...lookupMovie,
+				id: 0,
 				qualityProfileId: parseProviderQualityProfileId(99),
 				rootFolderPath: "/movies",
 				monitored: true,
 				minimumAvailability: "released",
 				tags: [parseProviderTagId(7), parseProviderTagId(8)],
 				addOptions: {
+					monitor: "movieAndCollection",
 					searchForMovie: false,
 				},
 			},
@@ -100,11 +116,11 @@ describe("addRadarrMovie", () => {
 					form: {
 						rootFolderPath: "/movies",
 						qualityProfileId: parseProviderQualityProfileId(99),
-						monitored: true,
 						minimumAvailability: "released",
 						tags: [],
 						freeformTags: ["New Tag"],
 						addOptions: {
+							monitor: "movieOnly",
 							searchForMovie: true,
 						},
 					},
@@ -119,6 +135,54 @@ describe("addRadarrMovie", () => {
 		expect(client.getTags).not.toHaveBeenCalled();
 		expect(client.createTag).not.toHaveBeenCalled();
 		expect(client.addMovie).not.toHaveBeenCalled();
+	});
+
+	it("derives unmonitored add payloads from the none monitor option", async () => {
+		const tmdbId = parseTmdbId(34);
+		const client = {
+			lookupMovieByTmdbId: vi.fn(async () => ({
+				title: "Lookup Movie",
+				tmdbId,
+			})),
+			addMovie: vi.fn(async (payload) => ({
+				...payload,
+				id: parseRadarrMovieId(12),
+				path: "/movies/Lookup Movie",
+			})),
+			getTags: vi.fn(async () => []),
+			createTag: vi.fn(),
+		};
+
+		await addRadarrMovie(
+			{
+				tmdbId,
+				form: {
+					rootFolderPath: "/movies",
+					qualityProfileId: parseProviderQualityProfileId(99),
+					minimumAvailability: "released",
+					tags: [],
+					freeformTags: [],
+					addOptions: {
+						monitor: "none",
+						searchForMovie: false,
+					},
+				},
+				defaults: { freeformTags: [] },
+				credentials,
+			},
+			{ client },
+		);
+
+		expect(client.addMovie).toHaveBeenCalledWith(
+			expect.objectContaining({
+				monitored: false,
+				addOptions: {
+					monitor: "none",
+					searchForMovie: false,
+				},
+			}),
+			credentials,
+		);
 	});
 
 	it("does not look up, resolve tags, or add when required add fields are missing", async () => {

@@ -27,11 +27,24 @@ export const RADARR_MINIMUM_AVAILABILITY_OPTIONS = [
 	"deleted",
 ] as const;
 
+export const RADARR_MOVIE_MONITOR_OPTIONS = [
+	"movieOnly",
+	"movieAndCollection",
+	"none",
+] as const;
+
 export const RadarrMinimumAvailabilitySchema = v.picklist(
 	RADARR_MINIMUM_AVAILABILITY_OPTIONS,
 );
 export type RadarrMinimumAvailability = v.InferOutput<
 	typeof RadarrMinimumAvailabilitySchema
+>;
+
+export const RadarrMovieMonitorSchema = v.picklist(
+	RADARR_MOVIE_MONITOR_OPTIONS,
+);
+export type RadarrMovieMonitor = v.InferOutput<
+	typeof RadarrMovieMonitorSchema
 >;
 
 type ProviderRecord = Record<string, unknown>;
@@ -86,10 +99,10 @@ interface RadarrMovieResource extends ProviderRecord {
 	physicalRelease?: string | null;
 	images?: RadarrImage[];
 	movieFile?: RadarrMovieFile;
-	addOptions?: { searchForMovie?: boolean };
+	addOptions?: { monitor?: RadarrMovieMonitor; searchForMovie?: boolean };
 }
 
-interface RadarrLookupMovieResource {
+interface RadarrLookupMovieResource extends ProviderRecord {
 	id?: RadarrMovieId;
 	title: string;
 	tmdbId: TmdbId;
@@ -196,6 +209,10 @@ function normalizeMinimumAvailability(
 	return v.is(RadarrMinimumAvailabilitySchema, value) ? value : undefined;
 }
 
+function normalizeMovieMonitor(value: unknown): RadarrMovieMonitor | undefined {
+	return v.is(RadarrMovieMonitorSchema, value) ? value : undefined;
+}
+
 function normalizeRadarrMovie(resource: ProviderRecord): RadarrMovieResource {
 	const id = parseRadarrMovieId(resource.id);
 	const tmdbId = parseTmdbId(resource.tmdbId);
@@ -247,7 +264,15 @@ function normalizeRadarrMovie(resource: ProviderRecord): RadarrMovieResource {
 		...ifDefined("images", normalizeImages(resource.images)),
 		...ifDefined("movieFile", normalizeMovieFile(resource.movieFile)),
 		...(resource.addOptions === addOptions && Object.keys(addOptions).length > 0
-			? { addOptions: addOptions as { searchForMovie?: boolean } }
+			? {
+					addOptions: {
+						...ifDefined("monitor", normalizeMovieMonitor(addOptions.monitor)),
+						...ifDefined(
+							"searchForMovie",
+							booleanValue(addOptions.searchForMovie),
+						),
+					},
+				}
 			: {}),
 	};
 }
@@ -261,6 +286,7 @@ function normalizeRadarrLookupMovie(
 		trimmedString(resource.folderName) ?? trimmedString(resource.folder);
 
 	return {
+		...resource,
 		title: trimmedString(resource.title) ?? `Radarr movie ${tmdbId}`,
 		tmdbId,
 		...(id === null ? {} : { id }),
@@ -337,6 +363,7 @@ export const RadarrTagSchema = v.object({
 });
 
 export const RadarrAddPayloadOptionsSchema = v.object({
+	monitor: RadarrMovieMonitorSchema,
 	searchForMovie: v.boolean(),
 });
 

@@ -24,7 +24,7 @@ import type {
 } from "./types";
 import { resolveRadarrTagIds } from "./tags";
 
-export type RadarrMovieChanges = Partial<
+type RadarrMovieChanges = Partial<
 	Pick<
 		RadarrMovie,
 		| "qualityProfileId"
@@ -59,7 +59,7 @@ type ResolvedRadarrMovieUpdate = {
 	moveFiles: boolean;
 };
 
-export function buildUpdateRadarrMoviePayload(
+function buildUpdateRadarrMoviePayload(
 	movie: RadarrMovie,
 	changes: RadarrMovieChanges,
 ): RadarrMovie {

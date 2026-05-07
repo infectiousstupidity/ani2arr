@@ -24,7 +24,7 @@ import {
 } from "../provider-media-paths";
 import { resolveSonarrTagIds } from "./tags";
 
-export type SonarrSeriesChanges = Partial<SonarrEditOptions>;
+type SonarrSeriesChanges = Partial<SonarrEditOptions>;
 
 type UpdateSonarrSeriesInput = {
 	tvdbId: TvdbId;
@@ -53,7 +53,7 @@ type ResolvedSonarrSeriesUpdate = {
 	moveFiles: boolean;
 };
 
-export function buildUpdateSonarrSeriesPayload(
+function buildUpdateSonarrSeriesPayload(
 	series: SonarrSeries,
 	changes: SonarrSeriesChanges,
 ): SonarrSeries {
