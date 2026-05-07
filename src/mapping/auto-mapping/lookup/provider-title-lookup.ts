@@ -3,7 +3,7 @@
 
 import type { TtlCache } from "@/shared/cache/ttl-cache";
 import PQueue from "p-queue";
-import type { RadarrClient } from "@/providers/clients/radarr.client";
+import type { RadarrClient } from "@/providers/radarr/client";
 import type { SonarrClient } from "@/providers/sonarr/client";
 import type { SonarrLookupSeries } from "@/providers/sonarr/types";
 import {
@@ -229,7 +229,7 @@ export function createRadarrTitleLookup(
 		loggerName: "RadarrTitleLookup",
 		caches,
 		fetchTitleResults: (term, credentials) =>
-			radarrApi.lookupMovieByTerm(term, credentials),
+			radarrApi.lookupMovies(term, credentials),
 		readProviderId: (result) => {
 			const candidate = result as { tmdbId?: unknown } | null;
 			return parseTmdbIdOrNull(candidate?.tmdbId);

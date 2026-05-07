@@ -15,7 +15,7 @@ import {
 	type RadarrMovie,
 	type RadarrMovieSnapshot,
 } from "@/providers";
-import type { RadarrClient } from "@/providers/clients/radarr.client";
+import type { RadarrClient } from "@/providers/radarr/client";
 import type { CacheHit, TtlCache } from "@/shared/cache/ttl-cache";
 import { PROVIDER_LIBRARY_CACHE_TTL } from "./cache";
 import { RadarrLibrary } from "./radarr-library";
@@ -197,7 +197,7 @@ describe("legacy Radarr provider library", () => {
 	it("force-verifies a mapped movie and updates the lean cache", async () => {
 		const movie = createRadarrMovie();
 		const client = {
-			getMovieByTmdbId: vi.fn(async () => movie),
+			findMovieByTmdbId: vi.fn(async () => movie),
 		};
 		const caches = createCaches<RadarrMovieSnapshot>([]);
 		const library = createRadarrLibrary(client, caches);

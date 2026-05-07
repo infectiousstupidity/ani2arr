@@ -16,7 +16,7 @@ import { anilistMediaCache } from "@/anilist/media.cache";
 import { providerLibraryCaches } from "@/providers/library/cache";
 import { SonarrClient } from "@/providers/sonarr/client";
 import { SonarrLibrary } from "@/providers/sonarr/library";
-import { RadarrClient } from "@/providers/clients/radarr.client";
+import { RadarrClient } from "@/providers/radarr/client";
 import {
 	getProviderHostPermissionPattern,
 	hasProviderHostPermission,
