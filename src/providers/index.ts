@@ -48,7 +48,7 @@ export type {
 	RadarrLookupMovie,
 	RadarrMovie,
 	RadarrMovieSnapshot,
-} from "./radarr.types";
+} from "./radarr/types";
 export {
 	formatProviderExternalId,
 	formatProviderTarget,
