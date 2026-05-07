@@ -2,7 +2,7 @@
 // src/rpc/handlers/handler-deps.ts
 
 import type { AniListMediaService, AniListMetadataStore } from "@/anilist";
-import type { RadarrLibrary } from "@/providers/library/radarr-library";
+import type { RadarrLibrary } from "@/providers/radarr/library";
 import type { SonarrLibrary } from "@/providers/sonarr/library";
 import type { RadarrClient } from "@/providers/radarr/client";
 import type { SonarrClient as CurrentSonarrClient } from "@/providers/sonarr/client";
@@ -20,7 +20,7 @@ export type ApiHandlerDeps = {
 		CurrentSonarrClient,
 		"lookupSeries" | "findSeriesByTvdbId" | "lookupSeriesByTvdbId"
 	>;
-	RadarrClient: RadarrClient;
+	radarrClient: RadarrClient;
 	anilistMediaService: AniListMediaService;
 	mappingService: MappingService;
 	manualMappingService: ManualMappingService;

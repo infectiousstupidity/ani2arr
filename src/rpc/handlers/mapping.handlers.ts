@@ -271,6 +271,7 @@ export function createMappingHandlers(
 			await manualMappingsReady;
 			await mappingService.initAnibridgeMappings();
 			const sonarrCredentials = await providerConfig.get("sonarr");
+			const radarrCredentials = await providerConfig.get("radarr");
 			return listMappings(parsedInput, {
 				manualMappingService,
 				autoMappingStore,
@@ -284,7 +285,15 @@ export function createMappingHandlers(
 						return sonarrLibrary.getSeriesSnapshots(sonarrCredentials);
 					},
 				},
-				radarrLibrary,
+				radarrLibrary: {
+					getLeanMovieList: async () => {
+						if (!radarrCredentials) {
+							await radarrLibrary.clearMovieSnapshotCache();
+							return [];
+						}
+						return radarrLibrary.getMovieSnapshots(radarrCredentials);
+					},
+				},
 			});
 		},
 
@@ -293,6 +302,7 @@ export function createMappingHandlers(
 			await manualMappingsReady;
 			await mappingService.initAnibridgeMappings();
 			const sonarrCredentials = await providerConfig.get("sonarr");
+			const radarrCredentials = await providerConfig.get("radarr");
 			return getMappingInspection(parsedInput, {
 				manualMappingService,
 				autoMappingStore,
@@ -307,7 +317,15 @@ export function createMappingHandlers(
 						return sonarrLibrary.getSeriesSnapshots(sonarrCredentials);
 					},
 				},
-				radarrLibrary,
+				radarrLibrary: {
+					getLeanMovieList: async () => {
+						if (!radarrCredentials) {
+							await radarrLibrary.clearMovieSnapshotCache();
+							return [];
+						}
+						return radarrLibrary.getMovieSnapshots(radarrCredentials);
+					},
+				},
 			});
 		},
 	} satisfies Pick<

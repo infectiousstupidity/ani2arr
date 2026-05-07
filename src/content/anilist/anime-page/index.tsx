@@ -53,7 +53,7 @@ import {
 	useAddMovie,
 	useMovieLibraryStatus,
 	useMovieStatus,
-} from "@/providers/hooks/radarr.queries";
+} from "@/queries/radarr";
 import {
 	useAddSeries,
 	useSeriesLibraryStatus,
@@ -622,12 +622,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({
 		},
 	);
 	const movieLibraryStatusQuery = useMovieLibraryStatus(
-		mappedRadarrProviderId
-			? {
-					anilistId,
-					tmdbId: mappedRadarrProviderId,
-				}
-			: null,
+		mappedRadarrProviderId,
 		{
 			enabled:
 				isConfigured && provider === "radarr" && mappedRadarrProviderId !== null,

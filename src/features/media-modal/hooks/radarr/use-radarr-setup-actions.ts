@@ -1,8 +1,8 @@
 /** Owns Radarr setup submit and default-save mutations for the media modal. */
-// src/features/media-modal/hooks/use-radarr-setup-actions.ts
+// src/features/media-modal/hooks/radarr/use-radarr-setup-actions.ts
 
 import type { AniListId } from "@/anilist";
-import { useAddMovie, useUpdateMovie } from "@/providers/hooks/radarr.queries";
+import { useAddMovie, useUpdateMovie } from "@/queries/radarr";
 import { type RadarrFormState } from "@/providers/radarr/form-state";
 import type { RadarrSetupTarget } from "../../setup-target";
 

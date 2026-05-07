@@ -16,13 +16,13 @@ describe("createProviderHandlers", () => {
 		const sonarrClient = {
 			testConnection: vi.fn(async () => ({ version: "4.0.1" })),
 		};
-		const RadarrClient = {
+		const radarrClient = {
 			testConnection: vi.fn(),
 		};
 
 		const handlers = createProviderHandlers({
 			sonarrClient,
-			RadarrClient,
+			radarrClient,
 		} as unknown as ApiHandlerDeps);
 
 		await expect(
@@ -33,6 +33,6 @@ describe("createProviderHandlers", () => {
 		).resolves.toEqual({ version: "4.0.1" });
 
 		expect(sonarrClient.testConnection).toHaveBeenCalledWith(credentials);
-		expect(RadarrClient.testConnection).not.toHaveBeenCalled();
+		expect(radarrClient.testConnection).not.toHaveBeenCalled();
 	});
 });
