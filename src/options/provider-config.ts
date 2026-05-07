@@ -6,7 +6,7 @@ import { getProviderLabel } from "@/providers/provider-labels";
 import {
 	validateProviderConnectionApiKey,
 	validateProviderConnectionUrl,
-} from "@/providers/settings/provider-connection.schema";
+} from "@/providers/settings/provider-connection.validation";
 import type { Provider, ProviderCredentials } from "@/providers";
 import type { ExtensionOptions, PublicOptions } from "./types";
 

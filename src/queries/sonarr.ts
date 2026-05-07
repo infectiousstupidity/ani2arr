@@ -7,8 +7,9 @@ import type {
 	CheckSeriesStatusResponse,
 	SonarrLookupOutput,
 } from "@/rpc/types";
+import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
-import { getProviderQueryScope, queryKeys } from "@/shared/queries/query-keys";
+import { queryKeys } from "@/shared/queries/query-keys";
 import type { ProviderCredentials, TvdbId } from "@/providers";
 import type { SonarrSeriesLibraryStatus } from "@/providers/sonarr/library";
 import type { SonarrSeries } from "@/providers/sonarr/types";
@@ -24,7 +25,7 @@ export const useSonarrFormOptions = (options?: {
 
 	return useQuery({
 		queryKey: queryKeys.sonarrFormOptions(
-			getProviderQueryScope(options?.credentials),
+			getProviderConnectionScope(options?.credentials),
 		),
 		queryFn: async () => {
 			try {

@@ -3,7 +3,7 @@ import type { Provider, ProviderCredentials } from "@/providers";
 import {
 	validateProviderConnectionApiKey,
 	validateProviderConnectionUrl,
-} from "@/providers/settings/provider-connection.schema";
+} from "@/providers/settings/provider-connection.validation";
 import { shouldEnableProviderFormOptions } from "../hooks/provider-settings-actions.shared";
 
 function getSavedCredentials(

@@ -16,7 +16,8 @@ import {
 	parseExtensionOptions,
 	type ExtensionOptions,
 } from "@/options";
-import { getProviderQueryScope, queryKeys } from "@/shared/queries/query-keys";
+import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
+import { queryKeys } from "@/shared/queries/query-keys";
 import { getAni2arrApi } from "@/rpc";
 import { getProviderLabel } from "@/providers/provider-labels";
 import type {
@@ -61,7 +62,7 @@ function seedProviderConnectionQueries(input: {
 }): void {
 	const { queryClient, provider, credentials, formOptions, connectionInfo } =
 		input;
-	const scope = getProviderQueryScope(credentials);
+	const scope = getProviderConnectionScope(credentials);
 
 	if (provider === "sonarr") {
 		queryClient.setQueryData(queryKeys.sonarrFormOptions(scope), formOptions);

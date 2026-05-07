@@ -6,7 +6,8 @@ import { getProviderLabel } from "@/providers/provider-labels";
 import { getAni2arrApi } from "@/rpc";
 import type { TestProviderConnectionInput } from "@/rpc/schemas";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
-import { getProviderQueryScope, queryKeys } from "@/shared/queries/query-keys";
+import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
+import { queryKeys } from "@/shared/queries/query-keys";
 import type { Provider, ProviderCredentials } from "@/providers";
 
 export type ProviderConnectionStatusView = {
@@ -28,8 +29,8 @@ const getConnectionQueryKey = (
 	credentials?: ProviderCredentials | null,
 ) =>
 	provider === "sonarr"
-		? queryKeys.sonarrConnection(getProviderQueryScope(credentials))
-		: queryKeys.radarrConnection(getProviderQueryScope(credentials));
+		? queryKeys.sonarrConnection(getProviderConnectionScope(credentials))
+		: queryKeys.radarrConnection(getProviderConnectionScope(credentials));
 
 export const useProviderConnectionCheck = (options: {
 	provider: Provider;

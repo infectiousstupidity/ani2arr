@@ -9,8 +9,9 @@ import type {
 	RadarrLookupOutput,
 } from "@/rpc/types";
 import type { RadarrMovieLibraryStatus } from "@/providers/radarr/library";
+import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
-import { getProviderQueryScope, queryKeys } from "@/shared/queries/query-keys";
+import { queryKeys } from "@/shared/queries/query-keys";
 import {
 	normalizeRadarrFormState,
 	stripRadarrFormStateForDefaults,
@@ -35,7 +36,7 @@ export const useRadarrFormOptions = (options?: {
 
 	return useQuery({
 		queryKey: queryKeys.radarrFormOptions(
-			getProviderQueryScope(options?.credentials),
+			getProviderConnectionScope(options?.credentials),
 		),
 		queryFn: async () => {
 			try {
