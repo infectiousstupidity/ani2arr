@@ -3,7 +3,7 @@
 
 import React from 'react';
 
-import { ProviderTagField } from '@/components/provider-tags/provider-tag-field';
+import { ProviderTagField } from '@/features/provider-setup/provider-tag-field';
 import { parseProviderQualityProfileId, type ProviderFormOptions } from '@/providers';
 import {
   type RadarrFormState,

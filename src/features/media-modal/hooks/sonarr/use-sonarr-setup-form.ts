@@ -7,7 +7,7 @@ import { useForm, type Path, type PathValue } from "react-hook-form";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
 
-import type { ProviderRootFolderPathPreview } from "@/components/provider-add-options/provider-root-folder-select";
+import type { ProviderRootFolderPathPreview } from "@/features/provider-setup/provider-root-folder-select";
 import {
 	buildAddPathPreview,
 	buildEditPathPreview,

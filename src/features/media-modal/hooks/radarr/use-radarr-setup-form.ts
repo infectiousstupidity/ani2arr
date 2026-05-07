@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, type FormEvent } from "react";
 import { useForm, type Path, type PathValue } from "react-hook-form";
 
-import type { ProviderRootFolderPathPreview } from "@/components/provider-add-options/provider-root-folder-select";
+import type { ProviderRootFolderPathPreview } from "@/features/provider-setup/provider-root-folder-select";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 
 import {
