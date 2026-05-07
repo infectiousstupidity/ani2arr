@@ -1,13 +1,16 @@
 /** Pure draft builders for media modal add and edit setup flows. */
+// src/features/media-modal/provider-drafts.ts
 
 import type { RadarrMovie } from "@/providers";
 import type { SonarrSeries } from "@/providers/sonarr/types";
 import {
-	normalizeRadarrFormState,
 	normalizeSonarrFormState,
-	type SonarrEditMonitoringAction,
-	type RadarrFormState,
 	type SonarrFormState,
+} from "@/providers/sonarr/form-state";
+import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
+import {
+	normalizeRadarrFormState,
+	type RadarrFormState,
 } from "@/providers/settings/provider-settings.schema";
 
 export const SONARR_EDIT_MONITORING_ACTION_DEFAULT = "noChange" as const;

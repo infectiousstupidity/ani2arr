@@ -4,10 +4,8 @@
 import { useEffect, useMemo, useRef, type FormEvent } from "react";
 import { useForm, type Path, type PathValue } from "react-hook-form";
 
-import type {
-	SonarrEditMonitoringAction,
-	SonarrFormState,
-} from "@/providers/settings/provider-settings.schema";
+import type { SonarrFormState } from "@/providers/sonarr/form-state";
+import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
 
 import type { ProviderRootFolderPathPreview } from "@/components/provider-add-options/provider-root-folder-select";
 import {

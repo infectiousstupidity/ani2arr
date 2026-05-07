@@ -47,10 +47,8 @@ import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type { HostMediaTarget } from "@/content/browse/types";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
-import type {
-	RadarrFormState,
-	SonarrFormState,
-} from "@/providers/settings/provider-settings.schema";
+import type { SonarrFormState } from "@/providers/sonarr/form-state";
+import type { RadarrFormState } from "@/providers/settings/provider-settings.schema";
 import {
 	useAddMovie,
 	useMovieLibraryStatus,

@@ -8,13 +8,13 @@ import {
 	parseProviderQualityProfileId,
 	type ProviderFormOptions,
 } from "@/providers";
+import type { SonarrFormState } from "@/providers/sonarr/form-state";
+import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
 import {
 	EDIT_MONITOR_ACTION_OPTIONS_WITH_DESCRIPTIONS,
 	MONITOR_NEW_ITEMS_OPTIONS_WITH_DESCRIPTIONS,
 	SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
-	type SonarrEditMonitoringAction,
-	type SonarrFormState,
-} from "@/providers/settings/provider-settings.schema";
+} from "./sonarr-options";
 import { SelectField, SwitchField } from "@/shared/ui/form/form";
 import { cn } from "@/shared/utils/cn";
 

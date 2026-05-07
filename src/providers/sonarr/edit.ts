@@ -9,11 +9,9 @@ import type {
 	TvdbId,
 } from "./types";
 import type { SonarrClient } from "./client";
+import type { SonarrFormState } from "./form-state";
+import type { SonarrEditMonitoringAction } from "./schemas";
 import type { ProviderCredentials } from "../types";
-import type {
-	SonarrEditMonitoringAction,
-	SonarrFormState,
-} from "../settings/provider-settings.schema";
 import {
 	createError,
 	ErrorCode,

@@ -1,12 +1,10 @@
 /** Owns Sonarr setup submit and default-save mutations for the media modal. */
-// src/features/media-modal/hooks/use-sonarr-setup-actions.ts
+// src/features/media-modal/hooks/sonarr/use-sonarr-setup-actions.ts
 
 import type { AniListId } from "@/anilist";
 import { useAddSeries, useUpdateSeries } from "@/queries/sonarr";
-import {
-	type SonarrEditMonitoringAction,
-	type SonarrFormState,
-} from "@/providers/settings/provider-settings.schema";
+import type { SonarrFormState } from "@/providers/sonarr/form-state";
+import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
 import type { SonarrSetupTarget } from "../../setup-target";
 
 type AddSeriesVariables = Parameters<

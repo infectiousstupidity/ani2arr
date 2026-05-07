@@ -2,28 +2,18 @@
 // src/options/schema.ts
 
 import * as v from "valibot";
+import { AniListTitleLanguageSchema } from "@/anilist/schemas/title-language.schema";
+import {
+	SonarrDefaultsSchema,
+	createDefaultSonarrFormState as createDefaultSonarrFormStateValue,
+} from "@/providers/sonarr/form-state";
 import {
 	RadarrDefaultsSchema,
 	RadarrSettingsSchema,
 	normalizeRadarrFormState,
-	SonarrDefaultsSchema,
-	SonarrSettingsSchema,
-	normalizeSonarrFormState,
 } from "@/providers/settings/provider-settings.schema";
 import type { ExtensionOptions } from "./types";
 import { createDefaultUiOptions, UiOptionsSchema } from "./ui-schema";
-
-export const createDefaultSonarrFormState = () =>
-	normalizeSonarrFormState({
-		...v.parse(SonarrDefaultsSchema, {}),
-		seriesType: "anime",
-		seasonFolder: true,
-		addOptions: {
-			monitor: "all",
-			searchForMissingEpisodes: true,
-			searchForCutoffUnmetEpisodes: false,
-		},
-	});
 
 export const createDefaultRadarrFormState = () =>
 	normalizeRadarrFormState({
@@ -39,7 +29,7 @@ const createDefaultSonarrProviderSettings = () => ({
 	url: "",
 	apiKey: "",
 	preferredAniListTitleLanguage: "english" as const,
-	defaults: createDefaultSonarrFormState(),
+	defaults: createDefaultSonarrFormStateValue(),
 });
 
 const createDefaultRadarrProviderSettings = () => ({
@@ -50,8 +40,13 @@ const createDefaultRadarrProviderSettings = () => ({
 });
 
 const SonarrProviderSettingsSchema = v.object({
-	...SonarrSettingsSchema.entries,
-	defaults: v.fallback(SonarrDefaultsSchema, createDefaultSonarrFormState()),
+	url: v.string(),
+	apiKey: v.string(),
+	preferredAniListTitleLanguage: v.fallback(
+		AniListTitleLanguageSchema,
+		"english",
+	),
+	defaults: v.fallback(SonarrDefaultsSchema, createDefaultSonarrFormStateValue()),
 });
 
 const RadarrProviderSettingsSchema = v.object({
@@ -88,6 +83,9 @@ export const ExtensionOptionsSchema = v.fallback(
 	createDefaultExtensionOptions(),
 );
 
-export { createDefaultSonarrFormState as defaultSonarrFormState };
+export { createDefaultSonarrFormState } from "@/providers/sonarr/form-state";
+export {
+	createDefaultSonarrFormState as defaultSonarrFormState,
+} from "@/providers/sonarr/form-state";
 export { createDefaultRadarrFormState as defaultRadarrFormState };
 export { createDefaultUiOptions as defaultUiOptions } from "./ui-schema";
