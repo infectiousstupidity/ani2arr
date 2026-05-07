@@ -12,7 +12,7 @@ import Button from '@/shared/ui/primitives/button';
 import type { ExtensionOptions } from '@/options';
 
 import { SaveSettingsBar } from './save-settings-bar';
-import type { useRadarrFormOptions } from '@/providers/hooks/radarr.queries';
+import type { useRadarrFormOptions } from '@/queries/radarr';
 
 export const RadarrDefaultsSection: React.FC<{
   actions: SettingsActions;

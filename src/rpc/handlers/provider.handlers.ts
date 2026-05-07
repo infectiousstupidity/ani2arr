@@ -26,13 +26,13 @@ export const normalizeInputCredentials = (
 export function createProviderHandlers(
 	deps: ApiHandlerDeps,
 ): Pick<Ani2arrApi, "testProviderConnection"> {
-	const { sonarrClient, RadarrClient } = deps;
+	const { sonarrClient, radarrClient } = deps;
 
 	const testProviderConnectionInternal: Ani2arrApi["testProviderConnection"] =
 		async (input) => {
 			return input.provider === "sonarr"
 				? sonarrClient.testConnection(input.credentials)
-				: RadarrClient.testConnection(input.credentials);
+				: radarrClient.testConnection(input.credentials);
 		};
 
 	return {

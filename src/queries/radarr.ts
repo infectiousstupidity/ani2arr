@@ -1,8 +1,7 @@
-/** Radarr query hooks owned by the provider domain. */
-// src/providers/hooks/radarr.queries.ts
+/** React Query hooks for Radarr form options, library status, and mutations over RPC. */
+// src/queries/radarr.ts
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AniListId } from "@/anilist";
 import { getAni2arrApi } from "@/rpc";
 import type {
 	CheckMovieStatusResponse,
@@ -18,10 +17,9 @@ import {
 	type RadarrFormState,
 } from "@/providers/radarr/form-state";
 import type { PublicOptions } from "@/options";
-import type { ProviderCredentials, RadarrMovie } from "@/providers";
+import type { ProviderCredentials, RadarrMovie, TmdbId } from "@/providers";
 import type {
 	AddRadarrInput,
-	MovieLibraryStatusInput,
 	StatusInput,
 	UpdateRadarrInput,
 } from "@/rpc/schemas";
@@ -100,10 +98,7 @@ export const useMovieStatus = (
 };
 
 export const useMovieLibraryStatus = (
-	payload: {
-		anilistId: AniListId;
-		tmdbId: MovieLibraryStatusInput["tmdbId"];
-	} | null,
+	tmdbId: TmdbId | null,
 	options?: {
 		enabled?: boolean;
 		forceVerify?: boolean;
@@ -111,29 +106,17 @@ export const useMovieLibraryStatus = (
 ) => {
 	const forceVerify = options?.forceVerify === true;
 	return useQuery<RadarrMovieLibraryStatus, ExtensionError>({
-		queryKey: payload
-			? queryKeys.providerLibraryStatus(
-					"radarr",
-					payload.anilistId,
-					payload.tmdbId,
-				)
-			: [...queryKeys.seriesStatusRoot("radarr"), "providerLibraryStatus", null],
+		queryKey: queryKeys.radarrMovieLibraryStatus(tmdbId),
 		queryFn: async () => {
-			if (!payload) {
-				throw new Error("Movie library status payload is required");
+			if (!tmdbId) {
+				throw new Error("TMDB ID is required");
 			}
-			const request: MovieLibraryStatusInput = {
-				tmdbId: payload.tmdbId,
-			};
-			if (forceVerify) {
-				request.forceVerify = true;
-			}
-			return getAni2arrApi().getMovieLibraryStatus(request);
+			return getAni2arrApi().getMovieLibraryStatus({
+				tmdbId,
+				...(forceVerify ? { forceVerify } : {}),
+			});
 		},
-		enabled:
-			!!payload?.anilistId &&
-			!!payload.tmdbId &&
-			(options?.enabled ?? true),
+		enabled: !!tmdbId && (options?.enabled ?? true),
 		staleTime: forceVerify ? 0 : 5 * 60 * 1000,
 		refetchOnWindowFocus: false,
 		meta: { persist: false },

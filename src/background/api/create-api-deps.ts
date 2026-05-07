@@ -13,17 +13,16 @@ import {
 } from "@/mapping/auto-mapping/lookup/lookup.cache";
 import { anibridgeMappingCache } from "@/mapping/upstream-mapping/anibridge-mapping.cache";
 import { anilistMediaCache } from "@/anilist/media.cache";
-import { providerLibraryCaches } from "@/providers/library/cache";
 import { SonarrClient } from "@/providers/sonarr/client";
 import { SonarrLibrary } from "@/providers/sonarr/library";
 import { RadarrClient } from "@/providers/radarr/client";
+import { RadarrLibrary } from "@/providers/radarr/library";
 import {
 	getProviderHostPermissionPattern,
 	hasProviderHostPermission,
 	removeProviderHostPermission,
 } from "@/providers/settings/host-permissions";
 import { AniListMediaService, AniListMetadataStore } from "@/anilist";
-import { RadarrLibrary } from "@/providers/library/radarr-library";
 import { MappingService } from "@/mapping/mapping.service";
 import { ManualMappingService } from "@/mapping/manual-mapping";
 import { AutoMappingStore } from "@/mapping/auto-mapping/auto-mapping.store";
@@ -185,19 +184,20 @@ export const createApiDeps = (): ApiHandlerDeps => {
 			return;
 		}
 
-		await radarrLibrary.refreshCache(options);
+		const credentials = getProviderCredentials(options, "radarr");
+		if (!credentials) {
+			await radarrLibrary.clearMovieSnapshotCache();
+			return;
+		}
+
+		await radarrLibrary.refreshMovieSnapshots(credentials);
 	};
 
 	const sonarrLibrary = sonarrSeriesLibrary;
 
 	const radarrLibrary = bindAll(
 		new RadarrLibrary({
-			radarrClient,
-			mappingService,
-			manualMappingService,
-			anibridgeMappingStore,
-			caches: providerLibraryCaches.radarr,
-			emitLibraryMutation: () => bumpLibraryRevision("radarr"),
+			client: radarrClient,
 		}),
 	);
 
@@ -226,7 +226,7 @@ export const createApiDeps = (): ApiHandlerDeps => {
 					return;
 				}
 
-				await radarrLibrary.refreshCache(options);
+				await refreshProviderLibrary("radarr", options);
 			} catch (error) {
 				logError(
 					normalizeError(error),
@@ -353,7 +353,7 @@ export const createApiDeps = (): ApiHandlerDeps => {
 	return {
 		sonarrClient,
 		sonarrLookupClient: sonarrClient,
-		RadarrClient: radarrClient,
+		radarrClient,
 		anilistMediaService,
 		mappingService,
 		manualMappingService,

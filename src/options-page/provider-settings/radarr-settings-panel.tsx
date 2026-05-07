@@ -27,7 +27,7 @@ import {
 import { RadarrDefaultsSection } from "./radarr-defaults-section";
 import { useSelectPortal } from "./use-select-portal";
 import type { ExtensionOptions } from "@/options";
-import { useRadarrFormOptions } from "@/providers/hooks/radarr.queries";
+import { useRadarrFormOptions } from "@/queries/radarr";
 import { deriveProviderPanelConnectionState } from "./provider-settings-panel-state.shared";
 
 export interface RadarrSettingsPanelProps {

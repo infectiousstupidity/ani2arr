@@ -24,7 +24,7 @@ export function createRadarrHandlers(
 	"getRadarrFormOptions" | "searchRadarr" | "validateTmdbId"
 > {
 	const {
-		RadarrClient,
+		radarrClient,
 		radarrLibrary,
 		manualMappingService,
 		anibridgeMappingStore,
@@ -52,9 +52,9 @@ export function createRadarrHandlers(
 					: await providerConfig.requireCredentials("radarr");
 
 			const [qualityProfiles, rootFolders, tags] = await Promise.all([
-				RadarrClient.getQualityProfiles(credentials),
-				RadarrClient.getRootFolders(credentials),
-				RadarrClient.getTags(credentials),
+				radarrClient.getQualityProfiles(credentials),
+				radarrClient.getRootFolders(credentials),
+				radarrClient.getTags(credentials),
 			]);
 
 			const formOptions: ProviderFormOptions = {
@@ -78,8 +78,8 @@ export function createRadarrHandlers(
 			await manualMappingsReady;
 
 			const [results, library] = await Promise.all([
-				RadarrClient.lookupMovies(parsedInput.term, credentials),
-				radarrLibrary.getLeanMovieList(),
+				radarrClient.lookupMovies(parsedInput.term, credentials),
+				radarrLibrary.getMovieSnapshots(credentials),
 			]);
 
 			const libraryTmdbIds = library.map((movie) => movie.tmdbId);
@@ -112,13 +112,13 @@ export function createRadarrHandlers(
 		async validateTmdbId(input) {
 			const parsedInput = v.parse(ValidateTmdbInputSchema, input);
 			const credentials = await providerConfig.requireCredentials("radarr");
-			const found = await RadarrClient.findMovieByTmdbId(
+			const found = await radarrClient.findMovieByTmdbId(
 				parsedInput.tmdbId,
 				credentials,
 			);
 			let inCatalog = false;
 			try {
-				const lookup = await RadarrClient.lookupMovieByTmdbId(
+				const lookup = await radarrClient.lookupMovieByTmdbId(
 					parsedInput.tmdbId,
 					credentials,
 				);

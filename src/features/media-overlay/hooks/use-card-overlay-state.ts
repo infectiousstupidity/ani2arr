@@ -20,7 +20,7 @@ import {
 	useAddMovie,
 	useMovieLibraryStatus,
 	useMovieStatus,
-} from "@/providers/hooks/radarr.queries";
+} from "@/queries/radarr";
 import {
 	useAddSeries,
 	useSeriesLibraryStatus,
@@ -461,12 +461,7 @@ export const useCardOverlayState = ({
 		},
 	);
 	const movieLibraryStatusQuery = useMovieLibraryStatus(
-		mappedRadarrProviderId
-			? {
-					anilistId,
-					tmdbId: mappedRadarrProviderId,
-				}
-			: null,
+		mappedRadarrProviderId,
 		{
 			enabled:
 				provider === "radarr" &&

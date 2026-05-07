@@ -21,7 +21,7 @@ import {
   getProviderRouteSlug,
   type ProviderRouteSlugSource,
 } from '@/providers/provider-route-slug';
-import { useMovieStatus } from '@/providers/hooks/radarr.queries';
+import { useMovieStatus } from '@/queries/radarr';
 import { useSeriesStatus } from '@/queries/sonarr';
 
 const entryKindStyles: Record<EffectiveMappingKind, { label: string; className: string }> = {

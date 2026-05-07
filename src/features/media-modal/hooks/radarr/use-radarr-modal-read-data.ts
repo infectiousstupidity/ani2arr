@@ -1,3 +1,4 @@
+/** Builds Radarr modal read-side data from options, AniList metadata, and status queries. */
 // src/features/media-modal/hooks/radarr/use-radarr-modal-read-data.ts
 
 import { useMemo } from "react";
@@ -13,7 +14,7 @@ import type { CheckMovieStatusResponse } from "@/rpc/types";
 import {
 	useMovieStatus,
 	useRadarrFormOptions,
-} from "@/providers/hooks/radarr.queries";
+} from "@/queries/radarr";
 import { getProviderBaseUrl } from "@/options/provider-config";
 import { useAniListMedia, useAniListMetadataBatch } from "@/shared/queries";
 import * as manualMappingHelpers from "@/features/media-modal/mapping-search/current-mapping";

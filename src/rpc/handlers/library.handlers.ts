@@ -10,6 +10,10 @@ import {
 	toSonarrSeriesSnapshot,
 	type SonarrSeriesLibraryStatus,
 } from "@/providers/sonarr/library";
+import {
+	toRadarrMovieSnapshot,
+	type RadarrMovieLibraryStatus,
+} from "@/providers/radarr/library";
 import type { Ani2arrApi } from "@/rpc";
 import {
 	AddRadarrInputSchema,
@@ -21,13 +25,19 @@ import {
 	UpdateSonarrInputSchema,
 	type StatusInput,
 } from "@/rpc/schemas";
-import type { CheckSeriesStatusResponse } from "@/rpc/types";
-import { buildSeriesStatusResponseFromLibraryStatus } from "@/rpc/status-response-adapter";
+import type {
+	CheckMovieStatusResponse,
+	CheckSeriesStatusResponse,
+} from "@/rpc/types";
+import {
+	buildMovieStatusResponseFromLibraryStatus,
+	buildSeriesStatusResponseFromLibraryStatus,
+} from "@/rpc/status-response-adapter";
 import type { AutoMappingOptions } from "@/mapping/auto-mapping/types";
 import { ErrorCode, logError, normalizeError } from "@/shared/errors";
 import type { RequestPriority } from "@/shared/utils/request-priority";
 import type { AniListId } from "@/anilist";
-import type { TvdbId } from "@/providers";
+import type { TmdbId, TvdbId } from "@/providers";
 import type { ApiHandlerDeps } from "./handler-deps";
 
 type SonarrStatusPayload = Pick<
@@ -52,6 +62,17 @@ type SonarrMappingResult =
 	| { kind: "unmapped" }
 	| { kind: "failed"; response: CheckSeriesStatusResponse };
 
+type RadarrMappingResult =
+	| {
+			kind: "mapped";
+			tmdbId: TmdbId;
+			successfulSynonym?: string;
+			mappingReason?: CheckMovieStatusResponse["mappingReason"];
+			mappingSource?: CheckMovieStatusResponse["mappingSource"];
+	  }
+	| { kind: "unmapped" }
+	| { kind: "failed"; response: CheckMovieStatusResponse };
+
 export function createLibraryHandlers(
 	deps: ApiHandlerDeps,
 ): Pick<
@@ -67,7 +88,7 @@ export function createLibraryHandlers(
 > {
 	const {
 		sonarrClient,
-		RadarrClient,
+		radarrClient,
 		mappingService,
 		manualMappingService,
 		anibridgeMappingStore,
@@ -126,9 +147,17 @@ export function createLibraryHandlers(
 
 			const requestOptions = buildStatusOptions(parsedInput);
 
-			const status = await radarrLibrary.getMovieStatus(
+			const status = await getRadarrStatusFromMappingAndLibrary(
 				payload,
 				requestOptions,
+				{
+					mappingService,
+					manualMappingService,
+					anibridgeMappingStore,
+					radarrLibrary,
+					providerConfig,
+					bumpLibraryRevision,
+				},
 			);
 			return {
 				...status,
@@ -152,9 +181,12 @@ export function createLibraryHandlers(
 
 		async getMovieLibraryStatus(input) {
 			const parsedInput = v.parse(MovieLibraryStatusInputSchema, input);
-			return radarrLibrary.getMovieLibraryStatus({
+			return getRadarrLibraryStatusForRpc({
 				tmdbId: parsedInput.tmdbId,
 				forceVerify: parsedInput.forceVerify === true,
+				radarrLibrary,
+				providerConfig,
+				bumpLibraryRevision,
 			});
 		},
 
@@ -194,10 +226,10 @@ export function createLibraryHandlers(
 					credentials,
 				},
 				{
-					client: RadarrClient,
+					client: radarrClient,
 				},
 			);
-			await radarrLibrary.addMovieToCache(created);
+			await radarrLibrary.upsertMovieSnapshot(toRadarrMovieSnapshot(created));
 			scheduleLibraryRefresh("radarr", options);
 			await bumpLibraryRevision("radarr");
 			return created;
@@ -247,10 +279,10 @@ export function createLibraryHandlers(
 					credentials,
 				},
 				{
-					client: RadarrClient,
+					client: radarrClient,
 				},
 			);
-			await radarrLibrary.addMovieToCache(updated);
+			await radarrLibrary.upsertMovieSnapshot(toRadarrMovieSnapshot(updated));
 			scheduleLibraryRefresh("radarr");
 			await bumpLibraryRevision("radarr");
 			return updated;
@@ -304,6 +336,137 @@ async function getSonarrLibraryStatusForRpc(input: {
 		onCacheChanged: () => input.bumpLibraryRevision("sonarr"),
 	});
 	return status;
+}
+
+async function getRadarrLibraryStatusForRpc(input: {
+	tmdbId: TmdbId;
+	forceVerify?: boolean;
+	radarrLibrary: ApiHandlerDeps["radarrLibrary"];
+	providerConfig: ApiHandlerDeps["providerConfig"];
+	bumpLibraryRevision: ApiHandlerDeps["bumpLibraryRevision"];
+}): Promise<RadarrMovieLibraryStatus> {
+	const credentials = await input.providerConfig.get("radarr");
+	if (!credentials) {
+		await input.radarrLibrary.clearMovieSnapshotCache();
+		return {
+			provider: "radarr",
+			providerId: input.tmdbId,
+			isInLibrary: false,
+		};
+	}
+
+	const status = await input.radarrLibrary.getMovieLibraryStatusByTmdbId({
+		tmdbId: input.tmdbId,
+		credentials,
+		...(input.forceVerify === undefined
+			? {}
+			: { forceVerify: input.forceVerify }),
+		onCacheChanged: () => input.bumpLibraryRevision("radarr"),
+	});
+	return status;
+}
+
+async function getRadarrStatusFromMappingAndLibrary(
+	payload: SonarrStatusPayload,
+	options: ProviderStatusOptions,
+	deps: Pick<
+		ApiHandlerDeps,
+		| "mappingService"
+		| "manualMappingService"
+		| "anibridgeMappingStore"
+		| "radarrLibrary"
+		| "providerConfig"
+		| "bumpLibraryRevision"
+	>,
+): Promise<CheckMovieStatusResponse> {
+	logRadarrStatusStart(payload, options);
+
+	const credentials = await deps.providerConfig.get("radarr");
+	if (!credentials) {
+		return {
+			providerId: null,
+			providerMappingState: "unknown",
+			isInLibrary: null,
+			mappingUnknownReason: "provider-not-configured",
+		};
+	}
+
+	if (options.network === "never") {
+		return {
+			providerId: null,
+			providerMappingState: "unknown",
+			isInLibrary: null,
+			mappingUnknownReason: "network-disabled",
+		};
+	}
+
+	const mapping = await resolveRadarrMapping(
+		payload,
+		payload.title?.trim(),
+		options,
+		deps,
+	);
+	if (mapping.kind === "failed") return mapping.response;
+	if (mapping.kind === "unmapped") return resolveUnmappedRadarr(payload, deps);
+
+	return buildMappedRadarrStatus(payload.anilistId, mapping, options, deps);
+}
+
+async function resolveUnmappedRadarr(
+	payload: SonarrStatusPayload,
+	deps: Pick<ApiHandlerDeps, "mappingService">,
+): Promise<CheckMovieStatusResponse> {
+	const unresolved = await resolveUnknownRadarrOutcome(
+		payload.anilistId,
+		deps,
+	);
+	if (import.meta.env.DEV) {
+		console.debug(
+			`[ani2arr | RadarrStatus] result anilistId=${payload.anilistId} outcome=unresolved`,
+		);
+	}
+	return {
+		providerId: null,
+		isInLibrary: null,
+		...unresolved,
+	};
+}
+
+async function buildMappedRadarrStatus(
+	anilistId: AniListId,
+	mapping: Extract<RadarrMappingResult, { kind: "mapped" }>,
+	options: ProviderStatusOptions,
+	deps: Pick<
+		ApiHandlerDeps,
+		| "radarrLibrary"
+		| "providerConfig"
+		| "manualMappingService"
+		| "anibridgeMappingStore"
+		| "bumpLibraryRevision"
+	>,
+): Promise<CheckMovieStatusResponse> {
+	const libraryStatus = await getRadarrLibraryStatusForRpc({
+		tmdbId: mapping.tmdbId,
+		forceVerify: options.force_verify === true,
+		radarrLibrary: deps.radarrLibrary,
+		providerConfig: deps.providerConfig,
+		bumpLibraryRevision: deps.bumpLibraryRevision,
+	});
+	const status = buildMovieStatusResponseFromLibraryStatus({
+		providerId: mapping.tmdbId,
+		...(mapping.mappingSource ? { mappingSource: mapping.mappingSource } : {}),
+		...(mapping.mappingReason ? { mappingReason: mapping.mappingReason } : {}),
+		libraryStatus,
+	});
+	const linkedAniListIds = getLinkedRadarrAniListIds(mapping.tmdbId, deps);
+
+	return {
+		...status,
+		...(mapping.successfulSynonym
+			? { successfulSynonym: mapping.successfulSynonym }
+			: {}),
+		...(linkedAniListIds ? { linkedAniListIds } : {}),
+	};
 }
 
 async function getSeriesStatusFromMappingAndLibrary(
@@ -422,6 +585,59 @@ function logSeriesStatusStart(
 	);
 }
 
+function logRadarrStatusStart(
+	payload: SonarrStatusPayload,
+	options: ProviderStatusOptions,
+): void {
+	if (!import.meta.env.DEV) return;
+
+	const priority = options.priority ?? "normal";
+	const network = options.network ?? "allow";
+	console.debug(
+		`[ani2arr | RadarrStatus] start anilistId=${payload.anilistId} priority=${priority} network=${network} force_verify=${String(options.force_verify === true)}`,
+	);
+}
+
+async function resolveRadarrMapping(
+	payload: SonarrStatusPayload,
+	normalizedTitle: string | undefined,
+	options: ProviderStatusOptions,
+	deps: Pick<ApiHandlerDeps, "mappingService">,
+): Promise<RadarrMappingResult> {
+	if (options.priority === "high") {
+		try {
+			deps.mappingService.prioritizeAniListMedia?.(payload.anilistId, {
+				schedule: false,
+			});
+		} catch {
+			// best-effort
+		}
+	}
+
+	try {
+		logRadarrLookupStart(payload, options);
+		const mapping = await deps.mappingService.resolveProviderId(
+			"radarr",
+			payload.anilistId,
+			buildMappingOptions(payload, normalizedTitle, options),
+		);
+		if (!mapping) return { kind: "unmapped" };
+
+		return {
+			kind: "mapped",
+			tmdbId: mapping.providerId,
+			...(mapping.successfulSynonym
+				? { successfulSynonym: mapping.successfulSynonym }
+				: {}),
+			mappingReason: mapping.reason,
+			mappingSource: resolveMappingSource(mapping.reason),
+		};
+	} catch (error) {
+		const response = toRadarrMappingErrorResponse(error, payload);
+		return { kind: "failed", response };
+	}
+}
+
 async function resolveSeriesMapping(
 	payload: SonarrStatusPayload,
 	normalizedTitle: string | undefined,
@@ -489,6 +705,17 @@ function logSeriesLookupStart(
 	);
 }
 
+function logRadarrLookupStart(
+	payload: SonarrStatusPayload,
+	options: ProviderStatusOptions,
+): void {
+	if (!import.meta.env.DEV) return;
+
+	console.debug(
+		`[ani2arr | RadarrStatus] lookup-start anilistId=${payload.anilistId} priority=${options.priority ?? "normal"} network=${options.network ?? "allow"} force_verify=${String(options.force_verify === true)}`,
+	);
+}
+
 function toSeriesMappingErrorResponse(
 	error: unknown,
 	payload: SonarrStatusPayload,
@@ -512,6 +739,36 @@ function toSeriesMappingErrorResponse(
 	}
 
 	logError(normalized, `SonarrStatus:getSeriesStatus:${payload.anilistId}`);
+	return {
+		providerId: null,
+		providerMappingState: "unknown",
+		isInLibrary: null,
+		mappingUnknownReason: "lookup-failed",
+	};
+}
+
+function toRadarrMappingErrorResponse(
+	error: unknown,
+	payload: SonarrStatusPayload,
+): CheckMovieStatusResponse {
+	const normalized = normalizeError(error);
+	if (
+		normalized.code === ErrorCode.CONFIGURATION_ERROR ||
+		(normalized.code === ErrorCode.VALIDATION_ERROR &&
+			normalized.details?.reason === "network-disabled")
+	) {
+		return {
+			providerId: null,
+			providerMappingState: "unknown",
+			isInLibrary: null,
+			mappingUnknownReason:
+				normalized.details?.reason === "network-disabled"
+					? "network-disabled"
+					: "provider-not-configured",
+		};
+	}
+
+	logError(normalized, `RadarrStatus:getMovieStatus:${payload.anilistId}`);
 	return {
 		providerId: null,
 		providerMappingState: "unknown",
@@ -564,6 +821,34 @@ async function resolveUnknownSeriesOutcome(
 	};
 }
 
+async function resolveUnknownRadarrOutcome(
+	anilistId: AniListId,
+	deps: Pick<ApiHandlerDeps, "mappingService">,
+): Promise<
+	Pick<
+		CheckMovieStatusResponse,
+		"providerMappingState" | "mappingUnknownReason" | "resolverOutcome"
+	>
+> {
+	const resolverState = await deps.mappingService.getAutoMapping(
+		"radarr",
+		anilistId,
+	);
+	if (resolverState?.state === "ambiguous") {
+		return {
+			providerMappingState: "unknown",
+			mappingUnknownReason: "ambiguous",
+			resolverOutcome: "ambiguous",
+		};
+	}
+	return {
+		providerMappingState: "unmapped",
+		...(resolverState?.state === "unresolved"
+			? { resolverOutcome: "unresolved" as const }
+			: {}),
+	};
+}
+
 function getLinkedAniListIds(
 	tvdbId: TvdbId,
 	deps: Pick<
@@ -575,6 +860,22 @@ function getLinkedAniListIds(
 		deps.manualMappingService.getLinkedAniListIds("sonarr", tvdbId),
 	);
 	for (const id of deps.anibridgeMappingStore.getAniListIdsForTvdb(tvdbId)) {
+		linked.add(id);
+	}
+	return linked.size > 0 ? [...linked] : undefined;
+}
+
+function getLinkedRadarrAniListIds(
+	tmdbId: TmdbId,
+	deps: Pick<
+		ApiHandlerDeps,
+		"manualMappingService" | "anibridgeMappingStore"
+	>,
+): number[] | undefined {
+	const linked = new Set<number>(
+		deps.manualMappingService.getLinkedAniListIds("radarr", tmdbId),
+	);
+	for (const id of deps.anibridgeMappingStore.getAniListIdsForTmdb(tmdbId)) {
 		linked.add(id);
 	}
 	return linked.size > 0 ? [...linked] : undefined;

@@ -5,7 +5,7 @@ import type { AniListId } from "@/anilist";
 import { isAniListId } from "@/anilist/anilist-id";
 import type { StatusInput, GetMappingsInput } from "@/rpc/schemas";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
-import type { Provider, TvdbId } from "@/providers";
+import type { Provider, TmdbId, TvdbId } from "@/providers";
 import type { ProviderExternalId } from "@/mapping/types";
 
 const rootQueryKey = ["a2a"] as const;
@@ -116,6 +116,8 @@ export const queryKeys = {
 		] as const,
 	sonarrSeriesLibraryStatus: (tvdbId: TvdbId | null) =>
 		[...rootQueryKey, "sonarrSeriesLibraryStatus", tvdbId] as const,
+	radarrMovieLibraryStatus: (tmdbId: TmdbId | null) =>
+		[...rootQueryKey, "radarrMovieLibraryStatus", tmdbId] as const,
 	sonarrFormOptionsRoot: () => providerFormOptionsRootKey("sonarr"),
 	sonarrFormOptions: (scope?: string) =>
 		[...rootQueryKey, "sonarrFormOptions", scope ?? "configured"] as const,
