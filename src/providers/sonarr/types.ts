@@ -8,35 +8,21 @@ import type {
 	SonarrAlternateTitlesSchema,
 	SonarrAddPayloadOptionsSchema,
 	SonarrAddOptionsSchema,
-	SonarrEditMonitoringActionSchema,
 	SonarrEditOptionsSchema,
 	SonarrGeneratedFolderSchema,
 	SonarrImageSchema,
 	SonarrLookupCacheRowSchema,
 	SonarrLookupSeriesSchema,
-	SonarrMonitorNewItemsOptionSchema,
-	SonarrMonitorOptionSchema,
 	SonarrQualityProfileSchema,
 	SonarrRootFolderSchema,
 	SonarrSeasonSchema,
 	SonarrSeriesSchema,
 	SonarrSeriesSnapshotSchema,
 	SonarrSeriesStatusSchema,
-	SonarrSeriesTypeSchema,
 	SonarrTagSchema,
 	UpdateSonarrSeriesInputSchema,
 } from "./schemas";
 
-export type SonarrSeriesType = v.InferOutput<typeof SonarrSeriesTypeSchema>;
-export type SonarrMonitorOption = v.InferOutput<
-	typeof SonarrMonitorOptionSchema
->;
-export type SonarrEditMonitoringAction = v.InferOutput<
-	typeof SonarrEditMonitoringActionSchema
->;
-export type SonarrMonitorNewItemsOption = v.InferOutput<
-	typeof SonarrMonitorNewItemsOptionSchema
->;
 export type SonarrSeriesStatus = v.InferOutput<typeof SonarrSeriesStatusSchema>;
 
 export type SonarrAlternateTitles = v.InferOutput<
