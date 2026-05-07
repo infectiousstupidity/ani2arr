@@ -2,7 +2,7 @@ allowBuilds:
   esbuild: true
   sharp: true
   spawn-sync: true
-  unrs-resolver: set this to true or false
+  unrs-resolver: true
 supportedArchitectures:
   cpu:
     - current
