@@ -18,7 +18,7 @@ type NormalizedSonarrTagLabel = {
 	key: string;
 };
 
-export function normalizeSonarrTagLabel(
+function normalizeSonarrTagLabel(
 	label: string | null | undefined,
 ): NormalizedSonarrTagLabel | null {
 	if (typeof label !== "string") return null;

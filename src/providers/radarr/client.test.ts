@@ -96,7 +96,7 @@ describe("RadarrClient", () => {
 		]);
 	});
 
-	it("normalizes lookup resources as smaller lookup movies", async () => {
+	it("normalizes lookup resources without dropping Radarr fields", async () => {
 		mockJson([
 			{
 				id: 0,
@@ -107,17 +107,25 @@ describe("RadarrClient", () => {
 				remotePoster: " https://image.example/poster.jpg ",
 				folder: " Lookup Folder ",
 				hasFile: true,
+				secondaryYearSourceId: 200,
+				ratings: { imdb: { value: 8.1 } },
 			},
 		]);
 
 		await expect(createClient().lookupMovies("movie", credentials)).resolves.toEqual(
 			[
 				{
+					id: 0,
 					title: "Lookup Movie",
 					tmdbId: 789,
+					folder: " Lookup Folder ",
 					folderName: "Lookup Folder",
 					remotePoster: "https://image.example/poster.jpg",
 					hasFile: true,
+					qualityProfileId: 12,
+					rootFolderPath: "/movies",
+					secondaryYearSourceId: 200,
+					ratings: { imdb: { value: 8.1 } },
 				},
 			],
 		);
@@ -131,48 +139,30 @@ describe("RadarrClient", () => {
 		);
 	});
 
-	it("looks up movies by TMDB and IMDb IDs", async () => {
+	it("looks up movies by TMDB ID", async () => {
 		const fetchMock = vi.fn<typeof fetch>();
-		fetchMock
-			.mockResolvedValueOnce(
-				createJsonResponse({
-					id: 0,
-					title: "TMDB Movie",
-					tmdbId: 456,
-				}),
-			)
-			.mockResolvedValueOnce(
-				createJsonResponse({
-					id: 0,
-					title: "IMDb Movie",
-					tmdbId: 789,
-					imdbId: "tt1234567",
-				}),
-			);
+		fetchMock.mockResolvedValueOnce(
+			createJsonResponse({
+				id: 0,
+				title: "TMDB Movie",
+				tmdbId: 456,
+			}),
+		);
 		vi.stubGlobal("fetch", fetchMock);
 
 		await expect(
 			createClient().lookupMovieByTmdbId(parseTmdbId(456), credentials),
 		).resolves.toMatchObject({ title: "TMDB Movie", tmdbId: 456 });
-		await expect(
-			createClient().lookupMovieByImdbId(" tt1234567 ", credentials),
-		).resolves.toMatchObject({
-			title: "IMDb Movie",
-			tmdbId: 789,
-			imdbId: "tt1234567",
-		});
 
 		expect(fetchMock.mock.calls[0]?.[0]).toBe(
 			"https://radarr.example/api/v3/movie/lookup/tmdb?tmdbId=456",
-		);
-		expect(fetchMock.mock.calls[1]?.[0]).toBe(
-			"https://radarr.example/api/v3/movie/lookup/imdb?imdbId=tt1234567",
 		);
 	});
 
 	it("posts add movie payloads with Radarr defaults", async () => {
 		const fetchMock = mockJson(movie);
 		const payload: RadarrAddMoviePayload = {
+			id: 0,
 			title: "Existing Movie",
 			tmdbId: parseTmdbId(456),
 			qualityProfileId: parseProviderQualityProfileId(2),
@@ -180,7 +170,7 @@ describe("RadarrClient", () => {
 			monitored: true,
 			minimumAvailability: "released",
 			tags: [parseProviderTagId(7)],
-			addOptions: { searchForMovie: true },
+			addOptions: { monitor: "movieOnly", searchForMovie: true },
 		};
 
 		await expect(createClient().addMovie(payload, credentials)).resolves.toEqual(
@@ -194,10 +184,7 @@ describe("RadarrClient", () => {
 		expect(request.method).toBe("POST");
 		expect(JSON.parse(String(request.body))).toEqual({
 			...payload,
-			monitored: true,
-			minimumAvailability: "released",
-			tags: [7],
-			addOptions: { searchForMovie: true },
+			addOptions: { monitor: "movieOnly", searchForMovie: true },
 		});
 	});
 

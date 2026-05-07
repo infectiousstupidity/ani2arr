@@ -5,7 +5,7 @@ import { createError, ErrorCode } from "@/shared/errors";
 import type { ProviderCredentials } from "../types";
 import type { RadarrClient } from "./client";
 import type { RadarrFormState } from "./form-state";
-import type { RadarrMinimumAvailability } from "./schemas";
+import type { RadarrMinimumAvailability, RadarrMovieMonitor } from "./schemas";
 import type {
 	RadarrLookupMovie,
 	RadarrMovie,
@@ -15,14 +15,18 @@ import type {
 } from "./types";
 import { resolveRadarrTagIds } from "./tags";
 
-export type RadarrAddMoviePayload = {
+export type RadarrAddMoviePayload = Omit<
+	RadarrLookupMovie,
+	"addOptions" | "id" | "minimumAvailability" | "monitored" | "qualityProfileId" | "rootFolderPath" | "tags"
+> & {
+	id: 0;
 	rootFolderPath: string;
 	qualityProfileId: RadarrQualityProfileId;
 	monitored: boolean;
 	minimumAvailability: RadarrMinimumAvailability;
 	tags: RadarrTagId[];
-	addOptions: { searchForMovie: boolean };
-} & RadarrLookupMovie;
+	addOptions: { monitor: RadarrMovieMonitor; searchForMovie: boolean };
+};
 
 type AddRadarrMovieInput = {
 	tmdbId: TmdbId;
@@ -38,12 +42,12 @@ type AddRadarrMovieDeps = {
 	>;
 };
 
-export function buildAddRadarrMoviePayload(
+function buildAddRadarrMoviePayload(
 	movie: RadarrLookupMovie,
 	options: {
 		rootFolderPath: string;
 		qualityProfileId: RadarrQualityProfileId;
-		monitored: boolean;
+		monitor: RadarrMovieMonitor;
 		minimumAvailability: RadarrMinimumAvailability;
 		searchForMovie: boolean;
 		tags: RadarrTagId[];
@@ -51,12 +55,14 @@ export function buildAddRadarrMoviePayload(
 ): RadarrAddMoviePayload {
 	return {
 		...movie,
+		id: 0,
 		rootFolderPath: options.rootFolderPath,
 		qualityProfileId: options.qualityProfileId,
-		monitored: options.monitored,
+		monitored: options.monitor !== "none",
 		minimumAvailability: options.minimumAvailability,
 		tags: options.tags,
 		addOptions: {
+			monitor: options.monitor,
 			searchForMovie: options.searchForMovie,
 		},
 	};
@@ -95,12 +101,7 @@ async function resolveRadarrAddPayload(input: {
 		fallback: defaults.rootFolderPath,
 		actionLabel: "add",
 	});
-	const monitored = resolveRequiredBoolean({
-		value: form.monitored,
-		fallback: defaults.monitored,
-		fieldLabel: "monitor setting",
-		userMessage: "Select whether Radarr should monitor this movie before adding it.",
-	});
+	const monitor = form.addOptions?.monitor ?? defaults.addOptions?.monitor;
 	const minimumAvailability =
 		form.minimumAvailability ?? defaults.minimumAvailability;
 	if (!minimumAvailability) {
@@ -111,12 +112,23 @@ async function resolveRadarrAddPayload(input: {
 		);
 	}
 
-	const searchForMovie = resolveRequiredBoolean({
-		value: form.addOptions?.searchForMovie,
-		fallback: defaults.addOptions?.searchForMovie,
-		fieldLabel: "search setting",
-		userMessage: "Select whether Radarr should search after adding this movie.",
-	});
+	if (!monitor) {
+		throw createError(
+			ErrorCode.VALIDATION_ERROR,
+			"Missing Radarr monitor option for add.",
+			"Select a Radarr monitor option before adding this movie.",
+		);
+	}
+
+	const searchForMovie =
+		form.addOptions?.searchForMovie ?? defaults.addOptions?.searchForMovie;
+	if (searchForMovie === undefined) {
+		throw createError(
+			ErrorCode.VALIDATION_ERROR,
+			"Missing Radarr search setting for add.",
+			"Select whether Radarr should search after adding this movie.",
+		);
+	}
 
 	const movie = await api.lookupMovieByTmdbId(tmdbId, credentials);
 	if (!movie) {
@@ -138,7 +150,7 @@ async function resolveRadarrAddPayload(input: {
 	return buildAddRadarrMoviePayload(movie, {
 		qualityProfileId,
 		rootFolderPath,
-		monitored,
+		monitor,
 		minimumAvailability,
 		searchForMovie,
 		tags,
@@ -178,26 +190,6 @@ function resolveRequiredRootFolderPath(input: {
 			ErrorCode.VALIDATION_ERROR,
 			`Missing Radarr root folder for ${input.actionLabel}.`,
 			"Select a Radarr root folder before adding this movie.",
-		);
-	}
-
-	return resolvedValue;
-}
-
-function resolveRequiredBoolean(input: {
-	value: boolean | undefined;
-	fallback: boolean | undefined;
-	fieldLabel: string;
-	userMessage: string;
-}): boolean {
-	const resolvedValue =
-		typeof input.value === "boolean" ? input.value : input.fallback;
-
-	if (typeof resolvedValue !== "boolean") {
-		throw createError(
-			ErrorCode.VALIDATION_ERROR,
-			`Missing Radarr ${input.fieldLabel} for add.`,
-			input.userMessage,
 		);
 	}
 

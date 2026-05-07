@@ -108,14 +108,6 @@ export class SonarrLibrary {
 		return this.refreshPromise;
 	}
 
-	public async findSeriesSnapshotByTvdbId(
-		tvdbId: TvdbId,
-		credentials: ProviderCredentials,
-	): Promise<SonarrSeriesSnapshot | null> {
-		const snapshots = await this.getSeriesSnapshots(credentials);
-		return snapshots.find((series) => series.tvdbId === tvdbId) ?? null;
-	}
-
 	public async findSeriesByTvdbId(
 		tvdbId: TvdbId,
 		credentials: ProviderCredentials,

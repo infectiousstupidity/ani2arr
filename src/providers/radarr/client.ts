@@ -81,40 +81,13 @@ export class RadarrClient extends ProviderApiClient {
 		return movie.tmdbId === tmdbId ? movie : null;
 	}
 
-	public async lookupMovieByImdbId(
-		imdbId: string,
-		credentials: ProviderCredentials,
-	): Promise<RadarrLookupMovie | null> {
-		const trimmed = imdbId.trim();
-		if (!trimmed) {
-			throw createError(
-				ErrorCode.VALIDATION_ERROR,
-				"IMDb ID is empty.",
-				"IMDb ID cannot be empty.",
-			);
-		}
-
-		const qs = new URLSearchParams({ imdbId: trimmed }).toString();
-		const json = await this.requestJson(`movie/lookup/imdb?${qs}`, credentials);
-		const movie = v.parse(RadarrLookupMovieSchema, json);
-		return movie.imdbId === trimmed ? movie : null;
-	}
-
 	public async addMovie(
 		payload: RadarrAddMoviePayload,
 		credentials: ProviderCredentials,
 	): Promise<RadarrMovie> {
 		const json = await this.requestJson("movie", credentials, {
 			method: "POST",
-			json: {
-				...payload,
-				monitored: payload.monitored ?? true,
-				minimumAvailability: payload.minimumAvailability ?? "released",
-				tags: payload.tags ?? [],
-				addOptions: {
-					searchForMovie: payload.addOptions?.searchForMovie ?? true,
-				},
-			},
+			json: payload,
 		});
 		return v.parse(RadarrMovieSchema, json);
 	}

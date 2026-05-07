@@ -9,36 +9,43 @@ import {
 } from "@/providers/schemas";
 
 import {
-	RADARR_MINIMUM_AVAILABILITY_OPTIONS,
 	RadarrMinimumAvailabilitySchema,
+	RadarrMovieMonitorSchema,
 } from "./schemas";
-import type { RadarrMinimumAvailability } from "./schemas";
 
 const FreeformTagsSchema = v.fallback(v.array(v.string()), []);
 
-const RadarrProviderFieldEntries = {
+const RadarrSharedFieldEntries = {
 	qualityProfileId: v.optional(ProviderQualityProfileIdSchema),
 	rootFolderPath: v.optional(v.string()),
-	monitored: v.optional(v.boolean()),
 	tags: v.optional(v.array(ProviderTagIdSchema)),
 	minimumAvailability: v.optional(RadarrMinimumAvailabilitySchema),
+} as const;
+
+const RadarrAddFieldEntries = {
+	...RadarrSharedFieldEntries,
 	addOptions: v.optional(
 		v.object({
+			monitor: v.optional(RadarrMovieMonitorSchema),
 			searchForMovie: v.optional(v.boolean()),
 		}),
 	),
 } as const;
 
-export const RadarrDefaultsSchema = v.object(RadarrProviderFieldEntries);
+export const RadarrDefaultsSchema = v.object(RadarrAddFieldEntries);
 
 export const RadarrFormStateSchema = v.object({
-	...RadarrProviderFieldEntries,
+	...RadarrAddFieldEntries,
+	monitored: v.optional(v.boolean()),
 	freeformTags: FreeformTagsSchema,
 });
 
 export type RadarrFormState = v.InferOutput<typeof RadarrFormStateSchema>;
-export { RADARR_MINIMUM_AVAILABILITY_OPTIONS } from "./schemas";
-export type { RadarrMinimumAvailability } from "./schemas";
+export {
+	RADARR_MINIMUM_AVAILABILITY_OPTIONS,
+	RADARR_MOVIE_MONITOR_OPTIONS,
+} from "./schemas";
+export type { RadarrMinimumAvailability, RadarrMovieMonitor } from "./schemas";
 
 export function normalizeRadarrFormState(
 	input: Partial<RadarrFormState> | null | undefined,
@@ -55,42 +62,9 @@ export function stripRadarrFormStateForDefaults(
 export const createDefaultRadarrFormState = (): RadarrFormState =>
 	normalizeRadarrFormState({
 		...v.parse(RadarrDefaultsSchema, {}),
-		monitored: true,
 		minimumAvailability: "released",
 		addOptions: {
+			monitor: "movieOnly",
 			searchForMovie: true,
 		},
 	});
-
-const RADARR_MINIMUM_AVAILABILITY_DETAILS = {
-	tba: {
-		label: "TBA",
-		description: "Wait until availability is no longer to be announced.",
-	},
-	announced: {
-		label: "Announced",
-		description: "Allow adds before a theatrical or digital date exists.",
-	},
-	inCinemas: {
-		label: "In Cinemas",
-		description: "Wait until the movie has a theatrical release.",
-	},
-	released: {
-		label: "Released",
-		description: "Wait until the movie is officially released.",
-	},
-	deleted: {
-		label: "Deleted",
-		description:
-			"Matches the provider enum exactly, even though it is not expected for add defaults.",
-	},
-} satisfies Record<
-	RadarrMinimumAvailability,
-	{ label: string; description: string }
->;
-
-export const MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS =
-	RADARR_MINIMUM_AVAILABILITY_OPTIONS.map((value) => ({
-		value,
-		...RADARR_MINIMUM_AVAILABILITY_DETAILS[value],
-	}));

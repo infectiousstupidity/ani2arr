@@ -3,6 +3,7 @@
 
 import type { ComponentProps } from "react";
 import { RadarrAddOptionsFields } from "@/components/provider-add-options/radarr-add-options-fields";
+import { RadarrEditOptionsFields } from "@/components/provider-add-options/radarr-edit-options-fields";
 import { BaseProviderSetupPanel } from "./provider-setup-panel";
 import type { RadarrSetupFormState } from "../../hooks/radarr/use-radarr-setup-form";
 
@@ -82,15 +83,27 @@ export function RadarrSetupPane({
 			headerDescription={getHeaderDescription(mode)}
 		>
 			{formState && formOptions ? (
-				<RadarrAddOptionsFields
-					values={formState.currentDraft}
-					onChange={formState.handleFieldChange}
-					disabled={formState.isBusy || setupMutationsBlocked}
-					portalContainer={portalContainer}
-					formOptions={formOptions}
-					pathPreview={formState.pathPreview}
-					layout="stacked"
-				/>
+				mode === "edit" ? (
+					<RadarrEditOptionsFields
+						values={formState.currentDraft}
+						onChange={formState.handleFieldChange}
+						disabled={formState.isBusy || setupMutationsBlocked}
+						portalContainer={portalContainer}
+						formOptions={formOptions}
+						pathPreview={formState.pathPreview}
+						layout="stacked"
+					/>
+				) : (
+					<RadarrAddOptionsFields
+						values={formState.currentDraft}
+						onChange={formState.handleFieldChange}
+						disabled={formState.isBusy || setupMutationsBlocked}
+						portalContainer={portalContainer}
+						formOptions={formOptions}
+						pathPreview={formState.pathPreview}
+						layout="stacked"
+					/>
+				)
 			) : null}
 		</BaseProviderSetupPanel>
 	);
