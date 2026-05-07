@@ -16,7 +16,7 @@ import {
 	normalizeRadarrFormState,
 	stripRadarrFormStateForDefaults,
 	type RadarrFormState,
-} from "@/providers/settings/provider-settings.schema";
+} from "@/providers/radarr/form-state";
 import type { PublicOptions } from "@/options";
 import type { ProviderCredentials, RadarrMovie } from "@/providers";
 import type {

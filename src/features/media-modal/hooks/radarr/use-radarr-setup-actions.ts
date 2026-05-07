@@ -3,7 +3,7 @@
 
 import type { AniListId } from "@/anilist";
 import { useAddMovie, useUpdateMovie } from "@/providers/hooks/radarr.queries";
-import { type RadarrFormState } from "@/providers/settings/provider-settings.schema";
+import { type RadarrFormState } from "@/providers/radarr/form-state";
 import type { RadarrSetupTarget } from "../../setup-target";
 
 type AddMovieVariables = Parameters<

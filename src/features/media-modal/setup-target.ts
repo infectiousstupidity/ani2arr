@@ -12,9 +12,7 @@ import {
 } from "@/providers";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
-import type {
-	RadarrFormState,
-} from "@/providers/settings/provider-settings.schema";
+import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type {
 	CheckMovieStatusResponse,
 	CheckSeriesStatusResponse,

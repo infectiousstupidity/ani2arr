@@ -13,7 +13,7 @@ import type {
 } from "@/rpc/types";
 import type { ProviderFormOptions } from "@/providers";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
-import type { RadarrFormState } from "@/providers/settings/provider-settings.schema";
+import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type {
 	RadarrLaunchSnapshot,
 	SonarrLaunchSnapshot,

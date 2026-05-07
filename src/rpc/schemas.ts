@@ -7,9 +7,7 @@ import { MAPPING_ENTRY_KIND_VALUES } from "@/mapping/types";
 import { PROVIDERS, TmdbIdSchema, TvdbIdSchema } from "@/providers";
 import { SonarrFormStateSchema } from "@/providers/sonarr/form-state";
 import { SonarrEditMonitoringActionSchema } from "@/providers/sonarr/schemas";
-import {
-	RadarrFormStateSchema,
-} from "@/providers/settings/provider-settings.schema";
+import { RadarrFormStateSchema } from "@/providers/radarr/form-state";
 
 // ============================================================================
 // Shared / Reusable Validators

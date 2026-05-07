@@ -9,9 +9,7 @@ import {
 	type ExtensionOptions,
 } from "@/options";
 import { normalizeSonarrFormState } from "@/providers/sonarr/form-state";
-import {
-	normalizeRadarrFormState,
-} from "@/providers/settings/provider-settings.schema";
+import { normalizeRadarrFormState } from "@/providers/radarr/form-state";
 import { NotifyProviderConnectionChangedInputSchema } from "@/rpc/schemas";
 import type { ApiHandlerDeps } from "./handler-deps";
 

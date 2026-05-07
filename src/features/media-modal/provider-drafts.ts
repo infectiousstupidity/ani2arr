@@ -11,7 +11,7 @@ import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
 import {
 	normalizeRadarrFormState,
 	type RadarrFormState,
-} from "@/providers/settings/provider-settings.schema";
+} from "@/providers/radarr/form-state";
 
 export const SONARR_EDIT_MONITORING_ACTION_DEFAULT = "noChange" as const;
 

@@ -10,7 +10,7 @@ import {
 import {
   normalizeRadarrFormState,
   stripRadarrFormStateForDefaults,
-} from '@/providers/settings/provider-settings.schema';
+} from '@/providers/radarr/form-state';
 import { isAniListTitleLanguage } from '@/anilist/schemas/title-language.schema';
 import { logger } from '@/shared/utils/logger';
 import { ExtensionOptionsSchema, createDefaultExtensionOptions } from './schema';

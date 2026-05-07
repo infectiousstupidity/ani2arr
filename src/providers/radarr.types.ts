@@ -1,7 +1,7 @@
 /** LEGACY:Radarr resource types owned by the provider domain until Radarr moves into src/providers/radarr. */
 // src/providers/radarr.types.ts
 
-import type { RadarrMinimumAvailability } from "@/providers/settings/provider-settings.schema";
+import type { RadarrMinimumAvailability } from "@/providers/radarr/form-state";
 import type {
 	ProviderQualityProfileId,
 	ProviderTagId,

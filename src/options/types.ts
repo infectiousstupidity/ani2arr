@@ -3,7 +3,7 @@
 
 import type { AniListTitleLanguage } from '@/anilist/schemas/title-language.schema';
 import type { SonarrFormState } from '@/providers/sonarr/form-state';
-import type { RadarrFormState } from '@/providers/settings/provider-settings.schema';
+import type { RadarrFormState } from '@/providers/radarr/form-state';
 import type { ProviderCredentials } from '@/providers';
 
 export type BadgeVisibility = 'always' | 'hover';
