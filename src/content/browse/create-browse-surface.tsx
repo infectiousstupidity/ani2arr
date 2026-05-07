@@ -5,7 +5,7 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import { ExtensionErrorBoundary } from '@/components/extension-error-boundary';
+import { ExtensionErrorBoundary } from '@/shared/ui/feedback/extension-error-boundary';
 import { ConfirmProvider } from '@/shared/hooks/use-confirm';
 import { createContentEntrypointShell } from '@/content/core/create-content-script-shell';
 import type { PublicOptions } from '@/options';

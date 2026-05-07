@@ -21,7 +21,7 @@ import {
 	buildMovieStatusResponseFromLibraryStatus,
 	buildSeriesStatusResponseFromLibraryStatus,
 } from "@/rpc/status-response-adapter";
-import { ExtensionErrorBoundary } from "@/components/extension-error-boundary";
+import { ExtensionErrorBoundary } from "@/shared/ui/feedback/extension-error-boundary";
 import { useTheme } from "@/shared/hooks/use-theme";
 import { useAniListMetadataBatch } from "@/shared/queries";
 import {
