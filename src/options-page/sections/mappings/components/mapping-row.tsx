@@ -18,7 +18,7 @@ import type {
   ProviderMappingTarget,
 } from '@/mapping/types';
 import type { MappingListRow } from '@/mapping/queries/list-mappings';
-import { useAniListMetadataBatch } from '@/shared/queries';
+import { useAniListMetadataBatch } from '@/queries';
 import Pill from '@/shared/ui/primitives/pill';
 import { cn } from '@/shared/utils/cn';
 import SonarrIcon from '@/assets/sonarr.svg';

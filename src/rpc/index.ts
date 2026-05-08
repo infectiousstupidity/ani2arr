@@ -1,6 +1,10 @@
 /** Typed RPC contract exposed across extension contexts. */
 // src/rpc/index.ts
-import { defineProxyService } from "@webext-core/proxy-service";
+import {
+	createProxyService,
+	registerService,
+	type ProxyServiceKey,
+} from "@webext-core/proxy-service";
 import type { AniListId } from "@/anilist";
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
@@ -113,7 +117,12 @@ export interface Ani2arrApi {
 	): Promise<GetAniListMetadataOutput>;
 }
 
-export const [registerAni2arrApi, getAni2arrApi] = defineProxyService<
-	Ani2arrApi,
-	[Ani2arrApi]
->("Ani2arrApi", (impl) => impl);
+const ANI2ARR_API_KEY = "Ani2arrApi" as ProxyServiceKey<Ani2arrApi>;
+
+export function registerAni2arrApi(api: Ani2arrApi) {
+	return registerService(ANI2ARR_API_KEY, api);
+}
+
+export function getAni2arrApi() {
+	return createProxyService(ANI2ARR_API_KEY);
+}

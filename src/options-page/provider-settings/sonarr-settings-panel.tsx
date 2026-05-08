@@ -12,7 +12,7 @@ import React, {
 import { useFormContext, useWatch } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { queryKeys } from "@/shared/queries";
+import { queryKeys } from "@/queries";
 import type { SettingsActions } from "../hooks/use-settings-actions";
 import {
 	deriveProviderConnectionStatusView,

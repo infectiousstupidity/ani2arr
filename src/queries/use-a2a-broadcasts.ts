@@ -11,7 +11,7 @@ import {
 	RADARR_LIBRARY_REVISION_CHANGE_KEY,
 	SONARR_LIBRARY_REVISION_CHANGE_KEY,
 } from "@/shared/sync/revisions";
-import { queryKeys } from "@/shared/queries";
+import { queryKeys } from "@/queries/query-keys";
 
 const PUBLIC_OPTIONS_KEY = queryKeys.publicOptions();
 

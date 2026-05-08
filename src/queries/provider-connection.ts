@@ -7,7 +7,7 @@ import { getAni2arrApi } from "@/rpc";
 import type { TestProviderConnectionInput } from "@/rpc/schemas";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
-import { queryKeys } from "@/shared/queries/query-keys";
+import { queryKeys } from "@/queries/query-keys";
 import type { Provider, ProviderCredentials } from "@/providers";
 
 export type ProviderConnectionStatusView = {
@@ -64,9 +64,11 @@ export const useProviderConnectionCheck = (options: {
 	});
 
 export const useTestProviderConnection = () =>
-	useMutation<{ version: string }, ExtensionError, TestProviderConnectionInput>({
-		mutationFn: testProviderConnection,
-	});
+	useMutation<{ version: string }, ExtensionError, TestProviderConnectionInput>(
+		{
+			mutationFn: testProviderConnection,
+		},
+	);
 
 export const deriveProviderConnectionStatusView = (input: {
 	isProviderConfigured: boolean;

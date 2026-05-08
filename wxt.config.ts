@@ -1,6 +1,8 @@
 // wxt.config.ts
 import { defineConfig, type WxtViteConfig } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import babel from "@rolldown/plugin-babel";
 
 export default defineConfig({
 	webExt: {
@@ -15,22 +17,19 @@ export default defineConfig({
 	srcDir: "src",
 
 	modules: [
-		"@wxt-dev/module-react",
 		"@wxt-dev/auto-icons",
 		"@wxt-dev/webextension-polyfill",
 	],
 
-	react: {
-		vite: {
-			babel: {
-				plugins: ["babel-plugin-react-compiler"],
-			},
-		},
-	},
-
 	vite: () =>
 		({
-			plugins: [tailwindcss()],
+			plugins: [
+				react(),
+				babel({
+					presets: [reactCompilerPreset()],
+				}),
+				tailwindcss(),
+			],
 			css: { devSourcemap: true },
 			build: {
 				sourcemap: (() => {

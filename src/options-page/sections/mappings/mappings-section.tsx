@@ -11,7 +11,8 @@ import {
   useClearManualMapping,
   useSetMappingIgnore,
   useSetMappingRejectedCandidate,
-} from '@/shared/queries';
+	usePublicOptions,
+} from '@/queries';
 import { useConfirm } from '@/shared/hooks/use-confirm';
 import { useToast } from '@/shared/ui/feedback/toast-provider';
 import { PROVIDERS, formatProviderExternalId } from '@/providers';
@@ -20,7 +21,6 @@ import { createProviderMappingTarget } from '@/mapping/types';
 import type { MappingListRow } from '@/mapping/queries/list-mappings';
 import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
 import SectionHeader from '../../components/section-header';
-import { usePublicOptions } from '@/options';
 import {
 	MappingToolbar,
   getScopeEntryKindFilters,

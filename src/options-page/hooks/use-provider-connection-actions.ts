@@ -17,7 +17,7 @@ import {
 	type ExtensionOptions,
 } from "@/options";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
-import { queryKeys } from "@/shared/queries/query-keys";
+import { queryKeys } from "@/queries/query-keys";
 import { getAni2arrApi } from "@/rpc";
 import { getProviderLabel } from "@/providers/provider-labels";
 import type {

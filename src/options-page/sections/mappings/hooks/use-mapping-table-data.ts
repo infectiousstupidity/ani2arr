@@ -3,7 +3,7 @@
 
 import { useMemo } from "react";
 import { useDebounced } from "@/shared/hooks/use-debounced";
-import { useAniListMetadataBatch, useMappings } from "@/shared/queries";
+import { useAniListMetadataBatch, useMappings } from "@/queries";
 import type { AniListId } from "@/anilist";
 import { PROVIDERS, type Provider } from "@/providers";
 import { formatProviderExternalId } from "@/providers/provider-labels";
@@ -190,10 +190,7 @@ export const useMappingTableData = ({
 					providerIdentity:
 						entry.providerId == null
 							? null
-							: createProviderMappingTarget(
-									entry.provider,
-									entry.providerId,
-								),
+							: createProviderMappingTarget(entry.provider, entry.providerId),
 					providerMeta: entry.providerMeta,
 					entries: [],
 					entryKinds: new Set<EffectiveMappingKind>(),
@@ -223,13 +220,13 @@ export const useMappingTableData = ({
 		};
 
 		const resolveTitle = (row: MappingTableRowData) => {
-				const fallback =
-					row.providerIdentity === null
-						? "Unmapped"
-						: formatProviderExternalId(
-								row.providerIdentity.provider,
-								row.providerIdentity.providerId,
-							);
+			const fallback =
+				row.providerIdentity === null
+					? "Unmapped"
+					: formatProviderExternalId(
+							row.providerIdentity.provider,
+							row.providerIdentity.providerId,
+						);
 			return row.providerMeta?.title ?? row.entries[0]?.title ?? fallback;
 		};
 

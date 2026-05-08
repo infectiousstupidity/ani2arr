@@ -9,11 +9,15 @@ import type {
 } from "@/rpc/types";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
-import { queryKeys } from "@/shared/queries/query-keys";
+import { queryKeys } from "@/queries/query-keys";
 import type { ProviderCredentials, TvdbId } from "@/providers";
 import type { SonarrSeriesLibraryStatus } from "@/providers/sonarr/library";
 import type { SonarrSeries } from "@/providers/sonarr/types";
-import type { AddSonarrInput, StatusInput, UpdateSonarrInput } from "@/rpc/schemas";
+import type {
+	AddSonarrInput,
+	StatusInput,
+	UpdateSonarrInput,
+} from "@/rpc/schemas";
 
 export const useSonarrFormOptions = (options?: {
 	enabled?: boolean;
