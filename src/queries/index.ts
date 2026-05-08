@@ -6,6 +6,6 @@ export {
 	useExtensionOptions,
 	usePublicOptions,
 	useSaveOptions,
-} from "@/options";
-export * from "./metadata";
+} from "./options";
+export * from "./anilist";
 export * from "./mapping";

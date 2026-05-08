@@ -7,7 +7,7 @@ import type { Provider } from "@/providers";
 import { getProviderLabel } from "@/providers/provider-labels";
 import { useConfirm } from "@/shared/hooks/use-confirm";
 import Button from "@/shared/ui/primitives/button";
-import { useMappingInspection } from "@/shared/queries";
+import { useMappingInspection } from "@/queries";
 import { DetailsPanel } from "./components/details/details-panel";
 import { Footer } from "./components/footer";
 import { Header } from "./components/header";

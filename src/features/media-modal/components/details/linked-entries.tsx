@@ -6,7 +6,7 @@ import type { AniListId } from '@/anilist';
 import { buildAniListAnimeUrl } from '@/anilist/anilist-links';
 import { resolveTitlePreference } from '@/anilist/title-preference';
 import type { MappingDetailsPayload } from '@/mapping/queries/mapping-details';
-import { useAniListMetadataBatch } from '@/shared/queries';
+import { useAniListMetadataBatch } from '@/queries';
 import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
 import { formatToken } from '../../helpers';
 

@@ -3,7 +3,7 @@
 
 import type { QueryClient } from "@tanstack/react-query";
 import { getAni2arrApi } from "@/rpc";
-import { queryKeys } from "@/shared/queries";
+import { queryKeys } from "@/queries";
 import type { Provider } from "@/providers";
 import { logger } from "@/shared/utils/logger";
 
@@ -30,9 +30,13 @@ function getProviderQueryKeys(provider: Provider) {
 export function invalidateAllSettingsQueries(queryClient: QueryClient): void {
 	queryClient.invalidateQueries({ queryKey: queryKeys.options() });
 	queryClient.invalidateQueries({ queryKey: queryKeys.publicOptions() });
-	queryClient.invalidateQueries({ queryKey: queryKeys.sonarrFormOptionsRoot() });
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.sonarrFormOptionsRoot(),
+	});
 	queryClient.invalidateQueries({ queryKey: queryKeys.sonarrConnectionRoot() });
-	queryClient.invalidateQueries({ queryKey: queryKeys.radarrFormOptionsRoot() });
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.radarrFormOptionsRoot(),
+	});
 	queryClient.invalidateQueries({ queryKey: queryKeys.radarrConnectionRoot() });
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingSearchRoot("sonarr"),

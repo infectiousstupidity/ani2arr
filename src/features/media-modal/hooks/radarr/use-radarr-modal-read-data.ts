@@ -9,14 +9,12 @@ import {
 	metadataHintFromAniListMetadata,
 } from "@/anilist/metadata-hints";
 import { resolveTitlePreference } from "@/anilist/title-preference";
-import { defaultRadarrFormState, usePublicOptions } from "@/options";
+import { defaultRadarrFormState } from "@/options";
 import type { CheckMovieStatusResponse } from "@/rpc/types";
-import {
-	useMovieStatus,
-	useRadarrFormOptions,
-} from "@/queries/radarr";
+import { useMovieStatus, useRadarrFormOptions } from "@/queries/radarr";
 import { getProviderBaseUrl } from "@/options/provider-config";
-import { useAniListMedia, useAniListMetadataBatch } from "@/shared/queries";
+import { useAniListMedia, useAniListMetadataBatch } from "@/queries/anilist";
+import { usePublicOptions } from "@/queries/options";
 import * as manualMappingHelpers from "@/features/media-modal/mapping-search/current-mapping";
 import {
 	buildAniListHeaderData,

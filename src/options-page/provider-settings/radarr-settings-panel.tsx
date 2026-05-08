@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
-import { queryKeys } from "@/shared/queries";
+import { queryKeys } from "@/queries";
 import type { SettingsActions } from "../hooks/use-settings-actions";
 import { getAniListTitleLanguageLabel } from "@/anilist/title-preference";
 import { useToast } from "@/shared/ui/feedback/toast-provider";

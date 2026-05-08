@@ -3,14 +3,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAni2arrApi } from "@/rpc";
-import type {
-	CheckMovieStatusResponse,
-	RadarrLookupOutput,
-} from "@/rpc/types";
+import type { CheckMovieStatusResponse, RadarrLookupOutput } from "@/rpc/types";
 import type { RadarrMovieLibraryStatus } from "@/providers/radarr/library";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
-import { queryKeys } from "@/shared/queries/query-keys";
+import { queryKeys } from "@/queries/query-keys";
 import {
 	normalizeRadarrFormState,
 	stripRadarrFormStateForDefaults,

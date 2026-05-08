@@ -8,13 +8,13 @@ import { ChevronRight, ShieldCheck } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import appIcon from '@/assets/icon.png';
 import type { AniListId } from '@/anilist';
-import { useA2aBroadcasts } from '@/shared/queries/use-a2a-broadcasts';
+import { useA2aBroadcasts } from '@/queries/use-a2a-broadcasts';
+import { useExtensionOptions } from '@/queries/options';
 import {
   createDefaultExtensionOptions,
   getProviderCredentials,
   parseExtensionOptions,
   type ExtensionOptions,
-  useExtensionOptions,
 } from '@/options';
 import {
   useProviderConnectionStatus,

@@ -6,9 +6,9 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import {
 	parseExtensionOptions,
-	useSaveOptions,
 	type ExtensionOptions,
 } from "@/options";
+import { useSaveOptions } from "@/queries/options";
 import { useTestProviderConnection } from "@/queries/provider-connection";
 import { logger } from "@/shared/utils/logger";
 import { hasUnsavedSettingsChanges } from "./provider-settings-actions.shared";

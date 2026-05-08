@@ -23,17 +23,17 @@ import {
 } from "@/rpc/status-response-adapter";
 import { ExtensionErrorBoundary } from "@/shared/ui/feedback/extension-error-boundary";
 import { useTheme } from "@/shared/hooks/use-theme";
-import { useAniListMetadataBatch } from "@/shared/queries";
+import { useAniListMetadataBatch } from "@/queries";
 import {
 	createContentEntrypointShell,
 	type ContentEntrypointShellContext,
 } from "@/content/core/create-content-script-shell";
-import { useA2aBroadcasts } from "@/shared/queries/use-a2a-broadcasts";
-import { useMappingIdentities } from "@/shared/queries/mapping";
+import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
+import { useMappingIdentities } from "@/queries/mapping";
+import { usePublicOptions } from "@/queries/options";
 import {
 	defaultRadarrFormState,
 	defaultSonarrFormState,
-	usePublicOptions,
 } from "@/options";
 import MediaActions from "./media-actions";
 import { logger } from "@/shared/utils/logger";

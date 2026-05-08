@@ -34,8 +34,3 @@ export {
 	hasConfiguredProviderCredentials,
 } from "./provider-config";
 export type { NormalizedProviderConnection } from "./provider-config";
-export {
-	useExtensionOptions,
-	usePublicOptions,
-	useSaveOptions,
-} from "./queries";

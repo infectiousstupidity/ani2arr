@@ -17,7 +17,7 @@ import {
 	useSetMappingIgnore,
 	useSetManualMapping,
 	useSetMappingRejectedCandidate,
-} from "@/shared/queries";
+} from "@/queries";
 import { useMappingSearch } from "./use-mapping-search";
 
 type AuthoritativeMappingState = {

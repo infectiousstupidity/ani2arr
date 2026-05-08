@@ -9,15 +9,11 @@ import { ExternalLink } from 'lucide-react';
 import { useProviderConnectionStatus } from '@/queries/provider-connection';
 import { getProviderLabel } from '@/providers/provider-labels';
 import { cn } from '@/shared/utils/cn';
-import type {
-  BadgeVisibility,
-  ExtensionOptions,
+import { getProviderCredentials,
+	type BadgeVisibility,
+  type ExtensionOptions,
 } from '@/options';
-import {
-  getProviderCredentials,
-  useExtensionOptions,
-  useSaveOptions,
-} from '@/options';
+import { useExtensionOptions, useSaveOptions } from '@/queries/options';
 import { PROVIDERS, type Provider } from '@/providers';
 import './style.css';
 
