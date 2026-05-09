@@ -13,7 +13,7 @@ import {
 	stripRadarrFormStateForDefaults,
 	type RadarrFormState,
 } from "@/providers/radarr/form-state";
-import type { PublicOptions } from "@/options";
+import type { PublicOptions } from "@/settings";
 import type { ProviderCredentials, RadarrMovie, TmdbId } from "@/providers";
 import type {
 	AddRadarrInput,

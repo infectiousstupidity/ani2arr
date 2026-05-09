@@ -10,9 +10,13 @@ import {
 	normalizeProviderConnectionSettings,
 	type ExtensionOptions,
 	type NormalizedProviderConnection,
-} from "@/options";
+} from "@/settings";
 import { getProviderLabel } from "@/providers/provider-labels";
-import { PROVIDERS, type Provider, type ProviderCredentials } from "@/providers";
+import {
+	PROVIDERS,
+	type Provider,
+	type ProviderCredentials,
+} from "@/providers";
 import {
 	removeProviderHostPermission,
 	requestProviderHostPermission,
@@ -305,10 +309,7 @@ export async function cleanupPreviousPermission(
 
 	const activePermissionPatterns = new Set(
 		PROVIDERS.map((configuredProvider) =>
-			normalizeProviderConnectionSettings(
-				currentSettings,
-				configuredProvider,
-			),
+			normalizeProviderConnectionSettings(currentSettings, configuredProvider),
 		)
 			.filter((connection) => connection !== null)
 			.map((connection) => connection.permissionPattern),

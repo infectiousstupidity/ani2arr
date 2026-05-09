@@ -9,10 +9,10 @@ import {
 	metadataHintFromAniListMetadata,
 } from "@/anilist/metadata-hints";
 import { resolveTitlePreference } from "@/anilist/title-preference";
-import { defaultRadarrFormState } from "@/options";
+import { defaultRadarrFormState } from "@/settings";
 import type { CheckMovieStatusResponse } from "@/rpc/types";
 import { useMovieStatus, useRadarrFormOptions } from "@/queries/radarr";
-import { getProviderBaseUrl } from "@/options/provider-config";
+import { getProviderBaseUrl } from "@/settings/provider-config";
 import { useAniListMedia, useAniListMetadataBatch } from "@/queries/anilist";
 import { usePublicOptions } from "@/queries/options";
 import * as manualMappingHelpers from "@/features/media-modal/mapping-search/current-mapping";

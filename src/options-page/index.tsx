@@ -15,7 +15,7 @@ import {
   getProviderCredentials,
   parseExtensionOptions,
   type ExtensionOptions,
-} from '@/options';
+} from '@/settings';
 import {
   useProviderConnectionStatus,
   type ProviderConnectionStatusView,

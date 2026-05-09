@@ -10,7 +10,7 @@ import type { MappingService } from "@/mapping/mapping.service";
 import type { ManualMappingService } from "@/mapping/manual-mapping";
 import type { AutoMappingStore } from "@/mapping/auto-mapping/auto-mapping.store";
 import type { AnibridgeMappingStore } from "@/mapping/upstream-mapping";
-import type { ExtensionOptions } from "@/options";
+import type { ExtensionOptions } from "@/settings";
 import type { Provider } from "@/providers";
 import type { ProviderConfigReader } from "@/background/api/provider-config-reader";
 

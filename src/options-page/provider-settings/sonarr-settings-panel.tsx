@@ -29,7 +29,7 @@ import {
 import type { SonarrAddOptionsFieldsLayout } from "@/features/provider-setup/sonarr-add-options-fields";
 import { SonarrDefaultsSection } from "./sonarr-defaults-section";
 import { useSelectPortal } from "./use-select-portal";
-import type { ExtensionOptions } from "@/options";
+import type { ExtensionOptions } from "@/settings";
 import { useSonarrFormOptions } from "@/queries/sonarr";
 import { deriveProviderPanelConnectionState } from "./provider-settings-panel-state.shared";
 

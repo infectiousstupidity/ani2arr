@@ -1,5 +1,5 @@
 /** Runtime-validated extension settings schema and default factories owned by the options domain. */
-// src/options/schema.ts
+// src/settings/schema.ts
 
 import * as v from "valibot";
 import { AniListTitleLanguageSchema } from "@/anilist/schemas/title-language.schema";
@@ -35,7 +35,10 @@ const SonarrProviderSettingsSchema = v.object({
 		AniListTitleLanguageSchema,
 		"english",
 	),
-	defaults: v.fallback(SonarrDefaultsSchema, createDefaultSonarrFormStateValue()),
+	defaults: v.fallback(
+		SonarrDefaultsSchema,
+		createDefaultSonarrFormStateValue(),
+	),
 });
 
 const RadarrProviderSettingsSchema = v.object({
@@ -78,9 +81,7 @@ export const ExtensionOptionsSchema = v.fallback(
 );
 
 export { createDefaultSonarrFormState } from "@/providers/sonarr/form-state";
-export {
-	createDefaultSonarrFormState as defaultSonarrFormState,
-} from "@/providers/sonarr/form-state";
+export { createDefaultSonarrFormState as defaultSonarrFormState } from "@/providers/sonarr/form-state";
 export {
 	createDefaultRadarrFormState,
 	createDefaultRadarrFormState as defaultRadarrFormState,

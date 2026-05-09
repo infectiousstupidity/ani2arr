@@ -8,7 +8,7 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { ExtensionErrorBoundary } from '@/shared/ui/feedback/extension-error-boundary';
 import { ConfirmProvider } from '@/shared/hooks/use-confirm';
 import { createContentEntrypointShell } from '@/content/core/create-content-script-shell';
-import type { PublicOptions } from '@/options';
+import type { PublicOptions } from '@/settings';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { createShadowRootUi, type ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 

@@ -12,7 +12,7 @@ import {
 import type { SettingsActions } from '../hooks/use-settings-actions';
 import type { SonarrFormState } from '@/providers/sonarr/form-state';
 import Button from '@/shared/ui/primitives/button';
-import type { ExtensionOptions } from '@/options';
+import type { ExtensionOptions } from '@/settings';
 
 import { SaveSettingsBar } from './save-settings-bar';
 import type { useSonarrFormOptions } from '@/queries/sonarr';

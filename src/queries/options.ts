@@ -14,8 +14,8 @@ import {
 	toPublicOptions,
 	watchExtensionOptionsSnapshot,
 	watchPublicOptionsSnapshot,
-} from "../options/store";
-import type { ExtensionOptions, PublicOptions } from "../options/types";
+} from "../settings/store";
+import type { ExtensionOptions, PublicOptions } from "../settings/types";
 
 const useSyncExtensionOptionsQuery = (
 	queryClient: ReturnType<typeof useQueryClient>,

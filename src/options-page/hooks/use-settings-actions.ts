@@ -4,10 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-	parseExtensionOptions,
-	type ExtensionOptions,
-} from "@/options";
+import { parseExtensionOptions, type ExtensionOptions } from "@/settings";
 import { useSaveOptions } from "@/queries/options";
 import { useTestProviderConnection } from "@/queries/provider-connection";
 import { logger } from "@/shared/utils/logger";

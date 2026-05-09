@@ -5,7 +5,7 @@ import React from 'react';
 import SectionHeader from '../components/section-header';
 import RadarrSettingsPanel from './radarr-settings-panel';
 import type { SettingsActions } from '../hooks/use-settings-actions';
-import type { ExtensionOptions } from '@/options';
+import type { ExtensionOptions } from '@/settings';
 
 const RadarrPage: React.FC<{
   actions: SettingsActions;

@@ -4,7 +4,7 @@
 import {
 	createDefaultRadarrFormState,
 	createDefaultSonarrFormState,
-} from "@/options/schema";
+} from "@/settings/schema";
 import type { Provider, ProviderFormOptions } from "@/providers";
 import {
 	normalizeSonarrFormState,
@@ -84,5 +84,8 @@ export function bootstrapProviderDefaults(
 ): SonarrFormState | RadarrFormState {
 	return provider === "sonarr"
 		? bootstrapSonarrDefaults(defaults as Partial<SonarrFormState>, formOptions)
-		: bootstrapRadarrDefaults(defaults as Partial<RadarrFormState>, formOptions);
+		: bootstrapRadarrDefaults(
+				defaults as Partial<RadarrFormState>,
+				formOptions,
+			);
 }

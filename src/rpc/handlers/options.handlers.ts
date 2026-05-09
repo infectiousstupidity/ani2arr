@@ -7,7 +7,7 @@ import {
 	getExtensionOptionsSnapshot,
 	setExtensionOptionsSnapshot,
 	type ExtensionOptions,
-} from "@/options";
+} from "@/settings";
 import { normalizeSonarrFormState } from "@/providers/sonarr/form-state";
 import { normalizeRadarrFormState } from "@/providers/radarr/form-state";
 import { NotifyProviderConnectionChangedInputSchema } from "@/rpc/schemas";

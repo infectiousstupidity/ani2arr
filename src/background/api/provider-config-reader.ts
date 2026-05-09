@@ -5,7 +5,7 @@ import {
 	getExtensionOptionsSnapshot,
 	getProviderCredentials,
 	type ExtensionOptions,
-} from "@/options";
+} from "@/settings";
 import type { Provider, ProviderCredentials } from "@/providers";
 import { getProviderLabel } from "@/providers/provider-labels";
 import { createError, ErrorCode, type ExtensionError } from "@/shared/errors";

@@ -11,7 +11,7 @@ import {
 } from '@/content/browse/browse-content-app';
 import { createBrowseEntrypointShell } from '@/content/browse/create-browse-surface';
 import { anilistBrowseAdapter } from './adapter';
-import type { PublicOptions } from '@/options';
+import type { PublicOptions } from '@/settings';
 
 const isBrowseSurface = (url: string): boolean => {
   try {

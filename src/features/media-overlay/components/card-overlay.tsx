@@ -22,7 +22,7 @@ import {
 import type { AniListId } from "@/anilist";
 import type { MediaModalLaunchSnapshot } from "@/features/media-modal/launch-snapshot";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
-import type { BadgeVisibility } from "@/options/types";
+import type { BadgeVisibility } from "@/settings/types";
 import type { Provider } from "@/providers";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";

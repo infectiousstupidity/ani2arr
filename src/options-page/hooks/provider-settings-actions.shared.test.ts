@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	createDefaultExtensionOptions,
 	normalizeProviderConnectionSettings,
-} from "@/options";
+} from "@/settings";
 import { parseProviderQualityProfileId } from "@/providers";
 import { removeProviderHostPermission } from "@/providers/settings/host-permissions";
 import {
@@ -19,7 +19,9 @@ import {
 
 vi.mock("@/providers/settings/host-permissions", async (importOriginal) => {
 	const actual =
-		await importOriginal<typeof import("@/providers/settings/host-permissions")>();
+		await importOriginal<
+			typeof import("@/providers/settings/host-permissions")
+		>();
 
 	return {
 		...actual,
@@ -28,7 +30,9 @@ vi.mock("@/providers/settings/host-permissions", async (importOriginal) => {
 	};
 });
 
-const removeProviderHostPermissionMock = vi.mocked(removeProviderHostPermission);
+const removeProviderHostPermissionMock = vi.mocked(
+	removeProviderHostPermission,
+);
 
 beforeEach(() => {
 	removeProviderHostPermissionMock.mockReset();

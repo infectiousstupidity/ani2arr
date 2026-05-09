@@ -38,7 +38,7 @@ import {
 	setExtensionOptionsSnapshot,
 	hasConfiguredProviderCredentials,
 	type ExtensionOptions,
-} from "@/options";
+} from "@/settings";
 import type { Provider } from "@/providers";
 import { logError, normalizeError } from "@/shared/errors";
 import type { ApiHandlerDeps } from "@/rpc/handlers/handler-deps";
