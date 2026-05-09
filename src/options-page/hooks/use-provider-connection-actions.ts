@@ -15,7 +15,7 @@ import {
 	createDefaultExtensionOptions,
 	parseExtensionOptions,
 	type ExtensionOptions,
-} from "@/options";
+} from "@/settings";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import { queryKeys } from "@/queries/query-keys";
 import { getAni2arrApi } from "@/rpc";

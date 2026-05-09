@@ -4,7 +4,7 @@
 import * as v from "valibot";
 import type { Ani2arrApi } from "@/rpc";
 import type { Provider, ProviderCredentials } from "@/providers";
-import { normalizeProviderConnectionInput } from "@/options";
+import { normalizeProviderConnectionInput } from "@/settings";
 import { TestProviderConnectionInputSchema } from "@/rpc/schemas";
 import type { ApiHandlerDeps } from "./handler-deps";
 

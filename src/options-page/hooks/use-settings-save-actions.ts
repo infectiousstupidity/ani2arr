@@ -15,7 +15,7 @@ import {
 	createDefaultExtensionOptions,
 	parseExtensionOptions,
 	type ExtensionOptions,
-} from "@/options";
+} from "@/settings";
 import { PROVIDERS } from "@/providers";
 import type { Provider } from "@/providers";
 import {
@@ -206,11 +206,7 @@ export function useSettingsSaveActions({
 
 		// Post-save cleanup and invalidation
 		for (const { provider, previous, changed } of providerStates) {
-			await cleanupPreviousPermission(
-				provider,
-				previous,
-				normalizedSettings,
-			);
+			await cleanupPreviousPermission(provider, previous, normalizedSettings);
 
 			if (changed) {
 				invalidateProviderQueries(queryClient, provider);

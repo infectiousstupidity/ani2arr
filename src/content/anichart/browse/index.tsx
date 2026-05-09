@@ -11,7 +11,7 @@ import {
 } from '@/content/browse/browse-content-app';
 import { createBrowseEntrypointShell } from '@/content/browse/create-browse-surface';
 import { anichartBrowseAdapter } from './adapter';
-import type { PublicOptions } from '@/options';
+import type { PublicOptions } from '@/settings';
 
 const isAniChartSurface = (url: string): boolean => {
   try {

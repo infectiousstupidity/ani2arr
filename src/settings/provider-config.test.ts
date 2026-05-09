@@ -1,8 +1,8 @@
 /** Focused tests for provider credential extraction and configured-state derivation. */
-// src/options/provider-config.test.ts
+// src/settings/provider-config.test.ts
 
 import { describe, expect, it } from "vitest";
-import { createDefaultExtensionOptions } from "@/options";
+import { createDefaultExtensionOptions } from "@/settings";
 import {
 	getProviderConnectionDraft,
 	getProviderCredentials,

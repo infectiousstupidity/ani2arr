@@ -34,7 +34,7 @@ import { usePublicOptions } from "@/queries/options";
 import {
 	defaultRadarrFormState,
 	defaultSonarrFormState,
-} from "@/options";
+} from "@/settings";
 import MediaActions from "./media-actions";
 import { logger } from "@/shared/utils/logger";
 import { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
@@ -42,7 +42,7 @@ import {
 	getProviderRouteSlug,
 	type ProviderRouteSlugSource,
 } from "@/providers/provider-route-slug";
-import { getProviderBaseUrl } from "@/options/provider-config";
+import { getProviderBaseUrl } from "@/settings/provider-config";
 import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type { HostMediaTarget } from "@/content/browse/types";

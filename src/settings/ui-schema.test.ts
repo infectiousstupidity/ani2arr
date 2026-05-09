@@ -1,12 +1,12 @@
 /** Focused tests for the options-owned UI schema behavior. */
-// src/options/ui-schema.test.ts
+// src/settings/ui-schema.test.ts
 
 import { describe, expect, it } from "vitest";
 import {
 	createDefaultExtensionOptions,
 	createDefaultUiOptions,
 	parseExtensionOptions,
-} from "@/options";
+} from "@/settings";
 
 describe("parseExtensionOptions ui schema", () => {
 	it("keeps current UI settings shape", () => {

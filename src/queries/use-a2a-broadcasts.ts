@@ -4,7 +4,7 @@
 import { useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { browser } from "wxt/browser";
-import { PUBLIC_OPTIONS_CHANGE_KEY } from "@/options";
+import { PUBLIC_OPTIONS_CHANGE_KEY } from "@/settings";
 import type { Provider } from "@/providers";
 import {
 	MAPPINGS_REVISION_CHANGE_KEY,

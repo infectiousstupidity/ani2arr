@@ -1,5 +1,5 @@
 /** Pure helpers to extract provider credentials and configured state from ExtensionOptions. */
-// src/options/provider-config.ts
+// src/settings/provider-config.ts
 
 import { getProviderHostPermissionPattern } from "@/providers/settings/host-permissions";
 import { getProviderLabel } from "@/providers/provider-labels";

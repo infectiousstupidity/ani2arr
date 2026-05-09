@@ -12,7 +12,7 @@ import { cn } from '@/shared/utils/cn';
 import { getProviderCredentials,
 	type BadgeVisibility,
   type ExtensionOptions,
-} from '@/options';
+} from '@/settings';
 import { useExtensionOptions, useSaveOptions } from '@/queries/options';
 import { PROVIDERS, type Provider } from '@/providers';
 import './style.css';

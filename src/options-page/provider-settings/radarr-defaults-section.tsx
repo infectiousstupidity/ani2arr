@@ -9,7 +9,7 @@ import { RadarrAddOptionsFields } from '@/features/provider-setup/radarr-add-opt
 import type { SettingsActions } from '../hooks/use-settings-actions';
 import type { RadarrFormState } from '@/providers/radarr/form-state';
 import Button from '@/shared/ui/primitives/button';
-import type { ExtensionOptions } from '@/options';
+import type { ExtensionOptions } from '@/settings';
 
 import { SaveSettingsBar } from './save-settings-bar';
 import type { useRadarrFormOptions } from '@/queries/radarr';

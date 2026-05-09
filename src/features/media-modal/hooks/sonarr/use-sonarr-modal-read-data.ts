@@ -8,10 +8,10 @@ import {
 	metadataHintFromAniListMetadata,
 } from "@/anilist/metadata-hints";
 import { resolveTitlePreference } from "@/anilist/title-preference";
-import { defaultSonarrFormState } from "@/options";
+import { defaultSonarrFormState } from "@/settings";
 import type { CheckSeriesStatusResponse } from "@/rpc/types";
 import { useSeriesStatus, useSonarrFormOptions } from "@/queries/sonarr";
-import { getProviderBaseUrl } from "@/options/provider-config";
+import { getProviderBaseUrl } from "@/settings/provider-config";
 import { usePublicOptions } from "@/queries/options";
 import { useAniListMedia, useAniListMetadataBatch } from "@/queries";
 import * as manualMappingHelpers from "@/features/media-modal/mapping-search/current-mapping";

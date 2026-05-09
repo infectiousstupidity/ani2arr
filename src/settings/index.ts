@@ -1,5 +1,5 @@
 /** Public options-domain type surface for settings and public option contracts. */
-// src/options/index.ts
+// src/settings/index.ts
 
 export type {
 	BadgeVisibility,

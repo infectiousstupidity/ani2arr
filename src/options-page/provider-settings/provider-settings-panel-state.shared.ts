@@ -1,4 +1,4 @@
-import type { ExtensionOptions } from "@/options";
+import type { ExtensionOptions } from "@/settings";
 import type { Provider, ProviderCredentials } from "@/providers";
 import {
 	validateProviderConnectionApiKey,
