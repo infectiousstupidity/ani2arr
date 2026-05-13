@@ -11,6 +11,7 @@ import {
 describe("parseExtensionOptions ui schema", () => {
 	it("keeps current UI settings shape", () => {
 		const settings = createDefaultExtensionOptions();
+		settings.ui.preferredAniListTitleLanguage = "romaji";
 		settings.ui.browseCards.sonarr.visibility = "hover";
 		settings.ui.animePages.radarr.enabled = false;
 		settings.ui.schedulerDebugOverlayEnabled = true;

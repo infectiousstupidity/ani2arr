@@ -20,7 +20,9 @@ export {
 	parseExtensionOptions,
 	toPublicOptions,
 	getExtensionOptionsSnapshot,
-	setExtensionOptionsSnapshot,
+	savePublicOptionsSnapshot,
+	saveProviderConnectionSnapshot,
+	resetAllSettingsSnapshot,
 	getPublicOptionsSnapshot,
 	watchExtensionOptionsSnapshot,
 	watchPublicOptionsSnapshot,
@@ -28,7 +30,6 @@ export {
 export {
 	getProviderConnectionDraft,
 	getProviderCredentials,
-	getProviderBaseUrl,
 	normalizeProviderConnectionInput,
 	normalizeProviderConnectionSettings,
 	hasConfiguredProviderCredentials,

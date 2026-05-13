@@ -5,7 +5,9 @@ export * from "./query-keys";
 export {
 	useExtensionOptions,
 	usePublicOptions,
-	useSaveOptions,
+	useSaveProviderConnection,
+	useSavePublicOptions,
 } from "./options";
+export { useProviderBaseUrl } from "./provider-base-url";
 export * from "./anilist";
 export * from "./mapping";

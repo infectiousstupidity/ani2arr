@@ -31,6 +31,7 @@ import {
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import { useMappingIdentities } from "@/queries/mapping";
 import { usePublicOptions } from "@/queries/options";
+import { useProviderBaseUrl } from "@/queries/provider-base-url";
 import {
 	defaultRadarrFormState,
 	defaultSonarrFormState,
@@ -42,7 +43,6 @@ import {
 	getProviderRouteSlug,
 	type ProviderRouteSlugSource,
 } from "@/providers/provider-route-slug";
-import { getProviderBaseUrl } from "@/settings/provider-config";
 import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type { HostMediaTarget } from "@/content/browse/types";
@@ -477,12 +477,12 @@ function buildAnimePageActionViewModel(input: {
 	optionsError: boolean;
 	title: string;
 	isConfigured: boolean;
+	providerBaseUrl: string;
 	movieStatusQuery: AnimePageStatusQuery;
 	seriesStatusQuery: AnimePageStatusQuery;
 	addMovieMutation: ReturnType<typeof useAddMovie>;
 	addSeriesMutation: ReturnType<typeof useAddSeries>;
 }): AnimePageActionViewModel {
-	const providerBaseUrl = getProviderBaseUrl(input.provider, input.options);
 	const providerSelection = selectAnimePageProviderSelection({
 		provider: input.provider,
 		movieStatusQuery: input.movieStatusQuery,
@@ -516,7 +516,7 @@ function buildAnimePageActionViewModel(input: {
 		providerSelection.statusQuery.data?.successfulSynonym ?? input.title;
 	const externalHref = buildProviderOpenUrl({
 		provider: input.provider,
-		baseUrl: providerBaseUrl,
+		baseUrl: input.providerBaseUrl,
 		isInLibrary:
 			actionSummary.state === "in-library" && Boolean(providerRouteSlug),
 		...(providerRouteSlug ? { providerRouteSlug } : {}),
@@ -588,6 +588,9 @@ export const ContentRoot: React.FC<ContentRootProps> = ({
 		? options?.providers[provider]?.isConfigured === true
 		: false;
 	const defaults = getAnimePageDefaults({ provider, options });
+	const providerBaseUrl = useProviderBaseUrl(provider ?? "sonarr", {
+		enabled: Boolean(provider && isConfigured),
+	});
 
 	const seriesStatusQuery = useSeriesStatus(
 		{ anilistId, title, metadata: resolvedMetadata },
@@ -695,6 +698,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({
 		optionsError,
 		title,
 		isConfigured,
+		providerBaseUrl: providerBaseUrl.data ?? "",
 		movieStatusQuery: effectiveMovieStatusQuery,
 		seriesStatusQuery: effectiveSeriesStatusQuery,
 		addMovieMutation,

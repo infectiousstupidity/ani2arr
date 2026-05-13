@@ -1,3 +1,4 @@
+/** Builds Sonarr modal read-side data from options, AniList metadata, and status queries. */
 // src/features/media-modal/hooks/sonarr/use-sonarr-modal-read-data.ts
 
 import { useMemo } from "react";
@@ -11,9 +12,12 @@ import { resolveTitlePreference } from "@/anilist/title-preference";
 import { defaultSonarrFormState } from "@/settings";
 import type { CheckSeriesStatusResponse } from "@/rpc/types";
 import { useSeriesStatus, useSonarrFormOptions } from "@/queries/sonarr";
-import { getProviderBaseUrl } from "@/settings/provider-config";
 import { usePublicOptions } from "@/queries/options";
-import { useAniListMedia, useAniListMetadataBatch } from "@/queries";
+import {
+	useAniListMedia,
+	useAniListMetadataBatch,
+	useProviderBaseUrl,
+} from "@/queries";
 import * as manualMappingHelpers from "@/features/media-modal/mapping-search/current-mapping";
 import {
 	buildAniListHeaderData,
@@ -69,6 +73,10 @@ export function useSonarrModalReadData(input: {
 		launchMetadata = null,
 	} = input;
 	const { data: options } = usePublicOptions();
+	const isConfigured = options?.providers.sonarr.isConfigured === true;
+	const providerBaseUrl = useProviderBaseUrl("sonarr", {
+		enabled: isConfigured,
+	});
 
 	const metadataBatch = useAniListMetadataBatch([anilistId], { enabled: true });
 	const { data: anilistMedia } = useAniListMedia(anilistId, {
@@ -102,7 +110,7 @@ export function useSonarrModalReadData(input: {
 			pickString(launchTitle, titles.english, titles.romaji, titles.native) ??
 			`AniList #${anilistId}`;
 		const preferredLang =
-			options?.providers.sonarr.preferredAniListTitleLanguage ?? "english";
+			options?.ui.preferredAniListTitleLanguage ?? "english";
 		const resolvedTitle = resolveTitlePreference({
 			titles,
 			preferred: preferredLang,
@@ -113,7 +121,7 @@ export function useSonarrModalReadData(input: {
 			resolvedMetadata: resolved,
 			providerRequestTitle: resolvedTitle.primary,
 			fallbackTitle: fallback,
-			baseUrl: getProviderBaseUrl("sonarr", options),
+			baseUrl: providerBaseUrl.data ?? "",
 			format: fmt,
 		};
 	}, [
@@ -123,9 +131,9 @@ export function useSonarrModalReadData(input: {
 		launchTitle,
 		metadataBatch.data,
 		options,
+		providerBaseUrl.data,
 	]);
 
-	const isConfigured = options?.providers.sonarr.isConfigured === true;
 	const sonarrFormOptions = useSonarrFormOptions({ enabled: isConfigured });
 
 	const statusPayload = useMemo(

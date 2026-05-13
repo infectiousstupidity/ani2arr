@@ -11,16 +11,21 @@ import {
 	normalizeRadarrFormState,
 	stripRadarrFormStateForDefaults,
 } from "@/providers/radarr/form-state";
-import { isAniListTitleLanguage } from "@/anilist/schemas/title-language.schema";
+import {
+	isAniListTitleLanguage,
+	type AniListTitleLanguage,
+} from "@/anilist/schemas/title-language.schema";
+import type { Provider, ProviderCredentials } from "@/providers";
 import { logger } from "@/shared/utils/logger";
 import {
 	ExtensionOptionsSchema,
 	createDefaultExtensionOptions,
 } from "./schema";
 import { UiOptionsSchema } from "./ui-schema";
-import type { ExtensionOptions, PublicOptions } from "./types";
+import type { ExtensionOptions, PublicOptions, UiOptions } from "./types";
 import {
 	hasConfiguredProviderCredentials,
+	normalizeProviderConnectionInput,
 	normalizeProviderConnectionSettings,
 } from "./provider-config";
 
@@ -33,23 +38,19 @@ export const PUBLIC_OPTIONS_CHANGE_KEY = PUBLIC_OPTIONS_STORAGE_KEY.replace(
 	"",
 );
 
-const createDefaultSonarrSecrets = (): { apiKey: string } => ({ apiKey: "" });
-const createDefaultRadarrSecrets = (): { apiKey: string } => ({ apiKey: "" });
+const createDefaultProviderConnection = (): ProviderCredentials => ({
+	url: "",
+	apiKey: "",
+});
 
 export function toPublicOptions(settings: ExtensionOptions): PublicOptions {
 	return {
 		providers: {
 			sonarr: {
-				url: settings.providers.sonarr.url,
-				preferredAniListTitleLanguage:
-					settings.providers.sonarr.preferredAniListTitleLanguage,
 				defaults: normalizeSonarrFormState(settings.providers.sonarr.defaults),
 				isConfigured: hasConfiguredProviderCredentials(settings, "sonarr"),
 			},
 			radarr: {
-				url: settings.providers.radarr.url,
-				preferredAniListTitleLanguage:
-					settings.providers.radarr.preferredAniListTitleLanguage,
 				defaults: normalizeRadarrFormState(settings.providers.radarr.defaults),
 				isConfigured: hasConfiguredProviderCredentials(settings, "radarr"),
 			},
@@ -71,21 +72,62 @@ const publicOptions = storage.defineItem<PublicOptions>(
 	},
 );
 
-const sonarrSecrets = storage.defineItem<{ apiKey: string }>(
+const sonarrConnectionStorage = storage.defineItem<ProviderCredentials>(
 	SONARR_SECRETS_STORAGE_KEY,
 	{
-		fallback: createDefaultSonarrSecrets(),
+		fallback: createDefaultProviderConnection(),
 		version: 1,
 	},
 );
 
-const radarrSecrets = storage.defineItem<{ apiKey: string }>(
+const radarrConnectionStorage = storage.defineItem<ProviderCredentials>(
 	RADARR_SECRETS_STORAGE_KEY,
 	{
-		fallback: createDefaultRadarrSecrets(),
+		fallback: createDefaultProviderConnection(),
 		version: 1,
 	},
 );
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getRecordProperty(
+	record: Record<string, unknown> | undefined,
+	key: string,
+): Record<string, unknown> | undefined {
+	const value = record?.[key];
+	return isRecord(value) ? value : undefined;
+}
+
+function resolvePreferredAniListTitleLanguage(
+	raw: unknown,
+): AniListTitleLanguage {
+	const fallback: AniListTitleLanguage = "english";
+	const record = isRecord(raw) ? raw : undefined;
+	const providers = getRecordProperty(record, "providers");
+	const sonarr = getRecordProperty(providers, "sonarr");
+	const radarr = getRecordProperty(providers, "radarr");
+	const ui = getRecordProperty(record, "ui");
+
+	// LEGACY: Provider-specific title language was moved to ui; keep old storage readable until users naturally rewrite settings.
+	const candidates = [
+		ui?.preferredAniListTitleLanguage,
+		sonarr?.preferredAniListTitleLanguage,
+		radarr?.preferredAniListTitleLanguage,
+	];
+	return candidates.find(isAniListTitleLanguage) ?? fallback;
+}
+
+function applyPreferredAniListTitleLanguage(
+	ui: UiOptions,
+	raw: unknown,
+): UiOptions {
+	return {
+		...ui,
+		preferredAniListTitleLanguage: resolvePreferredAniListTitleLanguage(raw),
+	};
+}
 
 export const parseExtensionOptions = (raw: unknown): ExtensionOptions => {
 	const result = v.safeParse(ExtensionOptionsSchema, raw);
@@ -107,28 +149,21 @@ export const parseExtensionOptions = (raw: unknown): ExtensionOptions => {
 					),
 				},
 			},
+			ui: applyPreferredAniListTitleLanguage(result.output.ui, raw),
 		};
 	}
 	logger.warn("Storage mismatch, applying defaults", result.issues);
 	return parseExtensionOptions(v.parse(ExtensionOptionsSchema, raw ?? {}));
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function getRecordProperty(
-	record: Record<string, unknown> | undefined,
-	key: string,
-): Record<string, unknown> | undefined {
-	const value = record?.[key];
-	return isRecord(value) ? value : undefined;
-}
-
 function getPersistedApiKey(record: unknown): string {
 	return isRecord(record) && typeof record.apiKey === "string"
 		? record.apiKey
 		: "";
+}
+
+function getPersistedUrl(record: unknown): string {
+	return isRecord(record) && typeof record.url === "string" ? record.url : "";
 }
 
 function safeNormalizeSonarrDefaults(
@@ -158,19 +193,11 @@ function parsePublicOptions(raw: unknown): PublicOptions {
 	const sonarr = getRecordProperty(providers, "sonarr");
 	const radarr = getRecordProperty(providers, "radarr");
 	const uiResult = v.safeParse(UiOptionsSchema, record.ui);
+	const ui = uiResult.success ? uiResult.output : fallback.ui;
 
 	return {
 		providers: {
 			sonarr: {
-				url:
-					typeof sonarr?.url === "string"
-						? sonarr.url
-						: fallback.providers.sonarr.url,
-				preferredAniListTitleLanguage: isAniListTitleLanguage(
-					sonarr?.preferredAniListTitleLanguage,
-				)
-					? sonarr.preferredAniListTitleLanguage
-					: fallback.providers.sonarr.preferredAniListTitleLanguage,
 				defaults: safeNormalizeSonarrDefaults(sonarr?.defaults),
 				isConfigured:
 					typeof sonarr?.isConfigured === "boolean"
@@ -178,15 +205,6 @@ function parsePublicOptions(raw: unknown): PublicOptions {
 						: fallback.providers.sonarr.isConfigured,
 			},
 			radarr: {
-				url:
-					typeof radarr?.url === "string"
-						? radarr.url
-						: fallback.providers.radarr.url,
-				preferredAniListTitleLanguage: isAniListTitleLanguage(
-					radarr?.preferredAniListTitleLanguage,
-				)
-					? radarr.preferredAniListTitleLanguage
-					: fallback.providers.radarr.preferredAniListTitleLanguage,
 				defaults: safeNormalizeRadarrDefaults(radarr?.defaults),
 				isConfigured:
 					typeof radarr?.isConfigured === "boolean"
@@ -194,7 +212,7 @@ function parsePublicOptions(raw: unknown): PublicOptions {
 						: fallback.providers.radarr.isConfigured,
 			},
 		},
-		ui: uiResult.success ? uiResult.output : fallback.ui,
+		ui: applyPreferredAniListTitleLanguage(ui, raw),
 		debugLogging:
 			typeof record.debugLogging === "boolean"
 				? record.debugLogging
@@ -205,8 +223,8 @@ function parsePublicOptions(raw: unknown): PublicOptions {
 async function readPersistedOptionRecords() {
 	return Promise.all([
 		publicOptions.getValue(),
-		sonarrSecrets.getValue(),
-		radarrSecrets.getValue(),
+		sonarrConnectionStorage.getValue(),
+		radarrConnectionStorage.getValue(),
 	]);
 }
 
@@ -224,10 +242,12 @@ function buildRawExtensionOptionsCandidate(
 		providers: {
 			sonarr: {
 				...sonarrPublic,
+				url: getPersistedUrl(sonarr),
 				apiKey: getPersistedApiKey(sonarr),
 			},
 			radarr: {
 				...radarrPublic,
+				url: getPersistedUrl(radarr),
 				apiKey: getPersistedApiKey(radarr),
 			},
 		},
@@ -245,7 +265,7 @@ export async function getExtensionOptionsSnapshot(): Promise<ExtensionOptions> {
 	return parseExtensionOptions(await getRawOptions());
 }
 
-export async function setExtensionOptionsSnapshot(
+async function writeExtensionOptionsSnapshot(
 	options: ExtensionOptions,
 ): Promise<void> {
 	const strippedInput = {
@@ -314,10 +334,87 @@ export async function setExtensionOptionsSnapshot(
 	} as PublicOptions;
 
 	await Promise.all([
-		sonarrSecrets.setValue({ apiKey: sonarrConnection?.apiKey ?? "" }),
-		radarrSecrets.setValue({ apiKey: radarrConnection?.apiKey ?? "" }),
+		sonarrConnectionStorage.setValue({
+			url: sonarrConnection?.url ?? "",
+			apiKey: sonarrConnection?.apiKey ?? "",
+		}),
+		radarrConnectionStorage.setValue({
+			url: radarrConnection?.url ?? "",
+			apiKey: radarrConnection?.apiKey ?? "",
+		}),
 	]);
 	await publicOptions.setValue(persistedPublicOptions);
+}
+
+export async function savePublicOptionsSnapshot(
+	options: PublicOptions,
+): Promise<void> {
+	const current = await getExtensionOptionsSnapshot();
+	const nextPublicOptions = toPublicOptions({
+		...current,
+		providers: {
+			sonarr: {
+				...current.providers.sonarr,
+				defaults: options.providers.sonarr.defaults,
+			},
+			radarr: {
+				...current.providers.radarr,
+				defaults: options.providers.radarr.defaults,
+			},
+		},
+		ui: options.ui,
+		debugLogging: options.debugLogging,
+	});
+	await publicOptions.setValue({
+		...nextPublicOptions,
+		providers: {
+			sonarr: {
+				...nextPublicOptions.providers.sonarr,
+				defaults: stripSonarrFormStateForDefaults(
+					nextPublicOptions.providers.sonarr.defaults,
+				),
+			},
+			radarr: {
+				...nextPublicOptions.providers.radarr,
+				defaults: stripRadarrFormStateForDefaults(
+					nextPublicOptions.providers.radarr.defaults,
+				),
+			},
+		},
+	});
+}
+
+export async function saveProviderConnectionSnapshot(
+	provider: Provider,
+	credentials: ProviderCredentials | null,
+): Promise<ExtensionOptions> {
+	const normalized = credentials
+		? normalizeProviderConnectionInput(credentials, provider)
+		: null;
+	const connection = {
+		url: normalized?.url ?? "",
+		apiKey: normalized?.apiKey ?? "",
+	};
+	const storageItem =
+		provider === "sonarr" ? sonarrConnectionStorage : radarrConnectionStorage;
+	await storageItem.setValue(connection);
+
+	const currentPublicOptions = await getPublicOptionsSnapshot();
+	await publicOptions.setValue({
+		...currentPublicOptions,
+		providers: {
+			...currentPublicOptions.providers,
+			[provider]: {
+				...currentPublicOptions.providers[provider],
+				isConfigured: normalized !== null,
+			},
+		},
+	});
+	return getExtensionOptionsSnapshot();
+}
+
+export async function resetAllSettingsSnapshot(): Promise<void> {
+	await writeExtensionOptionsSnapshot(createDefaultExtensionOptions());
 }
 
 export async function getPublicOptionsSnapshot(): Promise<PublicOptions> {
@@ -332,8 +429,8 @@ export function watchExtensionOptionsSnapshot(
 	};
 	const unsubscribes = [
 		publicOptions.watch(refresh),
-		sonarrSecrets.watch(refresh),
-		radarrSecrets.watch(refresh),
+		sonarrConnectionStorage.watch(refresh),
+		radarrConnectionStorage.watch(refresh),
 	];
 	return () => {
 		for (const unsubscribe of unsubscribes) unsubscribe();

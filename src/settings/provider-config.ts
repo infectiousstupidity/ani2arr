@@ -8,18 +8,10 @@ import {
 	validateProviderConnectionUrl,
 } from "@/providers/settings/provider-connection.validation";
 import type { Provider, ProviderCredentials } from "@/providers";
-import type { ExtensionOptions, PublicOptions } from "./types";
+import type { ExtensionOptions } from "./types";
 
 export type NormalizedProviderConnection = ProviderCredentials & {
 	permissionPattern: string;
-};
-
-const hasProviderShape = (
-	options: unknown,
-): options is Pick<PublicOptions, "providers"> => {
-	if (!options || typeof options !== "object") return false;
-	const maybeProviders = (options as { providers?: unknown }).providers;
-	return Boolean(maybeProviders && typeof maybeProviders === "object");
 };
 
 export function getProviderConnectionDraft(
@@ -103,11 +95,3 @@ export function hasConfiguredProviderCredentials(
 ): boolean {
 	return getProviderCredentials(settings, provider) !== null;
 }
-
-export const getProviderBaseUrl = (
-	provider: Provider,
-	options: unknown,
-): string => {
-	if (!hasProviderShape(options)) return "";
-	return options.providers?.[provider]?.url ?? "";
-};

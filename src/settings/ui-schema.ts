@@ -2,6 +2,7 @@
 // src/settings/ui-schema.ts
 
 import * as v from "valibot";
+import { AniListTitleLanguageSchema } from "@/anilist/schemas/title-language.schema";
 import type { BadgeVisibility, UiOptions } from "./types";
 
 const BADGE_VISIBILITY_OPTIONS: [BadgeVisibility, ...BadgeVisibility[]] = [
@@ -21,6 +22,7 @@ const createDefaultAnimePageUiOptions =
 	});
 
 export const createDefaultUiOptions = (): UiOptions => ({
+	preferredAniListTitleLanguage: "english",
 	browseCards: {
 		sonarr: createDefaultBrowseCardUiOptions(),
 		radarr: createDefaultBrowseCardUiOptions(),
@@ -56,6 +58,10 @@ export const UiOptionsSchema = v.pipe(
 	v.unknown(),
 	v.transform(asRecord),
 	v.object({
+		preferredAniListTitleLanguage: v.fallback(
+			AniListTitleLanguageSchema,
+			"english",
+		),
 		browseCards: v.object({
 			sonarr: v.fallback(
 				ProviderBrowseCardUiOptionsSchema,

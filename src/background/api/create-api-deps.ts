@@ -32,10 +32,9 @@ import {
 	createSonarrTitleLookup,
 } from "@/mapping/auto-mapping/lookup/provider-title-lookup";
 import {
-	createDefaultExtensionOptions,
 	getProviderCredentials,
 	getExtensionOptionsSnapshot,
-	setExtensionOptionsSnapshot,
+	resetAllSettingsSnapshot,
 	hasConfiguredProviderCredentials,
 	type ExtensionOptions,
 } from "@/settings";
@@ -342,11 +341,10 @@ export const createApiDeps = (): ApiHandlerDeps => {
 		await manualMappingsReady;
 
 		const previousOptions = await getExtensionOptionsSnapshot();
-		const defaults = createDefaultExtensionOptions();
 
 		await manualMappingService.clearAll();
 		await clearPersistentCaches();
-		await setExtensionOptionsSnapshot(defaults);
+		await resetAllSettingsSnapshot();
 		await removeConfiguredProviderHostPermissions(previousOptions);
 	};
 

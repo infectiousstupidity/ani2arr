@@ -2,7 +2,6 @@
 // src/settings/schema.ts
 
 import * as v from "valibot";
-import { AniListTitleLanguageSchema } from "@/anilist/schemas/title-language.schema";
 import {
 	SonarrDefaultsSchema,
 	createDefaultSonarrFormState as createDefaultSonarrFormStateValue,
@@ -17,24 +16,18 @@ import { createDefaultUiOptions, UiOptionsSchema } from "./ui-schema";
 const createDefaultSonarrProviderSettings = () => ({
 	url: "",
 	apiKey: "",
-	preferredAniListTitleLanguage: "english" as const,
 	defaults: createDefaultSonarrFormStateValue(),
 });
 
 const createDefaultRadarrProviderSettings = () => ({
 	url: "",
 	apiKey: "",
-	preferredAniListTitleLanguage: "english" as const,
 	defaults: createDefaultRadarrFormState(),
 });
 
 const SonarrProviderSettingsSchema = v.object({
 	url: v.string(),
 	apiKey: v.string(),
-	preferredAniListTitleLanguage: v.fallback(
-		AniListTitleLanguageSchema,
-		"english",
-	),
 	defaults: v.fallback(
 		SonarrDefaultsSchema,
 		createDefaultSonarrFormStateValue(),
@@ -44,10 +37,6 @@ const SonarrProviderSettingsSchema = v.object({
 const RadarrProviderSettingsSchema = v.object({
 	url: v.string(),
 	apiKey: v.string(),
-	preferredAniListTitleLanguage: v.fallback(
-		AniListTitleLanguageSchema,
-		"english",
-	),
 	defaults: v.fallback(RadarrDefaultsSchema, createDefaultRadarrFormState()),
 });
 

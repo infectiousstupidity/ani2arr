@@ -20,6 +20,7 @@ const RadarrSharedFieldEntries = {
 	rootFolderPath: v.optional(v.string()),
 	tags: v.optional(v.array(ProviderTagIdSchema)),
 	minimumAvailability: v.optional(RadarrMinimumAvailabilitySchema),
+	freeformTags: FreeformTagsSchema,
 } as const;
 
 const RadarrAddFieldEntries = {
@@ -37,7 +38,6 @@ export const RadarrDefaultsSchema = v.object(RadarrAddFieldEntries);
 export const RadarrFormStateSchema = v.object({
 	...RadarrAddFieldEntries,
 	monitored: v.optional(v.boolean()),
-	freeformTags: FreeformTagsSchema,
 });
 
 export type RadarrFormState = v.InferOutput<typeof RadarrFormStateSchema>;

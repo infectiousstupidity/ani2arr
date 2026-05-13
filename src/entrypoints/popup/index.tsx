@@ -11,9 +11,13 @@ import { getProviderLabel } from '@/providers/provider-labels';
 import { cn } from '@/shared/utils/cn';
 import { getProviderCredentials,
 	type BadgeVisibility,
-  type ExtensionOptions,
+  type PublicOptions,
 } from '@/settings';
-import { useExtensionOptions, useSaveOptions } from '@/queries/options';
+import {
+	useExtensionOptions,
+	usePublicOptions,
+	useSavePublicOptions,
+} from '@/queries/options';
 import { PROVIDERS, type Provider } from '@/providers';
 import './style.css';
 
@@ -40,10 +44,12 @@ const badgeOptions: Array<{ value: BadgeVisibility; label: string }> = [
 
 export const QuickSettings: React.FC = () => {
   const optionsQuery = useExtensionOptions();
-  const saveOptions = useSaveOptions();
+  const publicOptionsQuery = usePublicOptions();
+  const saveOptions = useSavePublicOptions();
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const settings = optionsQuery.data;
+  const publicSettings = publicOptionsQuery.data;
   const sonarrStatus = useProviderConnectionStatus(
     'sonarr',
     getProviderCredentials(settings, 'sonarr'),
@@ -54,7 +60,7 @@ export const QuickSettings: React.FC = () => {
   );
   const hasAnyProviderConfigured =
     sonarrStatus.isProviderConfigured || radarrStatus.isProviderConfigured;
-  const isLoading = optionsQuery.isLoading;
+  const isLoading = optionsQuery.isLoading || publicOptionsQuery.isLoading;
   const isSaving = saveOptions.isPending;
   const isBusy = isLoading || isSaving;
   let statusMessage = saveError;
@@ -64,13 +70,13 @@ export const QuickSettings: React.FC = () => {
     statusMessage = 'Saving...';
   }
 
-  const updateSettings = async (updater: (current: ExtensionOptions) => ExtensionOptions) => {
-    if (!settings || isSaving) return;
+  const updateSettings = async (updater: (current: PublicOptions) => PublicOptions) => {
+    if (!publicSettings || isSaving) return;
 
     setSaveError(null);
 
     try {
-      await saveOptions.mutateAsync(updater(settings));
+      await saveOptions.mutateAsync(updater(publicSettings));
     } catch (error) {
       setSaveError((error as Error)?.message ?? 'Failed to save settings.');
     }
@@ -78,7 +84,7 @@ export const QuickSettings: React.FC = () => {
 
   const updateBrowseProvider = async (
     provider: Provider,
-    patch: Partial<ExtensionOptions['ui']['browseCards'][Provider]>,
+    patch: Partial<PublicOptions['ui']['browseCards'][Provider]>,
   ) => {
     await updateSettings((current) => ({
       ...current,
@@ -201,7 +207,7 @@ export const QuickSettings: React.FC = () => {
 
         {PROVIDERS.map((provider) => {
           const providerLabel = getProviderLabel(provider);
-          const providerSettings = settings?.ui.browseCards[provider];
+          const providerSettings = publicSettings?.ui.browseCards[provider];
 
           return (
             <div
@@ -216,7 +222,7 @@ export const QuickSettings: React.FC = () => {
                   type="checkbox"
                   className="h-4 w-4"
                   checked={providerSettings?.enabled ?? false}
-                  disabled={isBusy || !settings}
+                  disabled={isBusy || !publicSettings}
                   onChange={(event) => {
                     void updateBrowseProvider(provider, {
                       enabled: event.currentTarget.checked,
@@ -234,7 +240,7 @@ export const QuickSettings: React.FC = () => {
                       <button
                         key={option.value}
                         type="button"
-                        disabled={isBusy || !settings || !(providerSettings?.enabled ?? false)}
+                        disabled={isBusy || !publicSettings || !(providerSettings?.enabled ?? false)}
                         onClick={() => {
                           void updateBrowseProvider(provider, { visibility: option.value });
                         }}
@@ -263,7 +269,7 @@ export const QuickSettings: React.FC = () => {
 
         {PROVIDERS.map((provider) => {
           const providerLabel = getProviderLabel(provider);
-          const enabled = settings?.ui.animePages[provider].enabled ?? false;
+          const enabled = publicSettings?.ui.animePages[provider].enabled ?? false;
 
           return (
             <div
@@ -282,7 +288,7 @@ export const QuickSettings: React.FC = () => {
                 type="checkbox"
                 className="h-4 w-4"
                 checked={enabled}
-                disabled={isBusy || !settings}
+                disabled={isBusy || !publicSettings}
                 onChange={(event) => {
                   void updateAnimeProvider(provider, event.currentTarget.checked);
                 }}

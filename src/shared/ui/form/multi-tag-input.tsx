@@ -1,4 +1,5 @@
-// src/shared/components/multi-tag-input.tsx
+/** Shared multi-value tag input with optional existing-tag suggestions. */
+// src/shared/ui/form/multi-tag-input.tsx
 import React, { useState, useMemo, useRef } from 'react';
 import { X } from 'lucide-react';
 
@@ -122,7 +123,7 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({
   return (
     <div className="relative" onBlur={handleBlur}>
       <div
-        className="flex w-full min-h-[42px] flex-wrap items-center gap-2 rounded-md bg-bg-primary p-2 text-sm ring-offset-background"
+        className="flex w-full min-h-[42px] flex-wrap items-center gap-2 rounded-md border border-border-primary bg-bg-secondary p-2 text-sm ring-offset-background focus-within:border-accent-primary focus-within:ring-1 focus-within:ring-accent-primary transition-colors"
         onClick={() => inputRef.current?.focus()}
       >
         {tags.map((tag) => (

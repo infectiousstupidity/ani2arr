@@ -12,8 +12,8 @@ import { resolveTitlePreference } from "@/anilist/title-preference";
 import { defaultRadarrFormState } from "@/settings";
 import type { CheckMovieStatusResponse } from "@/rpc/types";
 import { useMovieStatus, useRadarrFormOptions } from "@/queries/radarr";
-import { getProviderBaseUrl } from "@/settings/provider-config";
 import { useAniListMedia, useAniListMetadataBatch } from "@/queries/anilist";
+import { useProviderBaseUrl } from "@/queries/provider-base-url";
 import { usePublicOptions } from "@/queries/options";
 import * as manualMappingHelpers from "@/features/media-modal/mapping-search/current-mapping";
 import {
@@ -70,6 +70,10 @@ export function useRadarrModalReadData(input: {
 		launchMetadata = null,
 	} = input;
 	const { data: options } = usePublicOptions();
+	const isConfigured = options?.providers.radarr.isConfigured === true;
+	const providerBaseUrl = useProviderBaseUrl("radarr", {
+		enabled: isConfigured,
+	});
 
 	const metadataBatch = useAniListMetadataBatch([anilistId], { enabled: true });
 	const { data: anilistMedia } = useAniListMedia(anilistId, {
@@ -103,7 +107,7 @@ export function useRadarrModalReadData(input: {
 			pickString(launchTitle, titles.english, titles.romaji, titles.native) ??
 			`AniList #${anilistId}`;
 		const preferredLang =
-			options?.providers.radarr.preferredAniListTitleLanguage ?? "english";
+			options?.ui.preferredAniListTitleLanguage ?? "english";
 		const resolvedTitle = resolveTitlePreference({
 			titles,
 			preferred: preferredLang,
@@ -114,7 +118,7 @@ export function useRadarrModalReadData(input: {
 			resolvedMetadata: resolved,
 			providerRequestTitle: resolvedTitle.primary,
 			fallbackTitle: fallback,
-			baseUrl: getProviderBaseUrl("radarr", options),
+			baseUrl: providerBaseUrl.data ?? "",
 			format: fmt,
 		};
 	}, [
@@ -124,9 +128,9 @@ export function useRadarrModalReadData(input: {
 		launchTitle,
 		metadataBatch.data,
 		options,
+		providerBaseUrl.data,
 	]);
 
-	const isConfigured = options?.providers.radarr.isConfigured === true;
 	const radarrFormOptions = useRadarrFormOptions({ enabled: isConfigured });
 
 	const statusPayload = useMemo(
