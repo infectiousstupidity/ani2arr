@@ -11,7 +11,8 @@ import { getProviderCredentials, type PublicOptions } from "@/settings";
 import { useHashRoute, type PageId } from "./navigation";
 import { SonarrPage } from "./pages/sonarr-page";
 import { RadarrPage } from "./pages/radarr-page";
-import { MappingsPage, UiPage, AdvancedPage } from "./pages/placeholders";
+import { UiPage } from "./pages/ui-page";
+import { MappingsPage, AdvancedPage } from "./pages/placeholders";
 import { UniversalFormProvider } from "./universal-form";
 import { ConfirmDialog } from "./components/ui/alert-dialog";
 import {
