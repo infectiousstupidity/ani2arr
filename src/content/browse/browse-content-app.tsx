@@ -16,6 +16,7 @@ import type { BrowseAdapter, HostMediaTarget } from "./types";
 import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import { CardOverlay } from "@/features/media-overlay/components/card-overlay";
 import { usePublicOptions } from "@/queries/options";
+import { useProviderBaseUrl } from "@/queries/provider-base-url";
 import type { Provider } from "@/providers";
 import { useMappingIdentities } from "@/queries/mapping";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
@@ -99,6 +100,7 @@ function renderBrowseCardPortal(input: {
 	>;
 	mappedIdentityByAniListId: Map<AniListId, EffectiveMappingPresence>;
 	publicOptions: Awaited<ReturnType<typeof usePublicOptions>>["data"];
+	providerBaseUrls: Record<Provider, string>;
 	onOpenMediaModal(input: MediaModalOpenState): void;
 	adapter: BrowseAdapter;
 }) {
@@ -186,7 +188,7 @@ function renderBrowseCardPortal(input: {
 			defaultForm={providerOptions?.defaults ?? null}
 			mappedIdentity={mappedIdentity ?? null}
 			metadata={effectiveMetadata}
-			providerUrl={providerOptions?.url ?? null}
+			providerUrl={input.providerBaseUrls[provider] || null}
 			observeTarget={input.container}
 			badgeVisibility={badgeVisibility}
 			anchorCorner={input.adapter.anchorCorner ?? "bottom-left"}
@@ -265,6 +267,12 @@ export const createBrowseContentApp = (
 			(sonarrBrowseEnabled && publicOptions?.providers.sonarr.isConfigured) ||
 			(radarrBrowseEnabled && publicOptions?.providers.radarr.isConfigured),
 		);
+		const sonarrBaseUrl = useProviderBaseUrl("sonarr", {
+			enabled: publicOptions?.providers.sonarr.isConfigured === true,
+		});
+		const radarrBaseUrl = useProviderBaseUrl("radarr", {
+			enabled: publicOptions?.providers.radarr.isConfigured === true,
+		});
 
 		const { cardPortals } = useBrowsePortals({
 			cardSelector,
@@ -317,6 +325,10 @@ export const createBrowseContentApp = (
 						canonicalMetadataById,
 						mappedIdentityByAniListId,
 						publicOptions,
+						providerBaseUrls: {
+							sonarr: sonarrBaseUrl.data ?? "",
+							radarr: radarrBaseUrl.data ?? "",
+						},
 						onOpenMediaModal,
 						adapter,
 					});

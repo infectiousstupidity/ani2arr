@@ -8,12 +8,6 @@ import type { RadarrMovieLibraryStatus } from "@/providers/radarr/library";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
 import { queryKeys } from "@/queries/query-keys";
-import {
-	normalizeRadarrFormState,
-	stripRadarrFormStateForDefaults,
-	type RadarrFormState,
-} from "@/providers/radarr/form-state";
-import type { PublicOptions } from "@/settings";
 import type { ProviderCredentials, RadarrMovie, TmdbId } from "@/providers";
 import type {
 	AddRadarrInput,
@@ -168,46 +162,6 @@ export const useUpdateMovie = () => {
 			queryClient.invalidateQueries({
 				queryKey: queryKeys.seriesStatusBase(variables.anilistId, "radarr"),
 			});
-		},
-	});
-};
-
-export const useUpdateRadarrDefaultSettings = () => {
-	const queryClient = useQueryClient();
-	return useMutation<void, ExtensionError, RadarrFormState>({
-		mutationFn: async (defaults: RadarrFormState) => {
-			try {
-				await getAni2arrApi().updateRadarrDefaults(
-					normalizeRadarrFormState(stripRadarrFormStateForDefaults(defaults)),
-				);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
-		onSuccess: (_data, defaults) => {
-			const normalizedDefaults = normalizeRadarrFormState(
-				stripRadarrFormStateForDefaults(defaults),
-			);
-			queryClient.setQueryData(
-				queryKeys.publicOptions(),
-				(prev?: PublicOptions) =>
-					prev
-						? {
-								...prev,
-								providers: {
-									...prev.providers,
-									radarr: {
-										...prev.providers.radarr,
-										defaults: normalizedDefaults,
-									},
-								},
-							}
-						: prev,
-			);
-			queryClient.invalidateQueries({ queryKey: queryKeys.options() });
-		},
-		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: queryKeys.publicOptions() });
 		},
 	});
 };

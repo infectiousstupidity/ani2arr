@@ -15,6 +15,7 @@ describe("Radarr form state", () => {
 		expect(defaults.monitored).toBeUndefined();
 		expect(stripRadarrFormStateForDefaults(defaults)).toEqual({
 			minimumAvailability: "released",
+			freeformTags: [],
 			addOptions: {
 				monitor: "movieOnly",
 				searchForMovie: true,
@@ -26,7 +27,7 @@ describe("Radarr form state", () => {
 		expect(
 			stripRadarrFormStateForDefaults({
 				monitored: false,
-				freeformTags: [],
+				freeformTags: ["ani2arr"],
 				minimumAvailability: "released",
 				addOptions: {
 					monitor: "none",
@@ -35,8 +36,29 @@ describe("Radarr form state", () => {
 			}),
 		).toEqual({
 			minimumAvailability: "released",
+			freeformTags: ["ani2arr"],
 			addOptions: {
 				monitor: "none",
+				searchForMovie: false,
+			},
+		});
+	});
+
+	it("preserves freeform tags in add defaults", () => {
+		expect(
+			stripRadarrFormStateForDefaults({
+				freeformTags: ["ani2arr", "seasonal"],
+				minimumAvailability: "announced",
+				addOptions: {
+					monitor: "movieAndCollection",
+					searchForMovie: false,
+				},
+			}),
+		).toEqual({
+			freeformTags: ["ani2arr", "seasonal"],
+			minimumAvailability: "announced",
+			addOptions: {
+				monitor: "movieAndCollection",
 				searchForMovie: false,
 			},
 		});

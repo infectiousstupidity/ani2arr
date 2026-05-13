@@ -7,8 +7,6 @@ import {
 } from "@webext-core/proxy-service";
 import type { AniListId } from "@/anilist";
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
-import type { SonarrFormState } from "@/providers/sonarr/form-state";
-import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import type {
 	Provider,
@@ -50,6 +48,7 @@ import type {
 	GetMappingInspectionInput,
 	GetAniListMetadataInput,
 	TestProviderConnectionInput,
+	GetProviderBaseUrlInput,
 } from "./schemas";
 
 export interface Ani2arrApi {
@@ -76,11 +75,10 @@ export interface Ani2arrApi {
 		changedProviders?: Provider[];
 		disconnectedProviders?: Provider[];
 	}): Promise<{ ok: true }>;
-	updateSonarrDefaults(defaults: SonarrFormState): Promise<{ ok: true }>;
-	updateRadarrDefaults(defaults: RadarrFormState): Promise<{ ok: true }>;
 	testProviderConnection(
 		input: TestProviderConnectionInput,
 	): Promise<{ version: string }>;
+	getProviderBaseUrl(input: GetProviderBaseUrlInput): Promise<string>;
 	getSonarrFormOptions(
 		input?: GetProviderFormOptionsInput,
 	): Promise<ProviderFormOptions>;

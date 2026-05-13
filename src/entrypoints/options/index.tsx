@@ -8,6 +8,7 @@ import { ExtensionErrorBoundary } from '@/shared/ui/feedback/extension-error-bou
 import { ConfirmProvider } from '@/shared/hooks/use-confirm';
 import ToastProvider from '@/shared/ui/feedback/toast-provider';
 import { OptionsPage } from '@/options-page';
+import './style.css';
 
 const queryClient = new QueryClient();
 // Find the root element and render the app.

@@ -167,6 +167,10 @@ export const TestProviderConnectionInputSchema = v.object({
 	credentials: ProviderCredentialsSchema,
 });
 
+export const GetProviderBaseUrlInputSchema = v.object({
+	provider: ProviderSchema,
+});
+
 export const NotifyProviderConnectionChangedInputSchema = v.optional(
 	v.object({
 		changedProviders: v.optional(v.array(ProviderSchema)),
@@ -264,6 +268,9 @@ export type GetAniListMetadataInput = v.InferOutput<
 export type RadarrLookupInput = v.InferOutput<typeof RadarrLookupInputSchema>;
 export type TestProviderConnectionInput = v.InferOutput<
 	typeof TestProviderConnectionInputSchema
+>;
+export type GetProviderBaseUrlInput = v.InferOutput<
+	typeof GetProviderBaseUrlInputSchema
 >;
 export type GetProviderFormOptionsInput = v.InferOutput<
 	typeof GetProviderFormOptionsInputSchema

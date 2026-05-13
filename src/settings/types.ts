@@ -9,6 +9,7 @@ import type { ProviderCredentials } from "@/providers";
 export type BadgeVisibility = "always" | "hover";
 
 export interface UiOptions {
+	preferredAniListTitleLanguage: AniListTitleLanguage;
 	browseCards: {
 		sonarr: {
 			enabled: boolean;
@@ -33,11 +34,9 @@ export interface UiOptions {
 export interface ExtensionOptions {
 	providers: {
 		sonarr: ProviderCredentials & {
-			preferredAniListTitleLanguage: AniListTitleLanguage;
 			defaults: SonarrFormState;
 		};
 		radarr: ProviderCredentials & {
-			preferredAniListTitleLanguage: AniListTitleLanguage;
 			defaults: RadarrFormState;
 		};
 	};
@@ -48,14 +47,10 @@ export interface ExtensionOptions {
 export interface PublicOptions {
 	providers: {
 		sonarr: {
-			url: string;
-			preferredAniListTitleLanguage: AniListTitleLanguage;
 			defaults: SonarrFormState;
 			isConfigured: boolean;
 		};
 		radarr: {
-			url: string;
-			preferredAniListTitleLanguage: AniListTitleLanguage;
 			defaults: RadarrFormState;
 			isConfigured: boolean;
 		};

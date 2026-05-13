@@ -6,11 +6,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
 import { logger } from "@/shared/utils/logger";
 import { queryKeys } from "@/queries/query-keys";
+import type { Provider, ProviderCredentials } from "@/providers";
 import {
-	getExtensionOptionsSnapshot,
 	getPublicOptionsSnapshot,
-	parseExtensionOptions,
-	setExtensionOptionsSnapshot,
+	getExtensionOptionsSnapshot,
+	saveProviderConnectionSnapshot,
+	savePublicOptionsSnapshot,
 	toPublicOptions,
 	watchExtensionOptionsSnapshot,
 	watchPublicOptionsSnapshot,
@@ -80,49 +81,54 @@ export const usePublicOptions = () => {
 	return query;
 };
 
-export const useSaveOptions = () => {
+export const useSavePublicOptions = () => {
 	const queryClient = useQueryClient();
 
 	return useMutation<
-		void,
+		{ extensionOptions: ExtensionOptions; publicOptions: PublicOptions },
 		ExtensionError,
-		ExtensionOptions,
-		{ previousOptions: ExtensionOptions | undefined }
+		PublicOptions
 	>({
-		mutationFn: async (options: ExtensionOptions) => {
+		mutationFn: async (options: PublicOptions) => {
 			try {
-				await setExtensionOptionsSnapshot(options);
+				await savePublicOptionsSnapshot(options);
+				const [extensionOptions, publicOptions] = await Promise.all([
+					getExtensionOptionsSnapshot(),
+					getPublicOptionsSnapshot(),
+				]);
+				return { extensionOptions, publicOptions };
 			} catch (error) {
 				throw normalizeError(error);
 			}
 		},
-		onMutate: async (newOptions) => {
-			await Promise.all([
-				queryClient.cancelQueries({ queryKey: queryKeys.options() }),
-				queryClient.cancelQueries({ queryKey: queryKeys.publicOptions() }),
-			]);
-			const previousOptions = queryClient.getQueryData<ExtensionOptions>(
-				queryKeys.options(),
-			);
-			const nextSettings = parseExtensionOptions(newOptions);
-			const nextPublicOptions = toPublicOptions(nextSettings);
-			queryClient.setQueryData(queryKeys.options(), nextSettings);
-			queryClient.setQueryData(queryKeys.publicOptions(), nextPublicOptions);
-			return { previousOptions };
+		onSuccess: (saved) => {
+			queryClient.setQueryData(queryKeys.options(), saved.extensionOptions);
+			queryClient.setQueryData(queryKeys.publicOptions(), saved.publicOptions);
 		},
-		onError: (_err, _newOptions, context) => {
-			if (context?.previousOptions) {
-				const fallback = parseExtensionOptions(context.previousOptions);
-				queryClient.setQueryData(queryKeys.options(), fallback);
-				queryClient.setQueryData(
-					queryKeys.publicOptions(),
-					toPublicOptions(fallback),
-				);
+	});
+};
+
+export const useSaveProviderConnection = () => {
+	const queryClient = useQueryClient();
+
+	return useMutation<
+		ExtensionOptions,
+		ExtensionError,
+		{ provider: Provider; credentials: ProviderCredentials | null }
+	>({
+		mutationFn: async ({ provider, credentials }) => {
+			try {
+				return await saveProviderConnectionSnapshot(provider, credentials);
+			} catch (error) {
+				throw normalizeError(error);
 			}
 		},
-		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: queryKeys.options() });
-			queryClient.invalidateQueries({ queryKey: queryKeys.publicOptions() });
+		onSuccess: (savedOptions) => {
+			queryClient.setQueryData(queryKeys.options(), savedOptions);
+			queryClient.setQueryData(
+				queryKeys.publicOptions(),
+				toPublicOptions(savedOptions),
+			);
 		},
 	});
 };

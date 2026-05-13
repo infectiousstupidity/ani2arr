@@ -23,6 +23,7 @@ const SonarrProviderFieldEntries = {
 	tags: v.optional(v.array(ProviderTagIdSchema)),
 	seriesType: v.optional(SonarrSeriesTypeSchema),
 	seasonFolder: v.optional(v.boolean()),
+	freeformTags: FreeformTagsSchema,
 	addOptions: v.optional(
 		v.object({
 			monitor: v.optional(SonarrMonitorOptionSchema),
@@ -37,7 +38,6 @@ export const SonarrDefaultsSchema = v.object(SonarrProviderFieldEntries);
 export const SonarrFormStateSchema = v.object({
 	...SonarrProviderFieldEntries,
 	monitorNewItems: v.optional(SonarrMonitorNewItemsOptionSchema),
-	freeformTags: FreeformTagsSchema,
 });
 
 export type SonarrFormState = v.InferOutput<typeof SonarrFormStateSchema>;

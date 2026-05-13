@@ -5,7 +5,10 @@ import * as v from "valibot";
 import type { Ani2arrApi } from "@/rpc";
 import type { Provider, ProviderCredentials } from "@/providers";
 import { normalizeProviderConnectionInput } from "@/settings";
-import { TestProviderConnectionInputSchema } from "@/rpc/schemas";
+import {
+	GetProviderBaseUrlInputSchema,
+	TestProviderConnectionInputSchema,
+} from "@/rpc/schemas";
 import type { ApiHandlerDeps } from "./handler-deps";
 
 export const normalizeInputCredentials = (
@@ -25,8 +28,8 @@ export const normalizeInputCredentials = (
 
 export function createProviderHandlers(
 	deps: ApiHandlerDeps,
-): Pick<Ani2arrApi, "testProviderConnection"> {
-	const { sonarrClient, radarrClient } = deps;
+): Pick<Ani2arrApi, "getProviderBaseUrl" | "testProviderConnection"> {
+	const { providerConfig, sonarrClient, radarrClient } = deps;
 
 	const testProviderConnectionInternal: Ani2arrApi["testProviderConnection"] =
 		async (input) => {
@@ -36,6 +39,12 @@ export function createProviderHandlers(
 		};
 
 	return {
+		async getProviderBaseUrl(input) {
+			const parsedInput = v.parse(GetProviderBaseUrlInputSchema, input);
+			const credentials = await providerConfig.get(parsedInput.provider);
+			return credentials?.url ?? "";
+		},
+
 		testProviderConnection(input) {
 			const parsedInput = v.parse(TestProviderConnectionInputSchema, input);
 			return testProviderConnectionInternal({
@@ -46,5 +55,5 @@ export function createProviderHandlers(
 				),
 			});
 		},
-	} satisfies Pick<Ani2arrApi, "testProviderConnection">;
+	} satisfies Pick<Ani2arrApi, "getProviderBaseUrl" | "testProviderConnection">;
 }

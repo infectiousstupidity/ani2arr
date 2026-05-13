@@ -78,7 +78,7 @@ export const deriveProviderConnectionStatusView = (input: {
 	if (!input.isProviderConfigured) {
 		return {
 			isProviderConfigured: false,
-			shortLabel: "Not set",
+			shortLabel: "Not configured",
 		};
 	}
 

@@ -9,6 +9,9 @@ import {
 	getExtensionOptionsSnapshot,
 	getPublicOptionsSnapshot,
 	parseExtensionOptions,
+	resetAllSettingsSnapshot,
+	saveProviderConnectionSnapshot,
+	savePublicOptionsSnapshot,
 	toPublicOptions,
 	watchPublicOptionsSnapshot,
 } from "@/settings";
@@ -17,6 +20,15 @@ import type { PublicOptions } from "@/settings";
 const PUBLIC_OPTIONS_STORAGE_KEY = "publicOptions";
 const SONARR_SECRETS_STORAGE_KEY = "sonarrSecrets";
 const RADARR_SECRETS_STORAGE_KEY = "radarrSecrets";
+
+function createLegacyUiOptions() {
+	const { ui } = createDefaultExtensionOptions();
+	return {
+		browseCards: ui.browseCards,
+		animePages: ui.animePages,
+		schedulerDebugOverlayEnabled: ui.schedulerDebugOverlayEnabled,
+	};
+}
 
 describe("options store helpers", () => {
 	it("falls back to default settings for missing input", () => {
@@ -33,14 +45,10 @@ describe("options store helpers", () => {
 		expect(toPublicOptions(settings)).toEqual({
 			providers: {
 				sonarr: {
-					url: "https://sonarr.example",
-					preferredAniListTitleLanguage: "english",
 					defaults: settings.providers.sonarr.defaults,
 					isConfigured: true,
 				},
 				radarr: {
-					url: "https://radarr.example",
-					preferredAniListTitleLanguage: "english",
 					defaults: settings.providers.radarr.defaults,
 					isConfigured: false,
 				},
@@ -48,6 +56,93 @@ describe("options store helpers", () => {
 			ui: settings.ui,
 			debugLogging: false,
 		});
+	});
+
+	it("uses global title language before legacy provider fallbacks", () => {
+		const settings = createDefaultExtensionOptions();
+		const legacyUi = createLegacyUiOptions();
+		const parseTitleLanguage = (input: {
+			ui?: unknown;
+			sonarr?: unknown;
+			radarr?: unknown;
+			}) =>
+				parseExtensionOptions({
+					...settings,
+					ui: input.ui ?? legacyUi,
+				providers: {
+					sonarr: {
+						...settings.providers.sonarr,
+						preferredAniListTitleLanguage: input.sonarr,
+					},
+					radarr: {
+						...settings.providers.radarr,
+						preferredAniListTitleLanguage: input.radarr,
+						},
+					},
+				}).ui.preferredAniListTitleLanguage;
+
+		expect(
+			parseTitleLanguage({
+				ui: { ...legacyUi, preferredAniListTitleLanguage: "native" },
+				sonarr: "romaji",
+				radarr: "english",
+			}),
+		).toBe("native");
+		expect(parseTitleLanguage({ sonarr: "romaji", radarr: "native" })).toBe(
+			"romaji",
+		);
+		expect(parseTitleLanguage({ sonarr: "invalid", radarr: "native" })).toBe(
+			"native",
+		);
+		expect(parseTitleLanguage({ sonarr: "invalid", radarr: "invalid" })).toBe(
+			"english",
+		);
+		expect(
+			"preferredAniListTitleLanguage" in
+				parseExtensionOptions({
+					...settings,
+					providers: {
+						sonarr: {
+							...settings.providers.sonarr,
+							preferredAniListTitleLanguage: "romaji",
+						},
+						radarr: settings.providers.radarr,
+					},
+				}).providers.sonarr,
+		).toBe(false);
+	});
+
+	it("migrates legacy public provider title language into public ui", async () => {
+		const settings = createDefaultExtensionOptions();
+		const publicOptions = toPublicOptions(settings);
+		const legacyPublicOptions = {
+			...publicOptions,
+			ui: createLegacyUiOptions(),
+			providers: {
+				sonarr: {
+					...publicOptions.providers.sonarr,
+					preferredAniListTitleLanguage: "romaji",
+				},
+				radarr: {
+					...publicOptions.providers.radarr,
+					preferredAniListTitleLanguage: "native",
+				},
+			},
+		};
+
+		await browser.storage.local.set({
+			[PUBLIC_OPTIONS_STORAGE_KEY]: legacyPublicOptions,
+		});
+
+		const snapshot = await getPublicOptionsSnapshot();
+
+		expect(snapshot.ui.preferredAniListTitleLanguage).toBe("romaji");
+		expect(snapshot.providers.sonarr).not.toHaveProperty(
+			"preferredAniListTitleLanguage",
+		);
+		expect(snapshot.providers.radarr).not.toHaveProperty(
+			"preferredAniListTitleLanguage",
+		);
 	});
 
 	it("falls back from malformed public options without healing storage on read", async () => {
@@ -72,24 +167,9 @@ describe("options store helpers", () => {
 		});
 	});
 
-	it("falls back to empty API keys for malformed secret records", async () => {
-		const settings = createDefaultExtensionOptions();
-		const persistedPublicOptions = toPublicOptions({
-			...settings,
-			providers: {
-				sonarr: {
-					...settings.providers.sonarr,
-					url: "https://sonarr.example",
-				},
-				radarr: {
-					...settings.providers.radarr,
-					url: "https://radarr.example",
-				},
-			},
-		});
-
+	it("falls back to empty credentials for malformed private connection records", async () => {
 		await browser.storage.local.set({
-			[PUBLIC_OPTIONS_STORAGE_KEY]: persistedPublicOptions,
+			[PUBLIC_OPTIONS_STORAGE_KEY]: toPublicOptions(createDefaultExtensionOptions()),
 			[SONARR_SECRETS_STORAGE_KEY]: { apiKey: 123 } as unknown as {
 				apiKey: string;
 			},
@@ -98,10 +178,95 @@ describe("options store helpers", () => {
 
 		const snapshot = await getExtensionOptionsSnapshot();
 
-		expect(snapshot.providers.sonarr.url).toBe("https://sonarr.example");
+		expect(snapshot.providers.sonarr.url).toBe("");
 		expect(snapshot.providers.sonarr.apiKey).toBe("");
-		expect(snapshot.providers.radarr.url).toBe("https://radarr.example");
+		expect(snapshot.providers.radarr.url).toBe("");
 		expect(snapshot.providers.radarr.apiKey).toBe("");
+	});
+
+	it("composes extension options from private provider connections and public options", async () => {
+		const publicOptions = toPublicOptions(createDefaultExtensionOptions());
+		publicOptions.providers.sonarr.isConfigured = true;
+
+		await browser.storage.local.set({
+			[PUBLIC_OPTIONS_STORAGE_KEY]: publicOptions,
+			[SONARR_SECRETS_STORAGE_KEY]: {
+				url: "https://sonarr.example",
+				apiKey: "sonarr-key",
+			},
+		});
+
+		const snapshot = await getExtensionOptionsSnapshot();
+
+		expect(snapshot.providers.sonarr.url).toBe("https://sonarr.example");
+		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
+		expect(snapshot.providers.radarr.url).toBe("");
+		expect(snapshot.providers.radarr.apiKey).toBe("");
+	});
+
+	it("saving public options cannot clear private provider credentials", async () => {
+		await saveProviderConnectionSnapshot("sonarr", {
+			url: "https://sonarr.example",
+			apiKey: "sonarr-key",
+		});
+
+		const publicOptions = await getPublicOptionsSnapshot();
+		await savePublicOptionsSnapshot({
+			...publicOptions,
+			debugLogging: true,
+		});
+
+		const snapshot = await getExtensionOptionsSnapshot();
+
+		expect(snapshot.debugLogging).toBe(true);
+		expect(snapshot.providers.sonarr.url).toBe("https://sonarr.example");
+		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
+	});
+
+	it("saving provider credentials does not change public defaults", async () => {
+		const publicOptions = await getPublicOptionsSnapshot();
+		await savePublicOptionsSnapshot({
+			...publicOptions,
+			providers: {
+				...publicOptions.providers,
+				sonarr: {
+					...publicOptions.providers.sonarr,
+					defaults: {
+						...publicOptions.providers.sonarr.defaults,
+						rootFolderPath: "/anime",
+					},
+				},
+			},
+		});
+
+		await saveProviderConnectionSnapshot("sonarr", {
+			url: "https://sonarr.example",
+			apiKey: "sonarr-key",
+		});
+
+		const snapshot = await getExtensionOptionsSnapshot();
+
+		expect(snapshot.providers.sonarr.defaults.rootFolderPath).toBe("/anime");
+		expect(snapshot.providers.sonarr.url).toBe("https://sonarr.example");
+		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
+	});
+
+	it("reset clears public options and private provider credentials", async () => {
+		await saveProviderConnectionSnapshot("sonarr", {
+			url: "https://sonarr.example",
+			apiKey: "sonarr-key",
+		});
+		const publicOptions = await getPublicOptionsSnapshot();
+		await savePublicOptionsSnapshot({
+			...publicOptions,
+			debugLogging: true,
+		});
+
+		await resetAllSettingsSnapshot();
+
+		const snapshot = await getExtensionOptionsSnapshot();
+
+		expect(snapshot).toEqual(createDefaultExtensionOptions());
 	});
 
 	it("reads public options from the public snapshot only", async () => {
@@ -119,7 +284,7 @@ describe("options store helpers", () => {
 						.radarr,
 				},
 			},
-			[SONARR_SECRETS_STORAGE_KEY]: { apiKey: "" },
+			[SONARR_SECRETS_STORAGE_KEY]: { url: "", apiKey: "" },
 		});
 
 		const snapshot = await getPublicOptionsSnapshot();
@@ -135,7 +300,10 @@ describe("options store helpers", () => {
 		});
 
 		await browser.storage.local.set({
-			[SONARR_SECRETS_STORAGE_KEY]: { apiKey: "secret-only-change" },
+			[SONARR_SECRETS_STORAGE_KEY]: {
+				url: "https://sonarr.example",
+				apiKey: "secret-only-change",
+			},
 		});
 		await browser.storage.local.set({
 			[PUBLIC_OPTIONS_STORAGE_KEY]: {

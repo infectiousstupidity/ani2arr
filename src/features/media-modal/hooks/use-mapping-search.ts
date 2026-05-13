@@ -4,10 +4,9 @@
 import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
 import { toMappingSearchResultFromRadarr } from "@/features/media-modal/mapping-search/radarr-search-result.adapter";
 import { toMappingSearchResultFromSonarr } from "@/features/media-modal/mapping-search/sonarr-search-result.adapter";
-import { usePublicOptions } from "@/queries";
+import { useProviderBaseUrl } from "@/queries";
 import { useRadarrLookupSearch } from "@/queries/radarr";
 import { useSonarrLookupSearch } from "@/queries/sonarr";
-import { getProviderBaseUrl } from "@/settings/provider-config";
 import type { RadarrLookupOutput, SonarrLookupOutput } from "@/rpc/types";
 import type { Provider } from "@/providers";
 
@@ -61,8 +60,8 @@ export function useMappingSearch(
 	const query = input.query.trim();
 	const enabled = input.enabled && query.length >= 2;
 
-	const publicOptions = usePublicOptions();
-	const baseUrl = getProviderBaseUrl(input.provider, publicOptions.data);
+	const providerBaseUrl = useProviderBaseUrl(input.provider, { enabled });
+	const baseUrl = providerBaseUrl.data ?? "";
 
 	const sonarrSearch = useSonarrLookupSearch({
 		term: query,
