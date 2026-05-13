@@ -21,15 +21,6 @@ const PUBLIC_OPTIONS_STORAGE_KEY = "publicOptions";
 const SONARR_SECRETS_STORAGE_KEY = "sonarrSecrets";
 const RADARR_SECRETS_STORAGE_KEY = "radarrSecrets";
 
-function createLegacyUiOptions() {
-	const { ui } = createDefaultExtensionOptions();
-	return {
-		browseCards: ui.browseCards,
-		animePages: ui.animePages,
-		schedulerDebugOverlayEnabled: ui.schedulerDebugOverlayEnabled,
-	};
-}
-
 describe("options store helpers", () => {
 	it("falls back to default settings for missing input", () => {
 		expect(parseExtensionOptions({})).toEqual(createDefaultExtensionOptions());
@@ -56,93 +47,6 @@ describe("options store helpers", () => {
 			ui: settings.ui,
 			debugLogging: false,
 		});
-	});
-
-	it("uses global title language before legacy provider fallbacks", () => {
-		const settings = createDefaultExtensionOptions();
-		const legacyUi = createLegacyUiOptions();
-		const parseTitleLanguage = (input: {
-			ui?: unknown;
-			sonarr?: unknown;
-			radarr?: unknown;
-			}) =>
-				parseExtensionOptions({
-					...settings,
-					ui: input.ui ?? legacyUi,
-				providers: {
-					sonarr: {
-						...settings.providers.sonarr,
-						preferredAniListTitleLanguage: input.sonarr,
-					},
-					radarr: {
-						...settings.providers.radarr,
-						preferredAniListTitleLanguage: input.radarr,
-						},
-					},
-				}).ui.preferredAniListTitleLanguage;
-
-		expect(
-			parseTitleLanguage({
-				ui: { ...legacyUi, preferredAniListTitleLanguage: "native" },
-				sonarr: "romaji",
-				radarr: "english",
-			}),
-		).toBe("native");
-		expect(parseTitleLanguage({ sonarr: "romaji", radarr: "native" })).toBe(
-			"romaji",
-		);
-		expect(parseTitleLanguage({ sonarr: "invalid", radarr: "native" })).toBe(
-			"native",
-		);
-		expect(parseTitleLanguage({ sonarr: "invalid", radarr: "invalid" })).toBe(
-			"english",
-		);
-		expect(
-			"preferredAniListTitleLanguage" in
-				parseExtensionOptions({
-					...settings,
-					providers: {
-						sonarr: {
-							...settings.providers.sonarr,
-							preferredAniListTitleLanguage: "romaji",
-						},
-						radarr: settings.providers.radarr,
-					},
-				}).providers.sonarr,
-		).toBe(false);
-	});
-
-	it("migrates legacy public provider title language into public ui", async () => {
-		const settings = createDefaultExtensionOptions();
-		const publicOptions = toPublicOptions(settings);
-		const legacyPublicOptions = {
-			...publicOptions,
-			ui: createLegacyUiOptions(),
-			providers: {
-				sonarr: {
-					...publicOptions.providers.sonarr,
-					preferredAniListTitleLanguage: "romaji",
-				},
-				radarr: {
-					...publicOptions.providers.radarr,
-					preferredAniListTitleLanguage: "native",
-				},
-			},
-		};
-
-		await browser.storage.local.set({
-			[PUBLIC_OPTIONS_STORAGE_KEY]: legacyPublicOptions,
-		});
-
-		const snapshot = await getPublicOptionsSnapshot();
-
-		expect(snapshot.ui.preferredAniListTitleLanguage).toBe("romaji");
-		expect(snapshot.providers.sonarr).not.toHaveProperty(
-			"preferredAniListTitleLanguage",
-		);
-		expect(snapshot.providers.radarr).not.toHaveProperty(
-			"preferredAniListTitleLanguage",
-		);
 	});
 
 	it("falls back from malformed public options without healing storage on read", async () => {

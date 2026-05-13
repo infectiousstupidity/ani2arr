@@ -11,6 +11,7 @@ interface SettingsSectionProps {
   icon?: ReactNode;
   children: ReactNode;
   className?: string;
+  divider?: "header" | "top" | "none";
   hideHeaderOnDesktop?: boolean;
 }
 
@@ -20,17 +21,20 @@ export function SettingsSection({
   icon,
   children,
   className,
+  divider = "header",
   hideHeaderOnDesktop = false,
 }: SettingsSectionProps) {
   return (
     <section
       className={cn(
         "flex flex-col",
+        divider === "top" && "border-t border-border-primary/50 pt-8",
         className,
       )}
     >
       <header className={cn(
-        "mb-6 border-b border-border-primary/50 pb-5 md:mb-8",
+        "mb-6 md:mb-8",
+        divider === "header" && "border-b border-border-primary/50 pb-5",
         hideHeaderOnDesktop && "md:hidden"
       )}>
         <div className="flex items-center gap-3">
