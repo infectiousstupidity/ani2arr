@@ -1,4 +1,3 @@
-
 /** Placeholder content for options pages planned after provider settings. */
 // src/options-page/pages/placeholders.tsx
 
@@ -9,5 +8,4 @@ const PlaceholderContent = ({ title }: { title: string }) => (
 );
 
 export const MappingsPage = () => <PlaceholderContent title="Manual Mappings" />;
-export const UiPage = () => <PlaceholderContent title="UI & Actions" />;
 export const AdvancedPage = () => <PlaceholderContent title="Advanced" />;
