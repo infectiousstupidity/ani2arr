@@ -8,4 +8,3 @@ const PlaceholderContent = ({ title }: { title: string }) => (
 );
 
 export const MappingsPage = () => <PlaceholderContent title="Manual Mappings" />;
-export const AdvancedPage = () => <PlaceholderContent title="Advanced" />;
