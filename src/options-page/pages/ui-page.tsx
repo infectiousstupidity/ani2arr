@@ -9,8 +9,14 @@ import {
   ChevronDown,
   ExternalLink,
   Heart,
+  Languages,
   LayoutGrid,
 } from "lucide-react";
+import {
+  ANILIST_TITLE_LANGUAGES,
+  isAniListTitleLanguage,
+} from "@/anilist/schemas/title-language.schema";
+import { getAniListTitleLanguageLabel } from "@/anilist/title-preference";
 import type { PublicOptions, BadgeVisibility } from "@/settings";
 
 import { SettingsSection } from "../components/settings-section";
@@ -28,6 +34,11 @@ const BROWSE_CARD_MODE_OPTIONS: { label: string; value: BrowseCardMode }[] = [
   { label: "Hidden", value: "hidden" },
 ];
 
+const TITLE_LANGUAGE_OPTIONS = ANILIST_TITLE_LANGUAGES.map((language) => ({
+  label: getAniListTitleLanguageLabel(language),
+  value: language,
+}));
+
 const isBrowseCardMode = (mode: string): mode is BrowseCardMode =>
   BROWSE_CARD_MODE_OPTIONS.some((option) => option.value === mode);
 
@@ -37,6 +48,16 @@ const getBrowseCardMode = (options: BrowseCardSettings): BrowseCardMode =>
 export const UiPage = () => {
   const { control, getValues, setValue } = useFormContext<PublicOptions>();
   const uiOptions = useWatch({ control, name: "ui" });
+
+  const updateTitleLanguage = (language: string) => {
+    if (!isAniListTitleLanguage(language)) return;
+
+    setValue(
+      "ui.preferredAniListTitleLanguage",
+      language,
+      { shouldDirty: true, shouldTouch: true }
+    );
+  };
 
   const updateBrowseProvider = (
     provider: BrowseCardProvider,
@@ -96,9 +117,35 @@ export const UiPage = () => {
   return (
     <div className="space-y-10">
       <SettingsSection
+        title="AniList display title language"
+        description="Choose the AniList title language used in the media modal."
+        icon={<Languages className="h-4 w-4" />}
+        divider="none"
+      >
+        <ToggleGroup.Root
+          type="single"
+          value={uiOptions.preferredAniListTitleLanguage}
+          onValueChange={updateTitleLanguage}
+          aria-label="Preferred AniList title language"
+          className="grid w-full max-w-md grid-cols-3 rounded-md border border-border-primary bg-bg-secondary p-1"
+        >
+          {TITLE_LANGUAGE_OPTIONS.map((option) => (
+            <ToggleGroup.Item
+              key={option.value}
+              value={option.value}
+              className="min-h-10 rounded-sm px-2 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary data-[state=on]:bg-accent-primary data-[state=on]:text-white"
+            >
+              {option.label}
+            </ToggleGroup.Item>
+          ))}
+        </ToggleGroup.Root>
+      </SettingsSection>
+
+      <SettingsSection
         title="AniList and AniChart browse cards"
         description="Enable browse and search card injection per provider, then choose whether enabled cards stay visible or only appear on hover."
         icon={<LayoutGrid className="h-4 w-4" />}
+        divider="top"
       >
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[auto_auto_auto] lg:gap-8">
           <div className="flex h-30 items-start justify-center lg:w-20 lg:justify-start">
@@ -178,6 +225,7 @@ export const UiPage = () => {
         title="AniList anime pages"
         description="Enable/disable the action bar above AniList's native page buttons for each provider."
         icon={<AppWindow className="h-4 w-4" />}
+        divider="top"
       >
         <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)]">
           <div className="flex min-h-23 items-center justify-center rounded-lg border border-border-primary/40 bg-bg-tertiary/10 p-4 lg:w-56 lg:justify-start">

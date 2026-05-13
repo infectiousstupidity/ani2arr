@@ -138,7 +138,7 @@ const SonarrDefaultsFields = ({
         />
       </SettingsRow>
 
-      <div className="flex flex-col divide-y divide-border-primary/20 border-t border-border-primary/20 mt-4">
+      <div className="mt-4 flex flex-col divide-y divide-border-primary/20">
         <div className="py-5">
           <SettingsRow
             id="sonarr-season-folder"
@@ -288,6 +288,7 @@ export const SonarrDefaults = () => {
         description={DEFAULT_OPTIONS_DESCRIPTION}
         icon={<ListPlus className="h-4 w-4" />}
         className="opacity-60"
+        divider="top"
       >
         <p className="py-5 text-sm text-text-secondary">
           Connect Sonarr to configure defaults.
@@ -302,6 +303,7 @@ export const SonarrDefaults = () => {
         title="Default add options"
         description={DEFAULT_OPTIONS_DESCRIPTION}
         icon={<ListPlus className="h-4 w-4" />}
+        divider="top"
       >
         <p className="animate-pulse py-5 text-sm text-text-secondary">
           Loading Sonarr options...
@@ -317,6 +319,7 @@ export const SonarrDefaults = () => {
       title="Default add options"
       description={DEFAULT_OPTIONS_DESCRIPTION}
       icon={<ListPlus className="h-4 w-4" />}
+      divider="top"
     >
       <SonarrDefaultsFields
         formOptions={formOptions}

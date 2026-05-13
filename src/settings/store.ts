@@ -11,10 +11,6 @@ import {
 	normalizeRadarrFormState,
 	stripRadarrFormStateForDefaults,
 } from "@/providers/radarr/form-state";
-import {
-	isAniListTitleLanguage,
-	type AniListTitleLanguage,
-} from "@/anilist/schemas/title-language.schema";
 import type { Provider, ProviderCredentials } from "@/providers";
 import { logger } from "@/shared/utils/logger";
 import {
@@ -22,7 +18,7 @@ import {
 	createDefaultExtensionOptions,
 } from "./schema";
 import { UiOptionsSchema } from "./ui-schema";
-import type { ExtensionOptions, PublicOptions, UiOptions } from "./types";
+import type { ExtensionOptions, PublicOptions } from "./types";
 import {
 	hasConfiguredProviderCredentials,
 	normalizeProviderConnectionInput,
@@ -100,35 +96,6 @@ function getRecordProperty(
 	return isRecord(value) ? value : undefined;
 }
 
-function resolvePreferredAniListTitleLanguage(
-	raw: unknown,
-): AniListTitleLanguage {
-	const fallback: AniListTitleLanguage = "english";
-	const record = isRecord(raw) ? raw : undefined;
-	const providers = getRecordProperty(record, "providers");
-	const sonarr = getRecordProperty(providers, "sonarr");
-	const radarr = getRecordProperty(providers, "radarr");
-	const ui = getRecordProperty(record, "ui");
-
-	// LEGACY: Provider-specific title language was moved to ui; keep old storage readable until users naturally rewrite settings.
-	const candidates = [
-		ui?.preferredAniListTitleLanguage,
-		sonarr?.preferredAniListTitleLanguage,
-		radarr?.preferredAniListTitleLanguage,
-	];
-	return candidates.find(isAniListTitleLanguage) ?? fallback;
-}
-
-function applyPreferredAniListTitleLanguage(
-	ui: UiOptions,
-	raw: unknown,
-): UiOptions {
-	return {
-		...ui,
-		preferredAniListTitleLanguage: resolvePreferredAniListTitleLanguage(raw),
-	};
-}
-
 export const parseExtensionOptions = (raw: unknown): ExtensionOptions => {
 	const result = v.safeParse(ExtensionOptionsSchema, raw);
 	if (result.success) {
@@ -149,7 +116,6 @@ export const parseExtensionOptions = (raw: unknown): ExtensionOptions => {
 					),
 				},
 			},
-			ui: applyPreferredAniListTitleLanguage(result.output.ui, raw),
 		};
 	}
 	logger.warn("Storage mismatch, applying defaults", result.issues);
@@ -212,7 +178,7 @@ function parsePublicOptions(raw: unknown): PublicOptions {
 						: fallback.providers.radarr.isConfigured,
 			},
 		},
-		ui: applyPreferredAniListTitleLanguage(ui, raw),
+		ui,
 		debugLogging:
 			typeof record.debugLogging === "boolean"
 				? record.debugLogging

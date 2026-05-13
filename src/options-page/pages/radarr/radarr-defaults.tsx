@@ -112,6 +112,7 @@ export const RadarrDefaults = () => {
         description={DEFAULT_OPTIONS_DESCRIPTION}
         icon={<ListPlus className="h-4 w-4" />}
         className="opacity-60"
+        divider="top"
       >
         <p className="py-5 text-sm text-text-secondary">
           Connect Radarr to configure defaults.
@@ -126,6 +127,7 @@ export const RadarrDefaults = () => {
         title="Default add options"
         description={DEFAULT_OPTIONS_DESCRIPTION}
         icon={<ListPlus className="h-4 w-4" />}
+        divider="top"
       >
         <p className="animate-pulse py-5 text-sm text-text-secondary">
           Loading Radarr options...
@@ -151,6 +153,7 @@ export const RadarrDefaults = () => {
       title="Default add options"
       description={DEFAULT_OPTIONS_DESCRIPTION}
       icon={<ListPlus className="h-4 w-4" />}
+      divider="top"
     >
       <SettingsRow id="radarr-root-folder" label="Root folder">
         <Select
@@ -235,7 +238,7 @@ export const RadarrDefaults = () => {
         />
       </SettingsRow>
 
-      <div className="flex flex-col divide-y divide-border-primary/20 border-t border-border-primary/20 mt-4">
+      <div className="mt-4">
         <div className="py-5">
           <SettingsRow
             id="radarr-search-movie"

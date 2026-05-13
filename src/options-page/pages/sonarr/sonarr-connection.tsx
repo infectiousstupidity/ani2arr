@@ -138,7 +138,7 @@ const SonarrConnectionDraft = ({
         </SettingsRow>
 
         {showConnectionActions ? (
-          <div className="mt-2 flex min-w-0 flex-col gap-3 border-t border-border-primary/20 pt-6 sm:flex-row sm:items-center sm:justify-end">
+          <div className="mt-2 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
             {error ? (
               <p className="text-sm font-semibold text-error sm:mr-auto">
                 {error}
