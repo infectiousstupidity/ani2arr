@@ -19,14 +19,9 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
 export type { MediaModalProps } from "./types";
 export type {
 	AniListHeaderData,
+	MediaModalMetadataHint,
 	MediaModalOpenSource,
 	MediaModalOpenState,
 	MediaModalState,
 	MediaModalView,
 } from "./types";
-export type {
-	LaunchSnapshotSource,
-	MediaModalLaunchSnapshot,
-	RadarrLaunchSnapshot,
-	SonarrLaunchSnapshot,
-} from "./launch-snapshot";
