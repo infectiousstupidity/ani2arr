@@ -5,13 +5,15 @@ import React, { useRef } from "react";
 import { createPortal } from "react-dom";
 import type { AniListId } from "@/anilist";
 import { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
-import type { MediaModalLaunchSnapshot } from "@/features/media-modal/launch-snapshot";
 import { useAniListMetadataBatch } from "@/queries";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import { useTheme } from "@/shared/hooks/use-theme";
 import { useBrowsePortals } from "./use-browse-portals";
 import { useAnilistBatchPrefetch } from "./use-anilist-batch-prefetch";
-import type { MediaModalOpenState } from "@/features/media-modal";
+import type {
+	MediaModalMetadataHint,
+	MediaModalOpenState,
+} from "@/features/media-modal";
 import type { BrowseAdapter, HostMediaTarget } from "./types";
 import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import { CardOverlay } from "@/features/media-overlay/components/card-overlay";
@@ -74,6 +76,18 @@ function getLaunchTitle(input: {
 	);
 }
 
+function getModalMetadataHint(input: {
+	title: string;
+	format: HostMediaTarget["format"];
+	metadata: ReturnType<typeof metadataHintFromAniListMetadata>;
+}): MediaModalMetadataHint {
+	return {
+		title: input.title,
+		format: input.metadata?.format ?? input.format,
+		coverImage: input.metadata?.coverImage ?? null,
+	};
+}
+
 function getMappedIdentityByAniListId(
 	identities: readonly EffectiveMappingPresence[],
 ): Map<AniListId, EffectiveMappingPresence> {
@@ -115,8 +129,13 @@ function renderBrowseCardPortal(input: {
 	if (!provider) {
 		return null;
 	}
-	const launchTitle = getLaunchTitle({
+	const displayTitle = getLaunchTitle({
 		anilistId: input.parsed.anilistId,
+		metadata: effectiveMetadata,
+	});
+	const metadataHint = getModalMetadataHint({
+		title: displayTitle,
+		format: input.parsed.format,
 		metadata: effectiveMetadata,
 	});
 
@@ -131,57 +150,23 @@ function renderBrowseCardPortal(input: {
 			key={input.parsed.anilistId}
 			provider={provider}
 			anilistId={input.parsed.anilistId}
-			title={launchTitle}
-			onOpenModal={(launchSnapshot: MediaModalLaunchSnapshot) => {
-				if (provider === "radarr") {
-					input.onOpenMediaModal({
-						anilistId: input.parsed.anilistId,
-						provider: "radarr",
-						initialView: "setup",
-						openSource: "content",
-						launchTitle,
-						launchMetadata: effectiveMetadata,
-						launchSnapshot:
-							launchSnapshot.provider === "radarr" ? launchSnapshot : null,
-					});
-					return;
-				}
-
+			title={displayTitle}
+			onOpenModal={() => {
 				input.onOpenMediaModal({
 					anilistId: input.parsed.anilistId,
-					provider: "sonarr",
+					provider,
 					initialView: "setup",
 					openSource: "content",
-					launchTitle,
-					launchMetadata: effectiveMetadata,
-					launchSnapshot:
-							launchSnapshot.provider === "sonarr" ? launchSnapshot : null,
+					metadataHint,
 				});
 			}}
-			onOpenMapping={(launchSnapshot: MediaModalLaunchSnapshot) => {
-				if (provider === "radarr") {
-					input.onOpenMediaModal({
-						anilistId: input.parsed.anilistId,
-						provider: "radarr",
-						initialView: "mapping",
-						openSource: "content",
-						launchTitle,
-						launchMetadata: effectiveMetadata,
-						launchSnapshot:
-							launchSnapshot.provider === "radarr" ? launchSnapshot : null,
-					});
-					return;
-				}
-
+			onOpenMapping={() => {
 				input.onOpenMediaModal({
 					anilistId: input.parsed.anilistId,
-					provider: "sonarr",
+					provider,
 					initialView: "mapping",
 					openSource: "content",
-					launchTitle,
-					launchMetadata: effectiveMetadata,
-					launchSnapshot:
-							launchSnapshot.provider === "sonarr" ? launchSnapshot : null,
+					metadataHint,
 				});
 			}}
 			isConfigured={Boolean(providerOptions?.isConfigured)}

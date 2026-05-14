@@ -43,10 +43,6 @@ import {
 	type ProviderActionSummary,
 } from "@/features/provider-action";
 import {
-	createLaunchSnapshot,
-	type MediaModalLaunchSnapshot,
-} from "@/features/media-modal/launch-snapshot";
-import {
 	getProviderRouteSlug,
 	type ProviderRouteSlugSource,
 } from "@/providers/provider-route-slug";
@@ -60,7 +56,7 @@ export interface UseCardOverlayStateParams {
 	isConfigured: boolean;
 	mappedIdentity?: EffectiveMappingPresence | null;
 	enabled?: boolean;
-	onOpenMapping?: (snapshot: MediaModalLaunchSnapshot) => void;
+	onOpenMapping?: () => void;
 }
 
 export interface UseCardOverlayStateResult {
@@ -70,7 +66,6 @@ export interface UseCardOverlayStateResult {
 	handlePrimaryAction: (event: ReactMouseEvent<HTMLButtonElement>) => void;
 	providerRouteSlug: string | null;
 	resolvedSearchTerm: string;
-	launchSnapshot: MediaModalLaunchSnapshot;
 }
 
 type OverlayStatusData = CheckMovieStatusResponse | CheckSeriesStatusResponse;
@@ -288,12 +283,11 @@ function runOverlayPrimaryAction(input: {
 	event: ReactMouseEvent<HTMLButtonElement>;
 	primaryAction: ProviderActionModel["primaryAction"];
 	provider: Provider;
-	onOpenMapping?: (snapshot: MediaModalLaunchSnapshot) => void;
+	onOpenMapping?: () => void;
 	defaultForm: SonarrFormState | RadarrFormState | null;
 	anilistId: AniListId;
 	title: string;
 	metadata: AniListMediaHint | null;
-	launchSnapshot: MediaModalLaunchSnapshot;
 	statusData: OverlayStatusData | undefined;
 	addHasError: boolean;
 	reset: () => void;
@@ -321,7 +315,7 @@ function runOverlayPrimaryAction(input: {
 			return;
 		}
 		case "open-mapping": {
-			input.onOpenMapping?.(input.launchSnapshot);
+			input.onOpenMapping?.();
 			return;
 		}
 		case "retry-status": {
@@ -544,24 +538,6 @@ export const useCardOverlayState = ({
 	const { isAdding, addSucceeded, addHasError, addError, reset, addedMedia } =
 		addSelection;
 	const statusData = statusQuery.data;
-	const launchSnapshot = useMemo(() => {
-		if (provider === "radarr") {
-			return createLaunchSnapshot({
-				provider: "radarr",
-				status: (statusData as CheckMovieStatusResponse | undefined) ?? null,
-				source: statusData ? "cache" : "unknown",
-				verifiedAt: null,
-			});
-		}
-
-		return createLaunchSnapshot({
-			provider: "sonarr",
-			status: (statusData as CheckSeriesStatusResponse | undefined) ?? null,
-			source: statusData ? "cache" : "unknown",
-			verifiedAt: null,
-		});
-	}, [provider, statusData]);
-
 	useEffect(() => {
 		reset();
 	}, [anilistId, reset, title]);
@@ -657,7 +633,6 @@ export const useCardOverlayState = ({
 				anilistId,
 				title,
 				metadata,
-				launchSnapshot,
 				statusData,
 				addHasError,
 				reset,
@@ -680,7 +655,6 @@ export const useCardOverlayState = ({
 			provider,
 			statusData,
 			statusQuery.refetch,
-			launchSnapshot,
 			title,
 		],
 	);
@@ -692,6 +666,5 @@ export const useCardOverlayState = ({
 		handlePrimaryAction,
 		providerRouteSlug,
 		resolvedSearchTerm,
-		launchSnapshot,
 	};
 };

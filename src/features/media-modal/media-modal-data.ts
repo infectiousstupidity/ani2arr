@@ -39,12 +39,14 @@ export function getMediaFormat(input: {
 export function getCoverImage(input: {
 	anilistMedia: AniListMedia | null | undefined;
 	resolvedMetadata: AniListMediaHint | null;
+	coverImageHint: string | null | undefined;
 }): string | null {
 	return (
 		input.anilistMedia?.coverImage?.extraLarge ??
 		input.anilistMedia?.coverImage?.large ??
 		input.anilistMedia?.coverImage?.medium ??
 		input.resolvedMetadata?.coverImage ??
+		input.coverImageHint ??
 		null
 	);
 }
@@ -86,6 +88,7 @@ export function buildAniListHeaderData(input: {
 	anilistMedia: AniListMedia | null | undefined;
 	resolvedMetadata: AniListMediaHint | null;
 	format: AniListMediaFormat | null;
+	coverImageHint?: string | null;
 }): AniListHeaderData {
 	return {
 		title: input.title,
@@ -93,6 +96,7 @@ export function buildAniListHeaderData(input: {
 		coverImage: getCoverImage({
 			anilistMedia: input.anilistMedia,
 			resolvedMetadata: input.resolvedMetadata,
+			coverImageHint: input.coverImageHint,
 		}),
 		format: input.format,
 		year: getMediaYear({

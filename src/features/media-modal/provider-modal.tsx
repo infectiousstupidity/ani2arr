@@ -105,19 +105,10 @@ function SonarrProviderModal({
 	onMappingSaved,
 	onMappingSaveError,
 }: SonarrProviderModalProps): React.JSX.Element {
-	const {
-		anilistId,
-		launchStatus = null,
-		launchSnapshot = null,
-		launchTitle,
-		launchMetadata,
-	} = state;
+	const { anilistId, metadataHint } = state;
 	const data = useSonarrModalReadData({
 		anilistId,
-		launchStatus,
-		launchSnapshot,
-		...(launchTitle === undefined ? {} : { launchTitle }),
-		...(launchMetadata === undefined ? {} : { launchMetadata }),
+		...(metadataHint === undefined ? {} : { metadataHint }),
 	});
 	const {
 		setupTarget,
@@ -194,19 +185,10 @@ function RadarrProviderModal({
 	onMappingSaved,
 	onMappingSaveError,
 }: RadarrProviderModalProps): React.JSX.Element {
-	const {
-		anilistId,
-		launchStatus = null,
-		launchSnapshot = null,
-		launchTitle,
-		launchMetadata,
-	} = state;
+	const { anilistId, metadataHint } = state;
 	const data = useRadarrModalReadData({
 		anilistId,
-		launchStatus,
-		launchSnapshot,
-		...(launchTitle === undefined ? {} : { launchTitle }),
-		...(launchMetadata === undefined ? {} : { launchMetadata }),
+		...(metadataHint === undefined ? {} : { metadataHint }),
 	});
 	const {
 		setupTarget,

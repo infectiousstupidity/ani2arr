@@ -22,11 +22,7 @@ import {
 	getMediaFormat,
 	pickString,
 } from "../../media-modal-data";
-import {
-	createLaunchSnapshot,
-	shouldForceVerifyOnModalOpen,
-	type RadarrLaunchSnapshot,
-} from "../../launch-snapshot";
+import type { MediaModalMetadataHint } from "../../types";
 
 const OPTIMISTIC_MAPPING_STATUS_FLAG = "__ani2arrOptimisticMappingStatus";
 
@@ -44,31 +40,11 @@ function isOptimisticMappingStatus(
 	);
 }
 
-function createFallbackLaunchSnapshot(
-	status: CheckMovieStatusResponse | null,
-): RadarrLaunchSnapshot {
-	return createLaunchSnapshot({
-		provider: "radarr",
-		status,
-		source: "unknown",
-		verifiedAt: null,
-	});
-}
-
 export function useRadarrModalReadData(input: {
 	anilistId: AniListId;
-	launchStatus?: CheckMovieStatusResponse | null;
-	launchSnapshot?: RadarrLaunchSnapshot | null;
-	launchTitle?: string;
-	launchMetadata?: ReturnType<typeof metadataFromMediaObject>;
+	metadataHint?: MediaModalMetadataHint | null;
 }) {
-	const {
-		anilistId,
-		launchStatus = null,
-		launchSnapshot = null,
-		launchTitle,
-		launchMetadata = null,
-	} = input;
+	const { anilistId, metadataHint = null } = input;
 	const { data: options } = usePublicOptions();
 	const isConfigured = options?.providers.radarr.isConfigured === true;
 	const providerBaseUrl = useProviderBaseUrl("radarr", {
@@ -91,20 +67,25 @@ export function useRadarrModalReadData(input: {
 		const rawMetadata = metadataBatch.data?.metadata?.[0];
 		const canonical = metadataHintFromAniListMetadata(rawMetadata ?? null);
 		const mediaMeta = metadataFromMediaObject(anilistMedia ?? null);
-		const resolved = mergeMetadataHints(
-			mergeMetadataHints(canonical, launchMetadata),
-			mediaMeta,
-		);
+		const resolved = mergeMetadataHints(canonical, mediaMeta);
 
 		const titles = extractTitles({ anilistMedia, resolvedMetadata: resolved });
-		const fmt = getMediaFormat({
-			canonicalMetadata: canonical,
-			anilistMedia,
-			resolvedMetadata: resolved,
-		});
+		const fmt =
+			getMediaFormat({
+				canonicalMetadata: canonical,
+				anilistMedia,
+				resolvedMetadata: resolved,
+			}) ??
+			metadataHint?.format ??
+			null;
 
 		const fallback =
-			pickString(launchTitle, titles.english, titles.romaji, titles.native) ??
+			pickString(
+				titles.english,
+				titles.romaji,
+				titles.native,
+				metadataHint?.title,
+			) ??
 			`AniList #${anilistId}`;
 		const preferredLang =
 			options?.ui.preferredAniListTitleLanguage ?? "english";
@@ -124,8 +105,8 @@ export function useRadarrModalReadData(input: {
 	}, [
 		anilistId,
 		anilistMedia,
-		launchMetadata,
-		launchTitle,
+		metadataHint?.format,
+		metadataHint?.title,
 		metadataBatch.data,
 		options,
 		providerBaseUrl.data,
@@ -142,28 +123,19 @@ export function useRadarrModalReadData(input: {
 		[anilistId, fallbackTitle, resolvedMetadata],
 	);
 
-	const effectiveLaunchSnapshot = useMemo(
-		() => launchSnapshot ?? createFallbackLaunchSnapshot(launchStatus),
-		[launchSnapshot, launchStatus],
-	);
-	const shouldForceVerify = shouldForceVerifyOnModalOpen(
-		effectiveLaunchSnapshot,
-	);
-
 	const radarrStatus = useMovieStatus(statusPayload, {
 		enabled: isConfigured,
-		force_verify: shouldForceVerify,
+		force_verify: true,
 	});
 
 	const hasUsableVerifiedStatus =
 		radarrStatus.isFetchedAfterMount ||
 		isOptimisticMappingStatus(radarrStatus.data);
-	const verificationSettled =
-		!shouldForceVerify || hasUsableVerifiedStatus || radarrStatus.isError;
+	const verificationSettled = hasUsableVerifiedStatus || radarrStatus.isError;
 	const verifiedStatus = hasUsableVerifiedStatus
 		? (radarrStatus.data ?? null)
 		: null;
-	const providerStatus = verifiedStatus ?? effectiveLaunchSnapshot.status;
+	const providerStatus = verifiedStatus;
 
 	const currentMapping = useMemo(
 		() =>
@@ -175,12 +147,38 @@ export function useRadarrModalReadData(input: {
 			}),
 		[providerStatus, baseUrl, providerRequestTitle],
 	);
+	const anilistHeaderData = useMemo(
+		() =>
+			buildAniListHeaderData({
+				title:
+					pickString(
+						anilistMedia?.title?.english,
+						anilistMedia?.title?.romaji,
+						anilistMedia?.title?.native,
+						resolvedMetadata?.titles?.english,
+						resolvedMetadata?.titles?.romaji,
+						resolvedMetadata?.titles?.native,
+						metadataHint?.title,
+					) ?? providerRequestTitle,
+				anilistMedia,
+				resolvedMetadata,
+				format,
+				coverImageHint: metadataHint?.coverImage ?? null,
+			}),
+		[
+			anilistMedia,
+			format,
+			metadataHint?.coverImage,
+			metadataHint?.title,
+			providerRequestTitle,
+			resolvedMetadata,
+		],
+	);
 
 	return useMemo(() => {
 		const storedDefaults =
 			options?.providers.radarr.defaults ?? defaultRadarrFormState();
 		const verificationFailed =
-			shouldForceVerify &&
 			verificationSettled &&
 			(radarrStatus.isError || verifiedStatus?.isInLibrary === null);
 
@@ -189,18 +187,7 @@ export function useRadarrModalReadData(input: {
 			anilistId,
 			baseUrl,
 			isConfigured,
-			anilistHeaderData: buildAniListHeaderData({
-				title:
-					pickString(
-						launchTitle,
-						anilistMedia?.title?.english,
-						anilistMedia?.title?.romaji,
-						anilistMedia?.title?.native,
-					) ?? providerRequestTitle,
-				anilistMedia,
-				resolvedMetadata,
-				format,
-			}),
+			anilistHeaderData,
 			manualMappingActive: providerStatus?.manualMappingActive === true,
 			currentMapping,
 			resolvedMetadata,
@@ -216,18 +203,15 @@ export function useRadarrModalReadData(input: {
 		};
 	}, [
 		anilistId,
-		anilistMedia,
+		anilistHeaderData,
 		baseUrl,
 		currentMapping,
 		providerStatus,
 		fallbackTitle,
-		format,
 		isConfigured,
-		launchTitle,
 		options?.providers.radarr.defaults,
 		providerRequestTitle,
 		radarrFormOptions.data,
-		shouldForceVerify,
 		radarrStatus.isError,
 		resolvedMetadata,
 		verificationSettled,

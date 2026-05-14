@@ -59,12 +59,7 @@ import {
 	useSeriesLibraryStatus,
 	useSeriesStatus,
 } from "@/queries/sonarr";
-import { MediaModal } from "@/features/media-modal";
-import {
-	createLaunchSnapshot,
-	type RadarrLaunchSnapshot,
-	type SonarrLaunchSnapshot,
-} from "@/features/media-modal/launch-snapshot";
+import { MediaModal, type MediaModalMetadataHint } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
 import {
 	buildProviderActionModel,
@@ -188,44 +183,6 @@ async function resolveMappedProviderForAniListId(
 	}
 }
 
-function createAnimePageLaunchSnapshot(input: {
-	provider: "radarr";
-	status: CheckMovieStatusResponse | null | undefined;
-}): RadarrLaunchSnapshot;
-function createAnimePageLaunchSnapshot(input: {
-	provider: "sonarr";
-	status: CheckSeriesStatusResponse | null | undefined;
-}): SonarrLaunchSnapshot;
-function createAnimePageLaunchSnapshot(input:
-	| {
-			provider: "radarr";
-			status: CheckMovieStatusResponse | null | undefined;
-	  }
-	| {
-			provider: "sonarr";
-			status: CheckSeriesStatusResponse | null | undefined;
-	  },
-): RadarrLaunchSnapshot | SonarrLaunchSnapshot {
-	const source = input.status ? "live" : "unknown";
-	const verifiedAt = input.status ? Date.now() : null;
-
-	if (input.provider === "radarr") {
-		return createLaunchSnapshot({
-			provider: "radarr",
-			status: input.status ?? null,
-			source,
-			verifiedAt,
-		});
-	}
-
-	return createLaunchSnapshot({
-		provider: "sonarr",
-		status: input.status ?? null,
-		source,
-		verifiedAt,
-	});
-}
-
 function isProviderUiEnabled(
 	provider: Provider,
 	options: PublicOptionsData,
@@ -329,6 +286,18 @@ function getAnimePageDefaults(input: {
 	return input.options?.providers.sonarr.defaults ?? defaultSonarrFormState();
 }
 
+function getAnimePageModalMetadataHint(input: {
+	title: string;
+	format: HostMediaTarget["format"];
+	metadata: AniListMediaHint | null;
+}): MediaModalMetadataHint {
+	return {
+		title: input.title,
+		format: input.metadata?.format ?? input.format,
+		coverImage: input.metadata?.coverImage ?? null,
+	};
+}
+
 function selectAnimePageProviderSelection(input: {
 	provider: Provider;
 	movieStatusQuery: AnimePageStatusQuery;
@@ -388,6 +357,7 @@ function runAnimePagePrimaryAction(input: {
 	defaults: SonarrFormState | RadarrFormState;
 	anilistId: AniListId;
 	title: string;
+	metadataHint: MediaModalMetadataHint;
 	resolvedMetadata: AniListMediaHint | null;
 	addSeriesMutation: ReturnType<typeof useAddSeries>;
 	addMovieMutation: ReturnType<typeof useAddMovie>;
@@ -398,37 +368,12 @@ function runAnimePagePrimaryAction(input: {
 			return;
 		}
 		case "open-mapping": {
-			if (input.provider === "radarr") {
-				input.mediaModal.open({
-					anilistId: input.anilistId,
-					provider: "radarr",
-					initialView: "mapping",
-					openSource: "content",
-					launchTitle: input.title,
-					launchMetadata: input.resolvedMetadata,
-					launchSnapshot: createAnimePageLaunchSnapshot({
-						provider: "radarr",
-						status: input.providerStatusData as
-							| CheckMovieStatusResponse
-							| undefined,
-					}),
-				});
-				return;
-			}
-
 			input.mediaModal.open({
 				anilistId: input.anilistId,
-				provider: "sonarr",
+				provider: input.provider,
 				initialView: "mapping",
 				openSource: "content",
-				launchTitle: input.title,
-				launchMetadata: input.resolvedMetadata,
-				launchSnapshot: createAnimePageLaunchSnapshot({
-					provider: "sonarr",
-					status: input.providerStatusData as
-						| CheckSeriesStatusResponse
-						| undefined,
-				}),
+				metadataHint: input.metadataHint,
 			});
 			return;
 		}
@@ -584,6 +529,11 @@ export const ContentRoot: React.FC<ContentRootProps> = ({
 		resolvedMetadata?.titles?.romaji?.trim() ||
 		resolvedMetadata?.titles?.native?.trim() ||
 		`AniList #${anilistId}`;
+	const modalMetadataHint = getAnimePageModalMetadataHint({
+		title,
+		format: target.format,
+		metadata: resolvedMetadata,
+	});
 	const isConfigured = provider
 		? options?.providers[provider]?.isConfigured === true
 		: false;
@@ -717,6 +667,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({
 			defaults,
 			anilistId,
 			title,
+			metadataHint: modalMetadataHint,
 			resolvedMetadata,
 			addSeriesMutation,
 			addMovieMutation,
@@ -736,63 +687,21 @@ export const ContentRoot: React.FC<ContentRootProps> = ({
 					externalHref={viewModel.externalHref}
 					onPrimaryAction={handlePrimaryAction}
 					onOpenSetup={() => {
-						if (provider === "radarr") {
-							mediaModal.open({
-								anilistId,
-								provider: "radarr",
-								initialView: "setup",
-								openSource: "content",
-								launchTitle: title,
-								launchMetadata: resolvedMetadata,
-								launchSnapshot: createAnimePageLaunchSnapshot({
-									provider: "radarr",
-									status: viewModel.providerSelection.movieStatusData,
-								}),
-							});
-							return;
-						}
-
 						mediaModal.open({
 							anilistId,
-							provider: "sonarr",
+							provider,
 							initialView: "setup",
 							openSource: "content",
-							launchTitle: title,
-							launchMetadata: resolvedMetadata,
-							launchSnapshot: createAnimePageLaunchSnapshot({
-								provider: "sonarr",
-								status: viewModel.providerSelection.seriesStatusData,
-							}),
+							metadataHint: modalMetadataHint,
 						});
 					}}
 					onOpenMapping={() => {
-						if (provider === "radarr") {
-							mediaModal.open({
-								anilistId,
-								provider: "radarr",
-								initialView: "mapping",
-								openSource: "content",
-								launchTitle: title,
-								launchMetadata: resolvedMetadata,
-								launchSnapshot: createAnimePageLaunchSnapshot({
-									provider: "radarr",
-									status: viewModel.providerSelection.movieStatusData,
-								}),
-							});
-							return;
-						}
-
 						mediaModal.open({
 							anilistId,
-							provider: "sonarr",
+							provider,
 							initialView: "mapping",
 							openSource: "content",
-							launchTitle: title,
-							launchMetadata: resolvedMetadata,
-							launchSnapshot: createAnimePageLaunchSnapshot({
-								provider: "sonarr",
-								status: viewModel.providerSelection.seriesStatusData,
-							}),
+							metadataHint: modalMetadataHint,
 						});
 					}}
 					portalContainer={hostElement ?? undefined}

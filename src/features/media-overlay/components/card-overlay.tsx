@@ -20,7 +20,6 @@ import {
 	RotateCcw,
 } from "lucide-react";
 import type { AniListId } from "@/anilist";
-import type { MediaModalLaunchSnapshot } from "@/features/media-modal/launch-snapshot";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import type { BadgeVisibility } from "@/settings/types";
 import type { Provider } from "@/providers";
@@ -40,8 +39,8 @@ interface CardOverlayProps {
 	provider: Provider;
 	anilistId: AniListId;
 	title: string;
-	onOpenModal: (snapshot: MediaModalLaunchSnapshot) => void;
-	onOpenMapping?: (snapshot: MediaModalLaunchSnapshot) => void;
+	onOpenModal: () => void;
+	onOpenMapping?: () => void;
 	isConfigured: boolean;
 	defaultForm: SonarrFormState | RadarrFormState | null;
 	mappedIdentity?: EffectiveMappingPresence | null;
@@ -214,7 +213,6 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(
 			handlePrimaryAction,
 			providerRouteSlug,
 			resolvedSearchTerm,
-			launchSnapshot,
 		} = useCardOverlayState({
 			provider,
 			anilistId,
@@ -263,9 +261,9 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(
 		const handleOpenSetup = useCallback(
 			(event: React.MouseEvent<HTMLButtonElement>) => {
 				swallowEvent(event);
-				onOpenModal(launchSnapshot);
+				onOpenModal();
 			},
-			[launchSnapshot, onOpenModal, swallowEvent],
+			[onOpenModal, swallowEvent],
 		);
 
 		const tooltipContainer = useMemo(
@@ -325,7 +323,7 @@ const CardOverlay: React.FC<CardOverlayProps> = memo(
 						onClick={(event) => {
 							event.preventDefault();
 							event.stopPropagation();
-							onOpenMapping(launchSnapshot);
+							onOpenMapping();
 						}}
 						onMouseDown={swallowEvent}
 					>

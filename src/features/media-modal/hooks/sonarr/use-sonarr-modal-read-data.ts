@@ -25,11 +25,7 @@ import {
 	getMediaFormat,
 	pickString,
 } from "../../media-modal-data";
-import {
-	createLaunchSnapshot,
-	shouldForceVerifyOnModalOpen,
-	type SonarrLaunchSnapshot,
-} from "../../launch-snapshot";
+import type { MediaModalMetadataHint } from "../../types";
 
 const OPTIMISTIC_MAPPING_STATUS_FLAG = "__ani2arrOptimisticMappingStatus";
 
@@ -47,31 +43,11 @@ function isOptimisticMappingStatus(
 	);
 }
 
-function createFallbackLaunchSnapshot(
-	status: CheckSeriesStatusResponse | null,
-): SonarrLaunchSnapshot {
-	return createLaunchSnapshot({
-		provider: "sonarr",
-		status,
-		source: "unknown",
-		verifiedAt: null,
-	});
-}
-
 export function useSonarrModalReadData(input: {
 	anilistId: AniListId;
-	launchStatus?: CheckSeriesStatusResponse | null;
-	launchSnapshot?: SonarrLaunchSnapshot | null;
-	launchTitle?: string;
-	launchMetadata?: ReturnType<typeof metadataFromMediaObject>;
+	metadataHint?: MediaModalMetadataHint | null;
 }) {
-	const {
-		anilistId,
-		launchStatus = null,
-		launchSnapshot = null,
-		launchTitle,
-		launchMetadata = null,
-	} = input;
+	const { anilistId, metadataHint = null } = input;
 	const { data: options } = usePublicOptions();
 	const isConfigured = options?.providers.sonarr.isConfigured === true;
 	const providerBaseUrl = useProviderBaseUrl("sonarr", {
@@ -94,20 +70,25 @@ export function useSonarrModalReadData(input: {
 		const rawMetadata = metadataBatch.data?.metadata?.[0];
 		const canonical = metadataHintFromAniListMetadata(rawMetadata ?? null);
 		const mediaMeta = metadataFromMediaObject(anilistMedia ?? null);
-		const resolved = mergeMetadataHints(
-			mergeMetadataHints(canonical, launchMetadata),
-			mediaMeta,
-		);
+		const resolved = mergeMetadataHints(canonical, mediaMeta);
 
 		const titles = extractTitles({ anilistMedia, resolvedMetadata: resolved });
-		const fmt = getMediaFormat({
-			canonicalMetadata: canonical,
-			anilistMedia,
-			resolvedMetadata: resolved,
-		});
+		const fmt =
+			getMediaFormat({
+				canonicalMetadata: canonical,
+				anilistMedia,
+				resolvedMetadata: resolved,
+			}) ??
+			metadataHint?.format ??
+			null;
 
 		const fallback =
-			pickString(launchTitle, titles.english, titles.romaji, titles.native) ??
+			pickString(
+				titles.english,
+				titles.romaji,
+				titles.native,
+				metadataHint?.title,
+			) ??
 			`AniList #${anilistId}`;
 		const preferredLang =
 			options?.ui.preferredAniListTitleLanguage ?? "english";
@@ -127,8 +108,8 @@ export function useSonarrModalReadData(input: {
 	}, [
 		anilistId,
 		anilistMedia,
-		launchMetadata,
-		launchTitle,
+		metadataHint?.format,
+		metadataHint?.title,
 		metadataBatch.data,
 		options,
 		providerBaseUrl.data,
@@ -145,28 +126,19 @@ export function useSonarrModalReadData(input: {
 		[anilistId, fallbackTitle, resolvedMetadata],
 	);
 
-	const effectiveLaunchSnapshot = useMemo(
-		() => launchSnapshot ?? createFallbackLaunchSnapshot(launchStatus),
-		[launchSnapshot, launchStatus],
-	);
-	const shouldForceVerify = shouldForceVerifyOnModalOpen(
-		effectiveLaunchSnapshot,
-	);
-
 	const sonarrStatus = useSeriesStatus(statusPayload, {
 		enabled: isConfigured,
-		force_verify: shouldForceVerify,
+		force_verify: true,
 	});
 
 	const hasUsableVerifiedStatus =
 		sonarrStatus.isFetchedAfterMount ||
 		isOptimisticMappingStatus(sonarrStatus.data);
-	const verificationSettled =
-		!shouldForceVerify || hasUsableVerifiedStatus || sonarrStatus.isError;
+	const verificationSettled = hasUsableVerifiedStatus || sonarrStatus.isError;
 	const verifiedStatus = hasUsableVerifiedStatus
 		? (sonarrStatus.data ?? null)
 		: null;
-	const providerStatus = verifiedStatus ?? effectiveLaunchSnapshot.status;
+	const providerStatus = verifiedStatus;
 
 	const currentMapping = useMemo(
 		() =>
@@ -178,12 +150,38 @@ export function useSonarrModalReadData(input: {
 			}),
 		[providerStatus, baseUrl, providerRequestTitle],
 	);
+	const anilistHeaderData = useMemo(
+		() =>
+			buildAniListHeaderData({
+				title:
+					pickString(
+						anilistMedia?.title?.english,
+						anilistMedia?.title?.romaji,
+						anilistMedia?.title?.native,
+						resolvedMetadata?.titles?.english,
+						resolvedMetadata?.titles?.romaji,
+						resolvedMetadata?.titles?.native,
+						metadataHint?.title,
+					) ?? providerRequestTitle,
+				anilistMedia,
+				resolvedMetadata,
+				format,
+				coverImageHint: metadataHint?.coverImage ?? null,
+			}),
+		[
+			anilistMedia,
+			format,
+			metadataHint?.coverImage,
+			metadataHint?.title,
+			providerRequestTitle,
+			resolvedMetadata,
+		],
+	);
 
 	return useMemo(() => {
 		const storedDefaults =
 			options?.providers.sonarr.defaults ?? defaultSonarrFormState();
 		const verificationFailed =
-			shouldForceVerify &&
 			verificationSettled &&
 			(sonarrStatus.isError || verifiedStatus?.isInLibrary === null);
 
@@ -192,18 +190,7 @@ export function useSonarrModalReadData(input: {
 			anilistId,
 			baseUrl,
 			isConfigured,
-			anilistHeaderData: buildAniListHeaderData({
-				title:
-					pickString(
-						launchTitle,
-						anilistMedia?.title?.english,
-						anilistMedia?.title?.romaji,
-						anilistMedia?.title?.native,
-					) ?? providerRequestTitle,
-				anilistMedia,
-				resolvedMetadata,
-				format,
-			}),
+			anilistHeaderData,
 			manualMappingActive: providerStatus?.manualMappingActive === true,
 			currentMapping,
 			resolvedMetadata,
@@ -220,17 +207,14 @@ export function useSonarrModalReadData(input: {
 	}, [
 		options?.providers.sonarr.defaults,
 		verificationSettled,
-		shouldForceVerify,
 		sonarrStatus.isError,
 		verifiedStatus?.isInLibrary,
 		anilistId,
+		anilistHeaderData,
 		baseUrl,
 		isConfigured,
-		launchTitle,
-		anilistMedia,
 		providerRequestTitle,
 		resolvedMetadata,
-		format,
 		providerStatus,
 		currentMapping,
 		fallbackTitle,

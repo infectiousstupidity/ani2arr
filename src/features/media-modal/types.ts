@@ -14,14 +14,16 @@ import type {
 import type { ProviderFormOptions } from "@/providers";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
-import type {
-	RadarrLaunchSnapshot,
-	SonarrLaunchSnapshot,
-} from "./launch-snapshot";
 
 export type MediaModalView = "setup" | "mapping";
 export type MediaModalSetupMode = "add" | "edit";
 export type MediaModalOpenSource = "content" | "options-page";
+
+export type MediaModalMetadataHint = {
+	title?: string;
+	format?: AniListMediaFormat | null;
+	coverImage?: string | null;
+};
 
 export type AniListHeaderData = {
 	title: string;
@@ -71,20 +73,15 @@ type MediaModalStateBase = {
 	anilistId: AniListId;
 	initialView?: MediaModalView;
 	openSource: MediaModalOpenSource;
-	launchTitle?: string;
-	launchMetadata?: AniListMediaHint | null;
+	metadataHint?: MediaModalMetadataHint | null;
 };
 
 export type SonarrMediaModalState = MediaModalStateBase & {
 	provider: "sonarr";
-	launchStatus?: CheckSeriesStatusResponse | null;
-	launchSnapshot?: SonarrLaunchSnapshot | null;
 };
 
 export type RadarrMediaModalState = MediaModalStateBase & {
 	provider: "radarr";
-	launchStatus?: CheckMovieStatusResponse | null;
-	launchSnapshot?: RadarrLaunchSnapshot | null;
 };
 
 export type MediaModalState =
