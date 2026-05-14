@@ -229,7 +229,6 @@ export function useMediaModalMappingController(input: {
 				anilistId: input.anilistId,
 				...target,
 				...(options?.force === undefined ? {} : { force: options.force }),
-				optimisticMapping: selectedDraft,
 			});
 			resetDraft();
 			return true;

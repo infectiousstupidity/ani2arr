@@ -1,7 +1,12 @@
 /** React Query hooks for Sonarr form options, library status, and mutations over RPC. */
 // src/queries/sonarr.ts
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	useMutation,
+	useQuery,
+	useQueryClient,
+	type QueryClient,
+} from "@tanstack/react-query";
 import { getAni2arrApi } from "@/rpc";
 import type {
 	CheckSeriesStatusResponse,
@@ -134,6 +139,21 @@ export const useSonarrLookupSearch = (input: {
 	});
 };
 
+function invalidateSonarrMediaMutationQueries(
+	queryClient: QueryClient,
+	variables: Pick<AddSonarrInput, "anilistId" | "tvdbId">,
+): void {
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.seriesStatusBase(variables.anilistId, "sonarr"),
+	});
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.sonarrSeriesLibraryStatus(variables.tvdbId),
+	});
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.mappingInspection("sonarr", variables.anilistId),
+	});
+}
+
 export const useAddSeries = () => {
 	const queryClient = useQueryClient();
 	return useMutation<SonarrSeries, ExtensionError, AddSonarrInput>({
@@ -145,9 +165,7 @@ export const useAddSeries = () => {
 			}
 		},
 		onSuccess: (_createdSeries, variables) => {
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seriesStatusBase(variables.anilistId, "sonarr"),
-			});
+			invalidateSonarrMediaMutationQueries(queryClient, variables);
 		},
 	});
 };
@@ -163,9 +181,7 @@ export const useUpdateSeries = () => {
 			}
 		},
 		onSuccess: (_updatedSeries, variables) => {
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seriesStatusBase(variables.anilistId, "sonarr"),
-			});
+			invalidateSonarrMediaMutationQueries(queryClient, variables);
 		},
 	});
 };

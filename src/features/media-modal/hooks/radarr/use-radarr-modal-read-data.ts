@@ -10,7 +10,6 @@ import {
 } from "@/anilist/metadata-hints";
 import { resolveTitlePreference } from "@/anilist/title-preference";
 import { defaultRadarrFormState } from "@/settings";
-import type { CheckMovieStatusResponse } from "@/rpc/types";
 import { useMovieStatus, useRadarrFormOptions } from "@/queries/radarr";
 import { useAniListMedia, useAniListMetadataBatch } from "@/queries/anilist";
 import { useProviderBaseUrl } from "@/queries/provider-base-url";
@@ -23,22 +22,6 @@ import {
 	pickString,
 } from "../../media-modal-data";
 import type { MediaModalMetadataHint } from "../../types";
-
-const OPTIMISTIC_MAPPING_STATUS_FLAG = "__ani2arrOptimisticMappingStatus";
-
-type OptimisticMappingStatus = {
-	[OPTIMISTIC_MAPPING_STATUS_FLAG]?: true;
-};
-
-function isOptimisticMappingStatus(
-	status: CheckMovieStatusResponse | null | undefined,
-): boolean {
-	return (
-		(status as OptimisticMappingStatus | null | undefined)?.[
-			OPTIMISTIC_MAPPING_STATUS_FLAG
-		] === true
-	);
-}
 
 export function useRadarrModalReadData(input: {
 	anilistId: AniListId;
@@ -128,9 +111,7 @@ export function useRadarrModalReadData(input: {
 		force_verify: true,
 	});
 
-	const hasUsableVerifiedStatus =
-		radarrStatus.isFetchedAfterMount ||
-		isOptimisticMappingStatus(radarrStatus.data);
+	const hasUsableVerifiedStatus = radarrStatus.isFetchedAfterMount;
 	const verificationSettled = hasUsableVerifiedStatus || radarrStatus.isError;
 	const verifiedStatus = hasUsableVerifiedStatus
 		? (radarrStatus.data ?? null)

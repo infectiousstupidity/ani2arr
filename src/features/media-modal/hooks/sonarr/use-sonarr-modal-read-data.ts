@@ -10,7 +10,6 @@ import {
 } from "@/anilist/metadata-hints";
 import { resolveTitlePreference } from "@/anilist/title-preference";
 import { defaultSonarrFormState } from "@/settings";
-import type { CheckSeriesStatusResponse } from "@/rpc/types";
 import { useSeriesStatus, useSonarrFormOptions } from "@/queries/sonarr";
 import { usePublicOptions } from "@/queries/options";
 import {
@@ -26,22 +25,6 @@ import {
 	pickString,
 } from "../../media-modal-data";
 import type { MediaModalMetadataHint } from "../../types";
-
-const OPTIMISTIC_MAPPING_STATUS_FLAG = "__ani2arrOptimisticMappingStatus";
-
-type OptimisticMappingStatus = {
-	[OPTIMISTIC_MAPPING_STATUS_FLAG]?: true;
-};
-
-function isOptimisticMappingStatus(
-	status: CheckSeriesStatusResponse | null | undefined,
-): boolean {
-	return (
-		(status as OptimisticMappingStatus | null | undefined)?.[
-			OPTIMISTIC_MAPPING_STATUS_FLAG
-		] === true
-	);
-}
 
 export function useSonarrModalReadData(input: {
 	anilistId: AniListId;
@@ -131,9 +114,7 @@ export function useSonarrModalReadData(input: {
 		force_verify: true,
 	});
 
-	const hasUsableVerifiedStatus =
-		sonarrStatus.isFetchedAfterMount ||
-		isOptimisticMappingStatus(sonarrStatus.data);
+	const hasUsableVerifiedStatus = sonarrStatus.isFetchedAfterMount;
 	const verificationSettled = hasUsableVerifiedStatus || sonarrStatus.isError;
 	const verifiedStatus = hasUsableVerifiedStatus
 		? (sonarrStatus.data ?? null)

@@ -1,7 +1,12 @@
 /** React Query hooks for Radarr form options, library status, and mutations over RPC. */
 // src/queries/radarr.ts
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	useMutation,
+	useQuery,
+	useQueryClient,
+	type QueryClient,
+} from "@tanstack/react-query";
 import { getAni2arrApi } from "@/rpc";
 import type { CheckMovieStatusResponse, RadarrLookupOutput } from "@/rpc/types";
 import type { RadarrMovieLibraryStatus } from "@/providers/radarr/library";
@@ -130,6 +135,21 @@ export const useRadarrLookupSearch = (input: {
 	});
 };
 
+function invalidateRadarrMediaMutationQueries(
+	queryClient: QueryClient,
+	variables: Pick<AddRadarrInput, "anilistId" | "tmdbId">,
+): void {
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.seriesStatusBase(variables.anilistId, "radarr"),
+	});
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.radarrMovieLibraryStatus(variables.tmdbId),
+	});
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.mappingInspection("radarr", variables.anilistId),
+	});
+}
+
 export const useAddMovie = () => {
 	const queryClient = useQueryClient();
 	return useMutation<RadarrMovie, ExtensionError, AddRadarrInput>({
@@ -141,9 +161,7 @@ export const useAddMovie = () => {
 			}
 		},
 		onSuccess: (_createdMovie, variables) => {
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seriesStatusBase(variables.anilistId, "radarr"),
-			});
+			invalidateRadarrMediaMutationQueries(queryClient, variables);
 		},
 	});
 };
@@ -159,9 +177,7 @@ export const useUpdateMovie = () => {
 			}
 		},
 		onSuccess: (_updatedMovie, variables) => {
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seriesStatusBase(variables.anilistId, "radarr"),
-			});
+			invalidateRadarrMediaMutationQueries(queryClient, variables);
 		},
 	});
 };
