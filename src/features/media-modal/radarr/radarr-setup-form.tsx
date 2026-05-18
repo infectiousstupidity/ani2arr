@@ -24,6 +24,7 @@ import {
 } from "./radarr-setup-values";
 
 export type RadarrSetupFooterState = {
+	canSubmit: boolean;
 	isBusy: boolean;
 	isDirty: boolean;
 	isSubmitting: boolean;
@@ -36,15 +37,6 @@ type RadarrDraftState = {
 	targetKey: string | null;
 	values: RadarrFormState;
 	isDirty: boolean;
-};
-
-type RadarrDraftController = {
-	values: RadarrFormState;
-	isDirty: boolean;
-	onFieldChange: <K extends keyof RadarrFormState>(
-		field: K,
-		value: RadarrFormState[K],
-	) => void;
 };
 
 type RadarrSetupFormProps = {
@@ -73,54 +65,21 @@ function getHeaderDescription(mode: "add" | "edit"): string {
 		: "Choose the root folder and add options for this movie.";
 }
 
-function getInitialValues(target: RadarrSetupTarget | null): RadarrFormState {
+function getInitialValues(
+	target: RadarrSetupTarget | null,
+): RadarrFormState {
 	return normalizeRadarrFormState(target?.initialFormValues);
 }
 
-function getCleanDraftState(target: RadarrSetupTarget | null): RadarrDraftState {
-	return {
-		targetKey: target?.key ?? null,
-		values: getInitialValues(target),
-		isDirty: false,
-	};
-}
+function canSubmitSetupForm(
+	mode: "add" | "edit",
+	isDirty: boolean,
+	setupUnavailable: boolean,
+	setupMutationsBlocked: boolean,
+): boolean {
+	if (setupUnavailable || setupMutationsBlocked) return false;
 
-function useRadarrDraftState(
-	target: RadarrSetupTarget | null,
-): RadarrDraftController {
-	const [draftState, setDraftState] = useState<RadarrDraftState>(() =>
-		getCleanDraftState(target),
-	);
-	const targetKey = target?.key ?? null;
-	const resetDraftState =
-		draftState.targetKey === targetKey ? null : getCleanDraftState(target);
-
-	if (resetDraftState !== null) {
-		setDraftState(resetDraftState);
-	}
-
-	const activeDraftState = resetDraftState ?? draftState;
-	const getActiveValues = (state: RadarrDraftState): RadarrFormState =>
-		state.targetKey === targetKey
-			? state.values
-			: getCleanDraftState(target).values;
-
-	const onFieldChange = <K extends keyof RadarrFormState>(
-		field: K,
-		value: RadarrFormState[K],
-	): void => {
-		setDraftState((state) => ({
-			targetKey,
-			values: { ...getActiveValues(state), [field]: value },
-			isDirty: true,
-		}));
-	};
-
-	return {
-		values: activeDraftState.values,
-		isDirty: activeDraftState.isDirty,
-		onFieldChange,
-	};
+	return mode === "add" || isDirty;
 }
 
 function getPathPreview(input: {
@@ -163,8 +122,19 @@ export function useRadarrSetupForm(
 	} = props;
 	const addMovie = useAddMovie();
 	const updateMovie = useUpdateMovie();
-	const draft = useRadarrDraftState(target);
-	const currentDraft = draft.values;
+	const targetKey = target?.key ?? null;
+	const initialValues = getInitialValues(target);
+	const [draftState, setDraftState] = useState<RadarrDraftState>(() => ({
+		targetKey,
+		values: initialValues,
+		isDirty: false,
+	}));
+	let currentDraft = initialValues;
+	let isDirty = false;
+	if (draftState.targetKey === targetKey) {
+		currentDraft = draftState.values;
+		isDirty = draftState.isDirty;
+	}
 	const mode = target?.mode ?? "add";
 	const pathPreview = getPathPreview({ currentDraft, target });
 	const isSubmitting = addMovie.isPending || updateMovie.isPending;
@@ -173,25 +143,46 @@ export function useRadarrSetupForm(
 		providerPayloadTitle === undefined ||
 		!verificationSettled ||
 		verificationFailed;
-	const setupUnavailable = target === null || pathPreview === null;
+	const setupUnavailable = pathPreview === null;
 	const isBusy = isSubmitting;
+	const canSubmit = canSubmitSetupForm(
+		mode,
+		isDirty,
+		setupUnavailable,
+		setupMutationsBlocked,
+	);
 
 	const footerState = {
+		canSubmit,
 		isBusy,
-		isDirty: draft.isDirty,
+		isDirty,
 		isSubmitting,
 		setupMutationsBlocked,
 		setupUnavailable,
 		submitLabel: mode === "edit" ? "Save changes" : "Add movie",
 	} satisfies RadarrSetupFooterState;
 
+	const onFieldChange = <K extends keyof RadarrFormState>(
+		field: K,
+		value: RadarrFormState[K],
+	): void => {
+		setDraftState((state) => {
+			const values = state.targetKey === targetKey ? state.values : initialValues;
+
+			return {
+				targetKey,
+				values: { ...values, [field]: value },
+				isDirty: true,
+			};
+		});
+	};
 	const handleSubmit = async (
 		event: FormEvent<HTMLFormElement>,
 	): Promise<void> => {
 		event.preventDefault();
 
 		if (
-			setupMutationsBlocked ||
+			!canSubmit ||
 			target === null ||
 			providerPayloadTitle === undefined
 		) {
@@ -235,7 +226,7 @@ export function useRadarrSetupForm(
 				mode === "edit" ? (
 					<RadarrEditOptionsFields
 						values={currentDraft}
-						onChange={draft.onFieldChange}
+						onChange={onFieldChange}
 						disabled={isBusy || setupMutationsBlocked}
 						portalContainer={portalContainer}
 						formResources={formResources}
@@ -244,7 +235,7 @@ export function useRadarrSetupForm(
 				) : (
 					<RadarrAddOptionsFields
 						values={currentDraft}
-						onChange={draft.onFieldChange}
+						onChange={onFieldChange}
 						disabled={isBusy || setupMutationsBlocked}
 						portalContainer={portalContainer}
 						formResources={formResources}
