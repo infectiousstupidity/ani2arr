@@ -1,4 +1,4 @@
-/** RPC handlers for Sonarr form options, search, and validation flows. */
+/** RPC handlers for Sonarr form resources, search, and validation flows. */
 // src/rpc/handlers/sonarr.handlers.ts
 
 import * as v from "valibot";
@@ -11,7 +11,7 @@ import {
 } from "@/providers";
 import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import {
-	GetProviderFormOptionsInputSchema,
+	GetProviderFormResourcesInputSchema,
 	SonarrLookupInputSchema,
 	ValidateTvdbInputSchema,
 } from "@/rpc/schemas";
@@ -22,7 +22,7 @@ export function createSonarrHandlers(
 	deps: ApiHandlerDeps,
 ): Pick<
 	Ani2arrApi,
-	"getSonarrFormOptions" | "searchSonarr" | "validateTvdbId"
+	"getSonarrFormResources" | "searchSonarr" | "validateTvdbId"
 > {
 	const {
 		sonarrClient,
@@ -45,8 +45,8 @@ export function createSonarrHandlers(
 	};
 
 	return {
-		async getSonarrFormOptions(input) {
-			const parsedInput = v.parse(GetProviderFormOptionsInputSchema, input);
+		async getSonarrFormResources(input) {
+			const parsedInput = v.parse(GetProviderFormResourcesInputSchema, input);
 			const maybeCredentials = parsedInput?.credentials;
 			const credentials: ProviderCredentials =
 				maybeCredentials?.url && maybeCredentials.apiKey
@@ -135,7 +135,7 @@ export function createSonarrHandlers(
 		},
 	} satisfies Pick<
 		Ani2arrApi,
-		"getSonarrFormOptions" | "searchSonarr" | "validateTvdbId"
+		"getSonarrFormResources" | "searchSonarr" | "validateTvdbId"
 	>;
 }
 

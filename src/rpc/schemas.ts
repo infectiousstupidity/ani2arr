@@ -178,7 +178,7 @@ export const NotifyProviderConnectionChangedInputSchema = v.optional(
 	}),
 );
 
-export const GetProviderFormOptionsInputSchema = v.optional(
+export const GetProviderFormResourcesInputSchema = v.optional(
 	v.object({
 		credentials: v.optional(ProviderCredentialsSchema),
 	}),
@@ -272,8 +272,8 @@ export type TestProviderConnectionInput = v.InferOutput<
 export type GetProviderBaseUrlInput = v.InferOutput<
 	typeof GetProviderBaseUrlInputSchema
 >;
-export type GetProviderFormOptionsInput = v.InferOutput<
-	typeof GetProviderFormOptionsInputSchema
+export type GetProviderFormResourcesInput = v.InferOutput<
+	typeof GetProviderFormResourcesInputSchema
 >;
 export type NotifyProviderConnectionChangedInput = v.InferOutput<
 	typeof NotifyProviderConnectionChangedInputSchema

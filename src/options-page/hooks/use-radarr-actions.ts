@@ -48,7 +48,7 @@ export function useRadarrActions() {
 				const api = getAni2arrApi();
 
 				// 3. Test connection and fetch options to ensure credentials work.
-				await api.getRadarrFormOptions({
+				await api.getRadarrFormResources({
 					credentials: normalized,
 				});
 
@@ -60,7 +60,7 @@ export function useRadarrActions() {
 
 				// 5. Invalidate provider-scoped queries
 				queryClient.invalidateQueries({
-					queryKey: queryKeys.radarrFormOptionsRoot(),
+					queryKey: queryKeys.radarrFormResourcesRoot(),
 				});
 				queryClient.invalidateQueries({
 					queryKey: queryKeys.radarrConnectionRoot(),
@@ -115,7 +115,7 @@ export function useRadarrActions() {
 
 			// 2. Clear queries
 			queryClient.removeQueries({
-				queryKey: queryKeys.radarrFormOptionsRoot(),
+				queryKey: queryKeys.radarrFormResourcesRoot(),
 			});
 			queryClient.removeQueries({ queryKey: queryKeys.radarrConnectionRoot() });
 			queryClient.removeQueries({ queryKey: queryKeys.providerBaseUrl("radarr") });

@@ -68,8 +68,8 @@ export type SonarrMonitorNewItemsOption = v.InferOutput<
 // Display/cache status returned on Sonarr series and lookup results.
 export const SonarrSeriesStatusSchema = v.picklist(SONARR_SERIES_STATUSES);
 
-// Raw nested Sonarr response shape; normalized by SonarrAlternateTitlesSchema.
-const SonarrAlternateTitleResourceSchema = v.object({
+// Raw nested Sonarr response shape. Keep this PUT-compatible for full series saves.
+export const SonarrAlternateTitleResourceSchema = v.object({
 	title: v.optional(v.nullable(v.string())),
 	sceneSeasonNumber: v.optional(v.nullable(v.number())),
 	seasonNumber: v.optional(v.nullable(v.number())),
@@ -77,17 +77,9 @@ const SonarrAlternateTitleResourceSchema = v.object({
 	comment: v.optional(v.nullable(v.string())),
 });
 
-// Normalized alternate title strings used by lookup results and library cache rows.
+// Full Sonarr alternate title resources used by lookup results and edit saves.
 export const SonarrAlternateTitlesSchema = v.optional(
-	v.pipe(
-		v.nullable(v.array(SonarrAlternateTitleResourceSchema)),
-		v.transform(
-			(titles) =>
-				titles
-					?.map((entry) => entry.title?.trim())
-					.filter((title): title is string => !!title) ?? undefined,
-		),
-	),
+	v.nullable(v.array(SonarrAlternateTitleResourceSchema)),
 );
 
 // Nested Sonarr stats used for library cache/display counts.
@@ -125,6 +117,7 @@ export const SonarrLookupSeriesSchema = v.object({
 	id: v.optional(SonarrSeriesIdSchema),
 	title: v.string(),
 	tvdbId: TvdbIdSchema,
+	sortTitle: v.optional(v.string()),
 	titleSlug: v.optional(v.string()),
 	folder: v.string(),
 	year: v.optional(v.number()),

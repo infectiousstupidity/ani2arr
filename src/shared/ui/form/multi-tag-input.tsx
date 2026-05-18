@@ -94,6 +94,8 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({
   };
 
   const handleBlur = () => {
+    addTag(inputValue);
+
     // Small delay to allow click events on suggestions to fire before closing
     setTimeout(() => {
       if (document.activeElement !== inputRef.current) {

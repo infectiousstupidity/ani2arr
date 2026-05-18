@@ -27,7 +27,7 @@ export interface ProviderQualityProfile {
 	name: string;
 }
 
-export interface ProviderFormOptions {
+export interface ProviderFormResources {
 	qualityProfiles: ProviderQualityProfile[];
 	rootFolders: ProviderRootFolder[];
 	tags: ProviderTag[];

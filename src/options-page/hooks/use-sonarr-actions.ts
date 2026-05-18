@@ -48,7 +48,7 @@ export function useSonarrActions() {
 				const api = getAni2arrApi();
 
 				// 3. Test connection and fetch options to ensure credentials work.
-				await api.getSonarrFormOptions({
+				await api.getSonarrFormResources({
 					credentials: normalized,
 				});
 
@@ -60,7 +60,7 @@ export function useSonarrActions() {
 
 				// 5. Invalidate provider-scoped queries
 				queryClient.invalidateQueries({
-					queryKey: queryKeys.sonarrFormOptionsRoot(),
+					queryKey: queryKeys.sonarrFormResourcesRoot(),
 				});
 				queryClient.invalidateQueries({
 					queryKey: queryKeys.sonarrConnectionRoot(),
@@ -115,7 +115,7 @@ export function useSonarrActions() {
 
 			// 2. Clear queries
 			queryClient.removeQueries({
-				queryKey: queryKeys.sonarrFormOptionsRoot(),
+				queryKey: queryKeys.sonarrFormResourcesRoot(),
 			});
 			queryClient.removeQueries({ queryKey: queryKeys.sonarrConnectionRoot() });
 			queryClient.removeQueries({ queryKey: queryKeys.providerBaseUrl("sonarr") });

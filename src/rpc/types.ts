@@ -2,7 +2,9 @@
 // src/rpc/types.ts
 
 import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
+import type { AniListId } from "@/anilist";
 import type {
+	Provider,
 	RadarrMovieSnapshot,
 	RadarrLookupMovie,
 	RadarrMovie,
@@ -26,6 +28,28 @@ import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
 import type { LibraryUnknownReason } from "@/mapping/library-status";
 import type { MappingCursor } from "./schemas";
 
+export type ProviderTargetSummary = {
+	provider: Provider;
+	providerId: ProviderExternalId;
+	title: string;
+	providerFolderName?: string;
+	year?: number;
+	typeLabel?: string;
+	isInLibrary: boolean;
+	providerRouteSlug?: string;
+	posterUrl?: string;
+	backdropUrl?: string;
+	statusLabel?: string;
+	networkOrStudio?: string;
+	overview?: string;
+	alternateTitles?: string[];
+	episodeCount?: number;
+	episodeFileCount?: number;
+	runtimeMinutes?: number;
+	hasFile?: boolean;
+	linkedAniListIds?: AniListId[];
+};
+
 interface ProviderStatusResponseBase {
 	providerId: ProviderExternalId | null;
 	providerMappingState: EffectiveMappingState;
@@ -40,6 +64,7 @@ interface ProviderStatusResponseBase {
 	manualMappingActive?: boolean;
 	/** Other AniList IDs currently linked to the same provider ID. */
 	linkedAniListIds?: number[];
+	targetSummary?: ProviderTargetSummary;
 }
 
 // TODO: Rename to GetSeriesStatusOutput when the paired Radarr status cleanup happens.

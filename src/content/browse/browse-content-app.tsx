@@ -3,9 +3,9 @@
 
 import React, { useRef } from "react";
 import { createPortal } from "react-dom";
-import type { AniListId } from "@/anilist";
+import type { AniListId } from "@/anilist/anilist-id";
 import { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
-import { useAniListMetadataBatch } from "@/queries";
+import { useAniListMetadataBatch } from "@/queries/anilist";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import { useTheme } from "@/shared/hooks/use-theme";
 import { useBrowsePortals } from "./use-browse-portals";
@@ -15,19 +15,34 @@ import type {
 	MediaModalOpenState,
 } from "@/features/media-modal";
 import type { BrowseAdapter, HostMediaTarget } from "./types";
-import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
-import { CardOverlay } from "@/features/media-overlay/components/card-overlay";
+import { RadarrCardOverlay } from "@/features/media-overlay/radarr-card-overlay";
+import { SonarrCardOverlay } from "@/features/media-overlay/sonarr-card-overlay";
 import { usePublicOptions } from "@/queries/options";
-import { useProviderBaseUrl } from "@/queries/provider-base-url";
-import type { Provider } from "@/providers";
+import type { Provider } from "@/providers/types";
 import { useMappingIdentities } from "@/queries/mapping";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
+import {
+	getMappedIdentitiesByAniListId,
+	resolveAniListTargetProvider,
+} from "@/content/anilist/target-provider";
 
 export const DEFAULT_CONTAINER_CLASS = "a2a-overlay-container";
 export const DEFAULT_PROCESSED_ATTRIBUTE = "data-a2a-processed";
 
 export interface BrowseContentAppProps {
 	onOpenMediaModal(input: MediaModalOpenState): void;
+}
+
+interface BrowseOverlayCommonProps {
+	anilistId: AniListId;
+	title: string;
+	onOpenSetup(): void;
+	onOpenMapping(): void;
+	metadata: ReturnType<typeof metadataHintFromAniListMetadata>;
+	observeTarget: Element;
+	anchorCorner: "bottom-left" | "top-left";
+	stackDirection: "up" | "down";
+	anchorOffsetX: number;
 }
 
 function createDefaultContainer(
@@ -42,37 +57,16 @@ function createDefaultContainer(
 	return el;
 }
 
-function getProviderBrowseSettings(
-	provider: Provider,
-	publicOptions: Awaited<ReturnType<typeof usePublicOptions>>["data"],
-) {
-	const providerOptions =
-		provider === "radarr"
-			? publicOptions?.providers.radarr
-			: publicOptions?.providers.sonarr;
-	const providerUiOptions =
-		provider === "radarr"
-			? publicOptions?.ui?.browseCards.radarr
-			: publicOptions?.ui?.browseCards.sonarr;
-
-	return {
-		providerOptions,
-		providerUiOptions,
-		providerBrowseEnabled: providerUiOptions?.enabled ?? true,
-		badgeVisibility: providerUiOptions?.visibility ?? "always",
-	};
-}
-
-function getLaunchTitle(input: {
-	anilistId: AniListId;
+function getDisplayTitle(input: {
 	metadata: ReturnType<typeof metadataHintFromAniListMetadata>;
+	parsedTitle: string;
 }): string {
 	const titles = input.metadata?.titles;
 	return (
 		titles?.english?.trim() ||
 		titles?.romaji?.trim() ||
 		titles?.native?.trim() ||
-		`AniList #${input.anilistId}`
+		input.parsedTitle
 	);
 }
 
@@ -88,21 +82,57 @@ function getModalMetadataHint(input: {
 	};
 }
 
-function getMappedIdentityByAniListId(
-	identities: readonly EffectiveMappingPresence[],
-): Map<AniListId, EffectiveMappingPresence> {
-	const identitiesById = new Map<AniListId, EffectiveMappingPresence>();
-	for (const identity of identities) {
-		if (
-			identity.providerMappingState === "mapped" &&
-			identity.providerId !== null &&
-			!identitiesById.has(identity.anilistId)
-		) {
-			identitiesById.set(identity.anilistId, identity);
-		}
+function renderSonarrOverlayPortal(input: {
+	container: Element;
+	publicOptions: Awaited<ReturnType<typeof usePublicOptions>>["data"];
+	commonProps: BrowseOverlayCommonProps;
+}) {
+	const browseOptions = input.publicOptions?.ui?.browseCards.sonarr;
+	if ((browseOptions?.enabled ?? true) === false) return null;
+
+	return createPortal(
+		<SonarrCardOverlay
+			key={input.commonProps.anilistId}
+			{...input.commonProps}
+			isConfigured={input.publicOptions?.providers.sonarr.isConfigured === true}
+			defaultForm={input.publicOptions?.providers.sonarr.defaults ?? null}
+			badgeVisibility={browseOptions?.visibility ?? "always"}
+		/>,
+		input.container,
+	);
+}
+
+function renderRadarrOverlayPortal(input: {
+	container: Element;
+	publicOptions: Awaited<ReturnType<typeof usePublicOptions>>["data"];
+	commonProps: BrowseOverlayCommonProps;
+}) {
+	const browseOptions = input.publicOptions?.ui?.browseCards.radarr;
+	if ((browseOptions?.enabled ?? true) === false) return null;
+
+	return createPortal(
+		<RadarrCardOverlay
+			key={input.commonProps.anilistId}
+			{...input.commonProps}
+			isConfigured={input.publicOptions?.providers.radarr.isConfigured === true}
+			defaultForm={input.publicOptions?.providers.radarr.defaults ?? null}
+			badgeVisibility={browseOptions?.visibility ?? "always"}
+		/>,
+		input.container,
+	);
+}
+
+function renderProviderOverlayPortal(input: {
+	provider: Provider;
+	container: Element;
+	publicOptions: Awaited<ReturnType<typeof usePublicOptions>>["data"];
+	commonProps: BrowseOverlayCommonProps;
+}) {
+	if (input.provider === "sonarr") {
+		return renderSonarrOverlayPortal(input);
 	}
 
-	return identitiesById;
+	return renderRadarrOverlayPortal(input);
 }
 
 function renderBrowseCardPortal(input: {
@@ -112,26 +142,26 @@ function renderBrowseCardPortal(input: {
 		AniListId,
 		ReturnType<typeof metadataHintFromAniListMetadata>
 	>;
-	mappedIdentityByAniListId: Map<AniListId, EffectiveMappingPresence>;
+	mappedIdentitiesByAniListId: Map<AniListId, EffectiveMappingPresence[]>;
 	publicOptions: Awaited<ReturnType<typeof usePublicOptions>>["data"];
-	providerBaseUrls: Record<Provider, string>;
 	onOpenMediaModal(input: MediaModalOpenState): void;
 	adapter: BrowseAdapter;
 }) {
 	const effectiveMetadata =
 		input.canonicalMetadataById.get(input.parsed.anilistId) ?? null;
-	const mappedIdentity = input.mappedIdentityByAniListId.get(
-		input.parsed.anilistId,
-	);
-	const provider =
-		mappedIdentity?.provider ??
-		resolveProviderForAniListFormat(input.parsed.format);
+	const provider = resolveAniListTargetProvider({
+		anilistId: input.parsed.anilistId,
+		format: input.parsed.format,
+		mappedIdentities:
+			input.mappedIdentitiesByAniListId.get(input.parsed.anilistId) ?? [],
+	});
 	if (!provider) {
 		return null;
 	}
-	const displayTitle = getLaunchTitle({
-		anilistId: input.parsed.anilistId,
+
+	const displayTitle = getDisplayTitle({
 		metadata: effectiveMetadata,
+		parsedTitle: input.parsed.title,
 	});
 	const metadataHint = getModalMetadataHint({
 		title: displayTitle,
@@ -139,49 +169,42 @@ function renderBrowseCardPortal(input: {
 		metadata: effectiveMetadata,
 	});
 
-	const { providerOptions, providerBrowseEnabled, badgeVisibility } =
-		getProviderBrowseSettings(provider, input.publicOptions);
-	if (!providerBrowseEnabled) {
-		return null;
-	}
+	const openSetup = () => {
+		input.onOpenMediaModal({
+			anilistId: input.parsed.anilistId,
+			provider,
+			initialView: "setup",
+			openSource: "content",
+			metadataHint,
+		});
+	};
+	const openMapping = () => {
+		input.onOpenMediaModal({
+			anilistId: input.parsed.anilistId,
+			provider,
+			initialView: "mapping",
+			openSource: "content",
+			metadataHint,
+		});
+	};
+	const commonProps = {
+		anilistId: input.parsed.anilistId,
+		title: displayTitle,
+		onOpenSetup: openSetup,
+		onOpenMapping: openMapping,
+		metadata: effectiveMetadata,
+		observeTarget: input.container,
+		anchorCorner: input.adapter.anchorCorner ?? "bottom-left",
+		stackDirection: input.adapter.stackDirection ?? "up",
+		anchorOffsetX: input.adapter.anchorOffsetX ?? -8,
+	};
 
-	return createPortal(
-		<CardOverlay
-			key={input.parsed.anilistId}
-			provider={provider}
-			anilistId={input.parsed.anilistId}
-			title={displayTitle}
-			onOpenModal={() => {
-				input.onOpenMediaModal({
-					anilistId: input.parsed.anilistId,
-					provider,
-					initialView: "setup",
-					openSource: "content",
-					metadataHint,
-				});
-			}}
-			onOpenMapping={() => {
-				input.onOpenMediaModal({
-					anilistId: input.parsed.anilistId,
-					provider,
-					initialView: "mapping",
-					openSource: "content",
-					metadataHint,
-				});
-			}}
-			isConfigured={Boolean(providerOptions?.isConfigured)}
-			defaultForm={providerOptions?.defaults ?? null}
-			mappedIdentity={mappedIdentity ?? null}
-			metadata={effectiveMetadata}
-			providerUrl={input.providerBaseUrls[provider] || null}
-			observeTarget={input.container}
-			badgeVisibility={badgeVisibility}
-			anchorCorner={input.adapter.anchorCorner ?? "bottom-left"}
-			stackDirection={input.adapter.stackDirection ?? "up"}
-			anchorOffsetX={input.adapter.anchorOffsetX ?? -8}
-		/>,
-		input.container,
-	);
+	return renderProviderOverlayPortal({
+		provider,
+		container: input.container,
+		publicOptions: input.publicOptions,
+		commonProps,
+	});
 }
 
 export const createBrowseContentApp = (
@@ -252,12 +275,6 @@ export const createBrowseContentApp = (
 			(sonarrBrowseEnabled && publicOptions?.providers.sonarr.isConfigured) ||
 			(radarrBrowseEnabled && publicOptions?.providers.radarr.isConfigured),
 		);
-		const sonarrBaseUrl = useProviderBaseUrl("sonarr", {
-			enabled: publicOptions?.providers.sonarr.isConfigured === true,
-		});
-		const radarrBaseUrl = useProviderBaseUrl("radarr", {
-			enabled: publicOptions?.providers.radarr.isConfigured === true,
-		});
 
 		const { cardPortals } = useBrowsePortals({
 			cardSelector,
@@ -282,7 +299,7 @@ export const createBrowseContentApp = (
 		const mappingIdentities = useMappingIdentities(metadataIds, {
 			enabled: overlaysEnabled,
 		});
-		const mappedIdentityByAniListId = getMappedIdentityByAniListId(
+		const mappedIdentitiesByAniListId = getMappedIdentitiesByAniListId(
 			mappingIdentities.data ?? [],
 		);
 		const metadataBatch = useAniListMetadataBatch(metadataIds, {
@@ -308,12 +325,8 @@ export const createBrowseContentApp = (
 						container,
 						parsed,
 						canonicalMetadataById,
-						mappedIdentityByAniListId,
+						mappedIdentitiesByAniListId,
 						publicOptions,
-						providerBaseUrls: {
-							sonarr: sonarrBaseUrl.data ?? "",
-							radarr: radarrBaseUrl.data ?? "",
-						},
 						onOpenMediaModal,
 						adapter,
 					});

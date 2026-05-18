@@ -2,7 +2,7 @@
 // src/features/media-modal/hooks/use-content-portal-container.ts
 
 import { useState } from "react";
-import { MODAL_Z_INDEX_FLOATING } from "../dialog";
+import { MODAL_Z_INDEX_FLOATING } from "../chrome/modal-shell";
 
 export function createContentPortalContainer(
 	documentRef: Pick<Document, "createElement"> | null,
@@ -12,7 +12,6 @@ export function createContentPortalContainer(
 	}
 
 	const element = documentRef.createElement("div") as HTMLDivElement;
-	element.ariaHidden = "true";
 	element.style.position = "fixed";
 	element.style.inset = "0";
 	element.style.zIndex = String(MODAL_Z_INDEX_FLOATING);

@@ -113,7 +113,7 @@ describe("SonarrLibrary library status", () => {
 			provider: "sonarr",
 			providerId: parseTvdbId(123),
 			isInLibrary: true,
-			series: createSnapshot(),
+			series,
 		});
 
 		expect(client.findSeriesByTvdbId).toHaveBeenCalledWith(

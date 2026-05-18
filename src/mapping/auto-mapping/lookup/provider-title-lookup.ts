@@ -89,18 +89,10 @@ export function createProviderTitleLookup<
 		priority?: RequestPriority,
 	): Promise<TResult[]> => {
 		try {
-			if (import.meta.env.DEV) {
-				log.debug?.(
-					`lookup:queue term='${term}' priority=${priority ?? "normal"} prioValue=${priorityValue(priority)}`,
-				);
-			}
 			const results = await (queue.add(
 				() => config.fetchTitleResults(term, credentials),
 				{ priority: priorityValue(priority) },
 			) as Promise<TResult[]>);
-			log.debug(
-				`fetchQueuedTitleResults: term='${term}' resultCount=${results.length}`,
-			);
 			return results;
 		} catch (error) {
 			throw normalizeError(error);

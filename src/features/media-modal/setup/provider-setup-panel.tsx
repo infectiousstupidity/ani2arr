@@ -1,0 +1,76 @@
+/** Owns the generic provider setup shell used by Sonarr and Radarr panes. */
+// src/features/media-modal/setup/provider-setup-panel.tsx
+
+import type { ReactNode } from "react";
+
+export function BaseProviderSetupPanel(props: {
+	providerName: string;
+	isConfigured: boolean;
+	hasFormResources: boolean;
+	headerDescription: string;
+	statusNotice?: ReactNode;
+	children: ReactNode;
+}): React.JSX.Element {
+	const {
+		providerName,
+		isConfigured,
+		hasFormResources,
+		headerDescription,
+		statusNotice,
+		children,
+	} = props;
+
+	let setupContent: ReactNode;
+	if (isConfigured && hasFormResources) {
+		setupContent = (
+			<div className="flex h-full min-h-0 flex-col gap-3">
+				{statusNotice ? (
+					<div className="rounded-xl border border-border-primary/45 bg-bg-primary/35 px-3 py-2 text-xs leading-5 text-text-secondary">
+						{statusNotice}
+					</div>
+				) : null}
+				<div className="min-h-0 flex-1">{children}</div>
+			</div>
+		);
+	} else if (isConfigured) {
+		setupContent = (
+			<div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-sm text-text-secondary">
+				<p>Loading {providerName} choices...</p>
+			</div>
+		);
+	} else {
+		setupContent = (
+			<div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-sm text-text-secondary">
+				<p>
+					Connect {providerName} in the extension options to load provider
+					choices.
+				</p>
+				<p className="text-xs">
+					Add your {providerName} URL and API key, then return here to
+					continue.
+				</p>
+			</div>
+		);
+	}
+
+	return (
+		<div className="flex h-full min-h-0 flex-col px-4 pt-2">
+			<div className="shrink-0 pb-3">
+				<div className="flex items-start justify-between gap-3">
+					<div className="space-y-1">
+						<p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">
+							{providerName} configuration
+						</p>
+						<p className="text-xs leading-5 text-text-secondary">
+							{headerDescription}
+						</p>
+					</div>
+				</div>
+			</div>
+
+			<div className="min-h-0 flex-1">
+				{setupContent}
+			</div>
+		</div>
+	);
+}

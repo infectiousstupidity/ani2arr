@@ -6,21 +6,25 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { ListPlus } from "lucide-react";
 import {
   parseProviderQualityProfileId,
-  type ProviderFormOptions,
+  type ProviderFormResources,
 } from "@/providers";
 import {
   createDefaultSonarrFormState,
   type SonarrFormState,
 } from "@/providers/sonarr/form-state";
+import type { ProviderTagSelection } from "@/providers/provider-tag-selection";
+import {
+  SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
+  SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
+} from "@/providers/sonarr/form-options";
 import type {
   SonarrMonitorOption,
   SonarrSeriesType,
 } from "@/providers/sonarr/schemas";
 import { usePublicOptions } from "@/queries/options";
-import { useSonarrFormOptions } from "@/queries/sonarr";
+import { useSonarrFormResources } from "@/queries/sonarr";
 import type { PublicOptions } from "@/settings";
-import { ProviderTagField } from "../../components/provider-tag-field";
-import type { ProviderTagSelection } from "../../components/provider-tag-selection";
+import { ProviderTagField } from "@/shared/ui/provider-tag-field";
 import { SettingsRow, SettingsSection } from "../../components/settings-section";
 import { Select } from "../../components/ui/select";
 import { Switch } from "../../components/ui/switch";
@@ -31,7 +35,8 @@ const DEFAULT_OPTIONS_DESCRIPTION =
 const DEFAULT_FIELD_OPTIONS = { shouldDirty: true, shouldTouch: true } as const;
 
 interface SonarrDefaultsFieldsProps {
-  formOptions: ProviderFormOptions;
+  formResources?: ProviderFormResources | undefined;
+  resourceFieldsDisabled: boolean;
   values: SonarrFormState;
   onChange: <K extends keyof SonarrFormState>(
     field: K,
@@ -41,20 +46,21 @@ interface SonarrDefaultsFieldsProps {
 }
 
 const SonarrDefaultsFields = ({
-  formOptions,
+  formResources,
+  resourceFieldsDisabled,
   values,
   onChange,
   onTagsChange,
 }: SonarrDefaultsFieldsProps) => {
-  const rootFolderOptions = formOptions.rootFolders.map((rf) => ({
+  const rootFolderOptions = formResources?.rootFolders.map((rf) => ({
     label: rf.path,
     value: rf.path,
-  }));
+  })) ?? [];
 
-  const qualityProfileOptions = formOptions.qualityProfiles.map((qp) => ({
+  const qualityProfileOptions = formResources?.qualityProfiles.map((qp) => ({
     label: qp.name,
     value: String(qp.id),
-  }));
+  })) ?? [];
 
   return (
     <>
@@ -65,6 +71,7 @@ const SonarrDefaultsFields = ({
           onValueChange={(value) => onChange("rootFolderPath", value)}
           options={rootFolderOptions}
           placeholder="Select root folder"
+          disabled={resourceFieldsDisabled}
         />
       </SettingsRow>
 
@@ -87,6 +94,7 @@ const SonarrDefaultsFields = ({
           }}
           options={qualityProfileOptions}
           placeholder="Select quality profile"
+          disabled={resourceFieldsDisabled}
         />
       </SettingsRow>
 
@@ -97,18 +105,14 @@ const SonarrDefaultsFields = ({
           onValueChange={(value) =>
             onChange("seriesType", value as SonarrSeriesType)
           }
-          options={[
-            { label: "Anime", value: "anime" },
-            { label: "Standard", value: "standard" },
-            { label: "Daily", value: "daily" },
-          ]}
+          options={SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
         />
       </SettingsRow>
 
       <SettingsRow id="sonarr-tags" label="Tags">
         <ProviderTagField
           id="sonarr-tags"
-          availableTags={formOptions.tags}
+          availableTags={formResources?.tags ?? []}
           selectedTagIds={values.tags}
           selectedFreeformTags={values.freeformTags}
           onChange={onTagsChange}
@@ -126,15 +130,7 @@ const SonarrDefaultsFields = ({
               monitor: value as SonarrMonitorOption,
             })
           }
-          options={[
-            { label: "All Episodes", value: "all" },
-            { label: "Future Episodes", value: "future" },
-            { label: "Missing Episodes", value: "missing" },
-            { label: "Existing Episodes", value: "existing" },
-            { label: "First Season", value: "firstSeason" },
-            { label: "Latest Season", value: "latestSeason" },
-            { label: "None", value: "none" },
-          ]}
+          options={SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS}
         />
       </SettingsRow>
 
@@ -205,9 +201,10 @@ export const SonarrDefaults = () => {
   const { data: savedSettings } = usePublicOptions();
   const isConfigured = savedSettings?.providers.sonarr.isConfigured === true;
 
-  const { data: formOptions, isFetching } = useSonarrFormOptions({
+  const { data: formResources, isFetching } = useSonarrFormResources({
     enabled: isConfigured,
   });
+  const resourceFieldsDisabled = !formResources;
 
   const { control, getValues, setValue } = useFormContext<PublicOptions>();
   const values =
@@ -215,12 +212,12 @@ export const SonarrDefaults = () => {
     createDefaultSonarrFormState();
 
   useEffect(() => {
-    if (!formOptions) return;
+    if (!formResources) return;
 
     const currentDefaults =
       getValues("providers.sonarr.defaults") ?? createDefaultSonarrFormState();
-    const firstRootFolder = formOptions.rootFolders[0];
-    const firstQualityProfile = formOptions.qualityProfiles[0];
+    const firstRootFolder = formResources.rootFolders[0];
+    const firstQualityProfile = formResources.qualityProfiles[0];
     const nextDefaults: SonarrFormState = { ...currentDefaults };
 
     if (!nextDefaults.rootFolderPath && firstRootFolder) {
@@ -243,7 +240,7 @@ export const SonarrDefaults = () => {
       nextDefaults,
       DEFAULT_FIELD_OPTIONS,
     );
-  }, [formOptions, getValues, setValue]);
+  }, [formResources, getValues, setValue]);
 
   const updateDefaults = <K extends keyof SonarrFormState>(
     field: K,
@@ -275,7 +272,7 @@ export const SonarrDefaults = () => {
       "providers.sonarr.defaults",
       {
         ...nextDefaults,
-        ...(tagIds ? { tags: tagIds } : {}),
+        ...(tagIds.length > 0 ? { tags: tagIds } : {}),
       },
       DEFAULT_FIELD_OPTIONS,
     );
@@ -297,23 +294,6 @@ export const SonarrDefaults = () => {
     );
   }
 
-  if (isFetching && !formOptions) {
-    return (
-      <SettingsSection
-        title="Default add options"
-        description={DEFAULT_OPTIONS_DESCRIPTION}
-        icon={<ListPlus className="h-4 w-4" />}
-        divider="top"
-      >
-        <p className="animate-pulse py-5 text-sm text-text-secondary">
-          Loading Sonarr options...
-        </p>
-      </SettingsSection>
-    );
-  }
-
-  if (!formOptions) return null;
-
   return (
     <SettingsSection
       title="Default add options"
@@ -321,8 +301,15 @@ export const SonarrDefaults = () => {
       icon={<ListPlus className="h-4 w-4" />}
       divider="top"
     >
+      {!isFetching && !formResources ? (
+        <p className="text-sm text-text-secondary">
+          Sonarr folders, quality profiles, and existing tags are unavailable.
+          Static defaults remain editable.
+        </p>
+      ) : null}
       <SonarrDefaultsFields
-        formOptions={formOptions}
+        formResources={formResources}
+        resourceFieldsDisabled={resourceFieldsDisabled}
         values={values}
         onChange={updateDefaults}
         onTagsChange={updateTags}

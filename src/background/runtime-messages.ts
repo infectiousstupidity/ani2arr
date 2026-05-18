@@ -56,7 +56,7 @@ export const installBackgroundRuntimeMessages = (): void => {
 
 						let url = baseUrl;
 						if (section) {
-							url = `${baseUrl}#/options/${section}${targetHash}`;
+							url = `${baseUrl}#${section}${targetHash}`;
 						} else if (targetHash) {
 							url = `${baseUrl}#${targetHash}`;
 						}

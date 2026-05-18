@@ -204,6 +204,7 @@ function readAlternateTitles(value: unknown): string[] {
 function readSonarrResultTitleVariants(candidate: unknown): TitleVariant[] {
 	const record = candidate as {
 		title?: unknown;
+		sortTitle?: unknown;
 		titleSlug?: unknown;
 		alternateTitles?: unknown;
 	} | null;
@@ -211,6 +212,7 @@ function readSonarrResultTitleVariants(candidate: unknown): TitleVariant[] {
 	const seen = new Set<string>();
 
 	pushVariant(out, seen, record?.title, "title");
+	pushVariant(out, seen, record?.sortTitle, "sortTitle");
 	pushSlugVariants(out, seen, record?.titleSlug);
 	for (const title of readAlternateTitles(record?.alternateTitles)) {
 		pushVariant(out, seen, title, "alternateTitle");

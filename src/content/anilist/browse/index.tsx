@@ -1,8 +1,9 @@
 /** AniList browse surface composition for content-owned overlays. */
 // src/content/anilist/browse/index.tsx
 
-import baseStyles from '@/shared/styles/base.css?inline';
-import browseStyles from './style.css?inline';
+import '@/shared/styles/base.css';
+import cardOverlayLightDomStyles from '@/features/media-overlay/card-overlay.light-dom.css?inline';
+import browseLightDomStyles from './style.css?inline';
 import { BrowseRoot } from '@/content/browse/browse-root';
 import {
   createBrowseContentApp,
@@ -42,13 +43,12 @@ const isBrowseShellEligible = ({
 };
 
 const BrowseContentApp = createBrowseContentApp(anilistBrowseAdapter);
-const stylesText = `${baseStyles}\n${browseStyles}`;
+const lightDomStylesText = `${cardOverlayLightDomStyles}\n${browseLightDomStyles}`;
 
 export const main = createBrowseEntrypointShell({
   uiName: 'a2a-browse-root',
-  styleAttribute: 'data-a2a-browse',
-  shadowStyleAttribute: 'data-a2a-browse-shadow',
-  stylesText,
+  lightDomStyleAttribute: 'data-a2a-browse-light-dom',
+  lightDomStylesText,
   containerClassName: DEFAULT_CONTAINER_CLASS,
   processedAttribute: DEFAULT_PROCESSED_ATTRIBUTE,
   isEligible: isBrowseShellEligible,

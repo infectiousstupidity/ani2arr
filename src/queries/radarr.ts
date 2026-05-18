@@ -1,4 +1,4 @@
-/** React Query hooks for Radarr form options, library status, and mutations over RPC. */
+/** React Query hooks for Radarr form resources, library status, and mutations over RPC. */
 // src/queries/radarr.ts
 
 import {
@@ -8,19 +8,47 @@ import {
 	type QueryClient,
 } from "@tanstack/react-query";
 import { getAni2arrApi } from "@/rpc";
+import type { AniListId } from "@/anilist";
+import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type { CheckMovieStatusResponse, RadarrLookupOutput } from "@/rpc/types";
 import type { RadarrMovieLibraryStatus } from "@/providers/radarr/library";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import { normalizeError, type ExtensionError } from "@/shared/errors";
 import { queryKeys } from "@/queries/query-keys";
 import type { ProviderCredentials, RadarrMovie, TmdbId } from "@/providers";
+import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type {
 	AddRadarrInput,
 	StatusInput,
 	UpdateRadarrInput,
 } from "@/rpc/schemas";
 
-export const useRadarrFormOptions = (options?: {
+interface BuildRadarrQuickAddInputOptions {
+	anilistId: AniListId;
+	tmdbId: TmdbId | null;
+	title: string;
+	metadata: AniListMediaHint | null;
+	form: RadarrFormState | null;
+}
+
+export function buildRadarrQuickAddInput(
+	input: BuildRadarrQuickAddInputOptions,
+): AddRadarrInput | null {
+	if (input.tmdbId === null || input.form === null) {
+		return null;
+	}
+
+	return {
+		anilistId: input.anilistId,
+		tmdbId: input.tmdbId,
+		title: input.title,
+		primaryTitleHint: input.title,
+		metadata: input.metadata,
+		form: { ...input.form },
+	};
+}
+
+export const useRadarrFormResources = (options?: {
 	enabled?: boolean;
 	credentials?: ProviderCredentials | null;
 }) => {
@@ -29,13 +57,13 @@ export const useRadarrFormOptions = (options?: {
 		: undefined;
 
 	return useQuery({
-		queryKey: queryKeys.radarrFormOptions(
+		queryKey: queryKeys.radarrFormResources(
 			getProviderConnectionScope(options?.credentials),
 		),
 		queryFn: async () => {
 			try {
 				const api = getAni2arrApi();
-				return await api.getRadarrFormOptions(request);
+				return await api.getRadarrFormResources(request);
 			} catch (error) {
 				throw normalizeError(error);
 			}
@@ -88,6 +116,10 @@ export const useMovieStatus = (
 		},
 		enabled: !!payload.anilistId && (options?.enabled ?? true),
 		staleTime: forceVerify ? 0 : 5 * 60 * 1000,
+		placeholderData: (previousData, previousQuery) =>
+			previousQuery?.queryKey[3] === payload.anilistId
+				? previousData
+				: undefined,
 		refetchOnWindowFocus: false,
 		meta: { persist: false },
 	});

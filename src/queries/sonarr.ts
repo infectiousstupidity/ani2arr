@@ -1,4 +1,4 @@
-/** React Query hooks for Sonarr form options, library status, and mutations over RPC. */
+/** React Query hooks for Sonarr form resources, library status, and mutations over RPC. */
 // src/queries/sonarr.ts
 
 import {
@@ -8,6 +8,8 @@ import {
 	type QueryClient,
 } from "@tanstack/react-query";
 import { getAni2arrApi } from "@/rpc";
+import type { AniListId } from "@/anilist";
+import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type {
 	CheckSeriesStatusResponse,
 	SonarrLookupOutput,
@@ -16,6 +18,7 @@ import { getProviderConnectionScope } from "@/providers/settings/provider-connec
 import { normalizeError, type ExtensionError } from "@/shared/errors";
 import { queryKeys } from "@/queries/query-keys";
 import type { ProviderCredentials, TvdbId } from "@/providers";
+import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import type { SonarrSeriesLibraryStatus } from "@/providers/sonarr/library";
 import type { SonarrSeries } from "@/providers/sonarr/types";
 import type {
@@ -24,7 +27,32 @@ import type {
 	UpdateSonarrInput,
 } from "@/rpc/schemas";
 
-export const useSonarrFormOptions = (options?: {
+interface BuildSonarrQuickAddInputOptions {
+	anilistId: AniListId;
+	tvdbId: TvdbId | null;
+	title: string;
+	metadata: AniListMediaHint | null;
+	form: SonarrFormState | null;
+}
+
+export function buildSonarrQuickAddInput(
+	input: BuildSonarrQuickAddInputOptions,
+): AddSonarrInput | null {
+	if (input.tvdbId === null || input.form === null) {
+		return null;
+	}
+
+	return {
+		anilistId: input.anilistId,
+		tvdbId: input.tvdbId,
+		title: input.title,
+		primaryTitleHint: input.title,
+		metadata: input.metadata,
+		form: { ...input.form },
+	};
+}
+
+export const useSonarrFormResources = (options?: {
 	enabled?: boolean;
 	credentials?: ProviderCredentials | null;
 }) => {
@@ -33,13 +61,13 @@ export const useSonarrFormOptions = (options?: {
 		: undefined;
 
 	return useQuery({
-		queryKey: queryKeys.sonarrFormOptions(
+		queryKey: queryKeys.sonarrFormResources(
 			getProviderConnectionScope(options?.credentials),
 		),
 		queryFn: async () => {
 			try {
 				const api = getAni2arrApi();
-				return await api.getSonarrFormOptions(request);
+				return await api.getSonarrFormResources(request);
 			} catch (error) {
 				throw normalizeError(error);
 			}
@@ -92,6 +120,10 @@ export const useSeriesStatus = (
 		},
 		enabled: !!payload.anilistId && (options?.enabled ?? true),
 		staleTime: forceVerify ? 0 : 5 * 60 * 1000,
+		placeholderData: (previousData, previousQuery) =>
+			previousQuery?.queryKey[3] === payload.anilistId
+				? previousData
+				: undefined,
 		refetchOnWindowFocus: false,
 		meta: { persist: false },
 	});

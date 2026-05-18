@@ -16,7 +16,7 @@ const credentials: ProviderCredentials = {
 };
 
 describe("createSonarrHandlers", () => {
-	it("loads Sonarr form options through the current Sonarr client", async () => {
+	it("loads Sonarr form resources through the current Sonarr client", async () => {
 		const qualityProfiles = [
 			{ id: parseProviderQualityProfileId(1), name: "HD" },
 		];
@@ -36,7 +36,7 @@ describe("createSonarrHandlers", () => {
 		} as unknown as ApiHandlerDeps);
 
 		await expect(
-			handlers.getSonarrFormOptions({ credentials }),
+			handlers.getSonarrFormResources({ credentials }),
 		).resolves.toEqual({
 			qualityProfiles,
 			rootFolders,

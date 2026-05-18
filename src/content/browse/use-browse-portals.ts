@@ -1,7 +1,7 @@
 /** Content-owned browse portal discovery and lifecycle management. */
 // src/content/browse/use-browse-portals.ts
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { HostMediaTarget } from './types';
 
 const toElementArray = (value: Iterable<Element> | Element | null | undefined): Element[] => {
@@ -93,12 +93,7 @@ export const useBrowsePortals = ({
   enabled = true,
 }: UseBrowsePortalsParams): UseBrowsePortalsResult => {
   const [cardPortals, setCardPortals] = useState<Map<Element, HostMediaTarget>>(new Map());
-
-  useEffect(() => {
-    if (!enabled) {
-      setCardPortals(prev => (prev.size > 0 ? new Map() : prev));
-    }
-  }, [enabled]);
+  const emptyCardPortals = useMemo(() => new Map<Element, HostMediaTarget>(), []);
 
   const removePortalForContainer = useCallback((container: Element, removeDom = false) => {
     setCardPortals(prev => {
@@ -164,11 +159,6 @@ export const useBrowsePortals = ({
   }, [ensureContainer, getContainerForCard, markProcessed, onCardInvalid, parseCard, removePortalForContainer]);
 
   const scanAll = useCallback(() => {
-    if (!enabled) {
-      setCardPortals(prev => (prev.size > 0 ? new Map() : prev));
-      return;
-    }
-
     const root = getScanRoot();
     if (!root) {
       removeStalePortals();
@@ -183,7 +173,7 @@ export const useBrowsePortals = ({
 
     for (const card of cards) upsertCard(card);
     removeStalePortals();
-  }, [cardSelector, getScanRoot, removeStalePortals, upsertCard, enabled]);
+  }, [cardSelector, getScanRoot, removeStalePortals, upsertCard]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -191,21 +181,19 @@ export const useBrowsePortals = ({
     const observerRoot = getObserverRoot();
     if (!observerRoot) return;
 
-    scanAll();
-
     const fullScanTimerRef = { current: null as ReturnType<typeof globalThis.setTimeout> | null };
     const stalePortalsTimerRef = { current: null as ReturnType<typeof globalThis.setTimeout> | null };
     const FULL_SCAN_WAIT = 150;
     const STALE_PORTALS_WAIT = 100;
 
-    const scheduleFullScan = () => {
+    const scheduleFullScan = (delayMs = FULL_SCAN_WAIT) => {
       if (fullScanTimerRef.current !== null) {
         globalThis.clearTimeout(fullScanTimerRef.current);
       }
       fullScanTimerRef.current = globalThis.setTimeout(() => {
         fullScanTimerRef.current = null;
         scanAll();
-      }, FULL_SCAN_WAIT);
+      }, delayMs);
     };
 
     const scheduleStalePortalsCleanup = () => {
@@ -264,6 +252,7 @@ export const useBrowsePortals = ({
     });
 
     mo.observe(observerRoot, mutationObserverInit);
+    scheduleFullScan(0);
 
     const resizeTargets = toElementArray(getResizeTargets());
     let ro: ResizeObserver | null = null;
@@ -306,5 +295,5 @@ export const useBrowsePortals = ({
     enabled,
   ]);
 
-  return { cardPortals };
+  return { cardPortals: enabled ? cardPortals : emptyCardPortals };
 };

@@ -23,21 +23,17 @@ import {
 	deriveLibraryUnknownReason,
 	type LibraryUnknownReason,
 } from "@/mapping/library-status";
-import { deriveMappingRowStatus } from "@/features/provider-action";
+import {
+	deriveMappingRowStatus,
+	type MappingListRowStatus,
+} from "./mapping-row-status";
 import {
 	projectMappingIssues,
 	type MappingIssue,
 	type MappingIssuesSummary,
 } from "./mapping-issues";
 
-/** Primary user-facing status for one projected mapping summary row. */
-export type MappingListRowStatus =
-	| "needs-review"
-	| "in-library"
-	| "can-add"
-	| "suppressed"
-	| "unmapped"
-	| "unknown";
+export type { MappingListRowStatus } from "./mapping-row-status";
 
 /**
  * Enriched options-page/RPC summary row for one `provider + anilistId`.

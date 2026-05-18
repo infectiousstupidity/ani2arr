@@ -14,7 +14,6 @@ describe("parseExtensionOptions ui schema", () => {
 		settings.ui.preferredAniListTitleLanguage = "romaji";
 		settings.ui.browseCards.sonarr.visibility = "hover";
 		settings.ui.animePages.radarr.enabled = false;
-		settings.ui.schedulerDebugOverlayEnabled = true;
 
 		expect(parseExtensionOptions(settings).ui).toEqual(settings.ui);
 	});

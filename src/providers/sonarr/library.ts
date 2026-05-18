@@ -150,7 +150,7 @@ export class SonarrLibrary {
 					provider: "sonarr",
 					providerId: tvdbId,
 					isInLibrary: true,
-					series: snapshot,
+					series: liveSeries,
 				};
 			}
 		} catch (error) {
@@ -235,6 +235,9 @@ export class SonarrLibrary {
 export function toSonarrSeriesSnapshot(
 	series: SonarrSeries,
 ): SonarrSeriesSnapshot {
+	const alternateTitles = series.alternateTitles
+		?.map((entry) => entry.title?.trim())
+		.filter((title): title is string => !!title);
 	const statistics = series.statistics
 		? {
 				...(series.statistics.episodeCount === undefined
@@ -255,9 +258,9 @@ export function toSonarrSeriesSnapshot(
 		tvdbId: series.tvdbId,
 		title: series.title,
 		titleSlug: series.titleSlug,
-		...(series.alternateTitles === undefined
+		...(alternateTitles === undefined
 			? {}
-			: { alternateTitles: series.alternateTitles }),
+			: { alternateTitles }),
 		...(series.status === undefined ? {} : { status: series.status }),
 		...(statistics === undefined ? {} : { statistics }),
 	};
