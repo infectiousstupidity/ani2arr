@@ -3,16 +3,13 @@
 
 import { useMemo, useState } from "react";
 import type { AniListId } from "@/anilist";
+import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import {
 	parseTmdbIdOrNull,
 	type ProviderFormResources,
 	type TmdbId,
 } from "@/providers";
 import { getProviderLabel } from "@/providers/provider-labels";
-import {
-	useAniListMedia,
-	useAniListMetadataBatch,
-} from "@/queries/anilist";
 import {
 	useClearManualMapping,
 	useClearMappingRejectedCandidate,
@@ -21,7 +18,6 @@ import {
 	useSetMappingRejectedCandidate,
 	useSetManualMapping,
 } from "@/queries/mapping";
-import { usePublicOptions } from "@/queries/options";
 import { useProviderBaseUrl } from "@/queries/provider-base-url";
 import { useMovieStatus, useRadarrFormResources } from "@/queries/radarr";
 import type { CheckMovieStatusResponse } from "@/rpc/types";
@@ -30,9 +26,9 @@ import { useConfirm } from "@/shared/hooks/use-confirm";
 import { DetailsPanel } from "../details/details-panel";
 import { MappingHeaderActions } from "../mapping/mapping-header-actions";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
+import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
 import { useOpenMappingSettingsAction } from "../hooks/use-open-mapping-settings-action";
 import { targetsEqual } from "../helpers";
-import { resolveMediaModalMetadata } from "../anilist-modal-data";
 import { ModalFooter } from "../chrome/modal-footer";
 import { ModalHeader } from "../chrome/modal-header";
 import { ModalShell } from "../chrome/modal-shell";
@@ -46,6 +42,7 @@ import {
 	getRadarrSetupTarget,
 } from "./radarr-setup-values";
 import type {
+	AniListHeaderData,
 	MediaModalMetadataHint,
 	MediaModalTargetSummary,
 	MediaModalView,
@@ -58,17 +55,13 @@ const SETUP_FORM_ID = "radarr-setup-form";
 type RadarrModalData = {
 	baseUrl: string;
 	isConfigured: boolean;
-	anilistHeaderData: ReturnType<
-		typeof resolveMediaModalMetadata
-	>["anilistHeaderData"];
+	anilistHeaderData: AniListHeaderData;
 	manualMappingActive: boolean;
 	currentTarget: MediaModalTargetSummary | null;
-	resolvedMetadata: ReturnType<
-		typeof resolveMediaModalMetadata
-	>["resolvedMetadata"];
+	resolvedMetadata: AniListMediaHint | null;
 	providerRequestTitle: string;
-	providerPayloadTitle?: string | undefined;
-	fallbackLookupTitle?: string | undefined;
+	providerPayloadTitle: string | undefined;
+	fallbackLookupTitle: string | undefined;
 	rawProviderStatus: CheckMovieStatusResponse | null;
 	verificationSettled: boolean;
 	verificationFailed: boolean;
@@ -110,40 +103,23 @@ function useRadarrModalData(input: {
 	metadataHint: MediaModalMetadataHint | null;
 }): RadarrModalData {
 	const { anilistId, metadataHint } = input;
-	const { data: options } = usePublicOptions();
+	const base = useMediaModalBaseData({ anilistId, metadataHint });
+	const options = base.options;
 	const isConfigured = options?.providers.radarr.isConfigured === true;
 	const providerBaseUrl = useProviderBaseUrl(PROVIDER, {
 		enabled: isConfigured,
 	});
-	const metadataBatch = useAniListMetadataBatch([anilistId], { enabled: true });
-	const { data: anilistMedia } = useAniListMedia(anilistId, {
-		enabled: true,
-		forceRefresh: false,
-	});
 	const radarrFormResources = useRadarrFormResources({ enabled: isConfigured });
-
-	const resolved = useMemo(
-		() =>
-			resolveMediaModalMetadata({
-				anilistId,
-				anilistMedia,
-				metadataBatchData: metadataBatch.data,
-				metadataHint,
-				preferredTitleLanguage:
-					options?.ui.preferredAniListTitleLanguage ?? "english",
-			}),
-		[anilistId, anilistMedia, metadataBatch.data, metadataHint, options],
-	);
 
 	const statusPayload = useMemo(
 		() => ({
 			anilistId,
-			...(resolved.providerPayloadTitle === undefined
+			...(base.providerPayloadTitle === undefined
 				? {}
-				: { title: resolved.providerPayloadTitle }),
-			metadata: resolved.resolvedMetadata,
+				: { title: base.providerPayloadTitle }),
+			metadata: base.resolvedMetadata,
 		}),
-		[anilistId, resolved.providerPayloadTitle, resolved.resolvedMetadata],
+		[anilistId, base.providerPayloadTitle, base.resolvedMetadata],
 	);
 	const radarrStatus = useMovieStatus(statusPayload, {
 		enabled: isConfigured,
@@ -161,18 +137,13 @@ function useRadarrModalData(input: {
 	return {
 		baseUrl,
 		isConfigured,
-		anilistHeaderData: resolved.anilistHeaderData,
+		anilistHeaderData: base.anilistHeaderData,
 		manualMappingActive: rawProviderStatus?.manualMappingActive === true,
 		currentTarget,
-		resolvedMetadata: resolved.resolvedMetadata,
-		providerRequestTitle: resolved.providerRequestTitle,
-		...(resolved.providerPayloadTitle === undefined ||
-		resolved.fallbackTitle === resolved.providerPayloadTitle
-			? {}
-			: { fallbackLookupTitle: resolved.fallbackTitle }),
-		...(resolved.providerPayloadTitle === undefined
-			? {}
-			: { providerPayloadTitle: resolved.providerPayloadTitle }),
+		resolvedMetadata: base.resolvedMetadata,
+		providerRequestTitle: base.providerRequestTitle,
+		providerPayloadTitle: base.providerPayloadTitle,
+		fallbackLookupTitle: base.fallbackLookupTitle,
 		rawProviderStatus,
 		verificationSettled,
 		verificationFailed,
