@@ -88,7 +88,6 @@ export function CardOverlay({
 	const tooltipContainer = typeof document === "undefined" ? null : document.body;
 	const manualMappingLabel = hasMapping ? "Update mapping manually" : "Find match manually";
 
-	// Extracted boilerplate
 	const swallow = withSwallow();
 	const openStack = () => {
 		if (closeTimerRef.current !== null) {

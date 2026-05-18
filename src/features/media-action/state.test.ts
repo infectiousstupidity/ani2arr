@@ -1,8 +1,8 @@
-/** Tests for browse-card overlay primary-button state priority. */
-// src/features/media-overlay/card-overlay-state.test.ts
+/** Tests for shared media-action status priority and primary command selection. */
+// src/features/media-action/state.test.ts
 
 import { describe, expect, it } from "vitest";
-import { getCardOverlayPrimaryStatus } from "./card-overlay-state";
+import { getMediaActionStatus } from "./state";
 
 const baseInput = {
 	isConfigured: true,
@@ -17,18 +17,25 @@ const baseInput = {
 	canQuickAdd: true,
 };
 
-describe("getCardOverlayPrimaryStatus", () => {
-	it("uses the overlay priority order for conflicting states", () => {
+describe("getMediaActionStatus", () => {
+	it("uses the shared priority order for conflicting states", () => {
 		expect(
-			getCardOverlayPrimaryStatus({
+			getMediaActionStatus({
 				...baseInput,
 				isConfigured: false,
 				isChecking: true,
+			}).state,
+		).toBe("checking");
+
+		expect(
+			getMediaActionStatus({
+				...baseInput,
+				isConfigured: false,
 			}).action,
 		).toBe("configure");
 
 		expect(
-			getCardOverlayPrimaryStatus({
+			getMediaActionStatus({
 				...baseInput,
 				isChecking: true,
 				isAdding: true,
@@ -36,7 +43,7 @@ describe("getCardOverlayPrimaryStatus", () => {
 		).toBe("checking");
 
 		expect(
-			getCardOverlayPrimaryStatus({
+			getMediaActionStatus({
 				...baseInput,
 				hasAddError: true,
 				hasStatusError: true,
@@ -44,7 +51,7 @@ describe("getCardOverlayPrimaryStatus", () => {
 		).toBe("retry-add");
 
 		expect(
-			getCardOverlayPrimaryStatus({
+			getMediaActionStatus({
 				...baseInput,
 				providerMappingState: "unknown",
 				isInLibrary: true,
@@ -54,7 +61,7 @@ describe("getCardOverlayPrimaryStatus", () => {
 
 	it("opens mapping for unmapped or unknown status and quick-adds mapped missing media", () => {
 		expect(
-			getCardOverlayPrimaryStatus({
+			getMediaActionStatus({
 				...baseInput,
 				providerMappingState: "unmapped",
 				hasProviderId: false,
@@ -62,13 +69,13 @@ describe("getCardOverlayPrimaryStatus", () => {
 		).toBe("open-mapping");
 
 		expect(
-			getCardOverlayPrimaryStatus({
+			getMediaActionStatus({
 				...baseInput,
 				providerMappingState: "unknown",
 				hasProviderId: false,
 			}).action,
 		).toBe("open-mapping");
 
-		expect(getCardOverlayPrimaryStatus(baseInput).action).toBe("quick-add");
+		expect(getMediaActionStatus(baseInput).action).toBe("quick-add");
 	});
 });
