@@ -1,6 +1,5 @@
 /** Viewport gate used to avoid browse-card status fetches for offscreen cards. */
 // src/features/media-overlay/card-overlay-viewport.ts
-/* eslint-disable react-hooks/set-state-in-effect -- Viewport gate state follows IntersectionObserver visibility with a short settle delay. */
 
 import { useEffect, useState } from "react";
 
@@ -28,12 +27,8 @@ function getObserver() {
 }
 
 export function useCardOverlayInViewport(target?: Element | null): boolean {
-	const [isVisible, setIsVisible] = useState(
-		() => !target || typeof IntersectionObserver === "undefined",
-	);
-	const [gateOpen, setGateOpen] = useState(
-		() => !target || typeof IntersectionObserver === "undefined",
-	);
+	const [visibleTarget, setVisibleTarget] = useState<Element | null>(null);
+	const [openTarget, setOpenTarget] = useState<Element | null>(null);
 
 	useEffect(() => {
 		if (!target) return;
@@ -43,7 +38,12 @@ export function useCardOverlayInViewport(target?: Element | null): boolean {
 			return;
 		}
 
-		callbacks.set(target, setIsVisible);
+		callbacks.set(target, (isVisible) => {
+			setVisibleTarget(isVisible ? target : null);
+			if (!isVisible) {
+				setOpenTarget(null);
+			}
+		});
 		obs.observe(target);
 
 		return () => {
@@ -53,26 +53,18 @@ export function useCardOverlayInViewport(target?: Element | null): boolean {
 	}, [target]);
 
 	useEffect(() => {
-		if (!target || typeof IntersectionObserver === "undefined") {
-			setGateOpen(true);
-			return;
-		}
-
-		if (!isVisible) {
-			setGateOpen(false);
-			return;
-		}
+		if (visibleTarget === null) return;
 
 		const timer = globalThis.setTimeout(() => {
-			setGateOpen(true);
+			setOpenTarget(visibleTarget);
 		}, 125);
 
 		return () => {
 			globalThis.clearTimeout(timer);
 		};
-	}, [isVisible, target]);
+	}, [visibleTarget]);
 
 	return !target || typeof IntersectionObserver === "undefined"
 		? true
-		: gateOpen;
+		: visibleTarget === target && openTarget === target;
 }
