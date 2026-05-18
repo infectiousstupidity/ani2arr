@@ -9,23 +9,17 @@ import {
 	type ProviderFormResources,
 	type TmdbId,
 } from "@/providers";
-import { getProviderLabel } from "@/providers/provider-labels";
 import {
-	useClearManualMapping,
-	useClearMappingRejectedCandidate,
 	useMappingInspection,
-	useSetMappingIgnore,
-	useSetMappingRejectedCandidate,
-	useSetManualMapping,
 } from "@/queries/mapping";
 import { useProviderBaseUrl } from "@/queries/provider-base-url";
 import { useMovieStatus, useRadarrFormResources } from "@/queries/radarr";
 import type { CheckMovieStatusResponse } from "@/rpc/types";
 import { defaultRadarrFormState } from "@/settings";
-import { useConfirm } from "@/shared/hooks/use-confirm";
 import { DetailsPanel } from "../details/details-panel";
 import { MappingHeaderActions } from "../mapping/mapping-header-actions";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
+import { useMappingActions } from "../hooks/use-mapping-actions";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
 import { useOpenMappingSettingsAction } from "../hooks/use-open-mapping-settings-action";
 import { targetsEqual } from "../helpers";
@@ -162,18 +156,12 @@ export function RadarrModal({
 	const [view, setView] = useState<MediaModalView>(initialView ?? "setup");
 	const [selectedCandidate, setSelectedCandidate] =
 		useState<RadarrMappingCandidate | null>(null);
-	const confirm = useConfirm();
 	const contentContainer = useContentPortalContainer();
 	const data = useRadarrModalData({
 		anilistId,
 		metadataHint: metadataHint ?? null,
 	});
 	const inspection = useMappingInspection(PROVIDER, anilistId);
-	const setManualMapping = useSetManualMapping();
-	const clearManualMapping = useClearManualMapping();
-	const setIgnore = useSetMappingIgnore();
-	const setRejectedCandidate = useSetMappingRejectedCandidate();
-	const clearRejectedCandidate = useClearMappingRejectedCandidate();
 	const setupTarget = useMemo(
 		() =>
 			getRadarrSetupTarget({
@@ -226,84 +214,32 @@ export function RadarrModal({
 		selectedCandidate !== null &&
 		!targetsEqual(selectedCandidate.summary, data.currentTarget);
 	const showSetupView = (): void => setView("setup");
+	const mappingActions = useMappingActions({
+		anilistId,
+		provider: PROVIDER,
+		selectedProviderId: selectedCandidate?.tmdbId ?? null,
+		rejectProviderId: rejectCandidateTmdbId,
+		clearRejectedProviderId: clearRejectedCandidateTmdbId,
+		requiresApplyConfirmation: setupForm.footerState.isDirty && canSubmitMapping,
+		onMappingApplied: () => { setSelectedCandidate(null); showSetupView(); },
+		onMappingReset: () => { setSelectedCandidate(null); setView("mapping"); },
+		onIgnored: onClose,
+	});
 	const handleModeSwitch =
 		modeSwitchLabel === null
 			? undefined
 			: (): void => setView(isMappingView ? "setup" : "mapping");
-	const handleApplyMapping = async (): Promise<void> => {
-		if (selectedCandidate === null) return;
-
-		if (
-			setupForm.footerState.isDirty &&
-			!targetsEqual(selectedCandidate.summary, data.currentTarget)
-		) {
-			const providerLabel = getProviderLabel(PROVIDER);
-			const didConfirm = await confirm({
-				title: "Discard setup changes?",
-				description: `Changing the ${providerLabel} target will replace the current setup form and discard unsaved setup changes.`,
-				confirmText: "Discard changes",
-				cancelText: "Keep editing",
-			});
-
-			if (!didConfirm) return;
-		}
-
-		await setManualMapping.mutateAsync({
-			anilistId,
-			provider: PROVIDER,
-			providerId: selectedCandidate.tmdbId,
-		});
-		setSelectedCandidate(null);
-		showSetupView();
-	};
-	const handleResetMapping = async (): Promise<void> => {
-		await clearManualMapping.mutateAsync({ anilistId, provider: PROVIDER });
-		setSelectedCandidate(null);
-		setView("mapping");
-	};
-	const handleIgnoreTitle = async (): Promise<void> => {
-		const didConfirm = await confirm({
-			title: "Ignore this title entirely?",
-			description:
-				"ani2arr will stop using automatic or upstream matches for this AniList entry until you remove the title ignore or save a manual mapping.",
-			confirmText: "Ignore title",
-			cancelText: "Cancel",
-		});
-
-		if (!didConfirm) return;
-
-		await setIgnore.mutateAsync({ anilistId, provider: PROVIDER });
-		onClose();
-	};
-	const handleRejectCandidate = async (): Promise<void> => {
-		if (rejectCandidateTmdbId === null) return;
-
-		await setRejectedCandidate.mutateAsync({
-			anilistId,
-			provider: PROVIDER,
-			providerId: rejectCandidateTmdbId,
-		});
-	};
-	const handleClearRejectedCandidate = async (): Promise<void> => {
-		if (clearRejectedCandidateTmdbId === null) return;
-
-		await clearRejectedCandidate.mutateAsync({
-			anilistId,
-			provider: PROVIDER,
-			providerId: clearRejectedCandidateTmdbId,
-		});
-	};
 	const mappingActionButtons = isMappingView ? (
 		<MappingHeaderActions
 			canRejectCandidate={rejectCandidateTmdbId !== null}
 			canClearRejectedCandidate={clearRejectedCandidateTmdbId !== null}
 			canIgnoreTitle={canIgnoreTitle}
-			isRejectingCandidate={setRejectedCandidate.isPending}
-			isClearingRejectedCandidate={clearRejectedCandidate.isPending}
-			isIgnoring={setIgnore.isPending}
-			onRejectCandidate={handleRejectCandidate}
-			onClearRejectedCandidate={handleClearRejectedCandidate}
-			onIgnoreTitle={handleIgnoreTitle}
+			isRejectingCandidate={mappingActions.isRejectingCandidate}
+			isClearingRejectedCandidate={mappingActions.isClearingRejectedCandidate}
+			isIgnoring={mappingActions.isIgnoring}
+			onRejectCandidate={mappingActions.rejectCandidate}
+			onClearRejectedCandidate={mappingActions.clearRejectedCandidate}
+			onIgnoreTitle={mappingActions.ignoreTitle}
 		/>
 	) : null;
 
@@ -358,11 +294,11 @@ export function RadarrModal({
 					isMappingView={isMappingView}
 					manualMappingActive={data.manualMappingActive}
 					canShowSetup={canShowSetup}
-					isRevertingMapping={clearManualMapping.isPending}
+					isRevertingMapping={mappingActions.isRevertingMapping}
 					canSubmitMapping={canSubmitMapping}
-					isSubmittingMapping={setManualMapping.isPending}
-					onResetMapping={handleResetMapping}
-					onApplyMapping={handleApplyMapping}
+					isSubmittingMapping={mappingActions.isSubmittingMapping}
+					onResetMapping={mappingActions.resetMapping}
+					onApplyMapping={mappingActions.applyMapping}
 					onShowSetup={showSetupView}
 					onClose={onClose}
 					setupFormId={SETUP_FORM_ID}
