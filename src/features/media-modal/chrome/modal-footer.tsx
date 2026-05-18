@@ -9,22 +9,24 @@ type FooterLayoutProps = {
 	right: ReactNode;
 };
 
-type ModalFooterProps = {
-	isMappingView: boolean;
+type MappingFooterProps = {
 	manualMappingActive: boolean;
-	canShowSetup: boolean;
-	isRevertingMapping: boolean;
-	canSubmitMapping: boolean;
-	isSubmittingMapping: boolean;
+	isResettingMapping: boolean;
+	canApplyMapping: boolean;
+	isApplyingMapping: boolean;
+	leaveMappingLabel: string;
+	onLeaveMapping: () => void;
 	onResetMapping: () => void | Promise<void>;
 	onApplyMapping: () => void | Promise<void>;
-	onShowSetup: () => void;
-	onClose: () => void;
-	setupFormId: string;
-	setupCanSubmit: boolean;
-	setupIsBusy: boolean;
-	isSubmittingSetup: boolean;
-	setupSubmitLabel: string;
+};
+
+type SetupFooterProps = {
+	formId: string;
+	canSubmit: boolean;
+	isBusy: boolean;
+	isSubmitting: boolean;
+	submitLabel: string;
+	onCancel: () => void;
 };
 
 function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
@@ -41,85 +43,81 @@ function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
 	);
 }
 
-export function ModalFooter(props: ModalFooterProps): React.JSX.Element {
+export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 	const {
-		isMappingView,
 		manualMappingActive,
-		canShowSetup,
-		isRevertingMapping,
-		canSubmitMapping,
-		isSubmittingMapping,
+		isResettingMapping,
+		canApplyMapping,
+		isApplyingMapping,
+		leaveMappingLabel,
+		onLeaveMapping,
 		onResetMapping,
 		onApplyMapping,
-		onShowSetup,
-		onClose,
-		setupFormId,
-		setupCanSubmit,
-		setupIsBusy,
-		isSubmittingSetup,
-		setupSubmitLabel,
 	} = props;
 
-	if (isMappingView) {
-		return (
-			<FooterLayout
-				left={
-					manualMappingActive ? (
-						<Button
-							onClick={() => void onResetMapping()}
-							variant="outline"
-							size="sm"
-							disabled={isRevertingMapping}
-						>
-							Reset to automatic
-						</Button>
-					) : null
-				}
-				right={
-					<>
-						<Button
-							onClick={canShowSetup ? onShowSetup : onClose}
-							variant="outline"
-							size="sm"
-						>
-							{canShowSetup ? "Back to setup" : "Exit modal"}
-						</Button>
-						<Button
-							onClick={() => void onApplyMapping()}
-							variant="primary"
-							size="sm"
-							disabled={!canSubmitMapping}
-							isLoading={isSubmittingMapping}
-						>
-							Confirm Selection
-						</Button>
-					</>
-				}
-			/>
-		);
-	}
+	return (
+		<FooterLayout
+			left={
+				manualMappingActive ? (
+					<Button
+						onClick={() => void onResetMapping()}
+						variant="outline"
+						size="sm"
+						disabled={isResettingMapping}
+					>
+						Reset to automatic
+					</Button>
+				) : null
+			}
+			right={
+				<>
+					<Button
+						onClick={onLeaveMapping}
+						variant="outline"
+						size="sm"
+					>
+						{leaveMappingLabel}
+					</Button>
+					<Button
+						onClick={() => void onApplyMapping()}
+						variant="primary"
+						size="sm"
+						disabled={!canApplyMapping}
+						isLoading={isApplyingMapping}
+					>
+						Confirm Selection
+					</Button>
+				</>
+			}
+		/>
+	);
+}
+
+export function SetupFooter(props: SetupFooterProps): React.JSX.Element {
+	const { formId, canSubmit, isBusy, isSubmitting, submitLabel, onCancel } =
+		props;
 
 	return (
 		<FooterLayout
 			right={
 				<>
 					<Button
-						onClick={onClose}
+						onClick={onCancel}
 						variant="outline"
 						size="sm"
-						disabled={setupIsBusy}
+						disabled={isBusy}
 					>
 						Cancel
 					</Button>
 					<Button
 						type="submit"
-						form={setupFormId}
+						form={formId}
 						variant="primary"
 						size="sm"
-						disabled={!setupCanSubmit}
-						isLoading={isSubmittingSetup}
+						disabled={!canSubmit}
+						isLoading={isSubmitting}
 					>
-						{setupSubmitLabel}
+						{submitLabel}
 					</Button>
 				</>
 			}
