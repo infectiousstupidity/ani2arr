@@ -21,10 +21,9 @@ type ModalFooterProps = {
 	onShowSetup: () => void;
 	onClose: () => void;
 	setupFormId: string;
-	setupUnavailable: boolean;
+	setupCanSubmit: boolean;
 	setupIsBusy: boolean;
 	isSubmittingSetup: boolean;
-	setupMutationsBlocked: boolean;
 	setupSubmitLabel: string;
 };
 
@@ -55,10 +54,9 @@ export function ModalFooter(props: ModalFooterProps): React.JSX.Element {
 		onShowSetup,
 		onClose,
 		setupFormId,
-		setupUnavailable,
+		setupCanSubmit,
 		setupIsBusy,
 		isSubmittingSetup,
-		setupMutationsBlocked,
 		setupSubmitLabel,
 	} = props;
 
@@ -118,7 +116,7 @@ export function ModalFooter(props: ModalFooterProps): React.JSX.Element {
 						form={setupFormId}
 						variant="primary"
 						size="sm"
-						disabled={setupUnavailable || setupMutationsBlocked}
+						disabled={!setupCanSubmit}
 						isLoading={isSubmittingSetup}
 					>
 						{setupSubmitLabel}

@@ -302,10 +302,9 @@ export function RadarrModal({
 					onShowSetup={showSetupView}
 					onClose={onClose}
 					setupFormId={SETUP_FORM_ID}
-					setupUnavailable={setupForm.footerState.setupUnavailable}
+					setupCanSubmit={setupForm.footerState.canSubmit}
 					setupIsBusy={setupForm.footerState.isBusy}
 					isSubmittingSetup={setupForm.footerState.isSubmitting}
-					setupMutationsBlocked={setupForm.footerState.setupMutationsBlocked}
 					setupSubmitLabel={setupForm.footerState.submitLabel}
 				/>
 			}
