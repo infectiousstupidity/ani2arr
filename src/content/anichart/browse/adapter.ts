@@ -8,6 +8,7 @@ import type { BrowseAdapter, HostMediaTarget } from '@/content/browse/types';
 
 const CARD_SELECTOR = '.media-card';
 const COVER_SELECTOR = 'a.cover';
+const TITLE_SELECTOR = 'a.title';
 
 const getSectionHeading = (card: Element): string =>
   card.closest('section')?.querySelector('h2')?.textContent?.trim() ?? '';
@@ -20,6 +21,12 @@ const shouldSkipCard = (card: Element): boolean => {
 const parseAniChartCard = (card: Element): HostMediaTarget | null => {
   const cover = card.querySelector<HTMLAnchorElement>(COVER_SELECTOR);
   if (!cover) return null;
+
+  const title = card
+    .querySelector<HTMLAnchorElement>(TITLE_SELECTOR)
+    ?.textContent?.replaceAll(/\s+/g, ' ')
+    .trim();
+  if (!title) return null;
 
   if (shouldSkipCard(card)) {
     return null;
@@ -34,6 +41,7 @@ const parseAniChartCard = (card: Element): HostMediaTarget | null => {
 
   return {
     anilistId,
+    title,
     format: parseAniListMediaFormatLabel(heading),
     mountTarget: cover,
   };

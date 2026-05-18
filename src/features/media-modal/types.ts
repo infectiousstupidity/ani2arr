@@ -2,21 +2,10 @@
 // src/features/media-modal/types.ts
 
 import type { AniListId } from "@/anilist";
-import type {
-	AniListMediaHint,
-	AniListMediaFormat,
-} from "@/anilist/schemas/media.schema";
-import type { MappingSearchResult } from "@/features/media-modal/mapping-search/types";
-import type {
-	CheckMovieStatusResponse,
-	CheckSeriesStatusResponse,
-} from "@/rpc/types";
-import type { ProviderFormOptions } from "@/providers";
-import type { SonarrFormState } from "@/providers/sonarr/form-state";
-import type { RadarrFormState } from "@/providers/radarr/form-state";
+import type { AniListMediaFormat } from "@/anilist/schemas/media.schema";
+import type { ProviderTargetSummary } from "@/rpc/types";
 
 export type MediaModalView = "setup" | "mapping";
-export type MediaModalSetupMode = "add" | "edit";
 export type MediaModalOpenSource = "content" | "options-page";
 
 export type MediaModalMetadataHint = {
@@ -33,41 +22,7 @@ export type AniListHeaderData = {
 	year: number | null;
 };
 
-export type ProviderStatus =
-	| CheckSeriesStatusResponse
-	| CheckMovieStatusResponse
-	| null
-	| undefined;
-
-export type MediaModalBaseData = {
-	anilistId: AniListId;
-	baseUrl: string;
-	isConfigured: boolean;
-	anilistHeaderData: AniListHeaderData;
-	manualMappingActive: boolean;
-	currentMapping: MappingSearchResult | null;
-	resolvedMetadata: AniListMediaHint | null;
-	providerRequestTitle: string;
-	fallbackLookupTitle?: string;
-	verificationSettled: boolean;
-	verificationFailed: boolean;
-};
-
-export type RadarrMediaModalData = MediaModalBaseData & {
-	provider: "radarr";
-	rawProviderStatus: CheckMovieStatusResponse | null;
-	providerFormOptions: ProviderFormOptions | null;
-	storedDefaults: RadarrFormState;
-};
-
-export type SonarrMediaModalData = MediaModalBaseData & {
-	provider: "sonarr";
-	rawProviderStatus: CheckSeriesStatusResponse | null;
-	providerFormOptions: ProviderFormOptions | null;
-	storedDefaults: SonarrFormState;
-};
-
-export type MediaModalData = RadarrMediaModalData | SonarrMediaModalData;
+export type MediaModalTargetSummary = ProviderTargetSummary;
 
 type MediaModalStateBase = {
 	anilistId: AniListId;
@@ -93,35 +48,19 @@ export type MediaModalOpenState = Exclude<MediaModalState, null>;
 
 export type MediaModalContainer = HTMLElement | ShadowRoot;
 
-export type MappingSavedHandler = (input: {
-	anilistId: AniListId;
-	mapping: MappingSearchResult | null;
-}) => void;
-
-export type MappingSaveErrorHandler = (input: {
-	anilistId: AniListId;
-	error: Error;
-}) => void;
-
 export type MediaModalSharedProps = {
 	onClose: () => void;
-	container?: MediaModalContainer;
-	onMappingSaved?: MappingSavedHandler;
-	onMappingSaveError?: MappingSaveErrorHandler;
+	container?: MediaModalContainer | undefined;
 };
 
 export type MediaModalProps = MediaModalSharedProps & {
 	state: MediaModalState;
 };
 
-export type ProviderModalProps = MediaModalSharedProps & {
-	state: MediaModalOpenState;
-};
-
-export type SonarrProviderModalProps = MediaModalSharedProps & {
+export type SonarrModalProps = MediaModalSharedProps & {
 	state: SonarrMediaModalState;
 };
 
-export type RadarrProviderModalProps = MediaModalSharedProps & {
+export type RadarrModalProps = MediaModalSharedProps & {
 	state: RadarrMediaModalState;
 };

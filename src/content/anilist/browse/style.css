@@ -1,8 +1,10 @@
-/* AniList browse surface overrides for content-owned card overlays. */
+/* AniList light-DOM placement overrides for content-owned card overlays. */
 /* src/content/anilist/browse/style.css */
 
-/* Allow overlay anchor to extend for rank-badge alignment */
-a.cover { position: relative; overflow: visible !important; }
+a.cover:has(> .a2a-overlay-container) {
+  position: relative;
+  overflow: visible !important;
+}
 
 /* Corner offsets for this surface */
 .a2a-card-overlay[data-corner='bottom-left'] { left: var(--badge-offset-x, -6px); bottom: -6px; }

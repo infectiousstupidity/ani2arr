@@ -10,7 +10,7 @@ import type { AniListMedia } from "@/anilist/schemas/media.schema";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import type {
 	Provider,
-	ProviderFormOptions,
+	ProviderFormResources,
 	RadarrMovie,
 } from "@/providers";
 import type { SonarrSeriesLibraryStatus } from "@/providers/sonarr/library";
@@ -31,7 +31,7 @@ import type {
 	MovieLibraryStatusInput,
 	AddSonarrInput,
 	AddRadarrInput,
-	GetProviderFormOptionsInput,
+	GetProviderFormResourcesInput,
 	UpdateSonarrInput,
 	UpdateRadarrInput,
 	SetManualMappingInput,
@@ -79,12 +79,12 @@ export interface Ani2arrApi {
 		input: TestProviderConnectionInput,
 	): Promise<{ version: string }>;
 	getProviderBaseUrl(input: GetProviderBaseUrlInput): Promise<string>;
-	getSonarrFormOptions(
-		input?: GetProviderFormOptionsInput,
-	): Promise<ProviderFormOptions>;
-	getRadarrFormOptions(
-		input?: GetProviderFormOptionsInput,
-	): Promise<ProviderFormOptions>;
+	getSonarrFormResources(
+		input?: GetProviderFormResourcesInput,
+	): Promise<ProviderFormResources>;
+	getRadarrFormResources(
+		input?: GetProviderFormResourcesInput,
+	): Promise<ProviderFormResources>;
 	initMappings(): Promise<void>;
 	setManualMapping(input: SetManualMappingInput): Promise<{ ok: true }>;
 	clearManualMapping(input: ClearManualMappingInput): Promise<{ ok: true }>;

@@ -24,6 +24,7 @@ type StubAutoMappingStore = {
 
 type StubAniListApi = {
 	fetchMediaWithRelations: ReturnType<typeof vi.fn>;
+	iteratePrequelChain: ReturnType<typeof vi.fn>;
 	prioritize: ReturnType<typeof vi.fn>;
 	removeMediaFromCache: ReturnType<typeof vi.fn>;
 };
@@ -32,6 +33,7 @@ type LookupResult = {
 	title: string;
 	tvdbId: number;
 	year?: number;
+	genres?: string[];
 };
 
 type StubSonarrLookupClient = {
@@ -59,6 +61,7 @@ const createService = () => {
 		fetchMediaWithRelations: vi.fn(async () => {
 			throw new Error("Unexpected AniList fetch");
 		}),
+		iteratePrequelChain: vi.fn(async function* () {}),
 		prioritize: vi.fn(),
 		removeMediaFromCache: vi.fn(async () => {}),
 	};
@@ -336,6 +339,238 @@ describe("MappingService", () => {
 			}),
 			expect.any(Object),
 		);
+	});
+
+	it("maps Frieren sequels through direct AniList prequel titles", async () => {
+		const context = createService();
+		const { service, anilistApi, lookupClients } = context;
+		configureMediaFetch(context, {
+			209_939: {
+				id: aid(209_939),
+				format: "TV",
+				title: { romaji: "Sousou no Frieren 3rd Season" },
+				synonyms: ["Frieren: Beyond Journey’s End Season 3 Golden Land Arc"],
+				startDate: { year: 2027 },
+				relations: {
+					edges: [
+						{
+							relationType: "PREQUEL",
+							node: {
+								id: aid(182_255),
+								format: "TV",
+								title: {
+									romaji: "Sousou no Frieren 2nd Season",
+									english: "Frieren: Beyond Journey’s End Season 2",
+								},
+								synonyms: [],
+								startDate: { year: 2026 },
+							},
+						},
+					],
+				},
+			},
+		});
+		lookupClients.sonarr.lookupTitle.mockImplementation(
+			async (term: { display: string }) =>
+				term.display === "Frieren: Beyond Journeys End"
+					? [
+							{
+								title: "Frieren: Beyond Journey's End",
+								tvdbId: 424_536,
+								year: 2023,
+								genres: ["Animation", "Anime"],
+							},
+						]
+					: [],
+		);
+
+		const result = await service.resolveProviderId("sonarr", aid(209_939), {
+			forceLookupNetwork: true,
+		});
+
+		expect(result).toMatchObject({
+			providerId: 424_536,
+			reason: "exact-title-match",
+		});
+		expect(anilistApi.iteratePrequelChain).not.toHaveBeenCalled();
+	});
+
+	it("maps GATE sequels through direct AniList prequel titles", async () => {
+		const context = createService();
+		const { service, anilistApi, lookupClients } = context;
+		configureMediaFetch(context, {
+			195_496: {
+				id: aid(195_496),
+				format: "TV",
+				title: { romaji: "GATE 2: Jieitai Kano Umi nite, Kaku Tatakaeri" },
+				synonyms: ["Gate Season 2: Thus the JSDF Fought in Their Seas!"],
+				startDate: { year: 2027 },
+				relations: {
+					edges: [
+						{
+							relationType: "PREQUEL",
+							node: {
+								id: aid(21_364),
+								format: "TV",
+								title: {
+									romaji: "GATE: Jieitai Kanochi nite, Kaku Tatakaeri Part 2",
+									english: "Gate 2",
+								},
+								synonyms: [],
+								startDate: { year: 2016 },
+							},
+						},
+					],
+				},
+			},
+		});
+		lookupClients.sonarr.lookupTitle.mockImplementation(
+			async (term: { display: string }) =>
+				term.display === "Gate"
+					? [
+							{
+								title: "GATE",
+								tvdbId: 295_222,
+								year: 2015,
+								genres: ["Animation", "Anime"],
+							},
+						]
+					: [],
+		);
+
+		const result = await service.resolveProviderId("sonarr", aid(195_496), {
+			forceLookupNetwork: true,
+		});
+
+		expect(result).toMatchObject({
+			providerId: 295_222,
+			reason: "exact-title-match",
+		});
+		expect(anilistApi.iteratePrequelChain).not.toHaveBeenCalled();
+	});
+
+	it("maps slash-combined sequels through the direct AniList prequel", async () => {
+		const context = createService();
+		const { service, anilistApi, lookupClients } = context;
+		configureMediaFetch(context, {
+			189_121: {
+				id: aid(189_121),
+				format: "TV",
+				title: { romaji: "BanG Dream! It's MyGO!!!!! / Ave Mujica (Zoku-hen)" },
+				synonyms: [
+					"BanG Dream! It's MyGO!!!!! / Ave Mujica - The Die is Cast - Sequel",
+				],
+				startDate: { year: 2027 },
+				relations: {
+					edges: [
+						{
+							relationType: "PREQUEL",
+							node: {
+								id: aid(169_295),
+								format: "TV",
+								title: {
+									romaji: "BanG Dream! Ave Mujica",
+									english: "Ave Mujica - The Die is Cast -",
+								},
+								synonyms: ["Ave Mujica - The Die is Cast -"],
+								startDate: { year: 2025 },
+							},
+						},
+					],
+				},
+			},
+		});
+		lookupClients.sonarr.lookupTitle.mockImplementation(
+			async (term: { display: string }) =>
+				term.display === "BanG Dream! Ave Mujica"
+					? [
+							{
+								title: "BanG Dream! Ave Mujica",
+								tvdbId: 451_494,
+								year: 2025,
+								genres: ["Animation", "Anime"],
+							},
+						]
+					: [],
+		);
+
+		const result = await service.resolveProviderId("sonarr", aid(189_121), {
+			forceLookupNetwork: true,
+		});
+
+		expect(result).toMatchObject({
+			providerId: 451_494,
+			reason: "exact-title-match",
+		});
+		expect(anilistApi.iteratePrequelChain).not.toHaveBeenCalled();
+	});
+
+	it("continues the prequel chain when the direct prequel title does not match", async () => {
+		const context = createService();
+		const { service, anilistApi, lookupClients } = context;
+		const directPrequel = {
+			id: aid(701),
+			format: "TV",
+			title: { english: "Direct Prequel" },
+			synonyms: [],
+			startDate: { year: 2024 },
+		};
+		const baseSeries = {
+			id: aid(700),
+			format: "TV",
+			title: { english: "Base Series" },
+			synonyms: [],
+			startDate: { year: 2023 },
+		};
+		configureMediaFetch(context, {
+			702: {
+				id: aid(702),
+				format: "TV",
+				title: { english: "Future Sequel" },
+				synonyms: [],
+				startDate: { year: 2026 },
+				relations: {
+					edges: [
+						{
+							relationType: "PREQUEL",
+							node: directPrequel,
+						},
+					],
+				},
+			},
+		});
+		anilistApi.iteratePrequelChain.mockImplementation(async function* () {
+			yield directPrequel;
+			yield baseSeries;
+		});
+		lookupClients.sonarr.lookupTitle.mockImplementation(
+			async (term: { display: string }) =>
+				term.display === "Base Series"
+					? [
+							{
+								title: "Base Series",
+								tvdbId: 700_700,
+								year: 2023,
+								genres: ["Animation", "Anime"],
+							},
+						]
+					: [],
+		);
+
+		const result = await service.resolveProviderId("sonarr", aid(702), {
+			forceLookupNetwork: true,
+		});
+
+		expect(result).toMatchObject({
+			providerId: 700_700,
+			reason: "exact-title-match",
+		});
+		expect(anilistApi.iteratePrequelChain).toHaveBeenCalledTimes(1);
+		expect(
+			lookupClients.sonarr.lookupTitle.mock.calls.filter(
+				([term]) => term.display === "Direct Prequel",
+			),
+		).toHaveLength(1);
 	});
 
 	it("retries resolution after a retryable network failure", async () => {

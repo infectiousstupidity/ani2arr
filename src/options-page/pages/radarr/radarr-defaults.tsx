@@ -11,11 +11,15 @@ import {
   type RadarrFormState,
   type RadarrMovieMonitor,
 } from "@/providers/radarr/form-state";
+import type { ProviderTagSelection } from "@/providers/provider-tag-selection";
+import {
+  RADARR_ADD_MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS,
+  RADARR_MOVIE_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
+} from "@/providers/radarr/form-options";
 import { usePublicOptions } from "@/queries/options";
-import { useRadarrFormOptions } from "@/queries/radarr";
+import { useRadarrFormResources } from "@/queries/radarr";
 import type { PublicOptions } from "@/settings";
-import { ProviderTagField } from "../../components/provider-tag-field";
-import type { ProviderTagSelection } from "../../components/provider-tag-selection";
+import { ProviderTagField } from "@/shared/ui/provider-tag-field";
 import { SettingsRow, SettingsSection } from "../../components/settings-section";
 import { Select } from "../../components/ui/select";
 import { Switch } from "../../components/ui/switch";
@@ -29,9 +33,10 @@ export const RadarrDefaults = () => {
   const { data: savedSettings } = usePublicOptions();
   const isConfigured = savedSettings?.providers.radarr.isConfigured === true;
 
-  const { data: formOptions, isFetching } = useRadarrFormOptions({
+  const { data: formResources, isFetching } = useRadarrFormResources({
     enabled: isConfigured,
   });
+  const resourceFieldsDisabled = !formResources;
 
   const { control, getValues, setValue } = useFormContext<PublicOptions>();
   const values =
@@ -39,12 +44,12 @@ export const RadarrDefaults = () => {
     createDefaultRadarrFormState();
 
   useEffect(() => {
-    if (!formOptions) return;
+    if (!formResources) return;
 
     const currentDefaults =
       getValues("providers.radarr.defaults") ?? createDefaultRadarrFormState();
-    const firstRootFolder = formOptions.rootFolders[0];
-    const firstQualityProfile = formOptions.qualityProfiles[0];
+    const firstRootFolder = formResources.rootFolders[0];
+    const firstQualityProfile = formResources.qualityProfiles[0];
     const nextDefaults: RadarrFormState = { ...currentDefaults };
 
     if (!nextDefaults.rootFolderPath && firstRootFolder) {
@@ -67,7 +72,7 @@ export const RadarrDefaults = () => {
       nextDefaults,
       DEFAULT_FIELD_OPTIONS,
     );
-  }, [formOptions, getValues, setValue]);
+  }, [formResources, getValues, setValue]);
 
   const updateDefaults = <K extends keyof RadarrFormState>(
     field: K,
@@ -99,7 +104,7 @@ export const RadarrDefaults = () => {
       "providers.radarr.defaults",
       {
         ...nextDefaults,
-        ...(tagIds ? { tags: tagIds } : {}),
+        ...(tagIds.length > 0 ? { tags: tagIds } : {}),
       },
       DEFAULT_FIELD_OPTIONS,
     );
@@ -121,32 +126,15 @@ export const RadarrDefaults = () => {
     );
   }
 
-  if (isFetching && !formOptions) {
-    return (
-      <SettingsSection
-        title="Default add options"
-        description={DEFAULT_OPTIONS_DESCRIPTION}
-        icon={<ListPlus className="h-4 w-4" />}
-        divider="top"
-      >
-        <p className="animate-pulse py-5 text-sm text-text-secondary">
-          Loading Radarr options...
-        </p>
-      </SettingsSection>
-    );
-  }
-
-  if (!formOptions) return null;
-
-  const rootFolderOptions = formOptions.rootFolders.map((rf) => ({
+  const rootFolderOptions = formResources?.rootFolders.map((rf) => ({
     label: rf.path,
     value: rf.path,
-  }));
+  })) ?? [];
 
-  const qualityProfileOptions = formOptions.qualityProfiles.map((qp) => ({
+  const qualityProfileOptions = formResources?.qualityProfiles.map((qp) => ({
     label: qp.name,
     value: String(qp.id),
-  }));
+  })) ?? [];
 
   return (
     <SettingsSection
@@ -155,6 +143,12 @@ export const RadarrDefaults = () => {
       icon={<ListPlus className="h-4 w-4" />}
       divider="top"
     >
+      {!isFetching && !formResources ? (
+        <p className="text-sm text-text-secondary">
+          Radarr folders, quality profiles, and existing tags are unavailable.
+          Static defaults remain editable.
+        </p>
+      ) : null}
       <SettingsRow id="radarr-root-folder" label="Root folder">
         <Select
           id="radarr-root-folder"
@@ -162,6 +156,7 @@ export const RadarrDefaults = () => {
           onValueChange={(value) => updateDefaults("rootFolderPath", value)}
           options={rootFolderOptions}
           placeholder="Select root folder"
+          disabled={resourceFieldsDisabled}
         />
       </SettingsRow>
 
@@ -184,6 +179,7 @@ export const RadarrDefaults = () => {
           }}
           options={qualityProfileOptions}
           placeholder="Select quality profile"
+          disabled={resourceFieldsDisabled}
         />
       </SettingsRow>
 
@@ -200,19 +196,14 @@ export const RadarrDefaults = () => {
               value as RadarrMinimumAvailability,
             )
           }
-          options={[
-            { label: "Announced", value: "announced" },
-            { label: "In Cinemas", value: "inCinemas" },
-            { label: "Released", value: "released" },
-            { label: "TBA", value: "tba" },
-          ]}
+          options={RADARR_ADD_MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS}
         />
       </SettingsRow>
 
       <SettingsRow id="radarr-tags" label="Tags">
         <ProviderTagField
           id="radarr-tags"
-          availableTags={formOptions.tags}
+          availableTags={formResources?.tags ?? []}
           selectedTagIds={values.tags}
           selectedFreeformTags={values.freeformTags}
           onChange={updateTags}
@@ -230,11 +221,7 @@ export const RadarrDefaults = () => {
               monitor: value as RadarrMovieMonitor,
             })
           }
-          options={[
-            { label: "Movie Only", value: "movieOnly" },
-            { label: "Movie and Collection", value: "movieAndCollection" },
-            { label: "None", value: "none" },
-          ]}
+          options={RADARR_MOVIE_MONITOR_OPTIONS_WITH_DESCRIPTIONS}
         />
       </SettingsRow>
 

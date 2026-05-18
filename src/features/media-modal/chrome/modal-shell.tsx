@@ -1,0 +1,176 @@
+/** Slot-based media modal shell and modal-local portal plumbing. */
+// src/features/media-modal/chrome/modal-shell.tsx
+
+import {
+	forwardRef,
+	useEffect,
+	type ComponentRef,
+	type ComponentPropsWithoutRef,
+	type ReactNode,
+} from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { cn } from "@/shared/utils/cn";
+import type { MediaModalContainer } from "../types";
+
+export const MODAL_Z_INDEX_BASE = 2_147_483_600;
+const MODAL_Z_INDEX_OVERLAY = MODAL_Z_INDEX_BASE;
+const MODAL_Z_INDEX_CONTENT = MODAL_Z_INDEX_BASE + 1;
+export const MODAL_Z_INDEX_FLOATING = MODAL_Z_INDEX_BASE + 2;
+
+const SHELL_CLASS =
+	"h-[75.5vh] w-full max-w-250 flex flex-col overflow-hidden rounded-none bg-bg-primary p-0 shadow-2xl shadow-black/40 sm:min-h-180 sm:rounded-2xl";
+
+const FRAME_CLASS = "relative flex-1 overflow-hidden px-4 sm:px-8";
+const WORKSPACE_CLASS = "mx-auto flex h-full w-full max-w-250 flex-col";
+
+const PANES_GRID_CLASS =
+	"grid h-full min-h-0 grid-cols-1 gap-y-4 lg:grid-cols-[minmax(0,1fr)_8.5rem_minmax(0,1fr)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-0 lg:gap-y-2";
+
+const LEFT_PANE_CLASS =
+	"order-1 flex h-full flex-col overflow-hidden lg:col-start-1 lg:row-start-2";
+
+const RIGHT_PANE_TOP_CLASS =
+	"order-2 flex justify-center lg:col-start-3 lg:row-start-1 lg:items-end";
+
+const RIGHT_PANE_CLASS =
+	"order-3 relative min-h-0 lg:col-start-3 lg:row-start-2";
+
+type PortalContainer = ComponentPropsWithoutRef<
+	typeof Dialog.Portal
+>["container"];
+
+type ModalContentProps = ComponentPropsWithoutRef<typeof Dialog.Content> & {
+	container?: PortalContainer;
+	contentContainer?: HTMLDivElement | null;
+};
+
+type ModalShellProps = {
+	container?: MediaModalContainer | undefined;
+	contentContainer: HTMLDivElement | null;
+	header: ReactNode;
+	leftPane: ReactNode;
+	rightPane: ReactNode;
+	footer?: ReactNode | undefined;
+	rightPaneTop?: ReactNode | undefined;
+	onOpenChange: (open: boolean) => void;
+	onEscapeKeyDown?: ModalContentProps["onEscapeKeyDown"];
+};
+
+const Modal = Dialog.Root;
+
+function getContentContainerOwner(
+	container: PortalContainer | undefined,
+): HTMLElement | ShadowRoot | null {
+	if (container instanceof HTMLElement || container instanceof ShadowRoot) {
+		return container;
+	}
+
+	if (typeof document === "undefined") {
+		return null;
+	}
+
+	return document.body;
+}
+
+function attachContentContainer(
+	contentContainerOwner: { append(node: HTMLDivElement): void } | null,
+	contentContainer: { remove(): void } | null | undefined,
+): (() => void) | undefined {
+	if (!contentContainer || !contentContainerOwner) {
+		return undefined;
+	}
+
+	contentContainerOwner.append(contentContainer as HTMLDivElement);
+
+	return () => {
+		contentContainer.remove();
+	};
+}
+
+const ModalContent = forwardRef<
+	ComponentRef<typeof Dialog.Content>,
+	ModalContentProps
+>(function ModalContent(props, ref): React.JSX.Element {
+	const { className, children, container, contentContainer, style, ...rest } =
+		props;
+
+	const contentContainerOwner = getContentContainerOwner(container);
+
+	useEffect(() => {
+		return attachContentContainer(contentContainerOwner, contentContainer);
+	}, [contentContainer, contentContainerOwner]);
+
+	return (
+		<Dialog.Portal container={container}>
+			<Dialog.Overlay
+				data-testid="modal-overlay"
+				className={cn(
+					"fixed inset-0 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+				)}
+				style={{ zIndex: MODAL_Z_INDEX_OVERLAY }}
+			/>
+
+			<Dialog.Content
+				ref={ref}
+				className={cn(
+					"fixed left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 gap-4 bg-bg-primary p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+					className,
+				)}
+				style={{ ...style, zIndex: MODAL_Z_INDEX_CONTENT }}
+				{...rest}
+			>
+				{children}
+			</Dialog.Content>
+		</Dialog.Portal>
+	);
+});
+
+export function ModalShell(props: ModalShellProps): React.JSX.Element {
+	const {
+		container,
+		contentContainer,
+		header,
+		leftPane,
+		rightPane,
+		footer,
+		rightPaneTop,
+		onOpenChange,
+		onEscapeKeyDown,
+	} = props;
+
+	return (
+		<Modal open onOpenChange={onOpenChange}>
+			<ModalContent
+				container={container}
+				contentContainer={contentContainer}
+				className={SHELL_CLASS}
+				onOpenAutoFocus={(event) => event.preventDefault()}
+				{...(onEscapeKeyDown ? { onEscapeKeyDown } : {})}
+			>
+				{header}
+
+				<div className={FRAME_CLASS}>
+					<div className={WORKSPACE_CLASS}>
+						<div className="min-h-0 flex-1 pt-5 pb-4 sm:pt-6">
+							<div className={PANES_GRID_CLASS}>
+								<div className={LEFT_PANE_CLASS}>
+									<div className="min-h-0 flex-1">{leftPane}</div>
+								</div>
+
+								{rightPaneTop ? (
+									<div className={RIGHT_PANE_TOP_CLASS}>{rightPaneTop}</div>
+								) : null}
+
+								<div className={RIGHT_PANE_CLASS}>
+									<div className="h-full lg:sticky lg:top-0">{rightPane}</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				{footer}
+			</ModalContent>
+		</Modal>
+	);
+}

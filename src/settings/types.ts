@@ -28,7 +28,6 @@ export interface UiOptions {
 			enabled: boolean;
 		};
 	};
-	schedulerDebugOverlayEnabled: boolean;
 }
 
 export interface ExtensionOptions {

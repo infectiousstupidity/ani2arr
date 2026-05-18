@@ -17,9 +17,6 @@ export const AdvancedPage = () => {
 	const debugLogging = Boolean(
 		useWatch({ control, name: "debugLogging" }),
 	);
-	const schedulerDebugOverlayEnabled = Boolean(
-		useWatch({ control, name: "ui.schedulerDebugOverlayEnabled" }),
-	);
 	const [showResetDialog, setShowResetDialog] = useState(false);
 	const {
 		resetExtensionState,
@@ -83,26 +80,6 @@ export const AdvancedPage = () => {
 						}
 					/>
 				</SettingsRow>
-
-				{import.meta.env.DEV ? (
-					<SettingsRow
-						id="advanced-scheduler-debug-overlay"
-						label="Scheduler debug overlay"
-						description="Show the AniList query inspector on browse pages with aggregate totals, merge previews, and sent batch history."
-						inlineOnMobile={true}
-					>
-						<Switch
-							id="advanced-scheduler-debug-overlay"
-							checked={schedulerDebugOverlayEnabled}
-							onCheckedChange={(checked) =>
-								setValue("ui.schedulerDebugOverlayEnabled", checked, {
-									shouldDirty: true,
-									shouldTouch: true,
-								})
-							}
-						/>
-					</SettingsRow>
-				) : null}
 			</SettingsSection>
 
 			<SettingsSection

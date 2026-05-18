@@ -14,9 +14,8 @@ import { createShadowRootUi, type ShadowRootContentScriptUi } from 'wxt/utils/co
 
 export interface BrowseEntrypointShellOptions {
   uiName: string;
-  styleAttribute: string;
-  shadowStyleAttribute: string;
-  stylesText: string;
+  lightDomStyleAttribute: string;
+  lightDomStylesText: string;
   containerClassName: string;
   processedAttribute: string;
   isEligible: (input: { url: string; publicOptions: PublicOptions }) => boolean | Promise<boolean>;
@@ -47,42 +46,29 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
     let ui: ShadowRootContentScriptUi<Root> | null = null;
     let root: Root | null = null;
 
-    let globalStyleElement: HTMLStyleElement | null = null;
-    let shadowStyleElement: HTMLStyleElement | null = null;
+    let lightDomStyleElement: HTMLStyleElement | null = null;
 
-    const ensureGlobalStyles = () => {
-      if (!globalStyleElement) {
-        globalStyleElement = document.createElement('style');
-        globalStyleElement.setAttribute(options.styleAttribute, 'true');
-        globalStyleElement.textContent = options.stylesText;
+    const ensureLightDomStyles = () => {
+      if (!lightDomStyleElement) {
+        lightDomStyleElement = document.createElement('style');
+        lightDomStyleElement.setAttribute(options.lightDomStyleAttribute, 'true');
+        lightDomStyleElement.textContent = options.lightDomStylesText;
       }
-      if (globalStyleElement && !document.head.contains(globalStyleElement)) {
-        document.head.append(globalStyleElement);
-      }
-    };
-
-    const ensureShadowStyles = (shadowRoot: ShadowRoot) => {
-      if (!shadowStyleElement) {
-        shadowStyleElement = document.createElement('style');
-        shadowStyleElement.setAttribute(options.shadowStyleAttribute, 'true');
-        shadowStyleElement.textContent = options.stylesText;
-      }
-      if (shadowStyleElement && shadowStyleElement.getRootNode() !== shadowRoot) {
-        shadowRoot.append(shadowStyleElement);
+      if (lightDomStyleElement && !document.head.contains(lightDomStyleElement)) {
+        document.head.append(lightDomStyleElement);
       }
     };
 
     const mount = async () => {
       if (ui) return;
 
-      ensureGlobalStyles();
+      ensureLightDomStyles();
 
       ui = await createShadowRootUi(ctx, {
         name: options.uiName,
         position: 'inline',
         anchor: 'body',
-        onMount: (container: HTMLElement, shadow: ShadowRoot) => {
-          ensureShadowStyles(shadow);
+        onMount: (container: HTMLElement) => {
           const portalContainer = container;
           root = createRoot(container);
           root.render(
@@ -119,10 +105,8 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
       ui = null;
       root = null;
       cleanupDomArtifacts(options);
-      if (shadowStyleElement?.parentNode) shadowStyleElement.remove();
-      shadowStyleElement = null;
-      if (globalStyleElement?.parentNode) globalStyleElement.remove();
-      globalStyleElement = null;
+      if (lightDomStyleElement?.parentNode) lightDomStyleElement.remove();
+      lightDomStyleElement = null;
     };
 
     const main = createContentEntrypointShell({

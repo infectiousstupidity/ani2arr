@@ -232,13 +232,9 @@ function logStart(
 	ctx: CandidateSearchContext,
 	primaryTitleHint?: string,
 ): void {
-	if (!import.meta.env.DEV) {
-		return;
-	}
-
-	ctx.log.debug?.(
-		`pipeline:start anilistId=${media.id} priority=${ctx.priority ?? "normal"}${primaryTitleHint ? ` hint="${primaryTitleHint}"` : ""}`,
-	);
+	void media;
+	void ctx;
+	void primaryTitleHint;
 }
 
 function logResolved(
@@ -246,13 +242,9 @@ function logResolved(
 	ctx: CandidateSearchContext,
 	out: CandidateSearchOutcome,
 ): void {
-	if (!import.meta.env.DEV || out.status !== "resolved") {
-		return;
-	}
-
-	ctx.log.debug?.(
-		`pipeline:resolved anilistId=${media.id} providerId=${out.providerId} confidence=${out.confidence} synonym="${out.successfulSynonym}"`,
-	);
+	void media;
+	void ctx;
+	void out;
 }
 
 function logUnresolved(
@@ -260,11 +252,9 @@ function logUnresolved(
 	ctx: CandidateSearchContext,
 	reason: string,
 ): void {
-	if (!import.meta.env.DEV) {
-		return;
-	}
-
-	ctx.log.debug?.(`pipeline:unresolved anilistId=${media.id} reason=${reason}`);
+	void media;
+	void ctx;
+	void reason;
 }
 
 function filterSuppressedCandidates(

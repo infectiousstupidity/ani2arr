@@ -1,9 +1,14 @@
-/* AniChart browse surface overrides for content-owned card overlays. */
+/* AniChart light-DOM placement overrides for content-owned card overlays. */
 /* src/content/anichart/browse/style.css */
 
-/* Allow overlay anchor to extend */
-a.cover { position: relative; overflow: visible !important; }
-.media-card { overflow: visible !important; }
+a.cover:has(> .a2a-overlay-container) {
+  position: relative;
+  overflow: visible !important;
+}
+
+.media-card:has(.a2a-overlay-container) {
+  overflow: visible !important;
+}
 
 /* Corner offsets for this surface */
 .a2a-card-overlay[data-corner='bottom-left'] { left: var(--badge-offset-x, -8px); bottom: 16px; }

@@ -154,7 +154,7 @@ export class RadarrLibrary {
 					provider: "radarr",
 					providerId: tmdbId,
 					isInLibrary: true,
-					movie: snapshot,
+					movie: liveMovie,
 				};
 			}
 		} catch (error) {

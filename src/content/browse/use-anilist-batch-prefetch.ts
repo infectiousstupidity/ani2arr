@@ -128,14 +128,6 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
   const timerRef = useRef<ReturnType<typeof globalThis.setInterval> | null>(null);
   const tickRef = useRef<(() => Promise<void>) | null>(null);
 
-  const containerIdMap = useMemo(() => {
-    const map = new Map<Element, AniListId>();
-    for (const [container, parsed] of cardPortals) {
-      map.set(container, parsed.anilistId);
-    }
-    return map;
-  }, [cardPortals]);
-
   useEffect(() => {
     if (!isEnabled) return;
 
@@ -266,10 +258,23 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
 
     const idByContainer = idByContainerRef.current;
     const observedContainers = observedContainersRef.current;
-    const currentContainers = new Set(containerIdMap.keys());
+    const containers = [...cardPortals.keys()];
 
-    for (const container of observedContainers) {
-      if (!currentContainers.has(container)) {
+    for (const container of containers) {
+      const id = cardPortals.get(container)?.anilistId;
+      if (!id || observedContainers.has(container)) continue;
+
+      idByContainer.set(container, id);
+      try {
+        observer.observe(container);
+      } catch {
+        // ignore
+      }
+      observedContainers.add(container);
+    }
+
+    return () => {
+      for (const container of containers) {
         try {
           observer.unobserve(container);
         } catch {
@@ -277,22 +282,8 @@ export const useAnilistBatchPrefetch = ({ cardPortals, enabled = true }: UseAnil
         }
         observedContainers.delete(container);
       }
-    }
-
-    for (const container of currentContainers) {
-      if (!observedContainers.has(container)) {
-        const id = containerIdMap.get(container);
-        if (!id) continue;
-        idByContainer.set(container, id);
-        try {
-          observer.observe(container);
-        } catch {
-          // ignore
-        }
-        observedContainers.add(container);
-      }
-    }
-  }, [isEnabled, containerIdMap]);
+    };
+  }, [isEnabled, cardPortals]);
 };
 
 export default useAnilistBatchPrefetch;

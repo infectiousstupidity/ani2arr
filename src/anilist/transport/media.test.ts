@@ -27,7 +27,7 @@ const META: AniListResponseMeta = {
   receivedAt: 0,
 };
 
-const ids = (values: number[]): AniListId[] => values.map(parseAniListId);
+const ids = (values: number[]): AniListId[] => values.map(value => parseAniListId(value));
 
 afterEach(() => {
   postAniListMock.mockReset();
@@ -168,6 +168,63 @@ describe('AniList batch media transport', () => {
     expect(result.data).toHaveLength(1);
     expect(result.data[0]!.relations).toEqual({
       edges: [{ relationType: 'SEQUEL', node: { id: 200 } }],
+    });
+  });
+
+  it('preserves direct relation node titles for mapping fallbacks', async () => {
+    postAniListMock.mockResolvedValue({
+      payload: {
+        data: {
+          Page: {
+            media: [
+              {
+                id: 701,
+                format: 'TV',
+                title: { romaji: 'Current' },
+                relations: {
+                  edges: [
+                    {
+                      relationType: 'PREQUEL',
+                      node: {
+                        id: 700,
+                        format: 'TV',
+                        title: {
+                          romaji: 'Prequel Romaji',
+                          english: 'Prequel English',
+                          native: null,
+                        },
+                        startDate: { year: 2025 },
+                        synonyms: ['Prequel Alias', null],
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      },
+      meta: META,
+    });
+
+    const result = await fetchAniListMediaBatch(ids([701]));
+
+    expect(result.data[0]!.relations).toEqual({
+      edges: [
+        {
+          relationType: 'PREQUEL',
+          node: {
+            id: 700,
+            format: 'TV',
+            title: {
+              romaji: 'Prequel Romaji',
+              english: 'Prequel English',
+            },
+            startDate: { year: 2025 },
+            synonyms: ['Prequel Alias'],
+          },
+        },
+      ],
     });
   });
 

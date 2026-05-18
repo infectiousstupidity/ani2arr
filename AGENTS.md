@@ -1,184 +1,78 @@
-# AGENTS.md
+# General rules
 
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+- Caveman mode
+- Always run pnpm commands through Windows (e.g cmd.exe /d /s /c "pnpm lint")
+- KISS principles
+- SOLID principles
+- YAGNI principles
+- No typescript spaghetti or gymnastics
+- No overengineering or premature optimization
+- No enterprise patterns or jargon
+- No unnecessary abstractions or indirections
+- No overuse of design patterns. Use them only when they clearly solve a problem.
+- Only add the absolute highest value tests. Don't test implementation details or trivial code. Focus on critical paths and edge case where absolutely necessary. DO NOT TEST USELESS UI STUFF.
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+- validate touched files with pnpm lint:target
+- run tests for files with pnpm test
 
-Tests are extremely expensive as a solo hobby developer - so only implement the highest value tests.
+- All files must include a header comment with the file location and a brief description of their purpose and any important details.
+  -- Example:
 
-For refactors, first look for code that can be deleted, merged, or inlined.
-Do not start by extracting new layers.
-
-## 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-## 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
+```ts
+/** RPC handlers for AniList media fetch, search, and metadata flows. */
+// src/rpc/handlers/anilist.handlers.ts
 ```
 
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+- For all legacy or temporary compatibility code, add a comment with the prefix `LEGACY:` and a brief explanation of why it exists and when it can be removed.
+  -- Example:
 
----
+```ts
+/** LEGACY: Temporary compatibility layer for AniList integration. */
+// src/rpc/handlers/anilist.handlers.ts
+```
 
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+- Avoid these commenting mistakes
+  - Stating the obvious: Don't comment what the code clearly shows (e.g., "increment counter" above `i++`)
+  - Outdated comments: Remove or update comments when code changes
+  - Commented-out code: Use version control instead of leaving old code
+  - Excessive comments: If you need many comments, consider refactoring for clarity
 
-## Output style: visual-first, token-tight
+# Ownership Rules
 
-For all non-trivial outputs, prefer compact ASCII diagrams before prose.
+Respect folder boundaries.
 
-Use diagrams when the response involves:
+- `anilist`: AniList IDs, API, metadata, cache.
+- `mapping`: AniList ID -> provider ID. Manual, auto, ignored, upstream mappings.
+- `providers`: Sonarr/Radarr clients, IDs, metadata, search, library, cache.
+- `settings`: Persisted extension settings and provider config.
+- `rpc`: Request/response boundary. Combine domain facts into DTOs.
+- `queries`: React Query adapters. Cache keys, stale times, invalidations, and UI-facing query/mutation hooks around RPC or local option reads. No provider clients, storage ownership, or background work.
+- `background`: Wire services, lifecycle, startup, reset, scheduled refresh.
+- `content`: Injected page behavior, DOM parsing, portals, launch snapshots.
+- `features`: UI features. Modal, overlay, provider action, mapping UI.
+- `options-page`: Options UI only.
+- `shared`: Generic utilities only. No domain knowledge.
 
-- codebase review
-- implementation plans
-- architecture
-- data flow
-- state ownership
-- storage/cache/invalidation
-- UI/component structure
-- bug causes
-- refactors
-- proposal comparisons
-- tradeoffs
-
-Default structure:
-
-1. ASCII diagram
-2. Short explanation
-3. Recommendation or plan
-4. Files/components affected
-5. Risks/checks
-
-Keep output concise:
-
-- no filler
-- no motivational language
-- no repeated summaries
-- no long introductions
-- no obvious restatements
-- no giant diagrams when a small one works
-- no prose wall before the diagram
-
-Do not use full caveman style. Use clear technical English. Fragments are allowed only when they improve readability.
-
-Prefer concrete value-trace diagrams over abstract architecture diagrams.
-
-Good targets:
-
-- where a value starts
-- where it is validated
-- where it is stored/cached
-- where it is passed
-- where it is used as a key
-- where it is transformed
-- what UI/behavior it affects
-- what can refresh
-- what can reset
-- who owns it
-
-Avoid abstract phrases unless immediately grounded:
-
-- "source of truth"
-- "derived state"
-- "form identity"
-- "local ownership"
-- "controller"
-- "invalidation"
-- "abstraction boundary"
-
-When using one of those phrases, include:
-
-- concrete value
-- concrete file/hook/component
-- what changes it
-- what breaks if it changes incorrectly
-
-Example:
+Good flow:
 
 ```text
-+----------------------+
-| AniListId extracted  |
-| from page/card       |
-+----------+-----------+
-           |
-           v
-+----------------------+
-| Parsed/validated     |
-| as AniListId         |
-+----------+-----------+
-           |
-           +-------------------+
-           |                   |
-           v                   v
-+------------------+  +------------------+
-| Mapping lookup   |  | Metadata query   |
-+--------+---------+  +------------------+
-         |
-         v
-+------------------+
-| Provider ID      |
-| TVDB/TMDB        |
-+--------+---------+
-         |
-         v
-+------------------+
-| Provider status  |
-| Sonarr/Radarr    |
-+--------+---------+
-         |
-         v
-+------------------+
-| Modal behavior   |
-+------------------+
+features/options-page/content
+  -> queries
+  -> rpc
+  -> mapping.resolve(anilistId, provider)
+  -> providers/library.check(providerId)
+  -> response DTO
 ```
+
+Forbidden:
+
+```text
+providers/library -> mapping
+providers/library -> rpc
+mapping -> providers/library
+shared -> domain folders
+features -> provider clients/storage
+queries -> provider clients/storage
+```
+
+If a file answers more than one domain question, split or move it.

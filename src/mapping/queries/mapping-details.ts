@@ -35,14 +35,16 @@ import {
 	deriveLibraryUnknownReason,
 	type LibraryUnknownReason,
 } from "@/mapping/library-status";
-import { deriveMappingRowStatus } from "@/features/provider-action";
 import type {
 	MappingIssue,
 	MappingIssueReason,
 	MappingIssuesSummary,
 } from "./mapping-issues";
 import { projectMappingIssues } from "./mapping-issues";
-import type { MappingListRowStatus } from "./list-mappings";
+import {
+	deriveMappingRowStatus,
+	type MappingListRowStatus,
+} from "./mapping-row-status";
 
 export interface GetMappingInspectionInput {
 	provider: Provider;

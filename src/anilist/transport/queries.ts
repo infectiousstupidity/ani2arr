@@ -19,8 +19,14 @@ export const FIND_MEDIA_BATCH_QUERY = `
         }
         relations {
           edges {
-            relationType
-            node { id }
+            relationType(version: 2)
+            node {
+              id
+              format
+              title { romaji english native }
+              startDate { year }
+              synonyms
+            }
           }
         }
         bannerImage

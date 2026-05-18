@@ -160,12 +160,6 @@ export class MappingService {
 		anilistId: AniListId,
 		options: AutoMappingOptions = {},
 	): Promise<AcceptedAutoMappingResult | null> {
-		if (import.meta.env.DEV) {
-			this.log.debug?.(
-				`mapping:start provider=${provider} anilistId=${anilistId} priority=${options.priority ?? "normal"} network=${options.network ?? "allow"}`,
-			);
-		}
-
 		const canPersistAutoMappingResult = this.autoMappingPersistence.createCheck(
 			provider,
 			anilistId,

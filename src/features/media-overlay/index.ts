@@ -1,5 +1,6 @@
-/** Public surface for reusable card overlay UI and state. */
+/** Public surface for browse-card overlay components. */
 // src/features/media-overlay/index.ts
 
-export { CardOverlay } from './components/card-overlay';
-export { useCardOverlayState } from './hooks/use-card-overlay-state';
+export { CardOverlay } from "./card-overlay";
+export { RadarrCardOverlay } from "./radarr-card-overlay";
+export { SonarrCardOverlay } from "./sonarr-card-overlay";

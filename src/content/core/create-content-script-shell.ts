@@ -119,11 +119,11 @@ export const createContentEntrypointShell = (
 
 		await reconcile(location.href);
 
-		type LocationChangeEvent = CustomEvent<{ newUrl: URL }>;
+		type LocationChangeEvent = Event & { newUrl?: URL };
 
-		ctx.addEventListener(globalThis, "wxt:locationchange", (event: Event) => {
+		ctx.addEventListener(globalThis.window, "wxt:locationchange", (event: Event) => {
 			const locationChangeEvent = event as LocationChangeEvent;
-			const nextUrl = locationChangeEvent.detail?.newUrl?.href ?? location.href;
+			const nextUrl = locationChangeEvent.newUrl?.href ?? location.href;
 			void reconcile(nextUrl);
 		});
 

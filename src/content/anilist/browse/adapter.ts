@@ -8,6 +8,7 @@ import type { BrowseAdapter, HostMediaTarget } from '@/content/browse/types';
 
 const CARD_SELECTOR = '.media-card';
 const COVER_SELECTOR = 'a.cover';
+const TITLE_SELECTOR = 'a.title';
 const CARD_CONTAINER_SELECTORS = [
   '.media-grid',
   '.media-list',
@@ -40,6 +41,12 @@ const parseAniListCard = (card: Element): HostMediaTarget | null => {
   const cover = card.querySelector<HTMLAnchorElement>(COVER_SELECTOR);
   if (!cover) return null;
 
+  const title = card
+    .querySelector<HTMLAnchorElement>(TITLE_SELECTOR)
+    ?.textContent?.replaceAll(/\s+/g, ' ')
+    .trim();
+  if (!title) return null;
+
   const href = cover.getAttribute('href') ?? '';
   const idMatch = href.match(/\/anime\/(\d+)/);
 
@@ -50,7 +57,7 @@ const parseAniListCard = (card: Element): HostMediaTarget | null => {
     card.querySelector<HTMLSpanElement>('.hover-data .info span')?.textContent,
   );
 
-  return { anilistId, format, mountTarget: cover };
+  return { anilistId, title, format, mountTarget: cover };
 };
 
 const ensureOverlayContainer = (cover: HTMLAnchorElement): HTMLElement => {

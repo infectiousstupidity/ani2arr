@@ -31,7 +31,6 @@ export const createDefaultUiOptions = (): UiOptions => ({
 		sonarr: createDefaultAnimePageUiOptions(),
 		radarr: createDefaultAnimePageUiOptions(),
 	},
-	schedulerDebugOverlayEnabled: false,
 });
 
 const asRecord = (input: unknown): Record<string, unknown> =>
@@ -82,6 +81,5 @@ export const UiOptionsSchema = v.pipe(
 				createDefaultAnimePageUiOptions(),
 			),
 		}),
-		schedulerDebugOverlayEnabled: v.fallback(v.boolean(), false),
 	}),
 );

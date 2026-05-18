@@ -3,6 +3,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
+	parseProviderQualityProfileId,
 	parseRadarrMovieId,
 	parseTmdbId,
 	type ProviderCredentials,
@@ -101,7 +102,10 @@ describe("RadarrLibrary movie snapshots", () => {
 
 describe("RadarrLibrary library status", () => {
 	it("force-verifies a TMDB hit and updates the snapshot cache", async () => {
-		const movie = createRadarrMovie();
+		const movie = createRadarrMovie({
+			rootFolderPath: "/movies",
+			qualityProfileId: parseProviderQualityProfileId(99),
+		});
 		const cache = createMemoryCache<RadarrMovieSnapshot[]>([]);
 		const client = {
 			getAllMovies: vi.fn(async () => []),
@@ -122,7 +126,11 @@ describe("RadarrLibrary library status", () => {
 			provider: "radarr",
 			providerId: parseTmdbId(456),
 			isInLibrary: true,
-			movie: createSnapshot(),
+			movie: {
+				...movie,
+				rootFolderPath: "/movies",
+				qualityProfileId: parseProviderQualityProfileId(99),
+			},
 		});
 
 		expect(client.findMovieByTmdbId).toHaveBeenCalledWith(

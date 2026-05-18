@@ -1,5 +1,5 @@
 /** Shared query keys and stable AniList metadata serialization for query caching. */
-// src/shared/queries/query-keys.ts
+// src/queries/query-keys.ts
 
 import type { AniListId } from "@/anilist";
 import { isAniListId } from "@/anilist/anilist-id";
@@ -47,8 +47,8 @@ const seriesStatusRootKey = (provider: Provider) =>
 const seriesStatusBaseKey = (provider: Provider, anilistId: AniListId) =>
 	[...seriesStatusRootKey(provider), anilistId] as const;
 
-const providerFormOptionsRootKey = (provider: Provider) =>
-	[...rootQueryKey, `${provider}FormOptions`] as const;
+const providerFormResourcesRootKey = (provider: Provider) =>
+	[...rootQueryKey, `${provider}FormResources`] as const;
 
 const normalizeMappingsInput = (input?: GetMappingsInput) => {
 	if (!input) return "default";
@@ -120,15 +120,15 @@ export const queryKeys = {
 		[...rootQueryKey, "sonarrSeriesLibraryStatus", tvdbId] as const,
 	radarrMovieLibraryStatus: (tmdbId: TmdbId | null) =>
 		[...rootQueryKey, "radarrMovieLibraryStatus", tmdbId] as const,
-	sonarrFormOptionsRoot: () => providerFormOptionsRootKey("sonarr"),
-	sonarrFormOptions: (scope?: string) =>
-		[...rootQueryKey, "sonarrFormOptions", scope ?? "configured"] as const,
+	sonarrFormResourcesRoot: () => providerFormResourcesRootKey("sonarr"),
+	sonarrFormResources: (scope?: string) =>
+		[...rootQueryKey, "sonarrFormResources", scope ?? "configured"] as const,
 	sonarrConnectionRoot: () => [...rootQueryKey, "sonarrConnection"] as const,
 	sonarrConnection: (scope?: string) =>
 		[...rootQueryKey, "sonarrConnection", scope ?? "configured"] as const,
-	radarrFormOptionsRoot: () => providerFormOptionsRootKey("radarr"),
-	radarrFormOptions: (scope?: string) =>
-		[...rootQueryKey, "radarrFormOptions", scope ?? "configured"] as const,
+	radarrFormResourcesRoot: () => providerFormResourcesRootKey("radarr"),
+	radarrFormResources: (scope?: string) =>
+		[...rootQueryKey, "radarrFormResources", scope ?? "configured"] as const,
 	radarrConnectionRoot: () => [...rootQueryKey, "radarrConnection"] as const,
 	radarrConnection: (scope?: string) =>
 		[...rootQueryKey, "radarrConnection", scope ?? "configured"] as const,

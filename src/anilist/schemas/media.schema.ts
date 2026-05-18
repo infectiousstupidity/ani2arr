@@ -110,6 +110,10 @@ const AniListMediaStartDateSchema = v.object({
 
 const AniListMediaRelationNodeSchema = v.object({
   id: AniListIdSchema,
+  format: v.optional(v.nullable(AniListMediaFormatSchema)),
+  title: v.optional(AniListTitlesSchema),
+  startDate: v.optional(AniListMediaStartDateSchema),
+  synonyms: v.optional(v.array(v.string())),
 });
 
 const AniListMediaRelationEdgeSchema = v.object({

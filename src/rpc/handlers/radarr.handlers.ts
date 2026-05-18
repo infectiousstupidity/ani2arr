@@ -1,4 +1,4 @@
-/** RPC handlers for Radarr form options, search, and validation flows. */
+/** RPC handlers for Radarr form resources, search, and validation flows. */
 // src/rpc/handlers/radarr.handlers.ts
 
 import * as v from "valibot";
@@ -6,11 +6,11 @@ import type { Ani2arrApi } from "@/rpc";
 import {
 	parseTmdbIdOrNull,
 	type ProviderCredentials,
-	type ProviderFormOptions,
+	type ProviderFormResources,
 	type TmdbId,
 } from "@/providers";
 import {
-	GetProviderFormOptionsInputSchema,
+	GetProviderFormResourcesInputSchema,
 	RadarrLookupInputSchema,
 	ValidateTmdbInputSchema,
 } from "@/rpc/schemas";
@@ -21,7 +21,7 @@ export function createRadarrHandlers(
 	deps: ApiHandlerDeps,
 ): Pick<
 	Ani2arrApi,
-	"getRadarrFormOptions" | "searchRadarr" | "validateTmdbId"
+	"getRadarrFormResources" | "searchRadarr" | "validateTmdbId"
 > {
 	const {
 		radarrClient,
@@ -43,8 +43,8 @@ export function createRadarrHandlers(
 	};
 
 	return {
-		async getRadarrFormOptions(input) {
-			const parsedInput = v.parse(GetProviderFormOptionsInputSchema, input);
+		async getRadarrFormResources(input) {
+			const parsedInput = v.parse(GetProviderFormResourcesInputSchema, input);
 			const maybeCredentials = parsedInput?.credentials;
 			const credentials: ProviderCredentials =
 				maybeCredentials?.url && maybeCredentials.apiKey
@@ -57,7 +57,7 @@ export function createRadarrHandlers(
 				radarrClient.getTags(credentials),
 			]);
 
-			const formOptions: ProviderFormOptions = {
+			const formResources: ProviderFormResources = {
 				qualityProfiles,
 				rootFolders: rootFolders.map((folder) => ({
 					id: folder.id,
@@ -69,7 +69,7 @@ export function createRadarrHandlers(
 				tags,
 			};
 
-			return formOptions;
+			return formResources;
 		},
 
 		async searchRadarr(input) {
@@ -130,6 +130,6 @@ export function createRadarrHandlers(
 		},
 	} satisfies Pick<
 		Ani2arrApi,
-		"getRadarrFormOptions" | "searchRadarr" | "validateTmdbId"
+		"getRadarrFormResources" | "searchRadarr" | "validateTmdbId"
 	>;
 }

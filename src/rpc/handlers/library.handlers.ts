@@ -33,6 +33,10 @@ import {
 	buildMovieStatusResponseFromLibraryStatus,
 	buildSeriesStatusResponseFromLibraryStatus,
 } from "@/rpc/status-response-adapter";
+import {
+	buildRadarrTargetSummary,
+	buildSonarrTargetSummary,
+} from "@/rpc/provider-target-summary";
 import type { AutoMappingOptions } from "@/mapping/auto-mapping/types";
 import { ErrorCode, logError, normalizeError } from "@/shared/errors";
 import type { RequestPriority } from "@/shared/utils/request-priority";
@@ -409,7 +413,12 @@ async function getRadarrStatusFromMappingAndLibrary(
 	if (mapping.kind === "failed") return mapping.response;
 	if (mapping.kind === "unmapped") return resolveUnmappedRadarr(payload, deps);
 
-	return buildMappedRadarrStatus(payload.anilistId, mapping, options, deps);
+	return buildMappedRadarrStatus(
+		mapping,
+		options,
+		credentials.url,
+		deps,
+	);
 }
 
 async function resolveUnmappedRadarr(
@@ -433,9 +442,9 @@ async function resolveUnmappedRadarr(
 }
 
 async function buildMappedRadarrStatus(
-	anilistId: AniListId,
 	mapping: Extract<RadarrMappingResult, { kind: "mapped" }>,
 	options: ProviderStatusOptions,
+	baseUrl: string,
 	deps: Pick<
 		ApiHandlerDeps,
 		| "radarrLibrary"
@@ -459,6 +468,13 @@ async function buildMappedRadarrStatus(
 		libraryStatus,
 	});
 	const linkedAniListIds = getLinkedRadarrAniListIds(mapping.tmdbId, deps);
+	const targetSummary = buildRadarrTargetSummary({
+		tmdbId: mapping.tmdbId,
+		movie: status.movie,
+		isInLibrary: status.isInLibrary,
+		baseUrl,
+		linkedAniListIds,
+	});
 
 	return {
 		...status,
@@ -466,6 +482,7 @@ async function buildMappedRadarrStatus(
 			? { successfulSynonym: mapping.successfulSynonym }
 			: {}),
 		...(linkedAniListIds ? { linkedAniListIds } : {}),
+		...(targetSummary === null ? {} : { targetSummary }),
 	};
 }
 
@@ -512,7 +529,12 @@ async function getSeriesStatusFromMappingAndLibrary(
 	if (mapping.kind === "failed") return mapping.response;
 	if (mapping.kind === "unmapped") return resolveUnmappedSeries(payload, deps);
 
-	return buildMappedSeriesStatus(payload.anilistId, mapping, options, deps);
+	return buildMappedSeriesStatus(
+		mapping,
+		options,
+		credentials.url,
+		deps,
+	);
 }
 
 async function resolveUnmappedSeries(
@@ -536,9 +558,9 @@ async function resolveUnmappedSeries(
 }
 
 async function buildMappedSeriesStatus(
-	anilistId: AniListId,
 	mapping: Extract<SonarrMappingResult, { kind: "mapped" }>,
 	options: ProviderStatusOptions,
+	baseUrl: string,
 	deps: Pick<
 		ApiHandlerDeps,
 		| "sonarrLibrary"
@@ -562,6 +584,13 @@ async function buildMappedSeriesStatus(
 		libraryStatus,
 	});
 	const linkedAniListIds = getLinkedAniListIds(mapping.tvdbId, deps);
+	const targetSummary = buildSonarrTargetSummary({
+		tvdbId: mapping.tvdbId,
+		series: status.series,
+		isInLibrary: status.isInLibrary,
+		baseUrl,
+		linkedAniListIds,
+	});
 
 	return {
 		...status,
@@ -569,6 +598,7 @@ async function buildMappedSeriesStatus(
 			? { successfulSynonym: mapping.successfulSynonym }
 			: {}),
 		...(linkedAniListIds ? { linkedAniListIds } : {}),
+		...(targetSummary === null ? {} : { targetSummary }),
 	};
 }
 
@@ -576,26 +606,16 @@ function logSeriesStatusStart(
 	payload: SonarrStatusPayload,
 	options: ProviderStatusOptions,
 ): void {
-	if (!import.meta.env.DEV) return;
-
-	const priority = options.priority ?? "normal";
-	const network = options.network ?? "allow";
-	console.debug(
-		`[ani2arr | SonarrStatus] start anilistId=${payload.anilistId} priority=${priority} network=${network} force_verify=${String(options.force_verify === true)}`,
-	);
+	void payload;
+	void options;
 }
 
 function logRadarrStatusStart(
 	payload: SonarrStatusPayload,
 	options: ProviderStatusOptions,
 ): void {
-	if (!import.meta.env.DEV) return;
-
-	const priority = options.priority ?? "normal";
-	const network = options.network ?? "allow";
-	console.debug(
-		`[ani2arr | RadarrStatus] start anilistId=${payload.anilistId} priority=${priority} network=${network} force_verify=${String(options.force_verify === true)}`,
-	);
+	void payload;
+	void options;
 }
 
 async function resolveRadarrMapping(
@@ -698,22 +718,16 @@ function logSeriesLookupStart(
 	payload: SonarrStatusPayload,
 	options: ProviderStatusOptions,
 ): void {
-	if (!import.meta.env.DEV) return;
-
-	console.debug(
-		`[ani2arr | SonarrStatus] lookup-start anilistId=${payload.anilistId} priority=${options.priority ?? "normal"} network=${options.network ?? "allow"} force_verify=${String(options.force_verify === true)}`,
-	);
+	void payload;
+	void options;
 }
 
 function logRadarrLookupStart(
 	payload: SonarrStatusPayload,
 	options: ProviderStatusOptions,
 ): void {
-	if (!import.meta.env.DEV) return;
-
-	console.debug(
-		`[ani2arr | RadarrStatus] lookup-start anilistId=${payload.anilistId} priority=${options.priority ?? "normal"} network=${options.network ?? "allow"} force_verify=${String(options.force_verify === true)}`,
-	);
+	void payload;
+	void options;
 }
 
 function toSeriesMappingErrorResponse(

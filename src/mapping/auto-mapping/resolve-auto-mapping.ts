@@ -63,6 +63,8 @@ type MediaResolutionContext = NetworkResolutionContext & {
 	media: AniListMedia;
 };
 
+type ResolutionAttemptLabel = "metadata" | "api" | "relation" | "prequel-chain";
+
 type ResolveAutoMappingDeps = {
 	anilistApi: AniListMediaService;
 	lookupClients: ProviderTitleLookupRegistry;
@@ -207,14 +209,9 @@ async function attemptNetworkResolution(
 	deps: ResolveAutoMappingDeps,
 	request: AutoMappingRequest,
 ): Promise<AcceptedAutoMappingResult | null> {
-	const { provider, anilistId, options } = request;
+	const { provider, anilistId } = request;
 	let attempt: ResolutionAttempt;
 	try {
-		if (import.meta.env.DEV) {
-			deps.log.debug?.(
-				`mapping:network-start provider=${provider} anilistId=${anilistId} priority=${options.priority ?? "normal"}`,
-			);
-		}
 		attempt = await resolveViaNetwork(deps, request);
 	} catch (error) {
 		const normalized = normalizeError(error);
@@ -254,11 +251,6 @@ async function attemptNetworkResolution(
 	deps.log.debug?.(
 		`mapping:auto-resolution-outcome provider=${provider} anilistId=${anilistId} state=mapped providerId=${attempt.resolved.providerId} reason=${attempt.resolved.reason}${attempt.confidence === undefined ? "" : ` confidence=${attempt.confidence.toFixed(3)}`}`,
 	);
-	if (import.meta.env.DEV) {
-		deps.log.debug?.(
-			`mapping:network-success provider=${provider} anilistId=${anilistId} providerId=${attempt.resolved.providerId}${attempt.resolved.successfulSynonym ? ` synonym="${attempt.resolved.successfulSynonym}"` : ""}`,
-		);
-	}
 	return deps.acceptResolved(
 		provider,
 		anilistId,
@@ -284,7 +276,7 @@ async function resolveViaNetwork(
 	};
 
 	const applyAttempt = (
-		label: "metadata" | "api",
+		label: ResolutionAttemptLabel,
 		attempt: ResolutionAttempt,
 	): ResolutionAttempt | null => {
 		const resolved = attempt.resolved;
@@ -343,15 +335,56 @@ async function resolveViaNetwork(
 		return resolvedFromApi;
 	}
 
-	deps.log.debug?.(
-		`resolveViaNetwork: provider=${provider} no match found for AniList ID ${anilistId}`,
+	const directPrequelMedia = getDirectPrequelMedia(
+		anilistMediaWithRelations,
+		provider,
 	);
+	const directPrequelIds = new Set(
+		directPrequelMedia.map((media) => media.id),
+	);
+	for (const relationMedia of directPrequelMedia) {
+		const relationAttempt = await tryResolveWithMedia(
+			deps,
+			{
+				...context,
+				media: relationMedia,
+			},
+			{ usePrimaryTitleHint: false },
+		);
+		const resolvedFromRelation = applyAttempt("relation", relationAttempt);
+		if (resolvedFromRelation) {
+			return resolvedFromRelation;
+		}
+	}
+
+	for await (const prequelMedia of deps.anilistApi.iteratePrequelChain(
+		anilistMediaWithRelations,
+		{ includeRoot: false },
+	)) {
+		if (directPrequelIds.has(prequelMedia.id)) {
+			continue;
+		}
+		const prequelAttempt = await tryResolveWithMedia(
+			deps,
+			{
+				...context,
+				media: prequelMedia,
+			},
+			{ usePrimaryTitleHint: false },
+		);
+		const resolvedFromPrequel = applyAttempt("prequel-chain", prequelAttempt);
+		if (resolvedFromPrequel) {
+			return resolvedFromPrequel;
+		}
+	}
+
 	return { resolved: null };
 }
 
 async function tryResolveWithMedia(
 	deps: ResolveAutoMappingDeps,
 	context: MediaResolutionContext,
+	options: { usePrimaryTitleHint?: boolean } = {},
 ): Promise<ResolutionAttempt> {
 	const { provider, media } = context;
 	const routedProvider = resolveProviderForAniListFormat(media.format);
@@ -373,7 +406,7 @@ async function tryResolveWithMedia(
 			isCandidateSuppressed: (providerId, reason: AcceptedMappingReason) =>
 				deps.isResolvedCandidateSuppressed(
 					provider,
-					media.id,
+					context.anilistId,
 					{
 						providerId,
 						reason,
@@ -387,7 +420,9 @@ async function tryResolveWithMedia(
 			},
 			log: deps.log,
 		},
-		context.hints?.primaryTitle,
+		options.usePrimaryTitleHint === false
+			? undefined
+			: context.hints?.primaryTitle,
 	);
 
 	if (outcome.status === "resolved") {
@@ -403,4 +438,49 @@ async function tryResolveWithMedia(
 		};
 	}
 	return { resolved: null };
+}
+
+function hasUsableRelationTitles(media: AniListMedia): boolean {
+	return (
+		Object.values(media.title ?? {}).some(
+			(value) => typeof value === "string" && value.trim().length > 0,
+		) ||
+		(media.synonyms ?? []).some(
+			(value) => typeof value === "string" && value.trim().length > 0,
+		)
+	);
+}
+
+function relationNodeToMedia(
+	media: AniListMedia,
+	provider: Provider,
+): AniListMedia | null {
+	const routedProvider = resolveProviderForAniListFormat(media.format);
+	if (routedProvider !== provider || !hasUsableRelationTitles(media)) {
+		return null;
+	}
+	return media;
+}
+
+function getDirectPrequelMedia(
+	media: AniListMedia,
+	provider: Provider,
+): AniListMedia[] {
+	return (media.relations?.edges ?? []).flatMap((edge) => {
+		if (edge.relationType !== "PREQUEL") {
+			return [];
+		}
+		const node = edge.node;
+		const relationMedia = relationNodeToMedia(
+			{
+				id: node.id,
+				format: node.format ?? null,
+				title: node.title ?? {},
+				synonyms: node.synonyms ?? [],
+				...(node.startDate ? { startDate: node.startDate } : {}),
+			},
+			provider,
+		);
+		return relationMedia ? [relationMedia] : [];
+	});
 }

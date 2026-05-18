@@ -38,18 +38,6 @@ const mapStringArray = (values?: unknown[] | null) => {
   return values.flatMap(value => (typeof value === 'string' ? [value] : []));
 };
 
-// Null edges, null relationType, and null/invalid node ids are dropped defensively.
-const mapRelations = (relations?: FindMediaBatchMediaDto['relations'] | null) => {
-  if (!relations) return;
-  const edges = (relations.edges ?? []).flatMap(edge => {
-    if (!edge || typeof edge.relationType !== 'string') return [];
-    const nodeId = edge.node?.id;
-    if (!isAniListId(nodeId)) return [];
-    return [{ relationType: edge.relationType, node: { id: nodeId } }];
-  });
-  return { edges };
-};
-
 // Both fields are required in the canonical schema; null in either discards the object.
 // Returns undefined (not null) when the field is absent to avoid phantom output keys.
 const mapNextAiringEpisode = (nae?: FindMediaBatchMediaDto['nextAiringEpisode'] | null) => {
@@ -73,6 +61,49 @@ const mapStudios = (studios?: FindMediaBatchMediaDto['studios'] | null) => {
   if (studios == null) return studios;
   const nodes = (studios.nodes ?? []).flatMap(node => (node ? [node] : []));
   return { nodes };
+};
+
+const mapStartDate = (startDate?: FindMediaBatchMediaDto['startDate'] | null) => {
+  if (startDate === undefined) return;
+  if (startDate === null) return null;
+  return typeof startDate.year === 'number' ? { year: startDate.year } : {};
+};
+
+type RelationNodeDto = NonNullable<
+  NonNullable<
+    NonNullable<FindMediaBatchMediaDto['relations']>['edges']
+  >[number]
+>['node'];
+
+const mapRelationNode = (node?: RelationNodeDto | null) => {
+  if (!node) return null;
+  const nodeId = node.id;
+  if (!isAniListId(nodeId)) return null;
+
+  const format = mapEnum(node.format, ANILIST_MEDIA_FORMATS);
+  const title = mapTitles(node.title);
+  const synonyms = mapStringArray(node.synonyms);
+  const startDate = mapStartDate(node.startDate);
+
+  return {
+    id: nodeId,
+    ...(format !== undefined && { format }),
+    ...(Object.keys(title).length > 0 && { title }),
+    ...(startDate !== undefined && startDate !== null && { startDate }),
+    ...(synonyms !== undefined && synonyms !== null && { synonyms }),
+  };
+};
+
+// Null edges, null relationType, and null/invalid nodes are dropped defensively.
+const mapRelations = (relations?: FindMediaBatchMediaDto['relations'] | null) => {
+  if (!relations) return;
+  const edges = (relations.edges ?? []).flatMap(edge => {
+    if (!edge || typeof edge.relationType !== 'string') return [];
+    const node = mapRelationNode(edge.node);
+    if (!node) return [];
+    return [{ relationType: edge.relationType, node }];
+  });
+  return { edges };
 };
 
 const extractAniListId = (input: unknown): AniListId | null => {

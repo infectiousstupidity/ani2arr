@@ -1,9 +1,8 @@
-/** AniList anime-page surface composition and mount orchestration. */
+/** AniList anime-page content surface mount and provider action rendering. */
 // src/content/anilist/anime-page/index.tsx
-/* eslint-disable complexity -- Existing page root coordinates several AniList surface workflows. */
 
-import React, { useState } from "react";
-import ReactDOM, { Root } from "react-dom/client";
+import { useState, type ReactElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import {
 	QueryClient,
 	QueryClientProvider,
@@ -12,73 +11,38 @@ import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { browser } from "wxt/browser";
 import type { AniListId } from "@/anilist";
 import { parseAniListIdOrNull } from "@/anilist/anilist-id";
-import { getAni2arrApi } from "@/rpc";
+import { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
 import type {
-	CheckMovieStatusResponse,
-	CheckSeriesStatusResponse,
-} from "@/rpc/types";
+	AniListMediaFormat,
+	AniListMediaHint,
+} from "@/anilist/schemas/media.schema";
 import {
-	buildMovieStatusResponseFromLibraryStatus,
-	buildSeriesStatusResponseFromLibraryStatus,
-} from "@/rpc/status-response-adapter";
-import { ExtensionErrorBoundary } from "@/shared/ui/feedback/extension-error-boundary";
-import { useTheme } from "@/shared/hooks/use-theme";
-import { useAniListMetadataBatch } from "@/queries";
+	resolveAniListTargetProvider,
+} from "@/content/anilist/target-provider";
 import {
 	createContentEntrypointShell,
 	type ContentEntrypointShellContext,
 } from "@/content/core/create-content-script-shell";
-import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
-import { useMappingIdentities } from "@/queries/mapping";
-import { usePublicOptions } from "@/queries/options";
-import { useProviderBaseUrl } from "@/queries/provider-base-url";
-import {
-	defaultRadarrFormState,
-	defaultSonarrFormState,
-} from "@/settings";
-import MediaActions from "./media-actions";
-import { logger } from "@/shared/utils/logger";
-import { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
-import {
-	getProviderRouteSlug,
-	type ProviderRouteSlugSource,
-} from "@/providers/provider-route-slug";
-import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
-import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
-import type { HostMediaTarget } from "@/content/browse/types";
-import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
-import type { SonarrFormState } from "@/providers/sonarr/form-state";
-import type { RadarrFormState } from "@/providers/radarr/form-state";
-import {
-	useAddMovie,
-	useMovieLibraryStatus,
-	useMovieStatus,
-} from "@/queries/radarr";
-import {
-	useAddSeries,
-	useSeriesLibraryStatus,
-	useSeriesStatus,
-} from "@/queries/sonarr";
 import { MediaModal, type MediaModalMetadataHint } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
-import {
-	buildProviderActionModel,
-	deriveProviderActionSummary,
-	type ProviderActionModel,
-} from "@/features/provider-action";
-import { buildProviderOpenUrl } from "@/providers/provider-links";
+import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
+import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
+import type { Provider } from "@/providers";
+import type { RadarrFormState } from "@/providers/radarr/form-state";
+import type { SonarrFormState } from "@/providers/sonarr/form-state";
+import { useAniListMetadataBatch } from "@/queries";
+import { useMappingIdentities } from "@/queries/mapping";
+import { usePublicOptions } from "@/queries/options";
+import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
+import { ConfirmProvider } from "@/shared/hooks/use-confirm";
+import { useTheme } from "@/shared/hooks/use-theme";
 import "@/shared/styles/base.css";
-import "./style.css";
+import { ExtensionErrorBoundary } from "@/shared/ui/feedback/extension-error-boundary";
+import { logger } from "@/shared/utils/logger";
 import {
 	createShadowRootUi,
 	type ShadowRootContentScriptUi,
 } from "wxt/utils/content-script-ui/shadow-root";
-import { ConfirmProvider } from "@/shared/hooks/use-confirm";
-import {
-	parseTmdbIdOrNull,
-	parseTvdbIdOrNull,
-	type Provider,
-} from "@/providers";
 import {
 	ACTIONS_SELECTOR,
 	ANCHOR_ID,
@@ -87,20 +51,20 @@ import {
 	attachSizeSync,
 	ensureActionsAnchor,
 	removeLayoutArtifacts,
-	resolveAnimePageProvider,
 	readFormatFromSidebar,
-	shouldSkipByFormat,
 	startAnchorKeeper,
 	waitForElement,
 } from "./layout";
+import MediaActions from "./media-actions";
+import "./style.css";
 
 const log = logger.create("AniList Content");
 
 const queryClient = new QueryClient({
 	defaultOptions: {
 		queries: {
-			staleTime: 5 * 60 * 1000, // 5 minutes
-			gcTime: 30 * 60 * 1000, // 30 minutes
+			staleTime: 5 * 60 * 1000,
+			gcTime: 30 * 60 * 1000,
 			refetchOnWindowFocus: false,
 			retry: 1,
 		},
@@ -109,78 +73,65 @@ const queryClient = new QueryClient({
 
 const ANIME_PAGE = new MatchPattern("*://anilist.co/anime/*");
 
-/* -------------------------------- React UI -------------------------------- */
-
 interface ContentRootProps {
-	target: HostMediaTarget;
+	target: {
+		anilistId: AniListId;
+		format: AniListMediaFormat | null;
+	};
+}
+
+interface AnimeProviderActionProps {
+	anilistId: AniListId;
+	displayTitle: string;
+	providerTitle: string | null;
+	metadata: AniListMediaHint | null;
+	isConfigured: boolean;
+	statusBlocked: boolean;
+	portalContainer: HTMLElement | null;
+	onOpenSetup(): void;
+	onOpenMapping(): void;
+}
+
+interface SonarrAnimeActionProps extends AnimeProviderActionProps {
+	defaultForm: SonarrFormState | null;
+}
+
+interface RadarrAnimeActionProps extends AnimeProviderActionProps {
+	defaultForm: RadarrFormState | null;
 }
 
 type PublicOptionsData = Awaited<ReturnType<typeof usePublicOptions>>["data"];
-type AnimePageStatusData =
-	| CheckMovieStatusResponse
-	| CheckSeriesStatusResponse;
-type AnimePageStatusQuery = {
-	data: AnimePageStatusData | undefined;
-	isError: boolean;
-	fetchStatus: ReturnType<typeof useMovieStatus>["fetchStatus"];
-	refetch: (
-		options?: Parameters<ReturnType<typeof useMovieStatus>["refetch"]>[0],
-	) => Promise<unknown>;
-};
+type AnimePageModalView = "setup" | "mapping";
 
-interface AnimePageProviderSelection {
-	statusQuery: AnimePageStatusQuery;
-	seriesStatusData: CheckSeriesStatusResponse | undefined;
-	movieStatusData: CheckMovieStatusResponse | undefined;
-	providerStatusData:
-		| CheckMovieStatusResponse
-		| CheckSeriesStatusResponse
-		| undefined;
-	hasMapping: boolean;
-	isAdding: boolean;
-	hasAddError: boolean;
-	addSucceeded: boolean;
+interface AnimePageOptionsState {
+	sonarrEnabled: boolean;
+	radarrEnabled: boolean;
+	hasConfiguredProvider: boolean;
 }
 
-interface AnimePageActionViewModel {
-	uiEnabled: boolean;
-	providerSelection: AnimePageProviderSelection;
-	actionModel: ProviderActionModel;
-	externalHref: string | null;
+function trimToNull(value: string | null | undefined): string | null {
+	const trimmed = value?.trim() ?? "";
+	return trimmed.length > 0 ? trimmed : null;
 }
 
-function getMappedIdentityFromIdentities(
-	identities: readonly EffectiveMappingPresence[],
-	anilistId: AniListId,
-): EffectiveMappingPresence | null {
+function getMetadataTitle(metadata: AniListMediaHint | null): string | null {
 	return (
-		identities.find(
-			(identity) =>
-				identity.anilistId === anilistId &&
-				identity.providerMappingState === "mapped" &&
-				identity.providerId !== null,
-		) ?? null
+		trimToNull(metadata?.titles?.english) ??
+		trimToNull(metadata?.titles?.romaji) ??
+		trimToNull(metadata?.titles?.native)
 	);
 }
 
-function getMappedProviderFromIdentities(
-	identities: readonly EffectiveMappingPresence[],
-	anilistId: AniListId,
-): Provider | null {
-	return getMappedIdentityFromIdentities(identities, anilistId)?.provider ?? null;
-}
-
-async function resolveMappedProviderForAniListId(
-	anilistId: AniListId,
-): Promise<Provider | null> {
-	try {
-		return getMappedProviderFromIdentities(
-			await getAni2arrApi().getMappingIdentities([anilistId]),
-			anilistId,
-		);
-	} catch {
-		return null;
-	}
+function getModalMetadataHint(input: {
+	title: string;
+	format: AniListMediaFormat | null;
+	metadata: AniListMediaHint | null;
+}): MediaModalMetadataHint {
+	return {
+		title: input.title,
+		format: input.metadata?.format ?? input.format,
+		coverImage: input.metadata?.coverImage ?? null,
+	};
 }
 
 function isProviderUiEnabled(
@@ -190,6 +141,59 @@ function isProviderUiEnabled(
 	return provider === "radarr"
 		? (options?.ui?.animePages.radarr.enabled ?? true)
 		: (options?.ui?.animePages.sonarr.enabled ?? true);
+}
+
+function getAnimePageOptionsState(
+	options: PublicOptionsData,
+): AnimePageOptionsState {
+	const sonarrEnabled = options?.ui?.animePages.sonarr.enabled ?? true;
+	const radarrEnabled = options?.ui?.animePages.radarr.enabled ?? true;
+
+	return {
+		sonarrEnabled,
+		radarrEnabled,
+		hasConfiguredProvider: Boolean(
+			(sonarrEnabled && options?.providers.sonarr.isConfigured) ||
+				(radarrEnabled && options?.providers.radarr.isConfigured),
+		),
+	};
+}
+
+function isProviderConfigured(
+	provider: Provider,
+	options: PublicOptionsData,
+): boolean {
+	return options?.providers[provider].isConfigured === true;
+}
+
+function isStatusBlocked(input: {
+	optionsPending: boolean;
+	isConfigured: boolean;
+	providerTitle: string | null;
+	metadataReadyForStatus: boolean;
+}): boolean {
+	return (
+		input.optionsPending ||
+		(input.isConfigured &&
+			input.providerTitle === null &&
+			!input.metadataReadyForStatus)
+	);
+}
+
+function openAnimeMediaModal(input: {
+	mediaModal: ReturnType<typeof useMediaModalState>;
+	anilistId: AniListId;
+	provider: Provider;
+	initialView: AnimePageModalView;
+	metadataHint: MediaModalMetadataHint;
+}): void {
+	input.mediaModal.open({
+		anilistId: input.anilistId,
+		provider: input.provider,
+		initialView: input.initialView,
+		openSource: "content",
+		metadataHint: input.metadataHint,
+	});
 }
 
 function openAnimePageSettings(provider: Provider): void {
@@ -203,286 +207,93 @@ function openAnimePageSettings(provider: Provider): void {
 		.catch(() => {});
 }
 
-function quickAddAnimePageProvider(input: {
-	provider: Provider;
-	isConfigured: boolean;
-	defaults: SonarrFormState | RadarrFormState;
-	anilistId: AniListId;
-	title: string;
-	resolvedMetadata: AniListMediaHint | null;
-	providerStatusData: AnimePageStatusData | undefined;
-	addSeriesMutation: ReturnType<typeof useAddSeries>;
-	addMovieMutation: ReturnType<typeof useAddMovie>;
-}): void {
-	if (!input.isConfigured) {
-		openAnimePageSettings(input.provider);
-		return;
-	}
-
-	if (input.provider === "radarr") {
-		const tmdbId = parseTmdbIdOrNull(input.providerStatusData?.providerId);
-		if (tmdbId === null) {
-			return;
-		}
-
-		input.addMovieMutation.mutate({
-			anilistId: input.anilistId,
-			tmdbId,
-			title: input.title,
-			primaryTitleHint: input.title,
-			metadata: input.resolvedMetadata,
-			form: { ...(input.defaults as RadarrFormState) },
-		});
-		return;
-	}
-
-	const tvdbId = parseTvdbIdOrNull(input.providerStatusData?.providerId);
-	if (tvdbId === null) {
-		return;
-	}
-
-	input.addSeriesMutation.mutate({
-		anilistId: input.anilistId,
-		tvdbId,
-		title: input.title,
-		primaryTitleHint: input.title,
-		metadata: input.resolvedMetadata,
-		form: { ...(input.defaults as SonarrFormState) },
+function SonarrAnimePageActions({
+	anilistId,
+	displayTitle,
+	providerTitle,
+	metadata,
+	isConfigured,
+	defaultForm,
+	statusBlocked,
+	portalContainer,
+	onOpenSetup,
+	onOpenMapping,
+}: SonarrAnimeActionProps): ReactElement {
+	const mediaAction = useSonarrMediaAction({
+		anilistId,
+		displayTitle,
+		providerTitle,
+		metadata,
+		isConfigured,
+		defaultForm,
+		enabled: true,
+		statusBlocked,
+		forceVerify: true,
+		priority: "high",
+		onConfigure: () => openAnimePageSettings("sonarr"),
+		onOpenMapping,
 	});
-}
 
-function getAnimePageProviderRouteSlug(input: {
-	provider: Provider;
-	movieStatusData: CheckMovieStatusResponse | undefined;
-	seriesStatusData: CheckSeriesStatusResponse | undefined;
-	addMovieMutation: ReturnType<typeof useAddMovie>;
-	addSeriesMutation: ReturnType<typeof useAddSeries>;
-}): string | null {
-	if (input.provider === "radarr") {
-		return getProviderRouteSlug(
-			"radarr",
-			(input.movieStatusData?.movie ??
-				input.addMovieMutation.data ??
-				null) as ProviderRouteSlugSource | null,
-		);
-	}
-
-	return getProviderRouteSlug(
-		"sonarr",
-		(input.seriesStatusData?.series ??
-			input.addSeriesMutation.data ??
-			null) as ProviderRouteSlugSource | null,
+	return (
+		<MediaActions
+			provider="sonarr"
+			state={mediaAction.status.state}
+			errorSource={mediaAction.status.errorSource}
+			hasMapping={mediaAction.status.hasMapping}
+			disabled={mediaAction.status.disabled}
+			externalHref={mediaAction.externalHref}
+			onPrimaryAction={mediaAction.runPrimaryAction}
+			onOpenSetup={onOpenSetup}
+			onOpenMapping={onOpenMapping}
+			portalContainer={portalContainer ?? undefined}
+		/>
 	);
 }
 
-function getAnimePageDefaults(input: {
-	provider: Provider | null;
-	options: PublicOptionsData;
-}): SonarrFormState | RadarrFormState {
-	if (input.provider === "radarr") {
-		return input.options?.providers.radarr.defaults ?? defaultRadarrFormState();
-	}
-
-	return input.options?.providers.sonarr.defaults ?? defaultSonarrFormState();
-}
-
-function getAnimePageModalMetadataHint(input: {
-	title: string;
-	format: HostMediaTarget["format"];
-	metadata: AniListMediaHint | null;
-}): MediaModalMetadataHint {
-	return {
-		title: input.title,
-		format: input.metadata?.format ?? input.format,
-		coverImage: input.metadata?.coverImage ?? null,
-	};
-}
-
-function selectAnimePageProviderSelection(input: {
-	provider: Provider;
-	movieStatusQuery: AnimePageStatusQuery;
-	seriesStatusQuery: AnimePageStatusQuery;
-	addMovieMutation: ReturnType<typeof useAddMovie>;
-	addSeriesMutation: ReturnType<typeof useAddSeries>;
-}): AnimePageProviderSelection {
-	if (input.provider === "radarr") {
-		const providerStatusData = input.movieStatusQuery.data as
-			| CheckMovieStatusResponse
-			| undefined;
-
-		return {
-			statusQuery: input.movieStatusQuery,
-			seriesStatusData: undefined,
-			movieStatusData: providerStatusData,
-			providerStatusData,
-			hasMapping:
-				providerStatusData?.providerId != null ||
-				input.addMovieMutation.data?.tmdbId != null,
-			isAdding: input.addMovieMutation.isPending,
-			hasAddError: input.addMovieMutation.isError,
-			addSucceeded: input.addMovieMutation.isSuccess,
-		};
-	}
-
-	const providerStatusData = input.seriesStatusQuery.data as
-		| CheckSeriesStatusResponse
-		| undefined;
-
-	return {
-		statusQuery: input.seriesStatusQuery,
-		seriesStatusData: providerStatusData,
-		movieStatusData: undefined,
-		providerStatusData,
-		hasMapping:
-			providerStatusData?.providerId != null ||
-			input.addSeriesMutation.data?.tvdbId != null,
-		isAdding: input.addSeriesMutation.isPending,
-		hasAddError: input.addSeriesMutation.isError,
-		addSucceeded: input.addSeriesMutation.isSuccess,
-	};
-}
-
-function runAnimePagePrimaryAction(input: {
-	primaryAction: ProviderActionModel["primaryAction"];
-	provider: Provider;
-	mediaModal: ReturnType<typeof useMediaModalState>;
-	providerStatusData:
-		| CheckMovieStatusResponse
-		| CheckSeriesStatusResponse
-		| undefined;
-	optionsError: boolean;
-	refetchOptions: ReturnType<typeof usePublicOptions>["refetch"];
-	refetchStatus: AnimePageStatusQuery["refetch"];
-	isConfigured: boolean;
-	defaults: SonarrFormState | RadarrFormState;
-	anilistId: AniListId;
-	title: string;
-	metadataHint: MediaModalMetadataHint;
-	resolvedMetadata: AniListMediaHint | null;
-	addSeriesMutation: ReturnType<typeof useAddSeries>;
-	addMovieMutation: ReturnType<typeof useAddMovie>;
-}): void {
-	switch (input.primaryAction) {
-		case "configure": {
-			openAnimePageSettings(input.provider);
-			return;
-		}
-		case "open-mapping": {
-			input.mediaModal.open({
-				anilistId: input.anilistId,
-				provider: input.provider,
-				initialView: "mapping",
-				openSource: "content",
-				metadataHint: input.metadataHint,
-			});
-			return;
-		}
-		case "retry-status": {
-			if (input.optionsError) {
-				void input.refetchOptions().catch(() => {});
-				return;
-			}
-
-			void input.refetchStatus({ throwOnError: false }).catch(() => {});
-			return;
-		}
-		case "quick-add":
-		case "retry-add": {
-			quickAddAnimePageProvider({
-				provider: input.provider,
-				isConfigured: input.isConfigured,
-				defaults: input.defaults,
-				anilistId: input.anilistId,
-				title: input.title,
-				resolvedMetadata: input.resolvedMetadata,
-				providerStatusData: input.providerStatusData,
-				addSeriesMutation: input.addSeriesMutation,
-				addMovieMutation: input.addMovieMutation,
-			});
-			return;
-		}
-		default: {
-			return;
-		}
-	}
-}
-
-function shouldEnableAnimePageStatusQuery(input: {
-	target: Provider;
-	provider: Provider | null;
-	isConfigured: boolean;
-}): boolean {
-	return input.isConfigured && input.provider === input.target;
-}
-
-function buildAnimePageActionViewModel(input: {
-	provider: Provider;
-	options: PublicOptionsData;
-	optionsPending: boolean;
-	optionsError: boolean;
-	title: string;
-	isConfigured: boolean;
-	providerBaseUrl: string;
-	movieStatusQuery: AnimePageStatusQuery;
-	seriesStatusQuery: AnimePageStatusQuery;
-	addMovieMutation: ReturnType<typeof useAddMovie>;
-	addSeriesMutation: ReturnType<typeof useAddSeries>;
-}): AnimePageActionViewModel {
-	const providerSelection = selectAnimePageProviderSelection({
-		provider: input.provider,
-		movieStatusQuery: input.movieStatusQuery,
-		seriesStatusQuery: input.seriesStatusQuery,
-		addMovieMutation: input.addMovieMutation,
-		addSeriesMutation: input.addSeriesMutation,
-	});
-	const actionSummary = deriveProviderActionSummary({
-		isConfigured: input.isConfigured,
-		isChecking:
-			input.optionsPending ||
-			(providerSelection.statusQuery.fetchStatus === "fetching" &&
-				!providerSelection.statusQuery.data),
-		providerMappingState:
-			providerSelection.providerStatusData?.providerMappingState,
-		isInLibrary: providerSelection.providerStatusData?.isInLibrary ?? null,
-		hasStatusError: input.optionsError || providerSelection.statusQuery.isError,
-		isAdding: providerSelection.isAdding,
-		hasAddError: providerSelection.hasAddError,
-		addSucceeded: providerSelection.addSucceeded,
-		hasMapping: providerSelection.hasMapping,
-	});
-	const providerRouteSlug = getAnimePageProviderRouteSlug({
-		provider: input.provider,
-		movieStatusData: providerSelection.movieStatusData,
-		seriesStatusData: providerSelection.seriesStatusData,
-		addMovieMutation: input.addMovieMutation,
-		addSeriesMutation: input.addSeriesMutation,
-	});
-	const resolvedSearchTerm =
-		providerSelection.statusQuery.data?.successfulSynonym ?? input.title;
-	const externalHref = buildProviderOpenUrl({
-		provider: input.provider,
-		baseUrl: input.providerBaseUrl,
-		isInLibrary:
-			actionSummary.state === "in-library" && Boolean(providerRouteSlug),
-		...(providerRouteSlug ? { providerRouteSlug } : {}),
-		...(resolvedSearchTerm ? { searchTerm: resolvedSearchTerm } : {}),
+function RadarrAnimePageActions({
+	anilistId,
+	displayTitle,
+	providerTitle,
+	metadata,
+	isConfigured,
+	defaultForm,
+	statusBlocked,
+	portalContainer,
+	onOpenSetup,
+	onOpenMapping,
+}: RadarrAnimeActionProps): ReactElement {
+	const mediaAction = useRadarrMediaAction({
+		anilistId,
+		displayTitle,
+		providerTitle,
+		metadata,
+		isConfigured,
+		defaultForm,
+		enabled: true,
+		statusBlocked,
+		forceVerify: true,
+		priority: "high",
+		onConfigure: () => openAnimePageSettings("radarr"),
+		onOpenMapping,
 	});
 
-	return {
-		uiEnabled: isProviderUiEnabled(input.provider, input.options),
-		providerSelection,
-		actionModel: buildProviderActionModel({
-			summary: actionSummary,
-			hasExternalHref: Boolean(externalHref),
-			canQuickAdd: true,
-		}),
-		externalHref,
-	};
+	return (
+		<MediaActions
+			provider="radarr"
+			state={mediaAction.status.state}
+			errorSource={mediaAction.status.errorSource}
+			hasMapping={mediaAction.status.hasMapping}
+			disabled={mediaAction.status.disabled}
+			externalHref={mediaAction.externalHref}
+			onPrimaryAction={mediaAction.runPrimaryAction}
+			onOpenSetup={onOpenSetup}
+			onOpenMapping={onOpenMapping}
+			portalContainer={portalContainer ?? undefined}
+		/>
+	);
 }
 
-export const ContentRoot: React.FC<ContentRootProps> = ({
-	target,
-}) => {
+export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
 	const { anilistId } = target;
 	const [hostElement, setHostElement] = useState<HTMLDivElement | null>(null);
 	useTheme({ current: hostElement });
@@ -490,222 +301,94 @@ export const ContentRoot: React.FC<ContentRootProps> = ({
 
 	const mediaModal = useMediaModalState();
 	const publicOptionsQuery = usePublicOptions();
-	const {
-		data: options,
-		isPending: optionsPending,
-		isError: optionsError,
-	} = publicOptionsQuery;
-	const hasConfiguredProvider = Boolean(
-		options?.providers.sonarr.isConfigured ||
-		options?.providers.radarr.isConfigured,
-	);
+	const options = publicOptionsQuery.data;
+	const optionState = getAnimePageOptionsState(options);
 	const metadataBatch = useAniListMetadataBatch([anilistId], {
-		enabled: hasConfiguredProvider,
+		enabled: optionState.hasConfiguredProvider,
 	});
 	const mappingIdentities = useMappingIdentities([anilistId], {
-		enabled: true,
+		enabled: optionState.sonarrEnabled || optionState.radarrEnabled,
 	});
-	const canonicalMetadata = metadataHintFromAniListMetadata(
+	const metadata = metadataHintFromAniListMetadata(
 		metadataBatch.data?.metadata?.[0] ?? null,
 	);
-	const resolvedMetadata = canonicalMetadata;
-	const mappedIdentity = getMappedIdentityFromIdentities(
-		mappingIdentities.data ?? [],
+	const providerTitle = getMetadataTitle(metadata);
+	const displayTitle = providerTitle ?? `AniList #${anilistId}`;
+	const provider = resolveAniListTargetProvider({
 		anilistId,
-	);
-	const provider =
-		mappedIdentity?.provider ??
-		resolveProviderForAniListFormat(target.format);
-	const mappedSonarrProviderId =
-		mappedIdentity?.provider === "sonarr"
-			? parseTvdbIdOrNull(mappedIdentity.providerId)
-			: null;
-	const mappedRadarrProviderId =
-		mappedIdentity?.provider === "radarr"
-			? parseTmdbIdOrNull(mappedIdentity.providerId)
-			: null;
-	const title =
-		resolvedMetadata?.titles?.english?.trim() ||
-		resolvedMetadata?.titles?.romaji?.trim() ||
-		resolvedMetadata?.titles?.native?.trim() ||
-		`AniList #${anilistId}`;
-	const modalMetadataHint = getAnimePageModalMetadataHint({
-		title,
 		format: target.format,
-		metadata: resolvedMetadata,
-	});
-	const isConfigured = provider
-		? options?.providers[provider]?.isConfigured === true
-		: false;
-	const defaults = getAnimePageDefaults({ provider, options });
-	const providerBaseUrl = useProviderBaseUrl(provider ?? "sonarr", {
-		enabled: Boolean(provider && isConfigured),
+		mappedIdentities: mappingIdentities.data ?? [],
 	});
 
-	const seriesStatusQuery = useSeriesStatus(
-		{ anilistId, title, metadata: resolvedMetadata },
-		{
-			enabled: shouldEnableAnimePageStatusQuery({
-				target: "sonarr",
-				provider,
-				isConfigured,
-			}) && mappedIdentity === null,
-			force_verify: true,
-			priority: "high",
-		},
-	);
-	const movieStatusQuery = useMovieStatus(
-		{ anilistId, title, metadata: resolvedMetadata },
-		{
-			enabled: shouldEnableAnimePageStatusQuery({
-				target: "radarr",
-				provider,
-				isConfigured,
-			}) && mappedIdentity === null,
-			force_verify: true,
-			priority: "high",
-		},
-	);
-	const seriesLibraryStatusQuery = useSeriesLibraryStatus(
-		mappedSonarrProviderId,
-		{
-			enabled:
-				isConfigured && provider === "sonarr" && mappedSonarrProviderId !== null,
-			forceVerify: true,
-		},
-	);
-	const movieLibraryStatusQuery = useMovieLibraryStatus(
-		mappedRadarrProviderId,
-		{
-			enabled:
-				isConfigured && provider === "radarr" && mappedRadarrProviderId !== null,
-			forceVerify: true,
-		},
-	);
-	let adaptedSeriesStatusData: CheckSeriesStatusResponse | undefined;
-	if (
-		mappedIdentity?.provider === "sonarr" &&
-		mappedSonarrProviderId !== null &&
-		seriesLibraryStatusQuery.data
-	) {
-		adaptedSeriesStatusData = buildSeriesStatusResponseFromLibraryStatus({
-			providerId: mappedSonarrProviderId,
-			...(mappedIdentity.mappingSource
-				? { mappingSource: mappedIdentity.mappingSource }
-				: {}),
-			...(mappedIdentity.mappingReason
-				? { mappingReason: mappedIdentity.mappingReason }
-				: {}),
-			libraryStatus: seriesLibraryStatusQuery.data,
-		});
-	}
-	let adaptedMovieStatusData: CheckMovieStatusResponse | undefined;
-	if (
-		mappedIdentity?.provider === "radarr" &&
-		mappedRadarrProviderId !== null &&
-		movieLibraryStatusQuery.data
-	) {
-		adaptedMovieStatusData = buildMovieStatusResponseFromLibraryStatus({
-			providerId: mappedRadarrProviderId,
-			...(mappedIdentity.mappingSource
-				? { mappingSource: mappedIdentity.mappingSource }
-				: {}),
-			...(mappedIdentity.mappingReason
-				? { mappingReason: mappedIdentity.mappingReason }
-				: {}),
-			libraryStatus: movieLibraryStatusQuery.data,
-		});
-	}
-	const effectiveSeriesStatusQuery: AnimePageStatusQuery =
-		mappedIdentity?.provider === "sonarr"
-			? {
-					data: adaptedSeriesStatusData,
-					isError: seriesLibraryStatusQuery.isError,
-					fetchStatus: seriesLibraryStatusQuery.fetchStatus,
-					refetch: seriesLibraryStatusQuery.refetch,
-				}
-			: seriesStatusQuery;
-	const effectiveMovieStatusQuery: AnimePageStatusQuery =
-		mappedIdentity?.provider === "radarr"
-			? {
-					data: adaptedMovieStatusData,
-					isError: movieLibraryStatusQuery.isError,
-					fetchStatus: movieLibraryStatusQuery.fetchStatus,
-					refetch: movieLibraryStatusQuery.refetch,
-				}
-			: movieStatusQuery;
-	const addSeriesMutation = useAddSeries();
-	const addMovieMutation = useAddMovie();
-
-	if (!provider) {
+	if (!provider || !isProviderUiEnabled(provider, options)) {
 		return null;
 	}
 
-	const viewModel = buildAnimePageActionViewModel({
-		provider,
-		options,
-		optionsPending,
-		optionsError,
-		title,
+	const isConfigured = isProviderConfigured(provider, options);
+	const metadataReadyForStatus =
+		!optionState.hasConfiguredProvider ||
+		metadataBatch.isFetched ||
+		metadataBatch.isError;
+	const statusBlocked = isStatusBlocked({
+		optionsPending: publicOptionsQuery.isPending,
 		isConfigured,
-		providerBaseUrl: providerBaseUrl.data ?? "",
-		movieStatusQuery: effectiveMovieStatusQuery,
-		seriesStatusQuery: effectiveSeriesStatusQuery,
-		addMovieMutation,
-		addSeriesMutation,
+		providerTitle,
+		metadataReadyForStatus,
 	});
-	const handlePrimaryAction = () => {
-		runAnimePagePrimaryAction({
-			primaryAction: viewModel.actionModel.primaryAction,
-			provider,
+	const metadataHint = getModalMetadataHint({
+		title: displayTitle,
+		format: target.format,
+		metadata,
+	});
+	const openSetup = () => {
+		openAnimeMediaModal({
 			mediaModal,
-			providerStatusData: viewModel.providerSelection.providerStatusData,
-			optionsError,
-			refetchOptions: publicOptionsQuery.refetch,
-			refetchStatus: viewModel.providerSelection.statusQuery.refetch,
-			isConfigured,
-			defaults,
 			anilistId,
-			title,
-			metadataHint: modalMetadataHint,
-			resolvedMetadata,
-			addSeriesMutation,
-			addMovieMutation,
+			provider,
+			initialView: "setup",
+			metadataHint,
 		});
 	};
-
-	if (!viewModel.uiEnabled) {
-		return null;
-	}
+	const openMapping = () => {
+		openAnimeMediaModal({
+			mediaModal,
+			anilistId,
+			provider,
+			initialView: "mapping",
+			metadataHint,
+		});
+	};
 
 	return (
 		<div ref={setHostElement} style={{ width: "100%" }}>
 			<ConfirmProvider portalContainer={hostElement ?? null}>
-				<MediaActions
-					provider={provider}
-					actionModel={viewModel.actionModel}
-					externalHref={viewModel.externalHref}
-					onPrimaryAction={handlePrimaryAction}
-					onOpenSetup={() => {
-						mediaModal.open({
-							anilistId,
-							provider,
-							initialView: "setup",
-							openSource: "content",
-							metadataHint: modalMetadataHint,
-						});
-					}}
-					onOpenMapping={() => {
-						mediaModal.open({
-							anilistId,
-							provider,
-							initialView: "mapping",
-							openSource: "content",
-							metadataHint: modalMetadataHint,
-						});
-					}}
-					portalContainer={hostElement ?? undefined}
-				/>
+				{provider === "sonarr" ? (
+					<SonarrAnimePageActions
+						anilistId={anilistId}
+						displayTitle={displayTitle}
+						providerTitle={providerTitle}
+						metadata={metadata}
+						isConfigured={isConfigured}
+						defaultForm={options?.providers.sonarr.defaults ?? null}
+						statusBlocked={statusBlocked}
+						portalContainer={hostElement}
+						onOpenSetup={openSetup}
+						onOpenMapping={openMapping}
+					/>
+				) : (
+					<RadarrAnimePageActions
+						anilistId={anilistId}
+						displayTitle={displayTitle}
+						providerTitle={providerTitle}
+						metadata={metadata}
+						isConfigured={isConfigured}
+						defaultForm={options?.providers.radarr.defaults ?? null}
+						statusBlocked={statusBlocked}
+						portalContainer={hostElement}
+						onOpenSetup={openSetup}
+						onOpenMapping={openMapping}
+					/>
+				)}
 				{hostElement && mediaModal.state ? (
 					<MediaModal
 						key={`modal-${mediaModal.state.anilistId}`}
@@ -717,9 +400,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({
 			</ConfirmProvider>
 		</div>
 	);
-};
-
-/* -------------------------- Content-script boot --------------------------- */
+}
 
 let ui: ShadowRootContentScriptUi<Root> | null = null;
 let stopAnchorKeeper: (() => void) | null = null;
@@ -751,22 +432,18 @@ const isAnimePageShellEligible = async ({
 		return false;
 	}
 
-	const provider = await resolveAnimePageProvider(signal);
-	const idMatch = new URL(url).pathname.match(/\/anime\/(\d+)/);
-	const anilistId = parseAniListIdOrNull(
-		idMatch?.[1] ? Number.parseInt(idMatch[1], 10) : null,
-	);
-	const mappedProvider = anilistId
-		? await resolveMappedProviderForAniListId(anilistId)
-		: null;
-	const routedProvider = mappedProvider ?? provider;
-	if (!routedProvider) {
+	if (
+		(publicOptions.ui?.animePages.sonarr.enabled ?? true) === false &&
+		(publicOptions.ui?.animePages.radarr.enabled ?? true) === false
+	) {
 		return false;
 	}
 
-	return routedProvider === "radarr"
-		? (publicOptions.ui?.animePages.radarr.enabled ?? true)
-		: (publicOptions.ui?.animePages.sonarr.enabled ?? true);
+	await Promise.all([
+		waitForElement(ACTIONS_SELECTOR, { signal }),
+		waitForElement(SIDEBAR_SELECTOR, { signal }),
+	]);
+	return true;
 };
 
 async function mountAnimePageUI({
@@ -788,23 +465,14 @@ async function mountAnimePageUI({
 
 	if (!isCurrent()) return;
 
-	const mappedProvider = await resolveMappedProviderForAniListId(anilistId);
-	if (!mappedProvider && shouldSkipByFormat(document)) {
-		removeAnimeUI();
-		log.debug("AniList page skipped due to format being movie/music");
-		return;
-	}
-
-	const sidebarFormat = readFormatFromSidebar(document);
-
 	stopAnchorKeeper?.();
 	stopAnchorKeeper = startAnchorKeeper();
 	const mountTarget = ensureActionsAnchor();
 	if (!mountTarget) return;
-	const target: HostMediaTarget = {
+
+	const target: ContentRootProps["target"] = {
 		anilistId,
-		format: sidebarFormat,
-		mountTarget,
+		format: readFormatFromSidebar(document),
 	};
 
 	if (!isCurrent()) {
@@ -830,14 +498,12 @@ async function mountAnimePageUI({
 			shadowHost: HTMLElement,
 		): Root => {
 			stopSizeSync = attachSizeSync(shadowHost);
-			const root = ReactDOM.createRoot(uiContainer);
+			const root = createRoot(uiContainer);
 			root.render(
 				<ExtensionErrorBoundary scope="anilist-anime-root">
 					<QueryClientProvider client={queryClient}>
 						<TooltipProvider>
-							<ContentRoot
-								target={target}
-							/>
+							<ContentRoot target={target} />
 						</TooltipProvider>
 					</QueryClientProvider>
 				</ExtensionErrorBoundary>,

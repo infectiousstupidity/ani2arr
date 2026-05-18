@@ -2,7 +2,6 @@
 // src/content/anilist/anime-page/layout.ts
 
 import { parseAniListMediaFormatLabel, type AniListMediaFormat } from '@/anilist/schemas/media.schema';
-import { resolveProviderForAniListFormat } from '@/providers/provider-routing';
 
 export const ACTIONS_SELECTOR = '.header .cover-wrap .actions, .cover-wrap .actions';
 export const LIST_ROW_SELECTOR = '.actions .list';
@@ -178,14 +177,3 @@ export function readFormatFromSidebar(doc: Document = document): AniListMediaFor
   const raw = formatRow?.querySelector('.value')?.textContent ?? '';
   return parseAniListMediaFormatLabel(raw);
 }
-
-function shouldSkipByFormat(doc: Document = document): boolean {
-  return resolveProviderForAniListFormat(readFormatFromSidebar(doc)) === null;
-}
-
-export async function resolveAnimePageProvider(signal: AbortSignal): Promise<'sonarr' | 'radarr' | null> {
-  await waitForElement(SIDEBAR_SELECTOR, { signal });
-  return resolveProviderForAniListFormat(readFormatFromSidebar(document));
-}
-
-export { shouldSkipByFormat };

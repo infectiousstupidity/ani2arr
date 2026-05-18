@@ -20,6 +20,10 @@ const FindMediaBatchStartDateDtoSchema = v.object({
 
 const FindMediaBatchRelationNodeDtoSchema = v.object({
   id: v.optional(v.nullable(v.number())),
+  format: v.optional(v.nullable(v.string())),
+  title: v.optional(v.nullable(FindMediaBatchTitleDtoSchema)),
+  startDate: v.optional(v.nullable(FindMediaBatchStartDateDtoSchema)),
+  synonyms: v.optional(v.nullable(v.array(v.unknown()))),
 });
 
 const FindMediaBatchRelationEdgeDtoSchema = v.object({

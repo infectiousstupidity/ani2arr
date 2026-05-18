@@ -5,7 +5,7 @@ export { PROVIDERS } from "./types";
 export type {
 	Provider,
 	ProviderCredentials,
-	ProviderFormOptions,
+	ProviderFormResources,
 	ProviderQualityProfile,
 	ProviderRootFolder,
 	ProviderTag,
