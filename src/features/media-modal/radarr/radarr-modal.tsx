@@ -23,7 +23,7 @@ import { useMappingActions } from "../hooks/use-mapping-actions";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
 import { useOpenMappingSettingsAction } from "../hooks/use-open-mapping-settings-action";
 import { targetsEqual } from "../helpers";
-import { ModalFooter } from "../chrome/modal-footer";
+import { MappingFooter, SetupFooter } from "../chrome/modal-footer";
 import { ModalHeader } from "../chrome/modal-header";
 import { ModalShell } from "../chrome/modal-shell";
 import {
@@ -290,23 +290,27 @@ export function RadarrModal({
 				/>
 			}
 			footer={
-				<ModalFooter
-					isMappingView={isMappingView}
-					manualMappingActive={data.manualMappingActive}
-					canShowSetup={canShowSetup}
-					isRevertingMapping={mappingActions.isRevertingMapping}
-					canSubmitMapping={canSubmitMapping}
-					isSubmittingMapping={mappingActions.isSubmittingMapping}
-					onResetMapping={mappingActions.resetMapping}
-					onApplyMapping={mappingActions.applyMapping}
-					onShowSetup={showSetupView}
-					onClose={onClose}
-					setupFormId={SETUP_FORM_ID}
-					setupCanSubmit={setupForm.footerState.canSubmit}
-					setupIsBusy={setupForm.footerState.isBusy}
-					isSubmittingSetup={setupForm.footerState.isSubmitting}
-					setupSubmitLabel={setupForm.footerState.submitLabel}
-				/>
+				isMappingView ? (
+					<MappingFooter
+						manualMappingActive={data.manualMappingActive}
+						isResettingMapping={mappingActions.isRevertingMapping}
+						canApplyMapping={canSubmitMapping}
+						isApplyingMapping={mappingActions.isSubmittingMapping}
+						leaveMappingLabel={canShowSetup ? "Back to setup" : "Exit modal"}
+						onLeaveMapping={canShowSetup ? showSetupView : onClose}
+						onResetMapping={mappingActions.resetMapping}
+						onApplyMapping={mappingActions.applyMapping}
+					/>
+				) : (
+					<SetupFooter
+						formId={SETUP_FORM_ID}
+						canSubmit={setupForm.footerState.canSubmit}
+						isBusy={setupForm.footerState.isBusy}
+						isSubmitting={setupForm.footerState.isSubmitting}
+						submitLabel={setupForm.footerState.submitLabel}
+						onCancel={onClose}
+					/>
+				)
 			}
 			onOpenChange={(open) => !open && onClose()}
 			container={container}
