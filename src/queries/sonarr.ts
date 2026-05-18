@@ -164,7 +164,7 @@ export const useSonarrLookupSearch = (input: {
 	return useQuery<SonarrLookupOutput>({
 		queryKey: queryKeys.mappingSearch("sonarr", term),
 		queryFn: async () => getAni2arrApi().searchSonarr({ term }),
-		enabled: input.enabled && term.length >= 2,
+		enabled: input.enabled && term.length > 0,
 		staleTime: 60 * 1000,
 		refetchOnWindowFocus: false,
 		retry: 1,

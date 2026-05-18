@@ -11,11 +11,8 @@ import { buildProviderOpenUrl } from "@/providers/provider-links";
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import type { RadarrLookupMovie } from "@/providers/radarr/types";
 import { useRadarrLookupSearch } from "@/queries/radarr";
-import { useDebounced } from "@/shared/hooks/use-debounced";
-import {
-	MappingCandidateRow,
-	MappingResultList,
-} from "../mapping/mapping-search-results";
+import { MappingCandidateRow } from "../mapping/mapping-search-results";
+import { MappingSearchShell } from "../mapping/mapping-search-shell";
 import { normalizeLinkedAniListIds, pickProviderPoster } from "../helpers";
 import type { MediaModalTargetSummary } from "../types";
 
@@ -126,11 +123,10 @@ export function RadarrMappingPanel(
 		selectedCandidate,
 		onSelectCandidate,
 	} = props;
-	const [query, setQuery] = useState("");
-	const debouncedQuery = useDebounced(query, 300).trim();
+	const [searchTerm, setSearchTerm] = useState("");
 	const search = useRadarrLookupSearch({
-		term: debouncedQuery,
-		enabled: debouncedQuery.length >= 2,
+		term: searchTerm,
+		enabled: searchTerm.length > 0,
 	});
 	const providerLabel = getProviderLabel(PROVIDER);
 	const providerIdLabel = getProviderExternalIdLabel(PROVIDER);
@@ -146,77 +142,46 @@ export function RadarrMappingPanel(
 			) ?? [],
 		[baseUrl, search.data],
 	);
-	const trimmedQuery = query.trim();
-	const showMinimumCharacterMessage =
-		query.length > 0 && trimmedQuery.length < 2;
-	const canRenderSearchState = showMinimumCharacterMessage === false;
-	const showSearchingState =
-		canRenderSearchState && search.isFetching && candidates.length === 0;
-	const showEmptyState =
-		canRenderSearchState && !search.isFetching && candidates.length === 0;
 
-	const handleQueryChange = (nextQuery: string): void => {
-		setQuery(nextQuery);
+	const handleQueryChange = (): void => {
+		setSearchTerm("");
 		onSelectCandidate(null);
 	};
 
 	return (
-		<div className="flex h-full min-h-0 flex-col overflow-hidden px-4 pt-4">
-			<div className="shrink-0 pb-4">
-				<div className="space-y-1">
-					<p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">
-						Search Radarr database
-					</p>
-					<p className="text-xs text-text-secondary">
-						Search results update the target preview on the right.
-					</p>
-				</div>
+		<MappingSearchShell
+			providerLabel={providerLabel}
+			providerIdLabel={providerIdLabel}
+			hasSearchTerm={searchTerm.length > 0}
+			isFetching={search.isFetching}
+			resultCount={candidates.length}
+			onQueryChange={handleQueryChange}
+			onSearch={setSearchTerm}
+		>
+			{candidates.map((candidate) => {
+				const summary = candidate.summary;
+				const externalLabel = `Open in ${providerLabel}`;
 
-				<div className="mt-3">
-					<input
-						value={query}
-						onChange={(event) => handleQueryChange(event.target.value)}
-						placeholder={`Search ${providerLabel} title or ${providerIdLabel}...`}
-						className="w-full rounded-xl border border-border-primary/60 bg-bg-tertiary/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-accent-primary focus:outline-none"
+				return (
+					<MappingCandidateRow
+						key={candidate.tmdbId}
+						title={summary.title}
+						providerIdLabel={providerIdLabel}
+						providerId={summary.providerId}
+						contentContainer={contentContainer}
+						externalLabel={externalLabel}
+						externalUrl={getResultLink({ candidate, baseUrl })}
+						isCurrent={currentTarget?.providerId === candidate.tmdbId}
+						isSelected={selectedCandidate?.tmdbId === candidate.tmdbId}
+						libraryLabel={getLibraryLabel({ candidate, providerLabel })}
+						linkedAniListCount={summary.linkedAniListIds?.length}
+						onSelect={() => onSelectCandidate(candidate)}
+						posterUrl={summary.posterUrl}
+						typeLabel={summary.typeLabel}
+						year={summary.year}
 					/>
-				</div>
-			</div>
-
-			<div className="min-h-0 flex-1">
-				<MappingResultList
-					providerLabel={providerLabel}
-					query={query}
-					showMinimumCharacterMessage={showMinimumCharacterMessage}
-					showSearchingState={showSearchingState}
-					showEmptyState={showEmptyState}
-					canRenderResults={canRenderSearchState}
-				>
-					{candidates.map((candidate) => {
-						const summary = candidate.summary;
-						const externalLabel = `Open in ${providerLabel}`;
-
-						return (
-							<MappingCandidateRow
-								key={candidate.tmdbId}
-								title={summary.title}
-								providerIdLabel={providerIdLabel}
-								providerId={summary.providerId}
-								contentContainer={contentContainer}
-								externalLabel={externalLabel}
-								externalUrl={getResultLink({ candidate, baseUrl })}
-								isCurrent={currentTarget?.providerId === candidate.tmdbId}
-								isSelected={selectedCandidate?.tmdbId === candidate.tmdbId}
-								libraryLabel={getLibraryLabel({ candidate, providerLabel })}
-								linkedAniListCount={summary.linkedAniListIds?.length}
-								onSelect={() => onSelectCandidate(candidate)}
-								posterUrl={summary.posterUrl}
-								typeLabel={summary.typeLabel}
-								year={summary.year}
-							/>
-						);
-					})}
-				</MappingResultList>
-			</div>
-		</div>
+				);
+			})}
+		</MappingSearchShell>
 	);
 }

@@ -160,7 +160,7 @@ export const useRadarrLookupSearch = (input: {
 	return useQuery<RadarrLookupOutput>({
 		queryKey: queryKeys.mappingSearch("radarr", term),
 		queryFn: async () => getAni2arrApi().searchRadarr({ term }),
-		enabled: input.enabled && term.length >= 2,
+		enabled: input.enabled && term.length > 0,
 		staleTime: 60 * 1000,
 		refetchOnWindowFocus: false,
 		retry: 1,

@@ -1,19 +1,8 @@
-/** Dumb mapping search result list and candidate row UI for provider mapping panels. */
+/** Dumb mapping candidate row UI for provider mapping panels. */
 // src/features/media-modal/mapping/mapping-search-results.tsx
 
-import * as ScrollArea from "@radix-ui/react-scroll-area";
 import { ExternalLink } from "lucide-react";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
-
-type MappingResultListProps = {
-	providerLabel: string;
-	query: string;
-	showMinimumCharacterMessage: boolean;
-	showSearchingState: boolean;
-	showEmptyState: boolean;
-	canRenderResults: boolean;
-	children: React.ReactNode;
-};
 
 type MappingCandidateRowProps = {
 	title: string;
@@ -32,75 +21,12 @@ type MappingCandidateRowProps = {
 	year?: number | undefined;
 };
 
-function MappingSearchState(props: { children: React.ReactNode }): React.JSX.Element {
-	return (
-		<div className="px-3 py-6 text-center text-xs text-text-secondary">
-			{props.children}
-		</div>
-	);
-}
-
 function getLinkedWarning(linkedAniListCount: number | undefined): string | null {
 	if (!linkedAniListCount) return null;
 
 	return `Linked to ${linkedAniListCount} AniList entr${
 		linkedAniListCount === 1 ? "y" : "ies"
 	}`;
-}
-
-export function MappingResultList(
-	props: MappingResultListProps,
-): React.JSX.Element {
-	const {
-		providerLabel,
-		query,
-		showMinimumCharacterMessage,
-		showSearchingState,
-		showEmptyState,
-		canRenderResults,
-		children,
-	} = props;
-
-	return (
-		<ScrollArea.Root className="h-full w-full">
-			<ScrollArea.Viewport className="h-full w-full scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-				<div className="pb-4 pr-1">
-					<div className="overflow-hidden rounded-xl border border-border-primary/60 bg-bg-secondary/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-						<div className="divide-y divide-border-primary/70">
-							{showMinimumCharacterMessage ? (
-								<MappingSearchState>
-									Enter at least 2 characters to search {providerLabel}.
-								</MappingSearchState>
-							) : null}
-
-							{showSearchingState ? (
-								<MappingSearchState>Searching...</MappingSearchState>
-							) : null}
-
-							{showEmptyState ? (
-								<MappingSearchState>
-									{query.length > 0
-										? "No results found."
-										: `Type to search ${providerLabel} manually.`}
-								</MappingSearchState>
-							) : null}
-
-							{canRenderResults ? children : null}
-						</div>
-					</div>
-				</div>
-			</ScrollArea.Viewport>
-
-			<ScrollArea.Scrollbar
-				orientation="vertical"
-				className="flex w-2.5 select-none touch-none p-0.5"
-			>
-				<ScrollArea.Thumb className="flex-1 rounded bg-border-primary/40" />
-			</ScrollArea.Scrollbar>
-
-			<ScrollArea.Corner />
-		</ScrollArea.Root>
-	);
 }
 
 export function MappingCandidateRow(
