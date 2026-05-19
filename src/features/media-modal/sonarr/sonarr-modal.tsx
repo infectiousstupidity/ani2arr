@@ -285,7 +285,7 @@ export function SonarrModal({
 						isMappingView ? (selectedCandidate?.summary ?? null) : null
 					}
 					isInMappingMode={isMappingView}
-					inspectionQuery={inspection}
+					mappingDetails={inspection.data}
 					onClearPreview={() => setSelectedCandidate(null)}
 				/>
 			}
