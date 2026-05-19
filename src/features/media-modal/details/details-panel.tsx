@@ -1,22 +1,13 @@
-/** Read-only right-side details and logs panel for media modal flows. */
+/** Read-only right-side details panel for media modal flows. */
 // src/features/media-modal/details/details-panel.tsx
 
-import { useState, type ReactNode } from "react";
 import type { AniListId } from "@/anilist";
 import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
 import type { Provider } from "@/providers";
 import { getProviderLabel } from "@/providers/provider-labels";
 import type { MediaModalTargetSummary } from "../types";
-import { MappingPreviewDetails } from "./details-tab";
-import { MappingInspectionLogs } from "./logs-tab";
-
-type MappingInspectionQuery = {
-	data: MappingDetailsPayload | undefined;
-	error: unknown;
-	isPending: boolean;
-};
-
-type RightPanelTab = "details" | "logs";
+import { CurrentTargetDetails } from "./current-target-details";
+import { PreviewTargetDetails } from "./preview-target-details";
 
 export type DetailsPanelProps = {
 	provider: Provider;
@@ -26,43 +17,9 @@ export type DetailsPanelProps = {
 	effectiveMapping: MediaModalTargetSummary | null;
 	previewMapping: MediaModalTargetSummary | null;
 	isInMappingMode: boolean;
-	inspectionQuery: MappingInspectionQuery;
+	mappingDetails?: MappingDetailsPayload | undefined;
 	onClearPreview: () => void;
 };
-
-function getRightPanelHeading(
-	providerLabel: Capitalize<Provider>,
-	isInMappingMode: boolean,
-): string {
-	return isInMappingMode
-		? `PREVIEWING ${providerLabel.toUpperCase()} MATCH`
-		: "CURRENT TARGET DETAILS";
-}
-
-function TabButton(props: {
-	tab: RightPanelTab;
-	activeTab: RightPanelTab;
-	onTabChange: (tab: RightPanelTab) => void;
-	children: ReactNode;
-}): React.JSX.Element {
-	const { tab, activeTab, onTabChange, children } = props;
-	const isActive = activeTab === tab;
-
-	return (
-		<button
-			type="button"
-			onClick={() => onTabChange(tab)}
-			className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-colors ${
-				isActive
-					? "bg-bg-primary text-text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-					: "text-text-secondary hover:text-text-primary"
-			}`}
-			aria-pressed={isActive}
-		>
-			{children}
-		</button>
-	);
-}
 
 export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 	const {
@@ -73,14 +30,38 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 		effectiveMapping,
 		previewMapping,
 		isInMappingMode,
-		inspectionQuery,
+		mappingDetails,
 		onClearPreview,
 	} = props;
 	const providerLabel = getProviderLabel(provider);
-	const [activeTab, setActiveTab] = useState<RightPanelTab>("details");
-	const showPreviewReset = isInMappingMode && Boolean(previewMapping);
-	const headingLabel = getRightPanelHeading(providerLabel, isInMappingMode);
-	const inspection = inspectionQuery.data ?? null;
+	const headingLabel = isInMappingMode
+		? `PREVIEWING ${providerLabel.toUpperCase()} MATCH`
+		: "CURRENT TARGET DETAILS";
+	let content: React.JSX.Element;
+
+	if (isInMappingMode) {
+		content = previewMapping ? (
+			<PreviewTargetDetails
+				aniListEntryId={anilistId}
+				previewMapping={previewMapping}
+				onResetPreview={onClearPreview}
+				baseUrl={baseUrl}
+				contentContainer={contentContainer}
+			/>
+		) : (
+			<div className="flex min-h-65 flex-1 items-center justify-center rounded-xl border border-dashed border-border-primary bg-bg-tertiary/60 px-3 text-center text-sm text-text-secondary">
+				{`Select a search result to preview how it would replace the current ${providerLabel} target shown above.`}
+			</div>
+		);
+	} else {
+		content = (
+			<CurrentTargetDetails
+				aniListEntryId={anilistId}
+				effectiveMapping={effectiveMapping}
+				linkedAniListEntries={mappingDetails?.linkedAniListEntries ?? []}
+			/>
+		);
+	}
 
 	return (
 		<div className="flex h-full min-h-0 flex-col rounded-2xl bg-bg-secondary/34 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
@@ -88,55 +69,9 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 				<p className="text-[11px] font-semibold leading-none tracking-[0.16em] text-text-secondary uppercase">
 					{headingLabel}
 				</p>
-
-				<div className="inline-flex rounded-full border border-border-primary/50 bg-bg-primary/20 p-1">
-					<TabButton
-						tab="details"
-						activeTab={activeTab}
-						onTabChange={setActiveTab}
-					>
-						Details
-					</TabButton>
-					<TabButton tab="logs" activeTab={activeTab} onTabChange={setActiveTab}>
-						Logs
-					</TabButton>
-				</div>
 			</div>
 
-			<div className="min-h-0 flex-1">
-				{activeTab === "details" ? (
-					<MappingPreviewDetails
-						aniListEntryId={anilistId}
-						effectiveMapping={effectiveMapping}
-						previewMapping={previewMapping}
-						isInMappingMode={isInMappingMode}
-						showResetPreview={showPreviewReset}
-						onResetPreview={onClearPreview}
-						linkedAniListEntries={inspection?.linkedAniListEntries ?? []}
-						providerLabel={providerLabel}
-						baseUrl={baseUrl}
-						contentContainer={contentContainer}
-					/>
-				) : (
-					<div className="min-h-0 overflow-y-auto pr-1">
-						{inspectionQuery.isPending && !inspection ? (
-							<div className="rounded-xl bg-bg-secondary/35 px-3 py-6 text-sm text-text-secondary">
-								Loading mapping diagnostics...
-							</div>
-						) : null}
-
-						{inspectionQuery.error && !inspection ? (
-							<div className="rounded-xl bg-warning/8 px-3 py-4 text-sm text-text-secondary">
-								Mapping diagnostics are unavailable right now.
-							</div>
-						) : null}
-
-						{inspection ? (
-							<MappingInspectionLogs inspection={inspection} provider={provider} />
-						) : null}
-					</div>
-				)}
-			</div>
+			<div className="min-h-0 flex-1">{content}</div>
 		</div>
 	);
 }
