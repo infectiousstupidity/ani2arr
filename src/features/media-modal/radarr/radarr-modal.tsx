@@ -17,7 +17,6 @@ import { useMovieStatus, useRadarrFormResources } from "@/queries/radarr";
 import type { CheckMovieStatusResponse } from "@/rpc/types";
 import { defaultRadarrFormState } from "@/settings";
 import { DetailsPanel } from "../details/details-panel";
-import { MappingHeaderActions } from "../mapping/mapping-header-actions";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
 import { useMappingActions } from "../hooks/use-mapping-actions";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
@@ -62,17 +61,6 @@ type RadarrModalData = {
 	storedDefaults: ReturnType<typeof defaultRadarrFormState>;
 	providerFormResources: ProviderFormResources | null;
 };
-
-function getModeSwitchLabel(input: {
-	isMappingView: boolean;
-	canShowSetup: boolean;
-}): string | null {
-	if (!input.isMappingView) {
-		return "Change mapping";
-	}
-
-	return input.canShowSetup ? "Back to setup" : null;
-}
 
 function getRejectCandidateTmdbId(input: {
 	inspection: ReturnType<typeof useMappingInspection>["data"];
@@ -196,7 +184,6 @@ export function RadarrModal({
 		onClose,
 	});
 	const isMappingView = view === "mapping" || !canShowSetup;
-	const modeSwitchLabel = getModeSwitchLabel({ isMappingView, canShowSetup });
 	const handleOpenSettings = useOpenMappingSettingsAction({
 		anilistId,
 		openSource,
@@ -225,23 +212,7 @@ export function RadarrModal({
 		onMappingReset: () => { setSelectedCandidate(null); setView("mapping"); },
 		onIgnored: onClose,
 	});
-	const handleModeSwitch =
-		modeSwitchLabel === null
-			? undefined
-			: (): void => setView(isMappingView ? "setup" : "mapping");
-	const mappingActionButtons = isMappingView ? (
-		<MappingHeaderActions
-			canRejectCandidate={rejectCandidateTmdbId !== null}
-			canClearRejectedCandidate={clearRejectedCandidateTmdbId !== null}
-			canIgnoreTitle={canIgnoreTitle}
-			isRejectingCandidate={mappingActions.isRejectingCandidate}
-			isClearingRejectedCandidate={mappingActions.isClearingRejectedCandidate}
-			isIgnoring={mappingActions.isIgnoring}
-			onRejectCandidate={mappingActions.rejectCandidate}
-			onClearRejectedCandidate={mappingActions.clearRejectedCandidate}
-			onIgnoreTitle={mappingActions.ignoreTitle}
-		/>
-	) : null;
+	const showMappingView = (): void => setView("mapping");
 
 	return (
 		<ModalShell
@@ -256,9 +227,6 @@ export function RadarrModal({
 					effectiveMapping={data.currentTarget}
 					onClose={onClose}
 					onOpenSettings={handleOpenSettings ?? undefined}
-					modeSwitchLabel={modeSwitchLabel}
-					onModeSwitch={handleModeSwitch}
-					providerActions={mappingActionButtons}
 				/>
 			}
 			leftPane={
@@ -294,9 +262,18 @@ export function RadarrModal({
 					<MappingFooter
 						manualMappingActive={data.manualMappingActive}
 						isResettingMapping={mappingActions.isRevertingMapping}
+						canRejectCandidate={rejectCandidateTmdbId !== null}
+						canClearRejectedCandidate={clearRejectedCandidateTmdbId !== null}
+						canIgnoreTitle={canIgnoreTitle}
+						isRejectingCandidate={mappingActions.isRejectingCandidate}
+						isClearingRejectedCandidate={mappingActions.isClearingRejectedCandidate}
+						isIgnoring={mappingActions.isIgnoring}
 						canApplyMapping={canSubmitMapping}
 						isApplyingMapping={mappingActions.isSubmittingMapping}
 						leaveMappingLabel={canShowSetup ? "Back to setup" : "Exit modal"}
+						onRejectCandidate={mappingActions.rejectCandidate}
+						onClearRejectedCandidate={mappingActions.clearRejectedCandidate}
+						onIgnoreTitle={mappingActions.ignoreTitle}
 						onLeaveMapping={canShowSetup ? showSetupView : onClose}
 						onResetMapping={mappingActions.resetMapping}
 						onApplyMapping={mappingActions.applyMapping}
@@ -309,6 +286,7 @@ export function RadarrModal({
 						isSubmitting={setupForm.footerState.isSubmitting}
 						submitLabel={setupForm.footerState.submitLabel}
 						onCancel={onClose}
+						onOpenMapping={showMappingView}
 					/>
 				)
 			}

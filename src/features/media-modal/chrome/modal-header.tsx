@@ -2,7 +2,7 @@
 // src/features/media-modal/chrome/modal-header.tsx
 
 import { Settings, X } from "lucide-react";
-import type { MouseEventHandler, ReactNode } from "react";
+import type { MouseEventHandler } from "react";
 import type { AniListId } from "@/anilist";
 import { buildAniListAnimeUrl } from "@/anilist/anilist-links";
 import type { Provider } from "@/providers";
@@ -31,16 +31,10 @@ export type ModalHeaderProps = {
 	workspaceClassName?: string | undefined;
 	onClose: MouseEventHandler<HTMLButtonElement>;
 	onOpenSettings?: (() => void) | undefined;
-	modeSwitchLabel?: string | null | undefined;
-	onModeSwitch?: (() => void) | undefined;
-	providerActions?: ReactNode | undefined;
 };
 
 const CHROME_BUTTON_CLASS =
 	"rounded-full p-1.5 text-text-secondary hover:text-text-primary";
-
-const MODE_SWITCH_BUTTON_CLASS =
-	"mt-3 h-8 rounded-lg border border-border-primary/40 bg-bg-primary/12 px-3 text-xs font-medium text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)] hover:border-border-primary/60 hover:bg-bg-secondary/45 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/45 focus-visible:ring-offset-0";
 
 function toTitleCase(value: string): string {
 	return value
@@ -149,37 +143,14 @@ function SourceCard(props: {
 	);
 }
 
-function ProviderModeSwitchButton(props: {
-	label: string;
-	onClick: () => void;
-}): React.JSX.Element {
-	const { label, onClick } = props;
-
-	return (
-		<button type="button" onClick={onClick} className={MODE_SWITCH_BUTTON_CLASS}>
-			{label}
-		</button>
-	);
-}
-
 type ProviderCardProps = {
 	provider: Provider;
 	baseUrl: string;
 	effectiveMapping: MediaModalTargetSummary | null;
-	modeSwitchLabel?: string | null;
-	onModeSwitch?: () => void;
-	providerActions?: ReactNode;
 };
 
 function ProviderCard(props: ProviderCardProps): React.JSX.Element {
-	const {
-		provider,
-		baseUrl,
-		effectiveMapping,
-		modeSwitchLabel,
-		onModeSwitch,
-		providerActions,
-	} = props;
+	const { provider, baseUrl, effectiveMapping } = props;
 
 	const providerLabel = getProviderLabel(provider);
 
@@ -214,11 +185,6 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 		? null
 		: `Search below to choose the ${providerLabel} target.`;
 	const posterUrl = effectiveMapping?.posterUrl ?? null;
-
-	const modeSwitch =
-		modeSwitchLabel != null && onModeSwitch ? (
-			<ProviderModeSwitchButton label={modeSwitchLabel} onClick={onModeSwitch} />
-		) : null;
 
 	return (
 		<MappingCard>
@@ -261,14 +227,6 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 								{description}
 							</p>
 						) : null}
-
-						{modeSwitch}
-
-						{providerActions ? (
-							<div className="mt-3 flex flex-wrap items-center gap-2">
-								{providerActions}
-							</div>
-						) : null}
 					</div>
 				</div>
 			</div>
@@ -287,9 +245,6 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 		workspaceClassName,
 		onClose,
 		onOpenSettings,
-		modeSwitchLabel,
-		onModeSwitch,
-		providerActions,
 	} = props;
 	const { bannerImage } = anilistHeaderData;
 
@@ -357,9 +312,6 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 						provider={provider}
 						baseUrl={baseUrl}
 						effectiveMapping={effectiveMapping}
-						{...(modeSwitchLabel === undefined ? {} : { modeSwitchLabel })}
-						{...(onModeSwitch ? { onModeSwitch } : {})}
-						{...(providerActions ? { providerActions } : {})}
 					/>
 				</div>
 			</div>

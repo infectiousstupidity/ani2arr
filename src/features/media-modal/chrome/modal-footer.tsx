@@ -12,9 +12,18 @@ type FooterLayoutProps = {
 type MappingFooterProps = {
 	manualMappingActive: boolean;
 	isResettingMapping: boolean;
+	canRejectCandidate: boolean;
+	canClearRejectedCandidate: boolean;
+	canIgnoreTitle: boolean;
+	isRejectingCandidate: boolean;
+	isClearingRejectedCandidate: boolean;
+	isIgnoring: boolean;
 	canApplyMapping: boolean;
 	isApplyingMapping: boolean;
 	leaveMappingLabel: string;
+	onRejectCandidate: () => void | Promise<void>;
+	onClearRejectedCandidate: () => void | Promise<void>;
+	onIgnoreTitle: () => void | Promise<void>;
 	onLeaveMapping: () => void;
 	onResetMapping: () => void | Promise<void>;
 	onApplyMapping: () => void | Promise<void>;
@@ -27,6 +36,7 @@ type SetupFooterProps = {
 	isSubmitting: boolean;
 	submitLabel: string;
 	onCancel: () => void;
+	onOpenMapping?: (() => void) | undefined;
 };
 
 function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
@@ -47,9 +57,18 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 	const {
 		manualMappingActive,
 		isResettingMapping,
+		canRejectCandidate,
+		canClearRejectedCandidate,
+		canIgnoreTitle,
+		isRejectingCandidate,
+		isClearingRejectedCandidate,
+		isIgnoring,
 		canApplyMapping,
 		isApplyingMapping,
 		leaveMappingLabel,
+		onRejectCandidate,
+		onClearRejectedCandidate,
+		onIgnoreTitle,
 		onLeaveMapping,
 		onResetMapping,
 		onApplyMapping,
@@ -58,16 +77,60 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 	return (
 		<FooterLayout
 			left={
-				manualMappingActive ? (
-					<Button
-						onClick={() => void onResetMapping()}
-						variant="outline"
-						size="sm"
-						disabled={isResettingMapping}
-					>
-						Reset to automatic
-					</Button>
-				) : null
+				<>
+					{canIgnoreTitle ? (
+						<Button
+							type="button"
+							onClick={() => void onIgnoreTitle()}
+							variant="outline"
+							size="sm"
+							className="h-7 rounded-lg px-2 text-xs"
+							disabled={isRejectingCandidate || isClearingRejectedCandidate}
+							isLoading={isIgnoring}
+						>
+							Ignore title
+						</Button>
+					) : null}
+
+					{canRejectCandidate ? (
+						<Button
+							type="button"
+							onClick={() => void onRejectCandidate()}
+							variant="outline"
+							size="sm"
+							className="h-7 rounded-lg px-2 text-xs"
+							disabled={isIgnoring || isClearingRejectedCandidate}
+							isLoading={isRejectingCandidate}
+						>
+							Not this match
+						</Button>
+					) : null}
+
+					{canClearRejectedCandidate ? (
+						<Button
+							type="button"
+							onClick={() => void onClearRejectedCandidate()}
+							variant="outline"
+							size="sm"
+							className="h-7 rounded-lg px-2 text-xs"
+							disabled={isIgnoring || isRejectingCandidate}
+							isLoading={isClearingRejectedCandidate}
+						>
+							Clear rejected
+						</Button>
+					) : null}
+
+					{manualMappingActive ? (
+						<Button
+							onClick={() => void onResetMapping()}
+							variant="outline"
+							size="sm"
+							disabled={isResettingMapping}
+						>
+							Reset to automatic
+						</Button>
+					) : null}
+				</>
 			}
 			right={
 				<>
@@ -94,11 +157,30 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 }
 
 export function SetupFooter(props: SetupFooterProps): React.JSX.Element {
-	const { formId, canSubmit, isBusy, isSubmitting, submitLabel, onCancel } =
-		props;
+	const {
+		formId,
+		canSubmit,
+		isBusy,
+		isSubmitting,
+		submitLabel,
+		onCancel,
+		onOpenMapping,
+	} = props;
 
 	return (
 		<FooterLayout
+			left={
+				onOpenMapping ? (
+					<Button
+						type="button"
+						onClick={onOpenMapping}
+						variant="outline"
+						size="sm"
+					>
+						Change mapping
+					</Button>
+				) : null
+			}
 			right={
 				<>
 					<Button
