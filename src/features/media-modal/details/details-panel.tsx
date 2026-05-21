@@ -64,14 +64,14 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 	}
 
 	return (
-		<div className="flex h-full min-h-0 flex-col rounded-2xl bg-bg-secondary/34 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+		<div className="flex w-full flex-col rounded-2xl bg-bg-secondary/34 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)] md:min-h-full">
 			<div className="flex shrink-0 items-end justify-between gap-3 pb-4">
 				<p className="text-[11px] font-semibold leading-none tracking-[0.16em] text-text-secondary uppercase">
 					{headingLabel}
 				</p>
 			</div>
 
-			<div className="min-h-0 flex-1">{content}</div>
+			<div className="flex flex-col">{content}</div>
 		</div>
 	);
 }

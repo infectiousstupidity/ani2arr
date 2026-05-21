@@ -39,16 +39,22 @@ type SetupFooterProps = {
 	onOpenMapping?: (() => void) | undefined;
 };
 
+const FOOTER_BUTTON_CLASS = "h-11 flex-1 md:h-8 md:flex-none";
+const FOOTER_AUX_BUTTON_CLASS =
+	"h-11 flex-1 rounded-lg px-3 text-sm md:h-7 md:flex-none md:px-2 md:text-xs";
+
 function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
 	const { left, right } = props;
 
 	return (
-		<footer className="flex flex-wrap items-center justify-between gap-3 bg-bg-primary px-8 py-4">
-			<div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
+		<footer className="flex flex-col gap-3 bg-bg-primary px-4 py-3 md:flex-row md:items-center md:justify-between md:px-8 md:py-4">
+			<div className="order-2 flex w-full flex-wrap items-center gap-2 text-xs text-text-secondary md:order-1 md:w-auto">
 				{left}
 			</div>
 
-			<div className="flex flex-wrap items-center gap-2">{right}</div>
+			<div className="order-1 flex w-full flex-wrap items-center gap-2 md:order-2 md:w-auto md:justify-end">
+				{right}
+			</div>
 		</footer>
 	);
 }
@@ -84,7 +90,7 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 							onClick={() => void onIgnoreTitle()}
 							variant="outline"
 							size="sm"
-							className="h-7 rounded-lg px-2 text-xs"
+							className={FOOTER_AUX_BUTTON_CLASS}
 							disabled={isRejectingCandidate || isClearingRejectedCandidate}
 							isLoading={isIgnoring}
 						>
@@ -98,7 +104,7 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 							onClick={() => void onRejectCandidate()}
 							variant="outline"
 							size="sm"
-							className="h-7 rounded-lg px-2 text-xs"
+							className={FOOTER_AUX_BUTTON_CLASS}
 							disabled={isIgnoring || isClearingRejectedCandidate}
 							isLoading={isRejectingCandidate}
 						>
@@ -112,7 +118,7 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 							onClick={() => void onClearRejectedCandidate()}
 							variant="outline"
 							size="sm"
-							className="h-7 rounded-lg px-2 text-xs"
+							className={FOOTER_AUX_BUTTON_CLASS}
 							disabled={isIgnoring || isRejectingCandidate}
 							isLoading={isClearingRejectedCandidate}
 						>
@@ -125,6 +131,7 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 							onClick={() => void onResetMapping()}
 							variant="outline"
 							size="sm"
+							className={FOOTER_AUX_BUTTON_CLASS}
 							disabled={isResettingMapping}
 						>
 							Reset to automatic
@@ -138,6 +145,7 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 						onClick={onLeaveMapping}
 						variant="outline"
 						size="sm"
+						className={FOOTER_BUTTON_CLASS}
 					>
 						{leaveMappingLabel}
 					</Button>
@@ -145,6 +153,7 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 						onClick={() => void onApplyMapping()}
 						variant="primary"
 						size="sm"
+						className={FOOTER_BUTTON_CLASS}
 						disabled={!canApplyMapping}
 						isLoading={isApplyingMapping}
 					>
@@ -176,6 +185,7 @@ export function SetupFooter(props: SetupFooterProps): React.JSX.Element {
 						onClick={onOpenMapping}
 						variant="outline"
 						size="sm"
+						className={FOOTER_AUX_BUTTON_CLASS}
 					>
 						Change mapping
 					</Button>
@@ -187,6 +197,7 @@ export function SetupFooter(props: SetupFooterProps): React.JSX.Element {
 						onClick={onCancel}
 						variant="outline"
 						size="sm"
+						className={FOOTER_BUTTON_CLASS}
 						disabled={isBusy}
 					>
 						Cancel
@@ -196,6 +207,7 @@ export function SetupFooter(props: SetupFooterProps): React.JSX.Element {
 						form={formId}
 						variant="primary"
 						size="sm"
+						className={FOOTER_BUTTON_CLASS}
 						disabled={!canSubmit}
 						isLoading={isSubmitting}
 					>

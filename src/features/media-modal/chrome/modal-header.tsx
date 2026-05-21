@@ -34,7 +34,7 @@ export type ModalHeaderProps = {
 };
 
 const CHROME_BUTTON_CLASS =
-	"rounded-full p-1.5 text-text-secondary hover:text-text-primary";
+	"!h-9 !w-9 !rounded-none !p-0 text-text-secondary hover:text-text-primary";
 
 function toTitleCase(value: string): string {
 	return value
@@ -76,15 +76,13 @@ function joinMetaLine(parts: Array<string | null | undefined>): string | null {
 
 function MappingBridge(): React.JSX.Element {
 	return (
-		<div className="flex items-center justify-center self-center lg:self-stretch">
-			<div className="flex w-full max-w-34 flex-col items-center justify-center">
-				<p className="whitespace-nowrap text-[10px] leading-none font-semibold uppercase tracking-[0.18em] text-text-secondary">
-					MAPS TO
-				</p>
-				<div className="mt-1.5 flex w-full items-center">
-					<div className="h-px flex-1 bg-text-primary/70" />
-					<div className="h-2.5 w-2.5 shrink-0 rotate-45 border-t border-r border-text-primary/70" />
-				</div>
+		<div className="flex w-full flex-col items-center justify-center self-center md:max-w-34 md:self-stretch">
+			<p className="hidden whitespace-nowrap text-[10px] leading-none font-semibold uppercase tracking-[0.18em] text-text-secondary md:block">
+				MAPS TO
+			</p>
+			<div className="flex w-full items-center md:mt-1.5">
+				<div className="h-px flex-1 bg-text-primary/70" />
+				<div className="h-2 w-2 shrink-0 rotate-45 border-t border-r border-text-primary/70 md:h-2.5 md:w-2.5" />
 			</div>
 		</div>
 	);
@@ -110,29 +108,33 @@ function SourceCard(props: {
 		<MappingCard>
 			<div className="pointer-events-none absolute -top-5 bottom-8 -left-4 right-14 -z-10 rounded-full bg-bg-primary/24 blur-2xl" />
 
-			<div className="relative min-w-0">
-				<p className="pr-10 text-[11px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary">
+			<div className="relative min-w-0 text-left">
+				<p className="pl-9 text-[9px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary md:text-[11px]">
 					ANILIST
 				</p>
 
-				<MappingOpenLink href={anilistLink} label="Open in AniList" />
+				<MappingOpenLink
+					href={anilistLink}
+					label="Open in AniList"
+					side="left"
+				/>
 
-				<div className="mt-3 flex items-start gap-3">
+				<div className="mt-2 flex items-start gap-2 md:mt-3 md:gap-3">
 					<MappingPoster src={coverImage} />
 
-					<div className="min-w-0 flex-1 pt-1">
-						<h2 className="line-clamp-2 text-lg font-semibold leading-tight text-text-primary drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)]">
+					<div className="min-w-0 flex-1 pt-0 md:pt-1">
+						<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)] md:text-lg">
 							{title}
 						</h2>
 
 						{anilistMetaLine ? (
-							<p className="mt-2 text-xs text-text-secondary">
+							<p className="mt-1 truncate text-[10px] text-text-secondary md:mt-2 md:text-xs">
 								{anilistMetaLine}
 							</p>
 						) : null}
 
 						{anilistIdLine ? (
-							<p className="mt-1 text-xs text-text-secondary">
+							<p className="mt-0.5 truncate text-[10px] text-text-secondary md:mt-1 md:text-xs">
 								{anilistIdLine}
 							</p>
 						) : null}
@@ -191,7 +193,7 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 			<div className="pointer-events-none absolute -top-5 bottom-8 left-14 -right-4 -z-10 rounded-full bg-bg-primary/24 blur-2xl" />
 
 			<div className="relative min-w-0">
-				<p className="pr-10 text-[11px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary">
+				<p className="pr-9 text-right text-[9px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary md:text-[11px]">
 					{providerLabel.toUpperCase()}
 				</p>
 
@@ -199,31 +201,32 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 					<MappingOpenLink
 						href={providerLink}
 						label={`Open in ${providerLabel}`}
+						side="right"
 					/>
 				) : null}
 
-				<div className="mt-3 flex items-start gap-3">
+				<div className="mt-2 flex flex-row-reverse items-start gap-2 text-right md:mt-3 md:gap-3">
 					<MappingPoster src={posterUrl} />
 
-					<div className="min-w-0 flex-1 pt-1">
-						<h2 className="line-clamp-2 text-lg font-semibold leading-tight text-text-primary drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)]">
+					<div className="min-w-0 flex-1 pt-0 md:pt-1">
+						<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)] md:text-lg">
 							{title}
 						</h2>
 
 						{providerMetaLine ? (
-							<p className="mt-2 text-xs text-text-secondary">
+							<p className="mt-1 truncate text-[10px] text-text-secondary md:mt-2 md:text-xs">
 								{providerMetaLine}
 							</p>
 						) : null}
 
 						{providerIdLine ? (
-							<p className="mt-1 text-xs text-text-secondary">
+							<p className="mt-0.5 truncate text-[10px] text-text-secondary md:mt-1 md:text-xs">
 								{providerIdLine}
 							</p>
 						) : null}
 
 						{description ? (
-							<p className="mt-1 text-xs leading-5 text-text-secondary">
+							<p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-text-secondary md:mt-1 md:text-xs md:leading-5">
 								{description}
 							</p>
 						) : null}
@@ -249,9 +252,9 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 	const { bannerImage } = anilistHeaderData;
 
 	return (
-		<header className="relative shrink-0">
+		<header className="relative shrink-0 overflow-hidden bg-bg-tertiary">
 			<div
-				className="relative h-60 w-full overflow-hidden bg-bg-tertiary sm:h-64"
+				className="absolute inset-0 bg-bg-tertiary"
 				style={{
 					backgroundImage: bannerImage ? `url(${bannerImage})` : undefined,
 					backgroundPosition: "center",
@@ -265,7 +268,7 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 				<div className="absolute inset-0 shadow-[inset_0_0_180px_rgba(11,22,34,0.58)]" />
 			</div>
 
-			<div className="absolute inset-x-0 top-0 z-10 flex items-center justify-end gap-2 px-4 pt-4 sm:px-6">
+			<div className="relative z-10 flex h-9 items-center justify-end gap-0">
 				{onOpenSettings ? (
 					<Button
 						type="button"
@@ -296,10 +299,10 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 				</Button>
 			</div>
 
-			<div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-5 sm:px-8 sm:pb-7">
+			<div className="relative z-10 px-4 pb-3 pt-3 md:px-8 md:pb-5 md:pt-5">
 				<div
 					className={cn(
-						"grid w-full gap-5 lg:grid-cols-[minmax(0,1fr)_8.5rem_minmax(0,1fr)] lg:items-start lg:gap-x-0 lg:gap-y-4",
+						"grid w-full items-center gap-1 grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_8.5rem_minmax(0,1fr)] md:items-start md:gap-x-0 md:gap-y-4",
 						workspaceClassName,
 					)}
 				>

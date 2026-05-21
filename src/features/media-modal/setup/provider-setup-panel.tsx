@@ -23,13 +23,13 @@ export function BaseProviderSetupPanel(props: {
 	let setupContent: ReactNode;
 	if (isConfigured && hasFormResources) {
 		setupContent = (
-			<div className="flex h-full min-h-0 flex-col gap-3">
+			<div className="space-y-3">
 				{statusNotice ? (
 					<div className="rounded-xl border border-border-primary/45 bg-bg-primary/35 px-3 py-2 text-xs leading-5 text-text-secondary">
 						{statusNotice}
 					</div>
 				) : null}
-				<div className="min-h-0 flex-1">{children}</div>
+				{children}
 			</div>
 		);
 	} else if (isConfigured) {
@@ -54,21 +54,21 @@ export function BaseProviderSetupPanel(props: {
 	}
 
 	return (
-		<div className="flex h-full min-h-0 flex-col px-4 pt-2">
-			<div className="shrink-0 pb-3">
-				<div className="flex items-start justify-between gap-3">
-					<div className="space-y-1">
-						<p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">
-							{providerName} configuration
-						</p>
-						<p className="text-xs leading-5 text-text-secondary">
-							{headerDescription}
-						</p>
+		<div className="flex flex-col px-4 pt-2 pb-4 md:h-full md:min-h-0">
+			<div className="md:min-h-0 md:flex-1 md:overflow-y-auto">
+				<div className="pb-3">
+					<div className="flex items-start justify-between gap-3">
+						<div className="space-y-1">
+							<p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">
+								{providerName} configuration
+							</p>
+							<p className="text-xs leading-5 text-text-secondary">
+								{headerDescription}
+							</p>
+						</div>
 					</div>
 				</div>
-			</div>
 
-			<div className="min-h-0 flex-1">
 				{setupContent}
 			</div>
 		</div>

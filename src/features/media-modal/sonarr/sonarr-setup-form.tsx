@@ -278,7 +278,7 @@ export function useSonarrSetupForm(
 			<form
 				id={formId}
 				onSubmit={(event) => void handleSubmit(event)}
-				className="h-full flex flex-col min-h-0"
+				className="min-w-0 md:h-full md:min-h-0"
 			>
 				{panel}
 			</form>
