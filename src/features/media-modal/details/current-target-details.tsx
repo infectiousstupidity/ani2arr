@@ -71,7 +71,7 @@ export function CurrentTargetDetails(
 	const detailRows = effectiveMapping ? getDetailRows(effectiveMapping) : [];
 
 	return (
-		<div className="flex min-h-0 flex-1 flex-col gap-4 pr-1">
+		<div className="flex flex-col gap-4">
 			{detailRows.length > 0 ? (
 				<div className="rounded-xl border border-border-primary/50 bg-bg-primary/14 p-3">
 					<div className="min-w-0 flex-1 space-y-2">
@@ -91,7 +91,6 @@ export function CurrentTargetDetails(
 			) : null}
 
 			<MappingLinkedEntries
-				className="flex min-h-0 flex-1 flex-col space-y-2"
 				currentAniListId={aniListEntryId}
 				entries={linkedAniListEntries}
 			/>

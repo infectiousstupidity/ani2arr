@@ -69,7 +69,7 @@ function MappingPreviewCard(props: {
 		searchTerm: mapping.title,
 	});
 	return (
-		<div className="relative overflow-hidden rounded-2xl border border-border-primary/70 bg-bg-primary/18 ring-1 ring-inset ring-accent-primary/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+		<div className="relative shrink-0 overflow-hidden rounded-2xl border border-border-primary/70 bg-bg-primary/18 ring-1 ring-inset ring-accent-primary/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
 			<div className="flex gap-5 p-4">
 				<div className="h-44 w-32 shrink-0 overflow-hidden rounded-lg bg-bg-primary shadow-inner">
 					{mapping.posterUrl ? (
@@ -182,25 +182,26 @@ export function PreviewTargetDetails(
 	const providerLabel = getProviderLabel(previewMapping.provider);
 
 	return (
-		<div className="flex min-h-0 flex-1 flex-col gap-4 pr-1">
-			<div className="rounded-xl border border-border-primary/50 bg-bg-primary/14 p-3">
-				<div className="flex items-center gap-2 text-accent-primary">
-					<ArrowDown className="h-4 w-4 shrink-0" />
-					<p className="text-sm font-medium text-text-primary">
-						{`Confirm selection to replace the current ${providerLabel} target above.`}
-					</p>
+		<div className="flex flex-col gap-4">
+			<div className="shrink-0 space-y-4">
+				<div className="rounded-xl border border-border-primary/50 bg-bg-primary/14 p-3">
+					<div className="flex items-center gap-2 text-accent-primary">
+						<ArrowDown className="h-4 w-4 shrink-0" />
+						<p className="text-sm font-medium text-text-primary">
+							{`Confirm selection to replace the current ${providerLabel} target above.`}
+						</p>
+					</div>
 				</div>
+
+				<MappingPreviewCard
+					mapping={previewMapping}
+					baseUrl={baseUrl}
+					onResetPreview={onResetPreview}
+					contentContainer={contentContainer}
+				/>
 			</div>
 
-			<MappingPreviewCard
-				mapping={previewMapping}
-				baseUrl={baseUrl}
-				onResetPreview={onResetPreview}
-				contentContainer={contentContainer}
-			/>
-
 			<MappingLinkedEntries
-				className="flex min-h-0 flex-1 flex-col space-y-2"
 				currentAniListId={aniListEntryId}
 				linkedAniListIds={previewMapping.linkedAniListIds ?? []}
 			/>

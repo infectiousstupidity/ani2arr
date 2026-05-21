@@ -19,7 +19,7 @@ export function MappingPoster(props: { src: string | null }): React.JSX.Element 
   const { src } = props;
 
   return (
-    <div className="h-24 w-16 shrink-0 overflow-hidden rounded-xl border border-border-primary/45 bg-bg-primary/18 shadow-[0_10px_24px_rgba(0,0,0,0.14)]">
+    <div className="h-18 w-12 shrink-0 overflow-hidden rounded-xl border border-border-primary/45 bg-bg-primary/18 shadow-[0_10px_24px_rgba(0,0,0,0.14)] md:h-24 md:w-16">
       {src ? (
         <img src={src} alt="" className="h-full w-full object-cover" />
       ) : (
@@ -32,18 +32,20 @@ export function MappingPoster(props: { src: string | null }): React.JSX.Element 
 export function MappingOpenLink(props: {
   href: string;
   label: string;
+  side?: "left" | "right";
 }): React.JSX.Element {
-  const { href, label } = props;
+  const { href, label, side = "right" } = props;
+  const sideClass = side === "left" ? "left-0" : "right-0";
 
   return (
     <a
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="absolute right-0 top-0 inline-flex h-8 w-8 items-start justify-center rounded-full pt-px text-text-secondary transition-colors hover:bg-bg-primary/25 hover:text-text-primary"
+      className={`${sideClass} absolute -top-2 inline-flex h-7 w-7 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-bg-primary/25 hover:text-text-primary`}
       aria-label={label}
     >
-      <ExternalLink className="h-4 w-4" />
+      <ExternalLink className="h-3.5 w-3.5 md:h-4 md:w-4" />
     </a>
   );
 }

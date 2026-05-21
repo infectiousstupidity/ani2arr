@@ -18,22 +18,25 @@ const MODAL_Z_INDEX_CONTENT = MODAL_Z_INDEX_BASE + 1;
 export const MODAL_Z_INDEX_FLOATING = MODAL_Z_INDEX_BASE + 2;
 
 const SHELL_CLASS =
-	"h-[75.5vh] w-full max-w-250 flex flex-col overflow-hidden rounded-none bg-bg-primary p-0 shadow-2xl shadow-black/40 sm:min-h-180 sm:rounded-2xl";
+	"h-[100dvh] max-h-[100dvh] min-h-0 w-full max-w-none flex flex-col overflow-hidden rounded-none bg-bg-primary p-0 shadow-2xl shadow-black/40 md:h-[min(80vh,calc(100dvh-2rem))] md:max-h-[calc(100dvh-2rem)] md:max-w-250 md:rounded-2xl";
 
-const FRAME_CLASS = "relative flex-1 overflow-hidden px-4 sm:px-8";
-const WORKSPACE_CLASS = "mx-auto flex h-full w-full max-w-250 flex-col";
+const FRAME_CLASS =
+	"relative flex-1 flex flex-col min-h-0 overflow-y-auto px-4 md:overflow-hidden md:px-8";
 
-const PANES_GRID_CLASS =
-	"grid h-full min-h-0 grid-cols-1 gap-y-4 lg:grid-cols-[minmax(0,1fr)_8.5rem_minmax(0,1fr)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-0 lg:gap-y-2";
+const WORKSPACE_CLASS =
+	"mx-auto flex flex-col flex-1 w-full max-w-250 pb-4 md:h-full md:min-h-0";
+
+const GRID_CLASS =
+	"grid grid-cols-1 gap-y-4 md:h-full md:min-h-0 md:grid-cols-2 md:gap-x-6 md:gap-y-2 lg:gap-x-8";
 
 const LEFT_PANE_CLASS =
-	"order-1 flex h-full flex-col overflow-hidden lg:col-start-1 lg:row-start-2";
+	"order-1 flex flex-col min-h-80 min-w-0 md:col-start-1 md:row-start-1 md:h-full md:min-h-0 md:overflow-hidden md:pr-2";
 
 const RIGHT_PANE_TOP_CLASS =
-	"order-2 flex justify-center lg:col-start-3 lg:row-start-1 lg:items-end";
+	"order-2 flex justify-center md:col-start-2 md:row-start-1 md:items-end";
 
 const RIGHT_PANE_CLASS =
-	"order-3 relative min-h-0 lg:col-start-3 lg:row-start-2";
+	"order-3 relative flex flex-col min-h-80 min-w-0 md:col-start-2 md:h-full md:min-h-0 md:overflow-y-auto";
 
 type PortalContainer = ComponentPropsWithoutRef<
 	typeof Dialog.Portal
@@ -113,7 +116,7 @@ const ModalContent = forwardRef<
 			<Dialog.Content
 				ref={ref}
 				className={cn(
-					"fixed left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 gap-4 bg-bg-primary p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+					"fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-primary shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
 					className,
 				)}
 				style={{ ...style, zIndex: MODAL_Z_INDEX_CONTENT }}
@@ -137,6 +140,14 @@ export function ModalShell(props: ModalShellProps): React.JSX.Element {
 		onOpenChange,
 		onEscapeKeyDown,
 	} = props;
+	const leftPaneClass = cn(
+		LEFT_PANE_CLASS,
+		rightPaneTop ? "md:row-span-2" : "",
+	);
+	const rightPaneClass = cn(
+		RIGHT_PANE_CLASS,
+		rightPaneTop ? "md:row-start-2" : "md:row-start-1",
+	);
 
 	return (
 		<Modal open onOpenChange={onOpenChange}>
@@ -151,20 +162,14 @@ export function ModalShell(props: ModalShellProps): React.JSX.Element {
 
 				<div className={FRAME_CLASS}>
 					<div className={WORKSPACE_CLASS}>
-						<div className="min-h-0 flex-1 pt-5 pb-4 sm:pt-6">
-							<div className={PANES_GRID_CLASS}>
-								<div className={LEFT_PANE_CLASS}>
-									<div className="min-h-0 flex-1">{leftPane}</div>
-								</div>
+						<div className={GRID_CLASS}>
+							<div className={leftPaneClass}>{leftPane}</div>
 
-								{rightPaneTop ? (
-									<div className={RIGHT_PANE_TOP_CLASS}>{rightPaneTop}</div>
-								) : null}
+							{rightPaneTop ? (
+								<div className={RIGHT_PANE_TOP_CLASS}>{rightPaneTop}</div>
+							) : null}
 
-								<div className={RIGHT_PANE_CLASS}>
-									<div className="h-full lg:sticky lg:top-0">{rightPane}</div>
-								</div>
-							</div>
+							<div className={rightPaneClass}>{rightPane}</div>
 						</div>
 					</div>
 				</div>
