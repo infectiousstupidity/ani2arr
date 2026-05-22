@@ -120,6 +120,10 @@ describe("getMappingInspection", () => {
 					titles: { english: "Linked Show Season 1" },
 					format: "TV",
 					seasonYear: 2020,
+					coverImage: {
+						medium: "https://img.example/linked-show-s1-medium.jpg",
+						large: "https://img.example/linked-show-s1-large.jpg",
+					},
 					updatedAt: 1,
 				},
 				{
@@ -127,6 +131,10 @@ describe("getMappingInspection", () => {
 					titles: { english: "Linked Show Season 2" },
 					format: "TV",
 					seasonYear: 2021,
+					coverImage: {
+						medium: "https://img.example/linked-show-s2-medium.jpg",
+						large: "https://img.example/linked-show-s2-large.jpg",
+					},
 					updatedAt: 1,
 				},
 			],
@@ -177,6 +185,7 @@ describe("getMappingInspection", () => {
 				title: "Linked Show Season 1",
 				format: "TV",
 				year: 2020,
+				coverImage: "https://img.example/linked-show-s1-medium.jpg",
 				relation: "current",
 			},
 			{
@@ -184,6 +193,7 @@ describe("getMappingInspection", () => {
 				title: "Linked Show Season 2",
 				format: "TV",
 				year: 2021,
+				coverImage: "https://img.example/linked-show-s2-medium.jpg",
 			},
 		]);
 		expect(payload.whyThisMapping).toContainEqual(
