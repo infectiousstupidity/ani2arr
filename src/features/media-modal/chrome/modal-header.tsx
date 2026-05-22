@@ -27,7 +27,9 @@ export type ModalHeaderProps = {
 	contentContainer: HTMLDivElement | null;
 	anilistHeaderData: AniListHeaderData;
 	anilistId: AniListId;
-	effectiveMapping: MediaModalTargetSummary | null;
+	isMappingView: boolean;
+	currentTarget: MediaModalTargetSummary | null;
+	previewTarget: MediaModalTargetSummary | null;
 	workspaceClassName?: string | undefined;
 	onClose: MouseEventHandler<HTMLButtonElement>;
 	onOpenSettings?: (() => void) | undefined;
@@ -143,95 +145,107 @@ function SourceCard(props: {
 type ProviderCardProps = {
 	provider: Provider;
 	baseUrl: string;
-	effectiveMapping: MediaModalTargetSummary | null;
+	target: MediaModalTargetSummary | null;
+	isDimmed: boolean;
+	isHighlighted: boolean;
 };
 
 function ProviderCard(props: ProviderCardProps): React.JSX.Element {
-	const { provider, baseUrl, effectiveMapping } = props;
+	const { provider, baseUrl, target, isDimmed, isHighlighted } = props;
 
 	const providerLabel = getProviderLabel(provider);
 	const providerName = providerLabel.toUpperCase();
 
-	const providerMetaLine = effectiveMapping
+	const providerMetaLine = target
 		? joinMetaLine([
-				formatProviderType(effectiveMapping.typeLabel),
-				effectiveMapping.year ? String(effectiveMapping.year) : null,
+				formatProviderType(target.typeLabel),
+				target.year ? String(target.year) : null,
 			])
 		: null;
 
-	const providerIdLine = effectiveMapping
+	const providerIdLine = target
 		? formatProviderExternalId(
-				effectiveMapping.provider,
-				effectiveMapping.providerId,
+				target.provider,
+				target.providerId,
 			)
 		: null;
 
-	const providerLink = effectiveMapping
+	const providerLink = target
 		? buildProviderOpenUrl({
 				provider,
 				baseUrl,
-				isInLibrary: effectiveMapping.isInLibrary,
-				...(effectiveMapping.providerRouteSlug
-					? { providerRouteSlug: effectiveMapping.providerRouteSlug }
+				isInLibrary: target.isInLibrary,
+				...(target.providerRouteSlug
+					? { providerRouteSlug: target.providerRouteSlug }
 					: {}),
-				searchTerm: effectiveMapping.title,
+				searchTerm: target.title,
 			})
 		: null;
 
-	const title = effectiveMapping ? effectiveMapping.title : "No match selected";
-	const description = effectiveMapping
+	const title = target ? target.title : "No match selected";
+	const description = target
 		? null
 		: `Search below to choose the ${providerLabel} target.`;
-	const posterUrl = effectiveMapping?.posterUrl ?? null;
+	const posterUrl = target?.posterUrl ?? null;
 
 	return (
-		<MappingCard>
-			<div className="pointer-events-none absolute -top-5 bottom-8 left-14 -right-4 -z-10 rounded-full bg-bg-primary/24 blur-2xl" />
+		<div
+			className={cn(
+				"min-w-0 rounded-2xl transition-[opacity,box-shadow]",
+				isDimmed ? "opacity-50" : "opacity-100",
+				isHighlighted
+					? "ring-2 ring-accent-primary/60 shadow-[0_0_28px_rgba(61,180,242,0.24)]"
+					: null,
+			)}
+		>
+			<MappingCard>
+				<div className="pointer-events-none absolute -top-5 bottom-8 left-14 -right-4 -z-10 rounded-full bg-bg-primary/24 blur-2xl" />
 
-			<div className="relative min-w-0">
-				{providerLink ? (
-					<MappingOpenLink
-						href={providerLink}
-						ariaLabel={`Open in ${providerLabel}`}
-						side="right"
-					>
-						{providerName}
-					</MappingOpenLink>
-				) : (
-					<p className="text-right text-[9px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary md:text-[11px]">
-						{providerName}
-					</p>
-				)}
+				<div className="relative min-w-0">
+					{providerLink ? (
+						<MappingOpenLink
+							href={providerLink}
+							ariaLabel={`Open in ${providerLabel}`}
+							side="right"
+						>
+							{providerName}
+						</MappingOpenLink>
+					) : (
+						<p className="text-right text-[9px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary md:text-[11px]">
+							{providerName}
+						</p>
+					)}
 
-				<div className="mt-2 flex flex-row-reverse items-start gap-2 text-right md:mt-3 md:gap-3">
-					<MappingPoster src={posterUrl} />
+					<div className="mt-2 flex flex-row-reverse items-start gap-2 text-right md:mt-3 md:gap-3">
+						<MappingPoster src={posterUrl} />
 
-					<div className="min-w-0 flex-1 pt-0 md:pt-1">
-						<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)] md:text-lg">
-							{title}
-						</h2>
+						<div className="min-w-0 flex-1 pt-0 md:pt-1">
+							<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)] md:text-lg">
+								{title}
+							</h2>
 
-						{providerMetaLine ? (
-							<p className="mt-1 truncate text-[10px] text-text-secondary md:mt-2 md:text-xs">
-								{providerMetaLine}
-							</p>
-						) : null}
+							{providerMetaLine ? (
+								<p className="mt-1 truncate text-[10px] text-text-secondary md:mt-2 md:text-xs">
+									{providerMetaLine}
+								</p>
+							) : null}
 
-						{providerIdLine ? (
-							<p className="mt-0.5 truncate text-[10px] text-text-secondary md:mt-1 md:text-xs">
-								{providerIdLine}
-							</p>
-						) : null}
+							{providerIdLine ? (
+								<p className="mt-0.5 truncate text-[10px] text-text-secondary md:mt-1 md:text-xs">
+									{providerIdLine}
+								</p>
+							) : null}
 
-						{description ? (
-							<p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-text-secondary md:mt-1 md:text-xs md:leading-5">
-								{description}
-							</p>
-						) : null}
+							{description ? (
+								<p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-text-secondary md:mt-1 md:text-xs md:leading-5">
+									{description}
+								</p>
+							) : null}
+						</div>
 					</div>
 				</div>
-			</div>
-		</MappingCard>
+			</MappingCard>
+		</div>
 	);
 }
 
@@ -242,12 +256,18 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 		contentContainer,
 		anilistHeaderData,
 		anilistId,
-		effectiveMapping,
+		isMappingView,
+		currentTarget,
+		previewTarget,
 		workspaceClassName,
 		onClose,
 		onOpenSettings,
 	} = props;
 	const { bannerImage } = anilistHeaderData;
+	const target = isMappingView && previewTarget ? previewTarget : currentTarget;
+	const isCurrentTargetDimmed =
+		isMappingView && previewTarget === null && currentTarget !== null;
+	const isTargetHighlighted = isMappingView && previewTarget !== null;
 
 	return (
 		<header className="relative shrink-0 overflow-hidden bg-bg-tertiary">
@@ -312,7 +332,9 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 					<ProviderCard
 						provider={provider}
 						baseUrl={baseUrl}
-						effectiveMapping={effectiveMapping}
+						target={target}
+						isDimmed={isCurrentTargetDimmed}
+						isHighlighted={isTargetHighlighted}
 					/>
 				</div>
 			</div>

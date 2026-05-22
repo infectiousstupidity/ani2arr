@@ -214,6 +214,7 @@ export function SonarrMappingPanel(
 			{candidates.map((candidate) => {
 				const summary = candidate.summary;
 				const externalLabel = `Open in ${providerLabel}`;
+				const isSelected = selectedCandidate?.tvdbId === candidate.tvdbId;
 
 				return (
 					<MappingCandidateRow
@@ -225,10 +226,12 @@ export function SonarrMappingPanel(
 						externalLabel={externalLabel}
 						externalUrl={getResultLink({ candidate, baseUrl })}
 						isCurrent={currentTarget?.providerId === candidate.tvdbId}
-						isSelected={selectedCandidate?.tvdbId === candidate.tvdbId}
+						isSelected={isSelected}
 						libraryLabel={getLibraryLabel({ candidate, providerLabel })}
 						linkedAniListCount={summary.linkedAniListIds?.length}
-						onSelect={() => onSelectCandidate(candidate)}
+						onToggleSelection={() =>
+							onSelectCandidate(isSelected ? null : candidate)
+						}
 						posterUrl={summary.posterUrl}
 						typeLabel={summary.typeLabel}
 						year={summary.year}

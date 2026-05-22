@@ -12,7 +12,7 @@ type MappingCandidateRowProps = {
 	externalLabel: string;
 	isCurrent: boolean;
 	isSelected: boolean;
-	onSelect: () => void;
+	onToggleSelection: () => void;
 	externalUrl?: string | null | undefined;
 	libraryLabel?: string | null | undefined;
 	linkedAniListCount?: number | undefined;
@@ -40,7 +40,7 @@ export function MappingCandidateRow(
 		externalLabel,
 		isCurrent,
 		isSelected,
-		onSelect,
+		onToggleSelection,
 		externalUrl,
 		libraryLabel,
 		linkedAniListCount,
@@ -49,6 +49,9 @@ export function MappingCandidateRow(
 		year,
 	} = props;
 	const linkedWarning = getLinkedWarning(linkedAniListCount);
+	const selectionLabel = isSelected
+		? `Clear selected match: ${title}`
+		: `Preview match: ${title}`;
 
 	return (
 		<div
@@ -61,7 +64,8 @@ export function MappingCandidateRow(
 			<button
 				type="button"
 				className="flex flex-1 items-start gap-3 text-left"
-				onClick={onSelect}
+				onClick={onToggleSelection}
+				aria-label={selectionLabel}
 			>
 				{posterUrl ? (
 					<img
