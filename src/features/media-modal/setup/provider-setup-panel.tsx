@@ -55,7 +55,7 @@ export function BaseProviderSetupPanel(props: {
 
 	return (
 		<div className="flex flex-col px-4 pt-2 pb-4 md:h-full md:min-h-0">
-			<div className="md:min-h-0 md:flex-1 md:overflow-y-auto">
+			<div className="overscroll-contain touch-pan-y md:min-h-0 md:flex-1 md:overflow-y-auto">
 				<div className="pb-3">
 					<div className="flex items-start justify-between gap-3">
 						<div className="space-y-1">

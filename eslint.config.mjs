@@ -1,4 +1,5 @@
-// eslint.config.ts
+/** Root ESLint flat config for project lint rules and plugin setup. */
+// eslint.config.mjs
 import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
@@ -12,6 +13,7 @@ import testingLibrary from "eslint-plugin-testing-library";
 import eslintPluginUnicorn from "eslint-plugin-unicorn";
 import { importX } from "eslint-plugin-import-x";
 import { reactRefresh } from "eslint-plugin-react-refresh";
+import nounsanitized from "eslint-plugin-no-unsanitized";
 
 export default defineConfig([
 	autoImports,
@@ -39,6 +41,7 @@ export default defineConfig([
 	reactRefresh.configs.vite(),
 	reactHooks.configs.flat["recommended-latest"],
 	eslintPluginUnicorn.configs.recommended,
+	nounsanitized.configs.recommended,
 	{
 		rules: {
 			"unicorn/better-regex": "warn",
