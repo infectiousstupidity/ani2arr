@@ -26,7 +26,6 @@ type LinkedEntryRow = {
 	format?: AniListMediaFormat | null;
 	year?: number | null;
 	posterUrl?: string | null;
-	relation?: "current" | undefined;
 };
 
 function titleFromMetadata(
@@ -44,17 +43,27 @@ export function MappingLinkedEntries(
 	props: MappingLinkedEntriesProps,
 ): React.JSX.Element | null {
 	const { currentAniListId, linkedAniListIds = [], entries = [] } = props;
+	const visibleEntries = entries.filter(
+		(entry) =>
+			entry.anilistId !== currentAniListId && entry.relation !== "current",
+	);
 	const shouldFetchMetadata =
 		entries.length === 0 && linkedAniListIds.length > 0;
 	const uniqueLinkedIds = shouldFetchMetadata
-		? [...new Set(linkedAniListIds.filter(Boolean))]
+		? [
+				...new Set(
+					linkedAniListIds.filter(
+						(anilistId) => anilistId && anilistId !== currentAniListId,
+					),
+				),
+			]
 		: [];
 	const metadataQuery = useAniListMetadataBatch(uniqueLinkedIds, {
 		enabled: shouldFetchMetadata,
 		refreshStale: false,
 	});
 
-	if (entries.length === 0 && uniqueLinkedIds.length === 0) {
+	if (visibleEntries.length === 0 && uniqueLinkedIds.length === 0) {
 		return null;
 	}
 
@@ -62,14 +71,13 @@ export function MappingLinkedEntries(
 		(metadataQuery.data?.metadata ?? []).map((item) => [item.id, item]),
 	);
 	const rows: LinkedEntryRow[] =
-		entries.length > 0
-			? entries.map((entry) => ({
+		visibleEntries.length > 0
+			? visibleEntries.map((entry) => ({
 					anilistId: entry.anilistId,
 					title: entry.title ?? `AniList #${entry.anilistId}`,
 					format: entry.format ?? null,
 					year: entry.year ?? null,
 					posterUrl: entry.coverImage ?? null,
-					relation: entry.relation,
 				}))
 			: uniqueLinkedIds.map((anilistId) => {
 					const metadata = metadataById.get(anilistId);
@@ -81,19 +89,13 @@ export function MappingLinkedEntries(
 						year: metadata?.seasonYear ?? null,
 						posterUrl:
 							metadata?.coverImage?.medium ?? metadata?.coverImage?.large ?? null,
-						relation: undefined,
 					};
 				});
-	const hasCurrentEntry = rows.some(
-		(row) => row.anilistId === currentAniListId || row.relation === "current",
-	);
 
 	return (
 		<section className="flex flex-col gap-2">
 			<p className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-				{hasCurrentEntry
-					? "Linked AniList entries"
-					: `Also linked AniList entr${rows.length === 1 ? "y" : "ies"}`}
+				{`Also linked AniList entr${rows.length === 1 ? "y" : "ies"}`}
 			</p>
 			<div className="overflow-x-hidden rounded-xl border border-border-primary/50 bg-bg-primary/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
 				<div className="divide-y divide-border-primary/50">
@@ -119,11 +121,6 @@ export function MappingLinkedEntries(
 									<div className="truncate text-sm font-medium text-text-primary">
 										{row.title}
 									</div>
-									{row.relation === "current" ? (
-										<span className="shrink-0 rounded-full bg-accent-primary/18 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-accent-primary">
-											Current
-										</span>
-									) : null}
 								</div>
 								<div className="mt-0.5 text-xs text-text-secondary">
 									{row.format ? formatToken(row.format) : "Unknown format"}
