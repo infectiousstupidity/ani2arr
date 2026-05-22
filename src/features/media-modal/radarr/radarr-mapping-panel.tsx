@@ -161,6 +161,7 @@ export function RadarrMappingPanel(
 			{candidates.map((candidate) => {
 				const summary = candidate.summary;
 				const externalLabel = `Open in ${providerLabel}`;
+				const isSelected = selectedCandidate?.tmdbId === candidate.tmdbId;
 
 				return (
 					<MappingCandidateRow
@@ -172,10 +173,12 @@ export function RadarrMappingPanel(
 						externalLabel={externalLabel}
 						externalUrl={getResultLink({ candidate, baseUrl })}
 						isCurrent={currentTarget?.providerId === candidate.tmdbId}
-						isSelected={selectedCandidate?.tmdbId === candidate.tmdbId}
+						isSelected={isSelected}
 						libraryLabel={getLibraryLabel({ candidate, providerLabel })}
 						linkedAniListCount={summary.linkedAniListIds?.length}
-						onSelect={() => onSelectCandidate(candidate)}
+						onToggleSelection={() =>
+							onSelectCandidate(isSelected ? null : candidate)
+						}
 						posterUrl={summary.posterUrl}
 						typeLabel={summary.typeLabel}
 						year={summary.year}

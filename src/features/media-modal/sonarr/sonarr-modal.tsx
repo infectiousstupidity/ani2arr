@@ -184,6 +184,7 @@ export function SonarrModal({
 		onClose,
 	});
 	const isMappingView = view === "mapping" || !canShowSetup;
+	const previewTarget = isMappingView ? (selectedCandidate?.summary ?? null) : null;
 	const handleOpenSettings = useOpenMappingSettingsAction({
 		anilistId,
 		openSource,
@@ -224,7 +225,9 @@ export function SonarrModal({
 					contentContainer={contentContainer}
 					anilistHeaderData={data.anilistHeaderData}
 					anilistId={anilistId}
-					effectiveMapping={data.currentTarget}
+					isMappingView={isMappingView}
+					currentTarget={data.currentTarget}
+					previewTarget={previewTarget}
 					onClose={onClose}
 					onOpenSettings={handleOpenSettings ?? undefined}
 				/>
@@ -249,12 +252,9 @@ export function SonarrModal({
 					contentContainer={contentContainer}
 					anilistId={anilistId}
 					effectiveMapping={data.currentTarget}
-					previewMapping={
-						isMappingView ? (selectedCandidate?.summary ?? null) : null
-					}
+					previewMapping={previewTarget}
 					isInMappingMode={isMappingView}
 					mappingDetails={inspection.data}
-					onClearPreview={() => setSelectedCandidate(null)}
 				/>
 			}
 			footer={

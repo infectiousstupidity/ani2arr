@@ -5,6 +5,7 @@ import type { AniListId } from "@/anilist";
 import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
 import type { Provider } from "@/providers";
 import { getProviderLabel } from "@/providers/provider-labels";
+import { targetsEqual } from "../helpers";
 import type { MediaModalTargetSummary } from "../types";
 import { CurrentTargetDetails } from "./current-target-details";
 import { PreviewTargetDetails } from "./preview-target-details";
@@ -18,7 +19,6 @@ export type DetailsPanelProps = {
 	previewMapping: MediaModalTargetSummary | null;
 	isInMappingMode: boolean;
 	mappingDetails?: MappingDetailsPayload | undefined;
-	onClearPreview: () => void;
 };
 
 export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
@@ -31,12 +31,18 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 		previewMapping,
 		isInMappingMode,
 		mappingDetails,
-		onClearPreview,
 	} = props;
 	const providerLabel = getProviderLabel(provider);
 	const headingLabel = isInMappingMode
 		? `PREVIEWING ${providerLabel.toUpperCase()} MATCH`
 		: "CURRENT TARGET DETAILS";
+	const overwrittenTarget =
+		isInMappingMode &&
+		previewMapping !== null &&
+		effectiveMapping !== null &&
+		!targetsEqual(previewMapping, effectiveMapping)
+			? effectiveMapping
+			: null;
 	let content: React.JSX.Element;
 
 	if (isInMappingMode) {
@@ -44,7 +50,7 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 			<PreviewTargetDetails
 				aniListEntryId={anilistId}
 				previewMapping={previewMapping}
-				onResetPreview={onClearPreview}
+				overwrittenTarget={overwrittenTarget}
 				baseUrl={baseUrl}
 				contentContainer={contentContainer}
 			/>
