@@ -31,21 +31,32 @@ export function MappingPoster(props: { src: string | null }): React.JSX.Element 
 
 export function MappingOpenLink(props: {
   href: string;
-  label: string;
+  ariaLabel: string;
   side?: "left" | "right";
+  children: ReactNode;
 }): React.JSX.Element {
-  const { href, label, side = "right" } = props;
-  const sideClass = side === "left" ? "left-0" : "right-0";
+  const { href, ariaLabel, side = "right", children } = props;
+  const alignClass = side === "left" ? "mr-auto" : "ml-auto";
 
   return (
     <a
       href={href}
       target="_blank"
       rel="noreferrer"
-      className={`${sideClass} absolute -top-2 inline-flex h-7 w-7 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-bg-primary/25 hover:text-text-primary`}
-      aria-label={label}
+      className={`${alignClass} flex w-fit max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-[9px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary transition-colors hover:bg-bg-primary/25 hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary md:text-[11px]`}
+      aria-label={ariaLabel}
     >
-      <ExternalLink className="h-3.5 w-3.5 md:h-4 md:w-4" />
+      {side === "left" ? (
+        <>
+          <ExternalLink className="h-3.5 w-3.5 shrink-0 md:h-4 md:w-4" />
+          <span className="truncate">{children}</span>
+        </>
+      ) : (
+        <>
+          <span className="truncate">{children}</span>
+          <ExternalLink className="h-3.5 w-3.5 shrink-0 md:h-4 md:w-4" />
+        </>
+      )}
     </a>
   );
 }

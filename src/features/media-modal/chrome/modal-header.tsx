@@ -101,7 +101,6 @@ function SourceCard(props: {
 		format ? formatToken(format) : null,
 		year ? String(year) : null,
 	]);
-	const anilistIdLine = joinMetaLine(["AniList", String(anilistId)]);
 	const anilistLink = buildAniListAnimeUrl(anilistId);
 
 	return (
@@ -109,15 +108,13 @@ function SourceCard(props: {
 			<div className="pointer-events-none absolute -top-5 bottom-8 -left-4 right-14 -z-10 rounded-full bg-bg-primary/24 blur-2xl" />
 
 			<div className="relative min-w-0 text-left">
-				<p className="pl-9 text-[9px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary md:text-[11px]">
-					ANILIST
-				</p>
-
 				<MappingOpenLink
 					href={anilistLink}
-					label="Open in AniList"
+					ariaLabel="Open in AniList"
 					side="left"
-				/>
+				>
+					ANILIST
+				</MappingOpenLink>
 
 				<div className="mt-2 flex items-start gap-2 md:mt-3 md:gap-3">
 					<MappingPoster src={coverImage} />
@@ -133,11 +130,9 @@ function SourceCard(props: {
 							</p>
 						) : null}
 
-						{anilistIdLine ? (
-							<p className="mt-0.5 truncate text-[10px] text-text-secondary md:mt-1 md:text-xs">
-								{anilistIdLine}
-							</p>
-						) : null}
+						<p className="mt-0.5 truncate text-[10px] text-text-secondary md:mt-1 md:text-xs">
+							{`AniList - ${anilistId}`}
+						</p>
 					</div>
 				</div>
 			</div>
@@ -155,6 +150,7 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 	const { provider, baseUrl, effectiveMapping } = props;
 
 	const providerLabel = getProviderLabel(provider);
+	const providerName = providerLabel.toUpperCase();
 
 	const providerMetaLine = effectiveMapping
 		? joinMetaLine([
@@ -193,17 +189,19 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 			<div className="pointer-events-none absolute -top-5 bottom-8 left-14 -right-4 -z-10 rounded-full bg-bg-primary/24 blur-2xl" />
 
 			<div className="relative min-w-0">
-				<p className="pr-9 text-right text-[9px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary md:text-[11px]">
-					{providerLabel.toUpperCase()}
-				</p>
-
 				{providerLink ? (
 					<MappingOpenLink
 						href={providerLink}
-						label={`Open in ${providerLabel}`}
+						ariaLabel={`Open in ${providerLabel}`}
 						side="right"
-					/>
-				) : null}
+					>
+						{providerName}
+					</MappingOpenLink>
+				) : (
+					<p className="text-right text-[9px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary md:text-[11px]">
+						{providerName}
+					</p>
+				)}
 
 				<div className="mt-2 flex flex-row-reverse items-start gap-2 text-right md:mt-3 md:gap-3">
 					<MappingPoster src={posterUrl} />
