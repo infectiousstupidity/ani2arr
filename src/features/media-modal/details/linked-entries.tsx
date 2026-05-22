@@ -4,6 +4,7 @@
 import { ExternalLink } from "lucide-react";
 import type { AniListId } from "@/anilist";
 import { buildAniListAnimeUrl } from "@/anilist/anilist-links";
+import type { AniListMediaFormat } from "@/anilist/schemas/media.schema";
 import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
 import { resolveTitlePreference } from "@/anilist/title-preference";
 import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
@@ -22,7 +23,7 @@ interface MappingLinkedEntriesProps {
 type LinkedEntryRow = {
 	anilistId: AniListId;
 	title: string;
-	format?: string | null;
+	format?: AniListMediaFormat | null;
 	year?: number | null;
 	posterUrl?: string | null;
 	relation?: "current" | undefined;
