@@ -131,7 +131,7 @@ function SourceCard(props: {
 						) : null}
 
 						<p className="mt-0.5 truncate text-[10px] text-text-secondary md:mt-1 md:text-xs">
-							{`AniList - ${anilistId}`}
+							{`AniList #${anilistId}`}
 						</p>
 					</div>
 				</div>
