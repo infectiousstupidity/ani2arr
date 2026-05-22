@@ -67,6 +67,14 @@ export function MappingLinkedEntries(
 		return null;
 	}
 
+	if (
+		shouldFetchMetadata &&
+		metadataQuery.data === undefined &&
+		(metadataQuery.isPending || metadataQuery.isFetching)
+	) {
+		return null;
+	}
+
 	const metadataById = new Map(
 		(metadataQuery.data?.metadata ?? []).map((item) => [item.id, item]),
 	);
