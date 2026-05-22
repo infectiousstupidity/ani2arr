@@ -118,6 +118,7 @@ interface MappingDetailsLinkedAniListEntry {
 	title?: string;
 	format?: AniListMediaFormat | null;
 	year?: number | null;
+	coverImage?: string | null;
 	relation?: "current";
 }
 
@@ -342,6 +343,12 @@ const buildLinkedAniListEntries = (
 			...(metadata?.seasonYear === undefined
 				? {}
 				: { year: metadata.seasonYear }),
+			...(metadata?.coverImage === undefined
+				? {}
+				: {
+						coverImage:
+							metadata.coverImage?.medium ?? metadata.coverImage?.large ?? null,
+					}),
 			...(linkedAniListId === anilistId ? { relation: "current" } : {}),
 		};
 	});

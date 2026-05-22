@@ -68,7 +68,7 @@ export function MappingLinkedEntries(
 					title: entry.title ?? `AniList #${entry.anilistId}`,
 					format: entry.format ?? null,
 					year: entry.year ?? null,
-					posterUrl: null,
+					posterUrl: entry.coverImage ?? null,
 					relation: entry.relation,
 				}))
 			: uniqueLinkedIds.map((anilistId) => {
