@@ -49,6 +49,23 @@ const FOOTER_BUTTON_CLASS = "h-11 flex-1 md:h-8 md:flex-none";
 const FOOTER_AUX_BUTTON_CLASS =
 	"h-11 flex-1 rounded-lg px-3 text-sm md:h-7 md:flex-none md:px-2 md:text-xs";
 
+function FooterButtonSlot(props: { children: ReactNode }): React.JSX.Element {
+	const { children } = props;
+
+	return (
+		<m.span
+			layout
+			initial={{ opacity: 0, y: 4 }}
+			animate={{ opacity: 1, y: 0 }}
+			exit={{ opacity: 0, y: 4 }}
+			transition={{ duration: 0.14 }}
+			className="flex flex-1 md:flex-none"
+		>
+			{children}
+		</m.span>
+	);
+}
+
 function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
 	const { left, right } = props;
 
@@ -62,14 +79,18 @@ function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
 					layout
 					className="order-2 flex w-full flex-wrap items-center gap-2 text-xs text-text-secondary md:order-1 md:w-auto"
 				>
-					{left}
+					<AnimatePresence initial={false} mode="popLayout">
+						{left}
+					</AnimatePresence>
 				</m.div>
 
 				<m.div
 					layout
 					className="order-1 flex w-full flex-wrap items-center gap-2 md:order-2 md:w-auto md:justify-end"
 				>
-					{right}
+					<AnimatePresence initial={false} mode="popLayout">
+						{right}
+					</AnimatePresence>
 				</m.div>
 			</m.footer>
 		</LazyMotion>
@@ -83,9 +104,10 @@ export function MediaModalFooterTransition(
 
 	return (
 		<LazyMotion features={domMax}>
-			<AnimatePresence mode="wait" initial={false}>
+			<AnimatePresence mode="popLayout" initial={false}>
 				<m.div
 					key={modeKey}
+					layout
 					initial={{ opacity: 0, y: 8 }}
 					animate={{ opacity: 1, y: 0 }}
 					exit={{ opacity: 0, y: 8 }}
@@ -118,89 +140,93 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 		onResetMapping,
 		onApplyMapping,
 	} = props;
+	const leftActions = [
+		canIgnoreTitle ? (
+			<FooterButtonSlot key="ignore-title">
+				<Button
+					type="button"
+					onClick={() => void onIgnoreTitle()}
+					variant="outline"
+					size="sm"
+					className={FOOTER_AUX_BUTTON_CLASS}
+					disabled={isRejectingCandidate || isClearingRejectedCandidate}
+					isLoading={isIgnoring}
+				>
+					Ignore title
+				</Button>
+			</FooterButtonSlot>
+		) : null,
+		canRejectCandidate ? (
+			<FooterButtonSlot key="reject-candidate">
+				<Button
+					type="button"
+					onClick={() => void onRejectCandidate()}
+					variant="outline"
+					size="sm"
+					className={FOOTER_AUX_BUTTON_CLASS}
+					disabled={isIgnoring || isClearingRejectedCandidate}
+					isLoading={isRejectingCandidate}
+				>
+					Not this match
+				</Button>
+			</FooterButtonSlot>
+		) : null,
+		canClearRejectedCandidate ? (
+			<FooterButtonSlot key="clear-rejected">
+				<Button
+					type="button"
+					onClick={() => void onClearRejectedCandidate()}
+					variant="outline"
+					size="sm"
+					className={FOOTER_AUX_BUTTON_CLASS}
+					disabled={isIgnoring || isRejectingCandidate}
+					isLoading={isClearingRejectedCandidate}
+				>
+					Clear rejected
+				</Button>
+			</FooterButtonSlot>
+		) : null,
+		manualMappingActive ? (
+			<FooterButtonSlot key="reset-mapping">
+				<Button
+					onClick={() => void onResetMapping()}
+					variant="outline"
+					size="sm"
+					className={FOOTER_AUX_BUTTON_CLASS}
+					disabled={isResettingMapping}
+				>
+					Reset to automatic
+				</Button>
+			</FooterButtonSlot>
+		) : null,
+	];
+	const rightActions = [
+		<FooterButtonSlot key="leave-mapping">
+			<Button
+				onClick={onLeaveMapping}
+				variant="outline"
+				size="sm"
+				className={FOOTER_BUTTON_CLASS}
+			>
+				{leaveMappingLabel}
+			</Button>
+		</FooterButtonSlot>,
+		<FooterButtonSlot key="apply-mapping">
+			<Button
+				onClick={() => void onApplyMapping()}
+				variant="primary"
+				size="sm"
+				className={FOOTER_BUTTON_CLASS}
+				disabled={!canApplyMapping}
+				isLoading={isApplyingMapping}
+			>
+				Overwrite mapping
+			</Button>
+		</FooterButtonSlot>,
+	];
 
 	return (
-		<FooterLayout
-			left={
-				<>
-					{canIgnoreTitle ? (
-						<Button
-							type="button"
-							onClick={() => void onIgnoreTitle()}
-							variant="outline"
-							size="sm"
-							className={FOOTER_AUX_BUTTON_CLASS}
-							disabled={isRejectingCandidate || isClearingRejectedCandidate}
-							isLoading={isIgnoring}
-						>
-							Ignore title
-						</Button>
-					) : null}
-
-					{canRejectCandidate ? (
-						<Button
-							type="button"
-							onClick={() => void onRejectCandidate()}
-							variant="outline"
-							size="sm"
-							className={FOOTER_AUX_BUTTON_CLASS}
-							disabled={isIgnoring || isClearingRejectedCandidate}
-							isLoading={isRejectingCandidate}
-						>
-							Not this match
-						</Button>
-					) : null}
-
-					{canClearRejectedCandidate ? (
-						<Button
-							type="button"
-							onClick={() => void onClearRejectedCandidate()}
-							variant="outline"
-							size="sm"
-							className={FOOTER_AUX_BUTTON_CLASS}
-							disabled={isIgnoring || isRejectingCandidate}
-							isLoading={isClearingRejectedCandidate}
-						>
-							Clear rejected
-						</Button>
-					) : null}
-
-					{manualMappingActive ? (
-						<Button
-							onClick={() => void onResetMapping()}
-							variant="outline"
-							size="sm"
-							className={FOOTER_AUX_BUTTON_CLASS}
-							disabled={isResettingMapping}
-						>
-							Reset to automatic
-						</Button>
-					) : null}
-				</>
-			}
-			right={
-				<>
-					<Button
-						onClick={onLeaveMapping}
-						variant="outline"
-						size="sm"
-						className={FOOTER_BUTTON_CLASS}
-					>
-						{leaveMappingLabel}
-					</Button>
-					<Button
-						onClick={() => void onApplyMapping()}
-						variant="primary"
-						size="sm"
-						className={FOOTER_BUTTON_CLASS}
-						disabled={!canApplyMapping}
-						isLoading={isApplyingMapping}
-					>
-						Overwrite mapping
-					</Button>
-				</>
-			}
-		/>
+		<FooterLayout left={leftActions} right={rightActions} />
 	);
 }
 
@@ -214,11 +240,9 @@ export function SetupFooter(props: SetupFooterProps): React.JSX.Element {
 		onCancel,
 		onOpenMapping,
 	} = props;
-
-	return (
-		<FooterLayout
-			left={
-				onOpenMapping ? (
+	const leftActions = onOpenMapping
+		? [
+				<FooterButtonSlot key="change-mapping">
 					<Button
 						type="button"
 						onClick={onOpenMapping}
@@ -228,32 +252,37 @@ export function SetupFooter(props: SetupFooterProps): React.JSX.Element {
 					>
 						Change mapping
 					</Button>
-				) : null
-			}
-			right={
-				<>
-					<Button
-						onClick={onCancel}
-						variant="outline"
-						size="sm"
-						className={FOOTER_BUTTON_CLASS}
-						disabled={isBusy}
-					>
-						Cancel
-					</Button>
-					<Button
-						type="submit"
-						form={formId}
-						variant="primary"
-						size="sm"
-						className={FOOTER_BUTTON_CLASS}
-						disabled={!canSubmit}
-						isLoading={isSubmitting}
-					>
-						{submitLabel}
-					</Button>
-				</>
-			}
-		/>
+				</FooterButtonSlot>,
+			]
+		: null;
+	const rightActions = [
+		<FooterButtonSlot key="cancel">
+			<Button
+				onClick={onCancel}
+				variant="outline"
+				size="sm"
+				className={FOOTER_BUTTON_CLASS}
+				disabled={isBusy}
+			>
+				Cancel
+			</Button>
+		</FooterButtonSlot>,
+		<FooterButtonSlot key="submit-setup">
+			<Button
+				type="submit"
+				form={formId}
+				variant="primary"
+				size="sm"
+				className={FOOTER_BUTTON_CLASS}
+				disabled={!canSubmit}
+				isLoading={isSubmitting}
+			>
+				{submitLabel}
+			</Button>
+		</FooterButtonSlot>,
+	];
+
+	return (
+		<FooterLayout left={leftActions} right={rightActions} />
 	);
 }

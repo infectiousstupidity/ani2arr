@@ -198,6 +198,13 @@ export function SonarrMappingPanel(
 			) ?? [],
 		[baseUrl, search.data],
 	);
+	const candidatePosterUrls = useMemo(
+		() =>
+			candidates.flatMap((candidate) =>
+				candidate.summary.posterUrl ? [candidate.summary.posterUrl] : [],
+			),
+		[candidates],
+	);
 
 	const handleQueryChange = (): void => {
 		setSearchTerm("");
@@ -211,6 +218,7 @@ export function SonarrMappingPanel(
 			hasSearchTerm={searchTerm.length > 0}
 			isFetching={search.isFetching}
 			resultCount={candidates.length}
+			resultImageUrls={candidatePosterUrls}
 			onQueryChange={handleQueryChange}
 			onSearch={setSearchTerm}
 		>

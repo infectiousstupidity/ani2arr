@@ -187,10 +187,10 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 				<AnimatePresence mode="wait" initial={false}>
 					<m.div
 						key={targetKey}
-						initial={{ opacity: 0, scale: 0.96 }}
-						animate={{ opacity: 1, scale: 1 }}
-						exit={{ opacity: 0, scale: 0.96 }}
-						transition={{ duration: 0.16 }}
+						initial={{ opacity: 0, x: 20, filter: "blur(4px)" }}
+						animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+						exit={{ opacity: 0, x: -20, filter: "blur(4px)" }}
+						transition={{ type: "spring", stiffness: 300, damping: 25 }}
 						className="relative flex min-w-0 flex-1"
 					>
 						<div

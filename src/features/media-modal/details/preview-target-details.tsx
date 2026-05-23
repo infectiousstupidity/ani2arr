@@ -1,6 +1,7 @@
 /** Renders selected provider candidate support details and linked AniList entries in the media modal. */
 // src/features/media-modal/details/preview-target-details.tsx
 
+import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 import { AlertTriangle } from "lucide-react";
 import type { AniListId } from "@/anilist";
 import type { MediaModalTargetSummary } from "../types";
@@ -53,11 +54,22 @@ export function PreviewTargetDetails(
 				linkedAniListIds={previewMapping.linkedAniListIds ?? []}
 			/>
 
-			{overwrittenTarget ? (
-				<div className="mt-auto pt-4">
-					<OverwriteTargetBanner target={overwrittenTarget} />
-				</div>
-			) : null}
+			<LazyMotion features={domAnimation}>
+				<AnimatePresence>
+					{overwrittenTarget ? (
+						<m.div
+							key={`${overwrittenTarget.provider}:${overwrittenTarget.providerId}`}
+							className="mt-auto pt-4"
+							initial={{ opacity: 0, y: 30, scale: 0.95 }}
+							animate={{ opacity: 1, y: 0, scale: 1 }}
+							exit={{ opacity: 0, y: 18, scale: 0.98 }}
+							transition={{ type: "spring", bounce: 0.4, duration: 0.5 }}
+						>
+							<OverwriteTargetBanner target={overwrittenTarget} />
+						</m.div>
+					) : null}
+				</AnimatePresence>
+			</LazyMotion>
 		</div>
 	);
 }
