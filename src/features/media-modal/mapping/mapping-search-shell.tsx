@@ -77,18 +77,14 @@ export function MappingSearchShell(
 			<div className="md:min-h-0 md:flex-1 md:overflow-hidden">
 				<ScrollArea.Root className="h-full w-full">
 					<ScrollArea.Viewport className="h-full w-full overscroll-contain touch-pan-y scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-						<div className="pb-4 pr-1">
-							<div className="overflow-hidden rounded-xl border border-border-primary/60 bg-bg-secondary/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-								<div className="divide-y divide-border-primary/70">
-									{stateMessage ? (
-										<div className="px-3 py-6 text-center text-xs text-text-secondary">
-											{stateMessage}
-										</div>
-									) : null}
-
-									{hasSearchTerm ? children : null}
+						<div className="flex flex-col gap-2 pb-4 pr-1">
+							{stateMessage ? (
+								<div className="rounded-xl border border-border-primary/45 bg-bg-secondary/35 px-3 py-6 text-center text-xs text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+									{stateMessage}
 								</div>
-							</div>
+							) : null}
+
+							{hasSearchTerm ? children : null}
 						</div>
 					</ScrollArea.Viewport>
 

@@ -205,7 +205,10 @@ export function RadarrModal({
 	const canSubmitMapping =
 		selectedCandidate !== null &&
 		!targetsEqual(selectedCandidate.summary, data.currentTarget);
-	const showSetupView = (): void => setView("setup");
+	const showSetupView = (): void => {
+		setSelectedCandidate(null);
+		setView("setup");
+	};
 	const mappingActions = useMappingActions({
 		anilistId,
 		provider: PROVIDER,

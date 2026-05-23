@@ -3,6 +3,7 @@
 
 import { ExternalLink } from "lucide-react";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
+import { cn } from "@/shared/utils/cn";
 
 type MappingCandidateRowProps = {
 	title: string;
@@ -55,11 +56,12 @@ export function MappingCandidateRow(
 
 	return (
 		<div
-			className={`group flex items-center gap-3 border-l-2 px-3 py-3 transition-colors ${
+			className={cn(
+				"group flex items-center gap-3 rounded-lg border px-3 py-3 transition-[background-color,border-color,box-shadow]",
 				isSelected
-					? "border-l-accent-primary bg-white/8"
-					: "border-l-transparent hover:bg-bg-primary/45"
-			}`}
+					? "border-accent-primary bg-accent-primary/10 ring-1 ring-accent-primary shadow-[0_0_10px_var(--accent-primary)]"
+					: "border-transparent hover:border-border-primary/45 hover:bg-bg-tertiary/50",
+			)}
 		>
 			<button
 				type="button"

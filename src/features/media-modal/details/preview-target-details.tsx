@@ -50,7 +50,7 @@ function OverwriteTargetBanner(props: {
 	const { target } = props;
 
 	return (
-		<div className="flex min-w-0 items-center gap-2 rounded-md border border-border-primary bg-bg-secondary p-2 text-sm text-text-secondary">
+		<div className="flex min-w-0 items-center gap-2 rounded-md border border-error/30 bg-error/8 p-2 text-sm text-text-secondary">
 			<AlertTriangle className="h-4 w-4 shrink-0 text-error" />
 			<p className="min-w-0 truncate">
 				Overwriting current target:
