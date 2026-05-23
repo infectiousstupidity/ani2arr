@@ -39,7 +39,7 @@ export function MappingConnector(
 					className={cn(
 						"relative z-10 flex h-8 w-8 items-center justify-center rounded-full border bg-bg-tertiary text-text-secondary transition-colors",
 						isSelected
-							? "border-accent-primary text-accent-primary shadow-[0_0_10px_var(--accent-primary)]"
+							? "border-accent-primary/45 bg-accent-primary/8 text-accent-primary"
 							: "border-border-primary",
 					)}
 					aria-label={LABEL_BY_STATE[state]}

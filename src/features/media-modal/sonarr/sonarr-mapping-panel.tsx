@@ -160,7 +160,7 @@ function getLibraryLabel(input: {
 
 	return `In ${providerLabel}${
 		candidate.summary.episodeFileCount
-			? ` - ${candidate.summary.episodeFileCount} eps`
+			? `: ${candidate.summary.episodeFileCount} eps`
 			: ""
 	}`;
 }

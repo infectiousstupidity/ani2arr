@@ -110,7 +110,7 @@ function getLibraryLabel(input: {
 	const { candidate, providerLabel } = input;
 	if (!candidate.summary.isInLibrary) return null;
 
-	return `In ${providerLabel}${candidate.summary.hasFile ? " - has file" : ""}`;
+	return `In ${providerLabel}${candidate.summary.hasFile ? ": has file" : ""}`;
 }
 
 export function RadarrMappingPanel(
