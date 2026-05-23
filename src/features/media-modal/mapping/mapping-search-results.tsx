@@ -22,12 +22,15 @@ type MappingCandidateRowProps = {
 	year?: number | undefined;
 };
 
-function getLinkedWarning(linkedAniListCount: number | undefined): string | null {
+const BADGE_CLASS =
+	"inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-medium leading-none";
+
+function getLinkedBadgeLabel(
+	linkedAniListCount: number | undefined,
+): string | null {
 	if (!linkedAniListCount) return null;
 
-	return `Linked to ${linkedAniListCount} AniList entr${
-		linkedAniListCount === 1 ? "y" : "ies"
-	}`;
+	return `${linkedAniListCount} linked`;
 }
 
 export function MappingCandidateRow(
@@ -49,7 +52,7 @@ export function MappingCandidateRow(
 		typeLabel,
 		year,
 	} = props;
-	const linkedWarning = getLinkedWarning(linkedAniListCount);
+	const linkedBadgeLabel = getLinkedBadgeLabel(linkedAniListCount);
 	const selectionLabel = isSelected
 		? `Clear selected match: ${title}`
 		: `Preview match: ${title}`;
@@ -57,15 +60,15 @@ export function MappingCandidateRow(
 	return (
 		<div
 			className={cn(
-				"group flex items-center gap-3 rounded-lg border px-3 py-3 transition-[background-color,border-color,box-shadow]",
+				"group relative h-[120px] overflow-hidden rounded-lg border p-0 transition-[background-color,border-color] focus-within:border-accent-primary/45 focus-within:bg-bg-tertiary/45",
 				isSelected
-					? "border-accent-primary bg-accent-primary/10 ring-1 ring-accent-primary shadow-[0_0_10px_var(--accent-primary)]"
+					? "border-accent-primary/45 bg-accent-primary/10"
 					: "border-transparent hover:border-border-primary/45 hover:bg-bg-tertiary/50",
 			)}
 		>
 			<button
 				type="button"
-				className="flex flex-1 items-start gap-3 text-left"
+				className="flex h-full w-full min-w-0 items-stretch text-left"
 				onClick={onToggleSelection}
 				aria-label={selectionLabel}
 			>
@@ -73,43 +76,68 @@ export function MappingCandidateRow(
 					<img
 						src={posterUrl}
 						alt="Poster"
-						className="h-14 w-10 shrink-0 rounded object-cover shadow-sm"
+						className="h-full w-20 shrink-0 rounded-l-lg object-cover"
 					/>
 				) : (
-					<div className="h-14 w-10 shrink-0 rounded bg-bg-primary" />
+					<div className="h-full w-20 shrink-0 rounded-l-lg bg-bg-primary" />
 				)}
-				<div className="min-w-0 flex-1 space-y-2">
+				<div className="flex h-full min-w-0 flex-1 flex-col py-3 pl-4 pr-12">
 					<div className="text-sm font-semibold leading-tight text-text-primary line-clamp-2">
 						{title}
 					</div>
-					<div className="flex flex-wrap items-center gap-1 text-xs text-text-secondary">
-						<span className="font-mono text-text-primary">
+
+					<div className="mt-1 truncate text-xs text-text-secondary">
+						<span>
 							{providerIdLabel} {providerId}
 						</span>
 						{year ? (
 							<>
-								<span aria-hidden="true">•</span>
+								<span className="mx-1 opacity-30" aria-hidden="true">
+									•
+								</span>
 								<span>{year}</span>
 							</>
 						) : null}
 						{typeLabel ? (
 							<>
-								<span aria-hidden="true">•</span>
+								<span className="mx-1 opacity-30" aria-hidden="true">
+									•
+								</span>
 								<span>{typeLabel}</span>
 							</>
 						) : null}
 					</div>
-					{linkedWarning ? (
-						<div className="text-[11px] font-medium text-amber-100/85">
-							{linkedWarning}
-						</div>
-					) : null}
-					<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium">
+
+					<div className="mt-auto flex h-5 flex-wrap items-end gap-1.5 overflow-hidden">
 						{isCurrent ? (
-							<span className="text-success">Current match</span>
+							<span
+								className={cn(
+									BADGE_CLASS,
+									"border-success/25 bg-success/15 text-success",
+								)}
+							>
+								Current
+							</span>
 						) : null}
 						{libraryLabel ? (
-							<span className="text-text-secondary">{libraryLabel}</span>
+							<span
+								className={cn(
+									BADGE_CLASS,
+									"border-success/25 bg-success/15 text-success",
+								)}
+							>
+								{libraryLabel}
+							</span>
+						) : null}
+						{linkedBadgeLabel ? (
+							<span
+								className={cn(
+									BADGE_CLASS,
+									"border-amber-100/25 bg-amber-100/10 text-amber-100/90",
+								)}
+							>
+								{linkedBadgeLabel}
+							</span>
 						) : null}
 					</div>
 				</div>
@@ -120,10 +148,10 @@ export function MappingCandidateRow(
 						href={externalUrl}
 						target="_blank"
 						rel="noreferrer"
-						className="inline-flex items-center rounded p-2 text-text-secondary hover:text-text-primary"
+						className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full text-text-secondary hover:bg-bg-tertiary/70 hover:text-text-primary focus-visible:bg-bg-tertiary/70 focus-visible:text-text-primary"
 						aria-label={externalLabel}
 					>
-						<ExternalLink size={16} />
+						<ExternalLink className="h-4 w-4" />
 					</a>
 				</TooltipWrapper>
 			) : null}

@@ -15,17 +15,22 @@ export function MappingCard(props: { children: ReactNode }): React.JSX.Element {
   );
 }
 
-export function MappingPoster(props: { src: string | null }): React.JSX.Element {
-  const { src } = props;
+export function MappingPoster(props: {
+  src: string | null;
+  side?: "left" | "right";
+}): React.JSX.Element {
+  const { src, side = "left" } = props;
+  const separatorClass =
+    side === "left"
+      ? "border-r border-border-primary/35"
+      : "border-l border-border-primary/35";
+  const innerRadiusClass = side === "left" ? "rounded-r-xl" : "rounded-l-xl";
+  const posterClass = `h-full shrink-0 bg-bg-primary/18 shadow-sm ${separatorClass} ${innerRadiusClass}`;
 
-  return (
-    <div className="h-18 w-12 shrink-0 overflow-hidden rounded-lg border border-border-primary/45 bg-bg-primary/18 shadow-sm md:h-24 md:w-16">
-      {src ? (
-        <img src={src} alt="" className="h-full w-full object-cover" />
-      ) : (
-        <div className="h-full w-full bg-bg-primary/60" />
-      )}
-    </div>
+  return src ? (
+    <img src={src} alt="" className={`${posterClass} w-auto max-w-none`} />
+  ) : (
+    <div className={`${posterClass} aspect-[2/3] bg-bg-primary/60`} />
   );
 }
 
@@ -43,18 +48,18 @@ export function MappingOpenLink(props: {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className={`${alignClass} flex w-fit max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-[9px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary transition-colors hover:bg-bg-primary/25 hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary md:text-[11px]`}
+      className={`${alignClass} flex w-fit max-w-full items-center gap-1 text-[10px] leading-tight font-medium text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary md:text-xs`}
       aria-label={ariaLabel}
     >
       {side === "left" ? (
         <>
-          <ExternalLink className="h-3.5 w-3.5 shrink-0 md:h-4 md:w-4" />
+          <ExternalLink className="h-3 w-3 shrink-0 md:h-3.5 md:w-3.5" />
           <span className="truncate">{children}</span>
         </>
       ) : (
         <>
           <span className="truncate">{children}</span>
-          <ExternalLink className="h-3.5 w-3.5 shrink-0 md:h-4 md:w-4" />
+          <ExternalLink className="h-3 w-3 shrink-0 md:h-3.5 md:w-3.5" />
         </>
       )}
     </a>

@@ -42,7 +42,7 @@ export type ModalHeaderProps = {
 const CHROME_BUTTON_CLASS =
 	"!h-9 !w-9 !rounded-none !p-0 text-text-secondary hover:text-text-primary";
 const HEADER_CARD_CLASS =
-	"relative flex h-full min-w-0 rounded-lg border border-border-primary/60 bg-bg-secondary/10 p-2 backdrop-blur-[4px] transition-[opacity,filter,box-shadow]";
+	"relative flex h-[calc(var(--spacing)*30)] min-w-0 overflow-hidden rounded-xl border border-border-primary/60 bg-bg-secondary/10 backdrop-blur-[4px] transition-[opacity,filter,box-shadow] md:h-[calc(var(--spacing)*37)]";
 
 function toTitleCase(value: string): string {
 	return value
@@ -79,7 +79,7 @@ function joinMetaLine(parts: Array<string | null | undefined>): string | null {
 		}
 	}
 
-	return values.length > 0 ? values.join(" - ") : null;
+	return values.length > 0 ? values.join(" • ") : null;
 }
 
 function SourceCard(props: {
@@ -99,32 +99,28 @@ function SourceCard(props: {
 
 	return (
 		<div className={HEADER_CARD_CLASS}>
-			<div className="relative flex min-w-0 flex-1 flex-col text-left">
-				<MappingOpenLink
-					href={anilistLink}
-					ariaLabel="Open in AniList"
-					side="left"
-				>
-					ANILIST
-				</MappingOpenLink>
+			<MappingPoster src={coverImage} side="left" />
 
-				<div className="mt-2 flex min-w-0 flex-1 items-start gap-2 md:mt-3 md:gap-3">
-					<MappingPoster src={coverImage} />
+			<div className="relative flex min-w-0 flex-1 flex-col p-3 text-left md:p-4">
+				<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
+					{title}
+				</h2>
 
-					<div className="min-w-0 flex-1 pt-0 md:pt-1">
-						<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
-							{title}
-						</h2>
-
-						{anilistMetaLine ? (
-							<p className="mt-1 truncate text-[10px] text-text-secondary md:mt-2 md:text-xs">
-								{anilistMetaLine}
-							</p>
-						) : null}
-
-						<p className="mt-0.5 truncate text-[10px] text-text-secondary md:mt-1 md:text-xs">
-							{`AniList #${anilistId}`}
+				<div className="mt-auto min-w-0 pt-2 md:pt-3">
+					{anilistMetaLine ? (
+						<p className="truncate text-[10px] text-text-secondary md:text-xs">
+							{anilistMetaLine}
 						</p>
+					) : null}
+
+					<div className="mt-0.5 flex min-w-0">
+						<MappingOpenLink
+							href={anilistLink}
+							ariaLabel="Open in AniList"
+							side="left"
+						>
+							{`AniList #${anilistId}`}
+						</MappingOpenLink>
 					</div>
 				</div>
 			</div>
@@ -144,7 +140,6 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 	const { provider, baseUrl, target, isDimmed, isHighlighted } = props;
 
 	const providerLabel = getProviderLabel(provider);
-	const providerName = providerLabel.toUpperCase();
 
 	const providerMetaLine = target
 		? joinMetaLine([
@@ -184,7 +179,7 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 			className={cn(
 				HEADER_CARD_CLASS,
 				isHighlighted
-					? "ring-1 ring-accent-primary shadow-[0_0_10px_var(--accent-primary)]"
+					? "border-accent-primary/35 bg-accent-primary/8"
 					: null,
 			)}
 		>
@@ -200,51 +195,45 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 					>
 						<div
 							className={cn(
-								"relative flex min-w-0 flex-1 flex-col transition-[opacity,filter]",
+								"relative flex min-w-0 flex-1 transition-[opacity,filter]",
 								isDimmed ? "opacity-50 grayscale" : null,
 							)}
 						>
-							{providerLink ? (
-								<MappingOpenLink
-									href={providerLink}
-									ariaLabel={`Open in ${providerLabel}`}
-									side="right"
-								>
-									{providerName}
-								</MappingOpenLink>
-							) : (
-								<p className="text-right text-[9px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary md:text-[11px]">
-									{providerName}
-								</p>
-							)}
+							<div className="flex min-w-0 flex-1 flex-col items-end p-3 text-right md:p-4">
+								<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
+									{title}
+								</h2>
 
-							<div className="mt-2 flex min-w-0 flex-1 flex-row-reverse items-start gap-2 text-right md:mt-3 md:gap-3">
-								<MappingPoster src={posterUrl} />
+								{description ? (
+									<p className="mt-1 line-clamp-2 text-[10px] leading-4 text-text-secondary md:text-xs md:leading-5">
+										{description}
+									</p>
+								) : null}
 
-								<div className="min-w-0 flex-1 pt-0 md:pt-1">
-									<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
-										{title}
-									</h2>
+								{providerMetaLine || (providerIdLine && providerLink) ? (
+									<div className="mt-auto min-w-0 pt-2 md:pt-3">
+										{providerMetaLine ? (
+											<p className="truncate text-[10px] text-text-secondary md:text-xs">
+												{providerMetaLine}
+											</p>
+										) : null}
 
-									{providerMetaLine ? (
-										<p className="mt-1 truncate text-[10px] text-text-secondary md:mt-2 md:text-xs">
-											{providerMetaLine}
-										</p>
-									) : null}
-
-									{providerIdLine ? (
-										<p className="mt-0.5 truncate text-[10px] text-text-secondary md:mt-1 md:text-xs">
-											{providerIdLine}
-										</p>
-									) : null}
-
-									{description ? (
-										<p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-text-secondary md:mt-1 md:text-xs md:leading-5">
-											{description}
-										</p>
-									) : null}
-								</div>
+										{providerIdLine && providerLink ? (
+											<div className="mt-0.5 flex min-w-0 justify-end">
+												<MappingOpenLink
+													href={providerLink}
+													ariaLabel={`Open in ${providerLabel}`}
+													side="right"
+												>
+													{providerIdLine}
+												</MappingOpenLink>
+											</div>
+										) : null}
+									</div>
+								) : null}
 							</div>
+
+							<MappingPoster src={posterUrl} side="right" />
 						</div>
 					</m.div>
 				</AnimatePresence>
