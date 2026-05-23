@@ -105,40 +105,38 @@ export function MappingLinkedEntries(
 			<p className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
 				{`Also linked AniList entr${rows.length === 1 ? "y" : "ies"}`}
 			</p>
-			<div className="overflow-x-hidden rounded-xl border border-border-primary/50 bg-bg-primary/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-				<div className="divide-y divide-border-primary/50">
-					{rows.map((row) => (
-						<a
-							key={row.anilistId}
-							href={buildAniListAnimeUrl(row.anilistId)}
-							target="_blank"
-							rel="noreferrer"
-							className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-bg-primary/35"
-						>
-							<div className="h-12 w-9 shrink-0 overflow-hidden rounded-md bg-bg-primary/65">
-								{row.posterUrl ? (
-									<img
-										src={row.posterUrl}
-										alt=""
-										className="h-full w-full object-cover"
-									/>
-								) : null}
-							</div>
-							<div className="min-w-0 flex-1">
-								<div className="flex items-center gap-2">
-									<div className="truncate text-sm font-medium text-text-primary">
-										{row.title}
-									</div>
-								</div>
-								<div className="mt-0.5 text-xs text-text-secondary">
-									{row.format ? formatToken(row.format) : "Unknown format"}
-									{row.year ? ` • ${row.year}` : ""}
+			<div className="flex flex-col gap-2 overflow-x-hidden">
+				{rows.map((row) => (
+					<a
+						key={row.anilistId}
+						href={buildAniListAnimeUrl(row.anilistId)}
+						target="_blank"
+						rel="noreferrer"
+						className="flex items-center gap-3 rounded-lg border border-transparent bg-bg-primary/18 px-3 py-3 transition-colors hover:border-border-primary/45 hover:bg-bg-tertiary/50"
+					>
+						<div className="h-12 w-9 shrink-0 overflow-hidden rounded-md bg-bg-primary/65">
+							{row.posterUrl ? (
+								<img
+									src={row.posterUrl}
+									alt=""
+									className="h-full w-full object-cover"
+								/>
+							) : null}
+						</div>
+						<div className="min-w-0 flex-1">
+							<div className="flex items-center gap-2">
+								<div className="truncate text-sm font-medium text-text-primary">
+									{row.title}
 								</div>
 							</div>
-							<ExternalLink className="h-4 w-4 shrink-0 text-text-secondary" />
-						</a>
-					))}
-				</div>
+							<div className="mt-0.5 text-xs text-text-secondary">
+								{row.format ? formatToken(row.format) : "Unknown format"}
+								{row.year ? ` • ${row.year}` : ""}
+							</div>
+						</div>
+						<ExternalLink className="h-4 w-4 shrink-0 text-text-secondary" />
+					</a>
+				))}
 			</div>
 		</section>
 	);
