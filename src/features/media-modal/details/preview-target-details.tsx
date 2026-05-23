@@ -48,28 +48,14 @@ function OverwriteTargetBanner(props: {
 	target: MediaModalTargetSummary;
 }): React.JSX.Element {
 	const { target } = props;
-	const providerLabel = getProviderLabel(target.provider);
-	const providerIdLabel = formatProviderExternalId(
-		target.provider,
-		target.providerId,
-	);
 
 	return (
-		<div className="rounded-xl border border-amber-200/20 bg-bg-tertiary/70 p-3">
-			<div className="flex min-w-0 items-start gap-2 text-text-secondary">
-				<AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-100/85" />
-				<div className="min-w-0 flex-1">
-					<p className="text-[11px] font-semibold leading-none tracking-[0.14em] uppercase">
-						{`Overwriting current ${providerLabel} target`}
-					</p>
-					<p className="mt-2 truncate text-sm font-medium line-through">
-						{target.title}
-					</p>
-					<p className="mt-1 truncate font-mono text-[11px] text-text-secondary/75">
-						{providerIdLabel}
-					</p>
-				</div>
-			</div>
+		<div className="flex min-w-0 items-center gap-2 rounded-md border border-border-primary bg-bg-secondary p-2 text-sm text-text-secondary">
+			<AlertTriangle className="h-4 w-4 shrink-0 text-error" />
+			<p className="min-w-0 truncate">
+				Overwriting current target:
+				<span className="ml-1 line-through opacity-70">{target.title}</span>
+			</p>
 		</div>
 	);
 }
@@ -97,7 +83,7 @@ function MappingPreviewDetails(props: {
 		searchTerm: mapping.title,
 	});
 	return (
-		<div className="relative shrink-0 rounded-xl border border-border-primary/60 bg-bg-primary/14 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+		<div className="relative shrink-0 rounded-xl border border-border-primary/60 bg-bg-primary/14 p-3 shadow-sm">
 			<div className="flex items-start justify-between gap-3">
 				<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
 					<Pill small tone="muted" className="font-mono text-text-primary">
@@ -124,7 +110,7 @@ function MappingPreviewDetails(props: {
 						<Pill
 							small
 							tone="success"
-							className="border-transparent bg-success/85 text-white"
+							className="border-transparent bg-success/85 text-iconbutton-text"
 						>
 							{`In ${providerLabel}${getLibraryPillSuffix(mapping)}`}
 						</Pill>

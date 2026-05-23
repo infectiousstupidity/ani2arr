@@ -1,12 +1,18 @@
 /** Dumb setup and mapping footer controls for the media modal. */
 // src/features/media-modal/chrome/modal-footer.tsx
 
+import { AnimatePresence, LazyMotion, domMax, m } from "framer-motion";
 import type { ReactNode } from "react";
 import Button from "@/shared/ui/primitives/button";
 
 type FooterLayoutProps = {
 	left?: ReactNode;
 	right: ReactNode;
+};
+
+type MediaModalFooterTransitionProps = {
+	modeKey: string;
+	children: ReactNode;
 };
 
 type MappingFooterProps = {
@@ -47,15 +53,48 @@ function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
 	const { left, right } = props;
 
 	return (
-		<footer className="flex flex-col gap-3 bg-bg-primary px-4 py-3 md:flex-row md:items-center md:justify-between md:px-8 md:py-4">
-			<div className="order-2 flex w-full flex-wrap items-center gap-2 text-xs text-text-secondary md:order-1 md:w-auto">
-				{left}
-			</div>
+		<LazyMotion features={domMax}>
+			<m.footer
+				layout
+				className="flex flex-col gap-3 bg-bg-primary px-4 py-3 md:flex-row md:items-center md:justify-between md:px-8 md:py-4"
+			>
+				<m.div
+					layout
+					className="order-2 flex w-full flex-wrap items-center gap-2 text-xs text-text-secondary md:order-1 md:w-auto"
+				>
+					{left}
+				</m.div>
 
-			<div className="order-1 flex w-full flex-wrap items-center gap-2 md:order-2 md:w-auto md:justify-end">
-				{right}
-			</div>
-		</footer>
+				<m.div
+					layout
+					className="order-1 flex w-full flex-wrap items-center gap-2 md:order-2 md:w-auto md:justify-end"
+				>
+					{right}
+				</m.div>
+			</m.footer>
+		</LazyMotion>
+	);
+}
+
+export function MediaModalFooterTransition(
+	props: MediaModalFooterTransitionProps,
+): React.JSX.Element {
+	const { modeKey, children } = props;
+
+	return (
+		<LazyMotion features={domMax}>
+			<AnimatePresence mode="wait" initial={false}>
+				<m.div
+					key={modeKey}
+					initial={{ opacity: 0, y: 8 }}
+					animate={{ opacity: 1, y: 0 }}
+					exit={{ opacity: 0, y: 8 }}
+					transition={{ duration: 0.16 }}
+				>
+					{children}
+				</m.div>
+			</AnimatePresence>
+		</LazyMotion>
 	);
 }
 

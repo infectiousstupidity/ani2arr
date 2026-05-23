@@ -31,7 +31,11 @@ import { useMappingActions } from "../hooks/use-mapping-actions";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
 import { useOpenMappingSettingsAction } from "../hooks/use-open-mapping-settings-action";
 import { targetsEqual } from "../helpers";
-import { MappingFooter, SetupFooter } from "../chrome/modal-footer";
+import {
+	MappingFooter,
+	MediaModalFooterTransition,
+	SetupFooter,
+} from "../chrome/modal-footer";
 import { ModalHeader } from "../chrome/modal-header";
 import { ModalShell } from "../chrome/modal-shell";
 import type {
@@ -258,37 +262,41 @@ export function SonarrModal({
 				/>
 			}
 			footer={
-				isMappingView ? (
-					<MappingFooter
-						manualMappingActive={data.manualMappingActive}
-						isResettingMapping={mappingActions.isRevertingMapping}
-						canRejectCandidate={rejectCandidateTvdbId !== null}
-						canClearRejectedCandidate={clearRejectedCandidateTvdbId !== null}
-						canIgnoreTitle={canIgnoreTitle}
-						isRejectingCandidate={mappingActions.isRejectingCandidate}
-						isClearingRejectedCandidate={mappingActions.isClearingRejectedCandidate}
-						isIgnoring={mappingActions.isIgnoring}
-						canApplyMapping={canSubmitMapping}
-						isApplyingMapping={mappingActions.isSubmittingMapping}
-						leaveMappingLabel={canShowSetup ? "Back to setup" : "Exit modal"}
-						onRejectCandidate={mappingActions.rejectCandidate}
-						onClearRejectedCandidate={mappingActions.clearRejectedCandidate}
-						onIgnoreTitle={mappingActions.ignoreTitle}
-						onLeaveMapping={canShowSetup ? showSetupView : onClose}
-						onResetMapping={mappingActions.resetMapping}
-						onApplyMapping={mappingActions.applyMapping}
-					/>
-				) : (
-					<SetupFooter
-						formId={SETUP_FORM_ID}
-						canSubmit={setupForm.footerState.canSubmit}
-						isBusy={setupForm.footerState.isBusy}
-						isSubmitting={setupForm.footerState.isSubmitting}
-						submitLabel={setupForm.footerState.submitLabel}
-						onCancel={onClose}
-						onOpenMapping={showMappingView}
-					/>
-				)
+				<MediaModalFooterTransition
+					modeKey={isMappingView ? "mapping" : "setup"}
+				>
+					{isMappingView ? (
+						<MappingFooter
+							manualMappingActive={data.manualMappingActive}
+							isResettingMapping={mappingActions.isRevertingMapping}
+							canRejectCandidate={rejectCandidateTvdbId !== null}
+							canClearRejectedCandidate={clearRejectedCandidateTvdbId !== null}
+							canIgnoreTitle={canIgnoreTitle}
+							isRejectingCandidate={mappingActions.isRejectingCandidate}
+							isClearingRejectedCandidate={mappingActions.isClearingRejectedCandidate}
+							isIgnoring={mappingActions.isIgnoring}
+							canApplyMapping={canSubmitMapping}
+							isApplyingMapping={mappingActions.isSubmittingMapping}
+							leaveMappingLabel={canShowSetup ? "Back to setup" : "Exit modal"}
+							onRejectCandidate={mappingActions.rejectCandidate}
+							onClearRejectedCandidate={mappingActions.clearRejectedCandidate}
+							onIgnoreTitle={mappingActions.ignoreTitle}
+							onLeaveMapping={canShowSetup ? showSetupView : onClose}
+							onResetMapping={mappingActions.resetMapping}
+							onApplyMapping={mappingActions.applyMapping}
+						/>
+					) : (
+						<SetupFooter
+							formId={SETUP_FORM_ID}
+							canSubmit={setupForm.footerState.canSubmit}
+							isBusy={setupForm.footerState.isBusy}
+							isSubmitting={setupForm.footerState.isSubmitting}
+							submitLabel={setupForm.footerState.submitLabel}
+							onCancel={onClose}
+							onOpenMapping={showMappingView}
+						/>
+					)}
+				</MediaModalFooterTransition>
 			}
 			onOpenChange={(open) => !open && onClose()}
 			container={container}
