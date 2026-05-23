@@ -1,6 +1,7 @@
 /** Dumb media modal header with AniList and provider identity cards. */
 // src/features/media-modal/chrome/modal-header.tsx
 
+import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 import { Settings, X } from "lucide-react";
 import type { MouseEventHandler } from "react";
 import type { AniListId } from "@/anilist";
@@ -16,10 +17,13 @@ import { cn } from "@/shared/utils/cn";
 import { formatToken } from "../helpers";
 import type { AniListHeaderData, MediaModalTargetSummary } from "../types";
 import {
-	MappingCard,
 	MappingOpenLink,
 	MappingPoster,
 } from "./header-mapping-card";
+import {
+	MappingConnector,
+	type MappingConnectorState,
+} from "./mapping-connector";
 
 export type ModalHeaderProps = {
 	provider: Provider;
@@ -37,6 +41,8 @@ export type ModalHeaderProps = {
 
 const CHROME_BUTTON_CLASS =
 	"!h-9 !w-9 !rounded-none !p-0 text-text-secondary hover:text-text-primary";
+const HEADER_CARD_CLASS =
+	"relative flex h-full min-w-0 rounded-lg border border-border-primary/60 bg-bg-secondary/10 p-2 backdrop-blur-[4px] transition-[opacity,filter,box-shadow]";
 
 function toTitleCase(value: string): string {
 	return value
@@ -76,20 +82,6 @@ function joinMetaLine(parts: Array<string | null | undefined>): string | null {
 	return values.length > 0 ? values.join(" - ") : null;
 }
 
-function MappingBridge(): React.JSX.Element {
-	return (
-		<div className="flex w-full flex-col items-center justify-center self-center md:max-w-34 md:self-stretch">
-			<p className="hidden whitespace-nowrap text-[10px] leading-none font-semibold uppercase tracking-[0.18em] text-text-secondary md:block">
-				MAPS TO
-			</p>
-			<div className="flex w-full items-center md:mt-1.5">
-				<div className="h-px flex-1 bg-text-primary/70" />
-				<div className="h-2 w-2 shrink-0 rotate-45 border-t border-r border-text-primary/70 md:h-2.5 md:w-2.5" />
-			</div>
-		</div>
-	);
-}
-
 function SourceCard(props: {
 	anilistHeaderData: AniListHeaderData;
 	anilistId: AniListId;
@@ -106,10 +98,8 @@ function SourceCard(props: {
 	const anilistLink = buildAniListAnimeUrl(anilistId);
 
 	return (
-		<MappingCard>
-			<div className="pointer-events-none absolute -top-5 bottom-8 -left-4 right-14 -z-10 rounded-full bg-bg-primary/24 blur-2xl" />
-
-			<div className="relative min-w-0 text-left">
+		<div className={HEADER_CARD_CLASS}>
+			<div className="relative flex min-w-0 flex-1 flex-col text-left">
 				<MappingOpenLink
 					href={anilistLink}
 					ariaLabel="Open in AniList"
@@ -118,11 +108,11 @@ function SourceCard(props: {
 					ANILIST
 				</MappingOpenLink>
 
-				<div className="mt-2 flex items-start gap-2 md:mt-3 md:gap-3">
+				<div className="mt-2 flex min-w-0 flex-1 items-start gap-2 md:mt-3 md:gap-3">
 					<MappingPoster src={coverImage} />
 
 					<div className="min-w-0 flex-1 pt-0 md:pt-1">
-						<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)] md:text-lg">
+						<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
 							{title}
 						</h2>
 
@@ -138,7 +128,7 @@ function SourceCard(props: {
 					</div>
 				</div>
 			</div>
-		</MappingCard>
+		</div>
 	);
 }
 
@@ -187,64 +177,78 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 		? null
 		: `Search below to choose the ${providerLabel} target.`;
 	const posterUrl = target?.posterUrl ?? null;
+	const targetKey = target ? `${target.provider}:${target.providerId}` : "none";
 
 	return (
 		<div
 			className={cn(
-				"min-w-0 rounded-2xl transition-[opacity,box-shadow]",
-				isDimmed ? "opacity-50" : "opacity-100",
+				HEADER_CARD_CLASS,
 				isHighlighted
-					? "ring-2 ring-accent-primary/60 shadow-[0_0_28px_rgba(61,180,242,0.24)]"
+					? "ring-1 ring-accent-primary shadow-[0_0_10px_var(--accent-primary)]"
 					: null,
 			)}
 		>
-			<MappingCard>
-				<div className="pointer-events-none absolute -top-5 bottom-8 left-14 -right-4 -z-10 rounded-full bg-bg-primary/24 blur-2xl" />
-
-				<div className="relative min-w-0">
-					{providerLink ? (
-						<MappingOpenLink
-							href={providerLink}
-							ariaLabel={`Open in ${providerLabel}`}
-							side="right"
+			<LazyMotion features={domAnimation}>
+				<AnimatePresence mode="wait" initial={false}>
+					<m.div
+						key={targetKey}
+						initial={{ opacity: 0, scale: 0.96 }}
+						animate={{ opacity: 1, scale: 1 }}
+						exit={{ opacity: 0, scale: 0.96 }}
+						transition={{ duration: 0.16 }}
+						className="relative flex min-w-0 flex-1"
+					>
+						<div
+							className={cn(
+								"relative flex min-w-0 flex-1 flex-col transition-[opacity,filter]",
+								isDimmed ? "opacity-50 grayscale" : null,
+							)}
 						>
-							{providerName}
-						</MappingOpenLink>
-					) : (
-						<p className="text-right text-[9px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary md:text-[11px]">
-							{providerName}
-						</p>
-					)}
-
-					<div className="mt-2 flex flex-row-reverse items-start gap-2 text-right md:mt-3 md:gap-3">
-						<MappingPoster src={posterUrl} />
-
-						<div className="min-w-0 flex-1 pt-0 md:pt-1">
-							<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)] md:text-lg">
-								{title}
-							</h2>
-
-							{providerMetaLine ? (
-								<p className="mt-1 truncate text-[10px] text-text-secondary md:mt-2 md:text-xs">
-									{providerMetaLine}
+							{providerLink ? (
+								<MappingOpenLink
+									href={providerLink}
+									ariaLabel={`Open in ${providerLabel}`}
+									side="right"
+								>
+									{providerName}
+								</MappingOpenLink>
+							) : (
+								<p className="text-right text-[9px] leading-none font-semibold uppercase tracking-[0.16em] text-text-secondary md:text-[11px]">
+									{providerName}
 								</p>
-							) : null}
+							)}
 
-							{providerIdLine ? (
-								<p className="mt-0.5 truncate text-[10px] text-text-secondary md:mt-1 md:text-xs">
-									{providerIdLine}
-								</p>
-							) : null}
+							<div className="mt-2 flex min-w-0 flex-1 flex-row-reverse items-start gap-2 text-right md:mt-3 md:gap-3">
+								<MappingPoster src={posterUrl} />
 
-							{description ? (
-								<p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-text-secondary md:mt-1 md:text-xs md:leading-5">
-									{description}
-								</p>
-							) : null}
+								<div className="min-w-0 flex-1 pt-0 md:pt-1">
+									<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
+										{title}
+									</h2>
+
+									{providerMetaLine ? (
+										<p className="mt-1 truncate text-[10px] text-text-secondary md:mt-2 md:text-xs">
+											{providerMetaLine}
+										</p>
+									) : null}
+
+									{providerIdLine ? (
+										<p className="mt-0.5 truncate text-[10px] text-text-secondary md:mt-1 md:text-xs">
+											{providerIdLine}
+										</p>
+									) : null}
+
+									{description ? (
+										<p className="mt-0.5 line-clamp-2 text-[10px] leading-4 text-text-secondary md:mt-1 md:text-xs md:leading-5">
+											{description}
+										</p>
+									) : null}
+								</div>
+							</div>
 						</div>
-					</div>
-				</div>
-			</MappingCard>
+					</m.div>
+				</AnimatePresence>
+			</LazyMotion>
 		</div>
 	);
 }
@@ -268,6 +272,13 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 	const isCurrentTargetDimmed =
 		isMappingView && previewTarget === null && currentTarget !== null;
 	const isTargetHighlighted = isMappingView && previewTarget !== null;
+	let connectorState: MappingConnectorState = "setup";
+
+	if (isTargetHighlighted) {
+		connectorState = "selected";
+	} else if (isMappingView) {
+		connectorState = "search";
+	}
 
 	return (
 		<header className="relative shrink-0 overflow-hidden bg-bg-tertiary">
@@ -280,10 +291,10 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 					backgroundSize: "cover",
 				}}
 			>
-				<div className="absolute inset-0 bg-linear-to-r from-[rgba(11,22,34,0.9)] via-[rgba(11,22,34,0.72)] to-[rgba(11,22,34,0.38)]" />
-				<div className="absolute inset-0 bg-linear-to-b from-[rgba(5,12,20,0.08)] via-[rgba(11,22,34,0.28)] to-[rgba(11,22,34,0.72)]" />
+				<div className="absolute inset-0 bg-linear-to-r from-bg-primary/95 via-bg-primary/75 to-bg-primary/40" />
+				<div className="absolute inset-0 bg-linear-to-b from-bg-primary/10 via-bg-primary/30 to-bg-primary/80" />
 				<div className="absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent via-bg-primary/75 to-bg-primary" />
-				<div className="absolute inset-0 shadow-[inset_0_0_180px_rgba(11,22,34,0.58)]" />
+				<div className="absolute inset-0 shadow-[inset_0_0_180px_var(--bg-primary)]" />
 			</div>
 
 			<div className="relative z-10 flex h-9 items-center justify-end gap-0">
@@ -320,7 +331,7 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 			<div className="relative z-10 px-4 pb-3 pt-3 md:px-8 md:pb-5 md:pt-5">
 				<div
 					className={cn(
-						"grid w-full items-center gap-1 grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_8.5rem_minmax(0,1fr)] md:items-start md:gap-x-0 md:gap-y-4",
+						"grid w-full grid-cols-[minmax(0,1fr)_4rem_minmax(0,1fr)] items-stretch gap-2 sm:grid-cols-[minmax(0,1fr)_10%_minmax(0,1fr)] sm:gap-3",
 						workspaceClassName,
 					)}
 				>
@@ -328,7 +339,7 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 						anilistHeaderData={anilistHeaderData}
 						anilistId={anilistId}
 					/>
-					<MappingBridge />
+					<MappingConnector state={connectorState} />
 					<ProviderCard
 						provider={provider}
 						baseUrl={baseUrl}

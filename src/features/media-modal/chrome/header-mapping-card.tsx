@@ -19,7 +19,7 @@ export function MappingPoster(props: { src: string | null }): React.JSX.Element 
   const { src } = props;
 
   return (
-    <div className="h-18 w-12 shrink-0 overflow-hidden rounded-xl border border-border-primary/45 bg-bg-primary/18 shadow-[0_10px_24px_rgba(0,0,0,0.14)] md:h-24 md:w-16">
+    <div className="h-18 w-12 shrink-0 overflow-hidden rounded-lg border border-border-primary/45 bg-bg-primary/18 shadow-sm md:h-24 md:w-16">
       {src ? (
         <img src={src} alt="" className="h-full w-full object-cover" />
       ) : (
