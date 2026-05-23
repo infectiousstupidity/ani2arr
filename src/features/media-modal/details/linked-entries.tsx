@@ -34,6 +34,21 @@ const EXTERNAL_ICON_VARIANTS = {
 	hidden: { opacity: 0, scale: 0.92 },
 	visible: { opacity: 1, scale: 1 },
 };
+const LINKED_ENTRIES_LIST_VARIANTS = {
+	hidden: { opacity: 0 },
+	show: {
+		opacity: 1,
+		transition: { staggerChildren: 0.05 },
+	},
+};
+const LINKED_ENTRY_VARIANTS = {
+	hidden: { opacity: 0, y: 10 },
+	show: {
+		opacity: 1,
+		y: 0,
+		transition: { duration: 0.18 },
+	},
+};
 
 function LinkedEntryLink(props: { row: LinkedEntryRow }): React.JSX.Element {
 	const { row } = props;
@@ -43,6 +58,7 @@ function LinkedEntryLink(props: { row: LinkedEntryRow }): React.JSX.Element {
 
 	return (
 		<m.a
+			variants={LINKED_ENTRY_VARIANTS}
 			href={buildAniListAnimeUrl(row.anilistId)}
 			target="_blank"
 			rel="noreferrer"
@@ -164,6 +180,7 @@ export function MappingLinkedEntries(
 							metadata?.coverImage?.medium ?? metadata?.coverImage?.large ?? null,
 					};
 				});
+	const rowsKey = rows.map((row) => row.anilistId).join(":");
 
 	return (
 		<section className="flex flex-col gap-2 border-t border-border-primary/50 pt-4">
@@ -171,11 +188,17 @@ export function MappingLinkedEntries(
 				{`Mapped AniList entries (${rows.length})`}
 			</p>
 			<LazyMotion features={domAnimation}>
-				<div className="flex flex-col gap-2 overflow-x-hidden">
+				<m.div
+					key={rowsKey}
+					className="flex flex-col gap-2 overflow-x-hidden"
+					variants={LINKED_ENTRIES_LIST_VARIANTS}
+					initial="hidden"
+					animate="show"
+				>
 					{rows.map((row) => (
 						<LinkedEntryLink key={row.anilistId} row={row} />
 					))}
-				</div>
+				</m.div>
 			</LazyMotion>
 		</section>
 	);

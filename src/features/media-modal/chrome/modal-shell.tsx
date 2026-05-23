@@ -9,6 +9,7 @@ import {
 	type ReactNode,
 } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { MotionConfig } from "framer-motion";
 import { cn } from "@/shared/utils/cn";
 import type { MediaModalContainer } from "../types";
 
@@ -192,32 +193,34 @@ export function ModalShell(props: ModalShellProps): React.JSX.Element {
 	);
 
 	return (
-		<Modal open onOpenChange={onOpenChange}>
-			<ModalContent
-				container={container}
-				contentContainer={contentContainer}
-				className={SHELL_CLASS}
-				onOpenAutoFocus={(event) => event.preventDefault()}
-				{...(onEscapeKeyDown ? { onEscapeKeyDown } : {})}
-			>
-				{header}
+		<MotionConfig reducedMotion="user">
+			<Modal open onOpenChange={onOpenChange}>
+				<ModalContent
+					container={container}
+					contentContainer={contentContainer}
+					className={SHELL_CLASS}
+					onOpenAutoFocus={(event) => event.preventDefault()}
+					{...(onEscapeKeyDown ? { onEscapeKeyDown } : {})}
+				>
+					{header}
 
-				<div className={FRAME_CLASS}>
-					<div className={WORKSPACE_CLASS}>
-						<div className={GRID_CLASS}>
-							<div className={leftPaneClass}>{leftPane}</div>
+					<div className={FRAME_CLASS}>
+						<div className={WORKSPACE_CLASS}>
+							<div className={GRID_CLASS}>
+								<div className={leftPaneClass}>{leftPane}</div>
 
-							{rightPaneTop ? (
-								<div className={RIGHT_PANE_TOP_CLASS}>{rightPaneTop}</div>
-							) : null}
+								{rightPaneTop ? (
+									<div className={RIGHT_PANE_TOP_CLASS}>{rightPaneTop}</div>
+								) : null}
 
-							<div className={rightPaneClass}>{rightPane}</div>
+								<div className={rightPaneClass}>{rightPane}</div>
+							</div>
 						</div>
 					</div>
-				</div>
 
-				{footer}
-			</ModalContent>
-		</Modal>
+					{footer}
+				</ModalContent>
+			</Modal>
+		</MotionConfig>
 	);
 }
