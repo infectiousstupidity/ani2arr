@@ -30,7 +30,7 @@ export function MappingPoster(props: {
   return src ? (
     <img src={src} alt="" className={`${posterClass} w-auto max-w-none`} />
   ) : (
-    <div className={`${posterClass} aspect-[2/3] bg-bg-primary/60`} />
+    <div className={`${posterClass} aspect-2/3 bg-bg-primary/60`} />
   );
 }
 

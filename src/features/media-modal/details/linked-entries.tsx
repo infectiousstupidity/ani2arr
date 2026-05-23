@@ -1,7 +1,9 @@
 /** Renders other AniList entries linked to the selected provider target in the modal. */
 // src/features/media-modal/details/linked-entries.tsx
 
+import { LazyMotion, domAnimation, m } from "framer-motion";
 import { ExternalLink } from "lucide-react";
+import { useState } from "react";
 import type { AniListId } from "@/anilist";
 import { buildAniListAnimeUrl } from "@/anilist/anilist-links";
 import type { AniListMediaFormat } from "@/anilist/schemas/media.schema";
@@ -27,6 +29,69 @@ type LinkedEntryRow = {
 	year?: number | null;
 	posterUrl?: string | null;
 };
+
+const EXTERNAL_ICON_VARIANTS = {
+	hidden: { opacity: 0, scale: 0.92 },
+	visible: { opacity: 1, scale: 1 },
+};
+
+function LinkedEntryLink(props: { row: LinkedEntryRow }): React.JSX.Element {
+	const { row } = props;
+	const [isHovered, setIsHovered] = useState(false);
+	const [isFocusWithin, setIsFocusWithin] = useState(false);
+	const showExternalIcon = isHovered || isFocusWithin;
+
+	return (
+		<m.a
+			href={buildAniListAnimeUrl(row.anilistId)}
+			target="_blank"
+			rel="noreferrer"
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
+			onFocusCapture={() => setIsFocusWithin(true)}
+			onBlurCapture={(event) => {
+				const nextTarget = event.relatedTarget;
+				if (
+					!(nextTarget instanceof Node) ||
+					!event.currentTarget.contains(nextTarget)
+				) {
+					setIsFocusWithin(false);
+				}
+			}}
+			className="relative flex items-center gap-3 rounded-lg p-2 pr-10 transition-colors hover:bg-bg-tertiary/50"
+		>
+			<div className="h-14 w-10 shrink-0 rounded-md bg-bg-primary/65">
+				{row.posterUrl ? (
+					<img
+						src={row.posterUrl}
+						alt=""
+						className="h-full w-full rounded-md object-cover"
+					/>
+				) : null}
+			</div>
+			<div className="min-w-0 flex-1">
+				<div className="flex items-center gap-2">
+					<div className="line-clamp-1 text-sm font-medium text-text-primary">
+						{row.title}
+					</div>
+				</div>
+				<div className="mt-0.5 text-xs text-text-secondary">
+					{row.format ? formatToken(row.format) : "Unknown format"}
+					{row.year ? ` • ${row.year}` : ""}
+				</div>
+			</div>
+			<m.span
+				variants={EXTERNAL_ICON_VARIANTS}
+				initial={false}
+				animate={showExternalIcon ? "visible" : "hidden"}
+				transition={{ duration: 0.14 }}
+				className="absolute right-3 top-3 text-text-secondary"
+			>
+				<ExternalLink className="h-4 w-4" />
+			</m.span>
+		</m.a>
+	);
+}
 
 function titleFromMetadata(
 	metadata: AniListMetadata | undefined,
@@ -101,43 +166,17 @@ export function MappingLinkedEntries(
 				});
 
 	return (
-		<section className="flex flex-col gap-2">
-			<p className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
-				{`Also linked AniList entr${rows.length === 1 ? "y" : "ies"}`}
+		<section className="flex flex-col gap-2 border-t border-border-primary/50 pt-4">
+			<p className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.18em] text-text-secondary/70">
+				{`Mapped AniList entries (${rows.length})`}
 			</p>
-			<div className="flex flex-col gap-2 overflow-x-hidden">
-				{rows.map((row) => (
-					<a
-						key={row.anilistId}
-						href={buildAniListAnimeUrl(row.anilistId)}
-						target="_blank"
-						rel="noreferrer"
-						className="flex items-center gap-3 rounded-lg border border-transparent bg-bg-primary/18 px-3 py-3 transition-colors hover:border-border-primary/45 hover:bg-bg-tertiary/50"
-					>
-						<div className="h-12 w-9 shrink-0 overflow-hidden rounded-md bg-bg-primary/65">
-							{row.posterUrl ? (
-								<img
-									src={row.posterUrl}
-									alt=""
-									className="h-full w-full object-cover"
-								/>
-							) : null}
-						</div>
-						<div className="min-w-0 flex-1">
-							<div className="flex items-center gap-2">
-								<div className="truncate text-sm font-medium text-text-primary">
-									{row.title}
-								</div>
-							</div>
-							<div className="mt-0.5 text-xs text-text-secondary">
-								{row.format ? formatToken(row.format) : "Unknown format"}
-								{row.year ? ` • ${row.year}` : ""}
-							</div>
-						</div>
-						<ExternalLink className="h-4 w-4 shrink-0 text-text-secondary" />
-					</a>
-				))}
-			</div>
+			<LazyMotion features={domAnimation}>
+				<div className="flex flex-col gap-2 overflow-x-hidden">
+					{rows.map((row) => (
+						<LinkedEntryLink key={row.anilistId} row={row} />
+					))}
+				</div>
+			</LazyMotion>
 		</section>
 	);
 }

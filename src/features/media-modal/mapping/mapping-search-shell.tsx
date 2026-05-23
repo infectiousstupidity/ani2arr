@@ -46,7 +46,7 @@ export function MappingSearchShell(
 	};
 
 	return (
-		<div className="flex flex-col px-4 pt-4 md:h-full md:min-h-0">
+		<div className="flex flex-col pt-4 md:h-full md:min-h-0">
 			<div className="shrink-0 pb-4">
 				<p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">
 					Search {providerLabel} database

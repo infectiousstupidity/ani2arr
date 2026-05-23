@@ -196,7 +196,7 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 						disabled={!canApplyMapping}
 						isLoading={isApplyingMapping}
 					>
-						Confirm Selection
+						Overwrite mapping
 					</Button>
 				</>
 			}
