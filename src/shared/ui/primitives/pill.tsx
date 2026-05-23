@@ -1,19 +1,25 @@
-// src/shared/components/pill.tsx
-import React from "react";
+/** Shared pill badge primitive for compact status labels. */
+// src/shared/ui/primitives/pill.tsx
+import {
+	forwardRef,
+	type ComponentType,
+	type HTMLAttributes,
+	type ReactNode,
+} from "react";
 import { cn } from "@/shared/utils/cn";
 
 type Tone = "muted" | "success" | "warning" | "info" | "accent" | "blue" | "default";
 
-type PillProps = React.HTMLAttributes<HTMLSpanElement> & {
-  children: React.ReactNode;
+type PillProps = HTMLAttributes<HTMLSpanElement> & {
+  children: ReactNode;
   tone?: Tone;
   small?: boolean;
-  icon?: React.ComponentType<{ className?: string }> | null;
+  icon?: ComponentType<{ className?: string }> | null;
 };
 
 const TONE_CLASSES: Record<Tone, string> = {
   muted: "border-white/15 bg-white/10 text-white/80",
-  success: "border-success/25 bg-success/20 text-success",
+  success: "border-success/25 bg-success/20 text-success-foreground",
   warning: "border-amber-200/30 bg-amber-100/15 text-amber-100",
   info: "border-white/15 bg-white/10 text-white/80",
   accent: "bg-accent-primary/20 text-accent-primary",
@@ -21,7 +27,7 @@ const TONE_CLASSES: Record<Tone, string> = {
   default: "bg-bg-primary/10 text-text-primary",
 };
 
-const Pill = React.forwardRef<HTMLSpanElement, PillProps>(function Pill(props, ref) {
+const Pill = forwardRef<HTMLSpanElement, PillProps>(function Pill(props, ref) {
   const { children, tone = "muted", small = false, icon: Icon = null, className, ...rest } = props;
 
   const base = cn(

@@ -158,11 +158,14 @@ function getLibraryLabel(input: {
 	const { candidate, providerLabel } = input;
 	if (!candidate.summary.isInLibrary) return null;
 
-	return `In ${providerLabel}${
-		candidate.summary.episodeFileCount
-			? `: ${candidate.summary.episodeFileCount} eps`
-			: ""
-	}`;
+	if (
+		candidate.summary.episodeFileCount !== undefined &&
+		candidate.summary.episodeCount !== undefined
+	) {
+		return `In ${providerLabel}: ${candidate.summary.episodeFileCount}/${candidate.summary.episodeCount} eps`;
+	}
+
+	return `In ${providerLabel}`;
 }
 
 export function SonarrMappingPanel(

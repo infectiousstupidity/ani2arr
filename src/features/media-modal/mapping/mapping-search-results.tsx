@@ -1,7 +1,9 @@
 /** Dumb mapping candidate row UI for provider mapping panels. */
 // src/features/media-modal/mapping/mapping-search-results.tsx
 
+import { LazyMotion, domAnimation, m } from "framer-motion";
 import { ExternalLink } from "lucide-react";
+import { useState } from "react";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import { cn } from "@/shared/utils/cn";
 
@@ -24,6 +26,10 @@ type MappingCandidateRowProps = {
 
 const BADGE_CLASS =
 	"inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-medium leading-none";
+const EXTERNAL_ICON_VARIANTS = {
+	hidden: { opacity: 0, scale: 0.92 },
+	visible: { opacity: 1, scale: 1 },
+};
 
 function getLinkedBadgeLabel(
 	linkedAniListCount: number | undefined,
@@ -56,105 +62,127 @@ export function MappingCandidateRow(
 	const selectionLabel = isSelected
 		? `Clear selected match: ${title}`
 		: `Preview match: ${title}`;
+	const [isHovered, setIsHovered] = useState(false);
+	const [isFocusWithin, setIsFocusWithin] = useState(false);
+	const showExternalIcon = isSelected || isHovered || isFocusWithin;
 
 	return (
-		<div
-			className={cn(
-				"group relative h-[120px] overflow-hidden rounded-lg border p-0 transition-[background-color,border-color] focus-within:border-accent-primary/45 focus-within:bg-bg-tertiary/45",
-				isSelected
-					? "border-accent-primary/45 bg-accent-primary/10"
-					: "border-transparent hover:border-border-primary/45 hover:bg-bg-tertiary/50",
-			)}
-		>
-			<button
-				type="button"
-				className="flex h-full w-full min-w-0 items-stretch text-left"
-				onClick={onToggleSelection}
-				aria-label={selectionLabel}
-			>
-				{posterUrl ? (
-					<img
-						src={posterUrl}
-						alt="Poster"
-						className="h-full w-20 shrink-0 rounded-l-lg object-cover"
-					/>
-				) : (
-					<div className="h-full w-20 shrink-0 rounded-l-lg bg-bg-primary" />
+		<LazyMotion features={domAnimation}>
+			<m.div
+				initial={false}
+				onMouseEnter={() => setIsHovered(true)}
+				onMouseLeave={() => setIsHovered(false)}
+				onFocusCapture={() => setIsFocusWithin(true)}
+				onBlurCapture={(event) => {
+					const nextTarget = event.relatedTarget;
+					if (
+						!(nextTarget instanceof Node) ||
+						!event.currentTarget.contains(nextTarget)
+					) {
+						setIsFocusWithin(false);
+					}
+				}}
+				className={cn(
+					"group relative h-[120px] overflow-hidden rounded-lg border p-0 transition-[background-color,border-color] focus-within:border-accent-primary/45 focus-within:bg-bg-tertiary/45",
+					isSelected
+						? "border-accent-primary/45 bg-accent-primary/10"
+						: "border-transparent hover:border-border-primary/45 hover:bg-bg-tertiary/50",
 				)}
-				<div className="flex h-full min-w-0 flex-1 flex-col py-3 pl-4 pr-12">
-					<div className="text-sm font-semibold leading-tight text-text-primary line-clamp-2">
-						{title}
-					</div>
+			>
+				<button
+					type="button"
+					className="flex h-full w-full min-w-0 items-stretch text-left"
+					onClick={onToggleSelection}
+					aria-label={selectionLabel}
+				>
+					{posterUrl ? (
+						<img
+							src={posterUrl}
+							alt="Poster"
+							className="h-full w-20 shrink-0 rounded-l-lg object-cover"
+						/>
+					) : (
+						<div className="h-full w-20 shrink-0 rounded-l-lg bg-bg-primary" />
+					)}
+					<div className="flex h-full min-w-0 flex-1 flex-col py-3 pl-4 pr-12">
+						<div className="text-sm font-semibold leading-tight text-text-primary line-clamp-2">
+							{title}
+						</div>
 
-					<div className="mt-1 truncate text-xs text-text-secondary">
-						<span>
-							{providerIdLabel} {providerId}
-						</span>
-						{year ? (
-							<>
-								<span className="mx-1 opacity-30" aria-hidden="true">
-									•
-								</span>
-								<span>{year}</span>
-							</>
-						) : null}
-						{typeLabel ? (
-							<>
-								<span className="mx-1 opacity-30" aria-hidden="true">
-									•
-								</span>
-								<span>{typeLabel}</span>
-							</>
-						) : null}
-					</div>
+						<div className="mt-1 truncate text-xs text-text-secondary">
+							<span>
+								{providerIdLabel} {providerId}
+							</span>
+							{year ? (
+								<>
+									<span className="mx-1 opacity-30" aria-hidden="true">
+										•
+									</span>
+									<span>{year}</span>
+								</>
+							) : null}
+							{typeLabel ? (
+								<>
+									<span className="mx-1 opacity-30" aria-hidden="true">
+										•
+									</span>
+									<span>{typeLabel}</span>
+								</>
+							) : null}
+						</div>
 
-					<div className="mt-auto flex h-5 flex-wrap items-end gap-1.5 overflow-hidden">
-						{isCurrent ? (
-							<span
-								className={cn(
-									BADGE_CLASS,
-									"border-success/25 bg-success/15 text-success",
-								)}
-							>
-								Current
-							</span>
-						) : null}
-						{libraryLabel ? (
-							<span
-								className={cn(
-									BADGE_CLASS,
-									"border-success/25 bg-success/15 text-success",
-								)}
-							>
-								{libraryLabel}
-							</span>
-						) : null}
-						{linkedBadgeLabel ? (
-							<span
-								className={cn(
-									BADGE_CLASS,
-									"border-amber-100/25 bg-amber-100/10 text-amber-100/90",
-								)}
-							>
-								{linkedBadgeLabel}
-							</span>
-						) : null}
+						<div className="mt-auto flex h-5 flex-wrap items-end gap-1.5 overflow-hidden">
+							{isCurrent ? (
+								<span
+									className={cn(
+										BADGE_CLASS,
+										"border-success/25 bg-success/15 text-success-foreground",
+									)}
+								>
+									Current
+								</span>
+							) : null}
+							{libraryLabel ? (
+								<span
+									className={cn(
+										BADGE_CLASS,
+										"border-success/25 bg-success/15 text-success-foreground",
+									)}
+								>
+									{libraryLabel}
+								</span>
+							) : null}
+							{linkedBadgeLabel ? (
+								<span
+									className={cn(
+										BADGE_CLASS,
+										"border-amber-100/25 bg-amber-100/10 text-amber-100/90",
+									)}
+								>
+									{linkedBadgeLabel}
+								</span>
+							) : null}
+						</div>
 					</div>
-				</div>
-			</button>
-			{externalUrl ? (
-				<TooltipWrapper content={externalLabel} container={contentContainer}>
-					<a
-						href={externalUrl}
-						target="_blank"
-						rel="noreferrer"
-						className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full text-text-secondary hover:bg-bg-tertiary/70 hover:text-text-primary focus-visible:bg-bg-tertiary/70 focus-visible:text-text-primary"
-						aria-label={externalLabel}
-					>
-						<ExternalLink className="h-4 w-4" />
-					</a>
-				</TooltipWrapper>
-			) : null}
-		</div>
+				</button>
+				{externalUrl ? (
+					<TooltipWrapper content={externalLabel} container={contentContainer}>
+						<m.a
+							href={externalUrl}
+							target="_blank"
+							rel="noreferrer"
+							variants={EXTERNAL_ICON_VARIANTS}
+							initial={false}
+							animate={showExternalIcon ? "visible" : "hidden"}
+							transition={{ duration: 0.14 }}
+							className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full text-text-secondary hover:bg-bg-tertiary/70 hover:text-text-primary focus-visible:bg-bg-tertiary/70 focus-visible:text-text-primary"
+							aria-label={externalLabel}
+						>
+							<ExternalLink className="h-4 w-4" />
+						</m.a>
+					</TooltipWrapper>
+				) : null}
+			</m.div>
+		</LazyMotion>
 	);
 }

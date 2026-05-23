@@ -15,6 +15,7 @@
   --accent-primary:#3DB4F2;
   --accent-hover:  #299dd1;
   --success:       #00BA7C;
+  --success-foreground: #166534;
   --error:         #F91880;
   --iconbutton-text: #FAFAFA;
 
@@ -31,6 +32,7 @@
   --border-primary:#38444D;
   --accent-primary:#3DB4F2;
   --accent-hover:  #299dd1;
+  --success-foreground: #86EFAC;
   --iconbutton-text: #F7F9F9;
 }
 
@@ -57,6 +59,7 @@
   --color-accent-primary: var(--accent-primary);
   --color-accent-hover: var(--accent-hover);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-error: var(--error);
   --color-iconbutton-text: var(--iconbutton-text);
 }
