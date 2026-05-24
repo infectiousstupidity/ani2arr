@@ -214,7 +214,7 @@ export function SonarrMappingPanel(
 	return (
 		<MappingSearchShell
 			providerLabel={providerLabel}
-			providerIdLabel={providerIdLabel}
+			searchPlaceholder="Search by series title or TVDB ID..."
 			hasSearchTerm={searchTerm.length > 0}
 			isFetching={search.isFetching}
 			resultCount={candidates.length}

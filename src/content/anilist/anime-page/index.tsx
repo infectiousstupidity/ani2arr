@@ -8,6 +8,7 @@ import {
 	QueryClientProvider,
 } from "@tanstack/react-query";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
+import { AnimatePresence } from "framer-motion";
 import { browser } from "wxt/browser";
 import type { AniListId } from "@/anilist";
 import { parseAniListIdOrNull } from "@/anilist/anilist-id";
@@ -389,14 +390,16 @@ export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
 						onOpenMapping={openMapping}
 					/>
 				)}
-				{hostElement && mediaModal.state ? (
-					<MediaModal
-						key={`modal-${mediaModal.state.anilistId}`}
-						state={mediaModal.state}
-						onClose={mediaModal.close}
-						container={hostElement}
-					/>
-				) : null}
+				<AnimatePresence>
+					{hostElement && mediaModal.state ? (
+						<MediaModal
+							key={`modal-${mediaModal.state.anilistId}`}
+							state={mediaModal.state}
+							onClose={mediaModal.close}
+							container={hostElement}
+						/>
+					) : null}
+				</AnimatePresence>
 			</ConfirmProvider>
 		</div>
 	);
