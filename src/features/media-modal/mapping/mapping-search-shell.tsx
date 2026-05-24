@@ -157,7 +157,7 @@ export function MappingSearchShell(
 	};
 
 	return (
-		<div className="flex flex-col pt-4 md:h-full md:min-h-0">
+		<div className="flex h-80 min-h-0 flex-col overflow-hidden pt-4 md:h-full">
 			<div className="shrink-0 pb-4">
 				<p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">
 					Search {providerLabel} database
@@ -186,7 +186,7 @@ export function MappingSearchShell(
 				</form>
 			</div>
 
-			<div className="md:min-h-0 md:flex-1 md:overflow-hidden">
+			<div className="min-h-0 flex-1 overflow-hidden">
 				<LazyMotion features={domMax}>
 					<LayoutGroup id="mapping-search-results">
 						<ScrollArea.Root className="h-full w-full">
