@@ -1,7 +1,7 @@
 /** Read-only right-side details panel for media modal flows. */
 // src/features/media-modal/details/details-panel.tsx
 
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Search } from "lucide-react";
 import type { AniListId } from "@/anilist";
 import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
 import type { Provider } from "@/providers";
@@ -72,8 +72,13 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 				overwrittenTarget={overwrittenTarget}
 			/>
 		) : (
-			<div className="flex min-h-65 flex-1 items-center justify-center rounded-xl border border-dashed border-border-primary bg-bg-tertiary/60 px-3 text-center text-sm text-text-secondary">
-				{`Select a search result to preview how it would replace the current ${providerLabel} target shown above.`}
+			<div className="flex min-h-65 flex-1 items-center justify-center rounded-xl border border-dashed border-border-primary bg-bg-tertiary/60 px-6 py-8 text-center text-sm leading-relaxed text-text-secondary">
+				<div className="flex max-w-72 flex-col items-center gap-3">
+					<Search className="h-7 w-7 text-text-secondary/55" />
+					<p>
+						{`Select a search result to preview how it would replace the current ${providerLabel} target shown above.`}
+					</p>
+				</div>
 			</div>
 		);
 	} else {

@@ -9,7 +9,13 @@ import {
 	type ReactNode,
 } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { MotionConfig } from "framer-motion";
+import {
+	LazyMotion,
+	MotionConfig,
+	domAnimation,
+	m,
+	type Variants,
+} from "framer-motion";
 import { cn } from "@/shared/utils/cn";
 import type { MediaModalContainer } from "../types";
 
@@ -40,6 +46,65 @@ const RIGHT_PANE_CLASS =
 	"order-3 relative flex flex-col min-h-80 min-w-0 overscroll-contain touch-pan-y md:col-start-2 md:h-full md:min-h-0 md:overflow-y-auto";
 
 const MODAL_SCROLL_BOUNDARY_EVENTS = ["wheel", "touchmove"] as const;
+
+const OVERLAY_VARIANTS: Variants = {
+	hidden: { opacity: 0, backdropFilter: "blur(0px)" },
+	show: {
+		opacity: 1,
+		backdropFilter: "blur(8px)",
+		transition: { duration: 0.16, ease: "easeOut" },
+	},
+	exit: {
+		opacity: 0,
+		backdropFilter: "blur(0px)",
+		transition: { duration: 0.12, ease: "easeIn" },
+	},
+};
+
+const SHELL_VARIANTS: Variants = {
+	hidden: { opacity: 0, y: 30, scale: 0.95 },
+	show: {
+		opacity: 1,
+		y: 0,
+		scale: 1,
+		transition: {
+			type: "spring",
+			damping: 25,
+			stiffness: 300,
+		},
+	},
+	exit: {
+		opacity: 0,
+		y: 20,
+		scale: 0.95,
+		transition: { duration: 0.14, ease: "easeIn" },
+	},
+};
+
+const SECTION_VARIANTS: Variants = {
+	hidden: { opacity: 0, y: 15 },
+	show: (delay = 0) => ({
+		opacity: 1,
+		y: 0,
+		transition: {
+			type: "spring",
+			damping: 20,
+			stiffness: 250,
+			delay,
+		},
+	}),
+	exit: {
+		opacity: 0,
+		y: 10,
+		transition: { duration: 0.1, ease: "easeIn" },
+	},
+};
+
+const HEADER_SECTION_DELAY = 0.05;
+const LEFT_PANE_SECTION_DELAY = 0.1;
+const RIGHT_PANE_TOP_SECTION_DELAY = 0.12;
+const RIGHT_PANE_SECTION_DELAY = 0.14;
+const FOOTER_SECTION_DELAY = 0.15;
 
 type PortalContainer = ComponentPropsWithoutRef<
 	typeof Dialog.Portal
@@ -146,26 +211,37 @@ const ModalContent = forwardRef<
 
 	return (
 		<Dialog.Portal container={container}>
-			<Dialog.Overlay
-				data-testid="modal-overlay"
-				className={cn(
-					"fixed inset-0 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-				)}
-				style={{ zIndex: MODAL_Z_INDEX_OVERLAY }}
-			/>
+			<Dialog.Overlay asChild>
+				<m.div
+					data-testid="modal-overlay"
+					className="fixed inset-0 bg-black/60"
+					style={{ zIndex: MODAL_Z_INDEX_OVERLAY }}
+					variants={OVERLAY_VARIANTS}
+					initial="hidden"
+					animate="show"
+					exit="exit"
+				/>
+			</Dialog.Overlay>
 
 			<Dialog.Content
 				ref={ref}
 				className={cn(
-					"fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-bg-primary shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-					className,
+					"fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 outline-none",
 				)}
 				style={{ ...style, zIndex: MODAL_Z_INDEX_CONTENT }}
 				{...rest}
 				onTouchMove={stopModalScrollLockPropagation}
 				onWheel={stopModalScrollLockPropagation}
 			>
-				{children}
+				<m.div
+					className={className}
+					variants={SHELL_VARIANTS}
+					initial="hidden"
+					animate="show"
+					exit="exit"
+				>
+					{children}
+				</m.div>
 			</Dialog.Content>
 		</Dialog.Portal>
 	);
@@ -194,33 +270,67 @@ export function ModalShell(props: ModalShellProps): React.JSX.Element {
 
 	return (
 		<MotionConfig reducedMotion="user">
-			<Modal open onOpenChange={onOpenChange}>
-				<ModalContent
-					container={container}
-					contentContainer={contentContainer}
-					className={SHELL_CLASS}
-					onOpenAutoFocus={(event) => event.preventDefault()}
-					{...(onEscapeKeyDown ? { onEscapeKeyDown } : {})}
-				>
-					{header}
+			<LazyMotion features={domAnimation}>
+				<Modal open onOpenChange={onOpenChange}>
+					<ModalContent
+						container={container}
+						contentContainer={contentContainer}
+						className={SHELL_CLASS}
+						onOpenAutoFocus={(event) => event.preventDefault()}
+						{...(onEscapeKeyDown ? { onEscapeKeyDown } : {})}
+					>
+						<m.div
+							className="shrink-0"
+							variants={SECTION_VARIANTS}
+							custom={HEADER_SECTION_DELAY}
+						>
+							{header}
+						</m.div>
 
-					<div className={FRAME_CLASS}>
-						<div className={WORKSPACE_CLASS}>
-							<div className={GRID_CLASS}>
-								<div className={leftPaneClass}>{leftPane}</div>
+						<div className={FRAME_CLASS}>
+							<div className={WORKSPACE_CLASS}>
+								<div className={GRID_CLASS}>
+									<m.div
+										className={leftPaneClass}
+										variants={SECTION_VARIANTS}
+										custom={LEFT_PANE_SECTION_DELAY}
+									>
+										{leftPane}
+									</m.div>
 
-								{rightPaneTop ? (
-									<div className={RIGHT_PANE_TOP_CLASS}>{rightPaneTop}</div>
-								) : null}
+									{rightPaneTop ? (
+										<m.div
+											className={RIGHT_PANE_TOP_CLASS}
+											variants={SECTION_VARIANTS}
+											custom={RIGHT_PANE_TOP_SECTION_DELAY}
+										>
+											{rightPaneTop}
+										</m.div>
+									) : null}
 
-								<div className={rightPaneClass}>{rightPane}</div>
+									<m.div
+										className={rightPaneClass}
+										variants={SECTION_VARIANTS}
+										custom={RIGHT_PANE_SECTION_DELAY}
+									>
+										{rightPane}
+									</m.div>
+								</div>
 							</div>
 						</div>
-					</div>
 
-					{footer}
-				</ModalContent>
-			</Modal>
+						{footer ? (
+							<m.div
+								className="shrink-0"
+								variants={SECTION_VARIANTS}
+								custom={FOOTER_SECTION_DELAY}
+							>
+								{footer}
+							</m.div>
+						) : null}
+					</ModalContent>
+				</Modal>
+			</LazyMotion>
 		</MotionConfig>
 	);
 }

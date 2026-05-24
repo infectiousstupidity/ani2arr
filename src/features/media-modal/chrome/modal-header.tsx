@@ -1,7 +1,13 @@
 /** Dumb media modal header with AniList and provider identity cards. */
 // src/features/media-modal/chrome/modal-header.tsx
 
-import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
+import {
+	AnimatePresence,
+	LazyMotion,
+	domAnimation,
+	m,
+	type Variants,
+} from "framer-motion";
 import { Settings, X } from "lucide-react";
 import type { MouseEventHandler } from "react";
 import type { AniListId } from "@/anilist";
@@ -43,6 +49,39 @@ const CHROME_BUTTON_CLASS =
 	"!h-9 !w-9 !rounded-none !p-0 text-text-secondary hover:text-text-primary";
 const HEADER_CARD_CLASS =
 	"relative flex h-[calc(var(--spacing)*30)] min-w-0 overflow-hidden rounded-xl border border-border-primary/60 bg-bg-secondary/10 backdrop-blur-[4px] transition-[opacity,filter,box-shadow] md:h-[calc(var(--spacing)*37)]";
+const HEADER_ITEMS_VARIANTS: Variants = {
+	hidden: {},
+	show: {
+		transition: {
+			staggerChildren: 0.05,
+		},
+	},
+	exit: {
+		transition: {
+			staggerChildren: 0.02,
+			staggerDirection: -1,
+		},
+	},
+};
+const HEADER_ITEM_VARIANTS: Variants = {
+	hidden: { opacity: 0, y: 10, filter: "blur(4px)" },
+	show: {
+		opacity: 1,
+		y: 0,
+		filter: "blur(0px)",
+		transition: {
+			type: "spring",
+			damping: 22,
+			stiffness: 260,
+		},
+	},
+	exit: {
+		opacity: 0,
+		y: 6,
+		filter: "blur(4px)",
+		transition: { duration: 0.1, ease: "easeIn" },
+	},
+};
 
 function toTitleCase(value: string): string {
 	return value
@@ -318,25 +357,32 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 			</div>
 
 			<div className="relative z-10 px-4 pb-3 pt-3 md:px-8 md:pb-5 md:pt-5">
-				<div
+				<m.div
 					className={cn(
 						"grid w-full grid-cols-[minmax(0,1fr)_4rem_minmax(0,1fr)] items-stretch gap-2 sm:grid-cols-[minmax(0,1fr)_10%_minmax(0,1fr)] sm:gap-3",
 						workspaceClassName,
 					)}
+					variants={HEADER_ITEMS_VARIANTS}
 				>
-					<SourceCard
-						anilistHeaderData={anilistHeaderData}
-						anilistId={anilistId}
-					/>
-					<MappingConnector state={connectorState} />
-					<ProviderCard
-						provider={provider}
-						baseUrl={baseUrl}
-						target={target}
-						isDimmed={isCurrentTargetDimmed}
-						isHighlighted={isTargetHighlighted}
-					/>
-				</div>
+					<m.div className="min-w-0" variants={HEADER_ITEM_VARIANTS}>
+						<SourceCard
+							anilistHeaderData={anilistHeaderData}
+							anilistId={anilistId}
+						/>
+					</m.div>
+					<m.div className="min-w-0" variants={HEADER_ITEM_VARIANTS}>
+						<MappingConnector state={connectorState} />
+					</m.div>
+					<m.div className="min-w-0" variants={HEADER_ITEM_VARIANTS}>
+						<ProviderCard
+							provider={provider}
+							baseUrl={baseUrl}
+							target={target}
+							isDimmed={isCurrentTargetDimmed}
+							isHighlighted={isTargetHighlighted}
+						/>
+					</m.div>
+				</m.div>
 			</div>
 		</header>
 	);

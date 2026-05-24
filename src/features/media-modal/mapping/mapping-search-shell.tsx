@@ -4,12 +4,12 @@
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import { LayoutGroup, LazyMotion, domMax, m } from "framer-motion";
 import { Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Button from "@/shared/ui/primitives/button";
 
 type MappingSearchShellProps = {
 	providerLabel: string;
-	providerIdLabel: string;
+	searchPlaceholder: string;
 	hasSearchTerm: boolean;
 	isFetching: boolean;
 	resultCount: number;
@@ -89,7 +89,7 @@ export function MappingSearchShell(
 ): React.JSX.Element {
 	const {
 		providerLabel,
-		providerIdLabel,
+		searchPlaceholder,
 		hasSearchTerm,
 		isFetching,
 		resultCount,
@@ -100,6 +100,7 @@ export function MappingSearchShell(
 	} = props;
 	const [query, setQuery] = useState("");
 	const [resultListKey, setResultListKey] = useState(0);
+	const searchInputRef = useRef<HTMLInputElement>(null);
 	const imageUrlsKey = useMemo(
 		() => JSON.stringify(normalizeImageUrls(resultImageUrls)),
 		[resultImageUrls],
@@ -114,10 +115,23 @@ export function MappingSearchShell(
 	const trimmedQuery = query.trim();
 	const canSearch = trimmedQuery.length > 0;
 	let stateMessage: string | null = null;
-	if (!hasSearchTerm) stateMessage = "Type a query, then press Search.";
-	else if (isFetching && resultCount === 0) stateMessage = "Searching...";
-	else if (resultCount === 0) stateMessage = "No results found.";
-	else if (!areResultImagesReady) stateMessage = "Preparing results...";
+	if (isFetching && resultCount === 0) stateMessage = "Searching...";
+	else if (hasSearchTerm && resultCount === 0) stateMessage = "No results found.";
+	else if (hasSearchTerm && !areResultImagesReady) stateMessage = "Preparing results...";
+
+	useEffect(() => {
+		const searchInput = searchInputRef.current;
+		if (!searchInput) return;
+
+		if (typeof requestAnimationFrame !== "function") {
+			searchInput.focus();
+			return;
+		}
+
+		const frameId = requestAnimationFrame(() => searchInput.focus());
+
+		return () => cancelAnimationFrame(frameId);
+	}, []);
 
 	useEffect(() => {
 		if (!shouldPreloadImages) return;
@@ -151,12 +165,13 @@ export function MappingSearchShell(
 
 				<form className="mt-3 flex gap-2" onSubmit={handleSubmit}>
 					<input
+						ref={searchInputRef}
 						value={query}
 						onChange={(event) => {
 							setQuery(event.target.value);
 							if (hasSearchTerm) onQueryChange();
 						}}
-						placeholder={`Search ${providerLabel} title or ${providerIdLabel}...`}
+						placeholder={searchPlaceholder}
 						className="min-w-0 flex-1 rounded-xl border border-border-primary/60 bg-bg-tertiary/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-accent-primary focus:outline-none"
 					/>
 					<Button

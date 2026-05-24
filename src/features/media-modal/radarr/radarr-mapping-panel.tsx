@@ -162,7 +162,7 @@ export function RadarrMappingPanel(
 	return (
 		<MappingSearchShell
 			providerLabel={providerLabel}
-			providerIdLabel={providerIdLabel}
+			searchPlaceholder="Search by movie title or TMDB ID..."
 			hasSearchTerm={searchTerm.length > 0}
 			isFetching={search.isFetching}
 			resultCount={candidates.length}
