@@ -77,7 +77,7 @@ function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
 			>
 				<m.div
 					layout
-					className="order-2 flex w-full flex-wrap items-center gap-2 text-xs text-text-secondary md:order-1 md:w-auto"
+					className="order-1 flex w-full flex-wrap items-center gap-2 text-xs text-text-secondary md:order-1 md:w-auto"
 				>
 					<AnimatePresence initial={false} mode="popLayout">
 						{left}
@@ -86,7 +86,7 @@ function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
 
 				<m.div
 					layout
-					className="order-1 flex w-full flex-wrap items-center gap-2 md:order-2 md:w-auto md:justify-end"
+					className="order-2 flex w-full flex-wrap items-center gap-2 md:order-2 md:w-auto md:justify-end"
 				>
 					<AnimatePresence initial={false} mode="popLayout">
 						{right}
@@ -100,24 +100,9 @@ function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
 export function MediaModalFooterTransition(
 	props: MediaModalFooterTransitionProps,
 ): React.JSX.Element {
-	const { modeKey, children } = props;
+	const { children } = props;
 
-	return (
-		<LazyMotion features={domMax}>
-			<AnimatePresence mode="popLayout" initial={false}>
-				<m.div
-					key={modeKey}
-					layout
-					initial={{ opacity: 0, y: 8 }}
-					animate={{ opacity: 1, y: 0 }}
-					exit={{ opacity: 0, y: 8 }}
-					transition={{ duration: 0.16 }}
-				>
-					{children}
-				</m.div>
-			</AnimatePresence>
-		</LazyMotion>
-	);
+	return <>{children}</>;
 }
 
 export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
