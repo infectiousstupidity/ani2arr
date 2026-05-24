@@ -24,8 +24,11 @@ const MODAL_Z_INDEX_OVERLAY = MODAL_Z_INDEX_BASE;
 const MODAL_Z_INDEX_CONTENT = MODAL_Z_INDEX_BASE + 1;
 export const MODAL_Z_INDEX_FLOATING = MODAL_Z_INDEX_BASE + 2;
 
+const CONTENT_CLASS =
+	"fixed left-1/2 top-1/2 h-[100dvh] max-h-[100dvh] min-h-0 w-full max-w-none -translate-x-1/2 -translate-y-1/2 outline-none md:h-[min(80vh,calc(100dvh-2rem))] md:max-h-[calc(100dvh-2rem)] md:max-w-250";
+
 const SHELL_CLASS =
-	"h-[100dvh] max-h-[100dvh] min-h-0 w-full max-w-none flex flex-col overflow-hidden rounded-none bg-bg-primary p-0 shadow-2xl shadow-black/40 md:h-[min(80vh,calc(100dvh-2rem))] md:max-h-[calc(100dvh-2rem)] md:max-w-250 md:rounded-2xl";
+	"flex h-full w-full min-h-0 flex-col overflow-hidden rounded-none bg-bg-primary p-0 shadow-2xl shadow-black/40 md:rounded-2xl";
 
 const FRAME_CLASS =
 	"relative flex-1 flex flex-col min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-4 md:overflow-hidden md:px-8";
@@ -225,9 +228,7 @@ const ModalContent = forwardRef<
 
 			<Dialog.Content
 				ref={ref}
-				className={cn(
-					"fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 outline-none",
-				)}
+				className={CONTENT_CLASS}
 				style={{ ...style, zIndex: MODAL_Z_INDEX_CONTENT }}
 				{...rest}
 				onTouchMove={stopModalScrollLockPropagation}
