@@ -10,6 +10,7 @@ import {
 import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
 import type { SonarrSeries } from "@/providers/sonarr/types";
 import type { CheckSeriesStatusResponse } from "@/rpc/types";
+import { areArraysEqual } from "../helpers";
 
 export const SONARR_EDIT_MONITORING_ACTION_DEFAULT = "noChange" as const;
 
@@ -101,6 +102,32 @@ export function getSonarrEditDefaults(
 		}),
 		monitoringAction: SONARR_EDIT_MONITORING_ACTION_DEFAULT,
 	};
+}
+
+export function isSonarrSetupDraftDirty(input: {
+	baselineValues: SonarrFormState;
+	values: SonarrFormState;
+	baselineMonitoringAction: SonarrEditMonitoringAction;
+	monitoringAction: SonarrEditMonitoringAction;
+}): boolean {
+	const { baselineValues, values } = input;
+
+	return (
+		input.monitoringAction !== input.baselineMonitoringAction ||
+		values.qualityProfileId !== baselineValues.qualityProfileId ||
+		values.rootFolderPath !== baselineValues.rootFolderPath ||
+		values.monitored !== baselineValues.monitored ||
+		values.seriesType !== baselineValues.seriesType ||
+		values.seasonFolder !== baselineValues.seasonFolder ||
+		values.monitorNewItems !== baselineValues.monitorNewItems ||
+		values.addOptions?.monitor !== baselineValues.addOptions?.monitor ||
+		values.addOptions?.searchForMissingEpisodes !==
+			baselineValues.addOptions?.searchForMissingEpisodes ||
+		values.addOptions?.searchForCutoffUnmetEpisodes !==
+			baselineValues.addOptions?.searchForCutoffUnmetEpisodes ||
+		!areArraysEqual(values.tags, baselineValues.tags) ||
+		!areArraysEqual(values.freeformTags, baselineValues.freeformTags)
+	);
 }
 
 export function canShowSonarrSetup(input: {
