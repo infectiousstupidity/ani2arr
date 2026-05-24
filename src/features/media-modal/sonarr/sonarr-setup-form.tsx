@@ -18,6 +18,7 @@ import type { ProviderRootFolderPathPreview } from "../setup/provider-root-folde
 import { SonarrAddOptionsFields } from "./sonarr-add-options-fields";
 import { SonarrEditOptionsFields } from "./sonarr-edit-options-fields";
 import {
+	isSonarrSetupDraftDirty,
 	getSonarrSetupStatusNotice,
 	type SonarrSetupTarget,
 } from "./sonarr-setup-values";
@@ -26,9 +27,10 @@ import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 
 type SonarrDraftState = {
 	targetKey: string | null;
+	baselineValues: SonarrFormState;
 	values: SonarrFormState;
+	baselineMonitoringAction: SonarrEditMonitoringAction;
 	monitoringAction: SonarrEditMonitoringAction;
-	isDirty: boolean;
 };
 
 export type SonarrSetupFooterState = {
@@ -127,20 +129,26 @@ export function useSonarrSetupForm(
 	const targetKey = target?.key ?? null;
 	const initialValues = getInitialValues(target);
 	const initialMonitoringAction = target?.initialMonitoringAction ?? "noChange";
-	const [draftState, setDraftState] = useState<SonarrDraftState>(() => ({
+	const initialDraft = {
 		targetKey,
+		baselineValues: initialValues,
 		values: initialValues,
+		baselineMonitoringAction: initialMonitoringAction,
 		monitoringAction: initialMonitoringAction,
-		isDirty: false,
-	}));
-	let currentDraft = initialValues;
-	let monitoringAction = initialMonitoringAction;
-	let isDirty = false;
-	if (draftState.targetKey === targetKey) {
-		currentDraft = draftState.values;
-		monitoringAction = draftState.monitoringAction;
-		isDirty = draftState.isDirty;
-	}
+	} satisfies SonarrDraftState;
+	const [draftState, setDraftState] = useState<SonarrDraftState>(
+		() => initialDraft,
+	);
+	const activeDraft =
+		draftState.targetKey === targetKey ? draftState : initialDraft;
+	const currentDraft = activeDraft.values;
+	const monitoringAction = activeDraft.monitoringAction;
+	const isDirty = isSonarrSetupDraftDirty({
+		baselineValues: activeDraft.baselineValues,
+		values: currentDraft,
+		baselineMonitoringAction: activeDraft.baselineMonitoringAction,
+		monitoringAction,
+	});
 	const mode = target?.mode ?? "add";
 	const pathPreview = getPathPreview({ currentDraft, target });
 	const isSubmitting = addSeries.isPending || updateSeries.isPending;
@@ -173,28 +181,25 @@ export function useSonarrSetupForm(
 		value: SonarrFormState[K],
 	): void => {
 		setDraftState((state) => {
-			const values = state.targetKey === targetKey ? state.values : initialValues;
+			const draft = state.targetKey === targetKey ? state : initialDraft;
 
 			return {
-				targetKey,
-				values: { ...values, [field]: value },
-				monitoringAction:
-					state.targetKey === targetKey
-						? state.monitoringAction
-						: initialMonitoringAction,
-				isDirty: true,
+				...draft,
+				values: { ...draft.values, [field]: value },
 			};
 		});
 	};
 	const onMonitoringActionChange = (
 		value: SonarrEditMonitoringAction,
 	): void => {
-		setDraftState((state) => ({
-			targetKey,
-			values: state.targetKey === targetKey ? state.values : initialValues,
-			monitoringAction: value,
-			isDirty: true,
-		}));
+		setDraftState((state) => {
+			const draft = state.targetKey === targetKey ? state : initialDraft;
+
+			return {
+				...draft,
+				monitoringAction: value,
+			};
+		});
 	};
 	const handleSubmit = async (
 		event: FormEvent<HTMLFormElement>,

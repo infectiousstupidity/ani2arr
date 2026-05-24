@@ -20,6 +20,19 @@ export function formatToken(value: string): string {
 	return value.replaceAll("-", " ").replaceAll("_", " ");
 }
 
+export function areArraysEqual<T>(
+	left: ReadonlyArray<T> | undefined,
+	right: ReadonlyArray<T> | undefined,
+): boolean {
+	const leftValues = left ?? [];
+	const rightValues = right ?? [];
+
+	return (
+		leftValues.length === rightValues.length &&
+		leftValues.every((value, index) => Object.is(value, rightValues[index]))
+	);
+}
+
 export function normalizeLinkedAniListIds(
 	ids: readonly number[] | undefined,
 ): AniListId[] | undefined {

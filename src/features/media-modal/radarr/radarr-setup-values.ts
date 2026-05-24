@@ -13,6 +13,7 @@ import {
 	type RadarrFormState,
 } from "@/providers/radarr/form-state";
 import type { CheckMovieStatusResponse } from "@/rpc/types";
+import { areArraysEqual } from "../helpers";
 
 export type RadarrSetupTarget = {
 	key: string;
@@ -85,6 +86,25 @@ export function getRadarrEditDefaults(movie: RadarrMovie): RadarrFormState {
 		tags: movie.tags,
 		freeformTags: [],
 	});
+}
+
+export function isRadarrSetupDraftDirty(input: {
+	baselineValues: RadarrFormState;
+	values: RadarrFormState;
+}): boolean {
+	const { baselineValues, values } = input;
+
+	return (
+		values.qualityProfileId !== baselineValues.qualityProfileId ||
+		values.rootFolderPath !== baselineValues.rootFolderPath ||
+		values.minimumAvailability !== baselineValues.minimumAvailability ||
+		values.monitored !== baselineValues.monitored ||
+		values.addOptions?.monitor !== baselineValues.addOptions?.monitor ||
+		values.addOptions?.searchForMovie !==
+			baselineValues.addOptions?.searchForMovie ||
+		!areArraysEqual(values.tags, baselineValues.tags) ||
+		!areArraysEqual(values.freeformTags, baselineValues.freeformTags)
+	);
 }
 
 export function canShowRadarrSetup(input: {

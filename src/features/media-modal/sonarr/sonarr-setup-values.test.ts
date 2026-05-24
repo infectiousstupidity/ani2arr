@@ -15,6 +15,7 @@ import {
 	getSonarrEditDefaults,
 	getSonarrSetupTarget,
 	hasFullSonarrEditItem,
+	isSonarrSetupDraftDirty,
 } from "./sonarr-setup-values";
 
 describe("sonarr setup values", () => {
@@ -68,6 +69,56 @@ describe("sonarr setup values", () => {
 				searchForCutoffUnmetEpisodes: false,
 			},
 		});
+	});
+
+	it("derives dirty from current values and monitoring action", () => {
+		const defaults = getSonarrEditDefaults({
+			id: parseSonarrSeriesId(11),
+			title: "Example Series",
+			tvdbId: parseTvdbId(22),
+			titleSlug: "example-series",
+			qualityProfileId: parseProviderQualityProfileId(33),
+			rootFolderPath: "/media/series",
+			path: "/media/series/Example Series",
+			monitored: true,
+			monitorNewItems: "none",
+			seriesType: "anime",
+			seasonFolder: true,
+			tags: [],
+		});
+		const changed = {
+			...defaults.form,
+			qualityProfileId: parseProviderQualityProfileId(66),
+		};
+		const reverted = {
+			...changed,
+			qualityProfileId: defaults.form.qualityProfileId,
+		};
+
+		expect(
+			isSonarrSetupDraftDirty({
+				baselineValues: defaults.form,
+				values: changed,
+				baselineMonitoringAction: defaults.monitoringAction,
+				monitoringAction: defaults.monitoringAction,
+			}),
+		).toBe(true);
+		expect(
+			isSonarrSetupDraftDirty({
+				baselineValues: defaults.form,
+				values: reverted,
+				baselineMonitoringAction: defaults.monitoringAction,
+				monitoringAction: defaults.monitoringAction,
+			}),
+		).toBe(false);
+		expect(
+			isSonarrSetupDraftDirty({
+				baselineValues: defaults.form,
+				values: reverted,
+				baselineMonitoringAction: defaults.monitoringAction,
+				monitoringAction: "all",
+			}),
+		).toBe(true);
 	});
 
 	it("does not create an edit target from a lean in-library item", () => {

@@ -15,6 +15,7 @@ import {
 	getRadarrEditDefaults,
 	getRadarrSetupTarget,
 	hasFullRadarrEditItem,
+	isRadarrSetupDraftDirty,
 } from "./radarr-setup-values";
 
 describe("radarr setup values", () => {
@@ -61,6 +62,40 @@ describe("radarr setup values", () => {
 				searchForMovie: true,
 			},
 		});
+	});
+
+	it("derives dirty from current values instead of touched state", () => {
+		const baseline = getRadarrEditDefaults({
+			id: parseRadarrMovieId(11),
+			title: "Example Movie",
+			tmdbId: parseTmdbId(22),
+			qualityProfileId: parseProviderQualityProfileId(33),
+			rootFolderPath: "/media/movies",
+			monitored: true,
+			minimumAvailability: "released",
+			tags: [],
+		});
+		const changed = {
+			...baseline,
+			qualityProfileId: parseProviderQualityProfileId(66),
+		};
+		const reverted = {
+			...changed,
+			qualityProfileId: baseline.qualityProfileId,
+		};
+
+		expect(
+			isRadarrSetupDraftDirty({
+				baselineValues: baseline,
+				values: changed,
+			}),
+		).toBe(true);
+		expect(
+			isRadarrSetupDraftDirty({
+				baselineValues: baseline,
+				values: reverted,
+			}),
+		).toBe(false);
 	});
 
 	it("does not create an edit target from a lean in-library item", () => {

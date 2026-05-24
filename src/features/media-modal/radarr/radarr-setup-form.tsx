@@ -19,6 +19,7 @@ import {
 	buildEditPathPreview,
 } from "../setup/provider-path-preview";
 import {
+	isRadarrSetupDraftDirty,
 	getRadarrSetupStatusNotice,
 	type RadarrSetupTarget,
 } from "./radarr-setup-values";
@@ -35,8 +36,8 @@ export type RadarrSetupFooterState = {
 
 type RadarrDraftState = {
 	targetKey: string | null;
+	baselineValues: RadarrFormState;
 	values: RadarrFormState;
-	isDirty: boolean;
 };
 
 type RadarrSetupFormProps = {
@@ -124,17 +125,21 @@ export function useRadarrSetupForm(
 	const updateMovie = useUpdateMovie();
 	const targetKey = target?.key ?? null;
 	const initialValues = getInitialValues(target);
-	const [draftState, setDraftState] = useState<RadarrDraftState>(() => ({
+	const initialDraft = {
 		targetKey,
+		baselineValues: initialValues,
 		values: initialValues,
-		isDirty: false,
-	}));
-	let currentDraft = initialValues;
-	let isDirty = false;
-	if (draftState.targetKey === targetKey) {
-		currentDraft = draftState.values;
-		isDirty = draftState.isDirty;
-	}
+	} satisfies RadarrDraftState;
+	const [draftState, setDraftState] = useState<RadarrDraftState>(
+		() => initialDraft,
+	);
+	const activeDraft =
+		draftState.targetKey === targetKey ? draftState : initialDraft;
+	const currentDraft = activeDraft.values;
+	const isDirty = isRadarrSetupDraftDirty({
+		baselineValues: activeDraft.baselineValues,
+		values: currentDraft,
+	});
 	const mode = target?.mode ?? "add";
 	const pathPreview = getPathPreview({ currentDraft, target });
 	const isSubmitting = addMovie.isPending || updateMovie.isPending;
@@ -167,12 +172,11 @@ export function useRadarrSetupForm(
 		value: RadarrFormState[K],
 	): void => {
 		setDraftState((state) => {
-			const values = state.targetKey === targetKey ? state.values : initialValues;
+			const draft = state.targetKey === targetKey ? state : initialDraft;
 
 			return {
-				targetKey,
-				values: { ...values, [field]: value },
-				isDirty: true,
+				...draft,
+				values: { ...draft.values, [field]: value },
 			};
 		});
 	};
