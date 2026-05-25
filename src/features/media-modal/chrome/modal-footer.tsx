@@ -249,7 +249,7 @@ export function SetupFooter(props: SetupFooterProps): React.JSX.Element {
 				className={FOOTER_BUTTON_CLASS}
 				disabled={isBusy}
 			>
-				Cancel
+				Exit modal
 			</Button>
 		</FooterButtonSlot>,
 		<FooterButtonSlot key="submit-setup">

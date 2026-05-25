@@ -38,6 +38,7 @@ export type ModalHeaderProps = {
 	anilistHeaderData: AniListHeaderData;
 	anilistId: AniListId;
 	isMappingView: boolean;
+	isProviderTargetLoading?: boolean | undefined;
 	currentTarget: MediaModalTargetSummary | null;
 	previewTarget: MediaModalTargetSummary | null;
 	workspaceClassName?: string | undefined;
@@ -171,14 +172,115 @@ type ProviderCardProps = {
 	provider: Provider;
 	baseUrl: string;
 	target: MediaModalTargetSummary | null;
+	isLoading: boolean;
 	isDimmed: boolean;
 	isHighlighted: boolean;
 };
 
+function getProviderCardDisplay(input: {
+	providerLabel: string;
+	target: MediaModalTargetSummary | null;
+	isLoading: boolean;
+}): {
+	title: string;
+	description: string | null;
+	targetKey: string;
+} {
+	const { providerLabel, target, isLoading } = input;
+
+	if (target) {
+		return {
+			title: target.title,
+			description: null,
+			targetKey: `${target.provider}:${target.providerId}`,
+		};
+	}
+
+	if (isLoading) {
+		return {
+			title: `Loading ${providerLabel} target...`,
+			description: null,
+			targetKey: "loading",
+		};
+	}
+
+	return {
+		title: "No match selected",
+		description: `Search below to choose the ${providerLabel} target.`,
+		targetKey: "none",
+	};
+}
+
+function ProviderCardContent(props: {
+	display: ReturnType<typeof getProviderCardDisplay>;
+	providerLabel: string;
+	providerMetaLine: string | null;
+	providerIdLine: string | null;
+	providerLink: string | null;
+}): React.JSX.Element {
+	const {
+		display,
+		providerLabel,
+		providerMetaLine,
+		providerIdLine,
+		providerLink,
+	} = props;
+	const hasProviderMeta =
+		providerMetaLine !== null || (providerIdLine !== null && providerLink !== null);
+
+	return (
+		<m.div
+			key={display.targetKey}
+			initial={{ opacity: 0, filter: "blur(3px)" }}
+			animate={{ opacity: 1, filter: "blur(0px)" }}
+			exit={{ opacity: 0, filter: "blur(3px)" }}
+			transition={{ duration: 0.16, ease: "easeOut" }}
+			className="absolute inset-0 flex min-w-0 flex-col items-end p-3 text-right md:p-4"
+		>
+			<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
+				{display.title}
+			</h2>
+
+			{display.description ? (
+				<p className="mt-1 line-clamp-2 text-[10px] leading-4 text-text-secondary md:text-xs md:leading-5">
+					{display.description}
+				</p>
+			) : null}
+
+			{hasProviderMeta ? (
+				<div className="mt-auto min-w-0 pt-2 md:pt-3">
+					{providerMetaLine ? (
+						<p className="truncate text-[10px] text-text-secondary md:text-xs">
+							{providerMetaLine}
+						</p>
+					) : null}
+
+					{providerIdLine && providerLink ? (
+						<div className="mt-0.5 flex min-w-0 justify-end">
+							<MappingOpenLink
+								href={providerLink}
+								ariaLabel={`Open in ${providerLabel}`}
+								side="right"
+							>
+								{providerIdLine}
+							</MappingOpenLink>
+						</div>
+					) : null}
+				</div>
+			) : null}
+		</m.div>
+	);
+}
+
 function ProviderCard(props: ProviderCardProps): React.JSX.Element {
-	const { provider, baseUrl, target, isDimmed, isHighlighted } = props;
+	const { provider, baseUrl, target, isLoading, isDimmed, isHighlighted } = props;
 
 	const providerLabel = getProviderLabel(provider);
+	const display = getProviderCardDisplay({
+		providerLabel,
+		target,
+		isLoading,
+	});
 
 	const providerMetaLine = target
 		? joinMetaLine([
@@ -206,12 +308,7 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 			})
 		: null;
 
-	const title = target ? target.title : "No match selected";
-	const description = target
-		? null
-		: `Search below to choose the ${providerLabel} target.`;
 	const posterUrl = target?.posterUrl ?? null;
-	const targetKey = target ? `${target.provider}:${target.providerId}` : "none";
 
 	return (
 		<div
@@ -223,59 +320,26 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 			)}
 		>
 			<LazyMotion features={domAnimation}>
-				<AnimatePresence mode="wait" initial={false}>
-					<m.div
-						key={targetKey}
-						initial={{ opacity: 0, x: 20, filter: "blur(4px)" }}
-						animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-						exit={{ opacity: 0, x: -20, filter: "blur(4px)" }}
-						transition={{ type: "spring", stiffness: 300, damping: 25 }}
-						className="relative flex min-w-0 flex-1"
-					>
-						<div
-							className={cn(
-								"relative flex min-w-0 flex-1 transition-[opacity,filter]",
-								isDimmed ? "opacity-50 grayscale" : null,
-							)}
-						>
-							<div className="flex min-w-0 flex-1 flex-col items-end p-3 text-right md:p-4">
-								<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
-									{title}
-								</h2>
+				<div
+					className={cn(
+						"relative flex min-w-0 flex-1 transition-[opacity,filter]",
+						isDimmed ? "opacity-50 grayscale" : null,
+					)}
+				>
+					<div className="relative min-w-0 flex-1 overflow-hidden">
+						<AnimatePresence initial={false}>
+							<ProviderCardContent
+								display={display}
+								providerLabel={providerLabel}
+								providerMetaLine={providerMetaLine}
+								providerIdLine={providerIdLine}
+								providerLink={providerLink}
+							/>
+						</AnimatePresence>
+					</div>
 
-								{description ? (
-									<p className="mt-1 line-clamp-2 text-[10px] leading-4 text-text-secondary md:text-xs md:leading-5">
-										{description}
-									</p>
-								) : null}
-
-								{providerMetaLine || (providerIdLine && providerLink) ? (
-									<div className="mt-auto min-w-0 pt-2 md:pt-3">
-										{providerMetaLine ? (
-											<p className="truncate text-[10px] text-text-secondary md:text-xs">
-												{providerMetaLine}
-											</p>
-										) : null}
-
-										{providerIdLine && providerLink ? (
-											<div className="mt-0.5 flex min-w-0 justify-end">
-												<MappingOpenLink
-													href={providerLink}
-													ariaLabel={`Open in ${providerLabel}`}
-													side="right"
-												>
-													{providerIdLine}
-												</MappingOpenLink>
-											</div>
-										) : null}
-									</div>
-								) : null}
-							</div>
-
-							<MappingPoster src={posterUrl} side="right" />
-						</div>
-					</m.div>
-				</AnimatePresence>
+					<MappingPoster src={posterUrl} side="right" />
+				</div>
 			</LazyMotion>
 		</div>
 	);
@@ -289,6 +353,7 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 		anilistHeaderData,
 		anilistId,
 		isMappingView,
+		isProviderTargetLoading = false,
 		currentTarget,
 		previewTarget,
 		workspaceClassName,
@@ -378,6 +443,7 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 							provider={provider}
 							baseUrl={baseUrl}
 							target={target}
+							isLoading={isProviderTargetLoading && target === null}
 							isDimmed={isCurrentTargetDimmed}
 							isHighlighted={isTargetHighlighted}
 						/>

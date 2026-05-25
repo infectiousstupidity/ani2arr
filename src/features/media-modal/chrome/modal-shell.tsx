@@ -59,8 +59,7 @@ const OVERLAY_VARIANTS: Variants = {
 	},
 	exit: {
 		opacity: 0,
-		backdropFilter: "blur(0px)",
-		transition: { duration: 0.12, ease: "easeIn" },
+		transition: { duration: 0.08, ease: "easeIn" },
 	},
 };
 
@@ -78,9 +77,9 @@ const SHELL_VARIANTS: Variants = {
 	},
 	exit: {
 		opacity: 0,
-		y: 20,
-		scale: 0.95,
-		transition: { duration: 0.14, ease: "easeIn" },
+		y: 8,
+		scale: 0.98,
+		transition: { duration: 0.09, ease: "easeIn" },
 	},
 };
 
@@ -96,11 +95,6 @@ const SECTION_VARIANTS: Variants = {
 			delay,
 		},
 	}),
-	exit: {
-		opacity: 0,
-		y: 10,
-		transition: { duration: 0.1, ease: "easeIn" },
-	},
 };
 
 const HEADER_SECTION_DELAY = 0.05;

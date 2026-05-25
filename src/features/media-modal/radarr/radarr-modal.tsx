@@ -84,6 +84,32 @@ function getRejectCandidateTmdbId(input: {
 	return null;
 }
 
+function shouldShowMappingView(input: {
+	view: MediaModalView;
+	verificationSettled: boolean;
+	canShowSetup: boolean;
+}): boolean {
+	if (input.view === "mapping") return true;
+
+	return input.verificationSettled && !input.canShowSetup;
+}
+
+function isSetupTargetLoading(input: {
+	view: MediaModalView;
+	isMappingView: boolean;
+	isConfigured: boolean;
+	hasSetupTarget: boolean;
+	verificationSettled: boolean;
+}): boolean {
+	return (
+		input.view === "setup" &&
+		!input.isMappingView &&
+		input.isConfigured &&
+		!input.hasSetupTarget &&
+		!input.verificationSettled
+	);
+}
+
 function useRadarrModalData(input: {
 	anilistId: AniListId;
 	metadataHint: MediaModalMetadataHint | null;
@@ -173,6 +199,18 @@ export function RadarrModal({
 		isConfigured: data.isConfigured,
 		status: data.rawProviderStatus,
 	});
+	const isMappingView = shouldShowMappingView({
+		view,
+		verificationSettled: data.verificationSettled,
+		canShowSetup,
+	});
+	const setupTargetLoading = isSetupTargetLoading({
+		view,
+		isMappingView,
+		isConfigured: data.isConfigured,
+		hasSetupTarget: setupTarget !== null,
+		verificationSettled: data.verificationSettled,
+	});
 	const setupForm = useRadarrSetupForm({
 		formId: SETUP_FORM_ID,
 		anilistId,
@@ -183,11 +221,11 @@ export function RadarrModal({
 		isConfigured: data.isConfigured,
 		formResources: data.providerFormResources,
 		portalContainer: contentContainer,
+		targetLoading: setupTargetLoading,
 		verificationFailed: data.verificationFailed,
 		verificationSettled: data.verificationSettled,
 		onClose,
 	});
-	const isMappingView = view === "mapping" || !canShowSetup;
 	const previewTarget = isMappingView ? (selectedCandidate?.summary ?? null) : null;
 	const handleOpenSettings = useOpenMappingSettingsAction({
 		anilistId,
@@ -221,6 +259,12 @@ export function RadarrModal({
 		onIgnored: onClose,
 	});
 	const showMappingView = (): void => setView("mapping");
+	const handleEscapeKeyDown = (event: KeyboardEvent): void => {
+		if (!isMappingView || !canShowSetup) return;
+
+		event.preventDefault();
+		showSetupView();
+	};
 
 	return (
 		<ModalShell
@@ -233,6 +277,7 @@ export function RadarrModal({
 					anilistHeaderData={data.anilistHeaderData}
 					anilistId={anilistId}
 					isMappingView={isMappingView}
+					isProviderTargetLoading={setupTargetLoading}
 					currentTarget={data.currentTarget}
 					previewTarget={previewTarget}
 					onClose={onClose}
@@ -302,6 +347,7 @@ export function RadarrModal({
 				</MediaModalFooterTransition>
 			}
 			onOpenChange={(open) => !open && onClose()}
+			onEscapeKeyDown={handleEscapeKeyDown}
 			container={container}
 		/>
 	);
