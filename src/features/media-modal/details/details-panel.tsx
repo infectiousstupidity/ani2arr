@@ -8,7 +8,6 @@ import type { Provider } from "@/providers";
 import { getProviderLabel } from "@/providers/provider-labels";
 import { buildProviderOpenUrl } from "@/providers/provider-links";
 import Button from "@/shared/ui/primitives/button";
-import { targetsEqual } from "../helpers";
 import type { MediaModalTargetSummary } from "../types";
 import { CurrentTargetDetails } from "./current-target-details";
 import { PreviewTargetDetails } from "./preview-target-details";
@@ -55,13 +54,6 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 				searchTerm: activeTarget.title,
 			})
 		: null;
-	const overwrittenTarget =
-		isInMappingMode &&
-		previewMapping !== null &&
-		effectiveMapping !== null &&
-		!targetsEqual(previewMapping, effectiveMapping)
-			? effectiveMapping
-			: null;
 	let content: React.JSX.Element;
 
 	if (isInMappingMode) {
@@ -69,7 +61,6 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 			<PreviewTargetDetails
 				aniListEntryId={anilistId}
 				previewMapping={previewMapping}
-				overwrittenTarget={overwrittenTarget}
 			/>
 		) : (
 			<div className="flex min-h-65 flex-1 items-center justify-center rounded-xl border border-dashed border-border-primary bg-bg-tertiary/60 px-6 py-8 text-center text-sm leading-relaxed text-text-secondary">

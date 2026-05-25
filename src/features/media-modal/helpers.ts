@@ -83,3 +83,18 @@ export function targetsEqual(
 		a.providerId === b.providerId
 	);
 }
+
+export function getOverwriteTargetTitle(
+	previewTarget: Pick<MediaModalTargetSummary, "provider" | "providerId"> | null,
+	currentTarget: Pick<MediaModalTargetSummary, "provider" | "providerId" | "title"> | null,
+): string | null {
+	if (
+		previewTarget === null ||
+		currentTarget === null ||
+		targetsEqual(previewTarget, currentTarget)
+	) {
+		return null;
+	}
+
+	return currentTarget.title;
+}
