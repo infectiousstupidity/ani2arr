@@ -2,7 +2,7 @@
 // src/features/media-modal/chrome/header-mapping-card.tsx
 
 import { ExternalLink } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 export function MappingCard(props: { children: ReactNode }): React.JSX.Element {
   const { children } = props;
@@ -25,12 +25,29 @@ export function MappingPoster(props: {
       ? "border-r border-border-primary/35"
       : "border-l border-border-primary/35";
   const innerRadiusClass = side === "left" ? "rounded-r-xl" : "rounded-l-xl";
-  const posterClass = `h-full shrink-0 bg-bg-primary/18 shadow-sm ${separatorClass} ${innerRadiusClass}`;
+  const posterClass = `relative h-full aspect-2/3 shrink-0 overflow-hidden bg-bg-primary/18 shadow-sm ${separatorClass} ${innerRadiusClass}`;
 
-  return src ? (
-    <img src={src} alt="" className={`${posterClass} w-auto max-w-none`} />
-  ) : (
-    <div className={`${posterClass} aspect-2/3 bg-bg-primary/60`} />
+  return (
+    <div className={posterClass}>
+      <div className="absolute inset-0 bg-bg-primary/60" />
+      {src ? <MappingPosterImage key={src} src={src} /> : null}
+    </div>
+  );
+}
+
+function MappingPosterImage(props: { src: string }): React.JSX.Element {
+  const { src } = props;
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  return (
+    <img
+      src={src}
+      alt=""
+      onLoad={() => setImageLoaded(true)}
+      className={`relative h-full w-full object-cover transition-opacity duration-200 ${
+        imageLoaded ? "opacity-100" : "opacity-0"
+      }`}
+    />
   );
 }
 

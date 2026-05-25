@@ -50,6 +50,7 @@ type RadarrSetupFormProps = {
 	isConfigured: boolean;
 	formResources: ProviderFormResources | null;
 	portalContainer: HTMLElement | ShadowRoot | null;
+	targetLoading: boolean;
 	verificationFailed: boolean;
 	verificationSettled: boolean;
 	onClose: () => void;
@@ -58,6 +59,21 @@ type RadarrSetupFormProps = {
 type RadarrSetupFormResult = {
 	content: React.JSX.Element;
 	footerState: RadarrSetupFooterState;
+};
+
+type RadarrSetupFieldsInput = {
+	targetLoading: boolean;
+	target: RadarrSetupTarget | null;
+	formResources: ProviderFormResources | null;
+	pathPreview: ProviderRootFolderPathPreview | null;
+	currentDraft: RadarrFormState;
+	isBusy: boolean;
+	setupMutationsBlocked: boolean;
+	portalContainer: HTMLElement | ShadowRoot | null;
+	onFieldChange: <K extends keyof RadarrFormState>(
+		field: K,
+		value: RadarrFormState[K],
+	) => void;
 };
 
 function getHeaderDescription(mode: "add" | "edit"): string {
@@ -104,6 +120,56 @@ function getPathPreview(input: {
 	});
 }
 
+function renderRadarrSetupFields(
+	input: RadarrSetupFieldsInput,
+): React.JSX.Element | null {
+	const {
+		targetLoading,
+		target,
+		formResources,
+		pathPreview,
+		currentDraft,
+		isBusy,
+		setupMutationsBlocked,
+		portalContainer,
+		onFieldChange,
+	} = input;
+
+	if (targetLoading) {
+		return (
+			<div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-sm text-text-secondary">
+				<p>Loading Radarr target...</p>
+			</div>
+		);
+	}
+
+	if (!target || !formResources || !pathPreview) return null;
+
+	if (target.mode === "edit") {
+		return (
+			<RadarrEditOptionsFields
+				values={currentDraft}
+				onChange={onFieldChange}
+				disabled={isBusy || setupMutationsBlocked}
+				portalContainer={portalContainer}
+				formResources={formResources}
+				pathPreview={pathPreview}
+			/>
+		);
+	}
+
+	return (
+		<RadarrAddOptionsFields
+			values={currentDraft}
+			onChange={onFieldChange}
+			disabled={isBusy || setupMutationsBlocked}
+			portalContainer={portalContainer}
+			formResources={formResources}
+			pathPreview={pathPreview}
+		/>
+	);
+}
+
 export function useRadarrSetupForm(
 	props: RadarrSetupFormProps,
 ): RadarrSetupFormResult {
@@ -117,6 +183,7 @@ export function useRadarrSetupForm(
 		isConfigured,
 		formResources,
 		portalContainer,
+		targetLoading,
 		verificationFailed,
 		verificationSettled,
 		onClose,
@@ -218,35 +285,26 @@ export function useRadarrSetupForm(
 	const statusNotice = getRadarrSetupStatusNotice({
 		verificationFailed,
 	});
+	const setupFields = renderRadarrSetupFields({
+		targetLoading,
+		target,
+		formResources,
+		pathPreview,
+		currentDraft,
+		isBusy,
+		setupMutationsBlocked,
+		portalContainer,
+		onFieldChange,
+	});
 	const panel = (
 		<BaseProviderSetupPanel
 			providerName="Radarr"
 			isConfigured={isConfigured}
-			hasFormResources={!!formResources}
+			hasFormResources={targetLoading || !!formResources}
 			statusNotice={statusNotice}
 			headerDescription={getHeaderDescription(mode)}
 		>
-			{target && formResources && pathPreview ? (
-				mode === "edit" ? (
-					<RadarrEditOptionsFields
-						values={currentDraft}
-						onChange={onFieldChange}
-						disabled={isBusy || setupMutationsBlocked}
-						portalContainer={portalContainer}
-						formResources={formResources}
-						pathPreview={pathPreview}
-					/>
-				) : (
-					<RadarrAddOptionsFields
-						values={currentDraft}
-						onChange={onFieldChange}
-						disabled={isBusy || setupMutationsBlocked}
-						portalContainer={portalContainer}
-						formResources={formResources}
-						pathPreview={pathPreview}
-					/>
-				)
-			) : null}
+			{setupFields}
 		</BaseProviderSetupPanel>
 	);
 

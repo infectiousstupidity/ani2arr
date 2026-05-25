@@ -53,6 +53,7 @@ type SonarrSetupFormProps = {
 	isConfigured: boolean;
 	formResources: ProviderFormResources | null;
 	portalContainer: HTMLElement | ShadowRoot | null;
+	targetLoading: boolean;
 	verificationFailed: boolean;
 	verificationSettled: boolean;
 	onClose: () => void;
@@ -61,6 +62,23 @@ type SonarrSetupFormProps = {
 type SonarrSetupFormResult = {
 	content: React.JSX.Element;
 	footerState: SonarrSetupFooterState;
+};
+
+type SonarrSetupFieldsInput = {
+	targetLoading: boolean;
+	target: SonarrSetupTarget | null;
+	formResources: ProviderFormResources | null;
+	pathPreview: ProviderRootFolderPathPreview | null;
+	currentDraft: SonarrFormState;
+	monitoringAction: SonarrEditMonitoringAction;
+	isBusy: boolean;
+	setupMutationsBlocked: boolean;
+	portalContainer: HTMLElement | ShadowRoot | null;
+	onFieldChange: <K extends keyof SonarrFormState>(
+		field: K,
+		value: SonarrFormState[K],
+	) => void;
+	onMonitoringActionChange(value: SonarrEditMonitoringAction): void;
 };
 
 function getHeaderDescription(mode: "add" | "edit"): string {
@@ -107,6 +125,60 @@ function getPathPreview(input: {
 	});
 }
 
+function renderSonarrSetupFields(
+	input: SonarrSetupFieldsInput,
+): React.JSX.Element | null {
+	const {
+		targetLoading,
+		target,
+		formResources,
+		pathPreview,
+		currentDraft,
+		monitoringAction,
+		isBusy,
+		setupMutationsBlocked,
+		portalContainer,
+		onFieldChange,
+		onMonitoringActionChange,
+	} = input;
+
+	if (targetLoading) {
+		return (
+			<div className="flex flex-col items-center justify-center gap-2 py-8 text-center text-sm text-text-secondary">
+				<p>Loading Sonarr target...</p>
+			</div>
+		);
+	}
+
+	if (!target || !formResources || !pathPreview) return null;
+
+	if (target.mode === "edit") {
+		return (
+			<SonarrEditOptionsFields
+				values={currentDraft}
+				monitoringAction={monitoringAction}
+				onChange={onFieldChange}
+				onMonitoringActionChange={onMonitoringActionChange}
+				disabled={isBusy || setupMutationsBlocked}
+				portalContainer={portalContainer}
+				formResources={formResources}
+				pathPreview={pathPreview}
+			/>
+		);
+	}
+
+	return (
+		<SonarrAddOptionsFields
+			values={currentDraft}
+			onChange={onFieldChange}
+			disabled={isBusy || setupMutationsBlocked}
+			portalContainer={portalContainer}
+			formResources={formResources}
+			pathPreview={pathPreview}
+		/>
+	);
+}
+
 export function useSonarrSetupForm(
 	props: SonarrSetupFormProps,
 ): SonarrSetupFormResult {
@@ -120,6 +192,7 @@ export function useSonarrSetupForm(
 		isConfigured,
 		formResources,
 		portalContainer,
+		targetLoading,
 		verificationFailed,
 		verificationSettled,
 		onClose,
@@ -240,37 +313,28 @@ export function useSonarrSetupForm(
 	const statusNotice = getSonarrSetupStatusNotice({
 		verificationFailed,
 	});
+	const setupFields = renderSonarrSetupFields({
+		targetLoading,
+		target,
+		formResources,
+		pathPreview,
+		currentDraft,
+		monitoringAction,
+		isBusy,
+		setupMutationsBlocked,
+		portalContainer,
+		onFieldChange,
+		onMonitoringActionChange,
+	});
 	const panel = (
 		<BaseProviderSetupPanel
 			providerName="Sonarr"
 			isConfigured={isConfigured}
-			hasFormResources={!!formResources}
+			hasFormResources={targetLoading || !!formResources}
 			statusNotice={statusNotice}
 			headerDescription={getHeaderDescription(mode)}
 		>
-			{target && formResources && pathPreview ? (
-				mode === "edit" ? (
-					<SonarrEditOptionsFields
-						values={currentDraft}
-						monitoringAction={monitoringAction}
-						onChange={onFieldChange}
-						onMonitoringActionChange={onMonitoringActionChange}
-						disabled={isBusy || setupMutationsBlocked}
-						portalContainer={portalContainer}
-						formResources={formResources}
-						pathPreview={pathPreview}
-					/>
-				) : (
-					<SonarrAddOptionsFields
-						values={currentDraft}
-						onChange={onFieldChange}
-						disabled={isBusy || setupMutationsBlocked}
-						portalContainer={portalContainer}
-						formResources={formResources}
-						pathPreview={pathPreview}
-					/>
-				)
-			) : null}
+			{setupFields}
 		</BaseProviderSetupPanel>
 	);
 
