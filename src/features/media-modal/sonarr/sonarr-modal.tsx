@@ -30,7 +30,7 @@ import { useContentPortalContainer } from "../hooks/use-content-portal-container
 import { useMappingActions } from "../hooks/use-mapping-actions";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
 import { useOpenMappingSettingsAction } from "../hooks/use-open-mapping-settings-action";
-import { targetsEqual } from "../helpers";
+import { getOverwriteTargetTitle, targetsEqual } from "../helpers";
 import {
 	MappingFooter,
 	MediaModalFooterTransition,
@@ -243,6 +243,10 @@ export function SonarrModal({
 	const canSubmitMapping =
 		selectedCandidate !== null &&
 		!targetsEqual(selectedCandidate.summary, data.currentTarget);
+	const overwriteTargetTitle = getOverwriteTargetTitle(
+		previewTarget,
+		data.currentTarget,
+	);
 	const showSetupView = (): void => {
 		setSelectedCandidate(null);
 		setView("setup");
@@ -326,6 +330,7 @@ export function SonarrModal({
 							canApplyMapping={canSubmitMapping}
 							isApplyingMapping={mappingActions.isSubmittingMapping}
 							leaveMappingLabel={canShowSetup ? "Back to setup" : "Exit modal"}
+							overwriteTargetTitle={overwriteTargetTitle}
 							onRejectCandidate={mappingActions.rejectCandidate}
 							onClearRejectedCandidate={mappingActions.clearRejectedCandidate}
 							onIgnoreTitle={mappingActions.ignoreTitle}

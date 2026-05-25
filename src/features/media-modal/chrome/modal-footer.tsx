@@ -4,8 +4,10 @@
 import { AnimatePresence, LazyMotion, domMax, m } from "framer-motion";
 import type { ReactNode } from "react";
 import Button from "@/shared/ui/primitives/button";
+import { OverwriteTargetWarning } from "../mapping/overwrite-target-warning";
 
 type FooterLayoutProps = {
+	notice?: ReactNode;
 	left?: ReactNode;
 	right: ReactNode;
 };
@@ -27,6 +29,7 @@ type MappingFooterProps = {
 	canApplyMapping: boolean;
 	isApplyingMapping: boolean;
 	leaveMappingLabel: string;
+	overwriteTargetTitle: string | null;
 	onRejectCandidate: () => void | Promise<void>;
 	onClearRejectedCandidate: () => void | Promise<void>;
 	onIgnoreTitle: () => void | Promise<void>;
@@ -67,30 +70,42 @@ function FooterButtonSlot(props: { children: ReactNode }): React.JSX.Element {
 }
 
 function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
-	const { left, right } = props;
+	const { notice, left, right } = props;
+	const actionRowClass = notice ? "md:row-start-2" : "md:row-start-1";
 
 	return (
 		<LazyMotion features={domMax}>
 			<m.footer
 				layout
-				className="flex flex-col gap-3 bg-bg-primary px-4 py-3 md:flex-row md:items-center md:justify-between md:px-8 md:py-4"
+				className="bg-bg-primary px-4 py-3 md:px-8 md:py-4"
 			>
 				<m.div
 					layout
-					className="order-1 flex w-full flex-wrap items-center gap-2 text-xs text-text-secondary md:order-1 md:w-auto"
+					className="mx-auto grid w-full max-w-250 grid-cols-1 gap-3 md:grid-cols-2 md:gap-x-6 md:gap-y-3 lg:gap-x-8"
 				>
-					<AnimatePresence initial={false} mode="popLayout">
-						{left}
-					</AnimatePresence>
-				</m.div>
+					{notice ? (
+						<m.div layout className="min-w-0 md:col-start-2 md:row-start-1">
+							{notice}
+						</m.div>
+					) : null}
 
-				<m.div
-					layout
-					className="order-2 flex w-full flex-wrap items-center gap-2 md:order-2 md:w-auto md:justify-end"
-				>
-					<AnimatePresence initial={false} mode="popLayout">
-						{right}
-					</AnimatePresence>
+					<m.div
+						layout
+						className={`flex w-full flex-wrap items-center gap-2 text-xs text-text-secondary md:col-start-1 ${actionRowClass}`}
+					>
+						<AnimatePresence initial={false} mode="popLayout">
+							{left}
+						</AnimatePresence>
+					</m.div>
+
+					<m.div
+						layout
+						className={`flex w-full flex-wrap items-center gap-2 md:col-start-2 md:justify-end ${actionRowClass}`}
+					>
+						<AnimatePresence initial={false} mode="popLayout">
+							{right}
+						</AnimatePresence>
+					</m.div>
 				</m.div>
 			</m.footer>
 		</LazyMotion>
@@ -118,6 +133,7 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 		canApplyMapping,
 		isApplyingMapping,
 		leaveMappingLabel,
+		overwriteTargetTitle,
 		onRejectCandidate,
 		onClearRejectedCandidate,
 		onIgnoreTitle,
@@ -211,7 +227,15 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 	];
 
 	return (
-		<FooterLayout left={leftActions} right={rightActions} />
+		<FooterLayout
+			notice={
+				overwriteTargetTitle ? (
+					<OverwriteTargetWarning title={overwriteTargetTitle} />
+				) : null
+			}
+			left={leftActions}
+			right={rightActions}
+		/>
 	);
 }
 
