@@ -28,7 +28,7 @@ function OverwriteTargetBanner(props: {
 				<p className="truncate font-medium leading-5 text-text-primary">
 					This will replace the current mapping:
 				</p>
-				<p className="truncate leading-5 text-text-secondary line-through opacity-80">
+				<p className="truncate leading-5 text-text-secondary opacity-80">
 					{target.title}
 				</p>
 			</div>

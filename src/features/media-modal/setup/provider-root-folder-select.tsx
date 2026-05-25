@@ -111,7 +111,7 @@ function RootFolderOption(props: {
             className="min-w-0 truncate text-left"
           />
           {freeSpaceLabel ? (
-            <span className="shrink-0 whitespace-nowrap text-xs text-text-tertiary">
+            <span className="shrink-0 whitespace-nowrap text-xs text-text-secondary">
               {freeSpaceLabel}
             </span>
           ) : null}

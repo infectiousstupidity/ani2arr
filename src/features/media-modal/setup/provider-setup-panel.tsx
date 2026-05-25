@@ -59,8 +59,8 @@ export function BaseProviderSetupPanel(props: {
 				<div className="pb-3">
 					<div className="flex items-start justify-between gap-3">
 						<div className="space-y-1">
-							<p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">
-								{providerName} configuration
+							<p className="text-sm font-semibold leading-none text-text-primary">
+								{providerName} Configuration
 							</p>
 							<p className="text-xs leading-5 text-text-secondary">
 								{headerDescription}

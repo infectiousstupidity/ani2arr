@@ -74,7 +74,7 @@ function LinkedEntryLink(props: { row: LinkedEntryRow }): React.JSX.Element {
 					setIsFocusWithin(false);
 				}
 			}}
-			className="relative flex items-center gap-3 rounded-lg p-2 pr-10 transition-colors hover:bg-bg-tertiary/50"
+			className="group relative flex items-center gap-3 rounded-lg p-2 pr-10 transition-colors hover:bg-bg-tertiary/50 focus-visible:bg-bg-tertiary/50"
 		>
 			<div className="h-14 w-10 shrink-0 rounded-md bg-bg-primary/65">
 				{row.posterUrl ? (
@@ -101,7 +101,7 @@ function LinkedEntryLink(props: { row: LinkedEntryRow }): React.JSX.Element {
 				initial={false}
 				animate={showExternalIcon ? "visible" : "hidden"}
 				transition={{ duration: 0.14 }}
-				className="absolute right-3 top-3 text-text-secondary"
+				className="absolute right-3 top-3 text-text-secondary transition-colors group-hover:text-accent-primary group-focus-visible:text-accent-primary"
 			>
 				<ExternalLink className="h-4 w-4" />
 			</m.span>
@@ -184,8 +184,8 @@ export function MappingLinkedEntries(
 
 	return (
 		<section className="flex flex-col gap-2 border-t border-border-primary/50 pt-4">
-			<p className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.18em] text-text-secondary/70">
-				{`Mapped AniList entries (${rows.length})`}
+			<p className="shrink-0 text-xs font-semibold text-text-primary">
+				{`Mapped AniList Entries (${rows.length})`}
 			</p>
 			<LazyMotion features={domAnimation}>
 				<m.div
