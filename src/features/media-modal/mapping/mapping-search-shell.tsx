@@ -159,8 +159,8 @@ export function MappingSearchShell(
 	return (
 		<div className="flex h-80 min-h-0 flex-col overflow-hidden pt-4 md:h-full">
 			<div className="shrink-0 pb-4">
-				<p className="text-[11px] font-semibold leading-none uppercase tracking-[0.16em] text-text-secondary">
-					Search {providerLabel} database
+				<p className="text-sm font-semibold leading-none text-text-primary">
+					Search {providerLabel} Database
 				</p>
 
 				<form className="mt-3 flex gap-2" onSubmit={handleSubmit}>
@@ -172,7 +172,7 @@ export function MappingSearchShell(
 							if (hasSearchTerm) onQueryChange();
 						}}
 						placeholder={searchPlaceholder}
-						className="min-w-0 flex-1 rounded-xl border border-border-primary/60 bg-bg-tertiary/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-accent-primary focus:outline-none"
+						className="min-w-0 flex-1 rounded-xl border border-border-primary/60 bg-bg-tertiary/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary focus:border-accent-primary focus:outline-none"
 					/>
 					<Button
 						type="submit"

@@ -65,7 +65,7 @@ export function MappingOpenLink(props: {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className={`${alignClass} flex w-fit max-w-full items-center gap-1 text-[10px] leading-tight font-medium text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary md:text-xs`}
+      className={`${alignClass} flex w-fit max-w-full items-center gap-1 text-[10px] leading-tight font-medium text-text-secondary transition-colors hover:text-accent-primary focus-visible:text-accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary md:text-xs`}
       aria-label={ariaLabel}
     >
       {side === "left" ? (

@@ -186,7 +186,7 @@ export function MappingCandidateRow(
 						initial={false}
 						animate={showExternalIcon ? "visible" : "hidden"}
 						transition={{ duration: 0.14 }}
-						className="absolute right-2 top-2 z-20 inline-flex h-7 w-7 items-center justify-center rounded-full text-text-secondary hover:bg-bg-tertiary/70 hover:text-text-primary focus-visible:bg-bg-tertiary/70 focus-visible:text-text-primary"
+						className="absolute right-2 top-2 z-20 inline-flex h-7 w-7 items-center justify-center rounded-full text-text-secondary hover:bg-bg-tertiary/70 hover:text-accent-primary focus-visible:bg-bg-tertiary/70 focus-visible:text-accent-primary"
 						aria-label={externalLabel}
 					>
 						<ExternalLink className="h-4 w-4" />
