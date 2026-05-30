@@ -1,44 +1,43 @@
-/** Mapping row status derivation for options-page summaries and inspection payloads. */
+/** Derives the UI status for one mapping row. */
 // src/mapping/queries/mapping-row-status.ts
 
 import type {
+	EffectiveMappingKind,
 	EffectiveMappingState,
-	MappingSuppressionKind,
+	ProviderExternalId,
 } from "@/mapping/types";
-import type { MappingIssuesSummary } from "./mapping-issues";
 
-/** Primary user-facing status for one projected mapping summary row. */
 export type MappingListRowStatus =
-	| "needs-review"
-	| "in-library"
-	| "can-add"
-	| "suppressed"
+	| "mapped"
 	| "unmapped"
+	| "ignored"
+	| "needs-review"
 	| "unknown";
 
-export const deriveMappingRowStatus = (input: {
-	reviewSummary?: MappingIssuesSummary;
-	suppressionKind?: MappingSuppressionKind;
+export function getMappingRowStatus(input: {
+	providerId: ProviderExternalId | null;
 	providerMappingState: EffectiveMappingState;
+	mappingEntryKind: EffectiveMappingKind;
 	isInLibrary: boolean | null;
-}): MappingListRowStatus => {
-	if (input.reviewSummary) {
+}): MappingListRowStatus {
+	if (input.mappingEntryKind === "ignored") {
+		return "ignored";
+	}
+
+	if (
+		input.mappingEntryKind === "rejected" ||
+		input.providerMappingState === "unknown"
+	) {
 		return "needs-review";
 	}
-	if (input.suppressionKind) {
-		return "suppressed";
-	}
-	if (input.providerMappingState === "unknown") {
-		return "unknown";
-	}
-	if (input.providerMappingState === "unmapped") {
+
+	if (input.providerId === null || input.isInLibrary === false) {
 		return "unmapped";
 	}
-	if (input.isInLibrary === true) {
-		return "in-library";
+
+	if (input.isInLibrary === null) {
+		return "unknown";
 	}
-	if (input.isInLibrary === false) {
-		return "can-add";
-	}
-	return "unknown";
-};
+
+	return "mapped";
+}

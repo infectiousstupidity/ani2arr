@@ -2,11 +2,7 @@
 // src/features/media-modal/anilist-modal-data.ts
 
 import type { AniListId } from "@/anilist";
-import {
-	mergeMetadataHints,
-	metadataFromMediaObject,
-	metadataHintFromAniListMetadata,
-} from "@/anilist/metadata-hints";
+import { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
 import type {
 	AniListMedia,
 	AniListMediaFormat,
@@ -66,6 +62,134 @@ export function getCoverImage(input: {
 		input.coverImageHint ??
 		null
 	);
+}
+
+const normalizeSynonyms = (synonyms?: string[] | null): string[] => {
+	if (!Array.isArray(synonyms)) return [];
+
+	return [
+		...new Set(
+			synonyms
+				.filter((value): value is string => typeof value === "string")
+				.map((value) => value.trim())
+				.filter((value) => value.length > 0),
+		),
+	].toSorted();
+};
+
+const normalizeRelationIds = (ids?: number[] | null): number[] => {
+	if (!Array.isArray(ids)) return [];
+
+	return [
+		...new Set(
+			ids.filter(
+				(value): value is number =>
+					typeof value === "number" && Number.isFinite(value),
+			),
+		),
+	].toSorted((a, b) => a - b);
+};
+
+const mergeSynonyms = (
+	a: string[] | null | undefined,
+	b: string[] | null | undefined,
+): string[] | null => {
+	const merged = [...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])]
+		.map((item) => item.trim())
+		.filter((item) => item.length > 0);
+
+	if (merged.length === 0) return null;
+	return [...new Set(merged)];
+};
+
+const mergeRelationIds = (
+	a: number[] | null | undefined,
+	b: number[] | null | undefined,
+): number[] | null => {
+	const merged = [
+		...(Array.isArray(a) ? a : []),
+		...(Array.isArray(b) ? b : []),
+	].filter(
+		(value): value is number =>
+			typeof value === "number" && Number.isFinite(value),
+	);
+
+	if (merged.length === 0) return null;
+	return [...new Set(merged)];
+};
+
+function mergeMetadataHints(
+	primary?: AniListMediaHint | null,
+	secondary?: AniListMediaHint | null,
+): AniListMediaHint | null {
+	const hints = [primary ?? null, secondary ?? null].filter(
+		(hint): hint is AniListMediaHint => !!hint,
+	);
+	if (hints.length === 0) return null;
+
+	const result: AniListMediaHint = {
+		titles: null,
+		synonyms: null,
+		startYear: null,
+		format: null,
+		relationPrequelIds: null,
+		coverImage: null,
+	};
+
+	for (const hint of hints) {
+		if (!result.titles && hint.titles) result.titles = hint.titles;
+		if (!result.startYear && hint.startYear) result.startYear = hint.startYear;
+		if (!result.format && hint.format) result.format = hint.format;
+		if (!result.coverImage && hint.coverImage) {
+			result.coverImage = hint.coverImage;
+		}
+
+		result.synonyms = mergeSynonyms(result.synonyms, hint.synonyms);
+		result.relationPrequelIds = mergeRelationIds(
+			result.relationPrequelIds,
+			hint.relationPrequelIds,
+		);
+	}
+
+	return result;
+}
+
+function prequelIdsFromMedia(media: AniListMedia): number[] | null {
+	const ids = (media.relations?.edges ?? [])
+		.filter((edge) => edge.relationType === "PREQUEL")
+		.map((edge) => edge.node.id);
+	const normalized = normalizeRelationIds(ids);
+	return normalized.length > 0 ? normalized : null;
+}
+
+function metadataFromMediaObject(
+	media?: AniListMedia | null,
+): AniListMediaHint | null {
+	if (!media) return null;
+
+	const titles = Object.keys(media.title).length > 0 ? media.title : null;
+	const synonyms = normalizeSynonyms(media.synonyms);
+	const startYear = media.startDate?.year ?? null;
+	const format = media.format ?? null;
+	const prequelIds = prequelIdsFromMedia(media);
+
+	if (
+		!titles &&
+		synonyms.length === 0 &&
+		startYear == null &&
+		!format &&
+		!prequelIds
+	) {
+		return null;
+	}
+
+	return {
+		titles: titles ?? null,
+		synonyms: synonyms.length > 0 ? synonyms : null,
+		startYear: startYear ?? null,
+		format,
+		relationPrequelIds: prequelIds ?? null,
+	} satisfies AniListMediaHint;
 }
 
 function getMediaYear(input: {

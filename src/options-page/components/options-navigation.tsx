@@ -3,12 +3,11 @@
 
 import type { ComponentType } from "react";
 import { browser } from "wxt/browser";
-import { Palette, Plug, ShieldCheck, SlidersHorizontal, Zap } from "lucide-react";
+import { Palette, Plug, ShieldCheck, SlidersHorizontal, Link2 } from "lucide-react";
 import type { Provider } from "@/providers";
 import type { ProviderConnectionStatusView } from "@/queries/provider-connection";
 import { cn } from "@/shared/utils/cn";
 import type { PageId } from "../navigation";
-import { GlobalSaveButton } from "../universal-form";
 import { RadarrIcon, SonarrIcon } from "./icons";
 
 type IconComponent = ComponentType<{ className?: string }>;
@@ -26,7 +25,7 @@ interface OptionsNavItem {
 const NAV_ITEMS =[
   { id: "sonarr", title: "Sonarr", sidebarLabel: "Sonarr", bottomLabel: "Sonarr", group: "Providers", icon: SonarrIcon, provider: "sonarr" },
   { id: "radarr", title: "Radarr", sidebarLabel: "Radarr", bottomLabel: "Radarr", group: "Providers", icon: RadarrIcon, provider: "radarr" },
-  { id: "mappings", title: "Manual mappings", sidebarLabel: "Manual mappings", bottomLabel: "Mappings", group: "Extension", icon: Zap },
+  { id: "mappings", title: "Manage mappings", sidebarLabel: "Manage mappings", bottomLabel: "Mappings", group: "Extension", icon: Link2 },
   { id: "ui", title: "UI & Actions", sidebarLabel: "UI & actions", bottomLabel: "UI & Actions", group: "Extension", icon: Palette },
   { id: "advanced", title: "Advanced", sidebarLabel: "Advanced", bottomLabel: "Advanced", group: "Extension", icon: SlidersHorizontal },
 ] as const satisfies readonly OptionsNavItem[];
@@ -140,9 +139,10 @@ interface PageCommandProps {
   statuses: ProviderStatusLookup;
   onDisconnect: (provider: Provider) => void;
   isDisconnecting: boolean;
+  saveControl: React.JSX.Element;
 }
 
-export function DesktopPageHeader({ activePage, statuses, onDisconnect, isDisconnecting }: PageCommandProps) {
+export function DesktopPageHeader({ activePage, statuses, onDisconnect, isDisconnecting, saveControl }: PageCommandProps) {
   const meta = getPageMeta(activePage);
   const provider = getPageProvider(activePage);
   const status = getStatusForPage(activePage, statuses);
@@ -175,12 +175,12 @@ export function DesktopPageHeader({ activePage, statuses, onDisconnect, isDiscon
           </div>
         )}
       </div>
-      <GlobalSaveButton label="Save changes" className="shrink-0" />
+      {saveControl}
     </header>
   );
 }
 
-export function MobileTopBar({ activePage, statuses, onDisconnect, isDisconnecting }: PageCommandProps) {
+export function MobileTopBar({ activePage, statuses, onDisconnect, isDisconnecting, saveControl }: PageCommandProps) {
   const meta = getPageMeta(activePage);
   const Icon = meta.icon;
   const provider = getPageProvider(activePage);
@@ -206,7 +206,7 @@ export function MobileTopBar({ activePage, statuses, onDisconnect, isDisconnecti
           Disconnect
         </button>
       )}
-      <GlobalSaveButton isCompact label="Save" />
+      {saveControl}
     </header>
   );
 }

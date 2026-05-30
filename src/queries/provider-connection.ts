@@ -16,12 +16,8 @@ export type ProviderConnectionStatusView = {
 	variantClassName?: string;
 };
 
-const testProviderConnection = async (input: TestProviderConnectionInput) => {
-	try {
-		return await getAni2arrApi().testProviderConnection(input);
-	} catch (error) {
-		throw normalizeError(error);
-	}
+const testProviderConnection = (input: TestProviderConnectionInput) => {
+	return getAni2arrApi().testProviderConnection(input);
 };
 
 const getConnectionQueryKey = (
@@ -121,5 +117,26 @@ export const useProviderConnectionStatus = (
 		isProviderConnected: connectionQuery.isSuccess,
 		isCheckingProviderConnection:
 			isProviderConfigured && connectionQuery.isFetching,
+	});
+};
+
+export const useStoredProviderConnectionStatus = (options: {
+	provider: Provider;
+	credentials: ProviderCredentials | null;
+	isProviderConfigured: boolean;
+}): ProviderConnectionStatusView => {
+	const connectionQuery = useProviderConnectionCheck({
+		provider: options.provider,
+		credentials: options.credentials,
+		enabled: options.isProviderConfigured && options.credentials !== null,
+	});
+
+	return deriveProviderConnectionStatusView({
+		isProviderConfigured: options.isProviderConfigured,
+		isProviderConnected: connectionQuery.isSuccess,
+		isCheckingProviderConnection:
+			options.isProviderConfigured &&
+			options.credentials !== null &&
+			connectionQuery.isFetching,
 	});
 };

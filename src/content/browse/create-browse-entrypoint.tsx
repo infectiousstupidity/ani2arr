@@ -1,0 +1,130 @@
+/** Shared browse entrypoint shell for shadow-root mounting, styling, and cleanup. */
+// src/content/browse/create-browse-entrypoint.tsx
+
+import React from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TooltipProvider } from '@radix-ui/react-tooltip';
+import { ExtensionErrorBoundary } from '@/shared/ui/feedback/extension-error-boundary';
+import { ConfirmProvider } from '@/shared/hooks/use-confirm';
+import { createContentEntrypointShell } from '@/content/core/create-content-script-shell';
+import { BrowseOverlays } from '@/content/browse/browse-overlays';
+import {
+  BROWSE_OVERLAY_CONTAINER_CLASS,
+  BROWSE_PROCESSED_ATTRIBUTE,
+  type BrowseAdapter,
+} from '@/content/browse/types';
+import type { PublicOptions } from '@/settings';
+import type { ContentScriptContext } from 'wxt/utils/content-script-context';
+import { createShadowRootUi, type ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
+
+const LIGHT_DOM_STYLE_ATTRIBUTE = 'data-a2a-browse-light-dom';
+
+export interface BrowseEntrypointShellOptions {
+  adapter: BrowseAdapter;
+  uiName: string;
+  lightDomStylesText: string;
+  isEligible: (input: { url: string; publicOptions: PublicOptions }) => boolean | Promise<boolean>;
+}
+
+const cleanupDomArtifacts = (): void => {
+  for (const element of document
+    .querySelectorAll<HTMLElement>(`[${BROWSE_PROCESSED_ATTRIBUTE}]`)) element.removeAttribute(BROWSE_PROCESSED_ATTRIBUTE);
+
+  for (const container of document
+    .querySelectorAll<HTMLElement>(`.${BROWSE_OVERLAY_CONTAINER_CLASS}`)) container.remove();
+};
+
+export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOptions) => {
+  return async (ctx: ContentScriptContext): Promise<void> => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: Infinity,
+          refetchOnWindowFocus: false,
+          retry: false,
+          gcTime: 30 * 1000 * 60,
+        },
+      },
+    });
+
+    let ui: ShadowRootContentScriptUi<Root> | null = null;
+    let root: Root | null = null;
+
+    let lightDomStyleElement: HTMLStyleElement | null = null;
+
+    const ensureLightDomStyles = () => {
+      if (!lightDomStyleElement) {
+        lightDomStyleElement = document.createElement('style');
+        lightDomStyleElement.setAttribute(LIGHT_DOM_STYLE_ATTRIBUTE, 'true');
+        lightDomStyleElement.textContent = options.lightDomStylesText;
+      }
+      if (lightDomStyleElement && !document.head.contains(lightDomStyleElement)) {
+        document.head.append(lightDomStyleElement);
+      }
+    };
+
+    const mount = async () => {
+      if (ui) return;
+
+      ensureLightDomStyles();
+
+      ui = await createShadowRootUi(ctx, {
+        name: options.uiName,
+        position: 'inline',
+        anchor: 'body',
+        onMount: (container: HTMLElement) => {
+          const portalContainer = container;
+          root = createRoot(container);
+          root.render(
+            <React.StrictMode>
+              <ExtensionErrorBoundary scope="browse-overlays">
+                <QueryClientProvider client={queryClient}>
+                  <TooltipProvider>
+                    <ConfirmProvider portalContainer={portalContainer}>
+                      <BrowseOverlays
+                        adapter={options.adapter}
+                        portalContainer={portalContainer}
+                      />
+                    </ConfirmProvider>
+                  </TooltipProvider>
+                </QueryClientProvider>
+              </ExtensionErrorBoundary>
+            </React.StrictMode>,
+          );
+          return root;
+        },
+        onRemove: (maybeRoot?: Root) => {
+          (maybeRoot ?? root)?.unmount();
+          root = null;
+        },
+      });
+
+      await ui.mount();
+
+      if (ui?.shadowHost) {
+        ui.shadowHost.style.zIndex = '2147483647';
+        ui.shadowHost.style.position = 'relative';
+      }
+    };
+
+    const remove = async () => {
+      ui?.remove();
+      ui = null;
+      root = null;
+      cleanupDomArtifacts();
+      if (lightDomStyleElement?.parentNode) lightDomStyleElement.remove();
+      lightDomStyleElement = null;
+    };
+
+    const main = createContentEntrypointShell({
+      isEligible: ({ url, publicOptions }) => options.isEligible({ url, publicOptions }),
+      mount: async () => {
+        await mount();
+      },
+      remove,
+    });
+
+    await main(ctx);
+  };
+};

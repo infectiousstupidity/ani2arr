@@ -18,10 +18,12 @@ const mocks = vi.hoisted(() => ({
 	publicOptions: undefined as PublicOptions | undefined,
 	formResources: undefined as ProviderFormResources | undefined,
 	isFetching: false,
+	savePublicOptions: vi.fn(),
 }));
 
 vi.mock("@/queries/options", () => ({
 	usePublicOptions: () => ({ data: mocks.publicOptions }),
+	useSavePublicOptions: () => ({ mutateAsync: mocks.savePublicOptions }),
 }));
 
 vi.mock("@/queries/sonarr", () => ({
@@ -88,6 +90,7 @@ describe("SonarrDefaults", () => {
 		mocks.publicOptions = configuredPublicOptions(true);
 		mocks.formResources = undefined;
 		mocks.isFetching = false;
+		mocks.savePublicOptions.mockReset();
 	});
 
 	it("renders static defaults when provider resources are unavailable", () => {

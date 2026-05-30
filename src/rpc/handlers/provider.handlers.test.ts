@@ -3,36 +3,38 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { ProviderCredentials } from "@/providers";
-import type { ApiHandlerDeps } from "./handler-deps";
-import { createProviderHandlers } from "./provider.handlers";
+import { providerHandlers } from "./provider.handlers";
 
 const credentials: ProviderCredentials = {
 	url: "https://sonarr.example",
 	apiKey: "secret",
 };
 
-describe("createProviderHandlers", () => {
-	it("tests Sonarr connections through the current Sonarr client", async () => {
-		const sonarrClient = {
-			testConnection: vi.fn(async () => ({ version: "4.0.1" })),
-		};
-		const radarrClient = {
-			testConnection: vi.fn(),
-		};
+const sonarrClientMock = vi.hoisted(() => ({
+	testConnection: vi.fn(),
+}));
 
-		const handlers = createProviderHandlers({
-			sonarrClient,
-			radarrClient,
-		} as unknown as ApiHandlerDeps);
+const radarrClientMock = vi.hoisted(() => ({
+	testConnection: vi.fn(),
+}));
+
+vi.mock("@/background/api/api-services", () => ({
+	radarrClient: radarrClientMock,
+	sonarrClient: sonarrClientMock,
+}));
+
+describe("providerHandlers", () => {
+	it("tests Sonarr connections through the current Sonarr client", async () => {
+		sonarrClientMock.testConnection.mockResolvedValue({ version: "4.0.1" });
 
 		await expect(
-			handlers.testProviderConnection({
+			providerHandlers.testProviderConnection({
 				provider: "sonarr",
 				credentials,
 			}),
 		).resolves.toEqual({ version: "4.0.1" });
 
-		expect(sonarrClient.testConnection).toHaveBeenCalledWith(credentials);
-		expect(radarrClient.testConnection).not.toHaveBeenCalled();
+		expect(sonarrClientMock.testConnection).toHaveBeenCalledWith(credentials);
+		expect(radarrClientMock.testConnection).not.toHaveBeenCalled();
 	});
 });

@@ -15,7 +15,7 @@ import type {
 	SonarrLookupOutput,
 } from "@/rpc/types";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
-import { normalizeError, type ExtensionError } from "@/shared/errors";
+import type { ExtensionError } from "@/shared/errors";
 import { queryKeys } from "@/queries/query-keys";
 import type { ProviderCredentials, TvdbId } from "@/providers";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
@@ -64,13 +64,9 @@ export const useSonarrFormResources = (options?: {
 		queryKey: queryKeys.sonarrFormResources(
 			getProviderConnectionScope(options?.credentials),
 		),
-		queryFn: async () => {
-			try {
-				const api = getAni2arrApi();
-				return await api.getSonarrFormResources(request);
-			} catch (error) {
-				throw normalizeError(error);
-			}
+		queryFn: () => {
+			const api = getAni2arrApi();
+			return api.getSonarrFormResources(request);
 		},
 		enabled: options?.enabled ?? true,
 		staleTime: 60 * 60 * 1000,
@@ -189,13 +185,7 @@ function invalidateSonarrMediaMutationQueries(
 export const useAddSeries = () => {
 	const queryClient = useQueryClient();
 	return useMutation<SonarrSeries, ExtensionError, AddSonarrInput>({
-		mutationFn: async (input: AddSonarrInput) => {
-			try {
-				return await getAni2arrApi().addToSonarr(input);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
+		mutationFn: (input: AddSonarrInput) => getAni2arrApi().addToSonarr(input),
 		onSuccess: (_createdSeries, variables) => {
 			invalidateSonarrMediaMutationQueries(queryClient, variables);
 		},
@@ -205,13 +195,8 @@ export const useAddSeries = () => {
 export const useUpdateSeries = () => {
 	const queryClient = useQueryClient();
 	return useMutation<SonarrSeries, ExtensionError, UpdateSonarrInput>({
-		mutationFn: async (input: UpdateSonarrInput) => {
-			try {
-				return await getAni2arrApi().updateSonarrSeries(input);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
+		mutationFn: (input: UpdateSonarrInput) =>
+			getAni2arrApi().updateSonarrSeries(input),
 		onSuccess: (_updatedSeries, variables) => {
 			invalidateSonarrMediaMutationQueries(queryClient, variables);
 		},

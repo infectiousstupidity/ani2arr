@@ -9,14 +9,14 @@ import { AniListHttpError, AniListRateLimitError } from '@/anilist/transport/err
 import { toAniListResponseMeta } from '@/anilist/transport/rate-limit';
 import type { AniListResponseMeta } from '@/anilist/transport/types';
 
-interface RequestParams<TVariables> {
+interface RequestParams {
   query: string;
-  variables: TVariables;
+  variables: Record<string, unknown>;
 }
 
-export async function postAniList<TResponse, TVariables extends Record<string, unknown>>(
-  params: RequestParams<TVariables>,
-): Promise<{ payload: TResponse; meta: AniListResponseMeta }> {
+export async function postAniList(
+  params: RequestParams,
+): Promise<{ payload: unknown; meta: AniListResponseMeta }> {
   const response = await fetch(ANILIST_GRAPHQL_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -35,7 +35,7 @@ export async function postAniList<TResponse, TVariables extends Record<string, u
   }
 
   return {
-    payload: (await response.json()) as TResponse,
+    payload: await response.json(),
     meta,
   };
 }

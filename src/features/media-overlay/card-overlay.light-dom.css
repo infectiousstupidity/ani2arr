@@ -1,4 +1,4 @@
-/* Light-DOM styles for browse-card overlay portals and their body-level tooltips. */
+/* ShadowRoot styles for browse-card overlay buttons and tooltip portals. */
 /* src/features/media-overlay/card-overlay.light-dom.css */
 
 @keyframes a2a-spin { to { transform: rotate(360deg); } }
@@ -8,7 +8,7 @@
 .a2a-tooltip-content,
 .a2a-tooltip-content * { box-sizing: border-box; }
 
-.a2a-card-overlay { position: absolute; display: inline-block; pointer-events: none; z-index: 80; font-family: inherit; }
+.a2a-card-overlay { position: relative; display: inline-block; pointer-events: none; z-index: 80; font-family: inherit; }
 .a2a-card-overlay__anchor-wrap { display: inline-block; pointer-events: auto; }
 
 .a2a-card-overlay :is(.a2a-card-overlay__quick, .a2a-card-overlay__action) {

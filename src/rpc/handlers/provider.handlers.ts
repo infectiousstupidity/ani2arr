@@ -2,58 +2,29 @@
 // src/rpc/handlers/provider.handlers.ts
 
 import * as v from "valibot";
-import type { Ani2arrApi } from "@/rpc";
-import type { Provider, ProviderCredentials } from "@/providers";
-import { normalizeProviderConnectionInput } from "@/settings";
+import { radarrClient, sonarrClient } from "@/background/api-services";
+import { getProviderConfig } from "@/background/provider-config";
 import {
 	GetProviderBaseUrlInputSchema,
 	TestProviderConnectionInputSchema,
 } from "@/rpc/schemas";
-import type { ApiHandlerDeps } from "./handler-deps";
+import { normalizeInputCredentials } from "./provider-credentials";
 
-export const normalizeInputCredentials = (
-	provider: Provider,
-	credentials: ProviderCredentials,
-): ProviderCredentials => {
-	const normalized = normalizeProviderConnectionInput(credentials, provider);
-	if (!normalized) {
-		throw new Error("Provider credentials are required.");
-	}
+export const providerHandlers = {
+	async getProviderBaseUrl(input: unknown) {
+		const parsedInput = v.parse(GetProviderBaseUrlInputSchema, input);
+		const credentials = await getProviderConfig(parsedInput.provider);
+		return credentials?.url ?? "";
+	},
 
-	return {
-		url: normalized.url,
-		apiKey: normalized.apiKey,
-	};
+	testProviderConnection(input: unknown) {
+		const parsedInput = v.parse(TestProviderConnectionInputSchema, input);
+		const credentials = normalizeInputCredentials(
+			parsedInput.provider,
+			parsedInput.credentials,
+		);
+		return parsedInput.provider === "sonarr"
+			? sonarrClient.testConnection(credentials)
+			: radarrClient.testConnection(credentials);
+	},
 };
-
-export function createProviderHandlers(
-	deps: ApiHandlerDeps,
-): Pick<Ani2arrApi, "getProviderBaseUrl" | "testProviderConnection"> {
-	const { providerConfig, sonarrClient, radarrClient } = deps;
-
-	const testProviderConnectionInternal: Ani2arrApi["testProviderConnection"] =
-		async (input) => {
-			return input.provider === "sonarr"
-				? sonarrClient.testConnection(input.credentials)
-				: radarrClient.testConnection(input.credentials);
-		};
-
-	return {
-		async getProviderBaseUrl(input) {
-			const parsedInput = v.parse(GetProviderBaseUrlInputSchema, input);
-			const credentials = await providerConfig.get(parsedInput.provider);
-			return credentials?.url ?? "";
-		},
-
-		testProviderConnection(input) {
-			const parsedInput = v.parse(TestProviderConnectionInputSchema, input);
-			return testProviderConnectionInternal({
-				provider: parsedInput.provider,
-				credentials: normalizeInputCredentials(
-					parsedInput.provider,
-					parsedInput.credentials,
-				),
-			});
-		},
-	} satisfies Pick<Ani2arrApi, "getProviderBaseUrl" | "testProviderConnection">;
-}

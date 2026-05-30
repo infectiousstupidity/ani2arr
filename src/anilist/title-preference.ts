@@ -6,7 +6,7 @@ import type { AniListTitles } from '@/anilist/schemas/media.schema';
 
 const TITLE_LANGUAGE_ORDER: AniListTitleLanguage[] = ['english', 'romaji', 'native'];
 
-export const ANILIST_TITLE_LANGUAGE_LABELS: Readonly<Record<AniListTitleLanguage, string>> = {
+const ANILIST_TITLE_LANGUAGE_LABELS: Readonly<Record<AniListTitleLanguage, string>> = {
   english: 'English',
   romaji: 'Romaji',
   native: 'Native',
@@ -18,7 +18,7 @@ const normalizeTitle = (value?: string | null): string | null => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
-export const getAniListTitleLanguageLabel = (
+const getAniListTitleLanguageLabel = (
   language: AniListTitleLanguage,
   options?: { includeDefaultSuffix?: boolean },
 ): string => {

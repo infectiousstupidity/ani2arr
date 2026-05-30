@@ -59,6 +59,9 @@ const normalizeMappingsInput = (input?: GetMappingsInput) => {
 	if (input.providers?.length) {
 		normalized.providers = [...new Set(input.providers)].toSorted();
 	}
+	if (input.statuses?.length) {
+		normalized.statuses = [...new Set(input.statuses)].toSorted();
+	}
 	if (typeof input.limit === "number") {
 		normalized.limit = input.limit;
 	}
@@ -68,8 +71,7 @@ const normalizeMappingsInput = (input?: GetMappingsInput) => {
 	if (input.cursor) {
 		normalized.cursor = {
 			updatedAt: input.cursor.updatedAt,
-			anilistId: input.cursor.anilistId,
-			provider: input.cursor.provider,
+			groupKey: input.cursor.groupKey,
 		};
 	}
 	return normalized;

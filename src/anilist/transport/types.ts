@@ -10,7 +10,6 @@ export interface AniListRateLimitMeta {
 
 export interface AniListResponseMeta {
   status: number;
-  headers: Record<string, string>;
   rateLimit: AniListRateLimitMeta;
   receivedAt: number;
 }

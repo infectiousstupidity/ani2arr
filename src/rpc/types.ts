@@ -21,7 +21,7 @@ import type {
 	EffectiveMappingState,
 	ProviderExternalId,
 } from "@/mapping/types";
-import type { MappingListRow } from "@/mapping/queries/list-mappings";
+import type { MappingListGroup } from "@/mapping/queries/list-mappings";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
 import type { AutoMappingStatus } from "@/mapping/auto-mapping/types";
 import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
@@ -77,7 +77,7 @@ export interface CheckMovieStatusResponse extends ProviderStatusResponseBase {
 }
 
 export interface GetMappingsOutput {
-	mappings: MappingListRow[];
+	groups: MappingListGroup[];
 	nextCursor?: MappingCursor | null;
 	total?: number;
 }

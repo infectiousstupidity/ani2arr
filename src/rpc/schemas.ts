@@ -15,6 +15,14 @@ import { RadarrFormStateSchema } from "@/providers/radarr/form-state";
 
 const ProviderSchema = v.picklist(PROVIDERS);
 const MappingEntryKindSchema = v.picklist(MAPPING_ENTRY_KIND_VALUES);
+const MappingRowStatusSchema = v.picklist([
+	"needs-review",
+	"in-library",
+	"can-add",
+	"suppressed",
+	"unmapped",
+	"unknown",
+]);
 const ProviderMappingIdSchema = v.variant("provider", [
 	v.object({
 		provider: v.literal("sonarr"),
@@ -192,14 +200,14 @@ export const RadarrLookupInputSchema = v.object({
 
 export const MappingCursorSchema = v.object({
 	updatedAt: v.number(),
-	anilistId: AniListIdSchema,
-	provider: ProviderSchema,
+	groupKey: v.string(),
 });
 
 export const GetMappingsInputSchema = v.optional(
 	v.object({
 		entryKinds: v.optional(v.array(MappingEntryKindSchema)),
 		providers: v.optional(v.array(ProviderSchema)),
+		statuses: v.optional(v.array(MappingRowStatusSchema)),
 		limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 		cursor: v.optional(MappingCursorSchema),
 		query: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1))),

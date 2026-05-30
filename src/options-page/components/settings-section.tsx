@@ -6,7 +6,7 @@ import { cn } from "@/shared/utils/cn";
 import { Label } from "./ui/label";
 
 interface SettingsSectionProps {
-  title: string;
+  title?: string;
   description?: ReactNode;
   icon?: ReactNode;
   children: ReactNode;

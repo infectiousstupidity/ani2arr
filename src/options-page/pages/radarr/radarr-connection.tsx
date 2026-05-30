@@ -1,7 +1,7 @@
 /** Radarr connection draft fields for the options page. */
 // src/options-page/pages/radarr/radarr-connection.tsx
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type SubmitEvent } from "react";
 import { Plug } from "lucide-react";
 import { useExtensionOptions } from "@/queries/options";
 import {
@@ -87,7 +87,7 @@ const RadarrConnectionDraft = ({
     onDraftDirtyChange(draftUrl !== savedUrl || nextApiKey !== savedApiKey);
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (isConnecting || !draftUrl || !draftApiKey) {

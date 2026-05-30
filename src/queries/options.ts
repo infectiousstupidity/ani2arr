@@ -1,5 +1,5 @@
-/** Settings query hooks and cache synchronization owned by the options domain. */
-// src/options/queries.ts
+/** Settings query hooks and root cache synchronization for options values. */
+// src/queries/options.ts
 
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,21 +18,16 @@ import {
 } from "../settings/store";
 import type { ExtensionOptions, PublicOptions } from "../settings/types";
 
-const useSyncExtensionOptionsQuery = (
-	queryClient: ReturnType<typeof useQueryClient>,
-): void => {
-	useEffect(() => {
-		return watchExtensionOptionsSnapshot((snapshot) => {
-			queryClient.setQueryData(queryKeys.options(), snapshot);
-		});
-	}, [queryClient]);
-};
+export function useOptionsQuerySync(): void {
+	const queryClient = useQueryClient();
 
-const useSyncPublicOptionsQuery = (
-	queryClient: ReturnType<typeof useQueryClient>,
-): void => {
 	useEffect(() => {
 		let active = true;
+
+		const applyExtensionOptionsSnapshot = (snapshot: ExtensionOptions) => {
+			if (!active) return;
+			queryClient.setQueryData(queryKeys.options(), snapshot);
+		};
 
 		const applyPublicOptionsSnapshot = (snapshot: PublicOptions) => {
 			if (!active) return;
@@ -42,44 +37,53 @@ const useSyncPublicOptionsQuery = (
 			});
 		};
 
-		const unsubscribe = watchPublicOptionsSnapshot(applyPublicOptionsSnapshot);
+		const unsubscribeExtension = watchExtensionOptionsSnapshot(
+			applyExtensionOptionsSnapshot,
+		);
+		const unsubscribePublic = watchPublicOptionsSnapshot(
+			applyPublicOptionsSnapshot,
+		);
 
-		void getPublicOptionsSnapshot().then(applyPublicOptionsSnapshot);
+		void queryClient
+			.ensureQueryData({
+				queryKey: queryKeys.options(),
+				queryFn: () => getExtensionOptionsSnapshot(),
+				staleTime: Infinity,
+				meta: { persist: false },
+			})
+			.then(applyExtensionOptionsSnapshot, () => {});
+		void queryClient
+			.ensureQueryData({
+				queryKey: queryKeys.publicOptions(),
+				queryFn: () => getPublicOptionsSnapshot(),
+				staleTime: Infinity,
+				meta: { persist: false },
+			})
+			.then(applyPublicOptionsSnapshot, () => {});
 
 		return () => {
 			active = false;
-			unsubscribe();
+			unsubscribeExtension();
+			unsubscribePublic();
 		};
 	}, [queryClient]);
-};
+}
 
-export const useExtensionOptions = () => {
-	const queryClient = useQueryClient();
-	const query = useQuery<ExtensionOptions>({
+export const useExtensionOptions = () =>
+	useQuery<ExtensionOptions>({
 		queryKey: queryKeys.options(),
 		queryFn: () => getExtensionOptionsSnapshot(),
 		staleTime: Infinity,
 		meta: { persist: false },
 	});
 
-	useSyncExtensionOptionsQuery(queryClient);
-
-	return query;
-};
-
-export const usePublicOptions = () => {
-	const queryClient = useQueryClient();
-	const query = useQuery<PublicOptions>({
+export const usePublicOptions = () =>
+	useQuery<PublicOptions>({
 		queryKey: queryKeys.publicOptions(),
 		queryFn: () => getPublicOptionsSnapshot(),
 		staleTime: Infinity,
 		meta: { persist: false },
 	});
-
-	useSyncPublicOptionsQuery(queryClient);
-
-	return query;
-};
 
 export const useSavePublicOptions = () => {
 	const queryClient = useQueryClient();

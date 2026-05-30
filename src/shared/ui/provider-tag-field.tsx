@@ -9,7 +9,7 @@ import {
 	type ProviderTagSelection,
 	splitProviderTagLabels,
 } from "@/providers/provider-tag-selection";
-import { Label } from "@/shared/ui/form/form";
+import { Label } from "@/shared/ui/form/label";
 import MultiTagInput from "@/shared/ui/form/multi-tag-input";
 
 interface ProviderTagFieldProps {

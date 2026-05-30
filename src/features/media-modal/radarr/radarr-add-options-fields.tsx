@@ -9,7 +9,8 @@ import {
   type RadarrMinimumAvailability,
   type RadarrMovieMonitor,
 } from '@/providers/radarr/form-state';
-import { SelectField, SwitchField } from '@/shared/ui/form/form';
+import { SelectField } from '@/shared/ui/form/select-field';
+import { SwitchField } from '@/shared/ui/form/switch-field';
 import { ProviderTagField } from '@/shared/ui/provider-tag-field';
 import { cn } from '@/shared/utils/cn';
 

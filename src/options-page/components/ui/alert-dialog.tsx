@@ -1,7 +1,7 @@
 /** Local options-page confirmation dialog built on Radix AlertDialog primitives. */
 // src/options-page/components/ui/alert-dialog.tsx
 
-import { AlertDialog } from "radix-ui";
+import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import { Button } from "./button";
 
 export interface ConfirmDialogProps {

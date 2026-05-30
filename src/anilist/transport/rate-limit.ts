@@ -41,7 +41,6 @@ export function parseAniListRateLimitHeaders(headers: Headers, now = Date.now())
 export function toAniListResponseMeta(response: Response, now = Date.now()): AniListResponseMeta {
   return {
     status: response.status,
-    headers: Object.fromEntries(response.headers.entries()),
     rateLimit: parseAniListRateLimitHeaders(response.headers, now),
     receivedAt: now,
   };

@@ -1,0 +1,76 @@
+/* Shadow-root base variables and helpers for injected extension UI. */
+/* src/shared/styles/content-base.css */
+
+@import "tailwindcss";
+@import "@/shared/styles/color-tokens.css";
+
+:host {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f2f5f7;
+  --bg-tertiary: #edf1f5;
+  --text-primary: #212529;
+  --text-secondary: #607080;
+  --border-primary: #dee2e6;
+  --accent-primary: #3db4f2;
+  --accent-hover: #299dd1;
+  --warning: #f2c94c;
+  --success: #00ba7c;
+  --success-foreground: #166534;
+  --error: #f91880;
+  --iconbutton-text: #fafafa;
+
+  color: var(--text-primary);
+}
+
+:host(.dark) {
+  --bg-primary: #0b1622;
+  --bg-secondary: #151f2e;
+  --bg-tertiary: #253341;
+  --text-primary: #f7f9f9;
+  --text-secondary: #9fadbd;
+  --border-primary: #38444d;
+  --accent-primary: #3db4f2;
+  --accent-hover: #299dd1;
+  --success-foreground: #86efac;
+  --iconbutton-text: #f7f9f9;
+}
+
+@theme {
+  --spacing: 0.4rem;
+  --text-xs: 1.2rem;
+  --text-sm: 1.4rem;
+  --text-base: 1.6rem;
+  --text-lg: 1.8rem;
+  --text-xl: 2rem;
+  --text-2xl: 2.4rem;
+  --text-3xl: 3rem;
+  --text-button: 2.2rem;
+}
+
+[data-radix-popper-content-wrapper] {
+  z-index: 99999 !important;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.focus-trap {
+  isolation: isolate;
+}
+
+:host *:focus,
+:host *:focus-visible,
+:host *:focus-within {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}

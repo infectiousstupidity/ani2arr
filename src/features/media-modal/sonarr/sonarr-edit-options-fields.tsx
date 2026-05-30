@@ -14,7 +14,8 @@ import {
 	SONARR_MONITOR_NEW_ITEMS_OPTIONS_WITH_DESCRIPTIONS,
 	SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
 } from "@/providers/sonarr/form-options";
-import { SelectField, SwitchField } from "@/shared/ui/form/form";
+import { SelectField } from "@/shared/ui/form/select-field";
+import { SwitchField } from "@/shared/ui/form/switch-field";
 import { ProviderTagField } from "@/shared/ui/provider-tag-field";
 import { cn } from "@/shared/utils/cn";
 

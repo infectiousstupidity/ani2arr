@@ -8,11 +8,8 @@ import {
 import type { AniListId } from "@/anilist";
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
 import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
-import type {
-	Provider,
-	ProviderFormResources,
-	RadarrMovie,
-} from "@/providers";
+import { normalizeError } from "@/shared/errors";
+import type { Provider, ProviderFormResources, RadarrMovie } from "@/providers";
 import type { SonarrSeriesLibraryStatus } from "@/providers/sonarr/library";
 import type { SonarrSeries } from "@/providers/sonarr/types";
 import type { RadarrMovieLibraryStatus } from "@/providers/radarr/library";
@@ -69,8 +66,6 @@ export interface Ani2arrApi {
 	): Promise<Array<[AniListId, AniListMedia]>>;
 	fetchAniListMedia(anilistId: AniListId): Promise<AniListMedia | null>;
 	getMappingIdentities(ids: AniListId[]): Promise<EffectiveMappingPresence[]>;
-	/** @deprecated Use getMappingIdentities for provider-aware known mapping lookup. */
-	getStaticMapped(ids: AniListId[]): Promise<AniListId[]>;
 	notifyProviderConnectionChanged(input?: {
 		changedProviders?: Provider[];
 		disconnectedProviders?: Provider[];
@@ -117,10 +112,31 @@ export interface Ani2arrApi {
 
 const ANI2ARR_API_KEY = "Ani2arrApi" as ProxyServiceKey<Ani2arrApi>;
 
+type Ani2arrApiProxyMethod = (...args: unknown[]) => Promise<unknown>;
+
 export function registerAni2arrApi(api: Ani2arrApi) {
 	return registerService(ANI2ARR_API_KEY, api);
 }
 
+function normalizeAni2arrApiErrors(api: Ani2arrApi): Ani2arrApi {
+	return new Proxy(api, {
+		get(target, property, receiver) {
+			const value = Reflect.get(target, property, receiver) as unknown;
+			if (typeof value !== "function") {
+				return value;
+			}
+
+			return async (...args: unknown[]) => {
+				try {
+					return await (value as Ani2arrApiProxyMethod)(...args);
+				} catch (error) {
+					throw normalizeError(error);
+				}
+			};
+		},
+	}) as Ani2arrApi;
+}
+
 export function getAni2arrApi() {
-	return createProxyService(ANI2ARR_API_KEY);
+	return normalizeAni2arrApiErrors(createProxyService(ANI2ARR_API_KEY));
 }

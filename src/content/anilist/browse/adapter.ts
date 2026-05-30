@@ -3,7 +3,6 @@
 
 import { parseAniListIdOrNull } from '@/anilist/anilist-id';
 import { parseAniListMediaFormatLabel } from '@/anilist/schemas/media.schema';
-import { DEFAULT_CONTAINER_CLASS, DEFAULT_PROCESSED_ATTRIBUTE } from '@/content/browse/browse-content-app';
 import type { BrowseAdapter, HostMediaTarget } from '@/content/browse/types';
 
 const CARD_SELECTOR = '.media-card';
@@ -60,45 +59,11 @@ const parseAniListCard = (card: Element): HostMediaTarget | null => {
   return { anilistId, title, format, mountTarget: cover };
 };
 
-const ensureOverlayContainer = (cover: HTMLAnchorElement): HTMLElement => {
-  const existing = cover.querySelector<HTMLElement>(`.${DEFAULT_CONTAINER_CLASS}`);
-  if (existing) return existing;
-  const el = cover.ownerDocument.createElement('div');
-  el.className = DEFAULT_CONTAINER_CLASS;
-  cover.append(el);
-  return el;
-};
-
-const locateExistingContainer = (card: Element): HTMLElement | null => {
-  const cover = card.querySelector<HTMLElement>(COVER_SELECTOR);
-  return (
-    cover?.querySelector<HTMLElement>(`.${DEFAULT_CONTAINER_CLASS}`) ??
-    card.querySelector<HTMLElement>(`.${DEFAULT_CONTAINER_CLASS}`)
-  );
-};
-
-const clearProcessedAttribute = (card: Element): void => {
-  card.querySelector<HTMLAnchorElement>(COVER_SELECTOR)?.removeAttribute(DEFAULT_PROCESSED_ATTRIBUTE);
-};
-
 export const anilistBrowseAdapter: BrowseAdapter = {
   cardSelector: CARD_SELECTOR,
-  containerClassName: DEFAULT_CONTAINER_CLASS,
-  processedAttribute: DEFAULT_PROCESSED_ATTRIBUTE,
   parseCard: parseAniListCard,
-  ensureContainer: ensureOverlayContainer,
-  getContainerForCard: locateExistingContainer,
-  onCardInvalid: clearProcessedAttribute,
   getObserverRoot: () => document.body ?? document.documentElement,
   getScanRoot: () => findCardContainer(),
-  mutationObserverInit: {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['href'],
-  },
-  resizeObserverTargets: () => (document.body ? [document.body] : []),
   anchorCorner: 'bottom-left',
   stackDirection: 'up',
-  anchorOffsetX: -8,
 };

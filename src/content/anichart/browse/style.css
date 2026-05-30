@@ -10,6 +10,14 @@ a.cover:has(> .a2a-overlay-container) {
   overflow: visible !important;
 }
 
+.a2a-overlay-container {
+  position: absolute;
+  display: inline-block;
+  pointer-events: none;
+  z-index: 80;
+  overflow: visible;
+}
+
 /* Corner offsets for this surface */
-.a2a-card-overlay[data-corner='bottom-left'] { left: var(--badge-offset-x, -8px); bottom: 16px; }
-.a2a-card-overlay[data-corner='top-left'] { left: var(--badge-offset-x, -6px); top: -6px; }
+.a2a-overlay-container[data-corner='bottom-left'] { left: var(--badge-offset-x, -8px); bottom: 16px; }
+.a2a-overlay-container[data-corner='top-left'] { left: var(--badge-offset-x, -6px); top: -6px; }

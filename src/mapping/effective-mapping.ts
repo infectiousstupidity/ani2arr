@@ -1,3 +1,6 @@
+/** Centralized effective mapping precedence, suppression, and timestamp resolution. */
+// src/mapping/effective-mapping.ts
+
 import type { AniListId } from "@/anilist";
 import type { Provider } from "@/providers";
 import type {
@@ -27,30 +30,44 @@ export interface EffectiveMapping {
 	autoMappingStatus?: AutoMappingRecord["state"];
 	mappingUnknownReason?: MappingUnknownReason;
 	hadResolveAttempt?: boolean;
+	updatedAt: number;
 }
 
-interface BuildEffectiveMappingInput {
+export interface BuildEffectiveMappingInput {
 	provider: Provider;
 	anilistId: AniListId;
-	manualProviderId: ProviderExternalId | null;
-	ignored: boolean;
+	manual: { providerId: ProviderExternalId; updatedAt: number } | null;
+	ignored: { updatedAt: number } | null;
 	upstreamProviderIds: readonly ProviderExternalId[];
-	rejectedCandidateProviderId?: ProviderExternalId | null;
+	rejectedCandidate: {
+		providerId: ProviderExternalId;
+		updatedAt: number;
+	} | null;
 	autoMappingRecord: AutoMappingRecord | null;
 }
 
+const maxUpdatedAt = (...values: Array<number | undefined | null>): number => {
+	let max = 0;
+	for (const value of values) {
+		if (typeof value === "number") {
+			max = Math.max(max, value);
+		}
+	}
+	return max;
+};
+
 const withRejectedSuppression = (
 	effectiveMapping: EffectiveMapping,
-	rejectedCandidateProviderId: ProviderExternalId | null | undefined,
+	rejectedCandidate: { providerId: ProviderExternalId } | null,
 ): EffectiveMapping =>
-	rejectedCandidateProviderId == null
-		? effectiveMapping
-		: {
+	rejectedCandidate
+		? {
 				...effectiveMapping,
-				suppressedProviderId: rejectedCandidateProviderId,
+				suppressedProviderId: rejectedCandidate.providerId,
 				suppressionKind:
 					effectiveMapping.suppressionKind ?? "rejected-candidate",
-			};
+			}
+		: effectiveMapping;
 
 const shouldApplyRejectedSuppression = (
 	effectiveMapping: EffectiveMapping,
@@ -62,16 +79,17 @@ const buildManualEffectiveMapping = (
 	input: BuildEffectiveMappingInput,
 	upstreamProviderId: ProviderExternalId | null,
 ): EffectiveMapping | null => {
-	const { provider, anilistId, manualProviderId } = input;
-	if (manualProviderId === null) {
+	const { provider, anilistId, manual, autoMappingRecord, rejectedCandidate } =
+		input;
+	if (!manual) {
 		return null;
 	}
 
-	if (upstreamProviderId !== null && upstreamProviderId === manualProviderId) {
+	if (upstreamProviderId !== null && upstreamProviderId === manual.providerId) {
 		return {
 			provider,
 			anilistId,
-			providerId: manualProviderId,
+			providerId: manual.providerId,
 			providerMappingState: "mapped",
 			mappingEntryKind: "upstream",
 			mappingSource: "upstream",
@@ -82,13 +100,18 @@ const buildManualEffectiveMapping = (
 			},
 			autoMappingStatus: "mapped",
 			hadResolveAttempt: true,
+			updatedAt: maxUpdatedAt(
+				manual.updatedAt,
+				autoMappingRecord?.state === "mapped" ? autoMappingRecord.updatedAt : 0,
+				rejectedCandidate?.updatedAt,
+			),
 		};
 	}
 
 	return {
 		provider,
 		anilistId,
-		providerId: manualProviderId,
+		providerId: manual.providerId,
 		providerMappingState: "mapped",
 		mappingEntryKind: "manual",
 		mappingSource: "manual",
@@ -100,6 +123,7 @@ const buildManualEffectiveMapping = (
 		autoMappingStatus: "mapped",
 		exactUpstreamMatchProviderId: upstreamProviderId,
 		hadResolveAttempt: true,
+		updatedAt: maxUpdatedAt(manual.updatedAt, rejectedCandidate?.updatedAt),
 	};
 };
 
@@ -124,7 +148,7 @@ const buildEffectiveMappingWithoutSuppression = (
 		anilistId,
 		ignored,
 		upstreamProviderIds,
-		rejectedCandidateProviderId,
+		rejectedCandidate,
 		autoMappingRecord,
 	} = input;
 	const upstreamProviderId =
@@ -140,6 +164,7 @@ const buildEffectiveMappingWithoutSuppression = (
 			mappingEntryKind: "ignored",
 			exactUpstreamMatchProviderId: upstreamProviderId,
 			hadResolveAttempt: true,
+			updatedAt: maxUpdatedAt(ignored.updatedAt, rejectedCandidate?.updatedAt),
 		};
 	}
 
@@ -165,6 +190,10 @@ const buildEffectiveMappingWithoutSuppression = (
 				reason: "exact-upstream",
 			},
 			autoMappingStatus: "mapped",
+			updatedAt: maxUpdatedAt(
+				autoMappingRecord?.state === "mapped" ? autoMappingRecord.updatedAt : 0,
+				rejectedCandidate?.updatedAt,
+			),
 		};
 	}
 
@@ -178,6 +207,10 @@ const buildEffectiveMappingWithoutSuppression = (
 			autoMappingStatus: "ambiguous",
 			mappingUnknownReason: "ambiguous",
 			hadResolveAttempt: true,
+			updatedAt: maxUpdatedAt(
+				autoMappingRecord?.updatedAt,
+				rejectedCandidate?.updatedAt,
+			),
 		};
 	}
 
@@ -193,10 +226,14 @@ const buildEffectiveMappingWithoutSuppression = (
 			acceptedEvidence: autoMappingRecord.acceptedEvidence,
 			autoMappingStatus: "mapped",
 			hadResolveAttempt: autoMappingRecord.acceptedEvidence.source === "auto",
+			updatedAt: maxUpdatedAt(
+				autoMappingRecord.updatedAt,
+				rejectedCandidate?.updatedAt,
+			),
 		};
 	}
 
-	if (rejectedCandidateProviderId != null) {
+	if (rejectedCandidate != null) {
 		return {
 			provider,
 			anilistId,
@@ -204,6 +241,7 @@ const buildEffectiveMappingWithoutSuppression = (
 			providerMappingState: "unmapped",
 			mappingEntryKind: "rejected",
 			hadResolveAttempt: true,
+			updatedAt: rejectedCandidate.updatedAt,
 		};
 	}
 
@@ -220,6 +258,7 @@ const buildEffectiveMappingWithoutSuppression = (
 			autoMappingStatus: autoMappingRecord.state,
 			...(mappingUnknownReason ? { mappingUnknownReason } : {}),
 			hadResolveAttempt: true,
+			updatedAt: autoMappingRecord.updatedAt,
 		};
 	}
 
@@ -230,6 +269,7 @@ const buildEffectiveMappingWithoutSuppression = (
 		providerMappingState: "unmapped",
 		mappingEntryKind: "unmapped",
 		hadResolveAttempt: false,
+		updatedAt: 0,
 	};
 };
 
@@ -241,11 +281,13 @@ export function buildEffectiveMapping(
 		effectiveMapping.mappingEntryKind === "ignored"
 			? { ...effectiveMapping, suppressionKind: "ignored-entry" }
 			: effectiveMapping;
+
 	if (!shouldApplyRejectedSuppression(effectiveMapping)) {
 		return effectiveMappingWithSuppression;
 	}
+
 	return withRejectedSuppression(
 		effectiveMappingWithSuppression,
-		input.rejectedCandidateProviderId,
+		input.rejectedCandidate,
 	);
 }

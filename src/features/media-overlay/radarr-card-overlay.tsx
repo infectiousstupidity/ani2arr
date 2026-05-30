@@ -22,9 +22,8 @@ interface RadarrCardOverlayProps {
 	metadata: AniListMediaHint | null;
 	observeTarget?: Element | null;
 	badgeVisibility?: BadgeVisibility;
-	anchorCorner?: "bottom-left" | "top-left";
 	stackDirection?: "up" | "down";
-	anchorOffsetX?: number;
+	tooltipContainer?: HTMLElement | ShadowRoot | null;
 }
 
 function openRadarrOptions(): void {
@@ -83,9 +82,8 @@ export function RadarrCardOverlay({
 	metadata,
 	observeTarget,
 	badgeVisibility,
-	anchorCorner,
 	stackDirection,
-	anchorOffsetX,
+	tooltipContainer,
 }: RadarrCardOverlayProps): ReactElement {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const providerTitle = title.trim().length > 0 ? title : null;
@@ -121,9 +119,8 @@ export function RadarrCardOverlay({
 			onOpenMapping={onOpenMapping}
 			externalHref={mediaAction.externalHref}
 			badgeVisibility={badgeVisibility}
-			anchorCorner={anchorCorner}
 			stackDirection={stackDirection}
-			anchorOffsetX={anchorOffsetX}
+			tooltipContainer={tooltipContainer}
 		/>
 	);
 }
