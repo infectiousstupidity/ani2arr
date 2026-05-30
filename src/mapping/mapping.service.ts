@@ -8,15 +8,11 @@ import {
 	type TmdbId,
 	type TvdbId,
 } from "@/providers";
-import { logError, normalizeError } from "@/shared/errors";
+import { ErrorCode, logError, normalizeError } from "@/shared/errors";
 import { logger } from "@/shared/utils/logger";
 import { ManualMappingService } from "./manual-mapping";
-import type {
-	ProviderTitleLookup,
-	ProviderTitleResult,
-} from "./auto-mapping/lookup/provider-title-lookup";
+import type { ProviderTitleLookup } from "./auto-mapping/lookup/provider-title-lookup";
 import { resolveAutoMapping } from "./auto-mapping/resolve-auto-mapping";
-import { AutoMappingPersistenceGuard } from "./auto-mapping/persistence-guard";
 import { AutoMappingInflightRequests } from "./auto-mapping/inflight-requests";
 import {
 	MAPPED_AUTO_MAPPING_TTL,
@@ -25,22 +21,21 @@ import {
 } from "./auto-mapping/auto-mapping.store";
 import { shouldApplyCandidateSuppression } from "./resolution-policy";
 import { AnibridgeMappingStore } from "./upstream-mapping";
-import { buildEffectiveMapping } from "./effective-mapping";
-import type { AcceptedMappingSource, ProviderExternalId } from "./types";
+import {
+	buildEffectiveMapping,
+	type EffectiveMapping,
+} from "./effective-mapping";
+import type { ProviderExternalId } from "./types";
 import type {
 	AutoMappingSource,
 	AutoMappingOptions,
-	AutoMappingEvidence,
 	AcceptedAutoMappingResult,
 	AutoMappingRecord,
 } from "./auto-mapping/types";
 
-type ProviderTitleLookupRegistry = Record<
-	Provider,
-	ProviderTitleLookup<ProviderTitleResult>
->;
+type ProviderTitleLookupRegistry = Record<Provider, ProviderTitleLookup>;
 
-type MappingServiceDeps = {
+export type MappingServiceDeps = {
 	anilistApi: AniListMediaService;
 	anibridgeMappingStore: AnibridgeMappingStore;
 	lookupClients: ProviderTitleLookupRegistry;
@@ -89,8 +84,16 @@ export class MappingService {
 	) => Promise<ProviderCredentials>;
 	private readonly manualMappings: ManualMappingService | undefined;
 	private readonly notifyMappingsChanged: (() => void) | undefined;
+
 	private readonly inflight = new AutoMappingInflightRequests();
-	private readonly autoMappingPersistence = new AutoMappingPersistenceGuard();
+
+	// Generation tokens replace the over-engineered PersistenceGuard file
+	private readonly providerGenerations: Record<Provider, number> = {
+		sonarr: 0,
+		radarr: 0,
+	};
+	private readonly entryGenerations = new Map<string, number>();
+
 	constructor(deps: MappingServiceDeps) {
 		this.anilistApi = deps.anilistApi;
 		this.anibridgeMappingStore = deps.anibridgeMappingStore;
@@ -101,10 +104,31 @@ export class MappingService {
 		this.notifyMappingsChanged = deps.notifyMappingsChanged;
 	}
 
+	private createValidityCheck(
+		provider: Provider,
+		anilistId: AniListId,
+	): () => boolean {
+		const key = `${provider}:${anilistId}`;
+		const startProviderGen = this.providerGenerations[provider];
+		const startEntryGen = this.entryGenerations.get(key) ?? 0;
+		return () =>
+			this.providerGenerations[provider] === startProviderGen &&
+			(this.entryGenerations.get(key) ?? 0) === startEntryGen;
+	}
+
+	private invalidateProvider(provider: Provider): void {
+		this.providerGenerations[provider]++;
+	}
+
+	private invalidateEntry(provider: Provider, anilistId: AniListId): void {
+		const key = `${provider}:${anilistId}`;
+		this.entryGenerations.set(key, (this.entryGenerations.get(key) ?? 0) + 1);
+	}
+
 	public async resetLookupState(provider?: Provider): Promise<void> {
 		if (!provider) {
-			this.autoMappingPersistence.invalidateProvider("sonarr");
-			this.autoMappingPersistence.invalidateProvider("radarr");
+			this.invalidateProvider("sonarr");
+			this.invalidateProvider("radarr");
 			this.inflight.clear();
 			await Promise.all([
 				this.lookupClients.sonarr.reset(),
@@ -115,7 +139,7 @@ export class MappingService {
 			return;
 		}
 
-		this.autoMappingPersistence.invalidateProvider(provider);
+		this.invalidateProvider(provider);
 		this.inflight.deleteProvider(provider);
 
 		await Promise.all([
@@ -145,6 +169,55 @@ export class MappingService {
 		}
 	}
 
+	/**
+	 * Unified point-read method. Centralizes precedence for UI Modals and Identities.
+	 */
+	public async getEffectiveMapping(
+		provider: Provider,
+		anilistId: AniListId,
+	): Promise<EffectiveMapping> {
+		const manualList = this.manualMappings?.list(provider) ?? [];
+		const manualMatch = manualList.find((m) => m.anilistId === anilistId);
+		const manual = manualMatch
+			? { providerId: manualMatch.providerId, updatedAt: manualMatch.updatedAt }
+			: null;
+
+		const ignoreList = this.manualMappings?.listIgnores(provider) ?? [];
+		const ignoreMatch = ignoreList.find((m) => m.anilistId === anilistId);
+		const ignored = ignoreMatch ? { updatedAt: ignoreMatch.updatedAt } : null;
+
+		const rejectedList =
+			this.manualMappings?.listRejectedCandidates(provider) ?? [];
+		const rejectedMatch = rejectedList
+			.filter((m) => m.anilistId === anilistId)
+			.toSorted((a, b) => b.updatedAt - a.updatedAt)[0];
+		const rejectedCandidate = rejectedMatch
+			? {
+					providerId: rejectedMatch.providerId,
+					updatedAt: rejectedMatch.updatedAt,
+				}
+			: null;
+
+		const upstreamProviderIds = this.getAnibridgeProviderIds(
+			provider,
+			anilistId,
+		);
+		const autoMappingRecord = await this.autoMappingStore.get(
+			provider,
+			anilistId,
+		);
+
+		return buildEffectiveMapping({
+			provider,
+			anilistId,
+			manual,
+			ignored,
+			upstreamProviderIds,
+			rejectedCandidate,
+			autoMappingRecord,
+		});
+	}
+
 	public async resolveProviderId(
 		provider: "sonarr",
 		anilistId: AniListId,
@@ -160,14 +233,12 @@ export class MappingService {
 		anilistId: AniListId,
 		options: AutoMappingOptions = {},
 	): Promise<AcceptedAutoMappingResult | null> {
-		const canPersistAutoMappingResult = this.autoMappingPersistence.createCheck(
-			provider,
-			anilistId,
-		);
+		const isValid = this.createValidityCheck(provider, anilistId);
+
 		const precedenceResult = await this.resolveAuthoritativeMapping(
 			provider,
 			anilistId,
-			canPersistAutoMappingResult,
+			isValid,
 		);
 		if (precedenceResult.handled) {
 			return precedenceResult.resolved;
@@ -178,71 +249,57 @@ export class MappingService {
 			return existing;
 		}
 
-		const promise = resolveAutoMapping(
-			{
-				anilistApi: this.anilistApi,
-				lookupClients: this.lookupClients,
-				autoMappingStore: this.autoMappingStore,
-				log: this.log,
-				acceptResolved: (
-					resolvedProvider,
-					resolvedAniListId,
-					resolved,
-					source,
-				) => {
-					if (!canPersistAutoMappingResult()) {
-						return Promise.resolve(null);
-					}
-					return this.acceptResolved(
-						resolvedProvider,
-						resolvedAniListId,
-						resolved,
-						source,
-					);
-				},
-				recordAutoMapping: (
-					resolvedProvider,
-					resolvedAniListId,
-					state,
-					ttl,
-				) => {
-					if (!canPersistAutoMappingResult()) {
-						return Promise.resolve();
-					}
-					return this.recordAutoMapping(
-						resolvedProvider,
-						resolvedAniListId,
-						state,
-						ttl,
-					);
-				},
-				clearAutoMapping: (resolvedProvider, resolvedAniListId) => {
-					if (!canPersistAutoMappingResult()) {
-						return Promise.resolve();
-					}
-					return this.clearAutoMapping(resolvedProvider, resolvedAniListId);
-				},
-				getConfiguredCredentials: (resolvedProvider) =>
-					this.getConfiguredCredentials(resolvedProvider),
-				isResolvedCandidateSuppressed: (
-					resolvedProvider,
-					resolvedAniListId,
-					resolved,
-					source,
-				) =>
-					this.isResolvedCandidateSuppressed(
-						resolvedProvider,
-						resolvedAniListId,
-						resolved,
-						source,
-					),
-			},
-			provider,
-			anilistId,
-			options,
-		);
-		this.inflight.set(provider, anilistId, options, promise);
+		const promise = (async () => {
+			try {
+				const resolved = await resolveAutoMapping(
+					{
+						anilistApi: this.anilistApi,
+						lookupClients: this.lookupClients,
+						log: this.log,
+						getConfiguredCredentials: (p) => this.getConfiguredCredentials(p),
+						isCandidateSuppressed: (p, aId, pId, r) =>
+							shouldApplyCandidateSuppression("auto", r) &&
+							this.isCandidateSuppressed(p, aId, pId),
+					},
+					provider,
+					anilistId,
+					options,
+				);
 
+				if (!isValid()) return null;
+
+				if (resolved) {
+					return await this.acceptResolved(
+						provider,
+						anilistId,
+						resolved,
+						"auto",
+					);
+				}
+
+				await this.recordAutoMapping(
+					provider,
+					anilistId,
+					{ state: "unresolved" },
+					UNRESOLVED_AUTO_MAPPING_TTL,
+				);
+				return null;
+			} catch (error) {
+				const normalized = normalizeError(error);
+				if (normalized.code === ErrorCode.VALIDATION_ERROR && isValid()) {
+					await this.recordAutoMapping(
+						provider,
+						anilistId,
+						{ state: "unresolved" },
+						UNRESOLVED_AUTO_MAPPING_TTL,
+					);
+					return null;
+				}
+				throw normalized;
+			}
+		})();
+
+		this.inflight.set(provider, anilistId, options, promise);
 		return promise;
 	}
 
@@ -256,31 +313,23 @@ export class MappingService {
 	private async resolveAuthoritativeMapping(
 		provider: Provider,
 		anilistId: AniListId,
-		canPersistAutoMappingResult: () => boolean,
+		isValid: () => boolean,
 	): Promise<
 		| { handled: true; resolved: AcceptedAutoMappingResult | null }
 		| { handled: false }
 	> {
-		const manualProviderId =
-			this.manualMappings?.get(provider, anilistId) ?? null;
-		const upstreamProviderIds = this.getAnibridgeProviderIds(
+		const effectiveMapping = await this.getEffectiveMapping(
 			provider,
 			anilistId,
 		);
-		const effectiveMapping = buildEffectiveMapping({
-			provider,
-			anilistId,
-			manualProviderId,
-			ignored: this.manualMappings?.isIgnored(provider, anilistId) ?? false,
-			upstreamProviderIds,
-			autoMappingRecord: null,
-		});
+
 		const clearAutoMappingIfCurrent = () =>
-			canPersistAutoMappingResult()
+			isValid()
 				? this.clearAutoMapping(provider, anilistId)
 				: Promise.resolve();
+
 		const recordAmbiguousIfCurrent = () =>
-			canPersistAutoMappingResult()
+			isValid()
 				? this.recordAutoMapping(
 						provider,
 						anilistId,
@@ -322,7 +371,7 @@ export class MappingService {
 			effectiveMapping.mappingEntryKind === "upstream" &&
 			effectiveMapping.providerId !== null
 		) {
-			if (manualProviderId !== null) {
+			if (this.manualMappings?.get(provider, anilistId) !== null) {
 				try {
 					await this.manualMappings?.clear(provider, anilistId);
 				} catch (error) {
@@ -332,7 +381,6 @@ export class MappingService {
 					);
 				}
 			}
-
 			return {
 				handled: true,
 				resolved: {
@@ -365,7 +413,13 @@ export class MappingService {
 		> = {
 			state: "mapped",
 			providerId: resolved.providerId,
-			acceptedEvidence: buildAcceptedMappingEvidence(source, resolved),
+			acceptedEvidence: {
+				source,
+				reason: resolved.reason,
+				...(resolved.successfulSynonym
+					? { successfulTitle: resolved.successfulSynonym }
+					: {}),
+			},
 		};
 
 		try {
@@ -379,10 +433,9 @@ export class MappingService {
 				this.notifyMappingsChanged?.();
 			}
 		} catch (error) {
-			const normalized = normalizeError(error);
 			this.log.error?.(
 				`mapping:persist-resolved-failed provider=${provider} anilistId=${anilistId}`,
-				normalized,
+				normalizeError(error),
 			);
 			return null;
 		}
@@ -403,7 +456,7 @@ export class MappingService {
 		anilistId: AniListId,
 		provider: Provider = "sonarr",
 	): Promise<void> {
-		this.autoMappingPersistence.invalidateEntry(provider, anilistId);
+		this.invalidateEntry(provider, anilistId);
 		this.inflight.delete(provider, anilistId);
 		await this.autoMappingStore.delete(provider, anilistId);
 		this.evictAniListMedia(anilistId);
@@ -451,30 +504,6 @@ export class MappingService {
 		);
 	}
 
-	private isResolvedCandidateSuppressed(
-		provider: Provider,
-		anilistId: AniListId,
-		resolved: AcceptedAutoMappingResult,
-		source: AcceptedMappingSource,
-	): boolean {
-		return (
-			shouldApplyCandidateSuppression(source, resolved.reason) &&
-			this.isCandidateSuppressed(provider, anilistId, resolved.providerId)
-		);
-	}
-
-	private getAnibridgeProviderIds(
-		provider: "sonarr",
-		anilistId: AniListId,
-	): TvdbId[];
-	private getAnibridgeProviderIds(
-		provider: "radarr",
-		anilistId: AniListId,
-	): TmdbId[];
-	private getAnibridgeProviderIds(
-		provider: Provider,
-		anilistId: AniListId,
-	): ProviderExternalId[];
 	private getAnibridgeProviderIds(
 		provider: Provider,
 		anilistId: AniListId,
@@ -483,19 +512,6 @@ export class MappingService {
 			? this.anibridgeMappingStore.getSonarrCandidates(anilistId)
 			: this.anibridgeMappingStore.getRadarrCandidates(anilistId);
 	}
-}
-
-function buildAcceptedMappingEvidence(
-	source: AutoMappingSource,
-	resolved: AcceptedAutoMappingResult,
-): AutoMappingEvidence {
-	return {
-		source,
-		reason: resolved.reason,
-		...(resolved.successfulSynonym
-			? { successfulTitle: resolved.successfulSynonym }
-			: {}),
-	};
 }
 
 export { type AnibridgeMappingPayload } from "./upstream-mapping";

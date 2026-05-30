@@ -1,7 +1,7 @@
 /** Sonarr setup form for media modal add and edit flows. */
 // src/features/media-modal/sonarr/sonarr-setup-form.tsx
 
-import { useState, type FormEvent } from "react";
+import { useState, type SubmitEvent } from "react";
 import type { ProviderFormResources } from "@/providers";
 import {
 	normalizeSonarrFormState,
@@ -275,7 +275,7 @@ export function useSonarrSetupForm(
 		});
 	};
 	const handleSubmit = async (
-		event: FormEvent<HTMLFormElement>,
+		event: SubmitEvent<HTMLFormElement>,
 	): Promise<void> => {
 		event.preventDefault();
 

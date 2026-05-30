@@ -25,7 +25,7 @@ import { scoreTitleMatches } from "../title/title-matching";
 const MIN_WINNER_SCORE_MARGIN = 0.02;
 
 type CandidateSearchContext = {
-	lookupClient: ProviderTitleLookup<ProviderTitleResult>;
+	lookupClient: ProviderTitleLookup;
 	credentials: ProviderCredentials;
 	priority?: RequestPriority;
 	forceLookupNetwork?: boolean;
@@ -71,7 +71,7 @@ type EarlyStopLimits = {
 
 function bestByProviderId(
 	candidates: ScoredSearchCandidate[],
-	lookupClient: ProviderTitleLookup<ProviderTitleResult>,
+	lookupClient: ProviderTitleLookup,
 ): ScoredSearchCandidate[] {
 	const best = new Map<ProviderExternalId, ScoredSearchCandidate>();
 
@@ -91,7 +91,7 @@ function bestByProviderId(
 
 function pickEarlySearchResult(
 	batch: ScoredSearchCandidate[],
-	lookupClient: ProviderTitleLookup<ProviderTitleResult>,
+	lookupClient: ProviderTitleLookup,
 	limits: EarlyStopLimits,
 ): { stop: boolean; pick?: ScoredSearchCandidate } {
 	const providerWinners = bestByProviderId(batch, lookupClient);
@@ -117,7 +117,7 @@ function pickEarlySearchResult(
 
 function pickBestSearchResult(
 	overall: ScoredSearchCandidate[],
-	lookupClient: ProviderTitleLookup<ProviderTitleResult>,
+	lookupClient: ProviderTitleLookup,
 	scoreThreshold: number,
 ): ScoredSearchCandidate | undefined {
 	const providerWinners = bestByProviderId(overall, lookupClient);
@@ -283,11 +283,7 @@ export async function searchAutoMappingCandidates(
 
 	const mediaYear = media.startDate?.year ?? undefined;
 	const provider = ctx.lookupClient.provider;
-	const terms = buildSearchTerms(
-		media,
-		provider,
-		primaryTitleHint,
-	);
+	const terms = buildSearchTerms(media, provider, primaryTitleHint);
 
 	const overall: ScoredSearchCandidate[] = [];
 	const start = Date.now();
@@ -308,14 +304,10 @@ export async function searchAutoMappingCandidates(
 		const acceptedScored = filterSuppressedCandidates(scored, ctx);
 		overall.push(...acceptedScored);
 
-		const early = pickEarlySearchResult(
-			acceptedScored,
-			ctx.lookupClient,
-			{
-				earlyStopThreshold: ctx.limits.earlyStopThreshold,
-				scoreThreshold: ctx.limits.scoreThreshold,
-			},
-		);
+		const early = pickEarlySearchResult(acceptedScored, ctx.lookupClient, {
+			earlyStopThreshold: ctx.limits.earlyStopThreshold,
+			scoreThreshold: ctx.limits.scoreThreshold,
+		});
 		if (early.stop && early.pick) {
 			const out = resolvedOutcome(early.pick, ctx);
 			if (!out) {

@@ -1,18 +1,13 @@
+/** Builds effective mapping identity summaries for requested AniList media. */
+// src/mapping/queries/mapping-identities.ts
+
 import type { AniListId } from "@/anilist";
-import {
-	PROVIDERS,
-	type Provider,
-	type TmdbId,
-	type TvdbId,
-} from "@/providers";
+import type { AutoMappingRecord } from "@/mapping/auto-mapping/types";
+import type { MappingService } from "@/mapping/mapping.service";
+import type { EffectiveMapping } from "@/mapping/effective-mapping";
 import type { ProviderExternalId } from "@/mapping/types";
 import type { AnibridgeMappingPair } from "@/mapping/upstream-mapping";
-import type { AutoMappingRecord } from "@/mapping/auto-mapping/types";
-import {
-	buildEffectiveMapping,
-	type EffectiveMapping,
-} from "../effective-mapping";
-import { getMappingSource } from "./mapping-sources";
+import { PROVIDERS, type Provider } from "@/providers";
 
 export type EffectiveMappingPresence = Pick<
 	EffectiveMapping,
@@ -26,18 +21,8 @@ export type EffectiveMappingPresence = Pick<
 >;
 
 export interface GetMappingIdentitiesDeps {
+	mappingService: Pick<MappingService, "getEffectiveMapping">;
 	manualMappingService: {
-		get<P extends Provider>(
-			provider: P,
-			anilistId: AniListId,
-		): ProviderExternalId | null;
-		isIgnored(provider: Provider, anilistId: AniListId): boolean;
-		listRejectedCandidates(provider?: Provider): Array<{
-			anilistId: AniListId;
-			provider: Provider;
-			providerId: ProviderExternalId;
-			updatedAt: number;
-		}>;
 		listIgnores(): Array<{ anilistId: AniListId; provider: Provider }>;
 		list(): Array<{
 			anilistId: AniListId;
@@ -46,15 +31,9 @@ export interface GetMappingIdentitiesDeps {
 		}>;
 	};
 	anibridgeMappingStore: {
-		getSonarrCandidates(anilistId: AniListId): TvdbId[];
-		getRadarrCandidates(anilistId: AniListId): TmdbId[];
 		listAllProviderPairs(): AnibridgeMappingPair[];
 	};
 	autoMappingStore: {
-		get(
-			provider: Provider,
-			anilistId: AniListId,
-		): Promise<AutoMappingRecord | null>;
 		list(
 			provider?: Provider,
 		): Promise<
@@ -90,50 +69,39 @@ export async function getMappingIdentities(
 	const keys = new Set<string>();
 
 	for (const ignore of deps.manualMappingService.listIgnores()) {
-		if (!requestedIds.has(ignore.anilistId)) continue;
-		const key = createKey(ignore.provider, ignore.anilistId);
-		keys.add(key);
-	}
-
-	for (const manual of deps.manualMappingService.list()) {
-		if (!requestedIds.has(manual.anilistId)) continue;
-		const key = createKey(manual.provider, manual.anilistId);
-		keys.add(key);
-	}
-
-	for (const pair of deps.anibridgeMappingStore.listAllProviderPairs()) {
-		if (!requestedIds.has(pair.anilistId)) continue;
-		keys.add(createKey(pair.provider, pair.anilistId));
-	}
-
-	for (const autoMappingRecord of await deps.autoMappingStore.list()) {
-		if (!requestedIds.has(autoMappingRecord.anilistId)) continue;
-		const key = createKey(
-			autoMappingRecord.provider,
-			autoMappingRecord.anilistId,
-		);
-		keys.add(key);
-	}
-
-	const identities: EffectiveMappingPresence[] = [];
-	for (const anilistId of requestedIds) {
-		for (const provider of PROVIDERS) {
-			const key = createKey(provider, anilistId);
-			if (!keys.has(key)) continue;
-			const mappingSource = await getMappingSource(provider, anilistId, deps);
-
-			const identity = buildEffectiveMapping({
-				provider,
-				anilistId,
-				manualProviderId: mappingSource.manualMappedProviderId,
-				ignored: mappingSource.ignored,
-				upstreamProviderIds: mappingSource.upstreamProviderIds,
-				rejectedCandidateProviderId: mappingSource.rejectedCandidateProviderId,
-				autoMappingRecord: mappingSource.autoMappingRecord,
-			});
-			identities.push(toEffectiveMappingPresence(identity));
+		if (requestedIds.has(ignore.anilistId)) {
+			keys.add(createKey(ignore.provider, ignore.anilistId));
 		}
 	}
 
-	return identities;
+	for (const manual of deps.manualMappingService.list()) {
+		if (requestedIds.has(manual.anilistId)) {
+			keys.add(createKey(manual.provider, manual.anilistId));
+		}
+	}
+
+	for (const pair of deps.anibridgeMappingStore.listAllProviderPairs()) {
+		if (requestedIds.has(pair.anilistId)) {
+			keys.add(createKey(pair.provider, pair.anilistId));
+		}
+	}
+
+	const autoMappings = await deps.autoMappingStore.list();
+	for (const mapping of autoMappings) {
+		if (requestedIds.has(mapping.anilistId)) {
+			keys.add(createKey(mapping.provider, mapping.anilistId));
+		}
+	}
+
+	const mappings = await Promise.all(
+		[...requestedIds].flatMap((anilistId) =>
+			PROVIDERS.flatMap((provider) =>
+				keys.has(createKey(provider, anilistId))
+					? [deps.mappingService.getEffectiveMapping(provider, anilistId)]
+					: [],
+			),
+		),
+	);
+
+	return mappings.map((mapping) => toEffectiveMappingPresence(mapping));
 }

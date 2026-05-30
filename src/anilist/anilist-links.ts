@@ -1,7 +1,7 @@
 /** Builds AniList site URLs used across extension UI surfaces. */
 // src/anilist/anilist-links.ts
 
-import type { AniListId } from './types';
+import type { AniListId } from './anilist-id';
 
 const ANILIST_ANIME_ROOT_URL = 'https://anilist.co/anime';
 

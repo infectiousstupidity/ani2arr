@@ -1,10 +1,10 @@
 /** React Query hooks for AniList media and metadata RPC reads. */
-// src/shared/queries/metadata.ts
+// src/queries/anilist.ts
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type QueryClient } from "@tanstack/react-query";
 import type { AniListId } from "@/anilist";
 import { getAni2arrApi } from "@/rpc";
-import { normalizeError, type ExtensionError } from "@/shared/errors";
+import type { ExtensionError } from "@/shared/errors";
 import type { AniListMedia } from "@/anilist/schemas/media.schema";
 import type { GetAniListMetadataOutput } from "@/rpc/types";
 import { queryKeys, normalizeMetadataIds } from "./query-keys";
@@ -21,18 +21,9 @@ export const useAniListMedia = (
 			: ["a2a", "aniListMedia", 0],
 		queryFn: async () => {
 			if (!anilistId) return null;
-			try {
-				const api = getAni2arrApi();
-				const media = await api.fetchAniListMedia(anilistId);
-				return media ?? null;
-			} catch (error) {
-				const normalized = normalizeError(error);
-				console.error(
-					"[useAniListMedia] Failed to fetch AniList media:",
-					normalized,
-				);
-				throw normalized;
-			}
+			const api = getAni2arrApi();
+			const media = await api.fetchAniListMedia(anilistId);
+			return media ?? null;
 		},
 		enabled: (opts?.enabled ?? true) && Boolean(anilistId),
 		staleTime: forceRefresh ? 0 : 14 * 24 * 60 * 60 * 1000, // 14 days
@@ -43,6 +34,38 @@ export const useAniListMedia = (
 		meta: { persist: false },
 	});
 };
+
+export async function prefetchAniListMediaQueries(
+	queryClient: QueryClient,
+	ids: readonly AniListId[],
+): Promise<number> {
+	const idsToFetch: AniListId[] = [];
+	for (const id of normalizeMetadataIds(ids)) {
+		if (queryClient.getQueryData(queryKeys.aniListMedia(id)) !== undefined) {
+			continue;
+		}
+		if (
+			queryClient.isFetching({
+				queryKey: queryKeys.aniListMedia(id),
+				exact: true,
+			}) > 0
+		) {
+			continue;
+		}
+
+		idsToFetch.push(id);
+		if (idsToFetch.length >= 50) break;
+	}
+
+	if (idsToFetch.length === 0) return 0;
+
+	const entries = await getAni2arrApi().prefetchAniListMedia(idsToFetch);
+	for (const [id, media] of entries) {
+		queryClient.setQueryData(queryKeys.aniListMedia(id), media);
+	}
+
+	return entries.length;
+}
 
 export const useAniListMetadataBatch = (
 	ids: readonly AniListId[],

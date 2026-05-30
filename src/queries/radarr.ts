@@ -13,7 +13,7 @@ import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type { CheckMovieStatusResponse, RadarrLookupOutput } from "@/rpc/types";
 import type { RadarrMovieLibraryStatus } from "@/providers/radarr/library";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
-import { normalizeError, type ExtensionError } from "@/shared/errors";
+import type { ExtensionError } from "@/shared/errors";
 import { queryKeys } from "@/queries/query-keys";
 import type { ProviderCredentials, RadarrMovie, TmdbId } from "@/providers";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
@@ -60,13 +60,9 @@ export const useRadarrFormResources = (options?: {
 		queryKey: queryKeys.radarrFormResources(
 			getProviderConnectionScope(options?.credentials),
 		),
-		queryFn: async () => {
-			try {
-				const api = getAni2arrApi();
-				return await api.getRadarrFormResources(request);
-			} catch (error) {
-				throw normalizeError(error);
-			}
+		queryFn: () => {
+			const api = getAni2arrApi();
+			return api.getRadarrFormResources(request);
 		},
 		enabled: options?.enabled ?? true,
 		staleTime: 60 * 60 * 1000,
@@ -185,13 +181,7 @@ function invalidateRadarrMediaMutationQueries(
 export const useAddMovie = () => {
 	const queryClient = useQueryClient();
 	return useMutation<RadarrMovie, ExtensionError, AddRadarrInput>({
-		mutationFn: async (input: AddRadarrInput) => {
-			try {
-				return await getAni2arrApi().addToRadarr(input);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
+		mutationFn: (input: AddRadarrInput) => getAni2arrApi().addToRadarr(input),
 		onSuccess: (_createdMovie, variables) => {
 			invalidateRadarrMediaMutationQueries(queryClient, variables);
 		},
@@ -201,13 +191,8 @@ export const useAddMovie = () => {
 export const useUpdateMovie = () => {
 	const queryClient = useQueryClient();
 	return useMutation<RadarrMovie, ExtensionError, UpdateRadarrInput>({
-		mutationFn: async (input: UpdateRadarrInput) => {
-			try {
-				return await getAni2arrApi().updateRadarrMovie(input);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
+		mutationFn: (input: UpdateRadarrInput) =>
+			getAni2arrApi().updateRadarrMovie(input),
 		onSuccess: (_updatedMovie, variables) => {
 			invalidateRadarrMediaMutationQueries(queryClient, variables);
 		},

@@ -1,4 +1,4 @@
-/** Focused tests for AniList batch media transport parsing and mapping. */
+/** Focused tests for AniList batch media transport parsing and normalization. */
 // src/anilist/transport/media.test.ts
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -17,7 +17,6 @@ import { fetchAniListMediaBatch } from './media';
 
 const META: AniListResponseMeta = {
   status: 200,
-  headers: {},
   rateLimit: {
     limit: null,
     remaining: null,
@@ -34,7 +33,7 @@ afterEach(() => {
 });
 
 describe('AniList batch media transport', () => {
-  it('maps raw nullable title leaves and null title objects into canonical titles', async () => {
+  it('normalizes raw nullable title leaves and null title objects into canonical titles', async () => {
     postAniListMock.mockResolvedValue({
       payload: {
         data: {
@@ -171,7 +170,7 @@ describe('AniList batch media transport', () => {
     });
   });
 
-  it('preserves direct relation node titles for mapping fallbacks', async () => {
+  it('preserves direct relation node titles for downstream fallbacks', async () => {
     postAniListMock.mockResolvedValue({
       payload: {
         data: {
@@ -228,31 +227,7 @@ describe('AniList batch media transport', () => {
     });
   });
 
-  it('drops nextAiringEpisode with null leaves instead of failing the item', async () => {
-    postAniListMock.mockResolvedValue({
-      payload: {
-        data: {
-          Page: {
-            media: [
-              {
-                id: 601,
-                format: 'TV',
-                title: { romaji: 'Airing' },
-                nextAiringEpisode: { episode: 5, airingAt: null },
-              },
-            ],
-          },
-        },
-      },
-      meta: META,
-    });
-
-    const result = await fetchAniListMediaBatch(ids([601]));
-    expect(result.data).toHaveLength(1);
-    expect(result.data[0]!.nextAiringEpisode).toBeNull();
-  });
-
-  it('coerces unknown enum values to null instead of dropping the item', async () => {
+  it('coerces unknown media formats to null instead of dropping the item', async () => {
     postAniListMock.mockResolvedValue({
       payload: {
         data: {
@@ -261,8 +236,6 @@ describe('AniList batch media transport', () => {
               {
                 id: 701,
                 format: 'BRAND_NEW_FORMAT',
-                status: 'UNKNOWN_STATUS',
-                season: 'MONSOON',
                 title: { romaji: 'Future Show' },
               },
             ],
@@ -275,11 +248,9 @@ describe('AniList batch media transport', () => {
     const result = await fetchAniListMediaBatch(ids([701]));
     expect(result.data).toHaveLength(1);
     expect(result.data[0]!.format).toBeNull();
-    expect(result.data[0]!.status).toBeNull();
-    expect(result.data[0]!.season).toBeNull();
   });
 
-  it('drops invalid synonyms and genres entries instead of dropping the item', async () => {
+  it('drops invalid synonym entries instead of dropping the item', async () => {
     postAniListMock.mockResolvedValue({
       payload: {
         data: {
@@ -290,7 +261,6 @@ describe('AniList batch media transport', () => {
                 format: 'TV',
                 title: { romaji: 'Filtered Arrays' },
                 synonyms: ['Alpha', null, 123, 'Beta'],
-                genres: ['Action', false, 'Drama'],
               },
             ],
           },
@@ -302,7 +272,6 @@ describe('AniList batch media transport', () => {
     const result = await fetchAniListMediaBatch(ids([801]));
     expect(result.data).toHaveLength(1);
     expect(result.data[0]!.synonyms).toEqual(['Alpha', 'Beta']);
-    expect(result.data[0]!.genres).toEqual(['Action', 'Drama']);
   });
 
   it('drops an item with a null id', async () => {

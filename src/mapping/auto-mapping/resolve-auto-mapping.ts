@@ -1,4 +1,4 @@
-/** Auto-mapping workflow for lookup, scoring, persistence, and cached auto outcomes. */
+/** Auto-mapping workflow for lookup, scoring, and candidate resolution. */
 // src/mapping/auto-mapping/resolve-auto-mapping.ts
 
 import type { AniListId, AniListMediaService } from "@/anilist";
@@ -6,7 +6,7 @@ import type { AniListMedia } from "@/anilist/schemas/media.schema";
 import type { Provider, ProviderCredentials } from "@/providers";
 import { getProviderLabel } from "@/providers/provider-labels";
 import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
-import { createError, ErrorCode, normalizeError } from "@/shared/errors";
+import { createError, ErrorCode } from "@/shared/errors";
 import type { RequestPriority } from "@/shared/utils/request-priority";
 import type { ScopedLogger } from "@/shared/utils/logger";
 import {
@@ -15,44 +15,22 @@ import {
 	SCORE_THRESHOLD,
 } from "./constants";
 import { buildMediaFromMetadata } from "./metadata-hints";
-import type {
-	ProviderTitleLookup,
-	ProviderTitleResult,
-} from "./lookup/provider-title-lookup";
+import type { ProviderTitleLookup } from "./lookup/provider-title-lookup";
 import { searchAutoMappingCandidates } from "./candidate-search/candidate-search";
-import {
-	UNRESOLVED_AUTO_MAPPING_TTL,
-	type AutoMappingStore,
-} from "./auto-mapping.store";
-import type {
-	AcceptedMappingReason,
-	AcceptedMappingSource,
-} from "../types";
-import type {
-	AutoMappingSource,
-	AutoMappingOptions,
-	AcceptedAutoMappingResult,
-	AutoMappingRecord,
-} from "./types";
+import type { AcceptedMappingReason, ProviderExternalId } from "../types";
+import type { AutoMappingOptions, AcceptedAutoMappingResult } from "./types";
 
-type ProviderTitleLookupRegistry = Record<
-	Provider,
-	ProviderTitleLookup<ProviderTitleResult>
->;
+type ProviderTitleLookupRegistry = Record<Provider, ProviderTitleLookup>;
 
 type ResolutionAttempt = {
 	resolved: AcceptedAutoMappingResult | null;
 	confidence?: number;
 };
 
-type AutoMappingRequest = {
+type NetworkResolutionContext = {
 	provider: Provider;
 	anilistId: AniListId;
 	options: AutoMappingOptions;
-	bypassCachedResolutionState: boolean;
-};
-
-type NetworkResolutionContext = AutoMappingRequest & {
 	credentials: ProviderCredentials;
 	hints: AutoMappingOptions["hints"] | undefined;
 	priority: RequestPriority | undefined;
@@ -63,34 +41,18 @@ type MediaResolutionContext = NetworkResolutionContext & {
 	media: AniListMedia;
 };
 
-type ResolutionAttemptLabel = "metadata" | "api" | "relation" | "prequel-chain";
-
-type ResolveAutoMappingDeps = {
+export type ResolveAutoMappingDeps = {
 	anilistApi: AniListMediaService;
 	lookupClients: ProviderTitleLookupRegistry;
-	autoMappingStore: Pick<AutoMappingStore, "get">;
 	log: ScopedLogger;
-	acceptResolved: (
-		provider: Provider,
-		anilistId: AniListId,
-		resolved: AcceptedAutoMappingResult,
-		source: AutoMappingSource,
-	) => Promise<AcceptedAutoMappingResult | null>;
-	recordAutoMapping: (
-		provider: Provider,
-		anilistId: AniListId,
-		state: Omit<AutoMappingRecord, "updatedAt">,
-		ttl: { hardMs: number },
-	) => Promise<void>;
-	clearAutoMapping: (provider: Provider, anilistId: AniListId) => Promise<void>;
 	getConfiguredCredentials: (
 		provider: Provider,
 	) => Promise<ProviderCredentials>;
-	isResolvedCandidateSuppressed: (
+	isCandidateSuppressed: (
 		provider: Provider,
 		anilistId: AniListId,
-		resolved: AcceptedAutoMappingResult,
-		source: AcceptedMappingSource,
+		providerId: ProviderExternalId,
+		reason: AcceptedMappingReason,
 	) => boolean;
 };
 
@@ -100,27 +62,6 @@ export async function resolveAutoMapping(
 	anilistId: AniListId,
 	options: AutoMappingOptions,
 ): Promise<AcceptedAutoMappingResult | null> {
-	const request: AutoMappingRequest = {
-		provider,
-		anilistId,
-		options,
-		bypassCachedResolutionState: options.forceLookupNetwork === true,
-	};
-
-	const cachedAutoMapping = await readUsableCachedAutoMapping(deps, request);
-	if (cachedAutoMapping.handled) {
-		return cachedAutoMapping.resolved;
-	}
-
-	const cachedTerminalState = await readCachedTerminalState(
-		deps,
-		request,
-		cachedAutoMapping.autoMappingRecord,
-	);
-	if (cachedTerminalState.handled) {
-		return cachedTerminalState.resolved;
-	}
-
 	if (options.network === "never") {
 		throw createError(
 			ErrorCode.VALIDATION_ERROR,
@@ -130,118 +71,20 @@ export async function resolveAutoMapping(
 		);
 	}
 
-	return attemptNetworkResolution(deps, request);
-}
-
-async function readUsableCachedAutoMapping(
-	deps: ResolveAutoMappingDeps,
-	request: AutoMappingRequest,
-): Promise<
-	| { handled: true; resolved: AcceptedAutoMappingResult }
-	| { handled: false; autoMappingRecord: AutoMappingRecord | null }
-> {
-	const { provider, anilistId } = request;
-	const autoMappingRecord = await deps.autoMappingStore.get(
+	const credentials = await deps.getConfiguredCredentials(provider);
+	const context: NetworkResolutionContext = {
 		provider,
 		anilistId,
-	);
-	if (autoMappingRecord?.state !== "mapped") {
-		return { handled: false, autoMappingRecord };
-	}
-
-	const resolved = {
-		providerId: autoMappingRecord.providerId,
-		reason: autoMappingRecord.acceptedEvidence.reason,
-		...(autoMappingRecord.acceptedEvidence.successfulTitle
-			? {
-					successfulSynonym: autoMappingRecord.acceptedEvidence.successfulTitle,
-				}
-			: {}),
+		options,
+		credentials,
+		hints: options.hints,
+		priority: options.priority,
+		forceLookupNetwork: options.forceLookupNetwork === true,
 	};
 
-	if (
-		deps.isResolvedCandidateSuppressed(
-			provider,
-			anilistId,
-			resolved,
-			autoMappingRecord.acceptedEvidence.source,
-		)
-	) {
-		await deps.clearAutoMapping(provider, anilistId);
-		return { handled: false, autoMappingRecord: null };
-	}
-
-	if (request.options.forceLookupNetwork === true) {
-		return { handled: false, autoMappingRecord: null };
-	}
-
-	if (import.meta.env.DEV) {
-		deps.log.debug?.(
-			`mapping:auto-mapping-hit provider=${provider} anilistId=${anilistId} providerId=${autoMappingRecord.providerId} source=${autoMappingRecord.acceptedEvidence.source} reason=${autoMappingRecord.acceptedEvidence.reason}`,
-		);
-	}
-	return { handled: true, resolved };
-}
-
-async function readCachedTerminalState(
-	deps: ResolveAutoMappingDeps,
-	request: AutoMappingRequest,
-	autoMappingRecord: AutoMappingRecord | null,
-): Promise<{ handled: true; resolved: null } | { handled: false }> {
-	const { provider, anilistId, bypassCachedResolutionState } = request;
-	if (bypassCachedResolutionState) {
-		return { handled: false };
-	}
-
-	if (autoMappingRecord) {
-		if (import.meta.env.DEV) {
-			deps.log.debug?.(
-				`mapping:auto-mapping-terminal provider=${provider} anilistId=${anilistId} state=${autoMappingRecord.state}`,
-			);
-		}
-		return { handled: true, resolved: null };
-	}
-
-	return { handled: false };
-}
-
-async function attemptNetworkResolution(
-	deps: ResolveAutoMappingDeps,
-	request: AutoMappingRequest,
-): Promise<AcceptedAutoMappingResult | null> {
-	const { provider, anilistId } = request;
-	let attempt: ResolutionAttempt;
-	try {
-		attempt = await resolveViaNetwork(deps, request);
-	} catch (error) {
-		const normalized = normalizeError(error);
-		if (normalized.code === ErrorCode.VALIDATION_ERROR) {
-			await deps.recordAutoMapping(
-				provider,
-				anilistId,
-				{
-					state: "unresolved",
-				},
-				UNRESOLVED_AUTO_MAPPING_TTL,
-			);
-			deps.log.debug?.(
-				`mapping:auto-resolution-outcome provider=${provider} anilistId=${anilistId} state=unresolved reason=validation-error`,
-			);
-			return null;
-		}
-
-		throw normalized;
-	}
+	const attempt = await resolveViaNetwork(deps, context);
 
 	if (attempt.resolved === null) {
-		await deps.recordAutoMapping(
-			provider,
-			anilistId,
-			{
-				state: "unresolved",
-			},
-			UNRESOLVED_AUTO_MAPPING_TTL,
-		);
 		deps.log.debug?.(
 			`mapping:auto-resolution-outcome provider=${provider} anilistId=${anilistId} state=unresolved reason=no-match`,
 		);
@@ -251,49 +94,34 @@ async function attemptNetworkResolution(
 	deps.log.debug?.(
 		`mapping:auto-resolution-outcome provider=${provider} anilistId=${anilistId} state=mapped providerId=${attempt.resolved.providerId} reason=${attempt.resolved.reason}${attempt.confidence === undefined ? "" : ` confidence=${attempt.confidence.toFixed(3)}`}`,
 	);
-	return deps.acceptResolved(
-		provider,
-		anilistId,
-		{
-			...attempt.resolved,
-		},
-		"auto",
-	);
+
+	return attempt.resolved;
 }
 
 async function resolveViaNetwork(
 	deps: ResolveAutoMappingDeps,
-	request: AutoMappingRequest,
+	context: NetworkResolutionContext,
 ): Promise<ResolutionAttempt> {
-	const { provider, anilistId, options } = request;
-	const credentials = await deps.getConfiguredCredentials(provider);
-	const context: NetworkResolutionContext = {
-		...request,
-		credentials,
-		hints: options.hints,
-		priority: options.priority,
-		forceLookupNetwork: options.forceLookupNetwork === true,
-	};
+	const { provider, anilistId } = context;
 
 	const applyAttempt = (
-		label: ResolutionAttemptLabel,
+		label: string,
 		attempt: ResolutionAttempt,
 	): ResolutionAttempt | null => {
 		const resolved = attempt.resolved;
-
 		if (resolved === null) {
 			return null;
 		}
 
 		if (
-			!deps.isResolvedCandidateSuppressed(provider, anilistId, resolved, "auto")
+			!deps.isCandidateSuppressed(
+				provider,
+				anilistId,
+				resolved.providerId,
+				resolved.reason,
+			)
 		) {
-			return {
-				resolved,
-				...(attempt.confidence === undefined
-					? {}
-					: { confidence: attempt.confidence }),
-			};
+			return attempt;
 		}
 
 		if (import.meta.env.DEV) {
@@ -326,6 +154,7 @@ async function resolveViaNetwork(
 				? { source: "mapping-resolve" }
 				: { priority: context.priority, source: "mapping-resolve" },
 		);
+
 	const apiAttempt = await tryResolveWithMedia(deps, {
 		...context,
 		media: anilistMediaWithRelations,
@@ -339,16 +168,12 @@ async function resolveViaNetwork(
 		anilistMediaWithRelations,
 		provider,
 	);
-	const directPrequelIds = new Set(
-		directPrequelMedia.map((media) => media.id),
-	);
+	const directPrequelIds = new Set(directPrequelMedia.map((media) => media.id));
+
 	for (const relationMedia of directPrequelMedia) {
 		const relationAttempt = await tryResolveWithMedia(
 			deps,
-			{
-				...context,
-				media: relationMedia,
-			},
+			{ ...context, media: relationMedia },
 			{ usePrimaryTitleHint: false },
 		);
 		const resolvedFromRelation = applyAttempt("relation", relationAttempt);
@@ -366,10 +191,7 @@ async function resolveViaNetwork(
 		}
 		const prequelAttempt = await tryResolveWithMedia(
 			deps,
-			{
-				...context,
-				media: prequelMedia,
-			},
+			{ ...context, media: prequelMedia },
 			{ usePrimaryTitleHint: false },
 		);
 		const resolvedFromPrequel = applyAttempt("prequel-chain", prequelAttempt);
@@ -403,15 +225,12 @@ async function tryResolveWithMedia(
 			credentials: context.credentials,
 			...(context.priority === undefined ? {} : { priority: context.priority }),
 			...(context.forceLookupNetwork ? { forceLookupNetwork: true } : {}),
-			isCandidateSuppressed: (providerId, reason: AcceptedMappingReason) =>
-				deps.isResolvedCandidateSuppressed(
+			isCandidateSuppressed: (providerId, reason) =>
+				deps.isCandidateSuppressed(
 					provider,
 					context.anilistId,
-					{
-						providerId,
-						reason,
-					},
-					"auto",
+					providerId,
+					reason,
 				),
 			limits: {
 				maxTerms: MAX_SEARCH_TERMS,

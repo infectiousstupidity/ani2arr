@@ -188,6 +188,7 @@ export class AnibridgeMappingStore {
 	private initPromise: Promise<void> | null = null;
 	private refreshPromise: Promise<void> | null = null;
 	private hasQueuedInitRefresh = false;
+	private revision = 0;
 
 	constructor(
 		private readonly cache: TtlCache<AnibridgeMappingPayload> = anibridgeMappingCache,
@@ -259,6 +260,10 @@ export class AnibridgeMappingStore {
 		return entries;
 	}
 
+	public getRevision(): number {
+		return this.revision;
+	}
+
 	public refresh(): Promise<void> {
 		this.refreshPromise ??= this.refreshInternal().finally(() => {
 			this.refreshPromise = null;
@@ -326,6 +331,7 @@ export class AnibridgeMappingStore {
 		this.sonarrReverse.clear();
 		this.radarrReverse.clear();
 		this.hasQueuedInitRefresh = false;
+		this.revision += 1;
 		await this.cache.remove(CACHE_KEY);
 	}
 
@@ -360,6 +366,7 @@ export class AnibridgeMappingStore {
 		this.log.debug(
 			`hydrate: populated sonarr=${this.sonarrPairs.size} radarr=${this.radarrPairs.size} entries`,
 		);
+		this.revision += 1;
 	}
 
 	private hydrateProviderMap<TProviderId extends TvdbId | TmdbId>(

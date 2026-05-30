@@ -4,7 +4,7 @@
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import { LayoutGroup, LazyMotion, domMax, m } from "framer-motion";
 import { Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type SubmitEvent } from "react";
 import Button from "@/shared/ui/primitives/button";
 
 type MappingSearchShellProps = {
@@ -148,7 +148,7 @@ export function MappingSearchShell(
 		};
 	}, [imageUrlsKey, shouldPreloadImages]);
 
-	const handleSubmit = (event: React.FormEvent<HTMLFormElement>): void => {
+	const handleSubmit = (event: SubmitEvent<HTMLFormElement>): void => {
 		event.preventDefault();
 		if (!canSearch) return;
 

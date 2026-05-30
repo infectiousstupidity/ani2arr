@@ -2,13 +2,32 @@
 // src/rpc/handlers/mapping.handlers.ts
 
 import * as v from "valibot";
-import { AniListIdSchema, type AniListId } from "@/anilist/anilist-id";
-import { getMappingInspection } from "@/mapping/queries/mapping-details";
+import {
+	anibridgeMappingStore,
+	anilistMetadataStore,
+	autoMappingStore,
+	bumpLibraryRevision,
+	bumpMappingsRevision,
+	getMappingListRevision,
+	manualMappingService,
+	manualMappingsReady,
+	mappingService,
+	radarrLibrary,
+	scheduleLibraryRefresh,
+	sonarrLibrary,
+} from "@/background/api-services";
+import { getProviderConfig } from "@/background/provider-config";
+import {
+	getMappingInspection,
+	type GetMappingInspectionDeps,
+} from "@/mapping/queries/mapping-details";
 import { getMappingIdentities } from "@/mapping/queries/mapping-identities";
-import type { Ani2arrApi } from "@/rpc";
-import type { TmdbId, TvdbId } from "@/providers";
 import { createError, ErrorCode } from "@/shared/errors";
-import { listMappings } from "@/mapping/queries/list-mappings";
+import {
+	listMappings,
+	type ListMappingsDeps,
+	type MappingListProjectionCache,
+} from "@/mapping/queries/list-mappings";
 import {
 	ClearMappingIgnoreInputSchema,
 	ClearManualMappingInputSchema,
@@ -16,332 +35,244 @@ import {
 	GetMappingInspectionInputSchema,
 	GetMappingIdentitiesInputSchema,
 	GetMappingsInputSchema,
-	GetStaticMappedInputSchema,
 	SetMappingIgnoreInputSchema,
 	SetManualMappingInputSchema,
 	SetMappingRejectedCandidateInputSchema,
 } from "@/rpc/schemas";
-import type { ApiHandlerDeps } from "./handler-deps";
 
-export function createMappingHandlers(
-	deps: ApiHandlerDeps,
-): Pick<
-	Ani2arrApi,
-	| "getStaticMapped"
-	| "getMappingIdentities"
-	| "initMappings"
-	| "setManualMapping"
-	| "clearManualMapping"
-	| "setMappingIgnore"
-	| "clearMappingIgnore"
-	| "setMappingRejectedCandidate"
-	| "clearMappingRejectedCandidate"
-	| "getMappings"
-	| "getMappingInspection"
-> {
-	const {
-		mappingService,
-		manualMappingService,
-		autoMappingStore,
-		anibridgeMappingStore,
-		sonarrLibrary,
-		radarrLibrary,
-		manualMappingsReady,
-		providerConfig,
-		scheduleLibraryRefresh,
-		bumpLibraryRevision,
-		bumpMappingsRevision,
-	} = deps;
+const getProjectionRevisionKey = (): string => {
+	const revision = getMappingListRevision();
+	return [
+		`mappings:${revision.mappings}`,
+		`anibridge:${revision.anibridge}`,
+		`sonarr:${revision.sonarrLibrary}`,
+		`radarr:${revision.radarrLibrary}`,
+	].join("|");
+};
 
-	const anibridgeMappingStoreWithAniListIds = {
-		getSonarrCandidates: (anilistId: AniListId) =>
-			anibridgeMappingStore.getSonarrCandidates(anilistId),
-		getRadarrCandidates: (anilistId: AniListId) =>
-			anibridgeMappingStore.getRadarrCandidates(anilistId),
-		getAniListIdsForTvdb: (tvdbId: TvdbId): AniListId[] =>
-			anibridgeMappingStore
-				.getAniListIdsForTvdb(tvdbId)
-				.map((anilistId) => v.parse(AniListIdSchema, anilistId)),
-		getAniListIdsForTmdb: (tmdbId: TmdbId): AniListId[] =>
-			anibridgeMappingStore
-				.getAniListIdsForTmdb(tmdbId)
-				.map((anilistId) => v.parse(AniListIdSchema, anilistId)),
-		listAllProviderPairs: () =>
-			anibridgeMappingStore.listAllProviderPairs().map((pair) => ({
-				...pair,
-				anilistId: v.parse(AniListIdSchema, pair.anilistId),
-			})),
-	};
+const mappingListProjectionCache: MappingListProjectionCache = new Map();
+let activeProjectionRevisionKey = "";
 
-	const handlers = {
-		async getMappingIdentities(ids) {
-			const parsedIds = v.parse(GetMappingIdentitiesInputSchema, ids);
-			await manualMappingsReady;
-			await mappingService.initAnibridgeMappings();
-			return getMappingIdentities(parsedIds, {
-				manualMappingService,
-				autoMappingStore,
-				anibridgeMappingStore,
-			});
-		},
+const resetProjectionCacheWhenStale = (): string => {
+	const revisionKey = getProjectionRevisionKey();
+	if (revisionKey !== activeProjectionRevisionKey) {
+		mappingListProjectionCache.clear();
+		activeProjectionRevisionKey = revisionKey;
+	}
+	return revisionKey;
+};
 
-		/** @deprecated Use getMappingIdentities for provider-aware known mapping lookup. */
-		async getStaticMapped(ids) {
-			const parsedIds = v.parse(GetStaticMappedInputSchema, ids);
-			await manualMappingsReady;
-			await mappingService.initAnibridgeMappings();
-			const identities = await getMappingIdentities(parsedIds, {
-				manualMappingService,
-				autoMappingStore,
-				anibridgeMappingStore,
-			});
-			return [
-				...new Set(
-					identities
-						.filter(identity =>
-							identity.providerMappingState === "mapped" &&
-							identity.providerId !== null)
-						.map(identity => identity.anilistId),
-				),
-			];
-		},
+export const mappingHandlers = {
+	async getMappingIdentities(ids: unknown) {
+		const parsedIds = v.parse(GetMappingIdentitiesInputSchema, ids);
+		await manualMappingsReady;
+		await mappingService.initAnibridgeMappings();
+		return getMappingIdentities(parsedIds, {
+			manualMappingService,
+			autoMappingStore,
+			anibridgeMappingStore,
+		});
+	},
 
-		initMappings() {
-			return mappingService.initAnibridgeMappings();
-		},
+	initMappings() {
+		return mappingService.initAnibridgeMappings();
+	},
 
-		async setManualMapping(input) {
-			const parsedInput = v.parse(SetManualMappingInputSchema, input);
-			await manualMappingsReady;
+	async setManualMapping(input: unknown) {
+		const parsedInput = v.parse(SetManualMappingInputSchema, input);
+		await manualMappingsReady;
 
-			const linkedIds =
-				parsedInput.provider === "sonarr"
-					? new Set<number>(
-							manualMappingService.getLinkedAniListIds(
-								parsedInput.provider,
-								parsedInput.providerId,
-							),
-						)
-					: new Set<number>(
-							manualMappingService.getLinkedAniListIds(
-								parsedInput.provider,
-								parsedInput.providerId,
-							),
-						);
-			const anibridgeLinkedIds =
-				parsedInput.provider === "sonarr"
-					? anibridgeMappingStore.getAniListIdsForTvdb(parsedInput.providerId)
-					: anibridgeMappingStore.getAniListIdsForTmdb(parsedInput.providerId);
-			for (const id of anibridgeLinkedIds) {
-				linkedIds.add(id);
-			}
-			const conflictingAniListIds = [...linkedIds].filter(
-				(id) => id !== parsedInput.anilistId,
-			);
-			if (conflictingAniListIds.length > 0 && parsedInput.force !== true) {
-				const providerIdLabel =
-					parsedInput.provider === "sonarr" ? "TVDB" : "TMDB";
-				throw createError(
-					ErrorCode.VALIDATION_ERROR,
-					`${providerIdLabel} ID ${parsedInput.providerId} is already linked to other AniList entries.`,
-					`This ${providerIdLabel} ID is already linked to other AniList entries. Confirm if you want to share it.`,
-					{ conflictingAniListIds },
-				);
-			}
-
-			await manualMappingService.set(
+		const linkedIds = new Set<number>(
+			manualMappingService.getLinkedAniListIds(
 				parsedInput.provider,
-				parsedInput.anilistId,
 				parsedInput.providerId,
-			);
-			await mappingService.evictResolved(
-				parsedInput.anilistId,
-				parsedInput.provider,
-			);
+			),
+		);
 
-			if (parsedInput.provider === "sonarr") {
-				const credentials = await providerConfig.get("sonarr");
-				if (credentials) {
-					scheduleLibraryRefresh("sonarr");
-				}
-			}
+		const anibridgeLinkedIds =
+			parsedInput.provider === "sonarr"
+				? anibridgeMappingStore.getAniListIdsForTvdb(parsedInput.providerId)
+				: anibridgeMappingStore.getAniListIdsForTmdb(parsedInput.providerId);
 
-			await bumpLibraryRevision(parsedInput.provider);
-			await bumpMappingsRevision();
-			return { ok: true as const };
-		},
+		for (const id of anibridgeLinkedIds) linkedIds.add(id);
 
-		async clearManualMapping(input) {
-			const parsedInput = v.parse(ClearManualMappingInputSchema, input);
-			await manualMappingsReady;
-			await manualMappingService.clear(parsedInput.provider, parsedInput.anilistId);
-			await mappingService.evictResolved(
-				parsedInput.anilistId,
-				parsedInput.provider,
-			);
+		const conflictingAniListIds = [...linkedIds].filter(
+			(id) => id !== parsedInput.anilistId,
+		);
 
-			if (parsedInput.provider === "sonarr") {
-				const credentials = await providerConfig.get("sonarr");
-				if (credentials) {
-					scheduleLibraryRefresh("sonarr");
-				}
-			}
+		if (conflictingAniListIds.length > 0 && !parsedInput.force) {
+			const providerIdLabel =
+				parsedInput.provider === "sonarr" ? "TVDB" : "TMDB";
+			throw createError(
+				ErrorCode.VALIDATION_ERROR,
+				`${providerIdLabel} ID ${parsedInput.providerId} is already linked to other AniList entries.`,
+				`This ${providerIdLabel} ID is already linked to other AniList entries. Confirm if you want to share it.`,
+				{ conflictingAniListIds },
+			);
+		}
 
-			await bumpLibraryRevision(parsedInput.provider);
-			await bumpMappingsRevision();
-			return { ok: true as const };
-		},
+		await manualMappingService.set(
+			parsedInput.provider,
+			parsedInput.anilistId,
+			parsedInput.providerId,
+		);
+		await mappingService.evictResolved(
+			parsedInput.anilistId,
+			parsedInput.provider,
+		);
 
-		async setMappingIgnore(input) {
-			const parsedInput = v.parse(SetMappingIgnoreInputSchema, input);
-			await manualMappingsReady;
-			await manualMappingService.setIgnore(
-				parsedInput.provider,
-				parsedInput.anilistId,
-			);
-			await mappingService.evictResolved(
-				parsedInput.anilistId,
-				parsedInput.provider,
-			);
-			await bumpLibraryRevision(parsedInput.provider);
-			await bumpMappingsRevision();
-			return { ok: true as const };
-		},
+		if (
+			parsedInput.provider === "sonarr" &&
+			(await getProviderConfig("sonarr"))
+		) {
+			scheduleLibraryRefresh("sonarr");
+		}
 
-		async clearMappingIgnore(input) {
-			const parsedInput = v.parse(ClearMappingIgnoreInputSchema, input);
-			await manualMappingsReady;
-			await manualMappingService.clearIgnore(
-				parsedInput.provider,
-				parsedInput.anilistId,
-			);
-			await mappingService.evictResolved(
-				parsedInput.anilistId,
-				parsedInput.provider,
-			);
-			await bumpLibraryRevision(parsedInput.provider);
-			await bumpMappingsRevision();
-			return { ok: true as const };
-		},
+		await bumpLibraryRevision(parsedInput.provider);
+		await bumpMappingsRevision();
+		return { ok: true as const };
+	},
 
-		async setMappingRejectedCandidate(input) {
-			const parsedInput = v.parse(
-				SetMappingRejectedCandidateInputSchema,
-				input,
-			);
-			await manualMappingsReady;
-			await manualMappingService.setRejectedCandidate(
-				parsedInput.provider,
-				parsedInput.anilistId,
-				parsedInput.providerId,
-			);
-			await mappingService.evictResolved(
-				parsedInput.anilistId,
-				parsedInput.provider,
-			);
+	async clearManualMapping(input: unknown) {
+		const parsedInput = v.parse(ClearManualMappingInputSchema, input);
+		await manualMappingsReady;
 
-			await bumpLibraryRevision(parsedInput.provider);
-			await bumpMappingsRevision();
-			return { ok: true as const };
-		},
+		await manualMappingService.clear(
+			parsedInput.provider,
+			parsedInput.anilistId,
+		);
+		await mappingService.evictResolved(
+			parsedInput.anilistId,
+			parsedInput.provider,
+		);
 
-		async clearMappingRejectedCandidate(input) {
-			const parsedInput = v.parse(
-				ClearMappingRejectedCandidateInputSchema,
-				input,
-			);
-			await manualMappingsReady;
-			await manualMappingService.clearRejectedCandidate(
-				parsedInput.provider,
-				parsedInput.anilistId,
-				parsedInput.providerId,
-			);
-			await mappingService.evictResolved(
-				parsedInput.anilistId,
-				parsedInput.provider,
-			);
+		if (
+			parsedInput.provider === "sonarr" &&
+			(await getProviderConfig("sonarr"))
+		) {
+			scheduleLibraryRefresh("sonarr");
+		}
 
-			await bumpLibraryRevision(parsedInput.provider);
-			await bumpMappingsRevision();
-			return { ok: true as const };
-		},
+		await bumpLibraryRevision(parsedInput.provider);
+		await bumpMappingsRevision();
+		return { ok: true as const };
+	},
 
-		async getMappings(input) {
-			const parsedInput = v.parse(GetMappingsInputSchema, input);
-			await manualMappingsReady;
-			await mappingService.initAnibridgeMappings();
-			const sonarrCredentials = await providerConfig.get("sonarr");
-			const radarrCredentials = await providerConfig.get("radarr");
-			return listMappings(parsedInput, {
-				manualMappingService,
-				autoMappingStore,
-				anibridgeMappingStore: anibridgeMappingStoreWithAniListIds,
-				sonarrLibrary: {
-					getLeanSeriesList: async () => {
-						if (!sonarrCredentials) {
-							await sonarrLibrary.clearSeriesSnapshotCache();
-							return [];
-						}
-						return sonarrLibrary.getSeriesSnapshots(sonarrCredentials);
-					},
+	async setMappingIgnore(input: unknown) {
+		const parsedInput = v.parse(SetMappingIgnoreInputSchema, input);
+		await manualMappingsReady;
+		await manualMappingService.setIgnore(
+			parsedInput.provider,
+			parsedInput.anilistId,
+		);
+		await mappingService.evictResolved(
+			parsedInput.anilistId,
+			parsedInput.provider,
+		);
+		await bumpLibraryRevision(parsedInput.provider);
+		await bumpMappingsRevision();
+		return { ok: true as const };
+	},
+
+	async clearMappingIgnore(input: unknown) {
+		const parsedInput = v.parse(ClearMappingIgnoreInputSchema, input);
+		await manualMappingsReady;
+		await manualMappingService.clearIgnore(
+			parsedInput.provider,
+			parsedInput.anilistId,
+		);
+		await mappingService.evictResolved(
+			parsedInput.anilistId,
+			parsedInput.provider,
+		);
+		await bumpLibraryRevision(parsedInput.provider);
+		await bumpMappingsRevision();
+		return { ok: true as const };
+	},
+
+	async setMappingRejectedCandidate(input: unknown) {
+		const parsedInput = v.parse(SetMappingRejectedCandidateInputSchema, input);
+		await manualMappingsReady;
+		await manualMappingService.setRejectedCandidate(
+			parsedInput.provider,
+			parsedInput.anilistId,
+			parsedInput.providerId,
+		);
+		await mappingService.evictResolved(
+			parsedInput.anilistId,
+			parsedInput.provider,
+		);
+		await bumpLibraryRevision(parsedInput.provider);
+		await bumpMappingsRevision();
+		return { ok: true as const };
+	},
+
+	async clearMappingRejectedCandidate(input: unknown) {
+		const parsedInput = v.parse(
+			ClearMappingRejectedCandidateInputSchema,
+			input,
+		);
+		await manualMappingsReady;
+		await manualMappingService.clearRejectedCandidate(
+			parsedInput.provider,
+			parsedInput.anilistId,
+			parsedInput.providerId,
+		);
+		await mappingService.evictResolved(
+			parsedInput.anilistId,
+			parsedInput.provider,
+		);
+		await bumpLibraryRevision(parsedInput.provider);
+		await bumpMappingsRevision();
+		return { ok: true as const };
+	},
+
+	async getMappings(input?: unknown) {
+		const parsedInput = v.parse(GetMappingsInputSchema, input);
+		await manualMappingsReady;
+		await mappingService.initAnibridgeMappings();
+
+		const sonarrCredentials = await getProviderConfig("sonarr");
+		const radarrCredentials = await getProviderConfig("radarr");
+
+		return listMappings(parsedInput, {
+			manualMappingService,
+			autoMappingStore,
+			anibridgeMappingStore:
+				anibridgeMappingStore as unknown as ListMappingsDeps["anibridgeMappingStore"],
+			sonarrLibrary: {
+				getLeanSeriesList: async () => {
+					if (!sonarrCredentials) {
+						await sonarrLibrary.clearSeriesSnapshotCache();
+						return [];
+					}
+					return sonarrLibrary.getSeriesSnapshots(sonarrCredentials);
 				},
-				radarrLibrary: {
-					getLeanMovieList: async () => {
-						if (!radarrCredentials) {
-							await radarrLibrary.clearMovieSnapshotCache();
-							return [];
-						}
-						return radarrLibrary.getMovieSnapshots(radarrCredentials);
-					},
+			},
+			radarrLibrary: {
+				getLeanMovieList: async () => {
+					if (!radarrCredentials) {
+						await radarrLibrary.clearMovieSnapshotCache();
+						return [];
+					}
+					return radarrLibrary.getMovieSnapshots(radarrCredentials);
 				},
-			});
-		},
+			},
+			projectionCache: mappingListProjectionCache,
+			projectionCacheKey: resetProjectionCacheWhenStale(),
+		});
+	},
 
-		async getMappingInspection(input) {
-			const parsedInput = v.parse(GetMappingInspectionInputSchema, input);
-			await manualMappingsReady;
-			await mappingService.initAnibridgeMappings();
-			const sonarrCredentials = await providerConfig.get("sonarr");
-			const radarrCredentials = await providerConfig.get("radarr");
-			return getMappingInspection(parsedInput, {
-				manualMappingService,
-				autoMappingStore,
-				anibridgeMappingStore: anibridgeMappingStoreWithAniListIds,
-				anilistMetadataStore: deps.anilistMetadataStore,
-				sonarrLibrary: {
-					getLeanSeriesList: async () => {
-						if (!sonarrCredentials) {
-							await sonarrLibrary.clearSeriesSnapshotCache();
-							return [];
-						}
-						return sonarrLibrary.getSeriesSnapshots(sonarrCredentials);
-					},
-				},
-				radarrLibrary: {
-					getLeanMovieList: async () => {
-						if (!radarrCredentials) {
-							await radarrLibrary.clearMovieSnapshotCache();
-							return [];
-						}
-						return radarrLibrary.getMovieSnapshots(radarrCredentials);
-					},
-				},
-			});
-		},
-	} satisfies Pick<
-		Ani2arrApi,
-		| "getStaticMapped"
-		| "getMappingIdentities"
-		| "initMappings"
-		| "setManualMapping"
-		| "clearManualMapping"
-		| "setMappingIgnore"
-		| "clearMappingIgnore"
-		| "setMappingRejectedCandidate"
-		| "clearMappingRejectedCandidate"
-		| "getMappings"
-		| "getMappingInspection"
-	>;
-
-	return handlers;
-}
+	async getMappingInspection(input: unknown) {
+		const parsedInput = v.parse(GetMappingInspectionInputSchema, input);
+		await manualMappingsReady;
+		await mappingService.initAnibridgeMappings();
+		return getMappingInspection(parsedInput, {
+			manualMappingService,
+			autoMappingStore,
+			anibridgeMappingStore:
+				anibridgeMappingStore as unknown as GetMappingInspectionDeps["anibridgeMappingStore"],
+			anilistMetadataStore,
+		});
+	},
+};

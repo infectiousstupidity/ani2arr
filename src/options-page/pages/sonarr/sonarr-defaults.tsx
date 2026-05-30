@@ -21,7 +21,7 @@ import type {
   SonarrMonitorOption,
   SonarrSeriesType,
 } from "@/providers/sonarr/schemas";
-import { usePublicOptions } from "@/queries/options";
+import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
 import { useSonarrFormResources } from "@/queries/sonarr";
 import type { PublicOptions } from "@/settings";
 import { ProviderTagField } from "@/shared/ui/provider-tag-field";
@@ -33,6 +33,10 @@ const DEFAULT_OPTIONS_DESCRIPTION =
   "Configures default add options reused when adding series via the extension media modal and overlay.";
 
 const DEFAULT_FIELD_OPTIONS = { shouldDirty: true, shouldTouch: true } as const;
+const AUTO_DEFAULT_FIELD_OPTIONS = {
+  shouldDirty: false,
+  shouldTouch: false,
+} as const;
 
 interface SonarrDefaultsFieldsProps {
   formResources?: ProviderFormResources | undefined;
@@ -199,6 +203,7 @@ const SonarrDefaultsFields = ({
 
 export const SonarrDefaults = () => {
   const { data: savedSettings } = usePublicOptions();
+  const { mutateAsync: savePublicOptions } = useSavePublicOptions();
   const isConfigured = savedSettings?.providers.sonarr.isConfigured === true;
 
   const { data: formResources, isFetching } = useSonarrFormResources({
@@ -212,7 +217,7 @@ export const SonarrDefaults = () => {
     createDefaultSonarrFormState();
 
   useEffect(() => {
-    if (!formResources) return;
+    if (!formResources || !savedSettings) return;
 
     const currentDefaults =
       getValues("providers.sonarr.defaults") ?? createDefaultSonarrFormState();
@@ -238,9 +243,19 @@ export const SonarrDefaults = () => {
     setValue(
       "providers.sonarr.defaults",
       nextDefaults,
-      DEFAULT_FIELD_OPTIONS,
+      AUTO_DEFAULT_FIELD_OPTIONS,
     );
-  }, [formResources, getValues, setValue]);
+    void savePublicOptions({
+      ...savedSettings,
+      providers: {
+        ...savedSettings.providers,
+        sonarr: {
+          ...savedSettings.providers.sonarr,
+          defaults: nextDefaults,
+        },
+      },
+    });
+  }, [formResources, getValues, savedSettings, savePublicOptions, setValue]);
 
   const updateDefaults = <K extends keyof SonarrFormState>(
     field: K,

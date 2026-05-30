@@ -5,15 +5,11 @@ import type { TtlCache } from "@/shared/cache/ttl-cache";
 import PQueue from "p-queue";
 import type { RadarrClient } from "@/providers/radarr/client";
 import type { SonarrClient } from "@/providers/sonarr/client";
-import type { SonarrLookupSeries } from "@/providers/sonarr/types";
 import {
 	parseTmdbIdOrNull,
 	parseTvdbIdOrNull,
 	type Provider,
 	type ProviderCredentials,
-	type RadarrLookupMovie,
-	type TmdbId,
-	type TvdbId,
 } from "@/providers";
 import type { ProviderExternalId } from "@/mapping/types";
 import { normalizeError } from "@/shared/errors";
@@ -27,6 +23,9 @@ export interface ProviderTitleResult {
 	title: string;
 	year?: number | undefined;
 	genres?: string[] | undefined;
+	tvdbId?: number | undefined;
+	tmdbId?: number | undefined;
+	[key: string]: unknown; // Allows safe passthrough of raw provider fields
 }
 
 export interface TitleLookupOptions {
@@ -34,52 +33,41 @@ export interface TitleLookupOptions {
 	priority?: RequestPriority;
 }
 
-export type TitleLookupCaches<TResult> = TtlCache<TResult[]>;
-
-export interface ProviderTitleLookup<
-	TResult extends ProviderTitleResult = ProviderTitleResult,
-	TProviderId extends ProviderExternalId = ProviderExternalId,
-> {
+export interface ProviderTitleLookup {
 	readonly provider: Provider;
 	reset(): Promise<void>;
 	lookupByProviderId?(
-		providerId: TProviderId,
+		providerId: ProviderExternalId,
 		credentials: ProviderCredentials,
-	): Promise<TResult | null>;
+	): Promise<ProviderTitleResult | null>;
 	lookupTitle(
 		term: TitleSearchTerm,
 		credentials: ProviderCredentials,
 		options?: TitleLookupOptions,
-	): Promise<TResult[]>;
-	readProviderId(result: unknown): TProviderId | null;
+	): Promise<ProviderTitleResult[]>;
+	readProviderId(result: ProviderTitleResult): ProviderExternalId | null;
 }
 
-type ProviderTitleLookupConfig<
-	TResult extends ProviderTitleResult,
-	TProviderId extends ProviderExternalId,
-> = {
+type ProviderTitleLookupConfig = {
 	provider: Provider;
 	loggerName: string;
-	caches: TitleLookupCaches<TResult>;
+	caches: TtlCache<ProviderTitleResult[]>;
 	fetchTitleResults: (
 		term: string,
 		credentials: ProviderCredentials,
-	) => Promise<TResult[]>;
-	readProviderId: (result: unknown) => TProviderId | null;
+	) => Promise<ProviderTitleResult[]>;
+	readProviderId: (result: ProviderTitleResult) => ProviderExternalId | null;
 	lookupByProviderId?: (
-		providerId: TProviderId,
+		providerId: ProviderExternalId,
 		credentials: ProviderCredentials,
-	) => Promise<TResult | null>;
+	) => Promise<ProviderTitleResult | null>;
 };
 
-export function createProviderTitleLookup<
-	TResult extends ProviderTitleResult,
-	TProviderId extends ProviderExternalId,
->(
-	config: ProviderTitleLookupConfig<TResult, TProviderId>,
-): ProviderTitleLookup<TResult, TProviderId> {
+export function createProviderTitleLookup(
+	config: ProviderTitleLookupConfig,
+): ProviderTitleLookup {
 	const log = logger.create(config.loggerName);
-	const inflight = new Map<string, Promise<TResult[]>>();
+	const inflight = new Map<string, Promise<ProviderTitleResult[]>>();
 	const queue = new PQueue({ concurrency: 5 });
 	let resetGeneration = 0;
 
@@ -87,13 +75,12 @@ export function createProviderTitleLookup<
 		term: string,
 		credentials: ProviderCredentials,
 		priority?: RequestPriority,
-	): Promise<TResult[]> => {
+	): Promise<ProviderTitleResult[]> => {
 		try {
-			const results = await (queue.add(
+			return await (queue.add(
 				() => config.fetchTitleResults(term, credentials),
 				{ priority: priorityValue(priority) },
-			) as Promise<TResult[]>);
-			return results;
+			) as Promise<ProviderTitleResult[]>);
 		} catch (error) {
 			throw normalizeError(error);
 		}
@@ -103,7 +90,7 @@ export function createProviderTitleLookup<
 		term: TitleSearchTerm,
 		credentials: ProviderCredentials,
 		options: TitleLookupOptions = {},
-	): Promise<TResult[]> => {
+	): Promise<ProviderTitleResult[]> => {
 		const inflightKey =
 			options.forceNetwork === true
 				? `${term.canonical}:force`
@@ -117,7 +104,7 @@ export function createProviderTitleLookup<
 		}
 
 		const generation = resetGeneration;
-		const promise = (async (): Promise<TResult[]> => {
+		const promise = (async (): Promise<ProviderTitleResult[]> => {
 			try {
 				const results = await fetchQueuedTitleResults(
 					term.display,
@@ -154,13 +141,13 @@ export function createProviderTitleLookup<
 		term: TitleSearchTerm,
 		credentials: ProviderCredentials,
 		options: TitleLookupOptions = {},
-	): Promise<TResult[]> => {
+	): Promise<ProviderTitleResult[]> => {
 		const forceNetwork = options.forceNetwork === true;
 		if (forceNetwork) {
 			return lookupNetwork(term, credentials, options);
 		}
 
-		return (async (): Promise<TResult[]> => {
+		return (async (): Promise<ProviderTitleResult[]> => {
 			try {
 				const cached = await config.caches.read(term.canonical);
 				if (cached && !cached.stale) {
@@ -175,7 +162,7 @@ export function createProviderTitleLookup<
 		})();
 	};
 
-	const lookup: ProviderTitleLookup<TResult, TProviderId> = {
+	const lookup: ProviderTitleLookup = {
 		provider: config.provider,
 		reset: async () => {
 			resetGeneration += 1;
@@ -195,36 +182,54 @@ export function createProviderTitleLookup<
 
 export function createSonarrTitleLookup(
 	sonarrApi: SonarrClient,
-	caches: TitleLookupCaches<SonarrLookupSeries>,
-): ProviderTitleLookup<SonarrLookupSeries, TvdbId> {
+	caches: TtlCache<ProviderTitleResult[]>,
+): ProviderTitleLookup {
 	return createProviderTitleLookup({
 		provider: "sonarr",
 		loggerName: "SonarrTitleLookup",
 		caches,
-		fetchTitleResults: (term, credentials) =>
-			sonarrApi.lookupSeries(term, credentials),
-		readProviderId: (result) => {
-			const candidate = result as { tvdbId?: unknown } | null;
-			return parseTvdbIdOrNull(candidate?.tvdbId);
+		fetchTitleResults: async (term, credentials) => {
+			return (await sonarrApi.lookupSeries(
+				term,
+				credentials,
+			)) as ProviderTitleResult[];
 		},
-		lookupByProviderId: (tvdbId, credentials) =>
-			sonarrApi.lookupSeriesByTvdbId(tvdbId, credentials),
+		readProviderId: (result) => parseTvdbIdOrNull(result.tvdbId),
+		lookupByProviderId: async (providerId, credentials) => {
+			const tvdbId = parseTvdbIdOrNull(Number(providerId));
+			if (tvdbId === null) {
+				return null;
+			}
+
+			const result = await sonarrApi.lookupSeriesByTvdbId(tvdbId, credentials);
+			return result as ProviderTitleResult | null;
+		},
 	});
 }
 
 export function createRadarrTitleLookup(
 	radarrApi: RadarrClient,
-	caches: TitleLookupCaches<RadarrLookupMovie>,
-): ProviderTitleLookup<RadarrLookupMovie, TmdbId> {
+	caches: TtlCache<ProviderTitleResult[]>,
+): ProviderTitleLookup {
 	return createProviderTitleLookup({
 		provider: "radarr",
 		loggerName: "RadarrTitleLookup",
 		caches,
-		fetchTitleResults: (term, credentials) =>
-			radarrApi.lookupMovies(term, credentials),
-		readProviderId: (result) => {
-			const candidate = result as { tmdbId?: unknown } | null;
-			return parseTmdbIdOrNull(candidate?.tmdbId);
+		fetchTitleResults: async (term, credentials) => {
+			return (await radarrApi.lookupMovies(
+				term,
+				credentials,
+			)) as ProviderTitleResult[];
+		},
+		readProviderId: (result) => parseTmdbIdOrNull(result.tmdbId),
+		lookupByProviderId: async (providerId, credentials) => {
+			const tmdbId = parseTmdbIdOrNull(Number(providerId));
+			if (tmdbId === null) {
+				return null;
+			}
+
+			const result = await radarrApi.lookupMovieByTmdbId(tmdbId, credentials);
+			return result as ProviderTitleResult | null;
 		},
 	});
 }

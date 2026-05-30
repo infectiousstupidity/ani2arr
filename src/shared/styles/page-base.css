@@ -1,0 +1,23 @@
+/* Document-page dark theme variables for popup and options entrypoints. */
+/* src/shared/styles/page-base.css */
+
+@import "tailwindcss";
+@import "@/shared/styles/color-tokens.css";
+
+:root {
+  --bg-primary: #0b1622;
+  --bg-secondary: #151f2e;
+  --bg-tertiary: #253341;
+  --text-primary: #f7f9f9;
+  --text-secondary: #9fadbd;
+  --border-primary: #38444d;
+  --accent-primary: #3db4f2;
+  --accent-hover: #299dd1;
+  --warning: #f2c94c;
+  --success: #00ba7c;
+  --success-foreground: #86efac;
+  --error: #f91880;
+  --iconbutton-text: #f7f9f9;
+
+  color-scheme: dark;
+}

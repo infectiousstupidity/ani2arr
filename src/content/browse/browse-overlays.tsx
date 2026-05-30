@@ -1,0 +1,118 @@
+/** Content-owned browse overlay portals and media modal composition. */
+// src/content/browse/browse-overlays.tsx
+
+import React, { useMemo, useRef } from "react";
+import { AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
+import { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
+import { getMappedIdentitiesByAniListId } from "@/content/anilist/target-provider";
+import { MediaModal } from "@/features/media-modal";
+import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
+import { useAniListMetadataBatch } from "@/queries/anilist";
+import { useMappingIdentities } from "@/queries/mapping";
+import { useOptionsQuerySync, usePublicOptions } from "@/queries/options";
+import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
+import type { PublicOptions } from "@/settings";
+import { useTheme } from "@/shared/hooks/use-theme";
+import { BrowseCardOverlay } from "./browse-card-overlay";
+import { useBrowseCardTargets } from "./use-browse-card-targets";
+import type { BrowseAdapter } from "./types";
+
+export interface BrowseOverlaysProps {
+	adapter: BrowseAdapter;
+	portalContainer: HTMLElement;
+}
+
+function getBrowseFlags(publicOptions: PublicOptions | undefined): {
+	overlaysEnabled: boolean;
+	metadataEnabled: boolean;
+} {
+	const sonarrBrowseEnabled =
+		publicOptions?.ui?.browseCards.sonarr.enabled ?? true;
+	const radarrBrowseEnabled =
+		publicOptions?.ui?.browseCards.radarr.enabled ?? true;
+
+	return {
+		overlaysEnabled: sonarrBrowseEnabled || radarrBrowseEnabled,
+		metadataEnabled: Boolean(
+			(sonarrBrowseEnabled && publicOptions?.providers.sonarr.isConfigured) ||
+				(radarrBrowseEnabled && publicOptions?.providers.radarr.isConfigured),
+		),
+	};
+}
+
+export function BrowseOverlays({
+	adapter,
+	portalContainer,
+}: BrowseOverlaysProps): React.ReactElement {
+	const hostRef = useRef<HTMLDivElement>(null);
+	const mediaModal = useMediaModalState();
+	useTheme(hostRef);
+	useOptionsQuerySync();
+	useA2aBroadcasts();
+
+	const { data: publicOptions } = usePublicOptions();
+	const browseFlags = getBrowseFlags(publicOptions);
+	const targetOptions = useMemo(
+		() => ({
+			adapter,
+			enabled: browseFlags.overlaysEnabled,
+		}),
+		[adapter, browseFlags.overlaysEnabled],
+	);
+	const targets = useBrowseCardTargets(targetOptions);
+	const targetIds = useMemo(
+		() => targets.map(target => target.parsed.anilistId),
+		[targets],
+	);
+	const mappingIdentities = useMappingIdentities(targetIds, {
+		enabled: browseFlags.overlaysEnabled,
+	});
+	const metadataBatch = useAniListMetadataBatch(targetIds, {
+		enabled: browseFlags.metadataEnabled,
+	});
+	const mappedIdentitiesById = useMemo(
+		() => getMappedIdentitiesByAniListId(mappingIdentities.data ?? []),
+		[mappingIdentities.data],
+	);
+	const metadataById = useMemo(() => {
+		const map = new Map<number, ReturnType<typeof metadataHintFromAniListMetadata>>();
+		for (const entry of metadataBatch.data?.metadata ?? []) {
+			map.set(entry.id, metadataHintFromAniListMetadata(entry));
+		}
+		return map;
+	}, [metadataBatch.data]);
+
+	return (
+		<>
+			<div ref={hostRef} />
+			{targets.map(target =>
+				createPortal(
+					<BrowseCardOverlay
+						parsed={target.parsed}
+						adapter={adapter}
+						publicOptions={publicOptions}
+						mappedIdentities={
+							mappedIdentitiesById.get(target.parsed.anilistId) ?? []
+						}
+						metadata={metadataById.get(target.parsed.anilistId) ?? null}
+						onOpenMediaModal={mediaModal.open}
+						tooltipContainer={null}
+					/>,
+					target.container,
+					target.key,
+				),
+			)}
+			<AnimatePresence>
+				{mediaModal.state ? (
+					<MediaModal
+						key={`modal-${mediaModal.state.anilistId ?? "unknown"}`}
+						state={mediaModal.state}
+						onClose={mediaModal.close}
+						container={portalContainer}
+					/>
+				) : null}
+			</AnimatePresence>
+		</>
+	);
+}

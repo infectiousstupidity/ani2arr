@@ -49,71 +49,62 @@ export const createContentEntrypointShell = (
 	options: ContentEntrypointShellOptions,
 ) => {
 	return async (ctx: ContentScriptContext): Promise<void> => {
-		let invalidated = false;
+		let currentUrl = "";
 		let activeController: AbortController | null = null;
 
 		const reconcile = async (url: string) => {
 			activeController?.abort();
 			const controller = new AbortController();
 			activeController = controller;
+			currentUrl = url;
 
-			const createContext = (
-				publicOptions: PublicOptions,
-			): ContentEntrypointShellContext => ({
-				ctx,
-				url,
-				publicOptions,
-				signal: controller.signal,
-				isCurrent: () =>
-					!invalidated &&
-					activeController === controller &&
-					!controller.signal.aborted,
-			});
+			const isCurrent = () => currentUrl === url && !controller.signal.aborted;
 
-			let publicOptions: PublicOptions;
+			let phase: "load-public-options" | "evaluate" | "mount" | "remove" =
+				"load-public-options";
 			try {
-				publicOptions = await getPublicOptionsSnapshot();
-			} catch (error) {
-				if (!controller.signal.aborted) {
-					options.onError?.(error, "load-public-options", url);
-				}
-				return;
-			}
+				const publicOptions = await getPublicOptionsSnapshot();
+				if (!isCurrent()) return;
 
-			const shellContext = createContext(publicOptions);
-			if (!shellContext.isCurrent()) return;
+				const shellContext: ContentEntrypointShellContext = {
+					ctx,
+					url,
+					publicOptions,
+					signal: controller.signal,
+					isCurrent,
+				};
 
-			let eligible: boolean;
-			try {
-				eligible = await options.isEligible(shellContext);
-			} catch (error) {
-				if (!shellContext.signal.aborted && !isAbortError(error)) {
-					options.onError?.(error, "evaluate", url);
-				}
-				return;
-			}
+				phase = "evaluate";
+				const eligible = await options.isEligible(shellContext);
+				if (!isCurrent()) return;
 
-			if (!shellContext.isCurrent()) return;
-
-			if (!eligible) {
-				await removeSafely(options, url);
-				return;
-			}
-
-			try {
-				await awaitBackgroundReady();
-				if (!shellContext.isCurrent()) return;
-				await options.mount(shellContext);
-				if (!shellContext.isCurrent()) {
-					await removeSafely(options, url);
-				}
-			} catch (error) {
-				if (shellContext.signal.aborted || isAbortError(error)) {
+				if (!eligible) {
+					phase = "remove";
+					await options.remove();
 					return;
 				}
 
-				options.onError?.(error, "mount", url);
-				await removeSafely(options, url);
+				await awaitBackgroundReady();
+				if (!isCurrent()) return;
+
+				phase = "mount";
+				await options.mount(shellContext);
+				if (!isCurrent()) {
+					phase = "remove";
+					await options.remove();
+				}
+			} catch (error) {
+				if (controller.signal.aborted || isAbortError(error)) {
+					return;
+				}
+				options.onError?.(error, phase, url);
+				if (phase !== "remove") {
+					try {
+						await options.remove();
+					} catch {
+						// Ignore secondary errors during cleanup
+					}
+				}
 			}
 		};
 
@@ -121,11 +112,15 @@ export const createContentEntrypointShell = (
 
 		type LocationChangeEvent = Event & { newUrl?: URL };
 
-		ctx.addEventListener(globalThis.window, "wxt:locationchange", (event: Event) => {
-			const locationChangeEvent = event as LocationChangeEvent;
-			const nextUrl = locationChangeEvent.newUrl?.href ?? location.href;
-			void reconcile(nextUrl);
-		});
+		ctx.addEventListener(
+			globalThis.window,
+			"wxt:locationchange",
+			(event: Event) => {
+				const locationChangeEvent = event as LocationChangeEvent;
+				const nextUrl = locationChangeEvent.newUrl?.href ?? location.href;
+				void reconcile(nextUrl);
+			},
+		);
 
 		const onStorageChanged: Parameters<
 			typeof browser.storage.onChanged.addListener
@@ -138,7 +133,6 @@ export const createContentEntrypointShell = (
 		browser.storage.onChanged.addListener(onStorageChanged);
 
 		ctx.onInvalidated(() => {
-			invalidated = true;
 			activeController?.abort();
 			browser.storage.onChanged.removeListener(onStorageChanged);
 			void removeSafely(options, location.href);

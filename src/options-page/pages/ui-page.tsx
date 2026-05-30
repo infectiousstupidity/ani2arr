@@ -2,7 +2,6 @@
 // src/options-page/pages/ui-page.tsx
 
 import { useFormContext, useWatch } from "react-hook-form";
-import { ToggleGroup } from "radix-ui";
 import {
   AppWindow,
   Check,
@@ -15,9 +14,10 @@ import {
 import {
   ANILIST_TITLE_LANGUAGES,
   isAniListTitleLanguage,
+  type AniListTitleLanguage,
 } from "@/anilist/schemas/title-language.schema";
-import { getAniListTitleLanguageLabel } from "@/anilist/title-preference";
 import type { PublicOptions, BadgeVisibility } from "@/settings";
+import { cn } from "@/shared/utils/cn";
 
 import { SettingsSection } from "../components/settings-section";
 import { Switch } from "../components/ui/switch";
@@ -27,6 +27,10 @@ import { RadarrIcon, SonarrIcon } from "../components/icons";
 type BrowseCardMode = BadgeVisibility | "hidden";
 type BrowseCardProvider = keyof PublicOptions["ui"]["browseCards"];
 type BrowseCardSettings = PublicOptions["ui"]["browseCards"][BrowseCardProvider];
+type SegmentedOption<TValue extends string> = {
+  label: string;
+  value: TValue;
+};
 
 const BROWSE_CARD_MODE_OPTIONS: { label: string; value: BrowseCardMode }[] = [
   { label: "Always", value: "always" },
@@ -34,8 +38,14 @@ const BROWSE_CARD_MODE_OPTIONS: { label: string; value: BrowseCardMode }[] = [
   { label: "Hidden", value: "hidden" },
 ];
 
+const TITLE_LANGUAGE_LABELS: Record<AniListTitleLanguage, string> = {
+  english: "English",
+  romaji: "Romaji",
+  native: "Native",
+};
+
 const TITLE_LANGUAGE_OPTIONS = ANILIST_TITLE_LANGUAGES.map((language) => ({
-  label: getAniListTitleLanguageLabel(language),
+  label: TITLE_LANGUAGE_LABELS[language],
   value: language,
 }));
 
@@ -44,6 +54,58 @@ const isBrowseCardMode = (mode: string): mode is BrowseCardMode =>
 
 const getBrowseCardMode = (options: BrowseCardSettings): BrowseCardMode =>
   options.enabled ? options.visibility : "hidden";
+
+const SEGMENTED_ITEM_CLASS =
+  "min-h-10 rounded-sm px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary";
+
+function SegmentedControl<TValue extends string>({
+  ariaLabel,
+  ariaLabelledBy,
+  className,
+  onChange,
+  options,
+  value,
+}: {
+  ariaLabel?: string;
+  ariaLabelledBy?: string;
+  className?: string;
+  onChange: (value: TValue) => void;
+  options: readonly SegmentedOption<TValue>[];
+  value: TValue;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
+      className={cn(
+        "grid grid-cols-3 rounded-md border border-border-primary bg-bg-secondary p-1",
+        className,
+      )}
+    >
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            className={cn(
+              SEGMENTED_ITEM_CLASS,
+              selected
+                ? "bg-accent-primary text-white"
+                : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary",
+            )}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export const UiPage = () => {
   const { control, getValues, setValue } = useFormContext<PublicOptions>();
@@ -122,23 +184,13 @@ export const UiPage = () => {
         icon={<Languages className="h-4 w-4" />}
         divider="none"
       >
-        <ToggleGroup.Root
-          type="single"
+        <SegmentedControl
           value={uiOptions.preferredAniListTitleLanguage}
-          onValueChange={updateTitleLanguage}
-          aria-label="Preferred AniList title language"
-          className="grid w-full max-w-md grid-cols-3 rounded-md border border-border-primary bg-bg-secondary p-1"
-        >
-          {TITLE_LANGUAGE_OPTIONS.map((option) => (
-            <ToggleGroup.Item
-              key={option.value}
-              value={option.value}
-              className="min-h-10 rounded-sm px-2 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary data-[state=on]:bg-accent-primary data-[state=on]:text-white"
-            >
-              {option.label}
-            </ToggleGroup.Item>
-          ))}
-        </ToggleGroup.Root>
+          onChange={updateTitleLanguage}
+          options={TITLE_LANGUAGE_OPTIONS}
+          ariaLabel="Preferred AniList title language"
+          className="w-full max-w-md"
+        />
       </SettingsSection>
 
       <SettingsSection
@@ -173,23 +225,12 @@ export const UiPage = () => {
               </Label>
             </div>
 
-            <ToggleGroup.Root
-              type="single"
+            <SegmentedControl
               value={getBrowseCardMode(uiOptions.browseCards.sonarr)}
-              onValueChange={(mode) => updateBrowseProviderMode("sonarr", mode)}
-              aria-labelledby="ui-browse-sonarr-label"
-              className="grid grid-cols-3 rounded-md border border-border-primary bg-bg-secondary p-1"
-            >
-              {BROWSE_CARD_MODE_OPTIONS.map((option) => (
-                <ToggleGroup.Item
-                  key={option.value}
-                  value={option.value}
-                  className="min-h-10 rounded-sm px-2 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary data-[state=on]:bg-accent-primary data-[state=on]:text-white"
-                >
-                  {option.label}
-                </ToggleGroup.Item>
-              ))}
-            </ToggleGroup.Root>
+              onChange={(mode) => updateBrowseProviderMode("sonarr", mode)}
+              options={BROWSE_CARD_MODE_OPTIONS}
+              ariaLabelledBy="ui-browse-sonarr-label"
+            />
           </div>
 
           <div className="flex min-h-30 flex-col justify-center gap-4 lg:w-96">
@@ -200,23 +241,12 @@ export const UiPage = () => {
               </Label>
             </div>
 
-            <ToggleGroup.Root
-              type="single"
+            <SegmentedControl
               value={getBrowseCardMode(uiOptions.browseCards.radarr)}
-              onValueChange={(mode) => updateBrowseProviderMode("radarr", mode)}
-              aria-labelledby="ui-browse-radarr-label"
-              className="grid grid-cols-3 rounded-md border border-border-primary bg-bg-secondary p-1"
-            >
-              {BROWSE_CARD_MODE_OPTIONS.map((option) => (
-                <ToggleGroup.Item
-                  key={option.value}
-                  value={option.value}
-                  className="min-h-10 rounded-sm px-2 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary data-[state=on]:bg-accent-primary data-[state=on]:text-white"
-                >
-                  {option.label}
-                </ToggleGroup.Item>
-              ))}
-            </ToggleGroup.Root>
+              onChange={(mode) => updateBrowseProviderMode("radarr", mode)}
+              options={BROWSE_CARD_MODE_OPTIONS}
+              ariaLabelledBy="ui-browse-radarr-label"
+            />
           </div>
         </div>
       </SettingsSection>

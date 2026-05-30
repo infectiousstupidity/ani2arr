@@ -1,0 +1,233 @@
+/** Tracks host browse cards and creates light-DOM containers for React portals. */
+// src/content/browse/use-browse-card-targets.ts
+
+import { useEffect, useState } from "react";
+import {
+	BROWSE_OVERLAY_CONTAINER_CLASS,
+	BROWSE_PROCESSED_ATTRIBUTE,
+	type BrowseAdapter,
+	type HostMediaTarget,
+} from "./types";
+
+export const BROWSE_MUTATION_OBSERVER_INIT: MutationObserverInit = {
+	childList: true,
+	subtree: true,
+	attributes: true,
+	attributeFilter: ["href"],
+	characterData: true,
+};
+
+export interface BrowseCardTarget {
+	key: string;
+	parsed: HostMediaTarget;
+	container: HTMLElement;
+}
+
+interface BrowseCardTargetOptions {
+	adapter: BrowseAdapter;
+	enabled?: boolean;
+}
+
+function getCardSignature(parsed: HostMediaTarget): string {
+	return [
+		parsed.anilistId,
+		parsed.format ?? "",
+		parsed.title,
+		parsed.mountTarget.getAttribute("href") ?? "",
+	].join("|");
+}
+
+function getObserverRoot(adapter: BrowseAdapter): Node | null {
+	return adapter.getObserverRoot?.() ?? document.body ?? document.documentElement;
+}
+
+function getScanRoot(adapter: BrowseAdapter): Element | null {
+	return (
+		adapter.getScanRoot?.() ??
+		document.querySelector<HTMLElement>(".page-content") ??
+		document.body ??
+		null
+	);
+}
+
+function findPlacementContainer(
+	mountTarget: HTMLElement,
+): HTMLElement | null {
+	for (const child of mountTarget.children) {
+		if (
+			child instanceof HTMLElement &&
+			child.classList.contains(BROWSE_OVERLAY_CONTAINER_CLASS)
+		) {
+			return child;
+		}
+	}
+	return null;
+}
+
+function ensurePlacementContainer(input: {
+	mountTarget: HTMLElement;
+	adapter: BrowseAdapter;
+}): HTMLElement {
+	const existing = findPlacementContainer(input.mountTarget);
+	const container =
+		existing ?? input.mountTarget.ownerDocument.createElement("div");
+
+	container.className = BROWSE_OVERLAY_CONTAINER_CLASS;
+	container.dataset.corner = input.adapter.anchorCorner ?? "bottom-left";
+
+	if (!existing) {
+		input.mountTarget.append(container);
+	}
+
+	return container;
+}
+
+function removeTarget(
+	target: BrowseCardTarget,
+): void {
+	target.parsed.mountTarget.removeAttribute(BROWSE_PROCESSED_ATTRIBUTE);
+	target.container.remove();
+}
+
+export function cleanupBrowseCardTargets(
+	targets: readonly BrowseCardTarget[],
+): void {
+	for (const target of targets) {
+		removeTarget(target);
+	}
+}
+
+function cleanupMissingTargets(input: {
+	previousTargets: readonly BrowseCardTarget[];
+	nextTargets: readonly BrowseCardTarget[];
+}): void {
+	const nextMountTargets = new Set(
+		input.nextTargets.map(target => target.parsed.mountTarget),
+	);
+	for (const target of input.previousTargets) {
+		if (!nextMountTargets.has(target.parsed.mountTarget)) {
+			removeTarget(target);
+		}
+	}
+}
+
+function targetsEqual(
+	a: readonly BrowseCardTarget[],
+	b: readonly BrowseCardTarget[],
+): boolean {
+	if (a.length !== b.length) return false;
+	for (const [index, target] of a.entries()) {
+		const other = b[index];
+		if (
+			!other ||
+			target.key !== other.key ||
+			target.container !== other.container
+		) {
+			return false;
+		}
+	}
+	return true;
+}
+
+export function scanBrowseCardTargets(
+	options: BrowseCardTargetOptions,
+): BrowseCardTarget[] {
+	const root = getScanRoot(options.adapter);
+	if (!root) return [];
+
+	const targetsByMountTarget = new Map<HTMLElement, BrowseCardTarget>();
+	for (const card of root.querySelectorAll(options.adapter.cardSelector)) {
+		const parsed = options.adapter.parseCard(card);
+		if (!parsed) {
+			continue;
+		}
+		if (targetsByMountTarget.has(parsed.mountTarget)) {
+			continue;
+		}
+
+		const container = ensurePlacementContainer({
+			mountTarget: parsed.mountTarget,
+			adapter: options.adapter,
+		});
+		parsed.mountTarget.setAttribute(
+			BROWSE_PROCESSED_ATTRIBUTE,
+			String(parsed.anilistId),
+		);
+		targetsByMountTarget.set(parsed.mountTarget, {
+			key: getCardSignature(parsed),
+			parsed,
+			container,
+		});
+	}
+
+	return [...targetsByMountTarget.values()];
+}
+
+export function useBrowseCardTargets(
+	options: BrowseCardTargetOptions,
+): BrowseCardTarget[] {
+	const [targets, setTargets] = useState<BrowseCardTarget[]>([]);
+
+	useEffect(() => {
+		let currentTargets: BrowseCardTarget[] = [];
+		let frameId: number | null = null;
+		let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
+
+		const cancelScheduledScan = () => {
+			if (frameId !== null) {
+				globalThis.cancelAnimationFrame(frameId);
+				frameId = null;
+			}
+			if (timeoutId !== null) {
+				globalThis.clearTimeout(timeoutId);
+				timeoutId = null;
+			}
+		};
+
+		const scan = () => {
+			frameId = null;
+			timeoutId = null;
+			const nextTargets = scanBrowseCardTargets(options);
+			cleanupMissingTargets({
+				previousTargets: currentTargets,
+				nextTargets,
+			});
+			if (targetsEqual(currentTargets, nextTargets)) {
+				currentTargets = nextTargets;
+				return;
+			}
+
+			currentTargets = nextTargets;
+			setTargets(nextTargets);
+		};
+
+		const scheduleScan = () => {
+			if (frameId !== null || timeoutId !== null) return;
+			if (typeof globalThis.requestAnimationFrame === "function") {
+				frameId = globalThis.requestAnimationFrame(scan);
+				return;
+			}
+			timeoutId = globalThis.setTimeout(scan, 0);
+		};
+
+		if (options.enabled === false) {
+			return;
+		}
+
+		const observerRoot = getObserverRoot(options.adapter);
+		const observer = observerRoot
+			? new MutationObserver(scheduleScan)
+			: null;
+		observer?.observe(observerRoot as Node, BROWSE_MUTATION_OBSERVER_INIT);
+		scan();
+
+		return () => {
+			cancelScheduledScan();
+			observer?.disconnect();
+			cleanupBrowseCardTargets(currentTargets);
+			currentTargets = [];
+		};
+	}, [options]);
+
+	return options.enabled === false ? [] : targets;
+}

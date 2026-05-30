@@ -15,7 +15,7 @@ import type {
 	GetMappingInspectionOutput,
 	GetMappingsOutput,
 } from "@/rpc/types";
-import { normalizeError, type ExtensionError } from "@/shared/errors";
+import type { ExtensionError } from "@/shared/errors";
 import type { Provider } from "@/providers";
 import type {
 	ClearMappingIgnoreInput,
@@ -51,13 +51,8 @@ export const useSetManualMapping = () => {
 		ExtensionError,
 		SetManualMappingInput
 	>({
-		mutationFn: async (input: SetManualMappingInput) => {
-			try {
-				return await getAni2arrApi().setManualMapping(input);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
+		mutationFn: (input: SetManualMappingInput) =>
+			getAni2arrApi().setManualMapping(input),
 		onSettled: (_data, _error, variables) => {
 			if (variables) {
 				invalidateMappingMutationQueries(queryClient, variables);
@@ -73,13 +68,8 @@ export const useClearManualMapping = () => {
 		ExtensionError,
 		ClearManualMappingInput
 	>({
-		mutationFn: async (input: ClearManualMappingInput) => {
-			try {
-				return await getAni2arrApi().clearManualMapping(input);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
+		mutationFn: (input: ClearManualMappingInput) =>
+			getAni2arrApi().clearManualMapping(input),
 		onSettled: (_data, _error, variables) => {
 			if (variables) {
 				invalidateMappingMutationQueries(queryClient, variables);
@@ -91,13 +81,8 @@ export const useClearManualMapping = () => {
 export const useSetMappingIgnore = () => {
 	const queryClient = useQueryClient();
 	return useMutation<{ ok: true }, ExtensionError, SetMappingIgnoreInput>({
-		mutationFn: async (input: SetMappingIgnoreInput) => {
-			try {
-				return await getAni2arrApi().setMappingIgnore(input);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
+		mutationFn: (input: SetMappingIgnoreInput) =>
+			getAni2arrApi().setMappingIgnore(input),
 		onSuccess: (_data, variables) => {
 			invalidateMappingMutationQueries(queryClient, variables);
 		},
@@ -107,13 +92,8 @@ export const useSetMappingIgnore = () => {
 export const useClearMappingIgnore = () => {
 	const queryClient = useQueryClient();
 	return useMutation<{ ok: true }, ExtensionError, ClearMappingIgnoreInput>({
-		mutationFn: async (input: ClearMappingIgnoreInput) => {
-			try {
-				return await getAni2arrApi().clearMappingIgnore(input);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
+		mutationFn: (input: ClearMappingIgnoreInput) =>
+			getAni2arrApi().clearMappingIgnore(input),
 		onSuccess: (_data, variables) => {
 			invalidateMappingMutationQueries(queryClient, variables);
 		},
@@ -127,13 +107,8 @@ export const useSetMappingRejectedCandidate = () => {
 		ExtensionError,
 		SetMappingRejectedCandidateInput
 	>({
-		mutationFn: async (input: SetMappingRejectedCandidateInput) => {
-			try {
-				return await getAni2arrApi().setMappingRejectedCandidate(input);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
+		mutationFn: (input: SetMappingRejectedCandidateInput) =>
+			getAni2arrApi().setMappingRejectedCandidate(input),
 		onSuccess: (_data, variables) => {
 			invalidateMappingMutationQueries(queryClient, variables);
 		},
@@ -147,13 +122,8 @@ export const useClearMappingRejectedCandidate = () => {
 		ExtensionError,
 		ClearMappingRejectedCandidateInput
 	>({
-		mutationFn: async (input: ClearMappingRejectedCandidateInput) => {
-			try {
-				return await getAni2arrApi().clearMappingRejectedCandidate(input);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
+		mutationFn: (input: ClearMappingRejectedCandidateInput) =>
+			getAni2arrApi().clearMappingRejectedCandidate(input),
 		onSuccess: (_data, variables) => {
 			invalidateMappingMutationQueries(queryClient, variables);
 		},
@@ -187,13 +157,7 @@ export const useMappingIdentities = (
 	const normalizedIds = [...new Set(ids)].toSorted((a, b) => a - b);
 	return useQuery<GetMappingIdentitiesOutput, ExtensionError>({
 		queryKey: queryKeys.mappingIdentities(normalizedIds),
-		queryFn: async () => {
-			try {
-				return await getAni2arrApi().getMappingIdentities(normalizedIds);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
+		queryFn: () => getAni2arrApi().getMappingIdentities(normalizedIds),
 		enabled: (options?.enabled ?? true) && normalizedIds.length > 0,
 		staleTime: 10 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
@@ -208,16 +172,11 @@ export const useMappingInspection = (
 ) =>
 	useQuery<GetMappingInspectionOutput, ExtensionError>({
 		queryKey: queryKeys.mappingInspection(provider, anilistId),
-		queryFn: async () => {
-			try {
-				return await getAni2arrApi().getMappingInspection({
-					provider,
-					anilistId,
-				});
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
+		queryFn: () =>
+			getAni2arrApi().getMappingInspection({
+				provider,
+				anilistId,
+			}),
 		staleTime: 15 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,

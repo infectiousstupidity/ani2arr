@@ -99,10 +99,5 @@
 		"tailwind-merge": "^3.5.0",
 		"valibot": "^1.4.0"
 	},
-	"pnpm": {
-		"overrides": {
-			"zod-validation-error": "^4.0.0"
-		}
-	},
 	"packageManager": "pnpm@11.2.2"
 }

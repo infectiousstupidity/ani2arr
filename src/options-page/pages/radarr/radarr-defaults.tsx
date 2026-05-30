@@ -16,7 +16,7 @@ import {
   RADARR_ADD_MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS,
   RADARR_MOVIE_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
 } from "@/providers/radarr/form-options";
-import { usePublicOptions } from "@/queries/options";
+import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
 import { useRadarrFormResources } from "@/queries/radarr";
 import type { PublicOptions } from "@/settings";
 import { ProviderTagField } from "@/shared/ui/provider-tag-field";
@@ -28,9 +28,14 @@ const DEFAULT_OPTIONS_DESCRIPTION =
   "Configures default add options reused when adding movies via the extension media modal and overlay.";
 
 const DEFAULT_FIELD_OPTIONS = { shouldDirty: true, shouldTouch: true } as const;
+const AUTO_DEFAULT_FIELD_OPTIONS = {
+  shouldDirty: false,
+  shouldTouch: false,
+} as const;
 
 export const RadarrDefaults = () => {
   const { data: savedSettings } = usePublicOptions();
+  const { mutateAsync: savePublicOptions } = useSavePublicOptions();
   const isConfigured = savedSettings?.providers.radarr.isConfigured === true;
 
   const { data: formResources, isFetching } = useRadarrFormResources({
@@ -44,7 +49,7 @@ export const RadarrDefaults = () => {
     createDefaultRadarrFormState();
 
   useEffect(() => {
-    if (!formResources) return;
+    if (!formResources || !savedSettings) return;
 
     const currentDefaults =
       getValues("providers.radarr.defaults") ?? createDefaultRadarrFormState();
@@ -70,9 +75,19 @@ export const RadarrDefaults = () => {
     setValue(
       "providers.radarr.defaults",
       nextDefaults,
-      DEFAULT_FIELD_OPTIONS,
+      AUTO_DEFAULT_FIELD_OPTIONS,
     );
-  }, [formResources, getValues, setValue]);
+    void savePublicOptions({
+      ...savedSettings,
+      providers: {
+        ...savedSettings.providers,
+        radarr: {
+          ...savedSettings.providers.radarr,
+          defaults: nextDefaults,
+        },
+      },
+    });
+  }, [formResources, getValues, savedSettings, savePublicOptions, setValue]);
 
   const updateDefaults = <K extends keyof RadarrFormState>(
     field: K,

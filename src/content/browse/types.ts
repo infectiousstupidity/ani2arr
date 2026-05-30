@@ -4,6 +4,9 @@
 import type { AniListId } from '@/anilist';
 import type { AniListMediaFormat } from '@/anilist/schemas/media.schema';
 
+export const BROWSE_OVERLAY_CONTAINER_CLASS = 'a2a-overlay-container';
+export const BROWSE_PROCESSED_ATTRIBUTE = 'data-a2a-processed';
+
 type AnchorCorner = 'bottom-left' | 'top-left';
 type StackDirection = 'up' | 'down';
 
@@ -16,19 +19,9 @@ export interface HostMediaTarget {
 
 export interface BrowseAdapter {
   cardSelector: string;
-  containerClassName?: string;
-  processedAttribute?: string;
   parseCard(card: Element): HostMediaTarget | null;
-  ensureContainer?(mountTarget: HTMLElement, card: Element): HTMLElement;
-  getContainerForCard?(card: Element): HTMLElement | null;
-  markProcessed?(mountTarget: HTMLElement, parsed: HostMediaTarget): void;
-  clearProcessed?(mountTarget: HTMLElement): void;
-  onCardInvalid?(card: Element): void;
   getObserverRoot?(): Node | null;
   getScanRoot?(): Element | null;
-  mutationObserverInit?: MutationObserverInit;
-  resizeObserverTargets?: () => Iterable<Element> | Element | null;
   anchorCorner?: AnchorCorner;
   stackDirection?: StackDirection;
-  anchorOffsetX?: number;
 }

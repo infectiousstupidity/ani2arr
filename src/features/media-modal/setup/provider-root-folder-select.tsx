@@ -6,7 +6,9 @@ import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check } from 'lucide-react';
 
 import type { ProviderRootFolder } from '@/providers';
-import { FormField, Label, Select, SelectContent, SelectTrigger } from '@/shared/ui/form/form';
+import { FormField } from '@/shared/ui/form/form-field';
+import { Label } from '@/shared/ui/form/label';
+import { Select, SelectContent, SelectTrigger } from '@/shared/ui/form/select';
 import { cn } from '@/shared/utils/cn';
 
 export interface ProviderRootFolderPathPreview {

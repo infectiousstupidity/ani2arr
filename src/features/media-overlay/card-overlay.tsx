@@ -5,7 +5,6 @@ import {
 	useEffect,
 	useRef,
 	useState,
-	type CSSProperties,
 	type ReactElement,
 	type SyntheticEvent,
 } from "react";
@@ -36,9 +35,8 @@ interface CardOverlayProps {
 	onOpenMapping(): void;
 	externalHref: string | null;
 	badgeVisibility?: BadgeVisibility | undefined;
-	anchorCorner?: "bottom-left" | "top-left" | undefined;
 	stackDirection?: "up" | "down" | undefined;
-	anchorOffsetX?: number | undefined;
+	tooltipContainer?: HTMLElement | ShadowRoot | null | undefined;
 }
 
 function getPrimaryActionIcon(actionState: MediaActionState) {
@@ -61,6 +59,10 @@ function withSwallow<T extends SyntheticEvent>(fn?: () => void) {
 	};
 }
 
+function stopOverlayEvent(event: SyntheticEvent): void {
+	event.stopPropagation();
+}
+
 function openExternalHref(href: string): void {
 	try { window.open(href, "_blank", "noopener"); } catch { /* ignore */ }
 }
@@ -79,13 +81,13 @@ export function CardOverlay({
 	onOpenMapping,
 	externalHref,
 	badgeVisibility = "always",
-	anchorCorner = "bottom-left",
 	stackDirection = "up",
-	anchorOffsetX = -8,
+	tooltipContainer,
 }: CardOverlayProps): ReactElement {
 	const [stackOpen, setStackOpen] = useState(false);
 	const closeTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
-	const tooltipContainer = typeof document === "undefined" ? null : document.body;
+	const resolvedTooltipContainer =
+		tooltipContainer ?? (typeof document === "undefined" ? null : document.body);
 	const manualMappingLabel = hasMapping ? "Update mapping manually" : "Find match manually";
 
 	const swallow = withSwallow();
@@ -115,7 +117,7 @@ export function CardOverlay({
 	}, []);
 
 	const setupAction = showSetupAction ? (
-		<TooltipWrapper content={`Open ${providerLabel} setup`} side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
+		<TooltipWrapper content={`Open ${providerLabel} setup`} side="right" align="center" sideOffset={6} container={resolvedTooltipContainer} showArrow={false}>
 			<button
 				type="button"
 				className="a2a-card-overlay__action a2a-card-overlay__action--advanced"
@@ -129,7 +131,7 @@ export function CardOverlay({
 	) : null;
 
 	const mappingAction = showMappingAction ? (
-		<TooltipWrapper content={manualMappingLabel} side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
+		<TooltipWrapper content={manualMappingLabel} side="right" align="center" sideOffset={6} container={resolvedTooltipContainer} showArrow={false}>
 			<button
 				type="button"
 				className="a2a-card-overlay__action a2a-card-overlay__action--fix"
@@ -143,7 +145,7 @@ export function CardOverlay({
 	) : null;
 
 	const externalAction = externalHref ? (
-		<TooltipWrapper content={`Open in ${providerLabel}`} side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
+		<TooltipWrapper content={`Open in ${providerLabel}`} side="right" align="center" sideOffset={6} container={resolvedTooltipContainer} showArrow={false}>
 			<button
 				type="button"
 				className="a2a-card-overlay__action a2a-card-overlay__action--external"
@@ -160,9 +162,15 @@ export function CardOverlay({
 		<div
 			className="a2a-card-overlay"
 			data-state={primaryState}
-			data-corner={anchorCorner}
 			data-visibility={badgeVisibility}
-			style={{ ["--badge-offset-x"]: `${anchorOffsetX}px` } as CSSProperties}
+			onClick={stopOverlayEvent}
+			onDoubleClick={stopOverlayEvent}
+			onKeyDown={stopOverlayEvent}
+			onKeyUp={stopOverlayEvent}
+			onMouseDown={stopOverlayEvent}
+			onMouseUp={stopOverlayEvent}
+			onPointerDown={stopOverlayEvent}
+			onPointerUp={stopOverlayEvent}
 			onMouseEnter={openStack}
 			onMouseLeave={scheduleCloseStack}
 		>
@@ -171,7 +179,7 @@ export function CardOverlay({
 				onMouseEnter={openStack}
 				onMouseLeave={scheduleCloseStack}
 			>
-				<TooltipWrapper content={primaryTitle} side="right" align="center" sideOffset={6} container={tooltipContainer} showArrow={false}>
+				<TooltipWrapper content={primaryTitle} side="right" align="center" sideOffset={6} container={resolvedTooltipContainer} showArrow={false}>
 					<button
 						type="button"
 						className="a2a-card-overlay__quick"

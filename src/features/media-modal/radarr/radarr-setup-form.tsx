@@ -1,7 +1,7 @@
 /** Radarr setup form for media modal add and edit flows. */
 // src/features/media-modal/radarr/radarr-setup-form.tsx
 
-import { useState, type FormEvent } from "react";
+import { useState, type SubmitEvent } from "react";
 import type { AniListId } from "@/anilist";
 import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
 import type { ProviderFormResources } from "@/providers";
@@ -248,7 +248,7 @@ export function useRadarrSetupForm(
 		});
 	};
 	const handleSubmit = async (
-		event: FormEvent<HTMLFormElement>,
+		event: SubmitEvent<HTMLFormElement>,
 	): Promise<void> => {
 		event.preventDefault();
 

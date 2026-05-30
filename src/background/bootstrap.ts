@@ -1,23 +1,140 @@
 /** Background bootstrap wiring for API registration, lifecycle, and message handlers. */
 // src/background/bootstrap.ts
 
-import { registerAni2arrApi, getAni2arrApi } from '@/rpc';
-import { logger } from '@/shared/utils/logger';
-import { createBackgroundApi } from './api/create-background-api';
-import { installBackgroundLifecycle } from './lifecycle';
-import { installBackgroundRuntimeMessages } from './runtime-messages';
+import { browser } from "wxt/browser";
+import * as v from "valibot";
+import { registerAni2arrApi } from "@/rpc";
+import { apiHandlers } from "@/rpc/handlers";
+import { logger } from "@/shared/utils/logger";
+import { AniListIdSchema } from "@/anilist/anilist-id";
+import {
+	getExtensionOptionsSnapshot,
+	hasConfiguredProviderCredentials,
+} from "@/settings";
+import { logError, normalizeError } from "@/shared/errors";
 
-const log = logger.create('Background');
+const log = logger.create("Background");
+const MAPPING_REFRESH_ALARM = "a2a:refresh-static-mappings";
+const MAPPING_REFRESH_PERIOD_MIN = 360;
+
+const A2AMessageSchema = v.union([
+	v.object({
+		_a2a: v.literal(true),
+		type: v.literal("a2a:ping"),
+	}),
+	v.object({
+		_a2a: v.literal(true),
+		type: v.literal("OPEN_OPTIONS_PAGE"),
+		sectionId: v.optional(
+			v.picklist(["sonarr", "radarr", "mappings", "ui", "advanced"]),
+		),
+		targetAnilistId: v.optional(AniListIdSchema),
+	}),
+]);
+
+async function shouldWarmMappingsCache(): Promise<boolean> {
+	try {
+		const options = await getExtensionOptionsSnapshot();
+		return (
+			hasConfiguredProviderCredentials(options, "sonarr") ||
+			hasConfiguredProviderCredentials(options, "radarr")
+		);
+	} catch (error) {
+		logError(normalizeError(error), "Background:shouldWarmMappingsCache");
+		return false;
+	}
+}
+
+async function ensurePeriodicRefresh(): Promise<void> {
+	const existing = await browser.alarms.get(MAPPING_REFRESH_ALARM);
+	if (!existing) {
+		browser.alarms.create(MAPPING_REFRESH_ALARM, {
+			periodInMinutes: MAPPING_REFRESH_PERIOD_MIN,
+		});
+	}
+}
 
 export const bootstrapBackground = (): void => {
-  log.info('Background initializing…');
+	log.info("Background initializing…");
 
-  registerAni2arrApi(createBackgroundApi());
-  log.info('API services registered.');
+	registerAni2arrApi(apiHandlers);
 
-  const api = getAni2arrApi();
-  installBackgroundLifecycle(api);
-  installBackgroundRuntimeMessages();
+	browser.runtime.onInstalled.addListener(async (details) => {
+		try {
+			if (details.reason === "install" && import.meta.env.MODE !== "test") {
+				browser.runtime.openOptionsPage().catch(() => {});
+			}
+			if (await shouldWarmMappingsCache()) {
+				await apiHandlers.initMappings();
+			}
+			await ensurePeriodicRefresh();
+		} catch (error) {
+			logError(normalizeError(error), "Background:onInstalled");
+		}
+	});
 
-  log.info('Background setup complete.');
+	browser.runtime.onStartup.addListener(async () => {
+		try {
+			if (await shouldWarmMappingsCache()) {
+				await apiHandlers.initMappings();
+			}
+			await ensurePeriodicRefresh();
+		} catch (error) {
+			logError(normalizeError(error), "Background:onStartup");
+		}
+	});
+
+	browser.alarms.onAlarm.addListener((alarm) => {
+		if (alarm.name !== MAPPING_REFRESH_ALARM) return;
+
+		void (async () => {
+			try {
+				if (await shouldWarmMappingsCache()) {
+					await apiHandlers.initMappings();
+				}
+			} catch (error) {
+				logError(normalizeError(error), "Background:initMappings:alarm");
+			}
+		})();
+	});
+
+	browser.runtime.onMessage.addListener(
+		(message: unknown, sender): Promise<unknown> | void => {
+			if (sender.id !== browser.runtime.id) return;
+
+			const parsed = v.safeParse(A2AMessageSchema, message);
+			if (!parsed.success) return;
+			const msg = parsed.output;
+
+			if (msg.type === "a2a:ping") {
+				return Promise.resolve({ ok: true as const });
+			}
+
+			if (msg.type === "OPEN_OPTIONS_PAGE") {
+				const targetHash = msg.targetAnilistId
+					? `?anilistId=${msg.targetAnilistId}`
+					: "";
+				const hash = [msg.sectionId, targetHash]
+					.filter((p): p is string => !!p)
+					.join("");
+				const url = `${browser.runtime.getURL("/options.html")}${hash ? `#${hash}` : ""}`;
+
+				browser.tabs.create({ url }).catch(() => {
+					browser.runtime.openOptionsPage().catch(() => {});
+				});
+				return;
+			}
+			return;
+		},
+	);
+
+	getExtensionOptionsSnapshot()
+		.then((options) =>
+			logger.configure({
+				enabled: options.debugLogging || import.meta.env.DEV,
+			}),
+		)
+		.catch(() => {});
+
+	log.info("Background setup complete.");
 };
