@@ -66,6 +66,7 @@ function MappingList({
 					>
 						<MappingsAniListRow
 							row={item.row}
+							parentProviderId={item.parentProviderId}
 							metadata={metadataById.get(item.row.anilistId) ?? null}
 							isPending={pendingRowKeys.has(getRowKey(item.row))}
 							isHighlighted={targetAniListId === item.row.anilistId}

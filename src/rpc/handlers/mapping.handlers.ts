@@ -158,7 +158,7 @@ async function buildProviderGroups(provider: Provider): Promise<MappingListGroup
 				}));
 
 				return {
-					key: `${provider}:${group.providerId}:${group.season ?? ""}`,
+					key: `${provider}:${group.providerId}`,
 					provider,
 					providerId,
 					rows,

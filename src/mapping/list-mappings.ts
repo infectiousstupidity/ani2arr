@@ -46,7 +46,6 @@ export interface UnmappedMappingListEntry {
 
 export interface MappedTargetGroup {
 	providerId: MappedResult["providerId"];
-	season?: number;
 	entries: MappedMappingListEntry[];
 }
 
@@ -306,15 +305,12 @@ function addMappedEntry(
 
 	groups.set(key, {
 		providerId: entry.result.providerId,
-		...(entry.result.season === undefined
-			? {}
-			: { season: entry.result.season }),
 		entries: [entry],
 	});
 }
 
 function createTargetKey(result: MappedResult): string {
-	return `${result.providerId}:${result.season ?? ""}`;
+	return String(result.providerId);
 }
 
 function createIdentityKey(provider: Provider, anilistId: AniListId): string {
@@ -332,14 +328,7 @@ function compareGroups(
 	left: MappedTargetGroup,
 	right: MappedTargetGroup,
 ): number {
-	const providerIdDifference =
-		Number(left.providerId) - Number(right.providerId);
-
-	if (providerIdDifference !== 0) {
-		return providerIdDifference;
-	}
-
-	return (left.season ?? -1) - (right.season ?? -1);
+	return Number(left.providerId) - Number(right.providerId);
 }
 
 function compareEntries(

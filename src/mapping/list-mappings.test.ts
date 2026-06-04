@@ -106,6 +106,39 @@ describe("listMappings", () => {
 		expect(result.unmapped).toHaveLength(1);
 	});
 
+	it("groups Sonarr seasons for the same TVDB ID together", () => {
+		const result = listMappings("sonarr", [
+			{
+				anilistId: aid(171_018),
+				result: {
+					kind: "mapped",
+					source: "upstream",
+					providerId: tvdb(432_832),
+					season: 1,
+				},
+			},
+			{
+				anilistId: aid(185_660),
+				result: {
+					kind: "mapped",
+					source: "upstream",
+					providerId: tvdb(432_832),
+					season: 2,
+				},
+			},
+		]);
+
+		expect(result.mapped).toEqual([
+			{
+				providerId: tvdb(432_832),
+				entries: [
+					expect.objectContaining({ anilistId: aid(171_018) }),
+					expect.objectContaining({ anilistId: aid(185_660) }),
+				],
+			},
+		]);
+	});
+
 	it("returns identities only for requested IDs with stored mapping facts", async () => {
 		storeRecords.manual = [
 			{
