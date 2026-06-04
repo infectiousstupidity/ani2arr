@@ -9,7 +9,6 @@ import {
 import type { MappingResult } from "@/mapping/types";
 import type { Provider } from "@/providers/types";
 import {
-	formatProviderExternalId,
 	getProviderExternalIdLabel,
 	getProviderLabel,
 } from "@/providers/provider-labels";
@@ -37,6 +36,7 @@ export type MappingListItem =
 			kind: "row";
 			key: string;
 			row: MappingRow;
+			parentProviderId: ProviderExternalId | null;
 			isLastInGroup: boolean;
 	  };
 
@@ -69,6 +69,18 @@ const formatProviderType = (
 	return null;
 };
 
+const formatProviderStatus = (status: string | undefined): string | null => {
+	if (!status) return null;
+
+	return status
+		.replaceAll("_", " ")
+		.replaceAll("-", " ")
+		.split(" ")
+		.filter(Boolean)
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+		.join(" ");
+};
+
 const joinParts = (parts: Array<string | null | undefined>): string => {
 	const values: string[] = [];
 	for (const part of parts) {
@@ -95,18 +107,22 @@ export const formatMappingGroupTitle = (group: MappingGroup): string => {
 };
 
 export const formatMappingGroupMetaLine = (group: MappingGroup): string => {
+	return joinParts(getMappingGroupMetaPillLabels(group));
+};
+
+export const getMappingGroupMetaPillLabels = (group: MappingGroup): string[] => {
 	if (group.providerId === null) {
-		return "No provider target";
+		return ["No provider target"];
 	}
-	const providerIdLine = formatProviderExternalId(
-		group.provider,
-		group.providerId,
-	);
-	return joinParts([
-		providerIdLine,
-		formatProviderType(group.providerMeta?.type),
-		group.providerMeta?.statusLabel,
-	]);
+
+	const labels = [
+		`${getProviderExternalIdLabel(group.provider)} ID: ${group.providerId}`,
+	];
+	const providerType = formatProviderType(group.providerMeta?.type);
+	const status = formatProviderStatus(group.providerMeta?.statusLabel);
+	if (providerType) labels.push(providerType);
+	if (status) labels.push(status);
+	return labels;
 };
 
 export const formatMappingGroupLibraryLabel = (group: MappingGroup): string => {
@@ -185,6 +201,7 @@ export const getMappingListModel = (input: {
 				kind: "row",
 				key: `row:${group.key}:${row.provider}:${row.anilistId}`,
 				row,
+				parentProviderId: group.providerId,
 				isLastInGroup: index === group.rows.length - 1,
 			});
 			visibleAniListIds.add(row.anilistId);
@@ -252,14 +269,6 @@ export const formatMappingEntryKind = (result: MappingResult): string => {
 
 export const formatAniListToken = (value: string): string =>
 	value.replaceAll("_", " ").replaceAll("-", " ");
-
-export const formatProviderIdLabel = (
-	provider: Provider,
-	providerId: ProviderExternalId | null,
-): string =>
-	providerId === null
-		? `${getProviderExternalIdLabel(provider)} unknown`
-		: formatProviderExternalId(provider, providerId);
 
 export const readTargetAniListIdFromHash = (hash: string): AniListId | null => {
 	const queryIndex = hash.indexOf("?");

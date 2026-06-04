@@ -5,7 +5,10 @@ import { EyeOff, ImageOff, Loader2, RotateCcw, Unlink } from "lucide-react";
 import type { AniListMetadata } from "@/anilist/types";
 import { resolveTitlePreference } from "@/anilist/title";
 import type { AniListTitleLanguage } from "@/anilist/title";
+import { getProviderExternalIdLabel } from "@/providers/provider-labels";
+import type { ProviderExternalId } from "@/rpc/types";
 import Button from "@/shared/ui/primitives/button";
+import Pill from "@/shared/ui/primitives/pill";
 import { cn } from "@/shared/utils/cn";
 import { Tooltip } from "../../components/ui/tooltip";
 import type {
@@ -17,11 +20,11 @@ import {
 	formatAniListToken,
 	formatMappingEntryKind,
 	formatMappingStatusLabel,
-	formatProviderIdLabel,
 } from "./mapping-page-model";
 
 interface MappingsAniListRowProps {
 	row: MappingRow;
+	parentProviderId: ProviderExternalId | null;
 	metadata: AniListMetadata | null;
 	isPending: boolean;
 	isHighlighted: boolean;
@@ -40,6 +43,9 @@ const STATUS_DOT_CLASS: Record<MappingRow["mappingRowStatus"], string> = {
 	unknown: "bg-text-secondary",
 };
 
+const ID_PILL_CLASS =
+	"border border-border-primary/45 bg-bg-tertiary/20 text-text-secondary normal-case";
+
 const getRowTitle = (
 	row: MappingRow,
 	metadata: AniListMetadata | null,
@@ -51,14 +57,13 @@ const getRowTitle = (
 		fallback: row.providerMeta?.title ?? `AniList #${row.anilistId}`,
 	}).primary;
 
-const getMetaLine = (row: MappingRow, metadata: AniListMetadata | null): string => {
-	const parts: string[] = [`AniList #${row.anilistId}`];
-	if (metadata?.format) parts.push(formatAniListToken(metadata.format));
+const getMetaPillLabels = (metadata: AniListMetadata | null): string[] => {
+	const labels: string[] = [];
+	if (metadata?.format) labels.push(formatAniListToken(metadata.format));
 	if (typeof metadata?.seasonYear === "number") {
-		parts.push(String(metadata.seasonYear));
+		labels.push(String(metadata.seasonYear));
 	}
-	parts.push(formatProviderIdLabel(row.provider, row.providerId));
-	return parts.join(" • ");
+	return labels;
 };
 
 const getCoverUrl = (metadata: AniListMetadata | null): string | null =>
@@ -102,11 +107,19 @@ const getClearMatchAction = (row: MappingRow): ClearMatchAction | null => {
 	return null;
 };
 
+const shouldShowProviderIdPill = (
+	row: MappingRow,
+	parentProviderId: ProviderExternalId | null,
+): boolean =>
+	row.providerId !== null &&
+	(parentProviderId === null || row.providerId !== parentProviderId);
+
 export function MappingsAniListRow(
 	props: MappingsAniListRowProps,
 ): React.JSX.Element {
 	const {
 		row,
+		parentProviderId,
 		metadata,
 		isPending,
 		isHighlighted,
@@ -119,6 +132,9 @@ export function MappingsAniListRow(
 	const clearMatchAction = getClearMatchAction(row);
 	const coverUrl = getCoverUrl(metadata);
 	const title = getRowTitle(row, metadata, preferredTitleLanguage);
+	const metaPillLabels = getMetaPillLabels(metadata);
+	const entryKind = formatMappingEntryKind(row.result);
+	const showProviderIdPill = shouldShowProviderIdPill(row, parentProviderId);
 	const showRowStatus = row.mappingRowStatus !== "in-library";
 	const ignoreTitle =
 		ignoreAction.kind === "clear-ignore"
@@ -148,13 +164,13 @@ export function MappingsAniListRow(
 	return (
 		<div
 			className={cn(
-				"grid gap-3 px-4 py-3 transition-colors md:grid-cols-[minmax(0,1fr)_170px_150px] md:items-center md:gap-6 md:pl-10",
+				"grid grid-cols-[56px_minmax(0,1fr)_auto] gap-3 px-4 py-3 transition-colors md:grid-cols-[minmax(0,1fr)_170px_150px] md:items-center md:gap-6 md:pl-10",
 				"hover:bg-bg-tertiary/30",
 				isPending && "opacity-50",
 				isHighlighted && "bg-accent-primary/10",
 			)}
 		>
-			<div className="flex min-w-0 items-center gap-4">
+			<div className="col-start-1 col-end-3 flex min-w-0 items-center gap-4 md:col-auto">
 				<div className="flex aspect-2/3 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-bg-primary/70 text-text-secondary">
 					{coverUrl ? (
 						<img
@@ -173,15 +189,48 @@ export function MappingsAniListRow(
 					<p className="truncate text-sm font-semibold text-text-primary">
 						{title}
 					</p>
-					<p className="mt-1 truncate text-xs text-text-secondary">
-						{getMetaLine(row, metadata)}
-					</p>
+					<div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-text-secondary">
+						<Pill small tone="muted" className={ID_PILL_CLASS}>
+							AniList ID: {row.anilistId}
+						</Pill>
+						{metaPillLabels.map((label) => (
+							<Pill key={label} small tone="muted" className={ID_PILL_CLASS}>
+								{label}
+							</Pill>
+						))}
+						{showProviderIdPill ? (
+							<Pill small tone="muted" className={ID_PILL_CLASS}>
+								{getProviderExternalIdLabel(row.provider)} ID: {row.providerId}
+							</Pill>
+						) : null}
+					</div>
+					<div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs md:hidden">
+						{showRowStatus ? (
+							<span className="flex min-w-0 items-center gap-1.5 text-text-primary">
+								<span
+									className={cn(
+										"h-2 w-2 shrink-0 rounded-full",
+										STATUS_DOT_CLASS[row.mappingRowStatus],
+									)}
+								/>
+								<span className="truncate">
+									{formatMappingStatusLabel(row.mappingRowStatus)}
+								</span>
+							</span>
+						) : null}
+						{showRowStatus ? (
+							<span className="text-text-secondary/60">•</span>
+						) : null}
+						<span className="truncate text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+							{entryKind}
+						</span>
+					</div>
 				</div>
 			</div>
 
-			<div className="min-w-0">
+			<div className="hidden min-w-0 flex-col items-center text-center md:flex">
 				{showRowStatus ? (
-					<div className="flex items-center gap-2 text-sm text-text-primary">
+					<div className="flex items-center justify-center gap-2 text-sm text-text-primary">
 						<span
 							className={cn(
 								"h-2 w-2 shrink-0 rounded-full",
@@ -199,35 +248,37 @@ export function MappingsAniListRow(
 						showRowStatus && "mt-1",
 					)}
 				>
-					{formatMappingEntryKind(row.result)}
+					{entryKind}
 				</p>
 			</div>
 
-			<div className="flex items-center justify-end gap-1.5">
-				<Tooltip content={ignoreTitle}>
-					<button
-						type="button"
-						onClick={() => onIgnore(row, ignoreAction)}
-						disabled={isPending}
-						className="inline-flex h-9 w-9 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-tertiary/70 hover:text-text-primary disabled:pointer-events-none disabled:opacity-50"
-						aria-label={ignoreTitle}
-					>
-						{ignoreIcon}
-					</button>
-				</Tooltip>
-				{clearMatchAction ? (
-					<Tooltip content={getClearMatchTitle(clearMatchAction)}>
+			<div className="col-start-3 row-start-1 flex flex-col items-end justify-center gap-1.5 md:col-auto md:row-auto md:flex-row md:items-center">
+				<div className="flex items-center justify-end gap-1.5">
+					{clearMatchAction ? (
+						<Tooltip content={getClearMatchTitle(clearMatchAction)}>
+							<button
+								type="button"
+								onClick={() => onClearMatch(row, clearMatchAction)}
+								disabled={isPending}
+								className="inline-flex h-9 w-9 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-tertiary/70 hover:text-text-primary disabled:pointer-events-none disabled:opacity-50"
+								aria-label={getClearMatchTitle(clearMatchAction)}
+							>
+								{clearMatchIcon}
+							</button>
+						</Tooltip>
+					) : null}
+					<Tooltip content={ignoreTitle}>
 						<button
 							type="button"
-							onClick={() => onClearMatch(row, clearMatchAction)}
+							onClick={() => onIgnore(row, ignoreAction)}
 							disabled={isPending}
 							className="inline-flex h-9 w-9 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-tertiary/70 hover:text-text-primary disabled:pointer-events-none disabled:opacity-50"
-							aria-label={getClearMatchTitle(clearMatchAction)}
+							aria-label={ignoreTitle}
 						>
-							{clearMatchIcon}
+							{ignoreIcon}
 						</button>
 					</Tooltip>
-				) : null}
+				</div>
 				<Button
 					type="button"
 					variant="outline"

@@ -107,6 +107,11 @@ describe("mapping page model", () => {
 			"row",
 			"group",
 		]);
+		expect(
+			result.items.map((item) =>
+				item.kind === "row" ? item.parentProviderId : null,
+			),
+		).toEqual([null, tvdb(10), tvdb(10), null]);
 		expect(result.loadedRowCount).toBe(3);
 		expect(result.visibleAniListIds).toEqual([aid(1), aid(2)]);
 	});
