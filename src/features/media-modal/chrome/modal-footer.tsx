@@ -1,7 +1,6 @@
 /** Dumb setup and mapping footer controls for the media modal. */
 // src/features/media-modal/chrome/modal-footer.tsx
 
-import { AnimatePresence, LazyMotion, domMax, m } from "framer-motion";
 import type { ReactNode } from "react";
 import Button from "@/shared/ui/primitives/button";
 import { OverwriteTargetWarning } from "../mapping/overwrite-target-warning";
@@ -56,16 +55,11 @@ function FooterButtonSlot(props: { children: ReactNode }): React.JSX.Element {
 	const { children } = props;
 
 	return (
-		<m.span
-			layout
-			initial={{ opacity: 0, y: 4 }}
-			animate={{ opacity: 1, y: 0 }}
-			exit={{ opacity: 0, y: 4 }}
-			transition={{ duration: 0.14 }}
-			className="flex flex-1 md:flex-none"
+		<span
+			className="a2a-footer-button-in flex flex-1 md:flex-none"
 		>
 			{children}
-		</m.span>
+		</span>
 	);
 }
 
@@ -74,41 +68,27 @@ function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
 	const actionRowClass = notice ? "md:row-start-2" : "md:row-start-1";
 
 	return (
-		<LazyMotion features={domMax}>
-			<m.footer
-				layout
-				className="bg-bg-primary px-4 py-3 md:px-8 md:py-4"
-			>
-				<m.div
-					layout
-					className="mx-auto grid w-full max-w-250 grid-cols-1 gap-3 md:grid-cols-2 md:gap-x-6 md:gap-y-3 lg:gap-x-8"
+		<footer className="bg-bg-primary px-4 py-3 md:px-8 md:py-4">
+			<div className="mx-auto grid w-full max-w-250 grid-cols-1 gap-3 md:grid-cols-2 md:gap-x-6 md:gap-y-3 lg:gap-x-8">
+				{notice ? (
+					<div className="a2a-fade-blur-in min-w-0 md:col-start-2 md:row-start-1">
+						{notice}
+					</div>
+				) : null}
+
+				<div
+					className={`flex w-full flex-wrap items-center gap-2 text-xs text-text-secondary md:col-start-1 ${actionRowClass}`}
 				>
-					{notice ? (
-						<m.div layout className="min-w-0 md:col-start-2 md:row-start-1">
-							{notice}
-						</m.div>
-					) : null}
+					{left}
+				</div>
 
-					<m.div
-						layout
-						className={`flex w-full flex-wrap items-center gap-2 text-xs text-text-secondary md:col-start-1 ${actionRowClass}`}
-					>
-						<AnimatePresence initial={false} mode="popLayout">
-							{left}
-						</AnimatePresence>
-					</m.div>
-
-					<m.div
-						layout
-						className={`flex w-full flex-wrap items-center gap-2 md:col-start-2 md:justify-end ${actionRowClass}`}
-					>
-						<AnimatePresence initial={false} mode="popLayout">
-							{right}
-						</AnimatePresence>
-					</m.div>
-				</m.div>
-			</m.footer>
-		</LazyMotion>
+				<div
+					className={`flex w-full flex-wrap items-center gap-2 md:col-start-2 md:justify-end ${actionRowClass}`}
+				>
+					{right}
+				</div>
+			</div>
+		</footer>
 	);
 }
 

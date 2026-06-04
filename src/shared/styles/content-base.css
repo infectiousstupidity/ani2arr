@@ -74,3 +74,159 @@
   outline-offset: 0 !important;
   box-shadow: none !important;
 }
+
+.a2a-modal-overlay {
+  opacity: 0;
+  backdrop-filter: blur(0);
+  animation: a2a-modal-overlay-in 160ms ease-out forwards;
+}
+
+.a2a-modal-shell {
+  opacity: 0;
+  transform: translateY(30px) scale(0.95);
+  animation: a2a-modal-shell-in 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.a2a-modal-section,
+.a2a-modal-header-item {
+  opacity: 0;
+  transform: translateY(15px);
+  animation: a2a-modal-section-in 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.a2a-modal-header-item {
+  filter: blur(4px);
+}
+
+.a2a-fade-blur-in {
+  opacity: 0;
+  filter: blur(3px);
+  animation: a2a-fade-blur-in 160ms ease-out forwards;
+}
+
+.a2a-connector-icon-in {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.5);
+  animation: a2a-connector-icon-in 180ms ease-out forwards;
+}
+
+.a2a-footer-button-in {
+  opacity: 0;
+  transform: translateY(4px);
+  animation: a2a-footer-button-in 140ms ease-out forwards;
+}
+
+.a2a-stagger-list > * {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: a2a-row-in 180ms ease-out forwards;
+}
+
+.a2a-stagger-list > *:nth-child(1) { animation-delay: 0ms; }
+.a2a-stagger-list > *:nth-child(2) { animation-delay: 50ms; }
+.a2a-stagger-list > *:nth-child(3) { animation-delay: 100ms; }
+.a2a-stagger-list > *:nth-child(4) { animation-delay: 150ms; }
+.a2a-stagger-list > *:nth-child(5) { animation-delay: 200ms; }
+.a2a-stagger-list > *:nth-child(6) { animation-delay: 250ms; }
+.a2a-stagger-list > *:nth-child(n + 7) { animation-delay: 300ms; }
+
+.a2a-delay-50 { animation-delay: 50ms; }
+.a2a-delay-100 { animation-delay: 100ms; }
+.a2a-delay-120 { animation-delay: 120ms; }
+.a2a-delay-140 { animation-delay: 140ms; }
+.a2a-delay-150 { animation-delay: 150ms; }
+
+@keyframes a2a-modal-overlay-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(8px);
+  }
+}
+
+@keyframes a2a-modal-shell-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes a2a-modal-section-in {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes a2a-fade-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes a2a-connector-icon-in {
+  from {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+  }
+}
+
+@keyframes a2a-footer-button-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes a2a-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a2a-modal-overlay,
+  .a2a-modal-shell,
+  .a2a-modal-section,
+  .a2a-modal-header-item,
+  .a2a-fade-blur-in,
+  .a2a-connector-icon-in,
+  .a2a-footer-button-in,
+  .a2a-stagger-list > * {
+    animation: none;
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}

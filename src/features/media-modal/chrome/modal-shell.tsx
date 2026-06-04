@@ -9,13 +9,6 @@ import {
 	type ReactNode,
 } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import {
-	LazyMotion,
-	MotionConfig,
-	domAnimation,
-	m,
-	type Variants,
-} from "framer-motion";
 import { cn } from "@/shared/utils/cn";
 import type { MediaModalContainer } from "../types";
 
@@ -49,59 +42,6 @@ const RIGHT_PANE_CLASS =
 	"order-3 relative flex flex-col min-h-80 min-w-0 overscroll-contain touch-pan-y md:col-start-2 md:h-full md:min-h-0 md:overflow-y-auto";
 
 const MODAL_SCROLL_BOUNDARY_EVENTS = ["wheel", "touchmove"] as const;
-
-const OVERLAY_VARIANTS: Variants = {
-	hidden: { opacity: 0, backdropFilter: "blur(0px)" },
-	show: {
-		opacity: 1,
-		backdropFilter: "blur(8px)",
-		transition: { duration: 0.16, ease: "easeOut" },
-	},
-	exit: {
-		opacity: 0,
-		transition: { duration: 0.08, ease: "easeIn" },
-	},
-};
-
-const SHELL_VARIANTS: Variants = {
-	hidden: { opacity: 0, y: 30, scale: 0.95 },
-	show: {
-		opacity: 1,
-		y: 0,
-		scale: 1,
-		transition: {
-			type: "spring",
-			damping: 25,
-			stiffness: 300,
-		},
-	},
-	exit: {
-		opacity: 0,
-		y: 8,
-		scale: 0.98,
-		transition: { duration: 0.09, ease: "easeIn" },
-	},
-};
-
-const SECTION_VARIANTS: Variants = {
-	hidden: { opacity: 0, y: 15 },
-	show: (delay = 0) => ({
-		opacity: 1,
-		y: 0,
-		transition: {
-			type: "spring",
-			damping: 20,
-			stiffness: 250,
-			delay,
-		},
-	}),
-};
-
-const HEADER_SECTION_DELAY = 0.05;
-const LEFT_PANE_SECTION_DELAY = 0.1;
-const RIGHT_PANE_TOP_SECTION_DELAY = 0.12;
-const RIGHT_PANE_SECTION_DELAY = 0.14;
-const FOOTER_SECTION_DELAY = 0.15;
 
 type PortalContainer = ComponentPropsWithoutRef<
 	typeof Dialog.Portal
@@ -209,14 +149,10 @@ const ModalContent = forwardRef<
 	return (
 		<Dialog.Portal container={container}>
 			<Dialog.Overlay asChild>
-				<m.div
+				<div
 					data-testid="modal-overlay"
-					className="fixed inset-0 bg-black/60"
+					className="a2a-modal-overlay fixed inset-0 bg-black/60"
 					style={{ zIndex: MODAL_Z_INDEX_OVERLAY }}
-					variants={OVERLAY_VARIANTS}
-					initial="hidden"
-					animate="show"
-					exit="exit"
 				/>
 			</Dialog.Overlay>
 
@@ -228,15 +164,11 @@ const ModalContent = forwardRef<
 				onTouchMove={stopModalScrollLockPropagation}
 				onWheel={stopModalScrollLockPropagation}
 			>
-				<m.div
-					className={className}
-					variants={SHELL_VARIANTS}
-					initial="hidden"
-					animate="show"
-					exit="exit"
+				<div
+					className={cn("a2a-modal-shell", className)}
 				>
 					{children}
-				</m.div>
+				</div>
 			</Dialog.Content>
 		</Dialog.Portal>
 	);
@@ -264,68 +196,49 @@ export function ModalShell(props: ModalShellProps): React.JSX.Element {
 	);
 
 	return (
-		<MotionConfig reducedMotion="user">
-			<LazyMotion features={domAnimation}>
-				<Modal open onOpenChange={onOpenChange}>
-					<ModalContent
-						container={container}
-						contentContainer={contentContainer}
-						className={SHELL_CLASS}
-						onOpenAutoFocus={(event) => event.preventDefault()}
-						{...(onEscapeKeyDown ? { onEscapeKeyDown } : {})}
-					>
-						<m.div
-							className="shrink-0"
-							variants={SECTION_VARIANTS}
-							custom={HEADER_SECTION_DELAY}
-						>
-							{header}
-						</m.div>
+		<Modal open onOpenChange={onOpenChange}>
+			<ModalContent
+				container={container}
+				contentContainer={contentContainer}
+				className={SHELL_CLASS}
+				onOpenAutoFocus={(event) => event.preventDefault()}
+				{...(onEscapeKeyDown ? { onEscapeKeyDown } : {})}
+			>
+				<div className="a2a-modal-section a2a-delay-50 shrink-0">
+					{header}
+				</div>
 
-						<div className={FRAME_CLASS}>
-							<div className={WORKSPACE_CLASS}>
-								<div className={GRID_CLASS}>
-									<m.div
-										className={leftPaneClass}
-										variants={SECTION_VARIANTS}
-										custom={LEFT_PANE_SECTION_DELAY}
-									>
-										{leftPane}
-									</m.div>
+				<div className={FRAME_CLASS}>
+					<div className={WORKSPACE_CLASS}>
+						<div className={GRID_CLASS}>
+							<div className={cn("a2a-modal-section a2a-delay-100", leftPaneClass)}>
+								{leftPane}
+							</div>
 
-									{rightPaneTop ? (
-										<m.div
-											className={RIGHT_PANE_TOP_CLASS}
-											variants={SECTION_VARIANTS}
-											custom={RIGHT_PANE_TOP_SECTION_DELAY}
-										>
-											{rightPaneTop}
-										</m.div>
-									) : null}
-
-									<m.div
-										className={rightPaneClass}
-										variants={SECTION_VARIANTS}
-										custom={RIGHT_PANE_SECTION_DELAY}
-									>
-										{rightPane}
-									</m.div>
+							{rightPaneTop ? (
+								<div
+									className={cn(
+										"a2a-modal-section a2a-delay-120",
+										RIGHT_PANE_TOP_CLASS,
+									)}
+								>
+									{rightPaneTop}
 								</div>
+							) : null}
+
+							<div className={cn("a2a-modal-section a2a-delay-140", rightPaneClass)}>
+								{rightPane}
 							</div>
 						</div>
+					</div>
+				</div>
 
-						{footer ? (
-							<m.div
-								className="shrink-0"
-								variants={SECTION_VARIANTS}
-								custom={FOOTER_SECTION_DELAY}
-							>
-								{footer}
-							</m.div>
-						) : null}
-					</ModalContent>
-				</Modal>
-			</LazyMotion>
-		</MotionConfig>
+				{footer ? (
+					<div className="a2a-modal-section a2a-delay-150 shrink-0">
+						{footer}
+					</div>
+				) : null}
+			</ModalContent>
+		</Modal>
 	);
 }

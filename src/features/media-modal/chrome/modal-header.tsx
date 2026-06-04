@@ -1,13 +1,6 @@
 /** Dumb media modal header with AniList and provider identity cards. */
 // src/features/media-modal/chrome/modal-header.tsx
 
-import {
-	AnimatePresence,
-	LazyMotion,
-	domAnimation,
-	m,
-	type Variants,
-} from "framer-motion";
 import { Settings, X } from "lucide-react";
 import type { MouseEventHandler } from "react";
 import type { AniListId } from "@/anilist/types";
@@ -50,39 +43,6 @@ const CHROME_BUTTON_CLASS =
 	"!h-9 !w-9 !rounded-none !p-0 text-text-secondary hover:text-text-primary";
 const HEADER_CARD_CLASS =
 	"relative flex h-[calc(var(--spacing)*30)] min-w-0 overflow-hidden rounded-xl border border-border-primary/60 bg-bg-secondary/10 backdrop-blur-[4px] transition-[opacity,filter,box-shadow] md:h-[calc(var(--spacing)*37)]";
-const HEADER_ITEMS_VARIANTS: Variants = {
-	hidden: {},
-	show: {
-		transition: {
-			staggerChildren: 0.05,
-		},
-	},
-	exit: {
-		transition: {
-			staggerChildren: 0.02,
-			staggerDirection: -1,
-		},
-	},
-};
-const HEADER_ITEM_VARIANTS: Variants = {
-	hidden: { opacity: 0, y: 10, filter: "blur(4px)" },
-	show: {
-		opacity: 1,
-		y: 0,
-		filter: "blur(0px)",
-		transition: {
-			type: "spring",
-			damping: 22,
-			stiffness: 260,
-		},
-	},
-	exit: {
-		opacity: 0,
-		y: 6,
-		filter: "blur(4px)",
-		transition: { duration: 0.1, ease: "easeIn" },
-	},
-};
 
 function toTitleCase(value: string): string {
 	return value
@@ -229,13 +189,9 @@ function ProviderCardContent(props: {
 		providerMetaLine !== null || (providerIdLine !== null && providerLink !== null);
 
 	return (
-		<m.div
+		<div
 			key={display.targetKey}
-			initial={{ opacity: 0, filter: "blur(3px)" }}
-			animate={{ opacity: 1, filter: "blur(0px)" }}
-			exit={{ opacity: 0, filter: "blur(3px)" }}
-			transition={{ duration: 0.16, ease: "easeOut" }}
-			className="absolute inset-0 flex min-w-0 flex-col items-end p-3 text-right md:p-4"
+			className="a2a-fade-blur-in absolute inset-0 flex min-w-0 flex-col items-end p-3 text-right md:p-4"
 		>
 			<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
 				{display.title}
@@ -268,7 +224,7 @@ function ProviderCardContent(props: {
 					) : null}
 				</div>
 			) : null}
-		</m.div>
+		</div>
 	);
 }
 
@@ -319,28 +275,24 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 					: null,
 			)}
 		>
-			<LazyMotion features={domAnimation}>
-				<div
-					className={cn(
-						"relative flex min-w-0 flex-1 transition-[opacity,filter]",
-						isDimmed ? "opacity-50 grayscale" : null,
-					)}
-				>
-					<div className="relative min-w-0 flex-1 overflow-hidden">
-						<AnimatePresence initial={false}>
-							<ProviderCardContent
-								display={display}
-								providerLabel={providerLabel}
-								providerMetaLine={providerMetaLine}
-								providerIdLine={providerIdLine}
-								providerLink={providerLink}
-							/>
-						</AnimatePresence>
-					</div>
-
-					<MappingPoster src={posterUrl} side="right" />
+			<div
+				className={cn(
+					"relative flex min-w-0 flex-1 transition-[opacity,filter]",
+					isDimmed ? "opacity-50 grayscale" : null,
+				)}
+			>
+				<div className="relative min-w-0 flex-1 overflow-hidden">
+					<ProviderCardContent
+						display={display}
+						providerLabel={providerLabel}
+						providerMetaLine={providerMetaLine}
+						providerIdLine={providerIdLine}
+						providerLink={providerLink}
+					/>
 				</div>
-			</LazyMotion>
+
+				<MappingPoster src={posterUrl} side="right" />
+			</div>
 		</div>
 	);
 }
@@ -422,23 +374,22 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 			</div>
 
 			<div className="relative z-10 px-4 pb-3 pt-3 md:px-8 md:pb-5 md:pt-5">
-				<m.div
+				<div
 					className={cn(
 						"grid w-full grid-cols-[minmax(0,1fr)_4rem_minmax(0,1fr)] items-stretch gap-2 sm:grid-cols-[minmax(0,1fr)_10%_minmax(0,1fr)] sm:gap-3",
 						workspaceClassName,
 					)}
-					variants={HEADER_ITEMS_VARIANTS}
 				>
-					<m.div className="min-w-0" variants={HEADER_ITEM_VARIANTS}>
+					<div className="a2a-modal-header-item min-w-0">
 						<SourceCard
 							anilistHeaderData={anilistHeaderData}
 							anilistId={anilistId}
 						/>
-					</m.div>
-					<m.div className="min-w-0" variants={HEADER_ITEM_VARIANTS}>
+					</div>
+					<div className="a2a-modal-header-item a2a-delay-50 min-w-0">
 						<MappingConnector state={connectorState} />
-					</m.div>
-					<m.div className="min-w-0" variants={HEADER_ITEM_VARIANTS}>
+					</div>
+					<div className="a2a-modal-header-item a2a-delay-100 min-w-0">
 						<ProviderCard
 							provider={provider}
 							baseUrl={baseUrl}
@@ -447,8 +398,8 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 							isDimmed={isCurrentTargetDimmed}
 							isHighlighted={isTargetHighlighted}
 						/>
-					</m.div>
-				</m.div>
+					</div>
+				</div>
 			</div>
 		</header>
 	);

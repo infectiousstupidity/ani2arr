@@ -1,9 +1,7 @@
 /** Dumb mapping candidate row UI for provider mapping panels. */
 // src/features/media-modal/mapping/mapping-search-results.tsx
 
-import { m } from "framer-motion";
 import { ExternalLink } from "lucide-react";
-import { useState } from "react";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import { cn } from "@/shared/utils/cn";
 
@@ -26,18 +24,6 @@ type MappingCandidateRowProps = {
 
 const BADGE_CLASS =
 	"inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-medium leading-none";
-const EXTERNAL_ICON_VARIANTS = {
-	hidden: { opacity: 0, scale: 0.92 },
-	visible: { opacity: 1, scale: 1 },
-};
-const SEARCH_RESULT_ITEM_VARIANTS = {
-	hidden: { opacity: 0, y: 10 },
-	show: {
-		opacity: 1,
-		y: 0,
-		transition: { duration: 0.18 },
-	},
-};
 
 function getLinkedBadgeLabel(
 	linkedAniListCount: number | undefined,
@@ -70,32 +56,14 @@ export function MappingCandidateRow(
 	const selectionLabel = isSelected
 		? `Clear selected match: ${title}`
 		: `Preview match: ${title}`;
-	const [isHovered, setIsHovered] = useState(false);
-	const [isFocusWithin, setIsFocusWithin] = useState(false);
-	const showExternalIcon = isSelected || isHovered || isFocusWithin;
 
 	return (
-		<m.div
-			variants={SEARCH_RESULT_ITEM_VARIANTS}
-			onMouseEnter={() => setIsHovered(true)}
-			onMouseLeave={() => setIsHovered(false)}
-			onFocusCapture={() => setIsFocusWithin(true)}
-			onBlurCapture={(event) => {
-				const nextTarget = event.relatedTarget;
-				if (
-					!(nextTarget instanceof Node) ||
-					!event.currentTarget.contains(nextTarget)
-				) {
-					setIsFocusWithin(false);
-				}
-			}}
+		<div
 			className="group relative h-[120px] overflow-hidden rounded-lg border border-transparent p-0 transition-[background-color,border-color] hover:border-border-primary/45 hover:bg-bg-tertiary/50 focus-within:border-accent-primary/45 focus-within:bg-bg-tertiary/45"
 		>
 			{isSelected ? (
-				<m.div
-					layoutId="active-search-highlight"
-					className="pointer-events-none absolute inset-0 rounded-lg border border-accent-primary/45 bg-accent-primary/10"
-					transition={{ type: "spring", stiffness: 420, damping: 34 }}
+				<div
+					className="pointer-events-none absolute inset-0 rounded-lg border border-accent-primary/45 bg-accent-primary/10 transition-[background-color,border-color]"
 				/>
 			) : null}
 			<button
@@ -178,21 +146,20 @@ export function MappingCandidateRow(
 			</button>
 			{externalUrl ? (
 				<TooltipWrapper content={externalLabel} container={contentContainer}>
-					<m.a
+					<a
 						href={externalUrl}
 						target="_blank"
 						rel="noreferrer"
-						variants={EXTERNAL_ICON_VARIANTS}
-						initial={false}
-						animate={showExternalIcon ? "visible" : "hidden"}
-						transition={{ duration: 0.14 }}
-						className="absolute right-2 top-2 z-20 inline-flex h-7 w-7 items-center justify-center rounded-full text-text-secondary hover:bg-bg-tertiary/70 hover:text-accent-primary focus-visible:bg-bg-tertiary/70 focus-visible:text-accent-primary"
+						className={cn(
+							"absolute right-2 top-2 z-20 inline-flex h-7 w-7 scale-[0.92] items-center justify-center rounded-full text-text-secondary opacity-0 transition-[opacity,transform,color,background-color] duration-150 hover:bg-bg-tertiary/70 hover:text-accent-primary focus-visible:bg-bg-tertiary/70 focus-visible:text-accent-primary group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100",
+							isSelected ? "scale-100 opacity-100" : null,
+						)}
 						aria-label={externalLabel}
 					>
 						<ExternalLink className="h-4 w-4" />
-					</m.a>
+					</a>
 				</TooltipWrapper>
 			) : null}
-		</m.div>
+		</div>
 	);
 }

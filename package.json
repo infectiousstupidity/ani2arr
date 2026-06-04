@@ -79,7 +79,6 @@
 		"@wxt-dev/webextension-polyfill": "^1.0.0",
 		"clsx": "^2.1.1",
 		"date-fns": "^4.4.0",
-		"framer-motion": "^12.40.0",
 		"idb": "^8.0.3",
 		"lucide-react": "^1.17.0",
 		"p-queue": "^9.3.0",
