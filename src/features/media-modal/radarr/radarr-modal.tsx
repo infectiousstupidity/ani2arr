@@ -2,26 +2,28 @@
 // src/features/media-modal/radarr/radarr-modal.tsx
 
 import { useMemo, useState } from "react";
-import type { AniListId } from "@/anilist";
-import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
-import {
-	parseTmdbIdOrNull,
-	type ProviderFormResources,
-	type TmdbId,
-} from "@/providers";
+import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import { parseTmdbIdOrNull } from "@/providers/schemas";
+import type { ProviderFormResources } from "@/providers/types";
+import type { TmdbId } from "@/providers/schemas";
+import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import {
 	useMappingInspection,
 } from "@/queries/mapping";
 import { useProviderBaseUrl } from "@/queries/provider-base-url";
 import { useMovieStatus, useRadarrFormResources } from "@/queries/radarr";
-import type { CheckMovieStatusResponse } from "@/rpc/types";
-import { defaultRadarrFormState } from "@/settings";
+import type { GetMovieStatusOutput } from "@/rpc/types";
+import { createDefaultRadarrFormState as defaultRadarrFormState } from "@/providers/radarr/form-state";
 import { DetailsPanel } from "../details/details-panel";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
 import { useMappingActions } from "../hooks/use-mapping-actions";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
 import { useOpenMappingSettingsAction } from "../hooks/use-open-mapping-settings-action";
-import { getOverwriteTargetTitle, targetsEqual } from "../helpers";
+import {
+	getOverwriteTargetTitle,
+	pickProviderPoster,
+	targetsEqual,
+} from "../helpers";
 import {
 	MappingFooter,
 	MediaModalFooterTransition,
@@ -59,7 +61,7 @@ type RadarrModalData = {
 	providerRequestTitle: string;
 	providerPayloadTitle: string | undefined;
 	fallbackLookupTitle: string | undefined;
-	rawProviderStatus: CheckMovieStatusResponse | null;
+	rawProviderStatus: GetMovieStatusOutput | null;
 	verificationSettled: boolean;
 	verificationFailed: boolean;
 	storedDefaults: ReturnType<typeof defaultRadarrFormState>;
@@ -72,13 +74,9 @@ function getRejectCandidateTmdbId(input: {
 }): TmdbId | null {
 	if (input.manualMappingActive) return null;
 
-	const effectiveMapping = input.inspection?.effectiveMapping;
-	if (
-		(effectiveMapping?.mappingEntryKind === "auto" ||
-			effectiveMapping?.mappingEntryKind === "upstream") &&
-		effectiveMapping.providerId != null
-	) {
-		return parseTmdbIdOrNull(effectiveMapping.providerId);
+	const mapping = input.inspection?.mapping;
+	if (mapping?.kind === "mapped" && mapping.source === "auto") {
+		return parseTmdbIdOrNull(mapping.providerId);
 	}
 
 	return null;
@@ -110,6 +108,41 @@ function isSetupTargetLoading(input: {
 	);
 }
 
+function getCurrentTarget(input: {
+	status: GetMovieStatusOutput | null;
+	baseUrl: string;
+}): MediaModalTargetSummary | null {
+	const { status } = input;
+	const movie = status?.movie;
+	const tmdbId = parseTmdbIdOrNull(
+		status?.mapping.kind === "mapped" ? status.mapping.providerId : undefined,
+	);
+	if (!movie || tmdbId === null) return null;
+
+	const providerRouteSlug = getProviderRouteSlug(PROVIDER, movie) ?? undefined;
+	const posterUrl = pickProviderPoster(movie, input.baseUrl);
+
+	return {
+		provider: PROVIDER,
+		providerId: tmdbId,
+		title: movie.title,
+		isInLibrary: status.isInLibrary === true,
+		typeLabel: "Movie",
+		...(movie.folderName ? { providerFolderName: movie.folderName } : {}),
+		...(movie.year === undefined ? {} : { year: movie.year }),
+		...(providerRouteSlug ? { providerRouteSlug } : {}),
+		...(posterUrl ? { posterUrl } : {}),
+		...(movie.status ? { statusLabel: movie.status } : {}),
+		...("overview" in movie && movie.overview
+			? { overview: movie.overview }
+			: {}),
+		...("runtime" in movie && movie.runtime !== undefined
+			? { runtimeMinutes: movie.runtime }
+			: {}),
+		...(movie.hasFile === undefined ? {} : { hasFile: movie.hasFile }),
+	};
+}
+
 function useRadarrModalData(input: {
 	anilistId: AniListId;
 	metadataHint: MediaModalMetadataHint | null;
@@ -126,15 +159,13 @@ function useRadarrModalData(input: {
 	const statusPayload = useMemo(
 		() => ({
 			anilistId,
-			...(base.providerPayloadTitle === undefined
-				? {}
-				: { title: base.providerPayloadTitle }),
-			metadata: base.resolvedMetadata,
+			...(base.statusTitle === undefined ? {} : { title: base.statusTitle }),
+			metadata: base.statusMetadata,
 		}),
-		[anilistId, base.providerPayloadTitle, base.resolvedMetadata],
+		[anilistId, base.statusMetadata, base.statusTitle],
 	);
 	const radarrStatus = useMovieStatus(statusPayload, {
-		enabled: isConfigured,
+		enabled: isConfigured && base.statusReady,
 		force_verify: true,
 	});
 	const verificationSettled =
@@ -144,13 +175,19 @@ function useRadarrModalData(input: {
 		verificationSettled &&
 		(radarrStatus.isError || rawProviderStatus?.isInLibrary === null);
 	const baseUrl = providerBaseUrl.data ?? "";
-	const currentTarget = rawProviderStatus?.targetSummary ?? null;
+	const currentTarget = getCurrentTarget({
+		status: rawProviderStatus,
+		baseUrl,
+	});
+	const manualMappingActive =
+		rawProviderStatus?.mapping.kind === "mapped" &&
+		rawProviderStatus.mapping.source === "manual";
 
 	return {
 		baseUrl,
 		isConfigured,
 		anilistHeaderData: base.anilistHeaderData,
-		manualMappingActive: rawProviderStatus?.manualMappingActive === true,
+		manualMappingActive,
 		currentTarget,
 		resolvedMetadata: base.resolvedMetadata,
 		providerRequestTitle: base.providerRequestTitle,
@@ -236,10 +273,11 @@ export function RadarrModal({
 		manualMappingActive: data.manualMappingActive,
 	});
 	const clearRejectedCandidateTmdbId = parseTmdbIdOrNull(
-		inspection.data?.effectiveMapping.suppressedProviderId,
+		inspection.data?.mapping.kind === "unmapped"
+			? inspection.data.mapping.rejectedProviderIds?.[0]
+			: undefined,
 	);
-	const canIgnoreTitle =
-		inspection.data?.effectiveMapping.mappingEntryKind !== "ignored";
+	const canIgnoreTitle = inspection.data?.mapping.kind !== "ignored";
 	const canSubmitMapping =
 		selectedCandidate !== null &&
 		!targetsEqual(selectedCandidate.summary, data.currentTarget);

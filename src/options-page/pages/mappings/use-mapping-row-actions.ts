@@ -2,12 +2,20 @@
 // src/options-page/pages/mappings/use-mapping-row-actions.ts
 
 import { useState } from "react";
-import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
-import type { AniListTitleLanguage } from "@/anilist/schemas/title-language.schema";
-import { resolveTitlePreference } from "@/anilist/title-preference";
+import type { AniListMetadata } from "@/anilist/types";
+import type { AniListTitleLanguage } from "@/anilist/title";
+import { resolveTitlePreference } from "@/anilist/title";
 import type { MediaModalMetadataHint } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
-import { createProviderMappingTarget } from "@/mapping/types";
+import {
+	parseTmdbIdOrNull,
+	parseTvdbIdOrNull,
+} from "@/providers/schemas";
+import type { Provider } from "@/providers/types";
+import type {
+	TmdbId,
+	TvdbId,
+} from "@/providers/schemas";
 import {
 	useClearManualMapping,
 	useClearMappingIgnore,
@@ -15,13 +23,30 @@ import {
 	useSetMappingIgnore,
 	useSetMappingRejectedCandidate,
 } from "@/queries/mapping";
-import { normalizeError } from "@/shared/errors";
+import { normalizeError } from "@/shared/errors/error-utils";
 import {
 	getRowKey,
 	type ClearMatchAction,
 	type IgnoreAction,
 	type MappingRow,
 } from "./mapping-page-model";
+
+type ProviderMappingTarget =
+	| { provider: "sonarr"; providerId: TvdbId }
+	| { provider: "radarr"; providerId: TmdbId };
+
+function createProviderMappingTarget(
+	provider: Provider,
+	value: unknown,
+): ProviderMappingTarget | null {
+	if (provider === "sonarr") {
+		const providerId = parseTvdbIdOrNull(value);
+		return providerId === null ? null : { provider, providerId };
+	}
+
+	const providerId = parseTmdbIdOrNull(value);
+	return providerId === null ? null : { provider, providerId };
+}
 
 const getModalMetadataHint = (input: {
 	row: MappingRow;

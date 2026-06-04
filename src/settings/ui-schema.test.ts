@@ -2,11 +2,9 @@
 // src/settings/ui-schema.test.ts
 
 import { describe, expect, it } from "vitest";
-import {
-	createDefaultExtensionOptions,
-	createDefaultUiOptions,
-	parseExtensionOptions,
-} from "@/settings";
+import { createDefaultExtensionOptions } from "@/settings/schema";
+import { createDefaultUiOptions } from "@/settings/ui-schema";
+import { parseExtensionOptions } from "@/settings/store";
 
 describe("parseExtensionOptions ui schema", () => {
 	it("keeps current UI settings shape", () => {

@@ -2,7 +2,7 @@
 // src/providers/shared.client.test.ts
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ErrorCode } from "@/shared/errors";
+import { ErrorCode } from "@/shared/errors/error.types";
 import type { ProviderCredentials } from "./types";
 import { ProviderApiClient } from "./shared.client";
 

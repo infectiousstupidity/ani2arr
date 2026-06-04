@@ -1,4 +1,7 @@
-import { useState, useEffect } from "react";
+/** Hash route helpers for the options page navigation and deep links. */
+// src/options-page/navigation.ts
+
+import { useSyncExternalStore } from "react";
 
 export type PageId = "sonarr" | "radarr" | "mappings" | "ui" | "advanced";
 
@@ -13,7 +16,11 @@ const VALID_PAGES = new Set<PageId>([
 
 export function getHashPage(): PageId {
 	if (globalThis.window === undefined) return DEFAULT_PAGE;
-	const hash = globalThis.location.hash.replace(/^#\/?/, "");
+	return getPageFromHash(getCurrentHash());
+}
+
+function getPageFromHash(currentHash: string): PageId {
+	const hash = currentHash.replace(/^#\/?/, "");
 	const basePage = hash.split("?")[0];
 
 	if (VALID_PAGES.has(basePage as PageId)) {
@@ -27,14 +34,22 @@ export function setHashPage(page: PageId) {
 	globalThis.location.hash = page;
 }
 
+export function getCurrentHash(): string {
+	if (globalThis.window === undefined) return "";
+	return globalThis.location.hash;
+}
+
+function subscribeHashRoute(onStoreChange: () => void): () => void {
+	globalThis.addEventListener("hashchange", onStoreChange);
+	return () => globalThis.removeEventListener("hashchange", onStoreChange);
+}
+
 export function useHashRoute() {
-	const [page, setPage] = useState<PageId>(getHashPage);
-
-	useEffect(() => {
-		const handleHashChange = () => setPage(getHashPage());
-		globalThis.addEventListener("hashchange", handleHashChange);
-		return () => globalThis.removeEventListener("hashchange", handleHashChange);
-	}, []);
-
-	return { page, setPage: setHashPage };
+	const hash = useSyncExternalStore(
+		subscribeHashRoute,
+		getCurrentHash,
+		getCurrentHash,
+	);
+	const page = getPageFromHash(hash);
+	return { page, hash, setPage: setHashPage };
 }

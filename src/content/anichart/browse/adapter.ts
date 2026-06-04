@@ -1,20 +1,35 @@
 /** AniChart browse surface adapter for card parsing and portal placement. */
 // src/content/anichart/browse/adapter.ts
 
-import { parseAniListIdOrNull } from '@/anilist/anilist-id';
-import { parseAniListMediaFormatLabel } from '@/anilist/schemas/media.schema';
+import {
+  parseAniListIdOrNull,
+  parseAniListMediaFormatLabel,
+} from '@/anilist/types';
 import type { BrowseAdapter, HostMediaTarget } from '@/content/browse/types';
 
 const CARD_SELECTOR = '.media-card';
 const COVER_SELECTOR = 'a.cover';
 const TITLE_SELECTOR = 'a.title';
+const SECTION_HEADING_SELECTOR = 'h2.section-heading, h2';
+
+export const getDirectSectionHeadingText = (heading: Element | null): string => {
+  if (!heading) return '';
+
+  return [...heading.childNodes]
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent ?? '')
+    .join(' ')
+    .replaceAll(/\s+/g, ' ')
+    .trim();
+};
 
 const getSectionHeading = (card: Element): string =>
-  card.closest('section')?.querySelector('h2')?.textContent?.trim() ?? '';
+  getDirectSectionHeadingText(
+    card.closest('section')?.querySelector(SECTION_HEADING_SELECTOR) ?? null,
+  );
 
 const shouldSkipCard = (card: Element): boolean => {
-  const heading = getSectionHeading(card).toLowerCase();
-  return heading.includes('music');
+  return parseAniListMediaFormatLabel(getSectionHeading(card)) === 'MUSIC';
 };
 
 const parseAniChartCard = (card: Element): HostMediaTarget | null => {

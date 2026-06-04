@@ -5,27 +5,21 @@ import {
 	registerService,
 	type ProxyServiceKey,
 } from "@webext-core/proxy-service";
-import type { AniListId } from "@/anilist";
-import type { AniListMedia } from "@/anilist/schemas/media.schema";
-import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
-import { normalizeError } from "@/shared/errors";
-import type { Provider, ProviderFormResources, RadarrMovie } from "@/providers";
-import type { SonarrSeriesLibraryStatus } from "@/providers/sonarr/library";
+import type { AniListId, AniListMedia } from "@/anilist/types";
+import { normalizeError } from "@/shared/errors/error-utils";
+import type { ProviderFormResources } from "@/providers/types";
+import type { RadarrMovie } from "@/providers/radarr/types";
 import type { SonarrSeries } from "@/providers/sonarr/types";
-import type { RadarrMovieLibraryStatus } from "@/providers/radarr/library";
 import type {
 	GetAniListMetadataOutput,
 	GetMappingInspectionOutput,
 	GetMappingsOutput,
+	MappingIdentity,
 	RadarrLookupOutput,
 	SonarrLookupOutput,
-	CheckMovieStatusResponse,
-	CheckSeriesStatusResponse,
-} from "./types";
-import type {
+	GetMovieStatusOutput,
+	GetSeriesStatusOutput,
 	StatusInput,
-	SeriesLibraryStatusInput,
-	MovieLibraryStatusInput,
 	AddSonarrInput,
 	AddRadarrInput,
 	GetProviderFormResourcesInput,
@@ -44,34 +38,28 @@ import type {
 	GetMappingsInput,
 	GetMappingInspectionInput,
 	GetAniListMetadataInput,
-	TestProviderConnectionInput,
+	ProviderConnectionTestInput,
 	GetProviderBaseUrlInput,
-} from "./schemas";
+	NotifyProviderConnectionChangedInput,
+} from "./types";
 
 export interface Ani2arrApi {
-	getSeriesStatus(input: StatusInput): Promise<CheckSeriesStatusResponse>;
-	getMovieStatus(input: StatusInput): Promise<CheckMovieStatusResponse>;
-	getSeriesLibraryStatus(
-		input: SeriesLibraryStatusInput,
-	): Promise<SonarrSeriesLibraryStatus>;
-	getMovieLibraryStatus(
-		input: MovieLibraryStatusInput,
-	): Promise<RadarrMovieLibraryStatus>;
+	getSeriesStatus(input: StatusInput): Promise<GetSeriesStatusOutput>;
+	getMovieStatus(input: StatusInput): Promise<GetMovieStatusOutput>;
 	addToSonarr(input: AddSonarrInput): Promise<SonarrSeries>;
 	addToRadarr(input: AddRadarrInput): Promise<RadarrMovie>;
 	updateSonarrSeries(input: UpdateSonarrInput): Promise<SonarrSeries>;
 	updateRadarrMovie(input: UpdateRadarrInput): Promise<RadarrMovie>;
-	prefetchAniListMedia(
-		ids: AniListId[],
-	): Promise<Array<[AniListId, AniListMedia]>>;
 	fetchAniListMedia(anilistId: AniListId): Promise<AniListMedia | null>;
-	getMappingIdentities(ids: AniListId[]): Promise<EffectiveMappingPresence[]>;
-	notifyProviderConnectionChanged(input?: {
-		changedProviders?: Provider[];
-		disconnectedProviders?: Provider[];
-	}): Promise<{ ok: true }>;
-	testProviderConnection(
-		input: TestProviderConnectionInput,
+	getMappingIdentities(ids: AniListId[]): Promise<MappingIdentity[]>;
+	notifyProviderConnectionChanged(
+		input?: NotifyProviderConnectionChangedInput,
+	): Promise<{ ok: true }>;
+	testSonarrConnection(
+		input: ProviderConnectionTestInput,
+	): Promise<{ version: string }>;
+	testRadarrConnection(
+		input: ProviderConnectionTestInput,
 	): Promise<{ version: string }>;
 	getProviderBaseUrl(input: GetProviderBaseUrlInput): Promise<string>;
 	getSonarrFormResources(

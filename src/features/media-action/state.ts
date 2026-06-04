@@ -1,7 +1,7 @@
 /** Shared media-action state derivation for AniList browse and anime-page surfaces. */
 // src/features/media-action/state.ts
 
-import type { EffectiveMappingState } from "@/mapping/types";
+import type { MappingResult } from "@/mapping/types";
 
 export type MediaActionState =
 	| "unconfigured"
@@ -36,7 +36,7 @@ export function getMediaActionStatus(input: {
 	hasAddError: boolean;
 	hasStatusError: boolean;
 	addSucceeded: boolean;
-	providerMappingState: EffectiveMappingState | null | undefined;
+	mapping: MappingResult | null | undefined;
 	isInLibrary: boolean | null;
 	hasProviderId: boolean;
 	canQuickAdd: boolean;
@@ -104,7 +104,7 @@ export function getMediaActionStatus(input: {
 		};
 	}
 
-	if (input.providerMappingState === "unmapped") {
+	if (input.mapping?.kind === "unmapped") {
 		return {
 			state: "unmapped",
 			action: "open-mapping",
@@ -115,8 +115,7 @@ export function getMediaActionStatus(input: {
 	}
 
 	if (
-		input.providerMappingState === "unknown" ||
-		input.providerMappingState !== "mapped" ||
+		input.mapping?.kind !== "mapped" ||
 		input.isInLibrary !== false ||
 		!input.hasProviderId
 	) {

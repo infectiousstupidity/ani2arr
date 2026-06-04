@@ -1,15 +1,20 @@
 /** Pure Sonarr setup target and default-value helpers for the media modal. */
 // src/features/media-modal/sonarr/sonarr-setup-values.ts
 
-import type { AniListId } from "@/anilist";
-import { isSonarrSeriesId, parseTvdbIdOrNull, type TvdbId } from "@/providers";
+import type { AniListId } from "@/anilist/types";
+import * as v from "valibot";
+import {
+	parseTvdbIdOrNull,
+	SonarrSeriesIdSchema,
+} from "@/providers/schemas";
+import type { TvdbId } from "@/providers/schemas";
 import {
 	normalizeSonarrFormState,
 	type SonarrFormState,
 } from "@/providers/sonarr/form-state";
 import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
 import type { SonarrSeries } from "@/providers/sonarr/types";
-import type { CheckSeriesStatusResponse } from "@/rpc/types";
+import type { GetSeriesStatusOutput } from "@/rpc/types";
 import { areArraysEqual } from "../helpers";
 
 export const SONARR_EDIT_MONITORING_ACTION_DEFAULT = "noChange" as const;
@@ -38,7 +43,7 @@ export type SonarrSetupTarget = {
 
 type CreateSonarrSetupTargetInput = {
 	anilistId: AniListId;
-	status: CheckSeriesStatusResponse | null | undefined;
+	status: GetSeriesStatusOutput | null | undefined;
 	targetTitle: string;
 	storedDefaults: Partial<SonarrFormState> | null | undefined;
 	providerFolderName?: string | null | undefined;
@@ -61,7 +66,7 @@ const hasEditableSonarrFields = (value: Record<string, unknown>): boolean =>
 
 const isFullSonarrSeries = (value: unknown): value is SonarrSeries =>
 	isRecord(value) &&
-	isSonarrSeriesId(value.id) &&
+	v.safeParse(SonarrSeriesIdSchema, value.id).success &&
 	parseTvdbIdOrNull(value.tvdbId) !== null &&
 	typeof value.title === "string" &&
 	typeof value.titleSlug === "string" &&
@@ -75,8 +80,8 @@ function readProviderFolderName(value: unknown): string | undefined {
 }
 
 export function hasFullSonarrEditItem(
-	status: CheckSeriesStatusResponse | null | undefined,
-): status is CheckSeriesStatusResponse & { series: SonarrSeries } {
+	status: GetSeriesStatusOutput | null | undefined,
+): status is GetSeriesStatusOutput & { series: SonarrSeries } {
 	return status?.isInLibrary === true && isFullSonarrSeries(status.series);
 }
 
@@ -132,9 +137,9 @@ export function isSonarrSetupDraftDirty(input: {
 
 export function canShowSonarrSetup(input: {
 	isConfigured: boolean;
-	status: CheckSeriesStatusResponse | null | undefined;
+	status: GetSeriesStatusOutput | null | undefined;
 }): boolean {
-	return input.isConfigured && input.status?.providerMappingState === "mapped";
+	return input.isConfigured && input.status?.mapping.kind === "mapped";
 }
 
 export function getSonarrSetupTarget({
@@ -160,13 +165,13 @@ export function getSonarrSetupTarget({
 	}
 
 	if (
-		status?.providerMappingState !== "mapped" ||
+		status?.mapping.kind !== "mapped" ||
 		status.isInLibrary !== false
 	) {
 		return null;
 	}
 
-	const tvdbId = parseTvdbIdOrNull(status.providerId);
+	const tvdbId = parseTvdbIdOrNull(status.mapping.providerId);
 	if (tvdbId === null) return null;
 
 	const lookupFolderName =

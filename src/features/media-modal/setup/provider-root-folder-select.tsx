@@ -5,10 +5,10 @@ import React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check } from 'lucide-react';
 
-import type { ProviderRootFolder } from '@/providers';
-import { FormField } from '@/shared/ui/form/form-field';
-import { Label } from '@/shared/ui/form/label';
-import { Select, SelectContent, SelectTrigger } from '@/shared/ui/form/select';
+import type { ProviderRootFolder } from "@/providers/types";
+import { Field } from '@/shared/ui/fields/field';
+import { Label } from '@/shared/ui/primitives/label';
+import { Select, SelectContent, SelectTrigger } from '@/shared/ui/primitives/select';
 import { cn } from '@/shared/utils/cn';
 
 export interface ProviderRootFolderPathPreview {
@@ -179,7 +179,7 @@ export function ProviderRootFolderSelect(
 
   return (
     <>
-      <FormField>
+      <Field>
         <div className={cn('space-y-1', className)}>
           <Label>{isEditMode ? 'Path' : 'Root Folder'}</Label>
           <Select disabled={disabled} value={value} onValueChange={onChange}>
@@ -210,7 +210,7 @@ export function ProviderRootFolderSelect(
             </SelectContent>
           </Select>
         </div>
-      </FormField>
+      </Field>
 
       <RootFolderHelperText pathPreview={pathPreview} className={className} />
     </>

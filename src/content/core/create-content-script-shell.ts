@@ -7,8 +7,8 @@ import { awaitBackgroundReady } from "./await-background-ready";
 import {
 	getPublicOptionsSnapshot,
 	PUBLIC_OPTIONS_CHANGE_KEY,
-	type PublicOptions,
-} from "@/settings";
+} from "@/settings/store";
+import type { PublicOptions } from "@/settings/types";
 
 export interface ContentEntrypointShellContext {
 	ctx: ContentScriptContext;

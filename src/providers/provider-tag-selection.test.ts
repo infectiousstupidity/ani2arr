@@ -2,11 +2,13 @@
 // src/providers/provider-tag-selection.test.ts
 
 import { describe, expect, it } from "vitest";
-import { parseProviderTagId } from "@/providers";
+import type { ProviderTagId } from "@/providers/schemas";
 import {
 	buildProviderTagMaps,
 	splitProviderTagLabels,
 } from "./provider-tag-selection";
+
+const parseProviderTagId = (value: number) => value as ProviderTagId;
 
 describe("provider tag selection", () => {
 	it("splits mixed existing and freeform labels with case-insensitive dedupe", () => {

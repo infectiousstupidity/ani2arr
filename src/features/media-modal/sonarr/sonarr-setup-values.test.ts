@@ -2,14 +2,14 @@
 // src/features/media-modal/sonarr/sonarr-setup-values.test.ts
 
 import { describe, expect, it } from "vitest";
-import { parseAniListId } from "@/anilist";
-import {
-	parseProviderQualityProfileId,
-	parseProviderTagId,
-	parseSonarrSeriesId,
-	parseTvdbId,
-} from "@/providers";
-import type { CheckSeriesStatusResponse } from "@/rpc/types";
+import { parseAniListId } from "@/anilist/types";
+import { parseTvdbId } from "@/providers/schemas";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+	SonarrSeriesId,
+} from "@/providers/schemas";
+import type { GetSeriesStatusOutput } from "@/rpc/types";
 import {
 	getSonarrAddDefaults,
 	getSonarrEditDefaults,
@@ -17,6 +17,11 @@ import {
 	hasFullSonarrEditItem,
 	isSonarrSetupDraftDirty,
 } from "./sonarr-setup-values";
+
+const parseProviderQualityProfileId = (value: number) =>
+	value as ProviderQualityProfileId;
+const parseProviderTagId = (value: number) => value as ProviderTagId;
+const parseSonarrSeriesId = (value: number) => value as SonarrSeriesId;
 
 describe("sonarr setup values", () => {
 	it("hydrates edit defaults from series-level fields only", () => {
@@ -122,9 +127,8 @@ describe("sonarr setup values", () => {
 	});
 
 	it("does not create an edit target from a lean in-library item", () => {
-		const status: CheckSeriesStatusResponse = {
-			providerId: parseTvdbId(22),
-			providerMappingState: "mapped",
+		const status: GetSeriesStatusOutput = {
+			mapping: { kind: "mapped", source: "manual", providerId: parseTvdbId(22) },
 			isInLibrary: true,
 			series: {
 				id: parseSonarrSeriesId(11),
@@ -146,9 +150,8 @@ describe("sonarr setup values", () => {
 	});
 
 	it("creates an edit target from a full in-library item", () => {
-		const status: CheckSeriesStatusResponse = {
-			providerId: parseTvdbId(22),
-			providerMappingState: "mapped",
+		const status: GetSeriesStatusOutput = {
+			mapping: { kind: "mapped", source: "manual", providerId: parseTvdbId(22) },
 			isInLibrary: true,
 			series: {
 				id: parseSonarrSeriesId(11),
@@ -182,9 +185,8 @@ describe("sonarr setup values", () => {
 	});
 
 	it("creates an add target from mapped not-in-library status", () => {
-		const status: CheckSeriesStatusResponse = {
-			providerId: parseTvdbId(22),
-			providerMappingState: "mapped",
+		const status: GetSeriesStatusOutput = {
+			mapping: { kind: "mapped", source: "manual", providerId: parseTvdbId(22) },
 			isInLibrary: false,
 		};
 

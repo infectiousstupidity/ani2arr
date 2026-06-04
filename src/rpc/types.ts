@@ -1,88 +1,228 @@
-/** Plain payload and response types used by RPC and adjacent provider flows without runtime schemas. */
+/** Plain payload and response types used by RPC and adjacent provider flows. */
 // src/rpc/types.ts
 
-import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
-import type { AniListId } from "@/anilist";
+import type {
+	AniListId,
+	AniListMediaHint,
+	AniListMediaFormat,
+	AniListMetadata,
+} from "@/anilist/types";
 import type {
 	Provider,
+	ProviderCredentials,
+} from "@/providers/types";
+import type { RadarrFormState } from "@/providers/radarr/form-state";
+import type {
 	RadarrMovieSnapshot,
 	RadarrLookupMovie,
 	RadarrMovie,
-} from "@/providers";
+} from "@/providers/radarr/types";
+import type {
+	TmdbId,
+	TvdbId,
+} from "@/providers/schemas";
+import type { SonarrFormState } from "@/providers/sonarr/form-state";
+import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
 import type {
 	SonarrLookupSeries,
 	SonarrSeries,
 	SonarrSeriesSnapshot,
 } from "@/providers/sonarr/types";
-import type {
-	AcceptedMappingReason,
-	AcceptedMappingSource,
-	MappingUnknownReason,
-	EffectiveMappingState,
-	ProviderExternalId,
-} from "@/mapping/types";
-import type { MappingListGroup } from "@/mapping/queries/list-mappings";
-import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
-import type { AutoMappingStatus } from "@/mapping/auto-mapping/types";
-import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
-import type { LibraryUnknownReason } from "@/mapping/library-status";
-import type { MappingCursor } from "./schemas";
+import type { MappingResult } from "@/mapping/types";
 
-export type ProviderTargetSummary = {
-	provider: Provider;
-	providerId: ProviderExternalId;
+export type ProviderExternalId = TvdbId | TmdbId;
+
+export type StatusInput = {
+	anilistId: AniListId;
+	title?: string;
+	force_verify?: boolean;
+	force_mapping_retry?: boolean;
+	metadata?: AniListMediaHint | null;
+};
+
+export type AddSonarrInput = {
+	anilistId: AniListId;
+	tvdbId: TvdbId;
 	title: string;
-	providerFolderName?: string;
-	year?: number;
-	typeLabel?: string;
-	isInLibrary: boolean;
-	providerRouteSlug?: string;
-	posterUrl?: string;
-	backdropUrl?: string;
-	statusLabel?: string;
-	networkOrStudio?: string;
-	overview?: string;
-	alternateTitles?: string[];
-	episodeCount?: number;
-	episodeFileCount?: number;
-	runtimeMinutes?: number;
-	hasFile?: boolean;
-	linkedAniListIds?: AniListId[];
+	primaryTitleHint?: string;
+	metadata?: AniListMediaHint | null;
+	form: SonarrFormState;
+};
+
+export type UpdateSonarrInput = {
+	anilistId: AniListId;
+	tvdbId: TvdbId;
+	title: string;
+	form: SonarrFormState;
+	monitoringAction?: SonarrEditMonitoringAction;
+};
+
+export type AddRadarrInput = {
+	anilistId: AniListId;
+	tmdbId: TmdbId;
+	title: string;
+	primaryTitleHint?: string;
+	metadata?: AniListMediaHint | null;
+	form: RadarrFormState;
+};
+
+export type UpdateRadarrInput = {
+	anilistId: AniListId;
+	tmdbId: TmdbId;
+	title: string;
+	form: RadarrFormState;
+};
+
+export type SetManualMappingInput = {
+	anilistId: AniListId;
+	force?: boolean;
+} & (
+	| { provider: "sonarr"; providerId: TvdbId }
+	| { provider: "radarr"; providerId: TmdbId }
+);
+
+export type ClearManualMappingInput = {
+	anilistId: AniListId;
+	provider: Provider;
+};
+
+export type SetMappingIgnoreInput = ClearManualMappingInput;
+export type ClearMappingIgnoreInput = ClearManualMappingInput;
+
+export type SetMappingRejectedCandidateInput = {
+	anilistId: AniListId;
+} & (
+	| { provider: "sonarr"; providerId: TvdbId }
+	| { provider: "radarr"; providerId: TmdbId }
+);
+
+export type ClearMappingRejectedCandidateInput =
+	SetMappingRejectedCandidateInput;
+
+export type SonarrLookupInput = {
+	term: string;
+};
+
+export type RadarrLookupInput = {
+	term: string;
+};
+
+export type ValidateTvdbInput = {
+	tvdbId: TvdbId;
+};
+
+export type ValidateTmdbInput = {
+	tmdbId: TmdbId;
+};
+
+export type GetMappingsInput = {
+	providers?: Provider[];
+	statuses?: MappingListRowStatus[];
+	limit?: number;
+	query?: string;
+};
+
+export type GetMappingIdentitiesInput = AniListId[];
+
+export type GetMappingInspectionInput = {
+	anilistId: AniListId;
+	provider: Provider;
+};
+
+export type GetAniListMetadataInput = {
+	ids: AniListId[];
+};
+
+export type ProviderConnectionTestInput = {
+	credentials: ProviderCredentials;
+};
+
+export type GetProviderBaseUrlInput = {
+	provider: Provider;
+};
+
+export type NotifyProviderConnectionChangedInput = {
+	changedProviders?: Provider[];
+	disconnectedProviders?: Provider[];
+};
+
+export type GetProviderFormResourcesInput = {
+	credentials?: ProviderCredentials;
 };
 
 interface ProviderStatusResponseBase {
-	providerId: ProviderExternalId | null;
-	providerMappingState: EffectiveMappingState;
+	mapping: MappingResult;
 	isInLibrary: boolean | null;
-	successfulSynonym?: string;
-	mappingSource?: AcceptedMappingSource;
-	mappingReason?: AcceptedMappingReason;
-	resolverOutcome?: AutoMappingStatus;
-	mappingUnknownReason?: MappingUnknownReason;
-	libraryUnknownReason?: LibraryUnknownReason;
-	/** True when a manual AniList -> provider manual mapping is active for this ID. */
-	manualMappingActive?: boolean;
-	/** Other AniList IDs currently linked to the same provider ID. */
-	linkedAniListIds?: number[];
-	targetSummary?: ProviderTargetSummary;
 }
 
-// TODO: Rename to GetSeriesStatusOutput when the paired Radarr status cleanup happens.
-export interface CheckSeriesStatusResponse extends ProviderStatusResponseBase {
+export interface GetSeriesStatusOutput extends ProviderStatusResponseBase {
 	series?: SonarrSeriesSnapshot | SonarrSeries | SonarrLookupSeries;
 }
 
-export interface CheckMovieStatusResponse extends ProviderStatusResponseBase {
+export interface GetMovieStatusOutput extends ProviderStatusResponseBase {
 	movie?: RadarrMovieSnapshot | RadarrMovie | RadarrLookupMovie;
+}
+
+export type MappingListRowStatus =
+	| "needs-review"
+	| "in-library"
+	| "can-add"
+	| "suppressed"
+	| "unmapped"
+	| "unknown";
+
+export interface MappingListProviderMeta {
+	title?: string;
+	type?: "series" | "movie";
+	statusLabel?: string;
+}
+
+export interface MappingListRow {
+	anilistId: AniListId;
+	provider: Provider;
+	result: MappingResult;
+	providerId: ProviderExternalId | null;
+	isInLibrary: boolean | null;
+	mappingRowStatus: MappingListRowStatus;
+	providerMeta?: MappingListProviderMeta;
+}
+
+export interface MappingListGroup {
+	key: string;
+	provider: Provider;
+	providerId: ProviderExternalId | null;
+	rows: MappingListRow[];
+	linkedAniListIds: readonly AniListId[];
+	isInLibrary: boolean | null;
+	providerMeta?: MappingListProviderMeta;
 }
 
 export interface GetMappingsOutput {
 	groups: MappingListGroup[];
-	nextCursor?: MappingCursor | null;
-	total?: number;
+	total: number;
 }
 
-export type GetMappingIdentitiesOutput = EffectiveMappingPresence[];
+export interface MappingIdentity {
+	anilistId: AniListId;
+	provider: Provider;
+	result: MappingResult;
+}
+
+export type GetMappingIdentitiesOutput = MappingIdentity[];
+
+export interface MappingDetailsLinkedAniListEntry {
+	anilistId: AniListId;
+	title?: string;
+	format?: AniListMediaFormat | null;
+	year?: number | null;
+	coverImage?: string | null;
+	relation?: "current";
+}
+
+export interface MappingDetailsPayload {
+	mapping: MappingResult;
+	linkedAniListEntries: readonly MappingDetailsLinkedAniListEntry[];
+}
 
 export type GetMappingInspectionOutput = MappingDetailsPayload;
 

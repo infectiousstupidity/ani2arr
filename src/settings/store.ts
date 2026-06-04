@@ -11,7 +11,10 @@ import {
 	normalizeRadarrFormState,
 	stripRadarrFormStateForDefaults,
 } from "@/providers/radarr/form-state";
-import type { Provider, ProviderCredentials } from "@/providers";
+import type {
+	Provider,
+	ProviderCredentials,
+} from "@/providers/types";
 import { logger } from "@/shared/utils/logger";
 import {
 	ExtensionOptionsSchema,

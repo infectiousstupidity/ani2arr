@@ -1,15 +1,17 @@
 /** Pure AniList metadata, title, and header derivation for media modal data hooks. */
 // src/features/media-modal/anilist-modal-data.ts
 
-import type { AniListId } from "@/anilist";
-import { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
+import {
+	metadataHintFromAniListMetadata,
+	resolveTitlePreference,
+	type AniListTitleLanguage,
+} from "@/anilist/title";
 import type {
+	AniListId,
 	AniListMedia,
 	AniListMediaFormat,
 	AniListMediaHint,
-} from "@/anilist/schemas/media.schema";
-import type { AniListTitleLanguage } from "@/anilist/schemas/title-language.schema";
-import { resolveTitlePreference } from "@/anilist/title-preference";
+} from "@/anilist/types";
 import type { GetAniListMetadataOutput } from "@/rpc/types";
 import type { AniListHeaderData, MediaModalMetadataHint } from "./types";
 
@@ -25,6 +27,8 @@ export type ResolvedMediaModalMetadata = {
 	providerPayloadTitle?: string | undefined;
 	providerRequestTitle: string;
 	resolvedMetadata: AniListMediaHint | null;
+	statusMetadata: AniListMediaHint | null;
+	statusTitle?: string | undefined;
 };
 
 export function pickString(
@@ -262,25 +266,6 @@ function getFallbackTitle(input: {
 	);
 }
 
-function getHeaderTitle(input: {
-	anilistMedia: AniListMedia | null | undefined;
-	metadataHint: MediaModalMetadataHint | null;
-	providerRequestTitle: string;
-	resolvedMetadata: AniListMediaHint | null;
-}): string {
-	return (
-		pickString(
-			input.anilistMedia?.title?.english,
-			input.anilistMedia?.title?.romaji,
-			input.anilistMedia?.title?.native,
-			input.resolvedMetadata?.titles?.english,
-			input.resolvedMetadata?.titles?.romaji,
-			input.resolvedMetadata?.titles?.native,
-			input.metadataHint?.title,
-		) ?? input.providerRequestTitle
-	);
-}
-
 export function resolveMediaModalMetadata(input: {
 	anilistId: AniListId;
 	anilistMedia: AniListMedia | null | undefined;
@@ -319,19 +304,17 @@ export function resolveMediaModalMetadata(input: {
 		fallbackTitle === `AniList #${anilistId}`
 			? undefined
 			: providerRequestTitle;
+	const statusTitle = pickString(metadataHint?.title);
 
 	return {
 		resolvedMetadata,
+		statusMetadata: canonical,
+		...(statusTitle === undefined ? {} : { statusTitle }),
 		providerRequestTitle,
 		...(providerPayloadTitle === undefined ? {} : { providerPayloadTitle }),
 		fallbackTitle,
 		anilistHeaderData: buildAniListHeaderData({
-			title: getHeaderTitle({
-				anilistMedia,
-				metadataHint,
-				providerRequestTitle,
-				resolvedMetadata,
-			}),
+			title: providerRequestTitle,
 			anilistMedia,
 			resolvedMetadata,
 			format,

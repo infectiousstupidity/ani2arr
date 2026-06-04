@@ -4,7 +4,7 @@
 import type { ComponentType } from "react";
 import { browser } from "wxt/browser";
 import { Palette, Plug, ShieldCheck, SlidersHorizontal, Link2 } from "lucide-react";
-import type { Provider } from "@/providers";
+import type { Provider } from "@/providers/types";
 import type { ProviderConnectionStatusView } from "@/queries/provider-connection";
 import { cn } from "@/shared/utils/cn";
 import type { PageId } from "../navigation";
@@ -139,10 +139,9 @@ interface PageCommandProps {
   statuses: ProviderStatusLookup;
   onDisconnect: (provider: Provider) => void;
   isDisconnecting: boolean;
-  saveControl: React.JSX.Element;
 }
 
-export function DesktopPageHeader({ activePage, statuses, onDisconnect, isDisconnecting, saveControl }: PageCommandProps) {
+export function DesktopPageHeader({ activePage, statuses, onDisconnect, isDisconnecting }: PageCommandProps) {
   const meta = getPageMeta(activePage);
   const provider = getPageProvider(activePage);
   const status = getStatusForPage(activePage, statuses);
@@ -175,12 +174,11 @@ export function DesktopPageHeader({ activePage, statuses, onDisconnect, isDiscon
           </div>
         )}
       </div>
-      {saveControl}
     </header>
   );
 }
 
-export function MobileTopBar({ activePage, statuses, onDisconnect, isDisconnecting, saveControl }: PageCommandProps) {
+export function MobileTopBar({ activePage, statuses, onDisconnect, isDisconnecting }: PageCommandProps) {
   const meta = getPageMeta(activePage);
   const Icon = meta.icon;
   const provider = getPageProvider(activePage);
@@ -206,7 +204,6 @@ export function MobileTopBar({ activePage, statuses, onDisconnect, isDisconnecti
           Disconnect
         </button>
       )}
-      {saveControl}
     </header>
   );
 }

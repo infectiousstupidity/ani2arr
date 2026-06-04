@@ -1,9 +1,8 @@
-/** Main options page shell, navigation, and unsaved-work guards. */
+/** Main options page shell, navigation, and provider disconnect flow. */
 // src/options-page/index.tsx
 
-import { useEffect, useMemo, useState } from "react";
-import { useFormContext, useFormState } from "react-hook-form";
-import type { Provider } from "@/providers";
+import { useMemo, useState } from "react";
+import type { Provider } from "@/providers/types";
 import {
   useExtensionOptions,
   useOptionsQuerySync,
@@ -11,13 +10,14 @@ import {
 } from "@/queries/options";
 import { useStoredProviderConnectionStatus } from "@/queries/provider-connection";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
-import { getProviderCredentials, type PublicOptions } from "@/settings";
+import { getProviderCredentials } from "@/settings/provider-config";
 
 import { ConfirmDialog } from "./components/ui/alert-dialog";
-import { useRadarrActions } from "./hooks/use-radarr-actions";
-import { useSonarrActions } from "./hooks/use-sonarr-actions";
-import { useHashRoute, type PageId } from "./navigation";
-import { GlobalSaveButton, UniversalFormProvider } from "./universal-form";
+import {
+  useRadarrActions,
+  useSonarrActions,
+} from "./hooks/provider-connection-actions";
+import { useHashRoute } from "./navigation";
 import {
   DesktopPageHeader,
   DesktopSidebar,
@@ -32,30 +32,19 @@ import { UiPage } from "./pages/ui-page";
 
 export const OptionsPage = () => {
   useOptionsQuerySync();
-
-  return (
-    <UniversalFormProvider>
-      <OptionsPageContent />
-    </UniversalFormProvider>
-  );
+  return <OptionsPageContent />;
 };
 
 const OptionsPageContent = () => {
   useA2aBroadcasts();
 
-  const { page, setPage } = useHashRoute();
-  const { reset } = useFormContext<PublicOptions>();
-  const { isDirty } = useFormState<PublicOptions>();
+  const { page, hash, setPage } = useHashRoute();
   const extensionOptionsQuery = useExtensionOptions();
   const publicOptionsQuery = usePublicOptions();
   const sonarrActions = useSonarrActions();
   const radarrActions = useRadarrActions();
 
-  const [hasConnectionDraftChanges, setHasConnectionDraftChanges] = useState(false);
-  const [pendingPage, setPendingPage] = useState<PageId | null>(null);
   const [pendingDisconnectProvider, setPendingDisconnectProvider] = useState<Provider | null>(null);
-
-  const hasUnsavedChanges = isDirty || hasConnectionDraftChanges;
 
   const sonarrCredentials = useMemo(
     () => getProviderCredentials(extensionOptionsQuery.data, "sonarr"),
@@ -88,6 +77,14 @@ const OptionsPageContent = () => {
 
   const isProviderActionPending = sonarrActions.isConnecting || radarrActions.isConnecting;
 
+  if (publicOptionsQuery.isLoading || !publicOptionsQuery.data) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-bg-primary text-text-secondary">
+        Loading settings...
+      </div>
+    );
+  }
+
   const requestDisconnect = (provider: Provider) => {
     setPendingDisconnectProvider(provider);
   };
@@ -101,44 +98,7 @@ const OptionsPageContent = () => {
         : await radarrActions.disconnectRadarr();
 
     if (!success) return;
-    setHasConnectionDraftChanges(false);
     setPendingDisconnectProvider(null);
-  };
-
-  useEffect(() => {
-    if (!hasUnsavedChanges) return;
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-
-    globalThis.addEventListener("beforeunload", handleBeforeUnload);
-    return () => globalThis.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasUnsavedChanges]);
-
-  const requestPageChange = (nextPage: PageId) => {
-    if (nextPage === page) return;
-
-    if (hasUnsavedChanges) {
-      setPendingPage(nextPage);
-      return;
-    }
-
-    setHasConnectionDraftChanges(false);
-    setPage(nextPage);
-  };
-
-  const confirmPageChange = () => {
-    if (publicOptionsQuery.data) {
-      reset(publicOptionsQuery.data);
-    }
-
-    setHasConnectionDraftChanges(false);
-    if (pendingPage) {
-      setPage(pendingPage);
-    }
-    setPendingPage(null);
   };
 
   const renderActivePage = () => {
@@ -149,7 +109,6 @@ const OptionsPageContent = () => {
             connectSonarr={sonarrActions.connectSonarr}
             connectionError={sonarrActions.error}
             isConnecting={sonarrActions.isConnecting}
-            onConnectionDraftDirtyChange={setHasConnectionDraftChanges}
           />
         );
       }
@@ -159,12 +118,11 @@ const OptionsPageContent = () => {
             connectRadarr={radarrActions.connectRadarr}
             connectionError={radarrActions.error}
             isConnecting={radarrActions.isConnecting}
-            onConnectionDraftDirtyChange={setHasConnectionDraftChanges}
           />
         );
       }
       case "mappings": {
-        return <MappingsPage />;
+        return <MappingsPage hash={hash} />;
       }
       case "ui": {
         return <UiPage />;
@@ -178,7 +136,6 @@ const OptionsPageContent = () => {
             connectSonarr={sonarrActions.connectSonarr}
             connectionError={sonarrActions.error}
             isConnecting={sonarrActions.isConnecting}
-            onConnectionDraftDirtyChange={setHasConnectionDraftChanges}
           />
         );
       }
@@ -190,7 +147,6 @@ const OptionsPageContent = () => {
       <MobileTopBar
         activePage={page}
         isDisconnecting={isProviderActionPending}
-        saveControl={<GlobalSaveButton isCompact label="Save" />}
         statuses={statuses}
         onDisconnect={requestDisconnect}
       />
@@ -199,7 +155,7 @@ const OptionsPageContent = () => {
         <DesktopSidebar
           activePage={page}
           statuses={statuses}
-          onPageSelect={requestPageChange}
+          onPageSelect={setPage}
         />
 
         <div className="min-w-0 flex-1 md:h-screen md:overflow-y-auto">
@@ -207,7 +163,6 @@ const OptionsPageContent = () => {
             <DesktopPageHeader
               activePage={page}
               isDisconnecting={isProviderActionPending}
-              saveControl={<GlobalSaveButton label="Save changes" className="shrink-0" />}
               statuses={statuses}
               onDisconnect={requestDisconnect}
             />
@@ -216,23 +171,7 @@ const OptionsPageContent = () => {
         </div>
       </div>
 
-      <MobileBottomNav activePage={page} onPageSelect={requestPageChange} />
-
-      {pendingPage === null ? null : (
-        <ConfirmDialog
-          open={true}
-          onOpenChange={(open) => {
-            if (open) return;
-            setPendingPage(null);
-          }}
-          title="Discard unsaved changes?"
-          description="Unsaved settings or connection edits on this page will be lost."
-          confirmText="Discard"
-          cancelText="Stay"
-          onConfirm={confirmPageChange}
-          isDestructive={true}
-        />
-      )}
+      <MobileBottomNav activePage={page} onPageSelect={setPage} />
 
       {pendingDisconnectProvider === null ? null : (
         <ConfirmDialog

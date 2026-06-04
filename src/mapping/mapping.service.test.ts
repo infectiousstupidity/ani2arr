@@ -1,607 +1,480 @@
-/** Highest-value MappingService tests for precedence, concurrency, and resolver safety. */
+/** Tests for mapping precedence and linked AniList ID discovery. */
 // src/mapping/mapping.service.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { parseAniListId, type AniListId } from "@/anilist";
-import { createError, ErrorCode } from "@/shared/errors";
+import { parseAniListId, type AniListId } from "@/anilist/types";
+import {
+	parseTmdbId,
+	parseTvdbId,
+} from "@/providers/schemas";
+import type { Provider } from "@/providers/types";
+import type { ManualFacts } from "./manual.store";
 import { MappingService } from "./mapping.service";
+import type { AutoResult, MappingResult, UpstreamTarget } from "./types";
+
+const storeRecords = vi.hoisted(() => ({
+	manual: [] as Array<{
+		provider: Provider;
+		anilistId: AniListId;
+		facts: ManualFacts;
+	}>,
+	auto: [] as Array<{
+		provider: Provider;
+		anilistId: AniListId;
+		result: AutoResult;
+	}>,
+	upstream: [] as Array<{
+		anilistId: AniListId;
+		targets: UpstreamTarget[];
+	}>,
+}));
+
+vi.mock("./manual.store", () => ({
+	getManualFacts: vi.fn(async (provider: Provider, anilistId: AniListId) =>
+		storeRecords.manual.find(
+			(record) =>
+				record.provider === provider && record.anilistId === anilistId,
+		)?.facts ?? null,
+	),
+	listManualFacts: vi.fn(async (provider: Provider) =>
+		storeRecords.manual
+			.filter((record) => record.provider === provider)
+			.map(({ anilistId, facts }) => ({ anilistId, facts })),
+	),
+	clearIgnored: vi.fn(),
+	clearManualMapping: vi.fn(),
+	clearRejectedAutoCandidate: vi.fn(),
+	rejectAutoCandidate: vi.fn(),
+	setIgnored: vi.fn(),
+	setManualMapping: vi.fn(),
+}));
+
+vi.mock("./auto.store", () => ({
+	getAutoResult: vi.fn(async (provider: Provider, anilistId: AniListId) =>
+		storeRecords.auto.find(
+			(record) =>
+				record.provider === provider && record.anilistId === anilistId,
+		)?.result ?? null,
+	),
+	listAutoResults: vi.fn(async (provider: Provider) =>
+		storeRecords.auto
+			.filter((record) => record.provider === provider)
+			.map(({ anilistId, result }) => ({ anilistId, result })),
+	),
+}));
+
+vi.mock("./upstream.store", () => ({
+	getUpstreamTargets: vi.fn(async (provider: Provider, anilistId: AniListId) =>
+		(storeRecords.upstream.find((record) => record.anilistId === anilistId)
+			?.targets ?? []
+		).filter((target) => target.provider === provider),
+	),
+	listUpstreamMappings: vi.fn(async () => storeRecords.upstream),
+}));
 
 const aid = parseAniListId;
+const tmdb = parseTmdbId;
+const tvdb = parseTvdbId;
 
-type StubManualMappings = {
-	isIgnored: ReturnType<typeof vi.fn>;
-	get: ReturnType<typeof vi.fn>;
-	clear: ReturnType<typeof vi.fn>;
-	getCandidateSuppression: ReturnType<typeof vi.fn>;
-};
-
-type StubAutoMappingStore = {
-	get: ReturnType<typeof vi.fn>;
-	set: ReturnType<typeof vi.fn>;
-	delete: ReturnType<typeof vi.fn>;
-	clear: ReturnType<typeof vi.fn>;
-};
-
-type StubAniListApi = {
-	fetchMediaWithRelations: ReturnType<typeof vi.fn>;
-	iteratePrequelChain: ReturnType<typeof vi.fn>;
-	prioritize: ReturnType<typeof vi.fn>;
-	removeMediaFromCache: ReturnType<typeof vi.fn>;
-};
-
-type LookupResult = {
-	title: string;
-	tvdbId: number;
-	year?: number;
-	genres?: string[];
-};
-
-type StubSonarrLookupClient = {
-	provider: "sonarr";
-	reset: ReturnType<typeof vi.fn>;
-	lookupTitle: ReturnType<
-		typeof vi.fn<(term: { display: string }) => Promise<LookupResult[]>>
-	>;
-	lookupByProviderId: ReturnType<typeof vi.fn>;
-	readProviderId: ReturnType<typeof vi.fn>;
-};
-
-type TestService = ReturnType<typeof createService>;
-
-function createDeferred<T>() {
-	let resolve!: (value: T | PromiseLike<T>) => void;
-	const promise = new Promise<T>((promiseResolve) => {
-		resolve = promiseResolve;
-	});
-	return { promise, resolve };
-}
-
-const createService = () => {
-	const anilistApi: StubAniListApi = {
-		fetchMediaWithRelations: vi.fn(async () => {
-			throw new Error("Unexpected AniList fetch");
-		}),
-		iteratePrequelChain: vi.fn(async function* () {}),
-		prioritize: vi.fn(),
-		removeMediaFromCache: vi.fn(async () => {}),
-	};
-	const manualMappings: StubManualMappings = {
-		isIgnored: vi.fn(() => false),
-		get: vi.fn(() => null),
-		clear: vi.fn(async () => {}),
-		getCandidateSuppression: vi.fn(() => null),
-	};
-	const anibridgeMappingStore = {
-		getSonarrCandidates: vi.fn<(anilistId: AniListId) => number[]>(() => []),
-		getRadarrCandidates: vi.fn<(anilistId: AniListId) => number[]>(() => []),
-		init: vi.fn(async () => {}),
-	};
-	const autoMappingStore: StubAutoMappingStore = {
-		get: vi.fn(async () => null),
-		set: vi.fn(async () => true),
-		delete: vi.fn(async () => false),
-		clear: vi.fn(async () => false),
-	};
-	const sonarrLookupClient: StubSonarrLookupClient = {
-		provider: "sonarr" as const,
-		reset: vi.fn(async () => {}),
-		lookupTitle: vi.fn(async (_term: { display: string }) => []),
-		lookupByProviderId: vi.fn(async () => null),
-		readProviderId: vi.fn(
-			(result: { tvdbId?: number }) => result.tvdbId ?? null,
-		),
-	};
-	const lookupClients = {
-		sonarr: sonarrLookupClient,
-		radarr: { reset: vi.fn(async () => {}) },
-	};
-	const notifyMappingsChanged = vi.fn();
-	const getConfiguredCredentials = vi.fn(async () => ({
-		url: "http://localhost:8989",
-		apiKey: "test-key",
-	}));
-
-	const service = new MappingService({
-		anilistApi: anilistApi as never,
-		anibridgeMappingStore: anibridgeMappingStore as never,
-		lookupClients: lookupClients as never,
-		autoMappingStore: autoMappingStore as never,
-		getConfiguredCredentials,
-		manualMappings: manualMappings as never,
-		notifyMappingsChanged,
-	});
-
-	return {
-		anilistApi,
-		service,
-		manualMappings,
-		anibridgeMappingStore,
-		autoMappingStore,
-		lookupClients,
-		getConfiguredCredentials,
-		notifyMappingsChanged,
-	};
-};
-
-function configureMediaFetch(
-	{ anilistApi }: TestService,
-	mediaById: Record<number, unknown>,
-): void {
-	anilistApi.fetchMediaWithRelations.mockImplementation(
-		async (anilistId: AniListId) => {
-			const media = mediaById[anilistId];
-			if (!media) {
-				throw new Error(`Unexpected AniList fetch ${anilistId}`);
-			}
-			return media;
-		},
+const service = () => new MappingService(vi.fn());
+const replaceAuto = (
+	provider: Provider,
+	anilistId: AniListId,
+	result: AutoResult,
+): void => {
+	storeRecords.auto = storeRecords.auto.filter(
+		(record) =>
+			record.provider !== provider || record.anilistId !== anilistId,
 	);
+	storeRecords.auto.push({ provider, anilistId, result });
+};
+
+function resetRecords(): void {
+	storeRecords.manual = [];
+	storeRecords.auto = [];
+	storeRecords.upstream = [];
 }
 
 describe("MappingService", () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
+		resetRecords();
 	});
 
-	it("keeps a user manual mapping when upstream disagrees", async () => {
-		const { service, manualMappings, anibridgeMappingStore, autoMappingStore } =
-			createService();
-		manualMappings.get.mockReturnValue(222);
-		anibridgeMappingStore.getSonarrCandidates.mockReturnValue([999]);
-
-		const result = await service.resolveProviderId("sonarr", aid(1));
-
-		expect(result).toMatchObject({
-			providerId: 222,
-			reason: "manual-override",
-		});
-		expect(manualMappings.clear).not.toHaveBeenCalled();
-		expect(autoMappingStore.set).not.toHaveBeenCalled();
-	});
-
-	it("records upstream ambiguity instead of selecting a random candidate", async () => {
-		const { service, anibridgeMappingStore, autoMappingStore, anilistApi } =
-			createService();
-		anibridgeMappingStore.getSonarrCandidates.mockReturnValue([333, 444]);
-
-		const result = await service.resolveProviderId("sonarr", aid(6));
-
-		expect(result).toBeNull();
-		expect(autoMappingStore.set).toHaveBeenCalledWith(
-			"sonarr",
-			6,
-			{ state: "ambiguous" },
-			expect.any(Object),
-		);
-		expect(anilistApi.fetchMediaWithRelations).not.toHaveBeenCalled();
-	});
-
-	it("does not reuse a default in-flight request for force lookups", async () => {
-		const context = createService();
-		const { service, anilistApi, lookupClients } = context;
-		const defaultMedia = {
-			id: aid(78),
-			format: "TV",
-			title: { english: "Default Result" },
-			synonyms: [],
-		};
-		const forceMedia = {
-			id: aid(78),
-			format: "TV",
-			title: { english: "Force Result" },
-			synonyms: [],
-		};
-		const defaultFetch = createDeferred<typeof defaultMedia>();
-		let fetchCount = 0;
-		anilistApi.fetchMediaWithRelations.mockImplementation(async () => {
-			fetchCount += 1;
-			return fetchCount === 1 ? defaultFetch.promise : forceMedia;
-		});
-		lookupClients.sonarr.lookupTitle.mockImplementation(
-			async (term: { display: string }) => {
-				if (term.display === "Default Result") {
-					return [{ title: "Default Result", tvdbId: 101, year: 2020 }];
-				}
-				if (term.display === "Force Result") {
-					return [{ title: "Force Result", tvdbId: 202, year: 2020 }];
-				}
-				return [];
+	it("chooses the active mapping source by precedence", async () => {
+		const cases: Array<{
+			name: string;
+			provider: Provider;
+			manual?: ManualFacts;
+			upstream?: UpstreamTarget[];
+			auto?: AutoResult;
+			expected: MappingResult;
+		}> = [
+			{
+				name: "ignored beats all",
+				provider: "radarr",
+				manual: { ignored: true },
+				upstream: [{ provider: "radarr", providerId: tmdb(10) }],
+				auto: { kind: "mapped", providerId: tmdb(20) },
+				expected: { kind: "ignored" },
 			},
-		);
-
-		const defaultRequest = service.resolveProviderId("sonarr", aid(78));
-		await vi.waitFor(() => {
-			expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledTimes(1);
-		});
-
-		const forceRequest = service.resolveProviderId("sonarr", aid(78), {
-			forceLookupNetwork: true,
-		});
-
-		await vi.waitFor(() => {
-			expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledTimes(2);
-		});
-		await expect(forceRequest).resolves.toMatchObject({ providerId: 202 });
-
-		defaultFetch.resolve(defaultMedia);
-		await expect(defaultRequest).resolves.toMatchObject({ providerId: 101 });
-	});
-
-	it("does not let an old resolver write after provider reset", async () => {
-		const context = createService();
-		const {
-			service,
-			anilistApi,
-			lookupClients,
-			autoMappingStore,
-			notifyMappingsChanged,
-		} = context;
-		const media = {
-			id: aid(79),
-			format: "TV",
-			title: { english: "Old Credentials Result" },
-			synonyms: [],
-		};
-		const pendingFetch = createDeferred<typeof media>();
-		anilistApi.fetchMediaWithRelations.mockResolvedValue(pendingFetch.promise);
-		lookupClients.sonarr.lookupTitle.mockResolvedValue([
-			{ title: "Old Credentials Result", tvdbId: 303, year: 2020 },
-		]);
-
-		const request = service.resolveProviderId("sonarr", aid(79));
-		await vi.waitFor(() => {
-			expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledTimes(1);
-		});
-		notifyMappingsChanged.mockClear();
-
-		await service.resetLookupState("sonarr");
-		expect(notifyMappingsChanged).toHaveBeenCalledTimes(1);
-		notifyMappingsChanged.mockClear();
-
-		pendingFetch.resolve(media);
-		await expect(request).resolves.toBeNull();
-		expect(autoMappingStore.set).not.toHaveBeenCalled();
-		expect(notifyMappingsChanged).not.toHaveBeenCalled();
-	});
-
-	it("bypasses stored mapped auto results for force lookups", async () => {
-		const context = createService();
-		const { service, anilistApi, autoMappingStore, lookupClients } = context;
-		autoMappingStore.get.mockResolvedValue({
-			state: "mapped",
-			providerId: 101,
-			acceptedEvidence: {
-				source: "auto",
-				reason: "exact-title-match",
-			},
-			updatedAt: Date.now(),
-		});
-		configureMediaFetch(context, {
-			78: {
-				id: aid(78),
-				format: "TV",
-				title: { english: "Fresh Result" },
-				synonyms: [],
-			},
-		});
-		lookupClients.sonarr.lookupTitle.mockResolvedValue([
-			{ title: "Fresh Result", tvdbId: 202, year: 2020 },
-		]);
-
-		const result = await service.resolveProviderId("sonarr", aid(78), {
-			forceLookupNetwork: true,
-		});
-
-		expect(result).toMatchObject({ providerId: 202 });
-		expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledTimes(1);
-		expect(autoMappingStore.set).toHaveBeenCalledWith(
-			"sonarr",
-			78,
-			expect.objectContaining({
-				state: "mapped",
-				providerId: 202,
-			}),
-			expect.any(Object),
-		);
-	});
-
-	it("bypasses stored terminal auto results for force lookups", async () => {
-		const context = createService();
-		const { service, anilistApi, autoMappingStore, lookupClients } = context;
-		autoMappingStore.get.mockResolvedValue({
-			state: "unresolved",
-			updatedAt: Date.now(),
-		});
-		configureMediaFetch(context, {
-			81: {
-				id: aid(81),
-				format: "TV",
-				title: { english: "Recovered Result" },
-				synonyms: [],
-			},
-		});
-		lookupClients.sonarr.lookupTitle.mockResolvedValue([
-			{ title: "Recovered Result", tvdbId: 404, year: 2020 },
-		]);
-
-		const result = await service.resolveProviderId("sonarr", aid(81), {
-			forceLookupNetwork: true,
-		});
-
-		expect(result).toMatchObject({ providerId: 404 });
-		expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledTimes(1);
-		expect(autoMappingStore.set).toHaveBeenCalledWith(
-			"sonarr",
-			81,
-			expect.objectContaining({
-				state: "mapped",
-				providerId: 404,
-			}),
-			expect.any(Object),
-		);
-	});
-
-	it("maps Frieren sequels through direct AniList prequel titles", async () => {
-		const context = createService();
-		const { service, anilistApi, lookupClients } = context;
-		configureMediaFetch(context, {
-			209_939: {
-				id: aid(209_939),
-				format: "TV",
-				title: { romaji: "Sousou no Frieren 3rd Season" },
-				synonyms: ["Frieren: Beyond Journey’s End Season 3 Golden Land Arc"],
-				startDate: { year: 2027 },
-				relations: {
-					edges: [
-						{
-							relationType: "PREQUEL",
-							node: {
-								id: aid(182_255),
-								format: "TV",
-								title: {
-									romaji: "Sousou no Frieren 2nd Season",
-									english: "Frieren: Beyond Journey’s End Season 2",
-								},
-								synonyms: [],
-								startDate: { year: 2026 },
-							},
-						},
-					],
+			{
+				name: "manual different from upstream wins",
+				provider: "radarr",
+				manual: { mapping: { providerId: tmdb(20) } },
+				upstream: [{ provider: "radarr", providerId: tmdb(10) }],
+				expected: {
+					kind: "mapped",
+					source: "manual",
+					providerId: tmdb(20),
 				},
 			},
-		});
-		lookupClients.sonarr.lookupTitle.mockImplementation(
-			async (term: { display: string }) =>
-				term.display === "Frieren: Beyond Journeys End"
-					? [
-							{
-								title: "Frieren: Beyond Journey's End",
-								tvdbId: 424_536,
-								year: 2023,
-								genres: ["Animation", "Anime"],
-							},
-						]
-					: [],
-		);
-
-		const result = await service.resolveProviderId("sonarr", aid(209_939), {
-			forceLookupNetwork: true,
-		});
-
-		expect(result).toMatchObject({
-			providerId: 424_536,
-			reason: "exact-title-match",
-		});
-		expect(anilistApi.iteratePrequelChain).not.toHaveBeenCalled();
-	});
-
-	it("maps GATE sequels through direct AniList prequel titles", async () => {
-		const context = createService();
-		const { service, anilistApi, lookupClients } = context;
-		configureMediaFetch(context, {
-			195_496: {
-				id: aid(195_496),
-				format: "TV",
-				title: { romaji: "GATE 2: Jieitai Kano Umi nite, Kaku Tatakaeri" },
-				synonyms: ["Gate Season 2: Thus the JSDF Fought in Their Seas!"],
-				startDate: { year: 2027 },
-				relations: {
-					edges: [
-						{
-							relationType: "PREQUEL",
-							node: {
-								id: aid(21_364),
-								format: "TV",
-								title: {
-									romaji: "GATE: Jieitai Kanochi nite, Kaku Tatakaeri Part 2",
-									english: "Gate 2",
-								},
-								synonyms: [],
-								startDate: { year: 2016 },
-							},
-						},
-					],
+			{
+				name: "manual equal to upstream resolves as upstream",
+				provider: "radarr",
+				manual: { mapping: { providerId: tmdb(10) } },
+				upstream: [{ provider: "radarr", providerId: tmdb(10) }],
+				expected: {
+					kind: "mapped",
+					source: "upstream",
+					providerId: tmdb(10),
 				},
 			},
-		});
-		lookupClients.sonarr.lookupTitle.mockImplementation(
-			async (term: { display: string }) =>
-				term.display === "Gate"
-					? [
-							{
-								title: "GATE",
-								tvdbId: 295_222,
-								year: 2015,
-								genres: ["Animation", "Anime"],
-							},
-						]
-					: [],
-		);
-
-		const result = await service.resolveProviderId("sonarr", aid(195_496), {
-			forceLookupNetwork: true,
-		});
-
-		expect(result).toMatchObject({
-			providerId: 295_222,
-			reason: "exact-title-match",
-		});
-		expect(anilistApi.iteratePrequelChain).not.toHaveBeenCalled();
-	});
-
-	it("maps slash-combined sequels through the direct AniList prequel", async () => {
-		const context = createService();
-		const { service, anilistApi, lookupClients } = context;
-		configureMediaFetch(context, {
-			189_121: {
-				id: aid(189_121),
-				format: "TV",
-				title: { romaji: "BanG Dream! It's MyGO!!!!! / Ave Mujica (Zoku-hen)" },
-				synonyms: [
-					"BanG Dream! It's MyGO!!!!! / Ave Mujica - The Die is Cast - Sequel",
+			{
+				name: "manual chosen while upstream is ambiguous remains manual",
+				provider: "sonarr",
+				manual: { mapping: { providerId: tvdb(30), season: 2 } },
+				upstream: [
+					{ provider: "sonarr", providerId: tvdb(10), season: 1 },
+					{ provider: "sonarr", providerId: tvdb(20), season: 2 },
 				],
-				startDate: { year: 2027 },
-				relations: {
-					edges: [
-						{
-							relationType: "PREQUEL",
-							node: {
-								id: aid(169_295),
-								format: "TV",
-								title: {
-									romaji: "BanG Dream! Ave Mujica",
-									english: "Ave Mujica - The Die is Cast -",
-								},
-								synonyms: ["Ave Mujica - The Die is Cast -"],
-								startDate: { year: 2025 },
-							},
-						},
+				expected: {
+					kind: "mapped",
+					source: "manual",
+					providerId: tvdb(30),
+					season: 2,
+				},
+			},
+			{
+				name: "single upstream target maps automatically",
+				provider: "sonarr",
+				upstream: [{ provider: "sonarr", providerId: tvdb(10), season: 1 }],
+				expected: {
+					kind: "mapped",
+					source: "upstream",
+					providerId: tvdb(10),
+					season: 1,
+				},
+			},
+			{
+				name: "multiple Sonarr seasons for the same TVDB show collapse to one upstream mapping",
+				provider: "sonarr",
+				upstream: [
+					{ provider: "sonarr", providerId: tvdb(81_797), season: 0 },
+					{ provider: "sonarr", providerId: tvdb(81_797), season: 1 },
+					{ provider: "sonarr", providerId: tvdb(81_797), season: 2 },
+				],
+				expected: {
+					kind: "mapped",
+					source: "upstream",
+					providerId: tvdb(81_797),
+				},
+			},
+			{
+				name: "multiple upstream targets return ambiguous",
+				provider: "sonarr",
+				upstream: [
+					{ provider: "sonarr", providerId: tvdb(10), season: 1 },
+					{ provider: "sonarr", providerId: tvdb(20), season: 2 },
+				],
+				expected: {
+					kind: "ambiguous",
+					targets: [
+						{ provider: "sonarr", providerId: tvdb(10), season: 1 },
+						{ provider: "sonarr", providerId: tvdb(20), season: 2 },
 					],
 				},
 			},
-		});
-		lookupClients.sonarr.lookupTitle.mockImplementation(
-			async (term: { display: string }) =>
-				term.display === "BanG Dream! Ave Mujica"
-					? [
-							{
-								title: "BanG Dream! Ave Mujica",
-								tvdbId: 451_494,
-								year: 2025,
-								genres: ["Animation", "Anime"],
-							},
-						]
-					: [],
-		);
-
-		const result = await service.resolveProviderId("sonarr", aid(189_121), {
-			forceLookupNetwork: true,
-		});
-
-		expect(result).toMatchObject({
-			providerId: 451_494,
-			reason: "exact-title-match",
-		});
-		expect(anilistApi.iteratePrequelChain).not.toHaveBeenCalled();
-	});
-
-	it("continues the prequel chain when the direct prequel title does not match", async () => {
-		const context = createService();
-		const { service, anilistApi, lookupClients } = context;
-		const directPrequel = {
-			id: aid(701),
-			format: "TV",
-			title: { english: "Direct Prequel" },
-			synonyms: [],
-			startDate: { year: 2024 },
-		};
-		const baseSeries = {
-			id: aid(700),
-			format: "TV",
-			title: { english: "Base Series" },
-			synonyms: [],
-			startDate: { year: 2023 },
-		};
-		configureMediaFetch(context, {
-			702: {
-				id: aid(702),
-				format: "TV",
-				title: { english: "Future Sequel" },
-				synonyms: [],
-				startDate: { year: 2026 },
-				relations: {
-					edges: [
-						{
-							relationType: "PREQUEL",
-							node: directPrequel,
-						},
+			{
+				name: "auto can choose one ambiguous upstream target",
+				provider: "sonarr",
+				upstream: [
+					{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
+					{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
+				],
+				auto: { kind: "mapped", providerId: tvdb(310_718) },
+				expected: {
+					kind: "mapped",
+					source: "auto",
+					providerId: tvdb(310_718),
+				},
+			},
+			{
+				name: "auto outside ambiguous upstream targets is ignored",
+				provider: "sonarr",
+				upstream: [
+					{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
+					{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
+				],
+				auto: { kind: "mapped", providerId: tvdb(999_999) },
+				expected: {
+					kind: "ambiguous",
+					targets: [
+						{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
+						{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
 					],
 				},
 			},
-		});
-		anilistApi.iteratePrequelChain.mockImplementation(async function* () {
-			yield directPrequel;
-			yield baseSeries;
-		});
-		lookupClients.sonarr.lookupTitle.mockImplementation(
-			async (term: { display: string }) =>
-				term.display === "Base Series"
-					? [
-							{
-								title: "Base Series",
-								tvdbId: 700_700,
-								year: 2023,
-								genres: ["Animation", "Anime"],
-							},
-						]
-					: [],
-		);
+			{
+				name: "auto result used when no manual or upstream exists",
+				provider: "radarr",
+				auto: { kind: "mapped", providerId: tmdb(30), matchedTitle: "Match" },
+				expected: {
+					kind: "mapped",
+					source: "auto",
+					providerId: tmdb(30),
+					matchedTitle: "Match",
+				},
+			},
+			{
+				name: "rejected auto candidate returns unmapped",
+				provider: "radarr",
+				manual: { rejectedProviderIds: [tmdb(30)] },
+				auto: { kind: "mapped", providerId: tmdb(30) },
+				expected: {
+					kind: "unmapped",
+					hadResolveAttempt: true,
+					rejectedProviderIds: [tmdb(30)],
+				},
+			},
+		];
 
-		const result = await service.resolveProviderId("sonarr", aid(702), {
-			forceLookupNetwork: true,
-		});
+		for (const [index, testCase] of cases.entries()) {
+			resetRecords();
+			const anilistId = aid(index + 1);
+			const { provider } = testCase;
 
-		expect(result).toMatchObject({
-			providerId: 700_700,
-			reason: "exact-title-match",
-		});
-		expect(anilistApi.iteratePrequelChain).toHaveBeenCalledTimes(1);
-		expect(
-			lookupClients.sonarr.lookupTitle.mock.calls.filter(
-				([term]) => term.display === "Direct Prequel",
-			),
-		).toHaveLength(1);
+			if (testCase.manual) {
+				storeRecords.manual.push({
+					provider,
+					anilistId,
+					facts: testCase.manual,
+				});
+			}
+			if (testCase.upstream) {
+				storeRecords.upstream.push({
+					anilistId,
+					targets: testCase.upstream,
+				});
+			}
+			if (testCase.auto) {
+				storeRecords.auto.push({
+					provider,
+					anilistId,
+					result: testCase.auto,
+				});
+			}
+
+			await expect(service().getMapping(provider, anilistId)).resolves.toEqual(
+				testCase.expected,
+			);
+		}
 	});
 
-	it("retries resolution after a retryable network failure", async () => {
-		const { service, anilistApi, lookupClients } = createService();
-		const error = createError(
-			ErrorCode.NETWORK_ERROR,
-			"Timed out reaching AniList.",
-			"Unable to connect right now.",
-		);
-		const media = {
-			id: aid(12),
-			format: "TV",
-			title: { english: "Recovered Result" },
-			synonyms: [],
-		};
-		anilistApi.fetchMediaWithRelations
-			.mockRejectedValueOnce(error)
-			.mockResolvedValueOnce(media);
-		lookupClients.sonarr.lookupTitle.mockResolvedValue([
-			{ title: "Recovered Result", tvdbId: 1212, year: 2020 },
-		]);
+	it("computes linked AniList IDs from active mapping results", async () => {
+		storeRecords.upstream = [
+			{
+				anilistId: aid(1),
+				targets: [{ provider: "radarr", providerId: tmdb(50) }],
+			},
+			{
+				anilistId: aid(5),
+				targets: [{ provider: "radarr", providerId: tmdb(50) }],
+			},
+			{
+				anilistId: aid(6),
+				targets: [
+					{ provider: "radarr", providerId: tmdb(50) },
+					{ provider: "radarr", providerId: tmdb(51) },
+				],
+			},
+		];
+		storeRecords.auto = [
+			{
+				provider: "radarr",
+				anilistId: aid(2),
+				result: { kind: "mapped", providerId: tmdb(50) },
+			},
+			{
+				provider: "radarr",
+				anilistId: aid(4),
+				result: { kind: "mapped", providerId: tmdb(50) },
+			},
+		];
+		storeRecords.manual = [
+			{
+				provider: "radarr",
+				anilistId: aid(3),
+				facts: { mapping: { providerId: tmdb(50) } },
+			},
+			{
+				provider: "radarr",
+				anilistId: aid(4),
+				facts: { ignored: true },
+			},
+			{
+				provider: "radarr",
+				anilistId: aid(5),
+				facts: { mapping: { providerId: tmdb(60) } },
+			},
+		];
 
 		await expect(
-			service.resolveProviderId("sonarr", aid(12)),
-		).rejects.toMatchObject({
-			code: ErrorCode.NETWORK_ERROR,
+			service().getLinkedAniListIds("radarr", tmdb(50)),
+		).resolves.toEqual([aid(1), aid(2), aid(3)]);
+	});
+
+	it("retries cached unmapped auto results only when forced", async () => {
+		const anilistId = aid(20);
+		const resolver = vi.fn(async () => {
+			replaceAuto("sonarr", anilistId, {
+				kind: "mapped",
+				providerId: tvdb(200),
+				matchedTitle: "Kagurabachi",
+			});
+		});
+		replaceAuto("sonarr", anilistId, { kind: "unmapped" });
+		const mappingService = new MappingService(resolver);
+
+		await expect(
+			mappingService.resolveMapping("sonarr", anilistId),
+		).resolves.toEqual({
+			kind: "unmapped",
+			hadResolveAttempt: true,
+		});
+		expect(resolver).not.toHaveBeenCalled();
+
+		await expect(
+			mappingService.resolveMapping("sonarr", anilistId, {
+				forceRetry: true,
+				title: "Kagurabachi",
+			}),
+		).resolves.toEqual({
+			kind: "mapped",
+			source: "auto",
+			providerId: tvdb(200),
+			matchedTitle: "Kagurabachi",
+		});
+		expect(resolver).toHaveBeenCalledWith("sonarr", anilistId, [], {
+			title: "Kagurabachi",
+		});
+	});
+
+	it("runs automatic resolver for ambiguous upstream targets", async () => {
+		const anilistId = aid(22);
+		storeRecords.upstream = [
+			{
+				anilistId,
+				targets: [
+					{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
+					{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
+				],
+			},
+		];
+		const resolver = vi.fn(async () => {
+			replaceAuto("sonarr", anilistId, {
+				kind: "mapped",
+				providerId: tvdb(310_718),
+				matchedTitle: "Magi: Sinbad no Bouken",
+			});
 		});
 
-		await expect(service.resolveProviderId("sonarr", aid(12))).resolves.toMatchObject({
-			providerId: 1212,
+		await expect(
+			new MappingService(resolver).resolveMapping("sonarr", anilistId, {
+				title: "Magi: Sinbad no Bouken",
+			}),
+		).resolves.toEqual({
+			kind: "mapped",
+			source: "auto",
+			providerId: tvdb(310_718),
+			matchedTitle: "Magi: Sinbad no Bouken",
 		});
-		expect(anilistApi.fetchMediaWithRelations).toHaveBeenCalledTimes(2);
+		expect(resolver).toHaveBeenCalledWith("sonarr", anilistId, [], {
+			title: "Magi: Sinbad no Bouken",
+		});
+	});
+
+	it("does not retry ambiguous upstream targets after a cached auto miss", async () => {
+		const anilistId = aid(23);
+		const targets = [
+			{ provider: "sonarr" as const, providerId: tvdb(262_094), season: 0 },
+			{ provider: "sonarr" as const, providerId: tvdb(310_718), season: 1 },
+		];
+		storeRecords.upstream = [{ anilistId, targets }];
+		replaceAuto("sonarr", anilistId, { kind: "unmapped" });
+		const resolver = vi.fn();
+
+		await expect(
+			new MappingService(resolver).resolveMapping("sonarr", anilistId),
+		).resolves.toEqual({
+			kind: "ambiguous",
+			targets,
+		});
+		expect(resolver).not.toHaveBeenCalled();
+	});
+
+	it("force retries ambiguous upstream targets after a cached auto miss", async () => {
+		const anilistId = aid(24);
+		storeRecords.upstream = [
+			{
+				anilistId,
+				targets: [
+					{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
+					{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
+				],
+			},
+		];
+		replaceAuto("sonarr", anilistId, { kind: "unmapped" });
+		const resolver = vi.fn(async () => {
+			replaceAuto("sonarr", anilistId, {
+				kind: "mapped",
+				providerId: tvdb(310_718),
+				matchedTitle: "Magi: Sinbad no Bouken",
+			});
+		});
+
+		await expect(
+			new MappingService(resolver).resolveMapping("sonarr", anilistId, {
+				forceRetry: true,
+				title: "Magi: Sinbad no Bouken",
+			}),
+		).resolves.toEqual({
+			kind: "mapped",
+			source: "auto",
+			providerId: tvdb(310_718),
+			matchedTitle: "Magi: Sinbad no Bouken",
+		});
+		expect(resolver).toHaveBeenCalledWith("sonarr", anilistId, [], {
+			title: "Magi: Sinbad no Bouken",
+		});
+	});
+
+	it("does not force retry mapped auto results", async () => {
+		const anilistId = aid(21);
+		const resolver = vi.fn();
+		replaceAuto("radarr", anilistId, {
+			kind: "mapped",
+			providerId: tmdb(300),
+		});
+
+		await expect(
+			new MappingService(resolver).resolveMapping("radarr", anilistId, {
+				forceRetry: true,
+			}),
+		).resolves.toEqual({
+			kind: "mapped",
+			source: "auto",
+			providerId: tmdb(300),
+		});
+		expect(resolver).not.toHaveBeenCalled();
 	});
 });

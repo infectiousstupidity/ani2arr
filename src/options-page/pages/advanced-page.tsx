@@ -2,33 +2,50 @@
 // src/options-page/pages/advanced-page.tsx
 
 import { useState } from "react";
-import { useFormContext, useWatch } from "react-hook-form";
 import { Bug, RotateCcw, ShieldCheck, TriangleAlert } from "lucide-react";
-import type { PublicOptions } from "@/settings";
+import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
+import Button from "@/shared/ui/primitives/button";
 import { cn } from "@/shared/utils/cn";
 import { SettingsRow, SettingsSection } from "../components/settings-section";
 import { ConfirmDialog } from "../components/ui/alert-dialog";
-import { Button } from "../components/ui/button";
 import { Switch } from "../components/ui/switch";
 import { useResetExtensionState } from "../hooks/use-reset-extension-state";
+import { getActionErrorMessage } from "../hooks/action-helpers";
 
 export const AdvancedPage = () => {
-	const { control, setValue } = useFormContext<PublicOptions>();
-	const debugLogging = Boolean(
-		useWatch({ control, name: "debugLogging" }),
-	);
+	const { data: publicOptions } = usePublicOptions();
+	const saveOptions = useSavePublicOptions();
 	const [showResetDialog, setShowResetDialog] = useState(false);
+	const [saveError, setSaveError] = useState<string | null>(null);
 	const {
 		resetExtensionState,
 		isResetting,
 		resetError,
 		resetSuccess,
 	} = useResetExtensionState();
+	const debugLogging = publicOptions?.debugLogging ?? false;
 
 	const resetStatus = resetError
 		?? (resetSuccess
 			? "Settings, mappings, cached data, and permissions were reset."
 			: null);
+	const diagnosticsStatus = saveError;
+
+	const updateDebugLogging = async (checked: boolean): Promise<void> => {
+		if (!publicOptions || saveOptions.isPending) return;
+		setSaveError(null);
+
+		try {
+			await saveOptions.mutateAsync({
+				...publicOptions,
+				debugLogging: checked,
+			});
+		} catch (error) {
+			setSaveError(
+				getActionErrorMessage(error, "Failed to save diagnostics setting."),
+			);
+		}
+	};
 
 	return (
 		<div className="space-y-10">
@@ -72,14 +89,17 @@ export const AdvancedPage = () => {
 					<Switch
 						id="advanced-debug-logging"
 						checked={debugLogging}
+						disabled={saveOptions.isPending || !publicOptions}
 						onCheckedChange={(checked) =>
-							setValue("debugLogging", checked, {
-								shouldDirty: true,
-								shouldTouch: true,
-							})
+							void updateDebugLogging(checked)
 						}
 					/>
 				</SettingsRow>
+				{diagnosticsStatus ? (
+					<p className="text-sm font-semibold text-error" role="alert">
+						{diagnosticsStatus}
+					</p>
+				) : null}
 			</SettingsSection>
 
 			<SettingsSection

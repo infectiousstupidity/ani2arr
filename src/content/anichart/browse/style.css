@@ -10,6 +10,12 @@ a.cover:has(> .a2a-overlay-container) {
   overflow: visible !important;
 }
 
+.media-card:has(.a2a-card-overlay[data-visibility='hover']):is(:hover, :focus-within) .a2a-card-overlay__quick,
+.media-card:has(.a2a-card-overlay[data-visibility='hover']):is(:hover, :focus-within) .a2a-card-overlay__stack {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .a2a-overlay-container {
   position: absolute;
   display: inline-block;

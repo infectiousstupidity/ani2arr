@@ -1,10 +1,10 @@
 /** Canonical extension settings and public-options types owned by the options domain. */
 // src/settings/types.ts
 
-import type { AniListTitleLanguage } from "@/anilist/schemas/title-language.schema";
+import type { AniListTitleLanguage } from "@/anilist/title";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
-import type { ProviderCredentials } from "@/providers";
+import type { ProviderCredentials } from "@/providers/types";
 
 export type BadgeVisibility = "always" | "hover";
 

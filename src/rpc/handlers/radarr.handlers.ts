@@ -1,12 +1,8 @@
 /** RPC handlers for Radarr form resources, search, and validation flows. */
 // src/rpc/handlers/radarr.handlers.ts
 
-import * as v from "valibot";
 import {
-	anibridgeMappingStore,
 	bumpLibraryRevision,
-	manualMappingService,
-	manualMappingsReady,
 	mappingService,
 	radarrClient,
 	radarrLibrary,
@@ -17,98 +13,49 @@ import {
 	requireProviderConfig,
 	requireProviderCredentials,
 } from "@/background/provider-config";
-import type { AniListId } from "@/anilist";
+import type { MappingResult } from "@/mapping/types";
 import { addRadarrMovie } from "@/providers/radarr/add";
 import { updateRadarrMovie as updateRadarrMovieProvider } from "@/providers/radarr/edit";
 import {
 	toRadarrMovieSnapshot,
 	type RadarrMovieLibraryStatus,
 } from "@/providers/radarr/library";
-import {
-	parseTmdbIdOrNull,
-	type ProviderCredentials,
-	type ProviderFormResources,
-	type TmdbId,
-} from "@/providers";
-import {
-	AddRadarrInputSchema,
-	GetProviderFormResourcesInputSchema,
-	MovieLibraryStatusInputSchema,
-	RadarrLookupInputSchema,
-	StatusInputSchema,
-	UpdateRadarrInputSchema,
-	ValidateTmdbInputSchema,
-} from "@/rpc/schemas";
-import type { CheckMovieStatusResponse } from "@/rpc/types";
-import { buildRadarrTargetSummary } from "@/rpc/provider-target-summary";
-import { buildMovieStatusResponseFromLibraryStatus } from "@/rpc/status-response-adapter";
-import { ErrorCode, logError, normalizeError } from "@/shared/errors";
+import { parseTmdbIdOrNull } from "@/providers/schemas";
+import type {
+	ProviderCredentials,
+	ProviderFormResources,
+} from "@/providers/types";
+import type { TmdbId } from "@/providers/schemas";
+import type {
+	AddRadarrInput,
+	GetMovieStatusOutput,
+	GetProviderFormResourcesInput,
+	RadarrLookupInput,
+	StatusInput,
+	UpdateRadarrInput,
+	ValidateTmdbInput,
+} from "@/rpc/types";
 import { normalizeInputCredentials } from "./provider-credentials";
-import {
-	buildMappingOptions,
-	buildStatusOptions,
-	buildStatusPayload,
-	resolveMappingSource,
-	type ProviderStatusOptions,
-	type ProviderStatusPayload,
-} from "./provider-status.helpers";
 
 type RadarrMappingResult =
 	| {
 			kind: "mapped";
+			mapping: Extract<MappingResult, { kind: "mapped" }>;
 			tmdbId: TmdbId;
-			successfulSynonym?: string;
-			mappingReason?: CheckMovieStatusResponse["mappingReason"];
-			mappingSource?: CheckMovieStatusResponse["mappingSource"];
 	  }
-	| { kind: "unmapped" }
-	| { kind: "failed"; response: CheckMovieStatusResponse };
-
-const getLinkedRadarrAniListIds = (tmdbId: TmdbId): number[] => {
-	const ids = new Set<number>(
-		manualMappingService.getLinkedAniListIds("radarr", tmdbId),
-	);
-	for (const id of anibridgeMappingStore.getAniListIdsForTmdb(tmdbId)) {
-		ids.add(id);
-	}
-	return [...ids];
-};
+	| { kind: "unmapped"; mapping: MappingResult };
 
 export const radarrHandlers = {
-	async getMovieStatus(input: unknown) {
-		const parsedInput = v.parse(StatusInputSchema, input);
-		await manualMappingsReady;
-
-		const payload = buildStatusPayload(parsedInput);
-		const status = await getRadarrStatusFromMappingAndLibrary(
-			payload,
-			buildStatusOptions(parsedInput),
-		);
-		return {
-			...status,
-			manualMappingActive: manualMappingService.has(
-				"radarr",
-				parsedInput.anilistId,
-			),
-		};
+	getMovieStatus(input: StatusInput) {
+		return getRadarrStatusFromMappingAndLibrary(input);
 	},
 
-	async getMovieLibraryStatus(input: unknown) {
-		const parsedInput = v.parse(MovieLibraryStatusInputSchema, input);
-		return getRadarrLibraryStatusForRpc({
-			tmdbId: parsedInput.tmdbId,
-			forceVerify: parsedInput.forceVerify === true,
-		});
-	},
-
-	async addToRadarr(input: unknown) {
-		const parsedInput = v.parse(AddRadarrInputSchema, input);
+	async addToRadarr(input: AddRadarrInput) {
 		const { credentials, options } = await requireProviderConfig("radarr");
-		await manualMappingsReady;
 		const created = await addRadarrMovie(
 			{
-				tmdbId: parsedInput.tmdbId,
-				form: parsedInput.form,
+				tmdbId: input.tmdbId,
+				form: input.form,
 				defaults: options.providers.radarr.defaults,
 				credentials,
 			},
@@ -120,13 +67,12 @@ export const radarrHandlers = {
 		return created;
 	},
 
-	async updateRadarrMovie(input: unknown) {
-		const parsedInput = v.parse(UpdateRadarrInputSchema, input);
+	async updateRadarrMovie(input: UpdateRadarrInput) {
 		const credentials = await requireProviderCredentials("radarr");
 		const updated = await updateRadarrMovieProvider(
 			{
-				tmdbId: parsedInput.tmdbId,
-				form: parsedInput.form,
+				tmdbId: input.tmdbId,
+				form: input.form,
 				credentials,
 			},
 			{ client: radarrClient },
@@ -137,9 +83,8 @@ export const radarrHandlers = {
 		return updated;
 	},
 
-	async getRadarrFormResources(input?: unknown) {
-		const parsedInput = v.parse(GetProviderFormResourcesInputSchema, input);
-		const maybeCredentials = parsedInput?.credentials;
+	async getRadarrFormResources(input?: GetProviderFormResourcesInput) {
+		const maybeCredentials = input?.credentials;
 		const credentials: ProviderCredentials =
 			maybeCredentials?.url && maybeCredentials.apiKey
 				? normalizeInputCredentials("radarr", maybeCredentials)
@@ -166,13 +111,11 @@ export const radarrHandlers = {
 		return formResources;
 	},
 
-	async searchRadarr(input: unknown) {
-		const parsedInput = v.parse(RadarrLookupInputSchema, input);
+	async searchRadarr(input: RadarrLookupInput) {
 		const credentials = await requireProviderCredentials("radarr");
-		await manualMappingsReady;
 
 		const [results, library] = await Promise.all([
-			radarrClient.lookupMovies(parsedInput.term, credentials),
+			radarrClient.lookupMovies(input.term, credentials),
 			radarrLibrary.getMovieSnapshots(credentials),
 		]);
 
@@ -187,12 +130,12 @@ export const radarrHandlers = {
 			}
 		}
 
-		for (const tmdbId of uniqueTmdbIds) {
-			const linked = getLinkedRadarrAniListIds(tmdbId);
-			if (linked.length > 0) {
-				linkedAniListIdsByTmdbId[tmdbId] = linked;
-			}
-		}
+		await Promise.all(
+			[...uniqueTmdbIds].map(async (tmdbId) => {
+				const linked = await mappingService.getLinkedAniListIds("radarr", tmdbId);
+				if (linked.length > 0) linkedAniListIdsByTmdbId[tmdbId] = linked;
+			}),
+		);
 
 		return {
 			results,
@@ -203,20 +146,19 @@ export const radarrHandlers = {
 		};
 	},
 
-	async validateTmdbId(input: unknown) {
-		const parsedInput = v.parse(ValidateTmdbInputSchema, input);
+	async validateTmdbId(input: ValidateTmdbInput) {
 		const credentials = await requireProviderCredentials("radarr");
 		const found = await radarrClient.findMovieByTmdbId(
-			parsedInput.tmdbId,
+			input.tmdbId,
 			credentials,
 		);
 		let inCatalog = false;
 		try {
 			const lookup = await radarrClient.lookupMovieByTmdbId(
-				parsedInput.tmdbId,
+				input.tmdbId,
 				credentials,
 			);
-			inCatalog = lookup?.tmdbId === parsedInput.tmdbId;
+			inCatalog = lookup?.tmdbId === input.tmdbId;
 		} catch {
 			// ignore
 		}
@@ -230,7 +172,6 @@ async function getRadarrLibraryStatusForRpc(input: {
 }): Promise<RadarrMovieLibraryStatus> {
 	const credentials = await getProviderConfig("radarr");
 	if (!credentials) {
-		await radarrLibrary.clearMovieSnapshotCache();
 		return {
 			provider: "radarr",
 			providerId: input.tmdbId,
@@ -244,194 +185,68 @@ async function getRadarrLibraryStatusForRpc(input: {
 		...(input.forceVerify === undefined
 			? {}
 			: { forceVerify: input.forceVerify }),
-		onCacheChanged: () => bumpLibraryRevision("radarr"),
 	});
 }
 
 async function getRadarrStatusFromMappingAndLibrary(
-	payload: ProviderStatusPayload,
-	options: ProviderStatusOptions,
-): Promise<CheckMovieStatusResponse> {
+	input: StatusInput,
+): Promise<GetMovieStatusOutput> {
 	const credentials = await getProviderConfig("radarr");
 	if (!credentials) {
 		return {
-			providerId: null,
-			providerMappingState: "unknown",
+			mapping: unmappedMapping(),
 			isInLibrary: null,
-			mappingUnknownReason: "provider-not-configured",
 		};
 	}
 
-	if (options.network === "never") {
+	const mapping = await resolveRadarrMapping(input);
+	if (mapping.kind === "unmapped") {
 		return {
-			providerId: null,
-			providerMappingState: "unknown",
+			mapping: mapping.mapping,
 			isInLibrary: null,
-			mappingUnknownReason: "network-disabled",
 		};
 	}
 
-	const mapping = await resolveRadarrMapping(
-		payload,
-		payload.title?.trim(),
-		options,
-	);
-	if (mapping.kind === "failed") return mapping.response;
-	if (mapping.kind === "unmapped") return resolveUnmappedRadarr(payload);
-
-	return buildMappedRadarrStatus(mapping, options, credentials.url);
+	return buildMappedRadarrStatus(mapping, input);
 }
 
 async function resolveRadarrMapping(
-	payload: ProviderStatusPayload,
-	normalizedTitle: string | undefined,
-	options: ProviderStatusOptions,
+	input: StatusInput,
 ): Promise<RadarrMappingResult> {
-	if (options.priority === "high") {
-		try {
-			mappingService.prioritizeAniListMedia?.(payload.anilistId, {
-				schedule: false,
-			});
-		} catch {
-			// best-effort
-		}
-	}
-
-	try {
-		const mapping = await mappingService.resolveProviderId(
-			"radarr",
-			payload.anilistId,
-			buildMappingOptions(payload, normalizedTitle, options),
-		);
-		if (!mapping) return { kind: "unmapped" };
+	const mapping = await mappingService.resolveMapping("radarr", input.anilistId, {
+		forceRetry: input.force_mapping_retry === true,
+		...(input.title === undefined ? {} : { title: input.title }),
+		...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+	});
+	if (mapping.kind === "mapped") {
+		const tmdbId = parseTmdbIdOrNull(mapping.providerId);
+		if (tmdbId === null) return { kind: "unmapped", mapping };
 
 		return {
 			kind: "mapped",
-			tmdbId: mapping.providerId,
-			...(mapping.successfulSynonym
-				? { successfulSynonym: mapping.successfulSynonym }
-				: {}),
-			mappingReason: mapping.reason,
-			mappingSource: resolveMappingSource(mapping.reason),
-		};
-	} catch (error) {
-		return {
-			kind: "failed",
-			response: toRadarrMappingErrorResponse(error, payload),
+			tmdbId,
+			mapping,
 		};
 	}
-}
-
-async function resolveUnmappedRadarr(
-	payload: ProviderStatusPayload,
-): Promise<CheckMovieStatusResponse> {
-	const unresolved = await resolveUnknownRadarrOutcome(payload.anilistId);
-	if (import.meta.env.DEV) {
-		console.debug(
-			`[ani2arr | RadarrStatus] result anilistId=${payload.anilistId} outcome=unresolved`,
-		);
-	}
-	return {
-		providerId: null,
-		isInLibrary: null,
-		...unresolved,
-	};
+	return { kind: "unmapped", mapping };
 }
 
 async function buildMappedRadarrStatus(
 	mapping: Extract<RadarrMappingResult, { kind: "mapped" }>,
-	options: ProviderStatusOptions,
-	baseUrl: string,
-): Promise<CheckMovieStatusResponse> {
+	input: StatusInput,
+): Promise<GetMovieStatusOutput> {
 	const libraryStatus = await getRadarrLibraryStatusForRpc({
 		tmdbId: mapping.tmdbId,
-		forceVerify: options.force_verify === true,
-	});
-	const status = buildMovieStatusResponseFromLibraryStatus({
-		providerId: mapping.tmdbId,
-		...(mapping.mappingSource ? { mappingSource: mapping.mappingSource } : {}),
-		...(mapping.mappingReason ? { mappingReason: mapping.mappingReason } : {}),
-		libraryStatus,
-	});
-	const linkedAniListIds = getLinkedRadarrAniListIdsOrUndefined(mapping.tmdbId);
-	const targetSummary = buildRadarrTargetSummary({
-		tmdbId: mapping.tmdbId,
-		movie: status.movie,
-		isInLibrary: status.isInLibrary,
-		baseUrl,
-		linkedAniListIds,
+		forceVerify: input.force_verify === true,
 	});
 
 	return {
-		...status,
-		...(mapping.successfulSynonym
-			? { successfulSynonym: mapping.successfulSynonym }
-			: {}),
-		...(linkedAniListIds ? { linkedAniListIds } : {}),
-		...(targetSummary === null ? {} : { targetSummary }),
+		mapping: mapping.mapping,
+		isInLibrary: libraryStatus.isInLibrary,
+		...(libraryStatus.movie ? { movie: libraryStatus.movie } : {}),
 	};
 }
 
-function toRadarrMappingErrorResponse(
-	error: unknown,
-	payload: ProviderStatusPayload,
-): CheckMovieStatusResponse {
-	const normalized = normalizeError(error);
-	if (
-		normalized.code === ErrorCode.CONFIGURATION_ERROR ||
-		(normalized.code === ErrorCode.VALIDATION_ERROR &&
-			normalized.details?.reason === "network-disabled")
-	) {
-		return {
-			providerId: null,
-			providerMappingState: "unknown",
-			isInLibrary: null,
-			mappingUnknownReason:
-				normalized.details?.reason === "network-disabled"
-					? "network-disabled"
-					: "provider-not-configured",
-		};
-	}
-
-	logError(normalized, `RadarrStatus:getMovieStatus:${payload.anilistId}`);
-	return {
-		providerId: null,
-		providerMappingState: "unknown",
-		isInLibrary: null,
-		mappingUnknownReason: "lookup-failed",
-	};
-}
-
-async function resolveUnknownRadarrOutcome(
-	anilistId: AniListId,
-): Promise<
-	Pick<
-		CheckMovieStatusResponse,
-		"providerMappingState" | "mappingUnknownReason" | "resolverOutcome"
-	>
-> {
-	const resolverState = await mappingService.getAutoMapping(
-		"radarr",
-		anilistId,
-	);
-	if (resolverState?.state === "ambiguous") {
-		return {
-			providerMappingState: "unknown",
-			mappingUnknownReason: "ambiguous",
-			resolverOutcome: "ambiguous",
-		};
-	}
-	return {
-		providerMappingState: "unmapped",
-		...(resolverState?.state === "unresolved"
-			? { resolverOutcome: "unresolved" as const }
-			: {}),
-	};
-}
-
-function getLinkedRadarrAniListIdsOrUndefined(
-	tmdbId: TmdbId,
-): number[] | undefined {
-	const linked = getLinkedRadarrAniListIds(tmdbId);
-	return linked.length > 0 ? linked : undefined;
+function unmappedMapping(): MappingResult {
+	return { kind: "unmapped", hadResolveAttempt: false };
 }

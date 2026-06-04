@@ -2,20 +2,24 @@
 // src/rpc/handlers/radarr.handlers.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { parseAniListId } from "@/anilist";
-import {
-	parseProviderQualityProfileId,
-	parseRadarrMovieId,
-	parseProviderTagId,
-	parseTmdbId,
-	type ProviderCredentials,
-} from "@/providers";
+import { parseAniListId } from "@/anilist/types";
+import { parseTmdbId } from "@/providers/schemas";
+import type { ProviderCredentials } from "@/providers/types";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+	RadarrMovieId,
+} from "@/providers/schemas";
 import { radarrHandlers } from "./radarr.handlers";
 
 const credentials: ProviderCredentials = {
 	url: "https://radarr.example",
 	apiKey: "secret",
 };
+const parseProviderQualityProfileId = (value: number) =>
+	value as ProviderQualityProfileId;
+const parseProviderTagId = (value: number) => value as ProviderTagId;
+const parseRadarrMovieId = (value: number) => value as RadarrMovieId;
 
 const radarrClientMock = vi.hoisted(() => ({
 	findMovieByTmdbId: vi.fn(),
@@ -27,17 +31,10 @@ const radarrClientMock = vi.hoisted(() => ({
 }));
 
 const apiServicesMock = vi.hoisted(() => ({
-	anibridgeMappingStore: { getAniListIdsForTmdb: vi.fn() },
 	bumpLibraryRevision: vi.fn(),
-	manualMappingService: {
-		getLinkedAniListIds: vi.fn(),
-		has: vi.fn(),
-	},
-	manualMappingsReady: Promise.resolve(),
 	mappingService: {
-		getAutoMapping: vi.fn(),
-		prioritizeAniListMedia: vi.fn(),
-		resolveProviderId: vi.fn(),
+		getLinkedAniListIds: vi.fn(),
+		resolveMapping: vi.fn(),
 	},
 	radarrClient: radarrClientMock,
 	radarrLibrary: {
@@ -57,13 +54,12 @@ const providerConfigMock = vi.hoisted(() => ({
 
 const addRadarrMovieMock = vi.hoisted(() => vi.fn());
 const updateRadarrMovieMock = vi.hoisted(() => vi.fn());
-
-vi.mock("@/background/api/api-services", () => ({
+vi.mock("@/background/api-services", () => ({
 	...apiServicesMock,
 	radarrClient: radarrClientMock,
 }));
 
-vi.mock("@/background/api/provider-config", () => providerConfigMock);
+vi.mock("@/background/provider-config", () => providerConfigMock);
 
 vi.mock("@/providers/radarr/add", () => ({
 	addRadarrMovie: addRadarrMovieMock,
@@ -76,13 +72,7 @@ vi.mock("@/providers/radarr/edit", () => ({
 describe("radarrHandlers", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		apiServicesMock.anibridgeMappingStore.getAniListIdsForTmdb.mockReturnValue(
-			[],
-		);
-		apiServicesMock.manualMappingService.getLinkedAniListIds.mockReturnValue(
-			[],
-		);
-		apiServicesMock.manualMappingService.has.mockReturnValue(false);
+		apiServicesMock.mappingService.getLinkedAniListIds.mockResolvedValue([]);
 	});
 
 	it("loads Radarr form resources through the Radarr client", async () => {
@@ -116,21 +106,17 @@ describe("radarrHandlers", () => {
 		await expect(
 			radarrHandlers.getMovieStatus({ anilistId: parseAniListId(100) }),
 		).resolves.toEqual({
-			providerId: null,
-			providerMappingState: "unknown",
+			mapping: { kind: "unmapped", hadResolveAttempt: false },
 			isInLibrary: null,
-			mappingUnknownReason: "provider-not-configured",
-			manualMappingActive: false,
 		});
 
 		expect(
-			apiServicesMock.mappingService.resolveProviderId,
+			apiServicesMock.mappingService.resolveMapping,
 		).not.toHaveBeenCalled();
 	});
 
-	it("returns mapped Radarr library status with linked IDs and target summary", async () => {
+	it("returns mapped Radarr library status with raw movie", async () => {
 		const anilistId = parseAniListId(100);
-		const linkedAnilistId = parseAniListId(101);
 		const tmdbId = parseTmdbId(200);
 		const movie = {
 			id: parseRadarrMovieId(5),
@@ -141,9 +127,10 @@ describe("radarrHandlers", () => {
 			hasFile: true,
 		};
 		providerConfigMock.getProviderConfig.mockResolvedValue(credentials);
-		apiServicesMock.mappingService.resolveProviderId.mockResolvedValue({
+		apiServicesMock.mappingService.resolveMapping.mockResolvedValue({
+			kind: "mapped",
+			source: "upstream",
 			providerId: tmdbId,
-			reason: "exact-upstream",
 		});
 		apiServicesMock.radarrLibrary.getMovieLibraryStatusByTmdbId.mockResolvedValue(
 			{
@@ -153,37 +140,31 @@ describe("radarrHandlers", () => {
 				movie,
 			},
 		);
-		apiServicesMock.manualMappingService.getLinkedAniListIds.mockReturnValue([
-			anilistId,
-		]);
-		apiServicesMock.anibridgeMappingStore.getAniListIdsForTmdb.mockReturnValue([
-			linkedAnilistId,
-		]);
 
 		await expect(
 			radarrHandlers.getMovieStatus({
 				anilistId,
 				title: "Mapped Movie",
 				force_verify: true,
+				force_mapping_retry: true,
 			}),
 		).resolves.toMatchObject({
-			providerId: tmdbId,
-			providerMappingState: "mapped",
-			isInLibrary: true,
-			mappingSource: "upstream",
-			mappingReason: "exact-upstream",
-			linkedAniListIds: [anilistId, linkedAnilistId],
-			targetSummary: {
-				provider: "radarr",
+			mapping: {
+				kind: "mapped",
+				source: "upstream",
 				providerId: tmdbId,
-				title: "Mapped Movie",
-				isInLibrary: true,
-				typeLabel: "Movie",
-				year: 2024,
-				providerRouteSlug: "mapped-movie",
-				linkedAniListIds: [anilistId, linkedAnilistId],
 			},
+			isInLibrary: true,
+			movie,
 		});
+		expect(apiServicesMock.mappingService.resolveMapping).toHaveBeenCalledWith(
+			"radarr",
+			anilistId,
+			{
+				forceRetry: true,
+				title: "Mapped Movie",
+			},
+		);
 	});
 
 	it("updates Radarr cache and revision after add", async () => {

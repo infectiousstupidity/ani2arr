@@ -1,98 +1,138 @@
-/** Focused tests for AniList metadata store baked lookup behavior. */
+/** Focused tests for persistent shipped AniList metadata sync behavior. */
 // src/anilist/metadata.store.test.ts
 
-import { describe, expect, it, vi } from "vitest";
-import { parseAniListId, type AniListId } from "@/anilist/anilist-id";
-import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
-import type { CacheHit, CacheWriteOptions, TtlCache } from "@/shared/cache/ttl-cache";
-import type { BakedMetadataStore } from "./baked-metadata.store";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { parseAniListId, type AniListMetadata } from "@/anilist/types";
 import { AniListMetadataStore } from "./metadata.store";
 
-type MemoryCache<T> = TtlCache<T> & {
-	peek(key: string): CacheHit<T> | null;
+const idbMock = vi.hoisted(() => ({
+	metadata: new Map<IDBValidKey, unknown>(),
+	syncState: new Map<IDBValidKey, unknown>(),
+	openDB: vi.fn(),
+}));
+
+vi.mock("idb", () => ({
+	openDB: idbMock.openDB,
+}));
+
+const SYNC_STATE_KEY = "anilist-static-metadata";
+
+const storeFor = (name: string): Map<IDBValidKey, unknown> => {
+	if (name === "metadata") return idbMock.metadata;
+	if (name === "sync-state") return idbMock.syncState;
+	throw new Error(`Unknown object store ${name}`);
 };
 
-const createMemoryCache = <T>(): MemoryCache<T> => {
-	const entries = new Map<string, CacheHit<T>>();
+const createMockDb = () => ({
+	get: async (storeName: string, key: IDBValidKey): Promise<unknown> =>
+		storeFor(storeName).get(key),
+	transaction: () => ({
+		objectStore: (storeName: string) => ({
+			clear: async (): Promise<void> => {
+				storeFor(storeName).clear();
+			},
+			put: async (value: unknown, key: IDBValidKey): Promise<void> => {
+				storeFor(storeName).set(key, value);
+			},
+		}),
+		done: Promise.resolve(),
+	}),
+	objectStoreNames: {
+		contains: () => true,
+	},
+	createObjectStore: vi.fn(),
+});
 
-	return {
-		async read(key: string): Promise<CacheHit<T> | null> {
-			return entries.get(key) ?? null;
-		},
-		async write(
-			key: string,
-			value: T,
-			options: CacheWriteOptions,
-		): Promise<void> {
-			const now = Date.now();
-			entries.set(key, {
-				value,
-				stale: false,
-				staleAt: now + options.staleMs,
-				expiresAt: now + (options.hardMs ?? options.staleMs * 4),
-				...(options.meta ? { meta: options.meta } : {}),
-			});
-		},
-		async remove(key: string): Promise<void> {
-			entries.delete(key);
-		},
-		async clear(): Promise<void> {
-			entries.clear();
-		},
-		peek(key: string): CacheHit<T> | null {
-			return entries.get(key) ?? null;
-		},
-	};
-};
+const response = (payload: unknown): Response =>
+	({
+		ok: true,
+		status: 200,
+		json: async () => payload,
+	}) as Response;
 
-const metadataEntry = (id: AniListId, romaji: string): AniListMetadata => ({
-	id,
+const metadataEntry = (id: number, romaji: string): AniListMetadata => ({
+	id: parseAniListId(id),
 	titles: { romaji },
 	seasonYear: null,
 	format: null,
 	coverImage: null,
-	updatedAt: Date.now(),
-});
-
-const createBakedStore = (
-	entries: Map<AniListId, AniListMetadata>,
-): BakedMetadataStore => ({
-	syncFromBundleManifest: vi.fn(async () => {}),
-	get: vi.fn(async (id: AniListId) => entries.get(id) ?? null),
-	clear: vi.fn(async () => {
-		entries.clear();
-	}),
 });
 
 describe("AniListMetadataStore", () => {
-	it("returns baked metadata without fetching missing media", async () => {
-		const id = parseAniListId(101);
-		const entry = metadataEntry(id, "Baked");
-		const anilistApi = { fetchMediaBatch: vi.fn() };
-		const store = new AniListMetadataStore(
-			anilistApi as never,
-			createMemoryCache<AniListMetadata>(),
-			createBakedStore(new Map([[id, entry]])),
-		);
-
-		const result = await store.getMetadata([id], { fetchMissing: false });
-
-		expect(result).toEqual({ metadata: [entry] });
-		expect(anilistApi.fetchMediaBatch).not.toHaveBeenCalled();
+	beforeEach(() => {
+		idbMock.metadata.clear();
+		idbMock.syncState.clear();
+		idbMock.openDB.mockReset();
+		idbMock.openDB.mockResolvedValue(createMockDb());
 	});
 
-	it("returns missing IDs without network fetch when baked metadata is absent", async () => {
-		const id = parseAniListId(202);
-		const anilistApi = { fetchMediaBatch: vi.fn() };
-		const store = new AniListMetadataStore(
-			anilistApi as never,
-			createMemoryCache<AniListMetadata>(),
-			createBakedStore(new Map()),
+	it("skips chunk fetch when stored generatedAt matches manifest", async () => {
+		idbMock.syncState.set(SYNC_STATE_KEY, { generatedAt: 10 });
+		const fetchImpl = vi.fn<typeof fetch>(async () =>
+			response({
+				generatedAt: 10,
+				chunks: [{ file: "anilist-static-metadata.part-1.json", count: 1 }],
+			}),
 		);
+		const store = new AniListMetadataStore({ fetch: fetchImpl });
 
-		const result = await store.getMetadata([id], { fetchMissing: false });
+		await store.getMetadata([]);
 
-		expect(result).toEqual({ metadata: [], missingIds: [id] });
-		expect(anilistApi.fetchMediaBatch).not.toHaveBeenCalled();
+		expect(fetchImpl).toHaveBeenCalledTimes(1);
+		expect(idbMock.metadata.size).toBe(0);
+	});
+
+	it("replaces old rows before storing changed generatedAt entries", async () => {
+		const oldId = parseAniListId(1);
+		const newId = parseAniListId(2);
+		idbMock.metadata.set(oldId, metadataEntry(oldId, "Old"));
+		idbMock.syncState.set(SYNC_STATE_KEY, { generatedAt: 10 });
+		const fetchImpl = vi.fn<typeof fetch>(async (input) => {
+			const url = String(input);
+			if (url.includes("part-1")) {
+				return response({
+					generatedAt: 20,
+					entries: [metadataEntry(newId, "New")],
+				});
+			}
+
+			return response({
+				generatedAt: 20,
+				chunks: [{ file: "anilist-static-metadata.part-1.json", count: 1 }],
+			});
+		});
+		const store = new AniListMetadataStore({ fetch: fetchImpl });
+
+		const result = await store.getMetadata([oldId, newId]);
+
+		expect(result).toEqual({
+			metadata: [metadataEntry(newId, "New")],
+			missingIds: [oldId],
+		});
+		expect(idbMock.syncState.get(SYNC_STATE_KEY)).toEqual({ generatedAt: 20 });
+		expect(fetchImpl).toHaveBeenCalledTimes(2);
+	});
+
+	it("rejects a chunk that parses fewer entries than the manifest declares", async () => {
+		const fetchImpl = vi.fn<typeof fetch>(async (input) => {
+			const url = String(input);
+			if (url.includes("part-1")) {
+				return response({
+					generatedAt: 40,
+					entries: [{ id: 0, titles: { romaji: "Bad" } }],
+				});
+			}
+
+			return response({
+				generatedAt: 40,
+				chunks: [{ file: "anilist-static-metadata.part-1.json", count: 1 }],
+			});
+		});
+		const store = new AniListMetadataStore({ fetch: fetchImpl });
+
+		await store.getMetadata([]);
+		await expect(store.syncFromBundleManifest()).rejects.toThrow(
+			"AniList metadata bundle parse dropped 1 entries",
+		);
 	});
 });

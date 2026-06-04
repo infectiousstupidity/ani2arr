@@ -1,7 +1,8 @@
 /** Shared Sonarr and Radarr API client for common transport and connection checks. */
 // src/providers/shared.client.ts
 
-import { createError, ErrorCode } from "@/shared/errors";
+import { createError } from "@/shared/errors/error-utils";
+import { ErrorCode } from "@/shared/errors/error.types";
 import type { ProviderCredentials } from "./types";
 
 const REQUEST_TIMEOUT_MS = 15_000;

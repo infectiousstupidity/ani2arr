@@ -2,13 +2,13 @@
 // src/providers/radarr/client.test.ts
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-	parseProviderQualityProfileId,
-	parseProviderTagId,
-	parseRadarrMovieId,
-	parseTmdbId,
-	type ProviderCredentials,
-} from "@/providers";
+import { parseTmdbId } from "@/providers/schemas";
+import type { ProviderCredentials } from "@/providers/types";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+	RadarrMovieId,
+} from "@/providers/schemas";
 import type { RadarrAddMoviePayload } from "./add";
 import { RadarrClient } from "./client";
 import type { RadarrMovie } from "./types";
@@ -17,6 +17,10 @@ const credentials: ProviderCredentials = {
 	url: "https://radarr.example",
 	apiKey: "secret",
 };
+const parseProviderQualityProfileId = (value: number) =>
+	value as ProviderQualityProfileId;
+const parseProviderTagId = (value: number) => value as ProviderTagId;
+const parseRadarrMovieId = (value: number) => value as RadarrMovieId;
 
 const movie: RadarrMovie = {
 	id: parseRadarrMovieId(20),
@@ -55,14 +59,18 @@ describe("RadarrClient", () => {
 		vi.restoreAllMocks();
 	});
 
-	it("normalizes full movie resources", async () => {
+	it("parses full movie resources without fallback titles or unknown fields", async () => {
 		mockJson([
 			{
 				id: 20,
 				tmdbId: 456,
-				title: " ",
+				title: "Existing Movie",
+				path: "/movies/Existing Movie",
+				rootFolderPath: "/movies",
+				qualityProfileId: 2,
+				monitored: true,
 				folder: " Movie Folder ",
-				tags: null,
+				tags: [7],
 				movieFile: {
 					id: 99,
 					path: " /movies/file.mkv ",
@@ -78,25 +86,50 @@ describe("RadarrClient", () => {
 		await expect(createClient().getAllMovies(credentials)).resolves.toEqual([
 			{
 				id: 20,
-				title: "Radarr movie 20",
+				title: "Existing Movie",
 				tmdbId: 456,
-				folder: " Movie Folder ",
-				folderName: "Movie Folder",
-				tags: [],
-				movieFile: {
-					id: 99,
-					path: "/movies/file.mkv",
-					relativePath: "file.mkv",
-					size: 1000,
-					quality: { quality: { name: "HD" } },
-				},
-				images: [{ coverType: "poster", remoteUrl: "https://image" }],
-				customArrField: "preserved",
+				path: "/movies/Existing Movie",
+				rootFolderPath: "/movies",
+				qualityProfileId: 2,
+				monitored: true,
+				tags: [7],
+				images: [{ coverType: " poster ", remoteUrl: " https://image " }],
 			},
 		]);
 	});
 
-	it("normalizes lookup resources without dropping Radarr fields", async () => {
+	it("rejects movie resources with blank or missing titles", async () => {
+		mockJson([
+			{
+				id: 20,
+				tmdbId: 456,
+				title: "",
+				path: "/movies/Existing Movie",
+				rootFolderPath: "/movies",
+				qualityProfileId: 2,
+				monitored: true,
+				tags: [],
+			},
+		]);
+
+		await expect(createClient().getAllMovies(credentials)).rejects.toThrow();
+
+		mockJson([
+			{
+				id: 20,
+				tmdbId: 456,
+				path: "/movies/Existing Movie",
+				rootFolderPath: "/movies",
+				qualityProfileId: 2,
+				monitored: true,
+				tags: [],
+			},
+		]);
+
+		await expect(createClient().getAllMovies(credentials)).rejects.toThrow();
+	});
+
+	it("parses lookup resources without keeping unknown Radarr fields", async () => {
 		mockJson([
 			{
 				id: 0,
@@ -116,27 +149,44 @@ describe("RadarrClient", () => {
 			[
 				{
 					id: 0,
-					title: "Lookup Movie",
+					title: " Lookup Movie ",
 					tmdbId: 789,
-					folder: " Lookup Folder ",
-					folderName: "Lookup Folder",
-					remotePoster: "https://image.example/poster.jpg",
+					remotePoster: " https://image.example/poster.jpg ",
 					hasFile: true,
-					qualityProfileId: 12,
-					rootFolderPath: "/movies",
-					secondaryYearSourceId: 200,
-					ratings: { imdb: { value: 8.1 } },
 				},
 			],
 		);
 	});
 
-	it("rejects invalid required branded IDs", async () => {
-		mockJson([{ id: 20, tmdbId: 0, title: "Broken" }]);
+	it("rejects lookup resources without required title or TMDB ID", async () => {
+		mockJson([{ tmdbId: 789 }]);
 
-		await expect(createClient().getAllMovies(credentials)).rejects.toThrow(
-			"Invalid TMDB ID",
-		);
+		await expect(
+			createClient().lookupMovies("movie", credentials),
+		).rejects.toThrow();
+
+		mockJson([{ title: "Lookup Movie" }]);
+
+		await expect(
+			createClient().lookupMovies("movie", credentials),
+		).rejects.toThrow();
+	});
+
+	it("rejects invalid required branded IDs", async () => {
+		mockJson([
+			{
+				id: 20,
+				tmdbId: 0,
+				title: "Broken",
+				path: "/movies/Broken",
+				rootFolderPath: "/movies",
+				qualityProfileId: 2,
+				monitored: true,
+				tags: [],
+			},
+		]);
+
+		await expect(createClient().getAllMovies(credentials)).rejects.toThrow();
 	});
 
 	it("looks up movies by TMDB ID", async () => {

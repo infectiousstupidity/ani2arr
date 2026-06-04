@@ -1,22 +1,17 @@
 /** Background-owned singleton services used by the Ani2arr RPC implementation. */
-// src/background/api/api-services.ts
+// src/background/api-services.ts
 
-import { AniListMediaService, AniListMetadataStore } from "@/anilist";
-import { anilistMediaCache } from "@/anilist/media.cache";
-import {
-	createRadarrTitleLookup,
-	createSonarrTitleLookup,
-} from "@/mapping/auto-mapping/lookup/provider-title-lookup";
-import {
-	radarrTitleLookupCache,
-	sonarrTitleLookupCache,
-} from "@/mapping/auto-mapping/lookup/lookup.cache";
-import { AutoMappingStore } from "@/mapping/auto-mapping/auto-mapping.store";
+import { anilistMediaCache, AniListMediaService } from "@/anilist/media.service";
+import { AniListMetadataStore } from "@/anilist/metadata.store";
+import { clearAutoResults } from "@/mapping/auto.store";
+import { clearManualFacts } from "@/mapping/manual.store";
 import { MappingService } from "@/mapping/mapping.service";
-import { ManualMappingService } from "@/mapping/manual-mapping";
-import { AnibridgeMappingStore } from "@/mapping/upstream-mapping";
-import { anibridgeMappingCache } from "@/mapping/upstream-mapping/anibridge-mapping.cache";
-import type { Provider } from "@/providers";
+import { createAutomaticResolver } from "@/mapping/resolve/resolve";
+import {
+	clearUpstreamMappings,
+	refreshUpstreamMappings,
+} from "@/mapping/upstream.store";
+import type { Provider } from "@/providers/types";
 import { RadarrClient } from "@/providers/radarr/client";
 import { RadarrLibrary } from "@/providers/radarr/library";
 import {
@@ -28,13 +23,18 @@ import { SonarrClient } from "@/providers/sonarr/client";
 import { SonarrLibrary } from "@/providers/sonarr/library";
 import {
 	getExtensionOptionsSnapshot,
+	resetAllSettingsSnapshot,
+} from "@/settings/store";
+import {
 	getProviderCredentials,
 	hasConfiguredProviderCredentials,
-	resetAllSettingsSnapshot,
-	type ExtensionOptions,
-} from "@/settings";
+} from "@/settings/provider-config";
+import type { ExtensionOptions } from "@/settings/types";
 import { clearAllTtlCaches } from "@/shared/cache/ttl-cache";
-import { logError, normalizeError } from "@/shared/errors";
+import {
+	logError,
+	normalizeError,
+} from "@/shared/errors/error-utils";
 import {
 	bumpMappingsRevision as bumpMappingsRevisionSignal,
 	bumpProviderLibraryRevision,
@@ -44,12 +44,6 @@ import { logger } from "@/shared/utils/logger";
 import { requireProviderCredentials } from "./provider-config";
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 15 * 1000;
-
-const revisionState = {
-	mappings: 0,
-	sonarrLibrary: 0,
-	radarrLibrary: 0,
-};
 
 function createDebouncer(ms: number) {
 	let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -85,55 +79,30 @@ export const radarrClient = new RadarrClient({
 	hasUrlPermission: createHasUrlPermission("radarr"),
 });
 
-export const sonarrLibrary = new SonarrLibrary({ client: sonarrClient });
-export const radarrLibrary = new RadarrLibrary({ client: radarrClient });
+export const sonarrLibrary = new SonarrLibrary(sonarrClient);
+export const radarrLibrary = new RadarrLibrary(radarrClient);
 
 export const anilistMediaService = new AniListMediaService({
 	media: anilistMediaCache,
 });
-export const anibridgeMappingStore = new AnibridgeMappingStore(
-	anibridgeMappingCache,
-);
-export const anilistMetadataStore = new AniListMetadataStore(
-	anilistMediaService,
-);
-
-const sonarrTitleLookupClient = createSonarrTitleLookup(
-	sonarrClient,
-	sonarrTitleLookupCache,
-);
-const radarrTitleLookupClient = createRadarrTitleLookup(
-	radarrClient,
-	radarrTitleLookupCache,
-);
-
-export const manualMappingService = new ManualMappingService();
-export const manualMappingsReady = manualMappingService.init();
-export const autoMappingStore = new AutoMappingStore();
+export const anilistMetadataStore = new AniListMetadataStore();
 
 export const bumpMappingsRevision = async (): Promise<void> => {
-	revisionState.mappings += 1;
 	await bumpMappingsRevisionSignal();
 };
 
-export const mappingService = new MappingService({
-	anilistApi: anilistMediaService,
-	anibridgeMappingStore,
-	lookupClients: {
-		sonarr: sonarrTitleLookupClient,
-		radarr: radarrTitleLookupClient,
-	},
-	autoMappingStore,
-	getConfiguredCredentials: requireProviderCredentials,
-	manualMappings: manualMappingService,
-	notifyMappingsChanged: bumpMappingsRevision,
-});
+export const mappingService = new MappingService(
+	createAutomaticResolver({
+		anilistMedia: anilistMediaService,
+		sonarr: sonarrClient,
+		radarr: radarrClient,
+		getCredentials: requireProviderCredentials,
+	}),
+);
 
 export const bumpLibraryRevision = async (
 	provider: Provider,
 ): Promise<void> => {
-	if (provider === "sonarr") revisionState.sonarrLibrary += 1;
-	else revisionState.radarrLibrary += 1;
 	await bumpProviderLibraryRevision(provider);
 };
 
@@ -185,14 +154,12 @@ export const handleProviderConnectionChanged = async (
 	if (changedProviders.length === 0) return;
 
 	await Promise.all(
-		changedProviders.map((provider) =>
-			mappingService.resetLookupState(provider),
-		),
+		changedProviders.map((provider) => clearAutoResults(provider)),
 	);
 	await bumpMappingsRevision();
 
 	if (hasConfiguredProviderCredentials(options, "sonarr")) {
-		await mappingService.initAnibridgeMappings();
+		await refreshUpstreamMappings();
 	}
 
 	await Promise.all(
@@ -208,8 +175,9 @@ export const handleProviderConnectionChanged = async (
 export const clearPersistentCaches = async (): Promise<void> => {
 	await Promise.all([
 		anilistMetadataStore.clearLocalCache(),
-		mappingService.resetLookupState(),
-		anibridgeMappingStore.clear(),
+		clearAutoResults("sonarr"),
+		clearAutoResults("radarr"),
+		clearUpstreamMappings(),
 	]);
 	await clearAllTtlCaches();
 	await resetAllRevisions();
@@ -256,21 +224,10 @@ const removeConfiguredProviderHostPermissions = async (
 };
 
 export const resetExtensionState = async (): Promise<void> => {
-	await manualMappingsReady;
 	const previousOptions = await getExtensionOptionsSnapshot();
 
-	await manualMappingService.clearAll();
+	await clearManualFacts();
 	await clearPersistentCaches();
 	await resetAllSettingsSnapshot();
 	await removeConfiguredProviderHostPermissions(previousOptions);
 };
-
-export const getMappingListRevision = (): {
-	mappings: number;
-	anibridge: number;
-	sonarrLibrary: number;
-	radarrLibrary: number;
-} => ({
-	...revisionState,
-	anibridge: anibridgeMappingStore.getRevision(),
-});

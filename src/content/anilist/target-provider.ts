@@ -1,21 +1,17 @@
 /** AniList target provider selection shared by browse and anime-page content surfaces. */
 // src/content/anilist/target-provider.ts
 
-import type { AniListId } from "@/anilist/anilist-id";
-import type { AniListMediaFormat } from "@/anilist/schemas/media.schema";
-import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
+import type { AniListId, AniListMediaFormat } from "@/anilist/types";
+import type { MappingIdentity } from "@/rpc/types";
 import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import type { Provider } from "@/providers/types";
 
 export function getMappedIdentitiesByAniListId(
-	identities: readonly EffectiveMappingPresence[],
-): Map<AniListId, EffectiveMappingPresence[]> {
-	const identitiesById = new Map<AniListId, EffectiveMappingPresence[]>();
+	identities: readonly MappingIdentity[],
+): Map<AniListId, MappingIdentity[]> {
+	const identitiesById = new Map<AniListId, MappingIdentity[]>();
 	for (const identity of identities) {
-		if (
-			identity.providerMappingState !== "mapped" ||
-			identity.providerId === null
-		) {
+		if (identity.result.kind !== "mapped") {
 			continue;
 		}
 
@@ -34,14 +30,13 @@ export function getMappedIdentitiesByAniListId(
 export function resolveAniListTargetProvider(input: {
 	anilistId: AniListId;
 	format: AniListMediaFormat | null;
-	mappedIdentities: readonly EffectiveMappingPresence[];
+	mappedIdentities: readonly MappingIdentity[];
 }): Provider | null {
 	const routedProvider = resolveProviderForAniListFormat(input.format);
 	const mappedIdentities = input.mappedIdentities.filter(
 		(identity) =>
 			identity.anilistId === input.anilistId &&
-			identity.providerMappingState === "mapped" &&
-			identity.providerId !== null,
+			identity.result.kind === "mapped",
 	);
 	const formatMatchedIdentity =
 		routedProvider === null

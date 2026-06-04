@@ -1,12 +1,8 @@
 /** Radarr edit workflow for full-resource movie updates. */
 // src/providers/radarr/edit.ts
 
-import {
-	createError,
-	ErrorCode,
-	logError,
-	normalizeError,
-} from "@/shared/errors";
+import { createError } from "@/shared/errors/error-utils";
+import { ErrorCode } from "@/shared/errors/error.types";
 import {
 	extractPathLeaf,
 	extractRelativeFolder,
@@ -22,7 +18,7 @@ import type {
 	RadarrQualityProfileId,
 	TmdbId,
 } from "./types";
-import { resolveRadarrTagIds } from "./tags";
+import { resolveProviderTagIds } from "../provider-tags";
 
 type RadarrMovieChanges = Partial<
 	Pick<
@@ -43,14 +39,7 @@ type UpdateRadarrMovieInput = {
 };
 
 type UpdateRadarrMovieDeps = {
-	client: Pick<
-		RadarrClient,
-		| "findMovieByTmdbId"
-		| "getMovieById"
-		| "getTags"
-		| "createTag"
-		| "updateMovie"
-	>;
+	client: RadarrClient;
 };
 
 type ResolvedRadarrMovieUpdate = {
@@ -74,7 +63,7 @@ export async function updateRadarrMovie(
 	deps: UpdateRadarrMovieDeps,
 ): Promise<RadarrMovie> {
 	const resolvedUpdate = await resolveRadarrMovieUpdate({
-		api: deps.client,
+		client: deps.client,
 		credentials: input.credentials,
 		form: input.form,
 		tmdbId: input.tmdbId,
@@ -89,15 +78,12 @@ export async function updateRadarrMovie(
 }
 
 async function resolveRadarrMovieUpdate(input: {
-	api: Pick<
-		RadarrClient,
-		"findMovieByTmdbId" | "getMovieById" | "getTags" | "createTag"
-	>;
+	client: RadarrClient;
 	credentials: ProviderCredentials;
 	form: RadarrFormState;
 	tmdbId: TmdbId;
 }): Promise<ResolvedRadarrMovieUpdate> {
-	const { api, credentials, form, tmdbId } = input;
+	const { client, credentials, form, tmdbId } = input;
 
 	if (!Number.isFinite(tmdbId)) {
 		throw createError(
@@ -107,7 +93,7 @@ async function resolveRadarrMovieUpdate(input: {
 		);
 	}
 
-	const existing = await api.findMovieByTmdbId(tmdbId, credentials);
+	const existing = await client.findMovieByTmdbId(tmdbId, credentials);
 	if (!existing) {
 		throw createError(
 			ErrorCode.VALIDATION_ERROR,
@@ -116,13 +102,7 @@ async function resolveRadarrMovieUpdate(input: {
 		);
 	}
 
-	let baseMovie: RadarrMovie = existing;
-	try {
-		baseMovie = await api.getMovieById(existing.id, credentials);
-	} catch (error) {
-		const normalized = normalizeError(error);
-		logError(normalized, `Ani2arrApi:updateMovie:fetch:${tmdbId}`);
-	}
+	const baseMovie = await client.getMovieById(existing.id, credentials);
 
 	const qualityProfileId = resolveRequiredQualityProfileId({
 		value: form.qualityProfileId,
@@ -132,11 +112,12 @@ async function resolveRadarrMovieUpdate(input: {
 		value: form.rootFolderPath,
 		fallback: baseMovie.rootFolderPath,
 	});
-	const tags = await resolveRadarrTagIds({
-		api,
+	const tags = await resolveProviderTagIds({
+		provider: "radarr",
+		client,
 		credentials,
-		existingIdsFromForm: form.tags,
-		freeformLabelsFromForm: form.freeformTags,
+		existingIds: form.tags,
+		freeformLabels: form.freeformTags,
 	});
 	const monitored = form.monitored ?? baseMovie.monitored;
 	const minimumAvailability =

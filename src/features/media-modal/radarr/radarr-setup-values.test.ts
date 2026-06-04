@@ -2,14 +2,14 @@
 // src/features/media-modal/radarr/radarr-setup-values.test.ts
 
 import { describe, expect, it } from "vitest";
-import { parseAniListId } from "@/anilist";
-import {
-	parseProviderQualityProfileId,
-	parseProviderTagId,
-	parseRadarrMovieId,
-	parseTmdbId,
-} from "@/providers";
-import type { CheckMovieStatusResponse } from "@/rpc/types";
+import { parseAniListId } from "@/anilist/types";
+import { parseTmdbId } from "@/providers/schemas";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+	RadarrMovieId,
+} from "@/providers/schemas";
+import type { GetMovieStatusOutput } from "@/rpc/types";
 import {
 	getRadarrAddDefaults,
 	getRadarrEditDefaults,
@@ -18,12 +18,18 @@ import {
 	isRadarrSetupDraftDirty,
 } from "./radarr-setup-values";
 
+const parseProviderQualityProfileId = (value: number) =>
+	value as ProviderQualityProfileId;
+const parseProviderTagId = (value: number) => value as ProviderTagId;
+const parseRadarrMovieId = (value: number) => value as RadarrMovieId;
+
 describe("radarr setup values", () => {
 	it("hydrates edit defaults from movie-level fields only", () => {
 		const defaults = getRadarrEditDefaults({
 			id: parseRadarrMovieId(11),
 			title: "Example Movie",
 			tmdbId: parseTmdbId(22),
+			path: "/media/movies/Example Movie",
 			qualityProfileId: parseProviderQualityProfileId(33),
 			rootFolderPath: "/media/movies",
 			monitored: true,
@@ -69,6 +75,7 @@ describe("radarr setup values", () => {
 			id: parseRadarrMovieId(11),
 			title: "Example Movie",
 			tmdbId: parseTmdbId(22),
+			path: "/media/movies/Example Movie",
 			qualityProfileId: parseProviderQualityProfileId(33),
 			rootFolderPath: "/media/movies",
 			monitored: true,
@@ -99,9 +106,8 @@ describe("radarr setup values", () => {
 	});
 
 	it("does not create an edit target from a lean in-library item", () => {
-		const status: CheckMovieStatusResponse = {
-			providerId: parseTmdbId(22),
-			providerMappingState: "mapped",
+		const status: GetMovieStatusOutput = {
+			mapping: { kind: "mapped", source: "manual", providerId: parseTmdbId(22) },
 			isInLibrary: true,
 			movie: {
 				id: parseRadarrMovieId(11),
@@ -122,9 +128,8 @@ describe("radarr setup values", () => {
 	});
 
 	it("creates an edit target from a full in-library item", () => {
-		const status: CheckMovieStatusResponse = {
-			providerId: parseTmdbId(22),
-			providerMappingState: "mapped",
+		const status: GetMovieStatusOutput = {
+			mapping: { kind: "mapped", source: "manual", providerId: parseTmdbId(22) },
 			isInLibrary: true,
 			movie: {
 				id: parseRadarrMovieId(11),
@@ -153,9 +158,8 @@ describe("radarr setup values", () => {
 	});
 
 	it("creates an add target from mapped not-in-library status", () => {
-		const status: CheckMovieStatusResponse = {
-			providerId: parseTmdbId(22),
-			providerMappingState: "mapped",
+		const status: GetMovieStatusOutput = {
+			mapping: { kind: "mapped", source: "manual", providerId: parseTmdbId(22) },
 			isInLibrary: false,
 		};
 

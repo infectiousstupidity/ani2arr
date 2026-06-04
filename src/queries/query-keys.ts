@@ -1,51 +1,17 @@
-/** Shared query keys and stable AniList metadata serialization for query caching. */
+/** Shared query keys for React Query caches. */
 // src/queries/query-keys.ts
 
-import type { AniListId } from "@/anilist";
-import { isAniListId } from "@/anilist/anilist-id";
-import type { StatusInput, GetMappingsInput } from "@/rpc/schemas";
-import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
-import type { Provider, TmdbId, TvdbId } from "@/providers";
-import type { ProviderExternalId } from "@/mapping/types";
+import { isAniListId, type AniListId } from "@/anilist/types";
+import type { GetMappingsInput } from "@/rpc/types";
+import type { Provider } from "@/providers/types";
 
 const rootQueryKey = ["a2a"] as const;
 
-// Normalize strings to ensure "Show Name" and "show name " hit the same cache
-const normalizeTitleKey = (title?: string) => {
-	const trimmed = title?.trim();
-	return trimmed ? trimmed.toLowerCase() : "::";
-};
+const mediaStatusProviderKey = (provider: Provider) =>
+	[...rootQueryKey, "mediaStatus", provider] as const;
 
-// Create a deterministic subset of metadata for cache stability.
-// This prevents cache misses caused by:
-// 1. Reference instability (new objects with same content)
-// 2. undefined vs null inconsistencies
-// 3. Unstable array ordering (prequel IDs)
-// 4. Irrelevant fields (coverImage, etc.)
-const getStableMetadata = (metadata?: AniListMediaHint | null) => {
-	if (!metadata) return null;
-	return {
-		titles: {
-			english: metadata.titles?.english?.trim() || null,
-			romaji: metadata.titles?.romaji?.trim() || null,
-			native: metadata.titles?.native?.trim() || null,
-		},
-		startYear: metadata.startYear ?? null,
-		format: metadata.format ?? null,
-		// Limit synonyms to 5 to match backend matching logic and reduce cache fragmentation
-		synonyms: (metadata.synonyms || []).slice(0, 5),
-		// Sort numeric IDs to ensure array order doesn't affect cache identity
-		relationPrequelIds: [...(metadata.relationPrequelIds || [])].toSorted(
-			(a, b) => a - b,
-		),
-	};
-};
-
-const seriesStatusRootKey = (provider: Provider) =>
-	[...rootQueryKey, "seriesStatus", provider] as const;
-
-const seriesStatusBaseKey = (provider: Provider, anilistId: AniListId) =>
-	[...seriesStatusRootKey(provider), anilistId] as const;
+const mediaStatusItemKey = (provider: Provider, anilistId: AniListId) =>
+	[...mediaStatusProviderKey(provider), anilistId] as const;
 
 const providerFormResourcesRootKey = (provider: Provider) =>
 	[...rootQueryKey, `${provider}FormResources`] as const;
@@ -53,9 +19,6 @@ const providerFormResourcesRootKey = (provider: Provider) =>
 const normalizeMappingsInput = (input?: GetMappingsInput) => {
 	if (!input) return "default";
 	const normalized: Record<string, unknown> = {};
-	if (input.entryKinds?.length) {
-		normalized.entryKinds = [...new Set(input.entryKinds)].toSorted();
-	}
 	if (input.providers?.length) {
 		normalized.providers = [...new Set(input.providers)].toSorted();
 	}
@@ -67,12 +30,6 @@ const normalizeMappingsInput = (input?: GetMappingsInput) => {
 	}
 	if (input.query && input.query.trim()) {
 		normalized.query = input.query.trim().toLowerCase();
-	}
-	if (input.cursor) {
-		normalized.cursor = {
-			updatedAt: input.cursor.updatedAt,
-			groupKey: input.cursor.groupKey,
-		};
 	}
 	return normalized;
 };
@@ -91,37 +48,11 @@ export const queryKeys = {
 		[...rootQueryKey, "providerBaseUrl", provider] as const,
 	aniListMedia: (anilistId: AniListId) =>
 		[...rootQueryKey, "aniListMedia", anilistId] as const,
-	seriesStatusRoot: (provider: Provider = "sonarr") =>
-		seriesStatusRootKey(provider),
-	seriesStatusBase: (anilistId: AniListId, provider: Provider = "sonarr") =>
-		seriesStatusBaseKey(provider, anilistId),
-	seriesStatus: (
-		payload: Pick<StatusInput, "anilistId" | "title" | "metadata">,
-		provider: Provider = "sonarr",
-	) =>
-		[
-			...seriesStatusBaseKey(provider, payload.anilistId),
-			{
-				// TanStack Query hashes this object. By using normalized inputs,
-				// we ensure cache hits across different contexts (e.g. Card vs Page).
-				title: normalizeTitleKey(payload.title),
-				metadata: getStableMetadata(payload.metadata),
-			},
-		] as const,
-	providerLibraryStatus: (
-		provider: Provider,
-		anilistId: AniListId,
-		providerId: ProviderExternalId,
-	) =>
-		[
-			...seriesStatusBaseKey(provider, anilistId),
-			"providerLibraryStatus",
-			providerId,
-		] as const,
-	sonarrSeriesLibraryStatus: (tvdbId: TvdbId | null) =>
-		[...rootQueryKey, "sonarrSeriesLibraryStatus", tvdbId] as const,
-	radarrMovieLibraryStatus: (tmdbId: TmdbId | null) =>
-		[...rootQueryKey, "radarrMovieLibraryStatus", tmdbId] as const,
+	mediaStatusProvider: (provider: Provider) => mediaStatusProviderKey(provider),
+	mediaStatusItem: (provider: Provider, anilistId: AniListId) =>
+		mediaStatusItemKey(provider, anilistId),
+	mediaStatus: (provider: Provider, anilistId: AniListId) =>
+		mediaStatusItemKey(provider, anilistId),
 	sonarrFormResourcesRoot: () => providerFormResourcesRootKey("sonarr"),
 	sonarrFormResources: (scope?: string) =>
 		[...rootQueryKey, "sonarrFormResources", scope ?? "configured"] as const,

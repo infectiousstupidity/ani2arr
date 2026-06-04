@@ -1,7 +1,7 @@
 /** Provider routing for supported providers. */
 // src/providers/provider-routing.ts
 
-import type { AniListMediaFormat } from "@/anilist/schemas/media.schema";
+import type { AniListMediaFormat } from "@/anilist/types";
 import type { Provider } from "./types";
 
 export const resolveProviderForAniListFormat = (

@@ -6,7 +6,7 @@ import browseLightDomStyles from './style.css?inline';
 import cardOverlayStyles from '@/features/media-overlay/card-overlay.light-dom.css?inline';
 import { createBrowseEntrypointShell } from '@/content/browse/create-browse-entrypoint';
 import { anichartBrowseAdapter } from './adapter';
-import type { PublicOptions } from '@/settings';
+import type { PublicOptions } from "@/settings/types";
 
 const isAniChartSurface = (url: string): boolean => {
   try {

@@ -2,11 +2,11 @@
 // src/features/media-modal/details/details-panel.tsx
 
 import { ExternalLink, Search } from "lucide-react";
-import type { AniListId } from "@/anilist";
-import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
-import type { Provider } from "@/providers";
+import type { AniListId } from "@/anilist/types";
+import type { Provider } from "@/providers/types";
 import { getProviderLabel } from "@/providers/provider-labels";
 import { buildProviderOpenUrl } from "@/providers/provider-links";
+import type { MappingDetailsPayload } from "@/rpc/types";
 import Button from "@/shared/ui/primitives/button";
 import type { MediaModalTargetSummary } from "../types";
 import { CurrentTargetDetails } from "./current-target-details";
@@ -75,6 +75,7 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 	} else {
 		content = (
 			<CurrentTargetDetails
+				provider={provider}
 				aniListEntryId={anilistId}
 				effectiveMapping={effectiveMapping}
 				linkedAniListEntries={mappingDetails?.linkedAniListEntries ?? []}

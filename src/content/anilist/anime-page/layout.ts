@@ -1,11 +1,12 @@
 /** DOM and layout helpers for the AniList anime-page surface. */
 // src/content/anilist/anime-page/layout.ts
 
-import { parseAniListMediaFormatLabel, type AniListMediaFormat } from '@/anilist/schemas/media.schema';
+import { parseAniListMediaFormatLabel, type AniListMediaFormat } from '@/anilist/types';
 
 export const ACTIONS_SELECTOR = '.header .cover-wrap .actions, .cover-wrap .actions';
 export const LIST_ROW_SELECTOR = '.actions .list';
 export const SIDEBAR_SELECTOR = '.content.container .sidebar';
+export const TITLE_SELECTOR = '.header h1';
 
 export const UI_NAME = 'a2a-anime-page-ui';
 export const ANCHOR_ID = 'a2a-actions-anchor';
@@ -176,4 +177,9 @@ export function readFormatFromSidebar(doc: Document = document): AniListMediaFor
   const formatRow = rows.find(r => r.querySelector('.type')?.textContent?.trim() === 'Format');
   const raw = formatRow?.querySelector('.value')?.textContent ?? '';
   return parseAniListMediaFormatLabel(raw);
+}
+
+export function readTitleFromHeader(doc: Document = document): string | null {
+  const title = doc.querySelector<HTMLElement>(TITLE_SELECTOR)?.textContent?.trim();
+  return title ? title.replaceAll(/\s+/g, ' ') : null;
 }

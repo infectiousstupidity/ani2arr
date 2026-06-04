@@ -1,12 +1,35 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>ani2arr Quick Settings</title>
-  <meta name="manifest.browser_style" content="false">
-</head>
-<body class="bg-bg-primary text-text-primary">
-  <div id="popup-root"></div>
-  <script type="module" src="index.tsx"></script>
-</body>
+	<head>
+		<meta charset="utf-8" />
+		<title>ani2arr Quick Settings</title>
+		<meta name="manifest.browser_style" content="false" />
+		<style>
+			/* Apply background immediately to prevent white flash before Vite loads CSS */
+			html,
+			body {
+				background-color: #0b1622;
+				color: #f7f9f9;
+				margin: 0;
+				padding: 0;
+				width: 360px;
+				color-scheme: dark;
+			}
+			.a2a-skeleton {
+				display: flex;
+				padding-top: 60px; /* Small cushion for the loading text */
+				width: 360px;
+				justify-content: center;
+				color: #9fadbd;
+				font-size: 14px;
+				font-family: ui-sans-serif, system-ui, sans-serif;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="popup-root">
+			<div class="a2a-skeleton">Loading...</div>
+		</div>
+		<script type="module" src="index.tsx"></script>
+	</body>
 </html>

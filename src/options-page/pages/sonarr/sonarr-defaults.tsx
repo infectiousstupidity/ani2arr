@@ -1,13 +1,12 @@
 /** Sonarr provider default add-options form section for the options page. */
 // src/options-page/pages/sonarr/sonarr-defaults.tsx
 
-import { useEffect } from "react";
-import { useFormContext, useWatch } from "react-hook-form";
+import { useState } from "react";
 import { ListPlus } from "lucide-react";
-import {
-  parseProviderQualityProfileId,
-  type ProviderFormResources,
-} from "@/providers";
+import * as v from "valibot";
+import { ProviderQualityProfileIdSchema } from "@/providers/schemas";
+import type { ProviderFormResources } from "@/providers/types";
+import { ProviderTagField } from "@/providers/provider-tag-field";
 import {
   createDefaultSonarrFormState,
   type SonarrFormState,
@@ -23,291 +22,326 @@ import type {
 } from "@/providers/sonarr/schemas";
 import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
 import { useSonarrFormResources } from "@/queries/sonarr";
-import type { PublicOptions } from "@/settings";
-import { ProviderTagField } from "@/shared/ui/provider-tag-field";
+import type { PublicOptions } from "@/settings/types";
+import Button from "@/shared/ui/primitives/button";
+import { SelectControl } from "@/shared/ui/primitives/select";
 import { SettingsRow, SettingsSection } from "../../components/settings-section";
-import { Select } from "../../components/ui/select";
 import { Switch } from "../../components/ui/switch";
+import { getActionErrorMessage } from "../../hooks/action-helpers";
 
 const DEFAULT_OPTIONS_DESCRIPTION =
   "Configures default add options reused when adding series via the extension media modal and overlay.";
 
-const DEFAULT_FIELD_OPTIONS = { shouldDirty: true, shouldTouch: true } as const;
-const AUTO_DEFAULT_FIELD_OPTIONS = {
-  shouldDirty: false,
-  shouldTouch: false,
-} as const;
+type SonarrDraftChange = <K extends keyof SonarrFormState>(
+  field: K,
+  value: SonarrFormState[K],
+) => void;
 
 interface SonarrDefaultsFieldsProps {
-  formResources?: ProviderFormResources | undefined;
+  formResources: ProviderFormResources | undefined;
   resourceFieldsDisabled: boolean;
+  fieldsDisabled: boolean;
   values: SonarrFormState;
-  onChange: <K extends keyof SonarrFormState>(
-    field: K,
-    value: SonarrFormState[K],
-  ) => void;
+  onChange: SonarrDraftChange;
   onTagsChange: (selection: ProviderTagSelection) => void;
 }
 
 const SonarrDefaultsFields = ({
+  fieldsDisabled,
   formResources,
-  resourceFieldsDisabled,
-  values,
   onChange,
   onTagsChange,
+  resourceFieldsDisabled,
+  values,
 }: SonarrDefaultsFieldsProps) => {
-  const rootFolderOptions = formResources?.rootFolders.map((rf) => ({
-    label: rf.path,
-    value: rf.path,
-  })) ?? [];
+  const rootFolderOptions =
+    formResources?.rootFolders.map((rootFolder) => ({
+      label: rootFolder.path,
+      value: rootFolder.path,
+    })) ?? [];
 
-  const qualityProfileOptions = formResources?.qualityProfiles.map((qp) => ({
-    label: qp.name,
-    value: String(qp.id),
-  })) ?? [];
+  const qualityProfileOptions =
+    formResources?.qualityProfiles.map((qualityProfile) => ({
+      label: qualityProfile.name,
+      value: String(qualityProfile.id),
+    })) ?? [];
 
   return (
     <>
-      <SettingsRow id="sonarr-root-folder" label="Root folder">
-        <Select
-          id="sonarr-root-folder"
-          value={values.rootFolderPath ?? ""}
-          onValueChange={(value) => onChange("rootFolderPath", value)}
-          options={rootFolderOptions}
-          placeholder="Select root folder"
-          disabled={resourceFieldsDisabled}
-        />
-      </SettingsRow>
+    <SettingsRow id="sonarr-root-folder" label="Root folder">
+      <SelectControl
+        id="sonarr-root-folder"
+        value={values.rootFolderPath ?? ""}
+        onValueChange={(value) => onChange("rootFolderPath", value)}
+        options={rootFolderOptions}
+        placeholder="Select root folder"
+        disabled={resourceFieldsDisabled}
+      />
+    </SettingsRow>
 
-      <SettingsRow id="sonarr-quality-profile" label="Quality profile">
-        <Select
-          id="sonarr-quality-profile"
-          value={
-            values.qualityProfileId === undefined
-              ? ""
-              : String(values.qualityProfileId)
-          }
-          onValueChange={(value) => {
-            const num = Number(value);
-            onChange(
-              "qualityProfileId",
-              !value || Number.isNaN(num)
-                ? undefined
-                : parseProviderQualityProfileId(num),
-            );
-          }}
-          options={qualityProfileOptions}
-          placeholder="Select quality profile"
-          disabled={resourceFieldsDisabled}
-        />
-      </SettingsRow>
+    <SettingsRow id="sonarr-quality-profile" label="Quality profile">
+      <SelectControl
+        id="sonarr-quality-profile"
+        value={
+          values.qualityProfileId === undefined
+            ? ""
+            : String(values.qualityProfileId)
+        }
+        onValueChange={(value) => {
+          const qualityProfileId = Number(value);
+          onChange(
+            "qualityProfileId",
+            !value || Number.isNaN(qualityProfileId)
+              ? undefined
+              : v.parse(ProviderQualityProfileIdSchema, qualityProfileId),
+          );
+        }}
+        options={qualityProfileOptions}
+        placeholder="Select quality profile"
+        disabled={resourceFieldsDisabled}
+      />
+    </SettingsRow>
 
-      <SettingsRow id="sonarr-series-type" label="Series type">
-        <Select
-          id="sonarr-series-type"
-          value={values.seriesType ?? ""}
-          onValueChange={(value) =>
-            onChange("seriesType", value as SonarrSeriesType)
-          }
-          options={SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
-        />
-      </SettingsRow>
+    <SettingsRow id="sonarr-series-type" label="Series type">
+      <SelectControl
+        id="sonarr-series-type"
+        value={values.seriesType ?? ""}
+        onValueChange={(value) =>
+          onChange("seriesType", value as SonarrSeriesType)
+        }
+        options={SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
+        disabled={fieldsDisabled}
+      />
+    </SettingsRow>
 
-      <SettingsRow id="sonarr-tags" label="Tags">
-        <ProviderTagField
-          id="sonarr-tags"
-          availableTags={formResources?.tags ?? []}
-          selectedTagIds={values.tags}
-          selectedFreeformTags={values.freeformTags}
-          onChange={onTagsChange}
-          placeholder="Add tags..."
-        />
-      </SettingsRow>
+    <SettingsRow id="sonarr-tags" label="Tags">
+      <ProviderTagField
+        id="sonarr-tags"
+        availableTags={formResources?.tags ?? []}
+        selectedTagIds={values.tags}
+        selectedFreeformTags={values.freeformTags}
+        onChange={onTagsChange}
+        placeholder="Add tags..."
+        disabled={fieldsDisabled}
+      />
+    </SettingsRow>
 
-      <SettingsRow id="sonarr-monitor" label="Monitor episodes">
-        <Select
-          id="sonarr-monitor"
-          value={values.addOptions?.monitor ?? ""}
-          onValueChange={(value) =>
-            onChange("addOptions", {
-              ...values.addOptions,
-              monitor: value as SonarrMonitorOption,
-            })
-          }
-          options={SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS}
-        />
-      </SettingsRow>
+    <SettingsRow id="sonarr-monitor" label="Monitor episodes">
+      <SelectControl
+        id="sonarr-monitor"
+        value={values.addOptions?.monitor ?? ""}
+        onValueChange={(value) =>
+          onChange("addOptions", {
+            ...values.addOptions,
+            monitor: value as SonarrMonitorOption,
+          })
+        }
+        options={SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS}
+        disabled={fieldsDisabled}
+      />
+    </SettingsRow>
 
-      <div className="mt-4 flex flex-col divide-y divide-border-primary/20">
-        <div className="py-5">
-          <SettingsRow
+    <div className="mt-4 flex flex-col divide-y divide-border-primary/20">
+      <div className="py-5">
+        <SettingsRow
+          id="sonarr-season-folder"
+          label="Season Folders"
+          description="Use season folders for downloaded episodes."
+          inlineOnMobile
+          controlClassName="lg:flex lg:justify-end"
+        >
+          <Switch
             id="sonarr-season-folder"
-            label="Season Folders"
-            description="Use season folders for downloaded episodes."
-            inlineOnMobile
-            controlClassName="lg:flex lg:justify-end"
-          >
-            <Switch
-              id="sonarr-season-folder"
-              checked={values.seasonFolder ?? false}
-              onCheckedChange={(checked) => onChange("seasonFolder", checked)}
-            />
-          </SettingsRow>
-        </div>
-
-        <div className="py-5">
-          <SettingsRow
-            id="sonarr-search-missing"
-            label="Search Missing"
-            description="Automatically search for missing episodes when adding a series."
-            inlineOnMobile
-            controlClassName="lg:flex lg:justify-end"
-          >
-            <Switch
-              id="sonarr-search-missing"
-              checked={values.addOptions?.searchForMissingEpisodes ?? false}
-              onCheckedChange={(checked) =>
-                onChange("addOptions", {
-                  ...values.addOptions,
-                  searchForMissingEpisodes: checked,
-                })
-              }
-            />
-          </SettingsRow>
-        </div>
-
-        <div className="py-5">
-          <SettingsRow
-            id="sonarr-search-cutoff"
-            label="Search Cutoff"
-            description="Search for episodes that haven't met the cutoff."
-            inlineOnMobile
-            controlClassName="lg:flex lg:justify-end"
-          >
-            <Switch
-              id="sonarr-search-cutoff"
-              checked={values.addOptions?.searchForCutoffUnmetEpisodes ?? false}
-              onCheckedChange={(checked) =>
-                onChange("addOptions", {
-                  ...values.addOptions,
-                  searchForCutoffUnmetEpisodes: checked,
-                })
-              }
-            />
-          </SettingsRow>
-        </div>
+            checked={values.seasonFolder ?? false}
+            disabled={fieldsDisabled}
+            onCheckedChange={(checked) => onChange("seasonFolder", checked)}
+          />
+        </SettingsRow>
       </div>
-    </>
+
+      <div className="py-5">
+        <SettingsRow
+          id="sonarr-search-missing"
+          label="Search Missing"
+          description="Automatically search for missing episodes when adding a series."
+          inlineOnMobile
+          controlClassName="lg:flex lg:justify-end"
+        >
+          <Switch
+            id="sonarr-search-missing"
+            checked={values.addOptions?.searchForMissingEpisodes ?? false}
+            disabled={fieldsDisabled}
+            onCheckedChange={(checked) =>
+              onChange("addOptions", {
+                ...values.addOptions,
+                searchForMissingEpisodes: checked,
+              })
+            }
+          />
+        </SettingsRow>
+      </div>
+
+      <div className="py-5">
+        <SettingsRow
+          id="sonarr-search-cutoff"
+          label="Search Cutoff"
+          description="Search for episodes that haven't met the cutoff."
+          inlineOnMobile
+          controlClassName="lg:flex lg:justify-end"
+        >
+          <Switch
+            id="sonarr-search-cutoff"
+            checked={values.addOptions?.searchForCutoffUnmetEpisodes ?? false}
+            disabled={fieldsDisabled}
+            onCheckedChange={(checked) =>
+              onChange("addOptions", {
+                ...values.addOptions,
+                searchForCutoffUnmetEpisodes: checked,
+              })
+            }
+          />
+        </SettingsRow>
+      </div>
+    </div>
+  </>
   );
 };
 
+const cloneSonarrDefaults = (defaults: SonarrFormState): SonarrFormState =>
+  structuredClone(defaults);
+
+const getInitialSonarrDefaults = (
+  savedDefaults: SonarrFormState,
+  formResources: ProviderFormResources | undefined,
+): SonarrFormState => {
+  const defaults = cloneSonarrDefaults(savedDefaults);
+  const firstRootFolder = formResources?.rootFolders[0];
+  const firstQualityProfile = formResources?.qualityProfiles[0];
+
+  return {
+    ...defaults,
+    ...(!defaults.rootFolderPath && firstRootFolder
+      ? { rootFolderPath: firstRootFolder.path }
+      : {}),
+    ...(defaults.qualityProfileId === undefined && firstQualityProfile
+      ? { qualityProfileId: firstQualityProfile.id }
+      : {}),
+  };
+};
+
+const getSonarrDefaultsKey = (
+  savedDefaults: SonarrFormState,
+  formResources: ProviderFormResources | undefined,
+): string =>
+  JSON.stringify({
+    savedDefaults,
+    firstRootFolder: formResources?.rootFolders[0]?.path,
+    firstQualityProfile: formResources?.qualityProfiles[0]?.id,
+  });
+
+const areSonarrDefaultsEqual = (
+  left: SonarrFormState,
+  right: SonarrFormState,
+): boolean => JSON.stringify(left) === JSON.stringify(right);
+
 export const SonarrDefaults = () => {
   const { data: savedSettings } = usePublicOptions();
-  const { mutateAsync: savePublicOptions } = useSavePublicOptions();
+  const saveOptions = useSavePublicOptions();
   const isConfigured = savedSettings?.providers.sonarr.isConfigured === true;
 
   const { data: formResources, isFetching } = useSonarrFormResources({
     enabled: isConfigured,
   });
-  const resourceFieldsDisabled = !formResources;
+  const resourceFieldsDisabled = !formResources || saveOptions.isPending;
 
-  const { control, getValues, setValue } = useFormContext<PublicOptions>();
-  const values =
-    useWatch({ control, name: "providers.sonarr.defaults" }) ??
-    createDefaultSonarrFormState();
+  if (!isConfigured || !savedSettings) return null;
 
-  useEffect(() => {
-    if (!formResources || !savedSettings) return;
+  const savedDefaults =
+    savedSettings.providers.sonarr.defaults ?? createDefaultSonarrFormState();
+  const savedValues = cloneSonarrDefaults(savedDefaults);
+  const initialValues = getInitialSonarrDefaults(savedDefaults, formResources);
+  const draftKey = getSonarrDefaultsKey(savedDefaults, formResources);
 
-    const currentDefaults =
-      getValues("providers.sonarr.defaults") ?? createDefaultSonarrFormState();
-    const firstRootFolder = formResources.rootFolders[0];
-    const firstQualityProfile = formResources.qualityProfiles[0];
-    const nextDefaults: SonarrFormState = { ...currentDefaults };
+  return (
+    <SonarrDefaultsDraft
+      key={draftKey}
+      formResources={formResources}
+      initialValues={initialValues}
+      isFetching={isFetching}
+      resourceFieldsDisabled={resourceFieldsDisabled}
+      savedSettings={savedSettings}
+      savedValues={savedValues}
+      saveOptions={saveOptions}
+    />
+  );
+};
 
-    if (!nextDefaults.rootFolderPath && firstRootFolder) {
-      nextDefaults.rootFolderPath = firstRootFolder.path;
-    }
+const SonarrDefaultsDraft = ({
+  formResources,
+  initialValues,
+  isFetching,
+  resourceFieldsDisabled,
+  savedSettings,
+  savedValues,
+  saveOptions,
+}: {
+  formResources: ProviderFormResources | undefined;
+  initialValues: SonarrFormState;
+  isFetching: boolean;
+  resourceFieldsDisabled: boolean;
+  savedSettings: PublicOptions;
+  savedValues: SonarrFormState;
+  saveOptions: ReturnType<typeof useSavePublicOptions>;
+}) => {
+  const [values, setValues] = useState(() => cloneSonarrDefaults(initialValues));
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const hasDraftChanges = !areSonarrDefaultsEqual(values, initialValues);
+  const hasPersistableChanges = !areSonarrDefaultsEqual(values, savedValues);
 
-    if (nextDefaults.qualityProfileId === undefined && firstQualityProfile) {
-      nextDefaults.qualityProfileId = firstQualityProfile.id;
-    }
-
-    if (
-      nextDefaults.rootFolderPath === currentDefaults.rootFolderPath &&
-      nextDefaults.qualityProfileId === currentDefaults.qualityProfileId
-    ) {
-      return;
-    }
-
-    setValue(
-      "providers.sonarr.defaults",
-      nextDefaults,
-      AUTO_DEFAULT_FIELD_OPTIONS,
-    );
-    void savePublicOptions({
-      ...savedSettings,
-      providers: {
-        ...savedSettings.providers,
-        sonarr: {
-          ...savedSettings.providers.sonarr,
-          defaults: nextDefaults,
-        },
-      },
-    });
-  }, [formResources, getValues, savedSettings, savePublicOptions, setValue]);
-
-  const updateDefaults = <K extends keyof SonarrFormState>(
-    field: K,
-    value: SonarrFormState[K],
-  ) => {
-    const currentDefaults =
-      getValues("providers.sonarr.defaults") ?? createDefaultSonarrFormState();
-
-    setValue(
-      "providers.sonarr.defaults",
-      {
-        ...currentDefaults,
-        [field]: value,
-      },
-      DEFAULT_FIELD_OPTIONS,
-    );
+  const updateDefaults: SonarrDraftChange = (field, value) => {
+    setValues((currentDefaults) => ({
+      ...currentDefaults,
+      [field]: value,
+    }));
   };
 
   const updateTags = ({ tagIds, freeformTags }: ProviderTagSelection) => {
-    const currentDefaults =
-      getValues("providers.sonarr.defaults") ?? createDefaultSonarrFormState();
-    const nextDefaults: SonarrFormState = {
-      ...currentDefaults,
-      freeformTags,
-    };
-    delete nextDefaults.tags;
+    setValues((currentDefaults) => {
+      const nextDefaults: SonarrFormState = {
+        ...currentDefaults,
+        freeformTags,
+      };
 
-    setValue(
-      "providers.sonarr.defaults",
-      {
+      if (tagIds.length === 0) {
+        delete nextDefaults.tags;
+        return nextDefaults;
+      }
+
+      return {
         ...nextDefaults,
-        ...(tagIds.length > 0 ? { tags: tagIds } : {}),
-      },
-      DEFAULT_FIELD_OPTIONS,
-    );
+        tags: tagIds,
+      };
+    });
   };
 
-  if (!isConfigured) {
-    return (
-      <SettingsSection
-        title="Default add options"
-        description={DEFAULT_OPTIONS_DESCRIPTION}
-        icon={<ListPlus className="h-4 w-4" />}
-        className="opacity-60"
-        divider="top"
-      >
-        <p className="py-5 text-sm text-text-secondary">
-          Connect Sonarr to configure defaults.
-        </p>
-      </SettingsSection>
-    );
-  }
+  const saveDefaults = async (): Promise<void> => {
+    setSaveError(null);
+
+    try {
+      await saveOptions.mutateAsync({
+        ...savedSettings,
+        providers: {
+          ...savedSettings.providers,
+          sonarr: {
+            ...savedSettings.providers.sonarr,
+            defaults: values,
+          },
+        },
+      });
+    } catch (error) {
+      setSaveError(getActionErrorMessage(error, "Failed to save Sonarr defaults."));
+    }
+  };
 
   return (
     <SettingsSection
@@ -323,12 +357,36 @@ export const SonarrDefaults = () => {
         </p>
       ) : null}
       <SonarrDefaultsFields
+        fieldsDisabled={saveOptions.isPending}
         formResources={formResources}
         resourceFieldsDisabled={resourceFieldsDisabled}
         values={values}
         onChange={updateDefaults}
         onTagsChange={updateTags}
       />
+      {saveError ? (
+        <p className="text-sm font-semibold text-error" role="alert">
+          {saveError}
+        </p>
+      ) : null}
+      <div className="mt-6 flex justify-end gap-3">
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={!hasDraftChanges || saveOptions.isPending}
+          onClick={() => setValues(cloneSonarrDefaults(initialValues))}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          disabled={!hasPersistableChanges || saveOptions.isPending}
+          onClick={() => void saveDefaults()}
+        >
+          {saveOptions.isPending ? "Saving..." : "Save defaults"}
+        </Button>
+      </div>
     </SettingsSection>
   );
 };

@@ -1,3 +1,5 @@
+/** Local Radix Tooltip helpers for options page hover content. */
+// src/options-page/components/ui/tooltip.tsx
 import React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "@/shared/utils/cn";

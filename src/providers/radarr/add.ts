@@ -1,7 +1,8 @@
 /** Radarr add workflow and payload helpers for save-time movie creation. */
 // src/providers/radarr/add.ts
 
-import { createError, ErrorCode } from "@/shared/errors";
+import { createError } from "@/shared/errors/error-utils";
+import { ErrorCode } from "@/shared/errors/error.types";
 import type { ProviderCredentials } from "../types";
 import type { RadarrClient } from "./client";
 import type { RadarrFormState } from "./form-state";
@@ -13,11 +14,17 @@ import type {
 	RadarrTagId,
 	TmdbId,
 } from "./types";
-import { resolveRadarrTagIds } from "./tags";
+import { resolveProviderTagIds } from "../provider-tags";
 
 export type RadarrAddMoviePayload = Omit<
 	RadarrLookupMovie,
-	"addOptions" | "id" | "minimumAvailability" | "monitored" | "qualityProfileId" | "rootFolderPath" | "tags"
+	| "addOptions"
+	| "id"
+	| "minimumAvailability"
+	| "monitored"
+	| "qualityProfileId"
+	| "rootFolderPath"
+	| "tags"
 > & {
 	id: 0;
 	rootFolderPath: string;
@@ -36,10 +43,7 @@ type AddRadarrMovieInput = {
 };
 
 type AddRadarrMovieDeps = {
-	client: Pick<
-		RadarrClient,
-		"lookupMovieByTmdbId" | "addMovie" | "getTags" | "createTag"
-	>;
+	client: RadarrClient;
 };
 
 function buildAddRadarrMoviePayload(
@@ -54,8 +58,27 @@ function buildAddRadarrMoviePayload(
 	},
 ): RadarrAddMoviePayload {
 	return {
-		...movie,
 		id: 0,
+		title: movie.title,
+		tmdbId: movie.tmdbId,
+		...(movie.imdbId === undefined ? {} : { imdbId: movie.imdbId }),
+		...(movie.titleSlug === undefined ? {} : { titleSlug: movie.titleSlug }),
+		...(movie.originalTitle === undefined
+			? {}
+			: { originalTitle: movie.originalTitle }),
+		...(movie.folderName === undefined ? {} : { folderName: movie.folderName }),
+		...(movie.remotePoster === undefined
+			? {}
+			: { remotePoster: movie.remotePoster }),
+		...(movie.year === undefined ? {} : { year: movie.year }),
+		...(movie.runtime === undefined ? {} : { runtime: movie.runtime }),
+		...(movie.status === undefined ? {} : { status: movie.status }),
+		...(movie.overview === undefined ? {} : { overview: movie.overview }),
+		...(movie.images === undefined ? {} : { images: movie.images }),
+		...(movie.alternateTitles === undefined
+			? {}
+			: { alternateTitles: movie.alternateTitles }),
+		...(movie.hasFile === undefined ? {} : { hasFile: movie.hasFile }),
 		rootFolderPath: options.rootFolderPath,
 		qualityProfileId: options.qualityProfileId,
 		monitored: options.monitor !== "none",
@@ -73,7 +96,7 @@ export async function addRadarrMovie(
 	deps: AddRadarrMovieDeps,
 ): Promise<RadarrMovie> {
 	const payload = await resolveRadarrAddPayload({
-		api: deps.client,
+		client: deps.client,
 		credentials: input.credentials,
 		defaults: input.defaults,
 		form: input.form,
@@ -84,13 +107,13 @@ export async function addRadarrMovie(
 }
 
 async function resolveRadarrAddPayload(input: {
-	api: Pick<RadarrClient, "lookupMovieByTmdbId" | "getTags" | "createTag">;
+	client: RadarrClient;
 	credentials: ProviderCredentials;
 	defaults: RadarrFormState;
 	form: RadarrFormState;
 	tmdbId: TmdbId;
 }): Promise<RadarrAddMoviePayload> {
-	const { api, credentials, defaults, form, tmdbId } = input;
+	const { client, credentials, defaults, form, tmdbId } = input;
 	const qualityProfileId = resolveRequiredQualityProfileId({
 		value: form.qualityProfileId,
 		fallback: defaults.qualityProfileId,
@@ -130,7 +153,7 @@ async function resolveRadarrAddPayload(input: {
 		);
 	}
 
-	const movie = await api.lookupMovieByTmdbId(tmdbId, credentials);
+	const movie = await client.lookupMovieByTmdbId(tmdbId, credentials);
 	if (!movie) {
 		throw createError(
 			ErrorCode.VALIDATION_ERROR,
@@ -140,11 +163,12 @@ async function resolveRadarrAddPayload(input: {
 		);
 	}
 
-	const tags = await resolveRadarrTagIds({
-		api,
+	const tags = await resolveProviderTagIds({
+		provider: "radarr",
+		client,
 		credentials,
-		existingIdsFromForm: form.tags,
-		freeformLabelsFromForm: form.freeformTags,
+		existingIds: form.tags,
+		freeformLabels: form.freeformTags,
 	});
 
 	return buildAddRadarrMoviePayload(movie, {

@@ -3,10 +3,14 @@
 
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { normalizeError, type ExtensionError } from "@/shared/errors";
+import { normalizeError } from "@/shared/errors/error-utils";
+import type { ExtensionError } from "@/shared/errors/error.types";
 import { logger } from "@/shared/utils/logger";
 import { queryKeys } from "@/queries/query-keys";
-import type { Provider, ProviderCredentials } from "@/providers";
+import type {
+	Provider,
+	ProviderCredentials,
+} from "@/providers/types";
 import {
 	getPublicOptionsSnapshot,
 	getExtensionOptionsSnapshot,

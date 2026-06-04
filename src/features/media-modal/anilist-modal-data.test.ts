@@ -2,8 +2,7 @@
 // src/features/media-modal/anilist-modal-data.test.ts
 
 import { describe, expect, it } from "vitest";
-import { parseAniListId } from "@/anilist";
-import type { AniListMedia } from "@/anilist/schemas/media.schema";
+import { parseAniListId, type AniListMedia } from "@/anilist/types";
 import { resolveMediaModalMetadata } from "./anilist-modal-data";
 
 function createMedia(overrides: Partial<AniListMedia> = {}): AniListMedia {
@@ -34,6 +33,7 @@ describe("resolveMediaModalMetadata", () => {
 
 		expect(result.providerRequestTitle).toBe("Native Title");
 		expect(result.providerPayloadTitle).toBe("Native Title");
+		expect(result.anilistHeaderData.title).toBe("Native Title");
 		expect(result.fallbackTitle).toBe("English Title");
 	});
 
@@ -101,5 +101,74 @@ describe("resolveMediaModalMetadata", () => {
 			"https://img.example/hint-cover.jpg",
 		);
 		expect(result.anilistHeaderData.format).toBe("MOVIE");
+	});
+
+	it("keeps the DOM title for status when AniList media changes display titles", () => {
+		const result = resolveMediaModalMetadata({
+			anilistId: parseAniListId(4),
+			anilistMedia: createMedia({
+				title: {
+					english: "Frieren: Beyond Journey's End",
+					romaji: "Sousou no Frieren",
+				},
+			}),
+			metadataBatchData: {
+				metadata: [
+					{
+						id: parseAniListId(4),
+						titles: { romaji: "Sousou no Frieren" },
+						seasonYear: 2027,
+						format: "TV",
+					},
+				],
+			},
+			metadataHint: {
+				title: "Sousou no Frieren 3rd Season",
+				format: "TV",
+			},
+			preferredTitleLanguage: "english",
+		});
+
+		expect(result.providerRequestTitle).toBe("Frieren: Beyond Journey's End");
+		expect(result.statusTitle).toBe("Sousou no Frieren 3rd Season");
+		expect(result.statusMetadata?.titles).toEqual({ romaji: "Sousou no Frieren" });
+	});
+
+	it("does not let full AniList media alter status metadata", () => {
+		const result = resolveMediaModalMetadata({
+			anilistId: parseAniListId(5),
+			anilistMedia: createMedia({
+				id: parseAniListId(5),
+				title: { english: "Full Media Title" },
+				synonyms: ["Full Media Synonym"],
+				relations: {
+					edges: [
+						{
+							relationType: "PREQUEL",
+							node: {
+								id: parseAniListId(50),
+							},
+						},
+					],
+				},
+			}),
+			metadataBatchData: {
+				metadata: [
+					{
+						id: parseAniListId(5),
+						titles: { english: "Canonical Title" },
+						seasonYear: 2027,
+						format: "TV",
+					},
+				],
+			},
+			metadataHint: { title: "DOM Title", format: "TV" },
+			preferredTitleLanguage: "english",
+		});
+
+		expect(result.resolvedMetadata?.synonyms).toEqual(["Full Media Synonym"]);
+		expect(result.resolvedMetadata?.relationPrequelIds).toEqual([50]);
+		expect(result.statusMetadata?.synonyms).toBeNull();
+		expect(result.statusMetadata?.relationPrequelIds).toBeNull();
 	});
 });

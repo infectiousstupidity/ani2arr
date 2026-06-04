@@ -1,8 +1,11 @@
 /** Shared provider credential normalization for RPC handlers. */
 // src/rpc/handlers/provider-credentials.ts
 
-import type { Provider, ProviderCredentials } from "@/providers";
-import { normalizeProviderConnectionInput } from "@/settings";
+import type {
+	Provider,
+	ProviderCredentials,
+} from "@/providers/types";
+import { normalizeProviderConnectionInput } from "@/settings/provider-config";
 
 export const normalizeInputCredentials = (
 	provider: Provider,

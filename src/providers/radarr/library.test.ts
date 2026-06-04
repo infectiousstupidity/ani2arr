@@ -2,13 +2,17 @@
 // src/providers/radarr/library.test.ts
 
 import { describe, expect, it, vi } from "vitest";
-import {
-	parseProviderQualityProfileId,
-	parseRadarrMovieId,
-	parseTmdbId,
-	type ProviderCredentials,
-} from "@/providers";
+
+import { parseTmdbId } from "@/providers/schemas";
+import type { ProviderCredentials } from "@/providers/types";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+	RadarrMovieId,
+} from "@/providers/schemas";
 import type { CacheHit, TtlCache } from "@/shared/cache/ttl-cache";
+
+import { RadarrClient } from "./client";
 import { RadarrLibrary, toRadarrMovieSnapshot } from "./library";
 import type {
 	RadarrLookupMovie,
@@ -21,6 +25,17 @@ const credentials: ProviderCredentials = {
 	apiKey: "secret",
 };
 
+const parseProviderQualityProfileId = (value: number) =>
+	value as ProviderQualityProfileId;
+const parseProviderTagId = (value: number) => value as ProviderTagId;
+const parseRadarrMovieId = (value: number) => value as RadarrMovieId;
+
+function createClient(): RadarrClient {
+	return new RadarrClient({
+		hasUrlPermission: () => Promise.resolve(true),
+	});
+}
+
 function createMemoryCache<T>(
 	initialValue?: T,
 ): TtlCache<T> & { value: () => T | undefined } {
@@ -29,6 +44,7 @@ function createMemoryCache<T>(
 	return {
 		read: vi.fn(async (): Promise<CacheHit<T> | null> => {
 			if (value === undefined) return null;
+
 			return {
 				value,
 				stale: false,
@@ -54,6 +70,11 @@ function createRadarrMovie(input?: Partial<RadarrMovie>): RadarrMovie {
 		id: parseRadarrMovieId(20),
 		tmdbId: parseTmdbId(456),
 		title: "Known Movie",
+		path: "/movies/Known Movie",
+		rootFolderPath: "/movies",
+		qualityProfileId: parseProviderQualityProfileId(1),
+		monitored: true,
+		tags: [parseProviderTagId(1)],
 		...input,
 	};
 }
@@ -76,44 +97,60 @@ function createSnapshot(
 		id: parseRadarrMovieId(20),
 		tmdbId: parseTmdbId(456),
 		title: "Known Movie",
+		monitored: true,
 		...input,
 	};
 }
 
 describe("RadarrLibrary movie snapshots", () => {
+	it("uses memory after the first snapshot cache read", async () => {
+		const snapshot = createSnapshot();
+		const cache = createMemoryCache<RadarrMovieSnapshot[]>([snapshot]);
+		const client = createClient();
+		const getAllMovies = vi.spyOn(client, "getAllMovies");
+		const library = new RadarrLibrary(client, cache);
+
+		await expect(library.getMovieSnapshots(credentials)).resolves.toEqual([
+			snapshot,
+		]);
+		await expect(library.getMovieSnapshots(credentials)).resolves.toEqual([
+			snapshot,
+		]);
+
+		expect(cache.read).toHaveBeenCalledTimes(1);
+		expect(getAllMovies).not.toHaveBeenCalled();
+	});
+
 	it("refreshes a missing cache from Radarr and writes movie snapshots", async () => {
 		const movie = createRadarrMovie();
 		const cache = createMemoryCache<RadarrMovieSnapshot[]>();
-		const client = {
-			getAllMovies: vi.fn(async () => [movie]),
-			findMovieByTmdbId: vi.fn(),
-			lookupMovieByTmdbId: vi.fn(),
-		};
-		const library = new RadarrLibrary({ client, cache });
+		const client = createClient();
+		const getAllMovies = vi
+			.spyOn(client, "getAllMovies")
+			.mockResolvedValue([movie]);
+		const library = new RadarrLibrary(client, cache);
 
 		await expect(library.getMovieSnapshots(credentials)).resolves.toEqual([
 			createSnapshot(),
 		]);
 
-		expect(client.getAllMovies).toHaveBeenCalledWith(credentials);
+		expect(getAllMovies).toHaveBeenCalledWith(credentials);
 		expect(cache.value()).toEqual([toRadarrMovieSnapshot(movie)]);
 	});
-});
 
-describe("RadarrLibrary library status", () => {
 	it("force-verifies a TMDB hit and updates the snapshot cache", async () => {
 		const movie = createRadarrMovie({
 			rootFolderPath: "/movies",
 			qualityProfileId: parseProviderQualityProfileId(99),
 		});
 		const cache = createMemoryCache<RadarrMovieSnapshot[]>([]);
-		const client = {
-			getAllMovies: vi.fn(async () => []),
-			findMovieByTmdbId: vi.fn(async () => movie),
-			lookupMovieByTmdbId: vi.fn(),
-		};
+		const client = createClient();
+		const findMovieByTmdbId = vi
+			.spyOn(client, "findMovieByTmdbId")
+			.mockResolvedValue(movie);
+		const lookupMovieByTmdbId = vi.spyOn(client, "lookupMovieByTmdbId");
 		const onCacheChanged = vi.fn();
-		const library = new RadarrLibrary({ client, cache });
+		const library = new RadarrLibrary(client, cache);
 
 		await expect(
 			library.getMovieLibraryStatusByTmdbId({
@@ -133,11 +170,11 @@ describe("RadarrLibrary library status", () => {
 			},
 		});
 
-		expect(client.findMovieByTmdbId).toHaveBeenCalledWith(
+		expect(findMovieByTmdbId).toHaveBeenCalledWith(
 			parseTmdbId(456),
 			credentials,
 		);
-		expect(client.lookupMovieByTmdbId).not.toHaveBeenCalled();
+		expect(lookupMovieByTmdbId).not.toHaveBeenCalled();
 		expect(cache.value()).toEqual([toRadarrMovieSnapshot(movie)]);
 		expect(onCacheChanged).toHaveBeenCalledTimes(1);
 	});
@@ -146,13 +183,13 @@ describe("RadarrLibrary library status", () => {
 		const cache = createMemoryCache<RadarrMovieSnapshot[]>([
 			createSnapshot({ title: "Stale" }),
 		]);
-		const client = {
-			getAllMovies: vi.fn(async () => []),
-			findMovieByTmdbId: vi.fn(async () => null),
-			lookupMovieByTmdbId: vi.fn(async () => createLookupMovie()),
-		};
+		const client = createClient();
+		vi.spyOn(client, "findMovieByTmdbId").mockResolvedValue(null);
+		const lookupMovieByTmdbId = vi
+			.spyOn(client, "lookupMovieByTmdbId")
+			.mockResolvedValue(createLookupMovie());
 		const onCacheChanged = vi.fn();
-		const library = new RadarrLibrary({ client, cache });
+		const library = new RadarrLibrary(client, cache);
 
 		await expect(
 			library.getMovieLibraryStatusByTmdbId({
@@ -165,10 +202,13 @@ describe("RadarrLibrary library status", () => {
 			provider: "radarr",
 			providerId: parseTmdbId(456),
 			isInLibrary: false,
-			movie: { title: "Lookup Movie", tmdbId: parseTmdbId(456) },
+			movie: {
+				title: "Lookup Movie",
+				tmdbId: parseTmdbId(456),
+			},
 		});
 
-		expect(client.lookupMovieByTmdbId).toHaveBeenCalledWith(
+		expect(lookupMovieByTmdbId).toHaveBeenCalledWith(
 			parseTmdbId(456),
 			credentials,
 		);
@@ -179,15 +219,13 @@ describe("RadarrLibrary library status", () => {
 	it("returns unknown status without deleting cache when force verification fails", async () => {
 		const snapshot = createSnapshot({ title: "Cached" });
 		const cache = createMemoryCache<RadarrMovieSnapshot[]>([snapshot]);
-		const client = {
-			getAllMovies: vi.fn(async () => []),
-			findMovieByTmdbId: vi.fn(async () => {
-				throw new Error("Radarr unavailable");
-			}),
-			lookupMovieByTmdbId: vi.fn(),
-		};
+		const client = createClient();
+		vi.spyOn(client, "findMovieByTmdbId").mockRejectedValue(
+			new Error("Radarr unavailable"),
+		);
+		const lookupMovieByTmdbId = vi.spyOn(client, "lookupMovieByTmdbId");
 		const onCacheChanged = vi.fn();
-		const library = new RadarrLibrary({ client, cache });
+		const library = new RadarrLibrary(client, cache);
 
 		await expect(
 			library.getMovieLibraryStatusByTmdbId({
@@ -203,7 +241,7 @@ describe("RadarrLibrary library status", () => {
 			libraryUnknownReason: "library-check-failed",
 		});
 
-		expect(client.lookupMovieByTmdbId).not.toHaveBeenCalled();
+		expect(lookupMovieByTmdbId).not.toHaveBeenCalled();
 		expect(cache.value()).toEqual([snapshot]);
 		expect(onCacheChanged).not.toHaveBeenCalled();
 	});

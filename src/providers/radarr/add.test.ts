@@ -2,18 +2,23 @@
 // src/providers/radarr/add.test.ts
 
 import { describe, expect, it, vi } from "vitest";
-import {
-	parseProviderQualityProfileId,
-	parseProviderTagId,
-	parseRadarrMovieId,
-	parseTmdbId,
-} from "@/providers";
+import { parseTmdbId } from "@/providers/schemas";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+	RadarrMovieId,
+} from "@/providers/schemas";
 import { addRadarrMovie } from "./add";
+import type { RadarrClient } from "./client";
 
 const credentials = {
 	url: "https://radarr.example.test",
 	apiKey: "secret",
 };
+const parseProviderQualityProfileId = (value: number) =>
+	value as ProviderQualityProfileId;
+const parseProviderTagId = (value: number) => value as ProviderTagId;
+const parseRadarrMovieId = (value: number) => value as RadarrMovieId;
 
 describe("addRadarrMovie", () => {
 	it("looks up the movie by TMDB, builds the add payload, resolves tags, and returns the created movie", async () => {
@@ -24,6 +29,7 @@ describe("addRadarrMovie", () => {
 			tmdbId,
 			imdbId: "tt0034",
 			titleSlug: "lookup-movie",
+			originalTitle: "Lookup Movie Original",
 			year: 2025,
 			remotePoster: "https://image.example/poster.jpg",
 			alternateTitles: [{ title: "Preserved Title" }],
@@ -66,7 +72,7 @@ describe("addRadarrMovie", () => {
 				defaults: { freeformTags: [] },
 				credentials,
 			},
-			{ client },
+			{ client: client as unknown as RadarrClient },
 		);
 
 		expect(result).toBe(createdMovie);
@@ -76,6 +82,7 @@ describe("addRadarrMovie", () => {
 			tmdbId,
 			imdbId: "tt0034",
 			titleSlug: "lookup-movie",
+			originalTitle: "Lookup Movie Original",
 			year: 2025,
 			remotePoster: "https://image.example/poster.jpg",
 			alternateTitles: [{ title: "Preserved Title" }],
@@ -85,8 +92,15 @@ describe("addRadarrMovie", () => {
 		expect(client.createTag).toHaveBeenCalledWith("new-tag", credentials);
 		expect(client.addMovie).toHaveBeenCalledWith(
 			{
-				...lookupMovie,
 				id: 0,
+				title: "Lookup Movie",
+				tmdbId,
+				imdbId: "tt0034",
+				titleSlug: "lookup-movie",
+				originalTitle: "Lookup Movie Original",
+				year: 2025,
+				remotePoster: "https://image.example/poster.jpg",
+				alternateTitles: [{ title: "Preserved Title" }],
 				qualityProfileId: parseProviderQualityProfileId(99),
 				rootFolderPath: "/movies",
 				monitored: true,
@@ -127,7 +141,7 @@ describe("addRadarrMovie", () => {
 					defaults: { freeformTags: [] },
 					credentials,
 				},
-				{ client },
+				{ client: client as unknown as RadarrClient },
 			),
 		).rejects.toMatchObject({
 			code: "VALIDATION_ERROR",
@@ -170,7 +184,7 @@ describe("addRadarrMovie", () => {
 				defaults: { freeformTags: [] },
 				credentials,
 			},
-			{ client },
+			{ client: client as unknown as RadarrClient },
 		);
 
 		expect(client.addMovie).toHaveBeenCalledWith(
@@ -206,7 +220,7 @@ describe("addRadarrMovie", () => {
 					defaults: { freeformTags: [] },
 					credentials,
 				},
-				{ client },
+				{ client: client as unknown as RadarrClient },
 			),
 		).rejects.toMatchObject({
 			code: "VALIDATION_ERROR",

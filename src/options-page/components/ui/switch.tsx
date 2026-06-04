@@ -1,3 +1,5 @@
+/** Local Radix Switch control for options page toggle fields. */
+// src/options-page/components/ui/switch.tsx
 import React, { forwardRef } from "react";
 import * as SwitchPrimitive from "@radix-ui/react-switch";
 import { cn } from "@/shared/utils/cn";

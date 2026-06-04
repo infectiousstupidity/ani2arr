@@ -2,7 +2,7 @@
 // src/content/browse/use-browse-card-targets.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { parseAniListId } from "@/anilist";
+import { parseAniListId } from "@/anilist/types";
 import {
 	BROWSE_OVERLAY_CONTAINER_CLASS,
 	type BrowseAdapter,
@@ -194,5 +194,30 @@ describe("scanBrowseCardTargets", () => {
 
 		expect(getCover(card).dataset.a2aProcessed).toBeUndefined();
 		expect(getPlacementContainer(card)).toBeNull();
+	});
+
+	it("uses unique stable portal keys for duplicate media cards", () => {
+		const firstCard = createCard({
+			id: 147_105,
+			title: "Tongari Boushi no Atelier",
+			href: "/anime/147105/Tongari-Boushi-no-Atelier/",
+		});
+		const secondCard = createCard({
+			id: 147_105,
+			title: "Tongari Boushi no Atelier",
+			href: "/anime/147105/Tongari-Boushi-no-Atelier/",
+		});
+		fakeDocument.body?.append(firstCard);
+		fakeDocument.body?.append(secondCard);
+		const options = createOptions();
+
+		const firstTargets = scanBrowseCardTargets(options);
+		const firstKeys = firstTargets.map((target) => target.key);
+		const secondTargets = scanBrowseCardTargets(options);
+		const secondKeys = secondTargets.map((target) => target.key);
+
+		expect(firstTargets).toHaveLength(2);
+		expect(new Set(firstKeys).size).toBe(2);
+		expect(secondKeys).toEqual(firstKeys);
 	});
 });

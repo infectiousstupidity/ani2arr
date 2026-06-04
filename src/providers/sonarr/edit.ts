@@ -14,15 +14,14 @@ import type { SonarrEditMonitoringAction } from "./schemas";
 import type { ProviderCredentials } from "../types";
 import {
 	createError,
-	ErrorCode,
-	logError,
 	normalizeError,
-} from "@/shared/errors";
+} from "@/shared/errors/error-utils";
+import { ErrorCode } from "@/shared/errors/error.types";
 import {
 	joinRootAndFolder,
 	shouldMoveProviderFiles,
 } from "../provider-media-paths";
-import { resolveSonarrTagIds } from "./tags";
+import { resolveProviderTagIds } from "../provider-tags";
 
 type SonarrSeriesChanges = Partial<SonarrEditOptions>;
 
@@ -35,16 +34,7 @@ type UpdateSonarrSeriesInput = {
 };
 
 type UpdateSonarrSeriesDeps = {
-	client: Pick<
-		SonarrClient,
-		| "findSeriesByTvdbId"
-		| "getSeriesById"
-		| "getSeriesFolderName"
-		| "getTags"
-		| "createTag"
-		| "updateSeries"
-		| "setSeriesMonitorMode"
-	>;
+	client: SonarrClient;
 };
 
 type ResolvedSonarrSeriesUpdate = {
@@ -68,7 +58,7 @@ export async function updateSonarrSeries(
 	deps: UpdateSonarrSeriesDeps,
 ): Promise<SonarrSeries> {
 	const resolvedUpdate = await resolveSonarrSeriesUpdate({
-		api: deps.client,
+		client: deps.client,
 		credentials: input.credentials,
 		form: input.form,
 		tvdbId: input.tvdbId,
@@ -116,19 +106,12 @@ export async function updateSonarrSeries(
 }
 
 async function resolveSonarrSeriesUpdate(input: {
-	api: Pick<
-		SonarrClient,
-		| "findSeriesByTvdbId"
-		| "getSeriesById"
-		| "getSeriesFolderName"
-		| "getTags"
-		| "createTag"
-	>;
+	client: SonarrClient;
 	credentials: ProviderCredentials;
 	form: SonarrFormState;
 	tvdbId: TvdbId;
 }): Promise<ResolvedSonarrSeriesUpdate> {
-	const { api, credentials, form, tvdbId } = input;
+	const { client, credentials, form, tvdbId } = input;
 
 	if (!Number.isFinite(tvdbId)) {
 		throw createError(
@@ -138,7 +121,7 @@ async function resolveSonarrSeriesUpdate(input: {
 		);
 	}
 
-	const existing = await api.findSeriesByTvdbId(tvdbId, credentials);
+	const existing = await client.findSeriesByTvdbId(tvdbId, credentials);
 	if (!existing) {
 		throw createError(
 			ErrorCode.VALIDATION_ERROR,
@@ -147,13 +130,7 @@ async function resolveSonarrSeriesUpdate(input: {
 		);
 	}
 
-	let baseSeries: SonarrSeries = existing;
-	try {
-		baseSeries = await api.getSeriesById(existing.id, credentials);
-	} catch (error) {
-		const normalized = normalizeError(error);
-		logError(normalized, `Ani2arrApi:updateSeries:fetch:${tvdbId}`);
-	}
+	const baseSeries = await client.getSeriesById(existing.id, credentials);
 
 	const qualityProfileId = resolveRequiredQualityProfileId({
 		value: form.qualityProfileId,
@@ -163,12 +140,14 @@ async function resolveSonarrSeriesUpdate(input: {
 		value: form.rootFolderPath,
 		fallback: baseSeries.rootFolderPath,
 	});
-	const tags = await resolveSonarrTagIds({
-		api,
+	const tags = await resolveProviderTagIds({
+		provider: "sonarr",
+		client,
 		credentials,
-		existingIdsFromForm: form.tags,
-		freeformLabelsFromForm: form.freeformTags,
+		existingIds: form.tags,
+		freeformLabels: form.freeformTags,
 	});
+
 	const seasonFolder = form.seasonFolder ?? baseSeries.seasonFolder;
 	const seriesType = form.seriesType ?? baseSeries.seriesType;
 	const monitored = form.monitored ?? baseSeries.monitored;
@@ -179,7 +158,7 @@ async function resolveSonarrSeriesUpdate(input: {
 	);
 	const nextPath = rootFolderChanged
 		? await resolveMovedSeriesPath({
-				api,
+				client,
 				credentials,
 				rootFolderPath,
 				seriesId: baseSeries.id,
@@ -204,12 +183,12 @@ async function resolveSonarrSeriesUpdate(input: {
 }
 
 async function resolveMovedSeriesPath(input: {
-	api: Pick<SonarrClient, "getSeriesFolderName">;
+	client: SonarrClient;
 	credentials: ProviderCredentials;
 	rootFolderPath: string;
 	seriesId: SonarrSeriesId;
 }): Promise<string> {
-	const generated = await input.api.getSeriesFolderName(
+	const generated = await input.client.getSeriesFolderName(
 		input.seriesId,
 		input.credentials,
 	);

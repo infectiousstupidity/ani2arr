@@ -3,33 +3,34 @@
 
 import { useState, type ReactElement } from "react";
 import { AnimatePresence } from "framer-motion";
-import { browser } from "wxt/browser";
-import type { AniListId } from "@/anilist";
-import { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
+import { metadataHintFromAniListMetadata } from "@/anilist/title";
 import type {
+	AniListId,
 	AniListMediaFormat,
 	AniListMediaHint,
-} from "@/anilist/schemas/media.schema";
+} from "@/anilist/types";
 import { resolveAniListTargetProvider } from "@/content/anilist/target-provider";
+import { openOptionsPage } from "@/rpc/runtime-messages";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
 import { MediaModal, type MediaModalMetadataHint } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
-import type { Provider } from "@/providers";
+import type { Provider } from "@/providers/types";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
-import { useAniListMetadataBatch } from "@/queries";
+import { useAniListMetadataBatch } from "@/queries/anilist";
 import { useMappingIdentities } from "@/queries/mapping";
 import { useOptionsQuerySync, usePublicOptions } from "@/queries/options";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
-import type { PublicOptions } from "@/settings";
-import { ConfirmProvider } from "@/shared/hooks/use-confirm";
+import type { PublicOptions } from "@/settings/types";
+import { ConfirmProvider } from "@/shared/ui/feedback/confirm-provider";
 import { useTheme } from "@/shared/hooks/use-theme";
 import MediaActions from "./media-actions";
 
 export interface AnimePageTarget {
 	anilistId: AniListId;
 	format: AniListMediaFormat | null;
+	title: string | null;
 }
 
 interface ContentRootProps {
@@ -124,26 +125,12 @@ function isProviderConfigured(
 function isStatusBlocked(input: {
 	optionsPending: boolean;
 	isConfigured: boolean;
-	providerTitle: string | null;
 	metadataReadyForStatus: boolean;
 }): boolean {
 	return (
 		input.optionsPending ||
-		(input.isConfigured &&
-			input.providerTitle === null &&
-			!input.metadataReadyForStatus)
+		(input.isConfigured && !input.metadataReadyForStatus)
 	);
-}
-
-function openAnimePageSettings(provider: Provider): void {
-	void browser.runtime
-		.sendMessage({
-			_a2a: true,
-			type: "OPEN_OPTIONS_PAGE",
-			sectionId: provider,
-			timestamp: Date.now(),
-		})
-		.catch(() => {});
 }
 
 function SonarrAnimePageActions({
@@ -168,8 +155,8 @@ function SonarrAnimePageActions({
 		enabled: true,
 		statusBlocked,
 		forceVerify: true,
-		priority: "high",
-		onConfigure: () => openAnimePageSettings("sonarr"),
+		forceMappingRetry: true,
+		onConfigure: () => openOptionsPage({ sectionId: "sonarr" }),
 		onOpenMapping,
 	});
 
@@ -211,8 +198,8 @@ function RadarrAnimePageActions({
 		enabled: true,
 		statusBlocked,
 		forceVerify: true,
-		priority: "high",
-		onConfigure: () => openAnimePageSettings("radarr"),
+		forceMappingRetry: true,
+		onConfigure: () => openOptionsPage({ sectionId: "radarr" }),
 		onOpenMapping,
 	});
 
@@ -252,8 +239,9 @@ export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
 	const metadata = metadataHintFromAniListMetadata(
 		metadataBatch.data?.metadata?.[0] ?? null,
 	);
-	const providerTitle = getMetadataTitle(metadata);
-	const displayTitle = providerTitle ?? `AniList #${anilistId}`;
+	const providerTitle = trimToNull(target.title);
+	const displayTitle =
+		getMetadataTitle(metadata) ?? providerTitle ?? `AniList #${anilistId}`;
 	const provider = resolveAniListTargetProvider({
 		anilistId,
 		format: target.format,
@@ -272,7 +260,6 @@ export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
 	const statusBlocked = isStatusBlocked({
 		optionsPending: publicOptionsQuery.isPending,
 		isConfigured,
-		providerTitle,
 		metadataReadyForStatus,
 	});
 	const metadataHint = getModalMetadataHint({

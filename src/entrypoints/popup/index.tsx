@@ -1,22 +1,335 @@
-/** Immediate popup mount with shared styles loaded first. */
+/** Popup quick settings entrypoint for provider state and UI visibility toggles. */
 // src/entrypoints/popup/index.tsx
 
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { createExtensionQueryClient } from '@/queries/query-client';
-import { QuickSettings } from './popup-app';
-import './style.css';
+import React, { useState } from "react";
+import { createRoot } from "react-dom/client";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ExternalLink } from "lucide-react";
+import { browser } from "wxt/browser";
+import { openOptionsPage } from "@/rpc/runtime-messages";
+import { createExtensionQueryClient } from "@/queries/query-client";
+import {
+	useOptionsQuerySync,
+	usePublicOptions,
+	useSavePublicOptions,
+} from "@/queries/options";
+import { getProviderLabel } from "@/providers/provider-labels";
+import { PROVIDERS, type Provider } from "@/providers/types";
+import type { BadgeVisibility, PublicOptions } from "@/settings/types";
+import { cn } from "@/shared/utils/cn";
+import "./style.css";
 
+type ProviderStatusView = {
+	isProviderConfigured: boolean;
+	shortLabel: string;
+	variantClassName?: string;
+};
+
+const extensionVersion = browser.runtime.getManifest()?.version ?? "unknown";
 const queryClient = createExtensionQueryClient();
-const rootElement = document.querySelector('#popup-root');
+
+const badgeOptions: Array<{ value: BadgeVisibility; label: string }> = [
+	{ value: "always", label: "Always" },
+	{ value: "hover", label: "On hover" },
+];
+
+const configuredStatus: ProviderStatusView = {
+	isProviderConfigured: true,
+	shortLabel: "Configured",
+	variantClassName: "a2a-provider-status--configured",
+};
+
+const notConfiguredStatus: ProviderStatusView = {
+	isProviderConfigured: false,
+	shortLabel: "Not configured",
+};
+
+export function QuickSettings(): React.JSX.Element {
+	useOptionsQuerySync();
+
+	const publicOptionsQuery = usePublicOptions();
+	const saveOptions = useSavePublicOptions();
+	const [saveError, setSaveError] = useState<string | null>(null);
+
+	const publicSettings = publicOptionsQuery.data;
+	const isSonarrConfigured = publicSettings?.providers.sonarr.isConfigured ?? false;
+	const isRadarrConfigured = publicSettings?.providers.radarr.isConfigured ?? false;
+
+	const providerStatuses: Record<Provider, ProviderStatusView> = {
+		sonarr: isSonarrConfigured ? configuredStatus : notConfiguredStatus,
+		radarr: isRadarrConfigured ? configuredStatus : notConfiguredStatus,
+	};
+
+	const hasAnyProviderConfigured = isSonarrConfigured || isRadarrConfigured;
+	const isSaving = saveOptions.isPending;
+
+	// Early return without fixed height to let Chrome shrink-wrap the popup
+	if (publicOptionsQuery.isLoading || !publicSettings) {
+		return (
+			<div className="flex w-90 justify-center pb-4 pt-14 text-sm text-text-secondary">
+				Loading...
+			</div>
+		);
+	}
+
+	const updateSettings = async (
+		updater: (current: PublicOptions) => PublicOptions,
+	): Promise<void> => {
+		if (isSaving) return;
+		setSaveError(null);
+
+		try {
+			await saveOptions.mutateAsync(updater(publicSettings));
+		} catch (error) {
+			setSaveError((error as Error)?.message ?? "Failed to save settings.");
+		}
+	};
+
+	const updateBrowseProvider = (
+		provider: Provider,
+		patch: Partial<PublicOptions["ui"]["browseCards"][Provider]>,
+	): void => {
+		void updateSettings((current) => ({
+			...current,
+			ui: {
+				...current.ui,
+				browseCards: {
+					...current.ui.browseCards,
+					[provider]: {
+						...current.ui.browseCards[provider],
+						...patch,
+					},
+				},
+			},
+		}));
+	};
+
+	const updateAnimeProvider = (provider: Provider, enabled: boolean): void => {
+		void updateSettings((current) => ({
+			...current,
+			ui: {
+				...current.ui,
+				animePages: {
+					...current.ui.animePages,
+					[provider]: {
+						...current.ui.animePages[provider],
+						enabled,
+					},
+				},
+			},
+		}));
+	};
+
+	return (
+		<div className="p-3 text-text-primary">
+			<header className="mb-3 flex items-center justify-between">
+				<div className="flex items-center gap-2">
+					<img
+						src="/icons/48.png"
+						alt="ani2arr logo"
+						className="h-8 w-8 rounded-md"
+					/>
+					<div>
+						<div className="flex items-baseline gap-1.5 leading-none">
+							<p className="text-sm font-semibold">ani2arr</p>
+							<span className="text-[10px] font-medium tracking-wide text-text-secondary/80">
+								v{extensionVersion}
+							</span>
+						</div>
+						<p className="text-xs text-text-secondary">Quick settings</p>
+					</div>
+				</div>
+				<button
+					type="button"
+					onClick={() => openOptionsPage()}
+					className="inline-flex items-center gap-1 rounded-md border border-border-primary px-2.5 py-1.5 text-xs text-text-secondary transition-colors hover:bg-bg-secondary hover:text-text-primary"
+					aria-label="Open full settings page"
+				>
+					<ExternalLink className="h-3.5 w-3.5" />
+					Full
+				</button>
+			</header>
+
+			<section className="mb-3 grid grid-cols-2 gap-2">
+				{PROVIDERS.map((provider) => {
+					const status = providerStatuses[provider];
+					const providerLabel = getProviderLabel(provider);
+
+					return (
+						<div
+							key={provider}
+							className="relative rounded-xl border border-border-primary bg-bg-secondary/70 px-3 py-2"
+						>
+							<button
+								type="button"
+								onClick={() => openOptionsPage({ sectionId: provider })}
+								className="absolute right-2 top-2 rounded p-1 text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+								aria-label={`Open ${providerLabel} options in a new tab`}
+							>
+								<ExternalLink className="h-3.5 w-3.5" />
+							</button>
+							<p className="text-[11px] uppercase tracking-wide text-text-secondary">
+								{providerLabel}
+							</p>
+							<div className="mt-1 flex items-center gap-2 text-sm">
+								<span
+									className={cn(
+										"a2a-provider-status inline-flex items-center gap-2",
+										status.variantClassName,
+									)}
+								>
+									<span
+										className="a2a-provider-status-dot inline-block h-2.5 w-2.5 rounded-full"
+										aria-hidden
+									/>
+									<span className="a2a-provider-status-text">
+										{status.shortLabel}
+									</span>
+								</span>
+							</div>
+						</div>
+					);
+				})}
+			</section>
+
+			{hasAnyProviderConfigured ? (
+				<section className="space-y-2.5 rounded-xl border border-border-primary bg-bg-secondary/70 p-3">
+					<div>
+						<p className="text-sm font-semibold">Browse cards</p>
+						<p className="text-xs text-text-secondary">
+							Enabled controls whether browse-card UI is injected. Visibility
+							applies only while enabled.
+						</p>
+					</div>
+
+					{PROVIDERS.map((provider) => {
+						const providerLabel = getProviderLabel(provider);
+						const providerSettings = publicSettings.ui.browseCards[provider];
+
+						return (
+							<div
+								key={provider}
+								className="rounded-lg border border-border-primary/70 bg-bg-tertiary/40 px-3 py-2.5"
+							>
+								<div className="flex items-center justify-between gap-3">
+									<div>
+										<p className="text-sm font-semibold">{providerLabel}</p>
+									</div>
+									<input
+										type="checkbox"
+										className="h-4 w-4"
+										checked={providerSettings?.enabled ?? false}
+										disabled={isSaving}
+										onChange={(event) => {
+											updateBrowseProvider(provider, {
+												enabled: event.currentTarget.checked,
+											});
+										}}
+									/>
+								</div>
+
+								<div className="mt-2.5 grid grid-cols-2 gap-2">
+									{badgeOptions.map((option) => {
+										const selected = providerSettings?.visibility === option.value;
+
+										return (
+											<button
+												key={option.value}
+												type="button"
+												disabled={
+													isSaving || !(providerSettings?.enabled ?? false)
+												}
+												onClick={() => {
+													updateBrowseProvider(provider, {
+														visibility: option.value,
+													});
+												}}
+												className={cn(
+													"rounded-md border px-2 py-1.5 text-xs transition-colors",
+													selected
+														? "border-accent-primary bg-accent-primary/20 text-text-primary"
+														: "border-border-primary text-text-secondary hover:bg-bg-secondary",
+												)}
+											>
+												{option.label}
+											</button>
+										);
+									})}
+								</div>
+							</div>
+						);
+					})}
+
+					<div>
+						<p className="text-sm font-semibold">Anime pages</p>
+						<p className="text-xs text-text-secondary">
+							Button above AniList&apos;s native page buttons.
+						</p>
+					</div>
+
+					{PROVIDERS.map((provider) => {
+						const providerLabel = getProviderLabel(provider);
+						const enabled = publicSettings.ui.animePages[provider].enabled ?? false;
+
+						return (
+							<div
+								key={`${provider}-anime`}
+								className="flex items-center justify-between rounded-lg bg-bg-tertiary/60 px-3 py-1.5"
+							>
+								<div>
+									<p className="text-sm">{providerLabel}</p>
+									<p className="text-[11px] text-text-secondary">
+										{provider === "sonarr"
+											? "Show series actions on supported anime pages."
+											: "Show movie actions on supported anime pages."}
+									</p>
+								</div>
+								<input
+									type="checkbox"
+									className="h-4 w-4"
+									checked={enabled}
+									disabled={isSaving}
+									onChange={(event) => {
+										updateAnimeProvider(provider, event.currentTarget.checked);
+									}}
+								/>
+							</div>
+						);
+					})}
+				</section>
+			) : (
+				<section className="rounded-xl border border-border-primary bg-bg-secondary/70 p-4 text-center">
+					<p className="text-sm font-semibold">No provider configured yet</p>
+					<p className="mt-1 text-xs text-text-secondary">
+						Configure Sonarr, Radarr, or both in the full settings page to
+						enable quick settings here.
+					</p>
+				</section>
+			)}
+
+			<div
+				className="mt-2 min-h-5 text-center text-xs text-text-secondary"
+				role="status"
+				aria-live="polite"
+			>
+				{saveError ? (
+					<span className="text-error">{saveError}</span>
+				) : (isSaving ? (
+					"Saving..."
+				) : null)}
+			</div>
+		</div>
+	);
+}
+
+const rootElement = document.querySelector("#popup-root");
 
 if (rootElement) {
-  createRoot(rootElement).render(
-    <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <QuickSettings />
-      </QueryClientProvider>
-    </React.StrictMode>
-  );
+	createRoot(rootElement).render(
+		<React.StrictMode>
+			<QueryClientProvider client={queryClient}>
+				<QuickSettings />
+			</QueryClientProvider>
+		</React.StrictMode>,
+	);
 }

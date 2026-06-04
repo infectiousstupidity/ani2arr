@@ -3,7 +3,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContentScriptContext } from "wxt/utils/content-script-context";
-import type { PublicOptions } from "@/settings";
+import type { PublicOptions } from "@/settings/types";
 import { createContentEntrypointShell } from "./create-content-script-shell";
 
 const getPublicOptionsSnapshotMock = vi.hoisted(() => vi.fn());

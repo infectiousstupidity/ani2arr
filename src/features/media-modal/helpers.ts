@@ -1,7 +1,7 @@
 /** Owns small media-modal formatting and provider target helpers. */
 // src/features/media-modal/helpers.ts
 
-import { parseAniListIdOrNull, type AniListId } from "@/anilist";
+import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import type { MediaModalTargetSummary } from "./types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {

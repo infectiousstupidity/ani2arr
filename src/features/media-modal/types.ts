@@ -1,9 +1,9 @@
 /** Media modal public and shared prop types. */
 // src/features/media-modal/types.ts
 
-import type { AniListId } from "@/anilist";
-import type { AniListMediaFormat } from "@/anilist/schemas/media.schema";
-import type { ProviderTargetSummary } from "@/rpc/types";
+import type { AniListId, AniListMediaFormat } from "@/anilist/types";
+import type { TmdbId, TvdbId } from "@/providers/schemas";
+import type { Provider } from "@/providers/types";
 
 export type MediaModalView = "setup" | "mapping";
 export type MediaModalOpenSource = "content" | "options-page";
@@ -22,7 +22,24 @@ export type AniListHeaderData = {
 	year: number | null;
 };
 
-export type MediaModalTargetSummary = ProviderTargetSummary;
+export type MediaModalTargetSummary = {
+	provider: Provider;
+	providerId: TvdbId | TmdbId;
+	title: string;
+	isInLibrary: boolean;
+	providerFolderName?: string;
+	year?: number;
+	typeLabel?: string;
+	providerRouteSlug?: string;
+	posterUrl?: string;
+	statusLabel?: string;
+	overview?: string;
+	episodeCount?: number;
+	episodeFileCount?: number;
+	runtimeMinutes?: number;
+	hasFile?: boolean;
+	linkedAniListIds?: AniListId[];
+};
 
 type MediaModalStateBase = {
 	anilistId: AniListId;
