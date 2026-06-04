@@ -2,7 +2,6 @@
 // src/content/browse/browse-overlays.tsx
 
 import React, { useMemo, useRef } from "react";
-import { AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { metadataHintFromAniListMetadata } from "@/anilist/title";
 import { getMappedIdentitiesByAniListId } from "@/content/anilist/target-provider";
@@ -108,16 +107,14 @@ export function BrowseOverlays({
 					target.key,
 				),
 			)}
-			<AnimatePresence>
-				{mediaModal.state ? (
-					<MediaModal
-						key={`modal-${mediaModal.state.anilistId ?? "unknown"}`}
-						state={mediaModal.state}
-						onClose={mediaModal.close}
-						container={portalContainer}
-					/>
-				) : null}
-			</AnimatePresence>
+			{mediaModal.state ? (
+				<MediaModal
+					key={`modal-${mediaModal.state.anilistId ?? "unknown"}`}
+					state={mediaModal.state}
+					onClose={mediaModal.close}
+					container={portalContainer}
+				/>
+			) : null}
 		</>
 	);
 }

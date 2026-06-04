@@ -2,7 +2,6 @@
 // src/content/anilist/anime-page/root.tsx
 
 import { useState, type ReactElement } from "react";
-import { AnimatePresence } from "framer-motion";
 import { metadataHintFromAniListMetadata } from "@/anilist/title";
 import type {
 	AniListId,
@@ -309,16 +308,14 @@ export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
 						onOpenMapping={openMapping}
 					/>
 				)}
-				<AnimatePresence>
-					{hostElement && mediaModal.state ? (
-						<MediaModal
-							key={`modal-${mediaModal.state.anilistId}`}
-							state={mediaModal.state}
-							onClose={mediaModal.close}
-							container={hostElement}
-						/>
-					) : null}
-				</AnimatePresence>
+				{hostElement && mediaModal.state ? (
+					<MediaModal
+						key={`modal-${mediaModal.state.anilistId}`}
+						state={mediaModal.state}
+						onClose={mediaModal.close}
+						container={hostElement}
+					/>
+				) : null}
 			</ConfirmProvider>
 		</div>
 	);

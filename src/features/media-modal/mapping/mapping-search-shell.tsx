@@ -2,7 +2,6 @@
 // src/features/media-modal/mapping/mapping-search-shell.tsx
 
 import * as ScrollArea from "@radix-ui/react-scroll-area";
-import { LayoutGroup, LazyMotion, domMax, m } from "framer-motion";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type SubmitEvent } from "react";
 import Button from "@/shared/ui/primitives/button";
@@ -21,13 +20,6 @@ type MappingSearchShellProps = {
 
 const EMPTY_IMAGE_URLS_KEY = "[]";
 const IMAGE_PRELOAD_TIMEOUT_MS = 5000;
-const SEARCH_RESULTS_LIST_VARIANTS = {
-	hidden: { opacity: 0 },
-	show: {
-		opacity: 1,
-		transition: { staggerChildren: 0.05 },
-	},
-};
 
 function normalizeImageUrls(urls: readonly string[] | undefined): string[] {
 	if (!urls?.length) return [];
@@ -187,42 +179,35 @@ export function MappingSearchShell(
 			</div>
 
 			<div className="min-h-0 flex-1 overflow-hidden">
-				<LazyMotion features={domMax}>
-					<LayoutGroup id="mapping-search-results">
-						<ScrollArea.Root className="h-full w-full">
-							<ScrollArea.Viewport className="h-full w-full overscroll-contain touch-pan-y scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-								<div className="pb-4 pr-3">
-									{stateMessage ? (
-										<div className="rounded-xl border border-border-primary/45 bg-bg-secondary/35 px-3 py-6 text-center text-xs text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-											{stateMessage}
-										</div>
-									) : null}
-
-									{hasSearchTerm && !stateMessage ? (
-										<m.div
-											key={resultListKey}
-											className="flex flex-col gap-2"
-											variants={SEARCH_RESULTS_LIST_VARIANTS}
-											initial="hidden"
-											animate="show"
-										>
-											{children}
-										</m.div>
-									) : null}
+				<ScrollArea.Root className="h-full w-full">
+					<ScrollArea.Viewport className="h-full w-full overscroll-contain touch-pan-y scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+						<div className="pb-4 pr-3">
+							{stateMessage ? (
+								<div className="rounded-xl border border-border-primary/45 bg-bg-secondary/35 px-3 py-6 text-center text-xs text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+									{stateMessage}
 								</div>
-							</ScrollArea.Viewport>
+							) : null}
 
-							<ScrollArea.Scrollbar
-								orientation="vertical"
-								className="flex w-2.5 select-none touch-none p-0.5"
-							>
-								<ScrollArea.Thumb className="flex-1 rounded bg-border-primary/40" />
-							</ScrollArea.Scrollbar>
+							{hasSearchTerm && !stateMessage ? (
+								<div
+									key={resultListKey}
+									className="a2a-stagger-list flex flex-col gap-2"
+								>
+									{children}
+								</div>
+							) : null}
+						</div>
+					</ScrollArea.Viewport>
 
-							<ScrollArea.Corner />
-						</ScrollArea.Root>
-					</LayoutGroup>
-				</LazyMotion>
+					<ScrollArea.Scrollbar
+						orientation="vertical"
+						className="flex w-2.5 select-none touch-none p-0.5"
+					>
+						<ScrollArea.Thumb className="flex-1 rounded bg-border-primary/40" />
+					</ScrollArea.Scrollbar>
+
+					<ScrollArea.Corner />
+				</ScrollArea.Root>
 			</div>
 		</div>
 	);

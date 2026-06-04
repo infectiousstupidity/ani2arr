@@ -1,9 +1,7 @@
 /** Renders other AniList entries linked to the selected provider target in the modal. */
 // src/features/media-modal/details/linked-entries.tsx
 
-import { LazyMotion, domAnimation, m } from "framer-motion";
 import { ExternalLink } from "lucide-react";
-import { useState } from "react";
 import type {
 	AniListId,
 	AniListMediaFormat,
@@ -33,50 +31,14 @@ type LinkedEntryRow = {
 	posterUrl?: string | null;
 };
 
-const EXTERNAL_ICON_VARIANTS = {
-	hidden: { opacity: 0, scale: 0.92 },
-	visible: { opacity: 1, scale: 1 },
-};
-const LINKED_ENTRIES_LIST_VARIANTS = {
-	hidden: { opacity: 0 },
-	show: {
-		opacity: 1,
-		transition: { staggerChildren: 0.05 },
-	},
-};
-const LINKED_ENTRY_VARIANTS = {
-	hidden: { opacity: 0, y: 10 },
-	show: {
-		opacity: 1,
-		y: 0,
-		transition: { duration: 0.18 },
-	},
-};
-
 function LinkedEntryLink(props: { row: LinkedEntryRow }): React.JSX.Element {
 	const { row } = props;
-	const [isHovered, setIsHovered] = useState(false);
-	const [isFocusWithin, setIsFocusWithin] = useState(false);
-	const showExternalIcon = isHovered || isFocusWithin;
 
 	return (
-		<m.a
-			variants={LINKED_ENTRY_VARIANTS}
+		<a
 			href={buildAniListAnimeUrl(row.anilistId)}
 			target="_blank"
 			rel="noreferrer"
-			onMouseEnter={() => setIsHovered(true)}
-			onMouseLeave={() => setIsHovered(false)}
-			onFocusCapture={() => setIsFocusWithin(true)}
-			onBlurCapture={(event) => {
-				const nextTarget = event.relatedTarget;
-				if (
-					!(nextTarget instanceof Node) ||
-					!event.currentTarget.contains(nextTarget)
-				) {
-					setIsFocusWithin(false);
-				}
-			}}
 			className="group relative flex items-center gap-3 rounded-lg p-2 pr-10 transition-colors hover:bg-bg-tertiary/50 focus-visible:bg-bg-tertiary/50"
 		>
 			<div className="h-14 w-10 shrink-0 rounded-md bg-bg-primary/65">
@@ -99,16 +61,12 @@ function LinkedEntryLink(props: { row: LinkedEntryRow }): React.JSX.Element {
 					{row.year ? ` • ${row.year}` : ""}
 				</div>
 			</div>
-			<m.span
-				variants={EXTERNAL_ICON_VARIANTS}
-				initial={false}
-				animate={showExternalIcon ? "visible" : "hidden"}
-				transition={{ duration: 0.14 }}
-				className="absolute right-3 top-3 text-text-secondary transition-colors group-hover:text-accent-primary group-focus-visible:text-accent-primary"
+			<span
+				className="absolute right-3 top-3 scale-[0.92] text-text-secondary opacity-0 transition-[opacity,transform,color] duration-150 group-hover:scale-100 group-hover:text-accent-primary group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:text-accent-primary group-focus-visible:opacity-100"
 			>
 				<ExternalLink className="h-4 w-4" />
-			</m.span>
-		</m.a>
+			</span>
+		</a>
 	);
 }
 
@@ -192,19 +150,14 @@ export function MappingLinkedEntries(
 			<p className="shrink-0 text-xs font-semibold text-text-primary">
 				{`AniList ID's also mapped to this ${providerTargetLabel} (${rows.length})`}
 			</p>
-			<LazyMotion features={domAnimation}>
-				<m.div
-					key={rowsKey}
-					className="flex flex-col gap-2 overflow-x-hidden"
-					variants={LINKED_ENTRIES_LIST_VARIANTS}
-					initial="hidden"
-					animate="show"
-				>
-					{rows.map((row) => (
-						<LinkedEntryLink key={row.anilistId} row={row} />
-					))}
-				</m.div>
-			</LazyMotion>
+			<div
+				key={rowsKey}
+				className="a2a-stagger-list flex flex-col gap-2 overflow-x-hidden"
+			>
+				{rows.map((row) => (
+					<LinkedEntryLink key={row.anilistId} row={row} />
+				))}
+			</div>
 		</section>
 	);
 }
