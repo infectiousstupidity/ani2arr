@@ -4,9 +4,9 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { TooltipProvider } from '@radix-ui/react-tooltip';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import { ExtensionErrorBoundary } from '@/shared/ui/feedback/extension-error-boundary';
-import { ConfirmProvider } from '@/shared/hooks/use-confirm';
+import { ConfirmProvider } from '@/shared/ui/feedback/confirm-provider';
 import { createContentEntrypointShell } from '@/content/core/create-content-script-shell';
 import { BrowseOverlays } from '@/content/browse/browse-overlays';
 import {
@@ -14,7 +14,7 @@ import {
   BROWSE_PROCESSED_ATTRIBUTE,
   type BrowseAdapter,
 } from '@/content/browse/types';
-import type { PublicOptions } from '@/settings';
+import type { PublicOptions } from "@/settings/types";
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import { createShadowRootUi, type ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
 
@@ -80,14 +80,14 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
             <React.StrictMode>
               <ExtensionErrorBoundary scope="browse-overlays">
                 <QueryClientProvider client={queryClient}>
-                  <TooltipProvider>
+                  <Tooltip.Provider>
                     <ConfirmProvider portalContainer={portalContainer}>
                       <BrowseOverlays
                         adapter={options.adapter}
                         portalContainer={portalContainer}
                       />
                     </ConfirmProvider>
-                  </TooltipProvider>
+                  </Tooltip.Provider>
                 </QueryClientProvider>
               </ExtensionErrorBoundary>
             </React.StrictMode>,

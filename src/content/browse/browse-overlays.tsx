@@ -4,7 +4,7 @@
 import React, { useMemo, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
-import { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
+import { metadataHintFromAniListMetadata } from "@/anilist/title";
 import { getMappedIdentitiesByAniListId } from "@/content/anilist/target-provider";
 import { MediaModal } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
@@ -12,7 +12,7 @@ import { useAniListMetadataBatch } from "@/queries/anilist";
 import { useMappingIdentities } from "@/queries/mapping";
 import { useOptionsQuerySync, usePublicOptions } from "@/queries/options";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
-import type { PublicOptions } from "@/settings";
+import type { PublicOptions } from "@/settings/types";
 import { useTheme } from "@/shared/hooks/use-theme";
 import { BrowseCardOverlay } from "./browse-card-overlay";
 import { useBrowseCardTargets } from "./use-browse-card-targets";
@@ -25,7 +25,6 @@ export interface BrowseOverlaysProps {
 
 function getBrowseFlags(publicOptions: PublicOptions | undefined): {
 	overlaysEnabled: boolean;
-	metadataEnabled: boolean;
 } {
 	const sonarrBrowseEnabled =
 		publicOptions?.ui?.browseCards.sonarr.enabled ?? true;
@@ -34,10 +33,6 @@ function getBrowseFlags(publicOptions: PublicOptions | undefined): {
 
 	return {
 		overlaysEnabled: sonarrBrowseEnabled || radarrBrowseEnabled,
-		metadataEnabled: Boolean(
-			(sonarrBrowseEnabled && publicOptions?.providers.sonarr.isConfigured) ||
-				(radarrBrowseEnabled && publicOptions?.providers.radarr.isConfigured),
-		),
 	};
 }
 
@@ -65,23 +60,33 @@ export function BrowseOverlays({
 		() => targets.map(target => target.parsed.anilistId),
 		[targets],
 	);
+	const targetIdsMissingFormat = useMemo(
+		() =>
+			targets
+				.filter((target) => target.parsed.format === null)
+				.map((target) => target.parsed.anilistId),
+		[targets],
+	);
+	const metadataBatch = useAniListMetadataBatch(targetIdsMissingFormat, {
+		enabled: browseFlags.overlaysEnabled && targetIdsMissingFormat.length > 0,
+	});
 	const mappingIdentities = useMappingIdentities(targetIds, {
 		enabled: browseFlags.overlaysEnabled,
-	});
-	const metadataBatch = useAniListMetadataBatch(targetIds, {
-		enabled: browseFlags.metadataEnabled,
 	});
 	const mappedIdentitiesById = useMemo(
 		() => getMappedIdentitiesByAniListId(mappingIdentities.data ?? []),
 		[mappingIdentities.data],
 	);
-	const metadataById = useMemo(() => {
-		const map = new Map<number, ReturnType<typeof metadataHintFromAniListMetadata>>();
-		for (const entry of metadataBatch.data?.metadata ?? []) {
-			map.set(entry.id, metadataHintFromAniListMetadata(entry));
-		}
-		return map;
-	}, [metadataBatch.data]);
+	const metadataById = useMemo(
+		() =>
+			new Map(
+				(metadataBatch.data?.metadata ?? []).map((metadata) => [
+					metadata.id,
+					metadataHintFromAniListMetadata(metadata),
+				]),
+			),
+		[metadataBatch.data],
+	);
 
 	return (
 		<>

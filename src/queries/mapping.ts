@@ -1,40 +1,37 @@
 /** React Query hooks for mapping-related RPC reads and mutations. */
-// src/shared/queries/mapping.ts
+// src/queries/mapping.ts
 
 import {
-	useInfiniteQuery,
 	useMutation,
 	useQuery,
 	useQueryClient,
 	type QueryClient,
 } from "@tanstack/react-query";
-import type { AniListId } from "@/anilist";
+import type { AniListId } from "@/anilist/types";
 import { getAni2arrApi } from "@/rpc";
-import type {
-	GetMappingIdentitiesOutput,
-	GetMappingInspectionOutput,
-	GetMappingsOutput,
-} from "@/rpc/types";
-import type { ExtensionError } from "@/shared/errors";
-import type { Provider } from "@/providers";
 import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
 	ClearManualMappingInput,
+	GetMappingsInput,
+	GetMappingIdentitiesOutput,
+	GetMappingInspectionOutput,
+	GetMappingsOutput,
 	SetMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
 	SetManualMappingInput,
-	GetMappingsInput,
-} from "@/rpc/schemas";
+} from "@/rpc/types";
+import type { ExtensionError } from "@/shared/errors/error.types";
+import type { Provider } from "@/providers/types";
 import { queryKeys } from "./query-keys";
 
 function invalidateMappingMutationQueries(
 	queryClient: QueryClient,
 	input: Pick<SetManualMappingInput, "anilistId" | "provider">,
-): void {
-	queryClient.invalidateQueries({
-		queryKey: queryKeys.seriesStatusBase(input.anilistId, input.provider),
-	});
+	): void {
+		queryClient.invalidateQueries({
+			queryKey: queryKeys.mediaStatusItem(input.provider, input.anilistId),
+		});
 	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingIdentitiesRoot(),
@@ -46,11 +43,7 @@ function invalidateMappingMutationQueries(
 
 export const useSetManualMapping = () => {
 	const queryClient = useQueryClient();
-	return useMutation<
-		{ ok: true },
-		ExtensionError,
-		SetManualMappingInput
-	>({
+	return useMutation<{ ok: true }, ExtensionError, SetManualMappingInput>({
 		mutationFn: (input: SetManualMappingInput) =>
 			getAni2arrApi().setManualMapping(input),
 		onSettled: (_data, _error, variables) => {
@@ -63,11 +56,7 @@ export const useSetManualMapping = () => {
 
 export const useClearManualMapping = () => {
 	const queryClient = useQueryClient();
-	return useMutation<
-		{ ok: true },
-		ExtensionError,
-		ClearManualMappingInput
-	>({
+	return useMutation<{ ok: true }, ExtensionError, ClearManualMappingInput>({
 		mutationFn: (input: ClearManualMappingInput) =>
 			getAni2arrApi().clearManualMapping(input),
 		onSettled: (_data, _error, variables) => {
@@ -131,19 +120,9 @@ export const useClearMappingRejectedCandidate = () => {
 };
 
 export const useMappings = (input?: GetMappingsInput) =>
-	useInfiniteQuery<GetMappingsOutput, ExtensionError>({
+	useQuery<GetMappingsOutput, ExtensionError>({
 		queryKey: queryKeys.mappings(input),
-		queryFn: async ({ pageParam }) => {
-			const api = getAni2arrApi();
-			type MappingCursor = NonNullable<GetMappingsInput>["cursor"];
-			const cursor = (pageParam as MappingCursor | undefined) ?? input?.cursor;
-			return api.getMappings({
-				...input,
-				...(cursor ? { cursor } : {}),
-			});
-		},
-		initialPageParam: input?.cursor ?? undefined,
-		getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+		queryFn: () => getAni2arrApi().getMappings(input),
 		staleTime: 45 * 60 * 1000,
 		gcTime: 2 * 60 * 60 * 1000,
 		refetchOnWindowFocus: false,

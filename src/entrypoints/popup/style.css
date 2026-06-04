@@ -1,20 +1,39 @@
 /* Popup page layout and local imports for quick settings. */
 /* src/entrypoints/popup/style.css */
 
-@import "@/shared/styles/page-base.css";
+@import "tailwindcss" source(none);
+@import "@/shared/styles/color-tokens.css";
 @import "@/shared/styles/provider-connection-status.css";
+
+@source "./index.tsx";
+
+:root {
+	--bg-primary: #0b1622;
+	--bg-secondary: #151f2e;
+	--bg-tertiary: #253341;
+	--text-primary: #f7f9f9;
+	--text-secondary: #9fadbd;
+	--border-primary: #38444d;
+	--accent-primary: #3db4f2;
+	--accent-hover: #299dd1;
+	--warning: #f2c94c;
+	--success: #00ba7c;
+	--success-foreground: #86efac;
+	--error: #f91880;
+	--iconbutton-text: #f7f9f9;
+
+	color-scheme: dark;
+}
 
 html,
 body,
 #popup-root {
-  margin: 0;
-  padding: 0;
+	margin: 0;
+	padding: 0;
 }
 
 body {
-  width: 360px;
-  min-height: 420px;
-  overflow-y: auto;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+	width: 360px;
+	background: var(--bg-primary);
+	color: var(--text-primary);
 }

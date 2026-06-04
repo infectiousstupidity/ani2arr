@@ -6,25 +6,35 @@ import * as v from "valibot";
 import { registerAni2arrApi } from "@/rpc";
 import { apiHandlers } from "@/rpc/handlers";
 import { logger } from "@/shared/utils/logger";
-import { AniListIdSchema } from "@/anilist/anilist-id";
+import type { AniListId } from "@/anilist/types";
+import { getExtensionOptionsSnapshot } from "@/settings/store";
+import { hasConfiguredProviderCredentials } from "@/settings/provider-config";
 import {
-	getExtensionOptionsSnapshot,
-	hasConfiguredProviderCredentials,
-} from "@/settings";
-import { logError, normalizeError } from "@/shared/errors";
+	logError,
+	normalizeError,
+} from "@/shared/errors/error-utils";
 
 const log = logger.create("Background");
 const MAPPING_REFRESH_ALARM = "a2a:refresh-static-mappings";
 const MAPPING_REFRESH_PERIOD_MIN = 360;
+const AniListIdSchema = v.pipe(
+	v.number(),
+	v.finite(),
+	v.integer(),
+	v.minValue(1),
+	v.transform((value): AniListId => value as AniListId),
+);
 
 const A2AMessageSchema = v.union([
 	v.object({
 		_a2a: v.literal(true),
 		type: v.literal("a2a:ping"),
+		timestamp: v.number(),
 	}),
 	v.object({
 		_a2a: v.literal(true),
 		type: v.literal("OPEN_OPTIONS_PAGE"),
+		timestamp: v.number(),
 		sectionId: v.optional(
 			v.picklist(["sonarr", "radarr", "mappings", "ui", "advanced"]),
 		),

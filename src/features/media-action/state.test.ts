@@ -11,7 +11,7 @@ const baseInput = {
 	hasAddError: false,
 	hasStatusError: false,
 	addSucceeded: false,
-	providerMappingState: "mapped" as const,
+	mapping: { kind: "mapped", source: "manual", providerId: 1 } as const,
 	isInLibrary: false,
 	hasProviderId: true,
 	canQuickAdd: true,
@@ -53,7 +53,7 @@ describe("getMediaActionStatus", () => {
 		expect(
 			getMediaActionStatus({
 				...baseInput,
-				providerMappingState: "unknown",
+				mapping: { kind: "ambiguous", targets: [] },
 				isInLibrary: true,
 			}).state,
 		).toBe("in-library");
@@ -63,7 +63,7 @@ describe("getMediaActionStatus", () => {
 		expect(
 			getMediaActionStatus({
 				...baseInput,
-				providerMappingState: "unmapped",
+				mapping: { kind: "unmapped", hadResolveAttempt: true },
 				hasProviderId: false,
 			}).action,
 		).toBe("open-mapping");
@@ -71,7 +71,7 @@ describe("getMediaActionStatus", () => {
 		expect(
 			getMediaActionStatus({
 				...baseInput,
-				providerMappingState: "unknown",
+				mapping: { kind: "ambiguous", targets: [] },
 				hasProviderId: false,
 			}).action,
 		).toBe("open-mapping");

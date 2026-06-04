@@ -13,8 +13,9 @@ import type { SonarrClient } from "./client";
 import type { SonarrSeriesType } from "./schemas";
 import type { ProviderCredentials } from "../types";
 import type { SonarrFormState } from "./form-state";
-import { createError, ErrorCode } from "@/shared/errors";
-import { resolveSonarrTagIds } from "./tags";
+import { createError } from "@/shared/errors/error-utils";
+import { ErrorCode } from "@/shared/errors/error.types";
+import { resolveProviderTagIds } from "../provider-tags";
 
 export type SonarrAddSeriesPayload = {
 	rootFolderPath: string;
@@ -35,10 +36,7 @@ type AddSonarrSeriesInput = {
 };
 
 type AddSonarrSeriesDeps = {
-	client: Pick<
-		SonarrClient,
-		"lookupSeriesByTvdbId" | "addSeries" | "getTags" | "createTag"
-	>;
+	client: SonarrClient;
 };
 
 function buildAddSonarrSeriesPayload(
@@ -75,7 +73,7 @@ export async function addSonarrSeries(
 	deps: AddSonarrSeriesDeps,
 ): Promise<SonarrSeries> {
 	const payload = await resolveSonarrAddPayload({
-		api: deps.client,
+		client: deps.client,
 		credentials: input.credentials,
 		defaults: input.defaults,
 		form: input.form,
@@ -87,14 +85,14 @@ export async function addSonarrSeries(
 }
 
 async function resolveSonarrAddPayload(input: {
-	api: Pick<SonarrClient, "lookupSeriesByTvdbId" | "getTags" | "createTag">;
+	client: SonarrClient;
 	credentials: ProviderCredentials;
 	defaults: SonarrFormState;
 	form: SonarrFormState;
 	title: string;
 	tvdbId: TvdbId;
 }): Promise<SonarrAddSeriesPayload> {
-	const { api, credentials, defaults, form, tvdbId } = input;
+	const { client, credentials, defaults, form, tvdbId } = input;
 	const monitor = form.addOptions?.monitor ?? defaults.addOptions?.monitor;
 	const seasonFolder = form.seasonFolder ?? defaults.seasonFolder;
 	const seriesType = form.seriesType ?? defaults.seriesType;
@@ -151,7 +149,7 @@ async function resolveSonarrAddPayload(input: {
 		);
 	}
 
-	const series = await api.lookupSeriesByTvdbId(tvdbId, credentials);
+	const series = await client.lookupSeriesByTvdbId(tvdbId, credentials);
 
 	if (!series) {
 		throw createError(
@@ -162,11 +160,12 @@ async function resolveSonarrAddPayload(input: {
 		);
 	}
 
-	const tags = await resolveSonarrTagIds({
-		api,
+	const tags = await resolveProviderTagIds({
+		provider: "sonarr",
+		client,
 		credentials,
-		existingIdsFromForm: form.tags,
-		freeformLabelsFromForm: form.freeformTags,
+		existingIds: form.tags,
+		freeformLabels: form.freeformTags,
 	});
 
 	return buildAddSonarrSeriesPayload(series, {

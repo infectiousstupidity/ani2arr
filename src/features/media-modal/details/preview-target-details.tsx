@@ -1,7 +1,7 @@
 /** Renders selected provider candidate support details and linked AniList entries in the media modal. */
 // src/features/media-modal/details/preview-target-details.tsx
 
-import type { AniListId } from "@/anilist";
+import type { AniListId } from "@/anilist/types";
 import type { MediaModalTargetSummary } from "../types";
 import { MappingLinkedEntries } from "./linked-entries";
 import { TargetDetailsCard } from "./target-details-card";
@@ -24,6 +24,7 @@ export function PreviewTargetDetails(
 			<TargetDetailsCard mapping={previewMapping} />
 
 			<MappingLinkedEntries
+				provider={previewMapping.provider}
 				currentAniListId={aniListEntryId}
 				linkedAniListIds={previewMapping.linkedAniListIds ?? []}
 			/>

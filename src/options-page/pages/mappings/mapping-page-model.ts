@@ -1,20 +1,24 @@
 /** Pure grouping, filtering, and quick-action helpers for the options mapping page. */
 // src/options-page/pages/mappings/mapping-page-model.ts
 
-import { parseAniListIdOrNull, type AniListId } from "@/anilist";
-import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
-import type { MappingListRowStatus } from "@/mapping/queries/list-mappings";
-import type { ProviderExternalId } from "@/mapping/types";
-import type { Provider } from "@/providers";
+import {
+	parseAniListIdOrNull,
+	type AniListId,
+	type AniListMetadata,
+} from "@/anilist/types";
+import type { MappingResult } from "@/mapping/types";
+import type { Provider } from "@/providers/types";
 import {
 	formatProviderExternalId,
 	getProviderExternalIdLabel,
 	getProviderLabel,
 } from "@/providers/provider-labels";
-import type { GetMappingsInput } from "@/rpc/schemas";
-import type { GetMappingsOutput } from "@/rpc/types";
-
-const GROUP_PAGE_SIZE = 100;
+import type {
+	GetMappingsInput,
+	GetMappingsOutput,
+	MappingListRowStatus,
+	ProviderExternalId,
+} from "@/rpc/types";
 
 export type MappingGroup = GetMappingsOutput["groups"][number];
 export type MappingRow = MappingGroup["rows"][number];
@@ -22,7 +26,7 @@ export type MappingRow = MappingGroup["rows"][number];
 export type ProviderFilter = Provider | "all";
 export type MappingStatusFilter = MappingListRowStatus | "all";
 
-export type MappingVirtualItem =
+export type MappingListItem =
 	| {
 			kind: "group";
 			key: string;
@@ -32,7 +36,6 @@ export type MappingVirtualItem =
 	| {
 			kind: "row";
 			key: string;
-			groupKey: string;
 			row: MappingRow;
 			isLastInGroup: boolean;
 	  };
@@ -47,13 +50,13 @@ export type ClearMatchAction =
 			kind: "reject-candidate";
 			anilistId: AniListId;
 			provider: Provider;
-			providerId: ProviderExternalId;
+			providerId: number;
 	  }
 	| {
 			kind: "clear-rejected";
 			anilistId: AniListId;
 			provider: Provider;
-			providerId: ProviderExternalId;
+			providerId: number;
 	  };
 
 type ProviderMetaType = NonNullable<MappingRow["providerMeta"]>["type"];
@@ -112,26 +115,6 @@ export const formatMappingGroupLibraryLabel = (group: MappingGroup): string => {
 	return "Library unknown";
 };
 
-export const getMappingGroupRowCount = (
-	groups: readonly MappingGroup[],
-): number => {
-	let count = 0;
-	for (const group of groups) {
-		count += group.rows.length;
-	}
-	return count;
-};
-
-export const flattenMappingPages = (
-	pages: readonly { groups: MappingGroup[] }[] | undefined,
-): MappingGroup[] => {
-	const groups: MappingGroup[] = [];
-	for (const page of pages ?? []) {
-		groups.push(...page.groups);
-	}
-	return groups;
-};
-
 export const getMetadataById = (
 	metadata: readonly AniListMetadata[] | undefined,
 ): ReadonlyMap<number, AniListMetadata> => {
@@ -142,18 +125,6 @@ export const getMetadataById = (
 	return byId;
 };
 
-export const getLoadedAniListIds = (
-	groups: readonly MappingGroup[],
-): AniListId[] => {
-	const ids = new Set<AniListId>();
-	for (const group of groups) {
-		for (const row of group.rows) {
-			ids.add(row.anilistId);
-		}
-	}
-	return [...ids];
-};
-
 export const getTargetSearchValue = (
 	targetAniListId: AniListId | null,
 ): string => (targetAniListId === null ? "" : String(targetAniListId));
@@ -162,8 +133,9 @@ export const getMappingsInput = (
 	provider: ProviderFilter,
 	status: MappingStatusFilter,
 	search: string,
+	limit: number,
 ): GetMappingsInput => {
-	const input: NonNullable<GetMappingsInput> = { limit: GROUP_PAGE_SIZE };
+	const input: NonNullable<GetMappingsInput> = { limit };
 	if (provider !== "all") input.providers = [provider];
 	if (status !== "all") input.statuses = [status];
 	const query = search.trim();
@@ -180,12 +152,19 @@ export const isMappingGroupExpanded = (
 		group.rows.some((row) => row.anilistId === highlightedAniListId)) ||
 	!collapsedGroupKeys.has(group.key);
 
-export const flattenMappingGroupsForVirtualList = (input: {
+export const getMappingListModel = (input: {
 	groups: readonly MappingGroup[];
 	collapsedGroupKeys: ReadonlySet<string>;
 	highlightedAniListId: AniListId | null;
-}): MappingVirtualItem[] => {
-	const items: MappingVirtualItem[] = [];
+}): {
+	items: MappingListItem[];
+	loadedRowCount: number;
+	visibleAniListIds: AniListId[];
+} => {
+	const items: MappingListItem[] = [];
+	const visibleAniListIds = new Set<AniListId>();
+	let loadedRowCount = 0;
+
 	for (const group of input.groups) {
 		const isExpanded = isMappingGroupExpanded(
 			group,
@@ -198,58 +177,25 @@ export const flattenMappingGroupsForVirtualList = (input: {
 			group,
 			isExpanded,
 		});
+		loadedRowCount += group.rows.length;
 		if (!isExpanded) continue;
+
 		for (const [index, row] of group.rows.entries()) {
 			items.push({
 				kind: "row",
 				key: `row:${group.key}:${row.provider}:${row.anilistId}`,
-				groupKey: group.key,
 				row,
 				isLastInGroup: index === group.rows.length - 1,
 			});
+			visibleAniListIds.add(row.anilistId);
 		}
 	}
-	return items;
-};
 
-export const getIgnoreAction = (row: MappingRow): IgnoreAction =>
-	row.mappingEntryKind === "ignored"
-		? { kind: "clear-ignore", anilistId: row.anilistId, provider: row.provider }
-		: { kind: "set-ignore", anilistId: row.anilistId, provider: row.provider };
-
-export const getClearMatchAction = (
-	row: MappingRow,
-): ClearMatchAction | null => {
-	if (row.mappingEntryKind === "manual") {
-		return {
-			kind: "clear-manual",
-			anilistId: row.anilistId,
-			provider: row.provider,
-		};
-	}
-
-	if (row.mappingEntryKind === "auto" && row.providerId !== null) {
-		return {
-			kind: "reject-candidate",
-			anilistId: row.anilistId,
-			provider: row.provider,
-			providerId: row.providerId,
-		};
-	}
-
-	if (
-		row.mappingEntryKind === "rejected" &&
-		typeof row.suppressedProviderId === "number"
-	) {
-		return {
-			kind: "clear-rejected",
-			anilistId: row.anilistId,
-			provider: row.provider,
-			providerId: row.suppressedProviderId,
-		};
-	}
-
-	return null;
+	return {
+		items,
+		loadedRowCount,
+		visibleAniListIds: [...visibleAniListIds],
+	};
 };
 
 export const getRowKey = (
@@ -281,30 +227,25 @@ export const formatMappingStatusLabel = (
 	}
 };
 
-export const formatMappingEntryKind = (
-	kind: MappingRow["mappingEntryKind"],
-): string => {
-	switch (kind) {
-		case "manual": {
-			return "Manual";
-		}
-		case "upstream": {
-			return "Upstream";
-		}
-		case "auto": {
+export const formatMappingEntryKind = (result: MappingResult): string => {
+	switch (result.kind) {
+		case "mapped": {
+			if (result.source === "manual") {
+				return "Manual";
+			}
+			if (result.source === "upstream") {
+				return "Upstream";
+			}
 			return "Auto";
 		}
 		case "ignored": {
 			return "Ignored";
 		}
-		case "rejected": {
-			return "Rejected";
+		case "ambiguous": {
+			return "Ambiguous";
 		}
 		case "unmapped": {
-			return "Unmapped";
-		}
-		case "unknown": {
-			return "Unknown";
+			return result.rejectedProviderIds?.length ? "Rejected" : "Unmapped";
 		}
 	}
 };

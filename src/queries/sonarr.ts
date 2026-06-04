@@ -1,4 +1,4 @@
-/** React Query hooks for Sonarr form resources, library status, and mutations over RPC. */
+/** React Query hooks for Sonarr form resources, media status, and mutations over RPC. */
 // src/queries/sonarr.ts
 
 import {
@@ -8,49 +8,18 @@ import {
 	type QueryClient,
 } from "@tanstack/react-query";
 import { getAni2arrApi } from "@/rpc";
-import type { AniListId } from "@/anilist";
-import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
-import type {
-	CheckSeriesStatusResponse,
-	SonarrLookupOutput,
-} from "@/rpc/types";
-import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
-import type { ExtensionError } from "@/shared/errors";
-import { queryKeys } from "@/queries/query-keys";
-import type { ProviderCredentials, TvdbId } from "@/providers";
-import type { SonarrFormState } from "@/providers/sonarr/form-state";
-import type { SonarrSeriesLibraryStatus } from "@/providers/sonarr/library";
-import type { SonarrSeries } from "@/providers/sonarr/types";
 import type {
 	AddSonarrInput,
+	GetSeriesStatusOutput,
+	SonarrLookupOutput,
 	StatusInput,
 	UpdateSonarrInput,
-} from "@/rpc/schemas";
-
-interface BuildSonarrQuickAddInputOptions {
-	anilistId: AniListId;
-	tvdbId: TvdbId | null;
-	title: string;
-	metadata: AniListMediaHint | null;
-	form: SonarrFormState | null;
-}
-
-export function buildSonarrQuickAddInput(
-	input: BuildSonarrQuickAddInputOptions,
-): AddSonarrInput | null {
-	if (input.tvdbId === null || input.form === null) {
-		return null;
-	}
-
-	return {
-		anilistId: input.anilistId,
-		tvdbId: input.tvdbId,
-		title: input.title,
-		primaryTitleHint: input.title,
-		metadata: input.metadata,
-		form: { ...input.form },
-	};
-}
+} from "@/rpc/types";
+import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
+import type { ExtensionError } from "@/shared/errors/error.types";
+import { queryKeys } from "@/queries/query-keys";
+import type { ProviderCredentials } from "@/providers/types";
+import type { SonarrSeries } from "@/providers/sonarr/types";
 
 export const useSonarrFormResources = (options?: {
 	enabled?: boolean;
@@ -79,14 +48,15 @@ export const useSeriesStatus = (
 	payload: Pick<StatusInput, "anilistId" | "title" | "metadata">,
 	options?: {
 		enabled?: boolean;
-		force_verify?: boolean | (() => boolean);
-		network?: "never";
-		priority?: "high" | "normal" | (() => "high" | "normal" | undefined);
+		force_verify?: boolean;
+		force_mapping_retry?: boolean;
 	},
 ) => {
 	const forceVerify = options?.force_verify === true;
-	return useQuery<CheckSeriesStatusResponse, ExtensionError>({
-		queryKey: queryKeys.seriesStatus(payload, "sonarr"),
+	const forceMappingRetry = options?.force_mapping_retry === true;
+	const forceStatusRefresh = forceVerify || forceMappingRetry;
+	return useQuery<GetSeriesStatusOutput, ExtensionError>({
+		queryKey: queryKeys.mediaStatus("sonarr", payload.anilistId),
 		queryFn: async () => {
 			const request: StatusInput = { anilistId: payload.anilistId };
 			if (payload.title !== undefined) {
@@ -95,57 +65,21 @@ export const useSeriesStatus = (
 			if (payload.metadata !== undefined) {
 				request.metadata = payload.metadata;
 			}
-			const shouldForceVerify =
-				typeof options?.force_verify === "function"
-					? options.force_verify()
-					: options?.force_verify === true;
-			if (shouldForceVerify) {
+			if (options?.force_verify === true) {
 				request.force_verify = true;
 			}
-			if (options?.network) {
-				request.network = options.network;
-			}
-			const priority =
-				typeof options?.priority === "function"
-					? options.priority()
-					: options?.priority;
-			if (priority) {
-				request.priority = priority;
+			if (options?.force_mapping_retry === true) {
+				request.force_mapping_retry = true;
 			}
 			return getAni2arrApi().getSeriesStatus(request);
 		},
 		enabled: !!payload.anilistId && (options?.enabled ?? true),
-		staleTime: forceVerify ? 0 : 5 * 60 * 1000,
+		staleTime: forceStatusRefresh ? 0 : 5 * 60 * 1000,
+		...(forceStatusRefresh ? { refetchOnMount: "always" } : {}),
 		placeholderData: (previousData, previousQuery) =>
 			previousQuery?.queryKey[3] === payload.anilistId
 				? previousData
 				: undefined,
-		refetchOnWindowFocus: false,
-		meta: { persist: false },
-	});
-};
-
-export const useSeriesLibraryStatus = (
-	tvdbId: TvdbId | null,
-	options?: {
-		enabled?: boolean;
-		forceVerify?: boolean;
-	},
-) => {
-	const forceVerify = options?.forceVerify === true;
-	return useQuery<SonarrSeriesLibraryStatus, ExtensionError>({
-		queryKey: queryKeys.sonarrSeriesLibraryStatus(tvdbId),
-		queryFn: async () => {
-			if (!tvdbId) {
-				throw new Error("TVDB ID is required");
-			}
-			return getAni2arrApi().getSeriesLibraryStatus({
-				tvdbId,
-				...(forceVerify ? { forceVerify } : {}),
-			});
-		},
-		enabled: !!tvdbId && (options?.enabled ?? true),
-		staleTime: forceVerify ? 0 : 5 * 60 * 1000,
 		refetchOnWindowFocus: false,
 		meta: { persist: false },
 	});
@@ -172,10 +106,7 @@ function invalidateSonarrMediaMutationQueries(
 	variables: Pick<AddSonarrInput, "anilistId" | "tvdbId">,
 ): void {
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.seriesStatusBase(variables.anilistId, "sonarr"),
-	});
-	queryClient.invalidateQueries({
-		queryKey: queryKeys.sonarrSeriesLibraryStatus(variables.tvdbId),
+		queryKey: queryKeys.mediaStatusItem("sonarr", variables.anilistId),
 	});
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingInspection("sonarr", variables.anilistId),

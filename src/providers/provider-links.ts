@@ -1,7 +1,7 @@
 /** Builds provider UI links for opening Sonarr and Radarr entries or prefilled add flows. */
 // src/providers/provider-links.ts
 
-import type { Provider } from "@/providers";
+import type { Provider } from "@/providers/types";
 
 interface ProviderOpenUrlInput {
 	provider: Provider;

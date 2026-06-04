@@ -10,9 +10,9 @@ import {
 } from "framer-motion";
 import { Settings, X } from "lucide-react";
 import type { MouseEventHandler } from "react";
-import type { AniListId } from "@/anilist";
-import { buildAniListAnimeUrl } from "@/anilist/anilist-links";
-import type { Provider } from "@/providers";
+import type { AniListId } from "@/anilist/types";
+import { buildAniListAnimeUrl } from "@/anilist/title";
+import type { Provider } from "@/providers/types";
 import {
 	formatProviderExternalId,
 	getProviderLabel,

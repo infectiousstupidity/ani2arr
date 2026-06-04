@@ -3,19 +3,14 @@
 
 import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useFormContext } from "react-hook-form";
 import { getAni2arrApi } from "@/rpc";
 import { queryKeys } from "@/queries/query-keys";
-import {
-	createDefaultExtensionOptions,
-	toPublicOptions,
-	type PublicOptions,
-} from "@/settings";
+import { createDefaultExtensionOptions } from "@/settings/schema";
+import { toPublicOptions } from "@/settings/store";
 import { getActionErrorMessage } from "./action-helpers";
 
 export function useResetExtensionState() {
 	const queryClient = useQueryClient();
-	const { reset } = useFormContext<PublicOptions>();
 	const [isResetting, setIsResetting] = useState(false);
 	const [resetError, setResetError] = useState<string | null>(null);
 	const [resetSuccess, setResetSuccess] = useState(false);
@@ -31,7 +26,6 @@ export function useResetExtensionState() {
 			const extensionOptions = createDefaultExtensionOptions();
 			const publicOptions = toPublicOptions(extensionOptions);
 
-			reset(publicOptions);
 			queryClient.setQueryData(queryKeys.options(), extensionOptions);
 			queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
 			await queryClient.invalidateQueries({ queryKey: queryKeys.all });
@@ -46,7 +40,7 @@ export function useResetExtensionState() {
 		} finally {
 			setIsResetting(false);
 		}
-	}, [queryClient, reset]);
+	}, [queryClient]);
 
 	return {
 		resetExtensionState,

@@ -1,12 +1,16 @@
 /** Shared mapping mutation actions for media modal provider flows. */
 // src/features/media-modal/hooks/use-mapping-actions.ts
 
-import type { AniListId } from "@/anilist";
+import type { AniListId } from "@/anilist/types";
 import {
-	createProviderMappingTarget,
-	type ProviderExternalId,
-} from "@/mapping/types";
-import type { Provider } from "@/providers";
+	parseTmdbIdOrNull,
+	parseTvdbIdOrNull,
+} from "@/providers/schemas";
+import type { Provider } from "@/providers/types";
+import type {
+	TmdbId,
+	TvdbId,
+} from "@/providers/schemas";
 import { getProviderLabel } from "@/providers/provider-labels";
 import {
 	useClearManualMapping,
@@ -28,6 +32,25 @@ type UseMappingActionsInput = {
 	onMappingReset: () => void;
 	onIgnored: () => void;
 };
+
+type ProviderExternalId = TvdbId | TmdbId;
+
+type ProviderMappingTarget =
+	| { provider: "sonarr"; providerId: TvdbId }
+	| { provider: "radarr"; providerId: TmdbId };
+
+function createProviderMappingTarget(
+	provider: Provider,
+	value: unknown,
+): ProviderMappingTarget | null {
+	if (provider === "sonarr") {
+		const providerId = parseTvdbIdOrNull(value);
+		return providerId === null ? null : { provider, providerId };
+	}
+
+	const providerId = parseTmdbIdOrNull(value);
+	return providerId === null ? null : { provider, providerId };
+}
 
 export function useMappingActions({
 	anilistId,

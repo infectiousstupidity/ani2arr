@@ -41,11 +41,6 @@ export const RadarrFormStateSchema = v.object({
 });
 
 export type RadarrFormState = v.InferOutput<typeof RadarrFormStateSchema>;
-export {
-	RADARR_MINIMUM_AVAILABILITY_OPTIONS,
-	RADARR_MOVIE_MONITOR_OPTIONS,
-} from "./schemas";
-export type { RadarrMinimumAvailability, RadarrMovieMonitor } from "./schemas";
 
 export function normalizeRadarrFormState(
 	input: Partial<RadarrFormState> | null | undefined,

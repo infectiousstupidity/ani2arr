@@ -1,221 +1,246 @@
-/** AniList metadata hydration, refresh, and persistence workflow for domain-owned metadata state. */
+/** Shipped AniList metadata bundle import and lookup store. */
 // src/anilist/metadata.store.ts
 
-import { isAniListId, type AniListId } from '@/anilist/anilist-id';
-import type { AniListMedia } from '@/anilist/schemas/media.schema';
-import type { AniListMetadata } from '@/anilist/schemas/metadata.schema';
-import { logError, normalizeError } from '@/shared/errors';
-import { createTtlCache, type TtlCache } from '@/shared/cache/ttl-cache';
+import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { browser } from "wxt/browser";
+import { parseMetadataBundle } from "@/anilist/client";
 import {
-  bakedMetadataStore,
-  type BakedMetadataStore,
-} from './baked-metadata.store';
+	type AniListId,
+	type AniListMetadata,
+	type AniListMetadataBundle,
+	type AniListMetadataChunkRef,
+} from "@/anilist/types";
 import {
-  normalizeMetadataEntry,
-  normalizeTitles,
-} from './metadata-normalization';
-import type { AniListMediaService } from './media.service';
+	logError,
+	normalizeError,
+} from "@/shared/errors/error-utils";
+import { logger, type ScopedLogger } from "@/shared/utils/logger";
 
-const days = (n: number): number => n * 24 * 60 * 60 * 1000;
+const BAKED_METADATA_DB_NAME = "a2a-anilist-baked-metadata-db";
+const BAKED_METADATA_DB_VERSION = 1;
+const METADATA_STORE_NAME = "metadata";
+const SYNC_STATE_STORE_NAME = "sync-state";
+const SYNC_STATE_KEY = "anilist-static-metadata";
+const MANIFEST_FILE = "anilist-static-metadata.json";
+const DEFAULT_FETCH: typeof fetch = (...args) => fetch(...args);
 
-const METADATA_OVERLAY_CACHE_NAMESPACE = 'anilist:metadata-overlay';
-const METADATA_OVERLAY_STALE_MS = days(45);
-const METADATA_OVERLAY_HARD_MS = days(120);
-const MAX_REFRESH_BATCH = 10;
+interface SyncState {
+	generatedAt: number;
+}
 
-const metadataOverlayCache = createTtlCache<AniListMetadata>(METADATA_OVERLAY_CACHE_NAMESPACE);
+interface BakedMetadataDbSchema extends DBSchema {
+	[METADATA_STORE_NAME]: {
+		key: AniListId;
+		value: AniListMetadata;
+	};
+	[SYNC_STATE_STORE_NAME]: {
+		key: typeof SYNC_STATE_KEY;
+		value: SyncState;
+	};
+}
 
-const clampBatch = (ids: AniListId[], maxBatch?: number): AniListId[] => {
-  const limit = Math.max(1, Math.min(maxBatch ?? MAX_REFRESH_BATCH, MAX_REFRESH_BATCH));
-  return ids.slice(0, limit);
-};
+export interface BakedMetadataStore {
+	syncFromBundleManifest(): Promise<void>;
+	get(id: AniListId): Promise<AniListMetadata | null>;
+	clear(): Promise<void>;
+}
 
-export class AniListMetadataStore {
-  private readonly localMap = new Map<AniListId, AniListMetadata>();
-  private readonly inflight = new Map<AniListId, Promise<AniListMetadata | null>>();
-  private readonly ready: Promise<void>;
+export class AniListMetadataStore implements BakedMetadataStore {
+	private readonly fetchImpl: typeof fetch;
+	private readonly log: ScopedLogger;
+	private readonly ready: Promise<void>;
+	private dbPromise: Promise<IDBPDatabase<BakedMetadataDbSchema>> | null = null;
 
-  constructor(
-    private readonly anilistApi: AniListMediaService,
-    private readonly overlayCache: TtlCache<AniListMetadata> = metadataOverlayCache,
-    private readonly bakedStore: BakedMetadataStore = bakedMetadataStore,
-  ) {
-    this.ready = this.init();
-  }
+	constructor(options: { fetch?: typeof fetch; scope?: string } = {}) {
+		this.log = logger.create(options.scope ?? "AniListMetadataStore");
+		const rawFetch =
+			options.fetch ??
+			(typeof globalThis.fetch === "function" ? globalThis.fetch : undefined);
+		this.fetchImpl = rawFetch ? rawFetch.bind(globalThis) : DEFAULT_FETCH;
+		this.ready = this.init();
+	}
 
-  private async init(): Promise<void> {
-    try {
-      await this.bakedStore.syncFromBundleManifest();
-    } catch (error) {
-      logError(normalizeError(error), 'AniListMetadataStore:init:fetchStatic');
-    }
-  }
+	public async getMetadata(
+		ids: AniListId[],
+	): Promise<{ metadata: AniListMetadata[]; missingIds?: AniListId[] }> {
+		await this.ready;
 
-  private fromMedia(media: AniListMedia): AniListMetadata {
-    const cover = media.coverImage ?? null;
-    const coverImage = cover
-      ? {
-          medium: cover.medium ?? null,
-          large: cover.large ?? cover.extraLarge ?? null,
-        }
-      : null;
+		const metadata: AniListMetadata[] = [];
+		const missingIds: AniListId[] = [];
+		for (const id of ids) {
+			const entry = await this.get(id);
+			if (entry) {
+				metadata.push(entry);
+			} else {
+				missingIds.push(id);
+			}
+		}
 
-    return {
-      id: media.id,
-      titles: normalizeTitles(media.title),
-      seasonYear: media.seasonYear ?? media.startDate?.year ?? null,
-      format: media.format ?? null,
-      coverImage,
-      updatedAt: Date.now(),
-    };
-  }
+		return {
+			metadata,
+			...(missingIds.length > 0 ? { missingIds } : {}),
+		};
+	}
 
-  private isStale(entry: AniListMetadata, now: number): boolean {
-    return now - entry.updatedAt >= METADATA_OVERLAY_STALE_MS;
-  }
+	public async syncFromBundleManifest(): Promise<void> {
+		try {
+			const manifest = await this.fetchManifest();
+			if (!manifest) {
+				this.log.warn("syncFromBundleManifest: missing manifest");
+				return;
+			}
 
-  private async readOverlay(id: AniListId): Promise<AniListMetadata | null> {
-    const local = this.localMap.get(id);
-    if (local) return local;
-    try {
-      const cached = await this.overlayCache.read(String(id));
-      if (!cached) return null;
-      const normalized = normalizeMetadataEntry({ ...cached.value, id });
-      if (!normalized) return null;
-      this.localMap.set(id, normalized);
-      return normalized;
-    } catch (error) {
-      logError(normalizeError(error), 'AniListMetadataStore:readOverlay');
-      return null;
-    }
-  }
+			const existingState = await this.getSyncState();
+			if (existingState?.generatedAt === manifest.generatedAt) {
+				this.log.debug("syncFromBundleManifest: baked metadata current");
+				return;
+			}
 
-  private async writeOverlay(entries: AniListMetadata[]): Promise<void> {
-    try {
-      await Promise.all(
-        entries.map(entry =>
-          this.overlayCache.write(String(entry.id), entry, {
-            staleMs: METADATA_OVERLAY_STALE_MS,
-            hardMs: METADATA_OVERLAY_HARD_MS,
-          }),
-        ),
-      );
-    } catch (error) {
-      logError(normalizeError(error), 'AniListMetadataStore:writeOverlay');
-    }
-  }
+			const entries = await this.loadBundleEntries(manifest);
+			if (!entries) return;
 
-  private async bestFor(id: AniListId): Promise<AniListMetadata | null> {
-    const local = await this.readOverlay(id);
-    if (local) return local;
-    return this.bakedStore.get(id);
-  }
+			await this.replaceEntries(manifest.generatedAt, entries);
+			this.log.debug(
+				`syncFromBundleManifest: stored ${entries.length} baked metadata entries`,
+			);
+		} catch (error) {
+			logError(
+				normalizeError(error),
+				"AniListMetadataStore:syncFromBundleManifest",
+			);
+			throw error;
+		}
+	}
 
-  private async refreshBatch(ids: AniListId[]): Promise<AniListMetadata[]> {
-    const unique = [...new Set(ids.filter(isAniListId))];
-    if (unique.length === 0) return [];
+	public async get(id: AniListId): Promise<AniListMetadata | null> {
+		const db = await this.getDb();
+		return (await db.get(METADATA_STORE_NAME, id)) ?? null;
+	}
 
-    const pending: AniListId[] = [];
-    for (const id of unique) {
-      if (this.inflight.has(id)) continue;
-      pending.push(id);
-    }
-    if (pending.length === 0) {
-      const awaited = await Promise.all(unique.map(id => this.inflight.get(id)));
-      return awaited.filter(Boolean) as AniListMetadata[];
-    }
+	public async clearLocalCache(): Promise<void> {
+		await this.clear();
+	}
 
-    const limited = clampBatch(pending);
-    const batchPromise = this.anilistApi
-      .fetchMediaBatch(limited, {
-        priority: 'low',
-        forceRefresh: true,
-        source: 'metadata-refresh',
-      })
-      .then(mediaMap => {
-        const refreshed: AniListMetadata[] = [];
-        for (const [id, media] of mediaMap.entries()) {
-          const entry = this.fromMedia(media);
-          this.localMap.set(id, entry);
-          refreshed.push(entry);
-        }
-        if (refreshed.length > 0) {
-          void this.writeOverlay(refreshed);
-        }
-        return refreshed;
-      })
-      .catch(error => {
-        logError(normalizeError(error), 'AniListMetadataStore:refreshBatch');
-        return [] as AniListMetadata[];
-      });
+	public async clear(): Promise<void> {
+		await this.ready.catch(() => {});
+		const db = await this.getDb();
+		const tx = db.transaction(
+			[METADATA_STORE_NAME, SYNC_STATE_STORE_NAME],
+			"readwrite",
+		);
+		await tx.objectStore(METADATA_STORE_NAME).clear();
+		await tx.objectStore(SYNC_STATE_STORE_NAME).clear();
+		await tx.done;
+	}
 
-    for (const id of limited) {
-      this.inflight.set(
-        id,
-        batchPromise
-          .then(entries => entries.find(e => e.id === id) ?? null)
-          .finally(() => {
-            this.inflight.delete(id);
-          }),
-      );
-    }
+	private async init(): Promise<void> {
+		try {
+			await this.syncFromBundleManifest();
+		} catch (error) {
+			logError(normalizeError(error), "AniListMetadataStore:init");
+		}
+	}
 
-    return batchPromise;
-  }
+	private async getDb(): Promise<IDBPDatabase<BakedMetadataDbSchema>> {
+		this.dbPromise ??= openDB<BakedMetadataDbSchema>(
+			BAKED_METADATA_DB_NAME,
+			BAKED_METADATA_DB_VERSION,
+			{
+				upgrade(db) {
+					if (!db.objectStoreNames.contains(METADATA_STORE_NAME)) {
+						db.createObjectStore(METADATA_STORE_NAME);
+					}
+					if (!db.objectStoreNames.contains(SYNC_STATE_STORE_NAME)) {
+						db.createObjectStore(SYNC_STATE_STORE_NAME);
+					}
+				},
+			},
+		);
+		return this.dbPromise;
+	}
 
-  public async getMetadata(
-    ids: AniListId[],
-    options?: { refreshStale?: boolean; maxBatch?: number; fetchMissing?: boolean },
-  ): Promise<{ metadata: AniListMetadata[]; missingIds?: AniListId[] }> {
-    await this.ready;
-    const refreshStale = options?.refreshStale ?? true;
-    const maxBatch = options?.maxBatch;
-    const fetchMissing = options?.fetchMissing ?? true;
-    const now = Date.now();
-    const metadata = new Map<AniListId, AniListMetadata>();
-    const refreshIds: AniListId[] = [];
-    const validIds = ids.filter(isAniListId);
-    const entries = await Promise.all(
-      validIds.map(async id => [id, await this.bestFor(id)] as const),
-    );
+	private async fetchManifest(): Promise<AniListMetadataBundle | null> {
+		const response = await this.fetchImpl(this.toBakedUrl(MANIFEST_FILE));
+		if (!response.ok) {
+			this.log.warn(
+				`fetchManifest: failed to load static metadata (status ${response.status})`,
+			);
+			return null;
+		}
 
-    for (const [id, entry] of entries) {
-      if (entry) {
-        metadata.set(id, entry);
-        if (refreshStale && this.isStale(entry, now) && !this.inflight.has(id)) {
-          refreshIds.push(id);
-        }
-      } else if (fetchMissing) {
-        refreshIds.push(id);
-      }
-    }
+		return parseMetadataBundle(await response.json());
+	}
 
-    const clampedRefresh = clampBatch(refreshIds, maxBatch);
-    if (clampedRefresh.length > 0) {
-      const refreshed = await this.refreshBatch(clampedRefresh);
-      for (const entry of refreshed) {
-        metadata.set(entry.id, entry);
-      }
-    }
+	private toBakedUrl(file: string): string {
+		const getRuntimeUrl = browser.runtime.getURL as (path: string) => string;
+		return getRuntimeUrl(`/${file}`);
+	}
 
-    const missingIds = ids.filter(id => isAniListId(id) && !metadata.has(id));
+	private async getSyncState(): Promise<SyncState | null> {
+		const db = await this.getDb();
+		return (await db.get(SYNC_STATE_STORE_NAME, SYNC_STATE_KEY)) ?? null;
+	}
 
-    return {
-      metadata: [...metadata.values()],
-      ...(missingIds.length > 0 ? { missingIds } : {}),
-    };
-  }
+	private async loadBundleEntries(
+		manifest: AniListMetadataBundle,
+	): Promise<AniListMetadata[] | null> {
+		if (Array.isArray(manifest.entries) && manifest.entries.length > 0) {
+			return manifest.entries;
+		}
 
-  public async clearLocalCache(): Promise<void> {
-    await this.ready;
-    this.localMap.clear();
-    this.inflight.clear();
+		if (!Array.isArray(manifest.chunks) || manifest.chunks.length === 0) {
+			this.log.warn("loadBundleEntries: missing chunk manifest");
+			return null;
+		}
 
-    try {
-      await Promise.all([this.overlayCache.clear(), this.bakedStore.clear()]);
-    } catch (error) {
-      logError(normalizeError(error), 'AniListMetadataStore:clearLocalCache');
-      throw error;
-    }
-  }
+		const chunks = await Promise.all(
+			manifest.chunks.map((chunk) =>
+				this.fetchBakedChunk(chunk, manifest.generatedAt),
+			),
+		);
+		return chunks.flatMap((chunk) => chunk.entries ?? []);
+	}
+
+	private async fetchBakedChunk(
+		chunk: AniListMetadataChunkRef,
+		generatedAt: number,
+	): Promise<AniListMetadataBundle> {
+		const response = await this.fetchImpl(this.toBakedUrl(chunk.file));
+		if (!response.ok) {
+			throw new Error(
+				`Failed to load baked chunk ${chunk.file} (${response.status})`,
+			);
+		}
+
+		const parsed = parseMetadataBundle(await response.json(), generatedAt);
+		if (!parsed || !Array.isArray(parsed.entries)) {
+			throw new Error(`Failed to parse baked chunk ${chunk.file}`);
+		}
+		if (parsed.entries.length !== chunk.count) {
+			throw new Error(
+				`Baked chunk ${chunk.file} expected ${chunk.count} entries, parsed ${parsed.entries.length}`,
+			);
+		}
+		return parsed;
+	}
+
+	private async replaceEntries(
+		generatedAt: number,
+		entries: AniListMetadata[],
+	): Promise<void> {
+		const db = await this.getDb();
+		const tx = db.transaction(
+			[METADATA_STORE_NAME, SYNC_STATE_STORE_NAME],
+			"readwrite",
+		);
+		const metadataStore = tx.objectStore(METADATA_STORE_NAME);
+		await metadataStore.clear();
+		for (const entry of entries) {
+			await metadataStore.put(entry, entry.id);
+		}
+		await tx
+			.objectStore(SYNC_STATE_STORE_NAME)
+			.put({ generatedAt }, SYNC_STATE_KEY);
+		await tx.done;
+	}
 }

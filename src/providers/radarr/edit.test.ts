@@ -2,18 +2,23 @@
 // src/providers/radarr/edit.test.ts
 
 import { describe, expect, it, vi } from "vitest";
-import {
-	parseProviderQualityProfileId,
-	parseProviderTagId,
-	parseRadarrMovieId,
-	parseTmdbId,
-} from "@/providers";
+import { parseTmdbId } from "@/providers/schemas";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+	RadarrMovieId,
+} from "@/providers/schemas";
 import { updateRadarrMovie } from "./edit";
+import type { RadarrClient } from "./client";
 
 const credentials = {
 	url: "https://radarr.example.test",
 	apiKey: "secret",
 };
+const parseProviderQualityProfileId = (value: number) =>
+	value as ProviderQualityProfileId;
+const parseProviderTagId = (value: number) => value as ProviderTagId;
+const parseRadarrMovieId = (value: number) => value as RadarrMovieId;
 
 describe("updateRadarrMovie", () => {
 	it("sends a merged full movie payload, moves files when the path changes, and returns the updated movie", async () => {
@@ -30,13 +35,6 @@ describe("updateRadarrMovie", () => {
 			monitored: true,
 			minimumAvailability: "announced" as const,
 			tags: [parseProviderTagId(1)],
-			addOptions: {
-				searchForMovie: true,
-			},
-			movieFile: {
-				id: 100,
-				path: "/movies/Example Movie [tmdb-34]/movie.mkv",
-			},
 		};
 		const updatedMovie = {
 			...existingMovie,
@@ -68,7 +66,7 @@ describe("updateRadarrMovie", () => {
 				},
 				credentials,
 			},
-			{ client },
+			{ client: client as unknown as RadarrClient },
 		);
 
 		expect(result).toBe(updatedMovie);
@@ -100,6 +98,7 @@ describe("updateRadarrMovie", () => {
 			qualityProfileId: parseProviderQualityProfileId(56),
 			rootFolderPath: "/movies",
 			path: "/movies/Old Folder",
+			monitored: true,
 			tags: [],
 		};
 		const fullMovie = {
@@ -131,7 +130,7 @@ describe("updateRadarrMovie", () => {
 				},
 				credentials,
 			},
-			{ client },
+			{ client: client as unknown as RadarrClient },
 		);
 
 		expect(client.updateMovie).toHaveBeenCalledWith(
@@ -168,7 +167,7 @@ describe("updateRadarrMovie", () => {
 					},
 					credentials,
 				},
-				{ client },
+				{ client: client as unknown as RadarrClient },
 			),
 		).rejects.toMatchObject({
 			code: "VALIDATION_ERROR",

@@ -2,13 +2,13 @@
 // src/providers/sonarr/client.test.ts
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-	parseProviderQualityProfileId,
-	parseProviderTagId,
-	parseSonarrSeriesId,
-	parseTvdbId,
-	type ProviderCredentials,
-} from "@/providers";
+import { parseTvdbId } from "@/providers/schemas";
+import type { ProviderCredentials } from "@/providers/types";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+	SonarrSeriesId,
+} from "@/providers/schemas";
 import { SonarrClient } from "./client";
 import type { SonarrAddSeriesPayload } from "./add";
 import type { SonarrSeries } from "./types";
@@ -17,6 +17,10 @@ const credentials: ProviderCredentials = {
 	url: "https://sonarr.example",
 	apiKey: "secret",
 };
+const parseProviderQualityProfileId = (value: number) =>
+	value as ProviderQualityProfileId;
+const parseProviderTagId = (value: number) => value as ProviderTagId;
+const parseSonarrSeriesId = (value: number) => value as SonarrSeriesId;
 
 const series: SonarrSeries = {
 	id: parseSonarrSeriesId(10),

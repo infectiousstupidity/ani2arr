@@ -2,7 +2,7 @@
 // src/features/media-modal/sonarr/sonarr-setup-form.tsx
 
 import { useState, type SubmitEvent } from "react";
-import type { ProviderFormResources } from "@/providers";
+import type { ProviderFormResources } from "@/providers/types";
 import {
 	normalizeSonarrFormState,
 	type SonarrFormState,
@@ -22,8 +22,7 @@ import {
 	getSonarrSetupStatusNotice,
 	type SonarrSetupTarget,
 } from "./sonarr-setup-values";
-import type { AniListId } from "@/anilist";
-import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
+import type { AniListId, AniListMediaHint } from "@/anilist/types";
 
 type SonarrDraftState = {
 	targetKey: string | null;

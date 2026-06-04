@@ -2,13 +2,14 @@
 // src/settings/ui-schema.ts
 
 import * as v from "valibot";
-import { AniListTitleLanguageSchema } from "@/anilist/schemas/title-language.schema";
+import { ANILIST_TITLE_LANGUAGES } from "@/anilist/title";
 import type { BadgeVisibility, UiOptions } from "./types";
 
 const BADGE_VISIBILITY_OPTIONS: [BadgeVisibility, ...BadgeVisibility[]] = [
 	"always",
 	"hover",
 ];
+const AniListTitleLanguageSchema = v.picklist(ANILIST_TITLE_LANGUAGES);
 
 const createDefaultBrowseCardUiOptions =
 	(): UiOptions["browseCards"]["sonarr"] => ({

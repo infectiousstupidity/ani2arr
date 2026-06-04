@@ -2,11 +2,10 @@
 // src/features/media-modal/sonarr/sonarr-edit-options-fields.tsx
 
 import React from "react";
+import * as v from "valibot";
 
-import {
-	parseProviderQualityProfileId,
-	type ProviderFormResources,
-} from "@/providers";
+import { ProviderQualityProfileIdSchema } from "@/providers/schemas";
+import type { ProviderFormResources } from "@/providers/types";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
 import {
@@ -14,9 +13,9 @@ import {
 	SONARR_MONITOR_NEW_ITEMS_OPTIONS_WITH_DESCRIPTIONS,
 	SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
 } from "@/providers/sonarr/form-options";
-import { SelectField } from "@/shared/ui/form/select-field";
-import { SwitchField } from "@/shared/ui/form/switch-field";
-import { ProviderTagField } from "@/shared/ui/provider-tag-field";
+import { SelectField } from "@/shared/ui/fields/select-field";
+import { SwitchField } from "@/shared/ui/fields/switch-field";
+import { ProviderTagField } from "@/providers/provider-tag-field";
 import { cn } from "@/shared/utils/cn";
 
 import {
@@ -54,8 +53,6 @@ export function SonarrEditOptionsFields(
 		pathPreview,
 	} = props;
 
-	const modalSelectTriggerClassName =
-		"border border-border-primary/60 bg-bg-tertiary text-text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]";
 	const qualityProfileOptions = formResources.qualityProfiles.map((profile) => ({
 		value: String(profile.id),
 		label: profile.name,
@@ -69,7 +66,6 @@ export function SonarrEditOptionsFields(
 				rootFolders={formResources.rootFolders}
 				onChange={(value) => onChange("rootFolderPath", value)}
 				portalContainer={portalContainer ?? null}
-				triggerClassName={modalSelectTriggerClassName}
 				pathPreview={pathPreview}
 			/>
 
@@ -87,13 +83,12 @@ export function SonarrEditOptionsFields(
 						"qualityProfileId",
 						!value || Number.isNaN(num)
 							? undefined
-							: parseProviderQualityProfileId(num),
+							: v.parse(ProviderQualityProfileIdSchema, num),
 					);
 				}}
 				options={qualityProfileOptions}
 				placeholder="Select a profile..."
 				container={portalContainer ?? null}
-				triggerClassName={modalSelectTriggerClassName}
 			/>
 
 			<SelectField
@@ -105,7 +100,6 @@ export function SonarrEditOptionsFields(
 				}
 				options={SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
 				container={portalContainer ?? null}
-				triggerClassName={modalSelectTriggerClassName}
 			/>
 
 			<SelectField
@@ -120,7 +114,6 @@ export function SonarrEditOptionsFields(
 				}
 				options={SONARR_MONITOR_NEW_ITEMS_OPTIONS_WITH_DESCRIPTIONS}
 				container={portalContainer ?? null}
-				triggerClassName={modalSelectTriggerClassName}
 			/>
 
 			<SelectField
@@ -133,7 +126,6 @@ export function SonarrEditOptionsFields(
 				options={SONARR_EDIT_MONITORING_ACTION_OPTIONS_WITH_DESCRIPTIONS}
 				description="Applies a one-time Sonarr episode monitoring action. This does not reflect the current saved state."
 				container={portalContainer ?? null}
-				triggerClassName={modalSelectTriggerClassName}
 			/>
 
 			<ProviderTagField

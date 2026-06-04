@@ -1,22 +1,19 @@
 /** Options page mapping review list, filters, quick actions, and modal launch. */
 // src/options-page/pages/mapping-page.tsx
 
-import { lazy, Suspense, useState, useSyncExternalStore } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
+import type { AniListId } from "@/anilist/types";
 import { AlertCircle } from "lucide-react";
-import type { AniListId } from "@/anilist";
 import { useAniListMetadataBatch } from "@/queries/anilist";
 import { useMappings } from "@/queries/mapping";
 import { usePublicOptions } from "@/queries/options";
+import Button from "@/shared/ui/primitives/button";
 import { SettingsSection } from "../components/settings-section";
-import { Button } from "../components/ui/button";
 import { TooltipProvider } from "../components/ui/tooltip";
-import { MappingContent } from "./mappings/mappings-virtual-list";
+import { MappingContent } from "./mappings/mappings-list";
 import { MappingsFilterBar } from "./mappings/mappings-filter-bar";
 import {
-	flattenMappingGroupsForVirtualList,
-	flattenMappingPages,
-	getLoadedAniListIds,
-	getMappingGroupRowCount,
+	getMappingListModel,
 	getMappingsInput,
 	getMetadataById,
 	getTargetSearchValue,
@@ -32,43 +29,39 @@ const MediaModal = lazy(() =>
 	})),
 );
 
-const readCurrentTargetAniListId = (): AniListId | null => {
-	if (globalThis.location === undefined) return null;
-	return readTargetAniListIdFromHash(globalThis.location.hash);
-};
+const MAPPING_GROUP_PAGE_SIZE = 50;
 
-const subscribeHashChange = (onStoreChange: () => void): (() => void) => {
-	globalThis.addEventListener("hashchange", onStoreChange);
-	return () => globalThis.removeEventListener("hashchange", onStoreChange);
-};
-
-const getServerTargetAniListId = (): AniListId | null => null;
-
-function useHashTargetAniListId(): AniListId | null {
-	return useSyncExternalStore(
-		subscribeHashChange,
-		readCurrentTargetAniListId,
-		getServerTargetAniListId,
-	);
+interface MappingsPageProps {
+	hash: string;
 }
 
-export const MappingsPage = (): React.JSX.Element => {
-	const targetAniListId = useHashTargetAniListId();
+export const MappingsPage = ({ hash }: MappingsPageProps): React.JSX.Element => {
+	const targetAniListId = readTargetAniListIdFromHash(hash);
+
+	return (
+		<MappingsPageContent
+			key={targetAniListId ?? "all"}
+			targetAniListId={targetAniListId}
+		/>
+	);
+};
+
+interface MappingsPageContentProps {
+	targetAniListId: AniListId | null;
+}
+
+const MappingsPageContent = ({
+	targetAniListId,
+}: MappingsPageContentProps): React.JSX.Element => {
 	const initialTargetSearch = getTargetSearchValue(targetAniListId);
 
 	const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
 	const [statusFilter, setStatusFilter] = useState<MappingStatusFilter>("all");
 	const [searchQuery, setSearchQuery] = useState(() => initialTargetSearch);
+	const [visibleLimit, setVisibleLimit] = useState(MAPPING_GROUP_PAGE_SIZE);
 	const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(
 		() => new Set(),
 	);
-	const [prevTargetId, setPrevTargetId] =
-		useState<AniListId | null>(targetAniListId);
-
-	if (targetAniListId !== prevTargetId) {
-		setPrevTargetId(targetAniListId);
-		setSearchQuery(getTargetSearchValue(targetAniListId));
-	}
 
 	const { data: publicOptions } = usePublicOptions();
 	const preferredTitleLanguage =
@@ -78,22 +71,30 @@ export const MappingsPage = (): React.JSX.Element => {
 		providerFilter,
 		statusFilter,
 		searchQuery,
+		visibleLimit,
 	);
 	const mappingsQuery = useMappings(mappingsInput);
 
-	const groups = flattenMappingPages(mappingsQuery.data?.pages);
-	const virtualItems = flattenMappingGroupsForVirtualList({
-		groups,
-		collapsedGroupKeys,
-		highlightedAniListId: targetAniListId,
+	const groups = useMemo(
+		() => mappingsQuery.data?.groups ?? [],
+		[mappingsQuery.data?.groups],
+	);
+	const listModel = useMemo(
+		() =>
+			getMappingListModel({
+				groups,
+				collapsedGroupKeys,
+				highlightedAniListId: targetAniListId,
+			}),
+		[collapsedGroupKeys, groups, targetAniListId],
+	);
+	const metadataQuery = useAniListMetadataBatch(listModel.visibleAniListIds, {
+		enabled: listModel.visibleAniListIds.length > 0,
 	});
-
-	const loadedAniListIds = getLoadedAniListIds(groups);
-	const metadataQuery = useAniListMetadataBatch(loadedAniListIds, {
-		enabled: loadedAniListIds.length > 0,
-		refreshStale: false,
-	});
-	const metadataById = getMetadataById(metadataQuery.data?.metadata);
+	const metadataById = useMemo(
+		() => getMetadataById(metadataQuery.data?.metadata),
+		[metadataQuery.data?.metadata],
+	);
 
 	const {
 		pendingRowKeys,
@@ -106,7 +107,7 @@ export const MappingsPage = (): React.JSX.Element => {
 
 	const handleRefresh = (): void => {
 		void mappingsQuery.refetch();
-		if (loadedAniListIds.length > 0) {
+		if (listModel.visibleAniListIds.length > 0) {
 			void metadataQuery.refetch();
 		}
 	};
@@ -120,8 +121,10 @@ export const MappingsPage = (): React.JSX.Element => {
 		});
 	};
 
-	const total = mappingsQuery.data?.pages[0]?.total ?? groups.length;
-	const loadedRowCount = getMappingGroupRowCount(groups);
+	const totalGroups = mappingsQuery.data?.total ?? groups.length;
+	const resetVisibleLimit = (): void => {
+		setVisibleLimit(MAPPING_GROUP_PAGE_SIZE);
+	};
 
 	return (
 		<TooltipProvider>
@@ -134,9 +137,18 @@ export const MappingsPage = (): React.JSX.Element => {
 					status={statusFilter}
 					search={searchQuery}
 					isRefreshing={mappingsQuery.isRefetching}
-					onProviderChange={setProviderFilter}
-					onStatusChange={setStatusFilter}
-					onSearchChange={setSearchQuery}
+					onProviderChange={(provider) => {
+						resetVisibleLimit();
+						setProviderFilter(provider);
+					}}
+					onStatusChange={(status) => {
+						resetVisibleLimit();
+						setStatusFilter(status);
+					}}
+					onSearchChange={(search) => {
+						resetVisibleLimit();
+						setSearchQuery(search);
+					}}
 					onRefresh={handleRefresh}
 				/>
 
@@ -152,7 +164,8 @@ export const MappingsPage = (): React.JSX.Element => {
 
 				<div className="flex items-center justify-between gap-4 text-xs text-text-secondary">
 					<span>
-						{groups.length} visible of {total} groups • {loadedRowCount} mappings
+						{groups.length} of {totalGroups} groups •{" "}
+						{listModel.loadedRowCount} mappings loaded
 						{metadataQuery.isFetching ? " • Loading AniList metadata..." : ""}
 					</span>
 					{searchQuery.trim() ? (
@@ -164,7 +177,7 @@ export const MappingsPage = (): React.JSX.Element => {
 					isInitialLoading={mappingsQuery.isLoading && groups.length === 0}
 					error={mappingsQuery.error}
 					groupsCount={groups.length}
-					virtualItems={virtualItems}
+					items={listModel.items}
 					metadataById={metadataById}
 					pendingRowKeys={pendingRowKeys}
 					targetAniListId={targetAniListId}
@@ -173,20 +186,19 @@ export const MappingsPage = (): React.JSX.Element => {
 					handleIgnore={handleIgnore}
 					handleClearMatch={handleClearMatch}
 					handleEdit={handleEdit}
-					hasNextMappingsPage={mappingsQuery.hasNextPage}
-					isFetchingNextMappingsPage={mappingsQuery.isFetchingNextPage}
-					fetchNextMappingsPage={mappingsQuery.fetchNextPage}
 				/>
 
-				{mappingsQuery.hasNextPage ? (
+				{groups.length < totalGroups ? (
 					<div className="border-t border-border-primary/50 pt-6 text-center">
 						<Button
 							type="button"
 							variant="outline"
-							onClick={() => void mappingsQuery.fetchNextPage()}
-							disabled={mappingsQuery.isFetchingNextPage}
+							onClick={() =>
+								setVisibleLimit((current) => current + MAPPING_GROUP_PAGE_SIZE)
+							}
+							disabled={mappingsQuery.isFetching}
 						>
-							{mappingsQuery.isFetchingNextPage ? "Loading..." : "Load more"}
+							{mappingsQuery.isFetching ? "Loading..." : "Load more"}
 						</Button>
 					</div>
 				) : null}

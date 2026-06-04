@@ -2,13 +2,12 @@
 // src/features/media-overlay/radarr-card-overlay.tsx
 
 import type { ReactElement } from "react";
-import { browser } from "wxt/browser";
-import type { AniListId } from "@/anilist/anilist-id";
-import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
+import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import { openOptionsPage } from "@/rpc/runtime-messages";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
-import type { MediaActionState } from "@/features/media-action/state";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type { BadgeVisibility } from "@/settings/types";
+import { getCardPrimaryTitle } from "./card-primary-title";
 import { CardOverlay } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";
 
@@ -24,52 +23,6 @@ interface RadarrCardOverlayProps {
 	badgeVisibility?: BadgeVisibility;
 	stackDirection?: "up" | "down";
 	tooltipContainer?: HTMLElement | ShadowRoot | null;
-}
-
-function openRadarrOptions(): void {
-	void browser.runtime
-		.sendMessage({
-			_a2a: true,
-			type: "OPEN_OPTIONS_PAGE",
-			sectionId: "radarr",
-			timestamp: Date.now(),
-		})
-		.catch(() => {});
-}
-
-function getPrimaryTitle(input: {
-	state: MediaActionState;
-	errorSource: "status" | "add" | null;
-	canQuickAdd: boolean;
-}): string {
-	switch (input.state) {
-		case "unconfigured": {
-			return "Configure Radarr before adding";
-		}
-		case "checking": {
-			return "Checking Radarr status.";
-		}
-		case "adding": {
-			return "Adding to Radarr.";
-		}
-		case "error": {
-			return input.errorSource === "add"
-				? "Retry Radarr add"
-				: "Retry Radarr status check";
-		}
-		case "unmapped":
-		case "unknown": {
-			return "Find Radarr match manually";
-		}
-		case "in-library": {
-			return "Already in Radarr";
-		}
-		case "can-add": {
-			return input.canQuickAdd
-				? "Quick add to Radarr"
-				: "Radarr defaults unavailable";
-		}
-	}
 }
 
 export function RadarrCardOverlay({
@@ -95,10 +48,11 @@ export function RadarrCardOverlay({
 		isConfigured,
 		defaultForm,
 		enabled: isInViewport,
-		onConfigure: openRadarrOptions,
+		onConfigure: () => openOptionsPage({ sectionId: "radarr" }),
 		onOpenMapping,
 	});
-	const primaryTitle = getPrimaryTitle({
+	const primaryTitle = getCardPrimaryTitle({
+		providerLabel: "Radarr",
 		state: mediaAction.status.state,
 		errorSource: mediaAction.status.errorSource,
 		canQuickAdd: providerTitle !== null && defaultForm !== null,

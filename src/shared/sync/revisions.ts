@@ -1,7 +1,7 @@
 /** Cross-context revision signals for cache and query invalidation. */
 
 import { browser } from "wxt/browser";
-import type { Provider } from "@/providers";
+import type { Provider } from "@/providers/types";
 
 const REVISION_SIGNAL_KEYS = {
 	mappings: "mappingsRevision",

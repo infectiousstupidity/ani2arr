@@ -1,3 +1,5 @@
+/** Shared confirmation dialog primitive for destructive and cancelable actions. */
+// src/shared/ui/primitives/confirm-dialog.tsx
 import React, { useCallback, useRef } from 'react';
 import Button from '@/shared/ui/primitives/button';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';

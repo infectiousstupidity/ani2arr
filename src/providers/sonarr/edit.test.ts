@@ -2,18 +2,23 @@
 // src/providers/sonarr/edit.test.ts
 
 import { describe, expect, it, vi } from "vitest";
-import {
-	parseProviderQualityProfileId,
-	parseProviderTagId,
-	parseSonarrSeriesId,
-	parseTvdbId,
-} from "@/providers";
+import { parseTvdbId } from "@/providers/schemas";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+	SonarrSeriesId,
+} from "@/providers/schemas";
 import { updateSonarrSeries } from "./edit";
+import type { SonarrClient } from "./client";
 
 const credentials = {
 	url: "https://sonarr.example.test",
 	apiKey: "secret",
 };
+const parseProviderQualityProfileId = (value: number) =>
+	value as ProviderQualityProfileId;
+const parseProviderTagId = (value: number) => value as ProviderTagId;
+const parseSonarrSeriesId = (value: number) => value as SonarrSeriesId;
 
 describe("updateSonarrSeries", () => {
 	it("sends a merged full series payload, applies monitoring, and returns the refreshed series", async () => {
@@ -81,7 +86,7 @@ describe("updateSonarrSeries", () => {
 				monitoringAction: "all",
 				credentials,
 			},
-			{ client },
+			{ client: client as unknown as SonarrClient },
 		);
 
 		expect(result).toBe(refreshedSeries);
@@ -156,7 +161,7 @@ describe("updateSonarrSeries", () => {
 					monitoringAction: "all",
 					credentials,
 				},
-				{ client },
+				{ client: client as unknown as SonarrClient },
 			),
 		).rejects.toMatchObject({
 			details: {

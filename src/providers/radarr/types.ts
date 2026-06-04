@@ -8,7 +8,6 @@ import type {
 	RadarrAlternateTitleSchema,
 	RadarrImageSchema,
 	RadarrLookupMovieSchema,
-	RadarrMovieFileSchema,
 	RadarrMovieSchema,
 	RadarrMovieSnapshotSchema,
 	RadarrQualityProfileSchema,
@@ -20,7 +19,6 @@ export type RadarrImage = v.InferOutput<typeof RadarrImageSchema>;
 export type RadarrAlternateTitle = v.InferOutput<
 	typeof RadarrAlternateTitleSchema
 >;
-export type RadarrMovieFile = v.InferOutput<typeof RadarrMovieFileSchema>;
 
 export type RadarrMovie = v.InferOutput<typeof RadarrMovieSchema>;
 export type RadarrLookupMovie = v.InferOutput<typeof RadarrLookupMovieSchema>;

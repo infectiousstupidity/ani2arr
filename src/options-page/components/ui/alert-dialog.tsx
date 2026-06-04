@@ -2,7 +2,7 @@
 // src/options-page/components/ui/alert-dialog.tsx
 
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
-import { Button } from "./button";
+import Button from "@/shared/ui/primitives/button";
 
 export interface ConfirmDialogProps {
   open: boolean;

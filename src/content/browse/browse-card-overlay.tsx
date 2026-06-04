@@ -2,18 +2,18 @@
 // src/content/browse/browse-card-overlay.tsx
 
 import React from "react";
-import type { AniListId } from "@/anilist/anilist-id";
-import type { metadataHintFromAniListMetadata } from "@/anilist/metadata-hints";
+import type { AniListId } from "@/anilist/types";
+import type { metadataHintFromAniListMetadata } from "@/anilist/title";
 import type {
 	MediaModalMetadataHint,
 	MediaModalOpenState,
 } from "@/features/media-modal";
 import { RadarrCardOverlay } from "@/features/media-overlay/radarr-card-overlay";
 import { SonarrCardOverlay } from "@/features/media-overlay/sonarr-card-overlay";
-import type { EffectiveMappingPresence } from "@/mapping/queries/mapping-identities";
-import type { PublicOptions } from "@/settings";
-import { resolveAniListTargetProvider } from "@/content/anilist/target-provider";
+import type { MappingIdentity } from "@/rpc/types";
+import type { PublicOptions } from "@/settings/types";
 import type { BrowseAdapter, HostMediaTarget } from "./types";
+import { resolveBrowseCardProvider } from "./browse-card-provider";
 
 type MetadataHint = ReturnType<typeof metadataHintFromAniListMetadata>;
 
@@ -32,7 +32,7 @@ export interface BrowseCardOverlayProps {
 	parsed: HostMediaTarget;
 	adapter: BrowseAdapter;
 	publicOptions: PublicOptions | undefined;
-	mappedIdentities: readonly EffectiveMappingPresence[];
+	mappedIdentities: readonly MappingIdentity[];
 	metadata: MetadataHint;
 	onOpenMediaModal(input: MediaModalOpenState): void;
 	tooltipContainer: HTMLElement | ShadowRoot | null;
@@ -106,9 +106,9 @@ export function BrowseCardOverlay({
 	onOpenMediaModal,
 	tooltipContainer,
 }: BrowseCardOverlayProps): React.ReactElement | null {
-	const provider = resolveAniListTargetProvider({
-		anilistId: parsed.anilistId,
-		format: parsed.format,
+	const provider = resolveBrowseCardProvider({
+		parsed,
+		metadata,
 		mappedIdentities,
 	});
 	if (!provider) {
@@ -121,7 +121,7 @@ export function BrowseCardOverlay({
 	});
 	const metadataHint = getModalMetadataHint({
 		title: displayTitle,
-		format: parsed.format,
+		format: parsed.format ?? metadata?.format ?? null,
 		metadata,
 	});
 	const openSetup = () => {

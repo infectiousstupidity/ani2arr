@@ -1,7 +1,7 @@
 /** Public media modal entry point. */
 // src/features/media-modal/index.tsx
 
-import { ConfirmProvider } from "@/shared/hooks/use-confirm";
+import { ConfirmProvider } from "@/shared/ui/feedback/confirm-provider";
 import { RadarrModal } from "./radarr/radarr-modal";
 import { SonarrModal } from "./sonarr/sonarr-modal";
 import type { MediaModalProps } from "./types";

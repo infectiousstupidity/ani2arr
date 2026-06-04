@@ -68,11 +68,3 @@ export const ExtensionOptionsSchema = v.fallback(
 	ExtensionOptionsObjectSchema,
 	createDefaultExtensionOptions(),
 );
-
-export { createDefaultSonarrFormState } from "@/providers/sonarr/form-state";
-export { createDefaultSonarrFormState as defaultSonarrFormState } from "@/providers/sonarr/form-state";
-export {
-	createDefaultRadarrFormState,
-	createDefaultRadarrFormState as defaultRadarrFormState,
-} from "@/providers/radarr/form-state";
-export { createDefaultUiOptions as defaultUiOptions } from "./ui-schema";

@@ -68,16 +68,6 @@ function resolveStats(input: {
 	};
 }
 
-function getAlternateTitles(
-	series: SonarrLookupSeries,
-): MediaModalTargetSummary["alternateTitles"] {
-	const titles = series.alternateTitles
-		?.map((entry) => entry?.title?.trim())
-		.filter((title): title is string => !!title);
-
-	return titles?.length ? titles : undefined;
-}
-
 function buildCandidate(input: {
 	series: SonarrLookupSeries;
 	baseUrl: string;
@@ -109,7 +99,6 @@ function buildCandidate(input: {
 	const linkedAniListIds = normalizeLinkedAniListIds(
 		input.linkedAniListIdsByTvdbId?.[tvdbId],
 	);
-	const alternateTitles = getAlternateTitles(input.series);
 	const summary: MediaModalTargetSummary = {
 		provider: PROVIDER,
 		providerId: tvdbId,
@@ -123,13 +112,9 @@ function buildCandidate(input: {
 		...(input.series.status === undefined
 			? {}
 			: { statusLabel: input.series.status }),
-		...(input.series.network === undefined
-			? {}
-			: { networkOrStudio: input.series.network }),
 		...(episodeCount === undefined ? {} : { episodeCount }),
 		...(episodeFileCount === undefined ? {} : { episodeFileCount }),
 		...(input.series.overview ? { overview: input.series.overview } : {}),
-		...(alternateTitles ? { alternateTitles } : {}),
 		...(linkedAniListIds?.length ? { linkedAniListIds } : {}),
 	};
 

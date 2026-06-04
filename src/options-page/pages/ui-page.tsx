@@ -1,7 +1,7 @@
 /** Options-page controls for browse-card and anime-page UI enablement and visibility settings. */
 // src/options-page/pages/ui-page.tsx
 
-import { useFormContext, useWatch } from "react-hook-form";
+import { useState } from "react";
 import {
   AppWindow,
   Check,
@@ -15,14 +15,19 @@ import {
   ANILIST_TITLE_LANGUAGES,
   isAniListTitleLanguage,
   type AniListTitleLanguage,
-} from "@/anilist/schemas/title-language.schema";
-import type { PublicOptions, BadgeVisibility } from "@/settings";
+} from "@/anilist/title";
+import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
+import type {
+	PublicOptions,
+	BadgeVisibility,
+} from "@/settings/types";
 import { cn } from "@/shared/utils/cn";
 
 import { SettingsSection } from "../components/settings-section";
 import { Switch } from "../components/ui/switch";
 import { Label } from "../components/ui/label";
 import { RadarrIcon, SonarrIcon } from "../components/icons";
+import { getActionErrorMessage } from "../hooks/action-helpers";
 
 type BrowseCardMode = BadgeVisibility | "hidden";
 type BrowseCardProvider = keyof PublicOptions["ui"]["browseCards"];
@@ -62,6 +67,7 @@ function SegmentedControl<TValue extends string>({
   ariaLabel,
   ariaLabelledBy,
   className,
+  disabled,
   onChange,
   options,
   value,
@@ -69,6 +75,7 @@ function SegmentedControl<TValue extends string>({
   ariaLabel?: string;
   ariaLabelledBy?: string;
   className?: string;
+  disabled?: boolean;
   onChange: (value: TValue) => void;
   options: readonly SegmentedOption<TValue>[];
   value: TValue;
@@ -91,11 +98,13 @@ function SegmentedControl<TValue extends string>({
             type="button"
             role="radio"
             aria-checked={selected}
+            disabled={disabled}
             className={cn(
               SEGMENTED_ITEM_CLASS,
               selected
                 ? "bg-accent-primary text-white"
                 : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary",
+              disabled && "cursor-not-allowed opacity-60",
             )}
             onClick={() => onChange(option.value)}
           >
@@ -108,35 +117,51 @@ function SegmentedControl<TValue extends string>({
 }
 
 export const UiPage = () => {
-  const { control, getValues, setValue } = useFormContext<PublicOptions>();
-  const uiOptions = useWatch({ control, name: "ui" });
+  const { data: publicOptions } = usePublicOptions();
+  const saveOptions = useSavePublicOptions();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const uiOptions = publicOptions?.ui;
+  const isSaving = saveOptions.isPending;
+
+  const updateSettings = async (
+    updater: (current: PublicOptions) => PublicOptions,
+  ): Promise<void> => {
+    if (!publicOptions || isSaving) return;
+    setSaveError(null);
+
+    try {
+      await saveOptions.mutateAsync(updater(publicOptions));
+    } catch (error) {
+      setSaveError(getActionErrorMessage(error, "Failed to save UI settings."));
+    }
+  };
 
   const updateTitleLanguage = (language: string) => {
     if (!isAniListTitleLanguage(language)) return;
 
-    setValue(
-      "ui.preferredAniListTitleLanguage",
-      language,
-      { shouldDirty: true, shouldTouch: true }
-    );
+    void updateSettings((current) => ({
+      ...current,
+      ui: {
+        ...current.ui,
+        preferredAniListTitleLanguage: language,
+      },
+    }));
   };
 
   const updateBrowseProvider = (
     provider: BrowseCardProvider,
     patch: Partial<BrowseCardSettings>
   ) => {
-    const currentUi = getValues("ui");
-    setValue(
-      "ui",
-      {
-        ...currentUi,
+    void updateSettings((current) => ({
+      ...current,
+      ui: {
+        ...current.ui,
         browseCards: {
-          ...currentUi.browseCards,
-          [provider]: { ...currentUi.browseCards[provider], ...patch },
+          ...current.ui.browseCards,
+          [provider]: { ...current.ui.browseCards[provider], ...patch },
         },
       },
-      { shouldDirty: true, shouldTouch: true }
-    );
+    }));
   };
 
   const updateBrowseProviderMode = (
@@ -160,24 +185,28 @@ export const UiPage = () => {
     provider: P,
     patch: Partial<PublicOptions["ui"]["animePages"][P]>
   ) => {
-    const currentUi = getValues("ui");
-    setValue(
-      "ui",
-      {
-        ...currentUi,
+    void updateSettings((current) => ({
+      ...current,
+      ui: {
+        ...current.ui,
         animePages: {
-          ...currentUi.animePages,
-          [provider]: { ...currentUi.animePages[provider], ...patch },
+          ...current.ui.animePages,
+          [provider]: { ...current.ui.animePages[provider], ...patch },
         },
       },
-      { shouldDirty: true, shouldTouch: true }
-    );
+    }));
   };
 
   if (!uiOptions) return null;
 
   return (
     <div className="space-y-10">
+      {saveError ? (
+        <p className="text-sm font-semibold text-error" role="alert">
+          {saveError}
+        </p>
+      ) : null}
+
       <SettingsSection
         title="AniList display title language"
         description="Choose the AniList title language used in the media modal."
@@ -190,6 +219,7 @@ export const UiPage = () => {
           options={TITLE_LANGUAGE_OPTIONS}
           ariaLabel="Preferred AniList title language"
           className="w-full max-w-md"
+          disabled={isSaving}
         />
       </SettingsSection>
 
@@ -230,6 +260,7 @@ export const UiPage = () => {
               onChange={(mode) => updateBrowseProviderMode("sonarr", mode)}
               options={BROWSE_CARD_MODE_OPTIONS}
               ariaLabelledBy="ui-browse-sonarr-label"
+              disabled={isSaving}
             />
           </div>
 
@@ -246,6 +277,7 @@ export const UiPage = () => {
               onChange={(mode) => updateBrowseProviderMode("radarr", mode)}
               options={BROWSE_CARD_MODE_OPTIONS}
               ariaLabelledBy="ui-browse-radarr-label"
+              disabled={isSaving}
             />
           </div>
         </div>
@@ -299,6 +331,7 @@ export const UiPage = () => {
                 id="ui-anime-sonarr"
                 className="shrink-0"
                 checked={uiOptions.animePages.sonarr.enabled}
+                disabled={isSaving}
                 onCheckedChange={(checked) =>
                   updateAnimeProvider("sonarr", { enabled: checked })
                 }
@@ -321,6 +354,7 @@ export const UiPage = () => {
                 id="ui-anime-radarr"
                 className="shrink-0"
                 checked={uiOptions.animePages.radarr.enabled}
+                disabled={isSaving}
                 onCheckedChange={(checked) =>
                   updateAnimeProvider("radarr", { enabled: checked })
                 }

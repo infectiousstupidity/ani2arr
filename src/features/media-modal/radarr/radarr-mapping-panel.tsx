@@ -32,17 +32,6 @@ type RadarrMappingPanelProps = {
 
 const PROVIDER = "radarr" as const;
 
-function getAlternateTitles(movie: RadarrLookupMovie): string[] | undefined {
-	const titles = movie.alternateTitles
-		?.map((title) => title?.title)
-		.filter(
-			(title): title is string =>
-				typeof title === "string" && title.length > 0,
-		);
-
-	return titles?.length ? titles : undefined;
-}
-
 function buildCandidate(input: {
 	movie: RadarrLookupMovie;
 	baseUrl: string;
@@ -58,7 +47,6 @@ function buildCandidate(input: {
 	const linkedAniListIds = normalizeLinkedAniListIds(
 		input.linkedAniListIdsByTmdbId?.[tmdbId],
 	);
-	const alternateTitles = getAlternateTitles(input.movie);
 	const summary: MediaModalTargetSummary = {
 		provider: PROVIDER,
 		providerId: tmdbId,
@@ -75,7 +63,6 @@ function buildCandidate(input: {
 			? {}
 			: { statusLabel: input.movie.status }),
 		...(input.movie.overview ? { overview: input.movie.overview } : {}),
-		...(alternateTitles ? { alternateTitles } : {}),
 		...(typeof input.movie.runtime === "number"
 			? { runtimeMinutes: input.movie.runtime }
 			: {}),

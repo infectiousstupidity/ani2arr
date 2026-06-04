@@ -1,9 +1,16 @@
 /** Sonarr provider-domain library snapshot cache and TVDB lookup helpers. */
 // src/providers/sonarr/library.ts
 
-import type { LibraryUnknownReason } from "@/mapping/library-status";
-import { createTtlCache, type TtlCache } from "@/shared/cache/ttl-cache";
-import { logError, normalizeError } from "@/shared/errors";
+import {
+	createTtlCache,
+	type CacheHit,
+	type CacheWriteOptions,
+	type TtlCache,
+} from "@/shared/cache/ttl-cache";
+import {
+	logError,
+	normalizeError,
+} from "@/shared/errors/error-utils";
 import type { ProviderCredentials } from "../types";
 import type { SonarrClient } from "./client";
 import type {
@@ -13,31 +20,17 @@ import type {
 	TvdbId,
 } from "./types";
 
-const SONARR_SERIES_CACHE_KEY = "series";
-const SONARR_SERIES_CACHE_TTL = {
-	normal: {
-		staleMs: 60 * 60 * 1000,
-		hardMs: 24 * 60 * 60 * 1000,
-	},
-	error: {
-		staleMs: 5 * 60 * 1000,
-		hardMs: 10 * 60 * 1000,
-	},
+const CACHE_KEY = "series";
+const CACHE_TTL = {
+	normal: { staleMs: 60 * 60 * 1000, hardMs: 24 * 60 * 60 * 1000 },
+	error: { staleMs: 5 * 60 * 1000, hardMs: 10 * 60 * 1000 },
 };
 
-const defaultSeriesSnapshotCache = createTtlCache<SonarrSeriesSnapshot[]>(
+const defaultCache = createTtlCache<SonarrSeriesSnapshot[]>(
 	"sonarr:series-snapshots",
 );
 
-type SonarrLibraryClient = Pick<
-	SonarrClient,
-	"getAllSeries" | "findSeriesByTvdbId" | "lookupSeriesByTvdbId"
->;
-
-type SonarrLibraryDeps = {
-	client: SonarrLibraryClient;
-	cache?: TtlCache<SonarrSeriesSnapshot[]>;
-};
+export type LibraryUnknownReason = "library-check-failed";
 
 export interface SonarrSeriesLibraryStatus {
 	provider: "sonarr";
@@ -48,21 +41,34 @@ export interface SonarrSeriesLibraryStatus {
 }
 
 export class SonarrLibrary {
-	private readonly client: SonarrLibraryDeps["client"];
-	private readonly cache: TtlCache<SonarrSeriesSnapshot[]>;
+	private memoryCache: CacheHit<SonarrSeriesSnapshot[]> | null = null;
 	private refreshPromise: Promise<SonarrSeriesSnapshot[]> | null = null;
 
-	public constructor(deps: SonarrLibraryDeps) {
-		this.client = deps.client;
-		this.cache = deps.cache ?? defaultSeriesSnapshotCache;
-	}
+	public constructor(
+		private readonly client: SonarrClient,
+		private readonly cache: TtlCache<SonarrSeriesSnapshot[]> = defaultCache,
+	) {}
 
 	public async getSeriesSnapshots(
 		credentials: ProviderCredentials,
 	): Promise<SonarrSeriesSnapshot[]> {
-		const cached = await this.cache.read(SONARR_SERIES_CACHE_KEY);
+		const memoryCache = this.memoryCache;
+		const now = Date.now();
+
+		if (memoryCache && now < memoryCache.expiresAt) {
+			if (now >= memoryCache.staleAt) {
+				// Stale cache is good enough for status; refresh quietly for the next read.
+				void this.refreshSeriesSnapshots(credentials).catch(() => {});
+			}
+
+			return memoryCache.value;
+		}
+
+		this.memoryCache = null;
+		const cached = await this.cache.read(CACHE_KEY);
 		if (!cached) return this.refreshSeriesSnapshots(credentials);
 
+		this.memoryCache = cached;
 		if (cached.stale) {
 			// Stale cache is good enough for status; refresh quietly for the next read.
 			void this.refreshSeriesSnapshots(credentials).catch(() => {});
@@ -77,7 +83,7 @@ export class SonarrLibrary {
 		if (this.refreshPromise) return this.refreshPromise;
 
 		this.refreshPromise = (async () => {
-			const cached = await this.cache.read(SONARR_SERIES_CACHE_KEY);
+			const cached = await this.cache.read(CACHE_KEY);
 			const fallback = cached?.value ?? [];
 
 			try {
@@ -86,19 +92,18 @@ export class SonarrLibrary {
 					toSonarrSeriesSnapshot(element),
 				);
 
-				await this.cache.write(
-					SONARR_SERIES_CACHE_KEY,
-					snapshots,
-					SONARR_SERIES_CACHE_TTL.normal,
-				);
+				await this.cache.write(CACHE_KEY, snapshots, CACHE_TTL.normal);
+				this.setMemoryCache(snapshots, CACHE_TTL.normal);
 
 				return snapshots;
 			} catch (error) {
 				const normalized = normalizeError(error);
-				await this.cache.write(SONARR_SERIES_CACHE_KEY, fallback, {
-					...SONARR_SERIES_CACHE_TTL.error,
+				const ttl = {
+					...CACHE_TTL.error,
 					meta: { lastErrorCode: normalized.code },
-				});
+				};
+				await this.cache.write(CACHE_KEY, fallback, ttl);
+				this.setMemoryCache(fallback, ttl);
 				return fallback;
 			} finally {
 				this.refreshPromise = null;
@@ -106,13 +111,6 @@ export class SonarrLibrary {
 		})();
 
 		return this.refreshPromise;
-	}
-
-	public async findSeriesByTvdbId(
-		tvdbId: TvdbId,
-		credentials: ProviderCredentials,
-	): Promise<SonarrSeries | null> {
-		return this.client.findSeriesByTvdbId(tvdbId, credentials);
 	}
 
 	public async getSeriesLibraryStatusByTvdbId(input: {
@@ -137,7 +135,10 @@ export class SonarrLibrary {
 		}
 
 		try {
-			const liveSeries = await this.findSeriesByTvdbId(tvdbId, credentials);
+			const liveSeries = await this.client.findSeriesByTvdbId(
+				tvdbId,
+				credentials,
+			);
 
 			if (liveSeries) {
 				const snapshot = toSonarrSeriesSnapshot(liveSeries);
@@ -154,10 +155,7 @@ export class SonarrLibrary {
 				};
 			}
 		} catch (error) {
-			logError(
-				normalizeError(error),
-				`SonarrLibrary:getSeriesLibraryStatusByTvdbId:library:${tvdbId}`,
-			);
+			logError(normalizeError(error), `SonarrLibrary:check:${tvdbId}`);
 			return {
 				provider: "sonarr",
 				providerId: tvdbId,
@@ -168,12 +166,12 @@ export class SonarrLibrary {
 
 		let lookupSeries: SonarrLookupSeries | null = null;
 		try {
-			lookupSeries = await this.client.lookupSeriesByTvdbId(tvdbId, credentials);
-		} catch (error) {
-			logError(
-				normalizeError(error),
-				`SonarrLibrary:getSeriesLibraryStatusByTvdbId:lookup:${tvdbId}`,
+			lookupSeries = await this.client.lookupSeriesByTvdbId(
+				tvdbId,
+				credentials,
 			);
+		} catch (error) {
+			logError(normalizeError(error), `SonarrLibrary:lookup:${tvdbId}`);
 		}
 
 		if (existsInCache) {
@@ -192,7 +190,11 @@ export class SonarrLibrary {
 	public async upsertSeriesSnapshot(
 		snapshot: SonarrSeriesSnapshot,
 	): Promise<void> {
-		const cached = await this.cache.read(SONARR_SERIES_CACHE_KEY);
+		const memoryCache = this.memoryCache;
+		const cached =
+			memoryCache && Date.now() < memoryCache.expiresAt
+				? memoryCache
+				: await this.cache.read(CACHE_KEY);
 		const current = cached?.value ?? [];
 		const existingIndex = current.findIndex(
 			(item) => item.tvdbId === snapshot.tvdbId,
@@ -206,29 +208,42 @@ export class SonarrLibrary {
 						...current.slice(existingIndex + 1),
 					];
 
-		await this.cache.write(
-			SONARR_SERIES_CACHE_KEY,
-			next,
-			SONARR_SERIES_CACHE_TTL.normal,
-		);
+		await this.cache.write(CACHE_KEY, next, CACHE_TTL.normal);
+		this.setMemoryCache(next, CACHE_TTL.normal);
 	}
 
 	public async removeSeriesSnapshot(tvdbId: TvdbId): Promise<void> {
-		const cached = await this.cache.read(SONARR_SERIES_CACHE_KEY);
+		const memoryCache = this.memoryCache;
+		const cached =
+			memoryCache && Date.now() < memoryCache.expiresAt
+				? memoryCache
+				: await this.cache.read(CACHE_KEY);
 		if (!cached) return;
 
 		const next = cached.value.filter((series) => series.tvdbId !== tvdbId);
 		if (next.length === cached.value.length) return;
 
-		await this.cache.write(
-			SONARR_SERIES_CACHE_KEY,
-			next,
-			SONARR_SERIES_CACHE_TTL.normal,
-		);
+		await this.cache.write(CACHE_KEY, next, CACHE_TTL.normal);
+		this.setMemoryCache(next, CACHE_TTL.normal);
 	}
 
 	public async clearSeriesSnapshotCache(): Promise<void> {
-		await this.cache.remove(SONARR_SERIES_CACHE_KEY);
+		await this.cache.remove(CACHE_KEY);
+		this.memoryCache = null;
+	}
+
+	private setMemoryCache(
+		value: SonarrSeriesSnapshot[],
+		options: CacheWriteOptions,
+	): void {
+		const now = Date.now();
+		this.memoryCache = {
+			value,
+			stale: false,
+			staleAt: now + options.staleMs,
+			expiresAt: now + (options.hardMs ?? options.staleMs * 4),
+			...(options.meta ? { meta: options.meta } : {}),
+		};
 	}
 }
 
@@ -238,30 +253,37 @@ export function toSonarrSeriesSnapshot(
 	const alternateTitles = series.alternateTitles
 		?.map((entry) => entry.title?.trim())
 		.filter((title): title is string => !!title);
-	const statistics = series.statistics
-		? {
-				...(series.statistics.episodeCount === undefined
-					? {}
-					: { episodeCount: series.statistics.episodeCount }),
-				...(series.statistics.episodeFileCount === undefined
-					? {}
-					: { episodeFileCount: series.statistics.episodeFileCount }),
-				...(series.statistics.totalEpisodeCount === undefined
-					? {}
-					: { totalEpisodeCount: series.statistics.totalEpisodeCount }),
-			}
-		: undefined;
 
-	// Snapshots are intentionally small: enough for status checks, not edit saves.
-	return {
+	const snapshot: SonarrSeriesSnapshot = {
 		id: series.id,
 		tvdbId: series.tvdbId,
 		title: series.title,
 		titleSlug: series.titleSlug,
-		...(alternateTitles === undefined
-			? {}
-			: { alternateTitles }),
-		...(series.status === undefined ? {} : { status: series.status }),
-		...(statistics === undefined ? {} : { statistics }),
 	};
+
+	if (alternateTitles !== undefined) snapshot.alternateTitles = alternateTitles;
+	if (series.status !== undefined) snapshot.status = series.status;
+
+	if (series.statistics) {
+		snapshot.statistics = {};
+		if (series.statistics.episodeCount !== undefined) {
+			snapshot.statistics.episodeCount = series.statistics.episodeCount;
+		}
+		if (series.statistics.episodeFileCount !== undefined) {
+			snapshot.statistics.episodeFileCount = series.statistics.episodeFileCount;
+		}
+		if (series.statistics.totalEpisodeCount !== undefined) {
+			snapshot.statistics.totalEpisodeCount =
+				series.statistics.totalEpisodeCount;
+		}
+	}
+
+	return snapshot;
+}
+
+export function findSonarrSeriesInLibrary<TSeries extends { tvdbId: number }>(
+	library: readonly TSeries[],
+	tvdbId: number,
+): TSeries | null {
+	return library.find((series) => Number(series.tvdbId) === tvdbId) ?? null;
 }

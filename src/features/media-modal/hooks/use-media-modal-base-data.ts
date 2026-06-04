@@ -2,7 +2,7 @@
 // src/features/media-modal/hooks/use-media-modal-base-data.ts
 
 import { useMemo } from "react";
-import type { AniListId } from "@/anilist";
+import type { AniListId } from "@/anilist/types";
 import { useAniListMedia, useAniListMetadataBatch } from "@/queries/anilist";
 import { usePublicOptions } from "@/queries/options";
 import { resolveMediaModalMetadata } from "../anilist-modal-data";
@@ -14,12 +14,10 @@ export function useMediaModalBaseData(input: {
 }) {
 	const { anilistId, metadataHint } = input;
 	const { data: options } = usePublicOptions();
-	const { data: metadataBatchData } = useAniListMetadataBatch([anilistId], {
-		enabled: true,
-	});
+	const metadataBatch = useAniListMetadataBatch([anilistId], { enabled: true });
+	const { data: metadataBatchData } = metadataBatch;
 	const { data: anilistMedia } = useAniListMedia(anilistId, {
 		enabled: true,
-		forceRefresh: false,
 	});
 	const preferredTitleLanguage =
 		options?.ui.preferredAniListTitleLanguage ?? "english";
@@ -48,5 +46,8 @@ export function useMediaModalBaseData(input: {
 		providerRequestTitle: resolved.providerRequestTitle,
 		providerPayloadTitle: resolved.providerPayloadTitle,
 		fallbackLookupTitle,
+		statusMetadata: resolved.statusMetadata,
+		statusReady: metadataBatch.isFetched || metadataBatch.isError,
+		statusTitle: resolved.statusTitle,
 	};
 }

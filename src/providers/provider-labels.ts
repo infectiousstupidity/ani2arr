@@ -1,7 +1,6 @@
 /** Provider display labels for service names and external provider IDs. */
 // src/providers/provider-labels.ts
 
-import type { ProviderMappingTarget } from "@/mapping/types";
 import type { Provider } from "./types";
 
 const PROVIDER_LABELS = {
@@ -25,9 +24,3 @@ export const formatProviderExternalId = (
 	provider: Provider,
 	providerId: number,
 ): string => `${getProviderExternalIdLabel(provider)} #${providerId}`;
-
-export const formatProviderTarget = (target: ProviderMappingTarget): string =>
-	`${getProviderLabel(target.provider)} · ${formatProviderExternalId(
-		target.provider,
-		target.providerId,
-	)}`;

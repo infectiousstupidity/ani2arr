@@ -1,14 +1,22 @@
 /** React Query hooks and UI status derivation for provider connection checks. */
 // src/queries/provider-connection.ts
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getProviderLabel } from "@/providers/provider-labels";
 import { getAni2arrApi } from "@/rpc";
-import type { TestProviderConnectionInput } from "@/rpc/schemas";
-import { normalizeError, type ExtensionError } from "@/shared/errors";
+import { normalizeError } from "@/shared/errors/error-utils";
+import type { ExtensionError } from "@/shared/errors/error.types";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import { queryKeys } from "@/queries/query-keys";
-import type { Provider, ProviderCredentials } from "@/providers";
+import type {
+	Provider,
+	ProviderCredentials,
+} from "@/providers/types";
+
+type TestProviderConnectionInput = {
+	provider: Provider;
+	credentials: ProviderCredentials;
+};
 
 export type ProviderConnectionStatusView = {
 	isProviderConfigured: boolean;
@@ -16,8 +24,11 @@ export type ProviderConnectionStatusView = {
 	variantClassName?: string;
 };
 
-const testProviderConnection = (input: TestProviderConnectionInput) => {
-	return getAni2arrApi().testProviderConnection(input);
+const testConnection = (input: TestProviderConnectionInput) => {
+	const api = getAni2arrApi();
+	return input.provider === "sonarr"
+		? api.testSonarrConnection({ credentials: input.credentials })
+		: api.testRadarrConnection({ credentials: input.credentials });
 };
 
 const getConnectionQueryKey = (
@@ -45,7 +56,7 @@ export const useProviderConnectionCheck = (options: {
 				);
 			}
 
-			return testProviderConnection({
+			return testConnection({
 				provider: options.provider,
 				credentials: options.credentials,
 			});
@@ -58,13 +69,6 @@ export const useProviderConnectionCheck = (options: {
 		refetchOnMount: "always",
 		retry: 0,
 	});
-
-export const useTestProviderConnection = () =>
-	useMutation<{ version: string }, ExtensionError, TestProviderConnectionInput>(
-		{
-			mutationFn: testProviderConnection,
-		},
-	);
 
 export const deriveProviderConnectionStatusView = (input: {
 	isProviderConfigured: boolean;
@@ -99,25 +103,6 @@ export const deriveProviderConnectionStatusView = (input: {
 		shortLabel: "Configured",
 		variantClassName: "a2a-provider-status--configured",
 	};
-};
-
-export const useProviderConnectionStatus = (
-	provider: Provider,
-	credentials: ProviderCredentials | null,
-): ProviderConnectionStatusView => {
-	const isProviderConfigured = credentials !== null;
-	const connectionQuery = useProviderConnectionCheck({
-		provider,
-		enabled: isProviderConfigured,
-		credentials,
-	});
-
-	return deriveProviderConnectionStatusView({
-		isProviderConfigured,
-		isProviderConnected: connectionQuery.isSuccess,
-		isCheckingProviderConnection:
-			isProviderConfigured && connectionQuery.isFetching,
-	});
 };
 
 export const useStoredProviderConnectionStatus = (options: {

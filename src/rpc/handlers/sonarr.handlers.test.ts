@@ -2,21 +2,25 @@
 // src/rpc/handlers/sonarr.handlers.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { parseAniListId } from "@/anilist";
-import {
-	parseProviderQualityProfileId,
-	parseSonarrSeriesId,
-	parseProviderTagId,
-	parseTvdbId,
-	type ProviderCredentials,
-} from "@/providers";
-import { ErrorCode } from "@/shared/errors";
+import { parseAniListId } from "@/anilist/types";
+import { parseTvdbId } from "@/providers/schemas";
+import type { ProviderCredentials } from "@/providers/types";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+	SonarrSeriesId,
+} from "@/providers/schemas";
+import { ErrorCode } from "@/shared/errors/error.types";
 import { sonarrHandlers } from "./sonarr.handlers";
 
 const credentials: ProviderCredentials = {
 	url: "https://sonarr.example",
 	apiKey: "secret",
 };
+const parseProviderQualityProfileId = (value: number) =>
+	value as ProviderQualityProfileId;
+const parseProviderTagId = (value: number) => value as ProviderTagId;
+const parseSonarrSeriesId = (value: number) => value as SonarrSeriesId;
 
 const sonarrClientMock = vi.hoisted(() => ({
 	findSeriesByTvdbId: vi.fn(),
@@ -28,17 +32,10 @@ const sonarrClientMock = vi.hoisted(() => ({
 }));
 
 const apiServicesMock = vi.hoisted(() => ({
-	anibridgeMappingStore: { getAniListIdsForTvdb: vi.fn() },
 	bumpLibraryRevision: vi.fn(),
-	manualMappingService: {
-		getLinkedAniListIds: vi.fn(),
-		has: vi.fn(),
-	},
-	manualMappingsReady: Promise.resolve(),
 	mappingService: {
-		getAutoMapping: vi.fn(),
-		prioritizeAniListMedia: vi.fn(),
-		resolveProviderId: vi.fn(),
+		getLinkedAniListIds: vi.fn(),
+		resolveMapping: vi.fn(),
 	},
 	scheduleLibraryRefresh: vi.fn(),
 	sonarrClient: sonarrClientMock,
@@ -58,13 +55,12 @@ const providerConfigMock = vi.hoisted(() => ({
 
 const addSonarrSeriesMock = vi.hoisted(() => vi.fn());
 const updateSonarrSeriesMock = vi.hoisted(() => vi.fn());
-
-vi.mock("@/background/api/api-services", () => ({
+vi.mock("@/background/api-services", () => ({
 	...apiServicesMock,
 	sonarrClient: sonarrClientMock,
 }));
 
-vi.mock("@/background/api/provider-config", () => providerConfigMock);
+vi.mock("@/background/provider-config", () => providerConfigMock);
 
 vi.mock("@/providers/sonarr/add", () => ({
 	addSonarrSeries: addSonarrSeriesMock,
@@ -77,13 +73,7 @@ vi.mock("@/providers/sonarr/edit", () => ({
 describe("sonarrHandlers", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		apiServicesMock.anibridgeMappingStore.getAniListIdsForTvdb.mockReturnValue(
-			[],
-		);
-		apiServicesMock.manualMappingService.getLinkedAniListIds.mockReturnValue(
-			[],
-		);
-		apiServicesMock.manualMappingService.has.mockReturnValue(false);
+		apiServicesMock.mappingService.getLinkedAniListIds.mockResolvedValue([]);
 	});
 
 	it("loads Sonarr form resources through the current Sonarr client", async () => {
@@ -117,21 +107,17 @@ describe("sonarrHandlers", () => {
 		await expect(
 			sonarrHandlers.getSeriesStatus({ anilistId: parseAniListId(100) }),
 		).resolves.toEqual({
-			providerId: null,
-			providerMappingState: "unknown",
+			mapping: { kind: "unmapped", hadResolveAttempt: false },
 			isInLibrary: null,
-			mappingUnknownReason: "provider-not-configured",
-			manualMappingActive: false,
 		});
 
 		expect(
-			apiServicesMock.mappingService.resolveProviderId,
+			apiServicesMock.mappingService.resolveMapping,
 		).not.toHaveBeenCalled();
 	});
 
-	it("returns mapped Sonarr library status with linked IDs and target summary", async () => {
+	it("returns mapped Sonarr library status with raw series", async () => {
 		const anilistId = parseAniListId(100);
-		const linkedAnilistId = parseAniListId(101);
 		const tvdbId = parseTvdbId(200);
 		const series = {
 			id: parseSonarrSeriesId(5),
@@ -141,9 +127,10 @@ describe("sonarrHandlers", () => {
 			status: "continuing" as const,
 		};
 		providerConfigMock.getProviderConfig.mockResolvedValue(credentials);
-		apiServicesMock.mappingService.resolveProviderId.mockResolvedValue({
+		apiServicesMock.mappingService.resolveMapping.mockResolvedValue({
+			kind: "mapped",
+			source: "manual",
 			providerId: tvdbId,
-			reason: "manual-override",
 		});
 		apiServicesMock.sonarrLibrary.getSeriesLibraryStatusByTvdbId.mockResolvedValue(
 			{
@@ -153,35 +140,31 @@ describe("sonarrHandlers", () => {
 				series,
 			},
 		);
-		apiServicesMock.manualMappingService.getLinkedAniListIds.mockReturnValue([
-			anilistId,
-		]);
-		apiServicesMock.anibridgeMappingStore.getAniListIdsForTvdb.mockReturnValue([
-			linkedAnilistId,
-		]);
 
 		await expect(
 			sonarrHandlers.getSeriesStatus({
 				anilistId,
 				title: "Mapped Series",
 				force_verify: true,
+				force_mapping_retry: true,
 			}),
 		).resolves.toMatchObject({
-			providerId: tvdbId,
-			providerMappingState: "mapped",
-			isInLibrary: true,
-			mappingSource: "manual",
-			mappingReason: "manual-override",
-			linkedAniListIds: [anilistId, linkedAnilistId],
-			targetSummary: {
-				provider: "sonarr",
+			mapping: {
+				kind: "mapped",
+				source: "manual",
 				providerId: tvdbId,
-				title: "Mapped Series",
-				isInLibrary: true,
-				providerRouteSlug: "mapped-series",
-				linkedAniListIds: [anilistId, linkedAnilistId],
 			},
+			isInLibrary: true,
+			series,
 		});
+		expect(apiServicesMock.mappingService.resolveMapping).toHaveBeenCalledWith(
+			"sonarr",
+			anilistId,
+			{
+				forceRetry: true,
+				title: "Mapped Series",
+			},
+		);
 	});
 
 	it("updates Sonarr cache and revision after add", async () => {

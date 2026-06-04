@@ -3,9 +3,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Search } from "lucide-react";
-import { Button } from "../../components/ui/button";
+import Button from "@/shared/ui/primitives/button";
+import { SelectControl } from "@/shared/ui/primitives/select";
 import { Input } from "../../components/ui/input";
-import { Select } from "../../components/ui/select";
 import type { MappingStatusFilter, ProviderFilter } from "./mapping-page-model";
 
 interface MappingsFilterBarProps {
@@ -81,7 +81,7 @@ export function MappingsFilterBar(
 	return (
 		<div className="rounded-md border border-border-primary bg-bg-secondary/70 p-4">
 			<div className="grid gap-3 md:grid-cols-[160px_180px_minmax(0,1fr)_auto] md:items-center">
-				<Select
+				<SelectControl
 					value={provider}
 					onValueChange={(value) => {
 						if (isProviderFilter(value)) {
@@ -90,7 +90,7 @@ export function MappingsFilterBar(
 					}}
 					options={PROVIDER_OPTIONS}
 				/>
-				<Select
+				<SelectControl
 					value={status}
 					onValueChange={(value) => {
 						if (isStatusFilter(value)) {

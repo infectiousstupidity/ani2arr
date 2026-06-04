@@ -2,7 +2,7 @@
 // src/settings/provider-config.test.ts
 
 import { describe, expect, it } from "vitest";
-import { createDefaultExtensionOptions } from "@/settings";
+import { createDefaultExtensionOptions } from "@/settings/schema";
 import {
 	getProviderConnectionDraft,
 	getProviderCredentials,

@@ -1,9 +1,16 @@
 /** Radarr provider-domain library snapshot cache and TMDB lookup helpers. */
 // src/providers/radarr/library.ts
 
-import type { LibraryUnknownReason } from "@/mapping/library-status";
-import { createTtlCache, type TtlCache } from "@/shared/cache/ttl-cache";
-import { logError, normalizeError } from "@/shared/errors";
+import {
+	createTtlCache,
+	type CacheHit,
+	type CacheWriteOptions,
+	type TtlCache,
+} from "@/shared/cache/ttl-cache";
+import {
+	logError,
+	normalizeError,
+} from "@/shared/errors/error-utils";
 import type { ProviderCredentials } from "../types";
 import type { RadarrClient } from "./client";
 import type {
@@ -13,31 +20,17 @@ import type {
 	TmdbId,
 } from "./types";
 
-const RADARR_MOVIE_CACHE_KEY = "movies";
-const RADARR_MOVIE_CACHE_TTL = {
-	normal: {
-		staleMs: 60 * 60 * 1000,
-		hardMs: 24 * 60 * 60 * 1000,
-	},
-	error: {
-		staleMs: 5 * 60 * 1000,
-		hardMs: 10 * 60 * 1000,
-	},
+const CACHE_KEY = "movies";
+const CACHE_TTL = {
+	normal: { staleMs: 60 * 60 * 1000, hardMs: 24 * 60 * 60 * 1000 },
+	error: { staleMs: 5 * 60 * 1000, hardMs: 10 * 60 * 1000 },
 };
 
-const defaultMovieSnapshotCache = createTtlCache<RadarrMovieSnapshot[]>(
+const defaultCache = createTtlCache<RadarrMovieSnapshot[]>(
 	"radarr:movie-snapshots",
 );
 
-type RadarrLibraryClient = Pick<
-	RadarrClient,
-	"getAllMovies" | "findMovieByTmdbId" | "lookupMovieByTmdbId"
->;
-
-type RadarrLibraryDeps = {
-	client: RadarrLibraryClient;
-	cache?: TtlCache<RadarrMovieSnapshot[]>;
-};
+export type LibraryUnknownReason = "library-check-failed";
 
 export interface RadarrMovieLibraryStatus {
 	provider: "radarr";
@@ -48,21 +41,34 @@ export interface RadarrMovieLibraryStatus {
 }
 
 export class RadarrLibrary {
-	private readonly client: RadarrLibraryDeps["client"];
-	private readonly cache: TtlCache<RadarrMovieSnapshot[]>;
+	private memoryCache: CacheHit<RadarrMovieSnapshot[]> | null = null;
 	private refreshPromise: Promise<RadarrMovieSnapshot[]> | null = null;
 
-	public constructor(deps: RadarrLibraryDeps) {
-		this.client = deps.client;
-		this.cache = deps.cache ?? defaultMovieSnapshotCache;
-	}
+	public constructor(
+		private readonly client: RadarrClient,
+		private readonly cache: TtlCache<RadarrMovieSnapshot[]> = defaultCache,
+	) {}
 
 	public async getMovieSnapshots(
 		credentials: ProviderCredentials,
 	): Promise<RadarrMovieSnapshot[]> {
-		const cached = await this.cache.read(RADARR_MOVIE_CACHE_KEY);
+		const memoryCache = this.memoryCache;
+		const now = Date.now();
+
+		if (memoryCache && now < memoryCache.expiresAt) {
+			if (now >= memoryCache.staleAt) {
+				// Stale cache is good enough for status; refresh quietly for the next read.
+				void this.refreshMovieSnapshots(credentials).catch(() => {});
+			}
+
+			return memoryCache.value;
+		}
+
+		this.memoryCache = null;
+		const cached = await this.cache.read(CACHE_KEY);
 		if (!cached) return this.refreshMovieSnapshots(credentials);
 
+		this.memoryCache = cached;
 		if (cached.stale) {
 			// Stale cache is good enough for status; refresh quietly for the next read.
 			void this.refreshMovieSnapshots(credentials).catch(() => {});
@@ -77,7 +83,7 @@ export class RadarrLibrary {
 		if (this.refreshPromise) return this.refreshPromise;
 
 		this.refreshPromise = (async () => {
-			const cached = await this.cache.read(RADARR_MOVIE_CACHE_KEY);
+			const cached = await this.cache.read(CACHE_KEY);
 			const fallback = cached?.value ?? [];
 
 			try {
@@ -89,20 +95,19 @@ export class RadarrLibrary {
 					)
 					.map((movie) => toRadarrMovieSnapshot(movie));
 
-				await this.cache.write(
-					RADARR_MOVIE_CACHE_KEY,
-					snapshots,
-					RADARR_MOVIE_CACHE_TTL.normal,
-				);
+				await this.cache.write(CACHE_KEY, snapshots, CACHE_TTL.normal);
+				this.setMemoryCache(snapshots, CACHE_TTL.normal);
 
 				return snapshots;
 			} catch (error) {
 				const normalized = normalizeError(error);
 				logError(normalized, "RadarrLibrary:refreshMovieSnapshots");
-				await this.cache.write(RADARR_MOVIE_CACHE_KEY, fallback, {
-					...RADARR_MOVIE_CACHE_TTL.error,
+				const ttl = {
+					...CACHE_TTL.error,
 					meta: { lastErrorCode: normalized.code },
-				});
+				};
+				await this.cache.write(CACHE_KEY, fallback, ttl);
+				this.setMemoryCache(fallback, ttl);
 				return fallback;
 			} finally {
 				this.refreshPromise = null;
@@ -110,13 +115,6 @@ export class RadarrLibrary {
 		})();
 
 		return this.refreshPromise;
-	}
-
-	public async findMovieByTmdbId(
-		tmdbId: TmdbId,
-		credentials: ProviderCredentials,
-	): Promise<RadarrMovie | null> {
-		return this.client.findMovieByTmdbId(tmdbId, credentials);
 	}
 
 	public async getMovieLibraryStatusByTmdbId(input: {
@@ -141,7 +139,10 @@ export class RadarrLibrary {
 		}
 
 		try {
-			const liveMovie = await this.findMovieByTmdbId(tmdbId, credentials);
+			const liveMovie = await this.client.findMovieByTmdbId(
+				tmdbId,
+				credentials,
+			);
 
 			if (liveMovie) {
 				const snapshot = toRadarrMovieSnapshot(liveMovie);
@@ -158,10 +159,7 @@ export class RadarrLibrary {
 				};
 			}
 		} catch (error) {
-			logError(
-				normalizeError(error),
-				`RadarrLibrary:getMovieLibraryStatusByTmdbId:library:${tmdbId}`,
-			);
+			logError(normalizeError(error), `RadarrLibrary:check:${tmdbId}`);
 			return {
 				provider: "radarr",
 				providerId: tmdbId,
@@ -174,10 +172,7 @@ export class RadarrLibrary {
 		try {
 			lookupMovie = await this.client.lookupMovieByTmdbId(tmdbId, credentials);
 		} catch (error) {
-			logError(
-				normalizeError(error),
-				`RadarrLibrary:getMovieLibraryStatusByTmdbId:lookup:${tmdbId}`,
-			);
+			logError(normalizeError(error), `RadarrLibrary:lookup:${tmdbId}`);
 		}
 
 		if (existsInCache) {
@@ -196,7 +191,11 @@ export class RadarrLibrary {
 	public async upsertMovieSnapshot(
 		snapshot: RadarrMovieSnapshot,
 	): Promise<void> {
-		const cached = await this.cache.read(RADARR_MOVIE_CACHE_KEY);
+		const memoryCache = this.memoryCache;
+		const cached =
+			memoryCache && Date.now() < memoryCache.expiresAt
+				? memoryCache
+				: await this.cache.read(CACHE_KEY);
 		const current = cached?.value ?? [];
 		const existingIndex = current.findIndex(
 			(item) => item.tmdbId === snapshot.tmdbId,
@@ -210,29 +209,42 @@ export class RadarrLibrary {
 						...current.slice(existingIndex + 1),
 					];
 
-		await this.cache.write(
-			RADARR_MOVIE_CACHE_KEY,
-			next,
-			RADARR_MOVIE_CACHE_TTL.normal,
-		);
+		await this.cache.write(CACHE_KEY, next, CACHE_TTL.normal);
+		this.setMemoryCache(next, CACHE_TTL.normal);
 	}
 
 	public async removeMovieSnapshot(tmdbId: TmdbId): Promise<void> {
-		const cached = await this.cache.read(RADARR_MOVIE_CACHE_KEY);
+		const memoryCache = this.memoryCache;
+		const cached =
+			memoryCache && Date.now() < memoryCache.expiresAt
+				? memoryCache
+				: await this.cache.read(CACHE_KEY);
 		if (!cached) return;
 
 		const next = cached.value.filter((movie) => movie.tmdbId !== tmdbId);
 		if (next.length === cached.value.length) return;
 
-		await this.cache.write(
-			RADARR_MOVIE_CACHE_KEY,
-			next,
-			RADARR_MOVIE_CACHE_TTL.normal,
-		);
+		await this.cache.write(CACHE_KEY, next, CACHE_TTL.normal);
+		this.setMemoryCache(next, CACHE_TTL.normal);
 	}
 
 	public async clearMovieSnapshotCache(): Promise<void> {
-		await this.cache.remove(RADARR_MOVIE_CACHE_KEY);
+		await this.cache.remove(CACHE_KEY);
+		this.memoryCache = null;
+	}
+
+	private setMemoryCache(
+		value: RadarrMovieSnapshot[],
+		options: CacheWriteOptions,
+	): void {
+		const now = Date.now();
+		this.memoryCache = {
+			value,
+			stale: false,
+			staleAt: now + options.staleMs,
+			expiresAt: now + (options.hardMs ?? options.staleMs * 4),
+			...(options.meta ? { meta: options.meta } : {}),
+		};
 	}
 }
 
@@ -243,26 +255,33 @@ export function toRadarrMovieSnapshot(movie: RadarrMovie): RadarrMovieSnapshot {
 				.filter((value): value is string => !!value)
 		: undefined;
 
-	// Snapshots are intentionally small: enough for status checks, not edit saves.
-	return {
+	const snapshot: RadarrMovieSnapshot = {
 		id: movie.id,
 		tmdbId: movie.tmdbId,
 		title: movie.title,
-		...(movie.titleSlug === undefined ? {} : { titleSlug: movie.titleSlug }),
-		...(movie.sortTitle === undefined ? {} : { sortTitle: movie.sortTitle }),
-		...(movie.originalTitle === undefined
-			? {}
-			: { originalTitle: movie.originalTitle }),
-		...(movie.folderName === undefined ? {} : { folderName: movie.folderName }),
-		...(movie.imdbId === undefined ? {} : { imdbId: movie.imdbId }),
-		...(movie.year === undefined ? {} : { year: movie.year }),
-		...(alternateTitles === undefined ? {} : { alternateTitles }),
-		...(movie.monitored === undefined ? {} : { monitored: movie.monitored }),
-		...(movie.minimumAvailability === undefined
-			? {}
-			: { minimumAvailability: movie.minimumAvailability }),
-		...(movie.hasFile === undefined ? {} : { hasFile: movie.hasFile }),
-		...(movie.sizeOnDisk === undefined ? {} : { sizeOnDisk: movie.sizeOnDisk }),
-		...(movie.status === undefined ? {} : { status: movie.status }),
 	};
+
+	if (movie.titleSlug !== undefined) snapshot.titleSlug = movie.titleSlug;
+	if (movie.sortTitle !== undefined) snapshot.sortTitle = movie.sortTitle;
+	if (movie.originalTitle !== undefined)
+		snapshot.originalTitle = movie.originalTitle;
+	if (movie.folderName !== undefined) snapshot.folderName = movie.folderName;
+	if (movie.imdbId !== undefined) snapshot.imdbId = movie.imdbId;
+	if (movie.year !== undefined) snapshot.year = movie.year;
+	if (alternateTitles !== undefined) snapshot.alternateTitles = alternateTitles;
+	if (movie.monitored !== undefined) snapshot.monitored = movie.monitored;
+	if (movie.minimumAvailability !== undefined)
+		snapshot.minimumAvailability = movie.minimumAvailability;
+	if (movie.hasFile !== undefined) snapshot.hasFile = movie.hasFile;
+	if (movie.sizeOnDisk !== undefined) snapshot.sizeOnDisk = movie.sizeOnDisk;
+	if (movie.status !== undefined) snapshot.status = movie.status;
+
+	return snapshot;
+}
+
+export function findRadarrMovieInLibrary<TMovie extends { tmdbId: number }>(
+	library: readonly TMovie[],
+	tmdbId: number,
+): TMovie | null {
+	return library.find((movie) => Number(movie.tmdbId) === tmdbId) ?? null;
 }

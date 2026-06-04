@@ -1,4 +1,4 @@
-/** Provider-target group header for the virtualized options mapping list. */
+/** Provider-target group header for the options mapping list. */
 // src/options-page/pages/mappings/mappings-provider-group.tsx
 
 import { ChevronDown, CircleHelp } from "lucide-react";

@@ -1,7 +1,7 @@
 /** Tracks host browse cards and creates light-DOM containers for React portals. */
 // src/content/browse/use-browse-card-targets.ts
 
-import { useEffect, useState } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import {
 	BROWSE_OVERLAY_CONTAINER_CLASS,
 	BROWSE_PROCESSED_ATTRIBUTE,
@@ -28,12 +28,31 @@ interface BrowseCardTargetOptions {
 	enabled?: boolean;
 }
 
+interface BrowseCardTargetStore {
+	getSnapshot: () => BrowseCardTarget[];
+	subscribe: (onStoreChange: () => void) => () => void;
+}
+
+const cardInstanceIds = new WeakMap<HTMLElement, number>();
+let nextCardInstanceId = 1;
+
+function getCardInstanceId(mountTarget: HTMLElement): number {
+	const existing = cardInstanceIds.get(mountTarget);
+	if (existing !== undefined) return existing;
+
+	const next = nextCardInstanceId;
+	nextCardInstanceId += 1;
+	cardInstanceIds.set(mountTarget, next);
+	return next;
+}
+
 function getCardSignature(parsed: HostMediaTarget): string {
 	return [
 		parsed.anilistId,
 		parsed.format ?? "",
 		parsed.title,
 		parsed.mountTarget.getAttribute("href") ?? "",
+		getCardInstanceId(parsed.mountTarget),
 	].join("|");
 }
 
@@ -163,71 +182,78 @@ export function scanBrowseCardTargets(
 	return [...targetsByMountTarget.values()];
 }
 
+function createBrowseCardTargetStore(
+	options: BrowseCardTargetOptions,
+): BrowseCardTargetStore {
+	let currentTargets: BrowseCardTarget[] = [];
+
+	return {
+		getSnapshot: () => currentTargets,
+		subscribe: (onStoreChange) => {
+			let frameId: number | null = null;
+			let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
+
+			const cancelScheduledScan = () => {
+				if (frameId !== null) {
+					globalThis.cancelAnimationFrame(frameId);
+					frameId = null;
+				}
+				if (timeoutId !== null) {
+					globalThis.clearTimeout(timeoutId);
+					timeoutId = null;
+				}
+			};
+
+			const scan = () => {
+				frameId = null;
+				timeoutId = null;
+				const nextTargets = scanBrowseCardTargets(options);
+				cleanupMissingTargets({
+					previousTargets: currentTargets,
+					nextTargets,
+				});
+				if (targetsEqual(currentTargets, nextTargets)) {
+					currentTargets = nextTargets;
+					return;
+				}
+
+				currentTargets = nextTargets;
+				onStoreChange();
+			};
+
+			const scheduleScan = () => {
+				if (frameId !== null || timeoutId !== null) return;
+				if (typeof globalThis.requestAnimationFrame === "function") {
+					frameId = globalThis.requestAnimationFrame(scan);
+					return;
+				}
+				timeoutId = globalThis.setTimeout(scan, 0);
+			};
+
+			if (options.enabled === false) {
+				return () => {};
+			}
+
+			const observerRoot = getObserverRoot(options.adapter);
+			const observer = observerRoot
+				? new MutationObserver(scheduleScan)
+				: null;
+			observer?.observe(observerRoot as Node, BROWSE_MUTATION_OBSERVER_INIT);
+			scan();
+
+			return () => {
+				cancelScheduledScan();
+				observer?.disconnect();
+				cleanupBrowseCardTargets(currentTargets);
+				currentTargets = [];
+			};
+		},
+	};
+}
+
 export function useBrowseCardTargets(
 	options: BrowseCardTargetOptions,
 ): BrowseCardTarget[] {
-	const [targets, setTargets] = useState<BrowseCardTarget[]>([]);
-
-	useEffect(() => {
-		let currentTargets: BrowseCardTarget[] = [];
-		let frameId: number | null = null;
-		let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
-
-		const cancelScheduledScan = () => {
-			if (frameId !== null) {
-				globalThis.cancelAnimationFrame(frameId);
-				frameId = null;
-			}
-			if (timeoutId !== null) {
-				globalThis.clearTimeout(timeoutId);
-				timeoutId = null;
-			}
-		};
-
-		const scan = () => {
-			frameId = null;
-			timeoutId = null;
-			const nextTargets = scanBrowseCardTargets(options);
-			cleanupMissingTargets({
-				previousTargets: currentTargets,
-				nextTargets,
-			});
-			if (targetsEqual(currentTargets, nextTargets)) {
-				currentTargets = nextTargets;
-				return;
-			}
-
-			currentTargets = nextTargets;
-			setTargets(nextTargets);
-		};
-
-		const scheduleScan = () => {
-			if (frameId !== null || timeoutId !== null) return;
-			if (typeof globalThis.requestAnimationFrame === "function") {
-				frameId = globalThis.requestAnimationFrame(scan);
-				return;
-			}
-			timeoutId = globalThis.setTimeout(scan, 0);
-		};
-
-		if (options.enabled === false) {
-			return;
-		}
-
-		const observerRoot = getObserverRoot(options.adapter);
-		const observer = observerRoot
-			? new MutationObserver(scheduleScan)
-			: null;
-		observer?.observe(observerRoot as Node, BROWSE_MUTATION_OBSERVER_INIT);
-		scan();
-
-		return () => {
-			cancelScheduledScan();
-			observer?.disconnect();
-			cleanupBrowseCardTargets(currentTargets);
-			currentTargets = [];
-		};
-	}, [options]);
-
-	return options.enabled === false ? [] : targets;
+	const store = useMemo(() => createBrowseCardTargetStore(options), [options]);
+	return useSyncExternalStore(store.subscribe, store.getSnapshot);
 }

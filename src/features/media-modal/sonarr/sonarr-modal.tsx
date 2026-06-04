@@ -2,20 +2,18 @@
 // src/features/media-modal/sonarr/sonarr-modal.tsx
 
 import { useMemo, useState } from "react";
-import type { AniListId } from "@/anilist";
-import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
-import {
-	parseTvdbIdOrNull,
-	type ProviderFormResources,
-	type TvdbId,
-} from "@/providers";
+import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import { parseTvdbIdOrNull } from "@/providers/schemas";
+import type { ProviderFormResources } from "@/providers/types";
+import type { TvdbId } from "@/providers/schemas";
+import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import {
 	useMappingInspection,
 } from "@/queries/mapping";
 import { useProviderBaseUrl } from "@/queries/provider-base-url";
 import { useSeriesStatus, useSonarrFormResources } from "@/queries/sonarr";
-import { defaultSonarrFormState } from "@/settings";
-import type { CheckSeriesStatusResponse } from "@/rpc/types";
+import { createDefaultSonarrFormState as defaultSonarrFormState } from "@/providers/sonarr/form-state";
+import type { GetSeriesStatusOutput } from "@/rpc/types";
 import { DetailsPanel } from "../details/details-panel";
 import {
 	SonarrMappingPanel,
@@ -30,7 +28,11 @@ import { useContentPortalContainer } from "../hooks/use-content-portal-container
 import { useMappingActions } from "../hooks/use-mapping-actions";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
 import { useOpenMappingSettingsAction } from "../hooks/use-open-mapping-settings-action";
-import { getOverwriteTargetTitle, targetsEqual } from "../helpers";
+import {
+	getOverwriteTargetTitle,
+	pickProviderPoster,
+	targetsEqual,
+} from "../helpers";
 import {
 	MappingFooter,
 	MediaModalFooterTransition,
@@ -49,6 +51,8 @@ import type {
 const PROVIDER = "sonarr" as const;
 const SETUP_FORM_ID = "sonarr-setup-form";
 
+type SonarrStatusSeries = NonNullable<GetSeriesStatusOutput["series"]>;
+
 type SonarrModalData = {
 	baseUrl: string;
 	isConfigured: boolean;
@@ -59,7 +63,7 @@ type SonarrModalData = {
 	providerRequestTitle: string;
 	providerPayloadTitle: string | undefined;
 	fallbackLookupTitle: string | undefined;
-	rawProviderStatus: CheckSeriesStatusResponse | null;
+	rawProviderStatus: GetSeriesStatusOutput | null;
 	verificationSettled: boolean;
 	verificationFailed: boolean;
 	storedDefaults: ReturnType<typeof defaultSonarrFormState>;
@@ -72,13 +76,9 @@ function getRejectCandidateTvdbId(input: {
 }): TvdbId | null {
 	if (input.manualMappingActive) return null;
 
-	const effectiveMapping = input.inspection?.effectiveMapping;
-	if (
-		(effectiveMapping?.mappingEntryKind === "auto" ||
-			effectiveMapping?.mappingEntryKind === "upstream") &&
-		effectiveMapping.providerId != null
-	) {
-		return parseTvdbIdOrNull(effectiveMapping.providerId);
+	const mapping = input.inspection?.mapping;
+	if (mapping?.kind === "mapped" && mapping.source === "auto") {
+		return parseTvdbIdOrNull(mapping.providerId);
 	}
 
 	return null;
@@ -110,6 +110,72 @@ function isSetupTargetLoading(input: {
 	);
 }
 
+function getEpisodeCount(series: SonarrStatusSeries): number | undefined {
+	return (
+		series.statistics?.episodeCount ??
+		series.statistics?.totalEpisodeCount ??
+		("episodeCount" in series ? series.episodeCount : undefined)
+	);
+}
+
+function getEpisodeFileCount(series: SonarrStatusSeries): number | undefined {
+	return (
+		series.statistics?.episodeFileCount ??
+		("episodeFileCount" in series ? series.episodeFileCount : undefined)
+	);
+}
+
+function getCurrentTargetDetails(input: {
+	series: SonarrStatusSeries;
+	baseUrl: string;
+}): Partial<MediaModalTargetSummary> {
+	const { series } = input;
+	const episodeCount = getEpisodeCount(series);
+	const episodeFileCount = getEpisodeFileCount(series);
+	const providerRouteSlug = getProviderRouteSlug(PROVIDER, series) ?? undefined;
+	const posterUrl = pickProviderPoster(series, input.baseUrl);
+	const providerFolderName = "folder" in series ? series.folder : undefined;
+	const year = "year" in series ? series.year : undefined;
+	const typeLabel = "seriesType" in series ? series.seriesType : undefined;
+
+	return {
+		...(providerFolderName ? { providerFolderName } : {}),
+		...(year === undefined ? {} : { year }),
+		...(typeLabel ? { typeLabel } : {}),
+		...(providerRouteSlug ? { providerRouteSlug } : {}),
+		...(posterUrl ? { posterUrl } : {}),
+		...(series.status ? { statusLabel: series.status } : {}),
+		...(episodeCount === undefined ? {} : { episodeCount }),
+		...(episodeFileCount === undefined ? {} : { episodeFileCount }),
+		...("overview" in series && series.overview
+			? { overview: series.overview }
+			: {}),
+	};
+}
+
+function getCurrentTarget(input: {
+	status: GetSeriesStatusOutput | null;
+	baseUrl: string;
+}): MediaModalTargetSummary | null {
+	const { status } = input;
+	const series = status?.series;
+	const tvdbId = parseTvdbIdOrNull(
+		status?.mapping.kind === "mapped" ? status.mapping.providerId : undefined,
+	);
+	if (!series || tvdbId === null) return null;
+
+	return {
+		provider: PROVIDER,
+		providerId: tvdbId,
+		title: series.title,
+		isInLibrary: status.isInLibrary === true,
+		...getCurrentTargetDetails({
+			series,
+			baseUrl: input.baseUrl,
+		}),
+	};
+}
+
 function useSonarrModalData(input: {
 	anilistId: AniListId;
 	metadataHint: MediaModalMetadataHint | null;
@@ -126,15 +192,13 @@ function useSonarrModalData(input: {
 	const statusPayload = useMemo(
 		() => ({
 			anilistId,
-			...(base.providerPayloadTitle === undefined
-				? {}
-				: { title: base.providerPayloadTitle }),
-			metadata: base.resolvedMetadata,
+			...(base.statusTitle === undefined ? {} : { title: base.statusTitle }),
+			metadata: base.statusMetadata,
 		}),
-		[anilistId, base.providerPayloadTitle, base.resolvedMetadata],
+		[anilistId, base.statusMetadata, base.statusTitle],
 	);
 	const sonarrStatus = useSeriesStatus(statusPayload, {
-		enabled: isConfigured,
+		enabled: isConfigured && base.statusReady,
 		force_verify: true,
 	});
 	const verificationSettled =
@@ -144,13 +208,19 @@ function useSonarrModalData(input: {
 		verificationSettled &&
 		(sonarrStatus.isError || rawProviderStatus?.isInLibrary === null);
 	const baseUrl = providerBaseUrl.data ?? "";
-	const currentTarget = rawProviderStatus?.targetSummary ?? null;
+	const currentTarget = getCurrentTarget({
+		status: rawProviderStatus,
+		baseUrl,
+	});
+	const manualMappingActive =
+		rawProviderStatus?.mapping.kind === "mapped" &&
+		rawProviderStatus.mapping.source === "manual";
 
 	return {
 		baseUrl,
 		isConfigured,
 		anilistHeaderData: base.anilistHeaderData,
-		manualMappingActive: rawProviderStatus?.manualMappingActive === true,
+		manualMappingActive,
 		currentTarget,
 		resolvedMetadata: base.resolvedMetadata,
 		providerRequestTitle: base.providerRequestTitle,
@@ -236,10 +306,11 @@ export function SonarrModal({
 		manualMappingActive: data.manualMappingActive,
 	});
 	const clearRejectedCandidateTvdbId = parseTvdbIdOrNull(
-		inspection.data?.effectiveMapping.suppressedProviderId,
+		inspection.data?.mapping.kind === "unmapped"
+			? inspection.data.mapping.rejectedProviderIds?.[0]
+			: undefined,
 	);
-	const canIgnoreTitle =
-		inspection.data?.effectiveMapping.mappingEntryKind !== "ignored";
+	const canIgnoreTitle = inspection.data?.mapping.kind !== "ignored";
 	const canSubmitMapping =
 		selectedCandidate !== null &&
 		!targetsEqual(selectedCandidate.summary, data.currentTarget);

@@ -1,12 +1,8 @@
 /** RPC handlers for Sonarr form resources, search, and validation flows. */
 // src/rpc/handlers/sonarr.handlers.ts
 
-import * as v from "valibot";
 import {
-	anibridgeMappingStore,
 	bumpLibraryRevision,
-	manualMappingService,
-	manualMappingsReady,
 	mappingService,
 	scheduleLibraryRefresh,
 	sonarrClient,
@@ -17,100 +13,52 @@ import {
 	requireProviderConfig,
 	requireProviderCredentials,
 } from "@/background/provider-config";
-import type { AniListId } from "@/anilist";
+import type { MappingResult } from "@/mapping/types";
 import { addSonarrSeries } from "@/providers/sonarr/add";
 import { updateSonarrSeries as updateSonarrSeriesProvider } from "@/providers/sonarr/edit";
 import {
 	toSonarrSeriesSnapshot,
 	type SonarrSeriesLibraryStatus,
 } from "@/providers/sonarr/library";
-import {
-	parseTvdbIdOrNull,
-	type ProviderCredentials,
-	type ProviderRootFolder,
-	type TvdbId,
-} from "@/providers";
+import { parseTvdbIdOrNull } from "@/providers/schemas";
+import type {
+	ProviderCredentials,
+	ProviderRootFolder,
+} from "@/providers/types";
+import type { TvdbId } from "@/providers/schemas";
 import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
-import {
-	AddSonarrInputSchema,
-	GetProviderFormResourcesInputSchema,
-	SeriesLibraryStatusInputSchema,
-	SonarrLookupInputSchema,
-	StatusInputSchema,
-	UpdateSonarrInputSchema,
-	ValidateTvdbInputSchema,
-} from "@/rpc/schemas";
-import type { CheckSeriesStatusResponse } from "@/rpc/types";
-import { buildSeriesStatusResponseFromLibraryStatus } from "@/rpc/status-response-adapter";
-import { buildSonarrTargetSummary } from "@/rpc/provider-target-summary";
-import { ErrorCode, logError, normalizeError } from "@/shared/errors";
+import type {
+	AddSonarrInput,
+	GetSeriesStatusOutput,
+	GetProviderFormResourcesInput,
+	SonarrLookupInput,
+	StatusInput,
+	UpdateSonarrInput,
+	ValidateTvdbInput,
+} from "@/rpc/types";
+import { normalizeError } from "@/shared/errors/error-utils";
 import { normalizeInputCredentials } from "./provider-credentials";
-import {
-	buildMappingOptions,
-	buildStatusOptions,
-	buildStatusPayload,
-	resolveMappingSource,
-	type ProviderStatusOptions,
-	type ProviderStatusPayload,
-} from "./provider-status.helpers";
 
 type SonarrMappingResult =
 	| {
 			kind: "mapped";
+			mapping: Extract<MappingResult, { kind: "mapped" }>;
 			tvdbId: TvdbId;
-			successfulSynonym?: string;
-			mappingReason?: CheckSeriesStatusResponse["mappingReason"];
-			mappingSource?: CheckSeriesStatusResponse["mappingSource"];
 	  }
-	| { kind: "unmapped" }
-	| { kind: "failed"; response: CheckSeriesStatusResponse };
-
-const getLinkedSonarrAniListIds = (tvdbId: TvdbId): number[] => {
-	const ids = new Set<number>(
-		manualMappingService.getLinkedAniListIds("sonarr", tvdbId),
-	);
-	for (const id of anibridgeMappingStore.getAniListIdsForTvdb(tvdbId)) {
-		ids.add(id);
-	}
-	return [...ids];
-};
+	| { kind: "unmapped"; mapping: MappingResult };
 
 export const sonarrHandlers = {
-	async getSeriesStatus(input: unknown) {
-		const parsedInput = v.parse(StatusInputSchema, input);
-		await manualMappingsReady;
-
-		const payload = buildStatusPayload(parsedInput);
-		const status = await getSeriesStatusFromMappingAndLibrary(
-			payload,
-			buildStatusOptions(parsedInput),
-		);
-		return {
-			...status,
-			manualMappingActive: manualMappingService.has(
-				"sonarr",
-				parsedInput.anilistId,
-			),
-		};
+	getSeriesStatus(input: StatusInput) {
+		return getSeriesStatusFromMappingAndLibrary(input);
 	},
 
-	async getSeriesLibraryStatus(input: unknown) {
-		const parsedInput = v.parse(SeriesLibraryStatusInputSchema, input);
-		return getSonarrLibraryStatusForRpc({
-			tvdbId: parsedInput.tvdbId,
-			forceVerify: parsedInput.forceVerify === true,
-		});
-	},
-
-	async addToSonarr(input: unknown) {
-		const parsedInput = v.parse(AddSonarrInputSchema, input);
+	async addToSonarr(input: AddSonarrInput) {
 		const { credentials, options } = await requireProviderConfig("sonarr");
-		await manualMappingsReady;
 		const created = await addSonarrSeries(
 			{
-				tvdbId: parsedInput.tvdbId,
-				title: parsedInput.title,
-				form: parsedInput.form,
+				tvdbId: input.tvdbId,
+				title: input.title,
+				form: input.form,
 				defaults: options.providers.sonarr.defaults,
 				credentials,
 			},
@@ -122,19 +70,18 @@ export const sonarrHandlers = {
 		return created;
 	},
 
-	async updateSonarrSeries(input: unknown) {
-		const parsedInput = v.parse(UpdateSonarrInputSchema, input);
+	async updateSonarrSeries(input: UpdateSonarrInput) {
 		const credentials = await requireProviderCredentials("sonarr");
 		try {
 			const updated = await updateSonarrSeriesProvider(
 				{
-					tvdbId: parsedInput.tvdbId,
-					title: parsedInput.title,
-					form: parsedInput.form,
+					tvdbId: input.tvdbId,
+					title: input.title,
+					form: input.form,
 					credentials,
-					...(parsedInput.monitoringAction === undefined
+					...(input.monitoringAction === undefined
 						? {}
-						: { monitoringAction: parsedInput.monitoringAction }),
+						: { monitoringAction: input.monitoringAction }),
 				},
 				{ client: sonarrClient },
 			);
@@ -152,9 +99,8 @@ export const sonarrHandlers = {
 		}
 	},
 
-	async getSonarrFormResources(input?: unknown) {
-		const parsedInput = v.parse(GetProviderFormResourcesInputSchema, input);
-		const maybeCredentials = parsedInput?.credentials;
+	async getSonarrFormResources(input?: GetProviderFormResourcesInput) {
+		const maybeCredentials = input?.credentials;
 		const credentials: ProviderCredentials =
 			maybeCredentials?.url && maybeCredentials.apiKey
 				? normalizeInputCredentials("sonarr", maybeCredentials)
@@ -175,13 +121,11 @@ export const sonarrHandlers = {
 		};
 	},
 
-	async searchSonarr(input: unknown) {
-		const parsedInput = v.parse(SonarrLookupInputSchema, input);
+	async searchSonarr(input: SonarrLookupInput) {
 		const credentials = await requireProviderCredentials("sonarr");
-		await manualMappingsReady;
 
 		const [results, library] = await Promise.all([
-			sonarrClient.lookupSeries(parsedInput.term, credentials),
+			sonarrClient.lookupSeries(input.term, credentials),
 			sonarrLibrary.getSeriesSnapshots(credentials),
 		]);
 
@@ -204,12 +148,12 @@ export const sonarrHandlers = {
 				uniqueTvdbIds.add(tvdbId);
 			}
 		}
-		for (const tvdbId of uniqueTvdbIds) {
-			const linked = getLinkedSonarrAniListIds(tvdbId);
-			if (linked.length > 0) {
-				linkedAniListIdsByTvdbId[tvdbId] = linked;
-			}
-		}
+		await Promise.all(
+			[...uniqueTvdbIds].map(async (tvdbId) => {
+				const linked = await mappingService.getLinkedAniListIds("sonarr", tvdbId);
+				if (linked.length > 0) linkedAniListIdsByTvdbId[tvdbId] = linked;
+			}),
+		);
 
 		return {
 			results,
@@ -221,17 +165,16 @@ export const sonarrHandlers = {
 		};
 	},
 
-	async validateTvdbId(input: unknown) {
-		const parsedInput = v.parse(ValidateTvdbInputSchema, input);
+	async validateTvdbId(input: ValidateTvdbInput) {
 		const credentials = await requireProviderCredentials("sonarr");
 		const found = await sonarrClient.findSeriesByTvdbId(
-			parsedInput.tvdbId,
+			input.tvdbId,
 			credentials,
 		);
 		let inCatalog = false;
 		try {
 			const lookup = await sonarrClient.lookupSeriesByTvdbId(
-				parsedInput.tvdbId,
+				input.tvdbId,
 				credentials,
 			);
 			inCatalog = lookup !== null;
@@ -248,7 +191,6 @@ async function getSonarrLibraryStatusForRpc(input: {
 }): Promise<SonarrSeriesLibraryStatus> {
 	const credentials = await getProviderConfig("sonarr");
 	if (!credentials) {
-		await sonarrLibrary.clearSeriesSnapshotCache();
 		return {
 			provider: "sonarr",
 			providerId: input.tvdbId,
@@ -262,197 +204,70 @@ async function getSonarrLibraryStatusForRpc(input: {
 		...(input.forceVerify === undefined
 			? {}
 			: { forceVerify: input.forceVerify }),
-		onCacheChanged: () => bumpLibraryRevision("sonarr"),
 	});
 }
 
 async function getSeriesStatusFromMappingAndLibrary(
-	payload: ProviderStatusPayload,
-	options: ProviderStatusOptions,
-): Promise<CheckSeriesStatusResponse> {
+	input: StatusInput,
+): Promise<GetSeriesStatusOutput> {
 	const credentials = await getProviderConfig("sonarr");
 	if (!credentials) {
 		return {
-			providerId: null,
-			providerMappingState: "unknown",
+			mapping: unmappedMapping(),
 			isInLibrary: null,
-			mappingUnknownReason: "provider-not-configured",
 		};
 	}
 
-	if (options.network === "never") {
+	const mapping = await resolveSeriesMapping(input);
+	if (mapping.kind === "unmapped") {
 		return {
-			providerId: null,
-			providerMappingState: "unknown",
+			mapping: mapping.mapping,
 			isInLibrary: null,
-			mappingUnknownReason: "network-disabled",
 		};
 	}
 
-	const mapping = await resolveSeriesMapping(
-		payload,
-		payload.title?.trim(),
-		options,
-	);
-	if (mapping.kind === "failed") return mapping.response;
-	if (mapping.kind === "unmapped") return resolveUnmappedSeries(payload);
-
-	return buildMappedSeriesStatus(mapping, options, credentials.url);
+	return buildMappedSeriesStatus(mapping, input);
 }
 
 async function resolveSeriesMapping(
-	payload: ProviderStatusPayload,
-	normalizedTitle: string | undefined,
-	options: ProviderStatusOptions,
+	input: StatusInput,
 ): Promise<SonarrMappingResult> {
-	if (options.priority === "high") {
-		try {
-			mappingService.prioritizeAniListMedia?.(payload.anilistId, {
-				schedule: false,
-			});
-		} catch {
-			// best-effort
-		}
-	}
-
-	try {
-		const mapping = await mappingService.resolveProviderId(
-			"sonarr",
-			payload.anilistId,
-			buildMappingOptions(payload, normalizedTitle, options),
-		);
-		if (!mapping) return { kind: "unmapped" };
+	const mapping = await mappingService.resolveMapping("sonarr", input.anilistId, {
+		forceRetry: input.force_mapping_retry === true,
+		...(input.title === undefined ? {} : { title: input.title }),
+		...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+	});
+	if (mapping.kind === "mapped") {
+		const tvdbId = parseTvdbIdOrNull(mapping.providerId);
+		if (tvdbId === null) return { kind: "unmapped", mapping };
 
 		return {
 			kind: "mapped",
-			tvdbId: mapping.providerId,
-			...(mapping.successfulSynonym
-				? { successfulSynonym: mapping.successfulSynonym }
-				: {}),
-			mappingReason: mapping.reason,
-			mappingSource: resolveMappingSource(mapping.reason),
-		};
-	} catch (error) {
-		return {
-			kind: "failed",
-			response: toSeriesMappingErrorResponse(error, payload),
+			tvdbId,
+			mapping,
 		};
 	}
-}
-
-async function resolveUnmappedSeries(
-	payload: ProviderStatusPayload,
-): Promise<CheckSeriesStatusResponse> {
-	const unresolved = await resolveUnknownSeriesOutcome(payload.anilistId);
-	if (import.meta.env.DEV) {
-		console.debug(
-			`[ani2arr | SonarrStatus] result anilistId=${payload.anilistId} outcome=unresolved`,
-		);
-	}
-	return {
-		providerId: null,
-		isInLibrary: null,
-		...unresolved,
-	};
+	return { kind: "unmapped", mapping };
 }
 
 async function buildMappedSeriesStatus(
 	mapping: Extract<SonarrMappingResult, { kind: "mapped" }>,
-	options: ProviderStatusOptions,
-	baseUrl: string,
-): Promise<CheckSeriesStatusResponse> {
+	input: StatusInput,
+): Promise<GetSeriesStatusOutput> {
 	const libraryStatus = await getSonarrLibraryStatusForRpc({
 		tvdbId: mapping.tvdbId,
-		forceVerify: options.force_verify === true,
-	});
-	const status = buildSeriesStatusResponseFromLibraryStatus({
-		providerId: mapping.tvdbId,
-		...(mapping.mappingSource ? { mappingSource: mapping.mappingSource } : {}),
-		...(mapping.mappingReason ? { mappingReason: mapping.mappingReason } : {}),
-		libraryStatus,
-	});
-	const linkedAniListIds = getLinkedSonarrAniListIdsOrUndefined(mapping.tvdbId);
-	const targetSummary = buildSonarrTargetSummary({
-		tvdbId: mapping.tvdbId,
-		series: status.series,
-		isInLibrary: status.isInLibrary,
-		baseUrl,
-		linkedAniListIds,
+		forceVerify: input.force_verify === true,
 	});
 
 	return {
-		...status,
-		...(mapping.successfulSynonym
-			? { successfulSynonym: mapping.successfulSynonym }
-			: {}),
-		...(linkedAniListIds ? { linkedAniListIds } : {}),
-		...(targetSummary === null ? {} : { targetSummary }),
+		mapping: mapping.mapping,
+		isInLibrary: libraryStatus.isInLibrary,
+		...(libraryStatus.series ? { series: libraryStatus.series } : {}),
 	};
 }
 
-function toSeriesMappingErrorResponse(
-	error: unknown,
-	payload: ProviderStatusPayload,
-): CheckSeriesStatusResponse {
-	const normalized = normalizeError(error);
-	if (
-		normalized.code === ErrorCode.CONFIGURATION_ERROR ||
-		normalized.code === ErrorCode.SONARR_NOT_CONFIGURED ||
-		(normalized.code === ErrorCode.VALIDATION_ERROR &&
-			normalized.details?.reason === "network-disabled")
-	) {
-		return {
-			providerId: null,
-			providerMappingState: "unknown",
-			isInLibrary: null,
-			mappingUnknownReason:
-				normalized.details?.reason === "network-disabled"
-					? "network-disabled"
-					: "provider-not-configured",
-		};
-	}
-
-	logError(normalized, `SonarrStatus:getSeriesStatus:${payload.anilistId}`);
-	return {
-		providerId: null,
-		providerMappingState: "unknown",
-		isInLibrary: null,
-		mappingUnknownReason: "lookup-failed",
-	};
-}
-
-async function resolveUnknownSeriesOutcome(
-	anilistId: AniListId,
-): Promise<
-	Pick<
-		CheckSeriesStatusResponse,
-		"providerMappingState" | "mappingUnknownReason" | "resolverOutcome"
-	>
-> {
-	const resolverState = await mappingService.getAutoMapping(
-		"sonarr",
-		anilistId,
-	);
-	if (resolverState?.state === "ambiguous") {
-		return {
-			providerMappingState: "unknown",
-			mappingUnknownReason: "ambiguous",
-			resolverOutcome: "ambiguous",
-		};
-	}
-	return {
-		providerMappingState: "unmapped",
-		...(resolverState?.state === "unresolved"
-			? { resolverOutcome: "unresolved" as const }
-			: {}),
-	};
-}
-
-function getLinkedSonarrAniListIdsOrUndefined(
-	tvdbId: TvdbId,
-): number[] | undefined {
-	const linked = getLinkedSonarrAniListIds(tvdbId);
-	return linked.length > 0 ? linked : undefined;
+function unmappedMapping(): MappingResult {
+	return { kind: "unmapped", hadResolveAttempt: false };
 }
 
 function toProviderRootFolder(rootFolder: {

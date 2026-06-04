@@ -2,13 +2,16 @@
 // src/providers/sonarr/library.test.ts
 
 import { describe, expect, it, vi } from "vitest";
-import {
-	parseProviderQualityProfileId,
-	parseSonarrSeriesId,
-	parseTvdbId,
-	type ProviderCredentials,
-} from "@/providers";
+
+import { parseTvdbId } from "@/providers/schemas";
+import type { ProviderCredentials } from "@/providers/types";
+import type {
+	ProviderQualityProfileId,
+	SonarrSeriesId,
+} from "@/providers/schemas";
 import type { CacheHit, TtlCache } from "@/shared/cache/ttl-cache";
+
+import { SonarrClient } from "./client";
 import { SonarrLibrary, toSonarrSeriesSnapshot } from "./library";
 import type {
 	SonarrLookupSeries,
@@ -21,6 +24,16 @@ const credentials: ProviderCredentials = {
 	apiKey: "secret",
 };
 
+const parseProviderQualityProfileId = (value: number) =>
+	value as ProviderQualityProfileId;
+const parseSonarrSeriesId = (value: number) => value as SonarrSeriesId;
+
+function createClient(): SonarrClient {
+	return new SonarrClient({
+		hasUrlPermission: () => Promise.resolve(true),
+	});
+}
+
 function createMemoryCache<T>(
 	initialValue: T | undefined,
 ): TtlCache<T> & { value: () => T | undefined } {
@@ -29,6 +42,7 @@ function createMemoryCache<T>(
 	return {
 		read: vi.fn(async (): Promise<CacheHit<T> | null> => {
 			if (value === undefined) return null;
+
 			return {
 				value,
 				stale: false,
@@ -91,16 +105,34 @@ function createSnapshot(
 }
 
 describe("SonarrLibrary library status", () => {
+	it("uses memory after the first snapshot cache read", async () => {
+		const snapshot = createSnapshot();
+		const cache = createMemoryCache<SonarrSeriesSnapshot[]>([snapshot]);
+		const client = createClient();
+		const getAllSeries = vi.spyOn(client, "getAllSeries");
+		const library = new SonarrLibrary(client, cache);
+
+		await expect(library.getSeriesSnapshots(credentials)).resolves.toEqual([
+			snapshot,
+		]);
+		await expect(library.getSeriesSnapshots(credentials)).resolves.toEqual([
+			snapshot,
+		]);
+
+		expect(cache.read).toHaveBeenCalledTimes(1);
+		expect(getAllSeries).not.toHaveBeenCalled();
+	});
+
 	it("force-verifies a TVDB hit and updates the snapshot cache", async () => {
 		const series = createSonarrSeries();
 		const cache = createMemoryCache<SonarrSeriesSnapshot[]>([]);
-		const client = {
-			getAllSeries: vi.fn(async () => []),
-			findSeriesByTvdbId: vi.fn(async () => series),
-			lookupSeriesByTvdbId: vi.fn(),
-		};
+		const client = createClient();
+		const findSeriesByTvdbId = vi
+			.spyOn(client, "findSeriesByTvdbId")
+			.mockResolvedValue(series);
+		const lookupSeriesByTvdbId = vi.spyOn(client, "lookupSeriesByTvdbId");
 		const onCacheChanged = vi.fn();
-		const library = new SonarrLibrary({ client, cache });
+		const library = new SonarrLibrary(client, cache);
 
 		await expect(
 			library.getSeriesLibraryStatusByTvdbId({
@@ -116,11 +148,11 @@ describe("SonarrLibrary library status", () => {
 			series,
 		});
 
-		expect(client.findSeriesByTvdbId).toHaveBeenCalledWith(
+		expect(findSeriesByTvdbId).toHaveBeenCalledWith(
 			parseTvdbId(123),
 			credentials,
 		);
-		expect(client.lookupSeriesByTvdbId).not.toHaveBeenCalled();
+		expect(lookupSeriesByTvdbId).not.toHaveBeenCalled();
 		expect(cache.value()).toEqual([toSonarrSeriesSnapshot(series)]);
 		expect(onCacheChanged).toHaveBeenCalledTimes(1);
 	});
@@ -129,13 +161,13 @@ describe("SonarrLibrary library status", () => {
 		const cache = createMemoryCache<SonarrSeriesSnapshot[]>([
 			createSnapshot({ title: "Stale" }),
 		]);
-		const client = {
-			getAllSeries: vi.fn(async () => []),
-			findSeriesByTvdbId: vi.fn(async () => null),
-			lookupSeriesByTvdbId: vi.fn(async () => createLookupSeries()),
-		};
+		const client = createClient();
+		vi.spyOn(client, "findSeriesByTvdbId").mockResolvedValue(null);
+		const lookupSeriesByTvdbId = vi
+			.spyOn(client, "lookupSeriesByTvdbId")
+			.mockResolvedValue(createLookupSeries());
 		const onCacheChanged = vi.fn();
-		const library = new SonarrLibrary({ client, cache });
+		const library = new SonarrLibrary(client, cache);
 
 		await expect(
 			library.getSeriesLibraryStatusByTvdbId({
@@ -148,10 +180,13 @@ describe("SonarrLibrary library status", () => {
 			provider: "sonarr",
 			providerId: parseTvdbId(123),
 			isInLibrary: false,
-			series: { title: "Lookup Series", tvdbId: parseTvdbId(123) },
+			series: {
+				title: "Lookup Series",
+				tvdbId: parseTvdbId(123),
+			},
 		});
 
-		expect(client.lookupSeriesByTvdbId).toHaveBeenCalledWith(
+		expect(lookupSeriesByTvdbId).toHaveBeenCalledWith(
 			parseTvdbId(123),
 			credentials,
 		);

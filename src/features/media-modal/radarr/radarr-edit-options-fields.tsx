@@ -2,15 +2,15 @@
 // src/features/media-modal/radarr/radarr-edit-options-fields.tsx
 
 import React from 'react';
+import * as v from 'valibot';
 
-import { parseProviderQualityProfileId, type ProviderFormResources } from '@/providers';
-import {
-  type RadarrFormState,
-  type RadarrMinimumAvailability,
-} from '@/providers/radarr/form-state';
-import { SelectField } from '@/shared/ui/form/select-field';
-import { SwitchField } from '@/shared/ui/form/switch-field';
-import { ProviderTagField } from '@/shared/ui/provider-tag-field';
+import { ProviderQualityProfileIdSchema } from "@/providers/schemas";
+import type { ProviderFormResources } from "@/providers/types";
+import type { RadarrFormState } from "@/providers/radarr/form-state";
+import type { RadarrMinimumAvailability } from "@/providers/radarr/schemas";
+import { SelectField } from '@/shared/ui/fields/select-field';
+import { SwitchField } from '@/shared/ui/fields/switch-field';
+import { ProviderTagField } from '@/providers/provider-tag-field';
 import { cn } from '@/shared/utils/cn';
 
 import { ProviderRootFolderSelect, type ProviderRootFolderPathPreview } from '../setup/provider-root-folder-select';
@@ -39,7 +39,6 @@ export function RadarrEditOptionsFields(
     pathPreview,
   } = props;
 
-  const modalSelectTriggerClassName = 'border border-border-primary/60 bg-bg-tertiary text-text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
   const qualityProfileOptions = formResources.qualityProfiles.map(profile => ({
     value: String(profile.id),
     label: profile.name,
@@ -53,7 +52,6 @@ export function RadarrEditOptionsFields(
         rootFolders={formResources.rootFolders}
         onChange={value => onChange('rootFolderPath', value)}
         portalContainer={portalContainer ?? null}
-        triggerClassName={modalSelectTriggerClassName}
         pathPreview={pathPreview}
       />
 
@@ -63,12 +61,11 @@ export function RadarrEditOptionsFields(
         value={values.qualityProfileId === undefined ? '' : String(values.qualityProfileId)}
         onChange={value => {
           const num = Number(value);
-          onChange('qualityProfileId', !value || Number.isNaN(num) ? undefined : parseProviderQualityProfileId(num));
+          onChange('qualityProfileId', !value || Number.isNaN(num) ? undefined : v.parse(ProviderQualityProfileIdSchema, num));
         }}
         options={qualityProfileOptions}
         placeholder="Select a profile..."
         container={portalContainer ?? null}
-        triggerClassName={modalSelectTriggerClassName}
       />
 
       <SelectField
@@ -78,7 +75,6 @@ export function RadarrEditOptionsFields(
         onChange={value => onChange('minimumAvailability', value as RadarrMinimumAvailability)}
         options={RADARR_MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS}
         container={portalContainer ?? null}
-        triggerClassName={modalSelectTriggerClassName}
       />
 
       <ProviderTagField

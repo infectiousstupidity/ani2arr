@@ -2,16 +2,18 @@
 // src/features/media-modal/sonarr/sonarr-add-options-fields.tsx
 
 import React from 'react';
+import * as v from 'valibot';
 
-import { parseProviderQualityProfileId, type ProviderFormResources } from '@/providers';
+import { ProviderQualityProfileIdSchema } from "@/providers/schemas";
+import type { ProviderFormResources } from "@/providers/types";
 import type { SonarrFormState } from '@/providers/sonarr/form-state';
 import {
   SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,
 } from '@/providers/sonarr/form-options';
-import { SelectField } from '@/shared/ui/form/select-field';
-import { SwitchField } from '@/shared/ui/form/switch-field';
-import { ProviderTagField } from '@/shared/ui/provider-tag-field';
+import { SelectField } from '@/shared/ui/fields/select-field';
+import { SwitchField } from '@/shared/ui/fields/switch-field';
+import { ProviderTagField } from '@/providers/provider-tag-field';
 import { cn } from '@/shared/utils/cn';
 
 import { ProviderRootFolderSelect, type ProviderRootFolderPathPreview } from '../setup/provider-root-folder-select';
@@ -87,7 +89,6 @@ export function SonarrAddOptionsFields(
     pathPreview,
   } = props;
 
-  const modalSelectTriggerClassName = 'border border-border-primary/60 bg-bg-tertiary text-text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
   const qualityProfileOptions = formResources.qualityProfiles.map(profile => ({
     value: String(profile.id),
     label: profile.name,
@@ -102,7 +103,6 @@ export function SonarrAddOptionsFields(
         rootFolders={formResources.rootFolders}
         onChange={value => onChange('rootFolderPath', value)}
         portalContainer={portalContainer ?? null}
-        triggerClassName={modalSelectTriggerClassName}
         pathPreview={pathPreview}
       />
 
@@ -117,7 +117,6 @@ export function SonarrAddOptionsFields(
           })}
         options={SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS}
         container={portalContainer ?? null}
-        triggerClassName={modalSelectTriggerClassName}
       />
 
       <SelectField
@@ -126,12 +125,11 @@ export function SonarrAddOptionsFields(
         value={values.qualityProfileId === undefined ? '' : String(values.qualityProfileId)}
         onChange={value => {
           const num = Number(value);
-          onChange('qualityProfileId', !value || Number.isNaN(num) ? undefined : parseProviderQualityProfileId(num));
+          onChange('qualityProfileId', !value || Number.isNaN(num) ? undefined : v.parse(ProviderQualityProfileIdSchema, num));
         }}
         options={qualityProfileOptions}
         placeholder="Select a profile..."
         container={portalContainer ?? null}
-        triggerClassName={modalSelectTriggerClassName}
       />
 
       <SelectField
@@ -141,7 +139,6 @@ export function SonarrAddOptionsFields(
         onChange={value => onChange('seriesType', value as SonarrFormState['seriesType'])}
         options={SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS}
         container={portalContainer ?? null}
-        triggerClassName={modalSelectTriggerClassName}
       />
 
       <ProviderTagField

@@ -6,8 +6,8 @@ import {
 	QueryClient,
 	QueryClientProvider,
 } from "@tanstack/react-query";
-import { TooltipProvider } from "@radix-ui/react-tooltip";
-import { parseAniListIdOrNull } from "@/anilist/anilist-id";
+import * as Tooltip from "@radix-ui/react-tooltip";
+import { parseAniListIdOrNull } from "@/anilist/types";
 import {
 	createContentEntrypointShell,
 	type ContentEntrypointShellContext,
@@ -23,11 +23,13 @@ import {
 	ACTIONS_SELECTOR,
 	ANCHOR_ID,
 	SIDEBAR_SELECTOR,
+	TITLE_SELECTOR,
 	UI_NAME,
 	attachSizeSync,
 	ensureActionsAnchor,
 	removeLayoutArtifacts,
 	readFormatFromSidebar,
+	readTitleFromHeader,
 	startAnchorKeeper,
 	waitForElement,
 } from "./layout";
@@ -89,6 +91,7 @@ const isAnimePageShellEligible = async ({
 	await Promise.all([
 		waitForElement(ACTIONS_SELECTOR, { signal }),
 		waitForElement(SIDEBAR_SELECTOR, { signal }),
+		waitForElement(TITLE_SELECTOR, { signal }),
 	]);
 	return true;
 };
@@ -112,6 +115,7 @@ async function mountAnimePageUI({
 	const target: AnimePageTarget = {
 		anilistId,
 		format: readFormatFromSidebar(document),
+		title: readTitleFromHeader(document),
 	};
 
 	if (!isCurrent()) {
@@ -141,9 +145,9 @@ async function mountAnimePageUI({
 			root.render(
 				<ExtensionErrorBoundary scope="anilist-anime-root">
 					<QueryClientProvider client={queryClient}>
-						<TooltipProvider>
+						<Tooltip.Provider>
 							<ContentRoot target={target} />
-						</TooltipProvider>
+						</Tooltip.Provider>
 					</QueryClientProvider>
 				</ExtensionErrorBoundary>,
 			);

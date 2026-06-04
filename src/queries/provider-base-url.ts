@@ -2,9 +2,9 @@
 // src/queries/provider-base-url.ts
 
 import { useQuery } from "@tanstack/react-query";
-import type { Provider } from "@/providers";
+import type { Provider } from "@/providers/types";
 import { getAni2arrApi } from "@/rpc";
-import type { ExtensionError } from "@/shared/errors";
+import type { ExtensionError } from "@/shared/errors/error.types";
 import { queryKeys } from "./query-keys";
 
 export const useProviderBaseUrl = (

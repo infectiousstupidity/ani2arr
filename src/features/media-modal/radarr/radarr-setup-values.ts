@@ -1,18 +1,17 @@
 /** Pure Radarr setup target and default-value helpers for the media modal. */
 // src/features/media-modal/radarr/radarr-setup-values.ts
 
-import type { AniListId } from "@/anilist";
+import type { AniListId } from "@/anilist/types";
+import * as v from "valibot";
 import {
-	isRadarrMovieId,
 	parseTmdbIdOrNull,
-	type RadarrMovie,
-	type TmdbId,
-} from "@/providers";
-import {
-	normalizeRadarrFormState,
-	type RadarrFormState,
-} from "@/providers/radarr/form-state";
-import type { CheckMovieStatusResponse } from "@/rpc/types";
+	RadarrMovieIdSchema,
+} from "@/providers/schemas";
+import type { RadarrMovie } from "@/providers/radarr/types";
+import type { TmdbId } from "@/providers/schemas";
+import { normalizeRadarrFormState } from "@/providers/radarr/form-state";
+import type { RadarrFormState } from "@/providers/radarr/form-state";
+import type { GetMovieStatusOutput } from "@/rpc/types";
 import { areArraysEqual } from "../helpers";
 
 export type RadarrSetupTarget = {
@@ -33,7 +32,7 @@ export type RadarrSetupTarget = {
 
 type CreateRadarrSetupTargetInput = {
 	anilistId: AniListId;
-	status: CheckMovieStatusResponse | null | undefined;
+	status: GetMovieStatusOutput | null | undefined;
 	targetTitle: string;
 	storedDefaults: Partial<RadarrFormState> | null | undefined;
 	providerFolderName?: string | null | undefined;
@@ -51,7 +50,7 @@ const hasEditableRadarrFields = (value: Record<string, unknown>): boolean =>
 
 const isFullRadarrMovie = (value: unknown): value is RadarrMovie =>
 	isRecord(value) &&
-	isRadarrMovieId(value.id) &&
+	v.safeParse(RadarrMovieIdSchema, value.id).success &&
 	parseTmdbIdOrNull(value.tmdbId) !== null &&
 	typeof value.title === "string" &&
 	hasEditableRadarrFields(value);
@@ -66,8 +65,8 @@ function readProviderFolderName(value: unknown): string | undefined {
 }
 
 export function hasFullRadarrEditItem(
-	status: CheckMovieStatusResponse | null | undefined,
-): status is CheckMovieStatusResponse & { movie: RadarrMovie } {
+	status: GetMovieStatusOutput | null | undefined,
+): status is GetMovieStatusOutput & { movie: RadarrMovie } {
 	return status?.isInLibrary === true && isFullRadarrMovie(status.movie);
 }
 
@@ -109,9 +108,9 @@ export function isRadarrSetupDraftDirty(input: {
 
 export function canShowRadarrSetup(input: {
 	isConfigured: boolean;
-	status: CheckMovieStatusResponse | null | undefined;
+	status: GetMovieStatusOutput | null | undefined;
 }): boolean {
-	return input.isConfigured && input.status?.providerMappingState === "mapped";
+	return input.isConfigured && input.status?.mapping.kind === "mapped";
 }
 
 export function getRadarrSetupTarget({
@@ -135,13 +134,13 @@ export function getRadarrSetupTarget({
 	}
 
 	if (
-		status?.providerMappingState !== "mapped" ||
+		status?.mapping.kind !== "mapped" ||
 		status.isInLibrary !== false
 	) {
 		return null;
 	}
 
-	const tmdbId = parseTmdbIdOrNull(status.providerId);
+	const tmdbId = parseTmdbIdOrNull(status.mapping.providerId);
 	if (tmdbId === null) return null;
 
 	const lookupFolderName =

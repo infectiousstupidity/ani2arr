@@ -2,11 +2,11 @@
 // src/options-page/pages/mappings/mappings-anilist-row.tsx
 
 import { EyeOff, ImageOff, Loader2, RotateCcw, Unlink } from "lucide-react";
-import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
-import { resolveTitlePreference } from "@/anilist/title-preference";
-import type { AniListTitleLanguage } from "@/anilist/schemas/title-language.schema";
+import type { AniListMetadata } from "@/anilist/types";
+import { resolveTitlePreference } from "@/anilist/title";
+import type { AniListTitleLanguage } from "@/anilist/title";
+import Button from "@/shared/ui/primitives/button";
 import { cn } from "@/shared/utils/cn";
-import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/tooltip";
 import type {
 	ClearMatchAction,
@@ -18,8 +18,6 @@ import {
 	formatMappingEntryKind,
 	formatMappingStatusLabel,
 	formatProviderIdLabel,
-	getClearMatchAction,
-	getIgnoreAction,
 } from "./mapping-page-model";
 
 interface MappingsAniListRowProps {
@@ -70,6 +68,38 @@ const getClearMatchTitle = (action: ClearMatchAction): string => {
 	if (action.kind === "clear-manual") return "Clear manual match";
 	if (action.kind === "clear-rejected") return "Restore rejected candidate";
 	return "Not this match";
+};
+
+const getIgnoreAction = (row: MappingRow): IgnoreAction =>
+	row.result.kind === "ignored"
+		? { kind: "clear-ignore", anilistId: row.anilistId, provider: row.provider }
+		: { kind: "set-ignore", anilistId: row.anilistId, provider: row.provider };
+
+const getClearMatchAction = (row: MappingRow): ClearMatchAction | null => {
+	if (row.result.kind === "mapped" && row.result.source === "manual") {
+		return {
+			kind: "clear-manual",
+			anilistId: row.anilistId,
+			provider: row.provider,
+		};
+	}
+	if (row.result.kind === "mapped" && row.result.source === "auto") {
+		return {
+			kind: "reject-candidate",
+			anilistId: row.anilistId,
+			provider: row.provider,
+			providerId: row.result.providerId,
+		};
+	}
+	if (row.result.kind === "unmapped" && row.result.rejectedProviderIds?.[0]) {
+		return {
+			kind: "clear-rejected",
+			anilistId: row.anilistId,
+			provider: row.provider,
+			providerId: row.result.rejectedProviderIds[0],
+		};
+	}
+	return null;
 };
 
 export function MappingsAniListRow(
@@ -169,7 +199,7 @@ export function MappingsAniListRow(
 						showRowStatus && "mt-1",
 					)}
 				>
-					{formatMappingEntryKind(row.mappingEntryKind)}
+					{formatMappingEntryKind(row.result)}
 				</p>
 			</div>
 

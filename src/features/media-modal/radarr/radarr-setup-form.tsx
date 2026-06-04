@@ -2,13 +2,10 @@
 // src/features/media-modal/radarr/radarr-setup-form.tsx
 
 import { useState, type SubmitEvent } from "react";
-import type { AniListId } from "@/anilist";
-import type { AniListMediaHint } from "@/anilist/schemas/media.schema";
-import type { ProviderFormResources } from "@/providers";
-import {
-	normalizeRadarrFormState,
-	type RadarrFormState,
-} from "@/providers/radarr/form-state";
+import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { ProviderFormResources } from "@/providers/types";
+import { normalizeRadarrFormState } from "@/providers/radarr/form-state";
+import type { RadarrFormState } from "@/providers/radarr/form-state";
 import { useAddMovie, useUpdateMovie } from "@/queries/radarr";
 import { BaseProviderSetupPanel } from "../setup/provider-setup-panel";
 import type { ProviderRootFolderPathPreview } from "../setup/provider-root-folder-select";

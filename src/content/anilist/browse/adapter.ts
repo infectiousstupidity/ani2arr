@@ -1,8 +1,10 @@
 /** AniList browse surface adapter for card parsing and portal placement. */
 // src/content/anilist/browse/adapter.ts
 
-import { parseAniListIdOrNull } from '@/anilist/anilist-id';
-import { parseAniListMediaFormatLabel } from '@/anilist/schemas/media.schema';
+import {
+  parseAniListIdOrNull,
+  parseAniListMediaFormatLabel,
+} from '@/anilist/types';
 import type { BrowseAdapter, HostMediaTarget } from '@/content/browse/types';
 
 const CARD_SELECTOR = '.media-card';

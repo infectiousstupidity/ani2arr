@@ -5,7 +5,7 @@ import React from "react";
 import Button from "@/shared/ui/primitives/button";
 import { SquareArrowOutUpRight, ChevronDown } from "lucide-react";
 import { Dropdown, DropdownItem } from "@/shared/ui/primitives/dropdown";
-import type { Provider } from "@/providers";
+import type { Provider } from "@/providers/types";
 import { getProviderLabel } from "@/providers/provider-labels";
 import type { MediaActionState } from "@/features/media-action/state";
 
@@ -158,7 +158,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 			<MediaActionGroup>
 				<Button
 					data-testid="a2a-main-action-button"
-					size="md"
+					size="sm"
 					onClick={handlePrimaryAction}
 					isLoading={isLoading}
 					disabled={primaryDisabled}

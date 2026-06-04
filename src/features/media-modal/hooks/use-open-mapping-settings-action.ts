@@ -2,9 +2,9 @@
 // src/features/media-modal/hooks/use-open-mapping-settings-action.ts
 
 import { useCallback } from "react";
-import { browser } from "wxt/browser";
 
-import type { AniListId } from "@/anilist";
+import type { AniListId } from "@/anilist/types";
+import { openOptionsPage } from "@/rpc/runtime-messages";
 
 interface UseOpenMappingSettingsActionInput {
 	anilistId: AniListId;
@@ -16,14 +16,10 @@ export function useOpenMappingSettingsAction({
 	openSource,
 }: UseOpenMappingSettingsActionInput): (() => void) | null {
 	const openSettings = useCallback(() => {
-		void browser.runtime
-			.sendMessage({
-				_a2a: true,
-				type: "OPEN_OPTIONS_PAGE",
-				sectionId: "mappings",
-				targetAnilistId: anilistId,
-			})
-			.catch(() => {});
+		openOptionsPage({
+			sectionId: "mappings",
+			targetAnilistId: anilistId,
+		});
 	}, [anilistId]);
 
 	return openSource === "content" ? openSettings : null;

@@ -4,7 +4,7 @@
 import { useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { browser } from "wxt/browser";
-import type { Provider } from "@/providers";
+import type { Provider } from "@/providers/types";
 import { queryKeys } from "@/queries/query-keys";
 import {
 	MAPPINGS_REVISION_CHANGE_KEY,
@@ -22,7 +22,7 @@ export function useA2aBroadcasts(): void {
 	const refreshLibraryQueries = useCallback(
 		(provider: Provider) => {
 			queryClient.invalidateQueries({
-				queryKey: queryKeys.seriesStatusRoot(provider),
+				queryKey: queryKeys.mediaStatusProvider(provider),
 			});
 		},
 		[queryClient],

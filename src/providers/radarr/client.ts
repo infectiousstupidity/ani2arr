@@ -3,7 +3,8 @@
 
 import * as v from "valibot";
 
-import { createError, ErrorCode } from "@/shared/errors";
+import { createError } from "@/shared/errors/error-utils";
+import { ErrorCode } from "@/shared/errors/error.types";
 import { ProviderApiClient } from "../shared.client";
 import type { ProviderCredentials } from "../types";
 import type { RadarrAddMoviePayload } from "./add";

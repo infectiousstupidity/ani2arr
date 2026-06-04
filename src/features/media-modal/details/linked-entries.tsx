@@ -4,12 +4,14 @@
 import { LazyMotion, domAnimation, m } from "framer-motion";
 import { ExternalLink } from "lucide-react";
 import { useState } from "react";
-import type { AniListId } from "@/anilist";
-import { buildAniListAnimeUrl } from "@/anilist/anilist-links";
-import type { AniListMediaFormat } from "@/anilist/schemas/media.schema";
-import type { AniListMetadata } from "@/anilist/schemas/metadata.schema";
-import { resolveTitlePreference } from "@/anilist/title-preference";
-import type { MappingDetailsPayload } from "@/mapping/queries/mapping-details";
+import type {
+	AniListId,
+	AniListMediaFormat,
+	AniListMetadata,
+} from "@/anilist/types";
+import { buildAniListAnimeUrl, resolveTitlePreference } from "@/anilist/title";
+import type { Provider } from "@/providers/types";
+import type { MappingDetailsPayload } from "@/rpc/types";
 import { useAniListMetadataBatch } from "@/queries/anilist";
 import { formatToken } from "../helpers";
 
@@ -17,6 +19,7 @@ type MappingDetailsLinkedAniListEntry =
 	MappingDetailsPayload["linkedAniListEntries"][number];
 
 interface MappingLinkedEntriesProps {
+	provider: Provider;
 	currentAniListId: AniListId;
 	linkedAniListIds?: readonly AniListId[];
 	entries?: readonly MappingDetailsLinkedAniListEntry[];
@@ -123,7 +126,8 @@ function titleFromMetadata(
 export function MappingLinkedEntries(
 	props: MappingLinkedEntriesProps,
 ): React.JSX.Element | null {
-	const { currentAniListId, linkedAniListIds = [], entries = [] } = props;
+	const { provider, currentAniListId, linkedAniListIds = [], entries = [] } =
+		props;
 	const visibleEntries = entries.filter(
 		(entry) =>
 			entry.anilistId !== currentAniListId && entry.relation !== "current",
@@ -141,7 +145,6 @@ export function MappingLinkedEntries(
 		: [];
 	const metadataQuery = useAniListMetadataBatch(uniqueLinkedIds, {
 		enabled: shouldFetchMetadata,
-		refreshStale: false,
 	});
 
 	if (visibleEntries.length === 0 && uniqueLinkedIds.length === 0) {
@@ -181,11 +184,13 @@ export function MappingLinkedEntries(
 					};
 				});
 	const rowsKey = rows.map((row) => row.anilistId).join(":");
+	const providerTargetLabel =
+		provider === "sonarr" ? "Sonarr series" : "Radarr movie";
 
 	return (
 		<section className="flex flex-col gap-2 border-t border-border-primary/50 pt-4">
 			<p className="shrink-0 text-xs font-semibold text-text-primary">
-				{`Mapped AniList Entries (${rows.length})`}
+				{`AniList ID's also mapped to this ${providerTargetLabel} (${rows.length})`}
 			</p>
 			<LazyMotion features={domAnimation}>
 				<m.div

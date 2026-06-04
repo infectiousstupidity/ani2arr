@@ -1,8 +1,7 @@
 /** Browse card and adapter contracts owned by content-surface overlays. */
 // src/content/browse/types.ts
 
-import type { AniListId } from '@/anilist';
-import type { AniListMediaFormat } from '@/anilist/schemas/media.schema';
+import type { AniListId, AniListMediaFormat } from '@/anilist/types';
 
 export const BROWSE_OVERLAY_CONTAINER_CLASS = 'a2a-overlay-container';
 export const BROWSE_PROCESSED_ATTRIBUTE = 'data-a2a-processed';

@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import { browser } from "wxt/browser";
 import {
 	PUBLIC_OPTIONS_CHANGE_KEY,
-	createDefaultExtensionOptions,
 	getExtensionOptionsSnapshot,
 	getPublicOptionsSnapshot,
 	parseExtensionOptions,
@@ -14,8 +13,9 @@ import {
 	savePublicOptionsSnapshot,
 	toPublicOptions,
 	watchPublicOptionsSnapshot,
-} from "@/settings";
-import type { PublicOptions } from "@/settings";
+} from "@/settings/store";
+import { createDefaultExtensionOptions } from "@/settings/schema";
+import type { PublicOptions } from "@/settings/types";
 
 const PUBLIC_OPTIONS_STORAGE_KEY = "publicOptions";
 const SONARR_SECRETS_STORAGE_KEY = "sonarrSecrets";

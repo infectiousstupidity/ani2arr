@@ -1,14 +1,17 @@
 /** Background-owned provider configuration access for required and optional credentials. */
 // src/background/api/provider-config.ts
 
-import {
-	getExtensionOptionsSnapshot,
-	getProviderCredentials,
-	type ExtensionOptions,
-} from "@/settings";
-import type { Provider, ProviderCredentials } from "@/providers";
+import { getExtensionOptionsSnapshot } from "@/settings/store";
+import { getProviderCredentials } from "@/settings/provider-config";
+import type { ExtensionOptions } from "@/settings/types";
+import type {
+	Provider,
+	ProviderCredentials,
+} from "@/providers/types";
 import { getProviderLabel } from "@/providers/provider-labels";
-import { createError, ErrorCode, type ExtensionError } from "@/shared/errors";
+import { createError } from "@/shared/errors/error-utils";
+import { ErrorCode } from "@/shared/errors/error.types";
+import type { ExtensionError } from "@/shared/errors/error.types";
 
 export type ConfiguredProvider = {
 	credentials: ProviderCredentials;

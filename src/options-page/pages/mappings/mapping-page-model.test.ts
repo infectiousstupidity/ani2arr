@@ -2,21 +2,17 @@
 // src/options-page/pages/mappings/mapping-page-model.test.ts
 
 import { describe, expect, it } from "vitest";
-import { parseAniListId, type AniListId } from "@/anilist";
-import {
-	parseTmdbId,
-	parseTvdbId,
-} from "@/providers";
+import { parseAniListId, type AniListId } from "@/anilist/types";
+import { parseTvdbId } from "@/providers/schemas";
 import type { MappingGroup, MappingRow } from "./mapping-page-model";
 import {
-	flattenMappingGroupsForVirtualList,
-	getClearMatchAction,
+	getMappingListModel,
+	isMappingGroupExpanded,
 	readTargetAniListIdFromHash,
 } from "./mapping-page-model";
 
 const aid = parseAniListId;
 const tvdb = parseTvdbId;
-const tmdb = parseTmdbId;
 
 const createRow = (
 	patch: Partial<MappingRow> & {
@@ -29,10 +25,9 @@ const createRow = (
 		anilistId,
 		provider,
 		providerId: null,
-		providerMappingState: "unmapped",
+		result: { kind: "unmapped", hadResolveAttempt: false },
 		isInLibrary: null,
 		mappingRowStatus: "unmapped",
-		mappingEntryKind: "unmapped",
 		...rest,
 	};
 };
@@ -61,43 +56,12 @@ const createGroup = (
 		providerId,
 		rows,
 		linkedAniListIds,
-		linkedCount: linkedAniListIds.length,
 		isInLibrary: null,
 		...rest,
 	};
 };
 
 describe("mapping page model", () => {
-	it("flattens expanded groups into virtual headers and rows", () => {
-		const collapsedGroup = createGroup({
-			key: "sonarr:10",
-			provider: "sonarr",
-			providerId: tvdb(10),
-			rows: [
-				createRow({ anilistId: aid(1), provider: "sonarr" }),
-				createRow({ anilistId: aid(2), provider: "sonarr" }),
-			],
-		});
-		const expandedGroup = createGroup({
-			key: "radarr:20",
-			provider: "radarr",
-			providerId: tmdb(20),
-			rows: [createRow({ anilistId: aid(3), provider: "radarr" })],
-		});
-
-		const items = flattenMappingGroupsForVirtualList({
-			groups: [collapsedGroup, expandedGroup],
-			collapsedGroupKeys: new Set(["sonarr:10"]),
-			highlightedAniListId: null,
-		});
-
-		expect(items.map((item) => item.key)).toEqual([
-			"group:sonarr:10",
-			"group:radarr:20",
-			"row:radarr:20:radarr:3",
-		]);
-	});
-
 	it("keeps highlighted collapsed groups expanded", () => {
 		const group = createGroup({
 			key: "sonarr:10",
@@ -109,57 +73,42 @@ describe("mapping page model", () => {
 			],
 		});
 
-		const items = flattenMappingGroupsForVirtualList({
-			groups: [group],
-			collapsedGroupKeys: new Set(["sonarr:10"]),
-			highlightedAniListId: aid(2),
-		});
-
-		expect(items).toHaveLength(3);
+		expect(
+			isMappingGroupExpanded(group, new Set(["sonarr:10"]), aid(2)),
+		).toBe(true);
 	});
 
-	it("resolves clear-match actions only for persistent user-owned decisions", () => {
-		const manual = createRow({
-			anilistId: aid(1),
+	it("flattens loaded groups and only requests metadata for visible rows", () => {
+		const expanded = createGroup({
+			key: "sonarr:10",
 			provider: "sonarr",
-			providerId: tvdb(100),
-			mappingEntryKind: "manual",
-			providerMappingState: "mapped",
+			providerId: tvdb(10),
+			rows: [
+				createRow({ anilistId: aid(1), provider: "sonarr" }),
+				createRow({ anilistId: aid(2), provider: "sonarr" }),
+			],
 		});
-		const auto = createRow({
-			anilistId: aid(2),
+		const collapsed = createGroup({
+			key: "sonarr:20",
 			provider: "sonarr",
-			providerId: tvdb(200),
-			mappingEntryKind: "auto",
-			providerMappingState: "mapped",
-		});
-		const rejected = createRow({
-			anilistId: aid(3),
-			provider: "radarr",
-			mappingEntryKind: "rejected",
-			suppressedProviderId: tmdb(300),
-		});
-		const upstream = createRow({
-			anilistId: aid(4),
-			provider: "radarr",
-			providerId: tmdb(400),
-			mappingEntryKind: "upstream",
-			providerMappingState: "mapped",
+			providerId: tvdb(20),
+			rows: [createRow({ anilistId: aid(3), provider: "sonarr" })],
 		});
 
-		expect(getClearMatchAction(manual)).toMatchObject({
-			kind: "clear-manual",
-			anilistId: aid(1),
+		const result = getMappingListModel({
+			groups: [expanded, collapsed],
+			collapsedGroupKeys: new Set(["sonarr:20"]),
+			highlightedAniListId: null,
 		});
-		expect(getClearMatchAction(auto)).toMatchObject({
-			kind: "reject-candidate",
-			providerId: tvdb(200),
-		});
-		expect(getClearMatchAction(rejected)).toMatchObject({
-			kind: "clear-rejected",
-			providerId: tmdb(300),
-		});
-		expect(getClearMatchAction(upstream)).toBeNull();
+
+		expect(result.items.map((item) => item.kind)).toEqual([
+			"group",
+			"row",
+			"row",
+			"group",
+		]);
+		expect(result.loadedRowCount).toBe(3);
+		expect(result.visibleAniListIds).toEqual([aid(1), aid(2)]);
 	});
 
 	it("reads target AniList ID from options-page hash query", () => {
