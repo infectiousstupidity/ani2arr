@@ -20,7 +20,9 @@ export function getProviderHostPermissionPattern(
 		return normalized;
 	}
 
-	return { ok: true, value: `${normalized.value.origin}/*` };
+	const parsed = new URL(normalized.value.normalizedUrl);
+	// Browser host-permission match patterns do not include ports or URL paths.
+	return { ok: true, value: `${parsed.protocol}//${parsed.hostname}/*` };
 }
 
 export async function requestProviderHostPermission(
@@ -48,7 +50,7 @@ export async function requestProviderHostPermission(
 		} catch {
 			return {
 				ok: false as const,
-				error: `Permission request for origin '${pattern.value}' failed unexpectedly.`,
+				error: `Permission request for host '${pattern.value}' failed unexpectedly.`,
 			};
 		} finally {
 			pendingPermissionRequests.delete(pattern.value);
@@ -76,7 +78,7 @@ export async function hasProviderHostPermission(
 	} catch {
 		return {
 			ok: false,
-			error: `Permission check for origin '${pattern.value}' failed unexpectedly.`,
+			error: `Permission check for host '${pattern.value}' failed unexpectedly.`,
 		};
 	}
 }
@@ -100,7 +102,7 @@ export async function removeProviderHostPermission(
 	} catch {
 		return {
 			ok: false,
-			error: `Permission removal for origin '${pattern.value}' failed unexpectedly.`,
+			error: `Permission removal for host '${pattern.value}' failed unexpectedly.`,
 		};
 	}
 }

@@ -2,6 +2,7 @@
 // src/settings/provider-permissions.ts
 
 import {
+	getProviderHostPermissionPattern,
 	removeProviderHostPermission,
 	requestProviderHostPermission,
 } from "@/providers/settings/host-permissions";
@@ -10,27 +11,29 @@ import type { ExtensionOptions } from "./types";
 export const requestProviderConnectionPermission = (url: string) =>
 	requestProviderHostPermission(url);
 
+function getPermissionPattern(url: string | undefined): string | null {
+	if (!url) return null;
+
+	const pattern = getProviderHostPermissionPattern(url);
+	return pattern.ok ? pattern.value : null;
+}
+
 export async function cleanupUnusedProviderHostPermission(
 	oldUrl: string | undefined,
 	newSettings: ExtensionOptions,
 ) {
 	if (!oldUrl) return;
 
-	try {
-		const oldOrigin = new URL(oldUrl).origin;
-		const sonarrOrigin = newSettings.providers.sonarr.url
-			? new URL(newSettings.providers.sonarr.url).origin
-			: null;
-		const radarrOrigin = newSettings.providers.radarr.url
-			? new URL(newSettings.providers.radarr.url).origin
-			: null;
+	const oldPattern = getPermissionPattern(oldUrl);
+	if (!oldPattern) return;
 
-		if (oldOrigin === sonarrOrigin || oldOrigin === radarrOrigin) {
-			return;
-		}
-
-		await removeProviderHostPermission(oldUrl);
-	} catch {
-		// Ignore malformed old URLs; they cannot map to a removable permission.
+	const activePatterns = [
+		getPermissionPattern(newSettings.providers.sonarr.url),
+		getPermissionPattern(newSettings.providers.radarr.url),
+	];
+	if (activePatterns.includes(oldPattern)) {
+		return;
 	}
+
+	await removeProviderHostPermission(oldUrl);
 }

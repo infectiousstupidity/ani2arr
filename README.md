@@ -67,9 +67,9 @@ pnpm run zip:firefox
 ```
 
 ## Security & privacy
-- Sonarr and Radarr credentials are stored in `browser.storage.local` on the user's device. See [`src/shared/providers/common/validation.ts`](src/shared/providers/common/validation.ts) for shared URL, API key, and permission validation helpers, plus the provider-specific wrappers in [`src/shared/providers/sonarr/validation.ts`](src/shared/providers/sonarr/validation.ts) and [`src/shared/providers/radarr/validation.ts`](src/shared/providers/radarr/validation.ts).
+- Sonarr and Radarr credentials are stored in `browser.storage.local` on the user's device. See [`src/providers/settings/provider-connection.validation.ts`](src/providers/settings/provider-connection.validation.ts) and [`src/providers/settings/host-permissions.ts`](src/providers/settings/host-permissions.ts) for URL, API key, and permission helpers.
 - The extension does not use a developer-operated backend or analytics service.
-- Firefox host access is requested for the exact Sonarr or Radarr origin the user enters in settings. Broad optional host patterns are declared only so Firefox can grant those user-chosen origins at runtime.
+- Host access is requested for the configured provider scheme and host. Browser host permissions do not isolate by subfolder, and Firefox cannot isolate by port; API requests still use the exact configured URL.
 - See [`PRIVACY.md`](PRIVACY.md) for the user-facing privacy policy.
 
 ## Maintenance

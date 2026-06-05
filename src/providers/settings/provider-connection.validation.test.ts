@@ -31,6 +31,15 @@ describe("normalizeProviderConnectionUrl", () => {
 		);
 	});
 
+	it("preserves non-default ports and subfolders for API URLs", () => {
+		expect(
+			validateProviderConnectionUrl("https://arr.example:8443/radarr///"),
+		).toEqual({
+			ok: true,
+			value: "https://arr.example:8443/radarr",
+		});
+	});
+
 	it("rejects unsupported URL shapes", () => {
 		expect(validateProviderConnectionUrl("")).toEqual({
 			ok: false,
