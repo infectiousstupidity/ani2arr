@@ -33,7 +33,7 @@ interface CardOverlayProps {
 	onOpenSetup(): void;
 	showMappingAction: boolean;
 	onOpenMapping(): void;
-	externalHref: string | null;
+	openProvider: (() => void) | null;
 	badgeVisibility?: BadgeVisibility | undefined;
 	stackDirection?: "up" | "down" | undefined;
 	tooltipContainer?: HTMLElement | ShadowRoot | null | undefined;
@@ -55,6 +55,8 @@ function withSwallow<T extends SyntheticEvent>(fn?: () => void) {
 	return (event: T) => {
 		event.preventDefault();
 		event.stopPropagation();
+		if (!event.isTrusted) return;
+
 		fn?.();
 	};
 }
@@ -63,8 +65,9 @@ function stopOverlayEvent(event: SyntheticEvent): void {
 	event.stopPropagation();
 }
 
-function openExternalHref(href: string): void {
-	try { window.open(href, "_blank", "noopener"); } catch { /* ignore */ }
+function swallowEvent(event: SyntheticEvent): void {
+	event.preventDefault();
+	event.stopPropagation();
 }
 
 export function CardOverlay({
@@ -79,7 +82,7 @@ export function CardOverlay({
 	onOpenSetup,
 	showMappingAction,
 	onOpenMapping,
-	externalHref,
+	openProvider,
 	badgeVisibility = "always",
 	stackDirection = "up",
 	tooltipContainer,
@@ -90,7 +93,6 @@ export function CardOverlay({
 		tooltipContainer ?? (typeof document === "undefined" ? null : document.body);
 	const manualMappingLabel = hasMapping ? "Update mapping manually" : "Find match manually";
 
-	const swallow = withSwallow();
 	const openStack = () => {
 		if (closeTimerRef.current !== null) {
 			globalThis.clearTimeout(closeTimerRef.current);
@@ -123,7 +125,7 @@ export function CardOverlay({
 				className="a2a-card-overlay__action a2a-card-overlay__action--advanced"
 				aria-label={`Open ${providerLabel} setup`}
 				onClick={withSwallow(onOpenSetup)}
-				onMouseDown={swallow}
+				onMouseDown={swallowEvent}
 			>
 				<SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
 			</button>
@@ -137,21 +139,21 @@ export function CardOverlay({
 				className="a2a-card-overlay__action a2a-card-overlay__action--fix"
 				aria-label={manualMappingLabel}
 				onClick={withSwallow(onOpenMapping)}
-				onMouseDown={swallow}
+				onMouseDown={swallowEvent}
 			>
 				<Wrench aria-hidden="true" className="h-4 w-4" />
 			</button>
 		</TooltipWrapper>
 	) : null;
 
-	const externalAction = externalHref ? (
+	const externalAction = openProvider ? (
 		<TooltipWrapper content={`Open in ${providerLabel}`} side="right" align="center" sideOffset={6} container={resolvedTooltipContainer} showArrow={false}>
 			<button
 				type="button"
 				className="a2a-card-overlay__action a2a-card-overlay__action--external"
 				aria-label={`Open in ${providerLabel}`}
-				onClick={withSwallow(() => openExternalHref(externalHref))}
-				onMouseDown={swallow}
+				onClick={withSwallow(openProvider)}
+				onMouseDown={swallowEvent}
 			>
 				<SquareArrowOutUpRight aria-hidden="true" className="h-4 w-4" />
 			</button>
@@ -186,7 +188,7 @@ export function CardOverlay({
 						data-state={primaryState}
 						aria-label={primaryAriaLabel}
 						onClick={withSwallow(onPrimaryAction)}
-						onMouseDown={swallow}
+						onMouseDown={swallowEvent}
 						disabled={primaryDisabled}
 						aria-disabled={primaryDisabled || undefined}
 					>

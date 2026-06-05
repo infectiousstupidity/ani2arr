@@ -142,6 +142,7 @@ export function MappingSearchShell(
 
 	const handleSubmit = (event: SubmitEvent<HTMLFormElement>): void => {
 		event.preventDefault();
+		if (!event.isTrusted) return;
 		if (!canSearch) return;
 
 		onSearch(trimmedQuery);

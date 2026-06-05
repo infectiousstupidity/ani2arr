@@ -44,8 +44,6 @@ export const queryKeys = {
 	all: rootQueryKey,
 	options: () => [...rootQueryKey, "options"] as const,
 	publicOptions: () => [...rootQueryKey, "publicOptions"] as const,
-	providerBaseUrl: (provider: Provider) =>
-		[...rootQueryKey, "providerBaseUrl", provider] as const,
 	aniListMedia: (anilistId: AniListId) =>
 		[...rootQueryKey, "aniListMedia", anilistId] as const,
 	mediaStatusProvider: (provider: Provider) => mediaStatusProviderKey(provider),

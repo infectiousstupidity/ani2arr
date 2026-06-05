@@ -7,9 +7,10 @@ import {
 	getProviderExternalIdLabel,
 	getProviderLabel,
 } from "@/providers/provider-labels";
-import { buildProviderOpenUrl } from "@/providers/provider-links";
+import { getProviderOpenTarget } from "@/providers/provider-links";
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import type { RadarrLookupMovie } from "@/providers/radarr/types";
+import { openProviderPage } from "@/rpc/provider-page";
 import { useRadarrLookupSearch } from "@/queries/radarr";
 import { MappingCandidateRow } from "../mapping/mapping-search-results";
 import { MappingSearchShell } from "../mapping/mapping-search-shell";
@@ -23,7 +24,6 @@ export type RadarrMappingCandidate = {
 };
 
 type RadarrMappingPanelProps = {
-	baseUrl: string;
 	contentContainer: HTMLDivElement | null;
 	currentTarget: MediaModalTargetSummary | null;
 	selectedCandidate: RadarrMappingCandidate | null;
@@ -34,7 +34,6 @@ const PROVIDER = "radarr" as const;
 
 function buildCandidate(input: {
 	movie: RadarrLookupMovie;
-	baseUrl: string;
 	libraryTmdbIds: number[];
 	linkedAniListIdsByTmdbId: Record<number, number[]> | undefined;
 }): RadarrMappingCandidate {
@@ -43,7 +42,7 @@ function buildCandidate(input: {
 	const providerRouteSlug = isInLibrary
 		? (getProviderRouteSlug(PROVIDER, input.movie) ?? undefined)
 		: undefined;
-	const posterUrl = pickProviderPoster(input.movie, input.baseUrl);
+	const posterUrl = pickProviderPoster(input.movie);
 	const linkedAniListIds = normalizeLinkedAniListIds(
 		input.linkedAniListIdsByTmdbId?.[tmdbId],
 	);
@@ -75,21 +74,6 @@ function buildCandidate(input: {
 	return { tmdbId, result: input.movie, summary };
 }
 
-function getResultLink(input: {
-	candidate: RadarrMappingCandidate;
-	baseUrl: string;
-}): string | null {
-	return buildProviderOpenUrl({
-		provider: PROVIDER,
-		baseUrl: input.baseUrl,
-		isInLibrary: input.candidate.summary.isInLibrary,
-		...(input.candidate.summary.providerRouteSlug
-			? { providerRouteSlug: input.candidate.summary.providerRouteSlug }
-			: {}),
-		searchTerm: input.candidate.summary.title,
-	});
-}
-
 function getLibraryLabel(input: {
 	candidate: RadarrMappingCandidate;
 	providerLabel: string;
@@ -108,7 +92,6 @@ export function RadarrMappingPanel(
 	props: RadarrMappingPanelProps,
 ): React.JSX.Element {
 	const {
-		baseUrl,
 		contentContainer,
 		currentTarget,
 		selectedCandidate,
@@ -126,12 +109,11 @@ export function RadarrMappingPanel(
 			search.data?.results.map((movie) =>
 				buildCandidate({
 					movie,
-					baseUrl,
 					libraryTmdbIds: search.data?.libraryTmdbIds ?? [],
 					linkedAniListIdsByTmdbId: search.data?.linkedAniListIdsByTmdbId,
 				}),
 			) ?? [],
-		[baseUrl, search.data],
+		[search.data],
 	);
 	const candidatePosterUrls = useMemo(
 		() =>
@@ -170,7 +152,16 @@ export function RadarrMappingPanel(
 						providerId={summary.providerId}
 						contentContainer={contentContainer}
 						externalLabel={externalLabel}
-						externalUrl={getResultLink({ candidate, baseUrl })}
+						openProvider={() => {
+							openProviderPage({
+								provider: PROVIDER,
+								target: getProviderOpenTarget({
+									isInLibrary: summary.isInLibrary,
+									providerRouteSlug: summary.providerRouteSlug,
+									searchTerm: summary.title,
+								}),
+							});
+						}}
 						isCurrent={currentTarget?.providerId === candidate.tmdbId}
 						isSelected={isSelected}
 						libraryLabel={getLibraryLabel({ candidate, providerLabel })}

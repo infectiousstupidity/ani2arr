@@ -34,14 +34,12 @@ interface ProviderConnectionActionsOptions {
 
 const SONARR_QUERY_ROOTS = [
 	queryKeys.sonarrConnectionRoot(),
-	queryKeys.providerBaseUrl("sonarr"),
 	queryKeys.mediaStatusProvider("sonarr"),
 	queryKeys.mappingSearchRoot("sonarr"),
 ] as const;
 
 const RADARR_QUERY_ROOTS = [
 	queryKeys.radarrConnectionRoot(),
-	queryKeys.providerBaseUrl("radarr"),
 	queryKeys.mediaStatusProvider("radarr"),
 	queryKeys.mappingSearchRoot("radarr"),
 ] as const;

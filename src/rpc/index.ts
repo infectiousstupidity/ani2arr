@@ -39,8 +39,9 @@ import type {
 	GetMappingInspectionInput,
 	GetAniListMetadataInput,
 	ProviderConnectionTestInput,
-	GetProviderBaseUrlInput,
 	NotifyProviderConnectionChangedInput,
+	OpenProviderPageInput,
+	OpenProviderPageOutput,
 } from "./types";
 
 export interface Ani2arrApi {
@@ -61,7 +62,7 @@ export interface Ani2arrApi {
 	testRadarrConnection(
 		input: ProviderConnectionTestInput,
 	): Promise<{ version: string }>;
-	getProviderBaseUrl(input: GetProviderBaseUrlInput): Promise<string>;
+	openProviderPage(input: OpenProviderPageInput): Promise<OpenProviderPageOutput>;
 	getSonarrFormResources(
 		input?: GetProviderFormResourcesInput,
 	): Promise<ProviderFormResources>;

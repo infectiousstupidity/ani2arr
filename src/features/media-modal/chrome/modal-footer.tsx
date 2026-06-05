@@ -126,7 +126,11 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 			<FooterButtonSlot key="ignore-title">
 				<Button
 					type="button"
-					onClick={() => void onIgnoreTitle()}
+					onClick={(event) => {
+						if (!event.isTrusted) return;
+
+						void onIgnoreTitle();
+					}}
 					variant="outline"
 					size="sm"
 					className={FOOTER_AUX_BUTTON_CLASS}
@@ -141,7 +145,11 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 			<FooterButtonSlot key="reject-candidate">
 				<Button
 					type="button"
-					onClick={() => void onRejectCandidate()}
+					onClick={(event) => {
+						if (!event.isTrusted) return;
+
+						void onRejectCandidate();
+					}}
 					variant="outline"
 					size="sm"
 					className={FOOTER_AUX_BUTTON_CLASS}
@@ -156,7 +164,11 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 			<FooterButtonSlot key="clear-rejected">
 				<Button
 					type="button"
-					onClick={() => void onClearRejectedCandidate()}
+					onClick={(event) => {
+						if (!event.isTrusted) return;
+
+						void onClearRejectedCandidate();
+					}}
 					variant="outline"
 					size="sm"
 					className={FOOTER_AUX_BUTTON_CLASS}
@@ -170,7 +182,11 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 		manualMappingActive ? (
 			<FooterButtonSlot key="reset-mapping">
 				<Button
-					onClick={() => void onResetMapping()}
+					onClick={(event) => {
+						if (!event.isTrusted) return;
+
+						void onResetMapping();
+					}}
 					variant="outline"
 					size="sm"
 					className={FOOTER_AUX_BUTTON_CLASS}
@@ -194,7 +210,11 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 		</FooterButtonSlot>,
 		<FooterButtonSlot key="apply-mapping">
 			<Button
-				onClick={() => void onApplyMapping()}
+				onClick={(event) => {
+					if (!event.isTrusted) return;
+
+					void onApplyMapping();
+				}}
 				variant="primary"
 				size="sm"
 				className={FOOTER_BUTTON_CLASS}

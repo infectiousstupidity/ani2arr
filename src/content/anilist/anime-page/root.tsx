@@ -166,7 +166,7 @@ function SonarrAnimePageActions({
 			errorSource={mediaAction.status.errorSource}
 			hasMapping={mediaAction.status.hasMapping}
 			disabled={mediaAction.status.disabled}
-			externalHref={mediaAction.externalHref}
+			openProvider={mediaAction.openProvider}
 			onPrimaryAction={mediaAction.runPrimaryAction}
 			onOpenSetup={onOpenSetup}
 			onOpenMapping={onOpenMapping}
@@ -209,7 +209,7 @@ function RadarrAnimePageActions({
 			errorSource={mediaAction.status.errorSource}
 			hasMapping={mediaAction.status.hasMapping}
 			disabled={mediaAction.status.disabled}
-			externalHref={mediaAction.externalHref}
+			openProvider={mediaAction.openProvider}
 			onPrimaryAction={mediaAction.runPrimaryAction}
 			onOpenSetup={onOpenSetup}
 			onOpenMapping={onOpenMapping}

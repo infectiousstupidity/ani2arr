@@ -1,8 +1,8 @@
 /** Dumb media modal header with AniList and provider identity cards. */
 // src/features/media-modal/chrome/modal-header.tsx
 
-import { Settings, X } from "lucide-react";
-import type { MouseEventHandler } from "react";
+import { ExternalLink, Settings, X } from "lucide-react";
+import type { MouseEvent, MouseEventHandler } from "react";
 import type { AniListId } from "@/anilist/types";
 import { buildAniListAnimeUrl } from "@/anilist/title";
 import type { Provider } from "@/providers/types";
@@ -10,7 +10,8 @@ import {
 	formatProviderExternalId,
 	getProviderLabel,
 } from "@/providers/provider-labels";
-import { buildProviderOpenUrl } from "@/providers/provider-links";
+import { getProviderOpenTarget } from "@/providers/provider-links";
+import { openProviderPage } from "@/rpc/provider-page";
 import Button from "@/shared/ui/primitives/button";
 import { cn } from "@/shared/utils/cn";
 import { formatToken } from "../helpers";
@@ -26,7 +27,6 @@ import {
 
 export type ModalHeaderProps = {
 	provider: Provider;
-	baseUrl: string;
 	contentContainer: HTMLDivElement | null;
 	anilistHeaderData: AniListHeaderData;
 	anilistId: AniListId;
@@ -130,7 +130,6 @@ function SourceCard(props: {
 
 type ProviderCardProps = {
 	provider: Provider;
-	baseUrl: string;
 	target: MediaModalTargetSummary | null;
 	isLoading: boolean;
 	isDimmed: boolean;
@@ -176,17 +175,18 @@ function ProviderCardContent(props: {
 	providerLabel: string;
 	providerMetaLine: string | null;
 	providerIdLine: string | null;
-	providerLink: string | null;
+	openProvider: MouseEventHandler<HTMLButtonElement> | null;
 }): React.JSX.Element {
 	const {
 		display,
 		providerLabel,
 		providerMetaLine,
 		providerIdLine,
-		providerLink,
+		openProvider,
 	} = props;
 	const hasProviderMeta =
-		providerMetaLine !== null || (providerIdLine !== null && providerLink !== null);
+		providerMetaLine !== null ||
+		(providerIdLine !== null && openProvider !== null);
 
 	return (
 		<div
@@ -211,15 +211,17 @@ function ProviderCardContent(props: {
 						</p>
 					) : null}
 
-					{providerIdLine && providerLink ? (
+					{providerIdLine && openProvider ? (
 						<div className="mt-0.5 flex min-w-0 justify-end">
-							<MappingOpenLink
-								href={providerLink}
-								ariaLabel={`Open in ${providerLabel}`}
-								side="right"
+							<button
+								type="button"
+								onClick={openProvider}
+								className="ml-auto flex w-fit max-w-full items-center gap-1 text-[10px] leading-tight font-medium text-text-secondary transition-colors hover:text-accent-primary focus-visible:text-accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary md:text-xs"
+								aria-label={`Open in ${providerLabel}`}
 							>
-								{providerIdLine}
-							</MappingOpenLink>
+								<span className="truncate">{providerIdLine}</span>
+								<ExternalLink className="h-3 w-3 shrink-0 md:h-3.5 md:w-3.5" />
+							</button>
 						</div>
 					) : null}
 				</div>
@@ -229,7 +231,13 @@ function ProviderCardContent(props: {
 }
 
 function ProviderCard(props: ProviderCardProps): React.JSX.Element {
-	const { provider, baseUrl, target, isLoading, isDimmed, isHighlighted } = props;
+	const {
+		provider,
+		target,
+		isLoading,
+		isDimmed,
+		isHighlighted,
+	} = props;
 
 	const providerLabel = getProviderLabel(provider);
 	const display = getProviderCardDisplay({
@@ -252,16 +260,19 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 			)
 		: null;
 
-	const providerLink = target
-		? buildProviderOpenUrl({
-				provider,
-				baseUrl,
+	const providerOpenTarget = target
+		? getProviderOpenTarget({
 				isInLibrary: target.isInLibrary,
-				...(target.providerRouteSlug
-					? { providerRouteSlug: target.providerRouteSlug }
-					: {}),
+				providerRouteSlug: target.providerRouteSlug,
 				searchTerm: target.title,
 			})
+		: null;
+	const openProvider = providerOpenTarget
+		? (event: MouseEvent<HTMLButtonElement>): void => {
+				if (!event.isTrusted) return;
+
+				openProviderPage({ provider, target: providerOpenTarget });
+			}
 		: null;
 
 	const posterUrl = target?.posterUrl ?? null;
@@ -287,7 +298,7 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 						providerLabel={providerLabel}
 						providerMetaLine={providerMetaLine}
 						providerIdLine={providerIdLine}
-						providerLink={providerLink}
+						openProvider={openProvider}
 					/>
 				</div>
 
@@ -300,7 +311,6 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 	const {
 		provider,
-		baseUrl,
 		contentContainer,
 		anilistHeaderData,
 		anilistId,
@@ -348,6 +358,8 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 						type="button"
 						onClick={(event) => {
 							event.stopPropagation();
+							if (!event.isTrusted) return;
+
 							onOpenSettings();
 						}}
 						variant="ghost"
@@ -392,7 +404,6 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 					<div className="a2a-modal-header-item a2a-delay-100 min-w-0">
 						<ProviderCard
 							provider={provider}
-							baseUrl={baseUrl}
 							target={target}
 							isLoading={isProviderTargetLoading && target === null}
 							isDimmed={isCurrentTargetDimmed}

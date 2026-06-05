@@ -4,7 +4,7 @@
 import { main } from '@/content/anichart/browse';
 
 export default defineContentScript({
-  matches: ['*://anichart.net/*', '*://www.anichart.net/*'],
+  matches: ['https://anichart.net/*', 'https://www.anichart.net/*'],
   cssInjectionMode: 'ui',
   main,
 });

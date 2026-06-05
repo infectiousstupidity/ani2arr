@@ -11,6 +11,7 @@ import type {
 	Provider,
 	ProviderCredentials,
 } from "@/providers/types";
+import type { ProviderOpenTarget } from "@/providers/provider-links";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type {
 	RadarrMovieSnapshot,
@@ -137,8 +138,13 @@ export type ProviderConnectionTestInput = {
 	credentials: ProviderCredentials;
 };
 
-export type GetProviderBaseUrlInput = {
+export type OpenProviderPageInput = {
 	provider: Provider;
+	target: ProviderOpenTarget;
+};
+
+export type OpenProviderPageOutput = {
+	opened: boolean;
 };
 
 export type NotifyProviderConnectionChangedInput = {
