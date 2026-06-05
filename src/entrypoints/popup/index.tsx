@@ -142,8 +142,9 @@ export function QuickSettings(): React.JSX.Element {
 				<button
 					type="button"
 					onClick={() => openOptionsPage()}
-					className="inline-flex items-center gap-1 rounded-md border border-border-primary px-2.5 py-1.5 text-xs text-text-secondary transition-colors hover:bg-bg-secondary hover:text-text-primary"
+					className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border-primary px-2.5 py-1.5 text-xs text-text-secondary transition-colors hover:bg-bg-secondary hover:text-text-primary"
 					aria-label="Open full settings page"
+					title="Open full settings page"
 				>
 					<ExternalLink className="h-3.5 w-3.5" />
 					Full
@@ -163,8 +164,9 @@ export function QuickSettings(): React.JSX.Element {
 							<button
 								type="button"
 								onClick={() => openOptionsPage({ sectionId: provider })}
-								className="absolute right-2 top-2 rounded p-1 text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
-								aria-label={`Open ${providerLabel} options in a new tab`}
+								className="absolute right-2 top-2 cursor-pointer rounded p-1 text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+								aria-label={`Open ${providerLabel} settings`}
+								title={`Open ${providerLabel} settings`}
 							>
 								<ExternalLink className="h-3.5 w-3.5" />
 							</button>
@@ -217,7 +219,7 @@ export function QuickSettings(): React.JSX.Element {
 									</div>
 									<input
 										type="checkbox"
-										className="h-4 w-4"
+										className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
 										checked={providerSettings?.enabled ?? false}
 										disabled={isSaving}
 										onChange={(event) => {
@@ -245,7 +247,7 @@ export function QuickSettings(): React.JSX.Element {
 													});
 												}}
 												className={cn(
-													"rounded-md border px-2 py-1.5 text-xs transition-colors",
+													"cursor-pointer rounded-md border px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
 													selected
 														? "border-accent-primary bg-accent-primary/20 text-text-primary"
 														: "border-border-primary text-text-secondary hover:bg-bg-secondary",
@@ -286,7 +288,7 @@ export function QuickSettings(): React.JSX.Element {
 								</div>
 								<input
 									type="checkbox"
-									className="h-4 w-4"
+									className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
 									checked={enabled}
 									disabled={isSaving}
 									onChange={(event) => {

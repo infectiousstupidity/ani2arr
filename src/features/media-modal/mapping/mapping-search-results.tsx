@@ -74,7 +74,7 @@ export function MappingCandidateRow(
 			) : null}
 			<button
 				type="button"
-				className="relative z-10 flex h-full w-full min-w-0 items-stretch text-left"
+				className="relative z-10 flex h-full w-full min-w-0 cursor-pointer items-stretch text-left"
 				onClick={onToggleSelection}
 				aria-label={selectionLabel}
 			>
@@ -155,7 +155,7 @@ export function MappingCandidateRow(
 					<button
 						type="button"
 						className={cn(
-							"absolute right-2 top-2 z-20 inline-flex h-7 w-7 scale-[0.92] items-center justify-center rounded-full text-text-secondary opacity-0 transition-[opacity,transform,color,background-color] duration-150 hover:bg-bg-tertiary/70 hover:text-accent-primary focus-visible:bg-bg-tertiary/70 focus-visible:text-accent-primary group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100",
+							"absolute right-2 top-2 z-20 inline-flex h-7 w-7 scale-[0.92] cursor-pointer items-center justify-center rounded-full text-text-secondary opacity-0 transition-[opacity,transform,color,background-color] duration-150 hover:bg-bg-tertiary/70 hover:text-accent-primary focus-visible:bg-bg-tertiary/70 focus-visible:text-accent-primary group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100",
 							isSelected ? "scale-100 opacity-100" : null,
 						)}
 						onClick={handleOpenProvider}

@@ -65,7 +65,7 @@ export function MappingsProviderGroup(
 			type="button"
 			onClick={() => onToggle(group.key)}
 			className={cn(
-				"flex min-h-16 w-full items-center gap-4 border border-border-primary bg-bg-tertiary/50 px-4 py-3 text-left transition-colors hover:bg-bg-tertiary/70",
+				"flex min-h-16 w-full cursor-pointer items-center gap-4 border border-border-primary bg-bg-tertiary/50 px-4 py-3 text-left transition-colors hover:bg-bg-tertiary/70",
 				isExpanded ? "rounded-t-md" : "rounded-md",
 				className,
 			)}
