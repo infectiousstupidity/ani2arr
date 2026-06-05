@@ -1,5 +1,5 @@
 /** Background-owned provider configuration access for required and optional credentials. */
-// src/background/api/provider-config.ts
+// src/background/provider-config.ts
 
 import { getExtensionOptionsSnapshot } from "@/settings/store";
 import { getProviderCredentials } from "@/settings/provider-config";

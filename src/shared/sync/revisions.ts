@@ -1,4 +1,5 @@
 /** Cross-context revision signals for cache and query invalidation. */
+// src/shared/sync/revisions.ts
 
 import { browser } from "wxt/browser";
 import type { Provider } from "@/providers/types";

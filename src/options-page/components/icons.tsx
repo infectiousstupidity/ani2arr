@@ -1,3 +1,6 @@
+/** Inline provider SVG icon components for options-page controls. */
+// src/options-page/components/icons.tsx
+
 import React from "react";
 
 export const SonarrIcon = (props: React.SVGProps<SVGSVGElement>) => (

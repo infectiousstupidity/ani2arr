@@ -1,4 +1,5 @@
-// src/hooks/use-theme.ts
+/** Host-page theme synchronization hook for content-script shadow roots. */
+// src/shared/hooks/use-theme.ts
 import React, { useLayoutEffect } from "react";
 
 type ThemeConfig = {
