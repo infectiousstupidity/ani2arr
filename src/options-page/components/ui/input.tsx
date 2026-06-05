@@ -27,6 +27,7 @@ Input.displayName = "Input";
 export const PasswordInput = forwardRef<HTMLInputElement, InputProps>(
   ({ className, ...props }, ref) => {
     const [showPassword, setShowPassword] = useState(false);
+    const toggleLabel = showPassword ? "Hide API key" : "Show API key";
 
     return (
       <div className="relative w-full">
@@ -45,8 +46,9 @@ export const PasswordInput = forwardRef<HTMLInputElement, InputProps>(
         <button
           type="button"
           onClick={() => setShowPassword((prev) => !prev)}
-          className="absolute right-0 top-0 flex h-full min-w-[44px] items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
-          aria-label={showPassword ? "Hide password" : "Show password"}
+          className="absolute right-0 top-0 flex h-full min-w-[44px] cursor-pointer items-center justify-center text-text-secondary transition-colors hover:text-text-primary"
+          aria-label={toggleLabel}
+          title={toggleLabel}
         >
           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>

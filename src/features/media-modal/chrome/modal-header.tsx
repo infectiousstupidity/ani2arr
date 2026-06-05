@@ -379,6 +379,8 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 					onClick={onClose}
 					variant="ghost"
 					size="icon"
+					tooltip="Close modal"
+					tooltipContainer={contentContainer ?? undefined}
 					className={CHROME_BUTTON_CLASS}
 				>
 					<X className="h-4 w-4" />

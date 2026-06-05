@@ -61,7 +61,7 @@ const getBrowseCardMode = (options: BrowseCardSettings): BrowseCardMode =>
   options.enabled ? options.visibility : "hidden";
 
 const SEGMENTED_ITEM_CLASS =
-  "min-h-10 rounded-sm px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary";
+  "min-h-10 cursor-pointer rounded-sm px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary";
 
 function SegmentedControl<TValue extends string>({
   ariaLabel,

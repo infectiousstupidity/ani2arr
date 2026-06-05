@@ -109,7 +109,7 @@ export function DesktopSidebar({ activePage, statuses, onPageSelect }: { activeP
                     key={item.id}
                     onClick={() => onPageSelect(item.id)}
                     className={cn(
-                      "flex min-h-[44px] w-full items-center gap-3.5 rounded-md px-4 text-left text-sm transition-colors",
+                      "flex min-h-[44px] w-full cursor-pointer items-center gap-3.5 rounded-md px-4 text-left text-sm transition-colors",
                       active ? "bg-bg-tertiary text-text-primary" : "text-text-secondary hover:bg-bg-tertiary/50 hover:text-text-primary"
                     )}
                   >
@@ -129,7 +129,7 @@ export function DesktopSidebar({ activePage, statuses, onPageSelect }: { activeP
       <div className="mt-auto pt-6 border-t border-border-primary/50">
         <button
           onClick={() => onPageSelect("advanced")}
-          className="flex min-h-[44px] w-full items-center gap-3.5 rounded-md px-4 text-left text-sm text-text-secondary transition-colors hover:bg-bg-tertiary/50 hover:text-text-primary"
+          className="flex min-h-[44px] w-full cursor-pointer items-center gap-3.5 rounded-md px-4 text-left text-sm text-text-secondary transition-colors hover:bg-bg-tertiary/50 hover:text-text-primary"
         >
           <ShieldCheck className="h-5 w-5 shrink-0" />
           <span className="font-medium">Privacy</span>
@@ -173,7 +173,7 @@ export function DesktopPageHeader({ activePage, statuses, onDisconnect, isDiscon
                 <button
                   onClick={() => onDisconnect(provider)}
                   disabled={isDisconnecting}
-                  className="text-sm font-medium text-text-secondary hover:text-error transition-colors"
+                  className="cursor-pointer text-sm font-medium text-text-secondary transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Disconnect
                 </button>
@@ -207,7 +207,7 @@ export function MobileTopBar({ activePage, statuses, onDisconnect, isDisconnecti
         <button
           onClick={() => onDisconnect(provider)}
           disabled={isDisconnecting}
-          className="shrink-0 px-2 text-xs font-semibold text-error disabled:opacity-50"
+          className="shrink-0 cursor-pointer px-2 text-xs font-semibold text-error disabled:cursor-not-allowed disabled:opacity-50"
         >
           Disconnect
         </button>
@@ -229,7 +229,7 @@ export function MobileBottomNav({ activePage, onPageSelect }: { activePage: Page
               key={item.id}
               onClick={() => onPageSelect(item.id)}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 rounded-md px-1 py-1 transition-colors relative",
+                "relative flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-1 py-1 transition-colors",
                 active ? "text-text-primary" : "text-text-secondary hover:text-text-primary"
               )}
             >

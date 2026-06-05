@@ -58,7 +58,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 				ref={ref}
 				disabled={isDisabled}
 				className={cn(
-					"inline-flex items-center justify-center whitespace-nowrap rounded-md ring-offset-background transition-colors disabled:pointer-events-none disabled:opacity-50",
+					"inline-flex cursor-pointer items-center justify-center whitespace-nowrap rounded-md ring-offset-background transition-colors disabled:pointer-events-none disabled:opacity-50",
 					variantClasses[variant],
 					sizeClasses[size],
 					className,
