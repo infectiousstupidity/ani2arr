@@ -29,6 +29,7 @@ type MappingFooterProps = {
 	isApplyingMapping: boolean;
 	leaveMappingLabel: string;
 	overwriteTargetTitle: string | null;
+	actionError: string | null;
 	onRejectCandidate: () => void | Promise<void>;
 	onClearRejectedCandidate: () => void | Promise<void>;
 	onIgnoreTitle: () => void | Promise<void>;
@@ -114,6 +115,7 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 		isApplyingMapping,
 		leaveMappingLabel,
 		overwriteTargetTitle,
+		actionError,
 		onRejectCandidate,
 		onClearRejectedCandidate,
 		onIgnoreTitle,
@@ -225,14 +227,23 @@ export function MappingFooter(props: MappingFooterProps): React.JSX.Element {
 			</Button>
 		</FooterButtonSlot>,
 	];
+	let notice: ReactNode = null;
+	if (actionError) {
+		notice = (
+			<p
+				className="rounded-md border border-error/30 bg-error/10 px-3 py-2 text-sm font-medium text-error"
+				role="alert"
+			>
+				{actionError}
+			</p>
+		);
+	} else if (overwriteTargetTitle) {
+		notice = <OverwriteTargetWarning title={overwriteTargetTitle} />;
+	}
 
 	return (
 		<FooterLayout
-			notice={
-				overwriteTargetTitle ? (
-					<OverwriteTargetWarning title={overwriteTargetTitle} />
-				) : null
-			}
+			notice={notice}
 			left={leftActions}
 			right={rightActions}
 		/>

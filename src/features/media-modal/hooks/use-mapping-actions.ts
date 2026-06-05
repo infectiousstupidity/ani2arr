@@ -1,6 +1,7 @@
 /** Shared mapping mutation actions for media modal provider flows. */
 // src/features/media-modal/hooks/use-mapping-actions.ts
 
+import { useState } from "react";
 import type { AniListId } from "@/anilist/types";
 import {
 	parseTmdbIdOrNull,
@@ -11,7 +12,10 @@ import type {
 	TmdbId,
 	TvdbId,
 } from "@/providers/schemas";
-import { getProviderLabel } from "@/providers/provider-labels";
+import {
+	getProviderExternalIdLabel,
+	getProviderLabel,
+} from "@/providers/provider-labels";
 import {
 	useClearManualMapping,
 	useClearMappingRejectedCandidate,
@@ -19,6 +23,7 @@ import {
 	useSetMappingRejectedCandidate,
 	useSetManualMapping,
 } from "@/queries/mapping";
+import { normalizeError } from "@/shared/errors/error-utils";
 import { useConfirm } from "@/shared/hooks/use-confirm";
 
 type UseMappingActionsInput = {
@@ -63,6 +68,7 @@ export function useMappingActions({
 	onMappingReset,
 	onIgnored,
 }: UseMappingActionsInput) {
+	const [actionError, setActionError] = useState<string | null>(null);
 	const confirm = useConfirm();
 	const setManualMapping = useSetManualMapping();
 	const clearManualMapping = useClearManualMapping();
@@ -78,6 +84,7 @@ export function useMappingActions({
 
 	const applyMapping = async (): Promise<void> => {
 		if (selectedTarget === null) return;
+		setActionError(null);
 
 		if (requiresApplyConfirmation) {
 			const providerLabel = getProviderLabel(provider);
@@ -91,8 +98,43 @@ export function useMappingActions({
 			if (!didConfirm) return;
 		}
 
-		await setManualMapping.mutateAsync({ anilistId, ...selectedTarget });
-		onMappingApplied();
+		try {
+			await setManualMapping.mutateAsync({ anilistId, ...selectedTarget });
+			onMappingApplied();
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			const conflictingAniListIds =
+				normalizedError.details?.conflictingAniListIds;
+
+			if (
+				Array.isArray(conflictingAniListIds) &&
+				conflictingAniListIds.length > 0
+			) {
+				const providerIdLabel = getProviderExternalIdLabel(provider);
+				const didConfirm = await confirm({
+					title: `Share ${providerIdLabel} ID ${selectedTarget.providerId}?`,
+					description: normalizedError.userMessage,
+					confirmText: "Share ID",
+					cancelText: "Cancel",
+				});
+
+				if (!didConfirm) return;
+
+				try {
+					await setManualMapping.mutateAsync({
+						anilistId,
+						...selectedTarget,
+						force: true,
+					});
+					onMappingApplied();
+				} catch (retryError) {
+					setActionError(normalizeError(retryError).userMessage);
+				}
+				return;
+			}
+
+			setActionError(normalizedError.userMessage);
+		}
 	};
 
 	const resetMapping = async (): Promise<void> => {
@@ -130,6 +172,7 @@ export function useMappingActions({
 	return {
 		applyMapping, resetMapping, ignoreTitle, rejectCandidate,
 		clearRejectedCandidate: clearRejectedCandidateAction,
+		actionError,
 		isSubmittingMapping: setManualMapping.isPending,
 		isRevertingMapping: clearManualMapping.isPending,
 		isIgnoring: setIgnore.isPending,
