@@ -357,6 +357,7 @@ export function RadarrModal({
 							isApplyingMapping={mappingActions.isSubmittingMapping}
 							leaveMappingLabel={canShowSetup ? "Back to setup" : "Exit modal"}
 							overwriteTargetTitle={overwriteTargetTitle}
+							actionError={mappingActions.actionError}
 							onRejectCandidate={mappingActions.rejectCandidate}
 							onClearRejectedCandidate={mappingActions.clearRejectedCandidate}
 							onIgnoreTitle={mappingActions.ignoreTitle}
