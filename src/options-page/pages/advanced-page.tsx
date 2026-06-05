@@ -62,8 +62,9 @@ export const AdvancedPage = () => {
 						settings are stored locally in the browser.
 					</p>
 					<ul className="mt-4 list-disc space-y-2 pl-5 text-xs leading-5">
-						<li>Only the exact provider origins you enter are requested at runtime.</li>
-						<li>Provider API keys are sent only to their configured provider origins.</li>
+						<li>Only the configured provider scheme and host are requested at runtime.</li>
+						<li>Host permissions cannot be limited to subfolders, and Firefox cannot limit them by port.</li>
+						<li>Provider API keys are sent only to their configured provider URLs.</li>
 						<li>
 							AniList metadata is fetched from AniList GraphQL and public mapping
 							files from GitHub.

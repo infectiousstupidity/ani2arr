@@ -9,31 +9,34 @@ import {
 } from "./host-permissions";
 
 describe("getProviderHostPermissionPattern", () => {
-	it("uses the browser origin instead of the provider URL path", () => {
+	it("uses scheme and host instead of provider URL path or port", () => {
+		expect(
+			getProviderHostPermissionPattern("http://localhost:8989/sonarr"),
+		).toEqual({
+			ok: true,
+			value: "http://localhost/*",
+		});
+		expect(getProviderHostPermissionPattern("http://127.0.0.1:7878")).toEqual(
+			{
+				ok: true,
+				value: "http://127.0.0.1/*",
+			},
+		);
 		expect(
 			getProviderHostPermissionPattern("https://arr.example/sonarr///"),
 		).toEqual({
 			ok: true,
 			value: "https://arr.example/*",
 		});
-	});
-
-	it("treats different ports as different permission origins", () => {
 		expect(
-			getProviderHostPermissionPattern("http://192.168.50.166:8181"),
+			getProviderHostPermissionPattern("https://arr.example:8443/radarr"),
 		).toEqual({
 			ok: true,
-			value: "http://192.168.50.166:8181/*",
-		});
-		expect(
-			getProviderHostPermissionPattern("http://192.168.50.166:8282"),
-		).toEqual({
-			ok: true,
-			value: "http://192.168.50.166:8282/*",
+			value: "https://arr.example/*",
 		});
 	});
 
-	it("treats different subdomains as different permission origins", () => {
+	it("treats different subdomains as different permission hosts", () => {
 		expect(getProviderHostPermissionPattern("https://sonarr.example.com")).toEqual(
 			{
 				ok: true,
@@ -54,7 +57,7 @@ describe("requestProviderHostPermission", () => {
 		vi.restoreAllMocks();
 	});
 
-	it("requests host permission for the normalized origin pattern", async () => {
+	it("requests host permission for the normalized scheme and host pattern", async () => {
 		const requestSpy = vi
 			.spyOn(browser.permissions, "request")
 			.mockResolvedValue(true as never);
@@ -66,17 +69,17 @@ describe("requestProviderHostPermission", () => {
 		expect(result).toEqual({
 			ok: true,
 			value: {
-				pattern: "https://sonarr.example:8989/*",
+				pattern: "https://sonarr.example/*",
 				granted: true,
 			},
 		});
 		expect(requestSpy).toHaveBeenCalledTimes(1);
 		expect(requestSpy).toHaveBeenCalledWith({
-			origins: ["https://sonarr.example:8989/*"],
+			origins: ["https://sonarr.example/*"],
 		});
 	});
 
-	it("reuses an in-flight permission request for the same origin", async () => {
+	it("reuses an in-flight permission request for the same scheme and host", async () => {
 		let resolveRequest: ((value: boolean) => void) | undefined;
 
 		const requestSpy = vi
@@ -92,7 +95,7 @@ describe("requestProviderHostPermission", () => {
 			"https://arr.example:7878/sonarr",
 		);
 		const second = requestProviderHostPermission(
-			"https://arr.example:7878/radarr",
+			"https://arr.example:8989/radarr",
 		);
 
 		expect(requestSpy).toHaveBeenCalledTimes(1);
@@ -102,14 +105,14 @@ describe("requestProviderHostPermission", () => {
 		await expect(first).resolves.toEqual({
 			ok: true,
 			value: {
-				pattern: "https://arr.example:7878/*",
+				pattern: "https://arr.example/*",
 				granted: true,
 			},
 		});
 		await expect(second).resolves.toEqual({
 			ok: true,
 			value: {
-				pattern: "https://arr.example:7878/*",
+				pattern: "https://arr.example/*",
 				granted: true,
 			},
 		});
