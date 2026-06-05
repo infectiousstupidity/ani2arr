@@ -150,12 +150,14 @@ export const handleProviderConnectionChanged = async (
 	const options = optionsHint ?? (await getExtensionOptionsSnapshot());
 	logger.configure({ enabled: options.debugLogging || import.meta.env.DEV });
 
-	const changedProviders = [...new Set(input?.changedProviders)];
-	if (changedProviders.length === 0) return;
+	const affectedProviders = [
+		...new Set([
+			...(input?.changedProviders ?? []),
+			...(input?.disconnectedProviders ?? []),
+		]),
+	];
+	if (affectedProviders.length === 0) return;
 
-	await Promise.all(
-		changedProviders.map((provider) => clearAutoResults(provider)),
-	);
 	await bumpMappingsRevision();
 
 	if (hasConfiguredProviderCredentials(options, "sonarr")) {
@@ -163,20 +165,18 @@ export const handleProviderConnectionChanged = async (
 	}
 
 	await Promise.all(
-		changedProviders.map((provider) =>
+		affectedProviders.map((provider) =>
 			refreshProviderLibrary(provider, options),
 		),
 	);
 	await Promise.all(
-		changedProviders.map((provider) => bumpLibraryRevision(provider)),
+		affectedProviders.map((provider) => bumpLibraryRevision(provider)),
 	);
 };
 
 export const clearPersistentCaches = async (): Promise<void> => {
 	await Promise.all([
 		anilistMetadataStore.clearLocalCache(),
-		clearAutoResults("sonarr"),
-		clearAutoResults("radarr"),
 		clearUpstreamMappings(),
 	]);
 	await clearAllTtlCaches();
@@ -227,6 +227,7 @@ export const resetExtensionState = async (): Promise<void> => {
 	const previousOptions = await getExtensionOptionsSnapshot();
 
 	await clearManualFacts();
+	await Promise.all([clearAutoResults("sonarr"), clearAutoResults("radarr")]);
 	await clearPersistentCaches();
 	await resetAllSettingsSnapshot();
 	await removeConfiguredProviderHostPermissions(previousOptions);

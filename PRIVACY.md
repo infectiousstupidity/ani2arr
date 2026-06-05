@@ -1,6 +1,9 @@
+<!-- Public privacy policy for ani2arr data storage, transmission, and permissions. -->
+<!-- PRIVACY.md -->
+
 # ani2arr Privacy Policy
 
-Last updated: March 2, 2026
+Last updated: June 5, 2026
 
 ## Summary
 
@@ -30,15 +33,19 @@ ani2arr sends requests to the exact Sonarr and Radarr URLs entered by the user i
 
 - test Sonarr and Radarr connections
 - read quality profiles, root folders, tags, and library state
-- search for series or movie matches
+- search for series or movie matches using AniList-derived lookup terms
 - add or update series in Sonarr or movies in Radarr
 
 Requests to Sonarr or Radarr may include:
 
 - the relevant Sonarr or Radarr API key entered by the user
 - AniList-derived identifiers such as AniList IDs, TVDB IDs, and TMDB IDs
-- AniList-derived title, year, synonym, and mapping information needed to find the correct series or movie
+- lookup/search terms derived from AniList titles, years, synonyms, and mapping information needed to find the correct series or movie
 - Sonarr or Radarr add or update settings chosen by the user
+
+Responses from Sonarr or Radarr may include local provider data used by ani2arr, such as library titles and statuses, root folders, quality profiles, tags, and search candidates. The content UI on AniList and AniChart pages may show related provider status, matched provider titles, saved default add settings, form choices, tags, and search candidates.
+
+If the user configures a provider URL that starts with `http://`, the provider API key is sent over cleartext HTTP to that configured host. ani2arr supports HTTP for localhost and trusted LAN setups, but HTTPS is recommended for any provider exposed beyond a trusted local network.
 
 ### 2. AniList GraphQL
 
@@ -46,7 +53,7 @@ ani2arr sends AniList IDs and related query parameters to `https://graphql.anili
 
 ### 3. Public mapping files hosted on GitHub
 
-ani2arr fetches public JSON mapping files from `raw.githubusercontent.com` to improve AniList-to-TVDB and AniList-to-TMDB matching quality.
+ani2arr fetches public JSON mapping files from `https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json` to improve AniList-to-TVDB and AniList-to-TMDB matching quality. GitHub may serve those release downloads through `release-assets.githubusercontent.com`.
 
 ## What ani2arr does not do
 
