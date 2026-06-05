@@ -2,10 +2,12 @@
 // src/features/media-modal/details/details-panel.tsx
 
 import { ExternalLink, Search } from "lucide-react";
+import type { MouseEvent } from "react";
 import type { AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
 import { getProviderLabel } from "@/providers/provider-labels";
-import { buildProviderOpenUrl } from "@/providers/provider-links";
+import { getProviderOpenTarget } from "@/providers/provider-links";
+import { openProviderPage } from "@/rpc/provider-page";
 import type { MappingDetailsPayload } from "@/rpc/types";
 import Button from "@/shared/ui/primitives/button";
 import type { MediaModalTargetSummary } from "../types";
@@ -14,7 +16,6 @@ import { PreviewTargetDetails } from "./preview-target-details";
 
 export type DetailsPanelProps = {
 	provider: Provider;
-	baseUrl: string;
 	contentContainer: HTMLDivElement | null;
 	anilistId: AniListId;
 	effectiveMapping: MediaModalTargetSummary | null;
@@ -30,7 +31,6 @@ function getPreviewHeading(provider: Provider): string {
 export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 	const {
 		provider,
-		baseUrl,
 		contentContainer,
 		anilistId,
 		effectiveMapping,
@@ -43,17 +43,22 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 		? getPreviewHeading(provider)
 		: "Current Mapping Details";
 	const activeTarget = isInMappingMode ? previewMapping : effectiveMapping;
-	const activeTargetLink = activeTarget
-		? buildProviderOpenUrl({
-				provider: activeTarget.provider,
-				baseUrl,
+	const activeProviderTarget = activeTarget
+		? getProviderOpenTarget({
 				isInLibrary: activeTarget.isInLibrary,
-				...(activeTarget.providerRouteSlug
-					? { providerRouteSlug: activeTarget.providerRouteSlug }
-					: {}),
+				providerRouteSlug: activeTarget.providerRouteSlug,
 				searchTerm: activeTarget.title,
 			})
 		: null;
+	const handleOpenProvider = (event: MouseEvent<HTMLButtonElement>): void => {
+		if (!event.isTrusted) return;
+		if (!activeProviderTarget) return;
+
+		openProviderPage({
+			provider: activeTarget?.provider ?? provider,
+			target: activeProviderTarget,
+		});
+	};
 	let content: React.JSX.Element;
 
 	if (isInMappingMode) {
@@ -89,23 +94,18 @@ export function DetailsPanel(props: DetailsPanelProps): React.JSX.Element {
 				<p className="text-xs font-semibold leading-none text-text-primary">
 					{headingLabel}
 				</p>
-				{activeTargetLink ? (
+				{activeProviderTarget ? (
 					<Button
-						asChild
+						type="button"
 						variant="ghost"
 						size="icon"
 						tooltip={`Open in ${providerLabel}`}
 						tooltipContainer={contentContainer ?? undefined}
 						className="!h-[11px] !w-[11px] shrink-0 rounded-none! p-0! text-text-secondary hover:bg-transparent hover:text-accent-primary focus-visible:text-accent-primary"
+						onClick={handleOpenProvider}
+						aria-label={`Open in ${providerLabel}`}
 					>
-						<a
-							href={activeTargetLink}
-							target="_blank"
-							rel="noreferrer"
-							aria-label={`Open in ${providerLabel}`}
-						>
-							<ExternalLink className="h-[11px] w-[11px]" />
-						</a>
+						<ExternalLink className="h-[11px] w-[11px]" />
 					</Button>
 				) : null}
 			</div>

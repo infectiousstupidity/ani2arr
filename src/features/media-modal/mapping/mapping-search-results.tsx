@@ -2,6 +2,7 @@
 // src/features/media-modal/mapping/mapping-search-results.tsx
 
 import { ExternalLink } from "lucide-react";
+import type { MouseEvent } from "react";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import { cn } from "@/shared/utils/cn";
 
@@ -14,7 +15,7 @@ type MappingCandidateRowProps = {
 	isCurrent: boolean;
 	isSelected: boolean;
 	onToggleSelection: () => void;
-	externalUrl?: string | null | undefined;
+	openProvider?: (() => void) | undefined;
 	libraryLabel?: string | null | undefined;
 	linkedAniListCount?: number | undefined;
 	posterUrl?: string | undefined;
@@ -45,7 +46,7 @@ export function MappingCandidateRow(
 		isCurrent,
 		isSelected,
 		onToggleSelection,
-		externalUrl,
+		openProvider,
 		libraryLabel,
 		linkedAniListCount,
 		posterUrl,
@@ -56,6 +57,11 @@ export function MappingCandidateRow(
 	const selectionLabel = isSelected
 		? `Clear selected match: ${title}`
 		: `Preview match: ${title}`;
+	const handleOpenProvider = (event: MouseEvent<HTMLButtonElement>): void => {
+		if (!event.isTrusted) return;
+
+		openProvider?.();
+	};
 
 	return (
 		<div
@@ -144,20 +150,19 @@ export function MappingCandidateRow(
 					</div>
 				</div>
 			</button>
-			{externalUrl ? (
+			{openProvider ? (
 				<TooltipWrapper content={externalLabel} container={contentContainer}>
-					<a
-						href={externalUrl}
-						target="_blank"
-						rel="noreferrer"
+					<button
+						type="button"
 						className={cn(
 							"absolute right-2 top-2 z-20 inline-flex h-7 w-7 scale-[0.92] items-center justify-center rounded-full text-text-secondary opacity-0 transition-[opacity,transform,color,background-color] duration-150 hover:bg-bg-tertiary/70 hover:text-accent-primary focus-visible:bg-bg-tertiary/70 focus-visible:text-accent-primary group-hover:scale-100 group-hover:opacity-100 group-focus-within:scale-100 group-focus-within:opacity-100",
 							isSelected ? "scale-100 opacity-100" : null,
 						)}
+						onClick={handleOpenProvider}
 						aria-label={externalLabel}
 					>
 						<ExternalLink className="h-4 w-4" />
-					</a>
+					</button>
 				</TooltipWrapper>
 			) : null}
 		</div>

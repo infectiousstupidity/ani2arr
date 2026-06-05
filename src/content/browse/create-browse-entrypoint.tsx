@@ -71,6 +71,7 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
 
       ui = await createShadowRootUi(ctx, {
         name: options.uiName,
+        mode: 'closed',
         position: 'inline',
         anchor: 'body',
         onMount: (container: HTMLElement) => {

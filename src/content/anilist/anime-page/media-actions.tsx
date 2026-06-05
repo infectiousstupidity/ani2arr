@@ -1,7 +1,7 @@
 /** Anime-page action group for provider quick add, deep links, and manual mapping entry points. */
 // src/content/anilist/anime-page/media-actions.tsx
 
-import React from "react";
+import React, { type MouseEvent } from "react";
 import Button from "@/shared/ui/primitives/button";
 import { SquareArrowOutUpRight, ChevronDown } from "lucide-react";
 import { Dropdown, DropdownItem } from "@/shared/ui/primitives/dropdown";
@@ -15,7 +15,7 @@ interface MediaActionsProps {
 	errorSource: "status" | "add" | null;
 	hasMapping: boolean;
 	disabled: boolean;
-	externalHref: string | null;
+	openProvider: (() => void) | null;
 	onPrimaryAction: () => void;
 	onOpenSetup: () => void;
 	onOpenMapping: () => void;
@@ -122,7 +122,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 	errorSource,
 	hasMapping,
 	disabled,
-	externalHref,
+	openProvider,
 	onPrimaryAction,
 	onOpenSetup,
 	onOpenMapping,
@@ -132,11 +132,21 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 	const isLoading = state === "checking" || state === "adding";
 	const showSetupAction = hasMapping;
 	const showMappingAction = state !== "unconfigured";
-	const showExternalAction = state !== "unconfigured" && externalHref !== null;
+	const showExternalAction = state !== "unconfigured" && openProvider !== null;
 	const hasMenu = showSetupAction || showMappingAction;
 	const primaryDisabled = state === "in-library" ? false : disabled;
 	const handlePrimaryAction =
 		state === "in-library" ? onOpenSetup : onPrimaryAction;
+	const handlePrimaryClick = (event: MouseEvent<HTMLButtonElement>): void => {
+		if (!event.isTrusted) return;
+
+		handlePrimaryAction();
+	};
+	const handleProviderOpenClick = (event: MouseEvent<HTMLButtonElement>): void => {
+		if (!event.isTrusted) return;
+
+		openProvider?.();
+	};
 	const manualMappingLabel = hasMapping
 		? "Update mapping manually"
 		: "Find match manually";
@@ -153,13 +163,13 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 
 	return (
 		<div
-			className={`grid ${showExternalAction && externalHref ? "grid-cols-[1fr_auto] gap-3.75" : "grid-cols-1 gap-0"} items-start w-full`}
+			className={`grid ${showExternalAction ? "grid-cols-[1fr_auto] gap-3.75" : "grid-cols-1 gap-0"} items-start w-full`}
 		>
 			<MediaActionGroup>
 				<Button
 					data-testid="a2a-main-action-button"
 					size="sm"
-					onClick={handlePrimaryAction}
+					onClick={handlePrimaryClick}
 					isLoading={isLoading}
 					disabled={primaryDisabled}
 					{...(primaryButtonTooltip ? { tooltip: primaryButtonTooltip } : {})}
@@ -204,18 +214,17 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 				) : null}
 			</MediaActionGroup>
 
-			{showExternalAction && externalHref ? (
+			{showExternalAction ? (
 				<Button
-					asChild
+					type="button"
 					size="icon"
 					variant="primary"
 					tooltip={`Open in ${providerLabel}`}
 					tooltipContainer={portalContainer}
 					className="h-8.75 w-8.75 rounded-[3px]"
+					onClick={handleProviderOpenClick}
 				>
-					<a href={externalHref} target="_blank" rel="noopener noreferrer">
-						<SquareArrowOutUpRight className="h-4 w-4" />
-					</a>
+					<SquareArrowOutUpRight className="h-4 w-4" />
 				</Button>
 			) : null}
 		</div>

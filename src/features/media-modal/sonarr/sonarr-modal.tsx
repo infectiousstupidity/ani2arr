@@ -10,7 +10,6 @@ import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import {
 	useMappingInspection,
 } from "@/queries/mapping";
-import { useProviderBaseUrl } from "@/queries/provider-base-url";
 import { useSeriesStatus, useSonarrFormResources } from "@/queries/sonarr";
 import { createDefaultSonarrFormState as defaultSonarrFormState } from "@/providers/sonarr/form-state";
 import type { GetSeriesStatusOutput } from "@/rpc/types";
@@ -54,7 +53,6 @@ const SETUP_FORM_ID = "sonarr-setup-form";
 type SonarrStatusSeries = NonNullable<GetSeriesStatusOutput["series"]>;
 
 type SonarrModalData = {
-	baseUrl: string;
 	isConfigured: boolean;
 	anilistHeaderData: AniListHeaderData;
 	manualMappingActive: boolean;
@@ -127,13 +125,12 @@ function getEpisodeFileCount(series: SonarrStatusSeries): number | undefined {
 
 function getCurrentTargetDetails(input: {
 	series: SonarrStatusSeries;
-	baseUrl: string;
 }): Partial<MediaModalTargetSummary> {
 	const { series } = input;
 	const episodeCount = getEpisodeCount(series);
 	const episodeFileCount = getEpisodeFileCount(series);
 	const providerRouteSlug = getProviderRouteSlug(PROVIDER, series) ?? undefined;
-	const posterUrl = pickProviderPoster(series, input.baseUrl);
+	const posterUrl = pickProviderPoster(series);
 	const providerFolderName = "folder" in series ? series.folder : undefined;
 	const year = "year" in series ? series.year : undefined;
 	const typeLabel = "seriesType" in series ? series.seriesType : undefined;
@@ -155,7 +152,6 @@ function getCurrentTargetDetails(input: {
 
 function getCurrentTarget(input: {
 	status: GetSeriesStatusOutput | null;
-	baseUrl: string;
 }): MediaModalTargetSummary | null {
 	const { status } = input;
 	const series = status?.series;
@@ -171,7 +167,6 @@ function getCurrentTarget(input: {
 		isInLibrary: status.isInLibrary === true,
 		...getCurrentTargetDetails({
 			series,
-			baseUrl: input.baseUrl,
 		}),
 	};
 }
@@ -184,9 +179,6 @@ function useSonarrModalData(input: {
 	const base = useMediaModalBaseData({ anilistId, metadataHint });
 	const options = base.options;
 	const isConfigured = options?.providers.sonarr.isConfigured === true;
-	const providerBaseUrl = useProviderBaseUrl(PROVIDER, {
-		enabled: isConfigured,
-	});
 	const sonarrFormResources = useSonarrFormResources({ enabled: isConfigured });
 
 	const statusPayload = useMemo(
@@ -207,17 +199,14 @@ function useSonarrModalData(input: {
 	const verificationFailed =
 		verificationSettled &&
 		(sonarrStatus.isError || rawProviderStatus?.isInLibrary === null);
-	const baseUrl = providerBaseUrl.data ?? "";
 	const currentTarget = getCurrentTarget({
 		status: rawProviderStatus,
-		baseUrl,
 	});
 	const manualMappingActive =
 		rawProviderStatus?.mapping.kind === "mapped" &&
 		rawProviderStatus.mapping.source === "manual";
 
 	return {
-		baseUrl,
 		isConfigured,
 		anilistHeaderData: base.anilistHeaderData,
 		manualMappingActive,
@@ -347,7 +336,6 @@ export function SonarrModal({
 			header={
 				<ModalHeader
 					provider={PROVIDER}
-					baseUrl={data.baseUrl}
 					contentContainer={contentContainer}
 					anilistHeaderData={data.anilistHeaderData}
 					anilistId={anilistId}
@@ -362,7 +350,6 @@ export function SonarrModal({
 			leftPane={
 				isMappingView ? (
 					<SonarrMappingPanel
-						baseUrl={data.baseUrl}
 						contentContainer={contentContainer}
 						currentTarget={data.currentTarget}
 						selectedCandidate={selectedCandidate}
@@ -375,7 +362,6 @@ export function SonarrModal({
 			rightPane={
 				<DetailsPanel
 					provider={PROVIDER}
-					baseUrl={data.baseUrl}
 					contentContainer={contentContainer}
 					anilistId={anilistId}
 					effectiveMapping={data.currentTarget}

@@ -49,7 +49,7 @@ const queryClient = new QueryClient({
 	},
 });
 
-const ANIME_PAGE = new MatchPattern("*://anilist.co/anime/*");
+const ANIME_PAGE = new MatchPattern("https://anilist.co/anime/*");
 
 let ui: ShadowRootContentScriptUi<Root> | null = null;
 let stopAnchorKeeper: (() => void) | null = null;
@@ -132,6 +132,7 @@ async function mountAnimePageUI({
 
 	const nextUi = await createShadowRootUi(ctx, {
 		name: UI_NAME,
+		mode: "closed",
 		position: "inline",
 		anchor: `#${ANCHOR_ID}`,
 		append: "last",

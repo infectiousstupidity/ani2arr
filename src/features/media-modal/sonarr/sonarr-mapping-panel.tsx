@@ -6,10 +6,11 @@ import {
 	getProviderExternalIdLabel,
 	getProviderLabel,
 } from "@/providers/provider-labels";
-import { buildProviderOpenUrl } from "@/providers/provider-links";
+import { getProviderOpenTarget } from "@/providers/provider-links";
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import { parseTvdbId, type TvdbId } from "@/providers/schemas";
 import type { SonarrLookupSeries } from "@/providers/sonarr/types";
+import { openProviderPage } from "@/rpc/provider-page";
 import { useSonarrLookupSearch } from "@/queries/sonarr";
 import { MappingCandidateRow } from "../mapping/mapping-search-results";
 import { MappingSearchShell } from "../mapping/mapping-search-shell";
@@ -23,7 +24,6 @@ export type SonarrMappingCandidate = {
 };
 
 type SonarrMappingPanelProps = {
-	baseUrl: string;
 	contentContainer: HTMLDivElement | null;
 	currentTarget: MediaModalTargetSummary | null;
 	selectedCandidate: SonarrMappingCandidate | null;
@@ -70,7 +70,6 @@ function resolveStats(input: {
 
 function buildCandidate(input: {
 	series: SonarrLookupSeries;
-	baseUrl: string;
 	libraryTvdbIds: number[];
 	linkedAniListIdsByTvdbId: Record<number, number[]> | undefined;
 	statsMap:
@@ -95,7 +94,7 @@ function buildCandidate(input: {
 	const providerRouteSlug = isInLibrary
 		? (getProviderRouteSlug(PROVIDER, input.series) ?? undefined)
 		: undefined;
-	const posterUrl = pickProviderPoster(input.series, input.baseUrl);
+	const posterUrl = pickProviderPoster(input.series);
 	const linkedAniListIds = normalizeLinkedAniListIds(
 		input.linkedAniListIdsByTvdbId?.[tvdbId],
 	);
@@ -121,21 +120,6 @@ function buildCandidate(input: {
 	return { tvdbId, result: input.series, summary };
 }
 
-function getResultLink(input: {
-	candidate: SonarrMappingCandidate;
-	baseUrl: string;
-}): string | null {
-	return buildProviderOpenUrl({
-		provider: PROVIDER,
-		baseUrl: input.baseUrl,
-		isInLibrary: input.candidate.summary.isInLibrary,
-		...(input.candidate.summary.providerRouteSlug
-			? { providerRouteSlug: input.candidate.summary.providerRouteSlug }
-			: {}),
-		searchTerm: input.candidate.summary.title,
-	});
-}
-
 function getLibraryLabel(input: {
 	candidate: SonarrMappingCandidate;
 	providerLabel: string;
@@ -157,7 +141,6 @@ export function SonarrMappingPanel(
 	props: SonarrMappingPanelProps,
 ): React.JSX.Element {
 	const {
-		baseUrl,
 		contentContainer,
 		currentTarget,
 		selectedCandidate,
@@ -175,13 +158,12 @@ export function SonarrMappingPanel(
 			search.data?.results.map((series) =>
 				buildCandidate({
 					series,
-					baseUrl,
 					libraryTvdbIds: search.data?.libraryTvdbIds ?? [],
 					linkedAniListIdsByTvdbId: search.data?.linkedAniListIdsByTvdbId,
 					statsMap: search.data?.statsMap,
 				}),
 			) ?? [],
-		[baseUrl, search.data],
+		[search.data],
 	);
 	const candidatePosterUrls = useMemo(
 		() =>
@@ -220,7 +202,16 @@ export function SonarrMappingPanel(
 						providerId={summary.providerId}
 						contentContainer={contentContainer}
 						externalLabel={externalLabel}
-						externalUrl={getResultLink({ candidate, baseUrl })}
+						openProvider={() => {
+							openProviderPage({
+								provider: PROVIDER,
+								target: getProviderOpenTarget({
+									isInLibrary: summary.isInLibrary,
+									providerRouteSlug: summary.providerRouteSlug,
+									searchTerm: summary.title,
+								}),
+							});
+						}}
 						isCurrent={currentTarget?.providerId === candidate.tvdbId}
 						isSelected={isSelected}
 						libraryLabel={getLibraryLabel({ candidate, providerLabel })}

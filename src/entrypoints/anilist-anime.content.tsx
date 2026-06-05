@@ -4,7 +4,7 @@
 import { main } from '@/content/anilist/anime-page';
 
 export default defineContentScript({
-  matches: ['*://anilist.co/*'],
+  matches: ['https://anilist.co/*'],
   cssInjectionMode: 'ui',
   runAt: 'document_end',
   main,

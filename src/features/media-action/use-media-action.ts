@@ -4,8 +4,8 @@
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
 import type { MappingResult } from "@/mapping/types";
 import type { Provider } from "@/providers/types";
-import { buildProviderOpenUrl } from "@/providers/provider-links";
-import { useProviderBaseUrl } from "@/queries/provider-base-url";
+import { getProviderOpenTarget } from "@/providers/provider-links";
+import { openProviderPage } from "@/rpc/provider-page";
 import type { StatusInput } from "@/rpc/types";
 import { getMediaActionStatus, type MediaActionStatus } from "./state";
 
@@ -26,7 +26,7 @@ export interface MediaActionInputBase<TForm> {
 
 export interface MediaAction {
 	status: MediaActionStatus;
-	externalHref: string | null;
+	openProvider: (() => void) | null;
 	runPrimaryAction(): void;
 }
 
@@ -108,9 +108,6 @@ export function buildMediaActionStatusQuery(
 export function useMediaAction<TForm>(
 	input: UseMediaActionInput<TForm>,
 ): MediaAction {
-	const baseUrl = useProviderBaseUrl(input.provider, {
-		enabled: input.enabled && input.isConfigured,
-	});
 	const mapping = input.statusQuery.data?.mapping;
 	const status = getMediaActionStatus({
 		isConfigured: input.isConfigured,
@@ -125,23 +122,28 @@ export function useMediaAction<TForm>(
 		hasProviderId: input.hasProviderId,
 		canQuickAdd: input.providerTitle !== null && input.defaultForm !== null,
 	});
-	const externalHref = buildProviderOpenUrl({
-		provider: input.provider,
-		baseUrl: baseUrl.data ?? "",
-		isInLibrary:
-			status.state === "in-library" && input.providerRouteSlug !== null,
-		...(input.providerRouteSlug
-			? { providerRouteSlug: input.providerRouteSlug }
-			: {}),
-		searchTerm:
-			mapping?.kind === "mapped"
-				? (mapping.matchedTitle ?? input.displayTitle)
-				: input.displayTitle,
-	});
+	const searchTerm =
+		mapping?.kind === "mapped"
+			? (mapping.matchedTitle ?? input.displayTitle)
+			: input.displayTitle;
+	const providerOpenTarget =
+		status.state === "unconfigured"
+			? null
+			: getProviderOpenTarget({
+					isInLibrary:
+						status.state === "in-library" && input.providerRouteSlug !== null,
+					providerRouteSlug: input.providerRouteSlug,
+					searchTerm,
+				});
 
 	return {
 		status,
-		externalHref,
+		openProvider: providerOpenTarget
+			? () => openProviderPage({
+					provider: input.provider,
+					target: providerOpenTarget,
+				})
+			: null,
 		runPrimaryAction: () => {
 			switch (status.action) {
 				case "configure": {

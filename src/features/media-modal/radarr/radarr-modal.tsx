@@ -10,7 +10,6 @@ import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import {
 	useMappingInspection,
 } from "@/queries/mapping";
-import { useProviderBaseUrl } from "@/queries/provider-base-url";
 import { useMovieStatus, useRadarrFormResources } from "@/queries/radarr";
 import type { GetMovieStatusOutput } from "@/rpc/types";
 import { createDefaultRadarrFormState as defaultRadarrFormState } from "@/providers/radarr/form-state";
@@ -52,7 +51,6 @@ const PROVIDER = "radarr" as const;
 const SETUP_FORM_ID = "radarr-setup-form";
 
 type RadarrModalData = {
-	baseUrl: string;
 	isConfigured: boolean;
 	anilistHeaderData: AniListHeaderData;
 	manualMappingActive: boolean;
@@ -110,7 +108,6 @@ function isSetupTargetLoading(input: {
 
 function getCurrentTarget(input: {
 	status: GetMovieStatusOutput | null;
-	baseUrl: string;
 }): MediaModalTargetSummary | null {
 	const { status } = input;
 	const movie = status?.movie;
@@ -120,7 +117,7 @@ function getCurrentTarget(input: {
 	if (!movie || tmdbId === null) return null;
 
 	const providerRouteSlug = getProviderRouteSlug(PROVIDER, movie) ?? undefined;
-	const posterUrl = pickProviderPoster(movie, input.baseUrl);
+	const posterUrl = pickProviderPoster(movie);
 
 	return {
 		provider: PROVIDER,
@@ -151,9 +148,6 @@ function useRadarrModalData(input: {
 	const base = useMediaModalBaseData({ anilistId, metadataHint });
 	const options = base.options;
 	const isConfigured = options?.providers.radarr.isConfigured === true;
-	const providerBaseUrl = useProviderBaseUrl(PROVIDER, {
-		enabled: isConfigured,
-	});
 	const radarrFormResources = useRadarrFormResources({ enabled: isConfigured });
 
 	const statusPayload = useMemo(
@@ -174,17 +168,14 @@ function useRadarrModalData(input: {
 	const verificationFailed =
 		verificationSettled &&
 		(radarrStatus.isError || rawProviderStatus?.isInLibrary === null);
-	const baseUrl = providerBaseUrl.data ?? "";
 	const currentTarget = getCurrentTarget({
 		status: rawProviderStatus,
-		baseUrl,
 	});
 	const manualMappingActive =
 		rawProviderStatus?.mapping.kind === "mapped" &&
 		rawProviderStatus.mapping.source === "manual";
 
 	return {
-		baseUrl,
 		isConfigured,
 		anilistHeaderData: base.anilistHeaderData,
 		manualMappingActive,
@@ -314,7 +305,6 @@ export function RadarrModal({
 			header={
 				<ModalHeader
 					provider={PROVIDER}
-					baseUrl={data.baseUrl}
 					contentContainer={contentContainer}
 					anilistHeaderData={data.anilistHeaderData}
 					anilistId={anilistId}
@@ -329,7 +319,6 @@ export function RadarrModal({
 			leftPane={
 				isMappingView ? (
 					<RadarrMappingPanel
-						baseUrl={data.baseUrl}
 						contentContainer={contentContainer}
 						currentTarget={data.currentTarget}
 						selectedCandidate={selectedCandidate}
@@ -342,7 +331,6 @@ export function RadarrModal({
 			rightPane={
 				<DetailsPanel
 					provider={PROVIDER}
-					baseUrl={data.baseUrl}
 					contentContainer={contentContainer}
 					anilistId={anilistId}
 					effectiveMapping={data.currentTarget}

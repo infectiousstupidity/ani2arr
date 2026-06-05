@@ -71,7 +71,7 @@ export function SonarrCardOverlay({
 			onOpenSetup={onOpenSetup}
 			showMappingAction={mediaAction.status.state !== "unconfigured"}
 			onOpenMapping={onOpenMapping}
-			externalHref={mediaAction.externalHref}
+			openProvider={mediaAction.openProvider}
 			badgeVisibility={badgeVisibility}
 			stackDirection={stackDirection}
 			tooltipContainer={tooltipContainer}

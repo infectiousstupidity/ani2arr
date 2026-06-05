@@ -248,6 +248,7 @@ export function useRadarrSetupForm(
 		event: SubmitEvent<HTMLFormElement>,
 	): Promise<void> => {
 		event.preventDefault();
+		if (!event.isTrusted) return;
 
 		if (
 			!canSubmit ||
