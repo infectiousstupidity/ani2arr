@@ -160,7 +160,10 @@ export const handleProviderConnectionChanged = async (
 
 	await bumpMappingsRevision();
 
-	if (hasConfiguredProviderCredentials(options, "sonarr")) {
+	if (
+		hasConfiguredProviderCredentials(options, "sonarr") ||
+		hasConfiguredProviderCredentials(options, "radarr")
+	) {
 		await refreshUpstreamMappings();
 	}
 
