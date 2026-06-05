@@ -1,5 +1,5 @@
+/** Hook exposing the shared confirmation dialog action to consumers. */
 // src/shared/hooks/use-confirm.ts
-// Exposes the confirmation dialog action to consumers.
 
 import { useContext } from "react";
 

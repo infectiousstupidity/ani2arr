@@ -1,5 +1,5 @@
+/** Shared confirmation dialog provider and action state. */
 // src/shared/ui/feedback/confirm-provider.tsx
-// Renders the shared confirmation dialog and provides the confirm action.
 
 import { useCallback, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 

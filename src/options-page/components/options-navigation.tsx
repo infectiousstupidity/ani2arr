@@ -4,6 +4,7 @@
 import type { ComponentType } from "react";
 import { browser } from "wxt/browser";
 import { Palette, Plug, ShieldCheck, SlidersHorizontal, Link2 } from "lucide-react";
+import ani2arrIconUrl from "@/assets/icon.png";
 import type { Provider } from "@/providers/types";
 import type { ProviderConnectionStatusView } from "@/queries/provider-connection";
 import { cn } from "@/shared/utils/cn";
@@ -80,8 +81,15 @@ export function DesktopSidebar({ activePage, statuses, onPageSelect }: { activeP
   return (
     <aside className="hidden h-screen w-72 shrink-0 overflow-y-auto border-r border-border-primary bg-bg-secondary px-4 py-8 md:flex md:flex-col">
       <div className="px-4">
-        <div className="text-2xl font-bold leading-none text-accent-primary">ani2arr</div>
-        <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-text-secondary">Media bridge for AniList</div>
+        <div className="flex items-center gap-3">
+          <img
+            src={ani2arrIconUrl}
+            alt=""
+            aria-hidden="true"
+            className="h-8 w-8 shrink-0"
+          />
+          <div className="text-2xl font-bold leading-none text-text-primary">ani2arr</div>
+        </div>
       </div>
 
       <nav className="mt-12 space-y-8 flex-1">

@@ -1,3 +1,6 @@
+/** Tests for shared revision storage and broadcast helpers. */
+// src/shared/sync/revisions.test.ts
+
 import { describe, expect, it } from 'vitest';
 import { browser } from 'wxt/browser';
 import {
