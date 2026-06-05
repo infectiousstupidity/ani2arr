@@ -64,14 +64,15 @@ export const AdvancedPage = () => {
 					<ul className="mt-4 list-disc space-y-2 pl-5 text-xs leading-5">
 						<li>Only the configured provider scheme and host are requested at runtime.</li>
 						<li>Host permissions cannot be limited to subfolders, and Firefox cannot limit them by port.</li>
-						<li>Provider API keys are sent only to their configured provider URLs.</li>
+						<li>Provider API keys are sent only to their configured provider URLs. HTTP provider URLs send API keys in cleartext; use HTTPS outside trusted localhost or LAN setups.</li>
+						<li>AniList and AniChart content UI can show provider library status, matched titles, saved defaults, root folders, quality profiles, tags, and search candidates.</li>
 						<li>
 							AniList metadata is fetched from AniList GraphQL and public mapping
-							files from GitHub.
+							files from GitHub release downloads.
 						</li>
 					</ul>
 					<p className="mt-4 text-xs">
-						Full policy text is available in the repository privacy POLICY.md file.
+						Full policy text is available in the repository PRIVACY.md file.
 					</p>
 				</div>
 			</SettingsSection>

@@ -1,3 +1,6 @@
+/** Shared options-page text inputs, including API-key PasswordInput behavior. */
+// src/options-page/components/ui/input.tsx
+
 import { forwardRef, useState, type InputHTMLAttributes } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/shared/utils/cn";
@@ -32,6 +35,12 @@ export const PasswordInput = forwardRef<HTMLInputElement, InputProps>(
           className={cn("pr-10", className)}
           ref={ref}
           {...props}
+          autoComplete="off"
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          data-lpignore="true"
+          data-1p-ignore="true"
         />
         <button
           type="button"
