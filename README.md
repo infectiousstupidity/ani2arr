@@ -12,9 +12,9 @@
 </p>
 
 <p align="center">
-  <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/"><img alt="Firefox Add-on" src="https://img.shields.io/badge/Firefox-AMO-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white"></a>
-  <a href="https://github.com/infectiousstupidity/ani2arr/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/infectiousstupidity/ani2arr?style=for-the-badge&logo=github&label=Release"></a>
-  <a href="https://github.com/infectiousstupidity/ani2arr/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/infectiousstupidity/ani2arr/ci.yml?branch=main&label=CI&style=for-the-badge"></a>
+  <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/" target="_blank" rel="noopener noreferrer"><img alt="Firefox Add-on" src="https://img.shields.io/badge/Firefox-AMO-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white"></a>
+  <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer"><img alt="GitHub release" src="https://img.shields.io/github/v/release/infectiousstupidity/ani2arr?style=for-the-badge&logo=github&label=Release"></a>
+  <a href="https://github.com/infectiousstupidity/ani2arr/actions/workflows/ci.yml" target="_blank" rel="noopener noreferrer"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/infectiousstupidity/ani2arr/ci.yml?branch=main&label=CI&style=for-the-badge"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/infectiousstupidity/ani2arr?style=for-the-badge"></a>
 </p>
 
@@ -30,9 +30,9 @@
 
 ## Features
 
-- Adds Sonarr and Radarr actions to [AniList anime pages](https://anilist.co/anime/21/ONE-PIECE/), [AniList browse](https://anilist.co/search/anime), and [AniChart](https://anichart.net).
+- Adds Sonarr and Radarr actions to <a href="https://anilist.co/anime/21/ONE-PIECE/" target="_blank" rel="noopener noreferrer">AniList anime pages</a>, <a href="https://anilist.co/search/anime" target="_blank" rel="noopener noreferrer">AniList browse</a>, and <a href="https://anichart.net" target="_blank" rel="noopener noreferrer">AniChart</a>.
 - Routes AniList series to Sonarr and AniList movies to Radarr.
-- Uses AniList metadata and public [AniBridge mappings](https://github.com/anibridge/anibridge-mappings) to improve matching.
+- Uses AniList metadata and public <a href="https://github.com/anibridge/anibridge-mappings" target="_blank" rel="noopener noreferrer">AniBridge mappings</a> to improve matching.
 - Supports manual mappings when automatic matching is wrong, missing, or ambiguous.
 - Stores settings locally and does not include analytics, advertising, tracking SDKs, or a developer-operated backend.
 
@@ -40,21 +40,21 @@
 
 | Browser           | Recommended install                                                        | Notes                                             |
 | ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------- |
-| Firefox           | [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/ani2arr/) | Requires Firefox 142 or newer.                    |
-| Chrome / Chromium | [GitHub Releases](https://github.com/infectiousstupidity/ani2arr/releases) | Download the Chrome MV3 zip and load it unpacked. |
+| Firefox           | <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/" target="_blank" rel="noopener noreferrer">Firefox Add-ons</a> | Requires Firefox 142 or newer.                    |
+| Chrome / Chromium | <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a> | Download the Chrome MV3 zip and load it unpacked. |
 
 ### Manual install
 
 **Firefox XPI**
 
-1. Download the signed XPI from Firefox Add-ons or GitHub Releases.
+1. Download the signed XPI from <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/" target="_blank" rel="noopener noreferrer">Firefox Add-ons</a> or <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a>.
 2. Open `about:addons`.
 3. Gear menu -> `Install Add-on From File...`.
 4. Select the XPI.
 
 **Chrome / Chromium**
 
-1. Download and extract the Chrome MV3 zip from GitHub Releases.
+1. Download and extract the Chrome MV3 zip from <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a>.
 2. Open `chrome://extensions`.
 3. Enable Developer mode.
 4. Click `Load unpacked`.
@@ -118,7 +118,7 @@ See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
 
 ## Notes
 
-- Thanks to [AniBridge](https://github.com/anibridge/anibridge-mappings) and their contributors for maintaining the upstream mapping database.
+- Thanks to <a href="https://github.com/anibridge/anibridge-mappings" target="_blank" rel="noopener noreferrer">AniBridge</a> and their contributors for maintaining the upstream mapping database.
 - This project is not actively maintained. The author is not a formally trained developer; use at your own risk.
 - Issues and PRs are welcome.
 
