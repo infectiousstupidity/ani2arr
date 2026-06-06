@@ -93,17 +93,17 @@ describe("api services", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 
-		clearAutoResultsMock.mockResolvedValue();
-		clearManualFactsMock.mockResolvedValue();
-		clearUpstreamMappingsMock.mockResolvedValue();
-		refreshUpstreamMappingsMock.mockResolvedValue();
-		clearAllTtlCachesMock.mockResolvedValue();
+		clearAutoResultsMock.mockImplementation(async () => {});
+		clearManualFactsMock.mockImplementation(async () => {});
+		clearUpstreamMappingsMock.mockImplementation(async () => {});
+		refreshUpstreamMappingsMock.mockImplementation(async () => {});
+		clearAllTtlCachesMock.mockImplementation(async () => {});
 		getExtensionOptionsSnapshotMock.mockResolvedValue(createOptions());
-		resetAllSettingsSnapshotMock.mockResolvedValue();
+		resetAllSettingsSnapshotMock.mockImplementation(async () => {});
 		bumpMappingsRevisionMock.mockResolvedValue(1);
 		bumpProviderLibraryRevisionMock.mockResolvedValue(1);
-		resetAllRevisionsMock.mockResolvedValue();
-		clearLocalCacheMock.mockResolvedValue();
+		resetAllRevisionsMock.mockImplementation(async () => {});
+		clearLocalCacheMock.mockImplementation(async () => {});
 		vi.spyOn(sonarrLibrary, "clearSeriesSnapshotCache").mockResolvedValue();
 		vi.spyOn(sonarrLibrary, "refreshSeriesSnapshots").mockResolvedValue([]);
 		vi.spyOn(radarrLibrary, "clearMovieSnapshotCache").mockResolvedValue();

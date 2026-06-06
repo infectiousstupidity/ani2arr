@@ -13,9 +13,8 @@
     "types": [],
     "typeRoots": ["./node_modules/@types"],
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     }
   },
 }
