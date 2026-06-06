@@ -1,13 +1,19 @@
 /** AniList row renderer and quick actions for the options mapping page. */
 // src/options-page/pages/mappings/mappings-anilist-row.tsx
 
-import { EyeOff, ImageOff, Loader2, RotateCcw, Unlink } from "lucide-react";
+import {
+	EyeOff,
+	ImageOff,
+	Loader2,
+	RotateCcw,
+	SquarePen,
+	Unlink,
+} from "lucide-react";
 import type { AniListMetadata } from "@/anilist/types";
-import { resolveTitlePreference } from "@/anilist/title";
+import { buildAniListAnimeUrl, resolveTitlePreference } from "@/anilist/title";
 import type { AniListTitleLanguage } from "@/anilist/title";
 import { getProviderExternalIdLabel } from "@/providers/provider-labels";
 import type { ProviderExternalId } from "@/rpc/types";
-import Button from "@/shared/ui/primitives/button";
 import Pill from "@/shared/ui/primitives/pill";
 import { cn } from "@/shared/utils/cn";
 import { Tooltip } from "../../components/ui/tooltip";
@@ -34,17 +40,24 @@ interface MappingsAniListRowProps {
 	onEdit: (row: MappingRow) => void;
 }
 
-const STATUS_DOT_CLASS: Record<MappingRow["mappingRowStatus"], string> = {
-	"needs-review": "bg-warning",
-	"in-library": "bg-success",
-	"can-add": "bg-accent-primary",
-	suppressed: "bg-text-secondary",
-	unmapped: "bg-warning",
-	unknown: "bg-text-secondary",
+const STATUS_PILL_CLASS: Record<MappingRow["mappingRowStatus"], string> = {
+	"needs-review": "border-warning/35 bg-warning/15 text-warning normal-case",
+	"in-library": "border-success/35 bg-success/15 text-success normal-case",
+	"can-add":
+		"border-accent-primary/40 bg-accent-primary/15 text-accent-primary normal-case",
+	suppressed:
+		"border-border-primary/45 bg-bg-tertiary/20 text-text-secondary normal-case",
+	unmapped: "border-warning/35 bg-warning/15 text-warning normal-case",
+	unknown:
+		"border-border-primary/45 bg-bg-tertiary/20 text-text-secondary normal-case",
 };
 
 const ID_PILL_CLASS =
 	"border border-border-primary/45 bg-bg-tertiary/20 text-text-secondary normal-case";
+const ANILIST_LINK_CLASS =
+	"transition-colors hover:text-accent-primary focus-visible:text-accent-primary";
+const LINK_PILL_CLASS =
+	"hover:border-accent-primary/55 hover:bg-accent-primary/15 hover:text-accent-primary focus-visible:border-accent-primary/55 focus-visible:bg-accent-primary/15 focus-visible:text-accent-primary";
 
 const getRowTitle = (
 	row: MappingRow,
@@ -70,9 +83,11 @@ const getCoverUrl = (metadata: AniListMetadata | null): string | null =>
 	metadata?.coverImage?.large ?? metadata?.coverImage?.medium ?? null;
 
 const getClearMatchTitle = (action: ClearMatchAction): string => {
-	if (action.kind === "clear-manual") return "Clear manual match";
-	if (action.kind === "clear-rejected") return "Restore rejected candidate";
-	return "Not this match";
+	if (action.kind === "clear-manual") return "Remove manual mapping override";
+	if (action.kind === "clear-rejected") {
+		return "Allow this rejected match again";
+	}
+	return "Reject this automatic match";
 };
 
 const getIgnoreAction = (row: MappingRow): IgnoreAction =>
@@ -114,6 +129,16 @@ const shouldShowProviderIdPill = (
 	row.providerId !== null &&
 	(parentProviderId === null || row.providerId !== parentProviderId);
 
+function MappingStatusPill(props: {
+	status: MappingRow["mappingRowStatus"];
+}): React.JSX.Element {
+	return (
+		<Pill tone="muted" className={STATUS_PILL_CLASS[props.status]}>
+			{formatMappingStatusLabel(props.status)}
+		</Pill>
+	);
+}
+
 export function MappingsAniListRow(
 	props: MappingsAniListRowProps,
 ): React.JSX.Element {
@@ -132,14 +157,15 @@ export function MappingsAniListRow(
 	const clearMatchAction = getClearMatchAction(row);
 	const coverUrl = getCoverUrl(metadata);
 	const title = getRowTitle(row, metadata, preferredTitleLanguage);
+	const anilistUrl = buildAniListAnimeUrl(row.anilistId);
 	const metaPillLabels = getMetaPillLabels(metadata);
 	const entryKind = formatMappingEntryKind(row.result);
 	const showProviderIdPill = shouldShowProviderIdPill(row, parentProviderId);
 	const showRowStatus = row.mappingRowStatus !== "in-library";
 	const ignoreTitle =
 		ignoreAction.kind === "clear-ignore"
-			? "Remove title ignore"
-			: "Ignore this title";
+			? "Stop ignoring this AniList title"
+			: "Ignore this AniList title for this provider";
 
 	let ignoreIcon: React.JSX.Element;
 	if (isPending) {
@@ -186,13 +212,33 @@ export function MappingsAniListRow(
 					)}
 				</div>
 				<div className="min-w-0">
-					<p className="truncate text-sm font-semibold text-text-primary">
+					<a
+						href={anilistUrl}
+						target="_blank"
+						rel="noreferrer"
+						className={cn(
+							"block cursor-pointer truncate text-sm font-semibold text-text-primary",
+							ANILIST_LINK_CLASS,
+						)}
+					>
 						{title}
-					</p>
+					</a>
 					<div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-text-secondary">
-						<Pill small tone="muted" className={ID_PILL_CLASS}>
-							AniList ID: {row.anilistId}
-						</Pill>
+						<a
+							href={anilistUrl}
+							target="_blank"
+							rel="noreferrer"
+							className="cursor-pointer rounded-full"
+							aria-label={`Open AniList ID ${row.anilistId}`}
+						>
+							<Pill
+								small
+								tone="muted"
+								className={cn(ID_PILL_CLASS, LINK_PILL_CLASS)}
+							>
+								AniList ID: {row.anilistId}
+							</Pill>
+						</a>
 						{metaPillLabels.map((label) => (
 							<Pill key={label} small tone="muted" className={ID_PILL_CLASS}>
 								{label}
@@ -206,20 +252,7 @@ export function MappingsAniListRow(
 					</div>
 					<div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs md:hidden">
 						{showRowStatus ? (
-							<span className="flex min-w-0 items-center gap-1.5 text-text-primary">
-								<span
-									className={cn(
-										"h-2 w-2 shrink-0 rounded-full",
-										STATUS_DOT_CLASS[row.mappingRowStatus],
-									)}
-								/>
-								<span className="truncate">
-									{formatMappingStatusLabel(row.mappingRowStatus)}
-								</span>
-							</span>
-						) : null}
-						{showRowStatus ? (
-							<span className="text-text-secondary/60">•</span>
+							<MappingStatusPill status={row.mappingRowStatus} />
 						) : null}
 						<span className="truncate text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
 							{entryKind}
@@ -230,17 +263,7 @@ export function MappingsAniListRow(
 
 			<div className="hidden min-w-0 flex-col items-center text-center md:flex">
 				{showRowStatus ? (
-					<div className="flex items-center justify-center gap-2 text-sm text-text-primary">
-						<span
-							className={cn(
-								"h-2 w-2 shrink-0 rounded-full",
-								STATUS_DOT_CLASS[row.mappingRowStatus],
-							)}
-						/>
-						<span className="truncate">
-							{formatMappingStatusLabel(row.mappingRowStatus)}
-						</span>
-					</div>
+					<MappingStatusPill status={row.mappingRowStatus} />
 				) : null}
 				<p
 					className={cn(
@@ -252,7 +275,7 @@ export function MappingsAniListRow(
 				</p>
 			</div>
 
-			<div className="col-start-3 row-start-1 flex flex-col items-end justify-center gap-1.5 md:col-auto md:row-auto md:flex-row md:items-center">
+			<div className="col-start-3 row-start-1 flex flex-col items-end justify-center gap-1.5 md:col-auto md:row-auto md:flex-row md:items-center md:justify-end">
 				<div className="flex items-center justify-end gap-1.5">
 					{clearMatchAction ? (
 						<Tooltip content={getClearMatchTitle(clearMatchAction)}>
@@ -279,15 +302,17 @@ export function MappingsAniListRow(
 						</button>
 					</Tooltip>
 				</div>
-				<Button
-					type="button"
-					variant="outline"
-					onClick={() => onEdit(row)}
-					disabled={isPending}
-					className="h-9 gap-2 px-3 text-xs"
-				>
-					Edit
-				</Button>
+				<Tooltip content="Edit mapping">
+					<button
+						type="button"
+						onClick={() => onEdit(row)}
+						disabled={isPending}
+						className="inline-flex h-9 w-9 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-tertiary/70 hover:text-text-primary disabled:pointer-events-none disabled:opacity-50"
+						aria-label="Edit mapping"
+					>
+						<SquarePen className="h-4 w-4" />
+					</button>
+				</Tooltip>
 			</div>
 		</div>
 	);

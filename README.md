@@ -1,77 +1,129 @@
+<!-- README overview, install, screenshots, development, and privacy notes for ani2arr. -->
+<!-- README.md -->
+
 <p align="center">
   <img src="docs/images/icon.png" alt="ani2arr icon" width="96" height="96">
 </p>
 
-<p align="center">ani2arr adds one-click Sonarr and Radarr integration to AniList and AniChart. It maps AniList series to Sonarr, AniList movies to Radarr, and pushes them into your library.</p>
+<h1 align="center">ani2arr</h1>
+
+<p align="center">
+  One-click Sonarr and Radarr actions for AniList and AniChart.
+</p>
 
 <p align="center">
   <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/">
-    <img src="https://img.shields.io/badge/Firefox-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white&labelColor=1f2328&color=1f2328" alt="Firefox">
+    <img alt="Firefox Add-on" src="https://img.shields.io/badge/Firefox-AMO-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white">
   </a>
   <a href="https://github.com/infectiousstupidity/ani2arr/releases">
-    <img src="https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white&labelColor=1f2328&color=1f2328" alt="GitHub">
+    <img alt="GitHub release" src="https://img.shields.io/github/v/release/infectiousstupidity/ani2arr?style=for-the-badge&logo=github&label=Release">
+  </a>
+  <a href="https://github.com/infectiousstupidity/ani2arr/actions/workflows/ci.yml">
+    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/infectiousstupidity/ani2arr/ci.yml?branch=main&label=CI&style=for-the-badge">
+  </a>
+  <a href="LICENSE">
+    <img alt="License" src="https://img.shields.io/github/license/infectiousstupidity/ani2arr?style=for-the-badge">
   </a>
 </p>
 
-<h1 align="center">ani2arr</h1>
-<br><br>
 <p align="center">
   <img src="docs/images/banner.png" alt="ani2arr banner">
 </p>
 
+## Features
 
-## Key features
-- Injects Sonarr and Radarr actions on AniList anime pages, AniList browse views, and AniChart
-- Routes AniList series to Sonarr and AniList movies to Radarr
-- Resolves AniList mappings with cached lookups, throttled requests, and retry handling
-- Options UI to configure Sonarr and Radarr credentials and provider-specific default add options
+- Adds Sonarr and Radarr actions to [AniList anime pages](https://anilist.co/anime/21/ONE-PIECE/), [AniList browse](https://anilist.co/search/anime), and [AniChart](https://anichart.net).
+- Routes AniList series to Sonarr and AniList movies to Radarr.
+- Uses AniList metadata and public [AniBridge mappings](https://github.com/anibridge/anibridge-mappings) to improve matching.
+- Supports manual mappings when automatic matching is wrong, missing, or ambiguous.
+- Stores settings locally and does not include analytics, advertising, tracking SDKs, or a developer-operated backend.
 
 ## Install
-- Firefox (recommended): [Install from AMO](https://addons.mozilla.org/en-US/firefox/addon/ani2arr/)
-- GitHub releases: download the published artifact for your browser when a release is available
 
-### Compatibility
-- Firefox: MV2 / XPI (AMO-signed or local XPI)
-- Chrome / Chromium: MV3 (zip / unpack `.output/chrome-mv3`)
+| Browser           | Recommended install                                                        | Notes                                             |
+| ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------- |
+| Firefox           | [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/ani2arr/) | Requires Firefox 142 or newer.                    |
+| Chrome / Chromium | [GitHub Releases](https://github.com/infectiousstupidity/ani2arr/releases) | Download the Chrome MV3 zip and load it unpacked. |
 
 ### Manual install
-- Firefox (XPI):
-  1. Download the signed XPI from Releases or AMO.
-  2. In Firefox, open about:addons → Gear → "Install Add‑on From File..." and select the XPI.
-- Chrome / Chromium (MV3):
-  1. Download and extract the zip for Chrome MV3 (or build locally).
-  2. Open chrome://extensions, enable Developer mode, click "Load unpacked" and select the extracted folder (point at the folder that contains the extension manifest).
-  3. Alternatively use the produced folder: [.output/chrome-mv3](.output/chrome-mv3).
+
+**Firefox XPI**
+
+1. Download the signed XPI from Firefox Add-ons or GitHub Releases.
+2. Open `about:addons`.
+3. Gear menu -> `Install Add-on From File...`.
+4. Select the XPI.
+
+**Chrome / Chromium**
+
+1. Download and extract the Chrome MV3 zip from GitHub Releases.
+2. Open `chrome://extensions`.
+3. Enable Developer mode.
+4. Click `Load unpacked`.
+5. Select the extracted extension folder.
+
+Local Chrome builds are created under `.output/chrome-mv3`.
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/images/anime-page.png" alt="ani2arr actions on an AniList anime page">
+</p>
+
+<p align="center">
+  <img src="docs/images/quick-add.png" alt="ani2arr quick add dialog">
+</p>
+
+<p align="center">
+  <img src="docs/images/options-page.png" alt="ani2arr options page">
+</p>
 
 ## Development
-Artifacts are produced under `.output/` after build/zip.
 
-Developer commands (PowerShell)
+This project uses pnpm, WXT, React, TypeScript, Tailwind CSS, and Vitest.
+
+### Requirements
+
+- Node.js 24 or newer
+- pnpm 11.5.1 or compatible
+
+### Commands
+
 ```powershell
-# install deps
 pnpm install
 
-# dev
 pnpm run dev
 pnpm run dev:firefox
 
-# validate
 pnpm run lint
 pnpm run compile
+pnpm run test
+
 pnpm run build
 pnpm run build:firefox
 
-# create packaged artifacts
 pnpm run zip
 pnpm run zip:firefox
 ```
 
-## Security & privacy
-- Sonarr and Radarr credentials are stored in `browser.storage.local` on the user's device. See [`src/providers/settings/provider-connection.validation.ts`](src/providers/settings/provider-connection.validation.ts) and [`src/providers/settings/host-permissions.ts`](src/providers/settings/host-permissions.ts) for URL, API key, and permission helpers.
-- The extension does not use a developer-operated backend or analytics service.
-- Host access is requested for the configured provider scheme and host. Browser host permissions do not isolate by subfolder, and Firefox cannot isolate by port; API requests still use the exact configured URL.
-- See [`PRIVACY.md`](PRIVACY.md) for the user-facing privacy policy.
+Build and zip artifacts are created under `.output/`.
 
-## Maintenance
-- Not actively maintained. The author is not a formally trained developer - use at your own risk.
-- Please open issues or PRs if you find problems or want to contribute.
+## Privacy and permissions
+
+ani2arr stores configuration locally in browser extension storage, including provider URLs, API keys, default add settings, UI preferences, manual mappings, and cached metadata.
+
+ani2arr may request data from configured Sonarr/Radarr servers, AniList GraphQL, and public AniBridge mapping files hosted on GitHub. It does not send data to a developer-owned backend, include analytics, include advertising, include tracking SDKs, sell user data, or sync settings to a developer service.
+
+Browser permissions cover AniList, AniChart, AniList GraphQL, public AniBridge mapping files, and the Sonarr/Radarr provider URL configured by the user. Host permissions are origin-based, and Firefox cannot isolate permissions by port.
+
+See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
+
+## Notes
+
+- Thanks to [AniBridge](https://github.com/anibridge/anibridge-mappings) and their contributors for maintaining the upstream mapping database.
+- This project is not actively maintained. The author is not a formally trained developer; use at your own risk.
+- Issues and PRs are welcome.
+
+## License
+
+ani2arr is licensed under the [GNU General Public License v3.0](LICENSE).

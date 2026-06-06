@@ -18,6 +18,7 @@ import {
 	getMetadataById,
 	getTargetSearchValue,
 	readTargetAniListIdFromHash,
+	type MappingSourceFilter,
 	type MappingStatusFilter,
 	type ProviderFilter,
 } from "./mappings/mapping-page-model";
@@ -54,9 +55,13 @@ const MappingsPageContent = ({
 	targetAniListId,
 }: MappingsPageContentProps): React.JSX.Element => {
 	const initialTargetSearch = getTargetSearchValue(targetAniListId);
+	const initialStatusFilter: MappingStatusFilter =
+		targetAniListId === null ? "needs-review" : "all";
 
 	const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
-	const [statusFilter, setStatusFilter] = useState<MappingStatusFilter>("all");
+	const [statusFilter, setStatusFilter] =
+		useState<MappingStatusFilter>(initialStatusFilter);
+	const [sourceFilter, setSourceFilter] = useState<MappingSourceFilter>("all");
 	const [searchQuery, setSearchQuery] = useState(() => initialTargetSearch);
 	const [visibleLimit, setVisibleLimit] = useState(MAPPING_GROUP_PAGE_SIZE);
 	const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(
@@ -67,12 +72,13 @@ const MappingsPageContent = ({
 	const preferredTitleLanguage =
 		publicOptions?.ui.preferredAniListTitleLanguage ?? "english";
 
-	const mappingsInput = getMappingsInput(
-		providerFilter,
-		statusFilter,
-		searchQuery,
-		visibleLimit,
-	);
+	const mappingsInput = getMappingsInput({
+		provider: providerFilter,
+		search: searchQuery,
+		source: sourceFilter,
+		status: statusFilter,
+		limit: visibleLimit,
+	});
 	const mappingsQuery = useMappings(mappingsInput);
 
 	const groups = useMemo(
@@ -135,6 +141,7 @@ const MappingsPageContent = ({
 				<MappingsFilterBar
 					provider={providerFilter}
 					status={statusFilter}
+					source={sourceFilter}
 					search={searchQuery}
 					isRefreshing={mappingsQuery.isRefetching}
 					onProviderChange={(provider) => {
@@ -144,6 +151,10 @@ const MappingsPageContent = ({
 					onStatusChange={(status) => {
 						resetVisibleLimit();
 						setStatusFilter(status);
+					}}
+					onSourceChange={(source) => {
+						resetVisibleLimit();
+						setSourceFilter(source);
 					}}
 					onSearchChange={(search) => {
 						resetVisibleLimit();

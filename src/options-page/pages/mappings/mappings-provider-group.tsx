@@ -2,7 +2,11 @@
 // src/options-page/pages/mappings/mappings-provider-group.tsx
 
 import { ChevronDown, CircleHelp } from "lucide-react";
+import type { KeyboardEvent, MouseEvent } from "react";
 import { RadarrIcon, SonarrIcon } from "../../components/icons";
+import { getProviderExternalIdLabel } from "@/providers/provider-labels";
+import { getProviderOpenTarget } from "@/providers/provider-links";
+import { openProviderPage } from "@/rpc/provider-page";
 import Pill from "@/shared/ui/primitives/pill";
 import { cn } from "@/shared/utils/cn";
 import type {
@@ -36,6 +40,8 @@ const ProviderIcon = ({ group }: { group: MappingGroup }): React.JSX.Element => 
 
 const META_PILL_CLASS =
 	"border border-border-primary/45 bg-bg-tertiary/20 text-text-secondary normal-case";
+const LINK_PILL_CLASS =
+	"hover:border-accent-primary/55 hover:bg-accent-primary/15 hover:text-accent-primary focus-visible:border-accent-primary/55 focus-visible:bg-accent-primary/15 focus-visible:text-accent-primary";
 
 const getLibraryPillClass = (group: MappingGroup): string => {
 	if (group.isInLibrary === true) {
@@ -59,11 +65,45 @@ export function MappingsProviderGroup(
 		onToggle,
 	} = props;
 	const metaPillLabels = getMappingGroupMetaPillLabels(group);
+	const groupTitle = formatMappingGroupTitle(group);
+	const providerIdLabel =
+		group.providerId === null
+			? null
+			: `${getProviderExternalIdLabel(group.provider)} ID: ${group.providerId}`;
+	const providerMetaPillLabels =
+		group.providerId === null ? metaPillLabels : metaPillLabels.slice(1);
+	const providerTarget =
+		group.providerId === null
+			? null
+			: getProviderOpenTarget({
+					isInLibrary: group.isInLibrary === true,
+					providerRouteSlug: group.providerMeta?.providerRouteSlug,
+					searchTerm: groupTitle,
+				});
+	const handleToggleKeyDown = (
+		event: KeyboardEvent<HTMLDivElement>,
+	): void => {
+		if (event.target !== event.currentTarget) return;
+		if (event.key !== "Enter" && event.key !== " ") return;
+
+		event.preventDefault();
+		onToggle(group.key);
+	};
+	const handleOpenProvider = (
+		event: MouseEvent<HTMLButtonElement>,
+	): void => {
+		event.stopPropagation();
+		if (!event.isTrusted || providerTarget === null) return;
+
+		openProviderPage({ provider: group.provider, target: providerTarget });
+	};
 
 	return (
-		<button
-			type="button"
+		<div
+			role="button"
+			tabIndex={0}
 			onClick={() => onToggle(group.key)}
+			onKeyDown={handleToggleKeyDown}
 			className={cn(
 				"flex min-h-16 w-full cursor-pointer items-center gap-4 border border-border-primary bg-bg-tertiary/50 px-4 py-3 text-left transition-colors hover:bg-bg-tertiary/70",
 				isExpanded ? "rounded-t-md" : "rounded-md",
@@ -75,11 +115,38 @@ export function MappingsProviderGroup(
 				<ProviderIcon group={group} />
 			</span>
 			<span className="min-w-0 flex-1">
-				<span className="block truncate text-sm font-semibold text-text-primary">
-					{formatMappingGroupTitle(group)}
-				</span>
+				{providerTarget ? (
+					<button
+						type="button"
+						onClick={handleOpenProvider}
+						className="block max-w-full cursor-pointer truncate rounded-sm text-sm font-semibold text-text-primary transition-colors hover:text-accent-primary focus-visible:text-accent-primary"
+						aria-label={`Open ${groupTitle}`}
+					>
+						{groupTitle}
+					</button>
+				) : (
+					<span className="block truncate text-sm font-semibold text-text-primary">
+						{groupTitle}
+					</span>
+				)}
 				<span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-text-secondary">
-					{metaPillLabels.map((label) => (
+					{providerTarget && providerIdLabel ? (
+						<button
+							type="button"
+							onClick={handleOpenProvider}
+							className="cursor-pointer rounded-full"
+							aria-label={`Open ${providerIdLabel}`}
+						>
+							<Pill
+								small
+								tone="muted"
+								className={cn(META_PILL_CLASS, LINK_PILL_CLASS)}
+							>
+								{providerIdLabel}
+							</Pill>
+						</button>
+					) : null}
+					{providerMetaPillLabels.map((label) => (
 						<Pill key={label} small tone="muted" className={META_PILL_CLASS}>
 							{label}
 						</Pill>
@@ -105,6 +172,6 @@ export function MappingsProviderGroup(
 					isExpanded && "rotate-180",
 				)}
 			/>
-		</button>
+		</div>
 	);
 }

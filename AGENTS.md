@@ -11,6 +11,12 @@
 - No unnecessary abstractions or indirections
 - No overuse of design patterns. Use them only when they clearly solve a problem.
 - Only add the absolute highest value tests. Don't test implementation details or trivial code. Focus on critical paths and edge case where absolutely necessary. DO NOT TEST USELESS UI STUFF.
+- DO NOT use overlapping enums; prefer flat, discriminated unions.
+- Read functions must be 100% pure with zero side-effects or silent mutations.
+- Code should be dumb, flat, and easy to delete.
+- Optimize for simplicity, readability, and a single-user environment.
+- DO NOT use enterprise scaling patterns like CQRS, Dependency Injection containers, or materialized views
+- No barrel exports
 
 - validate touched files with pnpm lint:target
 - run tests for files with pnpm test

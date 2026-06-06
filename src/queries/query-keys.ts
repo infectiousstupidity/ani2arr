@@ -25,6 +25,9 @@ const normalizeMappingsInput = (input?: GetMappingsInput) => {
 	if (input.statuses?.length) {
 		normalized.statuses = [...new Set(input.statuses)].toSorted();
 	}
+	if (input.source) {
+		normalized.source = input.source;
+	}
 	if (typeof input.limit === "number") {
 		normalized.limit = input.limit;
 	}
