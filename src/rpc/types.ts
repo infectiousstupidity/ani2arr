@@ -29,7 +29,7 @@ import type {
 	SonarrSeries,
 	SonarrSeriesSnapshot,
 } from "@/providers/sonarr/types";
-import type { MappingResult } from "@/mapping/types";
+import type { MappingResult, MappingSource } from "@/mapping/types";
 
 export type ProviderExternalId = TvdbId | TmdbId;
 
@@ -119,6 +119,7 @@ export type ValidateTmdbInput = {
 export type GetMappingsInput = {
 	providers?: Provider[];
 	statuses?: MappingListRowStatus[];
+	source?: MappingSource;
 	limit?: number;
 	query?: string;
 };
@@ -181,6 +182,7 @@ export interface MappingListProviderMeta {
 	title?: string;
 	type?: "series" | "movie";
 	statusLabel?: string;
+	providerRouteSlug?: string;
 }
 
 export interface MappingListRow {

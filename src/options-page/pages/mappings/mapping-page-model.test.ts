@@ -7,6 +7,7 @@ import { parseTvdbId } from "@/providers/schemas";
 import type { MappingGroup, MappingRow } from "./mapping-page-model";
 import {
 	getMappingListModel,
+	getMappingsInput,
 	isMappingGroupExpanded,
 	readTargetAniListIdFromHash,
 } from "./mapping-page-model";
@@ -122,5 +123,34 @@ describe("mapping page model", () => {
 		);
 		expect(readTargetAniListIdFromHash("#mappings")).toBeNull();
 		expect(readTargetAniListIdFromHash("#mappings?anilistId=bad")).toBeNull();
+	});
+
+	it("builds mapping query input from active filters", () => {
+		expect(
+			getMappingsInput({
+				provider: "sonarr",
+				status: "can-add",
+				source: "auto",
+				search: "  123  ",
+				limit: 50,
+			}),
+		).toEqual({
+			limit: 50,
+			providers: ["sonarr"],
+			statuses: ["can-add"],
+			source: "auto",
+			query: "123",
+		});
+		expect(
+			getMappingsInput({
+				provider: "all",
+				status: "all",
+				source: "all",
+				search: "  ",
+				limit: 50,
+			}),
+		).toEqual({
+			limit: 50,
+		});
 	});
 });

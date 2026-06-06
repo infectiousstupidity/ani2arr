@@ -6,7 +6,7 @@ import {
 	type AniListId,
 	type AniListMetadata,
 } from "@/anilist/types";
-import type { MappingResult } from "@/mapping/types";
+import type { MappingResult, MappingSource } from "@/mapping/types";
 import type { Provider } from "@/providers/types";
 import {
 	getProviderExternalIdLabel,
@@ -24,6 +24,7 @@ export type MappingRow = MappingGroup["rows"][number];
 
 export type ProviderFilter = Provider | "all";
 export type MappingStatusFilter = MappingListRowStatus | "all";
+export type MappingSourceFilter = MappingSource | "all";
 
 export type MappingListItem =
 	| {
@@ -145,15 +146,25 @@ export const getTargetSearchValue = (
 	targetAniListId: AniListId | null,
 ): string => (targetAniListId === null ? "" : String(targetAniListId));
 
-export const getMappingsInput = (
-	provider: ProviderFilter,
-	status: MappingStatusFilter,
-	search: string,
-	limit: number,
-): GetMappingsInput => {
-	const input: NonNullable<GetMappingsInput> = { limit };
+interface GetMappingsInputParams {
+	provider: ProviderFilter;
+	status: MappingStatusFilter;
+	source: MappingSourceFilter;
+	search: string;
+	limit: number;
+}
+
+export const getMappingsInput = ({
+	provider,
+	status,
+	source,
+	search,
+	limit,
+}: GetMappingsInputParams): GetMappingsInput => {
+	const input: GetMappingsInput = { limit };
 	if (provider !== "all") input.providers = [provider];
 	if (status !== "all") input.statuses = [status];
+	if (source !== "all") input.source = source;
 	const query = search.trim();
 	if (query.length > 0) input.query = query;
 	return input;

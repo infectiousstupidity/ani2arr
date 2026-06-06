@@ -16,7 +16,7 @@ import {
 	getMappingIdentities,
 	getMappingList,
 } from "@/mapping/list-mappings";
-import type { MappingResult } from "@/mapping/types";
+import type { MappingResult, MappingSource } from "@/mapping/types";
 import { refreshUpstreamMappings } from "@/mapping/upstream.store";
 import {
 	composeRadarrMappingsLibraryStatus,
@@ -25,6 +25,10 @@ import {
 import type { Provider } from "@/providers/types";
 import type { RadarrMovieSnapshot } from "@/providers/radarr/types";
 import { getProviderExternalIdLabel } from "@/providers/provider-labels";
+import {
+	getProviderRouteSlug,
+	type ProviderRouteSlugSource,
+} from "@/providers/provider-route-slug";
 import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
@@ -52,7 +56,7 @@ const PROVIDERS = ["sonarr", "radarr"] as const satisfies readonly Provider[];
 type ProviderMetaSource = {
 	title: string;
 	status?: string | null | undefined;
-};
+} & ProviderRouteSlugSource;
 
 async function loadSonarrLibrary(): Promise<SonarrSeriesSnapshot[]> {
 	const credentials = await getProviderConfig("sonarr");
@@ -89,10 +93,12 @@ function sonarrMeta(
 	item: ProviderMetaSource | null,
 ): MappingListProviderMeta | undefined {
 	if (!item) return undefined;
+	const providerRouteSlug = getProviderRouteSlug("sonarr", item);
 	return {
 		title: item.title,
 		type: "series",
 		...(typeof item.status === "string" ? { statusLabel: item.status } : {}),
+		...(providerRouteSlug ? { providerRouteSlug } : {}),
 	};
 }
 
@@ -100,10 +106,12 @@ function radarrMeta(
 	item: ProviderMetaSource | null,
 ): MappingListProviderMeta | undefined {
 	if (!item) return undefined;
+	const providerRouteSlug = getProviderRouteSlug("radarr", item);
 	return {
 		title: item.title,
 		type: "movie",
 		...(typeof item.status === "string" ? { statusLabel: item.status } : {}),
+		...(providerRouteSlug ? { providerRouteSlug } : {}),
 	};
 }
 
@@ -355,14 +363,43 @@ function filterGroups(
 	groups: MappingListGroup[],
 	statuses: readonly MappingListRowStatus[] | undefined,
 	query: string | undefined,
+	source: MappingSource | undefined,
 ): MappingListGroup[] {
 	const statusSet = statuses?.length ? new Set(statuses) : null;
+	const filteredGroups: MappingListGroup[] = [];
 
-	return groups.filter((group) => {
-		if (!matchesQuery(group, query)) return false;
-		if (!statusSet) return true;
-		return group.rows.some((row) => statusSet.has(row.mappingRowStatus));
-	});
+	for (const group of groups) {
+		const sourceGroup = filterGroupBySource(group, source);
+		if (!sourceGroup) continue;
+		if (!matchesQuery(sourceGroup, query)) continue;
+		if (
+			statusSet &&
+			!sourceGroup.rows.some((row) => statusSet.has(row.mappingRowStatus))
+		) {
+			continue;
+		}
+		filteredGroups.push(sourceGroup);
+	}
+
+	return filteredGroups;
+}
+
+function filterGroupBySource(
+	group: MappingListGroup,
+	source: MappingSource | undefined,
+): MappingListGroup | null {
+	if (!source) return group;
+
+	const rows = group.rows.filter(
+		(row) => row.result.kind === "mapped" && row.result.source === source,
+	);
+	if (rows.length === 0) return null;
+
+	return {
+		...group,
+		rows,
+		linkedAniListIds: rows.map((row) => row.anilistId),
+	};
 }
 
 function sortGroups(groups: MappingListGroup[]): MappingListGroup[] {
@@ -385,6 +422,7 @@ async function getMappingsOutput(input?: GetMappingsInput): Promise<GetMappingsO
 			providerGroups.flat(),
 			input?.statuses,
 			input?.query,
+			input?.source,
 		),
 	);
 	return {

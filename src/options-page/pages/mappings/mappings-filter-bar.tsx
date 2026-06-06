@@ -6,15 +6,21 @@ import { Search } from "lucide-react";
 import Button from "@/shared/ui/primitives/button";
 import { SelectControl } from "@/shared/ui/primitives/select";
 import { Input } from "../../components/ui/input";
-import type { MappingStatusFilter, ProviderFilter } from "./mapping-page-model";
+import type {
+	MappingSourceFilter,
+	MappingStatusFilter,
+	ProviderFilter,
+} from "./mapping-page-model";
 
 interface MappingsFilterBarProps {
 	provider: ProviderFilter;
 	status: MappingStatusFilter;
+	source: MappingSourceFilter;
 	search: string;
 	isRefreshing: boolean;
 	onProviderChange: (provider: ProviderFilter) => void;
 	onStatusChange: (status: MappingStatusFilter) => void;
+	onSourceChange: (source: MappingSourceFilter) => void;
 	onSearchChange: (search: string) => void;
 	onRefresh: () => void;
 }
@@ -35,11 +41,21 @@ const STATUS_OPTIONS: { label: string; value: MappingStatusFilter }[] = [
 	{ label: "Unknown", value: "unknown" },
 ];
 
+const SOURCE_OPTIONS: { label: string; value: MappingSourceFilter }[] = [
+	{ label: "Source: All", value: "all" },
+	{ label: "Upstream", value: "upstream" },
+	{ label: "Auto", value: "auto" },
+	{ label: "Manual", value: "manual" },
+];
+
 const isProviderFilter = (value: string): value is ProviderFilter =>
 	PROVIDER_OPTIONS.some((option) => option.value === value);
 
 const isStatusFilter = (value: string): value is MappingStatusFilter =>
 	STATUS_OPTIONS.some((option) => option.value === value);
+
+const isSourceFilter = (value: string): value is MappingSourceFilter =>
+	SOURCE_OPTIONS.some((option) => option.value === value);
 
 export function MappingsFilterBar(
 	props: MappingsFilterBarProps,
@@ -47,10 +63,12 @@ export function MappingsFilterBar(
 	const {
 		provider,
 		status,
+		source,
 		search,
 		isRefreshing,
 		onProviderChange,
 		onStatusChange,
+		onSourceChange,
 		onSearchChange,
 		onRefresh,
 	} = props;
@@ -80,7 +98,7 @@ export function MappingsFilterBar(
 
 	return (
 		<div className="rounded-md border border-border-primary bg-bg-secondary/70 p-4">
-			<div className="grid gap-3 md:grid-cols-[160px_180px_minmax(0,1fr)_auto] md:items-center">
+			<div className="grid gap-3 md:grid-cols-[160px_180px_160px_minmax(0,1fr)_auto] md:items-center">
 				<SelectControl
 					value={provider}
 					onValueChange={(value) => {
@@ -98,6 +116,15 @@ export function MappingsFilterBar(
 						}
 					}}
 					options={STATUS_OPTIONS}
+				/>
+				<SelectControl
+					value={source}
+					onValueChange={(value) => {
+						if (isSourceFilter(value)) {
+							onSourceChange(value);
+						}
+					}}
+					options={SOURCE_OPTIONS}
 				/>
 				<div className="relative min-w-0">
 					<Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />

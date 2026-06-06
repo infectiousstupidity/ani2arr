@@ -1,13 +1,13 @@
 /** Dumb media modal header with AniList and provider identity cards. */
 // src/features/media-modal/chrome/modal-header.tsx
 
-import { ExternalLink, Settings, X } from "lucide-react";
+import { Settings, X } from "lucide-react";
 import type { MouseEvent, MouseEventHandler } from "react";
 import type { AniListId } from "@/anilist/types";
 import { buildAniListAnimeUrl } from "@/anilist/title";
 import type { Provider } from "@/providers/types";
 import {
-	formatProviderExternalId,
+	getProviderExternalIdLabel,
 	getProviderLabel,
 } from "@/providers/provider-labels";
 import { getProviderOpenTarget } from "@/providers/provider-links";
@@ -17,6 +17,7 @@ import { cn } from "@/shared/utils/cn";
 import { formatToken } from "../helpers";
 import type { AniListHeaderData, MediaModalTargetSummary } from "../types";
 import {
+	MappingIdPill,
 	MappingOpenLink,
 	MappingPoster,
 } from "./header-mapping-card";
@@ -119,7 +120,7 @@ function SourceCard(props: {
 							ariaLabel="Open in AniList"
 							side="left"
 						>
-							{`AniList #${anilistId}`}
+							{`AniList ID: ${anilistId}`}
 						</MappingOpenLink>
 					</div>
 				</div>
@@ -216,11 +217,10 @@ function ProviderCardContent(props: {
 							<button
 								type="button"
 								onClick={openProvider}
-								className="ml-auto flex w-fit max-w-full items-center gap-1 text-[10px] leading-tight font-medium text-text-secondary transition-colors hover:text-accent-primary focus-visible:text-accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary md:text-xs"
+								className="group ml-auto flex w-fit max-w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary"
 								aria-label={`Open in ${providerLabel}`}
 							>
-								<span className="truncate">{providerIdLine}</span>
-								<ExternalLink className="h-3 w-3 shrink-0 md:h-3.5 md:w-3.5" />
+								<MappingIdPill>{providerIdLine}</MappingIdPill>
 							</button>
 						</div>
 					) : null}
@@ -254,10 +254,7 @@ function ProviderCard(props: ProviderCardProps): React.JSX.Element {
 		: null;
 
 	const providerIdLine = target
-		? formatProviderExternalId(
-				target.provider,
-				target.providerId,
-			)
+		? `${getProviderExternalIdLabel(target.provider)} ID: ${target.providerId}`
 		: null;
 
 	const providerOpenTarget = target

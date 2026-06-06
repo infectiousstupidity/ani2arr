@@ -1,8 +1,11 @@
 /** Shared mapping-card primitives for media modal header cards. */
 // src/features/media-modal/chrome/header-mapping-card.tsx
 
-import { ExternalLink } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import Pill from "@/shared/ui/primitives/pill";
+
+const ID_PILL_CLASS =
+  "max-w-full border border-border-primary/45 bg-bg-tertiary/20 text-text-secondary normal-case transition-colors group-hover:border-accent-primary/35 group-hover:bg-accent-primary/10 group-hover:text-accent-primary group-focus-visible:border-accent-primary/45 group-focus-visible:bg-accent-primary/10 group-focus-visible:text-accent-primary";
 
 export function MappingCard(props: { children: ReactNode }): React.JSX.Element {
   const { children } = props;
@@ -51,6 +54,19 @@ function MappingPosterImage(props: { src: string }): React.JSX.Element {
   );
 }
 
+export function MappingIdPill(props: {
+  side?: "left" | "right";
+  children: ReactNode;
+}): React.JSX.Element {
+  const { children } = props;
+
+  return (
+    <Pill small tone="muted" className={ID_PILL_CLASS}>
+      <span className="truncate">{children}</span>
+    </Pill>
+  );
+}
+
 export function MappingOpenLink(props: {
   href: string;
   ariaLabel: string;
@@ -65,20 +81,10 @@ export function MappingOpenLink(props: {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className={`${alignClass} flex w-fit max-w-full items-center gap-1 text-[10px] leading-tight font-medium text-text-secondary transition-colors hover:text-accent-primary focus-visible:text-accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary md:text-xs`}
+      className={`${alignClass} group flex w-fit max-w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary`}
       aria-label={ariaLabel}
     >
-      {side === "left" ? (
-        <>
-          <ExternalLink className="h-3 w-3 shrink-0 md:h-3.5 md:w-3.5" />
-          <span className="truncate">{children}</span>
-        </>
-      ) : (
-        <>
-          <span className="truncate">{children}</span>
-          <ExternalLink className="h-3 w-3 shrink-0 md:h-3.5 md:w-3.5" />
-        </>
-      )}
+      <MappingIdPill side={side}>{children}</MappingIdPill>
     </a>
   );
 }

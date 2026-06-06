@@ -32,10 +32,12 @@ export type AutoResult =
 			targets: UpstreamTarget[];
 	  };
 
+export type MappingSource = "manual" | "upstream" | "auto";
+
 export type MappingResult =
 	| {
 			kind: "mapped";
-			source: "manual" | "upstream" | "auto";
+			source: MappingSource;
 			providerId: number;
 			season?: number;
 			matchedTitle?: string;
