@@ -26,9 +26,15 @@
   </a>
 </p>
 
-<p align="center">
-  <img src="docs/images/banner.png" alt="ani2arr banner">
-</p>
+## Table of contents
+
+- [Features](#features)
+- [Install](#install)
+- [Screenshots](#screenshots)
+- [Development](#development)
+- [Privacy and permissions](#privacy-and-permissions)
+- [Notes](#notes)
+- [License](#license)
 
 ## Features
 
@@ -66,17 +72,17 @@ Local Chrome builds are created under `.output/chrome-mv3`.
 
 ## Screenshots
 
-<p align="center">
-  <img src="docs/images/anime-page.png" alt="ani2arr actions on an AniList anime page">
-</p>
+| AniList browse                                                                                                                                                                  | AniChart browse                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a href="docs/images/browse-page.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/browse-page.png" alt="ani2arr actions on AniList browse" width="260"></a> | <a href="docs/images/anichart.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/anichart.png" alt="ani2arr actions on AniChart" width="260"></a> |
 
-<p align="center">
-  <img src="docs/images/quick-add.png" alt="ani2arr quick add dialog">
-</p>
+| Add modal                                                                                                                                                   | Edit modal                                                                                                                                                     | Change mapping modal                                                                                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a href="docs/images/modal-add.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-add.png" alt="ani2arr add modal" width="260"></a> | <a href="docs/images/modal-edit.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-edit.png" alt="ani2arr edit modal" width="260"></a> | <a href="docs/images/modal-mapping.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-mapping.png" alt="ani2arr mapping modal" width="260"></a> |
 
-<p align="center">
-  <img src="docs/images/options-page.png" alt="ani2arr options page">
-</p>
+| Provider options                                                                                                                                                                 | Mapping options                                                                                                                                                               | Options UI                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a href="docs/images/options-provider.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/options-provider.png" alt="ani2arr provider options" width="260"></a> | <a href="docs/images/options-mapping.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/options-mapping.png" alt="ani2arr mapping options" width="260"></a> | <a href="docs/images/options-ui.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/options-ui.png" alt="ani2arr options UI" width="260"></a> |
 
 ## Development
 
