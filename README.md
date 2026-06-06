@@ -12,18 +12,10 @@
 </p>
 
 <p align="center">
-  <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/">
-    <img alt="Firefox Add-on" src="https://img.shields.io/badge/Firefox-AMO-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white">
-  </a>
-  <a href="https://github.com/infectiousstupidity/ani2arr/releases">
-    <img alt="GitHub release" src="https://img.shields.io/github/v/release/infectiousstupidity/ani2arr?style=for-the-badge&logo=github&label=Release">
-  </a>
-  <a href="https://github.com/infectiousstupidity/ani2arr/actions/workflows/ci.yml">
-    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/infectiousstupidity/ani2arr/ci.yml?branch=main&label=CI&style=for-the-badge">
-  </a>
-  <a href="LICENSE">
-    <img alt="License" src="https://img.shields.io/github/license/infectiousstupidity/ani2arr?style=for-the-badge">
-  </a>
+  <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/"><img alt="Firefox Add-on" src="https://img.shields.io/badge/Firefox-AMO-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white"></a>
+  <a href="https://github.com/infectiousstupidity/ani2arr/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/infectiousstupidity/ani2arr?style=for-the-badge&logo=github&label=Release"></a>
+  <a href="https://github.com/infectiousstupidity/ani2arr/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/infectiousstupidity/ani2arr/ci.yml?branch=main&label=CI&style=for-the-badge"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/infectiousstupidity/ani2arr?style=for-the-badge"></a>
 </p>
 
 ## Table of contents
