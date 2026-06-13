@@ -3,12 +3,13 @@
 
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { ExtensionErrorBoundary } from '@/shared/ui/feedback/extension-error-boundary';
 import { ConfirmProvider } from '@/shared/ui/feedback/confirm-provider';
 import { createContentEntrypointShell } from '@/content/core/create-content-script-shell';
 import { BrowseOverlays } from '@/content/browse/browse-overlays';
+import { createExtensionQueryClient } from '@/queries/query-client';
 import {
   BROWSE_OVERLAY_CONTAINER_CLASS,
   BROWSE_PROCESSED_ATTRIBUTE,
@@ -37,15 +38,9 @@ const cleanupDomArtifacts = (): void => {
 
 export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOptions) => {
   return async (ctx: ContentScriptContext): Promise<void> => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          staleTime: Infinity,
-          refetchOnWindowFocus: false,
-          retry: false,
-          gcTime: 30 * 1000 * 60,
-        },
-      },
+    const queryClient = createExtensionQueryClient({
+      staleTime: Infinity,
+      retry: false,
     });
 
     let ui: ShadowRootContentScriptUi<Root> | null = null;

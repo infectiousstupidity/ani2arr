@@ -48,6 +48,26 @@ export function normalizeSonarrFormState(
 	return v.parse(SonarrFormStateSchema, input ?? {});
 }
 
+export function normalizeSonarrDefaults(
+	input: Partial<SonarrFormState> | null | undefined,
+): SonarrFormState {
+	const defaults = normalizeSonarrFormState(input);
+
+	return {
+		...defaults,
+		seriesType: defaults.seriesType ?? "anime",
+		seasonFolder: defaults.seasonFolder ?? true,
+		addOptions: {
+			...defaults.addOptions,
+			monitor: defaults.addOptions?.monitor ?? "all",
+			searchForMissingEpisodes:
+				defaults.addOptions?.searchForMissingEpisodes ?? true,
+			searchForCutoffUnmetEpisodes:
+				defaults.addOptions?.searchForCutoffUnmetEpisodes ?? false,
+		},
+	};
+}
+
 export function stripSonarrFormStateForDefaults(
 	input: SonarrFormState,
 ): v.InferOutput<typeof SonarrDefaultsSchema> {
@@ -55,13 +75,4 @@ export function stripSonarrFormStateForDefaults(
 }
 
 export const createDefaultSonarrFormState = (): SonarrFormState =>
-	normalizeSonarrFormState({
-		...v.parse(SonarrDefaultsSchema, {}),
-		seriesType: "anime",
-		seasonFolder: true,
-		addOptions: {
-			monitor: "all",
-			searchForMissingEpisodes: true,
-			searchForCutoffUnmetEpisodes: false,
-		},
-	});
+	normalizeSonarrDefaults({});

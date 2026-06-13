@@ -4,11 +4,11 @@
 import { storage } from "@wxt-dev/storage";
 import * as v from "valibot";
 import {
-	normalizeSonarrFormState,
+	normalizeSonarrDefaults,
 	stripSonarrFormStateForDefaults,
 } from "@/providers/sonarr/form-state";
 import {
-	normalizeRadarrFormState,
+	normalizeRadarrDefaults,
 	stripRadarrFormStateForDefaults,
 } from "@/providers/radarr/form-state";
 import type {
@@ -46,11 +46,11 @@ export function toPublicOptions(settings: ExtensionOptions): PublicOptions {
 	return {
 		providers: {
 			sonarr: {
-				defaults: normalizeSonarrFormState(settings.providers.sonarr.defaults),
+				defaults: normalizeSonarrDefaults(settings.providers.sonarr.defaults),
 				isConfigured: hasConfiguredProviderCredentials(settings, "sonarr"),
 			},
 			radarr: {
-				defaults: normalizeRadarrFormState(settings.providers.radarr.defaults),
+				defaults: normalizeRadarrDefaults(settings.providers.radarr.defaults),
 				isConfigured: hasConfiguredProviderCredentials(settings, "radarr"),
 			},
 		},
@@ -108,13 +108,13 @@ export const parseExtensionOptions = (raw: unknown): ExtensionOptions => {
 				...result.output.providers,
 				sonarr: {
 					...result.output.providers.sonarr,
-					defaults: normalizeSonarrFormState(
+					defaults: normalizeSonarrDefaults(
 						result.output.providers.sonarr.defaults,
 					),
 				},
 				radarr: {
 					...result.output.providers.radarr,
-					defaults: normalizeRadarrFormState(
+					defaults: normalizeRadarrDefaults(
 						result.output.providers.radarr.defaults,
 					),
 				},
@@ -139,7 +139,7 @@ function safeNormalizeSonarrDefaults(
 	input: unknown,
 ): PublicOptions["providers"]["sonarr"]["defaults"] {
 	try {
-		return normalizeSonarrFormState(input as never);
+		return normalizeSonarrDefaults(input as never);
 	} catch {
 		return createDefaultPublicOptions().providers.sonarr.defaults;
 	}
@@ -149,7 +149,7 @@ function safeNormalizeRadarrDefaults(
 	input: unknown,
 ): PublicOptions["providers"]["radarr"]["defaults"] {
 	try {
-		return normalizeRadarrFormState(input as never);
+		return normalizeRadarrDefaults(input as never);
 	} catch {
 		return createDefaultPublicOptions().providers.radarr.defaults;
 	}

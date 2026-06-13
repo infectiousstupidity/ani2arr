@@ -9,8 +9,11 @@ import {
 } from "@/providers/schemas";
 import type { RadarrMovie } from "@/providers/radarr/types";
 import type { TmdbId } from "@/providers/schemas";
-import { normalizeRadarrFormState } from "@/providers/radarr/form-state";
-import type { RadarrFormState } from "@/providers/radarr/form-state";
+import {
+	normalizeRadarrDefaults,
+	normalizeRadarrFormState,
+	type RadarrFormState,
+} from "@/providers/radarr/form-state";
 import type { GetMovieStatusOutput } from "@/rpc/types";
 import { areArraysEqual } from "../helpers";
 
@@ -73,7 +76,7 @@ export function hasFullRadarrEditItem(
 export function getRadarrAddDefaults(
 	defaults: Partial<RadarrFormState> | null | undefined,
 ): RadarrFormState {
-	return normalizeRadarrFormState(defaults);
+	return normalizeRadarrDefaults(defaults);
 }
 
 export function getRadarrEditDefaults(movie: RadarrMovie): RadarrFormState {

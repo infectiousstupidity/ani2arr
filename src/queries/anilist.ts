@@ -15,7 +15,7 @@ export const useAniListMedia = (
 	return useQuery<AniListMedia | null, ExtensionError>({
 		queryKey: anilistId
 			? queryKeys.aniListMedia(anilistId)
-			: ["a2a", "aniListMedia", 0],
+			: queryKeys.aniListMediaPlaceholder(),
 		queryFn: async () => {
 			if (!anilistId) return null;
 			const api = getAni2arrApi();
@@ -28,7 +28,6 @@ export const useAniListMedia = (
 		retry: 1,
 		refetchOnWindowFocus: false,
 		refetchOnMount: true,
-		meta: { persist: false },
 	});
 };
 
@@ -49,6 +48,5 @@ export const useAniListMetadataBatch = (
 		staleTime: 12 * 60 * 60 * 1000,
 		gcTime: 24 * 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
-		meta: { persist: false },
 	});
 };

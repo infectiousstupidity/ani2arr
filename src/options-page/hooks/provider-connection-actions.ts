@@ -2,11 +2,12 @@
 // src/options-page/hooks/provider-connection-actions.ts
 
 import { useCallback, useState } from "react";
-import { useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import type {
 	Provider,
 	ProviderCredentials,
 } from "@/providers/types";
+import { resetAfterProviderConnectionChange } from "@/queries/invalidation";
 import { queryKeys } from "@/queries/query-keys";
 import {
 	useExtensionOptions,
@@ -29,20 +30,7 @@ interface ProviderConnectionActionsOptions {
 	provider: Provider;
 	label: string;
 	fetchFormResources: FetchFormResources;
-	queryRoots: readonly QueryKey[];
 }
-
-const SONARR_QUERY_ROOTS = [
-	queryKeys.sonarrConnectionRoot(),
-	queryKeys.mediaStatusProvider("sonarr"),
-	queryKeys.mappingSearchRoot("sonarr"),
-] as const;
-
-const RADARR_QUERY_ROOTS = [
-	queryKeys.radarrConnectionRoot(),
-	queryKeys.mediaStatusProvider("radarr"),
-	queryKeys.mappingSearchRoot("radarr"),
-] as const;
 
 const fetchSonarrFormResources: FetchFormResources = (api, credentials) =>
 	api.getSonarrFormResources({ credentials });
@@ -54,7 +42,6 @@ function useProviderConnectionActions({
 	provider,
 	label,
 	fetchFormResources,
-	queryRoots,
 }: ProviderConnectionActionsOptions) {
 	const queryClient = useQueryClient();
 	const { data: currentSettings } = useExtensionOptions();
@@ -94,16 +81,11 @@ function useProviderConnectionActions({
 					credentials: normalized,
 				});
 
-				if (provider === "sonarr") {
-					queryClient.setQueryData(queryKeys.sonarrFormResources(), formResources);
-				} else {
-					queryClient.setQueryData(queryKeys.radarrFormResources(), formResources);
-				}
-
-				for (const queryRoot of queryRoots) {
-					queryClient.invalidateQueries({ queryKey: queryRoot });
-				}
-				queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+				resetAfterProviderConnectionChange(queryClient, provider);
+				queryClient.setQueryData(
+					queryKeys.providerFormResources(provider),
+					formResources,
+				);
 
 				await api.notifyProviderConnectionChanged({
 					changedProviders: [provider],
@@ -128,7 +110,6 @@ function useProviderConnectionActions({
 			label,
 			provider,
 			queryClient,
-			queryRoots,
 			saveProviderConnection,
 		],
 	);
@@ -146,10 +127,7 @@ function useProviderConnectionActions({
 				credentials: null,
 			});
 
-			for (const queryRoot of queryRoots) {
-				queryClient.removeQueries({ queryKey: queryRoot });
-			}
-			queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+			resetAfterProviderConnectionChange(queryClient, provider);
 
 			await getAni2arrApi().notifyProviderConnectionChanged({
 				disconnectedProviders: [provider],
@@ -171,7 +149,6 @@ function useProviderConnectionActions({
 		label,
 		provider,
 		queryClient,
-		queryRoots,
 		saveProviderConnection,
 	]);
 
@@ -183,7 +160,6 @@ export function useSonarrActions() {
 		provider: "sonarr",
 		label: "Sonarr",
 		fetchFormResources: fetchSonarrFormResources,
-		queryRoots: SONARR_QUERY_ROOTS,
 	});
 
 	return {
@@ -199,7 +175,6 @@ export function useRadarrActions() {
 		provider: "radarr",
 		label: "Radarr",
 		fetchFormResources: fetchRadarrFormResources,
-		queryRoots: RADARR_QUERY_ROOTS,
 	});
 
 	return {

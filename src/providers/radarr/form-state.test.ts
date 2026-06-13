@@ -4,6 +4,8 @@
 import { describe, expect, it } from "vitest";
 import {
 	createDefaultRadarrFormState,
+	normalizeRadarrDefaults,
+	normalizeRadarrFormState,
 	stripRadarrFormStateForDefaults,
 } from "./form-state";
 
@@ -61,6 +63,44 @@ describe("Radarr form state", () => {
 				monitor: "movieAndCollection",
 				searchForMovie: false,
 			},
+		});
+	});
+
+	it("fills missing add defaults without replacing explicit values", () => {
+		expect(
+			normalizeRadarrDefaults({
+				addOptions: {
+					monitor: "none",
+				},
+			}),
+		).toMatchObject({
+			minimumAvailability: "released",
+			addOptions: {
+				monitor: "none",
+				searchForMovie: true,
+			},
+		});
+
+		expect(normalizeRadarrDefaults({})).toMatchObject({
+			minimumAvailability: "released",
+			addOptions: {
+				monitor: "movieOnly",
+				searchForMovie: true,
+			},
+		});
+
+		expect(
+			normalizeRadarrDefaults({
+				addOptions: {
+					searchForMovie: false,
+				},
+			}).addOptions?.searchForMovie,
+		).toBe(false);
+	});
+
+	it("keeps generic form normalization free of add defaults", () => {
+		expect(normalizeRadarrFormState({})).toEqual({
+			freeformTags: [],
 		});
 	});
 });

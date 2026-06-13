@@ -197,6 +197,57 @@ describe("options store helpers", () => {
 		expect(snapshot.providers.sonarr.isConfigured).toBe(true);
 	});
 
+	it("heals stale provider add defaults while reading settings snapshots", async () => {
+		const currentPublicOptions = toPublicOptions(createDefaultExtensionOptions());
+		await browser.storage.local.set({
+			[PUBLIC_OPTIONS_STORAGE_KEY]: {
+				...currentPublicOptions,
+				providers: {
+					sonarr: {
+						...currentPublicOptions.providers.sonarr,
+						defaults: {
+							seriesType: "anime",
+							seasonFolder: true,
+							freeformTags: [],
+							addOptions: {
+								monitor: "future",
+							},
+						},
+					},
+					radarr: {
+						...currentPublicOptions.providers.radarr,
+						defaults: {
+							minimumAvailability: "released",
+							freeformTags: [],
+							addOptions: {
+								monitor: "movieOnly",
+							},
+						},
+					},
+				},
+			},
+		});
+
+		const publicSnapshot = await getPublicOptionsSnapshot();
+		const extensionSnapshot = await getExtensionOptionsSnapshot();
+
+		expect(publicSnapshot.providers.sonarr.defaults.addOptions).toEqual({
+			monitor: "future",
+			searchForMissingEpisodes: true,
+			searchForCutoffUnmetEpisodes: false,
+		});
+		expect(publicSnapshot.providers.radarr.defaults.addOptions).toEqual({
+			monitor: "movieOnly",
+			searchForMovie: true,
+		});
+		expect(extensionSnapshot.providers.sonarr.defaults.addOptions).toEqual(
+			publicSnapshot.providers.sonarr.defaults.addOptions,
+		);
+		expect(extensionSnapshot.providers.radarr.defaults.addOptions).toEqual(
+			publicSnapshot.providers.radarr.defaults.addOptions,
+		);
+	});
+
 	it("watches only public options for public snapshot updates", async () => {
 		const snapshots: PublicOptions[] = [];
 		const unsubscribe = watchPublicOptionsSnapshot((snapshot) => {

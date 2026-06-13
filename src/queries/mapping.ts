@@ -5,9 +5,9 @@ import {
 	useMutation,
 	useQuery,
 	useQueryClient,
-	type QueryClient,
 } from "@tanstack/react-query";
 import type { AniListId } from "@/anilist/types";
+import { invalidateAfterMappingChange } from "@/queries/invalidation";
 import { getAni2arrApi } from "@/rpc";
 import type {
 	ClearMappingIgnoreInput,
@@ -23,23 +23,7 @@ import type {
 } from "@/rpc/types";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { Provider } from "@/providers/types";
-import { queryKeys } from "./query-keys";
-
-function invalidateMappingMutationQueries(
-	queryClient: QueryClient,
-	input: Pick<SetManualMappingInput, "anilistId" | "provider">,
-	): void {
-		queryClient.invalidateQueries({
-			queryKey: queryKeys.mediaStatusItem(input.provider, input.anilistId),
-		});
-	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingIdentitiesRoot(),
-	});
-	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingInspection(input.provider, input.anilistId),
-	});
-}
+import { normalizeMetadataIds, queryKeys } from "./query-keys";
 
 export const useSetManualMapping = () => {
 	const queryClient = useQueryClient();
@@ -48,7 +32,7 @@ export const useSetManualMapping = () => {
 			getAni2arrApi().setManualMapping(input),
 		onSettled: (_data, _error, variables) => {
 			if (variables) {
-				invalidateMappingMutationQueries(queryClient, variables);
+				invalidateAfterMappingChange(queryClient, variables);
 			}
 		},
 	});
@@ -61,7 +45,7 @@ export const useClearManualMapping = () => {
 			getAni2arrApi().clearManualMapping(input),
 		onSettled: (_data, _error, variables) => {
 			if (variables) {
-				invalidateMappingMutationQueries(queryClient, variables);
+				invalidateAfterMappingChange(queryClient, variables);
 			}
 		},
 	});
@@ -73,7 +57,7 @@ export const useSetMappingIgnore = () => {
 		mutationFn: (input: SetMappingIgnoreInput) =>
 			getAni2arrApi().setMappingIgnore(input),
 		onSuccess: (_data, variables) => {
-			invalidateMappingMutationQueries(queryClient, variables);
+			invalidateAfterMappingChange(queryClient, variables);
 		},
 	});
 };
@@ -84,7 +68,7 @@ export const useClearMappingIgnore = () => {
 		mutationFn: (input: ClearMappingIgnoreInput) =>
 			getAni2arrApi().clearMappingIgnore(input),
 		onSuccess: (_data, variables) => {
-			invalidateMappingMutationQueries(queryClient, variables);
+			invalidateAfterMappingChange(queryClient, variables);
 		},
 	});
 };
@@ -99,7 +83,7 @@ export const useSetMappingRejectedCandidate = () => {
 		mutationFn: (input: SetMappingRejectedCandidateInput) =>
 			getAni2arrApi().setMappingRejectedCandidate(input),
 		onSuccess: (_data, variables) => {
-			invalidateMappingMutationQueries(queryClient, variables);
+			invalidateAfterMappingChange(queryClient, variables);
 		},
 	});
 };
@@ -114,7 +98,7 @@ export const useClearMappingRejectedCandidate = () => {
 		mutationFn: (input: ClearMappingRejectedCandidateInput) =>
 			getAni2arrApi().clearMappingRejectedCandidate(input),
 		onSuccess: (_data, variables) => {
-			invalidateMappingMutationQueries(queryClient, variables);
+			invalidateAfterMappingChange(queryClient, variables);
 		},
 	});
 };
@@ -126,14 +110,13 @@ export const useMappings = (input?: GetMappingsInput) =>
 		staleTime: 45 * 60 * 1000,
 		gcTime: 2 * 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
-		meta: { persist: false },
 	});
 
 export const useMappingIdentities = (
 	ids: readonly AniListId[],
 	options?: { enabled?: boolean },
 ) => {
-	const normalizedIds = [...new Set(ids)].toSorted((a, b) => a - b);
+	const normalizedIds = normalizeMetadataIds(ids);
 	return useQuery<GetMappingIdentitiesOutput, ExtensionError>({
 		queryKey: queryKeys.mappingIdentities(normalizedIds),
 		queryFn: () => getAni2arrApi().getMappingIdentities(normalizedIds),
@@ -141,7 +124,6 @@ export const useMappingIdentities = (
 		staleTime: 10 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
-		meta: { persist: false },
 	});
 };
 

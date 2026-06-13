@@ -3,13 +3,21 @@
 
 import { QueryClient } from "@tanstack/react-query";
 
-export function createExtensionQueryClient(): QueryClient {
+type ExtensionQueryClientOptions = {
+	staleTime?: number;
+	retry?: boolean | number;
+};
+
+export function createExtensionQueryClient(
+	options?: ExtensionQueryClientOptions,
+): QueryClient {
 	return new QueryClient({
 		defaultOptions: {
 			queries: {
-				staleTime: 1000 * 60 * 5,
+				staleTime: options?.staleTime ?? 5 * 60 * 1000,
+				gcTime: 30 * 60 * 1000,
 				refetchOnWindowFocus: false,
-				retry: 1,
+				retry: options?.retry ?? 1,
 			},
 		},
 	});

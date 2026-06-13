@@ -34,10 +34,7 @@ const testConnection = (input: TestProviderConnectionInput) => {
 const getConnectionQueryKey = (
 	provider: Provider,
 	credentials?: ProviderCredentials | null,
-) =>
-	provider === "sonarr"
-		? queryKeys.sonarrConnection(getProviderConnectionScope(credentials))
-		: queryKeys.radarrConnection(getProviderConnectionScope(credentials));
+) => queryKeys.providerConnection(provider, getProviderConnectionScope(credentials));
 
 export const useProviderConnectionCheck = (options: {
 	provider: Provider;

@@ -9,6 +9,7 @@ import {
 } from "@/providers/schemas";
 import type { TvdbId } from "@/providers/schemas";
 import {
+	normalizeSonarrDefaults,
 	normalizeSonarrFormState,
 	type SonarrFormState,
 } from "@/providers/sonarr/form-state";
@@ -88,7 +89,7 @@ export function hasFullSonarrEditItem(
 export function getSonarrAddDefaults(
 	defaults: Partial<SonarrFormState> | null | undefined,
 ): SonarrFormState {
-	return normalizeSonarrFormState(defaults);
+	return normalizeSonarrDefaults(defaults);
 }
 
 export function getSonarrEditDefaults(

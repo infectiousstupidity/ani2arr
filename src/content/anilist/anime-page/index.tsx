@@ -2,10 +2,7 @@
 // src/content/anilist/anime-page/index.tsx
 
 import { createRoot, type Root } from "react-dom/client";
-import {
-	QueryClient,
-	QueryClientProvider,
-} from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { parseAniListIdOrNull } from "@/anilist/types";
 import {
@@ -13,6 +10,7 @@ import {
 	type ContentEntrypointShellContext,
 } from "@/content/core/create-content-script-shell";
 import "@/shared/styles/content-base.css";
+import { createExtensionQueryClient } from "@/queries/query-client";
 import { ExtensionErrorBoundary } from "@/shared/ui/feedback/extension-error-boundary";
 import { logger } from "@/shared/utils/logger";
 import {
@@ -38,16 +36,7 @@ import "./style.css";
 
 const log = logger.create("AniList Content");
 
-const queryClient = new QueryClient({
-	defaultOptions: {
-		queries: {
-			staleTime: 5 * 60 * 1000,
-			gcTime: 30 * 60 * 1000,
-			refetchOnWindowFocus: false,
-			retry: 1,
-		},
-	},
-});
+const queryClient = createExtensionQueryClient();
 
 const ANIME_PAGE = new MatchPattern("https://anilist.co/anime/*");
 

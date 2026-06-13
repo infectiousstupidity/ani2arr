@@ -53,7 +53,6 @@ export function useOptionsQuerySync(): void {
 				queryKey: queryKeys.options(),
 				queryFn: () => getExtensionOptionsSnapshot(),
 				staleTime: Infinity,
-				meta: { persist: false },
 			})
 			.then(applyExtensionOptionsSnapshot, () => {});
 		void queryClient
@@ -61,7 +60,6 @@ export function useOptionsQuerySync(): void {
 				queryKey: queryKeys.publicOptions(),
 				queryFn: () => getPublicOptionsSnapshot(),
 				staleTime: Infinity,
-				meta: { persist: false },
 			})
 			.then(applyPublicOptionsSnapshot, () => {});
 
@@ -78,7 +76,6 @@ export const useExtensionOptions = () =>
 		queryKey: queryKeys.options(),
 		queryFn: () => getExtensionOptionsSnapshot(),
 		staleTime: Infinity,
-		meta: { persist: false },
 	});
 
 export const usePublicOptions = () =>
@@ -86,7 +83,6 @@ export const usePublicOptions = () =>
 		queryKey: queryKeys.publicOptions(),
 		queryFn: () => getPublicOptionsSnapshot(),
 		staleTime: Infinity,
-		meta: { persist: false },
 	});
 
 export const useSavePublicOptions = () => {

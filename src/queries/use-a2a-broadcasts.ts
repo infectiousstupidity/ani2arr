@@ -1,11 +1,13 @@
 /** Syncs query caches with storage-backed revision invalidation events. */
 // src/queries/use-a2a-broadcasts.ts
 
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { browser } from "wxt/browser";
-import { PROVIDERS, type Provider } from "@/providers/types";
-import { queryKeys } from "@/queries/query-keys";
+import {
+	invalidateAfterMappingsRevision,
+	invalidateAfterProviderLibraryChange,
+} from "@/queries/invalidation";
 import {
 	MAPPINGS_REVISION_CHANGE_KEY,
 	RADARR_LIBRARY_REVISION_CHANGE_KEY,
@@ -15,30 +17,6 @@ import {
 export function useA2aBroadcasts(): void {
 	const queryClient = useQueryClient();
 
-	const refreshMappingsQueries = useCallback(() => {
-		queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-		queryClient.invalidateQueries({
-			queryKey: queryKeys.mappingInspectionRoot(),
-		});
-		queryClient.invalidateQueries({
-			queryKey: queryKeys.mappingIdentitiesRoot(),
-		});
-		for (const provider of PROVIDERS) {
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.mediaStatusProvider(provider),
-			});
-		}
-	}, [queryClient]);
-
-	const refreshLibraryQueries = useCallback(
-		(provider: Provider) => {
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.mediaStatusProvider(provider),
-			});
-		},
-		[queryClient],
-	);
-
 	useEffect(() => {
 		const onStorageChanged: Parameters<
 			typeof browser.storage.onChanged.addListener
@@ -46,19 +24,19 @@ export function useA2aBroadcasts(): void {
 			if (areaName !== "local") return;
 
 			if (changes[SONARR_LIBRARY_REVISION_CHANGE_KEY]) {
-				refreshLibraryQueries("sonarr");
+				invalidateAfterProviderLibraryChange(queryClient, "sonarr");
 			}
 
 			if (changes[RADARR_LIBRARY_REVISION_CHANGE_KEY]) {
-				refreshLibraryQueries("radarr");
+				invalidateAfterProviderLibraryChange(queryClient, "radarr");
 			}
 
 			if (changes[MAPPINGS_REVISION_CHANGE_KEY]) {
-				refreshMappingsQueries();
+				invalidateAfterMappingsRevision(queryClient);
 			}
 		};
 
 		browser.storage.onChanged.addListener(onStorageChanged);
 		return () => browser.storage.onChanged.removeListener(onStorageChanged);
-	}, [refreshLibraryQueries, refreshMappingsQueries]);
+	}, [queryClient]);
 }

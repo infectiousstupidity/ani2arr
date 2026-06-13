@@ -48,6 +48,22 @@ export function normalizeRadarrFormState(
 	return v.parse(RadarrFormStateSchema, input ?? {});
 }
 
+export function normalizeRadarrDefaults(
+	input: Partial<RadarrFormState> | null | undefined,
+): RadarrFormState {
+	const defaults = normalizeRadarrFormState(input);
+
+	return {
+		...defaults,
+		minimumAvailability: defaults.minimumAvailability ?? "released",
+		addOptions: {
+			...defaults.addOptions,
+			monitor: defaults.addOptions?.monitor ?? "movieOnly",
+			searchForMovie: defaults.addOptions?.searchForMovie ?? true,
+		},
+	};
+}
+
 export function stripRadarrFormStateForDefaults(
 	input: RadarrFormState,
 ): v.InferOutput<typeof RadarrDefaultsSchema> {
@@ -55,11 +71,4 @@ export function stripRadarrFormStateForDefaults(
 }
 
 export const createDefaultRadarrFormState = (): RadarrFormState =>
-	normalizeRadarrFormState({
-		...v.parse(RadarrDefaultsSchema, {}),
-		minimumAvailability: "released",
-		addOptions: {
-			monitor: "movieOnly",
-			searchForMovie: true,
-		},
-	});
+	normalizeRadarrDefaults({});

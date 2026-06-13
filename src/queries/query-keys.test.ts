@@ -1,0 +1,137 @@
+/** Tests for canonical React Query key shape and pure key input normalization. */
+// src/queries/query-keys.test.ts
+
+import { describe, expect, it } from "vitest";
+import type { AniListId } from "@/anilist/types";
+import type { StatusInput } from "@/rpc/types";
+import { normalizeMetadataIds, queryKeys } from "@/queries/query-keys";
+
+const aid = (value: number): AniListId => value as AniListId;
+
+const expectPrefix = (
+	key: readonly unknown[],
+	prefix: readonly unknown[],
+): void => {
+	expect(key.slice(0, prefix.length)).toEqual(prefix);
+};
+
+describe("queryKeys", () => {
+	it("sorts, dedupes, and filters AniList IDs", () => {
+		expect(normalizeMetadataIds([aid(3), aid(1), aid(3), -1 as AniListId])).toEqual([
+			aid(1),
+			aid(3),
+		]);
+	});
+
+	it("keeps mapping list keys stable for reordered filters", () => {
+		expect(
+			queryKeys.mappings({
+				providers: ["radarr", "sonarr", "radarr"],
+				statuses: ["unmapped", "can-add", "unmapped"],
+				source: "manual",
+				limit: 50,
+				query: "  One Piece  ",
+			}),
+		).toEqual(
+			queryKeys.mappings({
+				providers: ["sonarr", "radarr"],
+				statuses: ["can-add", "unmapped"],
+				source: "manual",
+				limit: 50,
+				query: "one piece",
+			}),
+		);
+	});
+
+	it("normalizes provider lookup text", () => {
+		expect(queryKeys.providerLookup("sonarr", "  Cowboy Bebop  ")).toEqual(
+			queryKeys.providerLookup("sonarr", "cowboy bebop"),
+		);
+	});
+
+	it("uses provider media-status request fields without metadata filtering", () => {
+		const request = {
+			anilistId: aid(9),
+			title: "  Test  ",
+			force_verify: true,
+			metadata: {
+				titles: { english: "Test EN", romaji: "Test JP" },
+				synonyms: ["  Alias  ", "Second Alias"],
+				format: "TV",
+				startYear: 2025,
+				coverImage: "https://example.invalid/cover.jpg",
+				relationPrequelIds: [1, 2],
+			},
+		} satisfies StatusInput;
+		const metadata = {
+			titles: { english: "Test EN", romaji: "Test JP" },
+			synonyms: ["  Alias  ", "Second Alias"],
+			format: "TV" as const,
+			startYear: 2025,
+			coverImage: "https://example.invalid/cover.jpg",
+			relationPrequelIds: [1, 2],
+		};
+
+		expect(
+			queryKeys.providerMediaStatus("sonarr", request),
+		).toEqual([
+			"a2a",
+			"provider",
+			"sonarr",
+			"mediaStatus",
+			aid(9),
+			{
+				title: "  Test  ",
+				metadata,
+			},
+		]);
+	});
+
+	it("separates provider media-status keys by request field changes", () => {
+		expect(
+			queryKeys.providerMediaStatus("sonarr", {
+				anilistId: aid(7),
+				title: "   ",
+				metadata: null,
+			}),
+		).not.toEqual(
+			queryKeys.providerMediaStatus("sonarr", {
+				anilistId: aid(7),
+			}),
+		);
+	});
+
+	it("keeps provider root and media item prefixes valid", () => {
+		const providerRoot = queryKeys.providerRoot("sonarr");
+		expectPrefix(
+			queryKeys.providerConnection("sonarr", "configured"),
+			providerRoot,
+		);
+		expectPrefix(
+			queryKeys.providerFormResources("sonarr", "draft"),
+			providerRoot,
+		);
+		const lookupRoot = queryKeys.providerLookupRoot("sonarr");
+		expectPrefix(lookupRoot, providerRoot);
+		expectPrefix(queryKeys.providerLookup("sonarr", "test"), lookupRoot);
+		expectPrefix(queryKeys.providerMediaStatusRoot("sonarr"), providerRoot);
+
+		const itemRoot = queryKeys.providerMediaStatusItem("sonarr", aid(12));
+		expectPrefix(
+			queryKeys.providerMediaStatus("sonarr", {
+				anilistId: aid(12),
+				title: "A",
+				metadata: { format: "TV", startYear: 2024 },
+			}),
+			itemRoot,
+		);
+		expectPrefix(
+			queryKeys.providerMediaStatus("sonarr", {
+				anilistId: aid(12),
+				title: "B",
+				metadata: { format: null, startYear: null },
+			}),
+			itemRoot,
+		);
+	});
+});

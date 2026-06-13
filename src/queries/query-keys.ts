@@ -1,20 +1,16 @@
-/** Shared query keys for React Query caches. */
+/** Shared React Query cache keys and pure input normalizers. */
 // src/queries/query-keys.ts
 
 import { isAniListId, type AniListId } from "@/anilist/types";
-import type { GetMappingsInput } from "@/rpc/types";
 import type { Provider } from "@/providers/types";
+import type { GetMappingsInput, StatusInput } from "@/rpc/types";
 
 const rootQueryKey = ["a2a"] as const;
+const configuredScope = "configured";
 
-const mediaStatusProviderKey = (provider: Provider) =>
-	[...rootQueryKey, "mediaStatus", provider] as const;
+type MediaStatusKeyInput = Pick<StatusInput, "anilistId" | "title" | "metadata">;
 
-const mediaStatusItemKey = (provider: Provider, anilistId: AniListId) =>
-	[...mediaStatusProviderKey(provider), anilistId] as const;
-
-const providerFormResourcesRootKey = (provider: Provider) =>
-	[...rootQueryKey, `${provider}FormResources`] as const;
+const normalizeText = (value: string): string => value.trim().toLowerCase();
 
 const normalizeMappingsInput = (input?: GetMappingsInput) => {
 	if (!input) return "default";
@@ -31,8 +27,8 @@ const normalizeMappingsInput = (input?: GetMappingsInput) => {
 	if (typeof input.limit === "number") {
 		normalized.limit = input.limit;
 	}
-	if (input.query && input.query.trim()) {
-		normalized.query = input.query.trim().toLowerCase();
+	if (input.query?.trim()) {
+		normalized.query = normalizeText(input.query);
 	}
 	return normalized;
 };
@@ -45,47 +41,72 @@ export const normalizeMetadataIds = (
 
 export const queryKeys = {
 	all: rootQueryKey,
-	options: () => [...rootQueryKey, "options"] as const,
-	publicOptions: () => [...rootQueryKey, "publicOptions"] as const,
+	options: () => [...rootQueryKey, "options", "extension"] as const,
+	publicOptions: () => [...rootQueryKey, "options", "public"] as const,
 	aniListMedia: (anilistId: AniListId) =>
-		[...rootQueryKey, "aniListMedia", anilistId] as const,
-	mediaStatusProvider: (provider: Provider) => mediaStatusProviderKey(provider),
-	mediaStatusItem: (provider: Provider, anilistId: AniListId) =>
-		mediaStatusItemKey(provider, anilistId),
-	mediaStatus: (provider: Provider, anilistId: AniListId) =>
-		mediaStatusItemKey(provider, anilistId),
-	sonarrFormResourcesRoot: () => providerFormResourcesRootKey("sonarr"),
-	sonarrFormResources: (scope?: string) =>
-		[...rootQueryKey, "sonarrFormResources", scope ?? "configured"] as const,
-	sonarrConnectionRoot: () => [...rootQueryKey, "sonarrConnection"] as const,
-	sonarrConnection: (scope?: string) =>
-		[...rootQueryKey, "sonarrConnection", scope ?? "configured"] as const,
-	radarrFormResourcesRoot: () => providerFormResourcesRootKey("radarr"),
-	radarrFormResources: (scope?: string) =>
-		[...rootQueryKey, "radarrFormResources", scope ?? "configured"] as const,
-	radarrConnectionRoot: () => [...rootQueryKey, "radarrConnection"] as const,
-	radarrConnection: (scope?: string) =>
-		[...rootQueryKey, "radarrConnection", scope ?? "configured"] as const,
-	mappingSearchRoot: (provider?: Provider) =>
-		provider
-			? ([...rootQueryKey, "mappingSearch", provider] as const)
-			: ([...rootQueryKey, "mappingSearch"] as const),
-	mappingSearch: (service: "sonarr" | "radarr", query: string) =>
+		[...rootQueryKey, "anilist", "media", anilistId] as const,
+	aniListMediaPlaceholder: () =>
+		[...rootQueryKey, "anilist", "media", 0] as const,
+	aniListMetadata: (ids: readonly AniListId[]) =>
+		[...rootQueryKey, "anilist", "metadata", normalizeMetadataIds(ids)] as const,
+	mappingsRoot: () => [...rootQueryKey, "mapping", "list"] as const,
+	mappings: (input?: GetMappingsInput) =>
+		[...rootQueryKey, "mapping", "list", normalizeMappingsInput(input)] as const,
+	mappingIdentitiesRoot: () =>
+		[...rootQueryKey, "mapping", "identities"] as const,
+	mappingIdentities: (ids: readonly AniListId[]) =>
 		[
 			...rootQueryKey,
-			"mappingSearch",
-			service,
-			query.trim().toLowerCase(),
+			"mapping",
+			"identities",
+			normalizeMetadataIds(ids),
 		] as const,
-	mappingsRoot: () => [...rootQueryKey, "mappings"] as const,
-	mappings: (input?: GetMappingsInput) =>
-		[...rootQueryKey, "mappings", normalizeMappingsInput(input)] as const,
-	mappingIdentitiesRoot: () => [...rootQueryKey, "mappingIdentities"] as const,
-	mappingIdentities: (ids: readonly AniListId[]) =>
-		[...rootQueryKey, "mappingIdentities", normalizeMetadataIds(ids)] as const,
-	mappingInspectionRoot: () => [...rootQueryKey, "mappingInspection"] as const,
+	mappingInspectionRoot: () =>
+		[...rootQueryKey, "mapping", "inspection"] as const,
 	mappingInspection: (provider: Provider, anilistId: AniListId) =>
-		[...rootQueryKey, "mappingInspection", provider, anilistId] as const,
-	aniListMetadata: (ids: readonly AniListId[]) =>
-		[...rootQueryKey, "aniListMetadata", normalizeMetadataIds(ids)] as const,
+		[...rootQueryKey, "mapping", "inspection", provider, anilistId] as const,
+	providerRoot: (provider: Provider) =>
+		[...rootQueryKey, "provider", provider] as const,
+	providerConnection: (provider: Provider, scope = configuredScope) =>
+		[
+			...rootQueryKey,
+			"provider",
+			provider,
+			"connection",
+			scope,
+		] as const,
+	providerFormResources: (provider: Provider, scope = configuredScope) =>
+		[
+			...rootQueryKey,
+			"provider",
+			provider,
+			"formResources",
+			scope,
+		] as const,
+	providerLookupRoot: (provider: Provider) =>
+		[...rootQueryKey, "provider", provider, "lookup"] as const,
+	providerLookup: (provider: Provider, term: string) =>
+		[...rootQueryKey, "provider", provider, "lookup", normalizeText(term)] as const,
+	providerMediaStatusRoot: (provider: Provider) =>
+		[...rootQueryKey, "provider", provider, "mediaStatus"] as const,
+	providerMediaStatusItem: (provider: Provider, anilistId: AniListId) =>
+		[
+			...rootQueryKey,
+			"provider",
+			provider,
+			"mediaStatus",
+			anilistId,
+		] as const,
+	providerMediaStatus: (provider: Provider, input: MediaStatusKeyInput) =>
+		[
+			...rootQueryKey,
+			"provider",
+			provider,
+			"mediaStatus",
+			input.anilistId,
+			{
+				...(input.title === undefined ? {} : { title: input.title }),
+				...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+			},
+		] as const,
 };

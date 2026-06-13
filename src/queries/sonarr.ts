@@ -2,11 +2,12 @@
 // src/queries/sonarr.ts
 
 import {
+	type QueryKey,
 	useMutation,
 	useQuery,
 	useQueryClient,
-	type QueryClient,
 } from "@tanstack/react-query";
+import type { AniListId } from "@/anilist/types";
 import { getAni2arrApi } from "@/rpc";
 import type {
 	AddSonarrInput,
@@ -17,9 +18,31 @@ import type {
 } from "@/rpc/types";
 import { getProviderConnectionScope } from "@/providers/settings/provider-connection.validation";
 import type { ExtensionError } from "@/shared/errors/error.types";
+import { invalidateAfterProviderMediaChange } from "@/queries/invalidation";
 import { queryKeys } from "@/queries/query-keys";
 import type { ProviderCredentials } from "@/providers/types";
 import type { SonarrSeries } from "@/providers/sonarr/types";
+
+const hasQueryKeyPrefix = (
+	queryKey: QueryKey,
+	prefix: readonly unknown[],
+): boolean => prefix.every((part, index) => queryKey[index] === part);
+
+const keepPreviousSeriesStatusForSameMedia =
+	(anilistId: AniListId) =>
+	(
+		previousData: GetSeriesStatusOutput | undefined,
+		previousQuery: { queryKey: QueryKey } | undefined,
+	): GetSeriesStatusOutput | undefined => {
+		if (!previousQuery) return undefined;
+
+		return hasQueryKeyPrefix(
+			previousQuery.queryKey,
+			queryKeys.providerMediaStatusItem("sonarr", anilistId),
+		)
+			? previousData
+			: undefined;
+	};
 
 export const useSonarrFormResources = (options?: {
 	enabled?: boolean;
@@ -30,7 +53,8 @@ export const useSonarrFormResources = (options?: {
 		: undefined;
 
 	return useQuery({
-		queryKey: queryKeys.sonarrFormResources(
+		queryKey: queryKeys.providerFormResources(
+			"sonarr",
 			getProviderConnectionScope(options?.credentials),
 		),
 		queryFn: () => {
@@ -55,16 +79,16 @@ export const useSeriesStatus = (
 	const forceVerify = options?.force_verify === true;
 	const forceMappingRetry = options?.force_mapping_retry === true;
 	const forceStatusRefresh = forceVerify || forceMappingRetry;
+	const statusKeyInput = {
+		anilistId: payload.anilistId,
+		...(payload.title === undefined ? {} : { title: payload.title }),
+		...(payload.metadata === undefined ? {} : { metadata: payload.metadata }),
+	};
+
 	return useQuery<GetSeriesStatusOutput, ExtensionError>({
-		queryKey: queryKeys.mediaStatus("sonarr", payload.anilistId),
+		queryKey: queryKeys.providerMediaStatus("sonarr", statusKeyInput),
 		queryFn: async () => {
-			const request: StatusInput = { anilistId: payload.anilistId };
-			if (payload.title !== undefined) {
-				request.title = payload.title;
-			}
-			if (payload.metadata !== undefined) {
-				request.metadata = payload.metadata;
-			}
+			const request: StatusInput = { ...statusKeyInput };
 			if (options?.force_verify === true) {
 				request.force_verify = true;
 			}
@@ -76,12 +100,8 @@ export const useSeriesStatus = (
 		enabled: !!payload.anilistId && (options?.enabled ?? true),
 		staleTime: forceStatusRefresh ? 0 : 5 * 60 * 1000,
 		...(forceStatusRefresh ? { refetchOnMount: "always" } : {}),
-		placeholderData: (previousData, previousQuery) =>
-			previousQuery?.queryKey[3] === payload.anilistId
-				? previousData
-				: undefined,
+		placeholderData: keepPreviousSeriesStatusForSameMedia(payload.anilistId),
 		refetchOnWindowFocus: false,
-		meta: { persist: false },
 	});
 };
 
@@ -92,7 +112,7 @@ export const useSonarrLookupSearch = (input: {
 	const term = input.term.trim();
 
 	return useQuery<SonarrLookupOutput>({
-		queryKey: queryKeys.mappingSearch("sonarr", term),
+		queryKey: queryKeys.providerLookup("sonarr", term),
 		queryFn: async () => getAni2arrApi().searchSonarr({ term }),
 		enabled: input.enabled && term.length > 0,
 		staleTime: 60 * 1000,
@@ -101,24 +121,15 @@ export const useSonarrLookupSearch = (input: {
 	});
 };
 
-function invalidateSonarrMediaMutationQueries(
-	queryClient: QueryClient,
-	variables: Pick<AddSonarrInput, "anilistId" | "tvdbId">,
-): void {
-	queryClient.invalidateQueries({
-		queryKey: queryKeys.mediaStatusItem("sonarr", variables.anilistId),
-	});
-	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingInspection("sonarr", variables.anilistId),
-	});
-}
-
 export const useAddSeries = () => {
 	const queryClient = useQueryClient();
 	return useMutation<SonarrSeries, ExtensionError, AddSonarrInput>({
 		mutationFn: (input: AddSonarrInput) => getAni2arrApi().addToSonarr(input),
 		onSuccess: (_createdSeries, variables) => {
-			invalidateSonarrMediaMutationQueries(queryClient, variables);
+			invalidateAfterProviderMediaChange(queryClient, {
+				provider: "sonarr",
+				anilistId: variables.anilistId,
+			});
 		},
 	});
 };
@@ -129,7 +140,10 @@ export const useUpdateSeries = () => {
 		mutationFn: (input: UpdateSonarrInput) =>
 			getAni2arrApi().updateSonarrSeries(input),
 		onSuccess: (_updatedSeries, variables) => {
-			invalidateSonarrMediaMutationQueries(queryClient, variables);
+			invalidateAfterProviderMediaChange(queryClient, {
+				provider: "sonarr",
+				anilistId: variables.anilistId,
+			});
 		},
 	});
 };
