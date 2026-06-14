@@ -148,12 +148,14 @@ export const sonarrHandlers = {
 				uniqueTvdbIds.add(tvdbId);
 			}
 		}
-		await Promise.all(
-			[...uniqueTvdbIds].map(async (tvdbId) => {
-				const linked = await mappingService.getLinkedAniListIds("sonarr", tvdbId);
-				if (linked.length > 0) linkedAniListIdsByTvdbId[tvdbId] = linked;
-			}),
+
+		const linkedAniListIds = await mappingService.getLinkedAniListIdsByProviderIds(
+			"sonarr",
+			uniqueTvdbIds,
 		);
+		for (const [tvdbId, linked] of linkedAniListIds) {
+			linkedAniListIdsByTvdbId[tvdbId] = linked;
+		}
 
 		return {
 			results,

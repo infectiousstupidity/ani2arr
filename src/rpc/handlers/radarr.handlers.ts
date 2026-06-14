@@ -130,12 +130,13 @@ export const radarrHandlers = {
 			}
 		}
 
-		await Promise.all(
-			[...uniqueTmdbIds].map(async (tmdbId) => {
-				const linked = await mappingService.getLinkedAniListIds("radarr", tmdbId);
-				if (linked.length > 0) linkedAniListIdsByTmdbId[tmdbId] = linked;
-			}),
+		const linkedAniListIds = await mappingService.getLinkedAniListIdsByProviderIds(
+			"radarr",
+			uniqueTmdbIds,
 		);
+		for (const [tmdbId, linked] of linkedAniListIds) {
+			linkedAniListIdsByTmdbId[tmdbId] = linked;
+		}
 
 		return {
 			results,

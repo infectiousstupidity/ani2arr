@@ -333,6 +333,67 @@ describe("MappingService", () => {
 		).resolves.toEqual([aid(1), aid(2), aid(3)]);
 	});
 
+	it("computes linked AniList IDs for multiple provider IDs in one scan", async () => {
+		storeRecords.upstream = [
+			{
+				anilistId: aid(30),
+				targets: [{ provider: "radarr", providerId: tmdb(300) }],
+			},
+			{
+				anilistId: aid(10),
+				targets: [{ provider: "radarr", providerId: tmdb(100) }],
+			},
+			{
+				anilistId: aid(40),
+				targets: [{ provider: "radarr", providerId: tmdb(400) }],
+			},
+		];
+		storeRecords.auto = [
+			{
+				provider: "radarr",
+				anilistId: aid(20),
+				result: { kind: "mapped", providerId: tmdb(100) },
+			},
+			{
+				provider: "radarr",
+				anilistId: aid(30),
+				result: { kind: "mapped", providerId: tmdb(200) },
+			},
+			{
+				provider: "radarr",
+				anilistId: aid(40),
+				result: { kind: "mapped", providerId: tmdb(100) },
+			},
+		];
+		storeRecords.manual = [
+			{
+				provider: "radarr",
+				anilistId: aid(30),
+				facts: { mapping: { providerId: tmdb(100) } },
+			},
+			{
+				provider: "radarr",
+				anilistId: aid(40),
+				facts: { ignored: true },
+			},
+			{
+				provider: "radarr",
+				anilistId: aid(50),
+				facts: { mapping: { providerId: tmdb(200) } },
+			},
+		];
+
+		const linked = await service().getLinkedAniListIdsByProviderIds(
+			"radarr",
+			[tmdb(100), tmdb(200), tmdb(100)],
+		);
+
+		expect([...linked.entries()]).toEqual([
+			[tmdb(100), [aid(10), aid(20), aid(30)]],
+			[tmdb(200), [aid(50)]],
+		]);
+	});
+
 	it("retries cached unmapped auto results only when forced", async () => {
 		const anilistId = aid(20);
 		const resolver = vi.fn(async () => {

@@ -159,6 +159,21 @@ export class MappingService {
 		provider: Provider,
 		providerId: number,
 	): Promise<AniListId[]> {
+		const linkedAniListIdsByProviderId =
+			await this.getLinkedAniListIdsByProviderIds(provider, [providerId]);
+
+		return linkedAniListIdsByProviderId.get(providerId) ?? [];
+	}
+
+	public async getLinkedAniListIdsByProviderIds(
+		provider: Provider,
+		providerIds: Iterable<number>,
+	): Promise<Map<number, AniListId[]>> {
+		const requestedProviderIds = new Set(providerIds);
+		if (requestedProviderIds.size === 0) {
+			return new Map();
+		}
+
 		const [manualRecords, upstreamRecords, autoRecords] = await Promise.all([
 			listManualFacts(provider),
 			listUpstreamMappings(),
@@ -191,7 +206,7 @@ export class MappingService {
 			...autoByAniListId.keys(),
 		]);
 
-		const linkedAniListIds: AniListId[] = [];
+		const linkedAniListIdsByProviderId = new Map<number, AniListId[]>();
 
 		for (const anilistId of anilistIds) {
 			const result = chooseMappingResult(
@@ -201,12 +216,27 @@ export class MappingService {
 				autoByAniListId.get(anilistId) ?? null,
 			);
 
-			if (result.kind === "mapped" && result.providerId === providerId) {
-				linkedAniListIds.push(anilistId);
+			if (
+				result.kind !== "mapped" ||
+				!requestedProviderIds.has(result.providerId)
+			) {
+				continue;
 			}
+
+			const linkedAniListIds =
+				linkedAniListIdsByProviderId.get(result.providerId) ?? [];
+			linkedAniListIds.push(anilistId);
+			linkedAniListIdsByProviderId.set(result.providerId, linkedAniListIds);
 		}
 
-		return linkedAniListIds.toSorted((left, right) => left - right);
+		for (const [linkedProviderId, linkedAniListIds] of linkedAniListIdsByProviderId) {
+			linkedAniListIdsByProviderId.set(
+				linkedProviderId,
+				linkedAniListIds.toSorted((left, right) => left - right),
+			);
+		}
+
+		return linkedAniListIdsByProviderId;
 	}
 }
 
