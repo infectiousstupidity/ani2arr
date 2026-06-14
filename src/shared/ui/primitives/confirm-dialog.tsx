@@ -4,6 +4,7 @@ import React, { useCallback, useRef } from 'react';
 import Button from '@/shared/ui/primitives/button';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { cn } from '@/shared/utils/cn';
+import type { FloatingPortalContainer } from '../portal-container';
 
 const BASE_CONFIRM_Z_INDEX = 2_147_483_620;
 const CONFIRM_OVERLAY_Z_INDEX = BASE_CONFIRM_Z_INDEX;
@@ -15,7 +16,7 @@ type ConfirmDialogProps = {
   description?: React.ReactNode;
   confirmText?: string;
   cancelText?: string;
-  container?: HTMLElement | ShadowRoot | null;
+  container?: FloatingPortalContainer;
   onConfirm: () => void;
   onCancel: () => void;
   onOpenChange?: (open: boolean) => void;
@@ -33,11 +34,6 @@ export default function ConfirmDialog({
   onOpenChange,
 }: ConfirmDialogProps): React.ReactElement {
   const closeIntentRef = useRef<'confirm' | 'cancel' | null>(null);
-
-  const portalContainer =
-    container instanceof ShadowRoot
-      ? (container as unknown as HTMLElement)
-      : container ?? undefined;
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -64,9 +60,7 @@ export default function ConfirmDialog({
 
   return (
     <AlertDialog.Root open={open} onOpenChange={handleOpenChange}>
-      <AlertDialog.Portal
-        {...(portalContainer ? { container: portalContainer as HTMLElement } : {})}
-      >
+      <AlertDialog.Portal container={container}>
         <AlertDialog.Overlay
           className={cn(
             'fixed inset-0 bg-black/60 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out',

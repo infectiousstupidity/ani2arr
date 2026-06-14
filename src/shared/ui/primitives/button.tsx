@@ -4,6 +4,7 @@ import { Slot as SlotPrimitive } from "@radix-ui/react-slot";
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { cn } from "@/shared/utils/cn";
 import TooltipWrapper from "./tooltip";
+import type { FloatingPortalContainer } from "../portal-container";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 	asChild?: boolean;
@@ -12,7 +13,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 	isLoading?: boolean;
 	loadingText?: string;
 	tooltip?: string;
-	tooltipContainer?: HTMLElement | undefined;
+	tooltipContainer?: FloatingPortalContainer | undefined;
 }
 
 const sizeClasses = {

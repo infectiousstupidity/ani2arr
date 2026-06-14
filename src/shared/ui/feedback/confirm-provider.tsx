@@ -4,11 +4,12 @@
 import { useCallback, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 
 import ConfirmDialog from '@/shared/ui/primitives/confirm-dialog';
+import type { FloatingPortalContainer } from '@/shared/ui/portal-container';
 
 import { ConfirmContext, type ConfirmOptions } from './confirm-context';
 
 type ConfirmProviderProps = PropsWithChildren<{
-  portalContainer?: HTMLElement | ShadowRoot | null;
+  portalContainer?: FloatingPortalContainer | undefined;
 }>;
 
 export function ConfirmProvider({

@@ -5,11 +5,12 @@ import type { FieldProps } from './field-props';
 import { FieldLabel } from './field-label';
 import { Field } from './field';
 import { Switch } from '../primitives/switch';
+import type { FloatingPortalContainer } from '../portal-container';
 
 type SwitchFieldExtraProps = {
   labelHelp?: React.ReactNode | undefined;
   labelHelpDelay?: number | undefined;
-  labelHelpContainer?: HTMLElement | ShadowRoot | null | undefined;
+  labelHelpContainer?: FloatingPortalContainer | undefined;
   layout?: 'stacked' | 'inline' | undefined;
   containerClassName?: string | undefined;
   labelClassName?: string | undefined;
@@ -24,7 +25,7 @@ type SwitchFieldLayoutProps = {
   description?: React.ReactNode;
   labelHelp?: React.ReactNode;
   labelHelpDelay?: number | undefined;
-  labelHelpContainer?: HTMLElement | ShadowRoot | null | undefined;
+  labelHelpContainer?: FloatingPortalContainer | undefined;
   containerClassName?: string | undefined;
   labelClassName?: string | undefined;
   descriptionClassName?: string | undefined;

@@ -6,6 +6,7 @@ import type { AniListId, AniListMediaHint } from "@/anilist/types";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
+import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import type { BadgeVisibility } from "@/settings/types";
 import { getCardPrimaryTitle } from "./card-primary-title";
 import { CardOverlay } from "./card-overlay";
@@ -22,7 +23,7 @@ interface RadarrCardOverlayProps {
 	observeTarget?: Element | null;
 	badgeVisibility?: BadgeVisibility;
 	stackDirection?: "up" | "down";
-	tooltipContainer?: HTMLElement | ShadowRoot | null;
+	tooltipContainer?: FloatingPortalContainer;
 }
 
 export function RadarrCardOverlay({

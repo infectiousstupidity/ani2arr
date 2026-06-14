@@ -3,12 +3,13 @@
 import type { ReactNode } from 'react';
 import { HelpTooltip } from '../primitives/tooltip';
 import { Label } from '../primitives/label';
+import type { FloatingPortalContainer } from '../portal-container';
 
 interface FieldLabelProps {
   label: string;
   labelHelp?: ReactNode | undefined;
   labelHelpDelay?: number | undefined;
-  labelHelpContainer?: HTMLElement | ShadowRoot | null | undefined;
+  labelHelpContainer?: FloatingPortalContainer | undefined;
   className?: string | undefined;
   wrapperClassName?: string | undefined;
 }

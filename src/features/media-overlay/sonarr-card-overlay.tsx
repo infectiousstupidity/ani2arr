@@ -6,6 +6,7 @@ import type { AniListId, AniListMediaHint } from "@/anilist/types";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
+import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import type { BadgeVisibility } from "@/settings/types";
 import { getCardPrimaryTitle } from "./card-primary-title";
 import { CardOverlay } from "./card-overlay";
@@ -22,7 +23,7 @@ interface SonarrCardOverlayProps {
 	observeTarget?: Element | null;
 	badgeVisibility?: BadgeVisibility;
 	stackDirection?: "up" | "down";
-	tooltipContainer?: HTMLElement | ShadowRoot | null;
+	tooltipContainer?: FloatingPortalContainer;
 }
 
 export function SonarrCardOverlay({

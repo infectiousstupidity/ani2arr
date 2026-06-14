@@ -5,6 +5,7 @@ import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import { useOptionalFieldId } from '@/shared/ui/fields/field-context';
 import { cn } from '@/shared/utils/cn';
+import type { FloatingPortalContainer } from '../portal-container';
 
 export function Select(
   props: React.ComponentProps<typeof SelectPrimitive.Root>,
@@ -40,10 +41,10 @@ SelectTrigger.displayName = 'SelectTrigger';
 export const SelectContent = forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
-    container?: HTMLElement | ShadowRoot | null | undefined;
+    container?: FloatingPortalContainer | undefined;
   }
 >(({ className, children, container, position = 'popper', ...props }, ref) => (
-  <SelectPrimitive.Portal container={container as HTMLElement | ShadowRoot | null}>
+  <SelectPrimitive.Portal container={container}>
     <SelectPrimitive.Content
       ref={ref}
       position={position}
@@ -98,7 +99,7 @@ export interface SelectControlProps {
   disabled?: boolean | undefined;
   placeholder?: string | undefined;
   id?: string | undefined;
-  container?: HTMLElement | ShadowRoot | null | undefined;
+  container?: FloatingPortalContainer | undefined;
 }
 
 export function SelectControl({

@@ -18,6 +18,7 @@ import {
 	Wrench,
 } from "lucide-react";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
+import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import type { MediaActionState } from "@/features/media-action/state";
 import type { BadgeVisibility } from "@/settings/types";
 
@@ -36,7 +37,7 @@ interface CardOverlayProps {
 	openProvider: (() => void) | null;
 	badgeVisibility?: BadgeVisibility | undefined;
 	stackDirection?: "up" | "down" | undefined;
-	tooltipContainer?: HTMLElement | ShadowRoot | null | undefined;
+	tooltipContainer?: FloatingPortalContainer | undefined;
 }
 
 function getPrimaryActionIcon(actionState: MediaActionState) {

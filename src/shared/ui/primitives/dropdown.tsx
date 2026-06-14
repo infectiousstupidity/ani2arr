@@ -2,18 +2,19 @@
 // src/shared/ui/primitives/dropdown.tsx
 import React from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import type { FloatingPortalContainer } from '../portal-container';
 
 interface DropdownProps {
   trigger: React.ReactNode;
   children: React.ReactNode;
-  container?: HTMLElement | null;
+  container?: FloatingPortalContainer | undefined;
 }
 
 export const Dropdown: React.FC<DropdownProps> = ({ trigger, children, container }) => {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
-      <DropdownMenu.Portal container={container ?? undefined}>
+      <DropdownMenu.Portal container={container}>
         <DropdownMenu.Content
           className="rounded-md bg-[#ffffff] text-(--text-secondary) border-0 shadow-[0_1px_10px_rgba(49,54,68,0.15)] py-1.5 z-99999"
           side="bottom"

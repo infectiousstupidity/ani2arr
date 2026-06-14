@@ -6,13 +6,14 @@ import type { FieldProps } from './field-props';
 import { FieldLabel } from './field-label';
 import { Field } from './field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../primitives/select';
+import type { FloatingPortalContainer } from '../portal-container';
 
 interface SelectFieldProps
   extends FieldProps,
     Omit<React.ComponentProps<typeof SelectPrimitive.Root>, 'onChange'> {
   placeholder?: string;
   options: Array<{ value: string; label: string; description?: string }>;
-  container?: HTMLElement | ShadowRoot | null | undefined;
+  container?: FloatingPortalContainer | undefined;
   triggerClassName?: string | undefined;
   onChange?: ((value: string) => void) | undefined;
 }

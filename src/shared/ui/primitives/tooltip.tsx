@@ -3,6 +3,7 @@
 import React from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { CircleHelp } from 'lucide-react';
+import type { FloatingPortalContainer } from '../portal-container';
 
 interface TooltipWrapperProps {
   content: React.ReactNode;
@@ -10,7 +11,7 @@ interface TooltipWrapperProps {
   side?: 'top' | 'bottom' | 'left' | 'right';
   align?: 'start' | 'center' | 'end';
   sideOffset?: number;
-  container?: HTMLElement | ShadowRoot | null;
+  container?: FloatingPortalContainer;
   showArrow?: boolean;
   delayDuration?: number;
 }
