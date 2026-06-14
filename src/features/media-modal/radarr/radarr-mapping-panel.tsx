@@ -12,6 +12,7 @@ import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import type { RadarrLookupMovie } from "@/providers/radarr/types";
 import { openProviderPage } from "@/rpc/provider-page";
 import { useRadarrLookupSearch } from "@/queries/radarr";
+import { normalizeError } from "@/shared/errors/error-utils";
 import { MappingCandidateRow } from "../mapping/mapping-search-results";
 import { MappingSearchShell } from "../mapping/mapping-search-shell";
 import { normalizeLinkedAniListIds, pickProviderPoster } from "../helpers";
@@ -134,6 +135,7 @@ export function RadarrMappingPanel(
 			searchPlaceholder="Search by movie title or TMDB ID..."
 			hasSearchTerm={searchTerm.length > 0}
 			isFetching={search.isFetching}
+			errorMessage={search.error ? normalizeError(search.error).userMessage : null}
 			resultCount={candidates.length}
 			resultImageUrls={candidatePosterUrls}
 			onQueryChange={handleQueryChange}

@@ -27,6 +27,14 @@ function createJsonResponse(body: unknown): Response {
 	});
 }
 
+function createErrorResponse(body: unknown, status = 400): Response {
+	return new Response(typeof body === "string" ? body : JSON.stringify(body), {
+		status,
+		statusText: "Bad Request",
+		headers: { "Content-Type": "application/json" },
+	});
+}
+
 describe("ProviderApiClient", () => {
 	afterEach(() => {
 		vi.unstubAllGlobals();
@@ -67,5 +75,68 @@ describe("ProviderApiClient", () => {
 
 			vi.unstubAllGlobals();
 		}
+	});
+
+	it("uses useful provider API error messages from JSON responses", async () => {
+		const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+			createErrorResponse([
+				{
+					propertyName: "rootFolderPath",
+					errorMessage: "Root folder does not exist.",
+				},
+			]),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(
+			new TestProviderClient().testConnection(credentials),
+		).rejects.toMatchObject({
+			code: ErrorCode.API_ERROR,
+			userMessage:
+				"Testarr rejected the request: Root folder does not exist.",
+			details: {
+				status: 400,
+				statusText: "Bad Request",
+				providerMessage: "Root folder does not exist.",
+			},
+		});
+	});
+
+	it("sanitizes provider API error messages", async () => {
+		const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+			createErrorResponse({
+				message:
+					"Bad request for https://provider.example/api/v3/movie using secret",
+			}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(
+			new TestProviderClient().testConnection(credentials),
+		).rejects.toMatchObject({
+			userMessage:
+				"Testarr rejected the request: Bad request for [redacted url] using [redacted]",
+			details: {
+				providerMessage:
+					"Bad request for [redacted url] using [redacted]",
+			},
+		});
+	});
+
+	it("falls back when provider API errors have no useful body", async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(new Response("", { status: 500 }));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(
+			new TestProviderClient().testConnection(credentials),
+		).rejects.toMatchObject({
+			code: ErrorCode.API_ERROR,
+			userMessage: "Testarr returned an API error.",
+			details: {
+				status: 500,
+			},
+		});
 	});
 });

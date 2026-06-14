@@ -7,6 +7,7 @@ import type { ProviderFormResources } from "@/providers/types";
 import { normalizeRadarrFormState } from "@/providers/radarr/form-state";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import { useAddMovie, useUpdateMovie } from "@/queries/radarr";
+import { normalizeError } from "@/shared/errors/error-utils";
 import { BaseProviderSetupPanel } from "../setup/provider-setup-panel";
 import type { ProviderRootFolderPathPreview } from "../setup/provider-root-folder-select";
 import { RadarrAddOptionsFields } from "./radarr-add-options-fields";
@@ -29,6 +30,7 @@ export type RadarrSetupFooterState = {
 	setupMutationsBlocked: boolean;
 	setupUnavailable: boolean;
 	submitLabel: string;
+	actionError: string | null;
 };
 
 type RadarrDraftState = {
@@ -197,6 +199,7 @@ export function useRadarrSetupForm(
 	const [draftState, setDraftState] = useState<RadarrDraftState>(
 		() => initialDraft,
 	);
+	const [actionError, setActionError] = useState<string | null>(null);
 	const activeDraft =
 		draftState.targetKey === targetKey ? draftState : initialDraft;
 	const currentDraft = activeDraft.values;
@@ -229,6 +232,7 @@ export function useRadarrSetupForm(
 		setupMutationsBlocked,
 		setupUnavailable,
 		submitLabel: mode === "edit" ? "Save changes" : "Add movie",
+		actionError,
 	} satisfies RadarrSetupFooterState;
 
 	const onFieldChange = <K extends keyof RadarrFormState>(
@@ -268,17 +272,23 @@ export function useRadarrSetupForm(
 			...(resolvedMetadata === null ? {} : { metadata: resolvedMetadata }),
 		};
 
-		await (target.mode === "edit"
-			? updateMovie.mutateAsync({
-					...payload,
-					tmdbId: target.tmdbId,
-				})
-			: addMovie.mutateAsync({
-					...payload,
-					tmdbId: target.tmdbId,
-				}));
+		setActionError(null);
 
-		onClose();
+		try {
+			await (target.mode === "edit"
+				? updateMovie.mutateAsync({
+						...payload,
+						tmdbId: target.tmdbId,
+					})
+				: addMovie.mutateAsync({
+						...payload,
+						tmdbId: target.tmdbId,
+					}));
+
+			onClose();
+		} catch (error) {
+			setActionError(normalizeError(error).userMessage);
+		}
 	};
 	const statusNotice = getRadarrSetupStatusNotice({
 		verificationFailed,

@@ -44,6 +44,7 @@ type SetupFooterProps = {
 	isBusy: boolean;
 	isSubmitting: boolean;
 	submitLabel: string;
+	actionError: string | null;
 	onCancel: () => void;
 	onOpenMapping?: (() => void) | undefined;
 };
@@ -257,6 +258,7 @@ export function SetupFooter(props: SetupFooterProps): React.JSX.Element {
 		isBusy,
 		isSubmitting,
 		submitLabel,
+		actionError,
 		onCancel,
 		onOpenMapping,
 	} = props;
@@ -303,6 +305,19 @@ export function SetupFooter(props: SetupFooterProps): React.JSX.Element {
 	];
 
 	return (
-		<FooterLayout left={leftActions} right={rightActions} />
+		<FooterLayout
+			notice={
+				actionError ? (
+					<p
+						className="rounded-md border border-error/30 bg-error/10 px-3 py-2 text-sm font-medium text-error"
+						role="alert"
+					>
+						{actionError}
+					</p>
+				) : null
+			}
+			left={leftActions}
+			right={rightActions}
+		/>
 	);
 }

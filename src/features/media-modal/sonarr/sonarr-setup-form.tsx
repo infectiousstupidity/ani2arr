@@ -9,6 +9,7 @@ import {
 } from "@/providers/sonarr/form-state";
 import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
 import { useAddSeries, useUpdateSeries } from "@/queries/sonarr";
+import { normalizeError } from "@/shared/errors/error-utils";
 import {
 	buildAddPathPreview,
 	buildEditPathPreview,
@@ -40,6 +41,7 @@ export type SonarrSetupFooterState = {
 	setupMutationsBlocked: boolean;
 	setupUnavailable: boolean;
 	submitLabel: string;
+	actionError: string | null;
 };
 
 type SonarrSetupFormProps = {
@@ -211,6 +213,7 @@ export function useSonarrSetupForm(
 	const [draftState, setDraftState] = useState<SonarrDraftState>(
 		() => initialDraft,
 	);
+	const [actionError, setActionError] = useState<string | null>(null);
 	const activeDraft =
 		draftState.targetKey === targetKey ? draftState : initialDraft;
 	const currentDraft = activeDraft.values;
@@ -246,6 +249,7 @@ export function useSonarrSetupForm(
 		setupMutationsBlocked,
 		setupUnavailable,
 		submitLabel: mode === "edit" ? "Save changes" : "Add series",
+		actionError,
 	} satisfies SonarrSetupFooterState;
 
 	const onFieldChange = <K extends keyof SonarrFormState>(
@@ -297,18 +301,24 @@ export function useSonarrSetupForm(
 			...(resolvedMetadata === null ? {} : { metadata: resolvedMetadata }),
 		};
 
-		await (target.mode === "edit"
-			? updateSeries.mutateAsync({
-					...payload,
-					tvdbId: target.tvdbId,
-					monitoringAction,
-				})
-			: addSeries.mutateAsync({
-					...payload,
-					tvdbId: target.tvdbId,
-				}));
+		setActionError(null);
 
-		onClose();
+		try {
+			await (target.mode === "edit"
+				? updateSeries.mutateAsync({
+						...payload,
+						tvdbId: target.tvdbId,
+						monitoringAction,
+					})
+				: addSeries.mutateAsync({
+						...payload,
+						tvdbId: target.tvdbId,
+					}));
+
+			onClose();
+		} catch (error) {
+			setActionError(normalizeError(error).userMessage);
+		}
 	};
 	const statusNotice = getSonarrSetupStatusNotice({
 		verificationFailed,

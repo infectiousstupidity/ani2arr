@@ -11,6 +11,7 @@ type MappingSearchShellProps = {
 	searchPlaceholder: string;
 	hasSearchTerm: boolean;
 	isFetching: boolean;
+	errorMessage?: string | null | undefined;
 	resultCount: number;
 	resultImageUrls?: readonly string[] | undefined;
 	onQueryChange: () => void;
@@ -84,6 +85,7 @@ export function MappingSearchShell(
 		searchPlaceholder,
 		hasSearchTerm,
 		isFetching,
+		errorMessage,
 		resultCount,
 		resultImageUrls,
 		onQueryChange,
@@ -107,9 +109,13 @@ export function MappingSearchShell(
 	const trimmedQuery = query.trim();
 	const canSearch = trimmedQuery.length > 0;
 	let stateMessage: string | null = null;
-	if (isFetching && resultCount === 0) stateMessage = "Searching...";
+	if (errorMessage) stateMessage = errorMessage;
+	else if (isFetching && resultCount === 0) stateMessage = "Searching...";
 	else if (hasSearchTerm && resultCount === 0) stateMessage = "No results found.";
 	else if (hasSearchTerm && !areResultImagesReady) stateMessage = "Preparing results...";
+	const stateMessageClass = errorMessage
+		? "border-error/30 bg-error/10 text-error"
+		: "border-border-primary/45 bg-bg-secondary/35 text-text-secondary";
 
 	useEffect(() => {
 		const searchInput = searchInputRef.current;
@@ -184,7 +190,9 @@ export function MappingSearchShell(
 					<ScrollArea.Viewport className="h-full w-full overscroll-contain touch-pan-y scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
 						<div className="pb-4 pr-3">
 							{stateMessage ? (
-								<div className="rounded-xl border border-border-primary/45 bg-bg-secondary/35 px-3 py-6 text-center text-xs text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+								<div
+									className={`rounded-xl border px-3 py-6 text-center text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.02)] ${stateMessageClass}`}
+								>
 									{stateMessage}
 								</div>
 							) : null}

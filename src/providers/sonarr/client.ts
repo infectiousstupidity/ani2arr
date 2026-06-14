@@ -3,6 +3,8 @@
 
 import * as v from "valibot";
 
+import { createError } from "@/shared/errors/error-utils";
+import { ErrorCode } from "@/shared/errors/error.types";
 import { ProviderApiClient } from "../shared.client";
 import type { ProviderCredentials } from "../types";
 import type { SonarrAddSeriesPayload } from "./add";
@@ -167,7 +169,13 @@ export class SonarrClient extends ProviderApiClient {
 		credentials: ProviderCredentials,
 	): Promise<SonarrTag> {
 		const trimmed = label.trim();
-		if (!trimmed) throw new Error("Tag label cannot be empty.");
+		if (!trimmed) {
+			throw createError(
+				ErrorCode.VALIDATION_ERROR,
+				"Tag label is empty.",
+				"Tag label cannot be empty.",
+			);
+		}
 
 		const json = await this.requestJson("tag", credentials, {
 			method: "POST",

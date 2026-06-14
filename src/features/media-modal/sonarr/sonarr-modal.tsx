@@ -403,6 +403,7 @@ export function SonarrModal({
 							isBusy={setupForm.footerState.isBusy}
 							isSubmitting={setupForm.footerState.isSubmitting}
 							submitLabel={setupForm.footerState.submitLabel}
+							actionError={setupForm.footerState.actionError}
 							onCancel={onClose}
 							onOpenMapping={showMappingView}
 						/>

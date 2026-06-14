@@ -12,6 +12,7 @@ import { parseTvdbId, type TvdbId } from "@/providers/schemas";
 import type { SonarrLookupSeries } from "@/providers/sonarr/types";
 import { openProviderPage } from "@/rpc/provider-page";
 import { useSonarrLookupSearch } from "@/queries/sonarr";
+import { normalizeError } from "@/shared/errors/error-utils";
 import { MappingCandidateRow } from "../mapping/mapping-search-results";
 import { MappingSearchShell } from "../mapping/mapping-search-shell";
 import { normalizeLinkedAniListIds, pickProviderPoster } from "../helpers";
@@ -184,6 +185,7 @@ export function SonarrMappingPanel(
 			searchPlaceholder="Search by series title or TVDB ID..."
 			hasSearchTerm={searchTerm.length > 0}
 			isFetching={search.isFetching}
+			errorMessage={search.error ? normalizeError(search.error).userMessage : null}
 			resultCount={candidates.length}
 			resultImageUrls={candidatePosterUrls}
 			onQueryChange={handleQueryChange}

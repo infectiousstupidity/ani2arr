@@ -4,6 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseTvdbId } from "@/providers/schemas";
 import type { ProviderCredentials } from "@/providers/types";
+import { ErrorCode } from "@/shared/errors/error.types";
 import type {
 	ProviderQualityProfileId,
 	ProviderTagId,
@@ -156,6 +157,13 @@ describe("SonarrClient mutations", () => {
 		expect(JSON.parse(String(unmonitorRequest.body))).toEqual({
 			series: [{ id: series.id, monitored: false }],
 			monitoringOptions: { monitor: "none" },
+		});
+	});
+
+	it("rejects empty tag labels with a structured validation error", async () => {
+		await expect(createClient().createTag(" ", credentials)).rejects.toMatchObject({
+			code: ErrorCode.VALIDATION_ERROR,
+			userMessage: "Tag label cannot be empty.",
 		});
 	});
 });
