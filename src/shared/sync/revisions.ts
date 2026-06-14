@@ -14,24 +14,24 @@ export const MAPPINGS_REVISION_CHANGE_KEY = REVISION_SIGNAL_KEYS.mappings;
 export const SONARR_LIBRARY_REVISION_CHANGE_KEY = REVISION_SIGNAL_KEYS.sonarrLibrary;
 export const RADARR_LIBRARY_REVISION_CHANGE_KEY = REVISION_SIGNAL_KEYS.radarrLibrary;
 
-const writeRevisionSignal = async (storageKey: string): Promise<number> => {
-	const next = Date.now();
+const writeRevisionSignal = async (storageKey: string): Promise<string> => {
+	const next = crypto.randomUUID();
 	await browser.storage.local.set({ [storageKey]: next });
 	return next;
 };
 
-export const bumpMappingsRevision = (): Promise<number> =>
+export const bumpMappingsRevision = (): Promise<string> =>
 	writeRevisionSignal(REVISION_SIGNAL_KEYS.mappings);
 
-export const bumpSonarrLibraryRevision = (): Promise<number> =>
+export const bumpSonarrLibraryRevision = (): Promise<string> =>
 	writeRevisionSignal(REVISION_SIGNAL_KEYS.sonarrLibrary);
 
-export const bumpRadarrLibraryRevision = (): Promise<number> =>
+export const bumpRadarrLibraryRevision = (): Promise<string> =>
 	writeRevisionSignal(REVISION_SIGNAL_KEYS.radarrLibrary);
 
 export const bumpProviderLibraryRevision = (
 	provider: Provider,
-): Promise<number> =>
+): Promise<string> =>
 	provider === "sonarr"
 		? bumpSonarrLibraryRevision()
 		: bumpRadarrLibraryRevision();
