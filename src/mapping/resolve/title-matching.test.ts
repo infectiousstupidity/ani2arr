@@ -66,6 +66,21 @@ describe("title matching", () => {
 		);
 	});
 
+	it("preserves Sonarr reboot years while cleaning season suffixes", () => {
+		expect(
+			sanitizeLookupDisplayForProvider(
+				"sonarr",
+				"Ranma 1/2 (2024) 3rd Season",
+			),
+		).toBe("Ranma 1/2 2024");
+		expect(
+			sanitizeLookupDisplayForProvider(
+				"sonarr",
+				"Ranma1/2 (2024) Season 3",
+			),
+		).toBe("Ranma1/2 2024");
+	});
+
 	it("keeps Radarr movie-style part suffixes", () => {
 		expect(sanitizeLookupDisplayForProvider("radarr", "Movie Title Part 2")).toBe(
 			"Movie Title Part 2",
@@ -122,6 +137,17 @@ describe("title matching", () => {
 				},
 			]),
 		).toEqual({ providerId: 330_692, matchedTitle: "Yuru Camp△" });
+	});
+
+	it("prefers the Ranma 2024 reboot over the original Sonarr result", () => {
+		const term = firstSonarrTerm("Ranma 1/2 (2024) 3rd Season");
+
+		expect(
+			findTitleMatchForTerm("sonarr", term, 2026, [
+				{ providerId: 76_932, title: "Ranma 1/2", year: 1989 },
+				{ providerId: 451_479, title: "Ranma 1/2 (2024)", year: 2024 },
+			]),
+		).toEqual({ providerId: 451_479, matchedTitle: "Ranma 1/2 2024" });
 	});
 
 	it("does not accept weak Haikyuu figure-animation result", () => {

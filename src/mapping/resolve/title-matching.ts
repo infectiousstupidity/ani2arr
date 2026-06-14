@@ -246,6 +246,16 @@ function stripParenContent(value: string): string {
 		.trim();
 }
 
+function stripNonYearParenContent(value: string): string {
+	return value
+		.replaceAll(/\s*[([{]\s*([^)\]{}]*?)\s*[)\]}]\s*/g, (_match, content) => {
+			const trimmed = typeof content === "string" ? content.trim() : "";
+			return YEAR_TOKEN_RE.test(trimmed) ? ` ${trimmed} ` : " ";
+		})
+		.replaceAll(/\s+/g, " ")
+		.trim();
+}
+
 function normalizeTitleTokens(
 	term: string,
 	options: NormalizeTitleTokensOptions = {},
@@ -321,11 +331,12 @@ function stripSeasonalSuffixes(value: string): string {
 	return normalized;
 }
 
-function stripTrailingOrdinalOrNumber(value: string): string {
+function stripTrailingSeasonOrdinalOrNumber(value: string): string {
 	const tokens = value.trim().split(/\s+/);
 	if (tokens.length <= 1) return value.trim();
 	while (tokens.length > 1) {
 		const last = tokens.at(-1) as string;
+		if (YEAR_TOKEN_RE.test(last)) break;
 		if (/^(?:\d+|\d+(?:st|nd|rd|th)|[cdilmvx]+)$/i.test(last)) {
 			tokens.pop();
 			continue;
@@ -349,8 +360,10 @@ function sanitizeSonarrLookupDisplay(value: string): string {
 	normalized = normalized.replaceAll(/\[([^\]]+)]/g, "$1");
 	normalized = stripSeasonPrefixSubtitle(normalized);
 	normalized = stripSeasonalSuffixes(normalized);
-	normalized = stripTrailingOrdinalOrNumber(normalized);
-	normalized = stripParenContent(normalized).replaceAll(/\s+/g, " ").trim();
+	normalized = stripTrailingSeasonOrdinalOrNumber(normalized);
+	normalized = stripNonYearParenContent(normalized)
+		.replaceAll(/\s+/g, " ")
+		.trim();
 	return /[\p{L}\p{N}]/u.test(normalized) ? normalized : "";
 }
 
