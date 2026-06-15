@@ -78,7 +78,10 @@ function useSeerrCardAction(input: SeerrCardActionProps) {
 
 	const status = useSeerrMediaStatus({
 		requestInput,
-		enabled: input.isConfigured && input.statusEnabled === true && requestInput !== null,
+		enabled:
+			input.isConfigured &&
+			input.statusEnabled === true &&
+			requestInput !== null,
 	});
 
 	const actionState = getSeerrActionState({
@@ -90,22 +93,25 @@ function useSeerrCardAction(input: SeerrCardActionProps) {
 		status: status.data?.status,
 	});
 
-	const run = (): void => {
-		if (requestInput === null || actionState.disabled || actionState.settled) {
-			return;
-		}
+	const title =
+		input.isConfigured && requestInput === null
+			? "Choose Seerr target"
+			: actionState.label;
 
+	const run = (): void => {
 		if (!input.isConfigured) {
 			openOptionsPage({ sectionId: "seerr" });
 			return;
 		}
+
+		if (actionState.disabled) return;
 
 		input.onOpenModal();
 	};
 
 	return {
 		state: actionState.state,
-		title: actionState.label,
+		title,
 		disabled: actionState.disabled,
 		run,
 		requestInput,
@@ -133,7 +139,7 @@ export function SeerrCardStackAction({
 	});
 
 	if (!isInViewport) return null;
-	if (action.requestInput === null) return null;
+	if (!isConfigured && action.requestInput === null) return null;
 
 	const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
 		event.preventDefault();
@@ -188,7 +194,7 @@ export function SeerrStandaloneCardOverlay({
 	});
 
 	if (!isInViewport) return null;
-	if (action.requestInput === null) return null;
+	if (!isConfigured && action.requestInput === null) return null;
 
 	return (
 		<div

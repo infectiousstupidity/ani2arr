@@ -17,6 +17,10 @@ interface SeerrRequestButtonProps {
 	onOpenModal: () => void;
 }
 
+function isTrustedClick(event: MouseEvent<HTMLButtonElement>): boolean {
+	return event.nativeEvent.isTrusted === true || event.isTrusted === true;
+}
+
 export function SeerrRequestButton({
 	requestInput,
 	isConfigured,
@@ -26,7 +30,7 @@ export function SeerrRequestButton({
 }: SeerrRequestButtonProps): ReactElement | null {
 	const status = useSeerrMediaStatus({
 		requestInput,
-		enabled: isConfigured && statusEnabled,
+		enabled: isConfigured && statusEnabled && requestInput !== null,
 	});
 
 	if (requestInput === null) return null;
@@ -39,15 +43,16 @@ export function SeerrRequestButton({
 		requestFailed: false,
 		status: status.data?.status,
 	});
+
 	const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
-		if (!event.isTrusted) return;
+		if (!isTrustedClick(event)) return;
 
 		if (!isConfigured) {
 			openOptionsPage({ sectionId: "seerr" });
 			return;
 		}
 
-		if (actionState.disabled || actionState.settled) return;
+		if (actionState.disabled) return;
 
 		onOpenModal();
 	};
@@ -59,7 +64,7 @@ export function SeerrRequestButton({
 			variant="primary"
 			onClick={handleClick}
 			disabled={actionState.disabled}
-			tooltip="Request through Seerr"
+			tooltip={actionState.label}
 			tooltipContainer={portalContainer}
 			className="h-8.75 w-full rounded-[3px] text-[14px]"
 		>

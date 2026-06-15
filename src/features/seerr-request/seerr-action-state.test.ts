@@ -14,26 +14,26 @@ const baseInput = {
 };
 
 describe("getSeerrActionState", () => {
-	it("uses library wording for available media", () => {
+	it("uses available wording for available media", () => {
 		expect(
 			getSeerrActionState({
 				...baseInput,
 				status: "available",
 			}),
 		).toMatchObject({
-			label: "In Seerr library",
-			disabled: true,
+			label: "Available in Seerr",
+			disabled: false,
 			settled: true,
 		});
 	});
 
-	it("uses partial library wording for partially available media", () => {
+	it("uses partial wording for partially available media", () => {
 		expect(
 			getSeerrActionState({
 				...baseInput,
 				status: "partial",
 			}).label,
-		).toBe("Partially in Seerr library");
+		).toBe("Partially available in Seerr");
 	});
 
 	it("uses request wording for pending and processing media", () => {
@@ -50,6 +50,19 @@ describe("getSeerrActionState", () => {
 				status: "processing",
 			}).label,
 		).toBe("Requested in Seerr");
+	});
+
+	it("keeps settled Seerr media actionable", () => {
+		expect(
+			getSeerrActionState({
+				...baseInput,
+				status: "partial",
+			}),
+		).toMatchObject({
+			state: "in-library",
+			disabled: false,
+			settled: true,
+		});
 	});
 
 	it("treats enabled status without data as checking", () => {

@@ -159,7 +159,12 @@ export function BrowseCardOverlay({
 
 	if (provider === "sonarr") {
 		const sonarrOptions = getSonarrOverlayOptions(publicOptions);
-		if (sonarrOptions.enabled) {
+		const preferSeerr =
+			showSeerrAction &&
+			seerrOptions.isConfigured &&
+			!sonarrOptions.isConfigured;
+
+		if (sonarrOptions.enabled && !preferSeerr) {
 			return (
 				<SonarrCardOverlay
 					{...commonProps}
@@ -192,7 +197,12 @@ export function BrowseCardOverlay({
 
 	if (provider === "radarr") {
 		const radarrOptions = getRadarrOverlayOptions(publicOptions);
-		if (radarrOptions.enabled) {
+		const preferSeerr =
+			showSeerrAction &&
+			seerrOptions.isConfigured &&
+			!radarrOptions.isConfigured;
+
+		if (radarrOptions.enabled && !preferSeerr) {
 			return (
 				<RadarrCardOverlay
 					{...commonProps}

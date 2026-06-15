@@ -32,8 +32,8 @@ export function isSettledSeerrStatus(status: SeerrActionStatus): boolean {
 }
 
 function getSettledLabel(status: SeerrActionStatus): string {
-	if (status === "available") return "In Seerr library";
-	if (status === "partial") return "Partially in Seerr library";
+	if (status === "available") return "Available in Seerr";
+	if (status === "partial") return "Partially available in Seerr";
 	return "Requested in Seerr";
 }
 
@@ -89,7 +89,7 @@ export function getSeerrActionState(
 		return {
 			state: "in-library",
 			label: getSettledLabel(input.status),
-			disabled: true,
+			disabled: false,
 			settled: true,
 		};
 	}
