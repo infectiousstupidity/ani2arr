@@ -6,6 +6,7 @@ import {
 	useRef,
 	useState,
 	type ReactElement,
+	type ReactNode,
 	type SyntheticEvent,
 } from "react";
 import {
@@ -35,6 +36,7 @@ interface CardOverlayProps {
 	showMappingAction: boolean;
 	onOpenMapping(): void;
 	openProvider: (() => void) | null;
+	extraAction?: ReactNode;
 	badgeVisibility?: BadgeVisibility | undefined;
 	stackDirection?: "up" | "down" | undefined;
 	tooltipContainer?: FloatingPortalContainer | undefined;
@@ -84,6 +86,7 @@ export function CardOverlay({
 	showMappingAction,
 	onOpenMapping,
 	openProvider,
+	extraAction,
 	badgeVisibility = "always",
 	stackDirection = "up",
 	tooltipContainer,
@@ -198,7 +201,7 @@ export function CardOverlay({
 				</TooltipWrapper>
 			</div>
 
-			{setupAction || mappingAction || externalAction ? (
+			{setupAction || mappingAction || externalAction || extraAction ? (
 				<div
 					className="a2a-card-overlay__stack"
 					data-open={stackOpen || undefined}
@@ -207,9 +210,9 @@ export function CardOverlay({
 					onMouseLeave={scheduleCloseStack}
 				>
 					{stackDirection === "down" ? (
-						<>{setupAction}{mappingAction}{externalAction}</>
+						<>{setupAction}{mappingAction}{externalAction}{extraAction}</>
 					) : (
-						<>{externalAction}{mappingAction}{setupAction}</>
+						<>{extraAction}{externalAction}{mappingAction}{setupAction}</>
 					)}
 				</div>
 			) : null}

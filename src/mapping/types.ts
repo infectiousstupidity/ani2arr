@@ -1,10 +1,7 @@
 /** Mapping facts and resolved mapping result types. */
 // src/mapping/types.ts
 
-import type {
-	TmdbId,
-	TvdbId,
-} from "@/providers/schemas";
+import type { TmdbId, TvdbId } from "@/providers/schemas";
 
 export type UpstreamTarget =
 	| {
@@ -15,6 +12,20 @@ export type UpstreamTarget =
 	| {
 			provider: "radarr";
 			providerId: TmdbId;
+	  };
+
+export type SeerrUpstreamTarget =
+	| {
+			mediaType: "movie";
+			tmdbId: TmdbId;
+	  }
+	| {
+			mediaType: "tv";
+			tmdbId: TmdbId;
+			seasons: number[];
+			tmdbSeasons?: number[];
+			tvdbSeasons?: number[];
+			tvdbId?: TvdbId;
 	  };
 
 export type AutoResult =

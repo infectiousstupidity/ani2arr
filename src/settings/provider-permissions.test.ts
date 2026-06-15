@@ -1,6 +1,8 @@
 /** Tests for settings-owned provider permission cleanup behavior. */
 // src/settings/provider-permissions.test.ts
 
+/* eslint-disable unicorn/prefer-https */
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { createDefaultExtensionOptions } from "./schema";

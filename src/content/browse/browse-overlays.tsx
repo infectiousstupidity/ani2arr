@@ -29,9 +29,11 @@ function getBrowseFlags(publicOptions: PublicOptions | undefined): {
 		publicOptions?.ui?.browseCards.sonarr.enabled ?? true;
 	const radarrBrowseEnabled =
 		publicOptions?.ui?.browseCards.radarr.enabled ?? true;
+	const seerrBrowseEnabled =
+		publicOptions?.ui?.browseCards.seerr.enabled ?? true;
 
 	return {
-		overlaysEnabled: sonarrBrowseEnabled || radarrBrowseEnabled,
+		overlaysEnabled: sonarrBrowseEnabled || radarrBrowseEnabled || seerrBrowseEnabled,
 	};
 }
 
@@ -99,6 +101,7 @@ export function BrowseOverlays({
 						mappedIdentities={
 							mappedIdentitiesById.get(target.parsed.anilistId) ?? []
 						}
+
 						metadata={metadataById.get(target.parsed.anilistId) ?? null}
 						onOpenMediaModal={mediaModal.open}
 						tooltipContainer={null}

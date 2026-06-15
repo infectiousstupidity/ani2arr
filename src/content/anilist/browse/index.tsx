@@ -32,7 +32,8 @@ const isBrowseShellEligible = ({
 
   return (
     (publicOptions.ui?.browseCards?.sonarr?.enabled ?? true) ||
-    (publicOptions.ui?.browseCards?.radarr?.enabled ?? true)
+    (publicOptions.ui?.browseCards?.radarr?.enabled ?? true) ||
+    (publicOptions.ui?.browseCards?.seerr?.enabled ?? true)
   );
 };
 

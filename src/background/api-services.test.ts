@@ -15,6 +15,7 @@ import {
 
 const clearAutoResultsMock = vi.hoisted(() => vi.fn());
 const clearManualFactsMock = vi.hoisted(() => vi.fn());
+const clearManualSeerrTargetsMock = vi.hoisted(() => vi.fn());
 const clearUpstreamMappingsMock = vi.hoisted(() => vi.fn());
 const refreshUpstreamMappingsMock = vi.hoisted(() => vi.fn());
 const clearAllTtlCachesMock = vi.hoisted(() => vi.fn());
@@ -39,6 +40,10 @@ vi.mock("@/mapping/auto.store", () => ({
 
 vi.mock("@/mapping/manual.store", () => ({
 	clearManualFacts: clearManualFactsMock,
+}));
+
+vi.mock("@/mapping/seerr-target.store", () => ({
+	clearManualSeerrTargets: clearManualSeerrTargetsMock,
 }));
 
 vi.mock("@/mapping/upstream.store", () => ({
@@ -69,6 +74,7 @@ vi.mock("@/shared/sync/revisions", () => ({
 function createOptions(input: {
 	sonarrConfigured?: boolean;
 	radarrConfigured?: boolean;
+	seerrConfigured?: boolean;
 } = {}): ExtensionOptions {
 	const options = createDefaultExtensionOptions();
 
@@ -86,6 +92,11 @@ function createOptions(input: {
 				apiKey: input.radarrConfigured ? "radarr-key" : "",
 			},
 		},
+		seerr: {
+			...options.seerr,
+			url: input.seerrConfigured ? "https://seerr.example" : "",
+			apiKey: input.seerrConfigured ? "seerr-key" : "",
+		},
 	};
 }
 
@@ -95,6 +106,7 @@ describe("api services", () => {
 
 		clearAutoResultsMock.mockImplementation(async () => {});
 		clearManualFactsMock.mockImplementation(async () => {});
+		clearManualSeerrTargetsMock.mockImplementation(async () => {});
 		clearUpstreamMappingsMock.mockImplementation(async () => {});
 		refreshUpstreamMappingsMock.mockImplementation(async () => {});
 		clearAllTtlCachesMock.mockImplementation(async () => {});
@@ -138,6 +150,16 @@ describe("api services", () => {
 		expect(clearAutoResultsMock).not.toHaveBeenCalled();
 	});
 
+	it("refreshes upstream mappings when only Seerr is configured", async () => {
+		const options = createOptions({ seerrConfigured: true });
+
+		await handleProviderConnectionChanged(options, {
+			disconnectedProviders: ["radarr"],
+		});
+
+		expect(refreshUpstreamMappingsMock).toHaveBeenCalledTimes(1);
+	});
+
 	it("preserves auto mappings when clearing persistent caches", async () => {
 		await clearPersistentCaches();
 
@@ -153,6 +175,7 @@ describe("api services", () => {
 		await resetExtensionState();
 
 		expect(clearManualFactsMock).toHaveBeenCalledTimes(1);
+		expect(clearManualSeerrTargetsMock).toHaveBeenCalledTimes(1);
 		expect(clearAutoResultsMock).toHaveBeenCalledTimes(2);
 		expect(clearAutoResultsMock).toHaveBeenCalledWith("sonarr");
 		expect(clearAutoResultsMock).toHaveBeenCalledWith("radarr");

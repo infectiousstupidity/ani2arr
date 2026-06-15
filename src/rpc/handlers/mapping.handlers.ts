@@ -485,6 +485,8 @@ async function initMappingPipeline(): Promise<void> {
 	for (const provider of PROVIDERS) {
 		await resolveAmbiguousProviderMappings(provider);
 	}
+
+	await bumpMappingsRevision();
 }
 
 export const mappingHandlers = {

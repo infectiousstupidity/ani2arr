@@ -30,10 +30,14 @@ export interface BrowseEntrypointShellOptions {
 
 const cleanupDomArtifacts = (): void => {
   for (const element of document
-    .querySelectorAll<HTMLElement>(`[${BROWSE_PROCESSED_ATTRIBUTE}]`)) element.removeAttribute(BROWSE_PROCESSED_ATTRIBUTE);
+    .querySelectorAll<HTMLElement>(`[${CSS.escape(BROWSE_PROCESSED_ATTRIBUTE)}]`)) {
+    element.removeAttribute(BROWSE_PROCESSED_ATTRIBUTE);
+  }
 
   for (const container of document
-    .querySelectorAll<HTMLElement>(`.${BROWSE_OVERLAY_CONTAINER_CLASS}`)) container.remove();
+    .querySelectorAll<HTMLElement>(`.${CSS.escape(BROWSE_OVERLAY_CONTAINER_CLASS)}`)) {
+    container.remove();
+  }
 };
 
 export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOptions) => {

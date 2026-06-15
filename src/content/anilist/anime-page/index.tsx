@@ -72,7 +72,8 @@ const isAnimePageShellEligible = async ({
 
 	if (
 		(publicOptions.ui?.animePages.sonarr.enabled ?? true) === false &&
-		(publicOptions.ui?.animePages.radarr.enabled ?? true) === false
+		(publicOptions.ui?.animePages.radarr.enabled ?? true) === false &&
+		(publicOptions.ui?.animePages.seerr.enabled ?? true) === false
 	) {
 		return false;
 	}

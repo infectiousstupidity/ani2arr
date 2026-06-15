@@ -15,6 +15,7 @@ import {
 	getPublicOptionsSnapshot,
 	getExtensionOptionsSnapshot,
 	saveProviderConnectionSnapshot,
+	saveSeerrConnectionSnapshot,
 	savePublicOptionsSnapshot,
 	toPublicOptions,
 	watchExtensionOptionsSnapshot,
@@ -123,6 +124,31 @@ export const useSaveProviderConnection = () => {
 		mutationFn: async ({ provider, credentials }) => {
 			try {
 				return await saveProviderConnectionSnapshot(provider, credentials);
+			} catch (error) {
+				throw normalizeError(error);
+			}
+		},
+		onSuccess: (savedOptions) => {
+			queryClient.setQueryData(queryKeys.options(), savedOptions);
+			queryClient.setQueryData(
+				queryKeys.publicOptions(),
+				toPublicOptions(savedOptions),
+			);
+		},
+	});
+};
+
+export const useSaveSeerrConnection = () => {
+	const queryClient = useQueryClient();
+
+	return useMutation<
+		ExtensionOptions,
+		ExtensionError,
+		{ credentials: ProviderCredentials | null }
+	>({
+		mutationFn: async ({ credentials }) => {
+			try {
+				return await saveSeerrConnectionSnapshot(credentials);
 			} catch (error) {
 				throw normalizeError(error);
 			}

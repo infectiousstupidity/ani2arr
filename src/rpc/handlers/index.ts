@@ -8,11 +8,13 @@ import { mappingHandlers } from "./mapping.handlers";
 import { optionsHandlers } from "./options.handlers";
 import { providerHandlers } from "./provider.handlers";
 import { radarrHandlers } from "./radarr.handlers";
+import { seerrHandlers } from "./seerr.handlers";
 import { sonarrHandlers } from "./sonarr.handlers";
 
 export const apiHandlers = {
 	...optionsHandlers,
 	...providerHandlers,
+	...seerrHandlers,
 	...sonarrHandlers,
 	...radarrHandlers,
 	...mappingHandlers,

@@ -30,6 +30,7 @@ export async function cleanupUnusedProviderHostPermission(
 	const activePatterns = [
 		getPermissionPattern(newSettings.providers.sonarr.url),
 		getPermissionPattern(newSettings.providers.radarr.url),
+		getPermissionPattern(newSettings.seerr.url),
 	];
 	if (activePatterns.includes(oldPattern)) {
 		return;

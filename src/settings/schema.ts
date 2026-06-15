@@ -25,6 +25,11 @@ const createDefaultRadarrProviderSettings = () => ({
 	defaults: createDefaultRadarrFormState(),
 });
 
+const createDefaultSeerrSettings = () => ({
+	url: "",
+	apiKey: "",
+});
+
 const SonarrProviderSettingsSchema = v.object({
 	url: v.string(),
 	apiKey: v.string(),
@@ -40,11 +45,17 @@ const RadarrProviderSettingsSchema = v.object({
 	defaults: v.fallback(RadarrDefaultsSchema, createDefaultRadarrFormState()),
 });
 
+const SeerrSettingsSchema = v.object({
+	url: v.string(),
+	apiKey: v.string(),
+});
+
 export const createDefaultExtensionOptions = (): ExtensionOptions => ({
 	providers: {
 		sonarr: createDefaultSonarrProviderSettings(),
 		radarr: createDefaultRadarrProviderSettings(),
 	},
+	seerr: createDefaultSeerrSettings(),
 	ui: createDefaultUiOptions(),
 	debugLogging: false,
 });
@@ -60,6 +71,7 @@ const ExtensionOptionsObjectSchema = v.object({
 			createDefaultRadarrProviderSettings(),
 		),
 	}),
+	seerr: v.fallback(SeerrSettingsSchema, createDefaultSeerrSettings()),
 	ui: v.fallback(UiOptionsSchema, createDefaultUiOptions()),
 	debugLogging: v.fallback(v.boolean(), false),
 });

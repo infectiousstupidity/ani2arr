@@ -7,6 +7,7 @@ import type { AniListId } from "@/anilist/types";
 type OptionsPageSectionId =
 	| "sonarr"
 	| "radarr"
+	| "seerr"
 	| "mappings"
 	| "ui"
 	| "advanced";

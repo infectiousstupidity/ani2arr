@@ -9,6 +9,7 @@ import { logger } from "@/shared/utils/logger";
 import type { AniListId } from "@/anilist/types";
 import { getExtensionOptionsSnapshot } from "@/settings/store";
 import { hasConfiguredProviderCredentials } from "@/settings/provider-config";
+import { hasConfiguredSeerrCredentials } from "@/settings/seerr-config";
 import {
 	logError,
 	normalizeError,
@@ -36,7 +37,7 @@ const A2AMessageSchema = v.union([
 		type: v.literal("OPEN_OPTIONS_PAGE"),
 		timestamp: v.number(),
 		sectionId: v.optional(
-			v.picklist(["sonarr", "radarr", "mappings", "ui", "advanced"]),
+			v.picklist(["sonarr", "radarr", "seerr", "mappings", "ui", "advanced"]),
 		),
 		targetAnilistId: v.optional(AniListIdSchema),
 	}),
@@ -47,7 +48,8 @@ async function shouldWarmMappingsCache(): Promise<boolean> {
 		const options = await getExtensionOptionsSnapshot();
 		return (
 			hasConfiguredProviderCredentials(options, "sonarr") ||
-			hasConfiguredProviderCredentials(options, "radarr")
+			hasConfiguredProviderCredentials(options, "radarr") ||
+			hasConfiguredSeerrCredentials(options)
 		);
 	} catch (error) {
 		logError(normalizeError(error), "Background:shouldWarmMappingsCache");

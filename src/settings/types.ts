@@ -19,12 +19,19 @@ export interface UiOptions {
 			enabled: boolean;
 			visibility: BadgeVisibility;
 		};
+		seerr: {
+			enabled: boolean;
+			visibility: BadgeVisibility;
+		};
 	};
 	animePages: {
 		sonarr: {
 			enabled: boolean;
 		};
 		radarr: {
+			enabled: boolean;
+		};
+		seerr: {
 			enabled: boolean;
 		};
 	};
@@ -39,6 +46,7 @@ export interface ExtensionOptions {
 			defaults: RadarrFormState;
 		};
 	};
+	seerr: ProviderCredentials;
 	ui: UiOptions;
 	debugLogging: boolean;
 }
@@ -53,6 +61,9 @@ export interface PublicOptions {
 			defaults: RadarrFormState;
 			isConfigured: boolean;
 		};
+	};
+	seerr: {
+		isConfigured: boolean;
 	};
 	ui: UiOptions;
 	debugLogging: boolean;

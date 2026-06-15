@@ -17,8 +17,9 @@ type MappingDetailsLinkedAniListEntry =
 	MappingDetailsPayload["linkedAniListEntries"][number];
 
 interface MappingLinkedEntriesProps {
-	provider: Provider;
+	provider?: Provider;
 	currentAniListId: AniListId;
+	heading?: string;
 	linkedAniListIds?: readonly AniListId[];
 	entries?: readonly MappingDetailsLinkedAniListEntry[];
 }
@@ -84,8 +85,13 @@ function titleFromMetadata(
 export function MappingLinkedEntries(
 	props: MappingLinkedEntriesProps,
 ): React.JSX.Element | null {
-	const { provider, currentAniListId, linkedAniListIds = [], entries = [] } =
-		props;
+	const {
+		provider,
+		currentAniListId,
+		heading,
+		linkedAniListIds = [],
+		entries = [],
+	} = props;
 	const visibleEntries = entries.filter(
 		(entry) =>
 			entry.anilistId !== currentAniListId && entry.relation !== "current",
@@ -144,11 +150,14 @@ export function MappingLinkedEntries(
 	const rowsKey = rows.map((row) => row.anilistId).join(":");
 	const providerTargetLabel =
 		provider === "sonarr" ? "Sonarr series" : "Radarr movie";
+	const headingLabel =
+		heading ??
+		`AniList ID's also mapped to this ${providerTargetLabel} (${rows.length})`;
 
 	return (
 		<section className="flex flex-col gap-2 border-t border-border-primary/50 pt-4">
 			<p className="shrink-0 text-xs font-semibold text-text-primary">
-				{`AniList ID's also mapped to this ${providerTargetLabel} (${rows.length})`}
+				{heading ? `${heading} (${rows.length})` : headingLabel}
 			</p>
 			<div
 				key={rowsKey}

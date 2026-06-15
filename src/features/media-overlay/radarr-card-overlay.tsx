@@ -1,7 +1,7 @@
 /** Radarr browse-card overlay rendering backed by the shared media-action workflow. */
 // src/features/media-overlay/radarr-card-overlay.tsx
 
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
@@ -24,6 +24,7 @@ interface RadarrCardOverlayProps {
 	badgeVisibility?: BadgeVisibility;
 	stackDirection?: "up" | "down";
 	tooltipContainer?: FloatingPortalContainer;
+	extraAction?: ReactNode;
 }
 
 export function RadarrCardOverlay({
@@ -38,6 +39,7 @@ export function RadarrCardOverlay({
 	badgeVisibility,
 	stackDirection,
 	tooltipContainer,
+	extraAction,
 }: RadarrCardOverlayProps): ReactElement {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const providerTitle = title.trim().length > 0 ? title : null;
@@ -73,6 +75,7 @@ export function RadarrCardOverlay({
 			showMappingAction={mediaAction.status.state !== "unconfigured"}
 			onOpenMapping={onOpenMapping}
 			openProvider={mediaAction.openProvider}
+			extraAction={extraAction}
 			badgeVisibility={badgeVisibility}
 			stackDirection={stackDirection}
 			tooltipContainer={tooltipContainer}

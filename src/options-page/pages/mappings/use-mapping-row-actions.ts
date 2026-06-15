@@ -153,6 +153,7 @@ export function useMappingRowActions(
 		const metadata = metadataById.get(row.anilistId) ?? null;
 		mediaModal.open({
 			anilistId: row.anilistId,
+			kind: "provider",
 			provider: row.provider,
 			initialView: "mapping",
 			openSource: "options-page",

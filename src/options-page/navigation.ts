@@ -3,12 +3,19 @@
 
 import { useSyncExternalStore } from "react";
 
-export type PageId = "sonarr" | "radarr" | "mappings" | "ui" | "advanced";
+export type PageId =
+	| "sonarr"
+	| "radarr"
+	| "seerr"
+	| "mappings"
+	| "ui"
+	| "advanced";
 
 const DEFAULT_PAGE: PageId = "sonarr";
 const VALID_PAGES = new Set<PageId>([
 	"sonarr",
 	"radarr",
+	"seerr",
 	"mappings",
 	"ui",
 	"advanced",
@@ -21,7 +28,7 @@ export function getHashPage(): PageId {
 
 function getPageFromHash(currentHash: string): PageId {
 	const hash = currentHash.replace(/^#\/?/, "");
-	const basePage = hash.split("?")[0];
+	const basePage = hash.split("?", 1)[0];
 
 	if (VALID_PAGES.has(basePage as PageId)) {
 		return basePage as PageId;

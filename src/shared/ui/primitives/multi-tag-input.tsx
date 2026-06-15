@@ -73,12 +73,9 @@ const MultiTagInput: React.FC<MultiTagInputProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (
-      e.key === 'Enter' ||
-      e.key === ' ' ||
-      e.key === ',' ||
-      e.key === 'Spacebar'
-    ) {
+    const addKeyList = ['Enter', ' ', ',', 'Spacebar'];
+
+    if (addKeyList.includes(e.key)) {
       e.preventDefault();
       addTag(inputValue);
     } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {

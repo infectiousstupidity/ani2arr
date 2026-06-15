@@ -27,10 +27,12 @@ export const createDefaultUiOptions = (): UiOptions => ({
 	browseCards: {
 		sonarr: createDefaultBrowseCardUiOptions(),
 		radarr: createDefaultBrowseCardUiOptions(),
+		seerr: createDefaultBrowseCardUiOptions(),
 	},
 	animePages: {
 		sonarr: createDefaultAnimePageUiOptions(),
 		radarr: createDefaultAnimePageUiOptions(),
+		seerr: createDefaultAnimePageUiOptions(),
 	},
 });
 
@@ -71,6 +73,10 @@ export const UiOptionsSchema = v.pipe(
 				ProviderBrowseCardUiOptionsSchema,
 				createDefaultBrowseCardUiOptions(),
 			),
+			seerr: v.fallback(
+				ProviderBrowseCardUiOptionsSchema,
+				createDefaultBrowseCardUiOptions(),
+			),
 		}),
 		animePages: v.object({
 			sonarr: v.fallback(
@@ -78,6 +84,10 @@ export const UiOptionsSchema = v.pipe(
 				createDefaultAnimePageUiOptions(),
 			),
 			radarr: v.fallback(
+				ProviderAnimePageUiOptionsSchema,
+				createDefaultAnimePageUiOptions(),
+			),
+			seerr: v.fallback(
 				ProviderAnimePageUiOptionsSchema,
 				createDefaultAnimePageUiOptions(),
 			),

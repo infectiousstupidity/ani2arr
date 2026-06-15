@@ -11,6 +11,7 @@ import {
 	resetAllSettingsSnapshot,
 	saveProviderConnectionSnapshot,
 	savePublicOptionsSnapshot,
+	saveSeerrConnectionSnapshot,
 	toPublicOptions,
 	watchPublicOptionsSnapshot,
 } from "@/settings/store";
@@ -20,6 +21,7 @@ import type { PublicOptions } from "@/settings/types";
 const PUBLIC_OPTIONS_STORAGE_KEY = "publicOptions";
 const SONARR_SECRETS_STORAGE_KEY = "sonarrSecrets";
 const RADARR_SECRETS_STORAGE_KEY = "radarrSecrets";
+const SEERR_SECRETS_STORAGE_KEY = "seerrSecrets";
 
 describe("options store helpers", () => {
 	it("falls back to default settings for missing input", () => {
@@ -32,6 +34,8 @@ describe("options store helpers", () => {
 		settings.providers.sonarr.apiKey = "sonarr-key";
 		settings.providers.radarr.url = "https://radarr.example";
 		settings.providers.radarr.apiKey = "";
+		settings.seerr.url = "https://seerr.example";
+		settings.seerr.apiKey = "seerr-key";
 
 		expect(toPublicOptions(settings)).toEqual({
 			providers: {
@@ -43,6 +47,9 @@ describe("options store helpers", () => {
 					defaults: settings.providers.radarr.defaults,
 					isConfigured: false,
 				},
+			},
+			seerr: {
+				isConfigured: true,
 			},
 			ui: settings.ui,
 			debugLogging: false,
@@ -78,6 +85,9 @@ describe("options store helpers", () => {
 				apiKey: string;
 			},
 			[RADARR_SECRETS_STORAGE_KEY]: null as unknown as { apiKey: string },
+			[SEERR_SECRETS_STORAGE_KEY]: { url: 123 } as unknown as {
+				url: string;
+			},
 		});
 
 		const snapshot = await getExtensionOptionsSnapshot();
@@ -86,6 +96,8 @@ describe("options store helpers", () => {
 		expect(snapshot.providers.sonarr.apiKey).toBe("");
 		expect(snapshot.providers.radarr.url).toBe("");
 		expect(snapshot.providers.radarr.apiKey).toBe("");
+		expect(snapshot.seerr.url).toBe("");
+		expect(snapshot.seerr.apiKey).toBe("");
 	});
 
 	it("composes extension options from private provider connections and public options", async () => {
@@ -98,6 +110,10 @@ describe("options store helpers", () => {
 				url: "https://sonarr.example",
 				apiKey: "sonarr-key",
 			},
+			[SEERR_SECRETS_STORAGE_KEY]: {
+				url: "https://seerr.example",
+				apiKey: "seerr-key",
+			},
 		});
 
 		const snapshot = await getExtensionOptionsSnapshot();
@@ -106,6 +122,8 @@ describe("options store helpers", () => {
 		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
 		expect(snapshot.providers.radarr.url).toBe("");
 		expect(snapshot.providers.radarr.apiKey).toBe("");
+		expect(snapshot.seerr.url).toBe("https://seerr.example");
+		expect(snapshot.seerr.apiKey).toBe("seerr-key");
 	});
 
 	it("saving public options cannot clear private provider credentials", async () => {
@@ -153,6 +171,23 @@ describe("options store helpers", () => {
 		expect(snapshot.providers.sonarr.defaults.rootFolderPath).toBe("/anime");
 		expect(snapshot.providers.sonarr.url).toBe("https://sonarr.example");
 		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
+	});
+
+	it("saving Seerr credentials stores only configured state in public options", async () => {
+		await saveSeerrConnectionSnapshot({
+			url: "https://seerr.example",
+			apiKey: "seerr-key",
+		});
+
+		const extensionSnapshot = await getExtensionOptionsSnapshot();
+		const publicSnapshot = await getPublicOptionsSnapshot();
+
+		expect(extensionSnapshot.seerr).toEqual({
+			url: "https://seerr.example",
+			apiKey: "seerr-key",
+		});
+		expect(publicSnapshot.seerr).toEqual({ isConfigured: true });
+		expect(publicSnapshot).not.toHaveProperty("seerr.apiKey");
 	});
 
 	it("reset clears public options and private provider credentials", async () => {

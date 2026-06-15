@@ -8,13 +8,19 @@ import {
   useOptionsQuerySync,
   usePublicOptions,
 } from "@/queries/options";
-import { useStoredProviderConnectionStatus } from "@/queries/provider-connection";
+import {
+  deriveProviderConnectionStatusView,
+  useStoredProviderConnectionStatus,
+} from "@/queries/provider-connection";
+import { useSeerrConnectionCheck } from "@/queries/seerr";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import { getProviderCredentials } from "@/settings/provider-config";
+import { getSeerrCredentials } from "@/settings/seerr-config";
 
 import { ConfirmDialog } from "./components/ui/alert-dialog";
 import {
   useRadarrActions,
+  useSeerrActions,
   useSonarrActions,
 } from "./hooks/provider-connection-actions";
 import { useHashRoute } from "./navigation";
@@ -27,8 +33,17 @@ import {
 import { AdvancedPage } from "./pages/advanced-page";
 import { MappingsPage } from "./pages/mapping-page";
 import { RadarrPage } from "./pages/radarr-page";
+import { SeerrPage } from "./pages/seerr-page";
 import { SonarrPage } from "./pages/sonarr-page";
 import { UiPage } from "./pages/ui-page";
+
+type DisconnectTarget = Provider | "seerr";
+
+function getDisconnectTargetLabel(target: DisconnectTarget | null): string {
+	if (target === "radarr") return "Radarr";
+	if (target === "seerr") return "Seerr";
+	return "Sonarr";
+}
 
 export const OptionsPage = () => {
   useOptionsQuerySync();
@@ -43,8 +58,9 @@ const OptionsPageContent = () => {
   const publicOptionsQuery = usePublicOptions();
   const sonarrActions = useSonarrActions();
   const radarrActions = useRadarrActions();
+  const seerrActions = useSeerrActions();
 
-  const [pendingDisconnectProvider, setPendingDisconnectProvider] = useState<Provider | null>(null);
+  const [pendingDisconnectProvider, setPendingDisconnectProvider] = useState<DisconnectTarget | null>(null);
 
   const sonarrCredentials = useMemo(
     () => getProviderCredentials(extensionOptionsQuery.data, "sonarr"),
@@ -54,9 +70,14 @@ const OptionsPageContent = () => {
     () => getProviderCredentials(extensionOptionsQuery.data, "radarr"),
     [extensionOptionsQuery.data],
   );
+  const seerrCredentials = useMemo(
+    () => getSeerrCredentials(extensionOptionsQuery.data),
+    [extensionOptionsQuery.data],
+  );
 
   const isSonarrStoredConfigured = publicOptionsQuery.data?.providers.sonarr.isConfigured === true;
   const isRadarrStoredConfigured = publicOptionsQuery.data?.providers.radarr.isConfigured === true;
+  const isSeerrStoredConfigured = publicOptionsQuery.data?.seerr.isConfigured === true;
 
   const sonarrStatus = useStoredProviderConnectionStatus({
     provider: "sonarr",
@@ -70,12 +91,25 @@ const OptionsPageContent = () => {
     credentials: radarrCredentials,
   });
 
+  const seerrConnectionQuery = useSeerrConnectionCheck({
+    credentials: seerrCredentials,
+    enabled: isSeerrStoredConfigured && seerrCredentials !== null,
+  });
+  const seerrStatus = deriveProviderConnectionStatusView({
+    isProviderConfigured: isSeerrStoredConfigured,
+    isProviderConnected: seerrConnectionQuery.isSuccess,
+    isCheckingProviderConnection:
+      isSeerrStoredConfigured &&
+      seerrCredentials !== null &&
+      seerrConnectionQuery.isFetching,
+  });
+
   const statuses = useMemo(
-    () => ({ sonarr: sonarrStatus, radarr: radarrStatus }),
-    [radarrStatus, sonarrStatus],
+    () => ({ sonarr: sonarrStatus, radarr: radarrStatus, seerr: seerrStatus }),
+    [radarrStatus, seerrStatus, sonarrStatus],
   );
 
-  const isProviderActionPending = sonarrActions.isConnecting || radarrActions.isConnecting;
+  const isProviderActionPending = sonarrActions.isConnecting || radarrActions.isConnecting || seerrActions.isConnecting;
 
   if (publicOptionsQuery.isLoading || !publicOptionsQuery.data) {
     return (
@@ -85,21 +119,29 @@ const OptionsPageContent = () => {
     );
   }
 
-  const requestDisconnect = (provider: Provider) => {
+  const requestDisconnect = (provider: DisconnectTarget) => {
     setPendingDisconnectProvider(provider);
   };
 
   const confirmDisconnect = async () => {
     if (!pendingDisconnectProvider || isProviderActionPending) return;
 
-    const success =
-      pendingDisconnectProvider === "sonarr"
-        ? await sonarrActions.disconnectSonarr()
-        : await radarrActions.disconnectRadarr();
+    let success = false;
+    if (pendingDisconnectProvider === "sonarr") {
+      success = await sonarrActions.disconnectSonarr();
+    } else if (pendingDisconnectProvider === "radarr") {
+      success = await radarrActions.disconnectRadarr();
+    } else {
+      success = await seerrActions.disconnectSeerr();
+    }
 
     if (!success) return;
     setPendingDisconnectProvider(null);
   };
+
+  const pendingDisconnectLabel = getDisconnectTargetLabel(
+    pendingDisconnectProvider,
+  );
 
   const renderActivePage = () => {
     switch (page) {
@@ -118,6 +160,15 @@ const OptionsPageContent = () => {
             connectRadarr={radarrActions.connectRadarr}
             connectionError={radarrActions.error}
             isConnecting={radarrActions.isConnecting}
+          />
+        );
+      }
+      case "seerr": {
+        return (
+          <SeerrPage
+            connectSeerr={seerrActions.connectSeerr}
+            connectionError={seerrActions.error}
+            isConnecting={seerrActions.isConnecting}
           />
         );
       }
@@ -180,8 +231,8 @@ const OptionsPageContent = () => {
             if (open) return;
             setPendingDisconnectProvider(null);
           }}
-          title={`Disconnect ${pendingDisconnectProvider === "radarr" ? "Radarr" : "Sonarr"}?`}
-          description="This will clear the saved URL, API key, and provider defaults for this provider."
+          title={`Disconnect ${pendingDisconnectLabel}?`}
+          description="This will clear the saved URL and API key for this connection."
           confirmText={isProviderActionPending ? "Disconnecting..." : "Disconnect"}
           cancelText="Cancel"
           onConfirm={confirmDisconnect}

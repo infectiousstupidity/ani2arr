@@ -20,3 +20,19 @@ export const RadarrIcon = (props: React.SVGProps<SVGSVGElement>) => (
     />
   </svg>
 );
+
+export const SeerrIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden="true"
+    {...props}
+  >
+    <path
+      fill="currentColor"
+      fillRule="evenodd"
+      d="M12 24c6.627 0 12-5.373 12-12S18.627 0 12 0 0 5.373 0 12s5.373 12 12 12Zm8-11c0 3.865-3.135 7-7 7s-7-3.135-7-7c0-.718.108-1.41.308-2.063A3.501 3.501 0 0 0 9.5 13 3.5 3.5 0 0 0 13 9.5a3.501 3.501 0 0 0-2.063-3.192A7.01 7.01 0 0 1 13 6c3.865 0 7 3.135 7 7Z"
+    />
+  </svg>
+);

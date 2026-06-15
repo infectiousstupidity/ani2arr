@@ -24,6 +24,7 @@ type ProviderStatusView = {
 	shortLabel: string;
 	variantClassName?: string;
 };
+type ConnectionId = Provider | "seerr";
 
 const extensionVersion = browser.runtime.getManifest()?.version ?? "unknown";
 const queryClient = createExtensionQueryClient();
@@ -43,6 +44,21 @@ const notConfiguredStatus: ProviderStatusView = {
 	isProviderConfigured: false,
 	shortLabel: "Not configured",
 };
+const CONNECTIONS = [...PROVIDERS, "seerr"] as const satisfies readonly ConnectionId[];
+
+function getConnectionLabel(connection: ConnectionId): string {
+	return connection === "seerr" ? "Seerr" : getProviderLabel(connection);
+}
+
+function getAnimePageConnectionDescription(connection: ConnectionId): string {
+	if (connection === "sonarr") {
+		return "Show series actions on supported anime pages.";
+	}
+	if (connection === "radarr") {
+		return "Show movie actions on supported anime pages.";
+	}
+	return "Show request actions on supported anime pages.";
+}
 
 export function QuickSettings(): React.JSX.Element {
 	useOptionsQuerySync();
@@ -54,13 +70,16 @@ export function QuickSettings(): React.JSX.Element {
 	const publicSettings = publicOptionsQuery.data;
 	const isSonarrConfigured = publicSettings?.providers.sonarr.isConfigured ?? false;
 	const isRadarrConfigured = publicSettings?.providers.radarr.isConfigured ?? false;
+	const isSeerrConfigured = publicSettings?.seerr.isConfigured ?? false;
 
-	const providerStatuses: Record<Provider, ProviderStatusView> = {
+	const providerStatuses: Record<ConnectionId, ProviderStatusView> = {
 		sonarr: isSonarrConfigured ? configuredStatus : notConfiguredStatus,
 		radarr: isRadarrConfigured ? configuredStatus : notConfiguredStatus,
+		seerr: isSeerrConfigured ? configuredStatus : notConfiguredStatus,
 	};
 
-	const hasAnyProviderConfigured = isSonarrConfigured || isRadarrConfigured;
+	const hasAnyProviderConfigured =
+		isSonarrConfigured || isRadarrConfigured || isSeerrConfigured;
 	const isSaving = saveOptions.isPending;
 
 	// Early return without fixed height to let Chrome shrink-wrap the popup
@@ -86,8 +105,8 @@ export function QuickSettings(): React.JSX.Element {
 	};
 
 	const updateBrowseProvider = (
-		provider: Provider,
-		patch: Partial<PublicOptions["ui"]["browseCards"][Provider]>,
+		provider: keyof PublicOptions["ui"]["browseCards"],
+		patch: Partial<PublicOptions["ui"]["browseCards"][typeof provider]>,
 	): void => {
 		void updateSettings((current) => ({
 			...current,
@@ -104,7 +123,10 @@ export function QuickSettings(): React.JSX.Element {
 		}));
 	};
 
-	const updateAnimeProvider = (provider: Provider, enabled: boolean): void => {
+	const updateAnimeProvider = (
+		provider: keyof PublicOptions["ui"]["animePages"],
+		enabled: boolean,
+	): void => {
 		void updateSettings((current) => ({
 			...current,
 			ui: {
@@ -151,10 +173,10 @@ export function QuickSettings(): React.JSX.Element {
 				</button>
 			</header>
 
-			<section className="mb-3 grid grid-cols-2 gap-2">
-				{PROVIDERS.map((provider) => {
+			<section className="mb-3 grid grid-cols-3 gap-2">
+				{CONNECTIONS.map((provider) => {
 					const status = providerStatuses[provider];
-					const providerLabel = getProviderLabel(provider);
+					const providerLabel = getConnectionLabel(provider);
 
 					return (
 						<div
@@ -204,8 +226,8 @@ export function QuickSettings(): React.JSX.Element {
 						</p>
 					</div>
 
-					{PROVIDERS.map((provider) => {
-						const providerLabel = getProviderLabel(provider);
+					{CONNECTIONS.map((provider) => {
+						const providerLabel = getConnectionLabel(provider);
 						const providerSettings = publicSettings.ui.browseCards[provider];
 
 						return (
@@ -269,8 +291,8 @@ export function QuickSettings(): React.JSX.Element {
 						</p>
 					</div>
 
-					{PROVIDERS.map((provider) => {
-						const providerLabel = getProviderLabel(provider);
+					{CONNECTIONS.map((provider) => {
+						const providerLabel = getConnectionLabel(provider);
 						const enabled = publicSettings.ui.animePages[provider].enabled ?? false;
 
 						return (
@@ -281,9 +303,7 @@ export function QuickSettings(): React.JSX.Element {
 								<div>
 									<p className="text-sm">{providerLabel}</p>
 									<p className="text-[11px] text-text-secondary">
-										{provider === "sonarr"
-											? "Show series actions on supported anime pages."
-											: "Show movie actions on supported anime pages."}
+										{getAnimePageConnectionDescription(provider)}
 									</p>
 								</div>
 								<input

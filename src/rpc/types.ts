@@ -7,10 +7,7 @@ import type {
 	AniListMediaFormat,
 	AniListMetadata,
 } from "@/anilist/types";
-import type {
-	Provider,
-	ProviderCredentials,
-} from "@/providers/types";
+import type { Provider, ProviderCredentials } from "@/providers/types";
 import type { ProviderOpenTarget } from "@/providers/provider-links";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type {
@@ -18,10 +15,15 @@ import type {
 	RadarrLookupMovie,
 	RadarrMovie,
 } from "@/providers/radarr/types";
+import type { TmdbId, TvdbId } from "@/providers/schemas";
 import type {
-	TmdbId,
-	TvdbId,
-} from "@/providers/schemas";
+	SeerrMediaDetails,
+	SeerrMediaRequest,
+	SeerrMediaStatus,
+	SeerrSearchResult,
+	SeerrTargetSource,
+	SeerrTvSeasons,
+} from "@/providers/seerr/types";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import type { SonarrEditMonitoringAction } from "@/providers/sonarr/schemas";
 import type {
@@ -125,6 +127,8 @@ export type GetMappingsInput = {
 };
 
 export type GetMappingIdentitiesInput = AniListId[];
+export type GetSeerrTargetsInput = AniListId[];
+export type GetSeerrTargetInput = AniListId;
 
 export type GetMappingInspectionInput = {
 	anilistId: AniListId;
@@ -138,6 +142,101 @@ export type GetAniListMetadataInput = {
 export type ProviderConnectionTestInput = {
 	credentials: ProviderCredentials;
 };
+
+export type RequestInSeerrInput =
+	| {
+			anilistId: AniListId;
+			mediaType: "movie";
+			tmdbId: TmdbId;
+	  }
+	| {
+			anilistId: AniListId;
+			mediaType: "tv";
+			tmdbId: TmdbId;
+			tvdbId?: TvdbId;
+			seasons: number[];
+	  };
+
+export type GetSeerrMediaStatusInput =
+	| {
+			mediaType: "movie";
+			tmdbId: TmdbId;
+	  }
+	| {
+			mediaType: "tv";
+			tmdbId: TmdbId;
+			seasons?: SeerrTvSeasons;
+	  };
+
+export type GetSeerrMediaStatusOutput = {
+	status: SeerrMediaStatus;
+};
+
+export type SeerrRequestTarget = {
+	anilistId: AniListId;
+	source: SeerrTargetSource;
+} & (
+	| {
+			mediaType: "movie";
+			tmdbId: TmdbId;
+	  }
+	| {
+			mediaType: "tv";
+			tmdbId: TmdbId;
+			seasons: number[];
+			tmdbSeasons?: number[];
+			tvdbSeasons?: number[];
+			tvdbId?: TvdbId;
+	  }
+);
+
+export type SetManualSeerrTargetInput = {
+	anilistId: AniListId;
+} & (
+	| {
+			mediaType: "movie";
+			tmdbId: TmdbId;
+	  }
+	| {
+			mediaType: "tv";
+			tmdbId: TmdbId;
+			tvdbId?: TvdbId;
+			seasons: number[];
+	  }
+);
+
+export type ClearManualSeerrTargetInput = AniListId;
+
+export type SearchSeerrMediaInput = {
+	query: string;
+};
+
+export type SearchSeerrMediaOutput = SeerrSearchResult[];
+
+export type GetSeerrMediaDetailsInput =
+	| {
+			mediaType: "movie";
+			tmdbId: TmdbId;
+	  }
+	| {
+			mediaType: "tv";
+			tmdbId: TmdbId;
+	  };
+
+export type GetSeerrMediaDetailsOutput = SeerrMediaDetails;
+
+export type GetSeerrLinkedAniListEntriesInput =
+	| {
+			mediaType: "movie";
+			tmdbId: TmdbId;
+	  }
+	| {
+			mediaType: "tv";
+			tmdbId: TmdbId;
+	  };
+
+export type GetSeerrLinkedAniListEntriesOutput =
+	MappingDetailsLinkedAniListEntry[];
 
 export type OpenProviderPageInput = {
 	provider: Provider;
@@ -169,6 +268,8 @@ export interface GetSeriesStatusOutput extends ProviderStatusResponseBase {
 export interface GetMovieStatusOutput extends ProviderStatusResponseBase {
 	movie?: RadarrMovieSnapshot | RadarrMovie | RadarrLookupMovie;
 }
+
+export type RequestInSeerrOutput = SeerrMediaRequest;
 
 export type MappingListRowStatus =
 	| "needs-review"

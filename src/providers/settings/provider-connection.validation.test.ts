@@ -1,6 +1,8 @@
 /** Focused tests for provider connection validation and cache scope normalization. */
 // src/providers/settings/provider-connection.validation.test.ts
 
+/* eslint-disable unicorn/prefer-https */
+
 import { describe, expect, it } from "vitest";
 import {
 	getProviderConnectionScope,
@@ -23,12 +25,12 @@ describe("normalizeProviderConnectionUrl", () => {
 	});
 
 	it("preserves non-default ports", () => {
-		expect(validateProviderConnectionUrl("http://192.168.50.166:8181/")).toEqual(
-			{
-				ok: true,
-				value: "http://192.168.50.166:8181",
-			},
-		);
+		expect(
+			validateProviderConnectionUrl("http://192.168.50.166:8181/"),
+		).toEqual({
+			ok: true,
+			value: "http://192.168.50.166:8181",
+		});
 	});
 
 	it("preserves non-default ports and subfolders for API URLs", () => {
@@ -49,24 +51,24 @@ describe("normalizeProviderConnectionUrl", () => {
 			ok: false,
 			error: "URL must use http or https.",
 		});
-		expect(validateProviderConnectionUrl("https://user:pass@arr.example")).toEqual(
-			{
-				ok: false,
-				error: "Credentials in URL are not supported.",
-			},
-		);
-		expect(validateProviderConnectionUrl("https://arr.example?apiKey=secret")).toEqual(
-			{
-				ok: false,
-				error: "URL must not include query parameters or fragments.",
-			},
-		);
-		expect(validateProviderConnectionUrl("https://arr.example/#settings")).toEqual(
-			{
-				ok: false,
-				error: "URL must not include query parameters or fragments.",
-			},
-		);
+		expect(
+			validateProviderConnectionUrl("https://user:pass@arr.example"),
+		).toEqual({
+			ok: false,
+			error: "Credentials in URL are not supported.",
+		});
+		expect(
+			validateProviderConnectionUrl("https://arr.example?apiKey=secret"),
+		).toEqual({
+			ok: false,
+			error: "URL must not include query parameters or fragments.",
+		});
+		expect(
+			validateProviderConnectionUrl("https://arr.example/#settings"),
+		).toEqual({
+			ok: false,
+			error: "URL must not include query parameters or fragments.",
+		});
 		expect(validateProviderConnectionUrl("http://arr.example:0")).toEqual({
 			ok: false,
 			error: "Invalid port.",
@@ -80,7 +82,7 @@ describe("validateProviderConnectionApiKey", () => {
 			ok: true,
 			value: "key-123",
 		});
-		expect(validateProviderConnectionApiKey("   ")).toEqual({
+		expect(validateProviderConnectionApiKey(" ".repeat(3))).toEqual({
 			ok: false,
 			error: "API key cannot be empty.",
 		});

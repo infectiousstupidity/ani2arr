@@ -35,6 +35,7 @@ export function invalidateAfterMappingsRevision(
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingIdentitiesRoot(),
 	});
+	queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
 	for (const provider of PROVIDERS) {
 		queryClient.invalidateQueries({
 			queryKey: queryKeys.providerMediaStatusRoot(provider),

@@ -5,6 +5,7 @@ import { anilistMediaCache, AniListMediaService } from "@/anilist/media.service"
 import { AniListMetadataStore } from "@/anilist/metadata.store";
 import { clearAutoResults } from "@/mapping/auto.store";
 import { clearManualFacts } from "@/mapping/manual.store";
+import { clearManualSeerrTargets } from "@/mapping/seerr-target.store";
 import { MappingService } from "@/mapping/mapping.service";
 import { createAutomaticResolver } from "@/mapping/resolve/resolve";
 import {
@@ -14,6 +15,7 @@ import {
 import type { Provider } from "@/providers/types";
 import { RadarrClient } from "@/providers/radarr/client";
 import { RadarrLibrary } from "@/providers/radarr/library";
+import { SeerrClient } from "@/providers/seerr/client";
 import {
 	getProviderHostPermissionPattern,
 	hasProviderHostPermission,
@@ -29,6 +31,7 @@ import {
 	getProviderCredentials,
 	hasConfiguredProviderCredentials,
 } from "@/settings/provider-config";
+import { hasConfiguredSeerrCredentials } from "@/settings/seerr-config";
 import type { ExtensionOptions } from "@/settings/types";
 import { clearAllTtlCaches } from "@/shared/cache/ttl-cache";
 import {
@@ -59,13 +62,13 @@ function createDebouncer(ms: number) {
 }
 
 const createHasUrlPermission =
-	(provider: Provider) =>
+	(scope: string) =>
 	async (url: string): Promise<boolean> => {
 		const result = await hasProviderHostPermission(url);
 		if (!result.ok) {
 			logError(
 				normalizeError(result.error),
-				`Ani2arrApi:${provider}:hasUrlPermission`,
+				`Ani2arrApi:${scope}:hasUrlPermission`,
 			);
 			return false;
 		}
@@ -77,6 +80,9 @@ export const sonarrClient = new SonarrClient({
 });
 export const radarrClient = new RadarrClient({
 	hasUrlPermission: createHasUrlPermission("radarr"),
+});
+export const seerrClient = new SeerrClient({
+	hasUrlPermission: createHasUrlPermission("seerr"),
 });
 
 export const sonarrLibrary = new SonarrLibrary(sonarrClient);
@@ -162,7 +168,8 @@ export const handleProviderConnectionChanged = async (
 
 	if (
 		hasConfiguredProviderCredentials(options, "sonarr") ||
-		hasConfiguredProviderCredentials(options, "radarr")
+		hasConfiguredProviderCredentials(options, "radarr") ||
+		hasConfiguredSeerrCredentials(options)
 	) {
 		await refreshUpstreamMappings();
 	}
@@ -192,6 +199,7 @@ const removeConfiguredProviderHostPermissions = async (
 	const urls = [
 		options.providers.sonarr.url,
 		options.providers.radarr.url,
+		options.seerr.url,
 	].filter((url): url is string => !!url);
 
 	const uniqueUrls = new Set(urls);
@@ -230,6 +238,7 @@ export const resetExtensionState = async (): Promise<void> => {
 	const previousOptions = await getExtensionOptionsSnapshot();
 
 	await clearManualFacts();
+	await clearManualSeerrTargets();
 	await Promise.all([clearAutoResults("sonarr"), clearAutoResults("radarr")]);
 	await clearPersistentCaches();
 	await resetAllSettingsSnapshot();

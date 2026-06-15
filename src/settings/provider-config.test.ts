@@ -45,8 +45,8 @@ describe("getProviderCredentials", () => {
 
 	it("treats whitespace-only values as unconfigured", () => {
 		const settings = createDefaultExtensionOptions();
-		settings.providers.sonarr.url = "   ";
-		settings.providers.sonarr.apiKey = "  ";
+		settings.providers.sonarr.url = " ".repeat(3);
+		settings.providers.sonarr.apiKey = " ".repeat(2);
 
 		expect(getProviderCredentials(settings, "sonarr")).toBeNull();
 	});

@@ -43,22 +43,32 @@ export type MediaModalTargetSummary = {
 
 type MediaModalStateBase = {
 	anilistId: AniListId;
-	initialView?: MediaModalView;
 	openSource: MediaModalOpenSource;
 	metadataHint?: MediaModalMetadataHint | null;
 };
 
-export type SonarrMediaModalState = MediaModalStateBase & {
+type ProviderMediaModalStateBase = MediaModalStateBase & {
+	kind: "provider";
+	provider: Provider;
+	initialView?: MediaModalView;
+};
+
+export type SonarrMediaModalState = ProviderMediaModalStateBase & {
 	provider: "sonarr";
 };
 
-export type RadarrMediaModalState = MediaModalStateBase & {
+export type RadarrMediaModalState = ProviderMediaModalStateBase & {
 	provider: "radarr";
+};
+
+export type SeerrMediaModalState = MediaModalStateBase & {
+	kind: "seerr";
 };
 
 export type MediaModalState =
 	| SonarrMediaModalState
 	| RadarrMediaModalState
+	| SeerrMediaModalState
 	| null;
 
 export type MediaModalOpenState = Exclude<MediaModalState, null>;
@@ -80,4 +90,8 @@ export type SonarrModalProps = MediaModalSharedProps & {
 
 export type RadarrModalProps = MediaModalSharedProps & {
 	state: RadarrMediaModalState;
+};
+
+export type SeerrModalProps = MediaModalSharedProps & {
+	state: SeerrMediaModalState;
 };

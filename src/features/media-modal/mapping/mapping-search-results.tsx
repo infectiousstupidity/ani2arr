@@ -3,6 +3,7 @@
 
 import { ExternalLink } from "lucide-react";
 import type { MouseEvent } from "react";
+import Pill from "@/shared/ui/primitives/pill";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import { cn } from "@/shared/utils/cn";
 
@@ -54,6 +55,7 @@ export function MappingCandidateRow(
 		year,
 	} = props;
 	const linkedBadgeLabel = getLinkedBadgeLabel(linkedAniListCount);
+	const providerIdPillLabel = `${providerIdLabel} ID: ${providerId}`;
 	const selectionLabel = isSelected
 		? `Clear selected match: ${title}`
 		: `Preview match: ${title}`;
@@ -94,24 +96,24 @@ export function MappingCandidateRow(
 						{title}
 					</div>
 
-					<div className="mt-1 truncate text-xs text-text-secondary">
-						<span>
-							{providerIdLabel} {providerId}
-						</span>
+					<div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-text-secondary">
+						<Pill small tone="muted" className="normal-case">
+							{providerIdPillLabel}
+						</Pill>
 						{year ? (
 							<>
-								<span className="mx-1 opacity-30" aria-hidden="true">
+								<span className="opacity-30" aria-hidden="true">
 									•
 								</span>
-								<span>{year}</span>
+								<span className="min-w-0 truncate">{year}</span>
 							</>
 						) : null}
 						{typeLabel ? (
 							<>
-								<span className="mx-1 opacity-30" aria-hidden="true">
+								<span className="opacity-30" aria-hidden="true">
 									•
 								</span>
-								<span>{typeLabel}</span>
+								<span className="min-w-0 truncate">{typeLabel}</span>
 							</>
 						) : null}
 					</div>

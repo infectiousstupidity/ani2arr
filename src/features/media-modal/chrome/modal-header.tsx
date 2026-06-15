@@ -60,11 +60,8 @@ function formatProviderType(typeLabel: string | undefined): string | null {
 	}
 
 	const normalized = typeLabel.trim().toLowerCase();
-	if (
-		normalized === "anime" ||
-		normalized === "standard" ||
-		normalized === "daily"
-	) {
+	const tvTypes = ["anime", "standard", "daily"];
+	if (tvTypes.includes(normalized)) {
 		return "TV";
 	}
 

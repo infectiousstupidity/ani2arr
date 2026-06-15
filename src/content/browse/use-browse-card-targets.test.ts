@@ -63,7 +63,14 @@ class FakeElement extends FakeNode {
 	}
 
 	querySelector(selector: string): FakeElement | null {
-		return this.querySelectorAll(selector)[0] ?? null;
+		for (const child of this.children) {
+			if (child.matches(selector)) return child;
+
+			const match = child.querySelector(selector);
+			if (match) return match;
+		}
+
+		return null;
 	}
 
 	setAttribute(name: string, value: string): void {
@@ -104,7 +111,7 @@ const fakeDocument = {
 		return new FakeElement(tagName);
 	},
 	querySelector(selector: string): FakeElement | null {
-		return this.body?.querySelector(selector) ?? null;
+		return fakeDocument.body?.querySelector(selector) ?? null;
 	},
 };
 
@@ -136,9 +143,11 @@ function getPlacementContainer(card: FakeElement): FakeElement | null {
 	return getCover(card).querySelector(`.${BROWSE_OVERLAY_CONTAINER_CLASS}`);
 }
 
-function createAdapter(input: {
-	anchorCorner?: BrowseAdapter["anchorCorner"];
-} = {}): BrowseAdapter {
+function createAdapter(
+	input: {
+		anchorCorner?: BrowseAdapter["anchorCorner"];
+	} = {},
+): BrowseAdapter {
 	const adapter: BrowseAdapter = {
 		cardSelector: ".card",
 		parseCard(card: Element): HostMediaTarget | null {
@@ -177,7 +186,9 @@ describe("scanBrowseCardTargets", () => {
 	it("creates, reuses, and cleans one portal target", () => {
 		const card = createCard({ id: 101, title: "First" });
 		fakeDocument.body?.append(card);
-		const options = createOptions(createAdapter({ anchorCorner: "bottom-left" }));
+		const options = createOptions(
+			createAdapter({ anchorCorner: "bottom-left" }),
+		);
 
 		const firstTargets = scanBrowseCardTargets(options);
 		const firstContainer = getPlacementContainer(card);

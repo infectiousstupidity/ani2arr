@@ -2,7 +2,7 @@
 // src/rpc/handlers/provider.handlers.ts
 
 import { browser } from "wxt/browser";
-import { radarrClient, sonarrClient } from "@/background/api-services";
+import { radarrClient, seerrClient, sonarrClient } from "@/background/api-services";
 import { getProviderConfig } from "@/background/provider-config";
 import { buildProviderOpenUrl } from "@/providers/provider-links";
 import type {
@@ -11,6 +11,7 @@ import type {
 	ProviderConnectionTestInput,
 } from "@/rpc/types";
 import { normalizeInputCredentials } from "./provider-credentials";
+import { normalizeSeerrConnectionInput } from "@/settings/seerr-config";
 
 export const providerHandlers = {
 	async openProviderPage(
@@ -53,5 +54,17 @@ export const providerHandlers = {
 	testRadarrConnection(input: ProviderConnectionTestInput) {
 		const credentials = normalizeInputCredentials("radarr", input.credentials);
 		return radarrClient.testConnection(credentials);
+	},
+
+	testSeerrConnection(input: ProviderConnectionTestInput) {
+		const normalized = normalizeSeerrConnectionInput(input.credentials);
+		if (!normalized) {
+			throw new Error("Seerr credentials are required.");
+		}
+
+		return seerrClient.validateConnection({
+			url: normalized.url,
+			apiKey: normalized.apiKey,
+		});
 	},
 };

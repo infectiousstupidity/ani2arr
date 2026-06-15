@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { AniListId } from "@/anilist/types";
+import { parseTmdbId } from "@/providers/schemas";
 import type { StatusInput } from "@/rpc/types";
 import { normalizeMetadataIds, queryKeys } from "@/queries/query-keys";
 
@@ -17,10 +18,9 @@ const expectPrefix = (
 
 describe("queryKeys", () => {
 	it("sorts, dedupes, and filters AniList IDs", () => {
-		expect(normalizeMetadataIds([aid(3), aid(1), aid(3), -1 as AniListId])).toEqual([
-			aid(1),
-			aid(3),
-		]);
+		expect(
+			normalizeMetadataIds([aid(3), aid(1), aid(3), -1 as AniListId]),
+		).toEqual([aid(1), aid(3)]);
 	});
 
 	it("keeps mapping list keys stable for reordered filters", () => {
@@ -49,6 +49,40 @@ describe("queryKeys", () => {
 		);
 	});
 
+	it("sorts and dedupes Seerr target IDs", () => {
+		expect(queryKeys.seerrTargets([aid(3), aid(1), aid(3)])).toEqual(
+			queryKeys.seerrTargets([aid(1), aid(3)]),
+		);
+	});
+
+	it("separates Seerr media status keys by media type and seasons", () => {
+		expect(
+			queryKeys.seerrMediaStatus({
+				mediaType: "movie",
+				tmdbId: parseTmdbId(1),
+			}),
+		).not.toEqual(
+			queryKeys.seerrMediaStatus({
+				mediaType: "tv",
+				tmdbId: parseTmdbId(1),
+			}),
+		);
+
+		expect(
+			queryKeys.seerrMediaStatus({
+				mediaType: "tv",
+				tmdbId: parseTmdbId(1),
+				seasons: [2, 1, 2],
+			}),
+		).toEqual(
+			queryKeys.seerrMediaStatus({
+				mediaType: "tv",
+				tmdbId: parseTmdbId(1),
+				seasons: [1, 2],
+			}),
+		);
+	});
+
 	it("uses provider media-status request fields without metadata filtering", () => {
 		const request = {
 			anilistId: aid(9),
@@ -72,9 +106,7 @@ describe("queryKeys", () => {
 			relationPrequelIds: [1, 2],
 		};
 
-		expect(
-			queryKeys.providerMediaStatus("sonarr", request),
-		).toEqual([
+		expect(queryKeys.providerMediaStatus("sonarr", request)).toEqual([
 			"a2a",
 			"provider",
 			"sonarr",
@@ -91,7 +123,7 @@ describe("queryKeys", () => {
 		expect(
 			queryKeys.providerMediaStatus("sonarr", {
 				anilistId: aid(7),
-				title: "   ",
+				title: " ".repeat(3),
 				metadata: null,
 			}),
 		).not.toEqual(

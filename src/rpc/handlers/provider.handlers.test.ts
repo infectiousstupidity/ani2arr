@@ -18,10 +18,14 @@ const sonarrClientMock = vi.hoisted(() => ({
 const radarrClientMock = vi.hoisted(() => ({
 	testConnection: vi.fn(),
 }));
+const seerrClientMock = vi.hoisted(() => ({
+	validateConnection: vi.fn(),
+}));
 const getProviderConfigMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/background/api-services", () => ({
 	radarrClient: radarrClientMock,
+	seerrClient: seerrClientMock,
 	sonarrClient: sonarrClientMock,
 }));
 
@@ -58,6 +62,20 @@ describe("providerHandlers", () => {
 
 		expect(radarrClientMock.testConnection).toHaveBeenCalledWith(credentials);
 		expect(sonarrClientMock.testConnection).not.toHaveBeenCalled();
+	});
+
+	it("tests Seerr connections through the current Seerr client", async () => {
+		seerrClientMock.validateConnection.mockResolvedValue({ ok: true });
+
+		await expect(
+			providerHandlers.testSeerrConnection({
+				credentials,
+			}),
+		).resolves.toEqual({ ok: true });
+
+		expect(seerrClientMock.validateConnection).toHaveBeenCalledWith(credentials);
+		expect(sonarrClientMock.testConnection).not.toHaveBeenCalled();
+		expect(radarrClientMock.testConnection).not.toHaveBeenCalled();
 	});
 
 	it("opens configured provider pages privately", async () => {
