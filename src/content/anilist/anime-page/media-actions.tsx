@@ -3,11 +3,12 @@
 
 import React, { type MouseEvent } from "react";
 import Button from "@/shared/ui/primitives/button";
-import { SquareArrowOutUpRight, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Dropdown, DropdownItem } from "@/shared/ui/primitives/dropdown";
 import type { Provider } from "@/providers/types";
 import { getProviderLabel } from "@/providers/provider-labels";
 import type { MediaActionState } from "@/features/media-action/state";
+import { RadarrIcon, SonarrIcon } from "@/options-page/components/icons";
 
 interface MediaActionsProps {
 	provider: Provider;
@@ -104,6 +105,17 @@ function getLoadingText(input: {
 	return input.state === "adding"
 		? "Adding..."
 		: `Checking ${input.providerLabel}...`;
+}
+
+function renderProviderOpenIcon(provider: Provider): React.ReactElement {
+	switch (provider) {
+		case "sonarr": {
+			return <SonarrIcon className="h-4 w-4" />;
+		}
+		case "radarr": {
+			return <RadarrIcon className="h-4 w-4" />;
+		}
+	}
 }
 
 const MediaActionGroup: React.FC<React.PropsWithChildren> = ({ children }) => (
@@ -224,7 +236,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 					className="h-8.75 w-8.75 rounded-[3px]"
 					onClick={handleProviderOpenClick}
 				>
-					<SquareArrowOutUpRight className="h-4 w-4" />
+					{renderProviderOpenIcon(provider)}
 				</Button>
 			) : null}
 		</div>

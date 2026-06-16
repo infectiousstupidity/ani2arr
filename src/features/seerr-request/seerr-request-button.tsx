@@ -2,12 +2,12 @@
 // src/features/seerr-request/seerr-request-button.tsx
 
 import type { MouseEvent, ReactElement } from "react";
-import { Send, SquareArrowOutUpRight } from "lucide-react";
 import { useSeerrMediaStatus } from "@/queries/seerr";
 import { openSeerrPage } from "@/rpc/provider-page";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { RequestInSeerrInput } from "@/rpc/types";
 import Button from "@/shared/ui/primitives/button";
+import { SeerrIcon } from "@/options-page/components/icons";
 import { getSeerrActionState } from "./seerr-action-state";
 
 interface SeerrRequestButtonProps {
@@ -83,7 +83,6 @@ export function SeerrRequestButton({
 			className="h-8.75 w-full rounded-[3px] text-[14px]"
 		>
 			<span className="inline-flex min-w-0 items-center justify-center gap-2">
-				<Send className="h-4 w-4 shrink-0" />
 				<span className="truncate">{actionState.label}</span>
 			</span>
 		</Button>
@@ -116,7 +115,7 @@ export function SeerrOpenButton({
 			className="h-8.75 w-8.75 rounded-[3px]"
 			onClick={handleClick}
 		>
-			<SquareArrowOutUpRight className="h-4 w-4" />
+			<SeerrIcon className="h-4 w-4" />
 		</Button>
 	);
 }

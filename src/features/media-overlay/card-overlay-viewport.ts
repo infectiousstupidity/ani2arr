@@ -1,9 +1,8 @@
-/** Viewport gate used to avoid browse-card status fetches for offscreen cards. */
 // src/features/media-overlay/card-overlay-viewport.ts
 
 import { useEffect, useState } from "react";
 
-const callbacks = new WeakMap<Element, (isVisible: boolean) => void>();
+const callbacks = new WeakMap<Element, Set<(isVisible: boolean) => void>>();
 let observer: IntersectionObserver | null = null;
 
 function getObserver() {
@@ -13,9 +12,11 @@ function getObserver() {
 		observer = new IntersectionObserver(
 			(entries) => {
 				for (const entry of entries) {
-					const callback = callbacks.get(entry.target);
-					if (callback) {
-						callback(entry.isIntersecting && entry.intersectionRatio >= 0.25);
+					const elementCallbacks = callbacks.get(entry.target);
+					if (elementCallbacks) {
+						for (const callback of elementCallbacks) {
+							callback(entry.isIntersecting && entry.intersectionRatio >= 0.25);
+						}
 					}
 				}
 			},
@@ -38,17 +39,31 @@ export function useCardOverlayInViewport(target?: Element | null): boolean {
 			return;
 		}
 
-		callbacks.set(target, (isVisible) => {
+		const callback = (isVisible: boolean) => {
 			setVisibleTarget(isVisible ? target : null);
 			if (!isVisible) {
 				setOpenTarget(null);
 			}
-		});
+		};
+
+		let elementCallbacks = callbacks.get(target);
+		if (!elementCallbacks) {
+			elementCallbacks = new Set();
+			callbacks.set(target, elementCallbacks);
+		}
+		elementCallbacks.add(callback);
+
 		obs.observe(target);
 
 		return () => {
-			obs.unobserve(target);
-			callbacks.delete(target);
+			const currentCallbacks = callbacks.get(target);
+			if (currentCallbacks) {
+				currentCallbacks.delete(callback);
+				if (currentCallbacks.size === 0) {
+					obs.unobserve(target);
+					callbacks.delete(target);
+				}
+			}
 		};
 	}, [target]);
 

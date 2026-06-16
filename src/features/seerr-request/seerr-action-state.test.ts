@@ -33,7 +33,7 @@ describe("getSeerrActionState", () => {
 				...baseInput,
 				status: "partial",
 			}).label,
-		).toBe("Partially available in Seerr");
+		).toBe("Partially in Seerr");
 	});
 
 	it("uses request wording for pending and processing media", () => {

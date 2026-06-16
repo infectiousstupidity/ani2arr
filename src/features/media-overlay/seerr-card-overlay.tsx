@@ -9,15 +9,16 @@ import type {
 } from "react";
 import {
 	Check,
+	CircleDashed,
 	RotateCcw,
 	Send,
-	SquareArrowOutUpRight,
 	TriangleAlert,
 } from "lucide-react";
 import type { AniListId } from "@/anilist/types";
 import { resolveSeerrRequestInput } from "@/content/anilist/target-provider";
 import type { MediaActionState } from "@/features/media-action/state";
 import { getSeerrActionState } from "@/features/seerr-request/seerr-action-state";
+import type { SeerrMediaStatus } from "@/providers/seerr/types";
 import { useSeerrMediaStatus, useSeerrTarget } from "@/queries/seerr";
 import { openSeerrPage } from "@/rpc/provider-page";
 import { openOptionsPage } from "@/rpc/runtime-messages";
@@ -25,6 +26,7 @@ import type { MappingIdentity, RequestInSeerrInput } from "@/rpc/types";
 import type { BadgeVisibility } from "@/settings/types";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
+import { SeerrIcon } from "@/options-page/components/icons";
 import { CardOverlay } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";
 
@@ -36,6 +38,10 @@ interface SeerrCardActionProps {
 	tooltipContainer?: FloatingPortalContainer | undefined;
 	statusEnabled?: boolean;
 	onOpenModal: () => void;
+}
+
+interface SeerrCardStackActionsProps extends SeerrCardActionProps {
+	stackDirection?: "up" | "down" | undefined;
 }
 
 interface SeerrStandaloneCardOverlayProps extends SeerrCardActionProps {
@@ -64,11 +70,23 @@ function isTrustedClick(event: MouseEvent<HTMLButtonElement>): boolean {
 	return event.nativeEvent.isTrusted === true || event.isTrusted === true;
 }
 
-function getSeerrCardIcon(state: SeerrCardState): ReactElement {
-	switch (state) {
+function getSeerrCardIcon(input: {
+	state: SeerrCardState;
+	status: SeerrMediaStatus | undefined;
+}): ReactElement {
+	if (input.status === "partial") {
+		return <CircleDashed className="h-4 w-4" aria-hidden="true" />;
+	}
+
+	switch (input.state) {
 		case "checking":
 		case "adding": {
-			return <RotateCcw className="h-4 w-4 a2a-rotate" aria-hidden="true" />;
+			return (
+				<RotateCcw
+					className="h-4 w-4 a2a-rotate"
+					aria-hidden="true"
+				/>
+			);
 		}
 		case "in-library": {
 			return <Check className="h-4 w-4" aria-hidden="true" />;
@@ -103,6 +121,8 @@ function useSeerrCardAction(input: SeerrCardActionProps) {
 			requestInput !== null,
 	});
 
+	const seerrStatus = status.data?.status;
+
 	const actionState =
 		input.isConfigured && requestInput === null
 			? {
@@ -117,7 +137,7 @@ function useSeerrCardAction(input: SeerrCardActionProps) {
 					isChecking: status.isEnabled && !status.data && !status.isError,
 					requestSucceeded: false,
 					requestFailed: false,
-					status: status.data?.status,
+					status: seerrStatus,
 				});
 
 	const openSeerr =
@@ -144,6 +164,7 @@ function useSeerrCardAction(input: SeerrCardActionProps) {
 		state: actionState.state,
 		title: actionState.label,
 		disabled: actionState.disabled,
+		status: seerrStatus,
 		run,
 		requestInput,
 		openSeerr,
@@ -182,7 +203,10 @@ function SeerrStackRequestButton(props: {
 				disabled={action.disabled}
 				aria-disabled={action.disabled || undefined}
 			>
-				{getSeerrCardIcon(action.state)}
+				{getSeerrCardIcon({
+					state: action.state,
+					status: action.status,
+				})}
 			</button>
 		</TooltipWrapper>
 	);
@@ -219,7 +243,7 @@ function SeerrStackOpenButton(props: {
 				onClick={handleClick}
 				onMouseDown={swallowEvent}
 			>
-				<SquareArrowOutUpRight className="h-4 w-4" aria-hidden="true" />
+				<SeerrIcon className="h-4 w-4" aria-hidden="true" />
 			</button>
 		</TooltipWrapper>
 	);
@@ -260,7 +284,8 @@ export function SeerrCardStackActions({
 	observeTarget,
 	tooltipContainer,
 	onOpenModal,
-}: SeerrCardActionProps): ReactElement | null {
+	stackDirection = "up",
+}: SeerrCardStackActionsProps): ReactElement | null {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const action = useSeerrCardAction({
 		anilistId,
@@ -273,17 +298,23 @@ export function SeerrCardStackActions({
 
 	if (!isInViewport) return null;
 
-	return (
-		<>
-			<SeerrStackRequestButton
-				action={action}
-				tooltipContainer={tooltipContainer}
-			/>
-			<SeerrStackOpenButton
-				action={action}
-				tooltipContainer={tooltipContainer}
-			/>
-		</>
+	const requestButton = (
+		<SeerrStackRequestButton
+			action={action}
+			tooltipContainer={tooltipContainer}
+		/>
+	);
+	const openButton = (
+		<SeerrStackOpenButton
+			action={action}
+			tooltipContainer={tooltipContainer}
+		/>
+	);
+
+	return stackDirection === "down" ? (
+		<>{requestButton}{openButton}</>
+	) : (
+		<>{openButton}{requestButton}</>
 	);
 }
 
@@ -334,6 +365,7 @@ export function SeerrStandaloneCardOverlay({
 				showMappingAction={false}
 				onOpenMapping={() => {}}
 				openProvider={action.openSeerr}
+				openProviderIcon={SeerrIcon}
 				extraAction={extraAction}
 				badgeVisibility={badgeVisibility}
 				stackDirection={stackDirection}

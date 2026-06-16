@@ -8,6 +8,7 @@ import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-a
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import type { BadgeVisibility } from "@/settings/types";
+import { SonarrIcon } from "@/options-page/components/icons";
 import { getCardPrimaryTitle } from "./card-primary-title";
 import { CardOverlay } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";
@@ -75,6 +76,7 @@ export function SonarrCardOverlay({
 			showMappingAction={mediaAction.status.state !== "unconfigured"}
 			onOpenMapping={onOpenMapping}
 			openProvider={mediaAction.openProvider}
+			openProviderIcon={SonarrIcon}
 			extraAction={extraAction}
 			badgeVisibility={badgeVisibility}
 			stackDirection={stackDirection}

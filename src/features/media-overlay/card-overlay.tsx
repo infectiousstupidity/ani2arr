@@ -2,11 +2,10 @@
 // src/features/media-overlay/card-overlay.tsx
 
 import {
-	useEffect,
-	useRef,
-	useState,
+	type ComponentType,
 	type ReactElement,
 	type ReactNode,
+	type SVGProps,
 	type SyntheticEvent,
 } from "react";
 import {
@@ -14,7 +13,6 @@ import {
 	Plus,
 	RotateCcw,
 	SlidersHorizontal,
-	SquareArrowOutUpRight,
 	TriangleAlert,
 	Wrench,
 } from "lucide-react";
@@ -36,6 +34,7 @@ interface CardOverlayProps {
 	showMappingAction: boolean;
 	onOpenMapping(): void;
 	openProvider: (() => void) | null;
+	openProviderIcon?: ComponentType<SVGProps<SVGSVGElement>> | undefined;
 	extraAction?: ReactNode;
 	badgeVisibility?: BadgeVisibility | undefined;
 	stackDirection?: "up" | "down" | undefined;
@@ -45,12 +44,47 @@ interface CardOverlayProps {
 function getPrimaryActionIcon(actionState: MediaActionState) {
 	switch (actionState) {
 		case "checking":
-		case "adding": { return <RotateCcw className="a2a-card-overlay__symbol a2a-rotate" aria-hidden="true" />; }
-		case "in-library": { return <Check className="a2a-card-overlay__symbol" aria-hidden="true" />; }
-		case "unmapped": { return <Wrench className="a2a-card-overlay__symbol" aria-hidden="true" />; }
+		case "adding": {
+			return (
+				<RotateCcw
+					className="a2a-card-overlay__symbol a2a-rotate"
+					aria-hidden="true"
+				/>
+			);
+		}
+		case "in-library": {
+			return (
+				<Check
+					className="a2a-card-overlay__symbol"
+					aria-hidden="true"
+				/>
+			);
+		}
+		case "unmapped": {
+			return (
+				<Wrench
+					className="a2a-card-overlay__symbol"
+					aria-hidden="true"
+				/>
+			);
+		}
 		case "unknown":
-		case "error": { return <TriangleAlert className="a2a-card-overlay__symbol" aria-hidden="true" />; }
-		default: { return <Plus className="a2a-card-overlay__symbol" aria-hidden="true" />; }
+		case "error": {
+			return (
+				<TriangleAlert
+					className="a2a-card-overlay__symbol"
+					aria-hidden="true"
+				/>
+			);
+		}
+		default: {
+			return (
+				<Plus
+					className="a2a-card-overlay__symbol"
+					aria-hidden="true"
+				/>
+			);
+		}
 	}
 }
 
@@ -86,44 +120,27 @@ export function CardOverlay({
 	showMappingAction,
 	onOpenMapping,
 	openProvider,
+	openProviderIcon: OpenProviderIcon,
 	extraAction,
 	badgeVisibility = "always",
 	stackDirection = "up",
 	tooltipContainer,
 }: CardOverlayProps): ReactElement {
-	const [stackOpen, setStackOpen] = useState(false);
-	const closeTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
 	const resolvedTooltipContainer =
 		tooltipContainer ?? (typeof document === "undefined" ? null : document.body);
-	const manualMappingLabel = hasMapping ? "Update mapping manually" : "Find match manually";
-
-	const openStack = () => {
-		if (closeTimerRef.current !== null) {
-			globalThis.clearTimeout(closeTimerRef.current);
-			closeTimerRef.current = null;
-		}
-		setStackOpen(true);
-	};
-	const scheduleCloseStack = () => {
-		if (closeTimerRef.current !== null) {
-			globalThis.clearTimeout(closeTimerRef.current);
-		}
-		closeTimerRef.current = globalThis.setTimeout(() => {
-			setStackOpen(false);
-			closeTimerRef.current = null;
-		}, 160);
-	};
-
-	useEffect(() => {
-		return () => {
-			if (closeTimerRef.current !== null) {
-				globalThis.clearTimeout(closeTimerRef.current);
-			}
-		};
-	}, []);
+	const manualMappingLabel = hasMapping
+		? "Update mapping manually"
+		: "Find match manually";
 
 	const setupAction = showSetupAction ? (
-		<TooltipWrapper content={`Open ${providerLabel} setup`} side="right" align="center" sideOffset={6} container={resolvedTooltipContainer} showArrow={false}>
+		<TooltipWrapper
+			content={`Open ${providerLabel} setup`}
+			side="right"
+			align="center"
+			sideOffset={6}
+			container={resolvedTooltipContainer}
+			showArrow={false}
+		>
 			<button
 				type="button"
 				className="a2a-card-overlay__action a2a-card-overlay__action--advanced"
@@ -137,7 +154,14 @@ export function CardOverlay({
 	) : null;
 
 	const mappingAction = showMappingAction ? (
-		<TooltipWrapper content={manualMappingLabel} side="right" align="center" sideOffset={6} container={resolvedTooltipContainer} showArrow={false}>
+		<TooltipWrapper
+			content={manualMappingLabel}
+			side="right"
+			align="center"
+			sideOffset={6}
+			container={resolvedTooltipContainer}
+			showArrow={false}
+		>
 			<button
 				type="button"
 				className="a2a-card-overlay__action a2a-card-overlay__action--fix"
@@ -150,8 +174,15 @@ export function CardOverlay({
 		</TooltipWrapper>
 	) : null;
 
-	const externalAction = openProvider ? (
-		<TooltipWrapper content={`Open in ${providerLabel}`} side="right" align="center" sideOffset={6} container={resolvedTooltipContainer} showArrow={false}>
+	const externalAction = openProvider && OpenProviderIcon ? (
+		<TooltipWrapper
+			content={`Open in ${providerLabel}`}
+			side="right"
+			align="center"
+			sideOffset={6}
+			container={resolvedTooltipContainer}
+			showArrow={false}
+		>
 			<button
 				type="button"
 				className="a2a-card-overlay__action a2a-card-overlay__action--external"
@@ -159,7 +190,7 @@ export function CardOverlay({
 				onClick={withSwallow(openProvider)}
 				onMouseDown={swallowEvent}
 			>
-				<SquareArrowOutUpRight aria-hidden="true" className="h-4 w-4" />
+				<OpenProviderIcon aria-hidden="true" className="h-4 w-4" />
 			</button>
 		</TooltipWrapper>
 	) : null;
@@ -177,15 +208,16 @@ export function CardOverlay({
 			onMouseUp={stopOverlayEvent}
 			onPointerDown={stopOverlayEvent}
 			onPointerUp={stopOverlayEvent}
-			onMouseEnter={openStack}
-			onMouseLeave={scheduleCloseStack}
 		>
-			<div
-				className="a2a-card-overlay__anchor-wrap"
-				onMouseEnter={openStack}
-				onMouseLeave={scheduleCloseStack}
-			>
-				<TooltipWrapper content={primaryTitle} side="right" align="center" sideOffset={6} container={resolvedTooltipContainer} showArrow={false}>
+			<div className="a2a-card-overlay__anchor-wrap">
+				<TooltipWrapper
+					content={primaryTitle}
+					side="right"
+					align="center"
+					sideOffset={6}
+					container={resolvedTooltipContainer}
+					showArrow={false}
+				>
 					<button
 						type="button"
 						className="a2a-card-overlay__quick"
@@ -204,10 +236,7 @@ export function CardOverlay({
 			{setupAction || mappingAction || externalAction || extraAction ? (
 				<div
 					className="a2a-card-overlay__stack"
-					data-open={stackOpen || undefined}
 					data-direction={stackDirection}
-					onMouseEnter={openStack}
-					onMouseLeave={scheduleCloseStack}
 				>
 					{stackDirection === "down" ? (
 						<>{setupAction}{mappingAction}{externalAction}{extraAction}</>

@@ -283,6 +283,15 @@ function readSeerrSeason(value: unknown): SeerrSeasonStatus | null {
 	}
 
 	const episodeCount = value.episodeCount;
+
+	if (
+		typeof episodeCount === "number" &&
+		Number.isSafeInteger(episodeCount) &&
+		episodeCount <= 0
+	) {
+		return null;
+	}
+
 	const name = readString(value.name);
 	const status =
 		value.status === undefined

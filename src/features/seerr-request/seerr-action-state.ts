@@ -33,7 +33,7 @@ export function isSettledSeerrStatus(status: SeerrActionStatus): boolean {
 
 function getSettledLabel(status: SeerrActionStatus): string {
 	if (status === "available") return "Available in Seerr";
-	if (status === "partial") return "Partially available in Seerr";
+	if (status === "partial") return "Partially in Seerr";
 	return "Requested in Seerr";
 }
 

@@ -26,17 +26,17 @@ describe("Seerr request helpers", () => {
 	it("builds TV request payloads with explicit seasons", () => {
 		expect(
 			buildSeerrRequestPayload({
-					mediaType: "tv",
-					tmdbId: parseTmdbId(456),
-					tvdbId: parseTvdbId(789),
-					seasons: [1, 2],
-				}),
-			).toEqual({
 				mediaType: "tv",
-				mediaId: parseTmdbId(456),
+				tmdbId: parseTmdbId(456),
 				tvdbId: parseTvdbId(789),
 				seasons: [1, 2],
-			});
+			}),
+		).toEqual({
+			mediaType: "tv",
+			mediaId: parseTmdbId(456),
+			tvdbId: parseTvdbId(789),
+			seasons: [1, 2],
+		});
 	});
 
 	it("rejects TV request payloads without explicit seasons", () => {
@@ -247,7 +247,7 @@ describe("Seerr request helpers", () => {
 				],
 			}),
 		).toEqual([
-			 {
+			{
 				mediaType: "movie",
 				tmdbId: parseTmdbId(123),
 				title: "Movie",
@@ -318,10 +318,10 @@ describe("Seerr request helpers", () => {
 
 	it("merges Seerr season metadata with mediaInfo season statuses", () => {
 		expect(
-				readSeerrMediaDetails(
-					{
-						id: 37_854,
-						tvdbId: 81_797,
+			readSeerrMediaDetails(
+				{
+					id: 37_854,
+					tvdbId: 81_797,
 					name: "One Piece",
 					firstAirDate: "1999-10-20",
 					mediaInfo: {
@@ -380,4 +380,31 @@ describe("Seerr request helpers", () => {
 			},
 		]);
 	});
+});
+
+it("ignores zero-episode Seerr seasons", () => {
+	expect(
+		readSeerrMediaDetails(
+			{
+				id: 196_950,
+				tvdbId: 418_666,
+				name: "Witch Hat Atelier",
+				firstAirDate: "2026-01-01",
+				mediaInfo: { status: 4 },
+				seasons: [
+					{ seasonNumber: 0, name: "0", episodeCount: 0 },
+					{ seasonNumber: 1, name: "1", episodeCount: 13, status: 4 },
+				],
+			},
+			"tv",
+		).seasons,
+	).toEqual([
+		{
+			seasonNumber: 1,
+			name: "1",
+			episodeCount: 13,
+			status: "partial",
+			requestable: false,
+		},
+	]);
 });
