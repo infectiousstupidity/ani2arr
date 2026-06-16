@@ -19,15 +19,18 @@ import type { BadgeVisibility, PublicOptions } from "@/settings/types";
 import { cn } from "@/shared/utils/cn";
 import "./style.css";
 
+type ConnectionId = Provider | "seerr";
+
 type ProviderStatusView = {
 	isProviderConfigured: boolean;
 	shortLabel: string;
 	variantClassName?: string;
 };
-type ConnectionId = Provider | "seerr";
 
 const extensionVersion = browser.runtime.getManifest()?.version ?? "unknown";
 const queryClient = createExtensionQueryClient();
+
+const CONNECTIONS: readonly ConnectionId[] = [...PROVIDERS, "seerr"];
 
 const badgeOptions: Array<{ value: BadgeVisibility; label: string }> = [
 	{ value: "always", label: "Always" },
@@ -44,7 +47,6 @@ const notConfiguredStatus: ProviderStatusView = {
 	isProviderConfigured: false,
 	shortLabel: "Not configured",
 };
-const CONNECTIONS = [...PROVIDERS, "seerr"] as const satisfies readonly ConnectionId[];
 
 function getConnectionLabel(connection: ConnectionId): string {
 	return connection === "seerr" ? "Seerr" : getProviderLabel(connection);
@@ -54,9 +56,11 @@ function getAnimePageConnectionDescription(connection: ConnectionId): string {
 	if (connection === "sonarr") {
 		return "Show series actions on supported anime pages.";
 	}
+
 	if (connection === "radarr") {
 		return "Show movie actions on supported anime pages.";
 	}
+
 	return "Show request actions on supported anime pages.";
 }
 
@@ -68,9 +72,19 @@ export function QuickSettings(): React.JSX.Element {
 	const [saveError, setSaveError] = useState<string | null>(null);
 
 	const publicSettings = publicOptionsQuery.data;
-	const isSonarrConfigured = publicSettings?.providers.sonarr.isConfigured ?? false;
-	const isRadarrConfigured = publicSettings?.providers.radarr.isConfigured ?? false;
-	const isSeerrConfigured = publicSettings?.seerr.isConfigured ?? false;
+	const isSaving = saveOptions.isPending;
+
+	if (publicOptionsQuery.isLoading || !publicSettings) {
+		return (
+			<div className="flex w-90 justify-center pb-4 pt-14 text-sm text-text-secondary">
+				Loading...
+			</div>
+		);
+	}
+
+	const isSonarrConfigured = publicSettings.providers.sonarr.isConfigured;
+	const isRadarrConfigured = publicSettings.providers.radarr.isConfigured;
+	const isSeerrConfigured = publicSettings.seerr.isConfigured;
 
 	const providerStatuses: Record<ConnectionId, ProviderStatusView> = {
 		sonarr: isSonarrConfigured ? configuredStatus : notConfiguredStatus,
@@ -80,21 +94,12 @@ export function QuickSettings(): React.JSX.Element {
 
 	const hasAnyProviderConfigured =
 		isSonarrConfigured || isRadarrConfigured || isSeerrConfigured;
-	const isSaving = saveOptions.isPending;
-
-	// Early return without fixed height to let Chrome shrink-wrap the popup
-	if (publicOptionsQuery.isLoading || !publicSettings) {
-		return (
-			<div className="flex w-90 justify-center pb-4 pt-14 text-sm text-text-secondary">
-				Loading...
-			</div>
-		);
-	}
 
 	const updateSettings = async (
 		updater: (current: PublicOptions) => PublicOptions,
 	): Promise<void> => {
 		if (isSaving) return;
+
 		setSaveError(null);
 
 		try {
@@ -104,27 +109,54 @@ export function QuickSettings(): React.JSX.Element {
 		}
 	};
 
-	const updateBrowseProvider = (
-		provider: keyof PublicOptions["ui"]["browseCards"],
-		patch: Partial<PublicOptions["ui"]["browseCards"][typeof provider]>,
+	const setBrowseCardEnabled = (
+		provider: ConnectionId,
+		enabled: boolean,
 	): void => {
-		void updateSettings((current) => ({
-			...current,
-			ui: {
-				...current.ui,
-				browseCards: {
-					...current.ui.browseCards,
-					[provider]: {
-						...current.ui.browseCards[provider],
-						...patch,
+		void updateSettings((current) => {
+			const currentSettings = current.ui.browseCards[provider];
+
+			return {
+				...current,
+				ui: {
+					...current.ui,
+					browseCards: {
+						...current.ui.browseCards,
+						[provider]: {
+							enabled,
+							visibility: currentSettings?.visibility ?? "hover",
+						},
 					},
 				},
-			},
-		}));
+			};
+		});
 	};
 
-	const updateAnimeProvider = (
-		provider: keyof PublicOptions["ui"]["animePages"],
+	const setBrowseCardVisibility = (
+		provider: ConnectionId,
+		visibility: BadgeVisibility,
+	): void => {
+		void updateSettings((current) => {
+			const currentSettings = current.ui.browseCards[provider];
+
+			return {
+				...current,
+				ui: {
+					...current.ui,
+					browseCards: {
+						...current.ui.browseCards,
+						[provider]: {
+							enabled: currentSettings?.enabled ?? false,
+							visibility,
+						},
+					},
+				},
+			};
+		});
+	};
+
+	const setAnimePageEnabled = (
+		provider: ConnectionId,
 		enabled: boolean,
 	): void => {
 		void updateSettings((current) => ({
@@ -134,7 +166,6 @@ export function QuickSettings(): React.JSX.Element {
 				animePages: {
 					...current.ui.animePages,
 					[provider]: {
-						...current.ui.animePages[provider],
 						enabled,
 					},
 				},
@@ -161,6 +192,7 @@ export function QuickSettings(): React.JSX.Element {
 						<p className="text-xs text-text-secondary">Quick settings</p>
 					</div>
 				</div>
+
 				<button
 					type="button"
 					onClick={() => openOptionsPage()}
@@ -192,9 +224,11 @@ export function QuickSettings(): React.JSX.Element {
 							>
 								<ExternalLink className="h-3.5 w-3.5" />
 							</button>
+
 							<p className="text-[11px] uppercase tracking-wide text-text-secondary">
 								{providerLabel}
 							</p>
+
 							<div className="mt-1 flex items-center gap-2 text-sm">
 								<span
 									className={cn(
@@ -236,25 +270,26 @@ export function QuickSettings(): React.JSX.Element {
 								className="rounded-lg border border-border-primary/70 bg-bg-tertiary/40 px-3 py-2.5"
 							>
 								<div className="flex items-center justify-between gap-3">
-									<div>
-										<p className="text-sm font-semibold">{providerLabel}</p>
-									</div>
+									<p className="text-sm font-semibold">{providerLabel}</p>
+
 									<input
 										type="checkbox"
 										className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
 										checked={providerSettings?.enabled ?? false}
 										disabled={isSaving}
 										onChange={(event) => {
-											updateBrowseProvider(provider, {
-												enabled: event.currentTarget.checked,
-											});
+											setBrowseCardEnabled(
+												provider,
+												event.currentTarget.checked,
+											);
 										}}
 									/>
 								</div>
 
 								<div className="mt-2.5 grid grid-cols-2 gap-2">
 									{badgeOptions.map((option) => {
-										const selected = providerSettings?.visibility === option.value;
+										const selected =
+											providerSettings?.visibility === option.value;
 
 										return (
 											<button
@@ -264,9 +299,7 @@ export function QuickSettings(): React.JSX.Element {
 													isSaving || !(providerSettings?.enabled ?? false)
 												}
 												onClick={() => {
-													updateBrowseProvider(provider, {
-														visibility: option.value,
-													});
+													setBrowseCardVisibility(provider, option.value);
 												}}
 												className={cn(
 													"cursor-pointer rounded-md border px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
@@ -293,7 +326,8 @@ export function QuickSettings(): React.JSX.Element {
 
 					{CONNECTIONS.map((provider) => {
 						const providerLabel = getConnectionLabel(provider);
-						const enabled = publicSettings.ui.animePages[provider].enabled ?? false;
+						const enabled =
+							publicSettings.ui.animePages[provider]?.enabled ?? false;
 
 						return (
 							<div
@@ -306,13 +340,17 @@ export function QuickSettings(): React.JSX.Element {
 										{getAnimePageConnectionDescription(provider)}
 									</p>
 								</div>
+
 								<input
 									type="checkbox"
 									className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
 									checked={enabled}
 									disabled={isSaving}
 									onChange={(event) => {
-										updateAnimeProvider(provider, event.currentTarget.checked);
+										setAnimePageEnabled(
+											provider,
+											event.currentTarget.checked,
+										);
 									}}
 								/>
 							</div>
@@ -323,7 +361,7 @@ export function QuickSettings(): React.JSX.Element {
 				<section className="rounded-xl border border-border-primary bg-bg-secondary/70 p-4 text-center">
 					<p className="text-sm font-semibold">No provider configured yet</p>
 					<p className="mt-1 text-xs text-text-secondary">
-						Configure Sonarr, Radarr, or both in the full settings page to
+						Configure Sonarr, Radarr, or Seerr in the full settings page to
 						enable quick settings here.
 					</p>
 				</section>
@@ -347,11 +385,19 @@ export function QuickSettings(): React.JSX.Element {
 const rootElement = document.querySelector("#popup-root");
 
 if (rootElement) {
-	createRoot(rootElement).render(
+	const root = createRoot(rootElement);
+
+	root.render(
 		<React.StrictMode>
 			<QueryClientProvider client={queryClient}>
 				<QuickSettings />
 			</QueryClientProvider>
 		</React.StrictMode>,
 	);
+
+	if (import.meta.hot) {
+		import.meta.hot.dispose(() => {
+			root.unmount();
+		});
+	}
 }

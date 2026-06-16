@@ -247,6 +247,13 @@ export type OpenProviderPageOutput = {
 	opened: boolean;
 };
 
+export type OpenSeerrPageInput = {
+	mediaType: "movie" | "tv";
+	tmdbId: TmdbId;
+};
+
+export type OpenSeerrPageOutput = OpenProviderPageOutput;
+
 export type NotifyProviderConnectionChangedInput = {
 	changedProviders?: Provider[];
 	disconnectedProviders?: Provider[];

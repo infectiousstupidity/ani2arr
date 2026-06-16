@@ -2,69 +2,93 @@
 // src/rpc/handlers/provider.handlers.ts
 
 import { browser } from "wxt/browser";
-import { radarrClient, seerrClient, sonarrClient } from "@/background/api-services";
-import { getProviderConfig } from "@/background/provider-config";
+import {
+	radarrClient,
+	seerrClient,
+	sonarrClient,
+} from "@/background/api-services";
+import {
+	getProviderConfig,
+	getSeerrConfig,
+} from "@/background/provider-config";
 import { buildProviderOpenUrl } from "@/providers/provider-links";
 import type {
 	OpenProviderPageInput,
 	OpenProviderPageOutput,
+	OpenSeerrPageInput,
+	OpenSeerrPageOutput,
 	ProviderConnectionTestInput,
 } from "@/rpc/types";
-import { normalizeInputCredentials } from "./provider-credentials";
 import { normalizeSeerrConnectionInput } from "@/settings/seerr-config";
+import { normalizeInputCredentials } from "./provider-credentials";
+
+async function openTab(url?: string | null): Promise<{ opened: boolean }> {
+	if (!url) return { opened: false };
+
+	try {
+		await browser.tabs.create({ url });
+		return { opened: true };
+	} catch {
+		return { opened: false };
+	}
+}
 
 export const providerHandlers = {
-	async openProviderPage(
-		input: OpenProviderPageInput,
-	): Promise<OpenProviderPageOutput> {
-		const credentials = await getProviderConfig(input.provider);
-		if (!credentials) return { opened: false };
+	async openProviderPage({
+		provider,
+		target,
+	}: OpenProviderPageInput): Promise<OpenProviderPageOutput> {
+		const config = await getProviderConfig(provider);
+		const isDetails = target.type === "details";
 
-		if (
-			input.target.type === "details" &&
-			!input.target.providerRouteSlug.trim()
-		) {
+		if (!config || (isDetails && !target.providerRouteSlug?.trim())) {
 			return { opened: false };
 		}
 
-		const url = buildProviderOpenUrl({
-			provider: input.provider,
-			baseUrl: credentials.url,
-			isInLibrary: input.target.type === "details",
-			...(input.target.type === "details"
-				? { providerRouteSlug: input.target.providerRouteSlug }
-				: {}),
-			...(input.target.searchTerm ? { searchTerm: input.target.searchTerm } : {}),
-		});
-		if (!url) return { opened: false };
-
-		try {
-			await browser.tabs.create({ url });
-			return { opened: true };
-		} catch {
-			return { opened: false };
-		}
+		return openTab(
+			buildProviderOpenUrl({
+				provider,
+				baseUrl: config.url,
+				isInLibrary: isDetails,
+				...(isDetails ? { providerRouteSlug: target.providerRouteSlug } : {}),
+				...("searchTerm" in target && target.searchTerm
+					? { searchTerm: target.searchTerm }
+					: {}),
+			}),
+		);
 	},
 
-	testSonarrConnection(input: ProviderConnectionTestInput) {
-		const credentials = normalizeInputCredentials("sonarr", input.credentials);
-		return sonarrClient.testConnection(credentials);
+	async openSeerrPage({
+		mediaType,
+		tmdbId,
+	}: OpenSeerrPageInput): Promise<OpenSeerrPageOutput> {
+		const config = await getSeerrConfig();
+		const root = config?.url.trim().replace(/\/+$/, "");
+
+		if (!root) return { opened: false };
+
+		return openTab(
+			`${root}/${mediaType === "movie" ? "movie" : "tv"}/${tmdbId}`,
+		);
 	},
 
-	testRadarrConnection(input: ProviderConnectionTestInput) {
-		const credentials = normalizeInputCredentials("radarr", input.credentials);
-		return radarrClient.testConnection(credentials);
-	},
+	testSonarrConnection: ({ credentials }: ProviderConnectionTestInput) =>
+		sonarrClient.testConnection(
+			normalizeInputCredentials("sonarr", credentials),
+		),
 
-	testSeerrConnection(input: ProviderConnectionTestInput) {
-		const normalized = normalizeSeerrConnectionInput(input.credentials);
-		if (!normalized) {
-			throw new Error("Seerr credentials are required.");
-		}
+	testRadarrConnection: ({ credentials }: ProviderConnectionTestInput) =>
+		radarrClient.testConnection(
+			normalizeInputCredentials("radarr", credentials),
+		),
+
+	testSeerrConnection({ credentials }: ProviderConnectionTestInput) {
+		const creds = normalizeSeerrConnectionInput(credentials);
+		if (!creds) throw new Error("Seerr credentials are required.");
 
 		return seerrClient.validateConnection({
-			url: normalized.url,
-			apiKey: normalized.apiKey,
+			url: creds.url,
+			apiKey: creds.apiKey,
 		});
 	},
 };

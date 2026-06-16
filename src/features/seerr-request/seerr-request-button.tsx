@@ -2,8 +2,9 @@
 // src/features/seerr-request/seerr-request-button.tsx
 
 import type { MouseEvent, ReactElement } from "react";
-import { Send } from "lucide-react";
+import { Send, SquareArrowOutUpRight } from "lucide-react";
 import { useSeerrMediaStatus } from "@/queries/seerr";
+import { openSeerrPage } from "@/rpc/provider-page";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { RequestInSeerrInput } from "@/rpc/types";
 import Button from "@/shared/ui/primitives/button";
@@ -15,6 +16,12 @@ interface SeerrRequestButtonProps {
 	statusEnabled?: boolean;
 	portalContainer?: HTMLElement | undefined;
 	onOpenModal: () => void;
+}
+
+interface SeerrOpenButtonProps {
+	requestInput: RequestInSeerrInput | null;
+	isConfigured: boolean;
+	portalContainer?: HTMLElement | undefined;
 }
 
 function isTrustedClick(event: MouseEvent<HTMLButtonElement>): boolean {
@@ -33,16 +40,23 @@ export function SeerrRequestButton({
 		enabled: isConfigured && statusEnabled && requestInput !== null,
 	});
 
-	if (requestInput === null) return null;
+	const hasTarget = requestInput !== null;
 
-	const actionState = getSeerrActionState({
-		isConfigured,
-		isRequesting: false,
-		isChecking: status.isEnabled && !status.data && !status.isError,
-		requestSucceeded: false,
-		requestFailed: false,
-		status: status.data?.status,
-	});
+	const actionState = hasTarget
+		? getSeerrActionState({
+				isConfigured,
+				isRequesting: false,
+				isChecking: status.isEnabled && !status.data && !status.isError,
+				requestSucceeded: false,
+				requestFailed: false,
+				status: status.data?.status,
+			})
+		: {
+				state: isConfigured ? "can-add" : "unconfigured",
+				label: isConfigured ? "Choose Seerr target" : "Configure Seerr",
+				disabled: false,
+				settled: false,
+			} as const;
 
 	const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
 		if (!isTrustedClick(event)) return;
@@ -72,6 +86,37 @@ export function SeerrRequestButton({
 				<Send className="h-4 w-4 shrink-0" />
 				<span className="truncate">{actionState.label}</span>
 			</span>
+		</Button>
+	);
+}
+
+export function SeerrOpenButton({
+	requestInput,
+	isConfigured,
+	portalContainer,
+}: SeerrOpenButtonProps): ReactElement | null {
+	if (!isConfigured || requestInput === null) return null;
+
+	const handleClick = (event: MouseEvent<HTMLButtonElement>): void => {
+		if (!isTrustedClick(event)) return;
+
+		openSeerrPage({
+			mediaType: requestInput.mediaType,
+			tmdbId: requestInput.tmdbId,
+		});
+	};
+
+	return (
+		<Button
+			type="button"
+			size="icon"
+			variant="primary"
+			tooltip="Open in Seerr"
+			tooltipContainer={portalContainer}
+			className="h-8.75 w-8.75 rounded-[3px]"
+			onClick={handleClick}
+		>
+			<SquareArrowOutUpRight className="h-4 w-4" />
 		</Button>
 	);
 }

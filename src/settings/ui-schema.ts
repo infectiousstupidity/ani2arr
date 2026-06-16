@@ -3,12 +3,22 @@
 
 import * as v from "valibot";
 import { ANILIST_TITLE_LANGUAGES } from "@/anilist/title";
-import type { BadgeVisibility, UiOptions } from "./types";
+import type {
+	BadgeVisibility,
+	BrowseCardPrimaryStatus,
+	UiOptions,
+} from "./types";
 
 const BADGE_VISIBILITY_OPTIONS: [BadgeVisibility, ...BadgeVisibility[]] = [
 	"always",
 	"hover",
 ];
+
+const BROWSE_CARD_PRIMARY_STATUS_OPTIONS: [
+	BrowseCardPrimaryStatus,
+	...BrowseCardPrimaryStatus[],
+] = ["arr", "seerr"];
+
 const AniListTitleLanguageSchema = v.picklist(ANILIST_TITLE_LANGUAGES);
 
 const createDefaultBrowseCardUiOptions =
@@ -25,6 +35,7 @@ const createDefaultAnimePageUiOptions =
 export const createDefaultUiOptions = (): UiOptions => ({
 	preferredAniListTitleLanguage: "english",
 	browseCards: {
+		primaryStatus: "arr",
 		sonarr: createDefaultBrowseCardUiOptions(),
 		radarr: createDefaultBrowseCardUiOptions(),
 		seerr: createDefaultBrowseCardUiOptions(),
@@ -65,6 +76,10 @@ export const UiOptionsSchema = v.pipe(
 			"english",
 		),
 		browseCards: v.object({
+			primaryStatus: v.fallback(
+				v.picklist(BROWSE_CARD_PRIMARY_STATUS_OPTIONS),
+				"arr",
+			),
 			sonarr: v.fallback(
 				ProviderBrowseCardUiOptionsSchema,
 				createDefaultBrowseCardUiOptions(),

@@ -7,10 +7,12 @@ import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type { ProviderCredentials } from "@/providers/types";
 
 export type BadgeVisibility = "always" | "hover";
+export type BrowseCardPrimaryStatus = "arr" | "seerr";
 
 export interface UiOptions {
 	preferredAniListTitleLanguage: AniListTitleLanguage;
 	browseCards: {
+		primaryStatus: BrowseCardPrimaryStatus;
 		sonarr: {
 			enabled: boolean;
 			visibility: BadgeVisibility;

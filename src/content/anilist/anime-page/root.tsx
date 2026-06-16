@@ -15,7 +15,10 @@ import {
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { RequestInSeerrInput } from "@/rpc/types";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
-import { SeerrRequestButton } from "@/features/seerr-request/seerr-request-button";
+import {
+	SeerrOpenButton,
+	SeerrRequestButton,
+} from "@/features/seerr-request/seerr-request-button";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
 import { MediaModal, type MediaModalMetadataHint } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
@@ -160,12 +163,8 @@ function shouldShowProviderAction(
 
 function shouldShowSeerrAction(input: {
 	optionState: AnimePageOptionsState;
-	seerrRequestInput: RequestInSeerrInput | null;
 }): boolean {
-	return (
-		input.optionState.seerrEnabled &&
-		input.seerrRequestInput !== null
-	);
+	return input.optionState.seerrEnabled;
 }
 
 function isMetadataReadyForStatus(input: {
@@ -324,12 +323,25 @@ function AnimePageActionStack({
 				/>
 			) : null}
 			{showSeerrAction ? (
-				<SeerrRequestButton
-					requestInput={seerrRequestInput}
-					isConfigured={options?.seerr.isConfigured === true}
-					portalContainer={portalContainer ?? undefined}
-					onOpenModal={onOpenSeerrModal}
-				/>
+				<div
+					className={`grid ${
+						options?.seerr.isConfigured === true && seerrRequestInput !== null
+							? "grid-cols-[1fr_auto] gap-3.75"
+							: "grid-cols-1 gap-0"
+					} w-full items-start`}
+				>
+					<SeerrRequestButton
+						requestInput={seerrRequestInput}
+						isConfigured={options?.seerr.isConfigured === true}
+						portalContainer={portalContainer ?? undefined}
+						onOpenModal={onOpenSeerrModal}
+					/>
+					<SeerrOpenButton
+						requestInput={seerrRequestInput}
+						isConfigured={options?.seerr.isConfigured === true}
+						portalContainer={portalContainer ?? undefined}
+					/>
+				</div>
 			) : null}
 		</div>
 	);
@@ -374,7 +386,6 @@ export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
 	const showProviderAction = shouldShowProviderAction(provider, options);
 	const showSeerrAction = shouldShowSeerrAction({
 		optionState,
-		seerrRequestInput,
 	});
 
 	if (!showProviderAction && !showSeerrAction) {

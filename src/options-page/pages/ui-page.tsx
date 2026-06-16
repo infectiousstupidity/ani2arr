@@ -9,7 +9,11 @@ import {
 	type AniListTitleLanguage,
 } from "@/anilist/title";
 import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
-import type { BadgeVisibility, PublicOptions } from "@/settings/types";
+import type {
+	BadgeVisibility,
+	BrowseCardPrimaryStatus,
+	PublicOptions,
+} from "@/settings/types";
 import { cn } from "@/shared/utils/cn";
 import { RadarrIcon, SonarrIcon } from "../components/icons";
 import { SettingsSection } from "../components/settings-section";
@@ -18,7 +22,10 @@ import { Switch } from "../components/ui/switch";
 import { getActionErrorMessage } from "../hooks/action-helpers";
 
 type BrowseCardMode = BadgeVisibility | "hidden";
-type BrowseCardProvider = keyof PublicOptions["ui"]["browseCards"];
+type BrowseCardProvider = keyof Omit<
+	PublicOptions["ui"]["browseCards"],
+	"primaryStatus"
+>;
 type BrowseCardSettings = PublicOptions["ui"]["browseCards"][BrowseCardProvider];
 type AnimePageProvider = keyof PublicOptions["ui"]["animePages"];
 type IconComponent = ComponentType<{ className?: string }>;
@@ -45,6 +52,14 @@ const BROWSE_CARD_MODE_OPTIONS: readonly {
 	{ label: "Always", value: "always" },
 	{ label: "On hover", value: "hover" },
 	{ label: "Hidden", value: "hidden" },
+];
+
+const BROWSE_CARD_PRIMARY_OPTIONS: readonly {
+	label: string;
+	value: BrowseCardPrimaryStatus;
+}[] = [
+	{ label: "Arr", value: "arr" },
+	{ label: "Seerr", value: "seerr" },
 ];
 
 const TITLE_LANGUAGE_LABELS: Record<AniListTitleLanguage, string> = {
@@ -75,6 +90,12 @@ function getBrowseCardMode(options: BrowseCardSettings): BrowseCardMode {
 	return options.enabled ? options.visibility : "hidden";
 }
 
+function isBrowseCardPrimaryStatus(
+	value: string,
+): value is BrowseCardPrimaryStatus {
+	return BROWSE_CARD_PRIMARY_OPTIONS.some((option) => option.value === value);
+}
+
 function SegmentedButtons(props: SegmentedButtonsProps): React.JSX.Element {
 	const {
 		ariaLabel,
@@ -92,7 +113,8 @@ function SegmentedButtons(props: SegmentedButtonsProps): React.JSX.Element {
 			aria-label={ariaLabel}
 			aria-labelledby={ariaLabelledBy}
 			className={cn(
-				"grid grid-cols-3 rounded-md border border-border-primary bg-bg-secondary p-1",
+				"grid rounded-md border border-border-primary bg-bg-secondary p-1",
+				options.length === 2 ? "grid-cols-2" : "grid-cols-3",
 				className,
 			)}
 		>
@@ -217,6 +239,20 @@ export const UiPage = (): React.JSX.Element | null => {
 		}));
 	};
 
+	const updateBrowsePrimaryStatus = (value: string): void => {
+	if (!isBrowseCardPrimaryStatus(value)) return;
+
+	void updateSettings((current) => ({
+		...current,
+		ui: {
+			...current.ui,
+			browseCards: {
+				...current.ui.browseCards,
+				primaryStatus: value,
+			},
+		},
+	}));
+};
 	const updateBrowseProvider = (
 		provider: BrowseCardProvider,
 		patch: Partial<BrowseCardSettings>,
@@ -294,39 +330,62 @@ export const UiPage = (): React.JSX.Element | null => {
 
 			<SettingsSection
 				title="AniList and AniChart browse cards"
-				description="Enable browse and search card injection per provider, then choose whether enabled cards stay visible or only appear on hover."
+				description="Enable browse and search card injection per provider, choose the primary status, then choose whether enabled cards stay visible or only appear on hover."
 				icon={<LayoutGrid className="h-4 w-4" />}
 				divider="top"
 			>
-				<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[auto_repeat(3,minmax(0,1fr))] lg:gap-6">
-					<div className="flex h-30 items-start justify-center lg:w-20 lg:justify-start">
-						<div
-							aria-hidden="true"
-							className="relative aspect-2/3 h-full shrink-0 overflow-hidden rounded-md shadow-sm"
+				<div className="space-y-6">
+					<div className="max-w-md space-y-2">
+						<Label
+							id="ui-browse-primary-status-label"
+							className="text-sm font-semibold text-text-primary"
 						>
-							<img
-								src="https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx154587-qQTzQnEJJ3oB.jpg"
-								alt=""
-								draggable={false}
-								className="h-full w-full select-none object-cover"
-							/>
-							<div className="absolute -bottom-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#151f2e] bg-[#43d477]">
-								<Check className="h-3.5 w-3.5 stroke-3 text-white" />
-							</div>
-						</div>
+							Primary browse-card status
+						</Label>
+						<p className="text-sm text-text-secondary">
+							Choose which provider owns the visible browse-card button when both
+							Arr and Seerr can handle the title.
+						</p>
+						<SegmentedButtons
+							value={uiOptions.browseCards.primaryStatus}
+							onChange={updateBrowsePrimaryStatus}
+							options={BROWSE_CARD_PRIMARY_OPTIONS}
+							ariaLabelledBy="ui-browse-primary-status-label"
+							className="w-full"
+							disabled={isSaving}
+						/>
 					</div>
 
-					{UI_PROVIDER_CONTROLS.map(({ provider, label, Icon }) => (
-						<BrowseCardModeControl
-							key={provider}
-							provider={provider}
-							label={label}
-							Icon={Icon}
-							value={getBrowseCardMode(uiOptions.browseCards[provider])}
-							disabled={isSaving}
-							onChange={updateBrowseProviderMode}
-						/>
-					))}
+					<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[auto_repeat(3,minmax(0,1fr))] lg:gap-6">
+						<div className="flex h-30 items-start justify-center lg:w-20 lg:justify-start">
+							<div
+								aria-hidden="true"
+								className="relative aspect-2/3 h-full shrink-0 overflow-hidden rounded-md shadow-sm"
+							>
+								<img
+									src="https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx154587-qQTzQnEJJ3oB.jpg"
+									alt=""
+									draggable={false}
+									className="h-full w-full select-none object-cover"
+								/>
+								<div className="absolute -bottom-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#151f2e] bg-[#43d477]">
+									<Check className="h-3.5 w-3.5 stroke-3 text-white" />
+								</div>
+							</div>
+						</div>
+
+						{UI_PROVIDER_CONTROLS.map(({ provider, label, Icon }) => (
+							<BrowseCardModeControl
+								key={provider}
+								provider={provider}
+								label={label}
+								Icon={Icon}
+								value={getBrowseCardMode(uiOptions.browseCards[provider])}
+								disabled={isSaving}
+								onChange={updateBrowseProviderMode}
+							/>
+						))}
+					</div>
 				</div>
 			</SettingsSection>
 

@@ -42,6 +42,8 @@ import type {
 	NotifyProviderConnectionChangedInput,
 	OpenProviderPageInput,
 	OpenProviderPageOutput,
+	OpenSeerrPageInput,
+	OpenSeerrPageOutput,
 	RequestInSeerrInput,
 	RequestInSeerrOutput,
 	GetSeerrMediaStatusInput,
@@ -77,7 +79,9 @@ export interface Ani2arrApi {
 	testRadarrConnection(
 		input: ProviderConnectionTestInput,
 	): Promise<{ version: string }>;
-	testSeerrConnection(input: ProviderConnectionTestInput): Promise<{ ok: true }>;
+	testSeerrConnection(
+		input: ProviderConnectionTestInput,
+	): Promise<{ ok: true }>;
 	requestInSeerr(input: RequestInSeerrInput): Promise<RequestInSeerrOutput>;
 	getSeerrMediaStatus(
 		input: GetSeerrMediaStatusInput,
@@ -88,14 +92,21 @@ export interface Ani2arrApi {
 	getSeerrLinkedAniListEntries(
 		input: GetSeerrLinkedAniListEntriesInput,
 	): Promise<GetSeerrLinkedAniListEntriesOutput>;
-	getSeerrTarget(input: GetSeerrTargetInput): Promise<SeerrRequestTarget | null>;
+	getSeerrTarget(
+		input: GetSeerrTargetInput,
+	): Promise<SeerrRequestTarget | null>;
 	getSeerrTargets(input: GetSeerrTargetsInput): Promise<SeerrRequestTarget[]>;
 	setManualSeerrTarget(input: SetManualSeerrTargetInput): Promise<{ ok: true }>;
 	clearManualSeerrTarget(
 		input: ClearManualSeerrTargetInput,
 	): Promise<{ ok: true }>;
-	searchSeerrMedia(input: SearchSeerrMediaInput): Promise<SearchSeerrMediaOutput>;
-	openProviderPage(input: OpenProviderPageInput): Promise<OpenProviderPageOutput>;
+	searchSeerrMedia(
+		input: SearchSeerrMediaInput,
+	): Promise<SearchSeerrMediaOutput>;
+	openProviderPage(
+		input: OpenProviderPageInput,
+	): Promise<OpenProviderPageOutput>;
+	openSeerrPage(input: OpenSeerrPageInput): Promise<OpenSeerrPageOutput>;
 	getSonarrFormResources(
 		input?: GetProviderFormResourcesInput,
 	): Promise<ProviderFormResources>;
