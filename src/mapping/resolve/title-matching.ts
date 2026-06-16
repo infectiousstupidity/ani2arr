@@ -369,9 +369,14 @@ function sanitizeSonarrLookupDisplay(value: string): string {
 
 function sanitizeRadarrLookupDisplay(value: string): string {
 	if (!value) return "";
+
 	let normalized = cleanTitleDecorations(value);
+
+	normalized = normalized.replaceAll(/[~×Δ★☆♡♥♪・]/g, " ");
+
 	normalized = normalized.replaceAll(/\[([^\]]+)]/g, "$1");
 	normalized = stripParenContent(normalized).replaceAll(/\s+/g, " ").trim();
+
 	return /[\p{L}\p{N}]/u.test(normalized) ? normalized : "";
 }
 
