@@ -16,10 +16,7 @@ export default defineConfig({
 	},
 	srcDir: "src",
 
-	modules: [
-		"@wxt-dev/auto-icons",
-		"@wxt-dev/webextension-polyfill",
-	],
+	modules: ["@wxt-dev/auto-icons", "@wxt-dev/webextension-polyfill"],
 
 	vite: () =>
 		({
@@ -69,7 +66,7 @@ export default defineConfig({
 		return {
 			name: "ani2arr",
 			description:
-				"Adds one-click Sonarr and Radarr actions to AniList and AniChart pages",
+				"Adds one-click Sonarr, Radarr, and Seerr actions to AniList and AniChart pages",
 			...(manifestVersion === 3 ? mv3Permissions : mv2Permissions),
 			options_ui: {
 				page: "options/index.html",

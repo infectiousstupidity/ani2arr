@@ -2,7 +2,7 @@
 	"name": "ani2arr",
 	"description": "Adds one-click Sonarr and Radarr actions to AniList/AniChart pages.",
 	"private": true,
-	"version": "2.0.0",
+	"version": "2.1.0",
 	"license": "GPL-3.0-only",
 	"type": "module",
 	"scripts": {
@@ -83,5 +83,5 @@
 		"tailwind-merge": "^3.6.0",
 		"valibot": "^1.4.1"
 	},
-	"packageManager": "pnpm@11.5.1"
+	"packageManager": "pnpm@11.7.0"
 }
