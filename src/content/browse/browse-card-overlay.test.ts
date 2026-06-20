@@ -12,8 +12,10 @@ import { resolveBrowseCardProvider } from "./browse-card-provider";
 const mountTarget = {} as HTMLElement;
 
 function createTarget(format: HostMediaTarget["format"]): HostMediaTarget {
+	const anilistId = parseAniListId(210_031);
 	return {
-		anilistId: parseAniListId(210_031),
+		source: { source: "anilist", id: anilistId },
+		anilistId,
 		title: "Example",
 		format,
 		mountTarget,

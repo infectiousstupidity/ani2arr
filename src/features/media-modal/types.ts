@@ -44,7 +44,7 @@ export type MediaModalTargetSummary = {
 
 type MediaModalStateBase = {
 	anilistId: AniListId;
-	source?: SourceIdentity;
+	source?: SourceIdentity | undefined;
 	openSource: MediaModalOpenSource;
 	metadataHint?: MediaModalMetadataHint | null;
 };

@@ -12,7 +12,7 @@ import { getMediaActionStatus, type MediaActionStatus } from "./state";
 
 export interface MediaActionInputBase<TForm> {
 	anilistId: AniListId;
-	source?: SourceIdentity;
+	source?: SourceIdentity | undefined;
 	displayTitle: string;
 	providerTitle: string | null;
 	metadata: AniListMediaHint | null;

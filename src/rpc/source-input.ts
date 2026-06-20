@@ -5,7 +5,7 @@ import type { AniListId } from "@/anilist/types";
 import type { SourceIdentity } from "@/mapping/types";
 
 export type SourceInputLike = {
-	source?: SourceIdentity;
+	source?: SourceIdentity | undefined;
 	anilistId?: AniListId;
 };
 

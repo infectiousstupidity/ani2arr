@@ -3,6 +3,7 @@
 
 import type { ReactElement, ReactNode } from "react";
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/types";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
@@ -15,6 +16,7 @@ import { useCardOverlayInViewport } from "./card-overlay-viewport";
 
 interface RadarrCardOverlayProps {
 	anilistId: AniListId;
+	source?: SourceIdentity | undefined;
 	title: string;
 	onOpenSetup(): void;
 	onOpenMapping(): void;
@@ -30,6 +32,7 @@ interface RadarrCardOverlayProps {
 
 export function RadarrCardOverlay({
 	anilistId,
+	source,
 	title,
 	onOpenSetup,
 	onOpenMapping,
@@ -46,6 +49,7 @@ export function RadarrCardOverlay({
 	const providerTitle = title.trim().length > 0 ? title : null;
 	const mediaAction = useRadarrMediaAction({
 		anilistId,
+		source,
 		displayTitle: title,
 		providerTitle,
 		metadata,

@@ -103,6 +103,7 @@ async function mountAnimePageUI({
 	if (!mountTarget) return;
 
 	const target: AnimePageTarget = {
+		source: { source: "anilist", id: anilistId },
 		anilistId,
 		format: readFormatFromSidebar(document),
 		title: readTitleFromHeader(document),

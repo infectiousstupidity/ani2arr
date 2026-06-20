@@ -3,6 +3,7 @@
 
 import type { ReactElement, ReactNode } from "react";
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/types";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
@@ -15,6 +16,7 @@ import { useCardOverlayInViewport } from "./card-overlay-viewport";
 
 interface SonarrCardOverlayProps {
 	anilistId: AniListId;
+	source?: SourceIdentity | undefined;
 	title: string;
 	onOpenSetup(): void;
 	onOpenMapping(): void;
@@ -30,6 +32,7 @@ interface SonarrCardOverlayProps {
 
 export function SonarrCardOverlay({
 	anilistId,
+	source,
 	title,
 	onOpenSetup,
 	onOpenMapping,
@@ -46,6 +49,7 @@ export function SonarrCardOverlay({
 	const providerTitle = title.trim().length > 0 ? title : null;
 	const mediaAction = useSonarrMediaAction({
 		anilistId,
+		source,
 		displayTitle: title,
 		providerTitle,
 		metadata,

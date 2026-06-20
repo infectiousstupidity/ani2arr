@@ -12,6 +12,7 @@ import {
 	resolveAniListTargetProvider,
 	resolveSeerrRequestInput,
 } from "@/content/anilist/target-provider";
+import type { SourceIdentity } from "@/mapping/types";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { RequestInSeerrInput } from "@/rpc/types";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
@@ -36,6 +37,7 @@ import { useTheme } from "@/shared/hooks/use-theme";
 import MediaActions from "./media-actions";
 
 export interface AnimePageTarget {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	format: AniListMediaFormat | null;
 	title: string | null;
@@ -46,6 +48,7 @@ interface ContentRootProps {
 }
 
 interface AnimeProviderActionProps {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	displayTitle: string;
 	providerTitle: string | null;
@@ -68,6 +71,7 @@ interface RadarrAnimeActionProps extends AnimeProviderActionProps {
 interface AnimePageActionStackProps {
 	showProviderAction: boolean;
 	provider: Provider | null;
+	source: SourceIdentity;
 	anilistId: AniListId;
 	displayTitle: string;
 	providerTitle: string | null;
@@ -191,6 +195,7 @@ function isStatusBlocked(input: {
 
 function SonarrAnimePageActions({
 	anilistId,
+	source,
 	displayTitle,
 	providerTitle,
 	metadata,
@@ -203,6 +208,7 @@ function SonarrAnimePageActions({
 }: SonarrAnimeActionProps): ReactElement {
 	const mediaAction = useSonarrMediaAction({
 		anilistId,
+		source,
 		displayTitle,
 		providerTitle,
 		metadata,
@@ -234,6 +240,7 @@ function SonarrAnimePageActions({
 
 function RadarrAnimePageActions({
 	anilistId,
+	source,
 	displayTitle,
 	providerTitle,
 	metadata,
@@ -246,6 +253,7 @@ function RadarrAnimePageActions({
 }: RadarrAnimeActionProps): ReactElement {
 	const mediaAction = useRadarrMediaAction({
 		anilistId,
+		source,
 		displayTitle,
 		providerTitle,
 		metadata,
@@ -278,6 +286,7 @@ function RadarrAnimePageActions({
 function AnimePageActionStack({
 	showProviderAction,
 	provider,
+	source,
 	anilistId,
 	displayTitle,
 	providerTitle,
@@ -297,6 +306,7 @@ function AnimePageActionStack({
 			{showProviderAction && provider === "sonarr" ? (
 				<SonarrAnimePageActions
 					anilistId={anilistId}
+					source={source}
 					displayTitle={displayTitle}
 					providerTitle={providerTitle}
 					metadata={metadata}
@@ -311,6 +321,7 @@ function AnimePageActionStack({
 			{showProviderAction && provider === "radarr" ? (
 				<RadarrAnimePageActions
 					anilistId={anilistId}
+					source={source}
 					displayTitle={displayTitle}
 					providerTitle={providerTitle}
 					metadata={metadata}
@@ -348,7 +359,7 @@ function AnimePageActionStack({
 }
 
 export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
-	const { anilistId } = target;
+	const { anilistId, source } = target;
 	const [hostElement, setHostElement] = useState<HTMLDivElement | null>(null);
 	useTheme({ current: hostElement });
 	useOptionsQuerySync();
@@ -412,6 +423,7 @@ export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
 
 		mediaModal.open({
 			anilistId,
+			source,
 			kind: "provider",
 			provider,
 			initialView,
@@ -424,6 +436,7 @@ export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
 	const openSeerrModal = () => {
 		mediaModal.open({
 			anilistId,
+			source,
 			kind: "seerr",
 			openSource: "content",
 			metadataHint,
@@ -436,6 +449,7 @@ export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
 				<AnimePageActionStack
 					showProviderAction={showProviderAction}
 					provider={provider}
+					source={source}
 					anilistId={anilistId}
 					displayTitle={displayTitle}
 					providerTitle={providerTitle}

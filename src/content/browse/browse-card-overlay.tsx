@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import type { AniListId } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/types";
 import type { metadataHintFromAniListMetadata } from "@/anilist/title";
 import type {
 	MediaModalMetadataHint,
@@ -158,12 +159,14 @@ function ProviderStackAction(props: {
 function openProviderModal(input: {
 	onOpenMediaModal(input: MediaModalOpenState): void;
 	anilistId: AniListId;
+	source: SourceIdentity;
 	provider: Provider;
 	initialView: "setup" | "mapping";
 	metadataHint: MediaModalMetadataHint;
 }): void {
 	input.onOpenMediaModal({
 		anilistId: input.anilistId,
+		source: input.source,
 		kind: "provider",
 		provider: input.provider,
 		initialView: input.initialView,
@@ -202,6 +205,7 @@ export function BrowseCardOverlay({
 	const openSeerrModal = () => {
 		onOpenMediaModal({
 			anilistId: parsed.anilistId,
+			source: parsed.source,
 			kind: "seerr",
 			openSource: "content",
 			metadataHint,
@@ -222,6 +226,7 @@ export function BrowseCardOverlay({
 								openProviderModal({
 									onOpenMediaModal,
 									anilistId: parsed.anilistId,
+									source: parsed.source,
 									provider: "sonarr",
 									initialView: "setup",
 									metadataHint,
@@ -242,6 +247,7 @@ export function BrowseCardOverlay({
 								openProviderModal({
 									onOpenMediaModal,
 									anilistId: parsed.anilistId,
+									source: parsed.source,
 									provider: "radarr",
 									initialView: "setup",
 									metadataHint,
@@ -271,6 +277,7 @@ export function BrowseCardOverlay({
 
 	const commonProps = {
 		anilistId: parsed.anilistId,
+		source: parsed.source,
 		title: displayTitle,
 		metadata,
 		observeTarget: parsed.mountTarget,
@@ -302,6 +309,7 @@ export function BrowseCardOverlay({
 					openProviderModal({
 						onOpenMediaModal,
 						anilistId: parsed.anilistId,
+						source: parsed.source,
 						provider: "sonarr",
 						initialView: "setup",
 						metadataHint,
@@ -311,6 +319,7 @@ export function BrowseCardOverlay({
 					openProviderModal({
 						onOpenMediaModal,
 						anilistId: parsed.anilistId,
+						source: parsed.source,
 						provider: "sonarr",
 						initialView: "mapping",
 						metadataHint,
@@ -332,6 +341,7 @@ export function BrowseCardOverlay({
 					openProviderModal({
 						onOpenMediaModal,
 						anilistId: parsed.anilistId,
+						source: parsed.source,
 						provider: "radarr",
 						initialView: "setup",
 						metadataHint,
@@ -341,6 +351,7 @@ export function BrowseCardOverlay({
 					openProviderModal({
 						onOpenMediaModal,
 						anilistId: parsed.anilistId,
+						source: parsed.source,
 						provider: "radarr",
 						initialView: "mapping",
 						metadataHint,
