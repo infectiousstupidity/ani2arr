@@ -32,6 +32,11 @@ const storeRecords = vi.hoisted(() => ({
 		source?: SourceIdentity;
 		result: AutoResult;
 	}>,
+	idsmoe: [] as Array<{
+		provider: Provider;
+		source: SourceIdentity;
+		target: UpstreamTarget;
+	}>,
 	upstream: [] as Array<{
 		anilistId?: AniListId;
 		source?: SourceIdentity;
@@ -76,6 +81,23 @@ vi.mock("./auto.store", () => ({
 				(record) => record.provider === provider && record.anilistId !== undefined,
 			)
 			.map(({ anilistId, result }) => ({ anilistId, result })),
+	),
+}));
+
+vi.mock("./idsmoe.store", () => ({
+	getCachedIdsMoeTarget: vi.fn(async (provider: Provider, source: SourceIdentity) =>
+		storeRecords.idsmoe.find(
+			(record) =>
+				record.provider === provider &&
+				recordSourceKey(record) === inputSourceKey(source),
+		)?.target ?? null,
+	),
+	resolveIdsMoeTarget: vi.fn(async (provider: Provider, source: SourceIdentity) =>
+		storeRecords.idsmoe.find(
+			(record) =>
+				record.provider === provider &&
+				recordSourceKey(record) === inputSourceKey(source),
+		)?.target ?? null,
 	),
 }));
 
@@ -135,6 +157,7 @@ function recordSourceKey(record: {
 function resetRecords(): void {
 	storeRecords.manual = [];
 	storeRecords.auto = [];
+	storeRecords.idsmoe = [];
 	storeRecords.upstream = [];
 }
 
@@ -607,6 +630,92 @@ describe("MappingService", () => {
 			source: "manual",
 			providerId: tvdb(111_111),
 			season: 1,
+		});
+	});
+
+	it("uses ids.moe below upstream and above auto", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+		storeRecords.upstream = [
+			{
+				source,
+				targets: [{ provider: "radarr", providerId: tmdb(100) }],
+			},
+		];
+		storeRecords.idsmoe = [
+			{
+				provider: "radarr",
+				source,
+				target: { provider: "radarr", providerId: tmdb(200) },
+			},
+		];
+		storeRecords.auto = [
+			{
+				provider: "radarr",
+				source,
+				result: { kind: "mapped", providerId: tmdb(300) },
+			},
+		];
+
+		await expect(service().getMapping("radarr", source)).resolves.toEqual({
+			kind: "mapped",
+			source: "upstream",
+			providerId: tmdb(100),
+		});
+
+		storeRecords.upstream = [];
+
+		await expect(service().getMapping("radarr", source)).resolves.toEqual({
+			kind: "mapped",
+			source: "idsmoe",
+			providerId: tmdb(200),
+		});
+	});
+
+	it("lets manual mappings beat ids.moe", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+		storeRecords.manual = [
+			{
+				provider: "radarr",
+				source,
+				facts: { mapping: { providerId: tmdb(100) } },
+			},
+		];
+		storeRecords.idsmoe = [
+			{
+				provider: "radarr",
+				source,
+				target: { provider: "radarr", providerId: tmdb(200) },
+			},
+		];
+
+		await expect(service().getMapping("radarr", source)).resolves.toEqual({
+			kind: "mapped",
+			source: "manual",
+			providerId: tmdb(100),
+		});
+	});
+
+	it("treats rejected ids.moe targets as unmapped", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+		storeRecords.manual = [
+			{
+				provider: "radarr",
+				source,
+				facts: { rejectedProviderIds: [tmdb(200)] },
+			},
+		];
+		storeRecords.idsmoe = [
+			{
+				provider: "radarr",
+				source,
+				target: { provider: "radarr", providerId: tmdb(200) },
+			},
+		];
+
+		await expect(service().getMapping("radarr", source)).resolves.toEqual({
+			kind: "unmapped",
+			hadResolveAttempt: true,
+			rejectedProviderIds: [tmdb(200)],
 		});
 	});
 

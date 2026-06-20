@@ -237,12 +237,12 @@ async function collectMappingEntries(
 
 	return [...keys].map((anilistId): MappingListEntry => ({
 		anilistId,
-		result: chooseMappingResult(
+		result: chooseMappingResult({
 			provider,
-			manualByAniListId.get(anilistId) ?? null,
-			upstreamByAniListId.get(anilistId) ?? [],
-			autoByAniListId.get(anilistId) ?? null,
-		),
+			manual: manualByAniListId.get(anilistId) ?? null,
+			upstream: upstreamByAniListId.get(anilistId) ?? [],
+			auto: autoByAniListId.get(anilistId) ?? null,
+		}),
 	}));
 }
 

@@ -4,6 +4,7 @@
 import { anilistMediaCache, AniListMediaService } from "@/anilist/media.service";
 import { AniListMetadataStore } from "@/anilist/metadata.store";
 import { clearAutoResults } from "@/mapping/auto.store";
+import { clearIdsMoeCache } from "@/mapping/idsmoe.store";
 import { clearManualFacts } from "@/mapping/manual.store";
 import { clearManualSeerrTargets } from "@/mapping/seerr-target.store";
 import { MappingService } from "@/mapping/mapping.service";
@@ -187,6 +188,7 @@ export const handleProviderConnectionChanged = async (
 export const clearPersistentCaches = async (): Promise<void> => {
 	await Promise.all([
 		anilistMetadataStore.clearLocalCache(),
+		clearIdsMoeCache(),
 		clearUpstreamMappings(),
 	]);
 	await clearAllTtlCaches();

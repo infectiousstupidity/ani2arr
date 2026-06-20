@@ -15,6 +15,11 @@ import {
 	type ManualFacts,
 	type ManualMapping,
 } from "./manual.store";
+import {
+	getCachedIdsMoeTarget,
+	resolveIdsMoeTarget,
+	type IdsMoeResolver,
+} from "./idsmoe.store";
 import { getUpstreamTargets, listUpstreamMappings } from "./upstream.store";
 import { getAutoResult, listAutoResults } from "./auto.store";
 import type { AutomaticResolver } from "./resolve/resolve";
@@ -25,9 +30,19 @@ import type {
 	UpstreamTarget,
 } from "./types";
 
+type MappingCandidates = {
+	provider: Provider;
+	manual: ManualFacts | null;
+	upstream: UpstreamTarget[];
+	auto: AutoResult | null;
+	idsMoe?: UpstreamTarget | null;
+};
+
 export class MappingService {
 	public constructor(
 		private readonly resolveAutomaticMapping: AutomaticResolver,
+		private readonly resolveIdsMoeMapping: IdsMoeResolver = resolveIdsMoeTarget,
+		private readonly getCachedIdsMoeMapping: IdsMoeResolver = getCachedIdsMoeTarget,
 	) {}
 
 	public async getMapping(
@@ -40,8 +55,20 @@ export class MappingService {
 			getUpstreamTargets(provider, sourceIdentity),
 			getAutoResult(provider, sourceIdentity),
 		]);
+		const idsMoe = await getIdsMoeTargetIfUseful(
+			provider,
+			sourceIdentity,
+			upstream,
+			this.getCachedIdsMoeMapping,
+		);
 
-		return chooseMappingResult(provider, manual, upstream, auto);
+		return chooseMappingResult({
+			provider,
+			manual,
+			upstream,
+			auto,
+			idsMoe,
+		});
 	}
 
 	public async resolveMapping(
@@ -56,17 +83,33 @@ export class MappingService {
 		const sourceIdentity = toSourceIdentity(source);
 		const current = await this.getMapping(provider, sourceIdentity);
 
+		if (isStableMapping(current)) {
+			return current;
+		}
+
 		if (
-			current.kind === "mapped" ||
-			current.kind === "ignored" ||
-			(current.kind === "ambiguous" &&
-				(await getAutoResult(provider, sourceIdentity)) !== null &&
-				options?.forceRetry !== true) ||
-			(current.kind === "unmapped" &&
-				current.hadResolveAttempt &&
-				options?.forceRetry !== true)
+			await shouldKeepAmbiguousMapping({
+				provider,
+				source: sourceIdentity,
+				current,
+				forceRetry: options?.forceRetry === true,
+			})
 		) {
 			return current;
+		}
+
+		if (current.kind === "unmapped") {
+			const idsMoeTarget = await this.resolveIdsMoeMapping(
+				provider,
+				sourceIdentity,
+			);
+			if (idsMoeTarget !== null) {
+				return this.getMapping(provider, sourceIdentity);
+			}
+
+			if (shouldKeepUnmappedMapping(current, options?.forceRetry === true)) {
+				return current;
+			}
 		}
 
 		await this.resolveAutomaticMapping(
@@ -217,12 +260,12 @@ export class MappingService {
 		const linkedAniListIdsByProviderId = new Map<number, AniListId[]>();
 
 		for (const anilistId of anilistIds) {
-			const result = chooseMappingResult(
+			const result = chooseMappingResult({
 				provider,
-				manualByAniListId.get(anilistId) ?? null,
-				upstreamByAniListId.get(anilistId) ?? [],
-				autoByAniListId.get(anilistId) ?? null,
-			);
+				manual: manualByAniListId.get(anilistId) ?? null,
+				upstream: upstreamByAniListId.get(anilistId) ?? [],
+				auto: autoByAniListId.get(anilistId) ?? null,
+			});
 
 			if (
 				result.kind !== "mapped" ||
@@ -256,12 +299,9 @@ function toSourceIdentity(source: SourceIdentity | AniListId): SourceIdentity {
 	return source;
 }
 
-export function chooseMappingResult(
-	provider: Provider,
-	manual: ManualFacts | null,
-	upstream: UpstreamTarget[],
-	auto: AutoResult | null,
-): MappingResult {
+export function chooseMappingResult(input: MappingCandidates): MappingResult {
+	const { provider, manual, upstream, auto, idsMoe = null } = input;
+
 	if (manual && "ignored" in manual) {
 		return { kind: "ignored" };
 	}
@@ -292,11 +332,14 @@ export function chooseMappingResult(
 	}
 
 	const autoMapping = chooseAutoMapping(auto, upstream, rejectedProviderIds);
-	if (autoMapping) return autoMapping;
-
 	if (upstream.length > 1) {
-		return ambiguous(upstream);
+		return autoMapping ?? ambiguous(upstream);
 	}
+
+	const idsMoeMapping = chooseIdsMoeMapping(idsMoe, rejectedProviderIds);
+	if (idsMoeMapping) return idsMoeMapping;
+
+	if (autoMapping) return autoMapping;
 
 	if (auto?.kind === "ambiguous") {
 		return ambiguous(auto.targets);
@@ -335,6 +378,27 @@ function mappedFromUpstream(target: UpstreamTarget): MappingResult {
 	return {
 		kind: "mapped",
 		source: "upstream",
+		providerId: target.providerId,
+		...(target.provider === "sonarr" && target.season !== undefined
+			? { season: target.season }
+			: {}),
+	};
+}
+
+function chooseIdsMoeMapping(
+	target: UpstreamTarget | null,
+	rejectedProviderIds: number[] | undefined,
+): MappingResult | null {
+	if (!target) return null;
+	return rejectedProviderIds?.includes(target.providerId) === true
+		? unmapped(true, rejectedProviderIds)
+		: mappedFromIdsMoe(target);
+}
+
+function mappedFromIdsMoe(target: UpstreamTarget): MappingResult {
+	return {
+		kind: "mapped",
+		source: "idsmoe",
 		providerId: target.providerId,
 		...(target.provider === "sonarr" && target.season !== undefined
 			? { season: target.season }
@@ -412,4 +476,36 @@ function unmapped(
 		hadResolveAttempt,
 		...(rejectedProviderIds?.length ? { rejectedProviderIds } : {}),
 	};
+}
+
+async function getIdsMoeTargetIfUseful(
+	provider: Provider,
+	source: SourceIdentity,
+	upstream: UpstreamTarget[],
+	readCachedIdsMoeTarget: IdsMoeResolver,
+): Promise<UpstreamTarget | null> {
+	return upstream.length === 0
+		? readCachedIdsMoeTarget(provider, source)
+		: null;
+}
+
+function isStableMapping(mapping: MappingResult): boolean {
+	return mapping.kind === "mapped" || mapping.kind === "ignored";
+}
+
+async function shouldKeepAmbiguousMapping(input: {
+	provider: Provider;
+	source: SourceIdentity;
+	current: MappingResult;
+	forceRetry: boolean;
+}): Promise<boolean> {
+	if (input.current.kind !== "ambiguous" || input.forceRetry) return false;
+	return (await getAutoResult(input.provider, input.source)) !== null;
+}
+
+function shouldKeepUnmappedMapping(
+	current: Extract<MappingResult, { kind: "unmapped" }>,
+	forceRetry: boolean,
+): boolean {
+	return current.hadResolveAttempt && !forceRetry;
 }

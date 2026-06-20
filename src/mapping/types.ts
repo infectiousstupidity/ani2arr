@@ -84,7 +84,7 @@ export type AutoResult =
 			targets: UpstreamTarget[];
 	  };
 
-export type MappingSource = "manual" | "upstream" | "auto";
+export type MappingSource = "manual" | "upstream" | "idsmoe" | "auto";
 
 export type MappingResult =
 	| {
