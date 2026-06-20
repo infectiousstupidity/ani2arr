@@ -2,22 +2,29 @@
 // src/mapping/upstream.store.test.ts
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { browser } from "wxt/browser";
 import { parseAniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import {
 	clearUpstreamMappings,
+	getUniqueAniListIdForSource,
 	getUpstreamTargets,
 	listSeerrUpstreamTargets,
+	parseAniBridgeAniListCrosswalks,
 	parseAniBridgeMappings,
 	parseAniBridgeSeerrTargets,
 	refreshUpstreamMappings,
 } from "./upstream.store";
+import { sourceIdentityKey } from "./types";
 
 const aid = parseAniListId;
+const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
 const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const MAX_ANIBRIDGE_BYTES = 10 * 1024 * 1024;
+const UPSTREAM_STORAGE_KEY = "mapping:upstream";
 
 function createAniBridgeResponse(
 	body: string,
@@ -43,11 +50,59 @@ describe("parseAniBridgeMappings", () => {
 			},
 		});
 
-		expect(mappings[aid(1)]).toEqual([
+		expect(mappings[sourceIdentityKey({ source: "anilist", id: aid(1) })]).toEqual([
 			{ provider: "sonarr", providerId: tvdb(100), season: 1 },
 			{ provider: "sonarr", providerId: tvdb(200), season: 2 },
 			{ provider: "radarr", providerId: tmdb(300) },
 		]);
+	});
+
+	it("preserves MAL source descriptor targets", () => {
+		const mappings = parseAniBridgeMappings({
+			"mal:5114": {
+				"anilist:21": {},
+				"tvdb_show:78874:s1": {},
+				"tmdb_show:30991:s1": {},
+			},
+		});
+
+		expect(mappings[sourceIdentityKey({ source: "mal", id: mal(5114) })]).toEqual([
+			{ provider: "sonarr", providerId: tvdb(78_874), season: 1 },
+		]);
+	});
+
+	it("ignores scoped MAL source descriptors", () => {
+		const mappings = parseAniBridgeMappings({
+			"mal:5114:s1": {
+				"tvdb_show:78874:s1": {},
+			},
+		});
+
+		expect(mappings).toEqual({});
+	});
+
+	it("builds unique MAL to AniList crosswalks from same-row targets", () => {
+		const crosswalks = parseAniBridgeAniListCrosswalks({
+			"mal:5114": {
+				"anilist:21": {},
+				"tvdb_show:78874:s1": {},
+			},
+		});
+
+		expect(
+			crosswalks[sourceIdentityKey({ source: "mal", id: mal(5114) })],
+		).toBe(aid(21));
+	});
+
+	it("does not build ambiguous MAL to AniList crosswalks", () => {
+		const crosswalks = parseAniBridgeAniListCrosswalks({
+			"mal:5114": {
+				"anilist:21": {},
+				"anilist:22": {},
+			},
+		});
+
+		expect(crosswalks).toEqual({});
 	});
 
 	it("builds Seerr movie and TV request targets from TMDB upstream IDs", () => {
@@ -64,11 +119,15 @@ describe("parseAniBridgeMappings", () => {
 			},
 		});
 
-		expect(seerrTargets[aid(1)]).toEqual({
+		expect(
+			seerrTargets[sourceIdentityKey({ source: "anilist", id: aid(1) })],
+		).toEqual({
 			mediaType: "movie",
 			tmdbId: tmdb(300),
 		});
-		expect(seerrTargets[aid(2)]).toEqual({
+		expect(
+			seerrTargets[sourceIdentityKey({ source: "anilist", id: aid(2) })],
+		).toEqual({
 			mediaType: "tv",
 			tmdbId: tmdb(500),
 			seasons: [1, 2],
@@ -86,7 +145,9 @@ describe("parseAniBridgeMappings", () => {
 			},
 		});
 
-		expect(seerrTargets[aid(1)]).toEqual({
+		expect(
+			seerrTargets[sourceIdentityKey({ source: "anilist", id: aid(1) })],
+		).toEqual({
 			mediaType: "tv",
 			tmdbId: tmdb(500),
 			seasons: [1, 2],
@@ -153,5 +214,45 @@ describe("refreshUpstreamMappings", () => {
 		await expect(listSeerrUpstreamTargets([aid(1)])).resolves.toEqual([
 			{ anilistId: aid(1), target: { mediaType: "movie", tmdbId: tmdb(300) } },
 		]);
+	});
+
+	it("normalizes old raw AniList snapshot keys on read", async () => {
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				mappings: {
+					1: [{ provider: "radarr", providerId: tmdb(300) }],
+				},
+				seerrTargets: {
+					1: { mediaType: "movie", tmdbId: tmdb(300) },
+				},
+				fetchedAt: Date.now(),
+			},
+		});
+
+		await expect(getUpstreamTargets("radarr", aid(1))).resolves.toEqual([
+			{ provider: "radarr", providerId: tmdb(300) },
+		]);
+		await expect(listSeerrUpstreamTargets([aid(1)])).resolves.toEqual([
+			{ anilistId: aid(1), target: { mediaType: "movie", tmdbId: tmdb(300) } },
+		]);
+	});
+
+	it("returns unique AniList crosswalks for MAL sources", async () => {
+		mockAniBridgeResponse(
+			createAniBridgeResponse(
+				JSON.stringify({
+					"mal:5114": {
+						"anilist:21": {},
+						"tmdb_movie:300": {},
+					},
+				}),
+			),
+		);
+
+		await refreshUpstreamMappings();
+
+		await expect(
+			getUniqueAniListIdForSource({ source: "mal", id: mal(5114) }),
+		).resolves.toBe(aid(21));
 	});
 });

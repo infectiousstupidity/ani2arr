@@ -3,9 +3,16 @@
 
 import { storage } from "@wxt-dev/storage";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
+import { parseMyAnimeListIdOrNull } from "@/myanimelist/types";
 import { parseTmdbIdOrNull, parseTvdbIdOrNull } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
-import type { SeerrUpstreamTarget, UpstreamTarget } from "./types";
+import {
+	parseSourceIdentityKey,
+	sourceIdentityKey,
+	type SeerrUpstreamTarget,
+	type SourceIdentity,
+	type UpstreamTarget,
+} from "./types";
 
 const ANIBRIDGE_URL =
 	"https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json";
@@ -13,14 +20,21 @@ const ANIBRIDGE_TIMEOUT_MS = 15_000;
 const MAX_ANIBRIDGE_BYTES = 10 * 1024 * 1024;
 const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-type UpstreamMappings = Record<number, UpstreamTarget[]>;
-type SeerrUpstreamMappings = Record<number, SeerrUpstreamTarget>;
+type UpstreamMappings = Record<string, UpstreamTarget[]>;
+type SeerrUpstreamMappings = Record<string, SeerrUpstreamTarget>;
+type AniListCrosswalkMappings = Record<string, AniListId>;
 
 type UpstreamSnapshot = {
 	mappings: UpstreamMappings;
 	seerrTargets?: SeerrUpstreamMappings;
+	aniListCrosswalks?: AniListCrosswalkMappings;
 	fetchedAt: number;
 	etag?: string;
+};
+
+export type SourceUpstreamRecord = {
+	source: SourceIdentity;
+	targets: UpstreamTarget[];
 };
 
 export type UpstreamRecord = {
@@ -44,26 +58,54 @@ let writes: Promise<void> = Promise.resolve();
 
 export async function getUpstreamTargets(
 	provider: Provider,
-	anilistId: AniListId,
+	source: SourceIdentity | AniListId,
 ): Promise<UpstreamTarget[]> {
-	const snapshot = await upstreamMappings.getValue();
+	const snapshot = await getSnapshot();
+	const sourceKey = sourceIdentityKey(toSourceIdentity(source));
 
-	return (snapshot?.mappings[anilistId] ?? []).filter(
+	return (snapshot?.mappings[sourceKey] ?? []).filter(
 		(target) => target.provider === provider,
 	);
 }
 
-export async function listUpstreamMappings(): Promise<UpstreamRecord[]> {
-	const snapshot = await upstreamMappings.getValue();
-	const records: UpstreamRecord[] = [];
+export async function listSourceUpstreamMappings(): Promise<
+	SourceUpstreamRecord[]
+> {
+	const snapshot = await getSnapshot();
+	const records: SourceUpstreamRecord[] = [];
 
-	for (const [rawAniListId, targets] of Object.entries(
+	for (const [rawSourceKey, targets] of Object.entries(
 		snapshot?.mappings ?? {},
 	)) {
-		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
+		const source = parseSourceIdentityKey(rawSourceKey);
 
-		if (anilistId !== null) {
-			records.push({ anilistId, targets });
+		if (source !== null) {
+			records.push({ source, targets });
+		}
+	}
+
+	return records;
+}
+
+export async function getUniqueAniListIdForSource(
+	source: SourceIdentity,
+): Promise<AniListId | null> {
+	if (source.source === "anilist") return source.id;
+
+	const snapshot = await getSnapshot();
+	return snapshot?.aniListCrosswalks?.[sourceIdentityKey(source)] ?? null;
+}
+
+/** LEGACY: AniList-only callers migrate to listSourceUpstreamMappings in later MAL phases. */
+export async function listUpstreamMappings(): Promise<UpstreamRecord[]> {
+	const snapshot = await getSnapshot();
+	const records: UpstreamRecord[] = [];
+
+	for (const [rawSourceKey, targets] of Object.entries(snapshot?.mappings ?? {})) {
+		const source = parseSourceIdentityKey(rawSourceKey);
+
+		if (source?.source === "anilist") {
+			records.push({ anilistId: source.id, targets });
 		}
 	}
 
@@ -76,16 +118,16 @@ export async function listSeerrUpstreamTargets(
 	const requestedIds = new Set(ids);
 	if (requestedIds.size === 0) return [];
 
-	const snapshot = await upstreamMappings.getValue();
+	const snapshot = await getSnapshot();
 	const records: SeerrUpstreamRecord[] = [];
 
-	for (const [rawAniListId, target] of Object.entries(
+	for (const [rawSourceKey, target] of Object.entries(
 		snapshot?.seerrTargets ?? {},
 	)) {
-		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
+		const source = parseSourceIdentityKey(rawSourceKey);
 
-		if (anilistId !== null && requestedIds.has(anilistId)) {
-			records.push({ anilistId, target });
+		if (source?.source === "anilist" && requestedIds.has(source.id)) {
+			records.push({ anilistId: source.id, target });
 		}
 	}
 
@@ -95,16 +137,16 @@ export async function listSeerrUpstreamTargets(
 export async function listAllSeerrUpstreamTargets(): Promise<
 	SeerrUpstreamRecord[]
 > {
-	const snapshot = await upstreamMappings.getValue();
+	const snapshot = await getSnapshot();
 	const records: SeerrUpstreamRecord[] = [];
 
-	for (const [rawAniListId, target] of Object.entries(
+	for (const [rawSourceKey, target] of Object.entries(
 		snapshot?.seerrTargets ?? {},
 	)) {
-		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
+		const source = parseSourceIdentityKey(rawSourceKey);
 
-		if (anilistId !== null) {
-			records.push({ anilistId, target });
+		if (source?.source === "anilist") {
+			records.push({ anilistId: source.id, target });
 		}
 	}
 
@@ -115,10 +157,11 @@ export async function refreshUpstreamMappings(): Promise<void> {
 	const next = writes
 		.catch(() => {})
 		.then(async () => {
-			const previous = await upstreamMappings.getValue();
+			const previous = await getSnapshot();
 			if (
 				previous?.mappings &&
 				previous.seerrTargets &&
+				previous.aniListCrosswalks &&
 				Date.now() - previous.fetchedAt < UPSTREAM_REFRESH_INTERVAL_MS
 			) {
 				return;
@@ -184,6 +227,7 @@ export async function refreshUpstreamMappings(): Promise<void> {
 				await upstreamMappings.setValue({
 					mappings: parsed.mappings,
 					seerrTargets: parsed.seerrTargets,
+					aniListCrosswalks: parsed.aniListCrosswalks,
 					fetchedAt: Date.now(),
 					...(etag ? { etag } : {}),
 				});
@@ -223,25 +267,33 @@ export function parseAniBridgeSeerrTargets(
 	return parseAniBridgeMappingsPayload(payload).seerrTargets;
 }
 
+export function parseAniBridgeAniListCrosswalks(
+	payload: unknown,
+): AniListCrosswalkMappings {
+	return parseAniBridgeMappingsPayload(payload).aniListCrosswalks;
+}
+
 function parseAniBridgeMappingsPayload(payload: unknown): {
 	mappings: UpstreamMappings;
 	seerrTargets: SeerrUpstreamMappings;
+	aniListCrosswalks: AniListCrosswalkMappings;
 } {
 	const mappings: UpstreamMappings = {};
 	const seerrTargets: SeerrUpstreamMappings = {};
+	const aniListCrosswalks: AniListCrosswalkMappings = {};
 
 	if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-		return { mappings, seerrTargets };
+		return { mappings, seerrTargets, aniListCrosswalks };
 	}
 
 	for (const [rawSource, rawTargets] of Object.entries(
 		payload as Record<string, unknown>,
 	)) {
 		const source = parseDescriptor(rawSource);
+		const sourceIdentity = parseSourceDescriptor(source);
 
 		if (
-			source?.name !== "anilist" ||
-			source.scope !== undefined ||
+			sourceIdentity === null ||
 			!rawTargets ||
 			typeof rawTargets !== "object" ||
 			Array.isArray(rawTargets)
@@ -249,28 +301,60 @@ function parseAniBridgeMappingsPayload(payload: unknown): {
 			continue;
 		}
 
-		const anilistId = parseAniListIdOrNull(source.id);
-
-		if (anilistId === null) {
-			continue;
-		}
+		const sourceKey = sourceIdentityKey(sourceIdentity);
 
 		const rawTargetKeys = Object.keys(rawTargets);
 		for (const rawTarget of rawTargetKeys) {
 			const target = parseTarget(rawTarget);
 
 			if (target) {
-				addTarget(mappings, anilistId, target);
+				addTarget(mappings, sourceKey, target);
 			}
 		}
 
 		const seerrTarget = parseSeerrTarget(rawTargetKeys);
 		if (seerrTarget) {
-			seerrTargets[anilistId] = seerrTarget;
+			seerrTargets[sourceKey] = seerrTarget;
+		}
+
+		const aniListId = parseUniqueAniListTarget(rawTargetKeys);
+		if (sourceIdentity.source === "mal" && aniListId !== null) {
+			aniListCrosswalks[sourceKey] = aniListId;
 		}
 	}
 
-	return { mappings, seerrTargets };
+	return { mappings, seerrTargets, aniListCrosswalks };
+}
+
+function parseSourceDescriptor(
+	descriptor: Descriptor | null,
+): SourceIdentity | null {
+	if (descriptor?.scope !== undefined) return null;
+
+	if (descriptor?.name === "anilist") {
+		const id = parseAniListIdOrNull(descriptor.id);
+		return id === null ? null : { source: "anilist", id };
+	}
+
+	if (descriptor?.name === "mal") {
+		const id = parseMyAnimeListIdOrNull(descriptor.id);
+		return id === null ? null : { source: "mal", id };
+	}
+
+	return null;
+}
+
+function parseUniqueAniListTarget(values: readonly string[]): AniListId | null {
+	const aniListIds = values.flatMap((value) => {
+		const target = parseDescriptor(value);
+		if (target?.name !== "anilist" || target.scope !== undefined) return [];
+
+		const id = parseAniListIdOrNull(target.id);
+		return id === null ? [] : [id];
+	});
+	const uniqueIds = [...new Set(aniListIds)];
+
+	return uniqueIds.length === 1 ? (uniqueIds[0] ?? null) : null;
 }
 
 function parseTarget(value: string): UpstreamTarget | null {
@@ -411,9 +495,9 @@ function parseSeasonScope(scope: string | undefined): number | null {
 	return Number.isSafeInteger(season) ? season : null;
 }
 
-function parseDescriptor(
-	value: string,
-): { name: string; id: number; scope?: string } | null {
+type Descriptor = { name: string; id: number; scope?: string };
+
+function parseDescriptor(value: string): Descriptor | null {
 	const parts = value.split(":");
 
 	if (parts.length !== 2 && parts.length !== 3) {
@@ -436,10 +520,10 @@ function parseDescriptor(
 
 function addTarget(
 	mappings: UpstreamMappings,
-	anilistId: AniListId,
+	sourceKey: string,
 	target: UpstreamTarget,
 ): void {
-	const targets = mappings[anilistId] ?? [];
+	const targets = mappings[sourceKey] ?? [];
 
 	const alreadyExists = targets.some((existing) => {
 		if (
@@ -457,6 +541,90 @@ function addTarget(
 	});
 
 	if (!alreadyExists) {
-		mappings[anilistId] = [...targets, target];
+		mappings[sourceKey] = [...targets, target];
 	}
+}
+
+function toSourceIdentity(source: SourceIdentity | AniListId): SourceIdentity {
+	if (typeof source === "number") {
+		return { source: "anilist", id: source };
+	}
+
+	return source;
+}
+
+async function getSnapshot(): Promise<UpstreamSnapshot | null> {
+	const snapshot = await upstreamMappings.getValue();
+	return snapshot ? normalizeSnapshot(snapshot) : null;
+}
+
+function normalizeSnapshot(snapshot: UpstreamSnapshot): UpstreamSnapshot {
+	return {
+		...snapshot,
+		mappings: normalizeMappingKeys(snapshot.mappings),
+		...(snapshot.seerrTargets === undefined
+			? {}
+			: { seerrTargets: normalizeSeerrTargetKeys(snapshot.seerrTargets) }),
+		...(snapshot.aniListCrosswalks === undefined
+			? {}
+			: {
+					aniListCrosswalks: normalizeAniListCrosswalkKeys(
+						snapshot.aniListCrosswalks,
+					),
+				}),
+	};
+}
+
+function normalizeMappingKeys(mappings: UpstreamMappings): UpstreamMappings {
+	const normalized: UpstreamMappings = {};
+
+	for (const [rawKey, targets] of Object.entries(mappings)) {
+		const key = normalizeStoredSourceKey(rawKey);
+		if (key !== null) {
+			normalized[key] = targets;
+		}
+	}
+
+	return normalized;
+}
+
+function normalizeSeerrTargetKeys(
+	targets: SeerrUpstreamMappings,
+): SeerrUpstreamMappings {
+	const normalized: SeerrUpstreamMappings = {};
+
+	for (const [rawKey, target] of Object.entries(targets)) {
+		const key = normalizeStoredSourceKey(rawKey);
+		if (key !== null) {
+			normalized[key] = target;
+		}
+	}
+
+	return normalized;
+}
+
+function normalizeAniListCrosswalkKeys(
+	crosswalks: AniListCrosswalkMappings,
+): AniListCrosswalkMappings {
+	const normalized: AniListCrosswalkMappings = {};
+
+	for (const [rawKey, anilistId] of Object.entries(crosswalks)) {
+		const key = normalizeStoredSourceKey(rawKey);
+		if (key !== null) {
+			normalized[key] = anilistId;
+		}
+	}
+
+	return normalized;
+}
+
+function normalizeStoredSourceKey(rawKey: string): string | null {
+	const source = parseSourceIdentityKey(rawKey);
+	if (source !== null) return sourceIdentityKey(source);
+
+	/** LEGACY: pre-MAL snapshots used raw AniList ID object keys. */
+	const anilistId = parseAniListIdOrNull(Number(rawKey));
+	return anilistId === null
+		? null
+		: sourceIdentityKey({ source: "anilist", id: anilistId });
 }
