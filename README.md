@@ -51,6 +51,33 @@ Seerr can be used alongside Sonarr/Radarr, or as the main visible action on brow
 
 For Seerr TV requests, ani2arr sends explicit seasons when season data is known. For movies, ani2arr sends the TMDB movie target. Seerr then handles the request according to its own server-side configuration.
 
+## Install
+
+| Browser           | Recommended install                                                                                                             | Notes                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Firefox           | <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/" target="_blank" rel="noopener noreferrer">Firefox Add-ons</a> | Requires Firefox 142 or newer.                    |
+| Chrome / Chromium | <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a> | Download the Chrome MV3 zip and load it unpacked. |
+
+### Manual install
+
+**Firefox XPI**
+
+1. Download the signed XPI from <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/" target="_blank" rel="noopener noreferrer">Firefox Add-ons</a> or <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a>.
+2. Open `about:addons`.
+3. Gear menu -> `Install Add-on From File...`.
+4. Select the XPI.
+
+**Chrome / Chromium**
+
+1. Download and extract the Chrome MV3 zip from <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a>.
+2. Open `chrome://extensions`.
+3. Enable Developer mode.
+4. Click `Load unpacked`.
+5. Select the extracted extension folder.
+
+Local Chrome builds are created under `.output/chrome-mv3`.
+Release assets on GitHub include SHA256 checksums for manual verification.
+
 ## Setup
 
 1. Install ani2arr.
@@ -96,33 +123,62 @@ ani2arr uses multiple sources to match AniList entries to the correct Sonarr, Ra
 
 Manual mappings are useful when automatic matching is wrong, missing, or ambiguous.
 
-## Install
+## FAQ
 
-| Browser           | Recommended install                                                                                                             | Notes                                             |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| Firefox           | <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/" target="_blank" rel="noopener noreferrer">Firefox Add-ons</a> | Requires Firefox 142 or newer.                    |
-| Chrome / Chromium | <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a> | Download the Chrome MV3 zip and load it unpacked. |
+<details>
+<summary><strong>Can ani2arr delete items from Sonarr or Radarr?</strong></summary>
 
-### Manual install
+No. ani2arr does not implement delete actions. It can only add new items or edit existing items.
 
-**Firefox XPI**
+</details>
 
-1. Download the signed XPI from <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/" target="_blank" rel="noopener noreferrer">Firefox Add-ons</a> or <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a>.
-2. Open `about:addons`.
-3. Gear menu -> `Install Add-on From File...`.
-4. Select the XPI.
+<details>
+<summary><strong>Does ani2arr work with Seerr?</strong></summary>
 
-**Chrome / Chromium**
+Yes. ani2arr can request media through a configured Seerr instance and show request status when available.
 
-1. Download and extract the Chrome MV3 zip from <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a>.
-2. Open `chrome://extensions`.
-3. Enable Developer mode.
-4. Click `Load unpacked`.
-5. Select the extracted extension folder.
+</details>
 
-Local Chrome builds are created under `.output/chrome-mv3`.
+<details>
+<summary><strong>Does ani2arr require Seerr?</strong></summary>
 
-# Privacy and permissions
+No. Sonarr and Radarr can be used directly without Seerr.
+
+</details>
+
+<details>
+<summary><strong>Does ani2arr send data to a developer server?</strong></summary>
+
+No. ani2arr does not operate a backend. Settings are stored locally, and requests are made to AniList, AniBridge mapping files, and the providers configured by the user.
+
+</details>
+
+<details>
+<summary><strong>Why does Firefox show broad permissions?</strong></summary>
+
+Self-hosted services can run on localhost, private IPs, custom domains, subdomains, or reverse proxies. Browser host permissions are origin-based, so the permission text can look broader than the actual configured use.
+
+</details>
+
+<details>
+<summary><strong>Can ani2arr see how many episodes are available in Plex?</strong></summary>
+
+No. ani2arr can show Seerr request status when available, but it does not inspect Plex libraries or count available Plex episodes.
+
+</details>
+
+## Support and issues
+
+Use GitHub Issues to report bugs, mapping problems, and feature requests.
+
+* [Report a bug](https://github.com/infectiousstupidity/ani2arr/issues/new?template=bug_report.yml)
+* [Report a mapping issue](https://github.com/infectiousstupidity/ani2arr/issues/new?template=mapping_issue.yml)
+* [Request a feature](https://github.com/infectiousstupidity/ani2arr/issues/new?template=feature_request.yml)
+* [Open the issue chooser](https://github.com/infectiousstupidity/ani2arr/issues/new/choose)
+
+For security issues, do not open a public issue. See [SECURITY.md](SECURITY.md).
+
+## Privacy and permissions
 
 ani2arr stores configuration locally in browser extension storage, including provider URLs, API keys, default add settings, UI preferences, manual mappings, manual Seerr targets, and cached metadata.
 
@@ -181,9 +237,11 @@ Build and zip artifacts are created under `.output/`.
 
 ## Notes
 
+* See [CHANGELOG.md](CHANGELOG.md) for version history.
+* See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 * Thanks to <a href="https://github.com/anibridge/anibridge-mappings" target="_blank" rel="noopener noreferrer">AniBridge</a> and their contributors for maintaining the upstream mapping database.
 * ani2arr is a personal open source project.
-* Issues and PRs are welcome, but support and fixes are not guaranteed.
+* Issues and PRs are welcome, but support and fixes are not guaranteed. See [Support and issues](#support-and-issues).
 
 ## License
 
