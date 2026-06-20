@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Security issue
+    url: https://github.com/infectiousstupidity/ani2arr/security/advisories/new
+    about: Please report security issues privately. Do not open public issues for vulnerabilities.
+
+  - name: Firefox Add-ons listing
+    url: https://addons.mozilla.org/en-US/firefox/addon/ani2arr/
+    about: Install the Firefox version from AMO.
+
+  - name: GitHub releases
+    url: https://github.com/infectiousstupidity/ani2arr/releases
+    about: Download release builds and view release notes.
