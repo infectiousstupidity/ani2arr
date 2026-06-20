@@ -13,6 +13,7 @@ import type {
 	AddRadarrInput,
 	GetMovieStatusOutput,
 	RadarrLookupOutput,
+	SourceRpcInput,
 	StatusInput,
 	UpdateRadarrInput,
 } from "@/rpc/types";
@@ -44,6 +45,16 @@ const keepPreviousMovieStatusForSameMedia =
 			? previousData
 			: undefined;
 	};
+
+function mutationSourceInput(variables: SourceRpcInput): SourceRpcInput {
+	if (variables.source === undefined) {
+		return { anilistId: variables.anilistId };
+	}
+	if ("anilistId" in variables && variables.anilistId !== undefined) {
+		return { source: variables.source, anilistId: variables.anilistId };
+	}
+	return { source: variables.source };
+}
 
 export const useRadarrFormResources = (options?: {
 	enabled?: boolean;
@@ -130,8 +141,7 @@ export const useAddMovie = () => {
 		onSuccess: (_createdMovie, variables) => {
 			invalidateAfterProviderMediaChange(queryClient, {
 				provider: "radarr",
-				...(variables.source === undefined ? {} : { source: variables.source }),
-				anilistId: variables.anilistId,
+				...mutationSourceInput(variables),
 			});
 		},
 	});
@@ -145,8 +155,7 @@ export const useUpdateMovie = () => {
 		onSuccess: (_updatedMovie, variables) => {
 			invalidateAfterProviderMediaChange(queryClient, {
 				provider: "radarr",
-				...(variables.source === undefined ? {} : { source: variables.source }),
-				anilistId: variables.anilistId,
+				...mutationSourceInput(variables),
 			});
 		},
 	});

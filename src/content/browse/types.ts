@@ -12,7 +12,7 @@ type StackDirection = 'up' | 'down';
 
 export interface HostMediaTarget {
   source: SourceIdentity;
-  anilistId: AniListId;
+  anilistId?: AniListId;
   title: string;
   format: AniListMediaFormat | null;
   mountTarget: HTMLElement;

@@ -28,7 +28,7 @@ import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import type { BrowseAdapter, HostMediaTarget } from "./types";
 import { resolveBrowseCardProvider } from "./browse-card-provider";
-import { Provider } from "@/providers/types";
+import type { Provider } from "@/providers/types";
 
 type MetadataHint = ReturnType<typeof metadataHintFromAniListMetadata>;
 
@@ -191,7 +191,7 @@ export function BrowseCardOverlay({
 	const seerrOpts = getSeerrOverlayOptions(publicOptions);
 
 	const activeArr = getActiveArrProvider(rawProvider, sonarrOpts.enabled, radarrOpts.enabled);
-	const seerrEnabled = seerrOpts.enabled;
+	const seerrEnabled = seerrOpts.enabled && parsed.anilistId !== undefined;
 
 	if (activeArr === "none" && !seerrEnabled) return null;
 
@@ -202,7 +202,23 @@ export function BrowseCardOverlay({
 		metadata,
 	});
 
+	const openArrModal = (
+		provider: Provider,
+		initialView: "setup" | "mapping",
+	): void => {
+		if (parsed.anilistId === undefined) return;
+		openProviderModal({
+			onOpenMediaModal,
+			anilistId: parsed.anilistId,
+			source: parsed.source,
+			provider,
+			initialView,
+			metadataHint,
+		});
+	};
+
 	const openSeerrModal = () => {
+		if (parsed.anilistId === undefined) return;
 		onOpenMediaModal({
 			anilistId: parsed.anilistId,
 			source: parsed.source,
@@ -222,15 +238,7 @@ export function BrowseCardOverlay({
 				tooltipContainer={tooltipContainer}
 				onClick={
 					isConfig
-						? () =>
-								openProviderModal({
-									onOpenMediaModal,
-									anilistId: parsed.anilistId,
-									source: parsed.source,
-									provider: "sonarr",
-									initialView: "setup",
-									metadataHint,
-								})
+						? () => openArrModal("sonarr", "setup")
 						: () => openOptionsPage({ sectionId: "sonarr" })
 				}
 			/>
@@ -243,15 +251,7 @@ export function BrowseCardOverlay({
 				tooltipContainer={tooltipContainer}
 				onClick={
 					isConfig
-						? () =>
-								openProviderModal({
-									onOpenMediaModal,
-									anilistId: parsed.anilistId,
-									source: parsed.source,
-									provider: "radarr",
-									initialView: "setup",
-									metadataHint,
-								})
+						? () => openArrModal("radarr", "setup")
 						: () => openOptionsPage({ sectionId: "radarr" })
 				}
 			/>
@@ -260,23 +260,24 @@ export function BrowseCardOverlay({
 
 	const stackDirection = adapter.stackDirection ?? "up";
 
-	const seerrStackActions: ReactNode = seerrEnabled ? (
-		<SeerrCardStackActions
-			anilistId={parsed.anilistId}
-			mappedIdentities={mappedIdentities}
-			isConfigured={seerrOpts.isConfigured}
-			observeTarget={parsed.mountTarget}
-			tooltipContainer={tooltipContainer}
-			onOpenModal={openSeerrModal}
-			stackDirection={stackDirection}
-		/>
-	) : null;
+	const seerrStackActions: ReactNode =
+		seerrEnabled && parsed.anilistId !== undefined ? (
+			<SeerrCardStackActions
+				anilistId={parsed.anilistId}
+				mappedIdentities={mappedIdentities}
+				isConfigured={seerrOpts.isConfigured}
+				observeTarget={parsed.mountTarget}
+				tooltipContainer={tooltipContainer}
+				onOpenModal={openSeerrModal}
+				stackDirection={stackDirection}
+			/>
+		) : null;
 
 	const primaryStatus = getPrimaryStatus(publicOptions);
 	const showSeerrMain = seerrEnabled && (primaryStatus === "seerr" || activeArr === "none");
 
 	const commonProps = {
-		anilistId: parsed.anilistId,
+		...(parsed.anilistId === undefined ? {} : { anilistId: parsed.anilistId }),
 		source: parsed.source,
 		title: displayTitle,
 		metadata,
@@ -285,7 +286,7 @@ export function BrowseCardOverlay({
 		tooltipContainer,
 	};
 
-	if (showSeerrMain) {
+	if (showSeerrMain && parsed.anilistId !== undefined) {
 		return (
 			<SeerrStandaloneCardOverlay
 				anilistId={parsed.anilistId}
@@ -305,26 +306,8 @@ export function BrowseCardOverlay({
 		return (
 			<SonarrCardOverlay
 				{...commonProps}
-				onOpenSetup={() =>
-					openProviderModal({
-						onOpenMediaModal,
-						anilistId: parsed.anilistId,
-						source: parsed.source,
-						provider: "sonarr",
-						initialView: "setup",
-						metadataHint,
-					})
-				}
-				onOpenMapping={() =>
-					openProviderModal({
-						onOpenMediaModal,
-						anilistId: parsed.anilistId,
-						source: parsed.source,
-						provider: "sonarr",
-						initialView: "mapping",
-						metadataHint,
-					})
-				}
+				onOpenSetup={() => openArrModal("sonarr", "setup")}
+				onOpenMapping={() => openArrModal("sonarr", "mapping")}
 				isConfigured={sonarrOpts.isConfigured}
 				defaultForm={sonarrOpts.defaultForm}
 				badgeVisibility={sonarrOpts.visibility}
@@ -337,26 +320,8 @@ export function BrowseCardOverlay({
 		return (
 			<RadarrCardOverlay
 				{...commonProps}
-				onOpenSetup={() =>
-					openProviderModal({
-						onOpenMediaModal,
-						anilistId: parsed.anilistId,
-						source: parsed.source,
-						provider: "radarr",
-						initialView: "setup",
-						metadataHint,
-					})
-				}
-				onOpenMapping={() =>
-					openProviderModal({
-						onOpenMediaModal,
-						anilistId: parsed.anilistId,
-						source: parsed.source,
-						provider: "radarr",
-						initialView: "mapping",
-						metadataHint,
-					})
-				}
+				onOpenSetup={() => openArrModal("radarr", "setup")}
+				onOpenMapping={() => openArrModal("radarr", "mapping")}
 				isConfigured={radarrOpts.isConfigured}
 				defaultForm={radarrOpts.defaultForm}
 				badgeVisibility={radarrOpts.visibility}

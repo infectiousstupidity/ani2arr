@@ -58,14 +58,19 @@ export function BrowseOverlays({
 	);
 	const targets = useBrowseCardTargets(targetOptions);
 	const targetIds = useMemo(
-		() => targets.map(target => target.parsed.anilistId),
+		() =>
+			targets.flatMap((target) =>
+				target.parsed.anilistId === undefined ? [] : [target.parsed.anilistId],
+			),
 		[targets],
 	);
 	const targetIdsMissingFormat = useMemo(
 		() =>
 			targets
 				.filter((target) => target.parsed.format === null)
-				.map((target) => target.parsed.anilistId),
+				.flatMap((target) =>
+					target.parsed.anilistId === undefined ? [] : [target.parsed.anilistId],
+				),
 		[targets],
 	);
 	const metadataBatch = useAniListMetadataBatch(targetIdsMissingFormat, {
@@ -99,10 +104,16 @@ export function BrowseOverlays({
 						adapter={adapter}
 						publicOptions={publicOptions}
 						mappedIdentities={
-							mappedIdentitiesById.get(target.parsed.anilistId) ?? []
+							target.parsed.anilistId === undefined
+								? []
+								: (mappedIdentitiesById.get(target.parsed.anilistId) ?? [])
 						}
 
-						metadata={metadataById.get(target.parsed.anilistId) ?? null}
+						metadata={
+							target.parsed.anilistId === undefined
+								? null
+								: (metadataById.get(target.parsed.anilistId) ?? null)
+						}
 						onOpenMediaModal={mediaModal.open}
 						tooltipContainer={null}
 					/>,

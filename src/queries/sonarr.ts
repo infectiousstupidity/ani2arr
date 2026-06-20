@@ -13,6 +13,7 @@ import type {
 	AddSonarrInput,
 	GetSeriesStatusOutput,
 	SonarrLookupOutput,
+	SourceRpcInput,
 	StatusInput,
 	UpdateSonarrInput,
 } from "@/rpc/types";
@@ -44,6 +45,16 @@ const keepPreviousSeriesStatusForSameMedia =
 			? previousData
 			: undefined;
 	};
+
+function mutationSourceInput(variables: SourceRpcInput): SourceRpcInput {
+	if (variables.source === undefined) {
+		return { anilistId: variables.anilistId };
+	}
+	if ("anilistId" in variables && variables.anilistId !== undefined) {
+		return { source: variables.source, anilistId: variables.anilistId };
+	}
+	return { source: variables.source };
+}
 
 export const useSonarrFormResources = (options?: {
 	enabled?: boolean;
@@ -130,8 +141,7 @@ export const useAddSeries = () => {
 		onSuccess: (_createdSeries, variables) => {
 			invalidateAfterProviderMediaChange(queryClient, {
 				provider: "sonarr",
-				...(variables.source === undefined ? {} : { source: variables.source }),
-				anilistId: variables.anilistId,
+				...mutationSourceInput(variables),
 			});
 		},
 	});
@@ -145,8 +155,7 @@ export const useUpdateSeries = () => {
 		onSuccess: (_updatedSeries, variables) => {
 			invalidateAfterProviderMediaChange(queryClient, {
 				provider: "sonarr",
-				...(variables.source === undefined ? {} : { source: variables.source }),
-				anilistId: variables.anilistId,
+				...mutationSourceInput(variables),
 			});
 		},
 	});

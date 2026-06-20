@@ -53,9 +53,7 @@ export type StatusInput = SourceRpcInput & {
 	metadata?: AniListMediaHint | null;
 };
 
-export type AddSonarrInput = {
-	anilistId: AniListId;
-	source?: SourceIdentity;
+export type AddSonarrInput = SourceRpcInput & {
 	tvdbId: TvdbId;
 	title: string;
 	primaryTitleHint?: string;
@@ -63,18 +61,14 @@ export type AddSonarrInput = {
 	form: SonarrFormState;
 };
 
-export type UpdateSonarrInput = {
-	anilistId: AniListId;
-	source?: SourceIdentity;
+export type UpdateSonarrInput = SourceRpcInput & {
 	tvdbId: TvdbId;
 	title: string;
 	form: SonarrFormState;
 	monitoringAction?: SonarrEditMonitoringAction;
 };
 
-export type AddRadarrInput = {
-	anilistId: AniListId;
-	source?: SourceIdentity;
+export type AddRadarrInput = SourceRpcInput & {
 	tmdbId: TmdbId;
 	title: string;
 	primaryTitleHint?: string;
@@ -82,9 +76,7 @@ export type AddRadarrInput = {
 	form: RadarrFormState;
 };
 
-export type UpdateRadarrInput = {
-	anilistId: AniListId;
-	source?: SourceIdentity;
+export type UpdateRadarrInput = SourceRpcInput & {
 	tmdbId: TmdbId;
 	title: string;
 	form: RadarrFormState;

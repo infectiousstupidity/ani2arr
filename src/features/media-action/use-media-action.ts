@@ -6,13 +6,15 @@ import type { MappingResult, SourceIdentity } from "@/mapping/types";
 import type { Provider } from "@/providers/types";
 import { getProviderOpenTarget } from "@/providers/provider-links";
 import { openProviderPage } from "@/rpc/provider-page";
-import type { StatusInput } from "@/rpc/types";
+import type { SourceRpcInput, StatusInput } from "@/rpc/types";
 import { sourceFromInput } from "@/rpc/source-input";
 import { getMediaActionStatus, type MediaActionStatus } from "./state";
 
-export interface MediaActionInputBase<TForm> {
-	anilistId: AniListId;
-	source?: SourceIdentity | undefined;
+type MediaActionIdentity =
+	| { source: SourceIdentity; anilistId?: AniListId }
+	| { source?: undefined; anilistId: AniListId };
+
+export type MediaActionInputBase<TForm> = MediaActionIdentity & {
 	displayTitle: string;
 	providerTitle: string | null;
 	metadata: AniListMediaHint | null;
@@ -24,7 +26,7 @@ export interface MediaActionInputBase<TForm> {
 	forceMappingRetry?: boolean;
 	onConfigure(): void;
 	onOpenMapping(): void;
-}
+};
 
 export interface MediaAction {
 	status: MediaActionStatus;
@@ -59,14 +61,14 @@ interface MediaActionMutationState {
 	reset(): void;
 }
 
-interface UseMediaActionInput<TForm> extends MediaActionInputBase<TForm> {
+type UseMediaActionInput<TForm> = MediaActionInputBase<TForm> & {
 	provider: Provider;
 	statusQuery: MediaActionStatusQuery;
 	addMutation: MediaActionMutationState;
 	hasProviderId: boolean;
 	providerRouteSlug: string | null;
 	runQuickAdd(): void;
-}
+};
 
 function isQueryChecking(input: {
 	isLoading: boolean;
@@ -80,6 +82,18 @@ function shouldEnableStatus(input: MediaActionInputBase<unknown>): boolean {
 	return input.enabled && input.isConfigured && input.statusBlocked !== true;
 }
 
+export function mediaActionSourceInput(
+	input: MediaActionIdentity,
+): SourceRpcInput {
+	if (input.source !== undefined) {
+		return "anilistId" in input && input.anilistId !== undefined
+			? { source: input.source, anilistId: input.anilistId }
+			: { source: input.source };
+	}
+
+	return { anilistId: input.anilistId };
+}
+
 export function buildMediaActionStatusQuery(
 	input: MediaActionInputBase<unknown>,
 ): {
@@ -87,7 +101,7 @@ export function buildMediaActionStatusQuery(
 	options: MediaActionStatusOptions;
 } {
 	const payload: Pick<StatusInput, "metadata" | "source" | "title"> = {
-		source: sourceFromInput(input),
+		source: sourceFromInput(mediaActionSourceInput(input)),
 		metadata: input.metadata,
 	};
 	if (input.providerTitle !== null) {

@@ -15,8 +15,8 @@ import { CardOverlay } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";
 
 interface RadarrCardOverlayProps {
-	anilistId: AniListId;
-	source?: SourceIdentity | undefined;
+	anilistId?: AniListId | undefined;
+	source: SourceIdentity;
 	title: string;
 	onOpenSetup(): void;
 	onOpenMapping(): void;
@@ -47,9 +47,10 @@ export function RadarrCardOverlay({
 }: RadarrCardOverlayProps): ReactElement {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const providerTitle = title.trim().length > 0 ? title : null;
+	const identity =
+		anilistId === undefined ? { source } : { source, anilistId };
 	const mediaAction = useRadarrMediaAction({
-		anilistId,
-		source,
+		...identity,
 		displayTitle: title,
 		providerTitle,
 		metadata,
@@ -75,7 +76,7 @@ export function RadarrCardOverlay({
 			primaryDisabled={mediaAction.status.disabled}
 			onPrimaryAction={mediaAction.runPrimaryAction}
 			hasMapping={mediaAction.status.hasMapping}
-			showSetupAction={mediaAction.status.hasMapping}
+			showSetupAction={anilistId !== undefined && mediaAction.status.hasMapping}
 			onOpenSetup={onOpenSetup}
 			showMappingAction={mediaAction.status.state !== "unconfigured"}
 			onOpenMapping={onOpenMapping}
