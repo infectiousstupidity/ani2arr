@@ -3,6 +3,7 @@
 
 import { useState, type SubmitEvent } from "react";
 import { Plug } from "lucide-react";
+import { isPublicHttpProviderUrl } from "@/providers/settings/insecure-url";
 import type { Provider } from "@/providers/types";
 import { useExtensionOptions } from "@/queries/options";
 import {
@@ -74,6 +75,7 @@ const ProviderConnectionDraft = ({
 	const [draftApiKey, setDraftApiKey] = useState(savedApiKey);
 	const hasDraftChanges = draftUrl !== savedUrl || draftApiKey !== savedApiKey;
 	const showConnectionActions = !isConfigured || hasDraftChanges || Boolean(error);
+	const showPublicHttpWarning = isPublicHttpProviderUrl(draftUrl);
 	let connectButtonLabel = "Connect and save";
 
 	if (isConnecting) {
@@ -120,6 +122,16 @@ const ProviderConnectionDraft = ({
 						disabled={isConnecting}
 					/>
 				</SettingsRow>
+
+				{showPublicHttpWarning ? (
+					<p
+						className="rounded-md border border-warning/35 bg-warning/10 px-3 py-2 text-sm font-medium text-warning"
+						role="alert"
+					>
+						This sends your API key over unencrypted HTTP. Anyone between your
+						browser and this server may read it.
+					</p>
+				) : null}
 
 				<SettingsRow
 					id={`${provider}-api-key`}

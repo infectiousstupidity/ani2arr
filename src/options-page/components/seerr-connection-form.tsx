@@ -3,6 +3,7 @@
 
 import { useState, type SubmitEvent } from "react";
 import { Plug } from "lucide-react";
+import { isPublicHttpProviderUrl } from "@/providers/settings/insecure-url";
 import { useExtensionOptions } from "@/queries/options";
 import {
 	getSeerrConnectionDraft,
@@ -61,6 +62,7 @@ const SeerrConnectionDraft = ({
 	const [draftApiKey, setDraftApiKey] = useState(savedApiKey);
 	const hasDraftChanges = draftUrl !== savedUrl || draftApiKey !== savedApiKey;
 	const showConnectionActions = !isConfigured || hasDraftChanges || Boolean(error);
+	const showPublicHttpWarning = isPublicHttpProviderUrl(draftUrl);
 	let connectButtonLabel = "Connect and save";
 
 	if (isConnecting) {
@@ -105,6 +107,16 @@ const SeerrConnectionDraft = ({
 						disabled={isConnecting}
 					/>
 				</SettingsRow>
+
+				{showPublicHttpWarning ? (
+					<p
+						className="rounded-md border border-warning/35 bg-warning/10 px-3 py-2 text-sm font-medium text-warning"
+						role="alert"
+					>
+						This sends your API key over unencrypted HTTP. Anyone between your
+						browser and this server may read it.
+					</p>
+				) : null}
 
 				<SettingsRow
 					id="seerr-api-key"

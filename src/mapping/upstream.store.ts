@@ -9,6 +9,8 @@ import type { SeerrUpstreamTarget, UpstreamTarget } from "./types";
 
 const ANIBRIDGE_URL =
 	"https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json";
+const ANIBRIDGE_TIMEOUT_MS = 15_000;
+const MAX_ANIBRIDGE_BYTES = 10 * 1024 * 1024;
 const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 type UpstreamMappings = Record<number, UpstreamTarget[]>;
@@ -122,44 +124,72 @@ export async function refreshUpstreamMappings(): Promise<void> {
 				return;
 			}
 
-			const response = await fetch(ANIBRIDGE_URL, {
-				headers: previous?.etag
-					? {
-							"If-None-Match": previous.etag,
-						}
-					: {},
-			});
+			const controller = new AbortController();
+			const timeout = setTimeout(() => controller.abort(), ANIBRIDGE_TIMEOUT_MS);
 
-			if (response.status === 304) {
-				if (!previous) {
-					throw new Error("AniBridge returned 304 without stored mappings.");
-				}
-
-				await upstreamMappings.setValue({
-					...previous,
-					fetchedAt: Date.now(),
+			try {
+				const response = await fetch(ANIBRIDGE_URL, {
+					signal: controller.signal,
+					headers: previous?.etag
+						? {
+								"If-None-Match": previous.etag,
+							}
+						: {},
 				});
 
-				return;
+				if (response.status === 304) {
+					if (!previous) {
+						throw new Error("AniBridge returned 304 without stored mappings.");
+					}
+
+					await upstreamMappings.setValue({
+						...previous,
+						fetchedAt: Date.now(),
+					});
+
+					return;
+				}
+
+				if (!response.ok) {
+					throw new Error(
+						`Unable to download AniBridge mappings (${response.status}).`,
+					);
+				}
+
+				const contentLength = Number(response.headers.get("Content-Length") ?? 0);
+				if (contentLength > MAX_ANIBRIDGE_BYTES) {
+					throw new Error("AniBridge mappings payload is too large.");
+				}
+
+				const text = await response.text();
+				if (new TextEncoder().encode(text).byteLength > MAX_ANIBRIDGE_BYTES) {
+					throw new Error("AniBridge mappings payload is too large.");
+				}
+
+				let parsedJson: unknown;
+				try {
+					parsedJson = JSON.parse(text) as unknown;
+				} catch {
+					throw new Error("AniBridge mappings payload is not valid JSON.");
+				}
+
+				const parsed = parseAniBridgeMappingsPayload(parsedJson);
+				if (Object.keys(parsed.mappings).length === 0) {
+					throw new Error(
+						"AniBridge mappings payload did not contain valid mappings.",
+					);
+				}
+				const etag = response.headers.get("ETag");
+
+				await upstreamMappings.setValue({
+					mappings: parsed.mappings,
+					seerrTargets: parsed.seerrTargets,
+					fetchedAt: Date.now(),
+					...(etag ? { etag } : {}),
+				});
+			} finally {
+				clearTimeout(timeout);
 			}
-
-			if (!response.ok) {
-				throw new Error(
-					`Unable to download AniBridge mappings (${response.status}).`,
-				);
-			}
-
-			const parsed = parseAniBridgeMappingsPayload(
-				(await response.json()) as unknown,
-			);
-			const etag = response.headers.get("ETag");
-
-			await upstreamMappings.setValue({
-				mappings: parsed.mappings,
-				seerrTargets: parsed.seerrTargets,
-				fetchedAt: Date.now(),
-				...(etag ? { etag } : {}),
-			});
 		});
 
 	writes = next.then(
