@@ -1,0 +1,165 @@
+name: Bug report
+description: Report something that is broken in ani2arr.
+title: "bug: "
+labels:
+  - bug
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for broken behavior, errors, UI problems, provider failures, or regressions.
+
+        For wrong AniList to Sonarr, Radarr, or Seerr matches, use the mapping issue template instead.
+
+  - type: input
+    id: version
+    attributes:
+      label: ani2arr version
+      description: The extension version you are using.
+      placeholder: "2.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      description: Which browser are you using?
+      options:
+        - Firefox
+        - Firefox Developer Edition
+        - Firefox Nightly
+        - Chrome
+        - Chromium
+        - Brave
+        - Edge
+        - Other Chromium browser
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: browser-version
+    attributes:
+      label: Browser version
+      description: The browser version if known.
+      placeholder: "Firefox 142"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      description: Which provider is affected?
+      options:
+        - Sonarr
+        - Radarr
+        - Seerr
+        - Multiple providers
+        - Not provider-specific
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: page
+    attributes:
+      label: Page where the issue happens
+      description: Where did you see the problem?
+      options:
+        - AniList anime page
+        - AniList browse/search
+        - AniChart
+        - Extension options page
+        - Extension popup
+        - Manual mapping modal
+        - Seerr target picker
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: page-url
+    attributes:
+      label: Page URL
+      description: Paste the AniList, AniChart, or other page URL if relevant.
+      placeholder: "https://anilist.co/anime/21/ONE-PIECE/"
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+      placeholder: "The Sonarr add modal should open and show the correct series."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead?
+      placeholder: "The button appeared, but clicking it did nothing."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Give the shortest exact steps that reproduce the issue.
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. Select ...
+        4. See error ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors
+      description: Paste relevant browser console errors if available. Remove API keys, tokens, domains, and private data first.
+      render: text
+      placeholder: "Paste console errors here."
+    validations:
+      required: false
+
+  - type: textarea
+    id: provider-response
+    attributes:
+      label: Provider response
+      description: Paste relevant Sonarr, Radarr, or Seerr API response details if useful. Remove API keys, tokens, domains, and private data first.
+      render: json
+      placeholder: |
+        {
+          "error": "example"
+        }
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Drag and drop screenshots if they help explain the issue.
+      placeholder: "Add screenshots here."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I have checked that this issue is not already reported.
+          required: true
+        - label: I have removed API keys, tokens, private domains, and other secrets from this report.
+          required: true
+        - label: I am using a released version of ani2arr, not an old local build.
+          required: false
