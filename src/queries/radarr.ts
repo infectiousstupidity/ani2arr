@@ -7,7 +7,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import type { AniListId } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/types";
 import { getAni2arrApi } from "@/rpc";
 import type {
 	AddRadarrInput,
@@ -22,6 +22,7 @@ import { invalidateAfterProviderMediaChange } from "@/queries/invalidation";
 import { queryKeys } from "@/queries/query-keys";
 import type { ProviderCredentials } from "@/providers/types";
 import type { RadarrMovie } from "@/providers/radarr/types";
+import { sourceFromInput } from "@/rpc/source-input";
 
 const hasQueryKeyPrefix = (
 	queryKey: QueryKey,
@@ -29,7 +30,7 @@ const hasQueryKeyPrefix = (
 ): boolean => prefix.every((part, index) => queryKey[index] === part);
 
 const keepPreviousMovieStatusForSameMedia =
-	(anilistId: AniListId) =>
+	(source: SourceIdentity) =>
 	(
 		previousData: GetMovieStatusOutput | undefined,
 		previousQuery: { queryKey: QueryKey } | undefined,
@@ -38,7 +39,7 @@ const keepPreviousMovieStatusForSameMedia =
 
 		return hasQueryKeyPrefix(
 			previousQuery.queryKey,
-			queryKeys.providerMediaStatusItem("radarr", anilistId),
+			queryKeys.providerMediaStatusItem("radarr", source),
 		)
 			? previousData
 			: undefined;
@@ -79,8 +80,9 @@ export const useMovieStatus = (
 	const forceVerify = options?.force_verify === true;
 	const forceMappingRetry = options?.force_mapping_retry === true;
 	const forceStatusRefresh = forceVerify || forceMappingRetry;
+	const source = sourceFromInput(payload);
 	const statusKeyInput = {
-		anilistId: payload.anilistId,
+		source,
 		...(payload.title === undefined ? {} : { title: payload.title }),
 		...(payload.metadata === undefined ? {} : { metadata: payload.metadata }),
 	};
@@ -97,10 +99,10 @@ export const useMovieStatus = (
 			}
 			return getAni2arrApi().getMovieStatus(request);
 		},
-		enabled: !!payload.anilistId && (options?.enabled ?? true),
+		enabled: options?.enabled ?? true,
 		staleTime: forceStatusRefresh ? 0 : 5 * 60 * 1000,
 		...(forceStatusRefresh ? { refetchOnMount: "always" } : {}),
-		placeholderData: keepPreviousMovieStatusForSameMedia(payload.anilistId),
+		placeholderData: keepPreviousMovieStatusForSameMedia(source),
 		refetchOnWindowFocus: false,
 	});
 };

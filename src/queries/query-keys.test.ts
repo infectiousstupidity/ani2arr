@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { AniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId } from "@/providers/schemas";
 import type { StatusInput } from "@/rpc/types";
 import { normalizeMetadataIds, queryKeys } from "@/queries/query-keys";
@@ -111,7 +112,7 @@ describe("queryKeys", () => {
 			"provider",
 			"sonarr",
 			"mediaStatus",
-			aid(9),
+			"anilist:9",
 			{
 				title: "  Test  ",
 				metadata,
@@ -131,6 +132,22 @@ describe("queryKeys", () => {
 				anilistId: aid(7),
 			}),
 		);
+	});
+
+	it("keys provider media status by source identity", () => {
+		expect(
+			queryKeys.providerMediaStatus("sonarr", {
+				source: { source: "mal", id: parseMyAnimeListId(5114) },
+				title: "Fullmetal Alchemist: Brotherhood",
+			}),
+		).toEqual([
+			"a2a",
+			"provider",
+			"sonarr",
+			"mediaStatus",
+			"mal:5114",
+			{ title: "Fullmetal Alchemist: Brotherhood" },
+		]);
 	});
 
 	it("keeps provider root and media item prefixes valid", () => {

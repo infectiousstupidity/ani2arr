@@ -2,15 +2,20 @@
 // src/queries/query-keys.ts
 
 import { isAniListId, type AniListId } from "@/anilist/types";
+import { sourceIdentityKey, type SourceIdentity } from "@/mapping/types";
 import type { Provider } from "@/providers/types";
 import type { TmdbId } from "@/providers/schemas";
 import type { SeerrMediaType, SeerrTvSeasons } from "@/providers/seerr/types";
 import type { GetMappingsInput, StatusInput } from "@/rpc/types";
+import { sourceFromInput, type SourceInputLike } from "@/rpc/source-input";
 
 const rootQueryKey = ["a2a"] as const;
 const configuredScope = "configured";
 
-type MediaStatusKeyInput = Pick<StatusInput, "anilistId" | "title" | "metadata">;
+type MediaStatusKeyInput = Pick<
+	StatusInput,
+	"anilistId" | "metadata" | "source" | "title"
+>;
 type SeerrMediaStatusKeyInput = {
 	mediaType: SeerrMediaType;
 	tmdbId: TmdbId;
@@ -24,6 +29,7 @@ type SeerrLinkedAniListEntriesKeyInput = {
 	mediaType: SeerrMediaType;
 	tmdbId: TmdbId;
 };
+type SourceKeyInput = SourceInputLike | SourceIdentity | AniListId;
 
 const normalizeText = (value: string): string => value.trim().toLowerCase();
 
@@ -52,6 +58,19 @@ export const normalizeMetadataIds = (
 	ids: readonly AniListId[],
 ): AniListId[] => {
 	return [...new Set(ids.filter(isAniListId))].toSorted((a, b) => a - b);
+};
+
+export const normalizeSourceKey = (source: SourceIdentity): string =>
+	sourceIdentityKey(source);
+
+const sourceKeyFromInput = (input: SourceKeyInput): string => {
+	if (typeof input === "number") {
+		return normalizeSourceKey({ source: "anilist", id: input });
+	}
+	if ("id" in input && "source" in input && typeof input.source === "string") {
+		return normalizeSourceKey(input);
+	}
+	return normalizeSourceKey(sourceFromInput(input));
 };
 
 const normalizeSeerrSeasons = (
@@ -86,8 +105,14 @@ export const queryKeys = {
 		] as const,
 	mappingInspectionRoot: () =>
 		[...rootQueryKey, "mapping", "inspection"] as const,
-	mappingInspection: (provider: Provider, anilistId: AniListId) =>
-		[...rootQueryKey, "mapping", "inspection", provider, anilistId] as const,
+	mappingInspection: (provider: Provider, input: SourceKeyInput) =>
+		[
+			...rootQueryKey,
+			"mapping",
+			"inspection",
+			provider,
+			sourceKeyFromInput(input),
+		] as const,
 	providerRoot: (provider: Provider) =>
 		[...rootQueryKey, "provider", provider] as const,
 	providerConnection: (provider: Provider, scope = configuredScope) =>
@@ -165,13 +190,13 @@ export const queryKeys = {
 		[...rootQueryKey, "provider", provider, "lookup", normalizeText(term)] as const,
 	providerMediaStatusRoot: (provider: Provider) =>
 		[...rootQueryKey, "provider", provider, "mediaStatus"] as const,
-	providerMediaStatusItem: (provider: Provider, anilistId: AniListId) =>
+	providerMediaStatusItem: (provider: Provider, input: SourceKeyInput) =>
 		[
 			...rootQueryKey,
 			"provider",
 			provider,
 			"mediaStatus",
-			anilistId,
+			sourceKeyFromInput(input),
 		] as const,
 	providerMediaStatus: (provider: Provider, input: MediaStatusKeyInput) =>
 		[
@@ -179,7 +204,7 @@ export const queryKeys = {
 			"provider",
 			provider,
 			"mediaStatus",
-			input.anilistId,
+			sourceKeyFromInput(input),
 			{
 				...(input.title === undefined ? {} : { title: input.title }),
 				...(input.metadata === undefined ? {} : { metadata: input.metadata }),

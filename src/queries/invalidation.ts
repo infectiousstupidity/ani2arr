@@ -3,22 +3,23 @@
 
 import type { QueryClient } from "@tanstack/react-query";
 import type { AniListId } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/types";
 import { PROVIDERS, type Provider } from "@/providers/types";
 import { queryKeys } from "@/queries/query-keys";
 
 export function invalidateAfterMappingChange(
 	queryClient: QueryClient,
-	input: { provider: Provider; anilistId: AniListId },
+	input: { provider: Provider; source?: SourceIdentity; anilistId?: AniListId },
 ): void {
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.providerMediaStatusItem(input.provider, input.anilistId),
+		queryKey: queryKeys.providerMediaStatusItem(input.provider, input),
 	});
 	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingIdentitiesRoot(),
 	});
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingInspection(input.provider, input.anilistId),
+		queryKey: queryKeys.mappingInspection(input.provider, input),
 	});
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.providerLookupRoot(input.provider),
@@ -58,13 +59,13 @@ export function invalidateAfterProviderLibraryChange(
 
 export function invalidateAfterProviderMediaChange(
 	queryClient: QueryClient,
-	input: { provider: Provider; anilistId: AniListId },
+	input: { provider: Provider; source?: SourceIdentity; anilistId?: AniListId },
 ): void {
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.providerMediaStatusItem(input.provider, input.anilistId),
+		queryKey: queryKeys.providerMediaStatusItem(input.provider, input),
 	});
 	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingInspection(input.provider, input.anilistId),
+		queryKey: queryKeys.mappingInspection(input.provider, input),
 	});
 }
 

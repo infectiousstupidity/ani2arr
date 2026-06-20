@@ -33,6 +33,7 @@ import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 import { getMappingInspection } from "@/rpc/mapping-inspection";
+import { sourceFromInput } from "@/rpc/source-input";
 import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
@@ -436,7 +437,7 @@ async function getMappingsOutput(input?: GetMappingsInput): Promise<GetMappingsO
 
 async function assertNoConflictingLinkedIds(input: {
 	provider: Provider;
-	anilistId: AniListId;
+	source: ReturnType<typeof sourceFromInput>;
 	providerId: ProviderExternalId;
 	force?: boolean;
 }): Promise<void> {
@@ -444,8 +445,9 @@ async function assertNoConflictingLinkedIds(input: {
 		input.provider,
 		input.providerId,
 	);
+	const anilistId = input.source.source === "anilist" ? input.source.id : null;
 	const conflictingAniListIds = linkedIds.filter(
-		(id) => id !== input.anilistId,
+		(id) => id !== anilistId,
 	);
 
 	if (conflictingAniListIds.length === 0 || input.force) return;
@@ -499,16 +501,17 @@ export const mappingHandlers = {
 	},
 
 	async setManualMapping(input: SetManualMappingInput) {
+		const source = sourceFromInput(input);
 		await assertNoConflictingLinkedIds({
 			provider: input.provider,
-			anilistId: input.anilistId,
+			source,
 			providerId: input.providerId,
 			...(input.force === undefined ? {} : { force: input.force }),
 		});
 
 		await mappingService.setManualMapping(
 			input.provider,
-			input.anilistId,
+			source,
 			input.providerId,
 		);
 		await afterMappingWrite(input.provider);
@@ -516,19 +519,19 @@ export const mappingHandlers = {
 	},
 
 	async clearManualMapping(input: ClearManualMappingInput) {
-		await mappingService.clearManualMapping(input.provider, input.anilistId);
+		await mappingService.clearManualMapping(input.provider, sourceFromInput(input));
 		await afterMappingWrite(input.provider);
 		return { ok: true as const };
 	},
 
 	async setMappingIgnore(input: SetMappingIgnoreInput) {
-		await mappingService.setIgnored(input.provider, input.anilistId);
+		await mappingService.setIgnored(input.provider, sourceFromInput(input));
 		await afterMappingWrite(input.provider);
 		return { ok: true as const };
 	},
 
 	async clearMappingIgnore(input: ClearMappingIgnoreInput) {
-		await mappingService.clearIgnored(input.provider, input.anilistId);
+		await mappingService.clearIgnored(input.provider, sourceFromInput(input));
 		await afterMappingWrite(input.provider);
 		return { ok: true as const };
 	},
@@ -536,7 +539,7 @@ export const mappingHandlers = {
 	async setMappingRejectedCandidate(input: SetMappingRejectedCandidateInput) {
 		await mappingService.rejectCandidate(
 			input.provider,
-			input.anilistId,
+			sourceFromInput(input),
 			input.providerId,
 		);
 		await afterMappingWrite(input.provider);
@@ -546,7 +549,7 @@ export const mappingHandlers = {
 	async clearMappingRejectedCandidate(input: ClearMappingRejectedCandidateInput) {
 		await mappingService.clearRejectedCandidate(
 			input.provider,
-			input.anilistId,
+			sourceFromInput(input),
 			input.providerId,
 		);
 		await afterMappingWrite(input.provider);

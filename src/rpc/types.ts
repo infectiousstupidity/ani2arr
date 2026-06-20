@@ -31,12 +31,22 @@ import type {
 	SonarrSeries,
 	SonarrSeriesSnapshot,
 } from "@/providers/sonarr/types";
-import type { MappingResult, MappingSource } from "@/mapping/types";
+import type { MappingResult, MappingSource, SourceIdentity } from "@/mapping/types";
 
 export type ProviderExternalId = TvdbId | TmdbId;
 
-export type StatusInput = {
-	anilistId: AniListId;
+export type SourceRpcInput =
+	| {
+			source: SourceIdentity;
+			anilistId?: AniListId;
+	  }
+	| {
+			/** LEGACY: AniList callers migrate to source in MAL content phases. */
+			anilistId: AniListId;
+			source?: never;
+	  };
+
+export type StatusInput = SourceRpcInput & {
 	title?: string;
 	force_verify?: boolean;
 	force_mapping_retry?: boolean;
@@ -76,25 +86,22 @@ export type UpdateRadarrInput = {
 	form: RadarrFormState;
 };
 
-export type SetManualMappingInput = {
-	anilistId: AniListId;
+export type SetManualMappingInput = SourceRpcInput & {
 	force?: boolean;
 } & (
 	| { provider: "sonarr"; providerId: TvdbId }
 	| { provider: "radarr"; providerId: TmdbId }
 );
 
-export type ClearManualMappingInput = {
-	anilistId: AniListId;
+export type ClearManualMappingInput = SourceRpcInput & {
 	provider: Provider;
 };
 
 export type SetMappingIgnoreInput = ClearManualMappingInput;
 export type ClearMappingIgnoreInput = ClearManualMappingInput;
 
-export type SetMappingRejectedCandidateInput = {
-	anilistId: AniListId;
-} & (
+export type SetMappingRejectedCandidateInput = SourceRpcInput &
+	(
 	| { provider: "sonarr"; providerId: TvdbId }
 	| { provider: "radarr"; providerId: TmdbId }
 );
