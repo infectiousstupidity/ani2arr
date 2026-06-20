@@ -1,0 +1,171 @@
+name: Mapping issue
+description: Report a wrong, missing, or ambiguous AniList to Sonarr, Radarr, or Seerr match.
+title: "mapping: "
+labels:
+  - mapping
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when ani2arr matches the wrong series/movie, cannot find a match, or needs a manual mapping.
+
+        Do not include API keys, tokens, private hostnames, or screenshots containing secrets.
+
+  - type: input
+    id: anilist-url
+    attributes:
+      label: AniList URL
+      description: Paste the AniList entry URL.
+      placeholder: "https://anilist.co/anime/21/ONE-PIECE/"
+    validations:
+      required: true
+
+  - type: input
+    id: anilist-title
+    attributes:
+      label: AniList title
+      description: The title shown on AniList.
+      placeholder: "ONE PIECE"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: media-type
+    attributes:
+      label: Media type
+      description: What type of media is this?
+      options:
+        - TV/anime series
+        - Movie
+        - Special
+        - OVA/ONA
+        - Unknown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      description: Which provider has the mapping issue?
+      options:
+        - Sonarr
+        - Radarr
+        - Seerr
+        - Multiple providers
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected match
+      description: What should ani2arr match this entry to?
+      placeholder: |
+        Expected Sonarr series, Radarr movie, or Seerr target:
+        Expected TVDB ID if known:
+        Expected TMDB ID if known:
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual match
+      description: What did ani2arr match instead, or what failed?
+      placeholder: |
+        Actual result:
+        Wrong TVDB/TMDB ID if shown:
+        Error message if any:
+    validations:
+      required: true
+
+  - type: textarea
+    id: provider-search
+    attributes:
+      label: Provider search result
+      description: Paste relevant Sonarr, Radarr, or Seerr search result details if available. Remove secrets first.
+      render: json
+      placeholder: |
+        {
+          "title": "example",
+          "tvdbId": 0,
+          "tmdbId": 0
+        }
+    validations:
+      required: false
+
+  - type: textarea
+    id: anibridge
+    attributes:
+      label: AniBridge mapping data
+      description: Paste relevant AniBridge mapping details if you checked them.
+      render: json
+      placeholder: |
+        {
+          "anilist_id": 0,
+          "thetvdb_id": 0,
+          "themoviedb_id": 0
+        }
+    validations:
+      required: false
+
+  - type: dropdown
+    id: manual-mapping-tried
+    attributes:
+      label: Manual mapping tried
+      description: Did you try adding a manual mapping or manual Seerr target?
+      options:
+        - "Yes"
+        - "No"
+        - "Not applicable"
+    validations:
+      required: true
+
+  - type: textarea
+    id: manual-mapping-result
+    attributes:
+      label: Manual mapping result
+      description: What happened after trying a manual mapping or manual Seerr target?
+      placeholder: "Manual mapping fixed it / did not fix it / was not tried."
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: ani2arr version
+      placeholder: "2.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Firefox
+        - Firefox Developer Edition
+        - Firefox Nightly
+        - Chrome
+        - Chromium
+        - Brave
+        - Edge
+        - Other Chromium browser
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I have checked that this mapping issue is not already reported.
+          required: true
+        - label: I have removed API keys, tokens, private domains, and other secrets from this report.
+          required: true
+        - label: I have included the AniList URL.
+          required: true
