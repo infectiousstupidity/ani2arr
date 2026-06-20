@@ -56,6 +56,8 @@ vi.mock("./upstream.store", () => ({
 const aid = parseAniListId;
 const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
+const anilistSource = (anilistId: AniListId) =>
+	({ source: "anilist", id: anilistId }) as const;
 
 const formatLoader = (
 	formats: ReadonlyMap<AniListId, AniListMediaFormat | null | undefined>,
@@ -71,15 +73,22 @@ describe("listMappings", () => {
 	it("groups mapped results by provider target and keeps non-mapped buckets", () => {
 		const result = listMappings("sonarr", [
 			{
+				source: anilistSource(aid(2)),
 				anilistId: aid(2),
 				result: { kind: "mapped", source: "manual", providerId: 22 },
 			},
 			{
+				source: anilistSource(aid(1)),
 				anilistId: aid(1),
 				result: { kind: "mapped", source: "upstream", providerId: 22 },
 			},
-			{ anilistId: aid(3), result: { kind: "ignored" } },
 			{
+				source: anilistSource(aid(3)),
+				anilistId: aid(3),
+				result: { kind: "ignored" },
+			},
+			{
+				source: anilistSource(aid(4)),
 				anilistId: aid(4),
 				result: {
 					kind: "ambiguous",
@@ -87,6 +96,7 @@ describe("listMappings", () => {
 				},
 			},
 			{
+				source: anilistSource(aid(5)),
 				anilistId: aid(5),
 				result: { kind: "unmapped", hadResolveAttempt: true },
 			},
@@ -109,6 +119,7 @@ describe("listMappings", () => {
 	it("groups Sonarr seasons for the same TVDB ID together", () => {
 		const result = listMappings("sonarr", [
 			{
+				source: anilistSource(aid(171_018)),
 				anilistId: aid(171_018),
 				result: {
 					kind: "mapped",
@@ -118,6 +129,7 @@ describe("listMappings", () => {
 				},
 			},
 			{
+				source: anilistSource(aid(185_660)),
 				anilistId: aid(185_660),
 				result: {
 					kind: "mapped",
@@ -181,13 +193,20 @@ describe("listMappings", () => {
 				mappingService,
 			}),
 		).resolves.toEqual([
-			{ anilistId: aid(1), provider: "sonarr", result: { kind: "ignored" } },
 			{
+				source: anilistSource(aid(1)),
+				anilistId: aid(1),
+				provider: "sonarr",
+				result: { kind: "ignored" },
+			},
+			{
+				source: anilistSource(aid(2)),
 				anilistId: aid(2),
 				provider: "sonarr",
 				result: { kind: "mapped", source: "upstream", providerId: 202 },
 			},
 			{
+				source: anilistSource(aid(3)),
 				anilistId: aid(3),
 				provider: "radarr",
 				result: { kind: "mapped", source: "auto", providerId: tmdb(303) },
@@ -349,6 +368,7 @@ describe("listMappings", () => {
 
 		expect(result.ambiguous).toEqual([
 			{
+				source: anilistSource(anilistId),
 				anilistId,
 				result: {
 					kind: "ambiguous",

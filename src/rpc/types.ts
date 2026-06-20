@@ -134,9 +134,8 @@ export type GetSeerrTargetsInput = AniListId[];
 export type GetSeerrTargetInput = AniListId;
 
 export type GetMappingInspectionInput = {
-	anilistId: AniListId;
 	provider: Provider;
-};
+} & SourceRpcInput;
 
 export type GetAniListMetadataInput = {
 	ids: AniListId[];
@@ -301,6 +300,7 @@ export interface MappingListProviderMeta {
 }
 
 export interface MappingListRow {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	provider: Provider;
 	result: MappingResult;
@@ -326,6 +326,7 @@ export interface GetMappingsOutput {
 }
 
 export interface MappingIdentity {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	provider: Provider;
 	result: MappingResult;
@@ -343,6 +344,7 @@ export interface MappingDetailsLinkedAniListEntry {
 }
 
 export interface MappingDetailsPayload {
+	source: SourceIdentity;
 	mapping: MappingResult;
 	linkedAniListEntries: readonly MappingDetailsLinkedAniListEntry[];
 }

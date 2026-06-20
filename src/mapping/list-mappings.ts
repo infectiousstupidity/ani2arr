@@ -11,7 +11,12 @@ import type { Provider } from "@/providers/types";
 
 import { listAutoResults } from "./auto.store";
 import { listManualFacts, type ManualFacts } from "./manual.store";
-import type { AutoResult, MappingResult, UpstreamTarget } from "./types";
+import type {
+	AutoResult,
+	MappingResult,
+	SourceIdentity,
+	UpstreamTarget,
+} from "./types";
 import { listUpstreamMappings } from "./upstream.store";
 
 type MappedResult = Extract<MappingResult, { kind: "mapped" }>;
@@ -20,26 +25,31 @@ type AmbiguousResult = Extract<MappingResult, { kind: "ambiguous" }>;
 type UnmappedResult = Extract<MappingResult, { kind: "unmapped" }>;
 
 export interface MappingListEntry {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	result: MappingResult;
 }
 
 export interface MappedMappingListEntry {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	result: MappedResult;
 }
 
 export interface IgnoredMappingListEntry {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	result: IgnoredResult;
 }
 
 export interface AmbiguousMappingListEntry {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	result: AmbiguousResult;
 }
 
 export interface UnmappedMappingListEntry {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	result: UnmappedResult;
 }
@@ -58,6 +68,7 @@ export interface MappingList {
 }
 
 export interface ActiveMappingIdentity {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	provider: Provider;
 	result: MappingResult;
@@ -93,6 +104,7 @@ export function listMappings(
 		switch (entry.result.kind) {
 			case "mapped": {
 				addMappedEntry(mapped, {
+					source: entry.source,
 					anilistId: entry.anilistId,
 					result: entry.result,
 				});
@@ -101,6 +113,7 @@ export function listMappings(
 
 			case "ignored": {
 				ignored.push({
+					source: entry.source,
 					anilistId: entry.anilistId,
 					result: entry.result,
 				});
@@ -109,6 +122,7 @@ export function listMappings(
 
 			case "ambiguous": {
 				ambiguous.push({
+					source: entry.source,
 					anilistId: entry.anilistId,
 					result: entry.result,
 				});
@@ -117,6 +131,7 @@ export function listMappings(
 
 			case "unmapped": {
 				unmapped.push({
+					source: entry.source,
 					anilistId: entry.anilistId,
 					result: entry.result,
 				});
@@ -179,6 +194,7 @@ export async function getMappingIdentities(
 					? [
 							deps.mappingService.getMapping(provider, anilistId).then(
 								(result): ActiveMappingIdentity => ({
+									source: anilistSource(anilistId),
 									anilistId,
 									provider,
 									result,
@@ -236,6 +252,7 @@ async function collectMappingEntries(
 	}
 
 	return [...keys].map((anilistId): MappingListEntry => ({
+		source: anilistSource(anilistId),
 		anilistId,
 		result: chooseMappingResult({
 			provider,
@@ -315,6 +332,10 @@ function createTargetKey(result: MappedResult): string {
 
 function createIdentityKey(provider: Provider, anilistId: AniListId): string {
 	return `${provider}:${anilistId}`;
+}
+
+function anilistSource(anilistId: AniListId): SourceIdentity {
+	return { source: "anilist", id: anilistId };
 }
 
 function sortGroupEntries(group: MappedTargetGroup): MappedTargetGroup {

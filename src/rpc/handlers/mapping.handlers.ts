@@ -160,6 +160,7 @@ async function buildProviderGroups(provider: Provider): Promise<MappingListGroup
 				const providerMeta = sonarrMeta(group.libraryItem);
 				const providerId = group.providerId as ProviderExternalId;
 				const rows: MappingListRow[] = group.entries.map((entry) => ({
+					source: entry.source,
 					anilistId: entry.anilistId,
 					provider,
 					result: entry.result,
@@ -185,6 +186,7 @@ async function buildProviderGroups(provider: Provider): Promise<MappingListGroup
 				const providerId = active?.providerId as ProviderExternalId | undefined;
 				const isInLibrary = entry.existingTargets.length > 0;
 				const row: MappingListRow = {
+					source: entry.source,
 					anilistId: entry.anilistId,
 					provider,
 					result: entry.result,
@@ -210,6 +212,7 @@ async function buildProviderGroups(provider: Provider): Promise<MappingListGroup
 			}),
 			...status.ignored.map((entry) => {
 				const row: MappingListRow = {
+					source: entry.source,
 					anilistId: entry.anilistId,
 					provider,
 					result: entry.result,
@@ -229,6 +232,7 @@ async function buildProviderGroups(provider: Provider): Promise<MappingListGroup
 			}),
 			...status.unmapped.map((entry) => {
 				const row: MappingListRow = {
+					source: entry.source,
 					anilistId: entry.anilistId,
 					provider,
 					result: entry.result,
@@ -259,6 +263,7 @@ async function buildProviderGroups(provider: Provider): Promise<MappingListGroup
 			const providerMeta = radarrMeta(group.libraryItem);
 			const providerId = group.providerId as ProviderExternalId;
 			const rows: MappingListRow[] = group.entries.map((entry) => ({
+				source: entry.source,
 				anilistId: entry.anilistId,
 				provider,
 				result: entry.result,
@@ -284,6 +289,7 @@ async function buildProviderGroups(provider: Provider): Promise<MappingListGroup
 			const providerId = active?.providerId as ProviderExternalId | undefined;
 			const isInLibrary = entry.existingTargets.length > 0;
 			const row: MappingListRow = {
+				source: entry.source,
 				anilistId: entry.anilistId,
 				provider,
 				result: entry.result,
@@ -309,6 +315,7 @@ async function buildProviderGroups(provider: Provider): Promise<MappingListGroup
 		}),
 		...status.ignored.map((entry) => {
 			const row: MappingListRow = {
+				source: entry.source,
 				anilistId: entry.anilistId,
 				provider,
 				result: entry.result,
@@ -328,6 +335,7 @@ async function buildProviderGroups(provider: Provider): Promise<MappingListGroup
 		}),
 		...status.unmapped.map((entry) => {
 			const row: MappingListRow = {
+				source: entry.source,
 				anilistId: entry.anilistId,
 				provider,
 				result: entry.result,

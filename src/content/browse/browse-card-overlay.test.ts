@@ -43,6 +43,7 @@ describe("resolveBrowseCardProvider", () => {
 	it("uses mapped identity when both host and metadata formats are unknown", () => {
 		const mappedIdentities: MappingIdentity[] = [
 			{
+				source: { source: "anilist", id: parseAniListId(210_031) },
 				anilistId: parseAniListId(210_031),
 				provider: "sonarr",
 				result: {
@@ -93,6 +94,7 @@ describe("resolveSeerrRequestInput", () => {
 		const anilistId = parseAniListId(210_031);
 		const mappedIdentities: MappingIdentity[] = [
 			{
+				source: { source: "anilist", id: parseAniListId(123) },
 				anilistId: parseAniListId(123),
 				provider: "radarr",
 				result: {
@@ -102,6 +104,7 @@ describe("resolveSeerrRequestInput", () => {
 				},
 			},
 			{
+				source: { source: "anilist", id: anilistId },
 				anilistId,
 				provider: "radarr",
 				result: {

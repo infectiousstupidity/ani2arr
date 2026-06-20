@@ -3,9 +3,11 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { parseAniListId, type AniListMetadata } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { getMappingInspection } from "./mapping-inspection";
 
 const aid = parseAniListId;
+const mal = parseMyAnimeListId;
 
 describe("getMappingInspection", () => {
 	it("loads linked AniList metadata for mapped targets", async () => {
@@ -49,6 +51,7 @@ describe("getMappingInspection", () => {
 				},
 			),
 		).resolves.toEqual({
+			source: { source: "anilist", id: aid(10) },
 			mapping: { kind: "mapped", source: "manual", providerId: 100 },
 			linkedAniListEntries: [
 				{
@@ -89,9 +92,51 @@ describe("getMappingInspection", () => {
 				},
 			),
 		).resolves.toEqual({
+			source: { source: "anilist", id: aid(404) },
 			mapping: { kind: "unmapped", hadResolveAttempt: false },
 			linkedAniListEntries: [],
 		});
 		expect(metadataSpy).not.toHaveBeenCalled();
+	});
+
+	it("inspects MAL source identity while using optional AniList crosswalk for current relation", async () => {
+		const metadataSpy = vi.fn(async () => ({
+			metadata: [
+				{
+					id: aid(10),
+					titles: { english: "Current Show" },
+					format: "TV",
+				},
+			] satisfies AniListMetadata[],
+		}));
+		const source = { source: "mal", id: mal(5114) } as const;
+
+		await expect(
+			getMappingInspection(
+				{ provider: "sonarr", source, anilistId: aid(10) },
+				{
+					mappingService: {
+						getMapping: vi.fn(async () => ({
+							kind: "mapped",
+							source: "idsmoe",
+							providerId: 100,
+						} as const)),
+						getLinkedAniListIds: vi.fn(async () => []),
+					},
+					anilistMetadataStore: { getMetadata: metadataSpy },
+				},
+			),
+		).resolves.toEqual({
+			source,
+			mapping: { kind: "mapped", source: "idsmoe", providerId: 100 },
+			linkedAniListEntries: [
+				{
+					anilistId: aid(10),
+					title: "Current Show",
+					format: "TV",
+					relation: "current",
+				},
+			],
+		});
 	});
 });

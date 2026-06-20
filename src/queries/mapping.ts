@@ -20,7 +20,9 @@ import type {
 	SetMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
 	SetManualMappingInput,
+	SourceRpcInput,
 } from "@/rpc/types";
+import type { SourceIdentity } from "@/mapping/types";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { Provider } from "@/providers/types";
 import { normalizeMetadataIds, queryKeys } from "./query-keys";
@@ -127,18 +129,31 @@ export const useMappingIdentities = (
 	});
 };
 
+const inspectionSourceInput = (
+	input: AniListId | SourceRpcInput,
+): SourceRpcInput =>
+	typeof input === "number" ? { anilistId: input } : input;
+
+export const mappingInspectionInput = (
+	anilistId: AniListId,
+	source: SourceIdentity | undefined,
+): SourceRpcInput =>
+	source === undefined ? { anilistId } : { source, anilistId };
+
 export const useMappingInspection = (
 	provider: Provider,
-	anilistId: AniListId,
-) =>
-	useQuery<GetMappingInspectionOutput, ExtensionError>({
-		queryKey: queryKeys.mappingInspection(provider, anilistId),
+	input: AniListId | SourceRpcInput,
+) => {
+	const sourceInput = inspectionSourceInput(input);
+	return useQuery<GetMappingInspectionOutput, ExtensionError>({
+		queryKey: queryKeys.mappingInspection(provider, sourceInput),
 		queryFn: () =>
 			getAni2arrApi().getMappingInspection({
 				provider,
-				anilistId,
+				...sourceInput,
 			}),
 		staleTime: 15 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
 	});
+};

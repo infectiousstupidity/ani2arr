@@ -45,6 +45,8 @@ vi.mock("@/background/provider-config", () => ({
 
 const aid = parseAniListId;
 const tvdb = parseTvdbId;
+const anilistSource = (anilistId: ReturnType<typeof aid>) =>
+	({ source: "anilist", id: anilistId }) as const;
 
 const sonarrMappings: MappingList = {
 	provider: "sonarr",
@@ -53,10 +55,12 @@ const sonarrMappings: MappingList = {
 			providerId: tvdb(10),
 			entries: [
 				{
+					source: anilistSource(aid(1)),
 					anilistId: aid(1),
 					result: { kind: "mapped", source: "manual", providerId: tvdb(10) },
 				},
 				{
+					source: anilistSource(aid(2)),
 					anilistId: aid(2),
 					result: { kind: "mapped", source: "auto", providerId: tvdb(10) },
 				},
@@ -66,6 +70,7 @@ const sonarrMappings: MappingList = {
 			providerId: tvdb(20),
 			entries: [
 				{
+					source: anilistSource(aid(3)),
 					anilistId: aid(3),
 					result: { kind: "mapped", source: "auto", providerId: tvdb(20) },
 				},

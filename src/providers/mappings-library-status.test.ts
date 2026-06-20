@@ -13,6 +13,8 @@ import type { SonarrSeriesSnapshot } from "./sonarr/types";
 
 const aid = parseAniListId;
 const tvdb = parseTvdbId;
+const anilistSource = (anilistId: ReturnType<typeof aid>) =>
+	({ source: "anilist", id: anilistId }) as const;
 const sonarrSeriesId = (value: number): SonarrSeriesId =>
 	value as SonarrSeriesId;
 
@@ -34,6 +36,7 @@ describe("composeSonarrMappingsLibraryStatus", () => {
 					providerId: tvdb(100),
 					entries: [
 						{
+							source: anilistSource(aid(1)),
 							anilistId: aid(1),
 							result: {
 								kind: "mapped",
@@ -47,6 +50,7 @@ describe("composeSonarrMappingsLibraryStatus", () => {
 			ignored: [],
 			ambiguous: [
 				{
+					source: anilistSource(aid(2)),
 					anilistId: aid(2),
 					result: {
 						kind: "ambiguous",

@@ -6,7 +6,11 @@ import {
 	type AniListId,
 	type AniListMetadata,
 } from "@/anilist/types";
-import type { MappingResult, MappingSource } from "@/mapping/types";
+import type {
+	MappingResult,
+	MappingSource,
+	SourceIdentity,
+} from "@/mapping/types";
 import type { Provider } from "@/providers/types";
 import {
 	getProviderExternalIdLabel,
@@ -264,6 +268,9 @@ export const formatMappingEntryKind = (result: MappingResult): string => {
 			if (result.source === "upstream") {
 				return "Upstream";
 			}
+			if (result.source === "idsmoe") {
+				return "ids.moe";
+			}
 			return "Auto";
 		}
 		case "ignored": {
@@ -276,6 +283,11 @@ export const formatMappingEntryKind = (result: MappingResult): string => {
 			return result.rejectedProviderIds?.length ? "Rejected" : "Unmapped";
 		}
 	}
+};
+
+export const formatSourceIdentity = (source: SourceIdentity): string => {
+	if (source.source === "anilist") return `AniList #${source.id}`;
+	return `MAL #${source.id}`;
 };
 
 export const formatAniListToken = (value: string): string =>

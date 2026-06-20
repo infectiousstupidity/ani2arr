@@ -14,6 +14,8 @@ import {
 
 const aid = parseAniListId;
 const tvdb = parseTvdbId;
+const anilistSource = (anilistId: AniListId) =>
+	({ source: "anilist", id: anilistId }) as const;
 
 const createRow = (
 	patch: Partial<MappingRow> & {
@@ -23,6 +25,7 @@ const createRow = (
 ): MappingRow => {
 	const { anilistId, provider, ...rest } = patch;
 	return {
+		source: anilistSource(anilistId),
 		anilistId,
 		provider,
 		providerId: null,

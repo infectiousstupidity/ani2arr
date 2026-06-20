@@ -8,6 +8,7 @@ import type { ProviderFormResources } from "@/providers/types";
 import type { TvdbId } from "@/providers/schemas";
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import {
+	mappingInspectionInput,
 	useMappingInspection,
 } from "@/queries/mapping";
 import { useSeriesStatus, useSonarrFormResources } from "@/queries/sonarr";
@@ -238,7 +239,10 @@ export function SonarrModal({
 		anilistId,
 		metadataHint: metadataHint ?? null,
 	});
-	const inspection = useMappingInspection(PROVIDER, anilistId);
+	const inspection = useMappingInspection(
+		PROVIDER,
+		mappingInspectionInput(anilistId, source),
+	);
 	const setupTarget = useMemo(
 		() =>
 			getSonarrSetupTarget({

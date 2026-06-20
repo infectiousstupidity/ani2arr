@@ -26,6 +26,7 @@ import {
 	formatAniListToken,
 	formatMappingEntryKind,
 	formatMappingStatusLabel,
+	formatSourceIdentity,
 } from "./mapping-page-model";
 
 interface MappingsAniListRowProps {
@@ -158,6 +159,7 @@ export function MappingsAniListRow(
 	const coverUrl = getCoverUrl(metadata);
 	const title = getRowTitle(row, metadata, preferredTitleLanguage);
 	const anilistUrl = buildAniListAnimeUrl(row.anilistId);
+	const sourceLabel = formatSourceIdentity(row.source);
 	const metaPillLabels = getMetaPillLabels(metadata);
 	const entryKind = formatMappingEntryKind(row.result);
 	const showProviderIdPill = shouldShowProviderIdPill(row, parentProviderId);
@@ -224,21 +226,31 @@ export function MappingsAniListRow(
 						{title}
 					</a>
 					<div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-text-secondary">
-						<a
-							href={anilistUrl}
-							target="_blank"
-							rel="noreferrer"
-							className="cursor-pointer rounded-full"
-							aria-label={`Open AniList ID ${row.anilistId}`}
-						>
+						{row.source.source === "anilist" ? (
+							<a
+								href={anilistUrl}
+								target="_blank"
+								rel="noreferrer"
+								className="cursor-pointer rounded-full"
+								aria-label={`Open ${sourceLabel}`}
+							>
+								<Pill
+									small
+									tone="muted"
+									className={cn(ID_PILL_CLASS, LINK_PILL_CLASS)}
+								>
+									{sourceLabel}
+								</Pill>
+							</a>
+						) : (
 							<Pill
 								small
 								tone="muted"
-								className={cn(ID_PILL_CLASS, LINK_PILL_CLASS)}
+								className={ID_PILL_CLASS}
 							>
-								AniList ID: {row.anilistId}
+								{sourceLabel}
 							</Pill>
-						</a>
+						)}
 						{metaPillLabels.map((label) => (
 							<Pill key={label} small tone="muted" className={ID_PILL_CLASS}>
 								{label}

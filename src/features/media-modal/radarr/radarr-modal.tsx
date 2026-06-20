@@ -8,6 +8,7 @@ import type { ProviderFormResources } from "@/providers/types";
 import type { TmdbId } from "@/providers/schemas";
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import {
+	mappingInspectionInput,
 	useMappingInspection,
 } from "@/queries/mapping";
 import { useMovieStatus, useRadarrFormResources } from "@/queries/radarr";
@@ -207,7 +208,10 @@ export function RadarrModal({
 		anilistId,
 		metadataHint: metadataHint ?? null,
 	});
-	const inspection = useMappingInspection(PROVIDER, anilistId);
+	const inspection = useMappingInspection(
+		PROVIDER,
+		mappingInspectionInput(anilistId, source),
+	);
 	const setupTarget = useMemo(
 		() =>
 			getRadarrSetupTarget({

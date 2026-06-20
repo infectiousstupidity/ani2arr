@@ -44,6 +44,7 @@ const STATUS_OPTIONS: { label: string; value: MappingStatusFilter }[] = [
 const SOURCE_OPTIONS: { label: string; value: MappingSourceFilter }[] = [
 	{ label: "Source: All", value: "all" },
 	{ label: "Upstream", value: "upstream" },
+	{ label: "ids.moe", value: "idsmoe" },
 	{ label: "Auto", value: "auto" },
 	{ label: "Manual", value: "manual" },
 ];
