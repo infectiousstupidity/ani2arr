@@ -37,11 +37,6 @@ export type SourceUpstreamRecord = {
 	targets: UpstreamTarget[];
 };
 
-export type UpstreamRecord = {
-	anilistId: AniListId;
-	targets: UpstreamTarget[];
-};
-
 export type SeerrUpstreamRecord = {
 	anilistId: AniListId;
 	target: SeerrUpstreamTarget;
@@ -94,22 +89,6 @@ export async function getUniqueAniListIdForSource(
 
 	const snapshot = await getSnapshot();
 	return snapshot?.aniListCrosswalks?.[sourceIdentityKey(source)] ?? null;
-}
-
-/** LEGACY: AniList-only callers migrate to listSourceUpstreamMappings in later MAL phases. */
-export async function listUpstreamMappings(): Promise<UpstreamRecord[]> {
-	const snapshot = await getSnapshot();
-	const records: UpstreamRecord[] = [];
-
-	for (const [rawSourceKey, targets] of Object.entries(snapshot?.mappings ?? {})) {
-		const source = parseSourceIdentityKey(rawSourceKey);
-
-		if (source?.source === "anilist") {
-			records.push({ anilistId: source.id, targets });
-		}
-	}
-
-	return records;
 }
 
 export async function listSeerrUpstreamTargets(

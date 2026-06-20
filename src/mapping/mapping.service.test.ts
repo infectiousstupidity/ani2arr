@@ -42,6 +42,10 @@ const storeRecords = vi.hoisted(() => ({
 		source?: SourceIdentity;
 		targets: UpstreamTarget[];
 	}>,
+	crosswalks: [] as Array<{
+		source: SourceIdentity;
+		anilistId: AniListId;
+	}>,
 }));
 
 vi.mock("./manual.store", () => ({
@@ -52,12 +56,13 @@ vi.mock("./manual.store", () => ({
 				recordSourceKey(record) === inputSourceKey(source),
 		)?.facts ?? null,
 	),
-	listManualFacts: vi.fn(async (provider: Provider) =>
+	listSourceManualFacts: vi.fn(async (provider: Provider) =>
 		storeRecords.manual
-			.filter(
-				(record) => record.provider === provider && record.anilistId !== undefined,
-			)
-			.map(({ anilistId, facts }) => ({ anilistId, facts })),
+			.filter((record) => record.provider === provider)
+			.map((record) => ({
+				source: recordSource(record),
+				facts: record.facts,
+			})),
 	),
 	clearIgnored: vi.fn(),
 	clearManualMapping: vi.fn(),
@@ -75,12 +80,13 @@ vi.mock("./auto.store", () => ({
 				recordSourceKey(record) === inputSourceKey(source),
 		)?.result ?? null,
 	),
-	listAutoResults: vi.fn(async (provider: Provider) =>
+	listSourceAutoResults: vi.fn(async (provider: Provider) =>
 		storeRecords.auto
-			.filter(
-				(record) => record.provider === provider && record.anilistId !== undefined,
-			)
-			.map(({ anilistId, result }) => ({ anilistId, result })),
+			.filter((record) => record.provider === provider)
+			.map((record) => ({
+				source: recordSource(record),
+				result: record.result,
+			})),
 	),
 }));
 
@@ -109,11 +115,16 @@ vi.mock("./upstream.store", () => ({
 			?.targets ?? []
 		).filter((target) => target.provider === provider),
 	),
-	listUpstreamMappings: vi.fn(async () =>
-		storeRecords.upstream.filter(
-			(record): record is { anilistId: AniListId; targets: UpstreamTarget[] } =>
-				record.anilistId !== undefined,
-		),
+	getUniqueAniListIdForSource: vi.fn(async (source: SourceIdentity) =>
+		storeRecords.crosswalks.find(
+			(record) => recordSourceKey(record) === inputSourceKey(source),
+		)?.anilistId ?? null,
+	),
+	listSourceUpstreamMappings: vi.fn(async () =>
+		storeRecords.upstream.map((record) => ({
+			source: recordSource(record),
+			targets: record.targets,
+		})),
 	),
 }));
 
@@ -149,8 +160,15 @@ function recordSourceKey(record: {
 	anilistId?: AniListId;
 	source?: SourceIdentity;
 }): string {
-	if (record.source) return sourceIdentityKey(record.source);
-	if (record.anilistId !== undefined) return sourceIdentityKey(anilistSource(record.anilistId));
+	return sourceIdentityKey(recordSource(record));
+}
+
+function recordSource(record: {
+	anilistId?: AniListId;
+	source?: SourceIdentity;
+}): SourceIdentity {
+	if (record.source) return record.source;
+	if (record.anilistId !== undefined) return anilistSource(record.anilistId);
 	throw new Error("Test record needs source or anilistId.");
 }
 
@@ -159,6 +177,7 @@ function resetRecords(): void {
 	storeRecords.auto = [];
 	storeRecords.idsmoe = [];
 	storeRecords.upstream = [];
+	storeRecords.crosswalks = [];
 }
 
 describe("MappingService", () => {
@@ -458,6 +477,22 @@ describe("MappingService", () => {
 			[tmdb(100), [aid(10), aid(20), aid(30)]],
 			[tmdb(200), [aid(50)]],
 		]);
+	});
+
+	it("includes MAL source mappings with unique AniList crosswalks in linked ID scans", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+		storeRecords.crosswalks = [{ source, anilistId: aid(10) }];
+		storeRecords.manual = [
+			{
+				provider: "sonarr",
+				source,
+				facts: { mapping: { providerId: tvdb(78_874) } },
+			},
+		];
+
+		await expect(
+			service().getLinkedAniListIds("sonarr", tvdb(78_874)),
+		).resolves.toEqual([aid(10)]);
 	});
 
 	it("retries cached unmapped auto results only when forced", async () => {

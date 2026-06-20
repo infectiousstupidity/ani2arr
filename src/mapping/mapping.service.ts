@@ -8,7 +8,7 @@ import {
 	clearManualMapping as removeManualMapping,
 	clearRejectedAutoCandidate as removeRejectedCandidate,
 	getManualFacts,
-	listManualFacts,
+	listSourceManualFacts,
 	rejectAutoCandidate,
 	setIgnored as saveIgnored,
 	setManualMapping as saveManualMapping,
@@ -20,14 +20,19 @@ import {
 	resolveIdsMoeTarget,
 	type IdsMoeResolver,
 } from "./idsmoe.store";
-import { getUpstreamTargets, listUpstreamMappings } from "./upstream.store";
-import { getAutoResult, listAutoResults } from "./auto.store";
+import {
+	getUniqueAniListIdForSource,
+	getUpstreamTargets,
+	listSourceUpstreamMappings,
+} from "./upstream.store";
+import { getAutoResult, listSourceAutoResults } from "./auto.store";
 import type { AutomaticResolver } from "./resolve/resolve";
-import type {
-	AutoResult,
-	MappingResult,
-	SourceIdentity,
-	UpstreamTarget,
+import {
+	sourceIdentityKey,
+	type AutoResult,
+	type MappingResult,
+	type SourceIdentity,
+	type UpstreamTarget,
 } from "./types";
 
 type MappingCandidates = {
@@ -226,16 +231,19 @@ export class MappingService {
 		}
 
 		const [manualRecords, upstreamRecords, autoRecords] = await Promise.all([
-			listManualFacts(provider),
-			listUpstreamMappings(),
-			listAutoResults(provider),
+			listSourceManualFacts(provider),
+			listSourceUpstreamMappings(),
+			listSourceAutoResults(provider),
 		]);
 
-		const manualByAniListId = new Map(
-			manualRecords.map((record) => [record.anilistId, record.facts]),
+		const manualBySourceKey = new Map(
+			manualRecords.map((record) => [
+				sourceIdentityKey(record.source),
+				record.facts,
+			]),
 		);
 
-		const upstreamByAniListId = new Map<AniListId, UpstreamTarget[]>();
+		const upstreamBySourceKey = new Map<string, UpstreamTarget[]>();
 
 		for (const record of upstreamRecords) {
 			const targets = record.targets.filter(
@@ -243,28 +251,44 @@ export class MappingService {
 			);
 
 			if (targets.length > 0) {
-				upstreamByAniListId.set(record.anilistId, targets);
+				upstreamBySourceKey.set(sourceIdentityKey(record.source), targets);
 			}
 		}
 
-		const autoByAniListId = new Map(
-			autoRecords.map((record) => [record.anilistId, record.result]),
+		const autoBySourceKey = new Map(
+			autoRecords.map((record) => [
+				sourceIdentityKey(record.source),
+				record.result,
+			]),
 		);
 
-		const anilistIds = new Set([
-			...manualByAniListId.keys(),
-			...upstreamByAniListId.keys(),
-			...autoByAniListId.keys(),
+		const sourceKeys = new Set([
+			...manualBySourceKey.keys(),
+			...upstreamBySourceKey.keys(),
+			...autoBySourceKey.keys(),
 		]);
 
-		const linkedAniListIdsByProviderId = new Map<number, AniListId[]>();
+		const sourcesByKey = new Map(
+			[
+				...manualRecords.map((record) => record.source),
+				...upstreamRecords.map((record) => record.source),
+				...autoRecords.map((record) => record.source),
+			].map((source) => [sourceIdentityKey(source), source]),
+		);
+		const linkedAniListIdsByProviderId = new Map<number, Set<AniListId>>();
 
-		for (const anilistId of anilistIds) {
+		for (const sourceKey of sourceKeys) {
+			const source = sourcesByKey.get(sourceKey);
+			if (!source) continue;
+
+			const anilistId = await getLinkedAniListIdForSource(source);
+			if (anilistId === null) continue;
+
 			const result = chooseMappingResult({
 				provider,
-				manual: manualByAniListId.get(anilistId) ?? null,
-				upstream: upstreamByAniListId.get(anilistId) ?? [],
-				auto: autoByAniListId.get(anilistId) ?? null,
+				manual: manualBySourceKey.get(sourceKey) ?? null,
+				upstream: upstreamBySourceKey.get(sourceKey) ?? [],
+				auto: autoBySourceKey.get(sourceKey) ?? null,
 			});
 
 			if (
@@ -275,20 +299,29 @@ export class MappingService {
 			}
 
 			const linkedAniListIds =
-				linkedAniListIdsByProviderId.get(result.providerId) ?? [];
-			linkedAniListIds.push(anilistId);
+				linkedAniListIdsByProviderId.get(result.providerId) ?? new Set();
+			linkedAniListIds.add(anilistId);
 			linkedAniListIdsByProviderId.set(result.providerId, linkedAniListIds);
 		}
 
+		const sortedLinkedAniListIdsByProviderId = new Map<number, AniListId[]>();
 		for (const [linkedProviderId, linkedAniListIds] of linkedAniListIdsByProviderId) {
-			linkedAniListIdsByProviderId.set(
+			sortedLinkedAniListIdsByProviderId.set(
 				linkedProviderId,
-				linkedAniListIds.toSorted((left, right) => left - right),
+				[...linkedAniListIds].toSorted((left, right) => left - right),
 			);
 		}
 
-		return linkedAniListIdsByProviderId;
+		return sortedLinkedAniListIdsByProviderId;
 	}
+}
+
+async function getLinkedAniListIdForSource(
+	source: SourceIdentity,
+): Promise<AniListId | null> {
+	return source.source === "anilist"
+		? source.id
+		: getUniqueAniListIdForSource(source);
 }
 
 function toSourceIdentity(source: SourceIdentity | AniListId): SourceIdentity {

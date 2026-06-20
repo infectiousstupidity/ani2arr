@@ -7,57 +7,97 @@ import {
 	type AniListId,
 	type AniListMediaFormat,
 } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import {
 	parseTmdbId,
 	parseTvdbId,
 } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import type { ManualFacts } from "./manual.store";
-import type { AutoResult, MappingResult, UpstreamTarget } from "./types";
+import type {
+	AutoResult,
+	MappingResult,
+	SourceIdentity,
+	UpstreamTarget,
+} from "./types";
 import { getMappingIdentities, getMappingList, listMappings } from "./list-mappings";
 
 const storeRecords = vi.hoisted(() => ({
 	manual: [] as Array<{
 		provider: Provider;
-		anilistId: AniListId;
+		anilistId?: AniListId;
+		source?: SourceIdentity;
 		facts: ManualFacts;
 	}>,
 	auto: [] as Array<{
 		provider: Provider;
-		anilistId: AniListId;
+		anilistId?: AniListId;
+		source?: SourceIdentity;
 		result: AutoResult;
 	}>,
 	upstream: [] as Array<{
-		anilistId: AniListId;
+		anilistId?: AniListId;
+		source?: SourceIdentity;
 		targets: UpstreamTarget[];
 	}>,
+	crosswalks: [] as Array<{
+		source: SourceIdentity;
+		anilistId: AniListId;
+	}>,
+	sourceKey: (source: SourceIdentity): string => `${source.source}:${source.id}`,
+	recordSource: (
+		source: SourceIdentity | undefined,
+		anilistId: AniListId | undefined,
+	): SourceIdentity => {
+		if (source) return source;
+		if (anilistId !== undefined) return { source: "anilist", id: anilistId };
+		throw new Error("Test record needs source or anilistId.");
+	},
 }));
 
 vi.mock("./manual.store", () => ({
-	listManualFacts: vi.fn(async (provider: Provider) =>
+	listSourceManualFacts: vi.fn(async (provider: Provider) =>
 		storeRecords.manual
 			.filter((record) => record.provider === provider)
-			.map(({ anilistId, facts }) => ({ anilistId, facts })),
+			.map(({ source, anilistId, facts }) => ({
+				source: storeRecords.recordSource(source, anilistId),
+				facts,
+			})),
 	),
 }));
 
 vi.mock("./auto.store", () => ({
-	listAutoResults: vi.fn(async (provider: Provider) =>
+	listSourceAutoResults: vi.fn(async (provider: Provider) =>
 		storeRecords.auto
 			.filter((record) => record.provider === provider)
-			.map(({ anilistId, result }) => ({ anilistId, result })),
+			.map(({ source, anilistId, result }) => ({
+				source: storeRecords.recordSource(source, anilistId),
+				result,
+			})),
 	),
 }));
 
 vi.mock("./upstream.store", () => ({
-	listUpstreamMappings: vi.fn(async () => storeRecords.upstream),
+	getUniqueAniListIdForSource: vi.fn(async (source: SourceIdentity) =>
+		storeRecords.crosswalks.find(
+			(record) => storeRecords.sourceKey(record.source) === storeRecords.sourceKey(source),
+		)?.anilistId ?? null,
+	),
+	listSourceUpstreamMappings: vi.fn(async () =>
+		storeRecords.upstream.map(({ source, anilistId, targets }) => ({
+			source: storeRecords.recordSource(source, anilistId),
+			targets,
+		})),
+	),
 }));
 
 const aid = parseAniListId;
+const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
 const anilistSource = (anilistId: AniListId) =>
 	({ source: "anilist", id: anilistId }) as const;
+const malSource = (id: ReturnType<typeof mal>) => ({ source: "mal", id }) as const;
 
 const formatLoader = (
 	formats: ReadonlyMap<AniListId, AniListMediaFormat | null | undefined>,
@@ -68,6 +108,7 @@ describe("listMappings", () => {
 		storeRecords.manual = [];
 		storeRecords.auto = [];
 		storeRecords.upstream = [];
+		storeRecords.crosswalks = [];
 	});
 
 	it("groups mapped results by provider target and keeps non-mapped buckets", () => {
@@ -302,6 +343,33 @@ describe("listMappings", () => {
 			}),
 		]);
 		expect(result.ambiguous).toHaveLength(0);
+	});
+
+	it("includes MAL source mappings when AniBridge has a unique AniList crosswalk", async () => {
+		const source = malSource(mal(5114));
+		storeRecords.crosswalks = [{ source, anilistId: aid(10) }];
+		storeRecords.manual = [
+			{
+				provider: "sonarr",
+				source,
+				facts: { mapping: { providerId: tvdb(78_874) } },
+			},
+		];
+
+		const result = await getMappingList("sonarr");
+
+		expect(result.mapped).toEqual([
+			expect.objectContaining({
+				providerId: tvdb(78_874),
+				entries: [
+					expect.objectContaining({
+						source,
+						anilistId: aid(10),
+						result: expect.objectContaining({ source: "manual" }),
+					}),
+				],
+			}),
+		]);
 	});
 
 	it("uses Radarr only for movie upstream records with both Radarr and Sonarr targets", async () => {

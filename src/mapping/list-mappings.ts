@@ -9,15 +9,19 @@ import {
 import { PROVIDERS } from "@/providers/types";
 import type { Provider } from "@/providers/types";
 
-import { listAutoResults } from "./auto.store";
-import { listManualFacts, type ManualFacts } from "./manual.store";
-import type {
-	AutoResult,
-	MappingResult,
-	SourceIdentity,
-	UpstreamTarget,
+import { listSourceAutoResults } from "./auto.store";
+import { listSourceManualFacts, type ManualFacts } from "./manual.store";
+import {
+	sourceIdentityKey,
+	type AutoResult,
+	type MappingResult,
+	type SourceIdentity,
+	type UpstreamTarget,
 } from "./types";
-import { listUpstreamMappings } from "./upstream.store";
+import {
+	getUniqueAniListIdForSource,
+	listSourceUpstreamMappings,
+} from "./upstream.store";
 
 type MappedResult = Extract<MappingResult, { kind: "mapped" }>;
 type IgnoredResult = Extract<MappingResult, { kind: "ignored" }>;
@@ -83,6 +87,15 @@ interface MappingListDeps {
 		ids: readonly AniListId[],
 	) => Promise<ReadonlyMap<AniListId, AniListMediaFormat | null | undefined>>;
 }
+
+type SourceListRecord = {
+	source: SourceIdentity;
+	anilistId: AniListId;
+};
+
+type SourceUpstreamListRecord = SourceListRecord & {
+	targets: readonly UpstreamTarget[];
+};
 
 export async function getMappingList(
 	provider: Provider,
@@ -162,28 +175,30 @@ export async function getMappingIdentities(
 
 	for (const provider of PROVIDERS) {
 		const [manualRecords, autoRecords] = await Promise.all([
-			listManualFacts(provider),
-			listAutoResults(provider),
+			listSourceManualFacts(provider),
+			listSourceAutoResults(provider),
 		]);
 
 		for (const record of manualRecords) {
-			if (requestedIds.has(record.anilistId)) {
-				keys.add(createIdentityKey(provider, record.anilistId));
+			if (record.source.source === "anilist" && requestedIds.has(record.source.id)) {
+				keys.add(createIdentityKey(provider, record.source.id));
 			}
 		}
 
 		for (const record of autoRecords) {
-			if (requestedIds.has(record.anilistId)) {
-				keys.add(createIdentityKey(provider, record.anilistId));
+			if (record.source.source === "anilist" && requestedIds.has(record.source.id)) {
+				keys.add(createIdentityKey(provider, record.source.id));
 			}
 		}
 	}
 
-	for (const record of await listUpstreamMappings()) {
-		if (!requestedIds.has(record.anilistId)) continue;
+	for (const record of await listSourceUpstreamMappings()) {
+		if (record.source.source !== "anilist" || !requestedIds.has(record.source.id)) {
+			continue;
+		}
 
 		for (const target of record.targets) {
-			keys.add(createIdentityKey(target.provider, record.anilistId));
+			keys.add(createIdentityKey(target.provider, record.source.id));
 		}
 	}
 
@@ -213,59 +228,109 @@ async function collectMappingEntries(
 	provider: Provider,
 	deps: MappingListDeps,
 ): Promise<MappingListEntry[]> {
-	const keys = new Set<AniListId>();
+	const sourcesByKey = new Map<string, SourceListRecord>();
 	const [manualRecords, autoRecords, upstreamRecords] = await Promise.all([
-		listManualFacts(provider),
-		listAutoResults(provider),
-		listUpstreamMappings(),
+		listSourceManualFacts(provider),
+		listSourceAutoResults(provider),
+		listSourceUpstreamMappings(),
 	]);
+	const linkedManualRecords = await getLinkedSourceRecords(
+		manualRecords.map((record) => record.source),
+	);
+	const linkedAutoRecords = await getLinkedSourceRecords(
+		autoRecords.map((record) => record.source),
+	);
+	const linkedUpstreamRecords = await getLinkedSourceRecords(
+		upstreamRecords.map((record) => record.source),
+	);
+	const upstreamRecordsWithIds = upstreamRecords.flatMap((record) => {
+		const linked = linkedUpstreamRecords.get(sourceIdentityKey(record.source));
+		return linked === undefined ? [] : [{ ...linked, targets: record.targets }];
+	});
 	const movieIdsWithRadarrTargets = await getMovieIdsWithRadarrTargets(
 		provider,
-		upstreamRecords,
+		upstreamRecordsWithIds,
 		deps,
 	);
 
-	const manualByAniListId = new Map<AniListId, ManualFacts>();
-	const autoByAniListId = new Map<AniListId, AutoResult>();
-	const upstreamByAniListId = new Map<AniListId, UpstreamTarget[]>();
+	const manualBySourceKey = new Map<string, ManualFacts>();
+	const autoBySourceKey = new Map<string, AutoResult>();
+	const upstreamBySourceKey = new Map<string, UpstreamTarget[]>();
 
 	for (const record of manualRecords) {
-		keys.add(record.anilistId);
-		manualByAniListId.set(record.anilistId, record.facts);
+		const sourceKey = sourceIdentityKey(record.source);
+		const linked = linkedManualRecords.get(sourceKey);
+		if (linked === undefined) continue;
+
+		sourcesByKey.set(sourceKey, linked);
+		manualBySourceKey.set(sourceKey, record.facts);
 	}
 
 	for (const record of autoRecords) {
-		keys.add(record.anilistId);
-		autoByAniListId.set(record.anilistId, record.result);
+		const sourceKey = sourceIdentityKey(record.source);
+		const linked = linkedAutoRecords.get(sourceKey);
+		if (linked === undefined) continue;
+
+		sourcesByKey.set(sourceKey, linked);
+		autoBySourceKey.set(sourceKey, record.result);
 	}
 
-	for (const record of upstreamRecords) {
+	for (const record of upstreamRecordsWithIds) {
+		const sourceKey = sourceIdentityKey(record.source);
 		const targets = getProviderUpstreamTargets(
 			provider,
 			record,
 			movieIdsWithRadarrTargets,
 		);
 		if (targets.length > 0) {
-			keys.add(record.anilistId);
-			upstreamByAniListId.set(record.anilistId, targets);
+			sourcesByKey.set(sourceKey, record);
+			upstreamBySourceKey.set(sourceKey, targets);
 		}
 	}
 
-	return [...keys].map((anilistId): MappingListEntry => ({
-		source: anilistSource(anilistId),
-		anilistId,
+	return [...sourcesByKey.entries()].map(([sourceKey, record]): MappingListEntry => ({
+		source: record.source,
+		anilistId: record.anilistId,
 		result: chooseMappingResult({
 			provider,
-			manual: manualByAniListId.get(anilistId) ?? null,
-			upstream: upstreamByAniListId.get(anilistId) ?? [],
-			auto: autoByAniListId.get(anilistId) ?? null,
+			manual: manualBySourceKey.get(sourceKey) ?? null,
+			upstream: upstreamBySourceKey.get(sourceKey) ?? [],
+			auto: autoBySourceKey.get(sourceKey) ?? null,
 		}),
 	}));
 }
 
+async function getLinkedSourceRecords(
+	sources: readonly SourceIdentity[],
+): Promise<ReadonlyMap<string, SourceListRecord>> {
+	const records = await Promise.all(
+		sources.map(async (source): Promise<SourceListRecord | null> => {
+			const anilistId = await getLinkedAniListIdForSource(source);
+			return anilistId === null ? null : { source, anilistId };
+		}),
+	);
+	const linkedBySourceKey = new Map<string, SourceListRecord>();
+
+	for (const record of records) {
+		if (record) {
+			linkedBySourceKey.set(sourceIdentityKey(record.source), record);
+		}
+	}
+
+	return linkedBySourceKey;
+}
+
+async function getLinkedAniListIdForSource(
+	source: SourceIdentity,
+): Promise<AniListId | null> {
+	return source.source === "anilist"
+		? source.id
+		: getUniqueAniListIdForSource(source);
+}
+
 function getProviderUpstreamTargets(
 	provider: Provider,
-	record: { anilistId: AniListId; targets: readonly UpstreamTarget[] },
+	record: SourceUpstreamListRecord,
 	movieIdsWithRadarrTargets: ReadonlySet<AniListId>,
 ): UpstreamTarget[] {
 	if (provider === "sonarr" && movieIdsWithRadarrTargets.has(record.anilistId)) {
@@ -277,10 +342,7 @@ function getProviderUpstreamTargets(
 
 async function getMovieIdsWithRadarrTargets(
 	provider: Provider,
-	upstreamRecords: readonly {
-		anilistId: AniListId;
-		targets: readonly UpstreamTarget[];
-	}[],
+	upstreamRecords: readonly SourceUpstreamListRecord[],
 	deps: MappingListDeps,
 ): Promise<ReadonlySet<AniListId>> {
 	if (provider !== "sonarr" || !deps.loadFormatByAniListId) {

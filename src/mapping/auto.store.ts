@@ -15,11 +15,6 @@ import {
 const MAPPED_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ATTEMPT_TTL_MS = 48 * 60 * 60 * 1000;
 
-export type AutoRecord = {
-	anilistId: AniListId;
-	result: AutoResult;
-};
-
 export type SourceAutoRecord = {
 	source: SourceIdentity;
 	result: AutoResult;
@@ -76,25 +71,6 @@ export async function listSourceAutoResults(
 	}
 
 	return records;
-}
-
-/** LEGACY: AniList-only callers migrate to listSourceAutoResults in later MAL phases. */
-export async function listAutoResults(
-	provider: Provider,
-): Promise<AutoRecord[]> {
-	const records = await listSourceAutoResults(provider);
-	const anilistRecords: AutoRecord[] = [];
-
-	for (const record of records) {
-		if (record.source.source === "anilist") {
-			anilistRecords.push({
-				anilistId: record.source.id,
-				result: record.result,
-			});
-		}
-	}
-
-	return anilistRecords;
 }
 
 export async function setAutoResult(

@@ -9,7 +9,6 @@ import { parseTvdbId } from "@/providers/schemas";
 import {
 	clearManualFacts,
 	getManualFacts,
-	listManualFacts,
 	listSourceManualFacts,
 	setIgnored,
 	setManualMapping,
@@ -46,9 +45,15 @@ describe("manual mapping store", () => {
 			setManualMapping("sonarr", aid(2), { providerId: tvdb(20) }),
 		]);
 
-		await expect(listManualFacts("sonarr")).resolves.toEqual([
-			{ anilistId: aid(1), facts: { mapping: { providerId: tvdb(10) } } },
-			{ anilistId: aid(2), facts: { mapping: { providerId: tvdb(20) } } },
+		await expect(listSourceManualFacts("sonarr")).resolves.toEqual([
+			{
+				source: { source: "anilist", id: aid(1) },
+				facts: { mapping: { providerId: tvdb(10) } },
+			},
+			{
+				source: { source: "anilist", id: aid(2) },
+				facts: { mapping: { providerId: tvdb(20) } },
+			},
 		]);
 	});
 
@@ -68,7 +73,6 @@ describe("manual mapping store", () => {
 				facts: { mapping: { providerId: tvdb(78_874) } },
 			},
 		]);
-		await expect(listManualFacts("sonarr")).resolves.toEqual([]);
 	});
 
 	it("reads legacy raw AniList keys", async () => {
@@ -84,8 +88,11 @@ describe("manual mapping store", () => {
 		await expect(getManualFacts("sonarr", aid(1))).resolves.toEqual({
 			mapping: { providerId: tvdb(10) },
 		});
-		await expect(listManualFacts("sonarr")).resolves.toEqual([
-			{ anilistId: aid(1), facts: { mapping: { providerId: tvdb(10) } } },
+		await expect(listSourceManualFacts("sonarr")).resolves.toEqual([
+			{
+				source: { source: "anilist", id: aid(1) },
+				facts: { mapping: { providerId: tvdb(10) } },
+			},
 		]);
 	});
 });

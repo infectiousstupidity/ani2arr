@@ -28,11 +28,6 @@ export type ManualFacts =
 			rejectedProviderIds: number[];
 	  };
 
-export type ManualRecord = {
-	anilistId: AniListId;
-	facts: ManualFacts;
-};
-
 export type SourceManualRecord = {
 	source: SourceIdentity;
 	facts: ManualFacts;
@@ -76,22 +71,6 @@ export async function listSourceManualFacts(
 	}
 
 	return records;
-}
-
-/** LEGACY: AniList-only callers migrate to listSourceManualFacts in later MAL phases. */
-export async function listManualFacts(
-	provider: Provider,
-): Promise<ManualRecord[]> {
-	const records = await listSourceManualFacts(provider);
-	const anilistRecords: ManualRecord[] = [];
-
-	for (const record of records) {
-		if (record.source.source === "anilist") {
-			anilistRecords.push({ anilistId: record.source.id, facts: record.facts });
-		}
-	}
-
-	return anilistRecords;
 }
 
 export async function setManualMapping(
