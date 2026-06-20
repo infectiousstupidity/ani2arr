@@ -220,19 +220,24 @@ This project uses pnpm, WXT, React, TypeScript, Tailwind CSS, and Vitest.
 pnpm install
 
 pnpm run dev
-pnpm run dev:firefox
+pnpm run dev:chrome
 
+pnpm run audit
 pnpm run lint
 pnpm run compile
 pnpm run test
+pnpm run validate
 
 pnpm run build
-pnpm run build:firefox
+pnpm run build:chrome
+pnpm run build:all
 
 pnpm run zip
-pnpm run zip:firefox
+pnpm run zip:chrome
+pnpm run zip:all
 ```
 
+Firefox is the default browser target. Chrome commands use the `:chrome` suffix.
 Build and zip artifacts are created under `.output/`.
 
 ## Notes

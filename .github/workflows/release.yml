@@ -1,0 +1,58 @@
+# Builds release artifacts and creates GitHub releases for ani2arr tags.
+# .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate
+        run: pnpm run validate
+
+      - name: Build release zips
+        run: pnpm run zip:all
+
+      - name: Generate checksums
+        run: |
+          cd .output
+          sha256sum *.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            .output/*.zip \
+            .output/SHA256SUMS.txt \
+            --verify-tag \
+            --generate-notes

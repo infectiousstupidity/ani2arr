@@ -1,3 +1,5 @@
+# Runs pull request and main branch validation for ani2arr.
+# .github/workflows/ci.yml
 name: CI
 
 on:
@@ -35,6 +37,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Audit dependencies
+        run: pnpm run audit
+
       - name: Lint
         run: pnpm run lint
 
@@ -43,3 +48,9 @@ jobs:
 
       - name: Test
         run: pnpm run test
+
+      - name: Build Firefox
+        run: pnpm run build
+
+      - name: Build Chrome
+        run: pnpm run build:chrome
