@@ -1,0 +1,79 @@
+name: Feature request
+description: Suggest an improvement or new feature for ani2arr.
+title: "feature: "
+labels:
+  - enhancement
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for new features, workflow improvements, provider support, UI improvements, or configuration options.
+
+        Keep the request focused on one feature.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem would this feature solve?
+      placeholder: "When I browse AniChart, I want to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the feature or behavior you want.
+      placeholder: "Add an option that..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of ani2arr does this affect?
+      options:
+        - AniList anime page
+        - AniList browse/search
+        - AniChart
+        - Sonarr
+        - Radarr
+        - Seerr
+        - Manual mappings
+        - Options page
+        - Build/release process
+        - Privacy/permissions
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or alternatives have you considered?
+      placeholder: "Currently I work around this by..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples
+      description: Link to examples, screenshots, similar extensions, or provider behavior if useful.
+      placeholder: "Links or notes."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I have checked that this feature has not already been requested.
+          required: true
+        - label: This request is related to ani2arr's AniList, AniChart, Sonarr, Radarr, or Seerr workflow.
+          required: true
