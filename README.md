@@ -18,40 +18,83 @@
   <a href="LICENSE"><img alt="License GPL-3.0-only" src="https://img.shields.io/badge/License-GPL--3.0--only-6e6e6e?style=for-the-badge"></a>
 </p>
 
-## Table of contents
+## What is ani2arr?
 
-- [Features](#features)
-- [Provider model](#provider-model)
-- [Install](#install)
-- [Screenshots](#screenshots)
-- [Development](#development)
-- [Privacy and permissions](#privacy-and-permissions)
-- [Notes](#notes)
-- [License](#license)
+ani2arr is a browser extension that adds Sonarr, Radarr, and Seerr actions directly to AniList and AniChart.
+
+It is built for self-hosted media users who browse anime on AniList or AniChart and want to add or request media without copying titles, IDs, or metadata by hand.
 
 ## Features
 
-- Adds Sonarr, Radarr, and Seerr actions to <a href="https://anilist.co/anime/21/ONE-PIECE/" target="_blank" rel="noopener noreferrer">AniList anime pages</a>, <a href="https://anilist.co/search/anime" target="_blank" rel="noopener noreferrer">AniList browse</a>, and <a href="https://anichart.net" target="_blank" rel="noopener noreferrer">AniChart</a>.
-- Routes AniList TV entries to Sonarr and AniList movies to Radarr.
-- Adds optional Seerr request actions for users who prefer requesting through Seerr instead of adding directly to Sonarr or Radarr.
-- Shows Seerr request status such as requested, processing, partially available, or available.
-- Supports Seerr target selection when the automatic TMDB target is missing, wrong, or ambiguous.
-- Uses AniList metadata and public <a href="https://github.com/anibridge/anibridge-mappings" target="_blank" rel="noopener noreferrer">AniBridge mappings</a> to improve matching.
-- Supports manual mappings when automatic Sonarr, Radarr, or Seerr matching is wrong, missing, or ambiguous.
-- Stores settings locally and does not include analytics, advertising, tracking SDKs, or a developer-operated backend.
+* Adds Sonarr, Radarr, and Seerr actions to <a href="https://anilist.co/anime/21/ONE-PIECE/" target="_blank" rel="noopener noreferrer">AniList anime pages</a>, <a href="https://anilist.co/search/anime" target="_blank" rel="noopener noreferrer">AniList browse</a>, and <a href="https://anichart.net" target="_blank" rel="noopener noreferrer">AniChart</a>.
+* Adds AniList TV entries to Sonarr.
+* Adds AniList movie entries to Radarr.
+* Adds optional Seerr request actions for request-based workflows.
+* Shows Seerr request status such as requested, processing, partially available, or available.
+* Supports Seerr target selection when the automatic TMDB target is missing, wrong, or ambiguous.
+* Uses AniList metadata and public <a href="https://github.com/anibridge/anibridge-mappings" target="_blank" rel="noopener noreferrer">AniBridge mappings</a> to improve matching.
+* Supports manual mappings when automatic Sonarr, Radarr, or Seerr matching is wrong, missing, or ambiguous.
+* Stores settings locally in browser extension storage.
+* Does not include analytics, advertising, tracking SDKs, or a developer-operated backend.
 
-## Provider model
+## Supported providers
 
-ani2arr has two provider paths:
+| Provider | Purpose                                                                                                  |
+| -------- | -------------------------------------------------------------------------------------------------------- |
+| Sonarr   | Add and edit TV/anime series through your configured Sonarr server.                                      |
+| Radarr   | Add and edit movies through your configured Radarr server.                                               |
+| Seerr    | Request media through your configured Seerr instance and let Seerr apply its own Sonarr/Radarr defaults. |
 
-| Path            | Purpose                                                                                                  |
-| --------------- | -------------------------------------------------------------------------------------------------------- |
-| Sonarr / Radarr | Direct add and edit actions against your configured Arr servers.                                         |
-| Seerr           | Request media through your configured Seerr instance and let Seerr apply its own Sonarr/Radarr defaults. |
+Sonarr and Radarr can be used without Seerr.
 
-Sonarr and Radarr can be used without Seerr. Seerr can be used alongside Sonarr/Radarr, or as the main visible action on browse cards.
+Seerr can be used alongside Sonarr/Radarr, or as the main visible action on browse cards.
 
 For Seerr TV requests, ani2arr sends explicit seasons when season data is known. For movies, ani2arr sends the TMDB movie target. Seerr then handles the request according to its own server-side configuration.
+
+## Setup
+
+1. Install ani2arr.
+2. Open the extension options.
+3. Configure one or more providers:
+
+   * Sonarr
+   * Radarr
+   * Seerr
+4. Add the provider URL and API key.
+5. Set the default profiles, root folders, monitored state, and add behavior.
+6. Open AniList or AniChart.
+7. Use the ani2arr actions shown on supported pages.
+
+## Screenshots
+
+| AniList anime page                                                                                                                                                                                                             | AniList browse                                                                                                                                                                          | AniChart browse                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a href="docs/images/anilist-anime-page.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/anilist-anime-page.png" alt="ani2arr Sonarr, Radarr, and Seerr actions on an AniList anime page" width="260"></a> | <a href="docs/images/browse-page.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/browse-page.png" alt="ani2arr actions on AniList browse results" width="260"></a> | <a href="docs/images/anichart.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/anichart.png" alt="ani2arr actions on AniChart seasonal anime listings" width="260"></a> |
+
+| Sonarr/Radarr add modal                                                                                                                                                       | Sonarr/Radarr edit modal                                                                                                                                                         | Mapping modal                                                                                                                                                                                                   |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a href="docs/images/modal-add.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-add.png" alt="ani2arr Sonarr and Radarr add modal" width="260"></a> | <a href="docs/images/modal-edit.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-edit.png" alt="ani2arr Sonarr and Radarr edit modal" width="260"></a> | <a href="docs/images/modal-mapping.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-mapping.png" alt="ani2arr manual mapping modal for missing or incorrect matches" width="260"></a> |
+
+| Seerr request modal                                                                                                                                                                       | Seerr target picker                                                                                                                                                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a href="docs/images/modal-seerr-request.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-seerr-request.png" alt="ani2arr Seerr request modal" width="260"></a> | <a href="docs/images/modal-seerr-target.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-seerr-target.png" alt="ani2arr Seerr target picker for missing or ambiguous TMDB matches" width="260"></a> |
+
+| Provider options                                                                                                                                                                                               | Mapping options                                                                                                                                                               | UI options                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a href="docs/images/options-provider.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/options-provider.png" alt="ani2arr provider options for Sonarr, Radarr, and Seerr" width="260"></a> | <a href="docs/images/options-mapping.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/options-mapping.png" alt="ani2arr mapping options" width="260"></a> | <a href="docs/images/options-ui.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/options-ui.png" alt="ani2arr UI options" width="260"></a> |
+
+## Matching
+
+ani2arr uses multiple sources to match AniList entries to the correct Sonarr, Radarr, or Seerr target:
+
+* AniList metadata
+* AniList media type
+* public AniBridge mapping files
+* provider search results
+* manual mappings saved by the user
+* manual Seerr target selections saved by the user
+
+Manual mappings are useful when automatic matching is wrong, missing, or ambiguous.
 
 ## Install
 
@@ -79,23 +122,32 @@ For Seerr TV requests, ani2arr sends explicit seasons when season data is known.
 
 Local Chrome builds are created under `.output/chrome-mv3`.
 
-## Screenshots
+# Privacy and permissions
 
-| AniList anime page                                                                                                                                                                                   | AniList browse                                                                                                                                                                  | AniChart browse                                                                                                                                                     |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <a href="docs/images/anilist-anime-page.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/anilist-anime-page.png" alt="ani2arr actions on an AniList anime page" width="260"></a> | <a href="docs/images/browse-page.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/browse-page.png" alt="ani2arr actions on AniList browse" width="260"></a> | <a href="docs/images/anichart.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/anichart.png" alt="ani2arr actions on AniChart" width="260"></a> |
+ani2arr stores configuration locally in browser extension storage, including provider URLs, API keys, default add settings, UI preferences, manual mappings, manual Seerr targets, and cached metadata.
 
-| Sonarr/Radarr add modal                                                                                                                                     | Sonarr/Radarr edit modal                                                                                                                                       | Mapping modal                                                                                                                                                           |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <a href="docs/images/modal-add.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-add.png" alt="ani2arr add modal" width="260"></a> | <a href="docs/images/modal-edit.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-edit.png" alt="ani2arr edit modal" width="260"></a> | <a href="docs/images/modal-mapping.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-mapping.png" alt="ani2arr mapping modal" width="260"></a> |
+ani2arr may request data from:
 
-| Seerr request modal                                                                                                                                                                       | Seerr target picker                                                                                                                                                                     |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <a href="docs/images/modal-seerr-request.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-seerr-request.png" alt="ani2arr Seerr request modal" width="260"></a> | <a href="docs/images/modal-seerr-target.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/modal-seerr-target.png" alt="ani2arr Seerr target picker" width="260"></a> |
+* configured Sonarr servers
+* configured Radarr servers
+* configured Seerr servers
+* AniList GraphQL
+* public AniBridge mapping files hosted on GitHub
 
-| Provider options                                                                                                                                                                 | Mapping options                                                                                                                                                               | UI options                                                                                                                                                     |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <a href="docs/images/options-provider.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/options-provider.png" alt="ani2arr provider options" width="260"></a> | <a href="docs/images/options-mapping.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/options-mapping.png" alt="ani2arr mapping options" width="260"></a> | <a href="docs/images/options-ui.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/options-ui.png" alt="ani2arr UI options" width="260"></a> |
+ani2arr does not:
+
+* send data to a developer-owned backend
+* include analytics
+* include advertising
+* include tracking SDKs
+* sell user data
+* sync settings to a developer service
+
+Browser permissions cover AniList, AniChart, AniList GraphQL, public AniBridge mapping files, GitHub release asset URLs used by AniBridge downloads, and the provider URLs configured by the user.
+
+Host permissions are origin-based. Firefox cannot isolate permissions by port, so self-hosted services on localhost, private IPs, subdomains, or reverse proxies may require broader-looking permissions than the actual configured use.
+
+See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
 
 ## Development
 
@@ -103,8 +155,8 @@ This project uses pnpm, WXT, React, TypeScript, Tailwind CSS, and Vitest.
 
 ### Requirements
 
-- Node.js 24 or newer
-- pnpm 11.5.1 or compatible
+* Node.js 24 or newer
+* pnpm 11.5.1 or compatible
 
 ### Commands
 
@@ -127,29 +179,11 @@ pnpm run zip:firefox
 
 Build and zip artifacts are created under `.output/`.
 
-## Privacy and permissions
-
-ani2arr stores configuration locally in browser extension storage, including provider URLs, API keys, default add settings, UI preferences, manual mappings, manual Seerr targets, and cached metadata.
-
-ani2arr may request data from:
-
-- configured Sonarr servers
-- configured Radarr servers
-- configured Seerr servers
-- AniList GraphQL
-- public AniBridge mapping files hosted on GitHub
-
-ani2arr does not send data to a developer-owned backend, include analytics, include advertising, include tracking SDKs, sell user data, or sync settings to a developer service.
-
-Browser permissions cover AniList, AniChart, AniList GraphQL, public AniBridge mapping files, GitHub release asset URLs used by AniBridge downloads, and the provider URLs configured by the user. Host permissions are origin-based, and Firefox cannot isolate permissions by port.
-
-See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
-
 ## Notes
 
-- Thanks to <a href="https://github.com/anibridge/anibridge-mappings" target="_blank" rel="noopener noreferrer">AniBridge</a> and their contributors for maintaining the upstream mapping database.
-- This project is not actively maintained. The author is not a formally trained developer; use at your own risk.
-- Issues and PRs are welcome.
+* Thanks to <a href="https://github.com/anibridge/anibridge-mappings" target="_blank" rel="noopener noreferrer">AniBridge</a> and their contributors for maintaining the upstream mapping database.
+* ani2arr is a personal open source project.
+* Issues and PRs are welcome, but support and fixes are not guaranteed.
 
 ## License
 
