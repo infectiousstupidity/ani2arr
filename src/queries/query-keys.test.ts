@@ -6,7 +6,11 @@ import type { AniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId } from "@/providers/schemas";
 import type { StatusInput } from "@/rpc/types";
-import { normalizeMetadataIds, queryKeys } from "@/queries/query-keys";
+import {
+	normalizeMetadataIds,
+	normalizeSourceKeys,
+	queryKeys,
+} from "@/queries/query-keys";
 
 const aid = (value: number): AniListId => value as AniListId;
 
@@ -22,6 +26,22 @@ describe("queryKeys", () => {
 		expect(
 			normalizeMetadataIds([aid(3), aid(1), aid(3), -1 as AniListId]),
 		).toEqual([aid(1), aid(3)]);
+	});
+
+	it("sorts and dedupes source identity keys", () => {
+		const sources = [
+			{ source: "mal", id: parseMyAnimeListId(5114) },
+			{ source: "anilist", id: aid(21) },
+			{ source: "mal", id: parseMyAnimeListId(5114) },
+		] as const;
+
+		expect(normalizeSourceKeys(sources)).toEqual(["anilist:21", "mal:5114"]);
+		expect(queryKeys.sourceAniListIds(["mal:5114", "anilist:21", "mal:5114"])).toEqual([
+			"a2a",
+			"mapping",
+			"sourceAniListIds",
+			["anilist:21", "mal:5114"],
+		]);
 	});
 
 	it("keeps mapping list keys stable for reordered filters", () => {

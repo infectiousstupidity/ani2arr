@@ -39,6 +39,17 @@ const MAL_PAGE = new MatchPattern("https://myanimelist.net/*");
 let ui: ShadowRootContentScriptUi<Root> | null = null;
 let stopSizeSync: (() => void) | null = null;
 
+async function getAniListIdForMount(
+	source: AnimePageTarget["source"],
+): Promise<AnimePageTarget["anilistId"] | null> {
+	const api = getAni2arrApi();
+	const existing = await api.getAniListIdForSource(source);
+	if (existing !== null) return existing;
+
+	await api.initMappings();
+	return api.getAniListIdForSource(source);
+}
+
 const removeAnimeUI = (): void => {
 	try {
 		ui?.remove();
@@ -84,7 +95,7 @@ async function mountAnimePageUI({
 	if (malId === null) return;
 
 	const source = { source: "mal", id: malId } as const;
-	const anilistId = await getAni2arrApi().getAniListIdForSource(source);
+	const anilistId = await getAniListIdForMount(source);
 	if (anilistId === null) return;
 
 	const mountTarget = ensureActionsAnchor();

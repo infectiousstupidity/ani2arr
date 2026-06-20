@@ -7,24 +7,7 @@ import cardOverlayStyles from "@/features/media-overlay/card-overlay.light-dom.c
 import { createBrowseEntrypointShell } from "@/content/browse/create-browse-entrypoint";
 import type { PublicOptions } from "@/settings/types";
 import { myAnimeListBrowseAdapter } from "./adapter";
-
-const MAL_BROWSE_PATHS = [
-	"/anime/season",
-	"/topanime.php",
-	"/anime.php",
-	"/anime/genre",
-	"/anime/producer",
-] as const;
-
-function isBrowseSurface(url: string): boolean {
-	try {
-		const parsed = new URL(url);
-		if (parsed.hostname !== "myanimelist.net") return false;
-		return MAL_BROWSE_PATHS.some((path) => parsed.pathname.startsWith(path));
-	} catch {
-		return false;
-	}
-}
+import { isBrowseSurface } from "./surface";
 
 const isBrowseShellEligible = ({
 	url,

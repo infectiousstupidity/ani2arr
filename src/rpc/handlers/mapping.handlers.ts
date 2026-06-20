@@ -36,7 +36,7 @@ import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 import { getMappingInspection } from "@/rpc/mapping-inspection";
-import { sourceFromInput } from "@/rpc/source-input";
+import { anilistIdFromSource, sourceFromInput } from "@/rpc/source-input";
 import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
@@ -448,7 +448,7 @@ async function getMappingsOutput(input?: GetMappingsInput): Promise<GetMappingsO
 
 async function assertNoConflictingLinkedIds(input: {
 	provider: Provider;
-	source: ReturnType<typeof sourceFromInput>;
+	currentAniListId: AniListId | null;
 	providerId: ProviderExternalId;
 	force?: boolean;
 }): Promise<void> {
@@ -456,9 +456,8 @@ async function assertNoConflictingLinkedIds(input: {
 		input.provider,
 		input.providerId,
 	);
-	const anilistId = input.source.source === "anilist" ? input.source.id : null;
 	const conflictingAniListIds = linkedIds.filter(
-		(id) => id !== anilistId,
+		(id) => id !== input.currentAniListId,
 	);
 
 	if (conflictingAniListIds.length === 0 || input.force) return;
@@ -515,7 +514,7 @@ export const mappingHandlers = {
 		const source = sourceFromInput(input);
 		await assertNoConflictingLinkedIds({
 			provider: input.provider,
-			source,
+			currentAniListId: input.anilistId ?? anilistIdFromSource(source),
 			providerId: input.providerId,
 			...(input.force === undefined ? {} : { force: input.force }),
 		});

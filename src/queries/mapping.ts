@@ -22,10 +22,10 @@ import type {
 	SetManualMappingInput,
 	SourceRpcInput,
 } from "@/rpc/types";
-import type { SourceIdentity } from "@/mapping/types";
+import { sourceIdentityKey, type SourceIdentity } from "@/mapping/types";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { Provider } from "@/providers/types";
-import { normalizeMetadataIds, queryKeys } from "./query-keys";
+import { normalizeMetadataIds, normalizeSourceKeys, queryKeys } from "./query-keys";
 
 export const useSetManualMapping = () => {
 	const queryClient = useQueryClient();
@@ -123,6 +123,37 @@ export const useMappingIdentities = (
 		queryKey: queryKeys.mappingIdentities(normalizedIds),
 		queryFn: () => getAni2arrApi().getMappingIdentities(normalizedIds),
 		enabled: (options?.enabled ?? true) && normalizedIds.length > 0,
+		staleTime: 10 * 60 * 1000,
+		gcTime: 60 * 60 * 1000,
+		refetchOnWindowFocus: false,
+	});
+};
+
+export const useSourceAniListIdMap = (
+	sources: readonly SourceIdentity[],
+	options?: { enabled?: boolean },
+) => {
+	const sourceKeys = normalizeSourceKeys(sources);
+	const sourcesByKey = new Map(
+		sources.map((source) => [sourceIdentityKey(source), source]),
+	);
+	return useQuery<Record<string, AniListId | null>, ExtensionError>({
+		queryKey: queryKeys.sourceAniListIds(sourceKeys),
+		queryFn: async () => {
+			const entries = await Promise.all(
+				sourceKeys.map(async (sourceKey) => {
+					const source = sourcesByKey.get(sourceKey);
+					return [
+						sourceKey,
+						source === undefined
+							? null
+							: await getAni2arrApi().getAniListIdForSource(source),
+					] as const;
+				}),
+			);
+			return Object.fromEntries(entries) as Record<string, AniListId | null>;
+		},
+		enabled: (options?.enabled ?? true) && sourceKeys.length > 0,
 		staleTime: 10 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,

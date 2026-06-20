@@ -63,6 +63,12 @@ export const normalizeMetadataIds = (
 export const normalizeSourceKey = (source: SourceIdentity): string =>
 	sourceIdentityKey(source);
 
+export const normalizeSourceKeys = (
+	sources: readonly SourceIdentity[],
+): string[] => {
+	return [...new Set(sources.map((source) => sourceIdentityKey(source)))].toSorted();
+};
+
 const sourceKeyFromInput = (input: SourceKeyInput): string => {
 	if (typeof input === "number") {
 		return normalizeSourceKey({ source: "anilist", id: input });
@@ -102,6 +108,13 @@ export const queryKeys = {
 			"mapping",
 			"identities",
 			normalizeMetadataIds(ids),
+		] as const,
+	sourceAniListIds: (sourceKeys: readonly string[]) =>
+		[
+			...rootQueryKey,
+			"mapping",
+			"sourceAniListIds",
+			[...new Set(sourceKeys)].toSorted(),
 		] as const,
 	mappingInspectionRoot: () =>
 		[...rootQueryKey, "mapping", "inspection"] as const,

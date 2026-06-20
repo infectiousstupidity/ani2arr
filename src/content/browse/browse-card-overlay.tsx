@@ -184,6 +184,8 @@ export function BrowseCardOverlay({
 	onOpenMediaModal,
 	tooltipContainer,
 }: BrowseCardOverlayProps): React.ReactElement | null {
+	if (parsed.anilistId === undefined) return null;
+
 	const rawProvider = resolveBrowseCardProvider({ parsed, metadata, mappedIdentities });
 
 	const sonarrOpts = getSonarrOverlayOptions(publicOptions);
@@ -191,7 +193,7 @@ export function BrowseCardOverlay({
 	const seerrOpts = getSeerrOverlayOptions(publicOptions);
 
 	const activeArr = getActiveArrProvider(rawProvider, sonarrOpts.enabled, radarrOpts.enabled);
-	const seerrEnabled = seerrOpts.enabled && parsed.anilistId !== undefined;
+	const seerrEnabled = seerrOpts.enabled;
 
 	if (activeArr === "none" && !seerrEnabled) return null;
 
@@ -206,7 +208,6 @@ export function BrowseCardOverlay({
 		provider: Provider,
 		initialView: "setup" | "mapping",
 	): void => {
-		if (parsed.anilistId === undefined) return;
 		openProviderModal({
 			onOpenMediaModal,
 			anilistId: parsed.anilistId,
@@ -218,7 +219,6 @@ export function BrowseCardOverlay({
 	};
 
 	const openSeerrModal = () => {
-		if (parsed.anilistId === undefined) return;
 		onOpenMediaModal({
 			anilistId: parsed.anilistId,
 			source: parsed.source,
@@ -261,7 +261,7 @@ export function BrowseCardOverlay({
 	const stackDirection = adapter.stackDirection ?? "up";
 
 	const seerrStackActions: ReactNode =
-		seerrEnabled && parsed.anilistId !== undefined ? (
+		seerrEnabled ? (
 			<SeerrCardStackActions
 				anilistId={parsed.anilistId}
 				mappedIdentities={mappedIdentities}
@@ -277,7 +277,7 @@ export function BrowseCardOverlay({
 	const showSeerrMain = seerrEnabled && (primaryStatus === "seerr" || activeArr === "none");
 
 	const commonProps = {
-		...(parsed.anilistId === undefined ? {} : { anilistId: parsed.anilistId }),
+		anilistId: parsed.anilistId,
 		source: parsed.source,
 		title: displayTitle,
 		metadata,
@@ -286,7 +286,7 @@ export function BrowseCardOverlay({
 		tooltipContainer,
 	};
 
-	if (showSeerrMain && parsed.anilistId !== undefined) {
+	if (showSeerrMain) {
 		return (
 			<SeerrStandaloneCardOverlay
 				anilistId={parsed.anilistId}

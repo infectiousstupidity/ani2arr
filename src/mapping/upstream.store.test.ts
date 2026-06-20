@@ -43,7 +43,8 @@ function mockAniBridgeResponse(response: Response): void {
 describe("parseAniBridgeMappings", () => {
 	it("preserves multiple targets and Sonarr season scope", () => {
 		const mappings = parseAniBridgeMappings({
-			"anilist:1": {
+			"anidb:1:R": {
+				"anilist:1": {},
 				"tvdb_show:100:s1": {},
 				"tvdb_show:200:s2": {},
 				"tmdb_movie:300": {},
@@ -59,8 +60,9 @@ describe("parseAniBridgeMappings", () => {
 
 	it("preserves MAL source descriptor targets", () => {
 		const mappings = parseAniBridgeMappings({
-			"mal:5114": {
+			"anidb:5114:R": {
 				"anilist:21": {},
+				"mal:5114": {},
 				"tvdb_show:78874:s1": {},
 				"tmdb_show:30991:s1": {},
 			},
@@ -73,7 +75,8 @@ describe("parseAniBridgeMappings", () => {
 
 	it("ignores scoped MAL source descriptors", () => {
 		const mappings = parseAniBridgeMappings({
-			"mal:5114:s1": {
+			"anidb:5114:R": {
+				"mal:5114:s1": {},
 				"tvdb_show:78874:s1": {},
 			},
 		});
@@ -83,8 +86,9 @@ describe("parseAniBridgeMappings", () => {
 
 	it("builds unique MAL to AniList crosswalks from same-row targets", () => {
 		const crosswalks = parseAniBridgeAniListCrosswalks({
-			"mal:5114": {
+			"anidb:5114:R": {
 				"anilist:21": {},
+				"mal:5114": {},
 				"tvdb_show:78874:s1": {},
 			},
 		});
@@ -96,9 +100,10 @@ describe("parseAniBridgeMappings", () => {
 
 	it("does not build ambiguous MAL to AniList crosswalks", () => {
 		const crosswalks = parseAniBridgeAniListCrosswalks({
-			"mal:5114": {
+			"anidb:5114:R": {
 				"anilist:21": {},
 				"anilist:22": {},
+				"mal:5114": {},
 			},
 		});
 
@@ -107,11 +112,13 @@ describe("parseAniBridgeMappings", () => {
 
 	it("builds Seerr movie and TV request targets from TMDB upstream IDs", () => {
 		const seerrTargets = parseAniBridgeSeerrTargets({
-			"anilist:1": {
+			"anidb:1:R": {
+				"anilist:1": {},
 				"tmdb_movie:300": {},
 				"tvdb_show:100:s1": {},
 			},
-			"anilist:2": {
+			"anidb:2:R": {
+				"anilist:2": {},
 				"tmdb_show:500:s2": {},
 				"tmdb_show:500:s1": {},
 				"tvdb_show:700:s1": {},
@@ -137,7 +144,8 @@ describe("parseAniBridgeMappings", () => {
 
 	it("does not attach TVDB IDs when scoped TVDB targets disagree", () => {
 		const seerrTargets = parseAniBridgeSeerrTargets({
-			"anilist:1": {
+			"anidb:1:R": {
+				"anilist:1": {},
 				"tmdb_show:500:s1": {},
 				"tmdb_show:500:s2": {},
 				"tvdb_show:700:s1": {},
@@ -195,7 +203,12 @@ describe("refreshUpstreamMappings", () => {
 		vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
 		mockAniBridgeResponse(
 			createAniBridgeResponse(
-				JSON.stringify({ "anilist:1": { "tmdb_movie:300": {} } }),
+				JSON.stringify({
+					"anidb:1:R": {
+						"anilist:1": {},
+						"tmdb_movie:300": {},
+					},
+				}),
 				{ ETag: "previous-etag" },
 			),
 		);
@@ -241,8 +254,9 @@ describe("refreshUpstreamMappings", () => {
 		mockAniBridgeResponse(
 			createAniBridgeResponse(
 				JSON.stringify({
-					"mal:5114": {
+					"anidb:5114:R": {
 						"anilist:21": {},
+						"mal:5114": {},
 						"tmdb_movie:300": {},
 					},
 				}),

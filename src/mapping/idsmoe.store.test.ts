@@ -74,7 +74,7 @@ describe("ids.moe store", () => {
 		expect(fetchFn).toHaveBeenCalledTimes(1);
 	});
 
-	it("returns null on failures and caches the miss", async () => {
+	it("caches confirmed 404 misses", async () => {
 		const source = { source: "mal", id: mal(404) } as const;
 		const fetchFn = vi.fn(async () => jsonResponse({ error: "missing" }, 404));
 
@@ -86,6 +86,25 @@ describe("ids.moe store", () => {
 		).resolves.toBeNull();
 
 		expect(fetchFn).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not cache auth or malformed-response failures", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+		const fetchFn = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(jsonResponse({ error: "auth" }, 401))
+			.mockResolvedValueOnce(new Response("{", { status: 200 }));
+
+		await expect(
+			resolveIdsMoeTarget("radarr", source, { fetchFn }),
+		).resolves.toBeNull();
+		await expect(
+			resolveIdsMoeTarget("radarr", source, { fetchFn }),
+		).resolves.toBeNull();
+
+		expect(fetchFn).toHaveBeenCalledTimes(2);
+		expect(await getCachedIdsMoeTarget("radarr", source)).toBeNull();
+		expect(bumpMappingsRevisionMock).not.toHaveBeenCalled();
 	});
 
 	it("does not call ids.moe for Sonarr because public ids.moe has no TVDB field", async () => {

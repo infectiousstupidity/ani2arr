@@ -3,8 +3,10 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTvdbId } from "@/providers/schemas";
 import type { MappingList } from "@/mapping/list-mappings";
+import { mappingService } from "@/background/api-services";
 import { mappingHandlers } from "./mapping.handlers";
 
 const getMappingListMock = vi.hoisted(() => vi.fn());
@@ -44,6 +46,7 @@ vi.mock("@/background/provider-config", () => ({
 }));
 
 const aid = parseAniListId;
+const mal = parseMyAnimeListId;
 const tvdb = parseTvdbId;
 const anilistSource = (anilistId: ReturnType<typeof aid>) =>
 	({ source: "anilist", id: anilistId }) as const;
@@ -105,5 +108,26 @@ describe("mappingHandlers", () => {
 			}),
 		]);
 		expect(result.groups[0]?.linkedAniListIds).toEqual([aid(2)]);
+	});
+
+	it("does not flag a MAL manual mapping as conflicting with its current AniList crosswalk", async () => {
+		vi.mocked(mappingService.getLinkedAniListIds).mockResolvedValueOnce([
+			aid(10),
+		]);
+
+		await expect(
+			mappingHandlers.setManualMapping({
+				provider: "sonarr",
+				providerId: tvdb(20),
+				source: { source: "mal", id: mal(5114) },
+				anilistId: aid(10),
+			}),
+		).resolves.toEqual({ ok: true });
+
+		expect(mappingService.setManualMapping).toHaveBeenCalledWith(
+			"sonarr",
+			{ source: "mal", id: mal(5114) },
+			tvdb(20),
+		);
 	});
 });

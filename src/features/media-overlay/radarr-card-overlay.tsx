@@ -78,7 +78,9 @@ export function RadarrCardOverlay({
 			hasMapping={mediaAction.status.hasMapping}
 			showSetupAction={anilistId !== undefined && mediaAction.status.hasMapping}
 			onOpenSetup={onOpenSetup}
-			showMappingAction={mediaAction.status.state !== "unconfigured"}
+			showMappingAction={
+				anilistId !== undefined && mediaAction.status.state !== "unconfigured"
+			}
 			onOpenMapping={onOpenMapping}
 			openProvider={mediaAction.openProvider}
 			openProviderIcon={RadarrIcon}

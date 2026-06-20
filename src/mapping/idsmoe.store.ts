@@ -5,6 +5,7 @@ import { storage } from "@wxt-dev/storage";
 import type { Provider } from "@/providers/types";
 import { parseTmdbIdOrNull } from "@/providers/schemas";
 import { bumpMappingsRevision } from "@/shared/sync/revisions";
+import { logger } from "@/shared/utils/logger";
 import {
 	sourceIdentityKey,
 	type SourceIdentity,
@@ -17,6 +18,10 @@ const MAX_IDSMOE_BYTES = 32 * 1024;
 const IDSMOE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 type IdsMoeFetch = typeof fetch;
+type IdsMoeFetchResult =
+	| { kind: "hit"; target: UpstreamTarget }
+	| { kind: "miss" }
+	| { kind: "failure"; reason: string };
 
 type CachedIdsMoeRecord = {
 	fetchedAt: number;
@@ -33,6 +38,7 @@ export type IdsMoeResolver = (
 const idsMoeCache = storage.defineItem<IdsMoeCache>("local:mapping:idsmoe", {
 	fallback: {},
 });
+const log = logger.create("ids.moe");
 
 let writes: Promise<void> = Promise.resolve();
 
@@ -56,7 +62,16 @@ export async function resolveIdsMoeTarget(
 		return targetForProvider(provider, cached.target);
 	}
 
-	const target = await fetchIdsMoeTarget(source, dependencies.fetchFn ?? fetch);
+	const result = await fetchIdsMoeTarget(source, dependencies.fetchFn ?? fetch);
+	if (result.kind === "failure") {
+		log.debug("ids.moe fallback failed; result was not cached.", {
+			source: sourceIdentityKey(source),
+			reason: result.reason,
+		});
+		return null;
+	}
+
+	const target = result.kind === "hit" ? result.target : null;
 	await setCachedIdsMoeTarget(source, target);
 	return targetForProvider(provider, target);
 }
@@ -111,7 +126,7 @@ async function setCachedIdsMoeTarget(
 async function fetchIdsMoeTarget(
 	source: SourceIdentity,
 	fetchFn: IdsMoeFetch,
-): Promise<UpstreamTarget | null> {
+): Promise<IdsMoeFetchResult> {
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), IDSMOE_TIMEOUT_MS);
 
@@ -119,25 +134,32 @@ async function fetchIdsMoeTarget(
 		const response = await fetchFn(buildIdsMoeUrl(source), {
 			signal: controller.signal,
 		});
-		if (response.status === 404) return null;
-		if (!response.ok) return null;
+		if (response.status === 404) return { kind: "miss" };
+		if (!response.ok) {
+			return { kind: "failure", reason: `http-${response.status}` };
+		}
 
 		const contentLength = Number(response.headers.get("Content-Length") ?? 0);
-		if (contentLength > MAX_IDSMOE_BYTES) return null;
+		if (contentLength > MAX_IDSMOE_BYTES) {
+			return { kind: "failure", reason: "payload-too-large" };
+		}
 
 		const text = await response.text();
-		if (new TextEncoder().encode(text).byteLength > MAX_IDSMOE_BYTES) return null;
+		if (new TextEncoder().encode(text).byteLength > MAX_IDSMOE_BYTES) {
+			return { kind: "failure", reason: "payload-too-large" };
+		}
 
 		let payload: unknown;
 		try {
 			payload = JSON.parse(text) as unknown;
 		} catch {
-			return null;
+			return { kind: "failure", reason: "invalid-json" };
 		}
 
-		return targetFromPayload(payload);
+		const target = targetFromPayload(payload);
+		return target === null ? { kind: "miss" } : { kind: "hit", target };
 	} catch {
-		return null;
+		return { kind: "failure", reason: "network" };
 	} finally {
 		clearTimeout(timeout);
 	}

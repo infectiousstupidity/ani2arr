@@ -265,40 +265,40 @@ function parseAniBridgeMappingsPayload(payload: unknown): {
 		return { mappings, seerrTargets, aniListCrosswalks };
 	}
 
-	for (const [rawSource, rawTargets] of Object.entries(
+	for (const [rawRowKey, rawTargets] of Object.entries(
 		payload as Record<string, unknown>,
 	)) {
-		const source = parseDescriptor(rawSource);
-		const sourceIdentity = parseSourceDescriptor(source);
-
-		if (
-			sourceIdentity === null ||
-			!rawTargets ||
-			typeof rawTargets !== "object" ||
-			Array.isArray(rawTargets)
-		) {
+		if (!rawTargets || typeof rawTargets !== "object" || Array.isArray(rawTargets)) {
 			continue;
 		}
 
-		const sourceKey = sourceIdentityKey(sourceIdentity);
+		const rawDescriptorKeys = [rawRowKey, ...Object.keys(rawTargets)];
+		const sourceIdentities = rawDescriptorKeys.flatMap((rawDescriptor) => {
+			const source = parseSourceDescriptor(parseDescriptor(rawDescriptor));
+			return source === null ? [] : [source];
+		});
+		if (sourceIdentities.length === 0) continue;
 
-		const rawTargetKeys = Object.keys(rawTargets);
-		for (const rawTarget of rawTargetKeys) {
+		const targets = rawDescriptorKeys.flatMap((rawTarget) => {
 			const target = parseTarget(rawTarget);
+			return target === null ? [] : [target];
+		});
+		const seerrTarget = parseSeerrTarget(rawDescriptorKeys);
+		const aniListId = parseUniqueAniListTarget(rawDescriptorKeys);
 
-			if (target) {
+		for (const sourceIdentity of sourceIdentities) {
+			const sourceKey = sourceIdentityKey(sourceIdentity);
+			for (const target of targets) {
 				addTarget(mappings, sourceKey, target);
 			}
-		}
 
-		const seerrTarget = parseSeerrTarget(rawTargetKeys);
-		if (seerrTarget) {
-			seerrTargets[sourceKey] = seerrTarget;
-		}
+			if (seerrTarget) {
+				seerrTargets[sourceKey] = seerrTarget;
+			}
 
-		const aniListId = parseUniqueAniListTarget(rawTargetKeys);
-		if (sourceIdentity.source === "mal" && aniListId !== null) {
-			aniListCrosswalks[sourceKey] = aniListId;
+			if (sourceIdentity.source === "mal" && aniListId !== null) {
+				aniListCrosswalks[sourceKey] = aniListId;
+			}
 		}
 	}
 
