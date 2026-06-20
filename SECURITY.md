@@ -1,6 +1,3 @@
-# `SECURITY.md`
-
-```markdown
 # Security Policy
 
 ## Supported versions
@@ -113,4 +110,3 @@ After a valid report is received:
 5. Public disclosure can happen after users have had reasonable time to update.
 
 No response time or fix time is guaranteed.
-```
