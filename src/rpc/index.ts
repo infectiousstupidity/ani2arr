@@ -38,6 +38,8 @@ import type {
 	GetMappingsInput,
 	GetMappingInspectionInput,
 	GetAniListMetadataInput,
+	GetAniListIdForSourceInput,
+	GetAniListIdForSourceOutput,
 	ProviderConnectionTestInput,
 	NotifyProviderConnectionChangedInput,
 	OpenProviderPageInput,
@@ -141,6 +143,9 @@ export interface Ani2arrApi {
 	getAniListMetadata(
 		input: GetAniListMetadataInput,
 	): Promise<GetAniListMetadataOutput>;
+	getAniListIdForSource(
+		input: GetAniListIdForSourceInput,
+	): Promise<GetAniListIdForSourceOutput>;
 }
 
 const ANI2ARR_API_KEY = "Ani2arrApi" as ProxyServiceKey<Ani2arrApi>;

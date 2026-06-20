@@ -17,7 +17,10 @@ import {
 	getMappingList,
 } from "@/mapping/list-mappings";
 import type { MappingResult, MappingSource } from "@/mapping/types";
-import { refreshUpstreamMappings } from "@/mapping/upstream.store";
+import {
+	getUniqueAniListIdForSource,
+	refreshUpstreamMappings,
+} from "@/mapping/upstream.store";
 import {
 	composeRadarrMappingsLibraryStatus,
 	composeSonarrMappingsLibraryStatus,
@@ -566,4 +569,6 @@ export const mappingHandlers = {
 			anilistMetadataStore,
 		});
 	},
+
+	getAniListIdForSource: getUniqueAniListIdForSource,
 };

@@ -150,6 +150,10 @@ export type GetAniListMetadataInput = {
 	ids: AniListId[];
 };
 
+export type GetAniListIdForSourceInput = SourceIdentity;
+
+export type GetAniListIdForSourceOutput = AniListId | null;
+
 export type ProviderConnectionTestInput = {
 	credentials: ProviderCredentials;
 };
