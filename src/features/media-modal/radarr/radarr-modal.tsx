@@ -198,7 +198,7 @@ export function RadarrModal({
 	onClose,
 	container,
 }: RadarrModalProps): React.JSX.Element {
-	const { anilistId, metadataHint, openSource, initialView } = state;
+	const { anilistId, source, metadataHint, openSource, initialView } = state;
 	const [view, setView] = useState<MediaModalView>(initialView ?? "setup");
 	const [selectedCandidate, setSelectedCandidate] =
 		useState<RadarrMappingCandidate | null>(null);
@@ -282,6 +282,7 @@ export function RadarrModal({
 	};
 	const mappingActions = useMappingActions({
 		anilistId,
+		source,
 		provider: PROVIDER,
 		selectedProviderId: selectedCandidate?.tmdbId ?? null,
 		rejectProviderId: rejectCandidateTmdbId,

@@ -130,6 +130,7 @@ export const useAddSeries = () => {
 		onSuccess: (_createdSeries, variables) => {
 			invalidateAfterProviderMediaChange(queryClient, {
 				provider: "sonarr",
+				...(variables.source === undefined ? {} : { source: variables.source }),
 				anilistId: variables.anilistId,
 			});
 		},
@@ -144,6 +145,7 @@ export const useUpdateSeries = () => {
 		onSuccess: (_updatedSeries, variables) => {
 			invalidateAfterProviderMediaChange(queryClient, {
 				provider: "sonarr",
+				...(variables.source === undefined ? {} : { source: variables.source }),
 				anilistId: variables.anilistId,
 			});
 		},

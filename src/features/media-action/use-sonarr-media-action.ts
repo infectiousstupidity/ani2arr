@@ -30,6 +30,9 @@ function quickAdd(input: {
 
 	input.addSeries.mutate({
 		anilistId: input.mediaInput.anilistId,
+		...(input.mediaInput.source === undefined
+			? {}
+			: { source: input.mediaInput.source }),
 		tvdbId: input.tvdbId,
 		title: input.mediaInput.providerTitle,
 		primaryTitleHint: input.mediaInput.providerTitle,

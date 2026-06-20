@@ -2,15 +2,17 @@
 // src/features/media-action/use-media-action.ts
 
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
-import type { MappingResult } from "@/mapping/types";
+import type { MappingResult, SourceIdentity } from "@/mapping/types";
 import type { Provider } from "@/providers/types";
 import { getProviderOpenTarget } from "@/providers/provider-links";
 import { openProviderPage } from "@/rpc/provider-page";
 import type { StatusInput } from "@/rpc/types";
+import { sourceFromInput } from "@/rpc/source-input";
 import { getMediaActionStatus, type MediaActionStatus } from "./state";
 
 export interface MediaActionInputBase<TForm> {
 	anilistId: AniListId;
+	source?: SourceIdentity;
 	displayTitle: string;
 	providerTitle: string | null;
 	metadata: AniListMediaHint | null;
@@ -81,11 +83,11 @@ function shouldEnableStatus(input: MediaActionInputBase<unknown>): boolean {
 export function buildMediaActionStatusQuery(
 	input: MediaActionInputBase<unknown>,
 ): {
-	payload: Pick<StatusInput, "anilistId" | "title" | "metadata">;
+	payload: Pick<StatusInput, "metadata" | "source" | "title">;
 	options: MediaActionStatusOptions;
 } {
-	const payload: Pick<StatusInput, "anilistId" | "title" | "metadata"> = {
-		anilistId: input.anilistId,
+	const payload: Pick<StatusInput, "metadata" | "source" | "title"> = {
+		source: sourceFromInput(input),
 		metadata: input.metadata,
 	};
 	if (input.providerTitle !== null) {

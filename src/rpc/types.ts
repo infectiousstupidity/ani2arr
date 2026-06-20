@@ -55,6 +55,7 @@ export type StatusInput = SourceRpcInput & {
 
 export type AddSonarrInput = {
 	anilistId: AniListId;
+	source?: SourceIdentity;
 	tvdbId: TvdbId;
 	title: string;
 	primaryTitleHint?: string;
@@ -64,6 +65,7 @@ export type AddSonarrInput = {
 
 export type UpdateSonarrInput = {
 	anilistId: AniListId;
+	source?: SourceIdentity;
 	tvdbId: TvdbId;
 	title: string;
 	form: SonarrFormState;
@@ -72,6 +74,7 @@ export type UpdateSonarrInput = {
 
 export type AddRadarrInput = {
 	anilistId: AniListId;
+	source?: SourceIdentity;
 	tmdbId: TmdbId;
 	title: string;
 	primaryTitleHint?: string;
@@ -81,6 +84,7 @@ export type AddRadarrInput = {
 
 export type UpdateRadarrInput = {
 	anilistId: AniListId;
+	source?: SourceIdentity;
 	tmdbId: TmdbId;
 	title: string;
 	form: RadarrFormState;

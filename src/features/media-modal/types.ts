@@ -2,6 +2,7 @@
 // src/features/media-modal/types.ts
 
 import type { AniListId, AniListMediaFormat } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/types";
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 
@@ -43,6 +44,7 @@ export type MediaModalTargetSummary = {
 
 type MediaModalStateBase = {
 	anilistId: AniListId;
+	source?: SourceIdentity;
 	openSource: MediaModalOpenSource;
 	metadataHint?: MediaModalMetadataHint | null;
 };

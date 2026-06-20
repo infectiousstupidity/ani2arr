@@ -229,7 +229,7 @@ export function SonarrModal({
 	onClose,
 	container,
 }: SonarrModalProps): React.JSX.Element {
-	const { anilistId, metadataHint, openSource, initialView } = state;
+	const { anilistId, source, metadataHint, openSource, initialView } = state;
 	const [view, setView] = useState<MediaModalView>(initialView ?? "setup");
 	const [selectedCandidate, setSelectedCandidate] =
 		useState<SonarrMappingCandidate | null>(null);
@@ -313,6 +313,7 @@ export function SonarrModal({
 	};
 	const mappingActions = useMappingActions({
 		anilistId,
+		source,
 		provider: PROVIDER,
 		selectedProviderId: selectedCandidate?.tvdbId ?? null,
 		rejectProviderId: rejectCandidateTvdbId,

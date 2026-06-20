@@ -130,6 +130,7 @@ export const useAddMovie = () => {
 		onSuccess: (_createdMovie, variables) => {
 			invalidateAfterProviderMediaChange(queryClient, {
 				provider: "radarr",
+				...(variables.source === undefined ? {} : { source: variables.source }),
 				anilistId: variables.anilistId,
 			});
 		},
@@ -144,6 +145,7 @@ export const useUpdateMovie = () => {
 		onSuccess: (_updatedMovie, variables) => {
 			invalidateAfterProviderMediaChange(queryClient, {
 				provider: "radarr",
+				...(variables.source === undefined ? {} : { source: variables.source }),
 				anilistId: variables.anilistId,
 			});
 		},
