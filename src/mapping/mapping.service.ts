@@ -16,11 +16,6 @@ import {
 	type ManualMapping,
 } from "./manual.store";
 import {
-	getCachedIdsMoeTarget,
-	resolveIdsMoeTarget,
-	type IdsMoeResolver,
-} from "./idsmoe.store";
-import {
 	getUniqueAniListIdForSource,
 	getUpstreamTargets,
 	listSourceUpstreamMappings,
@@ -39,14 +34,11 @@ type MappingCandidates = {
 	manual: ManualFacts | null;
 	upstream: UpstreamTarget[];
 	auto: AutoResult | null;
-	idsMoe?: UpstreamTarget | null;
 };
 
 export class MappingService {
 	public constructor(
 		private readonly resolveAutomaticMapping: AutomaticResolver,
-		private readonly resolveIdsMoeMapping: IdsMoeResolver = resolveIdsMoeTarget,
-		private readonly getCachedIdsMoeMapping: IdsMoeResolver = getCachedIdsMoeTarget,
 	) {}
 
 	public async getMapping(
@@ -59,19 +51,11 @@ export class MappingService {
 			getUpstreamTargets(provider, sourceIdentity),
 			getAutoResult(provider, sourceIdentity),
 		]);
-		const idsMoe = await getIdsMoeTargetIfUseful(
-			provider,
-			sourceIdentity,
-			upstream,
-			this.getCachedIdsMoeMapping,
-		);
-
 		return chooseMappingResult({
 			provider,
 			manual,
 			upstream,
 			auto,
-			idsMoe,
 		});
 	}
 
@@ -102,18 +86,11 @@ export class MappingService {
 			return current;
 		}
 
-		if (current.kind === "unmapped") {
-			const idsMoeTarget = await this.resolveIdsMoeMapping(
-				provider,
-				sourceIdentity,
-			);
-			if (idsMoeTarget !== null) {
-				return this.getMapping(provider, sourceIdentity);
-			}
-
-			if (shouldKeepUnmappedMapping(current, options?.forceRetry === true)) {
-				return current;
-			}
+		if (
+			current.kind === "unmapped" &&
+			shouldKeepUnmappedMapping(current, options?.forceRetry === true)
+		) {
+			return current;
 		}
 
 		await this.resolveAutomaticMapping(
@@ -324,7 +301,7 @@ async function getLinkedAniListIdForSource(
 }
 
 export function chooseMappingResult(input: MappingCandidates): MappingResult {
-	const { provider, manual, upstream, auto, idsMoe = null } = input;
+	const { provider, manual, upstream, auto } = input;
 
 	if (manual && "ignored" in manual) {
 		return { kind: "ignored" };
@@ -359,9 +336,6 @@ export function chooseMappingResult(input: MappingCandidates): MappingResult {
 	if (upstream.length > 1) {
 		return autoMapping ?? ambiguous(upstream);
 	}
-
-	const idsMoeMapping = chooseIdsMoeMapping(idsMoe, rejectedProviderIds);
-	if (idsMoeMapping) return idsMoeMapping;
 
 	if (autoMapping) return autoMapping;
 
@@ -402,27 +376,6 @@ function mappedFromUpstream(target: UpstreamTarget): MappingResult {
 	return {
 		kind: "mapped",
 		source: "upstream",
-		providerId: target.providerId,
-		...(target.provider === "sonarr" && target.season !== undefined
-			? { season: target.season }
-			: {}),
-	};
-}
-
-function chooseIdsMoeMapping(
-	target: UpstreamTarget | null,
-	rejectedProviderIds: number[] | undefined,
-): MappingResult | null {
-	if (!target) return null;
-	return rejectedProviderIds?.includes(target.providerId) === true
-		? unmapped(true, rejectedProviderIds)
-		: mappedFromIdsMoe(target);
-}
-
-function mappedFromIdsMoe(target: UpstreamTarget): MappingResult {
-	return {
-		kind: "mapped",
-		source: "idsmoe",
 		providerId: target.providerId,
 		...(target.provider === "sonarr" && target.season !== undefined
 			? { season: target.season }
@@ -500,17 +453,6 @@ function unmapped(
 		hadResolveAttempt,
 		...(rejectedProviderIds?.length ? { rejectedProviderIds } : {}),
 	};
-}
-
-async function getIdsMoeTargetIfUseful(
-	provider: Provider,
-	source: SourceIdentity,
-	upstream: UpstreamTarget[],
-	readCachedIdsMoeTarget: IdsMoeResolver,
-): Promise<UpstreamTarget | null> {
-	return upstream.length === 0
-		? readCachedIdsMoeTarget(provider, source)
-		: null;
 }
 
 function isStableMapping(mapping: MappingResult): boolean {

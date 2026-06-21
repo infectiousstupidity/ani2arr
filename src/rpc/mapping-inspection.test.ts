@@ -118,7 +118,7 @@ describe("getMappingInspection", () => {
 					mappingService: {
 						getMapping: vi.fn(async () => ({
 							kind: "mapped",
-							source: "idsmoe",
+							source: "upstream",
 							providerId: 100,
 						} as const)),
 						getLinkedAniListIds: vi.fn(async () => []),
@@ -128,7 +128,7 @@ describe("getMappingInspection", () => {
 			),
 		).resolves.toEqual({
 			source,
-			mapping: { kind: "mapped", source: "idsmoe", providerId: 100 },
+			mapping: { kind: "mapped", source: "upstream", providerId: 100 },
 			linkedAniListEntries: [
 				{
 					anilistId: aid(10),

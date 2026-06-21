@@ -265,9 +265,6 @@ export const formatMappingEntryKind = (result: MappingResult): string => {
 			if (result.source === "upstream") {
 				return "Upstream";
 			}
-			if (result.source === "idsmoe") {
-				return "ids.moe";
-			}
 			return "Auto";
 		}
 		case "ignored": {
