@@ -115,7 +115,7 @@ export interface Ani2arrApi {
 	getRadarrFormResources(
 		input?: GetProviderFormResourcesInput,
 	): Promise<ProviderFormResources>;
-	initMappings(): Promise<void>;
+	refreshUpstreamMappings(): Promise<void>;
 	setManualMapping(input: SetManualMappingInput): Promise<{ ok: true }>;
 	clearManualMapping(input: ClearManualMappingInput): Promise<{ ok: true }>;
 	setMappingIgnore(input: SetMappingIgnoreInput): Promise<{ ok: true }>;

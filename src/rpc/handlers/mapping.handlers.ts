@@ -19,7 +19,7 @@ import {
 import type { MappingResult, MappingSource } from "@/mapping/types";
 import {
 	getUniqueAniListIdForSource,
-	refreshUpstreamMappings,
+	refreshUpstreamMappings as refreshStoredUpstreamMappings,
 } from "@/mapping/upstream.store";
 import {
 	composeRadarrMappingsLibraryStatus,
@@ -491,8 +491,8 @@ async function resolveAmbiguousProviderMappings(
 	}
 }
 
-async function initMappingPipeline(): Promise<void> {
-	await refreshUpstreamMappings();
+async function runMappingRefreshPipeline(): Promise<void> {
+	await refreshStoredUpstreamMappings();
 
 	for (const provider of PROVIDERS) {
 		await resolveAmbiguousProviderMappings(provider);
@@ -506,8 +506,12 @@ export const mappingHandlers = {
 		return getMappingIdentities(ids, { mappingService });
 	},
 
-	initMappings() {
-		return initMappingPipeline();
+	refreshMappingPipeline() {
+		return runMappingRefreshPipeline();
+	},
+
+	refreshUpstreamMappings() {
+		return refreshStoredUpstreamMappings();
 	},
 
 	async setManualMapping(input: SetManualMappingInput) {

@@ -77,7 +77,7 @@ export const bootstrapBackground = (): void => {
 				browser.runtime.openOptionsPage().catch(() => {});
 			}
 			if (await shouldWarmMappingsCache()) {
-				await apiHandlers.initMappings();
+				await apiHandlers.refreshMappingPipeline();
 			}
 			await ensurePeriodicRefresh();
 		} catch (error) {
@@ -88,7 +88,7 @@ export const bootstrapBackground = (): void => {
 	browser.runtime.onStartup.addListener(async () => {
 		try {
 			if (await shouldWarmMappingsCache()) {
-				await apiHandlers.initMappings();
+				await apiHandlers.refreshMappingPipeline();
 			}
 			await ensurePeriodicRefresh();
 		} catch (error) {
@@ -102,10 +102,10 @@ export const bootstrapBackground = (): void => {
 		void (async () => {
 			try {
 				if (await shouldWarmMappingsCache()) {
-					await apiHandlers.initMappings();
+					await apiHandlers.refreshMappingPipeline();
 				}
 			} catch (error) {
-				logError(normalizeError(error), "Background:initMappings:alarm");
+				logError(normalizeError(error), "Background:refreshMappingPipeline:alarm");
 			}
 		})();
 	});

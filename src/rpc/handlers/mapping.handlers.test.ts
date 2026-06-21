@@ -10,10 +10,16 @@ import { mappingService } from "@/background/api-services";
 import { mappingHandlers } from "./mapping.handlers";
 
 const getMappingListMock = vi.hoisted(() => vi.fn());
+const refreshUpstreamMappingsMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/mapping/list-mappings", () => ({
 	getMappingIdentities: vi.fn(),
 	getMappingList: getMappingListMock,
+}));
+
+vi.mock("@/mapping/upstream.store", () => ({
+	getUniqueAniListIdForSource: vi.fn(),
+	refreshUpstreamMappings: refreshUpstreamMappingsMock,
 }));
 
 vi.mock("@/background/api-services", () => ({
@@ -129,5 +135,13 @@ describe("mappingHandlers", () => {
 			{ source: "mal", id: mal(5114) },
 			tvdb(20),
 		);
+	});
+
+	it("exposes a narrow upstream refresh handler", async () => {
+		refreshUpstreamMappingsMock.mockResolvedValueOnce();
+
+		await expect(mappingHandlers.refreshUpstreamMappings()).resolves.toBeUndefined();
+
+		expect(refreshUpstreamMappingsMock).toHaveBeenCalledTimes(1);
 	});
 });

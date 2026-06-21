@@ -229,14 +229,14 @@ export function useSeerrActions() {
 				});
 
 				queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
-					try {
-						await api.initMappings();
-						queryClient.invalidateQueries({
-							queryKey: queryKeys.mappingIdentitiesRoot(),
-						});
-						queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-						queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
-					} catch {
+				try {
+					await api.refreshUpstreamMappings();
+					queryClient.invalidateQueries({
+						queryKey: queryKeys.mappingIdentitiesRoot(),
+					});
+					queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+					queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
+				} catch {
 					// Seerr remains usable if the upstream mapping refresh is temporarily unavailable.
 				}
 				await cleanupUnusedProviderHostPermission(
