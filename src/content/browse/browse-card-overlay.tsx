@@ -184,6 +184,7 @@ export function BrowseCardOverlay({
 	onOpenMediaModal,
 	tooltipContainer,
 }: BrowseCardOverlayProps): React.ReactElement | null {
+	/** MAL v1 uses source identity internally, but content actions still require an AniList crosswalk. */
 	if (parsed.anilistId === undefined) return null;
 
 	const rawProvider = resolveBrowseCardProvider({ parsed, metadata, mappedIdentities });

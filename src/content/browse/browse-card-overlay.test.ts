@@ -3,11 +3,13 @@
 
 import { describe, expect, it } from "vitest";
 import { parseAniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import type { MappingIdentity, SeerrRequestTarget } from "@/rpc/types";
 import { resolveSeerrRequestInput } from "@/content/anilist/target-provider";
 import type { HostMediaTarget } from "./types";
 import { resolveBrowseCardProvider } from "./browse-card-provider";
+import { BrowseCardOverlay } from "./browse-card-overlay";
 
 const mountTarget = {} as HTMLElement;
 
@@ -61,6 +63,36 @@ describe("resolveBrowseCardProvider", () => {
 				mappedIdentities,
 			}),
 		).toBe("sonarr");
+	});
+});
+
+describe("BrowseCardOverlay", () => {
+	it("renders no provider actions without an AniList crosswalk", () => {
+		const parsed: HostMediaTarget = {
+			source: { source: "mal", id: parseMyAnimeListId(5114) },
+			title: "Fullmetal Alchemist: Brotherhood",
+			format: "TV",
+			mountTarget,
+		};
+
+		expect(
+			BrowseCardOverlay({
+				parsed,
+				adapter: {
+					cardSelector: ".card",
+					parseCard: () => null,
+					getObserverRoot: () => document.body,
+					getScanRoot: () => document.body,
+					anchorCorner: "top-left",
+					stackDirection: "down",
+				},
+				publicOptions: undefined,
+				mappedIdentities: [],
+				metadata: null,
+				onOpenMediaModal: () => {},
+				tooltipContainer: null,
+			}),
+		).toBeNull();
 	});
 });
 

@@ -38,6 +38,7 @@ import MediaActions from "@/content/anime-page/media-actions";
 
 export interface AnimePageTarget {
 	source: SourceIdentity;
+	/** MAL v1 uses source identity internally, but content actions still require an AniList crosswalk. */
 	anilistId: AniListId;
 	format: AniListMediaFormat | null;
 	title: string | null;

@@ -62,6 +62,25 @@ describe("parseMyAnimeListBrowseCard", () => {
 		});
 	});
 
+	it("strips video suffixes from anime card links", () => {
+		const link = fakeElement({
+			textContent: "Fullmetal Alchemist: Brotherhood",
+			attributes: {
+				href: "/anime/5114/Fullmetal_Alchemist__Brotherhood/video",
+			},
+		});
+		const card = fakeElement({
+			children: {
+				"a[href*='/anime/']": link,
+			},
+		}) as unknown as Element;
+
+		expect(parseMyAnimeListBrowseCard(card)).toMatchObject({
+			source: { source: "mal", id: parseMyAnimeListId(5114) },
+			title: "Fullmetal Alchemist: Brotherhood",
+		});
+	});
+
 	it("parses search list rows", () => {
 		const link = fakeElement({
 			textContent: "Frieren: Beyond Journey's End",
