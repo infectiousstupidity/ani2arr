@@ -1,5 +1,5 @@
-/** AniList anime-page React root for provider actions, metadata, and modal state. */
-// src/content/anilist/anime-page/root.tsx
+/** Shared anime-page React root for provider actions, metadata, and modal state. */
+// src/content/anime-page/root.tsx
 
 import { useState, type ReactElement } from "react";
 import { metadataHintFromAniListMetadata } from "@/anilist/title";
@@ -34,7 +34,7 @@ import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import type { PublicOptions } from "@/settings/types";
 import { ConfirmProvider } from "@/shared/ui/feedback/confirm-provider";
 import { useTheme } from "@/shared/hooks/use-theme";
-import MediaActions from "./media-actions";
+import MediaActions from "@/content/anime-page/media-actions";
 
 export interface AnimePageTarget {
 	source: SourceIdentity;

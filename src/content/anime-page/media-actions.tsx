@@ -1,5 +1,5 @@
 /** Anime-page action group for provider quick add, deep links, and manual mapping entry points. */
-// src/content/anilist/anime-page/media-actions.tsx
+// src/content/anime-page/media-actions.tsx
 
 import React, { type MouseEvent } from "react";
 import Button from "@/shared/ui/primitives/button";

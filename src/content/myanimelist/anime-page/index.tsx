@@ -12,8 +12,8 @@ import {
 	createContentEntrypointShell,
 	type ContentEntrypointShellContext,
 } from "@/content/core/create-content-script-shell";
-import { ContentRoot, type AnimePageTarget } from "@/content/anilist/anime-page/root";
-import "@/content/anilist/anime-page/style.css";
+import { ContentRoot, type AnimePageTarget } from "@/content/anime-page/root";
+import "@/content/anime-page/style.css";
 import "@/shared/styles/content-base.css";
 import { readMyAnimeListIdFromUrl } from "@/myanimelist/url";
 import { createExtensionQueryClient } from "@/queries/query-client";
