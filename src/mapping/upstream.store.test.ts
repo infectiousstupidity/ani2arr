@@ -16,7 +16,7 @@ import {
 	parseAniBridgeSeerrTargets,
 	refreshUpstreamMappings,
 } from "./upstream.store";
-import { sourceIdentityKey } from "./types";
+import { sourceIdentityKey } from "./source-identity";
 
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;

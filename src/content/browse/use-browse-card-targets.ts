@@ -8,7 +8,7 @@ import {
 	type BrowseAdapter,
 	type HostMediaTarget,
 } from "./types";
-import { sourceIdentityKey } from "@/mapping/types";
+import { sourceIdentityKey } from "@/mapping/source-identity";
 
 export const BROWSE_MUTATION_OBSERVER_INIT: MutationObserverInit = {
 	childList: true,

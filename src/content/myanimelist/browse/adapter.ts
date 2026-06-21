@@ -2,10 +2,7 @@
 // src/content/myanimelist/browse/adapter.ts
 
 import { parseAniListMediaFormatLabel } from "@/anilist/types";
-import {
-	parseMyAnimeListIdOrNull,
-	type MyAnimeListId,
-} from "@/myanimelist/types";
+import { readMyAnimeListIdFromUrl } from "@/myanimelist/url";
 import type { BrowseAdapter, HostMediaTarget } from "@/content/browse/types";
 
 const SEASONAL_CARD_SELECTOR = ".seasonal-anime.js-seasonal-anime";
@@ -21,18 +18,6 @@ const CARD_SELECTOR = [
 	SEARCH_ROW_SELECTOR,
 	ADVANCED_SEARCH_ANCHOR_SELECTOR,
 ].join(",");
-
-function normalizeAnimeHref(value: string | null | undefined): string {
-	return (value ?? "").replace(/\/video(?:[/?#].*)?$/i, "");
-}
-
-export function readMyAnimeListIdFromHref(
-	value: string | null | undefined,
-): MyAnimeListId | null {
-	const href = normalizeAnimeHref(value);
-	const match = /\/anime\/(\d+)(?:\/|$)/.exec(href);
-	return parseMyAnimeListIdOrNull(Number(match?.[1]));
-}
 
 function cleanText(value: string | null | undefined): string | null {
 	const cleaned = value?.replaceAll(/\s+/g, " ").trim() ?? "";
@@ -61,7 +46,7 @@ function parseFromLink(input: {
 	const { card, link } = input;
 	if (!link) return null;
 
-	const malId = readMyAnimeListIdFromHref(link.getAttribute("href"));
+	const malId = readMyAnimeListIdFromUrl(link.getAttribute("href"));
 	if (malId === null) return null;
 
 	const title =

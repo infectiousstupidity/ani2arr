@@ -3,7 +3,7 @@
 
 import type { QueryClient } from "@tanstack/react-query";
 import type { AniListId } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { PROVIDERS, type Provider } from "@/providers/types";
 import { queryKeys } from "@/queries/query-keys";
 

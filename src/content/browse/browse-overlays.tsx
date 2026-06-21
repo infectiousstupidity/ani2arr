@@ -7,7 +7,7 @@ import { metadataHintFromAniListMetadata } from "@/anilist/title";
 import { getMappedIdentitiesByAniListId } from "@/content/anilist/target-provider";
 import { MediaModal } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
-import { sourceIdentityKey } from "@/mapping/types";
+import { sourceIdentityKey } from "@/mapping/source-identity";
 import { useAniListMetadataBatch } from "@/queries/anilist";
 import { useMappingIdentities, useSourceAniListIdMap } from "@/queries/mapping";
 import { useOptionsQuerySync, usePublicOptions } from "@/queries/options";

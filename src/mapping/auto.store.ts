@@ -6,11 +6,12 @@ import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
 import { bumpMappingsRevision } from "@/shared/sync/revisions";
 import {
+	normalizeSourceIdentity,
 	parseSourceIdentityKey,
 	sourceIdentityKey,
-	type AutoResult,
 	type SourceIdentity,
-} from "./types";
+} from "./source-identity";
+import type { AutoResult } from "./types";
 
 const MAPPED_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ATTEMPT_TTL_MS = 48 * 60 * 60 * 1000;
@@ -40,7 +41,7 @@ export async function getAutoResult(
 	source: SourceIdentity | AniListId,
 ): Promise<AutoResult | null> {
 	const mappings = await getAutoMappings();
-	const result = mappings[provider][sourceIdentityKey(toSourceIdentity(source))];
+	const result = mappings[provider][sourceIdentityKey(normalizeSourceIdentity(source))];
 
 	if (!result || result.expiresAt <= Date.now()) {
 		return null;
@@ -79,7 +80,7 @@ export async function setAutoResult(
 	result: AutoResult,
 ): Promise<void> {
 	await updateAutoMappings((mappings) => {
-		mappings[provider][sourceIdentityKey(toSourceIdentity(source))] = {
+		mappings[provider][sourceIdentityKey(normalizeSourceIdentity(source))] = {
 			...result,
 			expiresAt:
 				Date.now() +
@@ -180,12 +181,4 @@ function normalizeStoredSourceKey(rawKey: string): string | null {
 	return anilistId === null
 		? null
 		: sourceIdentityKey({ source: "anilist", id: anilistId });
-}
-
-function toSourceIdentity(source: SourceIdentity | AniListId): SourceIdentity {
-	if (typeof source === "number") {
-		return { source: "anilist", id: source };
-	}
-
-	return source;
 }

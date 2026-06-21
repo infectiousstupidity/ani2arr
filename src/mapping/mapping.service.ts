@@ -28,12 +28,11 @@ import {
 import { getAutoResult, listSourceAutoResults } from "./auto.store";
 import type { AutomaticResolver } from "./resolve/resolve";
 import {
+	normalizeSourceIdentity,
 	sourceIdentityKey,
-	type AutoResult,
-	type MappingResult,
 	type SourceIdentity,
-	type UpstreamTarget,
-} from "./types";
+} from "./source-identity";
+import type { AutoResult, MappingResult, UpstreamTarget } from "./types";
 
 type MappingCandidates = {
 	provider: Provider;
@@ -54,7 +53,7 @@ export class MappingService {
 		provider: Provider,
 		source: SourceIdentity | AniListId,
 	): Promise<MappingResult> {
-		const sourceIdentity = toSourceIdentity(source);
+		const sourceIdentity = normalizeSourceIdentity(source);
 		const [manual, upstream, auto] = await Promise.all([
 			getManualFacts(provider, sourceIdentity),
 			getUpstreamTargets(provider, sourceIdentity),
@@ -85,7 +84,7 @@ export class MappingService {
 			metadata?: AniListMediaHint | null;
 		},
 	): Promise<MappingResult> {
-		const sourceIdentity = toSourceIdentity(source);
+		const sourceIdentity = normalizeSourceIdentity(source);
 		const current = await this.getMapping(provider, sourceIdentity);
 
 		if (isStableMapping(current)) {
@@ -143,28 +142,28 @@ export class MappingService {
 				? { providerId, season }
 				: { providerId };
 
-		await saveManualMapping(provider, toSourceIdentity(source), mapping);
+		await saveManualMapping(provider, normalizeSourceIdentity(source), mapping);
 	}
 
 	public async clearManualMapping(
 		provider: Provider,
 		source: SourceIdentity | AniListId,
 	): Promise<void> {
-		await removeManualMapping(provider, toSourceIdentity(source));
+		await removeManualMapping(provider, normalizeSourceIdentity(source));
 	}
 
 	public async setIgnored(
 		provider: Provider,
 		source: SourceIdentity | AniListId,
 	): Promise<void> {
-		await saveIgnored(provider, toSourceIdentity(source));
+		await saveIgnored(provider, normalizeSourceIdentity(source));
 	}
 
 	public async clearIgnored(
 		provider: Provider,
 		source: SourceIdentity | AniListId,
 	): Promise<void> {
-		await removeIgnored(provider, toSourceIdentity(source));
+		await removeIgnored(provider, normalizeSourceIdentity(source));
 	}
 
 	public async rejectCandidate(
@@ -172,7 +171,7 @@ export class MappingService {
 		source: SourceIdentity | AniListId,
 		providerId: number,
 	): Promise<void> {
-		await rejectAutoCandidate(provider, toSourceIdentity(source), providerId);
+		await rejectAutoCandidate(provider, normalizeSourceIdentity(source), providerId);
 	}
 
 	public async clearRejectedCandidate(
@@ -180,14 +179,14 @@ export class MappingService {
 		source: SourceIdentity | AniListId,
 		providerId: number,
 	): Promise<void> {
-		await removeRejectedCandidate(provider, toSourceIdentity(source), providerId);
+		await removeRejectedCandidate(provider, normalizeSourceIdentity(source), providerId);
 	}
 
 	public async cleanupRedundantManualMapping(
 		provider: Provider,
 		source: SourceIdentity | AniListId,
 	): Promise<boolean> {
-		const sourceIdentity = toSourceIdentity(source);
+		const sourceIdentity = normalizeSourceIdentity(source);
 		const [manual, upstream] = await Promise.all([
 			getManualFacts(provider, sourceIdentity),
 			getUpstreamTargets(provider, sourceIdentity),
@@ -322,14 +321,6 @@ async function getLinkedAniListIdForSource(
 	return source.source === "anilist"
 		? source.id
 		: getUniqueAniListIdForSource(source);
-}
-
-function toSourceIdentity(source: SourceIdentity | AniListId): SourceIdentity {
-	if (typeof source === "number") {
-		return { source: "anilist", id: source };
-	}
-
-	return source;
 }
 
 export function chooseMappingResult(input: MappingCandidates): MappingResult {

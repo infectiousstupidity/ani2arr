@@ -15,6 +15,7 @@ import {
 import { ContentRoot, type AnimePageTarget } from "@/content/anilist/anime-page/root";
 import "@/content/anilist/anime-page/style.css";
 import "@/shared/styles/content-base.css";
+import { readMyAnimeListIdFromUrl } from "@/myanimelist/url";
 import { createExtensionQueryClient } from "@/queries/query-client";
 import { getAni2arrApi } from "@/rpc";
 import { ExtensionErrorBoundary } from "@/shared/ui/feedback/extension-error-boundary";
@@ -26,7 +27,6 @@ import {
 	attachSizeSync,
 	ensureActionsAnchor,
 	readFormatFromPage,
-	readMyAnimeListIdFromUrl,
 	readTitleFromPage,
 	removeLayoutArtifacts,
 	waitForElement,

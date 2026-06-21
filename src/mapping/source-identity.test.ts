@@ -1,10 +1,14 @@
 /** Tests for mapping source identity helper behavior. */
-// src/mapping/types.test.ts
+// src/mapping/source-identity.test.ts
 
 import { describe, expect, it } from "vitest";
 import { parseAniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
-import { parseSourceIdentityKey, sourceIdentityKey } from "@/mapping/types";
+import {
+	normalizeSourceIdentity,
+	parseSourceIdentityKey,
+	sourceIdentityKey,
+} from "@/mapping/source-identity";
 
 describe("sourceIdentityKey", () => {
 	it("round-trips AniList source identities", () => {
@@ -19,6 +23,12 @@ describe("sourceIdentityKey", () => {
 
 		expect(sourceIdentityKey(identity)).toBe("mal:5114");
 		expect(parseSourceIdentityKey("mal:5114")).toEqual(identity);
+	});
+
+	it("normalizes legacy AniList ID inputs", () => {
+		const id = parseAniListId(21);
+
+		expect(normalizeSourceIdentity(id)).toEqual({ source: "anilist", id });
 	});
 
 	it("rejects invalid keys", () => {

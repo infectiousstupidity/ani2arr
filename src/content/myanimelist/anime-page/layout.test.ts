@@ -2,12 +2,10 @@
 // src/content/myanimelist/anime-page/layout.test.ts
 
 import { describe, expect, it } from "vitest";
-import { parseMyAnimeListId } from "@/myanimelist/types";
 import {
 	readFormatFromPage,
 	readImageFromPage,
 	readLabeledFacts,
-	readMyAnimeListIdFromUrl,
 	readTitleFromPage,
 } from "./layout";
 
@@ -67,24 +65,6 @@ function createDocument(input: {
 		},
 	}) as unknown as Document;
 }
-
-describe("readMyAnimeListIdFromUrl", () => {
-	it("reads pretty and query anime URLs", () => {
-		expect(
-			readMyAnimeListIdFromUrl(
-				"https://myanimelist.net/anime/5114/Fullmetal_Alchemist__Brotherhood",
-			),
-		).toBe(parseMyAnimeListId(5114));
-		expect(
-			readMyAnimeListIdFromUrl("https://myanimelist.net/anime.php?id=5114"),
-		).toBe(parseMyAnimeListId(5114));
-	});
-
-	it("rejects invalid anime URLs", () => {
-		expect(readMyAnimeListIdFromUrl("https://myanimelist.net/topanime.php")).toBeNull();
-		expect(readMyAnimeListIdFromUrl("not a url")).toBeNull();
-	});
-});
 
 describe("MyAnimeList page readers", () => {
 	it("reads title, image, labels, and format", () => {

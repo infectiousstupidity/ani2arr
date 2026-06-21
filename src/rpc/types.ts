@@ -31,7 +31,8 @@ import type {
 	SonarrSeries,
 	SonarrSeriesSnapshot,
 } from "@/providers/sonarr/types";
-import type { MappingResult, MappingSource, SourceIdentity } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import type { MappingResult, MappingSource } from "@/mapping/types";
 
 export type ProviderExternalId = TvdbId | TmdbId;
 

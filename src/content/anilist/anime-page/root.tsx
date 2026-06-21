@@ -12,7 +12,7 @@ import {
 	resolveAniListTargetProvider,
 	resolveSeerrRequestInput,
 } from "@/content/anilist/target-provider";
-import type { SourceIdentity } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { RequestInSeerrInput } from "@/rpc/types";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";

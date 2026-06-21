@@ -14,10 +14,10 @@ import {
 } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import type { ManualFacts } from "./manual.store";
+import type { SourceIdentity } from "./source-identity";
 import type {
 	AutoResult,
 	MappingResult,
-	SourceIdentity,
 	UpstreamTarget,
 } from "./types";
 import { getMappingIdentities, getMappingList, listMappings } from "./list-mappings";

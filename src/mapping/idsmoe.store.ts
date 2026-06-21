@@ -6,11 +6,8 @@ import type { Provider } from "@/providers/types";
 import { parseTmdbIdOrNull } from "@/providers/schemas";
 import { bumpMappingsRevision } from "@/shared/sync/revisions";
 import { logger } from "@/shared/utils/logger";
-import {
-	sourceIdentityKey,
-	type SourceIdentity,
-	type UpstreamTarget,
-} from "./types";
+import { sourceIdentityKey, type SourceIdentity } from "./source-identity";
+import type { UpstreamTarget } from "./types";
 
 const IDSMOE_API_BASE_URL = "https://api.ids.moe/ids";
 const IDSMOE_TIMEOUT_MS = 10_000;

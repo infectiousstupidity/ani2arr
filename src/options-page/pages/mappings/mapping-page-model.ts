@@ -6,11 +6,8 @@ import {
 	type AniListId,
 	type AniListMetadata,
 } from "@/anilist/types";
-import type {
-	MappingResult,
-	MappingSource,
-	SourceIdentity,
-} from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import type { MappingResult, MappingSource } from "@/mapping/types";
 import type { Provider } from "@/providers/types";
 import {
 	getProviderExternalIdLabel,

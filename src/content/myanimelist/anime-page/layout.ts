@@ -5,10 +5,6 @@ import {
 	parseAniListMediaFormatLabel,
 	type AniListMediaFormat,
 } from "@/anilist/types";
-import {
-	parseMyAnimeListIdOrNull,
-	type MyAnimeListId,
-} from "@/myanimelist/types";
 
 export const TITLE_SELECTOR = "h1.title-name";
 export const DETAILS_COLUMN_SELECTOR = "#content .leftside, .leftside";
@@ -20,21 +16,6 @@ const noop = (): void => {};
 
 function createAbortError(): DOMException {
 	return new DOMException("The operation was aborted.", "AbortError");
-}
-
-export function readMyAnimeListIdFromUrl(value: string): MyAnimeListId | null {
-	let url: URL;
-	try {
-		url = new URL(value);
-	} catch {
-		return null;
-	}
-
-	const pathMatch = /^\/anime\/(\d+)(?:\/|$)/.exec(url.pathname);
-	const rawId =
-		pathMatch?.[1] ??
-		(url.pathname === "/anime.php" ? url.searchParams.get("id") : null);
-	return parseMyAnimeListIdOrNull(rawId === null ? null : Number(rawId));
 }
 
 export function waitForElement(

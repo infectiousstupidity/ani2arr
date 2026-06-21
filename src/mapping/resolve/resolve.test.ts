@@ -8,7 +8,7 @@ import {
 	type AniListMedia,
 } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
-import type { SourceIdentity } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { createAutomaticResolver } from "./resolve";
 
 const setAutoResultMock = vi.hoisted(() => vi.fn());

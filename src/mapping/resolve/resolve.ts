@@ -7,7 +7,7 @@ import type {
 	AniListMedia,
 	AniListMediaHint,
 } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type {
 	Provider,
 	ProviderCredentials,

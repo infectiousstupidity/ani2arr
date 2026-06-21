@@ -3,7 +3,7 @@
 
 import type { ReactElement, ReactNode } from "react";
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
 import type { RadarrFormState } from "@/providers/radarr/form-state";

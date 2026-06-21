@@ -7,12 +7,12 @@ import { parseMyAnimeListIdOrNull } from "@/myanimelist/types";
 import { parseTmdbIdOrNull, parseTvdbIdOrNull } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import {
+	normalizeSourceIdentity,
 	parseSourceIdentityKey,
 	sourceIdentityKey,
-	type SeerrUpstreamTarget,
 	type SourceIdentity,
-	type UpstreamTarget,
-} from "./types";
+} from "./source-identity";
+import type { SeerrUpstreamTarget, UpstreamTarget } from "./types";
 
 const ANIBRIDGE_URL =
 	"https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json";
@@ -56,7 +56,7 @@ export async function getUpstreamTargets(
 	source: SourceIdentity | AniListId,
 ): Promise<UpstreamTarget[]> {
 	const snapshot = await getSnapshot();
-	const sourceKey = sourceIdentityKey(toSourceIdentity(source));
+	const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
 
 	return (snapshot?.mappings[sourceKey] ?? []).filter(
 		(target) => target.provider === provider,
@@ -522,14 +522,6 @@ function addTarget(
 	if (!alreadyExists) {
 		mappings[sourceKey] = [...targets, target];
 	}
-}
-
-function toSourceIdentity(source: SourceIdentity | AniListId): SourceIdentity {
-	if (typeof source === "number") {
-		return { source: "anilist", id: source };
-	}
-
-	return source;
 }
 
 async function getSnapshot(): Promise<UpstreamSnapshot | null> {

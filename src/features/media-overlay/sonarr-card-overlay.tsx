@@ -3,7 +3,7 @@
 
 import type { ReactElement, ReactNode } from "react";
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";

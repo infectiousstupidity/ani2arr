@@ -2,7 +2,7 @@
 // src/rpc/source-input.ts
 
 import type { AniListId } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 
 export type SourceInputLike = {
 	source?: SourceIdentity | undefined;

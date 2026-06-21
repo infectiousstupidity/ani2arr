@@ -3,10 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { parseMyAnimeListId } from "@/myanimelist/types";
-import {
-	parseMyAnimeListBrowseCard,
-	readMyAnimeListIdFromHref,
-} from "./adapter";
+import { parseMyAnimeListBrowseCard } from "./adapter";
 
 type FakeElement = {
 	textContent?: string | null;
@@ -25,20 +22,6 @@ function fakeElement(input: {
 		querySelector: (selector) => input.children?.[selector] ?? null,
 	};
 }
-
-describe("readMyAnimeListIdFromHref", () => {
-	it("normalizes video links", () => {
-		expect(
-			readMyAnimeListIdFromHref(
-				"https://myanimelist.net/anime/5114/Fullmetal_Alchemist__Brotherhood/video",
-			),
-		).toBe(parseMyAnimeListId(5114));
-	});
-
-	it("rejects invalid links", () => {
-		expect(readMyAnimeListIdFromHref("/topanime.php")).toBeNull();
-	});
-});
 
 describe("parseMyAnimeListBrowseCard", () => {
 	it("parses seasonal cards", () => {

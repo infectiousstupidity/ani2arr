@@ -13,9 +13,11 @@ import { listSourceAutoResults } from "./auto.store";
 import { listSourceManualFacts, type ManualFacts } from "./manual.store";
 import {
 	sourceIdentityKey,
+	type SourceIdentity,
+} from "./source-identity";
+import {
 	type AutoResult,
 	type MappingResult,
-	type SourceIdentity,
 	type UpstreamTarget,
 } from "./types";
 import {

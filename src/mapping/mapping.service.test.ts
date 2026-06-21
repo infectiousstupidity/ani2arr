@@ -13,9 +13,11 @@ import type { ManualFacts } from "./manual.store";
 import { MappingService } from "./mapping.service";
 import {
 	sourceIdentityKey,
+	type SourceIdentity,
+} from "./source-identity";
+import {
 	type AutoResult,
 	type MappingResult,
-	type SourceIdentity,
 	type UpstreamTarget,
 } from "./types";
 

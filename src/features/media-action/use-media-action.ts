@@ -2,7 +2,8 @@
 // src/features/media-action/use-media-action.ts
 
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
-import type { MappingResult, SourceIdentity } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import type { MappingResult } from "@/mapping/types";
 import type { Provider } from "@/providers/types";
 import { getProviderOpenTarget } from "@/providers/provider-links";
 import { openProviderPage } from "@/rpc/provider-page";

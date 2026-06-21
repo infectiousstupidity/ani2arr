@@ -2,7 +2,10 @@
 // src/queries/query-keys.ts
 
 import { isAniListId, type AniListId } from "@/anilist/types";
-import { sourceIdentityKey, type SourceIdentity } from "@/mapping/types";
+import {
+	sourceIdentityKey,
+	type SourceIdentity,
+} from "@/mapping/source-identity";
 import type { Provider } from "@/providers/types";
 import type { TmdbId } from "@/providers/schemas";
 import type { SeerrMediaType, SeerrTvSeasons } from "@/providers/seerr/types";

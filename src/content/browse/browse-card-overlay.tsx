@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import type { AniListId } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type { metadataHintFromAniListMetadata } from "@/anilist/title";
 import type {
 	MediaModalMetadataHint,

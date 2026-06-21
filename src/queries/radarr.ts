@@ -7,7 +7,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import type { SourceIdentity } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { getAni2arrApi } from "@/rpc";
 import type {
 	AddRadarrInput,

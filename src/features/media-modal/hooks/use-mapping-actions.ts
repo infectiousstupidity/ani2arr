@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import type { AniListId } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import {
 	parseTmdbIdOrNull,
 	parseTvdbIdOrNull,

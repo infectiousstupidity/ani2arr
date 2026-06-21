@@ -22,7 +22,10 @@ import type {
 	SetManualMappingInput,
 	SourceRpcInput,
 } from "@/rpc/types";
-import { sourceIdentityKey, type SourceIdentity } from "@/mapping/types";
+import {
+	sourceIdentityKey,
+	type SourceIdentity,
+} from "@/mapping/source-identity";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { Provider } from "@/providers/types";
 import { normalizeMetadataIds, normalizeSourceKeys, queryKeys } from "./query-keys";

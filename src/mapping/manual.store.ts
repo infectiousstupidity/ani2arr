@@ -5,10 +5,11 @@ import { storage } from "@wxt-dev/storage";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
 import {
+	normalizeSourceIdentity,
 	parseSourceIdentityKey,
 	sourceIdentityKey,
 	type SourceIdentity,
-} from "./types";
+} from "./source-identity";
 
 export type ManualMapping = {
 	providerId: number;
@@ -53,7 +54,7 @@ export async function getManualFacts(
 ): Promise<ManualFacts | null> {
 	const mappings = await getManualMappings();
 
-	return mappings[provider][sourceIdentityKey(toSourceIdentity(source))] ?? null;
+	return mappings[provider][sourceIdentityKey(normalizeSourceIdentity(source))] ?? null;
 }
 
 export async function listSourceManualFacts(
@@ -79,7 +80,7 @@ export async function setManualMapping(
 	mapping: ManualMapping,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const sourceKey = sourceIdentityKey(toSourceIdentity(source));
+		const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
 		const previous = mappings[provider][sourceKey];
 		const rejectedProviderIds = previous?.rejectedProviderIds?.filter(
 			(providerId) => providerId !== mapping.providerId,
@@ -97,7 +98,7 @@ export async function clearManualMapping(
 	source: SourceIdentity | AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const sourceKey = sourceIdentityKey(toSourceIdentity(source));
+		const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
 		const previous = mappings[provider][sourceKey];
 
 		if (!previous || !("mapping" in previous)) {
@@ -120,7 +121,7 @@ export async function setIgnored(
 	source: SourceIdentity | AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const sourceKey = sourceIdentityKey(toSourceIdentity(source));
+		const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
 		const previous = mappings[provider][sourceKey];
 
 		mappings[provider][sourceKey] = {
@@ -137,7 +138,7 @@ export async function clearIgnored(
 	source: SourceIdentity | AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const sourceKey = sourceIdentityKey(toSourceIdentity(source));
+		const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
 		const previous = mappings[provider][sourceKey];
 
 		if (!previous || !("ignored" in previous)) {
@@ -161,7 +162,7 @@ export async function rejectAutoCandidate(
 	providerId: number,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const sourceKey = sourceIdentityKey(toSourceIdentity(source));
+		const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
 		const previous = mappings[provider][sourceKey];
 
 		if (
@@ -191,7 +192,7 @@ export async function clearRejectedAutoCandidate(
 	providerId: number,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const sourceKey = sourceIdentityKey(toSourceIdentity(source));
+		const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
 		const previous = mappings[provider][sourceKey];
 
 		if (!previous?.rejectedProviderIds?.includes(providerId)) {
@@ -291,12 +292,4 @@ function normalizeStoredSourceKey(rawKey: string): string | null {
 	return anilistId === null
 		? null
 		: sourceIdentityKey({ source: "anilist", id: anilistId });
-}
-
-function toSourceIdentity(source: SourceIdentity | AniListId): SourceIdentity {
-	if (typeof source === "number") {
-		return { source: "anilist", id: source };
-	}
-
-	return source;
 }
