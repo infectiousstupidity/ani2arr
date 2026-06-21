@@ -185,7 +185,8 @@ export function BrowseCardOverlay({
 	tooltipContainer,
 }: BrowseCardOverlayProps): React.ReactElement | null {
 	/** MAL v1 uses source identity internally, but content actions still require an AniList crosswalk. */
-	if (parsed.anilistId === undefined) return null;
+	const anilistId = parsed.anilistId;
+	if (anilistId === undefined) return null;
 
 	const rawProvider = resolveBrowseCardProvider({ parsed, metadata, mappedIdentities });
 
@@ -211,7 +212,7 @@ export function BrowseCardOverlay({
 	): void => {
 		openProviderModal({
 			onOpenMediaModal,
-			anilistId: parsed.anilistId,
+			anilistId,
 			source: parsed.source,
 			provider,
 			initialView,
@@ -221,7 +222,7 @@ export function BrowseCardOverlay({
 
 	const openSeerrModal = () => {
 		onOpenMediaModal({
-			anilistId: parsed.anilistId,
+			anilistId,
 			source: parsed.source,
 			kind: "seerr",
 			openSource: "content",
@@ -264,7 +265,7 @@ export function BrowseCardOverlay({
 	const seerrStackActions: ReactNode =
 		seerrEnabled ? (
 			<SeerrCardStackActions
-				anilistId={parsed.anilistId}
+				anilistId={anilistId}
 				mappedIdentities={mappedIdentities}
 				isConfigured={seerrOpts.isConfigured}
 				observeTarget={parsed.mountTarget}
@@ -278,7 +279,7 @@ export function BrowseCardOverlay({
 	const showSeerrMain = seerrEnabled && (primaryStatus === "seerr" || activeArr === "none");
 
 	const commonProps = {
-		anilistId: parsed.anilistId,
+		anilistId,
 		source: parsed.source,
 		title: displayTitle,
 		metadata,
@@ -290,7 +291,7 @@ export function BrowseCardOverlay({
 	if (showSeerrMain) {
 		return (
 			<SeerrStandaloneCardOverlay
-				anilistId={parsed.anilistId}
+				anilistId={anilistId}
 				mappedIdentities={mappedIdentities}
 				isConfigured={seerrOpts.isConfigured}
 				observeTarget={parsed.mountTarget}

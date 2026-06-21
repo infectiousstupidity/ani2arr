@@ -138,7 +138,7 @@ describe("mappingHandlers", () => {
 	});
 
 	it("exposes a narrow upstream refresh handler", async () => {
-		refreshUpstreamMappingsMock.mockResolvedValueOnce();
+		refreshUpstreamMappingsMock.mockImplementationOnce(async () => {});
 
 		await expect(mappingHandlers.refreshUpstreamMappings()).resolves.toBeUndefined();
 
