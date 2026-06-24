@@ -1,0 +1,28 @@
+# English extension messages for manifest and popup localization.
+# src/locales/en.yml
+
+extName: ani2arr
+extDescription: Adds one-click Sonarr, Radarr, and Seerr actions to AniList and AniChart pages
+
+popup:
+  loading: Loading...
+  quickSettings: Quick settings
+  fullSettingsCta: Full
+  openFullSettingsPage: Open full settings page
+  openProviderSettings: Open $1 settings
+  configured: Configured
+  notConfigured: Not configured
+  always: Always
+  onHover: On hover
+  browseCards: Browse cards
+  browseCardsDescription: Enabled controls whether browse-card UI is injected. Visibility applies only while enabled.
+  animePages: Anime pages
+  animePagesDescription: Button above AniList's native page buttons.
+  sonarrAnimePageDescription: Show series actions on supported anime pages.
+  radarrAnimePageDescription: Show movie actions on supported anime pages.
+  seerrAnimePageDescription: Show request actions on supported anime pages.
+  noProviderConfigured: No provider configured yet
+  noProviderConfiguredDescription: Configure Sonarr, Radarr, or Seerr in the full settings page to enable quick settings here.
+  saving: Saving...
+  saveError: Failed to save settings.
+  logoAlt: ani2arr logo
