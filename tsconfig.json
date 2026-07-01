@@ -15,8 +15,6 @@
     "jsx": "react-jsx",
     "paths": {
       "@/*": ["./src/*"],
-      "#i18n": ["./.wxt/i18n/index.ts"],
-      "#i18n/*": ["./.wxt/i18n/index.ts/*"]
     }
   },
 }

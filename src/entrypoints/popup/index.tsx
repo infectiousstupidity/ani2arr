@@ -4,7 +4,6 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { i18n } from "#i18n";
 import { ExternalLink } from "lucide-react";
 import { browser } from "wxt/browser";
 import { openOptionsPage } from "@/rpc/runtime-messages";
