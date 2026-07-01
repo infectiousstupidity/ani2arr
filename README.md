@@ -15,6 +15,7 @@
   <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/" target="_blank" rel="noopener noreferrer"><img alt="Firefox Add-on" src="https://img.shields.io/badge/Firefox-AMO-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white"></a>
   <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer"><img alt="Release 2.1.0" src="https://img.shields.io/badge/Release-v2.1.0-6e6e6e?style=for-the-badge&logo=github&logoColor=white"></a>
   <a href="https://github.com/infectiousstupidity/ani2arr/actions/workflows/ci.yml" target="_blank" rel="noopener noreferrer"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/infectiousstupidity/ani2arr/ci.yml?branch=main&label=CI&style=for-the-badge&logo=githubactions&logoColor=white"></a>
+  <img alt="Languages: en | ja" src="https://img.shields.io/badge/Languages-en%20%7C%20ja-6e6e6e?style=for-the-badge">
   <a href="LICENSE"><img alt="License GPL-3.0-only" src="https://img.shields.io/badge/License-GPL--3.0--only-6e6e6e?style=for-the-badge"></a>
 </p>
 
@@ -110,7 +111,7 @@ Release assets on GitHub include SHA256 checksums for manual verification.
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | <a href="docs/images/options-provider.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/options-provider.png" alt="ani2arr provider options for Sonarr, Radarr, and Seerr" width="260"></a> | <a href="docs/images/options-mapping.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/options-mapping.png" alt="ani2arr mapping options" width="260"></a> | <a href="docs/images/options-ui.png" target="_blank" rel="noopener noreferrer"><img src="docs/images/options-ui.png" alt="ani2arr UI options" width="260"></a> |
 
-## Matching
+## ID Matching
 
 ani2arr uses multiple sources to match AniList entries to the correct Sonarr, Radarr, or Seerr target:
 
