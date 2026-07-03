@@ -1,84 +1,73 @@
-# General rules
+# Ani2arr Agent Notes
 
-- Caveman mode
-- Always run pnpm commands through Windows (e.g cmd.exe /d /s /c "pnpm lint")
-- KISS principles
-- SOLID principles
-- YAGNI principles
-- No typescript spaghetti or gymnastics
-- No overengineering or premature optimization
-- No enterprise patterns or jargon
-- No unnecessary abstractions or indirections
-- No overuse of design patterns. Use them only when they clearly solve a problem.
-- Only add the absolute highest value tests. Don't test implementation details or trivial code. Focus on critical paths and edge case where absolutely necessary. DO NOT TEST USELESS UI STUFF.
-- DO NOT use overlapping enums; prefer flat, discriminated unions.
-- Read functions must be 100% pure with zero side-effects or silent mutations.
-- Code should be dumb, flat, and easy to delete.
-- Optimize for simplicity, readability, and a single-user environment.
-- DO NOT use enterprise scaling patterns like CQRS, Dependency Injection containers, or materialized views
-- No barrel exports
+Use global base skills when relevant.
 
-- validate touched files with pnpm lint:target
-- run tests for files with pnpm test
+## Project Shape
 
-- All files must include a header comment with the file location and a brief description of their purpose and any important details.
-  -- Example:
+Ani2arr is a WXT browser extension for AniList/AniChart pages with Sonarr, Radarr, and Seerr integration.
 
-```ts
-/** RPC handlers for AniList media fetch, search, and metadata flows. */
-// src/rpc/handlers/anilist.handlers.ts
-```
+Relevant skills:
 
-- For all legacy or temporary compatibility code, add a comment with the prefix `LEGACY:` and a brief explanation of why it exists and when it can be removed.
-  -- Example:
+- `caveman` always
+- `wxt-browser-extension` for extension runtime, entrypoints, storage, messaging, manifest, and content-script work.
+- `react-best-practices` for React UI work.
+- `boring-architecture` for boundary or data-flow changes.
+- `security-scanning` for audit, Gitleaks, Semgrep, or dependency security work.
+- `simplicity-review` for code, folder, architecture, and plan simplification.
+- `find-docs` for up to date dependency and API docs. Do not rely on your training data.
 
-```ts
-/** LEGACY: Temporary compatibility layer for AniList integration. */
-// src/rpc/handlers/anilist.handlers.ts
-```
+## Commands
 
-- Avoid these commenting mistakes
-  - Stating the obvious: Don't comment what the code clearly shows (e.g., "increment counter" above `i++`)
-  - Outdated comments: Remove or update comments when code changes
-  - Commented-out code: Use version control instead of leaving old code
-  - Excessive comments: If you need many comments, consider refactoring for clarity
+- Lint touched files: `pnpm lint:target <files>`
+- Run focused tests: `pnpm test <files-or-patterns>`
+- Full validation when broad behavior changes: `pnpm validate`
 
-# Ownership Rules
+## Code Rules
 
-Respect folder boundaries.
+- New or touched code files need the standard header:
+  ```ts
+  /** RPC handlers for AniList media fetch, search, and metadata flows. */
+  // src/rpc/handlers/anilist.handlers.ts
+  ```
+- Mark temporary compatibility code with `LEGACY:` and the removal condition.
+- No barrel exports.
+- Read functions must be pure: no side effects, no silent mutation.
+- Prefer flat discriminated unions over overlapping enums.
+
+## Ownership
+
+Respect folder ownership:
 
 - `anilist`: AniList IDs, API, metadata, cache.
-- `mapping`: AniList ID -> provider ID. Manual, auto, ignored, upstream mappings.
-- `providers`: Sonarr/Radarr clients, IDs, metadata, search, library, cache.
-- `settings`: Persisted extension settings and provider config.
-- `rpc`: Request/response boundary. Combine domain facts into DTOs.
-- `queries`: React Query adapters. Cache keys, stale times, invalidations, and UI-facing query/mutation hooks around RPC or local option reads. No provider clients, storage ownership, or background work.
-- `background`: Wire services, lifecycle, startup, reset, scheduled refresh.
-- `content`: Injected page behavior, DOM parsing, portals, launch snapshots.
-- `features`: UI features. Modal, overlay, provider action, mapping UI.
-- `options-page`: Options UI only.
-- `shared`: Generic utilities only. No domain knowledge.
+- `mapping`: AniList ID to provider ID mappings.
+- `providers`: Sonarr, Radarr, Seerr clients, IDs, metadata, search, library, cache.
+- `settings`: persisted extension settings and provider config.
+- `rpc`: request/response boundary and DTO composition.
+- `queries`: React Query hooks around RPC/local option reads only.
+- `background`: service wiring, lifecycle, startup, reset, scheduled refresh.
+- `content`: injected page behavior, DOM parsing, portals, launch snapshots.
+- `features`: modal, overlay, provider actions, mapping UI.
+- `options-page`: options UI only.
+- `shared`: generic utilities only. No domain knowledge.
 
-Good flow:
+Allowed flow:
 
 ```text
 features/options-page/content
   -> queries
   -> rpc
-  -> mapping.resolve(anilistId, provider)
-  -> providers/library.check(providerId)
-  -> response DTO
+  -> mapping
+  -> providers
 ```
 
-Forbidden:
+Forbidden flow:
 
 ```text
-providers/library -> mapping
-providers/library -> rpc
-mapping -> providers/library
-shared -> domain folders
+providers -> mapping/rpc
+mapping -> providers
 features -> provider clients/storage
 queries -> provider clients/storage
+shared -> domain folders
 ```
 
-If a file answers more than one domain question, split or move it.
+If one file answers multiple domain questions, split or move it.
