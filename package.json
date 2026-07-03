@@ -23,7 +23,9 @@
 		"generate:anilist-metadata": "node ./scripts/generate-anilist-metadata.mjs",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"prepare": "husky"
+		"prepare": "husky",
+		"security:secrets": "gitleaks detect --source . --redact --verbose --no-git",
+		"security": "pnpm run security:secrets && pnpm run audit"
 	},
 	"lint-staged": {
 		"src/**/*.{ts,tsx}": "eslint --fix"

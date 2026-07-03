@@ -1,0 +1,9 @@
+# .semgrepignore
+node_modules/
+dist/
+build/
+out/
+.output/
+.wxt/
+coverage/
+pnpm-lock.yaml

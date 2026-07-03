@@ -1,4 +1,3 @@
-# Builds release artifacts and creates GitHub releases for ani2arr tags.
 # .github/workflows/release.yml
 name: Release
 
@@ -19,15 +18,15 @@ jobs:
 
     steps:
       - name: Check out repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v5 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v4 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
         with:
           version: 11.7.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
         with:
           node-version: 24
           cache: pnpm

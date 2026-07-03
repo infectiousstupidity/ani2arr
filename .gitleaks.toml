@@ -1,0 +1,11 @@
+# .gitleaks.toml
+title = "project gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowed examples and generated files"
+paths = [
+  '(^|/)pnpm-lock.yaml$'
+]
