@@ -51,6 +51,7 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@v5 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Scan secrets
