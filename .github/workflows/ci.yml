@@ -1,4 +1,3 @@
-# Runs pull request and main branch validation for ani2arr.
 # .github/workflows/ci.yml
 name: CI
 
@@ -7,6 +6,10 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -21,15 +24,15 @@ jobs:
 
     steps:
       - name: Check out repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v5 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v4 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
         with:
           version: 11.7.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
         with:
           node-version: 24
           cache: pnpm
@@ -37,20 +40,38 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Audit dependencies
-        run: pnpm run audit
+      - name: Validate
+        run: pnpm run validate
 
-      - name: Lint
-        run: pnpm run lint
+  gitleaks:
+    name: Gitleaks
+    runs-on: ubuntu-latest
 
-      - name: Compile
-        run: pnpm run compile
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v5 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Test
-        run: pnpm run test
+      - name: Scan secrets
+        uses: gitleaks/gitleaks-action@v3 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
 
-      - name: Build Firefox
-        run: pnpm run build
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
 
-      - name: Build Chrome
-        run: pnpm run build:chrome
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v5 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
+        with:
+          persist-credentials: false
+
+      - name: Scan source
+        run: semgrep scan --config p/default --error

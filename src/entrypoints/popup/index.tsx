@@ -33,19 +33,19 @@ const queryClient = createExtensionQueryClient();
 const CONNECTIONS: readonly ConnectionId[] = [...PROVIDERS, "seerr"];
 
 const badgeOptions: Array<{ value: BadgeVisibility; label: string }> = [
-	{ value: "always", label: "Always" },
-	{ value: "hover", label: "On hover" },
+	{ value: "always", label: i18n.t("popup.always") },
+	{ value: "hover", label: i18n.t("popup.onHover") },
 ];
 
 const configuredStatus: ProviderStatusView = {
 	isProviderConfigured: true,
-	shortLabel: "Configured",
+	shortLabel: i18n.t("popup.configured"),
 	variantClassName: "a2a-provider-status--configured",
 };
 
 const notConfiguredStatus: ProviderStatusView = {
 	isProviderConfigured: false,
-	shortLabel: "Not configured",
+	shortLabel: i18n.t("popup.notConfigured"),
 };
 
 function getConnectionLabel(connection: ConnectionId): string {
@@ -54,14 +54,14 @@ function getConnectionLabel(connection: ConnectionId): string {
 
 function getAnimePageConnectionDescription(connection: ConnectionId): string {
 	if (connection === "sonarr") {
-		return "Show series actions on supported anime pages.";
+		return i18n.t("popup.sonarrAnimePageDescription");
 	}
 
 	if (connection === "radarr") {
-		return "Show movie actions on supported anime pages.";
+		return i18n.t("popup.radarrAnimePageDescription");
 	}
 
-	return "Show request actions on supported anime pages.";
+	return i18n.t("popup.seerrAnimePageDescription");
 }
 
 export function QuickSettings(): React.JSX.Element {
@@ -77,7 +77,7 @@ export function QuickSettings(): React.JSX.Element {
 	if (publicOptionsQuery.isLoading || !publicSettings) {
 		return (
 			<div className="flex w-90 justify-center pb-4 pt-14 text-sm text-text-secondary">
-				Loading...
+				{i18n.t("popup.loading")}
 			</div>
 		);
 	}
@@ -105,7 +105,7 @@ export function QuickSettings(): React.JSX.Element {
 		try {
 			await saveOptions.mutateAsync(updater(publicSettings));
 		} catch (error) {
-			setSaveError((error as Error)?.message ?? "Failed to save settings.");
+			setSaveError((error as Error)?.message ?? i18n.t("popup.saveError"));
 		}
 	};
 
@@ -179,7 +179,7 @@ export function QuickSettings(): React.JSX.Element {
 				<div className="flex items-center gap-2">
 					<img
 						src="/icons/48.png"
-						alt="ani2arr logo"
+						alt={i18n.t("popup.logoAlt")}
 						className="h-8 w-8 rounded-md"
 					/>
 					<div>
@@ -189,7 +189,9 @@ export function QuickSettings(): React.JSX.Element {
 								v{extensionVersion}
 							</span>
 						</div>
-						<p className="text-xs text-text-secondary">Quick settings</p>
+						<p className="text-xs text-text-secondary">
+							{i18n.t("popup.quickSettings")}
+						</p>
 					</div>
 				</div>
 
@@ -197,11 +199,11 @@ export function QuickSettings(): React.JSX.Element {
 					type="button"
 					onClick={() => openOptionsPage()}
 					className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border-primary px-2.5 py-1.5 text-xs text-text-secondary transition-colors hover:bg-bg-secondary hover:text-text-primary"
-					aria-label="Open full settings page"
-					title="Open full settings page"
+					aria-label={i18n.t("popup.openFullSettingsPage")}
+					title={i18n.t("popup.openFullSettingsPage")}
 				>
 					<ExternalLink className="h-3.5 w-3.5" />
-					Full
+					{i18n.t("popup.fullSettingsCta")}
 				</button>
 			</header>
 
@@ -219,8 +221,10 @@ export function QuickSettings(): React.JSX.Element {
 								type="button"
 								onClick={() => openOptionsPage({ sectionId: provider })}
 								className="absolute right-2 top-2 cursor-pointer rounded p-1 text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
-								aria-label={`Open ${providerLabel} settings`}
-								title={`Open ${providerLabel} settings`}
+								aria-label={i18n.t("popup.openProviderSettings", [
+									providerLabel,
+								])}
+								title={i18n.t("popup.openProviderSettings", [providerLabel])}
 							>
 								<ExternalLink className="h-3.5 w-3.5" />
 							</button>
@@ -253,10 +257,11 @@ export function QuickSettings(): React.JSX.Element {
 			{hasAnyProviderConfigured ? (
 				<section className="space-y-2.5 rounded-xl border border-border-primary bg-bg-secondary/70 p-3">
 					<div>
-						<p className="text-sm font-semibold">Browse cards</p>
+						<p className="text-sm font-semibold">
+							{i18n.t("popup.browseCards")}
+						</p>
 						<p className="text-xs text-text-secondary">
-							Enabled controls whether browse-card UI is injected. Visibility
-							applies only while enabled.
+							{i18n.t("popup.browseCardsDescription")}
 						</p>
 					</div>
 
@@ -318,9 +323,11 @@ export function QuickSettings(): React.JSX.Element {
 					})}
 
 					<div>
-						<p className="text-sm font-semibold">Anime pages</p>
+						<p className="text-sm font-semibold">
+							{i18n.t("popup.animePages")}
+						</p>
 						<p className="text-xs text-text-secondary">
-							Button above AniList&apos;s native page buttons.
+							{i18n.t("popup.animePagesDescription")}
 						</p>
 					</div>
 
@@ -359,10 +366,11 @@ export function QuickSettings(): React.JSX.Element {
 				</section>
 			) : (
 				<section className="rounded-xl border border-border-primary bg-bg-secondary/70 p-4 text-center">
-					<p className="text-sm font-semibold">No provider configured yet</p>
+					<p className="text-sm font-semibold">
+						{i18n.t("popup.noProviderConfigured")}
+					</p>
 					<p className="mt-1 text-xs text-text-secondary">
-						Configure Sonarr, Radarr, or Seerr in the full settings page to
-						enable quick settings here.
+						{i18n.t("popup.noProviderConfiguredDescription")}
 					</p>
 				</section>
 			)}
@@ -375,7 +383,7 @@ export function QuickSettings(): React.JSX.Element {
 				{saveError ? (
 					<span className="text-error">{saveError}</span>
 				) : (isSaving ? (
-					"Saving..."
+					i18n.t("popup.saving")
 				) : null)}
 			</div>
 		</div>
