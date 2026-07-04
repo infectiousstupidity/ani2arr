@@ -52,3 +52,14 @@ export function normalizeSourceIdentity(
 
 	return source;
 }
+
+export function normalizeStoredSourceKey(rawKey: string): string | null {
+	const source = parseSourceIdentityKey(rawKey);
+	if (source !== null) return sourceIdentityKey(source);
+
+	/** LEGACY: pre-MAL mapping stores used raw AniList ID object keys. */
+	const anilistId = parseAniListIdOrNull(Number(rawKey));
+	return anilistId === null
+		? null
+		: sourceIdentityKey({ source: "anilist", id: anilistId });
+}

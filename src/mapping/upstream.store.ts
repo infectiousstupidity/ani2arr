@@ -2,7 +2,7 @@
 // src/mapping/upstream.store.ts
 
 import { storage } from "@wxt-dev/storage";
-import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
+import type { AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
 import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
 import type {
@@ -11,6 +11,7 @@ import type {
 	UpstreamMappings,
 } from "@/mapping/upstream/anibridge.parser";
 import {
+	normalizeStoredSourceKey,
 	normalizeSourceIdentity,
 	parseSourceIdentityKey,
 	sourceIdentityKey,
@@ -247,15 +248,4 @@ function normalizeAniListCrosswalkKeys(
 	}
 
 	return normalized;
-}
-
-function normalizeStoredSourceKey(rawKey: string): string | null {
-	const source = parseSourceIdentityKey(rawKey);
-	if (source !== null) return sourceIdentityKey(source);
-
-	/** LEGACY: pre-MAL snapshots used raw AniList ID object keys. */
-	const anilistId = parseAniListIdOrNull(Number(rawKey));
-	return anilistId === null
-		? null
-		: sourceIdentityKey({ source: "anilist", id: anilistId });
 }

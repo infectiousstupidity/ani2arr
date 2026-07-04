@@ -2,10 +2,11 @@
 // src/mapping/auto.store.ts
 
 import { storage } from "@wxt-dev/storage";
-import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
+import type { AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
 import { bumpMappingsRevision } from "@/shared/sync/revisions";
 import {
+	normalizeStoredSourceKey,
 	normalizeSourceIdentity,
 	parseSourceIdentityKey,
 	sourceIdentityKey,
@@ -170,15 +171,4 @@ function normalizeAutoProviderMappings(
 	}
 
 	return normalized;
-}
-
-function normalizeStoredSourceKey(rawKey: string): string | null {
-	const source = parseSourceIdentityKey(rawKey);
-	if (source !== null) return sourceIdentityKey(source);
-
-	/** LEGACY: pre-MAL auto mappings used raw AniList ID object keys. */
-	const anilistId = parseAniListIdOrNull(Number(rawKey));
-	return anilistId === null
-		? null
-		: sourceIdentityKey({ source: "anilist", id: anilistId });
 }
