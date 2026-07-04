@@ -97,9 +97,7 @@ describe("parseAniBridgeMappings", () => {
 			"anidb:2:R": {
 				"anilist:2": {},
 				"tmdb_show:500:s2": {},
-				"tmdb_show:500:s1": {},
 				"tvdb_show:700:s1": {},
-				"tvdb_show:700:s2": {},
 			},
 		});
 
@@ -115,6 +113,8 @@ describe("parseAniBridgeMappings", () => {
 			mediaType: "tv",
 			tmdbId: tmdb(500),
 			seasons: [1, 2],
+			tmdbSeasons: [2],
+			tvdbSeasons: [1],
 			tvdbId: tvdb(700),
 		});
 	});
@@ -136,6 +136,7 @@ describe("parseAniBridgeMappings", () => {
 			mediaType: "tv",
 			tmdbId: tmdb(500),
 			seasons: [1, 2],
+			tmdbSeasons: [1, 2],
 		});
 	});
 });

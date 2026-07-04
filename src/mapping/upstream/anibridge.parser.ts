@@ -244,6 +244,8 @@ function parseSeerrTarget(
 		mediaType: "tv",
 		tmdbId,
 		seasons,
+		...(tmdbSeasons.length === 0 ? {} : { tmdbSeasons }),
+		...(tvdbSeasons.length === 0 ? {} : { tvdbSeasons }),
 		...(tvdbId === undefined ? {} : { tvdbId }),
 	};
 }
