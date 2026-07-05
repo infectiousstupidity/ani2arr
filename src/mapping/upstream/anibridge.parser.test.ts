@@ -119,6 +119,26 @@ describe("parseAniBridgeMappings", () => {
 		});
 	});
 
+	it("stores Seerr request targets only under AniList source keys", () => {
+		const seerrTargets = parseAniBridgeSeerrTargets({
+			"anidb:5114:R": {
+				"anilist:21": {},
+				"mal:5114": {},
+				"tmdb_movie:300": {},
+			},
+		});
+
+		expect(
+			seerrTargets[sourceIdentityKey({ source: "anilist", id: aid(21) })],
+		).toEqual({
+			mediaType: "movie",
+			tmdbId: tmdb(300),
+		});
+		expect(
+			seerrTargets[sourceIdentityKey({ source: "mal", id: mal(5114) })],
+		).toBeUndefined();
+	});
+
 	it("does not attach TVDB IDs when scoped TVDB targets disagree", () => {
 		const seerrTargets = parseAniBridgeSeerrTargets({
 			"anidb:1:R": {

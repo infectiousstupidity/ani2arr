@@ -102,6 +102,7 @@ export async function listSeerrUpstreamTargets(
 	)) {
 		const source = parseSourceIdentityKey(rawSourceKey);
 
+		/** LEGACY: remove when stored upstream snapshots are migrated past MAL-keyed Seerr targets. */
 		if (source?.source === "anilist" && requestedIds.has(source.id)) {
 			records.push({ anilistId: source.id, target });
 		}
@@ -121,6 +122,7 @@ export async function listAllSeerrUpstreamTargets(): Promise<
 	)) {
 		const source = parseSourceIdentityKey(rawSourceKey);
 
+		/** LEGACY: remove when stored upstream snapshots are migrated past MAL-keyed Seerr targets. */
 		if (source?.source === "anilist") {
 			records.push({ anilistId: source.id, target });
 		}

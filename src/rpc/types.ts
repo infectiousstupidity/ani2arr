@@ -131,6 +131,7 @@ export type GetMappingsInput = {
 };
 
 export type GetMappingIdentitiesInput = AniListId[];
+/** Seerr target/request APIs are AniList-only until source-only Seerr UI exists. */
 export type GetSeerrTargetsInput = AniListId[];
 export type GetSeerrTargetInput = AniListId;
 

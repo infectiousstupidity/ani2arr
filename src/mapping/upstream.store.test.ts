@@ -6,6 +6,7 @@ import { browser } from "wxt/browser";
 import { parseAniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId } from "@/providers/schemas";
+import { sourceIdentityKey } from "@/mapping/source-identity";
 import { MAX_ANIBRIDGE_BYTES } from "@/mapping/upstream/anibridge.client";
 import {
 	clearUpstreamMappings,
@@ -119,6 +120,29 @@ describe("refreshUpstreamMappings", () => {
 		]);
 		await expect(listSeerrUpstreamTargets([aid(1)])).resolves.toEqual([
 			{ anilistId: aid(1), target: { mediaType: "movie", tmdbId: tmdb(300) } },
+		]);
+	});
+
+	it("ignores legacy MAL-keyed Seerr targets on read", async () => {
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				mappings: {},
+				seerrTargets: {
+					[sourceIdentityKey({ source: "anilist", id: aid(21) })]: {
+						mediaType: "movie",
+						tmdbId: tmdb(300),
+					},
+					[sourceIdentityKey({ source: "mal", id: mal(5114) })]: {
+						mediaType: "movie",
+						tmdbId: tmdb(400),
+					},
+				},
+				fetchedAt: Date.now(),
+			},
+		});
+
+		await expect(listSeerrUpstreamTargets([aid(21)])).resolves.toEqual([
+			{ anilistId: aid(21), target: { mediaType: "movie", tmdbId: tmdb(300) } },
 		]);
 	});
 

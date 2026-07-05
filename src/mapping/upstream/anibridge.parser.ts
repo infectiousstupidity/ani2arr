@@ -74,7 +74,7 @@ export function parseAniBridgeMappingsPayload(
 				addTarget(mappings, sourceKey, target);
 			}
 
-			if (seerrTarget) {
+			if (seerrTarget && sourceIdentity.source === "anilist") {
 				seerrTargets[sourceKey] = seerrTarget;
 			}
 
