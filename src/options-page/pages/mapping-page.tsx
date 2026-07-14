@@ -13,8 +13,8 @@ import { SettingsSection } from "../components/settings-section";
 import { MappingContent } from "./mappings/mappings-list";
 import { MappingsFilterBar } from "./mappings/mappings-filter-bar";
 import {
+	getFilteredMappingGroups,
 	getMappingListModel,
-	getMappingsInput,
 	getMetadataById,
 	getTargetSearchValue,
 	readTargetAniListIdFromHash,
@@ -72,19 +72,27 @@ const MappingsPageContent = ({
 	const preferredTitleLanguage =
 		publicOptions?.ui.preferredAniListTitleLanguage ?? "english";
 
-	const mappingsInput = getMappingsInput({
-		provider: providerFilter,
-		search: searchQuery,
-		source: sourceFilter,
-		status: statusFilter,
-		limit: visibleLimit,
-	});
-	const mappingsQuery = useMappings(mappingsInput);
-
-	const groups = useMemo(
-		() => mappingsQuery.data?.groups ?? [],
-		[mappingsQuery.data?.groups],
+	const mappingsQuery = useMappings();
+	const filteredMappings = useMemo(
+		() =>
+			getFilteredMappingGroups({
+				groups: mappingsQuery.data?.groups ?? [],
+				provider: providerFilter,
+				status: statusFilter,
+				source: sourceFilter,
+				search: searchQuery,
+				limit: visibleLimit,
+			}),
+		[
+			mappingsQuery.data?.groups,
+			providerFilter,
+			searchQuery,
+			sourceFilter,
+			statusFilter,
+			visibleLimit,
+		],
 	);
+	const groups = filteredMappings.groups;
 	const listModel = useMemo(
 		() =>
 			getMappingListModel({
@@ -127,7 +135,7 @@ const MappingsPageContent = ({
 		});
 	};
 
-	const totalGroups = mappingsQuery.data?.total ?? groups.length;
+	const totalGroups = filteredMappings.total;
 	const resetVisibleLimit = (): void => {
 		setVisibleLimit(MAPPING_GROUP_PAGE_SIZE);
 	};
@@ -207,9 +215,8 @@ const MappingsPageContent = ({
 							onClick={() =>
 								setVisibleLimit((current) => current + MAPPING_GROUP_PAGE_SIZE)
 							}
-							disabled={mappingsQuery.isFetching}
 						>
-							{mappingsQuery.isFetching ? "Loading..." : "Load more"}
+							Load more
 						</Button>
 					</div>
 				) : null}
