@@ -15,6 +15,10 @@ import type { AniListId, AniListMediaFormat } from "@/anilist/types";
 import {
 	getMappingIdentities,
 	getMappingList,
+	type AmbiguousMappingListEntry,
+	type IgnoredMappingListEntry,
+	type MappedMappingListEntry,
+	type UnmappedMappingListEntry,
 } from "@/mapping/list-mappings";
 import type { MappingResult, MappingSource } from "@/mapping/types";
 import {
@@ -61,6 +65,32 @@ type ProviderMetaSource = {
 	title: string;
 	status?: string | null | undefined;
 } & ProviderRouteSlugSource;
+
+type ComposedMappingsStatus = {
+	mapped: readonly {
+		providerId: number;
+		entries: readonly MappedMappingListEntry[];
+		isInLibrary: boolean;
+		libraryItem: ProviderMetaSource | null;
+	}[];
+	ambiguous: readonly (AmbiguousMappingListEntry & {
+		existingTargets: readonly unknown[];
+		activeTarget: {
+			providerId: number;
+			libraryItem: ProviderMetaSource | null;
+		} | null;
+	})[];
+	ignored: readonly IgnoredMappingListEntry[];
+	unmapped: readonly UnmappedMappingListEntry[];
+};
+
+type BuildMappingGroupsInput = {
+	provider: Provider;
+	status: ComposedMappingsStatus;
+	toProviderMeta: (
+		item: ProviderMetaSource | null,
+	) => MappingListProviderMeta | undefined;
+};
 
 async function loadSonarrLibrary(): Promise<SonarrSeriesSnapshot[]> {
 	const credentials = await getProviderConfig("sonarr");
@@ -146,121 +176,14 @@ function rowStatus(
 	}
 }
 
-async function buildProviderGroups(provider: Provider): Promise<MappingListGroup[]> {
-	const mappingList = await getMappingList(provider, { loadFormatByAniListId });
-
-	if (provider === "sonarr") {
-		const status = composeSonarrMappingsLibraryStatus(
-			mappingList,
-			await loadSonarrLibrary(),
-		);
-
-		return [
-			...status.mapped.map((group) => {
-				const providerMeta = sonarrMeta(group.libraryItem);
-				const providerId = group.providerId as ProviderExternalId;
-				const rows: MappingListRow[] = group.entries.map((entry) => ({
-					source: entry.source,
-					anilistId: entry.anilistId,
-					provider,
-					result: entry.result,
-					providerId,
-					isInLibrary: group.isInLibrary,
-					mappingRowStatus: rowStatus(entry.result, group.isInLibrary),
-					...(providerMeta ? { providerMeta } : {}),
-				}));
-
-				return {
-					key: `${provider}:${group.providerId}`,
-					provider,
-					providerId,
-					rows,
-					linkedAniListIds: rows.map((row) => row.anilistId),
-					isInLibrary: group.isInLibrary,
-					...(providerMeta ? { providerMeta } : {}),
-				};
-			}),
-			...status.ambiguous.map((entry) => {
-				const active = entry.activeTarget;
-				const providerMeta = sonarrMeta(active?.libraryItem ?? null);
-				const providerId = active?.providerId as ProviderExternalId | undefined;
-				const isInLibrary = entry.existingTargets.length > 0;
-				const row: MappingListRow = {
-					source: entry.source,
-					anilistId: entry.anilistId,
-					provider,
-					result: entry.result,
-					providerId: providerId ?? null,
-					isInLibrary,
-					mappingRowStatus: rowStatus(
-						entry.result,
-						isInLibrary,
-						entry.existingTargets.length,
-					),
-					...(providerMeta ? { providerMeta } : {}),
-				};
-
-				return {
-					key: `${provider}:ambiguous:${entry.anilistId}`,
-					provider,
-					providerId: providerId ?? null,
-					rows: [row],
-					linkedAniListIds: [entry.anilistId],
-					isInLibrary: row.isInLibrary,
-					...(providerMeta ? { providerMeta } : {}),
-				};
-			}),
-			...status.ignored.map((entry) => {
-				const row: MappingListRow = {
-					source: entry.source,
-					anilistId: entry.anilistId,
-					provider,
-					result: entry.result,
-					providerId: null,
-					isInLibrary: false,
-					mappingRowStatus: rowStatus(entry.result, false),
-				};
-
-				return {
-					key: `${provider}:ignored:${entry.anilistId}`,
-					provider,
-					providerId: null,
-					rows: [row],
-					linkedAniListIds: [entry.anilistId],
-					isInLibrary: false,
-				};
-			}),
-			...status.unmapped.map((entry) => {
-				const row: MappingListRow = {
-					source: entry.source,
-					anilistId: entry.anilistId,
-					provider,
-					result: entry.result,
-					providerId: null,
-					isInLibrary: false,
-					mappingRowStatus: rowStatus(entry.result, false),
-				};
-
-				return {
-					key: `${provider}:unmapped:${entry.anilistId}`,
-					provider,
-					providerId: null,
-					rows: [row],
-					linkedAniListIds: [entry.anilistId],
-					isInLibrary: false,
-				};
-			}),
-		];
-	}
-
-	const status = composeRadarrMappingsLibraryStatus(
-		mappingList,
-		await loadRadarrLibrary(),
-	);
-
+function buildMappingGroups({
+	provider,
+	status,
+	toProviderMeta,
+}: BuildMappingGroupsInput): MappingListGroup[] {
 	return [
 		...status.mapped.map((group) => {
-			const providerMeta = radarrMeta(group.libraryItem);
+			const providerMeta = toProviderMeta(group.libraryItem);
 			const providerId = group.providerId as ProviderExternalId;
 			const rows: MappingListRow[] = group.entries.map((entry) => ({
 				source: entry.source,
@@ -285,7 +208,7 @@ async function buildProviderGroups(provider: Provider): Promise<MappingListGroup
 		}),
 		...status.ambiguous.map((entry) => {
 			const active = entry.activeTarget;
-			const providerMeta = radarrMeta(active?.libraryItem ?? null);
+			const providerMeta = toProviderMeta(active?.libraryItem ?? null);
 			const providerId = active?.providerId as ProviderExternalId | undefined;
 			const isInLibrary = entry.existingTargets.length > 0;
 			const row: MappingListRow = {
@@ -354,6 +277,34 @@ async function buildProviderGroups(provider: Provider): Promise<MappingListGroup
 			};
 		}),
 	];
+}
+
+async function buildProviderGroups(provider: Provider): Promise<MappingListGroup[]> {
+	const mappingList = await getMappingList(provider, { loadFormatByAniListId });
+
+	if (provider === "sonarr") {
+		const status = composeSonarrMappingsLibraryStatus(
+			mappingList,
+			await loadSonarrLibrary(),
+		);
+
+		return buildMappingGroups({
+			provider,
+			status,
+			toProviderMeta: sonarrMeta,
+		});
+	}
+
+	const status = composeRadarrMappingsLibraryStatus(
+		mappingList,
+		await loadRadarrLibrary(),
+	);
+
+	return buildMappingGroups({
+		provider,
+		status,
+		toProviderMeta: radarrMeta,
+	});
 }
 
 function matchesQuery(group: MappingListGroup, query: string | undefined): boolean {
