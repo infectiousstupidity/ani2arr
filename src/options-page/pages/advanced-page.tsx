@@ -5,10 +5,10 @@ import { useState } from "react";
 import { Bug, RotateCcw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
 import Button from "@/shared/ui/primitives/button";
+import ConfirmDialog from "@/shared/ui/primitives/confirm-dialog";
+import { Switch } from "@/shared/ui/primitives/switch";
 import { cn } from "@/shared/utils/cn";
 import { SettingsRow, SettingsSection } from "../components/settings-section";
-import { ConfirmDialog } from "../components/ui/alert-dialog";
-import { Switch } from "../components/ui/switch";
 import { useResetExtensionState } from "../hooks/use-reset-extension-state";
 import { getActionErrorMessage } from "../hooks/action-helpers";
 
@@ -148,10 +148,10 @@ export const AdvancedPage = () => {
 				description="This clears ani2arr configuration, stored manual mappings, cached page data, granted permissions, and session state. Sonarr and Radarr libraries are not affected."
 				confirmText="Reset"
 				cancelText="Cancel"
+				onCancel={() => setShowResetDialog(false)}
 				onConfirm={() => {
 					void resetExtensionState();
 				}}
-				isDestructive={true}
 			/>
 		</div>
 	);

@@ -8,8 +8,8 @@ import { useAniListMetadataBatch } from "@/queries/anilist";
 import { useMappings } from "@/queries/mapping";
 import { usePublicOptions } from "@/queries/options";
 import Button from "@/shared/ui/primitives/button";
+import { TooltipProvider } from "@/shared/ui/primitives/tooltip";
 import { SettingsSection } from "../components/settings-section";
-import { TooltipProvider } from "../components/ui/tooltip";
 import { MappingContent } from "./mappings/mappings-list";
 import { MappingsFilterBar } from "./mappings/mappings-filter-bar";
 import {
