@@ -14,7 +14,6 @@ import {
 	getProviderLabel,
 } from "@/providers/provider-labels";
 import type {
-	GetMappingsInput,
 	GetMappingsOutput,
 	MappingListRowStatus,
 	ProviderExternalId,
@@ -146,30 +145,6 @@ export const getMetadataById = (
 export const getTargetSearchValue = (
 	targetAniListId: AniListId | null,
 ): string => (targetAniListId === null ? "" : String(targetAniListId));
-
-interface GetMappingsInputParams {
-	provider: ProviderFilter;
-	status: MappingStatusFilter;
-	source: MappingSourceFilter;
-	search: string;
-	limit: number;
-}
-
-export const getMappingsInput = ({
-	provider,
-	status,
-	source,
-	search,
-	limit,
-}: GetMappingsInputParams): GetMappingsInput => {
-	const input: GetMappingsInput = { limit };
-	if (provider !== "all") input.providers = [provider];
-	if (status !== "all") input.statuses = [status];
-	if (source !== "all") input.source = source;
-	const query = search.trim();
-	if (query.length > 0) input.query = query;
-	return input;
-};
 
 interface GetFilteredMappingGroupsInput {
 	groups: readonly MappingGroup[];

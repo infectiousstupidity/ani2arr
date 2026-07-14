@@ -1,4 +1,4 @@
-/** Tests for mapping RPC handler filtering. */
+/** Tests for mapping RPC listing composition and mapping writes. */
 // src/rpc/handlers/mapping.handlers.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +12,7 @@ import {
 } from "@/providers/schemas";
 import type { RadarrMovieSnapshot } from "@/providers/radarr/types";
 import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
+import type { Provider } from "@/providers/types";
 import type { MappingList } from "@/mapping/list-mappings";
 import {
 	mappingService,
@@ -129,32 +130,44 @@ const sonarrMappings: MappingList = {
 	unmapped: [],
 };
 
+const emptyMappingList = (provider: Provider): MappingList => ({
+	provider,
+	mapped: [],
+	ignored: [],
+	ambiguous: [],
+	unmapped: [],
+});
+
+function mockMappingLists(lists: Partial<Record<Provider, MappingList>>): void {
+	getMappingListMock.mockImplementation(async (provider: Provider) => {
+		return lists[provider] ?? emptyMappingList(provider);
+	});
+}
+
 describe("mappingHandlers", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		getMappingListMock.mockResolvedValue(sonarrMappings);
+		mockMappingLists({ sonarr: sonarrMappings });
 		getProviderConfigMock.mockResolvedValue(null);
 		vi.mocked(sonarrLibrary.getSeriesSnapshots).mockResolvedValue([]);
 		vi.mocked(radarrLibrary.getMovieSnapshots).mockResolvedValue([]);
 	});
 
-	it("filters mapped groups by active source before applying limit", async () => {
-		const result = await mappingHandlers.getMappings({
-			providers: ["sonarr"],
-			source: "auto",
-			limit: 1,
-		});
+	it("returns every composed mapping group without filtering", async () => {
+		const result = await mappingHandlers.getMappings();
 
-		expect(result.total).toBe(2);
-		expect(result.groups).toHaveLength(1);
+		expect(result).not.toHaveProperty("total");
+		expect(result.groups).toHaveLength(2);
 		expect(result.groups[0]?.providerId).toBe(tvdb(10));
-		expect(result.groups[0]?.rows).toEqual([
-			expect.objectContaining({
-				anilistId: aid(2),
-				result: expect.objectContaining({ source: "auto" }),
-			}),
+		expect(result.groups[0]?.rows.map((row) => row.anilistId)).toEqual([
+			aid(1),
+			aid(2),
 		]);
-		expect(result.groups[0]?.linkedAniListIds).toEqual([aid(2)]);
+		expect(result.groups[0]?.linkedAniListIds).toEqual([aid(1), aid(2)]);
+		expect(getMappingListMock.mock.calls.map(([provider]) => provider)).toEqual([
+			"sonarr",
+			"radarr",
+		]);
 	});
 
 	it("builds Sonarr route metadata", async () => {
@@ -163,8 +176,10 @@ describe("mappingHandlers", () => {
 			sonarrSeries(tvdb(10)),
 		]);
 
-		const result = await mappingHandlers.getMappings({ providers: ["sonarr"] });
-		const group = result.groups.find((item) => item.providerId === tvdb(10));
+		const result = await mappingHandlers.getMappings();
+		const group = result.groups.find(
+			(item) => item.provider === "sonarr" && item.providerId === tvdb(10),
+		);
 
 		expect(group?.providerMeta).toEqual({
 			title: "Sonarr 10",
@@ -195,23 +210,22 @@ describe("mappingHandlers", () => {
 			ambiguous: [],
 			unmapped: [],
 		};
-		getMappingListMock.mockResolvedValue(mappings);
+		mockMappingLists({ radarr: mappings });
 		getProviderConfigMock.mockResolvedValue(credentials);
 		vi.mocked(radarrLibrary.getMovieSnapshots).mockResolvedValue([
 			radarrMovie(providerId),
 		]);
 
-		const result = await mappingHandlers.getMappings({ providers: ["radarr"] });
+		const result = await mappingHandlers.getMappings();
+		const group = result.groups.find((item) => item.provider === "radarr");
 
-		expect(result.groups[0]?.providerMeta).toEqual({
+		expect(group?.providerMeta).toEqual({
 			title: "Radarr 30",
 			type: "movie",
 			statusLabel: "released",
 			providerRouteSlug: "radarr-30",
 		});
-		expect(result.groups[0]?.rows[0]?.providerMeta).toEqual(
-			result.groups[0]?.providerMeta,
-		);
+		expect(group?.rows[0]?.providerMeta).toEqual(group?.providerMeta);
 	});
 
 	it("uses the only existing ambiguous target", async () => {
@@ -235,13 +249,13 @@ describe("mappingHandlers", () => {
 			],
 			unmapped: [],
 		};
-		getMappingListMock.mockResolvedValue(mappings);
+		mockMappingLists({ sonarr: mappings });
 		getProviderConfigMock.mockResolvedValue(credentials);
 		vi.mocked(sonarrLibrary.getSeriesSnapshots).mockResolvedValue([
 			sonarrSeries(existingProviderId),
 		]);
 
-		const result = await mappingHandlers.getMappings({ providers: ["sonarr"] });
+		const result = await mappingHandlers.getMappings();
 
 		expect(result.groups[0]).toMatchObject({
 			providerId: existingProviderId,
@@ -286,9 +300,9 @@ describe("mappingHandlers", () => {
 				},
 			],
 		};
-		getMappingListMock.mockResolvedValue(mappings);
+		mockMappingLists({ sonarr: mappings });
 
-		const result = await mappingHandlers.getMappings({ providers: ["sonarr"] });
+		const result = await mappingHandlers.getMappings();
 
 		expect(result.groups).toHaveLength(3);
 		expect(result.groups).toEqual(

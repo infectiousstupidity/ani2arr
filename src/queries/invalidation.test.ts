@@ -69,7 +69,7 @@ describe("query invalidation helpers", () => {
 		const otherItemStatus = queryKeys.providerMediaStatus("sonarr", {
 			anilistId: aid(2),
 		});
-		const mappings = queryKeys.mappings({ providers: ["sonarr"] });
+		const mappings = queryKeys.mappings();
 		const identities = queryKeys.mappingIdentities([aid(1)]);
 		const inspection = queryKeys.mappingInspection("sonarr", aid(1));
 		const changedProviderLookup = queryKeys.providerLookup("sonarr", "test");
@@ -143,7 +143,7 @@ describe("query invalidation helpers", () => {
 			anilistId: aid(1),
 		});
 		const sonarrLookup = queryKeys.providerLookup("sonarr", "test");
-		const mappings = queryKeys.mappings({ providers: ["sonarr"] });
+		const mappings = queryKeys.mappings();
 		const radarrStatus = queryKeys.providerMediaStatus("radarr", {
 			anilistId: aid(1),
 		});

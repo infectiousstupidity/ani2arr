@@ -9,7 +9,7 @@ import {
 import type { Provider } from "@/providers/types";
 import type { TmdbId } from "@/providers/schemas";
 import type { SeerrMediaType, SeerrTvSeasons } from "@/providers/seerr/types";
-import type { GetMappingsInput, StatusInput } from "@/rpc/types";
+import type { StatusInput } from "@/rpc/types";
 import { sourceFromInput, type SourceInputLike } from "@/rpc/source-input";
 
 const rootQueryKey = ["a2a"] as const;
@@ -35,27 +35,6 @@ type SeerrLinkedAniListEntriesKeyInput = {
 type SourceKeyInput = SourceInputLike | SourceIdentity | AniListId;
 
 const normalizeText = (value: string): string => value.trim().toLowerCase();
-
-const normalizeMappingsInput = (input?: GetMappingsInput) => {
-	if (!input) return "default";
-	const normalized: Record<string, unknown> = {};
-	if (input.providers?.length) {
-		normalized.providers = [...new Set(input.providers)].toSorted();
-	}
-	if (input.statuses?.length) {
-		normalized.statuses = [...new Set(input.statuses)].toSorted();
-	}
-	if (input.source) {
-		normalized.source = input.source;
-	}
-	if (typeof input.limit === "number") {
-		normalized.limit = input.limit;
-	}
-	if (input.query?.trim()) {
-		normalized.query = normalizeText(input.query);
-	}
-	return normalized;
-};
 
 export const normalizeMetadataIds = (
 	ids: readonly AniListId[],
@@ -101,8 +80,7 @@ export const queryKeys = {
 	aniListMetadata: (ids: readonly AniListId[]) =>
 		[...rootQueryKey, "anilist", "metadata", normalizeMetadataIds(ids)] as const,
 	mappingsRoot: () => [...rootQueryKey, "mapping", "list"] as const,
-	mappings: (input?: GetMappingsInput) =>
-		[...rootQueryKey, "mapping", "list", normalizeMappingsInput(input)] as const,
+	mappings: () => [...rootQueryKey, "mapping", "list", "default"] as const,
 	mappingIdentitiesRoot: () =>
 		[...rootQueryKey, "mapping", "identities"] as const,
 	mappingIdentities: (ids: readonly AniListId[]) =>
