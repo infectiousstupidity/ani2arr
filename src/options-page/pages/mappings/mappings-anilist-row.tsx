@@ -15,8 +15,8 @@ import type { AniListTitleLanguage } from "@/anilist/title";
 import { getProviderExternalIdLabel } from "@/providers/provider-labels";
 import type { ProviderExternalId } from "@/rpc/types";
 import Pill from "@/shared/ui/primitives/pill";
+import Tooltip from "@/shared/ui/primitives/tooltip";
 import { cn } from "@/shared/utils/cn";
-import { Tooltip } from "../../components/ui/tooltip";
 import type {
 	ClearMatchAction,
 	IgnoreAction,
@@ -59,6 +59,14 @@ const ANILIST_LINK_CLASS =
 	"transition-colors hover:text-accent-primary focus-visible:text-accent-primary";
 const LINK_PILL_CLASS =
 	"hover:border-accent-primary/55 hover:bg-accent-primary/15 hover:text-accent-primary focus-visible:border-accent-primary/55 focus-visible:bg-accent-primary/15 focus-visible:text-accent-primary";
+const OPTIONS_TOOLTIP_PROPS = {
+	contentClassName:
+		"overflow-hidden rounded-md border-border-primary bg-bg-tertiary px-3 py-1.5 text-xs font-normal text-text-primary shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+	delayDuration: 200,
+	disableHoverableContent: false,
+	showArrow: false,
+	sideOffset: 4,
+} as const;
 
 const getRowTitle = (
 	row: MappingRow,
@@ -290,7 +298,10 @@ export function MappingsAniListRow(
 			<div className="col-start-3 row-start-1 flex flex-col items-end justify-center gap-1.5 md:col-auto md:row-auto md:flex-row md:items-center md:justify-end">
 				<div className="flex items-center justify-end gap-1.5">
 					{clearMatchAction ? (
-						<Tooltip content={getClearMatchTitle(clearMatchAction)}>
+						<Tooltip
+							content={getClearMatchTitle(clearMatchAction)}
+							{...OPTIONS_TOOLTIP_PROPS}
+						>
 							<button
 								type="button"
 								onClick={() => onClearMatch(row, clearMatchAction)}
@@ -302,7 +313,7 @@ export function MappingsAniListRow(
 							</button>
 						</Tooltip>
 					) : null}
-					<Tooltip content={ignoreTitle}>
+					<Tooltip content={ignoreTitle} {...OPTIONS_TOOLTIP_PROPS}>
 						<button
 							type="button"
 							onClick={() => onIgnore(row, ignoreAction)}
@@ -314,7 +325,7 @@ export function MappingsAniListRow(
 						</button>
 					</Tooltip>
 				</div>
-				<Tooltip content="Edit mapping">
+				<Tooltip content="Edit mapping" {...OPTIONS_TOOLTIP_PROPS}>
 					<button
 						type="button"
 						onClick={() => onEdit(row)}

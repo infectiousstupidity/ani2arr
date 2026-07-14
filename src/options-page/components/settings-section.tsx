@@ -2,8 +2,8 @@
 // src/options-page/components/settings-section.tsx
 
 import type { ReactNode } from "react";
+import { Label } from "@/shared/ui/primitives/label";
 import { cn } from "@/shared/utils/cn";
-import { Label } from "./ui/label";
 
 interface SettingsSectionProps {
   title?: string;
@@ -86,7 +86,7 @@ export function SettingsRow({
       )}
     >
       <div className="min-w-0 md:pt-2.5">
-        <Label htmlFor={id} className="text-sm font-medium text-text-primary cursor-pointer">
+        <Label htmlFor={id} className="mb-0 inline cursor-pointer text-sm font-medium text-text-primary">
           {label}
         </Label>
         {description ? (

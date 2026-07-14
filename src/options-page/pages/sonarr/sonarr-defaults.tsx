@@ -25,8 +25,8 @@ import { useSonarrFormResources } from "@/queries/sonarr";
 import type { PublicOptions } from "@/settings/types";
 import Button from "@/shared/ui/primitives/button";
 import { SelectControl } from "@/shared/ui/primitives/select";
+import { Switch } from "@/shared/ui/primitives/switch";
 import { SettingsRow, SettingsSection } from "../../components/settings-section";
-import { Switch } from "../../components/ui/switch";
 import { getActionErrorMessage } from "../../hooks/action-helpers";
 
 const DEFAULT_OPTIONS_DESCRIPTION =

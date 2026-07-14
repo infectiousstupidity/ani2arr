@@ -16,8 +16,8 @@ import { useSeerrConnectionCheck } from "@/queries/seerr";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import { getProviderCredentials } from "@/settings/provider-config";
 import { getSeerrCredentials } from "@/settings/seerr-config";
+import ConfirmDialog from "@/shared/ui/primitives/confirm-dialog";
 
-import { ConfirmDialog } from "./components/ui/alert-dialog";
 import {
   useRadarrActions,
   useSeerrActions,
@@ -235,8 +235,8 @@ const OptionsPageContent = () => {
           description="This will clear the saved URL and API key for this connection."
           confirmText={isProviderActionPending ? "Disconnecting..." : "Disconnect"}
           cancelText="Cancel"
+          onCancel={() => setPendingDisconnectProvider(null)}
           onConfirm={confirmDisconnect}
-          isDestructive={true}
         />
       )}
     </div>
