@@ -167,7 +167,7 @@ export function chooseMappingResult(input: MappingCandidates): MappingResult {
 		return { kind: "ignored" };
 	}
 
-	const upstreamTarget = getSingleUpstreamTarget(provider, upstream);
+	const upstreamTarget = getSingleUpstreamTarget(upstream);
 	const rejectedProviderIds = manual?.rejectedProviderIds;
 
 	if (manual && "mapping" in manual) {
@@ -207,29 +207,9 @@ export function chooseMappingResult(input: MappingCandidates): MappingResult {
 }
 
 function getSingleUpstreamTarget(
-	provider: Provider,
 	upstream: UpstreamTarget[],
 ): UpstreamTarget | undefined {
-	if (upstream.length === 1) return upstream[0];
-	if (provider !== "sonarr" || upstream.length === 0) return undefined;
-
-	const firstTarget = upstream[0];
-	if (firstTarget?.provider !== "sonarr") return undefined;
-
-	const providerId = firstTarget.providerId;
-	if (
-		upstream.some(
-			(target) =>
-				target.provider !== "sonarr" || target.providerId !== providerId,
-		)
-	) {
-		return undefined;
-	}
-
-	return {
-		provider: "sonarr",
-		providerId,
-	};
+	return upstream.length === 1 ? upstream[0] : undefined;
 }
 
 function mappedFromUpstream(target: UpstreamTarget): MappingResult {
