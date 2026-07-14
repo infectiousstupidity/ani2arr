@@ -44,24 +44,14 @@ describe("queryKeys", () => {
 		]);
 	});
 
-	it("keeps mapping list keys stable for reordered filters", () => {
-		expect(
-			queryKeys.mappings({
-				providers: ["radarr", "sonarr", "radarr"],
-				statuses: ["unmapped", "can-add", "unmapped"],
-				source: "manual",
-				limit: 50,
-				query: "  One Piece  ",
-			}),
-		).toEqual(
-			queryKeys.mappings({
-				providers: ["sonarr", "radarr"],
-				statuses: ["can-add", "unmapped"],
-				source: "manual",
-				limit: 50,
-				query: "one piece",
-			}),
-		);
+	it("uses one mapping list key below the mappings root", () => {
+		expect(queryKeys.mappings()).toEqual([
+			"a2a",
+			"mapping",
+			"list",
+			"default",
+		]);
+		expectPrefix(queryKeys.mappings(), queryKeys.mappingsRoot());
 	});
 
 	it("normalizes provider lookup text", () => {

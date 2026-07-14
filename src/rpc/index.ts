@@ -35,7 +35,6 @@ import type {
 	ClearMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
 	ClearMappingRejectedCandidateInput,
-	GetMappingsInput,
 	GetMappingInspectionInput,
 	GetAniListMetadataInput,
 	GetAniListIdForSourceInput,
@@ -136,7 +135,7 @@ export interface Ani2arrApi {
 	): Promise<{ isInLibrary: boolean; inCatalog: boolean }>;
 	clearPersistentCaches(): Promise<{ ok: true }>;
 	resetExtensionState(): Promise<{ ok: true }>;
-	getMappings(input?: GetMappingsInput): Promise<GetMappingsOutput>;
+	getMappings(): Promise<GetMappingsOutput>;
 	getMappingInspection(
 		input: GetMappingInspectionInput,
 	): Promise<GetMappingInspectionOutput>;

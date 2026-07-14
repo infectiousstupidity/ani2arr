@@ -20,7 +20,7 @@ import {
 	type MappedMappingListEntry,
 	type UnmappedMappingListEntry,
 } from "@/mapping/list-mappings";
-import type { MappingResult, MappingSource } from "@/mapping/types";
+import type { MappingResult } from "@/mapping/types";
 import {
 	getUniqueAniListIdForSource,
 	refreshUpstreamMappings as refreshStoredUpstreamMappings,
@@ -47,7 +47,6 @@ import type {
 	ClearManualMappingInput,
 	GetMappingIdentitiesInput,
 	GetMappingInspectionInput,
-	GetMappingsInput,
 	GetMappingsOutput,
 	MappingListGroup,
 	MappingListProviderMeta,
@@ -307,64 +306,6 @@ async function buildProviderGroups(provider: Provider): Promise<MappingListGroup
 	});
 }
 
-function matchesQuery(group: MappingListGroup, query: string | undefined): boolean {
-	if (!query) return true;
-
-	const normalized = query.toLowerCase();
-	if (group.providerMeta?.title?.toLowerCase().includes(normalized)) return true;
-	if (String(group.providerId ?? "").includes(normalized)) return true;
-
-	return group.rows.some((row) => {
-		if (String(row.anilistId).includes(normalized)) return true;
-		if (row.providerMeta?.title?.toLowerCase().includes(normalized)) return true;
-		if (String(row.providerId ?? "").includes(normalized)) return true;
-		return false;
-	});
-}
-
-function filterGroups(
-	groups: MappingListGroup[],
-	statuses: readonly MappingListRowStatus[] | undefined,
-	query: string | undefined,
-	source: MappingSource | undefined,
-): MappingListGroup[] {
-	const statusSet = statuses?.length ? new Set(statuses) : null;
-	const filteredGroups: MappingListGroup[] = [];
-
-	for (const group of groups) {
-		const sourceGroup = filterGroupBySource(group, source);
-		if (!sourceGroup) continue;
-		if (!matchesQuery(sourceGroup, query)) continue;
-		if (
-			statusSet &&
-			!sourceGroup.rows.some((row) => statusSet.has(row.mappingRowStatus))
-		) {
-			continue;
-		}
-		filteredGroups.push(sourceGroup);
-	}
-
-	return filteredGroups;
-}
-
-function filterGroupBySource(
-	group: MappingListGroup,
-	source: MappingSource | undefined,
-): MappingListGroup | null {
-	if (!source) return group;
-
-	const rows = group.rows.filter(
-		(row) => row.result.kind === "mapped" && row.result.source === source,
-	);
-	if (rows.length === 0) return null;
-
-	return {
-		...group,
-		rows,
-		linkedAniListIds: rows.map((row) => row.anilistId),
-	};
-}
-
 function sortGroups(groups: MappingListGroup[]): MappingListGroup[] {
 	return groups.toSorted((left, right) => {
 		const providerOrder = left.provider.localeCompare(right.provider);
@@ -373,27 +314,12 @@ function sortGroups(groups: MappingListGroup[]): MappingListGroup[] {
 	});
 }
 
-async function getMappingsOutput(input?: GetMappingsInput): Promise<GetMappingsOutput> {
-	const providers = input?.providers?.length
-		? [...new Set(input.providers)]
-		: [...PROVIDERS];
+async function getMappingsOutput(): Promise<GetMappingsOutput> {
 	const providerGroups = await Promise.all(
-		providers.map((provider) => buildProviderGroups(provider)),
-	);
-	const allGroups = sortGroups(
-		filterGroups(
-			providerGroups.flat(),
-			input?.statuses,
-			input?.query,
-			input?.source,
-		),
+		PROVIDERS.map((provider) => buildProviderGroups(provider)),
 	);
 	return {
-		groups:
-			input?.limit === undefined
-				? allGroups
-				: allGroups.slice(0, input.limit),
-		total: allGroups.length,
+		groups: sortGroups(providerGroups.flat()),
 	};
 }
 
@@ -521,8 +447,8 @@ export const mappingHandlers = {
 		return { ok: true as const };
 	},
 
-	getMappings(input?: GetMappingsInput) {
-		return getMappingsOutput(input);
+	getMappings() {
+		return getMappingsOutput();
 	},
 
 	getMappingInspection(input: GetMappingInspectionInput) {

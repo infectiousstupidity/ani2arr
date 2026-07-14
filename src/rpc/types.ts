@@ -32,7 +32,7 @@ import type {
 	SonarrSeriesSnapshot,
 } from "@/providers/sonarr/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
-import type { MappingResult, MappingSource } from "@/mapping/types";
+import type { MappingResult } from "@/mapping/types";
 
 export type ProviderExternalId = TvdbId | TmdbId;
 
@@ -120,14 +120,6 @@ export type ValidateTvdbInput = {
 
 export type ValidateTmdbInput = {
 	tmdbId: TmdbId;
-};
-
-export type GetMappingsInput = {
-	providers?: Provider[];
-	statuses?: MappingListRowStatus[];
-	source?: MappingSource;
-	limit?: number;
-	query?: string;
 };
 
 export type GetMappingIdentitiesInput = AniListId[];
@@ -324,7 +316,6 @@ export interface MappingListGroup {
 
 export interface GetMappingsOutput {
 	groups: MappingListGroup[];
-	total: number;
 }
 
 export interface MappingIdentity {
