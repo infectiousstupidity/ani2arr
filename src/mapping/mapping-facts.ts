@@ -192,11 +192,11 @@ export function chooseMappingResult(input: MappingCandidates): MappingResult {
 		return mappedFromUpstream(upstreamTarget);
 	}
 
-	const autoMapping = chooseAutoMapping(auto, upstream, rejectedProviderIds);
 	if (upstream.length > 1) {
-		return autoMapping ?? ambiguous(upstream);
+		return ambiguous(upstream);
 	}
 
+	const autoMapping = chooseAutoMapping(auto, rejectedProviderIds);
 	if (autoMapping) return autoMapping;
 
 	if (auto?.kind === "ambiguous") {
@@ -245,18 +245,11 @@ function mappedFromUpstream(target: UpstreamTarget): MappingResult {
 
 function chooseAutoMapping(
 	auto: AutoResult | null,
-	upstream: UpstreamTarget[],
 	rejectedProviderIds: number[] | undefined,
 ): MappingResult | null {
 	if (auto?.kind !== "mapped") return null;
 
 	const autoIsRejected = rejectedProviderIds?.includes(auto.providerId) === true;
-	if (upstream.length > 1) {
-		return !autoIsRejected && upstreamHasProviderId(upstream, auto.providerId)
-			? mappedFromAuto(auto)
-			: ambiguous(upstream);
-	}
-
 	return autoIsRejected ? unmapped(true, rejectedProviderIds) : mappedFromAuto(auto);
 }
 
@@ -277,13 +270,6 @@ function ambiguous(targets: UpstreamTarget[]): MappingResult {
 		kind: "ambiguous",
 		targets,
 	};
-}
-
-function upstreamHasProviderId(
-	upstream: readonly UpstreamTarget[],
-	providerId: number,
-): boolean {
-	return upstream.some((target) => target.providerId === providerId);
 }
 
 export function matchesUpstream(
