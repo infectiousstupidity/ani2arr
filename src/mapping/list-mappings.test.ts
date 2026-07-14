@@ -326,15 +326,6 @@ describe("listMappings", () => {
 					}),
 				],
 			}),
-			expect.objectContaining({
-				providerId: tvdb(56),
-				entries: [
-					expect.objectContaining({
-						anilistId: aid(5),
-						result: expect.objectContaining({ source: "auto" }),
-					}),
-				],
-			}),
 		]);
 		expect(result.unmapped).toEqual([
 			expect.objectContaining({
@@ -342,7 +333,18 @@ describe("listMappings", () => {
 				result: expect.objectContaining({ rejectedProviderIds: [tvdb(44)] }),
 			}),
 		]);
-		expect(result.ambiguous).toHaveLength(0);
+		expect(result.ambiguous).toEqual([
+			expect.objectContaining({
+				anilistId: aid(5),
+				result: {
+					kind: "ambiguous",
+					targets: [
+						{ provider: "sonarr", providerId: tvdb(55) },
+						{ provider: "sonarr", providerId: tvdb(56) },
+					],
+				},
+			}),
+		]);
 	});
 
 	it("includes MAL source mappings when AniBridge has a unique AniList crosswalk", async () => {

@@ -230,7 +230,7 @@ describe("MappingService", () => {
 				},
 			},
 			{
-				name: "multiple Sonarr seasons for the same TVDB show collapse to one upstream mapping",
+				name: "multiple Sonarr seasons for the same TVDB show remain ambiguous",
 				provider: "sonarr",
 				upstream: [
 					{ provider: "sonarr", providerId: tvdb(81_797), season: 0 },
@@ -238,9 +238,27 @@ describe("MappingService", () => {
 					{ provider: "sonarr", providerId: tvdb(81_797), season: 2 },
 				],
 				expected: {
-					kind: "mapped",
-					source: "upstream",
-					providerId: tvdb(81_797),
+					kind: "ambiguous",
+					targets: [
+						{ provider: "sonarr", providerId: tvdb(81_797), season: 0 },
+						{ provider: "sonarr", providerId: tvdb(81_797), season: 1 },
+						{ provider: "sonarr", providerId: tvdb(81_797), season: 2 },
+					],
+				},
+			},
+			{
+				name: "unscoped and scoped Sonarr targets for the same TVDB show remain ambiguous",
+				provider: "sonarr",
+				upstream: [
+					{ provider: "sonarr", providerId: tvdb(81_797) },
+					{ provider: "sonarr", providerId: tvdb(81_797), season: 0 },
+				],
+				expected: {
+					kind: "ambiguous",
+					targets: [
+						{ provider: "sonarr", providerId: tvdb(81_797) },
+						{ provider: "sonarr", providerId: tvdb(81_797), season: 0 },
+					],
 				},
 			},
 			{
