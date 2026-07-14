@@ -259,7 +259,7 @@ describe("MappingService", () => {
 				},
 			},
 			{
-				name: "auto can choose one ambiguous upstream target",
+				name: "auto cannot choose one ambiguous upstream target",
 				provider: "sonarr",
 				upstream: [
 					{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
@@ -267,9 +267,11 @@ describe("MappingService", () => {
 				],
 				auto: { kind: "mapped", providerId: tvdb(310_718) },
 				expected: {
-					kind: "mapped",
-					source: "auto",
-					providerId: tvdb(310_718),
+					kind: "ambiguous",
+					targets: [
+						{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
+						{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
+					],
 				},
 			},
 			{
@@ -510,7 +512,7 @@ describe("MappingService", () => {
 		});
 	});
 
-	it("runs automatic resolver for ambiguous upstream targets", async () => {
+	it("does not run automatic resolver for ambiguous upstream targets", async () => {
 		const anilistId = aid(22);
 		storeRecords.upstream = [
 			{
@@ -521,27 +523,20 @@ describe("MappingService", () => {
 				],
 			},
 		];
-		const resolver = vi.fn(async () => {
-			replaceAuto("sonarr", anilistId, {
-				kind: "mapped",
-				providerId: tvdb(310_718),
-				matchedTitle: "Magi: Sinbad no Bouken",
-			});
-		});
+		const resolver = vi.fn();
 
 		await expect(
 			new MappingService(resolver).resolveMapping("sonarr", anilistId, {
 				title: "Magi: Sinbad no Bouken",
 			}),
 		).resolves.toEqual({
-			kind: "mapped",
-			source: "auto",
-			providerId: tvdb(310_718),
-			matchedTitle: "Magi: Sinbad no Bouken",
+			kind: "ambiguous",
+			targets: [
+				{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
+				{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
+			],
 		});
-		expect(resolver).toHaveBeenCalledWith("sonarr", anilistSource(anilistId), [], {
-			title: "Magi: Sinbad no Bouken",
-		});
+		expect(resolver).not.toHaveBeenCalled();
 	});
 
 	it("does not retry ambiguous upstream targets after a cached auto miss", async () => {
@@ -563,7 +558,7 @@ describe("MappingService", () => {
 		expect(resolver).not.toHaveBeenCalled();
 	});
 
-	it("force retries ambiguous upstream targets after a cached auto miss", async () => {
+	it("does not force retry ambiguous upstream targets after a cached auto miss", async () => {
 		const anilistId = aid(24);
 		storeRecords.upstream = [
 			{
@@ -575,13 +570,7 @@ describe("MappingService", () => {
 			},
 		];
 		replaceAuto("sonarr", anilistId, { kind: "unmapped" });
-		const resolver = vi.fn(async () => {
-			replaceAuto("sonarr", anilistId, {
-				kind: "mapped",
-				providerId: tvdb(310_718),
-				matchedTitle: "Magi: Sinbad no Bouken",
-			});
-		});
+		const resolver = vi.fn();
 
 		await expect(
 			new MappingService(resolver).resolveMapping("sonarr", anilistId, {
@@ -589,14 +578,13 @@ describe("MappingService", () => {
 				title: "Magi: Sinbad no Bouken",
 			}),
 		).resolves.toEqual({
-			kind: "mapped",
-			source: "auto",
-			providerId: tvdb(310_718),
-			matchedTitle: "Magi: Sinbad no Bouken",
+			kind: "ambiguous",
+			targets: [
+				{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
+				{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
+			],
 		});
-		expect(resolver).toHaveBeenCalledWith("sonarr", anilistSource(anilistId), [], {
-			title: "Magi: Sinbad no Bouken",
-		});
+		expect(resolver).not.toHaveBeenCalled();
 	});
 
 	it("resolves MAL direct upstream before auto", async () => {

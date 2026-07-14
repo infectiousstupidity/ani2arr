@@ -68,14 +68,7 @@ export class MappingService {
 			return current;
 		}
 
-		if (
-			await shouldKeepAmbiguousMapping({
-				provider,
-				source: sourceIdentity,
-				current,
-				forceRetry: options?.forceRetry === true,
-			})
-		) {
+		if (current.kind === "ambiguous") {
 			return current;
 		}
 
@@ -235,16 +228,6 @@ export class MappingService {
 
 function isStableMapping(mapping: MappingResult): boolean {
 	return mapping.kind === "mapped" || mapping.kind === "ignored";
-}
-
-async function shouldKeepAmbiguousMapping(input: {
-	provider: Provider;
-	source: SourceIdentity;
-	current: MappingResult;
-	forceRetry: boolean;
-}): Promise<boolean> {
-	if (input.current.kind !== "ambiguous" || input.forceRetry) return false;
-	return (await getAutoResult(input.provider, input.source)) !== null;
 }
 
 function shouldKeepUnmappedMapping(
