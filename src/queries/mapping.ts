@@ -13,7 +13,6 @@ import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
 	ClearManualMappingInput,
-	GetMappingsInput,
 	GetMappingIdentitiesOutput,
 	GetMappingInspectionOutput,
 	GetMappingsOutput,
@@ -108,10 +107,10 @@ export const useClearMappingRejectedCandidate = () => {
 	});
 };
 
-export const useMappings = (input?: GetMappingsInput) =>
+export const useMappings = () =>
 	useQuery<GetMappingsOutput, ExtensionError>({
-		queryKey: queryKeys.mappings(input),
-		queryFn: () => getAni2arrApi().getMappings(input),
+		queryKey: queryKeys.mappings(),
+		queryFn: () => getAni2arrApi().getMappings(),
 		staleTime: 45 * 60 * 1000,
 		gcTime: 2 * 60 * 60 * 1000,
 		refetchOnWindowFocus: false,

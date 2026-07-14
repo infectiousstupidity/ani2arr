@@ -171,6 +171,83 @@ export const getMappingsInput = ({
 	return input;
 };
 
+interface GetFilteredMappingGroupsInput {
+	groups: readonly MappingGroup[];
+	provider: ProviderFilter;
+	status: MappingStatusFilter;
+	source: MappingSourceFilter;
+	search: string;
+	limit: number;
+}
+
+const mappingGroupMatchesSearch = (
+	group: MappingGroup,
+	search: string,
+): boolean => {
+	if (search.length === 0) return true;
+	if (group.providerMeta?.title?.toLowerCase().includes(search)) return true;
+	if (String(group.providerId ?? "").includes(search)) return true;
+
+	return group.rows.some((row) => {
+		if (String(row.anilistId).includes(search)) return true;
+		if (row.providerMeta?.title?.toLowerCase().includes(search)) return true;
+		if (String(row.providerId ?? "").includes(search)) return true;
+		return false;
+	});
+};
+
+export const getFilteredMappingGroups = ({
+	groups,
+	provider,
+	status,
+	source,
+	search,
+	limit,
+}: GetFilteredMappingGroupsInput): {
+	groups: MappingGroup[];
+	total: number;
+} => {
+	const normalizedSearch = search.trim().toLowerCase();
+	const matchingGroups: MappingGroup[] = [];
+
+	for (const group of groups) {
+		if (provider !== "all" && group.provider !== provider) continue;
+
+		const rows =
+			source === "all"
+				? group.rows
+				: group.rows.filter(
+						(row) =>
+							row.result.kind === "mapped" && row.result.source === source,
+					);
+		if (rows.length === 0) continue;
+
+		const filteredGroup =
+			rows === group.rows
+				? group
+				: {
+						...group,
+						rows,
+						linkedAniListIds: rows.map((row) => row.anilistId),
+					};
+
+		if (
+			status !== "all" &&
+			!filteredGroup.rows.some((row) => row.mappingRowStatus === status)
+		) {
+			continue;
+		}
+		if (!mappingGroupMatchesSearch(filteredGroup, normalizedSearch)) continue;
+
+		matchingGroups.push(filteredGroup);
+	}
+
+	return {
+		groups: matchingGroups.slice(0, limit),
+		total: matchingGroups.length,
+	};
+};
+
 export const isMappingGroupExpanded = (
 	group: MappingGroup,
 	collapsedGroupKeys: ReadonlySet<string>,
