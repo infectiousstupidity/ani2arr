@@ -22,11 +22,9 @@ const anilistMetadataStoreMock = vi.hoisted(() => ({
 	getMetadata: vi.fn(),
 }));
 const requireSeerrCredentialsMock = vi.hoisted(() => vi.fn());
-const listSeerrUpstreamTargetsMock = vi.hoisted(() => vi.fn());
-const listAllSeerrUpstreamTargetsMock = vi.hoisted(() => vi.fn());
-const getManualSeerrTargetMock = vi.hoisted(() => vi.fn());
-const listManualSeerrTargetsMock = vi.hoisted(() => vi.fn());
-const listAllManualSeerrTargetsMock = vi.hoisted(() => vi.fn());
+const getEffectiveSeerrTargetMock = vi.hoisted(() => vi.fn());
+const listEffectiveSeerrTargetsMock = vi.hoisted(() => vi.fn());
+const listAllEffectiveSeerrTargetsMock = vi.hoisted(() => vi.fn());
 const setManualSeerrTargetMock = vi.hoisted(() => vi.fn());
 const clearManualSeerrTargetMock = vi.hoisted(() => vi.fn());
 
@@ -39,15 +37,10 @@ vi.mock("@/background/provider-config", () => ({
 	requireSeerrCredentials: requireSeerrCredentialsMock,
 }));
 
-vi.mock("@/mapping/upstream.store", () => ({
-	listSeerrUpstreamTargets: listSeerrUpstreamTargetsMock,
-	listAllSeerrUpstreamTargets: listAllSeerrUpstreamTargetsMock,
-}));
-
 vi.mock("@/mapping/seerr-target.store", () => ({
-	getManualSeerrTarget: getManualSeerrTargetMock,
-	listManualSeerrTargets: listManualSeerrTargetsMock,
-	listAllManualSeerrTargets: listAllManualSeerrTargetsMock,
+	getEffectiveSeerrTarget: getEffectiveSeerrTargetMock,
+	listEffectiveSeerrTargets: listEffectiveSeerrTargetsMock,
+	listAllEffectiveSeerrTargets: listAllEffectiveSeerrTargetsMock,
 	setManualSeerrTarget: setManualSeerrTargetMock,
 	clearManualSeerrTarget: clearManualSeerrTargetMock,
 }));
@@ -56,11 +49,9 @@ describe("seerrHandlers", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		requireSeerrCredentialsMock.mockResolvedValue(credentials);
-		getManualSeerrTargetMock.mockResolvedValue(null);
-		listManualSeerrTargetsMock.mockResolvedValue([]);
-		listAllManualSeerrTargetsMock.mockResolvedValue([]);
-		listSeerrUpstreamTargetsMock.mockResolvedValue([]);
-		listAllSeerrUpstreamTargetsMock.mockResolvedValue([]);
+		getEffectiveSeerrTargetMock.mockResolvedValue(null);
+		listEffectiveSeerrTargetsMock.mockResolvedValue([]);
+		listAllEffectiveSeerrTargetsMock.mockResolvedValue([]);
 		setManualSeerrTargetMock.mockResolvedValue(null);
 		clearManualSeerrTargetMock.mockResolvedValue(null);
 		anilistMetadataStoreMock.getMetadata.mockResolvedValue({ metadata: [] });
@@ -123,24 +114,8 @@ describe("seerrHandlers", () => {
 		);
 	});
 
-	it("returns Seerr request targets from upstream mappings", async () => {
-		listSeerrUpstreamTargetsMock.mockResolvedValue([
-			{
-				anilistId: parseAniListId(100),
-				target: {
-					mediaType: "tv",
-					tmdbId: parseTmdbId(456),
-					seasons: [0, 1, 2],
-					tmdbSeasons: [0, 2],
-					tvdbSeasons: [0, 1],
-					tvdbId: parseTvdbId(789),
-				},
-			},
-		]);
-
-		await expect(
-			seerrHandlers.getSeerrTargets([parseAniListId(100)]),
-		).resolves.toEqual([
+	it("delegates batch Seerr target reads to mapping", async () => {
+		listEffectiveSeerrTargetsMock.mockResolvedValue([
 			{
 				anilistId: parseAniListId(100),
 				mediaType: "tv",
@@ -152,13 +127,29 @@ describe("seerrHandlers", () => {
 				source: "anibridge",
 			},
 		]);
+		const ids = [parseAniListId(100)];
+
+		await expect(seerrHandlers.getSeerrTargets(ids)).resolves.toEqual([
+			{
+				anilistId: parseAniListId(100),
+				mediaType: "tv",
+				tmdbId: parseTmdbId(456),
+				seasons: [0, 1, 2],
+				tmdbSeasons: [0, 2],
+				tvdbSeasons: [0, 1],
+				tvdbId: parseTvdbId(789),
+				source: "anibridge",
+			},
+		]);
+		expect(listEffectiveSeerrTargetsMock).toHaveBeenCalledWith(ids);
 	});
 
-	it("uses manual Seerr target before AniBridge target", async () => {
-		getManualSeerrTargetMock.mockResolvedValue({
+	it("delegates one Seerr target read to mapping", async () => {
+		getEffectiveSeerrTargetMock.mockResolvedValue({
 			anilistId: parseAniListId(100),
 			mediaType: "movie",
 			tmdbId: parseTmdbId(123),
+			source: "manual",
 		});
 
 		await expect(
@@ -169,67 +160,31 @@ describe("seerrHandlers", () => {
 			tmdbId: parseTmdbId(123),
 			source: "manual",
 		});
-		expect(listSeerrUpstreamTargetsMock).not.toHaveBeenCalled();
+		expect(getEffectiveSeerrTargetMock).toHaveBeenCalledWith(
+			parseAniListId(100),
+		);
 	});
 
-	it("clearing manual target restores AniBridge fallback", async () => {
-		listSeerrUpstreamTargetsMock.mockResolvedValue([
-			{
-				anilistId: parseAniListId(100),
-				target: {
-					mediaType: "movie",
-					tmdbId: parseTmdbId(456),
-				},
-			},
-		]);
-
+	it("clears manual Seerr targets", async () => {
 		await expect(
 			seerrHandlers.clearManualSeerrTarget(parseAniListId(100)),
 		).resolves.toEqual({ ok: true });
-		await expect(
-			seerrHandlers.getSeerrTarget(parseAniListId(100)),
-		).resolves.toEqual({
-			anilistId: parseAniListId(100),
-			mediaType: "movie",
-			tmdbId: parseTmdbId(456),
-			source: "anibridge",
-		});
+		expect(clearManualSeerrTargetMock).toHaveBeenCalledWith(
+			parseAniListId(100),
+		);
 	});
 
 	it("returns null when no manual or upstream Seerr target exists", async () => {
 		await expect(
 			seerrHandlers.getSeerrTarget(parseAniListId(100)),
 		).resolves.toBeNull();
+		expect(getEffectiveSeerrTargetMock).toHaveBeenCalledWith(
+			parseAniListId(100),
+		);
 	});
 
-	it("uses manual targets in bulk target lookup", async () => {
-		listManualSeerrTargetsMock.mockResolvedValue([
-			{
-				anilistId: parseAniListId(100),
-				mediaType: "movie",
-				tmdbId: parseTmdbId(123),
-			},
-		]);
-		listSeerrUpstreamTargetsMock.mockResolvedValue([
-			{
-				anilistId: parseAniListId(100),
-				target: {
-					mediaType: "movie",
-					tmdbId: parseTmdbId(456),
-				},
-			},
-			{
-				anilistId: parseAniListId(200),
-				target: {
-					mediaType: "movie",
-					tmdbId: parseTmdbId(789),
-				},
-			},
-		]);
-
-		await expect(
-			seerrHandlers.getSeerrTargets([parseAniListId(100), parseAniListId(200)]),
-		).resolves.toEqual([
+	it("returns already-effective targets from bulk lookup", async () => {
+		listEffectiveSeerrTargetsMock.mockResolvedValue([
 			{
 				anilistId: parseAniListId(100),
 				mediaType: "movie",
@@ -243,6 +198,23 @@ describe("seerrHandlers", () => {
 				source: "anibridge",
 			},
 		]);
+		const ids = [parseAniListId(100), parseAniListId(200)];
+
+		await expect(seerrHandlers.getSeerrTargets(ids)).resolves.toEqual([
+			{
+				anilistId: parseAniListId(100),
+				mediaType: "movie",
+				tmdbId: parseTmdbId(123),
+				source: "manual",
+			},
+			{
+				anilistId: parseAniListId(200),
+				mediaType: "movie",
+				tmdbId: parseTmdbId(789),
+				source: "anibridge",
+			},
+		]);
+		expect(listEffectiveSeerrTargetsMock).toHaveBeenCalledWith(ids);
 	});
 
 	it("saves manual Seerr targets", async () => {
@@ -300,27 +272,24 @@ describe("seerrHandlers", () => {
 	});
 
 	it("returns AniList entries sharing the same effective Seerr title", async () => {
-		listAllManualSeerrTargetsMock.mockResolvedValue([
+		listAllEffectiveSeerrTargetsMock.mockResolvedValue([
 			{
 				anilistId: parseAniListId(100),
 				mediaType: "movie",
 				tmdbId: parseTmdbId(123),
-			},
-		]);
-		listAllSeerrUpstreamTargetsMock.mockResolvedValue([
-			{
-				anilistId: parseAniListId(100),
-				target: {
-					mediaType: "movie",
-					tmdbId: parseTmdbId(999),
-				},
+				source: "manual",
 			},
 			{
 				anilistId: parseAniListId(200),
-				target: {
-					mediaType: "movie",
-					tmdbId: parseTmdbId(123),
-				},
+				mediaType: "movie",
+				tmdbId: parseTmdbId(123),
+				source: "anibridge",
+			},
+			{
+				anilistId: parseAniListId(300),
+				mediaType: "movie",
+				tmdbId: parseTmdbId(999),
+				source: "anibridge",
 			},
 		]);
 		anilistMetadataStoreMock.getMetadata.mockResolvedValue({
@@ -355,5 +324,6 @@ describe("seerrHandlers", () => {
 				title: "Linked",
 			},
 		]);
+		expect(listAllEffectiveSeerrTargetsMock).toHaveBeenCalledOnce();
 	});
 });
