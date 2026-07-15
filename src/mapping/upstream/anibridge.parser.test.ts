@@ -8,6 +8,7 @@ import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import { sourceIdentityKey } from "@/mapping/source-identity";
 import {
 	parseAniBridgeAniListCrosswalks,
+	parseAniBridgeEntries,
 	parseAniBridgeMappings,
 	parseAniBridgeSeerrTargets,
 } from "@/mapping/upstream/anibridge.parser";
@@ -16,6 +17,63 @@ const aid = parseAniListId;
 const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
+
+describe("parseAniBridgeEntries", () => {
+	it("parses supported target kinds and preserves optional season scope", () => {
+		const entries = parseAniBridgeEntries({
+			"anidb:1:R": {
+				"anilist:1": {},
+				"tmdb_movie:300": {},
+				"tmdb_show:500:s2": {},
+				"tvdb_show:700:s0": {},
+				"tvdb_show:701": {},
+			},
+		});
+
+		expect(entries[aid(1)]).toEqual([
+			{ kind: "tmdb-movie", id: tmdb(300) },
+			{ kind: "tmdb-show", id: tmdb(500), season: 2 },
+			{ kind: "tvdb-show", id: tvdb(700), season: 0 },
+			{ kind: "tvdb-show", id: tvdb(701) },
+		]);
+	});
+
+	it("deduplicates exact targets but preserves distinct season scope", () => {
+		const entries = parseAniBridgeEntries({
+			"anidb:1:R": {
+				"anilist:1": {},
+				"tvdb_show:700:s0": {},
+			},
+			"anidb:1:S": {
+				"anilist:1": {},
+				"tvdb_show:700:s0": {},
+				"tvdb_show:700:s1": {},
+				"tvdb_show:700": {},
+			},
+		});
+
+		expect(entries[aid(1)]).toEqual([
+			{ kind: "tvdb-show", id: tvdb(700), season: 0 },
+			{ kind: "tvdb-show", id: tvdb(700), season: 1 },
+			{ kind: "tvdb-show", id: tvdb(700) },
+		]);
+	});
+
+	it("ignores malformed and unsupported target descriptors", () => {
+		const entries = parseAniBridgeEntries({
+			"anidb:1:R": {
+				"anilist:1": {},
+				"tmdb_movie:300:s1": {},
+				"tmdb_show:500:sx": {},
+				"tvdb_show:0:s1": {},
+				"tvdb_show:700:s-1": {},
+				"unsupported:800": {},
+			},
+		});
+
+		expect(entries).toEqual({});
+	});
+});
 
 describe("parseAniBridgeMappings", () => {
 	it("preserves multiple targets and Sonarr season scope", () => {
