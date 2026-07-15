@@ -29,9 +29,16 @@ import { UiOptionsSchema } from "./ui-schema";
 import type { ExtensionOptions, PublicOptions } from "./types";
 
 const PUBLIC_OPTIONS_STORAGE_KEY = "local:publicOptions";
+const PRIVATE_CONNECTIONS_STORAGE_KEY = "local:privateConnections";
 const SONARR_SECRETS_STORAGE_KEY = "local:sonarrSecrets";
 const RADARR_SECRETS_STORAGE_KEY = "local:radarrSecrets";
 const SEERR_SECRETS_STORAGE_KEY = "local:seerrSecrets";
+
+interface PrivateConnections {
+	sonarr: ProviderCredentials;
+	radarr: ProviderCredentials;
+	seerr: ProviderCredentials;
+}
 
 export const PUBLIC_OPTIONS_CHANGE_KEY = PUBLIC_OPTIONS_STORAGE_KEY.replace(
 	/^local:/,
@@ -41,6 +48,12 @@ export const PUBLIC_OPTIONS_CHANGE_KEY = PUBLIC_OPTIONS_STORAGE_KEY.replace(
 const createDefaultProviderConnection = (): ProviderCredentials => ({
 	url: "",
 	apiKey: "",
+});
+
+const createDefaultPrivateConnections = (): PrivateConnections => ({
+	sonarr: createDefaultProviderConnection(),
+	radarr: createDefaultProviderConnection(),
+	seerr: createDefaultProviderConnection(),
 });
 
 export function toPublicOptions(settings: ExtensionOptions): PublicOptions {
@@ -75,7 +88,16 @@ const publicOptions = storage.defineItem<PublicOptions>(
 	},
 );
 
-const sonarrConnectionStorage = storage.defineItem<ProviderCredentials>(
+const privateConnectionsStorage = storage.defineItem<PrivateConnections>(
+	PRIVATE_CONNECTIONS_STORAGE_KEY,
+	{
+		fallback: createDefaultPrivateConnections(),
+		version: 1,
+	},
+);
+
+// LEGACY: Remove after Task 12 deletes migrated per-service secret records.
+const legacySonarrConnectionStorage = storage.defineItem<ProviderCredentials>(
 	SONARR_SECRETS_STORAGE_KEY,
 	{
 		fallback: createDefaultProviderConnection(),
@@ -83,7 +105,8 @@ const sonarrConnectionStorage = storage.defineItem<ProviderCredentials>(
 	},
 );
 
-const radarrConnectionStorage = storage.defineItem<ProviderCredentials>(
+// LEGACY: Remove after Task 12 deletes migrated per-service secret records.
+const legacyRadarrConnectionStorage = storage.defineItem<ProviderCredentials>(
 	RADARR_SECRETS_STORAGE_KEY,
 	{
 		fallback: createDefaultProviderConnection(),
@@ -91,7 +114,8 @@ const radarrConnectionStorage = storage.defineItem<ProviderCredentials>(
 	},
 );
 
-const seerrConnectionStorage = storage.defineItem<ProviderCredentials>(
+// LEGACY: Remove after Task 12 deletes migrated per-service secret records.
+const legacySeerrConnectionStorage = storage.defineItem<ProviderCredentials>(
 	SEERR_SECRETS_STORAGE_KEY,
 	{
 		fallback: createDefaultProviderConnection(),
@@ -145,6 +169,45 @@ function getPersistedApiKey(record: unknown): string {
 
 function getPersistedUrl(record: unknown): string {
 	return isRecord(record) && typeof record.url === "string" ? record.url : "";
+}
+
+function parsePersistedConnection(record: unknown): ProviderCredentials {
+	return {
+		url: getPersistedUrl(record),
+		apiKey: getPersistedApiKey(record),
+	};
+}
+
+function parsePrivateConnection(record: unknown): ProviderCredentials {
+	if (
+		!isRecord(record) ||
+		typeof record.url !== "string" ||
+		typeof record.apiKey !== "string"
+	) {
+		return createDefaultProviderConnection();
+	}
+
+	return { url: record.url, apiKey: record.apiKey };
+}
+
+function parsePrivateConnections(raw: unknown): PrivateConnections {
+	const record = isRecord(raw) ? raw : undefined;
+	return {
+		sonarr: parsePrivateConnection(record?.sonarr),
+		radarr: parsePrivateConnection(record?.radarr),
+		seerr: parsePrivateConnection(record?.seerr),
+	};
+}
+
+function isCompletePrivateConnections(raw: unknown): raw is PrivateConnections {
+	if (!isRecord(raw)) return false;
+
+	return [raw.sonarr, raw.radarr, raw.seerr].every(
+		(connection) =>
+			isRecord(connection) &&
+			typeof connection.url === "string" &&
+			typeof connection.apiKey === "string",
+	);
 }
 
 function safeNormalizeSonarrDefaults(
@@ -211,49 +274,88 @@ function parsePublicOptions(raw: unknown): PublicOptions {
 async function readPersistedOptionRecords() {
 	return Promise.all([
 		publicOptions.getValue(),
-		sonarrConnectionStorage.getValue(),
-		radarrConnectionStorage.getValue(),
-		seerrConnectionStorage.getValue(),
+		privateConnectionsStorage.getValue(),
 	]);
 }
 
 function buildRawExtensionOptionsCandidate(
 	pub: unknown,
-	sonarr: unknown,
-	radarr: unknown,
-	seerr: unknown,
+	privateConnections: unknown,
 ): unknown {
 	const publicRecord = isRecord(pub) ? pub : undefined;
 	const providersRecord = getRecordProperty(publicRecord, "providers");
 	const sonarrPublic = getRecordProperty(providersRecord, "sonarr") ?? {};
 	const radarrPublic = getRecordProperty(providersRecord, "radarr") ?? {};
+	const connections = parsePrivateConnections(privateConnections);
 
 	return {
 		providers: {
 			sonarr: {
 				...sonarrPublic,
-				url: getPersistedUrl(sonarr),
-				apiKey: getPersistedApiKey(sonarr),
+				...connections.sonarr,
 			},
 			radarr: {
 				...radarrPublic,
-				url: getPersistedUrl(radarr),
-				apiKey: getPersistedApiKey(radarr),
+				...connections.radarr,
 			},
 		},
-		seerr: {
-			url: getPersistedUrl(seerr),
-			apiKey: getPersistedApiKey(seerr),
-		},
+		seerr: connections.seerr,
 		ui: publicRecord?.ui,
 		debugLogging: publicRecord?.debugLogging,
 	};
 }
 
 const getRawOptions = async () => {
-	const [pub, sonarr, radarr, seerr] = await readPersistedOptionRecords();
-	return buildRawExtensionOptionsCandidate(pub, sonarr, radarr, seerr);
+	const [pub, privateConnections] = await readPersistedOptionRecords();
+	return buildRawExtensionOptionsCandidate(pub, privateConnections);
 };
+
+let privateConnectionWrites: Promise<void> = Promise.resolve();
+
+async function updatePrivateConnections(
+	update: (connections: PrivateConnections) => PrivateConnections,
+): Promise<void> {
+	const next = privateConnectionWrites
+		.catch(() => {})
+		.then(async () => {
+			const current = parsePrivateConnections(
+				await privateConnectionsStorage.getValue(),
+			);
+			await privateConnectionsStorage.setValue(update(current));
+		});
+
+	privateConnectionWrites = next.then(
+		() => {},
+		() => {},
+	);
+
+	await next;
+}
+
+async function setPrivateConnections(
+	connections: PrivateConnections,
+): Promise<void> {
+	await updatePrivateConnections(() => connections);
+}
+
+export async function initializeSettingsStorage(): Promise<void> {
+	const storedConnections = await storage.getItem<unknown>(
+		PRIVATE_CONNECTIONS_STORAGE_KEY,
+	);
+	if (isCompletePrivateConnections(storedConnections)) return;
+
+	const [sonarr, radarr, seerr] = await Promise.all([
+		legacySonarrConnectionStorage.getValue(),
+		legacyRadarrConnectionStorage.getValue(),
+		legacySeerrConnectionStorage.getValue(),
+	]);
+
+	await setPrivateConnections({
+		sonarr: parsePersistedConnection(sonarr),
+		radarr: parsePersistedConnection(radarr),
+		seerr: parsePersistedConnection(seerr),
+	});
+}
 
 function connectionOrDefault(
 	connection: ProviderCredentials | null,
@@ -339,11 +441,11 @@ async function writeExtensionOptionsSnapshot(
 		},
 	} as PublicOptions;
 
-	await Promise.all([
-		sonarrConnectionStorage.setValue(sonarrCredentials),
-		radarrConnectionStorage.setValue(radarrCredentials),
-		seerrConnectionStorage.setValue(seerrCredentials),
-	]);
+	await setPrivateConnections({
+		sonarr: sonarrCredentials,
+		radarr: radarrCredentials,
+		seerr: seerrCredentials,
+	});
 	await publicOptions.setValue(persistedPublicOptions);
 }
 
@@ -396,9 +498,10 @@ export async function saveProviderConnectionSnapshot(
 		url: normalized?.url ?? "",
 		apiKey: normalized?.apiKey ?? "",
 	};
-	const storageItem =
-		provider === "sonarr" ? sonarrConnectionStorage : radarrConnectionStorage;
-	await storageItem.setValue(connection);
+	await updatePrivateConnections((current) => ({
+		...current,
+		[provider]: connection,
+	}));
 
 	const currentPublicOptions = await getPublicOptionsSnapshot();
 	await publicOptions.setValue({
@@ -424,7 +527,10 @@ export async function saveSeerrConnectionSnapshot(
 		url: normalized?.url ?? "",
 		apiKey: normalized?.apiKey ?? "",
 	};
-	await seerrConnectionStorage.setValue(connection);
+	await updatePrivateConnections((current) => ({
+		...current,
+		seerr: connection,
+	}));
 
 	const currentPublicOptions = await getPublicOptionsSnapshot();
 	await publicOptions.setValue({
@@ -452,9 +558,7 @@ export function watchExtensionOptionsSnapshot(
 	};
 	const unsubscribes = [
 		publicOptions.watch(refresh),
-		sonarrConnectionStorage.watch(refresh),
-		radarrConnectionStorage.watch(refresh),
-		seerrConnectionStorage.watch(refresh),
+		privateConnectionsStorage.watch(refresh),
 	];
 	return () => {
 		for (const unsubscribe of unsubscribes) unsubscribe();
