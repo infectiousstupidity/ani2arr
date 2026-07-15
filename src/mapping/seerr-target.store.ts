@@ -1,4 +1,4 @@
-/** Stores manual Seerr request targets separate from Arr provider mappings. */
+/** Stores manual Seerr targets and resolves effective target precedence. */
 // src/mapping/seerr-target.store.ts
 
 import { storage } from "@wxt-dev/storage";
@@ -9,8 +9,13 @@ import {
 	type TmdbId,
 	type TvdbId,
 } from "@/providers/schemas";
+import {
+	listAllSeerrUpstreamTargets,
+	listSeerrUpstreamTargets,
+	type SeerrUpstreamRecord,
+} from "./upstream.store";
 
-export type ManualSeerrTarget = {
+type ManualSeerrTarget = {
 	anilistId: AniListId;
 } & (
 	| {
@@ -37,6 +42,10 @@ type StoredManualSeerrTarget =
 			seasons: number[];
 	  };
 type ManualSeerrTargets = Record<number, StoredManualSeerrTarget>;
+
+type EffectiveSeerrTarget =
+	| (ManualSeerrTarget & { source: "manual" })
+	| ({ anilistId: AniListId; source: "anibridge" } & SeerrUpstreamRecord["target"]);
 
 const manualSeerrTargets = storage.defineItem<ManualSeerrTargets>(
 	"local:mapping:seerr-targets",
@@ -75,7 +84,7 @@ function normalizeTarget(
 	};
 }
 
-export async function getManualSeerrTarget(
+async function getManualSeerrTarget(
 	anilistId: AniListId,
 ): Promise<ManualSeerrTarget | null> {
 	const targets = await manualSeerrTargets.getValue();
@@ -86,7 +95,7 @@ export async function getManualSeerrTarget(
 	return normalized ? { anilistId, ...normalized } : null;
 }
 
-export async function listManualSeerrTargets(
+async function listManualSeerrTargets(
 	ids: readonly AniListId[],
 ): Promise<ManualSeerrTarget[]> {
 	const requestedIds = new Set(ids);
@@ -106,7 +115,7 @@ export async function listManualSeerrTargets(
 	return records.toSorted((left, right) => left.anilistId - right.anilistId);
 }
 
-export async function listAllManualSeerrTargets(): Promise<ManualSeerrTarget[]> {
+async function listAllManualSeerrTargets(): Promise<ManualSeerrTarget[]> {
 	const targets = await manualSeerrTargets.getValue();
 	const records: ManualSeerrTarget[] = [];
 
@@ -119,6 +128,39 @@ export async function listAllManualSeerrTargets(): Promise<ManualSeerrTarget[]> 
 	}
 
 	return records.toSorted((left, right) => left.anilistId - right.anilistId);
+}
+
+export async function getEffectiveSeerrTarget(
+	anilistId: AniListId,
+): Promise<EffectiveSeerrTarget | null> {
+	const manual = await getManualSeerrTarget(anilistId);
+	if (manual) return { ...manual, source: "manual" };
+
+	const upstream = await listSeerrUpstreamTargets([anilistId]);
+	const record = upstream[0];
+	return record
+		? { anilistId: record.anilistId, source: "anibridge", ...record.target }
+		: null;
+}
+
+export async function listEffectiveSeerrTargets(
+	ids: readonly AniListId[],
+): Promise<EffectiveSeerrTarget[]> {
+	const [manualTargets, upstreamTargets] = await Promise.all([
+		listManualSeerrTargets(ids),
+		listSeerrUpstreamTargets(ids),
+	]);
+	return mergeSeerrTargets(manualTargets, upstreamTargets);
+}
+
+export async function listAllEffectiveSeerrTargets(): Promise<
+	EffectiveSeerrTarget[]
+> {
+	const [manualTargets, upstreamTargets] = await Promise.all([
+		listAllManualSeerrTargets(),
+		listAllSeerrUpstreamTargets(),
+	]);
+	return mergeSeerrTargets(manualTargets, upstreamTargets);
 }
 
 export async function setManualSeerrTarget(
@@ -149,6 +191,25 @@ export async function clearManualSeerrTargets(): Promise<void> {
 			delete targets[Number(anilistId)];
 		}
 	});
+}
+
+function mergeSeerrTargets(
+	manualTargets: readonly ManualSeerrTarget[],
+	upstreamTargets: readonly SeerrUpstreamRecord[],
+): EffectiveSeerrTarget[] {
+	const manualById = new Set(manualTargets.map((target) => target.anilistId));
+	const targets: EffectiveSeerrTarget[] = [
+		...manualTargets.map((target) => ({ ...target, source: "manual" as const })),
+		...upstreamTargets
+			.filter((record) => !manualById.has(record.anilistId))
+			.map((record) => ({
+				anilistId: record.anilistId,
+				source: "anibridge" as const,
+				...record.target,
+			})),
+	];
+
+	return targets.toSorted((left, right) => left.anilistId - right.anilistId);
 }
 
 async function updateManualSeerrTargets(

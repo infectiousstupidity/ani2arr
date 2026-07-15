@@ -7,17 +7,11 @@ import type { AniListId, AniListMetadata } from "@/anilist/types";
 import { resolveTitlePreference } from "@/anilist/title";
 import {
 	clearManualSeerrTarget,
-	listAllManualSeerrTargets,
-	getManualSeerrTarget,
-	listManualSeerrTargets,
+	getEffectiveSeerrTarget,
+	listAllEffectiveSeerrTargets,
+	listEffectiveSeerrTargets,
 	setManualSeerrTarget,
-	type ManualSeerrTarget,
 } from "@/mapping/seerr-target.store";
-import {
-	listAllSeerrUpstreamTargets,
-	listSeerrUpstreamTargets,
-	type SeerrUpstreamRecord,
-} from "@/mapping/upstream.store";
 import { buildSeerrRequestPayload } from "@/providers/seerr/request";
 import type {
 	GetSeerrLinkedAniListEntriesInput,
@@ -30,17 +24,6 @@ import type {
 	SeerrRequestTarget,
 	SetManualSeerrTargetInput,
 } from "@/rpc/types";
-
-async function getAniListSeerrTarget(
-	anilistId: GetSeerrTargetInput,
-): Promise<SeerrRequestTarget | null> {
-	const manual = await getManualSeerrTarget(anilistId);
-	if (manual) return { ...manual, source: "manual" };
-
-	const upstream = await listSeerrUpstreamTargets([anilistId]);
-	const target = upstream[0]?.target;
-	return target ? { anilistId, source: "anibridge", ...target } : null;
-}
 
 function seerrTargetsMatch(
 	input: GetSeerrLinkedAniListEntriesInput,
@@ -73,44 +56,13 @@ function buildSeerrLinkedEntry(
 	};
 }
 
-function mergeSeerrTargets(
-	manualTargets: readonly ManualSeerrTarget[],
-	upstreamTargets: readonly SeerrUpstreamRecord[],
-): SeerrRequestTarget[] {
-	const manualById = new Set(manualTargets.map((target) => target.anilistId));
-	const targets: SeerrRequestTarget[] = [
-		...manualTargets.map((target) => ({ ...target, source: "manual" as const })),
-		...upstreamTargets
-			.filter((record) => !manualById.has(record.anilistId))
-			.map((record) => ({
-				anilistId: record.anilistId,
-				source: "anibridge" as const,
-				...record.target,
-			})),
-	];
-
-	return targets.toSorted((left, right) => left.anilistId - right.anilistId);
-}
-
-async function getEffectiveSeerrTargets(): Promise<SeerrRequestTarget[]> {
-	const [manualTargets, upstreamTargets] = await Promise.all([
-		listAllManualSeerrTargets(),
-		listAllSeerrUpstreamTargets(),
-	]);
-	return mergeSeerrTargets(manualTargets, upstreamTargets);
-}
-
 export const seerrHandlers = {
 	async getSeerrTarget(input: GetSeerrTargetInput) {
-		return getAniListSeerrTarget(input);
+		return getEffectiveSeerrTarget(input);
 	},
 
 	async getSeerrTargets(input: GetSeerrTargetsInput) {
-		const [manualTargets, upstreamTargets] = await Promise.all([
-			listManualSeerrTargets(input),
-			listSeerrUpstreamTargets(input),
-		]);
-		return mergeSeerrTargets(manualTargets, upstreamTargets);
+		return listEffectiveSeerrTargets(input);
 	},
 
 	async setManualSeerrTarget(input: SetManualSeerrTargetInput) {
@@ -146,7 +98,7 @@ export const seerrHandlers = {
 	},
 
 	async getSeerrLinkedAniListEntries(input: GetSeerrLinkedAniListEntriesInput) {
-		const targets = await getEffectiveSeerrTargets();
+		const targets = await listAllEffectiveSeerrTargets();
 		const ids = targets
 			.filter((target) => seerrTargetsMatch(input, target))
 			.map((target) => target.anilistId);
