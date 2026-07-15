@@ -1,75 +1,36 @@
-/** Pure helpers for Seerr credentials and configured state. */
+/** Legacy Seerr connection adapters backed by unified settings normalization. */
 // src/settings/seerr-config.ts
 
-import { getProviderHostPermissionPattern } from "@/providers/settings/host-permissions";
-import {
-	validateProviderConnectionApiKey,
-	validateProviderConnectionUrl,
-} from "@/providers/settings/provider-connection.validation";
 import type { ProviderCredentials } from "@/providers/types";
+import {
+	getConnectionCredentials,
+	getConnectionDraft,
+	hasConfiguredConnectionCredentials,
+	normalizeConnectionInput,
+	normalizeConnectionSettings,
+	type NormalizedConnection,
+} from "./connection-config";
 import type { ExtensionOptions } from "./types";
 
-export type NormalizedSeerrConnection = ProviderCredentials & {
-	permissionPattern: string;
-};
+export type { NormalizedConnection as NormalizedSeerrConnection } from "./connection-config";
 
-export function getSeerrConnectionDraft(
+// LEGACY: Remove in Task 10 after consumers switch to connection-config.
+export const getSeerrConnectionDraft = (
 	settings: ExtensionOptions | undefined,
-): ProviderCredentials {
-	return {
-		url: String(settings?.seerr.url ?? "").trim(),
-		apiKey: String(settings?.seerr.apiKey ?? "").trim(),
-	};
-}
+): ProviderCredentials => getConnectionDraft(settings, "seerr");
 
-export function getSeerrCredentials(
+export const getSeerrCredentials = (
 	settings: ExtensionOptions | undefined,
-): ProviderCredentials | null {
-	const { url, apiKey } = getSeerrConnectionDraft(settings);
-	if (!url || !apiKey) return null;
-	return { url, apiKey };
-}
+): ProviderCredentials | null => getConnectionCredentials(settings, "seerr");
 
-export function normalizeSeerrConnectionInput(
+export const normalizeSeerrConnectionInput = (
 	input: Partial<ProviderCredentials> | undefined,
-): NormalizedSeerrConnection | null {
-	const url = String(input?.url ?? "").trim();
-	const apiKey = String(input?.apiKey ?? "").trim();
+): NormalizedConnection | null => normalizeConnectionInput(input, "seerr");
 
-	if (!url && !apiKey) return null;
-
-	if (!url || !apiKey) {
-		throw new Error("Seerr: enter both URL and API key, or leave both blank.");
-	}
-
-	const normalizedUrl = validateProviderConnectionUrl(url);
-	const normalizedApiKey = validateProviderConnectionApiKey(apiKey);
-	if (!normalizedUrl.ok || !normalizedApiKey.ok) {
-		throw new Error("Please enter a valid Seerr URL and API key.");
-	}
-
-	const permissionPattern = getProviderHostPermissionPattern(
-		normalizedUrl.value,
-	);
-	if (!permissionPattern.ok) {
-		throw new Error("Failed to update Seerr host permissions. Please try again.");
-	}
-
-	return {
-		url: normalizedUrl.value,
-		apiKey: normalizedApiKey.value,
-		permissionPattern: permissionPattern.value,
-	};
-}
-
-export function normalizeSeerrConnectionSettings(
+export const normalizeSeerrConnectionSettings = (
 	settings: ExtensionOptions | undefined,
-): NormalizedSeerrConnection | null {
-	return normalizeSeerrConnectionInput(getSeerrConnectionDraft(settings));
-}
+): NormalizedConnection | null => normalizeConnectionSettings(settings, "seerr");
 
-export function hasConfiguredSeerrCredentials(
+export const hasConfiguredSeerrCredentials = (
 	settings: ExtensionOptions | undefined,
-): boolean {
-	return getSeerrCredentials(settings) !== null;
-}
+): boolean => hasConfiguredConnectionCredentials(settings, "seerr");
