@@ -2,22 +2,27 @@
 // src/settings/ui-schema.test.ts
 
 import { describe, expect, it } from "vitest";
-import { createDefaultExtensionOptions } from "@/settings/schema";
+import * as v from "valibot";
+import {
+	PublicOptionsSchema,
+	createDefaultExtensionOptions,
+} from "@/settings/schema";
 import { createDefaultUiOptions } from "@/settings/ui-schema";
-import { parseExtensionOptions } from "@/settings/store";
 
-describe("parseExtensionOptions ui schema", () => {
+describe("public options UI schema", () => {
 	it("keeps current UI settings shape", () => {
 		const settings = createDefaultExtensionOptions();
 		settings.ui.preferredAniListTitleLanguage = "romaji";
 		settings.ui.browseCards.sonarr.visibility = "hover";
 		settings.ui.animePages.radarr.enabled = false;
 
-		expect(parseExtensionOptions(settings).ui).toEqual(settings.ui);
+		expect(v.parse(PublicOptionsSchema, { ui: settings.ui }).ui).toEqual(
+			settings.ui,
+		);
 	});
 
 	it("does not migrate removed legacy UI fields", () => {
-		const parsed = parseExtensionOptions({
+		const parsed = v.parse(PublicOptionsSchema, {
 			ui: {
 				browseOverlayEnabled: false,
 				badgeVisibility: "hidden",

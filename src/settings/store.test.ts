@@ -8,7 +8,6 @@ import {
 	getExtensionOptionsSnapshot,
 	getPublicOptionsSnapshot,
 	initializeSettingsStorage,
-	parseExtensionOptions,
 	resetAllSettingsSnapshot,
 	saveProviderConnectionSnapshot,
 	savePublicOptionsSnapshot,
@@ -17,7 +16,10 @@ import {
 	watchExtensionOptionsSnapshot,
 	watchPublicOptionsSnapshot,
 } from "@/settings/store";
-import { createDefaultExtensionOptions } from "@/settings/schema";
+import {
+	createDefaultExtensionOptions,
+	createDefaultPublicOptions,
+} from "@/settings/schema";
 import type { ExtensionOptions, PublicOptions } from "@/settings/types";
 
 const PUBLIC_OPTIONS_STORAGE_KEY = "publicOptions";
@@ -25,6 +27,15 @@ const PRIVATE_CONNECTIONS_STORAGE_KEY = "privateConnections";
 const SONARR_SECRETS_STORAGE_KEY = "sonarrSecrets";
 const RADARR_SECRETS_STORAGE_KEY = "radarrSecrets";
 const SEERR_SECRETS_STORAGE_KEY = "seerrSecrets";
+const LEGACY_STORAGE_KEYS = [
+	SONARR_SECRETS_STORAGE_KEY,
+	RADARR_SECRETS_STORAGE_KEY,
+	SEERR_SECRETS_STORAGE_KEY,
+] as const;
+const LEGACY_STORAGE_AND_META_KEYS = LEGACY_STORAGE_KEYS.flatMap((key) => [
+	key,
+	`${key}$`,
+]);
 
 const EMPTY_PRIVATE_CONNECTIONS = {
 	sonarr: { url: "", apiKey: "" },
@@ -32,9 +43,17 @@ const EMPTY_PRIVATE_CONNECTIONS = {
 	seerr: { url: "", apiKey: "" },
 };
 
+async function expectLegacyStorageRemoved(): Promise<void> {
+	await expect(
+		browser.storage.local.get(LEGACY_STORAGE_AND_META_KEYS),
+	).resolves.toEqual({});
+}
+
 describe("options store helpers", () => {
-	it("falls back to default settings for missing input", () => {
-		expect(parseExtensionOptions({})).toEqual(createDefaultExtensionOptions());
+	it("falls back to default settings for missing input", async () => {
+		await expect(getExtensionOptionsSnapshot()).resolves.toEqual(
+			createDefaultExtensionOptions(),
+		);
 	});
 
 	it("omits secrets and computes provider configuration in public options", () => {
@@ -87,12 +106,15 @@ describe("options store helpers", () => {
 		});
 	});
 
-	it("falls back to empty credentials for malformed private connection records", async () => {
+	it("defaults malformed private connections without discarding valid siblings", async () => {
 		await browser.storage.local.set({
 			[PUBLIC_OPTIONS_STORAGE_KEY]: toPublicOptions(createDefaultExtensionOptions()),
 			[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
 				sonarr: { url: 123, apiKey: "sonarr-key" },
-				radarr: null,
+				radarr: {
+					url: "https://radarr.example",
+					apiKey: "radarr-key",
+				},
 				seerr: { url: "https://seerr.example", apiKey: 123 },
 			},
 		});
@@ -101,8 +123,8 @@ describe("options store helpers", () => {
 
 		expect(snapshot.providers.sonarr.url).toBe("");
 		expect(snapshot.providers.sonarr.apiKey).toBe("");
-		expect(snapshot.providers.radarr.url).toBe("");
-		expect(snapshot.providers.radarr.apiKey).toBe("");
+		expect(snapshot.providers.radarr.url).toBe("https://radarr.example");
+		expect(snapshot.providers.radarr.apiKey).toBe("radarr-key");
 		expect(snapshot.seerr.url).toBe("");
 		expect(snapshot.seerr.apiKey).toBe("");
 	});
@@ -121,6 +143,14 @@ describe("options store helpers", () => {
 		await expect(
 			browser.storage.local.get(PRIVATE_CONNECTIONS_STORAGE_KEY),
 		).resolves.toEqual({});
+		await expect(
+			browser.storage.local.get(SONARR_SECRETS_STORAGE_KEY),
+		).resolves.toEqual({
+			[SONARR_SECRETS_STORAGE_KEY]: {
+				url: "https://sonarr.example",
+				apiKey: "legacy-sonarr-key",
+			},
+		});
 	});
 
 	it("composes extension options from private provider connections and public options", async () => {
@@ -167,6 +197,9 @@ describe("options store helpers", () => {
 					url: "https://seerr.example",
 					apiKey: "seerr-key",
 				},
+				[`${SONARR_SECRETS_STORAGE_KEY}$`]: { v: 1 },
+				[`${RADARR_SECRETS_STORAGE_KEY}$`]: { v: 1 },
+				[`${SEERR_SECRETS_STORAGE_KEY}$`]: { v: 1 },
 			});
 
 			await initializeSettingsStorage();
@@ -189,6 +222,7 @@ describe("options store helpers", () => {
 					},
 				},
 			});
+			await expectLegacyStorageRemoved();
 		});
 
 		it("preserves an existing complete private record", async () => {
@@ -208,6 +242,7 @@ describe("options store helpers", () => {
 			).resolves.toEqual({
 				[PRIVATE_CONNECTIONS_STORAGE_KEY]: privateConnections,
 			});
+			await expectLegacyStorageRemoved();
 		});
 
 		it("keeps complete new connections when legacy records also exist", async () => {
@@ -231,6 +266,7 @@ describe("options store helpers", () => {
 			).resolves.toEqual({
 				[PRIVATE_CONNECTIONS_STORAGE_KEY]: privateConnections,
 			});
+			await expectLegacyStorageRemoved();
 		});
 
 		it("treats a complete all-empty private record as authoritative", async () => {
@@ -249,6 +285,7 @@ describe("options store helpers", () => {
 			).resolves.toEqual({
 				[PRIVATE_CONNECTIONS_STORAGE_KEY]: EMPTY_PRIVATE_CONNECTIONS,
 			});
+			await expectLegacyStorageRemoved();
 		});
 
 		it("preserves valid fields from partial legacy records", async () => {
@@ -273,6 +310,7 @@ describe("options store helpers", () => {
 					seerr: { url: "", apiKey: "" },
 				},
 			});
+			await expectLegacyStorageRemoved();
 		});
 
 		it("replaces corrupt legacy records with empty connections", async () => {
@@ -289,6 +327,7 @@ describe("options store helpers", () => {
 			).resolves.toEqual({
 				[PRIVATE_CONNECTIONS_STORAGE_KEY]: EMPTY_PRIVATE_CONNECTIONS,
 			});
+			await expectLegacyStorageRemoved();
 		});
 
 		it("does not rewrite a completed migration", async () => {
@@ -299,6 +338,7 @@ describe("options store helpers", () => {
 				},
 			});
 			await initializeSettingsStorage();
+			await expectLegacyStorageRemoved();
 			const onChanged = vi.fn();
 			browser.storage.onChanged.addListener(onChanged);
 
@@ -318,14 +358,23 @@ describe("options store helpers", () => {
 		const publicOptions = await getPublicOptionsSnapshot();
 		await savePublicOptionsSnapshot({
 			...publicOptions,
+			providers: {
+				...publicOptions.providers,
+				sonarr: {
+					...publicOptions.providers.sonarr,
+					isConfigured: false,
+				},
+			},
 			debugLogging: true,
 		});
 
 		const snapshot = await getExtensionOptionsSnapshot();
+		const savedPublicOptions = await getPublicOptionsSnapshot();
 
 		expect(snapshot.debugLogging).toBe(true);
 		expect(snapshot.providers.sonarr.url).toBe("https://sonarr.example");
 		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
+		expect(savedPublicOptions.providers.sonarr.isConfigured).toBe(true);
 	});
 
 	it("saving provider credentials does not change public defaults", async () => {
@@ -420,6 +469,7 @@ describe("options store helpers", () => {
 		};
 		await browser.storage.local.set({
 			[SONARR_SECRETS_STORAGE_KEY]: legacySonarr,
+			[`${SONARR_SECRETS_STORAGE_KEY}$`]: { v: 1 },
 		});
 		await saveProviderConnectionSnapshot("sonarr", {
 			url: "https://sonarr.example",
@@ -438,13 +488,14 @@ describe("options store helpers", () => {
 		expect(snapshot).toEqual(createDefaultExtensionOptions());
 		await expect(
 			browser.storage.local.get([
+				PUBLIC_OPTIONS_STORAGE_KEY,
 				PRIVATE_CONNECTIONS_STORAGE_KEY,
-				SONARR_SECRETS_STORAGE_KEY,
 			]),
 		).resolves.toEqual({
+			[PUBLIC_OPTIONS_STORAGE_KEY]: createDefaultPublicOptions(),
 			[PRIVATE_CONNECTIONS_STORAGE_KEY]: EMPTY_PRIVATE_CONNECTIONS,
-			[SONARR_SECRETS_STORAGE_KEY]: legacySonarr,
 		});
+		await expectLegacyStorageRemoved();
 	});
 
 	it("reads public options from the public snapshot only", async () => {
