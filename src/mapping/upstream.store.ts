@@ -3,13 +3,10 @@
 
 import { storage } from "@wxt-dev/storage";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
+import { parseTmdbIdOrNull, parseTvdbIdOrNull } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
-import type {
-	AniListCrosswalkMappings,
-	SeerrUpstreamMappings,
-	UpstreamMappings,
-} from "@/mapping/upstream/anibridge.parser";
+import type { AniListCrosswalkMappings } from "@/mapping/upstream/anibridge.parser";
 import {
 	normalizeStoredSourceKey,
 	normalizeSourceIdentity,
@@ -27,10 +24,8 @@ import type {
 const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 type UpstreamSnapshot = {
+	/** LEGACY: optional until projection-only snapshots have completed one full refresh. */
 	entries?: AniBridgeEntries;
-	/** LEGACY: remove when Task 15 removes persisted consumer projections. */
-	mappings: UpstreamMappings;
-	seerrTargets?: SeerrUpstreamMappings;
 	aniListCrosswalks?: AniListCrosswalkMappings;
 	fetchedAt: number;
 	etag?: string;
@@ -125,15 +120,9 @@ export async function listSeerrUpstreamTargets(
 	const snapshot = await getSnapshot();
 	const records: SeerrUpstreamRecord[] = [];
 
-	for (const [rawSourceKey, target] of Object.entries(
-		snapshot?.seerrTargets ?? {},
-	)) {
-		const source = parseSourceIdentityKey(rawSourceKey);
-
-		/** LEGACY: remove when stored upstream snapshots are migrated past MAL-keyed Seerr targets. */
-		if (source?.source === "anilist" && requestedIds.has(source.id)) {
-			records.push({ anilistId: source.id, target });
-		}
+	for (const anilistId of requestedIds) {
+		const target = projectSeerrTarget(snapshot?.entries?.[anilistId] ?? []);
+		if (target !== null) records.push({ anilistId, target });
 	}
 
 	return records.toSorted((left, right) => left.anilistId - right.anilistId);
@@ -145,15 +134,14 @@ export async function listAllSeerrUpstreamTargets(): Promise<
 	const snapshot = await getSnapshot();
 	const records: SeerrUpstreamRecord[] = [];
 
-	for (const [rawSourceKey, target] of Object.entries(
-		snapshot?.seerrTargets ?? {},
+	for (const [rawAniListId, entries] of Object.entries(
+		snapshot?.entries ?? {},
 	)) {
-		const source = parseSourceIdentityKey(rawSourceKey);
+		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
+		if (anilistId === null) continue;
 
-		/** LEGACY: remove when stored upstream snapshots are migrated past MAL-keyed Seerr targets. */
-		if (source?.source === "anilist") {
-			records.push({ anilistId: source.id, target });
-		}
+		const target = projectSeerrTarget(entries);
+		if (target !== null) records.push({ anilistId, target });
 	}
 
 	return records.toSorted((left, right) => left.anilistId - right.anilistId);
@@ -163,36 +151,38 @@ export async function refreshUpstreamMappings(): Promise<void> {
 	const next = writes
 		.catch(() => {})
 		.then(async () => {
-			const previous = await getSnapshot();
+			const storedPrevious = await upstreamMappings.getValue();
+			const previous = storedPrevious
+				? normalizeSnapshot(storedPrevious)
+				: null;
 			if (
 				previous?.entries !== undefined &&
-				previous?.mappings &&
-				previous.seerrTargets &&
-				previous.aniListCrosswalks &&
 				Date.now() - previous.fetchedAt < UPSTREAM_REFRESH_INTERVAL_MS
 			) {
+				if (storedPrevious && hasLegacyProjections(storedPrevious)) {
+					await upstreamMappings.setValue(previous);
+				}
 				return;
 			}
 
-			/** LEGACY: remove full-refresh fallback after Task 15 removes old projection-only snapshots. */
-			const etag =
-				previous?.entries === undefined ? undefined : previous.etag;
+			/** LEGACY: omit ETag until projection-only snapshots have completed one full refresh. */
+			const etag = previous?.entries === undefined ? undefined : previous.etag;
 			const result = await downloadAniBridgeMappings({ etag });
 			if (result.status === "not-modified") {
 				if (!previous || previous.entries === undefined) {
-					throw new Error("AniBridge returned 304 without stored mappings.");
+					throw new Error("AniBridge returned 304 without stored entries.");
 				}
 				await upstreamMappings.setValue({
-					...previous,
+					entries: previous.entries,
+					aniListCrosswalks: previous.aniListCrosswalks ?? {},
 					fetchedAt: Date.now(),
+					...(previous.etag ? { etag: previous.etag } : {}),
 				});
 				return;
 			}
 
 			await upstreamMappings.setValue({
 				entries: result.parsed.entries,
-				mappings: result.parsed.mappings,
-				seerrTargets: result.parsed.seerrTargets,
 				aniListCrosswalks: result.parsed.aniListCrosswalks,
 				fetchedAt: Date.now(),
 				...(result.etag ? { etag: result.etag } : {}),
@@ -227,47 +217,17 @@ async function getSnapshot(): Promise<UpstreamSnapshot | null> {
 
 function normalizeSnapshot(snapshot: UpstreamSnapshot): UpstreamSnapshot {
 	return {
-		...snapshot,
-		mappings: normalizeMappingKeys(snapshot.mappings),
-		...(snapshot.seerrTargets === undefined
-			? {}
-			: { seerrTargets: normalizeSeerrTargetKeys(snapshot.seerrTargets) }),
-		...(snapshot.aniListCrosswalks === undefined
-			? {}
-			: {
-					aniListCrosswalks: normalizeAniListCrosswalkKeys(
-						snapshot.aniListCrosswalks,
-					),
-				}),
+		...(snapshot.entries === undefined ? {} : { entries: snapshot.entries }),
+		aniListCrosswalks: normalizeAniListCrosswalkKeys(
+			snapshot.aniListCrosswalks ?? {},
+		),
+		fetchedAt: snapshot.fetchedAt,
+		...(snapshot.etag ? { etag: snapshot.etag } : {}),
 	};
 }
 
-function normalizeMappingKeys(mappings: UpstreamMappings): UpstreamMappings {
-	const normalized: UpstreamMappings = {};
-
-	for (const [rawKey, targets] of Object.entries(mappings)) {
-		const key = normalizeStoredSourceKey(rawKey);
-		if (key !== null) {
-			normalized[key] = targets;
-		}
-	}
-
-	return normalized;
-}
-
-function normalizeSeerrTargetKeys(
-	targets: SeerrUpstreamMappings,
-): SeerrUpstreamMappings {
-	const normalized: SeerrUpstreamMappings = {};
-
-	for (const [rawKey, target] of Object.entries(targets)) {
-		const key = normalizeStoredSourceKey(rawKey);
-		if (key !== null) {
-			normalized[key] = target;
-		}
-	}
-
-	return normalized;
+function hasLegacyProjections(snapshot: UpstreamSnapshot): boolean {
+	return "mappings" in snapshot || "seerrTargets" in snapshot;
 }
 
 function normalizeAniListCrosswalkKeys(
@@ -303,9 +263,7 @@ function projectUpstreamTargets(
 	});
 }
 
-function projectUpstreamTarget(
-	target: AniBridgeTarget,
-): UpstreamTarget | null {
+function projectUpstreamTarget(target: AniBridgeTarget): UpstreamTarget | null {
 	switch (target.kind) {
 		case "tmdb-movie": {
 			return { provider: "radarr", providerId: target.id };
@@ -321,4 +279,71 @@ function projectUpstreamTarget(
 			return null;
 		}
 	}
+}
+
+function normalizeSeasons(seasons: readonly number[]): number[] {
+	return [...new Set(seasons)]
+		.filter((season) => Number.isSafeInteger(season) && season >= 0)
+		.toSorted((left, right) => left - right);
+}
+
+function projectSeerrTarget(
+	targets: readonly AniBridgeTarget[],
+): SeerrUpstreamTarget | null {
+	const movieTmdbIds = targets.flatMap((target) => {
+		if (target.kind !== "tmdb-movie") return [];
+
+		const tmdbId = parseTmdbIdOrNull(target.id);
+		return tmdbId === null ? [] : [tmdbId];
+	});
+
+	if (movieTmdbIds.length > 0) {
+		const tmdbId = movieTmdbIds.toSorted((left, right) => left - right)[0];
+		return tmdbId === undefined ? null : { mediaType: "movie", tmdbId };
+	}
+
+	const tmdbTargets = targets.flatMap((target) => {
+		if (target.kind !== "tmdb-show") return [];
+
+		const tmdbId = parseTmdbIdOrNull(target.id);
+		return tmdbId === null ? [] : [{ tmdbId, season: target.season }];
+	});
+	const tmdbIds = new Set(tmdbTargets.map((target) => target.tmdbId));
+	if (tmdbIds.size !== 1) return null;
+
+	const tmdbId = tmdbTargets[0]?.tmdbId;
+	if (tmdbId === undefined) return null;
+
+	const tmdbSeasons = normalizeSeasons(
+		tmdbTargets.flatMap((target) =>
+			target.season === undefined ? [] : [target.season],
+		),
+	);
+	const tvdbTargets = targets.flatMap((target) => {
+		if (target.kind !== "tvdb-show" || target.season === undefined) return [];
+
+		const tvdbId = parseTvdbIdOrNull(target.id);
+		return tvdbId === null ? [] : [{ tvdbId, season: target.season }];
+	});
+	const tvdbIds = new Set(tvdbTargets.map((target) => target.tvdbId));
+	const tvdbId = tvdbIds.size === 1 ? [...tvdbIds][0] : undefined;
+	const tvdbSeasons =
+		tvdbId === undefined
+			? []
+			: normalizeSeasons(
+					tvdbTargets
+						.filter((target) => target.tvdbId === tvdbId)
+						.map((target) => target.season),
+				);
+	const seasons = normalizeSeasons([...tmdbSeasons, ...tvdbSeasons]);
+	if (seasons.length === 0) return null;
+
+	return {
+		mediaType: "tv",
+		tmdbId,
+		seasons,
+		...(tmdbSeasons.length === 0 ? {} : { tmdbSeasons }),
+		...(tvdbSeasons.length === 0 ? {} : { tvdbSeasons }),
+		...(tvdbId === undefined ? {} : { tvdbId }),
+	};
 }

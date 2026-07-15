@@ -3,7 +3,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
-import { parseTmdbId } from "@/providers/schemas";
+import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import type { ProviderCredentials } from "@/providers/types";
 import { seerrHandlers } from "./seerr.handlers";
 
@@ -130,7 +130,10 @@ describe("seerrHandlers", () => {
 				target: {
 					mediaType: "tv",
 					tmdbId: parseTmdbId(456),
-					seasons: [1, 2],
+					seasons: [0, 1, 2],
+					tmdbSeasons: [0, 2],
+					tvdbSeasons: [0, 1],
+					tvdbId: parseTvdbId(789),
 				},
 			},
 		]);
@@ -142,7 +145,10 @@ describe("seerrHandlers", () => {
 				anilistId: parseAniListId(100),
 				mediaType: "tv",
 				tmdbId: parseTmdbId(456),
-				seasons: [1, 2],
+				seasons: [0, 1, 2],
+				tmdbSeasons: [0, 2],
+				tvdbSeasons: [0, 1],
+				tvdbId: parseTvdbId(789),
 				source: "anibridge",
 			},
 		]);
@@ -262,7 +268,10 @@ describe("seerrHandlers", () => {
 		).resolves.toEqual([
 			{ mediaType: "movie", tmdbId: parseTmdbId(123), title: "Movie" },
 		]);
-		expect(seerrClientMock.searchMedia).toHaveBeenCalledWith("movie", credentials);
+		expect(seerrClientMock.searchMedia).toHaveBeenCalledWith(
+			"movie",
+			credentials,
+		);
 	});
 
 	it("reads Seerr details through configured credentials", async () => {

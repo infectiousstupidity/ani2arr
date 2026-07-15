@@ -2,8 +2,8 @@
 // src/mapping/upstream/anibridge.client.ts
 
 import {
-	parseAniBridgeMappingsPayload,
-	type ParsedAniBridgeMappings,
+	parseAniBridgeData,
+	type ParsedAniBridgeData,
 } from "@/mapping/upstream/anibridge.parser";
 
 const ANIBRIDGE_URL =
@@ -15,13 +15,15 @@ export type AniBridgeDownloadResult =
 	| { status: "not-modified" }
 	| {
 			status: "modified";
-			parsed: ParsedAniBridgeMappings;
+			parsed: ParsedAniBridgeData;
 			etag?: string;
 	  };
 
-export async function downloadAniBridgeMappings(input: {
-	etag?: string | undefined;
-} = {}): Promise<AniBridgeDownloadResult> {
+export async function downloadAniBridgeMappings(
+	input: {
+		etag?: string | undefined;
+	} = {},
+): Promise<AniBridgeDownloadResult> {
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), ANIBRIDGE_TIMEOUT_MS);
 
@@ -40,7 +42,9 @@ export async function downloadAniBridgeMappings(input: {
 		}
 
 		if (!response.ok) {
-			throw new Error(`Unable to download AniBridge mappings (${response.status}).`);
+			throw new Error(
+				`Unable to download AniBridge mappings (${response.status}).`,
+			);
 		}
 
 		const contentLength = Number(response.headers.get("Content-Length") ?? 0);
@@ -60,7 +64,7 @@ export async function downloadAniBridgeMappings(input: {
 			throw new Error("AniBridge mappings payload is not valid JSON.");
 		}
 
-		const parsed = parseAniBridgeMappingsPayload(parsedJson);
+		const parsed = parseAniBridgeData(parsedJson);
 		if (Object.keys(parsed.entries).length === 0) {
 			throw new Error(
 				"AniBridge mappings payload did not contain valid mappings.",
