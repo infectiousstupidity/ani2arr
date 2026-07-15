@@ -7,9 +7,8 @@ import { registerAni2arrApi } from "@/rpc";
 import { apiHandlers } from "@/rpc/handlers";
 import { logger } from "@/shared/utils/logger";
 import type { AniListId } from "@/anilist/types";
+import { hasConfiguredConnectionCredentials } from "@/settings/connection-config";
 import { getExtensionOptionsSnapshot } from "@/settings/store";
-import { hasConfiguredProviderCredentials } from "@/settings/provider-config";
-import { hasConfiguredSeerrCredentials } from "@/settings/seerr-config";
 import {
 	logError,
 	normalizeError,
@@ -47,9 +46,9 @@ async function shouldWarmMappingsCache(): Promise<boolean> {
 	try {
 		const options = await getExtensionOptionsSnapshot();
 		return (
-			hasConfiguredProviderCredentials(options, "sonarr") ||
-			hasConfiguredProviderCredentials(options, "radarr") ||
-			hasConfiguredSeerrCredentials(options)
+			hasConfiguredConnectionCredentials(options, "sonarr") ||
+			hasConfiguredConnectionCredentials(options, "radarr") ||
+			hasConfiguredConnectionCredentials(options, "seerr")
 		);
 	} catch (error) {
 		logError(normalizeError(error), "Background:shouldWarmMappingsCache");

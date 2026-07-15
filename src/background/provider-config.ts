@@ -2,8 +2,7 @@
 // src/background/provider-config.ts
 
 import { getExtensionOptionsSnapshot } from "@/settings/store";
-import { getProviderCredentials } from "@/settings/provider-config";
-import { getSeerrCredentials } from "@/settings/seerr-config";
+import { getConnectionCredentials } from "@/settings/connection-config";
 import type { ExtensionOptions } from "@/settings/types";
 import type {
 	Provider,
@@ -39,14 +38,14 @@ export async function getProviderConfig(
 	provider: Provider,
 ): Promise<ProviderCredentials | null> {
 	const options = await getExtensionOptionsSnapshot();
-	return getProviderCredentials(options, provider);
+	return getConnectionCredentials(options, provider);
 }
 
 export async function requireProviderConfig(
 	provider: Provider,
 ): Promise<ConfiguredProvider> {
 	const options = await getExtensionOptionsSnapshot();
-	const credentials = getProviderCredentials(options, provider);
+	const credentials = getConnectionCredentials(options, provider);
 	if (!credentials) throw createProviderNotConfiguredError(provider);
 
 	return { credentials, options };
@@ -69,12 +68,12 @@ export function createSeerrNotConfiguredError(): ExtensionError {
 
 export async function getSeerrConfig(): Promise<ProviderCredentials | null> {
 	const options = await getExtensionOptionsSnapshot();
-	return getSeerrCredentials(options);
+	return getConnectionCredentials(options, "seerr");
 }
 
 export async function requireSeerrCredentials(): Promise<ProviderCredentials> {
 	const options = await getExtensionOptionsSnapshot();
-	const credentials = getSeerrCredentials(options);
+	const credentials = getConnectionCredentials(options, "seerr");
 	if (!credentials) throw createSeerrNotConfiguredError();
 
 	return credentials;

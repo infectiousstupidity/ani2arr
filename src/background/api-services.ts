@@ -28,10 +28,9 @@ import {
 	resetAllSettingsSnapshot,
 } from "@/settings/store";
 import {
-	getProviderCredentials,
-	hasConfiguredProviderCredentials,
-} from "@/settings/provider-config";
-import { hasConfiguredSeerrCredentials } from "@/settings/seerr-config";
+	getConnectionCredentials,
+	hasConfiguredConnectionCredentials,
+} from "@/settings/connection-config";
 import type { ExtensionOptions } from "@/settings/types";
 import { clearAllTtlCaches } from "@/shared/cache/ttl-cache";
 import {
@@ -116,7 +115,7 @@ const refreshProviderLibrary = async (
 	provider: Provider,
 	options: ExtensionOptions,
 ): Promise<void> => {
-	const credentials = getProviderCredentials(options, provider);
+	const credentials = getConnectionCredentials(options, provider);
 
 	if (provider === "sonarr") {
 		if (!credentials) {
@@ -141,7 +140,7 @@ export const scheduleLibraryRefresh = (provider: Provider): void => {
 	const debouncer = provider === "sonarr" ? sonarrDebouncer : radarrDebouncer;
 	debouncer(async () => {
 		const options = await getExtensionOptionsSnapshot();
-		if (!hasConfiguredProviderCredentials(options, provider)) return;
+		if (!hasConfiguredConnectionCredentials(options, provider)) return;
 		await refreshProviderLibrary(provider, options);
 	});
 };
@@ -167,9 +166,9 @@ export const handleProviderConnectionChanged = async (
 	await bumpMappingsRevision();
 
 	if (
-		hasConfiguredProviderCredentials(options, "sonarr") ||
-		hasConfiguredProviderCredentials(options, "radarr") ||
-		hasConfiguredSeerrCredentials(options)
+		hasConfiguredConnectionCredentials(options, "sonarr") ||
+		hasConfiguredConnectionCredentials(options, "radarr") ||
+		hasConfiguredConnectionCredentials(options, "seerr")
 	) {
 		await refreshUpstreamMappings();
 	}

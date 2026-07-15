@@ -78,6 +78,15 @@ describe("providerHandlers", () => {
 		expect(radarrClientMock.testConnection).not.toHaveBeenCalled();
 	});
 
+	it("preserves the Seerr-specific missing credentials error", () => {
+		expect(() =>
+			providerHandlers.testSeerrConnection({
+				credentials: { url: " ", apiKey: " " },
+			}),
+		).toThrow("Seerr credentials are required.");
+		expect(seerrClientMock.validateConnection).not.toHaveBeenCalled();
+	});
+
 	it("opens configured provider pages privately", async () => {
 		getProviderConfigMock.mockResolvedValue({
 			url: "https://arr.example:8443/radarr",
