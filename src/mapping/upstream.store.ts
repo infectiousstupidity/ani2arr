@@ -17,11 +17,16 @@ import {
 	sourceIdentityKey,
 	type SourceIdentity,
 } from "./source-identity";
-import type { SeerrUpstreamTarget, UpstreamTarget } from "./types";
+import type {
+	AniBridgeEntries,
+	SeerrUpstreamTarget,
+	UpstreamTarget,
+} from "./types";
 
 const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 type UpstreamSnapshot = {
+	entries?: AniBridgeEntries;
 	mappings: UpstreamMappings;
 	seerrTargets?: SeerrUpstreamMappings;
 	aniListCrosswalks?: AniListCrosswalkMappings;
@@ -137,6 +142,7 @@ export async function refreshUpstreamMappings(): Promise<void> {
 		.then(async () => {
 			const previous = await getSnapshot();
 			if (
+				previous?.entries !== undefined &&
 				previous?.mappings &&
 				previous.seerrTargets &&
 				previous.aniListCrosswalks &&
@@ -145,9 +151,12 @@ export async function refreshUpstreamMappings(): Promise<void> {
 				return;
 			}
 
-			const result = await downloadAniBridgeMappings({ etag: previous?.etag });
+			/** LEGACY: remove full-refresh fallback after Task 15 removes old projection-only snapshots. */
+			const etag =
+				previous?.entries === undefined ? undefined : previous.etag;
+			const result = await downloadAniBridgeMappings({ etag });
 			if (result.status === "not-modified") {
-				if (!previous) {
+				if (!previous || previous.entries === undefined) {
 					throw new Error("AniBridge returned 304 without stored mappings.");
 				}
 				await upstreamMappings.setValue({
@@ -158,6 +167,7 @@ export async function refreshUpstreamMappings(): Promise<void> {
 			}
 
 			await upstreamMappings.setValue({
+				entries: result.parsed.entries,
 				mappings: result.parsed.mappings,
 				seerrTargets: result.parsed.seerrTargets,
 				aniListCrosswalks: result.parsed.aniListCrosswalks,

@@ -3,6 +3,24 @@
 
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 
+export type AniBridgeTarget =
+	| {
+			kind: "tmdb-movie";
+			id: TmdbId;
+	  }
+	| {
+			kind: "tmdb-show";
+			id: TmdbId;
+			season?: number;
+	  }
+	| {
+			kind: "tvdb-show";
+			id: TvdbId;
+			season?: number;
+	  };
+
+export type AniBridgeEntries = Record<number, AniBridgeTarget[]>;
+
 export type UpstreamTarget =
 	| {
 			provider: "sonarr";

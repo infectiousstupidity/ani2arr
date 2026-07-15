@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { parseAniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
-import { parseTmdbId } from "@/providers/schemas";
+import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import { sourceIdentityKey } from "@/mapping/source-identity";
 import { MAX_ANIBRIDGE_BYTES } from "@/mapping/upstream/anibridge.client";
 import {
@@ -19,6 +19,7 @@ import {
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
+const tvdb = parseTvdbId;
 const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const UPSTREAM_STORAGE_KEY = "mapping:upstream";
 
@@ -69,6 +70,116 @@ describe("refreshUpstreamMappings", () => {
 		await expect(refreshUpstreamMappings()).rejects.toThrow(
 			"AniBridge mappings payload did not contain valid mappings.",
 		);
+	});
+
+	it("persists canonical entries alongside legacy projections", async () => {
+		mockAniBridgeResponse(
+			createAniBridgeResponse(
+				JSON.stringify({
+					"anidb:1:R": {
+						"anilist:1": {},
+						"tmdb_movie:300": {},
+						"tmdb_show:500:s2": {},
+						"tvdb_show:700:s0": {},
+					},
+				}),
+			),
+		);
+
+		await refreshUpstreamMappings();
+
+		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
+		expect(stored[UPSTREAM_STORAGE_KEY]).toMatchObject({
+			entries: {
+				1: [
+					{ kind: "tmdb-movie", id: tmdb(300) },
+					{ kind: "tmdb-show", id: tmdb(500), season: 2 },
+					{ kind: "tvdb-show", id: tvdb(700), season: 0 },
+				],
+			},
+			mappings: {
+				"anilist:1": [
+					{ provider: "radarr", providerId: tmdb(300) },
+					{ provider: "sonarr", providerId: tvdb(700), season: 0 },
+				],
+			},
+		});
+	});
+
+	it("forces a full refresh for fresh legacy snapshots", async () => {
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				mappings: {
+					"anilist:1": [{ provider: "radarr", providerId: tmdb(300) }],
+				},
+				seerrTargets: {
+					"anilist:1": { mediaType: "movie", tmdbId: tmdb(300) },
+				},
+				aniListCrosswalks: {},
+				fetchedAt: Date.now(),
+				etag: "legacy-etag",
+			},
+		});
+		const fetchMock = vi.fn<typeof fetch>(async (_input, init) => {
+			expect(init?.headers).toEqual({});
+			return createAniBridgeResponse(
+				JSON.stringify({
+					"anidb:1:R": {
+						"anilist:1": {},
+						"tmdb_movie:400": {},
+					},
+				}),
+			);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		await refreshUpstreamMappings();
+
+		expect(fetchMock).toHaveBeenCalledOnce();
+		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
+		expect(stored[UPSTREAM_STORAGE_KEY]).toMatchObject({
+			entries: {
+				1: [{ kind: "tmdb-movie", id: tmdb(400) }],
+			},
+		});
+	});
+
+	it("keeps canonical entries after an ETag 304 refresh", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
+		const entries = {
+			1: [{ kind: "tmdb-movie", id: tmdb(300) }],
+		};
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				entries,
+				mappings: {
+					"anilist:1": [{ provider: "radarr", providerId: tmdb(300) }],
+				},
+				seerrTargets: {
+					"anilist:1": { mediaType: "movie", tmdbId: tmdb(300) },
+				},
+				aniListCrosswalks: {},
+				fetchedAt: Date.now() - UPSTREAM_REFRESH_INTERVAL_MS - 1,
+				etag: "canonical-etag",
+			},
+		});
+		const fetchMock = vi.fn<typeof fetch>(async (_input, init) => {
+			expect(init?.headers).toEqual({
+				"If-None-Match": "canonical-etag",
+			});
+			return new Response(null, { status: 304 });
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		await refreshUpstreamMappings();
+
+		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
+		expect(stored[UPSTREAM_STORAGE_KEY]).toMatchObject({
+			entries,
+			fetchedAt: Date.now(),
+			etag: "canonical-etag",
+		});
 	});
 
 	it("keeps previous stored snapshot when refresh payload is invalid", async () => {

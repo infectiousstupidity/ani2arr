@@ -8,17 +8,27 @@ import {
 	sourceIdentityKey,
 	type SourceIdentity,
 } from "@/mapping/source-identity";
-import type { SeerrUpstreamTarget, UpstreamTarget } from "@/mapping/types";
+import type {
+	AniBridgeEntries,
+	AniBridgeTarget,
+	SeerrUpstreamTarget,
+	UpstreamTarget,
+} from "@/mapping/types";
 
 export type UpstreamMappings = Record<string, UpstreamTarget[]>;
 export type SeerrUpstreamMappings = Record<string, SeerrUpstreamTarget>;
 export type AniListCrosswalkMappings = Record<string, AniListId>;
 
 export type ParsedAniBridgeMappings = {
+	entries: AniBridgeEntries;
 	mappings: UpstreamMappings;
 	seerrTargets: SeerrUpstreamMappings;
 	aniListCrosswalks: AniListCrosswalkMappings;
 };
+
+export function parseAniBridgeEntries(payload: unknown): AniBridgeEntries {
+	return parseAniBridgeMappingsPayload(payload).entries;
+}
 
 export function parseAniBridgeMappings(payload: unknown): UpstreamMappings {
 	return parseAniBridgeMappingsPayload(payload).mappings;
@@ -39,12 +49,13 @@ export function parseAniBridgeAniListCrosswalks(
 export function parseAniBridgeMappingsPayload(
 	payload: unknown,
 ): ParsedAniBridgeMappings {
+	const entries: AniBridgeEntries = {};
 	const mappings: UpstreamMappings = {};
 	const seerrTargets: SeerrUpstreamMappings = {};
 	const aniListCrosswalks: AniListCrosswalkMappings = {};
 
 	if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-		return { mappings, seerrTargets, aniListCrosswalks };
+		return { entries, mappings, seerrTargets, aniListCrosswalks };
 	}
 
 	for (const [rawRowKey, rawTargets] of Object.entries(
@@ -62,20 +73,29 @@ export function parseAniBridgeMappingsPayload(
 		if (sourceIdentities.length === 0) continue;
 
 		const targets = rawDescriptorKeys.flatMap((rawTarget) => {
-			const target = parseTarget(rawTarget);
+			const target = parseAniBridgeTarget(rawTarget);
 			return target === null ? [] : [target];
 		});
-		const seerrTarget = parseSeerrTarget(rawDescriptorKeys);
+		const seerrTarget = projectSeerrTarget(targets);
 		const aniListId = parseUniqueAniListTarget(rawDescriptorKeys);
 
 		for (const sourceIdentity of sourceIdentities) {
 			const sourceKey = sourceIdentityKey(sourceIdentity);
 			for (const target of targets) {
-				addTarget(mappings, sourceKey, target);
+				const upstreamTarget = projectUpstreamTarget(target);
+				if (upstreamTarget !== null) {
+					addTarget(mappings, sourceKey, upstreamTarget);
+				}
 			}
 
-			if (seerrTarget && sourceIdentity.source === "anilist") {
-				seerrTargets[sourceKey] = seerrTarget;
+			if (sourceIdentity.source === "anilist") {
+				for (const target of targets) {
+					addAniBridgeTarget(entries, sourceIdentity.id, target);
+				}
+
+				if (seerrTarget) {
+					seerrTargets[sourceKey] = seerrTarget;
+				}
 			}
 
 			if (sourceIdentity.source === "mal" && aniListId !== null) {
@@ -84,7 +104,7 @@ export function parseAniBridgeMappingsPayload(
 		}
 	}
 
-	return { mappings, seerrTargets, aniListCrosswalks };
+	return { entries, mappings, seerrTargets, aniListCrosswalks };
 }
 
 function parseSourceDescriptor(
@@ -118,58 +138,64 @@ function parseUniqueAniListTarget(values: readonly string[]): AniListId | null {
 	return uniqueIds.length === 1 ? (uniqueIds[0] ?? null) : null;
 }
 
-function parseTarget(value: string): UpstreamTarget | null {
+function parseAniBridgeTarget(value: string): AniBridgeTarget | null {
 	const target = parseDescriptor(value);
 
-	if (!target) {
-		return null;
-	}
+	if (!target) return null;
 
 	if (target.name === "tmdb_movie" && target.scope === undefined) {
-		const providerId = parseTmdbIdOrNull(target.id);
+		const id = parseTmdbIdOrNull(target.id);
 
-		return providerId === null
+		return id === null ? null : { kind: "tmdb-movie", id };
+	}
+
+	if (target.name === "tmdb_show") {
+		const id = parseTmdbIdOrNull(target.id);
+		const season = parseOptionalSeasonScope(target.scope);
+
+		return id === null || season === null
 			? null
 			: {
-					provider: "radarr",
-					providerId,
+					kind: "tmdb-show",
+					id,
+					...(season === undefined ? {} : { season }),
 				};
 	}
 
-	if (target.name !== "tvdb_show") {
-		return null;
+	if (target.name === "tvdb_show") {
+		const id = parseTvdbIdOrNull(target.id);
+		const season = parseOptionalSeasonScope(target.scope);
+
+		return id === null || season === null
+			? null
+			: {
+					kind: "tvdb-show",
+					id,
+					...(season === undefined ? {} : { season }),
+				};
 	}
 
-	const providerId = parseTvdbIdOrNull(target.id);
+	return null;
+}
 
-	if (providerId === null) {
-		return null;
+function projectUpstreamTarget(
+	target: AniBridgeTarget,
+): UpstreamTarget | null {
+	switch (target.kind) {
+		case "tmdb-movie": {
+			return { provider: "radarr", providerId: target.id };
+		}
+		case "tvdb-show": {
+			return {
+				provider: "sonarr",
+				providerId: target.id,
+				...(target.season === undefined ? {} : { season: target.season }),
+			};
+		}
+		case "tmdb-show": {
+			return null;
+		}
 	}
-
-	if (target.scope === undefined) {
-		return {
-			provider: "sonarr",
-			providerId,
-		};
-	}
-
-	const match = /^s(\d+)$/.exec(target.scope);
-
-	if (!match) {
-		return null;
-	}
-
-	const season = Number(match[1]);
-
-	if (!Number.isSafeInteger(season)) {
-		return null;
-	}
-
-	return {
-		provider: "sonarr",
-		providerId,
-		season,
-	};
 }
 
 function normalizeSeasons(seasons: readonly number[]): number[] {
@@ -178,18 +204,11 @@ function normalizeSeasons(seasons: readonly number[]): number[] {
 		.toSorted((left, right) => left - right);
 }
 
-function parseSeerrTarget(
-	values: readonly string[],
+function projectSeerrTarget(
+	targets: readonly AniBridgeTarget[],
 ): SeerrUpstreamTarget | null {
-	const descriptors = values.flatMap((value) => {
-		const target = parseDescriptor(value);
-		return target ? [target] : [];
-	});
-	const movieTmdbIds = descriptors.flatMap((target) => {
-		if (target.name !== "tmdb_movie" || target.scope !== undefined) return [];
-
-		const tmdbId = parseTmdbIdOrNull(target.id);
-		return tmdbId === null ? [] : [tmdbId];
+	const movieTmdbIds = targets.flatMap((target) => {
+		return target.kind === "tmdb-movie" ? [target.id] : [];
 	});
 
 	if (movieTmdbIds.length > 0) {
@@ -202,12 +221,10 @@ function parseSeerrTarget(
 		};
 	}
 
-	const tmdbTargets = descriptors.flatMap((target) => {
-		if (target.name !== "tmdb_show") return [];
-
-		const tmdbId = parseTmdbIdOrNull(target.id);
-		const season = parseSeasonScope(target.scope);
-		return tmdbId === null || season === null ? [] : [{ tmdbId, season }];
+	const tmdbTargets = targets.flatMap((target) => {
+		return target.kind === "tmdb-show" && target.season !== undefined
+			? [{ tmdbId: target.id, season: target.season }]
+			: [];
 	});
 	const tmdbIds = new Set(tmdbTargets.map((target) => target.tmdbId));
 	if (tmdbIds.size !== 1) return null;
@@ -219,12 +236,10 @@ function parseSeerrTarget(
 		tmdbTargets.map((target) => target.season),
 	);
 
-	const tvdbTargets = descriptors.flatMap((target) => {
-		if (target.name !== "tvdb_show") return [];
-
-		const tvdbId = parseTvdbIdOrNull(target.id);
-		const season = parseSeasonScope(target.scope);
-		return tvdbId === null || season === null ? [] : [{ tvdbId, season }];
+	const tvdbTargets = targets.flatMap((target) => {
+		return target.kind === "tvdb-show" && target.season !== undefined
+			? [{ tvdbId: target.id, season: target.season }]
+			: [];
 	});
 	const tvdbIds = new Set(tvdbTargets.map((target) => target.tvdbId));
 	const tvdbId = tvdbIds.size === 1 ? [...tvdbIds][0] : undefined;
@@ -250,12 +265,39 @@ function parseSeerrTarget(
 	};
 }
 
-function parseSeasonScope(scope: string | undefined): number | null {
-	const match = /^s(\d+)$/.exec(scope ?? "");
+function parseOptionalSeasonScope(
+	scope: string | undefined,
+): number | null | undefined {
+	if (scope === undefined) return undefined;
+
+	const match = /^s(\d+)$/.exec(scope);
 	if (!match) return null;
 
 	const season = Number(match[1]);
 	return Number.isSafeInteger(season) ? season : null;
+}
+
+function addAniBridgeTarget(
+	entries: AniBridgeEntries,
+	anilistId: AniListId,
+	target: AniBridgeTarget,
+): void {
+	const targets = entries[anilistId] ?? [];
+	const season = "season" in target ? target.season : undefined;
+	const alreadyExists = targets.some((existing) => {
+		const existingSeason =
+			"season" in existing ? existing.season : undefined;
+
+		return (
+			existing.kind === target.kind &&
+			existing.id === target.id &&
+			existingSeason === season
+		);
+	});
+
+	if (!alreadyExists) {
+		entries[anilistId] = [...targets, target];
+	}
 }
 
 type Descriptor = { name: string; id: number; scope?: string };
