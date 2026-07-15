@@ -13,6 +13,7 @@ import {
 	getUniqueAniListIdForSource,
 	getUpstreamTargets,
 	listSeerrUpstreamTargets,
+	listSourceUpstreamMappings,
 	refreshUpstreamMappings,
 } from "./upstream.store";
 
@@ -142,6 +143,9 @@ describe("refreshUpstreamMappings", () => {
 				1: [{ kind: "tmdb-movie", id: tmdb(400) }],
 			},
 		});
+		await expect(getUpstreamTargets("radarr", aid(1))).resolves.toEqual([
+			{ provider: "radarr", providerId: tmdb(400) },
+		]);
 	});
 
 	it("keeps canonical entries after an ETag 304 refresh", async () => {
@@ -213,7 +217,7 @@ describe("refreshUpstreamMappings", () => {
 		]);
 	});
 
-	it("normalizes old raw AniList snapshot keys on read", async () => {
+	it("ignores the legacy Arr projection while keeping legacy Seerr readable", async () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
 				mappings: {
@@ -226,11 +230,90 @@ describe("refreshUpstreamMappings", () => {
 			},
 		});
 
+		await expect(getUpstreamTargets("radarr", aid(1))).resolves.toEqual([]);
+		await expect(listSeerrUpstreamTargets([aid(1)])).resolves.toEqual([
+			{ anilistId: aid(1), target: { mediaType: "movie", tmdbId: tmdb(300) } },
+		]);
+	});
+
+	it("derives Arr reads and records only from canonical entries", async () => {
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				entries: {
+					1: [
+						{ kind: "tmdb-movie", id: tmdb(300) },
+						{ kind: "tmdb-show", id: tmdb(500), season: 2 },
+						{ kind: "tvdb-show", id: tvdb(700) },
+						{ kind: "tvdb-show", id: tvdb(700), season: 0 },
+						{ kind: "tvdb-show", id: tvdb(700), season: 2 },
+					],
+					2: [{ kind: "tmdb-show", id: tmdb(600), season: 1 }],
+					invalid: [{ kind: "tmdb-movie", id: tmdb(999) }],
+				},
+				mappings: {
+					"anilist:1": [
+						{ provider: "radarr", providerId: tmdb(999) },
+						{ provider: "sonarr", providerId: tvdb(999) },
+					],
+					"anilist:2": [{ provider: "radarr", providerId: tmdb(600) }],
+				},
+				fetchedAt: Date.now(),
+			},
+		});
+
+		const sonarrTargets = [
+			{ provider: "sonarr" as const, providerId: tvdb(700) },
+			{ provider: "sonarr" as const, providerId: tvdb(700), season: 0 },
+			{ provider: "sonarr" as const, providerId: tvdb(700), season: 2 },
+		];
 		await expect(getUpstreamTargets("radarr", aid(1))).resolves.toEqual([
 			{ provider: "radarr", providerId: tmdb(300) },
 		]);
-		await expect(listSeerrUpstreamTargets([aid(1)])).resolves.toEqual([
-			{ anilistId: aid(1), target: { mediaType: "movie", tmdbId: tmdb(300) } },
+		await expect(getUpstreamTargets("sonarr", aid(1))).resolves.toEqual(
+			sonarrTargets,
+		);
+		await expect(getUpstreamTargets("radarr", aid(2))).resolves.toEqual([]);
+		await expect(listSourceUpstreamMappings()).resolves.toEqual([
+			{
+				source: { source: "anilist", id: aid(1) },
+				targets: [
+					{ provider: "radarr", providerId: tmdb(300) },
+					...sonarrTargets,
+				],
+			},
+		]);
+	});
+
+	it("derives MAL Arr reads and list aliases through the AniList crosswalk", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+		const targets = [
+			{ provider: "sonarr" as const, providerId: tvdb(78_874), season: 1 },
+		];
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				entries: {
+					21: [
+						{ kind: "tvdb-show", id: tvdb(78_874), season: 1 },
+						{ kind: "tmdb-show", id: tmdb(1396), season: 1 },
+					],
+				},
+				mappings: {
+					[sourceIdentityKey(source)]: [
+						{ provider: "radarr", providerId: tmdb(999) },
+					],
+				},
+				aniListCrosswalks: {
+					[sourceIdentityKey(source)]: aid(21),
+				},
+				fetchedAt: Date.now(),
+			},
+		});
+
+		await expect(getUpstreamTargets("sonarr", source)).resolves.toEqual(targets);
+		await expect(getUpstreamTargets("radarr", source)).resolves.toEqual([]);
+		await expect(listSourceUpstreamMappings()).resolves.toEqual([
+			{ source: { source: "anilist", id: aid(21) }, targets },
+			{ source, targets },
 		]);
 	});
 

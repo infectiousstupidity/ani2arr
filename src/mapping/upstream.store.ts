@@ -2,7 +2,7 @@
 // src/mapping/upstream.store.ts
 
 import { storage } from "@wxt-dev/storage";
-import type { AniListId } from "@/anilist/types";
+import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
 import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
 import type {
@@ -19,6 +19,7 @@ import {
 } from "./source-identity";
 import type {
 	AniBridgeEntries,
+	AniBridgeTarget,
 	SeerrUpstreamTarget,
 	UpstreamTarget,
 } from "./types";
@@ -27,6 +28,7 @@ const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 type UpstreamSnapshot = {
 	entries?: AniBridgeEntries;
+	/** LEGACY: remove when Task 15 removes persisted consumer projections. */
 	mappings: UpstreamMappings;
 	seerrTargets?: SeerrUpstreamMappings;
 	aniListCrosswalks?: AniListCrosswalkMappings;
@@ -58,9 +60,13 @@ export async function getUpstreamTargets(
 	source: SourceIdentity | AniListId,
 ): Promise<UpstreamTarget[]> {
 	const snapshot = await getSnapshot();
-	const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
+	const anilistId = getSnapshotAniListId(
+		snapshot,
+		normalizeSourceIdentity(source),
+	);
+	if (anilistId === null) return [];
 
-	return (snapshot?.mappings[sourceKey] ?? []).filter(
+	return projectUpstreamTargets(snapshot?.entries?.[anilistId] ?? []).filter(
 		(target) => target.provider === provider,
 	);
 }
@@ -70,14 +76,31 @@ export async function listSourceUpstreamMappings(): Promise<
 > {
 	const snapshot = await getSnapshot();
 	const records: SourceUpstreamRecord[] = [];
+	const targetsByAniListId = new Map<AniListId, UpstreamTarget[]>();
 
-	for (const [rawSourceKey, targets] of Object.entries(
-		snapshot?.mappings ?? {},
+	for (const [rawAniListId, entries] of Object.entries(
+		snapshot?.entries ?? {},
+	)) {
+		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
+		if (anilistId === null) continue;
+
+		const targets = projectUpstreamTargets(entries);
+		if (targets.length === 0) continue;
+
+		targetsByAniListId.set(anilistId, targets);
+		records.push({ source: { source: "anilist", id: anilistId }, targets });
+	}
+
+	for (const [rawSourceKey, rawAniListId] of Object.entries(
+		snapshot?.aniListCrosswalks ?? {},
 	)) {
 		const source = parseSourceIdentityKey(rawSourceKey);
+		const anilistId = parseAniListIdOrNull(rawAniListId);
+		if (source?.source !== "mal" || anilistId === null) continue;
 
-		if (source !== null) {
-			records.push({ source, targets });
+		const targets = targetsByAniListId.get(anilistId);
+		if (targets !== undefined) {
+			records.push({ source, targets: [...targets] });
 		}
 	}
 
@@ -260,4 +283,42 @@ function normalizeAniListCrosswalkKeys(
 	}
 
 	return normalized;
+}
+
+function getSnapshotAniListId(
+	snapshot: UpstreamSnapshot | null,
+	source: SourceIdentity,
+): AniListId | null {
+	if (source.source === "anilist") return source.id;
+
+	return snapshot?.aniListCrosswalks?.[sourceIdentityKey(source)] ?? null;
+}
+
+function projectUpstreamTargets(
+	targets: readonly AniBridgeTarget[],
+): UpstreamTarget[] {
+	return targets.flatMap((target) => {
+		const projected = projectUpstreamTarget(target);
+		return projected === null ? [] : [projected];
+	});
+}
+
+function projectUpstreamTarget(
+	target: AniBridgeTarget,
+): UpstreamTarget | null {
+	switch (target.kind) {
+		case "tmdb-movie": {
+			return { provider: "radarr", providerId: target.id };
+		}
+		case "tvdb-show": {
+			return {
+				provider: "sonarr",
+				providerId: target.id,
+				...(target.season === undefined ? {} : { season: target.season }),
+			};
+		}
+		case "tmdb-show": {
+			return null;
+		}
+	}
 }
