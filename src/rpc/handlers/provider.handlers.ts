@@ -19,7 +19,6 @@ import type {
 	OpenSeerrPageOutput,
 	ProviderConnectionTestInput,
 } from "@/rpc/types";
-import { normalizeSeerrConnectionInput } from "@/settings/seerr-config";
 import { normalizeInputCredentials } from "./provider-credentials";
 
 async function openTab(url?: string | null): Promise<{ opened: boolean }> {
@@ -82,13 +81,8 @@ export const providerHandlers = {
 			normalizeInputCredentials("radarr", credentials),
 		),
 
-	testSeerrConnection({ credentials }: ProviderConnectionTestInput) {
-		const creds = normalizeSeerrConnectionInput(credentials);
-		if (!creds) throw new Error("Seerr credentials are required.");
-
-		return seerrClient.validateConnection({
-			url: creds.url,
-			apiKey: creds.apiKey,
-		});
-	},
+	testSeerrConnection: ({ credentials }: ProviderConnectionTestInput) =>
+		seerrClient.validateConnection(
+			normalizeInputCredentials("seerr", credentials),
+		),
 };

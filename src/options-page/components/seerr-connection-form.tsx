@@ -6,9 +6,9 @@ import { Plug } from "lucide-react";
 import { isPublicHttpProviderUrl } from "@/providers/settings/insecure-url";
 import { useExtensionOptions } from "@/queries/options";
 import {
-	getSeerrConnectionDraft,
-	hasConfiguredSeerrCredentials,
-} from "@/settings/seerr-config";
+	getConnectionDraft,
+	hasConfiguredConnectionCredentials,
+} from "@/settings/connection-config";
 import Button from "@/shared/ui/primitives/button";
 import { SettingsRow, SettingsSection } from "./settings-section";
 import { Input, PasswordInput } from "./ui/input";
@@ -25,11 +25,14 @@ export const SeerrConnectionForm = ({
 	onConnect,
 }: SeerrConnectionFormProps) => {
 	const { data: savedSettings } = useExtensionOptions();
-	const savedCredentials = getSeerrConnectionDraft(savedSettings);
+	const savedCredentials = getConnectionDraft(savedSettings, "seerr");
 
 	const savedUrl = savedCredentials.url;
 	const savedApiKey = savedCredentials.apiKey;
-	const isConfigured = hasConfiguredSeerrCredentials(savedSettings);
+	const isConfigured = hasConfiguredConnectionCredentials(
+		savedSettings,
+		"seerr",
+	);
 
 	return (
 		<SeerrConnectionDraft

@@ -1,19 +1,23 @@
 /** Shared provider credential normalization for RPC handlers. */
 // src/rpc/handlers/provider-credentials.ts
 
-import type {
-	Provider,
-	ProviderCredentials,
-} from "@/providers/types";
-import { normalizeProviderConnectionInput } from "@/settings/provider-config";
+import type { ProviderCredentials } from "@/providers/types";
+import {
+	normalizeConnectionInput,
+	type ConnectionKind,
+} from "@/settings/connection-config";
 
 export const normalizeInputCredentials = (
-	provider: Provider,
+	kind: ConnectionKind,
 	credentials: ProviderCredentials,
 ): ProviderCredentials => {
-	const normalized = normalizeProviderConnectionInput(credentials, provider);
+	const normalized = normalizeConnectionInput(credentials, kind);
 	if (!normalized) {
-		throw new Error("Provider credentials are required.");
+		throw new Error(
+			kind === "seerr"
+				? "Seerr credentials are required."
+				: "Provider credentials are required.",
+		);
 	}
 
 	return {

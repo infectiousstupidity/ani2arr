@@ -2,7 +2,6 @@
 // src/options-page/index.tsx
 
 import { useMemo, useState } from "react";
-import type { Provider } from "@/providers/types";
 import {
   useExtensionOptions,
   useOptionsQuerySync,
@@ -14,8 +13,10 @@ import {
 } from "@/queries/provider-connection";
 import { useSeerrConnectionCheck } from "@/queries/seerr";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
-import { getProviderCredentials } from "@/settings/provider-config";
-import { getSeerrCredentials } from "@/settings/seerr-config";
+import {
+  getConnectionCredentials,
+  type ConnectionKind,
+} from "@/settings/connection-config";
 import ConfirmDialog from "@/shared/ui/primitives/confirm-dialog";
 
 import {
@@ -37,7 +38,7 @@ import { SeerrPage } from "./pages/seerr-page";
 import { SonarrPage } from "./pages/sonarr-page";
 import { UiPage } from "./pages/ui-page";
 
-type DisconnectTarget = Provider | "seerr";
+type DisconnectTarget = ConnectionKind;
 
 function getDisconnectTargetLabel(target: DisconnectTarget | null): string {
 	if (target === "radarr") return "Radarr";
@@ -63,15 +64,15 @@ const OptionsPageContent = () => {
   const [pendingDisconnectProvider, setPendingDisconnectProvider] = useState<DisconnectTarget | null>(null);
 
   const sonarrCredentials = useMemo(
-    () => getProviderCredentials(extensionOptionsQuery.data, "sonarr"),
+    () => getConnectionCredentials(extensionOptionsQuery.data, "sonarr"),
     [extensionOptionsQuery.data],
   );
   const radarrCredentials = useMemo(
-    () => getProviderCredentials(extensionOptionsQuery.data, "radarr"),
+    () => getConnectionCredentials(extensionOptionsQuery.data, "radarr"),
     [extensionOptionsQuery.data],
   );
   const seerrCredentials = useMemo(
-    () => getSeerrCredentials(extensionOptionsQuery.data),
+    () => getConnectionCredentials(extensionOptionsQuery.data, "seerr"),
     [extensionOptionsQuery.data],
   );
 

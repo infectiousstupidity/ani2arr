@@ -17,21 +17,16 @@ import type {
 } from "@/providers/types";
 import { logger } from "@/shared/utils/logger";
 import {
+	hasConfiguredConnectionCredentials,
+	normalizeConnectionInput,
+	normalizeConnectionSettings,
+} from "./connection-config";
+import {
 	ExtensionOptionsSchema,
 	createDefaultExtensionOptions,
 } from "./schema";
 import { UiOptionsSchema } from "./ui-schema";
 import type { ExtensionOptions, PublicOptions } from "./types";
-import {
-	hasConfiguredProviderCredentials,
-	normalizeProviderConnectionInput,
-	normalizeProviderConnectionSettings,
-} from "./provider-config";
-import {
-	hasConfiguredSeerrCredentials,
-	normalizeSeerrConnectionInput,
-	normalizeSeerrConnectionSettings,
-} from "./seerr-config";
 
 const PUBLIC_OPTIONS_STORAGE_KEY = "local:publicOptions";
 const SONARR_SECRETS_STORAGE_KEY = "local:sonarrSecrets";
@@ -53,15 +48,15 @@ export function toPublicOptions(settings: ExtensionOptions): PublicOptions {
 		providers: {
 			sonarr: {
 				defaults: normalizeSonarrDefaults(settings.providers.sonarr.defaults),
-				isConfigured: hasConfiguredProviderCredentials(settings, "sonarr"),
+				isConfigured: hasConfiguredConnectionCredentials(settings, "sonarr"),
 			},
 			radarr: {
 				defaults: normalizeRadarrDefaults(settings.providers.radarr.defaults),
-				isConfigured: hasConfiguredProviderCredentials(settings, "radarr"),
+				isConfigured: hasConfiguredConnectionCredentials(settings, "radarr"),
 			},
 		},
 		seerr: {
-			isConfigured: hasConfiguredSeerrCredentials(settings),
+			isConfigured: hasConfiguredConnectionCredentials(settings, "seerr"),
 		},
 		ui: settings.ui,
 		debugLogging: settings.debugLogging,
@@ -296,15 +291,15 @@ async function writeExtensionOptionsSnapshot(
 	};
 	const parsed = parseExtensionOptions(strippedInput);
 
-	const sonarrConnection = normalizeProviderConnectionSettings(
+	const sonarrConnection = normalizeConnectionSettings(
 		parsed,
 		"sonarr",
 	);
-	const radarrConnection = normalizeProviderConnectionSettings(
+	const radarrConnection = normalizeConnectionSettings(
 		parsed,
 		"radarr",
 	);
-	const seerrConnection = normalizeSeerrConnectionSettings(parsed);
+	const seerrConnection = normalizeConnectionSettings(parsed, "seerr");
 	const sonarrCredentials = connectionOrDefault(sonarrConnection);
 	const radarrCredentials = connectionOrDefault(radarrConnection);
 	const seerrCredentials = connectionOrDefault(seerrConnection);
@@ -395,7 +390,7 @@ export async function saveProviderConnectionSnapshot(
 	credentials: ProviderCredentials | null,
 ): Promise<ExtensionOptions> {
 	const normalized = credentials
-		? normalizeProviderConnectionInput(credentials, provider)
+		? normalizeConnectionInput(credentials, provider)
 		: null;
 	const connection = {
 		url: normalized?.url ?? "",
@@ -423,7 +418,7 @@ export async function saveSeerrConnectionSnapshot(
 	credentials: ProviderCredentials | null,
 ): Promise<ExtensionOptions> {
 	const normalized = credentials
-		? normalizeSeerrConnectionInput(credentials)
+		? normalizeConnectionInput(credentials, "seerr")
 		: null;
 	const connection = {
 		url: normalized?.url ?? "",
