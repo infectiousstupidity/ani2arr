@@ -3,13 +3,16 @@
 
 # ani2arr Privacy Policy
 
-Last updated: June 5, 2026
+Last updated: July 16, 2026
 
 ## Summary
 
 ani2arr does not collect, sell, or transmit user data to the developer.
 
-The extension connects AniList and AniChart pages to the user's own self-hosted Sonarr and Radarr servers. To do that, it stores configuration locally in the browser and sends limited request data to external services that are necessary for the feature to work.
+The extension connects AniList and AniChart pages to the user's own self-hosted
+Sonarr, Radarr, and optional Seerr servers. To do that, it stores configuration
+locally in the browser and sends limited request data to external services that
+are necessary for the feature to work.
 
 ## What ani2arr stores locally
 
@@ -17,11 +20,20 @@ ani2arr stores the following data in the browser's local extension storage on th
 
 - Sonarr and Radarr URLs entered by the user
 - Sonarr and Radarr API keys entered by the user
+- the configured Seerr URL and authentication mode
+- an optional global Seerr API key when advanced API-key mode is used
+- a minimal last-verified Seerr account summary: numeric account ID, display
+  name, and optional avatar path
 - Sonarr and Radarr default add settings selected by the user
-- UI preferences and mapping overrides created by the user
+- UI preferences, mapping overrides, and manual Seerr targets created by the
+  user
 - Cached AniList metadata and mapping data used to reduce repeated lookups
 
 This data is not sent to the developer.
+
+In Seerr session mode, the browser stores and manages the Seerr session cookie.
+ani2arr does not collect or store Seerr, Plex, Jellyfin, or Emby passwords. It
+also does not read, store, log, or return the Seerr session-cookie value.
 
 ## What ani2arr transmits
 
@@ -47,11 +59,47 @@ Responses from Sonarr or Radarr may include local provider data used by ani2arr,
 
 If the user configures a provider URL that starts with `http://`, the provider API key is sent over cleartext HTTP to that configured host. ani2arr supports HTTP for localhost and trusted LAN setups, but HTTPS is recommended for any provider exposed beyond a trusted local network.
 
-### 2. AniList GraphQL
+### 2. The user's configured Seerr server
+
+ani2arr sends requests to the exact Seerr URL entered by the user. These
+requests are used to:
+
+- verify the browser's existing Seerr login
+- search for Seerr media and read request or availability status
+- create a media request after an explicit user action
+
+In the default session mode, ani2arr asks the browser to include applicable
+cookies with background requests to the configured Seerr server. The browser
+handles the cookie; its value does not enter ani2arr storage, logs, or RPC
+payloads.
+
+Before a session-authenticated media request, ani2arr verifies that the current
+Seerr account ID matches the last account confirmed in extension settings. If
+the account changed, ani2arr blocks the request until the user confirms the new
+account.
+
+Seerr requests may include:
+
+- TMDB or TVDB media identifiers and selected seasons
+- search terms derived from AniList titles
+- the optional global Seerr API key when advanced API-key mode is used
+
+The global Seerr API key is a privileged server credential. If a configured
+Seerr URL starts with `http://`, that key is sent without transport encryption
+to the configured host. HTTPS is recommended outside trusted localhost or LAN
+setups.
+
+Session mode depends on the browser making the configured Seerr login available
+to extension background requests. Third-party-cookie blocking, Firefox
+Containers, incognito separation, or other browser privacy settings may prevent
+that. Seerr installations with CSRF protection may also reject state-changing
+requests; advanced API-key mode is the current workaround.
+
+### 3. AniList GraphQL
 
 ani2arr sends AniList IDs and related query parameters to `https://graphql.anilist.co` to fetch media metadata used for matching and display.
 
-### 3. Public mapping files hosted on GitHub
+### 4. Public mapping files hosted on GitHub
 
 ani2arr fetches public JSON mapping files from `https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json` to improve AniList-to-TVDB and AniList-to-TMDB matching quality. GitHub may serve those release downloads through `release-assets.githubusercontent.com`.
 
@@ -76,8 +124,10 @@ When the user changes or clears a configured provider URL, ani2arr attempts to r
 
 Users can control data use by:
 
-- choosing whether to configure Sonarr or Radarr at all
+- choosing whether to configure Sonarr, Radarr, or Seerr at all
 - changing or removing the saved Sonarr or Radarr URL and API key
+- disconnecting Seerr or switching between browser-session and advanced
+  API-key mode
 - disconnecting Sonarr or Radarr from the extension
 - removing the extension and its stored local data through the browser
 

@@ -58,13 +58,15 @@ export const AdvancedPage = () => {
 				<div className="rounded-lg border border-border-primary/40 bg-bg-tertiary/10 p-4 text-sm leading-relaxed text-text-secondary md:p-5">
 					<p>
 						ani2arr does not use a developer-operated backend or analytics
-						service. Your Sonarr URL, Radarr URL, API keys, and extension
-						settings are stored locally in the browser.
+						service. Provider URLs, API keys, Seerr connection mode, the
+						last verified Seerr account, and extension settings are stored
+						locally in the browser.
 					</p>
 					<ul className="mt-4 list-disc space-y-2 pl-5 text-xs leading-5">
 						<li>Only the configured provider scheme and host are requested at runtime.</li>
 						<li>Host permissions cannot be limited to subfolders, and Firefox cannot limit them by port.</li>
 						<li>Provider API keys are sent only to their configured provider URLs. HTTP provider URLs send API keys in cleartext; use HTTPS outside trusted localhost or LAN setups.</li>
+						<li>Seerr session cookies remain browser-managed; ani2arr does not store or expose their values.</li>
 						<li>AniList and AniChart content UI can show provider library status, matched titles, saved defaults, root folders, quality profiles, tags, and search candidates.</li>
 						<li>
 							AniList metadata is fetched from AniList GraphQL and public mapping

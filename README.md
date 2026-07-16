@@ -88,10 +88,12 @@ Release assets on GitHub include SHA256 checksums for manual verification.
    * Sonarr
    * Radarr
    * Seerr
-4. Add the provider URL and API key.
-5. Set the default profiles, root folders, monitored state, and add behavior.
-6. Open AniList or AniChart.
-7. Use the ani2arr actions shown on supported pages.
+4. For Sonarr or Radarr, add the provider URL and API key.
+5. For Seerr, enter the server URL and check your existing browser session. If
+   needed, use the advanced global API-key mode.
+6. Set the default profiles, root folders, monitored state, and add behavior.
+7. Open AniList or AniChart.
+8. Use the ani2arr actions shown on supported pages.
 
 ## Screenshots
 
@@ -141,6 +143,34 @@ Yes. ani2arr can request media through a configured Seerr instance and show requ
 </details>
 
 <details>
+<summary><strong>How does ani2arr sign in to Seerr?</strong></summary>
+
+By default, ani2arr uses the Seerr session already stored by your browser. Enter
+the Seerr URL, click **Check Seerr session**, and sign in on Seerr's own page if
+prompted. ani2arr does not collect your Seerr, Plex, Jellyfin, or Emby password,
+and it does not copy or store the Seerr session cookie.
+
+The global Seerr API key remains available under **Advanced connection**. It is
+a privileged server credential and should not be shared with untrusted users.
+
+</details>
+
+<details>
+<summary><strong>Why can’t ani2arr use my Seerr browser session?</strong></summary>
+
+Third-party-cookie blocking, Firefox Containers, incognito separation, or other
+browser privacy settings can keep an extension background request from using
+the same Seerr session. Sign in to the configured Seerr URL in the same browser
+profile and try **I have signed in — check again**. If the session remains
+unavailable, use the advanced API-key mode.
+
+Seerr installations with CSRF protection may also reject request creation after
+the session check succeeds. ani2arr reports this separately; the global API-key
+mode is the current workaround.
+
+</details>
+
+<details>
 <summary><strong>Does ani2arr require Seerr?</strong></summary>
 
 No. Sonarr and Radarr can be used directly without Seerr.
@@ -181,7 +211,12 @@ For security issues, do not open a public issue. See [SECURITY.md](SECURITY.md).
 
 ## Privacy and permissions
 
-ani2arr stores configuration locally in browser extension storage, including provider URLs, API keys, default add settings, UI preferences, manual mappings, manual Seerr targets, and cached metadata.
+ani2arr stores configuration locally in browser extension storage, including provider URLs, Sonarr/Radarr API keys, an optional global Seerr API key, Seerr authentication mode, a minimal last-verified Seerr account summary, default add settings, UI preferences, manual mappings, manual Seerr targets, and cached metadata.
+
+In Seerr session mode, the browser manages the session cookie. ani2arr asks the
+browser to include applicable cookies when its background process calls the
+configured Seerr server, but ani2arr does not read, store, log, or return the
+session-cookie value.
 
 ani2arr may request data from:
 
