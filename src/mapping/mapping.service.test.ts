@@ -101,10 +101,36 @@ vi.mock("./upstream.store", () => ({
 		)?.anilistId ?? null,
 	),
 	listSourceUpstreamMappings: vi.fn(async () =>
-		storeRecords.upstream.map((record) => ({
-			source: recordSource(record),
-			targets: record.targets,
-		})),
+		[
+			...storeRecords.upstream.flatMap((record) => {
+				const source = recordSource(record);
+				const anilistId =
+					record.anilistId ??
+					(source.source === "anilist"
+						? source.id
+						: storeRecords.crosswalks.find(
+								(crosswalk) =>
+									recordSourceKey(crosswalk) === sourceIdentityKey(source),
+							)?.anilistId);
+				return anilistId === undefined
+					? []
+					: [{ source, anilistId, targets: record.targets }];
+			}),
+			...storeRecords.crosswalks.flatMap((crosswalk) =>
+				storeRecords.upstream.some(
+					(record) =>
+						recordSourceKey(record) === recordSourceKey(crosswalk),
+				)
+					? []
+					: [
+							{
+								source: crosswalk.source,
+								anilistId: crosswalk.anilistId,
+								targets: [],
+							},
+						],
+			),
+		]
 	),
 }));
 

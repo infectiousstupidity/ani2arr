@@ -31,8 +31,9 @@ type UpstreamSnapshot = {
 	etag?: string;
 };
 
-export type SourceUpstreamRecord = {
+export type UpstreamSourceFact = {
 	source: SourceIdentity;
+	anilistId: AniListId;
 	targets: UpstreamTarget[];
 };
 
@@ -67,10 +68,10 @@ export async function getUpstreamTargets(
 }
 
 export async function listSourceUpstreamMappings(): Promise<
-	SourceUpstreamRecord[]
+	UpstreamSourceFact[]
 > {
 	const snapshot = await getSnapshot();
-	const records: SourceUpstreamRecord[] = [];
+	const records: UpstreamSourceFact[] = [];
 	const targetsByAniListId = new Map<AniListId, UpstreamTarget[]>();
 
 	for (const [rawAniListId, entries] of Object.entries(
@@ -80,10 +81,12 @@ export async function listSourceUpstreamMappings(): Promise<
 		if (anilistId === null) continue;
 
 		const targets = projectUpstreamTargets(entries);
-		if (targets.length === 0) continue;
-
 		targetsByAniListId.set(anilistId, targets);
-		records.push({ source: { source: "anilist", id: anilistId }, targets });
+		records.push({
+			source: { source: "anilist", id: anilistId },
+			anilistId,
+			targets,
+		});
 	}
 
 	for (const [rawSourceKey, rawAniListId] of Object.entries(
@@ -93,10 +96,11 @@ export async function listSourceUpstreamMappings(): Promise<
 		const anilistId = parseAniListIdOrNull(rawAniListId);
 		if (source?.source !== "mal" || anilistId === null) continue;
 
-		const targets = targetsByAniListId.get(anilistId);
-		if (targets !== undefined) {
-			records.push({ source, targets: [...targets] });
-		}
+		records.push({
+			source,
+			anilistId,
+			targets: [...(targetsByAniListId.get(anilistId) ?? [])],
+		});
 	}
 
 	return records;
