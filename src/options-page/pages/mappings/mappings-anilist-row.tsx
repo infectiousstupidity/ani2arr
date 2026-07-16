@@ -27,6 +27,7 @@ import {
 	formatMappingEntryKind,
 	formatMappingStatusLabel,
 	formatSourceIdentity,
+	getMappingRowMutationInput,
 } from "./mapping-page-model";
 
 interface MappingsAniListRowProps {
@@ -101,30 +102,27 @@ const getClearMatchTitle = (action: ClearMatchAction): string => {
 
 const getIgnoreAction = (row: MappingRow): IgnoreAction =>
 	row.result.kind === "ignored"
-		? { kind: "clear-ignore", anilistId: row.anilistId, provider: row.provider }
-		: { kind: "set-ignore", anilistId: row.anilistId, provider: row.provider };
+		? { kind: "clear-ignore", ...getMappingRowMutationInput(row) }
+		: { kind: "set-ignore", ...getMappingRowMutationInput(row) };
 
 const getClearMatchAction = (row: MappingRow): ClearMatchAction | null => {
 	if (row.result.kind === "mapped" && row.result.source === "manual") {
 		return {
 			kind: "clear-manual",
-			anilistId: row.anilistId,
-			provider: row.provider,
+			...getMappingRowMutationInput(row),
 		};
 	}
 	if (row.result.kind === "mapped" && row.result.source === "auto") {
 		return {
 			kind: "reject-candidate",
-			anilistId: row.anilistId,
-			provider: row.provider,
+			...getMappingRowMutationInput(row),
 			providerId: row.result.providerId,
 		};
 	}
 	if (row.result.kind === "unmapped" && row.result.rejectedProviderIds?.[0]) {
 		return {
 			kind: "clear-rejected",
-			anilistId: row.anilistId,
-			provider: row.provider,
+			...getMappingRowMutationInput(row),
 			providerId: row.result.rejectedProviderIds[0],
 		};
 	}

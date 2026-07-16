@@ -139,10 +139,12 @@ export function useMappingRowActions(
 
 			await (action.kind === "clear-rejected"
 				? clearRejectedCandidate.mutateAsync({
+						source: action.source,
 						anilistId: action.anilistId,
 						...target,
 					})
 				: setRejectedCandidate.mutateAsync({
+						source: action.source,
 						anilistId: action.anilistId,
 						...target,
 					}));
@@ -152,6 +154,7 @@ export function useMappingRowActions(
 	const handleEdit = (row: MappingRow): void => {
 		const metadata = metadataById.get(row.anilistId) ?? null;
 		mediaModal.open({
+			source: row.source,
 			anilistId: row.anilistId,
 			kind: "provider",
 			provider: row.provider,

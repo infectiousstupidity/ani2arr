@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from "react";
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { parseTmdbIdOrNull } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
 import type { TmdbId } from "@/providers/schemas";
@@ -143,9 +144,10 @@ function getCurrentTarget(input: {
 
 function useRadarrModalData(input: {
 	anilistId: AniListId;
+	source?: SourceIdentity | undefined;
 	metadataHint: MediaModalMetadataHint | null;
 }): RadarrModalData {
-	const { anilistId, metadataHint } = input;
+	const { anilistId, source, metadataHint } = input;
 	const base = useMediaModalBaseData({ anilistId, metadataHint });
 	const options = base.options;
 	const isConfigured = options?.providers.radarr.isConfigured === true;
@@ -153,11 +155,12 @@ function useRadarrModalData(input: {
 
 	const statusPayload = useMemo(
 		() => ({
+			...(source === undefined ? {} : { source }),
 			anilistId,
 			...(base.statusTitle === undefined ? {} : { title: base.statusTitle }),
 			metadata: base.statusMetadata,
 		}),
-		[anilistId, base.statusMetadata, base.statusTitle],
+		[anilistId, base.statusMetadata, base.statusTitle, source],
 	);
 	const radarrStatus = useMovieStatus(statusPayload, {
 		enabled: isConfigured && base.statusReady,
@@ -206,6 +209,7 @@ export function RadarrModal({
 	const contentContainer = useContentPortalContainer();
 	const data = useRadarrModalData({
 		anilistId,
+		source,
 		metadataHint: metadataHint ?? null,
 	});
 	const inspection = useMappingInspection(
@@ -246,6 +250,7 @@ export function RadarrModal({
 	const setupForm = useRadarrSetupForm({
 		formId: SETUP_FORM_ID,
 		anilistId,
+		source,
 		target: setupTarget,
 		providerPayloadTitle: data.providerPayloadTitle,
 		fallbackLookupTitle: data.fallbackLookupTitle,

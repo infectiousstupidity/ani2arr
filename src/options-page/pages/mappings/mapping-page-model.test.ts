@@ -3,16 +3,19 @@
 
 import { describe, expect, it } from "vitest";
 import { parseAniListId, type AniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTvdbId } from "@/providers/schemas";
 import type { MappingGroup, MappingRow } from "./mapping-page-model";
 import {
 	getFilteredMappingGroups,
 	getMappingListModel,
+	getRowKey,
 	isMappingGroupExpanded,
 	readTargetAniListIdFromHash,
 } from "./mapping-page-model";
 
 const aid = parseAniListId;
+const mal = parseMyAnimeListId;
 const tvdb = parseTvdbId;
 const anilistSource = (anilistId: AniListId) =>
 	({ source: "anilist", id: anilistId }) as const;
@@ -118,6 +121,22 @@ describe("mapping page model", () => {
 		).toEqual([null, tvdb(10), tvdb(10), null]);
 		expect(result.loadedRowCount).toBe(3);
 		expect(result.visibleAniListIds).toEqual([aid(1), aid(2)]);
+	});
+
+	it("keeps AniList and MAL row keys distinct when they share an AniList ID", () => {
+		const anilistRow = createRow({
+			anilistId: aid(21),
+			provider: "sonarr",
+		});
+		const malRow = createRow({
+			source: { source: "mal", id: mal(5114) },
+			anilistId: aid(21),
+			provider: "sonarr",
+		});
+
+		expect(getRowKey(anilistRow)).toBe("sonarr:anilist:21");
+		expect(getRowKey(malRow)).toBe("sonarr:mal:5114");
+		expect(getRowKey(anilistRow)).not.toBe(getRowKey(malRow));
 	});
 
 	it("reads target AniList ID from options-page hash query", () => {
