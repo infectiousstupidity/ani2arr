@@ -19,7 +19,6 @@ import {
 import type {
 	GetMappingsOutput,
 	MappingListRowStatus,
-	ProviderExternalId,
 } from "@/rpc/types";
 
 export type MappingGroup = GetMappingsOutput["groups"][number];
@@ -28,21 +27,6 @@ export type MappingRow = MappingGroup["rows"][number];
 export type ProviderFilter = Provider | "all";
 export type MappingStatusFilter = MappingListRowStatus | "all";
 export type MappingSourceFilter = MappingSource | "all";
-
-export type MappingListItem =
-	| {
-			kind: "group";
-			key: string;
-			group: MappingGroup;
-			isExpanded: boolean;
-	  }
-	| {
-			kind: "row";
-			key: string;
-			row: MappingRow;
-			parentProviderId: ProviderExternalId | null;
-			isLastInGroup: boolean;
-	  };
 
 export type IgnoreAction =
 	| ({ kind: "set-ignore" } & Pick<
@@ -240,18 +224,17 @@ export const isMappingGroupExpanded = (
 		group.rows.some((row) => row.anilistId === highlightedAniListId)) ||
 	!collapsedGroupKeys.has(group.key);
 
-export const getMappingListModel = (input: {
+export const getLoadedMappingRowCount = (
+	groups: readonly MappingGroup[],
+): number =>
+	groups.reduce((count, group) => count + group.rows.length, 0);
+
+export const getVisibleAniListMetadataIds = (input: {
 	groups: readonly MappingGroup[];
 	collapsedGroupKeys: ReadonlySet<string>;
 	highlightedAniListId: AniListId | null;
-}): {
-	items: MappingListItem[];
-	loadedRowCount: number;
-	visibleAniListIds: AniListId[];
-} => {
-	const items: MappingListItem[] = [];
+}): AniListId[] => {
 	const visibleAniListIds = new Set<AniListId>();
-	let loadedRowCount = 0;
 
 	for (const group of input.groups) {
 		const isExpanded = isMappingGroupExpanded(
@@ -259,32 +242,14 @@ export const getMappingListModel = (input: {
 			input.collapsedGroupKeys,
 			input.highlightedAniListId,
 		);
-		items.push({
-			kind: "group",
-			key: `group:${group.key}`,
-			group,
-			isExpanded,
-		});
-		loadedRowCount += group.rows.length;
 		if (!isExpanded) continue;
 
-		for (const [index, row] of group.rows.entries()) {
-			items.push({
-				kind: "row",
-				key: `row:${group.key}:${row.provider}:${sourceIdentityKey(row.source)}`,
-				row,
-				parentProviderId: group.providerId,
-				isLastInGroup: index === group.rows.length - 1,
-			});
+		for (const row of group.rows) {
 			visibleAniListIds.add(row.anilistId);
 		}
 	}
 
-	return {
-		items,
-		loadedRowCount,
-		visibleAniListIds: [...visibleAniListIds],
-	};
+	return [...visibleAniListIds];
 };
 
 export const getRowKey = (

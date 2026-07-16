@@ -60,14 +60,6 @@ const ANILIST_LINK_CLASS =
 	"transition-colors hover:text-accent-primary focus-visible:text-accent-primary";
 const LINK_PILL_CLASS =
 	"hover:border-accent-primary/55 hover:bg-accent-primary/15 hover:text-accent-primary focus-visible:border-accent-primary/55 focus-visible:bg-accent-primary/15 focus-visible:text-accent-primary";
-const OPTIONS_TOOLTIP_PROPS = {
-	contentClassName:
-		"overflow-hidden rounded-md border-border-primary bg-bg-tertiary px-3 py-1.5 text-xs font-normal text-text-primary shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-	delayDuration: 200,
-	disableHoverableContent: false,
-	showArrow: false,
-	sideOffset: 4,
-} as const;
 
 const getRowTitle = (
 	row: MappingRow,
@@ -298,7 +290,7 @@ export function MappingsAniListRow(
 					{clearMatchAction ? (
 						<Tooltip
 							content={getClearMatchTitle(clearMatchAction)}
-							{...OPTIONS_TOOLTIP_PROPS}
+							delayDuration={200}
 						>
 							<button
 								type="button"
@@ -311,7 +303,7 @@ export function MappingsAniListRow(
 							</button>
 						</Tooltip>
 					) : null}
-					<Tooltip content={ignoreTitle} {...OPTIONS_TOOLTIP_PROPS}>
+					<Tooltip content={ignoreTitle} delayDuration={200}>
 						<button
 							type="button"
 							onClick={() => onIgnore(row, ignoreAction)}
@@ -323,7 +315,7 @@ export function MappingsAniListRow(
 						</button>
 					</Tooltip>
 				</div>
-				<Tooltip content="Edit mapping" {...OPTIONS_TOOLTIP_PROPS}>
+				<Tooltip content="Edit mapping" delayDuration={200}>
 					<button
 						type="button"
 						onClick={() => onEdit(row)}
