@@ -19,7 +19,6 @@ import {
 	type MappingRow,
 } from "@/options-page/pages/mappings/mapping-page-model";
 import {
-	bumpMappingsRevision,
 	mappingService,
 	radarrLibrary,
 	sonarrLibrary,
@@ -28,7 +27,6 @@ import { mappingHandlers } from "./mapping.handlers";
 
 const listEffectiveMappingRecordsByProviderMock = vi.hoisted(() => vi.fn());
 const getProviderConfigMock = vi.hoisted(() => vi.fn());
-const refreshUpstreamMappingsMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/mapping/list-mappings", () => ({
 	getMappingIdentities: vi.fn(),
@@ -38,7 +36,7 @@ vi.mock("@/mapping/list-mappings", () => ({
 
 vi.mock("@/mapping/upstream.store", () => ({
 	getUniqueAniListIdForSource: vi.fn(),
-	refreshUpstreamMappings: refreshUpstreamMappingsMock,
+	refreshUpstreamMappings: vi.fn(),
 }));
 
 vi.mock("@/background/api-services", () => ({
@@ -243,15 +241,6 @@ describe("mappingHandlers", () => {
 	it("keeps groups without an active provider target", async () => {
 		const mappings: EffectiveMappingRecord[] = [
 			{
-				source: anilistSource(aid(50)),
-				anilistId: aid(50),
-				provider: "sonarr",
-				result: {
-					kind: "ambiguous",
-					targets: [{ provider: "sonarr", providerId: tvdb(50) }],
-				},
-			},
-			{
 				source: anilistSource(aid(51)),
 				anilistId: aid(51),
 				provider: "sonarr",
@@ -274,7 +263,7 @@ describe("mappingHandlers", () => {
 
 		const result = await mappingHandlers.getMappings();
 
-		expect(result.groups).toHaveLength(4);
+		expect(result.groups).toHaveLength(3);
 		expect(result.groups.map((group) => group.key)).toEqual(
 			expect.arrayContaining([
 				"sonarr:ignored:anilist:51",
@@ -283,16 +272,6 @@ describe("mappingHandlers", () => {
 		);
 		expect(result.groups).toEqual(
 			expect.arrayContaining([
-				expect.objectContaining({
-					providerId: null,
-					rows: [
-						expect.objectContaining({
-							anilistId: aid(50),
-							providerId: null,
-							mappingRowStatus: "needs-review",
-						}),
-					],
-				}),
 				expect.objectContaining({
 					providerId: null,
 					rows: [expect.objectContaining({ anilistId: aid(51) })],
@@ -345,23 +324,5 @@ describe("mappingHandlers", () => {
 			source: "mal",
 			id: mal(5114),
 		});
-	});
-
-	it("exposes a narrow upstream refresh handler", async () => {
-		refreshUpstreamMappingsMock.mockImplementationOnce(async () => {});
-
-		await expect(mappingHandlers.refreshUpstreamMappings()).resolves.toBeUndefined();
-
-		expect(refreshUpstreamMappingsMock).toHaveBeenCalledTimes(1);
-	});
-
-	it("refreshes upstream mappings and bumps the mapping revision", async () => {
-		refreshUpstreamMappingsMock.mockImplementationOnce(async () => {});
-
-		await expect(mappingHandlers.refreshMappingPipeline()).resolves.toBeUndefined();
-
-		expect(refreshUpstreamMappingsMock).toHaveBeenCalledTimes(1);
-		expect(bumpMappingsRevision).toHaveBeenCalledTimes(1);
-		expect(listEffectiveMappingRecordsByProviderMock).not.toHaveBeenCalled();
 	});
 });

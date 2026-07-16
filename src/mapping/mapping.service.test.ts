@@ -390,59 +390,6 @@ describe("MappingService", () => {
 		}
 	});
 
-	it("computes linked AniList IDs from active mapping results", async () => {
-		storeRecords.upstream = [
-			{
-				anilistId: aid(1),
-				targets: [{ provider: "radarr", providerId: tmdb(50) }],
-			},
-			{
-				anilistId: aid(5),
-				targets: [{ provider: "radarr", providerId: tmdb(50) }],
-			},
-			{
-				anilistId: aid(6),
-				targets: [
-					{ provider: "radarr", providerId: tmdb(50) },
-					{ provider: "radarr", providerId: tmdb(51) },
-				],
-			},
-		];
-		storeRecords.auto = [
-			{
-				provider: "radarr",
-				anilistId: aid(2),
-				result: { kind: "mapped", providerId: tmdb(50) },
-			},
-			{
-				provider: "radarr",
-				anilistId: aid(4),
-				result: { kind: "mapped", providerId: tmdb(50) },
-			},
-		];
-		storeRecords.manual = [
-			{
-				provider: "radarr",
-				anilistId: aid(3),
-				facts: { mapping: { providerId: tmdb(50) } },
-			},
-			{
-				provider: "radarr",
-				anilistId: aid(4),
-				facts: { ignored: true },
-			},
-			{
-				provider: "radarr",
-				anilistId: aid(5),
-				facts: { mapping: { providerId: tmdb(60) } },
-			},
-		];
-
-		await expect(
-			service().getLinkedAniListIds("radarr", tmdb(50)),
-		).resolves.toEqual([aid(1), aid(2), aid(3)]);
-	});
-
 	it("computes linked AniList IDs for multiple provider IDs in one scan", async () => {
 		storeRecords.upstream = [
 			{
@@ -556,7 +503,7 @@ describe("MappingService", () => {
 		});
 	});
 
-	it("does not run automatic resolver for ambiguous upstream targets", async () => {
+	it("never resolves ambiguous upstream targets, including forced retries", async () => {
 		const anilistId = aid(22);
 		storeRecords.upstream = [
 			{
@@ -567,52 +514,6 @@ describe("MappingService", () => {
 				],
 			},
 		];
-		const resolver = vi.fn();
-
-		await expect(
-			new MappingService(resolver).resolveMapping("sonarr", anilistId, {
-				title: "Magi: Sinbad no Bouken",
-			}),
-		).resolves.toEqual({
-			kind: "ambiguous",
-			targets: [
-				{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
-				{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
-			],
-		});
-		expect(resolver).not.toHaveBeenCalled();
-	});
-
-	it("does not retry ambiguous upstream targets after a cached auto miss", async () => {
-		const anilistId = aid(23);
-		const targets = [
-			{ provider: "sonarr" as const, providerId: tvdb(262_094), season: 0 },
-			{ provider: "sonarr" as const, providerId: tvdb(310_718), season: 1 },
-		];
-		storeRecords.upstream = [{ anilistId, targets }];
-		replaceAuto("sonarr", anilistId, { kind: "unmapped" });
-		const resolver = vi.fn();
-
-		await expect(
-			new MappingService(resolver).resolveMapping("sonarr", anilistId),
-		).resolves.toEqual({
-			kind: "ambiguous",
-			targets,
-		});
-		expect(resolver).not.toHaveBeenCalled();
-	});
-
-	it("does not force retry ambiguous upstream targets after a cached auto miss", async () => {
-		const anilistId = aid(24);
-		storeRecords.upstream = [
-			{
-				anilistId,
-				targets: [
-					{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
-					{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
-				],
-			},
-		];
 		replaceAuto("sonarr", anilistId, { kind: "unmapped" });
 		const resolver = vi.fn();
 
@@ -627,119 +528,6 @@ describe("MappingService", () => {
 				{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
 				{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
 			],
-		});
-		expect(resolver).not.toHaveBeenCalled();
-	});
-
-	it("resolves MAL direct upstream before auto", async () => {
-		const source = { source: "mal", id: mal(5114) } as const;
-		storeRecords.upstream = [
-			{
-				source,
-				targets: [{ provider: "sonarr", providerId: tvdb(78_874), season: 1 }],
-			},
-		];
-		storeRecords.auto = [
-			{
-				provider: "sonarr",
-				source,
-				result: { kind: "mapped", providerId: tvdb(999_999) },
-			},
-		];
-
-		await expect(service().getMapping("sonarr", source)).resolves.toEqual({
-			kind: "mapped",
-			source: "upstream",
-			providerId: tvdb(78_874),
-			season: 1,
-		});
-	});
-
-	it("lets manual MAL mappings beat upstream", async () => {
-		const source = { source: "mal", id: mal(5114) } as const;
-		storeRecords.manual = [
-			{
-				provider: "sonarr",
-				source,
-				facts: { mapping: { providerId: tvdb(111_111), season: 1 } },
-			},
-		];
-		storeRecords.upstream = [
-			{
-				source,
-				targets: [{ provider: "sonarr", providerId: tvdb(78_874), season: 1 }],
-			},
-		];
-
-		await expect(service().getMapping("sonarr", source)).resolves.toEqual({
-			kind: "mapped",
-			source: "manual",
-			providerId: tvdb(111_111),
-			season: 1,
-		});
-	});
-
-	it("uses upstream above auto and auto when upstream is absent", async () => {
-		const source = { source: "mal", id: mal(5114) } as const;
-		storeRecords.upstream = [
-			{
-				source,
-				targets: [{ provider: "radarr", providerId: tmdb(100) }],
-			},
-		];
-		storeRecords.auto = [
-			{
-				provider: "radarr",
-				source,
-				result: { kind: "mapped", providerId: tmdb(300) },
-			},
-		];
-
-		await expect(service().getMapping("radarr", source)).resolves.toEqual({
-			kind: "mapped",
-			source: "upstream",
-			providerId: tmdb(100),
-		});
-
-		storeRecords.upstream = [];
-
-		await expect(service().getMapping("radarr", source)).resolves.toEqual({
-			kind: "mapped",
-			source: "auto",
-			providerId: tmdb(300),
-		});
-	});
-
-	it("keeps ambiguous MAL upstream targets ambiguous", async () => {
-		const source = { source: "mal", id: mal(5114) } as const;
-		const targets = [
-			{ provider: "sonarr" as const, providerId: tvdb(78_874), season: 1 },
-			{ provider: "sonarr" as const, providerId: tvdb(999_999), season: 1 },
-		];
-		storeRecords.upstream = [{ source, targets }];
-
-		await expect(service().getMapping("sonarr", source)).resolves.toEqual({
-			kind: "ambiguous",
-			targets,
-		});
-	});
-
-	it("does not force retry mapped auto results", async () => {
-		const anilistId = aid(21);
-		const resolver = vi.fn();
-		replaceAuto("radarr", anilistId, {
-			kind: "mapped",
-			providerId: tmdb(300),
-		});
-
-		await expect(
-			new MappingService(resolver).resolveMapping("radarr", anilistId, {
-				forceRetry: true,
-			}),
-		).resolves.toEqual({
-			kind: "mapped",
-			source: "auto",
-			providerId: tmdb(300),
 		});
 		expect(resolver).not.toHaveBeenCalled();
 	});

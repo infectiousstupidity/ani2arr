@@ -56,7 +56,22 @@ Seerr target overrides the derived target for the same AniList ID.
 
 ## Library boundary
 
-Mapping list functions return mapping-only groups and results. Provider library
-presence is composed in `providers/mappings-library-status.ts`; RPC then adds
-metadata and shapes response DTOs. Library state must not enter stored mapping
-facts or `MappingResult`.
+Complete mapping-list collection reads the upstream snapshot once, including
+AniList records and MAL crosswalk aliases, then returns one flat effective
+record list per provider:
+
+```ts
+type EffectiveMappingRecord = {
+  source: SourceIdentity;
+  anilistId: AniListId | null;
+  provider: Provider;
+  result: MappingResult;
+};
+```
+
+Provider library snapshots remain provider-owned. The mapping RPC handler builds
+small TVDB/TMDB lookup maps and directly composes final `MappingListGroup[]`
+responses with route metadata and library presence. There is no intermediate
+mapping-list or provider library-status model.
+
+Library state must not enter stored mapping facts or `MappingResult`.

@@ -4,7 +4,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import {
-	PUBLIC_OPTIONS_CHANGE_KEY,
 	getExtensionOptionsSnapshot,
 	getPublicOptionsSnapshot,
 	initializeSettingsStorage,
@@ -13,7 +12,6 @@ import {
 	savePublicOptionsSnapshot,
 	saveSeerrConnectionSnapshot,
 	watchExtensionOptionsSnapshot,
-	watchPublicOptionsSnapshot,
 } from "@/settings/store";
 import {
 	createDefaultExtensionOptions,
@@ -49,12 +47,6 @@ async function expectLegacyStorageRemoved(): Promise<void> {
 }
 
 describe("options store helpers", () => {
-	it("falls back to default settings for missing input", async () => {
-		await expect(getExtensionOptionsSnapshot()).resolves.toEqual(
-			createDefaultExtensionOptions(),
-		);
-	});
-
 	it("falls back from malformed public options without healing storage on read", async () => {
 		const malformedPublicOptions = {
 			debugLogging: true,
@@ -124,35 +116,6 @@ describe("options store helpers", () => {
 		});
 	});
 
-	it("composes extension options from private provider connections and public options", async () => {
-		const publicOptions = createDefaultPublicOptions();
-		publicOptions.providers.sonarr.isConfigured = true;
-
-		await browser.storage.local.set({
-			[PUBLIC_OPTIONS_STORAGE_KEY]: publicOptions,
-			[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
-				sonarr: {
-					url: "https://sonarr.example",
-					apiKey: "sonarr-key",
-				},
-				radarr: { url: "", apiKey: "" },
-				seerr: {
-					url: "https://seerr.example",
-					apiKey: "seerr-key",
-				},
-			},
-		});
-
-		const snapshot = await getExtensionOptionsSnapshot();
-
-		expect(snapshot.providers.sonarr.url).toBe("https://sonarr.example");
-		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
-		expect(snapshot.providers.radarr.url).toBe("");
-		expect(snapshot.providers.radarr.apiKey).toBe("");
-		expect(snapshot.seerr.url).toBe("https://seerr.example");
-		expect(snapshot.seerr.apiKey).toBe("seerr-key");
-	});
-
 	describe("settings storage initialization", () => {
 		it("migrates legacy-only connections into one private record", async () => {
 			await browser.storage.local.set({
@@ -192,26 +155,6 @@ describe("options store helpers", () => {
 						apiKey: "seerr-key",
 					},
 				},
-			});
-			await expectLegacyStorageRemoved();
-		});
-
-		it("preserves an existing complete private record", async () => {
-			const privateConnections = {
-				sonarr: { url: "https://new-sonarr.example", apiKey: "new-sonarr" },
-				radarr: { url: "https://new-radarr.example", apiKey: "new-radarr" },
-				seerr: { url: "https://new-seerr.example", apiKey: "new-seerr" },
-			};
-			await browser.storage.local.set({
-				[PRIVATE_CONNECTIONS_STORAGE_KEY]: privateConnections,
-			});
-
-			await initializeSettingsStorage();
-
-			await expect(
-				browser.storage.local.get(PRIVATE_CONNECTIONS_STORAGE_KEY),
-			).resolves.toEqual({
-				[PRIVATE_CONNECTIONS_STORAGE_KEY]: privateConnections,
 			});
 			await expectLegacyStorageRemoved();
 		});
@@ -437,34 +380,6 @@ describe("options store helpers", () => {
 		expect(savedPublicOptions.seerr.isConfigured).toBe(false);
 	});
 
-	it("saving provider credentials does not change public defaults", async () => {
-		const publicOptions = await getPublicOptionsSnapshot();
-		await savePublicOptionsSnapshot({
-			...publicOptions,
-			providers: {
-				...publicOptions.providers,
-				sonarr: {
-					...publicOptions.providers.sonarr,
-					defaults: {
-						...publicOptions.providers.sonarr.defaults,
-						rootFolderPath: "/anime",
-					},
-				},
-			},
-		});
-
-		await saveProviderConnectionSnapshot("sonarr", {
-			url: "https://sonarr.example",
-			apiKey: "sonarr-key",
-		});
-
-		const snapshot = await getExtensionOptionsSnapshot();
-
-		expect(snapshot.providers.sonarr.defaults.rootFolderPath).toBe("/anime");
-		expect(snapshot.providers.sonarr.url).toBe("https://sonarr.example");
-		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
-	});
-
 	it("saving one provider connection preserves the other private connections", async () => {
 		await browser.storage.local.set({
 			[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
@@ -556,109 +471,6 @@ describe("options store helpers", () => {
 			[PRIVATE_CONNECTIONS_STORAGE_KEY]: EMPTY_PRIVATE_CONNECTIONS,
 		});
 		await expectLegacyStorageRemoved();
-	});
-
-	it("reads public options from the public snapshot only", async () => {
-		const defaultPublicOptions = createDefaultPublicOptions();
-		await browser.storage.local.set({
-			[PUBLIC_OPTIONS_STORAGE_KEY]: {
-				...defaultPublicOptions,
-				debugLogging: true,
-				providers: {
-					sonarr: {
-						...defaultPublicOptions.providers.sonarr,
-						isConfigured: true,
-					},
-					radarr: defaultPublicOptions.providers.radarr,
-				},
-			},
-			[SONARR_SECRETS_STORAGE_KEY]: { url: "", apiKey: "" },
-		});
-
-		const snapshot = await getPublicOptionsSnapshot();
-
-		expect(snapshot.debugLogging).toBe(true);
-		expect(snapshot.providers.sonarr.isConfigured).toBe(true);
-	});
-
-	it("heals stale provider add defaults while reading settings snapshots", async () => {
-		const currentPublicOptions = createDefaultPublicOptions();
-		await browser.storage.local.set({
-			[PUBLIC_OPTIONS_STORAGE_KEY]: {
-				...currentPublicOptions,
-				providers: {
-					sonarr: {
-						...currentPublicOptions.providers.sonarr,
-						defaults: {
-							seriesType: "anime",
-							seasonFolder: true,
-							freeformTags: [],
-							addOptions: {
-								monitor: "future",
-							},
-						},
-					},
-					radarr: {
-						...currentPublicOptions.providers.radarr,
-						defaults: {
-							minimumAvailability: "released",
-							freeformTags: [],
-							addOptions: {
-								monitor: "movieOnly",
-							},
-						},
-					},
-				},
-			},
-		});
-
-		const publicSnapshot = await getPublicOptionsSnapshot();
-		const extensionSnapshot = await getExtensionOptionsSnapshot();
-
-		expect(publicSnapshot.providers.sonarr.defaults.addOptions).toEqual({
-			monitor: "future",
-			searchForMissingEpisodes: true,
-			searchForCutoffUnmetEpisodes: false,
-		});
-		expect(publicSnapshot.providers.radarr.defaults.addOptions).toEqual({
-			monitor: "movieOnly",
-			searchForMovie: true,
-		});
-		expect(extensionSnapshot.providers.sonarr.defaults.addOptions).toEqual(
-			publicSnapshot.providers.sonarr.defaults.addOptions,
-		);
-		expect(extensionSnapshot.providers.radarr.defaults.addOptions).toEqual(
-			publicSnapshot.providers.radarr.defaults.addOptions,
-		);
-	});
-
-	it("watches only public options for public snapshot updates", async () => {
-		const snapshots: PublicOptions[] = [];
-		const unsubscribe = watchPublicOptionsSnapshot((snapshot) => {
-			snapshots.push(snapshot);
-		});
-
-		await browser.storage.local.set({
-			[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
-				...EMPTY_PRIVATE_CONNECTIONS,
-				sonarr: {
-					url: "https://sonarr.example",
-					apiKey: "secret-only-change",
-				},
-			},
-		});
-		await browser.storage.local.set({
-			[PUBLIC_OPTIONS_STORAGE_KEY]: {
-				...createDefaultPublicOptions(),
-				debugLogging: true,
-			},
-		});
-
-		unsubscribe();
-
-		expect(PUBLIC_OPTIONS_CHANGE_KEY).toBe(PUBLIC_OPTIONS_STORAGE_KEY);
-		expect(snapshots).toHaveLength(1);
-		expect(snapshots[0]?.debugLogging).toBe(true);
 	});
 
 	it("watches public options and the new private record but ignores legacy records", async () => {

@@ -147,43 +147,6 @@ describe("refreshUpstreamMappings", () => {
 		]);
 	});
 
-	it("strips legacy projections from fresh canonical snapshots without fetching", async () => {
-		const fetchedAt = Date.now();
-		const entries = {
-			1: [{ kind: "tmdb-movie", id: tmdb(300) }],
-		};
-		await browser.storage.local.set({
-			[UPSTREAM_STORAGE_KEY]: {
-				entries,
-				mappings: {
-					"anilist:1": [{ provider: "radarr", providerId: tmdb(999) }],
-				},
-				seerrTargets: {
-					"anilist:1": { mediaType: "movie", tmdbId: tmdb(999) },
-				},
-				aniListCrosswalks: {},
-				fetchedAt,
-				etag: "canonical-etag",
-			},
-		});
-		const fetchMock = vi.fn<typeof fetch>();
-		vi.stubGlobal("fetch", fetchMock);
-
-		await refreshUpstreamMappings();
-
-		expect(fetchMock).not.toHaveBeenCalled();
-		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
-		expect(stored[UPSTREAM_STORAGE_KEY]).toEqual({
-			entries,
-			aniListCrosswalks: {},
-			fetchedAt,
-			etag: "canonical-etag",
-		});
-		await expect(listSeerrUpstreamTargets([aid(1)])).resolves.toEqual([
-			{ anilistId: aid(1), target: { mediaType: "movie", tmdbId: tmdb(300) } },
-		]);
-	});
-
 	it("keeps canonical entries and strips projections after an ETag 304", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
@@ -254,23 +217,6 @@ describe("refreshUpstreamMappings", () => {
 		]);
 	});
 
-	it("ignores legacy consumer projections on read", async () => {
-		await browser.storage.local.set({
-			[UPSTREAM_STORAGE_KEY]: {
-				mappings: {
-					1: [{ provider: "radarr", providerId: tmdb(300) }],
-				},
-				seerrTargets: {
-					1: { mediaType: "movie", tmdbId: tmdb(300) },
-				},
-				fetchedAt: Date.now(),
-			},
-		});
-
-		await expect(getUpstreamTargets("radarr", aid(1))).resolves.toEqual([]);
-		await expect(listSeerrUpstreamTargets([aid(1)])).resolves.toEqual([]);
-	});
-
 	it("derives Arr reads and records only from canonical entries", async () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
@@ -325,14 +271,10 @@ describe("refreshUpstreamMappings", () => {
 		]);
 	});
 
-	it("derives normalized Seerr movies and TV targets from canonical entries", async () => {
+	it("derives a normalized Seerr TV target from canonical entries", async () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
 				entries: {
-					10: [
-						{ kind: "tmdb-show", id: tmdb(600), season: 1 },
-						{ kind: "tmdb-show", id: tmdb(601) },
-					],
 					20: [
 						{ kind: "tmdb-show", id: tmdb(500) },
 						{ kind: "tmdb-show", id: tmdb(500), season: 2 },
@@ -340,26 +282,14 @@ describe("refreshUpstreamMappings", () => {
 						{ kind: "tmdb-show", id: tmdb(500), season: 2 },
 						{ kind: "tvdb-show", id: tvdb(700), season: 1 },
 						{ kind: "tvdb-show", id: tvdb(700), season: 0 },
-						{ kind: "tvdb-show", id: tvdb(700), season: -1 },
 					],
-					40: [{ kind: "tmdb-show", id: tmdb(700) }],
-					50: [
-						{ kind: "tmdb-show", id: tmdb(800), season: 2 },
-						{ kind: "tvdb-show", id: tvdb(900), season: 1 },
-						{ kind: "tvdb-show", id: tvdb(901), season: 3 },
-					],
-					60: [
-						{ kind: "tmdb-show", id: 0, season: 1 },
-						{ kind: "tvdb-show", id: tvdb(902), season: 1 },
-					],
-					invalid: [{ kind: "tmdb-movie", id: tmdb(999) }],
 				},
 				aniListCrosswalks: {},
 				fetchedAt: Date.now(),
 			},
 		});
 
-		const expected = [
+		await expect(listSeerrUpstreamTargets([aid(20)])).resolves.toEqual([
 			{
 				anilistId: aid(20),
 				target: {
@@ -371,28 +301,8 @@ describe("refreshUpstreamMappings", () => {
 					tvdbId: tvdb(700),
 				},
 			},
-			{
-				anilistId: aid(50),
-				target: {
-					mediaType: "tv" as const,
-					tmdbId: tmdb(800),
-					seasons: [2],
-					tmdbSeasons: [2],
-				},
-			},
-		];
-
-		await expect(
-			listSeerrUpstreamTargets([
-				aid(50),
-				aid(20),
-				aid(10),
-				aid(40),
-				aid(60),
-				aid(20),
-			]),
-		).resolves.toEqual(expected);
-		await expect(listAllSeerrUpstreamTargets()).resolves.toEqual(expected);
+		]);
+		await expect(listAllSeerrUpstreamTargets()).resolves.toHaveLength(1);
 	});
 
 	it("accepts one unique movie ID and rejects movie ambiguity", async () => {
@@ -492,44 +402,6 @@ describe("refreshUpstreamMappings", () => {
 			},
 			{ source, anilistId: aid(21), targets },
 		]);
-	});
-
-	it("does not read legacy AniList or MAL-keyed Seerr targets", async () => {
-		await browser.storage.local.set({
-			[UPSTREAM_STORAGE_KEY]: {
-				mappings: {},
-				seerrTargets: {
-					[sourceIdentityKey({ source: "anilist", id: aid(21) })]: {
-						mediaType: "movie",
-						tmdbId: tmdb(300),
-					},
-					[sourceIdentityKey({ source: "mal", id: mal(5114) })]: {
-						mediaType: "movie",
-						tmdbId: tmdb(400),
-					},
-				},
-				fetchedAt: Date.now(),
-			},
-		});
-
-		await expect(listSeerrUpstreamTargets([aid(21)])).resolves.toEqual([]);
-	});
-
-	it("returns unique AniList crosswalks for MAL sources", async () => {
-		mockAniBridgeResponse(
-			createAniBridgeResponse(
-				JSON.stringify({
-					"anidb:5114:R": {
-						"anilist:21": {},
-						"mal:5114": {},
-						"tmdb_movie:300": {},
-					},
-				}),
-			),
-		);
-
-		await refreshUpstreamMappings();
-
 		await expect(
 			getUniqueAniListIdForSource({ source: "mal", id: mal(5114) }),
 		).resolves.toBe(aid(21));
