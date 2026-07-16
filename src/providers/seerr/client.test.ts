@@ -142,22 +142,27 @@ describe("SeerrClient", () => {
 		);
 	});
 
-	it("maps auth/me 403 to a stable session-auth error", async () => {
-		vi.stubGlobal(
-			"fetch",
-			vi
-				.fn<typeof fetch>()
-				.mockResolvedValueOnce(createErrorResponse("No permission")),
-		);
+	it.each([401, 403])(
+		"maps auth/me %s to a stable session-auth error",
+		async (status) => {
+			vi.stubGlobal(
+				"fetch",
+				vi
+					.fn<typeof fetch>()
+					.mockResolvedValueOnce(
+						createErrorResponse("No session", status),
+					),
+			);
 
-		await expect(
-			createClient().getCurrentUser(sessionConnection),
-		).rejects.toMatchObject({
-			code: ErrorCode.SEERR_AUTH_REQUIRED,
-			userMessage:
-				"You are not signed into this Seerr server. Open Seerr, sign in, then check again.",
-		});
-	});
+			await expect(
+				createClient().getCurrentUser(sessionConnection),
+			).rejects.toMatchObject({
+				code: ErrorCode.SEERR_AUTH_REQUIRED,
+				userMessage:
+					"You are not signed into this Seerr server. Open Seerr, sign in, then check again.",
+			});
+		},
+	);
 
 	it("blocks account changes before the request POST", async () => {
 		const fetchMock = vi

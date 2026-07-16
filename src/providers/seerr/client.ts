@@ -43,7 +43,7 @@ export class SeerrClient {
 	): Promise<SeerrAccountSummary> {
 		const response = await this.request("auth/me", connection);
 		if (!response.ok) {
-			if (response.status === 403 && connection.auth.mode === "session") {
+			if (isAccessDenied(response) && connection.auth.mode === "session") {
 				throw createSeerrAuthRequiredError();
 			}
 			throw await createSeerrResponseError(response, connection);
