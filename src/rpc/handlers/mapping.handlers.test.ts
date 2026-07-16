@@ -19,6 +19,7 @@ import {
 	type MappingRow,
 } from "@/options-page/pages/mappings/mapping-page-model";
 import {
+	bumpMappingsRevision,
 	mappingService,
 	radarrLibrary,
 	sonarrLibrary,
@@ -51,7 +52,6 @@ vi.mock("@/background/api-services", () => ({
 		clearRejectedCandidate: vi.fn(),
 		getLinkedAniListIds: vi.fn(),
 		rejectCandidate: vi.fn(),
-		resolveMapping: vi.fn(),
 		setIgnored: vi.fn(),
 		setManualMapping: vi.fn(),
 	},
@@ -392,5 +392,15 @@ describe("mappingHandlers", () => {
 		await expect(mappingHandlers.refreshUpstreamMappings()).resolves.toBeUndefined();
 
 		expect(refreshUpstreamMappingsMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("refreshes upstream mappings and bumps the mapping revision", async () => {
+		refreshUpstreamMappingsMock.mockImplementationOnce(async () => {});
+
+		await expect(mappingHandlers.refreshMappingPipeline()).resolves.toBeUndefined();
+
+		expect(refreshUpstreamMappingsMock).toHaveBeenCalledTimes(1);
+		expect(bumpMappingsRevision).toHaveBeenCalledTimes(1);
+		expect(getMappingListMock).not.toHaveBeenCalled();
 	});
 });
