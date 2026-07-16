@@ -1,4 +1,4 @@
-/** Pure helpers for Seerr credentials and configured state. */
+/** Pure helpers for Seerr connection normalization and configured state. */
 // src/settings/seerr-config.ts
 
 import { getProviderHostPermissionPattern } from "@/providers/settings/host-permissions";
@@ -6,46 +6,63 @@ import {
 	validateProviderConnectionApiKey,
 	validateProviderConnectionUrl,
 } from "@/providers/settings/provider-connection.validation";
-import type { ProviderCredentials } from "@/providers/types";
+import type {
+	SeerrAccountSummary,
+	SeerrConnection,
+} from "@/providers/seerr/types";
+import { createDefaultSeerrConnection } from "./schema";
 import type { ExtensionOptions } from "./types";
 
-export type NormalizedSeerrConnection = ProviderCredentials & {
+export type NormalizedSeerrConnection = SeerrConnection & {
 	permissionPattern: string;
 };
 
 export function getSeerrConnectionDraft(
 	settings: ExtensionOptions | undefined,
-): ProviderCredentials {
+): SeerrConnection {
+	const connection = settings?.seerr ?? createDefaultSeerrConnection();
 	return {
-		url: String(settings?.seerr.url ?? "").trim(),
-		apiKey: String(settings?.seerr.apiKey ?? "").trim(),
+		...connection,
+		url: String(connection.url ?? "").trim(),
+		auth:
+			connection.auth.mode === "apiKey"
+				? {
+						mode: "apiKey",
+						apiKey: String(connection.auth.apiKey ?? "").trim(),
+					}
+				: { mode: "session" },
 	};
 }
 
-export function getSeerrCredentials(
-	settings: ExtensionOptions | undefined,
-): ProviderCredentials | null {
-	const { url, apiKey } = getSeerrConnectionDraft(settings);
-	if (!url || !apiKey) return null;
-	return { url, apiKey };
-}
-
-export function normalizeSeerrConnectionInput(
-	input: Partial<ProviderCredentials> | undefined,
-): NormalizedSeerrConnection | null {
-	const url = String(input?.url ?? "").trim();
-	const apiKey = String(input?.apiKey ?? "").trim();
-
-	if (!url && !apiKey) return null;
-
-	if (!url || !apiKey) {
-		throw new Error("Seerr: enter both URL and API key, or leave both blank.");
+function normalizeAccount(
+	account: SeerrAccountSummary | undefined,
+): SeerrAccountSummary | undefined {
+	if (
+		!account ||
+		!Number.isInteger(account.id) ||
+		account.id < 1 ||
+		!account.displayName.trim()
+	) {
+		return undefined;
 	}
 
+	const avatar = account.avatar?.trim();
+	return {
+		id: account.id,
+		displayName: account.displayName.trim(),
+		...(avatar ? { avatar } : {}),
+	};
+}
+
+export function normalizeSeerrUrlInput(
+	input: string | undefined,
+): { url: string; permissionPattern: string } | null {
+	const url = String(input ?? "").trim();
+	if (!url) return null;
+
 	const normalizedUrl = validateProviderConnectionUrl(url);
-	const normalizedApiKey = validateProviderConnectionApiKey(apiKey);
-	if (!normalizedUrl.ok || !normalizedApiKey.ok) {
-		throw new Error("Please enter a valid Seerr URL and API key.");
+	if (!normalizedUrl.ok) {
+		throw new Error("Please enter a valid Seerr URL.");
 	}
 
 	const permissionPattern = getProviderHostPermissionPattern(
@@ -57,19 +74,96 @@ export function normalizeSeerrConnectionInput(
 
 	return {
 		url: normalizedUrl.value,
-		apiKey: normalizedApiKey.value,
 		permissionPattern: permissionPattern.value,
 	};
+}
+
+export function normalizeSeerrConnectionInput(
+	input: SeerrConnection | undefined,
+): NormalizedSeerrConnection | null {
+	const normalizedUrl = normalizeSeerrUrlInput(input?.url);
+	if (!normalizedUrl) return null;
+
+	if (input?.auth.mode === "session") {
+		const account = normalizeAccount(input.account);
+		if (!account) {
+			throw new Error("Verify the Seerr browser session before saving it.");
+		}
+
+		return {
+			url: normalizedUrl.url,
+			auth: { mode: "session" },
+			account,
+			permissionPattern: normalizedUrl.permissionPattern,
+		};
+	}
+
+	const normalizedApiKey = validateProviderConnectionApiKey(
+		input?.auth.apiKey ?? "",
+	);
+	if (!normalizedApiKey.ok) {
+		throw new Error("Please enter a valid Seerr URL and API key.");
+	}
+
+	return {
+		url: normalizedUrl.url,
+		auth: {
+			mode: "apiKey",
+			apiKey: normalizedApiKey.value,
+		},
+		permissionPattern: normalizedUrl.permissionPattern,
+	};
+}
+
+export function normalizeSeerrApiKeyConnectionInput(input: {
+	url: string;
+	apiKey: string;
+}): NormalizedSeerrConnection {
+	const normalized = normalizeSeerrConnectionInput({
+		url: input.url,
+		auth: {
+			mode: "apiKey",
+			apiKey: input.apiKey,
+		},
+	});
+	if (!normalized) {
+		throw new Error("Please enter a valid Seerr URL and API key.");
+	}
+	return normalized;
 }
 
 export function normalizeSeerrConnectionSettings(
 	settings: ExtensionOptions | undefined,
 ): NormalizedSeerrConnection | null {
-	return normalizeSeerrConnectionInput(getSeerrConnectionDraft(settings));
+	if (!settings) return null;
+	try {
+		return normalizeSeerrConnectionInput(getSeerrConnectionDraft(settings));
+	} catch {
+		return null;
+	}
 }
 
-export function hasConfiguredSeerrCredentials(
+export function getSeerrConnection(
+	settings: ExtensionOptions | undefined,
+): SeerrConnection | null {
+	const normalized = normalizeSeerrConnectionSettings(settings);
+	if (!normalized) return null;
+
+	return {
+		url: normalized.url,
+		auth: normalized.auth,
+		...(normalized.account ? { account: normalized.account } : {}),
+	};
+}
+
+export function hasConfiguredSeerrConnection(
 	settings: ExtensionOptions | undefined,
 ): boolean {
-	return getSeerrCredentials(settings) !== null;
+	return getSeerrConnection(settings) !== null;
+}
+
+export function buildSeerrLoginUrl(input: string): string {
+	const normalized = normalizeSeerrUrlInput(input);
+	if (!normalized) throw new Error("Please enter a valid Seerr URL.");
+	return `${normalized.url.replace(/\/+$/, "")}/login`;
 }

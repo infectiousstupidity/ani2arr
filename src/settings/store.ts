@@ -15,10 +15,13 @@ import type {
 	Provider,
 	ProviderCredentials,
 } from "@/providers/types";
+import type { SeerrConnection } from "@/providers/seerr/types";
 import { logger } from "@/shared/utils/logger";
 import {
 	ExtensionOptionsSchema,
 	createDefaultExtensionOptions,
+	createDefaultSeerrConnection,
+	migrateLegacySeerrConnection,
 } from "./schema";
 import { UiOptionsSchema } from "./ui-schema";
 import type { ExtensionOptions, PublicOptions } from "./types";
@@ -28,7 +31,8 @@ import {
 	normalizeProviderConnectionSettings,
 } from "./provider-config";
 import {
-	hasConfiguredSeerrCredentials,
+	getSeerrConnection,
+	hasConfiguredSeerrConnection,
 	normalizeSeerrConnectionInput,
 	normalizeSeerrConnectionSettings,
 } from "./seerr-config";
@@ -61,7 +65,8 @@ export function toPublicOptions(settings: ExtensionOptions): PublicOptions {
 			},
 		},
 		seerr: {
-			isConfigured: hasConfiguredSeerrCredentials(settings),
+			isConfigured: hasConfiguredSeerrConnection(settings),
+			authMode: getSeerrConnection(settings)?.auth.mode ?? null,
 		},
 		ui: settings.ui,
 		debugLogging: settings.debugLogging,
@@ -96,11 +101,14 @@ const radarrConnectionStorage = storage.defineItem<ProviderCredentials>(
 	},
 );
 
-const seerrConnectionStorage = storage.defineItem<ProviderCredentials>(
+const seerrConnectionStorage = storage.defineItem<SeerrConnection>(
 	SEERR_SECRETS_STORAGE_KEY,
 	{
-		fallback: createDefaultProviderConnection(),
-		version: 1,
+		fallback: createDefaultSeerrConnection(),
+		version: 2,
+		migrations: {
+			2: migrateLegacySeerrConnection,
+		},
 	},
 );
 
@@ -117,7 +125,13 @@ function getRecordProperty(
 }
 
 export const parseExtensionOptions = (raw: unknown): ExtensionOptions => {
-	const result = v.safeParse(ExtensionOptionsSchema, raw);
+	const candidate = isRecord(raw)
+		? {
+				...raw,
+				seerr: migrateLegacySeerrConnection(raw.seerr),
+			}
+		: raw;
+	const result = v.safeParse(ExtensionOptionsSchema, candidate);
 	if (result.success) {
 		return {
 			...result.output,
@@ -204,6 +218,10 @@ function parsePublicOptions(raw: unknown): PublicOptions {
 				typeof seerr?.isConfigured === "boolean"
 					? seerr.isConfigured
 					: fallback.seerr.isConfigured,
+			authMode:
+				seerr?.authMode === "session" || seerr?.authMode === "apiKey"
+					? seerr.authMode
+					: fallback.seerr.authMode,
 		},
 		ui,
 		debugLogging:
@@ -246,10 +264,7 @@ function buildRawExtensionOptionsCandidate(
 				apiKey: getPersistedApiKey(radarr),
 			},
 		},
-		seerr: {
-			url: getPersistedUrl(seerr),
-			apiKey: getPersistedApiKey(seerr),
-		},
+		seerr: migrateLegacySeerrConnection(seerr),
 		ui: publicRecord?.ui,
 		debugLogging: publicRecord?.debugLogging,
 	};
@@ -307,7 +322,15 @@ async function writeExtensionOptionsSnapshot(
 	const seerrConnection = normalizeSeerrConnectionSettings(parsed);
 	const sonarrCredentials = connectionOrDefault(sonarrConnection);
 	const radarrCredentials = connectionOrDefault(radarrConnection);
-	const seerrCredentials = connectionOrDefault(seerrConnection);
+	const normalizedSeerrConnection = seerrConnection
+		? {
+				url: seerrConnection.url,
+				auth: seerrConnection.auth,
+				...(seerrConnection.account
+					? { account: seerrConnection.account }
+					: {}),
+			}
+		: createDefaultSeerrConnection();
 
 	const sanitized: ExtensionOptions = {
 		...parsed,
@@ -321,7 +344,7 @@ async function writeExtensionOptionsSnapshot(
 				...radarrCredentials,
 			},
 		},
-		seerr: seerrCredentials,
+		seerr: normalizedSeerrConnection,
 	};
 
 	const nextPublicOptions = toPublicOptions(sanitized);
@@ -347,7 +370,7 @@ async function writeExtensionOptionsSnapshot(
 	await Promise.all([
 		sonarrConnectionStorage.setValue(sonarrCredentials),
 		radarrConnectionStorage.setValue(radarrCredentials),
-		seerrConnectionStorage.setValue(seerrCredentials),
+		seerrConnectionStorage.setValue(normalizedSeerrConnection),
 	]);
 	await publicOptions.setValue(persistedPublicOptions);
 }
@@ -420,22 +443,26 @@ export async function saveProviderConnectionSnapshot(
 }
 
 export async function saveSeerrConnectionSnapshot(
-	credentials: ProviderCredentials | null,
+	connection: SeerrConnection | null,
 ): Promise<ExtensionOptions> {
-	const normalized = credentials
-		? normalizeSeerrConnectionInput(credentials)
+	const normalized = connection
+		? normalizeSeerrConnectionInput(connection)
 		: null;
-	const connection = {
-		url: normalized?.url ?? "",
-		apiKey: normalized?.apiKey ?? "",
-	};
-	await seerrConnectionStorage.setValue(connection);
+	const storedConnection = normalized
+		? {
+				url: normalized.url,
+				auth: normalized.auth,
+				...(normalized.account ? { account: normalized.account } : {}),
+			}
+		: createDefaultSeerrConnection();
+	await seerrConnectionStorage.setValue(storedConnection);
 
 	const currentPublicOptions = await getPublicOptionsSnapshot();
 	await publicOptions.setValue({
 		...currentPublicOptions,
 		seerr: {
 			isConfigured: normalized !== null,
+			authMode: normalized?.auth.mode ?? null,
 		},
 	});
 	return getExtensionOptionsSnapshot();
@@ -446,7 +473,24 @@ export async function resetAllSettingsSnapshot(): Promise<void> {
 }
 
 export async function getPublicOptionsSnapshot(): Promise<PublicOptions> {
-	return parsePublicOptions(await publicOptions.getValue());
+	const [storedPublicOptions, storedSeerrConnection] = await Promise.all([
+		publicOptions.getValue(),
+		seerrConnectionStorage.getValue(),
+	]);
+	const parsed = parsePublicOptions(storedPublicOptions);
+	const seerr = migrateLegacySeerrConnection(storedSeerrConnection);
+	const settings = {
+		...createDefaultExtensionOptions(),
+		seerr,
+	};
+
+	return {
+		...parsed,
+		seerr: {
+			isConfigured: hasConfiguredSeerrConnection(settings),
+			authMode: getSeerrConnection(settings)?.auth.mode ?? null,
+		},
+	};
 }
 
 export function watchExtensionOptionsSnapshot(

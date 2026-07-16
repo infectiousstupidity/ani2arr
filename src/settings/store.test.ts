@@ -1,7 +1,7 @@
 /** Focused tests for options parsing and public snapshot shaping. */
 // src/settings/store.test.ts
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import {
 	PUBLIC_OPTIONS_CHANGE_KEY,
@@ -34,8 +34,10 @@ describe("options store helpers", () => {
 		settings.providers.sonarr.apiKey = "sonarr-key";
 		settings.providers.radarr.url = "https://radarr.example";
 		settings.providers.radarr.apiKey = "";
-		settings.seerr.url = "https://seerr.example";
-		settings.seerr.apiKey = "seerr-key";
+		settings.seerr = {
+			url: "https://seerr.example",
+			auth: { mode: "apiKey", apiKey: "seerr-key" },
+		};
 
 		expect(toPublicOptions(settings)).toEqual({
 			providers: {
@@ -50,6 +52,7 @@ describe("options store helpers", () => {
 			},
 			seerr: {
 				isConfigured: true,
+				authMode: "apiKey",
 			},
 			ui: settings.ui,
 			debugLogging: false,
@@ -96,8 +99,10 @@ describe("options store helpers", () => {
 		expect(snapshot.providers.sonarr.apiKey).toBe("");
 		expect(snapshot.providers.radarr.url).toBe("");
 		expect(snapshot.providers.radarr.apiKey).toBe("");
-		expect(snapshot.seerr.url).toBe("");
-		expect(snapshot.seerr.apiKey).toBe("");
+		expect(snapshot.seerr).toEqual({
+			url: "",
+			auth: { mode: "session" },
+		});
 	});
 
 	it("composes extension options from private provider connections and public options", async () => {
@@ -122,8 +127,10 @@ describe("options store helpers", () => {
 		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
 		expect(snapshot.providers.radarr.url).toBe("");
 		expect(snapshot.providers.radarr.apiKey).toBe("");
-		expect(snapshot.seerr.url).toBe("https://seerr.example");
-		expect(snapshot.seerr.apiKey).toBe("seerr-key");
+		expect(snapshot.seerr).toEqual({
+			url: "https://seerr.example",
+			auth: { mode: "apiKey", apiKey: "seerr-key" },
+		});
 	});
 
 	it("saving public options cannot clear private provider credentials", async () => {
@@ -173,10 +180,15 @@ describe("options store helpers", () => {
 		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
 	});
 
-	it("saving Seerr credentials stores only configured state in public options", async () => {
+	it("saving a Seerr session stores only a minimal account summary", async () => {
 		await saveSeerrConnectionSnapshot({
 			url: "https://seerr.example",
-			apiKey: "seerr-key",
+			auth: { mode: "session" },
+			account: {
+				id: 7,
+				displayName: "Friend",
+				avatar: " /avatar.png ",
+			},
 		});
 
 		const extensionSnapshot = await getExtensionOptionsSnapshot();
@@ -184,10 +196,65 @@ describe("options store helpers", () => {
 
 		expect(extensionSnapshot.seerr).toEqual({
 			url: "https://seerr.example",
-			apiKey: "seerr-key",
+			auth: { mode: "session" },
+			account: {
+				id: 7,
+				displayName: "Friend",
+				avatar: "/avatar.png",
+			},
 		});
-		expect(publicSnapshot.seerr).toEqual({ isConfigured: true });
+		expect(extensionSnapshot.seerr).not.toHaveProperty("apiKey");
+		expect(publicSnapshot.seerr).toEqual({
+			isConfigured: true,
+			authMode: "session",
+		});
 		expect(publicSnapshot).not.toHaveProperty("seerr.apiKey");
+		expect(publicSnapshot).not.toHaveProperty("seerr.account");
+	});
+
+	it("saves advanced Seerr API-key mode without exposing the key publicly", async () => {
+		await saveSeerrConnectionSnapshot({
+			url: "https://seerr.example",
+			auth: { mode: "apiKey", apiKey: "seerr-key" },
+		});
+
+		const extensionSnapshot = await getExtensionOptionsSnapshot();
+		const publicSnapshot = await getPublicOptionsSnapshot();
+
+		expect(extensionSnapshot.seerr).toEqual({
+			url: "https://seerr.example",
+			auth: { mode: "apiKey", apiKey: "seerr-key" },
+		});
+		expect(publicSnapshot.seerr).toEqual({
+			isConfigured: true,
+			authMode: "apiKey",
+		});
+		expect(JSON.stringify(publicSnapshot)).not.toContain("seerr-key");
+	});
+
+	it("migrates old Seerr API-key records to advanced mode", async () => {
+		await browser.storage.local.set({
+			[SEERR_SECRETS_STORAGE_KEY]: {
+				url: "https://seerr.example/base",
+				apiKey: "legacy-key",
+			},
+		});
+
+		await expect(getExtensionOptionsSnapshot()).resolves.toMatchObject({
+			seerr: {
+				url: "https://seerr.example/base",
+				auth: {
+					mode: "apiKey",
+					apiKey: "legacy-key",
+				},
+			},
+		});
+		await expect(getPublicOptionsSnapshot()).resolves.toMatchObject({
+			seerr: {
+				isConfigured: true,
+				authMode: "apiKey",
+			},
+		});
 	});
 
 	it("reset clears public options and private provider credentials", async () => {
@@ -301,11 +368,13 @@ describe("options store helpers", () => {
 				debugLogging: true,
 			},
 		});
+		await vi.waitFor(() => {
+			expect(snapshots).toHaveLength(1);
+		});
 
 		unsubscribe();
 
 		expect(PUBLIC_OPTIONS_CHANGE_KEY).toBe(PUBLIC_OPTIONS_STORAGE_KEY);
-		expect(snapshots).toHaveLength(1);
 		expect(snapshots[0]?.debugLogging).toBe(true);
 	});
 });
