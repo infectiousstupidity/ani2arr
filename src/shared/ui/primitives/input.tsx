@@ -1,11 +1,11 @@
-/** Shared options-page text inputs, including API-key PasswordInput behavior. */
-// src/options-page/components/ui/input.tsx
+/** Shared text inputs, including API-key PasswordInput behavior. */
+// src/shared/ui/primitives/input.tsx
 
 import { forwardRef, useState, type InputHTMLAttributes } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/shared/utils/cn";
 
-export type InputProps = InputHTMLAttributes<HTMLInputElement>;
+type InputProps = InputHTMLAttributes<HTMLInputElement>;
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, ...props }, ref) => {

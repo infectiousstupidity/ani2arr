@@ -10,8 +10,8 @@ import {
 	hasConfiguredConnectionCredentials,
 } from "@/settings/connection-config";
 import Button from "@/shared/ui/primitives/button";
+import { Input, PasswordInput } from "@/shared/ui/primitives/input";
 import { SettingsRow, SettingsSection } from "./settings-section";
-import { Input, PasswordInput } from "./ui/input";
 
 interface SeerrConnectionFormProps {
 	onConnect: (url: string, apiKey: string) => Promise<boolean>;
