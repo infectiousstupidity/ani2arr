@@ -269,7 +269,7 @@ describe("options store helpers", () => {
 			await expectLegacyStorageRemoved();
 		});
 
-		it("treats a complete all-empty private record as authoritative", async () => {
+		it("uses meaningful legacy connections when the new record is entirely empty", async () => {
 			await browser.storage.local.set({
 				[PRIVATE_CONNECTIONS_STORAGE_KEY]: EMPTY_PRIVATE_CONNECTIONS,
 				[SONARR_SECRETS_STORAGE_KEY]: {
@@ -283,7 +283,52 @@ describe("options store helpers", () => {
 			await expect(
 				browser.storage.local.get(PRIVATE_CONNECTIONS_STORAGE_KEY),
 			).resolves.toEqual({
-				[PRIVATE_CONNECTIONS_STORAGE_KEY]: EMPTY_PRIVATE_CONNECTIONS,
+				[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
+					...EMPTY_PRIVATE_CONNECTIONS,
+					sonarr: {
+						url: "https://legacy-sonarr.example",
+						apiKey: "legacy-key",
+					},
+				},
+			});
+			await expectLegacyStorageRemoved();
+		});
+
+		it("chooses meaningful new and legacy connections per provider", async () => {
+			await browser.storage.local.set({
+				[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
+					...EMPTY_PRIVATE_CONNECTIONS,
+					sonarr: {
+						url: "https://new-sonarr.example",
+						apiKey: "new-key",
+					},
+				},
+				[SONARR_SECRETS_STORAGE_KEY]: {
+					url: "https://legacy-sonarr.example",
+					apiKey: "legacy-sonarr-key",
+				},
+				[RADARR_SECRETS_STORAGE_KEY]: {
+					url: "https://legacy-radarr.example",
+					apiKey: "legacy-radarr-key",
+				},
+			});
+
+			await initializeSettingsStorage();
+
+			await expect(
+				browser.storage.local.get(PRIVATE_CONNECTIONS_STORAGE_KEY),
+			).resolves.toEqual({
+				[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
+					sonarr: {
+						url: "https://new-sonarr.example",
+						apiKey: "new-key",
+					},
+					radarr: {
+						url: "https://legacy-radarr.example",
+						apiKey: "legacy-radarr-key",
+					},
+					seerr: { url: "", apiKey: "" },
+				},
 			});
 			await expectLegacyStorageRemoved();
 		});
