@@ -8,8 +8,9 @@ import { parseTvdbId } from "@/providers/schemas";
 import type { MappingGroup, MappingRow } from "./mapping-page-model";
 import {
 	getFilteredMappingGroups,
-	getMappingListModel,
+	getLoadedMappingRowCount,
 	getRowKey,
+	getVisibleAniListMetadataIds,
 	isMappingGroupExpanded,
 	readTargetAniListIdFromHash,
 } from "./mapping-page-model";
@@ -85,7 +86,7 @@ describe("mapping page model", () => {
 		).toBe(true);
 	});
 
-	it("flattens loaded groups and only requests metadata for visible rows", () => {
+	it("counts loaded rows and requests metadata only for expanded groups", () => {
 		const expanded = createGroup({
 			key: "sonarr:10",
 			provider: "sonarr",
@@ -102,25 +103,15 @@ describe("mapping page model", () => {
 			rows: [createRow({ anilistId: aid(3), provider: "sonarr" })],
 		});
 
-		const result = getMappingListModel({
-			groups: [expanded, collapsed],
+		const groups = [expanded, collapsed];
+		const visibleAniListIds = getVisibleAniListMetadataIds({
+			groups,
 			collapsedGroupKeys: new Set(["sonarr:20"]),
 			highlightedAniListId: null,
 		});
 
-		expect(result.items.map((item) => item.kind)).toEqual([
-			"group",
-			"row",
-			"row",
-			"group",
-		]);
-		expect(
-			result.items.map((item) =>
-				item.kind === "row" ? item.parentProviderId : null,
-			),
-		).toEqual([null, tvdb(10), tvdb(10), null]);
-		expect(result.loadedRowCount).toBe(3);
-		expect(result.visibleAniListIds).toEqual([aid(1), aid(2)]);
+		expect(getLoadedMappingRowCount(groups)).toBe(3);
+		expect(visibleAniListIds).toEqual([aid(1), aid(2)]);
 	});
 
 	it("keeps AniList and MAL row keys distinct when they share an AniList ID", () => {

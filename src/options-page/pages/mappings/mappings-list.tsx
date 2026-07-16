@@ -10,14 +10,16 @@ import { MappingsAniListRow } from "./mappings-anilist-row";
 import { MappingsProviderGroup } from "./mappings-provider-group";
 import {
 	getRowKey,
+	isMappingGroupExpanded,
 	type ClearMatchAction,
 	type IgnoreAction,
-	type MappingListItem,
+	type MappingGroup,
 	type MappingRow,
 } from "./mapping-page-model";
 
 interface MappingListProps {
-	items: readonly MappingListItem[];
+	groups: readonly MappingGroup[];
+	collapsedGroupKeys: ReadonlySet<string>;
 	metadataById: ReadonlyMap<number, AniListMetadata>;
 	pendingRowKeys: Set<string>;
 	targetAniListId: AniListId | null;
@@ -29,7 +31,8 @@ interface MappingListProps {
 }
 
 function MappingList({
-	items,
+	groups,
+	collapsedGroupKeys,
 	metadataById,
 	pendingRowKeys,
 	targetAniListId,
@@ -41,40 +44,44 @@ function MappingList({
 }: MappingListProps): React.JSX.Element {
 	return (
 		<div>
-			{items.map((item) => {
-				if (item.kind === "group") {
-					return (
-						<div key={item.key} className={cn(!item.isExpanded && "mb-4")}>
-							<MappingsProviderGroup
-								group={item.group}
-								isExpanded={item.isExpanded}
-								onToggle={handleToggleGroup}
-							/>
-						</div>
-					);
-				}
-
+			{groups.map((group) => {
+				const isExpanded = isMappingGroupExpanded(
+					group,
+					collapsedGroupKeys,
+					targetAniListId,
+				);
 				return (
-					<div
-						key={item.key}
-						className={cn(
-							"border-x border-b border-border-primary bg-bg-secondary/45",
-							item.isLastInGroup
-								? "mb-4 rounded-b-md"
-								: "border-b-border-primary/40",
-						)}
-					>
-						<MappingsAniListRow
-							row={item.row}
-							parentProviderId={item.parentProviderId}
-							metadata={metadataById.get(item.row.anilistId) ?? null}
-							isPending={pendingRowKeys.has(getRowKey(item.row))}
-							isHighlighted={targetAniListId === item.row.anilistId}
-							preferredTitleLanguage={preferredTitleLanguage}
-							onIgnore={handleIgnore}
-							onClearMatch={handleClearMatch}
-							onEdit={handleEdit}
+					<div key={group.key} className="mb-4">
+						<MappingsProviderGroup
+							group={group}
+							isExpanded={isExpanded}
+							onToggle={handleToggleGroup}
 						/>
+						{isExpanded
+							? group.rows.map((row, index) => (
+									<div
+										key={getRowKey(row)}
+										className={cn(
+											"border-x border-b border-border-primary bg-bg-secondary/45",
+											index === group.rows.length - 1
+												? "rounded-b-md"
+												: "border-b-border-primary/40",
+										)}
+									>
+										<MappingsAniListRow
+											row={row}
+											parentProviderId={group.providerId}
+											metadata={metadataById.get(row.anilistId) ?? null}
+											isPending={pendingRowKeys.has(getRowKey(row))}
+											isHighlighted={targetAniListId === row.anilistId}
+											preferredTitleLanguage={preferredTitleLanguage}
+											onIgnore={handleIgnore}
+											onClearMatch={handleClearMatch}
+											onEdit={handleEdit}
+										/>
+									</div>
+								))
+							: null}
 					</div>
 				);
 			})}
@@ -89,10 +96,9 @@ export function MappingContent(
 	props: {
 		isInitialLoading: boolean;
 		error: Error | ExtensionError | null;
-		groupsCount: number;
 	} & MappingListProps,
 ): React.JSX.Element {
-	const { isInitialLoading, error, groupsCount, ...listProps } = props;
+	const { isInitialLoading, error, groups, ...listProps } = props;
 
 	if (isInitialLoading) {
 		return (
@@ -108,12 +114,12 @@ export function MappingContent(
 			</div>
 		);
 	}
-	if (groupsCount === 0) {
+	if (groups.length === 0) {
 		return (
 			<div className="rounded-md border border-dashed border-border-primary bg-bg-secondary/40 px-4 py-8 text-center text-sm text-text-secondary">
 				No mappings match current filters.
 			</div>
 		);
 	}
-	return <MappingList {...listProps} />;
+	return <MappingList groups={groups} {...listProps} />;
 }

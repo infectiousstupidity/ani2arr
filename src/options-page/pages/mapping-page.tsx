@@ -14,9 +14,10 @@ import { MappingContent } from "./mappings/mappings-list";
 import { MappingsFilterBar } from "./mappings/mappings-filter-bar";
 import {
 	getFilteredMappingGroups,
-	getMappingListModel,
+	getLoadedMappingRowCount,
 	getMetadataById,
 	getTargetSearchValue,
+	getVisibleAniListMetadataIds,
 	readTargetAniListIdFromHash,
 	type MappingSourceFilter,
 	type MappingStatusFilter,
@@ -93,17 +94,17 @@ const MappingsPageContent = ({
 		],
 	);
 	const groups = filteredMappings.groups;
-	const listModel = useMemo(
+	const visibleAniListIds = useMemo(
 		() =>
-			getMappingListModel({
+			getVisibleAniListMetadataIds({
 				groups,
 				collapsedGroupKeys,
 				highlightedAniListId: targetAniListId,
 			}),
 		[collapsedGroupKeys, groups, targetAniListId],
 	);
-	const metadataQuery = useAniListMetadataBatch(listModel.visibleAniListIds, {
-		enabled: listModel.visibleAniListIds.length > 0,
+	const metadataQuery = useAniListMetadataBatch(visibleAniListIds, {
+		enabled: visibleAniListIds.length > 0,
 	});
 	const metadataById = useMemo(
 		() => getMetadataById(metadataQuery.data?.metadata),
@@ -121,7 +122,7 @@ const MappingsPageContent = ({
 
 	const handleRefresh = (): void => {
 		void mappingsQuery.refetch();
-		if (listModel.visibleAniListIds.length > 0) {
+		if (visibleAniListIds.length > 0) {
 			void metadataQuery.refetch();
 		}
 	};
@@ -184,7 +185,7 @@ const MappingsPageContent = ({
 				<div className="flex items-center justify-between gap-4 text-xs text-text-secondary">
 					<span>
 						{groups.length} of {totalGroups} groups •{" "}
-						{listModel.loadedRowCount} mappings loaded
+						{getLoadedMappingRowCount(groups)} mappings loaded
 						{metadataQuery.isFetching ? " • Loading AniList metadata..." : ""}
 					</span>
 					{searchQuery.trim() ? (
@@ -195,8 +196,8 @@ const MappingsPageContent = ({
 				<MappingContent
 					isInitialLoading={mappingsQuery.isLoading && groups.length === 0}
 					error={mappingsQuery.error}
-					groupsCount={groups.length}
-					items={listModel.items}
+					groups={groups}
+					collapsedGroupKeys={collapsedGroupKeys}
 					metadataById={metadataById}
 					pendingRowKeys={pendingRowKeys}
 					targetAniListId={targetAniListId}
