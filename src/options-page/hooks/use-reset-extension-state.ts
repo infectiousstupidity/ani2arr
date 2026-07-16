@@ -5,8 +5,10 @@ import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getAni2arrApi } from "@/rpc";
 import { queryKeys } from "@/queries/query-keys";
-import { createDefaultExtensionOptions } from "@/settings/schema";
-import { toPublicOptions } from "@/settings/store";
+import {
+	createDefaultExtensionOptions,
+	createDefaultPublicOptions,
+} from "@/settings/schema";
 import { getActionErrorMessage } from "./action-helpers";
 
 export function useResetExtensionState() {
@@ -24,7 +26,7 @@ export function useResetExtensionState() {
 			await getAni2arrApi().resetExtensionState();
 
 			const extensionOptions = createDefaultExtensionOptions();
-			const publicOptions = toPublicOptions(extensionOptions);
+			const publicOptions = createDefaultPublicOptions();
 
 			queryClient.setQueryData(queryKeys.options(), extensionOptions);
 			queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);

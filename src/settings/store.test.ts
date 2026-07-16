@@ -12,7 +12,6 @@ import {
 	saveProviderConnectionSnapshot,
 	savePublicOptionsSnapshot,
 	saveSeerrConnectionSnapshot,
-	toPublicOptions,
 	watchExtensionOptionsSnapshot,
 	watchPublicOptionsSnapshot,
 } from "@/settings/store";
@@ -56,34 +55,6 @@ describe("options store helpers", () => {
 		);
 	});
 
-	it("omits secrets and computes provider configuration in public options", () => {
-		const settings = createDefaultExtensionOptions();
-		settings.providers.sonarr.url = "https://sonarr.example";
-		settings.providers.sonarr.apiKey = "sonarr-key";
-		settings.providers.radarr.url = "https://radarr.example";
-		settings.providers.radarr.apiKey = "";
-		settings.seerr.url = "https://seerr.example";
-		settings.seerr.apiKey = "seerr-key";
-
-		expect(toPublicOptions(settings)).toEqual({
-			providers: {
-				sonarr: {
-					defaults: settings.providers.sonarr.defaults,
-					isConfigured: true,
-				},
-				radarr: {
-					defaults: settings.providers.radarr.defaults,
-					isConfigured: false,
-				},
-			},
-			seerr: {
-				isConfigured: true,
-			},
-			ui: settings.ui,
-			debugLogging: false,
-		});
-	});
-
 	it("falls back from malformed public options without healing storage on read", async () => {
 		const malformedPublicOptions = {
 			debugLogging: true,
@@ -108,7 +79,7 @@ describe("options store helpers", () => {
 
 	it("defaults malformed private connections without discarding valid siblings", async () => {
 		await browser.storage.local.set({
-			[PUBLIC_OPTIONS_STORAGE_KEY]: toPublicOptions(createDefaultExtensionOptions()),
+			[PUBLIC_OPTIONS_STORAGE_KEY]: createDefaultPublicOptions(),
 			[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
 				sonarr: { url: 123, apiKey: "sonarr-key" },
 				radarr: {
@@ -154,7 +125,7 @@ describe("options store helpers", () => {
 	});
 
 	it("composes extension options from private provider connections and public options", async () => {
-		const publicOptions = toPublicOptions(createDefaultExtensionOptions());
+		const publicOptions = createDefaultPublicOptions();
 		publicOptions.providers.sonarr.isConfigured = true;
 
 		await browser.storage.local.set({
@@ -375,6 +346,43 @@ describe("options store helpers", () => {
 			await expectLegacyStorageRemoved();
 		});
 
+		it("repairs stale public connection status from private connections", async () => {
+			const publicOptions = createDefaultPublicOptions();
+			await browser.storage.local.set({
+				[PUBLIC_OPTIONS_STORAGE_KEY]: {
+					...publicOptions,
+					providers: {
+						sonarr: {
+							...publicOptions.providers.sonarr,
+							isConfigured: false,
+						},
+						radarr: {
+							...publicOptions.providers.radarr,
+							isConfigured: true,
+						},
+					},
+					seerr: { isConfigured: true },
+				},
+				[PRIVATE_CONNECTIONS_STORAGE_KEY]: {
+					...EMPTY_PRIVATE_CONNECTIONS,
+					sonarr: {
+						url: "https://sonarr.example",
+						apiKey: "sonarr-key",
+					},
+				},
+			});
+
+			await initializeSettingsStorage();
+
+			await expect(getPublicOptionsSnapshot()).resolves.toMatchObject({
+				providers: {
+					sonarr: { isConfigured: true },
+					radarr: { isConfigured: false },
+				},
+				seerr: { isConfigured: false },
+			});
+		});
+
 		it("does not rewrite a completed migration", async () => {
 			await browser.storage.local.set({
 				[SONARR_SECRETS_STORAGE_KEY]: {
@@ -394,7 +402,7 @@ describe("options store helpers", () => {
 		});
 	});
 
-	it("saving public options cannot clear private provider credentials", async () => {
+	it("derives public connection status instead of accepting UI flags", async () => {
 		await saveProviderConnectionSnapshot("sonarr", {
 			url: "https://sonarr.example",
 			apiKey: "sonarr-key",
@@ -409,7 +417,12 @@ describe("options store helpers", () => {
 					...publicOptions.providers.sonarr,
 					isConfigured: false,
 				},
+				radarr: {
+					...publicOptions.providers.radarr,
+					isConfigured: true,
+				},
 			},
+			seerr: { isConfigured: true },
 			debugLogging: true,
 		});
 
@@ -420,6 +433,8 @@ describe("options store helpers", () => {
 		expect(snapshot.providers.sonarr.url).toBe("https://sonarr.example");
 		expect(snapshot.providers.sonarr.apiKey).toBe("sonarr-key");
 		expect(savedPublicOptions.providers.sonarr.isConfigured).toBe(true);
+		expect(savedPublicOptions.providers.radarr.isConfigured).toBe(false);
+		expect(savedPublicOptions.seerr.isConfigured).toBe(false);
 	});
 
 	it("saving provider credentials does not change public defaults", async () => {
@@ -544,18 +559,17 @@ describe("options store helpers", () => {
 	});
 
 	it("reads public options from the public snapshot only", async () => {
+		const defaultPublicOptions = createDefaultPublicOptions();
 		await browser.storage.local.set({
 			[PUBLIC_OPTIONS_STORAGE_KEY]: {
-				...toPublicOptions(createDefaultExtensionOptions()),
+				...defaultPublicOptions,
 				debugLogging: true,
 				providers: {
 					sonarr: {
-						...toPublicOptions(createDefaultExtensionOptions()).providers
-							.sonarr,
+						...defaultPublicOptions.providers.sonarr,
 						isConfigured: true,
 					},
-					radarr: toPublicOptions(createDefaultExtensionOptions()).providers
-						.radarr,
+					radarr: defaultPublicOptions.providers.radarr,
 				},
 			},
 			[SONARR_SECRETS_STORAGE_KEY]: { url: "", apiKey: "" },
@@ -568,7 +582,7 @@ describe("options store helpers", () => {
 	});
 
 	it("heals stale provider add defaults while reading settings snapshots", async () => {
-		const currentPublicOptions = toPublicOptions(createDefaultExtensionOptions());
+		const currentPublicOptions = createDefaultPublicOptions();
 		await browser.storage.local.set({
 			[PUBLIC_OPTIONS_STORAGE_KEY]: {
 				...currentPublicOptions,
@@ -635,7 +649,7 @@ describe("options store helpers", () => {
 		});
 		await browser.storage.local.set({
 			[PUBLIC_OPTIONS_STORAGE_KEY]: {
-				...toPublicOptions(createDefaultExtensionOptions()),
+				...createDefaultPublicOptions(),
 				debugLogging: true,
 			},
 		});
@@ -671,7 +685,7 @@ describe("options store helpers", () => {
 		await vi.waitFor(() => expect(snapshots).toHaveLength(1));
 		await browser.storage.local.set({
 			[PUBLIC_OPTIONS_STORAGE_KEY]: {
-				...toPublicOptions(createDefaultExtensionOptions()),
+				...createDefaultPublicOptions(),
 				debugLogging: true,
 			},
 		});
