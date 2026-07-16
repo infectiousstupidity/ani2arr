@@ -336,10 +336,6 @@ describe("refreshUpstreamMappings", () => {
 						{ kind: "tvdb-show", id: tvdb(700), season: 0 },
 						{ kind: "tvdb-show", id: tvdb(700), season: -1 },
 					],
-					30: [
-						{ kind: "tmdb-movie", id: tmdb(400) },
-						{ kind: "tmdb-movie", id: tmdb(300) },
-					],
 					40: [{ kind: "tmdb-show", id: tmdb(700) }],
 					50: [
 						{ kind: "tmdb-show", id: tmdb(800), season: 2 },
@@ -370,10 +366,6 @@ describe("refreshUpstreamMappings", () => {
 				},
 			},
 			{
-				anilistId: aid(30),
-				target: { mediaType: "movie" as const, tmdbId: tmdb(300) },
-			},
-			{
 				anilistId: aid(50),
 				target: {
 					mediaType: "tv" as const,
@@ -387,7 +379,6 @@ describe("refreshUpstreamMappings", () => {
 		await expect(
 			listSeerrUpstreamTargets([
 				aid(50),
-				aid(30),
 				aid(20),
 				aid(10),
 				aid(40),
@@ -396,6 +387,38 @@ describe("refreshUpstreamMappings", () => {
 			]),
 		).resolves.toEqual(expected);
 		await expect(listAllSeerrUpstreamTargets()).resolves.toEqual(expected);
+	});
+
+	it("accepts one unique movie ID and rejects movie ambiguity", async () => {
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				entries: {
+					1: [
+						{ kind: "tmdb-movie", id: tmdb(300) },
+						{ kind: "tmdb-movie", id: tmdb(300) },
+					],
+					2: [
+						{ kind: "tmdb-movie", id: tmdb(400) },
+						{ kind: "tmdb-movie", id: tmdb(300) },
+					],
+					3: [
+						{ kind: "tmdb-movie", id: tmdb(300) },
+						{ kind: "tmdb-show", id: tmdb(500), season: 1 },
+					],
+				},
+				aniListCrosswalks: {},
+				fetchedAt: Date.now(),
+			},
+		});
+
+		await expect(
+			listSeerrUpstreamTargets([aid(1), aid(2), aid(3)]),
+		).resolves.toEqual([
+			{
+				anilistId: aid(1),
+				target: { mediaType: "movie", tmdbId: tmdb(300) },
+			},
+		]);
 	});
 
 	it("uses scoped TVDB seasons with one unscoped TMDB show ID", async () => {

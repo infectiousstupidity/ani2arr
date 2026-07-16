@@ -290,17 +290,12 @@ function normalizeSeasons(seasons: readonly number[]): number[] {
 function projectSeerrTarget(
 	targets: readonly AniBridgeTarget[],
 ): SeerrUpstreamTarget | null {
-	const movieTmdbIds = targets.flatMap((target) => {
+	const movieTmdbIds = new Set(targets.flatMap((target) => {
 		if (target.kind !== "tmdb-movie") return [];
 
 		const tmdbId = parseTmdbIdOrNull(target.id);
 		return tmdbId === null ? [] : [tmdbId];
-	});
-
-	if (movieTmdbIds.length > 0) {
-		const tmdbId = movieTmdbIds.toSorted((left, right) => left - right)[0];
-		return tmdbId === undefined ? null : { mediaType: "movie", tmdbId };
-	}
+	}));
 
 	const tmdbTargets = targets.flatMap((target) => {
 		if (target.kind !== "tmdb-show") return [];
@@ -308,6 +303,13 @@ function projectSeerrTarget(
 		const tmdbId = parseTmdbIdOrNull(target.id);
 		return tmdbId === null ? [] : [{ tmdbId, season: target.season }];
 	});
+
+	if (movieTmdbIds.size > 0) {
+		if (movieTmdbIds.size !== 1 || tmdbTargets.length > 0) return null;
+		const tmdbId = [...movieTmdbIds][0];
+		return tmdbId === undefined ? null : { mediaType: "movie", tmdbId };
+	}
+
 	const tmdbIds = new Set(tmdbTargets.map((target) => target.tmdbId));
 	if (tmdbIds.size !== 1) return null;
 
