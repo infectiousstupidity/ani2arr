@@ -15,7 +15,7 @@ export function SeerrRequestMainPane(props: {
 	isConfigured: boolean;
 	requestError: string | null;
 	connectionActionLabel: string | null;
-	onOpenSeerrSettings: () => void;
+	onConnectionAction: () => void;
 	onSelectAllRequestable: () => void;
 	onToggleSeason: (seasonNumber: number) => void;
 }): React.JSX.Element {
@@ -28,7 +28,7 @@ export function SeerrRequestMainPane(props: {
 		isConfigured,
 		requestError,
 		connectionActionLabel,
-		onOpenSeerrSettings,
+		onConnectionAction,
 		onSelectAllRequestable,
 		onToggleSeason,
 	} = props;
@@ -53,7 +53,7 @@ export function SeerrRequestMainPane(props: {
 						type="button"
 						variant="outline"
 						size="sm"
-						onClick={onOpenSeerrSettings}
+						onClick={onConnectionAction}
 					>
 						{connectionActionLabel}
 					</Button>

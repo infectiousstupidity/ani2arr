@@ -40,6 +40,7 @@ const A2AMessageSchema = v.union([
 			v.picklist(["sonarr", "radarr", "seerr", "mappings", "ui", "advanced"]),
 		),
 		targetAnilistId: v.optional(AniListIdSchema),
+		enableSeerrCsrf: v.optional(v.literal(true)),
 	}),
 ]);
 
@@ -123,12 +124,13 @@ export const bootstrapBackground = (): void => {
 			}
 
 			if (msg.type === "OPEN_OPTIONS_PAGE") {
-				const targetHash = msg.targetAnilistId
-					? `?anilistId=${msg.targetAnilistId}`
-					: "";
-				const hash = [msg.sectionId, targetHash]
-					.filter((p): p is string => !!p)
-					.join("");
+				const params = new URLSearchParams();
+				if (msg.targetAnilistId) {
+					params.set("anilistId", String(msg.targetAnilistId));
+				}
+				if (msg.enableSeerrCsrf) params.set("enableCsrf", "1");
+				const query = params.size > 0 ? `?${params.toString()}` : "";
+				const hash = `${msg.sectionId ?? ""}${query}`;
 				const url = `${browser.runtime.getURL("/options.html")}${hash ? `#${hash}` : ""}`;
 
 				browser.tabs.create({ url }).catch(() => {

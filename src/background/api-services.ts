@@ -17,6 +17,10 @@ import { RadarrClient } from "@/providers/radarr/client";
 import { RadarrLibrary } from "@/providers/radarr/library";
 import { SeerrClient } from "@/providers/seerr/client";
 import {
+	getSeerrXsrfToken,
+	removeSeerrCsrfCookiePermission,
+} from "@/providers/seerr/csrf-token";
+import {
 	getProviderHostPermissionPattern,
 	hasProviderHostPermission,
 	removeProviderHostPermission,
@@ -83,6 +87,7 @@ export const radarrClient = new RadarrClient({
 });
 export const seerrClient = new SeerrClient({
 	hasUrlPermission: createHasUrlPermission("seerr"),
+	getCsrfToken: getSeerrXsrfToken,
 });
 
 export const sonarrLibrary = new SonarrLibrary(sonarrClient);
@@ -243,4 +248,5 @@ export const resetExtensionState = async (): Promise<void> => {
 	await clearPersistentCaches();
 	await resetAllSettingsSnapshot();
 	await removeConfiguredProviderHostPermissions(previousOptions);
+	await removeSeerrCsrfCookiePermission();
 };

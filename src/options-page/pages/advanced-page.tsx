@@ -67,6 +67,7 @@ export const AdvancedPage = () => {
 						<li>Host permissions cannot be limited to subfolders, and Firefox cannot limit them by port.</li>
 						<li>Provider API keys are sent only to their configured provider URLs. HTTP provider URLs send API keys in cleartext; use HTTPS outside trusted localhost or LAN setups.</li>
 						<li>Seerr session cookies remain browser-managed; ani2arr does not store or expose their values.</li>
+						<li>Optional cookie permission is requested only after a CSRF rejection and an explicit user click; ani2arr then reads only the configured Seerr host&apos;s XSRF-TOKEN.</li>
 						<li>AniList and AniChart content UI can show provider library status, matched titles, saved defaults, root folders, quality profiles, tags, and search candidates.</li>
 						<li>
 							AniList metadata is fetched from AniList GraphQL and public mapping

@@ -46,6 +46,11 @@ export function getCurrentHash(): string {
 	return globalThis.location.hash;
 }
 
+export function hasHashFlag(hash: string, flag: string): boolean {
+	const query = hash.split("?", 2)[1];
+	return query ? new URLSearchParams(query).get(flag) === "1" : false;
+}
+
 function subscribeHashRoute(onStoreChange: () => void): () => void {
 	globalThis.addEventListener("hashchange", onStoreChange);
 	return () => globalThis.removeEventListener("hashchange", onStoreChange);

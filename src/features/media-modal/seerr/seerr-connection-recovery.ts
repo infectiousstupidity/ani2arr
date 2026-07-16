@@ -9,6 +9,7 @@ import {
 export type SeerrConnectionRecoveryAction =
 	| "configure"
 	| "reconnect"
+	| "csrf"
 	| "settings";
 
 const RECONNECT_ERROR_CODES = new Set<ErrorCode>([
@@ -20,7 +21,6 @@ const RECONNECT_ERROR_CODES = new Set<ErrorCode>([
 const SETTINGS_ERROR_CODES = new Set<ErrorCode>([
 	ErrorCode.CONFIGURATION_ERROR,
 	ErrorCode.PERMISSION_ERROR,
-	ErrorCode.SEERR_CSRF_REQUIRED,
 ]);
 
 export function getSeerrConnectionRecoveryAction(input: {
@@ -33,6 +33,9 @@ export function getSeerrConnectionRecoveryAction(input: {
 		if (error && RECONNECT_ERROR_CODES.has(error.code)) return "reconnect";
 	}
 	for (const error of input.errors) {
+		if (error?.code === ErrorCode.SEERR_CSRF_REQUIRED) return "csrf";
+	}
+	for (const error of input.errors) {
 		if (error && SETTINGS_ERROR_CODES.has(error.code)) return "settings";
 	}
 	return null;
@@ -43,5 +46,6 @@ export function getSeerrConnectionRecoveryLabel(
 ): string {
 	if (action === "configure") return "Configure Seerr";
 	if (action === "reconnect") return "Reconnect Seerr";
+	if (action === "csrf") return "Enable CSRF support";
 	return "Open Seerr settings";
 }

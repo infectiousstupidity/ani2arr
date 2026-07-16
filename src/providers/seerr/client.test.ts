@@ -21,9 +21,13 @@ const sessionConnection: SeerrConnection = {
 	},
 };
 
-function createClient(hasUrlPermission = true): SeerrClient {
+function createClient(
+	hasUrlPermission = true,
+	getCsrfToken: (url: string) => Promise<string | null> = async () => null,
+): SeerrClient {
 	return new SeerrClient({
 		hasUrlPermission: async () => hasUrlPermission,
+		getCsrfToken,
 	});
 }
 
@@ -122,21 +126,51 @@ describe("SeerrClient", () => {
 		expect(request?.method).toBe("POST");
 		expect(request?.credentials).toBe("include");
 		expect((request?.headers as Headers).has("X-Api-Key")).toBe(false);
+		expect((request?.headers as Headers).has("X-XSRF-TOKEN")).toBe(false);
 		expect(request?.body).toBe('{"mediaType":"movie","mediaId":123}');
+	});
+
+	it("adds the optional XSRF token only to session state changes", async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(createAccountResponse())
+			.mockResolvedValueOnce(Response.json({ id: 10, status: 1 }));
+		const getCsrfToken = vi.fn(async () => "xsrf-secret");
+		vi.stubGlobal("fetch", fetchMock);
+
+		await createClient(true, getCsrfToken).requestMedia(
+			{ mediaType: "movie", mediaId: parseTmdbId(123) },
+			sessionConnection,
+		);
+
+		expect(getCsrfToken).toHaveBeenCalledOnce();
+		expect(getCsrfToken).toHaveBeenCalledWith("https://seerr.example");
+		expect(
+			(fetchMock.mock.calls[0]?.[1]?.headers as Headers).has(
+				"X-XSRF-TOKEN",
+			),
+		).toBe(false);
+		expect(
+			(fetchMock.mock.calls[1]?.[1]?.headers as Headers).get(
+				"X-XSRF-TOKEN",
+			),
+		).toBe("xsrf-secret");
 	});
 
 	it("does not add an identity preflight to API-key requests", async () => {
 		const fetchMock = vi
 			.fn<typeof fetch>()
 			.mockResolvedValueOnce(Response.json({ id: 10, status: 1 }));
+		const getCsrfToken = vi.fn(async () => "xsrf-secret");
 		vi.stubGlobal("fetch", fetchMock);
 
-		await createClient().requestMedia(
+		await createClient(true, getCsrfToken).requestMedia(
 			{ mediaType: "movie", mediaId: parseTmdbId(123) },
 			apiKeyConnection,
 		);
 
 		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(getCsrfToken).not.toHaveBeenCalled();
 		expect(fetchMock.mock.calls[0]?.[0]).toBe(
 			"https://seerr.example/api/v1/request",
 		);

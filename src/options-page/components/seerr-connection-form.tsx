@@ -22,8 +22,11 @@ import { Input, PasswordInput } from "./ui/input";
 interface SeerrConnectionFormProps {
 	onCheckSession: (url: string) => Promise<boolean>;
 	onConnectApiKey: (url: string, apiKey: string) => Promise<boolean>;
+	onEnableCsrfSupport: () => Promise<boolean>;
 	onOpenLogin: (url: string) => Promise<boolean>;
 	isConnecting: boolean;
+	isCsrfSupportEnabled: boolean;
+	showCsrfSupport: boolean;
 	error: string | null;
 	errorCode: ErrorCode | null;
 }
@@ -42,9 +45,12 @@ export const SeerrConnectionForm = ({
 	error,
 	errorCode,
 	isConnecting,
+	isCsrfSupportEnabled,
 	onCheckSession,
 	onConnectApiKey,
+	onEnableCsrfSupport,
 	onOpenLogin,
+	showCsrfSupport,
 }: SeerrConnectionFormProps) => {
 	const { data: savedSettings } = useExtensionOptions();
 	const savedDraft = getSeerrConnectionDraft(savedSettings);
@@ -65,7 +71,10 @@ export const SeerrConnectionForm = ({
 			isConnecting={isConnecting}
 			onCheckSession={onCheckSession}
 			onConnectApiKey={onConnectApiKey}
+			onEnableCsrfSupport={onEnableCsrfSupport}
 			onOpenLogin={onOpenLogin}
+			isCsrfSupportEnabled={isCsrfSupportEnabled}
+			showCsrfSupport={showCsrfSupport}
 			savedApiKey={savedApiKey}
 			savedConnection={savedConnection}
 			savedUrl={savedDraft.url}
@@ -79,13 +88,103 @@ interface SeerrConnectionDraftProps extends SeerrConnectionFormProps {
 	savedConnection: ReturnType<typeof getSeerrConnection>;
 }
 
+function SeerrCsrfSupportPanel(props: {
+	isEnabled: boolean;
+	isConnecting: boolean;
+	onEnable: () => Promise<boolean>;
+}): React.JSX.Element {
+	return (
+		<div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
+			<p className="text-sm font-semibold text-warning">
+				Seerr CSRF protection detected
+			</p>
+			<p className="mt-1 text-xs text-text-secondary">
+				Allow ani2arr to read only the configured server&apos;s readable
+				XSRF-TOKEN cookie. The HTTP-only session cookie is never read.
+			</p>
+			{props.isEnabled ? (
+				<p className="mt-3 text-sm font-semibold text-success">
+					CSRF support enabled. Return to AniList or AniChart and retry the
+					request.
+				</p>
+			) : (
+				<div className="mt-3 flex justify-end">
+					<Button
+						type="button"
+						variant="outline"
+						onClick={() => void props.onEnable()}
+						disabled={props.isConnecting}
+					>
+						Enable CSRF support
+					</Button>
+				</div>
+			)}
+		</div>
+	);
+}
+
+function SeerrSessionFeedback(props: {
+	sessionView: ReturnType<typeof getSeerrSessionView>;
+	savedConnection: ReturnType<typeof getSeerrConnection>;
+	error: string | null;
+	showCsrfSupport: boolean;
+	isCsrfSupportEnabled: boolean;
+	isConnecting: boolean;
+	onEnableCsrfSupport: () => Promise<boolean>;
+}): React.JSX.Element {
+	return (
+		<>
+			{props.sessionView === "connected" &&
+			props.savedConnection?.auth.mode === "session" ? (
+				<div className="rounded-lg border border-success/25 bg-success/5 px-4 py-3">
+					<p className="text-sm font-semibold text-text-primary">
+						Connected as {props.savedConnection.account?.displayName}
+					</p>
+					<p className="mt-1 text-xs text-text-secondary">
+						Using your existing Seerr browser login. ani2arr does not store
+						the session cookie.
+					</p>
+				</div>
+			) : null}
+
+			{props.sessionView === "api-key" ? (
+				<div className="rounded-lg border border-border-primary/50 bg-bg-tertiary/30 px-4 py-3 text-sm text-text-secondary">
+					Currently connected with the global Seerr API key. Check the browser
+					session above to switch to user-scoped requests.
+				</div>
+			) : null}
+
+			{props.error ? (
+				<p
+					className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm font-semibold text-error"
+					role="alert"
+				>
+					{props.error}
+				</p>
+			) : null}
+
+			{props.showCsrfSupport &&
+			props.savedConnection?.auth.mode === "session" ? (
+				<SeerrCsrfSupportPanel
+					isEnabled={props.isCsrfSupportEnabled}
+					isConnecting={props.isConnecting}
+					onEnable={props.onEnableCsrfSupport}
+				/>
+			) : null}
+		</>
+	);
+}
+
 const SeerrConnectionDraft = ({
 	error,
 	errorCode,
 	isConnecting,
+	isCsrfSupportEnabled,
 	onCheckSession,
 	onConnectApiKey,
+	onEnableCsrfSupport,
 	onOpenLogin,
+	showCsrfSupport,
 	savedApiKey,
 	savedConnection,
 	savedUrl,
@@ -164,33 +263,15 @@ const SeerrConnectionDraft = ({
 					</p>
 				) : null}
 
-				{sessionView === "connected" && savedConnection?.auth.mode === "session" ? (
-					<div className="rounded-lg border border-success/25 bg-success/5 px-4 py-3">
-						<p className="text-sm font-semibold text-text-primary">
-							Connected as {savedConnection.account?.displayName}
-						</p>
-						<p className="mt-1 text-xs text-text-secondary">
-							Using your existing Seerr browser login. ani2arr does not store
-							the session cookie.
-						</p>
-					</div>
-				) : null}
-
-				{sessionView === "api-key" ? (
-					<div className="rounded-lg border border-border-primary/50 bg-bg-tertiary/30 px-4 py-3 text-sm text-text-secondary">
-						Currently connected with the global Seerr API key. Check the
-						browser session above to switch to user-scoped requests.
-					</div>
-				) : null}
-
-				{error ? (
-					<p
-						className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm font-semibold text-error"
-						role="alert"
-					>
-						{error}
-					</p>
-				) : null}
+				<SeerrSessionFeedback
+					sessionView={sessionView}
+					savedConnection={savedConnection}
+					error={error}
+					showCsrfSupport={showCsrfSupport}
+					isCsrfSupportEnabled={isCsrfSupportEnabled}
+					isConnecting={isConnecting}
+					onEnableCsrfSupport={onEnableCsrfSupport}
+				/>
 
 				<div className="mt-2 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
 					{hasUrlChanges ? (

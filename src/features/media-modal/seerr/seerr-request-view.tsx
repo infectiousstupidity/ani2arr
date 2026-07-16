@@ -189,6 +189,19 @@ export function SeerrRequestView(props: {
 		request.mutate(requestInput);
 	};
 
+	const handleConnectionAction = (): void => {
+		if (feedback.connectionRecoveryAction === "csrf") {
+			request.reset();
+			openOptionsPage({
+				sectionId: "seerr",
+				enableSeerrCsrf: true,
+			});
+			return;
+		}
+
+		openOptionsPage({ sectionId: "seerr" });
+	};
+
 	return (
 		<ModalShell
 			contentContainer={contentContainer}
@@ -203,9 +216,7 @@ export function SeerrRequestView(props: {
 					isConfigured={isConfigured}
 					requestError={feedback.requestErrorMessage}
 					connectionActionLabel={feedback.connectionActionLabel}
-					onOpenSeerrSettings={() =>
-						openOptionsPage({ sectionId: "seerr" })
-					}
+					onConnectionAction={handleConnectionAction}
 					onSelectAllRequestable={() =>
 						setSelectedSeasonDraft({
 							key: selectedSeasonKey,

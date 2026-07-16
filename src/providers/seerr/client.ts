@@ -12,6 +12,7 @@ import {
 	readSeerrMediaStatus,
 	readSeerrSearchResults,
 } from "./request";
+import { SEERR_XSRF_HEADER_NAME } from "./csrf-token";
 import type {
 	SeerrAccountSummary,
 	SeerrConnection,
@@ -31,11 +32,14 @@ type SeerrRequestOptions = Omit<RequestInit, "body"> & {
 
 export class SeerrClient {
 	private readonly hasUrlPermission: (url: string) => Promise<boolean>;
+	private readonly getCsrfToken: (url: string) => Promise<string | null>;
 
 	public constructor(options: {
 		hasUrlPermission: (url: string) => Promise<boolean>;
+		getCsrfToken?: (url: string) => Promise<string | null>;
 	}) {
 		this.hasUrlPermission = options.hasUrlPermission;
+		this.getCsrfToken = options.getCsrfToken ?? (async () => null);
 	}
 
 	public async getCurrentUser(
@@ -184,6 +188,15 @@ export class SeerrClient {
 			if (connection.auth.mode === "apiKey") {
 				headers.set("X-Api-Key", connection.auth.apiKey);
 			}
+			if (
+				connection.auth.mode === "session" &&
+				isStateChangingMethod(fetchOptions.method)
+			) {
+				const csrfToken = await this.getCsrfToken(connection.url).catch(
+					() => null,
+				);
+				if (csrfToken) headers.set(SEERR_XSRF_HEADER_NAME, csrfToken);
+			}
 			if (body !== undefined) headers.set("Content-Type", "application/json");
 
 			const requestOptions: RequestInit = {
@@ -237,6 +250,11 @@ function buildSeerrApiUrl(baseUrl: string, endpoint: string): string {
 
 function isAccessDenied(response: Response): boolean {
 	return response.status === 401 || response.status === 403;
+}
+
+function isStateChangingMethod(method: string | undefined): boolean {
+	const normalized = method?.toUpperCase();
+	return ["POST", "PUT", "PATCH", "DELETE"].includes(normalized ?? "");
 }
 
 async function readJsonResponse(
@@ -329,7 +347,7 @@ async function createSeerrResponseError(
 		return createError(
 			ErrorCode.SEERR_CSRF_REQUIRED,
 			"Seerr rejected the request because CSRF validation is required.",
-			"Seerr requires CSRF validation for this session. Use API-key mode until optional CSRF support is enabled.",
+			"Seerr requires CSRF validation for this session. Enable CSRF support to let ani2arr read only this server's XSRF token.",
 			details,
 		);
 	}

@@ -92,8 +92,14 @@ setups.
 Session mode depends on the browser making the configured Seerr login available
 to extension background requests. Third-party-cookie blocking, Firefox
 Containers, incognito separation, or other browser privacy settings may prevent
-that. Seerr installations with CSRF protection may also reject state-changing
-requests; advanced API-key mode is the current workaround.
+that.
+
+If a CSRF-protected Seerr server rejects a request, ani2arr can ask for optional
+browser cookie permission after the user clicks **Enable CSRF support**. With
+that permission, ani2arr reads only the configured server's readable
+`XSRF-TOKEN` cookie and sends it in Seerr's XSRF request header. It does not read
+or expose the HTTP-only session cookie. Denial leaves advanced API-key mode
+available.
 
 ### 3. AniList GraphQL
 

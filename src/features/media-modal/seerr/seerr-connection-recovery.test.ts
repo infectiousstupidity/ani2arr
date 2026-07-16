@@ -41,7 +41,6 @@ describe("Seerr connection recovery", () => {
 	it.each([
 		ErrorCode.CONFIGURATION_ERROR,
 		ErrorCode.PERMISSION_ERROR,
-		ErrorCode.SEERR_CSRF_REQUIRED,
 	])("opens settings for %s", (code) => {
 		const action = getSeerrConnectionRecoveryAction({
 			isConfigured: true,
@@ -51,6 +50,18 @@ describe("Seerr connection recovery", () => {
 		expect(action).toBe("settings");
 		expect(getSeerrConnectionRecoveryLabel(action!)).toBe(
 			"Open Seerr settings",
+		);
+	});
+
+	it("offers the explicit optional-permission flow after a CSRF rejection", () => {
+		const action = getSeerrConnectionRecoveryAction({
+			isConfigured: true,
+			errors: [error(ErrorCode.SEERR_CSRF_REQUIRED)],
+		});
+
+		expect(action).toBe("csrf");
+		expect(getSeerrConnectionRecoveryLabel(action!)).toBe(
+			"Enable CSRF support",
 		);
 	});
 

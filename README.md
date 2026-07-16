@@ -165,8 +165,11 @@ profile and try **I have signed in — check again**. If the session remains
 unavailable, use the advanced API-key mode.
 
 Seerr installations with CSRF protection may also reject request creation after
-the session check succeeds. ani2arr reports this separately; the global API-key
-mode is the current workaround.
+the session check succeeds. ani2arr reports this separately and offers an
+explicit **Enable CSRF support** action. Only then does the browser ask for
+optional cookie access so ani2arr can read the configured server's readable
+`XSRF-TOKEN`; the HTTP-only session cookie is never read. The global API-key
+mode remains available if permission is denied.
 
 </details>
 

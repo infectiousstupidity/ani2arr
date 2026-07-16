@@ -23,7 +23,7 @@ import {
   useSeerrActions,
   useSonarrActions,
 } from "./hooks/provider-connection-actions";
-import { useHashRoute } from "./navigation";
+import { hasHashFlag, useHashRoute } from "./navigation";
 import {
   DesktopPageHeader,
   DesktopSidebar,
@@ -121,6 +121,7 @@ const OptionsPageContent = () => {
     sonarrActions.isConnecting ||
     radarrActions.isConnecting ||
     seerrActions.isConnecting;
+  const showSeerrCsrfSupport = hasHashFlag(hash, "enableCsrf");
 
   if (publicOptionsQuery.isLoading || !publicOptionsQuery.data) {
     return (
@@ -185,8 +186,11 @@ const OptionsPageContent = () => {
             connectSeerrApiKey={seerrActions.connectSeerrApiKey}
             connectionError={seerrConnectionError}
             connectionErrorCode={seerrConnectionErrorCode}
+            enableSeerrCsrfSupport={seerrActions.enableSeerrCsrfSupport}
             isConnecting={seerrActions.isConnecting}
+            isCsrfSupportEnabled={seerrActions.isCsrfSupportEnabled}
             openSeerrLogin={seerrActions.openSeerrLogin}
+            showCsrfSupport={showSeerrCsrfSupport}
           />
         );
       }

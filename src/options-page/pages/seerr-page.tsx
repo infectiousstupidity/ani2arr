@@ -9,8 +9,11 @@ import type { ErrorCode } from "@/shared/errors/error.types";
 interface SeerrPageProps {
 	checkSeerrSession: (url: string) => Promise<boolean>;
 	connectSeerrApiKey: (url: string, apiKey: string) => Promise<boolean>;
+	enableSeerrCsrfSupport: () => Promise<boolean>;
 	openSeerrLogin: (url: string) => Promise<boolean>;
 	isConnecting: boolean;
+	isCsrfSupportEnabled: boolean;
+	showCsrfSupport: boolean;
 	connectionError: string | null;
 	connectionErrorCode: ErrorCode | null;
 }
@@ -20,17 +23,23 @@ export const SeerrPage = ({
 	connectSeerrApiKey,
 	connectionError,
 	connectionErrorCode,
+	enableSeerrCsrfSupport,
 	isConnecting,
+	isCsrfSupportEnabled,
 	openSeerrLogin,
+	showCsrfSupport,
 }: SeerrPageProps) => (
 	<div className="space-y-10 md:space-y-12">
 		<SeerrConnectionForm
 			error={connectionError}
 			errorCode={connectionErrorCode}
 			isConnecting={isConnecting}
+			isCsrfSupportEnabled={isCsrfSupportEnabled}
 			onCheckSession={checkSeerrSession}
 			onConnectApiKey={connectSeerrApiKey}
+			onEnableCsrfSupport={enableSeerrCsrfSupport}
 			onOpenLogin={openSeerrLogin}
+			showCsrfSupport={showCsrfSupport}
 		/>
 		<SettingsSection
 			title="Request behavior"

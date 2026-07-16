@@ -27,11 +27,15 @@ import {
 import { normalizeProviderConnectionInput } from "@/settings/provider-config";
 import {
 	buildSeerrLoginUrl,
+	getSeerrConnection,
 	normalizeSeerrApiKeyConnectionInput,
 	normalizeSeerrUrlInput,
 } from "@/settings/seerr-config";
+import { removeSeerrCsrfCookiePermission } from "@/providers/seerr/csrf-token";
+import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 import { getActionErrorMessage } from "./action-helpers";
+import { requestSeerrCsrfCookiePermission } from "./seerr-csrf-permission";
 
 type FetchFormResources = (
 	api: Ani2arrApi,
@@ -228,6 +232,7 @@ export function useSeerrActions() {
 	const [error, setError] = useState<string | null>(null);
 	const [errorCode, setErrorCode] = useState<ErrorCode | null>(null);
 	const [openedLoginUrl, setOpenedLoginUrl] = useState<string | null>(null);
+	const [isCsrfSupportEnabled, setIsCsrfSupportEnabled] = useState(false);
 
 	const checkSeerrSession = useCallback(
 		async (draftUrl: string) => {
@@ -344,8 +349,10 @@ export function useSeerrActions() {
 					currentSettings.seerr.url,
 					newSettings,
 				);
+				await removeSeerrCsrfCookiePermission();
 
 				setOpenedLoginUrl(null);
+				setIsCsrfSupportEnabled(false);
 				return true;
 			} catch (error_) {
 				setErrorCode(getExtensionErrorCode(error_));
@@ -383,6 +390,37 @@ export function useSeerrActions() {
 		}
 	}, []);
 
+	const enableSeerrCsrfSupport = useCallback(async () => {
+		const connection = getSeerrConnection(currentSettings);
+		if (!connection || connection.auth.mode !== "session") return false;
+
+		setIsConnecting(true);
+		setError(null);
+		setErrorCode(null);
+
+		try {
+			const granted = await requestSeerrCsrfCookiePermission();
+			if (!granted) {
+				throw createError(
+					ErrorCode.PERMISSION_ERROR,
+					"Optional cookie permission was denied.",
+					"Cookie access was denied. API-key mode remains available.",
+				);
+			}
+
+			setIsCsrfSupportEnabled(true);
+			return true;
+		} catch (error_) {
+			setErrorCode(getExtensionErrorCode(error_));
+			setError(
+				getActionErrorMessage(error_, "Failed to enable Seerr CSRF support."),
+			);
+			return false;
+		} finally {
+			setIsConnecting(false);
+		}
+	}, [currentSettings]);
+
 	const disconnectSeerr = useCallback(async () => {
 		if (!currentSettings) return false;
 
@@ -398,7 +436,9 @@ export function useSeerrActions() {
 
 			queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
 			await cleanupUnusedProviderHostPermission(oldUrl, newSettings);
+			await removeSeerrCsrfCookiePermission();
 			setOpenedLoginUrl(null);
+			setIsCsrfSupportEnabled(false);
 
 			return true;
 		} catch (error_) {
@@ -414,8 +454,10 @@ export function useSeerrActions() {
 		checkSeerrSession,
 		connectSeerrApiKey,
 		openSeerrLogin,
+		enableSeerrCsrfSupport,
 		disconnectSeerr,
 		isConnecting,
+		isCsrfSupportEnabled,
 		error,
 		errorCode,
 	};
