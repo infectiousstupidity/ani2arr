@@ -6,19 +6,16 @@ import { parseAniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import { sourceIdentityKey } from "@/mapping/source-identity";
-import {
-	parseAniBridgeAniListCrosswalks,
-	parseAniBridgeEntries,
-} from "@/mapping/upstream/anibridge.parser";
+import { parseAniBridgeData } from "@/mapping/upstream/anibridge.parser";
 
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
 
-describe("parseAniBridgeEntries", () => {
+describe("parseAniBridgeData entries", () => {
 	it("parses supported target kinds and preserves optional season scope", () => {
-		const entries = parseAniBridgeEntries({
+		const { entries } = parseAniBridgeData({
 			"anidb:1:R": {
 				"anilist:1": {},
 				"tmdb_movie:300": {},
@@ -37,7 +34,7 @@ describe("parseAniBridgeEntries", () => {
 	});
 
 	it("deduplicates exact targets but preserves distinct season scope", () => {
-		const entries = parseAniBridgeEntries({
+		const { entries } = parseAniBridgeData({
 			"anidb:1:R": {
 				"anilist:1": {},
 				"tvdb_show:700:s0": {},
@@ -58,7 +55,7 @@ describe("parseAniBridgeEntries", () => {
 	});
 
 	it("ignores malformed and unsupported target descriptors", () => {
-		const entries = parseAniBridgeEntries({
+		const { entries } = parseAniBridgeData({
 			"anidb:1:R": {
 				"anilist:1": {},
 				"tmdb_movie:300:s1": {},
@@ -73,9 +70,9 @@ describe("parseAniBridgeEntries", () => {
 	});
 });
 
-describe("parseAniBridgeAniListCrosswalks", () => {
+describe("parseAniBridgeData AniList crosswalks", () => {
 	it("builds unique MAL to AniList crosswalks from same-row targets", () => {
-		const crosswalks = parseAniBridgeAniListCrosswalks({
+		const { aniListCrosswalks } = parseAniBridgeData({
 			"anidb:5114:R": {
 				"anilist:21": {},
 				"mal:5114": {},
@@ -84,12 +81,14 @@ describe("parseAniBridgeAniListCrosswalks", () => {
 		});
 
 		expect(
-			crosswalks[sourceIdentityKey({ source: "mal", id: mal(5114) })],
+			aniListCrosswalks[
+				sourceIdentityKey({ source: "mal", id: mal(5114) })
+			],
 		).toBe(aid(21));
 	});
 
 	it("does not build ambiguous MAL to AniList crosswalks", () => {
-		const crosswalks = parseAniBridgeAniListCrosswalks({
+		const { aniListCrosswalks } = parseAniBridgeData({
 			"anidb:5114:R": {
 				"anilist:21": {},
 				"anilist:22": {},
@@ -97,11 +96,11 @@ describe("parseAniBridgeAniListCrosswalks", () => {
 			},
 		});
 
-		expect(crosswalks).toEqual({});
+		expect(aniListCrosswalks).toEqual({});
 	});
 
 	it("ignores scoped MAL source descriptors", () => {
-		const crosswalks = parseAniBridgeAniListCrosswalks({
+		const { aniListCrosswalks } = parseAniBridgeData({
 			"anidb:5114:R": {
 				"anilist:21": {},
 				"mal:5114:s1": {},
@@ -109,6 +108,6 @@ describe("parseAniBridgeAniListCrosswalks", () => {
 			},
 		});
 
-		expect(crosswalks).toEqual({});
+		expect(aniListCrosswalks).toEqual({});
 	});
 });

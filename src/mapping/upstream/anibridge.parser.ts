@@ -17,16 +17,6 @@ export type ParsedAniBridgeData = {
 	aniListCrosswalks: AniListCrosswalkMappings;
 };
 
-export function parseAniBridgeEntries(payload: unknown): AniBridgeEntries {
-	return parseAniBridgeData(payload).entries;
-}
-
-export function parseAniBridgeAniListCrosswalks(
-	payload: unknown,
-): AniListCrosswalkMappings {
-	return parseAniBridgeData(payload).aniListCrosswalks;
-}
-
 export function parseAniBridgeData(payload: unknown): ParsedAniBridgeData {
 	const entries: AniBridgeEntries = {};
 	const aniListCrosswalks: AniListCrosswalkMappings = {};
