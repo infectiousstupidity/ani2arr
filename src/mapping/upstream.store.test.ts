@@ -311,10 +311,16 @@ describe("refreshUpstreamMappings", () => {
 		await expect(listSourceUpstreamMappings()).resolves.toEqual([
 			{
 				source: { source: "anilist", id: aid(1) },
+				anilistId: aid(1),
 				targets: [
 					{ provider: "radarr", providerId: tmdb(300) },
 					...sonarrTargets,
 				],
+			},
+			{
+				source: { source: "anilist", id: aid(2) },
+				anilistId: aid(2),
+				targets: [],
 			},
 		]);
 	});
@@ -479,8 +485,12 @@ describe("refreshUpstreamMappings", () => {
 		);
 		await expect(getUpstreamTargets("radarr", source)).resolves.toEqual([]);
 		await expect(listSourceUpstreamMappings()).resolves.toEqual([
-			{ source: { source: "anilist", id: aid(21) }, targets },
-			{ source, targets },
+			{
+				source: { source: "anilist", id: aid(21) },
+				anilistId: aid(21),
+				targets,
+			},
+			{ source, anilistId: aid(21), targets },
 		]);
 	});
 

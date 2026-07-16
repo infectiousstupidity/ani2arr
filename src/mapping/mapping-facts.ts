@@ -14,8 +14,8 @@ import {
 	type SourceIdentity,
 } from "./source-identity";
 import {
-	getUniqueAniListIdForSource,
 	listSourceUpstreamMappings,
+	type UpstreamSourceFact,
 } from "./upstream.store";
 import type { AutoResult, MappingResult, UpstreamTarget } from "./types";
 
@@ -26,36 +26,31 @@ type MappingCandidates = {
 	auto: AutoResult | null;
 };
 
-export type ActiveMappingRecord = {
+export type EffectiveMappingRecord = {
 	source: SourceIdentity;
 	anilistId: AniListId | null;
+	provider: Provider;
 	result: MappingResult;
-	upstreamTargets: UpstreamTarget[];
-};
-
-export type ActiveMappingUpstreamRecord = {
-	source: SourceIdentity;
-	anilistId: AniListId | null;
-	targets: readonly UpstreamTarget[];
 };
 
 type UpstreamTargetSelector = (
-	records: readonly ActiveMappingUpstreamRecord[],
+	records: readonly UpstreamSourceFact[],
 ) =>
 	| Promise<ReadonlyMap<string, readonly UpstreamTarget[]>>
 	| ReadonlyMap<string, readonly UpstreamTarget[]>;
 
-type CollectActiveMappingFactsOptions = {
+type CollectEffectiveMappingRecordsOptions = {
+	upstreamFacts?: readonly UpstreamSourceFact[];
 	selectUpstreamTargets?: UpstreamTargetSelector;
 };
 
-export async function collectActiveMappingFacts(
+export async function collectEffectiveMappingRecords(
 	provider: Provider,
-	options: CollectActiveMappingFactsOptions = {},
-): Promise<ActiveMappingRecord[]> {
+	options: CollectEffectiveMappingRecordsOptions = {},
+): Promise<EffectiveMappingRecord[]> {
 	const [manualRecords, upstreamRecords, autoRecords] = await Promise.all([
 		listSourceManualFacts(provider),
-		listSourceUpstreamMappings(),
+		options.upstreamFacts ?? listSourceUpstreamMappings(),
 		listSourceAutoResults(provider),
 	]);
 
@@ -74,23 +69,21 @@ export async function collectActiveMappingFacts(
 	const sourcesByKey = new Map(
 		[
 			...manualRecords.map((record) => record.source),
-			...upstreamRecords.map((record) => record.source),
+			...upstreamRecords.flatMap((record) =>
+				record.targets.length === 0 ? [] : [record.source],
+			),
 			...autoRecords.map((record) => record.source),
 		].map((source) => [sourceIdentityKey(source), source]),
 	);
-	const anilistIdsBySourceKey = await getAniListIdsBySourceKey(
-		[...sourcesByKey.values()],
-	);
-	const linkedUpstreamRecords = upstreamRecords.map(
-		(record): ActiveMappingUpstreamRecord => ({
-			source: record.source,
-			anilistId: anilistIdsBySourceKey.get(sourceIdentityKey(record.source)) ?? null,
-			targets: record.targets,
-		}),
+	const anilistIdsBySourceKey = new Map(
+		upstreamRecords.map((record) => [
+			sourceIdentityKey(record.source),
+			record.anilistId,
+		]),
 	);
 	const upstreamBySourceKey = await getUpstreamTargetsBySourceKey(
 		provider,
-		linkedUpstreamRecords,
+		upstreamRecords,
 		options,
 	);
 	const sourceKeys = new Set([
@@ -99,7 +92,7 @@ export async function collectActiveMappingFacts(
 		...autoBySourceKey.keys(),
 	]);
 
-	return [...sourceKeys].flatMap((sourceKey): ActiveMappingRecord[] => {
+	return [...sourceKeys].flatMap((sourceKey): EffectiveMappingRecord[] => {
 		const source = sourcesByKey.get(sourceKey);
 		if (!source) return [];
 
@@ -108,40 +101,26 @@ export async function collectActiveMappingFacts(
 		return [
 			{
 				source,
-				anilistId: anilistIdsBySourceKey.get(sourceKey) ?? null,
+				anilistId:
+					source.source === "anilist"
+						? source.id
+						: (anilistIdsBySourceKey.get(sourceKey) ?? null),
+				provider,
 				result: chooseMappingResult({
 					provider,
 					manual: manualBySourceKey.get(sourceKey) ?? null,
 					upstream: upstreamTargets,
 					auto: autoBySourceKey.get(sourceKey) ?? null,
 				}),
-				upstreamTargets,
 			},
 		];
 	});
 }
 
-async function getAniListIdsBySourceKey(
-	sources: readonly SourceIdentity[],
-): Promise<ReadonlyMap<string, AniListId>> {
-	const records = await Promise.all(
-		sources.map(async (source): Promise<[string, AniListId] | null> => {
-			const anilistId =
-				source.source === "anilist"
-					? source.id
-					: await getUniqueAniListIdForSource(source);
-
-			return anilistId === null ? null : [sourceIdentityKey(source), anilistId];
-		}),
-	);
-
-	return new Map(records.flatMap((record) => (record === null ? [] : [record])));
-}
-
 async function getUpstreamTargetsBySourceKey(
 	provider: Provider,
-	records: readonly ActiveMappingUpstreamRecord[],
-	options: CollectActiveMappingFactsOptions,
+	records: readonly UpstreamSourceFact[],
+	options: CollectEffectiveMappingRecordsOptions,
 ): Promise<ReadonlyMap<string, readonly UpstreamTarget[]>> {
 	if (options.selectUpstreamTargets) {
 		return options.selectUpstreamTargets(records);

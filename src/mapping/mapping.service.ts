@@ -23,7 +23,7 @@ import {
 import type { MappingResult } from "./types";
 import {
 	chooseMappingResult,
-	collectActiveMappingFacts,
+	collectEffectiveMappingRecords,
 	matchesUpstream,
 } from "./mapping-facts";
 
@@ -192,7 +192,7 @@ export class MappingService {
 			return new Map();
 		}
 
-		const activeRecords = await collectActiveMappingFacts(provider);
+		const activeRecords = await collectEffectiveMappingRecords(provider);
 		const linkedAniListIdsByProviderId = new Map<number, Set<AniListId>>();
 
 		for (const record of activeRecords) {
