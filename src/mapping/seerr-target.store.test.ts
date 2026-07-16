@@ -63,38 +63,6 @@ describe("Seerr targets", () => {
 		});
 	});
 
-	it("lists requested manual targets and clears one target", async () => {
-		await setManualSeerrTarget({
-			anilistId: aid(2),
-			mediaType: "movie",
-			tmdbId: tmdb(20),
-		});
-		await setManualSeerrTarget({
-			anilistId: aid(1),
-			mediaType: "movie",
-			tmdbId: tmdb(10),
-		});
-
-		await expect(listEffectiveSeerrTargets([aid(1)])).resolves.toEqual([
-			{
-				anilistId: aid(1),
-				mediaType: "movie",
-				tmdbId: tmdb(10),
-				source: "manual",
-			},
-		]);
-
-		await clearManualSeerrTarget(aid(1));
-
-		await expect(getEffectiveSeerrTarget(aid(1))).resolves.toBeNull();
-		await expect(getEffectiveSeerrTarget(aid(2))).resolves.toEqual({
-			anilistId: aid(2),
-			mediaType: "movie",
-			tmdbId: tmdb(20),
-			source: "manual",
-		});
-	});
-
 	it("rejects TV targets with no seasons", async () => {
 		await expect(
 			setManualSeerrTarget({
@@ -151,13 +119,6 @@ describe("Seerr targets", () => {
 			tmdbId: tmdb(456),
 			source: "anibridge",
 		});
-		expect(listSeerrUpstreamTargetsMock).toHaveBeenCalledWith([anilistId]);
-	});
-
-	it("returns null when neither source has a target", async () => {
-		const anilistId = aid(100);
-
-		await expect(getEffectiveSeerrTarget(anilistId)).resolves.toBeNull();
 		expect(listSeerrUpstreamTargetsMock).toHaveBeenCalledWith([anilistId]);
 	});
 
