@@ -6,7 +6,10 @@ import {
 	type AniListId,
 	type AniListMetadata,
 } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/source-identity";
+import {
+	sourceIdentityKey,
+	type SourceIdentity,
+} from "@/mapping/source-identity";
 import type { MappingResult, MappingSource } from "@/mapping/types";
 import type { Provider } from "@/providers/types";
 import {
@@ -42,23 +45,28 @@ export type MappingListItem =
 	  };
 
 export type IgnoreAction =
-	| { kind: "set-ignore"; anilistId: AniListId; provider: Provider }
-	| { kind: "clear-ignore"; anilistId: AniListId; provider: Provider };
+	| ({ kind: "set-ignore" } & Pick<
+			MappingRow,
+			"source" | "anilistId" | "provider"
+	  >)
+	| ({ kind: "clear-ignore" } & Pick<
+			MappingRow,
+			"source" | "anilistId" | "provider"
+	  >);
 
 export type ClearMatchAction =
-	| { kind: "clear-manual"; anilistId: AniListId; provider: Provider }
-	| {
-			kind: "reject-candidate";
-			anilistId: AniListId;
-			provider: Provider;
-			providerId: number;
-	  }
-	| {
-			kind: "clear-rejected";
-			anilistId: AniListId;
-			provider: Provider;
-			providerId: number;
-	  };
+	| ({ kind: "clear-manual" } & Pick<
+			MappingRow,
+			"source" | "anilistId" | "provider"
+	  >)
+	| ({ kind: "reject-candidate"; providerId: number } & Pick<
+			MappingRow,
+			"source" | "anilistId" | "provider"
+	  >)
+	| ({ kind: "clear-rejected"; providerId: number } & Pick<
+			MappingRow,
+			"source" | "anilistId" | "provider"
+	  >);
 
 type ProviderMetaType = NonNullable<MappingRow["providerMeta"]>["type"];
 
@@ -263,7 +271,7 @@ export const getMappingListModel = (input: {
 		for (const [index, row] of group.rows.entries()) {
 			items.push({
 				kind: "row",
-				key: `row:${group.key}:${row.provider}:${row.anilistId}`,
+				key: `row:${group.key}:${row.provider}:${sourceIdentityKey(row.source)}`,
 				row,
 				parentProviderId: group.providerId,
 				isLastInGroup: index === group.rows.length - 1,
@@ -280,8 +288,16 @@ export const getMappingListModel = (input: {
 };
 
 export const getRowKey = (
-	row: Pick<MappingRow, "provider" | "anilistId">,
-): string => `${row.provider}:${row.anilistId}`;
+	row: Pick<MappingRow, "provider" | "source">,
+): string => `${row.provider}:${sourceIdentityKey(row.source)}`;
+
+export const getMappingRowMutationInput = (
+	row: MappingRow,
+): Pick<MappingRow, "source" | "anilistId" | "provider"> => ({
+	source: row.source,
+	anilistId: row.anilistId,
+	provider: row.provider,
+});
 
 export const formatMappingStatusLabel = (
 	status: MappingListRowStatus,

@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from "react";
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { parseTvdbIdOrNull } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
 import type { TvdbId } from "@/providers/schemas";
@@ -174,9 +175,10 @@ function getCurrentTarget(input: {
 
 function useSonarrModalData(input: {
 	anilistId: AniListId;
+	source?: SourceIdentity | undefined;
 	metadataHint: MediaModalMetadataHint | null;
 }): SonarrModalData {
-	const { anilistId, metadataHint } = input;
+	const { anilistId, source, metadataHint } = input;
 	const base = useMediaModalBaseData({ anilistId, metadataHint });
 	const options = base.options;
 	const isConfigured = options?.providers.sonarr.isConfigured === true;
@@ -184,11 +186,12 @@ function useSonarrModalData(input: {
 
 	const statusPayload = useMemo(
 		() => ({
+			...(source === undefined ? {} : { source }),
 			anilistId,
 			...(base.statusTitle === undefined ? {} : { title: base.statusTitle }),
 			metadata: base.statusMetadata,
 		}),
-		[anilistId, base.statusMetadata, base.statusTitle],
+		[anilistId, base.statusMetadata, base.statusTitle, source],
 	);
 	const sonarrStatus = useSeriesStatus(statusPayload, {
 		enabled: isConfigured && base.statusReady,
@@ -237,6 +240,7 @@ export function SonarrModal({
 	const contentContainer = useContentPortalContainer();
 	const data = useSonarrModalData({
 		anilistId,
+		source,
 		metadataHint: metadataHint ?? null,
 	});
 	const inspection = useMappingInspection(
@@ -277,6 +281,7 @@ export function SonarrModal({
 	const setupForm = useSonarrSetupForm({
 		formId: SETUP_FORM_ID,
 		anilistId,
+		source,
 		target: setupTarget,
 		providerPayloadTitle: data.providerPayloadTitle,
 		fallbackLookupTitle: data.fallbackLookupTitle,

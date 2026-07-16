@@ -81,7 +81,7 @@ export const useSonarrFormResources = (options?: {
 };
 
 export const useSeriesStatus = (
-	payload: Pick<StatusInput, "anilistId" | "title" | "metadata">,
+	payload: SourceRpcInput & Pick<StatusInput, "title" | "metadata">,
 	options?: {
 		enabled?: boolean;
 		force_verify?: boolean;
@@ -93,7 +93,7 @@ export const useSeriesStatus = (
 	const forceStatusRefresh = forceVerify || forceMappingRetry;
 	const source = sourceFromInput(payload);
 	const statusKeyInput = {
-		source,
+		...mutationSourceInput(payload),
 		...(payload.title === undefined ? {} : { title: payload.title }),
 		...(payload.metadata === undefined ? {} : { metadata: payload.metadata }),
 	};

@@ -15,6 +15,10 @@ import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import type { Provider } from "@/providers/types";
 import type { MappingList } from "@/mapping/list-mappings";
 import {
+	getMappingRowMutationInput,
+	type MappingRow,
+} from "@/options-page/pages/mappings/mapping-page-model";
+import {
 	mappingService,
 	radarrLibrary,
 	sonarrLibrary,
@@ -291,6 +295,11 @@ describe("mappingHandlers", () => {
 					anilistId: aid(51),
 					result: { kind: "ignored" },
 				},
+				{
+					source: { source: "mal", id: mal(5114) },
+					anilistId: aid(51),
+					result: { kind: "ignored" },
+				},
 			],
 			unmapped: [
 				{
@@ -304,7 +313,13 @@ describe("mappingHandlers", () => {
 
 		const result = await mappingHandlers.getMappings();
 
-		expect(result.groups).toHaveLength(3);
+		expect(result.groups).toHaveLength(4);
+		expect(result.groups.map((group) => group.key)).toEqual(
+			expect.arrayContaining([
+				"sonarr:ignored:anilist:51",
+				"sonarr:ignored:mal:5114",
+			]),
+		);
 		expect(result.groups).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
@@ -348,6 +363,27 @@ describe("mappingHandlers", () => {
 			{ source: "mal", id: mal(5114) },
 			tvdb(20),
 		);
+	});
+
+	it("keeps a MAL row source in quick-action RPC input", async () => {
+		const row: MappingRow = {
+			source: { source: "mal", id: mal(5114) },
+			anilistId: aid(10),
+			provider: "sonarr",
+			providerId: null,
+			result: { kind: "unmapped", hadResolveAttempt: false },
+			isInLibrary: false,
+			mappingRowStatus: "unmapped",
+		};
+
+		await expect(
+			mappingHandlers.setMappingIgnore(getMappingRowMutationInput(row)),
+		).resolves.toEqual({ ok: true });
+
+		expect(mappingService.setIgnored).toHaveBeenCalledWith("sonarr", {
+			source: "mal",
+			id: mal(5114),
+		});
 	});
 
 	it("exposes a narrow upstream refresh handler", async () => {

@@ -21,6 +21,7 @@ import {
 	type UnmappedMappingListEntry,
 } from "@/mapping/list-mappings";
 import type { MappingResult } from "@/mapping/types";
+import { sourceIdentityKey } from "@/mapping/source-identity";
 import {
 	getUniqueAniListIdForSource,
 	refreshUpstreamMappings as refreshStoredUpstreamMappings,
@@ -226,7 +227,7 @@ function buildMappingGroups({
 			};
 
 			return {
-				key: `${provider}:ambiguous:${entry.anilistId}`,
+				key: `${provider}:ambiguous:${sourceIdentityKey(entry.source)}`,
 				provider,
 				providerId: providerId ?? null,
 				rows: [row],
@@ -247,7 +248,7 @@ function buildMappingGroups({
 			};
 
 			return {
-				key: `${provider}:ignored:${entry.anilistId}`,
+				key: `${provider}:ignored:${sourceIdentityKey(entry.source)}`,
 				provider,
 				providerId: null,
 				rows: [row],
@@ -267,7 +268,7 @@ function buildMappingGroups({
 			};
 
 			return {
-				key: `${provider}:unmapped:${entry.anilistId}`,
+				key: `${provider}:unmapped:${sourceIdentityKey(entry.source)}`,
 				provider,
 				providerId: null,
 				rows: [row],
