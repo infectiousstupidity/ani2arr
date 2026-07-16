@@ -108,7 +108,24 @@ export function migrateLegacySeerrConnection(
 	value: unknown,
 ): SeerrConnection {
 	const current = v.safeParse(SeerrConnectionSchema, value);
-	if (current.success) return current.output;
+	if (current.success) {
+		const account = current.output.account;
+		return {
+			url: current.output.url,
+			auth: current.output.auth,
+			...(account
+				? {
+						account: {
+							id: account.id,
+							displayName: account.displayName,
+							...(account.avatar === undefined
+								? {}
+								: { avatar: account.avatar }),
+						},
+					}
+				: {}),
+		};
+	}
 
 	if (!isRecord(value)) return createDefaultSeerrConnection();
 

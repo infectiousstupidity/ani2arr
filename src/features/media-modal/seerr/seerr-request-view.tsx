@@ -12,6 +12,7 @@ import {
 } from "@/queries/seerr";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { RequestInSeerrInput, SeerrRequestTarget } from "@/rpc/types";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import type { MediaModalContainer } from "../types";
 import { ModalShell } from "../chrome/modal-shell";
 import { SeerrFooter } from "./seerr-footer";
@@ -48,11 +49,6 @@ function buildRequestInput(input: {
 		...(input.target.tvdbId === undefined ? {} : { tvdbId: input.target.tvdbId }),
 		seasons: [...input.selectedSeasons],
 	};
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) return error.message;
-	return fallback;
 }
 
 export function SeerrRequestView(props: {
@@ -113,7 +109,7 @@ export function SeerrRequestView(props: {
 			? selectedSeasonDraft.seasons
 			: defaultSelectedSeasons;
 	const requestError = request.error
-		? getErrorMessage(request.error, "Failed to request in Seerr.")
+		? getUserErrorMessage(request.error, "Failed to request in Seerr.")
 		: null;
 	const isMovieRequestable =
 		target?.mediaType === "movie" &&

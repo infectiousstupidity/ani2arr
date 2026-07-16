@@ -4,23 +4,33 @@
 import { SeerrIcon } from "../components/icons";
 import { SeerrConnectionForm } from "../components/seerr-connection-form";
 import { SettingsSection } from "../components/settings-section";
+import type { ErrorCode } from "@/shared/errors/error.types";
 
 interface SeerrPageProps {
-	connectSeerr: (url: string, apiKey: string) => Promise<boolean>;
+	checkSeerrSession: (url: string) => Promise<boolean>;
+	connectSeerrApiKey: (url: string, apiKey: string) => Promise<boolean>;
+	openSeerrLogin: (url: string) => Promise<boolean>;
 	isConnecting: boolean;
 	connectionError: string | null;
+	connectionErrorCode: ErrorCode | null;
 }
 
 export const SeerrPage = ({
-	connectSeerr,
+	checkSeerrSession,
+	connectSeerrApiKey,
 	connectionError,
+	connectionErrorCode,
 	isConnecting,
+	openSeerrLogin,
 }: SeerrPageProps) => (
 	<div className="space-y-10 md:space-y-12">
 		<SeerrConnectionForm
-			onConnect={connectSeerr}
 			error={connectionError}
+			errorCode={connectionErrorCode}
 			isConnecting={isConnecting}
+			onCheckSession={checkSeerrSession}
+			onConnectApiKey={connectSeerrApiKey}
+			onOpenLogin={openSeerrLogin}
 		/>
 		<SettingsSection
 			title="Request behavior"

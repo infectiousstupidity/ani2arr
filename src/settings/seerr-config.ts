@@ -13,9 +13,22 @@ import type {
 import { createDefaultSeerrConnection } from "./schema";
 import type { ExtensionOptions } from "./types";
 
-export type NormalizedSeerrConnection = SeerrConnection & {
+type NormalizedSeerrSessionConnection = {
+	url: string;
+	auth: { mode: "session" };
+	account: SeerrAccountSummary;
 	permissionPattern: string;
 };
+
+type NormalizedSeerrApiKeyConnection = {
+	url: string;
+	auth: { mode: "apiKey"; apiKey: string };
+	permissionPattern: string;
+};
+
+export type NormalizedSeerrConnection =
+	| NormalizedSeerrSessionConnection
+	| NormalizedSeerrApiKeyConnection;
 
 export function getSeerrConnectionDraft(
 	settings: ExtensionOptions | undefined,
@@ -118,7 +131,7 @@ export function normalizeSeerrConnectionInput(
 export function normalizeSeerrApiKeyConnectionInput(input: {
 	url: string;
 	apiKey: string;
-}): NormalizedSeerrConnection {
+}): NormalizedSeerrApiKeyConnection {
 	const normalized = normalizeSeerrConnectionInput({
 		url: input.url,
 		auth: {
@@ -129,7 +142,17 @@ export function normalizeSeerrApiKeyConnectionInput(input: {
 	if (!normalized) {
 		throw new Error("Please enter a valid Seerr URL and API key.");
 	}
-	return normalized;
+	if (normalized.auth.mode !== "apiKey") {
+		throw new Error("Please enter a valid Seerr URL and API key.");
+	}
+	return {
+		url: normalized.url,
+		auth: {
+			mode: "apiKey",
+			apiKey: normalized.auth.apiKey,
+		},
+		permissionPattern: normalized.permissionPattern,
+	};
 }
 
 export function normalizeSeerrConnectionSettings(
@@ -148,11 +171,22 @@ export function getSeerrConnection(
 ): SeerrConnection | null {
 	const normalized = normalizeSeerrConnectionSettings(settings);
 	if (!normalized) return null;
+	return toSeerrConnection(normalized);
+}
 
+export function toSeerrConnection(
+	normalized: NormalizedSeerrConnection,
+): SeerrConnection {
+	if ("account" in normalized) {
+		return {
+			url: normalized.url,
+			auth: normalized.auth,
+			account: normalized.account,
+		};
+	}
 	return {
 		url: normalized.url,
 		auth: normalized.auth,
-		...(normalized.account ? { account: normalized.account } : {}),
 	};
 }
 

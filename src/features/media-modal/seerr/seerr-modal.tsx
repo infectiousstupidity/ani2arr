@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { SeerrMediaDetails, SeerrSearchResult } from "@/providers/seerr/types";
 import { useSeerrMediaDetails, useSeerrTarget } from "@/queries/seerr";
 import type { SeerrRequestTarget } from "@/rpc/types";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import type { MappingConnectorState } from "../chrome/mapping-connector";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
@@ -14,11 +15,6 @@ import { SeerrHeader } from "./seerr-header";
 import { SeerrRequestView } from "./seerr-request-view";
 
 type SeerrView = "request" | "change-target";
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) return error.message;
-	return fallback;
-}
 
 function getConnectorState(input: {
 	view: SeerrView;
@@ -60,7 +56,10 @@ export function SeerrModal({
 	});
 	const details = detailsQuery.data ?? null;
 	const detailsError = detailsQuery.error
-		? getErrorMessage(detailsQuery.error, "Failed to load Seerr media details.")
+		? getUserErrorMessage(
+				detailsQuery.error,
+				"Failed to load Seerr media details.",
+			)
 		: null;
 	const targetTitle = getTargetTitle({ target, details });
 	const header = (

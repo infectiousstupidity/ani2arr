@@ -2,7 +2,12 @@
 // src/options-page/hooks/provider-connection-actions.ts
 
 import { useCallback, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { browser } from "wxt/browser";
+import {
+	type QueryClient,
+	useQueryClient,
+} from "@tanstack/react-query";
+import type { SeerrConnection } from "@/providers/seerr/types";
 import type {
 	Provider,
 	ProviderCredentials,
@@ -20,7 +25,12 @@ import {
 	requestProviderConnectionPermission,
 } from "@/settings/provider-permissions";
 import { normalizeProviderConnectionInput } from "@/settings/provider-config";
-import { normalizeSeerrConnectionInput } from "@/settings/seerr-config";
+import {
+	buildSeerrLoginUrl,
+	normalizeSeerrApiKeyConnectionInput,
+	normalizeSeerrUrlInput,
+} from "@/settings/seerr-config";
+import { ErrorCode } from "@/shared/errors/error.types";
 import { getActionErrorMessage } from "./action-helpers";
 
 type FetchFormResources = (
@@ -39,6 +49,28 @@ const fetchSonarrFormResources: FetchFormResources = (api, credentials) =>
 
 const fetchRadarrFormResources: FetchFormResources = (api, credentials) =>
 	api.getRadarrFormResources({ credentials });
+
+async function refreshSeerrMappings(
+	api: Ani2arrApi,
+	queryClient: QueryClient,
+): Promise<void> {
+	queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
+	try {
+		await api.initMappings();
+		queryClient.invalidateQueries({
+			queryKey: queryKeys.mappingIdentitiesRoot(),
+		});
+		queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+		queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
+	} catch {
+		// Seerr remains usable if the upstream mapping refresh is temporarily unavailable.
+	}
+}
+
+function getExtensionErrorCode(error: unknown): ErrorCode | null {
+	if (!error || typeof error !== "object" || !("code" in error)) return null;
+	return typeof error.code === "string" ? (error.code as ErrorCode) : null;
+}
 
 function useProviderConnectionActions({
 	provider,
@@ -194,21 +226,21 @@ export function useSeerrActions() {
 
 	const [isConnecting, setIsConnecting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [errorCode, setErrorCode] = useState<ErrorCode | null>(null);
+	const [openedLoginUrl, setOpenedLoginUrl] = useState<string | null>(null);
 
-	const connectSeerr = useCallback(
-		async (draftUrl: string, draftApiKey: string) => {
+	const checkSeerrSession = useCallback(
+		async (draftUrl: string) => {
 			if (!currentSettings) return false;
 
 			setIsConnecting(true);
 			setError(null);
+			setErrorCode(null);
 
 			try {
-				const normalized = normalizeSeerrConnectionInput({
-					url: draftUrl,
-					apiKey: draftApiKey,
-				});
+				const normalized = normalizeSeerrUrlInput(draftUrl);
 				if (!normalized) {
-					throw new Error("Please enter a valid Seerr URL and API key.");
+					throw new Error("Please enter a valid Seerr URL.");
 				}
 
 				const permission = await requestProviderConnectionPermission(
@@ -218,35 +250,111 @@ export function useSeerrActions() {
 					throw new Error("Host permission was denied.");
 				}
 
-				const credentials = {
-					url: normalized.url,
-					apiKey: normalized.apiKey,
-				};
 				const api = getAni2arrApi();
-				await api.testSeerrConnection({ credentials });
+				const { account } = await api.checkSeerrSession({
+					url: normalized.url,
+				});
+				const connection: SeerrConnection = {
+					url: normalized.url,
+					auth: { mode: "session" },
+					account,
+				};
 				const newSettings = await saveSeerrConnection.mutateAsync({
-					credentials,
+					connection,
 				});
 
-				queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
-					try {
-						await api.initMappings();
-						queryClient.invalidateQueries({
-							queryKey: queryKeys.mappingIdentitiesRoot(),
-						});
-						queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-						queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
-					} catch {
-					// Seerr remains usable if the upstream mapping refresh is temporarily unavailable.
-				}
+				await refreshSeerrMappings(api, queryClient);
 				await cleanupUnusedProviderHostPermission(
 					currentSettings.seerr.url,
 					newSettings,
 				);
 
+				setOpenedLoginUrl(null);
 				return true;
 			} catch (error_) {
-				setError(getActionErrorMessage(error_, "Failed to connect to Seerr."));
+				const code = getExtensionErrorCode(error_);
+				const checkedUrl =
+					code === ErrorCode.SEERR_AUTH_REQUIRED
+						? normalizeSeerrUrlInput(draftUrl)?.url ?? null
+						: null;
+				if (
+					code === ErrorCode.SEERR_AUTH_REQUIRED &&
+					openedLoginUrl === checkedUrl
+				) {
+					setErrorCode(ErrorCode.SEERR_SESSION_UNAVAILABLE);
+					setError(
+						"Could not use your Seerr browser session. Make sure you signed in, check third-party-cookie settings for this server, or use API-key mode.",
+					);
+				} else {
+					setErrorCode(code);
+					setError(
+						getActionErrorMessage(
+							error_,
+							"Failed to check the Seerr browser session.",
+						),
+					);
+				}
+				return false;
+			} finally {
+				setIsConnecting(false);
+			}
+		},
+		[
+			currentSettings,
+			openedLoginUrl,
+			queryClient,
+			saveSeerrConnection,
+		],
+	);
+
+	const connectSeerrApiKey = useCallback(
+		async (draftUrl: string, draftApiKey: string) => {
+			if (!currentSettings) return false;
+
+			setIsConnecting(true);
+			setError(null);
+			setErrorCode(null);
+
+			try {
+				const normalized = normalizeSeerrApiKeyConnectionInput({
+					url: draftUrl,
+					apiKey: draftApiKey,
+				});
+				const permission = await requestProviderConnectionPermission(
+					normalized.url,
+				);
+				if (!permission.ok || !permission.value.granted) {
+					throw new Error("Host permission was denied.");
+				}
+
+				const api = getAni2arrApi();
+				await api.testSeerrApiKeyConnection({
+					url: normalized.url,
+					apiKey: normalized.auth.apiKey,
+				});
+				const newSettings = await saveSeerrConnection.mutateAsync({
+					connection: {
+						url: normalized.url,
+						auth: normalized.auth,
+					},
+				});
+
+				await refreshSeerrMappings(api, queryClient);
+				await cleanupUnusedProviderHostPermission(
+					currentSettings.seerr.url,
+					newSettings,
+				);
+
+				setOpenedLoginUrl(null);
+				return true;
+			} catch (error_) {
+				setErrorCode(getExtensionErrorCode(error_));
+				setError(
+					getActionErrorMessage(
+						error_,
+						"Failed to connect to Seerr with the API key.",
+					),
+				);
 				return false;
 			} finally {
 				setIsConnecting(false);
@@ -255,23 +363,46 @@ export function useSeerrActions() {
 		[currentSettings, queryClient, saveSeerrConnection],
 	);
 
+	const openSeerrLogin = useCallback(async (draftUrl: string) => {
+		setIsConnecting(true);
+
+		try {
+			const normalized = normalizeSeerrUrlInput(draftUrl);
+			if (!normalized) throw new Error("Please enter a valid Seerr URL.");
+			await browser.tabs.create({ url: buildSeerrLoginUrl(draftUrl) });
+			setOpenedLoginUrl(normalized.url);
+			return true;
+		} catch (error_) {
+			setErrorCode(getExtensionErrorCode(error_));
+			setError(
+				getActionErrorMessage(error_, "Failed to open the Seerr login page."),
+			);
+			return false;
+		} finally {
+			setIsConnecting(false);
+		}
+	}, []);
+
 	const disconnectSeerr = useCallback(async () => {
 		if (!currentSettings) return false;
 
 		setIsConnecting(true);
 		setError(null);
+		setErrorCode(null);
 
 		try {
 			const oldUrl = currentSettings.seerr.url;
 			const newSettings = await saveSeerrConnection.mutateAsync({
-				credentials: null,
+				connection: null,
 			});
 
 			queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
 			await cleanupUnusedProviderHostPermission(oldUrl, newSettings);
+			setOpenedLoginUrl(null);
 
 			return true;
 		} catch (error_) {
+			setErrorCode(getExtensionErrorCode(error_));
 			setError(getActionErrorMessage(error_, "Failed to disconnect Seerr."));
 			return false;
 		} finally {
@@ -280,9 +411,12 @@ export function useSeerrActions() {
 	}, [currentSettings, queryClient, saveSeerrConnection]);
 
 	return {
-		connectSeerr,
+		checkSeerrSession,
+		connectSeerrApiKey,
+		openSeerrLogin,
 		disconnectSeerr,
 		isConnecting,
 		error,
+		errorCode,
 	};
 }

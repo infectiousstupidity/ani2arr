@@ -234,6 +234,12 @@ describe("options store helpers", () => {
 
 	it("migrates old Seerr API-key records to advanced mode", async () => {
 		await browser.storage.local.set({
+			[PUBLIC_OPTIONS_STORAGE_KEY]: {
+				...toPublicOptions(createDefaultExtensionOptions()),
+				seerr: {
+					isConfigured: true,
+				},
+			},
 			[SEERR_SECRETS_STORAGE_KEY]: {
 				url: "https://seerr.example/base",
 				apiKey: "legacy-key",
