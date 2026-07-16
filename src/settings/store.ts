@@ -168,18 +168,13 @@ async function setPrivateConnections(
 	await updatePrivateConnections(() => connections);
 }
 
-async function readLegacyPrivateConnections(): Promise<PrivateConnections> {
-	const [sonarr, radarr, seerr] = await Promise.all(
-		LEGACY_CONNECTION_STORAGE_KEYS.map((key) =>
-			storage.getItem<unknown>(key),
-		),
-	);
-
-	return {
-		sonarr: v.parse(LegacyProviderCredentialsSchema, sonarr),
-		radarr: v.parse(LegacyProviderCredentialsSchema, radarr),
-		seerr: v.parse(LegacyProviderCredentialsSchema, seerr),
-	};
+function chooseMigratedConnection(
+	newValue: unknown,
+	legacyValue: unknown,
+): ProviderCredentials {
+	const next = v.parse(LegacyProviderCredentialsSchema, newValue);
+	if (next.url && next.apiKey) return next;
+	return v.parse(LegacyProviderCredentialsSchema, legacyValue);
 }
 
 async function removeLegacyConnectionStorage(): Promise<void> {
@@ -201,11 +196,32 @@ async function removeLegacyConnectionStorage(): Promise<void> {
 }
 
 export async function initializeSettingsStorage(): Promise<void> {
-	const storedConnections = await storage.getItem<unknown>(
-		PRIVATE_CONNECTIONS_STORAGE_KEY,
+	const [storedConnections, legacySonarr, legacyRadarr, legacySeerr] =
+		await Promise.all([
+			storage.getItem<unknown>(PRIVATE_CONNECTIONS_STORAGE_KEY),
+			...LEGACY_CONNECTION_STORAGE_KEYS.map((key) =>
+				storage.getItem<unknown>(key),
+			),
+		]);
+	const current = parsePrivateConnections(storedConnections);
+	const migrated = {
+		sonarr: chooseMigratedConnection(current.sonarr, legacySonarr),
+		radarr: chooseMigratedConnection(current.radarr, legacyRadarr),
+		seerr: chooseMigratedConnection(current.seerr, legacySeerr),
+	};
+	const hasCompleteStoredRecord = v.safeParse(
+		PrivateConnectionsSchema,
+		storedConnections,
+	).success;
+	const migrationChangedConnections = (
+		Object.keys(migrated) as Array<keyof PrivateConnections>
+	).some(
+		(kind) =>
+			migrated[kind].url !== current[kind].url ||
+			migrated[kind].apiKey !== current[kind].apiKey,
 	);
-	if (!v.safeParse(PrivateConnectionsSchema, storedConnections).success) {
-		await setPrivateConnections(await readLegacyPrivateConnections());
+	if (!hasCompleteStoredRecord || migrationChangedConnections) {
+		await setPrivateConnections(migrated);
 	}
 
 	await removeLegacyConnectionStorage();
