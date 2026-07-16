@@ -31,7 +31,7 @@ import {
 	getProviderCredentials,
 	hasConfiguredProviderCredentials,
 } from "@/settings/provider-config";
-import { hasConfiguredSeerrCredentials } from "@/settings/seerr-config";
+import { hasConfiguredSeerrConnection } from "@/settings/seerr-config";
 import type { ExtensionOptions } from "@/settings/types";
 import { clearAllTtlCaches } from "@/shared/cache/ttl-cache";
 import {
@@ -169,7 +169,7 @@ export const handleProviderConnectionChanged = async (
 	if (
 		hasConfiguredProviderCredentials(options, "sonarr") ||
 		hasConfiguredProviderCredentials(options, "radarr") ||
-		hasConfiguredSeerrCredentials(options)
+		hasConfiguredSeerrConnection(options)
 	) {
 		await refreshUpstreamMappings();
 	}

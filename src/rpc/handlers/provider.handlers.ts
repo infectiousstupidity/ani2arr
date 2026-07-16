@@ -13,13 +13,18 @@ import {
 } from "@/background/provider-config";
 import { buildProviderOpenUrl } from "@/providers/provider-links";
 import type {
+	CheckSeerrSessionInput,
 	OpenProviderPageInput,
 	OpenProviderPageOutput,
 	OpenSeerrPageInput,
 	OpenSeerrPageOutput,
 	ProviderConnectionTestInput,
+	TestSeerrApiKeyConnectionInput,
 } from "@/rpc/types";
-import { normalizeSeerrConnectionInput } from "@/settings/seerr-config";
+import {
+	normalizeSeerrApiKeyConnectionInput,
+	normalizeSeerrUrlInput,
+} from "@/settings/seerr-config";
 import { normalizeInputCredentials } from "./provider-credentials";
 
 async function openTab(url?: string | null): Promise<{ opened: boolean }> {
@@ -82,13 +87,27 @@ export const providerHandlers = {
 			normalizeInputCredentials("radarr", credentials),
 		),
 
-	testSeerrConnection({ credentials }: ProviderConnectionTestInput) {
-		const creds = normalizeSeerrConnectionInput(credentials);
-		if (!creds) throw new Error("Seerr credentials are required.");
+	checkSeerrSession({ url }: CheckSeerrSessionInput) {
+		const normalized = normalizeSeerrUrlInput(url);
+		if (!normalized) throw new Error("Seerr URL is required.");
 
 		return seerrClient.validateConnection({
-			url: creds.url,
-			apiKey: creds.apiKey,
+			url: normalized.url,
+			auth: { mode: "session" },
 		});
+	},
+
+	testSeerrApiKeyConnection(input: TestSeerrApiKeyConnectionInput) {
+		const normalized = normalizeSeerrApiKeyConnectionInput(input);
+		return seerrClient.validateConnection({
+			url: normalized.url,
+			auth: normalized.auth,
+		});
+	},
+
+	async checkConfiguredSeerrConnection() {
+		const connection = await getSeerrConfig();
+		if (!connection) throw new Error("Seerr connection is required.");
+		return seerrClient.validateConnection(connection);
 	},
 };

@@ -9,7 +9,7 @@ import { logger } from "@/shared/utils/logger";
 import type { AniListId } from "@/anilist/types";
 import { getExtensionOptionsSnapshot } from "@/settings/store";
 import { hasConfiguredProviderCredentials } from "@/settings/provider-config";
-import { hasConfiguredSeerrCredentials } from "@/settings/seerr-config";
+import { hasConfiguredSeerrConnection } from "@/settings/seerr-config";
 import {
 	logError,
 	normalizeError,
@@ -49,7 +49,7 @@ async function shouldWarmMappingsCache(): Promise<boolean> {
 		return (
 			hasConfiguredProviderCredentials(options, "sonarr") ||
 			hasConfiguredProviderCredentials(options, "radarr") ||
-			hasConfiguredSeerrCredentials(options)
+			hasConfiguredSeerrConnection(options)
 		);
 	} catch (error) {
 		logError(normalizeError(error), "Background:shouldWarmMappingsCache");

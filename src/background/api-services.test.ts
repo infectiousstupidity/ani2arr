@@ -93,9 +93,10 @@ function createOptions(input: {
 			},
 		},
 		seerr: {
-			...options.seerr,
 			url: input.seerrConfigured ? "https://seerr.example" : "",
-			apiKey: input.seerrConfigured ? "seerr-key" : "",
+			auth: input.seerrConfigured
+				? { mode: "apiKey", apiKey: "seerr-key" }
+				: { mode: "session" },
 		},
 	};
 }
