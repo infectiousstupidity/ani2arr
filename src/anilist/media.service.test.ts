@@ -178,6 +178,30 @@ describe("AniListMediaService", () => {
 		expect(fetchAniListMediaMock).toHaveBeenCalledTimes(2);
 	});
 
+	it("does not wait after the final failed attempt", async () => {
+		vi.useFakeTimers();
+		const id = parseAniListId(205);
+		fetchAniListMediaMock.mockRejectedValue(
+			new AniListError("Server error", { status: 500 }),
+		);
+		const service = new AniListMediaService();
+
+		const request = service.fetchMediaWithRelations(id);
+		const rejection = expect(request).rejects.toMatchObject({
+			message: "Server error",
+			details: { status: 500 },
+		});
+
+		await vi.advanceTimersByTimeAsync(0);
+		await vi.advanceTimersByTimeAsync(1000);
+		await vi.advanceTimersByTimeAsync(2000);
+		await vi.advanceTimersByTimeAsync(4000);
+
+		expect(fetchAniListMediaMock).toHaveBeenCalledTimes(4);
+		expect(vi.getTimerCount()).toBe(0);
+		await rejection;
+	});
+
 	it("returns fresh cache hits without fetching", async () => {
 		const id = parseAniListId(303);
 		const cache = createMemoryCache<AniListMedia>();

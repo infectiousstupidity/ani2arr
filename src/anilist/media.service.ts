@@ -151,8 +151,10 @@ export class AniListMediaService {
 				retries: RETRY_COUNT,
 				minTimeout: 0,
 				maxTimeout: 0,
-				onFailedAttempt: ({ error, attemptNumber }) =>
-					this.waitBeforeRetry(error, attemptNumber),
+				onFailedAttempt: ({ error, attemptNumber, retriesLeft }) =>
+					retriesLeft > 0
+						? this.waitBeforeRetry(error, attemptNumber)
+						: undefined,
 			},
 		).catch((error) => this.handleRequestError(error));
 	}

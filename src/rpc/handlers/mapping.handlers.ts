@@ -358,24 +358,8 @@ async function afterMappingWrite(provider: Provider): Promise<void> {
 	await bumpMappingsRevision();
 }
 
-async function resolveAmbiguousProviderMappings(
-	provider: Provider,
-): Promise<void> {
-	if (!(await getProviderConfig(provider))) return;
-
-	const mappingList = await getMappingList(provider, { loadFormatByAniListId });
-	for (const entry of mappingList.ambiguous) {
-		await mappingService.resolveMapping(provider, entry.anilistId);
-	}
-}
-
 async function runMappingRefreshPipeline(): Promise<void> {
 	await refreshStoredUpstreamMappings();
-
-	for (const provider of PROVIDERS) {
-		await resolveAmbiguousProviderMappings(provider);
-	}
-
 	await bumpMappingsRevision();
 }
 
