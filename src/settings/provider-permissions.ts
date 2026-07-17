@@ -12,6 +12,16 @@ import type { ExtensionOptions } from "./types";
 export const requestProviderConnectionPermission = (url: string) =>
 	requestProviderHostPermission(url);
 
+export async function requestSeerrCsrfCookiePermission(): Promise<boolean> {
+	try {
+		return await browser.permissions.request({
+			permissions: ["cookies"],
+		});
+	} catch {
+		return false;
+	}
+}
+
 export async function removeSeerrCsrfCookiePermission(): Promise<void> {
 	try {
 		await browser.permissions.remove({

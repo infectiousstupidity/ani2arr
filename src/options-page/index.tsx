@@ -20,9 +20,9 @@ import { getSeerrConnection } from "@/settings/seerr-config";
 import { ConfirmDialog } from "./components/ui/alert-dialog";
 import {
   useRadarrActions,
-  useSeerrActions,
   useSonarrActions,
 } from "./hooks/provider-connection-actions";
+import { useSeerrActions } from "./hooks/seerr-connection-actions";
 import { hasHashFlag, useHashRoute } from "./navigation";
 import {
   DesktopPageHeader,
