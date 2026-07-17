@@ -11,12 +11,14 @@ export type SeerrSessionView =
 	| "connected"
 	| "session-expired"
 	| "session-unavailable"
+	| "account-changed"
 	| "api-key";
 
 const RECONNECT_VIEWS = new Set<SeerrSessionView>([
 	"not-signed-in",
 	"session-expired",
 	"session-unavailable",
+	"account-changed",
 ]);
 
 export function getSeerrSessionView(input: {
@@ -27,6 +29,9 @@ export function getSeerrSessionView(input: {
 	if (input.isConnecting) return "checking";
 	if (input.errorCode === ErrorCode.SEERR_SESSION_UNAVAILABLE) {
 		return "session-unavailable";
+	}
+	if (input.errorCode === ErrorCode.SEERR_ACCOUNT_CHANGED) {
+		return "account-changed";
 	}
 	if (input.errorCode === ErrorCode.SEERR_AUTH_REQUIRED) {
 		return input.connection?.auth.mode === "session"
@@ -43,6 +48,7 @@ export function getSeerrSessionButtonLabel(input: {
 	hasUrlChanges: boolean;
 }): string {
 	if (input.view === "checking") return "Checking...";
+	if (input.view === "account-changed") return "Use current Seerr account";
 	if (RECONNECT_VIEWS.has(input.view)) {
 		return "I have signed in — check again";
 	}

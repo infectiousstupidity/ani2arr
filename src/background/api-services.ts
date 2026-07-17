@@ -16,10 +16,7 @@ import type { Provider } from "@/providers/types";
 import { RadarrClient } from "@/providers/radarr/client";
 import { RadarrLibrary } from "@/providers/radarr/library";
 import { SeerrClient } from "@/providers/seerr/client";
-import {
-	getSeerrXsrfToken,
-	removeSeerrCsrfCookiePermission,
-} from "@/providers/seerr/csrf-token";
+import { getSeerrXsrfToken } from "@/providers/seerr/csrf-token";
 import {
 	getProviderHostPermissionPattern,
 	hasProviderHostPermission,
@@ -31,6 +28,7 @@ import {
 	getExtensionOptionsSnapshot,
 	resetAllSettingsSnapshot,
 } from "@/settings/store";
+import { removeSeerrCsrfCookiePermission } from "@/settings/provider-permissions";
 import {
 	getProviderCredentials,
 	hasConfiguredProviderCredentials,

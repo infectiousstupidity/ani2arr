@@ -33,13 +33,3 @@ export async function getSeerrXsrfToken(url: string): Promise<string | null> {
 		return null;
 	}
 }
-
-export async function removeSeerrCsrfCookiePermission(): Promise<void> {
-	try {
-		await browser.permissions.remove({
-			permissions: ["cookies"],
-		});
-	} catch {
-		// Permission may already be absent or browser-managed.
-	}
-}

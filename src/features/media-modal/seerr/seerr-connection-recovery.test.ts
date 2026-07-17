@@ -17,6 +17,7 @@ describe("Seerr connection recovery", () => {
 	it("offers configuration when Seerr is disconnected", () => {
 		const action = getSeerrConnectionRecoveryAction({
 			isConfigured: false,
+			authMode: null,
 			errors: [],
 		});
 
@@ -31,6 +32,7 @@ describe("Seerr connection recovery", () => {
 	])("offers reconnect for %s", (code) => {
 		const action = getSeerrConnectionRecoveryAction({
 			isConfigured: true,
+			authMode: "session",
 			errors: [error(code)],
 		});
 
@@ -44,6 +46,7 @@ describe("Seerr connection recovery", () => {
 	])("opens settings for %s", (code) => {
 		const action = getSeerrConnectionRecoveryAction({
 			isConfigured: true,
+			authMode: "session",
 			errors: [error(code)],
 		});
 
@@ -56,6 +59,7 @@ describe("Seerr connection recovery", () => {
 	it("offers the explicit optional-permission flow after a CSRF rejection", () => {
 		const action = getSeerrConnectionRecoveryAction({
 			isConfigured: true,
+			authMode: "session",
 			errors: [error(ErrorCode.SEERR_CSRF_REQUIRED)],
 		});
 
@@ -63,6 +67,29 @@ describe("Seerr connection recovery", () => {
 		expect(getSeerrConnectionRecoveryLabel(action!)).toBe(
 			"Enable CSRF support",
 		);
+	});
+
+	it("switches API-key connections to browser-session auth after CSRF rejection", () => {
+		const action = getSeerrConnectionRecoveryAction({
+			isConfigured: true,
+			authMode: "apiKey",
+			errors: [error(ErrorCode.SEERR_CSRF_REQUIRED)],
+		});
+
+		expect(action).toBe("switch-to-session");
+		expect(getSeerrConnectionRecoveryLabel(action!)).toBe(
+			"Switch to browser session",
+		);
+	});
+
+	it("falls back to settings when configured auth mode is unavailable", () => {
+		expect(
+			getSeerrConnectionRecoveryAction({
+				isConfigured: true,
+				authMode: null,
+				errors: [error(ErrorCode.SEERR_CSRF_REQUIRED)],
+			}),
+		).toBe("settings");
 	});
 
 	it.each([
@@ -73,6 +100,7 @@ describe("Seerr connection recovery", () => {
 		expect(
 			getSeerrConnectionRecoveryAction({
 				isConfigured: true,
+				authMode: "session",
 				errors: [error(code)],
 			}),
 		).toBeNull();

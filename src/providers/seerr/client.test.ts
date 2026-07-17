@@ -101,6 +101,24 @@ describe("SeerrClient", () => {
 		expect((request?.headers as Headers).get("X-Api-Key")).toBe("secret");
 	});
 
+	it("rejects a changed account during configured session validation", async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(
+				createAccountResponse({ id: 2, displayName: "Bob" }),
+			);
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(
+			createClient().validateConnection(sessionConnection),
+		).rejects.toMatchObject({
+			code: ErrorCode.SEERR_ACCOUNT_CHANGED,
+			userMessage:
+				"The Seerr account changed from Alice to Bob. Re-check this account in ani2arr options before requesting.",
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
 	it("preflights session identity before creating a request", async () => {
 		const fetchMock = vi
 			.fn<typeof fetch>()
@@ -295,7 +313,33 @@ describe("SeerrClient", () => {
 			),
 		).rejects.toMatchObject({
 			code: ErrorCode.SEERR_CSRF_REQUIRED,
+			userMessage:
+				"Seerr requires CSRF validation for this session. Enable CSRF support to let ani2arr read only this server's XSRF token.",
 		});
+	});
+
+	it("directs API-key CSRF failures to browser-session authentication", async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(createErrorResponse("invalid csrf token"));
+		const getCsrfToken = vi.fn(async () => "xsrf-secret");
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(
+			createClient(true, getCsrfToken).requestMedia(
+				{ mediaType: "movie", mediaId: parseTmdbId(123) },
+				apiKeyConnection,
+			),
+		).rejects.toMatchObject({
+			code: ErrorCode.SEERR_CSRF_REQUIRED,
+			userMessage:
+				"Seerr CSRF protection blocks API-key request creation. Switch to browser-session authentication and enable CSRF support to create requests.",
+		});
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(getCsrfToken).not.toHaveBeenCalled();
+		const request = fetchMock.mock.calls[0]?.[1];
+		expect(request?.credentials).toBe("omit");
+		expect((request?.headers as Headers).get("X-Api-Key")).toBe("secret");
 	});
 
 	it("translates passive read expiry into auth-required state", async () => {

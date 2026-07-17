@@ -89,4 +89,21 @@ describe("Seerr connection state", () => {
 			}),
 		).toBe("I have signed in — check again");
 	});
+
+	it("requires explicit confirmation when the browser account changes", () => {
+		const accountChanged = getSeerrSessionView({
+			connection: sessionConnection,
+			isConnecting: false,
+			errorCode: ErrorCode.SEERR_ACCOUNT_CHANGED,
+		});
+
+		expect(accountChanged).toBe("account-changed");
+		expect(showsSeerrLoginActions(accountChanged)).toBe(true);
+		expect(
+			getSeerrSessionButtonLabel({
+				view: accountChanged,
+				hasUrlChanges: false,
+			}),
+		).toBe("Use current Seerr account");
+	});
 });

@@ -58,11 +58,13 @@ function buildRequestInput(input: {
 
 function getSeerrRequestFeedback(input: {
 	isConfigured: boolean;
+	authMode: "session" | "apiKey" | null;
 	detailsError: ExtensionError | null;
 	requestError: ExtensionError | null;
 }) {
 	const connectionRecoveryAction = getSeerrConnectionRecoveryAction({
 		isConfigured: input.isConfigured,
+		authMode: input.authMode,
 		errors: [input.detailsError, input.requestError],
 	});
 
@@ -98,6 +100,7 @@ function canRequestInSeerr(input: {
 
 export function SeerrRequestView(props: {
 	anilistId: AniListId;
+	authMode: "session" | "apiKey" | null;
 	container: MediaModalContainer | undefined;
 	contentContainer: HTMLDivElement | null;
 	details: SeerrMediaDetails | null;
@@ -111,6 +114,7 @@ export function SeerrRequestView(props: {
 }): React.JSX.Element {
 	const {
 		anilistId,
+		authMode,
 		container,
 		contentContainer,
 		details,
@@ -155,6 +159,7 @@ export function SeerrRequestView(props: {
 			: defaultSelectedSeasons;
 	const feedback = getSeerrRequestFeedback({
 		isConfigured,
+		authMode,
 		detailsError,
 		requestError: request.error,
 	});

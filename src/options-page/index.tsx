@@ -12,7 +12,7 @@ import {
   deriveProviderConnectionStatusView,
   useStoredProviderConnectionStatus,
 } from "@/queries/provider-connection";
-import { useSeerrConnectionCheck } from "@/queries/seerr";
+import { useConfiguredSeerrConnectionCheck } from "@/queries/seerr";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import { getProviderCredentials } from "@/settings/provider-config";
 import { getSeerrConnection } from "@/settings/seerr-config";
@@ -95,8 +95,8 @@ const OptionsPageContent = () => {
     credentials: radarrCredentials,
   });
 
-  const seerrConnectionQuery = useSeerrConnectionCheck({
-    connection: seerrConnection,
+  const seerrConnectionQuery = useConfiguredSeerrConnectionCheck({
+    configuredConnection: seerrConnection,
     enabled: isSeerrStoredConfigured && seerrConnection !== null,
   });
   const seerrStatus = deriveProviderConnectionStatusView({

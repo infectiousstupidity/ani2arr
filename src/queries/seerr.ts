@@ -41,26 +41,21 @@ function shouldRetrySeerrQuery(
 	return failureCount < 1 && !NON_RETRYABLE_SEERR_ERRORS.has(error.code);
 }
 
-export const useSeerrConnectionCheck = (options: {
-	connection?: SeerrConnection | null;
+export const useConfiguredSeerrConnectionCheck = (options: {
+	configuredConnection?: SeerrConnection | null;
 	enabled?: boolean;
 }) =>
 	useQuery<SeerrConnectionCheckOutput, ExtensionError>({
 		queryKey: queryKeys.seerrConnection(
-			options.connection
-				? `${options.connection.auth.mode}:${getProviderConnectionScope(
-						options.connection,
+			options.configuredConnection
+				? `${options.configuredConnection.auth.mode}:${getProviderConnectionScope(
+						options.configuredConnection,
 					)}`
 				: "configured",
 		),
-		queryFn: async () => {
-			if (!options.connection) {
-				throw new Error("Seerr connection is required to verify the connection.");
-			}
-
-			return getAni2arrApi().checkConfiguredSeerrConnection();
-		},
-		enabled: (options.enabled ?? true) && Boolean(options.connection),
+		queryFn: () => getAni2arrApi().checkConfiguredSeerrConnection(),
+		enabled:
+			(options.enabled ?? true) && Boolean(options.configuredConnection),
 		staleTime: 60 * 1000,
 		refetchOnWindowFocus: false,
 		refetchOnMount: "always",

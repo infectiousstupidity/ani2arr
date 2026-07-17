@@ -10,6 +10,7 @@ export type SeerrConnectionRecoveryAction =
 	| "configure"
 	| "reconnect"
 	| "csrf"
+	| "switch-to-session"
 	| "settings";
 
 const RECONNECT_ERROR_CODES = new Set<ErrorCode>([
@@ -25,6 +26,7 @@ const SETTINGS_ERROR_CODES = new Set<ErrorCode>([
 
 export function getSeerrConnectionRecoveryAction(input: {
 	isConfigured: boolean;
+	authMode: "session" | "apiKey" | null;
 	errors: readonly (ExtensionError | null | undefined)[];
 }): SeerrConnectionRecoveryAction | null {
 	if (!input.isConfigured) return "configure";
@@ -33,7 +35,10 @@ export function getSeerrConnectionRecoveryAction(input: {
 		if (error && RECONNECT_ERROR_CODES.has(error.code)) return "reconnect";
 	}
 	for (const error of input.errors) {
-		if (error?.code === ErrorCode.SEERR_CSRF_REQUIRED) return "csrf";
+		if (error?.code !== ErrorCode.SEERR_CSRF_REQUIRED) continue;
+		if (input.authMode === "session") return "csrf";
+		if (input.authMode === "apiKey") return "switch-to-session";
+		return "settings";
 	}
 	for (const error of input.errors) {
 		if (error && SETTINGS_ERROR_CODES.has(error.code)) return "settings";
@@ -47,5 +52,6 @@ export function getSeerrConnectionRecoveryLabel(
 	if (action === "configure") return "Configure Seerr";
 	if (action === "reconnect") return "Reconnect Seerr";
 	if (action === "csrf") return "Enable CSRF support";
+	if (action === "switch-to-session") return "Switch to browser session";
 	return "Open Seerr settings";
 }

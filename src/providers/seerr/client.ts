@@ -60,7 +60,11 @@ export class SeerrClient {
 	public async validateConnection(
 		connection: SeerrConnection,
 	): Promise<{ account: SeerrAccountSummary }> {
-		return { account: await this.getCurrentUser(connection) };
+		const account = await this.getCurrentUser(connection);
+		if (connection.auth.mode === "session" && connection.account) {
+			assertMatchingSeerrAccount(connection.account, account);
+		}
+		return { account };
 	}
 
 	public async requestMedia(
@@ -130,21 +134,8 @@ export class SeerrClient {
 	private async assertVerifiedSessionAccount(
 		connection: SeerrConnection,
 	): Promise<void> {
-		const verifiedAccount = connection.account;
-		if (!verifiedAccount) throw createSeerrAuthRequiredError();
-
-		const currentAccount = await this.getCurrentUser(connection);
-		if (currentAccount.id === verifiedAccount.id) return;
-
-		throw createError(
-			ErrorCode.SEERR_ACCOUNT_CHANGED,
-			`Seerr account changed from ${verifiedAccount.id} to ${currentAccount.id}.`,
-			`The Seerr account changed from ${verifiedAccount.displayName} to ${currentAccount.displayName}. Re-check this account in ani2arr options before requesting.`,
-			{
-				previousAccount: verifiedAccount,
-				currentAccount,
-			},
-		);
+		if (!connection.account) throw createSeerrAuthRequiredError();
+		await this.validateConnection(connection);
 	}
 
 	private async requestJson(
@@ -220,7 +211,7 @@ export class SeerrClient {
 					controller.signal.aborted
 						? "Seerr session request timed out."
 						: "Seerr session request failed.",
-					"Could not use your Seerr browser session. Check the server, network, and third-party-cookie settings, or use API-key mode.",
+					"Could not use your Seerr browser session. Check the server, network, and third-party-cookie settings, or use API-key mode when Seerr CSRF protection is disabled.",
 				);
 			}
 			throw error;
@@ -322,6 +313,23 @@ function createSeerrAuthRequiredError(): ExtensionError {
 	);
 }
 
+function assertMatchingSeerrAccount(
+	verifiedAccount: SeerrAccountSummary,
+	currentAccount: SeerrAccountSummary,
+): void {
+	if (currentAccount.id === verifiedAccount.id) return;
+
+	throw createError(
+		ErrorCode.SEERR_ACCOUNT_CHANGED,
+		`Seerr account changed from ${verifiedAccount.id} to ${currentAccount.id}.`,
+		`The Seerr account changed from ${verifiedAccount.displayName} to ${currentAccount.displayName}. Re-check this account in ani2arr options before requesting.`,
+		{
+			previousAccount: verifiedAccount,
+			currentAccount,
+		},
+	);
+}
+
 async function createSeerrResponseError(
 	response: Response,
 	connection: SeerrConnection,
@@ -347,7 +355,9 @@ async function createSeerrResponseError(
 		return createError(
 			ErrorCode.SEERR_CSRF_REQUIRED,
 			"Seerr rejected the request because CSRF validation is required.",
-			"Seerr requires CSRF validation for this session. Enable CSRF support to let ani2arr read only this server's XSRF token.",
+			connection.auth.mode === "apiKey"
+				? "Seerr CSRF protection blocks API-key request creation. Switch to browser-session authentication and enable CSRF support to create requests."
+				: "Seerr requires CSRF validation for this session. Enable CSRF support to let ani2arr read only this server's XSRF token.",
 			details,
 		);
 	}

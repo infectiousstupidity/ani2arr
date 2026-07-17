@@ -91,6 +91,7 @@ export function SeerrModal({
 	return (
 		<SeerrRequestView
 			anilistId={anilistId}
+			authMode={base.options?.seerr.authMode ?? null}
 			container={container}
 			contentContainer={contentContainer}
 			details={details}

@@ -162,14 +162,18 @@ Third-party-cookie blocking, Firefox Containers, incognito separation, or other
 browser privacy settings can keep an extension background request from using
 the same Seerr session. Sign in to the configured Seerr URL in the same browser
 profile and try **I have signed in — check again**. If the session remains
-unavailable, use the advanced API-key mode.
+unavailable, use the advanced API-key mode when Seerr CSRF protection is
+disabled.
 
 Seerr installations with CSRF protection may also reject request creation after
 the session check succeeds. ani2arr reports this separately and offers an
 explicit **Enable CSRF support** action. Only then does the browser ask for
 optional cookie access so ani2arr can read the configured server's readable
 `XSRF-TOKEN`; the HTTP-only session cookie is never read. The global API-key
-mode remains available if permission is denied.
+mode remains available for servers without CSRF protection, but it does not
+bypass CSRF-protected request creation. If cookie permission is denied, ani2arr
+cannot create requests on that server until browser-session CSRF support is
+enabled.
 
 </details>
 

@@ -6,7 +6,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { createDefaultExtensionOptions } from "./schema";
-import { cleanupUnusedProviderHostPermission } from "./provider-permissions";
+import {
+	cleanupUnusedProviderHostPermission,
+	removeSeerrCsrfCookiePermission,
+} from "./provider-permissions";
 
 describe("cleanupUnusedProviderHostPermission", () => {
 	afterEach(() => {
@@ -41,5 +44,28 @@ describe("cleanupUnusedProviderHostPermission", () => {
 		expect(removeSpy).toHaveBeenCalledWith({
 			origins: ["http://arr.local/*"],
 		});
+	});
+});
+
+describe("removeSeerrCsrfCookiePermission", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("removes optional cookie access when session support is unused", async () => {
+		const remove = vi
+			.spyOn(browser.permissions, "remove")
+			.mockResolvedValue(true as never);
+
+		await removeSeerrCsrfCookiePermission();
+		expect(remove).toHaveBeenCalledWith({ permissions: ["cookies"] });
+	});
+
+	it("handles permission removal that is already browser-managed", async () => {
+		vi.spyOn(browser.permissions, "remove").mockRejectedValue(
+			new Error("permission absent"),
+		);
+
+		await expect(removeSeerrCsrfCookiePermission()).resolves.toBeUndefined();
 	});
 });

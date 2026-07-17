@@ -98,8 +98,9 @@ If a CSRF-protected Seerr server rejects a request, ani2arr can ask for optional
 browser cookie permission after the user clicks **Enable CSRF support**. With
 that permission, ani2arr reads only the configured server's readable
 `XSRF-TOKEN` cookie and sends it in Seerr's XSRF request header. It does not read
-or expose the HTTP-only session cookie. Denial leaves advanced API-key mode
-available.
+or expose the HTTP-only session cookie. If permission is denied, no cookie is
+read and request creation remains unavailable while that Seerr server requires
+CSRF validation. Advanced API-key mode does not bypass CSRF-protected writes.
 
 ### 3. AniList GraphQL
 

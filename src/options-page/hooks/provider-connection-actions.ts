@@ -22,6 +22,7 @@ import {
 import { getAni2arrApi, type Ani2arrApi } from "@/rpc";
 import {
 	cleanupUnusedProviderHostPermission,
+	removeSeerrCsrfCookiePermission,
 	requestProviderConnectionPermission,
 } from "@/settings/provider-permissions";
 import { normalizeProviderConnectionInput } from "@/settings/provider-config";
@@ -31,7 +32,6 @@ import {
 	normalizeSeerrApiKeyConnectionInput,
 	normalizeSeerrUrlInput,
 } from "@/settings/seerr-config";
-import { removeSeerrCsrfCookiePermission } from "@/providers/seerr/csrf-token";
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 import { getActionErrorMessage } from "./action-helpers";
@@ -288,7 +288,7 @@ export function useSeerrActions() {
 				) {
 					setErrorCode(ErrorCode.SEERR_SESSION_UNAVAILABLE);
 					setError(
-						"Could not use your Seerr browser session. Make sure you signed in, check third-party-cookie settings for this server, or use API-key mode.",
+						"Could not use your Seerr browser session. Make sure you signed in, check third-party-cookie settings for this server, or use API-key mode when Seerr CSRF protection is disabled.",
 					);
 				} else {
 					setErrorCode(code);
@@ -404,7 +404,7 @@ export function useSeerrActions() {
 				throw createError(
 					ErrorCode.PERMISSION_ERROR,
 					"Optional cookie permission was denied.",
-					"Cookie access was denied. API-key mode remains available.",
+					"Cookie access was denied. Request creation remains unavailable while this Seerr server requires CSRF validation.",
 				);
 			}
 

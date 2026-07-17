@@ -54,6 +54,9 @@ vi.mock("@/mapping/upstream.store", () => ({
 
 vi.mock("@/providers/seerr/csrf-token", () => ({
 	getSeerrXsrfToken: vi.fn(),
+}));
+
+vi.mock("@/settings/provider-permissions", () => ({
 	removeSeerrCsrfCookiePermission: removeSeerrCsrfCookiePermissionMock,
 }));
 

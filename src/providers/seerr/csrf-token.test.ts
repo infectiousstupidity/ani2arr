@@ -5,7 +5,6 @@ import { browser } from "wxt/browser";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	getSeerrXsrfToken,
-	removeSeerrCsrfCookiePermission,
 	SEERR_XSRF_COOKIE_NAME,
 } from "./csrf-token";
 
@@ -45,22 +44,5 @@ describe("getSeerrXsrfToken", () => {
 
 		await expect(getSeerrXsrfToken("not a URL")).resolves.toBeNull();
 		expect(getCookie).not.toHaveBeenCalled();
-	});
-
-	it("removes optional cookie access when session support is unused", async () => {
-		const remove = vi
-			.spyOn(browser.permissions, "remove")
-			.mockResolvedValue(true as never);
-
-		await removeSeerrCsrfCookiePermission();
-		expect(remove).toHaveBeenCalledWith({ permissions: ["cookies"] });
-	});
-
-	it("handles permission removal that is already browser-managed", async () => {
-		vi.spyOn(browser.permissions, "remove").mockRejectedValue(
-			new Error("permission absent"),
-		);
-
-		await expect(removeSeerrCsrfCookiePermission()).resolves.toBeUndefined();
 	});
 });
