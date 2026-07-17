@@ -237,6 +237,7 @@ export function useSeerrActions() {
 				);
 			}
 
+			await getAni2arrApi().checkConfiguredSeerrCsrfSupport();
 			setIsCsrfSupportEnabled(true);
 			return true;
 		} catch (error_) {

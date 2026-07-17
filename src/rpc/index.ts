@@ -89,6 +89,7 @@ export interface Ani2arrApi {
 		input: TestSeerrApiKeyConnectionInput,
 	): Promise<SeerrConnectionCheckOutput>;
 	checkConfiguredSeerrConnection(): Promise<SeerrConnectionCheckOutput>;
+	checkConfiguredSeerrCsrfSupport(): Promise<{ ok: true }>;
 	requestInSeerr(input: RequestInSeerrInput): Promise<RequestInSeerrOutput>;
 	getSeerrMediaStatus(
 		input: GetSeerrMediaStatusInput,
