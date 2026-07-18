@@ -24,15 +24,15 @@ jobs:
 
     steps:
       - name: Check out repo
-        uses: actions/checkout@v5 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
+        uses: actions/checkout@v7 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
+        uses: pnpm/action-setup@v6 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
         with:
           version: 11.7.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
+        uses: actions/setup-node@v6 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
         with:
           node-version: 24
           cache: pnpm
@@ -49,7 +49,7 @@ jobs:
 
     steps:
       - name: Check out repo
-        uses: actions/checkout@v5 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
+        uses: actions/checkout@v7 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -69,7 +69,7 @@ jobs:
 
     steps:
       - name: Check out repo
-        uses: actions/checkout@v5 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
+        uses: actions/checkout@v7 # nosemgrep: yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag - Dependabot-managed action tags are accepted for this solo repo.
         with:
           persist-credentials: false
 
