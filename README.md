@@ -13,7 +13,9 @@
 
 <p align="center">
   <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/" target="_blank" rel="noopener noreferrer"><img alt="Firefox Add-on" src="https://img.shields.io/badge/Firefox-AMO-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white"></a>
+	<a href="https://chromewebstore.google.com/detail/ani2arr/eabpmdcepaidljblhlojckmkmnhdlfcc" target="_blank" rel="noopener noreferrer"><img alt="Chrome Web Store" src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge"></a>
   <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer"><img alt="Release 2.1.0" src="https://img.shields.io/badge/Release-v2.1.0-6e6e6e?style=for-the-badge&logo=github&logoColor=white"></a>
+	<br>
   <a href="https://github.com/infectiousstupidity/ani2arr/actions/workflows/ci.yml" target="_blank" rel="noopener noreferrer"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/infectiousstupidity/ani2arr/ci.yml?branch=main&label=CI&style=for-the-badge&logo=githubactions&logoColor=white"></a>
   <img alt="Languages: en | ja" src="https://img.shields.io/badge/Languages-en%20%7C%20ja-6e6e6e?style=for-the-badge">
   <a href="LICENSE"><img alt="License GPL-3.0-only" src="https://img.shields.io/badge/License-GPL--3.0--only-6e6e6e?style=for-the-badge"></a>
@@ -54,10 +56,10 @@ For Seerr TV requests, ani2arr sends explicit seasons when season data is known.
 
 ## Install
 
-| Browser           | Recommended install                                                                                                             | Notes                                             |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| Firefox           | <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/" target="_blank" rel="noopener noreferrer">Firefox Add-ons</a> | Requires Firefox 142 or newer.                    |
-| Chrome / Chromium | <a href="https://github.com/infectiousstupidity/ani2arr/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a> | Download the Chrome MV3 zip and load it unpacked. |
+| Browser           | Recommended install                                                                                                                                        | Notes                                  |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------|
+| Firefox           | <a href="https://addons.mozilla.org/en-US/firefox/addon/ani2arr/" target="_blank" rel="noopener noreferrer">Firefox Add-ons</a>                            | Requires Firefox 142 or newer.         |
+| Chrome / Chromium | <a href="https://chromewebstore.google.com/detail/ani2arr/eabpmdcepaidljblhlojckmkmnhdlfcc" target="_blank" rel="noopener noreferrer">Chrome Web Store</a> | Requires Chrome/Chromium 120 or newer. |
 
 ### Manual install
 
