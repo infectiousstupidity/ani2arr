@@ -24,18 +24,11 @@ function createDeps() {
 			fetchMediaWithRelations: vi.fn(),
 			iteratePrequelChain: vi.fn(async function* () {}),
 		},
-		sonarr: {
-			lookupSeries: vi.fn(),
-		},
-		radarr: {
-			lookupMovies: vi.fn(),
-		},
+		searchProviderCandidates: vi
+			.fn<ResolverDeps["searchProviderCandidates"]>()
+			.mockResolvedValue([]),
 		getUniqueAniListIdForSource:
 			undefined as ResolverDeps["getUniqueAniListIdForSource"],
-		getCredentials: vi.fn(async () => ({
-			url: "https://provider.example",
-			apiKey: "secret",
-		})),
 	};
 }
 
@@ -70,8 +63,8 @@ describe("createAutomaticResolver", () => {
 	it("maps from title lookup before fetching AniList media", async () => {
 		const deps = createDeps();
 		const anilistId = parseAniListId(211_496);
-		deps.sonarr.lookupSeries.mockResolvedValue([
-			{ tvdbId: 450_000, title: "Kagurabachi", year: 2026 },
+		deps.searchProviderCandidates.mockResolvedValue([
+			{ providerId: 450_000, title: "Kagurabachi", year: 2026 },
 		]);
 		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
@@ -79,9 +72,9 @@ describe("createAutomaticResolver", () => {
 			title: "Kagurabachi",
 		});
 
-		expect(deps.sonarr.lookupSeries).toHaveBeenCalledWith(
+		expect(deps.searchProviderCandidates).toHaveBeenCalledWith(
+			"sonarr",
 			"Kagurabachi",
-			expect.any(Object),
 		);
 		expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
 		expect(setAutoResultMock).toHaveBeenCalledWith(
@@ -99,8 +92,12 @@ describe("createAutomaticResolver", () => {
 		const deps = createDeps();
 		const malSource = { source: "mal", id: parseMyAnimeListId(5114) } as const;
 		deps.getUniqueAniListIdForSource = vi.fn(async () => null);
-		deps.sonarr.lookupSeries.mockResolvedValue([
-			{ tvdbId: 78_874, title: "Fullmetal Alchemist: Brotherhood", year: 2009 },
+		deps.searchProviderCandidates.mockResolvedValue([
+			{
+				providerId: 78_874,
+				title: "Fullmetal Alchemist: Brotherhood",
+				year: 2009,
+			},
 		]);
 		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
@@ -121,7 +118,6 @@ describe("createAutomaticResolver", () => {
 		const deps = createDeps();
 		const malSource = { source: "mal", id: parseMyAnimeListId(5114) } as const;
 		deps.getUniqueAniListIdForSource = vi.fn(async () => null);
-		deps.sonarr.lookupSeries.mockResolvedValue([]);
 		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
 		await resolve("sonarr", malSource, [], {
@@ -138,7 +134,6 @@ describe("createAutomaticResolver", () => {
 	it("does not cache unmapped when AniList fallback fails", async () => {
 		const deps = createDeps();
 		const anilistId = parseAniListId(211_496);
-		deps.sonarr.lookupSeries.mockResolvedValue([]);
 		deps.anilistMedia.fetchMediaWithRelations.mockRejectedValue(
 			new Error("AniList rate limit exceeded"),
 		);
@@ -159,10 +154,11 @@ describe("createAutomaticResolver", () => {
 	it("falls back to AniList only after the DOM title misses", async () => {
 		const deps = createDeps();
 		const anilistId = parseAniListId(211_496);
-		deps.sonarr.lookupSeries.mockImplementation(async (title: string) =>
-			title === "Kagurabachi"
-				? [{ tvdbId: 450_000, title: "Kagurabachi", year: 2026 }]
-				: [],
+		deps.searchProviderCandidates.mockImplementation(
+			async (_provider, title) =>
+				title === "Kagurabachi"
+					? [{ providerId: 450_000, title: "Kagurabachi", year: 2026 }]
+					: [],
 		);
 		deps.anilistMedia.fetchMediaWithRelations.mockResolvedValue(
 			createMedia({
@@ -177,20 +173,20 @@ describe("createAutomaticResolver", () => {
 			title: "DOM Miss",
 		});
 
-		expect(deps.sonarr.lookupSeries).toHaveBeenNthCalledWith(
+		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
 			1,
+			"sonarr",
 			"DOM Miss",
-			expect.any(Object),
 		);
 		expect(deps.anilistMedia.fetchMediaWithRelations).toHaveBeenCalledWith(
 			anilistId,
 		);
-		expect(deps.sonarr.lookupSeries).toHaveBeenNthCalledWith(
+		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
 			2,
+			"sonarr",
 			"Kagurabachi",
-			expect.any(Object),
 		);
-		expect(deps.sonarr.lookupSeries).toHaveBeenCalledTimes(2);
+		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(2);
 		expect(setAutoResultMock).toHaveBeenCalledWith(
 			"sonarr",
 			anilistSource(anilistId),
@@ -205,10 +201,11 @@ describe("createAutomaticResolver", () => {
 	it("does not repeat the DOM title during AniList fallback", async () => {
 		const deps = createDeps();
 		const anilistId = parseAniListId(211_496);
-		deps.sonarr.lookupSeries.mockImplementation(async (title: string) =>
-			title === "Next Title"
-				? [{ tvdbId: 450_001, title: "Next Title", year: 2026 }]
-				: [],
+		deps.searchProviderCandidates.mockImplementation(
+			async (_provider, title) =>
+				title === "Next Title"
+					? [{ providerId: 450_001, title: "Next Title", year: 2026 }]
+					: [],
 		);
 		deps.anilistMedia.fetchMediaWithRelations.mockResolvedValue(
 			createMedia({
@@ -223,16 +220,16 @@ describe("createAutomaticResolver", () => {
 			title: "Same Title",
 		});
 
-		expect(deps.sonarr.lookupSeries).toHaveBeenCalledTimes(2);
-		expect(deps.sonarr.lookupSeries).toHaveBeenNthCalledWith(
+		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(2);
+		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
 			1,
+			"sonarr",
 			"Same Title",
-			expect.any(Object),
 		);
-		expect(deps.sonarr.lookupSeries).toHaveBeenNthCalledWith(
+		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
 			2,
+			"sonarr",
 			"Next Title",
-			expect.any(Object),
 		);
 		expect(setAutoResultMock).toHaveBeenCalledWith(
 			"sonarr",
@@ -248,7 +245,6 @@ describe("createAutomaticResolver", () => {
 	it("stores unmapped after DOM and AniList fallback miss", async () => {
 		const deps = createDeps();
 		const anilistId = parseAniListId(211_496);
-		deps.sonarr.lookupSeries.mockResolvedValue([]);
 		deps.anilistMedia.fetchMediaWithRelations.mockResolvedValue(
 			createMedia({
 				id: anilistId,
@@ -262,12 +258,36 @@ describe("createAutomaticResolver", () => {
 			title: "DOM Miss",
 		});
 
-		expect(deps.sonarr.lookupSeries).toHaveBeenCalledTimes(3);
+		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(3);
 		expect(setAutoResultMock).toHaveBeenCalledWith(
 			"sonarr",
 			anilistSource(anilistId),
 			{
 				kind: "unmapped",
+			},
+		);
+	});
+
+	it("filters rejected provider IDs before matching", async () => {
+		const deps = createDeps();
+		const anilistId = parseAniListId(211_496);
+		deps.searchProviderCandidates.mockResolvedValue([
+			{ providerId: 450_000, title: "Kagurabachi", year: 2026 },
+			{ providerId: 450_001, title: "Kagurabachi", year: 2026 },
+		]);
+		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
+
+		await resolve("sonarr", anilistSource(anilistId), [450_000], {
+			title: "Kagurabachi",
+		});
+
+		expect(setAutoResultMock).toHaveBeenCalledWith(
+			"sonarr",
+			anilistSource(anilistId),
+			{
+				kind: "mapped",
+				providerId: 450_001,
+				matchedTitle: "Kagurabachi",
 			},
 		);
 	});

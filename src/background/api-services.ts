@@ -46,6 +46,7 @@ import {
 	resetAllRevisions,
 } from "@/shared/sync/revisions";
 import { logger } from "@/shared/utils/logger";
+import { fetchProviderCandidates } from "./provider-candidate-search";
 import { requireProviderCredentials } from "./provider-config";
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 15 * 1000;
@@ -100,12 +101,17 @@ export const bumpMappingsRevision = async (): Promise<void> => {
 	await bumpMappingsRevisionSignal();
 };
 
+const searchProviderCandidates = (provider: Provider, title: string) =>
+	fetchProviderCandidates(provider, title, {
+		getCredentials: requireProviderCredentials,
+		sonarr: sonarrClient,
+		radarr: radarrClient,
+	});
+
 export const mappingService = new MappingService(
 	createAutomaticResolver({
 		anilistMedia: anilistMediaService,
-		sonarr: sonarrClient,
-		radarr: radarrClient,
-		getCredentials: requireProviderCredentials,
+		searchProviderCandidates,
 	}),
 );
 

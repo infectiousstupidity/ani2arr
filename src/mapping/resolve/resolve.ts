@@ -8,15 +8,13 @@ import type {
 	AniListMediaHint,
 } from "@/anilist/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
-import type {
-	Provider,
-	ProviderCredentials,
-} from "@/providers/types";
-import type { RadarrClient } from "@/providers/radarr/client";
-import type { SonarrClient } from "@/providers/sonarr/client";
+import type { Provider } from "@/providers/types";
 import { setAutoResult } from "../auto.store";
 import { getUniqueAniListIdForSource } from "../upstream.store";
-import { searchCandidate } from "./candidate-search";
+import {
+	searchCandidate,
+	type ProviderCandidateSearch,
+} from "./candidate-search";
 import { searchPrequelChain } from "./prequel-chain";
 import type { SearchMedia } from "./title-matching";
 
@@ -48,9 +46,7 @@ function mediaFromStatusHint(input: {
 
 export function createAutomaticResolver(dependencies: {
 	anilistMedia: AniListMediaService;
-	sonarr: SonarrClient;
-	radarr: RadarrClient;
-	getCredentials: (provider: Provider) => Promise<ProviderCredentials>;
+	searchProviderCandidates: ProviderCandidateSearch;
 	getUniqueAniListIdForSource?: (source: SourceIdentity) => Promise<AniListId | null>;
 }): AutomaticResolver {
 	return async function resolveAutomaticMapping(
@@ -59,7 +55,6 @@ export function createAutomaticResolver(dependencies: {
 		rejectedProviderIds,
 		options,
 	): Promise<void> {
-		const credentials = await dependencies.getCredentials(provider);
 		const findUniqueAniListId =
 			dependencies.getUniqueAniListIdForSource ?? getUniqueAniListIdForSource;
 		const searchedTitleKeys = new Set<string>();
@@ -67,14 +62,10 @@ export function createAutomaticResolver(dependencies: {
 			searchCandidate({
 				provider,
 				media: candidateMedia,
-				credentials,
-				clients: {
-					sonarr: dependencies.sonarr,
-					radarr: dependencies.radarr,
-				},
+				searchProviderCandidates: dependencies.searchProviderCandidates,
 				rejectedProviderIds,
 				searchedTitleKeys,
-		});
+			});
 
 		const hintMedia = mediaFromStatusHint({
 			...(options?.title === undefined ? {} : { title: options.title }),
