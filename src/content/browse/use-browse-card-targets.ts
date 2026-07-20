@@ -253,8 +253,12 @@ function createBrowseCardTargetStore(
 }
 
 export function useBrowseCardTargets(
-	options: BrowseCardTargetOptions,
+	adapter: BrowseAdapter,
+	enabled: boolean,
 ): BrowseCardTarget[] {
-	const store = useMemo(() => createBrowseCardTargetStore(options), [options]);
+	const store = useMemo(
+		() => createBrowseCardTargetStore({ adapter, enabled }),
+		[adapter, enabled],
+	);
 	return useSyncExternalStore(store.subscribe, store.getSnapshot);
 }

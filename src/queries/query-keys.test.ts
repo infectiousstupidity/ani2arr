@@ -44,14 +44,8 @@ describe("queryKeys", () => {
 		]);
 	});
 
-	it("uses one mapping list key below the mappings root", () => {
-		expect(queryKeys.mappings()).toEqual([
-			"a2a",
-			"mapping",
-			"list",
-			"default",
-		]);
-		expectPrefix(queryKeys.mappings(), queryKeys.mappingsRoot());
+	it("uses one mapping list key", () => {
+		expect(queryKeys.mappings()).toEqual(["a2a", "mapping", "list"]);
 	});
 
 	it("normalizes provider lookup text", () => {

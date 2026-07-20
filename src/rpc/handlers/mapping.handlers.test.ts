@@ -15,10 +15,6 @@ import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import type { Provider } from "@/providers/types";
 import type { EffectiveMappingRecord } from "@/mapping/mapping-facts";
 import {
-	getMappingRowMutationInput,
-	type MappingRow,
-} from "@/options-page/pages/mappings/mapping-page-model";
-import {
 	mappingService,
 	radarrLibrary,
 	sonarrLibrary,
@@ -297,17 +293,13 @@ describe("mappingHandlers", () => {
 		);
 	});
 
-	it("keeps a MAL row source in quick-action RPC input", async () => {
-		const row: MappingRow = {
-			source: { source: "mal", id: mal(5114) },
-			anilistId: aid(10),
-			provider: "sonarr",
-			result: { kind: "unmapped", hadResolveAttempt: false },
-			mappingRowStatus: "unmapped",
-		};
-
+	it("keeps a MAL source in mapping mutation input", async () => {
 		await expect(
-			mappingHandlers.setMappingIgnore(getMappingRowMutationInput(row)),
+			mappingHandlers.setMappingIgnore({
+				source: { source: "mal", id: mal(5114) },
+				anilistId: aid(10),
+				provider: "sonarr",
+			}),
 		).resolves.toEqual({ ok: true });
 
 		expect(mappingService.setIgnored).toHaveBeenCalledWith("sonarr", {

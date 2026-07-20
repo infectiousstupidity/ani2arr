@@ -6,7 +6,7 @@ import type { AniListTitleLanguage } from "@/anilist/title";
 import { normalizeError } from "@/shared/errors/error-utils";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import { cn } from "@/shared/utils/cn";
-import { MappingsAniListRow } from "./mappings-anilist-row";
+import { MappingsSourceRow } from "./mappings-source-row";
 import { MappingsProviderGroup } from "./mappings-provider-group";
 import {
 	getRowKey,
@@ -68,7 +68,7 @@ function MappingList({
 												: "border-b-border-primary/40",
 										)}
 									>
-										<MappingsAniListRow
+										<MappingsSourceRow
 											row={row}
 											metadata={metadataById.get(row.anilistId) ?? null}
 											isPending={pendingRowKeys.has(getRowKey(row))}

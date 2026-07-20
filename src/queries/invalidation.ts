@@ -14,7 +14,7 @@ export function invalidateAfterMappingChange(
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.providerMediaStatusItem(input.provider, input),
 	});
-	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+	queryClient.invalidateQueries({ queryKey: queryKeys.mappings() });
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingIdentitiesRoot(),
 	});
@@ -29,7 +29,7 @@ export function invalidateAfterMappingChange(
 export function invalidateAfterMappingsRevision(
 	queryClient: QueryClient,
 ): void {
-	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+	queryClient.invalidateQueries({ queryKey: queryKeys.mappings() });
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.mappingInspectionRoot(),
 	});
@@ -54,7 +54,7 @@ export function invalidateAfterProviderLibraryChange(
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.providerLookupRoot(provider),
 	});
-	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+	queryClient.invalidateQueries({ queryKey: queryKeys.mappings() });
 }
 
 export function invalidateAfterProviderMediaChange(
@@ -76,5 +76,5 @@ export function resetAfterProviderConnectionChange(
 	queryClient.removeQueries({
 		queryKey: queryKeys.providerRoot(provider),
 	});
-	queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+	queryClient.invalidateQueries({ queryKey: queryKeys.mappings() });
 }

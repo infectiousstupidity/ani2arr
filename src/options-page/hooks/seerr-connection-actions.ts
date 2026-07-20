@@ -43,7 +43,7 @@ async function refreshSeerrMappings(
 		queryClient.invalidateQueries({
 			queryKey: queryKeys.mappingIdentitiesRoot(),
 		});
-		queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+		queryClient.invalidateQueries({ queryKey: queryKeys.mappings() });
 		queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
 	} catch {
 		// Seerr remains usable if the upstream mapping refresh is temporarily unavailable.

@@ -74,13 +74,7 @@ export function MappingsFilterBar(
 	} = props;
 
 	const [localSearch, setLocalSearch] = useState(search);
-	const [prevSearchProp, setPrevSearchProp] = useState(search);
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	if (search !== prevSearchProp) {
-		setPrevSearchProp(search);
-		setLocalSearch(search);
-	}
 
 	useEffect(() => {
 		return () => {

@@ -1,5 +1,5 @@
-/** AniList row renderer and quick actions for the options mapping page. */
-// src/options-page/pages/mappings/mappings-anilist-row.tsx
+/** Source row renderer and quick actions for the options mapping page. */
+// src/options-page/pages/mappings/mappings-source-row.tsx
 
 import {
 	EyeOff,
@@ -28,7 +28,7 @@ import {
 	getMappingRowMutationInput,
 } from "./mapping-page-model";
 
-interface MappingsAniListRowProps {
+interface MappingsSourceRowProps {
 	row: MappingRow;
 	metadata: AniListMetadata | null;
 	isPending: boolean;
@@ -128,8 +128,8 @@ function MappingStatusPill(props: {
 	);
 }
 
-export function MappingsAniListRow(
-	props: MappingsAniListRowProps,
+export function MappingsSourceRow(
+	props: MappingsSourceRowProps,
 ): React.JSX.Element {
 	const {
 		row,
