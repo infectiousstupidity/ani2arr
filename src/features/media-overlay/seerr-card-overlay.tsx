@@ -356,14 +356,9 @@ export function SeerrStandaloneCardOverlay({
 				providerLabel="Seerr"
 				primaryState={action.state}
 				primaryTitle={action.title}
-				primaryAriaLabel={action.title}
 				primaryDisabled={action.disabled}
 				onPrimaryAction={action.run}
 				hasMapping={true}
-				showSetupAction={false}
-				onOpenSetup={() => {}}
-				showMappingAction={false}
-				onOpenMapping={() => {}}
 				openProvider={action.openSeerr}
 				openProviderIcon={SeerrIcon}
 				extraAction={extraAction}

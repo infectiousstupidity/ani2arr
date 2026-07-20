@@ -242,16 +242,13 @@ export function SeerrRequestView(props: {
 				<SeerrFooter
 					view="request"
 					isManualTarget={target?.source === "manual"}
-					canSaveTvTarget={false}
 					canRequest={canRequest}
 					isBusy={isBusy}
 					isRequesting={request.isPending}
 					requestLabel={requestLabel}
 					onClose={onClose}
 					onChangeTarget={onChangeTarget}
-					onBackToRequest={() => {}}
 					onClearManualTarget={() => clearManualTarget.mutate(anilistId)}
-					onSaveTvTarget={() => {}}
 					onRequest={handleRequest}
 				/>
 			}

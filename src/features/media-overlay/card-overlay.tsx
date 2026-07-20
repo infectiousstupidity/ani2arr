@@ -25,14 +25,11 @@ interface CardOverlayProps {
 	providerLabel: string;
 	primaryState: MediaActionState;
 	primaryTitle: string;
-	primaryAriaLabel: string;
 	primaryDisabled: boolean;
 	onPrimaryAction(): void;
 	hasMapping: boolean;
-	showSetupAction: boolean;
-	onOpenSetup(): void;
-	showMappingAction: boolean;
-	onOpenMapping(): void;
+	onOpenSetup?: (() => void) | undefined;
+	onOpenMapping?: (() => void) | undefined;
 	openProvider: (() => void) | null;
 	openProviderIcon?: ComponentType<SVGProps<SVGSVGElement>> | undefined;
 	extraAction?: ReactNode;
@@ -111,13 +108,10 @@ export function CardOverlay({
 	providerLabel,
 	primaryState,
 	primaryTitle,
-	primaryAriaLabel,
 	primaryDisabled,
 	onPrimaryAction,
 	hasMapping,
-	showSetupAction,
 	onOpenSetup,
-	showMappingAction,
 	onOpenMapping,
 	openProvider,
 	openProviderIcon: OpenProviderIcon,
@@ -132,7 +126,7 @@ export function CardOverlay({
 		? "Update mapping manually"
 		: "Find match manually";
 
-	const setupAction = showSetupAction ? (
+	const setupAction = onOpenSetup ? (
 		<TooltipWrapper
 			content={`Open ${providerLabel} setup`}
 			side="right"
@@ -153,7 +147,7 @@ export function CardOverlay({
 		</TooltipWrapper>
 	) : null;
 
-	const mappingAction = showMappingAction ? (
+	const mappingAction = onOpenMapping ? (
 		<TooltipWrapper
 			content={manualMappingLabel}
 			side="right"
@@ -222,7 +216,7 @@ export function CardOverlay({
 						type="button"
 						className="a2a-card-overlay__quick"
 						data-state={primaryState}
-						aria-label={primaryAriaLabel}
+						aria-label={primaryTitle}
 						onClick={withSwallow(onPrimaryAction)}
 						onMouseDown={swallowEvent}
 						disabled={primaryDisabled}

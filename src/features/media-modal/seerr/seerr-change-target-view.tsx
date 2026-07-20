@@ -255,18 +255,10 @@ export function SeerrChangeTargetView(props: {
 			footer={
 				<SeerrFooter
 					view="change-target"
-					isManualTarget={false}
 					canSaveTvTarget={saveTvTargetEnabled}
-					canRequest={false}
 					isBusy={setManualTarget.isPending}
-					isRequesting={false}
-					requestLabel="Request selected"
-					onClose={onClose}
-					onChangeTarget={() => {}}
 					onBackToRequest={onBackToRequest}
-					onClearManualTarget={() => {}}
 					onSaveTvTarget={saveTvTarget}
-					onRequest={() => {}}
 				/>
 			}
 			onOpenChange={(open) => !open && onClose()}

@@ -72,16 +72,19 @@ export function SonarrCardOverlay({
 			providerLabel="Sonarr"
 			primaryState={mediaAction.status.state}
 			primaryTitle={primaryTitle}
-			primaryAriaLabel={primaryTitle}
 			primaryDisabled={mediaAction.status.disabled}
 			onPrimaryAction={mediaAction.runPrimaryAction}
 			hasMapping={mediaAction.status.hasMapping}
-			showSetupAction={anilistId !== undefined && mediaAction.status.hasMapping}
-			onOpenSetup={onOpenSetup}
-			showMappingAction={
-				anilistId !== undefined && mediaAction.status.state !== "unconfigured"
+			onOpenSetup={
+				anilistId !== undefined && mediaAction.status.hasMapping
+					? onOpenSetup
+					: undefined
 			}
-			onOpenMapping={onOpenMapping}
+			onOpenMapping={
+				anilistId !== undefined && mediaAction.status.state !== "unconfigured"
+					? onOpenMapping
+					: undefined
+			}
 			openProvider={mediaAction.openProvider}
 			openProviderIcon={SonarrIcon}
 			extraAction={extraAction}
