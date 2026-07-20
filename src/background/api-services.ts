@@ -8,10 +8,7 @@ import { clearManualFacts } from "@/mapping/manual.store";
 import { clearManualSeerrTargets } from "@/mapping/seerr-target.store";
 import { MappingService } from "@/mapping/mapping.service";
 import { createAutomaticResolver } from "@/mapping/resolve/resolve";
-import {
-	clearUpstreamMappings,
-	refreshUpstreamMappings,
-} from "@/mapping/upstream.store";
+import { clearUpstreamMappings } from "@/mapping/upstream.store";
 import type { Provider } from "@/providers/types";
 import { RadarrClient } from "@/providers/radarr/client";
 import { RadarrLibrary } from "@/providers/radarr/library";
@@ -46,6 +43,7 @@ import {
 	resetAllRevisions,
 } from "@/shared/sync/revisions";
 import { logger } from "@/shared/utils/logger";
+import { refreshMappingPipeline } from "./mapping-refresh";
 import { fetchProviderCandidates } from "./provider-candidate-search";
 import { requireProviderCredentials } from "./provider-config";
 
@@ -173,15 +171,15 @@ export const handleProviderConnectionChanged = async (
 	];
 	if (affectedProviders.length === 0) return;
 
-	await bumpMappingsRevision();
-
+	let mappingRevisionBumped = false;
 	if (
 		hasConfiguredProviderCredentials(options, "sonarr") ||
 		hasConfiguredProviderCredentials(options, "radarr") ||
 		hasConfiguredSeerrConnection(options)
 	) {
-		await refreshUpstreamMappings();
+		mappingRevisionBumped = await refreshMappingPipeline();
 	}
+	if (!mappingRevisionBumped) await bumpMappingsRevision();
 
 	await Promise.all(
 		affectedProviders.map((provider) =>

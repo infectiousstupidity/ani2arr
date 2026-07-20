@@ -148,7 +148,7 @@ export const useSourceAniListIdMap = (
 
 type SourceAniListIdApi = Pick<
 	Ani2arrApi,
-	"getAniListIdForSource" | "refreshUpstreamMappings"
+	"getAniListIdForSource" | "refreshMappingPipeline"
 >;
 
 export async function getSourceAniListIdMap(
@@ -188,7 +188,7 @@ export async function getSourceAniListIdMap(
 		return firstResult;
 	}
 
-	await api.refreshUpstreamMappings();
+	await api.refreshMappingPipeline();
 	return resolveBatch();
 }
 

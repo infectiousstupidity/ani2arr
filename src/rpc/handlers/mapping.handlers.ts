@@ -10,6 +10,7 @@ import {
 	scheduleLibraryRefresh,
 	sonarrLibrary,
 } from "@/background/api-services";
+import { refreshMappingPipeline } from "@/background/mapping-refresh";
 import { getProviderConfig } from "@/background/provider-config";
 import type { AniListId, AniListMediaFormat } from "@/anilist/types";
 import {
@@ -19,10 +20,7 @@ import {
 import type { EffectiveMappingRecord } from "@/mapping/mapping-facts";
 import type { MappingResult } from "@/mapping/types";
 import { sourceIdentityKey } from "@/mapping/source-identity";
-import {
-	getUniqueAniListIdForSource,
-	refreshUpstreamMappings as refreshStoredUpstreamMappings,
-} from "@/mapping/upstream.store";
+import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
 import type { Provider } from "@/providers/types";
 import type { RadarrMovieSnapshot } from "@/providers/radarr/types";
 import { getProviderExternalIdLabel } from "@/providers/provider-labels";
@@ -442,22 +440,13 @@ async function afterMappingWrite(provider: Provider): Promise<void> {
 	await bumpMappingsRevision();
 }
 
-async function runMappingRefreshPipeline(): Promise<void> {
-	await refreshStoredUpstreamMappings();
-	await bumpMappingsRevision();
-}
-
 export const mappingHandlers = {
 	getMappingIdentities(ids: GetMappingIdentitiesInput) {
 		return getMappingIdentities(ids);
 	},
 
-	refreshMappingPipeline() {
-		return runMappingRefreshPipeline();
-	},
-
-	refreshUpstreamMappings() {
-		return refreshStoredUpstreamMappings();
+	async refreshMappingPipeline() {
+		await refreshMappingPipeline();
 	},
 
 	async setManualMapping(input: SetManualMappingInput) {

@@ -5,6 +5,7 @@ import { browser } from "wxt/browser";
 import * as v from "valibot";
 import { registerAni2arrApi } from "@/rpc";
 import { apiHandlers } from "@/rpc/handlers";
+import { refreshMappingPipeline } from "@/background/mapping-refresh";
 import { logger } from "@/shared/utils/logger";
 import type { AniListId } from "@/anilist/types";
 import {
@@ -87,7 +88,7 @@ export const bootstrapBackground = (): void => {
 			}
 			await settingsInitialization;
 			if (await shouldWarmMappingsCache()) {
-				await apiHandlers.refreshMappingPipeline();
+				await refreshMappingPipeline();
 			}
 			await ensurePeriodicRefresh();
 		} catch (error) {
@@ -99,7 +100,7 @@ export const bootstrapBackground = (): void => {
 		try {
 			await settingsInitialization;
 			if (await shouldWarmMappingsCache()) {
-				await apiHandlers.refreshMappingPipeline();
+				await refreshMappingPipeline();
 			}
 			await ensurePeriodicRefresh();
 		} catch (error) {
@@ -114,7 +115,7 @@ export const bootstrapBackground = (): void => {
 			try {
 				await settingsInitialization;
 				if (await shouldWarmMappingsCache()) {
-					await apiHandlers.refreshMappingPipeline();
+					await refreshMappingPipeline();
 				}
 			} catch (error) {
 				logError(normalizeError(error), "Background:refreshMappingPipeline:alarm");

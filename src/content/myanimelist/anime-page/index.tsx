@@ -43,7 +43,7 @@ async function getAniListIdForMount(
 	const existing = await api.getAniListIdForSource(source);
 	if (existing !== null) return existing;
 
-	await api.refreshUpstreamMappings();
+	await api.refreshMappingPipeline();
 	return api.getAniListIdForSource(source);
 }
 

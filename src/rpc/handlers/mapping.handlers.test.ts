@@ -23,6 +23,7 @@ import { mappingHandlers } from "./mapping.handlers";
 
 const listEffectiveMappingRecordsByProviderMock = vi.hoisted(() => vi.fn());
 const getProviderConfigMock = vi.hoisted(() => vi.fn());
+const refreshMappingPipelineMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/mapping/list-mappings", () => ({
 	getMappingIdentities: vi.fn(),
@@ -32,7 +33,10 @@ vi.mock("@/mapping/list-mappings", () => ({
 
 vi.mock("@/mapping/upstream.store", () => ({
 	getUniqueAniListIdForSource: vi.fn(),
-	refreshUpstreamMappings: vi.fn(),
+}));
+
+vi.mock("@/background/mapping-refresh", () => ({
+	refreshMappingPipeline: refreshMappingPipelineMock,
 }));
 
 vi.mock("@/background/api-services", () => ({
@@ -128,10 +132,19 @@ function mockMappingRecords(
 describe("mappingHandlers", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		refreshMappingPipelineMock.mockResolvedValue(false);
 		mockMappingRecords({ sonarr: sonarrMappings });
 		getProviderConfigMock.mockResolvedValue(null);
 		vi.mocked(sonarrLibrary.getSeriesSnapshots).mockResolvedValue([]);
 		vi.mocked(radarrLibrary.getMovieSnapshots).mockResolvedValue([]);
+	});
+
+	it("runs the background-owned mapping refresh workflow", async () => {
+		await expect(
+			mappingHandlers.refreshMappingPipeline(),
+		).resolves.toBeUndefined();
+
+		expect(refreshMappingPipelineMock).toHaveBeenCalledOnce();
 	});
 
 	it("returns every composed mapping group without filtering", async () => {

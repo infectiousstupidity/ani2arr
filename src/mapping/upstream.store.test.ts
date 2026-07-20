@@ -87,7 +87,7 @@ describe("refreshUpstreamMappings", () => {
 			),
 		);
 
-		await refreshUpstreamMappings();
+		await expect(refreshUpstreamMappings()).resolves.toBe(true);
 
 		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
 		expect(stored[UPSTREAM_STORAGE_KEY]).toEqual({
@@ -101,6 +101,24 @@ describe("refreshUpstreamMappings", () => {
 			aniListCrosswalks: {},
 			fetchedAt: expect.any(Number),
 		});
+	});
+
+	it("reports unchanged without downloading a fresh canonical snapshot", async () => {
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				entries: {
+					1: [{ kind: "tmdb-movie", id: tmdb(300) }],
+				},
+				aniListCrosswalks: {},
+				fetchedAt: Date.now(),
+			},
+		});
+		const fetchMock = vi.fn<typeof fetch>();
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(refreshUpstreamMappings()).resolves.toBe(false);
+
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
 	it("forces a full refresh for fresh legacy snapshots", async () => {
@@ -129,7 +147,7 @@ describe("refreshUpstreamMappings", () => {
 		});
 		vi.stubGlobal("fetch", fetchMock);
 
-		await refreshUpstreamMappings();
+		await expect(refreshUpstreamMappings()).resolves.toBe(true);
 
 		expect(fetchMock).toHaveBeenCalledOnce();
 		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
@@ -167,7 +185,7 @@ describe("refreshUpstreamMappings", () => {
 		});
 		vi.stubGlobal("fetch", fetchMock);
 
-		await refreshUpstreamMappings();
+		await expect(refreshUpstreamMappings()).resolves.toBe(false);
 
 		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
 		expect(stored[UPSTREAM_STORAGE_KEY]).toEqual({
@@ -175,6 +193,41 @@ describe("refreshUpstreamMappings", () => {
 			aniListCrosswalks: {},
 			fetchedAt: Date.now(),
 			etag: "canonical-etag",
+		});
+	});
+
+	it("reports unchanged when a download contains the same mapping facts", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
+		const entries = {
+			1: [{ kind: "tmdb-movie" as const, id: tmdb(300) }],
+		};
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				entries,
+				aniListCrosswalks: { "mal:5114": aid(1) },
+				fetchedAt: Date.now() - UPSTREAM_REFRESH_INTERVAL_MS - 1,
+				etag: "old-etag",
+			},
+		});
+		mockAniBridgeResponse(
+			createAniBridgeResponse(
+				JSON.stringify({
+					"anilist:1": { "tmdb_movie:300": {} },
+					"mal:5114": { "anilist:1": {} },
+				}),
+				{ ETag: "new-etag" },
+			),
+		);
+
+		await expect(refreshUpstreamMappings()).resolves.toBe(false);
+
+		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
+		expect(stored[UPSTREAM_STORAGE_KEY]).toEqual({
+			entries,
+			aniListCrosswalks: { "mal:5114": aid(1) },
+			fetchedAt: Date.now(),
+			etag: "new-etag",
 		});
 	});
 

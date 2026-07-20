@@ -17,7 +17,7 @@ const clearAutoResultsMock = vi.hoisted(() => vi.fn());
 const clearManualFactsMock = vi.hoisted(() => vi.fn());
 const clearManualSeerrTargetsMock = vi.hoisted(() => vi.fn());
 const clearUpstreamMappingsMock = vi.hoisted(() => vi.fn());
-const refreshUpstreamMappingsMock = vi.hoisted(() => vi.fn());
+const refreshMappingPipelineMock = vi.hoisted(() => vi.fn());
 const clearAllTtlCachesMock = vi.hoisted(() => vi.fn());
 const getExtensionOptionsSnapshotMock = vi.hoisted(() => vi.fn());
 const resetAllSettingsSnapshotMock = vi.hoisted(() => vi.fn());
@@ -49,7 +49,10 @@ vi.mock("@/mapping/seerr-target.store", () => ({
 
 vi.mock("@/mapping/upstream.store", () => ({
 	clearUpstreamMappings: clearUpstreamMappingsMock,
-	refreshUpstreamMappings: refreshUpstreamMappingsMock,
+}));
+
+vi.mock("@/background/mapping-refresh", () => ({
+	refreshMappingPipeline: refreshMappingPipelineMock,
 }));
 
 vi.mock("@/providers/seerr/csrf-token", () => ({
@@ -118,7 +121,7 @@ describe("api services", () => {
 		clearManualFactsMock.mockImplementation(async () => {});
 		clearManualSeerrTargetsMock.mockImplementation(async () => {});
 		clearUpstreamMappingsMock.mockImplementation(async () => {});
-		refreshUpstreamMappingsMock.mockImplementation(async () => {});
+		refreshMappingPipelineMock.mockResolvedValue(false);
 		clearAllTtlCachesMock.mockImplementation(async () => {});
 		getExtensionOptionsSnapshotMock.mockResolvedValue(createOptions());
 		resetAllSettingsSnapshotMock.mockImplementation(async () => {});
@@ -168,7 +171,19 @@ describe("api services", () => {
 			disconnectedProviders: ["radarr"],
 		});
 
-		expect(refreshUpstreamMappingsMock).toHaveBeenCalledTimes(1);
+		expect(refreshMappingPipelineMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not duplicate the mapping revision after changed upstream facts", async () => {
+		const options = createOptions({ seerrConfigured: true });
+		refreshMappingPipelineMock.mockResolvedValueOnce(true);
+
+		await handleProviderConnectionChanged(options, {
+			changedProviders: ["sonarr"],
+		});
+
+		expect(refreshMappingPipelineMock).toHaveBeenCalledOnce();
+		expect(bumpMappingsRevisionMock).not.toHaveBeenCalled();
 	});
 
 	it("preserves auto mappings when clearing persistent caches", async () => {

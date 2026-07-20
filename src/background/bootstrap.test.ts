@@ -31,9 +31,11 @@ vi.mock("@/rpc", () => ({
 }));
 
 vi.mock("@/rpc/handlers", () => ({
-	apiHandlers: {
-		refreshMappingPipeline: refreshMappingPipelineMock,
-	},
+	apiHandlers: {},
+}));
+
+vi.mock("@/background/mapping-refresh", () => ({
+	refreshMappingPipeline: refreshMappingPipelineMock,
 }));
 
 vi.mock("@/shared/utils/logger", () => ({
@@ -108,5 +110,24 @@ describe("bootstrapBackground", () => {
 		});
 		expect(loggerConfigureMock).toHaveBeenCalledWith({ enabled: true });
 		addMessageListener.mockRestore();
+	});
+
+	it("runs the background mapping refresh workflow on startup", async () => {
+		initializeSettingsStorageMock.mockImplementation(async () => {});
+		hasConfiguredProviderCredentialsMock.mockReturnValue(true);
+		let onStartupListener!: Parameters<
+			typeof browser.runtime.onStartup.addListener
+		>[0];
+		const addStartupListener = vi
+			.spyOn(browser.runtime.onStartup, "addListener")
+			.mockImplementation((listener) => {
+				onStartupListener = listener;
+			});
+
+		bootstrapBackground();
+		await onStartupListener();
+
+		expect(refreshMappingPipelineMock).toHaveBeenCalledOnce();
+		addStartupListener.mockRestore();
 	});
 });

@@ -39,7 +39,7 @@ async function refreshSeerrMappings(
 ): Promise<void> {
 	queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
 	try {
-		await api.initMappings();
+		await api.refreshMappingPipeline();
 		queryClient.invalidateQueries({
 			queryKey: queryKeys.mappingIdentitiesRoot(),
 		});

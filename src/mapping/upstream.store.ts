@@ -156,7 +156,7 @@ export async function listAllSeerrUpstreamTargets(): Promise<
 	return records.toSorted((left, right) => left.anilistId - right.anilistId);
 }
 
-export async function refreshUpstreamMappings(): Promise<void> {
+export async function refreshUpstreamMappings(): Promise<boolean> {
 	const next = writes
 		.catch(() => {})
 		.then(async () => {
@@ -168,7 +168,7 @@ export async function refreshUpstreamMappings(): Promise<void> {
 				previous?.entries !== undefined &&
 				Date.now() - previous.fetchedAt < UPSTREAM_REFRESH_INTERVAL_MS
 			) {
-				return;
+				return false;
 			}
 
 			/** LEGACY: omit ETag until projection-only snapshots have completed one full refresh. */
@@ -184,8 +184,10 @@ export async function refreshUpstreamMappings(): Promise<void> {
 					fetchedAt: Date.now(),
 					...(previous.etag ? { etag: previous.etag } : {}),
 				});
-				return;
+				return false;
 			}
+
+			const changed = haveMappingFactsChanged(previous, result.parsed);
 
 			await upstreamMappings.setValue({
 				entries: result.parsed.entries,
@@ -193,6 +195,7 @@ export async function refreshUpstreamMappings(): Promise<void> {
 				fetchedAt: Date.now(),
 				...(result.etag ? { etag: result.etag } : {}),
 			});
+			return changed;
 		});
 
 	writes = next.then(
@@ -200,7 +203,7 @@ export async function refreshUpstreamMappings(): Promise<void> {
 		() => {},
 	);
 
-	await next;
+	return next;
 }
 
 export async function clearUpstreamMappings(): Promise<void> {
@@ -230,6 +233,19 @@ function normalizeSnapshot(snapshot: UpstreamSnapshot): UpstreamSnapshot {
 		fetchedAt: snapshot.fetchedAt,
 		...(snapshot.etag ? { etag: snapshot.etag } : {}),
 	};
+}
+
+function haveMappingFactsChanged(
+	previous: UpstreamSnapshot | null,
+	next: Pick<UpstreamSnapshot, "entries" | "aniListCrosswalks">,
+): boolean {
+	if (previous?.entries === undefined || next.entries === undefined) return true;
+
+	return (
+		JSON.stringify(previous.entries) !== JSON.stringify(next.entries) ||
+		JSON.stringify(previous.aniListCrosswalks ?? {}) !==
+			JSON.stringify(next.aniListCrosswalks ?? {})
+	);
 }
 
 function normalizeAniListCrosswalkKeys(

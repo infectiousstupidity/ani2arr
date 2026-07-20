@@ -15,30 +15,30 @@ describe("getSourceAniListIdMap", () => {
 			.fn()
 			.mockResolvedValueOnce(null)
 			.mockResolvedValueOnce(aid(21));
-		const refreshUpstreamMappings = vi.fn(async () => {});
+		const refreshMappingPipeline = vi.fn(async () => {});
 
 		await expect(
 			getSourceAniListIdMap(
-				{ getAniListIdForSource, refreshUpstreamMappings },
+				{ getAniListIdForSource, refreshMappingPipeline },
 				[malSource],
 			),
 		).resolves.toEqual({ "mal:5114": aid(21) });
 
-		expect(refreshUpstreamMappings).toHaveBeenCalledTimes(1);
+		expect(refreshMappingPipeline).toHaveBeenCalledTimes(1);
 		expect(getAniListIdForSource).toHaveBeenCalledTimes(2);
 	});
 
 	it("does not refresh when only AniList sources are requested", async () => {
 		const getAniListIdForSource = vi.fn(async () => aid(21));
-		const refreshUpstreamMappings = vi.fn(async () => {});
+		const refreshMappingPipeline = vi.fn(async () => {});
 
 		await expect(
 			getSourceAniListIdMap(
-				{ getAniListIdForSource, refreshUpstreamMappings },
+				{ getAniListIdForSource, refreshMappingPipeline },
 				[{ source: "anilist", id: aid(21) }],
 			),
 		).resolves.toEqual({ "anilist:21": aid(21) });
 
-		expect(refreshUpstreamMappings).not.toHaveBeenCalled();
+		expect(refreshMappingPipeline).not.toHaveBeenCalled();
 	});
 });
