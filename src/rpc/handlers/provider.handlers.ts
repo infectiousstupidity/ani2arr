@@ -12,13 +12,22 @@ import {
 	getSeerrConfig,
 } from "@/background/provider-config";
 import { buildProviderOpenUrl } from "@/providers/provider-links";
+import { getSeerrXsrfToken } from "@/providers/seerr/csrf-token";
 import type {
+	CheckSeerrSessionInput,
 	OpenProviderPageInput,
 	OpenProviderPageOutput,
 	OpenSeerrPageInput,
 	OpenSeerrPageOutput,
 	ProviderConnectionTestInput,
+	TestSeerrApiKeyConnectionInput,
 } from "@/rpc/types";
+import {
+	normalizeSeerrApiKeyConnectionInput,
+	normalizeSeerrUrlInput,
+} from "@/settings/seerr-config";
+import { createError } from "@/shared/errors/error-utils";
+import { ErrorCode } from "@/shared/errors/error.types";
 import { normalizeInputCredentials } from "./provider-credentials";
 
 async function openTab(url?: string | null): Promise<{ opened: boolean }> {
@@ -81,8 +90,49 @@ export const providerHandlers = {
 			normalizeInputCredentials("radarr", credentials),
 		),
 
-	testSeerrConnection: ({ credentials }: ProviderConnectionTestInput) =>
-		seerrClient.validateConnection(
-			normalizeInputCredentials("seerr", credentials),
-		),
+	checkSeerrSession({ url }: CheckSeerrSessionInput) {
+		const normalized = normalizeSeerrUrlInput(url);
+		if (!normalized) throw new Error("Seerr URL is required.");
+
+		return seerrClient.validateConnection({
+			url: normalized.url,
+			auth: { mode: "session" },
+		});
+	},
+
+	testSeerrApiKeyConnection(input: TestSeerrApiKeyConnectionInput) {
+		const normalized = normalizeSeerrApiKeyConnectionInput(input);
+		return seerrClient.validateConnection({
+			url: normalized.url,
+			auth: normalized.auth,
+		});
+	},
+
+	async checkConfiguredSeerrConnection() {
+		const connection = await getSeerrConfig();
+		if (!connection) throw new Error("Seerr connection is required.");
+		return seerrClient.validateConnection(connection);
+	},
+
+	async checkConfiguredSeerrCsrfSupport() {
+		const connection = await getSeerrConfig();
+		if (!connection || connection.auth.mode !== "session") {
+			throw createError(
+				ErrorCode.CONFIGURATION_ERROR,
+				"A configured Seerr browser session is required for CSRF support.",
+				"Connect Seerr with browser-session authentication before enabling CSRF support.",
+			);
+		}
+
+		const token = await getSeerrXsrfToken(connection.url);
+		if (!token) {
+			throw createError(
+				ErrorCode.SEERR_CSRF_REQUIRED,
+				"Cookie permission is enabled, but the configured Seerr XSRF token is unavailable.",
+				"Cookie access is enabled, but no Seerr XSRF token is available. Open or reload the configured Seerr server in the same browser profile, then try again. HTTPS may be required, and Firefox Containers can isolate the cookie.",
+			);
+		}
+
+		return { ok: true as const };
+	},
 };

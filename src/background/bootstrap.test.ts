@@ -8,7 +8,8 @@ const initializeSettingsStorageMock = vi.hoisted(() => vi.fn());
 const getExtensionOptionsSnapshotMock = vi.hoisted(() => vi.fn());
 const registerAni2arrApiMock = vi.hoisted(() => vi.fn());
 const refreshMappingPipelineMock = vi.hoisted(() => vi.fn());
-const hasConfiguredConnectionCredentialsMock = vi.hoisted(() => vi.fn());
+const hasConfiguredProviderCredentialsMock = vi.hoisted(() => vi.fn());
+const hasConfiguredSeerrConnectionMock = vi.hoisted(() => vi.fn());
 const loggerConfigureMock = vi.hoisted(() => vi.fn());
 const backgroundInfoMock = vi.hoisted(() => vi.fn());
 
@@ -17,8 +18,12 @@ vi.mock("@/settings/store", () => ({
 	initializeSettingsStorage: initializeSettingsStorageMock,
 }));
 
-vi.mock("@/settings/connection-config", () => ({
-	hasConfiguredConnectionCredentials: hasConfiguredConnectionCredentialsMock,
+vi.mock("@/settings/provider-config", () => ({
+	hasConfiguredProviderCredentials: hasConfiguredProviderCredentialsMock,
+}));
+
+vi.mock("@/settings/seerr-config", () => ({
+	hasConfiguredSeerrConnection: hasConfiguredSeerrConnectionMock,
 }));
 
 vi.mock("@/rpc", () => ({
@@ -54,7 +59,8 @@ function createDeferred(): {
 describe("bootstrapBackground", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		hasConfiguredConnectionCredentialsMock.mockReturnValue(false);
+		hasConfiguredProviderCredentialsMock.mockReturnValue(false);
+		hasConfiguredSeerrConnectionMock.mockReturnValue(false);
 		getExtensionOptionsSnapshotMock.mockResolvedValue({ debugLogging: true });
 	});
 

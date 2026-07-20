@@ -1,5 +1,4 @@
-/** Provider connection action hooks for the options page. */
-// src/options-page/hooks/provider-connection-actions.ts
+/** Arr provider connection actions for the options page. */
 
 import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -12,14 +11,13 @@ import { queryKeys } from "@/queries/query-keys";
 import {
 	useExtensionOptions,
 	useSaveProviderConnection,
-	useSaveSeerrConnection,
 } from "@/queries/options";
 import { getAni2arrApi, type Ani2arrApi } from "@/rpc";
 import {
 	cleanupUnusedProviderHostPermission,
 	requestProviderConnectionPermission,
 } from "@/settings/provider-permissions";
-import { normalizeConnectionInput } from "@/settings/connection-config";
+import { normalizeProviderConnectionInput } from "@/settings/provider-config";
 import { getActionErrorMessage } from "./action-helpers";
 
 type FetchFormResources = (
@@ -59,7 +57,7 @@ function useProviderConnectionActions({
 			setError(null);
 
 			try {
-				const normalized = normalizeConnectionInput(
+				const normalized = normalizeProviderConnectionInput(
 					{ url: draftUrl, apiKey: draftApiKey },
 					provider,
 				);
@@ -76,7 +74,6 @@ function useProviderConnectionActions({
 
 				const api = getAni2arrApi();
 				const formResources = await fetchFormResources(api, normalized);
-
 				const newSettings = await saveProviderConnection.mutateAsync({
 					provider,
 					credentials: normalized,
@@ -91,7 +88,6 @@ function useProviderConnectionActions({
 				await api.notifyProviderConnectionChanged({
 					changedProviders: [provider],
 				});
-
 				await cleanupUnusedProviderHostPermission(
 					currentSettings.providers[provider].url,
 					newSettings,
@@ -99,7 +95,9 @@ function useProviderConnectionActions({
 
 				return true;
 			} catch (error_) {
-				setError(getActionErrorMessage(error_, `Failed to connect to ${label}.`));
+				setError(
+					getActionErrorMessage(error_, `Failed to connect to ${label}.`),
+				);
 				return false;
 			} finally {
 				setIsConnecting(false);
@@ -129,11 +127,9 @@ function useProviderConnectionActions({
 			});
 
 			resetAfterProviderConnectionChange(queryClient, provider);
-
 			await getAni2arrApi().notifyProviderConnectionChanged({
 				disconnectedProviders: [provider],
 			});
-
 			await cleanupUnusedProviderHostPermission(oldUrl, newSettings);
 
 			return true;
@@ -183,108 +179,5 @@ export function useRadarrActions() {
 		disconnectRadarr: actions.disconnect,
 		isConnecting: actions.isConnecting,
 		error: actions.error,
-	};
-}
-
-export function useSeerrActions() {
-	const queryClient = useQueryClient();
-	const { data: currentSettings } = useExtensionOptions();
-	const saveSeerrConnection = useSaveSeerrConnection();
-
-	const [isConnecting, setIsConnecting] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const connectSeerr = useCallback(
-		async (draftUrl: string, draftApiKey: string) => {
-			if (!currentSettings) return false;
-
-			setIsConnecting(true);
-			setError(null);
-
-			try {
-				const normalized = normalizeConnectionInput(
-					{
-						url: draftUrl,
-						apiKey: draftApiKey,
-					},
-					"seerr",
-				);
-				if (!normalized) {
-					throw new Error("Please enter a valid Seerr URL and API key.");
-				}
-
-				const permission = await requestProviderConnectionPermission(
-					normalized.url,
-				);
-				if (!permission.ok || !permission.value.granted) {
-					throw new Error("Host permission was denied.");
-				}
-
-				const credentials = {
-					url: normalized.url,
-					apiKey: normalized.apiKey,
-				};
-				const api = getAni2arrApi();
-				await api.testSeerrConnection({ credentials });
-				const newSettings = await saveSeerrConnection.mutateAsync({
-					credentials,
-				});
-
-				queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
-				try {
-					await api.refreshUpstreamMappings();
-					queryClient.invalidateQueries({
-						queryKey: queryKeys.mappingIdentitiesRoot(),
-					});
-					queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-					queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
-				} catch {
-					// Seerr remains usable if the upstream mapping refresh is temporarily unavailable.
-				}
-				await cleanupUnusedProviderHostPermission(
-					currentSettings.seerr.url,
-					newSettings,
-				);
-
-				return true;
-			} catch (error_) {
-				setError(getActionErrorMessage(error_, "Failed to connect to Seerr."));
-				return false;
-			} finally {
-				setIsConnecting(false);
-			}
-		},
-		[currentSettings, queryClient, saveSeerrConnection],
-	);
-
-	const disconnectSeerr = useCallback(async () => {
-		if (!currentSettings) return false;
-
-		setIsConnecting(true);
-		setError(null);
-
-		try {
-			const oldUrl = currentSettings.seerr.url;
-			const newSettings = await saveSeerrConnection.mutateAsync({
-				credentials: null,
-			});
-
-			queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
-			await cleanupUnusedProviderHostPermission(oldUrl, newSettings);
-
-			return true;
-		} catch (error_) {
-			setError(getActionErrorMessage(error_, "Failed to disconnect Seerr."));
-			return false;
-		} finally {
-			setIsConnecting(false);
-		}
-	}, [currentSettings, queryClient, saveSeerrConnection]);
-
-	return {
-		connectSeerr,
-		disconnectSeerr,
-		isConnecting,
-		error,
 	};
 }

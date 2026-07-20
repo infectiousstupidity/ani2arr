@@ -7,9 +7,9 @@ import { isPublicHttpProviderUrl } from "@/providers/settings/insecure-url";
 import type { Provider } from "@/providers/types";
 import { useExtensionOptions } from "@/queries/options";
 import {
-	getConnectionDraft,
-	hasConfiguredConnectionCredentials,
-} from "@/settings/connection-config";
+	getProviderConnectionDraft,
+	hasConfiguredProviderCredentials,
+} from "@/settings/provider-config";
 import Button from "@/shared/ui/primitives/button";
 import { Input, PasswordInput } from "@/shared/ui/primitives/input";
 import { SettingsRow, SettingsSection } from "./settings-section";
@@ -32,11 +32,11 @@ export const ProviderConnectionForm = ({
 	urlPlaceholder,
 }: ProviderConnectionFormProps) => {
 	const { data: savedSettings } = useExtensionOptions();
-	const savedCredentials = getConnectionDraft(savedSettings, provider);
+	const savedCredentials = getProviderConnectionDraft(savedSettings, provider);
 
 	const savedUrl = savedCredentials.url;
 	const savedApiKey = savedCredentials.apiKey;
-	const isConfigured = hasConfiguredConnectionCredentials(
+	const isConfigured = hasConfiguredProviderCredentials(
 		savedSettings,
 		provider,
 	);

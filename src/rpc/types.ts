@@ -17,6 +17,7 @@ import type {
 } from "@/providers/radarr/types";
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 import type {
+	SeerrAccountSummary,
 	SeerrMediaDetails,
 	SeerrMediaRequest,
 	SeerrMediaStatus,
@@ -141,6 +142,19 @@ export type GetAniListIdForSourceOutput = AniListId | null;
 
 export type ProviderConnectionTestInput = {
 	credentials: ProviderCredentials;
+};
+
+export type CheckSeerrSessionInput = {
+	url: string;
+};
+
+export type TestSeerrApiKeyConnectionInput = {
+	url: string;
+	apiKey: string;
+};
+
+export type SeerrConnectionCheckOutput = {
+	account: SeerrAccountSummary;
 };
 
 export type RequestInSeerrInput =

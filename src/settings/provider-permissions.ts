@@ -1,6 +1,7 @@
 /** Settings-facing provider permission lifecycle helpers for options actions. */
 // src/settings/provider-permissions.ts
 
+import { browser } from "wxt/browser";
 import {
 	getProviderHostPermissionPattern,
 	removeProviderHostPermission,
@@ -10,6 +11,26 @@ import type { ExtensionOptions } from "./types";
 
 export const requestProviderConnectionPermission = (url: string) =>
 	requestProviderHostPermission(url);
+
+export async function requestSeerrCsrfCookiePermission(): Promise<boolean> {
+	try {
+		return await browser.permissions.request({
+			permissions: ["cookies"],
+		});
+	} catch {
+		return false;
+	}
+}
+
+export async function removeSeerrCsrfCookiePermission(): Promise<void> {
+	try {
+		await browser.permissions.remove({
+			permissions: ["cookies"],
+		});
+	} catch {
+		// Permission may already be absent or browser-managed.
+	}
+}
 
 function getPermissionPattern(url: string | undefined): string | null {
 	if (!url) return null;

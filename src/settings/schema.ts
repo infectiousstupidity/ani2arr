@@ -1,5 +1,4 @@
-/** Runtime-validated extension settings schema and default factories owned by the options domain. */
-// src/settings/schema.ts
+/** Runtime-validated extension settings schema and default factories owned by settings. */
 
 import * as v from "valibot";
 import {
@@ -12,6 +11,7 @@ import {
 	normalizeRadarrDefaults,
 	RadarrDefaultsSchema,
 } from "@/providers/radarr/form-state";
+import type { SeerrConnection } from "@/providers/seerr/types";
 import type { ProviderCredentials } from "@/providers/types";
 import type {
 	ExtensionOptions,
@@ -30,10 +30,15 @@ export const createDefaultProviderConnection = (): ProviderCredentials => ({
 	apiKey: "",
 });
 
+export const createDefaultSeerrConnection = (): SeerrConnection => ({
+	url: "",
+	auth: { mode: "session" },
+});
+
 export const createDefaultPrivateConnections = (): PrivateConnections => ({
 	sonarr: createDefaultProviderConnection(),
 	radarr: createDefaultProviderConnection(),
-	seerr: createDefaultProviderConnection(),
+	seerr: createDefaultSeerrConnection(),
 });
 
 export const createDefaultExtensionOptions = (): ExtensionOptions => ({
@@ -47,7 +52,7 @@ export const createDefaultExtensionOptions = (): ExtensionOptions => ({
 			defaults: createDefaultRadarrFormState(),
 		},
 	},
-	seerr: createDefaultProviderConnection(),
+	seerr: createDefaultSeerrConnection(),
 	ui: createDefaultUiOptions(),
 	debugLogging: false,
 });
@@ -65,7 +70,7 @@ export const createDefaultPublicOptions = (): PublicOptions => {
 				isConfigured: false,
 			},
 		},
-		seerr: { isConfigured: false },
+		seerr: { isConfigured: false, authMode: null },
 		ui: defaults.ui,
 		debugLogging: false,
 	};
@@ -76,10 +81,68 @@ const ProviderCredentialsSchema = v.object({
 	apiKey: v.string(),
 });
 
+const SeerrAccountSummarySchema = v.object({
+	id: v.pipe(v.number(), v.finite(), v.integer(), v.minValue(1)),
+	displayName: v.string(),
+	avatar: v.optional(v.string()),
+});
+
+const SeerrAuthSchema = v.union([
+	v.object({ mode: v.literal("session") }),
+	v.object({
+		mode: v.literal("apiKey"),
+		apiKey: v.string(),
+	}),
+]);
+
+export const SeerrConnectionSchema = v.object({
+	url: v.string(),
+	auth: SeerrAuthSchema,
+	account: v.optional(SeerrAccountSummarySchema),
+});
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// LEGACY: Remove after upgrades from API-key-only Seerr records are unsupported.
+export function migrateLegacySeerrConnection(value: unknown): SeerrConnection {
+	const current = v.safeParse(SeerrConnectionSchema, value);
+	if (current.success) {
+		const account = current.output.account;
+		return {
+			url: current.output.url,
+			auth: current.output.auth,
+			...(account
+				? {
+						account: {
+							id: account.id,
+							displayName: account.displayName,
+							...(account.avatar === undefined
+								? {}
+								: { avatar: account.avatar }),
+						},
+					}
+				: {}),
+		};
+	}
+
+	if (!isRecord(value)) return createDefaultSeerrConnection();
+
+	const url = typeof value.url === "string" ? value.url.trim() : "";
+	const apiKey = typeof value.apiKey === "string" ? value.apiKey.trim() : "";
+	if (!url || !apiKey) return createDefaultSeerrConnection();
+
+	return {
+		url,
+		auth: { mode: "apiKey", apiKey },
+	};
+}
+
 export const PrivateConnectionsSchema = v.object({
 	sonarr: ProviderCredentialsSchema,
 	radarr: ProviderCredentialsSchema,
-	seerr: ProviderCredentialsSchema,
+	seerr: SeerrConnectionSchema,
 });
 
 export const StoredPrivateConnectionsSchema = v.pipe(
@@ -94,10 +157,7 @@ export const StoredPrivateConnectionsSchema = v.pipe(
 			ProviderCredentialsSchema,
 			createDefaultProviderConnection(),
 		),
-		seerr: v.fallback(
-			ProviderCredentialsSchema,
-			createDefaultProviderConnection(),
-		),
+		seerr: v.pipe(v.unknown(), v.transform(migrateLegacySeerrConnection)),
 	}),
 );
 
@@ -170,6 +230,10 @@ export const PublicOptionsSchema = v.pipe(
 				v.transform(asRecord),
 				v.object({
 					isConfigured: v.fallback(v.boolean(), false),
+					authMode: v.fallback(
+						v.nullable(v.picklist(["session", "apiKey"])),
+						null,
+					),
 				}),
 			),
 			createDefaultPublicOptions().seerr,

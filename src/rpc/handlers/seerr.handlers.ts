@@ -2,7 +2,7 @@
 // src/rpc/handlers/seerr.handlers.ts
 
 import { anilistMetadataStore, seerrClient } from "@/background/api-services";
-import { requireSeerrCredentials } from "@/background/provider-config";
+import { requireSeerrConnection } from "@/background/provider-config";
 import type { AniListId, AniListMetadata } from "@/anilist/types";
 import { resolveTitlePreference } from "@/anilist/title";
 import {
@@ -76,25 +76,25 @@ export const seerrHandlers = {
 	},
 
 	async requestInSeerr(input: RequestInSeerrInput) {
-		const credentials = await requireSeerrCredentials();
-		return seerrClient.requestMedia(buildSeerrRequestPayload(input), credentials);
+		const connection = await requireSeerrConnection();
+		return seerrClient.requestMedia(buildSeerrRequestPayload(input), connection);
 	},
 
 	async getSeerrMediaStatus(input: GetSeerrMediaStatusInput) {
-		const credentials = await requireSeerrCredentials();
+		const connection = await requireSeerrConnection();
 		return {
-			status: await seerrClient.getMediaStatus(input, credentials),
+			status: await seerrClient.getMediaStatus(input, connection),
 		};
 	},
 
 	async searchSeerrMedia(input: { query: string }) {
-		const credentials = await requireSeerrCredentials();
-		return seerrClient.searchMedia(input.query, credentials);
+		const connection = await requireSeerrConnection();
+		return seerrClient.searchMedia(input.query, connection);
 	},
 
 	async getSeerrMediaDetails(input: GetSeerrMediaDetailsInput) {
-		const credentials = await requireSeerrCredentials();
-		return seerrClient.getMediaDetails(input, credentials);
+		const connection = await requireSeerrConnection();
+		return seerrClient.getMediaDetails(input, connection);
 	},
 
 	async getSeerrLinkedAniListEntries(input: GetSeerrLinkedAniListEntriesInput) {

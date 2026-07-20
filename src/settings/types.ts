@@ -4,6 +4,7 @@
 import type { AniListTitleLanguage } from "@/anilist/title";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
+import type { SeerrConnection } from "@/providers/seerr/types";
 import type { ProviderCredentials } from "@/providers/types";
 
 export type BadgeVisibility = "always" | "hover";
@@ -48,7 +49,7 @@ export interface ExtensionOptions {
 			defaults: RadarrFormState;
 		};
 	};
-	seerr: ProviderCredentials;
+	seerr: SeerrConnection;
 	ui: UiOptions;
 	debugLogging: boolean;
 }
@@ -56,7 +57,7 @@ export interface ExtensionOptions {
 export interface PrivateConnections {
 	sonarr: ProviderCredentials;
 	radarr: ProviderCredentials;
-	seerr: ProviderCredentials;
+	seerr: SeerrConnection;
 }
 
 export interface PublicOptions {
@@ -72,6 +73,7 @@ export interface PublicOptions {
 	};
 	seerr: {
 		isConfigured: boolean;
+		authMode: SeerrConnection["auth"]["mode"] | null;
 	};
 	ui: UiOptions;
 	debugLogging: boolean;

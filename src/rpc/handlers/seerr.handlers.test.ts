@@ -4,12 +4,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
-import type { ProviderCredentials } from "@/providers/types";
+import type { SeerrConnection } from "@/providers/seerr/types";
 import { seerrHandlers } from "./seerr.handlers";
 
-const credentials: ProviderCredentials = {
+const connection: SeerrConnection = {
 	url: "https://seerr.example",
-	apiKey: "secret",
+	auth: { mode: "session" },
+	account: { id: 1, displayName: "Alice" },
 };
 
 const seerrClientMock = vi.hoisted(() => ({
@@ -21,7 +22,7 @@ const seerrClientMock = vi.hoisted(() => ({
 const anilistMetadataStoreMock = vi.hoisted(() => ({
 	getMetadata: vi.fn(),
 }));
-const requireSeerrCredentialsMock = vi.hoisted(() => vi.fn());
+const requireSeerrConnectionMock = vi.hoisted(() => vi.fn());
 const getEffectiveSeerrTargetMock = vi.hoisted(() => vi.fn());
 const listEffectiveSeerrTargetsMock = vi.hoisted(() => vi.fn());
 const listAllEffectiveSeerrTargetsMock = vi.hoisted(() => vi.fn());
@@ -34,7 +35,7 @@ vi.mock("@/background/api-services", () => ({
 }));
 
 vi.mock("@/background/provider-config", () => ({
-	requireSeerrCredentials: requireSeerrCredentialsMock,
+	requireSeerrConnection: requireSeerrConnectionMock,
 }));
 
 vi.mock("@/mapping/seerr-target.store", () => ({
@@ -48,7 +49,7 @@ vi.mock("@/mapping/seerr-target.store", () => ({
 describe("seerrHandlers", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		requireSeerrCredentialsMock.mockResolvedValue(credentials);
+		requireSeerrConnectionMock.mockResolvedValue(connection);
 		getEffectiveSeerrTargetMock.mockResolvedValue(null);
 		listEffectiveSeerrTargetsMock.mockResolvedValue([]);
 		listAllEffectiveSeerrTargetsMock.mockResolvedValue([]);
@@ -70,7 +71,7 @@ describe("seerrHandlers", () => {
 
 		expect(seerrClientMock.requestMedia).toHaveBeenCalledWith(
 			{ mediaType: "movie", mediaId: parseTmdbId(123) },
-			credentials,
+			connection,
 		);
 	});
 
@@ -89,7 +90,7 @@ describe("seerrHandlers", () => {
 				mediaType: "movie",
 				tmdbId: parseTmdbId(123),
 			},
-			credentials,
+			connection,
 		);
 	});
 
@@ -110,7 +111,7 @@ describe("seerrHandlers", () => {
 				tmdbId: parseTmdbId(456),
 				seasons: [1, 2],
 			},
-			credentials,
+			connection,
 		);
 	});
 
@@ -240,10 +241,7 @@ describe("seerrHandlers", () => {
 		).resolves.toEqual([
 			{ mediaType: "movie", tmdbId: parseTmdbId(123), title: "Movie" },
 		]);
-		expect(seerrClientMock.searchMedia).toHaveBeenCalledWith(
-			"movie",
-			credentials,
-		);
+		expect(seerrClientMock.searchMedia).toHaveBeenCalledWith("movie", connection);
 	});
 
 	it("reads Seerr details through configured credentials", async () => {
@@ -267,7 +265,7 @@ describe("seerrHandlers", () => {
 		});
 		expect(seerrClientMock.getMediaDetails).toHaveBeenCalledWith(
 			{ mediaType: "movie", tmdbId: parseTmdbId(123) },
-			credentials,
+			connection,
 		);
 	});
 

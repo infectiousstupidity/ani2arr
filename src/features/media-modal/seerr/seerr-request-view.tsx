@@ -12,11 +12,17 @@ import {
 } from "@/queries/seerr";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { RequestInSeerrInput, SeerrRequestTarget } from "@/rpc/types";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
+import type { ExtensionError } from "@/shared/errors/error.types";
 import type { MediaModalContainer } from "../types";
 import { ModalShell } from "../chrome/modal-shell";
 import { SeerrFooter } from "./seerr-footer";
 import { SeerrRequestInfoPane } from "./seerr-request-info-pane";
 import { SeerrRequestMainPane } from "./seerr-request-main-pane";
+import {
+	getSeerrConnectionRecoveryAction,
+	getSeerrConnectionRecoveryLabel,
+} from "./seerr-connection-recovery";
 import {
 	getDefaultSelectedSeasons,
 	getSeerrDetailsSeasonKey,
@@ -50,17 +56,55 @@ function buildRequestInput(input: {
 	};
 }
 
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) return error.message;
-	return fallback;
+function getSeerrRequestFeedback(input: {
+	isConfigured: boolean;
+	authMode: "session" | "apiKey" | null;
+	detailsError: ExtensionError | null;
+	requestError: ExtensionError | null;
+}) {
+	const connectionRecoveryAction = getSeerrConnectionRecoveryAction({
+		isConfigured: input.isConfigured,
+		authMode: input.authMode,
+		errors: [input.detailsError, input.requestError],
+	});
+
+	return {
+		connectionRecoveryAction,
+		connectionActionLabel: connectionRecoveryAction
+			? getSeerrConnectionRecoveryLabel(connectionRecoveryAction)
+			: null,
+		detailsErrorMessage: input.detailsError
+			? getUserErrorMessage(
+					input.detailsError,
+					"Failed to load Seerr media details.",
+				)
+			: null,
+		requestErrorMessage: input.requestError
+			? getUserErrorMessage(input.requestError, "Failed to request in Seerr.")
+			: null,
+	};
+}
+
+function canRequestInSeerr(input: {
+	isConfigured: boolean;
+	needsConnectionRecovery: boolean;
+	target: SeerrRequestTarget | null;
+	selectedSeasons: readonly number[];
+	isMovieRequestable: boolean;
+}): boolean {
+	if (!input.isConfigured || input.needsConnectionRecovery) return false;
+	return input.target?.mediaType === "tv"
+		? input.selectedSeasons.length > 0
+		: input.isMovieRequestable;
 }
 
 export function SeerrRequestView(props: {
 	anilistId: AniListId;
+	authMode: "session" | "apiKey" | null;
 	container: MediaModalContainer | undefined;
 	contentContainer: HTMLDivElement | null;
 	details: SeerrMediaDetails | null;
-	detailsError: string | null;
+	detailsError: ExtensionError | null;
 	header: ReactNode;
 	isConfigured: boolean;
 	isLoading: boolean;
@@ -70,6 +114,7 @@ export function SeerrRequestView(props: {
 }): React.JSX.Element {
 	const {
 		anilistId,
+		authMode,
 		container,
 		contentContainer,
 		details,
@@ -112,18 +157,23 @@ export function SeerrRequestView(props: {
 		selectedSeasonDraft?.key === selectedSeasonKey
 			? selectedSeasonDraft.seasons
 			: defaultSelectedSeasons;
-	const requestError = request.error
-		? getErrorMessage(request.error, "Failed to request in Seerr.")
-		: null;
+	const feedback = getSeerrRequestFeedback({
+		isConfigured,
+		authMode,
+		detailsError,
+		requestError: request.error,
+	});
 	const isMovieRequestable =
 		target?.mediaType === "movie" &&
 		details !== null &&
 		isRequestableSeerrStatus(details.status);
-	const canRequest =
-		isConfigured &&
-		(target?.mediaType === "tv"
-			? selectedSeasons.length > 0
-			: isMovieRequestable);
+	const canRequest = canRequestInSeerr({
+		isConfigured,
+		needsConnectionRecovery: feedback.connectionRecoveryAction !== null,
+		target,
+		selectedSeasons,
+		isMovieRequestable,
+	});
 	const requestLabel =
 		target?.mediaType === "tv" ? "Request selected" : "Request movie";
 	const isBusy = request.isPending || clearManualTarget.isPending;
@@ -144,6 +194,19 @@ export function SeerrRequestView(props: {
 		request.mutate(requestInput);
 	};
 
+	const handleConnectionAction = (): void => {
+		if (feedback.connectionRecoveryAction === "csrf") {
+			request.reset();
+			openOptionsPage({
+				sectionId: "seerr",
+				enableSeerrCsrf: true,
+			});
+			return;
+		}
+
+		openOptionsPage({ sectionId: "seerr" });
+	};
+
 	return (
 		<ModalShell
 			contentContainer={contentContainer}
@@ -153,10 +216,12 @@ export function SeerrRequestView(props: {
 					target={target}
 					details={details}
 					isLoading={isLoading}
-					errorMessage={detailsError}
+					errorMessage={feedback.detailsErrorMessage}
 					selectedSeasons={selectedSeasons}
 					isConfigured={isConfigured}
-					requestError={requestError}
+					requestError={feedback.requestErrorMessage}
+					connectionActionLabel={feedback.connectionActionLabel}
+					onConnectionAction={handleConnectionAction}
 					onSelectAllRequestable={() =>
 						setSelectedSeasonDraft({
 							key: selectedSeasonKey,

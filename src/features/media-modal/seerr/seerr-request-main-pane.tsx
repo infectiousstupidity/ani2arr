@@ -14,6 +14,8 @@ export function SeerrRequestMainPane(props: {
 	selectedSeasons: readonly number[];
 	isConfigured: boolean;
 	requestError: string | null;
+	connectionActionLabel: string | null;
+	onConnectionAction: () => void;
 	onSelectAllRequestable: () => void;
 	onToggleSeason: (seasonNumber: number) => void;
 }): React.JSX.Element {
@@ -25,6 +27,8 @@ export function SeerrRequestMainPane(props: {
 		selectedSeasons,
 		isConfigured,
 		requestError,
+		connectionActionLabel,
+		onConnectionAction,
 		onSelectAllRequestable,
 		onToggleSeason,
 	} = props;
@@ -41,6 +45,19 @@ export function SeerrRequestMainPane(props: {
 				<p className="mt-3 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
 					{requestError}
 				</p>
+			) : null}
+
+			{connectionActionLabel ? (
+				<div className="mt-3">
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={onConnectionAction}
+					>
+						{connectionActionLabel}
+					</Button>
+				</div>
 			) : null}
 
 			{target?.mediaType === "tv" ? (
@@ -78,7 +95,7 @@ export function SeerrRequestMainPane(props: {
 				</div>
 			)}
 
-			{isConfigured ? null : (
+			{isConfigured || connectionActionLabel ? null : (
 				<p className="mt-3 rounded-lg border border-border-primary/50 bg-bg-tertiary/45 px-3 py-3 text-sm text-text-secondary">
 					Configure Seerr before requesting.
 				</p>

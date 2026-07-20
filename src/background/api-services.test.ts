@@ -25,6 +25,7 @@ const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
 const bumpProviderLibraryRevisionMock = vi.hoisted(() => vi.fn());
 const resetAllRevisionsMock = vi.hoisted(() => vi.fn());
 const clearLocalCacheMock = vi.hoisted(() => vi.fn());
+const removeSeerrCsrfCookiePermissionMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/anilist/metadata.store", () => ({
 	AniListMetadataStore: vi.fn(function AniListMetadataStore() {
@@ -49,6 +50,14 @@ vi.mock("@/mapping/seerr-target.store", () => ({
 vi.mock("@/mapping/upstream.store", () => ({
 	clearUpstreamMappings: clearUpstreamMappingsMock,
 	refreshUpstreamMappings: refreshUpstreamMappingsMock,
+}));
+
+vi.mock("@/providers/seerr/csrf-token", () => ({
+	getSeerrXsrfToken: vi.fn(),
+}));
+
+vi.mock("@/settings/provider-permissions", () => ({
+	removeSeerrCsrfCookiePermission: removeSeerrCsrfCookiePermissionMock,
 }));
 
 vi.mock("@/settings/store", () => ({
@@ -93,9 +102,10 @@ function createOptions(input: {
 			},
 		},
 		seerr: {
-			...options.seerr,
 			url: input.seerrConfigured ? "https://seerr.example" : "",
-			apiKey: input.seerrConfigured ? "seerr-key" : "",
+			auth: input.seerrConfigured
+				? { mode: "apiKey", apiKey: "seerr-key" }
+				: { mode: "session" },
 		},
 	};
 }
@@ -116,6 +126,7 @@ describe("api services", () => {
 		bumpProviderLibraryRevisionMock.mockResolvedValue(1);
 		resetAllRevisionsMock.mockImplementation(async () => {});
 		clearLocalCacheMock.mockImplementation(async () => {});
+		removeSeerrCsrfCookiePermissionMock.mockImplementation(async () => {});
 		vi.spyOn(sonarrLibrary, "clearSeriesSnapshotCache").mockResolvedValue();
 		vi.spyOn(sonarrLibrary, "refreshSeriesSnapshots").mockResolvedValue([]);
 		vi.spyOn(radarrLibrary, "clearMovieSnapshotCache").mockResolvedValue();
@@ -180,5 +191,6 @@ describe("api services", () => {
 		expect(clearAutoResultsMock).toHaveBeenCalledWith("sonarr");
 		expect(clearAutoResultsMock).toHaveBeenCalledWith("radarr");
 		expect(resetAllSettingsSnapshotMock).toHaveBeenCalledTimes(1);
+		expect(removeSeerrCsrfCookiePermissionMock).toHaveBeenCalledTimes(1);
 	});
 });

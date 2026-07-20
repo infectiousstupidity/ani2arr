@@ -6,7 +6,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { createDefaultExtensionOptions } from "./schema";
-import { cleanupUnusedProviderHostPermission } from "./provider-permissions";
+import {
+	cleanupUnusedProviderHostPermission,
+	removeSeerrCsrfCookiePermission,
+	requestSeerrCsrfCookiePermission,
+} from "./provider-permissions";
 
 describe("cleanupUnusedProviderHostPermission", () => {
 	afterEach(() => {
@@ -41,5 +45,53 @@ describe("cleanupUnusedProviderHostPermission", () => {
 		expect(removeSpy).toHaveBeenCalledWith({
 			origins: ["http://arr.local/*"],
 		});
+	});
+});
+
+describe("requestSeerrCsrfCookiePermission", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("requests cookie access only when the explicit action runs", async () => {
+		const request = vi
+			.spyOn(browser.permissions, "request")
+			.mockResolvedValue(true as never);
+
+		expect(request).not.toHaveBeenCalled();
+		await expect(requestSeerrCsrfCookiePermission()).resolves.toBe(true);
+		expect(request).toHaveBeenCalledWith({ permissions: ["cookies"] });
+	});
+
+	it("handles denied or failed permission prompts", async () => {
+		const request = vi.spyOn(browser.permissions, "request");
+		request.mockResolvedValueOnce(false as never);
+		await expect(requestSeerrCsrfCookiePermission()).resolves.toBe(false);
+
+		request.mockRejectedValueOnce(new Error("permission API unavailable"));
+		await expect(requestSeerrCsrfCookiePermission()).resolves.toBe(false);
+	});
+});
+
+describe("removeSeerrCsrfCookiePermission", () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("removes optional cookie access when session support is unused", async () => {
+		const remove = vi
+			.spyOn(browser.permissions, "remove")
+			.mockResolvedValue(true as never);
+
+		await removeSeerrCsrfCookiePermission();
+		expect(remove).toHaveBeenCalledWith({ permissions: ["cookies"] });
+	});
+
+	it("handles permission removal that is already browser-managed", async () => {
+		vi.spyOn(browser.permissions, "remove").mockRejectedValue(
+			new Error("permission absent"),
+		);
+
+		await expect(removeSeerrCsrfCookiePermission()).resolves.toBeUndefined();
 	});
 });

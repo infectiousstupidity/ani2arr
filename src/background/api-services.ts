@@ -16,6 +16,7 @@ import type { Provider } from "@/providers/types";
 import { RadarrClient } from "@/providers/radarr/client";
 import { RadarrLibrary } from "@/providers/radarr/library";
 import { SeerrClient } from "@/providers/seerr/client";
+import { getSeerrXsrfToken } from "@/providers/seerr/csrf-token";
 import {
 	getProviderHostPermissionPattern,
 	hasProviderHostPermission,
@@ -27,10 +28,12 @@ import {
 	getExtensionOptionsSnapshot,
 	resetAllSettingsSnapshot,
 } from "@/settings/store";
+import { removeSeerrCsrfCookiePermission } from "@/settings/provider-permissions";
 import {
-	getConnectionCredentials,
-	hasConfiguredConnectionCredentials,
-} from "@/settings/connection-config";
+	getProviderCredentials,
+	hasConfiguredProviderCredentials,
+} from "@/settings/provider-config";
+import { hasConfiguredSeerrConnection } from "@/settings/seerr-config";
 import type { ExtensionOptions } from "@/settings/types";
 import { clearAllTtlCaches } from "@/shared/cache/ttl-cache";
 import {
@@ -82,6 +85,7 @@ export const radarrClient = new RadarrClient({
 });
 export const seerrClient = new SeerrClient({
 	hasUrlPermission: createHasUrlPermission("seerr"),
+	getCsrfToken: getSeerrXsrfToken,
 });
 
 export const sonarrLibrary = new SonarrLibrary(sonarrClient);
@@ -115,7 +119,7 @@ const refreshProviderLibrary = async (
 	provider: Provider,
 	options: ExtensionOptions,
 ): Promise<void> => {
-	const credentials = getConnectionCredentials(options, provider);
+	const credentials = getProviderCredentials(options, provider);
 
 	if (provider === "sonarr") {
 		if (!credentials) {
@@ -140,7 +144,7 @@ export const scheduleLibraryRefresh = (provider: Provider): void => {
 	const debouncer = provider === "sonarr" ? sonarrDebouncer : radarrDebouncer;
 	debouncer(async () => {
 		const options = await getExtensionOptionsSnapshot();
-		if (!hasConfiguredConnectionCredentials(options, provider)) return;
+		if (!hasConfiguredProviderCredentials(options, provider)) return;
 		await refreshProviderLibrary(provider, options);
 	});
 };
@@ -166,9 +170,9 @@ export const handleProviderConnectionChanged = async (
 	await bumpMappingsRevision();
 
 	if (
-		hasConfiguredConnectionCredentials(options, "sonarr") ||
-		hasConfiguredConnectionCredentials(options, "radarr") ||
-		hasConfiguredConnectionCredentials(options, "seerr")
+		hasConfiguredProviderCredentials(options, "sonarr") ||
+		hasConfiguredProviderCredentials(options, "radarr") ||
+		hasConfiguredSeerrConnection(options)
 	) {
 		await refreshUpstreamMappings();
 	}
@@ -242,4 +246,5 @@ export const resetExtensionState = async (): Promise<void> => {
 	await clearPersistentCaches();
 	await resetAllSettingsSnapshot();
 	await removeConfiguredProviderHostPermissions(previousOptions);
+	await removeSeerrCsrfCookiePermission();
 };
