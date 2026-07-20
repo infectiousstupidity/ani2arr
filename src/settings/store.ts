@@ -1,6 +1,6 @@
 /** Settings persistence and public/private snapshot helpers owned by settings. */
 
-import { storage } from "@wxt-dev/storage";
+import { storage } from "wxt/utils/storage";
 import * as v from "valibot";
 import { stripSonarrFormStateForDefaults } from "@/providers/sonarr/form-state";
 import { stripRadarrFormStateForDefaults } from "@/providers/radarr/form-state";

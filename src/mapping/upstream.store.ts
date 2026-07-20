@@ -1,7 +1,7 @@
 /** Downloads and stores normalized AniBridge mappings. */
 // src/mapping/upstream.store.ts
 
-import { storage } from "@wxt-dev/storage";
+import { storage } from "wxt/utils/storage";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import { parseTmdbIdOrNull, parseTvdbIdOrNull } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";

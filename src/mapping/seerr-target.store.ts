@@ -1,7 +1,7 @@
 /** Stores manual Seerr targets and resolves effective target precedence. */
 // src/mapping/seerr-target.store.ts
 
-import { storage } from "@wxt-dev/storage";
+import { storage } from "wxt/utils/storage";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import {
 	parseTmdbIdOrNull,

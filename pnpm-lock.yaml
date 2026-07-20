@@ -48,9 +48,6 @@ importers:
       '@wxt-dev/i18n':
         specifier: ^0.2.6
         version: 0.2.6(wxt@0.20.27(@types/node@26.1.1)(eslint@9.39.5(jiti@2.7.0))(jiti@2.7.0)(rolldown@1.1.4)(terser@5.48.0)(yaml@2.9.0))
-      '@wxt-dev/storage':
-        specifier: ^1.2.8
-        version: 1.2.8
       clsx:
         specifier: ^2.1.1
         version: 2.1.1

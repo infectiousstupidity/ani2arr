@@ -1,7 +1,7 @@
 /** Stores automatic mapping results with expiry. */
 // src/mapping/auto.store.ts
 
-import { storage } from "@wxt-dev/storage";
+import { storage } from "wxt/utils/storage";
 import type { AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
 import { bumpMappingsRevision } from "@/shared/sync/revisions";

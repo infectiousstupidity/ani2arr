@@ -44,12 +44,8 @@ export default defineConfig({
 		}) as WxtViteConfig,
 
 	manifest: ({ manifestVersion }) => {
-		const requiredHosts = [
-			"https://anilist.co/*",
-			"https://www.anilist.co/*",
+		const backgroundFetchHosts = [
 			"https://graphql.anilist.co/*",
-			"https://anichart.net/*",
-			"https://www.anichart.net/*",
 			"https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json",
 			"https://release-assets.githubusercontent.com/*",
 		];
@@ -58,13 +54,13 @@ export default defineConfig({
 
 		const mv3Permissions = {
 			permissions: basePermissions,
-			host_permissions: requiredHosts,
+			host_permissions: backgroundFetchHosts,
 			optional_permissions: ["cookies"],
 			optional_host_permissions: ["http://*/*", "https://*/*"],
 		};
 
 		const mv2Permissions = {
-			permissions: [...basePermissions, ...requiredHosts],
+			permissions: [...basePermissions, ...backgroundFetchHosts],
 			optional_permissions: ["cookies", "http://*/*", "https://*/*"],
 		};
 

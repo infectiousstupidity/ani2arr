@@ -1,7 +1,7 @@
 /** Stores manual mappings, ignored entries, and rejected automatic candidates. */
 // src/mapping/manual.store.ts
 
-import { storage } from "@wxt-dev/storage";
+import { storage } from "wxt/utils/storage";
 import type { AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
 import {
