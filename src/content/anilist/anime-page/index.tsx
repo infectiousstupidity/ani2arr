@@ -9,7 +9,6 @@ import {
 	createContentEntrypointShell,
 	type ContentEntrypointShellContext,
 } from "@/content/core/create-content-script-shell";
-import "@/shared/styles/content-base.css";
 import { createExtensionQueryClient } from "@/queries/query-client";
 import { ExtensionErrorBoundary } from "@/shared/ui/feedback/extension-error-boundary";
 import { logger } from "@/shared/utils/logger";
@@ -18,7 +17,6 @@ import {
 	type ShadowRootContentScriptUi,
 } from "wxt/utils/content-script-ui/shadow-root";
 import { ContentRoot, type AnimePageTarget } from "@/content/anime-page/root";
-import "@/content/anime-page/style.css";
 import {
 	ACTIONS_SELECTOR,
 	ANCHOR_ID,

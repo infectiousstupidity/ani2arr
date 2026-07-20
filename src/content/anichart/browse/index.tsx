@@ -1,7 +1,6 @@
 /** AniChart browse surface composition for content-owned overlays. */
 // src/content/anichart/browse/index.tsx
 
-import '@/shared/styles/content-base.css';
 import browseLightDomStyles from './style.css?inline';
 import cardOverlayStyles from '@/features/media-overlay/card-overlay.light-dom.css?inline';
 import { createBrowseEntrypointShell } from '@/content/browse/create-browse-entrypoint';
