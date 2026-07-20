@@ -25,9 +25,8 @@ import {
 	normalizeSeerrApiKeyConnectionInput,
 	normalizeSeerrUrlInput,
 } from "@/settings/seerr-config";
-import { createError } from "@/shared/errors/error-utils";
+import { createError, getUserErrorMessage } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
-import { getActionErrorMessage } from "./action-helpers";
 
 export type SeerrConnectionFailure = {
 	message: string;
@@ -61,7 +60,7 @@ function getFailure(
 	fallbackMessage: string,
 ): SeerrConnectionFailure {
 	return {
-		message: getActionErrorMessage(error, fallbackMessage),
+		message: getUserErrorMessage(error, fallbackMessage),
 		code: getExtensionErrorCode(error),
 	};
 }

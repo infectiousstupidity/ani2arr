@@ -13,12 +13,12 @@ import {
 	useSaveProviderConnection,
 } from "@/queries/options";
 import { getAni2arrApi, type Ani2arrApi } from "@/rpc";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import {
 	cleanupUnusedProviderHostPermission,
 	requestProviderConnectionPermission,
 } from "@/settings/provider-permissions";
 import { normalizeProviderConnectionInput } from "@/settings/provider-config";
-import { getActionErrorMessage } from "./action-helpers";
 
 type FetchFormResources = (
 	api: Ani2arrApi,
@@ -96,7 +96,7 @@ function useProviderConnectionActions({
 				return true;
 			} catch (error_) {
 				setError(
-					getActionErrorMessage(error_, `Failed to connect to ${label}.`),
+					getUserErrorMessage(error_, `Failed to connect to ${label}.`),
 				);
 				return false;
 			} finally {
@@ -135,7 +135,7 @@ function useProviderConnectionActions({
 			return true;
 		} catch (error_) {
 			setError(
-				getActionErrorMessage(error_, `Failed to disconnect ${label}.`),
+				getUserErrorMessage(error_, `Failed to disconnect ${label}.`),
 			);
 			return false;
 		} finally {

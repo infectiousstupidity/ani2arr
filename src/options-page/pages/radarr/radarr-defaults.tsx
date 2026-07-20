@@ -21,11 +21,11 @@ import {
 import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
 import { useRadarrFormResources } from "@/queries/radarr";
 import type { PublicOptions } from "@/settings/types";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import Button from "@/shared/ui/primitives/button";
 import { SelectControl } from "@/shared/ui/primitives/select";
 import { Switch } from "@/shared/ui/primitives/switch";
 import { SettingsRow, SettingsSection } from "../../components/settings-section";
-import { getActionErrorMessage } from "../../hooks/action-helpers";
 
 const DEFAULT_OPTIONS_DESCRIPTION =
   "Configures default add options reused when adding movies via the extension media modal and overlay.";
@@ -253,9 +253,11 @@ const RadarrDefaultsDraft = ({
   saveOptions: ReturnType<typeof useSavePublicOptions>;
 }) => {
   const [values, setValues] = useState(() => cloneRadarrDefaults(initialValues));
-  const [saveError, setSaveError] = useState<string | null>(null);
   const hasDraftChanges = !areRadarrDefaultsEqual(values, initialValues);
   const hasPersistableChanges = !areRadarrDefaultsEqual(values, savedValues);
+  const saveError = saveOptions.error
+    ? getUserErrorMessage(saveOptions.error, "Failed to save Radarr defaults.")
+    : null;
 
   const updateDefaults: RadarrDraftChange = (field, value) => {
     setValues((currentDefaults) => ({
@@ -283,23 +285,17 @@ const RadarrDefaultsDraft = ({
     });
   };
 
-  const saveDefaults = async (): Promise<void> => {
-    setSaveError(null);
-
-    try {
-      await saveOptions.mutateAsync({
-        ...savedSettings,
-        providers: {
-          ...savedSettings.providers,
-          radarr: {
-            ...savedSettings.providers.radarr,
-            defaults: values,
-          },
+  const saveDefaults = (): void => {
+    saveOptions.mutate({
+      ...savedSettings,
+      providers: {
+        ...savedSettings.providers,
+        radarr: {
+          ...savedSettings.providers.radarr,
+          defaults: values,
         },
-      });
-    } catch (error) {
-      setSaveError(getActionErrorMessage(error, "Failed to save Radarr defaults."));
-    }
+      },
+    });
   };
 
   return (
@@ -341,7 +337,7 @@ const RadarrDefaultsDraft = ({
           type="button"
           variant="primary"
           disabled={!hasPersistableChanges || saveOptions.isPending}
-          onClick={() => void saveDefaults()}
+          onClick={saveDefaults}
         >
           {saveOptions.isPending ? "Saving..." : "Save defaults"}
         </Button>

@@ -4,19 +4,18 @@
 import { useState } from "react";
 import { Bug, RotateCcw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import Button from "@/shared/ui/primitives/button";
 import ConfirmDialog from "@/shared/ui/primitives/confirm-dialog";
 import { Switch } from "@/shared/ui/primitives/switch";
 import { cn } from "@/shared/utils/cn";
 import { SettingsRow, SettingsSection } from "../components/settings-section";
 import { useResetExtensionState } from "../hooks/use-reset-extension-state";
-import { getActionErrorMessage } from "../hooks/action-helpers";
 
 export const AdvancedPage = () => {
 	const { data: publicOptions } = usePublicOptions();
 	const saveOptions = useSavePublicOptions();
 	const [showResetDialog, setShowResetDialog] = useState(false);
-	const [saveError, setSaveError] = useState<string | null>(null);
 	const {
 		resetExtensionState,
 		isResetting,
@@ -29,22 +28,19 @@ export const AdvancedPage = () => {
 		?? (resetSuccess
 			? "Settings, mappings, cached data, and permissions were reset."
 			: null);
-	const diagnosticsStatus = saveError;
+	const diagnosticsStatus = saveOptions.error
+		? getUserErrorMessage(
+				saveOptions.error,
+				"Failed to save diagnostics setting.",
+			)
+		: null;
 
-	const updateDebugLogging = async (checked: boolean): Promise<void> => {
+	const updateDebugLogging = (checked: boolean): void => {
 		if (!publicOptions || saveOptions.isPending) return;
-		setSaveError(null);
-
-		try {
-			await saveOptions.mutateAsync({
-				...publicOptions,
-				debugLogging: checked,
-			});
-		} catch (error) {
-			setSaveError(
-				getActionErrorMessage(error, "Failed to save diagnostics setting."),
-			);
-		}
+		saveOptions.mutate({
+			...publicOptions,
+			debugLogging: checked,
+		});
 	};
 
 	return (
@@ -95,9 +91,7 @@ export const AdvancedPage = () => {
 						id="advanced-debug-logging"
 						checked={debugLogging}
 						disabled={saveOptions.isPending || !publicOptions}
-						onCheckedChange={(checked) =>
-							void updateDebugLogging(checked)
-						}
+						onCheckedChange={updateDebugLogging}
 					/>
 				</SettingsRow>
 				{diagnosticsStatus ? (

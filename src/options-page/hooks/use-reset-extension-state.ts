@@ -5,11 +5,11 @@ import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getAni2arrApi } from "@/rpc";
 import { queryKeys } from "@/queries/query-keys";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import {
 	createDefaultExtensionOptions,
 	createDefaultPublicOptions,
 } from "@/settings/schema";
-import { getActionErrorMessage } from "./action-helpers";
 
 export function useResetExtensionState() {
 	const queryClient = useQueryClient();
@@ -36,7 +36,7 @@ export function useResetExtensionState() {
 			return true;
 		} catch (error) {
 			setResetError(
-				getActionErrorMessage(error, "Failed to reset extension state."),
+				getUserErrorMessage(error, "Failed to reset extension state."),
 			);
 			return false;
 		} finally {

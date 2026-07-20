@@ -23,11 +23,11 @@ import type {
 import { usePublicOptions, useSavePublicOptions } from "@/queries/options";
 import { useSonarrFormResources } from "@/queries/sonarr";
 import type { PublicOptions } from "@/settings/types";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import Button from "@/shared/ui/primitives/button";
 import { SelectControl } from "@/shared/ui/primitives/select";
 import { Switch } from "@/shared/ui/primitives/switch";
 import { SettingsRow, SettingsSection } from "../../components/settings-section";
-import { getActionErrorMessage } from "../../hooks/action-helpers";
 
 const DEFAULT_OPTIONS_DESCRIPTION =
   "Configures default add options reused when adding series via the extension media modal and overlay.";
@@ -294,9 +294,11 @@ const SonarrDefaultsDraft = ({
   saveOptions: ReturnType<typeof useSavePublicOptions>;
 }) => {
   const [values, setValues] = useState(() => cloneSonarrDefaults(initialValues));
-  const [saveError, setSaveError] = useState<string | null>(null);
   const hasDraftChanges = !areSonarrDefaultsEqual(values, initialValues);
   const hasPersistableChanges = !areSonarrDefaultsEqual(values, savedValues);
+  const saveError = saveOptions.error
+    ? getUserErrorMessage(saveOptions.error, "Failed to save Sonarr defaults.")
+    : null;
 
   const updateDefaults: SonarrDraftChange = (field, value) => {
     setValues((currentDefaults) => ({
@@ -324,23 +326,17 @@ const SonarrDefaultsDraft = ({
     });
   };
 
-  const saveDefaults = async (): Promise<void> => {
-    setSaveError(null);
-
-    try {
-      await saveOptions.mutateAsync({
-        ...savedSettings,
-        providers: {
-          ...savedSettings.providers,
-          sonarr: {
-            ...savedSettings.providers.sonarr,
-            defaults: values,
-          },
+  const saveDefaults = (): void => {
+    saveOptions.mutate({
+      ...savedSettings,
+      providers: {
+        ...savedSettings.providers,
+        sonarr: {
+          ...savedSettings.providers.sonarr,
+          defaults: values,
         },
-      });
-    } catch (error) {
-      setSaveError(getActionErrorMessage(error, "Failed to save Sonarr defaults."));
-    }
+      },
+    });
   };
 
   return (
@@ -382,7 +378,7 @@ const SonarrDefaultsDraft = ({
           type="button"
           variant="primary"
           disabled={!hasPersistableChanges || saveOptions.isPending}
-          onClick={() => void saveDefaults()}
+          onClick={saveDefaults}
         >
           {saveOptions.isPending ? "Saving..." : "Save defaults"}
         </Button>

@@ -1,7 +1,7 @@
 /** Options-page controls for browse-card and anime-page UI enablement and visibility settings. */
 // src/options-page/pages/ui-page.tsx
 
-import { useState, type ComponentType } from "react";
+import type { ComponentType } from "react";
 import { AppWindow, Check, ChevronDown, ExternalLink, Heart, Languages, LayoutGrid, Send } from "lucide-react";
 import {
 	ANILIST_TITLE_LANGUAGES,
@@ -14,12 +14,12 @@ import type {
 	BrowseCardPrimaryStatus,
 	PublicOptions,
 } from "@/settings/types";
+import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import { Label } from "@/shared/ui/primitives/label";
 import { Switch } from "@/shared/ui/primitives/switch";
 import { cn } from "@/shared/utils/cn";
 import { RadarrIcon, SonarrIcon } from "../components/icons";
 import { SettingsSection } from "../components/settings-section";
-import { getActionErrorMessage } from "../hooks/action-helpers";
 
 type BrowseCardMode = BadgeVisibility | "hidden";
 type BrowseCardProvider = keyof Omit<
@@ -210,21 +210,17 @@ function AnimePageSwitch(props: {
 export const UiPage = (): React.JSX.Element | null => {
 	const { data: publicOptions } = usePublicOptions();
 	const saveOptions = useSavePublicOptions();
-	const [saveError, setSaveError] = useState<string | null>(null);
 	const uiOptions = publicOptions?.ui;
 	const isSaving = saveOptions.isPending;
+	const saveError = saveOptions.error
+		? getUserErrorMessage(saveOptions.error, "Failed to save UI settings.")
+		: null;
 
-	const updateSettings = async (
+	const updateSettings = (
 		updater: (current: PublicOptions) => PublicOptions,
-	): Promise<void> => {
+	): void => {
 		if (!publicOptions || isSaving) return;
-		setSaveError(null);
-
-		try {
-			await saveOptions.mutateAsync(updater(publicOptions));
-		} catch (error) {
-			setSaveError(getActionErrorMessage(error, "Failed to save UI settings."));
-		}
+		saveOptions.mutate(updater(publicOptions));
 	};
 
 	const updateTitleLanguage = (language: string): void => {
