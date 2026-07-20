@@ -7,17 +7,6 @@ import Pill from "@/shared/ui/primitives/pill";
 const ID_PILL_CLASS =
   "max-w-full border border-border-primary/45 bg-bg-tertiary/20 text-text-secondary normal-case transition-colors group-hover:border-accent-primary/35 group-hover:bg-accent-primary/10 group-hover:text-accent-primary group-focus-visible:border-accent-primary/45 group-focus-visible:bg-accent-primary/10 group-focus-visible:text-accent-primary";
 
-export function MappingCard(props: { children: ReactNode }): React.JSX.Element {
-  const { children } = props;
-
-  return (
-    <div className="relative isolate min-w-0">
-      <div className="pointer-events-none absolute inset-x-[-0.9rem] -top-4 bottom-0 -z-10 rounded-4xl bg-linear-to-b from-bg-primary/44 via-bg-primary/16 to-transparent" />
-      <div className="relative px-1.5 pt-1.5 pb-2">{children}</div>
-    </div>
-  );
-}
-
 export function MappingPoster(props: {
   src: string | null;
   side?: "left" | "right";
@@ -55,7 +44,6 @@ function MappingPosterImage(props: { src: string }): React.JSX.Element {
 }
 
 export function MappingIdPill(props: {
-  side?: "left" | "right";
   children: ReactNode;
 }): React.JSX.Element {
   const { children } = props;
@@ -84,7 +72,7 @@ export function MappingOpenLink(props: {
       className={`${alignClass} group flex w-fit max-w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary`}
       aria-label={ariaLabel}
     >
-      <MappingIdPill side={side}>{children}</MappingIdPill>
+      <MappingIdPill>{children}</MappingIdPill>
     </a>
   );
 }

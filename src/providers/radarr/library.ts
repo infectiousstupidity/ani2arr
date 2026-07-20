@@ -278,10 +278,3 @@ export function toRadarrMovieSnapshot(movie: RadarrMovie): RadarrMovieSnapshot {
 
 	return snapshot;
 }
-
-export function findRadarrMovieInLibrary<TMovie extends { tmdbId: number }>(
-	library: readonly TMovie[],
-	tmdbId: number,
-): TMovie | null {
-	return library.find((movie) => Number(movie.tmdbId) === tmdbId) ?? null;
-}

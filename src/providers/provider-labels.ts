@@ -19,8 +19,3 @@ export const getProviderLabel = (provider: Provider): Capitalize<Provider> =>
 export const getProviderExternalIdLabel = (
 	provider: Provider,
 ): "TMDB" | "TVDB" => PROVIDER_EXTERNAL_ID_LABELS[provider];
-
-export const formatProviderExternalId = (
-	provider: Provider,
-	providerId: number,
-): string => `${getProviderExternalIdLabel(provider)} #${providerId}`;

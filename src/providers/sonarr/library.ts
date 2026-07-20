@@ -280,10 +280,3 @@ export function toSonarrSeriesSnapshot(
 
 	return snapshot;
 }
-
-export function findSonarrSeriesInLibrary<TSeries extends { tvdbId: number }>(
-	library: readonly TSeries[],
-	tvdbId: number,
-): TSeries | null {
-	return library.find((series) => Number(series.tvdbId) === tvdbId) ?? null;
-}

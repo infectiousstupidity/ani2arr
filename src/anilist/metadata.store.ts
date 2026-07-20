@@ -39,13 +39,7 @@ interface BakedMetadataDbSchema extends DBSchema {
 	};
 }
 
-export interface BakedMetadataStore {
-	syncFromBundleManifest(): Promise<void>;
-	get(id: AniListId): Promise<AniListMetadata | null>;
-	clear(): Promise<void>;
-}
-
-export class AniListMetadataStore implements BakedMetadataStore {
+export class AniListMetadataStore {
 	private readonly fetchImpl: typeof fetch;
 	private readonly log: ScopedLogger;
 	private readonly ready: Promise<void>;

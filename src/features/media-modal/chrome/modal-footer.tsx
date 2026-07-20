@@ -11,11 +11,6 @@ type FooterLayoutProps = {
 	right: ReactNode;
 };
 
-type MediaModalFooterTransitionProps = {
-	modeKey: string;
-	children: ReactNode;
-};
-
 type MappingFooterProps = {
 	manualMappingActive: boolean;
 	isResettingMapping: boolean;
@@ -92,14 +87,6 @@ function FooterLayout(props: FooterLayoutProps): React.JSX.Element {
 			</div>
 		</footer>
 	);
-}
-
-export function MediaModalFooterTransition(
-	props: MediaModalFooterTransitionProps,
-): React.JSX.Element {
-	const { children } = props;
-
-	return <>{children}</>;
 }
 
 export function MappingFooter(props: MappingFooterProps): React.JSX.Element {

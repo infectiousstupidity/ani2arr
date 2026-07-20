@@ -7,8 +7,6 @@ import {
 	type MyAnimeListId,
 } from "@/myanimelist/types";
 
-export type SourceProvider = "anilist" | "mal";
-
 export type SourceIdentity =
 	| { source: "anilist"; id: AniListId }
 	| { source: "mal"; id: MyAnimeListId };

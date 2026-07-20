@@ -21,11 +21,6 @@ const VALID_PAGES = new Set<PageId>([
 	"advanced",
 ]);
 
-export function getHashPage(): PageId {
-	if (globalThis.window === undefined) return DEFAULT_PAGE;
-	return getPageFromHash(getCurrentHash());
-}
-
 function getPageFromHash(currentHash: string): PageId {
 	const hash = currentHash.replace(/^#\/?/, "");
 	const basePage = hash.split("?", 1)[0];
@@ -36,12 +31,12 @@ function getPageFromHash(currentHash: string): PageId {
 	return DEFAULT_PAGE;
 }
 
-export function setHashPage(page: PageId) {
+function setHashPage(page: PageId) {
 	if (globalThis.window === undefined) return;
 	globalThis.location.hash = page;
 }
 
-export function getCurrentHash(): string {
+function getCurrentHash(): string {
 	if (globalThis.window === undefined) return "";
 	return globalThis.location.hash;
 }

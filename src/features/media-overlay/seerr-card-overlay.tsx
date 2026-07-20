@@ -249,34 +249,6 @@ function SeerrStackOpenButton(props: {
 	);
 }
 
-export function SeerrCardStackAction({
-	anilistId,
-	mappedIdentities,
-	isConfigured,
-	observeTarget,
-	tooltipContainer,
-	onOpenModal,
-}: SeerrCardActionProps): ReactElement | null {
-	const isInViewport = useCardOverlayInViewport(observeTarget);
-	const action = useSeerrCardAction({
-		anilistId,
-		mappedIdentities,
-		isConfigured,
-		statusEnabled: isInViewport,
-		onOpenModal,
-		observeTarget,
-	});
-
-	if (!isInViewport) return null;
-
-	return (
-		<SeerrStackRequestButton
-			action={action}
-			tooltipContainer={tooltipContainer}
-		/>
-	);
-}
-
 export function SeerrCardStackActions({
 	anilistId,
 	mappedIdentities,

@@ -253,7 +253,7 @@ const normalizeMetadataCover = (
 	};
 };
 
-export function parseMetadataEntry(
+function parseMetadataEntry(
 	value: unknown,
 ): AniListMetadata | null {
 	const raw = asRecord(value);

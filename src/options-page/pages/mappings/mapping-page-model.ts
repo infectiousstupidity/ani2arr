@@ -64,16 +64,6 @@ const formatProviderStatus = (status: string | undefined): string | null => {
 		.join(" ");
 };
 
-const joinParts = (parts: Array<string | null | undefined>): string => {
-	const values: string[] = [];
-	for (const part of parts) {
-		if (part) {
-			values.push(part);
-		}
-	}
-	return values.join(" • ");
-};
-
 export const isUnmappedMappingGroup = (group: MappingGroup): boolean =>
 	group.providerId === null;
 
@@ -87,10 +77,6 @@ export const formatMappingGroupTitle = (group: MappingGroup): string => {
 	if (group.providerMeta?.title) return group.providerMeta.title;
 	if (first?.providerMeta?.title) return first.providerMeta.title;
 	return `${getProviderLabel(group.provider)} target`;
-};
-
-export const formatMappingGroupMetaLine = (group: MappingGroup): string => {
-	return joinParts(getMappingGroupMetaPillLabels(group));
 };
 
 export const getMappingGroupMetaPillLabels = (group: MappingGroup): string[] => {
