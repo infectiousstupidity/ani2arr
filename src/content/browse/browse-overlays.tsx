@@ -10,7 +10,7 @@ import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal
 import { sourceIdentityKey } from "@/mapping/source-identity";
 import { useAniListMetadataBatch } from "@/queries/anilist";
 import { useMappingIdentities, useSourceAniListIdMap } from "@/queries/mapping";
-import { useOptionsQuerySync, usePublicOptions } from "@/queries/options";
+import { usePublicOptions } from "@/queries/options";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import type { PublicOptions } from "@/settings/types";
 import { useTheme } from "@/shared/hooks/use-theme";
@@ -45,7 +45,6 @@ export function BrowseOverlays({
 	const hostRef = useRef<HTMLDivElement>(null);
 	const mediaModal = useMediaModalState();
 	useTheme(hostRef);
-	useOptionsQuerySync();
 	useA2aBroadcasts();
 
 	const { data: publicOptions } = usePublicOptions();

@@ -10,6 +10,7 @@ import { ConfirmProvider } from '@/shared/ui/feedback/confirm-provider';
 import { createContentEntrypointShell } from '@/content/core/create-content-script-shell';
 import { BrowseOverlays } from '@/content/browse/browse-overlays';
 import { createExtensionQueryClient } from '@/queries/query-client';
+import { queryKeys } from '@/queries/query-keys';
 import {
   BROWSE_OVERLAY_CONTAINER_CLASS,
   BROWSE_PROCESSED_ATTRIBUTE,
@@ -63,7 +64,8 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
       }
     };
 
-    const mount = async () => {
+    const mount = async (publicOptions: PublicOptions) => {
+      queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
       if (ui) return;
 
       ensureLightDomStyles();
@@ -119,8 +121,8 @@ export const createBrowseEntrypointShell = (options: BrowseEntrypointShellOption
 
     const main = createContentEntrypointShell({
       isEligible: ({ url, publicOptions }) => options.isEligible({ url, publicOptions }),
-      mount: async () => {
-        await mount();
+      mount: async ({ publicOptions }) => {
+        await mount(publicOptions);
       },
       remove,
     });

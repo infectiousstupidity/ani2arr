@@ -9,7 +9,7 @@ import { createContentEntrypointShell } from "./create-content-script-shell";
 const getPublicOptionsSnapshotMock = vi.hoisted(() => vi.fn());
 const awaitBackgroundReadyMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@/settings", () => ({
+vi.mock("@/settings/store", () => ({
 	PUBLIC_OPTIONS_CHANGE_KEY: "publicOptions",
 	getPublicOptionsSnapshot: getPublicOptionsSnapshotMock,
 }));

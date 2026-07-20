@@ -24,6 +24,8 @@ import {
 import type { ExtensionOptions, PublicOptions } from "../settings/types";
 
 export function useOptionsQuerySync(): void {
+	usePublicOptionsQuerySync();
+
 	const queryClient = useQueryClient();
 
 	useEffect(() => {
@@ -34,19 +36,8 @@ export function useOptionsQuerySync(): void {
 			queryClient.setQueryData(queryKeys.options(), snapshot);
 		};
 
-		const applyPublicOptionsSnapshot = (snapshot: PublicOptions) => {
-			if (!active) return;
-			queryClient.setQueryData(queryKeys.publicOptions(), snapshot);
-			logger.configure({
-				enabled: snapshot.debugLogging || import.meta.env.DEV,
-			});
-		};
-
 		const unsubscribeExtension = watchExtensionOptionsSnapshot(
 			applyExtensionOptionsSnapshot,
-		);
-		const unsubscribePublic = watchPublicOptionsSnapshot(
-			applyPublicOptionsSnapshot,
 		);
 
 		void queryClient
@@ -56,6 +47,27 @@ export function useOptionsQuerySync(): void {
 				staleTime: Infinity,
 			})
 			.then(applyExtensionOptionsSnapshot, () => {});
+		return () => {
+			active = false;
+			unsubscribeExtension();
+		};
+	}, [queryClient]);
+}
+
+export function usePublicOptionsQuerySync(): void {
+	const queryClient = useQueryClient();
+
+	useEffect(() => {
+		let active = true;
+		const applyPublicOptionsSnapshot = (snapshot: PublicOptions) => {
+			if (!active) return;
+			queryClient.setQueryData(queryKeys.publicOptions(), snapshot);
+			logger.configure({
+				enabled: snapshot.debugLogging || import.meta.env.DEV,
+			});
+		};
+		const unsubscribe = watchPublicOptionsSnapshot(applyPublicOptionsSnapshot);
+
 		void queryClient
 			.ensureQueryData({
 				queryKey: queryKeys.publicOptions(),
@@ -66,8 +78,7 @@ export function useOptionsQuerySync(): void {
 
 		return () => {
 			active = false;
-			unsubscribeExtension();
-			unsubscribePublic();
+			unsubscribe();
 		};
 	}, [queryClient]);
 }
@@ -90,25 +101,20 @@ export const useSavePublicOptions = () => {
 	const queryClient = useQueryClient();
 
 	return useMutation<
-		{ extensionOptions: ExtensionOptions; publicOptions: PublicOptions },
+		PublicOptions,
 		ExtensionError,
 		PublicOptions
 	>({
 		mutationFn: async (options: PublicOptions) => {
 			try {
 				await savePublicOptionsSnapshot(options);
-				const [extensionOptions, publicOptions] = await Promise.all([
-					getExtensionOptionsSnapshot(),
-					getPublicOptionsSnapshot(),
-				]);
-				return { extensionOptions, publicOptions };
+				return await getPublicOptionsSnapshot();
 			} catch (error) {
 				throw normalizeError(error);
 			}
 		},
-		onSuccess: (saved) => {
-			queryClient.setQueryData(queryKeys.options(), saved.extensionOptions);
-			queryClient.setQueryData(queryKeys.publicOptions(), saved.publicOptions);
+		onSuccess: (publicOptions) => {
+			queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
 		},
 	});
 };

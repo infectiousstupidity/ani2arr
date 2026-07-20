@@ -9,8 +9,8 @@ import { browser } from "wxt/browser";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import { createExtensionQueryClient } from "@/queries/query-client";
 import {
-	useOptionsQuerySync,
 	usePublicOptions,
+	usePublicOptionsQuerySync,
 	useSavePublicOptions,
 } from "@/queries/options";
 import { getProviderLabel } from "@/providers/provider-labels";
@@ -65,7 +65,7 @@ function getAnimePageConnectionDescription(connection: ConnectionId): string {
 }
 
 export function QuickSettings(): React.JSX.Element {
-	useOptionsQuerySync();
+	usePublicOptionsQuerySync();
 
 	const publicOptionsQuery = usePublicOptions();
 	const saveOptions = useSavePublicOptions();

@@ -10,6 +10,7 @@ import {
 	type ContentEntrypointShellContext,
 } from "@/content/core/create-content-script-shell";
 import { createExtensionQueryClient } from "@/queries/query-client";
+import { queryKeys } from "@/queries/query-keys";
 import { ExtensionErrorBoundary } from "@/shared/ui/feedback/extension-error-boundary";
 import { logger } from "@/shared/utils/logger";
 import {
@@ -88,7 +89,9 @@ async function mountAnimePageUI({
 	ctx,
 	url,
 	isCurrent,
+	publicOptions,
 }: ContentEntrypointShellContext): Promise<void> {
+	queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
 	const idMatch = new URL(url).pathname.match(/\/anime\/(\d+)/);
 	const anilistId = parseAniListIdOrNull(
 		idMatch?.[1] ? Number.parseInt(idMatch[1], 10) : null,

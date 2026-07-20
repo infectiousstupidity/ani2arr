@@ -15,6 +15,7 @@ import {
 import { ContentRoot, type AnimePageTarget } from "@/content/anime-page/root";
 import { readMyAnimeListIdFromUrl } from "@/myanimelist/url";
 import { createExtensionQueryClient } from "@/queries/query-client";
+import { queryKeys } from "@/queries/query-keys";
 import { getAni2arrApi } from "@/rpc";
 import { ExtensionErrorBoundary } from "@/shared/ui/feedback/extension-error-boundary";
 import { logger } from "@/shared/utils/logger";
@@ -88,7 +89,9 @@ async function mountAnimePageUI({
 	ctx,
 	url,
 	isCurrent,
+	publicOptions,
 }: ContentEntrypointShellContext): Promise<void> {
+	queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
 	const malId = readMyAnimeListIdFromUrl(url);
 	if (malId === null) return;
 

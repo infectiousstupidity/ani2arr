@@ -9,6 +9,7 @@ import {
 	PUBLIC_OPTIONS_CHANGE_KEY,
 } from "@/settings/store";
 import type { PublicOptions } from "@/settings/types";
+import { logger } from "@/shared/utils/logger";
 
 export interface ContentEntrypointShellContext {
 	ctx: ContentScriptContext;
@@ -65,6 +66,9 @@ export const createContentEntrypointShell = (
 			try {
 				const publicOptions = await getPublicOptionsSnapshot();
 				if (!isCurrent()) return;
+				logger.configure({
+					enabled: publicOptions.debugLogging || import.meta.env.DEV,
+				});
 
 				const shellContext: ContentEntrypointShellContext = {
 					ctx,

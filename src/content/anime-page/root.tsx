@@ -28,7 +28,7 @@ import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import { useAniListMetadataBatch } from "@/queries/anilist";
 import { useMappingIdentities } from "@/queries/mapping";
-import { useOptionsQuerySync, usePublicOptions } from "@/queries/options";
+import { usePublicOptions } from "@/queries/options";
 import { useSeerrTargets } from "@/queries/seerr";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import type { PublicOptions } from "@/settings/types";
@@ -363,7 +363,6 @@ export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
 	const { anilistId, source } = target;
 	const [hostElement, setHostElement] = useState<HTMLDivElement | null>(null);
 	useTheme({ current: hostElement });
-	useOptionsQuerySync();
 	useA2aBroadcasts();
 
 	const mediaModal = useMediaModalState();
