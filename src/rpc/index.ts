@@ -35,9 +35,10 @@ import type {
 	ClearMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
 	ClearMappingRejectedCandidateInput,
-	GetMappingsInput,
 	GetMappingInspectionInput,
 	GetAniListMetadataInput,
+	GetAniListIdForSourceInput,
+	GetAniListIdForSourceOutput,
 	ProviderConnectionTestInput,
 	NotifyProviderConnectionChangedInput,
 	OpenProviderPageInput,
@@ -113,7 +114,7 @@ export interface Ani2arrApi {
 	getRadarrFormResources(
 		input?: GetProviderFormResourcesInput,
 	): Promise<ProviderFormResources>;
-	initMappings(): Promise<void>;
+	refreshUpstreamMappings(): Promise<void>;
 	setManualMapping(input: SetManualMappingInput): Promise<{ ok: true }>;
 	clearManualMapping(input: ClearManualMappingInput): Promise<{ ok: true }>;
 	setMappingIgnore(input: SetMappingIgnoreInput): Promise<{ ok: true }>;
@@ -134,13 +135,16 @@ export interface Ani2arrApi {
 	): Promise<{ isInLibrary: boolean; inCatalog: boolean }>;
 	clearPersistentCaches(): Promise<{ ok: true }>;
 	resetExtensionState(): Promise<{ ok: true }>;
-	getMappings(input?: GetMappingsInput): Promise<GetMappingsOutput>;
+	getMappings(): Promise<GetMappingsOutput>;
 	getMappingInspection(
 		input: GetMappingInspectionInput,
 	): Promise<GetMappingInspectionOutput>;
 	getAniListMetadata(
 		input: GetAniListMetadataInput,
 	): Promise<GetAniListMetadataOutput>;
+	getAniListIdForSource(
+		input: GetAniListIdForSourceInput,
+	): Promise<GetAniListIdForSourceOutput>;
 }
 
 const ANI2ARR_API_KEY = "Ani2arrApi" as ProxyServiceKey<Ani2arrApi>;

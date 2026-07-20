@@ -17,6 +17,8 @@ import {
 	createShadowRootUi,
 	type ShadowRootContentScriptUi,
 } from "wxt/utils/content-script-ui/shadow-root";
+import { ContentRoot, type AnimePageTarget } from "@/content/anime-page/root";
+import "@/content/anime-page/style.css";
 import {
 	ACTIONS_SELECTOR,
 	ANCHOR_ID,
@@ -31,8 +33,6 @@ import {
 	startAnchorKeeper,
 	waitForElement,
 } from "./layout";
-import { ContentRoot, type AnimePageTarget } from "./root";
-import "./style.css";
 
 const log = logger.create("AniList Content");
 
@@ -103,6 +103,7 @@ async function mountAnimePageUI({
 	if (!mountTarget) return;
 
 	const target: AnimePageTarget = {
+		source: { source: "anilist", id: anilistId },
 		anilistId,
 		format: readFormatFromSidebar(document),
 		title: readTitleFromHeader(document),

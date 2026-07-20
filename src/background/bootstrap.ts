@@ -7,9 +7,11 @@ import { registerAni2arrApi } from "@/rpc";
 import { apiHandlers } from "@/rpc/handlers";
 import { logger } from "@/shared/utils/logger";
 import type { AniListId } from "@/anilist/types";
-import { getExtensionOptionsSnapshot } from "@/settings/store";
-import { hasConfiguredProviderCredentials } from "@/settings/provider-config";
-import { hasConfiguredSeerrCredentials } from "@/settings/seerr-config";
+import { hasConfiguredConnectionCredentials } from "@/settings/connection-config";
+import {
+	getExtensionOptionsSnapshot,
+	initializeSettingsStorage,
+} from "@/settings/store";
 import {
 	logError,
 	normalizeError,
@@ -47,9 +49,9 @@ async function shouldWarmMappingsCache(): Promise<boolean> {
 	try {
 		const options = await getExtensionOptionsSnapshot();
 		return (
-			hasConfiguredProviderCredentials(options, "sonarr") ||
-			hasConfiguredProviderCredentials(options, "radarr") ||
-			hasConfiguredSeerrCredentials(options)
+			hasConfiguredConnectionCredentials(options, "sonarr") ||
+			hasConfiguredConnectionCredentials(options, "radarr") ||
+			hasConfiguredConnectionCredentials(options, "seerr")
 		);
 	} catch (error) {
 		logError(normalizeError(error), "Background:shouldWarmMappingsCache");
@@ -69,6 +71,11 @@ async function ensurePeriodicRefresh(): Promise<void> {
 export const bootstrapBackground = (): void => {
 	log.info("Background initializing…");
 
+	const settingsInitialization = initializeSettingsStorage();
+	void settingsInitialization.catch((error) => {
+		logError(normalizeError(error), "Background:initializeSettingsStorage");
+	});
+
 	registerAni2arrApi(apiHandlers);
 
 	browser.runtime.onInstalled.addListener(async (details) => {
@@ -76,8 +83,9 @@ export const bootstrapBackground = (): void => {
 			if (details.reason === "install" && import.meta.env.MODE !== "test") {
 				browser.runtime.openOptionsPage().catch(() => {});
 			}
+			await settingsInitialization;
 			if (await shouldWarmMappingsCache()) {
-				await apiHandlers.initMappings();
+				await apiHandlers.refreshMappingPipeline();
 			}
 			await ensurePeriodicRefresh();
 		} catch (error) {
@@ -87,8 +95,9 @@ export const bootstrapBackground = (): void => {
 
 	browser.runtime.onStartup.addListener(async () => {
 		try {
+			await settingsInitialization;
 			if (await shouldWarmMappingsCache()) {
-				await apiHandlers.initMappings();
+				await apiHandlers.refreshMappingPipeline();
 			}
 			await ensurePeriodicRefresh();
 		} catch (error) {
@@ -101,11 +110,12 @@ export const bootstrapBackground = (): void => {
 
 		void (async () => {
 			try {
+				await settingsInitialization;
 				if (await shouldWarmMappingsCache()) {
-					await apiHandlers.initMappings();
+					await apiHandlers.refreshMappingPipeline();
 				}
 			} catch (error) {
-				logError(normalizeError(error), "Background:initMappings:alarm");
+				logError(normalizeError(error), "Background:refreshMappingPipeline:alarm");
 			}
 		})();
 	});
@@ -119,7 +129,7 @@ export const bootstrapBackground = (): void => {
 			const msg = parsed.output;
 
 			if (msg.type === "a2a:ping") {
-				return Promise.resolve({ ok: true as const });
+				return settingsInitialization.then(() => ({ ok: true as const }));
 			}
 
 			if (msg.type === "OPEN_OPTIONS_PAGE") {
@@ -140,7 +150,8 @@ export const bootstrapBackground = (): void => {
 		},
 	);
 
-	getExtensionOptionsSnapshot()
+	settingsInitialization
+		.then(() => getExtensionOptionsSnapshot())
 		.then((options) =>
 			logger.configure({
 				enabled: options.debugLogging || import.meta.env.DEV,

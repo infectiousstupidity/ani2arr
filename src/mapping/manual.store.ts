@@ -2,8 +2,15 @@
 // src/mapping/manual.store.ts
 
 import { storage } from "@wxt-dev/storage";
-import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
+import type { AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
+import {
+	normalizeStoredSourceKey,
+	normalizeSourceIdentity,
+	parseSourceIdentityKey,
+	sourceIdentityKey,
+	type SourceIdentity,
+} from "./source-identity";
 
 export type ManualMapping = {
 	providerId: number;
@@ -23,12 +30,12 @@ export type ManualFacts =
 			rejectedProviderIds: number[];
 	  };
 
-export type ManualRecord = {
-	anilistId: AniListId;
+export type SourceManualRecord = {
+	source: SourceIdentity;
 	facts: ManualFacts;
 };
 
-type ManualMappings = Record<Provider, Record<number, ManualFacts>>;
+type ManualMappings = Record<Provider, Record<string, ManualFacts>>;
 
 const manualMappings = storage.defineItem<ManualMappings>(
 	"local:mapping:manual",
@@ -44,24 +51,24 @@ let writes: Promise<void> = Promise.resolve();
 
 export async function getManualFacts(
 	provider: Provider,
-	anilistId: AniListId,
+	source: SourceIdentity | AniListId,
 ): Promise<ManualFacts | null> {
-	const mappings = await manualMappings.getValue();
+	const mappings = await getManualMappings();
 
-	return mappings[provider][anilistId] ?? null;
+	return mappings[provider][sourceIdentityKey(normalizeSourceIdentity(source))] ?? null;
 }
 
-export async function listManualFacts(
+export async function listSourceManualFacts(
 	provider: Provider,
-): Promise<ManualRecord[]> {
-	const mappings = await manualMappings.getValue();
-	const records: ManualRecord[] = [];
+): Promise<SourceManualRecord[]> {
+	const mappings = await getManualMappings();
+	const records: SourceManualRecord[] = [];
 
-	for (const [rawAniListId, facts] of Object.entries(mappings[provider])) {
-		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
+	for (const [rawSourceKey, facts] of Object.entries(mappings[provider])) {
+		const source = parseSourceIdentityKey(rawSourceKey);
 
-		if (anilistId !== null) {
-			records.push({ anilistId, facts });
+		if (source !== null) {
+			records.push({ source, facts });
 		}
 	}
 
@@ -70,16 +77,17 @@ export async function listManualFacts(
 
 export async function setManualMapping(
 	provider: Provider,
-	anilistId: AniListId,
+	source: SourceIdentity | AniListId,
 	mapping: ManualMapping,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const previous = mappings[provider][anilistId];
+		const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
+		const previous = mappings[provider][sourceKey];
 		const rejectedProviderIds = previous?.rejectedProviderIds?.filter(
 			(providerId) => providerId !== mapping.providerId,
 		);
 
-		mappings[provider][anilistId] = {
+		mappings[provider][sourceKey] = {
 			mapping,
 			...(rejectedProviderIds?.length ? { rejectedProviderIds } : {}),
 		};
@@ -88,34 +96,36 @@ export async function setManualMapping(
 
 export async function clearManualMapping(
 	provider: Provider,
-	anilistId: AniListId,
+	source: SourceIdentity | AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const previous = mappings[provider][anilistId];
+		const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
+		const previous = mappings[provider][sourceKey];
 
 		if (!previous || !("mapping" in previous)) {
 			return;
 		}
 
 		if (previous.rejectedProviderIds?.length) {
-			mappings[provider][anilistId] = {
+			mappings[provider][sourceKey] = {
 				rejectedProviderIds: previous.rejectedProviderIds,
 			};
 			return;
 		}
 
-		delete mappings[provider][anilistId];
+		delete mappings[provider][sourceKey];
 	});
 }
 
 export async function setIgnored(
 	provider: Provider,
-	anilistId: AniListId,
+	source: SourceIdentity | AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const previous = mappings[provider][anilistId];
+		const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
+		const previous = mappings[provider][sourceKey];
 
-		mappings[provider][anilistId] = {
+		mappings[provider][sourceKey] = {
 			ignored: true,
 			...(previous?.rejectedProviderIds?.length
 				? { rejectedProviderIds: previous.rejectedProviderIds }
@@ -126,33 +136,35 @@ export async function setIgnored(
 
 export async function clearIgnored(
 	provider: Provider,
-	anilistId: AniListId,
+	source: SourceIdentity | AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const previous = mappings[provider][anilistId];
+		const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
+		const previous = mappings[provider][sourceKey];
 
 		if (!previous || !("ignored" in previous)) {
 			return;
 		}
 
 		if (previous.rejectedProviderIds?.length) {
-			mappings[provider][anilistId] = {
+			mappings[provider][sourceKey] = {
 				rejectedProviderIds: previous.rejectedProviderIds,
 			};
 			return;
 		}
 
-		delete mappings[provider][anilistId];
+		delete mappings[provider][sourceKey];
 	});
 }
 
 export async function rejectAutoCandidate(
 	provider: Provider,
-	anilistId: AniListId,
+	source: SourceIdentity | AniListId,
 	providerId: number,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const previous = mappings[provider][anilistId];
+		const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
+		const previous = mappings[provider][sourceKey];
 
 		if (
 			previous &&
@@ -168,7 +180,7 @@ export async function rejectAutoCandidate(
 			return;
 		}
 
-		mappings[provider][anilistId] = {
+		mappings[provider][sourceKey] = {
 			...previous,
 			rejectedProviderIds: [...rejectedProviderIds, providerId],
 		};
@@ -177,11 +189,12 @@ export async function rejectAutoCandidate(
 
 export async function clearRejectedAutoCandidate(
 	provider: Provider,
-	anilistId: AniListId,
+	source: SourceIdentity | AniListId,
 	providerId: number,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const previous = mappings[provider][anilistId];
+		const sourceKey = sourceIdentityKey(normalizeSourceIdentity(source));
+		const previous = mappings[provider][sourceKey];
 
 		if (!previous?.rejectedProviderIds?.includes(providerId)) {
 			return;
@@ -192,7 +205,7 @@ export async function clearRejectedAutoCandidate(
 		);
 
 		if ("mapping" in previous) {
-			mappings[provider][anilistId] = {
+			mappings[provider][sourceKey] = {
 				mapping: previous.mapping,
 				...(rejectedProviderIds.length > 0 ? { rejectedProviderIds } : {}),
 			};
@@ -200,7 +213,7 @@ export async function clearRejectedAutoCandidate(
 		}
 
 		if ("ignored" in previous) {
-			mappings[provider][anilistId] = {
+			mappings[provider][sourceKey] = {
 				ignored: true,
 				...(rejectedProviderIds.length > 0 ? { rejectedProviderIds } : {}),
 			};
@@ -208,11 +221,11 @@ export async function clearRejectedAutoCandidate(
 		}
 
 		if (rejectedProviderIds.length > 0) {
-			mappings[provider][anilistId] = { rejectedProviderIds };
+			mappings[provider][sourceKey] = { rejectedProviderIds };
 			return;
 		}
 
-		delete mappings[provider][anilistId];
+		delete mappings[provider][sourceKey];
 	});
 }
 
@@ -229,7 +242,7 @@ async function updateManualMappings(
 	const next = writes
 		.catch(() => {})
 		.then(async () => {
-			const mappings = await manualMappings.getValue();
+			const mappings = await getManualMappings();
 
 			update(mappings);
 
@@ -242,4 +255,31 @@ async function updateManualMappings(
 	);
 
 	await next;
+}
+
+async function getManualMappings(): Promise<ManualMappings> {
+	return normalizeManualMappings(await manualMappings.getValue());
+}
+
+function normalizeManualMappings(mappings: ManualMappings): ManualMappings {
+	return {
+		sonarr: normalizeManualProviderMappings(mappings.sonarr),
+		radarr: normalizeManualProviderMappings(mappings.radarr),
+	};
+}
+
+function normalizeManualProviderMappings(
+	mappings: Record<string, ManualFacts>,
+): Record<string, ManualFacts> {
+	const normalized: Record<string, ManualFacts> = {};
+
+	for (const [rawKey, facts] of Object.entries(mappings)) {
+		const sourceKey = normalizeStoredSourceKey(rawKey);
+
+		if (sourceKey !== null) {
+			normalized[sourceKey] = facts;
+		}
+	}
+
+	return normalized;
 }

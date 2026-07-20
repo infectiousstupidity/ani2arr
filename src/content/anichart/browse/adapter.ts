@@ -54,6 +54,7 @@ const parseAniChartCard = (card: Element): HostMediaTarget | null => {
   const heading = getSectionHeading(card);
 
   return {
+    source: { source: 'anilist', id: anilistId },
     anilistId,
     title,
     format: parseAniListMediaFormatLabel(heading),

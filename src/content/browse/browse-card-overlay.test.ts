@@ -3,17 +3,21 @@
 
 import { describe, expect, it } from "vitest";
 import { parseAniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import type { MappingIdentity, SeerrRequestTarget } from "@/rpc/types";
 import { resolveSeerrRequestInput } from "@/content/anilist/target-provider";
 import type { HostMediaTarget } from "./types";
 import { resolveBrowseCardProvider } from "./browse-card-provider";
+import { BrowseCardOverlay } from "./browse-card-overlay";
 
 const mountTarget = {} as HTMLElement;
 
 function createTarget(format: HostMediaTarget["format"]): HostMediaTarget {
+	const anilistId = parseAniListId(210_031);
 	return {
-		anilistId: parseAniListId(210_031),
+		source: { source: "anilist", id: anilistId },
+		anilistId,
 		title: "Example",
 		format,
 		mountTarget,
@@ -41,6 +45,7 @@ describe("resolveBrowseCardProvider", () => {
 	it("uses mapped identity when both host and metadata formats are unknown", () => {
 		const mappedIdentities: MappingIdentity[] = [
 			{
+				source: { source: "anilist", id: parseAniListId(210_031) },
 				anilistId: parseAniListId(210_031),
 				provider: "sonarr",
 				result: {
@@ -58,6 +63,36 @@ describe("resolveBrowseCardProvider", () => {
 				mappedIdentities,
 			}),
 		).toBe("sonarr");
+	});
+});
+
+describe("BrowseCardOverlay", () => {
+	it("renders no provider actions without an AniList crosswalk", () => {
+		const parsed: HostMediaTarget = {
+			source: { source: "mal", id: parseMyAnimeListId(5114) },
+			title: "Fullmetal Alchemist: Brotherhood",
+			format: "TV",
+			mountTarget,
+		};
+
+		expect(
+			BrowseCardOverlay({
+				parsed,
+				adapter: {
+					cardSelector: ".card",
+					parseCard: () => null,
+					getObserverRoot: () => document.body,
+					getScanRoot: () => document.body,
+					anchorCorner: "top-left",
+					stackDirection: "down",
+				},
+				publicOptions: undefined,
+				mappedIdentities: [],
+				metadata: null,
+				onOpenMediaModal: () => {},
+				tooltipContainer: null,
+			}),
+		).toBeNull();
 	});
 });
 
@@ -91,6 +126,7 @@ describe("resolveSeerrRequestInput", () => {
 		const anilistId = parseAniListId(210_031);
 		const mappedIdentities: MappingIdentity[] = [
 			{
+				source: { source: "anilist", id: parseAniListId(123) },
 				anilistId: parseAniListId(123),
 				provider: "radarr",
 				result: {
@@ -100,6 +136,7 @@ describe("resolveSeerrRequestInput", () => {
 				},
 			},
 			{
+				source: { source: "anilist", id: anilistId },
 				anilistId,
 				provider: "radarr",
 				result: {

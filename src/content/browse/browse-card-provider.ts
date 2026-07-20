@@ -3,6 +3,7 @@
 
 import type { AniListMediaHint } from "@/anilist/types";
 import { resolveAniListTargetProvider } from "@/content/anilist/target-provider";
+import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import type { Provider } from "@/providers/types";
 import type { MappingIdentity } from "@/rpc/types";
 import type { HostMediaTarget } from "./types";
@@ -12,6 +13,12 @@ export function resolveBrowseCardProvider(input: {
 	metadata: AniListMediaHint | null;
 	mappedIdentities: readonly MappingIdentity[];
 }): Provider | null {
+	if (input.parsed.anilistId === undefined) {
+		return resolveProviderForAniListFormat(
+			input.parsed.format ?? input.metadata?.format ?? null,
+		);
+	}
+
 	return resolveAniListTargetProvider({
 		anilistId: input.parsed.anilistId,
 		format: input.parsed.format ?? input.metadata?.format ?? null,

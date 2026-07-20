@@ -154,8 +154,10 @@ function createAdapter(
 			const fakeCard = card as unknown as FakeElement;
 			const cover = fakeCard.querySelector(".cover");
 			if (!cover) return null;
+			const anilistId = parseAniListId(Number(fakeCard.dataset.id));
 			return {
-				anilistId: parseAniListId(Number(fakeCard.dataset.id)),
+				source: { source: "anilist", id: anilistId },
+				anilistId,
 				title: fakeCard.dataset.title ?? "",
 				format: null,
 				mountTarget: cover as unknown as HTMLElement,
@@ -198,7 +200,7 @@ describe("scanBrowseCardTargets", () => {
 		expect(secondTargets).toHaveLength(1);
 		expect(firstContainer).not.toBeNull();
 		expect(secondTargets[0]?.container).toBe(firstContainer);
-		expect(getCover(card).dataset.a2aProcessed).toBe("101");
+		expect(getCover(card).dataset.a2aProcessed).toBe("anilist:101");
 		expect(firstContainer?.dataset.corner).toBe("bottom-left");
 
 		cleanupBrowseCardTargets(firstTargets);

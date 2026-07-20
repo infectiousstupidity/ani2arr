@@ -17,7 +17,6 @@ import {
 	saveProviderConnectionSnapshot,
 	saveSeerrConnectionSnapshot,
 	savePublicOptionsSnapshot,
-	toPublicOptions,
 	watchExtensionOptionsSnapshot,
 	watchPublicOptionsSnapshot,
 } from "../settings/store";
@@ -128,11 +127,11 @@ export const useSaveProviderConnection = () => {
 				throw normalizeError(error);
 			}
 		},
-		onSuccess: (savedOptions) => {
+		onSuccess: async (savedOptions) => {
 			queryClient.setQueryData(queryKeys.options(), savedOptions);
 			queryClient.setQueryData(
 				queryKeys.publicOptions(),
-				toPublicOptions(savedOptions),
+				await getPublicOptionsSnapshot(),
 			);
 		},
 	});
@@ -153,11 +152,11 @@ export const useSaveSeerrConnection = () => {
 				throw normalizeError(error);
 			}
 		},
-		onSuccess: (savedOptions) => {
+		onSuccess: async (savedOptions) => {
 			queryClient.setQueryData(queryKeys.options(), savedOptions);
 			queryClient.setQueryData(
 				queryKeys.publicOptions(),
-				toPublicOptions(savedOptions),
+				await getPublicOptionsSnapshot(),
 			);
 		},
 	});

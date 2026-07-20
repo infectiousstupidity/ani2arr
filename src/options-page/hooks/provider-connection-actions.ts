@@ -19,8 +19,7 @@ import {
 	cleanupUnusedProviderHostPermission,
 	requestProviderConnectionPermission,
 } from "@/settings/provider-permissions";
-import { normalizeProviderConnectionInput } from "@/settings/provider-config";
-import { normalizeSeerrConnectionInput } from "@/settings/seerr-config";
+import { normalizeConnectionInput } from "@/settings/connection-config";
 import { getActionErrorMessage } from "./action-helpers";
 
 type FetchFormResources = (
@@ -60,7 +59,7 @@ function useProviderConnectionActions({
 			setError(null);
 
 			try {
-				const normalized = normalizeProviderConnectionInput(
+				const normalized = normalizeConnectionInput(
 					{ url: draftUrl, apiKey: draftApiKey },
 					provider,
 				);
@@ -203,10 +202,13 @@ export function useSeerrActions() {
 			setError(null);
 
 			try {
-				const normalized = normalizeSeerrConnectionInput({
-					url: draftUrl,
-					apiKey: draftApiKey,
-				});
+				const normalized = normalizeConnectionInput(
+					{
+						url: draftUrl,
+						apiKey: draftApiKey,
+					},
+					"seerr",
+				);
 				if (!normalized) {
 					throw new Error("Please enter a valid Seerr URL and API key.");
 				}
@@ -229,14 +231,14 @@ export function useSeerrActions() {
 				});
 
 				queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
-					try {
-						await api.initMappings();
-						queryClient.invalidateQueries({
-							queryKey: queryKeys.mappingIdentitiesRoot(),
-						});
-						queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
-						queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
-					} catch {
+				try {
+					await api.refreshUpstreamMappings();
+					queryClient.invalidateQueries({
+						queryKey: queryKeys.mappingIdentitiesRoot(),
+					});
+					queryClient.invalidateQueries({ queryKey: queryKeys.mappingsRoot() });
+					queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
+				} catch {
 					// Seerr remains usable if the upstream mapping refresh is temporarily unavailable.
 				}
 				await cleanupUnusedProviderHostPermission(

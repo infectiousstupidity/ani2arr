@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import type { AniListId } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import {
 	parseTmdbIdOrNull,
 	parseTvdbIdOrNull,
@@ -28,6 +29,7 @@ import { useConfirm } from "@/shared/hooks/use-confirm";
 
 type UseMappingActionsInput = {
 	anilistId: AniListId;
+	source?: SourceIdentity | undefined;
 	provider: Provider;
 	selectedProviderId: ProviderExternalId | null;
 	rejectProviderId: ProviderExternalId | null;
@@ -59,6 +61,7 @@ function createProviderMappingTarget(
 
 export function useMappingActions({
 	anilistId,
+	source,
 	provider,
 	selectedProviderId,
 	rejectProviderId,
@@ -81,6 +84,8 @@ export function useMappingActions({
 		provider,
 		clearRejectedProviderId,
 	);
+	const sourceInput =
+		source === undefined ? { anilistId } : { anilistId, source };
 
 	const applyMapping = async (): Promise<void> => {
 		if (selectedTarget === null) return;
@@ -99,7 +104,7 @@ export function useMappingActions({
 		}
 
 		try {
-			await setManualMapping.mutateAsync({ anilistId, ...selectedTarget });
+			await setManualMapping.mutateAsync({ ...sourceInput, ...selectedTarget });
 			onMappingApplied();
 		} catch (error) {
 			const normalizedError = normalizeError(error);
@@ -122,7 +127,7 @@ export function useMappingActions({
 
 				try {
 					await setManualMapping.mutateAsync({
-						anilistId,
+						...sourceInput,
 						...selectedTarget,
 						force: true,
 					});
@@ -138,7 +143,7 @@ export function useMappingActions({
 	};
 
 	const resetMapping = async (): Promise<void> => {
-		await clearManualMapping.mutateAsync({ anilistId, provider });
+		await clearManualMapping.mutateAsync({ ...sourceInput, provider });
 		onMappingReset();
 	};
 
@@ -153,20 +158,23 @@ export function useMappingActions({
 
 		if (!didConfirm) return;
 
-		await setIgnore.mutateAsync({ anilistId, provider });
+		await setIgnore.mutateAsync({ ...sourceInput, provider });
 		onIgnored();
 	};
 
 	const rejectCandidate = async (): Promise<void> => {
 		if (rejectTarget === null) return;
 
-		await setRejectedCandidate.mutateAsync({ anilistId, ...rejectTarget });
+		await setRejectedCandidate.mutateAsync({ ...sourceInput, ...rejectTarget });
 	};
 
 	const clearRejectedCandidateAction = async (): Promise<void> => {
 		if (clearRejectedTarget === null) return;
 
-		await clearRejectedCandidate.mutateAsync({ anilistId, ...clearRejectedTarget });
+		await clearRejectedCandidate.mutateAsync({
+			...sourceInput,
+			...clearRejectedTarget,
+		});
 	};
 
 	return {

@@ -7,8 +7,9 @@ import { metadataHintFromAniListMetadata } from "@/anilist/title";
 import { getMappedIdentitiesByAniListId } from "@/content/anilist/target-provider";
 import { MediaModal } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
+import { sourceIdentityKey } from "@/mapping/source-identity";
 import { useAniListMetadataBatch } from "@/queries/anilist";
-import { useMappingIdentities } from "@/queries/mapping";
+import { useMappingIdentities, useSourceAniListIdMap } from "@/queries/mapping";
 import { useOptionsQuerySync, usePublicOptions } from "@/queries/options";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import type { PublicOptions } from "@/settings/types";
@@ -57,16 +58,50 @@ export function BrowseOverlays({
 		[adapter, browseFlags.overlaysEnabled],
 	);
 	const targets = useBrowseCardTargets(targetOptions);
-	const targetIds = useMemo(
-		() => targets.map(target => target.parsed.anilistId),
+	const sourcesMissingAniListIds = useMemo(
+		() =>
+			targets.flatMap((target) =>
+				target.parsed.anilistId === undefined ? [target.parsed.source] : [],
+			),
 		[targets],
+	);
+	const sourceAniListIds = useSourceAniListIdMap(sourcesMissingAniListIds, {
+		enabled: browseFlags.overlaysEnabled && sourcesMissingAniListIds.length > 0,
+	});
+	const resolvedTargets = useMemo(
+		() =>
+			targets.map((target) => {
+				if (target.parsed.anilistId !== undefined) return target;
+
+				const anilistId =
+					sourceAniListIds.data?.[sourceIdentityKey(target.parsed.source)];
+				return anilistId === undefined || anilistId === null
+					? target
+					: {
+							...target,
+							parsed: {
+								...target.parsed,
+								anilistId,
+							},
+						};
+			}),
+		[targets, sourceAniListIds.data],
+	);
+	const targetIds = useMemo(
+		() =>
+			resolvedTargets.flatMap((target) =>
+				target.parsed.anilistId === undefined ? [] : [target.parsed.anilistId],
+			),
+		[resolvedTargets],
 	);
 	const targetIdsMissingFormat = useMemo(
 		() =>
-			targets
+			resolvedTargets
 				.filter((target) => target.parsed.format === null)
-				.map((target) => target.parsed.anilistId),
-		[targets],
+				.flatMap((target) =>
+					target.parsed.anilistId === undefined ? [] : [target.parsed.anilistId],
+				),
+		[resolvedTargets],
 	);
 	const metadataBatch = useAniListMetadataBatch(targetIdsMissingFormat, {
 		enabled: browseFlags.overlaysEnabled && targetIdsMissingFormat.length > 0,
@@ -92,17 +127,23 @@ export function BrowseOverlays({
 	return (
 		<>
 			<div ref={hostRef} />
-			{targets.map(target =>
+			{resolvedTargets.map(target =>
 				createPortal(
 					<BrowseCardOverlay
 						parsed={target.parsed}
 						adapter={adapter}
 						publicOptions={publicOptions}
 						mappedIdentities={
-							mappedIdentitiesById.get(target.parsed.anilistId) ?? []
+							target.parsed.anilistId === undefined
+								? []
+								: (mappedIdentitiesById.get(target.parsed.anilistId) ?? [])
 						}
 
-						metadata={metadataById.get(target.parsed.anilistId) ?? null}
+						metadata={
+							target.parsed.anilistId === undefined
+								? null
+								: (metadataById.get(target.parsed.anilistId) ?? null)
+						}
 						onOpenMediaModal={mediaModal.open}
 						tooltipContainer={null}
 					/>,

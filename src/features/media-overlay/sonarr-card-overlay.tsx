@@ -3,6 +3,7 @@
 
 import type { ReactElement, ReactNode } from "react";
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
@@ -14,7 +15,8 @@ import { CardOverlay } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";
 
 interface SonarrCardOverlayProps {
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
+	source: SourceIdentity;
 	title: string;
 	onOpenSetup(): void;
 	onOpenMapping(): void;
@@ -30,6 +32,7 @@ interface SonarrCardOverlayProps {
 
 export function SonarrCardOverlay({
 	anilistId,
+	source,
 	title,
 	onOpenSetup,
 	onOpenMapping,
@@ -44,8 +47,10 @@ export function SonarrCardOverlay({
 }: SonarrCardOverlayProps): ReactElement {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const providerTitle = title.trim().length > 0 ? title : null;
+	const identity =
+		anilistId === undefined ? { source } : { source, anilistId };
 	const mediaAction = useSonarrMediaAction({
-		anilistId,
+		...identity,
 		displayTitle: title,
 		providerTitle,
 		metadata,
@@ -71,9 +76,11 @@ export function SonarrCardOverlay({
 			primaryDisabled={mediaAction.status.disabled}
 			onPrimaryAction={mediaAction.runPrimaryAction}
 			hasMapping={mediaAction.status.hasMapping}
-			showSetupAction={mediaAction.status.hasMapping}
+			showSetupAction={anilistId !== undefined && mediaAction.status.hasMapping}
 			onOpenSetup={onOpenSetup}
-			showMappingAction={mediaAction.status.state !== "unconfigured"}
+			showMappingAction={
+				anilistId !== undefined && mediaAction.status.state !== "unconfigured"
+			}
 			onOpenMapping={onOpenMapping}
 			openProvider={mediaAction.openProvider}
 			openProviderIcon={SonarrIcon}

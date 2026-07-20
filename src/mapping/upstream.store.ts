@@ -5,25 +5,34 @@ import { storage } from "@wxt-dev/storage";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import { parseTmdbIdOrNull, parseTvdbIdOrNull } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
-import type { SeerrUpstreamTarget, UpstreamTarget } from "./types";
+import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
+import type { AniListCrosswalkMappings } from "@/mapping/upstream/anibridge.parser";
+import {
+	normalizeStoredSourceKey,
+	normalizeSourceIdentity,
+	parseSourceIdentityKey,
+	sourceIdentityKey,
+	type SourceIdentity,
+} from "./source-identity";
+import type {
+	AniBridgeEntries,
+	AniBridgeTarget,
+	SeerrUpstreamTarget,
+	UpstreamTarget,
+} from "./types";
 
-const ANIBRIDGE_URL =
-	"https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json";
-const ANIBRIDGE_TIMEOUT_MS = 15_000;
-const MAX_ANIBRIDGE_BYTES = 10 * 1024 * 1024;
 const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-type UpstreamMappings = Record<number, UpstreamTarget[]>;
-type SeerrUpstreamMappings = Record<number, SeerrUpstreamTarget>;
-
 type UpstreamSnapshot = {
-	mappings: UpstreamMappings;
-	seerrTargets?: SeerrUpstreamMappings;
+	/** LEGACY: optional until projection-only snapshots have completed one full refresh. */
+	entries?: AniBridgeEntries;
+	aniListCrosswalks?: AniListCrosswalkMappings;
 	fetchedAt: number;
 	etag?: string;
 };
 
-export type UpstreamRecord = {
+export type UpstreamSourceFact = {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	targets: UpstreamTarget[];
 };
@@ -44,30 +53,66 @@ let writes: Promise<void> = Promise.resolve();
 
 export async function getUpstreamTargets(
 	provider: Provider,
-	anilistId: AniListId,
+	source: SourceIdentity | AniListId,
 ): Promise<UpstreamTarget[]> {
-	const snapshot = await upstreamMappings.getValue();
+	const snapshot = await getSnapshot();
+	const anilistId = getSnapshotAniListId(
+		snapshot,
+		normalizeSourceIdentity(source),
+	);
+	if (anilistId === null) return [];
 
-	return (snapshot?.mappings[anilistId] ?? []).filter(
+	return projectUpstreamTargets(snapshot?.entries?.[anilistId] ?? []).filter(
 		(target) => target.provider === provider,
 	);
 }
 
-export async function listUpstreamMappings(): Promise<UpstreamRecord[]> {
-	const snapshot = await upstreamMappings.getValue();
-	const records: UpstreamRecord[] = [];
+export async function listSourceUpstreamMappings(): Promise<
+	UpstreamSourceFact[]
+> {
+	const snapshot = await getSnapshot();
+	const records: UpstreamSourceFact[] = [];
+	const targetsByAniListId = new Map<AniListId, UpstreamTarget[]>();
 
-	for (const [rawAniListId, targets] of Object.entries(
-		snapshot?.mappings ?? {},
+	for (const [rawAniListId, entries] of Object.entries(
+		snapshot?.entries ?? {},
 	)) {
 		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
+		if (anilistId === null) continue;
 
-		if (anilistId !== null) {
-			records.push({ anilistId, targets });
-		}
+		const targets = projectUpstreamTargets(entries);
+		targetsByAniListId.set(anilistId, targets);
+		records.push({
+			source: { source: "anilist", id: anilistId },
+			anilistId,
+			targets,
+		});
+	}
+
+	for (const [rawSourceKey, rawAniListId] of Object.entries(
+		snapshot?.aniListCrosswalks ?? {},
+	)) {
+		const source = parseSourceIdentityKey(rawSourceKey);
+		const anilistId = parseAniListIdOrNull(rawAniListId);
+		if (source?.source !== "mal" || anilistId === null) continue;
+
+		records.push({
+			source,
+			anilistId,
+			targets: [...(targetsByAniListId.get(anilistId) ?? [])],
+		});
 	}
 
 	return records;
+}
+
+export async function getUniqueAniListIdForSource(
+	source: SourceIdentity,
+): Promise<AniListId | null> {
+	if (source.source === "anilist") return source.id;
+
+	const snapshot = await getSnapshot();
+	return snapshot?.aniListCrosswalks?.[sourceIdentityKey(source)] ?? null;
 }
 
 export async function listSeerrUpstreamTargets(
@@ -76,17 +121,12 @@ export async function listSeerrUpstreamTargets(
 	const requestedIds = new Set(ids);
 	if (requestedIds.size === 0) return [];
 
-	const snapshot = await upstreamMappings.getValue();
+	const snapshot = await getSnapshot();
 	const records: SeerrUpstreamRecord[] = [];
 
-	for (const [rawAniListId, target] of Object.entries(
-		snapshot?.seerrTargets ?? {},
-	)) {
-		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
-
-		if (anilistId !== null && requestedIds.has(anilistId)) {
-			records.push({ anilistId, target });
-		}
+	for (const anilistId of requestedIds) {
+		const target = projectSeerrTarget(snapshot?.entries?.[anilistId] ?? []);
+		if (target !== null) records.push({ anilistId, target });
 	}
 
 	return records.toSorted((left, right) => left.anilistId - right.anilistId);
@@ -95,17 +135,17 @@ export async function listSeerrUpstreamTargets(
 export async function listAllSeerrUpstreamTargets(): Promise<
 	SeerrUpstreamRecord[]
 > {
-	const snapshot = await upstreamMappings.getValue();
+	const snapshot = await getSnapshot();
 	const records: SeerrUpstreamRecord[] = [];
 
-	for (const [rawAniListId, target] of Object.entries(
-		snapshot?.seerrTargets ?? {},
+	for (const [rawAniListId, entries] of Object.entries(
+		snapshot?.entries ?? {},
 	)) {
 		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
+		if (anilistId === null) continue;
 
-		if (anilistId !== null) {
-			records.push({ anilistId, target });
-		}
+		const target = projectSeerrTarget(entries);
+		if (target !== null) records.push({ anilistId, target });
 	}
 
 	return records.toSorted((left, right) => left.anilistId - right.anilistId);
@@ -115,81 +155,42 @@ export async function refreshUpstreamMappings(): Promise<void> {
 	const next = writes
 		.catch(() => {})
 		.then(async () => {
-			const previous = await upstreamMappings.getValue();
+			const storedPrevious = await upstreamMappings.getValue();
+			const previous = storedPrevious
+				? normalizeSnapshot(storedPrevious)
+				: null;
 			if (
-				previous?.mappings &&
-				previous.seerrTargets &&
+				previous?.entries !== undefined &&
 				Date.now() - previous.fetchedAt < UPSTREAM_REFRESH_INTERVAL_MS
 			) {
+				if (storedPrevious && hasLegacyProjections(storedPrevious)) {
+					await upstreamMappings.setValue(previous);
+				}
 				return;
 			}
 
-			const controller = new AbortController();
-			const timeout = setTimeout(() => controller.abort(), ANIBRIDGE_TIMEOUT_MS);
-
-			try {
-				const response = await fetch(ANIBRIDGE_URL, {
-					signal: controller.signal,
-					headers: previous?.etag
-						? {
-								"If-None-Match": previous.etag,
-							}
-						: {},
-				});
-
-				if (response.status === 304) {
-					if (!previous) {
-						throw new Error("AniBridge returned 304 without stored mappings.");
-					}
-
-					await upstreamMappings.setValue({
-						...previous,
-						fetchedAt: Date.now(),
-					});
-
-					return;
+			/** LEGACY: omit ETag until projection-only snapshots have completed one full refresh. */
+			const etag = previous?.entries === undefined ? undefined : previous.etag;
+			const result = await downloadAniBridgeMappings({ etag });
+			if (result.status === "not-modified") {
+				if (!previous || previous.entries === undefined) {
+					throw new Error("AniBridge returned 304 without stored entries.");
 				}
-
-				if (!response.ok) {
-					throw new Error(
-						`Unable to download AniBridge mappings (${response.status}).`,
-					);
-				}
-
-				const contentLength = Number(response.headers.get("Content-Length") ?? 0);
-				if (contentLength > MAX_ANIBRIDGE_BYTES) {
-					throw new Error("AniBridge mappings payload is too large.");
-				}
-
-				const text = await response.text();
-				if (new TextEncoder().encode(text).byteLength > MAX_ANIBRIDGE_BYTES) {
-					throw new Error("AniBridge mappings payload is too large.");
-				}
-
-				let parsedJson: unknown;
-				try {
-					parsedJson = JSON.parse(text) as unknown;
-				} catch {
-					throw new Error("AniBridge mappings payload is not valid JSON.");
-				}
-
-				const parsed = parseAniBridgeMappingsPayload(parsedJson);
-				if (Object.keys(parsed.mappings).length === 0) {
-					throw new Error(
-						"AniBridge mappings payload did not contain valid mappings.",
-					);
-				}
-				const etag = response.headers.get("ETag");
-
 				await upstreamMappings.setValue({
-					mappings: parsed.mappings,
-					seerrTargets: parsed.seerrTargets,
+					entries: previous.entries,
+					aniListCrosswalks: previous.aniListCrosswalks ?? {},
 					fetchedAt: Date.now(),
-					...(etag ? { etag } : {}),
+					...(previous.etag ? { etag: previous.etag } : {}),
 				});
-			} finally {
-				clearTimeout(timeout);
+				return;
 			}
+
+			await upstreamMappings.setValue({
+				entries: result.parsed.entries,
+				aniListCrosswalks: result.parsed.aniListCrosswalks,
+				fetchedAt: Date.now(),
+				...(result.etag ? { etag: result.etag } : {}),
+			});
 		});
 
 	writes = next.then(
@@ -213,118 +214,75 @@ export async function clearUpstreamMappings(): Promise<void> {
 	await next;
 }
 
-export function parseAniBridgeMappings(payload: unknown): UpstreamMappings {
-	return parseAniBridgeMappingsPayload(payload).mappings;
+async function getSnapshot(): Promise<UpstreamSnapshot | null> {
+	const snapshot = await upstreamMappings.getValue();
+	return snapshot ? normalizeSnapshot(snapshot) : null;
 }
 
-export function parseAniBridgeSeerrTargets(
-	payload: unknown,
-): SeerrUpstreamMappings {
-	return parseAniBridgeMappingsPayload(payload).seerrTargets;
-}
-
-function parseAniBridgeMappingsPayload(payload: unknown): {
-	mappings: UpstreamMappings;
-	seerrTargets: SeerrUpstreamMappings;
-} {
-	const mappings: UpstreamMappings = {};
-	const seerrTargets: SeerrUpstreamMappings = {};
-
-	if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-		return { mappings, seerrTargets };
-	}
-
-	for (const [rawSource, rawTargets] of Object.entries(
-		payload as Record<string, unknown>,
-	)) {
-		const source = parseDescriptor(rawSource);
-
-		if (
-			source?.name !== "anilist" ||
-			source.scope !== undefined ||
-			!rawTargets ||
-			typeof rawTargets !== "object" ||
-			Array.isArray(rawTargets)
-		) {
-			continue;
-		}
-
-		const anilistId = parseAniListIdOrNull(source.id);
-
-		if (anilistId === null) {
-			continue;
-		}
-
-		const rawTargetKeys = Object.keys(rawTargets);
-		for (const rawTarget of rawTargetKeys) {
-			const target = parseTarget(rawTarget);
-
-			if (target) {
-				addTarget(mappings, anilistId, target);
-			}
-		}
-
-		const seerrTarget = parseSeerrTarget(rawTargetKeys);
-		if (seerrTarget) {
-			seerrTargets[anilistId] = seerrTarget;
-		}
-	}
-
-	return { mappings, seerrTargets };
-}
-
-function parseTarget(value: string): UpstreamTarget | null {
-	const target = parseDescriptor(value);
-
-	if (!target) {
-		return null;
-	}
-
-	if (target.name === "tmdb_movie" && target.scope === undefined) {
-		const providerId = parseTmdbIdOrNull(target.id);
-
-		return providerId === null
-			? null
-			: {
-					provider: "radarr",
-					providerId,
-				};
-	}
-
-	if (target.name !== "tvdb_show") {
-		return null;
-	}
-
-	const providerId = parseTvdbIdOrNull(target.id);
-
-	if (providerId === null) {
-		return null;
-	}
-
-	if (target.scope === undefined) {
-		return {
-			provider: "sonarr",
-			providerId,
-		};
-	}
-
-	const match = /^s(\d+)$/.exec(target.scope);
-
-	if (!match) {
-		return null;
-	}
-
-	const season = Number(match[1]);
-
-	if (!Number.isSafeInteger(season)) {
-		return null;
-	}
-
+function normalizeSnapshot(snapshot: UpstreamSnapshot): UpstreamSnapshot {
 	return {
-		provider: "sonarr",
-		providerId,
-		season,
+		...(snapshot.entries === undefined ? {} : { entries: snapshot.entries }),
+		aniListCrosswalks: normalizeAniListCrosswalkKeys(
+			snapshot.aniListCrosswalks ?? {},
+		),
+		fetchedAt: snapshot.fetchedAt,
+		...(snapshot.etag ? { etag: snapshot.etag } : {}),
 	};
+}
+
+function hasLegacyProjections(snapshot: UpstreamSnapshot): boolean {
+	return "mappings" in snapshot || "seerrTargets" in snapshot;
+}
+
+function normalizeAniListCrosswalkKeys(
+	crosswalks: AniListCrosswalkMappings,
+): AniListCrosswalkMappings {
+	const normalized: AniListCrosswalkMappings = {};
+
+	for (const [rawKey, anilistId] of Object.entries(crosswalks)) {
+		const key = normalizeStoredSourceKey(rawKey);
+		if (key !== null) {
+			normalized[key] = anilistId;
+		}
+	}
+
+	return normalized;
+}
+
+function getSnapshotAniListId(
+	snapshot: UpstreamSnapshot | null,
+	source: SourceIdentity,
+): AniListId | null {
+	if (source.source === "anilist") return source.id;
+
+	return snapshot?.aniListCrosswalks?.[sourceIdentityKey(source)] ?? null;
+}
+
+function projectUpstreamTargets(
+	targets: readonly AniBridgeTarget[],
+): UpstreamTarget[] {
+	return targets.flatMap((target) => {
+		const projected = projectUpstreamTarget(target);
+		return projected === null ? [] : [projected];
+	});
+}
+
+function projectUpstreamTarget(target: AniBridgeTarget): UpstreamTarget | null {
+	switch (target.kind) {
+		case "tmdb-movie": {
+			return { provider: "radarr", providerId: target.id };
+		}
+		case "tvdb-show": {
+			return {
+				provider: "sonarr",
+				providerId: target.id,
+				...(target.season === undefined ? {} : { season: target.season }),
+			};
+		}
+		case "tmdb-show": {
+			return null;
+		}
+	}
 }
 
 function normalizeSeasons(seasons: readonly number[]): number[] {
@@ -333,37 +291,29 @@ function normalizeSeasons(seasons: readonly number[]): number[] {
 		.toSorted((left, right) => left - right);
 }
 
-function parseSeerrTarget(
-	values: readonly string[],
+function projectSeerrTarget(
+	targets: readonly AniBridgeTarget[],
 ): SeerrUpstreamTarget | null {
-	const descriptors = values.flatMap((value) => {
-		const target = parseDescriptor(value);
-		return target ? [target] : [];
-	});
-	const movieTmdbIds = descriptors.flatMap((target) => {
-		if (target.name !== "tmdb_movie" || target.scope !== undefined) return [];
+	const movieTmdbIds = new Set(targets.flatMap((target) => {
+		if (target.kind !== "tmdb-movie") return [];
 
 		const tmdbId = parseTmdbIdOrNull(target.id);
 		return tmdbId === null ? [] : [tmdbId];
-	});
+	}));
 
-	if (movieTmdbIds.length > 0) {
-		const tmdbId = movieTmdbIds.toSorted((left, right) => left - right)[0];
-		if (tmdbId === undefined) return null;
-
-		return {
-			mediaType: "movie",
-			tmdbId,
-		};
-	}
-
-	const tmdbTargets = descriptors.flatMap((target) => {
-		if (target.name !== "tmdb_show") return [];
+	const tmdbTargets = targets.flatMap((target) => {
+		if (target.kind !== "tmdb-show") return [];
 
 		const tmdbId = parseTmdbIdOrNull(target.id);
-		const season = parseSeasonScope(target.scope);
-		return tmdbId === null || season === null ? [] : [{ tmdbId, season }];
+		return tmdbId === null ? [] : [{ tmdbId, season: target.season }];
 	});
+
+	if (movieTmdbIds.size > 0) {
+		if (movieTmdbIds.size !== 1 || tmdbTargets.length > 0) return null;
+		const tmdbId = [...movieTmdbIds][0];
+		return tmdbId === undefined ? null : { mediaType: "movie", tmdbId };
+	}
+
 	const tmdbIds = new Set(tmdbTargets.map((target) => target.tmdbId));
 	if (tmdbIds.size !== 1) return null;
 
@@ -371,15 +321,15 @@ function parseSeerrTarget(
 	if (tmdbId === undefined) return null;
 
 	const tmdbSeasons = normalizeSeasons(
-		tmdbTargets.map((target) => target.season),
+		tmdbTargets.flatMap((target) =>
+			target.season === undefined ? [] : [target.season],
+		),
 	);
-
-	const tvdbTargets = descriptors.flatMap((target) => {
-		if (target.name !== "tvdb_show") return [];
+	const tvdbTargets = targets.flatMap((target) => {
+		if (target.kind !== "tvdb-show" || target.season === undefined) return [];
 
 		const tvdbId = parseTvdbIdOrNull(target.id);
-		const season = parseSeasonScope(target.scope);
-		return tvdbId === null || season === null ? [] : [{ tvdbId, season }];
+		return tvdbId === null ? [] : [{ tvdbId, season: target.season }];
 	});
 	const tvdbIds = new Set(tvdbTargets.map((target) => target.tvdbId));
 	const tvdbId = tvdbIds.size === 1 ? [...tvdbIds][0] : undefined;
@@ -391,7 +341,6 @@ function parseSeerrTarget(
 						.filter((target) => target.tvdbId === tvdbId)
 						.map((target) => target.season),
 				);
-
 	const seasons = normalizeSeasons([...tmdbSeasons, ...tvdbSeasons]);
 	if (seasons.length === 0) return null;
 
@@ -399,64 +348,8 @@ function parseSeerrTarget(
 		mediaType: "tv",
 		tmdbId,
 		seasons,
+		...(tmdbSeasons.length === 0 ? {} : { tmdbSeasons }),
+		...(tvdbSeasons.length === 0 ? {} : { tvdbSeasons }),
 		...(tvdbId === undefined ? {} : { tvdbId }),
 	};
-}
-
-function parseSeasonScope(scope: string | undefined): number | null {
-	const match = /^s(\d+)$/.exec(scope ?? "");
-	if (!match) return null;
-
-	const season = Number(match[1]);
-	return Number.isSafeInteger(season) ? season : null;
-}
-
-function parseDescriptor(
-	value: string,
-): { name: string; id: number; scope?: string } | null {
-	const parts = value.split(":");
-
-	if (parts.length !== 2 && parts.length !== 3) {
-		return null;
-	}
-
-	const [name, rawId, scope] = parts;
-	const id = Number(rawId);
-
-	if (!name || !Number.isSafeInteger(id) || id <= 0) {
-		return null;
-	}
-
-	return {
-		name,
-		id,
-		...(scope === undefined ? {} : { scope }),
-	};
-}
-
-function addTarget(
-	mappings: UpstreamMappings,
-	anilistId: AniListId,
-	target: UpstreamTarget,
-): void {
-	const targets = mappings[anilistId] ?? [];
-
-	const alreadyExists = targets.some((existing) => {
-		if (
-			existing.provider !== target.provider ||
-			existing.providerId !== target.providerId
-		) {
-			return false;
-		}
-
-		if (existing.provider === "sonarr" && target.provider === "sonarr") {
-			return existing.season === target.season;
-		}
-
-		return true;
-	});
-
-	if (!alreadyExists) {
-		mappings[anilistId] = [...targets, target];
-	}
 }

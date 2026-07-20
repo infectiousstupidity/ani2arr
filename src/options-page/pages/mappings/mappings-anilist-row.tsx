@@ -15,8 +15,8 @@ import type { AniListTitleLanguage } from "@/anilist/title";
 import { getProviderExternalIdLabel } from "@/providers/provider-labels";
 import type { ProviderExternalId } from "@/rpc/types";
 import Pill from "@/shared/ui/primitives/pill";
+import Tooltip from "@/shared/ui/primitives/tooltip";
 import { cn } from "@/shared/utils/cn";
-import { Tooltip } from "../../components/ui/tooltip";
 import type {
 	ClearMatchAction,
 	IgnoreAction,
@@ -26,6 +26,8 @@ import {
 	formatAniListToken,
 	formatMappingEntryKind,
 	formatMappingStatusLabel,
+	formatSourceIdentity,
+	getMappingRowMutationInput,
 } from "./mapping-page-model";
 
 interface MappingsAniListRowProps {
@@ -92,30 +94,27 @@ const getClearMatchTitle = (action: ClearMatchAction): string => {
 
 const getIgnoreAction = (row: MappingRow): IgnoreAction =>
 	row.result.kind === "ignored"
-		? { kind: "clear-ignore", anilistId: row.anilistId, provider: row.provider }
-		: { kind: "set-ignore", anilistId: row.anilistId, provider: row.provider };
+		? { kind: "clear-ignore", ...getMappingRowMutationInput(row) }
+		: { kind: "set-ignore", ...getMappingRowMutationInput(row) };
 
 const getClearMatchAction = (row: MappingRow): ClearMatchAction | null => {
 	if (row.result.kind === "mapped" && row.result.source === "manual") {
 		return {
 			kind: "clear-manual",
-			anilistId: row.anilistId,
-			provider: row.provider,
+			...getMappingRowMutationInput(row),
 		};
 	}
 	if (row.result.kind === "mapped" && row.result.source === "auto") {
 		return {
 			kind: "reject-candidate",
-			anilistId: row.anilistId,
-			provider: row.provider,
+			...getMappingRowMutationInput(row),
 			providerId: row.result.providerId,
 		};
 	}
 	if (row.result.kind === "unmapped" && row.result.rejectedProviderIds?.[0]) {
 		return {
 			kind: "clear-rejected",
-			anilistId: row.anilistId,
-			provider: row.provider,
+			...getMappingRowMutationInput(row),
 			providerId: row.result.rejectedProviderIds[0],
 		};
 	}
@@ -158,6 +157,7 @@ export function MappingsAniListRow(
 	const coverUrl = getCoverUrl(metadata);
 	const title = getRowTitle(row, metadata, preferredTitleLanguage);
 	const anilistUrl = buildAniListAnimeUrl(row.anilistId);
+	const sourceLabel = formatSourceIdentity(row.source);
 	const metaPillLabels = getMetaPillLabels(metadata);
 	const entryKind = formatMappingEntryKind(row.result);
 	const showProviderIdPill = shouldShowProviderIdPill(row, parentProviderId);
@@ -224,21 +224,31 @@ export function MappingsAniListRow(
 						{title}
 					</a>
 					<div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-text-secondary">
-						<a
-							href={anilistUrl}
-							target="_blank"
-							rel="noreferrer"
-							className="cursor-pointer rounded-full"
-							aria-label={`Open AniList ID ${row.anilistId}`}
-						>
+						{row.source.source === "anilist" ? (
+							<a
+								href={anilistUrl}
+								target="_blank"
+								rel="noreferrer"
+								className="cursor-pointer rounded-full"
+								aria-label={`Open ${sourceLabel}`}
+							>
+								<Pill
+									small
+									tone="muted"
+									className={cn(ID_PILL_CLASS, LINK_PILL_CLASS)}
+								>
+									{sourceLabel}
+								</Pill>
+							</a>
+						) : (
 							<Pill
 								small
 								tone="muted"
-								className={cn(ID_PILL_CLASS, LINK_PILL_CLASS)}
+								className={ID_PILL_CLASS}
 							>
-								AniList ID: {row.anilistId}
+								{sourceLabel}
 							</Pill>
-						</a>
+						)}
 						{metaPillLabels.map((label) => (
 							<Pill key={label} small tone="muted" className={ID_PILL_CLASS}>
 								{label}
@@ -278,7 +288,10 @@ export function MappingsAniListRow(
 			<div className="col-start-3 row-start-1 flex flex-col items-end justify-center gap-1.5 md:col-auto md:row-auto md:flex-row md:items-center md:justify-end">
 				<div className="flex items-center justify-end gap-1.5">
 					{clearMatchAction ? (
-						<Tooltip content={getClearMatchTitle(clearMatchAction)}>
+						<Tooltip
+							content={getClearMatchTitle(clearMatchAction)}
+							delayDuration={200}
+						>
 							<button
 								type="button"
 								onClick={() => onClearMatch(row, clearMatchAction)}
@@ -290,7 +303,7 @@ export function MappingsAniListRow(
 							</button>
 						</Tooltip>
 					) : null}
-					<Tooltip content={ignoreTitle}>
+					<Tooltip content={ignoreTitle} delayDuration={200}>
 						<button
 							type="button"
 							onClick={() => onIgnore(row, ignoreAction)}
@@ -302,7 +315,7 @@ export function MappingsAniListRow(
 						</button>
 					</Tooltip>
 				</div>
-				<Tooltip content="Edit mapping">
+				<Tooltip content="Edit mapping" delayDuration={200}>
 					<button
 						type="button"
 						onClick={() => onEdit(row)}

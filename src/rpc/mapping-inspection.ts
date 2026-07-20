@@ -5,15 +5,16 @@ import type { AniListId, AniListMetadata } from "@/anilist/types";
 import { resolveTitlePreference } from "@/anilist/title";
 import type { MappingService } from "@/mapping/mapping.service";
 import type { Provider } from "@/providers/types";
+import { anilistIdFromSource, sourceFromInput } from "@/rpc/source-input";
 import type {
 	GetMappingInspectionOutput,
 	MappingDetailsLinkedAniListEntry,
+	SourceRpcInput,
 } from "@/rpc/types";
 
-export interface GetMappingInspectionInput {
+export type GetMappingInspectionInput = SourceRpcInput & {
 	provider: Provider;
-	anilistId: AniListId;
-}
+};
 
 export interface GetMappingInspectionDeps {
 	mappingService: Pick<MappingService, "getMapping" | "getLinkedAniListIds">;
@@ -25,7 +26,7 @@ export interface GetMappingInspectionDeps {
 }
 
 function buildLinkedAniListEntries(
-	anilistId: AniListId,
+	currentAniListId: AniListId | null,
 	linkedAniListIds: readonly AniListId[],
 	metadataById: Map<AniListId, AniListMetadata>,
 ): MappingDetailsLinkedAniListEntry[] {
@@ -48,7 +49,7 @@ function buildLinkedAniListEntries(
 						coverImage:
 							metadata.coverImage?.medium ?? metadata.coverImage?.large ?? null,
 					}),
-			...(linkedAniListId === anilistId ? { relation: "current" } : {}),
+			...(linkedAniListId === currentAniListId ? { relation: "current" } : {}),
 		};
 	});
 }
@@ -57,10 +58,9 @@ export async function getMappingInspection(
 	input: GetMappingInspectionInput,
 	deps: GetMappingInspectionDeps,
 ): Promise<GetMappingInspectionOutput> {
-	const mapping = await deps.mappingService.getMapping(
-		input.provider,
-		input.anilistId,
-	);
+	const source = sourceFromInput(input);
+	const currentAniListId = input.anilistId ?? anilistIdFromSource(source);
+	const mapping = await deps.mappingService.getMapping(input.provider, source);
 
 	const linkedAniListIds =
 		mapping.kind === "mapped"
@@ -72,7 +72,13 @@ export async function getMappingInspection(
 
 	const linkedIdsWithCurrent =
 		mapping.kind === "mapped"
-			? [...new Set([input.anilistId, ...linkedAniListIds])].toSorted(
+			? [
+					...new Set(
+						currentAniListId === null
+							? linkedAniListIds
+							: [currentAniListId, ...linkedAniListIds],
+					),
+				].toSorted(
 					(left, right) => left - right,
 				)
 			: [];
@@ -87,9 +93,10 @@ export async function getMappingInspection(
 	);
 
 	return {
+		source,
 		mapping,
 		linkedAniListEntries: buildLinkedAniListEntries(
-			input.anilistId,
+			currentAniListId,
 			linkedIdsWithCurrent,
 			metadataById,
 		),

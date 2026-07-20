@@ -8,17 +8,26 @@ import {
 	clearManualMapping as removeManualMapping,
 	clearRejectedAutoCandidate as removeRejectedCandidate,
 	getManualFacts,
-	listManualFacts,
 	rejectAutoCandidate,
 	setIgnored as saveIgnored,
 	setManualMapping as saveManualMapping,
-	type ManualFacts,
 	type ManualMapping,
 } from "./manual.store";
-import { getUpstreamTargets, listUpstreamMappings } from "./upstream.store";
-import { getAutoResult, listAutoResults } from "./auto.store";
+import { getUpstreamTargets } from "./upstream.store";
+import { getAutoResult } from "./auto.store";
 import type { AutomaticResolver } from "./resolve/resolve";
-import type { AutoResult, MappingResult, UpstreamTarget } from "./types";
+import {
+	normalizeSourceIdentity,
+	type SourceIdentity,
+} from "./source-identity";
+import type { MappingResult } from "./types";
+import {
+	chooseMappingResult,
+	collectEffectiveMappingRecords,
+	matchesUpstream,
+} from "./mapping-facts";
+
+export { chooseMappingResult } from "./mapping-facts";
 
 export class MappingService {
 	public constructor(
@@ -27,44 +36,52 @@ export class MappingService {
 
 	public async getMapping(
 		provider: Provider,
-		anilistId: AniListId,
+		source: SourceIdentity | AniListId,
 	): Promise<MappingResult> {
+		const sourceIdentity = normalizeSourceIdentity(source);
 		const [manual, upstream, auto] = await Promise.all([
-			getManualFacts(provider, anilistId),
-			getUpstreamTargets(provider, anilistId),
-			getAutoResult(provider, anilistId),
+			getManualFacts(provider, sourceIdentity),
+			getUpstreamTargets(provider, sourceIdentity),
+			getAutoResult(provider, sourceIdentity),
 		]);
-
-		return chooseMappingResult(provider, manual, upstream, auto);
+		return chooseMappingResult({
+			provider,
+			manual,
+			upstream,
+			auto,
+		});
 	}
 
 	public async resolveMapping(
 		provider: Provider,
-		anilistId: AniListId,
+		source: SourceIdentity | AniListId,
 		options?: {
 			forceRetry?: boolean;
 			title?: string;
 			metadata?: AniListMediaHint | null;
 		},
 	): Promise<MappingResult> {
-		const current = await this.getMapping(provider, anilistId);
+		const sourceIdentity = normalizeSourceIdentity(source);
+		const current = await this.getMapping(provider, sourceIdentity);
+
+		if (isStableMapping(current)) {
+			return current;
+		}
+
+		if (current.kind === "ambiguous") {
+			return current;
+		}
 
 		if (
-			current.kind === "mapped" ||
-			current.kind === "ignored" ||
-			(current.kind === "ambiguous" &&
-				(await getAutoResult(provider, anilistId)) !== null &&
-				options?.forceRetry !== true) ||
-			(current.kind === "unmapped" &&
-				current.hadResolveAttempt &&
-				options?.forceRetry !== true)
+			current.kind === "unmapped" &&
+			shouldKeepUnmappedMapping(current, options?.forceRetry === true)
 		) {
 			return current;
 		}
 
 		await this.resolveAutomaticMapping(
 			provider,
-			anilistId,
+			sourceIdentity,
 			current.kind === "unmapped" ? (current.rejectedProviderIds ?? []) : [],
 			{
 				...(options?.title === undefined ? {} : { title: options.title }),
@@ -74,12 +91,12 @@ export class MappingService {
 			},
 		);
 
-		return this.getMapping(provider, anilistId);
+		return this.getMapping(provider, sourceIdentity);
 	}
 
 	public async setManualMapping(
 		provider: Provider,
-		anilistId: AniListId,
+		source: SourceIdentity | AniListId,
 		providerId: number,
 		season?: number,
 	): Promise<void> {
@@ -88,53 +105,54 @@ export class MappingService {
 				? { providerId, season }
 				: { providerId };
 
-		await saveManualMapping(provider, anilistId, mapping);
+		await saveManualMapping(provider, normalizeSourceIdentity(source), mapping);
 	}
 
 	public async clearManualMapping(
 		provider: Provider,
-		anilistId: AniListId,
+		source: SourceIdentity | AniListId,
 	): Promise<void> {
-		await removeManualMapping(provider, anilistId);
+		await removeManualMapping(provider, normalizeSourceIdentity(source));
 	}
 
 	public async setIgnored(
 		provider: Provider,
-		anilistId: AniListId,
+		source: SourceIdentity | AniListId,
 	): Promise<void> {
-		await saveIgnored(provider, anilistId);
+		await saveIgnored(provider, normalizeSourceIdentity(source));
 	}
 
 	public async clearIgnored(
 		provider: Provider,
-		anilistId: AniListId,
+		source: SourceIdentity | AniListId,
 	): Promise<void> {
-		await removeIgnored(provider, anilistId);
+		await removeIgnored(provider, normalizeSourceIdentity(source));
 	}
 
 	public async rejectCandidate(
 		provider: Provider,
-		anilistId: AniListId,
+		source: SourceIdentity | AniListId,
 		providerId: number,
 	): Promise<void> {
-		await rejectAutoCandidate(provider, anilistId, providerId);
+		await rejectAutoCandidate(provider, normalizeSourceIdentity(source), providerId);
 	}
 
 	public async clearRejectedCandidate(
 		provider: Provider,
-		anilistId: AniListId,
+		source: SourceIdentity | AniListId,
 		providerId: number,
 	): Promise<void> {
-		await removeRejectedCandidate(provider, anilistId, providerId);
+		await removeRejectedCandidate(provider, normalizeSourceIdentity(source), providerId);
 	}
 
 	public async cleanupRedundantManualMapping(
 		provider: Provider,
-		anilistId: AniListId,
+		source: SourceIdentity | AniListId,
 	): Promise<boolean> {
+		const sourceIdentity = normalizeSourceIdentity(source);
 		const [manual, upstream] = await Promise.all([
-			getManualFacts(provider, anilistId),
-			getUpstreamTargets(provider, anilistId),
+			getManualFacts(provider, sourceIdentity),
+			getUpstreamTargets(provider, sourceIdentity),
 		]);
 
 		if (!manual || !("mapping" in manual) || upstream.length !== 1) {
@@ -150,7 +168,7 @@ export class MappingService {
 			return false;
 		}
 
-		await removeManualMapping(provider, anilistId);
+		await removeManualMapping(provider, sourceIdentity);
 
 		return true;
 	}
@@ -174,226 +192,47 @@ export class MappingService {
 			return new Map();
 		}
 
-		const [manualRecords, upstreamRecords, autoRecords] = await Promise.all([
-			listManualFacts(provider),
-			listUpstreamMappings(),
-			listAutoResults(provider),
-		]);
+		const activeRecords = await collectEffectiveMappingRecords(provider);
+		const linkedAniListIdsByProviderId = new Map<number, Set<AniListId>>();
 
-		const manualByAniListId = new Map(
-			manualRecords.map((record) => [record.anilistId, record.facts]),
-		);
-
-		const upstreamByAniListId = new Map<AniListId, UpstreamTarget[]>();
-
-		for (const record of upstreamRecords) {
-			const targets = record.targets.filter(
-				(target) => target.provider === provider,
-			);
-
-			if (targets.length > 0) {
-				upstreamByAniListId.set(record.anilistId, targets);
-			}
-		}
-
-		const autoByAniListId = new Map(
-			autoRecords.map((record) => [record.anilistId, record.result]),
-		);
-
-		const anilistIds = new Set([
-			...manualByAniListId.keys(),
-			...upstreamByAniListId.keys(),
-			...autoByAniListId.keys(),
-		]);
-
-		const linkedAniListIdsByProviderId = new Map<number, AniListId[]>();
-
-		for (const anilistId of anilistIds) {
-			const result = chooseMappingResult(
-				provider,
-				manualByAniListId.get(anilistId) ?? null,
-				upstreamByAniListId.get(anilistId) ?? [],
-				autoByAniListId.get(anilistId) ?? null,
-			);
+		for (const record of activeRecords) {
+			if (record.anilistId === null) continue;
 
 			if (
-				result.kind !== "mapped" ||
-				!requestedProviderIds.has(result.providerId)
+				record.result.kind !== "mapped" ||
+				!requestedProviderIds.has(record.result.providerId)
 			) {
 				continue;
 			}
 
 			const linkedAniListIds =
-				linkedAniListIdsByProviderId.get(result.providerId) ?? [];
-			linkedAniListIds.push(anilistId);
-			linkedAniListIdsByProviderId.set(result.providerId, linkedAniListIds);
-		}
-
-		for (const [linkedProviderId, linkedAniListIds] of linkedAniListIdsByProviderId) {
+				linkedAniListIdsByProviderId.get(record.result.providerId) ?? new Set();
+			linkedAniListIds.add(record.anilistId);
 			linkedAniListIdsByProviderId.set(
-				linkedProviderId,
-				linkedAniListIds.toSorted((left, right) => left - right),
+				record.result.providerId,
+				linkedAniListIds,
 			);
 		}
 
-		return linkedAniListIdsByProviderId;
-	}
-}
-
-export function chooseMappingResult(
-	provider: Provider,
-	manual: ManualFacts | null,
-	upstream: UpstreamTarget[],
-	auto: AutoResult | null,
-): MappingResult {
-	if (manual && "ignored" in manual) {
-		return { kind: "ignored" };
-	}
-
-	const upstreamTarget = getSingleUpstreamTarget(provider, upstream);
-	const rejectedProviderIds = manual?.rejectedProviderIds;
-
-	if (manual && "mapping" in manual) {
-		if (
-			upstreamTarget &&
-			matchesUpstream(provider, manual.mapping, upstreamTarget)
-		) {
-			return mappedFromUpstream(upstreamTarget);
+		const sortedLinkedAniListIdsByProviderId = new Map<number, AniListId[]>();
+		for (const [linkedProviderId, linkedAniListIds] of linkedAniListIdsByProviderId) {
+			sortedLinkedAniListIdsByProviderId.set(
+				linkedProviderId,
+				[...linkedAniListIds].toSorted((left, right) => left - right),
+			);
 		}
 
-		return {
-			kind: "mapped",
-			source: "manual",
-			providerId: manual.mapping.providerId,
-			...(manual.mapping.season === undefined
-				? {}
-				: { season: manual.mapping.season }),
-		};
+		return sortedLinkedAniListIdsByProviderId;
 	}
-
-	if (upstreamTarget) {
-		return mappedFromUpstream(upstreamTarget);
-	}
-
-	const autoMapping = chooseAutoMapping(auto, upstream, rejectedProviderIds);
-	if (autoMapping) return autoMapping;
-
-	if (upstream.length > 1) {
-		return ambiguous(upstream);
-	}
-
-	if (auto?.kind === "ambiguous") {
-		return ambiguous(auto.targets);
-	}
-
-	return unmapped(auto !== null, rejectedProviderIds);
 }
 
-function getSingleUpstreamTarget(
-	provider: Provider,
-	upstream: UpstreamTarget[],
-): UpstreamTarget | undefined {
-	if (upstream.length === 1) return upstream[0];
-	if (provider !== "sonarr" || upstream.length === 0) return undefined;
-
-	const firstTarget = upstream[0];
-	if (firstTarget?.provider !== "sonarr") return undefined;
-
-	const providerId = firstTarget.providerId;
-	if (
-		upstream.some(
-			(target) =>
-				target.provider !== "sonarr" || target.providerId !== providerId,
-		)
-	) {
-		return undefined;
-	}
-
-	return {
-		provider: "sonarr",
-		providerId,
-	};
+function isStableMapping(mapping: MappingResult): boolean {
+	return mapping.kind === "mapped" || mapping.kind === "ignored";
 }
 
-function mappedFromUpstream(target: UpstreamTarget): MappingResult {
-	return {
-		kind: "mapped",
-		source: "upstream",
-		providerId: target.providerId,
-		...(target.provider === "sonarr" && target.season !== undefined
-			? { season: target.season }
-			: {}),
-	};
-}
-
-function chooseAutoMapping(
-	auto: AutoResult | null,
-	upstream: UpstreamTarget[],
-	rejectedProviderIds: number[] | undefined,
-): MappingResult | null {
-	if (auto?.kind !== "mapped") return null;
-
-	const autoIsRejected = rejectedProviderIds?.includes(auto.providerId) === true;
-	if (upstream.length > 1) {
-		return !autoIsRejected && upstreamHasProviderId(upstream, auto.providerId)
-			? mappedFromAuto(auto)
-			: ambiguous(upstream);
-	}
-
-	return autoIsRejected ? unmapped(true, rejectedProviderIds) : mappedFromAuto(auto);
-}
-
-function mappedFromAuto(result: Extract<AutoResult, { kind: "mapped" }>): MappingResult {
-	return {
-		kind: "mapped",
-		source: "auto",
-		providerId: result.providerId,
-		...(result.season === undefined ? {} : { season: result.season }),
-		...(result.matchedTitle === undefined
-			? {}
-			: { matchedTitle: result.matchedTitle }),
-	};
-}
-
-function ambiguous(targets: UpstreamTarget[]): MappingResult {
-	return {
-		kind: "ambiguous",
-		targets,
-	};
-}
-
-function upstreamHasProviderId(
-	upstream: readonly UpstreamTarget[],
-	providerId: number,
+function shouldKeepUnmappedMapping(
+	current: Extract<MappingResult, { kind: "unmapped" }>,
+	forceRetry: boolean,
 ): boolean {
-	return upstream.some((target) => target.providerId === providerId);
-}
-
-function matchesUpstream(
-	provider: Provider,
-	manual: ManualMapping,
-	upstream: UpstreamTarget,
-): boolean {
-	if (
-		upstream.provider !== provider ||
-		upstream.providerId !== manual.providerId
-	) {
-		return false;
-	}
-
-	return (
-		provider === "radarr" ||
-		(upstream.provider === "sonarr" && upstream.season === manual.season)
-	);
-}
-
-function unmapped(
-	hadResolveAttempt: boolean,
-	rejectedProviderIds: number[] | undefined,
-): MappingResult {
-	return {
-		kind: "unmapped",
-		hadResolveAttempt,
-		...(rejectedProviderIds?.length ? { rejectedProviderIds } : {}),
-	};
+	return current.hadResolveAttempt && !forceRetry;
 }

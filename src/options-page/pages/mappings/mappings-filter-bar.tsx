@@ -4,8 +4,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Search } from "lucide-react";
 import Button from "@/shared/ui/primitives/button";
+import { Input } from "@/shared/ui/primitives/input";
 import { SelectControl } from "@/shared/ui/primitives/select";
-import { Input } from "../../components/ui/input";
 import type {
 	MappingSourceFilter,
 	MappingStatusFilter,

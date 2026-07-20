@@ -8,6 +8,7 @@ import {
 	type BrowseAdapter,
 	type HostMediaTarget,
 } from "./types";
+import { sourceIdentityKey } from "@/mapping/source-identity";
 
 export const BROWSE_MUTATION_OBSERVER_INIT: MutationObserverInit = {
 	childList: true,
@@ -48,7 +49,7 @@ function getCardInstanceId(mountTarget: HTMLElement): number {
 
 function getCardSignature(parsed: HostMediaTarget): string {
 	return [
-		parsed.anilistId,
+		sourceIdentityKey(parsed.source),
 		parsed.format ?? "",
 		parsed.title,
 		parsed.mountTarget.getAttribute("href") ?? "",
@@ -170,7 +171,7 @@ export function scanBrowseCardTargets(
 		});
 		parsed.mountTarget.setAttribute(
 			BROWSE_PROCESSED_ATTRIBUTE,
-			String(parsed.anilistId),
+			sourceIdentityKey(parsed.source),
 		);
 		targetsByMountTarget.set(parsed.mountTarget, {
 			key: getCardSignature(parsed),

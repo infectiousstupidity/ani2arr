@@ -31,20 +31,30 @@ import type {
 	SonarrSeries,
 	SonarrSeriesSnapshot,
 } from "@/providers/sonarr/types";
-import type { MappingResult, MappingSource } from "@/mapping/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import type { MappingResult } from "@/mapping/types";
 
 export type ProviderExternalId = TvdbId | TmdbId;
 
-export type StatusInput = {
-	anilistId: AniListId;
+export type SourceRpcInput =
+	| {
+			source: SourceIdentity;
+			anilistId?: AniListId;
+	  }
+	| {
+			/** LEGACY: AniList callers migrate to source in MAL content phases. */
+			anilistId: AniListId;
+			source?: never;
+	  };
+
+export type StatusInput = SourceRpcInput & {
 	title?: string;
 	force_verify?: boolean;
 	force_mapping_retry?: boolean;
 	metadata?: AniListMediaHint | null;
 };
 
-export type AddSonarrInput = {
-	anilistId: AniListId;
+export type AddSonarrInput = SourceRpcInput & {
 	tvdbId: TvdbId;
 	title: string;
 	primaryTitleHint?: string;
@@ -52,16 +62,14 @@ export type AddSonarrInput = {
 	form: SonarrFormState;
 };
 
-export type UpdateSonarrInput = {
-	anilistId: AniListId;
+export type UpdateSonarrInput = SourceRpcInput & {
 	tvdbId: TvdbId;
 	title: string;
 	form: SonarrFormState;
 	monitoringAction?: SonarrEditMonitoringAction;
 };
 
-export type AddRadarrInput = {
-	anilistId: AniListId;
+export type AddRadarrInput = SourceRpcInput & {
 	tmdbId: TmdbId;
 	title: string;
 	primaryTitleHint?: string;
@@ -69,32 +77,28 @@ export type AddRadarrInput = {
 	form: RadarrFormState;
 };
 
-export type UpdateRadarrInput = {
-	anilistId: AniListId;
+export type UpdateRadarrInput = SourceRpcInput & {
 	tmdbId: TmdbId;
 	title: string;
 	form: RadarrFormState;
 };
 
-export type SetManualMappingInput = {
-	anilistId: AniListId;
+export type SetManualMappingInput = SourceRpcInput & {
 	force?: boolean;
 } & (
 	| { provider: "sonarr"; providerId: TvdbId }
 	| { provider: "radarr"; providerId: TmdbId }
 );
 
-export type ClearManualMappingInput = {
-	anilistId: AniListId;
+export type ClearManualMappingInput = SourceRpcInput & {
 	provider: Provider;
 };
 
 export type SetMappingIgnoreInput = ClearManualMappingInput;
 export type ClearMappingIgnoreInput = ClearManualMappingInput;
 
-export type SetMappingRejectedCandidateInput = {
-	anilistId: AniListId;
-} & (
+export type SetMappingRejectedCandidateInput = SourceRpcInput &
+	(
 	| { provider: "sonarr"; providerId: TvdbId }
 	| { provider: "radarr"; providerId: TmdbId }
 );
@@ -118,26 +122,22 @@ export type ValidateTmdbInput = {
 	tmdbId: TmdbId;
 };
 
-export type GetMappingsInput = {
-	providers?: Provider[];
-	statuses?: MappingListRowStatus[];
-	source?: MappingSource;
-	limit?: number;
-	query?: string;
-};
-
 export type GetMappingIdentitiesInput = AniListId[];
+/** Seerr target/request APIs are AniList-only until source-only Seerr UI exists. */
 export type GetSeerrTargetsInput = AniListId[];
 export type GetSeerrTargetInput = AniListId;
 
 export type GetMappingInspectionInput = {
-	anilistId: AniListId;
 	provider: Provider;
-};
+} & SourceRpcInput;
 
 export type GetAniListMetadataInput = {
 	ids: AniListId[];
 };
+
+export type GetAniListIdForSourceInput = SourceIdentity;
+
+export type GetAniListIdForSourceOutput = AniListId | null;
 
 export type ProviderConnectionTestInput = {
 	credentials: ProviderCredentials;
@@ -294,6 +294,7 @@ export interface MappingListProviderMeta {
 }
 
 export interface MappingListRow {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	provider: Provider;
 	result: MappingResult;
@@ -315,10 +316,10 @@ export interface MappingListGroup {
 
 export interface GetMappingsOutput {
 	groups: MappingListGroup[];
-	total: number;
 }
 
 export interface MappingIdentity {
+	source: SourceIdentity;
 	anilistId: AniListId;
 	provider: Provider;
 	result: MappingResult;
@@ -336,6 +337,7 @@ export interface MappingDetailsLinkedAniListEntry {
 }
 
 export interface MappingDetailsPayload {
+	source: SourceIdentity;
 	mapping: MappingResult;
 	linkedAniListEntries: readonly MappingDetailsLinkedAniListEntry[];
 }

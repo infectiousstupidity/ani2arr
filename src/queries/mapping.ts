@@ -8,22 +8,26 @@ import {
 } from "@tanstack/react-query";
 import type { AniListId } from "@/anilist/types";
 import { invalidateAfterMappingChange } from "@/queries/invalidation";
-import { getAni2arrApi } from "@/rpc";
+import { getAni2arrApi, type Ani2arrApi } from "@/rpc";
 import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
 	ClearManualMappingInput,
-	GetMappingsInput,
 	GetMappingIdentitiesOutput,
 	GetMappingInspectionOutput,
 	GetMappingsOutput,
 	SetMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
 	SetManualMappingInput,
+	SourceRpcInput,
 } from "@/rpc/types";
+import {
+	sourceIdentityKey,
+	type SourceIdentity,
+} from "@/mapping/source-identity";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { Provider } from "@/providers/types";
-import { normalizeMetadataIds, queryKeys } from "./query-keys";
+import { normalizeMetadataIds, normalizeSourceKeys, queryKeys } from "./query-keys";
 
 export const useSetManualMapping = () => {
 	const queryClient = useQueryClient();
@@ -103,10 +107,10 @@ export const useClearMappingRejectedCandidate = () => {
 	});
 };
 
-export const useMappings = (input?: GetMappingsInput) =>
+export const useMappings = () =>
 	useQuery<GetMappingsOutput, ExtensionError>({
-		queryKey: queryKeys.mappings(input),
-		queryFn: () => getAni2arrApi().getMappings(input),
+		queryKey: queryKeys.mappings(),
+		queryFn: () => getAni2arrApi().getMappings(),
 		staleTime: 45 * 60 * 1000,
 		gcTime: 2 * 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
@@ -127,18 +131,92 @@ export const useMappingIdentities = (
 	});
 };
 
+export const useSourceAniListIdMap = (
+	sources: readonly SourceIdentity[],
+	options?: { enabled?: boolean },
+) => {
+	const sourceKeys = normalizeSourceKeys(sources);
+	return useQuery<Record<string, AniListId | null>, ExtensionError>({
+		queryKey: queryKeys.sourceAniListIds(sourceKeys),
+		queryFn: () => getSourceAniListIdMap(getAni2arrApi(), sources),
+		enabled: (options?.enabled ?? true) && sourceKeys.length > 0,
+		staleTime: 10 * 60 * 1000,
+		gcTime: 60 * 60 * 1000,
+		refetchOnWindowFocus: false,
+	});
+};
+
+type SourceAniListIdApi = Pick<
+	Ani2arrApi,
+	"getAniListIdForSource" | "refreshUpstreamMappings"
+>;
+
+export async function getSourceAniListIdMap(
+	api: SourceAniListIdApi,
+	sources: readonly SourceIdentity[],
+): Promise<Record<string, AniListId | null>> {
+	const sourceKeys = normalizeSourceKeys(sources);
+	const sourcesByKey = new Map(
+		sources.map((source) => [sourceIdentityKey(source), source]),
+	);
+
+	const resolveBatch = async (): Promise<Record<string, AniListId | null>> => {
+		const entries = await Promise.all(
+			sourceKeys.map(async (sourceKey) => {
+				const source = sourcesByKey.get(sourceKey);
+				return [
+					sourceKey,
+					source === undefined ? null : await api.getAniListIdForSource(source),
+				] as const;
+			}),
+		);
+
+		return Object.fromEntries(entries) as Record<string, AniListId | null>;
+	};
+
+	const firstResult = await resolveBatch();
+	const hasMissingSourceCrosswalk = sourceKeys.some((sourceKey) => {
+		const source = sourcesByKey.get(sourceKey);
+		return (
+			source !== undefined &&
+			source.source !== "anilist" &&
+			firstResult[sourceKey] === null
+		);
+	});
+
+	if (!hasMissingSourceCrosswalk) {
+		return firstResult;
+	}
+
+	await api.refreshUpstreamMappings();
+	return resolveBatch();
+}
+
+const inspectionSourceInput = (
+	input: AniListId | SourceRpcInput,
+): SourceRpcInput =>
+	typeof input === "number" ? { anilistId: input } : input;
+
+export const mappingInspectionInput = (
+	anilistId: AniListId,
+	source: SourceIdentity | undefined,
+): SourceRpcInput =>
+	source === undefined ? { anilistId } : { source, anilistId };
+
 export const useMappingInspection = (
 	provider: Provider,
-	anilistId: AniListId,
-) =>
-	useQuery<GetMappingInspectionOutput, ExtensionError>({
-		queryKey: queryKeys.mappingInspection(provider, anilistId),
+	input: AniListId | SourceRpcInput,
+) => {
+	const sourceInput = inspectionSourceInput(input);
+	return useQuery<GetMappingInspectionOutput, ExtensionError>({
+		queryKey: queryKeys.mappingInspection(provider, sourceInput),
 		queryFn: () =>
 			getAni2arrApi().getMappingInspection({
 				provider,
-				anilistId,
+				...sourceInput,
 			}),
 		staleTime: 15 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
 	});
+};

@@ -2,16 +2,23 @@
 // src/mapping/auto.store.ts
 
 import { storage } from "@wxt-dev/storage";
-import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
+import type { AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
 import { bumpMappingsRevision } from "@/shared/sync/revisions";
+import {
+	normalizeStoredSourceKey,
+	normalizeSourceIdentity,
+	parseSourceIdentityKey,
+	sourceIdentityKey,
+	type SourceIdentity,
+} from "./source-identity";
 import type { AutoResult } from "./types";
 
 const MAPPED_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ATTEMPT_TTL_MS = 48 * 60 * 60 * 1000;
 
-export type AutoRecord = {
-	anilistId: AniListId;
+export type SourceAutoRecord = {
+	source: SourceIdentity;
 	result: AutoResult;
 };
 
@@ -19,7 +26,7 @@ type StoredAutoResult = AutoResult & {
 	expiresAt: number;
 };
 
-type AutoMappings = Record<Provider, Record<number, StoredAutoResult>>;
+type AutoMappings = Record<Provider, Record<string, StoredAutoResult>>;
 
 const autoMappings = storage.defineItem<AutoMappings>("local:mapping:auto", {
 	fallback: {
@@ -32,10 +39,10 @@ let writes: Promise<void> = Promise.resolve();
 
 export async function getAutoResult(
 	provider: Provider,
-	anilistId: AniListId,
+	source: SourceIdentity | AniListId,
 ): Promise<AutoResult | null> {
-	const mappings = await autoMappings.getValue();
-	const result = mappings[provider][anilistId];
+	const mappings = await getAutoMappings();
+	const result = mappings[provider][sourceIdentityKey(normalizeSourceIdentity(source))];
 
 	if (!result || result.expiresAt <= Date.now()) {
 		return null;
@@ -44,22 +51,22 @@ export async function getAutoResult(
 	return withoutExpiry(result);
 }
 
-export async function listAutoResults(
+export async function listSourceAutoResults(
 	provider: Provider,
-): Promise<AutoRecord[]> {
-	const mappings = await autoMappings.getValue();
-	const records: AutoRecord[] = [];
+): Promise<SourceAutoRecord[]> {
+	const mappings = await getAutoMappings();
+	const records: SourceAutoRecord[] = [];
 
-	for (const [rawAniListId, result] of Object.entries(mappings[provider])) {
+	for (const [rawSourceKey, result] of Object.entries(mappings[provider])) {
 		if (result.expiresAt <= Date.now()) {
 			continue;
 		}
 
-		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
+		const source = parseSourceIdentityKey(rawSourceKey);
 
-		if (anilistId !== null) {
+		if (source !== null) {
 			records.push({
-				anilistId,
+				source,
 				result: withoutExpiry(result),
 			});
 		}
@@ -70,11 +77,11 @@ export async function listAutoResults(
 
 export async function setAutoResult(
 	provider: Provider,
-	anilistId: AniListId,
+	source: SourceIdentity | AniListId,
 	result: AutoResult,
 ): Promise<void> {
 	await updateAutoMappings((mappings) => {
-		mappings[provider][anilistId] = {
+		mappings[provider][sourceIdentityKey(normalizeSourceIdentity(source))] = {
 			...result,
 			expiresAt:
 				Date.now() +
@@ -124,7 +131,7 @@ async function updateAutoMappings(
 	const next = writes
 		.catch(() => {})
 		.then(async () => {
-			const mappings = await autoMappings.getValue();
+			const mappings = await getAutoMappings();
 
 			update(mappings);
 
@@ -137,4 +144,31 @@ async function updateAutoMappings(
 	);
 
 	await next;
+}
+
+async function getAutoMappings(): Promise<AutoMappings> {
+	return normalizeAutoMappings(await autoMappings.getValue());
+}
+
+function normalizeAutoMappings(mappings: AutoMappings): AutoMappings {
+	return {
+		sonarr: normalizeAutoProviderMappings(mappings.sonarr),
+		radarr: normalizeAutoProviderMappings(mappings.radarr),
+	};
+}
+
+function normalizeAutoProviderMappings(
+	mappings: Record<string, StoredAutoResult>,
+): Record<string, StoredAutoResult> {
+	const normalized: Record<string, StoredAutoResult> = {};
+
+	for (const [rawKey, result] of Object.entries(mappings)) {
+		const sourceKey = normalizeStoredSourceKey(rawKey);
+
+		if (sourceKey !== null) {
+			normalized[sourceKey] = result;
+		}
+	}
+
+	return normalized;
 }

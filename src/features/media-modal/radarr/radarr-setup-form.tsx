@@ -3,6 +3,7 @@
 
 import { useState, type SubmitEvent } from "react";
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type { ProviderFormResources } from "@/providers/types";
 import { normalizeRadarrFormState } from "@/providers/radarr/form-state";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
@@ -42,6 +43,7 @@ type RadarrDraftState = {
 type RadarrSetupFormProps = {
 	formId: string;
 	anilistId: AniListId;
+	source?: SourceIdentity | undefined;
 	target: RadarrSetupTarget | null;
 	providerPayloadTitle?: string | undefined;
 	fallbackLookupTitle?: string | undefined;
@@ -175,6 +177,7 @@ export function useRadarrSetupForm(
 	const {
 		formId,
 		anilistId,
+		source,
 		target,
 		providerPayloadTitle,
 		fallbackLookupTitle,
@@ -263,6 +266,7 @@ export function useRadarrSetupForm(
 		}
 
 		const payload = {
+			...(source === undefined ? {} : { source }),
 			anilistId,
 			title: providerPayloadTitle,
 			form: currentDraft,

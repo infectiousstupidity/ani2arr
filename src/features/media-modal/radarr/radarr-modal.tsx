@@ -3,11 +3,13 @@
 
 import { useMemo, useState } from "react";
 import type { AniListId, AniListMediaHint } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { parseTmdbIdOrNull } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
 import type { TmdbId } from "@/providers/schemas";
 import { getProviderRouteSlug } from "@/providers/provider-route-slug";
 import {
+	mappingInspectionInput,
 	useMappingInspection,
 } from "@/queries/mapping";
 import { useMovieStatus, useRadarrFormResources } from "@/queries/radarr";
@@ -142,9 +144,10 @@ function getCurrentTarget(input: {
 
 function useRadarrModalData(input: {
 	anilistId: AniListId;
+	source?: SourceIdentity | undefined;
 	metadataHint: MediaModalMetadataHint | null;
 }): RadarrModalData {
-	const { anilistId, metadataHint } = input;
+	const { anilistId, source, metadataHint } = input;
 	const base = useMediaModalBaseData({ anilistId, metadataHint });
 	const options = base.options;
 	const isConfigured = options?.providers.radarr.isConfigured === true;
@@ -152,11 +155,12 @@ function useRadarrModalData(input: {
 
 	const statusPayload = useMemo(
 		() => ({
+			...(source === undefined ? {} : { source }),
 			anilistId,
 			...(base.statusTitle === undefined ? {} : { title: base.statusTitle }),
 			metadata: base.statusMetadata,
 		}),
-		[anilistId, base.statusMetadata, base.statusTitle],
+		[anilistId, base.statusMetadata, base.statusTitle, source],
 	);
 	const radarrStatus = useMovieStatus(statusPayload, {
 		enabled: isConfigured && base.statusReady,
@@ -198,16 +202,20 @@ export function RadarrModal({
 	onClose,
 	container,
 }: RadarrModalProps): React.JSX.Element {
-	const { anilistId, metadataHint, openSource, initialView } = state;
+	const { anilistId, source, metadataHint, openSource, initialView } = state;
 	const [view, setView] = useState<MediaModalView>(initialView ?? "setup");
 	const [selectedCandidate, setSelectedCandidate] =
 		useState<RadarrMappingCandidate | null>(null);
 	const contentContainer = useContentPortalContainer();
 	const data = useRadarrModalData({
 		anilistId,
+		source,
 		metadataHint: metadataHint ?? null,
 	});
-	const inspection = useMappingInspection(PROVIDER, anilistId);
+	const inspection = useMappingInspection(
+		PROVIDER,
+		mappingInspectionInput(anilistId, source),
+	);
 	const setupTarget = useMemo(
 		() =>
 			getRadarrSetupTarget({
@@ -242,6 +250,7 @@ export function RadarrModal({
 	const setupForm = useRadarrSetupForm({
 		formId: SETUP_FORM_ID,
 		anilistId,
+		source,
 		target: setupTarget,
 		providerPayloadTitle: data.providerPayloadTitle,
 		fallbackLookupTitle: data.fallbackLookupTitle,
@@ -282,6 +291,7 @@ export function RadarrModal({
 	};
 	const mappingActions = useMappingActions({
 		anilistId,
+		source,
 		provider: PROVIDER,
 		selectedProviderId: selectedCandidate?.tmdbId ?? null,
 		rejectProviderId: rejectCandidateTmdbId,

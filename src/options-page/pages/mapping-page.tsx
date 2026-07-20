@@ -8,15 +8,16 @@ import { useAniListMetadataBatch } from "@/queries/anilist";
 import { useMappings } from "@/queries/mapping";
 import { usePublicOptions } from "@/queries/options";
 import Button from "@/shared/ui/primitives/button";
+import { TooltipProvider } from "@/shared/ui/primitives/tooltip";
 import { SettingsSection } from "../components/settings-section";
-import { TooltipProvider } from "../components/ui/tooltip";
 import { MappingContent } from "./mappings/mappings-list";
 import { MappingsFilterBar } from "./mappings/mappings-filter-bar";
 import {
-	getMappingListModel,
-	getMappingsInput,
+	getFilteredMappingGroups,
+	getLoadedMappingRowCount,
 	getMetadataById,
 	getTargetSearchValue,
+	getVisibleAniListMetadataIds,
 	readTargetAniListIdFromHash,
 	type MappingSourceFilter,
 	type MappingStatusFilter,
@@ -72,30 +73,38 @@ const MappingsPageContent = ({
 	const preferredTitleLanguage =
 		publicOptions?.ui.preferredAniListTitleLanguage ?? "english";
 
-	const mappingsInput = getMappingsInput({
-		provider: providerFilter,
-		search: searchQuery,
-		source: sourceFilter,
-		status: statusFilter,
-		limit: visibleLimit,
-	});
-	const mappingsQuery = useMappings(mappingsInput);
-
-	const groups = useMemo(
-		() => mappingsQuery.data?.groups ?? [],
-		[mappingsQuery.data?.groups],
-	);
-	const listModel = useMemo(
+	const mappingsQuery = useMappings();
+	const filteredMappings = useMemo(
 		() =>
-			getMappingListModel({
+			getFilteredMappingGroups({
+				groups: mappingsQuery.data?.groups ?? [],
+				provider: providerFilter,
+				status: statusFilter,
+				source: sourceFilter,
+				search: searchQuery,
+				limit: visibleLimit,
+			}),
+		[
+			mappingsQuery.data?.groups,
+			providerFilter,
+			searchQuery,
+			sourceFilter,
+			statusFilter,
+			visibleLimit,
+		],
+	);
+	const groups = filteredMappings.groups;
+	const visibleAniListIds = useMemo(
+		() =>
+			getVisibleAniListMetadataIds({
 				groups,
 				collapsedGroupKeys,
 				highlightedAniListId: targetAniListId,
 			}),
 		[collapsedGroupKeys, groups, targetAniListId],
 	);
-	const metadataQuery = useAniListMetadataBatch(listModel.visibleAniListIds, {
-		enabled: listModel.visibleAniListIds.length > 0,
+	const metadataQuery = useAniListMetadataBatch(visibleAniListIds, {
+		enabled: visibleAniListIds.length > 0,
 	});
 	const metadataById = useMemo(
 		() => getMetadataById(metadataQuery.data?.metadata),
@@ -113,7 +122,7 @@ const MappingsPageContent = ({
 
 	const handleRefresh = (): void => {
 		void mappingsQuery.refetch();
-		if (listModel.visibleAniListIds.length > 0) {
+		if (visibleAniListIds.length > 0) {
 			void metadataQuery.refetch();
 		}
 	};
@@ -127,7 +136,7 @@ const MappingsPageContent = ({
 		});
 	};
 
-	const totalGroups = mappingsQuery.data?.total ?? groups.length;
+	const totalGroups = filteredMappings.total;
 	const resetVisibleLimit = (): void => {
 		setVisibleLimit(MAPPING_GROUP_PAGE_SIZE);
 	};
@@ -176,7 +185,7 @@ const MappingsPageContent = ({
 				<div className="flex items-center justify-between gap-4 text-xs text-text-secondary">
 					<span>
 						{groups.length} of {totalGroups} groups •{" "}
-						{listModel.loadedRowCount} mappings loaded
+						{getLoadedMappingRowCount(groups)} mappings loaded
 						{metadataQuery.isFetching ? " • Loading AniList metadata..." : ""}
 					</span>
 					{searchQuery.trim() ? (
@@ -187,8 +196,8 @@ const MappingsPageContent = ({
 				<MappingContent
 					isInitialLoading={mappingsQuery.isLoading && groups.length === 0}
 					error={mappingsQuery.error}
-					groupsCount={groups.length}
-					items={listModel.items}
+					groups={groups}
+					collapsedGroupKeys={collapsedGroupKeys}
 					metadataById={metadataById}
 					pendingRowKeys={pendingRowKeys}
 					targetAniListId={targetAniListId}
@@ -207,9 +216,8 @@ const MappingsPageContent = ({
 							onClick={() =>
 								setVisibleLimit((current) => current + MAPPING_GROUP_PAGE_SIZE)
 							}
-							disabled={mappingsQuery.isFetching}
 						>
-							{mappingsQuery.isFetching ? "Loading..." : "Load more"}
+							Load more
 						</Button>
 					</div>
 				) : null}

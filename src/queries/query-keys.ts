@@ -2,15 +2,23 @@
 // src/queries/query-keys.ts
 
 import { isAniListId, type AniListId } from "@/anilist/types";
+import {
+	sourceIdentityKey,
+	type SourceIdentity,
+} from "@/mapping/source-identity";
 import type { Provider } from "@/providers/types";
 import type { TmdbId } from "@/providers/schemas";
 import type { SeerrMediaType, SeerrTvSeasons } from "@/providers/seerr/types";
-import type { GetMappingsInput, StatusInput } from "@/rpc/types";
+import type { StatusInput } from "@/rpc/types";
+import { sourceFromInput, type SourceInputLike } from "@/rpc/source-input";
 
 const rootQueryKey = ["a2a"] as const;
 const configuredScope = "configured";
 
-type MediaStatusKeyInput = Pick<StatusInput, "anilistId" | "title" | "metadata">;
+type MediaStatusKeyInput = Pick<
+	StatusInput,
+	"anilistId" | "metadata" | "source" | "title"
+>;
 type SeerrMediaStatusKeyInput = {
 	mediaType: SeerrMediaType;
 	tmdbId: TmdbId;
@@ -24,34 +32,33 @@ type SeerrLinkedAniListEntriesKeyInput = {
 	mediaType: SeerrMediaType;
 	tmdbId: TmdbId;
 };
+type SourceKeyInput = SourceInputLike | SourceIdentity | AniListId;
 
 const normalizeText = (value: string): string => value.trim().toLowerCase();
-
-const normalizeMappingsInput = (input?: GetMappingsInput) => {
-	if (!input) return "default";
-	const normalized: Record<string, unknown> = {};
-	if (input.providers?.length) {
-		normalized.providers = [...new Set(input.providers)].toSorted();
-	}
-	if (input.statuses?.length) {
-		normalized.statuses = [...new Set(input.statuses)].toSorted();
-	}
-	if (input.source) {
-		normalized.source = input.source;
-	}
-	if (typeof input.limit === "number") {
-		normalized.limit = input.limit;
-	}
-	if (input.query?.trim()) {
-		normalized.query = normalizeText(input.query);
-	}
-	return normalized;
-};
 
 export const normalizeMetadataIds = (
 	ids: readonly AniListId[],
 ): AniListId[] => {
 	return [...new Set(ids.filter(isAniListId))].toSorted((a, b) => a - b);
+};
+
+export const normalizeSourceKey = (source: SourceIdentity): string =>
+	sourceIdentityKey(source);
+
+export const normalizeSourceKeys = (
+	sources: readonly SourceIdentity[],
+): string[] => {
+	return [...new Set(sources.map((source) => sourceIdentityKey(source)))].toSorted();
+};
+
+const sourceKeyFromInput = (input: SourceKeyInput): string => {
+	if (typeof input === "number") {
+		return normalizeSourceKey({ source: "anilist", id: input });
+	}
+	if ("id" in input && "source" in input && typeof input.source === "string") {
+		return normalizeSourceKey(input);
+	}
+	return normalizeSourceKey(sourceFromInput(input));
 };
 
 const normalizeSeerrSeasons = (
@@ -73,8 +80,7 @@ export const queryKeys = {
 	aniListMetadata: (ids: readonly AniListId[]) =>
 		[...rootQueryKey, "anilist", "metadata", normalizeMetadataIds(ids)] as const,
 	mappingsRoot: () => [...rootQueryKey, "mapping", "list"] as const,
-	mappings: (input?: GetMappingsInput) =>
-		[...rootQueryKey, "mapping", "list", normalizeMappingsInput(input)] as const,
+	mappings: () => [...rootQueryKey, "mapping", "list", "default"] as const,
 	mappingIdentitiesRoot: () =>
 		[...rootQueryKey, "mapping", "identities"] as const,
 	mappingIdentities: (ids: readonly AniListId[]) =>
@@ -84,10 +90,23 @@ export const queryKeys = {
 			"identities",
 			normalizeMetadataIds(ids),
 		] as const,
+	sourceAniListIds: (sourceKeys: readonly string[]) =>
+		[
+			...rootQueryKey,
+			"mapping",
+			"sourceAniListIds",
+			[...new Set(sourceKeys)].toSorted(),
+		] as const,
 	mappingInspectionRoot: () =>
 		[...rootQueryKey, "mapping", "inspection"] as const,
-	mappingInspection: (provider: Provider, anilistId: AniListId) =>
-		[...rootQueryKey, "mapping", "inspection", provider, anilistId] as const,
+	mappingInspection: (provider: Provider, input: SourceKeyInput) =>
+		[
+			...rootQueryKey,
+			"mapping",
+			"inspection",
+			provider,
+			sourceKeyFromInput(input),
+		] as const,
 	providerRoot: (provider: Provider) =>
 		[...rootQueryKey, "provider", provider] as const,
 	providerConnection: (provider: Provider, scope = configuredScope) =>
@@ -165,13 +184,13 @@ export const queryKeys = {
 		[...rootQueryKey, "provider", provider, "lookup", normalizeText(term)] as const,
 	providerMediaStatusRoot: (provider: Provider) =>
 		[...rootQueryKey, "provider", provider, "mediaStatus"] as const,
-	providerMediaStatusItem: (provider: Provider, anilistId: AniListId) =>
+	providerMediaStatusItem: (provider: Provider, input: SourceKeyInput) =>
 		[
 			...rootQueryKey,
 			"provider",
 			provider,
 			"mediaStatus",
-			anilistId,
+			sourceKeyFromInput(input),
 		] as const,
 	providerMediaStatus: (provider: Provider, input: MediaStatusKeyInput) =>
 		[
@@ -179,7 +198,7 @@ export const queryKeys = {
 			"provider",
 			provider,
 			"mediaStatus",
-			input.anilistId,
+			sourceKeyFromInput(input),
 			{
 				...(input.title === undefined ? {} : { title: input.title }),
 				...(input.metadata === undefined ? {} : { metadata: input.metadata }),

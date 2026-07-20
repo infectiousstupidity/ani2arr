@@ -1,7 +1,6 @@
 /** Searches Sonarr or Radarr for automatic mapping candidates. */
 // src/mapping/resolve/candidate-search.ts
 
-import type { AniListMedia } from "@/anilist/types";
 import type {
 	Provider,
 	ProviderCredentials,
@@ -13,13 +12,14 @@ import type { SonarrLookupSeries } from "@/providers/sonarr/types";
 import {
 	findTitleMatchForTerm,
 	getSearchTerms,
+	type SearchMedia,
 	type TitleCandidate,
 	type TitleMatch,
 } from "./title-matching";
 
 type SearchCandidateOptions = {
 	provider: Provider;
-	media: AniListMedia;
+	media: SearchMedia;
 	credentials: ProviderCredentials;
 	clients: {
 		sonarr: SonarrClient;

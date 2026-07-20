@@ -35,6 +35,7 @@ import type {
 	UpdateRadarrInput,
 	ValidateTmdbInput,
 } from "@/rpc/types";
+import { sourceFromInput } from "@/rpc/source-input";
 import { normalizeInputCredentials } from "./provider-credentials";
 
 type RadarrMappingResult =
@@ -214,7 +215,8 @@ async function getRadarrStatusFromMappingAndLibrary(
 async function resolveRadarrMapping(
 	input: StatusInput,
 ): Promise<RadarrMappingResult> {
-	const mapping = await mappingService.resolveMapping("radarr", input.anilistId, {
+	const source = sourceFromInput(input);
+	const mapping = await mappingService.resolveMapping("radarr", source, {
 		forceRetry: input.force_mapping_retry === true,
 		...(input.title === undefined ? {} : { title: input.title }),
 		...(input.metadata === undefined ? {} : { metadata: input.metadata }),

@@ -2,7 +2,12 @@
 // src/anilist/media.service.test.ts
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseAniListId, type AniListId, type AniListMedia } from "@/anilist/types";
+import {
+	AniListError,
+	parseAniListId,
+	type AniListId,
+	type AniListMedia,
+} from "@/anilist/types";
 import type { CacheHit, CacheWriteOptions, TtlCache } from "@/shared/cache/ttl-cache";
 import { AniListMediaService } from "./media.service";
 
@@ -89,6 +94,7 @@ const createMemoryCache = <T>(): MemoryCache<T> => {
 };
 
 afterEach(() => {
+	vi.useRealTimers();
 	fetchAniListMediaMock.mockReset();
 });
 
@@ -109,6 +115,91 @@ describe("AniListMediaService", () => {
 
 		await expect(first).resolves.toMatchObject({ id });
 		await expect(second).resolves.toMatchObject({ id });
+	});
+
+	it("aborts retries for known non-retriable client errors", async () => {
+		const id = parseAniListId(202);
+		fetchAniListMediaMock.mockRejectedValue(
+			new AniListError("Bad request", { status: 400 }),
+		);
+		const service = new AniListMediaService();
+
+		await expect(service.fetchMediaWithRelations(id)).rejects.toMatchObject({
+			message: "Bad request",
+			details: { status: 400 },
+		});
+		expect(fetchAniListMediaMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("honours positive Retry-After delays for rate limits", async () => {
+		vi.useFakeTimers();
+		const id = parseAniListId(203);
+		fetchAniListMediaMock
+			.mockRejectedValueOnce(
+				new AniListError("Rate limited", {
+					status: 429,
+					retryAfterMs: 250,
+				}),
+			)
+			.mockResolvedValue(createMedia(id));
+		const service = new AniListMediaService();
+
+		const request = service.fetchMediaWithRelations(id);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(fetchAniListMediaMock).toHaveBeenCalledTimes(1);
+
+		await vi.advanceTimersByTimeAsync(249);
+		expect(fetchAniListMediaMock).toHaveBeenCalledTimes(1);
+
+		await vi.advanceTimersByTimeAsync(1);
+		await expect(request).resolves.toMatchObject({ id });
+		expect(fetchAniListMediaMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("uses exponential fallback delay for server errors", async () => {
+		vi.useFakeTimers();
+		const id = parseAniListId(204);
+		fetchAniListMediaMock
+			.mockRejectedValueOnce(
+				new AniListError("Server error", { status: 500 }),
+			)
+			.mockResolvedValue(createMedia(id));
+		const service = new AniListMediaService();
+
+		const request = service.fetchMediaWithRelations(id);
+		await vi.advanceTimersByTimeAsync(0);
+		expect(fetchAniListMediaMock).toHaveBeenCalledTimes(1);
+
+		await vi.advanceTimersByTimeAsync(999);
+		expect(fetchAniListMediaMock).toHaveBeenCalledTimes(1);
+
+		await vi.advanceTimersByTimeAsync(1);
+		await expect(request).resolves.toMatchObject({ id });
+		expect(fetchAniListMediaMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("does not wait after the final failed attempt", async () => {
+		vi.useFakeTimers();
+		const id = parseAniListId(205);
+		fetchAniListMediaMock.mockRejectedValue(
+			new AniListError("Server error", { status: 500 }),
+		);
+		const service = new AniListMediaService();
+
+		const request = service.fetchMediaWithRelations(id);
+		const rejection = expect(request).rejects.toMatchObject({
+			message: "Server error",
+			details: { status: 500 },
+		});
+
+		await vi.advanceTimersByTimeAsync(0);
+		await vi.advanceTimersByTimeAsync(1000);
+		await vi.advanceTimersByTimeAsync(2000);
+		await vi.advanceTimersByTimeAsync(4000);
+
+		expect(fetchAniListMediaMock).toHaveBeenCalledTimes(4);
+		expect(vi.getTimerCount()).toBe(0);
+		await rejection;
 	});
 
 	it("returns fresh cache hits without fetching", async () => {

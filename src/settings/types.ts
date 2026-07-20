@@ -53,6 +53,12 @@ export interface ExtensionOptions {
 	debugLogging: boolean;
 }
 
+export interface PrivateConnections {
+	sonarr: ProviderCredentials;
+	radarr: ProviderCredentials;
+	seerr: ProviderCredentials;
+}
+
 export interface PublicOptions {
 	providers: {
 		sonarr: {

@@ -3,6 +3,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId, type AniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import {
 	parseTmdbId,
 	parseTvdbId,
@@ -10,36 +11,55 @@ import {
 import type { Provider } from "@/providers/types";
 import type { ManualFacts } from "./manual.store";
 import { MappingService } from "./mapping.service";
-import type { AutoResult, MappingResult, UpstreamTarget } from "./types";
+import {
+	sourceIdentityKey,
+	type SourceIdentity,
+} from "./source-identity";
+import {
+	type AutoResult,
+	type MappingResult,
+	type UpstreamTarget,
+} from "./types";
 
 const storeRecords = vi.hoisted(() => ({
 	manual: [] as Array<{
 		provider: Provider;
-		anilistId: AniListId;
+		anilistId?: AniListId;
+		source?: SourceIdentity;
 		facts: ManualFacts;
 	}>,
 	auto: [] as Array<{
 		provider: Provider;
-		anilistId: AniListId;
+		anilistId?: AniListId;
+		source?: SourceIdentity;
 		result: AutoResult;
 	}>,
 	upstream: [] as Array<{
-		anilistId: AniListId;
+		anilistId?: AniListId;
+		source?: SourceIdentity;
 		targets: UpstreamTarget[];
+	}>,
+	crosswalks: [] as Array<{
+		source: SourceIdentity;
+		anilistId: AniListId;
 	}>,
 }));
 
 vi.mock("./manual.store", () => ({
-	getManualFacts: vi.fn(async (provider: Provider, anilistId: AniListId) =>
+	getManualFacts: vi.fn(async (provider: Provider, source: SourceIdentity | AniListId) =>
 		storeRecords.manual.find(
 			(record) =>
-				record.provider === provider && record.anilistId === anilistId,
+				record.provider === provider &&
+				recordSourceKey(record) === inputSourceKey(source),
 		)?.facts ?? null,
 	),
-	listManualFacts: vi.fn(async (provider: Provider) =>
+	listSourceManualFacts: vi.fn(async (provider: Provider) =>
 		storeRecords.manual
 			.filter((record) => record.provider === provider)
-			.map(({ anilistId, facts }) => ({ anilistId, facts })),
+			.map((record) => ({
+				source: recordSource(record),
+				facts: record.facts,
+			})),
 	),
 	clearIgnored: vi.fn(),
 	clearManualMapping: vi.fn(),
@@ -50,29 +70,72 @@ vi.mock("./manual.store", () => ({
 }));
 
 vi.mock("./auto.store", () => ({
-	getAutoResult: vi.fn(async (provider: Provider, anilistId: AniListId) =>
+	getAutoResult: vi.fn(async (provider: Provider, source: SourceIdentity | AniListId) =>
 		storeRecords.auto.find(
 			(record) =>
-				record.provider === provider && record.anilistId === anilistId,
+				record.provider === provider &&
+				recordSourceKey(record) === inputSourceKey(source),
 		)?.result ?? null,
 	),
-	listAutoResults: vi.fn(async (provider: Provider) =>
+	listSourceAutoResults: vi.fn(async (provider: Provider) =>
 		storeRecords.auto
 			.filter((record) => record.provider === provider)
-			.map(({ anilistId, result }) => ({ anilistId, result })),
+			.map((record) => ({
+				source: recordSource(record),
+				result: record.result,
+			})),
 	),
 }));
 
 vi.mock("./upstream.store", () => ({
-	getUpstreamTargets: vi.fn(async (provider: Provider, anilistId: AniListId) =>
-		(storeRecords.upstream.find((record) => record.anilistId === anilistId)
+	getUpstreamTargets: vi.fn(async (provider: Provider, source: SourceIdentity | AniListId) =>
+		(storeRecords.upstream.find(
+			(record) => recordSourceKey(record) === inputSourceKey(source),
+		)
 			?.targets ?? []
 		).filter((target) => target.provider === provider),
 	),
-	listUpstreamMappings: vi.fn(async () => storeRecords.upstream),
+	getUniqueAniListIdForSource: vi.fn(async (source: SourceIdentity) =>
+		storeRecords.crosswalks.find(
+			(record) => recordSourceKey(record) === inputSourceKey(source),
+		)?.anilistId ?? null,
+	),
+	listSourceUpstreamMappings: vi.fn(async () =>
+		[
+			...storeRecords.upstream.flatMap((record) => {
+				const source = recordSource(record);
+				const anilistId =
+					record.anilistId ??
+					(source.source === "anilist"
+						? source.id
+						: storeRecords.crosswalks.find(
+								(crosswalk) =>
+									recordSourceKey(crosswalk) === sourceIdentityKey(source),
+							)?.anilistId);
+				return anilistId === undefined
+					? []
+					: [{ source, anilistId, targets: record.targets }];
+			}),
+			...storeRecords.crosswalks.flatMap((crosswalk) =>
+				storeRecords.upstream.some(
+					(record) =>
+						recordSourceKey(record) === recordSourceKey(crosswalk),
+				)
+					? []
+					: [
+							{
+								source: crosswalk.source,
+								anilistId: crosswalk.anilistId,
+								targets: [],
+							},
+						],
+			),
+		]
+	),
 }));
 
 const aid = parseAniListId;
+const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
 
@@ -89,10 +152,37 @@ const replaceAuto = (
 	storeRecords.auto.push({ provider, anilistId, result });
 };
 
+function anilistSource(id: AniListId): SourceIdentity {
+	return { source: "anilist", id };
+}
+
+function inputSourceKey(source: SourceIdentity | AniListId): string {
+	return sourceIdentityKey(
+		typeof source === "number" ? anilistSource(source) : source,
+	);
+}
+
+function recordSourceKey(record: {
+	anilistId?: AniListId;
+	source?: SourceIdentity;
+}): string {
+	return sourceIdentityKey(recordSource(record));
+}
+
+function recordSource(record: {
+	anilistId?: AniListId;
+	source?: SourceIdentity;
+}): SourceIdentity {
+	if (record.source) return record.source;
+	if (record.anilistId !== undefined) return anilistSource(record.anilistId);
+	throw new Error("Test record needs source or anilistId.");
+}
+
 function resetRecords(): void {
 	storeRecords.manual = [];
 	storeRecords.auto = [];
 	storeRecords.upstream = [];
+	storeRecords.crosswalks = [];
 }
 
 describe("MappingService", () => {
@@ -166,7 +256,7 @@ describe("MappingService", () => {
 				},
 			},
 			{
-				name: "multiple Sonarr seasons for the same TVDB show collapse to one upstream mapping",
+				name: "multiple Sonarr seasons for the same TVDB show remain ambiguous",
 				provider: "sonarr",
 				upstream: [
 					{ provider: "sonarr", providerId: tvdb(81_797), season: 0 },
@@ -174,9 +264,27 @@ describe("MappingService", () => {
 					{ provider: "sonarr", providerId: tvdb(81_797), season: 2 },
 				],
 				expected: {
-					kind: "mapped",
-					source: "upstream",
-					providerId: tvdb(81_797),
+					kind: "ambiguous",
+					targets: [
+						{ provider: "sonarr", providerId: tvdb(81_797), season: 0 },
+						{ provider: "sonarr", providerId: tvdb(81_797), season: 1 },
+						{ provider: "sonarr", providerId: tvdb(81_797), season: 2 },
+					],
+				},
+			},
+			{
+				name: "unscoped and scoped Sonarr targets for the same TVDB show remain ambiguous",
+				provider: "sonarr",
+				upstream: [
+					{ provider: "sonarr", providerId: tvdb(81_797) },
+					{ provider: "sonarr", providerId: tvdb(81_797), season: 0 },
+				],
+				expected: {
+					kind: "ambiguous",
+					targets: [
+						{ provider: "sonarr", providerId: tvdb(81_797) },
+						{ provider: "sonarr", providerId: tvdb(81_797), season: 0 },
+					],
 				},
 			},
 			{
@@ -195,7 +303,7 @@ describe("MappingService", () => {
 				},
 			},
 			{
-				name: "auto can choose one ambiguous upstream target",
+				name: "auto cannot choose one ambiguous upstream target",
 				provider: "sonarr",
 				upstream: [
 					{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
@@ -203,9 +311,11 @@ describe("MappingService", () => {
 				],
 				auto: { kind: "mapped", providerId: tvdb(310_718) },
 				expected: {
-					kind: "mapped",
-					source: "auto",
-					providerId: tvdb(310_718),
+					kind: "ambiguous",
+					targets: [
+						{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
+						{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
+					],
 				},
 			},
 			{
@@ -280,59 +390,6 @@ describe("MappingService", () => {
 		}
 	});
 
-	it("computes linked AniList IDs from active mapping results", async () => {
-		storeRecords.upstream = [
-			{
-				anilistId: aid(1),
-				targets: [{ provider: "radarr", providerId: tmdb(50) }],
-			},
-			{
-				anilistId: aid(5),
-				targets: [{ provider: "radarr", providerId: tmdb(50) }],
-			},
-			{
-				anilistId: aid(6),
-				targets: [
-					{ provider: "radarr", providerId: tmdb(50) },
-					{ provider: "radarr", providerId: tmdb(51) },
-				],
-			},
-		];
-		storeRecords.auto = [
-			{
-				provider: "radarr",
-				anilistId: aid(2),
-				result: { kind: "mapped", providerId: tmdb(50) },
-			},
-			{
-				provider: "radarr",
-				anilistId: aid(4),
-				result: { kind: "mapped", providerId: tmdb(50) },
-			},
-		];
-		storeRecords.manual = [
-			{
-				provider: "radarr",
-				anilistId: aid(3),
-				facts: { mapping: { providerId: tmdb(50) } },
-			},
-			{
-				provider: "radarr",
-				anilistId: aid(4),
-				facts: { ignored: true },
-			},
-			{
-				provider: "radarr",
-				anilistId: aid(5),
-				facts: { mapping: { providerId: tmdb(60) } },
-			},
-		];
-
-		await expect(
-			service().getLinkedAniListIds("radarr", tmdb(50)),
-		).resolves.toEqual([aid(1), aid(2), aid(3)]);
-	});
-
 	it("computes linked AniList IDs for multiple provider IDs in one scan", async () => {
 		storeRecords.upstream = [
 			{
@@ -394,6 +451,22 @@ describe("MappingService", () => {
 		]);
 	});
 
+	it("includes MAL source mappings with unique AniList crosswalks in linked ID scans", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+		storeRecords.crosswalks = [{ source, anilistId: aid(10) }];
+		storeRecords.manual = [
+			{
+				provider: "sonarr",
+				source,
+				facts: { mapping: { providerId: tvdb(78_874) } },
+			},
+		];
+
+		await expect(
+			service().getLinkedAniListIds("sonarr", tvdb(78_874)),
+		).resolves.toEqual([aid(10)]);
+	});
+
 	it("retries cached unmapped auto results only when forced", async () => {
 		const anilistId = aid(20);
 		const resolver = vi.fn(async () => {
@@ -425,12 +498,12 @@ describe("MappingService", () => {
 			providerId: tvdb(200),
 			matchedTitle: "Kagurabachi",
 		});
-		expect(resolver).toHaveBeenCalledWith("sonarr", anilistId, [], {
+		expect(resolver).toHaveBeenCalledWith("sonarr", anilistSource(anilistId), [], {
 			title: "Kagurabachi",
 		});
 	});
 
-	it("runs automatic resolver for ambiguous upstream targets", async () => {
+	it("never resolves ambiguous upstream targets, including forced retries", async () => {
 		const anilistId = aid(22);
 		storeRecords.upstream = [
 			{
@@ -441,100 +514,20 @@ describe("MappingService", () => {
 				],
 			},
 		];
-		const resolver = vi.fn(async () => {
-			replaceAuto("sonarr", anilistId, {
-				kind: "mapped",
-				providerId: tvdb(310_718),
-				matchedTitle: "Magi: Sinbad no Bouken",
-			});
-		});
-
-		await expect(
-			new MappingService(resolver).resolveMapping("sonarr", anilistId, {
-				title: "Magi: Sinbad no Bouken",
-			}),
-		).resolves.toEqual({
-			kind: "mapped",
-			source: "auto",
-			providerId: tvdb(310_718),
-			matchedTitle: "Magi: Sinbad no Bouken",
-		});
-		expect(resolver).toHaveBeenCalledWith("sonarr", anilistId, [], {
-			title: "Magi: Sinbad no Bouken",
-		});
-	});
-
-	it("does not retry ambiguous upstream targets after a cached auto miss", async () => {
-		const anilistId = aid(23);
-		const targets = [
-			{ provider: "sonarr" as const, providerId: tvdb(262_094), season: 0 },
-			{ provider: "sonarr" as const, providerId: tvdb(310_718), season: 1 },
-		];
-		storeRecords.upstream = [{ anilistId, targets }];
 		replaceAuto("sonarr", anilistId, { kind: "unmapped" });
 		const resolver = vi.fn();
 
 		await expect(
-			new MappingService(resolver).resolveMapping("sonarr", anilistId),
+			new MappingService(resolver).resolveMapping("sonarr", anilistId, {
+				forceRetry: true,
+				title: "Magi: Sinbad no Bouken",
+			}),
 		).resolves.toEqual({
 			kind: "ambiguous",
-			targets,
-		});
-		expect(resolver).not.toHaveBeenCalled();
-	});
-
-	it("force retries ambiguous upstream targets after a cached auto miss", async () => {
-		const anilistId = aid(24);
-		storeRecords.upstream = [
-			{
-				anilistId,
-				targets: [
-					{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
-					{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
-				],
-			},
-		];
-		replaceAuto("sonarr", anilistId, { kind: "unmapped" });
-		const resolver = vi.fn(async () => {
-			replaceAuto("sonarr", anilistId, {
-				kind: "mapped",
-				providerId: tvdb(310_718),
-				matchedTitle: "Magi: Sinbad no Bouken",
-			});
-		});
-
-		await expect(
-			new MappingService(resolver).resolveMapping("sonarr", anilistId, {
-				forceRetry: true,
-				title: "Magi: Sinbad no Bouken",
-			}),
-		).resolves.toEqual({
-			kind: "mapped",
-			source: "auto",
-			providerId: tvdb(310_718),
-			matchedTitle: "Magi: Sinbad no Bouken",
-		});
-		expect(resolver).toHaveBeenCalledWith("sonarr", anilistId, [], {
-			title: "Magi: Sinbad no Bouken",
-		});
-	});
-
-	it("does not force retry mapped auto results", async () => {
-		const anilistId = aid(21);
-		const resolver = vi.fn();
-		replaceAuto("radarr", anilistId, {
-			kind: "mapped",
-			providerId: tmdb(300),
-		});
-
-		await expect(
-			new MappingService(resolver).resolveMapping("radarr", anilistId, {
-				forceRetry: true,
-			}),
-		).resolves.toEqual({
-			kind: "mapped",
-			source: "auto",
-			providerId: tmdb(300),
+			targets: [
+				{ provider: "sonarr", providerId: tvdb(262_094), season: 0 },
+				{ provider: "sonarr", providerId: tvdb(310_718), season: 1 },
+			],
 		});
 		expect(resolver).not.toHaveBeenCalled();
 	});

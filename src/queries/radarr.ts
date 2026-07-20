@@ -7,12 +7,13 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import type { AniListId } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { getAni2arrApi } from "@/rpc";
 import type {
 	AddRadarrInput,
 	GetMovieStatusOutput,
 	RadarrLookupOutput,
+	SourceRpcInput,
 	StatusInput,
 	UpdateRadarrInput,
 } from "@/rpc/types";
@@ -22,6 +23,7 @@ import { invalidateAfterProviderMediaChange } from "@/queries/invalidation";
 import { queryKeys } from "@/queries/query-keys";
 import type { ProviderCredentials } from "@/providers/types";
 import type { RadarrMovie } from "@/providers/radarr/types";
+import { sourceFromInput } from "@/rpc/source-input";
 
 const hasQueryKeyPrefix = (
 	queryKey: QueryKey,
@@ -29,7 +31,7 @@ const hasQueryKeyPrefix = (
 ): boolean => prefix.every((part, index) => queryKey[index] === part);
 
 const keepPreviousMovieStatusForSameMedia =
-	(anilistId: AniListId) =>
+	(source: SourceIdentity) =>
 	(
 		previousData: GetMovieStatusOutput | undefined,
 		previousQuery: { queryKey: QueryKey } | undefined,
@@ -38,11 +40,21 @@ const keepPreviousMovieStatusForSameMedia =
 
 		return hasQueryKeyPrefix(
 			previousQuery.queryKey,
-			queryKeys.providerMediaStatusItem("radarr", anilistId),
+			queryKeys.providerMediaStatusItem("radarr", source),
 		)
 			? previousData
 			: undefined;
 	};
+
+function mutationSourceInput(variables: SourceRpcInput): SourceRpcInput {
+	if (variables.source === undefined) {
+		return { anilistId: variables.anilistId };
+	}
+	if ("anilistId" in variables && variables.anilistId !== undefined) {
+		return { source: variables.source, anilistId: variables.anilistId };
+	}
+	return { source: variables.source };
+}
 
 export const useRadarrFormResources = (options?: {
 	enabled?: boolean;
@@ -69,7 +81,7 @@ export const useRadarrFormResources = (options?: {
 };
 
 export const useMovieStatus = (
-	payload: Pick<StatusInput, "anilistId" | "title" | "metadata">,
+	payload: SourceRpcInput & Pick<StatusInput, "title" | "metadata">,
 	options?: {
 		enabled?: boolean;
 		force_verify?: boolean;
@@ -79,8 +91,9 @@ export const useMovieStatus = (
 	const forceVerify = options?.force_verify === true;
 	const forceMappingRetry = options?.force_mapping_retry === true;
 	const forceStatusRefresh = forceVerify || forceMappingRetry;
+	const source = sourceFromInput(payload);
 	const statusKeyInput = {
-		anilistId: payload.anilistId,
+		...mutationSourceInput(payload),
 		...(payload.title === undefined ? {} : { title: payload.title }),
 		...(payload.metadata === undefined ? {} : { metadata: payload.metadata }),
 	};
@@ -97,10 +110,10 @@ export const useMovieStatus = (
 			}
 			return getAni2arrApi().getMovieStatus(request);
 		},
-		enabled: !!payload.anilistId && (options?.enabled ?? true),
+		enabled: options?.enabled ?? true,
 		staleTime: forceStatusRefresh ? 0 : 5 * 60 * 1000,
 		...(forceStatusRefresh ? { refetchOnMount: "always" } : {}),
-		placeholderData: keepPreviousMovieStatusForSameMedia(payload.anilistId),
+		placeholderData: keepPreviousMovieStatusForSameMedia(source),
 		refetchOnWindowFocus: false,
 	});
 };
@@ -128,7 +141,7 @@ export const useAddMovie = () => {
 		onSuccess: (_createdMovie, variables) => {
 			invalidateAfterProviderMediaChange(queryClient, {
 				provider: "radarr",
-				anilistId: variables.anilistId,
+				...mutationSourceInput(variables),
 			});
 		},
 	});
@@ -142,7 +155,7 @@ export const useUpdateMovie = () => {
 		onSuccess: (_updatedMovie, variables) => {
 			invalidateAfterProviderMediaChange(queryClient, {
 				provider: "radarr",
-				anilistId: variables.anilistId,
+				...mutationSourceInput(variables),
 			});
 		},
 	});

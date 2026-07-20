@@ -159,7 +159,7 @@ describe("sonarrHandlers", () => {
 		});
 		expect(apiServicesMock.mappingService.resolveMapping).toHaveBeenCalledWith(
 			"sonarr",
-			anilistId,
+			{ source: "anilist", id: anilistId },
 			{
 				forceRetry: true,
 				title: "Mapped Series",

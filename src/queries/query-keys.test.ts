@@ -3,9 +3,14 @@
 
 import { describe, expect, it } from "vitest";
 import type { AniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId } from "@/providers/schemas";
 import type { StatusInput } from "@/rpc/types";
-import { normalizeMetadataIds, queryKeys } from "@/queries/query-keys";
+import {
+	normalizeMetadataIds,
+	normalizeSourceKeys,
+	queryKeys,
+} from "@/queries/query-keys";
 
 const aid = (value: number): AniListId => value as AniListId;
 
@@ -23,24 +28,30 @@ describe("queryKeys", () => {
 		).toEqual([aid(1), aid(3)]);
 	});
 
-	it("keeps mapping list keys stable for reordered filters", () => {
-		expect(
-			queryKeys.mappings({
-				providers: ["radarr", "sonarr", "radarr"],
-				statuses: ["unmapped", "can-add", "unmapped"],
-				source: "manual",
-				limit: 50,
-				query: "  One Piece  ",
-			}),
-		).toEqual(
-			queryKeys.mappings({
-				providers: ["sonarr", "radarr"],
-				statuses: ["can-add", "unmapped"],
-				source: "manual",
-				limit: 50,
-				query: "one piece",
-			}),
-		);
+	it("sorts and dedupes source identity keys", () => {
+		const sources = [
+			{ source: "mal", id: parseMyAnimeListId(5114) },
+			{ source: "anilist", id: aid(21) },
+			{ source: "mal", id: parseMyAnimeListId(5114) },
+		] as const;
+
+		expect(normalizeSourceKeys(sources)).toEqual(["anilist:21", "mal:5114"]);
+		expect(queryKeys.sourceAniListIds(["mal:5114", "anilist:21", "mal:5114"])).toEqual([
+			"a2a",
+			"mapping",
+			"sourceAniListIds",
+			["anilist:21", "mal:5114"],
+		]);
+	});
+
+	it("uses one mapping list key below the mappings root", () => {
+		expect(queryKeys.mappings()).toEqual([
+			"a2a",
+			"mapping",
+			"list",
+			"default",
+		]);
+		expectPrefix(queryKeys.mappings(), queryKeys.mappingsRoot());
 	});
 
 	it("normalizes provider lookup text", () => {
@@ -111,7 +122,7 @@ describe("queryKeys", () => {
 			"provider",
 			"sonarr",
 			"mediaStatus",
-			aid(9),
+			"anilist:9",
 			{
 				title: "  Test  ",
 				metadata,
@@ -131,6 +142,22 @@ describe("queryKeys", () => {
 				anilistId: aid(7),
 			}),
 		);
+	});
+
+	it("keys provider media status by source identity", () => {
+		expect(
+			queryKeys.providerMediaStatus("sonarr", {
+				source: { source: "mal", id: parseMyAnimeListId(5114) },
+				title: "Fullmetal Alchemist: Brotherhood",
+			}),
+		).toEqual([
+			"a2a",
+			"provider",
+			"sonarr",
+			"mediaStatus",
+			"mal:5114",
+			{ title: "Fullmetal Alchemist: Brotherhood" },
+		]);
 	});
 
 	it("keeps provider root and media item prefixes valid", () => {

@@ -14,14 +14,15 @@ import { getProviderConfig } from "@/background/provider-config";
 import type { AniListId, AniListMediaFormat } from "@/anilist/types";
 import {
 	getMappingIdentities,
-	getMappingList,
+	listEffectiveMappingRecordsByProvider,
 } from "@/mapping/list-mappings";
-import type { MappingResult, MappingSource } from "@/mapping/types";
-import { refreshUpstreamMappings } from "@/mapping/upstream.store";
+import type { EffectiveMappingRecord } from "@/mapping/mapping-facts";
+import type { MappingResult } from "@/mapping/types";
+import { sourceIdentityKey } from "@/mapping/source-identity";
 import {
-	composeRadarrMappingsLibraryStatus,
-	composeSonarrMappingsLibraryStatus,
-} from "@/providers/mappings-library-status";
+	getUniqueAniListIdForSource,
+	refreshUpstreamMappings as refreshStoredUpstreamMappings,
+} from "@/mapping/upstream.store";
 import type { Provider } from "@/providers/types";
 import type { RadarrMovieSnapshot } from "@/providers/radarr/types";
 import { getProviderExternalIdLabel } from "@/providers/provider-labels";
@@ -29,17 +30,18 @@ import {
 	getProviderRouteSlug,
 	type ProviderRouteSlugSource,
 } from "@/providers/provider-route-slug";
+import { parseTmdbIdOrNull, parseTvdbIdOrNull } from "@/providers/schemas";
 import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 import { getMappingInspection } from "@/rpc/mapping-inspection";
+import { anilistIdFromSource, sourceFromInput } from "@/rpc/source-input";
 import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
 	ClearManualMappingInput,
 	GetMappingIdentitiesInput,
 	GetMappingInspectionInput,
-	GetMappingsInput,
 	GetMappingsOutput,
 	MappingListGroup,
 	MappingListProviderMeta,
@@ -50,8 +52,6 @@ import type {
 	SetMappingRejectedCandidateInput,
 	SetManualMappingInput,
 } from "@/rpc/types";
-
-const PROVIDERS = ["sonarr", "radarr"] as const satisfies readonly Provider[];
 
 type ProviderMetaSource = {
 	title: string;
@@ -142,264 +142,258 @@ function rowStatus(
 	}
 }
 
-async function buildProviderGroups(provider: Provider): Promise<MappingListGroup[]> {
-	const mappingList = await getMappingList(provider, { loadFormatByAniListId });
+function groupMappedRecords(
+	records: readonly EffectiveMappingRecord[],
+): ReadonlyMap<number, EffectiveMappingRecord[]> {
+	const groups = new Map<number, EffectiveMappingRecord[]>();
 
-	if (provider === "sonarr") {
-		const status = composeSonarrMappingsLibraryStatus(
-			mappingList,
-			await loadSonarrLibrary(),
-		);
+	for (const record of records) {
+		if (record.anilistId === null || record.result.kind !== "mapped") continue;
 
-		return [
-			...status.mapped.map((group) => {
-				const providerMeta = sonarrMeta(group.libraryItem);
-				const providerId = group.providerId as ProviderExternalId;
-				const rows: MappingListRow[] = group.entries.map((entry) => ({
-					anilistId: entry.anilistId,
-					provider,
-					result: entry.result,
-					providerId,
-					isInLibrary: group.isInLibrary,
-					mappingRowStatus: rowStatus(entry.result, group.isInLibrary),
-					...(providerMeta ? { providerMeta } : {}),
-				}));
-
-				return {
-					key: `${provider}:${group.providerId}`,
-					provider,
-					providerId,
-					rows,
-					linkedAniListIds: rows.map((row) => row.anilistId),
-					isInLibrary: group.isInLibrary,
-					...(providerMeta ? { providerMeta } : {}),
-				};
-			}),
-			...status.ambiguous.map((entry) => {
-				const active = entry.activeTarget;
-				const providerMeta = sonarrMeta(active?.libraryItem ?? null);
-				const providerId = active?.providerId as ProviderExternalId | undefined;
-				const isInLibrary = entry.existingTargets.length > 0;
-				const row: MappingListRow = {
-					anilistId: entry.anilistId,
-					provider,
-					result: entry.result,
-					providerId: providerId ?? null,
-					isInLibrary,
-					mappingRowStatus: rowStatus(
-						entry.result,
-						isInLibrary,
-						entry.existingTargets.length,
-					),
-					...(providerMeta ? { providerMeta } : {}),
-				};
-
-				return {
-					key: `${provider}:ambiguous:${entry.anilistId}`,
-					provider,
-					providerId: providerId ?? null,
-					rows: [row],
-					linkedAniListIds: [entry.anilistId],
-					isInLibrary: row.isInLibrary,
-					...(providerMeta ? { providerMeta } : {}),
-				};
-			}),
-			...status.ignored.map((entry) => {
-				const row: MappingListRow = {
-					anilistId: entry.anilistId,
-					provider,
-					result: entry.result,
-					providerId: null,
-					isInLibrary: false,
-					mappingRowStatus: rowStatus(entry.result, false),
-				};
-
-				return {
-					key: `${provider}:ignored:${entry.anilistId}`,
-					provider,
-					providerId: null,
-					rows: [row],
-					linkedAniListIds: [entry.anilistId],
-					isInLibrary: false,
-				};
-			}),
-			...status.unmapped.map((entry) => {
-				const row: MappingListRow = {
-					anilistId: entry.anilistId,
-					provider,
-					result: entry.result,
-					providerId: null,
-					isInLibrary: false,
-					mappingRowStatus: rowStatus(entry.result, false),
-				};
-
-				return {
-					key: `${provider}:unmapped:${entry.anilistId}`,
-					provider,
-					providerId: null,
-					rows: [row],
-					linkedAniListIds: [entry.anilistId],
-					isInLibrary: false,
-				};
-			}),
-		];
+		const group = groups.get(record.result.providerId) ?? [];
+		group.push(record);
+		groups.set(record.result.providerId, group);
 	}
 
-	const status = composeRadarrMappingsLibraryStatus(
-		mappingList,
-		await loadRadarrLibrary(),
-	);
-
-	return [
-		...status.mapped.map((group) => {
-			const providerMeta = radarrMeta(group.libraryItem);
-			const providerId = group.providerId as ProviderExternalId;
-			const rows: MappingListRow[] = group.entries.map((entry) => ({
-				anilistId: entry.anilistId,
-				provider,
-				result: entry.result,
-				providerId,
-				isInLibrary: group.isInLibrary,
-				mappingRowStatus: rowStatus(entry.result, group.isInLibrary),
-				...(providerMeta ? { providerMeta } : {}),
-			}));
-
-			return {
-				key: `${provider}:${group.providerId}`,
-				provider,
-				providerId,
-				rows,
-				linkedAniListIds: rows.map((row) => row.anilistId),
-				isInLibrary: group.isInLibrary,
-				...(providerMeta ? { providerMeta } : {}),
-			};
-		}),
-		...status.ambiguous.map((entry) => {
-			const active = entry.activeTarget;
-			const providerMeta = radarrMeta(active?.libraryItem ?? null);
-			const providerId = active?.providerId as ProviderExternalId | undefined;
-			const isInLibrary = entry.existingTargets.length > 0;
-			const row: MappingListRow = {
-				anilistId: entry.anilistId,
-				provider,
-				result: entry.result,
-				providerId: providerId ?? null,
-				isInLibrary,
-				mappingRowStatus: rowStatus(
-					entry.result,
-					isInLibrary,
-					entry.existingTargets.length,
-				),
-				...(providerMeta ? { providerMeta } : {}),
-			};
-
-			return {
-				key: `${provider}:ambiguous:${entry.anilistId}`,
-				provider,
-				providerId: providerId ?? null,
-				rows: [row],
-				linkedAniListIds: [entry.anilistId],
-				isInLibrary: row.isInLibrary,
-				...(providerMeta ? { providerMeta } : {}),
-			};
-		}),
-		...status.ignored.map((entry) => {
-			const row: MappingListRow = {
-				anilistId: entry.anilistId,
-				provider,
-				result: entry.result,
-				providerId: null,
-				isInLibrary: false,
-				mappingRowStatus: rowStatus(entry.result, false),
-			};
-
-			return {
-				key: `${provider}:ignored:${entry.anilistId}`,
-				provider,
-				providerId: null,
-				rows: [row],
-				linkedAniListIds: [entry.anilistId],
-				isInLibrary: false,
-			};
-		}),
-		...status.unmapped.map((entry) => {
-			const row: MappingListRow = {
-				anilistId: entry.anilistId,
-				provider,
-				result: entry.result,
-				providerId: null,
-				isInLibrary: false,
-				mappingRowStatus: rowStatus(entry.result, false),
-			};
-
-			return {
-				key: `${provider}:unmapped:${entry.anilistId}`,
-				provider,
-				providerId: null,
-				rows: [row],
-				linkedAniListIds: [entry.anilistId],
-				isInLibrary: false,
-			};
-		}),
-	];
+	return groups;
 }
 
-function matchesQuery(group: MappingListGroup, query: string | undefined): boolean {
-	if (!query) return true;
-
-	const normalized = query.toLowerCase();
-	if (group.providerMeta?.title?.toLowerCase().includes(normalized)) return true;
-	if (String(group.providerId ?? "").includes(normalized)) return true;
-
-	return group.rows.some((row) => {
-		if (String(row.anilistId).includes(normalized)) return true;
-		if (row.providerMeta?.title?.toLowerCase().includes(normalized)) return true;
-		if (String(row.providerId ?? "").includes(normalized)) return true;
-		return false;
-	});
-}
-
-function filterGroups(
-	groups: MappingListGroup[],
-	statuses: readonly MappingListRowStatus[] | undefined,
-	query: string | undefined,
-	source: MappingSource | undefined,
-): MappingListGroup[] {
-	const statusSet = statuses?.length ? new Set(statuses) : null;
-	const filteredGroups: MappingListGroup[] = [];
-
-	for (const group of groups) {
-		const sourceGroup = filterGroupBySource(group, source);
-		if (!sourceGroup) continue;
-		if (!matchesQuery(sourceGroup, query)) continue;
-		if (
-			statusSet &&
-			!sourceGroup.rows.some((row) => statusSet.has(row.mappingRowStatus))
-		) {
-			continue;
-		}
-		filteredGroups.push(sourceGroup);
-	}
-
-	return filteredGroups;
-}
-
-function filterGroupBySource(
-	group: MappingListGroup,
-	source: MappingSource | undefined,
-): MappingListGroup | null {
-	if (!source) return group;
-
-	const rows = group.rows.filter(
-		(row) => row.result.kind === "mapped" && row.result.source === source,
-	);
-	if (rows.length === 0) return null;
+function composeRow(
+	record: EffectiveMappingRecord,
+	providerId: ProviderExternalId | null,
+	isInLibrary: boolean | null,
+	options?: {
+		existingTargetCount?: number;
+		providerMeta?: MappingListProviderMeta;
+	},
+): MappingListRow | null {
+	if (record.anilistId === null) return null;
+	const providerMeta = options?.providerMeta;
 
 	return {
-		...group,
+		source: record.source,
+		anilistId: record.anilistId,
+		provider: record.provider,
+		result: record.result,
+		providerId,
+		isInLibrary,
+		mappingRowStatus: rowStatus(
+			record.result,
+			isInLibrary,
+			options?.existingTargetCount,
+		),
+		...(providerMeta ? { providerMeta } : {}),
+	};
+}
+
+function composeMappedGroup(
+	provider: Provider,
+	providerId: ProviderExternalId,
+	records: readonly EffectiveMappingRecord[],
+	library: {
+		isInLibrary: boolean;
+		providerMeta?: MappingListProviderMeta;
+	},
+): MappingListGroup {
+	const rows = records
+		.toSorted(compareEffectiveRecords)
+		.flatMap((record) => {
+			const row = composeRow(record, providerId, library.isInLibrary, {
+				...(library.providerMeta
+					? { providerMeta: library.providerMeta }
+					: {}),
+			});
+			return row === null ? [] : [row];
+		});
+
+	return {
+		key: `${provider}:${providerId}`,
+		provider,
+		providerId,
 		rows,
 		linkedAniListIds: rows.map((row) => row.anilistId),
+		isInLibrary: library.isInLibrary,
+		...(library.providerMeta ? { providerMeta: library.providerMeta } : {}),
 	};
+}
+
+function composeAmbiguousGroup(
+	record: EffectiveMappingRecord,
+	providerId: ProviderExternalId | null,
+	existingTargetCount: number,
+	providerMeta?: MappingListProviderMeta,
+): MappingListGroup | null {
+	const isInLibrary = existingTargetCount > 0;
+	const row = composeRow(
+		record,
+		providerId,
+		isInLibrary,
+		{
+			existingTargetCount,
+			...(providerMeta ? { providerMeta } : {}),
+		},
+	);
+	if (row === null) return null;
+
+	return {
+		key: `${record.provider}:ambiguous:${sourceIdentityKey(record.source)}`,
+		provider: record.provider,
+		providerId,
+		rows: [row],
+		linkedAniListIds: [row.anilistId],
+		isInLibrary,
+		...(providerMeta ? { providerMeta } : {}),
+	};
+}
+
+function composeStandaloneGroup(
+	record: EffectiveMappingRecord,
+): MappingListGroup | null {
+	if (
+		record.result.kind !== "ignored" &&
+		record.result.kind !== "unmapped"
+	) {
+		return null;
+	}
+
+	const row = composeRow(record, null, false);
+	if (row === null) return null;
+
+	return {
+		key: `${record.provider}:${record.result.kind}:${sourceIdentityKey(record.source)}`,
+		provider: record.provider,
+		providerId: null,
+		rows: [row],
+		linkedAniListIds: [row.anilistId],
+		isInLibrary: false,
+	};
+}
+
+function buildSonarrGroups(
+	records: readonly EffectiveMappingRecord[],
+	library: readonly SonarrSeriesSnapshot[],
+): MappingListGroup[] {
+	const libraryByTvdbId = new Map(
+		library.map((series) => [Number(series.tvdbId), series] as const),
+	);
+	const groups = [...groupMappedRecords(records)].flatMap(
+		([rawProviderId, mappedRecords]) => {
+			const providerId = parseTvdbIdOrNull(rawProviderId);
+			if (providerId === null) return [];
+
+			const libraryItem = libraryByTvdbId.get(providerId) ?? null;
+			const providerMeta = sonarrMeta(libraryItem);
+			return [
+				composeMappedGroup(
+					"sonarr",
+					providerId,
+					mappedRecords,
+					{
+						isInLibrary: libraryItem !== null,
+						...(providerMeta ? { providerMeta } : {}),
+					},
+				),
+			];
+		},
+	);
+
+	for (const record of records) {
+		if (record.result.kind === "ambiguous" && record.anilistId !== null) {
+			const existingTargets = record.result.targets.flatMap((target) => {
+				if (target.provider !== "sonarr") return [];
+				const providerId = parseTvdbIdOrNull(target.providerId);
+				if (providerId === null) return [];
+				const libraryItem = libraryByTvdbId.get(providerId);
+				return libraryItem === undefined
+					? []
+					: [{ providerId, libraryItem }];
+			});
+			const activeTarget =
+				existingTargets.length === 1 ? (existingTargets[0] ?? null) : null;
+			const group = composeAmbiguousGroup(
+				record,
+				activeTarget?.providerId ?? null,
+				existingTargets.length,
+				sonarrMeta(activeTarget?.libraryItem ?? null),
+			);
+			if (group) groups.push(group);
+			continue;
+		}
+
+		const group = composeStandaloneGroup(record);
+		if (group) groups.push(group);
+	}
+
+	return groups;
+}
+
+function buildRadarrGroups(
+	records: readonly EffectiveMappingRecord[],
+	library: readonly RadarrMovieSnapshot[],
+): MappingListGroup[] {
+	const libraryByTmdbId = new Map(
+		library.map((movie) => [Number(movie.tmdbId), movie] as const),
+	);
+	const groups = [...groupMappedRecords(records)].flatMap(
+		([rawProviderId, mappedRecords]) => {
+			const providerId = parseTmdbIdOrNull(rawProviderId);
+			if (providerId === null) return [];
+
+			const libraryItem = libraryByTmdbId.get(providerId) ?? null;
+			const providerMeta = radarrMeta(libraryItem);
+			return [
+				composeMappedGroup(
+					"radarr",
+					providerId,
+					mappedRecords,
+					{
+						isInLibrary: libraryItem !== null,
+						...(providerMeta ? { providerMeta } : {}),
+					},
+				),
+			];
+		},
+	);
+
+	for (const record of records) {
+		if (record.result.kind === "ambiguous" && record.anilistId !== null) {
+			const existingTargets = record.result.targets.flatMap((target) => {
+				if (target.provider !== "radarr") return [];
+				const providerId = parseTmdbIdOrNull(target.providerId);
+				if (providerId === null) return [];
+				const libraryItem = libraryByTmdbId.get(providerId);
+				return libraryItem === undefined
+					? []
+					: [{ providerId, libraryItem }];
+			});
+			const activeTarget =
+				existingTargets.length === 1 ? (existingTargets[0] ?? null) : null;
+			const group = composeAmbiguousGroup(
+				record,
+				activeTarget?.providerId ?? null,
+				existingTargets.length,
+				radarrMeta(activeTarget?.libraryItem ?? null),
+			);
+			if (group) groups.push(group);
+			continue;
+		}
+
+		const group = composeStandaloneGroup(record);
+		if (group) groups.push(group);
+	}
+
+	return groups;
+}
+
+function compareEffectiveRecords(
+	left: EffectiveMappingRecord,
+	right: EffectiveMappingRecord,
+): number {
+	const leftId = left.anilistId ?? Number.POSITIVE_INFINITY;
+	const rightId = right.anilistId ?? Number.POSITIVE_INFINITY;
+	return leftId - rightId || sourceIdentityKey(left.source).localeCompare(
+		sourceIdentityKey(right.source),
+	);
 }
 
 function sortGroups(groups: MappingListGroup[]): MappingListGroup[] {
@@ -410,33 +404,25 @@ function sortGroups(groups: MappingListGroup[]): MappingListGroup[] {
 	});
 }
 
-async function getMappingsOutput(input?: GetMappingsInput): Promise<GetMappingsOutput> {
-	const providers = input?.providers?.length
-		? [...new Set(input.providers)]
-		: [...PROVIDERS];
-	const providerGroups = await Promise.all(
-		providers.map((provider) => buildProviderGroups(provider)),
-	);
-	const allGroups = sortGroups(
-		filterGroups(
-			providerGroups.flat(),
-			input?.statuses,
-			input?.query,
-			input?.source,
-		),
-	);
+async function getMappingsOutput(): Promise<GetMappingsOutput> {
+	const [recordsByProvider, sonarrLibraryItems, radarrLibraryItems] =
+		await Promise.all([
+			listEffectiveMappingRecordsByProvider({ loadFormatByAniListId }),
+			loadSonarrLibrary(),
+			loadRadarrLibrary(),
+		]);
+
 	return {
-		groups:
-			input?.limit === undefined
-				? allGroups
-				: allGroups.slice(0, input.limit),
-		total: allGroups.length,
+		groups: sortGroups([
+			...buildSonarrGroups(recordsByProvider.sonarr, sonarrLibraryItems),
+			...buildRadarrGroups(recordsByProvider.radarr, radarrLibraryItems),
+		]),
 	};
 }
 
 async function assertNoConflictingLinkedIds(input: {
 	provider: Provider;
-	anilistId: AniListId;
+	currentAniListId: AniListId | null;
 	providerId: ProviderExternalId;
 	force?: boolean;
 }): Promise<void> {
@@ -445,7 +431,7 @@ async function assertNoConflictingLinkedIds(input: {
 		input.providerId,
 	);
 	const conflictingAniListIds = linkedIds.filter(
-		(id) => id !== input.anilistId,
+		(id) => id !== input.currentAniListId,
 	);
 
 	if (conflictingAniListIds.length === 0 || input.force) return;
@@ -468,24 +454,8 @@ async function afterMappingWrite(provider: Provider): Promise<void> {
 	await bumpMappingsRevision();
 }
 
-async function resolveAmbiguousProviderMappings(
-	provider: Provider,
-): Promise<void> {
-	if (!(await getProviderConfig(provider))) return;
-
-	const mappingList = await getMappingList(provider, { loadFormatByAniListId });
-	for (const entry of mappingList.ambiguous) {
-		await mappingService.resolveMapping(provider, entry.anilistId);
-	}
-}
-
-async function initMappingPipeline(): Promise<void> {
-	await refreshUpstreamMappings();
-
-	for (const provider of PROVIDERS) {
-		await resolveAmbiguousProviderMappings(provider);
-	}
-
+async function runMappingRefreshPipeline(): Promise<void> {
+	await refreshStoredUpstreamMappings();
 	await bumpMappingsRevision();
 }
 
@@ -494,21 +464,26 @@ export const mappingHandlers = {
 		return getMappingIdentities(ids, { mappingService });
 	},
 
-	initMappings() {
-		return initMappingPipeline();
+	refreshMappingPipeline() {
+		return runMappingRefreshPipeline();
+	},
+
+	refreshUpstreamMappings() {
+		return refreshStoredUpstreamMappings();
 	},
 
 	async setManualMapping(input: SetManualMappingInput) {
+		const source = sourceFromInput(input);
 		await assertNoConflictingLinkedIds({
 			provider: input.provider,
-			anilistId: input.anilistId,
+			currentAniListId: input.anilistId ?? anilistIdFromSource(source),
 			providerId: input.providerId,
 			...(input.force === undefined ? {} : { force: input.force }),
 		});
 
 		await mappingService.setManualMapping(
 			input.provider,
-			input.anilistId,
+			source,
 			input.providerId,
 		);
 		await afterMappingWrite(input.provider);
@@ -516,19 +491,19 @@ export const mappingHandlers = {
 	},
 
 	async clearManualMapping(input: ClearManualMappingInput) {
-		await mappingService.clearManualMapping(input.provider, input.anilistId);
+		await mappingService.clearManualMapping(input.provider, sourceFromInput(input));
 		await afterMappingWrite(input.provider);
 		return { ok: true as const };
 	},
 
 	async setMappingIgnore(input: SetMappingIgnoreInput) {
-		await mappingService.setIgnored(input.provider, input.anilistId);
+		await mappingService.setIgnored(input.provider, sourceFromInput(input));
 		await afterMappingWrite(input.provider);
 		return { ok: true as const };
 	},
 
 	async clearMappingIgnore(input: ClearMappingIgnoreInput) {
-		await mappingService.clearIgnored(input.provider, input.anilistId);
+		await mappingService.clearIgnored(input.provider, sourceFromInput(input));
 		await afterMappingWrite(input.provider);
 		return { ok: true as const };
 	},
@@ -536,7 +511,7 @@ export const mappingHandlers = {
 	async setMappingRejectedCandidate(input: SetMappingRejectedCandidateInput) {
 		await mappingService.rejectCandidate(
 			input.provider,
-			input.anilistId,
+			sourceFromInput(input),
 			input.providerId,
 		);
 		await afterMappingWrite(input.provider);
@@ -546,15 +521,15 @@ export const mappingHandlers = {
 	async clearMappingRejectedCandidate(input: ClearMappingRejectedCandidateInput) {
 		await mappingService.clearRejectedCandidate(
 			input.provider,
-			input.anilistId,
+			sourceFromInput(input),
 			input.providerId,
 		);
 		await afterMappingWrite(input.provider);
 		return { ok: true as const };
 	},
 
-	getMappings(input?: GetMappingsInput) {
-		return getMappingsOutput(input);
+	getMappings() {
+		return getMappingsOutput();
 	},
 
 	getMappingInspection(input: GetMappingInspectionInput) {
@@ -563,4 +538,6 @@ export const mappingHandlers = {
 			anilistMetadataStore,
 		});
 	},
+
+	getAniListIdForSource: getUniqueAniListIdForSource,
 };
