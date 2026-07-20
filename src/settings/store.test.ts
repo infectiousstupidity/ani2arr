@@ -112,6 +112,19 @@ describe("options store helpers", () => {
 	});
 
 	describe("settings storage initialization", () => {
+		it("initializes empty storage with defaults", async () => {
+			await initializeSettingsStorage();
+
+			await expect(getExtensionOptionsSnapshot()).resolves.toEqual(
+				createDefaultExtensionOptions(),
+			);
+			await expect(
+				browser.storage.local.get(PRIVATE_CONNECTIONS_STORAGE_KEY),
+			).resolves.toEqual({
+				[PRIVATE_CONNECTIONS_STORAGE_KEY]: EMPTY_PRIVATE_CONNECTIONS,
+			});
+		});
+
 		it("migrates legacy provider records into one private record", async () => {
 			await browser.storage.local.set({
 				[SONARR_SECRETS_STORAGE_KEY]: {

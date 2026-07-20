@@ -289,7 +289,7 @@ const SeerrConnectionDraft = ({
 			</form>
 
 			<details
-				defaultOpen={savedConnection?.auth.mode === "apiKey"}
+				open={savedConnection?.auth.mode === "apiKey"}
 				className="rounded-lg border border-border-primary/50 bg-bg-tertiary/15"
 			>
 				<summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-text-primary">

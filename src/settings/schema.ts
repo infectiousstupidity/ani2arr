@@ -157,7 +157,10 @@ export const StoredPrivateConnectionsSchema = v.pipe(
 			ProviderCredentialsSchema,
 			createDefaultProviderConnection(),
 		),
-		seerr: v.pipe(v.unknown(), v.transform(migrateLegacySeerrConnection)),
+		seerr: v.fallback(
+			v.pipe(v.unknown(), v.transform(migrateLegacySeerrConnection)),
+			createDefaultSeerrConnection(),
+		),
 	}),
 );
 
