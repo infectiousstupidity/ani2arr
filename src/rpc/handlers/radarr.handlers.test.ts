@@ -204,7 +204,7 @@ describe("radarrHandlers", () => {
 
 		expect(
 			apiServicesMock.radarrLibrary.upsertMovieSnapshot,
-		).toHaveBeenCalled();
+		).toHaveBeenCalledWith(created, credentials);
 		expect(apiServicesMock.scheduleLibraryRefresh).toHaveBeenCalledWith(
 			"radarr",
 		);
@@ -241,7 +241,7 @@ describe("radarrHandlers", () => {
 
 		expect(
 			apiServicesMock.radarrLibrary.upsertMovieSnapshot,
-		).toHaveBeenCalled();
+		).toHaveBeenCalledWith(updated, credentials);
 		expect(apiServicesMock.scheduleLibraryRefresh).toHaveBeenCalledWith(
 			"radarr",
 		);

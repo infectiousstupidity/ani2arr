@@ -65,7 +65,10 @@ export const sonarrHandlers = {
 			},
 			{ client: sonarrClient },
 		);
-		await sonarrLibrary.upsertSeriesSnapshot(toSonarrSeriesSnapshot(created));
+		await sonarrLibrary.upsertSeriesSnapshot(
+			toSonarrSeriesSnapshot(created),
+			credentials,
+		);
 		scheduleLibraryRefresh("sonarr");
 		await bumpLibraryRevision("sonarr");
 		return created;
@@ -86,7 +89,10 @@ export const sonarrHandlers = {
 				},
 				{ client: sonarrClient },
 			);
-			await sonarrLibrary.upsertSeriesSnapshot(toSonarrSeriesSnapshot(updated));
+			await sonarrLibrary.upsertSeriesSnapshot(
+				toSonarrSeriesSnapshot(updated),
+				credentials,
+			);
 			scheduleLibraryRefresh("sonarr");
 			await bumpLibraryRevision("sonarr");
 			return updated;

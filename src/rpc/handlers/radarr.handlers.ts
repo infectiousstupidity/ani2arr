@@ -62,7 +62,10 @@ export const radarrHandlers = {
 			},
 			{ client: radarrClient },
 		);
-		await radarrLibrary.upsertMovieSnapshot(toRadarrMovieSnapshot(created));
+		await radarrLibrary.upsertMovieSnapshot(
+			toRadarrMovieSnapshot(created),
+			credentials,
+		);
 		scheduleLibraryRefresh("radarr");
 		await bumpLibraryRevision("radarr");
 		return created;
@@ -78,7 +81,10 @@ export const radarrHandlers = {
 			},
 			{ client: radarrClient },
 		);
-		await radarrLibrary.upsertMovieSnapshot(toRadarrMovieSnapshot(updated));
+		await radarrLibrary.upsertMovieSnapshot(
+			toRadarrMovieSnapshot(updated),
+			credentials,
+		);
 		scheduleLibraryRefresh("radarr");
 		await bumpLibraryRevision("radarr");
 		return updated;

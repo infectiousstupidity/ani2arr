@@ -192,6 +192,8 @@ describe("api services", () => {
 		expect(anilistMetadataStore.clearLocalCache).toHaveBeenCalledTimes(1);
 		expect(clearLocalCacheMock).toHaveBeenCalledTimes(1);
 		expect(clearUpstreamMappingsMock).toHaveBeenCalledTimes(1);
+		expect(sonarrLibrary.clearSeriesSnapshotCache).toHaveBeenCalledTimes(1);
+		expect(radarrLibrary.clearMovieSnapshotCache).toHaveBeenCalledTimes(1);
 		expect(clearAllTtlCachesMock).toHaveBeenCalledTimes(1);
 		expect(resetAllRevisionsMock).toHaveBeenCalledTimes(1);
 		expect(clearAutoResultsMock).not.toHaveBeenCalled();
@@ -205,6 +207,8 @@ describe("api services", () => {
 		expect(clearAutoResultsMock).toHaveBeenCalledTimes(2);
 		expect(clearAutoResultsMock).toHaveBeenCalledWith("sonarr");
 		expect(clearAutoResultsMock).toHaveBeenCalledWith("radarr");
+		expect(sonarrLibrary.clearSeriesSnapshotCache).toHaveBeenCalledTimes(1);
+		expect(radarrLibrary.clearMovieSnapshotCache).toHaveBeenCalledTimes(1);
 		expect(resetAllSettingsSnapshotMock).toHaveBeenCalledTimes(1);
 		expect(removeSeerrCsrfCookiePermissionMock).toHaveBeenCalledTimes(1);
 	});

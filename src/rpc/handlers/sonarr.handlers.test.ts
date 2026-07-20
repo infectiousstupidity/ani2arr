@@ -206,7 +206,45 @@ describe("sonarrHandlers", () => {
 
 		expect(
 			apiServicesMock.sonarrLibrary.upsertSeriesSnapshot,
-		).toHaveBeenCalled();
+		).toHaveBeenCalledWith(created, credentials);
+		expect(apiServicesMock.scheduleLibraryRefresh).toHaveBeenCalledWith(
+			"sonarr",
+		);
+		expect(apiServicesMock.bumpLibraryRevision).toHaveBeenCalledWith("sonarr");
+	});
+
+	it("updates the scoped Sonarr cache after update", async () => {
+		const tvdbId = parseTvdbId(200);
+		const updated = {
+			id: parseSonarrSeriesId(5),
+			title: "Updated Series",
+			titleSlug: "updated-series",
+			tvdbId,
+		};
+		providerConfigMock.requireProviderCredentials.mockResolvedValue(
+			credentials,
+		);
+		updateSonarrSeriesMock.mockResolvedValue(updated);
+
+		await expect(
+			sonarrHandlers.updateSonarrSeries({
+				anilistId: parseAniListId(100),
+				tvdbId,
+				title: "Updated Series",
+				form: {
+					rootFolderPath: "/anime",
+					qualityProfileId: parseProviderQualityProfileId(1),
+					seriesType: "anime",
+					seasonFolder: true,
+					tags: [],
+					freeformTags: [],
+				},
+			}),
+		).resolves.toBe(updated);
+
+		expect(
+			apiServicesMock.sonarrLibrary.upsertSeriesSnapshot,
+		).toHaveBeenCalledWith(updated, credentials);
 		expect(apiServicesMock.scheduleLibraryRefresh).toHaveBeenCalledWith(
 			"sonarr",
 		);

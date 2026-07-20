@@ -195,6 +195,8 @@ export const clearPersistentCaches = async (): Promise<void> => {
 	await Promise.all([
 		anilistMetadataStore.clearLocalCache(),
 		clearUpstreamMappings(),
+		sonarrLibrary.clearSeriesSnapshotCache(),
+		radarrLibrary.clearMovieSnapshotCache(),
 	]);
 	await clearAllTtlCaches();
 	await resetAllRevisions();
