@@ -28,6 +28,7 @@ const listEffectiveSeerrTargetsMock = vi.hoisted(() => vi.fn());
 const listAllEffectiveSeerrTargetsMock = vi.hoisted(() => vi.fn());
 const setManualSeerrTargetMock = vi.hoisted(() => vi.fn());
 const clearManualSeerrTargetMock = vi.hoisted(() => vi.fn());
+const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/background/api-services", () => ({
 	seerrClient: seerrClientMock,
@@ -44,6 +45,10 @@ vi.mock("@/mapping/seerr-target.store", () => ({
 	listAllEffectiveSeerrTargets: listAllEffectiveSeerrTargetsMock,
 	setManualSeerrTarget: setManualSeerrTargetMock,
 	clearManualSeerrTarget: clearManualSeerrTargetMock,
+}));
+
+vi.mock("@/rpc/revision-signals", () => ({
+	bumpMappingsRevision: bumpMappingsRevisionMock,
 }));
 
 describe("seerrHandlers", () => {
@@ -173,6 +178,7 @@ describe("seerrHandlers", () => {
 		expect(clearManualSeerrTargetMock).toHaveBeenCalledWith(
 			parseAniListId(100),
 		);
+		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 
 	it("returns null when no manual or upstream Seerr target exists", async () => {
@@ -229,6 +235,7 @@ describe("seerrHandlers", () => {
 			ok: true,
 		});
 		expect(setManualSeerrTargetMock).toHaveBeenCalledWith(input);
+		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 
 	it("searches Seerr through configured credentials", async () => {

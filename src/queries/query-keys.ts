@@ -14,6 +14,7 @@ import { sourceFromInput, type SourceInputLike } from "@/rpc/source-input";
 
 const rootQueryKey = ["a2a"] as const;
 const configuredScope = "configured";
+const mappingRootKey = () => [...rootQueryKey, "mapping"] as const;
 const seerrTargetsRootKey = () =>
 	[...rootQueryKey, "seerr", "targets"] as const;
 
@@ -81,29 +82,27 @@ export const queryKeys = {
 		[...rootQueryKey, "anilist", "media", 0] as const,
 	aniListMetadata: (ids: readonly AniListId[]) =>
 		[...rootQueryKey, "anilist", "metadata", normalizeMetadataIds(ids)] as const,
-	mappings: () => [...rootQueryKey, "mapping", "list"] as const,
+	mappingRoot: mappingRootKey,
+	mappings: () => [...mappingRootKey(), "list"] as const,
 	mappingIdentitiesRoot: () =>
-		[...rootQueryKey, "mapping", "identities"] as const,
+		[...mappingRootKey(), "identities"] as const,
 	mappingIdentities: (ids: readonly AniListId[]) =>
 		[
-			...rootQueryKey,
-			"mapping",
+			...mappingRootKey(),
 			"identities",
 			normalizeMetadataIds(ids),
 		] as const,
 	sourceAniListIds: (sourceKeys: readonly string[]) =>
 		[
-			...rootQueryKey,
-			"mapping",
+			...mappingRootKey(),
 			"sourceAniListIds",
 			[...new Set(sourceKeys)].toSorted(),
 		] as const,
 	mappingInspectionRoot: () =>
-		[...rootQueryKey, "mapping", "inspection"] as const,
+		[...mappingRootKey(), "inspection"] as const,
 	mappingInspection: (provider: Provider, input: SourceKeyInput) =>
 		[
-			...rootQueryKey,
-			"mapping",
+			...mappingRootKey(),
 			"inspection",
 			provider,
 			sourceKeyFromInput(input),

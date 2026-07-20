@@ -37,10 +37,10 @@ import {
 	normalizeError,
 } from "@/shared/errors/error-utils";
 import {
-	bumpMappingsRevision as bumpMappingsRevisionSignal,
+	bumpMappingsRevision,
 	bumpProviderLibraryRevision,
 	resetAllRevisions,
-} from "@/shared/sync/revisions";
+} from "@/rpc/revision-signals";
 import { fetchProviderCandidates } from "./provider-candidate-search";
 import { requireProviderCredentials } from "./provider-config";
 
@@ -84,17 +84,25 @@ export const seerrClient = new SeerrClient({
 	getCsrfToken: getSeerrXsrfToken,
 });
 
-export const sonarrLibrary = new SonarrLibrary(sonarrClient);
-export const radarrLibrary = new RadarrLibrary(radarrClient);
+export const sonarrLibrary = new SonarrLibrary(
+	sonarrClient,
+	undefined,
+	async () => {
+		await bumpProviderLibraryRevision("sonarr");
+	},
+);
+export const radarrLibrary = new RadarrLibrary(
+	radarrClient,
+	undefined,
+	async () => {
+		await bumpProviderLibraryRevision("radarr");
+	},
+);
 
 export const anilistMediaService = new AniListMediaService({
 	media: anilistMediaCache,
 });
 export const anilistMetadataStore = new AniListMetadataStore();
-
-export const bumpMappingsRevision = async (): Promise<void> => {
-	await bumpMappingsRevisionSignal();
-};
 
 const searchProviderCandidates = (provider: Provider, title: string) =>
 	fetchProviderCandidates(provider, title, {
@@ -103,18 +111,16 @@ const searchProviderCandidates = (provider: Provider, title: string) =>
 		radarr: radarrClient,
 	});
 
-export const mappingService = new MappingService(
-	createAutomaticResolver({
-		anilistMedia: anilistMediaService,
-		searchProviderCandidates,
-	}),
-);
+const resolveAutomaticMapping = createAutomaticResolver({
+	anilistMedia: anilistMediaService,
+	searchProviderCandidates,
+});
 
-export const bumpLibraryRevision = async (
-	provider: Provider,
-): Promise<void> => {
-	await bumpProviderLibraryRevision(provider);
-};
+export const mappingService = new MappingService(async (...args) => {
+	const stored = await resolveAutomaticMapping(...args);
+	if (stored) await bumpMappingsRevision();
+	return stored;
+});
 
 export const refreshProviderLibrary = async (
 	provider: Provider,

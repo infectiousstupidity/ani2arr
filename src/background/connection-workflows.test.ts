@@ -14,7 +14,6 @@ const saveProviderConnectionSnapshotMock = vi.hoisted(() => vi.fn());
 const saveSeerrConnectionSnapshotMock = vi.hoisted(() => vi.fn());
 const cleanupUnusedProviderHostPermissionMock = vi.hoisted(() => vi.fn());
 const removeSeerrCsrfCookiePermissionMock = vi.hoisted(() => vi.fn());
-const bumpLibraryRevisionMock = vi.hoisted(() => vi.fn());
 const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
 const refreshProviderLibraryMock = vi.hoisted(() => vi.fn());
 const refreshMappingPipelineMock = vi.hoisted(() => vi.fn());
@@ -33,9 +32,11 @@ vi.mock("@/settings/provider-permissions", () => ({
 }));
 
 vi.mock("./api-services", () => ({
-	bumpLibraryRevision: bumpLibraryRevisionMock,
-	bumpMappingsRevision: bumpMappingsRevisionMock,
 	refreshProviderLibrary: refreshProviderLibraryMock,
+}));
+
+vi.mock("@/rpc/revision-signals", () => ({
+	bumpMappingsRevision: bumpMappingsRevisionMock,
 }));
 
 vi.mock("./mapping-refresh", () => ({
@@ -90,7 +91,6 @@ describe("connection workflows", () => {
 		vi.clearAllMocks();
 		refreshMappingPipelineMock.mockResolvedValue(false);
 		bumpMappingsRevisionMock.mockImplementation(async () => {});
-		bumpLibraryRevisionMock.mockImplementation(async () => {});
 		refreshProviderLibraryMock.mockImplementation(async () => {});
 		cleanupUnusedProviderHostPermissionMock.mockImplementation(async () => {});
 		removeSeerrCsrfCookiePermissionMock.mockImplementation(async () => {});
@@ -113,7 +113,6 @@ describe("connection workflows", () => {
 
 		expect(saveProviderConnectionSnapshotMock).toHaveBeenCalledOnce();
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
-		expect(bumpLibraryRevisionMock).toHaveBeenCalledWith("sonarr");
 		expect(cleanupUnusedProviderHostPermissionMock).toHaveBeenCalledOnce();
 		expect(logErrorMock).toHaveBeenCalledTimes(2);
 	});
@@ -131,7 +130,6 @@ describe("connection workflows", () => {
 			savedOptions,
 		);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
-		expect(bumpLibraryRevisionMock).toHaveBeenCalledWith("radarr");
 		expect(cleanupUnusedProviderHostPermissionMock).toHaveBeenCalledWith(
 			"https://radarr.example",
 			savedOptions,

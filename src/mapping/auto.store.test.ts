@@ -13,12 +13,6 @@ import {
 	setAutoResult,
 } from "./auto.store";
 
-const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
-
-vi.mock("@/shared/sync/revisions", () => ({
-	bumpMappingsRevision: bumpMappingsRevisionMock,
-}));
-
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
@@ -51,15 +45,6 @@ describe("auto mapping store", () => {
 			kind: "mapped",
 			providerId: tmdb(10),
 		});
-	});
-
-	it("bumps mappings revision after storing auto result", async () => {
-		await setAutoResult("radarr", aid(1), {
-			kind: "mapped",
-			providerId: tmdb(10),
-		});
-
-		expect(bumpMappingsRevisionMock).toHaveBeenCalledTimes(1);
 	});
 
 	it("stores and lists MAL source auto results", async () => {

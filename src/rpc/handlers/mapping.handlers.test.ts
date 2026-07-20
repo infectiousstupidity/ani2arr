@@ -25,6 +25,7 @@ import { mappingHandlers } from "./mapping.handlers";
 const listEffectiveMappingRecordsByProviderMock = vi.hoisted(() => vi.fn());
 const getProviderConfigMock = vi.hoisted(() => vi.fn());
 const refreshMappingPipelineMock = vi.hoisted(() => vi.fn());
+const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/mapping/list-mappings", () => ({
 	getMappingIdentities: vi.fn(),
@@ -44,8 +45,6 @@ vi.mock("@/background/api-services", () => ({
 	anilistMetadataStore: {
 		getMetadata: vi.fn(),
 	},
-	bumpLibraryRevision: vi.fn(),
-	bumpMappingsRevision: vi.fn(),
 	mappingService: {
 		clearIgnored: vi.fn(),
 		clearManualMapping: vi.fn(),
@@ -58,10 +57,13 @@ vi.mock("@/background/api-services", () => ({
 	radarrLibrary: {
 		getMovieSnapshots: vi.fn(async () => []),
 	},
-	scheduleLibraryRefresh: vi.fn(),
 	sonarrLibrary: {
 		getSeriesSnapshots: vi.fn(async () => []),
 	},
+}));
+
+vi.mock("@/rpc/revision-signals", () => ({
+	bumpMappingsRevision: bumpMappingsRevisionMock,
 }));
 
 vi.mock("@/background/provider-config", () => ({
@@ -386,6 +388,7 @@ describe("mappingHandlers", () => {
 			{ source: "mal", id: mal(5114) },
 			tvdb(20),
 		);
+		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 
 	it("keeps a MAL source in mapping mutation input", async () => {
@@ -401,5 +404,6 @@ describe("mappingHandlers", () => {
 			source: "mal",
 			id: mal(5114),
 		});
+		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 });

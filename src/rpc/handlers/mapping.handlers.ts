@@ -3,11 +3,8 @@
 
 import {
 	anilistMetadataStore,
-	bumpLibraryRevision,
-	bumpMappingsRevision,
 	mappingService,
 	radarrLibrary,
-	scheduleLibraryRefresh,
 	sonarrLibrary,
 } from "@/background/api-services";
 import { refreshMappingPipeline } from "@/background/mapping-refresh";
@@ -35,6 +32,7 @@ import { parseTmdbIdOrNull, parseTvdbIdOrNull } from "@/providers/schemas";
 import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
+import { bumpMappingsRevision } from "@/rpc/revision-signals";
 import { getMappingInspection } from "@/rpc/mapping-inspection";
 import { anilistIdFromSource, sourceFromInput } from "@/rpc/source-input";
 import type {
@@ -434,15 +432,6 @@ async function assertNoConflictingLinkedIds(input: {
 	);
 }
 
-async function afterMappingWrite(provider: Provider): Promise<void> {
-	if (provider === "sonarr" && (await getProviderConfig("sonarr"))) {
-		scheduleLibraryRefresh("sonarr");
-	}
-
-	await bumpLibraryRevision(provider);
-	await bumpMappingsRevision();
-}
-
 export const mappingHandlers = {
 	getMappingIdentities(ids: GetMappingIdentitiesInput) {
 		return getMappingIdentities(ids);
@@ -462,25 +451,25 @@ export const mappingHandlers = {
 			source,
 			input.providerId,
 		);
-		await afterMappingWrite(input.provider);
+		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async clearManualMapping(input: ClearManualMappingInput) {
 		await mappingService.clearManualMapping(input.provider, sourceFromInput(input));
-		await afterMappingWrite(input.provider);
+		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async setMappingIgnore(input: SetMappingIgnoreInput) {
 		await mappingService.setIgnored(input.provider, sourceFromInput(input));
-		await afterMappingWrite(input.provider);
+		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async clearMappingIgnore(input: ClearMappingIgnoreInput) {
 		await mappingService.clearIgnored(input.provider, sourceFromInput(input));
-		await afterMappingWrite(input.provider);
+		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
@@ -490,7 +479,7 @@ export const mappingHandlers = {
 			sourceFromInput(input),
 			input.providerId,
 		);
-		await afterMappingWrite(input.provider);
+		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
@@ -500,7 +489,7 @@ export const mappingHandlers = {
 			sourceFromInput(input),
 			input.providerId,
 		);
-		await afterMappingWrite(input.provider);
+		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 

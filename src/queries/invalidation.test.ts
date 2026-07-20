@@ -144,6 +144,7 @@ describe("query invalidation helpers", () => {
 		const mappings = queryKeys.mappings();
 		const inspection = queryKeys.mappingInspection("sonarr", aid(1));
 		const identities = queryKeys.mappingIdentities([aid(1)]);
+		const sourceAniListIds = queryKeys.sourceAniListIds(["mal:5114"]);
 		const sonarrStatus = queryKeys.providerMediaStatus("sonarr", {
 			anilistId: aid(1),
 		});
@@ -151,6 +152,7 @@ describe("query invalidation helpers", () => {
 			anilistId: aid(1),
 		});
 		const sonarrLookup = queryKeys.providerLookup("sonarr", "test");
+		const radarrLookup = queryKeys.providerLookup("radarr", "test");
 		const seerrTarget = queryKeys.seerrTarget(aid(1));
 		const seerrTargets = queryKeys.seerrTargets([aid(1), aid(2)]);
 		const seerrLinkedEntries = queryKeys.seerrLinkedAniListEntries({
@@ -161,9 +163,11 @@ describe("query invalidation helpers", () => {
 			mappings,
 			inspection,
 			identities,
+			sourceAniListIds,
 			sonarrStatus,
 			radarrStatus,
 			sonarrLookup,
+			radarrLookup,
 			seerrTarget,
 			seerrTargets,
 			seerrLinkedEntries,
@@ -176,9 +180,11 @@ describe("query invalidation helpers", () => {
 		expect(isInvalidated(queryClient, mappings)).toBe(true);
 		expect(isInvalidated(queryClient, inspection)).toBe(true);
 		expect(isInvalidated(queryClient, identities)).toBe(true);
+		expect(isInvalidated(queryClient, sourceAniListIds)).toBe(true);
 		expect(isInvalidated(queryClient, sonarrStatus)).toBe(true);
 		expect(isInvalidated(queryClient, radarrStatus)).toBe(true);
-		expect(isInvalidated(queryClient, sonarrLookup)).toBe(false);
+		expect(isInvalidated(queryClient, sonarrLookup)).toBe(true);
+		expect(isInvalidated(queryClient, radarrLookup)).toBe(true);
 		expect(isInvalidated(queryClient, seerrTarget)).toBe(true);
 		expect(isInvalidated(queryClient, seerrTargets)).toBe(true);
 		expect(isInvalidated(queryClient, seerrLinkedEntries)).toBe(true);

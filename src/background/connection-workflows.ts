@@ -21,11 +21,8 @@ import {
 } from "@/settings/store";
 import type { ExtensionOptions } from "@/settings/types";
 import { logError, normalizeError } from "@/shared/errors/error-utils";
-import {
-	bumpLibraryRevision,
-	bumpMappingsRevision,
-	refreshProviderLibrary,
-} from "./api-services";
+import { bumpMappingsRevision } from "@/rpc/revision-signals";
+import { refreshProviderLibrary } from "./api-services";
 import { refreshMappingPipeline } from "./mapping-refresh";
 
 async function attempt(effect: () => Promise<unknown>, scope: string) {
@@ -87,10 +84,6 @@ export async function commitProviderConnection(
 	await attempt(
 		() => refreshProviderLibrary(provider, savedOptions),
 		`${provider}:refreshLibrary`,
-	);
-	await attempt(
-		() => bumpLibraryRevision(provider),
-		`${provider}:bumpLibraryRevision`,
 	);
 	await attempt(
 		() =>

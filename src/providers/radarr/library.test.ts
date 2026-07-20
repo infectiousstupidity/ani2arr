@@ -210,7 +210,8 @@ describe("RadarrLibrary movie snapshots", () => {
 		vi.spyOn(client, "getAllMovies").mockRejectedValue(
 			new Error("Second Radarr unavailable"),
 		);
-		const library = new RadarrLibrary(client, cache);
+		const onSnapshotsChanged = vi.fn();
+		const library = new RadarrLibrary(client, cache, onSnapshotsChanged);
 
 		await expect(library.getMovieSnapshots(credentials)).resolves.toEqual([
 			firstSnapshot,
@@ -226,6 +227,7 @@ describe("RadarrLibrary movie snapshots", () => {
 			[],
 			expect.any(Object),
 		);
+		expect(onSnapshotsChanged).not.toHaveBeenCalled();
 	});
 
 	it("coalesces refreshes per server without reusing another server request", async () => {
@@ -246,7 +248,8 @@ describe("RadarrLibrary movie snapshots", () => {
 					? firstRefresh.promise
 					: secondRefresh.promise,
 			);
-		const library = new RadarrLibrary(client, cache);
+		const onSnapshotsChanged = vi.fn();
+		const library = new RadarrLibrary(client, cache, onSnapshotsChanged);
 
 		const firstRequest = library.refreshMovieSnapshots(credentials);
 		const duplicateFirstRequest = library.refreshMovieSnapshots(credentials);
@@ -267,6 +270,10 @@ describe("RadarrLibrary movie snapshots", () => {
 		]);
 		expect(getAllMovies).toHaveBeenCalledWith(credentials);
 		expect(getAllMovies).toHaveBeenCalledWith(otherCredentials);
+		expect(onSnapshotsChanged).toHaveBeenCalledTimes(2);
+
+		await library.refreshMovieSnapshots(credentials);
+		expect(onSnapshotsChanged).toHaveBeenCalledTimes(2);
 	});
 
 	it("mutates only the cache for the supplied server", async () => {
@@ -287,11 +294,15 @@ describe("RadarrLibrary movie snapshots", () => {
 		]);
 		const library = new RadarrLibrary(createClient(), cache);
 
-		await library.upsertMovieSnapshot(addedSecondSnapshot, otherCredentials);
-		await library.removeMovieSnapshot(
-			staleSecondSnapshot.tmdbId,
-			otherCredentials,
-		);
+		await expect(
+			library.upsertMovieSnapshot(addedSecondSnapshot, otherCredentials),
+		).resolves.toBe(true);
+		await expect(
+			library.upsertMovieSnapshot(addedSecondSnapshot, otherCredentials),
+		).resolves.toBe(false);
+		await expect(
+			library.removeMovieSnapshot(staleSecondSnapshot.tmdbId, otherCredentials),
+		).resolves.toBe(true);
 
 		expect(cache.value(movieCacheKey)).toEqual([firstSnapshot]);
 		expect(cache.value(otherMovieCacheKey)).toEqual([addedSecondSnapshot]);

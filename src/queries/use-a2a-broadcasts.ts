@@ -12,7 +12,7 @@ import {
 	MAPPINGS_REVISION_CHANGE_KEY,
 	RADARR_LIBRARY_REVISION_CHANGE_KEY,
 	SONARR_LIBRARY_REVISION_CHANGE_KEY,
-} from "@/shared/sync/revisions";
+} from "@/rpc/revision-signals";
 
 export function useA2aBroadcasts(): void {
 	const queryClient = useQueryClient();

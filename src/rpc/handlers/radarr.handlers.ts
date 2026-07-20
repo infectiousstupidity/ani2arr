@@ -2,7 +2,6 @@
 // src/rpc/handlers/radarr.handlers.ts
 
 import {
-	bumpLibraryRevision,
 	mappingService,
 	radarrClient,
 	radarrLibrary,
@@ -35,6 +34,7 @@ import type {
 	UpdateRadarrInput,
 	ValidateTmdbInput,
 } from "@/rpc/types";
+import { bumpProviderLibraryRevision } from "@/rpc/revision-signals";
 import { sourceFromInput } from "@/rpc/source-input";
 import { normalizeInputCredentials } from "./provider-credentials";
 
@@ -62,12 +62,12 @@ export const radarrHandlers = {
 			},
 			{ client: radarrClient },
 		);
-		await radarrLibrary.upsertMovieSnapshot(
+		const changed = await radarrLibrary.upsertMovieSnapshot(
 			toRadarrMovieSnapshot(created),
 			credentials,
 		);
 		scheduleLibraryRefresh("radarr");
-		await bumpLibraryRevision("radarr");
+		if (changed) await bumpProviderLibraryRevision("radarr");
 		return created;
 	},
 
@@ -81,12 +81,12 @@ export const radarrHandlers = {
 			},
 			{ client: radarrClient },
 		);
-		await radarrLibrary.upsertMovieSnapshot(
+		const changed = await radarrLibrary.upsertMovieSnapshot(
 			toRadarrMovieSnapshot(updated),
 			credentials,
 		);
 		scheduleLibraryRefresh("radarr");
-		await bumpLibraryRevision("radarr");
+		if (changed) await bumpProviderLibraryRevision("radarr");
 		return updated;
 	},
 
@@ -190,6 +190,9 @@ async function getRadarrLibraryStatusForRpc(input: {
 	return radarrLibrary.getMovieLibraryStatusByTmdbId({
 		tmdbId: input.tmdbId,
 		credentials,
+		onCacheChanged: async () => {
+			await bumpProviderLibraryRevision("radarr");
+		},
 		...(input.forceVerify === undefined
 			? {}
 			: { forceVerify: input.forceVerify }),

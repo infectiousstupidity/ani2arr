@@ -23,7 +23,7 @@ export type AutomaticResolver = (
 	source: SourceIdentity,
 	rejectedProviderIds: number[],
 	options?: { title?: string; metadata?: AniListMediaHint | null },
-) => Promise<void>;
+) => Promise<boolean>;
 
 function mediaFromStatusHint(input: {
 	title?: string;
@@ -54,7 +54,7 @@ export function createAutomaticResolver(dependencies: {
 		source,
 		rejectedProviderIds,
 		options,
-	): Promise<void> {
+	): Promise<boolean> {
 		const findUniqueAniListId =
 			dependencies.getUniqueAniListIdForSource ?? getUniqueAniListIdForSource;
 		const searchedTitleKeys = new Set<string>();
@@ -78,13 +78,13 @@ export function createAutomaticResolver(dependencies: {
 				providerId: hintMatch.providerId,
 				matchedTitle: hintMatch.matchedTitle,
 			});
-			return;
+			return true;
 		}
 
 		const anilistId = await findUniqueAniListId(source);
 		if (anilistId === null) {
 			await setAutoResult(provider, source, { kind: "unmapped" });
-			return;
+			return true;
 		}
 
 		let media: AniListMedia;
@@ -93,7 +93,7 @@ export function createAutomaticResolver(dependencies: {
 				anilistId,
 			);
 		} catch {
-			return;
+			return false;
 		}
 
 		const match =
@@ -104,7 +104,7 @@ export function createAutomaticResolver(dependencies: {
 			await setAutoResult(provider, source, {
 				kind: "unmapped",
 			});
-			return;
+			return true;
 		}
 
 		await setAutoResult(provider, source, {
@@ -112,5 +112,6 @@ export function createAutomaticResolver(dependencies: {
 			providerId: match.providerId,
 			matchedTitle: match.matchedTitle,
 		});
+		return true;
 	};
 }

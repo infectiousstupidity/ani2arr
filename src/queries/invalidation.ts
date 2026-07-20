@@ -36,13 +36,7 @@ export function invalidateAfterMappingChange(
 export function invalidateAfterMappingsRevision(
 	queryClient: QueryClient,
 ): void {
-	queryClient.invalidateQueries({ queryKey: queryKeys.mappings() });
-	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingInspectionRoot(),
-	});
-	queryClient.invalidateQueries({
-		queryKey: queryKeys.mappingIdentitiesRoot(),
-	});
+	queryClient.invalidateQueries({ queryKey: queryKeys.mappingRoot() });
 	queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.seerrLinkedAniListEntriesRoot(),
@@ -50,6 +44,9 @@ export function invalidateAfterMappingsRevision(
 	for (const provider of PROVIDERS) {
 		queryClient.invalidateQueries({
 			queryKey: queryKeys.providerMediaStatusRoot(provider),
+		});
+		queryClient.invalidateQueries({
+			queryKey: queryKeys.providerLookupRoot(provider),
 		});
 	}
 }

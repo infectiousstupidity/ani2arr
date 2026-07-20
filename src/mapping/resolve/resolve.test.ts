@@ -68,9 +68,11 @@ describe("createAutomaticResolver", () => {
 		]);
 		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await resolve("sonarr", anilistSource(anilistId), [], {
-			title: "Kagurabachi",
-		});
+		await expect(
+			resolve("sonarr", anilistSource(anilistId), [], {
+				title: "Kagurabachi",
+			}),
+		).resolves.toBe(true);
 
 		expect(deps.searchProviderCandidates).toHaveBeenCalledWith(
 			"sonarr",
@@ -143,7 +145,7 @@ describe("createAutomaticResolver", () => {
 			resolve("sonarr", anilistSource(anilistId), [], {
 				title: "Kagurabachi",
 			}),
-		).resolves.toBeUndefined();
+		).resolves.toBe(false);
 
 		expect(deps.anilistMedia.fetchMediaWithRelations).toHaveBeenCalledWith(
 			anilistId,

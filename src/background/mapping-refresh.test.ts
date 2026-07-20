@@ -10,7 +10,7 @@ vi.mock("@/mapping/upstream.store", () => ({
 	refreshUpstreamMappings: refreshUpstreamMappingsMock,
 }));
 
-vi.mock("@/shared/sync/revisions", () => ({
+vi.mock("@/rpc/revision-signals", () => ({
 	bumpMappingsRevision: bumpMappingsRevisionMock,
 }));
 

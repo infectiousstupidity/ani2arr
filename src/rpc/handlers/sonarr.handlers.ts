@@ -2,7 +2,6 @@
 // src/rpc/handlers/sonarr.handlers.ts
 
 import {
-	bumpLibraryRevision,
 	mappingService,
 	scheduleLibraryRefresh,
 	sonarrClient,
@@ -27,6 +26,7 @@ import type {
 } from "@/providers/types";
 import type { TvdbId } from "@/providers/schemas";
 import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
+import { bumpProviderLibraryRevision } from "@/rpc/revision-signals";
 import type {
 	AddSonarrInput,
 	GetSeriesStatusOutput,
@@ -65,12 +65,12 @@ export const sonarrHandlers = {
 			},
 			{ client: sonarrClient },
 		);
-		await sonarrLibrary.upsertSeriesSnapshot(
+		const changed = await sonarrLibrary.upsertSeriesSnapshot(
 			toSonarrSeriesSnapshot(created),
 			credentials,
 		);
 		scheduleLibraryRefresh("sonarr");
-		await bumpLibraryRevision("sonarr");
+		if (changed) await bumpProviderLibraryRevision("sonarr");
 		return created;
 	},
 
@@ -89,18 +89,17 @@ export const sonarrHandlers = {
 				},
 				{ client: sonarrClient },
 			);
-			await sonarrLibrary.upsertSeriesSnapshot(
+			const changed = await sonarrLibrary.upsertSeriesSnapshot(
 				toSonarrSeriesSnapshot(updated),
 				credentials,
 			);
 			scheduleLibraryRefresh("sonarr");
-			await bumpLibraryRevision("sonarr");
+			if (changed) await bumpProviderLibraryRevision("sonarr");
 			return updated;
 		} catch (error) {
 			const normalized = normalizeError(error);
 			if (normalized.details?.partialSuccess === true) {
 				scheduleLibraryRefresh("sonarr");
-				await bumpLibraryRevision("sonarr");
 			}
 			throw normalized;
 		}
@@ -210,6 +209,9 @@ async function getSonarrLibraryStatusForRpc(input: {
 	return sonarrLibrary.getSeriesLibraryStatusByTvdbId({
 		tvdbId: input.tvdbId,
 		credentials,
+		onCacheChanged: async () => {
+			await bumpProviderLibraryRevision("sonarr");
+		},
 		...(input.forceVerify === undefined
 			? {}
 			: { forceVerify: input.forceVerify }),

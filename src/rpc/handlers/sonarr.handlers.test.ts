@@ -32,7 +32,6 @@ const sonarrClientMock = vi.hoisted(() => ({
 }));
 
 const apiServicesMock = vi.hoisted(() => ({
-	bumpLibraryRevision: vi.fn(),
 	mappingService: {
 		getLinkedAniListIds: vi.fn(),
 		resolveMapping: vi.fn(),
@@ -55,9 +54,14 @@ const providerConfigMock = vi.hoisted(() => ({
 
 const addSonarrSeriesMock = vi.hoisted(() => vi.fn());
 const updateSonarrSeriesMock = vi.hoisted(() => vi.fn());
+const bumpProviderLibraryRevisionMock = vi.hoisted(() => vi.fn());
 vi.mock("@/background/api-services", () => ({
 	...apiServicesMock,
 	sonarrClient: sonarrClientMock,
+}));
+
+vi.mock("@/rpc/revision-signals", () => ({
+	bumpProviderLibraryRevision: bumpProviderLibraryRevisionMock,
 }));
 
 vi.mock("@/background/provider-config", () => providerConfigMock);
@@ -74,6 +78,7 @@ describe("sonarrHandlers", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		apiServicesMock.mappingService.getLinkedAniListIds.mockResolvedValue([]);
+		apiServicesMock.sonarrLibrary.upsertSeriesSnapshot.mockResolvedValue(true);
 	});
 
 	it("loads Sonarr form resources through the current Sonarr client", async () => {
@@ -210,7 +215,7 @@ describe("sonarrHandlers", () => {
 		expect(apiServicesMock.scheduleLibraryRefresh).toHaveBeenCalledWith(
 			"sonarr",
 		);
-		expect(apiServicesMock.bumpLibraryRevision).toHaveBeenCalledWith("sonarr");
+		expect(bumpProviderLibraryRevisionMock).toHaveBeenCalledWith("sonarr");
 	});
 
 	it("updates the scoped Sonarr cache after update", async () => {
@@ -225,6 +230,7 @@ describe("sonarrHandlers", () => {
 			credentials,
 		);
 		updateSonarrSeriesMock.mockResolvedValue(updated);
+		apiServicesMock.sonarrLibrary.upsertSeriesSnapshot.mockResolvedValue(false);
 
 		await expect(
 			sonarrHandlers.updateSonarrSeries({
@@ -248,10 +254,10 @@ describe("sonarrHandlers", () => {
 		expect(apiServicesMock.scheduleLibraryRefresh).toHaveBeenCalledWith(
 			"sonarr",
 		);
-		expect(apiServicesMock.bumpLibraryRevision).toHaveBeenCalledWith("sonarr");
+		expect(bumpProviderLibraryRevisionMock).not.toHaveBeenCalled();
 	});
 
-	it("bumps Sonarr revision after partial-success update failure", async () => {
+	it("refreshes Sonarr after partial-success update failure", async () => {
 		const partialSuccessError = {
 			code: ErrorCode.API_ERROR,
 			message: "Update partly succeeded",
@@ -283,6 +289,6 @@ describe("sonarrHandlers", () => {
 		expect(apiServicesMock.scheduleLibraryRefresh).toHaveBeenCalledWith(
 			"sonarr",
 		);
-		expect(apiServicesMock.bumpLibraryRevision).toHaveBeenCalledWith("sonarr");
+		expect(bumpProviderLibraryRevisionMock).not.toHaveBeenCalled();
 	});
 });

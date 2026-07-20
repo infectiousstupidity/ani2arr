@@ -4,7 +4,6 @@
 import { storage } from "wxt/utils/storage";
 import type { AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
-import { bumpMappingsRevision } from "@/shared/sync/revisions";
 import {
 	normalizeStoredSourceKey,
 	normalizeSourceIdentity,
@@ -88,7 +87,6 @@ export async function setAutoResult(
 				(result.kind === "mapped" ? MAPPED_TTL_MS : ATTEMPT_TTL_MS),
 		};
 	});
-	await bumpMappingsRevision();
 }
 
 export async function clearAutoResults(provider: Provider): Promise<void> {

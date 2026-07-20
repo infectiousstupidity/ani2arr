@@ -68,7 +68,7 @@ vi.mock("@/shared/cache/ttl-cache", () => ({
 	}),
 }));
 
-vi.mock("@/shared/sync/revisions", () => ({
+vi.mock("@/rpc/revision-signals", () => ({
 	bumpMappingsRevision: vi.fn(),
 	bumpProviderLibraryRevision: vi.fn(),
 	resetAllRevisions: resetAllRevisionsMock,

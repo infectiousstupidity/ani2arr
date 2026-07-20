@@ -213,7 +213,8 @@ describe("SonarrLibrary library status", () => {
 		vi.spyOn(client, "getAllSeries").mockRejectedValue(
 			new Error("Second Sonarr unavailable"),
 		);
-		const library = new SonarrLibrary(client, cache);
+		const onSnapshotsChanged = vi.fn();
+		const library = new SonarrLibrary(client, cache, onSnapshotsChanged);
 
 		await expect(library.getSeriesSnapshots(credentials)).resolves.toEqual([
 			firstSnapshot,
@@ -229,6 +230,7 @@ describe("SonarrLibrary library status", () => {
 			[],
 			expect.any(Object),
 		);
+		expect(onSnapshotsChanged).not.toHaveBeenCalled();
 	});
 
 	it("coalesces refreshes per server without reusing another server request", async () => {
@@ -249,7 +251,8 @@ describe("SonarrLibrary library status", () => {
 					? firstRefresh.promise
 					: secondRefresh.promise,
 			);
-		const library = new SonarrLibrary(client, cache);
+		const onSnapshotsChanged = vi.fn();
+		const library = new SonarrLibrary(client, cache, onSnapshotsChanged);
 
 		const firstRequest = library.refreshSeriesSnapshots(credentials);
 		const duplicateFirstRequest = library.refreshSeriesSnapshots(credentials);
@@ -270,6 +273,10 @@ describe("SonarrLibrary library status", () => {
 		]);
 		expect(getAllSeries).toHaveBeenCalledWith(credentials);
 		expect(getAllSeries).toHaveBeenCalledWith(otherCredentials);
+		expect(onSnapshotsChanged).toHaveBeenCalledTimes(2);
+
+		await library.refreshSeriesSnapshots(credentials);
+		expect(onSnapshotsChanged).toHaveBeenCalledTimes(2);
 	});
 
 	it("mutates only the cache for the supplied server", async () => {
@@ -290,14 +297,18 @@ describe("SonarrLibrary library status", () => {
 		]);
 		const library = new SonarrLibrary(createClient(), cache);
 
-		await library.upsertSeriesSnapshot(
-			addedSecondSnapshot,
-			otherCredentials,
-		);
-		await library.removeSeriesSnapshot(
-			staleSecondSnapshot.tvdbId,
-			otherCredentials,
-		);
+		await expect(
+			library.upsertSeriesSnapshot(addedSecondSnapshot, otherCredentials),
+		).resolves.toBe(true);
+		await expect(
+			library.upsertSeriesSnapshot(addedSecondSnapshot, otherCredentials),
+		).resolves.toBe(false);
+		await expect(
+			library.removeSeriesSnapshot(
+				staleSecondSnapshot.tvdbId,
+				otherCredentials,
+			),
+		).resolves.toBe(true);
 
 		expect(cache.value(seriesCacheKey)).toEqual([firstSnapshot]);
 		expect(cache.value(otherSeriesCacheKey)).toEqual([addedSecondSnapshot]);

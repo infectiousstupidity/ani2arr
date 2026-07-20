@@ -13,6 +13,7 @@ import {
 	setManualSeerrTarget,
 } from "@/mapping/seerr-target.store";
 import { buildSeerrRequestPayload } from "@/providers/seerr/request";
+import { bumpMappingsRevision } from "@/rpc/revision-signals";
 import type {
 	GetSeerrLinkedAniListEntriesInput,
 	GetSeerrMediaDetailsInput,
@@ -67,11 +68,13 @@ export const seerrHandlers = {
 
 	async setManualSeerrTarget(input: SetManualSeerrTargetInput) {
 		await setManualSeerrTarget(input);
+		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async clearManualSeerrTarget(input: GetSeerrTargetInput) {
 		await clearManualSeerrTarget(input);
+		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 

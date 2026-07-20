@@ -31,7 +31,6 @@ const radarrClientMock = vi.hoisted(() => ({
 }));
 
 const apiServicesMock = vi.hoisted(() => ({
-	bumpLibraryRevision: vi.fn(),
 	mappingService: {
 		getLinkedAniListIds: vi.fn(),
 		resolveMapping: vi.fn(),
@@ -54,9 +53,14 @@ const providerConfigMock = vi.hoisted(() => ({
 
 const addRadarrMovieMock = vi.hoisted(() => vi.fn());
 const updateRadarrMovieMock = vi.hoisted(() => vi.fn());
+const bumpProviderLibraryRevisionMock = vi.hoisted(() => vi.fn());
 vi.mock("@/background/api-services", () => ({
 	...apiServicesMock,
 	radarrClient: radarrClientMock,
+}));
+
+vi.mock("@/rpc/revision-signals", () => ({
+	bumpProviderLibraryRevision: bumpProviderLibraryRevisionMock,
 }));
 
 vi.mock("@/background/provider-config", () => providerConfigMock);
@@ -73,6 +77,7 @@ describe("radarrHandlers", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		apiServicesMock.mappingService.getLinkedAniListIds.mockResolvedValue([]);
+		apiServicesMock.radarrLibrary.upsertMovieSnapshot.mockResolvedValue(true);
 	});
 
 	it("loads Radarr form resources through the Radarr client", async () => {
@@ -208,10 +213,10 @@ describe("radarrHandlers", () => {
 		expect(apiServicesMock.scheduleLibraryRefresh).toHaveBeenCalledWith(
 			"radarr",
 		);
-		expect(apiServicesMock.bumpLibraryRevision).toHaveBeenCalledWith("radarr");
+		expect(bumpProviderLibraryRevisionMock).toHaveBeenCalledWith("radarr");
 	});
 
-	it("updates Radarr cache and revision after update", async () => {
+	it("does not signal an unchanged Radarr cache after update", async () => {
 		const tmdbId = parseTmdbId(200);
 		const updated = {
 			id: parseRadarrMovieId(5),
@@ -223,6 +228,7 @@ describe("radarrHandlers", () => {
 			credentials,
 		);
 		updateRadarrMovieMock.mockResolvedValue(updated);
+		apiServicesMock.radarrLibrary.upsertMovieSnapshot.mockResolvedValue(false);
 
 		await expect(
 			radarrHandlers.updateRadarrMovie({
@@ -245,6 +251,6 @@ describe("radarrHandlers", () => {
 		expect(apiServicesMock.scheduleLibraryRefresh).toHaveBeenCalledWith(
 			"radarr",
 		);
-		expect(apiServicesMock.bumpLibraryRevision).toHaveBeenCalledWith("radarr");
+		expect(bumpProviderLibraryRevisionMock).not.toHaveBeenCalled();
 	});
 });

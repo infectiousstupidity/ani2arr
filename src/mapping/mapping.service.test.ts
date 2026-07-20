@@ -443,6 +443,7 @@ describe("MappingService", () => {
 				providerId: tvdb(200),
 				matchedTitle: "Kagurabachi",
 			});
+			return true;
 		});
 		replaceAuto("sonarr", anilistId, { kind: "unmapped" });
 		const mappingService = new MappingService(resolver);

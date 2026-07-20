@@ -56,6 +56,7 @@ export class RadarrLibrary {
 	public constructor(
 		private readonly client: RadarrClient,
 		private readonly cache: TtlCache<RadarrMovieSnapshot[]> = defaultCache,
+		private readonly onSnapshotsChanged?: () => Promise<void> | void,
 	) {}
 
 	public async getMovieSnapshots(
@@ -118,10 +119,19 @@ export class RadarrLibrary {
 					)
 					.map((movie) => toRadarrMovieSnapshot(movie));
 
-				if (generation === this.cacheGeneration) {
-					await this.cache.write(cacheKey, snapshots, CACHE_TTL.normal);
-					if (generation === this.cacheGeneration) {
-						this.setMemoryCache(scope, snapshots, CACHE_TTL.normal);
+				if (generation !== this.cacheGeneration) return snapshots;
+				await this.cache.write(cacheKey, snapshots, CACHE_TTL.normal);
+				if (generation !== this.cacheGeneration) return snapshots;
+
+				this.setMemoryCache(scope, snapshots, CACHE_TTL.normal);
+				if (JSON.stringify(fallback) !== JSON.stringify(snapshots)) {
+					try {
+						await this.onSnapshotsChanged?.();
+					} catch (error) {
+						logError(
+							normalizeError(error),
+							"RadarrLibrary:snapshotChanged",
+						);
 					}
 				}
 
@@ -183,8 +193,8 @@ export class RadarrLibrary {
 			if (liveMovie) {
 				const snapshot = toRadarrMovieSnapshot(liveMovie);
 				if (!existsInCache) {
-					await this.upsertMovieSnapshot(snapshot, credentials);
-					await input.onCacheChanged?.();
+					const changed = await this.upsertMovieSnapshot(snapshot, credentials);
+					if (changed) await input.onCacheChanged?.();
 				}
 
 				return {
@@ -212,8 +222,8 @@ export class RadarrLibrary {
 		}
 
 		if (existsInCache) {
-			await this.removeMovieSnapshot(tmdbId, credentials);
-			await input.onCacheChanged?.();
+			const changed = await this.removeMovieSnapshot(tmdbId, credentials);
+			if (changed) await input.onCacheChanged?.();
 		}
 
 		return {
@@ -227,7 +237,7 @@ export class RadarrLibrary {
 	public async upsertMovieSnapshot(
 		snapshot: RadarrMovieSnapshot,
 		credentials: ProviderCredentials,
-	): Promise<void> {
+	): Promise<boolean> {
 		if (this.clearPromise) await this.clearPromise;
 
 		const scope = getProviderConnectionScope(credentials);
@@ -238,11 +248,18 @@ export class RadarrLibrary {
 			memoryCache && Date.now() < memoryCache.expiresAt
 				? memoryCache
 				: await this.cache.read(cacheKey);
-		if (generation !== this.cacheGeneration) return;
+		if (generation !== this.cacheGeneration) return false;
 		const current = cached?.value ?? [];
 		const existingIndex = current.findIndex(
 			(item) => item.tmdbId === snapshot.tmdbId,
 		);
+		const existingSnapshot = current[existingIndex];
+		if (
+			existingSnapshot !== undefined &&
+			JSON.stringify(existingSnapshot) === JSON.stringify(snapshot)
+		) {
+			return false;
+		}
 		const next =
 			existingIndex === -1
 				? [...current, snapshot]
@@ -253,15 +270,15 @@ export class RadarrLibrary {
 					];
 
 		await this.cache.write(cacheKey, next, CACHE_TTL.normal);
-		if (generation === this.cacheGeneration) {
-			this.setMemoryCache(scope, next, CACHE_TTL.normal);
-		}
+		if (generation !== this.cacheGeneration) return false;
+		this.setMemoryCache(scope, next, CACHE_TTL.normal);
+		return true;
 	}
 
 	public async removeMovieSnapshot(
 		tmdbId: TmdbId,
 		credentials: ProviderCredentials,
-	): Promise<void> {
+	): Promise<boolean> {
 		if (this.clearPromise) await this.clearPromise;
 
 		const scope = getProviderConnectionScope(credentials);
@@ -272,16 +289,16 @@ export class RadarrLibrary {
 			memoryCache && Date.now() < memoryCache.expiresAt
 				? memoryCache
 				: await this.cache.read(cacheKey);
-		if (generation !== this.cacheGeneration) return;
-		if (!cached) return;
+		if (generation !== this.cacheGeneration) return false;
+		if (!cached) return false;
 
 		const next = cached.value.filter((movie) => movie.tmdbId !== tmdbId);
-		if (next.length === cached.value.length) return;
+		if (next.length === cached.value.length) return false;
 
 		await this.cache.write(cacheKey, next, CACHE_TTL.normal);
-		if (generation === this.cacheGeneration) {
-			this.setMemoryCache(scope, next, CACHE_TTL.normal);
-		}
+		if (generation !== this.cacheGeneration) return false;
+		this.setMemoryCache(scope, next, CACHE_TTL.normal);
+		return true;
 	}
 
 	public async clearMovieSnapshotCache(): Promise<void> {
