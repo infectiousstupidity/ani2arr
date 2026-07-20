@@ -12,11 +12,10 @@ import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import type { ManualFacts } from "./manual.store";
 import type { SourceIdentity } from "./source-identity";
-import type { AutoResult, MappingResult, UpstreamTarget } from "./types";
+import type { AutoResult, UpstreamTarget } from "./types";
 import { listSourceUpstreamMappings } from "./upstream.store";
 import {
 	getMappingIdentities,
-	listEffectiveMappingRecords,
 	listEffectiveMappingRecordsByProvider,
 } from "./list-mappings";
 
@@ -106,7 +105,9 @@ describe("effective mapping records", () => {
 			},
 		];
 
-		await expect(listEffectiveMappingRecords("sonarr")).resolves.toEqual(
+		const result = await listEffectiveMappingRecordsByProvider();
+
+		expect(result.sonarr).toEqual(
 			expect.arrayContaining([
 				{
 					source: anilistSource(aid(1)),
@@ -155,7 +156,9 @@ describe("effective mapping records", () => {
 			},
 		];
 
-		await expect(listEffectiveMappingRecords("sonarr")).resolves.toEqual([
+		const result = await listEffectiveMappingRecordsByProvider();
+
+		expect(result.sonarr).toEqual([
 			{
 				source,
 				anilistId: aid(10),
@@ -232,15 +235,25 @@ describe("getMappingIdentities", () => {
 		vi.clearAllMocks();
 	});
 
-	it("returns identities only for requested AniList IDs with stored facts", async () => {
+	it("returns requested AniList identities in ID and provider order", async () => {
 		storeRecords.manual = [
 			{
 				provider: "sonarr",
 				source: anilistSource(aid(1)),
 				facts: { ignored: true },
 			},
+			{
+				provider: "sonarr",
+				source: { source: "mal", id: mal(5114) },
+				facts: { mapping: { providerId: tvdb(999) } },
+			},
 		];
 		storeRecords.auto = [
+			{
+				provider: "radarr",
+				source: anilistSource(aid(1)),
+				result: { kind: "mapped", providerId: tmdb(101) },
+			},
 			{
 				provider: "radarr",
 				source: anilistSource(aid(3)),
@@ -253,36 +266,41 @@ describe("getMappingIdentities", () => {
 				anilistId: aid(2),
 				targets: [{ provider: "sonarr", providerId: tvdb(202) }],
 			},
+			{
+				source: { source: "mal", id: mal(5114) },
+				anilistId: aid(1),
+				targets: [],
+			},
 		];
-		const resultByKey = new Map<string, MappingResult>([
-			["sonarr:1", { kind: "ignored" }],
-			[
-				"sonarr:2",
-				{ kind: "mapped", source: "upstream", providerId: tvdb(202) },
-			],
-			[
-				"radarr:3",
-				{ kind: "mapped", source: "auto", providerId: tmdb(303) },
-			],
-		]);
-		const mappingService = {
-			getMapping: vi.fn(async (provider: Provider, anilistId: AniListId) => {
-				const result = resultByKey.get(`${provider}:${anilistId}`);
-				if (!result) throw new Error("Unexpected identity lookup.");
-				return result;
-			}),
-		};
 
 		await expect(
-			getMappingIdentities([aid(1), aid(2), aid(3), aid(4)], {
-				mappingService,
-			}),
+			getMappingIdentities([aid(3), aid(1), aid(2), aid(4)]),
 		).resolves.toEqual([
+			{
+				source: anilistSource(aid(3)),
+				anilistId: aid(3),
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "auto",
+					providerId: tmdb(303),
+				},
+			},
 			{
 				source: anilistSource(aid(1)),
 				anilistId: aid(1),
 				provider: "sonarr",
 				result: { kind: "ignored" },
+			},
+			{
+				source: anilistSource(aid(1)),
+				anilistId: aid(1),
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "auto",
+					providerId: tmdb(101),
+				},
 			},
 			{
 				source: anilistSource(aid(2)),
@@ -292,16 +310,6 @@ describe("getMappingIdentities", () => {
 					kind: "mapped",
 					source: "upstream",
 					providerId: tvdb(202),
-				},
-			},
-			{
-				source: anilistSource(aid(3)),
-				anilistId: aid(3),
-				provider: "radarr",
-				result: {
-					kind: "mapped",
-					source: "auto",
-					providerId: tmdb(303),
 				},
 			},
 		]);

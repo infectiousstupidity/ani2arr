@@ -449,7 +449,7 @@ async function runMappingRefreshPipeline(): Promise<void> {
 
 export const mappingHandlers = {
 	getMappingIdentities(ids: GetMappingIdentitiesInput) {
-		return getMappingIdentities(ids, { mappingService });
+		return getMappingIdentities(ids);
 	},
 
 	refreshMappingPipeline() {

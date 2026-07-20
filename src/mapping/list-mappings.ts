@@ -2,10 +2,7 @@
 // src/mapping/list-mappings.ts
 
 import type { AniListId, AniListMediaFormat } from "@/anilist/types";
-import type { MappingService } from "@/mapping/mapping.service";
 import { PROVIDERS, type Provider } from "@/providers/types";
-import { listSourceAutoResults } from "./auto.store";
-import { listSourceManualFacts } from "./manual.store";
 import {
 	collectEffectiveMappingRecords,
 	type EffectiveMappingRecord,
@@ -24,22 +21,10 @@ export interface ActiveMappingIdentity {
 	result: MappingResult;
 }
 
-interface MappingReadDeps {
-	mappingService: Pick<MappingService, "getMapping">;
-}
-
 interface EffectiveMappingListDeps {
 	loadFormatByAniListId?: (
 		ids: readonly AniListId[],
 	) => Promise<ReadonlyMap<AniListId, AniListMediaFormat | null | undefined>>;
-}
-
-export async function listEffectiveMappingRecords(
-	provider: Provider,
-	deps: EffectiveMappingListDeps = {},
-): Promise<EffectiveMappingRecord[]> {
-	const upstreamFacts = await listSourceUpstreamMappings();
-	return collectListRecords(provider, upstreamFacts, deps);
 }
 
 export async function listEffectiveMappingRecordsByProvider(
@@ -56,59 +41,38 @@ export async function listEffectiveMappingRecordsByProvider(
 
 export async function getMappingIdentities(
 	ids: readonly AniListId[],
-	deps: MappingReadDeps,
 ): Promise<ActiveMappingIdentity[]> {
 	const requestedIds = new Set(ids);
 	if (requestedIds.size === 0) return [];
 
-	const keys = new Set<string>();
+	const recordsByProvider = await listEffectiveMappingRecordsByProvider();
+	const identitiesByKey = new Map<string, ActiveMappingIdentity>();
 
 	for (const provider of PROVIDERS) {
-		const [manualRecords, autoRecords] = await Promise.all([
-			listSourceManualFacts(provider),
-			listSourceAutoResults(provider),
-		]);
-
-		for (const record of manualRecords) {
-			if (record.source.source === "anilist" && requestedIds.has(record.source.id)) {
-				keys.add(createIdentityKey(provider, record.source.id));
+		for (const record of recordsByProvider[provider]) {
+			if (
+				record.source.source !== "anilist" ||
+				!requestedIds.has(record.source.id)
+			) {
+				continue;
 			}
-		}
 
-		for (const record of autoRecords) {
-			if (record.source.source === "anilist" && requestedIds.has(record.source.id)) {
-				keys.add(createIdentityKey(provider, record.source.id));
-			}
+			identitiesByKey.set(createIdentityKey(provider, record.source.id), {
+				source: record.source,
+				anilistId: record.source.id,
+				provider,
+				result: record.result,
+			});
 		}
 	}
 
-	for (const record of await listSourceUpstreamMappings()) {
-		if (record.source.source !== "anilist" || !requestedIds.has(record.anilistId)) {
-			continue;
-		}
-
-		for (const target of record.targets) {
-			keys.add(createIdentityKey(target.provider, record.anilistId));
-		}
-	}
-
-	return Promise.all(
-		[...requestedIds].flatMap((anilistId) =>
-			PROVIDERS.flatMap((provider) =>
-				keys.has(createIdentityKey(provider, anilistId))
-					? [
-							deps.mappingService.getMapping(provider, anilistId).then(
-								(result): ActiveMappingIdentity => ({
-									source: anilistSource(anilistId),
-									anilistId,
-									provider,
-									result,
-								}),
-							),
-						]
-					: [],
-			),
-		),
+	return [...requestedIds].flatMap((anilistId) =>
+		PROVIDERS.flatMap((provider) => {
+			const identity = identitiesByKey.get(
+				createIdentityKey(provider, anilistId),
+			);
+			return identity ? [identity] : [];
+		}),
 	);
 }
 
@@ -178,8 +142,4 @@ async function getMovieIdsWithRadarrTargets(
 
 function createIdentityKey(provider: Provider, anilistId: AniListId): string {
 	return `${provider}:${anilistId}`;
-}
-
-function anilistSource(anilistId: AniListId): SourceIdentity {
-	return { source: "anilist", id: anilistId };
 }

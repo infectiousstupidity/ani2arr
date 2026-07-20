@@ -32,6 +32,7 @@ import type {
 	SonarrSeries,
 	SonarrSeriesSnapshot,
 } from "@/providers/sonarr/types";
+import type { ActiveMappingIdentity } from "@/mapping/list-mappings";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import type { MappingResult } from "@/mapping/types";
 
@@ -324,12 +325,7 @@ export interface MappingListGroup {
 	providerMeta?: MappingListProviderMeta;
 }
 
-export interface MappingIdentity {
-	source: SourceIdentity;
-	anilistId: AniListId;
-	provider: Provider;
-	result: MappingResult;
-}
+export type MappingIdentity = ActiveMappingIdentity;
 
 export type GetMappingIdentitiesOutput = MappingIdentity[];
 
