@@ -1,14 +1,9 @@
-/** Tests for Seerr options session state labels and reconnect actions. */
-// src/options-page/components/seerr-connection-state.test.ts
+/** Tests for visible Seerr session controls. */
 
 import { describe, expect, it } from "vitest";
 import type { SeerrConnection } from "@/providers/seerr/types";
 import { ErrorCode } from "@/shared/errors/error.types";
-import {
-	getSeerrSessionButtonLabel,
-	getSeerrSessionView,
-	showsSeerrLoginActions,
-} from "./seerr-connection-state";
+import { getSeerrSessionControl } from "./seerr-connection-state";
 
 const sessionConnection: SeerrConnection = {
 	url: "https://seerr.example",
@@ -16,94 +11,65 @@ const sessionConnection: SeerrConnection = {
 	account: { id: 1, displayName: "Alice" },
 };
 
-describe("Seerr connection state", () => {
-	it("distinguishes disconnected, connected, and advanced API-key modes", () => {
+function control(input: {
+	connection?: SeerrConnection | null;
+	isConnecting?: boolean;
+	errorCode?: ErrorCode | null;
+	hasUrlChanges?: boolean;
+}) {
+	return getSeerrSessionControl({
+		connection: input.connection ?? null,
+		isConnecting: input.isConnecting ?? false,
+		errorCode: input.errorCode ?? null,
+		hasUrlChanges: input.hasUrlChanges ?? false,
+	});
+}
+
+describe("Seerr connection controls", () => {
+	it("gives checking state precedence", () => {
 		expect(
-			getSeerrSessionView({
-				connection: null,
-				isConnecting: false,
-				errorCode: null,
-			}),
-		).toBe("disconnected");
-		expect(
-			getSeerrSessionView({
+			control({
 				connection: sessionConnection,
-				isConnecting: false,
-				errorCode: null,
+				isConnecting: true,
+				errorCode: ErrorCode.SEERR_ACCOUNT_CHANGED,
 			}),
-		).toBe("connected");
-		expect(
-			getSeerrSessionView({
-				connection: {
-					url: "https://seerr.example",
-					auth: { mode: "apiKey", apiKey: "secret" },
-				},
-				isConnecting: false,
-				errorCode: null,
-			}),
-		).toBe("api-key");
+		).toEqual({ buttonLabel: "Checking...", showLoginActions: false });
 	});
 
-	it("distinguishes first login, expiry, and unavailable browser sessions", () => {
-		const signedOut = getSeerrSessionView({
-			connection: null,
-			isConnecting: false,
-			errorCode: ErrorCode.SEERR_AUTH_REQUIRED,
+	it("uses explicit account-change confirmation", () => {
+		expect(
+			control({
+				connection: sessionConnection,
+				errorCode: ErrorCode.SEERR_ACCOUNT_CHANGED,
+			}),
+		).toEqual({
+			buttonLabel: "Use current Seerr account",
+			showLoginActions: true,
 		});
-		const expired = getSeerrSessionView({
-			connection: sessionConnection,
-			isConnecting: false,
-			errorCode: ErrorCode.SEERR_AUTH_REQUIRED,
-		});
-		const unavailable = getSeerrSessionView({
-			connection: sessionConnection,
-			isConnecting: false,
-			errorCode: ErrorCode.SEERR_SESSION_UNAVAILABLE,
-		});
-
-		expect(signedOut).toBe("not-signed-in");
-		expect(expired).toBe("session-expired");
-		expect(unavailable).toBe("session-unavailable");
-		expect(showsSeerrLoginActions(signedOut)).toBe(true);
-		expect(showsSeerrLoginActions(expired)).toBe(true);
-		expect(showsSeerrLoginActions(unavailable)).toBe(true);
 	});
 
-	it("uses explicit check and re-check button labels", () => {
-		expect(
-			getSeerrSessionButtonLabel({
-				view: "disconnected",
-				hasUrlChanges: false,
-			}),
-		).toBe("Check Seerr session");
-		expect(
-			getSeerrSessionButtonLabel({
-				view: "connected",
-				hasUrlChanges: false,
-			}),
-		).toBe("Re-check account");
-		expect(
-			getSeerrSessionButtonLabel({
-				view: "session-expired",
-				hasUrlChanges: false,
-			}),
-		).toBe("I have signed in — check again");
+	it.each([
+		ErrorCode.SEERR_AUTH_REQUIRED,
+		ErrorCode.SEERR_SESSION_UNAVAILABLE,
+	])("shows login actions for %s", (errorCode) => {
+		expect(control({ connection: sessionConnection, errorCode })).toEqual({
+			buttonLabel: "I have signed in — check again",
+			showLoginActions: true,
+		});
 	});
 
-	it("requires explicit confirmation when the browser account changes", () => {
-		const accountChanged = getSeerrSessionView({
-			connection: sessionConnection,
-			isConnecting: false,
-			errorCode: ErrorCode.SEERR_ACCOUNT_CHANGED,
+	it("distinguishes stable sessions from new or changed URLs", () => {
+		expect(control({ connection: sessionConnection })).toEqual({
+			buttonLabel: "Re-check account",
+			showLoginActions: false,
 		});
-
-		expect(accountChanged).toBe("account-changed");
-		expect(showsSeerrLoginActions(accountChanged)).toBe(true);
-		expect(
-			getSeerrSessionButtonLabel({
-				view: accountChanged,
-				hasUrlChanges: false,
-			}),
-		).toBe("Use current Seerr account");
+		expect(control({ connection: sessionConnection, hasUrlChanges: true })).toEqual({
+			buttonLabel: "Check Seerr session",
+			showLoginActions: false,
+		});
+		expect(control({ connection: null })).toEqual({
+			buttonLabel: "Check Seerr session",
+			showLoginActions: false,
+		});
 	});
 });

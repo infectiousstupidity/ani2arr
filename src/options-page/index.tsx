@@ -22,7 +22,7 @@ import {
   useRadarrActions,
   useSonarrActions,
 } from "./hooks/provider-connection-actions";
-import { useSeerrActions } from "./hooks/seerr-connection-actions";
+import { useSeerrConnectionActions } from "./hooks/seerr-connection-actions";
 import { hasHashFlag, useHashRoute } from "./navigation";
 import {
   DesktopPageHeader,
@@ -58,7 +58,7 @@ const OptionsPageContent = () => {
   const publicOptionsQuery = usePublicOptions();
   const sonarrActions = useSonarrActions();
   const radarrActions = useRadarrActions();
-  const seerrActions = useSeerrActions();
+  const seerrActions = useSeerrConnectionActions();
 
   const [pendingDisconnectProvider, setPendingDisconnectProvider] =
     useState<DisconnectTarget | null>(null);
@@ -107,10 +107,14 @@ const OptionsPageContent = () => {
       seerrConnection !== null &&
       seerrConnectionQuery.isFetching,
   });
-  const seerrConnectionError =
-    seerrActions.error ?? seerrConnectionQuery.error?.userMessage ?? null;
-  const seerrConnectionErrorCode =
-    seerrActions.errorCode ?? seerrConnectionQuery.error?.code ?? null;
+  const seerrConnectionFailure =
+    seerrActions.failure ??
+    (seerrConnectionQuery.error
+      ? {
+          message: seerrConnectionQuery.error.userMessage,
+          code: seerrConnectionQuery.error.code,
+        }
+      : null);
 
   const statuses = useMemo(
     () => ({ sonarr: sonarrStatus, radarr: radarrStatus, seerr: seerrStatus }),
@@ -184,8 +188,7 @@ const OptionsPageContent = () => {
           <SeerrPage
             checkSeerrSession={seerrActions.checkSeerrSession}
             connectSeerrApiKey={seerrActions.connectSeerrApiKey}
-            connectionError={seerrConnectionError}
-            connectionErrorCode={seerrConnectionErrorCode}
+            connectionFailure={seerrConnectionFailure}
             enableSeerrCsrfSupport={seerrActions.enableSeerrCsrfSupport}
             isConnecting={seerrActions.isConnecting}
             isCsrfSupportEnabled={seerrActions.isCsrfSupportEnabled}

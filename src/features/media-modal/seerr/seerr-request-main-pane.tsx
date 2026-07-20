@@ -12,7 +12,6 @@ export function SeerrRequestMainPane(props: {
 	isLoading: boolean;
 	errorMessage: string | null;
 	selectedSeasons: readonly number[];
-	isConfigured: boolean;
 	requestError: string | null;
 	connectionActionLabel: string | null;
 	onConnectionAction: () => void;
@@ -25,7 +24,6 @@ export function SeerrRequestMainPane(props: {
 		isLoading,
 		errorMessage,
 		selectedSeasons,
-		isConfigured,
 		requestError,
 		connectionActionLabel,
 		onConnectionAction,
@@ -93,12 +91,6 @@ export function SeerrRequestMainPane(props: {
 				<div className="mt-3 rounded-xl border border-border-primary/55 bg-bg-secondary/35 p-4 text-sm text-text-secondary">
 					Movie requests use Seerr defaults. Review target, then request.
 				</div>
-			)}
-
-			{isConfigured || connectionActionLabel ? null : (
-				<p className="mt-3 rounded-lg border border-border-primary/50 bg-bg-tertiary/45 px-3 py-3 text-sm text-text-secondary">
-					Configure Seerr before requesting.
-				</p>
 			)}
 		</div>
 	);

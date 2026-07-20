@@ -1,63 +1,34 @@
-/** Pure options-page state derivation for Seerr browser-session controls. */
-// src/options-page/components/seerr-connection-state.ts
+/** Final visible controls for the Seerr browser-session connection form. */
 
 import type { SeerrConnection } from "@/providers/seerr/types";
 import { ErrorCode } from "@/shared/errors/error.types";
 
-export type SeerrSessionView =
-	| "disconnected"
-	| "checking"
-	| "not-signed-in"
-	| "connected"
-	| "session-expired"
-	| "session-unavailable"
-	| "account-changed"
-	| "api-key";
-
-const RECONNECT_VIEWS = new Set<SeerrSessionView>([
-	"not-signed-in",
-	"session-expired",
-	"session-unavailable",
-	"account-changed",
-]);
-
-export function getSeerrSessionView(input: {
+export function getSeerrSessionControl(input: {
 	connection: SeerrConnection | null;
 	isConnecting: boolean;
 	errorCode: ErrorCode | null;
-}): SeerrSessionView {
-	if (input.isConnecting) return "checking";
-	if (input.errorCode === ErrorCode.SEERR_SESSION_UNAVAILABLE) {
-		return "session-unavailable";
+	hasUrlChanges: boolean;
+}): { buttonLabel: string; showLoginActions: boolean } {
+	if (input.isConnecting) {
+		return { buttonLabel: "Checking...", showLoginActions: false };
 	}
 	if (input.errorCode === ErrorCode.SEERR_ACCOUNT_CHANGED) {
-		return "account-changed";
+		return {
+			buttonLabel: "Use current Seerr account",
+			showLoginActions: true,
+		};
 	}
-	if (input.errorCode === ErrorCode.SEERR_AUTH_REQUIRED) {
-		return input.connection?.auth.mode === "session"
-			? "session-expired"
-			: "not-signed-in";
+	if (
+		input.errorCode === ErrorCode.SEERR_AUTH_REQUIRED ||
+		input.errorCode === ErrorCode.SEERR_SESSION_UNAVAILABLE
+	) {
+		return {
+			buttonLabel: "I have signed in — check again",
+			showLoginActions: true,
+		};
 	}
-	if (input.connection?.auth.mode === "session") return "connected";
-	if (input.connection?.auth.mode === "apiKey") return "api-key";
-	return "disconnected";
-}
-
-export function getSeerrSessionButtonLabel(input: {
-	view: SeerrSessionView;
-	hasUrlChanges: boolean;
-}): string {
-	if (input.view === "checking") return "Checking...";
-	if (input.view === "account-changed") return "Use current Seerr account";
-	if (RECONNECT_VIEWS.has(input.view)) {
-		return "I have signed in — check again";
+	if (input.connection?.auth.mode === "session" && !input.hasUrlChanges) {
+		return { buttonLabel: "Re-check account", showLoginActions: false };
 	}
-	if (input.view === "connected" && !input.hasUrlChanges) {
-		return "Re-check account";
-	}
-	return "Check Seerr session";
-}
-
-export function showsSeerrLoginActions(view: SeerrSessionView): boolean {
-	return RECONNECT_VIEWS.has(view);
+	return { buttonLabel: "Check Seerr session", showLoginActions: false };
 }

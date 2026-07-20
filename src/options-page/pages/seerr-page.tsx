@@ -4,25 +4,23 @@
 import { SeerrIcon } from "../components/icons";
 import { SeerrConnectionForm } from "../components/seerr-connection-form";
 import { SettingsSection } from "../components/settings-section";
-import type { ErrorCode } from "@/shared/errors/error.types";
+import type { SeerrConnectionFailure } from "../hooks/seerr-connection-actions";
 
 interface SeerrPageProps {
-	checkSeerrSession: (url: string) => Promise<boolean>;
-	connectSeerrApiKey: (url: string, apiKey: string) => Promise<boolean>;
-	enableSeerrCsrfSupport: () => Promise<boolean>;
-	openSeerrLogin: (url: string) => Promise<boolean>;
+	checkSeerrSession: (url: string) => Promise<void>;
+	connectSeerrApiKey: (url: string, apiKey: string) => Promise<void>;
+	enableSeerrCsrfSupport: () => Promise<void>;
+	openSeerrLogin: (url: string) => Promise<void>;
 	isConnecting: boolean;
 	isCsrfSupportEnabled: boolean;
 	showCsrfSupport: boolean;
-	connectionError: string | null;
-	connectionErrorCode: ErrorCode | null;
+	connectionFailure: SeerrConnectionFailure | null;
 }
 
 export const SeerrPage = ({
 	checkSeerrSession,
 	connectSeerrApiKey,
-	connectionError,
-	connectionErrorCode,
+	connectionFailure,
 	enableSeerrCsrfSupport,
 	isConnecting,
 	isCsrfSupportEnabled,
@@ -31,8 +29,7 @@ export const SeerrPage = ({
 }: SeerrPageProps) => (
 	<div className="space-y-10 md:space-y-12">
 		<SeerrConnectionForm
-			error={connectionError}
-			errorCode={connectionErrorCode}
+			failure={connectionFailure}
 			isConnecting={isConnecting}
 			isCsrfSupportEnabled={isCsrfSupportEnabled}
 			onCheckSession={checkSeerrSession}

@@ -19,10 +19,7 @@ import { ModalShell } from "../chrome/modal-shell";
 import { SeerrFooter } from "./seerr-footer";
 import { SeerrRequestInfoPane } from "./seerr-request-info-pane";
 import { SeerrRequestMainPane } from "./seerr-request-main-pane";
-import {
-	getSeerrConnectionRecoveryAction,
-	getSeerrConnectionRecoveryLabel,
-} from "./seerr-connection-recovery";
+import { getSeerrConnectionRecovery } from "./seerr-connection-recovery";
 import {
 	getDefaultSelectedSeasons,
 	getSeerrDetailsSeasonKey,
@@ -62,17 +59,14 @@ function getSeerrRequestFeedback(input: {
 	detailsError: ExtensionError | null;
 	requestError: ExtensionError | null;
 }) {
-	const connectionRecoveryAction = getSeerrConnectionRecoveryAction({
+	const connectionRecovery = getSeerrConnectionRecovery({
 		isConfigured: input.isConfigured,
 		authMode: input.authMode,
 		errors: [input.detailsError, input.requestError],
 	});
 
 	return {
-		connectionRecoveryAction,
-		connectionActionLabel: connectionRecoveryAction
-			? getSeerrConnectionRecoveryLabel(connectionRecoveryAction)
-			: null,
+		connectionRecovery,
 		detailsErrorMessage: input.detailsError
 			? getUserErrorMessage(
 					input.detailsError,
@@ -169,7 +163,7 @@ export function SeerrRequestView(props: {
 		isRequestableSeerrStatus(details.status);
 	const canRequest = canRequestInSeerr({
 		isConfigured,
-		needsConnectionRecovery: feedback.connectionRecoveryAction !== null,
+		needsConnectionRecovery: feedback.connectionRecovery !== null,
 		target,
 		selectedSeasons,
 		isMovieRequestable,
@@ -195,7 +189,7 @@ export function SeerrRequestView(props: {
 	};
 
 	const handleConnectionAction = (): void => {
-		if (feedback.connectionRecoveryAction === "csrf") {
+		if (feedback.connectionRecovery?.enableCsrf) {
 			request.reset();
 			openOptionsPage({
 				sectionId: "seerr",
@@ -218,9 +212,8 @@ export function SeerrRequestView(props: {
 					isLoading={isLoading}
 					errorMessage={feedback.detailsErrorMessage}
 					selectedSeasons={selectedSeasons}
-					isConfigured={isConfigured}
 					requestError={feedback.requestErrorMessage}
-					connectionActionLabel={feedback.connectionActionLabel}
+					connectionActionLabel={feedback.connectionRecovery?.label ?? null}
 					onConnectionAction={handleConnectionAction}
 					onSelectAllRequestable={() =>
 						setSelectedSeasonDraft({

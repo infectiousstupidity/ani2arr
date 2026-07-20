@@ -9,26 +9,21 @@ import {
 	getSeerrConnection,
 	getSeerrConnectionDraft,
 } from "@/settings/seerr-config";
-import { ErrorCode } from "@/shared/errors/error.types";
 import Button from "@/shared/ui/primitives/button";
 import { Input, PasswordInput } from "@/shared/ui/primitives/input";
+import type { SeerrConnectionFailure } from "../hooks/seerr-connection-actions";
 import { SettingsRow, SettingsSection } from "./settings-section";
-import {
-	getSeerrSessionButtonLabel,
-	getSeerrSessionView,
-	showsSeerrLoginActions,
-} from "./seerr-connection-state";
+import { getSeerrSessionControl } from "./seerr-connection-state";
 
 interface SeerrConnectionFormProps {
-	onCheckSession: (url: string) => Promise<boolean>;
-	onConnectApiKey: (url: string, apiKey: string) => Promise<boolean>;
-	onEnableCsrfSupport: () => Promise<boolean>;
-	onOpenLogin: (url: string) => Promise<boolean>;
+	onCheckSession: (url: string) => Promise<void>;
+	onConnectApiKey: (url: string, apiKey: string) => Promise<void>;
+	onEnableCsrfSupport: () => Promise<void>;
+	onOpenLogin: (url: string) => Promise<void>;
 	isConnecting: boolean;
 	isCsrfSupportEnabled: boolean;
 	showCsrfSupport: boolean;
-	error: string | null;
-	errorCode: ErrorCode | null;
+	failure: SeerrConnectionFailure | null;
 }
 
 function getSeerrApiKeyButtonLabel(input: {
@@ -42,8 +37,7 @@ function getSeerrApiKeyButtonLabel(input: {
 }
 
 export const SeerrConnectionForm = ({
-	error,
-	errorCode,
+	failure,
 	isConnecting,
 	isCsrfSupportEnabled,
 	onCheckSession,
@@ -66,8 +60,7 @@ export const SeerrConnectionForm = ({
 				savedApiKey,
 				savedDraft.account?.id ?? "",
 			].join("\u0000")}
-			error={error}
-			errorCode={errorCode}
+			failure={failure}
 			isConnecting={isConnecting}
 			onCheckSession={onCheckSession}
 			onConnectApiKey={onConnectApiKey}
@@ -91,7 +84,7 @@ interface SeerrConnectionDraftProps extends SeerrConnectionFormProps {
 function SeerrCsrfSupportPanel(props: {
 	isEnabled: boolean;
 	isConnecting: boolean;
-	onEnable: () => Promise<boolean>;
+	onEnable: () => Promise<void>;
 }): React.JSX.Element {
 	return (
 		<div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
@@ -124,18 +117,16 @@ function SeerrCsrfSupportPanel(props: {
 }
 
 function SeerrSessionFeedback(props: {
-	sessionView: ReturnType<typeof getSeerrSessionView>;
 	savedConnection: ReturnType<typeof getSeerrConnection>;
-	error: string | null;
+	failure: SeerrConnectionFailure | null;
 	showCsrfSupport: boolean;
 	isCsrfSupportEnabled: boolean;
 	isConnecting: boolean;
-	onEnableCsrfSupport: () => Promise<boolean>;
+	onEnableCsrfSupport: () => Promise<void>;
 }): React.JSX.Element {
 	return (
 		<>
-			{props.sessionView === "connected" &&
-			props.savedConnection?.auth.mode === "session" ? (
+			{props.savedConnection?.auth.mode === "session" ? (
 				<div className="rounded-lg border border-success/25 bg-success/5 px-4 py-3">
 					<p className="text-sm font-semibold text-text-primary">
 						Connected as {props.savedConnection.account?.displayName}
@@ -147,19 +138,19 @@ function SeerrSessionFeedback(props: {
 				</div>
 			) : null}
 
-			{props.sessionView === "api-key" ? (
+			{props.savedConnection?.auth.mode === "apiKey" ? (
 				<div className="rounded-lg border border-border-primary/50 bg-bg-tertiary/30 px-4 py-3 text-sm text-text-secondary">
 					Currently connected with the global Seerr API key. Check the browser
 					session above to switch to user-scoped requests.
 				</div>
 			) : null}
 
-			{props.error ? (
+			{props.failure ? (
 				<p
 					className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm font-semibold text-error"
 					role="alert"
 				>
-					{props.error}
+					{props.failure.message}
 				</p>
 			) : null}
 
@@ -176,8 +167,7 @@ function SeerrSessionFeedback(props: {
 }
 
 const SeerrConnectionDraft = ({
-	error,
-	errorCode,
+	failure,
 	isConnecting,
 	isCsrfSupportEnabled,
 	onCheckSession,
@@ -191,19 +181,12 @@ const SeerrConnectionDraft = ({
 }: SeerrConnectionDraftProps) => {
 	const [draftUrl, setDraftUrl] = useState(savedUrl);
 	const [draftApiKey, setDraftApiKey] = useState(savedApiKey);
-	const [advancedOpen, setAdvancedOpen] = useState(
-		savedConnection?.auth.mode === "apiKey",
-	);
 	const hasUrlChanges = draftUrl !== savedUrl;
 	const hasApiKeyChanges = draftApiKey !== savedApiKey;
-	const sessionView = getSeerrSessionView({
+	const sessionControl = getSeerrSessionControl({
 		connection: savedConnection,
 		isConnecting,
-		errorCode,
-	});
-	const showLoginActions = showsSeerrLoginActions(sessionView);
-	const sessionButtonLabel = getSeerrSessionButtonLabel({
-		view: sessionView,
+		errorCode: failure?.code ?? null,
 		hasUrlChanges,
 	});
 	const showPublicHttpWarning = isPublicHttpProviderUrl(draftUrl);
@@ -264,9 +247,8 @@ const SeerrConnectionDraft = ({
 				) : null}
 
 				<SeerrSessionFeedback
-					sessionView={sessionView}
 					savedConnection={savedConnection}
-					error={error}
+					failure={failure}
 					showCsrfSupport={showCsrfSupport}
 					isCsrfSupportEnabled={isCsrfSupportEnabled}
 					isConnecting={isConnecting}
@@ -284,7 +266,7 @@ const SeerrConnectionDraft = ({
 							Cancel
 						</Button>
 					) : null}
-					{showLoginActions ? (
+					{sessionControl.showLoginActions ? (
 						<Button
 							type="button"
 							variant="outline"
@@ -301,14 +283,13 @@ const SeerrConnectionDraft = ({
 						disabled={isConnecting || !draftUrl}
 					>
 						<LogIn className="mr-2 h-4 w-4" />
-						{sessionButtonLabel}
+						{sessionControl.buttonLabel}
 					</Button>
 				</div>
 			</form>
 
 			<details
-				open={advancedOpen}
-				onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+				defaultOpen={savedConnection?.auth.mode === "apiKey"}
 				className="rounded-lg border border-border-primary/50 bg-bg-tertiary/15"
 			>
 				<summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-text-primary">

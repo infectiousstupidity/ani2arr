@@ -1,17 +1,14 @@
-/** Pure Seerr modal recovery-action derivation from connection errors. */
-// src/features/media-modal/seerr/seerr-connection-recovery.ts
+/** Final Seerr modal recovery control derived from connection errors. */
 
 import {
 	ErrorCode,
 	type ExtensionError,
 } from "@/shared/errors/error.types";
 
-export type SeerrConnectionRecoveryAction =
-	| "configure"
-	| "reconnect"
-	| "csrf"
-	| "switch-to-session"
-	| "settings";
+export type SeerrConnectionRecovery = {
+	label: string;
+	enableCsrf: boolean;
+};
 
 const RECONNECT_ERROR_CODES = new Set<ErrorCode>([
 	ErrorCode.SEERR_AUTH_REQUIRED,
@@ -24,34 +21,34 @@ const SETTINGS_ERROR_CODES = new Set<ErrorCode>([
 	ErrorCode.PERMISSION_ERROR,
 ]);
 
-export function getSeerrConnectionRecoveryAction(input: {
+export function getSeerrConnectionRecovery(input: {
 	isConfigured: boolean;
 	authMode: "session" | "apiKey" | null;
 	errors: readonly (ExtensionError | null | undefined)[];
-}): SeerrConnectionRecoveryAction | null {
-	if (!input.isConfigured) return "configure";
+}): SeerrConnectionRecovery | null {
+	if (!input.isConfigured) {
+		return { label: "Configure Seerr", enableCsrf: false };
+	}
 
 	for (const error of input.errors) {
-		if (error && RECONNECT_ERROR_CODES.has(error.code)) return "reconnect";
+		if (error && RECONNECT_ERROR_CODES.has(error.code)) {
+			return { label: "Reconnect Seerr", enableCsrf: false };
+		}
 	}
 	for (const error of input.errors) {
 		if (error?.code !== ErrorCode.SEERR_CSRF_REQUIRED) continue;
-		if (input.authMode === "session") return "csrf";
-		if (input.authMode === "apiKey") return "switch-to-session";
-		return "settings";
+		if (input.authMode === "session") {
+			return { label: "Enable CSRF support", enableCsrf: true };
+		}
+		if (input.authMode === "apiKey") {
+			return { label: "Switch to browser session", enableCsrf: false };
+		}
+		return { label: "Open Seerr settings", enableCsrf: false };
 	}
 	for (const error of input.errors) {
-		if (error && SETTINGS_ERROR_CODES.has(error.code)) return "settings";
+		if (error && SETTINGS_ERROR_CODES.has(error.code)) {
+			return { label: "Open Seerr settings", enableCsrf: false };
+		}
 	}
 	return null;
-}
-
-export function getSeerrConnectionRecoveryLabel(
-	action: SeerrConnectionRecoveryAction,
-): string {
-	if (action === "configure") return "Configure Seerr";
-	if (action === "reconnect") return "Reconnect Seerr";
-	if (action === "csrf") return "Enable CSRF support";
-	if (action === "switch-to-session") return "Switch to browser session";
-	return "Open Seerr settings";
 }
