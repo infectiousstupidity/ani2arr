@@ -23,7 +23,6 @@ import {
 	ANCHOR_ID,
 	TITLE_SELECTOR,
 	UI_NAME,
-	attachSizeSync,
 	ensureActionsAnchor,
 	readFormatFromPage,
 	readTitleFromPage,
@@ -36,7 +35,6 @@ const queryClient = createExtensionQueryClient();
 const MAL_PAGE = new MatchPattern("https://myanimelist.net/*");
 
 let ui: ShadowRootContentScriptUi<Root> | null = null;
-let stopSizeSync: (() => void) | null = null;
 
 async function getAniListIdForMount(
 	source: AnimePageTarget["source"],
@@ -56,8 +54,6 @@ const removeAnimeUI = (): void => {
 		log.error("Error removing MAL UI:", error);
 	}
 	ui = null;
-	stopSizeSync?.();
-	stopSizeSync = null;
 	removeLayoutArtifacts();
 };
 
@@ -116,9 +112,7 @@ async function mountAnimePageUI({
 
 	if (ui) {
 		ui.remove();
-		stopSizeSync?.();
 		ui = null;
-		stopSizeSync = null;
 	}
 
 	const nextUi = await createShadowRootUi(ctx, {
@@ -128,7 +122,13 @@ async function mountAnimePageUI({
 		anchor: `#${ANCHOR_ID}`,
 		append: "last",
 		onMount: (uiContainer, _shadow, shadowHost): Root => {
-			stopSizeSync = attachSizeSync(shadowHost);
+			Object.assign(shadowHost.style, {
+				display: "block",
+				position: "static",
+				width: "100%",
+				maxWidth: "420px",
+				margin: "0",
+			});
 			const root = createRoot(uiContainer);
 			root.render(
 				<ExtensionErrorBoundary scope="myanimelist-anime-root">
@@ -143,8 +143,6 @@ async function mountAnimePageUI({
 		},
 		onRemove: (mounted?: Root) => {
 			mounted?.unmount();
-			stopSizeSync?.();
-			stopSizeSync = null;
 		},
 	});
 

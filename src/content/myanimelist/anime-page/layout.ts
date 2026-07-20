@@ -8,11 +8,8 @@ import {
 
 export const TITLE_SELECTOR = "h1.title-name";
 export const DETAILS_COLUMN_SELECTOR = "#content .leftside, .leftside";
-export const IMAGE_SELECTOR = 'img[itemprop="image"]';
 export const UI_NAME = "a2a-myanimelist-anime-page-ui";
 export const ANCHOR_ID = "a2a-myanimelist-actions-anchor";
-
-const noop = (): void => {};
 
 function createAbortError(): DOMException {
 	return new DOMException("The operation was aborted.", "AbortError");
@@ -65,14 +62,6 @@ export function readTitleFromPage(doc: Document = document): string | null {
 	return title ? title.replaceAll(/\s+/g, " ") : null;
 }
 
-export function readImageFromPage(doc: Document = document): string | null {
-	const source = doc
-		.querySelector<HTMLImageElement>(IMAGE_SELECTOR)
-		?.getAttribute("src")
-		?.trim();
-	return source || null;
-}
-
 export function readLabeledFacts(doc: Document = document): Map<string, string> {
 	const facts = new Map<string, string>();
 	const root = doc.querySelector(DETAILS_COLUMN_SELECTOR);
@@ -114,16 +103,4 @@ export function ensureActionsAnchor(doc: Document = document): HTMLElement | nul
 
 export function removeLayoutArtifacts(doc: Document = document): void {
 	doc.querySelector<HTMLElement>(`#${ANCHOR_ID}`)?.remove();
-}
-
-export function attachSizeSync(host: HTMLElement): () => void {
-	Object.assign(host.style, {
-		display: "block",
-		position: "static",
-		width: "100%",
-		maxWidth: "420px",
-		margin: "0",
-	});
-
-	return noop;
 }
