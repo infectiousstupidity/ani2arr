@@ -25,7 +25,7 @@ export interface SeerrConnection {
 }
 
 export type SeerrMediaType = "movie" | "tv";
-export type SeerrTargetSource = "manual" | "anibridge";
+export type SeerrTargetSource = "manual" | "anibridge" | "radarr-mapping";
 
 export type SeerrTvSeasons = "all" | number[];
 

@@ -3,6 +3,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import {
 	clearManualSeerrTarget,
@@ -15,6 +16,11 @@ import {
 
 const listSeerrUpstreamTargetsMock = vi.hoisted(() => vi.fn());
 const listAllSeerrUpstreamTargetsMock = vi.hoisted(() => vi.fn());
+const collectEffectiveMappingRecordsMock = vi.hoisted(() => vi.fn());
+
+vi.mock("./mapping-facts", () => ({
+	collectEffectiveMappingRecords: collectEffectiveMappingRecordsMock,
+}));
 
 vi.mock("./upstream.store", () => ({
 	listSeerrUpstreamTargets: listSeerrUpstreamTargetsMock,
@@ -30,6 +36,7 @@ describe("Seerr targets", () => {
 		vi.clearAllMocks();
 		listSeerrUpstreamTargetsMock.mockResolvedValue([]);
 		listAllSeerrUpstreamTargetsMock.mockResolvedValue([]);
+		collectEffectiveMappingRecordsMock.mockResolvedValue([]);
 		await clearManualSeerrTargets();
 	});
 
@@ -95,6 +102,7 @@ describe("Seerr targets", () => {
 			source: "manual",
 		});
 		expect(listSeerrUpstreamTargetsMock).not.toHaveBeenCalled();
+		expect(collectEffectiveMappingRecordsMock).not.toHaveBeenCalled();
 	});
 
 	it("restores upstream fallback after clearing a manual target", async () => {
@@ -120,6 +128,62 @@ describe("Seerr targets", () => {
 			source: "anibridge",
 		});
 		expect(listSeerrUpstreamTargetsMock).toHaveBeenCalledWith([anilistId]);
+		expect(collectEffectiveMappingRecordsMock).not.toHaveBeenCalled();
+	});
+
+	it("falls back to a direct AniList Radarr mapping", async () => {
+		const anilistId = aid(100);
+		collectEffectiveMappingRecordsMock.mockResolvedValue([
+			{
+				source: { source: "anilist", id: anilistId },
+				anilistId,
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "auto",
+					providerId: tmdb(789),
+				},
+			},
+		]);
+
+		await expect(getEffectiveSeerrTarget(anilistId)).resolves.toEqual({
+			anilistId,
+			mediaType: "movie",
+			tmdbId: tmdb(789),
+			source: "radarr-mapping",
+		});
+		expect(listSeerrUpstreamTargetsMock).toHaveBeenCalledWith([anilistId]);
+		expect(collectEffectiveMappingRecordsMock).toHaveBeenCalledWith("radarr");
+	});
+
+	it("reveals the Radarr mapping after clearing a manual target", async () => {
+		const anilistId = aid(100);
+		await setManualSeerrTarget({
+			anilistId,
+			mediaType: "movie",
+			tmdbId: tmdb(123),
+		});
+		collectEffectiveMappingRecordsMock.mockResolvedValue([
+			{
+				source: { source: "anilist", id: anilistId },
+				anilistId,
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "manual",
+					providerId: tmdb(789),
+				},
+			},
+		]);
+
+		await clearManualSeerrTarget(anilistId);
+
+		await expect(getEffectiveSeerrTarget(anilistId)).resolves.toEqual({
+			anilistId,
+			mediaType: "movie",
+			tmdbId: tmdb(789),
+			source: "radarr-mapping",
+		});
 	});
 
 	it("merges requested targets with manual precedence and sorted output", async () => {
@@ -149,7 +213,49 @@ describe("Seerr targets", () => {
 				target: { mediaType: "movie", tmdbId: tmdb(110) },
 			},
 		]);
-		const ids = [aid(300), aid(200), aid(100), aid(300)];
+		collectEffectiveMappingRecordsMock.mockResolvedValue([
+			{
+				source: { source: "anilist", id: aid(100) },
+				anilistId: aid(100),
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "auto",
+					providerId: tmdb(999),
+				},
+			},
+			{
+				source: { source: "anilist", id: aid(200) },
+				anilistId: aid(200),
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "manual",
+					providerId: tmdb(998),
+				},
+			},
+			{
+				source: { source: "anilist", id: aid(400) },
+				anilistId: aid(400),
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "auto",
+					providerId: tmdb(440),
+				},
+			},
+			{
+				source: { source: "anilist", id: aid(500) },
+				anilistId: aid(500),
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "auto",
+					providerId: tmdb(550),
+				},
+			},
+		]);
+		const ids = [aid(400), aid(300), aid(200), aid(100), aid(300)];
 
 		await expect(listEffectiveSeerrTargets(ids)).resolves.toEqual([
 			{
@@ -173,6 +279,12 @@ describe("Seerr targets", () => {
 				tmdbSeasons: [1],
 				tvdbSeasons: [0],
 				source: "anibridge",
+			},
+			{
+				anilistId: aid(400),
+				mediaType: "movie",
+				tmdbId: tmdb(440),
+				source: "radarr-mapping",
 			},
 		]);
 		expect(listSeerrUpstreamTargetsMock).toHaveBeenCalledWith(ids);
@@ -199,6 +311,28 @@ describe("Seerr targets", () => {
 				target: { mediaType: "movie", tmdbId: tmdb(220) },
 			},
 		]);
+		collectEffectiveMappingRecordsMock.mockResolvedValue([
+			{
+				source: { source: "anilist", id: aid(200) },
+				anilistId: aid(200),
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "auto",
+					providerId: tmdb(999),
+				},
+			},
+			{
+				source: { source: "anilist", id: aid(400) },
+				anilistId: aid(400),
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "auto",
+					providerId: tmdb(440),
+				},
+			},
+		]);
 
 		await expect(listAllEffectiveSeerrTargets()).resolves.toEqual([
 			{
@@ -219,7 +353,73 @@ describe("Seerr targets", () => {
 				tmdbId: tmdb(330),
 				source: "manual",
 			},
+			{
+				anilistId: aid(400),
+				mediaType: "movie",
+				tmdbId: tmdb(440),
+				source: "radarr-mapping",
+			},
 		]);
 		expect(listAllSeerrUpstreamTargetsMock).toHaveBeenCalledOnce();
+	});
+
+	it("ignores Radarr facts that cannot be direct mapped movie targets", async () => {
+		collectEffectiveMappingRecordsMock.mockResolvedValue([
+			{
+				source: { source: "mal", id: parseMyAnimeListId(5114) },
+				anilistId: aid(1),
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "manual",
+					providerId: tmdb(10),
+				},
+			},
+			{
+				source: { source: "anilist", id: aid(2) },
+				anilistId: aid(2),
+				provider: "radarr",
+				result: { kind: "ignored" },
+			},
+			{
+				source: { source: "anilist", id: aid(3) },
+				anilistId: aid(3),
+				provider: "radarr",
+				result: {
+					kind: "unmapped",
+					hadResolveAttempt: true,
+				},
+			},
+			{
+				source: { source: "anilist", id: aid(4) },
+				anilistId: aid(4),
+				provider: "radarr",
+				result: {
+					kind: "ambiguous",
+					targets: [
+						{ provider: "radarr", providerId: tmdb(40) },
+						{ provider: "radarr", providerId: tmdb(41) },
+					],
+				},
+			},
+			{
+				source: { source: "anilist", id: aid(5) },
+				anilistId: aid(5),
+				provider: "radarr",
+				result: {
+					kind: "mapped",
+					source: "auto",
+					providerId: 0,
+				},
+			},
+		]);
+
+		await expect(listAllEffectiveSeerrTargets()).resolves.toEqual([]);
+	});
+
+	it("does not read mapping facts for an empty batch", async () => {
+		await expect(listEffectiveSeerrTargets([])).resolves.toEqual([]);
+		expect(listSeerrUpstreamTargetsMock).not.toHaveBeenCalled();
+		expect(collectEffectiveMappingRecordsMock).not.toHaveBeenCalled();
 	});
 });

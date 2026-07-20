@@ -15,14 +15,13 @@ import {
 	TriangleAlert,
 } from "lucide-react";
 import type { AniListId } from "@/anilist/types";
-import { resolveSeerrRequestInput } from "@/content/anilist/target-provider";
 import type { MediaActionState } from "@/features/media-action/state";
 import { getSeerrActionState } from "@/features/seerr-request/seerr-action-state";
+import { toSeerrRequestInput } from "@/features/seerr-request/seerr-request-input";
 import type { SeerrMediaStatus } from "@/providers/seerr/types";
 import { useSeerrMediaStatus, useSeerrTarget } from "@/queries/seerr";
 import { openSeerrPage } from "@/rpc/provider-page";
 import { openOptionsPage } from "@/rpc/runtime-messages";
-import type { MappingIdentity, RequestInSeerrInput } from "@/rpc/types";
 import type { BadgeVisibility } from "@/settings/types";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
@@ -32,7 +31,6 @@ import { useCardOverlayInViewport } from "./card-overlay-viewport";
 
 interface SeerrCardActionProps {
 	anilistId: AniListId;
-	mappedIdentities: readonly MappingIdentity[];
 	isConfigured: boolean;
 	observeTarget?: Element | null | undefined;
 	tooltipContainer?: FloatingPortalContainer | undefined;
@@ -105,13 +103,7 @@ function useSeerrCardAction(input: SeerrCardActionProps) {
 		enabled: input.isConfigured && input.statusEnabled === true,
 	});
 
-	const seerrRequestTarget = seerrTargetQuery.data ?? null;
-
-	const requestInput: RequestInSeerrInput | null = resolveSeerrRequestInput({
-		anilistId: input.anilistId,
-		mappedIdentities: input.mappedIdentities,
-		seerrRequestTarget,
-	});
+	const requestInput = toSeerrRequestInput(seerrTargetQuery.data ?? null);
 
 	const status = useSeerrMediaStatus({
 		requestInput,
@@ -251,7 +243,6 @@ function SeerrStackOpenButton(props: {
 
 export function SeerrCardStackActions({
 	anilistId,
-	mappedIdentities,
 	isConfigured,
 	observeTarget,
 	tooltipContainer,
@@ -261,7 +252,6 @@ export function SeerrCardStackActions({
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const action = useSeerrCardAction({
 		anilistId,
-		mappedIdentities,
 		isConfigured,
 		statusEnabled: isInViewport,
 		onOpenModal,
@@ -292,7 +282,6 @@ export function SeerrCardStackActions({
 
 export function SeerrStandaloneCardOverlay({
 	anilistId,
-	mappedIdentities,
 	isConfigured,
 	observeTarget,
 	badgeVisibility,
@@ -304,7 +293,6 @@ export function SeerrStandaloneCardOverlay({
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const action = useSeerrCardAction({
 		anilistId,
-		mappedIdentities,
 		isConfigured,
 		statusEnabled: isInViewport,
 		onOpenModal,

@@ -24,6 +24,13 @@ export function invalidateAfterMappingChange(
 	queryClient.invalidateQueries({
 		queryKey: queryKeys.providerLookupRoot(input.provider),
 	});
+
+	if (input.provider === "radarr") {
+		queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
+		queryClient.invalidateQueries({
+			queryKey: queryKeys.seerrLinkedAniListEntriesRoot(),
+		});
+	}
 }
 
 export function invalidateAfterMappingsRevision(
@@ -37,6 +44,9 @@ export function invalidateAfterMappingsRevision(
 		queryKey: queryKeys.mappingIdentitiesRoot(),
 	});
 	queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
+	queryClient.invalidateQueries({
+		queryKey: queryKeys.seerrLinkedAniListEntriesRoot(),
+	});
 	for (const provider of PROVIDERS) {
 		queryClient.invalidateQueries({
 			queryKey: queryKeys.providerMediaStatusRoot(provider),

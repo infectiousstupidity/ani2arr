@@ -2,14 +2,9 @@
 // src/content/anilist/target-provider.ts
 
 import type { AniListId, AniListMediaFormat } from "@/anilist/types";
-import { parseTmdbIdOrNull } from "@/providers/schemas";
 import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import type { Provider } from "@/providers/types";
-import type {
-	MappingIdentity,
-	RequestInSeerrInput,
-	SeerrRequestTarget,
-} from "@/rpc/types";
+import type { MappingIdentity } from "@/rpc/types";
 
 export function getMappedIdentitiesByAniListId(
 	identities: readonly MappingIdentity[],
@@ -52,66 +47,4 @@ export function resolveAniListTargetProvider(input: {
 	const mappedIdentity = formatMatchedIdentity ?? mappedIdentities[0] ?? null;
 
 	return mappedIdentity?.provider ?? routedProvider;
-}
-
-function getMappedRadarrSeerrRequestInput(input: {
-	anilistId: AniListId;
-	mappedIdentities: readonly MappingIdentity[];
-}): RequestInSeerrInput | null {
-	for (const identity of input.mappedIdentities) {
-		if (
-			identity.anilistId !== input.anilistId ||
-			identity.provider !== "radarr" ||
-			identity.result.kind !== "mapped"
-		) {
-			continue;
-		}
-
-		const tmdbId = parseTmdbIdOrNull(identity.result.providerId);
-		if (tmdbId !== null) {
-			return {
-				anilistId: input.anilistId,
-				mediaType: "movie",
-				tmdbId,
-			};
-		}
-	}
-
-	return null;
-}
-
-function toSeerrRequestInput(
-	target: SeerrRequestTarget | null,
-): RequestInSeerrInput | null {
-	if (target === null) return null;
-
-	if (target.mediaType === "movie") {
-		return {
-			anilistId: target.anilistId,
-			mediaType: "movie",
-			tmdbId: target.tmdbId,
-		};
-	}
-
-	return {
-		anilistId: target.anilistId,
-		mediaType: "tv",
-		tmdbId: target.tmdbId,
-		...(target.tvdbId === undefined ? {} : { tvdbId: target.tvdbId }),
-		seasons: target.seasons,
-	};
-}
-
-export function resolveSeerrRequestInput(input: {
-	anilistId: AniListId;
-	mappedIdentities: readonly MappingIdentity[];
-	seerrRequestTarget: SeerrRequestTarget | null;
-}): RequestInSeerrInput | null {
-	return (
-		toSeerrRequestInput(input.seerrRequestTarget) ??
-		getMappedRadarrSeerrRequestInput({
-			anilistId: input.anilistId,
-			mappedIdentities: input.mappedIdentities,
-		})
-	);
 }

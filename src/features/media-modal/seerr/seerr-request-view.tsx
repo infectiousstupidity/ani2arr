@@ -3,6 +3,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import type { AniListId } from "@/anilist/types";
+import { toSeerrRequestInput } from "@/features/seerr-request/seerr-request-input";
 import { isRequestableSeerrStatus } from "@/providers/seerr/request";
 import type { SeerrMediaDetails } from "@/providers/seerr/types";
 import {
@@ -11,7 +12,7 @@ import {
 	useSeerrLinkedAniListEntries,
 } from "@/queries/seerr";
 import { openOptionsPage } from "@/rpc/runtime-messages";
-import type { RequestInSeerrInput, SeerrRequestTarget } from "@/rpc/types";
+import type { SeerrRequestTarget } from "@/rpc/types";
 import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { MediaModalContainer } from "../types";
@@ -28,30 +29,6 @@ import {
 	toggleSeasonSelection,
 	type SeerrSeasonDraft,
 } from "./seerr-selection";
-
-function buildRequestInput(input: {
-	anilistId: AniListId;
-	target: SeerrRequestTarget | null;
-	selectedSeasons: readonly number[];
-}): RequestInSeerrInput | null {
-	if (!input.target) return null;
-	if (input.target.mediaType === "movie") {
-		return {
-			anilistId: input.anilistId,
-			mediaType: "movie",
-			tmdbId: input.target.tmdbId,
-		};
-	}
-
-	if (input.selectedSeasons.length === 0) return null;
-	return {
-		anilistId: input.anilistId,
-		mediaType: "tv",
-		tmdbId: input.target.tmdbId,
-		...(input.target.tvdbId === undefined ? {} : { tvdbId: input.target.tvdbId }),
-		seasons: [...input.selectedSeasons],
-	};
-}
 
 function getSeerrRequestFeedback(input: {
 	isConfigured: boolean;
@@ -178,11 +155,7 @@ export function SeerrRequestView(props: {
 			return;
 		}
 
-		const requestInput = buildRequestInput({
-			anilistId,
-			target,
-			selectedSeasons,
-		});
+		const requestInput = toSeerrRequestInput(target, selectedSeasons);
 		if (!requestInput) return;
 
 		request.mutate(requestInput);

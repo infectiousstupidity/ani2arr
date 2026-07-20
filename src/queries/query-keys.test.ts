@@ -60,6 +60,16 @@ describe("queryKeys", () => {
 		);
 	});
 
+	it("keeps single and batch Seerr targets under one root", () => {
+		const root = queryKeys.seerrTargetsRoot();
+
+		expectPrefix(queryKeys.seerrTarget(aid(1)), root);
+		expectPrefix(queryKeys.seerrTargets([aid(1), aid(2)]), root);
+		expect(queryKeys.seerrTarget(aid(1))).not.toEqual(
+			queryKeys.seerrTargets([aid(1)]),
+		);
+	});
+
 	it("separates Seerr media status keys by media type and seasons", () => {
 		expect(
 			queryKeys.seerrMediaStatus({

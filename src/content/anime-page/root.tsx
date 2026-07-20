@@ -8,10 +8,7 @@ import type {
 	AniListMediaFormat,
 	AniListMediaHint,
 } from "@/anilist/types";
-import {
-	resolveAniListTargetProvider,
-	resolveSeerrRequestInput,
-} from "@/content/anilist/target-provider";
+import { resolveAniListTargetProvider } from "@/content/anilist/target-provider";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { RequestInSeerrInput } from "@/rpc/types";
@@ -20,6 +17,7 @@ import {
 	SeerrOpenButton,
 	SeerrRequestButton,
 } from "@/features/seerr-request/seerr-request-button";
+import { toSeerrRequestInput } from "@/features/seerr-request/seerr-request-input";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
 import { MediaModal, type MediaModalMetadataHint } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
@@ -389,11 +387,9 @@ export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
 		format: target.format,
 		mappedIdentities: mappingIdentities.data ?? [],
 	});
-	const seerrRequestInput = resolveSeerrRequestInput({
-		anilistId,
-		mappedIdentities: mappingIdentities.data ?? [],
-		seerrRequestTarget: seerrTargets.data?.[0] ?? null,
-	});
+	const seerrRequestInput = toSeerrRequestInput(
+		seerrTargets.data?.[0] ?? null,
+	);
 	const showProviderAction = shouldShowProviderAction(provider, options);
 	const showSeerrAction = shouldShowSeerrAction({
 		optionState,

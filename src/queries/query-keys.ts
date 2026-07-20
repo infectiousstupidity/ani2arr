@@ -14,6 +14,8 @@ import { sourceFromInput, type SourceInputLike } from "@/rpc/source-input";
 
 const rootQueryKey = ["a2a"] as const;
 const configuredScope = "configured";
+const seerrTargetsRootKey = () =>
+	[...rootQueryKey, "seerr", "targets"] as const;
 
 type MediaStatusKeyInput = Pick<
 	StatusInput,
@@ -119,11 +121,15 @@ export const queryKeys = {
 	seerrRoot: () => [...rootQueryKey, "seerr"] as const,
 	seerrConnection: (scope = configuredScope) =>
 		[...rootQueryKey, "seerr", "connection", scope] as const,
-	seerrTargetsRoot: () => [...rootQueryKey, "seerr", "targets"] as const,
+	seerrTargetsRoot: seerrTargetsRootKey,
 	seerrTarget: (anilistId: AniListId) =>
-		[...rootQueryKey, "seerr", "target", anilistId] as const,
+		[...seerrTargetsRootKey(), "single", anilistId] as const,
 	seerrTargets: (ids: readonly AniListId[]) =>
-		[...rootQueryKey, "seerr", "targets", normalizeMetadataIds(ids)] as const,
+		[
+			...seerrTargetsRootKey(),
+			"batch",
+			normalizeMetadataIds(ids),
+		] as const,
 	seerrMediaStatus: (input: SeerrMediaStatusKeyInput | null) =>
 		[
 			...rootQueryKey,

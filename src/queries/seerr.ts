@@ -175,10 +175,7 @@ export const useSetManualSeerrTarget = () => {
 
 	return useMutation<{ ok: true }, ExtensionError, SetManualSeerrTargetInput>({
 		mutationFn: (input) => getAni2arrApi().setManualSeerrTarget(input),
-		onSuccess: (_result, variables) => {
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seerrTarget(variables.anilistId),
-			});
+		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
 			queryClient.invalidateQueries({
 				queryKey: queryKeys.seerrLinkedAniListEntriesRoot(),
@@ -192,10 +189,7 @@ export const useClearManualSeerrTarget = () => {
 
 	return useMutation<{ ok: true }, ExtensionError, AniListId>({
 		mutationFn: (anilistId) => getAni2arrApi().clearManualSeerrTarget(anilistId),
-		onSuccess: (_result, anilistId) => {
-			queryClient.invalidateQueries({
-				queryKey: queryKeys.seerrTarget(anilistId),
-			});
+		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
 			queryClient.invalidateQueries({
 				queryKey: queryKeys.seerrLinkedAniListEntriesRoot(),

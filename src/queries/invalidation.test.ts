@@ -4,6 +4,7 @@
 import { QueryClient, type QueryKey } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import type { AniListId } from "@/anilist/types";
+import { parseTmdbId } from "@/providers/schemas";
 import {
 	invalidateAfterMappingChange,
 	invalidateAfterMappingsRevision,
@@ -74,6 +75,12 @@ describe("query invalidation helpers", () => {
 		const inspection = queryKeys.mappingInspection("sonarr", aid(1));
 		const changedProviderLookup = queryKeys.providerLookup("sonarr", "test");
 		const otherProviderLookup = queryKeys.providerLookup("radarr", "test");
+		const seerrTarget = queryKeys.seerrTarget(aid(1));
+		const seerrTargets = queryKeys.seerrTargets([aid(1)]);
+		const seerrLinkedEntries = queryKeys.seerrLinkedAniListEntries({
+			mediaType: "movie",
+			tmdbId: parseTmdbId(100),
+		});
 		for (const queryKey of [
 			changedStatus,
 			changedStatusVariant,
@@ -84,6 +91,9 @@ describe("query invalidation helpers", () => {
 			inspection,
 			changedProviderLookup,
 			otherProviderLookup,
+			seerrTarget,
+			seerrTargets,
+			seerrLinkedEntries,
 		]) {
 			seed(queryClient, queryKey);
 		}
@@ -102,6 +112,31 @@ describe("query invalidation helpers", () => {
 		expect(isInvalidated(queryClient, otherProviderStatus)).toBe(false);
 		expect(isInvalidated(queryClient, otherItemStatus)).toBe(false);
 		expect(isInvalidated(queryClient, otherProviderLookup)).toBe(false);
+		expect(isInvalidated(queryClient, seerrTarget)).toBe(false);
+		expect(isInvalidated(queryClient, seerrTargets)).toBe(false);
+		expect(isInvalidated(queryClient, seerrLinkedEntries)).toBe(false);
+	});
+
+	it("invalidates effective Seerr reads after a Radarr mapping change", () => {
+		const queryClient = createQueryClient();
+		const seerrTarget = queryKeys.seerrTarget(aid(1));
+		const seerrTargets = queryKeys.seerrTargets([aid(1), aid(2)]);
+		const seerrLinkedEntries = queryKeys.seerrLinkedAniListEntries({
+			mediaType: "movie",
+			tmdbId: parseTmdbId(100),
+		});
+		for (const queryKey of [seerrTarget, seerrTargets, seerrLinkedEntries]) {
+			seed(queryClient, queryKey);
+		}
+
+		invalidateAfterMappingChange(queryClient, {
+			provider: "radarr",
+			anilistId: aid(1),
+		});
+
+		expect(isInvalidated(queryClient, seerrTarget)).toBe(true);
+		expect(isInvalidated(queryClient, seerrTargets)).toBe(true);
+		expect(isInvalidated(queryClient, seerrLinkedEntries)).toBe(true);
 	});
 
 	it("invalidates mapping roots and all provider statuses for mapping revisions", () => {
@@ -116,6 +151,12 @@ describe("query invalidation helpers", () => {
 			anilistId: aid(1),
 		});
 		const sonarrLookup = queryKeys.providerLookup("sonarr", "test");
+		const seerrTarget = queryKeys.seerrTarget(aid(1));
+		const seerrTargets = queryKeys.seerrTargets([aid(1), aid(2)]);
+		const seerrLinkedEntries = queryKeys.seerrLinkedAniListEntries({
+			mediaType: "movie",
+			tmdbId: parseTmdbId(100),
+		});
 		for (const queryKey of [
 			mappings,
 			inspection,
@@ -123,6 +164,9 @@ describe("query invalidation helpers", () => {
 			sonarrStatus,
 			radarrStatus,
 			sonarrLookup,
+			seerrTarget,
+			seerrTargets,
+			seerrLinkedEntries,
 		]) {
 			seed(queryClient, queryKey);
 		}
@@ -135,6 +179,9 @@ describe("query invalidation helpers", () => {
 		expect(isInvalidated(queryClient, sonarrStatus)).toBe(true);
 		expect(isInvalidated(queryClient, radarrStatus)).toBe(true);
 		expect(isInvalidated(queryClient, sonarrLookup)).toBe(false);
+		expect(isInvalidated(queryClient, seerrTarget)).toBe(true);
+		expect(isInvalidated(queryClient, seerrTargets)).toBe(true);
+		expect(isInvalidated(queryClient, seerrLinkedEntries)).toBe(true);
 	});
 
 	it("invalidates provider library-dependent queries for library changes", () => {

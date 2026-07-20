@@ -9,6 +9,7 @@ import {
 	type TmdbId,
 	type TvdbId,
 } from "@/providers/schemas";
+import { collectEffectiveMappingRecords } from "./mapping-facts";
 import {
 	listAllSeerrUpstreamTargets,
 	listSeerrUpstreamTargets,
@@ -43,9 +44,18 @@ type StoredManualSeerrTarget =
 	  };
 type ManualSeerrTargets = Record<number, StoredManualSeerrTarget>;
 
+type RadarrMappingSeerrTarget = {
+	anilistId: AniListId;
+	mediaType: "movie";
+	tmdbId: TmdbId;
+	source: "radarr-mapping";
+};
+
 type EffectiveSeerrTarget =
 	| (ManualSeerrTarget & { source: "manual" })
-	| ({ anilistId: AniListId; source: "anibridge" } & SeerrUpstreamRecord["target"]);
+	| ({ anilistId: AniListId; source: "anibridge" } &
+			SeerrUpstreamRecord["target"])
+	| RadarrMappingSeerrTarget;
 
 const manualSeerrTargets = storage.defineItem<ManualSeerrTargets>(
 	"local:mapping:seerr-targets",
@@ -130,6 +140,35 @@ async function listAllManualSeerrTargets(): Promise<ManualSeerrTarget[]> {
 	return records.toSorted((left, right) => left.anilistId - right.anilistId);
 }
 
+async function listRadarrMappingSeerrTargets(
+	requestedIds?: ReadonlySet<AniListId>,
+): Promise<RadarrMappingSeerrTarget[]> {
+	const records = await collectEffectiveMappingRecords("radarr");
+	const targets: RadarrMappingSeerrTarget[] = [];
+
+	for (const record of records) {
+		if (
+			record.source.source !== "anilist" ||
+			record.result.kind !== "mapped" ||
+			(requestedIds && !requestedIds.has(record.source.id))
+		) {
+			continue;
+		}
+
+		const tmdbId = parseTmdbIdOrNull(record.result.providerId);
+		if (tmdbId === null) continue;
+
+		targets.push({
+			anilistId: record.source.id,
+			mediaType: "movie",
+			tmdbId,
+			source: "radarr-mapping",
+		});
+	}
+
+	return targets.toSorted((left, right) => left.anilistId - right.anilistId);
+}
+
 export async function getEffectiveSeerrTarget(
 	anilistId: AniListId,
 ): Promise<EffectiveSeerrTarget | null> {
@@ -138,29 +177,43 @@ export async function getEffectiveSeerrTarget(
 
 	const upstream = await listSeerrUpstreamTargets([anilistId]);
 	const record = upstream[0];
-	return record
-		? { anilistId: record.anilistId, source: "anibridge", ...record.target }
-		: null;
+	if (record) {
+		return {
+			anilistId: record.anilistId,
+			source: "anibridge",
+			...record.target,
+		};
+	}
+
+	const radarrTargets = await listRadarrMappingSeerrTargets(
+		new Set([anilistId]),
+	);
+	return radarrTargets[0] ?? null;
 }
 
 export async function listEffectiveSeerrTargets(
 	ids: readonly AniListId[],
 ): Promise<EffectiveSeerrTarget[]> {
-	const [manualTargets, upstreamTargets] = await Promise.all([
+	const requestedIds = new Set(ids);
+	if (requestedIds.size === 0) return [];
+
+	const [manualTargets, upstreamTargets, radarrTargets] = await Promise.all([
 		listManualSeerrTargets(ids),
 		listSeerrUpstreamTargets(ids),
+		listRadarrMappingSeerrTargets(requestedIds),
 	]);
-	return mergeSeerrTargets(manualTargets, upstreamTargets);
+	return mergeSeerrTargets(manualTargets, upstreamTargets, radarrTargets);
 }
 
 export async function listAllEffectiveSeerrTargets(): Promise<
 	EffectiveSeerrTarget[]
 > {
-	const [manualTargets, upstreamTargets] = await Promise.all([
+	const [manualTargets, upstreamTargets, radarrTargets] = await Promise.all([
 		listAllManualSeerrTargets(),
 		listAllSeerrUpstreamTargets(),
+		listRadarrMappingSeerrTargets(),
 	]);
-	return mergeSeerrTargets(manualTargets, upstreamTargets);
+	return mergeSeerrTargets(manualTargets, upstreamTargets, radarrTargets);
 }
 
 export async function setManualSeerrTarget(
@@ -196,20 +249,27 @@ export async function clearManualSeerrTargets(): Promise<void> {
 function mergeSeerrTargets(
 	manualTargets: readonly ManualSeerrTarget[],
 	upstreamTargets: readonly SeerrUpstreamRecord[],
+	radarrTargets: readonly RadarrMappingSeerrTarget[],
 ): EffectiveSeerrTarget[] {
-	const manualById = new Set(manualTargets.map((target) => target.anilistId));
-	const targets: EffectiveSeerrTarget[] = [
-		...manualTargets.map((target) => ({ ...target, source: "manual" as const })),
-		...upstreamTargets
-			.filter((record) => !manualById.has(record.anilistId))
-			.map((record) => ({
-				anilistId: record.anilistId,
-				source: "anibridge" as const,
-				...record.target,
-			})),
-	];
+	const targetsById = new Map<AniListId, EffectiveSeerrTarget>(
+		radarrTargets.map((target) => [target.anilistId, target]),
+	);
 
-	return targets.toSorted((left, right) => left.anilistId - right.anilistId);
+	for (const record of upstreamTargets) {
+		targetsById.set(record.anilistId, {
+			anilistId: record.anilistId,
+			source: "anibridge",
+			...record.target,
+		});
+	}
+
+	for (const target of manualTargets) {
+		targetsById.set(target.anilistId, { ...target, source: "manual" });
+	}
+
+	return [...targetsById.values()].toSorted(
+		(left, right) => left.anilistId - right.anilistId,
+	);
 }
 
 async function updateManualSeerrTargets(
