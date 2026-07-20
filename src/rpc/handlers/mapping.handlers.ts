@@ -19,7 +19,10 @@ import {
 } from "@/mapping/list-mappings";
 import type { EffectiveMappingRecord } from "@/mapping/mapping-facts";
 import type { MappingResult } from "@/mapping/types";
-import { sourceIdentityKey } from "@/mapping/source-identity";
+import {
+	sourceIdentityKey,
+	type SourceIdentity,
+} from "@/mapping/source-identity";
 import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
 import type { Provider } from "@/providers/types";
 import type { RadarrMovieSnapshot } from "@/providers/radarr/types";
@@ -516,5 +519,30 @@ export const mappingHandlers = {
 		});
 	},
 
-	getAniListIdForSource: getUniqueAniListIdForSource,
+	async resolveAniListIdsForSources(sources: SourceIdentity[]) {
+		const uniqueSources = new Map(
+			sources.map((source) => [sourceIdentityKey(source), source]),
+		);
+		const readSources = async (): Promise<
+			Record<string, AniListId | null>
+		> =>
+			Object.fromEntries(
+				await Promise.all(
+					[...uniqueSources].map(async ([sourceKey, source]) => [
+						sourceKey,
+						await getUniqueAniListIdForSource(source),
+					] as const),
+				),
+			);
+
+		const firstResult = await readSources();
+		const hasMissingMalSource = [...uniqueSources].some(
+			([sourceKey, source]) =>
+				source.source === "mal" && firstResult[sourceKey] === null,
+		);
+		if (!hasMissingMalSource) return firstResult;
+
+		await refreshMappingPipeline();
+		return readSources();
+	},
 };

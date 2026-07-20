@@ -13,6 +13,7 @@ import {
 	type ContentEntrypointShellContext,
 } from "@/content/core/create-content-script-shell";
 import { ContentRoot, type AnimePageTarget } from "@/content/anime-page/root";
+import { sourceIdentityKey } from "@/mapping/source-identity";
 import { readMyAnimeListIdFromUrl } from "@/myanimelist/url";
 import { createExtensionQueryClient } from "@/queries/query-client";
 import { queryKeys } from "@/queries/query-keys";
@@ -35,17 +36,6 @@ const queryClient = createExtensionQueryClient();
 const MAL_PAGE = new MatchPattern("https://myanimelist.net/*");
 
 let ui: ShadowRootContentScriptUi<Root> | null = null;
-
-async function getAniListIdForMount(
-	source: AnimePageTarget["source"],
-): Promise<AnimePageTarget["anilistId"] | null> {
-	const api = getAni2arrApi();
-	const existing = await api.getAniListIdForSource(source);
-	if (existing !== null) return existing;
-
-	await api.refreshMappingPipeline();
-	return api.getAniListIdForSource(source);
-}
 
 const removeAnimeUI = (): void => {
 	try {
@@ -92,7 +82,9 @@ async function mountAnimePageUI({
 	if (malId === null) return;
 
 	const source = { source: "mal", id: malId } as const;
-	const anilistId = await getAniListIdForMount(source);
+	const anilistIdsBySource =
+		await getAni2arrApi().resolveAniListIdsForSources([source]);
+	const anilistId = anilistIdsBySource[sourceIdentityKey(source)] ?? null;
 	if (anilistId === null) return;
 
 	const mountTarget = ensureActionsAnchor();

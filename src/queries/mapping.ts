@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-query";
 import type { AniListId } from "@/anilist/types";
 import { invalidateAfterMappingChange } from "@/queries/invalidation";
-import { getAni2arrApi, type Ani2arrApi } from "@/rpc";
+import { getAni2arrApi } from "@/rpc";
 import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
@@ -21,10 +21,7 @@ import type {
 	SetManualMappingInput,
 	SourceRpcInput,
 } from "@/rpc/types";
-import {
-	sourceIdentityKey,
-	type SourceIdentity,
-} from "@/mapping/source-identity";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { Provider } from "@/providers/types";
 import { normalizeMetadataIds, normalizeSourceKeys, queryKeys } from "./query-keys";
@@ -138,59 +135,14 @@ export const useSourceAniListIdMap = (
 	const sourceKeys = normalizeSourceKeys(sources);
 	return useQuery<Record<string, AniListId | null>, ExtensionError>({
 		queryKey: queryKeys.sourceAniListIds(sourceKeys),
-		queryFn: () => getSourceAniListIdMap(getAni2arrApi(), sources),
+		queryFn: () =>
+			getAni2arrApi().resolveAniListIdsForSources([...sources]),
 		enabled: (options?.enabled ?? true) && sourceKeys.length > 0,
 		staleTime: 10 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
 	});
 };
-
-type SourceAniListIdApi = Pick<
-	Ani2arrApi,
-	"getAniListIdForSource" | "refreshMappingPipeline"
->;
-
-export async function getSourceAniListIdMap(
-	api: SourceAniListIdApi,
-	sources: readonly SourceIdentity[],
-): Promise<Record<string, AniListId | null>> {
-	const sourceKeys = normalizeSourceKeys(sources);
-	const sourcesByKey = new Map(
-		sources.map((source) => [sourceIdentityKey(source), source]),
-	);
-
-	const resolveBatch = async (): Promise<Record<string, AniListId | null>> => {
-		const entries = await Promise.all(
-			sourceKeys.map(async (sourceKey) => {
-				const source = sourcesByKey.get(sourceKey);
-				return [
-					sourceKey,
-					source === undefined ? null : await api.getAniListIdForSource(source),
-				] as const;
-			}),
-		);
-
-		return Object.fromEntries(entries) as Record<string, AniListId | null>;
-	};
-
-	const firstResult = await resolveBatch();
-	const hasMissingSourceCrosswalk = sourceKeys.some((sourceKey) => {
-		const source = sourcesByKey.get(sourceKey);
-		return (
-			source !== undefined &&
-			source.source !== "anilist" &&
-			firstResult[sourceKey] === null
-		);
-	});
-
-	if (!hasMissingSourceCrosswalk) {
-		return firstResult;
-	}
-
-	await api.refreshMappingPipeline();
-	return resolveBatch();
-}
 
 const inspectionSourceInput = (
 	input: AniListId | SourceRpcInput,

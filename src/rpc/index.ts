@@ -6,6 +6,7 @@ import {
 	type ProxyServiceKey,
 } from "@webext-core/proxy-service";
 import type { AniListId, AniListMedia } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { normalizeError } from "@/shared/errors/error-utils";
 import type { ProviderFormResources } from "@/providers/types";
 import type { RadarrMovie } from "@/providers/radarr/types";
@@ -37,8 +38,6 @@ import type {
 	ClearMappingRejectedCandidateInput,
 	GetMappingInspectionInput,
 	GetAniListMetadataInput,
-	GetAniListIdForSourceInput,
-	GetAniListIdForSourceOutput,
 	ProviderConnectionTestInput,
 	NotifyProviderConnectionChangedInput,
 	OpenProviderPageInput,
@@ -150,9 +149,9 @@ export interface Ani2arrApi {
 	getAniListMetadata(
 		input: GetAniListMetadataInput,
 	): Promise<GetAniListMetadataOutput>;
-	getAniListIdForSource(
-		input: GetAniListIdForSourceInput,
-	): Promise<GetAniListIdForSourceOutput>;
+	resolveAniListIdsForSources(
+		sources: SourceIdentity[],
+	): Promise<Record<string, AniListId | null>>;
 }
 
 const ANI2ARR_API_KEY = "Ani2arrApi" as ProxyServiceKey<Ani2arrApi>;
