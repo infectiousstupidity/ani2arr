@@ -8,7 +8,11 @@ import type { Provider } from "@/providers/types";
 import type { ProviderConnectionStatusView } from "@/queries/provider-connection";
 import { cn } from "@/shared/utils/cn";
 import type { PageId } from "../navigation";
-import { RadarrIcon, SonarrIcon, SeerrIcon } from "./icons";
+import {
+	RadarrIcon,
+	SeerrIcon,
+	SonarrIcon,
+} from "@/features/provider-ui/provider-icons";
 
 type ConnectionPage = Provider | "seerr";
 type ProviderStatusLookup = Record<ConnectionPage, ProviderConnectionStatusView>;

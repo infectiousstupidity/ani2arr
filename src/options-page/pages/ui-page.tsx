@@ -18,7 +18,7 @@ import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import { Label } from "@/shared/ui/primitives/label";
 import { Switch } from "@/shared/ui/primitives/switch";
 import { cn } from "@/shared/utils/cn";
-import { RadarrIcon, SonarrIcon } from "../components/icons";
+import { RadarrIcon, SonarrIcon } from "@/features/provider-ui/provider-icons";
 import { SettingsSection } from "../components/settings-section";
 
 type BrowseCardMode = BadgeVisibility | "hidden";

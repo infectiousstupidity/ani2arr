@@ -9,7 +9,7 @@ import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-a
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import type { BadgeVisibility } from "@/settings/types";
-import { SonarrIcon } from "@/options-page/components/icons";
+import { SonarrIcon } from "@/features/provider-ui/provider-icons";
 import { getCardPrimaryTitle } from "./card-primary-title";
 import { CardOverlay } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";

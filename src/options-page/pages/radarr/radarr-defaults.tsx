@@ -6,14 +6,14 @@ import { ListPlus } from "lucide-react";
 import * as v from "valibot";
 import { ProviderQualityProfileIdSchema } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
-import { ProviderTagField } from "@/providers/provider-tag-field";
+import { ProviderTagField } from "@/features/provider-ui/provider-tag-field";
 import { createDefaultRadarrFormState } from "@/providers/radarr/form-state";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type {
 	RadarrMinimumAvailability,
 	RadarrMovieMonitor,
 } from "@/providers/radarr/schemas";
-import type { ProviderTagSelection } from "@/providers/provider-tag-selection";
+import type { ProviderTagSelection } from "@/features/provider-ui/provider-tag-selection";
 import {
   RADARR_ADD_MINIMUM_AVAILABILITY_OPTIONS_WITH_DESCRIPTIONS,
   RADARR_MOVIE_MONITOR_OPTIONS_WITH_DESCRIPTIONS,

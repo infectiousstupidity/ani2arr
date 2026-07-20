@@ -6,12 +6,12 @@ import { ListPlus } from "lucide-react";
 import * as v from "valibot";
 import { ProviderQualityProfileIdSchema } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
-import { ProviderTagField } from "@/providers/provider-tag-field";
+import { ProviderTagField } from "@/features/provider-ui/provider-tag-field";
 import {
   createDefaultSonarrFormState,
   type SonarrFormState,
 } from "@/providers/sonarr/form-state";
-import type { ProviderTagSelection } from "@/providers/provider-tag-selection";
+import type { ProviderTagSelection } from "@/features/provider-ui/provider-tag-selection";
 import {
   SONARR_MONITOR_OPTIONS_WITH_DESCRIPTIONS,
   SONARR_SERIES_TYPE_OPTIONS_WITH_DESCRIPTIONS,

@@ -1,7 +1,7 @@
 /** Seerr options page section for request-backend connection settings. */
 // src/options-page/pages/seerr-page.tsx
 
-import { SeerrIcon } from "../components/icons";
+import { SeerrIcon } from "@/features/provider-ui/provider-icons";
 import { SeerrConnectionForm } from "../components/seerr-connection-form";
 import { SettingsSection } from "../components/settings-section";
 import type { SeerrConnectionFailure } from "../hooks/seerr-connection-actions";

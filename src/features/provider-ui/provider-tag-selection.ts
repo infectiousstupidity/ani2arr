@@ -1,10 +1,7 @@
-/** Provider tag label/id mapping helpers for shared provider tag fields. */
-// src/providers/provider-tag-selection.ts
+import type { ProviderTagId } from "@/providers/schemas";
+import type { ProviderTag } from "@/providers/types";
 
-import type { ProviderTagId } from "./schemas";
-import type { ProviderTag } from "./types";
-
-export interface ProviderTagMaps {
+interface ProviderTagMaps {
 	idToLabel: Map<ProviderTagId, string>;
 	lookupKeyToId: Map<string, ProviderTagId>;
 	existingLabels: string[];

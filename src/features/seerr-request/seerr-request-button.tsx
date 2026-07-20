@@ -7,7 +7,7 @@ import { openSeerrPage } from "@/rpc/provider-page";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { RequestInSeerrInput } from "@/rpc/types";
 import Button from "@/shared/ui/primitives/button";
-import { SeerrIcon } from "@/options-page/components/icons";
+import { SeerrIcon } from "@/features/provider-ui/provider-icons";
 import { getSeerrActionState } from "./seerr-action-state";
 
 interface SeerrRequestButtonProps {

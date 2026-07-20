@@ -25,7 +25,7 @@ import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { BadgeVisibility } from "@/settings/types";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
-import { SeerrIcon } from "@/options-page/components/icons";
+import { SeerrIcon } from "@/features/provider-ui/provider-icons";
 import { CardOverlay } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";
 

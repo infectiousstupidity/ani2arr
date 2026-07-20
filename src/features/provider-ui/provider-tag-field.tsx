@@ -1,6 +1,3 @@
-/** Provider-owned tag field that adapts provider tag IDs/freeform labels to generic MultiTagInput. */
-// src/providers/provider-tag-field.tsx
-
 import { useCallback, useId, useMemo } from "react";
 import type { ProviderTag } from "@/providers/types";
 import type { ProviderTagId } from "@/providers/schemas";
@@ -9,7 +6,7 @@ import {
 	deriveSelectedProviderTagLabels,
 	type ProviderTagSelection,
 	splitProviderTagLabels,
-} from "@/providers/provider-tag-selection";
+} from "./provider-tag-selection";
 import { Label } from "@/shared/ui/primitives/label";
 import MultiTagInput from "@/shared/ui/primitives/multi-tag-input";
 

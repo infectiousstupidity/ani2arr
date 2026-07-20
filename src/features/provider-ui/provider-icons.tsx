@@ -1,6 +1,3 @@
-/** Inline provider SVG icon components for options-page controls. */
-// src/options-page/components/icons.tsx
-
 import React from "react";
 import { cn } from "@/shared/utils/cn";
 
@@ -32,7 +29,7 @@ export const SonarrIcon = ({
 	...props
 }: ProviderIconProps): React.ReactElement => (
 	<ProviderIconSvg
-		className={cn("a2a-provider-icon--sonarr", className)}
+		className={className}
 		{...props}
 	>
 		<g transform="translate(12 12) scale(1.12) translate(-12 -12)">
@@ -49,7 +46,7 @@ export const RadarrIcon = ({
 	...props
 }: ProviderIconProps): React.ReactElement => (
 	<ProviderIconSvg
-		className={cn("a2a-provider-icon--radarr", className)}
+		className={className}
 		{...props}
 	>
 		<g transform="translate(12 12) scale(1.16) translate(-12 -12)">
@@ -66,7 +63,7 @@ export const SeerrIcon = ({
 	...props
 }: ProviderIconProps): React.ReactElement => (
 	<ProviderIconSvg
-		className={cn("a2a-provider-icon--seerr", className)}
+		className={className}
 		{...props}
 	>
 		<path

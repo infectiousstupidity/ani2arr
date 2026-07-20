@@ -8,7 +8,7 @@ import { Dropdown, DropdownItem } from "@/shared/ui/primitives/dropdown";
 import type { Provider } from "@/providers/types";
 import { getProviderLabel } from "@/providers/provider-labels";
 import type { MediaActionState } from "@/features/media-action/state";
-import { RadarrIcon, SonarrIcon } from "@/options-page/components/icons";
+import { RadarrIcon, SonarrIcon } from "@/features/provider-ui/provider-icons";
 
 interface MediaActionsProps {
 	provider: Provider;

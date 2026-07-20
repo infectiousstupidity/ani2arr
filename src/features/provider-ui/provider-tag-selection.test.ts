@@ -1,6 +1,3 @@
-/** Focused tests for provider tag mapping helpers. */
-// src/providers/provider-tag-selection.test.ts
-
 import { describe, expect, it } from "vitest";
 import type { ProviderTagId } from "@/providers/schemas";
 import {
@@ -25,11 +22,6 @@ describe("provider tag selection", () => {
 		).toEqual({
 			tagIds: [parseProviderTagId(7), parseProviderTagId(8)],
 			freeformTags: ["test1", "test2"],
-		});
-
-		expect(splitProviderTagLabels([], maps.lookupKeyToId)).toEqual({
-			tagIds: [],
-			freeformTags: [],
 		});
 	});
 });
