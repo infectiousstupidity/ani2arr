@@ -4,10 +4,11 @@
 import { describe, expect, it } from "vitest";
 import { parseAniListId, type AniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
-import { parseTvdbId } from "@/providers/schemas";
+import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import type { MappingGroup, MappingRow } from "./mapping-page-model";
 import {
 	getFilteredMappingGroups,
+	getMappingGroupMetaPillLabels,
 	getLoadedMappingRowCount,
 	getRowKey,
 	getVisibleAniListMetadataIds,
@@ -17,6 +18,7 @@ import {
 
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;
+const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
 const anilistSource = (anilistId: AniListId) =>
 	({ source: "anilist", id: anilistId }) as const;
@@ -32,9 +34,7 @@ const createRow = (
 		source: anilistSource(anilistId),
 		anilistId,
 		provider,
-		providerId: null,
 		result: { kind: "unmapped", hadResolveAttempt: false },
-		isInLibrary: null,
 		mappingRowStatus: "unmapped",
 		...rest,
 	};
@@ -48,22 +48,12 @@ const createGroup = (
 		rows: MappingRow[];
 	},
 ): MappingGroup => {
-	const {
-		key,
-		provider,
-		providerId,
-		rows,
-		linkedAniListIds: linkedAniListIdsPatch,
-		...rest
-	} = patch;
-	const linkedAniListIds =
-		linkedAniListIdsPatch ?? rows.map((row) => row.anilistId);
+	const { key, provider, providerId, rows, ...rest } = patch;
 	return {
 		key,
 		provider,
 		providerId,
 		rows,
-		linkedAniListIds,
 		isInLibrary: null,
 		...rest,
 	};
@@ -138,6 +128,20 @@ describe("mapping page model", () => {
 		expect(readTargetAniListIdFromHash("#mappings?anilistId=bad")).toBeNull();
 	});
 
+	it.each([
+		["sonarr", "Series"],
+		["radarr", "Movie"],
+	] as const)("derives the %s media type label", (provider, expectedLabel) => {
+		const group = createGroup({
+			key: `${provider}:10`,
+			provider,
+			providerId: provider === "sonarr" ? tvdb(10) : tmdb(10),
+			rows: [createRow({ anilistId: aid(1), provider })],
+		});
+
+		expect(getMappingGroupMetaPillLabels(group)).toContain(expectedLabel);
+	});
+
 	it("applies combined filters while preserving source-matched relationships", () => {
 		const matching = createGroup({
 			key: "sonarr:10",
@@ -148,14 +152,12 @@ describe("mapping page model", () => {
 				createRow({
 					anilistId: aid(1),
 					provider: "sonarr",
-					providerId: tvdb(10),
 					result: { kind: "mapped", source: "manual", providerId: tvdb(10) },
 					mappingRowStatus: "can-add",
 				}),
 				createRow({
 					anilistId: aid(2),
 					provider: "sonarr",
-					providerId: tvdb(10),
 					result: { kind: "mapped", source: "auto", providerId: tvdb(10) },
 					mappingRowStatus: "needs-review",
 				}),
@@ -205,9 +207,7 @@ describe("mapping page model", () => {
 		expect(result.groups[0]?.rows.map((row) => row.anilistId)).toEqual([
 			aid(2),
 		]);
-		expect(result.groups[0]?.linkedAniListIds).toEqual([aid(2)]);
 		expect(matching.rows.map((row) => row.anilistId)).toEqual([aid(1), aid(2)]);
-		expect(matching.linkedAniListIds).toEqual([aid(1), aid(2)]);
 	});
 
 	it("uses row status to admit groups without removing sibling rows", () => {
@@ -246,8 +246,6 @@ describe("mapping page model", () => {
 		["group title", "COWBOY BEBOP"],
 		["group provider ID", "777"],
 		["AniList ID", "42"],
-		["row title", "ROW ALIAS"],
-		["row provider ID", "888"],
 	])("searches %s", (_field, search) => {
 		const group = createGroup({
 			key: "sonarr:777",
@@ -258,8 +256,6 @@ describe("mapping page model", () => {
 				createRow({
 					anilistId: aid(42),
 					provider: "sonarr",
-					providerId: tvdb(888),
-					providerMeta: { title: "Row Alias" },
 				}),
 			],
 		});

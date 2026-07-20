@@ -42,7 +42,6 @@ import type {
 	ClearManualMappingInput,
 	GetMappingIdentitiesInput,
 	GetMappingInspectionInput,
-	GetMappingsOutput,
 	MappingListGroup,
 	MappingListProviderMeta,
 	MappingListRow,
@@ -96,7 +95,6 @@ function sonarrMeta(
 	const providerRouteSlug = getProviderRouteSlug("sonarr", item);
 	return {
 		title: item.title,
-		type: "series",
 		...(typeof item.status === "string" ? { statusLabel: item.status } : {}),
 		...(providerRouteSlug ? { providerRouteSlug } : {}),
 	};
@@ -109,7 +107,6 @@ function radarrMeta(
 	const providerRouteSlug = getProviderRouteSlug("radarr", item);
 	return {
 		title: item.title,
-		type: "movie",
 		...(typeof item.status === "string" ? { statusLabel: item.status } : {}),
 		...(providerRouteSlug ? { providerRouteSlug } : {}),
 	};
@@ -160,7 +157,6 @@ function groupMappedRecords(
 
 function composeRow(
 	record: EffectiveMappingRecord,
-	providerId: ProviderExternalId | null,
 	isInLibrary: boolean | null,
 	options?: {
 		existingTargetCount?: number;
@@ -175,8 +171,6 @@ function composeRow(
 		anilistId: record.anilistId,
 		provider: record.provider,
 		result: record.result,
-		providerId,
-		isInLibrary,
 		mappingRowStatus: rowStatus(
 			record.result,
 			isInLibrary,
@@ -198,7 +192,7 @@ function composeMappedGroup(
 	const rows = records
 		.toSorted(compareEffectiveRecords)
 		.flatMap((record) => {
-			const row = composeRow(record, providerId, library.isInLibrary, {
+			const row = composeRow(record, library.isInLibrary, {
 				...(library.providerMeta
 					? { providerMeta: library.providerMeta }
 					: {}),
@@ -211,7 +205,6 @@ function composeMappedGroup(
 		provider,
 		providerId,
 		rows,
-		linkedAniListIds: rows.map((row) => row.anilistId),
 		isInLibrary: library.isInLibrary,
 		...(library.providerMeta ? { providerMeta: library.providerMeta } : {}),
 	};
@@ -226,7 +219,6 @@ function composeAmbiguousGroup(
 	const isInLibrary = existingTargetCount > 0;
 	const row = composeRow(
 		record,
-		providerId,
 		isInLibrary,
 		{
 			existingTargetCount,
@@ -240,7 +232,6 @@ function composeAmbiguousGroup(
 		provider: record.provider,
 		providerId,
 		rows: [row],
-		linkedAniListIds: [row.anilistId],
 		isInLibrary,
 		...(providerMeta ? { providerMeta } : {}),
 	};
@@ -256,7 +247,7 @@ function composeStandaloneGroup(
 		return null;
 	}
 
-	const row = composeRow(record, null, false);
+	const row = composeRow(record, false);
 	if (row === null) return null;
 
 	return {
@@ -264,7 +255,6 @@ function composeStandaloneGroup(
 		provider: record.provider,
 		providerId: null,
 		rows: [row],
-		linkedAniListIds: [row.anilistId],
 		isInLibrary: false,
 	};
 }
@@ -404,7 +394,7 @@ function sortGroups(groups: MappingListGroup[]): MappingListGroup[] {
 	});
 }
 
-async function getMappingsOutput(): Promise<GetMappingsOutput> {
+async function getMappingsOutput(): Promise<MappingListGroup[]> {
 	const [recordsByProvider, sonarrLibraryItems, radarrLibraryItems] =
 		await Promise.all([
 			listEffectiveMappingRecordsByProvider({ loadFormatByAniListId }),
@@ -412,12 +402,10 @@ async function getMappingsOutput(): Promise<GetMappingsOutput> {
 			loadRadarrLibrary(),
 		]);
 
-	return {
-		groups: sortGroups([
-			...buildSonarrGroups(recordsByProvider.sonarr, sonarrLibraryItems),
-			...buildRadarrGroups(recordsByProvider.radarr, radarrLibraryItems),
-		]),
-	};
+	return sortGroups([
+		...buildSonarrGroups(recordsByProvider.sonarr, sonarrLibraryItems),
+		...buildRadarrGroups(recordsByProvider.radarr, radarrLibraryItems),
+	]);
 }
 
 async function assertNoConflictingLinkedIds(input: {

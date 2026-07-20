@@ -77,7 +77,7 @@ const MappingsPageContent = ({
 	const filteredMappings = useMemo(
 		() =>
 			getFilteredMappingGroups({
-				groups: mappingsQuery.data?.groups ?? [],
+				groups: mappingsQuery.data ?? [],
 				provider: providerFilter,
 				status: statusFilter,
 				source: sourceFilter,
@@ -85,7 +85,7 @@ const MappingsPageContent = ({
 				limit: visibleLimit,
 			}),
 		[
-			mappingsQuery.data?.groups,
+			mappingsQuery.data,
 			providerFilter,
 			searchQuery,
 			sourceFilter,

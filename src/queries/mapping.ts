@@ -15,7 +15,7 @@ import type {
 	ClearManualMappingInput,
 	GetMappingIdentitiesOutput,
 	GetMappingInspectionOutput,
-	GetMappingsOutput,
+	MappingListGroup,
 	SetMappingIgnoreInput,
 	SetMappingRejectedCandidateInput,
 	SetManualMappingInput,
@@ -108,7 +108,7 @@ export const useClearMappingRejectedCandidate = () => {
 };
 
 export const useMappings = () =>
-	useQuery<GetMappingsOutput, ExtensionError>({
+	useQuery<MappingListGroup[], ExtensionError>({
 		queryKey: queryKeys.mappings(),
 		queryFn: () => getAni2arrApi().getMappings(),
 		staleTime: 45 * 60 * 1000,

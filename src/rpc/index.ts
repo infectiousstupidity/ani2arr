@@ -13,7 +13,7 @@ import type { SonarrSeries } from "@/providers/sonarr/types";
 import type {
 	GetAniListMetadataOutput,
 	GetMappingInspectionOutput,
-	GetMappingsOutput,
+	MappingListGroup,
 	MappingIdentity,
 	RadarrLookupOutput,
 	SonarrLookupOutput,
@@ -143,7 +143,7 @@ export interface Ani2arrApi {
 	): Promise<{ isInLibrary: boolean; inCatalog: boolean }>;
 	clearPersistentCaches(): Promise<{ ok: true }>;
 	resetExtensionState(): Promise<{ ok: true }>;
-	getMappings(): Promise<GetMappingsOutput>;
+	getMappings(): Promise<MappingListGroup[]>;
 	getMappingInspection(
 		input: GetMappingInspectionInput,
 	): Promise<GetMappingInspectionOutput>;

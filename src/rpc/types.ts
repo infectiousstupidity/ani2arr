@@ -302,7 +302,6 @@ export type MappingListRowStatus =
 
 export interface MappingListProviderMeta {
 	title?: string;
-	type?: "series" | "movie";
 	statusLabel?: string;
 	providerRouteSlug?: string;
 }
@@ -312,8 +311,6 @@ export interface MappingListRow {
 	anilistId: AniListId;
 	provider: Provider;
 	result: MappingResult;
-	providerId: ProviderExternalId | null;
-	isInLibrary: boolean | null;
 	mappingRowStatus: MappingListRowStatus;
 	providerMeta?: MappingListProviderMeta;
 }
@@ -323,13 +320,8 @@ export interface MappingListGroup {
 	provider: Provider;
 	providerId: ProviderExternalId | null;
 	rows: MappingListRow[];
-	linkedAniListIds: readonly AniListId[];
 	isInLibrary: boolean | null;
 	providerMeta?: MappingListProviderMeta;
-}
-
-export interface GetMappingsOutput {
-	groups: MappingListGroup[];
 }
 
 export interface MappingIdentity {

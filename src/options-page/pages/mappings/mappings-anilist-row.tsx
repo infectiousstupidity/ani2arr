@@ -12,8 +12,6 @@ import {
 import type { AniListMetadata } from "@/anilist/types";
 import { buildAniListAnimeUrl, resolveTitlePreference } from "@/anilist/title";
 import type { AniListTitleLanguage } from "@/anilist/title";
-import { getProviderExternalIdLabel } from "@/providers/provider-labels";
-import type { ProviderExternalId } from "@/rpc/types";
 import Pill from "@/shared/ui/primitives/pill";
 import Tooltip from "@/shared/ui/primitives/tooltip";
 import { cn } from "@/shared/utils/cn";
@@ -32,7 +30,6 @@ import {
 
 interface MappingsAniListRowProps {
 	row: MappingRow;
-	parentProviderId: ProviderExternalId | null;
 	metadata: AniListMetadata | null;
 	isPending: boolean;
 	isHighlighted: boolean;
@@ -121,13 +118,6 @@ const getClearMatchAction = (row: MappingRow): ClearMatchAction | null => {
 	return null;
 };
 
-const shouldShowProviderIdPill = (
-	row: MappingRow,
-	parentProviderId: ProviderExternalId | null,
-): boolean =>
-	row.providerId !== null &&
-	(parentProviderId === null || row.providerId !== parentProviderId);
-
 function MappingStatusPill(props: {
 	status: MappingRow["mappingRowStatus"];
 }): React.JSX.Element {
@@ -143,7 +133,6 @@ export function MappingsAniListRow(
 ): React.JSX.Element {
 	const {
 		row,
-		parentProviderId,
 		metadata,
 		isPending,
 		isHighlighted,
@@ -160,7 +149,6 @@ export function MappingsAniListRow(
 	const sourceLabel = formatSourceIdentity(row.source);
 	const metaPillLabels = getMetaPillLabels(metadata);
 	const entryKind = formatMappingEntryKind(row.result);
-	const showProviderIdPill = shouldShowProviderIdPill(row, parentProviderId);
 	const showRowStatus = row.mappingRowStatus !== "in-library";
 	const ignoreTitle =
 		ignoreAction.kind === "clear-ignore"
@@ -254,11 +242,6 @@ export function MappingsAniListRow(
 								{label}
 							</Pill>
 						))}
-						{showProviderIdPill ? (
-							<Pill small tone="muted" className={ID_PILL_CLASS}>
-								{getProviderExternalIdLabel(row.provider)} ID: {row.providerId}
-							</Pill>
-						) : null}
 					</div>
 					<div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs md:hidden">
 						{showRowStatus ? (

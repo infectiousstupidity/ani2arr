@@ -17,11 +17,11 @@ import {
 	getProviderLabel,
 } from "@/providers/provider-labels";
 import type {
-	GetMappingsOutput,
+	MappingListGroup,
 	MappingListRowStatus,
 } from "@/rpc/types";
 
-export type MappingGroup = GetMappingsOutput["groups"][number];
+export type MappingGroup = MappingListGroup;
 export type MappingRow = MappingGroup["rows"][number];
 
 export type ProviderFilter = Provider | "all";
@@ -51,16 +51,6 @@ export type ClearMatchAction =
 			MappingRow,
 			"source" | "anilistId" | "provider"
 	  >);
-
-type ProviderMetaType = NonNullable<MappingRow["providerMeta"]>["type"];
-
-const formatProviderType = (
-	type: ProviderMetaType | undefined,
-): string | null => {
-	if (type === "series") return "Series";
-	if (type === "movie") return "Movie";
-	return null;
-};
 
 const formatProviderStatus = (status: string | undefined): string | null => {
 	if (!status) return null;
@@ -111,9 +101,9 @@ export const getMappingGroupMetaPillLabels = (group: MappingGroup): string[] => 
 	const labels = [
 		`${getProviderExternalIdLabel(group.provider)} ID: ${group.providerId}`,
 	];
-	const providerType = formatProviderType(group.providerMeta?.type);
+	const providerType = group.provider === "sonarr" ? "Series" : "Movie";
 	const status = formatProviderStatus(group.providerMeta?.statusLabel);
-	if (providerType) labels.push(providerType);
+	labels.push(providerType);
 	if (status) labels.push(status);
 	return labels;
 };
@@ -155,12 +145,7 @@ const mappingGroupMatchesSearch = (
 	if (group.providerMeta?.title?.toLowerCase().includes(search)) return true;
 	if (String(group.providerId ?? "").includes(search)) return true;
 
-	return group.rows.some((row) => {
-		if (String(row.anilistId).includes(search)) return true;
-		if (row.providerMeta?.title?.toLowerCase().includes(search)) return true;
-		if (String(row.providerId ?? "").includes(search)) return true;
-		return false;
-	});
+	return group.rows.some((row) => String(row.anilistId).includes(search));
 };
 
 export const getFilteredMappingGroups = ({
@@ -195,7 +180,6 @@ export const getFilteredMappingGroups = ({
 				: {
 						...group,
 						rows,
-						linkedAniListIds: rows.map((row) => row.anilistId),
 					};
 
 		if (
