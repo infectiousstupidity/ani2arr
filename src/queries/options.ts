@@ -2,22 +2,25 @@
 // src/queries/options.ts
 
 import { useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { normalizeError } from "@/shared/errors/error-utils";
+import {
+	type QueryClient,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import { logger } from "@/shared/utils/logger";
+import { resetAfterProviderConnectionChange } from "@/queries/invalidation";
 import { queryKeys } from "@/queries/query-keys";
 import type {
 	Provider,
 	ProviderCredentials,
 } from "@/providers/types";
 import type { SeerrConnection } from "@/providers/seerr/types";
+import { getAni2arrApi } from "@/rpc";
 import {
 	getPublicOptionsSnapshot,
 	getExtensionOptionsSnapshot,
-	saveProviderConnectionSnapshot,
-	saveSeerrConnectionSnapshot,
-	savePublicOptionsSnapshot,
 	watchExtensionOptionsSnapshot,
 	watchPublicOptionsSnapshot,
 } from "../settings/store";
@@ -97,24 +100,31 @@ export const usePublicOptions = () =>
 		staleTime: Infinity,
 	});
 
+function syncOptionsSnapshots(queryClient: QueryClient): void {
+	void Promise.all([
+		getExtensionOptionsSnapshot(),
+		getPublicOptionsSnapshot(),
+	]).then(
+		([options, publicOptions]) => {
+			queryClient.setQueryData(queryKeys.options(), options);
+			queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
+		},
+		() => {},
+	);
+}
+
 export const useSavePublicOptions = () => {
 	const queryClient = useQueryClient();
 
-	return useMutation<
-		PublicOptions,
-		ExtensionError,
-		PublicOptions
-	>({
-		mutationFn: async (options: PublicOptions) => {
-			try {
-				await savePublicOptionsSnapshot(options);
-				return await getPublicOptionsSnapshot();
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
-		onSuccess: (publicOptions) => {
-			queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
+	return useMutation<{ ok: true }, ExtensionError, PublicOptions>({
+		mutationFn: (options) => getAni2arrApi().savePublicOptions(options),
+		onSuccess: () => {
+			void getPublicOptionsSnapshot().then(
+				(publicOptions) => {
+					queryClient.setQueryData(queryKeys.publicOptions(), publicOptions);
+				},
+				() => {},
+			);
 		},
 	});
 };
@@ -123,23 +133,14 @@ export const useSaveProviderConnection = () => {
 	const queryClient = useQueryClient();
 
 	return useMutation<
-		ExtensionOptions,
+		{ ok: true },
 		ExtensionError,
 		{ provider: Provider; credentials: ProviderCredentials | null }
 	>({
-		mutationFn: async ({ provider, credentials }) => {
-			try {
-				return await saveProviderConnectionSnapshot(provider, credentials);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
-		onSuccess: async (savedOptions) => {
-			queryClient.setQueryData(queryKeys.options(), savedOptions);
-			queryClient.setQueryData(
-				queryKeys.publicOptions(),
-				await getPublicOptionsSnapshot(),
-			);
+		mutationFn: (input) => getAni2arrApi().saveProviderConnection(input),
+		onSuccess: (_, { provider }) => {
+			resetAfterProviderConnectionChange(queryClient, provider);
+			syncOptionsSnapshots(queryClient);
 		},
 	});
 };
@@ -148,23 +149,14 @@ export const useSaveSeerrConnection = () => {
 	const queryClient = useQueryClient();
 
 	return useMutation<
-		ExtensionOptions,
+		{ ok: true },
 		ExtensionError,
 		{ connection: SeerrConnection | null }
 	>({
-		mutationFn: async ({ connection }) => {
-			try {
-				return await saveSeerrConnectionSnapshot(connection);
-			} catch (error) {
-				throw normalizeError(error);
-			}
-		},
-		onSuccess: async (savedOptions) => {
-			queryClient.setQueryData(queryKeys.options(), savedOptions);
-			queryClient.setQueryData(
-				queryKeys.publicOptions(),
-				await getPublicOptionsSnapshot(),
-			);
+		mutationFn: (input) => getAni2arrApi().saveSeerrConnection(input),
+		onSuccess: () => {
+			queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
+			syncOptionsSnapshots(queryClient);
 		},
 	});
 };

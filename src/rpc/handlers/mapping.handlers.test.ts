@@ -141,14 +141,6 @@ describe("mappingHandlers", () => {
 		vi.mocked(radarrLibrary.getMovieSnapshots).mockResolvedValue([]);
 	});
 
-	it("runs the background-owned mapping refresh workflow", async () => {
-		await expect(
-			mappingHandlers.refreshMappingPipeline(),
-		).resolves.toBeUndefined();
-
-		expect(refreshMappingPipelineMock).toHaveBeenCalledOnce();
-	});
-
 	it("returns resolved AniList and MAL sources without refreshing", async () => {
 		const directSource = anilistSource(aid(20));
 		const malSource = { source: "mal", id: mal(5114) } as const;

@@ -448,10 +448,6 @@ export const mappingHandlers = {
 		return getMappingIdentities(ids);
 	},
 
-	async refreshMappingPipeline() {
-		await refreshMappingPipeline();
-	},
-
 	async setManualMapping(input: SetManualMappingInput) {
 		const source = sourceFromInput(input);
 		await assertNoConflictingLinkedIds({

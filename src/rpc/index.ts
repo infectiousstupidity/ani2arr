@@ -39,7 +39,9 @@ import type {
 	GetMappingInspectionInput,
 	GetAniListMetadataInput,
 	ProviderConnectionTestInput,
-	NotifyProviderConnectionChangedInput,
+	SaveProviderConnectionInput,
+	SavePublicOptionsInput,
+	SaveSeerrConnectionInput,
 	OpenProviderPageInput,
 	OpenProviderPageOutput,
 	OpenSeerrPageInput,
@@ -73,9 +75,11 @@ export interface Ani2arrApi {
 	updateRadarrMovie(input: UpdateRadarrInput): Promise<RadarrMovie>;
 	fetchAniListMedia(anilistId: AniListId): Promise<AniListMedia | null>;
 	getMappingIdentities(ids: AniListId[]): Promise<MappingIdentity[]>;
-	notifyProviderConnectionChanged(
-		input?: NotifyProviderConnectionChangedInput,
+	savePublicOptions(input: SavePublicOptionsInput): Promise<{ ok: true }>;
+	saveProviderConnection(
+		input: SaveProviderConnectionInput,
 	): Promise<{ ok: true }>;
+	saveSeerrConnection(input: SaveSeerrConnectionInput): Promise<{ ok: true }>;
 	testSonarrConnection(
 		input: ProviderConnectionTestInput,
 	): Promise<{ version: string }>;
@@ -121,7 +125,6 @@ export interface Ani2arrApi {
 	getRadarrFormResources(
 		input?: GetProviderFormResourcesInput,
 	): Promise<ProviderFormResources>;
-	refreshMappingPipeline(): Promise<void>;
 	setManualMapping(input: SetManualMappingInput): Promise<{ ok: true }>;
 	clearManualMapping(input: ClearManualMappingInput): Promise<{ ok: true }>;
 	setMappingIgnore(input: SetMappingIgnoreInput): Promise<{ ok: true }>;

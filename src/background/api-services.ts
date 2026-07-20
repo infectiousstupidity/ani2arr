@@ -30,7 +30,6 @@ import {
 	getProviderCredentials,
 	hasConfiguredProviderCredentials,
 } from "@/settings/provider-config";
-import { hasConfiguredSeerrConnection } from "@/settings/seerr-config";
 import type { ExtensionOptions } from "@/settings/types";
 import { clearAllTtlCaches } from "@/shared/cache/ttl-cache";
 import {
@@ -42,8 +41,6 @@ import {
 	bumpProviderLibraryRevision,
 	resetAllRevisions,
 } from "@/shared/sync/revisions";
-import { logger } from "@/shared/utils/logger";
-import { refreshMappingPipeline } from "./mapping-refresh";
 import { fetchProviderCandidates } from "./provider-candidate-search";
 import { requireProviderCredentials } from "./provider-config";
 
@@ -119,7 +116,7 @@ export const bumpLibraryRevision = async (
 	await bumpProviderLibraryRevision(provider);
 };
 
-const refreshProviderLibrary = async (
+export const refreshProviderLibrary = async (
 	provider: Provider,
 	options: ExtensionOptions,
 ): Promise<void> => {
@@ -151,44 +148,6 @@ export const scheduleLibraryRefresh = (provider: Provider): void => {
 		if (!hasConfiguredProviderCredentials(options, provider)) return;
 		await refreshProviderLibrary(provider, options);
 	});
-};
-
-export const handleProviderConnectionChanged = async (
-	optionsHint?: ExtensionOptions,
-	input?: {
-		changedProviders?: Provider[];
-		disconnectedProviders?: Provider[];
-	},
-): Promise<void> => {
-	const options = optionsHint ?? (await getExtensionOptionsSnapshot());
-	logger.configure({ enabled: options.debugLogging || import.meta.env.DEV });
-
-	const affectedProviders = [
-		...new Set([
-			...(input?.changedProviders ?? []),
-			...(input?.disconnectedProviders ?? []),
-		]),
-	];
-	if (affectedProviders.length === 0) return;
-
-	let mappingRevisionBumped = false;
-	if (
-		hasConfiguredProviderCredentials(options, "sonarr") ||
-		hasConfiguredProviderCredentials(options, "radarr") ||
-		hasConfiguredSeerrConnection(options)
-	) {
-		mappingRevisionBumped = await refreshMappingPipeline();
-	}
-	if (!mappingRevisionBumped) await bumpMappingsRevision();
-
-	await Promise.all(
-		affectedProviders.map((provider) =>
-			refreshProviderLibrary(provider, options),
-		),
-	);
-	await Promise.all(
-		affectedProviders.map((provider) => bumpLibraryRevision(provider)),
-	);
 };
 
 export const clearPersistentCaches = async (): Promise<void> => {

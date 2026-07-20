@@ -18,6 +18,7 @@ import type {
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 import type {
 	SeerrAccountSummary,
+	SeerrConnection,
 	SeerrMediaDetails,
 	SeerrMediaRequest,
 	SeerrMediaStatus,
@@ -35,6 +36,7 @@ import type {
 import type { ActiveMappingIdentity } from "@/mapping/list-mappings";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import type { MappingResult } from "@/mapping/types";
+import type { PublicOptions } from "@/settings/types";
 
 export type ProviderExternalId = TvdbId | TmdbId;
 
@@ -265,9 +267,15 @@ export type OpenSeerrPageInput = {
 
 export type OpenSeerrPageOutput = OpenProviderPageOutput;
 
-export type NotifyProviderConnectionChangedInput = {
-	changedProviders?: Provider[];
-	disconnectedProviders?: Provider[];
+export type SavePublicOptionsInput = PublicOptions;
+
+export type SaveProviderConnectionInput = {
+	provider: Provider;
+	credentials: ProviderCredentials | null;
+};
+
+export type SaveSeerrConnectionInput = {
+	connection: SeerrConnection | null;
 };
 
 export type GetProviderFormResourcesInput = {

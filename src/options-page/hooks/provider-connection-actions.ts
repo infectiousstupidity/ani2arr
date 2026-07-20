@@ -6,18 +6,11 @@ import type {
 	Provider,
 	ProviderCredentials,
 } from "@/providers/types";
-import { resetAfterProviderConnectionChange } from "@/queries/invalidation";
 import { queryKeys } from "@/queries/query-keys";
-import {
-	useExtensionOptions,
-	useSaveProviderConnection,
-} from "@/queries/options";
+import { useSaveProviderConnection } from "@/queries/options";
 import { getAni2arrApi, type Ani2arrApi } from "@/rpc";
 import { getUserErrorMessage } from "@/shared/errors/error-utils";
-import {
-	cleanupUnusedProviderHostPermission,
-	requestProviderConnectionPermission,
-} from "@/settings/provider-permissions";
+import { requestProviderConnectionPermission } from "@/settings/provider-permissions";
 import { normalizeProviderConnectionInput } from "@/settings/provider-config";
 
 type FetchFormResources = (
@@ -43,7 +36,6 @@ function useProviderConnectionActions({
 	fetchFormResources,
 }: ProviderConnectionActionsOptions) {
 	const queryClient = useQueryClient();
-	const { data: currentSettings } = useExtensionOptions();
 	const saveProviderConnection = useSaveProviderConnection();
 
 	const [isConnecting, setIsConnecting] = useState(false);
@@ -51,8 +43,6 @@ function useProviderConnectionActions({
 
 	const connect = useCallback(
 		async (draftUrl: string, draftApiKey: string) => {
-			if (!currentSettings) return false;
-
 			setIsConnecting(true);
 			setError(null);
 
@@ -74,23 +64,14 @@ function useProviderConnectionActions({
 
 				const api = getAni2arrApi();
 				const formResources = await fetchFormResources(api, normalized);
-				const newSettings = await saveProviderConnection.mutateAsync({
+				await saveProviderConnection.mutateAsync({
 					provider,
 					credentials: normalized,
 				});
 
-				resetAfterProviderConnectionChange(queryClient, provider);
 				queryClient.setQueryData(
 					queryKeys.providerFormResources(provider),
 					formResources,
-				);
-
-				await api.notifyProviderConnectionChanged({
-					changedProviders: [provider],
-				});
-				await cleanupUnusedProviderHostPermission(
-					currentSettings.providers[provider].url,
-					newSettings,
 				);
 
 				return true;
@@ -104,7 +85,6 @@ function useProviderConnectionActions({
 			}
 		},
 		[
-			currentSettings,
 			fetchFormResources,
 			label,
 			provider,
@@ -114,23 +94,14 @@ function useProviderConnectionActions({
 	);
 
 	const disconnect = useCallback(async () => {
-		if (!currentSettings) return false;
-
 		setIsConnecting(true);
 		setError(null);
 
 		try {
-			const oldUrl = currentSettings.providers[provider].url;
-			const newSettings = await saveProviderConnection.mutateAsync({
+			await saveProviderConnection.mutateAsync({
 				provider,
 				credentials: null,
 			});
-
-			resetAfterProviderConnectionChange(queryClient, provider);
-			await getAni2arrApi().notifyProviderConnectionChanged({
-				disconnectedProviders: [provider],
-			});
-			await cleanupUnusedProviderHostPermission(oldUrl, newSettings);
 
 			return true;
 		} catch (error_) {
@@ -141,13 +112,7 @@ function useProviderConnectionActions({
 		} finally {
 			setIsConnecting(false);
 		}
-	}, [
-		currentSettings,
-		label,
-		provider,
-		queryClient,
-		saveProviderConnection,
-	]);
+	}, [label, provider, saveProviderConnection]);
 
 	return { connect, disconnect, isConnecting, error };
 }

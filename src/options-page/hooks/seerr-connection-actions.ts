@@ -2,20 +2,13 @@
 
 import { useState } from "react";
 import { browser } from "wxt/browser";
-import {
-	type QueryClient,
-	useQueryClient,
-} from "@tanstack/react-query";
 import type { SeerrConnection } from "@/providers/seerr/types";
-import { queryKeys } from "@/queries/query-keys";
 import {
 	useExtensionOptions,
 	useSaveSeerrConnection,
 } from "@/queries/options";
-import { getAni2arrApi, type Ani2arrApi } from "@/rpc";
+import { getAni2arrApi } from "@/rpc";
 import {
-	cleanupUnusedProviderHostPermission,
-	removeSeerrCsrfCookiePermission,
 	requestProviderConnectionPermission,
 	requestSeerrCsrfCookiePermission,
 } from "@/settings/provider-permissions";
@@ -33,23 +26,6 @@ export type SeerrConnectionFailure = {
 	code: ErrorCode | null;
 };
 
-async function refreshSeerrMappings(
-	api: Ani2arrApi,
-	queryClient: QueryClient,
-): Promise<void> {
-	queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
-	try {
-		await api.refreshMappingPipeline();
-		queryClient.invalidateQueries({
-			queryKey: queryKeys.mappingIdentitiesRoot(),
-		});
-		queryClient.invalidateQueries({ queryKey: queryKeys.mappings() });
-		queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
-	} catch {
-		// Seerr remains usable if the upstream mapping refresh is temporarily unavailable.
-	}
-}
-
 function getExtensionErrorCode(error: unknown): ErrorCode | null {
 	if (!error || typeof error !== "object" || !("code" in error)) return null;
 	return typeof error.code === "string" ? (error.code as ErrorCode) : null;
@@ -66,7 +42,6 @@ function getFailure(
 }
 
 export function useSeerrConnectionActions() {
-	const queryClient = useQueryClient();
 	const { data: currentSettings } = useExtensionOptions();
 	const saveSeerrConnection = useSaveSeerrConnection();
 	const [isConnecting, setIsConnecting] = useState(false);
@@ -75,8 +50,6 @@ export function useSeerrConnectionActions() {
 	const [isCsrfSupportEnabled, setIsCsrfSupportEnabled] = useState(false);
 
 	const checkSeerrSession = async (draftUrl: string): Promise<void> => {
-		if (!currentSettings) return;
-
 		setIsConnecting(true);
 		setFailure(null);
 
@@ -100,15 +73,10 @@ export function useSeerrConnectionActions() {
 				auth: { mode: "session" },
 				account,
 			};
-			const newSettings = await saveSeerrConnection.mutateAsync({
+			await saveSeerrConnection.mutateAsync({
 				connection,
 			});
 
-			await refreshSeerrMappings(api, queryClient);
-			await cleanupUnusedProviderHostPermission(
-				currentSettings.seerr.url,
-				newSettings,
-			);
 			setOpenedLoginUrl(null);
 		} catch (error) {
 			const code = getExtensionErrorCode(error);
@@ -135,8 +103,6 @@ export function useSeerrConnectionActions() {
 		draftUrl: string,
 		draftApiKey: string,
 	): Promise<void> => {
-		if (!currentSettings) return;
-
 		setIsConnecting(true);
 		setFailure(null);
 
@@ -157,16 +123,10 @@ export function useSeerrConnectionActions() {
 				url: normalized.url,
 				apiKey: normalized.auth.apiKey,
 			});
-			const newSettings = await saveSeerrConnection.mutateAsync({
+			await saveSeerrConnection.mutateAsync({
 				connection: { url: normalized.url, auth: normalized.auth },
 			});
 
-			await refreshSeerrMappings(api, queryClient);
-			await cleanupUnusedProviderHostPermission(
-				currentSettings.seerr.url,
-				newSettings,
-			);
-			await removeSeerrCsrfCookiePermission();
 			setOpenedLoginUrl(null);
 			setIsCsrfSupportEnabled(false);
 		} catch (error) {
@@ -220,20 +180,14 @@ export function useSeerrConnectionActions() {
 	};
 
 	const disconnectSeerr = async (): Promise<boolean> => {
-		if (!currentSettings) return false;
-
 		setIsConnecting(true);
 		setFailure(null);
 
 		try {
-			const oldUrl = currentSettings.seerr.url;
-			const newSettings = await saveSeerrConnection.mutateAsync({
+			await saveSeerrConnection.mutateAsync({
 				connection: null,
 			});
 
-			queryClient.removeQueries({ queryKey: queryKeys.seerrRoot() });
-			await cleanupUnusedProviderHostPermission(oldUrl, newSettings);
-			await removeSeerrCsrfCookiePermission();
 			setOpenedLoginUrl(null);
 			setIsCsrfSupportEnabled(false);
 			return true;
