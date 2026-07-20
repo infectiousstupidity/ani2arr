@@ -3,7 +3,12 @@
 
 import { storage } from "wxt/utils/storage";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
-import { parseTmdbIdOrNull, parseTvdbIdOrNull } from "@/providers/schemas";
+import {
+	parseTmdbIdOrNull,
+	parseTvdbIdOrNull,
+	type TmdbId,
+	type TvdbId,
+} from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
 import type { AniListCrosswalkMappings } from "@/mapping/upstream/anibridge.parser";
@@ -155,17 +160,14 @@ export async function refreshUpstreamMappings(): Promise<void> {
 	const next = writes
 		.catch(() => {})
 		.then(async () => {
-			const storedPrevious = await upstreamMappings.getValue();
-			const previous = storedPrevious
-				? normalizeSnapshot(storedPrevious)
+			const stored = await upstreamMappings.getValue();
+			const previous = stored
+				? normalizeSnapshot(stored)
 				: null;
 			if (
 				previous?.entries !== undefined &&
 				Date.now() - previous.fetchedAt < UPSTREAM_REFRESH_INTERVAL_MS
 			) {
-				if (storedPrevious && hasLegacyProjections(storedPrevious)) {
-					await upstreamMappings.setValue(previous);
-				}
 				return;
 			}
 
@@ -230,10 +232,6 @@ function normalizeSnapshot(snapshot: UpstreamSnapshot): UpstreamSnapshot {
 	};
 }
 
-function hasLegacyProjections(snapshot: UpstreamSnapshot): boolean {
-	return "mappings" in snapshot || "seerrTargets" in snapshot;
-}
-
 function normalizeAniListCrosswalkKeys(
 	crosswalks: AniListCrosswalkMappings,
 ): AniListCrosswalkMappings {
@@ -261,28 +259,39 @@ function getSnapshotAniListId(
 function projectUpstreamTargets(
 	targets: readonly AniBridgeTarget[],
 ): UpstreamTarget[] {
-	return targets.flatMap((target) => {
-		const projected = projectUpstreamTarget(target);
-		return projected === null ? [] : [projected];
-	});
-}
+	const radarrIds = new Set<TmdbId>();
+	const sonarrSeasonsById = new Map<TvdbId, Set<number | undefined>>();
 
-function projectUpstreamTarget(target: AniBridgeTarget): UpstreamTarget | null {
-	switch (target.kind) {
-		case "tmdb-movie": {
-			return { provider: "radarr", providerId: target.id };
+	for (const target of targets) {
+		if (target.kind === "tmdb-movie") {
+			radarrIds.add(target.id);
+			continue;
 		}
-		case "tvdb-show": {
-			return {
-				provider: "sonarr",
-				providerId: target.id,
-				...(target.season === undefined ? {} : { season: target.season }),
-			};
-		}
-		case "tmdb-show": {
-			return null;
+
+		if (target.kind === "tvdb-show") {
+			const seasons =
+				sonarrSeasonsById.get(target.id) ?? new Set<number | undefined>();
+			seasons.add(target.season);
+			sonarrSeasonsById.set(target.id, seasons);
 		}
 	}
+
+	const radarrTargets: UpstreamTarget[] = [...radarrIds].map((providerId) => ({
+		provider: "radarr",
+		providerId,
+	}));
+	const sonarrTargets: UpstreamTarget[] = [...sonarrSeasonsById].map(
+		([providerId, seasons]) => {
+			const [season] = seasons;
+			return {
+				provider: "sonarr",
+				providerId,
+				...(seasons.size === 1 && season !== undefined ? { season } : {}),
+			};
+		},
+	);
+
+	return [...radarrTargets, ...sonarrTargets];
 }
 
 function normalizeSeasons(seasons: readonly number[]): number[] {

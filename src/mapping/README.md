@@ -30,15 +30,16 @@ type AniBridgeTarget =
 
 ```text
 manual ignore or mapping
-single provider-relevant AniBridge target
-multiple provider-relevant AniBridge targets -> ambiguous
+single provider identity from AniBridge
+multiple provider identities from AniBridge -> ambiguous
 automatic result when no upstream target exists
 unmapped
 ```
 
 Manual mappings may match and therefore be reported as upstream, but user intent
-still wins. Automatic results never resolve upstream ambiguity. Sonarr season
-scope remains part of target identity.
+still wins. Automatic results never resolve upstream ambiguity. A single Sonarr
+season scope is preserved; multiple scopes for one TVDB ID resolve as the
+unscoped series identity.
 
 AniBridge projections are derived on read:
 

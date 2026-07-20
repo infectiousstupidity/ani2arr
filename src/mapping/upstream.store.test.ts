@@ -78,8 +78,7 @@ describe("refreshUpstreamMappings", () => {
 		mockAniBridgeResponse(
 			createAniBridgeResponse(
 				JSON.stringify({
-					"anidb:1:R": {
-						"anilist:1": {},
+					"anilist:1": {
 						"tmdb_movie:300": {},
 						"tmdb_show:500:s2": {},
 						"tvdb_show:700:s0": {},
@@ -122,8 +121,7 @@ describe("refreshUpstreamMappings", () => {
 			expect(init?.headers).toEqual({});
 			return createAniBridgeResponse(
 				JSON.stringify({
-					"anidb:1:R": {
-						"anilist:1": {},
+					"anilist:1": {
 						"tmdb_movie:400": {},
 					},
 				}),
@@ -147,7 +145,7 @@ describe("refreshUpstreamMappings", () => {
 		]);
 	});
 
-	it("keeps canonical entries and strips projections after an ETag 304", async () => {
+	it("refreshes canonical snapshot metadata after an ETag 304", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
 		const entries = {
@@ -156,12 +154,6 @@ describe("refreshUpstreamMappings", () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
 				entries,
-				mappings: {
-					"anilist:1": [{ provider: "radarr", providerId: tmdb(300) }],
-				},
-				seerrTargets: {
-					"anilist:1": { mediaType: "movie", tmdbId: tmdb(300) },
-				},
 				aniListCrosswalks: {},
 				fetchedAt: Date.now() - UPSTREAM_REFRESH_INTERVAL_MS - 1,
 				etag: "canonical-etag",
@@ -192,8 +184,7 @@ describe("refreshUpstreamMappings", () => {
 		mockAniBridgeResponse(
 			createAniBridgeResponse(
 				JSON.stringify({
-					"anidb:1:R": {
-						"anilist:1": {},
+					"anilist:1": {
 						"tmdb_movie:300": {},
 					},
 				}),
@@ -217,57 +208,48 @@ describe("refreshUpstreamMappings", () => {
 		]);
 	});
 
-	it("derives Arr reads and records only from canonical entries", async () => {
+	it("normalizes Arr targets by provider ID", async () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
 				entries: {
-					1: [
+					1: [{ kind: "tvdb-show", id: tvdb(700), season: 1 }],
+					2: [
+						{ kind: "tvdb-show", id: tvdb(81_797), season: 0 },
+						{ kind: "tvdb-show", id: tvdb(81_797), season: 1 },
+						{ kind: "tvdb-show", id: tvdb(81_797), season: 2 },
+					],
+					3: [
+						{ kind: "tvdb-show", id: tvdb(100), season: 1 },
+						{ kind: "tvdb-show", id: tvdb(200), season: 2 },
+					],
+					4: [
 						{ kind: "tmdb-movie", id: tmdb(300) },
-						{ kind: "tmdb-show", id: tmdb(500), season: 2 },
-						{ kind: "tvdb-show", id: tvdb(700) },
-						{ kind: "tvdb-show", id: tvdb(700), season: 0 },
-						{ kind: "tvdb-show", id: tvdb(700), season: 2 },
+						{ kind: "tmdb-movie", id: tmdb(400) },
 					],
-					2: [{ kind: "tmdb-show", id: tmdb(600), season: 1 }],
-					invalid: [{ kind: "tmdb-movie", id: tmdb(999) }],
 				},
-				mappings: {
-					"anilist:1": [
-						{ provider: "radarr", providerId: tmdb(999) },
-						{ provider: "sonarr", providerId: tvdb(999) },
-					],
-					"anilist:2": [{ provider: "radarr", providerId: tmdb(600) }],
-				},
+				aniListCrosswalks: {},
 				fetchedAt: Date.now(),
 			},
 		});
 
-		const sonarrTargets = [
-			{ provider: "sonarr" as const, providerId: tvdb(700) },
-			{ provider: "sonarr" as const, providerId: tvdb(700), season: 0 },
-			{ provider: "sonarr" as const, providerId: tvdb(700), season: 2 },
-		];
-		await expect(getUpstreamTargets("radarr", aid(1))).resolves.toEqual([
-			{ provider: "radarr", providerId: tmdb(300) },
-		]);
-		await expect(getUpstreamTargets("sonarr", aid(1))).resolves.toEqual(
-			sonarrTargets,
-		);
-		await expect(getUpstreamTargets("radarr", aid(2))).resolves.toEqual([]);
-		await expect(listSourceUpstreamMappings()).resolves.toEqual([
-			{
-				source: { source: "anilist", id: aid(1) },
-				anilistId: aid(1),
-				targets: [
-					{ provider: "radarr", providerId: tmdb(300) },
-					...sonarrTargets,
-				],
-			},
-			{
-				source: { source: "anilist", id: aid(2) },
-				anilistId: aid(2),
-				targets: [],
-			},
+		await expect(
+			Promise.all([
+				getUpstreamTargets("sonarr", aid(1)),
+				getUpstreamTargets("sonarr", aid(2)),
+				getUpstreamTargets("sonarr", aid(3)),
+				getUpstreamTargets("radarr", aid(4)),
+			]),
+		).resolves.toEqual([
+			[{ provider: "sonarr", providerId: tvdb(700), season: 1 }],
+			[{ provider: "sonarr", providerId: tvdb(81_797) }],
+			[
+				{ provider: "sonarr", providerId: tvdb(100), season: 1 },
+				{ provider: "sonarr", providerId: tvdb(200), season: 2 },
+			],
+			[
+				{ provider: "radarr", providerId: tmdb(300) },
+				{ provider: "radarr", providerId: tmdb(400) },
+			],
 		]);
 	});
 
@@ -376,11 +358,6 @@ describe("refreshUpstreamMappings", () => {
 					21: [
 						{ kind: "tvdb-show", id: tvdb(78_874), season: 1 },
 						{ kind: "tmdb-show", id: tmdb(1396), season: 1 },
-					],
-				},
-				mappings: {
-					[sourceIdentityKey(source)]: [
-						{ provider: "radarr", providerId: tmdb(999) },
 					],
 				},
 				aniListCrosswalks: {

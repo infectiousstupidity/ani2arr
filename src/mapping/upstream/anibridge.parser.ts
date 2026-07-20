@@ -36,29 +36,22 @@ export function parseAniBridgeData(payload: unknown): ParsedAniBridgeData {
 			continue;
 		}
 
-		const rawDescriptorKeys = [rawRowKey, ...Object.keys(rawTargets)];
-		const sourceIdentities = rawDescriptorKeys.flatMap((rawDescriptor) => {
-			const source = parseSourceDescriptor(parseDescriptor(rawDescriptor));
-			return source === null ? [] : [source];
-		});
-		if (sourceIdentities.length === 0) continue;
+		const source = parseSourceDescriptor(parseDescriptor(rawRowKey));
+		if (source === null) continue;
 
-		const targets = rawDescriptorKeys.flatMap((rawTarget) => {
-			const target = parseAniBridgeTarget(rawTarget);
-			return target === null ? [] : [target];
-		});
-		const aniListId = parseUniqueAniListTarget(rawDescriptorKeys);
+		const rawTargetKeys = Object.keys(rawTargets);
+		if (source.source === "anilist") {
+			const targets = rawTargetKeys.flatMap((rawTarget) => {
+				const target = parseAniBridgeTarget(rawTarget);
+				return target === null ? [] : [target];
+			});
+			if (targets.length > 0) entries[source.id] = targets;
+			continue;
+		}
 
-		for (const sourceIdentity of sourceIdentities) {
-			if (sourceIdentity.source === "anilist") {
-				for (const target of targets) {
-					addAniBridgeTarget(entries, sourceIdentity.id, target);
-				}
-			}
-
-			if (sourceIdentity.source === "mal" && aniListId !== null) {
-				aniListCrosswalks[sourceIdentityKey(sourceIdentity)] = aniListId;
-			}
+		const aniListId = parseUniqueAniListTarget(rawTargetKeys);
+		if (aniListId !== null) {
+			aniListCrosswalks[sourceIdentityKey(source)] = aniListId;
 		}
 	}
 
@@ -146,28 +139,6 @@ function parseOptionalSeasonScope(
 
 	const season = Number(match[1]);
 	return Number.isSafeInteger(season) ? season : null;
-}
-
-function addAniBridgeTarget(
-	entries: AniBridgeEntries,
-	anilistId: AniListId,
-	target: AniBridgeTarget,
-): void {
-	const targets = entries[anilistId] ?? [];
-	const season = "season" in target ? target.season : undefined;
-	const alreadyExists = targets.some((existing) => {
-		const existingSeason = "season" in existing ? existing.season : undefined;
-
-		return (
-			existing.kind === target.kind &&
-			existing.id === target.id &&
-			existingSeason === season
-		);
-	});
-
-	if (!alreadyExists) {
-		entries[anilistId] = [...targets, target];
-	}
 }
 
 type Descriptor = { name: string; id: number; scope?: string };

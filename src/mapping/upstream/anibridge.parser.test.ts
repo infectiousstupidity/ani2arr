@@ -14,100 +14,55 @@ const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
 
 describe("parseAniBridgeData entries", () => {
-	it("parses supported target kinds and preserves optional season scope", () => {
+	it("uses only the canonical AniList row for provider targets", () => {
 		const { entries } = parseAniBridgeData({
-			"anidb:1:R": {
-				"anilist:1": {},
+			"anilist:113415": {
 				"tmdb_movie:300": {},
-				"tmdb_show:500:s2": {},
-				"tvdb_show:700:s0": {},
-				"tvdb_show:701": {},
-			},
-		});
-
-		expect(entries[aid(1)]).toEqual([
-			{ kind: "tmdb-movie", id: tmdb(300) },
-			{ kind: "tmdb-show", id: tmdb(500), season: 2 },
-			{ kind: "tvdb-show", id: tvdb(700), season: 0 },
-			{ kind: "tvdb-show", id: tvdb(701) },
-		]);
-	});
-
-	it("deduplicates exact targets but preserves distinct season scope", () => {
-		const { entries } = parseAniBridgeData({
-			"anidb:1:R": {
-				"anilist:1": {},
-				"tvdb_show:700:s0": {},
-			},
-			"anidb:1:S": {
-				"anilist:1": {},
-				"tvdb_show:700:s0": {},
-				"tvdb_show:700:s1": {},
-				"tvdb_show:700": {},
-			},
-		});
-
-		expect(entries[aid(1)]).toEqual([
-			{ kind: "tvdb-show", id: tvdb(700), season: 0 },
-			{ kind: "tvdb-show", id: tvdb(700), season: 1 },
-			{ kind: "tvdb-show", id: tvdb(700) },
-		]);
-	});
-
-	it("ignores malformed and unsupported target descriptors", () => {
-		const { entries } = parseAniBridgeData({
-			"anidb:1:R": {
-				"anilist:1": {},
-				"tmdb_movie:300:s1": {},
+				"tmdb_show:95479:s1": {},
+				"tvdb_show:377543:s1": {},
 				"tmdb_show:500:sx": {},
 				"tvdb_show:0:s1": {},
-				"tvdb_show:700:s-1": {},
 				"unsupported:800": {},
+			},
+			"tmdb_show:95479:s1": {
+				"anilist:113415": {},
+				"anilist:145064": {},
+				"anilist:172463": {},
+				"tvdb_show:377543:s1": {},
+				"tvdb_show:377543:s2": {},
+				"tvdb_show:377543:s3": {},
 			},
 		});
 
-		expect(entries).toEqual({});
+		expect(entries[aid(113_415)]).toEqual([
+			{ kind: "tmdb-movie", id: tmdb(300) },
+			{ kind: "tmdb-show", id: tmdb(95_479), season: 1 },
+			{ kind: "tvdb-show", id: tvdb(377_543), season: 1 },
+		]);
+		expect(entries[aid(145_064)]).toBeUndefined();
+		expect(entries[aid(172_463)]).toBeUndefined();
 	});
 });
 
 describe("parseAniBridgeData AniList crosswalks", () => {
-	it("builds unique MAL to AniList crosswalks from same-row targets", () => {
+	it("uses only canonical MAL rows with one AniList target", () => {
 		const { aniListCrosswalks } = parseAniBridgeData({
-			"anidb:5114:R": {
-				"anilist:21": {},
-				"mal:5114": {},
+			"mal:40748": {
+				"anilist:113415": {},
 				"tvdb_show:78874:s1": {},
 			},
-		});
-
-		expect(
-			aniListCrosswalks[
-				sourceIdentityKey({ source: "mal", id: mal(5114) })
-			],
-		).toBe(aid(21));
-	});
-
-	it("does not build ambiguous MAL to AniList crosswalks", () => {
-		const { aniListCrosswalks } = parseAniBridgeData({
-			"anidb:5114:R": {
+			"mal:5114": {
 				"anilist:21": {},
 				"anilist:22": {},
-				"mal:5114": {},
+			},
+			"anidb:1:R": {
+				"anilist:1": {},
+				"mal:1": {},
 			},
 		});
 
-		expect(aniListCrosswalks).toEqual({});
-	});
-
-	it("ignores scoped MAL source descriptors", () => {
-		const { aniListCrosswalks } = parseAniBridgeData({
-			"anidb:5114:R": {
-				"anilist:21": {},
-				"mal:5114:s1": {},
-				"tvdb_show:78874:s1": {},
-			},
+		expect(aniListCrosswalks).toEqual({
+			[sourceIdentityKey({ source: "mal", id: mal(40_748) })]: aid(113_415),
 		});
-
-		expect(aniListCrosswalks).toEqual({});
 	});
 });
