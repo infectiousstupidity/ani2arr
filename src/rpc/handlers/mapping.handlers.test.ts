@@ -368,7 +368,7 @@ describe("mappingHandlers", () => {
 		);
 	});
 
-	it("does not flag a MAL manual mapping as conflicting with its current AniList crosswalk", async () => {
+	it("uses the supplied AniList ID for a MAL manual mapping and conflict check", async () => {
 		vi.mocked(mappingService.getLinkedAniListIds).mockResolvedValueOnce([
 			aid(10),
 		]);
@@ -384,13 +384,13 @@ describe("mappingHandlers", () => {
 
 		expect(mappingService.setManualMapping).toHaveBeenCalledWith(
 			"sonarr",
-			{ source: "mal", id: mal(5114) },
+			aid(10),
 			tvdb(20),
 		);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 
-	it("keeps a MAL source in mapping mutation input", async () => {
+	it("uses the canonical AniList ID for a MAL mapping mutation", async () => {
 		await expect(
 			mappingHandlers.setMappingIgnore({
 				source: { source: "mal", id: mal(5114) },
@@ -399,10 +399,35 @@ describe("mappingHandlers", () => {
 			}),
 		).resolves.toEqual({ ok: true });
 
-		expect(mappingService.setIgnored).toHaveBeenCalledWith("sonarr", {
-			source: "mal",
-			id: mal(5114),
-		});
+		expect(mappingService.setIgnored).toHaveBeenCalledWith("sonarr", aid(10));
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
+	});
+
+	it("resolves a MAL-only mutation before writing", async () => {
+		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(aid(10));
+
+		await expect(
+			mappingHandlers.setMappingIgnore({
+				source: { source: "mal", id: mal(5114) },
+				provider: "sonarr",
+			}),
+		).resolves.toEqual({ ok: true });
+
+		expect(mappingService.setIgnored).toHaveBeenCalledWith("sonarr", aid(10));
+	});
+
+	it("rejects a MAL mutation without a canonical AniList ID", async () => {
+		await expect(
+			mappingHandlers.setMappingIgnore({
+				source: { source: "mal", id: mal(5114) },
+				provider: "sonarr",
+			}),
+		).rejects.toMatchObject({
+			code: "VALIDATION_ERROR",
+			message: "Mapping changes require a canonical AniList ID.",
+		});
+
+		expect(mappingService.setIgnored).not.toHaveBeenCalled();
+		expect(bumpMappingsRevisionMock).not.toHaveBeenCalled();
 	});
 });

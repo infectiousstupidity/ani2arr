@@ -5,7 +5,7 @@ import type { AniListId, AniListMetadata } from "@/anilist/types";
 import { resolveTitlePreference } from "@/anilist/title";
 import type { MappingService } from "@/mapping/mapping.service";
 import type { Provider } from "@/providers/types";
-import { anilistIdFromSource, sourceFromInput } from "@/rpc/source-input";
+import { resolveAniListIdFromInput, sourceFromInput } from "@/rpc/source-input";
 import type {
 	GetMappingInspectionOutput,
 	MappingDetailsLinkedAniListEntry,
@@ -59,8 +59,11 @@ export async function getMappingInspection(
 	deps: GetMappingInspectionDeps,
 ): Promise<GetMappingInspectionOutput> {
 	const source = sourceFromInput(input);
-	const currentAniListId = input.anilistId ?? anilistIdFromSource(source);
-	const mapping = await deps.mappingService.getMapping(input.provider, source);
+	const currentAniListId = await resolveAniListIdFromInput(input);
+	const mapping =
+		currentAniListId === null
+			? ({ kind: "unmapped", hadResolveAttempt: false } as const)
+			: await deps.mappingService.getMapping(input.provider, currentAniListId);
 
 	const linkedAniListIds =
 		mapping.kind === "mapped"

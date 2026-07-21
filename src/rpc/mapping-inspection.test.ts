@@ -3,8 +3,13 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { parseAniListId, type AniListMetadata } from "@/anilist/types";
+import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { getMappingInspection } from "./mapping-inspection";
+
+vi.mock("@/mapping/upstream.store", () => ({
+	getUniqueAniListIdForSource: vi.fn(),
+}));
 
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;
@@ -110,17 +115,21 @@ describe("getMappingInspection", () => {
 			] satisfies AniListMetadata[],
 		}));
 		const source = { source: "mal", id: mal(5114) } as const;
+		const getMapping = vi.fn(
+			async () =>
+				({
+					kind: "mapped",
+					source: "upstream",
+					providerId: 100,
+				}) as const,
+		);
 
 		await expect(
 			getMappingInspection(
 				{ provider: "sonarr", source, anilistId: aid(10) },
 				{
 					mappingService: {
-						getMapping: vi.fn(async () => ({
-							kind: "mapped",
-							source: "upstream",
-							providerId: 100,
-						} as const)),
+						getMapping,
 						getLinkedAniListIds: vi.fn(async () => []),
 					},
 					anilistMetadataStore: { getMetadata: metadataSpy },
@@ -138,5 +147,34 @@ describe("getMappingInspection", () => {
 				},
 			],
 		});
+		expect(getMapping).toHaveBeenCalledWith("sonarr", aid(10));
+		expect(getUniqueAniListIdForSource).not.toHaveBeenCalled();
+	});
+
+	it("returns unmapped for a MAL source without a crosswalk", async () => {
+		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(null);
+		const getMapping = vi.fn();
+		const metadataSpy = vi.fn();
+		const source = { source: "mal", id: mal(5114) } as const;
+
+		await expect(
+			getMappingInspection(
+				{ provider: "sonarr", source },
+				{
+					mappingService: {
+						getMapping,
+						getLinkedAniListIds: vi.fn(),
+					},
+					anilistMetadataStore: { getMetadata: metadataSpy },
+				},
+			),
+		).resolves.toEqual({
+			source,
+			mapping: { kind: "unmapped", hadResolveAttempt: false },
+			linkedAniListEntries: [],
+		});
+
+		expect(getMapping).not.toHaveBeenCalled();
+		expect(metadataSpy).not.toHaveBeenCalled();
 	});
 });

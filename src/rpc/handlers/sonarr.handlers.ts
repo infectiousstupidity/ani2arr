@@ -36,7 +36,7 @@ import type {
 	UpdateSonarrInput,
 	ValidateTvdbInput,
 } from "@/rpc/types";
-import { sourceFromInput } from "@/rpc/source-input";
+import { resolveAniListIdFromInput } from "@/rpc/source-input";
 import { normalizeError } from "@/shared/errors/error-utils";
 import { normalizeInputCredentials } from "./provider-credentials";
 
@@ -243,8 +243,12 @@ async function getSeriesStatusFromMappingAndLibrary(
 async function resolveSeriesMapping(
 	input: StatusInput,
 ): Promise<SonarrMappingResult> {
-	const source = sourceFromInput(input);
-	const mapping = await mappingService.resolveMapping("sonarr", source, {
+	const anilistId = await resolveAniListIdFromInput(input);
+	if (anilistId === null) {
+		return { kind: "unmapped", mapping: unmappedMapping() };
+	}
+
+	const mapping = await mappingService.resolveMapping("sonarr", anilistId, {
 		forceRetry: input.force_mapping_retry === true,
 		...(input.title === undefined ? {} : { title: input.title }),
 		...(input.metadata === undefined ? {} : { metadata: input.metadata }),

@@ -164,7 +164,7 @@ describe("radarrHandlers", () => {
 		});
 		expect(apiServicesMock.mappingService.resolveMapping).toHaveBeenCalledWith(
 			"radarr",
-			{ source: "anilist", id: anilistId },
+			anilistId,
 			{
 				forceRetry: true,
 				title: "Mapped Movie",

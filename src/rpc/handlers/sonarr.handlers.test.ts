@@ -3,6 +3,8 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
+import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTvdbId } from "@/providers/schemas";
 import type { ProviderCredentials } from "@/providers/types";
 import type {
@@ -74,9 +76,14 @@ vi.mock("@/providers/sonarr/edit", () => ({
 	updateSonarrSeries: updateSonarrSeriesMock,
 }));
 
+vi.mock("@/mapping/upstream.store", () => ({
+	getUniqueAniListIdForSource: vi.fn(),
+}));
+
 describe("sonarrHandlers", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(null);
 		apiServicesMock.mappingService.getLinkedAniListIds.mockResolvedValue([]);
 		apiServicesMock.sonarrLibrary.upsertSeriesSnapshot.mockResolvedValue(true);
 	});
@@ -164,12 +171,29 @@ describe("sonarrHandlers", () => {
 		});
 		expect(apiServicesMock.mappingService.resolveMapping).toHaveBeenCalledWith(
 			"sonarr",
-			{ source: "anilist", id: anilistId },
+			anilistId,
 			{
 				forceRetry: true,
 				title: "Mapped Series",
 			},
 		);
+	});
+
+	it("returns unmapped for a MAL status read without a crosswalk", async () => {
+		providerConfigMock.getProviderConfig.mockResolvedValue(credentials);
+
+		await expect(
+			sonarrHandlers.getSeriesStatus({
+				source: { source: "mal", id: parseMyAnimeListId(5114) },
+			}),
+		).resolves.toEqual({
+			mapping: { kind: "unmapped", hadResolveAttempt: false },
+			isInLibrary: null,
+		});
+
+		expect(
+			apiServicesMock.mappingService.resolveMapping,
+		).not.toHaveBeenCalled();
 	});
 
 	it("updates Sonarr cache and revision after add", async () => {
