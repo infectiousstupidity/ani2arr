@@ -52,18 +52,14 @@ Respect folder ownership:
 
 Allowed flow:
 
-```text
 features/options-page/content -> queries -> rpc
 rpc/background composes mapping and provider services
 mapping may import provider identity types only
-```
 
 Forbidden flow:
 
-```text
 providers must not call mapping services or rpc
 queries must not call provider clients or storage
 shared must not import domain folders
-```
 
 If one file answers multiple domain questions, split or move it.

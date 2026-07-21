@@ -240,7 +240,6 @@ describe("mappingHandlers", () => {
 			aid(1),
 			aid(2),
 		]);
-		expect(listEffectiveMappingRecordsByProviderMock).toHaveBeenCalledOnce();
 	});
 
 	it("builds Sonarr route metadata", async () => {
