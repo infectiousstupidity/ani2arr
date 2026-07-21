@@ -114,11 +114,15 @@ async function mountAnimePageUI({
 		anchor: `#${ANCHOR_ID}`,
 		append: "last",
 		onMount: (uiContainer, _shadow, shadowHost): Root => {
+			Object.assign(uiContainer.style, {
+				width: "300px",
+				maxWidth: "100%",
+			});
 			Object.assign(shadowHost.style, {
 				display: "block",
 				position: "static",
 				width: "100%",
-				maxWidth: "420px",
+				maxWidth: "300px",
 				margin: "0",
 			});
 			const root = createRoot(uiContainer);
@@ -126,7 +130,7 @@ async function mountAnimePageUI({
 				<ExtensionErrorBoundary scope="myanimelist-anime-root">
 					<QueryClientProvider client={queryClient}>
 						<Tooltip.Provider>
-							<ContentRoot target={target} />
+							<ContentRoot target={target} compactActions />
 						</Tooltip.Provider>
 					</QueryClientProvider>
 				</ExtensionErrorBoundary>,

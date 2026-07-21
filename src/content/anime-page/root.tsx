@@ -45,9 +45,11 @@ export interface AnimePageTarget {
 
 interface ContentRootProps {
 	target: AnimePageTarget;
+	compactActions?: boolean;
 }
 
 interface AnimeProviderActionProps {
+	compact: boolean;
 	source: SourceIdentity;
 	anilistId: AniListId;
 	displayTitle: string;
@@ -69,6 +71,7 @@ interface RadarrAnimeActionProps extends AnimeProviderActionProps {
 }
 
 interface AnimePageActionStackProps {
+	compact: boolean;
 	showProviderAction: boolean;
 	provider: Provider | null;
 	source: SourceIdentity;
@@ -194,6 +197,7 @@ function isStatusBlocked(input: {
 }
 
 function SonarrAnimePageActions({
+	compact,
 	anilistId,
 	source,
 	displayTitle,
@@ -225,6 +229,7 @@ function SonarrAnimePageActions({
 	return (
 		<MediaActions
 			provider="sonarr"
+			compact={compact}
 			state={mediaAction.status.state}
 			errorSource={mediaAction.status.errorSource}
 			hasMapping={mediaAction.status.hasMapping}
@@ -239,6 +244,7 @@ function SonarrAnimePageActions({
 }
 
 function RadarrAnimePageActions({
+	compact,
 	anilistId,
 	source,
 	displayTitle,
@@ -270,6 +276,7 @@ function RadarrAnimePageActions({
 	return (
 		<MediaActions
 			provider="radarr"
+			compact={compact}
 			state={mediaAction.status.state}
 			errorSource={mediaAction.status.errorSource}
 			hasMapping={mediaAction.status.hasMapping}
@@ -284,6 +291,7 @@ function RadarrAnimePageActions({
 }
 
 function AnimePageActionStack({
+	compact,
 	showProviderAction,
 	provider,
 	source,
@@ -302,9 +310,10 @@ function AnimePageActionStack({
 	onOpenSeerrModal,
 }: AnimePageActionStackProps): ReactElement {
 	return (
-		<div className="flex w-full flex-col gap-2">
+		<div className={`flex w-full flex-col ${compact ? "gap-1.5" : "gap-2"}`}>
 			{showProviderAction && provider === "sonarr" ? (
 				<SonarrAnimePageActions
+					compact={compact}
 					anilistId={anilistId}
 					source={source}
 					displayTitle={displayTitle}
@@ -320,6 +329,7 @@ function AnimePageActionStack({
 			) : null}
 			{showProviderAction && provider === "radarr" ? (
 				<RadarrAnimePageActions
+					compact={compact}
 					anilistId={anilistId}
 					source={source}
 					displayTitle={displayTitle}
@@ -337,19 +347,21 @@ function AnimePageActionStack({
 				<div
 					className={`grid ${
 						options?.seerr.isConfigured === true && seerrRequestInput !== null
-							? "grid-cols-[1fr_auto] gap-3.75"
+							? `grid-cols-[1fr_auto] ${compact ? "gap-2" : "gap-3.75"}`
 							: "grid-cols-1 gap-0"
 					} w-full items-start`}
 				>
 					<SeerrRequestButton
 						requestInput={seerrRequestInput}
 						isConfigured={options?.seerr.isConfigured === true}
+						compact={compact}
 						portalContainer={portalContainer ?? undefined}
 						onOpenModal={onOpenSeerrModal}
 					/>
 					<SeerrOpenButton
 						requestInput={seerrRequestInput}
 						isConfigured={options?.seerr.isConfigured === true}
+						compact={compact}
 						portalContainer={portalContainer ?? undefined}
 					/>
 				</div>
@@ -358,7 +370,10 @@ function AnimePageActionStack({
 	);
 }
 
-export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
+export function ContentRoot({
+	target,
+	compactActions = false,
+}: ContentRootProps): ReactElement | null {
 	const { anilistId, source } = target;
 	const [hostElement, setHostElement] = useState<HTMLDivElement | null>(null);
 	useTheme({ current: hostElement });
@@ -444,6 +459,7 @@ export function ContentRoot({ target }: ContentRootProps): ReactElement | null {
 		<div ref={setHostElement} style={{ width: "100%" }}>
 			<ConfirmProvider portalContainer={hostElement ?? null}>
 				<AnimePageActionStack
+					compact={compactActions}
 					showProviderAction={showProviderAction}
 					provider={provider}
 					source={source}

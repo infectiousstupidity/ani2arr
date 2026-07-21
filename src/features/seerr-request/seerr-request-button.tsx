@@ -13,6 +13,7 @@ import { getSeerrActionState } from "./seerr-action-state";
 interface SeerrRequestButtonProps {
 	requestInput: RequestInSeerrInput | null;
 	isConfigured: boolean;
+	compact?: boolean;
 	statusEnabled?: boolean;
 	portalContainer?: HTMLElement | undefined;
 	onOpenModal: () => void;
@@ -21,6 +22,7 @@ interface SeerrRequestButtonProps {
 interface SeerrOpenButtonProps {
 	requestInput: RequestInSeerrInput | null;
 	isConfigured: boolean;
+	compact?: boolean;
 	portalContainer?: HTMLElement | undefined;
 }
 
@@ -31,6 +33,7 @@ function isTrustedClick(event: MouseEvent<HTMLButtonElement>): boolean {
 export function SeerrRequestButton({
 	requestInput,
 	isConfigured,
+	compact = false,
 	statusEnabled = true,
 	portalContainer,
 	onOpenModal,
@@ -80,7 +83,7 @@ export function SeerrRequestButton({
 			disabled={actionState.disabled}
 			tooltip={actionState.label}
 			tooltipContainer={portalContainer}
-			className="h-8.75 w-full rounded-[3px] text-[14px]"
+			className={`${compact ? "h-6.5 text-[11px]" : "h-8.75 text-[14px]"} w-full rounded-[3px]`}
 		>
 			<span className="inline-flex min-w-0 items-center justify-center gap-2">
 				<span className="truncate">{actionState.label}</span>
@@ -92,6 +95,7 @@ export function SeerrRequestButton({
 export function SeerrOpenButton({
 	requestInput,
 	isConfigured,
+	compact = false,
 	portalContainer,
 }: SeerrOpenButtonProps): ReactElement | null {
 	if (!isConfigured || requestInput === null) return null;
@@ -112,10 +116,10 @@ export function SeerrOpenButton({
 			variant="primary"
 			tooltip="Open in Seerr"
 			tooltipContainer={portalContainer}
-			className="h-8.75 w-8.75 rounded-[3px]"
+			className={`${compact ? "h-6.5 w-6.5" : "h-8.75 w-8.75"} rounded-[3px]`}
 			onClick={handleClick}
 		>
-			<SeerrIcon className="h-4 w-4" />
+			<SeerrIcon className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
 		</Button>
 	);
 }

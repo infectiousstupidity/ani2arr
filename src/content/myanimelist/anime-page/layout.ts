@@ -11,6 +11,11 @@ export const DETAILS_COLUMN_SELECTOR = "#content .leftside, .leftside";
 export const UI_NAME = "a2a-myanimelist-anime-page-ui";
 export const ANCHOR_ID = "a2a-myanimelist-actions-anchor";
 
+const MAIN_USER_STATUS_SELECTOR =
+	"#content .anime-detail-header-stats .js-user-status-block";
+const MAIN_USER_STATUS_FALLBACK_SELECTOR =
+	"#content .anime-detail-header-stats .user-status-block";
+
 function createAbortError(): DOMException {
 	return new DOMException("The operation was aborted.", "AbortError");
 }
@@ -86,17 +91,21 @@ export function readFormatFromPage(doc: Document = document): AniListMediaFormat
 }
 
 export function ensureActionsAnchor(doc: Document = document): HTMLElement | null {
-	const title = doc.querySelector<HTMLElement>(TITLE_SELECTOR);
-	if (!title) return null;
+	const userStatus =
+		doc.querySelector<HTMLElement>(MAIN_USER_STATUS_SELECTOR) ??
+		doc.querySelector<HTMLElement>(MAIN_USER_STATUS_FALLBACK_SELECTOR);
+	if (!userStatus) return null;
 
 	let anchor = doc.querySelector<HTMLElement>(`#${ANCHOR_ID}`);
 	if (!anchor) {
 		anchor = doc.createElement("div");
 		anchor.id = ANCHOR_ID;
-		anchor.style.display = "block";
-		anchor.style.margin = "8px 0 12px";
-		title.after(anchor);
 	}
+
+	anchor.style.display = "block";
+	anchor.style.clear = "both";
+	anchor.style.margin = "8px 0 0";
+	userStatus.after(anchor);
 
 	return anchor;
 }

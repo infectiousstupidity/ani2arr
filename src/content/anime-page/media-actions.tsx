@@ -12,6 +12,7 @@ import { RadarrIcon, SonarrIcon } from "@/features/provider-ui/provider-icons";
 
 interface MediaActionsProps {
 	provider: Provider;
+	compact?: boolean;
 	state: MediaActionState;
 	errorSource: "status" | "add" | null;
 	hasMapping: boolean;
@@ -22,6 +23,27 @@ interface MediaActionsProps {
 	onOpenMapping: () => void;
 	portalContainer?: HTMLElement | undefined;
 }
+
+const MEDIA_ACTION_CLASS_NAMES = {
+	compact: {
+		externalGap: "gap-2",
+		primary: "h-6.5 text-[11px] pl-2",
+		menuWidth: "w-[calc(100%-26px)]",
+		dropdown: "h-6.5 w-6.5",
+		chevron: "h-3 w-3",
+		external: "h-6.5 w-6.5",
+		providerIcon: "h-3.5 w-3.5",
+	},
+	default: {
+		externalGap: "gap-3.75",
+		primary: "h-8.75 text-[14px] pl-2.5",
+		menuWidth: "w-[calc(100%-34px)]",
+		dropdown: "h-8.75 w-8.5",
+		chevron: "h-4 w-4",
+		external: "h-8.75 w-8.75",
+		providerIcon: "h-4 w-4",
+	},
+} as const;
 
 function getPrimaryButtonText(input: {
 	providerLabel: string;
@@ -107,13 +129,16 @@ function getLoadingText(input: {
 		: `Checking ${input.providerLabel}...`;
 }
 
-function renderProviderOpenIcon(provider: Provider): React.ReactElement {
+function renderProviderOpenIcon(
+	provider: Provider,
+	className: string,
+): React.ReactElement {
 	switch (provider) {
 		case "sonarr": {
-			return <SonarrIcon className="h-4 w-4" />;
+			return <SonarrIcon className={className} />;
 		}
 		case "radarr": {
-			return <RadarrIcon className="h-4 w-4" />;
+			return <RadarrIcon className={className} />;
 		}
 	}
 }
@@ -130,6 +155,7 @@ const MediaActionGroup: React.FC<React.PropsWithChildren> = ({ children }) => (
 
 const MediaActions: React.FC<MediaActionsProps> = ({
 	provider,
+	compact = false,
 	state,
 	errorSource,
 	hasMapping,
@@ -140,6 +166,8 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 	onOpenMapping,
 	portalContainer,
 }) => {
+	const classNames =
+		MEDIA_ACTION_CLASS_NAMES[compact ? "compact" : "default"];
 	const providerLabel = getProviderLabel(provider);
 	const isLoading = state === "checking" || state === "adding";
 	const showSetupAction = hasMapping;
@@ -175,7 +203,7 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 
 	return (
 		<div
-			className={`grid ${showExternalAction ? "grid-cols-[1fr_auto] gap-3.75" : "grid-cols-1 gap-0"} items-start w-full`}
+			className={`grid ${showExternalAction ? `grid-cols-[1fr_auto] ${classNames.externalGap}` : "grid-cols-1 gap-0"} items-start w-full`}
 		>
 			<MediaActionGroup>
 				<Button
@@ -186,9 +214,9 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 					disabled={primaryDisabled}
 					{...(primaryButtonTooltip ? { tooltip: primaryButtonTooltip } : {})}
 					tooltipContainer={portalContainer}
-					className={`h-8.75 text-[14px] text-center px-0 pl-2.5 ${
+					className={`${classNames.primary} text-center px-0 ${
 						hasMenu
-							? "flex-1 w-[calc(100%-34px)] rounded-none"
+							? `flex-1 ${classNames.menuWidth} rounded-none`
 							: "w-full rounded-[3px]"
 					}`}
 					loadingText={getLoadingText({ providerLabel, state })}
@@ -205,10 +233,10 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 								size="icon"
 								variant="primary"
 								tooltipContainer={portalContainer}
-								className="relative rounded-none h-8.75 w-8.5 after:content-[''] after:absolute after:inset-0 after:bg-[rgba(255,255,255,0.14)] after:pointer-events-none"
+								className={`relative rounded-none ${classNames.dropdown} after:content-[''] after:absolute after:inset-0 after:bg-[rgba(255,255,255,0.14)] after:pointer-events-none`}
 								aria-label="Actions"
 							>
-								<ChevronDown className="h-4 w-4" />
+								<ChevronDown className={classNames.chevron} />
 							</Button>
 						}
 					>
@@ -233,10 +261,10 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 					variant="primary"
 					tooltip={`Open in ${providerLabel}`}
 					tooltipContainer={portalContainer}
-					className="h-8.75 w-8.75 rounded-[3px]"
+					className={`${classNames.external} rounded-[3px]`}
 					onClick={handleProviderOpenClick}
 				>
-					{renderProviderOpenIcon(provider)}
+					{renderProviderOpenIcon(provider, classNames.providerIcon)}
 				</Button>
 			) : null}
 		</div>
