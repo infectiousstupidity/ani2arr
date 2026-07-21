@@ -10,13 +10,15 @@ import {
 	shouldMoveProviderFiles,
 } from "../provider-media-paths";
 import type { ProviderCredentials } from "../types";
+import type {
+	ProviderQualityProfileId,
+	RadarrMovieId,
+	TmdbId,
+} from "../schemas";
 import type { RadarrClient } from "./client";
 import type { RadarrFormState } from "./form-state";
 import type {
 	RadarrMovie,
-	RadarrMovieId,
-	RadarrQualityProfileId,
-	TmdbId,
 } from "./types";
 import { resolveProviderTagIds } from "../provider-tags";
 
@@ -153,9 +155,9 @@ async function resolveRadarrMovieUpdate(input: {
 }
 
 function resolveRequiredQualityProfileId(input: {
-	value: RadarrQualityProfileId | undefined;
-	fallback: RadarrQualityProfileId | undefined;
-}): RadarrQualityProfileId {
+	value: ProviderQualityProfileId | undefined;
+	fallback: ProviderQualityProfileId | undefined;
+}): ProviderQualityProfileId {
 	const resolvedValue =
 		typeof input.value === "number" && Number.isFinite(input.value)
 			? input.value

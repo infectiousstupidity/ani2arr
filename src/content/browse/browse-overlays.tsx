@@ -4,7 +4,7 @@
 import React, { useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { metadataHintFromAniListMetadata } from "@/anilist/title";
-import { getMappedIdentitiesByAniListId } from "@/content/anilist/target-provider";
+import type { AniListId } from "@/anilist/types";
 import { MediaModal } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
 import { sourceIdentityKey } from "@/mapping/source-identity";
@@ -13,6 +13,7 @@ import { useMappingIdentities, useSourceAniListIdMap } from "@/queries/mapping";
 import { usePublicOptions } from "@/queries/options";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import { useTheme } from "@/shared/hooks/use-theme";
+import type { MappingIdentity } from "@/rpc/types";
 import { BrowseCardOverlay } from "./browse-card-overlay";
 import { useBrowseCardTargets } from "./use-browse-card-targets";
 import type { BrowseAdapter } from "./types";
@@ -20,6 +21,24 @@ import type { BrowseAdapter } from "./types";
 export interface BrowseOverlaysProps {
 	adapter: BrowseAdapter;
 	portalContainer: HTMLElement;
+}
+
+function getMappedIdentitiesByAniListId(
+	identities: readonly MappingIdentity[],
+): Map<AniListId, MappingIdentity[]> {
+	const identitiesById = new Map<AniListId, MappingIdentity[]>();
+	for (const identity of identities) {
+		if (identity.result.kind !== "mapped") continue;
+
+		const existing = identitiesById.get(identity.anilistId);
+		if (existing) {
+			existing.push(identity);
+		} else {
+			identitiesById.set(identity.anilistId, [identity]);
+		}
+	}
+
+	return identitiesById;
 }
 
 export function BrowseOverlays({

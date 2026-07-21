@@ -5,7 +5,7 @@ import { Link2, Palette, Plug, ShieldCheck, SlidersHorizontal } from "lucide-rea
 import { browser } from "wxt/browser";
 import ani2arrIconUrl from "@/assets/icon.png";
 import type { Provider } from "@/providers/types";
-import type { ProviderConnectionStatusView } from "@/queries/provider-connection";
+import type { ProviderConnectionStatusView } from "../hooks/provider-connection-status";
 import { cn } from "@/shared/utils/cn";
 import type { PageId } from "../navigation";
 import {

@@ -1,6 +1,5 @@
 /** Pure helpers for Arr provider connection normalization and configured state. */
 
-import { getProviderHostPermissionPattern } from "@/providers/settings/host-permissions";
 import { getProviderLabel } from "@/providers/provider-labels";
 import {
 	validateProviderConnectionApiKey,
@@ -11,10 +10,6 @@ import type {
 	ProviderCredentials,
 } from "@/providers/types";
 import type { ExtensionOptions } from "./types";
-
-export type NormalizedProviderConnection = ProviderCredentials & {
-	permissionPattern: string;
-};
 
 export function getProviderConnectionDraft(
 	settings: ExtensionOptions | undefined,
@@ -39,7 +34,7 @@ export function getProviderCredentials(
 export function normalizeProviderConnectionInput(
 	input: Partial<ProviderCredentials> | undefined,
 	provider: Provider,
-): NormalizedProviderConnection | null {
+): ProviderCredentials | null {
 	const label = getProviderLabel(provider);
 	const url = String(input?.url ?? "").trim();
 	const apiKey = String(input?.apiKey ?? "").trim();
@@ -58,26 +53,16 @@ export function normalizeProviderConnectionInput(
 		throw new Error(`Please enter a valid ${label} URL and API key.`);
 	}
 
-	const permissionPattern = getProviderHostPermissionPattern(
-		normalizedUrl.value,
-	);
-	if (!permissionPattern.ok) {
-		throw new Error(
-			`Failed to update ${label} host permissions. Please try again.`,
-		);
-	}
-
 	return {
 		url: normalizedUrl.value,
 		apiKey: normalizedApiKey.value,
-		permissionPattern: permissionPattern.value,
 	};
 }
 
 export function normalizeProviderConnectionSettings(
 	settings: ExtensionOptions | undefined,
 	provider: Provider,
-): NormalizedProviderConnection | null {
+): ProviderCredentials | null {
 	return normalizeProviderConnectionInput(
 		getProviderConnectionDraft(settings, provider),
 		provider,

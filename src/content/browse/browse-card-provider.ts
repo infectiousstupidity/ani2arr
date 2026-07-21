@@ -2,8 +2,10 @@
 // src/content/browse/browse-card-provider.ts
 
 import type { AniListMediaHint } from "@/anilist/types";
-import { resolveAniListTargetProvider } from "@/content/anilist/target-provider";
-import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
+import {
+	resolveAniListTargetProvider,
+	resolveProviderForAniListFormat,
+} from "@/content/target-provider";
 import type { Provider } from "@/providers/types";
 import type { MappingIdentity } from "@/rpc/types";
 import type { HostMediaTarget } from "./types";

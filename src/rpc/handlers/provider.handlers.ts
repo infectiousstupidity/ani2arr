@@ -91,11 +91,11 @@ export const providerHandlers = {
 		),
 
 	checkSeerrSession({ url }: CheckSeerrSessionInput) {
-		const normalized = normalizeSeerrUrlInput(url);
-		if (!normalized) throw new Error("Seerr URL is required.");
+		const normalizedUrl = normalizeSeerrUrlInput(url);
+		if (!normalizedUrl) throw new Error("Seerr URL is required.");
 
 		return seerrClient.validateConnection({
-			url: normalized.url,
+			url: normalizedUrl,
 			auth: { mode: "session" },
 		});
 	},

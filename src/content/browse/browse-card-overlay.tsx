@@ -14,7 +14,7 @@ import type { metadataHintFromAniListMetadata } from "@/anilist/title";
 import type {
 	MediaModalMetadataHint,
 	MediaModalOpenState,
-} from "@/features/media-modal";
+} from "@/features/media-modal/types";
 import { RadarrCardOverlay } from "@/features/media-overlay/radarr-card-overlay";
 import {
 	SeerrCardStackActions,

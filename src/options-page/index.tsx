@@ -11,7 +11,7 @@ import {
 import {
   deriveProviderConnectionStatusView,
   useStoredProviderConnectionStatus,
-} from "@/queries/provider-connection";
+} from "./hooks/provider-connection-status";
 import { useConfiguredSeerrConnectionCheck } from "@/queries/seerr";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import { getProviderCredentials } from "@/settings/provider-config";

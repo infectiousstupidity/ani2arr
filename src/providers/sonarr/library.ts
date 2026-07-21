@@ -12,13 +12,13 @@ import {
 	logError,
 	normalizeError,
 } from "@/shared/errors/error-utils";
+import type { TvdbId } from "../schemas";
 import type { ProviderCredentials } from "../types";
 import type { SonarrClient } from "./client";
 import type {
 	SonarrLookupSeries,
 	SonarrSeries,
 	SonarrSeriesSnapshot,
-	TvdbId,
 } from "./types";
 
 const CACHE_KEY = "series";

@@ -1,4 +1,4 @@
-/** React Query hooks and UI status derivation for provider connection checks. */
+/** React Query hook for provider connection checks. */
 // src/queries/provider-connection.ts
 
 import { useQuery } from "@tanstack/react-query";
@@ -16,12 +16,6 @@ import type {
 type TestProviderConnectionInput = {
 	provider: Provider;
 	credentials: ProviderCredentials;
-};
-
-export type ProviderConnectionStatusView = {
-	isProviderConfigured: boolean;
-	shortLabel: string;
-	variantClassName?: string;
 };
 
 const testConnection = (input: TestProviderConnectionInput) => {
@@ -66,59 +60,3 @@ export const useProviderConnectionCheck = (options: {
 		refetchOnMount: "always",
 		retry: 0,
 	});
-
-export const deriveProviderConnectionStatusView = (input: {
-	isProviderConfigured: boolean;
-	isProviderConnected: boolean;
-	isCheckingProviderConnection: boolean;
-}): ProviderConnectionStatusView => {
-	if (!input.isProviderConfigured) {
-		return {
-			isProviderConfigured: false,
-			shortLabel: "Not configured",
-		};
-	}
-
-	if (input.isCheckingProviderConnection) {
-		return {
-			isProviderConfigured: true,
-			shortLabel: "Checking",
-			variantClassName: "a2a-provider-status--connecting",
-		};
-	}
-
-	if (input.isProviderConnected) {
-		return {
-			isProviderConfigured: true,
-			shortLabel: "Connected",
-			variantClassName: "a2a-provider-status--connected",
-		};
-	}
-
-	return {
-		isProviderConfigured: true,
-		shortLabel: "Configured",
-		variantClassName: "a2a-provider-status--configured",
-	};
-};
-
-export const useStoredProviderConnectionStatus = (options: {
-	provider: Provider;
-	credentials: ProviderCredentials | null;
-	isProviderConfigured: boolean;
-}): ProviderConnectionStatusView => {
-	const connectionQuery = useProviderConnectionCheck({
-		provider: options.provider,
-		credentials: options.credentials,
-		enabled: options.isProviderConfigured && options.credentials !== null,
-	});
-
-	return deriveProviderConnectionStatusView({
-		isProviderConfigured: options.isProviderConfigured,
-		isProviderConnected: connectionQuery.isSuccess,
-		isCheckingProviderConnection:
-			options.isProviderConfigured &&
-			options.credentials !== null &&
-			connectionQuery.isFetching,
-	});
-};

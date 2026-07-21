@@ -9,9 +9,8 @@ import type {
 	ProviderTagId,
 	RadarrMovieId,
 } from "@/providers/schemas";
-import type { RadarrAddMoviePayload } from "./add";
 import { RadarrClient } from "./client";
-import type { RadarrMovie } from "./types";
+import type { RadarrAddMoviePayload, RadarrMovie } from "./types";
 
 const credentials: ProviderCredentials = {
 	url: "https://radarr.example",

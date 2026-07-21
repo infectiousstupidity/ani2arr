@@ -8,7 +8,7 @@ import type {
 	AniListMediaFormat,
 	AniListMediaHint,
 } from "@/anilist/types";
-import { resolveAniListTargetProvider } from "@/content/anilist/target-provider";
+import { resolveAniListTargetProvider } from "@/content/target-provider";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import { openOptionsPage } from "@/rpc/runtime-messages";
 import type { RequestInSeerrInput } from "@/rpc/types";
@@ -19,8 +19,9 @@ import {
 } from "@/features/seerr-request/seerr-request-button";
 import { toSeerrRequestInput } from "@/features/seerr-request/seerr-request-input";
 import { useSonarrMediaAction } from "@/features/media-action/use-sonarr-media-action";
-import { MediaModal, type MediaModalMetadataHint } from "@/features/media-modal";
+import { MediaModal } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
+import type { MediaModalMetadataHint } from "@/features/media-modal/types";
 import type { Provider } from "@/providers/types";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";

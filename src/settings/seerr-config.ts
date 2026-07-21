@@ -1,7 +1,6 @@
 /** Pure helpers for Seerr connection normalization and configured state. */
 // src/settings/seerr-config.ts
 
-import { getProviderHostPermissionPattern } from "@/providers/settings/host-permissions";
 import {
 	validateProviderConnectionApiKey,
 	validateProviderConnectionUrl,
@@ -17,13 +16,11 @@ type NormalizedSeerrSessionConnection = {
 	url: string;
 	auth: { mode: "session" };
 	account: SeerrAccountSummary;
-	permissionPattern: string;
 };
 
 type NormalizedSeerrApiKeyConnection = {
 	url: string;
 	auth: { mode: "apiKey"; apiKey: string };
-	permissionPattern: string;
 };
 
 export type NormalizedSeerrConnection =
@@ -69,7 +66,7 @@ function normalizeAccount(
 
 export function normalizeSeerrUrlInput(
 	input: string | undefined,
-): { url: string; permissionPattern: string } | null {
+): string | null {
 	const url = String(input ?? "").trim();
 	if (!url) return null;
 
@@ -78,17 +75,7 @@ export function normalizeSeerrUrlInput(
 		throw new Error("Please enter a valid Seerr URL.");
 	}
 
-	const permissionPattern = getProviderHostPermissionPattern(
-		normalizedUrl.value,
-	);
-	if (!permissionPattern.ok) {
-		throw new Error("Failed to update Seerr host permissions. Please try again.");
-	}
-
-	return {
-		url: normalizedUrl.value,
-		permissionPattern: permissionPattern.value,
-	};
+	return normalizedUrl.value;
 }
 
 export function normalizeSeerrConnectionInput(
@@ -104,10 +91,9 @@ export function normalizeSeerrConnectionInput(
 		}
 
 		return {
-			url: normalizedUrl.url,
+			url: normalizedUrl,
 			auth: { mode: "session" },
 			account,
-			permissionPattern: normalizedUrl.permissionPattern,
 		};
 	}
 
@@ -119,12 +105,11 @@ export function normalizeSeerrConnectionInput(
 	}
 
 	return {
-		url: normalizedUrl.url,
+		url: normalizedUrl,
 		auth: {
 			mode: "apiKey",
 			apiKey: normalizedApiKey.value,
 		},
-		permissionPattern: normalizedUrl.permissionPattern,
 	};
 }
 
@@ -151,7 +136,6 @@ export function normalizeSeerrApiKeyConnectionInput(input: {
 			mode: "apiKey",
 			apiKey: normalized.auth.apiKey,
 		},
-		permissionPattern: normalized.permissionPattern,
 	};
 }
 
@@ -199,5 +183,5 @@ export function hasConfiguredSeerrConnection(
 export function buildSeerrLoginUrl(input: string): string {
 	const normalized = normalizeSeerrUrlInput(input);
 	if (!normalized) throw new Error("Please enter a valid Seerr URL.");
-	return `${normalized.url.replace(/\/+$/, "")}/login`;
+	return `${normalized.replace(/\/+$/, "")}/login`;
 }

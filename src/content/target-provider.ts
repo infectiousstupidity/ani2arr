@@ -1,30 +1,27 @@
-/** AniList target provider selection shared by browse and anime-page content surfaces. */
-// src/content/anilist/target-provider.ts
+/** Provider selection shared by supported content surfaces. */
 
 import type { AniListId, AniListMediaFormat } from "@/anilist/types";
-import { resolveProviderForAniListFormat } from "@/providers/provider-routing";
 import type { Provider } from "@/providers/types";
 import type { MappingIdentity } from "@/rpc/types";
 
-export function getMappedIdentitiesByAniListId(
-	identities: readonly MappingIdentity[],
-): Map<AniListId, MappingIdentity[]> {
-	const identitiesById = new Map<AniListId, MappingIdentity[]>();
-	for (const identity of identities) {
-		if (identity.result.kind !== "mapped") {
-			continue;
+export function resolveProviderForAniListFormat(
+	format: AniListMediaFormat | null | undefined,
+): Provider | null {
+	switch (format) {
+		case "MOVIE": {
+			return "radarr";
 		}
-
-		const existing = identitiesById.get(identity.anilistId);
-		if (existing) {
-			existing.push(identity);
-			continue;
+		case "TV":
+		case "TV_SHORT":
+		case "SPECIAL":
+		case "OVA":
+		case "ONA": {
+			return "sonarr";
 		}
-
-		identitiesById.set(identity.anilistId, [identity]);
+		default: {
+			return null;
+		}
 	}
-
-	return identitiesById;
 }
 
 export function resolveAniListTargetProvider(input: {

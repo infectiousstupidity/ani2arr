@@ -19,9 +19,14 @@ import type {
 	SonarrSeriesSchema,
 	SonarrSeriesSnapshotSchema,
 	SonarrSeriesStatusSchema,
+	SonarrSeriesType,
 	SonarrTagSchema,
 	UpdateSonarrSeriesInputSchema,
 } from "./schemas";
+import type {
+	ProviderQualityProfileId,
+	ProviderTagId,
+} from "../schemas";
 
 export type SonarrSeriesStatus = v.InferOutput<typeof SonarrSeriesStatusSchema>;
 
@@ -47,6 +52,15 @@ export type SonarrAddOptions = v.InferOutput<typeof SonarrAddOptionsSchema>;
 export type SonarrAddPayloadOptions = v.InferOutput<
 	typeof SonarrAddPayloadOptionsSchema
 >;
+export type SonarrAddSeriesPayload = SonarrLookupSeries & {
+	rootFolderPath: string;
+	qualityProfileId: ProviderQualityProfileId;
+	seriesType: SonarrSeriesType;
+	seasonFolder: boolean;
+	monitored: boolean;
+	tags: ProviderTagId[];
+	addOptions: SonarrAddPayloadOptions;
+};
 export type SonarrAddDefaults = SonarrAddOptions;
 export type SonarrAddDraft = {
 	options: SonarrAddOptions;
@@ -70,10 +84,3 @@ export type SonarrSeriesSnapshot = v.InferOutput<
 export type SonarrLookupCacheRow = v.InferOutput<
 	typeof SonarrLookupCacheRowSchema
 >;
-
-export {
-	type ProviderQualityProfileId as SonarrQualityProfileId,
-	type ProviderTagId as SonarrTagId,
-	type SonarrSeriesId,
-	type TvdbId,
-} from "../schemas";

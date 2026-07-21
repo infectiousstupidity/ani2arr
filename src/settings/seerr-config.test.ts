@@ -13,13 +13,10 @@ import {
 } from "./seerr-config";
 
 describe("Seerr connection config", () => {
-	it("normalizes URL-only session inputs and derives host permission", () => {
+	it("normalizes URL-only session inputs", () => {
 		expect(
 			normalizeSeerrUrlInput(" https://SEERR.example:443/base/// "),
-		).toEqual({
-			url: "https://seerr.example/base",
-			permissionPattern: "https://seerr.example/*",
-		});
+		).toBe("https://seerr.example/base");
 	});
 
 	it("requires a verified account before session mode is configured", () => {

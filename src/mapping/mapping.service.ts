@@ -27,8 +27,6 @@ import {
 	matchesUpstream,
 } from "./mapping-facts";
 
-export { chooseMappingResult } from "./mapping-facts";
-
 export class MappingService {
 	public constructor(
 		private readonly resolveAutomaticMapping: AutomaticResolver,

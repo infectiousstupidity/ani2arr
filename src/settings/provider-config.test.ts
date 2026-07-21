@@ -14,7 +14,7 @@ describe.each([
 	{ provider: "sonarr" as const, label: "Sonarr" },
 	{ provider: "radarr" as const, label: "Radarr" },
 ])("$label connection config", ({ provider, label }) => {
-	it("normalizes configured credentials and permission patterns", () => {
+	it("normalizes configured credentials", () => {
 		expect(
 			normalizeProviderConnectionInput(
 				{
@@ -26,7 +26,6 @@ describe.each([
 		).toEqual({
 			url: `https://${provider}.example/api`,
 			apiKey: "key-123",
-			permissionPattern: `https://${provider}.example/*`,
 		});
 	});
 
@@ -56,7 +55,6 @@ describe.each([
 		expect(normalizeProviderConnectionSettings(settings, provider)).toEqual({
 			url: `https://${provider}.example/base`,
 			apiKey: "key-123",
-			permissionPattern: `https://${provider}.example/*`,
 		});
 	});
 

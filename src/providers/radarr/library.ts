@@ -12,13 +12,13 @@ import {
 	logError,
 	normalizeError,
 } from "@/shared/errors/error-utils";
+import type { TmdbId } from "../schemas";
 import type { ProviderCredentials } from "../types";
 import type { RadarrClient } from "./client";
 import type {
 	RadarrLookupMovie,
 	RadarrMovie,
 	RadarrMovieSnapshot,
-	TmdbId,
 } from "./types";
 
 const CACHE_KEY = "movies";

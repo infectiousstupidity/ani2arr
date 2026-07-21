@@ -11,8 +11,7 @@ import type {
 	SonarrSeriesId,
 } from "@/providers/schemas";
 import { SonarrClient } from "./client";
-import type { SonarrAddSeriesPayload } from "./add";
-import type { SonarrSeries } from "./types";
+import type { SonarrAddSeriesPayload, SonarrSeries } from "./types";
 
 const credentials: ProviderCredentials = {
 	url: "https://sonarr.example",

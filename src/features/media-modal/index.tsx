@@ -54,14 +54,3 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
 		</ConfirmProvider>
 	);
 }
-
-export type { MediaModalProps } from "./types";
-export type {
-	AniListHeaderData,
-	MediaModalMetadataHint,
-	MediaModalOpenSource,
-	MediaModalOpenState,
-	MediaModalState,
-	MediaModalView,
-	SeerrMediaModalState,
-} from "./types";

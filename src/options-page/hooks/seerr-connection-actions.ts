@@ -54,11 +54,11 @@ export function useSeerrConnectionActions() {
 		setFailure(null);
 
 		try {
-			const normalized = normalizeSeerrUrlInput(draftUrl);
-			if (!normalized) throw new Error("Please enter a valid Seerr URL.");
+			const normalizedUrl = normalizeSeerrUrlInput(draftUrl);
+			if (!normalizedUrl) throw new Error("Please enter a valid Seerr URL.");
 
 			const permission = await requestProviderConnectionPermission(
-				normalized.url,
+				normalizedUrl,
 			);
 			if (!permission.ok || !permission.value.granted) {
 				throw new Error("Host permission was denied.");
@@ -66,10 +66,10 @@ export function useSeerrConnectionActions() {
 
 			const api = getAni2arrApi();
 			const { account } = await api.checkSeerrSession({
-				url: normalized.url,
+				url: normalizedUrl,
 			});
 			const connection: SeerrConnection = {
-				url: normalized.url,
+				url: normalizedUrl,
 				auth: { mode: "session" },
 				account,
 			};
@@ -82,7 +82,7 @@ export function useSeerrConnectionActions() {
 			const code = getExtensionErrorCode(error);
 			const checkedUrl =
 				code === ErrorCode.SEERR_AUTH_REQUIRED
-					? normalizeSeerrUrlInput(draftUrl)?.url ?? null
+					? normalizeSeerrUrlInput(draftUrl)
 					: null;
 			setFailure(
 				code === ErrorCode.SEERR_AUTH_REQUIRED &&
@@ -142,10 +142,10 @@ export function useSeerrConnectionActions() {
 		setIsConnecting(true);
 
 		try {
-			const normalized = normalizeSeerrUrlInput(draftUrl);
-			if (!normalized) throw new Error("Please enter a valid Seerr URL.");
+			const normalizedUrl = normalizeSeerrUrlInput(draftUrl);
+			if (!normalizedUrl) throw new Error("Please enter a valid Seerr URL.");
 			await browser.tabs.create({ url: buildSeerrLoginUrl(draftUrl) });
-			setOpenedLoginUrl(normalized.url);
+			setOpenedLoginUrl(normalizedUrl);
 		} catch (error) {
 			setFailure(getFailure(error, "Failed to open the Seerr login page."));
 		} finally {

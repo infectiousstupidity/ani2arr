@@ -5,8 +5,8 @@ import { useState } from "react";
 import type { AniListMetadata } from "@/anilist/types";
 import type { AniListTitleLanguage } from "@/anilist/title";
 import { resolveTitlePreference } from "@/anilist/title";
-import type { MediaModalMetadataHint } from "@/features/media-modal";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
+import type { MediaModalMetadataHint } from "@/features/media-modal/types";
 import {
 	parseTmdbIdOrNull,
 	parseTvdbIdOrNull,

@@ -5,9 +5,9 @@ import * as v from "valibot";
 
 import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
+import type { RadarrMovieId, TmdbId } from "../schemas";
 import { ProviderApiClient } from "../shared.client";
 import type { ProviderCredentials } from "../types";
-import type { RadarrAddMoviePayload } from "./add";
 import {
 	RadarrLookupMovieSchema,
 	RadarrMovieSchema,
@@ -16,13 +16,12 @@ import {
 	RadarrTagSchema,
 } from "./schemas";
 import type {
+	RadarrAddMoviePayload,
 	RadarrLookupMovie,
 	RadarrMovie,
-	RadarrMovieId,
 	RadarrQualityProfile,
 	RadarrRootFolder,
 	RadarrTag,
-	TmdbId,
 } from "./types";
 
 const RADARR_API_BASE_PATH = "/api/v3";
