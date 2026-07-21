@@ -90,9 +90,9 @@ export type UpdateRadarrInput = SourceRpcInput & {
 export type SetManualMappingInput = SourceRpcInput & {
 	force?: boolean;
 } & (
-	| { provider: "sonarr"; providerId: TvdbId }
-	| { provider: "radarr"; providerId: TmdbId }
-);
+		| { provider: "sonarr"; providerId: TvdbId }
+		| { provider: "radarr"; providerId: TmdbId }
+	);
 
 export type ClearManualMappingInput = SourceRpcInput & {
 	provider: Provider;
@@ -103,9 +103,9 @@ export type ClearMappingIgnoreInput = ClearManualMappingInput;
 
 export type SetMappingRejectedCandidateInput = SourceRpcInput &
 	(
-	| { provider: "sonarr"; providerId: TvdbId }
-	| { provider: "radarr"; providerId: TmdbId }
-);
+		| { provider: "sonarr"; providerId: TvdbId }
+		| { provider: "radarr"; providerId: TmdbId }
+	);
 
 export type ClearMappingRejectedCandidateInput =
 	SetMappingRejectedCandidateInput;
@@ -312,8 +312,8 @@ export interface MappingListProviderMeta {
 }
 
 export interface MappingListRow {
-	source: SourceIdentity;
 	anilistId: AniListId;
+	aliases?: SourceIdentity[];
 	provider: Provider;
 	result: MappingResult;
 	mappingRowStatus: MappingListRowStatus;

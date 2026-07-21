@@ -7,15 +7,9 @@ import type { AniListTitleLanguage } from "@/anilist/title";
 import { resolveTitlePreference } from "@/anilist/title";
 import { useMediaModalState } from "@/features/media-modal/hooks/use-media-modal-state";
 import type { MediaModalMetadataHint } from "@/features/media-modal/types";
-import {
-	parseTmdbIdOrNull,
-	parseTvdbIdOrNull,
-} from "@/providers/schemas";
+import { parseTmdbIdOrNull, parseTvdbIdOrNull } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
-import type {
-	TmdbId,
-	TvdbId,
-} from "@/providers/schemas";
+import type { TmdbId, TvdbId } from "@/providers/schemas";
 import {
 	useClearManualMapping,
 	useClearMappingIgnore,
@@ -25,6 +19,7 @@ import {
 } from "@/queries/mapping";
 import { normalizeError } from "@/shared/errors/error-utils";
 import {
+	getMappingEditorIdentity,
 	getRowKey,
 	type ClearMatchAction,
 	type IgnoreAction,
@@ -118,16 +113,26 @@ export function useMappingRowActions(
 
 	const handleIgnore = (row: MappingRow, action: IgnoreAction): void => {
 		void runRowMutation(row, async () => {
+			const input = {
+				provider: action.provider,
+				anilistId: action.anilistId,
+			};
 			await (action.kind === "clear-ignore"
-				? clearIgnore.mutateAsync(action)
-				: setIgnore.mutateAsync(action));
+				? clearIgnore.mutateAsync(input)
+				: setIgnore.mutateAsync(input));
 		});
 	};
 
-	const handleClearMatch = (row: MappingRow, action: ClearMatchAction): void => {
+	const handleClearMatch = (
+		row: MappingRow,
+		action: ClearMatchAction,
+	): void => {
 		void runRowMutation(row, async () => {
 			if (action.kind === "clear-manual") {
-				await clearManualMapping.mutateAsync(action);
+				await clearManualMapping.mutateAsync({
+					provider: action.provider,
+					anilistId: action.anilistId,
+				});
 				return;
 			}
 
@@ -139,12 +144,10 @@ export function useMappingRowActions(
 
 			await (action.kind === "clear-rejected"
 				? clearRejectedCandidate.mutateAsync({
-						source: action.source,
 						anilistId: action.anilistId,
 						...target,
 					})
 				: setRejectedCandidate.mutateAsync({
-						source: action.source,
 						anilistId: action.anilistId,
 						...target,
 					}));
@@ -154,8 +157,7 @@ export function useMappingRowActions(
 	const handleEdit = (row: MappingRow): void => {
 		const metadata = metadataById.get(row.anilistId) ?? null;
 		mediaModal.open({
-			source: row.source,
-			anilistId: row.anilistId,
+			...getMappingEditorIdentity(row),
 			kind: "provider",
 			provider: row.provider,
 			initialView: "mapping",

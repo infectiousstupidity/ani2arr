@@ -6,20 +6,14 @@ import {
 	type AniListId,
 	type AniListMetadata,
 } from "@/anilist/types";
-import {
-	sourceIdentityKey,
-	type SourceIdentity,
-} from "@/mapping/source-identity";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type { MappingResult, MappingSource } from "@/mapping/types";
 import type { Provider } from "@/providers/types";
 import {
 	getProviderExternalIdLabel,
 	getProviderLabel,
 } from "@/providers/provider-labels";
-import type {
-	MappingListGroup,
-	MappingListRowStatus,
-} from "@/rpc/types";
+import type { MappingListGroup, MappingListRowStatus } from "@/rpc/types";
 
 export type MappingGroup = MappingListGroup;
 export type MappingRow = MappingGroup["rows"][number];
@@ -29,27 +23,18 @@ export type MappingStatusFilter = MappingListRowStatus | "all";
 export type MappingSourceFilter = MappingSource | "all";
 
 export type IgnoreAction =
-	| ({ kind: "set-ignore" } & Pick<
-			MappingRow,
-			"source" | "anilistId" | "provider"
-	  >)
-	| ({ kind: "clear-ignore" } & Pick<
-			MappingRow,
-			"source" | "anilistId" | "provider"
-	  >);
+	| ({ kind: "set-ignore" } & Pick<MappingRow, "anilistId" | "provider">)
+	| ({ kind: "clear-ignore" } & Pick<MappingRow, "anilistId" | "provider">);
 
 export type ClearMatchAction =
-	| ({ kind: "clear-manual" } & Pick<
-			MappingRow,
-			"source" | "anilistId" | "provider"
-	  >)
+	| ({ kind: "clear-manual" } & Pick<MappingRow, "anilistId" | "provider">)
 	| ({ kind: "reject-candidate"; providerId: number } & Pick<
 			MappingRow,
-			"source" | "anilistId" | "provider"
+			"anilistId" | "provider"
 	  >)
 	| ({ kind: "clear-rejected"; providerId: number } & Pick<
 			MappingRow,
-			"source" | "anilistId" | "provider"
+			"anilistId" | "provider"
 	  >);
 
 const formatProviderStatus = (status: string | undefined): string | null => {
@@ -79,7 +64,9 @@ export const formatMappingGroupTitle = (group: MappingGroup): string => {
 	return `${getProviderLabel(group.provider)} target`;
 };
 
-export const getMappingGroupMetaPillLabels = (group: MappingGroup): string[] => {
+export const getMappingGroupMetaPillLabels = (
+	group: MappingGroup,
+): string[] => {
 	if (group.providerId === null) {
 		return ["No provider target"];
 	}
@@ -131,7 +118,11 @@ const mappingGroupMatchesSearch = (
 	if (group.providerMeta?.title?.toLowerCase().includes(search)) return true;
 	if (String(group.providerId ?? "").includes(search)) return true;
 
-	return group.rows.some((row) => String(row.anilistId).includes(search));
+	return group.rows.some(
+		(row) =>
+			String(row.anilistId).includes(search) ||
+			row.aliases?.some((alias) => String(alias.id).includes(search)),
+	);
 };
 
 export const getFilteredMappingGroups = ({
@@ -196,8 +187,7 @@ export const isMappingGroupExpanded = (
 
 export const getLoadedMappingRowCount = (
 	groups: readonly MappingGroup[],
-): number =>
-	groups.reduce((count, group) => count + group.rows.length, 0);
+): number => groups.reduce((count, group) => count + group.rows.length, 0);
 
 export const getVisibleAniListMetadataIds = (input: {
 	groups: readonly MappingGroup[];
@@ -223,15 +213,21 @@ export const getVisibleAniListMetadataIds = (input: {
 };
 
 export const getRowKey = (
-	row: Pick<MappingRow, "provider" | "source">,
-): string => `${row.provider}:${sourceIdentityKey(row.source)}`;
+	row: Pick<MappingRow, "provider" | "anilistId">,
+): string => `${row.provider}:${row.anilistId}`;
 
 export const getMappingRowMutationInput = (
 	row: MappingRow,
-): Pick<MappingRow, "source" | "anilistId" | "provider"> => ({
-	source: row.source,
+): Pick<MappingRow, "anilistId" | "provider"> => ({
 	anilistId: row.anilistId,
 	provider: row.provider,
+});
+
+export const getMappingEditorIdentity = (
+	row: MappingRow,
+): { source: SourceIdentity; anilistId: AniListId } => ({
+	source: { source: "anilist", id: row.anilistId },
+	anilistId: row.anilistId,
 });
 
 export const formatMappingStatusLabel = (

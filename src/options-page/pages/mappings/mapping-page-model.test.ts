@@ -10,6 +10,8 @@ import {
 	getFilteredMappingGroups,
 	getMappingGroupMetaPillLabels,
 	getLoadedMappingRowCount,
+	getMappingEditorIdentity,
+	getMappingRowMutationInput,
 	getRowKey,
 	getVisibleAniListMetadataIds,
 	isMappingGroupExpanded,
@@ -20,8 +22,6 @@ const aid = parseAniListId;
 const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
-const anilistSource = (anilistId: AniListId) =>
-	({ source: "anilist", id: anilistId }) as const;
 
 const createRow = (
 	patch: Partial<MappingRow> & {
@@ -31,7 +31,6 @@ const createRow = (
 ): MappingRow => {
 	const { anilistId, provider, ...rest } = patch;
 	return {
-		source: anilistSource(anilistId),
 		anilistId,
 		provider,
 		result: { kind: "unmapped", hadResolveAttempt: false },
@@ -71,9 +70,9 @@ describe("mapping page model", () => {
 			],
 		});
 
-		expect(
-			isMappingGroupExpanded(group, new Set(["sonarr:10"]), aid(2)),
-		).toBe(true);
+		expect(isMappingGroupExpanded(group, new Set(["sonarr:10"]), aid(2))).toBe(
+			true,
+		);
 	});
 
 	it("counts loaded rows and requests metadata only for expanded groups", () => {
@@ -104,20 +103,22 @@ describe("mapping page model", () => {
 		expect(visibleAniListIds).toEqual([aid(1), aid(2)]);
 	});
 
-	it("keeps AniList and MAL row keys distinct when they share an AniList ID", () => {
-		const anilistRow = createRow({
+	it("keys and mutates an alias row by its canonical AniList ID", () => {
+		const row = createRow({
 			anilistId: aid(21),
 			provider: "sonarr",
-		});
-		const malRow = createRow({
-			source: { source: "mal", id: mal(5114) },
-			anilistId: aid(21),
-			provider: "sonarr",
+			aliases: [{ source: "mal", id: mal(5114) }],
 		});
 
-		expect(getRowKey(anilistRow)).toBe("sonarr:anilist:21");
-		expect(getRowKey(malRow)).toBe("sonarr:mal:5114");
-		expect(getRowKey(anilistRow)).not.toBe(getRowKey(malRow));
+		expect(getRowKey(row)).toBe("sonarr:21");
+		expect(getMappingRowMutationInput(row)).toEqual({
+			provider: "sonarr",
+			anilistId: aid(21),
+		});
+		expect(getMappingEditorIdentity(row)).toEqual({
+			source: { source: "anilist", id: aid(21) },
+			anilistId: aid(21),
+		});
 	});
 
 	it("reads target AniList ID from options-page hash query", () => {
@@ -246,6 +247,7 @@ describe("mapping page model", () => {
 		["group title", "COWBOY BEBOP"],
 		["group provider ID", "777"],
 		["AniList ID", "42"],
+		["MAL alias ID", "5114"],
 	])("searches %s", (_field, search) => {
 		const group = createGroup({
 			key: "sonarr:777",
@@ -256,6 +258,7 @@ describe("mapping page model", () => {
 				createRow({
 					anilistId: aid(42),
 					provider: "sonarr",
+					aliases: [{ source: "mal", id: mal(5114) }],
 				}),
 			],
 		});
@@ -304,5 +307,4 @@ describe("mapping page model", () => {
 		]);
 		expect(expanded.groups).toEqual(groups);
 	});
-
 });

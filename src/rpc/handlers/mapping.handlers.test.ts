@@ -14,7 +14,10 @@ import type { RadarrMovieSnapshot } from "@/providers/radarr/types";
 import type { SonarrSeriesSnapshot } from "@/providers/sonarr/types";
 import type { Provider } from "@/providers/types";
 import type { EffectiveMappingRecord } from "@/mapping/mapping-facts";
-import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
+import {
+	getSourceAliasesByAniListId,
+	getUniqueAniListIdForSource,
+} from "@/mapping/upstream.store";
 import {
 	mappingService,
 	radarrLibrary,
@@ -34,6 +37,7 @@ vi.mock("@/mapping/list-mappings", () => ({
 }));
 
 vi.mock("@/mapping/upstream.store", () => ({
+	getSourceAliasesByAniListId: vi.fn(),
 	getUniqueAniListIdForSource: vi.fn(),
 }));
 
@@ -78,9 +82,7 @@ const anilistSource = (anilistId: ReturnType<typeof aid>) =>
 	({ source: "anilist", id: anilistId }) as const;
 const credentials = { url: "http://localhost", apiKey: "api-key" };
 
-function sonarrSeries(
-	tvdbId: ReturnType<typeof tvdb>,
-): SonarrSeriesSnapshot {
+function sonarrSeries(tvdbId: ReturnType<typeof tvdb>): SonarrSeriesSnapshot {
 	return {
 		id: Number(tvdbId) as SonarrSeriesId,
 		tvdbId,
@@ -90,9 +92,7 @@ function sonarrSeries(
 	};
 }
 
-function radarrMovie(
-	tmdbId: ReturnType<typeof tmdb>,
-): RadarrMovieSnapshot {
+function radarrMovie(tmdbId: ReturnType<typeof tmdb>): RadarrMovieSnapshot {
 	return {
 		id: Number(tmdbId) as RadarrMovieId,
 		tmdbId,
@@ -133,6 +133,7 @@ describe("mappingHandlers", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		refreshMappingPipelineMock.mockResolvedValue(false);
+		vi.mocked(getSourceAliasesByAniListId).mockResolvedValue(new Map());
 		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(null);
 		mockMappingRecords({ sonarr: sonarrMappings });
 		getProviderConfigMock.mockResolvedValue(null);
@@ -161,12 +162,14 @@ describe("mappingHandlers", () => {
 	it("refreshes once and rereads the complete batch when a MAL source is missing", async () => {
 		const directSource = anilistSource(aid(20));
 		const malSource = { source: "mal", id: mal(5114) } as const;
-		vi.mocked(getUniqueAniListIdForSource).mockImplementation(async (source) => {
-			if (source.source === "anilist") return source.id;
-			return refreshMappingPipelineMock.mock.calls.length === 0
-				? null
-				: aid(21);
-		});
+		vi.mocked(getUniqueAniListIdForSource).mockImplementation(
+			async (source) => {
+				if (source.source === "anilist") return source.id;
+				return refreshMappingPipelineMock.mock.calls.length === 0
+					? null
+					: aid(21);
+			},
+		);
 
 		await expect(
 			mappingHandlers.resolveAniListIdsForSources([directSource, malSource]),
@@ -177,9 +180,15 @@ describe("mappingHandlers", () => {
 
 		expect(refreshMappingPipelineMock).toHaveBeenCalledOnce();
 		expect(getUniqueAniListIdForSource).toHaveBeenCalledTimes(4);
-		expect(getUniqueAniListIdForSource).toHaveBeenNthCalledWith(1, directSource);
+		expect(getUniqueAniListIdForSource).toHaveBeenNthCalledWith(
+			1,
+			directSource,
+		);
 		expect(getUniqueAniListIdForSource).toHaveBeenNthCalledWith(2, malSource);
-		expect(getUniqueAniListIdForSource).toHaveBeenNthCalledWith(3, directSource);
+		expect(getUniqueAniListIdForSource).toHaveBeenNthCalledWith(
+			3,
+			directSource,
+		);
 		expect(getUniqueAniListIdForSource).toHaveBeenNthCalledWith(4, malSource);
 	});
 
@@ -237,6 +246,39 @@ describe("mappingHandlers", () => {
 			aid(1),
 			aid(2),
 		]);
+	});
+
+	it("attaches MAL aliases to one canonical mapping row", async () => {
+		const anilistId = aid(21);
+		const alias = { source: "mal", id: mal(5114) } as const;
+		mockMappingRecords({
+			sonarr: [
+				{
+					anilistId,
+					provider: "sonarr",
+					result: {
+						kind: "mapped",
+						source: "upstream",
+						providerId: tvdb(10),
+					},
+				},
+			],
+		});
+		vi.mocked(getSourceAliasesByAniListId).mockResolvedValue(
+			new Map([[anilistId, [alias]]]),
+		);
+
+		const result = await mappingHandlers.getMappings();
+
+		expect(result).toHaveLength(1);
+		expect(result[0]?.rows).toEqual([
+			expect.objectContaining({
+				anilistId,
+				aliases: [alias],
+			}),
+		]);
+		expect(result[0]?.rows).toHaveLength(1);
+		expect(getSourceAliasesByAniListId).toHaveBeenCalledOnce();
 	});
 
 	it("builds Sonarr route metadata", async () => {
@@ -336,9 +378,7 @@ describe("mappingHandlers", () => {
 
 		expect(result).toHaveLength(2);
 		expect(result.map((group) => group.key)).toEqual(
-			expect.arrayContaining([
-				"sonarr:ignored:anilist:51",
-			]),
+			expect.arrayContaining(["sonarr:ignored:anilist:51"]),
 		);
 		expect(result).toEqual(
 			expect.arrayContaining([

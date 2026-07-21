@@ -20,7 +20,10 @@ import {
 	sourceIdentityKey,
 	type SourceIdentity,
 } from "@/mapping/source-identity";
-import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
+import {
+	getSourceAliasesByAniListId,
+	getUniqueAniListIdForSource,
+} from "@/mapping/upstream.store";
 import type { Provider } from "@/providers/types";
 import type { RadarrMovieSnapshot } from "@/providers/radarr/types";
 import { getProviderExternalIdLabel } from "@/providers/provider-labels";
@@ -157,16 +160,18 @@ function groupMappedRecords(
 function composeRow(
 	record: EffectiveMappingRecord,
 	isInLibrary: boolean | null,
+	aliasesByAniListId: ReadonlyMap<AniListId, SourceIdentity[]>,
 	options?: {
 		existingTargetCount?: number;
 		providerMeta?: MappingListProviderMeta;
 	},
 ): MappingListRow | null {
 	const providerMeta = options?.providerMeta;
+	const aliases = aliasesByAniListId.get(record.anilistId);
 
 	return {
-		source: { source: "anilist", id: record.anilistId },
 		anilistId: record.anilistId,
+		...(aliases?.length ? { aliases } : {}),
 		provider: record.provider,
 		result: record.result,
 		mappingRowStatus: rowStatus(
@@ -182,47 +187,48 @@ function composeMappedGroup(
 	provider: Provider,
 	providerId: ProviderExternalId,
 	records: readonly EffectiveMappingRecord[],
-	library: {
+	options: {
+		aliasesByAniListId: ReadonlyMap<AniListId, SourceIdentity[]>;
 		isInLibrary: boolean;
 		providerMeta?: MappingListProviderMeta;
 	},
 ): MappingListGroup {
-	const rows = records
-		.toSorted(compareEffectiveRecords)
-		.flatMap((record) => {
-			const row = composeRow(record, library.isInLibrary, {
-				...(library.providerMeta
-					? { providerMeta: library.providerMeta }
-					: {}),
-			});
-			return row === null ? [] : [row];
-		});
+	const rows = records.toSorted(compareEffectiveRecords).flatMap((record) => {
+		const row = composeRow(
+			record,
+			options.isInLibrary,
+			options.aliasesByAniListId,
+			{
+				...(options.providerMeta ? { providerMeta: options.providerMeta } : {}),
+			},
+		);
+		return row === null ? [] : [row];
+	});
 
 	return {
 		key: `${provider}:${providerId}`,
 		provider,
 		providerId,
 		rows,
-		isInLibrary: library.isInLibrary,
-		...(library.providerMeta ? { providerMeta: library.providerMeta } : {}),
+		isInLibrary: options.isInLibrary,
+		...(options.providerMeta ? { providerMeta: options.providerMeta } : {}),
 	};
 }
 
 function composeAmbiguousGroup(
 	record: EffectiveMappingRecord,
 	providerId: ProviderExternalId | null,
-	existingTargetCount: number,
-	providerMeta?: MappingListProviderMeta,
+	options: {
+		existingTargetCount: number;
+		aliasesByAniListId: ReadonlyMap<AniListId, SourceIdentity[]>;
+		providerMeta?: MappingListProviderMeta;
+	},
 ): MappingListGroup | null {
-	const isInLibrary = existingTargetCount > 0;
-	const row = composeRow(
-		record,
-		isInLibrary,
-		{
-			existingTargetCount,
-			...(providerMeta ? { providerMeta } : {}),
-		},
-	);
+	const isInLibrary = options.existingTargetCount > 0;
+	const row = composeRow(record, isInLibrary, options.aliasesByAniListId, {
+		existingTargetCount: options.existingTargetCount,
+		...(options.providerMeta ? { providerMeta: options.providerMeta } : {}),
+	});
 	if (row === null) return null;
 
 	return {
@@ -231,21 +237,19 @@ function composeAmbiguousGroup(
 		providerId,
 		rows: [row],
 		isInLibrary,
-		...(providerMeta ? { providerMeta } : {}),
+		...(options.providerMeta ? { providerMeta: options.providerMeta } : {}),
 	};
 }
 
 function composeStandaloneGroup(
 	record: EffectiveMappingRecord,
+	aliasesByAniListId: ReadonlyMap<AniListId, SourceIdentity[]>,
 ): MappingListGroup | null {
-	if (
-		record.result.kind !== "ignored" &&
-		record.result.kind !== "unmapped"
-	) {
+	if (record.result.kind !== "ignored" && record.result.kind !== "unmapped") {
 		return null;
 	}
 
-	const row = composeRow(record, false);
+	const row = composeRow(record, false, aliasesByAniListId);
 	if (row === null) return null;
 
 	return {
@@ -260,6 +264,7 @@ function composeStandaloneGroup(
 function buildSonarrGroups(
 	records: readonly EffectiveMappingRecord[],
 	library: readonly SonarrSeriesSnapshot[],
+	aliasesByAniListId: ReadonlyMap<AniListId, SourceIdentity[]>,
 ): MappingListGroup[] {
 	const libraryByTvdbId = new Map(
 		library.map((series) => [Number(series.tvdbId), series] as const),
@@ -272,15 +277,11 @@ function buildSonarrGroups(
 			const libraryItem = libraryByTvdbId.get(providerId) ?? null;
 			const providerMeta = sonarrMeta(libraryItem);
 			return [
-				composeMappedGroup(
-					"sonarr",
-					providerId,
-					mappedRecords,
-					{
-						isInLibrary: libraryItem !== null,
-						...(providerMeta ? { providerMeta } : {}),
-					},
-				),
+				composeMappedGroup("sonarr", providerId, mappedRecords, {
+					aliasesByAniListId,
+					isInLibrary: libraryItem !== null,
+					...(providerMeta ? { providerMeta } : {}),
+				}),
 			];
 		},
 	);
@@ -292,23 +293,25 @@ function buildSonarrGroups(
 				const providerId = parseTvdbIdOrNull(target.providerId);
 				if (providerId === null) return [];
 				const libraryItem = libraryByTvdbId.get(providerId);
-				return libraryItem === undefined
-					? []
-					: [{ providerId, libraryItem }];
+				return libraryItem === undefined ? [] : [{ providerId, libraryItem }];
 			});
 			const activeTarget =
 				existingTargets.length === 1 ? (existingTargets[0] ?? null) : null;
+			const providerMeta = sonarrMeta(activeTarget?.libraryItem ?? null);
 			const group = composeAmbiguousGroup(
 				record,
 				activeTarget?.providerId ?? null,
-				existingTargets.length,
-				sonarrMeta(activeTarget?.libraryItem ?? null),
+				{
+					existingTargetCount: existingTargets.length,
+					aliasesByAniListId,
+					...(providerMeta ? { providerMeta } : {}),
+				},
 			);
 			if (group) groups.push(group);
 			continue;
 		}
 
-		const group = composeStandaloneGroup(record);
+		const group = composeStandaloneGroup(record, aliasesByAniListId);
 		if (group) groups.push(group);
 	}
 
@@ -318,6 +321,7 @@ function buildSonarrGroups(
 function buildRadarrGroups(
 	records: readonly EffectiveMappingRecord[],
 	library: readonly RadarrMovieSnapshot[],
+	aliasesByAniListId: ReadonlyMap<AniListId, SourceIdentity[]>,
 ): MappingListGroup[] {
 	const libraryByTmdbId = new Map(
 		library.map((movie) => [Number(movie.tmdbId), movie] as const),
@@ -330,15 +334,11 @@ function buildRadarrGroups(
 			const libraryItem = libraryByTmdbId.get(providerId) ?? null;
 			const providerMeta = radarrMeta(libraryItem);
 			return [
-				composeMappedGroup(
-					"radarr",
-					providerId,
-					mappedRecords,
-					{
-						isInLibrary: libraryItem !== null,
-						...(providerMeta ? { providerMeta } : {}),
-					},
-				),
+				composeMappedGroup("radarr", providerId, mappedRecords, {
+					aliasesByAniListId,
+					isInLibrary: libraryItem !== null,
+					...(providerMeta ? { providerMeta } : {}),
+				}),
 			];
 		},
 	);
@@ -350,23 +350,25 @@ function buildRadarrGroups(
 				const providerId = parseTmdbIdOrNull(target.providerId);
 				if (providerId === null) return [];
 				const libraryItem = libraryByTmdbId.get(providerId);
-				return libraryItem === undefined
-					? []
-					: [{ providerId, libraryItem }];
+				return libraryItem === undefined ? [] : [{ providerId, libraryItem }];
 			});
 			const activeTarget =
 				existingTargets.length === 1 ? (existingTargets[0] ?? null) : null;
+			const providerMeta = radarrMeta(activeTarget?.libraryItem ?? null);
 			const group = composeAmbiguousGroup(
 				record,
 				activeTarget?.providerId ?? null,
-				existingTargets.length,
-				radarrMeta(activeTarget?.libraryItem ?? null),
+				{
+					existingTargetCount: existingTargets.length,
+					aliasesByAniListId,
+					...(providerMeta ? { providerMeta } : {}),
+				},
 			);
 			if (group) groups.push(group);
 			continue;
 		}
 
-		const group = composeStandaloneGroup(record);
+		const group = composeStandaloneGroup(record, aliasesByAniListId);
 		if (group) groups.push(group);
 	}
 
@@ -389,16 +391,29 @@ function sortGroups(groups: MappingListGroup[]): MappingListGroup[] {
 }
 
 async function getMappingsOutput(): Promise<MappingListGroup[]> {
-	const [recordsByProvider, sonarrLibraryItems, radarrLibraryItems] =
-		await Promise.all([
-			listEffectiveMappingRecordsByProvider({ loadFormatByAniListId }),
-			loadSonarrLibrary(),
-			loadRadarrLibrary(),
-		]);
+	const [
+		recordsByProvider,
+		sonarrLibraryItems,
+		radarrLibraryItems,
+		aliasesByAniListId,
+	] = await Promise.all([
+		listEffectiveMappingRecordsByProvider({ loadFormatByAniListId }),
+		loadSonarrLibrary(),
+		loadRadarrLibrary(),
+		getSourceAliasesByAniListId(),
+	]);
 
 	return sortGroups([
-		...buildSonarrGroups(recordsByProvider.sonarr, sonarrLibraryItems),
-		...buildRadarrGroups(recordsByProvider.radarr, radarrLibraryItems),
+		...buildSonarrGroups(
+			recordsByProvider.sonarr,
+			sonarrLibraryItems,
+			aliasesByAniListId,
+		),
+		...buildRadarrGroups(
+			recordsByProvider.radarr,
+			radarrLibraryItems,
+			aliasesByAniListId,
+		),
 	]);
 }
 
@@ -510,15 +525,13 @@ export const mappingHandlers = {
 		const uniqueSources = new Map(
 			sources.map((source) => [sourceIdentityKey(source), source]),
 		);
-		const readSources = async (): Promise<
-			Record<string, AniListId | null>
-		> =>
+		const readSources = async (): Promise<Record<string, AniListId | null>> =>
 			Object.fromEntries(
 				await Promise.all(
-					[...uniqueSources].map(async ([sourceKey, source]) => [
-						sourceKey,
-						await getUniqueAniListIdForSource(source),
-					] as const),
+					[...uniqueSources].map(
+						async ([sourceKey, source]) =>
+							[sourceKey, await getUniqueAniListIdForSource(source)] as const,
+					),
 				),
 			);
 

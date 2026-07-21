@@ -6,6 +6,10 @@ import {
 	type MyAnimeListId,
 } from "@/myanimelist/types";
 
+export function buildMyAnimeListAnimeUrl(id: MyAnimeListId): string {
+	return `https://myanimelist.net/anime/${id}`;
+}
+
 function parseUrl(value: string): URL | null {
 	try {
 		return new URL(value, "https://myanimelist.net");

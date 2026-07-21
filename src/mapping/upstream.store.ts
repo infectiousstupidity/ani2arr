@@ -14,6 +14,7 @@ import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
 import type { AniListCrosswalkMappings } from "@/mapping/upstream/anibridge.parser";
 import {
 	normalizeStoredSourceKey,
+	parseSourceIdentityKey,
 	sourceIdentityKey,
 	type SourceIdentity,
 } from "./source-identity";
@@ -95,6 +96,29 @@ export async function getUniqueAniListIdForSource(
 	return snapshot?.aniListCrosswalks?.[sourceIdentityKey(source)] ?? null;
 }
 
+export async function getSourceAliasesByAniListId(): Promise<
+	ReadonlyMap<AniListId, SourceIdentity[]>
+> {
+	const snapshot = await getSnapshot();
+	const aliasesByAniListId = new Map<AniListId, SourceIdentity[]>();
+
+	for (const [sourceKey, anilistId] of Object.entries(
+		snapshot?.aniListCrosswalks ?? {},
+	)) {
+		const alias = parseSourceIdentityKey(sourceKey);
+		if (alias === null || alias.source === "anilist") continue;
+
+		const aliases = aliasesByAniListId.get(anilistId) ?? [];
+		aliases.push(alias);
+		aliasesByAniListId.set(anilistId, aliases);
+	}
+	for (const aliases of aliasesByAniListId.values()) {
+		aliases.sort((left, right) => left.id - right.id);
+	}
+
+	return aliasesByAniListId;
+}
+
 export async function listSeerrUpstreamTargets(
 	ids: readonly AniListId[],
 ): Promise<SeerrUpstreamRecord[]> {
@@ -136,9 +160,7 @@ export async function refreshUpstreamMappings(): Promise<boolean> {
 		.catch(() => {})
 		.then(async () => {
 			const stored = await upstreamMappings.getValue();
-			const previous = stored
-				? normalizeSnapshot(stored)
-				: null;
+			const previous = stored ? normalizeSnapshot(stored) : null;
 			if (
 				previous?.entries !== undefined &&
 				Date.now() - previous.fetchedAt < UPSTREAM_REFRESH_INTERVAL_MS
@@ -214,7 +236,8 @@ function haveMappingFactsChanged(
 	previous: UpstreamSnapshot | null,
 	next: Pick<UpstreamSnapshot, "entries" | "aniListCrosswalks">,
 ): boolean {
-	if (previous?.entries === undefined || next.entries === undefined) return true;
+	if (previous?.entries === undefined || next.entries === undefined)
+		return true;
 
 	return (
 		JSON.stringify(previous.entries) !== JSON.stringify(next.entries) ||
@@ -285,12 +308,14 @@ function normalizeSeasons(seasons: readonly number[]): number[] {
 function projectSeerrTarget(
 	targets: readonly AniBridgeTarget[],
 ): SeerrUpstreamTarget | null {
-	const movieTmdbIds = new Set(targets.flatMap((target) => {
-		if (target.kind !== "tmdb-movie") return [];
+	const movieTmdbIds = new Set(
+		targets.flatMap((target) => {
+			if (target.kind !== "tmdb-movie") return [];
 
-		const tmdbId = parseTmdbIdOrNull(target.id);
-		return tmdbId === null ? [] : [tmdbId];
-	}));
+			const tmdbId = parseTmdbIdOrNull(target.id);
+			return tmdbId === null ? [] : [tmdbId];
+		}),
+	);
 
 	const tmdbTargets = targets.flatMap((target) => {
 		if (target.kind !== "tmdb-show") return [];

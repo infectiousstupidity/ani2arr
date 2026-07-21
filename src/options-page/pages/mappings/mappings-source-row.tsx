@@ -12,6 +12,8 @@ import {
 import type { AniListMetadata } from "@/anilist/types";
 import { buildAniListAnimeUrl, resolveTitlePreference } from "@/anilist/title";
 import type { AniListTitleLanguage } from "@/anilist/title";
+import { sourceIdentityKey } from "@/mapping/source-identity";
+import { buildMyAnimeListAnimeUrl } from "@/myanimelist/url";
 import Pill from "@/shared/ui/primitives/pill";
 import Tooltip from "@/shared/ui/primitives/tooltip";
 import { cn } from "@/shared/utils/cn";
@@ -146,7 +148,10 @@ export function MappingsSourceRow(
 	const coverUrl = getCoverUrl(metadata);
 	const title = getRowTitle(row, metadata, preferredTitleLanguage);
 	const anilistUrl = buildAniListAnimeUrl(row.anilistId);
-	const sourceLabel = formatSourceIdentity(row.source);
+	const sources = [
+		{ source: "anilist", id: row.anilistId } as const,
+		...(row.aliases ?? []),
+	];
 	const metaPillLabels = getMetaPillLabels(metadata);
 	const entryKind = formatMappingEntryKind(row.result);
 	const showRowStatus = row.mappingRowStatus !== "in-library";
@@ -212,31 +217,31 @@ export function MappingsSourceRow(
 						{title}
 					</a>
 					<div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-text-secondary">
-						{row.source.source === "anilist" ? (
-							<a
-								href={anilistUrl}
-								target="_blank"
-								rel="noreferrer"
-								className="cursor-pointer rounded-full"
-								aria-label={`Open ${sourceLabel}`}
-							>
-								<Pill
-									small
-									tone="muted"
-									className={cn(ID_PILL_CLASS, LINK_PILL_CLASS)}
+						{sources.map((source) => {
+							const sourceLabel = formatSourceIdentity(source);
+							const sourceUrl =
+								source.source === "anilist"
+									? buildAniListAnimeUrl(source.id)
+									: buildMyAnimeListAnimeUrl(source.id);
+							return (
+								<a
+									key={sourceIdentityKey(source)}
+									href={sourceUrl}
+									target="_blank"
+									rel="noreferrer"
+									className="cursor-pointer rounded-full"
+									aria-label={`Open ${sourceLabel}`}
 								>
-									{sourceLabel}
-								</Pill>
-							</a>
-						) : (
-							<Pill
-								small
-								tone="muted"
-								className={ID_PILL_CLASS}
-							>
-								{sourceLabel}
-							</Pill>
-						)}
+									<Pill
+										small
+										tone="muted"
+										className={cn(ID_PILL_CLASS, LINK_PILL_CLASS)}
+									>
+										{sourceLabel}
+									</Pill>
+								</a>
+							);
+						})}
 						{metaPillLabels.map((label) => (
 							<Pill key={label} small tone="muted" className={ID_PILL_CLASS}>
 								{label}

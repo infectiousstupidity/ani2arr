@@ -10,6 +10,7 @@ import { sourceIdentityKey } from "@/mapping/source-identity";
 import { MAX_ANIBRIDGE_BYTES } from "@/mapping/upstream/anibridge.client";
 import {
 	clearUpstreamMappings,
+	getSourceAliasesByAniListId,
 	getUniqueAniListIdForSource,
 	getUpstreamTargets,
 	listAllSeerrUpstreamTargets,
@@ -402,6 +403,7 @@ describe("refreshUpstreamMappings", () => {
 
 	it("keeps MAL alias lookup separate from canonical Arr facts", async () => {
 		const source = { source: "mal", id: mal(5114) } as const;
+		const lowerAlias = { source: "mal", id: mal(100) } as const;
 		const targets = [
 			{ provider: "sonarr" as const, providerId: tvdb(78_874), season: 1 },
 		];
@@ -415,6 +417,7 @@ describe("refreshUpstreamMappings", () => {
 				},
 				aniListCrosswalks: {
 					[sourceIdentityKey(source)]: aid(21),
+					[sourceIdentityKey(lowerAlias)]: aid(21),
 				},
 				fetchedAt: Date.now(),
 			},
@@ -433,5 +436,8 @@ describe("refreshUpstreamMappings", () => {
 		await expect(
 			getUniqueAniListIdForSource({ source: "mal", id: mal(5114) }),
 		).resolves.toBe(aid(21));
+		await expect(getSourceAliasesByAniListId()).resolves.toEqual(
+			new Map([[aid(21), [lowerAlias, source]]]),
+		);
 	});
 });
