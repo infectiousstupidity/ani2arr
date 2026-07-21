@@ -7,10 +7,8 @@ import type {
 	AniListMedia,
 	AniListMediaHint,
 } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/source-identity";
 import type { Provider } from "@/providers/types";
 import { setAutoResult } from "../auto.store";
-import { getUniqueAniListIdForSource } from "../upstream.store";
 import {
 	searchCandidate,
 	type ProviderCandidateSearch,
@@ -20,7 +18,7 @@ import type { SearchMedia } from "./title-matching";
 
 export type AutomaticResolver = (
 	provider: Provider,
-	source: SourceIdentity,
+	anilistId: AniListId,
 	rejectedProviderIds: number[],
 	options?: { title?: string; metadata?: AniListMediaHint | null },
 ) => Promise<boolean>;
@@ -47,16 +45,13 @@ function mediaFromStatusHint(input: {
 export function createAutomaticResolver(dependencies: {
 	anilistMedia: AniListMediaService;
 	searchProviderCandidates: ProviderCandidateSearch;
-	getUniqueAniListIdForSource?: (source: SourceIdentity) => Promise<AniListId | null>;
 }): AutomaticResolver {
 	return async function resolveAutomaticMapping(
 		provider,
-		source,
+		anilistId,
 		rejectedProviderIds,
 		options,
 	): Promise<boolean> {
-		const findUniqueAniListId =
-			dependencies.getUniqueAniListIdForSource ?? getUniqueAniListIdForSource;
 		const searchedTitleKeys = new Set<string>();
 		const search = (candidateMedia: SearchMedia) =>
 			searchCandidate({
@@ -73,17 +68,11 @@ export function createAutomaticResolver(dependencies: {
 		});
 		const hintMatch = hintMedia ? await search(hintMedia) : null;
 		if (hintMatch) {
-			await setAutoResult(provider, source, {
+			await setAutoResult(provider, anilistId, {
 				kind: "mapped",
 				providerId: hintMatch.providerId,
 				matchedTitle: hintMatch.matchedTitle,
 			});
-			return true;
-		}
-
-		const anilistId = await findUniqueAniListId(source);
-		if (anilistId === null) {
-			await setAutoResult(provider, source, { kind: "unmapped" });
 			return true;
 		}
 
@@ -101,13 +90,13 @@ export function createAutomaticResolver(dependencies: {
 			(await searchPrequelChain(dependencies.anilistMedia, media, search));
 
 		if (!match) {
-			await setAutoResult(provider, source, {
+			await setAutoResult(provider, anilistId, {
 				kind: "unmapped",
 			});
 			return true;
 		}
 
-		await setAutoResult(provider, source, {
+		await setAutoResult(provider, anilistId, {
 			kind: "mapped",
 			providerId: match.providerId,
 			matchedTitle: match.matchedTitle,

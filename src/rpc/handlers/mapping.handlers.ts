@@ -144,7 +144,7 @@ function groupMappedRecords(
 	const groups = new Map<number, EffectiveMappingRecord[]>();
 
 	for (const record of records) {
-		if (record.anilistId === null || record.result.kind !== "mapped") continue;
+		if (record.result.kind !== "mapped") continue;
 
 		const group = groups.get(record.result.providerId) ?? [];
 		group.push(record);
@@ -162,11 +162,10 @@ function composeRow(
 		providerMeta?: MappingListProviderMeta;
 	},
 ): MappingListRow | null {
-	if (record.anilistId === null) return null;
 	const providerMeta = options?.providerMeta;
 
 	return {
-		source: record.source,
+		source: { source: "anilist", id: record.anilistId },
 		anilistId: record.anilistId,
 		provider: record.provider,
 		result: record.result,
@@ -227,7 +226,7 @@ function composeAmbiguousGroup(
 	if (row === null) return null;
 
 	return {
-		key: `${record.provider}:ambiguous:${sourceIdentityKey(record.source)}`,
+		key: `${record.provider}:ambiguous:anilist:${record.anilistId}`,
 		provider: record.provider,
 		providerId,
 		rows: [row],
@@ -250,7 +249,7 @@ function composeStandaloneGroup(
 	if (row === null) return null;
 
 	return {
-		key: `${record.provider}:${record.result.kind}:${sourceIdentityKey(record.source)}`,
+		key: `${record.provider}:${record.result.kind}:anilist:${record.anilistId}`,
 		provider: record.provider,
 		providerId: null,
 		rows: [row],
@@ -287,7 +286,7 @@ function buildSonarrGroups(
 	);
 
 	for (const record of records) {
-		if (record.result.kind === "ambiguous" && record.anilistId !== null) {
+		if (record.result.kind === "ambiguous") {
 			const existingTargets = record.result.targets.flatMap((target) => {
 				if (target.provider !== "sonarr") return [];
 				const providerId = parseTvdbIdOrNull(target.providerId);
@@ -345,7 +344,7 @@ function buildRadarrGroups(
 	);
 
 	for (const record of records) {
-		if (record.result.kind === "ambiguous" && record.anilistId !== null) {
+		if (record.result.kind === "ambiguous") {
 			const existingTargets = record.result.targets.flatMap((target) => {
 				if (target.provider !== "radarr") return [];
 				const providerId = parseTmdbIdOrNull(target.providerId);
@@ -378,11 +377,7 @@ function compareEffectiveRecords(
 	left: EffectiveMappingRecord,
 	right: EffectiveMappingRecord,
 ): number {
-	const leftId = left.anilistId ?? Number.POSITIVE_INFINITY;
-	const rightId = right.anilistId ?? Number.POSITIVE_INFINITY;
-	return leftId - rightId || sourceIdentityKey(left.source).localeCompare(
-		sourceIdentityKey(right.source),
-	);
+	return left.anilistId - right.anilistId;
 }
 
 function sortGroups(groups: MappingListGroup[]): MappingListGroup[] {

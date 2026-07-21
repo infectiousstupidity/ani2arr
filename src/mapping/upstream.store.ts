@@ -14,8 +14,6 @@ import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
 import type { AniListCrosswalkMappings } from "@/mapping/upstream/anibridge.parser";
 import {
 	normalizeStoredSourceKey,
-	normalizeSourceIdentity,
-	parseSourceIdentityKey,
 	sourceIdentityKey,
 	type SourceIdentity,
 } from "./source-identity";
@@ -36,8 +34,7 @@ type UpstreamSnapshot = {
 	etag?: string;
 };
 
-export type UpstreamSourceFact = {
-	source: SourceIdentity;
+export type UpstreamMappingFact = {
 	anilistId: AniListId;
 	targets: UpstreamTarget[];
 };
@@ -58,26 +55,20 @@ let writes: Promise<void> = Promise.resolve();
 
 export async function getUpstreamTargets(
 	provider: Provider,
-	source: SourceIdentity | AniListId,
+	anilistId: AniListId,
 ): Promise<UpstreamTarget[]> {
 	const snapshot = await getSnapshot();
-	const anilistId = getSnapshotAniListId(
-		snapshot,
-		normalizeSourceIdentity(source),
-	);
-	if (anilistId === null) return [];
 
 	return projectUpstreamTargets(snapshot?.entries?.[anilistId] ?? []).filter(
 		(target) => target.provider === provider,
 	);
 }
 
-export async function listSourceUpstreamMappings(): Promise<
-	UpstreamSourceFact[]
+export async function listAniListUpstreamMappings(): Promise<
+	UpstreamMappingFact[]
 > {
 	const snapshot = await getSnapshot();
-	const records: UpstreamSourceFact[] = [];
-	const targetsByAniListId = new Map<AniListId, UpstreamTarget[]>();
+	const records: UpstreamMappingFact[] = [];
 
 	for (const [rawAniListId, entries] of Object.entries(
 		snapshot?.entries ?? {},
@@ -86,25 +77,9 @@ export async function listSourceUpstreamMappings(): Promise<
 		if (anilistId === null) continue;
 
 		const targets = projectUpstreamTargets(entries);
-		targetsByAniListId.set(anilistId, targets);
 		records.push({
-			source: { source: "anilist", id: anilistId },
 			anilistId,
 			targets,
-		});
-	}
-
-	for (const [rawSourceKey, rawAniListId] of Object.entries(
-		snapshot?.aniListCrosswalks ?? {},
-	)) {
-		const source = parseSourceIdentityKey(rawSourceKey);
-		const anilistId = parseAniListIdOrNull(rawAniListId);
-		if (source?.source !== "mal" || anilistId === null) continue;
-
-		records.push({
-			source,
-			anilistId,
-			targets: [...(targetsByAniListId.get(anilistId) ?? [])],
 		});
 	}
 
@@ -261,15 +236,6 @@ function normalizeAniListCrosswalkKeys(
 	}
 
 	return normalized;
-}
-
-function getSnapshotAniListId(
-	snapshot: UpstreamSnapshot | null,
-	source: SourceIdentity,
-): AniListId | null {
-	if (source.source === "anilist") return source.id;
-
-	return snapshot?.aniListCrosswalks?.[sourceIdentityKey(source)] ?? null;
 }
 
 function projectUpstreamTargets(

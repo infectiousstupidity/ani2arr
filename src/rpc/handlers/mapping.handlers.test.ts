@@ -104,19 +104,16 @@ function radarrMovie(
 
 const sonarrMappings: EffectiveMappingRecord[] = [
 	{
-		source: anilistSource(aid(1)),
 		anilistId: aid(1),
 		provider: "sonarr",
 		result: { kind: "mapped", source: "manual", providerId: tvdb(10) },
 	},
 	{
-		source: anilistSource(aid(2)),
 		anilistId: aid(2),
 		provider: "sonarr",
 		result: { kind: "mapped", source: "auto", providerId: tvdb(10) },
 	},
 	{
-		source: anilistSource(aid(3)),
 		anilistId: aid(3),
 		provider: "sonarr",
 		result: { kind: "mapped", source: "auto", providerId: tvdb(20) },
@@ -264,7 +261,6 @@ describe("mappingHandlers", () => {
 		const providerId = tmdb(30);
 		const mappings: EffectiveMappingRecord[] = [
 			{
-				source: anilistSource(aid(30)),
 				anilistId: aid(30),
 				provider: "radarr",
 				result: { kind: "mapped", source: "auto", providerId },
@@ -290,7 +286,6 @@ describe("mappingHandlers", () => {
 		const existingProviderId = tvdb(40);
 		const mappings: EffectiveMappingRecord[] = [
 			{
-				source: anilistSource(aid(40)),
 				anilistId: aid(40),
 				provider: "sonarr",
 				result: {
@@ -325,19 +320,11 @@ describe("mappingHandlers", () => {
 	it("keeps groups without an active provider target", async () => {
 		const mappings: EffectiveMappingRecord[] = [
 			{
-				source: anilistSource(aid(51)),
 				anilistId: aid(51),
 				provider: "sonarr",
 				result: { kind: "ignored" },
 			},
 			{
-				source: { source: "mal", id: mal(5114) },
-				anilistId: aid(51),
-				provider: "sonarr",
-				result: { kind: "ignored" },
-			},
-			{
-				source: anilistSource(aid(52)),
 				anilistId: aid(52),
 				provider: "sonarr",
 				result: { kind: "unmapped", hadResolveAttempt: false },
@@ -347,11 +334,10 @@ describe("mappingHandlers", () => {
 
 		const result = await mappingHandlers.getMappings();
 
-		expect(result).toHaveLength(3);
+		expect(result).toHaveLength(2);
 		expect(result.map((group) => group.key)).toEqual(
 			expect.arrayContaining([
 				"sonarr:ignored:anilist:51",
-				"sonarr:ignored:mal:5114",
 			]),
 		);
 		expect(result).toEqual(

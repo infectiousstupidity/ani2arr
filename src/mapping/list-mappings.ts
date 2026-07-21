@@ -7,11 +7,11 @@ import {
 	collectEffectiveMappingRecords,
 	type EffectiveMappingRecord,
 } from "./mapping-facts";
-import { sourceIdentityKey, type SourceIdentity } from "./source-identity";
+import type { SourceIdentity } from "./source-identity";
 import type { MappingResult, UpstreamTarget } from "./types";
 import {
-	listSourceUpstreamMappings,
-	type UpstreamSourceFact,
+	listAniListUpstreamMappings,
+	type UpstreamMappingFact,
 } from "./upstream.store";
 
 export interface ActiveMappingIdentity {
@@ -30,7 +30,7 @@ interface EffectiveMappingListDeps {
 export async function listEffectiveMappingRecordsByProvider(
 	deps: EffectiveMappingListDeps = {},
 ): Promise<Record<Provider, EffectiveMappingRecord[]>> {
-	const upstreamFacts = await listSourceUpstreamMappings();
+	const upstreamFacts = await listAniListUpstreamMappings();
 	const [sonarr, radarr] = await Promise.all([
 		collectListRecords("sonarr", upstreamFacts, deps),
 		collectListRecords("radarr", upstreamFacts, deps),
@@ -50,16 +50,13 @@ export async function getMappingIdentities(
 
 	for (const provider of PROVIDERS) {
 		for (const record of recordsByProvider[provider]) {
-			if (
-				record.source.source !== "anilist" ||
-				!requestedIds.has(record.source.id)
-			) {
+			if (!requestedIds.has(record.anilistId)) {
 				continue;
 			}
 
-			identitiesByKey.set(createIdentityKey(provider, record.source.id), {
-				source: record.source,
-				anilistId: record.source.id,
+			identitiesByKey.set(createIdentityKey(provider, record.anilistId), {
+				source: { source: "anilist", id: record.anilistId },
+				anilistId: record.anilistId,
 				provider,
 				result: record.result,
 			});
@@ -78,7 +75,7 @@ export async function getMappingIdentities(
 
 async function collectListRecords(
 	provider: Provider,
-	upstreamFacts: readonly UpstreamSourceFact[],
+	upstreamFacts: readonly UpstreamMappingFact[],
 	deps: EffectiveMappingListDeps,
 ): Promise<EffectiveMappingRecord[]> {
 	return collectEffectiveMappingRecords(provider, {
@@ -90,15 +87,15 @@ async function collectListRecords(
 
 async function selectListUpstreamTargets(
 	provider: Provider,
-	records: readonly UpstreamSourceFact[],
+	records: readonly UpstreamMappingFact[],
 	deps: EffectiveMappingListDeps,
-): Promise<ReadonlyMap<string, readonly UpstreamTarget[]>> {
+): Promise<ReadonlyMap<AniListId, readonly UpstreamTarget[]>> {
 	const movieIdsWithRadarrTargets = await getMovieIdsWithRadarrTargets(
 		provider,
 		records,
 		deps,
 	);
-	const upstreamBySourceKey = new Map<string, UpstreamTarget[]>();
+	const upstreamByAniListId = new Map<AniListId, UpstreamTarget[]>();
 
 	for (const record of records) {
 		const targets =
@@ -107,16 +104,16 @@ async function selectListUpstreamTargets(
 				: record.targets.filter((target) => target.provider === provider);
 
 		if (targets.length > 0) {
-			upstreamBySourceKey.set(sourceIdentityKey(record.source), targets);
+			upstreamByAniListId.set(record.anilistId, targets);
 		}
 	}
 
-	return upstreamBySourceKey;
+	return upstreamByAniListId;
 }
 
 async function getMovieIdsWithRadarrTargets(
 	provider: Provider,
-	upstreamFacts: readonly UpstreamSourceFact[],
+	upstreamFacts: readonly UpstreamMappingFact[],
 	deps: EffectiveMappingListDeps,
 ): Promise<ReadonlySet<AniListId>> {
 	if (provider !== "sonarr" || !deps.loadFormatByAniListId) {

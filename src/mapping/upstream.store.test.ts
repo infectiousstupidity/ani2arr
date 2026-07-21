@@ -13,8 +13,8 @@ import {
 	getUniqueAniListIdForSource,
 	getUpstreamTargets,
 	listAllSeerrUpstreamTargets,
+	listAniListUpstreamMappings,
 	listSeerrUpstreamTargets,
-	listSourceUpstreamMappings,
 	refreshUpstreamMappings,
 } from "./upstream.store";
 
@@ -400,7 +400,7 @@ describe("refreshUpstreamMappings", () => {
 		]);
 	});
 
-	it("derives MAL Arr reads and list aliases through the AniList crosswalk", async () => {
+	it("keeps MAL alias lookup separate from canonical Arr facts", async () => {
 		const source = { source: "mal", id: mal(5114) } as const;
 		const targets = [
 			{ provider: "sonarr" as const, providerId: tvdb(78_874), season: 1 },
@@ -420,17 +420,15 @@ describe("refreshUpstreamMappings", () => {
 			},
 		});
 
-		await expect(getUpstreamTargets("sonarr", source)).resolves.toEqual(
+		await expect(getUpstreamTargets("sonarr", aid(21))).resolves.toEqual(
 			targets,
 		);
-		await expect(getUpstreamTargets("radarr", source)).resolves.toEqual([]);
-		await expect(listSourceUpstreamMappings()).resolves.toEqual([
+		await expect(getUpstreamTargets("radarr", aid(21))).resolves.toEqual([]);
+		await expect(listAniListUpstreamMappings()).resolves.toEqual([
 			{
-				source: { source: "anilist", id: aid(21) },
 				anilistId: aid(21),
 				targets,
 			},
-			{ source, anilistId: aid(21), targets },
 		]);
 		await expect(
 			getUniqueAniListIdForSource({ source: "mal", id: mal(5114) }),

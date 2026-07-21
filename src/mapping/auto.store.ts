@@ -2,22 +2,16 @@
 // src/mapping/auto.store.ts
 
 import { storage } from "wxt/utils/storage";
-import type { AniListId } from "@/anilist/types";
+import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
-import {
-	normalizeStoredSourceKey,
-	normalizeSourceIdentity,
-	parseSourceIdentityKey,
-	sourceIdentityKey,
-	type SourceIdentity,
-} from "./source-identity";
+import { parseSourceIdentityKey } from "./source-identity";
 import type { AutoResult } from "./types";
 
 const MAPPED_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ATTEMPT_TTL_MS = 48 * 60 * 60 * 1000;
 
-export type SourceAutoRecord = {
-	source: SourceIdentity;
+export type AutoRecord = {
+	anilistId: AniListId;
 	result: AutoResult;
 };
 
@@ -38,10 +32,10 @@ let writes: Promise<void> = Promise.resolve();
 
 export async function getAutoResult(
 	provider: Provider,
-	source: SourceIdentity | AniListId,
+	anilistId: AniListId,
 ): Promise<AutoResult | null> {
 	const mappings = await getAutoMappings();
-	const result = mappings[provider][sourceIdentityKey(normalizeSourceIdentity(source))];
+	const result = mappings[provider][anilistId];
 
 	if (!result || result.expiresAt <= Date.now()) {
 		return null;
@@ -50,22 +44,22 @@ export async function getAutoResult(
 	return withoutExpiry(result);
 }
 
-export async function listSourceAutoResults(
+export async function listAniListAutoResults(
 	provider: Provider,
-): Promise<SourceAutoRecord[]> {
+): Promise<AutoRecord[]> {
 	const mappings = await getAutoMappings();
-	const records: SourceAutoRecord[] = [];
+	const records: AutoRecord[] = [];
 
-	for (const [rawSourceKey, result] of Object.entries(mappings[provider])) {
+	for (const [rawAniListId, result] of Object.entries(mappings[provider])) {
 		if (result.expiresAt <= Date.now()) {
 			continue;
 		}
 
-		const source = parseSourceIdentityKey(rawSourceKey);
+		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
 
-		if (source !== null) {
+		if (anilistId !== null) {
 			records.push({
-				source,
+				anilistId,
 				result: withoutExpiry(result),
 			});
 		}
@@ -76,11 +70,11 @@ export async function listSourceAutoResults(
 
 export async function setAutoResult(
 	provider: Provider,
-	source: SourceIdentity | AniListId,
+	anilistId: AniListId,
 	result: AutoResult,
 ): Promise<void> {
 	await updateAutoMappings((mappings) => {
-		mappings[provider][sourceIdentityKey(normalizeSourceIdentity(source))] = {
+		mappings[provider][anilistId] = {
 			...result,
 			expiresAt:
 				Date.now() +
@@ -161,12 +155,24 @@ function normalizeAutoProviderMappings(
 	const normalized: Record<string, StoredAutoResult> = {};
 
 	for (const [rawKey, result] of Object.entries(mappings)) {
-		const sourceKey = normalizeStoredSourceKey(rawKey);
+		const anilistId = parseStoredAniListId(rawKey);
 
-		if (sourceKey !== null) {
-			normalized[sourceKey] = result;
+		if (
+			anilistId !== null &&
+			(rawKey === String(anilistId) || normalized[anilistId] === undefined)
+		) {
+			normalized[anilistId] = result;
 		}
 	}
 
 	return normalized;
+}
+
+function parseStoredAniListId(rawKey: string): AniListId | null {
+	const direct = parseAniListIdOrNull(Number(rawKey));
+	if (direct !== null && rawKey === String(direct)) return direct;
+
+	/** LEGACY: remove after branch testers have rewritten pre-canonical AniList facts. */
+	const source = parseSourceIdentityKey(rawKey);
+	return source?.source === "anilist" ? source.id : null;
 }

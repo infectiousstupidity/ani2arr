@@ -16,10 +16,6 @@ import {
 import { getUpstreamTargets } from "./upstream.store";
 import { getAutoResult } from "./auto.store";
 import type { AutomaticResolver } from "./resolve/resolve";
-import {
-	normalizeSourceIdentity,
-	type SourceIdentity,
-} from "./source-identity";
 import type { MappingResult } from "./types";
 import {
 	chooseMappingResult,
@@ -34,13 +30,12 @@ export class MappingService {
 
 	public async getMapping(
 		provider: Provider,
-		source: SourceIdentity | AniListId,
+		anilistId: AniListId,
 	): Promise<MappingResult> {
-		const sourceIdentity = normalizeSourceIdentity(source);
 		const [manual, upstream, auto] = await Promise.all([
-			getManualFacts(provider, sourceIdentity),
-			getUpstreamTargets(provider, sourceIdentity),
-			getAutoResult(provider, sourceIdentity),
+			getManualFacts(provider, anilistId),
+			getUpstreamTargets(provider, anilistId),
+			getAutoResult(provider, anilistId),
 		]);
 		return chooseMappingResult({
 			provider,
@@ -52,15 +47,14 @@ export class MappingService {
 
 	public async resolveMapping(
 		provider: Provider,
-		source: SourceIdentity | AniListId,
+		anilistId: AniListId,
 		options?: {
 			forceRetry?: boolean;
 			title?: string;
 			metadata?: AniListMediaHint | null;
 		},
 	): Promise<MappingResult> {
-		const sourceIdentity = normalizeSourceIdentity(source);
-		const current = await this.getMapping(provider, sourceIdentity);
+		const current = await this.getMapping(provider, anilistId);
 
 		if (isStableMapping(current)) {
 			return current;
@@ -79,7 +73,7 @@ export class MappingService {
 
 		await this.resolveAutomaticMapping(
 			provider,
-			sourceIdentity,
+			anilistId,
 			current.kind === "unmapped" ? (current.rejectedProviderIds ?? []) : [],
 			{
 				...(options?.title === undefined ? {} : { title: options.title }),
@@ -89,12 +83,12 @@ export class MappingService {
 			},
 		);
 
-		return this.getMapping(provider, sourceIdentity);
+		return this.getMapping(provider, anilistId);
 	}
 
 	public async setManualMapping(
 		provider: Provider,
-		source: SourceIdentity | AniListId,
+		anilistId: AniListId,
 		providerId: number,
 		season?: number,
 	): Promise<void> {
@@ -103,54 +97,53 @@ export class MappingService {
 				? { providerId, season }
 				: { providerId };
 
-		await saveManualMapping(provider, normalizeSourceIdentity(source), mapping);
+		await saveManualMapping(provider, anilistId, mapping);
 	}
 
 	public async clearManualMapping(
 		provider: Provider,
-		source: SourceIdentity | AniListId,
+		anilistId: AniListId,
 	): Promise<void> {
-		await removeManualMapping(provider, normalizeSourceIdentity(source));
+		await removeManualMapping(provider, anilistId);
 	}
 
 	public async setIgnored(
 		provider: Provider,
-		source: SourceIdentity | AniListId,
+		anilistId: AniListId,
 	): Promise<void> {
-		await saveIgnored(provider, normalizeSourceIdentity(source));
+		await saveIgnored(provider, anilistId);
 	}
 
 	public async clearIgnored(
 		provider: Provider,
-		source: SourceIdentity | AniListId,
+		anilistId: AniListId,
 	): Promise<void> {
-		await removeIgnored(provider, normalizeSourceIdentity(source));
+		await removeIgnored(provider, anilistId);
 	}
 
 	public async rejectCandidate(
 		provider: Provider,
-		source: SourceIdentity | AniListId,
+		anilistId: AniListId,
 		providerId: number,
 	): Promise<void> {
-		await rejectAutoCandidate(provider, normalizeSourceIdentity(source), providerId);
+		await rejectAutoCandidate(provider, anilistId, providerId);
 	}
 
 	public async clearRejectedCandidate(
 		provider: Provider,
-		source: SourceIdentity | AniListId,
+		anilistId: AniListId,
 		providerId: number,
 	): Promise<void> {
-		await removeRejectedCandidate(provider, normalizeSourceIdentity(source), providerId);
+		await removeRejectedCandidate(provider, anilistId, providerId);
 	}
 
 	public async cleanupRedundantManualMapping(
 		provider: Provider,
-		source: SourceIdentity | AniListId,
+		anilistId: AniListId,
 	): Promise<boolean> {
-		const sourceIdentity = normalizeSourceIdentity(source);
 		const [manual, upstream] = await Promise.all([
-			getManualFacts(provider, sourceIdentity),
-			getUpstreamTargets(provider, sourceIdentity),
+			getManualFacts(provider, anilistId),
+			getUpstreamTargets(provider, anilistId),
 		]);
 
 		if (!manual || !("mapping" in manual) || upstream.length !== 1) {
@@ -166,7 +159,7 @@ export class MappingService {
 			return false;
 		}
 
-		await removeManualMapping(provider, sourceIdentity);
+		await removeManualMapping(provider, anilistId);
 
 		return true;
 	}
@@ -194,8 +187,6 @@ export class MappingService {
 		const linkedAniListIdsByProviderId = new Map<number, Set<AniListId>>();
 
 		for (const record of activeRecords) {
-			if (record.anilistId === null) continue;
-
 			if (
 				record.result.kind !== "mapped" ||
 				!requestedProviderIds.has(record.result.providerId)

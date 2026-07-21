@@ -7,8 +7,6 @@ import {
 	type AniListId,
 	type AniListMedia,
 } from "@/anilist/types";
-import { parseMyAnimeListId } from "@/myanimelist/types";
-import type { SourceIdentity } from "@/mapping/source-identity";
 import { createAutomaticResolver } from "./resolve";
 
 const setAutoResultMock = vi.hoisted(() => vi.fn());
@@ -27,8 +25,6 @@ function createDeps() {
 		searchProviderCandidates: vi
 			.fn<ResolverDeps["searchProviderCandidates"]>()
 			.mockResolvedValue([]),
-		getUniqueAniListIdForSource:
-			undefined as ResolverDeps["getUniqueAniListIdForSource"],
 	};
 }
 
@@ -51,10 +47,6 @@ function createMedia(input: {
 	};
 }
 
-function anilistSource(id: AniListId): SourceIdentity {
-	return { source: "anilist", id };
-}
-
 describe("createAutomaticResolver", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -69,7 +61,7 @@ describe("createAutomaticResolver", () => {
 		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
 		await expect(
-			resolve("sonarr", anilistSource(anilistId), [], {
+			resolve("sonarr", anilistId, [], {
 				title: "Kagurabachi",
 			}),
 		).resolves.toBe(true);
@@ -81,56 +73,13 @@ describe("createAutomaticResolver", () => {
 		expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
 		expect(setAutoResultMock).toHaveBeenCalledWith(
 			"sonarr",
-			anilistSource(anilistId),
+			anilistId,
 			{
 				kind: "mapped",
 				providerId: 450_000,
 				matchedTitle: "Kagurabachi",
 			},
 		);
-	});
-
-	it("maps MAL sources from title lookup without AniList fallback", async () => {
-		const deps = createDeps();
-		const malSource = { source: "mal", id: parseMyAnimeListId(5114) } as const;
-		deps.getUniqueAniListIdForSource = vi.fn(async () => null);
-		deps.searchProviderCandidates.mockResolvedValue([
-			{
-				providerId: 78_874,
-				title: "Fullmetal Alchemist: Brotherhood",
-				year: 2009,
-			},
-		]);
-		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
-
-		await resolve("sonarr", malSource, [], {
-			title: "Fullmetal Alchemist: Brotherhood",
-		});
-
-		expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
-		expect(deps.getUniqueAniListIdForSource).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", malSource, {
-			kind: "mapped",
-			providerId: 78_874,
-			matchedTitle: "Fullmetal Alchemist: Brotherhood",
-		});
-	});
-
-	it("stores unmapped for MAL sources without a unique AniList crosswalk", async () => {
-		const deps = createDeps();
-		const malSource = { source: "mal", id: parseMyAnimeListId(5114) } as const;
-		deps.getUniqueAniListIdForSource = vi.fn(async () => null);
-		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
-
-		await resolve("sonarr", malSource, [], {
-			title: "Unknown",
-		});
-
-		expect(deps.getUniqueAniListIdForSource).toHaveBeenCalledWith(malSource);
-		expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", malSource, {
-			kind: "unmapped",
-		});
 	});
 
 	it("does not cache unmapped when AniList fallback fails", async () => {
@@ -142,7 +91,7 @@ describe("createAutomaticResolver", () => {
 		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
 		await expect(
-			resolve("sonarr", anilistSource(anilistId), [], {
+			resolve("sonarr", anilistId, [], {
 				title: "Kagurabachi",
 			}),
 		).resolves.toBe(false);
@@ -171,7 +120,7 @@ describe("createAutomaticResolver", () => {
 		);
 		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await resolve("sonarr", anilistSource(anilistId), [], {
+		await resolve("sonarr", anilistId, [], {
 			title: "DOM Miss",
 		});
 
@@ -191,7 +140,7 @@ describe("createAutomaticResolver", () => {
 		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(2);
 		expect(setAutoResultMock).toHaveBeenCalledWith(
 			"sonarr",
-			anilistSource(anilistId),
+			anilistId,
 			{
 				kind: "mapped",
 				providerId: 450_000,
@@ -218,7 +167,7 @@ describe("createAutomaticResolver", () => {
 		);
 		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await resolve("sonarr", anilistSource(anilistId), [], {
+		await resolve("sonarr", anilistId, [], {
 			title: "Same Title",
 		});
 
@@ -235,7 +184,7 @@ describe("createAutomaticResolver", () => {
 		);
 		expect(setAutoResultMock).toHaveBeenCalledWith(
 			"sonarr",
-			anilistSource(anilistId),
+			anilistId,
 			{
 				kind: "mapped",
 				providerId: 450_001,
@@ -256,14 +205,14 @@ describe("createAutomaticResolver", () => {
 		);
 		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await resolve("sonarr", anilistSource(anilistId), [], {
+		await resolve("sonarr", anilistId, [], {
 			title: "DOM Miss",
 		});
 
 		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(3);
 		expect(setAutoResultMock).toHaveBeenCalledWith(
 			"sonarr",
-			anilistSource(anilistId),
+			anilistId,
 			{
 				kind: "unmapped",
 			},
@@ -279,13 +228,13 @@ describe("createAutomaticResolver", () => {
 		]);
 		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await resolve("sonarr", anilistSource(anilistId), [450_000], {
+		await resolve("sonarr", anilistId, [450_000], {
 			title: "Kagurabachi",
 		});
 
 		expect(setAutoResultMock).toHaveBeenCalledWith(
 			"sonarr",
-			anilistSource(anilistId),
+			anilistId,
 			{
 				kind: "mapped",
 				providerId: 450_001,

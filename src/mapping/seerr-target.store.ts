@@ -148,9 +148,8 @@ async function listRadarrMappingSeerrTargets(
 
 	for (const record of records) {
 		if (
-			record.source.source !== "anilist" ||
 			record.result.kind !== "mapped" ||
-			(requestedIds && !requestedIds.has(record.source.id))
+			(requestedIds && !requestedIds.has(record.anilistId))
 		) {
 			continue;
 		}
@@ -159,7 +158,7 @@ async function listRadarrMappingSeerrTargets(
 		if (tmdbId === null) continue;
 
 		targets.push({
-			anilistId: record.source.id,
+			anilistId: record.anilistId,
 			mediaType: "movie",
 			tmdbId,
 			source: "radarr-mapping",
