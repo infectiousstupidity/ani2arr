@@ -1,16 +1,20 @@
 # Mapping architecture
 
-Mapping owns facts and effective AniList-to-provider mapping results. It does not
-own provider library state or RPC presentation DTOs.
+Mapping is canonical AniList ID -> Sonarr/Radarr target. Other website IDs are
+aliases resolved to AniList before entering this folder.
+
+Mapping owns facts and effective AniList-to-provider mapping results. It does
+not own provider library state or RPC presentation DTOs.
 
 ## Stored facts
 
 - `manual.store.ts` stores user mappings, ignores, and rejected automatic
-  candidates. Rejected IDs are facts attached to the manual record.
+  candidates by AniList ID. Rejected IDs are facts attached to the manual
+  record.
 - `upstream.store.ts` stores canonical AniBridge targets plus source crosswalks
   and refresh metadata. It does not persist Sonarr, Radarr, or Seerr projections.
-- `auto.store.ts` stores expiring automatic results. Expired reads return no
-  result and do not mutate storage.
+- `auto.store.ts` stores expiring automatic results by AniList ID. Expired
+  reads return no result and do not mutate storage.
 - `seerr-target.store.ts` stores user-owned manual Seerr overrides separately
   from downloaded AniBridge data.
 
@@ -57,14 +61,13 @@ Seerr target overrides the derived target for the same AniList ID.
 
 ## Library boundary
 
-Complete mapping-list collection reads the upstream snapshot once, including
-AniList records and MAL crosswalk aliases, then returns one flat effective
-record list per provider:
+Mapping-list collection reads canonical AniList records and returns one flat
+effective record list per provider. The RPC presentation boundary separately
+attaches MAL crosswalk aliases to those records:
 
 ```ts
 type EffectiveMappingRecord = {
-  source: SourceIdentity;
-  anilistId: AniListId | null;
+  anilistId: AniListId;
   provider: Provider;
   result: MappingResult;
 };
