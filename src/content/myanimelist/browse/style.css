@@ -1,0 +1,19 @@
+/* MyAnimeList light-DOM placement for browse-card overlays. */
+
+a[data-a2a-processed] {
+	position: relative;
+	overflow: visible !important;
+}
+
+.a2a-overlay-container {
+	position: absolute;
+	display: inline-block;
+	pointer-events: none;
+	z-index: 80;
+	overflow: visible;
+}
+
+.a2a-overlay-container[data-corner="top-left"] {
+	left: var(--badge-offset-x, -8px);
+	top: 14px;
+}

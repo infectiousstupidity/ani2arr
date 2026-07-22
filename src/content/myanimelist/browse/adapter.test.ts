@@ -1,139 +1,144 @@
-/** Tests for MyAnimeList browse card parsing. */
-// src/content/myanimelist/browse/adapter.test.ts
+/** Focused placement and identity tests for MyAnimeList browse cards. */
 
 import { describe, expect, it } from "vitest";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseMyAnimeListBrowseCard } from "./adapter";
 
+const ANIME_LINK_SELECTOR = "a[href*='/anime/']";
+const AUTOCOMPLETE_SELECTOR = "#advancedSearchResultList > div > div > a";
+
 type FakeElement = {
-	textContent?: string | null;
+	tagName: string;
+	textContent: string | null;
 	getAttribute: (name: string) => string | null;
+	matches: (selector: string) => boolean;
 	querySelector: (selector: string) => FakeElement | null;
+	querySelectorAll: (selector: string) => FakeElement[];
 };
 
-function fakeElement(input: {
-	textContent?: string;
-	attributes?: Record<string, string>;
-	children?: Record<string, FakeElement | null>;
-} = {}): FakeElement {
+function fakeElement(
+	input: {
+		tagName?: string;
+		textContent?: string;
+		attributes?: Record<string, string>;
+		matches?: string;
+		children?: Record<string, FakeElement | null>;
+		childLists?: Record<string, FakeElement[]>;
+	} = {},
+): FakeElement {
 	return {
+		tagName: input.tagName ?? "DIV",
 		textContent: input.textContent ?? null,
 		getAttribute: (name) => input.attributes?.[name] ?? null,
+		matches: (selector) => selector === input.matches,
 		querySelector: (selector) => input.children?.[selector] ?? null,
+		querySelectorAll: (selector) => input.childLists?.[selector] ?? [],
 	};
 }
 
+function animeLink(input: {
+	id: number;
+	title?: string;
+	imageAlt?: string;
+}): FakeElement {
+	const image = input.imageAlt
+		? fakeElement({ tagName: "IMG", attributes: { alt: input.imageAlt } })
+		: null;
+	return fakeElement({
+		tagName: "A",
+		textContent: input.title ?? "",
+		attributes: { href: `/anime/${input.id}/title` },
+		children: { img: image },
+	});
+}
+
+const surfaceCases = [
+	{
+		name: "seasonal card",
+		surfaceSelector: ".seasonal-anime.js-seasonal-anime",
+		titleSelector: ".title h2 a",
+	},
+	{
+		name: "ranking row",
+		surfaceSelector: "tr.ranking-list",
+		titleSelector: ".anime_ranking_h3 a",
+	},
+	{
+		name: "general search card",
+		surfaceSelector: "#anime + article > .list",
+		titleSelector: ".information .title > a",
+	},
+	{
+		name: "anime search row",
+		surfaceSelector: ".js-block-list.list > table > tbody > tr",
+		titleSelector: ".title a.hoverinfo_trigger",
+	},
+] as const;
+
 describe("parseMyAnimeListBrowseCard", () => {
-	it("parses seasonal cards", () => {
-		const link = fakeElement({
-			textContent: "Fullmetal Alchemist: Brotherhood",
-			attributes: { href: "/anime/5114/Fullmetal_Alchemist__Brotherhood" },
-		});
+	it.each(surfaceCases)("mounts a $name on its poster", (surface) => {
+		const posterLink = animeLink({ id: 52_991, imageAlt: "Sousou no Frieren" });
+		const titleLink = animeLink({ id: 52_991, title: "Sousou no Frieren" });
 		const card = fakeElement({
-			children: {
-				".title h2 a": link,
-				".info .item": fakeElement({ textContent: "TV" }),
-			},
+			matches: surface.surfaceSelector,
+			children: { [surface.titleSelector]: titleLink },
+			childLists: { [ANIME_LINK_SELECTOR]: [posterLink, titleLink] },
 		}) as unknown as Element;
 
-		expect(parseMyAnimeListBrowseCard(card)).toMatchObject({
-			source: { source: "mal", id: parseMyAnimeListId(5114) },
-			title: "Fullmetal Alchemist: Brotherhood",
-			format: "TV",
-		});
-	});
+		const parsed = parseMyAnimeListBrowseCard(card);
 
-	it("parses ranking rows", () => {
-		const link = fakeElement({
-			textContent: "Cowboy Bebop",
-			attributes: { href: "/anime/1/Cowboy_Bebop" },
-		});
-		const card = fakeElement({
-			children: {
-				"a[href*='/anime/']": link,
-				".information": fakeElement({ textContent: "TV (26 eps)" }),
-			},
-		}) as unknown as Element;
-
-		expect(parseMyAnimeListBrowseCard(card)).toMatchObject({
-			source: { source: "mal", id: parseMyAnimeListId(1) },
-			title: "Cowboy Bebop",
-			format: "TV",
-		});
-	});
-
-	it("strips video suffixes from anime card links", () => {
-		const link = fakeElement({
-			textContent: "Fullmetal Alchemist: Brotherhood",
-			attributes: {
-				href: "/anime/5114/Fullmetal_Alchemist__Brotherhood/video",
-			},
-		});
-		const card = fakeElement({
-			children: {
-				"a[href*='/anime/']": link,
-			},
-		}) as unknown as Element;
-
-		expect(parseMyAnimeListBrowseCard(card)).toMatchObject({
-			source: { source: "mal", id: parseMyAnimeListId(5114) },
-			title: "Fullmetal Alchemist: Brotherhood",
-		});
-	});
-
-	it("parses search list rows", () => {
-		const link = fakeElement({
-			textContent: "Frieren: Beyond Journey's End",
-			attributes: { href: "/anime/52991/Sousou_no_Frieren" },
-		});
-		const card = fakeElement({
-			children: {
-				"a[href*='/anime/']": link,
-				".information": fakeElement({ textContent: "TV (28 eps)" }),
-			},
-		}) as unknown as Element;
-
-		expect(parseMyAnimeListBrowseCard(card)).toMatchObject({
+		expect(parsed).toMatchObject({
 			source: { source: "mal", id: parseMyAnimeListId(52_991) },
-			title: "Frieren: Beyond Journey's End",
-			format: "TV",
+			title: "Sousou no Frieren",
 		});
+		expect(parsed?.mountTarget).toBe(posterLink);
 	});
 
-	it("parses advanced search anchors", () => {
-		const card = fakeElement({
-			textContent: "Mushishi",
-			attributes: { href: "/anime/457/Mushishi" },
-		}) as unknown as Element;
+	it("uses only an image-bearing autocomplete anchor", () => {
+		const posterLink = animeLink({ id: 457, imageAlt: "Mushishi" });
+		const card = {
+			...posterLink,
+			matches: (selector: string) => selector === AUTOCOMPLETE_SELECTOR,
+		} as unknown as Element;
 
-		expect(parseMyAnimeListBrowseCard(card)).toMatchObject({
+		const parsed = parseMyAnimeListBrowseCard(card);
+
+		expect(parsed).toMatchObject({
 			source: { source: "mal", id: parseMyAnimeListId(457) },
 			title: "Mushishi",
-			format: null,
 		});
+		expect(parsed?.mountTarget).toBe(card);
+		expect(
+			parseMyAnimeListBrowseCard({
+				...animeLink({ id: 457 }),
+				matches: (selector: string) => selector === AUTOCOMPLETE_SELECTOR,
+			} as unknown as Element),
+		).toBeNull();
 	});
 
-	it("falls back to image alt text when link text is empty", () => {
-		const link = fakeElement({
-			textContent: " ",
-			attributes: { href: "/anime/16498/Shingeki_no_Kyojin" },
-		});
-		const card = fakeElement({
-			children: {
-				"a[href*='/anime/']": link,
-				img: fakeElement({
-					attributes: { alt: "Attack on Titan" },
-				}),
-			},
-		}) as unknown as Element;
-
-		expect(parseMyAnimeListBrowseCard(card)).toMatchObject({
-			source: { source: "mal", id: parseMyAnimeListId(16_498) },
-			title: "Attack on Titan",
-		});
-	});
-
-	it("returns null for invalid cards", () => {
-		expect(parseMyAnimeListBrowseCard(fakeElement() as unknown as Element)).toBeNull();
+	it.each([
+		{
+			name: "a non-anime result",
+			card: fakeElement({ matches: "#anime + article > .list" }),
+		},
+		{
+			name: "an anime link without a poster",
+			card: fakeElement({
+				matches: "#anime + article > .list",
+				childLists: { [ANIME_LINK_SELECTOR]: [animeLink({ id: 1 })] },
+			}),
+		},
+		{
+			name: "different poster and title IDs",
+			card: fakeElement({
+				matches: ".seasonal-anime.js-seasonal-anime",
+				children: { ".title h2 a": animeLink({ id: 2, title: "Wrong" }) },
+				childLists: {
+					[ANIME_LINK_SELECTOR]: [animeLink({ id: 1, imageAlt: "Correct" })],
+				},
+			}),
+		},
+	])("rejects $name", ({ card }) => {
+		expect(parseMyAnimeListBrowseCard(card as unknown as Element)).toBeNull();
 	});
 });

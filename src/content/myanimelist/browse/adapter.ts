@@ -3,31 +3,63 @@
 
 import { parseAniListMediaFormatLabel } from "@/anilist/types";
 import { readMyAnimeListIdFromUrl } from "@/myanimelist/url";
+import type { MyAnimeListId } from "@/myanimelist/types";
 import type { BrowseAdapter, HostMediaTarget } from "@/content/browse/types";
 
 const SEASONAL_CARD_SELECTOR = ".seasonal-anime.js-seasonal-anime";
 const RANKING_ROW_SELECTOR = "tr.ranking-list";
-const SEARCH_ROW_SELECTOR = ".js-block-list.list > table > tbody > tr";
-const ADVANCED_SEARCH_ANCHOR_SELECTOR =
+const GENERAL_SEARCH_CARD_SELECTOR = "#anime + article > .list";
+const ANIME_SEARCH_ROW_SELECTOR = ".js-block-list.list > table > tbody > tr";
+const AUTOCOMPLETE_ANCHOR_SELECTOR =
 	"#advancedSearchResultList > div > div > a";
 const ANIME_LINK_SELECTOR = "a[href*='/anime/']";
 
 const CARD_SELECTOR = [
 	SEASONAL_CARD_SELECTOR,
 	RANKING_ROW_SELECTOR,
-	SEARCH_ROW_SELECTOR,
-	ADVANCED_SEARCH_ANCHOR_SELECTOR,
+	GENERAL_SEARCH_CARD_SELECTOR,
+	ANIME_SEARCH_ROW_SELECTOR,
+	AUTOCOMPLETE_ANCHOR_SELECTOR,
 ].join(",");
+
+interface AnimeLink {
+	link: HTMLAnchorElement;
+	malId: MyAnimeListId;
+}
 
 function cleanText(value: string | null | undefined): string | null {
 	const cleaned = value?.replaceAll(/\s+/g, " ").trim() ?? "";
 	return cleaned || null;
 }
 
-function ownAnimeLink(card: Element): HTMLAnchorElement | null {
-	return card.getAttribute("href")?.includes("/anime/") === true
-		? (card as HTMLAnchorElement)
-		: null;
+function parseAnimeLink(element: Element | null): AnimeLink | null {
+	if (!element || element.tagName.toLowerCase() !== "a") return null;
+
+	const href = element.getAttribute("href");
+	if (!href) return null;
+
+	try {
+		const url = new URL(href, "https://myanimelist.net");
+		if (
+			url.hostname !== "myanimelist.net" ||
+			!/^\/anime\/\d+(?:\/|$)/.test(url.pathname)
+		) {
+			return null;
+		}
+	} catch {
+		return null;
+	}
+
+	const malId = readMyAnimeListIdFromUrl(href);
+	return malId === null ? null : { link: element as HTMLAnchorElement, malId };
+}
+
+function findPosterLink(card: Element): HTMLAnchorElement | null {
+	for (const candidate of card.querySelectorAll(ANIME_LINK_SELECTOR)) {
+		const parsed = parseAnimeLink(candidate);
+		if (parsed?.link.querySelector("img")) return parsed.link;
+	}
+	return null;
 }
 
 function parseFormat(card: Element) {
@@ -39,72 +71,91 @@ function parseFormat(card: Element) {
 	return parseAniListMediaFormatLabel(normalized || raw);
 }
 
-function parseFromLink(input: {
+function parseFromLinks(input: {
 	card: Element;
-	link: HTMLAnchorElement | null;
+	posterLink: HTMLAnchorElement | null;
+	titleLink: HTMLAnchorElement | null;
 }): HostMediaTarget | null {
-	const { card, link } = input;
-	if (!link) return null;
+	const { card, posterLink, titleLink } = input;
+	const poster = parseAnimeLink(posterLink);
+	const posterImage = poster?.link.querySelector<HTMLImageElement>("img");
+	if (!poster || !posterImage) return null;
 
-	const malId = readMyAnimeListIdFromUrl(link.getAttribute("href"));
-	if (malId === null) return null;
+	const titleAnimeLink = titleLink ? parseAnimeLink(titleLink) : null;
+	if (titleLink && (!titleAnimeLink || titleAnimeLink.malId !== poster.malId)) {
+		return null;
+	}
 
 	const title =
-		cleanText(link.textContent) ??
-		cleanText(link.getAttribute("title")) ??
-		cleanText(
-			card.querySelector<HTMLImageElement>("img")?.alt ??
-				card.querySelector<HTMLImageElement>("img")?.getAttribute("alt"),
-		);
+		cleanText(titleAnimeLink?.link.textContent) ??
+		cleanText(titleAnimeLink?.link.getAttribute("title")) ??
+		cleanText(posterImage.getAttribute("alt"));
 	if (title === null) return null;
 
 	return {
-		source: { source: "mal", id: malId },
+		source: { source: "mal", id: poster.malId },
 		title,
 		format: parseFormat(card),
-		mountTarget: link as HTMLElement,
+		mountTarget: poster.link,
 	};
 }
 
 function parseSeasonalCard(card: Element): HostMediaTarget | null {
-	return parseFromLink({
+	return parseFromLinks({
 		card,
-		link: card.querySelector<HTMLAnchorElement>(".title h2 a"),
+		posterLink: findPosterLink(card),
+		titleLink: card.querySelector<HTMLAnchorElement>(".title h2 a"),
 	});
 }
 
 function parseRankingRow(card: Element): HostMediaTarget | null {
-	return parseFromLink({
+	return parseFromLinks({
 		card,
-		link:
-			card.querySelector<HTMLAnchorElement>("a.hoverinfo_trigger") ??
-			card.querySelector<HTMLAnchorElement>(ANIME_LINK_SELECTOR),
+		posterLink: findPosterLink(card),
+		titleLink: card.querySelector<HTMLAnchorElement>(".anime_ranking_h3 a"),
 	});
 }
 
-function parseSearchRow(card: Element): HostMediaTarget | null {
-	return parseFromLink({
+function parseGeneralSearchCard(card: Element): HostMediaTarget | null {
+	return parseFromLinks({
 		card,
-		link: card.querySelector<HTMLAnchorElement>(ANIME_LINK_SELECTOR),
+		posterLink: findPosterLink(card),
+		titleLink: card.querySelector<HTMLAnchorElement>(".information .title > a"),
 	});
 }
 
-function parseAdvancedSearchAnchor(card: Element): HostMediaTarget | null {
-	return parseFromLink({
+function parseAnimeSearchRow(card: Element): HostMediaTarget | null {
+	return parseFromLinks({
 		card,
-		link: ownAnimeLink(card),
+		posterLink: findPosterLink(card),
+		titleLink: card.querySelector<HTMLAnchorElement>(
+			".title a.hoverinfo_trigger",
+		),
+	});
+}
+
+function parseAutocompleteAnchor(card: Element): HostMediaTarget | null {
+	const ownLink = parseAnimeLink(card)?.link ?? null;
+	return parseFromLinks({
+		card,
+		posterLink: ownLink,
+		titleLink: null,
 	});
 }
 
 export function parseMyAnimeListBrowseCard(
 	card: Element,
 ): HostMediaTarget | null {
-	return (
-		parseSeasonalCard(card) ??
-		parseRankingRow(card) ??
-		parseSearchRow(card) ??
-		parseAdvancedSearchAnchor(card)
-	);
+	if (card.matches(SEASONAL_CARD_SELECTOR)) return parseSeasonalCard(card);
+	if (card.matches(RANKING_ROW_SELECTOR)) return parseRankingRow(card);
+	if (card.matches(GENERAL_SEARCH_CARD_SELECTOR)) {
+		return parseGeneralSearchCard(card);
+	}
+	if (card.matches(ANIME_SEARCH_ROW_SELECTOR)) return parseAnimeSearchRow(card);
+	if (card.matches(AUTOCOMPLETE_ANCHOR_SELECTOR)) {
+		return parseAutocompleteAnchor(card);
+	}
+	return null;
 }
 
 export const myAnimeListBrowseAdapter: BrowseAdapter = {

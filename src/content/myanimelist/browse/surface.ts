@@ -19,6 +19,7 @@ export function isBrowseSurface(url: string): boolean {
 		if (parsed.pathname === "/anime.php") {
 			return !parsed.searchParams.has("id");
 		}
+		if (parsed.pathname === "/search/all") return true;
 		return MAL_BROWSE_PATHS.some((path) => isBrowsePath(parsed.pathname, path));
 	} catch {
 		return false;

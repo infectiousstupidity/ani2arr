@@ -1,12 +1,12 @@
 /** MyAnimeList browse surface composition for content-owned overlays. */
 // src/content/myanimelist/browse/index.tsx
 
-import browseLightDomStyles from "@/content/anilist/browse/style.css?inline";
 import cardOverlayStyles from "@/features/media-overlay/card-overlay.light-dom.css?inline";
 import { createBrowseEntrypointShell } from "@/content/browse/create-browse-entrypoint";
 import type { PublicOptions } from "@/settings/types";
 import { myAnimeListBrowseAdapter } from "./adapter";
 import { isBrowseSurface } from "./surface";
+import browseLightDomStyles from "./style.css?inline";
 
 const isBrowseShellEligible = ({
 	url,
