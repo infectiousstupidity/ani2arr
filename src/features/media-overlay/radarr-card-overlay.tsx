@@ -28,7 +28,7 @@ interface RadarrCardOverlayProps {
 	stackDirection?: "up" | "down";
 	tooltipContainer?: FloatingPortalContainer;
 	extraAction?: ReactNode;
-	presentation?: "status-column" | undefined;
+	presentation?: "status-column" | "action-row" | undefined;
 }
 
 export function RadarrCardOverlay({
@@ -67,6 +67,7 @@ export function RadarrCardOverlay({
 		state: mediaAction.status.state,
 		errorSource: mediaAction.status.errorSource,
 		canQuickAdd: providerTitle !== null && defaultForm !== null,
+		presentation,
 	};
 	const primaryTitle = getCardPrimaryTitle(primaryLabelInput);
 	const primaryLabel = getCardPrimaryLabel(primaryLabelInput);

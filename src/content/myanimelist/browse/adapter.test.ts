@@ -10,6 +10,7 @@ const AUTOCOMPLETE_SELECTOR = "#advancedSearchResultList > div > div > a";
 type FakeElement = {
 	tagName: string;
 	textContent: string | null;
+	parentElement: FakeElement | null;
 	getAttribute: (name: string) => string | null;
 	matches: (selector: string) => boolean;
 	querySelector: (selector: string) => FakeElement | null;
@@ -22,6 +23,7 @@ function fakeElement(
 		textContent?: string;
 		attributes?: Record<string, string>;
 		matches?: string;
+		parentElement?: FakeElement;
 		children?: Record<string, FakeElement | null>;
 		childLists?: Record<string, FakeElement[]>;
 	} = {},
@@ -29,6 +31,7 @@ function fakeElement(
 	return {
 		tagName: input.tagName ?? "DIV",
 		textContent: input.textContent ?? null,
+		parentElement: input.parentElement ?? null,
 		getAttribute: (name) => input.attributes?.[name] ?? null,
 		matches: (selector) => selector === input.matches,
 		querySelector: (selector) => input.children?.[selector] ?? null,
@@ -85,19 +88,26 @@ describe("parseMyAnimeListBrowseCard", () => {
 		).toBeNull();
 	});
 
-	it("keeps a seasonal card on its poster", () => {
+	it("mounts a seasonal card action row on the whole card", () => {
 		const posterLink = animeLink({ id: 457, imageAlt: "Mushishi" });
 		const titleLink = animeLink({ id: 457, title: "Mushishi" });
+		const seasonalList = fakeElement({
+			children: {
+				".anime-header": fakeElement({ textContent: "TV (New)" }),
+			},
+		});
 		const card = fakeElement({
 			matches: ".seasonal-anime.js-seasonal-anime",
+			parentElement: seasonalList,
 			children: { ".title h2 a": titleLink },
 			childLists: { [ANIME_LINK_SELECTOR]: [posterLink, titleLink] },
 		}) as unknown as Element;
 
 		const parsed = parseMyAnimeListBrowseCard(card);
 
-		expect(parsed?.mountTarget).toBe(posterLink);
-		expect(parsed?.presentation).toBeUndefined();
+		expect(parsed?.mountTarget).toBe(card);
+		expect(parsed?.presentation).toBe("action-row");
+		expect(parsed?.format).toBe("TV");
 	});
 
 	it("uses only an image-bearing autocomplete anchor", () => {

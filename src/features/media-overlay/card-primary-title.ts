@@ -8,6 +8,7 @@ interface CardPrimaryTitleInput {
 	state: MediaActionState;
 	errorSource: "status" | "add" | null;
 	canQuickAdd: boolean;
+	presentation?: "status-column" | "action-row" | undefined;
 }
 
 export function getCardPrimaryTitle(input: CardPrimaryTitleInput): string {
@@ -47,17 +48,22 @@ export function getCardPrimaryLabel(input: CardPrimaryTitleInput): string {
 			return `Configure ${input.providerLabel}`;
 		}
 		case "checking": {
-			return `Checking ${input.providerLabel}...`;
+			return input.presentation === "action-row"
+				? `Checking ${input.providerLabel}`
+				: `Checking ${input.providerLabel}...`;
 		}
 		case "adding": {
-			return "Adding...";
+			return input.presentation === "action-row"
+				? `Adding to ${input.providerLabel}`
+				: "Adding...";
 		}
 		case "error": {
+			if (input.presentation === "action-row") return "Retry";
 			return input.errorSource === "add" ? "Retry add" : "Retry check";
 		}
 		case "unmapped":
 		case "unknown": {
-			return "Find match";
+			return input.presentation === "action-row" ? "Fix mapping" : "Find match";
 		}
 		case "in-library": {
 			return `In ${input.providerLabel}`;

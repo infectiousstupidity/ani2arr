@@ -44,4 +44,41 @@ describe("CardOverlay", () => {
 			view.indexOf("Configure Seerr"),
 		);
 	});
+
+	it("renders an action row without circular or stacked controls", () => {
+		const view = renderToStaticMarkup(
+			<Tooltip.Provider>
+				<CardOverlay
+					providerLabel="Sonarr"
+					primaryState="in-library"
+					primaryTitle="Already in Sonarr"
+					primaryLabel="In Sonarr"
+					primaryDisabled={true}
+					statusPrimaryDisabled={false}
+					onPrimaryAction={() => {}}
+					onStatusPrimaryAction={() => {}}
+					hasMapping={true}
+					onOpenSetup={() => {}}
+					onOpenMapping={() => {}}
+					openProvider={() => {}}
+					openProviderIcon={ProviderIcon}
+					extraAction={<span>Configure Seerr</span>}
+					presentation="action-row"
+				/>
+			</Tooltip.Provider>,
+		);
+
+		expect(view).toContain('data-presentation="action-row"');
+		expect(view).toContain("a2a-card-overlay__row-primary");
+		expect(view).toContain("a2a-card-overlay__row-external");
+		expect(view).toContain('aria-label="Already in Sonarr"');
+		expect(view).toContain('aria-label="Open in Sonarr"');
+		expect(view).toContain('data-provider-icon="sonarr"');
+		expect(view).not.toContain("a2a-card-overlay__quick");
+		expect(view).not.toContain("a2a-card-overlay__stack");
+		expect(view).not.toContain("a2a-card-overlay__menu-trigger");
+		expect(view.indexOf("In Sonarr")).toBeLessThan(
+			view.indexOf("Configure Seerr"),
+		);
+	});
 });

@@ -16,7 +16,7 @@ export interface HostMediaTarget {
   title: string;
   format: AniListMediaFormat | null;
   mountTarget: HTMLElement;
-  presentation?: 'status-column';
+  presentation?: 'status-column' | 'action-row';
 }
 
 export interface BrowseAdapter {

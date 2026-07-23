@@ -72,6 +72,14 @@ function parseFormat(card: Element) {
 	return parseAniListMediaFormatLabel(normalized || raw);
 }
 
+function parseSeasonalFormat(card: Element) {
+	const raw = cleanText(
+		card.parentElement?.querySelector<HTMLElement>(".anime-header")
+			?.textContent,
+	);
+	return parseAniListMediaFormatLabel(raw?.replace(/\s*\(.*/, "") ?? raw);
+}
+
 function parseFromLinks(input: {
 	card: Element;
 	posterLink: HTMLAnchorElement | null;
@@ -102,11 +110,19 @@ function parseFromLinks(input: {
 }
 
 function parseSeasonalCard(card: Element): HostMediaTarget | null {
-	return parseFromLinks({
+	const parsed = parseFromLinks({
 		card,
 		posterLink: findPosterLink(card),
 		titleLink: card.querySelector<HTMLAnchorElement>(".title h2 a"),
 	});
+	if (!parsed) return null;
+
+	return {
+		...parsed,
+		format: parseSeasonalFormat(card),
+		mountTarget: card as HTMLElement,
+		presentation: "action-row",
+	};
 }
 
 function parseRankingRow(card: Element): HostMediaTarget | null {

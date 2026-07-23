@@ -108,37 +108,40 @@ describe("BrowseCardOverlay", () => {
 		});
 	});
 
-	it("keeps Arr before Seerr for status-column targets", () => {
-		const parsed = {
-			...createTarget("TV"),
-			presentation: "status-column" as const,
-		};
-		const publicOptions = createDefaultPublicOptions();
-		publicOptions.ui.browseCards.primaryStatus = "seerr";
-		publicOptions.seerr.isConfigured = true;
+	it.each(["status-column", "action-row"] as const)(
+		"keeps Arr before Seerr for %s targets",
+		(presentation) => {
+			const parsed = {
+				...createTarget("TV"),
+				presentation,
+			};
+			const publicOptions = createDefaultPublicOptions();
+			publicOptions.ui.browseCards.primaryStatus = "seerr";
+			publicOptions.seerr.isConfigured = true;
 
-		const overlay = BrowseCardOverlay({
-			parsed,
-			adapter: {
-				cardSelector: ".card",
-				parseCard: () => null,
-			},
-			publicOptions,
-			mappedIdentities: [],
-			metadata: null,
-			onOpenMediaModal: () => {},
-			tooltipContainer: null,
-		});
-
-		expect(overlay).toMatchObject({
-			type: SonarrCardOverlay,
-			props: {
-				presentation: "status-column",
-				extraAction: {
-					type: SeerrCardStackActions,
-					props: { presentation: "status-column" },
+			const overlay = BrowseCardOverlay({
+				parsed,
+				adapter: {
+					cardSelector: ".card",
+					parseCard: () => null,
 				},
-			},
-		});
-	});
+				publicOptions,
+				mappedIdentities: [],
+				metadata: null,
+				onOpenMediaModal: () => {},
+				tooltipContainer: null,
+			});
+
+			expect(overlay).toMatchObject({
+				type: SonarrCardOverlay,
+				props: {
+					presentation,
+					extraAction: {
+						type: SeerrCardStackActions,
+						props: { presentation },
+					},
+				},
+			});
+		},
+	);
 });

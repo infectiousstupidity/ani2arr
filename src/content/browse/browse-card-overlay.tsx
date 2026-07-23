@@ -323,7 +323,9 @@ export function BrowseCardOverlay({
 	const showSeerrMain =
 		seerrEnabled &&
 		(activeArr === "none" ||
-			(parsed.presentation !== "status-column" && primaryStatus === "seerr"));
+			(parsed.presentation !== "status-column" &&
+				parsed.presentation !== "action-row" &&
+				primaryStatus === "seerr"));
 
 	const commonProps = {
 		anilistId,

@@ -40,14 +40,14 @@ interface SeerrCardActionProps {
 
 interface SeerrCardStackActionsProps extends SeerrCardActionProps {
 	stackDirection?: "up" | "down" | undefined;
-	presentation?: "status-column" | undefined;
+	presentation?: "status-column" | "action-row" | undefined;
 }
 
 interface SeerrStandaloneCardOverlayProps extends SeerrCardActionProps {
 	badgeVisibility?: BadgeVisibility;
 	stackDirection?: "up" | "down";
 	extraAction?: ReactNode;
-	presentation?: "status-column" | undefined;
+	presentation?: "status-column" | "action-row" | undefined;
 }
 
 type SeerrCardState = Extract<
@@ -261,8 +261,14 @@ export function SeerrCardStackActions({
 		observeTarget,
 	});
 
-	if (!isInViewport && presentation !== "status-column") return null;
-	if (presentation === "status-column") {
+	if (
+		!isInViewport &&
+		presentation !== "status-column" &&
+		presentation !== "action-row"
+	) {
+		return null;
+	}
+	if (presentation === "status-column" || presentation === "action-row") {
 		return (
 			<CardOverlay
 				providerLabel="Seerr"
@@ -272,10 +278,12 @@ export function SeerrCardStackActions({
 				primaryDisabled={action.disabled}
 				onPrimaryAction={action.run}
 				hasMapping={true}
-				openProvider={action.openSeerr}
+				openProvider={
+					presentation === "status-column" ? action.openSeerr : null
+				}
 				openProviderIcon={SeerrIcon}
 				tooltipContainer={tooltipContainer}
-				presentation="status-column"
+				presentation={presentation}
 			/>
 		);
 	}
@@ -320,7 +328,13 @@ export function SeerrStandaloneCardOverlay({
 		observeTarget,
 	});
 
-	if (!isInViewport && presentation !== "status-column") return null;
+	if (
+		!isInViewport &&
+		presentation !== "status-column" &&
+		presentation !== "action-row"
+	) {
+		return null;
+	}
 
 	return (
 		<div
@@ -341,7 +355,9 @@ export function SeerrStandaloneCardOverlay({
 				primaryDisabled={action.disabled}
 				onPrimaryAction={action.run}
 				hasMapping={true}
-				openProvider={action.openSeerr}
+				openProvider={
+					presentation === "action-row" ? null : action.openSeerr
+				}
 				openProviderIcon={SeerrIcon}
 				extraAction={extraAction}
 				badgeVisibility={badgeVisibility}

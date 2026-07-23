@@ -30,3 +30,114 @@ a[data-a2a-processed] {
 .a2a-overlay-container[data-presentation="status-column"]:not(:empty) {
 	margin-bottom: 5px;
 }
+
+.seasonal-anime.js-seasonal-anime[data-a2a-processed] {
+	height: auto !important;
+}
+
+.seasonal-anime.js-seasonal-anime[data-a2a-processed] > .information {
+	position: static;
+	clear: both;
+	width: auto;
+}
+
+.a2a-overlay-container[data-presentation="action-row"] {
+	position: static;
+	display: block;
+	clear: both;
+	box-sizing: border-box;
+	width: 100%;
+	padding: 0 6px 7px;
+	pointer-events: none;
+	z-index: auto;
+	overflow: visible;
+}
+
+.a2a-overlay-container[data-presentation="action-row"]:not(:empty) {
+	margin-top: 5px;
+}
+
+.a2a-card-overlay[data-presentation="action-row"] {
+	--a2a-action-row-height: 23px;
+
+	display: flex;
+	flex: 1 1 0;
+	align-items: stretch;
+	gap: 5px;
+	min-width: 0;
+	width: 100%;
+	pointer-events: none;
+	z-index: auto;
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	:is(
+		.a2a-card-overlay__row-primary,
+		.a2a-card-overlay__row-external
+	) {
+	appearance: none;
+	box-sizing: border-box;
+	pointer-events: auto;
+	height: var(--a2a-action-row-height);
+	margin: 0;
+	padding: 0;
+	border: 1px solid #4069bd;
+	border-radius: 3px;
+	background: #2e51a2;
+	color: #fff;
+	font-family: Verdana, Arial, sans-serif;
+	font-size: 10px;
+	font-weight: 400;
+	line-height: 21px;
+	white-space: nowrap;
+	cursor: pointer;
+	box-shadow: none;
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	:is(
+		.a2a-card-overlay__row-primary,
+		.a2a-card-overlay__row-external
+	):is(:hover, :active):not(:disabled) {
+	background: #4165b4;
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	:is(
+		.a2a-card-overlay__row-primary,
+		.a2a-card-overlay__row-external
+	):focus-visible {
+	position: relative;
+	z-index: 1;
+	outline: 2px solid #8aa9ed;
+	outline-offset: -2px;
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	.a2a-card-overlay__row-primary {
+	min-width: 0;
+	flex: 1 1 0;
+	padding: 0 5px;
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	.a2a-card-overlay__row-external {
+	display: inline-grid;
+	flex: 0 0 var(--a2a-action-row-height);
+	place-items: center;
+	width: var(--a2a-action-row-height);
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	.a2a-card-overlay__row-external
+	.a2a-provider-icon {
+	width: 16px;
+	height: 16px;
+	color: currentColor;
+}
+
+.a2a-card-overlay[data-presentation="action-row"]
+	button:is(:disabled, [aria-disabled="true"]) {
+	cursor: default;
+	opacity: 0.72;
+}
