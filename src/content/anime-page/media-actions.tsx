@@ -19,8 +19,8 @@ interface MediaActionsProps {
 	disabled: boolean;
 	openProvider: (() => void) | null;
 	onPrimaryAction: () => void;
-	onOpenSetup: () => void;
-	onOpenMapping: () => void;
+	onOpenSetup?: (() => void) | undefined;
+	onOpenMapping?: (() => void) | undefined;
 	portalContainer?: HTMLElement | undefined;
 }
 
@@ -143,6 +143,31 @@ function renderProviderOpenIcon(
 	}
 }
 
+function getPrimaryAction(input: {
+	state: MediaActionState;
+	onOpenSetup: (() => void) | undefined;
+	openProvider: (() => void) | null;
+	onPrimaryAction: () => void;
+}): () => void {
+	if (input.state !== "in-library") return input.onPrimaryAction;
+	return input.onOpenSetup ?? input.openProvider ?? input.onPrimaryAction;
+}
+
+function getMenuActions(input: {
+	state: MediaActionState;
+	hasMapping: boolean;
+	onOpenSetup: (() => void) | undefined;
+	onOpenMapping: (() => void) | undefined;
+}): {
+	setup: (() => void) | undefined;
+	mapping: (() => void) | undefined;
+} {
+	return {
+		setup: input.hasMapping ? input.onOpenSetup : undefined,
+		mapping: input.state === "unconfigured" ? undefined : input.onOpenMapping,
+	};
+}
+
 const MediaActionGroup: React.FC<React.PropsWithChildren> = ({ children }) => (
 	<div
 		className="relative flex items-stretch rounded-[3px] overflow-hidden"
@@ -166,23 +191,33 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 	onOpenMapping,
 	portalContainer,
 }) => {
-	const classNames =
-		MEDIA_ACTION_CLASS_NAMES[compact ? "compact" : "default"];
+	const classNames = MEDIA_ACTION_CLASS_NAMES[compact ? "compact" : "default"];
 	const providerLabel = getProviderLabel(provider);
 	const isLoading = state === "checking" || state === "adding";
-	const showSetupAction = hasMapping;
-	const showMappingAction = state !== "unconfigured";
+	const menuActions = getMenuActions({
+		state,
+		hasMapping,
+		onOpenSetup,
+		onOpenMapping,
+	});
 	const showExternalAction = state !== "unconfigured" && openProvider !== null;
-	const hasMenu = showSetupAction || showMappingAction;
+	const hasMenu =
+		menuActions.setup !== undefined || menuActions.mapping !== undefined;
 	const primaryDisabled = state === "in-library" ? false : disabled;
-	const handlePrimaryAction =
-		state === "in-library" ? onOpenSetup : onPrimaryAction;
+	const handlePrimaryAction = getPrimaryAction({
+		state,
+		onOpenSetup,
+		openProvider,
+		onPrimaryAction,
+	});
 	const handlePrimaryClick = (event: MouseEvent<HTMLButtonElement>): void => {
 		if (!event.isTrusted) return;
 
 		handlePrimaryAction();
 	};
-	const handleProviderOpenClick = (event: MouseEvent<HTMLButtonElement>): void => {
+	const handleProviderOpenClick = (
+		event: MouseEvent<HTMLButtonElement>,
+	): void => {
 		if (!event.isTrusted) return;
 
 		openProvider?.();
@@ -240,13 +275,13 @@ const MediaActions: React.FC<MediaActionsProps> = ({
 							</Button>
 						}
 					>
-						{showSetupAction ? (
-							<DropdownItem onSelect={onOpenSetup}>
+						{menuActions.setup ? (
+							<DropdownItem onSelect={menuActions.setup}>
 								{providerLabel} options
 							</DropdownItem>
 						) : null}
-						{showMappingAction ? (
-							<DropdownItem onSelect={onOpenMapping}>
+						{menuActions.mapping ? (
+							<DropdownItem onSelect={menuActions.mapping}>
 								{manualMappingLabel}
 							</DropdownItem>
 						) : null}

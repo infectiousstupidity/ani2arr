@@ -8,10 +8,16 @@ import type {
 	AniListMediaFormat,
 	AniListMediaHint,
 } from "@/anilist/types";
-import { resolveAniListTargetProvider } from "@/content/target-provider";
-import type { SourceIdentity } from "@/mapping/source-identity";
+import {
+	resolveAniListTargetProvider,
+	resolveProviderForAniListFormat,
+} from "@/content/target-provider";
+import {
+	sourceIdentityKey,
+	type SourceIdentity,
+} from "@/mapping/source-identity";
 import { openOptionsPage } from "@/rpc/runtime-messages";
-import type { RequestInSeerrInput } from "@/rpc/types";
+import type { MappingIdentity, RequestInSeerrInput } from "@/rpc/types";
 import { useRadarrMediaAction } from "@/features/media-action/use-radarr-media-action";
 import {
 	SeerrOpenButton,
@@ -26,7 +32,7 @@ import type { Provider } from "@/providers/types";
 import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import { useAniListMetadataBatch } from "@/queries/anilist";
-import { useMappingIdentities } from "@/queries/mapping";
+import { useMappingIdentities, useSourceAniListIdMap } from "@/queries/mapping";
 import { usePublicOptions } from "@/queries/options";
 import { useSeerrTargets } from "@/queries/seerr";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
@@ -37,8 +43,7 @@ import MediaActions from "@/content/anime-page/media-actions";
 
 export interface AnimePageTarget {
 	source: SourceIdentity;
-	/** MAL v1 uses source identity internally, but content actions still require an AniList crosswalk. */
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
 	format: AniListMediaFormat | null;
 	title: string | null;
 }
@@ -51,7 +56,7 @@ interface ContentRootProps {
 interface AnimeProviderActionProps {
 	compact: boolean;
 	source: SourceIdentity;
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
 	displayTitle: string;
 	providerTitle: string | null;
 	metadata: AniListMediaHint | null;
@@ -75,7 +80,7 @@ interface AnimePageActionStackProps {
 	showProviderAction: boolean;
 	provider: Provider | null;
 	source: SourceIdentity;
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
 	displayTitle: string;
 	providerTitle: string | null;
 	metadata: AniListMediaHint | null;
@@ -148,8 +153,8 @@ function getAnimePageOptionsState(
 		actionsEnabled: sonarrEnabled || radarrEnabled || seerrEnabled,
 		hasConfiguredProvider: Boolean(
 			(sonarrEnabled && options?.providers.sonarr.isConfigured) ||
-				(radarrEnabled && options?.providers.radarr.isConfigured) ||
-				(seerrEnabled && options?.seerr.isConfigured),
+			(radarrEnabled && options?.providers.radarr.isConfigured) ||
+			(seerrEnabled && options?.seerr.isConfigured),
 		),
 	};
 }
@@ -169,16 +174,51 @@ function shouldShowProviderAction(
 }
 
 function shouldShowSeerrAction(input: {
+	hasAniListId: boolean;
 	optionState: AnimePageOptionsState;
 }): boolean {
-	return input.optionState.seerrEnabled;
+	return input.hasAniListId && input.optionState.seerrEnabled;
+}
+
+function getResolvedAniListId(
+	target: AnimePageTarget,
+	idsBySource: Record<string, AniListId | null> | undefined,
+): AniListId | undefined {
+	if (target.anilistId !== undefined) return target.anilistId;
+	return idsBySource?.[sourceIdentityKey(target.source)] ?? undefined;
+}
+
+function toAniListIdBatch(anilistId: AniListId | undefined): AniListId[] {
+	return anilistId === undefined ? [] : [anilistId];
+}
+
+function getTargetProvider(input: {
+	anilistId: AniListId | undefined;
+	format: AniListMediaFormat | null;
+	mappedIdentities: readonly MappingIdentity[];
+}): Provider | null {
+	if (input.anilistId === undefined) {
+		return resolveProviderForAniListFormat(input.format);
+	}
+
+	return resolveAniListTargetProvider({
+		anilistId: input.anilistId,
+		format: input.format,
+		mappedIdentities: input.mappedIdentities,
+	});
+}
+
+function getFallbackTitle(source: SourceIdentity): string {
+	return `${source.source === "mal" ? "MAL" : "AniList"} #${source.id}`;
 }
 
 function isMetadataReadyForStatus(input: {
+	hasAniListId: boolean;
 	optionState: AnimePageOptionsState;
 	metadataBatch: { isFetched: boolean; isError: boolean };
 }): boolean {
 	return (
+		!input.hasAniListId ||
 		!input.optionState.hasConfiguredProvider ||
 		input.metadataBatch.isFetched ||
 		input.metadataBatch.isError
@@ -211,7 +251,7 @@ function SonarrAnimePageActions({
 	onOpenMapping,
 }: SonarrAnimeActionProps): ReactElement {
 	const mediaAction = useSonarrMediaAction({
-		anilistId,
+		...(anilistId === undefined ? {} : { anilistId }),
 		source,
 		displayTitle,
 		providerTitle,
@@ -233,11 +273,14 @@ function SonarrAnimePageActions({
 			state={mediaAction.status.state}
 			errorSource={mediaAction.status.errorSource}
 			hasMapping={mediaAction.status.hasMapping}
-			disabled={mediaAction.status.disabled}
+			disabled={
+				mediaAction.status.disabled ||
+				(anilistId === undefined && !mediaAction.status.hasMapping)
+			}
 			openProvider={mediaAction.openProvider}
 			onPrimaryAction={mediaAction.runPrimaryAction}
-			onOpenSetup={onOpenSetup}
-			onOpenMapping={onOpenMapping}
+			onOpenSetup={anilistId === undefined ? undefined : onOpenSetup}
+			onOpenMapping={anilistId === undefined ? undefined : onOpenMapping}
 			portalContainer={portalContainer ?? undefined}
 		/>
 	);
@@ -258,7 +301,7 @@ function RadarrAnimePageActions({
 	onOpenMapping,
 }: RadarrAnimeActionProps): ReactElement {
 	const mediaAction = useRadarrMediaAction({
-		anilistId,
+		...(anilistId === undefined ? {} : { anilistId }),
 		source,
 		displayTitle,
 		providerTitle,
@@ -280,11 +323,14 @@ function RadarrAnimePageActions({
 			state={mediaAction.status.state}
 			errorSource={mediaAction.status.errorSource}
 			hasMapping={mediaAction.status.hasMapping}
-			disabled={mediaAction.status.disabled}
+			disabled={
+				mediaAction.status.disabled ||
+				(anilistId === undefined && !mediaAction.status.hasMapping)
+			}
 			openProvider={mediaAction.openProvider}
 			onPrimaryAction={mediaAction.runPrimaryAction}
-			onOpenSetup={onOpenSetup}
-			onOpenMapping={onOpenMapping}
+			onOpenSetup={anilistId === undefined ? undefined : onOpenSetup}
+			onOpenMapping={anilistId === undefined ? undefined : onOpenMapping}
 			portalContainer={portalContainer ?? undefined}
 		/>
 	);
@@ -374,7 +420,7 @@ export function ContentRoot({
 	target,
 	compactActions = false,
 }: ContentRootProps): ReactElement | null {
-	const { anilistId, source } = target;
+	const { source } = target;
 	const [hostElement, setHostElement] = useState<HTMLDivElement | null>(null);
 	useTheme({ current: hostElement });
 	useA2aBroadcasts();
@@ -383,13 +429,18 @@ export function ContentRoot({
 	const publicOptionsQuery = usePublicOptions();
 	const options = publicOptionsQuery.data;
 	const optionState = getAnimePageOptionsState(options);
-	const metadataBatch = useAniListMetadataBatch([anilistId], {
+	const sourceAniListIds = useSourceAniListIdMap([source], {
+		enabled: target.anilistId === undefined,
+	});
+	const anilistId = getResolvedAniListId(target, sourceAniListIds.data);
+	const anilistIds = toAniListIdBatch(anilistId);
+	const metadataBatch = useAniListMetadataBatch(anilistIds, {
 		enabled: optionState.hasConfiguredProvider,
 	});
-	const mappingIdentities = useMappingIdentities([anilistId], {
+	const mappingIdentities = useMappingIdentities(anilistIds, {
 		enabled: optionState.actionsEnabled,
 	});
-	const seerrTargets = useSeerrTargets([anilistId], {
+	const seerrTargets = useSeerrTargets(anilistIds, {
 		enabled: optionState.seerrEnabled,
 	});
 	const metadata = metadataHintFromAniListMetadata(
@@ -397,17 +448,16 @@ export function ContentRoot({
 	);
 	const providerTitle = trimToNull(target.title);
 	const displayTitle =
-		getMetadataTitle(metadata) ?? providerTitle ?? `AniList #${anilistId}`;
-	const provider = resolveAniListTargetProvider({
+		getMetadataTitle(metadata) ?? providerTitle ?? getFallbackTitle(source);
+	const provider = getTargetProvider({
 		anilistId,
 		format: target.format,
 		mappedIdentities: mappingIdentities.data ?? [],
 	});
-	const seerrRequestInput = toSeerrRequestInput(
-		seerrTargets.data?.[0] ?? null,
-	);
+	const seerrRequestInput = toSeerrRequestInput(seerrTargets.data?.[0] ?? null);
 	const showProviderAction = shouldShowProviderAction(provider, options);
 	const showSeerrAction = shouldShowSeerrAction({
+		hasAniListId: anilistId !== undefined,
 		optionState,
 	});
 
@@ -415,8 +465,11 @@ export function ContentRoot({
 		return null;
 	}
 
-	const isConfigured = provider ? isProviderConfigured(provider, options) : false;
+	const isConfigured = provider
+		? isProviderConfigured(provider, options)
+		: false;
 	const metadataReadyForStatus = isMetadataReadyForStatus({
+		hasAniListId: anilistId !== undefined,
 		optionState,
 		metadataBatch,
 	});
@@ -431,7 +484,7 @@ export function ContentRoot({
 		metadata,
 	});
 	const openModal = (initialView: AnimePageModalView) => {
-		if (!provider) return;
+		if (!provider || anilistId === undefined) return;
 
 		mediaModal.open({
 			anilistId,
@@ -446,6 +499,7 @@ export function ContentRoot({
 	const openSetup = () => openModal("setup");
 	const openMapping = () => openModal("mapping");
 	const openSeerrModal = () => {
+		if (anilistId === undefined) return;
 		mediaModal.open({
 			anilistId,
 			source,

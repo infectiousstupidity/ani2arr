@@ -13,11 +13,9 @@ import {
 	type ContentEntrypointShellContext,
 } from "@/content/core/create-content-script-shell";
 import { ContentRoot, type AnimePageTarget } from "@/content/anime-page/root";
-import { sourceIdentityKey } from "@/mapping/source-identity";
 import { readMyAnimeListIdFromUrl } from "@/myanimelist/url";
 import { createExtensionQueryClient } from "@/queries/query-client";
 import { queryKeys } from "@/queries/query-keys";
-import { getAni2arrApi } from "@/rpc";
 import { ExtensionErrorBoundary } from "@/shared/ui/feedback/extension-error-boundary";
 import { logger } from "@/shared/utils/logger";
 import {
@@ -82,17 +80,11 @@ async function mountAnimePageUI({
 	if (malId === null) return;
 
 	const source = { source: "mal", id: malId } as const;
-	const anilistIdsBySource =
-		await getAni2arrApi().resolveAniListIdsForSources([source]);
-	const anilistId = anilistIdsBySource[sourceIdentityKey(source)] ?? null;
-	if (anilistId === null) return;
-
 	const mountTarget = ensureActionsAnchor();
 	if (!mountTarget) return;
 
 	const target: AnimePageTarget = {
 		source,
-		anilistId,
 		format: readFormatFromPage(document),
 		title: readTitleFromPage(document),
 	};
