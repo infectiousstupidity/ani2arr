@@ -17,6 +17,7 @@ import type { EffectiveMappingRecord } from "@/mapping/mapping-facts";
 import {
 	getSourceAliasesByAniListId,
 	getUniqueAniListIdForSource,
+	getUniqueAniListIdsForSources,
 } from "@/mapping/upstream.store";
 import {
 	mappingService,
@@ -27,7 +28,6 @@ import { mappingHandlers } from "./mapping.handlers";
 
 const listEffectiveMappingRecordsByProviderMock = vi.hoisted(() => vi.fn());
 const getProviderConfigMock = vi.hoisted(() => vi.fn());
-const refreshMappingPipelineMock = vi.hoisted(() => vi.fn());
 const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/mapping/list-mappings", () => ({
@@ -39,10 +39,7 @@ vi.mock("@/mapping/list-mappings", () => ({
 vi.mock("@/mapping/upstream.store", () => ({
 	getSourceAliasesByAniListId: vi.fn(),
 	getUniqueAniListIdForSource: vi.fn(),
-}));
-
-vi.mock("@/background/mapping-refresh", () => ({
-	refreshMappingPipeline: refreshMappingPipelineMock,
+	getUniqueAniListIdsForSources: vi.fn(),
 }));
 
 vi.mock("@/background/api-services", () => ({
@@ -132,21 +129,22 @@ function mockMappingRecords(
 describe("mappingHandlers", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		refreshMappingPipelineMock.mockResolvedValue(false);
 		vi.mocked(getSourceAliasesByAniListId).mockResolvedValue(new Map());
 		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(null);
+		vi.mocked(getUniqueAniListIdsForSources).mockResolvedValue({});
 		mockMappingRecords({ sonarr: sonarrMappings });
 		getProviderConfigMock.mockResolvedValue(null);
 		vi.mocked(sonarrLibrary.getSeriesSnapshots).mockResolvedValue([]);
 		vi.mocked(radarrLibrary.getMovieSnapshots).mockResolvedValue([]);
 	});
 
-	it("returns resolved AniList and MAL sources without refreshing", async () => {
+	it("delegates the complete alias batch to one pure store read", async () => {
 		const directSource = anilistSource(aid(20));
 		const malSource = { source: "mal", id: mal(5114) } as const;
-		vi.mocked(getUniqueAniListIdForSource).mockImplementation(async (source) =>
-			source.source === "anilist" ? source.id : aid(21),
-		);
+		vi.mocked(getUniqueAniListIdsForSources).mockResolvedValue({
+			"anilist:20": aid(20),
+			"mal:5114": aid(21),
+		});
 
 		await expect(
 			mappingHandlers.resolveAniListIdsForSources([directSource, malSource]),
@@ -155,86 +153,26 @@ describe("mappingHandlers", () => {
 			"mal:5114": aid(21),
 		});
 
-		expect(getUniqueAniListIdForSource).toHaveBeenCalledTimes(2);
-		expect(refreshMappingPipelineMock).not.toHaveBeenCalled();
+		expect(getUniqueAniListIdsForSources).toHaveBeenCalledOnce();
+		expect(getUniqueAniListIdsForSources).toHaveBeenCalledWith([
+			directSource,
+			malSource,
+		]);
 	});
 
-	it("refreshes once and rereads the complete batch when a MAL source is missing", async () => {
-		const directSource = anilistSource(aid(20));
+	it("returns a missing alias without triggering another operation", async () => {
 		const malSource = { source: "mal", id: mal(5114) } as const;
-		vi.mocked(getUniqueAniListIdForSource).mockImplementation(
-			async (source) => {
-				if (source.source === "anilist") return source.id;
-				return refreshMappingPipelineMock.mock.calls.length === 0
-					? null
-					: aid(21);
-			},
-		);
-
-		await expect(
-			mappingHandlers.resolveAniListIdsForSources([directSource, malSource]),
-		).resolves.toEqual({
-			"anilist:20": aid(20),
-			"mal:5114": aid(21),
+		vi.mocked(getUniqueAniListIdsForSources).mockResolvedValue({
+			"mal:5114": null,
 		});
-
-		expect(refreshMappingPipelineMock).toHaveBeenCalledOnce();
-		expect(getUniqueAniListIdForSource).toHaveBeenCalledTimes(4);
-		expect(getUniqueAniListIdForSource).toHaveBeenNthCalledWith(
-			1,
-			directSource,
-		);
-		expect(getUniqueAniListIdForSource).toHaveBeenNthCalledWith(2, malSource);
-		expect(getUniqueAniListIdForSource).toHaveBeenNthCalledWith(
-			3,
-			directSource,
-		);
-		expect(getUniqueAniListIdForSource).toHaveBeenNthCalledWith(4, malSource);
-	});
-
-	it("reads duplicate sources once per pass and returns one keyed result", async () => {
-		const malSource = { source: "mal", id: mal(5114) } as const;
-		vi.mocked(getUniqueAniListIdForSource).mockImplementation(async () =>
-			refreshMappingPipelineMock.mock.calls.length === 0 ? null : aid(21),
-		);
-
-		await expect(
-			mappingHandlers.resolveAniListIdsForSources([
-				malSource,
-				malSource,
-				{ ...malSource },
-			]),
-		).resolves.toEqual({ "mal:5114": aid(21) });
-
-		expect(refreshMappingPipelineMock).toHaveBeenCalledOnce();
-		expect(getUniqueAniListIdForSource).toHaveBeenCalledTimes(2);
-		expect(getUniqueAniListIdForSource).toHaveBeenNthCalledWith(1, malSource);
-		expect(getUniqueAniListIdForSource).toHaveBeenNthCalledWith(2, malSource);
-	});
-
-	it("returns null without retrying when a source is still missing", async () => {
-		const malSource = { source: "mal", id: mal(5114) } as const;
 
 		await expect(
 			mappingHandlers.resolveAniListIdsForSources([malSource]),
-		).resolves.toEqual({ "mal:5114": null });
+		).resolves.toEqual({
+			"mal:5114": null,
+		});
 
-		expect(refreshMappingPipelineMock).toHaveBeenCalledOnce();
-		expect(getUniqueAniListIdForSource).toHaveBeenCalledTimes(2);
-	});
-
-	it("propagates mapping refresh failures unchanged", async () => {
-		const error = new Error("refresh failed");
-		refreshMappingPipelineMock.mockRejectedValueOnce(error);
-
-		await expect(
-			mappingHandlers.resolveAniListIdsForSources([
-				{ source: "mal", id: mal(5114) },
-			]),
-		).rejects.toBe(error);
-
-		expect(refreshMappingPipelineMock).toHaveBeenCalledOnce();
-		expect(getUniqueAniListIdForSource).toHaveBeenCalledOnce();
+		expect(getUniqueAniListIdsForSources).toHaveBeenCalledOnce();
 	});
 
 	it("returns every composed mapping group without filtering", async () => {

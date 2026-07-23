@@ -35,7 +35,7 @@ import type {
 	ValidateTmdbInput,
 } from "@/rpc/types";
 import { bumpProviderLibraryRevision } from "@/rpc/revision-signals";
-import { resolveAniListIdFromInput } from "@/rpc/source-input";
+import { sourceFromInput } from "@/rpc/source-input";
 import { normalizeInputCredentials } from "./provider-credentials";
 
 type RadarrMappingResult =
@@ -137,10 +137,11 @@ export const radarrHandlers = {
 			}
 		}
 
-		const linkedAniListIds = await mappingService.getLinkedAniListIdsByProviderIds(
-			"radarr",
-			uniqueTmdbIds,
-		);
+		const linkedAniListIds =
+			await mappingService.getLinkedAniListIdsByProviderIds(
+				"radarr",
+				uniqueTmdbIds,
+			);
 		for (const [tmdbId, linked] of linkedAniListIds) {
 			linkedAniListIdsByTmdbId[tmdbId] = linked;
 		}
@@ -224,16 +225,15 @@ async function getRadarrStatusFromMappingAndLibrary(
 async function resolveRadarrMapping(
 	input: StatusInput,
 ): Promise<RadarrMappingResult> {
-	const anilistId = await resolveAniListIdFromInput(input);
-	if (anilistId === null) {
-		return { kind: "unmapped", mapping: unmappedMapping() };
-	}
-
-	const mapping = await mappingService.resolveMapping("radarr", anilistId, {
-		forceRetry: input.force_mapping_retry === true,
-		...(input.title === undefined ? {} : { title: input.title }),
-		...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-	});
+	const mapping = await mappingService.resolveMapping(
+		"radarr",
+		sourceFromInput(input),
+		{
+			forceRetry: input.force_mapping_retry === true,
+			...(input.title === undefined ? {} : { title: input.title }),
+			...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+		},
+	);
 	if (mapping.kind === "mapped") {
 		const tmdbId = parseTmdbIdOrNull(mapping.providerId);
 		if (tmdbId === null) return { kind: "unmapped", mapping };

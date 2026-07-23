@@ -19,7 +19,7 @@ export type AniBridgeTarget =
 			season?: number;
 	  };
 
-export type AniBridgeEntries = Record<number, AniBridgeTarget[]>;
+export type AniBridgeEntries = Record<string, AniBridgeTarget[]>;
 
 export type UpstreamTarget =
 	| {

@@ -82,7 +82,7 @@ describe("canonical AniList mapping regression", () => {
 		await browser.storage.local.set({
 			"mapping:upstream": {
 				entries: {
-					[BLACK_TORCH_ANILIST_ID]: [
+					[`anilist:${BLACK_TORCH_ANILIST_ID}`]: [
 						{ kind: "tvdb-show", id: BLACK_TORCH_TVDB_ID },
 					],
 				},
@@ -102,7 +102,10 @@ describe("canonical AniList mapping regression", () => {
 		});
 
 		await expect(
-			mappingService.getMapping("sonarr", BLACK_TORCH_ANILIST_ID),
+			mappingService.getMapping("sonarr", {
+				source: "anilist",
+				id: BLACK_TORCH_ANILIST_ID,
+			}),
 		).resolves.toEqual({
 			kind: "mapped",
 			source: "manual",
@@ -133,9 +136,7 @@ describe("canonical AniList mapping regression", () => {
 			manualGroups.some(
 				(group) =>
 					group.providerId === BLACK_TORCH_TVDB_ID &&
-					group.rows.some(
-						(row) => row.anilistId === BLACK_TORCH_ANILIST_ID,
-					),
+					group.rows.some((row) => row.anilistId === BLACK_TORCH_ANILIST_ID),
 			),
 		).toBe(false);
 
@@ -145,7 +146,10 @@ describe("canonical AniList mapping regression", () => {
 		});
 
 		await expect(
-			mappingService.getMapping("sonarr", BLACK_TORCH_ANILIST_ID),
+			mappingService.getMapping("sonarr", {
+				source: "anilist",
+				id: BLACK_TORCH_ANILIST_ID,
+			}),
 		).resolves.toEqual({
 			kind: "mapped",
 			source: "upstream",
@@ -176,10 +180,7 @@ describe("canonical AniList mapping regression", () => {
 		});
 		expect(restoredRows[0]?.group.rows).toHaveLength(1);
 		await expect(
-			mappingService.getLinkedAniListIds(
-				"sonarr",
-				BLACK_TORCH_TVDB_ID,
-			),
+			mappingService.getLinkedAniListIds("sonarr", BLACK_TORCH_TVDB_ID),
 		).resolves.toEqual([BLACK_TORCH_ANILIST_ID]);
 	});
 });

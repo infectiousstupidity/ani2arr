@@ -8,8 +8,7 @@ import {
 } from "@/myanimelist/types";
 
 export type SourceIdentity =
-	| { source: "anilist"; id: AniListId }
-	| { source: "mal"; id: MyAnimeListId };
+	{ source: "anilist"; id: AniListId } | { source: "mal"; id: MyAnimeListId };
 
 const SOURCE_IDENTITY_KEY_PATTERN = /^(anilist|mal):([1-9]\d*)$/;
 
@@ -17,9 +16,7 @@ export function sourceIdentityKey(identity: SourceIdentity): string {
 	return `${identity.source}:${identity.id}`;
 }
 
-export function parseSourceIdentityKey(
-	value: unknown,
-): SourceIdentity | null {
+export function parseSourceIdentityKey(value: unknown): SourceIdentity | null {
 	if (typeof value !== "string") return null;
 
 	const match = SOURCE_IDENTITY_KEY_PATTERN.exec(value);
@@ -49,15 +46,4 @@ export function normalizeSourceIdentity(
 	}
 
 	return source;
-}
-
-export function normalizeStoredSourceKey(rawKey: string): string | null {
-	const source = parseSourceIdentityKey(rawKey);
-	if (source !== null) return sourceIdentityKey(source);
-
-	/** LEGACY: pre-MAL mapping stores used raw AniList ID object keys. */
-	const anilistId = parseAniListIdOrNull(Number(rawKey));
-	return anilistId === null
-		? null
-		: sourceIdentityKey({ source: "anilist", id: anilistId });
 }

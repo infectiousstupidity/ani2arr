@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import { parseAniListId } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import {
-	normalizeStoredSourceKey,
 	normalizeSourceIdentity,
 	parseSourceIdentityKey,
 	sourceIdentityKey,
@@ -30,19 +29,6 @@ describe("sourceIdentityKey", () => {
 		const id = parseAniListId(21);
 
 		expect(normalizeSourceIdentity(id)).toEqual({ source: "anilist", id });
-	});
-
-	it("normalizes stored current and legacy source keys", () => {
-		expect(normalizeStoredSourceKey("anilist:21")).toBe("anilist:21");
-		expect(normalizeStoredSourceKey("mal:5114")).toBe("mal:5114");
-		expect(normalizeStoredSourceKey("21")).toBe("anilist:21");
-	});
-
-	it("rejects invalid stored source keys", () => {
-		expect(normalizeStoredSourceKey("tvdb:100")).toBeNull();
-		expect(normalizeStoredSourceKey("mal:001")).toBeNull();
-		expect(normalizeStoredSourceKey("0")).toBeNull();
-		expect(normalizeStoredSourceKey("bad")).toBeNull();
 	});
 
 	it("rejects invalid keys", () => {

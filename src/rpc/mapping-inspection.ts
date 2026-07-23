@@ -63,7 +63,7 @@ export async function getMappingInspection(
 	const mapping =
 		currentAniListId === null
 			? ({ kind: "unmapped", hadResolveAttempt: false } as const)
-			: await deps.mappingService.getMapping(input.provider, currentAniListId);
+			: await deps.mappingService.getMapping(input.provider, source);
 
 	const linkedAniListIds =
 		mapping.kind === "mapped"
@@ -81,9 +81,7 @@ export async function getMappingInspection(
 							? linkedAniListIds
 							: [currentAniListId, ...linkedAniListIds],
 					),
-				].toSorted(
-					(left, right) => left - right,
-				)
+				].toSorted((left, right) => left - right)
 			: [];
 
 	const linkedMetadata =

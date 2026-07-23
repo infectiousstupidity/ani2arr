@@ -1,7 +1,7 @@
 # Mapping architecture
 
-Mapping is canonical AniList ID -> Sonarr/Radarr target. Other website IDs are
-aliases resolved to AniList before entering this folder.
+Upstream provider facts are keyed by `SourceIdentity`. Stored mapping decisions
+are keyed by canonical AniList ID when one is available.
 
 Mapping owns facts and effective AniList-to-provider mapping results. It does
 not own provider library state or RPC presentation DTOs.
@@ -11,21 +11,22 @@ not own provider library state or RPC presentation DTOs.
 - `manual.store.ts` stores user mappings, ignores, and rejected automatic
   candidates by AniList ID. Rejected IDs are facts attached to the manual
   record.
-- `upstream.store.ts` stores canonical AniBridge targets plus source crosswalks
-  and refresh metadata. It does not persist Sonarr, Radarr, or Seerr projections.
+- `upstream.store.ts` stores source-native AniBridge targets plus source
+  crosswalks and refresh metadata. It does not persist Sonarr, Radarr, or Seerr
+  projections.
 - `auto.store.ts` stores expiring automatic results by AniList ID. Expired
   reads return no result and do not mutate storage.
 - `seerr-target.store.ts` stores user-owned manual Seerr overrides separately
   from downloaded AniBridge data.
 
-Canonical AniBridge targets preserve target kind, external ID, and optional
-season scope:
+AniBridge targets preserve source identity, target kind, external ID, and
+optional season scope:
 
 ```ts
 type AniBridgeTarget =
-  | { kind: "tmdb-movie"; id: TmdbId }
-  | { kind: "tmdb-show"; id: TmdbId; season?: number }
-  | { kind: "tvdb-show"; id: TvdbId; season?: number };
+	| { kind: "tmdb-movie"; id: TmdbId }
+	| { kind: "tmdb-show"; id: TmdbId; season?: number }
+	| { kind: "tvdb-show"; id: TvdbId; season?: number };
 ```
 
 ## Effective Arr mappings
@@ -55,7 +56,7 @@ tmdb-show -> no direct Arr target
 
 ## Effective Seerr targets
 
-Seerr targets are derived from canonical AniBridge external IDs. TV targets
+Seerr targets are derived from AniList-source AniBridge external IDs. TV targets
 require one unambiguous TMDB show ID and at least one valid season. A manual
 Seerr target overrides the derived target for the same AniList ID.
 
@@ -67,9 +68,9 @@ attaches MAL crosswalk aliases to those records:
 
 ```ts
 type EffectiveMappingRecord = {
-  anilistId: AniListId;
-  provider: Provider;
-  result: MappingResult;
+	anilistId: AniListId;
+	provider: Provider;
+	result: MappingResult;
 };
 ```
 

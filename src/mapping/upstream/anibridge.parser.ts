@@ -40,14 +40,12 @@ export function parseAniBridgeData(payload: unknown): ParsedAniBridgeData {
 		if (source === null) continue;
 
 		const rawTargetKeys = Object.keys(rawTargets);
-		if (source.source === "anilist") {
-			const targets = rawTargetKeys.flatMap((rawTarget) => {
-				const target = parseAniBridgeTarget(rawTarget);
-				return target === null ? [] : [target];
-			});
-			if (targets.length > 0) entries[source.id] = targets;
-			continue;
-		}
+		const targets = rawTargetKeys.flatMap((rawTarget) => {
+			const target = parseAniBridgeTarget(rawTarget);
+			return target === null ? [] : [target];
+		});
+		if (targets.length > 0) entries[sourceIdentityKey(source)] = targets;
+		if (source.source === "anilist") continue;
 
 		const aniListId = parseUniqueAniListTarget(rawTargetKeys);
 		if (aniListId !== null) {

@@ -2,7 +2,7 @@
 // src/mapping/upstream.store.ts
 
 import { storage } from "wxt/utils/storage";
-import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
+import type { AniListId } from "@/anilist/types";
 import {
 	parseTmdbIdOrNull,
 	parseTvdbIdOrNull,
@@ -13,7 +13,6 @@ import type { Provider } from "@/providers/types";
 import { downloadAniBridgeMappings } from "@/mapping/upstream/anibridge.client";
 import type { AniListCrosswalkMappings } from "@/mapping/upstream/anibridge.parser";
 import {
-	normalizeStoredSourceKey,
 	parseSourceIdentityKey,
 	sourceIdentityKey,
 	type SourceIdentity,
@@ -28,7 +27,7 @@ import type {
 const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 type UpstreamSnapshot = {
-	/** LEGACY: optional until projection-only snapshots have completed one full refresh. */
+	/** LEGACY: optional until pre-source-key snapshots have completed one full refresh. */
 	entries?: AniBridgeEntries;
 	aniListCrosswalks?: AniListCrosswalkMappings;
 	fetchedAt: number;
@@ -37,6 +36,11 @@ type UpstreamSnapshot = {
 
 export type UpstreamMappingFact = {
 	anilistId: AniListId;
+	targets: UpstreamTarget[];
+};
+
+export type SourceUpstreamMapping = {
+	anilistId: AniListId | null;
 	targets: UpstreamTarget[];
 };
 
@@ -54,15 +58,25 @@ const upstreamMappings = storage.defineItem<UpstreamSnapshot | null>(
 
 let writes: Promise<void> = Promise.resolve();
 
-export async function getUpstreamTargets(
+export async function getSourceUpstreamMapping(
 	provider: Provider,
-	anilistId: AniListId,
-): Promise<UpstreamTarget[]> {
+	source: SourceIdentity,
+): Promise<SourceUpstreamMapping> {
 	const snapshot = await getSnapshot();
+	const anilistId = getAniListIdForSource(snapshot, source);
+	const directTargets = projectProviderTargets(snapshot, source, provider);
+	const targets =
+		directTargets.length > 0 ||
+		source.source === "anilist" ||
+		anilistId === null
+			? directTargets
+			: projectProviderTargets(
+					snapshot,
+					{ source: "anilist", id: anilistId },
+					provider,
+				);
 
-	return projectUpstreamTargets(snapshot?.entries?.[anilistId] ?? []).filter(
-		(target) => target.provider === provider,
-	);
+	return { anilistId, targets };
 }
 
 export async function listAniListUpstreamMappings(): Promise<
@@ -71,15 +85,13 @@ export async function listAniListUpstreamMappings(): Promise<
 	const snapshot = await getSnapshot();
 	const records: UpstreamMappingFact[] = [];
 
-	for (const [rawAniListId, entries] of Object.entries(
-		snapshot?.entries ?? {},
-	)) {
-		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
-		if (anilistId === null) continue;
+	for (const [sourceKey, entries] of Object.entries(snapshot?.entries ?? {})) {
+		const source = parseSourceIdentityKey(sourceKey);
+		if (source?.source !== "anilist") continue;
 
 		const targets = projectUpstreamTargets(entries);
 		records.push({
-			anilistId,
+			anilistId: source.id,
 			targets,
 		});
 	}
@@ -91,9 +103,25 @@ export async function getUniqueAniListIdForSource(
 	source: SourceIdentity,
 ): Promise<AniListId | null> {
 	if (source.source === "anilist") return source.id;
+	const snapshot = await getSnapshot();
+	return getAniListIdForSource(snapshot, source);
+}
+
+export async function getUniqueAniListIdsForSources(
+	sources: readonly SourceIdentity[],
+): Promise<Record<string, AniListId | null>> {
+	const uniqueSources = new Map(
+		sources.map((source) => [sourceIdentityKey(source), source]),
+	);
+	if (uniqueSources.size === 0) return {};
 
 	const snapshot = await getSnapshot();
-	return snapshot?.aniListCrosswalks?.[sourceIdentityKey(source)] ?? null;
+	return Object.fromEntries(
+		[...uniqueSources].map(([sourceKey, source]) => [
+			sourceKey,
+			getAniListIdForSource(snapshot, source),
+		]),
+	);
 }
 
 export async function getSourceAliasesByAniListId(): Promise<
@@ -129,7 +157,11 @@ export async function listSeerrUpstreamTargets(
 	const records: SeerrUpstreamRecord[] = [];
 
 	for (const anilistId of requestedIds) {
-		const target = projectSeerrTarget(snapshot?.entries?.[anilistId] ?? []);
+		const target = projectSeerrTarget(
+			snapshot?.entries?.[
+				sourceIdentityKey({ source: "anilist", id: anilistId })
+			] ?? [],
+		);
 		if (target !== null) records.push({ anilistId, target });
 	}
 
@@ -142,14 +174,12 @@ export async function listAllSeerrUpstreamTargets(): Promise<
 	const snapshot = await getSnapshot();
 	const records: SeerrUpstreamRecord[] = [];
 
-	for (const [rawAniListId, entries] of Object.entries(
-		snapshot?.entries ?? {},
-	)) {
-		const anilistId = parseAniListIdOrNull(Number(rawAniListId));
-		if (anilistId === null) continue;
+	for (const [sourceKey, entries] of Object.entries(snapshot?.entries ?? {})) {
+		const source = parseSourceIdentityKey(sourceKey);
+		if (source?.source !== "anilist") continue;
 
 		const target = projectSeerrTarget(entries);
-		if (target !== null) records.push({ anilistId, target });
+		if (target !== null) records.push({ anilistId: source.id, target });
 	}
 
 	return records.toSorted((left, right) => left.anilistId - right.anilistId);
@@ -160,19 +190,20 @@ export async function refreshUpstreamMappings(): Promise<boolean> {
 		.catch(() => {})
 		.then(async () => {
 			const stored = await upstreamMappings.getValue();
-			const previous = stored ? normalizeSnapshot(stored) : null;
+			const previous = stored;
+			const hasSourceKeyedEntries = isSourceKeyedSnapshot(previous);
 			if (
-				previous?.entries !== undefined &&
+				hasSourceKeyedEntries &&
 				Date.now() - previous.fetchedAt < UPSTREAM_REFRESH_INTERVAL_MS
 			) {
 				return false;
 			}
 
-			/** LEGACY: omit ETag until projection-only snapshots have completed one full refresh. */
-			const etag = previous?.entries === undefined ? undefined : previous.etag;
+			/** LEGACY: omit ETag until pre-source-key snapshots have refreshed once. Remove after one released version. */
+			const etag = hasSourceKeyedEntries ? previous?.etag : undefined;
 			const result = await downloadAniBridgeMappings({ etag });
 			if (result.status === "not-modified") {
-				if (!previous || previous.entries === undefined) {
+				if (!previous || !hasSourceKeyedEntries) {
 					throw new Error("AniBridge returned 304 without stored entries.");
 				}
 				await upstreamMappings.setValue({
@@ -217,19 +248,16 @@ export async function clearUpstreamMappings(): Promise<void> {
 }
 
 async function getSnapshot(): Promise<UpstreamSnapshot | null> {
-	const snapshot = await upstreamMappings.getValue();
-	return snapshot ? normalizeSnapshot(snapshot) : null;
+	return upstreamMappings.getValue();
 }
 
-function normalizeSnapshot(snapshot: UpstreamSnapshot): UpstreamSnapshot {
-	return {
-		...(snapshot.entries === undefined ? {} : { entries: snapshot.entries }),
-		aniListCrosswalks: normalizeAniListCrosswalkKeys(
-			snapshot.aniListCrosswalks ?? {},
-		),
-		fetchedAt: snapshot.fetchedAt,
-		...(snapshot.etag ? { etag: snapshot.etag } : {}),
-	};
+function isSourceKeyedSnapshot(
+	snapshot: UpstreamSnapshot | null,
+): snapshot is UpstreamSnapshot & { entries: AniBridgeEntries } {
+	if (snapshot?.entries === undefined) return false;
+	return Object.keys(snapshot.entries).every(
+		(key) => parseSourceIdentityKey(key) !== null,
+	);
 }
 
 function haveMappingFactsChanged(
@@ -246,19 +274,23 @@ function haveMappingFactsChanged(
 	);
 }
 
-function normalizeAniListCrosswalkKeys(
-	crosswalks: AniListCrosswalkMappings,
-): AniListCrosswalkMappings {
-	const normalized: AniListCrosswalkMappings = {};
+function getAniListIdForSource(
+	snapshot: UpstreamSnapshot | null,
+	source: SourceIdentity,
+): AniListId | null {
+	return source.source === "anilist"
+		? source.id
+		: (snapshot?.aniListCrosswalks?.[sourceIdentityKey(source)] ?? null);
+}
 
-	for (const [rawKey, anilistId] of Object.entries(crosswalks)) {
-		const key = normalizeStoredSourceKey(rawKey);
-		if (key !== null) {
-			normalized[key] = anilistId;
-		}
-	}
-
-	return normalized;
+function projectProviderTargets(
+	snapshot: UpstreamSnapshot | null,
+	source: SourceIdentity,
+	provider: Provider,
+): UpstreamTarget[] {
+	return projectUpstreamTargets(
+		snapshot?.entries?.[sourceIdentityKey(source)] ?? [],
+	).filter((target) => target.provider === provider);
 }
 
 function projectUpstreamTargets(

@@ -45,11 +45,14 @@ describe("getMappingInspection", () => {
 				{ provider: "sonarr", anilistId: aid(10) },
 				{
 					mappingService: {
-						getMapping: vi.fn(async () => ({
-							kind: "mapped",
-							source: "manual",
-							providerId: 100,
-						} as const)),
+						getMapping: vi.fn(
+							async () =>
+								({
+									kind: "mapped",
+									source: "manual",
+									providerId: 100,
+								}) as const,
+						),
 						getLinkedAniListIds: vi.fn(async () => [aid(11)]),
 					},
 					anilistMetadataStore: { getMetadata: metadataSpy },
@@ -87,10 +90,13 @@ describe("getMappingInspection", () => {
 				{ provider: "radarr", anilistId: aid(404) },
 				{
 					mappingService: {
-						getMapping: vi.fn(async () => ({
-							kind: "unmapped",
-							hadResolveAttempt: false,
-						} as const)),
+						getMapping: vi.fn(
+							async () =>
+								({
+									kind: "unmapped",
+									hadResolveAttempt: false,
+								}) as const,
+						),
 						getLinkedAniListIds: vi.fn(),
 					},
 					anilistMetadataStore: { getMetadata: metadataSpy },
@@ -147,7 +153,7 @@ describe("getMappingInspection", () => {
 				},
 			],
 		});
-		expect(getMapping).toHaveBeenCalledWith("sonarr", aid(10));
+		expect(getMapping).toHaveBeenCalledWith("sonarr", source);
 		expect(getUniqueAniListIdForSource).not.toHaveBeenCalled();
 	});
 

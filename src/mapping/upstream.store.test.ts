@@ -11,8 +11,9 @@ import { MAX_ANIBRIDGE_BYTES } from "@/mapping/upstream/anibridge.client";
 import {
 	clearUpstreamMappings,
 	getSourceAliasesByAniListId,
+	getSourceUpstreamMapping,
 	getUniqueAniListIdForSource,
-	getUpstreamTargets,
+	getUniqueAniListIdsForSources,
 	listAllSeerrUpstreamTargets,
 	listAniListUpstreamMappings,
 	listSeerrUpstreamTargets,
@@ -23,6 +24,8 @@ const aid = parseAniListId;
 const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
+const anilistSource = (id: number) =>
+	({ source: "anilist", id: aid(id) }) as const;
 const UPSTREAM_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const UPSTREAM_STORAGE_KEY = "mapping:upstream";
 
@@ -75,7 +78,7 @@ describe("refreshUpstreamMappings", () => {
 		);
 	});
 
-	it("persists only canonical entries and refresh metadata", async () => {
+	it("persists source-keyed entries and refresh metadata", async () => {
 		mockAniBridgeResponse(
 			createAniBridgeResponse(
 				JSON.stringify({
@@ -93,7 +96,7 @@ describe("refreshUpstreamMappings", () => {
 		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
 		expect(stored[UPSTREAM_STORAGE_KEY]).toEqual({
 			entries: {
-				1: [
+				"anilist:1": [
 					{ kind: "tmdb-movie", id: tmdb(300) },
 					{ kind: "tmdb-show", id: tmdb(500), season: 2 },
 					{ kind: "tvdb-show", id: tvdb(700), season: 0 },
@@ -108,7 +111,7 @@ describe("refreshUpstreamMappings", () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
 				entries: {
-					1: [{ kind: "tmdb-movie", id: tmdb(300) }],
+					"anilist:1": [{ kind: "tmdb-movie", id: tmdb(300) }],
 				},
 				aniListCrosswalks: {},
 				fetchedAt: Date.now(),
@@ -125,11 +128,8 @@ describe("refreshUpstreamMappings", () => {
 	it("forces a full refresh for fresh legacy snapshots", async () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
-				mappings: {
-					"anilist:1": [{ provider: "radarr", providerId: tmdb(300) }],
-				},
-				seerrTargets: {
-					"anilist:1": { mediaType: "movie", tmdbId: tmdb(300) },
+				entries: {
+					1: [{ kind: "tmdb-movie", id: tmdb(300) }],
 				},
 				aniListCrosswalks: {},
 				fetchedAt: Date.now(),
@@ -154,21 +154,24 @@ describe("refreshUpstreamMappings", () => {
 		const stored = await browser.storage.local.get(UPSTREAM_STORAGE_KEY);
 		expect(stored[UPSTREAM_STORAGE_KEY]).toEqual({
 			entries: {
-				1: [{ kind: "tmdb-movie", id: tmdb(400) }],
+				"anilist:1": [{ kind: "tmdb-movie", id: tmdb(400) }],
 			},
 			aniListCrosswalks: {},
 			fetchedAt: expect.any(Number),
 		});
-		await expect(getUpstreamTargets("radarr", aid(1))).resolves.toEqual([
-			{ provider: "radarr", providerId: tmdb(400) },
-		]);
+		await expect(
+			getSourceUpstreamMapping("radarr", anilistSource(1)),
+		).resolves.toEqual({
+			anilistId: aid(1),
+			targets: [{ provider: "radarr", providerId: tmdb(400) }],
+		});
 	});
 
 	it("refreshes canonical snapshot metadata after an ETag 304", async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
 		const entries = {
-			1: [{ kind: "tmdb-movie", id: tmdb(300) }],
+			"anilist:1": [{ kind: "tmdb-movie", id: tmdb(300) }],
 		};
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
@@ -201,7 +204,7 @@ describe("refreshUpstreamMappings", () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
 		const entries = {
-			1: [{ kind: "tmdb-movie" as const, id: tmdb(300) }],
+			"anilist:1": [{ kind: "tmdb-movie" as const, id: tmdb(300) }],
 		};
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
@@ -254,9 +257,12 @@ describe("refreshUpstreamMappings", () => {
 			"AniBridge mappings payload is not valid JSON.",
 		);
 
-		await expect(getUpstreamTargets("radarr", aid(1))).resolves.toEqual([
-			{ provider: "radarr", providerId: tmdb(300) },
-		]);
+		await expect(
+			getSourceUpstreamMapping("radarr", anilistSource(1)),
+		).resolves.toEqual({
+			anilistId: aid(1),
+			targets: [{ provider: "radarr", providerId: tmdb(300) }],
+		});
 		await expect(listSeerrUpstreamTargets([aid(1)])).resolves.toEqual([
 			{ anilistId: aid(1), target: { mediaType: "movie", tmdbId: tmdb(300) } },
 		]);
@@ -266,17 +272,17 @@ describe("refreshUpstreamMappings", () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
 				entries: {
-					1: [{ kind: "tvdb-show", id: tvdb(700), season: 1 }],
-					2: [
+					"anilist:1": [{ kind: "tvdb-show", id: tvdb(700), season: 1 }],
+					"anilist:2": [
 						{ kind: "tvdb-show", id: tvdb(81_797), season: 0 },
 						{ kind: "tvdb-show", id: tvdb(81_797), season: 1 },
 						{ kind: "tvdb-show", id: tvdb(81_797), season: 2 },
 					],
-					3: [
+					"anilist:3": [
 						{ kind: "tvdb-show", id: tvdb(100), season: 1 },
 						{ kind: "tvdb-show", id: tvdb(200), season: 2 },
 					],
-					4: [
+					"anilist:4": [
 						{ kind: "tmdb-movie", id: tmdb(300) },
 						{ kind: "tmdb-movie", id: tmdb(400) },
 					],
@@ -288,22 +294,34 @@ describe("refreshUpstreamMappings", () => {
 
 		await expect(
 			Promise.all([
-				getUpstreamTargets("sonarr", aid(1)),
-				getUpstreamTargets("sonarr", aid(2)),
-				getUpstreamTargets("sonarr", aid(3)),
-				getUpstreamTargets("radarr", aid(4)),
+				getSourceUpstreamMapping("sonarr", anilistSource(1)),
+				getSourceUpstreamMapping("sonarr", anilistSource(2)),
+				getSourceUpstreamMapping("sonarr", anilistSource(3)),
+				getSourceUpstreamMapping("radarr", anilistSource(4)),
 			]),
 		).resolves.toEqual([
-			[{ provider: "sonarr", providerId: tvdb(700), season: 1 }],
-			[{ provider: "sonarr", providerId: tvdb(81_797) }],
-			[
-				{ provider: "sonarr", providerId: tvdb(100), season: 1 },
-				{ provider: "sonarr", providerId: tvdb(200), season: 2 },
-			],
-			[
-				{ provider: "radarr", providerId: tmdb(300) },
-				{ provider: "radarr", providerId: tmdb(400) },
-			],
+			{
+				anilistId: aid(1),
+				targets: [{ provider: "sonarr", providerId: tvdb(700), season: 1 }],
+			},
+			{
+				anilistId: aid(2),
+				targets: [{ provider: "sonarr", providerId: tvdb(81_797) }],
+			},
+			{
+				anilistId: aid(3),
+				targets: [
+					{ provider: "sonarr", providerId: tvdb(100), season: 1 },
+					{ provider: "sonarr", providerId: tvdb(200), season: 2 },
+				],
+			},
+			{
+				anilistId: aid(4),
+				targets: [
+					{ provider: "radarr", providerId: tmdb(300) },
+					{ provider: "radarr", providerId: tmdb(400) },
+				],
+			},
 		]);
 	});
 
@@ -311,7 +329,7 @@ describe("refreshUpstreamMappings", () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
 				entries: {
-					20: [
+					"anilist:20": [
 						{ kind: "tmdb-show", id: tmdb(500) },
 						{ kind: "tmdb-show", id: tmdb(500), season: 2 },
 						{ kind: "tmdb-show", id: tmdb(500), season: 0 },
@@ -345,15 +363,15 @@ describe("refreshUpstreamMappings", () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
 				entries: {
-					1: [
+					"anilist:1": [
 						{ kind: "tmdb-movie", id: tmdb(300) },
 						{ kind: "tmdb-movie", id: tmdb(300) },
 					],
-					2: [
+					"anilist:2": [
 						{ kind: "tmdb-movie", id: tmdb(400) },
 						{ kind: "tmdb-movie", id: tmdb(300) },
 					],
-					3: [
+					"anilist:3": [
 						{ kind: "tmdb-movie", id: tmdb(300) },
 						{ kind: "tmdb-show", id: tmdb(500), season: 1 },
 					],
@@ -377,7 +395,7 @@ describe("refreshUpstreamMappings", () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
 				entries: {
-					1: [
+					"anilist:1": [
 						{ kind: "tmdb-show", id: tmdb(500) },
 						{ kind: "tvdb-show", id: tvdb(700), season: 0 },
 					],
@@ -401,7 +419,7 @@ describe("refreshUpstreamMappings", () => {
 		]);
 	});
 
-	it("keeps MAL alias lookup separate from canonical Arr facts", async () => {
+	it("uses direct MAL targets before provider-specific AniList fallbacks", async () => {
 		const source = { source: "mal", id: mal(5114) } as const;
 		const lowerAlias = { source: "mal", id: mal(100) } as const;
 		const targets = [
@@ -410,10 +428,11 @@ describe("refreshUpstreamMappings", () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
 				entries: {
-					21: [
+					"anilist:21": [
 						{ kind: "tvdb-show", id: tvdb(78_874), season: 1 },
 						{ kind: "tmdb-show", id: tmdb(1396), season: 1 },
 					],
+					"mal:5114": [{ kind: "tmdb-movie", id: tmdb(300) }],
 				},
 				aniListCrosswalks: {
 					[sourceIdentityKey(source)]: aid(21),
@@ -423,10 +442,14 @@ describe("refreshUpstreamMappings", () => {
 			},
 		});
 
-		await expect(getUpstreamTargets("sonarr", aid(21))).resolves.toEqual(
+		await expect(getSourceUpstreamMapping("sonarr", source)).resolves.toEqual({
+			anilistId: aid(21),
 			targets,
-		);
-		await expect(getUpstreamTargets("radarr", aid(21))).resolves.toEqual([]);
+		});
+		await expect(getSourceUpstreamMapping("radarr", source)).resolves.toEqual({
+			anilistId: aid(21),
+			targets: [{ provider: "radarr", providerId: tmdb(300) }],
+		});
 		await expect(listAniListUpstreamMappings()).resolves.toEqual([
 			{
 				anilistId: aid(21),
@@ -439,5 +462,55 @@ describe("refreshUpstreamMappings", () => {
 		await expect(getSourceAliasesByAniListId()).resolves.toEqual(
 			new Map([[aid(21), [lowerAlias, source]]]),
 		);
+	});
+
+	it("returns a direct MAL target without an AniList alias", async () => {
+		const source = { source: "mal", id: mal(59_571) } as const;
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				entries: {
+					"mal:59571": [{ kind: "tmdb-movie", id: tmdb(1_333_100) }],
+				},
+				aniListCrosswalks: {},
+				fetchedAt: Date.now(),
+			},
+		});
+
+		await expect(getSourceUpstreamMapping("radarr", source)).resolves.toEqual({
+			anilistId: null,
+			targets: [{ provider: "radarr", providerId: tmdb(1_333_100) }],
+		});
+		await expect(listAniListUpstreamMappings()).resolves.toEqual([]);
+	});
+
+	it("resolves a deduplicated alias batch with one pure storage read", async () => {
+		const mapped = { source: "mal", id: mal(5114) } as const;
+		const missing = { source: "mal", id: mal(59_571) } as const;
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				entries: {},
+				aniListCrosswalks: { "mal:5114": aid(21) },
+				fetchedAt: Date.now(),
+			},
+		});
+		const getSpy = vi.spyOn(browser.storage.local, "get");
+		const setSpy = vi.spyOn(browser.storage.local, "set");
+
+		await expect(
+			getUniqueAniListIdsForSources([
+				mapped,
+				missing,
+				mapped,
+				anilistSource(10),
+			]),
+		).resolves.toEqual({
+			"mal:5114": aid(21),
+			"mal:59571": null,
+			"anilist:10": aid(10),
+		});
+		expect(getSpy).toHaveBeenCalledOnce();
+		expect(setSpy).not.toHaveBeenCalled();
+		getSpy.mockRestore();
+		setSpy.mockRestore();
 	});
 });

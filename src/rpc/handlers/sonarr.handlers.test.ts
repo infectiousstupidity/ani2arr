@@ -3,7 +3,6 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
-import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTvdbId } from "@/providers/schemas";
 import type { ProviderCredentials } from "@/providers/types";
@@ -76,14 +75,9 @@ vi.mock("@/providers/sonarr/edit", () => ({
 	updateSonarrSeries: updateSonarrSeriesMock,
 }));
 
-vi.mock("@/mapping/upstream.store", () => ({
-	getUniqueAniListIdForSource: vi.fn(),
-}));
-
 describe("sonarrHandlers", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(null);
 		apiServicesMock.mappingService.getLinkedAniListIds.mockResolvedValue([]);
 		apiServicesMock.sonarrLibrary.upsertSeriesSnapshot.mockResolvedValue(true);
 	});
@@ -171,7 +165,7 @@ describe("sonarrHandlers", () => {
 		});
 		expect(apiServicesMock.mappingService.resolveMapping).toHaveBeenCalledWith(
 			"sonarr",
-			anilistId,
+			{ source: "anilist", id: anilistId },
 			{
 				forceRetry: true,
 				title: "Mapped Series",
@@ -179,21 +173,41 @@ describe("sonarrHandlers", () => {
 		);
 	});
 
-	it("returns unmapped for a MAL status read without a crosswalk", async () => {
+	it("uses a direct MAL mapping for Sonarr library status", async () => {
 		providerConfigMock.getProviderConfig.mockResolvedValue(credentials);
+		const source = { source: "mal", id: parseMyAnimeListId(5114) } as const;
+		const tvdbId = parseTvdbId(78_874);
+		apiServicesMock.mappingService.resolveMapping.mockResolvedValue({
+			kind: "mapped",
+			source: "upstream",
+			providerId: tvdbId,
+		});
+		apiServicesMock.sonarrLibrary.getSeriesLibraryStatusByTvdbId.mockResolvedValue(
+			{
+				provider: "sonarr",
+				providerId: tvdbId,
+				isInLibrary: false,
+			},
+		);
 
-		await expect(
-			sonarrHandlers.getSeriesStatus({
-				source: { source: "mal", id: parseMyAnimeListId(5114) },
-			}),
-		).resolves.toEqual({
-			mapping: { kind: "unmapped", hadResolveAttempt: false },
-			isInLibrary: null,
+		await expect(sonarrHandlers.getSeriesStatus({ source })).resolves.toEqual({
+			mapping: { kind: "mapped", source: "upstream", providerId: tvdbId },
+			isInLibrary: false,
 		});
 
+		expect(apiServicesMock.mappingService.resolveMapping).toHaveBeenCalledWith(
+			"sonarr",
+			source,
+			{ forceRetry: false },
+		);
 		expect(
-			apiServicesMock.mappingService.resolveMapping,
-		).not.toHaveBeenCalled();
+			apiServicesMock.sonarrLibrary.getSeriesLibraryStatusByTvdbId,
+		).toHaveBeenCalledWith({
+			tvdbId,
+			credentials,
+			onCacheChanged: expect.any(Function),
+			forceVerify: false,
+		});
 	});
 
 	it("updates Sonarr cache and revision after add", async () => {

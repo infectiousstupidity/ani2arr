@@ -3,10 +3,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId, type AniListId } from "@/anilist/types";
-import {
-	parseTmdbId,
-	parseTvdbId,
-} from "@/providers/schemas";
+import { parseMyAnimeListId } from "@/myanimelist/types";
+import { sourceIdentityKey, type SourceIdentity } from "./source-identity";
+import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import type { ManualFacts } from "./manual.store";
 import { MappingService } from "./mapping.service";
@@ -31,15 +30,20 @@ const storeRecords = vi.hoisted(() => ({
 		anilistId: AniListId;
 		targets: UpstreamTarget[];
 	}>,
+	sourceFacts: [] as Array<{
+		source: SourceIdentity;
+		targets: UpstreamTarget[];
+	}>,
+	aliases: new Map<string, AniListId>(),
 }));
 
 vi.mock("./manual.store", () => ({
-	getManualFacts: vi.fn(async (provider: Provider, anilistId: AniListId) =>
-		storeRecords.manual.find(
-			(record) =>
-				record.provider === provider &&
-				record.anilistId === anilistId,
-		)?.facts ?? null,
+	getManualFacts: vi.fn(
+		async (provider: Provider, anilistId: AniListId) =>
+			storeRecords.manual.find(
+				(record) =>
+					record.provider === provider && record.anilistId === anilistId,
+			)?.facts ?? null,
 	),
 	listAniListManualFacts: vi.fn(async (provider: Provider) =>
 		storeRecords.manual
@@ -58,12 +62,12 @@ vi.mock("./manual.store", () => ({
 }));
 
 vi.mock("./auto.store", () => ({
-	getAutoResult: vi.fn(async (provider: Provider, anilistId: AniListId) =>
-		storeRecords.auto.find(
-			(record) =>
-				record.provider === provider &&
-				record.anilistId === anilistId,
-		)?.result ?? null,
+	getAutoResult: vi.fn(
+		async (provider: Provider, anilistId: AniListId) =>
+			storeRecords.auto.find(
+				(record) =>
+					record.provider === provider && record.anilistId === anilistId,
+			)?.result ?? null,
 	),
 	listAniListAutoResults: vi.fn(async (provider: Provider) =>
 		storeRecords.auto
@@ -76,19 +80,42 @@ vi.mock("./auto.store", () => ({
 }));
 
 vi.mock("./upstream.store", () => ({
-	getUpstreamTargets: vi.fn(async (provider: Provider, anilistId: AniListId) =>
-		(storeRecords.upstream.find(
-			(record) => record.anilistId === anilistId,
-		)
-			?.targets ?? []
-		).filter((target) => target.provider === provider),
+	getSourceUpstreamMapping: vi.fn(
+		async (provider: Provider, source: SourceIdentity) => {
+			const anilistId =
+				source.source === "anilist"
+					? source.id
+					: (storeRecords.aliases.get(sourceIdentityKey(source)) ?? null);
+			const directTargets = (
+				(source.source === "anilist"
+					? storeRecords.upstream.find(
+							(record) => record.anilistId === source.id,
+						)?.targets
+					: storeRecords.sourceFacts.find(
+							(record) =>
+								sourceIdentityKey(record.source) === sourceIdentityKey(source),
+						)?.targets) ?? []
+			).filter((target) => target.provider === provider);
+			const fallbackTargets =
+				directTargets.length > 0 || anilistId === null
+					? directTargets
+					: (
+							storeRecords.upstream.find(
+								(record) => record.anilistId === anilistId,
+							)?.targets ?? []
+						).filter((target) => target.provider === provider);
+
+			return { anilistId, targets: fallbackTargets };
+		},
 	),
 	listAniListUpstreamMappings: vi.fn(async () => storeRecords.upstream),
 }));
 
 const aid = parseAniListId;
+const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
+const anilistSource = (id: AniListId) => ({ source: "anilist", id }) as const;
 
 const service = () => new MappingService(vi.fn());
 const replaceAuto = (
@@ -97,8 +124,7 @@ const replaceAuto = (
 	result: AutoResult,
 ): void => {
 	storeRecords.auto = storeRecords.auto.filter(
-		(record) =>
-			record.provider !== provider || record.anilistId !== anilistId,
+		(record) => record.provider !== provider || record.anilistId !== anilistId,
 	);
 	storeRecords.auto.push({ provider, anilistId, result });
 };
@@ -107,6 +133,8 @@ function resetRecords(): void {
 	storeRecords.manual = [];
 	storeRecords.auto = [];
 	storeRecords.upstream = [];
+	storeRecords.sourceFacts = [];
+	storeRecords.aliases = new Map();
 }
 
 describe("MappingService", () => {
@@ -276,10 +304,83 @@ describe("MappingService", () => {
 				});
 			}
 
-			await expect(service().getMapping(provider, anilistId)).resolves.toEqual(
-				testCase.expected,
-			);
+			await expect(
+				service().getMapping(provider, anilistSource(anilistId)),
+			).resolves.toEqual(testCase.expected);
 		}
+	});
+
+	it("uses a direct MAL target without running automatic matching", async () => {
+		const source = { source: "mal", id: mal(59_571) } as const;
+		storeRecords.sourceFacts = [
+			{
+				source,
+				targets: [{ provider: "radarr", providerId: tmdb(1_333_100) }],
+			},
+		];
+		const resolver = vi.fn();
+
+		await expect(
+			new MappingService(resolver).resolveMapping("radarr", source, {
+				forceRetry: true,
+				title: "Kaguya-sama: Love Is War - The First Kiss That Never Ends",
+			}),
+		).resolves.toEqual({
+			kind: "mapped",
+			source: "upstream",
+			providerId: tmdb(1_333_100),
+		});
+		expect(resolver).not.toHaveBeenCalled();
+	});
+
+	it("applies one canonical manual decision over differing source facts", async () => {
+		const anilistId = aid(21);
+		const source = { source: "mal", id: mal(5114) } as const;
+		storeRecords.aliases.set(sourceIdentityKey(source), anilistId);
+		storeRecords.upstream = [
+			{
+				anilistId,
+				targets: [{ provider: "sonarr", providerId: tvdb(100) }],
+			},
+		];
+		storeRecords.sourceFacts = [
+			{
+				source,
+				targets: [{ provider: "sonarr", providerId: tvdb(200) }],
+			},
+		];
+		storeRecords.manual = [
+			{
+				provider: "sonarr",
+				anilistId,
+				facts: { mapping: { providerId: tvdb(300) } },
+			},
+		];
+
+		await expect(service().getMapping("sonarr", source)).resolves.toEqual({
+			kind: "mapped",
+			source: "manual",
+			providerId: tvdb(300),
+		});
+		await expect(
+			service().getMapping("sonarr", anilistSource(anilistId)),
+		).resolves.toEqual({
+			kind: "mapped",
+			source: "manual",
+			providerId: tvdb(300),
+		});
+	});
+
+	it("does not run automatic matching for an unmapped MAL-only source", async () => {
+		const resolver = vi.fn();
+		const source = { source: "mal", id: mal(59_999) } as const;
+
+		await expect(
+			new MappingService(resolver).resolveMapping("sonarr", source, {
+				forceRetry: true,
+			}),
+		).resolves.toEqual({ kind: "unmapped", hadResolveAttempt: false });
+		expect(resolver).not.toHaveBeenCalled();
 	});
 
 	it("computes linked AniList IDs for multiple provider IDs in one scan", async () => {
@@ -332,10 +433,11 @@ describe("MappingService", () => {
 			},
 		];
 
-		const linked = await service().getLinkedAniListIdsByProviderIds(
-			"radarr",
-			[tmdb(100), tmdb(200), tmdb(100)],
-		);
+		const linked = await service().getLinkedAniListIdsByProviderIds("radarr", [
+			tmdb(100),
+			tmdb(200),
+			tmdb(100),
+		]);
 
 		expect([...linked.entries()]).toEqual([
 			[tmdb(100), [aid(10), aid(20), aid(30)]],
@@ -377,7 +479,7 @@ describe("MappingService", () => {
 		const mappingService = new MappingService(resolver);
 
 		await expect(
-			mappingService.resolveMapping("sonarr", anilistId),
+			mappingService.resolveMapping("sonarr", anilistSource(anilistId)),
 		).resolves.toEqual({
 			kind: "unmapped",
 			hadResolveAttempt: true,
@@ -385,7 +487,7 @@ describe("MappingService", () => {
 		expect(resolver).not.toHaveBeenCalled();
 
 		await expect(
-			mappingService.resolveMapping("sonarr", anilistId, {
+			mappingService.resolveMapping("sonarr", anilistSource(anilistId), {
 				forceRetry: true,
 				title: "Kagurabachi",
 			}),
@@ -415,10 +517,14 @@ describe("MappingService", () => {
 		const resolver = vi.fn();
 
 		await expect(
-			new MappingService(resolver).resolveMapping("sonarr", anilistId, {
-				forceRetry: true,
-				title: "Magi: Sinbad no Bouken",
-			}),
+			new MappingService(resolver).resolveMapping(
+				"sonarr",
+				anilistSource(anilistId),
+				{
+					forceRetry: true,
+					title: "Magi: Sinbad no Bouken",
+				},
+			),
 		).resolves.toEqual({
 			kind: "ambiguous",
 			targets: [

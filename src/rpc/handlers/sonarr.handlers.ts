@@ -36,7 +36,7 @@ import type {
 	UpdateSonarrInput,
 	ValidateTvdbInput,
 } from "@/rpc/types";
-import { resolveAniListIdFromInput } from "@/rpc/source-input";
+import { sourceFromInput } from "@/rpc/source-input";
 import { normalizeError } from "@/shared/errors/error-utils";
 import { normalizeInputCredentials } from "./provider-credentials";
 
@@ -155,10 +155,11 @@ export const sonarrHandlers = {
 			}
 		}
 
-		const linkedAniListIds = await mappingService.getLinkedAniListIdsByProviderIds(
-			"sonarr",
-			uniqueTvdbIds,
-		);
+		const linkedAniListIds =
+			await mappingService.getLinkedAniListIdsByProviderIds(
+				"sonarr",
+				uniqueTvdbIds,
+			);
 		for (const [tvdbId, linked] of linkedAniListIds) {
 			linkedAniListIdsByTvdbId[tvdbId] = linked;
 		}
@@ -243,16 +244,15 @@ async function getSeriesStatusFromMappingAndLibrary(
 async function resolveSeriesMapping(
 	input: StatusInput,
 ): Promise<SonarrMappingResult> {
-	const anilistId = await resolveAniListIdFromInput(input);
-	if (anilistId === null) {
-		return { kind: "unmapped", mapping: unmappedMapping() };
-	}
-
-	const mapping = await mappingService.resolveMapping("sonarr", anilistId, {
-		forceRetry: input.force_mapping_retry === true,
-		...(input.title === undefined ? {} : { title: input.title }),
-		...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-	});
+	const mapping = await mappingService.resolveMapping(
+		"sonarr",
+		sourceFromInput(input),
+		{
+			forceRetry: input.force_mapping_retry === true,
+			...(input.title === undefined ? {} : { title: input.title }),
+			...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+		},
+	);
 	if (mapping.kind === "mapped") {
 		const tvdbId = parseTvdbIdOrNull(mapping.providerId);
 		if (tvdbId === null) return { kind: "unmapped", mapping };

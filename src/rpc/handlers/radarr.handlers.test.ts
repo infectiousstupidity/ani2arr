@@ -3,6 +3,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId } from "@/providers/schemas";
 import type { ProviderCredentials } from "@/providers/types";
 import type {
@@ -164,12 +165,48 @@ describe("radarrHandlers", () => {
 		});
 		expect(apiServicesMock.mappingService.resolveMapping).toHaveBeenCalledWith(
 			"radarr",
-			anilistId,
+			{ source: "anilist", id: anilistId },
 			{
 				forceRetry: true,
 				title: "Mapped Movie",
 			},
 		);
+	});
+
+	it("uses a direct MAL mapping for Radarr library status", async () => {
+		providerConfigMock.getProviderConfig.mockResolvedValue(credentials);
+		const source = { source: "mal", id: parseMyAnimeListId(59_571) } as const;
+		const tmdbId = parseTmdbId(1_333_100);
+		apiServicesMock.mappingService.resolveMapping.mockResolvedValue({
+			kind: "mapped",
+			source: "upstream",
+			providerId: tmdbId,
+		});
+		apiServicesMock.radarrLibrary.getMovieLibraryStatusByTmdbId.mockResolvedValue(
+			{
+				provider: "radarr",
+				providerId: tmdbId,
+				isInLibrary: false,
+			},
+		);
+
+		await expect(radarrHandlers.getMovieStatus({ source })).resolves.toEqual({
+			mapping: { kind: "mapped", source: "upstream", providerId: tmdbId },
+			isInLibrary: false,
+		});
+		expect(apiServicesMock.mappingService.resolveMapping).toHaveBeenCalledWith(
+			"radarr",
+			source,
+			{ forceRetry: false },
+		);
+		expect(
+			apiServicesMock.radarrLibrary.getMovieLibraryStatusByTmdbId,
+		).toHaveBeenCalledWith({
+			tmdbId,
+			credentials,
+			onCacheChanged: expect.any(Function),
+			forceVerify: false,
+		});
 	});
 
 	it("updates Radarr cache and revision after add", async () => {

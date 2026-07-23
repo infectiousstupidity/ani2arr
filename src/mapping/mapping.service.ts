@@ -13,8 +13,9 @@ import {
 	setManualMapping as saveManualMapping,
 	type ManualMapping,
 } from "./manual.store";
-import { getUpstreamTargets } from "./upstream.store";
+import { getSourceUpstreamMapping } from "./upstream.store";
 import { getAutoResult } from "./auto.store";
+import type { SourceIdentity } from "./source-identity";
 import type { AutomaticResolver } from "./resolve/resolve";
 import type { MappingResult } from "./types";
 import {
@@ -30,31 +31,46 @@ export class MappingService {
 
 	public async getMapping(
 		provider: Provider,
-		anilistId: AniListId,
+		source: SourceIdentity,
 	): Promise<MappingResult> {
-		const [manual, upstream, auto] = await Promise.all([
-			getManualFacts(provider, anilistId),
-			getUpstreamTargets(provider, anilistId),
-			getAutoResult(provider, anilistId),
-		]);
-		return chooseMappingResult({
-			provider,
-			manual,
-			upstream,
-			auto,
-		});
+		const state = await this.getMappingState(provider, source);
+		return state.result;
+	}
+
+	private async getMappingState(
+		provider: Provider,
+		source: SourceIdentity,
+	): Promise<{ anilistId: AniListId | null; result: MappingResult }> {
+		const upstream = await getSourceUpstreamMapping(provider, source);
+		const [manual, auto] =
+			upstream.anilistId === null
+				? [null, null]
+				: await Promise.all([
+						getManualFacts(provider, upstream.anilistId),
+						getAutoResult(provider, upstream.anilistId),
+					]);
+		return {
+			anilistId: upstream.anilistId,
+			result: chooseMappingResult({
+				provider,
+				manual,
+				upstream: upstream.targets,
+				auto,
+			}),
+		};
 	}
 
 	public async resolveMapping(
 		provider: Provider,
-		anilistId: AniListId,
+		source: SourceIdentity,
 		options?: {
 			forceRetry?: boolean;
 			title?: string;
 			metadata?: AniListMediaHint | null;
 		},
 	): Promise<MappingResult> {
-		const current = await this.getMapping(provider, anilistId);
+		const currentState = await this.getMappingState(provider, source);
+		const current = currentState.result;
 
 		if (isStableMapping(current)) {
 			return current;
@@ -71,9 +87,11 @@ export class MappingService {
 			return current;
 		}
 
+		if (currentState.anilistId === null) return current;
+
 		await this.resolveAutomaticMapping(
 			provider,
-			anilistId,
+			currentState.anilistId,
 			current.kind === "unmapped" ? (current.rejectedProviderIds ?? []) : [],
 			{
 				...(options?.title === undefined ? {} : { title: options.title }),
@@ -83,7 +101,7 @@ export class MappingService {
 			},
 		);
 
-		return this.getMapping(provider, anilistId);
+		return this.getMapping(provider, source);
 	}
 
 	public async setManualMapping(
@@ -143,14 +161,14 @@ export class MappingService {
 	): Promise<boolean> {
 		const [manual, upstream] = await Promise.all([
 			getManualFacts(provider, anilistId),
-			getUpstreamTargets(provider, anilistId),
+			getSourceUpstreamMapping(provider, { source: "anilist", id: anilistId }),
 		]);
 
-		if (!manual || !("mapping" in manual) || upstream.length !== 1) {
+		if (!manual || !("mapping" in manual) || upstream.targets.length !== 1) {
 			return false;
 		}
 
-		const upstreamTarget = upstream[0];
+		const upstreamTarget = upstream.targets[0];
 
 		if (
 			!upstreamTarget ||
@@ -204,7 +222,10 @@ export class MappingService {
 		}
 
 		const sortedLinkedAniListIdsByProviderId = new Map<number, AniListId[]>();
-		for (const [linkedProviderId, linkedAniListIds] of linkedAniListIdsByProviderId) {
+		for (const [
+			linkedProviderId,
+			linkedAniListIds,
+		] of linkedAniListIdsByProviderId) {
 			sortedLinkedAniListIdsByProviderId.set(
 				linkedProviderId,
 				[...linkedAniListIds].toSorted((left, right) => left - right),
