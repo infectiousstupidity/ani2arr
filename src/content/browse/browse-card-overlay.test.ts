@@ -10,6 +10,8 @@ import { resolveBrowseCardProvider } from "./browse-card-provider";
 import { BrowseCardOverlay } from "./browse-card-overlay";
 import { SonarrCardOverlay } from "@/features/media-overlay/sonarr-card-overlay";
 import { RadarrCardOverlay } from "@/features/media-overlay/radarr-card-overlay";
+import { SeerrCardStackActions } from "@/features/media-overlay/seerr-card-overlay";
+import { createDefaultPublicOptions } from "@/settings/schema";
 
 const mountTarget = {} as HTMLElement;
 
@@ -102,6 +104,40 @@ describe("BrowseCardOverlay", () => {
 				anilistId: undefined,
 				source: parsed.source,
 				extraAction: null,
+			},
+		});
+	});
+
+	it("keeps Arr before Seerr for status-column targets", () => {
+		const parsed = {
+			...createTarget("TV"),
+			presentation: "status-column" as const,
+		};
+		const publicOptions = createDefaultPublicOptions();
+		publicOptions.ui.browseCards.primaryStatus = "seerr";
+		publicOptions.seerr.isConfigured = true;
+
+		const overlay = BrowseCardOverlay({
+			parsed,
+			adapter: {
+				cardSelector: ".card",
+				parseCard: () => null,
+			},
+			publicOptions,
+			mappedIdentities: [],
+			metadata: null,
+			onOpenMediaModal: () => {},
+			tooltipContainer: null,
+		});
+
+		expect(overlay).toMatchObject({
+			type: SonarrCardOverlay,
+			props: {
+				presentation: "status-column",
+				extraAction: {
+					type: SeerrCardStackActions,
+					props: { presentation: "status-column" },
+				},
 			},
 		});
 	});

@@ -38,6 +38,11 @@ class FakeElement extends FakeNode {
 		this.children.push(child);
 	}
 
+	prepend(child: FakeElement): void {
+		child.parentElement = this;
+		this.children.unshift(child);
+	}
+
 	remove(): void {
 		if (!this.parentElement) return;
 		const siblings = this.parentElement.children;
@@ -146,21 +151,25 @@ function getPlacementContainer(card: FakeElement): FakeElement | null {
 function createAdapter(
 	input: {
 		anchorCorner?: BrowseAdapter["anchorCorner"];
+		presentation?: "status-column";
 	} = {},
 ): BrowseAdapter {
 	const adapter: BrowseAdapter = {
 		cardSelector: ".card",
 		parseCard(card: Element): HostMediaTarget | null {
 			const fakeCard = card as unknown as FakeElement;
-			const cover = fakeCard.querySelector(".cover");
-			if (!cover) return null;
+			const mountTarget = fakeCard.querySelector(
+				input.presentation === "status-column" ? ".status" : ".cover",
+			);
+			if (!mountTarget) return null;
 			const anilistId = parseAniListId(Number(fakeCard.dataset.id));
 			return {
 				source: { source: "anilist", id: anilistId },
 				anilistId,
 				title: fakeCard.dataset.title ?? "",
 				format: null,
-				mountTarget: cover as unknown as HTMLElement,
+				mountTarget: mountTarget as unknown as HTMLElement,
+				...(input.presentation ? { presentation: input.presentation } : {}),
 			};
 		},
 		getScanRoot: () => fakeDocument.body as unknown as Element,
@@ -232,5 +241,33 @@ describe("scanBrowseCardTargets", () => {
 		expect(firstTargets).toHaveLength(2);
 		expect(new Set(firstKeys).size).toBe(2);
 		expect(secondKeys).toEqual(firstKeys);
+	});
+
+	it("prepends, reuses, and cleans a status-column target", () => {
+		const card = createCard({ id: 52_991, title: "Sousou no Frieren" });
+		const statusCell = new FakeElement("td");
+		statusCell.className = "status";
+		const nativeButton = new FakeElement("a");
+		nativeButton.textContent = "Add to My List";
+		statusCell.append(nativeButton);
+		card.append(statusCell);
+		fakeDocument.body?.append(card);
+		const options = createOptions(
+			createAdapter({ presentation: "status-column" }),
+		);
+
+		const firstTargets = scanBrowseCardTargets(options);
+		const container = firstTargets[0]?.container as unknown as FakeElement;
+		const secondTargets = scanBrowseCardTargets(options);
+
+		expect(firstTargets).toHaveLength(1);
+		expect(secondTargets[0]?.container).toBe(container);
+		expect(container.dataset.presentation).toBe("status-column");
+		expect(statusCell.children).toEqual([container, nativeButton]);
+
+		cleanupBrowseCardTargets(firstTargets);
+
+		expect(statusCell.children).toEqual([nativeButton]);
+		expect(statusCell.dataset.a2aProcessed).toBeUndefined();
 	});
 });

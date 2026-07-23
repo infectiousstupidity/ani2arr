@@ -40,3 +40,30 @@ export function getCardPrimaryTitle(input: CardPrimaryTitleInput): string {
 		}
 	}
 }
+
+export function getCardPrimaryLabel(input: CardPrimaryTitleInput): string {
+	switch (input.state) {
+		case "unconfigured": {
+			return `Configure ${input.providerLabel}`;
+		}
+		case "checking": {
+			return `Checking ${input.providerLabel}...`;
+		}
+		case "adding": {
+			return "Adding...";
+		}
+		case "error": {
+			return input.errorSource === "add" ? "Retry add" : "Retry check";
+		}
+		case "unmapped":
+		case "unknown": {
+			return "Find match";
+		}
+		case "in-library": {
+			return `In ${input.providerLabel}`;
+		}
+		case "can-add": {
+			return `Add to ${input.providerLabel}`;
+		}
+	}
+}

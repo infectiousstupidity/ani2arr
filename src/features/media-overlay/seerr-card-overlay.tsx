@@ -40,12 +40,14 @@ interface SeerrCardActionProps {
 
 interface SeerrCardStackActionsProps extends SeerrCardActionProps {
 	stackDirection?: "up" | "down" | undefined;
+	presentation?: "status-column" | undefined;
 }
 
 interface SeerrStandaloneCardOverlayProps extends SeerrCardActionProps {
 	badgeVisibility?: BadgeVisibility;
 	stackDirection?: "up" | "down";
 	extraAction?: ReactNode;
+	presentation?: "status-column" | undefined;
 }
 
 type SeerrCardState = Extract<
@@ -248,6 +250,7 @@ export function SeerrCardStackActions({
 	tooltipContainer,
 	onOpenModal,
 	stackDirection = "up",
+	presentation,
 }: SeerrCardStackActionsProps): ReactElement | null {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const action = useSeerrCardAction({
@@ -258,7 +261,24 @@ export function SeerrCardStackActions({
 		observeTarget,
 	});
 
-	if (!isInViewport) return null;
+	if (!isInViewport && presentation !== "status-column") return null;
+	if (presentation === "status-column") {
+		return (
+			<CardOverlay
+				providerLabel="Seerr"
+				primaryState={action.state}
+				primaryTitle={action.title}
+				primaryLabel={action.title}
+				primaryDisabled={action.disabled}
+				onPrimaryAction={action.run}
+				hasMapping={true}
+				openProvider={action.openSeerr}
+				openProviderIcon={SeerrIcon}
+				tooltipContainer={tooltipContainer}
+				presentation="status-column"
+			/>
+		);
+	}
 
 	const requestButton = (
 		<SeerrStackRequestButton
@@ -289,6 +309,7 @@ export function SeerrStandaloneCardOverlay({
 	tooltipContainer,
 	onOpenModal,
 	extraAction,
+	presentation,
 }: SeerrStandaloneCardOverlayProps): ReactElement | null {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const action = useSeerrCardAction({
@@ -299,7 +320,7 @@ export function SeerrStandaloneCardOverlay({
 		observeTarget,
 	});
 
-	if (!isInViewport) return null;
+	if (!isInViewport && presentation !== "status-column") return null;
 
 	return (
 		<div
@@ -316,6 +337,7 @@ export function SeerrStandaloneCardOverlay({
 				providerLabel="Seerr"
 				primaryState={action.state}
 				primaryTitle={action.title}
+				primaryLabel={action.title}
 				primaryDisabled={action.disabled}
 				onPrimaryAction={action.run}
 				hasMapping={true}
@@ -325,6 +347,7 @@ export function SeerrStandaloneCardOverlay({
 				badgeVisibility={badgeVisibility}
 				stackDirection={stackDirection}
 				tooltipContainer={tooltipContainer}
+				presentation={presentation}
 			/>
 		</div>
 	);

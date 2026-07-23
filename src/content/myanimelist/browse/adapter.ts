@@ -13,6 +13,7 @@ const ANIME_SEARCH_ROW_SELECTOR = ".js-block-list.list > table > tbody > tr";
 const AUTOCOMPLETE_ANCHOR_SELECTOR =
 	"#advancedSearchResultList > div > div > a";
 const ANIME_LINK_SELECTOR = "a[href*='/anime/']";
+const RANKING_STATUS_SELECTOR = "td.status";
 
 const CARD_SELECTOR = [
 	SEASONAL_CARD_SELECTOR,
@@ -109,11 +110,19 @@ function parseSeasonalCard(card: Element): HostMediaTarget | null {
 }
 
 function parseRankingRow(card: Element): HostMediaTarget | null {
-	return parseFromLinks({
+	const parsed = parseFromLinks({
 		card,
 		posterLink: findPosterLink(card),
 		titleLink: card.querySelector<HTMLAnchorElement>(".anime_ranking_h3 a"),
 	});
+	const statusCell = card.querySelector<HTMLElement>(RANKING_STATUS_SELECTOR);
+	if (!parsed || !statusCell) return null;
+
+	return {
+		...parsed,
+		mountTarget: statusCell,
+		presentation: "status-column",
+	};
 }
 
 function parseGeneralSearchCard(card: Element): HostMediaTarget | null {

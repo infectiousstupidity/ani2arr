@@ -10,7 +10,7 @@ import type { RadarrFormState } from "@/providers/radarr/form-state";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import type { BadgeVisibility } from "@/settings/types";
 import { RadarrIcon } from "@/features/provider-ui/provider-icons";
-import { getCardPrimaryTitle } from "./card-primary-title";
+import { getCardPrimaryLabel, getCardPrimaryTitle } from "./card-primary-title";
 import { CardOverlay } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";
 
@@ -28,6 +28,7 @@ interface RadarrCardOverlayProps {
 	stackDirection?: "up" | "down";
 	tooltipContainer?: FloatingPortalContainer;
 	extraAction?: ReactNode;
+	presentation?: "status-column" | undefined;
 }
 
 export function RadarrCardOverlay({
@@ -44,6 +45,7 @@ export function RadarrCardOverlay({
 	stackDirection,
 	tooltipContainer,
 	extraAction,
+	presentation,
 }: RadarrCardOverlayProps): ReactElement {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const providerTitle = title.trim().length > 0 ? title : null;
@@ -60,26 +62,39 @@ export function RadarrCardOverlay({
 		onConfigure: () => openOptionsPage({ sectionId: "radarr" }),
 		onOpenMapping,
 	});
-	const primaryTitle = getCardPrimaryTitle({
+	const primaryLabelInput = {
 		providerLabel: "Radarr",
 		state: mediaAction.status.state,
 		errorSource: mediaAction.status.errorSource,
 		canQuickAdd: providerTitle !== null && defaultForm !== null,
-	});
+	};
+	const primaryTitle = getCardPrimaryTitle(primaryLabelInput);
+	const primaryLabel = getCardPrimaryLabel(primaryLabelInput);
+	const openSetup =
+		anilistId !== undefined && mediaAction.status.hasMapping
+			? onOpenSetup
+			: undefined;
+	const statusPrimaryAction =
+		mediaAction.status.state === "in-library"
+			? (openSetup ?? mediaAction.openProvider ?? mediaAction.runPrimaryAction)
+			: mediaAction.runPrimaryAction;
 
 	return (
 		<CardOverlay
 			providerLabel="Radarr"
 			primaryState={mediaAction.status.state}
 			primaryTitle={primaryTitle}
+			primaryLabel={primaryLabel}
 			primaryDisabled={mediaAction.status.disabled}
 			onPrimaryAction={mediaAction.runPrimaryAction}
-			hasMapping={mediaAction.status.hasMapping}
-			onOpenSetup={
-				anilistId !== undefined && mediaAction.status.hasMapping
-					? onOpenSetup
-					: undefined
+			statusPrimaryDisabled={
+				mediaAction.status.state === "in-library"
+					? false
+					: mediaAction.status.disabled
 			}
+			onStatusPrimaryAction={statusPrimaryAction}
+			hasMapping={mediaAction.status.hasMapping}
+			onOpenSetup={openSetup}
 			onOpenMapping={
 				anilistId !== undefined && mediaAction.status.state !== "unconfigured"
 					? onOpenMapping
@@ -91,6 +106,7 @@ export function RadarrCardOverlay({
 			badgeVisibility={badgeVisibility}
 			stackDirection={stackDirection}
 			tooltipContainer={tooltipContainer}
+			presentation={presentation}
 		/>
 	);
 }

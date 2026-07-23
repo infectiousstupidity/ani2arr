@@ -203,3 +203,128 @@
 	box-shadow: 0 12px 24px rgba(8, 12, 20, 0.35);
 	backdrop-filter: blur(8px);
 }
+
+.a2a-card-overlay[data-presentation="status-column"] {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	width: 100%;
+	z-index: auto;
+}
+
+.a2a-card-overlay__status-row {
+	width: 100%;
+}
+
+.a2a-card-overlay__status-main {
+	display: flex;
+	min-width: 0;
+	width: 100%;
+	height: 26px;
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.a2a-card-overlay[data-presentation="status-column"]
+	:is(
+		.a2a-card-overlay__status-primary,
+		.a2a-card-overlay__menu-trigger
+	) {
+	appearance: none;
+	box-sizing: border-box;
+	pointer-events: auto;
+	height: 26px;
+	margin: 0;
+	padding: 0;
+	border: 1px solid #4069bd;
+	background: #2e51a2;
+	color: #fff;
+	font-family: Verdana, Arial, sans-serif;
+	font-size: 11px;
+	font-weight: 400;
+	line-height: 24px;
+	cursor: pointer;
+	box-shadow: none;
+}
+
+.a2a-card-overlay[data-presentation="status-column"]
+	:is(
+		.a2a-card-overlay__status-primary,
+		.a2a-card-overlay__menu-trigger
+	):is(:hover, :active):not(:disabled) {
+	background: #4165b4;
+}
+
+.a2a-card-overlay[data-presentation="status-column"]
+	:is(
+		.a2a-card-overlay__status-primary,
+		.a2a-card-overlay__menu-trigger
+	):focus-visible {
+	position: relative;
+	z-index: 1;
+	outline: 2px solid #8aa9ed;
+	outline-offset: -2px;
+}
+
+.a2a-card-overlay__status-primary {
+	min-width: 0;
+	flex: 1 1 auto;
+	padding: 0 7px !important;
+	border-radius: 3px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.a2a-card-overlay__status-main[data-has-menu="true"]
+	.a2a-card-overlay__status-primary {
+	border-right: 0 !important;
+	border-radius: 3px 0 0 3px;
+}
+
+.a2a-card-overlay__menu-trigger {
+	display: inline-grid;
+	flex: 0 0 26px;
+	place-items: center;
+	width: 26px;
+	border-left-color: rgba(255, 255, 255, 0.24) !important;
+	border-radius: 0 3px 3px 0;
+}
+
+.a2a-card-overlay__menu-trigger svg {
+	width: 12px;
+	height: 12px;
+}
+
+.a2a-card-overlay[data-presentation="status-column"]
+	button:is(:disabled, [aria-disabled="true"]) {
+	cursor: default;
+	opacity: 0.72;
+}
+
+.a2a-card-overlay__menu-content {
+	z-index: 99999;
+	min-width: 140px;
+	padding: 4px;
+	border: 1px solid #c7c7c7;
+	border-radius: 3px;
+	background: #fff;
+	color: #1c439b;
+	font-family: Verdana, Arial, sans-serif;
+	font-size: 11px;
+	line-height: 1.25;
+	box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+}
+
+.a2a-card-overlay__menu-item {
+	padding: 6px 8px;
+	border-radius: 2px;
+	cursor: pointer;
+	outline: none;
+	user-select: none;
+}
+
+.a2a-card-overlay__menu-item:is(:hover, :focus, [data-highlighted]) {
+	background: #2e51a2;
+	color: #fff;
+}

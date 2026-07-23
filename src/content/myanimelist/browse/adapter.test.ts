@@ -52,36 +52,17 @@ function animeLink(input: {
 	});
 }
 
-const surfaceCases = [
-	{
-		name: "seasonal card",
-		surfaceSelector: ".seasonal-anime.js-seasonal-anime",
-		titleSelector: ".title h2 a",
-	},
-	{
-		name: "ranking row",
-		surfaceSelector: "tr.ranking-list",
-		titleSelector: ".anime_ranking_h3 a",
-	},
-	{
-		name: "general search card",
-		surfaceSelector: "#anime + article > .list",
-		titleSelector: ".information .title > a",
-	},
-	{
-		name: "anime search row",
-		surfaceSelector: ".js-block-list.list > table > tbody > tr",
-		titleSelector: ".title a.hoverinfo_trigger",
-	},
-] as const;
-
 describe("parseMyAnimeListBrowseCard", () => {
-	it.each(surfaceCases)("mounts a $name on its poster", (surface) => {
+	it("mounts a ranking row in its Status cell", () => {
 		const posterLink = animeLink({ id: 52_991, imageAlt: "Sousou no Frieren" });
 		const titleLink = animeLink({ id: 52_991, title: "Sousou no Frieren" });
+		const statusCell = fakeElement({ tagName: "TD" });
 		const card = fakeElement({
-			matches: surface.surfaceSelector,
-			children: { [surface.titleSelector]: titleLink },
+			matches: "tr.ranking-list",
+			children: {
+				".anime_ranking_h3 a": titleLink,
+				"td.status": statusCell,
+			},
 			childLists: { [ANIME_LINK_SELECTOR]: [posterLink, titleLink] },
 		}) as unknown as Element;
 
@@ -90,8 +71,33 @@ describe("parseMyAnimeListBrowseCard", () => {
 		expect(parsed).toMatchObject({
 			source: { source: "mal", id: parseMyAnimeListId(52_991) },
 			title: "Sousou no Frieren",
+			presentation: "status-column",
 		});
+		expect(parsed?.mountTarget).toBe(statusCell);
+		expect(
+			parseMyAnimeListBrowseCard(
+				fakeElement({
+					matches: "tr.ranking-list",
+					children: { ".anime_ranking_h3 a": titleLink },
+					childLists: { [ANIME_LINK_SELECTOR]: [posterLink, titleLink] },
+				}) as unknown as Element,
+			),
+		).toBeNull();
+	});
+
+	it("keeps a seasonal card on its poster", () => {
+		const posterLink = animeLink({ id: 457, imageAlt: "Mushishi" });
+		const titleLink = animeLink({ id: 457, title: "Mushishi" });
+		const card = fakeElement({
+			matches: ".seasonal-anime.js-seasonal-anime",
+			children: { ".title h2 a": titleLink },
+			childLists: { [ANIME_LINK_SELECTOR]: [posterLink, titleLink] },
+		}) as unknown as Element;
+
+		const parsed = parseMyAnimeListBrowseCard(card);
+
 		expect(parsed?.mountTarget).toBe(posterLink);
+		expect(parsed?.presentation).toBeUndefined();
 	});
 
 	it("uses only an image-bearing autocomplete anchor", () => {

@@ -85,18 +85,24 @@ function findPlacementContainer(
 }
 
 function ensurePlacementContainer(input: {
-	mountTarget: HTMLElement;
+	parsed: HostMediaTarget;
 	adapter: BrowseAdapter;
 }): HTMLElement {
-	const existing = findPlacementContainer(input.mountTarget);
+	const existing = findPlacementContainer(input.parsed.mountTarget);
 	const container =
-		existing ?? input.mountTarget.ownerDocument.createElement("div");
+		existing ?? input.parsed.mountTarget.ownerDocument.createElement("div");
 
 	container.className = BROWSE_OVERLAY_CONTAINER_CLASS;
 	container.dataset.corner = input.adapter.anchorCorner ?? "bottom-left";
+	container.dataset.presentation =
+		input.parsed.presentation ?? "poster-overlay";
 
 	if (!existing) {
-		input.mountTarget.append(container);
+		if (input.parsed.presentation === "status-column") {
+			input.parsed.mountTarget.prepend(container);
+		} else {
+			input.parsed.mountTarget.append(container);
+		}
 	}
 
 	return container;
@@ -166,7 +172,7 @@ export function scanBrowseCardTargets(
 		}
 
 		const container = ensurePlacementContainer({
-			mountTarget: parsed.mountTarget,
+			parsed,
 			adapter: options.adapter,
 		});
 		parsed.mountTarget.setAttribute(

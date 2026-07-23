@@ -8,8 +8,10 @@ import {
 	type SVGProps,
 	type SyntheticEvent,
 } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
 	Check,
+	ChevronDown,
 	Plus,
 	RotateCcw,
 	SlidersHorizontal,
@@ -25,8 +27,11 @@ interface CardOverlayProps {
 	providerLabel: string;
 	primaryState: MediaActionState;
 	primaryTitle: string;
+	primaryLabel?: string;
 	primaryDisabled: boolean;
 	onPrimaryAction(): void;
+	statusPrimaryDisabled?: boolean;
+	onStatusPrimaryAction?: (() => void) | undefined;
 	hasMapping: boolean;
 	onOpenSetup?: (() => void) | undefined;
 	onOpenMapping?: (() => void) | undefined;
@@ -36,6 +41,7 @@ interface CardOverlayProps {
 	badgeVisibility?: BadgeVisibility | undefined;
 	stackDirection?: "up" | "down" | undefined;
 	tooltipContainer?: FloatingPortalContainer | undefined;
+	presentation?: "status-column" | undefined;
 }
 
 function getPrimaryActionIcon(actionState: MediaActionState) {
@@ -104,27 +110,187 @@ function swallowEvent(event: SyntheticEvent): void {
 	event.stopPropagation();
 }
 
-export function CardOverlay({
+function StatusColumnMenu(props: {
+	providerLabel: string;
+	setupAction: (() => void) | undefined;
+	mappingAction: (() => void) | undefined;
+	openProvider: (() => void) | null;
+	mappingLabel: string;
+	container: FloatingPortalContainer | null;
+}): ReactElement | null {
+	const {
+		providerLabel,
+		setupAction,
+		mappingAction,
+		openProvider,
+		mappingLabel,
+		container,
+	} = props;
+	if (!setupAction && !mappingAction && !openProvider) return null;
+
+	return (
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger asChild>
+				<button
+					type="button"
+					className="a2a-card-overlay__menu-trigger"
+					aria-label={`${providerLabel} actions`}
+				>
+					<ChevronDown aria-hidden="true" />
+				</button>
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Portal container={container}>
+				<DropdownMenu.Content
+					className="a2a-card-overlay__menu-content"
+					side="bottom"
+					align="end"
+					sideOffset={4}
+				>
+					{setupAction ? (
+						<DropdownMenu.Item
+							className="a2a-card-overlay__menu-item"
+							onSelect={setupAction}
+						>
+							{providerLabel} options
+						</DropdownMenu.Item>
+					) : null}
+					{mappingAction ? (
+						<DropdownMenu.Item
+							className="a2a-card-overlay__menu-item"
+							onSelect={mappingAction}
+						>
+							{mappingLabel}
+						</DropdownMenu.Item>
+					) : null}
+					{openProvider ? (
+						<DropdownMenu.Item
+							className="a2a-card-overlay__menu-item"
+							onSelect={openProvider}
+						>
+							Open in {providerLabel}
+						</DropdownMenu.Item>
+					) : null}
+				</DropdownMenu.Content>
+			</DropdownMenu.Portal>
+		</DropdownMenu.Root>
+	);
+}
+
+interface StatusColumnOverlayProps extends CardOverlayProps {
+	resolvedTooltipContainer: FloatingPortalContainer | null;
+	statusMappingLabel: string;
+	statusSetupAction: (() => void) | undefined;
+	statusMappingAction: (() => void) | undefined;
+}
+
+function StatusColumnOverlay({
 	providerLabel,
 	primaryState,
 	primaryTitle,
+	primaryLabel,
 	primaryDisabled,
 	onPrimaryAction,
-	hasMapping,
-	onOpenSetup,
-	onOpenMapping,
+	statusPrimaryDisabled,
+	onStatusPrimaryAction,
 	openProvider,
-	openProviderIcon: OpenProviderIcon,
 	extraAction,
-	badgeVisibility = "always",
-	stackDirection = "up",
-	tooltipContainer,
-}: CardOverlayProps): ReactElement {
+	resolvedTooltipContainer,
+	statusMappingLabel,
+	statusSetupAction,
+	statusMappingAction,
+}: StatusColumnOverlayProps): ReactElement {
+	const hasMenu =
+		statusSetupAction !== undefined ||
+		statusMappingAction !== undefined ||
+		openProvider !== null;
+
+	return (
+		<div
+			className="a2a-card-overlay"
+			data-state={primaryState}
+			data-presentation="status-column"
+			onClick={stopOverlayEvent}
+			onDoubleClick={stopOverlayEvent}
+			onKeyDown={stopOverlayEvent}
+			onKeyUp={stopOverlayEvent}
+			onMouseDown={stopOverlayEvent}
+			onMouseUp={stopOverlayEvent}
+			onPointerDown={stopOverlayEvent}
+			onPointerUp={stopOverlayEvent}
+		>
+			<div className="a2a-card-overlay__status-row">
+				<div
+					className="a2a-card-overlay__status-main"
+					data-has-menu={hasMenu || undefined}
+				>
+					<button
+						type="button"
+						className="a2a-card-overlay__status-primary"
+						data-state={primaryState}
+						onClick={withSwallow(onStatusPrimaryAction ?? onPrimaryAction)}
+						onMouseDown={swallowEvent}
+						disabled={statusPrimaryDisabled ?? primaryDisabled}
+						aria-disabled={
+							(statusPrimaryDisabled ?? primaryDisabled) || undefined
+						}
+					>
+						{primaryLabel ?? primaryTitle}
+					</button>
+					<StatusColumnMenu
+						providerLabel={providerLabel}
+						setupAction={statusSetupAction}
+						mappingAction={statusMappingAction}
+						openProvider={openProvider}
+						mappingLabel={statusMappingLabel}
+						container={resolvedTooltipContainer}
+					/>
+				</div>
+			</div>
+			{extraAction}
+		</div>
+	);
+}
+
+export function CardOverlay(props: CardOverlayProps): ReactElement {
+	const {
+		providerLabel,
+		primaryState,
+		primaryTitle,
+		primaryDisabled,
+		onPrimaryAction,
+		hasMapping,
+		onOpenSetup,
+		onOpenMapping,
+		openProvider,
+		openProviderIcon: OpenProviderIcon,
+		extraAction,
+		badgeVisibility = "always",
+		stackDirection = "up",
+		tooltipContainer,
+		presentation,
+	} = props;
 	const resolvedTooltipContainer =
-		tooltipContainer ?? (typeof document === "undefined" ? null : document.body);
+		tooltipContainer ??
+		(typeof document === "undefined" ? null : document.body);
 	const manualMappingLabel = hasMapping
 		? "Update mapping manually"
 		: "Find match manually";
+	const statusMappingLabel = hasMapping ? "Update mapping" : "Find match";
+	const statusSetupAction = hasMapping ? onOpenSetup : undefined;
+	const statusMappingAction =
+		primaryState === "unconfigured" ? undefined : onOpenMapping;
+
+	if (presentation === "status-column") {
+		return (
+			<StatusColumnOverlay
+				{...props}
+				resolvedTooltipContainer={resolvedTooltipContainer}
+				statusMappingLabel={statusMappingLabel}
+				statusSetupAction={statusSetupAction}
+				statusMappingAction={statusMappingAction}
+			/>
+		);
+	}
 
 	const setupAction = onOpenSetup ? (
 		<TooltipWrapper

@@ -17,3 +17,16 @@ a[data-a2a-processed] {
 	left: var(--badge-offset-x, -8px);
 	top: 14px;
 }
+
+.a2a-overlay-container[data-presentation="status-column"] {
+	position: static;
+	display: block;
+	width: 100%;
+	pointer-events: none;
+	z-index: auto;
+	overflow: visible;
+}
+
+.a2a-overlay-container[data-presentation="status-column"]:not(:empty) {
+	margin-bottom: 5px;
+}

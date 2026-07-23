@@ -315,12 +315,15 @@ export function BrowseCardOverlay({
 				tooltipContainer={tooltipContainer}
 				onOpenModal={handleOpenSeerrModal}
 				stackDirection={stackDirection}
+				presentation={parsed.presentation}
 			/>
 		) : null;
 
 	const primaryStatus = getPrimaryStatus(publicOptions);
 	const showSeerrMain =
-		seerrEnabled && (primaryStatus === "seerr" || activeArr === "none");
+		seerrEnabled &&
+		(activeArr === "none" ||
+			(parsed.presentation !== "status-column" && primaryStatus === "seerr"));
 
 	const commonProps = {
 		anilistId,
@@ -330,6 +333,7 @@ export function BrowseCardOverlay({
 		observeTarget: parsed.mountTarget,
 		stackDirection,
 		tooltipContainer,
+		presentation: parsed.presentation,
 	};
 
 	if (showSeerrMain && anilistId !== undefined) {
@@ -343,6 +347,7 @@ export function BrowseCardOverlay({
 				tooltipContainer={tooltipContainer}
 				onOpenModal={handleOpenSeerrModal}
 				extraAction={arrStackAction}
+				presentation={parsed.presentation}
 			/>
 		);
 	}
