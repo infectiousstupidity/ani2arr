@@ -18,6 +18,8 @@ export const BROWSE_MUTATION_OBSERVER_INIT: MutationObserverInit = {
 	characterData: true,
 };
 
+const ACTION_ROW_HOST_HEIGHT_PROPERTY = "--a2a-action-row-host-height";
+
 export interface BrowseCardTarget {
 	key: string;
 	parsed: HostMediaTarget;
@@ -58,7 +60,9 @@ function getCardSignature(parsed: HostMediaTarget): string {
 }
 
 function getObserverRoot(adapter: BrowseAdapter): Node | null {
-	return adapter.getObserverRoot?.() ?? document.body ?? document.documentElement;
+	return (
+		adapter.getObserverRoot?.() ?? document.body ?? document.documentElement
+	);
 }
 
 function getScanRoot(adapter: BrowseAdapter): Element | null {
@@ -70,9 +74,30 @@ function getScanRoot(adapter: BrowseAdapter): Element | null {
 	);
 }
 
-function findPlacementContainer(
-	mountTarget: HTMLElement,
-): HTMLElement | null {
+function captureActionRowHostHeight(mountTarget: HTMLElement): void {
+	if (
+		mountTarget.style.getPropertyValue(ACTION_ROW_HOST_HEIGHT_PROPERTY) !== ""
+	) {
+		return;
+	}
+
+	const view = mountTarget.ownerDocument.defaultView;
+	const computedHeight = view?.getComputedStyle(mountTarget).height ?? "";
+	const parsedHeight = Number.parseFloat(computedHeight);
+	const measuredHeight =
+		Number.isFinite(parsedHeight) && parsedHeight > 0
+			? parsedHeight
+			: mountTarget.getBoundingClientRect().height;
+
+	if (measuredHeight <= 0) return;
+
+	mountTarget.style.setProperty(
+		ACTION_ROW_HOST_HEIGHT_PROPERTY,
+		`${measuredHeight}px`,
+	);
+}
+
+function findPlacementContainer(mountTarget: HTMLElement): HTMLElement | null {
 	for (const child of mountTarget.children) {
 		if (
 			child instanceof HTMLElement &&
@@ -81,6 +106,7 @@ function findPlacementContainer(
 			return child;
 		}
 	}
+
 	return null;
 }
 
@@ -88,6 +114,10 @@ function ensurePlacementContainer(input: {
 	parsed: HostMediaTarget;
 	adapter: BrowseAdapter;
 }): HTMLElement {
+	if (input.parsed.presentation === "action-row") {
+		captureActionRowHostHeight(input.parsed.mountTarget);
+	}
+
 	const existing = findPlacementContainer(input.parsed.mountTarget);
 	const container =
 		existing ?? input.parsed.mountTarget.ownerDocument.createElement("div");
@@ -108,11 +138,15 @@ function ensurePlacementContainer(input: {
 	return container;
 }
 
-function removeTarget(
-	target: BrowseCardTarget,
-): void {
+function removeTarget(target: BrowseCardTarget): void {
 	target.parsed.mountTarget.removeAttribute(BROWSE_PROCESSED_ATTRIBUTE);
 	target.container.remove();
+
+	if (target.parsed.presentation === "action-row") {
+		target.parsed.mountTarget.style.removeProperty(
+			ACTION_ROW_HOST_HEIGHT_PROPERTY,
+		);
+	}
 }
 
 export function cleanupBrowseCardTargets(
@@ -128,8 +162,9 @@ function cleanupMissingTargets(input: {
 	nextTargets: readonly BrowseCardTarget[];
 }): void {
 	const nextMountTargets = new Set(
-		input.nextTargets.map(target => target.parsed.mountTarget),
+		input.nextTargets.map((target) => target.parsed.mountTarget),
 	);
+
 	for (const target of input.previousTargets) {
 		if (!nextMountTargets.has(target.parsed.mountTarget)) {
 			removeTarget(target);
@@ -142,8 +177,10 @@ function targetsEqual(
 	b: readonly BrowseCardTarget[],
 ): boolean {
 	if (a.length !== b.length) return false;
+
 	for (const [index, target] of a.entries()) {
 		const other = b[index];
+
 		if (
 			!other ||
 			target.key !== other.key ||
@@ -152,6 +189,7 @@ function targetsEqual(
 			return false;
 		}
 	}
+
 	return true;
 }
 
@@ -162,11 +200,11 @@ export function scanBrowseCardTargets(
 	if (!root) return [];
 
 	const targetsByMountTarget = new Map<HTMLElement, BrowseCardTarget>();
+
 	for (const card of root.querySelectorAll(options.adapter.cardSelector)) {
 		const parsed = options.adapter.parseCard(card);
-		if (!parsed) {
-			continue;
-		}
+		if (!parsed) continue;
+
 		if (targetsByMountTarget.has(parsed.mountTarget)) {
 			continue;
 		}
@@ -175,10 +213,12 @@ export function scanBrowseCardTargets(
 			parsed,
 			adapter: options.adapter,
 		});
+
 		parsed.mountTarget.setAttribute(
 			BROWSE_PROCESSED_ATTRIBUTE,
 			sourceIdentityKey(parsed.source),
 		);
+
 		targetsByMountTarget.set(parsed.mountTarget, {
 			key: getCardSignature(parsed),
 			parsed,
@@ -196,6 +236,7 @@ function createBrowseCardTargetStore(
 
 	return {
 		getSnapshot: () => currentTargets,
+
 		subscribe: (onStoreChange) => {
 			let frameId: number | null = null;
 			let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -205,6 +246,7 @@ function createBrowseCardTargetStore(
 					globalThis.cancelAnimationFrame(frameId);
 					frameId = null;
 				}
+
 				if (timeoutId !== null) {
 					globalThis.clearTimeout(timeoutId);
 					timeoutId = null;
@@ -214,11 +256,14 @@ function createBrowseCardTargetStore(
 			const scan = () => {
 				frameId = null;
 				timeoutId = null;
+
 				const nextTargets = scanBrowseCardTargets(options);
+
 				cleanupMissingTargets({
 					previousTargets: currentTargets,
 					nextTargets,
 				});
+
 				if (targetsEqual(currentTargets, nextTargets)) {
 					currentTargets = nextTargets;
 					return;
@@ -230,10 +275,12 @@ function createBrowseCardTargetStore(
 
 			const scheduleScan = () => {
 				if (frameId !== null || timeoutId !== null) return;
+
 				if (typeof globalThis.requestAnimationFrame === "function") {
 					frameId = globalThis.requestAnimationFrame(scan);
 					return;
 				}
+
 				timeoutId = globalThis.setTimeout(scan, 0);
 			};
 
@@ -242,9 +289,8 @@ function createBrowseCardTargetStore(
 			}
 
 			const observerRoot = getObserverRoot(options.adapter);
-			const observer = observerRoot
-				? new MutationObserver(scheduleScan)
-				: null;
+			const observer = observerRoot ? new MutationObserver(scheduleScan) : null;
+
 			observer?.observe(observerRoot as Node, BROWSE_MUTATION_OBSERVER_INIT);
 			scan();
 
@@ -266,5 +312,6 @@ export function useBrowseCardTargets(
 		() => createBrowseCardTargetStore({ adapter, enabled }),
 		[adapter, enabled],
 	);
+
 	return useSyncExternalStore(store.subscribe, store.getSnapshot);
 }

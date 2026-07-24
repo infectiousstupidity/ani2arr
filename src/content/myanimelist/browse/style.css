@@ -13,7 +13,14 @@ a[data-a2a-processed] {
 	overflow: visible;
 }
 
-.a2a-overlay-container[data-corner="top-left"] {
+/*
+ * Only poster overlays use the corner position.
+ * Action rows and status columns have their own placement.
+ */
+.a2a-overlay-container[data-corner="top-left"]:not(
+		[data-presentation="action-row"],
+		[data-presentation="status-column"]
+	) {
 	left: var(--badge-offset-x, -8px);
 	top: 14px;
 }
@@ -31,35 +38,40 @@ a[data-a2a-processed] {
 	margin-bottom: 5px;
 }
 
+/*
+ * Preserve MAL's original card content height and reserve a footer:
+ *
+ * 5px top gap + 23px button height + 7px bottom padding = 35px.
+ */
 .seasonal-anime.js-seasonal-anime[data-a2a-processed] {
-	height: auto !important;
+	--a2a-action-row-height: 23px;
+	--a2a-action-row-space: 35px;
+
+	height: calc(
+		var(--a2a-action-row-host-height) + var(--a2a-action-row-space)
+	) !important;
 }
 
+/* Move MAL's native score/list row above the injected footer. */
 .seasonal-anime.js-seasonal-anime[data-a2a-processed] > .information {
-	position: static;
-	clear: both;
-	width: auto;
+	bottom: var(--a2a-action-row-space) !important;
 }
 
+/* Place the injected row inside the reserved footer. */
 .a2a-overlay-container[data-presentation="action-row"] {
-	position: static;
+	position: absolute;
+	inset: auto 0 0;
 	display: block;
-	clear: both;
 	box-sizing: border-box;
 	width: 100%;
-	padding: 0 6px 7px;
+	height: var(--a2a-action-row-space);
+	padding: 5px 6px 7px;
 	pointer-events: none;
 	z-index: auto;
 	overflow: visible;
 }
 
-.a2a-overlay-container[data-presentation="action-row"]:not(:empty) {
-	margin-top: 5px;
-}
-
 .a2a-card-overlay[data-presentation="action-row"] {
-	--a2a-action-row-height: 23px;
-
 	display: flex;
 	flex: 1 1 0;
 	align-items: stretch;
