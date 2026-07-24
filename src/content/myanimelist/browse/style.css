@@ -71,10 +71,7 @@ a[data-a2a-processed] {
 }
 
 .a2a-card-overlay[data-presentation="action-row"]
-	:is(
-		.a2a-card-overlay__row-primary,
-		.a2a-card-overlay__row-external
-	) {
+	:is(.a2a-card-overlay__row-primary, .a2a-card-overlay__row-external) {
 	appearance: none;
 	box-sizing: border-box;
 	pointer-events: auto;
@@ -83,7 +80,7 @@ a[data-a2a-processed] {
 	padding: 0;
 	border: 1px solid #4069bd;
 	border-radius: 3px;
-	background: #2e51a2;
+	background: #4f74c8;
 	color: #fff;
 	font-family: Verdana, Arial, sans-serif;
 	font-size: 10px;
@@ -95,11 +92,11 @@ a[data-a2a-processed] {
 }
 
 .a2a-card-overlay[data-presentation="action-row"]
-	:is(
-		.a2a-card-overlay__row-primary,
-		.a2a-card-overlay__row-external
-	):is(:hover, :active):not(:disabled) {
-	background: #4165b4;
+	:is(.a2a-card-overlay__row-primary, .a2a-card-overlay__row-external):is(
+		:hover,
+		:active
+	):not(:disabled) {
+	opacity: 0.7;
 }
 
 .a2a-card-overlay[data-presentation="action-row"]
