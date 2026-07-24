@@ -12,6 +12,7 @@ import { BrowseOverlays } from '@/content/browse/browse-overlays';
 import { createExtensionQueryClient } from '@/queries/query-client';
 import { queryKeys } from '@/queries/query-keys';
 import {
+  BROWSE_CREATED_ATTRIBUTE,
   BROWSE_OVERLAY_CONTAINER_CLASS,
   BROWSE_PROCESSED_ATTRIBUTE,
   type BrowseAdapter,
@@ -38,6 +39,11 @@ const cleanupDomArtifacts = (): void => {
   for (const container of document
     .querySelectorAll<HTMLElement>(`.${CSS.escape(BROWSE_OVERLAY_CONTAINER_CLASS)}`)) {
     container.remove();
+  }
+
+  for (const element of document
+    .querySelectorAll<HTMLElement>(`[${CSS.escape(BROWSE_CREATED_ATTRIBUTE)}]`)) {
+    element.remove();
   }
 };
 

@@ -4,16 +4,23 @@
 import { parseAniListMediaFormatLabel } from "@/anilist/types";
 import { readMyAnimeListIdFromUrl } from "@/myanimelist/url";
 import type { MyAnimeListId } from "@/myanimelist/types";
-import type { BrowseAdapter, HostMediaTarget } from "@/content/browse/types";
+import {
+	BROWSE_CREATED_ATTRIBUTE,
+	type BrowseAdapter,
+	type HostMediaTarget,
+} from "@/content/browse/types";
 
 const SEASONAL_CARD_SELECTOR = ".seasonal-anime.js-seasonal-anime";
 const RANKING_ROW_SELECTOR = "tr.ranking-list";
 const GENERAL_SEARCH_CARD_SELECTOR = "#anime + article > .list";
+const ANIME_SEARCH_TABLE_SELECTOR = ".js-block-list.list > table";
 const ANIME_SEARCH_ROW_SELECTOR = ".js-block-list.list > table > tbody > tr";
 const AUTOCOMPLETE_ANCHOR_SELECTOR =
 	"#advancedSearchResultList > div > div > a";
 const ANIME_LINK_SELECTOR = "a[href*='/anime/']";
 const RANKING_STATUS_SELECTOR = "td.status";
+const ANIME_SEARCH_HEADER_CLASS = "a2a-anime-search-header";
+const ANIME_SEARCH_ACTION_CELL_CLASS = "a2a-anime-search-action-cell";
 
 const CARD_SELECTOR = [
 	SEASONAL_CARD_SELECTOR,
@@ -149,14 +156,74 @@ function parseGeneralSearchCard(card: Element): HostMediaTarget | null {
 	});
 }
 
+function ensureAnimeSearchHeader(table: HTMLTableElement): void {
+	const headerRow = table.tBodies.item(0)?.rows.item(0);
+	const titleCell = headerRow?.cells.item(1);
+	if (!headerRow || !titleCell) return;
+	if (headerRow.querySelector(`.${ANIME_SEARCH_HEADER_CLASS}`)) return;
+
+	const headerCell = table.ownerDocument.createElement("td");
+	headerCell.className = titleCell.className;
+	headerCell.classList.add(ANIME_SEARCH_HEADER_CLASS);
+	headerCell.setAttribute(BROWSE_CREATED_ATTRIBUTE, "true");
+	headerCell.textContent = "ani2arr";
+	titleCell.after(headerCell);
+}
+
+function ensureAnimeSearchActionCell(input: {
+	row: HTMLTableRowElement;
+	titleCell: HTMLTableCellElement;
+}): HTMLTableCellElement {
+	const existing = input.row.querySelector<HTMLTableCellElement>(
+		`:scope > td.${ANIME_SEARCH_ACTION_CELL_CLASS}`,
+	);
+	if (existing) return existing;
+
+	const actionCell = input.row.ownerDocument.createElement("td");
+	actionCell.className = input.titleCell.className;
+	actionCell.classList.add(ANIME_SEARCH_ACTION_CELL_CLASS);
+	actionCell.setAttribute(BROWSE_CREATED_ATTRIBUTE, "true");
+	input.titleCell.after(actionCell);
+	return actionCell;
+}
+
+function parseAnimeSearchFormat(titleCell: HTMLTableCellElement) {
+	const nextCell = titleCell.nextElementSibling;
+	const typeCell = nextCell?.classList.contains(ANIME_SEARCH_ACTION_CELL_CLASS)
+		? nextCell.nextElementSibling
+		: nextCell;
+	return parseAniListMediaFormatLabel(cleanText(typeCell?.textContent));
+}
+
 function parseAnimeSearchRow(card: Element): HostMediaTarget | null {
-	return parseFromLinks({
+	const table = card.closest<HTMLTableElement>(ANIME_SEARCH_TABLE_SELECTOR);
+	if (!table) return null;
+	ensureAnimeSearchHeader(table);
+	const row = card as HTMLTableRowElement;
+
+	const titleLink = card.querySelector<HTMLAnchorElement>(
+		".title a.hoverinfo_trigger",
+	);
+	const parsed = parseFromLinks({
 		card,
 		posterLink: findPosterLink(card),
-		titleLink: card.querySelector<HTMLAnchorElement>(
-			".title a.hoverinfo_trigger",
-		),
+		titleLink,
 	});
+	const titleCell = titleLink?.closest<HTMLTableCellElement>("td");
+	if (!parsed || !titleCell || titleCell.parentElement !== card) return null;
+	const format = parseAnimeSearchFormat(titleCell);
+	const mountTarget = ensureAnimeSearchActionCell({
+		row,
+		titleCell,
+	});
+	if (format === "MUSIC") return null;
+
+	return {
+		...parsed,
+		format,
+		mountTarget,
+		presentation: "status-column",
+	};
 }
 
 function parseAutocompleteAnchor(card: Element): HostMediaTarget | null {

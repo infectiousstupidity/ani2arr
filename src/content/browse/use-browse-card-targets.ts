@@ -3,6 +3,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 import {
+	BROWSE_CREATED_ATTRIBUTE,
 	BROWSE_OVERLAY_CONTAINER_CLASS,
 	BROWSE_PROCESSED_ATTRIBUTE,
 	type BrowseAdapter,
@@ -139,6 +140,9 @@ function ensurePlacementContainer(input: {
 }
 
 function removeTarget(target: BrowseCardTarget): void {
+	const removeMountTarget =
+		target.parsed.mountTarget.getAttribute(BROWSE_CREATED_ATTRIBUTE) !== null;
+
 	target.parsed.mountTarget.removeAttribute(BROWSE_PROCESSED_ATTRIBUTE);
 	target.container.remove();
 
@@ -147,6 +151,8 @@ function removeTarget(target: BrowseCardTarget): void {
 			ACTION_ROW_HOST_HEIGHT_PROPERTY,
 		);
 	}
+
+	if (removeMountTarget) target.parsed.mountTarget.remove();
 }
 
 export function cleanupBrowseCardTargets(

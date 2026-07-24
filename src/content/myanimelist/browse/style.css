@@ -38,6 +38,25 @@ a[data-a2a-processed] {
 	margin-bottom: 5px;
 }
 
+.a2a-anime-search-header,
+.a2a-anime-search-action-cell {
+	box-sizing: border-box;
+	width: 160px;
+	min-width: 160px;
+	text-align: right;
+	white-space: nowrap;
+}
+
+.a2a-anime-search-action-cell {
+	padding: 0 4px;
+	vertical-align: middle;
+}
+
+.a2a-anime-search-action-cell
+	> .a2a-overlay-container[data-presentation="status-column"]:not(:empty) {
+	margin-bottom: 0;
+}
+
 /*
  * Preserve MAL's original card content height and reserve a footer:
  *

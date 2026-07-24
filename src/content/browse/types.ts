@@ -6,6 +6,7 @@ import type { SourceIdentity } from '@/mapping/source-identity';
 
 export const BROWSE_OVERLAY_CONTAINER_CLASS = 'a2a-overlay-container';
 export const BROWSE_PROCESSED_ATTRIBUTE = 'data-a2a-processed';
+export const BROWSE_CREATED_ATTRIBUTE = 'data-a2a-created';
 
 type AnchorCorner = 'bottom-left' | 'top-left';
 type StackDirection = 'up' | 'down';
