@@ -27,10 +27,10 @@ const getAnichartIsDark = (target: Element): boolean => {
 			: false;
 	}
 
-	// Fallbacks for any other custom data attributes they may add later on.
 	const dataTheme = (target as HTMLElement).dataset?.theme;
 	if (typeof dataTheme === "string") {
 		const normalized = dataTheme.toLowerCase();
+
 		if (normalized.includes("dark")) return true;
 		if (normalized.includes("light")) return false;
 	}
@@ -56,6 +56,14 @@ const themeConfig = new Map<string, ThemeConfig>([
 			mediaQuery: prefersDarkQuery,
 		},
 	],
+	[
+		"myanimelist.net",
+		{
+			selector: "html",
+			attributeFilter: ["class"],
+			isDark: (target) => target.classList.contains("dark-mode"),
+		},
+	],
 ]);
 
 const DEFAULT_ATTRIBUTE_FILTER = ["class"];
@@ -68,9 +76,7 @@ export function useTheme(
 		if (!childElement) return;
 
 		const rootNode = childElement.getRootNode();
-		if (!(rootNode instanceof ShadowRoot)) {
-			return;
-		}
+		if (!(rootNode instanceof ShadowRoot)) return;
 
 		const hostElement = rootNode.host as HTMLElement;
 		const config = themeConfig.get(globalThis.location.hostname);
@@ -80,8 +86,7 @@ export function useTheme(
 		if (!targetNode) return;
 
 		const syncTheme = () => {
-			const isDark = config.isDark(targetNode);
-			hostElement.classList.toggle("dark", isDark);
+			hostElement.classList.toggle("dark", config.isDark(targetNode));
 		};
 
 		syncTheme();
@@ -98,19 +103,15 @@ export function useTheme(
 			const mediaQueryList = globalThis.matchMedia(config.mediaQuery);
 			const handleMediaChange = () => syncTheme();
 
-			if (typeof mediaQueryList.addEventListener === "function") {
-				mediaQueryList.addEventListener("change", handleMediaChange);
-				mediaCleanup = () =>
-					mediaQueryList.removeEventListener("change", handleMediaChange);
-			} else if (typeof mediaQueryList.addListener === "function") {
-				mediaQueryList.addListener(handleMediaChange);
-				mediaCleanup = () => mediaQueryList.removeListener(handleMediaChange);
-			}
+			mediaQueryList.addEventListener("change", handleMediaChange);
+			mediaCleanup = () => {
+				mediaQueryList.removeEventListener("change", handleMediaChange);
+			};
 		}
 
 		return () => {
 			observer.disconnect();
-			if (mediaCleanup) mediaCleanup();
+			mediaCleanup?.();
 		};
 	}, [refToChildOfHost]);
 }
