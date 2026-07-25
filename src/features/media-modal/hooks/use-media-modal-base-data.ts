@@ -9,15 +9,19 @@ import { resolveMediaModalMetadata } from "../anilist-modal-data";
 import type { MediaModalMetadataHint } from "../types";
 
 export function useMediaModalBaseData(input: {
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
+	fallbackLabel?: string | undefined;
 	metadataHint: MediaModalMetadataHint | null;
 }) {
-	const { anilistId, metadataHint } = input;
+	const { anilistId, fallbackLabel, metadataHint } = input;
 	const { data: options } = usePublicOptions();
-	const metadataBatch = useAniListMetadataBatch([anilistId], { enabled: true });
+	const metadataBatch = useAniListMetadataBatch(
+		anilistId === undefined ? [] : [anilistId],
+		{ enabled: anilistId !== undefined },
+	);
 	const { data: metadataBatchData } = metadataBatch;
 	const { data: anilistMedia } = useAniListMedia(anilistId, {
-		enabled: true,
+		enabled: anilistId !== undefined,
 	});
 	const preferredTitleLanguage =
 		options?.ui.preferredAniListTitleLanguage ?? "english";
@@ -25,13 +29,21 @@ export function useMediaModalBaseData(input: {
 	const resolved = useMemo(
 		() =>
 			resolveMediaModalMetadata({
-				anilistId,
+				...(anilistId === undefined ? {} : { anilistId }),
+				...(fallbackLabel === undefined ? {} : { fallbackLabel }),
 				anilistMedia,
 				metadataBatchData,
 				metadataHint,
 				preferredTitleLanguage,
 			}),
-		[anilistId, anilistMedia, metadataBatchData, metadataHint, preferredTitleLanguage],
+		[
+			anilistId,
+			anilistMedia,
+			fallbackLabel,
+			metadataBatchData,
+			metadataHint,
+			preferredTitleLanguage,
+		],
 	);
 	const fallbackLookupTitle =
 		resolved.providerPayloadTitle === undefined ||
@@ -47,7 +59,8 @@ export function useMediaModalBaseData(input: {
 		providerPayloadTitle: resolved.providerPayloadTitle,
 		fallbackLookupTitle,
 		statusMetadata: resolved.statusMetadata,
-		statusReady: metadataBatch.isFetched || metadataBatch.isError,
+		statusReady:
+			anilistId === undefined || metadataBatch.isFetched || metadataBatch.isError,
 		statusTitle: resolved.statusTitle,
 	};
 }

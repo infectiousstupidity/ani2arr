@@ -23,8 +23,8 @@ import {
 	getSonarrSetupStatusNotice,
 	type SonarrSetupTarget,
 } from "./sonarr-setup-values";
-import type { AniListId, AniListMediaHint } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/source-identity";
+import type { AniListMediaHint } from "@/anilist/types";
+import type { SourceRpcInput } from "@/rpc/types";
 
 type SonarrDraftState = {
 	targetKey: string | null;
@@ -47,8 +47,7 @@ export type SonarrSetupFooterState = {
 
 type SonarrSetupFormProps = {
 	formId: string;
-	anilistId: AniListId;
-	source?: SourceIdentity | undefined;
+	sourceInput: SourceRpcInput;
 	target: SonarrSetupTarget | null;
 	providerPayloadTitle?: string | undefined;
 	fallbackLookupTitle?: string | undefined;
@@ -187,8 +186,7 @@ export function useSonarrSetupForm(
 ): SonarrSetupFormResult {
 	const {
 		formId,
-		anilistId,
-		source,
+		sourceInput,
 		target,
 		providerPayloadTitle,
 		fallbackLookupTitle,
@@ -295,8 +293,7 @@ export function useSonarrSetupForm(
 		}
 
 		const payload = {
-			...(source === undefined ? {} : { source }),
-			anilistId,
+			...sourceInput,
 			title: providerPayloadTitle,
 			form: currentDraft,
 			...(fallbackLookupTitle === undefined

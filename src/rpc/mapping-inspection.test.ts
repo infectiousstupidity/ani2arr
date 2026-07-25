@@ -157,9 +157,16 @@ describe("getMappingInspection", () => {
 		expect(getUniqueAniListIdForSource).not.toHaveBeenCalled();
 	});
 
-	it("returns unmapped for a MAL source without a crosswalk", async () => {
+	it("inspects a source-native MAL mapping without a crosswalk", async () => {
 		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(null);
-		const getMapping = vi.fn();
+		const getMapping = vi.fn(
+			async () =>
+				({
+					kind: "mapped",
+					source: "manual",
+					providerId: 424_536,
+				}) as const,
+		);
 		const metadataSpy = vi.fn();
 		const source = { source: "mal", id: mal(5114) } as const;
 
@@ -169,18 +176,22 @@ describe("getMappingInspection", () => {
 				{
 					mappingService: {
 						getMapping,
-						getLinkedAniListIds: vi.fn(),
+						getLinkedAniListIds: vi.fn(async () => []),
 					},
 					anilistMetadataStore: { getMetadata: metadataSpy },
 				},
 			),
 		).resolves.toEqual({
 			source,
-			mapping: { kind: "unmapped", hadResolveAttempt: false },
+			mapping: {
+				kind: "mapped",
+				source: "manual",
+				providerId: 424_536,
+			},
 			linkedAniListEntries: [],
 		});
 
-		expect(getMapping).not.toHaveBeenCalled();
+		expect(getMapping).toHaveBeenCalledWith("sonarr", source);
 		expect(metadataSpy).not.toHaveBeenCalled();
 	});
 });

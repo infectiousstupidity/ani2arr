@@ -127,9 +127,8 @@ export type ValidateTmdbInput = {
 };
 
 export type GetMappingIdentitiesInput = AniListId[];
-/** Seerr target/request APIs are AniList-only until source-only Seerr UI exists. */
 export type GetSeerrTargetsInput = AniListId[];
-export type GetSeerrTargetInput = AniListId;
+export type GetSeerrTargetInput = SourceRpcInput;
 
 export type GetMappingInspectionInput = {
 	provider: Provider;
@@ -158,12 +157,10 @@ export type SeerrConnectionCheckOutput = {
 
 export type RequestInSeerrInput =
 	| {
-			anilistId: AniListId;
 			mediaType: "movie";
 			tmdbId: TmdbId;
 	  }
 	| {
-			anilistId: AniListId;
 			mediaType: "tv";
 			tmdbId: TmdbId;
 			tvdbId?: TvdbId;
@@ -186,7 +183,7 @@ export type GetSeerrMediaStatusOutput = {
 };
 
 export type SeerrRequestTarget = {
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
 	source: SeerrTargetSource;
 } & (
 	| {
@@ -203,9 +200,8 @@ export type SeerrRequestTarget = {
 	  }
 );
 
-export type SetManualSeerrTargetInput = {
-	anilistId: AniListId;
-} & (
+export type SetManualSeerrTargetInput = SourceRpcInput &
+	(
 	| {
 			mediaType: "movie";
 			tmdbId: TmdbId;
@@ -216,9 +212,9 @@ export type SetManualSeerrTargetInput = {
 			tvdbId?: TvdbId;
 			seasons: number[];
 	  }
-);
+	  );
 
-export type ClearManualSeerrTargetInput = AniListId;
+export type ClearManualSeerrTargetInput = SourceRpcInput;
 
 export type SearchSeerrMediaInput = {
 	query: string;

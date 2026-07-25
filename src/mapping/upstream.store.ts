@@ -44,10 +44,18 @@ export type SourceUpstreamMapping = {
 	targets: UpstreamTarget[];
 };
 
-export type SeerrUpstreamRecord = {
-	anilistId: AniListId;
-	target: SeerrUpstreamTarget;
-};
+type SeerrTargetProjection =
+	| { kind: "missing" }
+	| { kind: "target"; target: SeerrUpstreamTarget }
+	| { kind: "conflict" };
+
+export type SeerrUpstreamRecord =
+	| { anilistId: AniListId; kind: "target"; target: SeerrUpstreamTarget }
+	| { anilistId: AniListId; kind: "conflict" };
+
+export type SourceSeerrUpstreamMapping = {
+	anilistId: AniListId | null;
+} & SeerrTargetProjection;
 
 const upstreamMappings = storage.defineItem<UpstreamSnapshot | null>(
 	"local:mapping:upstream",
@@ -107,6 +115,32 @@ export async function getUniqueAniListIdForSource(
 	return getAniListIdForSource(snapshot, source);
 }
 
+export async function getSourceSeerrUpstreamMapping(
+	source: SourceIdentity,
+): Promise<SourceSeerrUpstreamMapping> {
+	const snapshot = await getSnapshot();
+	const anilistId = getAniListIdForSource(snapshot, source);
+	const directProjection = projectSeerrTarget(
+		snapshot?.entries?.[sourceIdentityKey(source)] ?? [],
+	);
+	if (
+		directProjection.kind !== "missing" ||
+		source.source === "anilist" ||
+		anilistId === null
+	) {
+		return { anilistId, ...directProjection };
+	}
+
+	return {
+		anilistId,
+		...projectSeerrTarget(
+			snapshot?.entries?.[
+				sourceIdentityKey({ source: "anilist", id: anilistId })
+			] ?? [],
+		),
+	};
+}
+
 export async function getUniqueAniListIdsForSources(
 	sources: readonly SourceIdentity[],
 ): Promise<Record<string, AniListId | null>> {
@@ -157,12 +191,14 @@ export async function listSeerrUpstreamTargets(
 	const records: SeerrUpstreamRecord[] = [];
 
 	for (const anilistId of requestedIds) {
-		const target = projectSeerrTarget(
+		const projection = projectSeerrTarget(
 			snapshot?.entries?.[
 				sourceIdentityKey({ source: "anilist", id: anilistId })
 			] ?? [],
 		);
-		if (target !== null) records.push({ anilistId, target });
+		if (projection.kind !== "missing") {
+			records.push({ anilistId, ...projection });
+		}
 	}
 
 	return records.toSorted((left, right) => left.anilistId - right.anilistId);
@@ -178,8 +214,10 @@ export async function listAllSeerrUpstreamTargets(): Promise<
 		const source = parseSourceIdentityKey(sourceKey);
 		if (source?.source !== "anilist") continue;
 
-		const target = projectSeerrTarget(entries);
-		if (target !== null) records.push({ anilistId: source.id, target });
+		const projection = projectSeerrTarget(entries);
+		if (projection.kind !== "missing") {
+			records.push({ anilistId: source.id, ...projection });
+		}
 	}
 
 	return records.toSorted((left, right) => left.anilistId - right.anilistId);
@@ -339,7 +377,9 @@ function normalizeSeasons(seasons: readonly number[]): number[] {
 
 function projectSeerrTarget(
 	targets: readonly AniBridgeTarget[],
-): SeerrUpstreamTarget | null {
+): SeerrTargetProjection {
+	if (targets.length === 0) return { kind: "missing" };
+
 	const movieTmdbIds = new Set(
 		targets.flatMap((target) => {
 			if (target.kind !== "tmdb-movie") return [];
@@ -357,16 +397,20 @@ function projectSeerrTarget(
 	});
 
 	if (movieTmdbIds.size > 0) {
-		if (movieTmdbIds.size !== 1 || tmdbTargets.length > 0) return null;
+		if (movieTmdbIds.size !== 1 || tmdbTargets.length > 0) {
+			return { kind: "conflict" };
+		}
 		const tmdbId = [...movieTmdbIds][0];
-		return tmdbId === undefined ? null : { mediaType: "movie", tmdbId };
+		return tmdbId === undefined
+			? { kind: "conflict" }
+			: { kind: "target", target: { mediaType: "movie", tmdbId } };
 	}
 
 	const tmdbIds = new Set(tmdbTargets.map((target) => target.tmdbId));
-	if (tmdbIds.size !== 1) return null;
+	if (tmdbIds.size !== 1) return { kind: "conflict" };
 
 	const tmdbId = tmdbTargets[0]?.tmdbId;
-	if (tmdbId === undefined) return null;
+	if (tmdbId === undefined) return { kind: "conflict" };
 
 	const tmdbSeasons = normalizeSeasons(
 		tmdbTargets.flatMap((target) =>
@@ -390,14 +434,17 @@ function projectSeerrTarget(
 						.map((target) => target.season),
 				);
 	const seasons = normalizeSeasons([...tmdbSeasons, ...tvdbSeasons]);
-	if (seasons.length === 0) return null;
+	if (seasons.length === 0) return { kind: "conflict" };
 
 	return {
-		mediaType: "tv",
-		tmdbId,
-		seasons,
-		...(tmdbSeasons.length === 0 ? {} : { tmdbSeasons }),
-		...(tvdbSeasons.length === 0 ? {} : { tvdbSeasons }),
-		...(tvdbId === undefined ? {} : { tvdbId }),
+		kind: "target",
+		target: {
+			mediaType: "tv",
+			tmdbId,
+			seasons,
+			...(tmdbSeasons.length === 0 ? {} : { tmdbSeasons }),
+			...(tvdbSeasons.length === 0 ? {} : { tvdbSeasons }),
+			...(tvdbId === undefined ? {} : { tvdbId }),
+		},
 	};
 }

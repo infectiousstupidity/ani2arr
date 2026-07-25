@@ -2,8 +2,8 @@
 // src/features/media-modal/sonarr/sonarr-modal.tsx
 
 import { useMemo, useState } from "react";
-import type { AniListId, AniListMediaHint } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/source-identity";
+import type { AniListMediaHint } from "@/anilist/types";
+import { sourceIdentityKey } from "@/mapping/source-identity";
 import { parseTvdbIdOrNull } from "@/providers/schemas";
 import type { ProviderFormResources } from "@/providers/types";
 import type { TvdbId } from "@/providers/schemas";
@@ -14,7 +14,8 @@ import {
 } from "@/queries/mapping";
 import { useSeriesStatus, useSonarrFormResources } from "@/queries/sonarr";
 import { createDefaultSonarrFormState as defaultSonarrFormState } from "@/providers/sonarr/form-state";
-import type { GetSeriesStatusOutput } from "@/rpc/types";
+import { sourceFromInput } from "@/rpc/source-input";
+import type { GetSeriesStatusOutput, SourceRpcInput } from "@/rpc/types";
 import { DetailsPanel } from "../details/details-panel";
 import {
 	SonarrMappingPanel,
@@ -172,21 +173,24 @@ function getCurrentTarget(input: {
 	};
 }
 
-function useSonarrModalData(input: {
-	anilistId: AniListId;
-	source?: SourceIdentity | undefined;
+function useSonarrModalData(input: SourceRpcInput & {
 	metadataHint: MediaModalMetadataHint | null;
 }): SonarrModalData {
 	const { anilistId, source, metadataHint } = input;
-	const base = useMediaModalBaseData({ anilistId, metadataHint });
+	const sourceInput = mappingInspectionInput(anilistId, source);
+	const sourceIdentity = sourceFromInput(sourceInput);
+	const base = useMediaModalBaseData({
+		anilistId,
+		fallbackLabel: `${sourceIdentity.source === "mal" ? "MAL" : "AniList"} #${sourceIdentity.id}`,
+		metadataHint,
+	});
 	const options = base.options;
 	const isConfigured = options?.providers.sonarr.isConfigured === true;
 	const sonarrFormResources = useSonarrFormResources({ enabled: isConfigured });
 
 	const statusPayload = useMemo(
 		() => ({
-			...(source === undefined ? {} : { source }),
-			anilistId,
+			...mappingInspectionInput(anilistId, source),
 			...(base.statusTitle === undefined ? {} : { title: base.statusTitle }),
 			metadata: base.statusMetadata,
 		}),
@@ -233,13 +237,15 @@ export function SonarrModal({
 	container,
 }: SonarrModalProps): React.JSX.Element {
 	const { anilistId, source, metadataHint, openSource, initialView } = state;
+	const sourceInput = mappingInspectionInput(anilistId, source);
+	const sourceIdentity = sourceFromInput(sourceInput);
+	const identityKey = sourceIdentityKey(sourceIdentity);
 	const [view, setView] = useState<MediaModalView>(initialView ?? "setup");
 	const [selectedCandidate, setSelectedCandidate] =
 		useState<SonarrMappingCandidate | null>(null);
 	const contentContainer = useContentPortalContainer();
 	const data = useSonarrModalData({
-		anilistId,
-		source,
+		...sourceInput,
 		metadataHint: metadataHint ?? null,
 	});
 	const inspection = useMappingInspection(
@@ -249,13 +255,13 @@ export function SonarrModal({
 	const setupTarget = useMemo(
 		() =>
 			getSonarrSetupTarget({
-				anilistId,
+				identityKey,
 				status: data.rawProviderStatus,
 				targetTitle: data.providerRequestTitle,
 				storedDefaults: data.storedDefaults,
 			}),
 		[
-			anilistId,
+			identityKey,
 			data.providerRequestTitle,
 			data.rawProviderStatus,
 			data.storedDefaults,
@@ -279,8 +285,7 @@ export function SonarrModal({
 	});
 	const setupForm = useSonarrSetupForm({
 		formId: SETUP_FORM_ID,
-		anilistId,
-		source,
+		sourceInput,
 		target: setupTarget,
 		providerPayloadTitle: data.providerPayloadTitle,
 		fallbackLookupTitle: data.fallbackLookupTitle,
@@ -320,8 +325,7 @@ export function SonarrModal({
 		setView("setup");
 	};
 	const mappingActions = useMappingActions({
-		anilistId,
-		source,
+		sourceInput,
 		provider: PROVIDER,
 		selectedProviderId: selectedCandidate?.tvdbId ?? null,
 		rejectProviderId: rejectCandidateTvdbId,
@@ -347,7 +351,7 @@ export function SonarrModal({
 					provider={PROVIDER}
 					contentContainer={contentContainer}
 					anilistHeaderData={data.anilistHeaderData}
-					anilistId={anilistId}
+					source={sourceIdentity}
 					isMappingView={isMappingView}
 					isProviderTargetLoading={setupTargetLoading}
 					currentTarget={data.currentTarget}

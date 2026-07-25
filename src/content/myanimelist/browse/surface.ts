@@ -12,16 +12,31 @@ function isBrowsePath(pathname: string, browsePath: string): boolean {
 	return pathname === browsePath || pathname.startsWith(`${browsePath}/`);
 }
 
-export function isBrowseSurface(url: string): boolean {
+function parseMyAnimeListUrl(url: string): URL | null {
 	try {
 		const parsed = new URL(url);
-		if (parsed.hostname !== "myanimelist.net") return false;
-		if (parsed.pathname === "/anime.php") {
-			return !parsed.searchParams.has("id");
-		}
-		if (parsed.pathname === "/search/all") return true;
-		return MAL_BROWSE_PATHS.some((path) => isBrowsePath(parsed.pathname, path));
+		return parsed.hostname === "myanimelist.net" ? parsed : null;
 	} catch {
-		return false;
+		return null;
 	}
+}
+
+export function isEarlyBrowseSurface(url: string): boolean {
+	const parsed = parseMyAnimeListUrl(url);
+	if (!parsed) return false;
+
+	return (
+		isBrowsePath(parsed.pathname, "/anime/season") ||
+		parsed.pathname === "/topanime.php"
+	);
+}
+
+export function isBrowseSurface(url: string): boolean {
+	const parsed = parseMyAnimeListUrl(url);
+	if (!parsed) return false;
+	if (parsed.pathname === "/anime.php") {
+		return !parsed.searchParams.has("id");
+	}
+	if (parsed.pathname === "/search/all") return true;
+	return MAL_BROWSE_PATHS.some((path) => isBrowsePath(parsed.pathname, path));
 }

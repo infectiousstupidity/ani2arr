@@ -2,8 +2,6 @@
 // src/features/media-modal/hooks/use-mapping-actions.ts
 
 import { useState } from "react";
-import type { AniListId } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/source-identity";
 import {
 	parseTmdbIdOrNull,
 	parseTvdbIdOrNull,
@@ -13,6 +11,7 @@ import type {
 	TmdbId,
 	TvdbId,
 } from "@/providers/schemas";
+import type { SourceRpcInput } from "@/rpc/types";
 import {
 	getProviderExternalIdLabel,
 	getProviderLabel,
@@ -28,8 +27,7 @@ import { normalizeError } from "@/shared/errors/error-utils";
 import { useConfirm } from "@/shared/hooks/use-confirm";
 
 type UseMappingActionsInput = {
-	anilistId: AniListId;
-	source?: SourceIdentity | undefined;
+	sourceInput: SourceRpcInput;
 	provider: Provider;
 	selectedProviderId: ProviderExternalId | null;
 	rejectProviderId: ProviderExternalId | null;
@@ -60,8 +58,7 @@ function createProviderMappingTarget(
 }
 
 export function useMappingActions({
-	anilistId,
-	source,
+	sourceInput,
 	provider,
 	selectedProviderId,
 	rejectProviderId,
@@ -84,9 +81,6 @@ export function useMappingActions({
 		provider,
 		clearRejectedProviderId,
 	);
-	const sourceInput =
-		source === undefined ? { anilistId } : { anilistId, source };
-
 	const applyMapping = async (): Promise<void> => {
 		if (selectedTarget === null) return;
 		setActionError(null);

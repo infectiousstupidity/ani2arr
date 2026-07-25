@@ -103,7 +103,10 @@ describe("BrowseCardOverlay", () => {
 			props: {
 				anilistId: undefined,
 				source: parsed.source,
-				extraAction: null,
+				extraAction: {
+					type: SeerrCardStackActions,
+					props: { source: parsed.source },
+				},
 			},
 		});
 	});

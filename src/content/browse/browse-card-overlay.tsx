@@ -202,21 +202,13 @@ function openSeerrModal(input: {
 	source: SourceIdentity;
 	metadataHint: MediaModalMetadataHint;
 }): void {
-	if (input.anilistId === undefined) return;
 	input.onOpenMediaModal({
-		anilistId: input.anilistId,
+		...(input.anilistId === undefined ? {} : { anilistId: input.anilistId }),
 		source: input.source,
 		kind: "seerr",
 		openSource: "content",
 		metadataHint: input.metadataHint,
 	});
-}
-
-function isSeerrAvailable(
-	enabled: boolean,
-	anilistId: AniListId | undefined,
-): boolean {
-	return enabled && anilistId !== undefined;
 }
 
 export function BrowseCardOverlay({
@@ -244,7 +236,7 @@ export function BrowseCardOverlay({
 		sonarrOpts.enabled,
 		radarrOpts.enabled,
 	);
-	const seerrEnabled = isSeerrAvailable(seerrOpts.enabled, anilistId);
+	const seerrEnabled = seerrOpts.enabled;
 
 	if (activeArr === "none" && !seerrEnabled) return null;
 
@@ -307,9 +299,10 @@ export function BrowseCardOverlay({
 	const stackDirection = adapter.stackDirection ?? "up";
 
 	const seerrStackActions: ReactNode =
-		seerrEnabled && anilistId !== undefined ? (
+		seerrEnabled ? (
 			<SeerrCardStackActions
-				anilistId={anilistId}
+				source={parsed.source}
+				{...(anilistId === undefined ? {} : { anilistId })}
 				isConfigured={seerrOpts.isConfigured}
 				observeTarget={parsed.mountTarget}
 				tooltipContainer={tooltipContainer}
@@ -338,10 +331,11 @@ export function BrowseCardOverlay({
 		presentation: parsed.presentation,
 	};
 
-	if (showSeerrMain && anilistId !== undefined) {
+	if (showSeerrMain) {
 		return (
 			<SeerrStandaloneCardOverlay
-				anilistId={anilistId}
+				source={parsed.source}
+				{...(anilistId === undefined ? {} : { anilistId })}
 				isConfigured={seerrOpts.isConfigured}
 				observeTarget={parsed.mountTarget}
 				badgeVisibility={seerrOpts.visibility}

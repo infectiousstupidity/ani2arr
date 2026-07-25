@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { SeerrMediaDetails, SeerrSearchResult } from "@/providers/seerr/types";
 import { useSeerrMediaDetails, useSeerrTarget } from "@/queries/seerr";
 import type { SeerrRequestTarget } from "@/rpc/types";
+import { getDirectAniListId, sourceFromInput } from "@/rpc/source-input";
 import type { MappingConnectorState } from "../chrome/mapping-connector";
 import { useContentPortalContainer } from "../hooks/use-content-portal-container";
 import { useMediaModalBaseData } from "../hooks/use-media-modal-base-data";
@@ -37,17 +38,24 @@ export function SeerrModal({
 	onClose,
 	container,
 }: SeerrModalProps): React.JSX.Element {
-	const { anilistId, metadataHint } = state;
+	const { metadataHint } = state;
+	const source = sourceFromInput(state);
+	const anilistId = getDirectAniListId(state) ?? undefined;
+	const targetInput = {
+		source,
+		...(anilistId === undefined ? {} : { anilistId }),
+	};
 	const [view, setView] = useState<SeerrView>("request");
 	const [selectedResult, setSelectedResult] =
 		useState<SeerrSearchResult | null>(null);
 	const contentContainer = useContentPortalContainer();
 	const base = useMediaModalBaseData({
-		anilistId,
+		...(anilistId === undefined ? {} : { anilistId }),
+		fallbackLabel: `${source.source === "mal" ? "MAL" : "AniList"} #${source.id}`,
 		metadataHint: metadataHint ?? null,
 	});
 	const isConfigured = base.options?.seerr.isConfigured === true;
-	const targetQuery = useSeerrTarget(anilistId, { enabled: isConfigured });
+	const targetQuery = useSeerrTarget(targetInput, { enabled: isConfigured });
 	const target = targetQuery.data ?? null;
 	const detailsQuery = useSeerrMediaDetails({
 		input: target ? { mediaType: target.mediaType, tmdbId: target.tmdbId } : null,
@@ -57,7 +65,7 @@ export function SeerrModal({
 	const targetTitle = getTargetTitle({ target, details });
 	const header = (
 		<SeerrHeader
-			anilistId={anilistId}
+			source={source}
 			data={base.anilistHeaderData}
 			target={target}
 			details={details}
@@ -72,7 +80,8 @@ export function SeerrModal({
 	if (view === "change-target") {
 		return (
 			<SeerrChangeTargetView
-				anilistId={anilistId}
+				targetInput={targetInput}
+				{...(anilistId === undefined ? {} : { anilistId })}
 				container={container}
 				contentContainer={contentContainer}
 				defaultQuery={base.providerRequestTitle}
@@ -90,7 +99,8 @@ export function SeerrModal({
 
 	return (
 		<SeerrRequestView
-			anilistId={anilistId}
+			targetInput={targetInput}
+			{...(anilistId === undefined ? {} : { anilistId })}
 			authMode={base.options?.seerr.authMode ?? null}
 			container={container}
 			contentContainer={contentContainer}

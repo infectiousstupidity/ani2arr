@@ -4,6 +4,7 @@
 import {
 	parseAniListMediaFormatLabel,
 	type AniListMediaFormat,
+	type AniListMediaHint,
 } from "@/anilist/types";
 
 export const TITLE_SELECTOR = "h1.title-name";
@@ -62,9 +63,9 @@ export function waitForElement(
 	});
 }
 
-export function readTitleFromPage(doc: Document = document): string | null {
-	const title = doc.querySelector<HTMLElement>(TITLE_SELECTOR)?.textContent?.trim();
-	return title ? title.replaceAll(/\s+/g, " ") : null;
+function readText(element: Element | null): string | null {
+	const value = element?.textContent?.replaceAll(/\s+/g, " ").trim();
+	return value || null;
 }
 
 export function readLabeledFacts(doc: Document = document): Map<string, string> {
@@ -86,8 +87,41 @@ export function readLabeledFacts(doc: Document = document): Map<string, string> 
 	return facts;
 }
 
-export function readFormatFromPage(doc: Document = document): AniListMediaFormat | null {
-	return parseAniListMediaFormatLabel(readLabeledFacts(doc).get("type"));
+export function readAnimePageData(doc: Document = document): {
+	title: string | null;
+	format: AniListMediaFormat | null;
+	metadata: AniListMediaHint;
+} {
+	const facts = readLabeledFacts(doc);
+	const title =
+		readText(doc.querySelector(`${TITLE_SELECTOR} > strong`)) ??
+		readText(doc.querySelector(TITLE_SELECTOR));
+	const english =
+		readText(doc.querySelector("p.title-english")) ?? facts.get("english");
+	const native = facts.get("japanese");
+	const synonyms = [
+		...new Set(
+			(facts.get("synonyms") ?? "")
+				.split(",")
+				.map((synonym) => synonym.trim())
+				.filter(Boolean),
+		),
+	];
+	const format = parseAniListMediaFormatLabel(facts.get("type"));
+
+	return {
+		title,
+		format,
+		metadata: {
+			titles: {
+				...(title === null ? {} : { romaji: title }),
+				...(english === undefined || english === null ? {} : { english }),
+				...(native === undefined ? {} : { native }),
+			},
+			synonyms,
+			format,
+		},
+	};
 }
 
 export function ensureActionsAnchor(doc: Document = document): HTMLElement | null {

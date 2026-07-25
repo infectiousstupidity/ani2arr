@@ -3,8 +3,9 @@
 
 import { Settings, X } from "lucide-react";
 import type { MouseEvent, MouseEventHandler } from "react";
-import type { AniListId } from "@/anilist/types";
 import { buildAniListAnimeUrl } from "@/anilist/title";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import { buildMyAnimeListAnimeUrl } from "@/myanimelist/url";
 import type { Provider } from "@/providers/types";
 import {
 	getProviderExternalIdLabel,
@@ -30,7 +31,7 @@ export type ModalHeaderProps = {
 	provider: Provider;
 	contentContainer: HTMLDivElement | null;
 	anilistHeaderData: AniListHeaderData;
-	anilistId: AniListId;
+	source: SourceIdentity;
 	isMappingView: boolean;
 	isProviderTargetLoading?: boolean | undefined;
 	currentTarget: MediaModalTargetSummary | null;
@@ -82,18 +83,22 @@ function joinMetaLine(parts: Array<string | null | undefined>): string | null {
 
 function SourceCard(props: {
 	anilistHeaderData: AniListHeaderData;
-	anilistId: AniListId;
+	source: SourceIdentity;
 }): React.JSX.Element {
 	const {
 		anilistHeaderData: { title, coverImage, format, year },
-		anilistId,
+		source,
 	} = props;
 
 	const anilistMetaLine = joinMetaLine([
 		format ? formatToken(format) : null,
 		year ? String(year) : null,
 	]);
-	const anilistLink = buildAniListAnimeUrl(anilistId);
+	const sourceLabel = source.source === "anilist" ? "AniList" : "MAL";
+	const sourceLink =
+		source.source === "anilist"
+			? buildAniListAnimeUrl(source.id)
+			: buildMyAnimeListAnimeUrl(source.id);
 
 	return (
 		<div className={HEADER_CARD_CLASS}>
@@ -113,11 +118,11 @@ function SourceCard(props: {
 
 					<div className="mt-0.5 flex min-w-0">
 						<MappingOpenLink
-							href={anilistLink}
-							ariaLabel="Open in AniList"
+							href={sourceLink}
+							ariaLabel={`Open in ${sourceLabel}`}
 							side="left"
 						>
-							{`AniList ID: ${anilistId}`}
+							{`${sourceLabel} ID: ${source.id}`}
 						</MappingOpenLink>
 					</div>
 				</div>
@@ -307,7 +312,7 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 		provider,
 		contentContainer,
 		anilistHeaderData,
-		anilistId,
+		source,
 		isMappingView,
 		isProviderTargetLoading = false,
 		currentTarget,
@@ -391,7 +396,7 @@ export function ModalHeader(props: ModalHeaderProps): React.JSX.Element {
 					<div className="a2a-modal-header-item min-w-0">
 						<SourceCard
 							anilistHeaderData={anilistHeaderData}
-							anilistId={anilistId}
+							source={source}
 						/>
 					</div>
 					<div className="a2a-modal-header-item a2a-delay-50 min-w-0">

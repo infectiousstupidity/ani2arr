@@ -11,6 +11,7 @@ import { MAX_ANIBRIDGE_BYTES } from "@/mapping/upstream/anibridge.client";
 import {
 	clearUpstreamMappings,
 	getSourceAliasesByAniListId,
+	getSourceSeerrUpstreamMapping,
 	getSourceUpstreamMapping,
 	getUniqueAniListIdForSource,
 	getUniqueAniListIdsForSources,
@@ -264,7 +265,11 @@ describe("refreshUpstreamMappings", () => {
 			targets: [{ provider: "radarr", providerId: tmdb(300) }],
 		});
 		await expect(listSeerrUpstreamTargets([aid(1)])).resolves.toEqual([
-			{ anilistId: aid(1), target: { mediaType: "movie", tmdbId: tmdb(300) } },
+			{
+				anilistId: aid(1),
+				kind: "target",
+				target: { mediaType: "movie", tmdbId: tmdb(300) },
+			},
 		]);
 	});
 
@@ -346,6 +351,7 @@ describe("refreshUpstreamMappings", () => {
 		await expect(listSeerrUpstreamTargets([aid(20)])).resolves.toEqual([
 			{
 				anilistId: aid(20),
+				kind: "target",
 				target: {
 					mediaType: "tv" as const,
 					tmdbId: tmdb(500),
@@ -359,7 +365,7 @@ describe("refreshUpstreamMappings", () => {
 		await expect(listAllSeerrUpstreamTargets()).resolves.toHaveLength(1);
 	});
 
-	it("accepts one unique movie ID and rejects movie ambiguity", async () => {
+	it("accepts one unique movie ID and reports movie conflicts", async () => {
 		await browser.storage.local.set({
 			[UPSTREAM_STORAGE_KEY]: {
 				entries: {
@@ -386,8 +392,11 @@ describe("refreshUpstreamMappings", () => {
 		).resolves.toEqual([
 			{
 				anilistId: aid(1),
+				kind: "target",
 				target: { mediaType: "movie", tmdbId: tmdb(300) },
 			},
+			{ anilistId: aid(2), kind: "conflict" },
+			{ anilistId: aid(3), kind: "conflict" },
 		]);
 	});
 
@@ -408,6 +417,7 @@ describe("refreshUpstreamMappings", () => {
 		await expect(listSeerrUpstreamTargets([aid(1)])).resolves.toEqual([
 			{
 				anilistId: aid(1),
+				kind: "target",
 				target: {
 					mediaType: "tv",
 					tmdbId: tmdb(500),
@@ -464,6 +474,47 @@ describe("refreshUpstreamMappings", () => {
 		);
 	});
 
+	it("falls back to AniList Seerr facts only when direct MAL facts are missing", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				entries: {
+					"anilist:21": [{ kind: "tmdb-movie", id: tmdb(400) }],
+				},
+				aniListCrosswalks: { [sourceIdentityKey(source)]: aid(21) },
+				fetchedAt: Date.now(),
+			},
+		});
+
+		await expect(getSourceSeerrUpstreamMapping(source)).resolves.toEqual({
+			anilistId: aid(21),
+			kind: "target",
+			target: { mediaType: "movie", tmdbId: tmdb(400) },
+		});
+	});
+
+	it("does not replace conflicting direct MAL facts with an AniList target", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+		await browser.storage.local.set({
+			[UPSTREAM_STORAGE_KEY]: {
+				entries: {
+					"anilist:21": [{ kind: "tmdb-movie", id: tmdb(400) }],
+					"mal:5114": [
+						{ kind: "tmdb-movie", id: tmdb(100) },
+						{ kind: "tmdb-movie", id: tmdb(200) },
+					],
+				},
+				aniListCrosswalks: { [sourceIdentityKey(source)]: aid(21) },
+				fetchedAt: Date.now(),
+			},
+		});
+
+		await expect(getSourceSeerrUpstreamMapping(source)).resolves.toEqual({
+			anilistId: aid(21),
+			kind: "conflict",
+		});
+	});
+
 	it("returns a direct MAL target without an AniList alias", async () => {
 		const source = { source: "mal", id: mal(59_571) } as const;
 		await browser.storage.local.set({
@@ -479,6 +530,11 @@ describe("refreshUpstreamMappings", () => {
 		await expect(getSourceUpstreamMapping("radarr", source)).resolves.toEqual({
 			anilistId: null,
 			targets: [{ provider: "radarr", providerId: tmdb(1_333_100) }],
+		});
+		await expect(getSourceSeerrUpstreamMapping(source)).resolves.toEqual({
+			anilistId: null,
+			kind: "target",
+			target: { mediaType: "movie", tmdbId: tmdb(1_333_100) },
 		});
 		await expect(listAniListUpstreamMappings()).resolves.toEqual([]);
 	});

@@ -2,8 +2,9 @@
 // src/features/media-modal/seerr/seerr-header.tsx
 
 import { X } from "lucide-react";
-import type { AniListId } from "@/anilist/types";
 import { buildAniListAnimeUrl } from "@/anilist/title";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import { buildMyAnimeListAnimeUrl } from "@/myanimelist/url";
 import type { SeerrMediaDetails } from "@/providers/seerr/types";
 import type { SeerrRequestTarget } from "@/rpc/types";
 import Button from "@/shared/ui/primitives/button";
@@ -74,7 +75,7 @@ function getTargetIdLinks(
 }
 
 export function SeerrHeader(props: {
-	anilistId: AniListId;
+	source: SourceIdentity;
 	data: AniListHeaderData;
 	target: SeerrRequestTarget | null;
 	details: SeerrMediaDetails | null;
@@ -85,7 +86,7 @@ export function SeerrHeader(props: {
 	contentContainer: HTMLDivElement | null;
 }): React.JSX.Element {
 	const {
-		anilistId,
+		source,
 		data,
 		target,
 		details,
@@ -95,7 +96,11 @@ export function SeerrHeader(props: {
 		onClose,
 		contentContainer,
 	} = props;
-	const anilistUrl = buildAniListAnimeUrl(anilistId);
+	const sourceUrl =
+		source.source === "anilist"
+			? buildAniListAnimeUrl(source.id)
+			: buildMyAnimeListAnimeUrl(source.id);
+	const sourceLabel = source.source === "anilist" ? "AniList" : "MAL";
 	const anilistMetaLine = joinMetaLine([
 		data.format ? formatToken(data.format) : null,
 		data.year ? String(data.year) : null,
@@ -156,11 +161,11 @@ export function SeerrHeader(props: {
 
 									<div className="mt-0.5 flex min-w-0">
 										<MappingOpenLink
-											href={anilistUrl}
-											ariaLabel="Open in AniList"
+											href={sourceUrl}
+											ariaLabel={`Open in ${sourceLabel}`}
 											side="left"
 										>
-											{`AniList ID: ${anilistId}`}
+											{`${sourceLabel} ID: ${source.id}`}
 										</MappingOpenLink>
 									</div>
 								</div>

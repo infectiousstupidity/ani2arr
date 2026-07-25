@@ -60,10 +60,7 @@ export async function getMappingInspection(
 ): Promise<GetMappingInspectionOutput> {
 	const source = sourceFromInput(input);
 	const currentAniListId = await resolveAniListIdFromInput(input);
-	const mapping =
-		currentAniListId === null
-			? ({ kind: "unmapped", hadResolveAttempt: false } as const)
-			: await deps.mappingService.getMapping(input.provider, source);
+	const mapping = await deps.mappingService.getMapping(input.provider, source);
 
 	const linkedAniListIds =
 		mapping.kind === "mapped"

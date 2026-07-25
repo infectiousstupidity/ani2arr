@@ -121,8 +121,8 @@ export const queryKeys = {
 	seerrConnection: (scope = configuredScope) =>
 		[...rootQueryKey, "seerr", "connection", scope] as const,
 	seerrTargetsRoot: seerrTargetsRootKey,
-	seerrTarget: (anilistId: AniListId) =>
-		[...seerrTargetsRootKey(), "single", anilistId] as const,
+	seerrTarget: (input: SourceKeyInput) =>
+		[...seerrTargetsRootKey(), "single", sourceKeyFromInput(input)] as const,
 	seerrTargets: (ids: readonly AniListId[]) =>
 		[
 			...seerrTargetsRootKey(),

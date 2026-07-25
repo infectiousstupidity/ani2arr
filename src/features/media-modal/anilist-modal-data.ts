@@ -252,22 +252,29 @@ function buildAniListHeaderData(input: {
 }
 
 function getFallbackTitle(input: {
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
+	fallbackLabel?: string | undefined;
 	metadataHint: MediaModalMetadataHint | null;
 	titles: MediaModalTitles;
 }): string {
+	const fallbackLabel =
+		input.fallbackLabel ??
+		(input.anilistId === undefined
+			? "Unknown media"
+			: `AniList #${input.anilistId}`);
 	return (
 		pickString(
 			input.titles.english,
 			input.titles.romaji,
 			input.titles.native,
 			input.metadataHint?.title,
-		) ?? `AniList #${input.anilistId}`
+		) ?? fallbackLabel
 	);
 }
 
 export function resolveMediaModalMetadata(input: {
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
+	fallbackLabel?: string | undefined;
 	anilistMedia: AniListMedia | null | undefined;
 	metadataBatchData: GetAniListMetadataOutput | undefined;
 	metadataHint: MediaModalMetadataHint | null;
@@ -275,6 +282,7 @@ export function resolveMediaModalMetadata(input: {
 }): ResolvedMediaModalMetadata {
 	const {
 		anilistId,
+		fallbackLabel,
 		anilistMedia,
 		metadataBatchData,
 		metadataHint,
@@ -293,17 +301,23 @@ export function resolveMediaModalMetadata(input: {
 		}) ??
 		metadataHint?.format ??
 		null;
-	const fallbackTitle = getFallbackTitle({ anilistId, metadataHint, titles });
+	const fallbackTitle = getFallbackTitle({
+		...(anilistId === undefined ? {} : { anilistId }),
+		...(fallbackLabel === undefined ? {} : { fallbackLabel }),
+		metadataHint,
+		titles,
+	});
 	const resolvedTitle = resolveTitlePreference({
 		titles,
 		preferred: preferredTitleLanguage,
 		fallback: fallbackTitle,
 	});
 	const providerRequestTitle = resolvedTitle.primary;
+	const defaultFallbackLabel =
+		fallbackLabel ??
+		(anilistId === undefined ? "Unknown media" : `AniList #${anilistId}`);
 	const providerPayloadTitle =
-		fallbackTitle === `AniList #${anilistId}`
-			? undefined
-			: providerRequestTitle;
+		fallbackTitle === defaultFallbackLabel ? undefined : providerRequestTitle;
 	const statusTitle = pickString(metadataHint?.title);
 
 	return {

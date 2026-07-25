@@ -13,7 +13,6 @@ export function toSeerrRequestInput(
 
 	if (target.mediaType === "movie") {
 		return {
-			anilistId: target.anilistId,
 			mediaType: "movie",
 			tmdbId: target.tmdbId,
 		};
@@ -23,7 +22,6 @@ export function toSeerrRequestInput(
 	if (seasons.length === 0) return null;
 
 	return {
-		anilistId: target.anilistId,
 		mediaType: "tv",
 		tmdbId: target.tmdbId,
 		...(target.tvdbId === undefined ? {} : { tvdbId: target.tvdbId }),

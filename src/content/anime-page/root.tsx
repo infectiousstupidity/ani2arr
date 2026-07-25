@@ -34,7 +34,7 @@ import type { SonarrFormState } from "@/providers/sonarr/form-state";
 import { useAniListMetadataBatch } from "@/queries/anilist";
 import { useMappingIdentities, useSourceAniListIdMap } from "@/queries/mapping";
 import { usePublicOptions } from "@/queries/options";
-import { useSeerrTargets } from "@/queries/seerr";
+import { useSeerrTarget } from "@/queries/seerr";
 import { useA2aBroadcasts } from "@/queries/use-a2a-broadcasts";
 import type { PublicOptions } from "@/settings/types";
 import { ConfirmProvider } from "@/shared/ui/feedback/confirm-provider";
@@ -46,6 +46,7 @@ export interface AnimePageTarget {
 	anilistId?: AniListId | undefined;
 	format: AniListMediaFormat | null;
 	title: string | null;
+	metadata?: AniListMediaHint | null | undefined;
 }
 
 interface ContentRootProps {
@@ -174,10 +175,9 @@ function shouldShowProviderAction(
 }
 
 function shouldShowSeerrAction(input: {
-	hasAniListId: boolean;
 	optionState: AnimePageOptionsState;
 }): boolean {
-	return input.hasAniListId && input.optionState.seerrEnabled;
+	return input.optionState.seerrEnabled;
 }
 
 function getResolvedAniListId(
@@ -273,14 +273,11 @@ function SonarrAnimePageActions({
 			state={mediaAction.status.state}
 			errorSource={mediaAction.status.errorSource}
 			hasMapping={mediaAction.status.hasMapping}
-			disabled={
-				mediaAction.status.disabled ||
-				(anilistId === undefined && !mediaAction.status.hasMapping)
-			}
+			disabled={mediaAction.status.disabled}
 			openProvider={mediaAction.openProvider}
 			onPrimaryAction={mediaAction.runPrimaryAction}
-			onOpenSetup={anilistId === undefined ? undefined : onOpenSetup}
-			onOpenMapping={anilistId === undefined ? undefined : onOpenMapping}
+			onOpenSetup={onOpenSetup}
+			onOpenMapping={onOpenMapping}
 			portalContainer={portalContainer ?? undefined}
 		/>
 	);
@@ -323,14 +320,11 @@ function RadarrAnimePageActions({
 			state={mediaAction.status.state}
 			errorSource={mediaAction.status.errorSource}
 			hasMapping={mediaAction.status.hasMapping}
-			disabled={
-				mediaAction.status.disabled ||
-				(anilistId === undefined && !mediaAction.status.hasMapping)
-			}
+			disabled={mediaAction.status.disabled}
 			openProvider={mediaAction.openProvider}
 			onPrimaryAction={mediaAction.runPrimaryAction}
-			onOpenSetup={anilistId === undefined ? undefined : onOpenSetup}
-			onOpenMapping={anilistId === undefined ? undefined : onOpenMapping}
+			onOpenSetup={onOpenSetup}
+			onOpenMapping={onOpenMapping}
 			portalContainer={portalContainer ?? undefined}
 		/>
 	);
@@ -440,12 +434,17 @@ export function ContentRoot({
 	const mappingIdentities = useMappingIdentities(anilistIds, {
 		enabled: optionState.actionsEnabled,
 	});
-	const seerrTargets = useSeerrTargets(anilistIds, {
+	const seerrTargetInput = {
+		source,
+		...(anilistId === undefined ? {} : { anilistId }),
+	};
+	const seerrTarget = useSeerrTarget(seerrTargetInput, {
 		enabled: optionState.seerrEnabled,
 	});
-	const metadata = metadataHintFromAniListMetadata(
+	const canonicalMetadata = metadataHintFromAniListMetadata(
 		metadataBatch.data?.metadata?.[0] ?? null,
 	);
+	const metadata = canonicalMetadata ?? target.metadata ?? null;
 	const providerTitle = trimToNull(target.title);
 	const displayTitle =
 		getMetadataTitle(metadata) ?? providerTitle ?? getFallbackTitle(source);
@@ -454,10 +453,9 @@ export function ContentRoot({
 		format: target.format,
 		mappedIdentities: mappingIdentities.data ?? [],
 	});
-	const seerrRequestInput = toSeerrRequestInput(seerrTargets.data?.[0] ?? null);
+	const seerrRequestInput = toSeerrRequestInput(seerrTarget.data ?? null);
 	const showProviderAction = shouldShowProviderAction(provider, options);
 	const showSeerrAction = shouldShowSeerrAction({
-		hasAniListId: anilistId !== undefined,
 		optionState,
 	});
 
@@ -484,10 +482,10 @@ export function ContentRoot({
 		metadata,
 	});
 	const openModal = (initialView: AnimePageModalView) => {
-		if (!provider || anilistId === undefined) return;
+		if (!provider) return;
 
 		mediaModal.open({
-			anilistId,
+			...(anilistId === undefined ? {} : { anilistId }),
 			source,
 			kind: "provider",
 			provider,
@@ -499,9 +497,8 @@ export function ContentRoot({
 	const openSetup = () => openModal("setup");
 	const openMapping = () => openModal("mapping");
 	const openSeerrModal = () => {
-		if (anilistId === undefined) return;
 		mediaModal.open({
-			anilistId,
+			...(anilistId === undefined ? {} : { anilistId }),
 			source,
 			kind: "seerr",
 			openSource: "content",
@@ -533,7 +530,7 @@ export function ContentRoot({
 				/>
 				{hostElement && mediaModal.state ? (
 					<MediaModal
-						key={`modal-${mediaModal.state.anilistId}`}
+						key={`modal-${sourceIdentityKey(source)}`}
 						state={mediaModal.state}
 						onClose={mediaModal.close}
 						container={hostElement}

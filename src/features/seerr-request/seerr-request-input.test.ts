@@ -20,7 +20,6 @@ describe("toSeerrRequestInput", () => {
 		};
 
 		expect(toSeerrRequestInput(target)).toEqual({
-			anilistId: aid(100),
 			mediaType: "movie",
 			tmdbId: tmdb(200),
 		});
@@ -37,7 +36,6 @@ describe("toSeerrRequestInput", () => {
 		};
 
 		expect(toSeerrRequestInput(target)).toEqual({
-			anilistId: aid(100),
 			mediaType: "tv",
 			tmdbId: tmdb(200),
 			tvdbId: tvdb(300),
@@ -55,7 +53,6 @@ describe("toSeerrRequestInput", () => {
 		};
 
 		expect(toSeerrRequestInput(target, [2])).toEqual({
-			anilistId: aid(100),
 			mediaType: "tv",
 			tmdbId: tmdb(200),
 			seasons: [2],

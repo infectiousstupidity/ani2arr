@@ -5,9 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	ANCHOR_ID,
 	ensureActionsAnchor,
-	readFormatFromPage,
+	readAnimePageData,
 	readLabeledFacts,
-	readTitleFromPage,
 	removeLayoutArtifacts,
 } from "./layout";
 
@@ -36,6 +35,7 @@ function createElement(input: {
 
 function createDocument(input: {
 	title?: string;
+	englishTitle?: string;
 	rows?: Array<{ label: string; value: string }>;
 }): Document {
 	const rows = (input.rows ?? []).map((row) =>
@@ -54,10 +54,21 @@ function createDocument(input: {
 	const title =
 		input.title === undefined
 			? null
-			: createElement({ textContent: input.title });
+			: createElement({
+					textContent: `${input.title}${input.englishTitle ?? ""}`,
+					children: {
+						strong: createElement({ textContent: input.title }),
+					},
+				});
+	const englishTitle =
+		input.englishTitle === undefined
+			? null
+			: createElement({ textContent: input.englishTitle });
 	return createElement({
 		children: {
 			"h1.title-name": title,
+			"h1.title-name > strong": title?.querySelector("strong") ?? null,
+			"p.title-english": englishTitle,
 			"#content .leftside, .leftside": leftside,
 		},
 	}) as unknown as Document;
@@ -79,13 +90,15 @@ function createLayoutElement(id = ""): FakeLayoutElement {
 	};
 }
 
-function createLayoutDocument(input: {
-	primaryStatus?: boolean;
-	fallbackStatus?: boolean;
-	existingAnchor?: FakeLayoutElement;
-	title?: boolean;
-	sidebarControl?: boolean;
-} = {}) {
+function createLayoutDocument(
+	input: {
+		primaryStatus?: boolean;
+		fallbackStatus?: boolean;
+		existingAnchor?: FakeLayoutElement;
+		title?: boolean;
+		sidebarControl?: boolean;
+	} = {},
+) {
 	const primaryStatus = createLayoutElement();
 	const fallbackStatus = createLayoutElement();
 	const title = createLayoutElement();
@@ -123,25 +136,48 @@ function createLayoutDocument(input: {
 }
 
 describe("MyAnimeList page readers", () => {
-	it("reads title, labels, and format", () => {
+	it("reads the real MAL 63816 titles, synonym, and format", () => {
 		const doc = createDocument({
-			title: " Fullmetal Alchemist: Brotherhood ",
+			title: " Sousou no Frieren: Ougonkyou-hen ",
+			englishTitle: " Frieren: Beyond Journey's End - Golden Land Arc ",
 			rows: [
 				{ label: "Type:", value: "TV" },
-				{ label: "Episodes:", value: "64" },
+				{ label: "Japanese:", value: "葬送のフリーレン 黄金郷編" },
+				{
+					label: "Synonyms:",
+					value: "Frieren at the Funeral Season 3",
+				},
 			],
 		});
 
-		expect(readTitleFromPage(doc)).toBe("Fullmetal Alchemist: Brotherhood");
-		expect(readLabeledFacts(doc).get("episodes")).toBe("64");
-		expect(readFormatFromPage(doc)).toBe("TV");
+		expect(readAnimePageData(doc)).toEqual({
+			title: "Sousou no Frieren: Ougonkyou-hen",
+			format: "TV",
+			metadata: {
+				titles: {
+					romaji: "Sousou no Frieren: Ougonkyou-hen",
+					english: "Frieren: Beyond Journey's End - Golden Land Arc",
+					native: "葬送のフリーレン 黄金郷編",
+				},
+				synonyms: ["Frieren at the Funeral Season 3"],
+				format: "TV",
+			},
+		});
 	});
 
 	it("handles missing optional labels", () => {
 		const doc = createDocument({ title: "Test" });
 
 		expect(readLabeledFacts(doc).size).toBe(0);
-		expect(readFormatFromPage(doc)).toBeNull();
+		expect(readAnimePageData(doc)).toEqual({
+			title: "Test",
+			format: null,
+			metadata: {
+				titles: { romaji: "Test" },
+				synonyms: [],
+				format: null,
+			},
+		});
 	});
 });
 

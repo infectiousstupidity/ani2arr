@@ -139,6 +139,28 @@ describe("title matching", () => {
 		).toEqual({ providerId: 330_692, matchedTitle: "Yuru Camp△" });
 	});
 
+	it("adds a lower-priority base-title lookup for a spaced-dash subtitle", () => {
+		expect(
+			getSearchTerms("sonarr", {
+				id: parseAniListId(1),
+				format: "TV",
+				title: {
+					english: "Frieren: Beyond Journey's End - Golden Land Arc",
+				},
+				synonyms: [],
+			}),
+		).toEqual([
+			{
+				canonical: "frieren beyond journeys end golden land arc",
+				display: "Frieren: Beyond Journeys End - Golden Land Arc",
+			},
+			{
+				canonical: "frieren beyond journeys end",
+				display: "Frieren: Beyond Journeys End",
+			},
+		]);
+	});
+
 	it("prefers the Ranma 2024 reboot over the original Sonarr result", () => {
 		const term = firstSonarrTerm("Ranma 1/2 (2024) 3rd Season");
 

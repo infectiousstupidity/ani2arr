@@ -150,10 +150,15 @@ const inspectionSourceInput = (
 	typeof input === "number" ? { anilistId: input } : input;
 
 export const mappingInspectionInput = (
-	anilistId: AniListId,
+	anilistId: AniListId | undefined,
 	source: SourceIdentity | undefined,
-): SourceRpcInput =>
-	source === undefined ? { anilistId } : { source, anilistId };
+): SourceRpcInput => {
+	if (source !== undefined) {
+		return anilistId === undefined ? { source } : { source, anilistId };
+	}
+	if (anilistId !== undefined) return { anilistId };
+	throw new Error("Missing mapping inspection source.");
+};
 
 export const useMappingInspection = (
 	provider: Provider,

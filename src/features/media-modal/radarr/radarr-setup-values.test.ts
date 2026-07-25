@@ -2,7 +2,6 @@
 // src/features/media-modal/radarr/radarr-setup-values.test.ts
 
 import { describe, expect, it } from "vitest";
-import { parseAniListId } from "@/anilist/types";
 import { parseTmdbId } from "@/providers/schemas";
 import type {
 	ProviderQualityProfileId,
@@ -119,7 +118,7 @@ describe("radarr setup values", () => {
 		expect(hasFullRadarrEditItem(status)).toBe(false);
 		expect(
 			getRadarrSetupTarget({
-				anilistId: parseAniListId(1),
+				identityKey: "anilist:1",
 				status,
 				targetTitle: "Fallback",
 				storedDefaults: {},
@@ -144,14 +143,14 @@ describe("radarr setup values", () => {
 
 		expect(
 			getRadarrSetupTarget({
-				anilistId: parseAniListId(1),
+				identityKey: "anilist:1",
 				status,
 				targetTitle: "Fallback",
 				storedDefaults: {},
 			}),
 		).toMatchObject({
 			mode: "edit",
-			key: "radarr:edit:1:11",
+			key: "radarr:edit:anilist:1:11",
 			tmdbId: parseTmdbId(22),
 			title: "Editable Movie",
 		});
@@ -165,7 +164,7 @@ describe("radarr setup values", () => {
 
 		expect(
 			getRadarrSetupTarget({
-				anilistId: parseAniListId(1),
+				identityKey: "anilist:1",
 				status,
 				targetTitle: "Add Movie",
 				storedDefaults: {
@@ -175,7 +174,7 @@ describe("radarr setup values", () => {
 			}),
 		).toMatchObject({
 			mode: "add",
-			key: "radarr:add:1:22",
+			key: "radarr:add:anilist:1:22",
 			tmdbId: parseTmdbId(22),
 			title: "Add Movie",
 			initialFormValues: {

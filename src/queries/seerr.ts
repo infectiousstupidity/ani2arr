@@ -18,6 +18,7 @@ import type {
 	SeerrConnectionCheckOutput,
 	SeerrRequestTarget,
 	SetManualSeerrTargetInput,
+	SourceRpcInput,
 } from "@/rpc/types";
 import {
 	ErrorCode,
@@ -104,17 +105,20 @@ export const useSeerrTargets = (
 };
 
 export const useSeerrTarget = (
-	anilistId: AniListId,
+	input: SourceRpcInput | AniListId,
 	options?: { enabled?: boolean },
-) =>
-	useQuery<SeerrRequestTarget | null, ExtensionError>({
-		queryKey: queryKeys.seerrTarget(anilistId),
-		queryFn: () => getAni2arrApi().getSeerrTarget(anilistId),
+) => {
+	const sourceInput =
+		typeof input === "number" ? ({ anilistId: input } as const) : input;
+	return useQuery<SeerrRequestTarget | null, ExtensionError>({
+		queryKey: queryKeys.seerrTarget(sourceInput),
+		queryFn: () => getAni2arrApi().getSeerrTarget(sourceInput),
 		enabled: options?.enabled ?? true,
 		staleTime: 10 * 60 * 1000,
 		gcTime: 60 * 60 * 1000,
 		refetchOnWindowFocus: false,
 	});
+};
 
 export const useSeerrMediaDetails = (options: {
 	input: GetSeerrMediaDetailsInput | null;
@@ -187,8 +191,8 @@ export const useSetManualSeerrTarget = () => {
 export const useClearManualSeerrTarget = () => {
 	const queryClient = useQueryClient();
 
-	return useMutation<{ ok: true }, ExtensionError, AniListId>({
-		mutationFn: (anilistId) => getAni2arrApi().clearManualSeerrTarget(anilistId),
+	return useMutation<{ ok: true }, ExtensionError, SourceRpcInput>({
+		mutationFn: (input) => getAni2arrApi().clearManualSeerrTarget(input),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.seerrTargetsRoot() });
 			queryClient.invalidateQueries({

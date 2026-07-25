@@ -39,6 +39,15 @@ export async function resolveAniListIdFromInput(
 	return getUniqueAniListIdForSource(input.source);
 }
 
+export async function resolveMappingIdentityFromInput(
+	input: SourceInputLike,
+): Promise<SourceIdentity> {
+	const source = sourceFromInput(input);
+	const anilistId = await resolveAniListIdFromInput(input);
+
+	return anilistId === null ? source : { source: "anilist", id: anilistId };
+}
+
 export async function requireAniListIdFromInput(
 	input: SourceInputLike,
 ): Promise<AniListId> {

@@ -30,6 +30,7 @@ const overlayRenderers = [
 		name: "stacked",
 		render: (presentation?: "status-column", isConfigured = false) => (
 			<SeerrCardStackActions
+				source={{ source: "anilist", id: anilistId }}
 				anilistId={anilistId}
 				isConfigured={isConfigured}
 				onOpenModal={() => {}}
@@ -41,6 +42,7 @@ const overlayRenderers = [
 		name: "standalone",
 		render: (presentation?: "status-column", isConfigured = false) => (
 			<SeerrStandaloneCardOverlay
+				source={{ source: "anilist", id: anilistId }}
 				anilistId={anilistId}
 				isConfigured={isConfigured}
 				onOpenModal={() => {}}
@@ -72,6 +74,7 @@ describe.each(overlayRenderers)("$name Seerr overlay outside the viewport", ({
 it("keeps configured Seerr status queries disabled outside the viewport", () => {
 	renderToStaticMarkup(
 		<SeerrCardStackActions
+			source={{ source: "anilist", id: anilistId }}
 			anilistId={anilistId}
 			isConfigured={true}
 			onOpenModal={() => {}}
@@ -79,9 +82,10 @@ it("keeps configured Seerr status queries disabled outside the viewport", () => 
 		/>,
 	);
 
-	expect(queryMocks.useSeerrTarget).toHaveBeenCalledWith(anilistId, {
-		enabled: false,
-	});
+	expect(queryMocks.useSeerrTarget).toHaveBeenCalledWith(
+		{ source: { source: "anilist", id: anilistId }, anilistId },
+		{ enabled: false },
+	);
 	expect(queryMocks.useSeerrMediaStatus).toHaveBeenCalledWith({
 		requestInput: null,
 		enabled: false,

@@ -2,6 +2,8 @@
 // src/features/media-modal/index.tsx
 
 import { ConfirmProvider } from "@/shared/ui/feedback/confirm-provider";
+import { sourceIdentityKey } from "@/mapping/source-identity";
+import { sourceFromInput } from "@/rpc/source-input";
 import { RadarrModal } from "./radarr/radarr-modal";
 import { SeerrModal } from "./seerr/seerr-modal";
 import { SonarrModal } from "./sonarr/sonarr-modal";
@@ -14,10 +16,9 @@ export function MediaModal(props: MediaModalProps): React.JSX.Element | null {
 		return null;
 	}
 
-	const modalKey =
-		state.kind === "provider"
-			? `${state.provider}-${state.anilistId}`
-			: `seerr-${state.anilistId}`;
+	const modalKey = `${
+		state.kind === "provider" ? state.provider : "seerr"
+	}-${sourceIdentityKey(sourceFromInput(state))}`;
 	let modal: React.JSX.Element;
 	if (state.kind === "seerr") {
 		modal = (

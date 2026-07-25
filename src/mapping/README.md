@@ -1,7 +1,8 @@
 # Mapping architecture
 
-Upstream provider facts are keyed by `SourceIdentity`. Stored mapping decisions
-are keyed by canonical AniList ID when one is available.
+Upstream provider facts are keyed by `SourceIdentity`. Manual decisions are
+keyed by canonical AniList ID. Automatic results use that same canonical
+identity when a crosswalk exists and the original source identity otherwise.
 
 Mapping owns facts and effective AniList-to-provider mapping results. It does
 not own provider library state or RPC presentation DTOs.
@@ -14,8 +15,9 @@ not own provider library state or RPC presentation DTOs.
 - `upstream.store.ts` stores source-native AniBridge targets plus source
   crosswalks and refresh metadata. It does not persist Sonarr, Radarr, or Seerr
   projections.
-- `auto.store.ts` stores expiring automatic results by AniList ID. Expired
-  reads return no result and do not mutate storage.
+- `auto.store.ts` stores expiring automatic results by cache identity. AniList
+  identities keep their numeric keys; unlinked sources use keys such as
+  `mal:63816`. Expired reads return no result and do not mutate storage.
 - `seerr-target.store.ts` stores user-owned manual Seerr overrides separately
   from downloaded AniBridge data.
 
@@ -53,6 +55,23 @@ tmdb-movie -> Radarr
 tvdb-show -> Sonarr
 tmdb-show -> no direct Arr target
 ```
+
+## Automatic resolution
+
+`MappingService` resolves the AniBridge crosswalk and direct targets once per
+request. It passes the existing resolver four independent facts:
+
+```text
+cache identity
+optional canonical AniList ID
+page title metadata
+rejected provider IDs
+```
+
+The resolver searches page titles first, then canonical AniList metadata when
+that capability exists, then known prequel relations. It never branches on the
+content site's name and never reconstructs an AniList ID from the cache key.
+Mapped and unmapped results use one write path under the chosen cache identity.
 
 ## Effective Seerr targets
 

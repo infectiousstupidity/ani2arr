@@ -9,7 +9,12 @@ import {
 	type SetStateAction,
 } from "react";
 import type { AniListId } from "@/anilist/types";
-import type { GetSeerrMediaDetailsInput, SetManualSeerrTargetInput, SeerrRequestTarget } from "@/rpc/types";
+import type {
+	GetSeerrMediaDetailsInput,
+	SeerrRequestTarget,
+	SetManualSeerrTargetInput,
+	SourceRpcInput,
+} from "@/rpc/types";
 import type {
 	SeerrMediaDetails,
 	SeerrSearchResult,
@@ -64,7 +69,7 @@ function canSaveTvTarget(
 }
 
 function buildTvManualTargetInput(input: {
-	anilistId: AniListId;
+	targetInput: SourceRpcInput;
 	selectedDetails: SeerrMediaDetails | null;
 	selectedResult: SeerrSearchResult | null;
 	draftSeasons: readonly number[];
@@ -74,7 +79,7 @@ function buildTvManualTargetInput(input: {
 	}
 
 	return {
-		anilistId: input.anilistId,
+		...input.targetInput,
 		mediaType: "tv",
 		tmdbId: input.selectedResult.tmdbId,
 		...(input.selectedDetails?.tvdbId === undefined
@@ -85,7 +90,8 @@ function buildTvManualTargetInput(input: {
 }
 
 export function SeerrChangeTargetView(props: {
-	anilistId: AniListId;
+	targetInput: SourceRpcInput;
+	anilistId?: AniListId | undefined;
 	container: MediaModalContainer | undefined;
 	contentContainer: HTMLDivElement | null;
 	defaultQuery: string;
@@ -99,6 +105,7 @@ export function SeerrChangeTargetView(props: {
 	target: SeerrRequestTarget | null;
 }): React.JSX.Element {
 	const {
+		targetInput,
 		anilistId,
 		container,
 		contentContainer,
@@ -174,7 +181,7 @@ export function SeerrChangeTargetView(props: {
 	const saveMovieTarget = (result: SeerrSearchResult): void => {
 		setManualTarget.mutate(
 			{
-				anilistId,
+				...targetInput,
 				mediaType: "movie",
 				tmdbId: result.tmdbId,
 			},
@@ -191,7 +198,7 @@ export function SeerrChangeTargetView(props: {
 	};
 	const saveTvTarget = (): void => {
 		const input = buildTvManualTargetInput({
-			anilistId,
+			targetInput,
 			selectedDetails,
 			selectedResult,
 			draftSeasons,

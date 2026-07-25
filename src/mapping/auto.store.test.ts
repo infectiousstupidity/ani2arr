@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { parseAniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTmdbId } from "@/providers/schemas";
 import {
 	clearAutoResults,
@@ -13,6 +14,7 @@ import {
 } from "./auto.store";
 
 const aid = parseAniListId;
+const mal = parseMyAnimeListId;
 const tmdb = parseTmdbId;
 const start = new Date("2026-01-01T00:00:00Z");
 const AUTO_STORAGE_KEY = "mapping:auto";
@@ -30,7 +32,8 @@ describe("auto mapping store", () => {
 	});
 
 	it("ignores expired results without deleting them on read", async () => {
-		await setAutoResult("radarr", aid(1), {
+		const identity = { source: "anilist", id: aid(1) } as const;
+		await setAutoResult("radarr", identity, {
 			kind: "mapped",
 			providerId: tmdb(10),
 		});
@@ -45,16 +48,16 @@ describe("auto mapping store", () => {
 		});
 
 		vi.setSystemTime(new Date("2026-02-02T00:00:00Z"));
-		await expect(getAutoResult("radarr", aid(1))).resolves.toBeNull();
+		await expect(getAutoResult("radarr", identity)).resolves.toBeNull();
 
 		vi.setSystemTime(new Date("2026-01-02T00:00:00Z"));
-		await expect(getAutoResult("radarr", aid(1))).resolves.toEqual({
+		await expect(getAutoResult("radarr", identity)).resolves.toEqual({
 			kind: "mapped",
 			providerId: tmdb(10),
 		});
 	});
 
-	it("reads legacy AniList results and ignores MAL results", async () => {
+	it("normalizes legacy AniList keys and lists only AniList results", async () => {
 		await browser.storage.local.set({
 			[AUTO_STORAGE_KEY]: {
 				sonarr: {},
@@ -73,9 +76,17 @@ describe("auto mapping store", () => {
 			},
 		});
 
-		await expect(getAutoResult("radarr", aid(1))).resolves.toEqual({
+		await expect(
+			getAutoResult("radarr", { source: "anilist", id: aid(1) }),
+		).resolves.toEqual({
 			kind: "mapped",
 			providerId: tmdb(300),
+		});
+		await expect(
+			getAutoResult("radarr", { source: "mal", id: mal(5114) }),
+		).resolves.toEqual({
+			kind: "mapped",
+			providerId: tmdb(400),
 		});
 		await expect(listAniListAutoResults("radarr")).resolves.toEqual([
 			{
@@ -83,6 +94,32 @@ describe("auto mapping store", () => {
 				result: { kind: "mapped", providerId: tmdb(300) },
 			},
 		]);
+	});
+
+	it("round-trips MAL results under a source-aware key", async () => {
+		const identity = { source: "mal", id: mal(63_816) } as const;
+		await setAutoResult("radarr", identity, {
+			kind: "mapped",
+			providerId: tmdb(1_400_000),
+		});
+
+		await expect(getAutoResult("radarr", identity)).resolves.toEqual({
+			kind: "mapped",
+			providerId: tmdb(1_400_000),
+		});
+		await expect(
+			browser.storage.local.get(AUTO_STORAGE_KEY),
+		).resolves.toMatchObject({
+			[AUTO_STORAGE_KEY]: {
+				radarr: {
+					"mal:63816": {
+						kind: "mapped",
+						providerId: tmdb(1_400_000),
+					},
+				},
+			},
+		});
+		await expect(listAniListAutoResults("radarr")).resolves.toEqual([]);
 	});
 
 	it("reads legacy raw AniList keys", async () => {
@@ -99,7 +136,9 @@ describe("auto mapping store", () => {
 			},
 		});
 
-		await expect(getAutoResult("radarr", aid(1))).resolves.toEqual({
+		await expect(
+			getAutoResult("radarr", { source: "anilist", id: aid(1) }),
+		).resolves.toEqual({
 			kind: "mapped",
 			providerId: tmdb(300),
 		});

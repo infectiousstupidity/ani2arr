@@ -2,7 +2,6 @@
 // src/features/media-modal/sonarr/sonarr-setup-values.test.ts
 
 import { describe, expect, it } from "vitest";
-import { parseAniListId } from "@/anilist/types";
 import { parseTvdbId } from "@/providers/schemas";
 import type {
 	ProviderQualityProfileId,
@@ -141,7 +140,7 @@ describe("sonarr setup values", () => {
 		expect(hasFullSonarrEditItem(status)).toBe(false);
 		expect(
 			getSonarrSetupTarget({
-				anilistId: parseAniListId(1),
+				identityKey: "anilist:1",
 				status,
 				targetTitle: "Fallback",
 				storedDefaults: {},
@@ -171,14 +170,14 @@ describe("sonarr setup values", () => {
 
 		expect(
 			getSonarrSetupTarget({
-				anilistId: parseAniListId(1),
+				identityKey: "anilist:1",
 				status,
 				targetTitle: "Fallback",
 				storedDefaults: {},
 			}),
 		).toMatchObject({
 			mode: "edit",
-			key: "sonarr:edit:1:11",
+			key: "sonarr:edit:anilist:1:11",
 			tvdbId: parseTvdbId(22),
 			title: "Editable Series",
 		});
@@ -192,7 +191,7 @@ describe("sonarr setup values", () => {
 
 		expect(
 			getSonarrSetupTarget({
-				anilistId: parseAniListId(1),
+				identityKey: "anilist:1",
 				status,
 				targetTitle: "Add Series",
 				storedDefaults: {
@@ -202,7 +201,7 @@ describe("sonarr setup values", () => {
 			}),
 		).toMatchObject({
 			mode: "add",
-			key: "sonarr:add:1:22",
+			key: "sonarr:add:anilist:1:22",
 			tvdbId: parseTvdbId(22),
 			title: "Add Series",
 			initialFormValues: {

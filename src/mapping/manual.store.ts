@@ -4,7 +4,12 @@
 import { storage } from "wxt/utils/storage";
 import { parseAniListIdOrNull, type AniListId } from "@/anilist/types";
 import type { Provider } from "@/providers/types";
-import { parseSourceIdentityKey } from "./source-identity";
+import {
+	normalizeSourceIdentity,
+	parseSourceIdentityKey,
+	sourceIdentityKey,
+	type SourceIdentity,
+} from "./source-identity";
 
 export type ManualMapping = {
 	providerId: number;
@@ -45,11 +50,11 @@ let writes: Promise<void> = Promise.resolve();
 
 export async function getManualFacts(
 	provider: Provider,
-	anilistId: AniListId,
+	identity: SourceIdentity | AniListId,
 ): Promise<ManualFacts | null> {
 	const mappings = await getManualMappings();
 
-	return mappings[provider][anilistId] ?? null;
+	return mappings[provider][manualFactsKey(identity)] ?? null;
 }
 
 export async function listAniListManualFacts(
@@ -71,16 +76,17 @@ export async function listAniListManualFacts(
 
 export async function setManualMapping(
 	provider: Provider,
-	anilistId: AniListId,
+	identity: SourceIdentity | AniListId,
 	mapping: ManualMapping,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const previous = mappings[provider][anilistId];
+		const key = manualFactsKey(identity);
+		const previous = mappings[provider][key];
 		const rejectedProviderIds = previous?.rejectedProviderIds?.filter(
 			(providerId) => providerId !== mapping.providerId,
 		);
 
-		mappings[provider][anilistId] = {
+		mappings[provider][key] = {
 			mapping,
 			...(rejectedProviderIds?.length ? { rejectedProviderIds } : {}),
 		};
@@ -89,34 +95,36 @@ export async function setManualMapping(
 
 export async function clearManualMapping(
 	provider: Provider,
-	anilistId: AniListId,
+	identity: SourceIdentity | AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const previous = mappings[provider][anilistId];
+		const key = manualFactsKey(identity);
+		const previous = mappings[provider][key];
 
 		if (!previous || !("mapping" in previous)) {
 			return;
 		}
 
 		if (previous.rejectedProviderIds?.length) {
-			mappings[provider][anilistId] = {
+			mappings[provider][key] = {
 				rejectedProviderIds: previous.rejectedProviderIds,
 			};
 			return;
 		}
 
-		delete mappings[provider][anilistId];
+		delete mappings[provider][key];
 	});
 }
 
 export async function setIgnored(
 	provider: Provider,
-	anilistId: AniListId,
+	identity: SourceIdentity | AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const previous = mappings[provider][anilistId];
+		const key = manualFactsKey(identity);
+		const previous = mappings[provider][key];
 
-		mappings[provider][anilistId] = {
+		mappings[provider][key] = {
 			ignored: true,
 			...(previous?.rejectedProviderIds?.length
 				? { rejectedProviderIds: previous.rejectedProviderIds }
@@ -127,33 +135,35 @@ export async function setIgnored(
 
 export async function clearIgnored(
 	provider: Provider,
-	anilistId: AniListId,
+	identity: SourceIdentity | AniListId,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const previous = mappings[provider][anilistId];
+		const key = manualFactsKey(identity);
+		const previous = mappings[provider][key];
 
 		if (!previous || !("ignored" in previous)) {
 			return;
 		}
 
 		if (previous.rejectedProviderIds?.length) {
-			mappings[provider][anilistId] = {
+			mappings[provider][key] = {
 				rejectedProviderIds: previous.rejectedProviderIds,
 			};
 			return;
 		}
 
-		delete mappings[provider][anilistId];
+		delete mappings[provider][key];
 	});
 }
 
 export async function rejectAutoCandidate(
 	provider: Provider,
-	anilistId: AniListId,
+	identity: SourceIdentity | AniListId,
 	providerId: number,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const previous = mappings[provider][anilistId];
+		const key = manualFactsKey(identity);
+		const previous = mappings[provider][key];
 
 		if (
 			previous &&
@@ -169,7 +179,7 @@ export async function rejectAutoCandidate(
 			return;
 		}
 
-		mappings[provider][anilistId] = {
+		mappings[provider][key] = {
 			...previous,
 			rejectedProviderIds: [...rejectedProviderIds, providerId],
 		};
@@ -178,11 +188,12 @@ export async function rejectAutoCandidate(
 
 export async function clearRejectedAutoCandidate(
 	provider: Provider,
-	anilistId: AniListId,
+	identity: SourceIdentity | AniListId,
 	providerId: number,
 ): Promise<void> {
 	await updateManualMappings((mappings) => {
-		const previous = mappings[provider][anilistId];
+		const key = manualFactsKey(identity);
+		const previous = mappings[provider][key];
 
 		if (!previous?.rejectedProviderIds?.includes(providerId)) {
 			return;
@@ -193,7 +204,7 @@ export async function clearRejectedAutoCandidate(
 		);
 
 		if ("mapping" in previous) {
-			mappings[provider][anilistId] = {
+			mappings[provider][key] = {
 				mapping: previous.mapping,
 				...(rejectedProviderIds.length > 0 ? { rejectedProviderIds } : {}),
 			};
@@ -201,7 +212,7 @@ export async function clearRejectedAutoCandidate(
 		}
 
 		if ("ignored" in previous) {
-			mappings[provider][anilistId] = {
+			mappings[provider][key] = {
 				ignored: true,
 				...(rejectedProviderIds.length > 0 ? { rejectedProviderIds } : {}),
 			};
@@ -209,11 +220,11 @@ export async function clearRejectedAutoCandidate(
 		}
 
 		if (rejectedProviderIds.length > 0) {
-			mappings[provider][anilistId] = { rejectedProviderIds };
+			mappings[provider][key] = { rejectedProviderIds };
 			return;
 		}
 
-		delete mappings[provider][anilistId];
+		delete mappings[provider][key];
 	});
 }
 
@@ -262,24 +273,31 @@ function normalizeManualProviderMappings(
 	const normalized: Record<string, ManualFacts> = {};
 
 	for (const [rawKey, facts] of Object.entries(mappings)) {
-		const anilistId = parseStoredAniListId(rawKey);
+		const key = normalizeStoredManualFactsKey(rawKey);
 
 		if (
-			anilistId !== null &&
-			(rawKey === String(anilistId) || normalized[anilistId] === undefined)
+			key !== null &&
+			(rawKey === key || normalized[key] === undefined)
 		) {
-			normalized[anilistId] = facts;
+			normalized[key] = facts;
 		}
 	}
 
 	return normalized;
 }
 
-function parseStoredAniListId(rawKey: string): AniListId | null {
+function normalizeStoredManualFactsKey(rawKey: string): string | null {
 	const direct = parseAniListIdOrNull(Number(rawKey));
-	if (direct !== null && rawKey === String(direct)) return direct;
+	if (direct !== null && rawKey === String(direct)) return rawKey;
 
 	/** LEGACY: remove after branch testers have rewritten pre-canonical AniList facts. */
 	const source = parseSourceIdentityKey(rawKey);
-	return source?.source === "anilist" ? source.id : null;
+	return source === null ? null : manualFactsKey(source);
+}
+
+function manualFactsKey(identity: SourceIdentity | AniListId): string {
+	const source = normalizeSourceIdentity(identity);
+	return source.source === "anilist"
+		? String(source.id)
+		: sourceIdentityKey(source);
 }

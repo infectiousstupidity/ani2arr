@@ -68,7 +68,6 @@ describe("seerrHandlers", () => {
 
 		await expect(
 			seerrHandlers.requestInSeerr({
-				anilistId: parseAniListId(100),
 				mediaType: "movie",
 				tmdbId: parseTmdbId(123),
 			}),
@@ -159,7 +158,7 @@ describe("seerrHandlers", () => {
 		});
 
 		await expect(
-			seerrHandlers.getSeerrTarget(parseAniListId(100)),
+			seerrHandlers.getSeerrTarget({ anilistId: parseAniListId(100) }),
 		).resolves.toEqual({
 			anilistId: parseAniListId(100),
 			mediaType: "movie",
@@ -167,26 +166,35 @@ describe("seerrHandlers", () => {
 			source: "manual",
 		});
 		expect(getEffectiveSeerrTargetMock).toHaveBeenCalledWith(
-			parseAniListId(100),
+			{
+				identity: { source: "anilist", id: parseAniListId(100) },
+				anilistId: parseAniListId(100),
+			},
 		);
 	});
 
 	it("clears manual Seerr targets", async () => {
 		await expect(
-			seerrHandlers.clearManualSeerrTarget(parseAniListId(100)),
+			seerrHandlers.clearManualSeerrTarget({ anilistId: parseAniListId(100) }),
 		).resolves.toEqual({ ok: true });
 		expect(clearManualSeerrTargetMock).toHaveBeenCalledWith(
-			parseAniListId(100),
+			{
+				identity: { source: "anilist", id: parseAniListId(100) },
+				anilistId: parseAniListId(100),
+			},
 		);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 
 	it("returns null when no manual or upstream Seerr target exists", async () => {
 		await expect(
-			seerrHandlers.getSeerrTarget(parseAniListId(100)),
+			seerrHandlers.getSeerrTarget({ anilistId: parseAniListId(100) }),
 		).resolves.toBeNull();
 		expect(getEffectiveSeerrTargetMock).toHaveBeenCalledWith(
-			parseAniListId(100),
+			{
+				identity: { source: "anilist", id: parseAniListId(100) },
+				anilistId: parseAniListId(100),
+			},
 		);
 	});
 
@@ -234,7 +242,10 @@ describe("seerrHandlers", () => {
 		await expect(seerrHandlers.setManualSeerrTarget(input)).resolves.toEqual({
 			ok: true,
 		});
-		expect(setManualSeerrTargetMock).toHaveBeenCalledWith(input);
+		expect(setManualSeerrTargetMock).toHaveBeenCalledWith({
+			...input,
+			identity: { source: "anilist", id: input.anilistId },
+		});
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 

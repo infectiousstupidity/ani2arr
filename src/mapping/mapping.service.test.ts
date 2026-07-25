@@ -9,6 +9,7 @@ import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
 import type { ManualFacts } from "./manual.store";
 import { MappingService } from "./mapping.service";
+import { getSourceUpstreamMapping } from "./upstream.store";
 import {
 	type AutoResult,
 	type MappingResult,
@@ -18,12 +19,12 @@ import {
 const storeRecords = vi.hoisted(() => ({
 	manual: [] as Array<{
 		provider: Provider;
-		anilistId: AniListId;
+		identity: SourceIdentity;
 		facts: ManualFacts;
 	}>,
 	auto: [] as Array<{
 		provider: Provider;
-		anilistId: AniListId;
+		identity: SourceIdentity;
 		result: AutoResult;
 	}>,
 	upstream: [] as Array<{
@@ -39,17 +40,21 @@ const storeRecords = vi.hoisted(() => ({
 
 vi.mock("./manual.store", () => ({
 	getManualFacts: vi.fn(
-		async (provider: Provider, anilistId: AniListId) =>
+		async (provider: Provider, identity: SourceIdentity) =>
 			storeRecords.manual.find(
 				(record) =>
-					record.provider === provider && record.anilistId === anilistId,
+					record.provider === provider &&
+					sourceIdentityKey(record.identity) === sourceIdentityKey(identity),
 			)?.facts ?? null,
 	),
 	listAniListManualFacts: vi.fn(async (provider: Provider) =>
 		storeRecords.manual
-			.filter((record) => record.provider === provider)
+			.filter(
+				(record) =>
+					record.provider === provider && record.identity.source === "anilist",
+			)
 			.map((record) => ({
-				anilistId: record.anilistId,
+				anilistId: record.identity.id,
 				facts: record.facts,
 			})),
 	),
@@ -63,19 +68,19 @@ vi.mock("./manual.store", () => ({
 
 vi.mock("./auto.store", () => ({
 	getAutoResult: vi.fn(
-		async (provider: Provider, anilistId: AniListId) =>
+		async (provider: Provider, identity: SourceIdentity) =>
 			storeRecords.auto.find(
 				(record) =>
-					record.provider === provider && record.anilistId === anilistId,
+					record.provider === provider &&
+					sourceIdentityKey(record.identity) === sourceIdentityKey(identity),
 			)?.result ?? null,
 	),
 	listAniListAutoResults: vi.fn(async (provider: Provider) =>
-		storeRecords.auto
-			.filter((record) => record.provider === provider)
-			.map((record) => ({
-				anilistId: record.anilistId,
-				result: record.result,
-			})),
+		storeRecords.auto.flatMap((record) =>
+			record.provider === provider && record.identity.source === "anilist"
+				? [{ anilistId: record.identity.id, result: record.result }]
+				: [],
+		),
 	),
 }));
 
@@ -120,13 +125,15 @@ const anilistSource = (id: AniListId) => ({ source: "anilist", id }) as const;
 const service = () => new MappingService(vi.fn());
 const replaceAuto = (
 	provider: Provider,
-	anilistId: AniListId,
+	identity: SourceIdentity,
 	result: AutoResult,
 ): void => {
 	storeRecords.auto = storeRecords.auto.filter(
-		(record) => record.provider !== provider || record.anilistId !== anilistId,
+		(record) =>
+			record.provider !== provider ||
+			sourceIdentityKey(record.identity) !== sourceIdentityKey(identity),
 	);
-	storeRecords.auto.push({ provider, anilistId, result });
+	storeRecords.auto.push({ provider, identity, result });
 };
 
 function resetRecords(): void {
@@ -139,6 +146,7 @@ function resetRecords(): void {
 
 describe("MappingService", () => {
 	beforeEach(() => {
+		vi.clearAllMocks();
 		resetRecords();
 	});
 
@@ -286,7 +294,7 @@ describe("MappingService", () => {
 			if (testCase.manual) {
 				storeRecords.manual.push({
 					provider,
-					anilistId,
+					identity: anilistSource(anilistId),
 					facts: testCase.manual,
 				});
 			}
@@ -299,7 +307,7 @@ describe("MappingService", () => {
 			if (testCase.auto) {
 				storeRecords.auto.push({
 					provider,
-					anilistId,
+					identity: anilistSource(anilistId),
 					result: testCase.auto,
 				});
 			}
@@ -352,7 +360,7 @@ describe("MappingService", () => {
 		storeRecords.manual = [
 			{
 				provider: "sonarr",
-				anilistId,
+				identity: anilistSource(anilistId),
 				facts: { mapping: { providerId: tvdb(300) } },
 			},
 		];
@@ -371,16 +379,93 @@ describe("MappingService", () => {
 		});
 	});
 
-	it("does not run automatic matching for an unmapped MAL-only source", async () => {
-		const resolver = vi.fn();
+	it("uses a source-native manual decision for an unlinked MAL entry", async () => {
+		const source = { source: "mal", id: mal(63_816) } as const;
+		storeRecords.manual = [
+			{
+				provider: "sonarr",
+				identity: source,
+				facts: { mapping: { providerId: tvdb(424_536) } },
+			},
+		];
+
+		await expect(service().getMapping("sonarr", source)).resolves.toEqual({
+			kind: "mapped",
+			source: "manual",
+			providerId: tvdb(424_536),
+		});
+	});
+
+	it("resolves and reuses an automatic mapping for a MAL-only source", async () => {
 		const source = { source: "mal", id: mal(59_999) } as const;
+		const resolver = vi.fn(async () => {
+			replaceAuto("sonarr", source, {
+				kind: "mapped",
+				providerId: tvdb(999),
+				matchedTitle: "MAL Page Title",
+			});
+			return true;
+		});
 
 		await expect(
 			new MappingService(resolver).resolveMapping("sonarr", source, {
 				forceRetry: true,
+				title: "MAL Page Title",
 			}),
-		).resolves.toEqual({ kind: "unmapped", hadResolveAttempt: false });
-		expect(resolver).not.toHaveBeenCalled();
+		).resolves.toEqual({
+			kind: "mapped",
+			source: "auto",
+			providerId: tvdb(999),
+			matchedTitle: "MAL Page Title",
+		});
+		expect(resolver).toHaveBeenCalledWith({
+			provider: "sonarr",
+			cacheIdentity: source,
+			canonicalAniListId: null,
+			rejectedProviderIds: [],
+			title: "MAL Page Title",
+		});
+		expect(getSourceUpstreamMapping).toHaveBeenCalledOnce();
+	});
+
+	it("uses the canonical AniList identity for crosswalked MAL resolution", async () => {
+		const source = { source: "mal", id: mal(59_999) } as const;
+		const anilistId = aid(211_496);
+		const identity = anilistSource(anilistId);
+		storeRecords.aliases.set(sourceIdentityKey(source), anilistId);
+		const resolver = vi.fn(async () => {
+			replaceAuto("sonarr", identity, {
+				kind: "mapped",
+				providerId: tvdb(1000),
+			});
+			return true;
+		});
+		const mappingService = new MappingService(resolver);
+
+		await expect(
+			mappingService.resolveMapping("sonarr", source, {
+				forceRetry: true,
+				title: "Crosswalked MAL Page Title",
+			}),
+		).resolves.toEqual({
+			kind: "mapped",
+			source: "auto",
+			providerId: tvdb(1000),
+		});
+		expect(resolver).toHaveBeenCalledWith({
+			provider: "sonarr",
+			cacheIdentity: identity,
+			canonicalAniListId: anilistId,
+			rejectedProviderIds: [],
+			title: "Crosswalked MAL Page Title",
+		});
+		await expect(
+			mappingService.getMapping("sonarr", identity),
+		).resolves.toEqual({
+			kind: "mapped",
+			source: "auto",
+			providerId: tvdb(1000),
+		});
 	});
 
 	it("computes linked AniList IDs for multiple provider IDs in one scan", async () => {
@@ -401,34 +486,34 @@ describe("MappingService", () => {
 		storeRecords.auto = [
 			{
 				provider: "radarr",
-				anilistId: aid(20),
+				identity: anilistSource(aid(20)),
 				result: { kind: "mapped", providerId: tmdb(100) },
 			},
 			{
 				provider: "radarr",
-				anilistId: aid(30),
+				identity: anilistSource(aid(30)),
 				result: { kind: "mapped", providerId: tmdb(200) },
 			},
 			{
 				provider: "radarr",
-				anilistId: aid(40),
+				identity: anilistSource(aid(40)),
 				result: { kind: "mapped", providerId: tmdb(100) },
 			},
 		];
 		storeRecords.manual = [
 			{
 				provider: "radarr",
-				anilistId: aid(30),
+				identity: anilistSource(aid(30)),
 				facts: { mapping: { providerId: tmdb(100) } },
 			},
 			{
 				provider: "radarr",
-				anilistId: aid(40),
+				identity: anilistSource(aid(40)),
 				facts: { ignored: true },
 			},
 			{
 				provider: "radarr",
-				anilistId: aid(50),
+				identity: anilistSource(aid(50)),
 				facts: { mapping: { providerId: tmdb(200) } },
 			},
 		];
@@ -449,7 +534,7 @@ describe("MappingService", () => {
 		storeRecords.manual = [
 			{
 				provider: "sonarr",
-				anilistId: aid(10),
+				identity: anilistSource(aid(10)),
 				facts: { mapping: { providerId: tvdb(78_874) } },
 			},
 		];
@@ -468,14 +553,14 @@ describe("MappingService", () => {
 	it("retries cached unmapped auto results only when forced", async () => {
 		const anilistId = aid(20);
 		const resolver = vi.fn(async () => {
-			replaceAuto("sonarr", anilistId, {
+			replaceAuto("sonarr", anilistSource(anilistId), {
 				kind: "mapped",
 				providerId: tvdb(200),
 				matchedTitle: "Kagurabachi",
 			});
 			return true;
 		});
-		replaceAuto("sonarr", anilistId, { kind: "unmapped" });
+		replaceAuto("sonarr", anilistSource(anilistId), { kind: "unmapped" });
 		const mappingService = new MappingService(resolver);
 
 		await expect(
@@ -497,7 +582,11 @@ describe("MappingService", () => {
 			providerId: tvdb(200),
 			matchedTitle: "Kagurabachi",
 		});
-		expect(resolver).toHaveBeenCalledWith("sonarr", anilistId, [], {
+		expect(resolver).toHaveBeenCalledWith({
+			provider: "sonarr",
+			cacheIdentity: anilistSource(anilistId),
+			canonicalAniListId: anilistId,
+			rejectedProviderIds: [],
 			title: "Kagurabachi",
 		});
 	});
@@ -513,7 +602,7 @@ describe("MappingService", () => {
 				],
 			},
 		];
-		replaceAuto("sonarr", anilistId, { kind: "unmapped" });
+		replaceAuto("sonarr", anilistSource(anilistId), { kind: "unmapped" });
 		const resolver = vi.fn();
 
 		await expect(

@@ -12,7 +12,7 @@ import {
 	useSeerrLinkedAniListEntries,
 } from "@/queries/seerr";
 import { openOptionsPage } from "@/rpc/runtime-messages";
-import type { SeerrRequestTarget } from "@/rpc/types";
+import type { SeerrRequestTarget, SourceRpcInput } from "@/rpc/types";
 import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { MediaModalContainer } from "../types";
@@ -70,7 +70,8 @@ function canRequestInSeerr(input: {
 }
 
 export function SeerrRequestView(props: {
-	anilistId: AniListId;
+	targetInput: SourceRpcInput;
+	anilistId?: AniListId | undefined;
 	authMode: "session" | "apiKey" | null;
 	container: MediaModalContainer | undefined;
 	contentContainer: HTMLDivElement | null;
@@ -84,6 +85,7 @@ export function SeerrRequestView(props: {
 	target: SeerrRequestTarget | null;
 }): React.JSX.Element {
 	const {
+		targetInput,
 		anilistId,
 		authMode,
 		container,
@@ -221,7 +223,7 @@ export function SeerrRequestView(props: {
 					requestLabel={requestLabel}
 					onClose={onClose}
 					onChangeTarget={onChangeTarget}
-					onClearManualTarget={() => clearManualTarget.mutate(anilistId)}
+					onClearManualTarget={() => clearManualTarget.mutate(targetInput)}
 					onRequest={handleRequest}
 				/>
 			}

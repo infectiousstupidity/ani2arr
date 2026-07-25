@@ -14,6 +14,10 @@ import {
 } from "@/mapping/seerr-target.store";
 import { buildSeerrRequestPayload } from "@/providers/seerr/request";
 import { bumpMappingsRevision } from "@/rpc/revision-signals";
+import {
+	resolveAniListIdFromInput,
+	sourceFromInput,
+} from "@/rpc/source-input";
 import type {
 	GetSeerrLinkedAniListEntriesInput,
 	GetSeerrMediaDetailsInput,
@@ -24,7 +28,16 @@ import type {
 	RequestInSeerrInput,
 	SeerrRequestTarget,
 	SetManualSeerrTargetInput,
+	SourceRpcInput,
 } from "@/rpc/types";
+
+async function resolveSeerrTargetIdentity(input: SourceRpcInput) {
+	const anilistId = await resolveAniListIdFromInput(input);
+	return {
+		identity: sourceFromInput(input),
+		...(anilistId === null ? {} : { anilistId }),
+	};
+}
 
 function seerrTargetsMatch(
 	input: GetSeerrLinkedAniListEntriesInput,
@@ -59,7 +72,7 @@ function buildSeerrLinkedEntry(
 
 export const seerrHandlers = {
 	async getSeerrTarget(input: GetSeerrTargetInput) {
-		return getEffectiveSeerrTarget(input);
+		return getEffectiveSeerrTarget(await resolveSeerrTargetIdentity(input));
 	},
 
 	async getSeerrTargets(input: GetSeerrTargetsInput) {
@@ -67,13 +80,23 @@ export const seerrHandlers = {
 	},
 
 	async setManualSeerrTarget(input: SetManualSeerrTargetInput) {
-		await setManualSeerrTarget(input);
+		await setManualSeerrTarget({
+			...(await resolveSeerrTargetIdentity(input)),
+			...(input.mediaType === "movie"
+				? { mediaType: "movie", tmdbId: input.tmdbId }
+				: {
+						mediaType: "tv",
+						tmdbId: input.tmdbId,
+						...(input.tvdbId === undefined ? {} : { tvdbId: input.tvdbId }),
+						seasons: input.seasons,
+					}),
+		});
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async clearManualSeerrTarget(input: GetSeerrTargetInput) {
-		await clearManualSeerrTarget(input);
+		await clearManualSeerrTarget(await resolveSeerrTargetIdentity(input));
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},

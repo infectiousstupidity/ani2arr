@@ -26,11 +26,13 @@ import type { BadgeVisibility } from "@/settings/types";
 import type { FloatingPortalContainer } from "@/shared/ui/portal-container";
 import TooltipWrapper from "@/shared/ui/primitives/tooltip";
 import { SeerrIcon } from "@/features/provider-ui/provider-icons";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import { CardOverlay } from "./card-overlay";
 import { useCardOverlayInViewport } from "./card-overlay-viewport";
 
 interface SeerrCardActionProps {
-	anilistId: AniListId;
+	source: SourceIdentity;
+	anilistId?: AniListId | undefined;
 	isConfigured: boolean;
 	observeTarget?: Element | null | undefined;
 	tooltipContainer?: FloatingPortalContainer | undefined;
@@ -101,7 +103,10 @@ function getSeerrCardIcon(input: {
 }
 
 function useSeerrCardAction(input: SeerrCardActionProps) {
-	const seerrTargetQuery = useSeerrTarget(input.anilistId, {
+	const seerrTargetQuery = useSeerrTarget({
+		source: input.source,
+		...(input.anilistId === undefined ? {} : { anilistId: input.anilistId }),
+	}, {
 		enabled: input.isConfigured && input.statusEnabled === true,
 	});
 
@@ -244,6 +249,7 @@ function SeerrStackOpenButton(props: {
 }
 
 export function SeerrCardStackActions({
+	source,
 	anilistId,
 	isConfigured,
 	observeTarget,
@@ -254,6 +260,7 @@ export function SeerrCardStackActions({
 }: SeerrCardStackActionsProps): ReactElement | null {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const action = useSeerrCardAction({
+		source,
 		anilistId,
 		isConfigured,
 		statusEnabled: isInViewport,
@@ -309,6 +316,7 @@ export function SeerrCardStackActions({
 }
 
 export function SeerrStandaloneCardOverlay({
+	source,
 	anilistId,
 	isConfigured,
 	observeTarget,
@@ -321,6 +329,7 @@ export function SeerrStandaloneCardOverlay({
 }: SeerrStandaloneCardOverlayProps): ReactElement | null {
 	const isInViewport = useCardOverlayInViewport(observeTarget);
 	const action = useSeerrCardAction({
+		source,
 		anilistId,
 		isConfigured,
 		statusEnabled: isInViewport,

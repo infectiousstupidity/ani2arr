@@ -472,6 +472,13 @@ function makeTitleSearchTerms(
 		if (stripped !== value) {
 			register(stripped, priority + 0.5);
 		}
+
+		if (provider === "sonarr") {
+			const baseTitle = /^(.*)\s+[-–—]\s+\S.*$/.exec(value)?.[1]?.trim();
+			if (baseTitle) {
+				register(baseTitle, priority + 1);
+			}
+		}
 	};
 
 	consider(titles.english, 0);

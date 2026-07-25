@@ -2,9 +2,9 @@
 // src/features/media-modal/types.ts
 
 import type { AniListId, AniListMediaFormat } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/source-identity";
 import type { TmdbId, TvdbId } from "@/providers/schemas";
 import type { Provider } from "@/providers/types";
+import type { SourceRpcInput } from "@/rpc/types";
 
 export type MediaModalView = "setup" | "mapping";
 export type MediaModalOpenSource = "content" | "options-page";
@@ -43,13 +43,12 @@ export type MediaModalTargetSummary = {
 };
 
 type MediaModalStateBase = {
-	anilistId: AniListId;
-	source?: SourceIdentity | undefined;
 	openSource: MediaModalOpenSource;
 	metadataHint?: MediaModalMetadataHint | null;
 };
 
-type ProviderMediaModalStateBase = MediaModalStateBase & {
+type ProviderMediaModalStateBase = MediaModalStateBase &
+	SourceRpcInput & {
 	kind: "provider";
 	provider: Provider;
 	initialView?: MediaModalView;
@@ -63,9 +62,10 @@ export type RadarrMediaModalState = ProviderMediaModalStateBase & {
 	provider: "radarr";
 };
 
-export type SeerrMediaModalState = MediaModalStateBase & {
-	kind: "seerr";
-};
+export type SeerrMediaModalState = MediaModalStateBase &
+	SourceRpcInput & {
+		kind: "seerr";
+	};
 
 export type MediaModalState =
 	| SonarrMediaModalState

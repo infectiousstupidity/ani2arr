@@ -10,6 +10,7 @@ import {
 	getDirectAniListId,
 	requireAniListIdFromInput,
 	resolveAniListIdFromInput,
+	resolveMappingIdentityFromInput,
 } from "./source-input";
 
 vi.mock("@/mapping/upstream.store", () => ({
@@ -58,6 +59,25 @@ describe("canonical AniList RPC input", () => {
 				source: { source: "mal", id: mal(5114) },
 			}),
 		).resolves.toBeNull();
+	});
+
+	it("keeps an unlinked MAL identity for mapping decisions", async () => {
+		const source = { source: "mal", id: mal(63_816) } as const;
+		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(null);
+
+		await expect(resolveMappingIdentityFromInput({ source })).resolves.toEqual(
+			source,
+		);
+	});
+
+	it("uses the canonical identity for a crosswalked source decision", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(aid(20));
+
+		await expect(resolveMappingIdentityFromInput({ source })).resolves.toEqual({
+			source: "anilist",
+			id: aid(20),
+		});
 	});
 
 	it("rejects a MAL mutation without a crosswalk", async () => {

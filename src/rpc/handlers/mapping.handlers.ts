@@ -33,7 +33,10 @@ import { createError } from "@/shared/errors/error-utils";
 import { ErrorCode } from "@/shared/errors/error.types";
 import { bumpMappingsRevision } from "@/rpc/revision-signals";
 import { getMappingInspection } from "@/rpc/mapping-inspection";
-import { requireAniListIdFromInput } from "@/rpc/source-input";
+import {
+	anilistIdFromSource,
+	resolveMappingIdentityFromInput,
+} from "@/rpc/source-input";
 import type {
 	ClearMappingIgnoreInput,
 	ClearMappingRejectedCandidateInput,
@@ -444,17 +447,17 @@ export const mappingHandlers = {
 	},
 
 	async setManualMapping(input: SetManualMappingInput) {
-		const anilistId = await requireAniListIdFromInput(input);
+		const identity = await resolveMappingIdentityFromInput(input);
 		await assertNoConflictingLinkedIds({
 			provider: input.provider,
-			currentAniListId: anilistId,
+			currentAniListId: anilistIdFromSource(identity),
 			providerId: input.providerId,
 			...(input.force === undefined ? {} : { force: input.force }),
 		});
 
 		await mappingService.setManualMapping(
 			input.provider,
-			anilistId,
+			identity,
 			input.providerId,
 		);
 		await bumpMappingsRevision();
@@ -462,31 +465,31 @@ export const mappingHandlers = {
 	},
 
 	async clearManualMapping(input: ClearManualMappingInput) {
-		const anilistId = await requireAniListIdFromInput(input);
-		await mappingService.clearManualMapping(input.provider, anilistId);
+		const identity = await resolveMappingIdentityFromInput(input);
+		await mappingService.clearManualMapping(input.provider, identity);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async setMappingIgnore(input: SetMappingIgnoreInput) {
-		const anilistId = await requireAniListIdFromInput(input);
-		await mappingService.setIgnored(input.provider, anilistId);
+		const identity = await resolveMappingIdentityFromInput(input);
+		await mappingService.setIgnored(input.provider, identity);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async clearMappingIgnore(input: ClearMappingIgnoreInput) {
-		const anilistId = await requireAniListIdFromInput(input);
-		await mappingService.clearIgnored(input.provider, anilistId);
+		const identity = await resolveMappingIdentityFromInput(input);
+		await mappingService.clearIgnored(input.provider, identity);
 		await bumpMappingsRevision();
 		return { ok: true as const };
 	},
 
 	async setMappingRejectedCandidate(input: SetMappingRejectedCandidateInput) {
-		const anilistId = await requireAniListIdFromInput(input);
+		const identity = await resolveMappingIdentityFromInput(input);
 		await mappingService.rejectCandidate(
 			input.provider,
-			anilistId,
+			identity,
 			input.providerId,
 		);
 		await bumpMappingsRevision();
@@ -496,10 +499,10 @@ export const mappingHandlers = {
 	async clearMappingRejectedCandidate(
 		input: ClearMappingRejectedCandidateInput,
 	) {
-		const anilistId = await requireAniListIdFromInput(input);
+		const identity = await resolveMappingIdentityFromInput(input);
 		await mappingService.clearRejectedCandidate(
 			input.provider,
-			anilistId,
+			identity,
 			input.providerId,
 		);
 		await bumpMappingsRevision();

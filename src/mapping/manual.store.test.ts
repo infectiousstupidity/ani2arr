@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { browser } from "wxt/browser";
 import { parseAniListId } from "@/anilist/types";
+import { parseMyAnimeListId } from "@/myanimelist/types";
 import { parseTvdbId } from "@/providers/schemas";
 import {
 	clearManualFacts,
@@ -14,6 +15,7 @@ import {
 } from "./manual.store";
 
 const aid = parseAniListId;
+const mal = parseMyAnimeListId;
 const tvdb = parseTvdbId;
 const MANUAL_STORAGE_KEY = "mapping:manual";
 
@@ -62,7 +64,7 @@ describe("manual mapping store", () => {
 		]);
 	});
 
-	it("reads legacy AniList facts and ignores MAL facts", async () => {
+	it("reads source-native MAL facts without listing them as AniList records", async () => {
 		await browser.storage.local.set({
 			[MANUAL_STORAGE_KEY]: {
 				sonarr: {
@@ -76,12 +78,35 @@ describe("manual mapping store", () => {
 		await expect(getManualFacts("sonarr", aid(1))).resolves.toEqual({
 			mapping: { providerId: tvdb(10) },
 		});
+		await expect(
+			getManualFacts("sonarr", { source: "mal", id: mal(5114) }),
+		).resolves.toEqual({ mapping: { providerId: tvdb(78_874) } });
 		await expect(listAniListManualFacts("sonarr")).resolves.toEqual([
 			{
 				anilistId: aid(1),
 				facts: { mapping: { providerId: tvdb(10) } },
 			},
 		]);
+	});
+
+	it("round-trips a source-native MAL manual decision", async () => {
+		const source = { source: "mal", id: mal(63_816) } as const;
+
+		await setManualMapping("sonarr", source, { providerId: tvdb(424_536) });
+
+		await expect(getManualFacts("sonarr", source)).resolves.toEqual({
+			mapping: { providerId: tvdb(424_536) },
+		});
+		await expect(
+			browser.storage.local.get(MANUAL_STORAGE_KEY),
+		).resolves.toMatchObject({
+			[MANUAL_STORAGE_KEY]: {
+				sonarr: {
+					"mal:63816": { mapping: { providerId: tvdb(424_536) } },
+				},
+			},
+		});
+		await expect(listAniListManualFacts("sonarr")).resolves.toEqual([]);
 	});
 
 	it("reads legacy raw AniList keys", async () => {

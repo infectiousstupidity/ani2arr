@@ -30,22 +30,21 @@ function createDependencies() {
 }
 
 describe("fetchProviderCandidates", () => {
-	it("fetches and converts deduplicated Sonarr candidates", async () => {
+	it("preserves aliases from a representative Frieren Sonarr lookup", async () => {
 		const deps = createDependencies();
-		const tvdbId = parseTvdbId(450_000);
+		const tvdbId = parseTvdbId(424_536);
 		deps.sonarr.lookupSeries.mockResolvedValue([
 			{
 				tvdbId,
-				title: "Kagurabachi",
-				sortTitle: "Kagurabachi",
-				titleSlug: "kagurabachi",
-				folder: "Kagurabachi",
-				year: 2026,
-				genres: ["Action"],
+				title: "Frieren: Beyond Journey's End",
+				sortTitle: "frieren beyond journeys end",
+				titleSlug: "frieren-beyond-journeys-end",
+				folder: "Frieren Beyond Journey's End",
+				year: 2023,
+				genres: ["Adventure", "Animation", "Anime", "Drama", "Fantasy"],
 				alternateTitles: [
-					{ title: " Kagurabachi Alt " },
-					{ title: " " },
-					{ title: null },
+					{ title: "Frieren of the Funeral" },
+					{ title: "Frieren" },
 				],
 			},
 			{
@@ -56,21 +55,25 @@ describe("fetchProviderCandidates", () => {
 		]);
 
 		await expect(
-			fetchProviderCandidates("sonarr", "Kagurabachi", deps.dependencies),
+			fetchProviderCandidates(
+				"sonarr",
+				"Frieren at the Funeral",
+				deps.dependencies,
+			),
 		).resolves.toEqual([
 			{
 				providerId: tvdbId,
-				title: "Kagurabachi",
-				sortTitle: "Kagurabachi",
-				titleSlug: "kagurabachi",
-				alternateTitles: ["Kagurabachi Alt"],
-				year: 2026,
-				genres: ["Action"],
+				title: "Frieren: Beyond Journey's End",
+				sortTitle: "frieren beyond journeys end",
+				titleSlug: "frieren-beyond-journeys-end",
+				alternateTitles: ["Frieren of the Funeral", "Frieren"],
+				year: 2023,
+				genres: ["Adventure", "Animation", "Anime", "Drama", "Fantasy"],
 			},
 		]);
 		expect(deps.getCredentials).toHaveBeenCalledWith("sonarr");
 		expect(deps.sonarr.lookupSeries).toHaveBeenCalledWith(
-			"Kagurabachi",
+			"Frieren at the Funeral",
 			credentials,
 		);
 		expect(deps.radarr.lookupMovies).not.toHaveBeenCalled();

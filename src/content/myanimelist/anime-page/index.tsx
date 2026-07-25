@@ -23,8 +23,7 @@ import {
 	TITLE_SELECTOR,
 	UI_NAME,
 	ensureActionsAnchor,
-	readFormatFromPage,
-	readTitleFromPage,
+	readAnimePageData,
 	removeLayoutArtifacts,
 	waitForElement,
 } from "./layout";
@@ -82,11 +81,11 @@ async function mountAnimePageUI({
 	const source = { source: "mal", id: malId } as const;
 	const mountTarget = ensureActionsAnchor();
 	if (!mountTarget) return;
+	const pageData = readAnimePageData(document);
 
 	const target: AnimePageTarget = {
 		source,
-		format: readFormatFromPage(document),
-		title: readTitleFromPage(document),
+		...pageData,
 	};
 
 	if (!isCurrent()) {

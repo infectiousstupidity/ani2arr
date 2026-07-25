@@ -348,7 +348,7 @@ describe("mappingHandlers", () => {
 
 		expect(mappingService.setManualMapping).toHaveBeenCalledWith(
 			"sonarr",
-			aid(10),
+			anilistSource(aid(10)),
 			tvdb(20),
 		);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
@@ -363,7 +363,10 @@ describe("mappingHandlers", () => {
 			}),
 		).resolves.toEqual({ ok: true });
 
-		expect(mappingService.setIgnored).toHaveBeenCalledWith("sonarr", aid(10));
+		expect(mappingService.setIgnored).toHaveBeenCalledWith(
+			"sonarr",
+			anilistSource(aid(10)),
+		);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 
@@ -377,21 +380,23 @@ describe("mappingHandlers", () => {
 			}),
 		).resolves.toEqual({ ok: true });
 
-		expect(mappingService.setIgnored).toHaveBeenCalledWith("sonarr", aid(10));
+		expect(mappingService.setIgnored).toHaveBeenCalledWith(
+			"sonarr",
+			anilistSource(aid(10)),
+		);
 	});
 
-	it("rejects a MAL mutation without a canonical AniList ID", async () => {
+	it("writes a source-native MAL mutation without a canonical AniList ID", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
+
 		await expect(
 			mappingHandlers.setMappingIgnore({
-				source: { source: "mal", id: mal(5114) },
+				source,
 				provider: "sonarr",
 			}),
-		).rejects.toMatchObject({
-			code: "VALIDATION_ERROR",
-			message: "Mapping changes require a canonical AniList ID.",
-		});
+		).resolves.toEqual({ ok: true });
 
-		expect(mappingService.setIgnored).not.toHaveBeenCalled();
-		expect(bumpMappingsRevisionMock).not.toHaveBeenCalled();
+		expect(mappingService.setIgnored).toHaveBeenCalledWith("sonarr", source);
+		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 });

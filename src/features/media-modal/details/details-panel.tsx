@@ -17,7 +17,7 @@ import { PreviewTargetDetails } from "./preview-target-details";
 export type DetailsPanelProps = {
 	provider: Provider;
 	contentContainer: HTMLDivElement | null;
-	anilistId: AniListId;
+	anilistId?: AniListId | undefined;
 	effectiveMapping: MediaModalTargetSummary | null;
 	previewMapping: MediaModalTargetSummary | null;
 	isInMappingMode: boolean;
