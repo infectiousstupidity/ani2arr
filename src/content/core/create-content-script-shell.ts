@@ -3,7 +3,6 @@
 
 import { browser } from "wxt/browser";
 import type { ContentScriptContext } from "wxt/utils/content-script-context";
-import { awaitBackgroundReady } from "./await-background-ready";
 import {
 	getPublicOptionsSnapshot,
 	PUBLIC_OPTIONS_CHANGE_KEY,
@@ -98,9 +97,6 @@ export const createContentEntrypointShell = (
 						await options.remove();
 						return;
 					}
-
-					await awaitBackgroundReady();
-					if (!isCurrent()) return;
 
 					phase = "mount";
 					await options.mount(shellContext);

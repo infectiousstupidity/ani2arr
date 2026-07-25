@@ -21,16 +21,6 @@ function parseMyAnimeListUrl(url: string): URL | null {
 	}
 }
 
-export function isEarlyBrowseSurface(url: string): boolean {
-	const parsed = parseMyAnimeListUrl(url);
-	if (!parsed) return false;
-
-	return (
-		isBrowsePath(parsed.pathname, "/anime/season") ||
-		parsed.pathname === "/topanime.php"
-	);
-}
-
 export function isBrowseSurface(url: string): boolean {
 	const parsed = parseMyAnimeListUrl(url);
 	if (!parsed) return false;

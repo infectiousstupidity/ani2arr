@@ -253,8 +253,11 @@ export function parseMyAnimeListBrowseCard(
 export const myAnimeListBrowseAdapter: BrowseAdapter = {
 	cardSelector: CARD_SELECTOR,
 	parseCard: parseMyAnimeListBrowseCard,
-	getObserverRoot: () => document.body ?? document.documentElement,
-	getScanRoot: () => document.body ?? null,
+	getObserverRoot: () =>
+		document.querySelector("#content") ??
+		document.body ??
+		document.documentElement,
+	getScanRoot: () => document.querySelector("#content") ?? document.body ?? null,
 	anchorCorner: "top-left",
 	stackDirection: "down",
 };

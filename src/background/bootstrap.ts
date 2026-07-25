@@ -30,23 +30,16 @@ const AniListIdSchema = v.pipe(
 	v.transform((value): AniListId => value as AniListId),
 );
 
-const A2AMessageSchema = v.union([
-	v.object({
-		_a2a: v.literal(true),
-		type: v.literal("a2a:ping"),
-		timestamp: v.number(),
-	}),
-	v.object({
-		_a2a: v.literal(true),
-		type: v.literal("OPEN_OPTIONS_PAGE"),
-		timestamp: v.number(),
-		sectionId: v.optional(
-			v.picklist(["sonarr", "radarr", "seerr", "mappings", "ui", "advanced"]),
-		),
-		targetAnilistId: v.optional(AniListIdSchema),
-		enableSeerrCsrf: v.optional(v.literal(true)),
-	}),
-]);
+const A2AMessageSchema = v.object({
+	_a2a: v.literal(true),
+	type: v.literal("OPEN_OPTIONS_PAGE"),
+	timestamp: v.number(),
+	sectionId: v.optional(
+		v.picklist(["sonarr", "radarr", "seerr", "mappings", "ui", "advanced"]),
+	),
+	targetAnilistId: v.optional(AniListIdSchema),
+	enableSeerrCsrf: v.optional(v.literal(true)),
+});
 
 async function shouldWarmMappingsCache(): Promise<boolean> {
 	try {
@@ -131,26 +124,18 @@ export const bootstrapBackground = (): void => {
 			if (!parsed.success) return;
 			const msg = parsed.output;
 
-			if (msg.type === "a2a:ping") {
-				return settingsInitialization.then(() => ({ ok: true as const }));
+			const params = new URLSearchParams();
+			if (msg.targetAnilistId) {
+				params.set("anilistId", String(msg.targetAnilistId));
 			}
+			if (msg.enableSeerrCsrf) params.set("enableCsrf", "1");
+			const query = params.size > 0 ? `?${params.toString()}` : "";
+			const hash = `${msg.sectionId ?? ""}${query}`;
+			const url = `${browser.runtime.getURL("/options.html")}${hash ? `#${hash}` : ""}`;
 
-			if (msg.type === "OPEN_OPTIONS_PAGE") {
-				const params = new URLSearchParams();
-				if (msg.targetAnilistId) {
-					params.set("anilistId", String(msg.targetAnilistId));
-				}
-				if (msg.enableSeerrCsrf) params.set("enableCsrf", "1");
-				const query = params.size > 0 ? `?${params.toString()}` : "";
-				const hash = `${msg.sectionId ?? ""}${query}`;
-				const url = `${browser.runtime.getURL("/options.html")}${hash ? `#${hash}` : ""}`;
-
-				browser.tabs.create({ url }).catch(() => {
-					browser.runtime.openOptionsPage().catch(() => {});
-				});
-				return;
-			}
-			return;
+			browser.tabs.create({ url }).catch(() => {
+				browser.runtime.openOptionsPage().catch(() => {});
+			});
 		},
 	);
 

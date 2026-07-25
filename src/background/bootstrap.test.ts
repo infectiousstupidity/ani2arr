@@ -66,17 +66,9 @@ describe("bootstrapBackground", () => {
 		getExtensionOptionsSnapshotMock.mockResolvedValue({ debugLogging: true });
 	});
 
-	it("registers immediately but delays readiness and settings work", async () => {
+	it("registers immediately but delays settings work", async () => {
 		const initialization = createDeferred();
 		initializeSettingsStorageMock.mockReturnValue(initialization.promise);
-		let onMessageListener!: Parameters<
-			typeof browser.runtime.onMessage.addListener
-		>[0];
-		const addMessageListener = vi
-			.spyOn(browser.runtime.onMessage, "addListener")
-			.mockImplementation((listener) => {
-				onMessageListener = listener;
-			});
 
 		bootstrapBackground();
 
@@ -84,32 +76,14 @@ describe("bootstrapBackground", () => {
 		expect(registerAni2arrApiMock).toHaveBeenCalledOnce();
 		expect(getExtensionOptionsSnapshotMock).not.toHaveBeenCalled();
 
-		const ping = onMessageListener(
-			{
-				_a2a: true,
-				type: "a2a:ping",
-				timestamp: Date.now(),
-			},
-			{ id: browser.runtime.id } as Browser.runtime.MessageSender,
-			() => {},
-		) as unknown as Promise<unknown>;
-		let pingSettled = false;
-		void ping.then(() => {
-			pingSettled = true;
-		});
-		await Promise.resolve();
-
-		expect(pingSettled).toBe(false);
 		expect(getExtensionOptionsSnapshotMock).not.toHaveBeenCalled();
 
 		initialization.resolve();
 
-		await expect(ping).resolves.toEqual({ ok: true });
 		await vi.waitFor(() => {
 			expect(getExtensionOptionsSnapshotMock).toHaveBeenCalledOnce();
 		});
 		expect(loggerConfigureMock).toHaveBeenCalledWith({ enabled: true });
-		addMessageListener.mockRestore();
 	});
 
 	it("runs the background mapping refresh workflow on startup", async () => {

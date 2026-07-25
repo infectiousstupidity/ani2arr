@@ -1,30 +1,7 @@
 /** Focused URL eligibility tests for MyAnimeList browse surfaces. */
 
 import { describe, expect, it } from "vitest";
-import { isBrowseSurface, isEarlyBrowseSurface } from "./surface";
-
-describe("isEarlyBrowseSurface", () => {
-	it.each([
-		"https://myanimelist.net/anime/season",
-		"https://myanimelist.net/anime/season?letter=A#summer",
-		"https://myanimelist.net/anime/season/2026/summer",
-		"https://myanimelist.net/topanime.php",
-		"https://myanimelist.net/topanime.php?type=movie",
-		"https://myanimelist.net/topanime.php?limit=50#ranking",
-	])("accepts %s", (url) => {
-		expect(isEarlyBrowseSurface(url)).toBe(true);
-	});
-
-	it.each([
-		"https://myanimelist.net/anime/seasonal",
-		"https://myanimelist.net/topanime.php/extra",
-		"https://myanimelist.net/anime/genre/2/Adventure",
-		"https://anilist.co/anime/season",
-		"not a url",
-	])("rejects %s", (url) => {
-		expect(isEarlyBrowseSurface(url)).toBe(false);
-	});
-});
+import { isBrowseSurface } from "./surface";
 
 describe("isBrowseSurface", () => {
 	it.each([
