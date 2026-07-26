@@ -52,11 +52,14 @@ describe("toSeerrRequestInput", () => {
 			source: "manual",
 		};
 
-		expect(toSeerrRequestInput(target, [2])).toEqual({
+		const requestInput = toSeerrRequestInput(target, [2]);
+
+		expect(requestInput).toEqual({
 			mediaType: "tv",
 			tmdbId: tmdb(200),
 			seasons: [2],
 		});
+		expect(target.seasons).toEqual([1, 2]);
 	});
 
 	it("requires request scope for a show-only target", () => {

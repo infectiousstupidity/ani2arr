@@ -159,6 +159,8 @@ export const queryKeys = {
 						tmdbId: input.tmdbId,
 					},
 		] as const,
+	seerrPublicSettings: () =>
+		[...rootQueryKey, "seerr", "publicSettings"] as const,
 	seerrLinkedAniListEntriesRoot: () =>
 		[...rootQueryKey, "seerr", "linkedAniListEntries"] as const,
 	seerrLinkedAniListEntries: (

@@ -1,18 +1,32 @@
-/** Seerr request modal view with request mutation and season selection state. */
+/** Seerr request modal view with request mutation and modal-local scope state. */
 // src/features/media-modal/seerr/seerr-request-view.tsx
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { AniListId } from "@/anilist/types";
 import { toSeerrRequestInput } from "@/features/seerr-request/seerr-request-input";
+import {
+	getSeerrRequestScopeDecision,
+	type SeerrRequestScope,
+	type SeerrRequestScopeDecision,
+} from "@/features/seerr-request/seerr-request-scope";
 import { isRequestableSeerrStatus } from "@/providers/seerr/request";
-import type { SeerrMediaDetails } from "@/providers/seerr/types";
+import type {
+	SeerrMediaDetails,
+	SeerrMediaStatus,
+	SeerrPublicSettings,
+} from "@/providers/seerr/types";
 import {
 	useClearManualSeerrTarget,
 	useRequestInSeerr,
 	useSeerrLinkedAniListEntries,
+	useSeerrMediaStatus,
 } from "@/queries/seerr";
 import { openOptionsPage } from "@/rpc/runtime-messages";
-import type { SeerrRequestTarget, SourceRpcInput } from "@/rpc/types";
+import type {
+	RequestInSeerrInput,
+	SeerrRequestTarget,
+	SourceRpcInput,
+} from "@/rpc/types";
 import { getUserErrorMessage } from "@/shared/errors/error-utils";
 import type { ExtensionError } from "@/shared/errors/error.types";
 import type { MediaModalContainer } from "../types";
@@ -21,33 +35,53 @@ import { SeerrFooter } from "./seerr-footer";
 import { SeerrRequestInfoPane } from "./seerr-request-info-pane";
 import { SeerrRequestMainPane } from "./seerr-request-main-pane";
 import { getSeerrConnectionRecovery } from "./seerr-connection-recovery";
-import {
-	getDefaultSelectedSeasons,
-	getSeerrDetailsSeasonKey,
-	getSeerrTargetSeasonKey,
-	getRequestableSeasonNumbers,
-	toggleSeasonSelection,
-	type SeerrSeasonDraft,
-} from "./seerr-selection";
+import { getMappedSeasonsForDetails } from "./seerr-selection";
+
+type SeerrRequestScopeDraft = {
+	key: string;
+	scope: SeerrRequestScope;
+};
+
+const UNAVAILABLE_TV_SCOPE = {
+	canChooseScope: false,
+	canRequestWholeSeries: false,
+	mappedSeasons: [],
+	defaultScope: "all" as const,
+} satisfies SeerrRequestScopeDecision;
+
+type SeerrTvRequestState = {
+	decision: SeerrRequestScopeDecision;
+	key: string;
+	selectedScope: SeerrRequestScope;
+};
 
 function getSeerrRequestFeedback(input: {
 	isConfigured: boolean;
 	authMode: "session" | "apiKey" | null;
 	detailsError: ExtensionError | null;
+	publicSettingsError: ExtensionError | null;
+	statusError: ExtensionError | null;
 	requestError: ExtensionError | null;
 }) {
+	const loadError =
+		input.detailsError ?? input.publicSettingsError ?? input.statusError;
 	const connectionRecovery = getSeerrConnectionRecovery({
 		isConfigured: input.isConfigured,
 		authMode: input.authMode,
-		errors: [input.detailsError, input.requestError],
+		errors: [
+			input.detailsError,
+			input.publicSettingsError,
+			input.statusError,
+			input.requestError,
+		],
 	});
 
 	return {
 		connectionRecovery,
-		detailsErrorMessage: input.detailsError
+		detailsErrorMessage: loadError
 			? getUserErrorMessage(
-					input.detailsError,
-					"Failed to load Seerr media details.",
+					loadError,
+					"Failed to load Seerr request details.",
 				)
 			: null,
 		requestErrorMessage: input.requestError
@@ -56,17 +90,133 @@ function getSeerrRequestFeedback(input: {
 	};
 }
 
+function isTvScopeRequestable(
+	scope: SeerrRequestScope,
+	status: SeerrMediaStatus | undefined,
+): boolean {
+	if (status === undefined) return false;
+	if (scope === "mapped") return isRequestableSeerrStatus(status);
+
+	return !["available", "pending", "processing", "deleted-or-blocked"].includes(
+		status,
+	);
+}
+
+function getMappedScopeLabel(mappedSeasons: readonly number[]): string {
+	return mappedSeasons.length === 1
+		? `Request Season ${mappedSeasons[0]}`
+		: "Request mapped seasons";
+}
+
+function getSeerrTvRequestState(input: {
+	target: SeerrRequestTarget | null;
+	details: SeerrMediaDetails | null;
+	publicSettings: SeerrPublicSettings | null;
+	draft: SeerrRequestScopeDraft | null;
+}): SeerrTvRequestState {
+	if (input.target?.mediaType !== "tv") {
+		return { decision: UNAVAILABLE_TV_SCOPE, key: "", selectedScope: "all" };
+	}
+
+	const mappedSeasons = getMappedSeasonsForDetails({
+		mappedSeasons: input.target.seasons,
+		tmdbMappedSeasons: input.target.tmdbSeasons,
+		tvdbMappedSeasons: input.target.tvdbSeasons,
+		seasons: input.details?.seasons,
+	});
+	const decision =
+		input.details === null || input.publicSettings === null
+			? UNAVAILABLE_TV_SCOPE
+			: getSeerrRequestScopeDecision({
+					partialRequestsEnabled:
+						input.publicSettings.partialRequestsEnabled,
+					enableSpecialEpisodes: input.publicSettings.enableSpecialEpisodes,
+					mappedSeasons,
+					seasons: input.details.seasons ?? [],
+				});
+	const key = `${input.target.tmdbId}:${decision.mappedSeasons.join(",")}:${decision.canChooseScope}`;
+	const draftApplies =
+		input.draft?.key === key &&
+		(input.draft.scope === "all" || decision.canChooseScope);
+
+	return {
+		decision,
+		key,
+		selectedScope: draftApplies
+			? input.draft?.scope ?? decision.defaultScope
+			: decision.defaultScope,
+	};
+}
+
+function getRequestInput(
+	target: SeerrRequestTarget | null,
+	tvState: SeerrTvRequestState,
+): RequestInSeerrInput | null {
+	if (target?.mediaType !== "tv") return toSeerrRequestInput(target);
+
+	const seasons =
+		tvState.selectedScope === "mapped"
+			? tvState.decision.mappedSeasons
+			: "all";
+	return toSeerrRequestInput(target, seasons);
+}
+
 function canRequestInSeerr(input: {
 	isConfigured: boolean;
 	needsConnectionRecovery: boolean;
 	target: SeerrRequestTarget | null;
-	selectedSeasons: readonly number[];
+	tvState: SeerrTvRequestState;
+	tvStatus: SeerrMediaStatus | undefined;
 	isMovieRequestable: boolean;
 }): boolean {
 	if (!input.isConfigured || input.needsConnectionRecovery) return false;
-	return input.target?.mediaType === "tv"
-		? input.selectedSeasons.length > 0
-		: input.isMovieRequestable;
+	if (input.target?.mediaType !== "tv") return input.isMovieRequestable;
+
+	const scopeAvailable =
+		input.tvState.selectedScope === "mapped"
+			? input.tvState.decision.canChooseScope
+			: input.tvState.decision.canRequestWholeSeries;
+	return (
+		scopeAvailable &&
+		isTvScopeRequestable(input.tvState.selectedScope, input.tvStatus)
+	);
+}
+
+function getRequestLabel(
+	target: SeerrRequestTarget | null,
+	tvState: SeerrTvRequestState,
+): string {
+	if (target?.mediaType !== "tv") return "Request movie";
+	if (tvState.selectedScope === "mapped") {
+		return `${getMappedScopeLabel(tvState.decision.mappedSeasons)} in Seerr`;
+	}
+	return "Request whole series in Seerr";
+}
+
+function shouldLoadTvStatus(input: {
+	isConfigured: boolean;
+	target: SeerrRequestTarget | null;
+	details: SeerrMediaDetails | null;
+	publicSettings: SeerrPublicSettings | null;
+	requestInput: RequestInSeerrInput | null;
+}): boolean {
+	return (
+		input.isConfigured &&
+		input.target?.mediaType === "tv" &&
+		input.details !== null &&
+		input.publicSettings !== null &&
+		input.requestInput !== null
+	);
+}
+
+function isRequestDataLoading(input: {
+	isLoading: boolean;
+	statusEnabled: boolean;
+	hasStatus: boolean;
+	hasStatusError: boolean;
+}): boolean {
+	if (input.isLoading) return true;
+	return input.statusEnabled && !input.hasStatus && !input.hasStatusError;
 }
 
 export function SeerrRequestView(props: {
@@ -77,6 +227,8 @@ export function SeerrRequestView(props: {
 	contentContainer: HTMLDivElement | null;
 	details: SeerrMediaDetails | null;
 	detailsError: ExtensionError | null;
+	publicSettings: SeerrPublicSettings | null;
+	publicSettingsError: ExtensionError | null;
 	header: ReactNode;
 	isConfigured: boolean;
 	isLoading: boolean;
@@ -92,6 +244,8 @@ export function SeerrRequestView(props: {
 		contentContainer,
 		details,
 		detailsError,
+		publicSettings,
+		publicSettingsError,
 		header,
 		isConfigured,
 		isLoading,
@@ -99,41 +253,44 @@ export function SeerrRequestView(props: {
 		onClose,
 		target,
 	} = props;
-	const [selectedSeasonDraft, setSelectedSeasonDraft] =
-		useState<SeerrSeasonDraft | null>(null);
+	const [scopeDraft, setScopeDraft] =
+		useState<SeerrRequestScopeDraft | null>(null);
 	const request = useRequestInSeerr();
 	const clearManualTarget = useClearManualSeerrTarget();
 	const linkedEntriesQuery = useSeerrLinkedAniListEntries({
 		input: target ? { mediaType: target.mediaType, tmdbId: target.tmdbId } : null,
 		enabled: isConfigured && target !== null,
 	});
-	const detailsSeasonKey = useMemo(
-		() => getSeerrDetailsSeasonKey(details?.seasons),
-		[details?.seasons],
-	);
-	const targetSeasonKey = getSeerrTargetSeasonKey(target);
-	const selectedSeasonKey =
-		target?.mediaType === "tv"
-			? `${target.tmdbId}:${targetSeasonKey}:${detailsSeasonKey}`
-			: "";
-	const defaultSelectedSeasons = useMemo(() => {
-		if (target?.mediaType !== "tv" || details === null) return [];
-
-		return getDefaultSelectedSeasons({
-			mappedSeasons: target.seasons,
-			tmdbMappedSeasons: target.tmdbSeasons,
-			tvdbMappedSeasons: target.tvdbSeasons,
-			seasons: details.seasons,
-		});
-	}, [details, target]);
-	const selectedSeasons =
-		selectedSeasonDraft?.key === selectedSeasonKey
-			? selectedSeasonDraft.seasons
-			: defaultSelectedSeasons;
+	const tvState = getSeerrTvRequestState({
+		target,
+		details,
+		publicSettings,
+		draft: scopeDraft,
+	});
+	const requestInput = getRequestInput(target, tvState);
+	const statusEnabled = shouldLoadTvStatus({
+		isConfigured,
+		target,
+		details,
+		publicSettings,
+		requestInput,
+	});
+	const statusQuery = useSeerrMediaStatus({
+		requestInput,
+		enabled: statusEnabled,
+	});
+	const isRequestLoading = isRequestDataLoading({
+		isLoading,
+		statusEnabled,
+		hasStatus: statusQuery.data !== undefined,
+		hasStatusError: statusQuery.isError,
+	});
 	const feedback = getSeerrRequestFeedback({
 		isConfigured,
 		authMode,
 		detailsError,
+		publicSettingsError,
+		statusError: statusQuery.error,
 		requestError: request.error,
 	});
 	const isMovieRequestable =
@@ -144,11 +301,12 @@ export function SeerrRequestView(props: {
 		isConfigured,
 		needsConnectionRecovery: feedback.connectionRecovery !== null,
 		target,
-		selectedSeasons,
+		tvState,
+		tvStatus: statusQuery.data?.status,
 		isMovieRequestable,
 	});
-	const requestLabel =
-		target?.mediaType === "tv" ? "Request selected" : "Request movie";
+	const mappedScopeLabel = getMappedScopeLabel(tvState.decision.mappedSeasons);
+	const requestLabel = getRequestLabel(target, tvState);
 	const isBusy = request.isPending || clearManualTarget.isPending;
 
 	const handleRequest = (): void => {
@@ -157,10 +315,13 @@ export function SeerrRequestView(props: {
 			return;
 		}
 
-		const requestInput = toSeerrRequestInput(target, selectedSeasons);
 		if (!requestInput) return;
 
 		request.mutate(requestInput);
+	};
+	const handleScopeChange = (scope: SeerrRequestScope): void => {
+		request.reset();
+		setScopeDraft({ key: tvState.key, scope });
 	};
 
 	const handleConnectionAction = (): void => {
@@ -183,25 +344,15 @@ export function SeerrRequestView(props: {
 			leftPane={
 				<SeerrRequestMainPane
 					target={target}
-					details={details}
-					isLoading={isLoading}
+					isLoading={isRequestLoading}
 					errorMessage={feedback.detailsErrorMessage}
-					selectedSeasons={selectedSeasons}
+					canChooseScope={tvState.decision.canChooseScope}
+					mappedScopeLabel={mappedScopeLabel}
+					selectedScope={tvState.selectedScope}
 					requestError={feedback.requestErrorMessage}
 					connectionActionLabel={feedback.connectionRecovery?.label ?? null}
 					onConnectionAction={handleConnectionAction}
-					onSelectAllRequestable={() =>
-						setSelectedSeasonDraft({
-							key: selectedSeasonKey,
-							seasons: getRequestableSeasonNumbers(details?.seasons),
-						})
-					}
-					onToggleSeason={(seasonNumber) =>
-						setSelectedSeasonDraft({
-							key: selectedSeasonKey,
-							seasons: toggleSeasonSelection(selectedSeasons, seasonNumber),
-						})
-					}
+					onScopeChange={handleScopeChange}
 				/>
 			}
 			rightPane={

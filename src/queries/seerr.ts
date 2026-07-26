@@ -9,6 +9,7 @@ import { getAni2arrApi } from "@/rpc";
 import type {
 	GetSeerrMediaDetailsInput,
 	GetSeerrMediaDetailsOutput,
+	GetSeerrPublicSettingsOutput,
 	GetSeerrLinkedAniListEntriesInput,
 	GetSeerrLinkedAniListEntriesOutput,
 	GetSeerrMediaStatusOutput,
@@ -135,6 +136,16 @@ export const useSeerrMediaDetails = (options: {
 			return getAni2arrApi().getSeerrMediaDetails(options.input);
 		},
 		enabled: (options.enabled ?? true) && options.input !== null,
+		staleTime: 60 * 1000,
+		refetchOnWindowFocus: false,
+		retry: shouldRetrySeerrQuery,
+	});
+
+export const useSeerrPublicSettings = (options?: { enabled?: boolean }) =>
+	useQuery<GetSeerrPublicSettingsOutput, ExtensionError>({
+		queryKey: queryKeys.seerrPublicSettings(),
+		queryFn: () => getAni2arrApi().getSeerrPublicSettings(),
+		enabled: options?.enabled ?? true,
 		staleTime: 60 * 1000,
 		refetchOnWindowFocus: false,
 		retry: shouldRetrySeerrQuery,

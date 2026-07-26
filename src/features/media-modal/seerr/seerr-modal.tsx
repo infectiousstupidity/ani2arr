@@ -3,7 +3,11 @@
 
 import { useState } from "react";
 import type { SeerrMediaDetails, SeerrSearchResult } from "@/providers/seerr/types";
-import { useSeerrMediaDetails, useSeerrTarget } from "@/queries/seerr";
+import {
+	useSeerrMediaDetails,
+	useSeerrPublicSettings,
+	useSeerrTarget,
+} from "@/queries/seerr";
 import type { SeerrRequestTarget } from "@/rpc/types";
 import { getDirectAniListId, sourceFromInput } from "@/rpc/source-input";
 import type { MappingConnectorState } from "../chrome/mapping-connector";
@@ -31,6 +35,23 @@ function getTargetTitle(input: {
 	if (input.details) return input.details.title;
 	if (!input.target) return "No Seerr target";
 	return `${input.target.mediaType === "movie" ? "Movie" : "TV"} TMDB ID: ${input.target.tmdbId}`;
+}
+
+function shouldLoadSeerrPublicSettings(input: {
+	isConfigured: boolean;
+	target: SeerrRequestTarget | null;
+}): boolean {
+	return input.isConfigured && input.target?.mediaType === "tv";
+}
+
+function isSeerrRequestDataLoading(input: {
+	targetLoading: boolean;
+	detailsLoading: boolean;
+	publicSettingsLoading: boolean;
+	target: SeerrRequestTarget | null;
+}): boolean {
+	if (input.targetLoading || input.detailsLoading) return true;
+	return input.target?.mediaType === "tv" && input.publicSettingsLoading;
 }
 
 export function SeerrModal({
@@ -68,6 +89,9 @@ export function SeerrModal({
 	const detailsQuery = useSeerrMediaDetails({
 		input: target ? { mediaType: target.mediaType, tmdbId: target.tmdbId } : null,
 		enabled: isConfigured && target !== null,
+	});
+	const publicSettingsQuery = useSeerrPublicSettings({
+		enabled: shouldLoadSeerrPublicSettings({ isConfigured, target }),
 	});
 	const details = detailsQuery.data ?? null;
 	const targetTitle = getTargetTitle({ target, details });
@@ -114,9 +138,16 @@ export function SeerrModal({
 			contentContainer={contentContainer}
 			details={details}
 			detailsError={detailsQuery.error ?? null}
+			publicSettings={publicSettingsQuery.data ?? null}
+			publicSettingsError={publicSettingsQuery.error ?? null}
 			header={header}
 			isConfigured={isConfigured}
-			isLoading={targetQuery.isLoading || detailsQuery.isLoading}
+			isLoading={isSeerrRequestDataLoading({
+				targetLoading: targetQuery.isLoading,
+				detailsLoading: detailsQuery.isLoading,
+				publicSettingsLoading: publicSettingsQuery.isLoading,
+				target,
+			})}
 			onChangeTarget={() => setView("change-target")}
 			onClose={onClose}
 			target={target}

@@ -145,6 +145,11 @@ export const seerrHandlers = {
 		return seerrClient.getMediaDetails(input, connection);
 	},
 
+	async getSeerrPublicSettings() {
+		const connection = await requireSeerrConnection();
+		return seerrClient.getPublicSettings(connection);
+	},
+
 	async getSeerrLinkedAniListEntries(input: GetSeerrLinkedAniListEntriesInput) {
 		const targets = await listAllEffectiveSeerrTargets();
 		const ids = targets

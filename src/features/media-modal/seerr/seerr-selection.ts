@@ -158,23 +158,26 @@ function getSeerrSeasonShape(
 	return "unknown";
 }
 
-function chooseMappedSeasons(input: {
+export function getMappedSeasonsForDetails(input: {
 	mappedSeasons?: readonly number[] | undefined;
 	tmdbMappedSeasons?: readonly number[] | undefined;
 	tvdbMappedSeasons?: readonly number[] | undefined;
 	seasons: readonly SeerrSeasonStatus[] | undefined;
-}): readonly number[] {
+}): number[] {
 	const shape = getSeerrSeasonShape(input.seasons);
+	let mappedSeasons: readonly number[];
 
 	if (shape === "tvdb" && input.tvdbMappedSeasons?.length) {
-		return input.tvdbMappedSeasons;
+		mappedSeasons = input.tvdbMappedSeasons;
+	} else if (shape === "tmdb" && input.tmdbMappedSeasons?.length) {
+		mappedSeasons = input.tmdbMappedSeasons;
+	} else {
+		mappedSeasons = input.mappedSeasons ?? [];
 	}
 
-	if (shape === "tmdb" && input.tmdbMappedSeasons?.length) {
-		return input.tmdbMappedSeasons;
-	}
-
-	return input.mappedSeasons ?? [];
+	return [...new Set(mappedSeasons)]
+		.filter((season) => Number.isSafeInteger(season) && season >= 0)
+		.toSorted((left, right) => left - right);
 }
 
 export function getDefaultSelectedSeasons(input: {
@@ -184,11 +187,9 @@ export function getDefaultSelectedSeasons(input: {
 	seasons: readonly SeerrSeasonStatus[] | undefined;
 }): number[] {
 	const requestable = new Set(getRequestableSeasonNumbers(input.seasons));
-	const mappedSeasons = chooseMappedSeasons(input);
+	const mappedSeasons = getMappedSeasonsForDetails(input);
 
-	return [...new Set(mappedSeasons)]
-		.filter((season) => requestable.has(season))
-		.toSorted((left, right) => left - right);
+	return mappedSeasons.filter((season) => requestable.has(season));
 }
 
 export function toggleSeasonSelection(

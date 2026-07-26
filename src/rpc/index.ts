@@ -54,6 +54,7 @@ import type {
 	GetSeerrMediaStatusOutput,
 	GetSeerrMediaDetailsInput,
 	GetSeerrMediaDetailsOutput,
+	GetSeerrPublicSettingsOutput,
 	GetSeerrLinkedAniListEntriesInput,
 	GetSeerrLinkedAniListEntriesOutput,
 	GetSeerrTargetInput,
@@ -103,6 +104,7 @@ export interface Ani2arrApi {
 	getSeerrMediaDetails(
 		input: GetSeerrMediaDetailsInput,
 	): Promise<GetSeerrMediaDetailsOutput>;
+	getSeerrPublicSettings(): Promise<GetSeerrPublicSettingsOutput>;
 	getSeerrLinkedAniListEntries(
 		input: GetSeerrLinkedAniListEntriesInput,
 	): Promise<GetSeerrLinkedAniListEntriesOutput>;

@@ -22,6 +22,7 @@ import type {
 	SeerrMediaDetails,
 	SeerrMediaRequest,
 	SeerrMediaStatus,
+	SeerrPublicSettings,
 	SeerrSearchResult,
 	SeerrTargetSource,
 	SeerrTvSeasons,
@@ -238,6 +239,8 @@ export type GetSeerrMediaDetailsInput =
 	  };
 
 export type GetSeerrMediaDetailsOutput = SeerrMediaDetails;
+
+export type GetSeerrPublicSettingsOutput = SeerrPublicSettings;
 
 export type GetSeerrLinkedAniListEntriesInput =
 	| {
