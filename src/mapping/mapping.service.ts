@@ -42,24 +42,37 @@ export class MappingService {
 		provider: Provider,
 		source: SourceIdentity,
 	): Promise<{
-		cacheIdentity: SourceIdentity;
-		canonicalAniListId: AniListId | null;
+		identity: SourceIdentity;
+		anilistId: AniListId | null;
 		manual: ManualFacts | null;
 		upstream: UpstreamTarget[];
 		result: MappingResult;
 	}> {
 		const upstream = await getSourceUpstreamMapping(provider, source);
-		const cacheIdentity: SourceIdentity =
-			upstream.anilistId === null
-				? source
-				: { source: "anilist", id: upstream.anilistId };
-		const [manual, auto] = await Promise.all([
-			getManualFacts(provider, cacheIdentity),
-			getAutoResult(provider, cacheIdentity),
+		const legacyIdentity =
+			source.source === "mal" && upstream.anilistId !== null
+				? ({ source: "anilist", id: upstream.anilistId } as const)
+				: null;
+		const [directManual, directAuto] = await Promise.all([
+			getManualFacts(provider, source),
+			getAutoResult(provider, source),
 		]);
+		const [legacyManual, legacyAuto] =
+			legacyIdentity === null
+				? [null, null]
+				: await Promise.all([
+						directManual === null
+							? getManualFacts(provider, legacyIdentity)
+							: null,
+						directAuto === null
+							? getAutoResult(provider, legacyIdentity)
+							: null,
+					]);
+		const manual = directManual ?? legacyManual;
+		const auto = directAuto ?? legacyAuto;
 		return {
-			cacheIdentity,
-			canonicalAniListId: upstream.anilistId,
+			identity: source,
+			anilistId: upstream.anilistId,
 			manual,
 			upstream: upstream.targets,
 			result: chooseMappingResult({
@@ -100,8 +113,8 @@ export class MappingService {
 
 		await this.resolveAutomaticMapping({
 			provider,
-			cacheIdentity: currentState.cacheIdentity,
-			canonicalAniListId: currentState.canonicalAniListId,
+			identity: currentState.identity,
+			anilistId: currentState.anilistId,
 			rejectedProviderIds:
 				current.kind === "unmapped" ? (current.rejectedProviderIds ?? []) : [],
 			...(options?.title === undefined ? {} : { title: options.title }),
@@ -110,7 +123,7 @@ export class MappingService {
 				: { metadata: options.metadata }),
 		});
 
-		const auto = await getAutoResult(provider, currentState.cacheIdentity);
+		const auto = await getAutoResult(provider, currentState.identity);
 		return chooseMappingResult({
 			provider,
 			manual: currentState.manual,

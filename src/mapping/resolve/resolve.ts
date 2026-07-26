@@ -20,8 +20,8 @@ import type { SearchMedia } from "./title-matching";
 
 export type AutomaticResolver = (request: {
 	provider: Provider;
-	cacheIdentity: SourceIdentity;
-	canonicalAniListId: AniListId | null;
+	identity: SourceIdentity;
+	anilistId: AniListId | null;
 	rejectedProviderIds: number[];
 	title?: string;
 	metadata?: AniListMediaHint | null;
@@ -65,8 +65,7 @@ export function createAutomaticResolver(dependencies: {
 	searchProviderCandidates: ProviderCandidateSearch;
 }): AutomaticResolver {
 	return async function resolveAutomaticMapping(request): Promise<boolean> {
-		const { provider, cacheIdentity, canonicalAniListId, rejectedProviderIds } =
-			request;
+		const { provider, identity, anilistId, rejectedProviderIds } = request;
 		const searchedTitleKeys = new Set<string>();
 		const search = (candidateMedia: SearchMedia) =>
 			searchCandidate({
@@ -84,12 +83,10 @@ export function createAutomaticResolver(dependencies: {
 		let match = hintMedia ? await search(hintMedia) : null;
 		let canonicalMedia: AniListMedia | null = null;
 
-		if (!match && canonicalAniListId !== null) {
+		if (!match && anilistId !== null) {
 			try {
 				canonicalMedia =
-					await dependencies.anilistMedia.fetchMediaWithRelations(
-						canonicalAniListId,
-					);
+					await dependencies.anilistMedia.fetchMediaWithRelations(anilistId);
 			} catch {
 				return false;
 			}
@@ -132,7 +129,7 @@ export function createAutomaticResolver(dependencies: {
 
 		await setAutoResult(
 			provider,
-			cacheIdentity,
+			identity,
 			match
 				? {
 						kind: "mapped",

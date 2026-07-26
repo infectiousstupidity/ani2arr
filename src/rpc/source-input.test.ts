@@ -1,16 +1,14 @@
-/** Tests for canonical AniList resolution at the RPC boundary. */
+/** Tests for source identity and optional AniList resolution at the RPC boundary. */
 // src/rpc/source-input.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
 import { getUniqueAniListIdForSource } from "@/mapping/upstream.store";
 import { parseMyAnimeListId } from "@/myanimelist/types";
-import { ErrorCode } from "@/shared/errors/error.types";
 import {
 	getDirectAniListId,
-	requireAniListIdFromInput,
 	resolveAniListIdFromInput,
-	resolveMappingIdentityFromInput,
+	sourceFromInput,
 } from "./source-input";
 
 vi.mock("@/mapping/upstream.store", () => ({
@@ -20,7 +18,7 @@ vi.mock("@/mapping/upstream.store", () => ({
 const aid = parseAniListId;
 const mal = parseMyAnimeListId;
 
-describe("canonical AniList RPC input", () => {
+describe("source RPC input", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
@@ -61,35 +59,16 @@ describe("canonical AniList RPC input", () => {
 		).resolves.toBeNull();
 	});
 
-	it("keeps an unlinked MAL identity for mapping decisions", async () => {
-		const source = { source: "mal", id: mal(63_816) } as const;
-		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(null);
-
-		await expect(resolveMappingIdentityFromInput({ source })).resolves.toEqual(
-			source,
-		);
-	});
-
-	it("uses the canonical identity for a crosswalked source decision", async () => {
+	it("keeps the supplied source as the mapping identity", () => {
 		const source = { source: "mal", id: mal(5114) } as const;
-		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(aid(20));
 
-		await expect(resolveMappingIdentityFromInput({ source })).resolves.toEqual({
+		expect(sourceFromInput({ source, anilistId: aid(20) })).toEqual(source);
+		expect(sourceFromInput({ source })).toEqual(source);
+		expect(sourceFromInput({ anilistId: aid(20) })).toEqual({
 			source: "anilist",
 			id: aid(20),
 		});
+		expect(getUniqueAniListIdForSource).not.toHaveBeenCalled();
 	});
 
-	it("rejects a MAL mutation without a crosswalk", async () => {
-		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(null);
-
-		await expect(
-			requireAniListIdFromInput({
-				source: { source: "mal", id: mal(5114) },
-			}),
-		).rejects.toMatchObject({
-			code: ErrorCode.VALIDATION_ERROR,
-			message: "Mapping changes require a canonical AniList ID.",
-		});
-	});
 });

@@ -341,41 +341,51 @@ describe("MappingService", () => {
 		expect(resolver).not.toHaveBeenCalled();
 	});
 
-	it("applies one canonical manual decision over differing source facts", async () => {
-		const anilistId = aid(21);
+	it("prefers source-native manual facts and uses the linked AniList fact only as fallback", async () => {
+		const firstAniListId = aid(21);
+		const secondAniListId = aid(22);
 		const source = { source: "mal", id: mal(5114) } as const;
-		storeRecords.aliases.set(sourceIdentityKey(source), anilistId);
-		storeRecords.upstream = [
-			{
-				anilistId,
-				targets: [{ provider: "sonarr", providerId: tvdb(100) }],
-			},
-		];
-		storeRecords.sourceFacts = [
-			{
-				source,
-				targets: [{ provider: "sonarr", providerId: tvdb(200) }],
-			},
-		];
+		storeRecords.aliases.set(sourceIdentityKey(source), firstAniListId);
 		storeRecords.manual = [
 			{
 				provider: "sonarr",
-				identity: anilistSource(anilistId),
+				identity: anilistSource(firstAniListId),
 				facts: { mapping: { providerId: tvdb(300) } },
+			},
+			{
+				provider: "sonarr",
+				identity: anilistSource(secondAniListId),
+				facts: { mapping: { providerId: tvdb(500) } },
+			},
+			{
+				provider: "sonarr",
+				identity: source,
+				facts: { mapping: { providerId: tvdb(400) } },
 			},
 		];
 
 		await expect(service().getMapping("sonarr", source)).resolves.toEqual({
 			kind: "mapped",
 			source: "manual",
-			providerId: tvdb(300),
+			providerId: tvdb(400),
 		});
+
+		storeRecords.aliases.set(sourceIdentityKey(source), secondAniListId);
 		await expect(
-			service().getMapping("sonarr", anilistSource(anilistId)),
+			service().getMapping("sonarr", source),
 		).resolves.toEqual({
 			kind: "mapped",
 			source: "manual",
-			providerId: tvdb(300),
+			providerId: tvdb(400),
+		});
+
+		storeRecords.manual = storeRecords.manual.filter(
+			(record) => sourceIdentityKey(record.identity) !== sourceIdentityKey(source),
+		);
+		await expect(service().getMapping("sonarr", source)).resolves.toEqual({
+			kind: "mapped",
+			source: "manual",
+			providerId: tvdb(500),
 		});
 	});
 
@@ -420,27 +430,30 @@ describe("MappingService", () => {
 		});
 		expect(resolver).toHaveBeenCalledWith({
 			provider: "sonarr",
-			cacheIdentity: source,
-			canonicalAniListId: null,
+			identity: source,
+			anilistId: null,
 			rejectedProviderIds: [],
 			title: "MAL Page Title",
 		});
 		expect(getSourceUpstreamMapping).toHaveBeenCalledOnce();
 	});
 
-	it("uses the canonical AniList identity for crosswalked MAL resolution", async () => {
+	it("uses the MAL identity and linked AniList metadata for crosswalked resolution", async () => {
 		const source = { source: "mal", id: mal(59_999) } as const;
 		const anilistId = aid(211_496);
-		const identity = anilistSource(anilistId);
 		storeRecords.aliases.set(sourceIdentityKey(source), anilistId);
+		replaceAuto("sonarr", anilistSource(anilistId), { kind: "unmapped" });
 		const resolver = vi.fn(async () => {
-			replaceAuto("sonarr", identity, {
+			replaceAuto("sonarr", source, {
 				kind: "mapped",
 				providerId: tvdb(1000),
 			});
 			return true;
 		});
 		const mappingService = new MappingService(resolver);
+		await expect(
+			mappingService.getMapping("sonarr", source),
+		).resolves.toEqual({ kind: "unmapped", hadResolveAttempt: true });
 
 		await expect(
 			mappingService.resolveMapping("sonarr", source, {
@@ -454,18 +467,14 @@ describe("MappingService", () => {
 		});
 		expect(resolver).toHaveBeenCalledWith({
 			provider: "sonarr",
-			cacheIdentity: identity,
-			canonicalAniListId: anilistId,
+			identity: source,
+			anilistId,
 			rejectedProviderIds: [],
 			title: "Crosswalked MAL Page Title",
 		});
 		await expect(
-			mappingService.getMapping("sonarr", identity),
-		).resolves.toEqual({
-			kind: "mapped",
-			source: "auto",
-			providerId: tvdb(1000),
-		});
+			mappingService.getMapping("sonarr", anilistSource(anilistId)),
+		).resolves.toEqual({ kind: "unmapped", hadResolveAttempt: true });
 	});
 
 	it("computes linked AniList IDs for multiple provider IDs in one scan", async () => {
@@ -584,8 +593,8 @@ describe("MappingService", () => {
 		});
 		expect(resolver).toHaveBeenCalledWith({
 			provider: "sonarr",
-			cacheIdentity: anilistSource(anilistId),
-			canonicalAniListId: anilistId,
+			identity: anilistSource(anilistId),
+			anilistId,
 			rejectedProviderIds: [],
 			title: "Kagurabachi",
 		});

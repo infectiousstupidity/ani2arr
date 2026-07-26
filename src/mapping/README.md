@@ -1,8 +1,8 @@
 # Mapping architecture
 
-Upstream provider facts are keyed by `SourceIdentity`. Manual decisions are
-keyed by canonical AniList ID. Automatic results use that same canonical
-identity when a crosswalk exists and the original source identity otherwise.
+Upstream provider facts, manual decisions, and automatic results are keyed by
+the page's `SourceIdentity`. A linked AniList ID is used only for metadata
+fallback and narrow reads of records written before source-native storage.
 
 Mapping owns facts and effective AniList-to-provider mapping results. It does
 not own provider library state or RPC presentation DTOs.
@@ -10,13 +10,13 @@ not own provider library state or RPC presentation DTOs.
 ## Stored facts
 
 - `manual.store.ts` stores user mappings, ignores, and rejected automatic
-  candidates by AniList ID. Rejected IDs are facts attached to the manual
+  candidates by source identity. Rejected IDs are facts attached to the manual
   record.
 - `upstream.store.ts` stores source-native AniBridge targets plus source
   crosswalks and refresh metadata. It does not persist Sonarr, Radarr, or Seerr
   projections.
-- `auto.store.ts` stores expiring automatic results by cache identity. AniList
-  identities keep their numeric keys; unlinked sources use keys such as
+- `auto.store.ts` stores expiring automatic results by source identity. AniList
+  identities keep their numeric keys; MAL sources use keys such as
   `mal:63816`. Expired reads return no result and do not mutate storage.
 - `seerr-target.store.ts` stores user-owned manual Seerr overrides separately
   from downloaded AniBridge data.
@@ -59,19 +59,19 @@ tmdb-show -> no direct Arr target
 ## Automatic resolution
 
 `MappingService` resolves the AniBridge crosswalk and direct targets once per
-request. It passes the existing resolver four independent facts:
+request. It passes the resolver four independent facts:
 
 ```text
-cache identity
-optional canonical AniList ID
+source identity
+optional AniList ID
 page title metadata
 rejected provider IDs
 ```
 
-The resolver searches page titles first, then canonical AniList metadata when
-that capability exists, then known prequel relations. It never branches on the
-content site's name and never reconstructs an AniList ID from the cache key.
-Mapped and unmapped results use one write path under the chosen cache identity.
+The resolver searches page titles first, then linked AniList metadata when that
+capability exists, then known prequel relations. It never branches on the
+content site's name or reconstructs an AniList ID from the source key. Mapped
+and unmapped results use one write path under the page source identity.
 
 ## Effective Seerr targets
 

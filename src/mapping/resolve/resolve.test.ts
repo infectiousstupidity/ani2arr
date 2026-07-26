@@ -68,8 +68,8 @@ describe("createAutomaticResolver", () => {
 		await expect(
 			resolve({
 				provider: "sonarr",
-				cacheIdentity: identity,
-				canonicalAniListId: anilistId,
+				identity,
+				anilistId,
 				rejectedProviderIds: [],
 				title: "Kagurabachi",
 			}),
@@ -103,8 +103,8 @@ describe("createAutomaticResolver", () => {
 
 		await resolve({
 			provider: "sonarr",
-			cacheIdentity: identity,
-			canonicalAniListId: null,
+			identity,
+			anilistId: null,
 			rejectedProviderIds: [],
 			title: "Page Match",
 			metadata: { titles: { romaji: "Metadata Miss" } },
@@ -134,8 +134,8 @@ describe("createAutomaticResolver", () => {
 		await expect(
 			resolve({
 				provider: "sonarr",
-				cacheIdentity: identity,
-				canonicalAniListId: anilistId,
+				identity,
+				anilistId,
 				rejectedProviderIds: [],
 				title: "Kagurabachi",
 			}),
@@ -168,8 +168,8 @@ describe("createAutomaticResolver", () => {
 
 		await resolve({
 			provider: "sonarr",
-			cacheIdentity: identity,
-			canonicalAniListId: anilistId,
+			identity,
+			anilistId,
 			rejectedProviderIds: [],
 			title: "DOM Miss",
 		});
@@ -216,8 +216,8 @@ describe("createAutomaticResolver", () => {
 
 		await resolve({
 			provider: "sonarr",
-			cacheIdentity: identity,
-			canonicalAniListId: anilistId,
+			identity,
+			anilistId,
 			rejectedProviderIds: [],
 			title: "Same Title",
 		});
@@ -255,8 +255,8 @@ describe("createAutomaticResolver", () => {
 
 		await resolve({
 			provider: "sonarr",
-			cacheIdentity: identity,
-			canonicalAniListId: anilistId,
+			identity,
+			anilistId,
 			rejectedProviderIds: [],
 			title: "DOM Miss",
 		});
@@ -279,8 +279,8 @@ describe("createAutomaticResolver", () => {
 
 		await resolve({
 			provider: "sonarr",
-			cacheIdentity: identity,
-			canonicalAniListId: anilistId,
+			identity,
+			anilistId,
 			rejectedProviderIds: [450_000],
 			title: "Kagurabachi",
 		});
@@ -292,7 +292,7 @@ describe("createAutomaticResolver", () => {
 		});
 	});
 
-	it("maps the real MAL 63816 hint identically for different cache identities", async () => {
+	it("maps the real MAL 63816 hint identically for different source identities", async () => {
 		const identities = [
 			{
 				source: "mal",
@@ -302,7 +302,7 @@ describe("createAutomaticResolver", () => {
 		];
 		const searches: Array<Array<[string, string]>> = [];
 
-		for (const cacheIdentity of identities) {
+		for (const identity of identities) {
 			const deps = createDeps();
 			deps.searchProviderCandidates.mockResolvedValue([
 				{
@@ -320,8 +320,8 @@ describe("createAutomaticResolver", () => {
 			await expect(
 				resolve({
 					provider: "sonarr",
-					cacheIdentity,
-					canonicalAniListId: null,
+					identity,
+					anilistId: null,
 					rejectedProviderIds: [],
 					title: "Sousou no Frieren: Ougonkyou-hen",
 					metadata: {
@@ -339,7 +339,7 @@ describe("createAutomaticResolver", () => {
 			expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
 			expect(setAutoResultMock).toHaveBeenLastCalledWith(
 				"sonarr",
-				cacheIdentity,
+				identity,
 				{
 					kind: "mapped",
 					providerId: 424_536,
@@ -372,8 +372,8 @@ describe("createAutomaticResolver", () => {
 		await expect(
 			resolve({
 				provider: "radarr",
-				cacheIdentity: identity,
-				canonicalAniListId: null,
+				identity,
+				anilistId: null,
 				rejectedProviderIds: [],
 				title: "No Provider Match",
 			}),
@@ -415,8 +415,8 @@ describe("createAutomaticResolver", () => {
 		await expect(
 			resolve({
 				provider: "sonarr",
-				cacheIdentity: identity,
-				canonicalAniListId: anilistId,
+				identity,
+				anilistId,
 				rejectedProviderIds: [],
 				title: "DOM Miss",
 			}),
@@ -433,7 +433,7 @@ describe("createAutomaticResolver", () => {
 		});
 	});
 
-	it("uses relation IDs without sending the cache identity to AniList", async () => {
+	it("uses relation IDs without sending the source identity to AniList", async () => {
 		const deps = createDeps();
 		const identity = {
 			source: "mal",
@@ -454,8 +454,8 @@ describe("createAutomaticResolver", () => {
 		await expect(
 			resolve({
 				provider: "sonarr",
-				cacheIdentity: identity,
-				canonicalAniListId: null,
+				identity,
+				anilistId: null,
 				rejectedProviderIds: [],
 				title: "Page Miss",
 				metadata: { relationPrequelIds: [prequelId, -1] },

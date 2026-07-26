@@ -332,7 +332,8 @@ describe("mappingHandlers", () => {
 		);
 	});
 
-	it("uses the supplied AniList ID for a MAL manual mapping and conflict check", async () => {
+	it("uses the MAL source for a manual mapping and its AniList ID for the conflict check", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
 		vi.mocked(mappingService.getLinkedAniListIds).mockResolvedValueOnce([
 			aid(10),
 		]);
@@ -341,52 +342,34 @@ describe("mappingHandlers", () => {
 			mappingHandlers.setManualMapping({
 				provider: "sonarr",
 				providerId: tvdb(20),
-				source: { source: "mal", id: mal(5114) },
+				source,
 				anilistId: aid(10),
 			}),
 		).resolves.toEqual({ ok: true });
 
 		expect(mappingService.setManualMapping).toHaveBeenCalledWith(
 			"sonarr",
-			anilistSource(aid(10)),
+			source,
 			tvdb(20),
 		);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 
-	it("uses the canonical AniList ID for a MAL mapping mutation", async () => {
+	it("keeps the MAL source when an AniList metadata ID accompanies a mutation", async () => {
+		const source = { source: "mal", id: mal(5114) } as const;
 		await expect(
 			mappingHandlers.setMappingIgnore({
-				source: { source: "mal", id: mal(5114) },
+				source,
 				anilistId: aid(10),
 				provider: "sonarr",
 			}),
 		).resolves.toEqual({ ok: true });
 
-		expect(mappingService.setIgnored).toHaveBeenCalledWith(
-			"sonarr",
-			anilistSource(aid(10)),
-		);
+		expect(mappingService.setIgnored).toHaveBeenCalledWith("sonarr", source);
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 
-	it("resolves a MAL-only mutation before writing", async () => {
-		vi.mocked(getUniqueAniListIdForSource).mockResolvedValue(aid(10));
-
-		await expect(
-			mappingHandlers.setMappingIgnore({
-				source: { source: "mal", id: mal(5114) },
-				provider: "sonarr",
-			}),
-		).resolves.toEqual({ ok: true });
-
-		expect(mappingService.setIgnored).toHaveBeenCalledWith(
-			"sonarr",
-			anilistSource(aid(10)),
-		);
-	});
-
-	it("writes a source-native MAL mutation without a canonical AniList ID", async () => {
+	it("writes a MAL-only mutation without resolving its crosswalk", async () => {
 		const source = { source: "mal", id: mal(5114) } as const;
 
 		await expect(
@@ -397,6 +380,7 @@ describe("mappingHandlers", () => {
 		).resolves.toEqual({ ok: true });
 
 		expect(mappingService.setIgnored).toHaveBeenCalledWith("sonarr", source);
+		expect(getUniqueAniListIdForSource).not.toHaveBeenCalled();
 		expect(bumpMappingsRevisionMock).toHaveBeenCalledOnce();
 	});
 });
