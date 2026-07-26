@@ -36,6 +36,7 @@ import type {
 import type { ActiveMappingIdentity } from "@/mapping/list-mappings";
 import type { SourceIdentity } from "@/mapping/source-identity";
 import type { MappingResult } from "@/mapping/types";
+import type { MyAnimeListMetadata } from "@/myanimelist/types";
 import type { PublicOptions } from "@/settings/types";
 
 export type ProviderExternalId = TvdbId | TmdbId;
@@ -370,3 +371,5 @@ export interface GetAniListMetadataOutput {
 	metadata: AniListMetadata[];
 	missingIds?: number[];
 }
+
+export type GetMyAnimeListMetadataOutput = MyAnimeListMetadata | null;

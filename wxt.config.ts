@@ -46,6 +46,7 @@ export default defineConfig({
 	manifest: ({ manifestVersion }) => {
 		const backgroundFetchHosts = [
 			"https://graphql.anilist.co/*",
+			"https://api.jikan.moe/*",
 			"https://github.com/anibridge/anibridge-mappings/releases/download/v3/mappings.min.json",
 			"https://release-assets.githubusercontent.com/*",
 		];

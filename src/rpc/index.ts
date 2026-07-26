@@ -7,12 +7,14 @@ import {
 } from "@webext-core/proxy-service";
 import type { AniListId, AniListMedia } from "@/anilist/types";
 import type { SourceIdentity } from "@/mapping/source-identity";
+import type { MyAnimeListId } from "@/myanimelist/types";
 import { normalizeError } from "@/shared/errors/error-utils";
 import type { ProviderFormResources } from "@/providers/types";
 import type { RadarrMovie } from "@/providers/radarr/types";
 import type { SonarrSeries } from "@/providers/sonarr/types";
 import type {
 	GetAniListMetadataOutput,
+	GetMyAnimeListMetadataOutput,
 	GetMappingInspectionOutput,
 	MappingListGroup,
 	MappingIdentity,
@@ -152,6 +154,9 @@ export interface Ani2arrApi {
 	getAniListMetadata(
 		input: GetAniListMetadataInput,
 	): Promise<GetAniListMetadataOutput>;
+	getMyAnimeListMetadata(
+		malId: MyAnimeListId,
+	): Promise<GetMyAnimeListMetadataOutput>;
 	resolveAniListIdsForSources(
 		sources: SourceIdentity[],
 	): Promise<Record<string, AniListId | null>>;

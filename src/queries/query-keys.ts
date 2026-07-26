@@ -6,6 +6,7 @@ import {
 	sourceIdentityKey,
 	type SourceIdentity,
 } from "@/mapping/source-identity";
+import type { MyAnimeListId } from "@/myanimelist/types";
 import type { Provider } from "@/providers/types";
 import type { TmdbId } from "@/providers/schemas";
 import type { SeerrMediaType, SeerrTvSeasons } from "@/providers/seerr/types";
@@ -82,6 +83,8 @@ export const queryKeys = {
 		[...rootQueryKey, "anilist", "media", 0] as const,
 	aniListMetadata: (ids: readonly AniListId[]) =>
 		[...rootQueryKey, "anilist", "metadata", normalizeMetadataIds(ids)] as const,
+	myAnimeListMetadata: (malId: MyAnimeListId | 0) =>
+		[...rootQueryKey, "myanimelist", "metadata", malId] as const,
 	mappingRoot: mappingRootKey,
 	mappings: () => [...mappingRootKey(), "list"] as const,
 	mappingIdentitiesRoot: () =>

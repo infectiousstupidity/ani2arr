@@ -180,6 +180,7 @@ function useSonarrModalData(input: SourceRpcInput & {
 	const sourceInput = mappingInspectionInput(anilistId, source);
 	const sourceIdentity = sourceFromInput(sourceInput);
 	const base = useMediaModalBaseData({
+		source: sourceIdentity,
 		anilistId,
 		fallbackLabel: `${sourceIdentity.source === "mal" ? "MAL" : "AniList"} #${sourceIdentity.id}`,
 		metadataHint,

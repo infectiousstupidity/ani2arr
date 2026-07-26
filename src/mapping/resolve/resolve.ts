@@ -8,6 +8,7 @@ import {
 	type AniListMedia,
 	type AniListMediaHint,
 } from "@/anilist/types";
+import type { MyAnimeListId } from "@/myanimelist/types";
 import type { Provider } from "@/providers/types";
 import { setAutoResult } from "../auto.store";
 import type { SourceIdentity } from "../source-identity";
@@ -16,7 +17,7 @@ import {
 	type ProviderCandidateSearch,
 } from "./candidate-search";
 import { searchPrequelChain } from "./prequel-chain";
-import type { SearchMedia } from "./title-matching";
+import type { SearchMedia, TitleMatch } from "./title-matching";
 
 export type AutomaticResolver = (request: {
 	provider: Provider;
@@ -60,8 +61,34 @@ function searchMediaFromHint(input: {
 	};
 }
 
+async function searchInitialMetadata(input: {
+	hintMedia: SearchMedia | null;
+	identity: SourceIdentity;
+	loadMyAnimeListMetadata: (
+		malId: MyAnimeListId,
+	) => Promise<AniListMediaHint | null>;
+	search: (media: SearchMedia) => Promise<TitleMatch | null>;
+}): Promise<TitleMatch | null> {
+	const hintMatch = input.hintMedia
+		? await input.search(input.hintMedia)
+		: null;
+	if (hintMatch || input.identity.source !== "mal") return hintMatch;
+
+	try {
+		const metadata = await input.loadMyAnimeListMetadata(input.identity.id);
+		const media = searchMediaFromHint({ metadata });
+		return media ? input.search(media) : null;
+	} catch {
+		// DOM metadata remains usable, and a linked AniList fallback may still work.
+		return null;
+	}
+}
+
 export function createAutomaticResolver(dependencies: {
 	anilistMedia: AniListMediaService;
+	loadMyAnimeListMetadata: (
+		malId: MyAnimeListId,
+	) => Promise<AniListMediaHint | null>;
 	searchProviderCandidates: ProviderCandidateSearch;
 }): AutomaticResolver {
 	return async function resolveAutomaticMapping(request): Promise<boolean> {
@@ -80,7 +107,12 @@ export function createAutomaticResolver(dependencies: {
 			...(request.title === undefined ? {} : { title: request.title }),
 			...(request.metadata === undefined ? {} : { metadata: request.metadata }),
 		});
-		let match = hintMedia ? await search(hintMedia) : null;
+		let match = await searchInitialMetadata({
+			hintMedia,
+			identity,
+			loadMyAnimeListMetadata: dependencies.loadMyAnimeListMetadata,
+			search,
+		});
 		let canonicalMedia: AniListMedia | null = null;
 
 		if (!match && anilistId !== null) {

@@ -86,13 +86,23 @@ function SourceCard(props: {
 	source: SourceIdentity;
 }): React.JSX.Element {
 	const {
-		anilistHeaderData: { title, coverImage, format, year },
+		anilistHeaderData: {
+			title,
+			coverImage,
+			format,
+			year,
+			episodeCount,
+			status,
+			synopsis,
+		},
 		source,
 	} = props;
 
 	const anilistMetaLine = joinMetaLine([
 		format ? formatToken(format) : null,
 		year ? String(year) : null,
+		episodeCount === undefined ? null : `${episodeCount} eps`,
+		status,
 	]);
 	const sourceLabel = source.source === "anilist" ? "AniList" : "MAL";
 	const sourceLink =
@@ -108,6 +118,11 @@ function SourceCard(props: {
 				<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
 					{title}
 				</h2>
+				{synopsis ? (
+					<p className="mt-1 line-clamp-1 text-[10px] leading-4 text-text-secondary md:line-clamp-2 md:text-xs md:leading-5">
+						{synopsis}
+					</p>
+				) : null}
 
 				<div className="mt-auto min-w-0 pt-2 md:pt-3">
 					{anilistMetaLine ? (

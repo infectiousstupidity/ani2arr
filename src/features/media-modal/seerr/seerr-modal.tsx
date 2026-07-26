@@ -50,6 +50,7 @@ export function SeerrModal({
 		useState<SeerrSearchResult | null>(null);
 	const contentContainer = useContentPortalContainer();
 	const base = useMediaModalBaseData({
+		source,
 		...(anilistId === undefined ? {} : { anilistId }),
 		fallbackLabel: `${source.source === "mal" ? "MAL" : "AniList"} #${source.id}`,
 		metadataHint: metadataHint ?? null,

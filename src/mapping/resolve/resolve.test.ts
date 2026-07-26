@@ -26,6 +26,9 @@ function createDeps() {
 				async function* (): AsyncGenerator<AniListMedia> {},
 			),
 		},
+		loadMyAnimeListMetadata: vi
+			.fn<ResolverDeps["loadMyAnimeListMetadata"]>()
+			.mockResolvedValue(null),
 		searchProviderCandidates: vi
 			.fn<ResolverDeps["searchProviderCandidates"]>()
 			.mockResolvedValue([]),
@@ -337,6 +340,7 @@ describe("createAutomaticResolver", () => {
 
 			expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
 			expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
+			expect(deps.loadMyAnimeListMetadata).not.toHaveBeenCalled();
 			expect(setAutoResultMock).toHaveBeenLastCalledWith(
 				"sonarr",
 				identity,
@@ -361,28 +365,53 @@ describe("createAutomaticResolver", () => {
 		]);
 	});
 
-	it("stores a MAL-only miss without fetching AniList relations", async () => {
+	it("uses MAL metadata after the DOM hint misses without an AniList ID", async () => {
 		const deps = createDeps();
 		const identity = {
 			source: "mal",
 			id: parseMyAnimeListId(63_816),
 		} as const;
+		deps.loadMyAnimeListMetadata.mockResolvedValue({
+			titles: { english: "Jikan Match" },
+			synonyms: ["Jikan Alias"],
+			startYear: 2026,
+			format: "TV",
+		});
+		deps.searchProviderCandidates.mockImplementation(
+			async (_provider, title) =>
+				title === "Jikan Match"
+					? [{ providerId: 450_020, title: "Jikan Match", year: 2026 }]
+					: [],
+		);
 		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
 		await expect(
 			resolve({
-				provider: "radarr",
+				provider: "sonarr",
 				identity,
 				anilistId: null,
 				rejectedProviderIds: [],
-				title: "No Provider Match",
+				title: "DOM Miss",
 			}),
 		).resolves.toBe(true);
 
+		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
+			1,
+			"sonarr",
+			"DOM Miss",
+		);
+		expect(deps.loadMyAnimeListMetadata).toHaveBeenCalledWith(identity.id);
+		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
+			2,
+			"sonarr",
+			"Jikan Match",
+		);
 		expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
 		expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
-		expect(setAutoResultMock).toHaveBeenCalledWith("radarr", identity, {
-			kind: "unmapped",
+		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
+			kind: "mapped",
+			providerId: 450_020,
+			matchedTitle: "Jikan Match",
 		});
 	});
 

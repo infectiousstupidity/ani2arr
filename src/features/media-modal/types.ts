@@ -21,6 +21,9 @@ export type AniListHeaderData = {
 	coverImage: string | null;
 	format: AniListMediaFormat | null;
 	year: number | null;
+	episodeCount?: number;
+	status?: string;
+	synopsis?: string;
 };
 
 export type MediaModalTargetSummary = {

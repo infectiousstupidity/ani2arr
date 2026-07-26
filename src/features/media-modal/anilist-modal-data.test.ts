@@ -18,6 +18,7 @@ function createMedia(overrides: Partial<AniListMedia> = {}): AniListMedia {
 describe("resolveMediaModalMetadata", () => {
 	it("uses the configured preferred AniList title language for provider requests", () => {
 		const result = resolveMediaModalMetadata({
+			source: { source: "anilist", id: parseAniListId(1) },
 			anilistId: parseAniListId(1),
 			anilistMedia: createMedia({
 				title: {
@@ -27,6 +28,7 @@ describe("resolveMediaModalMetadata", () => {
 				},
 			}),
 			metadataBatchData: undefined,
+			myAnimeListMetadata: undefined,
 			metadataHint: null,
 			preferredTitleLanguage: "native",
 		});
@@ -39,9 +41,11 @@ describe("resolveMediaModalMetadata", () => {
 
 	it("uses synthetic fallback title and omits provider payload title without usable titles", () => {
 		const result = resolveMediaModalMetadata({
+			source: { source: "anilist", id: parseAniListId(123) },
 			anilistId: parseAniListId(123),
 			anilistMedia: null,
 			metadataBatchData: undefined,
+			myAnimeListMetadata: undefined,
 			metadataHint: null,
 			preferredTitleLanguage: "english",
 		});
@@ -53,6 +57,7 @@ describe("resolveMediaModalMetadata", () => {
 
 	it("builds header data from AniList media fields", () => {
 		const result = resolveMediaModalMetadata({
+			source: { source: "anilist", id: parseAniListId(2) },
 			anilistId: parseAniListId(2),
 			anilistMedia: createMedia({
 				format: "TV",
@@ -68,6 +73,7 @@ describe("resolveMediaModalMetadata", () => {
 				},
 			}),
 			metadataBatchData: undefined,
+			myAnimeListMetadata: undefined,
 			metadataHint: null,
 			preferredTitleLanguage: "english",
 		});
@@ -83,6 +89,7 @@ describe("resolveMediaModalMetadata", () => {
 
 	it("uses metadata hints as cover fallback when media has no cover image", () => {
 		const result = resolveMediaModalMetadata({
+			source: { source: "anilist", id: parseAniListId(3) },
 			anilistId: parseAniListId(3),
 			anilistMedia: createMedia({
 				title: {
@@ -90,6 +97,7 @@ describe("resolveMediaModalMetadata", () => {
 				},
 			}),
 			metadataBatchData: undefined,
+			myAnimeListMetadata: undefined,
 			metadataHint: {
 				coverImage: "https://img.example/hint-cover.jpg",
 				format: "MOVIE",
@@ -105,6 +113,7 @@ describe("resolveMediaModalMetadata", () => {
 
 	it("keeps the DOM title for status when AniList media changes display titles", () => {
 		const result = resolveMediaModalMetadata({
+			source: { source: "anilist", id: parseAniListId(4) },
 			anilistId: parseAniListId(4),
 			anilistMedia: createMedia({
 				title: {
@@ -126,6 +135,7 @@ describe("resolveMediaModalMetadata", () => {
 				title: "Sousou no Frieren 3rd Season",
 				format: "TV",
 			},
+			myAnimeListMetadata: undefined,
 			preferredTitleLanguage: "english",
 		});
 
@@ -136,6 +146,7 @@ describe("resolveMediaModalMetadata", () => {
 
 	it("does not let full AniList media alter status metadata", () => {
 		const result = resolveMediaModalMetadata({
+			source: { source: "anilist", id: parseAniListId(5) },
 			anilistId: parseAniListId(5),
 			anilistMedia: createMedia({
 				id: parseAniListId(5),
@@ -163,6 +174,7 @@ describe("resolveMediaModalMetadata", () => {
 				],
 			},
 			metadataHint: { title: "DOM Title", format: "TV" },
+			myAnimeListMetadata: undefined,
 			preferredTitleLanguage: "english",
 		});
 

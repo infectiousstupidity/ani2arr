@@ -104,6 +104,8 @@ export function SeerrHeader(props: {
 	const anilistMetaLine = joinMetaLine([
 		data.format ? formatToken(data.format) : null,
 		data.year ? String(data.year) : null,
+		data.episodeCount === undefined ? null : `${data.episodeCount} eps`,
+		data.status,
 	]);
 	const targetMetaLine = getTargetMetaLine(target);
 	const targetIdLinks = getTargetIdLinks(target);
@@ -151,6 +153,11 @@ export function SeerrHeader(props: {
 								<h2 className="line-clamp-2 text-sm font-semibold leading-tight text-text-primary md:text-lg">
 									{data.title}
 								</h2>
+								{data.synopsis ? (
+									<p className="mt-1 line-clamp-1 text-[10px] leading-4 text-text-secondary md:line-clamp-2 md:text-xs md:leading-5">
+										{data.synopsis}
+									</p>
+								) : null}
 
 								<div className="mt-auto min-w-0 pt-2 md:pt-3">
 									{anilistMetaLine ? (

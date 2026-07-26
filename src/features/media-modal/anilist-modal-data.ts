@@ -12,6 +12,11 @@ import type {
 	AniListMediaFormat,
 	AniListMediaHint,
 } from "@/anilist/types";
+import type { SourceIdentity } from "@/mapping/source-identity";
+import {
+	metadataHintFromMyAnimeListMetadata,
+	type MyAnimeListMetadata,
+} from "@/myanimelist/types";
 import type { GetAniListMetadataOutput } from "@/rpc/types";
 import type { AniListHeaderData, MediaModalMetadataHint } from "./types";
 
@@ -158,6 +163,50 @@ function mergeMetadataHints(
 	return result;
 }
 
+function metadataFromLaunchHint(
+	hint: MediaModalMetadataHint | null,
+): AniListMediaHint | null {
+	if (!hint) return null;
+
+	return {
+		titles: hint.title ? { romaji: hint.title } : null,
+		synonyms: null,
+		startYear: null,
+		format: hint.format ?? null,
+		relationPrequelIds: null,
+		coverImage: hint.coverImage ?? null,
+	};
+}
+
+function getSourceMetadata(input: {
+	source: SourceIdentity;
+	anilistMedia: AniListMedia | null | undefined;
+	aniListMetadata: Parameters<typeof metadataHintFromAniListMetadata>[0];
+	myAnimeListMetadata: MyAnimeListMetadata | null | undefined;
+	launchMetadata: AniListMediaHint | null;
+}): {
+	canonical: AniListMediaHint | null;
+	media: AniListMediaHint | null;
+	status: AniListMediaHint | null;
+} {
+	if (input.source.source === "mal") {
+		return {
+			canonical: metadataHintFromMyAnimeListMetadata(
+				input.myAnimeListMetadata,
+			),
+			media: null,
+			status: input.launchMetadata,
+		};
+	}
+
+	const canonical = metadataHintFromAniListMetadata(input.aniListMetadata);
+	return {
+		canonical,
+		media: metadataFromMediaObject(input.anilistMedia),
+		status: canonical,
+	};
+}
+
 function prequelIdsFromMedia(media: AniListMedia): number[] | null {
 	const ids = (media.relations?.edges ?? [])
 		.filter((edge) => edge.relationType === "PREQUEL")
@@ -231,6 +280,7 @@ function extractTitles(input: {
 function buildAniListHeaderData(input: {
 	title: string;
 	anilistMedia: AniListMedia | null | undefined;
+	myAnimeListMetadata: MyAnimeListMetadata | null | undefined;
 	resolvedMetadata: AniListMediaHint | null;
 	format: AniListMediaFormat | null;
 	coverImageHint?: string | null;
@@ -248,6 +298,15 @@ function buildAniListHeaderData(input: {
 			anilistMedia: input.anilistMedia,
 			resolvedMetadata: input.resolvedMetadata,
 		}),
+		...(input.myAnimeListMetadata?.episodes == null
+			? {}
+			: { episodeCount: input.myAnimeListMetadata.episodes }),
+		...(input.myAnimeListMetadata?.status
+			? { status: input.myAnimeListMetadata.status }
+			: {}),
+		...(input.myAnimeListMetadata?.synopsis
+			? { synopsis: input.myAnimeListMetadata.synopsis }
+			: {}),
 	};
 }
 
@@ -273,29 +332,42 @@ function getFallbackTitle(input: {
 }
 
 export function resolveMediaModalMetadata(input: {
+	source: SourceIdentity;
 	anilistId?: AniListId | undefined;
 	fallbackLabel?: string | undefined;
 	anilistMedia: AniListMedia | null | undefined;
 	metadataBatchData: GetAniListMetadataOutput | undefined;
+	myAnimeListMetadata: MyAnimeListMetadata | null | undefined;
 	metadataHint: MediaModalMetadataHint | null;
 	preferredTitleLanguage: AniListTitleLanguage;
 }): ResolvedMediaModalMetadata {
 	const {
+		source,
 		anilistId,
 		fallbackLabel,
 		anilistMedia,
 		metadataBatchData,
+		myAnimeListMetadata,
 		metadataHint,
 		preferredTitleLanguage,
 	} = input;
 	const rawMetadata = metadataBatchData?.metadata?.[0];
-	const canonical = metadataHintFromAniListMetadata(rawMetadata ?? null);
-	const mediaMeta = metadataFromMediaObject(anilistMedia ?? null);
-	const resolvedMetadata = mergeMetadataHints(canonical, mediaMeta);
+	const launchMeta = metadataFromLaunchHint(metadataHint);
+	const sourceMetadata = getSourceMetadata({
+		source,
+		anilistMedia,
+		aniListMetadata: rawMetadata ?? null,
+		myAnimeListMetadata,
+		launchMetadata: launchMeta,
+	});
+	const resolvedMetadata = mergeMetadataHints(
+		mergeMetadataHints(sourceMetadata.canonical, sourceMetadata.media),
+		launchMeta,
+	);
 	const titles = extractTitles({ anilistMedia, resolvedMetadata });
 	const format =
 		getMediaFormat({
-			canonicalMetadata: canonical,
+			canonicalMetadata: sourceMetadata.canonical,
 			anilistMedia,
 			resolvedMetadata,
 		}) ??
@@ -322,7 +394,7 @@ export function resolveMediaModalMetadata(input: {
 
 	return {
 		resolvedMetadata,
-		statusMetadata: canonical,
+		statusMetadata: sourceMetadata.status,
 		...(statusTitle === undefined ? {} : { statusTitle }),
 		providerRequestTitle,
 		...(providerPayloadTitle === undefined ? {} : { providerPayloadTitle }),
@@ -330,6 +402,7 @@ export function resolveMediaModalMetadata(input: {
 		anilistHeaderData: buildAniListHeaderData({
 			title: providerRequestTitle,
 			anilistMedia,
+			myAnimeListMetadata,
 			resolvedMetadata,
 			format,
 			coverImageHint: metadataHint?.coverImage ?? null,

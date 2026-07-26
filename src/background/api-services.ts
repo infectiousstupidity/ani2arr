@@ -9,6 +9,8 @@ import { clearManualSeerrTargets } from "@/mapping/seerr-target.store";
 import { MappingService } from "@/mapping/mapping.service";
 import { createAutomaticResolver } from "@/mapping/resolve/resolve";
 import { clearUpstreamMappings } from "@/mapping/upstream.store";
+import { MyAnimeListMediaService } from "@/myanimelist/media.service";
+import { metadataHintFromMyAnimeListMetadata } from "@/myanimelist/types";
 import type { Provider } from "@/providers/types";
 import { RadarrClient } from "@/providers/radarr/client";
 import { RadarrLibrary } from "@/providers/radarr/library";
@@ -103,6 +105,7 @@ export const anilistMediaService = new AniListMediaService({
 	media: anilistMediaCache,
 });
 export const anilistMetadataStore = new AniListMetadataStore();
+export const myAnimeListMediaService = new MyAnimeListMediaService();
 
 const searchProviderCandidates = (provider: Provider, title: string) =>
 	fetchProviderCandidates(provider, title, {
@@ -113,6 +116,10 @@ const searchProviderCandidates = (provider: Provider, title: string) =>
 
 const resolveAutomaticMapping = createAutomaticResolver({
 	anilistMedia: anilistMediaService,
+	loadMyAnimeListMetadata: async (malId) =>
+		metadataHintFromMyAnimeListMetadata(
+			await myAnimeListMediaService.getMetadata(malId),
+		),
 	searchProviderCandidates,
 });
 
