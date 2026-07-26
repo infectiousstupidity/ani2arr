@@ -14,7 +14,11 @@ import {
 	type TmdbId,
 	type TvdbId,
 } from "@/providers/schemas";
-import { collectEffectiveMappingRecords } from "./mapping-facts";
+import {
+	getSeerrAutoResult,
+	listAniListSeerrAutoResults,
+	type AniListSeerrAutoRecord,
+} from "./seerr-auto.store";
 import {
 	getSourceSeerrUpstreamMapping,
 	listAllSeerrUpstreamTargets,
@@ -51,22 +55,14 @@ type StoredManualSeerrTarget =
 	  };
 type ManualSeerrTargets = Record<string, StoredManualSeerrTarget>;
 
-type SeerrTargetIdentity = {
+export type SeerrTargetIdentity = {
 	identity: SourceIdentity;
 	anilistId?: AniListId | undefined;
 };
 
 type SeerrTargetIdentityInput = SeerrTargetIdentity | AniListId;
 
-/** LEGACY: remove with the Radarr fallback when source-native Seerr auto-resolution lands. */
-type LegacyRadarrSeerrTarget = {
-	anilistId: AniListId;
-	mediaType: "movie";
-	tmdbId: TmdbId;
-	source: "automatic";
-};
-
-type EffectiveSeerrTarget =
+export type EffectiveSeerrTarget =
 	| ({
 			anilistId?: AniListId | undefined;
 			source: "manual";
@@ -75,7 +71,10 @@ type EffectiveSeerrTarget =
 			anilistId?: AniListId | undefined;
 			source: "anibridge";
 	  } & SeerrUpstreamTarget)
-	| LegacyRadarrSeerrTarget;
+	| ({
+			anilistId?: AniListId | undefined;
+			source: "automatic";
+	  } & StoredManualSeerrTarget);
 
 type AniListEffectiveSeerrTarget = EffectiveSeerrTarget & {
 	anilistId: AniListId;
@@ -239,34 +238,6 @@ async function listAllManualSeerrTargets(): Promise<
 	return records.toSorted((left, right) => left.anilistId - right.anilistId);
 }
 
-async function listRadarrMappingSeerrTargets(
-	requestedIds?: ReadonlySet<AniListId>,
-): Promise<LegacyRadarrSeerrTarget[]> {
-	const records = await collectEffectiveMappingRecords("radarr");
-	const targets: LegacyRadarrSeerrTarget[] = [];
-
-	for (const record of records) {
-		if (
-			record.result.kind !== "mapped" ||
-			(requestedIds && !requestedIds.has(record.anilistId))
-		) {
-			continue;
-		}
-
-		const tmdbId = parseTmdbIdOrNull(record.result.providerId);
-		if (tmdbId === null) continue;
-
-		targets.push({
-			anilistId: record.anilistId,
-			mediaType: "movie",
-			tmdbId,
-			source: "automatic",
-		});
-	}
-
-	return targets.toSorted((left, right) => left.anilistId - right.anilistId);
-}
-
 export async function getEffectiveSeerrTarget(
 	input: SeerrTargetIdentityInput,
 ): Promise<EffectiveSeerrTarget | null> {
@@ -295,38 +266,43 @@ export async function getEffectiveSeerrTarget(
 			...upstream.target,
 		};
 	}
-	if (upstream.kind === "conflict") return null;
-	if (anilistId === undefined) return null;
 
-	const radarrTargets = await listRadarrMappingSeerrTargets(
-		new Set([anilistId]),
-	);
-	return radarrTargets[0] ?? null;
+	const automatic = await getSeerrAutoResult(normalizedInput.identity);
+	if (automatic?.kind !== "mapped") return null;
+	return {
+		...(anilistId === undefined ? {} : { anilistId }),
+		source: "automatic",
+		...automatic.target,
+	};
 }
 
 export async function listEffectiveSeerrTargets(
 	ids: readonly AniListId[],
 ): Promise<AniListEffectiveSeerrTarget[]> {
-	const requestedIds = new Set(ids);
-	if (requestedIds.size === 0) return [];
+	if (new Set(ids).size === 0) return [];
 
-	const [manualTargets, upstreamTargets, radarrTargets] = await Promise.all([
+	const [manualTargets, upstreamTargets, automaticTargets] = await Promise.all([
 		listManualSeerrTargets(ids),
 		listSeerrUpstreamTargets(ids),
-		listRadarrMappingSeerrTargets(requestedIds),
+		listAniListSeerrAutoResults(),
 	]);
-	return mergeSeerrTargets(manualTargets, upstreamTargets, radarrTargets);
+	const requestedIds = new Set(ids);
+	return mergeSeerrTargets(
+		manualTargets,
+		upstreamTargets,
+		automaticTargets.filter((target) => requestedIds.has(target.anilistId)),
+	);
 }
 
 export async function listAllEffectiveSeerrTargets(): Promise<
 	AniListEffectiveSeerrTarget[]
 > {
-	const [manualTargets, upstreamTargets, radarrTargets] = await Promise.all([
+	const [manualTargets, upstreamTargets, automaticTargets] = await Promise.all([
 		listAllManualSeerrTargets(),
 		listAllSeerrUpstreamTargets(),
-		listRadarrMappingSeerrTargets(),
+		listAniListSeerrAutoResults(),
 	]);
-	return mergeSeerrTargets(manualTargets, upstreamTargets, radarrTargets);
+	return mergeSeerrTargets(manualTargets, upstreamTargets, automaticTargets);
 }
 
 export async function setManualSeerrTarget(
@@ -351,16 +327,13 @@ export async function setManualSeerrTarget(
 	if (normalized === null) {
 		throw new Error("Invalid Seerr target.");
 	}
-	const storageIdentity =
-		anilistId === undefined
-			? identity
-			: ({ source: "anilist", id: anilistId } as const);
-
 	await updateManualSeerrTargets((targets) => {
-		if (sourceIdentityKey(identity) !== sourceIdentityKey(storageIdentity)) {
-			delete targets[sourceIdentityKey(identity)];
+		if (anilistId !== undefined && identity.source !== "anilist") {
+			delete targets[
+				sourceIdentityKey({ source: "anilist", id: anilistId })
+			];
 		}
-		targets[sourceIdentityKey(storageIdentity)] = normalized;
+		targets[sourceIdentityKey(identity)] = normalized;
 	});
 }
 
@@ -392,17 +365,17 @@ export async function clearManualSeerrTargets(): Promise<void> {
 function mergeSeerrTargets(
 	manualTargets: readonly AniListManualSeerrTarget[],
 	upstreamTargets: readonly SeerrUpstreamRecord[],
-	radarrTargets: readonly LegacyRadarrSeerrTarget[],
+	automaticTargets: readonly AniListSeerrAutoRecord[],
 ): AniListEffectiveSeerrTarget[] {
 	const targetsById = new Map<AniListId, AniListEffectiveSeerrTarget>(
-		radarrTargets.map((target) => [target.anilistId, target]),
+		automaticTargets.map(({ anilistId, result }) => [
+			anilistId,
+			{ anilistId, source: "automatic", ...result.target },
+		]),
 	);
 
 	for (const record of upstreamTargets) {
-		if (record.kind === "conflict") {
-			targetsById.delete(record.anilistId);
-			continue;
-		}
+		if (record.kind === "conflict") continue;
 		targetsById.set(record.anilistId, {
 			anilistId: record.anilistId,
 			source: "anibridge",

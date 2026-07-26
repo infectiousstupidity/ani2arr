@@ -12,6 +12,7 @@ import type {
 	GetSeerrLinkedAniListEntriesInput,
 	GetSeerrLinkedAniListEntriesOutput,
 	GetSeerrMediaStatusOutput,
+	GetSeerrTargetInput,
 	RequestInSeerrInput,
 	RequestInSeerrOutput,
 	SearchSeerrMediaOutput,
@@ -105,7 +106,7 @@ export const useSeerrTargets = (
 };
 
 export const useSeerrTarget = (
-	input: SourceRpcInput | AniListId,
+	input: GetSeerrTargetInput | AniListId,
 	options?: { enabled?: boolean },
 ) => {
 	const sourceInput =

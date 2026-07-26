@@ -14,7 +14,7 @@ import {
 	Send,
 	TriangleAlert,
 } from "lucide-react";
-import type { AniListId } from "@/anilist/types";
+import type { AniListId, AniListMediaHint } from "@/anilist/types";
 import type { MediaActionState } from "@/features/media-action/state";
 import { getSeerrActionState } from "@/features/seerr-request/seerr-action-state";
 import { toSeerrRequestInput } from "@/features/seerr-request/seerr-request-input";
@@ -33,6 +33,8 @@ import { useCardOverlayInViewport } from "./card-overlay-viewport";
 interface SeerrCardActionProps {
 	source: SourceIdentity;
 	anilistId?: AniListId | undefined;
+	title: string;
+	metadata: AniListMediaHint | null;
 	isConfigured: boolean;
 	observeTarget?: Element | null | undefined;
 	tooltipContainer?: FloatingPortalContainer | undefined;
@@ -106,6 +108,8 @@ function useSeerrCardAction(input: SeerrCardActionProps) {
 	const seerrTargetQuery = useSeerrTarget({
 		source: input.source,
 		...(input.anilistId === undefined ? {} : { anilistId: input.anilistId }),
+		title: input.title,
+		metadata: input.metadata,
 	}, {
 		enabled: input.isConfigured && input.statusEnabled === true,
 	});
@@ -251,6 +255,8 @@ function SeerrStackOpenButton(props: {
 export function SeerrCardStackActions({
 	source,
 	anilistId,
+	title,
+	metadata,
 	isConfigured,
 	observeTarget,
 	tooltipContainer,
@@ -262,6 +268,8 @@ export function SeerrCardStackActions({
 	const action = useSeerrCardAction({
 		source,
 		anilistId,
+		title,
+		metadata,
 		isConfigured,
 		statusEnabled: isInViewport,
 		onOpenModal,
@@ -318,6 +326,8 @@ export function SeerrCardStackActions({
 export function SeerrStandaloneCardOverlay({
 	source,
 	anilistId,
+	title,
+	metadata,
 	isConfigured,
 	observeTarget,
 	badgeVisibility,
@@ -331,6 +341,8 @@ export function SeerrStandaloneCardOverlay({
 	const action = useSeerrCardAction({
 		source,
 		anilistId,
+		title,
+		metadata,
 		isConfigured,
 		statusEnabled: isInViewport,
 		onOpenModal,

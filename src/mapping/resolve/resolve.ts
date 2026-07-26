@@ -28,7 +28,7 @@ export type AutomaticResolver = (request: {
 	metadata?: AniListMediaHint | null;
 }) => Promise<boolean>;
 
-function searchMediaFromHint(input: {
+export function searchMediaFromHint(input: {
 	title?: string;
 	metadata?: AniListMediaHint | null;
 }): SearchMedia | null {
@@ -54,6 +54,9 @@ function searchMediaFromHint(input: {
 
 	return {
 		title: titles,
+		...(input.metadata?.format == null
+			? {}
+			: { format: input.metadata.format }),
 		...(typeof startYear === "number"
 			? { startDate: { year: startYear } }
 			: {}),

@@ -1,7 +1,11 @@
 /** RPC handlers for Seerr request creation, details, and target mapping reads. */
 // src/rpc/handlers/seerr.handlers.ts
 
-import { anilistMetadataStore, seerrClient } from "@/background/api-services";
+import {
+	anilistMetadataStore,
+	resolveSeerrAutomaticTarget,
+	seerrClient,
+} from "@/background/api-services";
 import { requireSeerrConnection } from "@/background/provider-config";
 import type { AniListId, AniListMetadata } from "@/anilist/types";
 import { resolveTitlePreference } from "@/anilist/title";
@@ -72,7 +76,25 @@ function buildSeerrLinkedEntry(
 
 export const seerrHandlers = {
 	async getSeerrTarget(input: GetSeerrTargetInput) {
-		return getEffectiveSeerrTarget(await resolveSeerrTargetIdentity(input));
+		const identity = await resolveSeerrTargetIdentity(input);
+		if (
+			input.title !== undefined ||
+			input.metadata !== undefined ||
+			input.forceRetry === true
+		) {
+			return resolveSeerrAutomaticTarget({
+				source: identity.identity,
+				...(identity.anilistId === undefined
+					? {}
+					: { anilistId: identity.anilistId }),
+				...(input.title === undefined ? {} : { title: input.title }),
+				...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+				...(input.forceRetry === undefined
+					? {}
+					: { forceRetry: input.forceRetry }),
+			});
+		}
+		return getEffectiveSeerrTarget(identity);
 	},
 
 	async getSeerrTargets(input: GetSeerrTargetsInput) {

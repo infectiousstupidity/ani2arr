@@ -180,6 +180,13 @@ function shouldShowSeerrAction(input: {
 	return input.optionState.seerrEnabled;
 }
 
+function isSeerrTargetQueryEnabled(
+	optionState: AnimePageOptionsState,
+	options: PublicOptions | undefined,
+): boolean {
+	return optionState.seerrEnabled && options?.seerr.isConfigured === true;
+}
+
 function getResolvedAniListId(
 	target: AnimePageTarget,
 	idsBySource: Record<string, AniListId | null> | undefined,
@@ -437,9 +444,11 @@ export function ContentRoot({
 	const seerrTargetInput = {
 		source,
 		...(anilistId === undefined ? {} : { anilistId }),
+		...(target.title === null ? {} : { title: target.title }),
+		metadata: target.metadata ?? null,
 	};
 	const seerrTarget = useSeerrTarget(seerrTargetInput, {
-		enabled: optionState.seerrEnabled,
+		enabled: isSeerrTargetQueryEnabled(optionState, options),
 	});
 	const canonicalMetadata = metadataHintFromAniListMetadata(
 		metadataBatch.data?.metadata?.[0] ?? null,

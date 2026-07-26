@@ -56,7 +56,14 @@ export function SeerrModal({
 		metadataHint: metadataHint ?? null,
 	});
 	const isConfigured = base.options?.seerr.isConfigured === true;
-	const targetQuery = useSeerrTarget(targetInput, { enabled: isConfigured });
+	const targetQuery = useSeerrTarget(
+		{
+			...targetInput,
+			title: base.providerRequestTitle,
+			metadata: base.resolvedMetadata,
+		},
+		{ enabled: isConfigured },
+	);
 	const target = targetQuery.data ?? null;
 	const detailsQuery = useSeerrMediaDetails({
 		input: target ? { mediaType: target.mediaType, tmdbId: target.tmdbId } : null,

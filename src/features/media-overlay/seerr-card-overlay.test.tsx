@@ -1,6 +1,7 @@
 /** Focused viewport tests for Seerr card overlay presentations. */
 
 import { renderToStaticMarkup } from "react-dom/server";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { parseAniListId } from "@/anilist/types";
 import {
@@ -16,12 +17,17 @@ const queryMocks = vi.hoisted(() => ({
 		isError: false,
 	})),
 }));
+const viewportMock = vi.hoisted(() => vi.fn(() => false));
 
 vi.mock("./card-overlay-viewport", () => ({
-	useCardOverlayInViewport: () => false,
+	useCardOverlayInViewport: viewportMock,
 }));
 
 vi.mock("@/queries/seerr", () => queryMocks);
+
+vi.mock("@/shared/ui/primitives/tooltip", () => ({
+	default: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
 
 const anilistId = parseAniListId(21_003);
 
@@ -32,6 +38,8 @@ const overlayRenderers = [
 			<SeerrCardStackActions
 				source={{ source: "anilist", id: anilistId }}
 				anilistId={anilistId}
+				title="Frieren"
+				metadata={{ format: "TV", startYear: 2023 }}
 				isConfigured={isConfigured}
 				onOpenModal={() => {}}
 				presentation={presentation}
@@ -44,6 +52,8 @@ const overlayRenderers = [
 			<SeerrStandaloneCardOverlay
 				source={{ source: "anilist", id: anilistId }}
 				anilistId={anilistId}
+				title="Frieren"
+				metadata={{ format: "TV", startYear: 2023 }}
 				isConfigured={isConfigured}
 				onOpenModal={() => {}}
 				presentation={presentation}
@@ -54,6 +64,7 @@ const overlayRenderers = [
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	viewportMock.mockReturnValue(false);
 });
 
 describe.each(overlayRenderers)("$name Seerr overlay outside the viewport", ({
@@ -76,6 +87,8 @@ it("keeps configured Seerr status queries disabled outside the viewport", () => 
 		<SeerrCardStackActions
 			source={{ source: "anilist", id: anilistId }}
 			anilistId={anilistId}
+			title="Frieren"
+			metadata={{ format: "TV", startYear: 2023 }}
 			isConfigured={true}
 			onOpenModal={() => {}}
 			presentation="status-column"
@@ -83,11 +96,41 @@ it("keeps configured Seerr status queries disabled outside the viewport", () => 
 	);
 
 	expect(queryMocks.useSeerrTarget).toHaveBeenCalledWith(
-		{ source: { source: "anilist", id: anilistId }, anilistId },
+		{
+			source: { source: "anilist", id: anilistId },
+			anilistId,
+			title: "Frieren",
+			metadata: { format: "TV", startYear: 2023 },
+		},
 		{ enabled: false },
 	);
 	expect(queryMocks.useSeerrMediaStatus).toHaveBeenCalledWith({
 		requestInput: null,
 		enabled: false,
 	});
+});
+
+it("requests automatic resolution with card metadata inside the viewport", () => {
+	viewportMock.mockReturnValue(true);
+
+	renderToStaticMarkup(
+		<SeerrCardStackActions
+			source={{ source: "anilist", id: anilistId }}
+			anilistId={anilistId}
+			title="Frieren"
+			metadata={{ format: "TV", startYear: 2023 }}
+			isConfigured={true}
+			onOpenModal={() => {}}
+		/>,
+	);
+
+	expect(queryMocks.useSeerrTarget).toHaveBeenCalledWith(
+		{
+			source: { source: "anilist", id: anilistId },
+			anilistId,
+			title: "Frieren",
+			metadata: { format: "TV", startYear: 2023 },
+		},
+		{ enabled: true },
+	);
 });

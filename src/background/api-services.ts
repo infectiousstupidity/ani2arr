@@ -5,7 +5,15 @@ import { anilistMediaCache, AniListMediaService } from "@/anilist/media.service"
 import { AniListMetadataStore } from "@/anilist/metadata.store";
 import { clearAutoResults } from "@/mapping/auto.store";
 import { clearManualFacts } from "@/mapping/manual.store";
-import { clearManualSeerrTargets } from "@/mapping/seerr-target.store";
+import {
+	clearSeerrAutoResults,
+	getSeerrAutoResult,
+	setSeerrAutoResult,
+} from "@/mapping/seerr-auto.store";
+import {
+	clearManualSeerrTargets,
+	getEffectiveSeerrTarget,
+} from "@/mapping/seerr-target.store";
 import { MappingService } from "@/mapping/mapping.service";
 import { createAutomaticResolver } from "@/mapping/resolve/resolve";
 import { clearUpstreamMappings } from "@/mapping/upstream.store";
@@ -44,7 +52,11 @@ import {
 	resetAllRevisions,
 } from "@/rpc/revision-signals";
 import { fetchProviderCandidates } from "./provider-candidate-search";
-import { requireProviderCredentials } from "./provider-config";
+import { createSeerrAutoResolver } from "./seerr-auto-resolver";
+import {
+	requireProviderCredentials,
+	requireSeerrConnection,
+} from "./provider-config";
 
 const DEBOUNCED_LIBRARY_REFRESH_MS = 15 * 1000;
 
@@ -127,6 +139,28 @@ export const mappingService = new MappingService(async (...args) => {
 	const stored = await resolveAutomaticMapping(...args);
 	if (stored) await bumpMappingsRevision();
 	return stored;
+});
+
+export const resolveSeerrAutomaticTarget = createSeerrAutoResolver({
+	getEffectiveTarget: getEffectiveSeerrTarget,
+	getAutoResult: getSeerrAutoResult,
+	setAutoResult: async (...args) => {
+		await setSeerrAutoResult(...args);
+		await bumpMappingsRevision();
+	},
+	loadAniListMedia: (anilistId) =>
+		anilistMediaService.fetchMediaWithRelations(anilistId),
+	loadMyAnimeListMetadata: async (malId) =>
+		metadataHintFromMyAnimeListMetadata(
+			await myAnimeListMediaService.getMetadata(malId),
+		),
+	searchMedia: async (query) =>
+		seerrClient.searchMedia(query, await requireSeerrConnection()),
+	getTvDetails: async (tmdbId) =>
+		seerrClient.getMediaDetails(
+			{ mediaType: "tv", tmdbId },
+			await requireSeerrConnection(),
+		),
 });
 
 export const refreshProviderLibrary = async (
@@ -220,7 +254,11 @@ export const resetExtensionState = async (): Promise<void> => {
 
 	await clearManualFacts();
 	await clearManualSeerrTargets();
-	await Promise.all([clearAutoResults("sonarr"), clearAutoResults("radarr")]);
+	await Promise.all([
+		clearAutoResults("sonarr"),
+		clearAutoResults("radarr"),
+		clearSeerrAutoResults(),
+	]);
 	await clearPersistentCaches();
 	await resetAllSettingsSnapshot();
 	await removeConfiguredProviderHostPermissions(previousOptions);

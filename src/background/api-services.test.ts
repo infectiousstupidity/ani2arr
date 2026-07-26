@@ -14,6 +14,7 @@ import {
 const clearAutoResultsMock = vi.hoisted(() => vi.fn());
 const clearManualFactsMock = vi.hoisted(() => vi.fn());
 const clearManualSeerrTargetsMock = vi.hoisted(() => vi.fn());
+const clearSeerrAutoResultsMock = vi.hoisted(() => vi.fn());
 const clearUpstreamMappingsMock = vi.hoisted(() => vi.fn());
 const clearAllTtlCachesMock = vi.hoisted(() => vi.fn());
 const getExtensionOptionsSnapshotMock = vi.hoisted(() => vi.fn());
@@ -38,8 +39,15 @@ vi.mock("@/mapping/manual.store", () => ({
 	clearManualFacts: clearManualFactsMock,
 }));
 
+vi.mock("@/mapping/seerr-auto.store", () => ({
+	clearSeerrAutoResults: clearSeerrAutoResultsMock,
+	getSeerrAutoResult: vi.fn(),
+	setSeerrAutoResult: vi.fn(),
+}));
+
 vi.mock("@/mapping/seerr-target.store", () => ({
 	clearManualSeerrTargets: clearManualSeerrTargetsMock,
+	getEffectiveSeerrTarget: vi.fn(),
 }));
 
 vi.mock("@/mapping/upstream.store", () => ({
@@ -81,6 +89,7 @@ describe("api services", () => {
 		clearAutoResultsMock.mockImplementation(async () => {});
 		clearManualFactsMock.mockImplementation(async () => {});
 		clearManualSeerrTargetsMock.mockImplementation(async () => {});
+		clearSeerrAutoResultsMock.mockImplementation(async () => {});
 		clearUpstreamMappingsMock.mockImplementation(async () => {});
 		clearAllTtlCachesMock.mockImplementation(async () => {});
 		getExtensionOptionsSnapshotMock.mockResolvedValue(
@@ -117,6 +126,7 @@ describe("api services", () => {
 		expect(clearAutoResultsMock).toHaveBeenCalledTimes(2);
 		expect(clearAutoResultsMock).toHaveBeenCalledWith("sonarr");
 		expect(clearAutoResultsMock).toHaveBeenCalledWith("radarr");
+		expect(clearSeerrAutoResultsMock).toHaveBeenCalledOnce();
 		expect(sonarrLibrary.clearSeriesSnapshotCache).toHaveBeenCalledTimes(1);
 		expect(radarrLibrary.clearMovieSnapshotCache).toHaveBeenCalledTimes(1);
 		expect(resetAllSettingsSnapshotMock).toHaveBeenCalledTimes(1);

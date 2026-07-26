@@ -22,6 +22,7 @@ const seerrClientMock = vi.hoisted(() => ({
 const anilistMetadataStoreMock = vi.hoisted(() => ({
 	getMetadata: vi.fn(),
 }));
+const resolveSeerrAutomaticTargetMock = vi.hoisted(() => vi.fn());
 const requireSeerrConnectionMock = vi.hoisted(() => vi.fn());
 const getEffectiveSeerrTargetMock = vi.hoisted(() => vi.fn());
 const listEffectiveSeerrTargetsMock = vi.hoisted(() => vi.fn());
@@ -33,6 +34,7 @@ const bumpMappingsRevisionMock = vi.hoisted(() => vi.fn());
 vi.mock("@/background/api-services", () => ({
 	seerrClient: seerrClientMock,
 	anilistMetadataStore: anilistMetadataStoreMock,
+	resolveSeerrAutomaticTarget: resolveSeerrAutomaticTargetMock,
 }));
 
 vi.mock("@/background/provider-config", () => ({
@@ -56,6 +58,7 @@ describe("seerrHandlers", () => {
 		vi.clearAllMocks();
 		requireSeerrConnectionMock.mockResolvedValue(connection);
 		getEffectiveSeerrTargetMock.mockResolvedValue(null);
+		resolveSeerrAutomaticTargetMock.mockResolvedValue(null);
 		listEffectiveSeerrTargetsMock.mockResolvedValue([]);
 		listAllEffectiveSeerrTargetsMock.mockResolvedValue([]);
 		setManualSeerrTargetMock.mockResolvedValue(null);
@@ -196,6 +199,31 @@ describe("seerrHandlers", () => {
 				anilistId: parseAniListId(100),
 			},
 		);
+	});
+
+	it("resolves a missing target when source metadata is provided", async () => {
+		const anilistId = parseAniListId(100);
+		resolveSeerrAutomaticTargetMock.mockResolvedValue({
+			anilistId,
+			mediaType: "movie",
+			tmdbId: parseTmdbId(123),
+			source: "automatic",
+		});
+
+		await expect(
+			seerrHandlers.getSeerrTarget({
+				anilistId,
+				title: "Perfect Blue",
+				metadata: { format: "MOVIE", startYear: 1998 },
+			}),
+		).resolves.toMatchObject({ source: "automatic", tmdbId: parseTmdbId(123) });
+		expect(resolveSeerrAutomaticTargetMock).toHaveBeenCalledWith({
+			source: { source: "anilist", id: anilistId },
+			anilistId,
+			title: "Perfect Blue",
+			metadata: { format: "MOVIE", startYear: 1998 },
+		});
+		expect(getEffectiveSeerrTargetMock).not.toHaveBeenCalled();
 	});
 
 	it("returns already-effective targets from bulk lookup", async () => {

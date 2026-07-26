@@ -129,7 +129,11 @@ export type ValidateTmdbInput = {
 
 export type GetMappingIdentitiesInput = AniListId[];
 export type GetSeerrTargetsInput = AniListId[];
-export type GetSeerrTargetInput = SourceRpcInput;
+export type GetSeerrTargetInput = SourceRpcInput & {
+	title?: string;
+	metadata?: AniListMediaHint | null;
+	forceRetry?: boolean;
+};
 
 export type GetMappingInspectionInput = {
 	provider: Provider;

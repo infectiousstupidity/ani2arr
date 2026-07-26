@@ -303,6 +303,8 @@ export function BrowseCardOverlay({
 			<SeerrCardStackActions
 				source={parsed.source}
 				{...(anilistId === undefined ? {} : { anilistId })}
+				title={displayTitle}
+				metadata={metadata}
 				isConfigured={seerrOpts.isConfigured}
 				observeTarget={parsed.mountTarget}
 				tooltipContainer={tooltipContainer}
@@ -336,6 +338,8 @@ export function BrowseCardOverlay({
 			<SeerrStandaloneCardOverlay
 				source={parsed.source}
 				{...(anilistId === undefined ? {} : { anilistId })}
+				title={displayTitle}
+				metadata={metadata}
 				isConfigured={seerrOpts.isConfigured}
 				observeTarget={parsed.mountTarget}
 				badgeVisibility={seerrOpts.visibility}
