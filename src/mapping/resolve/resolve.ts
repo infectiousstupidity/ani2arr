@@ -3,21 +3,18 @@
 
 import type { AniListMediaService } from "@/anilist/media.service";
 import {
-	parseAniListIdOrNull,
 	type AniListId,
 	type AniListMedia,
 	type AniListMediaHint,
+	parseAniListIdOrNull,
 } from "@/anilist/types";
 import type { MyAnimeListId } from "@/myanimelist/types";
 import type { Provider } from "@/providers/types";
 import { setAutoResult } from "../auto.store";
+import { type SourceIdentity, storageIdentity } from "../source-identity";
 import {
-	storageIdentity,
-	type SourceIdentity,
-} from "../source-identity";
-import {
-	searchCandidate,
 	type ProviderCandidateSearch,
+	searchCandidate,
 } from "./candidate-search";
 import { searchPrequelChain } from "./prequel-chain";
 import type { SearchMedia, TitleMatch } from "./title-matching";
@@ -43,9 +40,11 @@ export function searchMediaFromHint(input: {
 	};
 	const startYear = input.metadata?.startYear ?? null;
 	const synonyms = [...(input.metadata?.synonyms ?? [])];
+
 	if (title && !Object.values(metadataTitles).includes(title)) {
 		synonyms.unshift(title);
 	}
+
 	if (
 		!titles.english &&
 		!titles.romaji &&
@@ -78,6 +77,7 @@ async function searchInitialMetadata(input: {
 	const hintMatch = input.hintMedia
 		? await input.search(input.hintMedia)
 		: null;
+
 	if (hintMatch || input.identity.source !== "mal") return hintMatch;
 
 	try {
@@ -100,6 +100,7 @@ export function createAutomaticResolver(dependencies: {
 	return async function resolveAutomaticMapping(request): Promise<boolean> {
 		const { provider, identity, anilistId, rejectedProviderIds } = request;
 		const searchedTitleKeys = new Set<string>();
+
 		const search = (candidateMedia: SearchMedia) =>
 			searchCandidate({
 				provider,
@@ -113,6 +114,7 @@ export function createAutomaticResolver(dependencies: {
 			...(request.title === undefined ? {} : { title: request.title }),
 			...(request.metadata === undefined ? {} : { metadata: request.metadata }),
 		});
+
 		let match = await searchInitialMetadata({
 			hintMedia,
 			identity,
@@ -128,40 +130,46 @@ export function createAutomaticResolver(dependencies: {
 			} catch {
 				return false;
 			}
+
 			match = await search(canonicalMedia);
 		}
 
-		if (!match && canonicalMedia?.relations !== undefined) {
-			match = await searchPrequelChain(
-				dependencies.anilistMedia,
-				canonicalMedia,
-				search,
-			);
-		}
+		if (provider === "sonarr" && !match) {
+			if (canonicalMedia?.relations === undefined) {
+				const prequelIds = new Set(
+					(request.metadata?.relationPrequelIds ?? [])
+						.map((id) => parseAniListIdOrNull(id))
+						.filter((id): id is AniListId => id !== null),
+				);
 
-		if (!match && canonicalMedia?.relations === undefined) {
-			const prequelIds = new Set(
-				(request.metadata?.relationPrequelIds ?? [])
-					.map((id) => parseAniListIdOrNull(id))
-					.filter((id): id is AniListId => id !== null),
-			);
-			for (const prequelId of prequelIds) {
-				let prequel: AniListMedia;
-				try {
-					prequel =
-						await dependencies.anilistMedia.fetchMediaWithRelations(prequelId);
-				} catch {
-					return false;
+				for (const prequelId of prequelIds) {
+					let prequel: AniListMedia;
+
+					try {
+						prequel =
+							await dependencies.anilistMedia.fetchMediaWithRelations(
+								prequelId,
+							);
+					} catch {
+						return false;
+					}
+
+					match =
+						(await search(prequel)) ??
+						(await searchPrequelChain(
+							dependencies.anilistMedia,
+							prequel,
+							search,
+						));
+
+					if (match) break;
 				}
-
-				match =
-					(await search(prequel)) ??
-					(await searchPrequelChain(
-						dependencies.anilistMedia,
-						prequel,
-						search,
-					));
-				if (match) break;
+			} else {
+				match = await searchPrequelChain(
+					dependencies.anilistMedia,
+					canonicalMedia,
+					search,
+				);
 			}
 		}
 
@@ -172,11 +180,13 @@ export function createAutomaticResolver(dependencies: {
 					matchedTitle: match.matchedTitle,
 				}
 			: { kind: "unmapped" };
+
 		await setAutoResult(
 			provider,
 			storageIdentity(identity, anilistId ?? undefined),
 			result,
 		);
+
 		return true;
 	};
 }

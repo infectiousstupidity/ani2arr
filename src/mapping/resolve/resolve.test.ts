@@ -3,9 +3,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	parseAniListId,
 	type AniListId,
 	type AniListMedia,
+	parseAniListId,
 } from "@/anilist/types";
 import { parseMyAnimeListId } from "@/myanimelist/types";
 import { createAutomaticResolver } from "./resolve";
@@ -341,15 +341,11 @@ describe("createAutomaticResolver", () => {
 			expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
 			expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
 			expect(deps.loadMyAnimeListMetadata).not.toHaveBeenCalled();
-			expect(setAutoResultMock).toHaveBeenLastCalledWith(
-				"sonarr",
-				identity,
-				{
-					kind: "mapped",
-					providerId: 424_536,
-					matchedTitle: "Frieren: Beyond Journeys End",
-				},
-			);
+			expect(setAutoResultMock).toHaveBeenLastCalledWith("sonarr", identity, {
+				kind: "mapped",
+				providerId: 424_536,
+				matchedTitle: "Frieren: Beyond Journeys End",
+			});
 			searches.push(
 				deps.searchProviderCandidates.mock.calls.map(([provider, title]) => [
 					provider,
@@ -415,7 +411,7 @@ describe("createAutomaticResolver", () => {
 		});
 	});
 
-	it("uses canonical metadata and prequel relations from explicit capabilities", async () => {
+	it("uses canonical prequel relations only for Sonarr", async () => {
 		const deps = createDeps();
 		const anilistId = parseAniListId(211_496);
 		const identity = anilistSource(anilistId);
@@ -427,6 +423,7 @@ describe("createAutomaticResolver", () => {
 			id: parseAniListId(100),
 			english: "Matching Prequel",
 		});
+
 		deps.anilistMedia.fetchMediaWithRelations.mockResolvedValue(media);
 		deps.anilistMedia.iteratePrequelChain.mockImplementation(
 			async function* () {
@@ -439,6 +436,7 @@ describe("createAutomaticResolver", () => {
 					? [{ providerId: 450_002, title: "Matching Prequel", year: 2024 }]
 					: [],
 		);
+
 		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
 		await expect(
@@ -451,14 +449,29 @@ describe("createAutomaticResolver", () => {
 			}),
 		).resolves.toBe(true);
 
-		expect(deps.anilistMedia.fetchMediaWithRelations).toHaveBeenCalledWith(
-			anilistId,
-		);
 		expect(deps.anilistMedia.iteratePrequelChain).toHaveBeenCalledWith(media);
-		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
+		expect(setAutoResultMock).toHaveBeenLastCalledWith("sonarr", identity, {
 			kind: "mapped",
 			providerId: 450_002,
 			matchedTitle: "Matching Prequel",
+		});
+
+		deps.anilistMedia.iteratePrequelChain.mockClear();
+		setAutoResultMock.mockClear();
+
+		await expect(
+			resolve({
+				provider: "radarr",
+				identity,
+				anilistId,
+				rejectedProviderIds: [],
+				title: "DOM Miss",
+			}),
+		).resolves.toBe(true);
+
+		expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
+		expect(setAutoResultMock).toHaveBeenCalledWith("radarr", identity, {
+			kind: "unmapped",
 		});
 	});
 
