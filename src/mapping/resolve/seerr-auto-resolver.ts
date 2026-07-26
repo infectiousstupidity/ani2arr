@@ -6,23 +6,23 @@ import type {
 	AniListMediaFormat,
 	AniListMediaHint,
 } from "@/anilist/types";
-import type { SourceIdentity } from "@/mapping/source-identity";
-import type { SeerrAutoResult } from "@/mapping/seerr-auto.store";
-import type { SeerrTarget } from "@/mapping/seerr-target";
-import type { EffectiveSeerrTarget } from "@/mapping/seerr-target.store";
 import { searchMediaFromHint } from "@/mapping/resolve/resolve";
 import {
 	findTitleMatchForTerm,
 	getSearchTerms,
 	type SearchMedia,
 } from "@/mapping/resolve/title-matching";
+import type { SeerrAutoResult } from "@/mapping/seerr-auto.store";
+import type { SeerrTarget } from "@/mapping/seerr-target";
+import type { EffectiveSeerrTarget } from "@/mapping/seerr-target.store";
+import type { SourceIdentity } from "@/mapping/source-identity";
 import type { MyAnimeListId } from "@/myanimelist/types";
+import type { TmdbId } from "@/providers/schemas";
 import type {
 	SeerrMediaDetails,
 	SeerrMediaType,
 	SeerrSearchResult,
 } from "@/providers/seerr/types";
-import type { TmdbId } from "@/providers/schemas";
 
 export type SeerrAutoResolverInput = {
 	source: SourceIdentity;
@@ -155,6 +155,7 @@ function inferExplicitSeason(titles: readonly string[]): number | undefined {
 	const patterns = [
 		/(?:^|[^\p{L}\p{N}])season\s+([1-9]\d*)(?![\d.])/giu,
 		/(?:^|[^\p{L}\p{N}])([1-9]\d*)(?:st|nd|rd|th)\s+season(?![\p{L}\p{N}])/giu,
+		/(?:^|[^\p{L}\p{N}])s([1-9]\d*)(?![\p{L}\p{N}]|\.\d)/giu,
 		/第\s*([1-9]\d*)\s*期/gu,
 	] as const;
 
@@ -205,10 +206,7 @@ async function buildMatchedTarget(input: {
 		collectTitles(input.request, enrichedMedia),
 	);
 	if (inferredSeason === undefined && enrichedMedia === null) {
-		enrichedMedia = await loadEnrichedMedia(
-			input.request,
-			input.dependencies,
-		);
+		enrichedMedia = await loadEnrichedMedia(input.request, input.dependencies);
 		inferredSeason = inferExplicitSeason(
 			collectTitles(input.request, enrichedMedia),
 		);

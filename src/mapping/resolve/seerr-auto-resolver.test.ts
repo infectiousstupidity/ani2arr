@@ -153,7 +153,7 @@ describe("Seerr automatic resolver", () => {
 
 		await resolve({
 			source,
-			title: "Fullmetal Alchemist Season 3",
+			title: "Fullmetal Alchemist S3",
 			metadata: { format: "TV", startYear: 2003 },
 		});
 
@@ -176,15 +176,14 @@ describe("Seerr automatic resolver", () => {
 				},
 			],
 		});
+
 		await resolve({
 			source: { source: "anilist", id: parseAniListId(21_004) },
 			title: "Fullmetal Alchemist Season 3",
 			metadata: { format: "TV", startYear: 2003 },
 		});
 
-		expect(
-			requireMappedResult(cached).target,
-		).not.toHaveProperty("seasons");
+		expect(requireMappedResult(cached).target).not.toHaveProperty("seasons");
 	});
 
 	it("stores an unclear part title as a show-only target", async () => {
@@ -220,9 +219,7 @@ describe("Seerr automatic resolver", () => {
 			kind: "mapped",
 			target: { mediaType: "tv", tmdbId: parseTmdbId(1429) },
 		});
-		expect(
-			requireMappedResult(cached).target,
-		).not.toHaveProperty("seasons");
+		expect(requireMappedResult(cached).target).not.toHaveProperty("seasons");
 	});
 
 	it("returns fresh mapped results without another search", async () => {
