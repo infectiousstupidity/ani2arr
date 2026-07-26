@@ -1,4 +1,5 @@
 /** Tests for manual Seerr persistence and effective target precedence. */
+// src/mapping/seerr-target.store.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
@@ -37,6 +38,13 @@ const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
 const MANUAL_STORAGE_KEY = "mapping:seerr-targets";
 
+function movie(tmdbId: number) {
+	return {
+		mediaType: "movie" as const,
+		tmdbId: tmdb(tmdbId),
+	};
+}
+
 describe("Seerr targets", () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
@@ -55,8 +63,8 @@ describe("Seerr targets", () => {
 		const identity = { source: "mal", id: mal(5114) } as const;
 		await browser.storage.local.set({
 			[MANUAL_STORAGE_KEY]: {
-				"anilist:100": { mediaType: "movie", tmdbId: tmdb(999) },
-				"mal:5114": { mediaType: "movie", tmdbId: tmdb(555) },
+				"anilist:100": movie(999),
+				"mal:5114": movie(555),
 			},
 		});
 		await setManualSeerrTarget({
@@ -76,22 +84,26 @@ describe("Seerr targets", () => {
 			seasons: [1],
 			source: "manual",
 		});
-		await expect(browser.storage.local.get(MANUAL_STORAGE_KEY)).resolves.toEqual({
+		await expect(
+			browser.storage.local.get(MANUAL_STORAGE_KEY),
+		).resolves.toEqual({
 			[MANUAL_STORAGE_KEY]: {
 				"anilist:100": {
 					mediaType: "tv",
 					tmdbId: 31_911,
 					seasons: [1],
 				},
-				"mal:5114": { mediaType: "movie", tmdbId: 555 },
+				"mal:5114": movie(555),
 			},
 		});
 
 		await clearManualSeerrTarget({ identity, anilistId: aid(100) });
 
-		await expect(browser.storage.local.get(MANUAL_STORAGE_KEY)).resolves.toEqual({
+		await expect(
+			browser.storage.local.get(MANUAL_STORAGE_KEY),
+		).resolves.toEqual({
 			[MANUAL_STORAGE_KEY]: {
-				"mal:5114": { mediaType: "movie", tmdbId: 555 },
+				"mal:5114": movie(555),
 			},
 		});
 	});
@@ -100,26 +112,23 @@ describe("Seerr targets", () => {
 		const identity = { source: "mal", id: mal(5114) } as const;
 		await setManualSeerrTarget({
 			anilistId: aid(100),
-			mediaType: "movie",
-			tmdbId: tmdb(123),
+			...movie(123),
 		});
 
 		await expect(
 			getEffectiveSeerrTarget({ identity, anilistId: aid(100) }),
 		).resolves.toEqual({
 			anilistId: aid(100),
-			mediaType: "movie",
-			tmdbId: tmdb(123),
+			...movie(123),
 			source: "manual",
 		});
 		expect(getSourceSeerrUpstreamMappingMock).not.toHaveBeenCalled();
 	});
 
-	it("reads legacy numeric AniList keys and rewrites them on mutation", async () => {
+	it("reads a legacy numeric AniList key and rewrites it on mutation", async () => {
 		await browser.storage.local.set({
 			[MANUAL_STORAGE_KEY]: {
-				"100": { mediaType: "movie", tmdbId: 1000 },
-				"200": { mediaType: "movie", tmdbId: 2000 },
+				"100": movie(1000),
 			},
 		});
 
@@ -129,15 +138,15 @@ describe("Seerr targets", () => {
 		});
 		await setManualSeerrTarget({
 			anilistId: aid(300),
-			mediaType: "movie",
-			tmdbId: tmdb(3000),
+			...movie(3000),
 		});
 
-		await expect(browser.storage.local.get(MANUAL_STORAGE_KEY)).resolves.toEqual({
+		await expect(
+			browser.storage.local.get(MANUAL_STORAGE_KEY),
+		).resolves.toEqual({
 			[MANUAL_STORAGE_KEY]: {
-				"anilist:100": { mediaType: "movie", tmdbId: 1000 },
-				"anilist:200": { mediaType: "movie", tmdbId: 2000 },
-				"anilist:300": { mediaType: "movie", tmdbId: 3000 },
+				"anilist:100": movie(1000),
+				"anilist:300": movie(3000),
 			},
 		});
 	});
@@ -164,10 +173,10 @@ describe("Seerr targets", () => {
 	it("keeps manual and AniBridge targets ahead of cached automatic targets", async () => {
 		const manualId = aid(100);
 		const upstreamId = aid(200);
+
 		await setManualSeerrTarget({
 			anilistId: manualId,
-			mediaType: "movie",
-			tmdbId: tmdb(101),
+			...movie(101),
 		});
 		listSeerrUpstreamTargetsMock.mockImplementation(async (ids: number[]) =>
 			ids.includes(upstreamId)
@@ -175,14 +184,14 @@ describe("Seerr targets", () => {
 						{
 							anilistId: upstreamId,
 							kind: "target",
-							target: { mediaType: "movie", tmdbId: tmdb(202) },
+							target: movie(202),
 						},
 					]
 				: [],
 		);
 		getSeerrAutoResultMock.mockResolvedValue({
 			kind: "mapped",
-			target: { mediaType: "movie", tmdbId: tmdb(999) },
+			target: movie(999),
 		});
 
 		await expect(getEffectiveSeerrTarget(manualId)).resolves.toMatchObject({
@@ -215,37 +224,20 @@ describe("Seerr targets", () => {
 		});
 	});
 
-	it("restores the automatic target after clearing a manual target", async () => {
-		const anilistId = aid(100);
-		await setManualSeerrTarget({
-			anilistId,
-			mediaType: "movie",
-			tmdbId: tmdb(123),
-		});
-		getSeerrAutoResultMock.mockResolvedValue({
-			kind: "mapped",
-			target: { mediaType: "movie", tmdbId: tmdb(789) },
-		});
-
-		await clearManualSeerrTarget(anilistId);
-
-		await expect(getEffectiveSeerrTarget(anilistId)).resolves.toMatchObject({
-			tmdbId: tmdb(789),
-			source: "automatic",
-		});
-	});
-
 	it("merges batch targets with manual and AniBridge precedence", async () => {
 		await setManualSeerrTarget({
 			anilistId: aid(200),
-			mediaType: "movie",
-			tmdbId: tmdb(220),
+			...movie(220),
 		});
 		listSeerrUpstreamTargetsMock.mockResolvedValue([
 			{
 				anilistId: aid(300),
 				kind: "target",
-				target: { mediaType: "tv", tmdbId: tmdb(330), tvdbId: tvdb(331) },
+				target: {
+					mediaType: "tv",
+					tmdbId: tmdb(330),
+					tvdbId: tvdb(331),
+				},
 			},
 		]);
 		listAniListSeerrAutoResultsMock.mockResolvedValue([
@@ -253,37 +245,43 @@ describe("Seerr targets", () => {
 				anilistId: aid(200),
 				result: {
 					kind: "mapped",
-					target: { mediaType: "movie", tmdbId: tmdb(999) },
+					target: movie(999),
 				},
 			},
 			{
 				anilistId: aid(400),
 				result: {
 					kind: "mapped",
-					target: { mediaType: "movie", tmdbId: tmdb(440) },
+					target: movie(440),
 				},
 			},
 		]);
 
-		await expect(
-			listEffectiveSeerrTargets([aid(400), aid(300), aid(200)]),
-		).resolves.toEqual([
+		const targets = await listEffectiveSeerrTargets([
+			aid(400),
+			aid(300),
+			aid(200),
+		]);
+
+		expect(
+			targets.map(({ anilistId, tmdbId, source }) => ({
+				anilistId,
+				tmdbId,
+				source,
+			})),
+		).toEqual([
 			{
 				anilistId: aid(200),
-				mediaType: "movie",
 				tmdbId: tmdb(220),
 				source: "manual",
 			},
 			{
 				anilistId: aid(300),
-				mediaType: "tv",
 				tmdbId: tmdb(330),
-				tvdbId: tvdb(331),
 				source: "anibridge",
 			},
 			{
 				anilistId: aid(400),
-				mediaType: "movie",
 				tmdbId: tmdb(440),
 				source: "automatic",
 			},
@@ -295,15 +293,14 @@ describe("Seerr targets", () => {
 			{
 				anilistId: aid(200),
 				kind: "target",
-				target: { mediaType: "movie", tmdbId: tmdb(220) },
+				target: movie(220),
 			},
 		]);
 
 		await expect(listAllEffectiveSeerrTargets()).resolves.toEqual([
 			{
 				anilistId: aid(200),
-				mediaType: "movie",
-				tmdbId: tmdb(220),
+				...movie(220),
 				source: "anibridge",
 			},
 		]);

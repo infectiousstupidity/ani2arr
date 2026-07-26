@@ -12,7 +12,15 @@ import { createAutomaticResolver } from "./resolve";
 
 const setAutoResultMock = vi.hoisted(() => vi.fn());
 type ResolverDeps = Parameters<typeof createAutomaticResolver>[0];
+type ResolveRequest = Parameters<ReturnType<typeof createAutomaticResolver>>[0];
+
+const defaultAniListId = parseAniListId(211_496);
 const anilistSource = (id: AniListId) => ({ source: "anilist", id }) as const;
+const defaultIdentity = anilistSource(defaultAniListId);
+const malIdentity = {
+	source: "mal",
+	id: parseMyAnimeListId(63_816),
+} as const;
 
 vi.mock("../auto.store", () => ({
 	setAutoResult: setAutoResultMock,
@@ -32,6 +40,33 @@ function createDeps() {
 		searchProviderCandidates: vi
 			.fn<ResolverDeps["searchProviderCandidates"]>()
 			.mockResolvedValue([]),
+	};
+}
+
+function setup(defaults: Partial<ResolveRequest> = {}) {
+	const deps = createDeps();
+	const identity = defaults.identity ?? defaultIdentity;
+	const request: ResolveRequest = {
+		provider: defaults.provider ?? "sonarr",
+		identity,
+		anilistId:
+			defaults.anilistId === undefined
+				? (identity.source === "anilist"
+					? identity.id
+					: null)
+				: defaults.anilistId,
+		rejectedProviderIds: defaults.rejectedProviderIds ?? [],
+		...(defaults.title === undefined ? {} : { title: defaults.title }),
+		...(defaults.metadata === undefined ? {} : { metadata: defaults.metadata }),
+	};
+	const resolver = createAutomaticResolver(deps as unknown as ResolverDeps);
+
+	return {
+		deps,
+		identity: request.identity,
+		anilistId: request.anilistId,
+		resolve: (overrides: Partial<ResolveRequest> = {}) =>
+			resolver({ ...request, ...overrides }),
 	};
 }
 
@@ -60,23 +95,12 @@ describe("createAutomaticResolver", () => {
 	});
 
 	it("maps from title lookup before fetching AniList media", async () => {
-		const deps = createDeps();
-		const anilistId = parseAniListId(211_496);
-		const identity = anilistSource(anilistId);
+		const { deps, identity, resolve } = setup({ title: "Kagurabachi" });
 		deps.searchProviderCandidates.mockResolvedValue([
 			{ providerId: 450_000, title: "Kagurabachi", year: 2026 },
 		]);
-		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await expect(
-			resolve({
-				provider: "sonarr",
-				identity,
-				anilistId,
-				rejectedProviderIds: [],
-				title: "Kagurabachi",
-			}),
-		).resolves.toBe(true);
+		await expect(resolve()).resolves.toBe(true);
 
 		expect(deps.searchProviderCandidates).toHaveBeenCalledWith(
 			"sonarr",
@@ -91,27 +115,19 @@ describe("createAutomaticResolver", () => {
 	});
 
 	it("keeps a distinct page title and metadata title in the same search", async () => {
-		const deps = createDeps();
-		const identity = {
-			source: "mal",
-			id: parseMyAnimeListId(63_816),
-		} as const;
+		const { deps, resolve } = setup({
+			identity: malIdentity,
+			title: "Page Match",
+			metadata: { titles: { romaji: "Metadata Miss" } },
+		});
 		deps.searchProviderCandidates.mockImplementation(
 			async (_provider, title) =>
 				title === "Page Match"
 					? [{ providerId: 450_010, title: "Page Match", year: 2026 }]
 					: [],
 		);
-		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await resolve({
-			provider: "sonarr",
-			identity,
-			anilistId: null,
-			rejectedProviderIds: [],
-			title: "Page Match",
-			metadata: { titles: { romaji: "Metadata Miss" } },
-		});
+		await resolve();
 
 		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
 			1,
@@ -126,23 +142,12 @@ describe("createAutomaticResolver", () => {
 	});
 
 	it("does not cache unmapped when AniList fallback fails", async () => {
-		const deps = createDeps();
-		const anilistId = parseAniListId(211_496);
-		const identity = anilistSource(anilistId);
+		const { deps, anilistId, resolve } = setup({ title: "Kagurabachi" });
 		deps.anilistMedia.fetchMediaWithRelations.mockRejectedValue(
 			new Error("AniList rate limit exceeded"),
 		);
-		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await expect(
-			resolve({
-				provider: "sonarr",
-				identity,
-				anilistId,
-				rejectedProviderIds: [],
-				title: "Kagurabachi",
-			}),
-		).resolves.toBe(false);
+		await expect(resolve()).resolves.toBe(false);
 
 		expect(deps.anilistMedia.fetchMediaWithRelations).toHaveBeenCalledWith(
 			anilistId,
@@ -150,58 +155,10 @@ describe("createAutomaticResolver", () => {
 		expect(setAutoResultMock).not.toHaveBeenCalled();
 	});
 
-	it("falls back to AniList only after the DOM title misses", async () => {
-		const deps = createDeps();
-		const anilistId = parseAniListId(211_496);
-		const identity = anilistSource(anilistId);
-		deps.searchProviderCandidates.mockImplementation(
-			async (_provider, title) =>
-				title === "Kagurabachi"
-					? [{ providerId: 450_000, title: "Kagurabachi", year: 2026 }]
-					: [],
-		);
-		deps.anilistMedia.fetchMediaWithRelations.mockResolvedValue(
-			createMedia({
-				id: anilistId,
-				english: "Kagurabachi",
-				romaji: "Kagurabachi Romaji",
-			}),
-		);
-		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
-
-		await resolve({
-			provider: "sonarr",
-			identity,
-			anilistId,
-			rejectedProviderIds: [],
-			title: "DOM Miss",
+	it("falls back to AniList without repeating the page title", async () => {
+		const { deps, identity, anilistId, resolve } = setup({
+			title: "Same Title",
 		});
-
-		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
-			1,
-			"sonarr",
-			"DOM Miss",
-		);
-		expect(deps.anilistMedia.fetchMediaWithRelations).toHaveBeenCalledWith(
-			anilistId,
-		);
-		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
-			2,
-			"sonarr",
-			"Kagurabachi",
-		);
-		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(2);
-		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
-			kind: "mapped",
-			providerId: 450_000,
-			matchedTitle: "Kagurabachi",
-		});
-	});
-
-	it("does not repeat the DOM title during AniList fallback", async () => {
-		const deps = createDeps();
-		const anilistId = parseAniListId(211_496);
-		const identity = anilistSource(anilistId);
 		deps.searchProviderCandidates.mockImplementation(
 			async (_provider, title) =>
 				title === "Next Title"
@@ -210,32 +167,28 @@ describe("createAutomaticResolver", () => {
 		);
 		deps.anilistMedia.fetchMediaWithRelations.mockResolvedValue(
 			createMedia({
-				id: anilistId,
+				id: defaultAniListId,
 				english: "Same Title",
 				romaji: "Next Title",
 			}),
 		);
-		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await resolve({
-			provider: "sonarr",
-			identity,
-			anilistId,
-			rejectedProviderIds: [],
-			title: "Same Title",
-		});
+		await expect(resolve()).resolves.toBe(true);
 
-		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(2);
 		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
 			1,
 			"sonarr",
 			"Same Title",
+		);
+		expect(deps.anilistMedia.fetchMediaWithRelations).toHaveBeenCalledWith(
+			anilistId,
 		);
 		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
 			2,
 			"sonarr",
 			"Next Title",
 		);
+		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(2);
 		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
 			kind: "mapped",
 			providerId: 450_001,
@@ -243,26 +196,17 @@ describe("createAutomaticResolver", () => {
 		});
 	});
 
-	it("stores unmapped after DOM and AniList fallback miss", async () => {
-		const deps = createDeps();
-		const anilistId = parseAniListId(211_496);
-		const identity = anilistSource(anilistId);
+	it("stores unmapped after page and AniList fallback miss", async () => {
+		const { deps, identity, resolve } = setup({ title: "Page Miss" });
 		deps.anilistMedia.fetchMediaWithRelations.mockResolvedValue(
 			createMedia({
-				id: anilistId,
+				id: defaultAniListId,
 				english: "Kagurabachi",
 				romaji: "Kagurabachi Romaji",
 			}),
 		);
-		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await resolve({
-			provider: "sonarr",
-			identity,
-			anilistId,
-			rejectedProviderIds: [],
-			title: "DOM Miss",
-		});
+		await resolve();
 
 		expect(deps.searchProviderCandidates).toHaveBeenCalledTimes(3);
 		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
@@ -271,22 +215,16 @@ describe("createAutomaticResolver", () => {
 	});
 
 	it("filters rejected provider IDs before matching", async () => {
-		const deps = createDeps();
-		const anilistId = parseAniListId(211_496);
-		const identity = anilistSource(anilistId);
+		const { deps, identity, resolve } = setup({
+			title: "Kagurabachi",
+			rejectedProviderIds: [450_000],
+		});
 		deps.searchProviderCandidates.mockResolvedValue([
 			{ providerId: 450_000, title: "Kagurabachi", year: 2026 },
 			{ providerId: 450_001, title: "Kagurabachi", year: 2026 },
 		]);
-		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await resolve({
-			provider: "sonarr",
-			identity,
-			anilistId,
-			rejectedProviderIds: [450_000],
-			title: "Kagurabachi",
-		});
+		await resolve();
 
 		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
 			kind: "mapped",
@@ -295,78 +233,43 @@ describe("createAutomaticResolver", () => {
 		});
 	});
 
-	it("maps the real MAL 63816 hint identically for different source identities", async () => {
-		const identities = [
-			{
-				source: "mal",
-				id: parseMyAnimeListId(63_816),
-			} as const,
-			anilistSource(parseAniListId(209_939)),
-		];
-		const searches: Array<Array<[string, string]>> = [];
-
-		for (const identity of identities) {
-			const deps = createDeps();
-			deps.searchProviderCandidates.mockResolvedValue([
-				{
-					providerId: 424_536,
-					title: "Frieren: Beyond Journey's End",
-					sortTitle: "frieren beyond journeys end",
-					titleSlug: "frieren-beyond-journeys-end",
-					alternateTitles: [],
-					year: 2023,
-					genres: ["Adventure", "Animation", "Anime", "Drama", "Fantasy"],
+	it("maps the real MAL 63816 title hint after removing the arc suffix", async () => {
+		const { deps, identity, resolve } = setup({
+			identity: malIdentity,
+			metadata: {
+				titles: {
+					english: "Frieren: Beyond Journey's End - Golden Land Arc",
 				},
-			]);
-			const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
-
-			await expect(
-				resolve({
-					provider: "sonarr",
-					identity,
-					anilistId: null,
-					rejectedProviderIds: [],
-					title: "Sousou no Frieren: Ougonkyou-hen",
-					metadata: {
-						titles: {
-							romaji: "Sousou no Frieren: Ougonkyou-hen",
-							english: "Frieren: Beyond Journey's End - Golden Land Arc",
-							native: "葬送のフリーレン 黄金郷編",
-						},
-						synonyms: ["Frieren at the Funeral Season 3"],
-					},
-				}),
-			).resolves.toBe(true);
-
-			expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
-			expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
-			expect(deps.loadMyAnimeListMetadata).not.toHaveBeenCalled();
-			expect(setAutoResultMock).toHaveBeenLastCalledWith("sonarr", identity, {
-				kind: "mapped",
+			},
+		});
+		deps.searchProviderCandidates.mockResolvedValue([
+			{
 				providerId: 424_536,
-				matchedTitle: "Frieren: Beyond Journeys End",
-			});
-			searches.push(
-				deps.searchProviderCandidates.mock.calls.map(([provider, title]) => [
-					provider,
-					title,
-				]),
-			);
-		}
+				title: "Frieren: Beyond Journey's End",
+				year: 2023,
+			},
+		]);
 
-		expect(searches[0]).toEqual(searches[1]);
-		expect(searches[0]).toEqual([
+		await expect(resolve()).resolves.toBe(true);
+
+		expect(deps.searchProviderCandidates.mock.calls).toEqual([
 			["sonarr", "Frieren: Beyond Journeys End - Golden Land Arc"],
 			["sonarr", "Frieren: Beyond Journeys End"],
 		]);
+		expect(deps.loadMyAnimeListMetadata).not.toHaveBeenCalled();
+		expect(deps.anilistMedia.fetchMediaWithRelations).not.toHaveBeenCalled();
+		expect(setAutoResultMock).toHaveBeenCalledWith("sonarr", identity, {
+			kind: "mapped",
+			providerId: 424_536,
+			matchedTitle: "Frieren: Beyond Journeys End",
+		});
 	});
 
-	it("uses MAL metadata after the DOM hint misses without an AniList ID", async () => {
-		const deps = createDeps();
-		const identity = {
-			source: "mal",
-			id: parseMyAnimeListId(63_816),
-		} as const;
+	it("uses MAL metadata after the page hint misses without an AniList ID", async () => {
+		const { deps, identity, resolve } = setup({
+			identity: malIdentity,
+			title: "Page Miss",
+		});
 		deps.loadMyAnimeListMetadata.mockResolvedValue({
 			titles: { english: "Jikan Match" },
 			synonyms: ["Jikan Alias"],
@@ -379,22 +282,13 @@ describe("createAutomaticResolver", () => {
 					? [{ providerId: 450_020, title: "Jikan Match", year: 2026 }]
 					: [],
 		);
-		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await expect(
-			resolve({
-				provider: "sonarr",
-				identity,
-				anilistId: null,
-				rejectedProviderIds: [],
-				title: "DOM Miss",
-			}),
-		).resolves.toBe(true);
+		await expect(resolve()).resolves.toBe(true);
 
 		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
 			1,
 			"sonarr",
-			"DOM Miss",
+			"Page Miss",
 		);
 		expect(deps.loadMyAnimeListMetadata).toHaveBeenCalledWith(identity.id);
 		expect(deps.searchProviderCandidates).toHaveBeenNthCalledWith(
@@ -412,11 +306,12 @@ describe("createAutomaticResolver", () => {
 	});
 
 	it("uses canonical prequel relations only for Sonarr", async () => {
-		const deps = createDeps();
-		const anilistId = parseAniListId(211_496);
-		const identity = anilistSource(anilistId);
+		const { deps, identity, resolve } = setup({ title: "Page Miss" });
 		const media = {
-			...createMedia({ id: anilistId, english: "Current Series" }),
+			...createMedia({
+				id: defaultAniListId,
+				english: "Current Series",
+			}),
 			relations: { edges: [] },
 		};
 		const prequel = createMedia({
@@ -437,17 +332,7 @@ describe("createAutomaticResolver", () => {
 					: [],
 		);
 
-		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
-
-		await expect(
-			resolve({
-				provider: "sonarr",
-				identity,
-				anilistId,
-				rejectedProviderIds: [],
-				title: "DOM Miss",
-			}),
-		).resolves.toBe(true);
+		await expect(resolve()).resolves.toBe(true);
 
 		expect(deps.anilistMedia.iteratePrequelChain).toHaveBeenCalledWith(media);
 		expect(setAutoResultMock).toHaveBeenLastCalledWith("sonarr", identity, {
@@ -459,15 +344,7 @@ describe("createAutomaticResolver", () => {
 		deps.anilistMedia.iteratePrequelChain.mockClear();
 		setAutoResultMock.mockClear();
 
-		await expect(
-			resolve({
-				provider: "radarr",
-				identity,
-				anilistId,
-				rejectedProviderIds: [],
-				title: "DOM Miss",
-			}),
-		).resolves.toBe(true);
+		await expect(resolve({ provider: "radarr" })).resolves.toBe(true);
 
 		expect(deps.anilistMedia.iteratePrequelChain).not.toHaveBeenCalled();
 		expect(setAutoResultMock).toHaveBeenCalledWith("radarr", identity, {
@@ -476,12 +353,12 @@ describe("createAutomaticResolver", () => {
 	});
 
 	it("uses relation IDs without sending the source identity to AniList", async () => {
-		const deps = createDeps();
-		const identity = {
-			source: "mal",
-			id: parseMyAnimeListId(63_816),
-		} as const;
 		const prequelId = parseAniListId(52_991);
+		const { deps, identity, resolve } = setup({
+			identity: malIdentity,
+			title: "Page Miss",
+			metadata: { relationPrequelIds: [prequelId, -1] },
+		});
 		deps.anilistMedia.fetchMediaWithRelations.mockResolvedValue(
 			createMedia({ id: prequelId, english: "Matching Prequel" }),
 		);
@@ -491,18 +368,8 @@ describe("createAutomaticResolver", () => {
 					? [{ providerId: 450_003, title: "Matching Prequel", year: 2023 }]
 					: [],
 		);
-		const resolve = createAutomaticResolver(deps as unknown as ResolverDeps);
 
-		await expect(
-			resolve({
-				provider: "sonarr",
-				identity,
-				anilistId: null,
-				rejectedProviderIds: [],
-				title: "Page Miss",
-				metadata: { relationPrequelIds: [prequelId, -1] },
-			}),
-		).resolves.toBe(true);
+		await expect(resolve()).resolves.toBe(true);
 
 		expect(deps.anilistMedia.fetchMediaWithRelations).toHaveBeenCalledOnce();
 		expect(deps.anilistMedia.fetchMediaWithRelations).toHaveBeenCalledWith(

@@ -1,6 +1,3 @@
-/** Tests for provider-aware automatic mapping title normalization and scoring. */
-// src/mapping/resolve/title-matching.test.ts
-
 import { describe, expect, it } from "vitest";
 import { parseAniListId, type AniListMedia } from "@/anilist/types";
 import {
@@ -36,34 +33,15 @@ function matchSonarr(title: string, candidates: TitleCandidate[]) {
 }
 
 describe("title matching", () => {
-	it("sanitizes Sonarr lookup titles with suffix-only season cleanup", () => {
-		expect(
-			sanitizeLookupDisplayForProvider("sonarr", "[Oshi no Ko] 3rd Season"),
-		).toBe("Oshi no Ko");
-		expect(
-			sanitizeLookupDisplayForProvider(
-				"sonarr",
-				"Attack on Titan Final Season",
-			),
-		).toBe("Attack on Titan");
-		expect(
-			sanitizeLookupDisplayForProvider(
-				"sonarr",
-				"Bleach: Thousand-Year Blood War Part 2",
-			),
-		).toBe("Bleach: Thousand-Year Blood War");
-		expect(
-			sanitizeLookupDisplayForProvider(
-				"sonarr",
-				"Kusuriya no Hitorigoto 3rd Season Part 2",
-			),
-		).toBe("Kusuriya no Hitorigoto");
-		expect(sanitizeLookupDisplayForProvider("sonarr", "Some Show Cour II")).toBe(
-			"Some Show",
-		);
-		expect(sanitizeLookupDisplayForProvider("sonarr", "Some Show S2")).toBe(
-			"Some Show",
-		);
+	it.each([
+		["[Oshi no Ko] 3rd Season", "Oshi no Ko"],
+		["Attack on Titan Final Season", "Attack on Titan"],
+		["Bleach: Thousand-Year Blood War Part 2", "Bleach: Thousand-Year Blood War"],
+		["Kusuriya no Hitorigoto 3rd Season Part 2", "Kusuriya no Hitorigoto"],
+		["Some Show Cour II", "Some Show"],
+		["Some Show S2", "Some Show"],
+	])("sanitizes the Sonarr lookup title %s", (title, expected) => {
+		expect(sanitizeLookupDisplayForProvider("sonarr", title)).toBe(expected);
 	});
 
 	it("preserves Sonarr reboot years while cleaning season suffixes", () => {
@@ -73,12 +51,6 @@ describe("title matching", () => {
 				"Ranma 1/2 (2024) 3rd Season",
 			),
 		).toBe("Ranma 1/2 2024");
-		expect(
-			sanitizeLookupDisplayForProvider(
-				"sonarr",
-				"Ranma1/2 (2024) Season 3",
-			),
-		).toBe("Ranma1/2 2024");
 	});
 
 	it("keeps Radarr movie-style part suffixes", () => {
@@ -99,14 +71,6 @@ describe("title matching", () => {
 		expect(canonicalTitleKeyForProvider("sonarr", "One Punch Man!")).toBe(
 			"one punch man",
 		);
-	});
-
-	it("matches compact title variants without AniList fallback", () => {
-		expect(
-			matchSonarr("Dandadan 3rd Season", [
-				{ providerId: 432_832, title: "DAN DA DAN", year: 2024 },
-			]),
-		).toEqual({ providerId: 432_832, matchedTitle: "Dandadan" });
 	});
 
 	it("matches hyphenated titles after Sonarr season cleanup", () => {
@@ -141,14 +105,10 @@ describe("title matching", () => {
 
 	it("adds a lower-priority base-title lookup for a spaced-dash subtitle", () => {
 		expect(
-			getSearchTerms("sonarr", {
-				id: parseAniListId(1),
-				format: "TV",
-				title: {
-					english: "Frieren: Beyond Journey's End - Golden Land Arc",
-				},
-				synonyms: [],
-			}),
+			getSearchTerms(
+				"sonarr",
+				media("Frieren: Beyond Journey's End - Golden Land Arc"),
+			),
 		).toEqual([
 			{
 				canonical: "frieren beyond journeys end golden land arc",

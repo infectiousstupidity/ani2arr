@@ -1,7 +1,8 @@
 /** Focused behavior tests for source-native Seerr automatic resolution. */
+// src/mapping/resolve/seerr-auto-resolver.test.ts
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { parseAniListId } from "@/anilist/types";
+import { type AniListMediaFormat, parseAniListId } from "@/anilist/types";
 import type { SeerrAutoResult } from "@/mapping/seerr-auto.store";
 import { parseTmdbId, parseTvdbId } from "@/providers/schemas";
 import { createSeerrAutoResolver } from "./seerr-auto-resolver";
@@ -11,10 +12,67 @@ const source = {
 	id: parseAniListId(21_003),
 } as const;
 
+const tmdb = parseTmdbId;
+const tvdb = parseTvdbId;
+
+function movie(tmdbId = 10_494, title = "Perfect Blue", year = 1998) {
+	return {
+		mediaType: "movie" as const,
+		tmdbId: tmdb(tmdbId),
+		title,
+		year,
+	};
+}
+
+function tv(tmdbId: number, title: string, year: number) {
+	return {
+		mediaType: "tv" as const,
+		tmdbId: tmdb(tmdbId),
+		title,
+		year,
+	};
+}
+
+function tvDetails(input: {
+	tmdbId: number;
+	title: string;
+	tvdbId?: number;
+	seasons?: number[];
+}) {
+	return {
+		mediaType: "tv" as const,
+		tmdbId: tmdb(input.tmdbId),
+		...(input.tvdbId === undefined ? {} : { tvdbId: tvdb(input.tvdbId) }),
+		title: input.title,
+		status: "unknown" as const,
+		seasons: (input.seasons ?? []).map((seasonNumber) => ({
+			seasonNumber,
+			status: "not-requested" as const,
+			requestable: true,
+		})),
+	};
+}
+
+function request(
+	title?: string,
+	metadata?: {
+		format: AniListMediaFormat;
+		startYear?: number;
+	},
+) {
+	return {
+		source,
+		...(title === undefined ? {} : { title }),
+		...(metadata === undefined ? {} : { metadata }),
+	};
+}
+
 function requireMappedResult(
 	result: SeerrAutoResult | null,
 ): Extract<SeerrAutoResult, { kind: "mapped" }> {
-	if (result?.kind !== "mapped") throw new Error("Expected a mapped result.");
+	if (result?.kind !== "mapped") {
+		throw new Error("Expected a mapped result.");
+	}
 	return result;
 }
 
@@ -53,35 +111,27 @@ describe("Seerr automatic resolver", () => {
 	});
 
 	it("stores one confident movie search result", async () => {
-		searchMedia.mockResolvedValue([
-			{
-				mediaType: "tv",
-				tmdbId: parseTmdbId(100),
-				title: "Perfect Blue",
-				year: 1998,
-			},
-			{
-				mediaType: "movie",
-				tmdbId: parseTmdbId(10_494),
-				title: "Perfect Blue",
-				year: 1998,
-			},
-		]);
+		searchMedia.mockResolvedValue([tv(100, "Perfect Blue", 1998), movie()]);
 
 		await expect(
-			resolve({
-				source,
-				title: "Perfect Blue",
-				metadata: { format: "MOVIE", startYear: 1998 },
-			}),
+			resolve(
+				request("Perfect Blue", {
+					format: "MOVIE",
+					startYear: 1998,
+				}),
+			),
 		).resolves.toEqual({
 			source: "automatic",
 			mediaType: "movie",
-			tmdbId: parseTmdbId(10_494),
+			tmdbId: tmdb(10_494),
 		});
+
 		expect(cached).toEqual({
 			kind: "mapped",
-			target: { mediaType: "movie", tmdbId: parseTmdbId(10_494) },
+			target: {
+				mediaType: "movie",
+				tmdbId: tmdb(10_494),
+			},
 			matchedTitle: "Perfect Blue",
 		});
 		expect(getTvDetails).not.toHaveBeenCalled();
@@ -89,73 +139,52 @@ describe("Seerr automatic resolver", () => {
 
 	it("fetches TV details and stores the TVDB ID", async () => {
 		searchMedia.mockResolvedValue([
-			{
-				mediaType: "tv",
-				tmdbId: parseTmdbId(209_867),
-				title: "Frieren: Beyond Journey's End",
-				year: 2023,
-			},
+			tv(209_867, "Frieren: Beyond Journey's End", 2023),
 		]);
-		getTvDetails.mockResolvedValue({
-			mediaType: "tv",
-			tmdbId: parseTmdbId(209_867),
-			tvdbId: parseTvdbId(424_536),
-			title: "Frieren: Beyond Journey's End",
-			status: "unknown",
-			seasons: [],
-		});
+		getTvDetails.mockResolvedValue(
+			tvDetails({
+				tmdbId: 209_867,
+				tvdbId: 424_536,
+				title: "Frieren: Beyond Journey's End",
+			}),
+		);
 
 		await expect(
-			resolve({
-				source,
-				title: "Frieren: Beyond Journey's End",
-				metadata: { format: "TV", startYear: 2023 },
-			}),
+			resolve(
+				request("Frieren: Beyond Journey's End", {
+					format: "TV",
+					startYear: 2023,
+				}),
+			),
 		).resolves.toMatchObject({
 			mediaType: "tv",
-			tmdbId: parseTmdbId(209_867),
-			tvdbId: parseTvdbId(424_536),
+			tmdbId: tmdb(209_867),
+			tvdbId: tvdb(424_536),
 		});
-		expect(getTvDetails).toHaveBeenCalledWith(parseTmdbId(209_867));
+
+		expect(getTvDetails).toHaveBeenCalledWith(tmdb(209_867));
 		expect(cached).toMatchObject({
 			kind: "mapped",
-			target: { tvdbId: parseTvdbId(424_536) },
+			target: { tvdbId: tvdb(424_536) },
 		});
 	});
 
-	it("retains explicit Season 3 only when TV details contain it", async () => {
-		searchMedia.mockResolvedValue([
-			{
-				mediaType: "tv",
-				tmdbId: parseTmdbId(31_911),
+	it("retains an explicit season only when TV details contain it", async () => {
+		searchMedia.mockResolvedValue([tv(31_911, "Fullmetal Alchemist", 2003)]);
+		getTvDetails.mockResolvedValue(
+			tvDetails({
+				tmdbId: 31_911,
 				title: "Fullmetal Alchemist",
-				year: 2003,
-			},
-		]);
-		getTvDetails.mockResolvedValue({
-			mediaType: "tv",
-			tmdbId: parseTmdbId(31_911),
-			title: "Fullmetal Alchemist",
-			status: "unknown",
-			seasons: [
-				{
-					seasonNumber: 1,
-					status: "not-requested",
-					requestable: true,
-				},
-				{
-					seasonNumber: 3,
-					status: "not-requested",
-					requestable: true,
-				},
-			],
-		});
+				seasons: [1, 3],
+			}),
+		);
 
-		await resolve({
-			source,
-			title: "Fullmetal Alchemist S3",
-			metadata: { format: "TV", startYear: 2003 },
-		});
+		await resolve(
+			request("Fullmetal Alchemist S3", {
+				format: "TV",
+				startYear: 2003,
+			}),
+		);
 
 		expect(cached).toMatchObject({
 			kind: "mapped",
@@ -163,61 +192,51 @@ describe("Seerr automatic resolver", () => {
 		});
 
 		cached = null;
-		getTvDetails.mockResolvedValue({
-			mediaType: "tv",
-			tmdbId: parseTmdbId(31_911),
-			title: "Fullmetal Alchemist",
-			status: "unknown",
-			seasons: [
-				{
-					seasonNumber: 1,
-					status: "not-requested",
-					requestable: true,
-				},
-			],
-		});
+		getTvDetails.mockResolvedValue(
+			tvDetails({
+				tmdbId: 31_911,
+				title: "Fullmetal Alchemist",
+				seasons: [1],
+			}),
+		);
 
 		await resolve({
-			source: { source: "anilist", id: parseAniListId(21_004) },
-			title: "Fullmetal Alchemist Season 3",
-			metadata: { format: "TV", startYear: 2003 },
+			...request("Fullmetal Alchemist Season 3", {
+				format: "TV",
+				startYear: 2003,
+			}),
+			source: {
+				source: "anilist",
+				id: parseAniListId(21_004),
+			},
 		});
 
 		expect(requireMappedResult(cached).target).not.toHaveProperty("seasons");
 	});
 
 	it("stores an unclear part title as a show-only target", async () => {
-		searchMedia.mockResolvedValue([
-			{
-				mediaType: "tv",
-				tmdbId: parseTmdbId(1429),
+		searchMedia.mockResolvedValue([tv(1429, "Attack on Titan", 2013)]);
+		getTvDetails.mockResolvedValue(
+			tvDetails({
+				tmdbId: 1429,
 				title: "Attack on Titan",
-				year: 2013,
-			},
-		]);
-		getTvDetails.mockResolvedValue({
-			mediaType: "tv",
-			tmdbId: parseTmdbId(1429),
-			title: "Attack on Titan",
-			status: "unknown",
-			seasons: [
-				{
-					seasonNumber: 2,
-					status: "not-requested",
-					requestable: true,
-				},
-			],
-		});
+				seasons: [2],
+			}),
+		);
 
-		await resolve({
-			source,
-			title: "Attack on Titan Part 2",
-			metadata: { format: "TV", startYear: 2013 },
-		});
+		await resolve(
+			request("Attack on Titan Part 2", {
+				format: "TV",
+				startYear: 2013,
+			}),
+		);
 
 		expect(cached).toMatchObject({
 			kind: "mapped",
-			target: { mediaType: "tv", tmdbId: parseTmdbId(1429) },
+			target: {
+				mediaType: "tv",
+				tmdbId: tmdb(1429),
+			},
 		});
 		expect(requireMappedResult(cached).target).not.toHaveProperty("seasons");
 	});
@@ -225,70 +244,73 @@ describe("Seerr automatic resolver", () => {
 	it("returns fresh mapped results without another search", async () => {
 		cached = {
 			kind: "mapped",
-			target: { mediaType: "movie", tmdbId: parseTmdbId(10_494) },
+			target: {
+				mediaType: "movie",
+				tmdbId: tmdb(10_494),
+			},
 		};
 
 		await expect(
-			resolve({
-				source,
-				title: "Perfect Blue",
-				metadata: { format: "MOVIE" },
-			}),
+			resolve(
+				request("Perfect Blue", {
+					format: "MOVIE",
+				}),
+			),
 		).resolves.toEqual({
 			source: "automatic",
 			mediaType: "movie",
-			tmdbId: parseTmdbId(10_494),
+			tmdbId: tmdb(10_494),
 		});
+
 		expect(searchMedia).not.toHaveBeenCalled();
 	});
 
 	it("retries after metadata enrichment changes an earlier null result", async () => {
 		searchMedia.mockResolvedValue([]);
-		await expect(
-			resolve({
-				source,
-				title: "Unknown anime",
-			}),
-		).resolves.toBeNull();
+
+		await expect(resolve(request("Unknown anime"))).resolves.toBeNull();
 		expect(cached).toEqual({ kind: "unmapped" });
 
-		searchMedia.mockResolvedValue([
-			{
-				mediaType: "movie",
-				tmdbId: parseTmdbId(10_494),
-				title: "Perfect Blue",
-				year: 1998,
-			},
-		]);
+		searchMedia.mockResolvedValue([movie()]);
+
 		await expect(
-			resolve({
-				source,
-				title: "Perfect Blue",
-				metadata: { format: "MOVIE", startYear: 1998 },
-			}),
-		).resolves.toMatchObject({ tmdbId: parseTmdbId(10_494) });
+			resolve(
+				request("Perfect Blue", {
+					format: "MOVIE",
+					startYear: 1998,
+				}),
+			),
+		).resolves.toMatchObject({
+			tmdbId: tmdb(10_494),
+		});
 		expect(searchMedia).toHaveBeenCalledWith("Perfect Blue");
 	});
 
-	it("force retries an earlier null result", async () => {
+	it("uses forceRetry to retry a cached null result without new hints", async () => {
 		cached = { kind: "unmapped" };
-		searchMedia.mockResolvedValue([
-			{
-				mediaType: "movie",
-				tmdbId: parseTmdbId(10_494),
-				title: "Perfect Blue",
-				year: 1998,
-			},
-		]);
+		loadAniListMedia.mockResolvedValue({
+			id: source.id,
+			format: "MOVIE",
+			title: { english: "Perfect Blue" },
+			synonyms: [],
+			seasonYear: 1998,
+		});
+		searchMedia.mockResolvedValue([movie()]);
+
+		await expect(resolve(request())).resolves.toBeNull();
+		expect(loadAniListMedia).not.toHaveBeenCalled();
+		expect(searchMedia).not.toHaveBeenCalled();
 
 		await expect(
 			resolve({
-				source,
-				title: "Perfect Blue",
-				metadata: { format: "MOVIE", startYear: 1998 },
+				...request(),
 				forceRetry: true,
 			}),
-		).resolves.toMatchObject({ tmdbId: parseTmdbId(10_494) });
+		).resolves.toMatchObject({
+			tmdbId: tmdb(10_494),
+		});
+
+		expect(loadAniListMedia).toHaveBeenCalledOnce();
 		expect(searchMedia).toHaveBeenCalledWith("Perfect Blue");
 	});
 });

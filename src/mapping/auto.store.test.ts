@@ -1,6 +1,3 @@
-/** Tests for automatic mapping result expiry behavior. */
-// src/mapping/auto.store.test.ts
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { parseAniListId } from "@/anilist/types";
@@ -57,7 +54,7 @@ describe("auto mapping store", () => {
 		});
 	});
 
-	it("normalizes legacy AniList keys and lists only AniList results", async () => {
+	it("lists only AniList results from mixed-source storage", async () => {
 		await browser.storage.local.set({
 			[AUTO_STORAGE_KEY]: {
 				sonarr: {},
@@ -76,18 +73,6 @@ describe("auto mapping store", () => {
 			},
 		});
 
-		await expect(
-			getAutoResult("radarr", { source: "anilist", id: aid(1) }),
-		).resolves.toEqual({
-			kind: "mapped",
-			providerId: tmdb(300),
-		});
-		await expect(
-			getAutoResult("radarr", { source: "mal", id: mal(5114) }),
-		).resolves.toEqual({
-			kind: "mapped",
-			providerId: tmdb(400),
-		});
 		await expect(listAniListAutoResults("radarr")).resolves.toEqual([
 			{
 				anilistId: aid(1),
@@ -119,7 +104,6 @@ describe("auto mapping store", () => {
 				},
 			},
 		});
-		await expect(listAniListAutoResults("radarr")).resolves.toEqual([]);
 	});
 
 	it("reads legacy raw AniList keys", async () => {

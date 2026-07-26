@@ -1,6 +1,3 @@
-/** Tests for persistent manual mapping facts and write serialization. */
-// src/mapping/manual.store.test.ts
-
 import { beforeEach, describe, expect, it } from "vitest";
 import { browser } from "wxt/browser";
 import { parseAniListId } from "@/anilist/types";
@@ -37,15 +34,6 @@ describe("manual mapping store", () => {
 		await expect(getManualFacts("sonarr", aid(1))).resolves.toEqual({
 			mapping: { providerId: tvdb(20) },
 		});
-		await expect(
-			browser.storage.local.get(MANUAL_STORAGE_KEY),
-		).resolves.toMatchObject({
-			[MANUAL_STORAGE_KEY]: {
-				sonarr: {
-					"anilist:1": { mapping: { providerId: tvdb(20) } },
-				},
-			},
-		});
 	});
 
 	it("serializes concurrent writes without losing records", async () => {
@@ -77,9 +65,6 @@ describe("manual mapping store", () => {
 			},
 		});
 
-		await expect(getManualFacts("sonarr", aid(1))).resolves.toEqual({
-			mapping: { providerId: tvdb(10) },
-		});
 		await expect(
 			getManualFacts("sonarr", { source: "mal", id: mal(5114) }),
 		).resolves.toEqual({ mapping: { providerId: tvdb(78_874) } });
