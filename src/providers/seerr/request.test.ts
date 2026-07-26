@@ -30,13 +30,13 @@ describe("Seerr request helpers", () => {
 				mediaType: "tv",
 				tmdbId: parseTmdbId(456),
 				tvdbId: parseTvdbId(789),
-				seasons: [2, 1, 2],
+				seasons: [2, -1, 1.5, 1, 2, 0],
 			}),
 		).toEqual({
 			mediaType: "tv",
 			mediaId: parseTmdbId(456),
 			tvdbId: parseTvdbId(789),
-			seasons: [1, 2],
+			seasons: [0, 1, 2],
 		});
 
 		expect(

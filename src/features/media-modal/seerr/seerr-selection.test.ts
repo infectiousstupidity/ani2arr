@@ -45,11 +45,13 @@ describe("Seerr season selection helpers", () => {
 		expect(
 			getRequestableSeasonNumbers([
 				season(1, "available"),
+				season(0, "unknown"),
 				season(2, "unknown"),
+				season(2, "deleted"),
 				season(3, "deleted"),
 				season(4, "deleted-or-blocked"),
 			]),
-		).toEqual([2, 3]);
+		).toEqual([0, 2, 3]);
 	});
 
 	it("leaves no default selection when no mapped seasons are requestable", () => {

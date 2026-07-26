@@ -6,6 +6,7 @@ import {
 	type AniListId,
 	type AniListMediaHint,
 } from "@/anilist/types";
+import { normalizeSeasonNumbers } from "@/mapping/season-numbers";
 import {
 	sourceIdentityKey,
 	type SourceIdentity,
@@ -93,14 +94,6 @@ const sourceKeyFromInput = (input: SourceKeyInput): string => {
 	return normalizeSourceKey(sourceFromInput(input));
 };
 
-const normalizeSeerrSeasons = (
-	seasons: SeerrTvSeasons | undefined,
-): SeerrTvSeasons | undefined => {
-	if (!Array.isArray(seasons)) return seasons;
-	return [...new Set(seasons.filter((season) => Number.isSafeInteger(season)))]
-		.toSorted((a, b) => a - b);
-};
-
 export const queryKeys = {
 	all: rootQueryKey,
 	options: () => [...rootQueryKey, "options", "extension"] as const,
@@ -176,7 +169,11 @@ export const queryKeys = {
 						tmdbId: input.tmdbId,
 						...(input.seasons === undefined
 							? {}
-							: { seasons: normalizeSeerrSeasons(input.seasons) }),
+							: {
+									seasons: Array.isArray(input.seasons)
+										? normalizeSeasonNumbers(input.seasons)
+										: input.seasons,
+								}),
 					},
 		] as const,
 	seerrMediaDetails: (input: SeerrMediaDetailsKeyInput | null) =>

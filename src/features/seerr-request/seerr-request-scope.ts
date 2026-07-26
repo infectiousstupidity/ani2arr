@@ -1,5 +1,6 @@
 /** Derives the modal-local scope for a Seerr TV request. */
 
+import { normalizeSeasonNumbers } from "@/mapping/season-numbers";
 import type { SeerrSeasonStatus } from "@/providers/seerr/types";
 
 export type SeerrRequestScope = "mapped" | "all";
@@ -10,12 +11,6 @@ export type SeerrRequestScopeDecision = {
 	mappedSeasons: number[];
 	defaultScope: SeerrRequestScope;
 };
-
-function normalizeMappedSeasons(seasons: readonly number[]): number[] {
-	return [...new Set(seasons)]
-		.filter((season) => Number.isSafeInteger(season) && season >= 0)
-		.toSorted((left, right) => left - right);
-}
 
 export function getSeerrRequestScopeDecision(input: {
 	partialRequestsEnabled: boolean;
@@ -32,7 +27,7 @@ export function getSeerrRequestScopeDecision(input: {
 	const requestableSeasonNumbers = new Set(
 		requestableSeasons.map((season) => season.seasonNumber),
 	);
-	const mappedSeasons = normalizeMappedSeasons(input.mappedSeasons);
+	const mappedSeasons = normalizeSeasonNumbers(input.mappedSeasons);
 	const mappedSeasonsAreRequestable =
 		mappedSeasons.length > 0 &&
 		mappedSeasons.every((season) => requestableSeasonNumbers.has(season));

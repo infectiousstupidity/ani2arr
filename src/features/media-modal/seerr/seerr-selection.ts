@@ -2,6 +2,7 @@
 // src/features/media-modal/seerr/seerr-selection.ts
 
 import type { AniListMediaFormat } from "@/anilist/types";
+import { normalizeSeasonNumbers } from "@/mapping/season-numbers";
 import type {
 	SeerrMediaType,
 	SeerrSearchResult,
@@ -37,10 +38,11 @@ export function getSeerrTargetSeasonKey(
 export function getRequestableSeasonNumbers(
 	seasons: readonly SeerrSeasonStatus[] | undefined,
 ): number[] {
-	return (seasons ?? [])
-		.filter((season) => season.requestable)
-		.map((season) => season.seasonNumber)
-		.toSorted((left, right) => left - right);
+	return normalizeSeasonNumbers(
+		(seasons ?? [])
+			.filter((season) => season.requestable)
+			.map((season) => season.seasonNumber),
+	);
 }
 
 export type SeerrSeasonAvailabilitySummary = {
@@ -175,9 +177,7 @@ export function getMappedSeasonsForDetails(input: {
 		mappedSeasons = input.mappedSeasons ?? [];
 	}
 
-	return [...new Set(mappedSeasons)]
-		.filter((season) => Number.isSafeInteger(season) && season >= 0)
-		.toSorted((left, right) => left - right);
+	return normalizeSeasonNumbers(mappedSeasons);
 }
 
 export function getDefaultSelectedSeasons(input: {
@@ -203,7 +203,7 @@ export function toggleSeasonSelection(
 		selected.add(seasonNumber);
 	}
 
-	return [...selected].toSorted((left, right) => left - right);
+	return normalizeSeasonNumbers([...selected]);
 }
 
 export function getTmdbPosterUrl(

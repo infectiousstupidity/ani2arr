@@ -123,31 +123,36 @@ describe("queryKeys", () => {
 	});
 
 	it("separates Seerr media status keys by media type and seasons", () => {
+		const tvInput = {
+			mediaType: "tv",
+			tmdbId: parseTmdbId(1),
+		} as const;
+
 		expect(
 			queryKeys.seerrMediaStatus({
 				mediaType: "movie",
 				tmdbId: parseTmdbId(1),
 			}),
-		).not.toEqual(
+		).not.toEqual(queryKeys.seerrMediaStatus(tvInput));
+
+		expect(
 			queryKeys.seerrMediaStatus({
-				mediaType: "tv",
-				tmdbId: parseTmdbId(1),
+				...tvInput,
+				seasons: [2, -1, 1, 2],
+			}),
+		).toEqual(
+			queryKeys.seerrMediaStatus({
+				...tvInput,
+				seasons: [1, 2],
 			}),
 		);
 
 		expect(
 			queryKeys.seerrMediaStatus({
-				mediaType: "tv",
-				tmdbId: parseTmdbId(1),
-				seasons: [2, 1, 2],
+				...tvInput,
+				seasons: "all",
 			}),
-		).toEqual(
-			queryKeys.seerrMediaStatus({
-				mediaType: "tv",
-				tmdbId: parseTmdbId(1),
-				seasons: [1, 2],
-			}),
-		);
+		).not.toEqual(queryKeys.seerrMediaStatus(tvInput));
 	});
 
 	it("uses provider media-status request fields without metadata filtering", () => {

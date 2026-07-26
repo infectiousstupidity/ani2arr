@@ -17,7 +17,7 @@ import {
 	sourceIdentityKey,
 	type SourceIdentity,
 } from "./source-identity";
-import { normalizeSeerrSeasons } from "./seerr-target";
+import { normalizeSeasonNumbers } from "./season-numbers";
 import type {
 	AniBridgeEntries,
 	AniBridgeTarget,
@@ -416,7 +416,7 @@ function projectSeerrTarget(
 	const tmdbId = tmdbTargets[0]?.tmdbId;
 	if (tmdbId === undefined) return { kind: "conflict" };
 
-	const tmdbSeasons = normalizeSeerrSeasons(
+	const tmdbSeasons = normalizeSeasonNumbers(
 		tmdbTargets.flatMap((target) =>
 			target.season === undefined ? [] : [target.season],
 		),
@@ -426,14 +426,14 @@ function projectSeerrTarget(
 	const tvdbSeasons =
 		tvdbId === undefined
 			? []
-			: normalizeSeerrSeasons(
+			: normalizeSeasonNumbers(
 					tvdbTargets.flatMap((target) =>
 						target.tvdbId === tvdbId && target.season !== undefined
 							? [target.season]
 							: [],
 					),
 				);
-	const seasons = normalizeSeerrSeasons([...tmdbSeasons, ...tvdbSeasons]);
+	const seasons = normalizeSeasonNumbers([...tmdbSeasons, ...tvdbSeasons]);
 
 	return {
 		kind: "target",

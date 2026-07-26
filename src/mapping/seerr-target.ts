@@ -6,6 +6,7 @@ import {
 	type TmdbId,
 	type TvdbId,
 } from "@/providers/schemas";
+import { normalizeSeasonNumbers } from "./season-numbers";
 
 export type SeerrTarget =
 	| { mediaType: "movie"; tmdbId: TmdbId }
@@ -16,14 +17,6 @@ export type SeerrTarget =
 			seasons?: number[];
 	  };
 
-export function normalizeSeerrSeasons(
-	seasons: readonly number[],
-): number[] {
-	return [...new Set(seasons)]
-		.filter((season) => Number.isSafeInteger(season) && season >= 0)
-		.toSorted((left, right) => left - right);
-}
-
 export function normalizeSeerrTarget(
 	target: SeerrTarget,
 ): SeerrTarget | null {
@@ -32,7 +25,7 @@ export function normalizeSeerrTarget(
 	if (target.mediaType === "movie") return { mediaType: "movie", tmdbId };
 
 	const tvdbId = parseTvdbIdOrNull(target.tvdbId);
-	const seasons = normalizeSeerrSeasons(target.seasons ?? []);
+	const seasons = normalizeSeasonNumbers(target.seasons ?? []);
 	return {
 		mediaType: "tv",
 		tmdbId,

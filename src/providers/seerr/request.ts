@@ -1,6 +1,7 @@
 /** Pure Seerr request payload builders and status readers. */
 // src/providers/seerr/request.ts
 
+import { normalizeSeasonNumbers } from "@/mapping/season-numbers";
 import {
 	parseTmdbId,
 	parseTmdbIdOrNull,
@@ -46,7 +47,7 @@ export function buildSeerrRequestPayload(
 		if (!Array.isArray(input.seasons)) {
 			throw new TypeError("TV Seerr requests require explicit seasons.");
 		}
-		const seasons = normalizeSeasons(input.seasons);
+		const seasons = normalizeSeasonNumbers(input.seasons);
 		if (seasons.length === 0) {
 			throw new RangeError("TV Seerr requests require explicit seasons.");
 		}
@@ -96,12 +97,6 @@ export function readSeerrStatus(value: unknown): SeerrMediaStatus {
 
 export function isRequestableSeerrStatus(status: SeerrMediaStatus): boolean {
 	return ["unknown", "deleted", "not-requested"].includes(status);
-}
-
-function normalizeSeasons(seasons: readonly number[]): number[] {
-	return [...new Set(seasons)]
-		.filter((season) => Number.isSafeInteger(season) && season >= 0)
-		.toSorted((a, b) => a - b);
 }
 
 function hasActiveRequestForSeason(
@@ -204,7 +199,7 @@ export function readSeerrMediaStatus(
 	const status = readSeerrStatus((mediaInfo as { status?: unknown }).status);
 	const targetSeasons =
 		input?.mediaType === "tv" && Array.isArray(input.seasons)
-			? normalizeSeasons(input.seasons)
+			? normalizeSeasonNumbers(input.seasons)
 			: [];
 	if (targetSeasons.length > 0) {
 		return readSeerrTvSeasonStatus(mediaInfo, targetSeasons, status);
