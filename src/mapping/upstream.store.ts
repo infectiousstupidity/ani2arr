@@ -434,14 +434,13 @@ function projectSeerrTarget(
 						.map((target) => target.season),
 				);
 	const seasons = normalizeSeasons([...tmdbSeasons, ...tvdbSeasons]);
-	if (seasons.length === 0) return { kind: "conflict" };
 
 	return {
 		kind: "target",
 		target: {
 			mediaType: "tv",
 			tmdbId,
-			seasons,
+			...(seasons.length === 0 ? {} : { seasons }),
 			...(tmdbSeasons.length === 0 ? {} : { tmdbSeasons }),
 			...(tvdbSeasons.length === 0 ? {} : { tvdbSeasons }),
 			...(tvdbId === undefined ? {} : { tvdbId }),

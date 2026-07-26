@@ -11,12 +11,12 @@ const tmdb = parseTmdbId;
 const tvdb = parseTvdbId;
 
 describe("toSeerrRequestInput", () => {
-	it("converts a Radarr-derived movie target", () => {
+	it("converts an automatic movie target", () => {
 		const target: SeerrRequestTarget = {
 			anilistId: aid(100),
 			mediaType: "movie",
 			tmdbId: tmdb(200),
-			source: "radarr-mapping",
+			source: "automatic",
 		};
 
 		expect(toSeerrRequestInput(target)).toEqual({
@@ -59,16 +59,21 @@ describe("toSeerrRequestInput", () => {
 		});
 	});
 
-	it("returns null without a target or with an empty TV selection", () => {
+	it("requires request scope for a show-only target", () => {
 		const target: SeerrRequestTarget = {
 			anilistId: aid(100),
 			mediaType: "tv",
 			tmdbId: tmdb(200),
-			seasons: [1],
 			source: "manual",
 		};
 
 		expect(toSeerrRequestInput(null)).toBeNull();
+		expect(toSeerrRequestInput(target)).toBeNull();
 		expect(toSeerrRequestInput(target, [])).toBeNull();
+		expect(toSeerrRequestInput(target, "all")).toEqual({
+			mediaType: "tv",
+			tmdbId: tmdb(200),
+			seasons: "all",
+		});
 	});
 });

@@ -342,13 +342,14 @@ describe("refreshUpstreamMappings", () => {
 						{ kind: "tvdb-show", id: tvdb(700), season: 1 },
 						{ kind: "tvdb-show", id: tvdb(700), season: 0 },
 					],
+					"anilist:21": [{ kind: "tmdb-show", id: tmdb(501) }],
 				},
 				aniListCrosswalks: {},
 				fetchedAt: Date.now(),
 			},
 		});
 
-		await expect(listSeerrUpstreamTargets([aid(20)])).resolves.toEqual([
+		await expect(listSeerrUpstreamTargets([aid(20), aid(21)])).resolves.toEqual([
 			{
 				anilistId: aid(20),
 				kind: "target",
@@ -361,8 +362,16 @@ describe("refreshUpstreamMappings", () => {
 					tvdbId: tvdb(700),
 				},
 			},
+			{
+				anilistId: aid(21),
+				kind: "target",
+				target: {
+					mediaType: "tv",
+					tmdbId: tmdb(501),
+				},
+			},
 		]);
-		await expect(listAllSeerrUpstreamTargets()).resolves.toHaveLength(1);
+		await expect(listAllSeerrUpstreamTargets()).resolves.toHaveLength(2);
 	});
 
 	it("accepts one unique movie ID and reports movie conflicts", async () => {

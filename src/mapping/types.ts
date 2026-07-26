@@ -40,7 +40,7 @@ export type SeerrUpstreamTarget =
 	| {
 			mediaType: "tv";
 			tmdbId: TmdbId;
-			seasons: number[];
+			seasons?: number[];
 			tmdbSeasons?: number[];
 			tvdbSeasons?: number[];
 			tvdbId?: TvdbId;

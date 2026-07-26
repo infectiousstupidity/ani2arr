@@ -28,7 +28,7 @@ export function getSeerrTargetSeasonKey(
 	if (target?.mediaType !== "tv") return "";
 
 	return [
-		`effective:${target.seasons.join(",")}`,
+		`effective:${target.seasons?.join(",") ?? ""}`,
 		`tmdb:${target.tmdbSeasons?.join(",") ?? ""}`,
 		`tvdb:${target.tvdbSeasons?.join(",") ?? ""}`,
 	].join("|");
@@ -159,7 +159,7 @@ function getSeerrSeasonShape(
 }
 
 function chooseMappedSeasons(input: {
-	mappedSeasons: readonly number[];
+	mappedSeasons?: readonly number[] | undefined;
 	tmdbMappedSeasons?: readonly number[] | undefined;
 	tvdbMappedSeasons?: readonly number[] | undefined;
 	seasons: readonly SeerrSeasonStatus[] | undefined;
@@ -174,11 +174,11 @@ function chooseMappedSeasons(input: {
 		return input.tmdbMappedSeasons;
 	}
 
-	return input.mappedSeasons;
+	return input.mappedSeasons ?? [];
 }
 
 export function getDefaultSelectedSeasons(input: {
-	mappedSeasons: readonly number[];
+	mappedSeasons?: readonly number[] | undefined;
 	tmdbMappedSeasons?: readonly number[] | undefined;
 	tvdbMappedSeasons?: readonly number[] | undefined;
 	seasons: readonly SeerrSeasonStatus[] | undefined;

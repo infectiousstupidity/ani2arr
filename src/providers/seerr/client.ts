@@ -10,6 +10,7 @@ import {
 import {
 	readSeerrMediaDetails,
 	readSeerrMediaStatus,
+	readSeerrPublicSettings,
 	readSeerrSearchResults,
 } from "./request";
 import { SEERR_XSRF_HEADER_NAME } from "./csrf-token";
@@ -20,6 +21,7 @@ import type {
 	SeerrMediaStatusInput,
 	SeerrMediaRequest,
 	SeerrMediaStatus,
+	SeerrPublicSettings,
 	SeerrRequestPayload,
 	SeerrSearchResult,
 } from "./types";
@@ -129,6 +131,13 @@ export class SeerrClient {
 			connection,
 		);
 		return readSeerrMediaStatus(details, input);
+	}
+
+	public async getPublicSettings(
+		connection: SeerrConnection,
+	): Promise<SeerrPublicSettings> {
+		const settings = await this.requestJson("settings/public", connection);
+		return readSeerrPublicSettings(settings);
 	}
 
 	private async assertVerifiedSessionAccount(

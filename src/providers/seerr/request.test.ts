@@ -7,6 +7,7 @@ import {
 	buildSeerrRequestPayload,
 	readSeerrMediaDetails,
 	readSeerrMediaStatus,
+	readSeerrPublicSettings,
 	readSeerrSearchResults,
 } from "./request";
 
@@ -23,19 +24,31 @@ describe("Seerr request helpers", () => {
 		});
 	});
 
-	it("builds TV request payloads with explicit seasons", () => {
+	it("builds TV request payloads with numeric seasons or all seasons", () => {
 		expect(
 			buildSeerrRequestPayload({
 				mediaType: "tv",
 				tmdbId: parseTmdbId(456),
 				tvdbId: parseTvdbId(789),
-				seasons: [1, 2],
+				seasons: [2, 1, 2],
 			}),
 		).toEqual({
 			mediaType: "tv",
 			mediaId: parseTmdbId(456),
 			tvdbId: parseTvdbId(789),
 			seasons: [1, 2],
+		});
+
+		expect(
+			buildSeerrRequestPayload({
+				mediaType: "tv",
+				tmdbId: parseTmdbId(456),
+				seasons: "all",
+			}),
+		).toEqual({
+			mediaType: "tv",
+			mediaId: parseTmdbId(456),
+			seasons: "all",
 		});
 	});
 
@@ -229,6 +242,7 @@ describe("Seerr request helpers", () => {
 						id: 123,
 						mediaType: "movie",
 						title: "Movie",
+						originalTitle: " Original Movie ",
 						releaseDate: "2024-01-01",
 						posterPath: "/poster.jpg",
 						overview: "Overview",
@@ -237,6 +251,7 @@ describe("Seerr request helpers", () => {
 						id: 456,
 						mediaType: "tv",
 						name: "Show",
+						originalName: "Original Show",
 						firstAirDate: "2023-05-01",
 					},
 					{
@@ -251,6 +266,7 @@ describe("Seerr request helpers", () => {
 				mediaType: "movie",
 				tmdbId: parseTmdbId(123),
 				title: "Movie",
+				alternateTitles: ["Original Movie"],
 				year: 2024,
 				posterPath: "/poster.jpg",
 				overview: "Overview",
@@ -259,6 +275,7 @@ describe("Seerr request helpers", () => {
 				mediaType: "tv",
 				tmdbId: parseTmdbId(456),
 				title: "Show",
+				alternateTitles: ["Original Show"],
 				year: 2023,
 			},
 		]);
@@ -269,8 +286,9 @@ describe("Seerr request helpers", () => {
 			readSeerrMediaDetails(
 				{
 					id: 456,
-					tvdbId: 789,
+					externalIds: { tvdbId: 789 },
 					name: "Show",
+					originalName: "Original Show",
 					firstAirDate: "2020-01-01",
 					mediaInfo: { status: 4 },
 					seasons: [
@@ -287,6 +305,7 @@ describe("Seerr request helpers", () => {
 			tmdbId: parseTmdbId(456),
 			tvdbId: parseTvdbId(789),
 			title: "Show",
+			alternateTitles: ["Original Show"],
 			year: 2020,
 			status: "partial",
 			seasons: [
@@ -380,6 +399,23 @@ describe("Seerr request helpers", () => {
 			},
 		]);
 	});
+
+	it("reads only supported Seerr public settings with safe defaults", () => {
+		expect(
+			readSeerrPublicSettings({
+				partialRequestsEnabled: false,
+				enableSpecialEpisodes: true,
+				applicationTitle: "Private Seerr",
+			}),
+		).toEqual({
+			partialRequestsEnabled: false,
+			enableSpecialEpisodes: true,
+		});
+		expect(readSeerrPublicSettings({})).toEqual({
+			partialRequestsEnabled: true,
+			enableSpecialEpisodes: false,
+		});
+	});
 });
 
 it("ignores zero-episode Seerr seasons", () => {
@@ -387,7 +423,7 @@ it("ignores zero-episode Seerr seasons", () => {
 		readSeerrMediaDetails(
 			{
 				id: 196_950,
-				tvdbId: 418_666,
+				externalIds: { tvdbId: 418_666 },
 				name: "Witch Hat Atelier",
 				firstAirDate: "2026-01-01",
 				mediaInfo: { status: 4 },

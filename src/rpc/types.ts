@@ -165,7 +165,7 @@ export type RequestInSeerrInput =
 			mediaType: "tv";
 			tmdbId: TmdbId;
 			tvdbId?: TvdbId;
-			seasons: number[];
+			seasons: SeerrTvSeasons;
 	  };
 
 export type GetSeerrMediaStatusInput =
@@ -194,7 +194,7 @@ export type SeerrRequestTarget = {
 	| {
 			mediaType: "tv";
 			tmdbId: TmdbId;
-			seasons: number[];
+			seasons?: number[];
 			tmdbSeasons?: number[];
 			tvdbSeasons?: number[];
 			tvdbId?: TvdbId;
@@ -211,7 +211,7 @@ export type SetManualSeerrTargetInput = SourceRpcInput &
 			mediaType: "tv";
 			tmdbId: TmdbId;
 			tvdbId?: TvdbId;
-			seasons: number[];
+			seasons?: number[];
 	  }
 	  );
 

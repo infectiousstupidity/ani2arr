@@ -7,7 +7,7 @@ import type {
 
 export function toSeerrRequestInput(
 	target: SeerrRequestTarget | null,
-	selectedSeasons?: readonly number[],
+	selectedSeasons?: ReadonlyArray<number> | "all",
 ): RequestInSeerrInput | null {
 	if (target === null) return null;
 
@@ -19,12 +19,14 @@ export function toSeerrRequestInput(
 	}
 
 	const seasons = selectedSeasons ?? target.seasons;
-	if (seasons.length === 0) return null;
+	if (seasons === undefined || (seasons !== "all" && seasons.length === 0)) {
+		return null;
+	}
 
 	return {
 		mediaType: "tv",
 		tmdbId: target.tmdbId,
 		...(target.tvdbId === undefined ? {} : { tvdbId: target.tvdbId }),
-		seasons: [...seasons],
+		seasons: seasons === "all" ? "all" : [...seasons],
 	};
 }

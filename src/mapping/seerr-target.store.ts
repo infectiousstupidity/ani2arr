@@ -34,7 +34,7 @@ type AniListManualSeerrTarget = {
 			mediaType: "tv";
 			tmdbId: TmdbId;
 			tvdbId?: TvdbId;
-			seasons: number[];
+			seasons?: number[];
 	  }
 );
 
@@ -47,7 +47,7 @@ type StoredManualSeerrTarget =
 			mediaType: "tv";
 			tmdbId: TmdbId;
 			tvdbId?: TvdbId;
-			seasons: number[];
+			seasons?: number[];
 	  };
 type ManualSeerrTargets = Record<string, StoredManualSeerrTarget>;
 
@@ -58,11 +58,12 @@ type SeerrTargetIdentity = {
 
 type SeerrTargetIdentityInput = SeerrTargetIdentity | AniListId;
 
-type RadarrMappingSeerrTarget = {
+/** LEGACY: remove with the Radarr fallback when source-native Seerr auto-resolution lands. */
+type LegacyRadarrSeerrTarget = {
 	anilistId: AniListId;
 	mediaType: "movie";
 	tmdbId: TmdbId;
-	source: "radarr-mapping";
+	source: "automatic";
 };
 
 type EffectiveSeerrTarget =
@@ -74,7 +75,7 @@ type EffectiveSeerrTarget =
 			anilistId?: AniListId | undefined;
 			source: "anibridge";
 	  } & SeerrUpstreamTarget)
-	| RadarrMappingSeerrTarget;
+	| LegacyRadarrSeerrTarget;
 
 type AniListEffectiveSeerrTarget = EffectiveSeerrTarget & {
 	anilistId: AniListId;
@@ -105,14 +106,13 @@ function normalizeTarget(
 		return { mediaType: "movie", tmdbId };
 	}
 
-	const seasons = normalizeSeasons(target.seasons);
-	if (seasons.length === 0) return null;
+	const seasons = normalizeSeasons(target.seasons ?? []);
 
 	const tvdbId = parseTvdbIdOrNull(target.tvdbId);
 	return {
 		mediaType: "tv",
 		tmdbId,
-		seasons,
+		...(seasons.length === 0 ? {} : { seasons }),
 		...(tvdbId === null ? {} : { tvdbId }),
 	};
 }
@@ -241,9 +241,9 @@ async function listAllManualSeerrTargets(): Promise<
 
 async function listRadarrMappingSeerrTargets(
 	requestedIds?: ReadonlySet<AniListId>,
-): Promise<RadarrMappingSeerrTarget[]> {
+): Promise<LegacyRadarrSeerrTarget[]> {
 	const records = await collectEffectiveMappingRecords("radarr");
-	const targets: RadarrMappingSeerrTarget[] = [];
+	const targets: LegacyRadarrSeerrTarget[] = [];
 
 	for (const record of records) {
 		if (
@@ -260,7 +260,7 @@ async function listRadarrMappingSeerrTargets(
 			anilistId: record.anilistId,
 			mediaType: "movie",
 			tmdbId,
-			source: "radarr-mapping",
+			source: "automatic",
 		});
 	}
 
@@ -345,7 +345,7 @@ export async function setManualSeerrTarget(
 					mediaType: "tv",
 					tmdbId: input.tmdbId,
 					...(input.tvdbId === undefined ? {} : { tvdbId: input.tvdbId }),
-					seasons: input.seasons,
+					...(input.seasons === undefined ? {} : { seasons: input.seasons }),
 				};
 	const normalized = normalizeTarget(storedTarget);
 	if (normalized === null) {
@@ -392,7 +392,7 @@ export async function clearManualSeerrTargets(): Promise<void> {
 function mergeSeerrTargets(
 	manualTargets: readonly AniListManualSeerrTarget[],
 	upstreamTargets: readonly SeerrUpstreamRecord[],
-	radarrTargets: readonly RadarrMappingSeerrTarget[],
+	radarrTargets: readonly LegacyRadarrSeerrTarget[],
 ): AniListEffectiveSeerrTarget[] {
 	const targetsById = new Map<AniListId, AniListEffectiveSeerrTarget>(
 		radarrTargets.map((target) => [target.anilistId, target]),

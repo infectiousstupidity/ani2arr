@@ -88,7 +88,7 @@ export const seerrHandlers = {
 						mediaType: "tv",
 						tmdbId: input.tmdbId,
 						...(input.tvdbId === undefined ? {} : { tvdbId: input.tvdbId }),
-						seasons: input.seasons,
+						...(input.seasons === undefined ? {} : { seasons: input.seasons }),
 					}),
 		});
 		await bumpMappingsRevision();

@@ -142,15 +142,19 @@ describe("Seerr targets", () => {
 		});
 	});
 
-	it("rejects TV targets with no seasons", async () => {
-		await expect(
-			setManualSeerrTarget({
-				anilistId: aid(1),
-				mediaType: "tv",
-				tmdbId: tmdb(10),
-				seasons: [],
-			}),
-		).rejects.toThrow("Invalid Seerr target.");
+	it("stores a show-only TV target without request scope", async () => {
+		await setManualSeerrTarget({
+			anilistId: aid(1),
+			mediaType: "tv",
+			tmdbId: tmdb(10),
+		});
+
+		await expect(getEffectiveSeerrTarget(aid(1))).resolves.toEqual({
+			anilistId: aid(1),
+			mediaType: "tv",
+			tmdbId: tmdb(10),
+			source: "manual",
+		});
 	});
 
 	it("uses one manual target without reading upstream data", async () => {
@@ -223,7 +227,7 @@ describe("Seerr targets", () => {
 			anilistId,
 			mediaType: "movie",
 			tmdbId: tmdb(789),
-			source: "radarr-mapping",
+			source: "automatic",
 		});
 		expect(listSeerrUpstreamTargetsMock).toHaveBeenCalledWith([anilistId]);
 		expect(collectEffectiveMappingRecordsMock).toHaveBeenCalledWith("radarr");
@@ -279,7 +283,7 @@ describe("Seerr targets", () => {
 			anilistId,
 			mediaType: "movie",
 			tmdbId: tmdb(789),
-			source: "radarr-mapping",
+			source: "automatic",
 		});
 	});
 
@@ -380,7 +384,7 @@ describe("Seerr targets", () => {
 				anilistId: aid(400),
 				mediaType: "movie",
 				tmdbId: tmdb(440),
-				source: "radarr-mapping",
+				source: "automatic",
 			},
 		]);
 		expect(listSeerrUpstreamTargetsMock).toHaveBeenCalledWith(ids);
@@ -453,7 +457,7 @@ describe("Seerr targets", () => {
 				anilistId: aid(400),
 				mediaType: "movie",
 				tmdbId: tmdb(440),
-				source: "radarr-mapping",
+				source: "automatic",
 			},
 		]);
 		expect(listAllSeerrUpstreamTargetsMock).toHaveBeenCalledOnce();

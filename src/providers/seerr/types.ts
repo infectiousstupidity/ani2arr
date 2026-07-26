@@ -25,7 +25,7 @@ export interface SeerrConnection {
 }
 
 export type SeerrMediaType = "movie" | "tv";
-export type SeerrTargetSource = "manual" | "anibridge" | "radarr-mapping";
+export type SeerrTargetSource = "manual" | "anibridge" | "automatic";
 
 export type SeerrTvSeasons = "all" | number[];
 
@@ -63,6 +63,7 @@ export interface SeerrSearchResult {
 	mediaType: SeerrMediaType;
 	tmdbId: TmdbId;
 	title: string;
+	alternateTitles?: string[];
 	year?: number;
 	posterPath?: string | null;
 	overview?: string | null;
@@ -81,6 +82,7 @@ export type SeerrMediaDetails = {
 	tmdbId: TmdbId;
 	tvdbId?: TvdbId;
 	title: string;
+	alternateTitles?: string[];
 	year?: number;
 	posterPath?: string | null;
 	backdropPath?: string | null;
@@ -88,6 +90,11 @@ export type SeerrMediaDetails = {
 	status: SeerrMediaStatus;
 	seasons?: SeerrSeasonStatus[];
 };
+
+export interface SeerrPublicSettings {
+	partialRequestsEnabled: boolean;
+	enableSpecialEpisodes: boolean;
+}
 
 export interface SeerrMediaRequest {
 	id: number;

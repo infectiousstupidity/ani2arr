@@ -78,7 +78,7 @@ function getSourceLabel(
 ): string {
 	if (source === "manual") return "Manual target";
 	if (source === "anibridge") return "From AniBridge";
-	if (source === "radarr-mapping") return "From Radarr mapping";
+	if (source === "automatic") return "Automatic match";
 	return "Selected target";
 }
 
